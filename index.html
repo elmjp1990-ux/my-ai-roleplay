@@ -517,6 +517,16 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   * { scroll-behavior:auto!important; transition:none!important; }
 }
 </style>
+<!-- 引入 Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://ouyewoagbmtqehbofrje.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_MyTDqAKNTkK4zo7eap8gZA_ZGozHRMd';
+    
+    // 初始化 Supabase
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  </script>
+
 </head>
 
 <body>
