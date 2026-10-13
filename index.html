@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Persona Messenger Platform</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #090d16; color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+  </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden select-none">
+
+  <!-- ==================== 頂部導覽列 (Header) ==================== -->
+  <header class="h-14 border-b border-slate-800/80 bg-slate-900/90 px-4 flex justify-between items-center backdrop-blur z-20 shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="w-3 h-3 rounded-full bg-indigo-500 animate-pulse"></div>
+      <span class="font-bold text-lg text-white tracking-wider">PersonaAI</span>
+      <span class="hidden md:inline-block text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full">SaaS RP Pro</span>
+    </div>
+    
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/60 px-3 py-1 rounded-full text-xs font-semibold text-amber-400">
+        💎 <span id="diamondBalance">1,250</span> 鑽石
+        <button onclick="openTaskModal()" class="ml-1 text-[10px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/40">賺鑽石</button>
+      </div>
+
+      <nav class="flex gap-1 bg-slate-800/50 p-1 rounded-xl border border-slate-700/50">
+        <button onclick="switchTab('lobby')" id="nav-lobby" class="px-3 py-1 rounded-lg text-xs font-medium bg-indigo-600 text-white transition">首頁大廳</button>
+        <button onclick="switchTab('chat')" id="nav-chat" class="px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition">聊天室</button>
+      </nav>
+
+      <button onclick="openAuthModal()" id="authBtn" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3.5 py-1.5 rounded-xl font-medium transition shadow-lg shadow-indigo-600/20">
+        登入 / 註冊
+      </button>
+    </div>
+  </header>
+
+  <!-- ==================== 頁面一：首頁角色大廳 (Lobby) ==================== -->
+  <div id="page-lobby" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+    
+    <!-- 頂部 Banner -->
+    <div class="relative w-full h-44 md:h-52 rounded-2xl bg-gradient-to-r from-indigo-950 via-purple-950 to-slate-900 border border-indigo-500/20 flex items-center px-6 overflow-hidden shadow-2xl">
+      <div class="z-10 max-w-xl">
+        <span class="bg-indigo-500/20 text-indigo-300 text-[11px] font-semibold px-2.5 py-1 rounded-full border border-indigo-500/30">📢 最新活動公告</span>
+        <h2 class="text-xl md:text-2xl font-bold text-white mt-2">獨家首發：封以恆 CEO (33歲深情版)</h2>
+        <p class="text-xs text-slate-300 mt-1 leading-relaxed">解鎖極致冷峻與掌控感！支援雙重 User 人設切換（未婚妻 vs 首席秘書），體驗高質感沉浸對話。</p>
+        <button onclick="quickStartFeng()" class="mt-3 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-lg shadow-indigo-600/30">立即體驗對話 ➔</button>
+      </div>
+    </div>
+
+    <!-- 角色牆標題與創建工具按鈕 -->
+    <div class="flex justify-between items-center flex-wrap gap-2">
+      <div>
+        <h3 class="text-base font-bold text-white">探索社群與自訂角色</h3>
+        <p class="text-xs text-slate-400">選擇熱門 AI 角色、對話式 AI 引導創建，或匯入 JSON 角色卡</p>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="openCreatorChatModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-500/30 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition shadow-sm flex items-center gap-1.5">
+          🧙‍♂️ D-001 對話式創建角色
+        </button>
+        <label class="bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition flex items-center gap-1.5 shadow-sm">
+          ➕ 匯入 JSON 角色
+          <input type="file" id="jsonInput" accept=".json" class="hidden" onchange="handleJsonImport(event)">
+        </label>
+      </div>
+    </div>
+
+    <div id="characterGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+  </div>
+
+  <!-- ==================== 頁面二：通訊軟體主介面 (Chat Hub) ==================== -->
+  <div id="page-chat" class="flex-1 flex overflow-hidden hidden">
+    
+    <!-- 👈 左側欄：好友 / 角色列表 -->
+    <aside class="w-72 border-r border-slate-800/80 bg-slate-900/50 flex flex-col shrink-0">
+      <div class="p-3 border-b border-slate-800/80 flex justify-between items-center">
+        <span class="font-bold text-xs text-slate-300">訊息對話 (好友清單)</span>
+        <button onclick="exportCurrentCharacter()" class="text-[11px] text-indigo-400 hover:text-indigo-300 font-semibold">📤 匯出角色</button>
+      </div>
+      <div id="chatList" class="flex-1 overflow-y-auto divide-y divide-slate-800/40"></div>
+    </aside>
+
+    <!-- 👉 中央欄：主對話區 -->
+    <main class="flex-1 flex flex-col bg-slate-950/90 relative min-w-0">
+      
+      <div class="h-16 border-b border-slate-800/80 px-4 flex justify-between items-center bg-slate-900/80 backdrop-blur z-10 shrink-0">
+        <div class="flex flex-col gap-0.5 overflow-hidden">
+          <div class="flex items-center gap-2">
+            <span id="chatCharName" class="font-bold text-sm text-white">封以恆</span>
+            <span class="text-xs text-emerald-400 font-medium">🟢 在線</span>
+            <span class="text-slate-600 text-xs">|</span>
+            <span id="chatClock" class="text-xs text-indigo-300 font-mono">22:30 (夜晚) | 星期一</span>
+          </div>
+          <div class="text-[11px] text-slate-400 truncate flex items-center gap-2">
+            <span>📍 <span id="chatLocation">私人餐廳頂樓包廂</span></span>
+            <span class="text-slate-600">|</span>
+            <span>💭 <span id="chatInnerThought" class="text-amber-200/90 italic">「今晚這女人的眼神，比平常還要大膽……」</span></span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4 shrink-0">
+          <div class="hidden sm:flex flex-col items-end">
+            <span class="text-[10px] text-rose-300 font-semibold flex items-center gap-1">💖 好感度: <span id="affinityText">Lv.2 漸生好感 (35/100)</span></span>
+            <div class="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden mt-1 border border-slate-700">
+              <div id="affinityBar" class="h-full bg-gradient-to-r from-rose-500 to-pink-500 w-[35%] transition-all"></div>
+            </div>
+          </div>
+
+          <div class="flex bg-slate-800/80 p-0.5 rounded-lg border border-slate-700/60">
+            <button onclick="switchCenterTab('chat')" id="centerTab-chat" class="px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-600 text-white">💬 對話</button>
+            <button onclick="switchCenterTab('info')" id="centerTab-info" class="px-2.5 py-1 rounded-md text-xs font-medium text-slate-400 hover:text-white">📖 介紹</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="centerContent-chat" class="flex-1 flex flex-col overflow-hidden">
+        <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
+
+        <div id="smartSuggestions" class="px-4 py-2 bg-slate-900/60 border-t border-slate-800/50 flex gap-2 overflow-x-auto text-xs">
+          <span class="text-slate-500 whitespace-nowrap self-center text-[10px]">✨ 智慧續寫選項:</span>
+          <button onclick="useSuggestion('（微笑着直視他的眼睛）「公事談完了，現在是私人時間對吧？」')" class="bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60 px-2.5 py-1 rounded-lg shrink-0 transition">1. 撩人試探</button>
+          <button onclick="useSuggestion('（避開視線，整理文件）「請注意職場分寸。」')" class="bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60 px-2.5 py-1 rounded-lg shrink-0 transition">2. 冷淡克制</button>
+          <button onclick="useSuggestion('（端起酒杯抿了一口）「今晚夜景很美，但你似乎心不在焉？」')" class="bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60 px-2.5 py-1 rounded-lg shrink-0 transition">3. 轉移話題</button>
+        </div>
+
+        <div class="px-4 py-2 bg-slate-900/80 border-t border-slate-800/80 flex items-center justify-between text-xs gap-2 flex-wrap">
+          <div class="flex items-center gap-2">
+            <select id="modelSelect" onchange="handleModelChange()" class="bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1 focus:outline-none text-xs">
+              <option value="deepseek">DeepSeek V4.1 Flash (純文字/極速)</option>
+              <option value="glm">GLM 5.3 Flash (純文字/自然中文)</option>
+              <option value="gptoss">gpt-oss-120b (120B 大邏輯)</option>
+              <option value="gemini">Gemini 3.8 Flash (多模態/支援圖片)</option>
+            </select>
+
+            <label id="imageUploadBtn" class="hidden bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-700/60 px-2.5 py-1 rounded-lg cursor-pointer transition flex items-center gap-1 font-medium">
+              📷 匯入圖片
+              <input type="file" accept="image/*" class="hidden" onchange="
