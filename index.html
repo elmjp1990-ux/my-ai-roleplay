@@ -3541,5 +3541,1065 @@ renderPage();
   routeHash();
 })();
 </script>
+<!-- PersonaX：聊天版面與舊回憶更新 -->
+<style>
+  /* Sidebar collapse button beside logo */
+  .px-sidebar-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .px-sidebar-heading .brand {
+    min-width: 0;
+    padding-inline: 5px;
+    font-size: 21px;
+    white-space: nowrap;
+  }
+
+  .px-sidebar-toggle {
+    flex-shrink: 0;
+    padding: 7px;
+    border: 0;
+    background: transparent;
+    color: #b8c3d5;
+  }
+
+  body.collapsed .px-sidebar-heading {
+    flex-direction: column;
+  }
+
+  /* Chat workspace */
+  body.px-chat-workspace main {
+    max-width: none;
+    padding: 12px;
+  }
+
+  body.px-chat-workspace .chat-layout {
+    display: grid;
+    grid-template-columns: 250px minmax(0, 1fr);
+    gap: 12px;
+    height: calc(100dvh - 92px);
+    min-height: 0;
+  }
+
+  body.px-chat-workspace.px-hide-chat-list .chat-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body.px-chat-workspace.px-hide-chat-list .chat-list {
+    display: none;
+  }
+
+  body.px-chat-workspace .chat-list {
+    min-height: 0;
+    max-height: none;
+    padding: 14px;
+    overflow-y: auto;
+  }
+
+  .px-list-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .px-list-top button {
+    border: 0;
+    background: transparent;
+    padding: 6px 4px;
+  }
+
+  body.px-chat-workspace .chat-main {
+    --chat-bg: #0b1120;
+    --chat-text: #e2e8f0;
+    --chat-muted: #9aa9bf;
+    --chat-border: #ffffff1f;
+    --chat-surface: #101827e8;
+    --chat-input: #0b1220;
+    --chat-bubble: #1b263b;
+    --chat-user-bubble: #4f46e5;
+    --chat-overlay-color: #0b1120fa;
+    --chat-shade: #080d17d9;
+
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    padding: 0;
+    border-radius: 18px;
+    color: var(--chat-text);
+    background: var(--chat-bg);
+    overflow: hidden;
+  }
+
+  body.px-chat-workspace .chat-main.px-day {
+    color-scheme: light;
+    --chat-bg: #f4f6fa;
+    --chat-text: #182334;
+    --chat-muted: #5b6b80;
+    --chat-border: #17233426;
+    --chat-surface: #ffffffec;
+    --chat-input: #ffffff;
+    --chat-bubble: #ffffff;
+    --chat-user-bubble: #6366f1;
+    --chat-overlay-color: #f4f6fafb;
+    --chat-shade: #f4f6fae0;
+  }
+
+  body.px-chat-workspace .chat-main::before {
+    background-image:
+      linear-gradient(var(--chat-shade), var(--chat-shade)),
+      var(--px-chat-background, none);
+  }
+
+  .px-conversation-heading {
+    flex: 0 0 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--chat-border);
+    background: var(--chat-surface);
+    backdrop-filter: blur(15px);
+  }
+
+  .px-conversation-heading .avatar {
+    width: 32px;
+    height: 32px;
+  }
+
+  .px-heading-name {
+    font-size: 13px;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .px-conversation-heading button {
+    padding: 7px;
+    border: 0;
+    background: transparent;
+    color: var(--chat-text);
+  }
+
+  .px-heading-icons {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+
+  .px-ui-icon {
+    width: 20px;
+    height: 20px;
+    display: block;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* Messages expand into remaining space */
+  body.px-chat-workspace .messages {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 20px;
+  }
+
+  body.px-chat-workspace .message {
+    margin-bottom: 18px;
+  }
+
+  body.px-chat-workspace .message-content {
+    max-width: 85%;
+  }
+
+  body.px-chat-workspace .message-name {
+    color: var(--chat-muted);
+    font-size: 10px;
+  }
+
+  body.px-chat-workspace .bubble {
+    font-size: 14px;
+    line-height: 1.85;
+    color: var(--chat-text);
+    background: var(--chat-bubble);
+    border: 1px solid var(--chat-border);
+    padding: 10px 14px;
+  }
+
+  body.px-chat-workspace .user .bubble {
+    color: white;
+    background: var(--chat-user-bubble);
+    border-color: transparent;
+  }
+
+  body.px-chat-workspace .px-narration {
+    color: var(--chat-muted);
+    font-size: 13px;
+    font-style: italic;
+    white-space: pre-wrap;
+    line-height: 1.8;
+  }
+
+  body.px-chat-workspace .user .px-narration {
+    text-align: right;
+  }
+
+  /* Compact character phone */
+  .px-compact-phone {
+    flex: 0 0 auto;
+    margin: 0 12px 7px;
+    padding: 5px 10px;
+    border: 1px solid var(--chat-border);
+    border-radius: 12px;
+    color: var(--chat-muted);
+    background: var(--chat-surface);
+    font-size: 10px;
+  }
+
+  .px-compact-phone summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    cursor: pointer;
+    list-style: none;
+    line-height: 1.6;
+  }
+
+  .px-compact-phone summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .px-compact-phone p {
+    margin: 7px 0;
+    font-size: 11px;
+  }
+
+  /* Composer always remains visible */
+  body.px-chat-workspace .composer {
+    flex: 0 0 auto;
+    min-height: 0;
+    padding: 8px 12px 10px;
+    border-top: 1px solid var(--chat-border);
+    background: var(--chat-surface);
+  }
+
+  body.px-chat-workspace .composer textarea {
+    min-height: 44px;
+    height: 44px;
+    max-height: 110px;
+    resize: none;
+    padding: 9px 10px;
+    border-color: var(--chat-border);
+    color: var(--chat-text);
+    background: var(--chat-input);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  body.px-chat-workspace .composer .suggestions {
+    margin-bottom: 7px;
+    gap: 6px;
+  }
+
+  body.px-chat-workspace .suggestions button {
+    padding: 5px 8px;
+    font-size: 10px;
+    color: var(--chat-muted);
+    background: var(--chat-input);
+    border-color: var(--chat-border);
+  }
+
+  body.px-chat-workspace .chat-tools {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    margin-top: 7px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  body.px-chat-workspace .chat-tools button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding: 5px 7px;
+    font-size: 10px;
+    color: var(--chat-muted);
+    background: var(--chat-input);
+    border-color: var(--chat-border);
+  }
+
+  body.px-chat-workspace .px-chat-overlay {
+    color: var(--chat-text);
+    background: var(--chat-overlay-color);
+  }
+
+  body.px-chat-workspace .px-overlay-heading {
+    background: var(--chat-overlay-color);
+  }
+
+  body.px-chat-workspace .px-chat-overlay .muted,
+  body.px-chat-workspace .px-chat-overlay .small {
+    color: var(--chat-muted);
+  }
+
+  body.px-chat-workspace .memory-item {
+    background: var(--chat-input);
+  }
+
+  .px-archive-card {
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    margin-top: 12px;
+  }
+
+  .px-archive-content {
+    max-height: 55dvh;
+    overflow-y: auto;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+  }
+
+  .px-archive-message {
+    margin-bottom: 18px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: 1.8;
+  }
+
+  .px-archive-message em {
+    color: var(--muted);
+  }
+
+  @media (max-width: 767px) {
+    body.px-chat-workspace main {
+      padding: 12px 10px 100px;
+    }
+
+    body.px-chat-workspace .chat-layout {
+      display: block;
+      height: auto;
+    }
+
+    body.px-chat-workspace .chat-list {
+      min-height: 65dvh;
+    }
+
+    /* Actual mobile conversation: no account/global header */
+    body.px-mobile-conversation .app > header {
+      display: none;
+    }
+
+    body.px-mobile-conversation .mobile-nav {
+      display: none;
+    }
+
+    body.px-mobile-conversation main {
+      padding: 0;
+      margin: 0;
+      height: 100dvh;
+    }
+
+    body.px-mobile-conversation .chat-layout {
+      height: 100%;
+      min-height: 0;
+    }
+
+    body.px-mobile-conversation .chat-main {
+      height: 100%;
+      min-height: 0;
+      border: 0;
+      border-radius: 0;
+    }
+
+    body.px-mobile-conversation .px-conversation-heading {
+      flex-basis: 50px;
+      padding: 6px 8px;
+    }
+
+    body.px-mobile-conversation .messages {
+      min-height: 0;
+      max-height: none;
+      padding: 14px 10px;
+    }
+
+    body.px-mobile-conversation .message .avatar {
+      width: 28px;
+      height: 28px;
+    }
+
+    body.px-mobile-conversation .bubble {
+      padding: 8px 11px;
+      font-size: 14px;
+    }
+
+    body.px-mobile-conversation .px-compact-phone {
+      margin: 0 8px 4px;
+      padding: 3px 8px;
+      font-size: 9px;
+    }
+
+    body.px-mobile-conversation .composer {
+      padding: 5px 8px calc(5px + env(safe-area-inset-bottom));
+    }
+
+    body.px-mobile-conversation .composer textarea {
+      height: 36px;
+      min-height: 36px;
+      padding: 6px 9px;
+    }
+
+    body.px-mobile-conversation .suggestions {
+      margin-bottom: 4px;
+    }
+
+    body.px-mobile-conversation .suggestions button,
+    body.px-mobile-conversation .chat-tools button {
+      padding: 3px 6px;
+      font-size: 9px;
+    }
+
+    body.px-mobile-conversation .chat-tools {
+      margin-top: 4px;
+    }
+
+    body.px-mobile-conversation #toast {
+      bottom: 18px;
+    }
+
+    body.px-chat-workspace.px-hide-chat-list .chat-list {
+      display: block;
+    }
+  }
+</style>
+
+<script>
+(() => {
+  'use strict';
+
+  if (!window.PX) {
+    console.error('此更新需要先安裝第二版 PDF 更新補丁。');
+    return;
+  }
+
+  const previousShell = renderShell;
+  let hideDesktopList = false;
+  let archiveId = null;
+  let archiveTab = 'messages';
+
+  const inlineArg = value => esc(JSON.stringify(String(value)));
+  const copy = value => JSON.parse(JSON.stringify(value));
+
+  const icon = paths => `
+    <svg class="px-ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+      ${paths}
+    </svg>`;
+
+  const icons = {
+    back: icon('<path d="m14 5-7 7 7 7"></path>'),
+    album: icon(`
+      <rect x="3" y="4" width="18" height="16" rx="3"></rect>
+      <circle cx="8" cy="9" r="1.5"></circle>
+      <path d="m4 17 5-5 4 4 3-3 5 5"></path>
+    `),
+    diary: icon(`
+      <path d="M5 3h14v18H5z"></path>
+      <path d="M3 7h4M3 12h4M3 17h4M10 8h5M10 12h5M10 16h3"></path>
+    `),
+    menu: icon('<path d="M4 6h16M4 12h16M4 18h16"></path>')
+  };
+
+  function prepareChat(chat) {
+    chat.archives ||= [];
+    chat.startedAt ||= chat.messages?.[0]?.at || Date.now();
+    chat.settings ||= {};
+
+    if (!['day', 'night'].includes(chat.settings.theme)) {
+      chat.settings.theme = 'night';
+    }
+
+    if (!['avatar', 'none'].includes(chat.settings.background)) {
+      chat.settings.background = 'avatar';
+    }
+
+    chat.album ||= [];
+    chat.memories ||= [];
+  }
+
+  Object.values(state.chats).forEach(prepareChat);
+
+  /* ---------- Global shell and sidebar toggle ---------- */
+
+  renderShell = function() {
+    previousShell();
+
+    document.body.classList.toggle('px-chat-workspace', page === 'chat');
+    document.body.classList.toggle(
+      'px-hide-chat-list',
+      page === 'chat' && hideDesktopList
+    );
+
+    // Remove old collapse control from the global header.
+    const oldToggle = document.querySelector(
+      '.app > header .desktop-only[onclick="toggleSidebar()"]'
+    );
+    oldToggle?.remove();
+
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebar && !sidebar.querySelector('.px-sidebar-heading')) {
+      const brand = sidebar.querySelector(':scope > .brand');
+
+      if (brand) {
+        const heading = document.createElement('div');
+        heading.className = 'px-sidebar-heading';
+
+        sidebar.insertBefore(heading, brand);
+        heading.appendChild(brand);
+
+        const toggle = document.createElement('button');
+        toggle.className = 'px-sidebar-toggle';
+        toggle.type = 'button';
+        toggle.setAttribute('aria-label', '收合或展開網站選單');
+        toggle.onclick = toggleSidebar;
+        toggle.innerHTML = icons.menu;
+        heading.appendChild(toggle);
+      }
+    }
+  };
+
+  /* ---------- Rebuild chat layout ---------- */
+
+  renderChat = function() {
+    const chat = selectedChat();
+    const character = state.characters.find(c => c.id === activeChat);
+
+    if (chat) prepareChat(chat);
+
+    $('view').innerHTML = `
+      <div class="chat-layout">
+        ${chatListHTML()}
+
+        ${chat && character ? conversationHTML(character, chat) : `
+          <section class="panel chat-main">
+            <div class="empty" style="margin:20px">
+              尚未開始聊天，請先到探索頁選擇角色。
+            </div>
+            <button class="primary" style="margin:0 20px"
+                    onclick="navigate('home')">探索角色</button>
+          </section>
+        `}
+      </div>`;
+
+    // Replace large group button with "All" list menu.
+    const list = $('view').querySelector('.chat-list');
+    const groupButton = list?.querySelector(
+      'button[onclick="showGroupInfo()"]'
+    );
+
+    if (groupButton) {
+      groupButton.outerHTML = `
+        <div class="px-list-top">
+          <button onclick="CX.listMenu()">☰ 全部</button>
+          <span class="muted small">聊天列表</span>
+        </div>`;
+    }
+
+    renderShell();
+
+    if (chat && character) {
+      applyAppearance();
+      renderMessages();
+    }
+  };
+
+  function conversationHTML(character, chat) {
+    const suggestions = [
+      '你今天過得如何？',
+      '可以多說一些嗎？',
+      '我想聽聽你的故事。'
+    ];
+
+    return `
+      <section class="panel chat-main">
+        <div class="px-conversation-heading">
+          <div class="row grow" style="gap:7px">
+            <button onclick="CX.back()"
+                    aria-label="返回列表或收合角色列表">
+              ${icons.back}
+            </button>
+
+            <button onclick="openDetail(${inlineArg(character.id)})"
+                    aria-label="查看角色介紹">
+              <img class="avatar" src="${esc(character.image)}" alt="">
+            </button>
+
+            <span class="px-heading-name">${esc(character.name)}</span>
+          </div>
+
+          <div class="px-heading-icons">
+            <button onclick="PX.openChatOverlay('album')"
+                    title="回憶相簿" aria-label="回憶相簿">
+              ${icons.album}
+            </button>
+
+            <button onclick="PX.openChatOverlay('diary')"
+                    title="甜蜜日記" aria-label="甜蜜日記">
+              ${icons.diary}
+            </button>
+
+            <button onclick="CX.menu()"
+                    title="聊天功能" aria-label="聊天功能">
+              ${icons.menu}
+            </button>
+          </div>
+        </div>
+
+        <div id="messages" class="messages"></div>
+
+        <details class="px-compact-phone">
+          <summary>
+            <span>▰ 100% · ${esc(character.name)}的手機 ▾</span>
+            <span>${esc(new Date().toLocaleTimeString('zh-TW', {
+              hour: '2-digit',
+              minute: '2-digit'
+            }))}</span>
+          </summary>
+
+          <p>地點：初始場景 · 狀態：等待你的回應</p>
+          <p>通知／備忘：此為展示欄位，尚未接入 AI 動態狀態。</p>
+        </details>
+
+        <form class="composer" onsubmit="sendMessage(event)">
+          ${chat.suggestions ? `
+            <div class="suggestions">
+              ${suggestions.map((text, index) => `
+                <button type="button" onclick="useSuggestion(${index})">
+                  ${esc(text)}
+                </button>
+              `).join('')}
+            </div>
+          ` : ''}
+
+          <div class="row" style="gap:7px">
+            <textarea id="messageInput" maxlength="3000"
+                      placeholder="輸入對話…"
+                      onkeydown="messageKeydown(event)"></textarea>
+
+            <button class="primary" type="submit"
+                    aria-label="送出或讓角色接續回應"
+                    style="padding:9px 12px">➤</button>
+          </div>
+
+          <div class="chat-tools">
+            <button type="button" onclick="snapshotInfo()">📷 快照</button>
+            <button type="button" onclick="editPersona()">⚙ 人設</button>
+            <button type="button" onclick="toggleSuggestions()">
+              建議回覆 ${chat.suggestions ? 'ON' : 'OFF'}
+            </button>
+            <button type="button" disabled>圖片上傳｜未開放</button>
+          </div>
+        </form>
+      </section>
+    `;
+  }
+
+  function applyAppearance() {
+    const chat = state.chats[activeChat];
+    const character = state.characters.find(c => c.id === activeChat);
+    const panel = $('view').querySelector('.chat-main');
+
+    if (!chat || !character || !panel) return;
+
+    prepareChat(chat);
+    panel.classList.toggle('px-day', chat.settings.theme === 'day');
+
+    panel.style.setProperty(
+      '--px-chat-background',
+      chat.settings.background === 'avatar'
+        ? `url(${JSON.stringify(character.image)})`
+        : 'none'
+    );
+  }
+
+  function back() {
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      PX.backToChatList();
+      return;
+    }
+
+    hideDesktopList = !hideDesktopList;
+    renderShell();
+  }
+
+  /* ---------- Same action formatting for AI and user ---------- */
+
+  renderMessages = function() {
+    const chat = state.chats[activeChat];
+    const character = state.characters.find(c => c.id === activeChat);
+    const holder = $('messages');
+
+    if (!chat || !character || !holder) return;
+
+    holder.innerHTML = chat.messages.map(message => {
+      const user = message.role === 'user';
+
+      const content = String(message.text)
+        .split(/(\*\*[\s\S]*?\*\*)/g)
+        .filter(Boolean)
+        .map(part => {
+          const narration = part.startsWith('**') && part.endsWith('**');
+
+          if (narration) {
+            return `
+              <div class="px-narration">${esc(part.slice(2, -2))}</div>
+            `;
+          }
+
+          if (!part.trim()) return '';
+
+          return `
+            <div class="bubble" style="margin-bottom:7px">
+              ${esc(part.trim())}
+            </div>
+          `;
+        }).join('');
+
+      return `
+        <div class="message ${user ? 'user' : ''}">
+          ${user
+            ? avatarHTML(state.user)
+            : `<img class="avatar" src="${esc(character.image)}" alt="">`}
+
+          <div class="message-content">
+            <div class="message-name">
+              ${esc(user ? state.user.nickname : character.name)}
+            </div>
+            ${content}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    holder.scrollTop = holder.scrollHeight;
+  };
+
+  /* ---------- Menus ---------- */
+
+  function listMenu() {
+    modal('聊天列表', `
+      <div class="stack">
+        <button style="width:100%" onclick="CX.groupInfo()">＋ 創建群組</button>
+        <button style="width:100%" onclick="CX.menu()">聊天管理</button>
+      </div>
+      <p class="muted small" style="margin-top:18px">
+        群組 AI 與付費會員驗證尚未串接。
+      </p>
+    `);
+  }
+
+  function menu() {
+    const chat = state.chats[activeChat];
+
+    if (!chat) {
+      toast('請先選擇一個角色對話。');
+      return;
+    }
+
+    prepareChat(chat);
+
+    modal('聊天功能', `
+      <div class="stack">
+        <button style="width:100%" onclick="CX.manage()">
+          聊天管理
+        </button>
+
+        <label class="field">
+          <span>預設色系</span>
+          <select onchange="CX.setting('theme', this.value)">
+            <option value="day"
+                    ${chat.settings.theme === 'day' ? 'selected' : ''}>
+              白天
+            </option>
+            <option value="night"
+                    ${chat.settings.theme === 'night' ? 'selected' : ''}>
+              黑夜
+            </option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>聊天背景設定</span>
+          <select onchange="CX.setting('background', this.value)">
+            <option value="avatar"
+                    ${chat.settings.background === 'avatar' ? 'selected' : ''}>
+              角色頭像
+            </option>
+            <option value="none"
+                    ${chat.settings.background === 'none' ? 'selected' : ''}>
+              無背景
+            </option>
+          </select>
+        </label>
+
+        <button class="primary" style="width:100%" onclick="CX.newConversation()">
+          開始新對話
+        </button>
+
+        <button style="width:100%" onclick="CX.archives()">
+          舊的回憶 · ${chat.archives.length}
+        </button>
+      </div>
+
+      <p class="muted small" style="margin-top:18px">
+        色系及背景設定會保存在此瀏覽器。
+        開始新對話前，現有對話、日記及相簿會封存。
+      </p>
+    `);
+  }
+
+  function setting(key, value) {
+    const chat = state.chats[activeChat];
+    if (!chat) return;
+
+    const allowed = {
+      theme: ['day', 'night'],
+      background: ['avatar', 'none']
+    };
+
+    if (!allowed[key]?.includes(value)) return;
+
+    prepareChat(chat);
+    chat.settings[key] = value;
+    save();
+    applyAppearance();
+  }
+
+  function manage() {
+    if (!activeChat || !state.chats[activeChat]) return;
+    PX.chatMenu(activeChat);
+  }
+
+  /* ---------- New conversation and archives ---------- */
+
+  function newConversation() {
+    const chat = state.chats[activeChat];
+    const character = state.characters.find(c => c.id === activeChat);
+
+    if (!chat || !character) return;
+
+    if (!confirm(
+      '開始新對話嗎？目前的對話、甜蜜日記及相簿會保存到「舊的回憶」。'
+    )) return;
+
+    prepareChat(chat);
+
+    const previous = copy(chat);
+
+    const date = new Date(chat.startedAt);
+    const dateName = [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, '0'),
+      String(date.getDate()).padStart(2, '0')
+    ].join('-');
+
+    const archive = {
+      id: uid(),
+      name: character.name + '_' + dateName,
+      startedAt: chat.startedAt,
+      archivedAt: Date.now(),
+      messages: copy(chat.messages),
+      memories: copy(chat.memories),
+      album: copy(chat.album),
+      persona: chat.persona || ''
+    };
+
+    chat.archives.unshift(archive);
+
+    chat.messages = [{
+      id: uid(),
+      role: 'assistant',
+      text: character.opening || '**新的故事開始了。**',
+      at: Date.now()
+    }];
+
+    chat.memories = [];
+    chat.album = [];
+    chat.startedAt = Date.now();
+
+    // Keep existing preferences and persona; only reset story records.
+    if (!save()) {
+      state.chats[activeChat] = previous;
+      toast('封存失敗，未開始新對話。請確認瀏覽器儲存空間。');
+      return;
+    }
+
+    closeModal();
+    renderChat();
+    toast('新對話已開始，舊資料已保存到「舊的回憶」。');
+  }
+
+  function archives() {
+    const chat = state.chats[activeChat];
+    if (!chat) return;
+    prepareChat(chat);
+
+    modal('舊的回憶', `
+      <p class="muted small">
+        保存之前的對話、日記與相簿；目前僅儲存在此瀏覽器。
+      </p>
+
+      ${chat.archives.map(item => `
+        <article class="px-archive-card">
+          <strong>${esc(item.name)}</strong>
+
+          <p class="muted small" style="margin:8px 0">
+            封存時間：
+            ${esc(new Date(item.archivedAt).toLocaleString('zh-TW'))}<br>
+            對話 ${item.messages.length} 筆 ·
+            日記 ${item.memories.length} 筆 ·
+            相片 ${item.album.length} 張
+          </p>
+
+          <button onclick="CX.viewArchive(${inlineArg(item.id)}, 'messages')">
+            查看回憶
+          </button>
+        </article>
+      `).join('') || '<div class="empty">還沒有封存的回憶。</div>'}
+    `);
+  }
+
+  function archivedMessageHTML(message) {
+    const text = String(message.text)
+      .split(/(\*\*[\s\S]*?\*\*)/g)
+      .map(part => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return `<em>${esc(part.slice(2, -2))}</em>`;
+        }
+        return esc(part);
+      }).join('');
+
+    return `
+      <div class="px-archive-message">
+        <strong>${message.role === 'user' ? '你' : '角色'}</strong>
+        <div>${text}</div>
+      </div>
+    `;
+  }
+
+  function safePhotoURL(value) {
+    const url = String(value || '');
+
+    if (/^data:image\/(png|jpeg|webp);base64,/.test(url)) return url;
+
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === 'https:' &&
+          !parsed.username && !parsed.password) {
+        return parsed.href;
+      }
+    } catch (_) {}
+
+    return '';
+  }
+
+  function viewArchive(id, tab = 'messages') {
+    const chat = state.chats[activeChat];
+    const archive = chat?.archives?.find(item => item.id === id);
+    if (!archive) return;
+
+    archiveId = id;
+    archiveTab = tab;
+
+    let content = '';
+
+    if (tab === 'messages') {
+      content = archive.messages.map(archivedMessageHTML).join('');
+    } else if (tab === 'memories') {
+      content = archive.memories.map(memory => `
+        <div class="px-archive-card">
+          ${memory.important ? '<span class="badge">重大記憶</span>' : ''}
+          <p class="prose" style="margin:8px 0">${esc(memory.text)}</p>
+        </div>
+      `).join('') || '<div class="empty">這次對話沒有日記。</div>';
+    } else {
+      content = archive.album.map(photo => {
+        const url = safePhotoURL(photo.url);
+        if (!url) return '';
+
+        return `
+          <div class="px-archive-card">
+            <img src="${esc(url)}" alt="封存的回憶快照"
+                 style="width:100%;border-radius:12px">
+            <p class="muted small" style="margin:8px 0">
+              ${esc(new Date(photo.at).toLocaleString('zh-TW'))}
+            </p>
+          </div>
+        `;
+      }).join('') || '<div class="empty">這次對話沒有相片。</div>';
+    }
+
+    modal(archive.name, `
+      <div class="tabs" style="margin-bottom:14px">
+        <button class="tab ${tab === 'messages' ? 'active' : ''}"
+                onclick="CX.viewArchive(${inlineArg(id)}, 'messages')">
+          對話
+        </button>
+        <button class="tab ${tab === 'memories' ? 'active' : ''}"
+                onclick="CX.viewArchive(${inlineArg(id)}, 'memories')">
+          甜蜜日記
+        </button>
+        <button class="tab ${tab === 'album' ? 'active' : ''}"
+                onclick="CX.viewArchive(${inlineArg(id)}, 'album')">
+          回憶相簿
+        </button>
+      </div>
+
+      <div class="px-archive-content">${content}</div>
+
+      <p class="muted small">
+        此為封存記錄，只供查看，不會與目前的新對話混合。
+      </p>
+
+      <button onclick="CX.archives()">← 返回舊的回憶</button>
+    `);
+  }
+
+  window.CX = {
+    back,
+    menu,
+    listMenu,
+    setting,
+    manage,
+    newConversation,
+    archives,
+    viewArchive,
+    groupInfo: () => {
+      closeModal();
+      showGroupInfo();
+    }
+  };
+
+  save();
+  renderShell();
+
+  if (page === 'chat') renderChat();
+})();
+</script>
 </body>
 </html>
