@@ -1,157 +1,2041 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#090d16" />
-  <title>PersonaX｜探索 AI 角色</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#090d16">
+  <title>PersonaX｜AI 角色世界</title>
+
   <style>
-    :root { color-scheme: dark; }
-    body { background:#080b12; color:#f8fafc; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif; }
-    * { scrollbar-width:thin; scrollbar-color:#334155 transparent; }
-    .glass { background:rgba(15,23,42,.72); backdrop-filter:blur(18px); }
-    .card { transition:transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
-    .card:hover { transform:translateY(-3px); border-color:rgba(129,140,248,.55); box-shadow:0 18px 45px rgba(0,0,0,.28); }
-    .hero { background:radial-gradient(circle at 78% 25%,rgba(129,140,248,.28),transparent 32%), radial-gradient(circle at 18% 90%,rgba(168,85,247,.18),transparent 34%), linear-gradient(115deg,#111827,#172554 52%,#0f172a); }
-    .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-    .nav-active { background:rgba(99,102,241,.18); color:#c7d2fe; }
+    :root {
+      color-scheme: dark;
+      --bg: #080b12;
+      --panel: #101725;
+      --panel2: #151e30;
+      --border: #273247;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --primary: #6366f1;
+      --pink: #fb7185;
+      --sidebar: 240px;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                   "Noto Sans TC", sans-serif;
+      font-size: 14px;
+    }
+    button, input, textarea, select { font: inherit; }
+    button { cursor: pointer; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    button, input, textarea, select { border-radius: 12px; }
+    button {
+      border: 1px solid var(--border);
+      color: var(--text);
+      background: var(--panel2);
+      padding: 10px 14px;
+    }
+    button:hover:not(:disabled) { filter: brightness(1.15); }
+    button:focus-visible, input:focus-visible,
+    textarea:focus-visible, select:focus-visible {
+      outline: 2px solid #a5b4fc;
+      outline-offset: 3px;
+    }
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: #0b1220;
+      color: var(--text);
+      padding: 12px;
+      outline: none;
+    }
+    input:focus, textarea:focus, select:focus { border-color: var(--primary); }
+    textarea { resize: vertical; min-height: 110px; line-height: 1.7; }
+    input[type="checkbox"] { width: auto; accent-color: var(--primary); }
+    input[type="file"] { font-size: 12px; }
+    img { display: block; max-width: 100%; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { font-size: 30px; }
+    h2 { font-size: 22px; }
+    h3 { font-size: 17px; }
+    p { line-height: 1.8; }
+    .hidden { display: none !important; }
+    .muted { color: var(--muted); }
+    .small { font-size: 12px; }
+    .primary { background: var(--primary); border-color: transparent; }
+    .danger { color: #fda4af; border-color: #713344; }
+    .ghost { background: transparent; }
+    .row { display: flex; align-items: center; gap: 10px; }
+    .between { justify-content: space-between; }
+    .wrap { flex-wrap: wrap; }
+    .grow { flex: 1; min-width: 0; }
+    .stack > * + * { margin-top: 18px; }
+    .panel {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 20px;
+      padding: 22px;
+    }
+    .empty {
+      padding: 40px 20px;
+      text-align: center;
+      border: 1px dashed var(--border);
+      border-radius: 18px;
+      color: var(--muted);
+      grid-column: 1 / -1;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: #6366f11c;
+      color: #c7d2fe;
+    }
+    .note {
+      border: 1px solid #a78bfa35;
+      background: #a78bfa0c;
+      color: #c4b5fd;
+      padding: 12px 16px;
+      border-radius: 14px;
+      font-size: 12px;
+      line-height: 1.8;
+    }
+    .field { display: block; margin-bottom: 18px; }
+    .field > span { display: block; margin-bottom: 8px; font-weight: 600; }
+    .field small { display: block; margin-top: 6px; color: var(--muted); }
+    .check { display: flex; gap: 10px; align-items: flex-start; line-height: 1.7; }
+    .check input { margin-top: 5px; }
+
+    /* Desktop navigation */
+    .sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+      width: var(--sidebar);
+      padding: 20px 14px;
+      background: #090e1b;
+      border-right: 1px solid var(--border);
+      z-index: 40;
+      display: flex;
+      flex-direction: column;
+      transition: width .2s;
+    }
+    .brand {
+      border: 0;
+      background: transparent;
+      font-size: 22px;
+      font-weight: 900;
+      color: #c7d2fe;
+      padding: 8px;
+    }
+    .sidebar nav { display: grid; gap: 6px; margin-top: 28px; }
+    .nav-btn {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      text-align: left;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .nav-btn.active { background: #6366f125; color: #c7d2fe; }
+    .nav-icon { font-size: 19px; width: 24px; text-align: center; }
+    .sidebar-footer { margin-top: auto; padding: 14px; }
+    .app { margin-left: var(--sidebar); transition: margin-left .2s; }
+    body.collapsed { --sidebar: 78px; }
+    body.collapsed .nav-label,
+    body.collapsed .brand-name,
+    body.collapsed .sidebar-footer { display: none; }
+    body.collapsed .sidebar { padding-inline: 10px; }
+    body.collapsed .nav-btn { justify-content: center; padding-inline: 5px; }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      height: 68px;
+      padding: 0 26px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      background: #0b1120e8;
+      backdrop-filter: blur(18px);
+    }
+    main { max-width: 1500px; margin: auto; padding: 26px; }
+    .avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: #312e81;
+    }
+    .avatar-fallback {
+      display: grid;
+      place-items: center;
+      background: #312e81;
+      color: #ddd6fe;
+      font-weight: 700;
+    }
+    .diamonds {
+      color: #fde68a;
+      background: #f59e0b12;
+      border: 1px solid #f59e0b30;
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 12px;
+    }
+
+    /* Explore */
+    .hero {
+      position: relative;
+      overflow: hidden;
+      border-radius: 26px;
+      border: 1px solid #818cf840;
+      padding: 38px;
+      min-height: 280px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      background:
+        radial-gradient(circle at 85% 25%, #818cf845, transparent 35%),
+        radial-gradient(circle at 25% 100%, #a855f730, transparent 40%),
+        linear-gradient(120deg, #111827, #172554 55%, #0f172a);
+    }
+    .hero h1 { margin: 16px 0; font-size: clamp(28px, 4vw, 46px); }
+    .hero p { max-width: 670px; color: #cbd5e1; }
+    .hero-controls { display: flex; gap: 8px; margin-top: 18px; }
+    .hero-dot {
+      width: 10px;
+      height: 10px;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      background: #ffffff45;
+    }
+    .hero-dot.active { background: #fff; }
+    .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .search { max-width: 420px; flex: 1; min-width: 180px; }
+    .tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+    .tab { white-space: nowrap; color: var(--muted); }
+    .tab.active { background: var(--primary); color: white; border-color: transparent; }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+    .card {
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--panel);
+      transition: transform .2s, border-color .2s;
+    }
+    .card:hover { transform: translateY(-3px); border-color: #818cf8; }
+    .card-image { position: relative; aspect-ratio: 4 / 5; }
+    .image-btn {
+      display: block;
+      width: 100%;
+      height: 100%;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      overflow: hidden;
+      background: #172036;
+    }
+    .image-btn img { width: 100%; height: 100%; object-fit: cover; }
+    .card-chat {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      right: 12px;
+      opacity: 0;
+      transform: translateY(5px);
+      transition: .2s;
+      background: #6366f1ee;
+    }
+    .card:hover .card-chat, .card:focus-within .card-chat {
+      opacity: 1;
+      transform: none;
+    }
+    .card-body { padding: 14px; }
+    .card-body h3 { margin: 9px 0 6px; }
+    .card-intro {
+      color: #aebbd0;
+      font-size: 12px;
+      line-height: 1.8;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      min-height: 43px;
+      margin-bottom: 10px;
+    }
+    .heart { padding: 4px 8px; background: transparent; border: 0; font-size: 21px; }
+    .heart.on { color: var(--pink); }
+    .owner-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .owner-actions button { flex: 1; font-size: 12px; padding: 8px; }
+    .detail-layout {
+      display: grid;
+      grid-template-columns: minmax(220px, 360px) 1fr;
+      gap: 28px;
+    }
+    .detail-image { width: 100%; border-radius: 20px; max-height: 580px; object-fit: cover; }
+    .prose { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.9; }
+    .form-width { max-width: 820px; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+
+    /* Chat */
+    .chat-layout {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr) 280px;
+      gap: 16px;
+      height: calc(100dvh - 190px);
+      min-height: 550px;
+    }
+    .chat-list, .memory-panel { overflow-y: auto; }
+    .chat-list { padding: 14px; }
+    .chat-entry {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      padding: 8px;
+      border-radius: 12px;
+    }
+    .chat-entry.active { background: #6366f122; }
+    .chat-entry .select-chat {
+      flex: 1;
+      min-width: 0;
+      text-align: left;
+      background: transparent;
+      border: 0;
+      padding: 3px;
+    }
+    .ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .chat-main { padding: 0; display: flex; flex-direction: column; min-height: 0; }
+    .chat-heading { padding: 14px 18px; border-bottom: 1px solid var(--border); }
+    .messages { flex: 1; overflow-y: auto; padding: 20px; min-height: 150px; }
+    .message { display: flex; gap: 10px; margin-bottom: 20px; }
+    .message.user { flex-direction: row-reverse; }
+    .message-content { max-width: 85%; min-width: 0; }
+    .message-name { color: var(--muted); font-size: 11px; margin-bottom: 5px; }
+    .message.user .message-name { text-align: right; }
+    .bubble {
+      background: #1b263b;
+      padding: 12px 15px;
+      border-radius: 16px;
+      line-height: 1.8;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .user .bubble { background: #4f46e5; }
+    .bubble em { color: #b2bdcf; font-style: italic; }
+    .status {
+      margin: 0 16px 12px;
+      padding: 12px 14px;
+      background: #a5b4fc08;
+      border: 1px solid #a5b4fc26;
+      border-radius: 14px;
+      color: #aebbd0;
+      font-size: 12px;
+      line-height: 1.8;
+    }
+    .composer { border-top: 1px solid var(--border); padding: 14px; }
+    .composer textarea { min-height: 72px; max-height: 150px; }
+    .suggestions { display: flex; gap: 7px; overflow-x: auto; margin-bottom: 10px; }
+    .suggestions button { font-size: 11px; flex-shrink: 0; }
+    .chat-tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .chat-tools button { font-size: 11px; padding: 8px 10px; }
+    .memory-panel { padding: 16px; }
+    .memory-item {
+      padding: 12px;
+      background: #0b1220;
+      border-radius: 12px;
+      margin-top: 10px;
+      font-size: 12px;
+    }
+    .memory-item p { margin: 7px 0; }
+    .notice {
+      padding: 18px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 16px;
+      margin-top: 12px;
+    }
+
+    /* Modal */
+    dialog {
+      width: min(560px, calc(100vw - 28px));
+      max-height: 90dvh;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      background: #0d1423;
+      color: var(--text);
+      border-radius: 22px;
+      padding: 24px;
+      box-shadow: 0 25px 100px #0009;
+    }
+    dialog::backdrop { background: #000b; backdrop-filter: blur(4px); }
+    .modal-heading { margin-bottom: 20px; }
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #e2e8f0;
+      color: #0f172a;
+      padding: 12px 20px;
+      border-radius: 14px;
+      z-index: 100;
+      max-width: 90vw;
+      box-shadow: 0 8px 30px #0005;
+    }
+    .mobile-nav { display: none; }
+
+    @media (max-width: 1200px) {
+      .chat-layout { grid-template-columns: 190px minmax(0, 1fr); height: auto; }
+      .chat-main { min-height: 650px; }
+      .messages { max-height: 480px; }
+      .memory-panel { grid-column: 1 / -1; max-height: 450px; }
+    }
+    @media (max-width: 767px) {
+      .sidebar { display: none; }
+      .app, body.collapsed .app { margin-left: 0; }
+      header { padding: 0 16px; height: 62px; }
+      .desktop-only { display: none; }
+      main { padding: 16px 14px 100px; }
+      h1 { font-size: 26px; }
+      .hero { padding: 24px; min-height: 290px; }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      .card-body { padding: 10px; }
+      .card-chat { opacity: 1; transform: none; font-size: 12px; }
+      .card-body h3 { font-size: 15px; }
+      .detail-layout, .two-col { grid-template-columns: 1fr; }
+      .detail-image { max-height: 480px; }
+      .panel { padding: 18px; }
+      .mobile-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 40;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        border-top: 1px solid var(--border);
+        background: #0b1120f5;
+        backdrop-filter: blur(18px);
+        padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+      }
+      .mobile-nav .nav-btn {
+        flex-direction: column;
+        gap: 3px;
+        padding: 7px 2px;
+        font-size: 10px;
+        justify-content: center;
+      }
+      .chat-layout { display: flex; flex-direction: column; min-height: 0; }
+      .chat-list { max-height: 240px; }
+      .chat-main { min-height: 650px; }
+      .message-content { max-width: 82%; }
+      #toast { bottom: 90px; }
+      .diamonds { padding: 6px 8px; font-size: 11px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; }
+    }
   </style>
 </head>
-<body class="min-h-screen">
-  <div class="flex min-h-screen">
-    <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full md:translate-x-0 md:static shrink-0 border-r border-slate-800/80 bg-slate-950/95 transition-transform duration-200">
-      <div class="h-full flex flex-col p-4">
-        <div class="flex items-center justify-between mb-8">
-          <button onclick="goHome()" class="text-xl font-black tracking-tight">✨ <span class="bg-gradient-to-r from-indigo-300 to-fuchsia-300 bg-clip-text text-transparent">PersonaX</span></button>
-          <button onclick="toggleSidebar()" class="md:hidden text-slate-400">✕</button>
-        </div>
-        <nav class="space-y-1 text-sm">
-          <button class="nav-active w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left" onclick="goHome()">⌂ 探索角色</button>
-          <button class="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-slate-400 hover:bg-slate-900 hover:text-white" onclick="requireLogin('開始暢聊')">💬 開始暢聊</button>
-          <button class="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-slate-400 hover:bg-slate-900 hover:text-white" onclick="requireLogin('創建角色')">✦ 創建角色</button>
-          <button class="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-slate-400 hover:bg-slate-900 hover:text-white" onclick="requireLogin('系統通知')">♢ 系統通知</button>
-          <button class="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-slate-400 hover:bg-slate-900 hover:text-white" onclick="requireLogin('喜愛角色')">♡ 喜愛角色</button>
-        </nav>
-        <div class="mt-auto rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-          <p class="text-xs text-slate-500">PersonaX V1</p>
-          <p class="mt-1 text-sm font-semibold">沉浸式 AI 角色世界</p>
-          <p class="mt-2 text-xs leading-5 text-slate-500">探索角色、收藏喜愛的人物，之後與他們開始專屬故事。</p>
-        </div>
+
+<body>
+  <aside class="sidebar">
+    <button class="brand" onclick="navigate('home')">
+      ✦ <span class="brand-name">PersonaX</span>
+    </button>
+    <nav id="desktopNav"></nav>
+    <div class="sidebar-footer muted small">
+      PersonaX V2 前端原型<br>
+      資料僅保存在此瀏覽器。
+    </div>
+  </aside>
+
+  <div class="app">
+    <header>
+      <div class="row">
+        <button class="desktop-only ghost" onclick="toggleSidebar()"
+                aria-label="收合或展開選單">☰</button>
+        <strong id="pageTitle">探索角色</strong>
       </div>
-    </aside>
-
-    <div class="flex-1 min-w-0">
-      <header class="sticky top-0 z-30 h-16 border-b border-slate-800/80 glass px-4 md:px-7 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <button onclick="toggleSidebar()" class="md:hidden rounded-xl border border-slate-700 px-3 py-2 text-slate-300">☰</button>
-          <div class="hidden sm:block text-sm font-semibold text-slate-200">探索角色</div>
-        </div>
-        <div class="flex items-center gap-2 md:gap-3">
-          <div class="hidden sm:flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300">💎 <span>1,250</span></div>
-          <button onclick="openLogin()" class="rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-xs font-bold shadow-lg shadow-indigo-900/30">登入 / 註冊</button>
-        </div>
-      </header>
-
-      <main class="mx-auto max-w-[1500px] p-4 md:p-7 space-y-7">
-        <section class="hero relative overflow-hidden rounded-3xl border border-indigo-400/20 p-6 md:p-10 min-h-[260px] flex items-center">
-          <div class="relative z-10 max-w-2xl">
-            <span class="inline-flex rounded-full border border-indigo-300/20 bg-indigo-400/10 px-3 py-1 text-xs font-semibold text-indigo-200">✦ 最新活動</span>
-            <h1 class="mt-4 text-3xl md:text-5xl font-black tracking-tight">找到一個，<br class="sm:hidden"/>真正屬於你的角色。</h1>
-            <p class="mt-4 max-w-xl text-sm md:text-base leading-7 text-slate-300">探索不同性格、故事與世界觀的 AI 角色。每一次對話，都可以成為只有你們知道的故事。</p>
-            <button onclick="scrollToCharacters()" class="mt-6 rounded-xl bg-white px-5 py-3 text-sm font-bold text-slate-900 hover:bg-indigo-50">開始探索 →</button>
-          </div>
-          <div class="absolute -right-12 -bottom-20 h-64 w-64 rounded-full border border-white/10 bg-white/5 blur-sm"></div>
-          <div class="absolute right-20 top-10 h-24 w-24 rounded-full bg-fuchsia-500/10 blur-2xl"></div>
-        </section>
-
-        <section class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 class="text-xl font-bold">探索角色</h2>
-            <p class="mt-1 text-xs text-slate-500">找到今天最想聊天的那個人。</p>
-          </div>
-          <div class="relative w-full md:w-80">
-            <span class="absolute left-3 top-2.5 text-slate-500">⌕</span>
-            <input id="search" oninput="renderCharacters()" placeholder="搜尋角色名稱或標籤…" class="w-full rounded-xl border border-slate-700 bg-slate-900/80 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-indigo-500" />
-          </div>
-        </section>
-
-        <section id="characters" class="space-y-4">
-          <div class="flex gap-2 overflow-x-auto pb-1">
-            <button data-filter="latest" onclick="setFilter('latest',this)" class="filter-btn rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold">最新角色</button>
-            <button data-filter="recommended" onclick="setFilter('recommended',this)" class="filter-btn rounded-full bg-slate-900 px-4 py-2 text-xs text-slate-400">推薦角色</button>
-            <button data-filter="male" onclick="setFilter('male',this)" class="filter-btn rounded-full bg-slate-900 px-4 py-2 text-xs text-slate-400">男生</button>
-            <button data-filter="female" onclick="setFilter('female',this)" class="filter-btn rounded-full bg-slate-900 px-4 py-2 text-xs text-slate-400">女生</button>
-          </div>
-          <div id="characterGrid" class="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"></div>
-        </section>
-      </main>
-    </div>
+      <div id="accountArea" class="row"></div>
+    </header>
+    <main id="view"></main>
   </div>
 
-  <div id="loginModal" class="hidden fixed inset-0 z-50 items-center justify-center bg-black/70 p-4">
-    <div class="w-full max-w-sm rounded-3xl border border-slate-700 bg-slate-950 p-6 shadow-2xl">
-      <div class="flex justify-between"><div><h3 class="text-xl font-bold">登入 PersonaX</h3><p class="mt-1 text-xs text-slate-500">登入後即可開始聊天、收藏與創建角色。</p></div><button onclick="closeLogin()" class="text-slate-500">✕</button></div>
-      <button onclick="fakeLogin()" class="mt-6 w-full rounded-xl bg-white py-3 text-sm font-bold text-slate-900 hover:bg-slate-100">使用 Google 登入</button>
-      <button onclick="fakeLogin()" class="mt-2 w-full rounded-xl border border-slate-700 py-3 text-sm font-semibold text-slate-200 hover:bg-slate-900">Email 登入</button>
-    </div>
-  </div>
+  <nav id="mobileNav" class="mobile-nav" aria-label="手機主要選單"></nav>
+  <dialog id="modal"></dialog>
+  <div id="toast" class="hidden" role="status"></div>
 
-  <div id="detailModal" class="hidden fixed inset-0 z-50 items-center justify-center bg-black/75 p-4">
-    <div class="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-700 bg-slate-950 shadow-2xl">
-      <div id="detailBody"></div>
-    </div>
-  </div>
+  <input id="jsonFile" type="file" accept=".json,application/json"
+         class="hidden" onchange="importJSON(event)">
 
 <script>
-const characters = [
-  {id:1,name:'封以恆',gender:'male',age:'33',tags:['CEO','深情','掌控感'],chats:'12.8萬',image:'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=800&q=80',intro:'冷峻強勢的 CEO，只有在你面前會露出不為人知的溫柔。'},
-  {id:2,name:'沈知言',gender:'male',age:'29',tags:['醫生','溫柔','日常'],chats:'8.6萬',image:'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=800&q=80',intro:'總是耐心聽你說話的年輕醫生，平靜外表下藏著很深的在意。'},
-  {id:3,name:'顧晚晴',gender:'female',age:'27',tags:['作家','知性','慢熱'],chats:'6.2萬',image:'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=800&q=80',intro:'喜歡在深夜寫故事的作家，也許下一個故事主角就是你。'},
-  {id:4,name:'林澈',gender:'male',age:'25',tags:['校園','陽光','戀愛'],chats:'4.9萬',image:'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80',intro:'笑起來很有感染力的校園人氣人物，對你的反應總是特別明顯。'},
-  {id:5,name:'蘇晚棠',gender:'female',age:'31',tags:['姐姐','成熟','療癒'],chats:'3.7萬',image:'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=800&q=80',intro:'成熟可靠的姐姐系角色，擅長在你需要時給你剛剛好的陪伴。'},
-  {id:6,name:'裴修然',gender:'male',age:'35',tags:['總裁','冷淡','反差'],chats:'9.1萬',image:'https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?auto=format&fit=crop&w=800&q=80',intro:'看似拒人於千里之外，實際上只是不知道怎麼對你坦白。'},
-  {id:7,name:'夏妍',gender:'female',age:'24',tags:['音樂','可愛','陪伴'],chats:'2.8萬',image:'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?auto=format&fit=crop&w=800&q=80',intro:'喜歡唱歌與分享生活的小太陽，和她聊天很容易忘記時間。'},
-  {id:8,name:'周沉',gender:'male',age:'30',tags:['刑警','懸疑','保護'],chats:'7.4萬',image:'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=800&q=80',intro:'沉默寡言的刑警，習慣把危險擋在你之前。'}
+'use strict';
+
+/* =========================================================
+   V2 FRONTEND DEMO
+   No real authentication, AI, payment or server authorization.
+   Do not put API keys or real confidential data in this file.
+   ========================================================= */
+
+const STORE_KEY = 'personax-v2-demo';
+const DAY = 24 * 60 * 60 * 1000;
+const NOW = Date.now();
+
+const TAGS = [
+  'CEO', '深情', '掌控感', '醫生', '溫柔', '日常',
+  '作家', '知性', '慢熱', '校園', '陽光', '戀愛',
+  '姐姐', '成熟', '療癒', '總裁', '冷淡', '反差',
+  '音樂', '可愛', '陪伴', '刑警', '懸疑', '保護',
+  '奇幻', '古風', '冒險', '原創'
 ];
-let filter='latest';
-let favorites=new Set();
-function renderCharacters(){
-  const q=document.getElementById('search').value.trim().toLowerCase();
-  let list=characters.filter(c=>filter==='latest'||filter==='recommended'||c.gender===filter);
-  if(filter==='recommended') list=[...characters].sort((a,b)=>parseFloat(b.chats)-parseFloat(a.chats));
-  list=list.filter(c=>!q || c.name.toLowerCase().includes(q)||c.tags.some(t=>t.toLowerCase().includes(q)));
-  document.getElementById('characterGrid').innerHTML=list.map(c=>`
-    <article class="card overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/70">
-      <div class="group relative aspect-[4/5] cursor-pointer" onclick="openDetail(${c.id})">
-        <img src="${c.image}" alt="${c.name}" class="h-full w-full object-cover" loading="lazy" />
-        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent"></div>
-        <button onclick="event.stopPropagation();toggleFavorite(${c.id})" class="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-black/45 backdrop-blur text-lg ${favorites.has(c.id)?'text-rose-400':'text-white'}">${favorites.has(c.id)?'♥':'♡'}</button>
-        <div class="absolute inset-x-0 bottom-0 p-3">
-          <div class="flex items-center justify-between gap-2"><h3 class="font-bold truncate">${c.name}</h3><span class="text-[10px] text-slate-300">💬 ${c.chats}</span></div>
-          <p class="mt-1 line-clamp-2 text-[11px] leading-5 text-slate-300">${c.intro}</p>
-          <div class="mt-2 flex gap-1 overflow-hidden">${c.tags.slice(0,3).map(t=>`<span class="shrink-0 rounded-full bg-white/10 px-2 py-1 text-[9px] text-slate-300">#${t}</span>`).join('')}</div>
-          <button onclick="event.stopPropagation();startChat(${c.id})" class="mt-3 w-full rounded-xl bg-indigo-600 py-2 text-xs font-bold opacity-90 hover:bg-indigo-500">開始聊天</button>
-        </div>
-      </div>
-    </article>`).join('') || `<div class="col-span-full rounded-2xl border border-dashed border-slate-800 p-10 text-center text-sm text-slate-500">找不到符合條件的角色。</div>`;
+
+const NAV = [
+  ['home', '⌕', '探索角色'],
+  ['chat', '💬', '開始暢聊'],
+  ['create', '✦', '創建角色'],
+  ['notifications', '♧', '系統通知'],
+  ['favorites', '♡', '喜愛角色']
+];
+
+const BANNERS = [
+  {
+    title: '找到一個，真正屬於你的角色。',
+    text: '探索不同性格、故事與世界觀。每一次對話，都可以是故事的開始。'
+  },
+  {
+    title: '你的想像，值得成為主角。',
+    text: '建立自己的角色，設定介紹、開場白與對話風格。'
+  },
+  {
+    title: '把相遇，收藏成日記。',
+    text: '體驗聊天與重大記憶的介面。正式 AI 功能將由後端接入。'
+  }
+];
+
+const seed = [
+  ['封以恆','male',33,['CEO','深情','掌控感'],'12.8萬',
+   'photo-1500648767791-00dcc994a43e',
+   '冷峻強勢的 CEO，只有在你面前會露出不為人知的溫柔。'],
+  ['沈知言','male',29,['醫生','溫柔','日常'],'8.6萬',
+   'photo-1535713875002-d1d0cf377fde',
+   '總是耐心聽你說話的年輕醫生，平靜外表下藏著很深的在意。'],
+  ['顧晚晴','female',27,['作家','知性','慢熱'],'6.2萬',
+   'photo-1494790108377-be9c29b29330',
+   '喜歡在深夜寫故事的作家，也許下一個故事主角就是你。'],
+  ['林澈','male',25,['校園','陽光','戀愛'],'4.9萬',
+   'photo-1507003211169-0a1dd7228f2d',
+   '笑起來很有感染力的校園人氣人物，對你的反應總是特別明顯。'],
+  ['蘇晚棠','female',31,['姐姐','成熟','療癒'],'3.7萬',
+   'photo-1544005313-94ddf0286df2',
+   '成熟可靠的姐姐系角色，擅長在你需要時給你剛剛好的陪伴。'],
+  ['裴修然','male',35,['總裁','冷淡','反差'],'9.1萬',
+   'photo-1501196354995-cbb51c65aaea',
+   '看似拒人於千里之外，實際上只是不知道怎麼對你坦白。'],
+  ['夏妍','female',24,['音樂','可愛','陪伴'],'2.8萬',
+   'photo-1488426862026-3ee34a7d66df',
+   '喜歡唱歌與分享生活的小太陽，和她聊天很容易忘記時間。'],
+  ['周沉','male',30,['刑警','懸疑','保護'],'7.4萬',
+   'photo-1506794778202-cad84cf45f1d',
+   '沉默寡言的刑警，習慣把危險擋在你之前。']
+].map((r, i) => ({
+  id: 'seed-' + (i + 1),
+  name: r[0], gender: r[1], age: String(r[2]), race: '人類',
+  tags: r[3], chats: r[4],
+  image: `https://images.unsplash.com/${r[5]}?auto=format&fit=crop&w=800&q=80`,
+  intro: r[6],
+  opening: `**${r[0]}抬起頭，看向剛走進來的你。**\n「你來了。今天想聊些什麼？」`,
+  privateInfo: '',
+  style: '',
+  visibility: 'public',
+  owner: false,
+  createdAt: NOW - i * 60 * 60 * 1000
+}));
+
+function defaultState() {
+  return {
+    user: null,
+    characters: seed,
+    favorites: [],
+    chats: {},
+    preferences: [],
+    notifications: [
+      {
+        id: 'welcome',
+        title: '歡迎來到 PersonaX V2',
+        body: '這是前端原型。示範登入、回覆與創角均不會呼叫真正的 AI 或金流。',
+        read: false,
+        at: NOW
+      }
+    ]
+  };
 }
-function setFilter(f,btn){filter=f;document.querySelectorAll('.filter-btn').forEach(b=>{b.className='filter-btn rounded-full bg-slate-900 px-4 py-2 text-xs text-slate-400'});btn.className='filter-btn rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold';renderCharacters();}
-function toggleFavorite(id){favorites.has(id)?favorites.delete(id):favorites.add(id);renderCharacters();}
-function openDetail(id){const c=characters.find(x=>x.id===id);document.getElementById('detailBody').innerHTML=`<div class="relative"><img src="${c.image}" class="h-72 w-full object-cover"/><button onclick="closeDetail()" class="absolute right-4 top-4 rounded-full bg-black/50 px-3 py-2">✕</button><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 p-6"><h2 class="text-3xl font-black">${c.name}</h2><p class="mt-1 text-xs text-slate-400">${c.gender==='male'?'男':'女'} · ${c.age} 歲 · 💬 ${c.chats} 次對話</p></div></div><div class="p-6"><div class="flex flex-wrap gap-2">${c.tags.map(t=>`<span class="rounded-full bg-indigo-500/10 px-3 py-1 text-xs text-indigo-300">#${t}</span>`).join('')}</div><p class="mt-5 text-sm leading-7 text-slate-300">${c.intro}</p><p class="mt-3 text-sm leading-7 text-slate-400">這是 PersonaX 的角色介紹預覽。之後這裡會接上完整公開介紹、角色資訊與開始暢聊功能。</p><button onclick="startChat(${c.id})" class="mt-6 w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold hover:bg-indigo-500">開始暢聊</button></div>`;show('detailModal');}
-function startChat(id){const c=characters.find(x=>x.id===id);closeDetail();requireLogin('與 '+c.name+' 開始暢聊');}
-function requireLogin(action){openLogin();}
-function openLogin(){show('loginModal');}
-function closeLogin(){hide('loginModal');}
-function fakeLogin(){closeLogin();alert('目前為 V1 前端展示。下一階段會接真正的登入系統。');}
-function closeDetail(){hide('detailModal');}
-function show(id){const e=document.getElementById(id);e.classList.remove('hidden');e.classList.add('flex');}
-function hide(id){const e=document.getElementById(id);e.classList.add('hidden');e.classList.remove('flex');}
-function toggleSidebar(){document.getElementById('sidebar').classList.toggle('-translate-x-full');}
-function scrollToCharacters(){document.getElementById('characters').scrollIntoView({behavior:'smooth'});}
-function goHome(){window.scrollTo({top:0,behavior:'smooth'});}
-window.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLogin();closeDetail();}});
-renderCharacters();
+
+function loadState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY));
+    if (saved && Array.isArray(saved.characters) &&
+        Array.isArray(saved.favorites) && saved.chats &&
+        Array.isArray(saved.notifications)) {
+      return { ...defaultState(), ...saved };
+    }
+  } catch (e) {
+    console.warn('Unable to load demo data', e);
+  }
+  return defaultState();
+}
+
+let state = loadState();
+let page = 'home';
+let activeCharacter = null;
+let activeChat = null;
+let currentFilter = 'latest';
+let searchText = '';
+let selectedTags = [];
+let recommendationLimit = 24;
+let recommendationBatch = 0;
+let notificationTab = 'all';
+let bannerIndex = 0;
+let pendingAction = null;
+let editingId = null;
+let formTags = [];
+let imageDraft = '';
+let toastTimer;
+
+const $ = id => document.getElementById(id);
+
+function esc(value = '') {
+  return String(value).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;',
+    '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function uid() {
+  return window.crypto?.randomUUID?.() ||
+    'id-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+}
+
+function save() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    return true;
+  } catch (e) {
+    toast('本機儲存失敗，可能空間不足；請縮小上傳圖片。');
+    return false;
+  }
+}
+
+function toast(text) {
+  clearTimeout(toastTimer);
+  $('toast').textContent = text;
+  $('toast').classList.remove('hidden');
+  toastTimer = setTimeout(() => $('toast').classList.add('hidden'), 3500);
+}
+
+function modal(title, body) {
+  $('modal').innerHTML = `
+    <div class="row between modal-heading">
+      <h2 style="margin:0">${esc(title)}</h2>
+      <button onclick="closeModal()" aria-label="關閉視窗">✕</button>
+    </div>
+    ${body}`;
+  if (!$('modal').open) $('modal').showModal();
+}
+
+function closeModal() { $('modal').close(); }
+
+$('modal').addEventListener('click', e => {
+  if (e.target !== $('modal')) return;
+  const r = $('modal').getBoundingClientRect();
+  if (e.clientX < r.left || e.clientX > r.right ||
+      e.clientY < r.top || e.clientY > r.bottom) closeModal();
+});
+
+function toggleSidebar() {
+  document.body.classList.toggle('collapsed');
+}
+
+function avatarHTML(user, className = '') {
+  if (user?.avatar) {
+    return `<img class="avatar ${className}" src="${esc(user.avatar)}" alt="使用者頭像">`;
+  }
+  return `<span class="avatar avatar-fallback ${className}">${esc(
+    (user?.nickname || 'P').slice(0, 1)
+  )}</span>`;
+}
+
+function renderShell() {
+  const navPage = ['detail'].includes(page) ? 'home'
+    : ['editor','ai'].includes(page) ? 'create' : page;
+
+  const html = NAV.map(([key, icon, label]) => `
+    <button class="nav-btn ${navPage === key ? 'active' : ''}"
+            onclick="navigate('${key}')">
+      <span class="nav-icon">${icon}</span>
+      <span class="nav-label">${label}</span>
+    </button>`).join('');
+
+  $('desktopNav').innerHTML = html;
+  $('mobileNav').innerHTML = html;
+
+  const names = {
+    home:'探索角色', detail:'角色介紹', chat:'開始暢聊',
+    create:'創建角色', editor:'編輯角色', ai:'AI 創建',
+    notifications:'系統通知', favorites:'喜愛角色', profile:'個人帳號'
+  };
+  $('pageTitle').textContent = names[page] || 'PersonaX';
+
+  $('accountArea').innerHTML = state.user
+    ? `<span class="diamonds">💎 ${state.user.diamonds.toLocaleString()} <span class="desktop-only">示範</span></span>
+       <button class="ghost row" style="padding:3px;border:0"
+               onclick="navigate('profile')" aria-label="開啟個人帳號">
+         ${avatarHTML(state.user)}
+       </button>`
+    : `<button class="primary" onclick="openLogin()">登入 / 註冊</button>`;
+}
+
+function navigate(target) {
+  if (target !== 'home' && target !== 'detail' && !state.user) {
+    openLogin(() => navigate(target));
+    return;
+  }
+  page = target;
+  renderShell();
+  renderPage();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+function renderPage() {
+  switch (page) {
+    case 'home': renderHome(); break;
+    case 'detail': renderDetail(); break;
+    case 'favorites': renderFavorites(); break;
+    case 'create': renderCreate(); break;
+    case 'editor': renderEditor(); break;
+    case 'ai': renderAI(); break;
+    case 'chat': renderChat(); break;
+    case 'notifications': renderNotifications(); break;
+    case 'profile': renderProfile(); break;
+  }
+}
+
+/* ---------------- Demo login ---------------- */
+
+function openLogin(action = null) {
+  pendingAction = action;
+  modal('登入 PersonaX', `
+    <div class="note">
+      目前尚未接入 Google 或 Email 登入。下方只會建立本機示範身分，
+      不會取得你的 Google 帳號，也不是真正的帳號驗證。
+    </div>
+    <button disabled style="width:100%;margin-top:18px">Google 登入｜尚未串接</button>
+    <button disabled style="width:100%;margin-top:10px">Email 登入｜尚未串接</button>
+    <button class="primary" style="width:100%;margin-top:18px"
+            onclick="demoLogin()">以示範帳號體驗</button>
+  `);
+}
+
+function demoLogin() {
+  state.user = {
+    uid: 'demo-local-account',
+    nickname: '故事旅人',
+    bio: '喜歡在不同的故事裡，遇見不一樣的角色。',
+    avatar: '',
+    diamonds: 1250,
+    member: 'free'
+  };
+  save();
+  closeModal();
+  const action = pendingAction;
+  pendingAction = null;
+  renderShell();
+  renderPage();
+  toast('已進入本機示範帳號；非正式登入。');
+  if (action) action();
+}
+
+function logout() {
+  state.user = null;
+  save();
+  navigate('home');
+}
+
+/* ---------------- Explore ---------------- */
+
+function renderHome() {
+  $('view').innerHTML = `
+    <div class="stack">
+      <section class="hero" id="hero"></section>
+
+      <div class="row between wrap">
+        <div>
+          <h2 style="margin-bottom:5px">探索角色</h2>
+          <span class="muted small">找到今天最想聊天的那個人。</span>
+        </div>
+        <span class="badge">V2 前端示範</span>
+      </div>
+
+      <div class="toolbar">
+        <input class="search" id="searchInput"
+               value="${esc(searchText)}"
+               placeholder="搜尋角色名稱或標籤…"
+               oninput="searchText=this.value;renderExploreGrid()">
+        <button onclick="openTagPicker('explore')">
+          # 標籤 ${selectedTags.length ? '· ' + selectedTags.length : ''}
+        </button>
+        <button onclick="clearExplore()">清除篩選</button>
+      </div>
+      <div id="selectedTagArea" class="row wrap"></div>
+
+      <div class="tabs">
+        ${[
+          ['latest','最新角色'], ['recommended','推薦角色'],
+          ['male','男生'], ['female','女生']
+        ].map(([key,label]) => `
+          <button class="tab ${currentFilter === key ? 'active' : ''}"
+                  onclick="setFilter('${key}')">${label}</button>
+        `).join('')}
+      </div>
+
+      <div id="exploreHint" class="muted small"></div>
+      <div id="characterGrid" class="grid"></div>
+      <div id="loadMoreArea" style="text-align:center"></div>
+    </div>`;
+
+  renderBanner();
+  renderExploreGrid();
+}
+
+function renderBanner() {
+  if (!$('hero')) return;
+  const b = BANNERS[bannerIndex];
+  $('hero').innerHTML = `
+    <div><span class="badge">✦ 最新活動｜示範內容</span></div>
+    <h1>${esc(b.title)}</h1>
+    <p>${esc(b.text)}</p>
+    <div>
+      <button class="primary" onclick="document.getElementById('characterGrid').scrollIntoView({behavior:'smooth'})">
+        開始探索 →
+      </button>
+    </div>
+    <div class="hero-controls">
+      ${BANNERS.map((_,i) => `
+        <button class="hero-dot ${i === bannerIndex ? 'active' : ''}"
+                aria-label="切換至活動 ${i + 1}"
+                onclick="bannerIndex=${i};renderBanner()"></button>
+      `).join('')}
+    </div>`;
+}
+
+setInterval(() => {
+  if (page === 'home' && !document.hidden && !$('modal').open) {
+    bannerIndex = (bannerIndex + 1) % BANNERS.length;
+    renderBanner();
+  }
+}, 6000);
+
+function publicCharacters() {
+  return state.characters.filter(c => c.visibility === 'public');
+}
+
+function recommendationScore(c) {
+  const preferences = state.preferences || [];
+  return c.tags.filter(t => preferences.includes(t)).length * 100 +
+    parseFloat(c.chats || '0');
+}
+
+function exploreList() {
+  let list = publicCharacters();
+  if (currentFilter === 'latest') {
+    list = list.filter(c => Date.now() - c.createdAt <= DAY)
+      .sort((a,b) => b.createdAt - a.createdAt)
+      .slice(0,30);
+  } else if (currentFilter === 'male' || currentFilter === 'female') {
+    list = list.filter(c => c.gender === currentFilter);
+  } else {
+    list.sort((a,b) => recommendationScore(b) - recommendationScore(a));
+    if (list.length && recommendationBatch) {
+      const offset = recommendationBatch % list.length;
+      list = [...list.slice(offset), ...list.slice(0,offset)];
+    }
+  }
+
+  const q = searchText.trim().toLowerCase();
+  return list.filter(c =>
+    (!q || c.name.toLowerCase().includes(q) ||
+      c.tags.some(t => t.toLowerCase().includes(q))) &&
+    selectedTags.every(t => c.tags.includes(t))
+  );
+}
+
+function cardHTML(c, owner = false) {
+  const favorite = state.favorites.includes(c.id);
+  return `
+    <article class="card">
+      <div class="card-image">
+        <button class="image-btn" onclick="openDetail('${c.id}')"
+                aria-label="查看 ${esc(c.name)} 的完整介紹">
+          <img src="${esc(c.image)}" alt="${esc(c.name)}" loading="lazy"
+               onerror="this.style.opacity='.15'">
+        </button>
+        <button class="card-chat" onclick="startChat('${c.id}')">開始聊天</button>
+      </div>
+      <div class="card-body">
+        <div class="row between">
+          <span class="muted small">💬 ${esc(c.chats || '0')}</span>
+          <button class="heart ${favorite ? 'on' : ''}"
+                  onclick="toggleFavorite('${c.id}')"
+                  aria-label="${favorite ? '取消喜愛' : '加入喜愛'}"
+                  aria-pressed="${favorite}">${favorite ? '♥' : '♡'}</button>
+        </div>
+        <h3>${esc(c.name)}</h3>
+        <p class="card-intro">${esc(c.intro)}</p>
+        <div class="row wrap" style="gap:5px">
+          ${c.tags.slice(0,3).map(t => `<span class="badge">#${esc(t)}</span>`).join('')}
+        </div>
+        ${owner ? `
+          <div style="margin-top:12px">
+            <span class="badge">${c.visibility === 'public' ? '● 公開' : '● 私密'}</span>
+          </div>
+          <div class="owner-actions">
+            <button onclick="editCharacter('${c.id}')">修改</button>
+            <button class="danger" onclick="confirmDelete('${c.id}')">刪除</button>
+          </div>` : ''}
+      </div>
+    </article>`;
+}
+
+function renderExploreGrid() {
+  if (!$('characterGrid')) return;
+  const list = exploreList();
+  const shown = currentFilter === 'recommended'
+    ? list.slice(0,recommendationLimit) : list;
+
+  $('characterGrid').innerHTML = shown.map(c => cardHTML(c)).join('') ||
+    `<div class="empty">找不到符合條件的角色。</div>`;
+
+  $('selectedTagArea').innerHTML =
+    selectedTags.map(t => `<span class="badge">#${esc(t)}</span>`).join('');
+
+  $('exploreHint').textContent = currentFilter === 'latest'
+    ? '顯示最近 24 小時公開上架的角色，最多 30 位。示範角色超過時間後也會從此分類消失。'
+    : currentFilter === 'recommended'
+    ? '本機示範推薦：依你曾選擇的標籤排序，每批最多 150 位。'
+    : `共有 ${list.length} 位符合條件的角色。`;
+
+  $('loadMoreArea').innerHTML = currentFilter === 'recommended' && list.length
+    ? shown.length < Math.min(list.length,150)
+      ? `<button onclick="loadMoreRecommendations()">載入更多</button>`
+      : `<button onclick="newRecommendationBatch()">換一批</button>`
+    : '';
+}
+
+function setFilter(value) {
+  currentFilter = value;
+  recommendationLimit = 24;
+  renderHome();
+}
+
+function loadMoreRecommendations() {
+  recommendationLimit = Math.min(150,recommendationLimit + 24);
+  renderExploreGrid();
+}
+
+function newRecommendationBatch() {
+  recommendationBatch += 7;
+  recommendationLimit = 24;
+  renderExploreGrid();
+  toast('已切換示範推薦順序；目前角色數量有限，可能仍看到相同角色。');
+}
+
+function clearExplore() {
+  searchText = '';
+  selectedTags = [];
+  renderHome();
+}
+
+function openTagPicker(mode) {
+  const current = mode === 'explore' ? selectedTags : formTags;
+  modal('選擇標籤', `
+    <p class="muted small">${mode === 'explore'
+      ? '探索篩選：角色需包含所有勾選標籤。'
+      : '角色最多選擇 5 個標籤。'}</p>
+    <div class="two-col">
+      ${TAGS.map((t,i) => `
+        <label class="check">
+          <input type="checkbox" name="tag" value="${i}"
+                 ${current.includes(t) ? 'checked' : ''}>
+          ${esc(t)}
+        </label>
+      `).join('')}
+    </div>
+    <button class="primary" style="width:100%;margin-top:22px"
+            onclick="applyTags('${mode}')">套用標籤</button>
+  `);
+}
+
+function applyTags(mode) {
+  const chosen = [...$('modal').querySelectorAll('input[name="tag"]:checked')]
+    .map(e => TAGS[Number(e.value)]);
+
+  if (mode !== 'explore' && chosen.length > 5) {
+    toast('角色最多選擇 5 個標籤。');
+    return;
+  }
+  if (mode === 'explore') {
+    selectedTags = chosen;
+    state.preferences = [...new Set([...(state.preferences || []), ...chosen])];
+    save();
+    closeModal();
+    renderHome();
+  } else {
+    formTags = chosen;
+    closeModal();
+    if ($('formTagSummary')) {
+      $('formTagSummary').textContent = chosen.length
+        ? chosen.map(t => '#' + t).join(' ') : '尚未選擇標籤';
+    }
+  }
+}
+
+/* ---------------- Details and favorites ---------------- */
+
+function openDetail(id) {
+  const c = state.characters.find(x => x.id === id);
+  if (!c) return;
+  if (c.visibility === 'private' && !state.user) {
+    openLogin(() => openDetail(id));
+    return;
+  }
+  activeCharacter = id;
+  navigate('detail');
+}
+
+function renderDetail() {
+  const c = state.characters.find(x => x.id === activeCharacter);
+  if (!c) { navigate('home'); return; }
+
+  $('view').innerHTML = `
+    <div class="stack">
+      <button onclick="navigate('home')">← 返回探索</button>
+      <div class="detail-layout">
+        <div>
+          <img class="detail-image" src="${esc(c.image)}" alt="${esc(c.name)}">
+          <div class="row between" style="margin-top:14px">
+            <span class="muted">💬 ${esc(c.chats)} 次對話｜示範統計</span>
+            <button class="heart ${state.favorites.includes(c.id) ? 'on' : ''}"
+                    onclick="toggleFavorite('${c.id}')"
+                    aria-label="切換喜愛角色">
+              ${state.favorites.includes(c.id) ? '♥' : '♡'}
+            </button>
+          </div>
+        </div>
+        <section class="panel stack">
+          <h1>${esc(c.name)}</h1>
+          <div class="row wrap">
+            ${c.tags.map(t => `<span class="badge">#${esc(t)}</span>`).join('')}
+          </div>
+          <p class="muted">
+            ${c.gender === 'male' ? '男' : c.gender === 'female' ? '女' : '模糊'}
+            · ${esc(c.age || '未設定')} 歲 · ${esc(c.race || '未設定種族')}
+          </p>
+          <div>
+            <h3>角色介紹</h3>
+            <div class="prose">${esc(c.intro)}</div>
+          </div>
+          <div>
+            <h3>開場白</h3>
+            <div class="prose muted">${esc(c.opening)}</div>
+          </div>
+          <button class="primary" onclick="startChat('${c.id}')">開始暢聊 →</button>
+        </section>
+      </div>
+    </div>`;
+}
+
+function toggleFavorite(id) {
+  if (!state.user) {
+    openLogin(() => toggleFavorite(id));
+    return;
+  }
+  const i = state.favorites.indexOf(id);
+  if (i >= 0) state.favorites.splice(i,1);
+  else state.favorites.push(id);
+  save();
+  renderPage();
+}
+
+function renderFavorites() {
+  const list = state.characters.filter(c => state.favorites.includes(c.id));
+  $('view').innerHTML = `
+    <div class="stack">
+      <h1>喜愛角色</h1>
+      <div class="grid">${list.map(c => cardHTML(c)).join('') ||
+        '<div class="empty">還沒有收藏角色，去探索頁按下愛心吧。</div>'}</div>
+    </div>`;
+}
+
+/* ---------------- Character management ---------------- */
+
+function creationTabs() {
+  return `
+    <div class="tabs">
+      <button class="tab ${page === 'editor' ? 'active' : ''}" onclick="newCharacter()">
+        建立新角色
+      </button>
+      <button class="tab ${page === 'ai' ? 'active' : ''}" onclick="openAI()">
+        AI 創建
+      </button>
+      <button class="tab" onclick="document.getElementById('jsonFile').click()">
+        匯入 JSON
+      </button>
+    </div>`;
+}
+
+function renderCreate() {
+  const list = state.characters.filter(c => c.owner);
+  $('view').innerHTML = `
+    <div class="stack">
+      <h1>創建角色</h1>
+      ${creationTabs()}
+      <div class="note">
+        公開／私密目前只影響此瀏覽器的示範列表；
+        正式網站必須由後端實作存取權限。
+      </div>
+      <h2>你的角色</h2>
+      <div class="grid">${list.map(c => cardHTML(c,true)).join('') ||
+        '<div class="empty">尚未建立角色。可以手動建立，或匯入 JSON。</div>'}</div>
+    </div>`;
+}
+
+function newCharacter() {
+  editingId = null;
+  formTags = [];
+  imageDraft = '';
+  navigate('editor');
+}
+
+function editCharacter(id) {
+  const c = state.characters.find(x => x.id === id && x.owner);
+  if (!c) return;
+  editingId = id;
+  formTags = [...c.tags];
+  imageDraft = c.image;
+  navigate('editor');
+}
+
+function renderEditor() {
+  const c = state.characters.find(x => x.id === editingId) || {};
+  $('view').innerHTML = `
+    <div class="stack">
+      ${creationTabs()}
+      <form class="panel form-width" id="characterForm" onsubmit="submitCharacter(event)">
+        <h2>${editingId ? '修改角色' : '建立新角色'}</h2>
+
+        <label class="field">
+          <span>角色頭像 *</span>
+          <input id="characterImageFile" type="file" accept="image/png,image/jpeg,image/webp"
+                 onchange="readCharacterImage(event)">
+          <small>支援 PNG、JPG、WebP；原型限制 1 MB。修改時不必重新上傳。</small>
+        </label>
+        <img id="characterImagePreview"
+             ${imageDraft ? `src="${esc(imageDraft)}"` : ''}
+             class="${imageDraft ? '' : 'hidden'}"
+             style="width:120px;height:150px;object-fit:cover;border-radius:14px;margin-bottom:18px"
+             alt="角色頭像預覽">
+
+        <label class="field">
+          <span>角色名字 *</span>
+          <input name="name" required minlength="3" maxlength="25"
+                 pattern="[\\p{L}\\p{N}]{3,25}"
+                 value="${esc(c.name || '')}"
+                 title="3–25 字，只能包含文字、字母及數字">
+          <small>3–25 字，只能包含文字、字母及數字。</small>
+        </label>
+
+        <div class="two-col">
+          <label class="field">
+            <span>性別 *</span>
+            <select name="gender">
+              <option value="male" ${c.gender === 'male' ? 'selected' : ''}>男</option>
+              <option value="female" ${c.gender === 'female' ? 'selected' : ''}>女</option>
+              <option value="ambiguous" ${c.gender === 'ambiguous' ? 'selected' : ''}>模糊</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>年齡</span>
+            <input name="age" maxlength="20" value="${esc(c.age || '')}" placeholder="例如：29">
+          </label>
+        </div>
+
+        <label class="field">
+          <span>種族</span>
+          <input name="race" maxlength="50" value="${esc(c.race || '')}" placeholder="例如：人類">
+        </label>
+        <label class="field">
+          <span>公開介紹 *</span>
+          <textarea name="intro" required maxlength="2000">${esc(c.intro || '')}</textarea>
+          <small>最多 2000 字，會顯示於角色介紹頁。</small>
+        </label>
+        <label class="field">
+          <span>開場白 *</span>
+          <textarea name="opening" required maxlength="3000">${esc(c.opening || '')}</textarea>
+          <small>最多 3000 字；可用 **動作描述** 表示動作或場景。</small>
+        </label>
+        <label class="field">
+          <span>私密資訊</span>
+          <textarea name="privateInfo" maxlength="10000">${esc(c.privateInfo || '')}</textarea>
+          <small>最多 10000 字，不顯示於公開介紹頁。但本機原型不是安全儲存，勿填真正機密。</small>
+        </label>
+        <label class="field">
+          <span>對話風格</span>
+          <textarea name="style" maxlength="1000">${esc(c.style || '')}</textarea>
+          <small>最多 1000 字。真正影響 AI 回覆需接後端。</small>
+        </label>
+        <label class="field">
+          <span>權限 *</span>
+          <select name="visibility">
+            <option value="public" ${c.visibility === 'public' ? 'selected' : ''}>公開</option>
+            <option value="private" ${!c.visibility || c.visibility === 'private' ? 'selected' : ''}>私密</option>
+          </select>
+        </label>
+
+        <div class="field">
+          <span>標籤</span>
+          <button type="button" onclick="openTagPicker('form')">添加標籤</button>
+          <p id="formTagSummary" class="muted small" style="margin-top:10px">
+            ${esc(formTags.length ? formTags.map(t => '#'+t).join(' ') : '尚未選擇標籤')}
+          </p>
+        </div>
+
+        <label class="check">
+          <input type="checkbox" name="rights" required>
+          <span>我確認我的角色沒有侵犯智慧財產權、形象或其他任何權利。</span>
+        </label>
+
+        <div class="row" style="margin-top:24px">
+          <button type="button" onclick="navigate('create')">取消</button>
+          <button class="primary" type="submit">${editingId ? '儲存修改' : '創建角色'}</button>
+        </div>
+      </form>
+    </div>`;
+}
+
+function readImageFile(file) {
+  return new Promise((resolve,reject) => {
+    if (!file || !['image/png','image/jpeg','image/webp'].includes(file.type)) {
+      reject(new Error('請選擇 PNG、JPG 或 WebP 圖片。'));
+      return;
+    }
+    if (file.size > 1024 * 1024) {
+      reject(new Error('示範版本圖片限制 1 MB。'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('圖片讀取失敗。'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function readCharacterImage(event) {
+  try {
+    imageDraft = await readImageFile(event.target.files[0]);
+    $('characterImagePreview').src = imageDraft;
+    $('characterImagePreview').classList.remove('hidden');
+  } catch (e) {
+    toast(e.message);
+    event.target.value = '';
+  }
+}
+
+function submitCharacter(event) {
+  event.preventDefault();
+  if (!state.user) return;
+  const f = new FormData(event.target);
+  const name = String(f.get('name')).trim();
+  if (!/^[\p{L}\p{N}]{3,25}$/u.test(name)) {
+    toast('名字需為 3–25 字，且只能包含文字、字母及數字。');
+    return;
+  }
+  if (!imageDraft) { toast('請上傳角色頭像。'); return; }
+  if (!String(f.get('intro')).trim() || !String(f.get('opening')).trim()) {
+    toast('介紹與開場白不可只輸入空白。');
+    return;
+  }
+
+  const old = state.characters.find(c => c.id === editingId);
+  const c = {
+    id: old?.id || uid(),
+    name,
+    gender: String(f.get('gender')),
+    age: String(f.get('age')).trim(),
+    race: String(f.get('race')).trim(),
+    intro: String(f.get('intro')).trim(),
+    opening: String(f.get('opening')).trim(),
+    privateInfo: String(f.get('privateInfo')).trim(),
+    style: String(f.get('style')).trim(),
+    visibility: String(f.get('visibility')),
+    image: imageDraft,
+    tags: [...formTags],
+    owner: true,
+    chats: old?.chats || '0',
+    createdAt: old?.createdAt || Date.now()
+  };
+
+  if (old) state.characters[state.characters.indexOf(old)] = c;
+  else state.characters.unshift(c);
+  save();
+  navigate('create');
+  toast(old ? '已儲存角色修改。' : '已建立角色。');
+}
+
+function confirmDelete(id) {
+  modal('刪除角色', `
+    <p class="muted">將同時移除此角色的本機聊天及收藏。此操作無法復原。</p>
+    <label class="field">
+      <span>請輸入 Delete 確認</span>
+      <input id="deleteConfirm" autocomplete="off"
+             oninput="document.getElementById('deleteButton').disabled=this.value!=='Delete'">
+    </label>
+    <button id="deleteButton" class="danger" disabled
+            onclick="deleteCharacter('${id}')">永久刪除</button>
+  `);
+}
+
+function deleteCharacter(id) {
+  if (!state.user || $('deleteConfirm')?.value !== 'Delete') return;
+  if (!state.characters.some(c => c.id === id && c.owner)) return;
+  state.characters = state.characters.filter(c => c.id !== id);
+  state.favorites = state.favorites.filter(x => x !== id);
+  delete state.chats[id];
+  if (activeChat === id) activeChat = null;
+  save();
+  closeModal();
+  renderCreate();
+  toast('角色已刪除。');
+}
+
+/* Only our own JSON schema is supported in this demo. */
+async function importJSON(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!state.user || !file) return;
+
+  try {
+    if (file.size > 2 * 1024 * 1024) throw new Error('JSON 檔案上限 2 MB。');
+    const data = JSON.parse(await file.text());
+
+    const name = String(data.name || '').trim();
+    if (!/^[\p{L}\p{N}]{3,25}$/u.test(name)) {
+      throw new Error('name 必須為 3–25 字的文字、字母或數字。');
+    }
+    const intro = String(data.intro || '').trim();
+    const opening = String(data.opening || '').trim();
+    if (!intro || intro.length > 2000 || !opening || opening.length > 3000) {
+      throw new Error('需要 intro 與 opening，且不能超過 2000／3000 字。');
+    }
+    if (String(data.privateInfo || '').length > 10000 ||
+        String(data.style || '').length > 1000) {
+      throw new Error('私密資訊或對話風格超過長度限制。');
+    }
+
+    const image = String(data.image || '');
+    let validImage = false;
+    try {
+      const u = new URL(image);
+      validImage = u.protocol === 'https:' &&
+        !u.username && !u.password;
+    } catch (_) {}
+    if (!validImage) throw new Error('image 請提供 HTTPS 圖片網址。');
+
+    const tags = Array.isArray(data.tags)
+      ? [...new Set(data.tags.filter(t => TAGS.includes(t)))] : [];
+    if (tags.length > 5) throw new Error('標籤最多 5 個。');
+
+    state.characters.unshift({
+      id: uid(),
+      name,
+      intro,
+      opening,
+      image,
+      gender: ['male','female','ambiguous'].includes(data.gender)
+        ? data.gender : 'ambiguous',
+      age: String(data.age || '').slice(0,20),
+      race: String(data.race || '').slice(0,50),
+      privateInfo: String(data.privateInfo || ''),
+      style: String(data.style || ''),
+      visibility: 'private',
+      tags,
+      owner: true,
+      chats: '0',
+      createdAt: Date.now()
+    });
+    save();
+    navigate('create');
+    toast('已匯入角色，預設為私密。');
+  } catch (e) {
+    toast('匯入失敗：' + e.message);
+  }
+}
+
+/* ---------------- AI creation demo ---------------- */
+
+function openAI() {
+  formTags = [];
+  navigate('ai');
+}
+
+function renderAI() {
+  $('view').innerHTML = `
+    <div class="stack">
+      ${creationTabs()}
+      <form class="panel form-width" onsubmit="generateDemoCharacter(event)">
+        <h2>AI 創建角色</h2>
+        <div class="note" style="margin-bottom:20px">
+          尚未串接 AI。此頁可體驗費用計算與建立示範草稿；
+          不會真的生成文字、圖片，也不會扣除鑽石。
+        </div>
+        <label class="field">
+          <span>故事大綱 *</span>
+          <textarea name="outline" required maxlength="10000"
+                    placeholder="用 3–5 句話描寫背景、人物與故事走向…"></textarea>
+          <small>最多 10000 字。</small>
+        </label>
+        <div class="field">
+          <span>標籤</span>
+          <button type="button" onclick="openTagPicker('form')">添加標籤</button>
+          <p id="formTagSummary" class="muted small" style="margin-top:10px">尚未選擇標籤</p>
+        </div>
+        <label class="check">
+          <input id="generateImages" type="checkbox" onchange="updateAICost()">
+          <span>同時生成圖片｜介面示範</span>
+        </label>
+        <div id="imageCountArea" class="hidden" style="margin-top:18px">
+          <label class="field">
+            <span>生成圖片數</span>
+            <select id="imageCount" onchange="updateAICost()">
+              <option value="1">1 張</option>
+              <option value="2">2 張</option>
+              <option value="3">3 張</option>
+              <option value="4">4 張</option>
+            </select>
+          </label>
+        </div>
+        <p id="aiCostText" class="muted" style="margin-top:22px"></p>
+        <div class="row">
+          <button type="button" onclick="navigate('create')">取消</button>
+          <button id="aiGenerateButton" class="primary" type="submit">建立示範草稿</button>
+        </div>
+      </form>
+    </div>`;
+  updateAICost();
+}
+
+function updateAICost() {
+  const enabled = $('generateImages').checked;
+  $('imageCountArea').classList.toggle('hidden', !enabled);
+  const cost = 30 + (enabled ? Number($('imageCount').value) * 2 : 0);
+  $('aiCostText').textContent =
+    `預計費用：${cost} 鑽石。角色 30 鑽石，每張圖片 2 鑽石。此原型不扣款。`;
+  $('aiGenerateButton').disabled = !state.user || state.user.diamonds < cost;
+}
+
+function generateDemoCharacter(event) {
+  event.preventDefault();
+  const outline = String(new FormData(event.target).get('outline')).trim();
+  if (!outline) { toast('請輸入故事大綱。'); return; }
+
+  const cost = 30 + ($('generateImages').checked ? Number($('imageCount').value)*2 : 0);
+  if (!state.user || state.user.diamonds < cost) return;
+
+  state.characters.unshift({
+    id: uid(),
+    name: '示範新角色',
+    gender: 'ambiguous',
+    age: '',
+    race: '',
+    intro: outline.slice(0,2000),
+    opening: '**故事即將開始。**\n「你好，這是一份示範角色草稿。」',
+    privateInfo: outline,
+    style: '',
+    image: seed[0].image,
+    tags: [...formTags],
+    visibility: 'private',
+    owner: true,
+    chats: '0',
+    createdAt: Date.now()
+  });
+  addNotice('示範草稿建立完成', '此草稿使用你輸入的大綱及既有示範頭像，並非 AI 生成。請至創建角色頁修改。');
+  save();
+  navigate('create');
+  toast('已建立示範草稿；未使用 AI、未生成圖片、未扣鑽石。');
+}
+
+/* ---------------- Chat demo ---------------- */
+
+function startChat(id) {
+  if (!state.user) {
+    openLogin(() => startChat(id));
+    return;
+  }
+  const c = state.characters.find(x => x.id === id);
+  if (!c) return;
+  if (!state.chats[id]) {
+    state.chats[id] = {
+      pinned: false,
+      persona: '',
+      suggestions: true,
+      messages: [
+        { id: uid(), role:'assistant', text:c.opening, at:Date.now() }
+      ],
+      memories: []
+    };
+  }
+  activeChat = id;
+  save();
+  navigate('chat');
+}
+
+function selectedChat() {
+  if (!state.chats[activeChat]) {
+    activeChat = Object.keys(state.chats)[0] || null;
+  }
+  return state.chats[activeChat] || null;
+}
+
+function actionText(text) {
+  return String(text).split(/(\*\*[\s\S]*?\*\*)/g).map(part =>
+    part.startsWith('**') && part.endsWith('**')
+      ? `<em>${esc(part.slice(2,-2))}</em>` : esc(part)
+  ).join('');
+}
+
+function chatListHTML() {
+  const ids = Object.keys(state.chats).filter(id =>
+    state.characters.some(c => c.id === id)
+  ).sort((a,b) => {
+    const x = state.chats[a], y = state.chats[b];
+    return Number(y.pinned)-Number(x.pinned) ||
+      (y.messages.at(-1)?.at || 0)-(x.messages.at(-1)?.at || 0);
+  });
+
+  return `
+    <div class="panel chat-list">
+      <button style="width:100%" onclick="showGroupInfo()">＋ 創建群組</button>
+      <p class="muted small" style="margin-top:12px">群組：尚未串接會員及後端</p>
+      <h3 style="margin-top:24px">角色列表</h3>
+      ${ids.map(id => {
+        const c = state.characters.find(x => x.id === id);
+        const chat = state.chats[id];
+        return `
+          <div class="chat-entry ${activeChat === id ? 'active' : ''}">
+            <button class="ghost" style="padding:3px;border:0"
+                    onclick="pinChat('${id}')" aria-label="置頂或取消置頂">
+              ${chat.pinned ? '📌' : '♧'}
+            </button>
+            <button style="padding:0;border:0;background:transparent"
+                    onclick="openDetail('${id}')" aria-label="查看角色介紹">
+              <img class="avatar" src="${esc(c.image)}" alt="${esc(c.name)}">
+            </button>
+            <button class="select-chat" onclick="selectChat('${id}')">
+              <strong>${esc(c.name)}</strong>
+              <div class="muted small ellipsis">${esc(chat.messages.at(-1)?.text || '')}</div>
+            </button>
+          </div>`;
+      }).join('') || '<p class="muted small">還沒有聊過天的角色。</p>'}
+    </div>`;
+}
+
+function renderChat() {
+  const chat = selectedChat();
+  const c = state.characters.find(x => x.id === activeChat);
+
+  $('view').innerHTML = `
+    <div class="stack">
+      <div class="note">
+        聊天為固定示範回覆，日記為本機摘錄；兩者都不是真正的 AI。
+      </div>
+      <div class="chat-layout">
+        ${chatListHTML()}
+        ${chat && c ? `
+          <section class="panel chat-main">
+            <div class="chat-heading row between">
+              <div class="row">
+                <img class="avatar" src="${esc(c.image)}" alt="">
+                <div>
+                  <strong>${esc(c.name)}</strong>
+                  <div class="muted small">示範對話</div>
+                </div>
+              </div>
+              <button onclick="openDetail('${c.id}')">介紹</button>
+            </div>
+            <div id="messages" class="messages"></div>
+            <div class="status">
+              <strong>角色狀態｜展示欄位</strong><br>
+              時間：${esc(new Date().toLocaleString('zh-TW'))}<br>
+              地點：初始場景 · 狀態：等待你的回應<br>
+              最近通知：尚未接入動態狀態生成<br>
+              備忘：這些欄位目前不會隨劇情自動改變。
+            </div>
+            <form class="composer" onsubmit="sendMessage(event)">
+              ${chat.suggestions ? `
+                <div class="suggestions">
+                  ${['你今天過得如何？','可以多說一些嗎？','我想聽聽你的故事。']
+                    .map((t,i) => `<button type="button" onclick="useSuggestion(${i})">${esc(t)}</button>`)
+                    .join('')}
+                </div>` : ''}
+              <div class="row">
+                <textarea id="messageInput" maxlength="3000"
+                          placeholder="輸入對話… Enter 送出，Shift + Enter 換行"
+                          onkeydown="messageKeydown(event)"></textarea>
+                <button class="primary" type="submit" aria-label="送出訊息">➤</button>
+              </div>
+              <div class="chat-tools">
+                <button type="button" onclick="snapshotInfo()">📷 快照</button>
+                <button type="button" onclick="editPersona()">⚙ 專屬人設</button>
+                <button type="button" onclick="toggleSuggestions()">
+                  建議回覆 ${chat.suggestions ? 'ON' : 'OFF'}
+                </button>
+                <button type="button" disabled>圖片上傳｜後續開放</button>
+              </div>
+            </form>
+          </section>
+          <aside class="panel memory-panel">
+            <h3>回憶相簿</h3>
+            <p class="muted small">
+              OH NO，你現在還沒有跟他有回憶哦。<br>
+              圖片模型與相簿儲存尚未串接。
+            </p>
+            <hr style="border:0;border-top:1px solid var(--border);margin:24px 0">
+            <h3>甜蜜日記 <span class="badge">示範摘錄</span></h3>
+            <p class="muted small">
+              每輸入 5 次建立一筆摘錄；總上限 3000 字。
+              重大記憶不會自動移除，鎖定後不能編輯。
+            </p>
+            <div id="memories"></div>
+          </aside>
+        ` : `
+          <section class="panel" style="grid-column:2 / -1">
+            <div class="empty">尚未開始聊天。到探索頁選擇一個角色吧。</div>
+            <button class="primary" style="margin-top:18px" onclick="navigate('home')">探索角色</button>
+          </section>`}
+      </div>
+    </div>`;
+
+  if (chat && c) {
+    renderMessages();
+    renderMemories();
+  }
+}
+
+function renderMessages() {
+  const chat = state.chats[activeChat];
+  const c = state.characters.find(x => x.id === activeChat);
+  if (!chat || !$('messages')) return;
+
+  $('messages').innerHTML = chat.messages.map(m => `
+    <div class="message ${m.role === 'user' ? 'user' : ''}">
+      ${m.role === 'user' ? avatarHTML(state.user)
+        : `<img class="avatar" src="${esc(c.image)}" alt="">`}
+      <div class="message-content">
+        <div class="message-name">
+          ${esc(m.role === 'user' ? state.user.nickname : c.name)}
+        </div>
+        <div class="bubble">${actionText(m.text)}</div>
+      </div>
+    </div>`).join('');
+  $('messages').scrollTop = $('messages').scrollHeight;
+}
+
+function messageKeydown(event) {
+  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+    event.preventDefault();
+    event.target.form.requestSubmit();
+  }
+}
+
+function sendMessage(event) {
+  event.preventDefault();
+  const chat = state.chats[activeChat];
+  if (!state.user || !chat) return;
+  const text = $('messageInput').value.trim();
+  if (!text) return;
+
+  chat.messages.push({id:uid(),role:'user',text,at:Date.now()});
+  const count = chat.messages.filter(m => m.role === 'user').length;
+  const replies = [
+    '**他停下手邊的事，認真望向你。**\n「我在聽，你可以慢慢說。」\n\n［固定示範回覆，非 AI 生成］',
+    '**窗外的光線落在桌邊，氣氛安靜下來。**\n「聽起來，這件事對你很重要。」\n\n［固定示範回覆，非 AI 生成］',
+    '**他微微點頭，留給你繼續說話的空間。**\n「那麼，你希望接下來怎麼做？」\n\n［固定示範回覆，非 AI 生成］'
+  ];
+  chat.messages.push({
+    id:uid(), role:'assistant',
+    text:replies[(count-1)%replies.length], at:Date.now()+1
+  });
+
+  if (count % 5 === 0) {
+    const recent = chat.messages.filter(m => m.role === 'user').slice(-5);
+    const snippets = recent.map(m => [...m.text].slice(0,7).join('')).join('、');
+    const summary = `本輪摘錄：${snippets}。這是本機摘錄，非AI摘要。`;
+    addMemory(chat, summary);
+  }
+
+  $('messageInput').value = '';
+  save();
+  renderMessages();
+  renderMemories();
+}
+
+function useSuggestion(index) {
+  const texts = ['你今天過得如何？','可以多說一些嗎？','我想聽聽你的故事。'];
+  $('messageInput').value = texts[index];
+  $('messageInput').focus();
+}
+
+function selectChat(id) {
+  activeChat = id;
+  renderChat();
+}
+
+function pinChat(id) {
+  state.chats[id].pinned = !state.chats[id].pinned;
+  save();
+  renderChat();
+}
+
+function toggleSuggestions() {
+  const draft = $('messageInput').value;
+  state.chats[activeChat].suggestions = !state.chats[activeChat].suggestions;
+  save();
+  renderChat();
+  $('messageInput').value = draft;
+}
+
+function editPersona() {
+  const chat = state.chats[activeChat];
+  modal('此對話的專屬人設', `
+    <p class="muted small">最多 1000 字。只保存設定；示範回覆不會使用這些內容。</p>
+    <textarea id="personaInput" maxlength="1000">${esc(chat.persona)}</textarea>
+    <button class="primary" style="margin-top:16px" onclick="savePersona()">儲存</button>
+  `);
+}
+
+function savePersona() {
+  state.chats[activeChat].persona = $('personaInput').value;
+  save();
+  closeModal();
+  toast('已保存此對話的人設設定。');
+}
+
+function snapshotInfo() {
+  modal('角色快照', `
+    <p>這個按鈕未串接圖片模型，因此目前不會產生圖片或扣鑽石。</p>
+    <p class="muted small">
+      正式版需由後端建立生成任務、扣款、保存圖片及產生時間，
+      並處理失敗退款與保存期限。
+    </p>
+  `);
+}
+
+function showGroupInfo() {
+  modal('群組聊天', `
+    <p>PDF 指定此功能限月費會員使用。</p>
+    <div class="note">
+      原型尚未接入會員驗證與多角色 AI，因此目前只提供入口，
+      不會假裝已建立可用的群組聊天。
+    </div>
+  `);
+}
+
+/* ---------------- Diary ---------------- */
+
+function memoryLength(memories) {
+  return memories.reduce((n,m) => n + [...m.text].length,0);
+}
+
+function addMemory(chat, text) {
+  const next = [...chat.memories, {
+    id:uid(), text, important:false, at:Date.now()
+  }];
+  while (memoryLength(next) > 3000) {
+    const removable = next.findIndex(m => !m.important);
+    if (removable < 0) {
+      toast('重大記憶已達上限，無法新增日記。');
+      return;
+    }
+    const removed = next.splice(removable,1)[0];
+    if (removed.id === next.at(-1)?.id) break;
+  }
+  chat.memories = next;
+}
+
+function renderMemories() {
+  if (!$('memories')) return;
+  const memories = state.chats[activeChat].memories;
+  $('memories').innerHTML = `
+    <p class="muted small">${memoryLength(memories)} / 3000 字</p>
+    ${memories.map(m => `
+      <div class="memory-item">
+        <label class="check">
+          <input type="checkbox" ${m.important ? 'checked disabled' : ''}
+                 onchange="lockMemory('${m.id}',this)">
+          <span>${m.important ? '🔒 重大記憶' : '設為重大記憶'}</span>
+        </label>
+        <p>${esc(m.text)}</p>
+        <div class="muted small">${esc(new Date(m.at).toLocaleString('zh-TW'))}</div>
+        <button style="margin-top:8px;font-size:11px" ${m.important ? 'disabled' : ''}
+                onclick="editMemory('${m.id}')">編輯</button>
+      </div>
+    `).join('') || '<p class="muted small">還沒有日記。完成 5 次輸入後會建立示範摘錄。</p>'}`;
+}
+
+function lockMemory(id, input) {
+  if (!confirm('設為重大記憶後，此原型不允許解除或編輯。確定嗎？')) {
+    input.checked = false;
+    return;
+  }
+  const m = state.chats[activeChat].memories.find(x => x.id === id);
+  if (m) m.important = true;
+  save();
+  renderMemories();
+}
+
+function editMemory(id) {
+  const m = state.chats[activeChat].memories.find(x => x.id === id);
+  if (!m || m.important) return;
+  modal('編輯日記', `
+    <textarea id="memoryEdit" maxlength="3000">${esc(m.text)}</textarea>
+    <button class="primary" style="margin-top:16px"
+            onclick="saveMemory('${id}')">儲存</button>
+  `);
+}
+
+function saveMemory(id) {
+  const chat = state.chats[activeChat];
+  const m = chat.memories.find(x => x.id === id);
+  if (!m || m.important) return;
+  const text = $('memoryEdit').value.trim();
+  if (!text) { toast('日記內容不能為空。'); return; }
+  const total = memoryLength(chat.memories) - [...m.text].length + [...text].length;
+  if (total > 3000) {
+    toast('儲存後會超過 3000 字，請縮短內容。');
+    return;
+  }
+  m.text = text;
+  save();
+  closeModal();
+  renderMemories();
+}
+
+/* ---------------- Notifications ---------------- */
+
+function addNotice(title, body) {
+  state.notifications.unshift({
+    id:uid(), title, body, read:false, at:Date.now()
+  });
+}
+
+function renderNotifications() {
+  const list = state.notifications.filter(n => notificationTab !== 'unread' || !n.read);
+  $('view').innerHTML = `
+    <div class="stack">
+      <div class="row between wrap">
+        <h1 style="margin:0">系統通知</h1>
+        <button onclick="readAllNotices()">全部標為已讀</button>
+      </div>
+      <div class="tabs">
+        <button class="tab ${notificationTab === 'all' ? 'active' : ''}"
+                onclick="notificationTab='all';renderNotifications()">全部訊息</button>
+        <button class="tab ${notificationTab === 'unread' ? 'active' : ''}"
+                onclick="notificationTab='unread';renderNotifications()">未讀訊息</button>
+      </div>
+      <div>
+        ${list.map(n => `
+          <article class="notice">
+            <div class="row between">
+              <h3 style="margin:0">${n.read ? '' : '● '}${esc(n.title)}</h3>
+              ${!n.read ? `<button onclick="readNotice('${n.id}')">標為已讀</button>` : ''}
+            </div>
+            <p class="muted" style="margin:12px 0">${esc(n.body)}</p>
+            <span class="muted small">${esc(new Date(n.at).toLocaleString('zh-TW'))}</span>
+          </article>
+        `).join('') || '<div class="empty">目前沒有訊息。</div>'}
+      </div>
+    </div>`;
+}
+
+function readNotice(id) {
+  const n = state.notifications.find(x => x.id === id);
+  if (n) n.read = true;
+  save();
+  renderNotifications();
+}
+
+function readAllNotices() {
+  state.notifications.forEach(n => n.read = true);
+  save();
+  renderNotifications();
+}
+
+/* ---------------- Profile and report ---------------- */
+
+function renderProfile() {
+  const u = state.user;
+  $('view').innerHTML = `
+    <div class="stack form-width">
+      <h1>個人帳號</h1>
+      <section class="panel stack">
+        <div class="row between">
+          <div class="row">
+            ${avatarHTML(u)}
+            <div>
+              <h2 style="margin:0">${esc(u.nickname)}</h2>
+              <p class="muted small" style="margin:5px 0 0">
+                UID：${esc(u.uid)}｜本機示範 UID
+              </p>
+            </div>
+          </div>
+          <button onclick="editProfile()">⚙ 編輯</button>
+        </div>
+        <div>
+          <h3>帳號簡介</h3>
+          <p class="prose muted">${esc(u.bio || '尚未填寫')}</p>
+        </div>
+      </section>
+      <section class="panel stack">
+        <div class="row between"><span>會員等級</span><strong>免費會員｜示範</strong></div>
+        <div class="row between">
+          <span>鑽石數量</span>
+          <strong>💎 ${u.diamonds.toLocaleString()}｜示範額度</strong>
+        </div>
+        <button onclick="purchaseInfo()">購買鑽石</button>
+      </section>
+      <section class="panel">
+        <h3>BUG 回報</h3>
+        <p class="muted small">可填寫問題並附上圖片；目前僅示範表單，不會送至管理員。</p>
+        <button onclick="openBugReport()">回報問題</button>
+      </section>
+      <div class="note">
+        所有示範資料均存於此瀏覽器，不能跨裝置同步。
+        本機 UID 不具備正式帳號的唯一性或安全保證。
+      </div>
+      <button class="danger" onclick="logout()">登出示範帳號</button>
+    </div>`;
+}
+
+let profileImageDraft = '';
+
+function editProfile() {
+  profileImageDraft = state.user.avatar;
+  modal('編輯個人資料', `
+    <form onsubmit="saveProfile(event)">
+      <label class="field">
+        <span>主頭像</span>
+        <input type="file" accept="image/png,image/jpeg,image/webp"
+               onchange="readProfileImage(event)">
+        <small>限制 1 MB；更新後會套用到聊天畫面。</small>
+      </label>
+      <label class="field">
+        <span>暱稱</span>
+        <input name="nickname" required maxlength="30" value="${esc(state.user.nickname)}">
+      </label>
+      <label class="field">
+        <span>帳號簡介</span>
+        <textarea name="bio" maxlength="1000">${esc(state.user.bio)}</textarea>
+      </label>
+      <button class="primary" type="submit">儲存修改</button>
+    </form>
+  `);
+}
+
+async function readProfileImage(event) {
+  try {
+    profileImageDraft = await readImageFile(event.target.files[0]);
+    toast('頭像已讀取，按儲存後套用。');
+  } catch (e) {
+    toast(e.message);
+    event.target.value = '';
+  }
+}
+
+function saveProfile(event) {
+  event.preventDefault();
+  const f = new FormData(event.target);
+  const nickname = String(f.get('nickname')).trim();
+  if (!nickname) { toast('暱稱不能為空。'); return; }
+  state.user.nickname = nickname;
+  state.user.bio = String(f.get('bio')).trim();
+  state.user.avatar = profileImageDraft;
+  save();
+  closeModal();
+  renderShell();
+  renderProfile();
+}
+
+function purchaseInfo() {
+  modal('購買鑽石', `
+    <p>目前尚未串接金流，因此不會建立訂單或收款。</p>
+    <div class="note">
+      正式版必須由伺服器確認付款成功，再增加鑽石；
+      不能以瀏覽器按鈕或本機資料當作付款依據。
+    </div>
+  `);
+}
+
+function openBugReport() {
+  modal('BUG 回報｜表單示範', `
+    <form onsubmit="submitBugReport(event)">
+      <div class="note" style="margin-bottom:18px">
+        尚未接入回報 API 與驗證碼服務。內容不會上傳或寄送。
+      </div>
+      <label class="field">
+        <span>問題說明 *</span>
+        <textarea name="description" required maxlength="3000"
+                  placeholder="請描述操作步驟、預期結果及實際問題…"></textarea>
+      </label>
+      <label class="field">
+        <span>截圖｜非必填</span>
+        <input name="screenshot" type="file" accept="image/png,image/jpeg,image/webp">
+      </label>
+      <p class="muted small">正式版需接入 Turnstile 或其他服務，並在伺服器驗證。</p>
+      <button class="primary" type="submit">測試表單檢查｜不會送出</button>
+    </form>
+  `);
+}
+
+function submitBugReport(event) {
+  event.preventDefault();
+  const f = new FormData(event.target);
+  if (!String(f.get('description')).trim()) {
+    toast('請填寫問題說明。');
+    return;
+  }
+  const file = f.get('screenshot');
+  if (file && file.size > 0 &&
+      (!['image/png','image/jpeg','image/webp'].includes(file.type) ||
+       file.size > 1024*1024)) {
+    toast('截圖需為 PNG、JPG 或 WebP，且不超過 1 MB。');
+    return;
+  }
+  closeModal();
+  toast('表單檢查通過；這次沒有實際送出回報。');
+}
+
+renderShell();
+renderPage();
 </script>
 </body>
 </html>
