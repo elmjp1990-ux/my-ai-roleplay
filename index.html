@@ -1,41 +1,157 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PersonaX - AI 角色扮演平台</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#090d16" />
+  <title>PersonaX｜探索 AI 角色</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background-color: #090d16; color: #f1f5f9; font-family: sans-serif; }
+    :root { color-scheme: dark; }
+    body { background:#080b12; color:#f8fafc; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif; }
+    * { scrollbar-width:thin; scrollbar-color:#334155 transparent; }
+    .glass { background:rgba(15,23,42,.72); backdrop-filter:blur(18px); }
+    .card { transition:transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+    .card:hover { transform:translateY(-3px); border-color:rgba(129,140,248,.55); box-shadow:0 18px 45px rgba(0,0,0,.28); }
+    .hero { background:radial-gradient(circle at 78% 25%,rgba(129,140,248,.28),transparent 32%), radial-gradient(circle at 18% 90%,rgba(168,85,247,.18),transparent 34%), linear-gradient(115deg,#111827,#172554 52%,#0f172a); }
+    .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .nav-active { background:rgba(99,102,241,.18); color:#c7d2fe; }
   </style>
 </head>
-<body class="h-screen flex flex-col overflow-hidden">
-
-  <!-- 頂部導覽列 -->
-  <header class="h-14 border-b border-slate-800 bg-slate-900 px-4 flex justify-between items-center shrink-0">
-    <div class="flex items-center gap-2">
-      <span class="font-bold text-white text-base">✨ PersonaX</span>
-    </div>
-    <div>
-      <button onclick="alert('點擊成功！')" class="bg-indigo-600 text-white text-xs px-3 py-1.5 rounded-xl font-medium">測試按鈕</button>
-    </div>
-  </header>
-
-  <!-- 主體區域 -->
-  <div class="flex-1 flex overflow-hidden">
-    <!-- 左側選單 -->
-    <aside class="w-60 border-r border-slate-800 bg-slate-900 p-4 space-y-2">
-      <div class="text-xs font-bold text-indigo-400 mb-2">導覽選單</div>
-      <button onclick="alert('切換到探索角色')" class="w-full text-left px-3 py-2 bg-slate-800 text-white rounded-xl text-xs font-medium">🏠 探索角色</button>
-      <button onclick="alert('切換到開始暢聊')" class="w-full text-left px-3 py-2 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-medium">💬 開始暢聊</button>
+<body class="min-h-screen">
+  <div class="flex min-h-screen">
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full md:translate-x-0 md:static shrink-0 border-r border-slate-800/80 bg-slate-950/95 transition-transform duration-200">
+      <div class="h-full flex flex-col p-4">
+        <div class="flex items-center justify-between mb-8">
+          <button onclick="goHome()" class="text-xl font-black tracking-tight">✨ <span class="bg-gradient-to-r from-indigo-300 to-fuchsia-300 bg-clip-text text-transparent">PersonaX</span></button>
+          <button onclick="toggleSidebar()" class="md:hidden text-slate-400">✕</button>
+        </div>
+        <nav class="space-y-1 text-sm">
+          <button class="nav-active w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left" onclick="goHome()">⌂ 探索角色</button>
+          <button class="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-slate-400 hover:bg-slate-900 hover:text-white" onclick="requireLogin('開始暢聊')">💬 開始暢聊</button>
+          <button class="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-slate-400 hover:bg-slate-900 hover:text-white" onclick="requireLogin('創建角色')">✦ 創建角色</button>
+          <button class="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-slate-400 hover:bg-slate-900 hover:text-white" onclick="requireLogin('系統通知')">♢ 系統通知</button>
+          <button class="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-slate-400 hover:bg-slate-900 hover:text-white" onclick="requireLogin('喜愛角色')">♡ 喜愛角色</button>
+        </nav>
+        <div class="mt-auto rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+          <p class="text-xs text-slate-500">PersonaX V1</p>
+          <p class="mt-1 text-sm font-semibold">沉浸式 AI 角色世界</p>
+          <p class="mt-2 text-xs leading-5 text-slate-500">探索角色、收藏喜愛的人物，之後與他們開始專屬故事。</p>
+        </div>
+      </div>
     </aside>
 
-    <!-- 右側內容 -->
-    <main class="flex-1 p-6 bg-slate-950 text-white">
-      <h1 class="text-xl font-bold">歡迎來到 PersonaX</h1>
-      <p class="text-xs text-slate-400 mt-2">請點擊左側按鈕測試互動是否恢復正常。</p>
-    </main>
+    <div class="flex-1 min-w-0">
+      <header class="sticky top-0 z-30 h-16 border-b border-slate-800/80 glass px-4 md:px-7 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <button onclick="toggleSidebar()" class="md:hidden rounded-xl border border-slate-700 px-3 py-2 text-slate-300">☰</button>
+          <div class="hidden sm:block text-sm font-semibold text-slate-200">探索角色</div>
+        </div>
+        <div class="flex items-center gap-2 md:gap-3">
+          <div class="hidden sm:flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300">💎 <span>1,250</span></div>
+          <button onclick="openLogin()" class="rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-xs font-bold shadow-lg shadow-indigo-900/30">登入 / 註冊</button>
+        </div>
+      </header>
+
+      <main class="mx-auto max-w-[1500px] p-4 md:p-7 space-y-7">
+        <section class="hero relative overflow-hidden rounded-3xl border border-indigo-400/20 p-6 md:p-10 min-h-[260px] flex items-center">
+          <div class="relative z-10 max-w-2xl">
+            <span class="inline-flex rounded-full border border-indigo-300/20 bg-indigo-400/10 px-3 py-1 text-xs font-semibold text-indigo-200">✦ 最新活動</span>
+            <h1 class="mt-4 text-3xl md:text-5xl font-black tracking-tight">找到一個，<br class="sm:hidden"/>真正屬於你的角色。</h1>
+            <p class="mt-4 max-w-xl text-sm md:text-base leading-7 text-slate-300">探索不同性格、故事與世界觀的 AI 角色。每一次對話，都可以成為只有你們知道的故事。</p>
+            <button onclick="scrollToCharacters()" class="mt-6 rounded-xl bg-white px-5 py-3 text-sm font-bold text-slate-900 hover:bg-indigo-50">開始探索 →</button>
+          </div>
+          <div class="absolute -right-12 -bottom-20 h-64 w-64 rounded-full border border-white/10 bg-white/5 blur-sm"></div>
+          <div class="absolute right-20 top-10 h-24 w-24 rounded-full bg-fuchsia-500/10 blur-2xl"></div>
+        </section>
+
+        <section class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 class="text-xl font-bold">探索角色</h2>
+            <p class="mt-1 text-xs text-slate-500">找到今天最想聊天的那個人。</p>
+          </div>
+          <div class="relative w-full md:w-80">
+            <span class="absolute left-3 top-2.5 text-slate-500">⌕</span>
+            <input id="search" oninput="renderCharacters()" placeholder="搜尋角色名稱或標籤…" class="w-full rounded-xl border border-slate-700 bg-slate-900/80 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-indigo-500" />
+          </div>
+        </section>
+
+        <section id="characters" class="space-y-4">
+          <div class="flex gap-2 overflow-x-auto pb-1">
+            <button data-filter="latest" onclick="setFilter('latest',this)" class="filter-btn rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold">最新角色</button>
+            <button data-filter="recommended" onclick="setFilter('recommended',this)" class="filter-btn rounded-full bg-slate-900 px-4 py-2 text-xs text-slate-400">推薦角色</button>
+            <button data-filter="male" onclick="setFilter('male',this)" class="filter-btn rounded-full bg-slate-900 px-4 py-2 text-xs text-slate-400">男生</button>
+            <button data-filter="female" onclick="setFilter('female',this)" class="filter-btn rounded-full bg-slate-900 px-4 py-2 text-xs text-slate-400">女生</button>
+          </div>
+          <div id="characterGrid" class="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"></div>
+        </section>
+      </main>
+    </div>
   </div>
 
+  <div id="loginModal" class="hidden fixed inset-0 z-50 items-center justify-center bg-black/70 p-4">
+    <div class="w-full max-w-sm rounded-3xl border border-slate-700 bg-slate-950 p-6 shadow-2xl">
+      <div class="flex justify-between"><div><h3 class="text-xl font-bold">登入 PersonaX</h3><p class="mt-1 text-xs text-slate-500">登入後即可開始聊天、收藏與創建角色。</p></div><button onclick="closeLogin()" class="text-slate-500">✕</button></div>
+      <button onclick="fakeLogin()" class="mt-6 w-full rounded-xl bg-white py-3 text-sm font-bold text-slate-900 hover:bg-slate-100">使用 Google 登入</button>
+      <button onclick="fakeLogin()" class="mt-2 w-full rounded-xl border border-slate-700 py-3 text-sm font-semibold text-slate-200 hover:bg-slate-900">Email 登入</button>
+    </div>
+  </div>
+
+  <div id="detailModal" class="hidden fixed inset-0 z-50 items-center justify-center bg-black/75 p-4">
+    <div class="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-700 bg-slate-950 shadow-2xl">
+      <div id="detailBody"></div>
+    </div>
+  </div>
+
+<script>
+const characters = [
+  {id:1,name:'封以恆',gender:'male',age:'33',tags:['CEO','深情','掌控感'],chats:'12.8萬',image:'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=800&q=80',intro:'冷峻強勢的 CEO，只有在你面前會露出不為人知的溫柔。'},
+  {id:2,name:'沈知言',gender:'male',age:'29',tags:['醫生','溫柔','日常'],chats:'8.6萬',image:'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=800&q=80',intro:'總是耐心聽你說話的年輕醫生，平靜外表下藏著很深的在意。'},
+  {id:3,name:'顧晚晴',gender:'female',age:'27',tags:['作家','知性','慢熱'],chats:'6.2萬',image:'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=800&q=80',intro:'喜歡在深夜寫故事的作家，也許下一個故事主角就是你。'},
+  {id:4,name:'林澈',gender:'male',age:'25',tags:['校園','陽光','戀愛'],chats:'4.9萬',image:'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80',intro:'笑起來很有感染力的校園人氣人物，對你的反應總是特別明顯。'},
+  {id:5,name:'蘇晚棠',gender:'female',age:'31',tags:['姐姐','成熟','療癒'],chats:'3.7萬',image:'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=800&q=80',intro:'成熟可靠的姐姐系角色，擅長在你需要時給你剛剛好的陪伴。'},
+  {id:6,name:'裴修然',gender:'male',age:'35',tags:['總裁','冷淡','反差'],chats:'9.1萬',image:'https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?auto=format&fit=crop&w=800&q=80',intro:'看似拒人於千里之外，實際上只是不知道怎麼對你坦白。'},
+  {id:7,name:'夏妍',gender:'female',age:'24',tags:['音樂','可愛','陪伴'],chats:'2.8萬',image:'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?auto=format&fit=crop&w=800&q=80',intro:'喜歡唱歌與分享生活的小太陽，和她聊天很容易忘記時間。'},
+  {id:8,name:'周沉',gender:'male',age:'30',tags:['刑警','懸疑','保護'],chats:'7.4萬',image:'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=800&q=80',intro:'沉默寡言的刑警，習慣把危險擋在你之前。'}
+];
+let filter='latest';
+let favorites=new Set();
+function renderCharacters(){
+  const q=document.getElementById('search').value.trim().toLowerCase();
+  let list=characters.filter(c=>filter==='latest'||filter==='recommended'||c.gender===filter);
+  if(filter==='recommended') list=[...characters].sort((a,b)=>parseFloat(b.chats)-parseFloat(a.chats));
+  list=list.filter(c=>!q || c.name.toLowerCase().includes(q)||c.tags.some(t=>t.toLowerCase().includes(q)));
+  document.getElementById('characterGrid').innerHTML=list.map(c=>`
+    <article class="card overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/70">
+      <div class="group relative aspect-[4/5] cursor-pointer" onclick="openDetail(${c.id})">
+        <img src="${c.image}" alt="${c.name}" class="h-full w-full object-cover" loading="lazy" />
+        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent"></div>
+        <button onclick="event.stopPropagation();toggleFavorite(${c.id})" class="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-black/45 backdrop-blur text-lg ${favorites.has(c.id)?'text-rose-400':'text-white'}">${favorites.has(c.id)?'♥':'♡'}</button>
+        <div class="absolute inset-x-0 bottom-0 p-3">
+          <div class="flex items-center justify-between gap-2"><h3 class="font-bold truncate">${c.name}</h3><span class="text-[10px] text-slate-300">💬 ${c.chats}</span></div>
+          <p class="mt-1 line-clamp-2 text-[11px] leading-5 text-slate-300">${c.intro}</p>
+          <div class="mt-2 flex gap-1 overflow-hidden">${c.tags.slice(0,3).map(t=>`<span class="shrink-0 rounded-full bg-white/10 px-2 py-1 text-[9px] text-slate-300">#${t}</span>`).join('')}</div>
+          <button onclick="event.stopPropagation();startChat(${c.id})" class="mt-3 w-full rounded-xl bg-indigo-600 py-2 text-xs font-bold opacity-90 hover:bg-indigo-500">開始聊天</button>
+        </div>
+      </div>
+    </article>`).join('') || `<div class="col-span-full rounded-2xl border border-dashed border-slate-800 p-10 text-center text-sm text-slate-500">找不到符合條件的角色。</div>`;
+}
+function setFilter(f,btn){filter=f;document.querySelectorAll('.filter-btn').forEach(b=>{b.className='filter-btn rounded-full bg-slate-900 px-4 py-2 text-xs text-slate-400'});btn.className='filter-btn rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold';renderCharacters();}
+function toggleFavorite(id){favorites.has(id)?favorites.delete(id):favorites.add(id);renderCharacters();}
+function openDetail(id){const c=characters.find(x=>x.id===id);document.getElementById('detailBody').innerHTML=`<div class="relative"><img src="${c.image}" class="h-72 w-full object-cover"/><button onclick="closeDetail()" class="absolute right-4 top-4 rounded-full bg-black/50 px-3 py-2">✕</button><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 p-6"><h2 class="text-3xl font-black">${c.name}</h2><p class="mt-1 text-xs text-slate-400">${c.gender==='male'?'男':'女'} · ${c.age} 歲 · 💬 ${c.chats} 次對話</p></div></div><div class="p-6"><div class="flex flex-wrap gap-2">${c.tags.map(t=>`<span class="rounded-full bg-indigo-500/10 px-3 py-1 text-xs text-indigo-300">#${t}</span>`).join('')}</div><p class="mt-5 text-sm leading-7 text-slate-300">${c.intro}</p><p class="mt-3 text-sm leading-7 text-slate-400">這是 PersonaX 的角色介紹預覽。之後這裡會接上完整公開介紹、角色資訊與開始暢聊功能。</p><button onclick="startChat(${c.id})" class="mt-6 w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold hover:bg-indigo-500">開始暢聊</button></div>`;show('detailModal');}
+function startChat(id){const c=characters.find(x=>x.id===id);closeDetail();requireLogin('與 '+c.name+' 開始暢聊');}
+function requireLogin(action){openLogin();}
+function openLogin(){show('loginModal');}
+function closeLogin(){hide('loginModal');}
+function fakeLogin(){closeLogin();alert('目前為 V1 前端展示。下一階段會接真正的登入系統。');}
+function closeDetail(){hide('detailModal');}
+function show(id){const e=document.getElementById(id);e.classList.remove('hidden');e.classList.add('flex');}
+function hide(id){const e=document.getElementById(id);e.classList.add('hidden');e.classList.remove('flex');}
+function toggleSidebar(){document.getElementById('sidebar').classList.toggle('-translate-x-full');}
+function scrollToCharacters(){document.getElementById('characters').scrollIntoView({behavior:'smooth'});}
+function goHome(){window.scrollTo({top:0,behavior:'smooth'});}
+window.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLogin();closeDetail();}});
+renderCharacters();
+</script>
 </body>
 </html>
