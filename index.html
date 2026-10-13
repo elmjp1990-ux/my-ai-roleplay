@@ -517,18 +517,21 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   * { scroll-behavior:auto!important; transition:none!important; }
 }
 </style>
-<!-- 引入 Supabase JS SDK -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script>
-    const SUPABASE_URL = 'https://ouyewoagbmtqehbofrje.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_MyTDqAKNTkK4zo7eap8gZA_ZGozHRMd';
-    
-    // 初始化 Supabase
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  // 3. 測試連線的函式
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // 如果原本已經有初始化過，我們直接把網址和 Key 設定進去，或者重新建立一個不重複的變數名稱
+  const SUPABASE_URL = 'https://ouyewoagbmtqehbofrje.supabase.co';
+  const SUPABASE_ANON_KEY = '把你剛剛複製的_publishable_key_貼在這裡';
+  
+  // 檢查如果還沒建立過，才建立全域的 supabase 客戶端
+  if (!window.mySupabase) {
+    window.mySupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+
+  // 測試連線的函式
   async function testSupabaseConnection() {
     try {
-      const { data, error } = await supabase.from('profiles').select('*').limit(1);
+      const { data, error } = await window.mySupabase.from('profiles').select('*').limit(1);
       if (error) {
         console.error('❌ 連線失敗：', error.message);
       } else {
@@ -540,12 +543,11 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     }
   }
 
-  // 4. 網頁一打開就自動執行測試
+  // 網頁一打開就自動執行測試
   window.onload = function() {
     testSupabaseConnection();
   };
-  </script>
-
+</script>
 </head>
 
 <body>
