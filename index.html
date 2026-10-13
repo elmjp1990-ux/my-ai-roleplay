@@ -13,7 +13,7 @@
 </head>
 <body class="h-screen flex flex-col overflow-hidden select-none">
 
-  <!-- ==================== 頂部導覽列 (Header) ==================== -->
+  <!-- 頂部導覽列 -->
   <header class="h-14 border-b border-slate-800/80 bg-slate-900/90 px-4 flex justify-between items-center backdrop-blur z-20 shrink-0">
     <div class="flex items-center gap-2">
       <button onclick="toggleSidebarCollapse()" class="text-slate-400 hover:text-white text-lg p-1">☰</button>
@@ -32,62 +32,49 @@
     </div>
   </header>
 
-  <!-- ==================== 主體佈局 ==================== -->
+  <!-- 主體佈局 -->
   <div class="flex-1 flex overflow-hidden relative">
     
-    <!-- 👈 可收合左側導覽列 (Sidebar) -->
+    <!-- 左側導覽列 (整合 LOGO 與收合) -->
     <aside id="sidebar" class="w-60 border-r border-slate-800/80 bg-slate-900/90 flex flex-col shrink-0 transition-all duration-300 z-10 overflow-hidden">
-      
-      <!-- LOGO 與名稱 -->
       <div class="p-3.5 border-b border-slate-800/80 flex items-center justify-between shrink-0">
         <div onclick="switchTab('lobby')" class="flex items-center gap-2.5 cursor-pointer overflow-hidden">
-          <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-500 flex items-center justify-center font-bold text-white shadow-lg shrink-0 text-sm">
-            PX
-          </div>
+          <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-500 flex items-center justify-center font-bold text-white shadow-lg shrink-0 text-sm">PX</div>
           <span class="sidebar-text font-bold text-base text-white tracking-wider whitespace-nowrap">PersonaX</span>
         </div>
-        <button onclick="toggleSidebarCollapse()" class="sidebar-text text-slate-400 hover:text-white text-xs p-1 rounded hover:bg-slate-800 transition">
-          ◀
-        </button>
+        <button onclick="toggleSidebarCollapse()" class="sidebar-text text-slate-400 hover:text-white text-xs p-1 rounded hover:bg-slate-800 transition">◀</button>
       </div>
 
-      <!-- 選單按鈕列表 -->
       <div class="flex-1 py-3 space-y-1 text-xs">
-        <button onclick="switchTab('lobby')" id="nav-lobby" title="探索角色" class="w-full text-left px-4 py-3 hover:bg-slate-800/80 text-slate-200 font-medium flex items-center gap-3 transition bg-slate-800/50 border-r-2 border-indigo-500">
+        <button onclick="switchTab('lobby')" id="nav-lobby" class="w-full text-left px-4 py-3 hover:bg-slate-800/80 text-slate-200 font-medium flex items-center gap-3 transition bg-slate-800/50 border-r-2 border-indigo-500">
           <span class="text-base shrink-0">🏠</span>
           <span class="sidebar-text whitespace-nowrap">探索角色</span>
         </button>
 
-        <button onclick="switchTab('chat')" id="nav-chat" title="開始暢聊" class="w-full text-left px-4 py-3 hover:bg-slate-800/80 text-slate-400 font-medium flex items-center gap-3 transition">
+        <button onclick="switchTab('chat')" id="nav-chat" class="w-full text-left px-4 py-3 hover:bg-slate-800/80 text-slate-400 font-medium flex items-center gap-3 transition">
           <span class="text-base shrink-0">💬</span>
           <span class="sidebar-text whitespace-nowrap">開始暢聊</span>
         </button>
 
-        <button onclick="openCreatorChatModal()" title="創建角色" class="w-full text-left px-4 py-3 hover:bg-slate-800/80 text-slate-400 font-medium flex items-center gap-3 transition">
+        <button onclick="openCreatorChatModal()" class="w-full text-left px-4 py-3 hover:bg-slate-800/80 text-slate-400 font-medium flex items-center gap-3 transition">
           <span class="text-base shrink-0">🧙‍♂️</span>
           <span class="sidebar-text whitespace-nowrap">創建角色</span>
         </button>
 
-        <button onclick="switchTab('notifications')" id="nav-notif" title="系統通知" class="w-full text-left px-4 py-3 hover:bg-slate-800/80 text-slate-400 font-medium flex items-center gap-3 transition">
+        <button onclick="switchTab('notifications')" id="nav-notif" class="w-full text-left px-4 py-3 hover:bg-slate-800/80 text-slate-400 font-medium flex items-center gap-3 transition">
           <span class="text-base shrink-0">🔔</span>
           <span class="sidebar-text whitespace-nowrap">系統通知</span>
         </button>
 
-        <button onclick="switchTab('favorites')" id="nav-fav" title="吾愛角色" class="w-full text-left px-4 py-3 hover:bg-slate-800/80 text-slate-400 font-medium flex items-center gap-3 transition">
+        <button onclick="switchTab('favorites')" id="nav-fav" class="w-full text-left px-4 py-3 hover:bg-slate-800/80 text-slate-400 font-medium flex items-center gap-3 transition">
           <span class="text-base shrink-0">💖</span>
           <span class="sidebar-text whitespace-nowrap">吾愛角色</span>
         </button>
       </div>
-
-      <div class="p-3 border-t border-slate-800/80 text-[10px] text-slate-500 text-center sidebar-text whitespace-nowrap">
-        PersonaX System v2.6
-      </div>
     </aside>
 
-    <!-- ==================== 頁面一：主畫面/可搜尋角色 (Lobby) ==================== -->
-    <div id="page-lobby" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 bg-slate-950 block">
-      
-      <!-- 活動輪播 Banner -->
+    <!-- 頁面一：探索角色 (Lobby) -->
+    <div id="page-lobby" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 bg-slate-950">
       <div class="relative w-full h-40 md:h-48 rounded-2xl bg-gradient-to-r from-indigo-950 via-purple-950 to-slate-900 border border-indigo-500/20 flex items-center px-6 overflow-hidden shadow-2xl">
         <div class="z-10 max-w-xl">
           <span class="bg-indigo-500/20 text-indigo-300 text-[11px] font-semibold px-2.5 py-1 rounded-full border border-indigo-500/30">📢 最新活動公告</span>
@@ -97,65 +84,155 @@
         </div>
       </div>
 
-      <!-- 可搜尋角色列 -->
       <div class="flex justify-between items-center flex-wrap gap-3">
         <div class="flex-1 min-w-[240px]">
           <input type="text" placeholder="🔍 搜尋/可直接輸入標籤名稱或者角色名稱進行篩選..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
         </div>
-        <div class="flex gap-2 text-xs">
-          <button class="bg-indigo-600 text-white px-3 py-2 rounded-xl font-medium">🔥 推薦角色</button>
-          <button class="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-2 rounded-xl font-medium">👨 男生角色</button>
-          <button class="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-2 rounded-xl font-medium">👩 女生角色</button>
-        </div>
       </div>
 
-      <!-- 角色卡清單 -->
       <div id="characterGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
     </div>
 
-    <!-- ==================== 頁面二：聊天視窗/開始暢聊 (Chat Hub) ==================== -->
+    <!-- 頁面二：開始暢聊 (Chat) -->
     <div id="page-chat" class="flex-1 flex overflow-hidden hidden bg-slate-950">
-      
-      <!-- 👈 角色列表 -->
       <div class="w-64 border-r border-slate-800/80 bg-slate-900/60 flex flex-col shrink-0 hidden md:flex">
         <div class="p-3 border-b border-slate-800/80 font-bold text-xs text-slate-300">過往對話角色</div>
         <div id="chatHistoryList" class="flex-1 overflow-y-auto divide-y divide-slate-800/40"></div>
       </div>
 
-      <!-- 中央對話與狀態區 -->
       <main class="flex-1 flex flex-col relative min-w-0">
-        
         <div class="h-16 border-b border-slate-800/80 px-4 flex justify-between items-center bg-slate-900/90 backdrop-blur z-10 shrink-0">
-          <div class="flex flex-col gap-0.5 overflow-hidden">
+          <div class="flex flex-col gap-0.5">
             <div class="flex items-center gap-2">
               <span id="chatCharName" class="font-bold text-sm text-white">封以恆</span>
               <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">在線</span>
-              <span class="text-slate-600 text-xs">|</span>
-              <span id="chatClock" class="text-xs text-indigo-300 font-mono">17:25 (傍晚) | 星期一</span>
             </div>
-            <div class="text-[11px] text-slate-400 truncate flex items-center gap-2">
-              <span>📍 <span id="chatLocation">私人餐廳頂樓包廂</span></span>
-              <span class="text-slate-600">|</span>
-              <span>💭 <span id="chatInnerThought" class="text-amber-200/90 italic">「今晚這女人的眼神……」</span></span>
-            </div>
-          </div>
-
-          <div class="flex bg-slate-800/80 p-0.5 rounded-lg border border-slate-700/60">
-            <button onclick="switchCenterTab('chat')" id="centerTab-chat" class="px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-600 text-white">💬 對話</button>
-            <button onclick="switchCenterTab('info')" id="centerTab-info" class="px-2.5 py-1 rounded-md text-xs font-medium text-slate-400 hover:text-white">📖 介紹</button>
+            <span class="text-[11px] text-slate-400">📍 <span id="chatLocation">私人餐廳頂樓包廂</span></span>
           </div>
         </div>
 
-        <div id="centerContent-chat" class="flex-1 flex flex-col overflow-hidden">
+        <div class="flex-1 flex flex-col overflow-hidden">
           <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
-
-          <div id="smartSuggestions" class="px-4 py-2 bg-slate-900/70 border-t border-slate-800/60 flex gap-2 overflow-x-auto text-xs">
-            <span class="text-slate-500 whitespace-nowrap self-center text-[10px]">✨ 建議回覆:</span>
-            <button onclick="useSuggestion('（微笑着直視他的眼睛）「公事談完了，現在是私人時間對吧？」')" class="bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0 transition">1. 撩人試探</button>
-            <button onclick="useSuggestion('（避開視線，整理文件）「請注意職場分寸。」')" class="bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0 transition">2. 冷淡克制</button>
+          <div class="p-3 bg-slate-900 border-t border-slate-800 flex gap-2 items-center">
+            <textarea id="chatInput" rows="1" placeholder="輸入訊息與角色對話..." class="flex-1 bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+            <button onclick="sendChatMessage()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs transition">✈️ 傳送</button>
           </div>
+        </div>
+      </main>
+    </div>
 
-          <div class="px-4 py-2 bg-slate-900/90 border-t border-slate-800/80 flex items-center justify-between text-xs gap-2">
-            <div class="flex items-center gap-2">
-              <button onclick="insertActionPrompt()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-2 py-1 rounded-lg transition">🎬 插入動作</button>
-              <button onclick="triggerGenerateImage
+    <!-- 其他分頁 -->
+    <div id="page-notifications" class="flex-1 overflow-y-auto p-6 hidden bg-slate-950 text-xs text-slate-300"><h2 class="text-lg font-bold text-white mb-2">🔔 系統通知</h2>近期無未讀系統通知。</div>
+    <div id="page-favorites" class="flex-1 overflow-y-auto p-6 hidden bg-slate-950 text-xs text-slate-300"><h2 class="text-lg font-bold text-white mb-2">💖 吾愛角色</h2>你尚未收藏任何吾愛角色。</div>
+  </div>
+
+  <!-- D-001 創建角色 Modal -->
+  <div id="creatorChatModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="p-4 border-b border-slate-800 bg-slate-950/80 flex justify-between items-center">
+        <h3 class="font-bold text-white text-sm">🧙‍♂️ D-001 專屬遊戲角色製作人</h3>
+        <button onclick="closeCreatorChatModal()" class="text-slate-500 hover:text-white">✕</button>
+      </div>
+      <div id="creatorChatBox" class="flex-1 overflow-y-auto p-4 space-y-3 text-xs leading-relaxed"></div>
+      <div class="p-3 border-t border-slate-800 bg-slate-950/90 flex gap-2">
+        <input type="text" id="creatorInput" placeholder="請輸入回答..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none">
+        <button onclick="sendCreatorMessage()" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs">送出</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 登入彈窗 -->
+  <div id="authModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl space-y-4 text-center text-xs">
+      <h3 class="text-base font-bold text-white">登入 / 註冊 PersonaX</h3>
+      <button onclick="simulateAuth()" class="w-full bg-white text-slate-900 font-semibold py-2.5 rounded-xl">🔴 Google 一鍵登入</button>
+      <button onclick="closeAuthModal()" class="text-slate-500">關閉</button>
+    </div>
+  </div>
+
+  <script>
+    var diamonds = 1250, isAuthed = false, isCollapsed = false;
+    var characters = [{ id: "feng", name: "封以恆", title: "集團 CEO (33歲)", desc: "眼神深邃、舉止優雅而帶有強烈掌控感。", location: "私人餐廳頂樓包廂", thought: "「今晚這女人的眼神……」", avatar: "封" }];
+    var activeCharIndex = 0, creatorStep = 1, tempChar = {};
+
+    function toggleSidebarCollapse() {
+      var sidebar = document.getElementById('sidebar');
+      var texts = document.querySelectorAll('.sidebar-text');
+      isCollapsed = !isCollapsed;
+      sidebar.classList.toggle('w-60', !isCollapsed);
+      sidebar.classList.toggle('w-16', isCollapsed);
+      texts.forEach(function(el) { el.classList.toggle('hidden', isCollapsed); });
+    }
+
+    function switchTab(tab) {
+      ['lobby', 'chat', 'notifications', 'favorites'].forEach(function(t) {
+        var el = document.getElementById('page-' + t);
+        if(el) el.classList.toggle('hidden', t !== tab);
+      });
+      if (tab === 'chat') {
+        renderChatHistoryList();
+        if (characters.length > 0) startChat(activeCharIndex);
+      }
+    }
+
+    function renderLobbyGrid() {
+      var grid = document.getElementById('characterGrid');
+      if (!grid) return;
+      grid.innerHTML = characters.map(function(c, i) {
+        return '<div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between shadow-xl">' +
+          '<div><div class="w-12 h-12 rounded-2xl bg-indigo-900 border border-indigo-500 flex items-center justify-center font-bold text-lg text-white mb-3">' + c.avatar + '</div>' +
+          '<h4 class="font-bold text-white text-base">' + c.name + '</h4>' +
+          '<span class="text-[10px] bg-indigo-950 text-indigo-300 px-2 py-0.5 rounded-full">' + c.title + '</span>' +
+          '<p class="text-xs text-slate-400 mt-2">' + c.desc + '</p></div>' +
+          '<button onclick="startChat(' + i + ')" class="mt-4 w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-2 rounded-xl">💬 開啟對話</button></div>';
+      }).join('');
+    }
+
+    function renderChatHistoryList() {
+      var list = document.getElementById('chatHistoryList');
+      if (!list) return;
+      list.innerHTML = characters.map(function(c, i) {
+        return '<div onclick="startChat(' + i + ')" class="p-3 flex items-center gap-3 hover:bg-slate-800 cursor-pointer ' + (i === activeCharIndex ? 'bg-slate-800 border-l-4 border-indigo-500' : '') + '">' +
+          '<div class="w-9 h-9 rounded-xl bg-indigo-900 flex items-center justify-center font-bold text-xs text-white">' + c.avatar + '</div>' +
+          '<div class="flex-1 overflow-hidden"><div class="font-bold text-xs text-slate-200">' + c.name + '</div><div class="text-[10px] text-slate-400 truncate">' + c.thought + '</div></div></div>';
+      }).join('');
+    }
+
+    function startChat(index) {
+      activeCharIndex = index;
+      var c = characters[index];
+      document.getElementById('chatCharName').innerText = c.name;
+      document.getElementById('chatLocation').innerText = c.location;
+      switchTab('chat');
+      document.getElementById('chatMessages').innerHTML = '<div class="flex gap-3 max-w-xl"><div class="w-8 h-8 rounded-full bg-indigo-900 flex items-center justify-center font-bold text-xs text-white">' + c.avatar + '</div><div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 text-xs text-slate-200">（站在' + c.location + '）<br>「來了？坐吧。」</div></div>';
+    }
+
+    function sendChatMessage() {
+      var input = document.getElementById('chatInput');
+      var text = input.value.trim();
+      if (!text) return;
+      var chatBox = document.getElementById('chatMessages');
+      chatBox.innerHTML += '<div class="flex gap-3 max-w-xl ml-auto flex-row-reverse"><div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center font-bold text-xs text-white">你</div><div class="bg-indigo-900 border border-indigo-700 rounded-2xl p-3.5 text-xs text-white">' + text + '</div></div>';
+      input.value = '';
+      chatBox.scrollTop = chatBox.scrollHeight;
+      setTimeout(function() {
+        chatBox.innerHTML += '<div class="flex gap-3 max-w-xl"><div class="w-8 h-8 rounded-full bg-indigo-900 flex items-center justify-center font-bold text-xs text-white">封</div><div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 text-xs text-slate-200">「繼續說給我聽。」</div></div>';
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }, 600);
+    }
+
+    function openCreatorChatModal() {
+      document.getElementById('creatorChatModal').classList.remove('hidden');
+      creatorStep = 1;
+      document.getElementById('creatorChatBox').innerHTML = '<div class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-indigo-300">🤖 <strong>D-001 角色製作人</strong>：歡迎！請指定角色的<strong>「基本資料」</strong>？</div>';
+    }
+    function closeCreatorChatModal() { document.getElementById('creatorChatModal').classList.add('hidden'); }
+    function sendCreatorMessage() {
+      var input = document.getElementById('creatorInput');
+      var val = input.value.trim();
+      if (!val) return;
+      var box = document.getElementById('creatorChatBox');
+      box.innerHTML += '<div class="bg-indigo-950 p-2.5 rounded-xl text-white ml-auto max-w-md">你：' + val + '</div>';
+      input.value = '';
+      setTimeout(function() {
+        if (creatorStep === 1) { tempChar.basic = val; creatorStep = 2; box.innerHTML += '<div class="bg-slate-950 p-3 text-indigo-300">🤖 <strong>D-001</strong>
