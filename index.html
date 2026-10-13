@@ -2037,5 +2037,1509 @@ function submitBugReport(event) {
 renderShell();
 renderPage();
 </script>
+<!-- PersonaX：第二版 PDF 更新補丁 -->
+<style>
+  /* Sidebar logo and icons */
+  .sidebar {
+    background: #111214;
+  }
+  .sidebar-footer .brand {
+    width: 100%;
+    font-size: 20px;
+  }
+  .nav-btn.active {
+    background: #ffffff09;
+    color: #e0e7ff;
+    border-radius: 999px;
+  }
+  .px-icon {
+    width: 19px;
+    height: 19px;
+    vertical-align: middle;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* Detail and comments */
+  .px-author {
+    color: #c4b5fd;
+    border: 0;
+    background: transparent;
+    padding: 4px 0;
+  }
+  .px-detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+  }
+  .px-detail-actions .primary {
+    flex: 1;
+    min-width: 140px;
+  }
+  .px-comment {
+    padding: 18px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .px-comment-reply {
+    margin-left: 28px;
+    border-left: 2px solid #6366f140;
+    padding-left: 14px;
+  }
+  .px-comment-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .px-comment-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    margin: 12px 0;
+  }
+  .px-comment-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .px-comment-tools button {
+    font-size: 11px;
+    padding: 6px 9px;
+  }
+  .px-comment-deleted {
+    color: var(--muted);
+    font-style: italic;
+  }
+  .px-author-avatar {
+    width: 80px;
+    height: 80px;
+    font-size: 28px;
+  }
+
+  /* Chat */
+  .chat-layout {
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+  .chat-main {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+  }
+  .chat-main::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(#080d17cf, #080d17e8),
+      var(--px-chat-background, none);
+    background-size: cover;
+    background-position: center;
+    z-index: -1;
+    pointer-events: none;
+  }
+  .chat-heading {
+    background: #0b1220bb;
+    backdrop-filter: blur(12px);
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .composer {
+    background: #0b1220d9;
+  }
+  .chat-entry {
+    position: relative;
+  }
+  .px-chat-menu {
+    opacity: 0;
+    padding: 4px 7px;
+  }
+  .chat-entry:hover .px-chat-menu,
+  .chat-entry:focus-within .px-chat-menu {
+    opacity: 1;
+  }
+  .px-pin {
+    border: 0;
+    padding: 3px;
+    background: transparent;
+    color: #b8c3d5;
+  }
+  .px-pin.on {
+    color: #fb7185;
+  }
+  .px-pin.on svg {
+    fill: #fb718533;
+  }
+  .px-narration {
+    color: #aab4c6;
+    font-style: italic;
+    white-space: pre-wrap;
+    line-height: 1.9;
+    margin: 10px 0;
+    overflow-wrap: anywhere;
+  }
+  .px-phone {
+    max-width: 350px;
+    margin: 0 auto 14px;
+    border: 1px solid #ffffff25;
+    border-radius: 25px;
+    padding: 15px 18px;
+    background: #1118279c;
+    backdrop-filter: blur(15px);
+    box-shadow: 0 10px 35px #0003;
+    font-size: 12px;
+    color: #bac7db;
+  }
+  .px-phone-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    color: #e2e8f0;
+    font-size: 11px;
+  }
+  .px-phone p {
+    margin: 7px 0;
+    line-height: 1.6;
+  }
+
+  /* Album / diary overlay */
+  .px-chat-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 12;
+    padding: 20px;
+    background: #0b1120f7;
+    backdrop-filter: blur(18px);
+    overflow-y: auto;
+  }
+  .px-overlay-heading {
+    position: sticky;
+    top: -20px;
+    z-index: 2;
+    background: #0b1120f5;
+    padding: 12px 0;
+    margin-bottom: 16px;
+  }
+  .px-album-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .px-album-photo {
+    position: relative;
+    padding: 0;
+    overflow: hidden;
+    aspect-ratio: 1;
+  }
+  .px-album-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .px-photo-date {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 9px;
+    color: white;
+    background: linear-gradient(transparent, #000d);
+    text-align: left;
+    font-size: 10px;
+  }
+
+  @media (max-width: 1200px) {
+    .chat-layout {
+      grid-template-columns: 230px minmax(0, 1fr);
+    }
+  }
+  @media (max-width: 767px) {
+    .chat-layout {
+      display: block;
+    }
+    .chat-list {
+      max-height: none;
+      min-height: 55dvh;
+    }
+    .px-chat-menu {
+      opacity: 1;
+    }
+    body.px-mobile-conversation .mobile-nav {
+      display: none;
+    }
+    body.px-mobile-conversation main {
+      padding: 10px 8px;
+    }
+    body.px-mobile-conversation .chat-list,
+    body.px-mobile-conversation #pxChatDemoNote {
+      display: none;
+    }
+    body.px-mobile-conversation .chat-main {
+      min-height: 0;
+      height: calc(100dvh - 82px);
+    }
+    body.px-mobile-conversation .messages {
+      max-height: none;
+      min-height: 0;
+    }
+    body.px-mobile-conversation .px-phone {
+      margin: 0 12px 10px;
+      max-width: none;
+      padding: 10px 14px;
+    }
+    body.px-mobile-conversation .px-phone p {
+      font-size: 10px;
+      margin: 4px 0;
+    }
+    body.px-mobile-conversation .composer {
+      padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    }
+    body.px-mobile-chat-list .chat-main {
+      display: none;
+    }
+    .px-chat-overlay {
+      padding: 16px;
+    }
+    .px-comment-reply {
+      margin-left: 12px;
+    }
+  }
+</style>
+
+<script>
+/*
+ * Requires the complete V2 index.html from the previous message.
+ * Frontend demo only; no real auth, AI, translation or moderation.
+ */
+(() => {
+  'use strict';
+
+  const original = {
+    navigate,
+    renderShell,
+    renderDetail,
+    renderProfile,
+    renderChat,
+    renderExploreGrid,
+    submitCharacter,
+    importJSON,
+    generateDemoCharacter,
+    startChat,
+    demoLogin,
+    logout
+  };
+
+  const PIN = `
+    <svg class="px-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M9 3h6l-1 6 4 4v2H6v-2l4-4-1-6Z"></path>
+      <path d="M12 15v7"></path>
+    </svg>`;
+
+  const LOCAL_UID = 'demo-local-account';
+  let authorPageId = null;
+  let mobileConversation = false;
+  let chatSearch = '';
+  let showingHidden = false;
+  let replyTo = null;
+  let exploreObserver = null;
+
+  // Escape JSON values when used inside inline event attributes.
+  const arg = value => esc(JSON.stringify(String(value)));
+  const chars = value => [...String(value)];
+  const currentUID = () => state.user?.uid || null;
+
+  const dateText = time =>
+    new Date(time).toLocaleString('zh-TW');
+
+  function fallbackAuthor(id) {
+    return {
+      uid: id,
+      nickname: '故事創作者',
+      bio: 'PersonaX 示範創作者。',
+      avatar: '',
+      fans: 0
+    };
+  }
+
+  function migrate() {
+    state.authors ||= {};
+    state.comments ||= {};
+    state.following ||= [];
+
+    state.authors['personax-studio'] ||= {
+      uid: 'personax-studio',
+      nickname: 'PersonaX工作室',
+      bio: '在不同的故事中，探索不同的相遇。此為示範作者。',
+      avatar: seed[0].image,
+      fans: 128
+    };
+
+    state.characters.forEach(c => {
+      c.authorId ||= c.owner ? LOCAL_UID : 'personax-studio';
+      // Existing V2 stats do not include unique-user counts.
+      c.userCount ??= null;
+    });
+
+    Object.values(state.chats).forEach(chat => {
+      chat.hidden ??= false;
+      chat.album ||= [];
+      chat.memories ||= [];
+    });
+
+    syncMyAuthor();
+  }
+
+  function syncMyAuthor() {
+    if (!state.user) return;
+    const u = state.user;
+    const previous = state.authors[u.uid] || {};
+    state.authors[u.uid] = {
+      ...previous,
+      uid: u.uid,
+      nickname: u.nickname,
+      bio: u.bio || '',
+      avatar: u.avatar || '',
+      fans: previous.fans || 0
+    };
+  }
+
+  function getAuthor(id) {
+    if (state.user?.uid === id) syncMyAuthor();
+    return state.authors[id] || fallbackAuthor(id);
+  }
+
+  function requireDemo(action) {
+    if (!state.user) {
+      openLogin(action);
+      return false;
+    }
+    return true;
+  }
+
+  function shareURL(type, id) {
+    const u = new URL(location.href);
+    u.hash = type + '/' + encodeURIComponent(id);
+    return u.href;
+  }
+
+  async function sharePage(type, id, title) {
+    const url = shareURL(type, id);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, url });
+      } else if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(url);
+        toast('分享網址已複製。');
+      } else {
+        modal('分享網址', `
+          <p class="muted small">請手動複製下方網址。</p>
+          <input readonly value="${esc(url)}"
+                 onclick="this.select()">
+        `);
+      }
+    } catch (e) {
+      if (e.name !== 'AbortError') toast('分享未完成，請稍後重試。');
+    }
+  }
+
+  /*
+   * Hash routes support seeded characters across browsers.
+   * Local-created data is not available on another browser/device.
+   */
+  function routeHash() {
+    const match = location.hash.match(/^#(character|author)\/(.+)$/);
+    if (!match) return;
+
+    let id;
+    try { id = decodeURIComponent(match[2]); }
+    catch (_) { return; }
+
+    if (match[1] === 'character') {
+      const c = state.characters.find(x => x.id === id);
+      if (!c) {
+        toast('此瀏覽器沒有該角色資料；本機創角尚未支援跨裝置分享。');
+        return;
+      }
+      if (c.visibility !== 'public' &&
+          (!state.user || c.authorId !== currentUID())) {
+        toast('這是私密角色，無法公開查看。');
+        return;
+      }
+      activeCharacter = id;
+      navigate('detail');
+    } else {
+      authorPageId = id;
+      openAuthor(id);
+    }
+  }
+
+  window.addEventListener('hashchange', routeHash);
+
+  /* ---------- Shell ---------- */
+
+  renderShell = function() {
+    original.renderShell();
+
+    document.body.classList.toggle(
+      'px-mobile-conversation',
+      page === 'chat' && mobileConversation && !!activeChat
+    );
+    document.body.classList.toggle(
+      'px-mobile-chat-list',
+      page === 'chat' && !mobileConversation
+    );
+
+    const footer = document.querySelector('.sidebar-footer');
+    if (footer) {
+      footer.innerHTML = `
+        <button class="brand" onclick="navigate('home')">
+          ✦ <span class="brand-name">PersonaX</span>
+        </button>
+        <p class="muted small" style="text-align:center;margin:12px 0">
+          本機前端原型
+        </p>`;
+    }
+
+    if (page === 'author') {
+      $('pageTitle').textContent = '作者主頁';
+    }
+
+    document.querySelectorAll('.nav-btn').forEach(button => {
+      const label = button.querySelector('.nav-label')?.textContent;
+      const icon = button.querySelector('.nav-icon');
+      if (!icon) return;
+
+      if (label === '系統通知') {
+        icon.innerHTML = `
+          <svg class="px-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"></path>
+            <path d="M10 21h4"></path>
+          </svg>`;
+      }
+      if (label === '創建角色') {
+        icon.innerHTML = `
+          <svg class="px-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M2 21v-2a7 7 0 0 1 12-5"></path>
+            <path d="M18 13v8M14 17h8"></path>
+          </svg>`;
+      }
+    });
+  };
+
+  navigate = function(target) {
+    if (target !== 'chat') mobileConversation = false;
+    if (target !== 'detail') replyTo = null;
+
+    if (target === 'author') {
+      page = 'author';
+      renderShell();
+      renderAuthor();
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    original.navigate(target);
+    renderShell();
+  };
+
+  demoLogin = function() {
+    original.demoLogin();
+    migrate();
+    save();
+    renderShell();
+  };
+
+  logout = function() {
+    mobileConversation = false;
+    original.logout();
+  };
+
+  /* ---------- Detail ---------- */
+
+  renderDetail = function() {
+    const c = state.characters.find(x => x.id === activeCharacter);
+    if (!c) return original.renderDetail();
+
+    if (c.visibility !== 'public' &&
+        (!state.user || c.authorId !== currentUID())) {
+      toast('無法查看其他作者的私密角色。');
+      navigate('home');
+      return;
+    }
+
+    original.renderDetail();
+
+    const section = $('view').querySelector('.detail-layout > section');
+    const author = getAuthor(c.authorId);
+
+    const title = section.querySelector('h1');
+    title.insertAdjacentHTML('afterend', `
+      <div>
+        <button class="px-author"
+                onclick="PX.openAuthor(${arg(c.authorId)})">
+          BY @${esc(author.nickname)}
+        </button>
+        <p class="muted small" style="margin:8px 0">
+          👥 ${c.userCount === null ? '尚未統計' : esc(c.userCount)} 位對話用戶
+          ｜💬 ${esc(c.chats)} 次對話
+          <span class="badge">示範資料</span>
+        </p>
+      </div>`);
+
+    const startButton = section.querySelector('button.primary');
+    if (startButton) {
+      startButton.outerHTML = `
+        <div class="px-detail-actions">
+          <button class="primary" onclick="startChat(${arg(c.id)})">
+            開始聊天
+          </button>
+          <button onclick="PX.shareCharacter(${arg(c.id)})">↗ 分享</button>
+          <button onclick="toggleFavorite(${arg(c.id)})"
+                  aria-pressed="${state.favorites.includes(c.id)}">
+            ${state.favorites.includes(c.id) ? '♥ 已喜愛' : '♡ 喜愛'}
+          </button>
+          <button onclick="PX.report('角色', ${arg(c.id)})">⚑ 檢舉</button>
+        </div>`;
+    }
+
+    $('view').insertAdjacentHTML('beforeend', `
+      <section class="panel" style="margin-top:24px">
+        <h2>評論</h2>
+        <p class="muted small">
+          本機示範評論，尚未與其他使用者同步。
+        </p>
+        <div id="pxComments"></div>
+        <div id="pxReplyHint" class="muted small"
+             style="margin-top:18px"></div>
+        <form onsubmit="PX.postComment(event)" style="margin-top:12px">
+          <textarea id="pxCommentInput" maxlength="2000"
+                    placeholder="輸入評論…"></textarea>
+          <div class="row between" style="margin-top:10px">
+            <span class="muted small">最多 2000 字</span>
+            <button class="primary" type="submit">送出評論</button>
+          </div>
+        </form>
+      </section>`);
+
+    renderComments();
+  };
+
+  /* ---------- Comments ---------- */
+
+  function commentList() {
+    return state.comments[activeCharacter] ||= [];
+  }
+
+  function renderComments() {
+    if (!$('pxComments')) return;
+    const list = commentList();
+
+    $('pxComments').innerHTML = list.map(comment => {
+      const author = getAuthor(comment.authorId);
+      const mine = comment.authorId === currentUID();
+      const liked = (comment.likes || []).includes(currentUID());
+      const parent = list.find(x => x.id === comment.parentId);
+      const parentAuthor = parent ? getAuthor(parent.authorId) : null;
+
+      return `
+        <article class="px-comment ${comment.parentId ? 'px-comment-reply' : ''}">
+          <div class="px-comment-header">
+            ${avatarHTML(author)}
+            <div class="grow">
+              <button class="px-author"
+                      onclick="PX.openAuthor(${arg(author.uid)})">
+                @${esc(author.nickname)}
+              </button>
+              <div class="muted small">
+                ${esc(dateText(comment.at))}
+                ${comment.edited ? ' · 已修改' : ''}
+              </div>
+            </div>
+            ${!comment.deleted ? `
+              <button class="heart ${liked ? 'on' : ''}"
+                      onclick="PX.likeComment(${arg(comment.id)})">
+                ${liked ? '♥' : '♡'} ${(comment.likes || []).length}
+              </button>` : ''}
+          </div>
+
+          ${parentAuthor ? `
+            <p class="muted small" style="margin:10px 0 0">
+              回覆 @${esc(parentAuthor.nickname)}
+            </p>` : ''}
+
+          <p class="px-comment-text ${comment.deleted ? 'px-comment-deleted' : ''}">
+            ${comment.deleted ? '該筆評論已被刪除' : esc(comment.text)}
+          </p>
+
+          ${!comment.deleted ? `
+            <div class="px-comment-tools">
+              <button onclick="PX.replyComment(${arg(comment.id)})">回覆</button>
+              <button onclick="PX.translationInfo()">翻譯</button>
+              <button onclick="PX.commentMenu(${arg(comment.id)})">⋯</button>
+              ${mine ? '<span class="muted small">你的評論</span>' : ''}
+            </div>` : ''}
+        </article>`;
+    }).join('') || '<div class="empty">還沒有評論，成為第一個留言的人吧。</div>';
+  }
+
+  function postComment(event) {
+    event.preventDefault();
+    if (!state.user) {
+      openLogin(() => toast('已登入，請再次按下送出評論。'));
+      return;
+    }
+
+    const input = $('pxCommentInput');
+    const text = input.value.trim();
+    if (!text) return toast('請輸入評論內容。');
+
+    syncMyAuthor();
+    commentList().push({
+      id: uid(),
+      authorId: currentUID(),
+      text,
+      parentId: replyTo,
+      likes: [],
+      deleted: false,
+      at: Date.now()
+    });
+
+    replyTo = null;
+    input.value = '';
+    $('pxReplyHint').textContent = '';
+    save();
+    renderComments();
+  }
+
+  function likeComment(id) {
+    if (!requireDemo(() => likeComment(id))) return;
+    const c = commentList().find(x => x.id === id);
+    if (!c || c.deleted) return;
+    c.likes ||= [];
+    const index = c.likes.indexOf(currentUID());
+    if (index >= 0) c.likes.splice(index, 1);
+    else c.likes.push(currentUID());
+    save();
+    renderComments();
+  }
+
+  function replyComment(id) {
+    const c = commentList().find(x => x.id === id);
+    if (!c || c.deleted) return;
+    replyTo = id;
+    $('pxReplyHint').innerHTML = `
+      回覆 @${esc(getAuthor(c.authorId).nickname)}
+      <button onclick="PX.cancelReply()" style="padding:4px 8px">取消</button>`;
+    $('pxCommentInput').focus();
+  }
+
+  function commentMenu(id) {
+    const c = commentList().find(x => x.id === id);
+    if (!c || c.deleted) return;
+    const mine = c.authorId === currentUID();
+
+    modal('評論選項', mine ? `
+      <div class="stack">
+        <button onclick="PX.editComment(${arg(id)})" style="width:100%">修改評論</button>
+        <button class="danger" onclick="PX.deleteComment(${arg(id)})"
+                style="width:100%">刪除評論</button>
+      </div>
+    ` : `
+      <button onclick="PX.report('評論', ${arg(id)})"
+              style="width:100%">⚑ 檢舉評論</button>
+    `);
+  }
+
+  function editComment(id) {
+    const c = commentList().find(x => x.id === id);
+    if (!c || c.deleted || c.authorId !== currentUID()) return;
+
+    modal('修改評論', `
+      <textarea id="pxCommentEdit" maxlength="2000">${esc(c.text)}</textarea>
+      <div class="row" style="margin-top:16px">
+        <button onclick="closeModal()">取消</button>
+        <button class="primary" onclick="PX.saveComment(${arg(id)})">儲存</button>
+      </div>`);
+  }
+
+  function saveComment(id) {
+    const c = commentList().find(x => x.id === id);
+    if (!c || c.authorId !== currentUID() || c.deleted) return;
+    const text = $('pxCommentEdit').value.trim();
+    if (!text) return toast('評論不能留空；要移除請使用刪除。');
+    c.text = text;
+    c.edited = true;
+    save();
+    closeModal();
+    renderComments();
+  }
+
+  function deleteComment(id) {
+    const c = commentList().find(x => x.id === id);
+    if (!c || c.authorId !== currentUID() || c.deleted) return;
+    if (!confirm('確定刪除此評論？刪除後會保留「該筆評論已被刪除」提示。')) return;
+    c.text = '';
+    c.deleted = true;
+    c.likes = [];
+    save();
+    closeModal();
+    renderComments();
+  }
+
+  /* ---------- Author public page ---------- */
+
+  function openAuthor(id) {
+    authorPageId = id;
+    navigate('author');
+  }
+
+  function renderAuthor() {
+    const a = getAuthor(authorPageId);
+    const followed = state.following.includes(a.uid);
+    const own = currentUID() === a.uid;
+    const list = state.characters.filter(c =>
+      c.authorId === a.uid && c.visibility === 'public'
+    );
+
+    $('view').innerHTML = `
+      <div class="stack">
+        <button onclick="navigate('home')">← 返回探索</button>
+        <section class="panel stack">
+          <div class="row">
+            ${avatarHTML(a, 'px-author-avatar')}
+            <div>
+              <h1 style="margin-bottom:6px">@${esc(a.nickname)}</h1>
+              <span class="muted small">帳號 UID：${esc(a.uid)}</span>
+            </div>
+          </div>
+          <p class="prose muted">${esc(a.bio || '這位作者尚未填寫簡介。')}</p>
+          <div class="row between wrap">
+            <strong>
+              粉絲 ${(a.fans || 0) + (followed ? 1 : 0)}
+              <span class="badge">示範統計</span>
+            </strong>
+            <div class="row">
+              ${!own ? `
+                <button class="${followed ? '' : 'primary'}"
+                        onclick="PX.followAuthor(${arg(a.uid)})">
+                  ${followed ? '♥ 已追蹤' : '♡ 追蹤作者'}
+                </button>` : '<span class="badge">這是你的公開主頁</span>'}
+              <button onclick="PX.shareAuthor(${arg(a.uid)})">↗ 分享</button>
+            </div>
+          </div>
+        </section>
+        <h2>公開角色</h2>
+        <div class="grid">
+          ${list.map(c => cardHTML(c)).join('') ||
+            '<div class="empty">這位作者目前沒有公開角色。</div>'}
+        </div>
+        <div class="note">
+          此頁不公開鑽石、會員資料或私密角色。
+          本機建立的作者與角色尚未支援跨裝置同步。
+        </div>
+      </div>`;
+  }
+
+  function followAuthor(id) {
+    if (!requireDemo(() => followAuthor(id))) return;
+    if (id === currentUID()) return;
+    const i = state.following.indexOf(id);
+    if (i >= 0) state.following.splice(i, 1);
+    else state.following.push(id);
+    save();
+    renderAuthor();
+  }
+
+  renderProfile = function() {
+    original.renderProfile();
+    if (!state.user) return;
+    syncMyAuthor();
+
+    const title = $('view').querySelector('.panel h2');
+    if (title) {
+      title.insertAdjacentHTML('afterend', `
+        <button class="px-author" onclick="PX.openAuthor(${arg(currentUID())})">
+          @${esc(state.user.nickname)} · 查看公開主頁
+        </button>`);
+    }
+  };
+
+  // Preserve original behavior while assigning author metadata.
+  submitCharacter = function(event) {
+    original.submitCharacter(event);
+    migrate();
+    save();
+  };
+
+  importJSON = async function(event) {
+    await original.importJSON(event);
+    migrate();
+    save();
+  };
+
+  generateDemoCharacter = function(event) {
+    original.generateDemoCharacter(event);
+    migrate();
+    save();
+  };
+
+  /* ---------- Report form: no actual submission ---------- */
+
+  function report(type, id) {
+    if (!requireDemo(() => report(type, id))) return;
+
+    const categories = [
+      '血腥暴力', '色情低俗', '仇恨言論',
+      '侵害權益', '對未成年人有害的內容', '自我傷害', '其他'
+    ];
+
+    modal(type + '檢舉', `
+      <form onsubmit="PX.checkReport(event)">
+        <div class="note" style="margin-bottom:18px">
+          表單示範：尚未接入管理員系統，本次不會實際送出檢舉。
+        </div>
+        <label class="field">
+          <span>主要問題 *</span>
+          <select name="category" required>
+            <option value="">請選擇原因</option>
+            ${categories.map(t => `<option>${esc(t)}</option>`).join('')}
+          </select>
+        </label>
+        <label class="field">
+          <span>檢舉內容 *</span>
+          <textarea name="description" required maxlength="300"
+                    placeholder="請描述問題，最多 300 字"></textarea>
+        </label>
+        <label class="field">
+          <span>上傳圖片｜非必填</span>
+          <input name="image" type="file"
+                 accept="image/png,image/jpeg,image/webp">
+          <small>示範限制 1 MB。</small>
+        </label>
+        <p class="muted small">對象：${esc(type)} · ${esc(id)}</p>
+        <div class="row">
+          <button type="button" onclick="closeModal()">取消</button>
+          <button class="primary" type="submit">檢查表單｜不會送出</button>
+        </div>
+      </form>`);
+  }
+
+  function checkReport(event) {
+    event.preventDefault();
+    const f = new FormData(event.target);
+    if (!String(f.get('description')).trim()) {
+      return toast('請描述檢舉原因。');
+    }
+    const image = f.get('image');
+    if (image?.size &&
+        (!['image/png', 'image/jpeg', 'image/webp'].includes(image.type) ||
+         image.size > 1024 * 1024)) {
+      return toast('圖片需為 PNG、JPG 或 WebP，且不超過 1 MB。');
+    }
+    closeModal();
+    toast('表單檢查通過；尚未送至管理員。');
+  }
+
+  /* ---------- Chat list ---------- */
+
+  function relativeDay(time) {
+    const now = new Date();
+    const midnight = new Date(
+      now.getFullYear(), now.getMonth(), now.getDate()
+    ).getTime();
+    if (time >= midnight) return '今天';
+    if (time >= midnight - DAY) return '昨天';
+    return new Date(time).toLocaleDateString('zh-TW');
+  }
+
+  chatListHTML = function() {
+    const q = chatSearch.trim().toLowerCase();
+    const ids = Object.keys(state.chats).filter(id => {
+      const c = state.characters.find(x => x.id === id);
+      const chat = state.chats[id];
+      return c && (showingHidden || !chat.hidden) &&
+        (!q || c.name.toLowerCase().includes(q));
+    }).sort((a, b) => {
+      const x = state.chats[a], y = state.chats[b];
+      return Number(y.pinned) - Number(x.pinned) ||
+        (y.messages.at(-1)?.at || 0) - (x.messages.at(-1)?.at || 0);
+    });
+
+    return `
+      <aside class="panel chat-list">
+        <button style="width:100%" onclick="showGroupInfo()">＋ 創建群組</button>
+        <input id="pxChatSearch" style="margin-top:14px"
+               placeholder="搜尋角色名稱"
+               value="${esc(chatSearch)}"
+               oninput="PX.searchChats(this.value)">
+        <label class="check muted small" style="margin:12px 0">
+          <input type="checkbox" ${showingHidden ? 'checked' : ''}
+                 onchange="PX.showHidden(this.checked)">
+          顯示已隱藏對話
+        </label>
+        <div id="pxChatEntries">
+          ${chatEntries(ids)}
+        </div>
+      </aside>`;
+  };
+
+  function chatEntries(ids) {
+    return ids.map(id => {
+      const c = state.characters.find(x => x.id === id);
+      const chat = state.chats[id];
+      const last = chat.messages.at(-1);
+      return `
+        <div class="chat-entry ${activeChat === id ? 'active' : ''}">
+          <button class="px-pin ${chat.pinned ? 'on' : ''}"
+                  aria-label="${chat.pinned ? '取消置頂' : '置頂對話'}"
+                  onclick="pinChat(${arg(id)})">${PIN}</button>
+          <button class="ghost" style="padding:0;border:0"
+                  onclick="openDetail(${arg(id)})" aria-label="角色介紹">
+            <img class="avatar" src="${esc(c.image)}" alt="">
+          </button>
+          <button class="select-chat" onclick="selectChat(${arg(id)})">
+            <div class="row between">
+              <strong>${esc(c.name)}</strong>
+              <span class="muted small">${relativeDay(last?.at || 0)}</span>
+            </div>
+            <div class="muted small ellipsis">${esc(last?.text || '')}</div>
+            ${chat.hidden ? '<span class="badge">已隱藏</span>' : ''}
+          </button>
+          <button class="px-chat-menu"
+                  onclick="PX.chatMenu(${arg(id)})"
+                  aria-label="對話選項">⋯</button>
+        </div>`;
+    }).join('') || '<div class="empty">沒有符合條件的對話。</div>';
+  }
+
+  function refreshChatList() {
+    const holder = document.querySelector('.chat-list');
+    if (!holder) return;
+    holder.outerHTML = chatListHTML();
+  }
+
+  function searchChats(value) {
+    chatSearch = value;
+    const q = value.trim().toLowerCase();
+    const ids = Object.keys(state.chats).filter(id => {
+      const c = state.characters.find(x => x.id === id);
+      return c && (showingHidden || !state.chats[id].hidden) &&
+        (!q || c.name.toLowerCase().includes(q));
+    }).sort((a, b) =>
+      Number(state.chats[b].pinned) - Number(state.chats[a].pinned) ||
+      (state.chats[b].messages.at(-1)?.at || 0) -
+      (state.chats[a].messages.at(-1)?.at || 0)
+    );
+    if ($('pxChatEntries')) $('pxChatEntries').innerHTML = chatEntries(ids);
+  }
+
+  function chatMenu(id) {
+    const chat = state.chats[id];
+    if (!chat) return;
+    modal('對話選項', `
+      <div class="stack">
+        <button style="width:100%" onclick="PX.hideChat(${arg(id)})">
+          ${chat.hidden ? '取消隱藏' : '隱藏對話'}
+        </button>
+        <button class="danger" style="width:100%"
+                onclick="PX.removeChat(${arg(id)})">
+          移除好友與全部對話
+        </button>
+      </div>`);
+  }
+
+  function hideChat(id) {
+    const chat = state.chats[id];
+    if (!chat) return;
+    chat.hidden = !chat.hidden;
+    if (chat.hidden && activeChat === id) {
+      activeChat = null;
+      mobileConversation = false;
+    }
+    save();
+    closeModal();
+    renderChat();
+    renderShell();
+  }
+
+  function removeChat(id) {
+    const c = state.characters.find(x => x.id === id);
+    if (!c || !state.chats[id]) return;
+    if (!confirm(`確定要刪除「${c.name}」嗎？所有的對話、日記與相簿資料都會不見哦！`)) return;
+
+    delete state.chats[id];
+    if (activeChat === id) activeChat = null;
+    mobileConversation = false;
+    save();
+    closeModal();
+    renderChat();
+    renderShell();
+  }
+
+  selectedChat = function() {
+    if (!activeChat || !state.chats[activeChat] ||
+        state.chats[activeChat].hidden) {
+      activeChat = Object.keys(state.chats).find(id =>
+        !state.chats[id].hidden &&
+        state.characters.some(c => c.id === id)
+      ) || null;
+    }
+    return state.chats[activeChat] || null;
+  };
+
+  startChat = function(id) {
+    if (!state.user) {
+      openLogin(() => startChat(id));
+      return;
+    }
+    const c = state.characters.find(x => x.id === id);
+    if (!c) return;
+    if (c.visibility !== 'public' && c.authorId !== currentUID()) {
+      return toast('無法與其他作者的私密角色聊天。');
+    }
+
+    if (state.chats[id]) state.chats[id].hidden = false;
+    mobileConversation = true;
+    original.startChat(id);
+    migrate();
+    save();
+    renderShell();
+  };
+
+  selectChat = function(id) {
+    if (!state.chats[id]) return;
+    state.chats[id].hidden = false;
+    activeChat = id;
+    mobileConversation = true;
+    save();
+    renderChat();
+    renderShell();
+  };
+
+  /* ---------- Chat layout ---------- */
+
+  renderChat = function() {
+    original.renderChat();
+    renderShell();
+
+    const note = $('view').querySelector('.note');
+    if (note) note.id = 'pxChatDemoNote';
+
+    const panel = $('view').querySelector('.chat-main');
+    if (!panel) return;
+
+    // Album and diary now overlay the main chat, not a side column.
+    $('view').querySelector('.memory-panel')?.remove();
+
+    const c = state.characters.find(x => x.id === activeChat);
+    if (!c) return;
+
+    panel.style.setProperty(
+      '--px-chat-background',
+      `url(${JSON.stringify(c.image)})`
+    );
+
+    const heading = panel.querySelector('.chat-heading');
+    heading.innerHTML = `
+      <div class="row">
+        <button onclick="PX.backToChatList()" aria-label="返回聊天列表">←</button>
+        <button class="ghost row" style="padding:0;border:0"
+                onclick="openDetail(${arg(c.id)})">
+          <img class="avatar" src="${esc(c.image)}" alt="">
+          <strong>${esc(c.name)}</strong>
+        </button>
+      </div>
+      <div class="row">
+        <button onclick="PX.openChatOverlay('album')">回憶相簿</button>
+        <button onclick="PX.openChatOverlay('diary')">甜蜜日記</button>
+      </div>`;
+
+    const status = panel.querySelector('.status');
+    if (status) {
+      status.outerHTML = `
+        <section class="px-phone" aria-label="角色手機狀態">
+          <div class="px-phone-top">
+            <span>▰ 100%</span>
+            <span>
+              ${esc(new Date().toLocaleTimeString('zh-TW', {
+                hour: '2-digit', minute: '2-digit'
+              }))}
+              ${esc(new Date().toLocaleDateString('zh-TW', {
+                weekday: 'long'
+              }))}
+            </span>
+          </div>
+          <strong>${esc(c.name)}的手機</strong>
+          <p>⌖ 地點：初始場景</p>
+          <p>通知：等待你的回應</p>
+          <p>備忘：動態遊戲時間、內心話與狀態尚未接入 AI。</p>
+        </section>`;
+    }
+  };
+
+  function backToChatList() {
+    mobileConversation = false;
+    renderChat();
+    renderShell();
+  }
+
+  /* Narration is outside speech bubbles. */
+  renderMessages = function() {
+    const chat = state.chats[activeChat];
+    const c = state.characters.find(x => x.id === activeChat);
+    if (!chat || !c || !$('messages')) return;
+
+    $('messages').innerHTML = chat.messages.map(m => {
+      const user = m.role === 'user';
+
+      const pieces = user ? [m.text]
+        : String(m.text).split(/(\*\*[\s\S]*?\*\*)/g);
+
+      const content = pieces.filter(Boolean).map(part => {
+        const narration = !user &&
+          part.startsWith('**') && part.endsWith('**');
+
+        if (narration) {
+          return `<div class="px-narration">${esc(part.slice(2, -2))}</div>`;
+        }
+        if (!part.trim()) return '';
+        return `<div class="bubble" style="margin-bottom:7px">${esc(part.trim())}</div>`;
+      }).join('');
+
+      return `
+        <div class="message ${user ? 'user' : ''}">
+          ${user ? avatarHTML(state.user) :
+            `<img class="avatar" src="${esc(c.image)}" alt="">`}
+          <div class="message-content">
+            <div class="message-name">
+              ${esc(user ? state.user.nickname : c.name)}
+            </div>
+            ${content}
+          </div>
+        </div>`;
+    }).join('');
+
+    $('messages').scrollTop = $('messages').scrollHeight;
+  };
+
+  /* Blank send continues the demo, without adding an empty user turn. */
+  sendMessage = function(event) {
+    event.preventDefault();
+    const chat = state.chats[activeChat];
+    if (!state.user || !chat) return;
+
+    const text = $('messageInput').value.trim();
+
+    if (text) {
+      chat.messages.push({
+        id: uid(), role: 'user', text, at: Date.now()
+      });
+    }
+
+    chat.messages.push({
+      id: uid(),
+      role: 'assistant',
+      text: text
+        ? '**他將目光移向你，耐心等待你繼續說下去。**\n「我在聽。你可以慢慢說。」\n\n［固定示範回覆，非 AI 生成］'
+        : '**短暫的沉默後，他再次開口。**\n「如果你還不想說，我可以先陪你待一會兒。」\n\n［空白送出的接續示範，非 AI 生成］',
+      at: Date.now() + 1
+    });
+
+    const users = chat.messages.filter(m => m.role === 'user');
+    if (text && users.length % 5 === 0) {
+      const snippets = users.slice(-5)
+        .map(m => chars(m.text).slice(0, 6).join(''))
+        .join('、');
+
+      const summary = chars(
+        `本輪五次輸入摘錄：${snippets}。僅為示範，非AI摘要。`
+      ).slice(0, 50).join('');
+
+      addMemory(chat, summary);
+    }
+
+    $('messageInput').value = '';
+    save();
+    renderMessages();
+    renderMemories();
+  };
+
+  editPersona = function() {
+    const chat = state.chats[activeChat];
+    if (!chat) return;
+    modal('此對話的專屬人設', `
+      <p class="muted small">
+        最多 3000 字。示範回覆不會使用此設定，正式效果需串接 AI。
+      </p>
+      <textarea id="personaInput" maxlength="3000">${esc(chat.persona || '')}</textarea>
+      <div class="row" style="margin-top:16px">
+        <button onclick="closeModal()">取消</button>
+        <button class="primary" onclick="savePersona()">儲存</button>
+      </div>`);
+  };
+
+  /* ---------- Album / diary overlay ---------- */
+
+  function openChatOverlay(type) {
+    const panel = $('view').querySelector('.chat-main');
+    const chat = state.chats[activeChat];
+    if (!panel || !chat) return;
+
+    panel.querySelector('.px-chat-overlay')?.remove();
+
+    panel.insertAdjacentHTML('beforeend', `
+      <section class="px-chat-overlay" role="region"
+               aria-label="${type === 'album' ? '回憶相簿' : '甜蜜日記'}">
+        <div class="row between px-overlay-heading">
+          <h2 style="margin:0">${type === 'album' ? '回憶相簿' : '甜蜜日記'}</h2>
+          <button onclick="PX.closeChatOverlay()">返回聊天 ✕</button>
+        </div>
+        ${type === 'album' ? albumHTML(chat) : `
+          <p class="muted small">
+            每 5 次輸入建立一筆示範摘錄，上限 3000 字。
+            重大記憶可以取消勾選，再進行編輯。
+          </p>
+          <div id="memories"></div>
+        `}
+      </section>`);
+
+    if (type === 'diary') renderMemories();
+  }
+
+  function albumHTML(chat) {
+    /*
+     * No images are created here.
+     * Future backend can populate chat.album with:
+     * { id, url, at } using server-generated timestamps.
+     */
+    const photos = (chat.album || []).filter(p =>
+      typeof p.url === 'string' &&
+      (p.url.startsWith('https://') ||
+       /^data:image\/(png|jpeg|webp);base64,/.test(p.url)) &&
+      Number.isFinite(p.at)
+    );
+
+    return `
+      <div class="note" style="margin-bottom:18px">
+        正式版圖片最多保存一年，請及時下載。
+        本機原型尚未接入圖片生成、雲端保存與到期清理。
+      </div>
+      ${photos.length ? `
+        <div class="px-album-grid">
+          ${photos.map(p => `
+            <button class="px-album-photo" onclick="PX.viewPhoto(${arg(p.id)})">
+              <img src="${esc(p.url)}" alt="角色回憶快照">
+              <span class="px-photo-date">${esc(dateText(p.at))}</span>
+            </button>`).join('')}
+        </div>` : `
+        <div class="empty">
+          OH NO，你現在還沒有跟他有回憶哦。<br>
+          快照功能尚未串接圖片模型。
+        </div>`}`;
+  }
+
+  function viewPhoto(id) {
+    const photo = state.chats[activeChat]?.album?.find(p => p.id === id);
+    if (!photo) return;
+
+    modal('回憶快照', `
+      <img src="${esc(photo.url)}" alt="回憶快照"
+           style="width:100%;border-radius:14px">
+      <p class="muted small" style="margin-top:12px">${esc(dateText(photo.at))}</p>
+      <button onclick="PX.fullscreenPhoto()">全螢幕查看</button>
+    `);
+  }
+
+  async function fullscreenPhoto() {
+    const image = $('modal').querySelector('img');
+    if (!image?.requestFullscreen) {
+      toast('此瀏覽器不支援圖片全螢幕，可用縮放查看。');
+      return;
+    }
+    try { await image.requestFullscreen(); }
+    catch (_) { toast('無法進入全螢幕。'); }
+  }
+
+  /* ---------- Diary changes ---------- */
+
+  addMemory = function(chat, text) {
+    const newMemory = {
+      id: uid(), text, important: false, at: Date.now()
+    };
+
+    const next = [...chat.memories, newMemory];
+    while (memoryLength(next) > 3000) {
+      const index = next.findIndex(m => !m.important);
+
+      if (index < 0) {
+        toast('重大記憶已達容量上限，無法新增日記。');
+        return;
+      }
+
+      const removed = next.splice(index, 1)[0];
+
+      if (removed.id === newMemory.id) {
+        toast('剩餘記憶容量不足，這次未新增日記。');
+        return;
+      }
+    }
+
+    chat.memories = next;
+  };
+
+  renderMemories = function() {
+    if (!$('memories')) return;
+    const chat = state.chats[activeChat];
+    if (!chat) return;
+
+    $('memories').innerHTML = `
+      <p class="muted small">${memoryLength(chat.memories)} / 3000 字</p>
+      ${chat.memories.map(m => `
+        <div class="memory-item">
+          <label class="check">
+            <input type="checkbox" ${m.important ? 'checked' : ''}
+                   onchange="PX.toggleMemory(${arg(m.id)}, this.checked)">
+            <span>${m.important ? '♥ 重大記憶' : '設為重大記憶'}</span>
+          </label>
+          <p class="prose">${esc(m.text)}</p>
+          <div class="muted small">${esc(dateText(m.at))}</div>
+          <button style="margin-top:10px" ${m.important ? 'disabled' : ''}
+                  onclick="editMemory(${arg(m.id)})">編輯</button>
+        </div>`).join('') ||
+      '<div class="empty">還沒有日記，完成 5 次輸入後會建立示範摘錄。</div>'}`;
+  };
+
+  function toggleMemory(id, checked) {
+    const m = state.chats[activeChat]?.memories.find(x => x.id === id);
+    if (!m) return;
+    m.important = checked;
+    save();
+    renderMemories();
+  }
+
+  editMemory = function(id) {
+    const m = state.chats[activeChat]?.memories.find(x => x.id === id);
+    if (!m || m.important) return;
+    modal('編輯記憶', `
+      <p class="muted small">將內容全部清空後儲存，會刪除此筆記憶。</p>
+      <textarea id="memoryEdit" maxlength="3000">${esc(m.text)}</textarea>
+      <div class="row" style="margin-top:16px">
+        <button onclick="closeModal()">取消</button>
+        <button class="primary" onclick="saveMemory(${arg(id)})">存檔</button>
+      </div>`);
+  };
+
+  saveMemory = function(id) {
+    const chat = state.chats[activeChat];
+    const m = chat?.memories.find(x => x.id === id);
+    if (!m || m.important) return;
+
+    const text = $('memoryEdit').value.trim();
+    if (!text) {
+      if (!confirm('內容為空，確定刪除此筆記憶？')) return;
+      chat.memories = chat.memories.filter(x => x.id !== id);
+    } else {
+      const total = memoryLength(chat.memories) -
+        chars(m.text).length + chars(text).length;
+      if (total > 3000) return toast('儲存後超過 3000 字，請縮短內容。');
+      m.text = text;
+    }
+
+    save();
+    closeModal();
+    renderMemories();
+  };
+
+  /* ---------- Recommendation infinite loading ---------- */
+
+  renderExploreGrid = function() {
+    original.renderExploreGrid();
+    exploreObserver?.disconnect();
+
+    if (currentFilter !== 'recommended' || !$('loadMoreArea')) return;
+
+    const list = exploreList();
+    const maximum = Math.min(150, list.length);
+
+    if (recommendationLimit >= maximum) return;
+
+    $('loadMoreArea').innerHTML = `
+      <div id="pxRecommendationSentinel" style="padding:20px">
+        <button onclick="loadMoreRecommendations()">載入更多角色</button>
+      </div>`;
+
+    if (!('IntersectionObserver' in window)) return;
+
+    exploreObserver = new IntersectionObserver(entries => {
+      if (!entries.some(e => e.isIntersecting)) return;
+      exploreObserver.disconnect();
+      recommendationLimit = Math.min(maximum, recommendationLimit + 24);
+      renderExploreGrid();
+    }, { rootMargin: '150px' });
+
+    exploreObserver.observe($('pxRecommendationSentinel'));
+  };
+
+  /* Export only UI handlers needed by inline event attributes. */
+  window.PX = {
+    openAuthor,
+    followAuthor,
+    shareCharacter: id => {
+      const c = state.characters.find(x => x.id === id);
+      if (!c) return;
+      if (c.visibility !== 'public') {
+        toast('私密角色不能公開分享。');
+        return;
+      }
+      sharePage('character', id, c.name + '｜PersonaX');
+    },
+    shareAuthor: id =>
+      sharePage('author', id, getAuthor(id).nickname + '｜PersonaX'),
+    postComment,
+    likeComment,
+    replyComment,
+    cancelReply: () => {
+      replyTo = null;
+      if ($('pxReplyHint')) $('pxReplyHint').textContent = '';
+    },
+    commentMenu,
+    editComment,
+    saveComment,
+    deleteComment,
+    translationInfo: () => modal('評論翻譯', `
+      <p>尚未接入翻譯服務，因此目前不能產生翻譯。</p>
+      <p class="muted small">正式版可接翻譯 API，或由後端呼叫文字模型。</p>
+    `),
+    report,
+    checkReport,
+    searchChats,
+    showHidden: checked => {
+      showingHidden = checked;
+      refreshChatList();
+    },
+    chatMenu,
+    hideChat,
+    removeChat,
+    backToChatList,
+    openChatOverlay,
+    closeChatOverlay: () =>
+      $('view').querySelector('.px-chat-overlay')?.remove(),
+    viewPhoto,
+    fullscreenPhoto,
+    toggleMemory
+  };
+
+  migrate();
+  save();
+  renderShell();
+
+  if (page === 'author') renderAuthor();
+  else renderPage();
+
+  routeHash();
+})();
+</script>
 </body>
 </html>
