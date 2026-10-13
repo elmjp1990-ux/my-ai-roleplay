@@ -525,6 +525,25 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     
     // 初始化 Supabase
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // 3. 測試連線的函式
+  async function testSupabaseConnection() {
+    try {
+      const { data, error } = await supabase.from('profiles').select('*').limit(1);
+      if (error) {
+        console.error('❌ 連線失敗：', error.message);
+      } else {
+        console.log('🎉 恭喜！Supabase 資料庫連線成功！', data);
+        alert('Supabase 資料庫連線成功！');
+      }
+    } catch (err) {
+      console.error('❌ 異常：', err);
+    }
+  }
+
+  // 4. 網頁一打開就自動執行測試
+  window.onload = function() {
+    testSupabaseConnection();
+  };
   </script>
 
 </head>
