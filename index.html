@@ -38,7 +38,7 @@
     <!-- 👈 可收合左側導覽列 (Sidebar) -->
     <aside id="sidebar" class="w-60 border-r border-slate-800/80 bg-slate-900/90 flex flex-col shrink-0 transition-all duration-300 z-10 overflow-hidden">
       
-      <!-- 1. 網站 LOGO 與 名稱 (收合按鈕) -->
+      <!-- LOGO 與名稱 -->
       <div class="p-3.5 border-b border-slate-800/80 flex items-center justify-between shrink-0">
         <div onclick="switchTab('lobby')" class="flex items-center gap-2.5 cursor-pointer overflow-hidden">
           <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-500 flex items-center justify-center font-bold text-white shadow-lg shrink-0 text-sm">
@@ -51,33 +51,28 @@
         </button>
       </div>
 
-      <!-- 選單按鈕列表 (收合後僅顯示圖片/Icon) -->
+      <!-- 選單按鈕列表 -->
       <div class="flex-1 py-3 space-y-1 text-xs">
-        <!-- 3. 探索角色 -->
         <button onclick="switchTab('lobby')" id="nav-lobby" title="探索角色" class="w-full text-left px-4 py-3 hover:bg-slate-800/80 text-slate-200 font-medium flex items-center gap-3 transition bg-slate-800/50 border-r-2 border-indigo-500">
           <span class="text-base shrink-0">🏠</span>
           <span class="sidebar-text whitespace-nowrap">探索角色</span>
         </button>
 
-        <!-- 4. 開始暢聊 -->
         <button onclick="switchTab('chat')" id="nav-chat" title="開始暢聊" class="w-full text-left px-4 py-3 hover:bg-slate-800/80 text-slate-400 font-medium flex items-center gap-3 transition">
           <span class="text-base shrink-0">💬</span>
           <span class="sidebar-text whitespace-nowrap">開始暢聊</span>
         </button>
 
-        <!-- 創建角色 (D-001) -->
         <button onclick="openCreatorChatModal()" title="創建角色" class="w-full text-left px-4 py-3 hover:bg-slate-800/80 text-slate-400 font-medium flex items-center gap-3 transition">
           <span class="text-base shrink-0">🧙‍♂️</span>
           <span class="sidebar-text whitespace-nowrap">創建角色</span>
         </button>
 
-        <!-- 系統通知 -->
         <button onclick="switchTab('notifications')" id="nav-notif" title="系統通知" class="w-full text-left px-4 py-3 hover:bg-slate-800/80 text-slate-400 font-medium flex items-center gap-3 transition">
           <span class="text-base shrink-0">🔔</span>
           <span class="sidebar-text whitespace-nowrap">系統通知</span>
         </button>
 
-        <!-- 吾愛角色 -->
         <button onclick="switchTab('favorites')" id="nav-fav" title="吾愛角色" class="w-full text-left px-4 py-3 hover:bg-slate-800/80 text-slate-400 font-medium flex items-center gap-3 transition">
           <span class="text-base shrink-0">💖</span>
           <span class="sidebar-text whitespace-nowrap">吾愛角色</span>
@@ -85,17 +80,17 @@
       </div>
 
       <div class="p-3 border-t border-slate-800/80 text-[10px] text-slate-500 text-center sidebar-text whitespace-nowrap">
-        PersonaX System v2.5
+        PersonaX System v2.6
       </div>
     </aside>
 
     <!-- ==================== 頁面一：主畫面/可搜尋角色 (Lobby) ==================== -->
-    <div id="page-lobby" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 bg-slate-950">
+    <div id="page-lobby" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 bg-slate-950 block">
       
       <!-- 活動輪播 Banner -->
       <div class="relative w-full h-40 md:h-48 rounded-2xl bg-gradient-to-r from-indigo-950 via-purple-950 to-slate-900 border border-indigo-500/20 flex items-center px-6 overflow-hidden shadow-2xl">
         <div class="z-10 max-w-xl">
-          <span class="bg-indigo-500/20 text-indigo-300 text-[11px] font-semibold px-2.5 py-1 rounded-full border border-indigo-500/30">📢 最新活動公告 (Banner 1/3)</span>
+          <span class="bg-indigo-500/20 text-indigo-300 text-[11px] font-semibold px-2.5 py-1 rounded-full border border-indigo-500/30">📢 最新活動公告</span>
           <h2 class="text-xl md:text-2xl font-bold text-white mt-2">獨家首發：封以恆 CEO (33歲深情版)</h2>
           <p class="text-xs text-slate-300 mt-1 leading-relaxed">解鎖極致冷峻與掌控感！支援雙重 User 人設切換與自動記憶摘要。</p>
           <button onclick="quickStartFeng()" class="mt-3 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-lg shadow-indigo-600/30">立即體驗對話 ➔</button>
@@ -105,4 +100,62 @@
       <!-- 可搜尋角色列 -->
       <div class="flex justify-between items-center flex-wrap gap-3">
         <div class="flex-1 min-w-[240px]">
-          <input type="text" placeholder="🔍 搜尋/可直接輸入標籤名稱或者角色名稱進行篩選..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border
+          <input type="text" placeholder="🔍 搜尋/可直接輸入標籤名稱或者角色名稱進行篩選..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+        </div>
+        <div class="flex gap-2 text-xs">
+          <button class="bg-indigo-600 text-white px-3 py-2 rounded-xl font-medium">🔥 推薦角色</button>
+          <button class="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-2 rounded-xl font-medium">👨 男生角色</button>
+          <button class="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-2 rounded-xl font-medium">👩 女生角色</button>
+        </div>
+      </div>
+
+      <!-- 角色卡清單 -->
+      <div id="characterGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+    </div>
+
+    <!-- ==================== 頁面二：聊天視窗/開始暢聊 (Chat Hub) ==================== -->
+    <div id="page-chat" class="flex-1 flex overflow-hidden hidden bg-slate-950">
+      
+      <!-- 👈 角色列表 -->
+      <div class="w-64 border-r border-slate-800/80 bg-slate-900/60 flex flex-col shrink-0 hidden md:flex">
+        <div class="p-3 border-b border-slate-800/80 font-bold text-xs text-slate-300">過往對話角色</div>
+        <div id="chatHistoryList" class="flex-1 overflow-y-auto divide-y divide-slate-800/40"></div>
+      </div>
+
+      <!-- 中央對話與狀態區 -->
+      <main class="flex-1 flex flex-col relative min-w-0">
+        
+        <div class="h-16 border-b border-slate-800/80 px-4 flex justify-between items-center bg-slate-900/90 backdrop-blur z-10 shrink-0">
+          <div class="flex flex-col gap-0.5 overflow-hidden">
+            <div class="flex items-center gap-2">
+              <span id="chatCharName" class="font-bold text-sm text-white">封以恆</span>
+              <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">在線</span>
+              <span class="text-slate-600 text-xs">|</span>
+              <span id="chatClock" class="text-xs text-indigo-300 font-mono">17:25 (傍晚) | 星期一</span>
+            </div>
+            <div class="text-[11px] text-slate-400 truncate flex items-center gap-2">
+              <span>📍 <span id="chatLocation">私人餐廳頂樓包廂</span></span>
+              <span class="text-slate-600">|</span>
+              <span>💭 <span id="chatInnerThought" class="text-amber-200/90 italic">「今晚這女人的眼神……」</span></span>
+            </div>
+          </div>
+
+          <div class="flex bg-slate-800/80 p-0.5 rounded-lg border border-slate-700/60">
+            <button onclick="switchCenterTab('chat')" id="centerTab-chat" class="px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-600 text-white">💬 對話</button>
+            <button onclick="switchCenterTab('info')" id="centerTab-info" class="px-2.5 py-1 rounded-md text-xs font-medium text-slate-400 hover:text-white">📖 介紹</button>
+          </div>
+        </div>
+
+        <div id="centerContent-chat" class="flex-1 flex flex-col overflow-hidden">
+          <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
+
+          <div id="smartSuggestions" class="px-4 py-2 bg-slate-900/70 border-t border-slate-800/60 flex gap-2 overflow-x-auto text-xs">
+            <span class="text-slate-500 whitespace-nowrap self-center text-[10px]">✨ 建議回覆:</span>
+            <button onclick="useSuggestion('（微笑着直視他的眼睛）「公事談完了，現在是私人時間對吧？」')" class="bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0 transition">1. 撩人試探</button>
+            <button onclick="useSuggestion('（避開視線，整理文件）「請注意職場分寸。」')" class="bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0 transition">2. 冷淡克制</button>
+          </div>
+
+          <div class="px-4 py-2 bg-slate-900/90 border-t border-slate-800/80 flex items-center justify-between text-xs gap-2">
+            <div class="flex items-center gap-2">
+              <button onclick="insertActionPrompt()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-2 py-1 rounded-lg transition">🎬 插入動作</button>
+              <button onclick="triggerGenerateImage
