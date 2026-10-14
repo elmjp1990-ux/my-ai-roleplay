@@ -542,7 +542,7 @@ function updateUIForUser(user) {
     const userName = user.user_metadata.name || userEmail.split('@')[0];
     const avatarUrl = user.user_metadata.avatar_url;
 
-    // A. 同步寫入本機狀態
+    // A. 同步寫入所有常見的本機狀態與全域變數，讓原網站各功能抓得到你
     const currentUserObj = {
       id: user.id,
       name: userName,
@@ -550,14 +550,21 @@ function updateUIForUser(user) {
       avatar: avatarUrl,
       isLoggedIn: true
     };
+    
+    // 寫入 localStorage 供原網站讀取
     localStorage.setItem('personaX_user', JSON.stringify(currentUserObj));
+    localStorage.setItem('user', JSON.stringify(currentUserObj));
+    localStorage.setItem('isLoggedIn', 'true');
 
-    // B. 局部精準尋找：只找「右上角」包含「登入」文字的按鈕
-    // 我們排除掉側邊欄（sidebar），只找導覽列或頁面右上角的按鈕
+    // 如果原網站有用全域變數記錄使用者，這裡也直接賦值
+    if (typeof window !== 'undefined') {
+      window.currentUser = currentUserObj;
+    }
+
+    // B. 精準尋找右上角包含「登入」或「註冊」的按鈕，換成你的大頭貼與名字
     const topLoginBtns = document.querySelectorAll('header button, .top-bar button, button');
     topLoginBtns.forEach(btn => {
-      // 確保不是左側 Logo 區域，且文字包含登入或註冊
-      if (!btn.closest('aside') && (btn.innerText.includes('登入') || btn.innerText.includes('註冊') || btn.innerText.includes('Una'))) {
+      if (!btn.closest('aside') && (btn.innerText.includes('登入') || btn.innerText.includes('註冊'))) {
         if (avatarUrl) {
           btn.innerHTML = `<img src="${avatarUrl}" style="width:24px;height:24px;border-radius:50%;vertical-align:middle;margin-right:6px;"> ${userName}`;
         } else {
@@ -567,8 +574,11 @@ function updateUIForUser(user) {
     });
 
     // C. 自動關閉登入彈窗
-    const dialogOverlay = document.querySelector('.dialog-overlay, .modal-overlay');
-    if (dialogOverlay) dialogOverlay.style.display = 'none';
+    const dialogOverlay = document.querySelector('.dialog-overlay, .modal-overlay, dialog');
+    if (dialogOverlay) {
+      dialogOverlay.style.display = 'none';
+      dialogOverlay.remove();
+    }
   }
   // 3. 網頁載入時自動檢查登入狀態（解決重新整理要重登的問題）
   window.onload = async function() {
