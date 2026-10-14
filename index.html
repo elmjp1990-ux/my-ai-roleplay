@@ -1388,6 +1388,23 @@ function load() {
 }
 
 let state = load();
+
+// 一次性清除舊版共用 localStorage 中無法確認所屬帳號的聊天，避免升級後仍顯示跨帳號紀錄。
+// 已同步的正式聊天會在登入後依目前 UID 從 Supabase 重新載入。
+const CHAT_ISOLATION_MIGRATION_KEY = 'personax-chat-isolation-v1';
+try {
+  if (localStorage.getItem(CHAT_ISOLATION_MIGRATION_KEY) !== 'done') {
+    state.sessions = {};
+    state.characters = state.characters.filter(character =>
+      !character.cloudSnapshotOnly && character.visibility !== 'private'
+    );
+    localStorage.setItem(CHAT_ISOLATION_MIGRATION_KEY, 'done');
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  }
+} catch (error) {
+  console.warn('聊天帳號隔離初始化失敗：', error);
+}
+
 // 重新載入時若本機記錄為待刪除，先等 Supabase 確認狀態及錢包餘額，再顯示狀態視窗。
 let pendingDeletionWalletSyncUid =
   state.account?.accountDeletionPending && state.account?.uid
