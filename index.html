@@ -1700,7 +1700,7 @@ function renderEditor() {
         <h2>${route.id ? '修改角色' : '建立新角色'}</h2>
         <label class="field"><span>角色頭像 *</span>
           <input id="characterImage" type="file" accept="image/png,image/jpeg,image/webp">
-          <small>PNG、JPG、WebP，最多1 MB。</small>
+          <small>支援 PNG、JPG、WebP 格式。</small>
         </label>
         <img id="imagePreview" ${draftImage ? `src="${e(safeImage(draftImage))}"` : ''}
              class="${draftImage ? '' : 'hidden'}"
@@ -1776,7 +1776,6 @@ function updateAICost() {
 }
 async function readImage(file) {
   if (!file || !['image/png','image/jpeg','image/webp'].includes(file.type)) throw Error('請選擇PNG、JPG或WebP。');
-  if (file.size > 1048576) throw Error('圖片不能超過1 MB。');
   return await new Promise((resolve,reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
@@ -2912,8 +2911,8 @@ document.addEventListener('submit',async event => {
       case 'bug': {
         if (!text) return toast('請填寫問題說明。');
         const file=f.get('image');
-        if (file?.size && (!['image/png','image/jpeg','image/webp'].includes(file.type) || file.size>1048576)) {
-          return toast('圖片需為PNG、JPG或WebP，最多1 MB。');
+        if (file?.size && !['image/png','image/jpeg','image/webp'].includes(file.type)) {
+          return toast('圖片格式需為PNG、JPG或WebP。');
         }
         toast('表單檢查通過。回報API尚未串接，本次沒有實際送出。');
         break;
