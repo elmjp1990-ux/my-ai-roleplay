@@ -3328,7 +3328,7 @@ document.addEventListener('submit',async event => {
         const duplicate=Object.values(state.sessions).some(other =>
           other.id !== item.id && sessionTitle(other) === name
         );
-        if (duplicate) return toast('這個檔名已被你自己的其他聊天或角色使用，請換一個名稱。');
+        if (duplicate) return alert('這個檔名已被你自己的其他聊天或角色使用，請換一個名稱。');
         item.name=name;persist();
         if (hasUserMessage(item)) await saveChatSessionSafely(item);
         openModal('archives');break;
