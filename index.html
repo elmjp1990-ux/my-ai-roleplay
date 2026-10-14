@@ -2906,7 +2906,6 @@ document.addEventListener('click',async event => {
           return toast('登出失敗：' + error.message);
         }
         cacheSessionsForUser(state.account?.uid);
-        const previousUid = state.account?.uid || null;
         state.signedIn = false;
         state.account = null;
         state.sessions = {};
