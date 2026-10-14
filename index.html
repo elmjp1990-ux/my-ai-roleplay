@@ -960,7 +960,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     if (storyResult.error) {
       return { storyError: '角色已儲存，但開場故事儲存失敗：' + storyResult.error.message };
     }
-    return { storyError: null };
+    return { storyError: null, firstPublishedAt: firstPublishedAt ? new Date(firstPublishedAt).getTime() : null, latestEligible };
   }
 
   async function saveSupabaseProfile(account) {
@@ -2652,6 +2652,8 @@ document.addEventListener('click',async event => {
         const saveResult = await saveSupabaseCharacter({...c, visibility: nextVisibility}, user.uid);
         if (saveResult.storyError) throw new Error(saveResult.storyError);
         c.visibility = nextVisibility;
+        c.firstPublishedAt = saveResult.firstPublishedAt;
+        c.latestEligible = saveResult.latestEligible;
         persist();render();
         toast(nextVisibility === 'public' ? '角色已設為公開並同步到雲端。' : '角色已設為私密，雲端資料已同步。');
         break;
