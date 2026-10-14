@@ -812,6 +812,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible')
         .eq('visibility', 'public')
         .eq('review_status', 'approved')
+        .is('deleted_at', null)
         .order('first_published_at', { ascending: false, nullsFirst: false });
       if (error) throw new Error(error.message);
 
@@ -880,7 +881,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       // 這可修復舊版匯入只存 localStorage 的資料；不會上傳其他帳號的本機角色。
       let { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, private_info, style, tags, created_at, first_published_at, latest_eligible, rights_confirmed')
+        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, private_info, style, tags, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
         .eq('author_id', user.id)
         .order('created_at', { ascending: false });
       if (error) throw new Error('讀取雲端角色失敗：' + error.message);
@@ -906,7 +907,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       if (migratedCount > 0) {
         const refreshed = await client
           .from('characters')
-          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, private_info, style, tags, created_at, first_published_at, latest_eligible, rights_confirmed')
+          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, private_info, style, tags, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
           .eq('author_id', user.id)
           .order('created_at', { ascending: false });
         if (refreshed.error) throw new Error('角色補傳後重新讀取失敗：' + refreshed.error.message);
@@ -930,7 +931,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       }
       if (state.account?.uid !== user.id) return;
       const localOwnedForMerge = state.characters.filter(c => c.authorId === user.id);
-      const cloudCharacters = (rows || []).map(row => {
+      const cloudCharacters = (rows || []).filter(row => !row.deleted_at).map(row => {
         const local = localOwnedForMerge.find(c => c.id === row.id) || {};
         const story = latestStory.get(row.id);
         return {
@@ -1001,12 +1002,15 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     // 先讀取既有上架紀錄，避免 upsert 把首次公開時間或資格重設。
     const { data: existingCharacter, error: existingCharacterError } = await client
       .from('characters')
-      .select('visibility, first_published_at, latest_eligible, rights_confirmed')
+      .select('visibility, first_published_at, latest_eligible, rights_confirmed, deleted_at')
       .eq('id', character.id)
       .eq('author_id', expectedUserId)
       .maybeSingle();
     if (existingCharacterError) {
       throw new Error('讀取角色上架紀錄失敗：' + existingCharacterError.message);
+    }
+    if (existingCharacter?.deleted_at) {
+      throw new Error('此角色已被刪除，不能重新公開或修改。若要創作新版本，請建立新角色。');
     }
 
     const firstPublishedAt = existingCharacter?.first_published_at ||
@@ -1047,7 +1051,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     // 重新讀取資料庫，避免 RLS／trigger／資料庫規則拒絕公開卻讓前端顯示成功。
     const { data: savedCharacter, error: verifyError } = await client
       .from('characters')
-      .select('visibility, first_published_at, latest_eligible, rights_confirmed')
+      .select('visibility, first_published_at, latest_eligible, rights_confirmed, deleted_at')
       .eq('id', character.id)
       .eq('author_id', expectedUserId)
       .maybeSingle();
@@ -1488,12 +1492,15 @@ async function saveChatSessionToCloud(s, options = {}) {
   }
   const character = state.characters.find(item => item.id === s.characterId);
   if (!character) throw new Error('找不到這段聊天所屬的正式角色。');
-  const snapshot = {
+  const snapshot = s.cloudCharacterSnapshot || {
     id:character.id, name:character.name || s.characterName || '角色',
     gender:character.gender || 'ambiguous', age:character.age || '',
     image:character.image || '', intro:character.intro || '',
     opening:character.opening || '', race:character.race || '',
-    style:character.style || '', tags:Array.isArray(character.tags) ? character.tags : []
+    style:character.style || '', tags:Array.isArray(character.tags) ? character.tags : [],
+    visibility:character.visibility || 'private',
+    firstPublishedAt:character.firstPublishedAt || null,
+    deletedAt:character.deletedAt || null
   };
   const row = {
     id:s.id, user_id:localUser.uid, character_id:character.id,
@@ -1502,8 +1509,22 @@ async function saveChatSessionToCloud(s, options = {}) {
     character_snapshot:snapshot, session_data:chatSessionData(s),
     updated_at:new Date().toISOString()
   };
-  const { error: sessionError } = await client.from('chat_sessions').upsert(row,{onConflict:'id'});
-  if (sessionError) throw new Error('聊天基本資料同步失敗：'+sessionError.message);
+  let sessionWrite;
+  if (s.cloudOwned && s.cloudOwnerUid === localUser.uid) {
+    // 已存在的聊天使用 UPDATE；即使角色已下架，也可繼續保存原有劇情。
+    sessionWrite = await client.from('chat_sessions').update(row)
+      .eq('id', s.id).eq('user_id', localUser.uid);
+  } else {
+    // 新聊天只能在角色仍可建立新對話時 INSERT。
+    if (character.deletedAt || (character.visibility !== 'public' && character.firstPublishedAt)) {
+      throw new Error('此角色已被作者調整為私密或刪除狀態，不支持開啟新對話');
+    }
+    sessionWrite = await client.from('chat_sessions').insert(row);
+  }
+  if (sessionWrite.error) throw new Error('聊天基本資料同步失敗：'+sessionWrite.error.message);
+  s.cloudOwned = true;
+  s.cloudOwnerUid = localUser.uid;
+  s.cloudCharacterSnapshot = snapshot;
   const messages = (s.messages || []).filter(m => isUuid(m.id)).map(m => ({
     id:m.id, session_id:s.id,
     role:m.role === 'user' ? 'user' : 'assistant',
@@ -1985,7 +2006,7 @@ function renderGrid() {
 
 /* Detail, author and comments */
 function accessible(c) {
-  return c && (c.visibility === 'public' ||
+  return !!c && !c.deletedAt && (c.visibility === 'public' ||
     currentUser()?.uid === c.authorId);
 }
 function renderDetail() {
@@ -2107,7 +2128,7 @@ function owned(c) { return currentUser() && c?.authorId === currentUser().uid; }
 function renderCreate() {
   $('view').innerHTML = `<div class="stack"><h1>創建角色</h1>${creationTabs()}
     <h2>你的角色</h2><div class="grid">
-      ${state.characters.filter(owned).map(c => card(c,true)).join('') ||
+      ${state.characters.filter(c => owned(c) && !c.deletedAt).map(c => card(c,true)).join('') ||
       '<div class="empty">尚未建立角色。</div>'}
     </div></div>`;
 }
@@ -2580,7 +2601,7 @@ function renderModal(o) {
     case 'delete-character':
       showDialog('刪除角色',`
         <form data-form="delete-character">
-          <p class="muted">角色的對話、日記、相簿與收藏也會刪除。</p>
+          <p class="muted">角色會從公開列表下架，不再接受新對話；已開始的聊天與必要角色快照會保留。</p>
           <label class="field"><span>請輸入「Delete」確認</span>
             <input name="confirm" required autocomplete="off"></label>
           <button class="danger">永久刪除</button>
@@ -3011,7 +3032,7 @@ document.addEventListener('click',async event => {
       case 'import':$('jsonFile').click();break;
       case 'select-chat': {
         const item = state.sessions[key];
-        if (!item || !accessible(sessionCharacter(item))) break;
+        if (!item || !canAccessSessionCharacter(item,sessionCharacter(item))) break;
         item.hidden=false;persist();
         go({page:'conversation',id:key});
         break;
@@ -3062,6 +3083,10 @@ document.addEventListener('click',async event => {
       case 'new-conversation': {
         const c=sessionCharacter(s);
         if (!s || !c) break;
+        if (c.deletedAt || (c.visibility !== 'public' && c.firstPublishedAt)) {
+          toast('此角色已被作者調整為私密或刪除狀態，不支持開啟新對話');
+          break;
+        }
         if (!hasUserMessage(s)) {
           alert('這段聊天還沒開始：請先送出第一句訊息，才能封存並開始新對話。');
           break;
@@ -3095,7 +3120,7 @@ document.addEventListener('click',async event => {
       case 'rename-archive':openModal('rename-archive',{id:key});break;
       case 'resume-archive': {
         const item=state.sessions[key];
-        if (!item || !accessible(sessionCharacter(item))) break;
+        if (!item || !canAccessSessionCharacter(item,sessionCharacter(item))) break;
         if (!confirm('恢復這段回憶？它會以原檔名回到角色聊天列表。')) break;
         item.name=uniqueSessionName(item.name || sessionTitle(item),item.id);
         item.archived=false;item.hidden=false;
@@ -3289,14 +3314,38 @@ document.addEventListener('submit',async event => {
       case 'delete-character': {
         if (String(f.get('confirm'))!=='Delete') return toast('請輸入「Delete」。');
         const c=state.characters.find(c=>c.id===o.id);
-        if (!owned(c) || !confirm('最後確認：永久刪除角色與所有相關回憶？')) return;
-        state.characters=state.characters.filter(c=>c.id!==o.id);
-        state.favorites=state.favorites.filter(v=>v!==o.id);
-        delete state.comments[o.id];
-        for (const [key,session] of Object.entries(state.sessions)) {
-          if (session.characterId===o.id) delete state.sessions[key];
+        const user=currentUser();
+        if (!owned(c) || !user?.uid || !window.mySupabase) return toast('請登入後再刪除角色。');
+        if (!confirm('最後確認：將角色下架？公開列表會隱藏，既有聊天保留，新對話將被禁止。')) return;
+        const { data: authResult, error: authError } = await window.mySupabase.auth.getUser();
+        if (authError || authResult?.user?.id !== user.uid) throw new Error('登入狀態驗證失敗，請重新登入。');
+        const deletedAt=new Date().toISOString();
+        const { data: deletedRows, error: deleteError } = await window.mySupabase
+          .from('characters')
+          .update({visibility:'private',review_status:'draft',deleted_at:deletedAt,deletion_reason:'author_deleted'})
+          .eq('id',c.id).eq('author_id',user.uid).is('deleted_at',null)
+          .select('id,deleted_at');
+        if (deleteError) throw new Error('角色軟刪除失敗：'+deleteError.message);
+        if (!deletedRows?.length) throw new Error('資料庫未確認角色下架成功，請重新整理後再試。');
+        const { error: storyError } = await window.mySupabase.from('character_stories')
+          .update({visibility:'private'}).eq('character_id',c.id);
+        if (storyError) throw new Error('角色已下架，但故事可見狀態更新失敗：'+storyError.message);
+        c.visibility='private';c.deletedAt=deletedAt;c.deletionReason='author_deleted';
+        for (const session of Object.values(state.sessions)) {
+          if (session.characterId===c.id && !session.cloudCharacterSnapshot) {
+            session.cloudCharacterSnapshot={
+              id:c.id,name:c.name,gender:c.gender,age:c.age,image:c.image,intro:c.intro,
+              opening:c.opening,race:c.race,style:c.style,tags:Array.isArray(c.tags)?c.tags:[],
+              visibility:c.visibility,firstPublishedAt:c.firstPublishedAt||null,deletedAt
+            };
+          }
         }
-        persist();go({page:'create'},true);break;
+        state.characters=state.characters.filter(item=>item.id!==c.id);
+        state.favorites=state.favorites.filter(v=>v!==c.id);
+        delete state.comments[c.id];
+        persist();go({page:'create'},true);
+        toast('角色已下架；既有聊天保留，不能再開啟新對話。');
+        break;
       }
       case 'profile': {
         const name=String(f.get('nickname')).trim();
