@@ -637,13 +637,33 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       const deletionStatus = Array.isArray(deletionData) ? deletionData[0] : deletionData;
       if (deletionStatus?.is_pending) {
         if (state.account?.uid !== user.id) return;
+
+        // 待刪除帳號仍讀取既有錢包餘額；只 SELECT，不初始化或補發銀幣。
+        const { data: pendingWallet, error: pendingWalletError } = await client
+          .from('wallet_accounts')
+          .select('diamonds, silver_coins')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
         state.account = {
           ...state.account,
           accountDeletionPending: true,
           deletionScheduledFor: deletionStatus.scheduled_for
         };
+        if (pendingWalletError) {
+          console.error('讀取待刪除帳號錢包失敗：', pendingWalletError);
+          toast('帳號仍在待刪除狀態，但錢包餘額讀取失敗；尚未修改或補發銀幣。');
+        } else if (pendingWallet) {
+          state.account.diamonds = Number(pendingWallet.diamonds ?? 0);
+          state.account.silver = Number(pendingWallet.silver_coins ?? 0);
+        } else {
+          console.warn('待刪除帳號找不到既有 wallet_accounts 資料；未自動建立錢包。');
+          toast('找不到此帳號的既有錢包資料，系統沒有自動補發銀幣。');
+        }
+
         state.signedIn = true;
         persist();
+        render();
         if (!state.account.accountDeletionModalDismissed &&
             route?.overlay?.name !== 'account-deletion-pending') {
           openModal('account-deletion-pending', {
@@ -741,7 +761,9 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       const { error } = await window.mySupabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin
+          redirectTo: window.location.origin,
+          // 明確顯示 Google 帳號選擇器，方便切換到另一個帳號。
+          queryParams: { prompt: 'select_account' }
         }
       });
 
@@ -1186,9 +1208,9 @@ function showDialog(title,content) {
   modal.innerHTML = `
     <div class="row between modal-heading">
       <h2>${e(title)}</h2>
-      <button class="ghost" data-action="${pendingDeletionDialog ? 'pending-dismiss-deletion-modal' : 'back'}"
-              aria-label="關閉"
-              title="關閉">✕</button>
+      <button class="ghost" data-action="${pendingDeletionDialog ? 'pending-switch-account' : 'back'}"
+              aria-label="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}"
+              title="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}">✕</button>
     </div>${content}`;
 
   if (!modal.open) modal.showModal();
@@ -2697,6 +2719,7 @@ document.addEventListener('submit',async event => {
         if (error) throw new Error('取消刪除失敗：' + error.message);
         delete state.account.accountDeletionPending;
         delete state.account.deletionScheduledFor;
+        delete state.account.accountDeletionModalDismissed;
         persist();
         go({page:'home'}, true);
         await loadSupabaseProfileAndWallet(authData.user);
