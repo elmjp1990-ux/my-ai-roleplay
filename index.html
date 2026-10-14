@@ -560,20 +560,29 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     testSupabaseConnection();
   };
 // 監聽登入狀態變化
-window.mySupabase.auth.onAuthStateChange((event, session) => {
-  if (session) {
-    console.log('🎉 玩家已成功登入：', session.user);
-    // 這裡可以取得使用者的信箱或名字
-    const userEmail = session.user.email;
-    
-    // 如果你想自動關閉登入彈窗或更新右上角按鈕文字，可以寫在這裡
-    // 例如把右上角的「登入 / 註冊」改成使用者的信箱前綴
-    const loginBtn = document.querySelector('.login-btn-selector'); // 依你按鈕的 class 調整
-    if (loginBtn) {
-      loginBtn.innerText = session.user.user_metadata.name || userEmail.split('@')[0];
+  window.mySupabase.auth.onAuthStateChange((event, session) => {
+    if (session) {
+      console.log('🎉 玩家已成功登入：', session.user);
+      const userEmail = session.user.email;
+      const userName = session.user.user_metadata.name || userEmail.split('@')[0];
+      
+      // 1. 自動把右上角的「登入 / 註冊」按鈕文字換成你的名字/信箱
+      // 尋找包含「登入」文字的按鈕
+      const buttons = document.querySelectorAll('button, a');
+      buttons.forEach(btn => {
+        if (btn.innerText.includes('登入 / 註冊') || btn.innerText.includes('登入')) {
+          btn.innerText = userName;
+        }
+      });
+
+      // 2. 如果目前剛好開著登入彈窗，自動把它關閉
+      const dialogOverlay = document.querySelector('.dialog-overlay, .modal-overlay, dialog');
+      if (dialogOverlay) {
+        // 嘗試關閉彈窗或移除它
+        dialogOverlay.style.display = 'none';
+      }
     }
-  }
-});
+  });
 </script>
 </head>
 
