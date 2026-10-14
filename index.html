@@ -858,8 +858,8 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       // 保留 seed 與目前帳號自己的私密草稿；不保留其他帳號殘留的本機角色。
       const keepLocal = state.characters.filter(character =>
         String(character.id).startsWith('seed-') ||
-        character.visibility !== 'public' ||
-        (currentUid && character.authorId === currentUid)
+        (!character.deletedAt && character.visibility !== 'public') ||
+        (currentUid && character.authorId === currentUid && !character.deletedAt)
       );
       state.characters = [...publicCharacters, ...keepLocal.filter(character => !publicIds.has(character.id))];
       persist();
@@ -958,7 +958,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
           rightsConfirmed: row.rights_confirmed === true
         };
       });
-      const cloudIds = new Set(cloudCharacters.map(c => c.id));
+      const cloudIds = new Set((rows || []).map(row => row.id));
       state.characters = [
         ...cloudCharacters,
         ...state.characters.filter(c => c.authorId !== user.id || !cloudIds.has(c.id))
@@ -1492,6 +1492,12 @@ async function saveChatSessionToCloud(s, options = {}) {
     throw new Error('登入狀態驗證失敗，聊天尚未同步。');
   }
   const character = state.characters.find(item => item.id === s.characterId) || null;
+  if (s.cloudOwned && s.cloudOwnerUid === localUser.uid) {
+    const currentRow = await client.from('chat_sessions').select('character_snapshot')
+      .eq('id',s.id).eq('user_id',localUser.uid).maybeSingle();
+    if (currentRow.error) throw new Error('讀取既有聊天快照失敗：'+currentRow.error.message);
+    if (currentRow.data?.character_snapshot) s.cloudCharacterSnapshot = currentRow.data.character_snapshot;
+  }
   const priorSnapshot = s.cloudCharacterSnapshot && typeof s.cloudCharacterSnapshot === 'object'
     ? s.cloudCharacterSnapshot : {};
   if (!character && (!s.cloudOwned || !priorSnapshot.id)) {
@@ -1523,6 +1529,11 @@ async function saveChatSessionToCloud(s, options = {}) {
       s.cloudOwned = true;
       s.cloudOwnerUid = localUser.uid;
       s.cloudCharacterSnapshot = existing.data.character_snapshot || snapshot;
+      const canonical = s.cloudCharacterSnapshot;
+      snapshot.authorId = canonical.authorId || snapshot.authorId;
+      snapshot.visibility = canonical.visibility || snapshot.visibility;
+      snapshot.firstPublishedAt = canonical.firstPublishedAt || snapshot.firstPublishedAt;
+      snapshot.deletedAt = canonical.deletedAt || snapshot.deletedAt;
     }
   }
   const row = {
@@ -3108,8 +3119,26 @@ document.addEventListener('click',async event => {
       case 'persona':openModal('persona');break;
       case 'archives':openModal('archives');break;
       case 'new-conversation': {
-        const c=sessionCharacter(s);
+        let c=sessionCharacter(s);
         if (!s || !c) break;
+        if (s.cloudOwned && currentUser()?.uid && window.mySupabase) {
+          const { data: sessionRow, error: sessionReadError } = await window.mySupabase
+            .from('chat_sessions').select('character_snapshot')
+            .eq('id',s.id).eq('user_id',currentUser().uid).maybeSingle();
+          if (sessionReadError) throw new Error('確認角色狀態失敗：'+sessionReadError.message);
+          const snapshot=sessionRow?.character_snapshot;
+          if (snapshot && typeof snapshot === 'object') {
+            s.cloudCharacterSnapshot=snapshot;
+            const live=state.characters.find(item=>item.id===s.characterId);
+            if (live) {
+              live.visibility=snapshot.visibility || live.visibility;
+              live.firstPublishedAt=snapshot.firstPublishedAt || live.firstPublishedAt || null;
+              live.deletedAt=snapshot.deletedAt || live.deletedAt || null;
+              if (live.deletedAt) state.characters=state.characters.filter(item=>item.id!==live.id);
+            }
+            c=sessionCharacter(s);
+          }
+        }
         if (c.deletedAt || (c.visibility !== 'public' && (!owned(c) || c.firstPublishedAt))) {
           toast('此角色已被作者調整為私密或刪除狀態，不支持開啟新對話');
           break;
