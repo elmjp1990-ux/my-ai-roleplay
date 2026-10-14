@@ -2154,7 +2154,7 @@ function renderEditor() {
         <label class="field"><span>公開介紹 *</span><textarea name="intro" required maxlength="2000">${e(c.intro || '')}</textarea>
           <small>最多2000字。</small></label>
         <label class="field"><span>開場白 *</span><textarea name="opening" required maxlength="3000">${e(c.opening || '')}</textarea>
-          <small>最多3000字；用 **動作** 表示場景描述。</small></label>
+          <small>最多3000字；用 *動作* 表示場景描述。</small></label>
         <label class="field"><span>私密資訊</span><textarea name="privateInfo" maxlength="10000">${e(c.privateInfo || '')}</textarea>
           <small>最多10000字，不顯示在公開介紹；勿填真實機密。</small></label>
         <label class="field"><span>對話風格</span><textarea name="style" maxlength="1000">${e(c.style || '')}</textarea></label>
@@ -2411,9 +2411,12 @@ function renderConversation() {
   if (route.chatOverlay) renderChatOverlay(route.chatOverlay);
 }
 function formatMessage(text) {
-  return String(text).split(/(\*\*[\s\S]*?\*\*)/g).filter(Boolean).map(part => {
+  return String(text).split(/(\*\*[\s\S]*?\*\*|\*[\s\S]*?\*)/g).filter(Boolean).map(part => {
     if (part.startsWith('**') && part.endsWith('**')) {
       return `<em class="narration">${e(part.slice(2,-2))}</em>`;
+    }
+    if (part.startsWith('*') && part.endsWith('*')) {
+      return `<em class="narration">${e(part.slice(1,-1))}</em>`;
     }
     return part.trim() ? `<div class="bubble">${e(part.trim())}</div>` : '';
   }).join('');
