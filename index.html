@@ -519,16 +519,15 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  // 如果原本已經有初始化過，我們直接把網址和 Key 設定進去，或者重新建立一個不重複的變數名稱
+  // 1. 初始化 Supabase
   const SUPABASE_URL = 'https://ouyewoagbmtqehbofrje.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_MyTDqAKNTkK4zo7eap8gZA_ZGozHRMd';
   
-  // 檢查如果還沒建立過，才建立全域的 supabase 客戶端
   if (!window.mySupabase) {
     window.mySupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
 
-  // 測試連線的函式
+  // 2. 網頁開啟時自動測試連線
   async function testSupabaseConnection() {
     try {
       const { data, error } = await window.mySupabase.from('profiles').select('*').limit(1);
@@ -536,14 +535,27 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         console.error('❌ 連線失敗：', error.message);
       } else {
         console.log('🎉 恭喜！Supabase 資料庫連線成功！', data);
-        alert('Supabase 資料庫連線成功！');
       }
     } catch (err) {
       console.error('❌ 異常：', err);
     }
   }
 
-  // 網頁一打開就自動執行測試
+  // 3. 綁定 Google 登入功能
+  async function loginWithGoogle() {
+    const { data, error } = await window.mySupabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        // 登入成功後自動跳轉回你的網頁
+        redirectTo: window.location.origin
+      }
+    });
+    if (error) {
+      console.error('登入失敗:', error.message);
+      alert('登入失敗：' + error.message);
+    }
+  }
+
   window.onload = function() {
     testSupabaseConnection();
   };
