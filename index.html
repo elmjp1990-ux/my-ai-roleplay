@@ -550,6 +550,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     }
 
     if (!user) {
+      pendingDeletionWalletSyncUid = null;
       state.signedIn = false;
       state.account = null;
       persist();
@@ -560,6 +561,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     const metadata = user.user_metadata || {};
     const previous =
       state.account?.uid === user.id ? state.account : {};
+    const wasPendingDeletion = previous.accountDeletionPending === true;
     const nickname =
       metadata.full_name ||
       metadata.name ||
@@ -593,6 +595,9 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       member: metadata.member || previous.member || 'free'
     };
     state.signedIn = true;
+
+    // 本機記錄為待刪除時，先暫緩顯示狀態視窗，等資料庫確認並讀完真實錢包。
+    if (wasPendingDeletion) pendingDeletionWalletSyncUid = user.id;
 
     persist();
     // 真實會員資料與錢包由資料庫載入；不可把 user_metadata 當成正式餘額。
@@ -650,6 +655,10 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
           accountDeletionPending: true,
           deletionScheduledFor: deletionStatus.scheduled_for
         };
+        if (!pendingWalletError && pendingWallet) {
+          // 先取得資料庫餘額，才允許 render() 顯示待刪除狀態視窗。
+          pendingDeletionWalletSyncUid = null;
+        }
         if (pendingWalletError) {
           console.error('讀取待刪除帳號錢包失敗：', pendingWalletError);
           toast('帳號仍在待刪除狀態，但錢包餘額讀取失敗；尚未修改或補發銀幣。');
@@ -675,6 +684,10 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       if (state.account?.uid === user.id) {
         delete state.account.accountDeletionPending;
         delete state.account.deletionScheduledFor;
+      }
+      // 資料庫確認帳號不在待刪除期後，解除視窗等待；正常錢包同步完成後才會重新 render。
+      if (pendingDeletionWalletSyncUid === user.id) {
+        pendingDeletionWalletSyncUid = null;
       }
 
       let { data: profile, error: profileError } = await client
@@ -1029,6 +1042,11 @@ function load() {
 }
 
 let state = load();
+// 重新載入時若本機記錄為待刪除，先等 Supabase 確認狀態及錢包餘額，再顯示狀態視窗。
+let pendingDeletionWalletSyncUid =
+  state.account?.accountDeletionPending && state.account?.uid
+    ? state.account.uid
+    : null;
 let route = {page:'home'};
 let search = '';
 let filter = 'latest';
@@ -1269,8 +1287,18 @@ function render() {
   if (!['home','detail','author'].includes(route.page) && !currentUser()) {
     route = {page:'home',overlay:{name:'login'}};
   }
-  // 待刪除帳號首次顯示狀態視窗；關閉後保留首頁，但仍限制 PersonaX 功能。
+  // 若狀態同步尚未完成，先移除可能殘留的待刪除視窗，避免舊餘額先出現。
+  if (state.account?.uid &&
+      pendingDeletionWalletSyncUid === state.account.uid &&
+      route.overlay?.name === 'account-deletion-pending') {
+    const cleanRoute = {...route};
+    delete cleanRoute.overlay;
+    route = cleanRoute;
+  }
+
+  // 待刪除帳號首次顯示狀態視窗；必須先確認資料庫狀態並載入既有錢包餘額。
   if (state.account?.accountDeletionPending &&
+      pendingDeletionWalletSyncUid !== state.account.uid &&
       !state.account.accountDeletionModalDismissed &&
       route.overlay?.name !== 'account-deletion-pending') {
     route = {
