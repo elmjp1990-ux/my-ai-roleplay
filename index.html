@@ -3409,8 +3409,19 @@ document.addEventListener('submit',async event => {
           s.messages.filter(item=>item.role==='user').at(-1)?.id===m.id;
         if (!m || !latestUserMessage) return;
         if (!text) return toast('訊息不可為空。');
+        const previousText=m.text;
         m.text=text;m.edited=true;
-        persist();back();break;
+        if (!persist()) {
+          m.text=previousText;
+          break;
+        }
+        const synced = await saveChatSessionSafely(s);
+        if (!synced) {
+          toast('修改已暫存在本機，但雲端同步失敗；請確認網路後再試。');
+          renderMessages();
+          break;
+        }
+        back();break;
       }
       case 'comment':
         if (!requireLogin({page:'detail',id:route.id})) return;
