@@ -2192,7 +2192,18 @@ function uniqueSessionName(base,excludeId = '') {
 function newArchiveName(character,session) {
   const d = new Date(session.archivedAt || Date.now());
   const date = [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
-  return uniqueSessionName([...((character?.name || '角色')+'_'+date)].slice(0,25).join(''),session.id);
+  const characterName = character?.name || '角色';
+  const used = new Set(Object.values(state.sessions)
+    .filter(item => item.id !== session.id)
+    .map(sessionTitle));
+  for (let n = 0; n < 10000; n++) {
+    const suffix = n ? '-'+n : '';
+    const room = Math.max(1,25-[...date].length-1-[...suffix].length);
+    const prefix = [...characterName].slice(0,room).join('');
+    const candidate = prefix+'_'+date+suffix;
+    if (!used.has(candidate)) return candidate;
+  }
+  return uniqueSessionName(characterName+'_'+date,session.id);
 }
 function startChat(characterId) {
   const c = state.characters.find(c => c.id === characterId);
