@@ -1289,6 +1289,12 @@ function renderHome() {
   }
   $('view').innerHTML = `
     <div class="stack">
+      ${state.account?.accountDeletionPending ? `
+        <section class="card" style="border:1px solid #d97706;padding:14px;margin-bottom:14px">
+          <strong>帳號正在等待刪除</strong>
+          <p class="muted small" style="margin:6px 0 10px">此帳號目前無法使用 PersonaX 功能。若要保留帳號與錢包餘額，可在 30 天期限內取消刪除申請。</p>
+          <button class="primary" data-action="pending-show-deletion-modal">查看狀態／取消刪除</button>
+        </section>` : ''}
       <section class="hero" id="hero"></section>
       <h2>探索角色</h2>
       <div class="toolbar">
@@ -2269,7 +2275,7 @@ document.addEventListener('click',async event => {
   const s = currentSession();
 
   if (state.account?.accountDeletionPending &&
-      !['home','pending-dismiss-deletion-modal','cancel-account-deletion','logout','pending-switch-account'].includes(action)) {
+      !['home','pending-dismiss-deletion-modal','pending-show-deletion-modal','cancel-account-deletion','logout','pending-switch-account'].includes(action)) {
     toast('此帳號正在等待刪除，目前不能使用 PersonaX 功能。你可以取消刪除申請以恢復帳號。');
     return;
   }
@@ -2302,6 +2308,12 @@ document.addEventListener('click',async event => {
       }
       case 'pending-dismiss-deletion-modal': {
         dismissPendingDeletionModal();
+        break;
+      }
+      case 'pending-show-deletion-modal': {
+        openModal('account-deletion-pending', {
+          scheduledFor: state.account?.deletionScheduledFor
+        });
         break;
       }
       case 'logout':
