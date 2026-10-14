@@ -605,6 +605,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     void loadSupabaseProfileAndWallet(user);
     void loadPublicSupabaseCharacters();
     void loadSupabaseCharacters(user);
+      void loadCloudChatSessions(user);
 
     // OAuth 返回後，不要把使用者留在登入遮罩；回到登入前想去的頁面。
     const next = localStorage.getItem('personaX_login_next');
@@ -1371,7 +1372,20 @@ const drafts = {};
 const currentUser = () => state.signedIn ? state.account : null;
 const currentSession = () => state.sessions[route.id] || null;
 const currentCharacter = () => state.characters.find(c => c.id === route.id);
-const sessionCharacter = s => state.characters.find(c => c.id === s?.characterId);
+function sessionCharacter(s) {
+  if (!s) return null;
+  const found = state.characters.find(c => c.id === s.characterId);
+  if (found) return found;
+  const snap = s.cloudCharacterSnapshot;
+  if (!snap || snap.id !== s.characterId) return null;
+  return {...snap, id:s.characterId, name:snap.name || s.characterName || '角色',
+    visibility:'private', reviewStatus:'draft', authorId:s.cloudOwnerUid || '',
+    owner:false, cloudSnapshotOnly:true};
+}
+function canAccessSessionCharacter(s,c) {
+  return !!c && (accessible(c) ||
+    (!!s?.cloudOwned && !!currentUser()?.uid && s.cloudOwnerUid === currentUser().uid));
+}
 const isMobile = () => matchMedia('(max-width:767px)').matches;
 
 function persist() {
@@ -1436,6 +1450,67 @@ async function saveChatSessionToCloud(s, options = {}) {
   }
   return true;
 }
+async function loadCloudChatSessions(user) {
+  const client = window.mySupabase;
+  if (!client || !user?.id) return;
+  try {
+    const { data: authResult, error: authError } = await client.auth.getUser();
+    if (authError || authResult?.user?.id !== user.id) return;
+    const { data: rows, error } = await client.from('chat_sessions')
+      .select('id,user_id,character_id,character_name,status,created_at,updated_at,character_snapshot,session_data')
+      .eq('user_id', user.id).is('deleted_at', null).order('updated_at', { ascending:false });
+    if (error) throw new Error(error.message);
+    if (state.account?.uid !== user.id) return;
+    const sessions = rows || [];
+    if (!sessions.length) return;
+    const sessionIds = sessions.map(row => row.id).filter(isUuid);
+    let messageRows = [];
+    if (sessionIds.length) {
+      const result = await client.from('chat_messages').select('id,session_id,role,content,created_at')
+        .in('session_id', sessionIds).is('deleted_at', null).order('created_at', { ascending:true });
+      if (result.error) throw new Error(result.error.message);
+      messageRows = result.data || [];
+    }
+    if (state.account?.uid !== user.id) return;
+    const bySession = new Map();
+    for (const row of messageRows) {
+      if (!bySession.has(row.session_id)) bySession.set(row.session_id, []);
+      bySession.get(row.session_id).push({id:row.id, role:row.role === 'user' ? 'user' : 'assistant',
+        text:row.content || '', at:row.created_at ? new Date(row.created_at).getTime() : Date.now()});
+    }
+    let changed = false;
+    for (const row of sessions) {
+      if (!isUuid(row.id) || !isUuid(row.character_id)) continue;
+      const data = row.session_data && typeof row.session_data === 'object' ? row.session_data : {};
+      const snapshot = row.character_snapshot && typeof row.character_snapshot === 'object' ? row.character_snapshot : {};
+      const existing = state.sessions[row.id];
+      const cloudMessages = bySession.get(row.id) || [];
+      state.sessions[row.id] = {
+        ...(existing || {}), id:row.id, characterId:row.character_id,
+        characterName:row.character_name || snapshot.name || '角色',
+        name:data.name || '', archived:data.archived === true || row.status === 'archived',
+        hidden:data.hidden === true, pinned:data.pinned === true,
+        startedAt:Number(data.startedAt) || (row.created_at ? new Date(row.created_at).getTime() : Date.now()),
+        archivedAt:data.archivedAt || null, persona:data.persona || '',
+        suggestions:data.suggestions !== false, background:data.background || 'avatar',
+        memories:Array.isArray(data.memories) ? data.memories : [],
+        album:Array.isArray(data.album) ? data.album : [],
+        messages:cloudMessages.length ? cloudMessages : (existing?.messages || []),
+        cloudOwned:true, cloudOwnerUid:user.id, cloudCharacterSnapshot:snapshot
+      };
+      if (!state.characters.some(character => character.id === row.character_id) && snapshot.id === row.character_id) {
+        state.characters.push({...snapshot, id:row.character_id, name:snapshot.name || row.character_name || '角色',
+          visibility:'private', reviewStatus:'draft', authorId:'', owner:false, cloudSnapshotOnly:true});
+      }
+      changed = true;
+    }
+    if (changed) { persist(); render(); }
+  } catch (error) {
+    console.error('雲端聊天載入失敗：', error);
+    if (state.account?.uid === user.id) toast('雲端聊天載入失敗：' + error.message);
+  }
+}
+
 async function saveChatSessionSafely(s) {
   try {
     const saved = await saveChatSessionToCloud(s);
@@ -2182,7 +2257,7 @@ function phoneHTML(c) {
 function renderConversation() {
   const s = currentSession();
   const c = sessionCharacter(s);
-  if (!s || !accessible(c)) {
+  if (!s || !canAccessSessionCharacter(s,c)) {
     $('view').innerHTML = '<div class="empty">此對話不存在或無法存取。</div>';
     return;
   }
