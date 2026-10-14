@@ -766,7 +766,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       // 這可修復舊版匯入只存 localStorage 的資料；不會上傳其他帳號的本機角色。
       let { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, private_info, style, tags, created_at, first_published_at, latest_eligible')
+        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, private_info, style, tags, created_at, first_published_at, latest_eligible, rights_confirmed')
         .eq('author_id', user.id)
         .order('created_at', { ascending: false });
       if (error) throw new Error('讀取雲端角色失敗：' + error.message);
@@ -839,7 +839,8 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
           users: local.users ?? null,
           createdAt: row.created_at ? new Date(row.created_at).getTime() : (local.createdAt || Date.now()),
           firstPublishedAt: row.first_published_at ? new Date(row.first_published_at).getTime() : null,
-          latestEligible: row.latest_eligible !== false
+          latestEligible: row.latest_eligible !== false,
+          rightsConfirmed: row.rights_confirmed === true
         };
       });
       const cloudIds = new Set(cloudCharacters.map(c => c.id));
@@ -878,10 +879,15 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       : null;
 
     const nextVisibility = character.visibility === 'public' ? 'public' : 'private';
+    // 公開必須由創作者明確勾選權利確認；私密草稿不會自動視為已確認。
+    const rightsConfirmed = character.rightsConfirmed === true || character.rightsConfirmed === 'true';
+    if (nextVisibility === 'public' && !rightsConfirmed) {
+      throw new Error('公開角色前，請先勾選「我確認角色沒有侵犯智慧財產權、形象或其他任何權利。」');
+    }
     // 先讀取既有上架紀錄，避免 upsert 把首次公開時間或資格重設。
     const { data: existingCharacter, error: existingCharacterError } = await client
       .from('characters')
-      .select('visibility, first_published_at, latest_eligible')
+      .select('visibility, first_published_at, latest_eligible, rights_confirmed')
       .eq('id', character.id)
       .eq('author_id', expectedUserId)
       .maybeSingle();
@@ -910,6 +916,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       review_status: nextVisibility === 'public' ? 'approved' : 'draft',
       first_published_at: firstPublishedAt,
       latest_eligible: latestEligible,
+      rights_confirmed: rightsConfirmed || existingCharacter?.rights_confirmed === true,
       intro: character.intro || '',
       race: character.race || '',
       private_info: character.privateInfo || '',
@@ -922,6 +929,21 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       .upsert(row, { onConflict: 'id' });
     if (characterError) {
       throw new Error('角色資料寫入 Supabase 失敗：' + characterError.message);
+    }
+    // 重新讀取資料庫，避免 RLS／trigger／資料庫規則拒絕公開卻讓前端顯示成功。
+    const { data: savedCharacter, error: verifyError } = await client
+      .from('characters')
+      .select('visibility, first_published_at, latest_eligible, rights_confirmed')
+      .eq('id', character.id)
+      .eq('author_id', expectedUserId)
+      .maybeSingle();
+    if (verifyError) throw new Error('角色已送出寫入，但無法驗證資料庫結果：' + verifyError.message);
+    if (!savedCharacter) throw new Error('角色寫入後查不到資料，請檢查 Supabase 權限設定。');
+    if (savedCharacter.visibility !== nextVisibility) {
+      throw new Error('資料庫中的角色狀態仍是「' + savedCharacter.visibility + '」，沒有成功改成「' + nextVisibility + '」。請檢查 Supabase RLS 政策或資料庫 trigger。');
+    }
+    if (nextVisibility === 'public' && savedCharacter.rights_confirmed !== true) {
+      throw new Error('資料庫尚未記錄權利確認，角色不能公開。');
     }
 
     // 每個角色先沿用最新的一筆故事；沒有故事時才新增，避免每次編輯都重複建立。
@@ -960,7 +982,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     if (storyResult.error) {
       return { storyError: '角色已儲存，但開場故事儲存失敗：' + storyResult.error.message };
     }
-    return { storyError: null, firstPublishedAt: firstPublishedAt ? new Date(firstPublishedAt).getTime() : null, latestEligible };
+    return { storyError: null, visibility: savedCharacter.visibility, rightsConfirmed: savedCharacter.rights_confirmed === true, firstPublishedAt: savedCharacter.first_published_at ? new Date(savedCharacter.first_published_at).getTime() : null, latestEligible: savedCharacter.latest_eligible !== false };
   }
 
   async function saveSupabaseProfile(account) {
@@ -2645,13 +2667,19 @@ document.addEventListener('click',async event => {
         if (!owned(c)) break;
         const user = currentUser();
         const nextVisibility = button.dataset.value;
+        if (nextVisibility === 'public' && c.rightsConfirmed !== true) {
+          startEditor(c);
+          toast('請先在角色編輯頁勾選權利確認，再儲存並公開角色。');
+          break;
+        }
         if (!user?.uid || !window.mySupabase) {
           throw new Error('請先登入並連接 Supabase，再修改角色公開狀態。');
         }
         // 使用 upsert，而不是單純 UPDATE：本機草稿／匯入角色可能尚未有雲端資料列。
         const saveResult = await saveSupabaseCharacter({...c, visibility: nextVisibility}, user.uid);
         if (saveResult.storyError) throw new Error(saveResult.storyError);
-        c.visibility = nextVisibility;
+        c.visibility = saveResult.visibility;
+        c.rightsConfirmed = saveResult.rightsConfirmed;
         c.firstPublishedAt = saveResult.firstPublishedAt;
         c.latestEligible = saveResult.latestEligible;
         persist();render();
@@ -2896,7 +2924,7 @@ document.addEventListener('submit',async event => {
           opening:'**新的故事開始了。**\n「你好。」',
           privateInfo:outline,style:'',tags:[...draftTags],
           image:state.characters.find(c=>c.id==='seed-1')?.image || '',
-          authorId:currentUser().uid,owner:true,visibility:'private',
+          authorId:currentUser().uid,owner:true,visibility:'private',rightsConfirmed:false,
           chats:'0',users:null,createdAt:Date.now()
         });
         persist();go({page:'create'});break;
@@ -3161,7 +3189,7 @@ async function importCharacter(file) {
     age:String(data.age || '').slice(0,20),
     race:String(data.race || '').slice(0,50),
     privateInfo:String(data.privateInfo || ''),style:String(data.style || ''),
-    authorId:user.uid,owner:true,visibility:'private',
+    authorId:user.uid,owner:true,visibility:'private',rightsConfirmed:false,
     chats:'0',users:null,createdAt:Date.now()
   };
   // 匯入完成即建立雲端私密角色，不必先公開才上傳。
