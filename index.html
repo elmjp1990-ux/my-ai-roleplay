@@ -967,12 +967,12 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 
     const firstPublishedAt = existingCharacter?.first_published_at ||
       (nextVisibility === 'public' ? new Date().toISOString() : null);
-    // 只要曾公開後轉私密，就永久失去「最新角色」資格。
-    const latestEligible = existingCharacter
-      ? existingCharacter.latest_eligible !== false &&
-        !(existingCharacter.visibility === 'public' && nextVisibility === 'private') &&
-        !(nextVisibility === 'private' && !!firstPublishedAt)
-      : true;
+    // 「最新角色」資格只看首次公開時間的 24 小時窗口。
+    // 轉私密不重設首次公開時間；24 小時內重新公開仍可回到最新，超過期限則不可。
+    const firstPublishedMs = firstPublishedAt ? new Date(firstPublishedAt).getTime() : NaN;
+    const latestEligible = Number.isFinite(firstPublishedMs) &&
+      Date.now() - firstPublishedMs >= 0 &&
+      Date.now() - firstPublishedMs <= DAY;
 
     const row = {
       id: character.id,
@@ -1692,7 +1692,6 @@ function exploreList() {
     // 內建展示用 seed 角色不是實際上架紀錄，永遠不可列入「最新角色」。
     // 其 createdAt 會在全新本機資料初始化時重新產生，不能用來判斷真正上架時間。
     list = list.filter(c => !String(c.id).startsWith('seed-') &&
-      c.latestEligible !== false &&
       Number.isFinite(Number(c.firstPublishedAt ?? c.createdAt)) &&
       Date.now()-Number(c.firstPublishedAt ?? c.createdAt) >= 0 &&
       Date.now()-Number(c.firstPublishedAt ?? c.createdAt) <= DAY)
