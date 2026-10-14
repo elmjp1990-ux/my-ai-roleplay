@@ -579,7 +579,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     // 舊聊天可能附帶只為該帳號載入的私密角色快照，不可留給下一個帳號。
     state.characters = state.characters.filter(character =>
       !character.cloudSnapshotOnly &&
-      (!previousUid || character.authorId !== previousUid)
+      (character.visibility !== 'private' || character.authorId === nextUid)
     );
     if (route?.page === 'conversation') route = {page:'home'};
   }
@@ -2911,8 +2911,7 @@ document.addEventListener('click',async event => {
         state.account = null;
         state.sessions = {};
         state.characters = state.characters.filter(character =>
-          !character.cloudSnapshotOnly &&
-          (!previousUid || character.authorId !== previousUid)
+          !character.cloudSnapshotOnly && character.visibility !== 'private'
         );
         persist();
         go({page:'home'}, true);
