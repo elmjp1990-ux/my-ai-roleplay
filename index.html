@@ -1421,7 +1421,6 @@ let exploreTags = [];
 let limit = 24;
 let batch = 0;
 let chatSearch = '';
-let showHidden = false;
 let hideList = false;
 let banner = 0;
 let draftCharacter = null;
@@ -2288,7 +2287,7 @@ function visibleSessions() {
   const q = chatSearch.trim().toLowerCase();
   return Object.values(state.sessions).filter(s => {
     const c = sessionCharacter(s);
-    return c && !s.archived && (showHidden || !s.hidden) &&
+    return c && !s.archived &&
       (!q || (s.name || c.name).toLowerCase().includes(q));
   }).sort((a,b) =>
     Number(b.pinned)-Number(a.pinned) ||
@@ -2316,7 +2315,6 @@ function chatEntries() {
         <div class="row between"><strong class="ellipsis">${e(s.name || c.name)}</strong>
           <span class="small muted">${relativeDate(last?.at || s.startedAt)}</span></div>
         <div class="ellipsis small muted">${e(last?.text || '')}</div>
-        ${s.hidden ? '<span class="badge">已隱藏</span>' : ''}
       </button>
       <button class="entry-menu" data-action="session-menu" data-id="${e(s.id)}" aria-label="聊天選項">⋯</button>
     </div>`;
@@ -2327,9 +2325,6 @@ function chatListHTML() {
     <div class="list-top"><button class="ghost" data-action="list-menu">☰ 全部</button>
       <span class="small muted">聊天列表</span></div>
     <input id="chatSearch" value="${e(chatSearch)}" placeholder="搜尋角色或回憶名稱">
-    <label class="check small muted" style="margin:12px 0">
-      <input id="showHidden" type="checkbox" ${showHidden ? 'checked' : ''}>顯示已隱藏對話
-    </label>
     <div id="chatEntries">${chatEntries()}</div>
   </aside>`;
 }
@@ -2673,7 +2668,6 @@ function renderModal(o) {
       if (!selected) return;
       showDialog('聊天管理',`
         <div class="stack">
-          <button style="width:100%" data-action="hide-session" data-id="${e(o.id)}">${selected.hidden ? '取消隱藏' : '隱藏對話'}</button>
           <button class="danger" style="width:100%" data-action="remove-session" data-id="${e(o.id)}">刪除這段對話與回憶</button>
         </div>`);
       break;
@@ -3037,14 +3031,6 @@ document.addEventListener('click',async event => {
       case 'list-menu':openModal('list-menu');break;
       case 'group':openModal('group');break;
       case 'session-menu':openModal('session-menu',{id:key});break;
-      case 'hide-session': {
-        const item=state.sessions[key];
-        if (!item) break;
-        item.hidden=!item.hidden;persist();
-        if (key === route.id && item.hidden) go({page:'chat'});
-        else closeModal();
-        break;
-      }
       case 'remove-session': {
         const item=state.sessions[key];
         if (!item) break;
@@ -3479,10 +3465,6 @@ document.addEventListener('change',async event => {
     if (target.id==='profileImage') {
       profileImage=await readImage(target.files[0]);
       toast('頭像已讀取，儲存後套用。');
-    }
-    if (target.id==='showHidden') {
-      showHidden=target.checked;
-      $('chatEntries').innerHTML=chatEntries();
     }
     if (target.id==='backgroundSetting') {
       const s=currentSession();
