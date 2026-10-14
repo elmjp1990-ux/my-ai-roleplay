@@ -2505,25 +2505,17 @@ document.addEventListener('click',async event => {
       case 'visibility': {
         const c = state.characters.find(c => c.id === key);
         if (!owned(c)) break;
+        const user = currentUser();
         const nextVisibility = button.dataset.value;
-        if (window.mySupabase && currentUser()?.uid && c.id) {
-          const client = window.mySupabase;
-          const { data: authResult, error: authError } = await client.auth.getUser();
-          if (authError || authResult?.user?.id !== currentUser().uid) {
-            throw new Error('登入狀態驗證失敗，請重新登入後再修改公開狀態。');
-          }
-          const { error: characterError } = await client.from('characters').update({
-            visibility: nextVisibility,
-            review_status: nextVisibility === 'public' ? 'approved' : 'draft'
-          }).eq('id', c.id).eq('author_id', currentUser().uid);
-          if (characterError) throw new Error('公開狀態更新失敗：' + characterError.message);
-          const { error: storyError } = await client.from('character_stories')
-            .update({visibility: nextVisibility}).eq('character_id', c.id);
-          if (storyError) throw new Error('角色公開狀態已更新，但故事狀態更新失敗：' + storyError.message);
+        if (!user?.uid || !window.mySupabase) {
+          throw new Error('請先登入並連接 Supabase，再修改角色公開狀態。');
         }
+        // 使用 upsert，而不是單純 UPDATE：本機草稿／匯入角色可能尚未有雲端資料列。
+        const saveResult = await saveSupabaseCharacter({...c, visibility: nextVisibility}, user.uid);
+        if (saveResult.storyError) throw new Error(saveResult.storyError);
         c.visibility = nextVisibility;
         persist();render();
-        toast(nextVisibility === 'public' ? '角色已設為公開。' : '角色已設為私密。');
+        toast(nextVisibility === 'public' ? '角色已設為公開並同步到雲端。' : '角色已設為私密，雲端資料已同步。');
         break;
       }
       case 'delete-character':openModal('delete-character',{id:key});break;
@@ -3019,17 +3011,25 @@ async function importCharacter(file) {
   if (!image) throw Error('需提供有效的HTTPS或支援的圖片資料。');
   const tags=Array.isArray(data.tags) ? [...new Set(data.tags.filter(t=>TAGS.includes(t)))] : [];
   if (tags.length>5) throw Error('標籤最多5個。');
-  state.characters.unshift({
+  const user = currentUser();
+  if (!user?.uid || !window.mySupabase) {
+    throw Error('請先使用 Google 帳號登入，角色才能儲存到雲端。');
+  }
+  const character = {
     id:id(),name,intro,opening,image,tags,
     gender:['male','female','ambiguous'].includes(data.gender) ? data.gender : 'ambiguous',
     age:String(data.age || '').slice(0,20),
     race:String(data.race || '').slice(0,50),
     privateInfo:String(data.privateInfo || ''),style:String(data.style || ''),
-    authorId:currentUser().uid,owner:true,visibility:'private',
+    authorId:user.uid,owner:true,visibility:'private',
     chats:'0',users:null,createdAt:Date.now()
-  });
+  };
+  // 匯入完成即建立雲端私密角色，不必先公開才上傳。
+  const saveResult = await saveSupabaseCharacter(character, user.uid);
+  state.characters.unshift(character);
   persist();go({page:'create'});
-  toast('角色已匯入，預設為私密。');
+  if (saveResult.storyError) toast('角色已匯入雲端，但故事同步失敗：' + saveResult.storyError);
+  else toast('角色已匯入雲端，預設為私密。');
 }
 
 /* Image errors do not inject HTML. */
