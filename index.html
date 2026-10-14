@@ -1991,7 +1991,7 @@ function accessible(c) {
 function renderDetail() {
   const c = currentCharacter();
   if (!accessible(c)) {
-    $('view').innerHTML = '<div class="empty">角色不存在或無法存取。</div>';
+    $('view').innerHTML = '<div class="empty">此角色已被修改為私密或已被刪除。</div>';
     return;
   }
   const a = author(c.authorId);
