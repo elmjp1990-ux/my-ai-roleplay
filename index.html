@@ -761,12 +761,43 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     try {
       const { data: authResult, error: authError } = await client.auth.getUser();
       if (authError || authResult?.user?.id !== user.id) return;
-      const { data: rows, error } = await client
+
+      // 先讀取雲端角色；將此裝置上屬於目前帳號、但雲端尚不存在的舊角色補上雲端。
+      // 這可修復舊版匯入只存 localStorage 的資料；不會上傳其他帳號的本機角色。
+      let { data: rows, error } = await client
         .from('characters')
         .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, private_info, style, tags, created_at')
         .eq('author_id', user.id)
         .order('created_at', { ascending: false });
       if (error) throw new Error('讀取雲端角色失敗：' + error.message);
+
+      if (state.account?.uid !== user.id) return;
+      const localOwned = state.characters.filter(c => c.authorId === user.id && c.id);
+      const cloudIdsBeforeMigration = new Set((rows || []).map(row => row.id));
+      const localOnly = localOwned.filter(c => !cloudIdsBeforeMigration.has(c.id));
+      const migrationErrors = [];
+      let migratedCount = 0;
+
+      for (const character of localOnly) {
+        try {
+          const result = await saveSupabaseCharacter(character, user.id);
+          migratedCount++;
+          if (result?.storyError) migrationErrors.push(character.name + '：' + result.storyError);
+        } catch (migrationError) {
+          migrationErrors.push((character.name || '未命名角色') + '：' + migrationError.message);
+        }
+      }
+
+      // 補傳後重新讀取，以資料庫結果為準；失敗的本機角色仍會保留在本機。
+      if (migratedCount > 0) {
+        const refreshed = await client
+          .from('characters')
+          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, private_info, style, tags, created_at')
+          .eq('author_id', user.id)
+          .order('created_at', { ascending: false });
+        if (refreshed.error) throw new Error('角色補傳後重新讀取失敗：' + refreshed.error.message);
+        rows = refreshed.data || [];
+      }
 
       const ids = (rows || []).map(row => row.id);
       let stories = [];
@@ -784,9 +815,9 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         if (!latestStory.has(story.character_id)) latestStory.set(story.character_id, story);
       }
       if (state.account?.uid !== user.id) return;
-      const localOwned = state.characters.filter(c => c.authorId === user.id);
+      const localOwnedForMerge = state.characters.filter(c => c.authorId === user.id);
       const cloudCharacters = (rows || []).map(row => {
-        const local = localOwned.find(c => c.id === row.id) || {};
+        const local = localOwnedForMerge.find(c => c.id === row.id) || {};
         const story = latestStory.get(row.id);
         return {
           ...local,
@@ -816,6 +847,12 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       ];
       persist();
       render();
+      if (migrationErrors.length) {
+        console.warn('PersonaX 舊角色補傳有部分失敗：', migrationErrors);
+        toast('有些本機角色尚未同步：' + migrationErrors.slice(0, 2).join('；'));
+      } else if (migratedCount > 0) {
+        toast('已將 ' + migratedCount + ' 個本機角色補同步到雲端。');
+      }
     } catch (error) {
       console.error('PersonaX 雲端角色載入失敗：', error);
       if (state.account?.uid === user.id) {
