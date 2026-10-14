@@ -602,6 +602,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     persist();
     // 真實會員資料與錢包由資料庫載入；不可把 user_metadata 當成正式餘額。
     void loadSupabaseProfileAndWallet(user);
+    void loadSupabaseCharacters(user);
 
     // OAuth 返回後，不要把使用者留在登入遮罩；回到登入前想去的頁面。
     const next = localStorage.getItem('personaX_login_next');
@@ -750,6 +751,75 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       // 登入本身仍可使用；提示使用者檢查 RLS/資料表權限，而不使用假餘額。
       if (state.account?.uid === user.id) {
         toast('已登入，但會員資料或錢包同步失敗。請檢查 Supabase RLS 權限與資料表設定。');
+      }
+    }
+  }
+
+  async function loadSupabaseCharacters(user) {
+    const client = window.mySupabase;
+    if (!client || !user?.id) return;
+    try {
+      const { data: authResult, error: authError } = await client.auth.getUser();
+      if (authError || authResult?.user?.id !== user.id) return;
+      const { data: rows, error } = await client
+        .from('characters')
+        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, private_info, style, tags, created_at')
+        .eq('author_id', user.id)
+        .order('created_at', { ascending: false });
+      if (error) throw new Error('讀取雲端角色失敗：' + error.message);
+
+      const ids = (rows || []).map(row => row.id);
+      let stories = [];
+      if (ids.length) {
+        const result = await client
+          .from('character_stories')
+          .select('id, character_id, story_name, description, opening_message, visibility, created_at')
+          .in('character_id', ids)
+          .order('created_at', { ascending: false });
+        if (result.error) throw new Error('讀取雲端角色故事失敗：' + result.error.message);
+        stories = result.data || [];
+      }
+      const latestStory = new Map();
+      for (const story of stories) {
+        if (!latestStory.has(story.character_id)) latestStory.set(story.character_id, story);
+      }
+      if (state.account?.uid !== user.id) return;
+      const localOwned = state.characters.filter(c => c.authorId === user.id);
+      const cloudCharacters = (rows || []).map(row => {
+        const local = localOwned.find(c => c.id === row.id) || {};
+        const story = latestStory.get(row.id);
+        return {
+          ...local,
+          id: row.id,
+          name: row.name || local.name || '未命名角色',
+          gender: row.gender || local.gender || 'ambiguous',
+          age: row.age == null ? (local.age || '') : String(row.age),
+          image: row.avatar_url || local.image || '',
+          visibility: row.visibility || 'private',
+          intro: row.intro ?? local.intro ?? '',
+          opening: story?.opening_message ?? local.opening ?? '',
+          race: row.race ?? local.race ?? '',
+          privateInfo: row.private_info ?? local.privateInfo ?? '',
+          style: row.style ?? local.style ?? '',
+          tags: Array.isArray(row.tags) ? row.tags : (local.tags || []),
+          authorId: row.author_id,
+          owner: true,
+          chats: local.chats || '0',
+          users: local.users ?? null,
+          createdAt: row.created_at ? new Date(row.created_at).getTime() : (local.createdAt || Date.now())
+        };
+      });
+      const cloudIds = new Set(cloudCharacters.map(c => c.id));
+      state.characters = [
+        ...cloudCharacters,
+        ...state.characters.filter(c => c.authorId !== user.id || !cloudIds.has(c.id))
+      ];
+      persist();
+      render();
+    } catch (error) {
+      console.error('PersonaX 雲端角色載入失敗：', error);
+      if (state.account?.uid === user.id) {
+        toast('登入成功，但雲端角色載入失敗：' + error.message);
       }
     }
   }
