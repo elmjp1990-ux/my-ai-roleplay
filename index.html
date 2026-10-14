@@ -766,7 +766,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       // 這可修復舊版匯入只存 localStorage 的資料；不會上傳其他帳號的本機角色。
       let { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, private_info, style, tags, created_at')
+        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, private_info, style, tags, created_at, first_published_at, latest_eligible')
         .eq('author_id', user.id)
         .order('created_at', { ascending: false });
       if (error) throw new Error('讀取雲端角色失敗：' + error.message);
@@ -792,7 +792,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       if (migratedCount > 0) {
         const refreshed = await client
           .from('characters')
-          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, private_info, style, tags, created_at')
+          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, private_info, style, tags, created_at, first_published_at, latest_eligible')
           .eq('author_id', user.id)
           .order('created_at', { ascending: false });
         if (refreshed.error) throw new Error('角色補傳後重新讀取失敗：' + refreshed.error.message);
@@ -837,7 +837,9 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
           owner: true,
           chats: local.chats || '0',
           users: local.users ?? null,
-          createdAt: row.created_at ? new Date(row.created_at).getTime() : (local.createdAt || Date.now())
+          createdAt: row.created_at ? new Date(row.created_at).getTime() : (local.createdAt || Date.now()),
+          firstPublishedAt: row.first_published_at ? new Date(row.first_published_at).getTime() : null,
+          latestEligible: row.latest_eligible !== false
         };
       });
       const cloudIds = new Set(cloudCharacters.map(c => c.id));
@@ -875,6 +877,27 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       ? Number.parseInt(ageValue, 10)
       : null;
 
+    const nextVisibility = character.visibility === 'public' ? 'public' : 'private';
+    // 先讀取既有上架紀錄，避免 upsert 把首次公開時間或資格重設。
+    const { data: existingCharacter, error: existingCharacterError } = await client
+      .from('characters')
+      .select('visibility, first_published_at, latest_eligible')
+      .eq('id', character.id)
+      .eq('author_id', expectedUserId)
+      .maybeSingle();
+    if (existingCharacterError) {
+      throw new Error('讀取角色上架紀錄失敗：' + existingCharacterError.message);
+    }
+
+    const firstPublishedAt = existingCharacter?.first_published_at ||
+      (nextVisibility === 'public' ? new Date().toISOString() : null);
+    // 只要曾公開後轉私密，就永久失去「最新角色」資格。
+    const latestEligible = existingCharacter
+      ? existingCharacter.latest_eligible !== false &&
+        !(existingCharacter.visibility === 'public' && nextVisibility === 'private') &&
+        !(nextVisibility === 'private' && !!firstPublishedAt)
+      : true;
+
     const row = {
       id: character.id,
       author_id: expectedUserId,
@@ -883,8 +906,10 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       gender: character.gender || null,
       age,
       avatar_url: character.image || null,
-      visibility: character.visibility === 'public' ? 'public' : 'private',
-      review_status: character.visibility === 'public' ? 'approved' : 'draft',
+      visibility: nextVisibility,
+      review_status: nextVisibility === 'public' ? 'approved' : 'draft',
+      first_published_at: firstPublishedAt,
+      latest_eligible: latestEligible,
       intro: character.intro || '',
       race: character.race || '',
       private_info: character.privateInfo || '',
@@ -1574,10 +1599,11 @@ function exploreList() {
     // 內建展示用 seed 角色不是實際上架紀錄，永遠不可列入「最新角色」。
     // 其 createdAt 會在全新本機資料初始化時重新產生，不能用來判斷真正上架時間。
     list = list.filter(c => !String(c.id).startsWith('seed-') &&
-      Number.isFinite(Number(c.createdAt)) &&
-      Date.now()-Number(c.createdAt) >= 0 &&
-      Date.now()-Number(c.createdAt) <= DAY)
-      .sort((a,b) => b.createdAt-a.createdAt).slice(0,30);
+      c.latestEligible !== false &&
+      Number.isFinite(Number(c.firstPublishedAt ?? c.createdAt)) &&
+      Date.now()-Number(c.firstPublishedAt ?? c.createdAt) >= 0 &&
+      Date.now()-Number(c.firstPublishedAt ?? c.createdAt) <= DAY)
+      .sort((a,b) => (b.firstPublishedAt ?? b.createdAt)-(a.firstPublishedAt ?? a.createdAt)).slice(0,30);
   } else if (['male','female'].includes(filter)) {
     list = list.filter(c => c.gender === filter);
   } else {
