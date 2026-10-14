@@ -754,6 +754,83 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     }
   }
 
+  async function saveSupabaseCharacter(character, expectedUserId) {
+    const client = window.mySupabase;
+    if (!client || !expectedUserId) throw new Error('請先使用 Google 帳號登入，再儲存角色。');
+
+    const { data: authResult, error: authError } = await client.auth.getUser();
+    if (authError || authResult?.user?.id !== expectedUserId) {
+      throw new Error('登入狀態驗證失敗，請重新登入後再儲存角色。');
+    }
+
+    const ageValue = String(character.age ?? '').trim();
+    const age = ageValue && Number.isFinite(Number(ageValue))
+      ? Number.parseInt(ageValue, 10)
+      : null;
+
+    const row = {
+      id: character.id,
+      author_id: expectedUserId,
+      name: String(character.name || '').trim(),
+      title: null,
+      gender: character.gender || null,
+      age,
+      avatar_url: character.image || null,
+      visibility: character.visibility === 'public' ? 'public' : 'private',
+      review_status: character.visibility === 'public' ? 'pending' : 'draft',
+      intro: character.intro || '',
+      race: character.race || '',
+      private_info: character.privateInfo || '',
+      style: character.style || '',
+      tags: Array.isArray(character.tags) ? character.tags : []
+    };
+
+    const { error: characterError } = await client
+      .from('characters')
+      .upsert(row, { onConflict: 'id' });
+    if (characterError) {
+      throw new Error('角色資料寫入 Supabase 失敗：' + characterError.message);
+    }
+
+    // 每個角色先沿用最新的一筆故事；沒有故事時才新增，避免每次編輯都重複建立。
+    const { data: existingStory, error: lookupError } = await client
+      .from('character_stories')
+      .select('id')
+      .eq('character_id', character.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (lookupError) {
+      return { storyError: '角色已儲存，但讀取故事資料失敗：' + lookupError.message };
+    }
+
+    const storyRow = {
+      character_id: character.id,
+      story_name: String(character.name || '角色') + '的故事',
+      description: character.intro || '',
+      opening_message: character.opening || '',
+      visibility: character.visibility === 'public' ? 'public' : 'private'
+    };
+
+    let storyResult;
+    if (existingStory?.id) {
+      storyResult = await client
+        .from('character_stories')
+        .update(storyRow)
+        .eq('id', existingStory.id);
+    } else {
+      storyResult = await client
+        .from('character_stories')
+        .insert(storyRow);
+    }
+
+    if (storyResult.error) {
+      return { storyError: '角色已儲存，但開場故事儲存失敗：' + storyResult.error.message };
+    }
+    return { storyError: null };
+  }
+
   async function saveSupabaseProfile(account) {
     if (!account?.uid || !window.mySupabase) return;
     const { error } = await window.mySupabase.from('profiles').upsert({
@@ -2623,6 +2700,10 @@ document.addEventListener('submit',async event => {
   try {
     switch(type) {
       case 'character': {
+        const user = currentUser();
+        if (!user?.uid || !window.mySupabase) {
+          return toast('請先使用 Google 帳號登入，角色才會保存到雲端。');
+        }
         const name=String(f.get('name')).trim();
         if (!validName(name,3)) return toast('角色名字不符合規則。'+NAME_HELP);
         if (!draftImage) return toast('請上傳角色頭像。');
@@ -2638,13 +2719,20 @@ document.addEventListener('submit',async event => {
           privateInfo:String(f.get('privateInfo')).trim(),
           style:String(f.get('style')).trim(),
           visibility:String(f.get('visibility')),image:draftImage,
-          tags:[...draftTags],authorId:currentUser().uid,owner:true,
+          tags:[...draftTags],authorId:user.uid,owner:true,
           chats:old?.chats || '0',users:old?.users ?? null,
           createdAt:old?.createdAt || Date.now()
         };
-        if (old)state.characters[state.characters.indexOf(old)]=c;
+
+        // 先寫入雲端；只有角色資料成功後才更新本機畫面狀態。
+        const saveResult = await saveSupabaseCharacter(c, user.uid);
+        if (old) state.characters[state.characters.indexOf(old)]=c;
         else state.characters.unshift(c);
-        persist();go({page:'create'});break;
+        persist();
+        go({page:'create'});
+        if (saveResult.storyError) toast(saveResult.storyError);
+        else toast('角色與開場故事已儲存到雲端。');
+        break;
       }
       case 'ai': {
         const name=String(f.get('name')).trim();
