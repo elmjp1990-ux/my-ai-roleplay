@@ -1383,6 +1383,70 @@ function persist() {
     return false;
   }
 }
+
+// Chat cloud persistence (official UUID characters only).
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+}
+function chatSessionData(s) {
+  return {
+    name:s.name || '', archived:!!s.archived, hidden:!!s.hidden,
+    pinned:!!s.pinned, persona:s.persona || '',
+    suggestions:s.suggestions !== false, background:s.background || 'avatar',
+    startedAt:s.startedAt || Date.now(), archivedAt:s.archivedAt || null,
+    memories:Array.isArray(s.memories) ? s.memories : [],
+    album:Array.isArray(s.album) ? s.album : []
+  };
+}
+async function saveChatSessionToCloud(s, options = {}) {
+  const client = window.mySupabase;
+  const localUser = currentUser();
+  if (!client || !localUser?.uid || !s) return false;
+  if (!isUuid(s.characterId) || !isUuid(s.id)) return false;
+  const { data: authResult, error: authError } = await client.auth.getUser();
+  if (authError || authResult?.user?.id !== localUser.uid) {
+    throw new Error('登入狀態驗證失敗，聊天尚未同步。');
+  }
+  const character = state.characters.find(item => item.id === s.characterId);
+  if (!character) throw new Error('找不到這段聊天所屬的正式角色。');
+  const snapshot = {
+    id:character.id, name:character.name || s.characterName || '角色',
+    gender:character.gender || 'ambiguous', age:character.age || '',
+    image:character.image || '', intro:character.intro || '',
+    opening:character.opening || '', race:character.race || '',
+    style:character.style || '', tags:Array.isArray(character.tags) ? character.tags : []
+  };
+  const row = {
+    id:s.id, user_id:localUser.uid, character_id:character.id,
+    character_name:snapshot.name,
+    status:s.archived ? 'archived' : 'active',
+    character_snapshot:snapshot, session_data:chatSessionData(s),
+    updated_at:new Date().toISOString()
+  };
+  const { error: sessionError } = await client.from('chat_sessions').upsert(row,{onConflict:'id'});
+  if (sessionError) throw new Error('聊天基本資料同步失敗：'+sessionError.message);
+  const messages = (s.messages || []).filter(m => isUuid(m.id)).map(m => ({
+    id:m.id, session_id:s.id,
+    role:m.role === 'user' ? 'user' : 'assistant',
+    content:String(m.text ?? ''), created_at:new Date(Number(m.at) || Date.now()).toISOString()
+  }));
+  if (messages.length) {
+    const { error: messageError } = await client.from('chat_messages').upsert(messages,{onConflict:'id'});
+    if (messageError) throw new Error('聊天訊息同步失敗：'+messageError.message);
+  }
+  return true;
+}
+async function saveChatSessionSafely(s) {
+  try {
+    const saved = await saveChatSessionToCloud(s);
+    return saved;
+  } catch (error) {
+    console.error('PersonaX 聊天同步失敗：',error);
+    toast(error.message || '聊天已保存在本機，但雲端同步失敗。');
+    return false;
+  }
+}
+
 function toast(text) {
   clearTimeout(toastTimer);
   $('toast').textContent = text;
@@ -2037,6 +2101,7 @@ function startChat(characterId) {
   s.hidden = false;
   persist();
   go({page:'conversation',id:s.id});
+  void saveChatSessionSafely(s);
 }
 function visibleSessions() {
   const q = chatSearch.trim().toLowerCase();
@@ -2821,6 +2886,7 @@ document.addEventListener('click',async event => {
         if (!s || !c || !confirm('開始新對話？目前對話、日記與相簿會保存到舊的回憶。')) break;
         const snapshot=clone(state);
         s.archived=true;s.archivedAt=Date.now();
+        void saveChatSessionSafely(s);
         const d=new Date(s.startedAt);
         const date=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
         s.name ||= [...(c.name+'_'+date)].slice(0,25).join('');
@@ -3105,7 +3171,9 @@ document.addEventListener('submit',async event => {
           addMemory(s,[...('本輪對話摘錄：'+snippets+'。')].slice(0,50).join(''));
         }
         drafts[s.id]='';$('messageInput').value='';
-        persist();renderMessages();break;
+        persist();renderMessages();
+        await saveChatSessionSafely(s);
+        break;
       }
       case 'persona':
         if (!s) return;
