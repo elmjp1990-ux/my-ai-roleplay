@@ -519,70 +519,64 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  // 1. 初始化 Supabase
   const SUPABASE_URL = 'https://ouyewoagbmtqehbofrje.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_MyTDqAKNTkK4zo7eap8gZA_ZGozHRMd';
+  const SUPABASE_ANON_KEY = 'sb_publishable_MyTDqAKNTkK4zo7eap8gZA_ZGozHRMd'; // 保持你原本的 key
   
   if (!window.mySupabase) {
     window.mySupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
 
-  // 2. 網頁開啟時自動測試連線
-  async function testSupabaseConnection() {
-    try {
-      const { data, error } = await window.mySupabase.from('profiles').select('*').limit(1);
-      if (error) {
-        console.error('❌ 連線失敗：', error.message);
-      } else {
-        console.log('🎉 恭喜！Supabase 資料庫連線成功！', data);
-      }
-    } catch (err) {
-      console.error('❌ 異常：', err);
-    }
-  }
-
-  // 3. 綁定 Google 登入功能
+  // 1. Google 登入函式
   async function loginWithGoogle() {
-    const { data, error } = await window.mySupabase.auth.signInWithOAuth({
+    const { error } = await window.mySupabase.auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        // 登入成功後自動跳轉回你的網頁
-        redirectTo: window.location.origin
-      }
+      options: { redirectTo: window.location.origin }
     });
-    if (error) {
-      console.error('登入失敗:', error.message);
-      alert('登入失敗：' + error.message);
-    }
+    if (error) alert('登入失敗：' + error.message);
   }
 
-  window.onload = function() {
-    testSupabaseConnection();
-  };
-// 監聽登入狀態變化
-  window.mySupabase.auth.onAuthStateChange((event, session) => {
-    if (session) {
-      console.log('🎉 玩家已成功登入：', session.user);
-      const userEmail = session.user.email;
-      const userName = session.user.user_metadata.name || userEmail.split('@')[0];
-      
-      // 1. 自動把右上角的「登入 / 註冊」按鈕文字換成你的名字/信箱
-      // 尋找包含「登入」文字的按鈕
-      const buttons = document.querySelectorAll('button, a');
-      buttons.forEach(btn => {
-        if (btn.innerText.includes('登入 / 註冊') || btn.innerText.includes('登入')) {
+  // 2. 更新畫面的共用函式（支援大頭照與名字）
+  function updateUIForUser(user) {
+    if (!user) return;
+    const userEmail = user.email;
+    const userName = user.user_metadata.name || userEmail.split('@')[0];
+    const avatarUrl = user.user_metadata.avatar_url; // Google 大頭照網址
+
+    // 精準尋找右上角原本的「登入 / 註冊」按鈕（避免誤改其他按鈕導致當機）
+    const loginBtns = document.querySelectorAll('button');
+    loginBtns.forEach(btn => {
+      if (btn.innerText.includes('登入') || btn.innerText.includes('註冊') || btn.querySelector('img')) {
+        // 如果有抓到 Google 大頭照，直接用圖片包裝；否則顯示文字
+        if (avatarUrl) {
+          btn.innerHTML = `<img src="${avatarUrl}" style="width:24px;height:24px;border-radius:50%;vertical-align:middle;margin-right:6px;"> ${userName}`;
+        } else {
           btn.innerText = userName;
         }
-      });
-
-      // 2. 如果目前剛好開著登入彈窗，自動把它關閉
-      const dialogOverlay = document.querySelector('.dialog-overlay, .modal-overlay, dialog');
-      if (dialogOverlay) {
-        // 嘗試關閉彈窗或移除它
-        dialogOverlay.style.display = 'none';
       }
+    });
+
+    // 關閉可能還開著的登入彈窗
+    const dialogOverlay = document.querySelector('.dialog-overlay, .modal-overlay');
+    if (dialogOverlay) dialogOverlay.style.display = 'none';
+  }
+
+  // 3. 網頁載入時自動檢查登入狀態（解決重新整理要重登的問題）
+  window.onload = async function() {
+    // 檢查現有 Session
+    const { data: { session } } = await window.mySupabase.auth.getSession();
+    if (session) {
+      console.log('🎉 自動恢復登入身分：', session.user);
+      updateUIForUser(session.user);
     }
-  });
+
+    // 即時監聽登入狀態變化
+    window.mySupabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        updateUIForUser(session.user);
+      }
+    });
+  };
+</script>
 </script>
 </head>
 
