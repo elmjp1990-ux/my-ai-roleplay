@@ -3007,7 +3007,7 @@ document.addEventListener('click',async event => {
         const c=sessionCharacter(s);
         if (!s || !c) break;
         if (!hasUserMessage(s)) {
-          toast('這段聊天還沒開始：請先送出第一句訊息，才能封存並開始新對話。');
+          alert('這段聊天還沒開始：請先送出第一句訊息，才能封存並開始新對話。');
           break;
         }
         if (!confirm('封存目前劇情並開始新對話？')) break;
