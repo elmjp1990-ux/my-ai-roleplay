@@ -1394,6 +1394,10 @@ let state = load();
 const CHAT_ISOLATION_MIGRATION_KEY = 'personax-chat-isolation-v1';
 try {
   if (localStorage.getItem(CHAT_ISOLATION_MIGRATION_KEY) !== 'done') {
+    // 保留一份不會載入畫面的舊資料備份，避免未同步到雲端的聊天無法復原。
+    if (Object.keys(state.sessions || {}).length) {
+      localStorage.setItem('personax-chat-legacy-quarantine-v1', JSON.stringify(state.sessions));
+    }
     state.sessions = {};
     state.characters = state.characters.filter(character =>
       !character.cloudSnapshotOnly && character.visibility !== 'private'
