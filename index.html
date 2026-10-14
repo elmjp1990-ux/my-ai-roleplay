@@ -603,6 +603,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     persist();
     // 真實會員資料與錢包由資料庫載入；不可把 user_metadata 當成正式餘額。
     void loadSupabaseProfileAndWallet(user);
+    void loadPublicSupabaseCharacters();
     void loadSupabaseCharacters(user);
 
     // OAuth 返回後，不要把使用者留在登入遮罩；回到登入前想去的頁面。
