@@ -644,7 +644,8 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         };
         state.signedIn = true;
         persist();
-        if (route?.overlay?.name !== 'account-deletion-pending') {
+        if (!state.account.accountDeletionModalDismissed &&
+            route?.overlay?.name !== 'account-deletion-pending') {
           openModal('account-deletion-pending', {
             scheduledFor: deletionStatus.scheduled_for
           });
@@ -1135,6 +1136,15 @@ function openModal(name, data = {}) {
   go({...route,overlay:{name,...data}},!!route.overlay);
 }
 function closeModal() { back(); }
+function dismissPendingDeletionModal() {
+  if (state.account?.accountDeletionPending) {
+    state.account.accountDeletionModalDismissed = true;
+    persist();
+    go({page:'home'}, true);
+  } else {
+    back();
+  }
+}
 window.addEventListener('popstate',event => {
   captureDraft();
   route = event.state?.personax ? event.state.route : parseRoute();
@@ -1142,13 +1152,13 @@ window.addEventListener('popstate',event => {
 });
 $('modal').addEventListener('cancel',event => {
   event.preventDefault();
-  back();
+  dismissPendingDeletionModal();
 });
 $('modal').addEventListener('click',event => {
   if (event.target !== $('modal')) return;
   const r = $('modal').getBoundingClientRect();
   if (event.clientX < r.left || event.clientX > r.right ||
-      event.clientY < r.top || event.clientY > r.bottom) back();
+      event.clientY < r.top || event.clientY > r.bottom) dismissPendingDeletionModal();
 });
 function showDialog(title,content) {
   let modal = $('modal');
@@ -1176,9 +1186,9 @@ function showDialog(title,content) {
   modal.innerHTML = `
     <div class="row between modal-heading">
       <h2>${e(title)}</h2>
-      <button class="ghost" data-action="${pendingDeletionDialog ? 'pending-switch-account' : 'back'}"
-              aria-label="${pendingDeletionDialog ? '登出並切換帳號' : '關閉'}"
-              title="${pendingDeletionDialog ? '登出並切換帳號' : '關閉'}">✕</button>
+      <button class="ghost" data-action="${pendingDeletionDialog ? 'pending-dismiss-deletion-modal' : 'back'}"
+              aria-label="關閉"
+              title="關閉">✕</button>
     </div>${content}`;
 
   if (!modal.open) modal.showModal();
@@ -1237,8 +1247,10 @@ function render() {
   if (!['home','detail','author'].includes(route.page) && !currentUser()) {
     route = {page:'home',overlay:{name:'login'}};
   }
-  // 待刪除帳號被鎖定在狀態視窗，避免關閉視窗後繼續使用功能。
-  if (state.account?.accountDeletionPending && route.overlay?.name !== 'account-deletion-pending') {
+  // 待刪除帳號首次顯示狀態視窗；關閉後保留首頁，但仍限制 PersonaX 功能。
+  if (state.account?.accountDeletionPending &&
+      !state.account.accountDeletionModalDismissed &&
+      route.overlay?.name !== 'account-deletion-pending') {
     route = {
       ...route,
       overlay: {
@@ -2004,10 +2016,7 @@ function renderModal(o) {
         <form data-form="cancel-account-deletion">
           <button class="primary">取消刪除，恢復帳號</button>
         </form>
-        <button class="ghost" data-action="pending-switch-account" style="width:100%;margin-top:10px">
-          登出並切換其他帳號
-        </button>
-        <p class="muted small" style="margin-top:8px">登出不會取消刪除申請；重新登入此帳號時，仍可在期限內取消申請。</p>`);
+        <p class="muted small" style="margin-top:8px">關閉此視窗不會取消刪除申請；你仍可在 30 天期限內重新開啟此視窗並取消申請。</p>`);
       break;
     }
     case 'shop':
@@ -2259,6 +2268,12 @@ document.addEventListener('click',async event => {
   const key = button.dataset.id;
   const s = currentSession();
 
+  if (state.account?.accountDeletionPending &&
+      !['home','pending-dismiss-deletion-modal','cancel-account-deletion','logout','pending-switch-account'].includes(action)) {
+    toast('此帳號正在等待刪除，目前不能使用 PersonaX 功能。你可以取消刪除申請以恢復帳號。');
+    return;
+  }
+
   try {
     switch(action) {
       case 'home':go({page:'home'});break;
@@ -2283,6 +2298,10 @@ document.addEventListener('click',async event => {
         state.signedIn = true;
         persist();
         go(next,true);
+        break;
+      }
+      case 'pending-dismiss-deletion-modal': {
+        dismissPendingDeletionModal();
         break;
       }
       case 'logout':
