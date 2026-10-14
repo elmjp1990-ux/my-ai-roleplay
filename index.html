@@ -595,6 +595,8 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     state.signedIn = true;
 
     persist();
+    // 真實會員資料與錢包由資料庫載入；不可把 user_metadata 當成正式餘額。
+    void loadSupabaseProfileAndWallet(user);
 
     // OAuth 返回後，不要把使用者留在登入遮罩；回到登入前想去的頁面。
     const next = localStorage.getItem('personaX_login_next');
@@ -618,6 +620,91 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     } else {
       render();
     }
+  }
+
+  // 從 Supabase Database 讀取真正的會員資料與錢包餘額。
+  // 表名與欄位依目前提供的資料庫截圖：profiles / wallet_accounts。
+  async function loadSupabaseProfileAndWallet(user) {
+    if (!user?.id || !window.mySupabase) return;
+    const client = window.mySupabase;
+
+    try {
+      let { data: profile, error: profileError } = await client
+        .from('profiles')
+        .select('id, handle, nickname, avatar_url, bio')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileError) throw new Error('讀取 profiles 失敗：' + profileError.message);
+
+      if (!profile) {
+        const metadata = user.user_metadata || {};
+        const baseName = metadata.full_name || metadata.name ||
+          metadata.user_name || user.email?.split('@')[0] || 'PersonaX 使用者';
+        const handle = 'user_' + user.id.replace(/-/g, '').slice(0, 12);
+        const result = await client.from('profiles').upsert({
+          id: user.id,
+          handle,
+          nickname: String(baseName).slice(0, 25),
+          avatar_url: metadata.avatar_url || metadata.picture || null,
+          bio: ''
+        }, { onConflict: 'id' }).select('id, handle, nickname, avatar_url, bio').single();
+        if (result.error) throw new Error('建立 profiles 失敗：' + result.error.message);
+        profile = result.data;
+      }
+
+      let { data: walletRow, error: walletError } = await client
+        .from('wallet_accounts')
+        .select('user_id, diamonds, silver_coins, updated_at')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (walletError) throw new Error('讀取 wallet_accounts 失敗：' + walletError.message);
+
+      if (!walletRow) {
+        const result = await client.from('wallet_accounts').upsert({
+          user_id: user.id,
+          diamonds: 0,
+          silver_coins: 0
+        }, { onConflict: 'user_id' })
+          .select('user_id, diamonds, silver_coins, updated_at').single();
+        if (result.error) throw new Error('建立 wallet_accounts 失敗：' + result.error.message);
+        walletRow = result.data;
+      }
+
+      // 避免較早發出的請求覆蓋另一個已登入帳號。
+      if (state.account?.uid !== user.id) return;
+      state.account = {
+        ...state.account,
+        nickname: profile.nickname || state.account.nickname,
+        handle: profile.handle || '',
+        avatar: profile.avatar_url || state.account.avatar || '',
+        bio: profile.bio || '',
+        diamonds: Number(walletRow.diamonds ?? 0),
+        silver: Number(walletRow.silver_coins ?? 0)
+      };
+      state.signedIn = true;
+      persist();
+      render();
+    } catch (error) {
+      console.error('PersonaX 資料庫同步失敗：', error);
+      // 登入本身仍可使用；提示使用者檢查 RLS/資料表權限，而不使用假餘額。
+      if (state.account?.uid === user.id) {
+        toast('已登入，但會員資料或錢包同步失敗。請檢查 Supabase RLS 權限與資料表設定。');
+      }
+    }
+  }
+
+  async function saveSupabaseProfile(account) {
+    if (!account?.uid || !window.mySupabase) return;
+    const { error } = await window.mySupabase.from('profiles').upsert({
+      id: account.uid,
+      handle: account.handle || ('user_' + account.uid.replace(/-/g, '').slice(0, 12)),
+      nickname: account.nickname,
+      avatar_url: account.avatar || null,
+      bio: account.bio || ''
+    }, { onConflict: 'id' });
+    if (error) throw new Error('儲存 profiles 失敗：' + error.message);
   }
 
   async function loginWithGoogle() {
@@ -2481,7 +2568,19 @@ document.addEventListener('submit',async event => {
         state.account.bio=String(f.get('bio')).trim();
         state.account.avatar=profileImage;
         state.theme=f.get('day') ? 'day' : 'night';
-        persist();back();break;
+        persist();
+        try {
+          if (window.mySupabase?.auth) {
+            const { data } = await window.mySupabase.auth.getUser();
+            if (data?.user?.id === state.account.uid) await saveSupabaseProfile(state.account);
+          }
+          back();
+          toast('個人資料已儲存。');
+        } catch (error) {
+          console.error(error);
+          toast('本機已更新，但資料庫儲存失敗；請檢查 RLS 權限。');
+        }
+        break;
       }
       case 'delete-account': {
         if (String(f.get('confirm'))!=='Deltet') return toast('請輸入「Deltet」。');
