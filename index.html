@@ -554,6 +554,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       state.signedIn = false;
       state.account = null;
       persist();
+      void loadPublicSupabaseCharacters();
       render();
       return;
     }
@@ -752,6 +753,73 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       if (state.account?.uid === user.id) {
         toast('已登入，但會員資料或錢包同步失敗。請檢查 Supabase RLS 權限與資料表設定。');
       }
+    }
+  }
+
+  // 探索頁公開角色獨立於登入帳號載入，訪客也能看見。
+  // 每次登入／登出都以雲端公開清單為準，避免沿用前一個帳號的過期本機資料。
+  async function loadPublicSupabaseCharacters() {
+    const client = window.mySupabase;
+    if (!client) return;
+    try {
+      const { data: rows, error } = await client
+        .from('characters')
+        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible')
+        .eq('visibility', 'public')
+        .eq('review_status', 'approved')
+        .order('first_published_at', { ascending: false, nullsFirst: false });
+      if (error) throw new Error(error.message);
+
+      const ids = (rows || []).map(row => row.id);
+      let stories = [];
+      if (ids.length) {
+        const result = await client
+          .from('character_stories')
+          .select('id, character_id, story_name, description, opening_message, visibility, created_at')
+          .in('character_id', ids)
+          .eq('visibility', 'public')
+          .order('created_at', { ascending: false });
+        if (result.error) throw new Error(result.error.message);
+        stories = result.data || [];
+      }
+      const latestStory = new Map();
+      for (const story of stories) {
+        if (!latestStory.has(story.character_id)) latestStory.set(story.character_id, story);
+      }
+
+      const publicCharacters = (rows || []).map(row => {
+        const story = latestStory.get(row.id);
+        return {
+          id: row.id, name: row.name || '未命名角色',
+          gender: row.gender || 'ambiguous',
+          age: row.age == null ? '' : String(row.age),
+          image: row.avatar_url || '', visibility: 'public',
+          reviewStatus: row.review_status, intro: row.intro || '',
+          opening: story?.opening_message || '', race: row.race || '',
+          privateInfo: '', style: row.style || '',
+          tags: Array.isArray(row.tags) ? row.tags : [],
+          authorId: row.author_id, owner: state.account?.uid === row.author_id,
+          chats: '0', users: null,
+          createdAt: row.created_at ? new Date(row.created_at).getTime() : 0,
+          firstPublishedAt: row.first_published_at ? new Date(row.first_published_at).getTime() : null,
+          latestEligible: row.latest_eligible !== false,
+          rightsConfirmed: false, cloudPublic: true
+        };
+      });
+
+      const publicIds = new Set(publicCharacters.map(character => character.id));
+      const currentUid = state.account?.uid || null;
+      // 保留 seed 與目前帳號自己的私密草稿；不保留其他帳號殘留的本機角色。
+      const keepLocal = state.characters.filter(character =>
+        String(character.id).startsWith('seed-') ||
+        (currentUid && character.authorId === currentUid && !publicIds.has(character.id))
+      );
+      state.characters = [...publicCharacters, ...keepLocal.filter(character => !publicIds.has(character.id))];
+      persist();
+      render();
+    } catch (error) {
+      console.error('公開角色載入失敗：', error);
+      if (state.account?.uid) toast('公開角色載入失敗：' + error.message);
     }
   }
 
@@ -1034,6 +1102,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       }
 
       syncSupabaseUser(data?.session?.user || null);
+      void loadPublicSupabaseCharacters();
 
       window.mySupabase.auth.onAuthStateChange((event, session) => {
         // INITIAL_SESSION / SIGNED_IN / TOKEN_REFRESHED 等狀態都統一交給同一入口。
