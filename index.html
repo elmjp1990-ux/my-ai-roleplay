@@ -653,23 +653,21 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         profile = result.data;
       }
 
-      let { data: walletRow, error: walletError } = await client
-        .from('wallet_accounts')
-        .select('user_id, diamonds, silver_coins, updated_at')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      // 安全初始化：由資料庫依 auth.uid() 建立新錢包（0 鑽石、100 銀幣），
+      // 舊會員則保留原餘額。前端不再直接 INSERT/UPSERT wallet_accounts。
+      const { data: walletData, error: walletError } = await client.rpc(
+        'ensure_wallet_account'
+      );
+      if (walletError) {
+        throw new Error(
+          '初始化錢包失敗：' + walletError.message +
+          '。請確認已在 Supabase 建立 public.ensure_wallet_account() 函式。'
+        );
+      }
 
-      if (walletError) throw new Error('讀取 wallet_accounts 失敗：' + walletError.message);
-
-      if (!walletRow) {
-        const result = await client.from('wallet_accounts').upsert({
-          user_id: user.id,
-          diamonds: 0,
-          silver_coins: 0
-        }, { onConflict: 'user_id' })
-          .select('user_id, diamonds, silver_coins, updated_at').single();
-        if (result.error) throw new Error('建立 wallet_accounts 失敗：' + result.error.message);
-        walletRow = result.data;
+      const walletRow = Array.isArray(walletData) ? walletData[0] : walletData;
+      if (!walletRow || walletRow.diamonds == null || walletRow.silver_coins == null) {
+        throw new Error('錢包初始化函式沒有回傳有效的鑽石與銀幣餘額。');
       }
 
       // 避免較早發出的請求覆蓋另一個已登入帳號。
