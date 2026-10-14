@@ -3410,15 +3410,20 @@ document.addEventListener('submit',async event => {
         if (!m || !latestUserMessage) return;
         if (!text) return toast('訊息不可為空。');
         const previousText=m.text;
+        const wasEdited=!!m.edited;
         m.text=text;m.edited=true;
         if (!persist()) {
           m.text=previousText;
+          m.edited=wasEdited;
           break;
         }
         const synced = await saveChatSessionSafely(s);
         if (!synced) {
-          toast('修改已暫存在本機，但雲端同步失敗；請確認網路後再試。');
+          m.text=previousText;
+          m.edited=wasEdited;
+          persist();
           renderMessages();
+          toast('雲端同步失敗，已還原原訊息；請確認網路後再重新編輯。');
           break;
         }
         back();break;
