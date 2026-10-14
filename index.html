@@ -535,18 +535,32 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     if (error) alert('登入失敗：' + error.message);
   }
 
-  // 2. 更新畫面的共用函式（支援大頭照與名字）
+// 2. 更新畫面的共用函式（同步寫入全域狀態，避免其他功能擋住）
   function updateUIForUser(user) {
     if (!user) return;
     const userEmail = user.email;
     const userName = user.user_metadata.name || userEmail.split('@')[0];
-    const avatarUrl = user.user_metadata.avatar_url; // Google 大頭照網址
+    const avatarUrl = user.user_metadata.avatar_url;
 
-    // 精準尋找右上角原本的「登入 / 註冊」按鈕（避免誤改其他按鈕導致當機）
+    // A. 同步寫入本機狀態，讓網站其他功能知道你已經登入了
+    const currentUserObj = {
+      id: user.id,
+      name: userName,
+      email: userEmail,
+      avatar: avatarUrl,
+      isLoggedIn: true
+    };
+    localStorage.setItem('personaX_user', JSON.stringify(currentUserObj));
+    
+    // 如果你原本的網站有全域變數（例如 window.currentUser），也可以在這裡賦值
+    if (typeof window.currentUser === 'function' || window.currentUser !== undefined) {
+      window.currentUser = () => currentUserObj;
+    }
+
+    // B. 更新右上角按鈕
     const loginBtns = document.querySelectorAll('button');
     loginBtns.forEach(btn => {
       if (btn.innerText.includes('登入') || btn.innerText.includes('註冊') || btn.querySelector('img')) {
-        // 如果有抓到 Google 大頭照，直接用圖片包裝；否則顯示文字
         if (avatarUrl) {
           btn.innerHTML = `<img src="${avatarUrl}" style="width:24px;height:24px;border-radius:50%;vertical-align:middle;margin-right:6px;"> ${userName}`;
         } else {
@@ -555,11 +569,11 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       }
     });
 
-    // 關閉可能還開著的登入彈窗
+    // C. 自動關閉登入彈窗
     const dialogOverlay = document.querySelector('.dialog-overlay, .modal-overlay');
     if (dialogOverlay) dialogOverlay.style.display = 'none';
   }
-
+  
   // 3. 網頁載入時自動檢查登入狀態（解決重新整理要重登的問題）
   window.onload = async function() {
     // 檢查現有 Session
