@@ -1571,7 +1571,12 @@ setInterval(() => {
 function exploreList() {
   let list = state.characters.filter(c => c.visibility === 'public');
   if (filter === 'latest') {
-    list = list.filter(c => Date.now()-c.createdAt <= DAY)
+    // 內建展示用 seed 角色不是實際上架紀錄，永遠不可列入「最新角色」。
+    // 其 createdAt 會在全新本機資料初始化時重新產生，不能用來判斷真正上架時間。
+    list = list.filter(c => !String(c.id).startsWith('seed-') &&
+      Number.isFinite(Number(c.createdAt)) &&
+      Date.now()-Number(c.createdAt) >= 0 &&
+      Date.now()-Number(c.createdAt) <= DAY)
       .sort((a,b) => b.createdAt-a.createdAt).slice(0,30);
   } else if (['male','female'].includes(filter)) {
     list = list.filter(c => c.gender === filter);
