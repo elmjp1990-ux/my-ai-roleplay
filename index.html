@@ -2168,14 +2168,43 @@ function newSession(character,options = {}) {
   state.sessions[sessionId] = session;
   return session;
 }
+function hasUserMessage(session) {
+  return (session?.messages || []).some(message =>
+    message.role === 'user' && String(message.text || '').trim()
+  );
+}
+function sessionTitle(session) {
+  return String(session?.name || sessionCharacter(session)?.name || session?.characterName || '角色').trim();
+}
+function uniqueSessionName(base,excludeId = '') {
+  const used = new Set(Object.values(state.sessions)
+    .filter(item => item.id !== excludeId)
+    .map(sessionTitle));
+  const clean = [...String(base || '回憶').trim()].slice(0,25).join('') || '回憶';
+  if (!used.has(clean)) return clean;
+  for (let n = 1; n < 10000; n++) {
+    const suffix = '-'+n;
+    const candidate = [...clean].slice(0,25-[...suffix].length).join('')+suffix;
+    if (!used.has(candidate)) return candidate;
+  }
+  return [...clean].slice(0,20).join('')+'-'+Date.now().toString().slice(-4);
+}
+function newArchiveName(character,session) {
+  const d = new Date(session.archivedAt || Date.now());
+  const date = [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
+  return uniqueSessionName([...((character?.name || '角色')+'_'+date)].slice(0,25).join(''),session.id);
+}
 function startChat(characterId) {
   const c = state.characters.find(c => c.id === characterId);
   if (!accessible(c)) return toast('角色不存在或無法存取。');
   if (!requireLogin({page:'detail',id:characterId})) return;
-  let s = Object.values(state.sessions).find(s =>
-    s.characterId === c.id && !s.archived &&
-    !(s.messages || []).some(message => message.role === 'user' && String(message.text || '').trim()));
-  if (!s) s = newSession(c);
+  const sessions = Object.values(state.sessions).filter(item =>
+    item.characterId === c.id && !item.archived
+  ).sort((a,b) =>
+    Number(hasUserMessage(b))-Number(hasUserMessage(a)) ||
+    (b.messages?.at(-1)?.at || b.startedAt || 0)-(a.messages?.at(-1)?.at || a.startedAt || 0)
+  );
+  let s = sessions[0] || newSession(c);
   s.hidden = false;
   persist();
   go({page:'conversation',id:s.id});
@@ -2718,7 +2747,7 @@ function renderArchives() {
       <strong>${e(item.name)}</strong>
       <p class="small muted" style="margin:8px 0">
         ${e(timeText(item.archivedAt || item.startedAt))}<br>
-        對話 ${item.messages.length} 筆 · 日記 ${item.memories.length} 筆 · 相片 ${item.album.length} 張
+        玩家訊息 ${item.messages.filter(message => message.role === 'user' && String(message.text || '').trim()).length} 筆 · 日記 ${item.memories.length} 筆 · 相片 ${item.album.length} 張
       </p>
       <div class="row wrap">
         <button data-action="view-archive" data-id="${e(item.id)}">查看回憶</button>
@@ -2960,19 +2989,33 @@ document.addEventListener('click',async event => {
       case 'archives':openModal('archives');break;
       case 'new-conversation': {
         const c=sessionCharacter(s);
-        if (!s || !c || !confirm('開始新對話？目前對話、日記與相簿會保存到舊的回憶。')) break;
+        if (!s || !c) break;
+        if (!hasUserMessage(s)) {
+          toast('這段聊天還沒開始：請先送出第一句訊息，才能封存並開始新對話。');
+          break;
+        }
+        if (!confirm('封存目前劇情並開始新對話？')) break;
         const snapshot=clone(state);
-        s.archived=true;s.archivedAt=Date.now();
-        const d=new Date(s.startedAt);
-        const date=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
-        s.name ||= [...(c.name+'_'+date)].slice(0,25).join('');
-        let next=Object.values(state.sessions).find(item =>
-          item.id !== s.id && item.characterId === c.id && !item.archived &&
-          !(item.messages || []).some(message => message.role === 'user' && String(message.text || '').trim()));
-        if (!next) next=newSession(c,{persona:s.persona,background:s.background,suggestions:s.suggestions});
+        s.archivedAt=Date.now();
+        s.name=uniqueSessionName(s.name || newArchiveName(c,s),s.id);
+        s.archived=true;
+        const existing=Object.values(state.sessions).filter(item =>
+          item.id !== s.id && item.characterId === c.id && !item.archived
+        ).sort((a,b) =>
+          Number(hasUserMessage(b))-Number(hasUserMessage(a)) ||
+          (b.messages?.at(-1)?.at || b.startedAt || 0)-(a.messages?.at(-1)?.at || a.startedAt || 0)
+        )[0];
         if (!persist()) {state=snapshot;break;}
-        void saveChatSessionSafely(s);
-        go({page:'conversation',id:next.id});
+        await saveChatSessionSafely(s);
+        if (existing) {
+          existing.hidden=false;
+          persist();
+          go({page:'conversation',id:existing.id});
+        } else {
+          const next=newSession(c,{persona:s.persona,background:s.background,suggestions:s.suggestions});
+          persist();
+          go({page:'conversation',id:next.id});
+        }
         break;
       }
       case 'view-archive':openModal('archive',{id:key});break;
@@ -2981,10 +3024,11 @@ document.addEventListener('click',async event => {
       case 'resume-archive': {
         const item=state.sessions[key];
         if (!item || !accessible(sessionCharacter(item))) break;
-        if (!confirm('繼續這段回憶？它將以檔名出現在聊天列表中。')) break;
+        if (!confirm('恢復這段回憶？它會以原檔名回到角色聊天列表。')) break;
+        item.name=uniqueSessionName(item.name || sessionTitle(item),item.id);
         item.archived=false;item.hidden=false;
         persist();
-        void saveChatSessionSafely(item);
+        if (hasUserMessage(item)) await saveChatSessionSafely(item);
         go({page:'conversation',id:item.id});
         break;
       }
@@ -3265,8 +3309,12 @@ document.addEventListener('submit',async event => {
         const item=state.sessions[o.id];
         const name=String(f.get('name')).trim();
         if (!item || !validName(name)) return toast('檔名不符合規則。'+NAME_HELP);
+        const duplicate=Object.values(state.sessions).some(other =>
+          other.id !== item.id && sessionTitle(other) === name
+        );
+        if (duplicate) return toast('這個檔名已被你自己的其他聊天或角色使用，請換一個名稱。');
         item.name=name;persist();
-        void saveChatSessionSafely(item);
+        if (hasUserMessage(item)) await saveChatSessionSafely(item);
         openModal('archives');break;
       }
       case 'memory': {
