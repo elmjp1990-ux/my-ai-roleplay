@@ -2731,11 +2731,12 @@ function renderModal(o) {
     case 'message-menu': {
       const m = s?.messages.find(m => m.id === o.id);
       if (!m) return;
-      const latest = s.messages.at(-1)?.id === m.id;
+      const latestUserMessage = m.role === 'user' &&
+        s.messages.filter(item => item.role === 'user').at(-1)?.id === m.id;
       showDialog('訊息操作',`
         <div class="stack">
           <button style="width:100%" data-action="copy-message" data-id="${e(m.id)}">複製</button>
-          ${latest ? `<button style="width:100%" data-action="edit-message" data-id="${e(m.id)}">編輯</button>` : ''}
+          ${latestUserMessage ? `<button style="width:100%" data-action="edit-message" data-id="${e(m.id)}">編輯</button>` : ''}
           <button class="danger" style="width:100%" data-action="delete-message" data-id="${e(m.id)}">刪除</button>
           ${m.role === 'assistant' ? `<button style="width:100%" data-action="report"
             data-kind="AI訊息" data-id="${e(m.id)}">舉報</button>` : ''}
@@ -2744,8 +2745,10 @@ function renderModal(o) {
     }
     case 'edit-message': {
       const m = s?.messages.find(m => m.id === o.id);
-      if (!m || s.messages.at(-1)?.id !== m.id) return;
-      showDialog('編輯最新訊息',`
+      const latestUserMessage = m?.role === 'user' &&
+        s.messages.filter(item => item.role === 'user').at(-1)?.id === m.id;
+      if (!m || !latestUserMessage) return;
+      showDialog('編輯最新輸入',`
         <form data-form="message-edit">
           <textarea name="text" required maxlength="10000">${e(m.text)}</textarea>
           <button class="primary" style="margin-top:15px">儲存</button>
@@ -3402,7 +3405,9 @@ document.addEventListener('submit',async event => {
       }
       case 'message-edit': {
         const m=s?.messages.find(m=>m.id===o.id);
-        if (!m || s.messages.at(-1)?.id!==m.id) return;
+        const latestUserMessage = m?.role === 'user' &&
+          s.messages.filter(item=>item.role==='user').at(-1)?.id===m.id;
+        if (!m || !latestUserMessage) return;
         if (!text) return toast('訊息不可為空。');
         m.text=text;m.edited=true;
         persist();back();break;
