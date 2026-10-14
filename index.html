@@ -777,7 +777,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       age,
       avatar_url: character.image || null,
       visibility: character.visibility === 'public' ? 'public' : 'private',
-      review_status: character.visibility === 'public' ? 'pending' : 'draft',
+      review_status: character.visibility === 'public' ? 'approved' : 'draft',
       intro: character.intro || '',
       race: character.race || '',
       private_info: character.privateInfo || '',
@@ -2505,8 +2505,26 @@ document.addEventListener('click',async event => {
       case 'visibility': {
         const c = state.characters.find(c => c.id === key);
         if (!owned(c)) break;
-        c.visibility = button.dataset.value;
-        persist();render();break;
+        const nextVisibility = button.dataset.value;
+        if (window.mySupabase && currentUser()?.uid && c.id) {
+          const client = window.mySupabase;
+          const { data: authResult, error: authError } = await client.auth.getUser();
+          if (authError || authResult?.user?.id !== currentUser().uid) {
+            throw new Error('登入狀態驗證失敗，請重新登入後再修改公開狀態。');
+          }
+          const { error: characterError } = await client.from('characters').update({
+            visibility: nextVisibility,
+            review_status: nextVisibility === 'public' ? 'approved' : 'draft'
+          }).eq('id', c.id).eq('author_id', currentUser().uid);
+          if (characterError) throw new Error('公開狀態更新失敗：' + characterError.message);
+          const { error: storyError } = await client.from('character_stories')
+            .update({visibility: nextVisibility}).eq('character_id', c.id);
+          if (storyError) throw new Error('角色公開狀態已更新，但故事狀態更新失敗：' + storyError.message);
+        }
+        c.visibility = nextVisibility;
+        persist();render();
+        toast(nextVisibility === 'public' ? '角色已設為公開。' : '角色已設為私密。');
+        break;
       }
       case 'delete-character':openModal('delete-character',{id:key});break;
       case 'import':$('jsonFile').click();break;
