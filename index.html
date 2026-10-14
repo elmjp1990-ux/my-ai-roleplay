@@ -571,7 +571,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 
   function isolateSessionsForUser(nextUid) {
     const previousUid = state.account?.uid || null;
-    if (previousUid === nextUid) return;
+    if (previousUid === nextUid && nextUid) return;
 
     // 先把上一個帳號的聊天存入該 UID 專屬的本機區域，再切換到新帳號的聊天。
     if (previousUid) cacheSessionsForUser(previousUid);
@@ -2905,10 +2905,15 @@ document.addEventListener('click',async event => {
           console.error('登出失敗：', error);
           return toast('登出失敗：' + error.message);
         }
+        cacheSessionsForUser(state.account?.uid);
+        const previousUid = state.account?.uid || null;
         state.signedIn = false;
         state.account = null;
         state.sessions = {};
-        state.characters = state.characters.filter(character => !character.cloudSnapshotOnly);
+        state.characters = state.characters.filter(character =>
+          !character.cloudSnapshotOnly &&
+          (!previousUid || character.authorId !== previousUid)
+        );
         persist();
         go({page:'home'}, true);
         if (action === 'pending-switch-account') openModal('login');
