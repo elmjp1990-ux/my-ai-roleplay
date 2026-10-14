@@ -1537,7 +1537,7 @@ async function saveChatSessionToCloud(s, options = {}) {
     }
   }
   const row = {
-    id:s.id, user_id:localUser.uid, character_id:character.id,
+    id:s.id, user_id:localUser.uid, character_id:s.characterId,
     character_name:snapshot.name,
     status:s.archived ? 'archived' : 'active',
     character_snapshot:snapshot, session_data:chatSessionData(s),
