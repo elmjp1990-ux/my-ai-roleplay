@@ -548,6 +548,42 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
    * Supabase Auth 與 PersonaX 本機 UI 狀態的唯一同步入口。
    * 不直接改 DOM，也絕對不刪除 #modal。
    */
+  const USER_SESSIONS_KEY_PREFIX = 'personax-chat-sessions-v1:';
+
+  function cacheSessionsForUser(uid) {
+    if (!uid || typeof state === 'undefined') return;
+    try {
+      localStorage.setItem(USER_SESSIONS_KEY_PREFIX + uid, JSON.stringify(state.sessions || {}));
+    } catch (error) {
+      console.warn('聊天本機備份失敗：', error);
+    }
+  }
+
+  function restoreSessionsForUser(uid) {
+    if (!uid) return {};
+    try {
+      const saved = JSON.parse(localStorage.getItem(USER_SESSIONS_KEY_PREFIX + uid) || '{}');
+      return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function isolateSessionsForUser(nextUid) {
+    const previousUid = state.account?.uid || null;
+    if (previousUid === nextUid) return;
+
+    // 先把上一個帳號的聊天存入該 UID 專屬的本機區域，再切換到新帳號的聊天。
+    if (previousUid) cacheSessionsForUser(previousUid);
+    state.sessions = nextUid ? restoreSessionsForUser(nextUid) : {};
+    // 舊聊天可能附帶只為該帳號載入的私密角色快照，不可留給下一個帳號。
+    state.characters = state.characters.filter(character =>
+      !character.cloudSnapshotOnly &&
+      (!previousUid || character.authorId !== previousUid)
+    );
+    if (route?.page === 'conversation') route = {page:'home'};
+  }
+
   function syncSupabaseUser(user) {
     if (typeof state === 'undefined') {
       window.__pendingSupabaseUser = user || null;
@@ -555,6 +591,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     }
 
     if (!user) {
+      isolateSessionsForUser(null);
       pendingDeletionWalletSyncUid = null;
       state.signedIn = false;
       state.account = null;
@@ -564,6 +601,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       return;
     }
 
+    isolateSessionsForUser(user.id);
     const metadata = user.user_metadata || {};
     const previous =
       state.account?.uid === user.id ? state.account : {};
@@ -2869,6 +2907,8 @@ document.addEventListener('click',async event => {
         }
         state.signedIn = false;
         state.account = null;
+        state.sessions = {};
+        state.characters = state.characters.filter(character => !character.cloudSnapshotOnly);
         persist();
         go({page:'home'}, true);
         if (action === 'pending-switch-account') openModal('login');
