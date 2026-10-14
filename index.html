@@ -629,6 +629,33 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     const client = window.mySupabase;
 
     try {
+      // 先檢查帳號是否處於 30 天待刪除期；待刪除帳號只能取消申請，不能繼續使用功能。
+      const { data: deletionData, error: deletionError } = await client.rpc(
+        'get_account_deletion_status'
+      );
+      if (deletionError) throw new Error('讀取帳號刪除狀態失敗：' + deletionError.message);
+      const deletionStatus = Array.isArray(deletionData) ? deletionData[0] : deletionData;
+      if (deletionStatus?.is_pending) {
+        if (state.account?.uid !== user.id) return;
+        state.account = {
+          ...state.account,
+          accountDeletionPending: true,
+          deletionScheduledFor: deletionStatus.scheduled_for
+        };
+        state.signedIn = true;
+        persist();
+        if (route?.overlay?.name !== 'account-deletion-pending') {
+          openModal('account-deletion-pending', {
+            scheduledFor: deletionStatus.scheduled_for
+          });
+        }
+        return;
+      }
+      if (state.account?.uid === user.id) {
+        delete state.account.accountDeletionPending;
+        delete state.account.deletionScheduledFor;
+      }
+
       let { data: profile, error: profileError } = await client
         .from('profiles')
         .select('id, handle, nickname, avatar_url, bio')
@@ -1206,6 +1233,16 @@ function render() {
 
   if (!['home','detail','author'].includes(route.page) && !currentUser()) {
     route = {page:'home',overlay:{name:'login'}};
+  }
+  // 待刪除帳號被鎖定在狀態視窗，避免關閉視窗後繼續使用功能。
+  if (state.account?.accountDeletionPending && route.overlay?.name !== 'account-deletion-pending') {
+    route = {
+      ...route,
+      overlay: {
+        name: 'account-deletion-pending',
+        scheduledFor: state.account.deletionScheduledFor
+      }
+    };
   }
   renderShell();
   switch(route.page) {
@@ -1947,14 +1984,25 @@ function renderModal(o) {
         </form>`);
       break;
     case 'delete-account':
-      showDialog('刪除帳號',`
+      showDialog('申請刪除帳號',`
         <form data-form="delete-account">
-          <p class="danger">將清空此網站在此瀏覽器中的帳號、角色、聊天與回憶。無法復原。</p>
-          <label class="field"><span>請輸入「Deltet」確認</span>
+          <p>提出申請後，帳號會進入 <strong>30 天待刪除期</strong>。這段期間會暫停使用 PersonaX 功能；你可以使用原本的 Google 帳號登入並取消申請。</p>
+          <p class="muted">本階段只會建立刪除申請，不會立即刪除 UID、個人檔案、角色、聊天、交易紀錄或錢包，也不會修改鑽石與銀幣餘額。</p>
+          <label class="field"><span>請輸入「DELETE」確認</span>
             <input name="confirm" required autocomplete="off"></label>
-          <button class="danger">刪除帳號與本機資料</button>
+          <button class="danger">申請刪除（30 天內可取消）</button>
         </form>`);
       break;
+    case 'account-deletion-pending': {
+      const scheduled = o.scheduledFor ? new Date(o.scheduledFor).toLocaleString('zh-TW') : '30 天期限後';
+      showDialog('帳號正在等待刪除',`
+        <p>你的帳號已進入待刪除期。期限內不能使用 PersonaX 功能，但可以取消刪除並保留原本的帳號與錢包餘額。</p>
+        <p><strong>預定刪除時間：</strong>${e(scheduled)}</p>
+        <form data-form="cancel-account-deletion">
+          <button class="primary">取消刪除，恢復帳號</button>
+        </form>`);
+      break;
+    }
     case 'shop':
       showDialog('購買鑽石',`
         <div class="tabs">
@@ -2581,17 +2629,37 @@ document.addEventListener('submit',async event => {
         break;
       }
       case 'delete-account': {
-        if (String(f.get('confirm'))!=='Deltet') return toast('請輸入「Deltet」。');
-        if (!confirm('最後確認：刪除帳號並清空此網站的全部本機資料？')) return;
-        localStorage.removeItem(STORE_KEY);
-        localStorage.removeItem(OLD_KEY);
-        state=freshState();
-        for (const key of Object.keys(drafts)) delete drafts[key];
-        draftCharacter=null;draftImage='';draftTags=[];
-        history.replaceState({personax:true,depth:0,route:{page:'home'}},'',routeURL({page:'home'}));
-        route={page:'home'};
-        render();
-        toast('此網站的帳號與本機資料已清空。');
+        if (String(f.get('confirm')).trim() !== 'DELETE') return toast('請輸入「DELETE」。');
+        if (!state.account?.uid || !window.mySupabase) return toast('請先使用 Google 帳號登入。');
+        if (!confirm('確定提出帳號刪除申請？申請後會暫停使用功能，30 天內仍可取消。')) return;
+        const { data: authData, error: authError } = await window.mySupabase.auth.getUser();
+        if (authError || authData?.user?.id !== state.account.uid) {
+          return toast('登入狀態驗證失敗，請重新登入後再試。');
+        }
+        const { data, error } = await window.mySupabase.rpc('request_account_deletion');
+        if (error) throw new Error('申請刪除失敗：' + error.message);
+        const requestRow = Array.isArray(data) ? data[0] : data;
+        state.account.accountDeletionPending = true;
+        state.account.deletionScheduledFor = requestRow?.scheduled_for || null;
+        persist();
+        openModal('account-deletion-pending', {scheduledFor: state.account.deletionScheduledFor});
+        toast('已提出刪除申請；目前不會刪除錢包或修改餘額。');
+        break;
+      }
+      case 'cancel-account-deletion': {
+        if (!state.account?.uid || !window.mySupabase) return toast('請先使用原 Google 帳號登入。');
+        const { data: authData, error: authError } = await window.mySupabase.auth.getUser();
+        if (authError || authData?.user?.id !== state.account.uid) {
+          return toast('登入狀態驗證失敗，請重新登入後再試。');
+        }
+        const { error } = await window.mySupabase.rpc('cancel_account_deletion');
+        if (error) throw new Error('取消刪除失敗：' + error.message);
+        delete state.account.accountDeletionPending;
+        delete state.account.deletionScheduledFor;
+        persist();
+        go({page:'home'}, true);
+        await loadSupabaseProfileAndWallet(authData.user);
+        toast('已取消刪除申請，原帳號與錢包餘額已保留。');
         break;
       }
       case 'message': {
