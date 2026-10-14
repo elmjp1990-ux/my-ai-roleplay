@@ -3381,11 +3381,14 @@ document.addEventListener('submit',async event => {
         if (!deletedAt) throw new Error('資料庫未確認角色下架成功，請重新整理後再試。');
         c.visibility='private';c.deletedAt=deletedAt;c.deletionReason='author_deleted';
         for (const session of Object.values(state.sessions)) {
-          if (session.characterId===c.id && !session.cloudCharacterSnapshot) {
+          if (session.characterId===c.id) {
             session.cloudCharacterSnapshot={
+              ...(session.cloudCharacterSnapshot || {}),
               id:c.id,name:c.name,gender:c.gender,age:c.age,image:c.image,intro:c.intro,
               opening:c.opening,race:c.race,style:c.style,tags:Array.isArray(c.tags)?c.tags:[],
-              visibility:c.visibility,firstPublishedAt:c.firstPublishedAt||null,deletedAt
+              authorId:c.authorId,visibility:'private',
+              firstPublishedAt:c.firstPublishedAt || session.cloudCharacterSnapshot?.firstPublishedAt || null,
+              deletedAt
             };
           }
         }
