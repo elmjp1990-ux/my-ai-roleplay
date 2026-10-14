@@ -2704,7 +2704,7 @@ document.addEventListener('submit',async event => {
           return toast('請先使用 Google 帳號登入，角色才會保存到雲端。');
         }
         const name=String(f.get('name')).trim();
-        if (!validName(name,3)) return toast('角色名字不符合規則。'+NAME_HELP);
+        if (!validName(name)) return toast('角色名字不符合規則。'+NAME_HELP);
         if (!draftImage) return toast('請上傳角色頭像。');
         const intro=String(f.get('intro')).trim();
         const opening=String(f.get('opening')).trim();
@@ -2989,7 +2989,7 @@ async function importCharacter(file) {
   const name=String(data.name || '').trim();
   const intro=String(data.intro || '').trim();
   const opening=String(data.opening || '').trim();
-  if (!validName(name,3)) throw Error('角色名稱不符合規則。'+NAME_HELP);
+  if (!validName(name)) throw Error('角色名稱不符合規則。'+NAME_HELP);
   if (!intro || intro.length>2000 || !opening || opening.length>3000) {
     throw Error('需有intro與opening，並符合2000／3000字上限。');
   }
