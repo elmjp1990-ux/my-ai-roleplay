@@ -1732,7 +1732,7 @@ function renderEditor() {
           <button type="button" data-action="tags" data-mode="character">添加標籤</button>
           <div id="formTags" class="row wrap" style="margin-top:10px">${draftTags.map(tagButton).join('')}</div>
         </div>
-        <label class="check"><input type="checkbox" required>
+        <label class="check"><input name="rightsConfirmed" type="checkbox" required ${c.rightsConfirmed === true ? 'checked' : ''}>
           <span>我確認角色沒有侵犯智慧財產權、形象或其他任何權利。</span></label>
         <div class="row" style="margin-top:22px">
           <button type="button" data-action="back">取消</button>
@@ -2718,6 +2718,7 @@ document.addEventListener('submit',async event => {
           privateInfo:String(f.get('privateInfo')).trim(),
           style:String(f.get('style')).trim(),
           visibility:String(f.get('visibility')),image:draftImage,
+          rightsConfirmed:f.get('rightsConfirmed') === 'on',
           tags:[...draftTags],authorId:user.uid,owner:true,
           chats:old?.chats || '0',users:old?.users ?? null,
           createdAt:old?.createdAt || Date.now()
