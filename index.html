@@ -1417,6 +1417,8 @@ async function saveChatSessionToCloud(s, options = {}) {
   const localUser = currentUser();
   if (!client || !localUser?.uid || !s) return false;
   if (!isUuid(s.characterId) || !isUuid(s.id)) return false;
+  // 空白聊天只存在本機；玩家真正送出訊息後才建立雲端聊天紀錄。
+  if (!(s.messages || []).some(message => message.role === 'user' && String(message.text || '').trim())) return false;
   const { data: authResult, error: authError } = await client.auth.getUser();
   if (authError || authResult?.user?.id !== localUser.uid) {
     throw new Error('登入狀態驗證失敗，聊天尚未同步。');
@@ -2171,12 +2173,12 @@ function startChat(characterId) {
   if (!accessible(c)) return toast('角色不存在或無法存取。');
   if (!requireLogin({page:'detail',id:characterId})) return;
   let s = Object.values(state.sessions).find(s =>
-    s.characterId === c.id && !s.archived && !s.name);
+    s.characterId === c.id && !s.archived &&
+    !(s.messages || []).some(message => message.role === 'user' && String(message.text || '').trim()));
   if (!s) s = newSession(c);
   s.hidden = false;
   persist();
   go({page:'conversation',id:s.id});
-  void saveChatSessionSafely(s);
 }
 function visibleSessions() {
   const q = chatSearch.trim().toLowerCase();
@@ -2961,12 +2963,15 @@ document.addEventListener('click',async event => {
         if (!s || !c || !confirm('開始新對話？目前對話、日記與相簿會保存到舊的回憶。')) break;
         const snapshot=clone(state);
         s.archived=true;s.archivedAt=Date.now();
-        void saveChatSessionSafely(s);
         const d=new Date(s.startedAt);
         const date=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
         s.name ||= [...(c.name+'_'+date)].slice(0,25).join('');
-        const next=newSession(c,{persona:s.persona,background:s.background,suggestions:s.suggestions});
+        let next=Object.values(state.sessions).find(item =>
+          item.id !== s.id && item.characterId === c.id && !item.archived &&
+          !(item.messages || []).some(message => message.role === 'user' && String(message.text || '').trim()));
+        if (!next) next=newSession(c,{persona:s.persona,background:s.background,suggestions:s.suggestions});
         if (!persist()) {state=snapshot;break;}
+        void saveChatSessionSafely(s);
         go({page:'conversation',id:next.id});
         break;
       }
@@ -2978,7 +2983,9 @@ document.addEventListener('click',async event => {
         if (!item || !accessible(sessionCharacter(item))) break;
         if (!confirm('繼續這段回憶？它將以檔名出現在聊天列表中。')) break;
         item.archived=false;item.hidden=false;
-        persist();go({page:'conversation',id:item.id});
+        persist();
+        void saveChatSessionSafely(item);
+        go({page:'conversation',id:item.id});
         break;
       }
       case 'edit-memory':openModal('edit-memory',{id:key});break;
@@ -3259,6 +3266,7 @@ document.addEventListener('submit',async event => {
         const name=String(f.get('name')).trim();
         if (!item || !validName(name)) return toast('檔名不符合規則。'+NAME_HELP);
         item.name=name;persist();
+        void saveChatSessionSafely(item);
         openModal('archives');break;
       }
       case 'memory': {
