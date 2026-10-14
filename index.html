@@ -1688,10 +1688,11 @@ function renderModal(o) {
       break;
     case 'login':
       showDialog('登入 PersonaX',`
-        <p class="muted">Google及Email登入尚未串接。</p>
-        <button disabled style="width:100%">Google登入</button>
-        <button disabled style="width:100%;margin-top:10px">Email登入</button>
-        <button class="primary" style="width:100%;margin-top:18px" data-action="local-login">進入測試帳號</button>`);
+        <p class="muted">已連線至雲端資料庫，可使用 Google 帳號登入。</p>
+        <button onclick="loginWithGoogle()" class="primary" style="width:100%">Google登入</button>
+        <button disabled style="width:100%;margin-top:10px">Email登入 (建置中)</button>
+        <button class="muted" style="width:100%;margin-top:18px" data-action="local-login">進入測試帳號</button>`);
+      break;
       break;
     case 'tags':
       showDialog('選擇標籤',`
