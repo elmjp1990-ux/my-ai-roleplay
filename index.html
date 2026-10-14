@@ -459,10 +459,15 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   transform:translateX(-50%);
   background:var(--text);
   color:var(--bg);
-  z-index:100;
+  z-index:2147483647;
   padding:12px 18px;
   border-radius:13px;
-  max-width:90vw;
+  max-width:min(90vw,560px);
+  text-align:center;
+  line-height:1.6;
+  overflow-wrap:anywhere;
+  pointer-events:none;
+  box-shadow:0 8px 32px #0005;
 }
 @media(max-width:1050px) {
   .chat-layout { grid-template-columns:210px minmax(0,1fr); }
