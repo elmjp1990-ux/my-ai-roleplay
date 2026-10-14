@@ -2736,7 +2736,7 @@ document.addEventListener('submit',async event => {
       case 'ai': {
         const name=String(f.get('name')).trim();
         const outline=String(f.get('outline')).trim();
-        if (!validName(name,3)) return toast('角色名稱不符合規則。'+NAME_HELP);
+        if (!validName(name)) return toast('角色名稱不符合規則。'+NAME_HELP);
         if (!outline) return toast('請輸入故事大綱。');
         if (!confirm('AI尚未串接，這次只建立可編輯草稿，不生成圖片、不扣鑽石。繼續嗎？')) return;
         state.characters.unshift({
