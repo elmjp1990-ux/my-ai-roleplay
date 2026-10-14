@@ -216,12 +216,25 @@ header {
   display:flex;
   align-items:center;
   gap:9px;
-  padding:5px 9px;
+  padding:3px 0;
+  border:0;
   border-radius:999px;
-  background:var(--panel2);
+  background:transparent;
   font-size:12px;
+  box-shadow:none;
 }
-.wallet-button .avatar { width:28px; height:28px; }
+.wallet-button:hover:not(:disabled) {
+  filter:none;
+}
+.wallet-button .avatar {
+  width:32px;
+  height:32px;
+  border:0;
+  box-shadow:none;
+}
+.wallet-button .avatar-fallback {
+  border:0;
+}
 .wallet-diamond { color:#dcad35; }
 .wallet-silver { color:var(--muted); }
 main { max-width:1500px; margin:auto; padding:25px; }
@@ -520,83 +533,137 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   const SUPABASE_URL = 'https://ouyewoagbmtqehbofrje.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_MyTDqAKNTkK4zo7eap8gZA_ZGozHRMd'; // 保持你原本的 key
-  
+  const SUPABASE_ANON_KEY = 'sb_publishable_MyTDqAKNTkK4zo7eap8gZA_ZGozHRMd';
+
   if (!window.mySupabase) {
     window.mySupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
 
-  // 1. Google 登入函式
-  async function loginWithGoogle() {
-    const { error } = await window.mySupabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin }
-    });
-    if (error) alert('登入失敗：' + error.message);
-  }
+  /*
+   * Supabase Auth 與 PersonaX 本機 UI 狀態的唯一同步入口。
+   * 不直接改 DOM，也絕對不刪除 #modal。
+   */
+  function syncSupabaseUser(user) {
+    if (typeof state === 'undefined') {
+      window.__pendingSupabaseUser = user || null;
+      return;
+    }
 
-// 2. 更新畫面的共用函式（同步寫入全域狀態，避免其他功能擋住）
-function updateUIForUser(user) {
-    if (!user) return;
-    const userEmail = user.email;
-    const userName = user.user_metadata.name || userEmail.split('@')[0];
-    const avatarUrl = user.user_metadata.avatar_url;
+    if (!user) {
+      state.signedIn = false;
+      state.account = null;
+      persist();
+      render();
+      return;
+    }
 
-    // A. 同步寫入所有常見的本機狀態與全域變數，讓原網站各功能抓得到你
-    const currentUserObj = {
-      id: user.id,
-      name: userName,
-      email: userEmail,
+    const metadata = user.user_metadata || {};
+    const previous =
+      state.account?.uid === user.id ? state.account : {};
+    const nickname =
+      metadata.full_name ||
+      metadata.name ||
+      metadata.user_name ||
+      user.email?.split('@')[0] ||
+      'PersonaX 使用者';
+
+    const avatarUrl =
+      metadata.avatar_url ||
+      metadata.picture ||
+      previous.avatar ||
+      '';
+
+    state.account = {
+      ...previous,
+      uid: user.id,
+      nickname,
+      email: user.email || previous.email || '',
       avatar: avatarUrl,
-      isLoggedIn: true
+      bio: previous.bio || '',
+      diamonds: Number(
+        metadata.diamonds ??
+        previous.diamonds ??
+        0
+      ),
+      silver: Number(
+        metadata.silver ??
+        previous.silver ??
+        0
+      ),
+      member: metadata.member || previous.member || 'free'
     };
-    
-    // 寫入 localStorage 供原網站讀取
-    localStorage.setItem('personaX_user', JSON.stringify(currentUserObj));
-    localStorage.setItem('user', JSON.stringify(currentUserObj));
-    localStorage.setItem('isLoggedIn', 'true');
+    state.signedIn = true;
 
-    // 如果原網站有用全域變數記錄使用者，這裡也直接賦值
-    if (typeof window !== 'undefined') {
-      window.currentUser = currentUserObj;
+    persist();
+
+    // OAuth 返回後，不要把使用者留在登入遮罩；回到登入前想去的頁面。
+    const next = localStorage.getItem('personaX_login_next');
+    localStorage.removeItem('personaX_login_next');
+
+    if (next) {
+      try {
+        const parsed = JSON.parse(next);
+        if (parsed && parsed.page) {
+          go(parsed, true);
+          return;
+        }
+      } catch (_) {}
     }
 
-    // B. 精準尋找右上角包含「登入」或「註冊」的按鈕，換成你的大頭貼與名字
-    const topLoginBtns = document.querySelectorAll('header button, .top-bar button, button');
-    topLoginBtns.forEach(btn => {
-      if (!btn.closest('aside') && (btn.innerText.includes('登入') || btn.innerText.includes('註冊'))) {
-        if (avatarUrl) {
-          btn.innerHTML = `<img src="${avatarUrl}" style="width:24px;height:24px;border-radius:50%;vertical-align:middle;margin-right:6px;"> ${userName}`;
-        } else {
-          btn.innerText = userName;
-        }
-      }
-    });
-
-    // C. 自動關閉登入彈窗
-    const dialogOverlay = document.querySelector('.dialog-overlay, .modal-overlay, dialog');
-    if (dialogOverlay) {
-      dialogOverlay.style.display = 'none';
-      dialogOverlay.remove();
+    // 若目前還停在登入遮罩，直接關閉它；否則只重新渲染帳號區。
+    if (route?.overlay?.name === 'login') {
+      const cleanRoute = {...route};
+      delete cleanRoute.overlay;
+      go(cleanRoute, true);
+    } else {
+      render();
     }
   }
-  // 3. 網頁載入時自動檢查登入狀態（解決重新整理要重登的問題）
-  window.onload = async function() {
-    // 檢查現有 Session
-    const { data: { session } } = await window.mySupabase.auth.getSession();
-    if (session) {
-      console.log('🎉 自動恢復登入身分：', session.user);
-      updateUIForUser(session.user);
-    }
 
-    // 即時監聽登入狀態變化
-    window.mySupabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        updateUIForUser(session.user);
+  async function loginWithGoogle() {
+    try {
+      const next = route?.overlay?.next || route || {page:'home'};
+      localStorage.setItem('personaX_login_next', JSON.stringify(next));
+
+      const { error } = await window.mySupabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+
+      if (error) {
+        localStorage.removeItem('personaX_login_next');
+        console.error('Google 登入失敗：', error);
+        alert('登入失敗：' + error.message);
       }
-    });
-  };
-</script>
+    } catch (error) {
+      localStorage.removeItem('personaX_login_next');
+      console.error('Google 登入例外：', error);
+      alert('登入失敗，請稍後再試。');
+    }
+  }
+
+  // Google OAuth 回站後恢復 Session。
+  window.addEventListener('load', async () => {
+    try {
+      const { data, error } = await window.mySupabase.auth.getSession();
+
+      if (error) {
+        console.error('Supabase Session 讀取失敗：', error);
+        return;
+      }
+
+      syncSupabaseUser(data?.session?.user || null);
+
+      window.mySupabase.auth.onAuthStateChange((event, session) => {
+        // INITIAL_SESSION / SIGNED_IN / TOKEN_REFRESHED 等狀態都統一交給同一入口。
+        syncSupabaseUser(session?.user || null);
+      });
+    } catch (error) {
+      console.error('Supabase Auth 初始化失敗：', error);
+    }
+  });
 </script>
 </head>
 
@@ -972,12 +1039,34 @@ $('modal').addEventListener('click',event => {
       event.clientY < r.top || event.clientY > r.bottom) back();
 });
 function showDialog(title,content) {
-  $('modal').innerHTML = `
+  let modal = $('modal');
+
+  // 防呆：登入流程或第三方程式不得讓主要 dialog 永久消失。
+  if (!modal) {
+    modal = document.createElement('dialog');
+    modal.id = 'modal';
+    document.body.appendChild(modal);
+
+    modal.addEventListener('cancel',event => {
+      event.preventDefault();
+      back();
+    });
+
+    modal.addEventListener('click',event => {
+      if (event.target !== modal) return;
+      const r = modal.getBoundingClientRect();
+      if (event.clientX < r.left || event.clientX > r.right ||
+          event.clientY < r.top || event.clientY > r.bottom) back();
+    });
+  }
+
+  modal.innerHTML = `
     <div class="row between modal-heading">
       <h2>${e(title)}</h2>
       <button class="ghost" data-action="back" aria-label="關閉">✕</button>
     </div>${content}`;
-  if (!$('modal').open) $('modal').showModal();
+
+  if (!modal.open) modal.showModal();
 }
 function requireLogin(next) {
   if (currentUser()) return true;
@@ -2056,11 +2145,18 @@ document.addEventListener('click',async event => {
         go(next,true);
         break;
       }
-      case 'logout':
+      case 'logout': {
+        const { error } = await window.mySupabase.auth.signOut();
+        if (error) {
+          console.error('登出失敗：', error);
+          return toast('登出失敗，請稍後再試。');
+        }
         state.signedIn = false;
+        state.account = null;
         persist();
         go({page:'home'});
         break;
+      }
       case 'detail':visit('detail',key);break;
       case 'author':visit('author',key);break;
       case 'start-chat':startChat(key);break;
@@ -2583,6 +2679,13 @@ route=parseRoute();
 history.replaceState({personax:true,depth:0,route},'',routeURL(route));
 persist();
 render();
+
+// Supabase Auth 的 load 事件會在此之後恢復真正的登入身分。
+// 這裡不再另外建立第二套登入 UI，避免兩套狀態互相覆蓋。
+if (window.__pendingSupabaseUser) {
+  syncSupabaseUser(window.__pendingSupabaseUser);
+  window.__pendingSupabaseUser = null;
+}
 </script>
 </body>
 </html>
