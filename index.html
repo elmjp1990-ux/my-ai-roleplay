@@ -1172,10 +1172,13 @@ function showDialog(title,content) {
     });
   }
 
+  const pendingDeletionDialog = route?.overlay?.name === 'account-deletion-pending';
   modal.innerHTML = `
     <div class="row between modal-heading">
       <h2>${e(title)}</h2>
-      <button class="ghost" data-action="back" aria-label="關閉">✕</button>
+      <button class="ghost" data-action="${pendingDeletionDialog ? 'pending-switch-account' : 'back'}"
+              aria-label="${pendingDeletionDialog ? '登出並切換帳號' : '關閉'}"
+              title="${pendingDeletionDialog ? '登出並切換帳號' : '關閉'}">✕</button>
     </div>${content}`;
 
   if (!modal.open) modal.showModal();
@@ -2000,7 +2003,11 @@ function renderModal(o) {
         <p><strong>預定刪除時間：</strong>${e(scheduled)}</p>
         <form data-form="cancel-account-deletion">
           <button class="primary">取消刪除，恢復帳號</button>
-        </form>`);
+        </form>
+        <button class="ghost" data-action="pending-switch-account" style="width:100%;margin-top:10px">
+          登出並切換其他帳號
+        </button>
+        <p class="muted small" style="margin-top:8px">登出不會取消刪除申請；重新登入此帳號時，仍可在期限內取消申請。</p>`);
       break;
     }
     case 'shop':
@@ -2278,16 +2285,19 @@ document.addEventListener('click',async event => {
         go(next,true);
         break;
       }
-      case 'logout': {
+      case 'logout':
+      case 'pending-switch-account': {
+        if (!window.mySupabase?.auth) return toast('登入服務尚未準備好，請稍後再試。');
         const { error } = await window.mySupabase.auth.signOut();
         if (error) {
           console.error('登出失敗：', error);
-          return toast('登出失敗，請稍後再試。');
+          return toast('登出失敗：' + error.message);
         }
         state.signedIn = false;
         state.account = null;
         persist();
-        go({page:'home'});
+        go({page:'home'}, true);
+        if (action === 'pending-switch-account') openModal('login');
         break;
       }
       case 'detail':visit('detail',key);break;
