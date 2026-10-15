@@ -55,3 +55,16 @@ Phase 1 — repair design and read-only verification. The production frontend pa
 
 ## Approval boundary
 This document is design only. Before any production SQL, schedule, worker, or data modification, show the exact change and obtain explicit approval. Do not perform actual account deletion as part of recovery repair.
+
+
+## Additional read-only FK and privilege findings (2026-10-15)
+
+- The three deletion-control tables have RLS enabled. Their table ACLs show only the `postgres` role for the archive batch/item tables; `account_deletion_requests` has `postgres` and `service_role`. No broad client grants should be added without an explicit access design.
+- No Supabase Edge Functions are currently listed for this project, so there is no deployed Edge Function visible here that processes account deletion.
+- The FK inventory confirms a hard deletion-order blocker: `ai_generation_records` references `profiles`, `chat_sessions`, and `chat_messages` with NO ACTION behavior. A direct Auth-user delete cascades through `profiles` and `chat_sessions`, but may fail while those AI-generation rows still reference the records. `chat_message_versions` also has NO ACTION references to messages and profiles. These dependencies must be resolved deliberately before any worker can call Auth Admin deletion.
+- Several other user-owned chains use CASCADE (for example characters → stories → conversations/messages and wallet rows → profile), while `chat_sessions.character_id` uses SET NULL. Do not change these FK actions globally; first decide retention and archive policy for each content category.
+- The live archive batch summary remains one `archived` batch with no `completed_at`. The archive batch/item tables are RLS-enabled and have no non-postgres table ACL entries. The existing archived status is not a completed account deletion and must not be rewritten just to unblock recovery.
+
+## Frontend recovery path confirmation
+
+The frontend calls `get_account_deletion_status()` during startup and `cancel_account_deletion()` for recovery. The cancellation UI clears local pending flags only after the RPC succeeds; on failure it retains a persistent error dialog. Therefore the deployed frontend error-dialog patch is behaving as intended, but the backend's expired-request rule still prevents recovery after `scheduled_for`. Do not ask for another user test until a reviewed backend recovery implementation exists in a disposable test project.
