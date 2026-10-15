@@ -735,7 +735,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     const client = window.mySupabase;
 
     try {
-      // 先檢查帳號是否處於 30 天待刪除期；待刪除帳號只能取消申請，不能繼續使用功能。
+      // 先檢查帳號是否處於待刪除期；實際期限由資料庫設定決定。
       const { data: deletionData, error: deletionError } = await client.rpc(
         'get_account_deletion_status'
       );
@@ -2080,7 +2080,7 @@ function renderHome() {
       ${state.account?.accountDeletionPending ? `
         <section class="card" style="border:1px solid #d97706;padding:14px;margin-bottom:14px">
           <strong>帳號正在等待刪除</strong>
-          <p class="muted small" style="margin:6px 0 10px">此帳號目前無法使用 PersonaX 功能。若要保留帳號與錢包餘額，可在 30 天期限內取消刪除申請。</p>
+          <p class="muted small" style="margin:6px 0 10px">此帳號目前無法使用 PersonaX 功能。若要保留帳號與錢包餘額，請在預定刪除時間前取消申請；實際時間請查看狀態視窗。</p>
           <button class="primary" data-action="pending-show-deletion-modal">查看狀態／取消刪除</button>
         </section>` : ''}
       <section class="hero" id="hero"></section>
@@ -2874,22 +2874,22 @@ function renderModal(o) {
     case 'delete-account':
       showDialog('申請刪除帳號',`
         <form data-form="delete-account">
-          <p>提出申請後，帳號會進入 <strong>30 天待刪除期</strong>。這段期間會暫停使用 PersonaX 功能；你可以使用原本的 Google 帳號登入並取消申請。</p>
+          <p>提出申請後，帳號會進入待刪除期。這段期間會暫停使用 PersonaX 功能；你可以使用原本的 Google 帳號登入並在預定刪除時間前取消申請。實際期限依系統設定，請以申請後顯示的預定刪除時間為準。</p>
           <p class="muted">本階段只會建立刪除申請，不會立即刪除 UID、個人檔案、角色、聊天、交易紀錄或錢包，也不會修改鑽石與銀幣餘額。</p>
           <label class="field"><span>請輸入「DELETE」確認</span>
             <input name="confirm" required autocomplete="off"></label>
-          <button class="danger">申請刪除（30 天內可取消）</button>
+          <button class="danger">申請刪除（期限依系統設定）</button>
         </form>`);
       break;
     case 'account-deletion-pending': {
-      const scheduled = o.scheduledFor ? new Date(o.scheduledFor).toLocaleString('zh-TW') : '30 天期限後';
+      const scheduled = o.scheduledFor ? new Date(o.scheduledFor).toLocaleString('zh-TW') : '尚未取得，請重新查詢狀態';
       showDialog('帳號正在等待刪除',`
         <p>你的帳號已進入待刪除期。期限內不能使用 PersonaX 功能，但可以取消刪除並保留原本的帳號與錢包餘額。</p>
         <p><strong>預定刪除時間：</strong>${e(scheduled)}</p>
         <form data-form="cancel-account-deletion">
           <button class="primary">取消刪除，恢復帳號</button>
         </form>
-        <p class="muted small" style="margin-top:8px">關閉此視窗不會取消刪除申請；你仍可在 30 天期限內重新開啟此視窗並取消申請。</p>`);
+        <p class="muted small" style="margin-top:8px">關閉此視窗不會取消刪除申請；在預定刪除時間前，你仍可重新開啟此視窗並取消申請。</p>`);
       break;
     }
     case 'shop':
