@@ -88,6 +88,9 @@ The worker is a source-only draft and is safe only for the deterministic demo re
 - F9: The Edge Function returns `status='settled'` but an assistant message ID different from the pending turn's expected ID; the UI does not render it or clear the pending turn.
 - F10: The Edge Function returns a non-assistant role or empty content; the UI does not render it or clear the pending turn.
 - F11: A recovered/idempotent settled response omits `role`; the UI rejects it, keeps the pending turn, and does not render the reply.
+- F12: A reserved turn's expected assistant row exists but has `deleted_at` set; the Edge Function detects the row without filtering soft-deleted messages, sets/keeps `needs_reconciliation`, and never invokes refund.
+- F13: A `needs_reconciliation` turn has a soft-deleted expected assistant reply; retry does not insert a replacement reply or refund the turn, and records `expected_reply_soft_deleted`.
+- F14: After a persistence error, the follow-up lookup finds a soft-deleted expected assistant row; the code fails closed and does not refund, even if the currently deployed refund RPC has not yet been hardened.
 
 ## Acceptance criteria
 
