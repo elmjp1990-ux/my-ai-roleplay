@@ -75,6 +75,15 @@ begin
             v_failed := v_failed + 1;
           end if;
         else
+          -- Move the unresolved row's retry window forward so every worker
+          -- run does not emit the same alert repeatedly. Funds remain reserved.
+          update public.chat_turn_charges c
+          set status = 'needs_reconciliation',
+              failure_code = 'expected_reply_soft_deleted',
+              updated_at = now()
+          where c.turn_id = v_charge.turn_id
+            and c.status in ('reserved', 'needs_reconciliation');
+
           insert into public.chat_turn_events(
             turn_id, user_id, event_type, stage, error_code
           ) values (
