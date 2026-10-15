@@ -1758,7 +1758,7 @@ async function loadCloudChatSessions(user) {
         suggestions:data.suggestions !== false, background:data.background || 'avatar',
         memories:Array.isArray(data.memories) ? data.memories : [],
         album:Array.isArray(data.album) ? data.album : [],
-        messages:cloudMessages.length ? cloudMessages : (existing?.messages || []),
+        messages:cloudMessages,
         cloudOwned:true, cloudOwnerUid:user.id, cloudCharacterSnapshot:snapshot
       };
       if (snapshot.id === row.character_id) {
