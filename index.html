@@ -3513,7 +3513,7 @@ document.addEventListener('click',async event => {
           break;
         }
         render();
-        toast(type==='clear-chat-test-data' ? '測試資料已清除並同步。' :
+        toast(action==='clear-chat-test-data' ? '測試資料已清除並同步。' :
           '測試資料已寫入雲端；可重新整理後確認是否仍存在。');
         break;
       }
