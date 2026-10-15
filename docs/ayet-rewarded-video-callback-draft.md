@@ -94,9 +94,19 @@ The AI request is an external network operation and cannot be part of the same P
 7. An insufficient balance does not create a partial reservation or partial deduction.
 8. The UI must distinguish insufficient balance from network/server errors; only the former should prompt rewarded ads.
 
-### Implementation blocker
+### Test-mode scope decision (2026-10-15)
 
-The actual chat-send JavaScript path and its request/retry behavior still need to be identified in the repository before wiring this state machine into the UI. A guessed integration point risks double charging or charging edits, so no charging function or frontend hook is being deployed at this stage.
+The project owner confirmed that the current environment has no real users and that the fixed demonstration reply may be treated as a billable reply for testing. Therefore, the first end-to-end billing test may charge for the existing fixed demonstration response; real AI-provider integration is not a prerequisite for validating wallet charging and the insufficient-balance UI.
+
+This does not relax server-side wallet security. The frontend must not directly change balances. A secure database RPC must perform the atomic deduction and ledger write, and must verify the authenticated user, active account, session ownership, and idempotency key. The current `case 'message'` handler creates local message IDs, appends the user message and fixed assistant reply, then persists the session; it does not yet call an AI provider. The integration must account for first-message cloud-session creation and avoid showing a free reply when a charge fails. The `message-edit` path must remain uncharged unless the user explicitly regenerates a reply.
+
+### Next implementation sequence
+
+1. Draft a database migration for a per-turn charge ledger and an atomic RPC; do not apply it to the connected Supabase project yet.
+2. Define a stable UUID per send attempt and reuse it for retries; ensure the database rejects duplicate charges.
+3. Integrate the current fixed demonstration reply with the RPC on the feature branch only, with explicit handling for insufficient balance and server/network errors.
+4. Add tests for silver-only, diamond-only, mixed payment, insufficient balance, duplicate request, concurrent requests, deleted/pending-deletion sessions, and save failure/refund behavior.
+5. Review the resulting diff before asking the owner to run browser tests. Do not merge or deploy until approved.
 
 ### Current action boundary
 
