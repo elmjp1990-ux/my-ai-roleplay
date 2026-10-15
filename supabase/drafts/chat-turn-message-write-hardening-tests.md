@@ -50,6 +50,18 @@ The existing `chat_messages_save_version_before_update` trigger runs on `UPDATE 
 
 Message roles are immutable for every row, including user -> system changes, so an authenticated UPDATE cannot promote player-controlled text into a privileged prompt role. The UPDATE guard must lock all matching old/new charge rows in deterministic `expected_assistant_message_id` order. This both detects cross-turn ID swaps and avoids opposite-order locks for concurrent swaps. The guard trigger must include `deleted_at`; only a `settled` turn may soft-delete its charged assistant reply. The refund RPC must also be hardened to detect an expected assistant row regardless of `deleted_at`, so legacy hidden replies cannot be refunded as if absent.
 
+## Edge Function reservation-error mapping tests
+
+| Case | Injected/observed RPC failure | Expected HTTP/API result | Wallet/UI expectation |
+|---|---|---|---|
+| E1 | `account_not_active` | `account_not_active`, 403 | Client may clear this turn because account validation failed before reservation |
+| E2 | `chat_session_not_owned_or_active` | `chat_session_not_owned_or_active`, 403 | Client removes the unsent local message and does not claim a charge occurred |
+| E3 | `user_message_not_found` | `user_message_not_found`, 400 | Client may clear this turn because the server cannot reserve against the specified user message |
+| E4 | `wallet_not_initialized` | `wallet_not_ready`, 409 | Client shows a recoverable wallet readiness error without claiming a refund |
+| E5 | `turn_id_reuse_conflict` or an unknown database error | Generic `reservation_failed`, 503 | Client keeps the same stable turn IDs; never create a new turn or claim a refund from an unknown result |
+
+These cases validate response mapping only; also verify no wallet transaction or reservation mutation occurs for errors thrown before the reserve RPC's transaction commits.
+
 ## Frontend sync regression tests
 
 - F1: Before the first billable turn, cloud sync saves the user message, and no assistant-role row is written by the browser.
