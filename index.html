@@ -1831,6 +1831,7 @@ async function runPendingChatTurn(s) {
   if (result?.status === 'insufficient_funds' || result?.error === 'insufficient_funds') {
     delete s.pendingTurn;
     persist();
+    renderMessages();
     await refreshWalletBalance();
     openModal('wallet-insufficient');
     return;
@@ -1839,6 +1840,7 @@ async function runPendingChatTurn(s) {
   if (result?.status === 'refunded' || result?.error === 'assistant_persistence_failed') {
     delete s.pendingTurn;
     persist();
+    renderMessages();
     await refreshWalletBalance();
     toast('這次回覆未能保存，系統已退回本回合預扣的銀幣／鑽石。');
     return;
@@ -3797,7 +3799,10 @@ document.addEventListener('submit',async event => {
           break;
         }
 
+        drafts[s.id]='';
+        $('messageInput').value='';
         persist();
+        renderMessages();
         await runPendingChatTurn(s);
         break;
       }
