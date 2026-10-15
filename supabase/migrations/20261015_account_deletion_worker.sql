@@ -55,6 +55,10 @@ DECLARE
   v_ai_archived bigint;
   v_wallet_source bigint;
   v_wallet_archived bigint;
+  v_charge_source bigint;
+  v_charge_archived bigint;
+  v_event_source bigint;
+  v_event_archived bigint;
 BEGIN
   IF p_user_id IS NULL THEN
     RAISE EXCEPTION '目標帳號不可為空';
@@ -99,8 +103,19 @@ BEGIN
     SELECT count(*) INTO v_wallet_archived
     FROM public.account_deletion_archive_items AS i
     WHERE i.batch_id = v_batch_id AND i.source_table = 'wallet_transactions';
+    SELECT count(*) INTO v_charge_source
+    FROM public.chat_turn_charges AS c WHERE c.user_id = p_user_id;
+    SELECT count(*) INTO v_charge_archived
+    FROM public.account_deletion_archive_items AS i
+    WHERE i.batch_id = v_batch_id AND i.source_table = 'chat_turn_charges';
+    SELECT count(*) INTO v_event_source
+    FROM public.chat_turn_events AS e WHERE e.user_id = p_user_id;
+    SELECT count(*) INTO v_event_archived
+    FROM public.account_deletion_archive_items AS i
+    WHERE i.batch_id = v_batch_id AND i.source_table = 'chat_turn_events';
 
     IF v_ai_source <> v_ai_archived OR v_wallet_source <> v_wallet_archived
+       OR v_charge_source <> v_charge_archived OR v_event_source <> v_event_archived
        OR EXISTS (
          SELECT 1 FROM public.ai_generation_records AS a
          LEFT JOIN public.account_deletion_archive_items AS i
@@ -118,6 +133,24 @@ BEGIN
           AND i.source_record_id = w.id::text
          WHERE w.user_id = p_user_id
            AND (i.id IS NULL OR i.payload IS DISTINCT FROM pg_catalog.to_jsonb(w))
+       )
+       OR EXISTS (
+         SELECT 1 FROM public.chat_turn_charges AS c
+         LEFT JOIN public.account_deletion_archive_items AS i
+           ON i.batch_id = v_batch_id
+          AND i.source_table = 'chat_turn_charges'
+          AND i.source_record_id = c.turn_id::text
+         WHERE c.user_id = p_user_id
+           AND (i.id IS NULL OR i.payload IS DISTINCT FROM pg_catalog.to_jsonb(c))
+       )
+       OR EXISTS (
+         SELECT 1 FROM public.chat_turn_events AS e
+         LEFT JOIN public.account_deletion_archive_items AS i
+           ON i.batch_id = v_batch_id
+          AND i.source_table = 'chat_turn_events'
+          AND i.source_record_id = e.event_id::text
+         WHERE e.user_id = p_user_id
+           AND (i.id IS NULL OR i.payload IS DISTINCT FROM pg_catalog.to_jsonb(e))
        ) THEN
       RAISE EXCEPTION '既有封存批次與來源資料不一致，已停止刪除以避免資料遺失';
     END IF;
@@ -133,7 +166,59 @@ BEGIN
     SELECT a.batch_id INTO v_batch_id
     FROM public.archive_account_deletion_data(p_user_id) AS a
     LIMIT 1;
+
+    -- Preserve billing/audit rows as well as the original AI and wallet archive payloads.
+    INSERT INTO public.account_deletion_archive_items
+      (batch_id, source_table, source_record_id, payload)
+    SELECT v_batch_id, 'chat_turn_charges', c.turn_id::text, pg_catalog.to_jsonb(c)
+    FROM public.chat_turn_charges AS c
+    WHERE c.user_id = p_user_id
+    ON CONFLICT ON CONSTRAINT account_deletion_archive_item_batch_id_source_table_source__key
+    DO NOTHING;
+
+    INSERT INTO public.account_deletion_archive_items
+      (batch_id, source_table, source_record_id, payload)
+    SELECT v_batch_id, 'chat_turn_events', e.event_id::text, pg_catalog.to_jsonb(e)
+    FROM public.chat_turn_events AS e
+    WHERE e.user_id = p_user_id
+    ON CONFLICT ON CONSTRAINT account_deletion_archive_item_batch_id_source_table_source__key
+    DO NOTHING;
+
     v_status := 'archived';
+  END IF;
+
+  -- Verify billing/audit archive rows too before any irreversible deletion.
+  SELECT count(*) INTO v_charge_source
+  FROM public.chat_turn_charges AS c WHERE c.user_id = p_user_id;
+  SELECT count(*) INTO v_charge_archived
+  FROM public.account_deletion_archive_items AS i
+  WHERE i.batch_id = v_batch_id AND i.source_table = 'chat_turn_charges';
+  SELECT count(*) INTO v_event_source
+  FROM public.chat_turn_events AS e WHERE e.user_id = p_user_id;
+  SELECT count(*) INTO v_event_archived
+  FROM public.account_deletion_archive_items AS i
+  WHERE i.batch_id = v_batch_id AND i.source_table = 'chat_turn_events';
+
+  IF v_charge_source <> v_charge_archived OR v_event_source <> v_event_archived
+     OR EXISTS (
+       SELECT 1 FROM public.chat_turn_charges AS c
+       LEFT JOIN public.account_deletion_archive_items AS i
+         ON i.batch_id = v_batch_id
+        AND i.source_table = 'chat_turn_charges'
+        AND i.source_record_id = c.turn_id::text
+       WHERE c.user_id = p_user_id
+         AND (i.id IS NULL OR i.payload IS DISTINCT FROM pg_catalog.to_jsonb(c))
+     )
+     OR EXISTS (
+       SELECT 1 FROM public.chat_turn_events AS e
+       LEFT JOIN public.account_deletion_archive_items AS i
+         ON i.batch_id = v_batch_id
+        AND i.source_table = 'chat_turn_events'
+        AND i.source_record_id = e.event_id::text
+       WHERE e.user_id = p_user_id
+         AND (i.id IS NULL OR i.payload IS DISTINCT FROM pg_catalog.to_jsonb(e))
+     ) THEN
+    RAISE EXCEPTION '聊天扣款／事件紀錄封存核對失敗，已停止刪除';
   END IF;
 
   -- Archive verified: mark the irreversible phase before deleting source rows.
