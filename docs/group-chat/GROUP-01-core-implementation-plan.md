@@ -20,9 +20,9 @@ Use new group-specific records rather than overloading single-character `chat_se
 - `chat_group_members`: id, group_id, character_id, position (1–3), scene_id (nullable for shared-scene mode), character_snapshot (JSON), created_at. Unique(group_id, character_id) and unique(group_id, position).
 - `chat_group_scenes`: id, group_id, name, scene_description, position, created_at. Used when the group starts in separate scenes; shared-scene mode can use one scene.
 - `chat_group_messages`: id, group_id, scene_id (nullable), speaker_type (`user` | `character` | `system`), character_id (nullable), content, turn_id, sequence_no, created_at. Keep one turn identifier for messages generated in the same user submission.
-- `chat_group_turns`: id, group_id, user_id, status (`pending` | `completed` | `failed`), request_key, reserved_amount (nullable), charged_amount (nullable), error_code (nullable), created_at, completed_at (nullable). This is a proposed idempotency/audit boundary; do not enable real charging until wallet integration is reviewed.
+- `chat_group_turns`: id, group_id, user_id, request_key, request_content, status (`completed` in mock phase), created_at, completed_at. The request key is unique per group and prevents duplicate mock messages. Wallet reservation/settlement fields are intentionally not implemented yet.
 
-These are a proposed schema, not an applied migration. Confirm existing naming conventions, foreign keys, wallet ledger design, and current RLS patterns before implementation.
+The five core group tables and the checked create/mock-turn RPCs are applied to the test Supabase project. Wallet reservation/settlement and real AI integration remain out of scope until their idempotency and failure paths are reviewed.
 
 ## Three-step creation flow
 
