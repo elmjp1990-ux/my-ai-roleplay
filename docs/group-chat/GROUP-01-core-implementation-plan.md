@@ -1,7 +1,7 @@
 # Group Chat Core — Implementation Plan
 
-Status: planning/specification only. This document does not claim that group chat is implemented.
-AI provider integration is intentionally out of scope for the initial build. Implement deterministic/mock orchestration first, then connect AI after the UI, persistence, permissions, and wallet boundaries are verified.
+Status: staged implementation. The frontend wizard/mock director is integrated in `index.html`; the core schema and `create_chat_group` RPC are applied to the test Supabase project under migration `20261015141259_group_chat_core_schema`. A valid shared-scene RPC call and malformed-input rejection checks passed inside rolled-back transactions. Browser integration, separate-scene end-to-end tests, cross-user RLS tests, and persistent message writes remain incomplete.
+AI provider integration is intentionally out of scope for the initial build. Complete deterministic/mock orchestration, persistence, permissions, and wallet boundaries before connecting AI.
 
 ## Goals
 
@@ -85,4 +85,4 @@ Validation: speaker IDs must be group members, no duplicate speaker in a single 
 
 ## Current scope and exclusions
 
-This plan is the starting contract for implementation. It does not apply SQL, alter production data, make real AI calls, enable real charges, or claim any feature has passed runtime testing. Frontend and backend code should be adapted to the actual existing architecture after the integration audit.
+This plan remains the acceptance contract. The schema has been applied only to the connected test Supabase project; no AI calls or wallet charges were enabled. Database smoke tests were run in transactions and rolled back. Do not treat the UI as database-integrated yet: it still uses local in-memory mock state.
