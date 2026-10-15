@@ -35,16 +35,19 @@ Run only against a disposable Supabase branch/project. Do not execute fixture wr
 | U5 | Change ordinary user-message content | Allowed; existing version-history behavior preserved |
 | U6 | Convert ordinary user message to assistant | Rejected |
 | U7 | Convert uncharged assistant row to user | Rejected |
-| U8 | Soft-delete a charged assistant reply by changing only `deleted_at` | Allowed; protected fields remain unchanged |
+| U8 | Soft-delete a charged assistant reply after its charge is `settled`, changing only `deleted_at` | Allowed; protected fields remain unchanged |
 | U9 | Attempt to target another turn's expected assistant ID | Rejected; neither turn/message changes |
-| U10 | Two concurrent transactions attempt content edit and soft-delete | Protected content/identity cannot change; soft-delete may succeed |
+| U10 | Two concurrent transactions attempt content edit and soft-delete on a settled reply | Protected content/identity cannot change; soft-delete may succeed |
+| U14 | Soft-delete a reply while its charge is `reserved` after the assistant row was inserted | Rejected; row remains visible so refund logic cannot mistake a persisted reply for no reply |
+| U15 | Soft-delete a reply while its charge is `needs_reconciliation` or `refunded` | Rejected; only `settled` permits soft-delete |
+| U16 | Attempt refund after a reply row exists but was hidden by legacy `deleted_at` before hardening | Refund must still be rejected after the refund RPC is hardened to detect any persisted expected assistant row, including soft-deleted rows |
 | U11 | Failed protected content edit with version trigger enabled | Transaction rollback leaves no new `chat_message_versions` row |
 | U12 | Change message A's ID to the expected assistant ID of charged turn B while A belongs to charged turn A | Rejected as cross-turn conflict; both charge rows and messages remain unchanged |
 | U13 | Run simultaneous opposite-direction ID swaps between two charged assistant messages | Both swaps rejected; charge rows are locked in deterministic expected-message-ID order, and neither transaction changes message/charge data |
 
 The existing `chat_messages_save_version_before_update` trigger runs on `UPDATE OF content`. Verify PostgreSQL trigger order and confirm that if it fires before the guard, the guard exception rolls back the version insert as part of the same statement.
 
-The UPDATE guard must lock all matching old/new charge rows in deterministic `expected_assistant_message_id` order. This both detects cross-turn ID swaps and avoids opposite-order locks for concurrent swaps.
+The UPDATE guard must lock all matching old/new charge rows in deterministic `expected_assistant_message_id` order. This both detects cross-turn ID swaps and avoids opposite-order locks for concurrent swaps. The guard trigger must include `deleted_at`; only a `settled` turn may soft-delete its charged assistant reply. The refund RPC must also be hardened to detect an expected assistant row regardless of `deleted_at`, so legacy hidden replies cannot be refunded as if absent.
 
 ## Frontend sync regression tests
 
