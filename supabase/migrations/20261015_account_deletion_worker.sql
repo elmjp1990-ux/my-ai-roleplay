@@ -1,6 +1,19 @@
 -- Account deletion worker orchestration.
 -- This migration is intentionally proposed in a PR only; do not apply until migration history is reconciled.
 
+-- The existing archive allow-list covered only AI and wallet rows. Expand it before
+-- archiving chat billing/audit rows, otherwise the new inserts would fail their CHECK.
+ALTER TABLE public.account_deletion_archive_items
+  DROP CONSTRAINT IF EXISTS account_deletion_archive_items_source_table_check;
+ALTER TABLE public.account_deletion_archive_items
+  ADD CONSTRAINT account_deletion_archive_items_source_table_check
+  CHECK (source_table IN (
+    'ai_generation_records',
+    'wallet_transactions',
+    'chat_turn_charges',
+    'chat_turn_events'
+  ));
+
 CREATE OR REPLACE FUNCTION public.get_account_deletion_work_items()
 RETURNS TABLE (
   target_user_id uuid,
