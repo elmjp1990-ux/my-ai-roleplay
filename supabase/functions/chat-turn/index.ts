@@ -225,12 +225,17 @@ Deno.serve(async (request) => {
       return json({ status: settled, assistantMessage: possibleReply, recovered: true });
     }
 
-    const { error: refundError } = await admin.rpc("refund_chat_turn", {
-      p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
-      p_failure_code: "assistant_persistence_failed",
+    await admin.from("chat_turn_charges").update({
+      status: "needs_reconciliation",
+      failure_code: "assistant_persistence_failed",
+      updated_at: new Date().toISOString(),
+    }).eq("turn_id", turnId).eq("user_id", user.id).eq("status", "reserved");
+    await admin.from("chat_turn_events").insert({
+      turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
+      stage: "persistence", error_code: "assistant_persistence_failed",
     });
-    if (refundError) return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
-    return json({ status: "refunded", error: "assistant_persistence_failed" }, 503);
+    // Do not refund on a point-in-time absence: a concurrent retry may still
+    // persist the same stable assistant ID. The same turn can safely retry.
   }
 
   const { data: settled, error: settleError } = await admin.rpc("settle_chat_turn", {
