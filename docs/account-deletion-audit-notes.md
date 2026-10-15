@@ -46,3 +46,21 @@ Scope: live Supabase metadata and GitHub `main` frontend source. No database wri
 ## No-go conditions
 - Do not ask the user to repeat the five-minute test until there is a safe recovery path and a dry-run proves what would change.
 - Do not enable a scheduled deletion worker while retention decisions, complete FK handling, and failure recovery remain unresolved.
+
+
+## Additional privilege and user-data inventory checks (2026-10-15)
+
+- The three account-deletion tables have RLS enabled but not FORCE RLS. The archive batch/item tables' table ACLs list only `postgres`; the request table lists `postgres` and `service_role`. This is consistent with keeping direct client table access closed, but policies and function-mediated access still need review before any worker is designed.
+- The five inspected deletion-related functions are `SECURITY DEFINER` with an empty `search_path`. Explicit ACLs currently allow `authenticated` and `service_role` to execute the request, cancel, status, and active-check functions; the archive function is executable only by `postgres`. Do not grant archive execution to a general role without a reviewed worker boundary and a function-level authorization model.
+- User-linked public tables identified through ownership-like columns include `profiles`, `characters`, `character_private_info`, `conversations`, `wallet_accounts`, `wallet_transactions`, `ai_generation_records`, `chat_sessions`, and `chat_message_versions`. This column scan is a discovery aid, not a complete proof that every table containing user content has been found; inspect all public tables, indirect relations, storage objects, and external integrations before implementation.
+- Archive item payloads are JSONB and currently have nullable `retention_until`; no retention-expiry behavior has been verified. The design must specify payload sensitivity, who can read them, and how/when they expire.
+- There are no listed Supabase Edge Functions in the live project. No deployed account-deletion worker was identified during this audit.
+
+## Recommended implementation sequence (proposal only; no live changes)
+
+1. **Freeze destructive processing.** Keep production deletion scheduling disabled. Preserve the current request and archive evidence; do not manually delete or rewrite the overdue request or the existing `archived` batch.
+2. **Decide retention rules.** For characters/private information/stories, chat sessions/messages/versions, AI-generation records, wallet transactions, archive payloads, and storage assets, explicitly decide delete, retain, anonymize, or transfer. Document legal/business retention needs for wallet/audit records.
+3. **Specify lifecycle and recovery.** Define durable states and allowed transitions; distinguish archive completion from account deletion completion. Make recovery idempotent and atomic, authenticated via `auth.uid()`, row-locked against a worker, and backed by restricted append-only audit events.
+4. **Design the worker with least privilege.** Separate dry-run from destructive execution, use an explicit claim/lock protocol and retry limit, implement an emergency stop switch, and ensure no client role can invoke destructive operations.
+5. **Build migration and tests on a separate test project.** Keep five-minute deadlines test-only; use disposable accounts. Test normal cancel, expired recovery, ambiguous archived state, repeated/concurrent calls, FK handling, RLS restoration, and dry-run no-write guarantees.
+6. **Review and approve exact production changes.** Only after the migration, function grants, rollback plan, and test evidence are reviewed should any production SQL or worker activation be considered. No production change is authorized by this proposal.
