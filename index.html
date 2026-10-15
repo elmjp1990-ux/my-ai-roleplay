@@ -876,7 +876,9 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         const profileResult = await client.from('profiles')
           .select('id, handle, nickname, avatar_url, bio')
           .in('id', authorIds);
-        if (profileResult.error) throw new Error('讀取角色作者資料失敗：' + profileResult.error.message);
+        if (profileResult.error) {
+          console.warn('角色作者資料載入失敗，仍繼續顯示公開角色：', profileResult.error.message);
+        }
         for (const profile of profileResult.data || []) {
           state.authors[profile.id] = {
             uid:profile.id, handle:profile.handle || '',
