@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS public.chat_group_messages (
   turn_id uuid NOT NULL,
   sequence_no integer NOT NULL CHECK (sequence_no >= 0),
   speaker_type text NOT NULL CHECK (speaker_type IN ('user', 'character', 'system')),
-  character_id uuid REFERENCES public.characters(id) ON DELETE SET NULL,
+  character_id uuid REFERENCES public.characters(id) ON DELETE RESTRICT,
   content text NOT NULL CHECK (char_length(content) <= 20000),
   created_at timestamptz NOT NULL DEFAULT now(),
   FOREIGN KEY (scene_id, group_id)
