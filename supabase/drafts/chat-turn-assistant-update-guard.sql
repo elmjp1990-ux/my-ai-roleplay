@@ -27,6 +27,12 @@ begin
   for update;
 
   if not found then
+    -- Prevent a client from converting an ordinary user message into a fake
+    -- assistant reply (or converting an uncharged assistant row into another role).
+    if new.role is distinct from old.role
+       and (old.role = 'assistant' or new.role = 'assistant') then
+      raise exception 'assistant_role_change_requires_chat_turn';
+    end if;
     return new;
   end if;
 
