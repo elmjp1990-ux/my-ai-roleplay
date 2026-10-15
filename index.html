@@ -1926,6 +1926,21 @@ async function runPendingChatTurn(s) {
   }
 
   if (
+    result?.error === 'chat_session_character_id_invalid' ||
+    result?.error === 'chat_session_character_snapshot_mismatch'
+  ) {
+    // These server-side identity guards run before reserve_chat_turn, so no
+    // charge was reserved. Stop retrying this logical turn and preserve the
+    // message for diagnosis instead of leaving a permanently pending spinner.
+    delete s.pendingTurn;
+    persist();
+    renderMessages();
+    await clearCloudPendingTurn(s);
+    toast('聊天角色資料不一致，本回合尚未扣款。請重新整理聊天；若持續發生，請先不要重送並回報問題。');
+    return;
+  }
+
+  if (
     result?.error === 'user_message_not_found' ||
     result?.error === 'chat_session_not_owned_or_active' ||
     result?.error === 'account_not_active' ||
