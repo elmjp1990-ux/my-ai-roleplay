@@ -188,17 +188,17 @@ BEGIN
   IF p_world_background IS NULL OR char_length(p_world_background) > 10000 THEN
     RAISE EXCEPTION 'invalid_world_background' USING ERRCODE = '22023';
   END IF;
-  IF p_scene_mode NOT IN ('shared', 'separate') THEN
+  IF p_scene_mode IS NULL OR p_scene_mode NOT IN ('shared', 'separate') THEN
     RAISE EXCEPTION 'invalid_scene_mode' USING ERRCODE = '22023';
   END IF;
-  IF jsonb_typeof(p_members) <> 'array' THEN
+  IF jsonb_typeof(p_members) IS DISTINCT FROM 'array' THEN
     RAISE EXCEPTION 'members_must_be_array' USING ERRCODE = '22023';
   END IF;
   v_member_count := jsonb_array_length(p_members);
   IF v_member_count NOT BETWEEN 1 AND 3 THEN
     RAISE EXCEPTION 'group_requires_one_to_three_characters' USING ERRCODE = '22023';
   END IF;
-  IF jsonb_typeof(p_scenes) <> 'array' OR jsonb_array_length(p_scenes) NOT BETWEEN 1 AND 3 THEN
+  IF jsonb_typeof(p_scenes) IS DISTINCT FROM 'array' OR jsonb_array_length(p_scenes) NOT BETWEEN 1 AND 3 THEN
     RAISE EXCEPTION 'invalid_scenes' USING ERRCODE = '22023';
   END IF;
   v_scene_count := jsonb_array_length(p_scenes);
