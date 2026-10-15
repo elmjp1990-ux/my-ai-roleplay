@@ -25,6 +25,14 @@ AS $function$
     LIMIT 1
   ) AS b ON true
   WHERE q.scheduled_for <= pg_catalog.statement_timestamp()
+    AND NOT EXISTS (
+      SELECT 1
+      FROM public.account_deletion_archive_batches AS completed_batch
+      WHERE completed_batch.target_user_id = q.user_id
+        AND completed_batch.requested_at = q.requested_at
+        AND completed_batch.scheduled_for = q.scheduled_for
+        AND completed_batch.status = 'completed'
+    )
 
   UNION ALL
 
@@ -88,8 +96,11 @@ BEGIN
   FOR UPDATE;
 
   IF FOUND AND v_status = 'deleting' THEN
-    -- Deletion SQL below is idempotent; continue retrying Auth deletion after this returns.
-    NULL;
+    -- The status change and relational cleanup commit in one PostgreSQL transaction.
+    -- Therefore a committed deleting batch means cleanup already completed; do not
+    -- compare now-empty source tables with their preserved archive row counts.
+    RETURN QUERY SELECT v_batch_id, p_user_id, 'deleting'::text;
+    RETURN;
   ELSIF FOUND THEN
     -- A failed or interrupted archive can be retried only if every remaining source row
     -- is exactly represented in the existing archive. Any mismatch fails closed.
