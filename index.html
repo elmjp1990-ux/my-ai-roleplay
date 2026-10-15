@@ -1192,7 +1192,23 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         private_info: String(character.privateInfo || '')
       }, { onConflict: 'character_id' });
     if (privateInfoError) {
-      throw new Error('角色基本資料已儲存，但私密設定同步失敗：' + privateInfoError.message);
+      throw new Error('角色基本資料已儲存，但私密設定同步失敗：' + privateInfoError.message + '。請保留目前編輯內容，修復權限後再重試。');
+    }
+
+    // 驗證私密設定確實由資料庫讀回，避免 upsert 沒有實際寫入卻被視為成功。
+    const { data: savedPrivateInfo, error: privateVerifyError } = await client
+      .from('character_private_info')
+      .select('author_id, private_info')
+      .eq('character_id', character.id)
+      .eq('author_id', expectedUserId)
+      .maybeSingle();
+    if (privateVerifyError) {
+      throw new Error('角色基本資料已儲存，但無法驗證私密設定：' + privateVerifyError.message + '。請保留目前編輯內容，稍後重新同步。');
+    }
+    if (!savedPrivateInfo ||
+        String(savedPrivateInfo.private_info || '') !== String(character.privateInfo || '') ||
+        savedPrivateInfo.author_id !== expectedUserId) {
+      throw new Error('角色基本資料已儲存，但私密設定驗證不一致。請保留目前編輯內容，勿關閉編輯畫面，稍後重新同步。');
     }
 
     // 重新讀取資料庫，避免 RLS／trigger／資料庫規則拒絕公開卻讓前端顯示成功。
