@@ -3410,10 +3410,30 @@ document.addEventListener('click',async event => {
         }
         break;
       }
-      case 'delete-message':
-        if (!s || !confirm('確定刪除此訊息？此操作無法復原。')) break;
+      case 'delete-message': {
+        const message = s?.messages.find(m=>m.id===key);
+        if (!s || !message || !confirm('確定刪除此訊息？此操作無法復原。')) break;
+        // 雲端聊天先將訊息標記為軟刪除，確認成功後才移除本機副本，
+        // 避免重新載入時該訊息又從 chat_messages 出現。
+        if (s.cloudOwned && currentUser()?.uid === s.cloudOwnerUid && window.mySupabase && isUuid(message.id)) {
+          const deletedAt = new Date().toISOString();
+          const { data, error } = await window.mySupabase.from('chat_messages')
+            .update({deleted_at:deletedAt})
+            .eq('id',message.id).eq('session_id',s.id).is('deleted_at',null)
+            .select('id').maybeSingle();
+          if (error) throw new Error('訊息刪除同步失敗：' + error.message);
+          if (!data) throw new Error('雲端未確認這則訊息的刪除狀態；訊息仍保留，請重新整理後再試。');
+        }
         s.messages=s.messages.filter(m=>m.id!==key);
-        persist();closeModal();break;
+        if (!persist()) {
+          s.messages.push(message);
+          s.messages.sort((a,b)=>(Number(a.at)||0)-(Number(b.at)||0));
+          break;
+        }
+        closeModal();
+        renderMessages();
+        break;
+      }
       case 'photo':openModal('photo',{id:key});break;
       case 'fullscreen':
         await $('modal').querySelector('img')?.requestFullscreen?.();break;
