@@ -1,6 +1,6 @@
-# Chat-turn billing implementation draft
+# Chat-turn billing implementation design and acceptance criteria
 
-Status: design-only. No Supabase schema, production balances, or deployed code have been changed.
+Status: the reviewed wallet SQL migration and fixed-demo `chat-turn` Edge Function v1 are deployed to production Supabase. The frontend remains on the feature branch and is not merged/deployed to the production website. No end-to-end billing acceptance tests have passed. The stale-turn reconciliation and assistant-reply UPDATE guard are source-only SQL drafts and have not been applied.
 
 ## Test-mode decision
 
@@ -13,7 +13,8 @@ The project owner confirmed that the current environment has no real users and f
 - `chat_sessions` has `id`, `user_id`, and `deleted_at`; `chat_messages` belongs to a session.
 - The current message handler adds a fixed demonstration reply, calls local `persist()`, then awaits `saveChatSessionSafely(s)` but ignores its boolean result. This is a confirmed integration defect: cloud persistence can fail while the UI still appears to have a completed reply.
 - `saveChatSessionToCloud` creates the cloud session and upserts messages together, but returns false for a chat without a non-empty user message. This matters for first-send flow: the current reserve RPC cannot require an existing cloud session unless the first-send session creation sequence is designed explicitly.
-- The current handler does not call an AI provider. The browser must not directly update wallet balances.
+- The deployed `chat-turn` handler returns a fixed demonstration reply and does not call an AI provider. The browser must not directly update wallet balances.
+- Production RLS includes `chat_messages_update_own`; the billing trigger currently protects assistant INSERT but not later UPDATE. A source-only guard draft now prevents changes to a charged assistant reply's ID, session, role, or content while allowing unrelated updates such as soft-delete metadata. Review and test before applying.
 - The latest-user-message edit path saves the edit and does not regenerate; it must remain outside the billing flow.
 
 ## Billing invariants (must always hold)
@@ -149,4 +150,4 @@ The existing application creates a cloud session only after the first user messa
 
 ## Safety boundary
 
-This is a design document committed to `feat/ayet-rewarded-video-callback` only. It has not been applied to Supabase, merged to main, or deployed. No production data or schema has been changed. Next step is to implement and review the audit/ledger contract and frontend/server orchestration against current schema before any database migration or deployment.
+The design and acceptance criteria live on `feat/ayet-rewarded-video-callback`. The wallet migration and fixed-demo Edge Function v1 are already applied/deployed; the frontend is not merged/deployed. No end-to-end tests have passed. The stale-turn reconciliation and assistant UPDATE guard are drafts only. Next steps: review the two SQL drafts, add repeatable isolated tests for the state machine and concurrent races, then request explicit approval before any further production DB changes, frontend merge, or deployment.
