@@ -1162,12 +1162,27 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       tags: Array.isArray(character.tags) ? character.tags : []
     };
 
+    // 角色資料寫入前再次確認真實登入身分，防止編輯期間切換帳號。
+    const { data: preSaveAuth, error: preSaveAuthError } = await client.auth.getUser();
+    if (preSaveAuthError || preSaveAuth?.user?.id !== expectedUserId ||
+        state.account?.uid !== expectedUserId) {
+      throw new Error('登入帳號已變更，已停止儲存角色，請重新載入後再試。');
+    }
+
     const { error: characterError } = await client
       .from('characters')
       .upsert(row, { onConflict: 'id' });
     if (characterError) {
       throw new Error('角色資料寫入 Supabase 失敗：' + characterError.message);
     }
+
+    // 基本資料寫入後再次確認帳號；若身分已變更，不繼續寫私密設定。
+    const { data: prePrivateAuth, error: prePrivateAuthError } = await client.auth.getUser();
+    if (prePrivateAuthError || prePrivateAuth?.user?.id !== expectedUserId ||
+        state.account?.uid !== expectedUserId) {
+      throw new Error('角色基本資料已儲存，但登入帳號在同步期間變更；私密設定尚未確認，請切回原帳號重新同步。');
+    }
+
     // 私密設定另存於作者專用資料表，不再寫入公開角色資料列。
     const { error: privateInfoError } = await client
       .from('character_private_info')
