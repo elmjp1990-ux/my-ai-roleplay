@@ -105,6 +105,18 @@ begin
     exception when others then
       get stacked diagnostics v_sqlstate = returned_sqlstate;
       v_failed := v_failed + 1;
+
+      -- Back off failed attempts too. In particular, a reply may be inserted
+      -- after the worker's initial absence check but before refund_chat_turn
+      -- locks the charge. The refund RPC correctly rejects that race; without
+      -- advancing updated_at, every worker run would retry and emit an alert.
+      update public.chat_turn_charges c
+      set status = 'needs_reconciliation',
+          failure_code = left('reconciliation_sqlstate_' || v_sqlstate, 80),
+          updated_at = now()
+      where c.turn_id = v_charge.turn_id
+        and c.status in ('reserved', 'needs_reconciliation');
+
       insert into public.chat_turn_events(
         turn_id, user_id, event_type, stage, error_code
       ) values (
