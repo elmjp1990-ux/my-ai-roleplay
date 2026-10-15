@@ -3832,7 +3832,6 @@ document.addEventListener('submit',async event => {
 
         const previousMessages = s.messages.slice();
         const previousMemories = (s.memories || []).map(memory => ({...memory}));
-        const hadOwnedCloudSession = !!(s.cloudOwned && s.cloudOwnerUid === currentUser()?.uid);
         const userMessage = {id:id(),role:'user',text,at:Date.now()};
         s.messages.push(userMessage);
         s.pendingTurn = {
@@ -3850,19 +3849,7 @@ document.addEventListener('submit',async event => {
           s.memories = previousMemories;
           delete s.pendingTurn;
           persist();
-          if (!hadOwnedCloudSession && s.cloudOwned && s.cloudOwnerUid === currentUser()?.uid) {
-            // If the first session row was inserted but its messages failed to save,
-            // soft-delete only this newly-created empty session to avoid an orphan.
-            const { error: cleanupError } = await window.mySupabase.from('chat_sessions')
-              .update({deleted_at:new Date().toISOString(),updated_at:new Date().toISOString()})
-              .eq('id',s.id).eq('user_id',currentUser().uid).is('deleted_at',null);
-            if (cleanupError) console.warn('清理未完成的首次聊天紀錄失敗：',cleanupError.message);
-            s.cloudOwned = false;
-            s.cloudOwnerUid = null;
-            s.cloudCharacterSnapshot = null;
-          } else {
-            await clearCloudPendingTurn(s);
-          }
+          await clearCloudPendingTurn(s);
           renderMessages();
           toast('訊息尚未保存到雲端，本次沒有扣款；請確認網路後再試。');
           break;
