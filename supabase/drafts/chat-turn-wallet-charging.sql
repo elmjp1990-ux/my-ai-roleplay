@@ -246,9 +246,14 @@ begin
   -- was soft-deleted. This is defense in depth alongside the UPDATE guard.
   if p_assistant_message_id is not null and exists (
     select 1 from public.chat_messages m
-    where m.id=p_assistant_message_id and m.session_id=v_charge.session_id
-      and m.role='assistant' and length(btrim(m.content)) > 0
-  ) then raise exception 'reply_already_persisted'; end if;
+    where m.id = p_assistant_message_id
+      and m.session_id = v_charge.session_id
+  ) then
+    -- Any row occupying the expected reply ID is an integrity signal. This
+    -- includes soft-deleted, empty, or wrong-role legacy/collision rows; do not
+    -- refund based on an assistant-only lookup that could miss such a row.
+    raise exception 'expected_reply_id_already_persisted';
+  end if;
 
   select w.* into v_wallet from public.wallet_accounts w
     where w.user_id=p_user_id for update;
