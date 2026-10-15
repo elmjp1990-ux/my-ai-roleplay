@@ -1,4 +1,6 @@
--- REVIEW ONLY: browser chat-message INSERT hardening for server-authoritative billing.
+-- REVIEW ONLY: standalone reference for browser chat-message INSERT hardening.
+-- DO NOT APPLY THIS FILE INDEPENDENTLY. Use chat-turn-message-write-hardening.sql,
+-- which applies this policy and the assistant UPDATE guard atomically.
 -- Do not apply to production without owner approval and a reviewed rollback plan.
 --
 -- The browser should insert/update user-authored turns only. Assistant replies are
