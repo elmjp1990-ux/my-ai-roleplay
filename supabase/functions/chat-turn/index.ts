@@ -169,7 +169,7 @@ Deno.serve(async (request) => {
 
   const { error: saveReplyError } = await admin
     .from("chat_messages")
-    .upsert(assistantRow, { onConflict: "id" });
+    .insert(assistantRow);
 
   if (saveReplyError) {
     await admin.from("chat_turn_events").insert({
@@ -196,12 +196,24 @@ Deno.serve(async (request) => {
     }
 
     if (possibleReply && String(possibleReply.content || "").trim()) {
-      await admin.from("chat_turn_events").insert({
-    turn_id: turnId, user_id: user.id, event_type: "assistant_reply_saved",
-    stage: "persistence",
-  });
+      if (String(possibleReply.content) !== demoReply) {
+        await admin.from("chat_turn_charges").update({
+          status: "needs_reconciliation",
+          failure_code: "assistant_message_id_collision",
+          updated_at: new Date().toISOString(),
+        }).eq("turn_id", turnId).eq("user_id", user.id).eq("status", "reserved");
+        await admin.from("chat_turn_events").insert({
+          turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
+          stage: "persistence", error_code: "assistant_message_id_collision",
+        });
+        return json({ status: "needs_reconciliation", retryAllowed: false }, 409);
+      }
 
-  const { data: settled, error: settleError } = await admin.rpc("settle_chat_turn", {
+      await admin.from("chat_turn_events").insert({
+        turn_id: turnId, user_id: user.id, event_type: "assistant_reply_saved",
+        stage: "persistence",
+      });
+      const { data: settled, error: settleError } = await admin.rpc("settle_chat_turn", {
         p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
       });
       if (settleError) return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
