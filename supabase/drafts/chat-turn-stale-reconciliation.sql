@@ -45,22 +45,44 @@ begin
   loop
     v_processed := v_processed + 1;
     begin
+      -- A non-empty expected reply that was soft-deleted is still evidence
+      -- that a reply was persisted. Never refund it or treat it as absent.
       if exists (
         select 1
         from public.chat_messages m
         where m.id = v_charge.expected_assistant_message_id
           and m.session_id = v_charge.session_id
           and m.role = 'assistant'
-          and m.deleted_at is null
           and length(btrim(coalesce(m.content, ''))) > 0
       ) then
-        v_result := public.settle_chat_turn(
-          v_charge.user_id,
-          v_charge.turn_id,
-          v_charge.expected_assistant_message_id
-        );
-        if v_result = 'settled' then
-          v_settled := v_settled + 1;
+        if exists (
+          select 1
+          from public.chat_messages m
+          where m.id = v_charge.expected_assistant_message_id
+            and m.session_id = v_charge.session_id
+            and m.role = 'assistant'
+            and m.deleted_at is null
+            and length(btrim(coalesce(m.content, ''))) > 0
+        ) then
+          v_result := public.settle_chat_turn(
+            v_charge.user_id,
+            v_charge.turn_id,
+            v_charge.expected_assistant_message_id
+          );
+          if v_result = 'settled' then
+            v_settled := v_settled + 1;
+          else
+            v_failed := v_failed + 1;
+          end if;
+        else
+          insert into public.chat_turn_events(
+            turn_id, user_id, event_type, stage, error_code
+          ) values (
+            v_charge.turn_id, v_charge.user_id,
+            'reconciliation_blocked_soft_deleted_reply',
+            'stale_demo_reconciliation', 'expected_reply_soft_deleted'
+          );
+          v_failed := v_failed + 1;
         end if;
       else
         perform public.refund_chat_turn(
