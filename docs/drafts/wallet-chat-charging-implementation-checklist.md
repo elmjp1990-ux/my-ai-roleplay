@@ -14,6 +14,7 @@ Status: production SQL migration and fixed-demo Edge Function v1 are deployed. F
 - [ ] Verify silver-only, diamond-only, mixed payment, and insufficient-balance paths in an isolated repeatable test.
 - [ ] Verify reservation, settlement, refund and ledger writes are atomic and idempotent under concurrent calls.
 - [ ] Verify a refunded turn can never later deliver a successful reply and a settled turn cannot be refunded.
+- [ ] Review and test `supabase/drafts/chat-turn-assistant-update-guard.sql`: the production `chat_messages_update_own` policy permits message updates, while the current billing trigger only guards INSERT. Ensure a charged assistant reply cannot have its ID/session/role/content changed after insertion, while intended soft-delete behavior remains intact. This hardening draft is not applied.
 - [ ] Review stale-turn reconciliation SQL draft and test it against the fixed-demo handler before considering production application or scheduling.
 - [ ] Do not use the demo stale-turn refund strategy once a real AI provider is integrated; first query provider/job status and distinguish confirmed failure from unknown outcome.
 - [ ] Confirm the frontend preserves pending IDs across refresh/relogin and never creates a second turn while the previous result is ambiguous.
@@ -46,6 +47,8 @@ Status: production SQL migration and fixed-demo Edge Function v1 are deployed. F
 - [ ] Treat animation as display only; server turn state remains authoritative.
 
 ## Reconciliation draft
+
+`supabase/drafts/chat-turn-assistant-update-guard.sql` is a source-only trigger draft protecting the identity and content of charged assistant replies against later UPDATEs. The production `chat_messages_update_own` policy exists, and the deployed billing trigger currently guards INSERT only; review compatibility with soft-delete behavior before considering application.
 
 `supabase/drafts/chat-turn-stale-reconciliation.sql` contains a source-only function for stale turns in the deterministic demo mode. It is **not applied, not scheduled, and not yet tested**. It locks eligible stale charge rows, settles if a durable non-empty assistant reply exists, otherwise calls the guarded refund RPC. The shared row-locking trigger prevents a late assistant insert after refund. This strategy is valid only while no external provider job can complete later; real AI integration requires provider/job-state reconciliation first.
 
