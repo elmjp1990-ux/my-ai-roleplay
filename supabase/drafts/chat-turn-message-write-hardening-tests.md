@@ -68,7 +68,7 @@ These cases validate response mapping only; also verify no wallet transaction or
 |---|---|---|
 | R1 | Old reserved turn has no expected assistant row | Refund exactly once; a retry of the worker does not create another refund transaction |
 | R2 | Old reserved or needs_reconciliation turn has a non-empty, visible expected assistant row | Settle the turn; do not refund |
-| R3 | Old turn has a non-empty expected assistant row with deleted_at set | Do not refund or mark the reply absent; emit reconciliation_blocked_soft_deleted_reply, keep the charge unresolved, and count the row as failed for operator follow-up |
+| R3 | Old turn has a non-empty expected assistant row with deleted_at set | Do not refund or mark the reply absent; emit reconciliation_blocked_soft_deleted_reply, keep the charge unresolved, set failure_code=expected_reply_soft_deleted and advance updated_at so repeated worker runs do not emit the same alert every run; count the row as failed for operator follow-up |
 | R4 | Assistant INSERT races with stale reconciliation when no reply is visible initially | Charge-row locking serializes the operations: either the durable reply wins and the turn settles, or refund wins and the late insert is rejected |
 | R5 | A real AI provider/job is configured and a generation request may still finish later | Do not enable this demo-only reconciliation worker until provider/job status and late completion are safely handled |
 
