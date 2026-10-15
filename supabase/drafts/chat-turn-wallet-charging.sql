@@ -10,7 +10,7 @@ create table if not exists public.chat_turn_charges (
   user_id uuid not null references auth.users(id) on delete cascade,
   session_id uuid not null references public.chat_sessions(id) on delete cascade,
   user_message_id uuid not null references public.chat_messages(id) on delete restrict,
-  expected_assistant_message_id uuid not null,
+  expected_assistant_message_id uuid not null unique,
   assistant_message_id uuid references public.chat_messages(id) on delete set null,
   cost integer not null default 2 check (cost = 2),
   silver_reserved integer not null default 0 check (silver_reserved >= 0),
