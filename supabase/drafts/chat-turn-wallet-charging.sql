@@ -181,8 +181,15 @@ begin
   select c.* into v_charge from public.chat_turn_charges c
   where c.turn_id=p_turn_id for update;
   if not found or v_charge.user_id <> p_user_id then raise exception 'turn_not_found'; end if;
-  if v_charge.status = 'settled' then return 'settled'; end if;
-  if v_charge.status <> 'reserved' then raise exception 'turn_not_settleable'; end if;
+  if v_charge.status = 'settled' then
+    if v_charge.assistant_message_id is distinct from p_assistant_message_id then
+      raise exception 'settled_turn_reply_id_conflict';
+    end if;
+    return 'settled';
+  end if;
+  if v_charge.status not in ('reserved','needs_reconciliation') then
+    raise exception 'turn_not_settleable';
+  end if;
   if not exists (
     select 1 from public.chat_messages m
     where m.id=p_assistant_message_id and m.session_id=v_charge.session_id
