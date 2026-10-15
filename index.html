@@ -1570,7 +1570,18 @@ function chatSessionData(s) {
     suggestions:s.suggestions !== false, background:s.background || 'avatar',
     startedAt:s.startedAt || Date.now(), archivedAt:s.archivedAt || null,
     memories:Array.isArray(s.memories) ? s.memories : [],
-    album:Array.isArray(s.album) ? s.album : []
+    album:Array.isArray(s.album) ? s.album : [],
+    pendingTurn:s.pendingTurn &&
+      isUuid(s.pendingTurn.turnId) &&
+      isUuid(s.pendingTurn.userMessageId) &&
+      isUuid(s.pendingTurn.assistantMessageId)
+      ? {
+          turnId:s.pendingTurn.turnId,
+          userMessageId:s.pendingTurn.userMessageId,
+          assistantMessageId:s.pendingTurn.assistantMessageId,
+          createdAt:Number(s.pendingTurn.createdAt) || Date.now()
+        }
+      : null
   };
 }
 async function saveChatSessionToCloud(s, options = {}) {
@@ -1744,6 +1755,17 @@ async function loadCloudChatSessions(user) {
         suggestions:data.suggestions !== false, background:data.background || 'avatar',
         memories:Array.isArray(data.memories) ? data.memories : [],
         album:Array.isArray(data.album) ? data.album : [],
+        pendingTurn:data.pendingTurn &&
+          isUuid(data.pendingTurn.turnId) &&
+          isUuid(data.pendingTurn.userMessageId) &&
+          isUuid(data.pendingTurn.assistantMessageId)
+          ? {
+              turnId:data.pendingTurn.turnId,
+              userMessageId:data.pendingTurn.userMessageId,
+              assistantMessageId:data.pendingTurn.assistantMessageId,
+              createdAt:Number(data.pendingTurn.createdAt) || Date.now()
+            }
+          : null,
         messages:cloudMessages.length ? cloudMessages : (existing?.messages || []),
         cloudOwned:true, cloudOwnerUid:user.id, cloudCharacterSnapshot:snapshot
       };
@@ -1832,6 +1854,7 @@ async function runPendingChatTurn(s) {
     delete s.pendingTurn;
     persist();
     renderMessages();
+    await saveChatSessionSafely(s);
     await refreshWalletBalance();
     openModal('wallet-insufficient');
     return;
@@ -1841,6 +1864,7 @@ async function runPendingChatTurn(s) {
     delete s.pendingTurn;
     persist();
     renderMessages();
+    await saveChatSessionSafely(s);
     await refreshWalletBalance();
     toast('這次回覆未能保存，系統已退回本回合預扣的銀幣／鑽石。');
     return;
