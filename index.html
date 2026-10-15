@@ -3428,6 +3428,13 @@ document.addEventListener('click',async event => {
         if (!persist()) {
           s.messages.push(message);
           s.messages.sort((a,b)=>(Number(a.at)||0)-(Number(b.at)||0));
+          // 若本機保存失敗，嘗試撤回剛才的雲端軟刪除，避免兩端狀態不一致。
+          if (s.cloudOwned && currentUser()?.uid === s.cloudOwnerUid && window.mySupabase && isUuid(message.id)) {
+            const { error: rollbackError } = await window.mySupabase.from('chat_messages')
+              .update({deleted_at:null})
+              .eq('id',message.id).eq('session_id',s.id).eq('deleted_at',deletedAt);
+            if (rollbackError) console.error('訊息刪除回復同步失敗：',rollbackError.message);
+          }
           break;
         }
         closeModal();
