@@ -926,11 +926,10 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 
       const publicIds = new Set(publicCharacters.map(character => character.id));
       const currentUid = state.account?.uid || null;
-      // 保留 seed 與目前帳號自己的私密草稿；不保留其他帳號殘留的本機角色。
+      // 只保留示範角色與目前登入帳號自己的未刪除角色，避免帳號切換時顯示其他帳號的本機私密草稿。
       const keepLocal = state.characters.filter(character =>
         String(character.id).startsWith('seed-') ||
-        (!character.deletedAt && character.visibility !== 'public') ||
-        (currentUid && character.authorId === currentUid && !character.deletedAt)
+        (!!currentUid && character.authorId === currentUid && !character.deletedAt)
       );
       state.characters = [...publicCharacters, ...keepLocal.filter(character => !publicIds.has(character.id))];
       persist();
