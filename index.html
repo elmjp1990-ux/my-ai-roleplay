@@ -1543,7 +1543,7 @@ let pendingDeletionWalletSyncUid =
     ? state.account.uid
     : null;
 let route = {page:'home'};
-let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]},active:null,turn:0,messages:[],lastSpeaker:-1};
+let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]},active:null,turn:0,messages:[],groups:[],groupsLoaded:false,loadingGroups:false,loading:false,sending:false,formError:'',loadError:''};
 let search = '';
 let filter = 'latest';
 let exploreTags = [];
@@ -2798,11 +2798,9 @@ function phoneHTML(c) {
   </details>`;
 }
 
-/* GROUP-01: integrated front-end prototype only; no database, AI, or wallet calls. */
+/* GROUP-01: Supabase-persisted group core with deterministic mock director; no AI or wallet calls. */
 function groupAvailableCharacters() {
-  // Public characters must be approved; the database RPC will re-check this rule.
-  // Local seed/demo characters may not carry reviewStatus, so preserve them for mock testing.
-  return state.characters.filter(c => !c.deletedAt && (
+  return state.characters.filter(c => isUuid(c.id) && !c.deletedAt && (
     owned(c) || (c.visibility === 'public' && (!c.reviewStatus || c.reviewStatus === 'approved'))
   ));
 }
@@ -2821,8 +2819,7 @@ function groupRenderScenes() {
 }
 document.addEventListener('change',event => {
   if (event.target?.id !== 'groupModeInput' || route.page !== 'group' || groupPrototype.step !== 2) return;
-  const oldMode=groupPrototype.draft.mode;
-  const oldCount=oldMode==='shared'?1:3;
+  const oldCount=groupPrototype.draft.mode==='shared'?1:3;
   const captured=Array.from({length:oldCount},(_,i)=>({
     name:$('groupSceneName'+i)?.value.trim()||groupPrototype.draft.scenes[i]?.name||'',
     description:$('groupSceneDesc'+i)?.value||groupPrototype.draft.scenes[i]?.description||''
@@ -2833,20 +2830,88 @@ document.addEventListener('change',event => {
 });
 function groupRenderCharacters() {
   const chars=groupAvailableCharacters();
-  if (!chars.length) return '<div class="group-alert">目前找不到可選角色。請先登入並建立角色，或讓測試環境載入公開示範角色。這個原型不會自動新增角色。</div>';
-  return '<div class="group-character-grid">'+chars.map(c=>'<label class="group-character-option"><input type="checkbox" data-action="group-toggle-character" data-id="'+e(c.id)+'" '+(groupPrototype.draft.memberIds.includes(c.id)?'checked':'')+' '+(groupPrototype.draft.memberIds.length>=3&&!groupPrototype.draft.memberIds.includes(c.id)?'disabled':'')+'><span><strong>'+e(c.name)+'</strong><span class="muted small" style="display:block">'+e(c.intro||'尚無角色介紹')+'</span></span></label>').join('')+'</div><p class="muted small">已選 '+groupPrototype.draft.memberIds.length+' / 3 名。角色可見性僅依目前前端狀態顯示，正式權限仍須由資料庫驗證。</p>';
+  if (!chars.length) return '<div class="group-alert">目前沒有可選的雲端角色。請先登入並確認角色已儲存在 Supabase，且你擁有該角色或該角色已公開核准。</div>';
+  return '<div class="group-character-grid">'+chars.map(c=>'<label class="group-character-option"><input type="checkbox" data-action="group-toggle-character" data-id="'+e(c.id)+'" '+(groupPrototype.draft.memberIds.includes(c.id)?'checked':'')+' '+(groupPrototype.draft.memberIds.length>=3&&!groupPrototype.draft.memberIds.includes(c.id)?'disabled':'')+'><span><strong>'+e(c.name)+'</strong><span class="muted small" style="display:block">'+e(c.intro||'尚無角色介紹')+'</span></span></label>').join('')+'</div><p class="muted small">已選 '+groupPrototype.draft.memberIds.length+' / 3 名。後端會再次驗證角色權限與數量。</p>';
+}
+async function groupLoadList(force=false) {
+  const g=groupPrototype;
+  if(g.loadingGroups||(!force&&g.groupsLoaded)) return;
+  g.loadingGroups=true;g.loadError='';
+  if(!window.mySupabase) {
+    g.groupsLoaded=true;g.loadingGroups=false;g.loadError='Supabase 用戶端尚未載入。';return;
+  }
+  try {
+    const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
+    if(authError||!user||user.id!==currentUser()?.uid) {
+      g.groupsLoaded=true;g.loadingGroups=false;g.loadError='請使用已連結 Supabase 的帳號登入，才能讀取或建立雲端群組。';
+      if(route.page==='group'&&!g.active) render();
+      return;
+    }
+    const {data,error}=await window.mySupabase.from('chat_groups')
+      .select('id,name,world_background,scene_mode,created_at,updated_at')
+      .is('archived_at',null).order('updated_at',{ascending:false});
+    if(error) throw error;
+    g.groups=data||[];g.groupsLoaded=true;g.loadingGroups=false;
+  } catch(error) {
+    g.groupsLoaded=true;g.loadingGroups=false;g.loadError=error?.message||'讀取群組清單失敗。';
+  }
+  if(route.page==='group'&&!g.active) render();
+}
+function groupRenderList() {
+  const g=groupPrototype;
+  let body='';
+  if(g.loadingGroups) body='<p class="muted">正在讀取雲端群組…</p>';
+  else if(g.loadError) body='<div class="group-alert">'+e(g.loadError)+'</div><button data-action="group-refresh-list">重新載入</button>';
+  else if(!g.groups.length) body='<p class="muted">目前還沒有已保存的群組。建立後即可在這裡重新開啟。</p>';
+  else body='<div class="group-character-grid">'+g.groups.map(x=>'<div class="group-character-option"><span style="flex:1"><strong>'+e(x.name)+'</strong><span class="muted small" style="display:block">'+(x.scene_mode==='shared'?'共用場景':'分開場景')+' · '+e(String(x.created_at||'').slice(0,10))+'</span></span><button data-action="group-open" data-id="'+e(x.id)+'">開啟</button></div>').join('')+'</div>';
+  return '<section class="group-panel"><div class="row between wrap"><h2>已保存的群組</h2><button data-action="group-refresh-list">重新載入</button></div>'+body+'</section>';
+}
+async function groupOpen(groupId) {
+  const g=groupPrototype;
+  if(!isUuid(groupId)||!window.mySupabase) { toast('群組識別碼無效。');return; }
+  g.loading=true;g.formError='';g.active=null;render();
+  try {
+    const [groupRes,sceneRes,memberRes,messageRes]=await Promise.all([
+      window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,created_at,updated_at').eq('id',groupId).single(),
+      window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
+      window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position'),
+      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,content,created_at').eq('group_id',groupId).order('created_at',{ascending:true}).order('sequence_no',{ascending:true})
+    ]);
+    const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error;
+    if(error) throw error;
+    const group=groupRes.data, scenes=sceneRes.data||[], memberRows=memberRes.data||[];
+    if(memberRows.length<1||memberRows.length>3) throw new Error('群組成員資料不完整，請重新整理或重新建立群組。');
+    const members=memberRows.map(m=>({...m.character_snapshot,id:m.character_id,characterId:m.character_id,position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'}));
+    const messages=(messageRes.data||[]).map(m=>{
+      const member=members.find(x=>x.characterId===m.character_id);
+      const scene=scenes.find(x=>x.id===m.scene_id);
+      return {id:m.id,type:m.speaker_type==='user'?'user':m.speaker_type==='system'?'system':'character',speaker:m.speaker_type==='user'?'你':(member?.name||'角色')+(scene?' · '+scene.name:''),content:m.content,createdAt:m.created_at};
+    });
+    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,scenes,members};
+    g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;g.formError='';
+    g.loading=false;g.groupsLoaded=false;
+    await groupLoadList(true);
+  } catch(error) {
+    g.loading=false;g.formError=error?.message||'開啟群組失敗。';
+  }
+  render();
 }
 function renderGroupPrototype() {
   const g=groupPrototype;
-  if (g.active) {
-    $('view').innerHTML='<div class="group-wizard"><div class="row between wrap"><div><h1>'+e(g.active.name)+'</h1><p class="muted">群組聊天 · Mock 導演測試模式</p></div><button data-action="group-restart">重新建立</button></div><div class="group-panel"><div class="group-alert">目前只在前端記憶體運作，不會保存到 Supabase、不呼叫 AI，也不扣款。</div><p><strong>世界背景：</strong>'+e(g.active.world||'（未設定）')+'</p><p><strong>場景模式：</strong>'+(g.active.mode==='shared'?'共用場景':'分開場景')+' · '+g.active.members.length+' 名角色</p><div class="group-chat-log">'+g.messages.map(m=>'<div class="group-bubble '+(m.type==='user'?'user':'')+'"><small>'+e(m.speaker)+'</small>'+e(m.content)+'</div>').join('')+'</div><label class="group-field"><span>輸入訊息</span><textarea id="groupMessageInput" maxlength="2000" placeholder="輸入故事內容"></textarea></label><div class="group-actions"><span class="muted small">'+g.turn+' 個 mock 回合</span><button class="primary" data-action="group-send">送出給 Mock 導演</button></div></div></div>';
+  if(!g.groupsLoaded&&!g.loadingGroups&&!g.active) groupLoadList();
+  if(g.loading) {
+    $('view').innerHTML='<div class="group-wizard"><div class="group-panel">正在讀取群組資料…</div></div>';
+    return;
+  }
+  if(g.active) {
+    $('view').innerHTML='<div class="group-wizard"><div class="row between wrap"><div><h1>'+e(g.active.name)+'</h1><p class="muted">群組聊天 · 持久化 Mock 導演模式</p></div><button data-action="group-list">返回群組清單</button></div><div class="group-panel"><div class="group-alert">訊息已保存於測試 Supabase。回覆由固定 Mock 導演產生，不呼叫 AI、不扣款。</div><p><strong>世界背景：</strong>'+e(g.active.world||'（未設定）')+'</p><p><strong>場景模式：</strong>'+(g.active.mode==='shared'?'共用場景':'分開場景')+' · '+g.active.members.length+' 名角色</p><div class="group-chat-log">'+g.messages.map(m=>'<div class="group-bubble '+(m.type==='user'?'user':'')+'"><small>'+e(m.speaker)+'</small>'+e(m.content)+'</div>').join('')+'</div><div class="error" role="alert" aria-live="polite">'+e(g.formError)+'</div><label class="group-field"><span>輸入訊息</span><textarea id="groupMessageInput" maxlength="2000" placeholder="輸入故事內容" '+(g.sending?'disabled':'')+'></textarea></label><div class="group-actions"><span class="muted small">'+g.turn+' 個已保存回合</span><button class="primary" data-action="group-send" '+(g.sending?'disabled':'')+'>'+(g.sending?'正在保存…':'送出給 Mock 導演')+'</button></div></div></div>';
     return;
   }
   let body='';
   if(g.step===1) body='<h2>群組基本資料</h2><label class="group-field"><span>群組名稱（1–80 字）</span><input id="groupNameInput" maxlength="80" value="'+e(g.draft.name)+'" placeholder="例如：月影旅團"></label><label class="group-field"><span>世界背景（最多 10000 字）</span><textarea id="groupWorldInput" maxlength="10000" placeholder="故事世界、時代、規則與氛圍">'+e(g.draft.world)+'</textarea></label>';
-  if(g.step===2) body='<h2>世界與初始場景</h2><label class="group-field"><span>場景模式</span><select id="groupModeInput"><option value="shared" '+(g.draft.mode==='shared'?'selected':'')+'>所有角色在同一場景</option><option value="separate" '+(g.draft.mode==='separate'?'selected':'')+'>角色分開場景</option></select></label><div class="group-alert">分開場景模式會為每名角色分配場景；確認時會依所選角色數量取用場景。</div>'+groupRenderScenes();
-  if(g.step===3) body='<h2>選擇角色</h2><p class="muted">最多三名角色。角色列表取自目前網站狀態，不會建立或修改角色資料。</p>'+groupRenderCharacters();
-  $('view').innerHTML='<div class="group-wizard"><div><h1>建立群組聊天</h1><p class="muted">先接上既有網站路由的前端測試流程；資料與回覆都不會上雲端。</p></div>'+groupRenderSteps()+'<section class="group-panel">'+body+'<div id="groupFormError" class="error" role="alert" aria-live="polite"></div><div class="group-actions"><button data-action="group-back" '+(g.step===1?'disabled':'')+'>上一步</button><button class="primary" data-action="group-next">'+(g.step===3?'確認群組':'下一步')+'</button></div></section></div>';
+  if(g.step===2) body='<h2>世界與初始場景</h2><label class="group-field"><span>場景模式</span><select id="groupModeInput"><option value="shared" '+(g.draft.mode==='shared'?'selected':'')+'>所有角色在同一場景</option><option value="separate" '+(g.draft.mode==='separate'?'selected':'')+'>角色分開場景</option></select></label><div class="group-alert">分開場景模式會為每名角色分配場景；確認時依角色數量使用對應場景。</div>'+groupRenderScenes();
+  if(g.step===3) body='<h2>選擇角色</h2><p class="muted">最多三名角色。只能選擇雲端 UUID 角色，後端會再次驗證所有權及公開核准狀態。</p>'+groupRenderCharacters();
+  $('view').innerHTML='<div class="group-wizard"><div><h1>建立群組聊天</h1><p class="muted">建立資料與 Mock 回覆會保存於測試 Supabase；不呼叫 AI、不扣款。</p></div>'+groupRenderList()+groupRenderSteps()+'<section class="group-panel">'+body+'<div id="groupFormError" class="error" role="alert" aria-live="polite">'+e(g.formError)+'</div><div class="group-actions"><button data-action="group-back" '+(g.step===1||g.loading?'disabled':'')+'>上一步</button><button class="primary" data-action="group-next" '+(g.loading?'disabled':'')+'>'+(g.loading?'正在建立…':g.step===3?'確認並保存群組':'下一步')+'</button></div></section></div>';
 }
 function groupReadStep() {
   const g=groupPrototype;
@@ -2871,47 +2936,68 @@ function groupReadStep() {
   }
   return '';
 }
-function groupNext() {
+async function groupNext() {
   const err=groupReadStep();
-  if(err) { const target=$('groupFormError'); if(target) target.textContent=err; else toast(err); return; }
-  if(groupPrototype.step<3) { groupPrototype.step++; render(); return; }
-  const scenes=groupPrototype.draft.mode==='shared'?[groupPrototype.draft.scenes[0]]:groupPrototype.draft.scenes.slice(0,groupSelectedCharacters().length);
-  groupPrototype.active={...groupPrototype.draft,scenes,members:groupSelectedCharacters()};
-  groupPrototype.turn=0;groupPrototype.messages=[];groupPrototype.lastSpeaker=-1;
-  groupPrototype.messages.push({type:'system',speaker:'系統',content:'群組已在前端測試模式建立。未呼叫 AI、未寫入資料庫、未扣款。'});
-  render();
+  if(err) { groupPrototype.formError=err;render();return; }
+  groupPrototype.formError='';
+  if(groupPrototype.step<3) { groupPrototype.step++;render();return; }
+  await groupCreateMock();
 }
-function groupBack() { if(groupPrototype.active) return; if(groupPrototype.step>1){groupPrototype.step--;render();} }
+async function groupCreateMock() {
+  const g=groupPrototype;
+  const err=groupReadStep();
+  if(err) {g.formError=err;render();return;}
+  if(!window.mySupabase) {g.formError='Supabase 用戶端尚未載入。';render();return;}
+  g.loading=true;g.formError='';render();
+  try {
+    const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
+    if(authError||!user||user.id!==currentUser()?.uid) throw new Error('請使用已連結 Supabase 的帳號登入，才能建立雲端群組。');
+    const members=groupSelectedCharacters();
+    const scenes=(g.draft.mode==='shared'?[g.draft.scenes[0]]:g.draft.scenes.slice(0,members.length))
+      .map(x=>({name:x.name.trim(),description:x.description||''}));
+    const pMembers=members.map((m,i)=>({character_id:m.id,scene_position:g.draft.mode==='shared'?1:i+1}));
+    const {data:groupId,error}=await window.mySupabase.rpc('create_chat_group',{
+      p_name:g.draft.name.trim(),p_world_background:g.draft.world,p_scene_mode:g.draft.mode,p_scenes:scenes,p_members:pMembers
+    });
+    if(error) throw error;
+    g.loading=false;
+    await groupOpen(groupId);
+  } catch(error) {
+    g.loading=false;g.formError=error?.message||'建立群組失敗。';render();
+  }
+}
+function groupBack() { if(groupPrototype.active||groupPrototype.loading) return; if(groupPrototype.step>1){groupPrototype.step--;groupPrototype.formError='';render();} }
 function groupToggleCharacter(idValue) {
   const g=groupPrototype;
   if(g.draft.memberIds.includes(idValue)) g.draft.memberIds=g.draft.memberIds.filter(x=>x!==idValue);
   else if(g.draft.memberIds.length<3) g.draft.memberIds.push(idValue);
   else toast('每個群組最多三名角色。');
-  render();
+  g.formError='';render();
 }
-function groupCreateMock() { groupNext(); }
-function groupSendMock() {
+async function groupSendMock() {
   const input=$('groupMessageInput');
   const content=input?.value.trim();
-  if(!content) { toast('請先輸入訊息。'); return; }
   const g=groupPrototype;
-  if(!g.active||!g.active.members.length) { toast('群組狀態無效，請重新建立。'); return; }
-  g.turn++;
-  g.messages.push({type:'user',speaker:'你',content});
-  const count=g.active.members.length;
-  const index=(g.lastSpeaker+1)%count;
-  g.lastSpeaker=index;
-  const c=g.active.members[index];
-  const scene=g.active.scenes[g.active.mode==='shared'?0:index]||g.active.scenes[0];
-  const contentReply='聽見你的話，'+c.name+'回應：「我明白了。'+(c.style||c.intro||'我會仔細留意目前的情況。')+' 我們可以從「'+scene.name+'」開始，你接下來想怎麼做？」';
-  g.messages.push({type:'character',speaker:c.name+' · '+scene.name,content:contentReply});
-  render();
+  if(!content) {g.formError='請先輸入訊息。';render();return;}
+  if(!g.active?.id) {g.formError='群組尚未保存，請重新開啟群組。';render();return;}
+  if(!window.crypto?.randomUUID) {g.formError='此瀏覽器無法產生安全的回合識別碼，請更新瀏覽器後重試。';render();return;}
+  g.sending=true;g.formError='';render();
+  try {
+    const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
+    if(authError||!user||user.id!==currentUser()?.uid) throw new Error('登入狀態已失效，請重新登入。');
+    const {error}=await window.mySupabase.rpc('append_chat_group_mock_turn',{
+      p_group_id:g.active.id,p_request_key:window.crypto.randomUUID(),p_content:content
+    });
+    if(error) throw error;
+    g.sending=false;
+    await groupOpen(g.active.id);
+  } catch(error) {
+    g.sending=false;g.formError=error?.message||'訊息保存失敗，請重試。';render();
+  }
 }
-function groupRestart() {
-  groupPrototype={step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]},active:null,turn:0,messages:[],lastSpeaker:-1};
-  render();
-}
-
+async function groupRefreshList() { groupPrototype.groupsLoaded=false;await groupLoadList(true);if(route.page==='group'&&!groupPrototype.active)render(); }
+function groupList() { const g=groupPrototype;g.active=null;g.step=1;g.formError='';g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]};render(); }
+function groupRestart() { groupList(); }
 function renderConversation() {
   const s = currentSession();
   const c = sessionCharacter(s);
@@ -3474,6 +3560,9 @@ document.addEventListener('click',async event => {
       case 'home':go({page:'home'});break;
       case 'nav':visit(button.dataset.page);break;
       case 'group-next':groupNext();break;
+      case 'group-open':groupOpen(key);break;
+      case 'group-refresh-list':groupRefreshList();break;
+      case 'group-list':groupList();break;
       case 'group-back':groupBack();break;
       case 'group-toggle-character':groupToggleCharacter(key);break;
       case 'group-create':groupCreateMock();break;
