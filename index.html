@@ -3486,13 +3486,13 @@ document.addEventListener('click',async event => {
         }
         const previousMemories=clone(s.memories);
         const previousAlbum=clone(s.album);
-        if (type === 'test-chat-memory') {
+        if (action === 'test-chat-memory') {
           const text='[測試資料] PersonaX 回憶同步測試：新增、重新載入與跨裝置保存。';
           if (memorySize(s.memories)+countChars(text)>3000) {
             return toast('回憶容量不足，請先清除部分測試回憶。');
           }
           s.memories.push({id:id(),text,important:false,at:Date.now(),testData:true});
-        } else if (type === 'test-chat-photo') {
+        } else if (action === 'test-chat-photo') {
           const character=sessionCharacter(s);
           const url=safeImage(character?.image);
           if (!url) return toast('目前角色沒有可用的安全圖片網址，無法建立相簿測試項目。');
