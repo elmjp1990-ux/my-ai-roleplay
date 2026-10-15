@@ -91,6 +91,7 @@ The worker is a source-only draft and is safe only for the deterministic demo re
 - F12: A reserved turn's expected assistant row exists but has `deleted_at` set; the Edge Function detects the row without filtering soft-deleted messages, sets/keeps `needs_reconciliation`, and never invokes refund.
 - F13: A `needs_reconciliation` turn has a soft-deleted expected assistant reply; retry does not insert a replacement reply or refund the turn, and records `expected_reply_soft_deleted`.
 - F14: After a persistence error, the follow-up lookup finds a soft-deleted expected assistant row; the code fails closed and does not refund, even if the currently deployed refund RPC has not yet been hardened.
+- F15: A previously settled expected assistant reply is soft-deleted and the client retries after an ambiguous response; the Edge Function reports `status='settled'` with `replyHidden=true`, the frontend clears only the pending UI state, does not render hidden content, refreshes the wallet, and does not create a new turn or charge.
 
 ## Acceptance criteria
 
