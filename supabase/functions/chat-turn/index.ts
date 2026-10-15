@@ -225,17 +225,54 @@ Deno.serve(async (request) => {
       return json({ status: settled, assistantMessage: possibleReply, recovered: true });
     }
 
-    await admin.from("chat_turn_charges").update({
-      status: "needs_reconciliation",
-      failure_code: "assistant_persistence_failed",
-      updated_at: new Date().toISOString(),
-    }).eq("turn_id", turnId).eq("user_id", user.id).eq("status", "reserved");
+    // The refund RPC locks the charge row and rechecks durable reply presence.
+    // The SQL draft's BEFORE INSERT trigger takes the same row lock, preventing
+    // a late assistant insert from racing past a successful refund.
+    const { data: refunded, error: refundError } = await admin.rpc("refund_chat_turn", {
+      p_user_id: user.id,
+      p_turn_id: turnId,
+      p_assistant_message_id: assistantMessageId,
+      p_failure_code: "assistant_persistence_failed",
+    });
+
+    if (!refundError) {
+      const refundResult = Array.isArray(refunded) ? refunded[0] : refunded;
+      if (refundResult?.status === "refunded") {
+        await admin.from("chat_turn_events").insert({
+          turn_id: turnId, user_id: user.id, event_type: "refunded",
+          stage: "persistence", error_code: "assistant_persistence_failed",
+        });
+        return json({
+          status: "refunded",
+          balance: {
+            silver_coins: refundResult.balance_silver,
+            diamonds: refundResult.balance_diamonds,
+          },
+        }, 200);
+      }
+    }
+
+    // A concurrent insert may have won the charge-row lock. Re-read and settle
+    // only if the exact deterministic reply is now durable; otherwise keep the
+    // turn unresolved rather than refunding or claiming success.
+    const { data: finalReply, error: finalReplyError } = await admin
+      .from("chat_messages").select("id,content")
+      .eq("id", assistantMessageId).eq("session_id", sessionId)
+      .eq("role", "assistant").is("deleted_at", null).maybeSingle();
+
+    if (!finalReplyError && finalReply && String(finalReply.content || "").trim() === demoReply) {
+      const { data: finalSettlement, error: finalSettlementError } = await admin.rpc("settle_chat_turn", {
+        p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
+      });
+      if (!finalSettlementError) {
+        return json({ status: finalSettlement, assistantMessage: finalReply, recovered: true });
+      }
+    }
+
     await admin.from("chat_turn_events").insert({
       turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
-      stage: "persistence", error_code: "assistant_persistence_failed",
+      stage: "persistence", error_code: refundError ? "refund_or_reply_outcome_unknown" : "assistant_persistence_failed",
     });
-    // Do not refund on a point-in-time absence: a concurrent retry may still
-    // persist the same stable assistant ID. The same turn can safely retry.
     return json({ status: "needs_reconciliation", retryAllowed: true }, 503);
   }
 
