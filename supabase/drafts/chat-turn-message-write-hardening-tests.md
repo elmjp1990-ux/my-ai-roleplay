@@ -16,7 +16,7 @@ Run only against a disposable Supabase branch/project. Do not execute fixture wr
 |---|---|---|
 | P1 | Insert a `role='user'` message into own active session | Allowed |
 | P2 | Insert an `role='assistant'` message into own active session | Rejected by RLS |
-| P3 | Insert a `role='system'` message into own active session | Rejected by RLS |
+| P3 | Insert an `role='system'` message into own active session | Rejected by RLS |
 | P4 | Insert a user message into another user's session | Rejected by RLS |
 | P5 | Insert a user message into a soft-deleted session | Rejected by RLS |
 | P6 | Insert any message while account is inactive | Rejected by RLS |
@@ -39,8 +39,11 @@ Run only against a disposable Supabase branch/project. Do not execute fixture wr
 | U9 | Attempt to target another turn's expected assistant ID | Rejected; neither turn/message changes |
 | U10 | Two concurrent transactions attempt content edit and soft-delete | Protected content/identity cannot change; soft-delete may succeed |
 | U11 | Failed protected content edit with version trigger enabled | Transaction rollback leaves no new `chat_message_versions` row |
+| U12 | Change message A's ID to the expected assistant ID of charged turn B while A belongs to charged turn A | Rejected as cross-turn conflict; both charge rows and messages remain unchanged |
 
 The existing `chat_messages_save_version_before_update` trigger runs on `UPDATE OF content`. Verify PostgreSQL trigger order and confirm that if it fires before the guard, the guard exception rolls back the version insert as part of the same statement.
+
+The UPDATE guard must lock and inspect the old and new expected-assistant IDs independently. A query that combines them with `OR ... ORDER BY ... LIMIT 1` can miss a cross-turn ID swap when two charge rows match.
 
 ## Frontend sync regression tests
 
@@ -52,7 +55,6 @@ The existing `chat_messages_save_version_before_update` trigger runs on `UPDATE 
 - F6: When an opening assistant row already exists, reload does not duplicate it.
 - F7: Editing a user message remains free and persists normally.
 - F8: A failed user-message sync aborts before invoking `chat-turn`, so no wallet reservation occurs.
-
 - F9: The Edge Function returns `status='settled'` but an assistant message ID different from the pending turn's expected ID; the UI does not render it or clear the pending turn.
 - F10: The Edge Function returns a non-assistant role or empty content; the UI does not render it or clear the pending turn.
 
