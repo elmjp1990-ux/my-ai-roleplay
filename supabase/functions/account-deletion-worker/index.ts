@@ -71,17 +71,23 @@ Deno.serve(async (request) => {
 
       if (!userData?.user) throw new Error("auth_lookup_empty");
 
-      // This transaction verifies/reuses the archive, marks the batch deleting,
-      // and removes non-cascading references. It does not delete auth.users.
-      const { data: prepared, error: prepareError } = await admin.rpc("prepare_account_deletion", {
-        p_user_id: userId,
-      });
-      if (prepareError) throw new Error("prepare_deletion_failed");
-      const preparedRow = Array.isArray(prepared) ? prepared[0] : prepared;
-      if (!preparedRow?.batch_id || preparedRow?.batch_status !== "deleting") {
-        throw new Error("deletion_state_not_confirmed");
+      if (item?.work_status === "deleting") {
+        // A committed deleting batch means the SQL cleanup transaction already finished.
+        // This also recovers if its request row was removed before the worker retried.
+        if (!batchId) throw new Error("deleting_batch_id_missing");
+      } else {
+        // This transaction verifies/reuses the archive, marks the batch deleting,
+        // and removes non-cascading references. It does not delete auth.users.
+        const { data: prepared, error: prepareError } = await admin.rpc("prepare_account_deletion", {
+          p_user_id: userId,
+        });
+        if (prepareError) throw new Error("prepare_deletion_failed");
+        const preparedRow = Array.isArray(prepared) ? prepared[0] : prepared;
+        if (!preparedRow?.batch_id || preparedRow?.batch_status !== "deleting") {
+          throw new Error("deletion_state_not_confirmed");
+        }
+        batchId = preparedRow.batch_id;
       }
-      batchId = preparedRow.batch_id;
 
       const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
       if (deleteError) {
