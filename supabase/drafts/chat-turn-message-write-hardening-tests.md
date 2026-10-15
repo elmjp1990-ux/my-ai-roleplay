@@ -95,3 +95,25 @@ The worker is a source-only draft and is safe only for the deterministic demo re
 - Client cannot create arbitrary assistant messages or mutate a charged assistant reply.
 - Failed UPDATE does not leave a message-version side effect.
 - No production policy/function/trigger changes until isolated results and rollback SQL are reviewed and explicitly approved.
+
+
+## Wallet state-transition and idempotency tests
+
+| Case | Concurrent/repeated operation | Expected result |
+|---|---|---|
+| W1 | Submit the exact same reserve request twice with the same turn/user/session/message IDs | One charge row and one debit per currency; both callers observe the same reservation state and reserved split |
+| W2 | Reuse a turn ID with a different user, session, user-message ID, or expected assistant ID | Reject with `turn_id_reuse_conflict`; do not debit or mutate the original charge |
+| W3 | Two different turn IDs reserve concurrently against one wallet with exactly 2 total points | Wallet row lock serializes reservations; at most one turn reserves successfully, and balances never become negative |
+| W4 | Reserve with 0 or 1 total point and retry the same turn ID after a later top-up | The original turn remains `insufficient_funds`; no charge occurs for that ID. A new intentional send must use a new turn ID |
+| W5 | Call settlement twice for the same settled turn and same assistant ID | Both calls return settled; no additional wallet transaction or debit is created |
+| W6 | Attempt settlement with a different assistant ID or with an empty/missing/soft-deleted expected reply | Reject; charge is not marked settled |
+| W7 | Race settlement and refund for the same reserved turn | Charge-row lock serializes outcomes; exactly one terminal state wins, never both settled and refunded, and the wallet is changed at most once |
+| W8 | Call refund repeatedly after a successful refund | Status remains refunded; no second refund transaction and no second balance credit |
+| W9 | Attempt refund after settlement, or settlement after refund | Reject the incompatible transition without changing the wallet or transaction ledger |
+| W10 | Force a wallet-transaction unique-index conflict during reserve/refund | The whole database transaction rolls back; no partial balance mutation or terminal status update remains |
+| W11 | Lose the HTTP response after reserve committed, then retry with identical IDs | The retry discovers the existing charge and must not debit again; client keeps the same IDs until it receives a definitive state |
+| W12 | Lose the HTTP response after settlement committed, then retry with identical IDs | The retry recovers the exact saved assistant reply and settled state; no second reply or debit is created |
+| W13 | Simulate an exception after wallet balance update but before charge status/event insert | The SQL transaction rolls back the balance and ledger writes together; no partial reservation/refund survives |
+| W14 | Inspect direct execution grants for reserve/settle/refund RPCs and the internal trigger functions | `anon`, `authenticated`, and `PUBLIC` cannot execute privileged RPCs; only the trusted server role has the required execute grant |
+
+These are required database integration tests, not assertions that have already passed. Use separate database sessions for concurrency cases and verify charge rows, wallet balances, and wallet_transactions after both sessions complete.
