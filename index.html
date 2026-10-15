@@ -1950,6 +1950,17 @@ async function runPendingChatTurn(s) {
     return;
   }
 
+  // A settled reply can have been soft-deleted after successful delivery.
+  // Resolve the pending UI state without rendering hidden content or charging again.
+  if (result.replyHidden === true) {
+    delete s.pendingTurn;
+    persist();
+    renderMessages();
+    await refreshWalletBalance();
+    toast('這回合已扣款完成，但回覆已被隱藏；不會再次扣款。');
+    return;
+  }
+
   const reply = result.assistantMessage;
   if (
     !reply?.id ||
