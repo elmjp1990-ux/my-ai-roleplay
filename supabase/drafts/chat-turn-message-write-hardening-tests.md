@@ -53,6 +53,9 @@ The existing `chat_messages_save_version_before_update` trigger runs on `UPDATE 
 - F7: Editing a user message remains free and persists normally.
 - F8: A failed user-message sync aborts before invoking `chat-turn`, so no wallet reservation occurs.
 
+- F9: The Edge Function returns `status='settled'` but an assistant message ID different from the pending turn's expected ID; the UI does not render it or clear the pending turn.
+- F10: The Edge Function returns a non-assistant role or empty content; the UI does not render it or clear the pending turn.
+
 ## Acceptance criteria
 
 - All tests pass in isolation, including an authenticated client and service-role request.
