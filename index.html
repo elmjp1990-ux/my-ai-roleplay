@@ -1969,6 +1969,18 @@ async function runPendingChatTurn(s) {
     toast('扣款狀態已回報成功，但回覆資料尚待確認；請勿重複發送。');
     return;
   }
+  // A settled response must belong to the exact assistant message reserved for
+  // this pending turn. Never attach an unrelated reply to the current chat.
+  if (reply.id !== turn.assistantMessageId) {
+    persist();
+    console.error('聊天回覆 ID 與待處理回合不一致，已保留回合供查核。', {
+      expected:turn.assistantMessageId,
+      received:reply.id,
+      sessionId:s.id
+    });
+    toast('回覆識別資料不一致，已保留本回合狀態；請勿重複發送，稍後再試或回報問題。');
+    return;
+  }
 
   if (!s.messages.some(message => message.id === reply.id)) {
     s.messages.push({
