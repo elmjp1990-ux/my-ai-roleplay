@@ -133,12 +133,21 @@ Deno.serve(async (request) => {
     }, 402);
   }
   if (charge.status === "settled") {
+    // Inspect hidden rows too: a settled, soft-deleted reply is not missing and
+    // must not leave the browser's pending turn stuck or trigger another charge.
     const { data: savedReply, error: savedReplyError } = await admin
-      .from("chat_messages").select("id,content,role")
+      .from("chat_messages").select("id,content,role,deleted_at")
       .eq("id", assistantMessageId).eq("session_id", sessionId)
-      .eq("role", "assistant").is("deleted_at", null).maybeSingle();
+      .eq("role", "assistant").maybeSingle();
     if (savedReplyError || !savedReply) return json({ error: "settled_reply_lookup_failed" }, 503);
-    return json({ status: "settled", assistantMessage: savedReply, idempotent: true });
+    if (savedReply.deleted_at !== null) {
+      return json({ status: "settled", replyHidden: true, idempotent: true });
+    }
+    return json({
+      status: "settled",
+      assistantMessage: { id: savedReply.id, content: savedReply.content, role: savedReply.role },
+      idempotent: true,
+    });
   }
   if (charge.status === "refunded") return json({ error: "turn_already_refunded" }, 409);
   if (charge.status === "needs_reconciliation") {
