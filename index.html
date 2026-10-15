@@ -152,6 +152,56 @@ body.day .tag { color:#4f46b8; }
 }
 .avatar-fallback { display:grid; place-items:center; color:#ddd6fe; font-weight:bold; }
 .ellipsis { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.character-avatar-status {
+  position:relative;
+  display:inline-flex;
+  flex:0 0 auto;
+  line-height:0;
+}
+.character-avatar-status .avatar {
+  display:block;
+}
+.character-avatar-status.is-offline .avatar,
+.detail-image.character-offline-image {
+  filter:grayscale(1);
+  opacity:.68;
+}
+.character-status-dot {
+  position:absolute;
+  right:-1px;
+  bottom:-1px;
+  width:11px;
+  height:11px;
+  border:2px solid var(--panel);
+  border-radius:50%;
+  background:#22c55e;
+  box-shadow:0 0 0 1px #0003;
+}
+.character-avatar-status.is-offline .character-status-dot {
+  background:#8993a4;
+}
+.character-status-label {
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  width:max-content;
+  max-width:100%;
+  color:var(--muted);
+  font-size:12px;
+}
+.character-status-label .character-status-dot {
+  position:static;
+  display:inline-block;
+  flex:0 0 auto;
+}
+.character-status-banner {
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:11px 13px;
+  color:var(--muted);
+  background:var(--panel2);
+  line-height:1.6;
+}
 
 /* Logo / navigation */
 .logo-img { width:132px; height:29px; object-fit:contain; }
@@ -455,7 +505,8 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 #toast {
   position:fixed;
   left:50%;
-  bottom:25px;
+  top:max(18px, env(safe-area-inset-top));
+  bottom:auto;
   transform:translateX(-50%);
   background:var(--text);
   color:var(--bg);
@@ -528,8 +579,11 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .chat-tools { margin-top:4px; }
   .message-content { max-width:80%; }
   .comment.reply { margin-left:12px; }
-  #toast { bottom:90px; }
-  body.conversation #toast { bottom:18px; }
+  #toast {
+    top:max(18px, env(safe-area-inset-top));
+    bottom:auto;
+    max-width:calc(100vw - 24px);
+  }
 }
 @media(prefers-reduced-motion:reduce) {
   * { scroll-behavior:auto!important; transition:none!important; }
@@ -1811,7 +1865,7 @@ function visit(page,idValue) {
 function renderShell() {
   const navPage = route.page === 'conversation' ? 'chat'
     : ['editor','ai'].includes(route.page) ? 'create'
-    : route.page === 'detail' ? 'home' : route.page;
+    : ['detail','session-detail'].includes(route.page) ? 'home' : route.page;
   const labels = [
     ['home','探索角色'],['chat','開始暢聊'],['create','創建角色'],
     ['notifications','系統通知'],['favorites','喜愛角色']
@@ -1828,7 +1882,8 @@ function renderShell() {
     home:'探索角色',chat:'開始暢聊',conversation:'開始暢聊',
     create:'創建角色',editor:'編輯角色',ai:'AI 創建',
     notifications:'系統通知',favorites:'喜愛角色',
-    profile:'個人帳號',author:'作者主頁',detail:'角色介紹'
+    profile:'個人帳號',author:'作者主頁',detail:'角色介紹',
+    'session-detail':'角色介紹'
   };
   $('pageTitle').textContent = titles[route.page] || 'PersonaX';
   $('accountArea').innerHTML = environment() + wallet();
@@ -1874,6 +1929,7 @@ function render() {
   switch(route.page) {
     case 'home':renderHome();break;
     case 'detail':renderDetail();break;
+    case 'session-detail':renderDetail();break;
     case 'author':renderAuthor();break;
     case 'chat':renderChatListPage();break;
     case 'conversation':renderConversation();break;
@@ -2043,18 +2099,26 @@ function accessible(c) {
   return !!c && !c.deletedAt && (c.visibility === 'public' ||
     currentUser()?.uid === c.authorId);
 }
+function characterIsOffline(c) {
+  return !c || !!c.deletedAt || c.visibility !== 'public';
+}
 function renderDetail() {
-  const c = currentCharacter();
-  if (!accessible(c)) {
+  const session = route.page === 'session-detail' ? state.sessions[route.id] : null;
+  const c = session ? sessionCharacter(session) : currentCharacter();
+  const fromExistingSession = !!session && !!c &&
+    canAccessSessionCharacter(session,c);
+  if (!c || (!fromExistingSession && !accessible(c))) {
     $('view').innerHTML = '<div class="empty">此角色已被修改為私密或已被刪除。</div>';
     return;
   }
+  const offline = characterIsOffline(c);
   const a = author(c.authorId);
   $('view').innerHTML = `
     <div class="stack">
       <button class="ghost" data-action="back">← 返回上一頁</button>
+      ${offline ? '<div class="character-status-banner">● 此角色目前離線或已下架。你仍可查看這段既有聊天所保留的角色簡介與開場白，但不能開啟新對話。</div>' : ''}
       <div class="detail-layout">
-        <img class="detail-image" src="${e(safeImage(c.image))}" alt="${e(c.name)}">
+        <img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" alt="${e(c.name)}">
         <section class="panel stack">
           <h1>${e(c.name)}</h1>
           <button class="author-link" data-action="author" data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>
@@ -2064,15 +2128,17 @@ function renderDetail() {
           <div><h3>角色介紹</h3><div class="prose">${e(c.intro)}</div></div>
           <div class="row wrap">${(c.tags || []).map(tagButton).join('')}</div>
           <div><h3>開場白</h3><div class="prose muted">${e(c.opening)}</div></div>
-          <div class="row wrap">
-            <button class="primary" data-action="start-chat" data-id="${e(c.id)}">開始聊天</button>
-            <button data-action="share" data-kind="detail" data-id="${e(c.id)}">↗ 分享</button>
-            <button data-action="favorite" data-id="${e(c.id)}">${state.favorites.includes(c.id) ? '♥ 已喜愛' : '♡ 喜愛'}</button>
-            <button data-action="report" data-kind="角色" data-id="${e(c.id)}">⚑ 檢舉</button>
-          </div>
+          ${offline
+            ? '<div class="character-status-label"><span class="character-status-dot" style="position:static;background:#8993a4"></span>離線／已下架</div>'
+            : `<div class="row wrap">
+                <button class="primary" data-action="start-chat" data-id="${e(c.id)}">開始聊天</button>
+                <button data-action="share" data-kind="detail" data-id="${e(c.id)}">↗ 分享</button>
+                <button data-action="favorite" data-id="${e(c.id)}">${state.favorites.includes(c.id) ? '♥ 已喜愛' : '♡ 喜愛'}</button>
+                <button data-action="report" data-kind="角色" data-id="${e(c.id)}">⚑ 檢舉</button>
+              </div>`}
         </section>
       </div>
-      <section class="panel">
+      ${offline ? '' : `<section class="panel">
         <h2>評論</h2>
         <div id="comments"></div>
         <div id="replyHint" class="small muted" style="margin-top:15px"></div>
@@ -2083,9 +2149,9 @@ function renderDetail() {
             <button class="primary">送出</button>
           </div>
         </form>
-      </section>
+      </section>`}
     </div>`;
-  renderComments();
+  if (!offline) renderComments();
 }
 function renderComments() {
   if (!$('comments')) return;
@@ -2363,8 +2429,12 @@ function chatEntries() {
     return `<div class="chat-entry ${route.id === s.id ? 'active' : ''}">
       <button class="pin ${s.pinned ? 'on' : ''}" data-action="pin"
               data-id="${e(s.id)}" aria-label="切換置頂">${ICON.pin}</button>
-      <button class="ghost" style="padding:0" data-action="detail" data-id="${e(c.id)}">
-        <img class="avatar" src="${e(safeImage(c.image))}" alt="${e(c.name)}">
+      <button class="ghost" style="padding:0" data-action="session-detail" data-id="${e(s.id)}"
+              aria-label="查看${e(c.name)}角色簡介">
+        <span class="character-avatar-status ${characterIsOffline(c) ? 'is-offline' : ''}">
+          <img class="avatar" src="${e(safeImage(c.image))}" alt="${e(c.name)}">
+          <span class="character-status-dot" title="${characterIsOffline(c) ? '角色離線／已下架' : '角色公開中'}"></span>
+        </span>
       </button>
       <button class="select-chat" data-action="select-chat" data-id="${e(s.id)}">
         <div class="row between"><strong class="ellipsis">${e(s.name || c.name)}</strong>
@@ -2425,10 +2495,18 @@ function renderConversation() {
           <div class="row between">
             <div class="row grow" style="gap:6px">
               <button class="ghost" data-action="chat-back" aria-label="返回或切換角色列表">${ICON.back}</button>
-              <button class="ghost" data-action="detail" data-id="${e(c.id)}" style="padding:0">
-                <img class="avatar" src="${e(safeImage(c.image))}" alt="">
+              <button class="ghost" data-action="session-detail" data-id="${e(s.id)}" style="padding:0"
+                      aria-label="查看角色簡介">
+                <span class="character-avatar-status ${characterIsOffline(c) ? 'is-offline' : ''}">
+                  <img class="avatar" src="${e(safeImage(c.image))}" alt="">
+                  <span class="character-status-dot" title="${characterIsOffline(c) ? '角色離線／已下架' : '角色公開中'}"></span>
+                </span>
               </button>
               <span class="chat-name ellipsis">${e(s.name || c.name)}</span>
+              <span class="character-status-label" title="${characterIsOffline(c) ? '角色離線或已下架' : '角色公開中'}">
+                <span class="character-status-dot" style="position:static"></span>
+                ${characterIsOffline(c) ? '離線／已下架' : '公開中'}
+              </span>
             </div>
             <div class="row" style="gap:1px">
               <button class="ghost" data-action="chat-overlay" data-kind="album" aria-label="回憶相簿">${ICON.album}</button>
@@ -2994,6 +3072,16 @@ document.addEventListener('click',async event => {
         break;
       }
       case 'detail':visit('detail',key);break;
+      case 'session-detail': {
+        const item=state.sessions[key];
+        const character=sessionCharacter(item);
+        if (!item || !character || !canAccessSessionCharacter(item,character)) {
+          toast('找不到這段聊天的角色簡介。');
+          break;
+        }
+        go({page:'session-detail',id:key});
+        break;
+      }
       case 'author':visit('author',key);break;
       case 'start-chat':startChat(key);break;
       case 'favorite': {
