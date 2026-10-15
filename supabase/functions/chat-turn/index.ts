@@ -72,13 +72,30 @@ Deno.serve(async (request) => {
 
   const { data: session, error: sessionError } = await admin
     .from("chat_sessions")
-    .select("id,user_id,deleted_at")
+    .select("id,user_id,deleted_at,character_id,character_snapshot")
     .eq("id", sessionId)
     .eq("user_id", user.id)
     .is("deleted_at", null)
     .maybeSingle();
   if (sessionError) return json({ error: "session_lookup_failed" }, 503);
   if (!session) return json({ error: "chat_session_not_owned_or_active" }, 403);
+
+  // Validate the session's role identity before reserving or settling any charge.
+  // Existing chats with retired characters remain usable; this only rejects
+  // missing/mismatched identity metadata that could attach a turn to the wrong role.
+  if (!isUuid(session.character_id)) {
+    return json({ error: "chat_session_character_id_invalid", retryAllowed: false }, 409);
+  }
+  const characterSnapshot = session.character_snapshot;
+  if (
+    characterSnapshot &&
+    typeof characterSnapshot === "object" &&
+    !Array.isArray(characterSnapshot) &&
+    characterSnapshot.id &&
+    characterSnapshot.id !== session.character_id
+  ) {
+    return json({ error: "chat_session_character_snapshot_mismatch", retryAllowed: false }, 409);
+  }
 
   const { data: userMessage, error: messageError } = await admin
     .from("chat_messages")
