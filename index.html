@@ -1722,6 +1722,8 @@ async function loadCloudChatSessions(user) {
       const profileResult = await client.from('profiles')
         .select('id, handle, nickname, avatar_url, bio')
         .in('id', snapshotAuthorIds);
+      // 帳號可能在 profiles 查詢等待期間切換；舊帳號請求不得再寫入目前畫面狀態。
+      if (state.account?.uid !== user.id) return;
       if (profileResult.error) {
         console.warn('既有聊天作者資料載入失敗：', profileResult.error.message);
       } else {
