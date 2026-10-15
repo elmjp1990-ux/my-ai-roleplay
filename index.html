@@ -1954,7 +1954,7 @@ async function runPendingChatTurn(s) {
   if (
     !reply?.id ||
     reply.id !== turn.assistantMessageId ||
-    (reply.role && reply.role !== 'assistant') ||
+    reply.role !== 'assistant' ||
     !String(reply.content || '').trim()
   ) {
     // A settled status is not enough to render an arbitrary response. Keep the
