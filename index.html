@@ -1031,6 +1031,24 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         privateInfoByCharacterId = new Map((privateResult.data || []).map(item => [item.character_id, item.private_info || '']));
       }
       const localOwnedForMerge = state.characters.filter(c => c.authorId === user.id);
+      // 若角色主資料已同步、私密設定列卻不存在，保留本機設定並嘗試補同步。
+      // 使用 Map.has() 區分「資料列不存在」與「資料列存在但內容為空」。
+      for (const local of localOwnedForMerge) {
+        if (!ids.includes(local.id) || privateInfoByCharacterId.has(local.id)) continue;
+        const localPrivateInfo = String(local.privateInfo || '');
+        privateInfoByCharacterId.set(local.id, localPrivateInfo);
+        if (!localPrivateInfo) continue;
+        const { error: repairPrivateInfoError } = await client
+          .from('character_private_info')
+          .upsert({
+            character_id: local.id,
+            author_id: user.id,
+            private_info: localPrivateInfo
+          }, { onConflict: 'character_id' });
+        if (repairPrivateInfoError) {
+          console.warn('角色私密設定補同步失敗，已保留本機內容：', local.name, repairPrivateInfoError.message);
+        }
+      }
       const cloudCharacters = (rows || []).filter(row => !row.deleted_at).map(row => {
         const local = localOwnedForMerge.find(c => c.id === row.id) || {};
         const story = latestStory.get(row.id);
