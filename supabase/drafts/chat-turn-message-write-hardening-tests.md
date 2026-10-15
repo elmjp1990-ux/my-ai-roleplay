@@ -46,6 +46,7 @@ Run only against a disposable Supabase branch/project. Do not execute fixture wr
 | U12 | Change message A's ID to the expected assistant ID of charged turn B while A belongs to charged turn A | Rejected as cross-turn conflict; both charge rows and messages remain unchanged |
 | U13 | Run simultaneous opposite-direction ID swaps between two charged assistant messages | Both swaps rejected; charge rows are locked in deterministic expected-message-ID order, and neither transaction changes message/charge data |
 | U18 | Change the content, ID, or session of a legacy assistant row that has no charge-ledger row | Rejected; legacy assistant content/identity is immutable, while a `deleted_at`-only cleanup may proceed |
+| U19 | A reserved turn's expected assistant ID is occupied by a same-session row with a non-assistant role, empty content, or soft-deleted state; attempt refund | Refund is rejected as an integrity conflict; balance and charge state remain unchanged for manual reconciliation |
 
 The existing `chat_messages_save_version_before_update` trigger runs on `UPDATE OF content`. Verify PostgreSQL trigger order and confirm that if it fires before the guard, the guard exception rolls back the version insert as part of the same statement. The guard also makes legacy assistant rows without charge-ledger entries immutable for content and identity, preventing old rows from becoming an UPDATE bypass; only a `deleted_at`-only cleanup may proceed.
 
