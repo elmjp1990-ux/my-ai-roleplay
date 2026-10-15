@@ -3736,7 +3736,7 @@ document.addEventListener('submit',async event => {
       case 'delete-account': {
         if (String(f.get('confirm')).trim() !== 'DELETE') return toast('請輸入「DELETE」。');
         if (!state.account?.uid || !window.mySupabase) return toast('請先使用 Google 帳號登入。');
-        if (!confirm('確定提出帳號刪除申請？申請後會暫停使用功能，30 天內仍可取消。')) return;
+        if (!confirm('確定提出帳號刪除申請？申請後會暫停使用功能，實際取消期限以系統顯示的預定刪除時間為準。')) return;
         const { data: authData, error: authError } = await window.mySupabase.auth.getUser();
         if (authError || authData?.user?.id !== state.account.uid) {
           return toast('登入狀態驗證失敗，請重新登入後再試。');
