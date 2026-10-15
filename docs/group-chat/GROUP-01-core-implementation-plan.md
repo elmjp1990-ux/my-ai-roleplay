@@ -1,6 +1,6 @@
 # Group Chat Core — Implementation Plan
 
-Status: staged implementation. The frontend wizard/mock director is integrated in `index.html`; the core schema and `create_chat_group` RPC are applied to the test Supabase project under migration `20261015141259_group_chat_core_schema`. A valid shared-scene RPC call and malformed-input rejection checks passed inside rolled-back transactions. Browser integration, separate-scene end-to-end tests, cross-user RLS tests, and persistent message writes remain incomplete.
+Status: staged implementation. The frontend wizard now uses Supabase for group listing, creation, and persisted deterministic mock turns. Test database migrations `20261015141259_group_chat_core_schema`, `20261015141609_group_chat_mock_turns`, and `20261015141936_group_chat_group_activity` are applied. Shared-scene creation, malformed-input rejection, turn persistence/idempotency, non-owner isolation, and invalid scene-position rejection passed in rolled-back database tests. Browser interaction and full separate-scene end-to-end tests remain incomplete.
 AI provider integration is intentionally out of scope for the initial build. Complete deterministic/mock orchestration, persistence, permissions, and wallet boundaries before connecting AI.
 
 ## Goals
@@ -62,8 +62,8 @@ Validation: speaker IDs must be group members, no duplicate speaker in a single 
 1. Read existing chat-session/message persistence, character snapshots, RLS, and wallet code; document integration points.
 2. Add group-domain types and pure validators (1–3 members, scene-mode validation, director output validation).
 3. Build the three-step creation UI with mock data and local/test persistence; add accessible loading, validation, and error states.
-4. Add group list/detail/chat shell and deterministic mock director.
-5. Add migrations and RLS policies only after existing schema conventions are verified; test owner/non-owner/anon cases.
+4. Add group list/detail/chat shell and deterministic mock director. (Implemented in the test branch; browser regression still required.)
+5. Add migrations and RLS policies after checking the live schema; applied to the test Supabase project. Owner creation, anon function denial, and non-owner read/write isolation have smoke-test coverage; broaden tests before release.
 6. Integrate the existing wallet service in test mode with idempotency and failure rollback tests.
 7. Add three-character acceptance tests for context boundaries, speaker ordering, scenes, permissions, and charging.
 8. Only after the above pass, connect the AI provider and run end-to-end tests.
@@ -85,4 +85,4 @@ Validation: speaker IDs must be group members, no duplicate speaker in a single 
 
 ## Current scope and exclusions
 
-This plan remains the acceptance contract. The schema has been applied only to the connected test Supabase project; no AI calls or wallet charges were enabled. Database smoke tests were run in transactions and rolled back. Do not treat the UI as database-integrated yet: it still uses local in-memory mock state.
+This plan remains the acceptance contract. The schema and deterministic mock-turn RPCs are applied only to the connected test Supabase project; no AI calls or wallet charges were enabled. Database smoke tests were run in transactions and rolled back. The UI now reads and writes group data through Supabase, but still requires browser-level end-to-end verification.
