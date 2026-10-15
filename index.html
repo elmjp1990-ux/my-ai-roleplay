@@ -1821,6 +1821,16 @@ async function refreshWalletBalance() {
   renderShell();
 }
 
+async function clearCloudPendingTurn(s) {
+  const user = currentUser();
+  const client = window.mySupabase;
+  if (!s || !user || !client || !s.cloudOwned || s.cloudOwnerUid !== user.uid) return;
+  const { error } = await client.from('chat_sessions')
+    .update({session_data:chatSessionData(s),updated_at:new Date().toISOString()})
+    .eq('id',s.id).eq('user_id',user.uid);
+  if (error) console.warn('清除雲端待處理回合標記失敗：',error.message);
+}
+
 async function runPendingChatTurn(s) {
   const turn = s?.pendingTurn;
   const user = currentUser();
@@ -1855,18 +1865,39 @@ async function runPendingChatTurn(s) {
     persist();
     renderMessages();
     await saveChatSessionSafely(s);
+    await clearCloudPendingTurn(s);
     await refreshWalletBalance();
     openModal('wallet-insufficient');
     return;
   }
 
-  if (result?.status === 'refunded' || result?.error === 'assistant_persistence_failed') {
+  if (
+    result?.status === 'refunded' ||
+    result?.error === 'assistant_persistence_failed' ||
+    result?.error === 'turn_already_refunded'
+  ) {
     delete s.pendingTurn;
     persist();
     renderMessages();
     await saveChatSessionSafely(s);
+    await clearCloudPendingTurn(s);
     await refreshWalletBalance();
     toast('這次回覆未能保存，系統已退回本回合預扣的銀幣／鑽石。');
+    return;
+  }
+
+  if (
+    result?.error === 'user_message_not_found' ||
+    result?.error === 'chat_session_not_owned_or_active' ||
+    result?.error === 'account_not_active' ||
+    result?.error === 'wallet_not_ready'
+  ) {
+    s.messages = s.messages.filter(message => message.id !== turn.userMessageId);
+    delete s.pendingTurn;
+    persist();
+    await clearCloudPendingTurn(s);
+    renderMessages();
+    toast('這則訊息尚未進入扣款流程，請重新輸入後再送出。');
     return;
   }
 
@@ -3818,6 +3849,7 @@ document.addEventListener('submit',async event => {
           s.memories = previousMemories;
           delete s.pendingTurn;
           persist();
+          await clearCloudPendingTurn(s);
           renderMessages();
           toast('訊息尚未保存到雲端，本次沒有扣款；請確認網路後再試。');
           break;
