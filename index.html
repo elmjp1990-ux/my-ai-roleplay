@@ -3275,8 +3275,22 @@ document.addEventListener('click',async event => {
       case 'pin': {
         const item = state.sessions[key];
         if (!item) break;
-        captureDraft();item.pinned=!item.pinned;
-        persist();render();break;
+        const previousPinned=!!item.pinned;
+        captureDraft();item.pinned=!previousPinned;
+        if (!persist()) {
+          item.pinned=previousPinned;
+          break;
+        }
+        if (item.cloudOwned && currentUser()?.uid===item.cloudOwnerUid && hasUserMessage(item)) {
+          const synced=await saveChatSessionSafely(item);
+          if (!synced) {
+            item.pinned=previousPinned;
+            persist();render();
+            toast('聊天置頂同步失敗，已還原原設定。');
+            break;
+          }
+        }
+        render();break;
       }
       case 'chat-back':
         if (isMobile()) back();
