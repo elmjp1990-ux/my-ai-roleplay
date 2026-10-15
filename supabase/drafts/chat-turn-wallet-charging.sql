@@ -10,6 +10,7 @@ create table if not exists public.chat_turn_charges (
   user_id uuid not null references auth.users(id) on delete cascade,
   session_id uuid not null references public.chat_sessions(id) on delete cascade,
   user_message_id uuid not null references public.chat_messages(id) on delete restrict,
+  expected_assistant_message_id uuid not null,
   assistant_message_id uuid references public.chat_messages(id) on delete set null,
   cost integer not null default 2 check (cost = 2),
   silver_reserved integer not null default 0 check (silver_reserved >= 0),
@@ -60,7 +61,8 @@ create or replace function public.reserve_chat_turn(
   p_user_id uuid,
   p_turn_id uuid,
   p_session_id uuid,
-  p_user_message_id uuid
+  p_user_message_id uuid,
+  p_assistant_message_id uuid
 )
 returns table(turn_id uuid, status text, silver_reserved integer, diamonds_reserved integer, balance_silver integer, balance_diamonds integer)
 language plpgsql
@@ -73,7 +75,7 @@ declare
   v_silver integer;
   v_diamonds integer;
 begin
-  if p_user_id is null or p_turn_id is null or p_session_id is null or p_user_message_id is null then
+  if p_user_id is null or p_turn_id is null or p_session_id is null or p_user_message_id is null or p_assistant_message_id is null then
     raise exception 'invalid_turn_request';
   end if;
 
@@ -92,8 +94,8 @@ begin
       and m.role = 'user' and m.deleted_at is null
   ) then raise exception 'user_message_not_found'; end if;
 
-  insert into public.chat_turn_charges(turn_id,user_id,session_id,user_message_id,cost,status)
-  values (p_turn_id,p_user_id,p_session_id,p_user_message_id,2,'created')
+  insert into public.chat_turn_charges(turn_id,user_id,session_id,user_message_id,expected_assistant_message_id,cost,status)
+  values (p_turn_id,p_user_id,p_session_id,p_user_message_id,p_assistant_message_id,2,'created')
   on conflict (turn_id) do nothing;
 
   select c.* into v_charge
@@ -103,7 +105,8 @@ begin
 
   if v_charge.user_id <> p_user_id
      or v_charge.session_id <> p_session_id
-     or v_charge.user_message_id <> p_user_message_id then
+     or v_charge.user_message_id <> p_user_message_id
+     or v_charge.expected_assistant_message_id <> p_assistant_message_id then
     raise exception 'turn_id_reuse_conflict';
   end if;
 
@@ -181,6 +184,9 @@ begin
   select c.* into v_charge from public.chat_turn_charges c
   where c.turn_id=p_turn_id for update;
   if not found or v_charge.user_id <> p_user_id then raise exception 'turn_not_found'; end if;
+  if v_charge.expected_assistant_message_id is distinct from p_assistant_message_id then
+    raise exception 'turn_assistant_id_conflict';
+  end if;
   if v_charge.status = 'settled' then
     if v_charge.assistant_message_id is distinct from p_assistant_message_id then
       raise exception 'settled_turn_reply_id_conflict';
@@ -224,6 +230,9 @@ begin
   select c.* into v_charge from public.chat_turn_charges c
   where c.turn_id=p_turn_id for update;
   if not found or v_charge.user_id <> p_user_id then raise exception 'turn_not_found'; end if;
+  if v_charge.expected_assistant_message_id is distinct from p_assistant_message_id then
+    raise exception 'turn_assistant_id_conflict';
+  end if;
   if v_charge.status = 'refunded' then
     select w.silver_coins,w.diamonds into v_wallet.silver_coins,v_wallet.diamonds
       from public.wallet_accounts w where w.user_id=p_user_id;
@@ -270,10 +279,10 @@ begin
 end;
 $function$;
 
-revoke all on function public.reserve_chat_turn(uuid,uuid,uuid,uuid) from public, anon, authenticated;
+revoke all on function public.reserve_chat_turn(uuid,uuid,uuid,uuid,uuid) from public, anon, authenticated;
 revoke all on function public.settle_chat_turn(uuid,uuid,uuid) from public, anon, authenticated;
 revoke all on function public.refund_chat_turn(uuid,uuid,uuid,text) from public, anon, authenticated;
-grant execute on function public.reserve_chat_turn(uuid,uuid,uuid,uuid) to service_role;
+grant execute on function public.reserve_chat_turn(uuid,uuid,uuid,uuid,uuid) to service_role;
 grant execute on function public.settle_chat_turn(uuid,uuid,uuid) to service_role;
 grant execute on function public.refund_chat_turn(uuid,uuid,uuid,text) to service_role;
 
