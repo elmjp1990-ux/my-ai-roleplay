@@ -3703,6 +3703,7 @@ document.addEventListener('submit',async event => {
       case 'memory': {
         const m=s?.memories.find(m=>m.id===o.id);
         if (!m || m.important) return;
+        const previousMemories=clone(s.memories);
         if (!text) {
           if (!confirm('內容為空，確定刪除此記憶？')) return;
           s.memories=s.memories.filter(m=>m.id!==o.id);
@@ -3712,7 +3713,21 @@ document.addEventListener('submit',async event => {
           }
           m.text=text;
         }
-        persist();back();break;
+        if (!persist()) {
+          s.memories=previousMemories;
+          return;
+        }
+        if (s.cloudOwned && currentUser()?.uid===s.cloudOwnerUid) {
+          const synced=await saveChatSessionSafely(s);
+          if (!synced) {
+            s.memories=previousMemories;
+            persist();
+            render();
+            toast('回憶同步失敗，已還原原內容；請確認網路後再試。');
+            return;
+          }
+        }
+        back();break;
       }
       case 'message-edit': {
         const m=s?.messages.find(m=>m.id===o.id);
@@ -3827,10 +3842,20 @@ document.addEventListener('change',async event => {
       }
     }
     if (target.dataset.memory) {
-      const m=currentSession()?.memories.find(m=>m.id===target.dataset.memory);
+      const session=currentSession();
+      const m=session?.memories.find(m=>m.id===target.dataset.memory);
       if (m) {
+        const previousImportant=m.important;
         m.important=target.checked;
         persist();render();
+        if (session.cloudOwned && currentUser()?.uid===session.cloudOwnerUid) {
+          const synced=await saveChatSessionSafely(session);
+          if (!synced) {
+            m.important=previousImportant;
+            persist();render();
+            toast('重大記憶同步失敗，已還原原設定。');
+          }
+        }
       }
     }
     if (['aiImages','aiImageCount'].includes(target.id)) updateAICost();
