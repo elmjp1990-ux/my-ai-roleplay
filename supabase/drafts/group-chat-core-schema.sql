@@ -255,6 +255,11 @@ BEGIN
       RAISE EXCEPTION 'duplicate_character' USING ERRCODE = '22023';
     END IF;
 
+    IF jsonb_typeof(v_member) IS DISTINCT FROM 'object'
+      OR NULLIF(v_member->>'character_id', '') IS NULL THEN
+      RAISE EXCEPTION 'invalid_member_payload' USING ERRCODE = '22023';
+    END IF;
+
     IF p_scene_mode = 'shared' THEN
       v_scene_position := 1;
     ELSE
@@ -263,7 +268,10 @@ BEGIN
       EXCEPTION WHEN invalid_text_representation OR numeric_value_out_of_range THEN
         RAISE EXCEPTION 'invalid_scene_position' USING ERRCODE = '22023';
       END;
-      IF v_scene_position NOT BETWEEN 1 AND v_scene_count THEN
+      -- In separate-scene mode each member maps to the corresponding unique
+      -- scene position, preventing multiple characters from silently sharing one.
+      IF v_scene_position IS DISTINCT FROM v_position
+        OR v_scene_position NOT BETWEEN 1 AND v_scene_count THEN
         RAISE EXCEPTION 'invalid_scene_position' USING ERRCODE = '22023';
       END IF;
     END IF;
