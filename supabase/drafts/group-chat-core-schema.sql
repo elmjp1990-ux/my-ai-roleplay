@@ -198,10 +198,14 @@ BEGIN
   IF v_member_count NOT BETWEEN 1 AND 3 THEN
     RAISE EXCEPTION 'group_requires_one_to_three_characters' USING ERRCODE = '22023';
   END IF;
-  IF jsonb_typeof(p_scenes) IS DISTINCT FROM 'array' OR jsonb_array_length(p_scenes) NOT BETWEEN 1 AND 3 THEN
+  -- Keep type validation separate: jsonb_array_length throws for non-array JSON.
+  IF jsonb_typeof(p_scenes) IS DISTINCT FROM 'array' THEN
     RAISE EXCEPTION 'invalid_scenes' USING ERRCODE = '22023';
   END IF;
   v_scene_count := jsonb_array_length(p_scenes);
+  IF v_scene_count NOT BETWEEN 1 AND 3 THEN
+    RAISE EXCEPTION 'invalid_scenes' USING ERRCODE = '22023';
+  END IF;
   IF p_scene_mode = 'shared' AND v_scene_count <> 1 THEN
     RAISE EXCEPTION 'shared_mode_requires_one_scene' USING ERRCODE = '22023';
   END IF;
