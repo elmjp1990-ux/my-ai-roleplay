@@ -3642,12 +3642,20 @@ document.addEventListener('submit',async event => {
         }
         const { error } = await window.mySupabase.rpc('cancel_account_deletion');
         if (error) throw new Error('取消刪除失敗：' + error.message);
+        // The server has already cancelled the request. Do not report cancellation
+        // failure merely because the subsequent profile/wallet refresh fails.
         delete state.account.accountDeletionPending;
         delete state.account.deletionScheduledFor;
         delete state.account.accountDeletionModalDismissed;
         persist();
         go({page:'home'}, true);
-        await loadSupabaseProfileAndWallet(authData.user);
+        try {
+          await loadSupabaseProfileAndWallet(authData.user);
+        } catch (refreshError) {
+          console.error('帳號已恢復，但個人資料／錢包重新載入失敗：', refreshError);
+          toast('已取消刪除申請，但個人資料或錢包重新載入失敗。請重新整理頁面；目前不需要重新申請刪除。');
+          break;
+        }
         toast('已取消刪除申請，原帳號與錢包餘額已保留。');
         break;
       }
