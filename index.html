@@ -753,7 +753,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     const client = window.mySupabase;
 
     try {
-      // 先檢查帳號是否處於 30 天待刪除期；待刪除帳號只能取消申請，不能繼續使用功能。
+      // 先檢查後端帳號刪除期限；待刪除帳號只能取消申請，不能繼續使用功能。
       const { data: deletionData, error: deletionError } = await client.rpc(
         'get_account_deletion_status'
       );
@@ -2303,7 +2303,7 @@ function renderHome() {
       ${state.account?.accountDeletionPending ? `
         <section class="card" style="border:1px solid #d97706;padding:14px;margin-bottom:14px">
           <strong>帳號正在等待刪除</strong>
-          <p class="muted small" style="margin:6px 0 10px">此帳號目前無法使用 PersonaX 功能。若要保留帳號與錢包餘額，可在 30 天期限內取消刪除申請。</p>
+          <p class="muted small" style="margin:6px 0 10px">此帳號目前無法使用 PersonaX 功能。若要保留帳號與錢包餘額，請在後端設定的期限內取消刪除申請。</p>
           <button class="primary" data-action="pending-show-deletion-modal">查看狀態／取消刪除</button>
         </section>` : ''}
       <section class="hero" id="hero"></section>
@@ -3350,22 +3350,22 @@ function renderModal(o) {
     case 'delete-account':
       showDialog('申請刪除帳號',`
         <form data-form="delete-account">
-          <p>提出申請後，帳號會進入 <strong>30 天待刪除期</strong>。這段期間會暫停使用 PersonaX 功能；你可以使用原本的 Google 帳號登入並取消申請。</p>
+          <p>提出申請後，帳號會進入後端設定的待刪除期。這段期間會暫停使用 PersonaX 功能；你可以使用原本的 Google 帳號登入，並在期限內取消申請。</p>
           <p class="muted">本階段只會建立刪除申請，不會立即刪除 UID、個人檔案、角色、聊天、交易紀錄或錢包，也不會修改鑽石與銀幣餘額。</p>
           <label class="field"><span>請輸入「DELETE」確認</span>
             <input name="confirm" required autocomplete="off"></label>
-          <button class="danger">申請刪除（30 天內可取消）</button>
+          <button class="danger">申請刪除（期限內可取消）</button>
         </form>`);
       break;
     case 'account-deletion-pending': {
-      const scheduled = o.scheduledFor ? new Date(o.scheduledFor).toLocaleString('zh-TW') : '30 天期限後';
+      const scheduled = o.scheduledFor ? new Date(o.scheduledFor).toLocaleString('zh-TW') : '尚未取得後端設定的期限';
       showDialog('帳號正在等待刪除',`
         <p>你的帳號已進入待刪除期。期限內不能使用 PersonaX 功能，但可以取消刪除並保留原本的帳號與錢包餘額。</p>
         <p><strong>預定刪除時間：</strong>${e(scheduled)}</p>
         <form data-form="cancel-account-deletion">
           <button class="primary">取消刪除，恢復帳號</button>
         </form>
-        <p class="muted small" style="margin-top:8px">關閉此視窗不會取消刪除申請；你仍可在 30 天期限內重新開啟此視窗並取消申請。</p>`);
+        <p class="muted small" style="margin-top:8px">關閉此視窗不會取消刪除申請；你仍可在後端設定的期限內重新開啟此視窗並取消申請。</p>`);
       break;
     }
     case 'shop':
@@ -4221,7 +4221,7 @@ document.addEventListener('submit',async event => {
       case 'delete-account': {
         if (String(f.get('confirm')).trim() !== 'DELETE') return toast('請輸入「DELETE」。');
         if (!state.account?.uid || !window.mySupabase) return toast('請先使用 Google 帳號登入。');
-        if (!confirm('確定提出帳號刪除申請？申請後會暫停使用功能，30 天內仍可取消。')) return;
+        if (!confirm('確定提出帳號刪除申請？申請後會暫停使用功能，並可在後端設定的期限內取消。')) return;
         const { data: authData, error: authError } = await window.mySupabase.auth.getUser();
         if (authError || authData?.user?.id !== state.account.uid) {
           return toast('登入狀態驗證失敗，請重新登入後再試。');
