@@ -99,6 +99,7 @@ Deno.serve(async (request) => {
     p_turn_id: turnId,
     p_session_id: sessionId,
     p_user_message_id: userMessageId,
+    p_assistant_message_id: assistantMessageId,
   });
   if (reserveError) return json({ error: "reservation_failed", code: reserveError.message }, 503);
   const charge = Array.isArray(reservation) ? reservation[0] : reservation;
