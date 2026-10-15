@@ -1675,7 +1675,19 @@ async function loadCloudChatSessions(user) {
     if (error) throw new Error(error.message);
     if (state.account?.uid !== user.id) return;
     const sessions = rows || [];
-    if (!sessions.length) return;
+    const activeSessionIds = new Set(sessions.map(row => row.id));
+    let changed = false;
+    // 雲端清單不再包含的本帳號聊天，可能已被軟刪除；清掉過期本機副本，避免刷新後復活。
+    for (const [sessionId, cached] of Object.entries(state.sessions || {})) {
+      if (cached?.cloudOwned && cached.cloudOwnerUid === user.id && !activeSessionIds.has(sessionId)) {
+        delete state.sessions[sessionId];
+        changed = true;
+      }
+    }
+    if (!sessions.length) {
+      if (changed) { persist(); render(); }
+      return;
+    }
     const sessionIds = sessions.map(row => row.id).filter(isUuid);
     let messageRows = [];
     if (sessionIds.length) {
@@ -1691,7 +1703,6 @@ async function loadCloudChatSessions(user) {
       bySession.get(row.session_id).push({id:row.id, role:row.role === 'user' ? 'user' : 'assistant',
         text:row.content || '', at:row.created_at ? new Date(row.created_at).getTime() : Date.now()});
     }
-    let changed = false;
     for (const row of sessions) {
       if (!isUuid(row.id) || !isUuid(row.character_id)) continue;
       const data = row.session_data && typeof row.session_data === 'object' ? row.session_data : {};
