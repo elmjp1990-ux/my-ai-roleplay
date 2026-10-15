@@ -21,11 +21,12 @@ Phase 1 — repair design and read-only verification. The production frontend pa
 3. If a request is not expired, use the normal cancellation path rather than the expired-recovery path.
 4. For an expired request, reject recovery if any processing batch indicates a destructive phase has begun or the account is completed. Until lifecycle states are implemented, the current `archived` status alone must not be interpreted as completed deletion.
 5. Before restoring access when a batch is `archived`, verify that the original source rows still exist and that the archived payload is readable and reconciles. If the check is inconclusive, stop and require manual review; do not delete archive/source rows.
-6. Record an append-only recovery event with request timestamps, actor, event time, result, and reason before removing or transitioning the blocking request. Restrict direct access to the event table; users must not be able to forge events or read other users' audit data.
-7. Restore normal access only after the event is persisted and all preconditions pass. Perform the event write and request-state transition atomically in one database transaction.
-8. Keep a recovery event even if a request row must be removed to restore access. Do not silently reset the deadline or overwrite the prior request history.
-9. Return a stable, non-sensitive status to the frontend; write detailed errors only to a restricted audit/operations log.
-10. Make repeated recovery calls safe and deterministic. Use row-level locking to avoid races with a worker.
+6. A `cancelled` batch is only potentially safe when it has no archive items. Any residual item may indicate partial work; refuse recovery and require manual reconciliation.
+7. Record an append-only recovery event with request timestamps, actor, event time, result, and reason before removing or transitioning the blocking request. Restrict direct access to the event table; users must not be able to forge events or read other users' audit data.
+8. Restore normal access only after the event is persisted and all preconditions pass. Perform the event write and request-state transition atomically in one database transaction.
+9. Keep a recovery event even if a request row must be removed to restore access. Do not silently reset the deadline or overwrite the prior request history.
+10. Return a stable, non-sensitive status to the frontend; write detailed errors only to a restricted audit/operations log.
+11. Make repeated recovery calls safe and deterministic. Use row-level locking to avoid races with a worker.
 
 ## Required schema/lifecycle design before SQL
 - Add a durable request lifecycle model or separate append-only events; the current request table cannot represent pending, expired, archiving, archived, deleting, completed, failed, cancelled, and recovered distinctly.
@@ -47,6 +48,7 @@ Phase 1 — repair design and read-only verification. The production frontend pa
 - Valid pending request cancellation succeeds before deadline and leaves audit history.
 - Expired recovery works only when no destructive processing began and archive/source reconciliation passes.
 - Expired recovery refuses ambiguous or destructive states without modifying data.
+- Cancelled batches containing archive items are refused.
 - Repeated/concurrent recovery requests do not create duplicate events or race a worker.
 - Access returns only after the request state is safely transitioned.
 - Five-minute timing is configured only in a disposable test project; production remains aligned with the promised 30-day recovery window.
@@ -55,7 +57,6 @@ Phase 1 — repair design and read-only verification. The production frontend pa
 
 ## Approval boundary
 This document is design only. Before any production SQL, schedule, worker, or data modification, show the exact change and obtain explicit approval. Do not perform actual account deletion as part of recovery repair.
-
 
 ## Additional read-only FK and privilege findings (2026-10-15)
 
