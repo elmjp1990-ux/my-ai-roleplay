@@ -294,16 +294,15 @@ begin
     return new;
   end if;
 
-  if length(btrim(coalesce(new.content, ''))) = 0 then
-    raise exception 'assistant_reply_must_be_nonempty';
-  end if;
-
   select c.* into v_charge
   from public.chat_turn_charges c
   where c.expected_assistant_message_id = new.id
   for update;
 
   if found then
+    if length(btrim(coalesce(new.content, ''))) = 0 then
+      raise exception 'assistant_reply_must_be_nonempty';
+    end if;
     if new.session_id is distinct from v_charge.session_id then
       raise exception 'assistant_message_session_conflict';
     end if;
