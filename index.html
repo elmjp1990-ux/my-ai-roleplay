@@ -3891,7 +3891,7 @@ document.addEventListener('change',async event => {
         if (!persist()) {
           s.background=previousBackground;
           target.value=previousBackground;
-          break;
+          return;
         }
         if (s.cloudOwned && currentUser()?.uid === s.cloudOwnerUid) {
           const synced=await saveChatSessionSafely(s);
@@ -3900,7 +3900,7 @@ document.addEventListener('change',async event => {
             persist();render();
             target.value=previousBackground;
             toast('聊天背景同步失敗，已還原原設定。');
-            break;
+            return;
           }
         }
         const panel=$('view').querySelector('.chat-main');
