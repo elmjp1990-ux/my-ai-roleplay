@@ -1,6 +1,7 @@
 -- The grace period is configured per Supabase environment.
 -- Intentionally do not seed a duration here: set 5 minutes in test and 30 days in production
--- after applying this migration. The request function fails closed until configured.
+-- after applying this migration. Example environment values: test = interval '5 minutes'; production = interval '30 days'.
+-- The request function fails closed until configured.
 CREATE TABLE IF NOT EXISTS public.account_deletion_settings (
   singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton),
   grace_period interval NOT NULL
