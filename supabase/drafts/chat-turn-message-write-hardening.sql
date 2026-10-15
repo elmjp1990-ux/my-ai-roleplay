@@ -31,6 +31,13 @@ begin
   end if;
 
   if old.role <> 'assistant' then
+    -- User-authored message content may be edited, but its identity and owning
+    -- session must remain stable so a client cannot move a billed input between
+    -- sessions or detach it from an existing charge's user_message_id.
+    if new.id is distinct from old.id
+       or new.session_id is distinct from old.session_id then
+      raise exception 'user_message_identity_is_immutable';
+    end if;
     return new;
   end if;
 
