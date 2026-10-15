@@ -242,10 +242,12 @@ begin
   end if;
   if v_charge.status = 'settled' then raise exception 'settled_turn_cannot_be_refunded'; end if;
   if v_charge.status not in ('reserved','needs_reconciliation') then raise exception 'turn_not_refundable'; end if;
+  -- A persisted expected reply must never be treated as absent merely because it
+  -- was soft-deleted. This is defense in depth alongside the UPDATE guard.
   if p_assistant_message_id is not null and exists (
     select 1 from public.chat_messages m
     where m.id=p_assistant_message_id and m.session_id=v_charge.session_id
-      and m.role='assistant' and m.deleted_at is null and length(btrim(m.content)) > 0
+      and m.role='assistant' and length(btrim(m.content)) > 0
   ) then raise exception 'reply_already_persisted'; end if;
 
   select w.* into v_wallet from public.wallet_accounts w

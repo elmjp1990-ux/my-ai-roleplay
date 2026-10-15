@@ -117,7 +117,26 @@ Deno.serve(async (request) => {
     p_user_message_id: userMessageId,
     p_assistant_message_id: assistantMessageId,
   });
-  if (reserveError) return json({ error: "reservation_failed" }, 503);
+  if (reserveError) {
+    // Preserve known domain failures so the client can safely clear only turns
+    // that provably never reserved funds. Conflicts/unknown errors stay unresolved.
+    const reserveMessage = String(reserveError.message || "");
+    if (reserveMessage.includes("account_not_active")) {
+      return json({ error: "account_not_active" }, 403);
+    }
+    if (reserveMessage.includes("chat_session_not_owned_or_active")) {
+      return json({ error: "chat_session_not_owned_or_active" }, 403);
+    }
+    if (reserveMessage.includes("user_message_not_found")) {
+      return json({ error: "user_message_not_found" }, 400);
+    }
+    if (reserveMessage.includes("wallet_not_initialized")) {
+      return json({ error: "wallet_not_ready" }, 409);
+    }
+    // turn_id_reuse_conflict and unexpected database errors must not be
+    // translated into a confirmed failure/refund; keep the stable turn pending.
+    return json({ error: "reservation_failed" }, 503);
+  }
   const charge = Array.isArray(reservation) ? reservation[0] : reservation;
   if (!charge) return json({ error: "reservation_state_missing" }, 503);
 
@@ -132,7 +151,7 @@ Deno.serve(async (request) => {
   }
   if (charge.status === "settled") {
     const { data: savedReply, error: savedReplyError } = await admin
-      .from("chat_messages").select("id,content")
+      .from("chat_messages").select("id,content,role")
       .eq("id", assistantMessageId).eq("session_id", sessionId)
       .eq("role", "assistant").is("deleted_at", null).maybeSingle();
     if (savedReplyError || !savedReply) {
@@ -157,13 +176,28 @@ Deno.serve(async (request) => {
     // A real AI provider integration must also query the provider/job status
     // before refunding an absent reply.
     const { data: recoveredReply, error: recoveredReplyError } = await admin
-      .from("chat_messages").select("id,content")
+      .from("chat_messages").select("id,content,role,deleted_at")
       .eq("id", assistantMessageId).eq("session_id", sessionId)
-      .eq("role", "assistant").is("deleted_at", null).maybeSingle();
+      .eq("role", "assistant").maybeSingle();
 
     if (recoveredReplyError) {
       return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
     }
+    if (recoveredReply && recoveredReply.deleted_at !== null) {
+      // A soft-deleted expected reply is durable evidence of generation.
+      // Never treat it as absent or refund it; keep funds reserved for audited recovery.
+      await admin.from("chat_turn_charges").update({
+        status: "needs_reconciliation",
+        failure_code: "expected_reply_soft_deleted",
+        updated_at: new Date().toISOString(),
+      }).eq("turn_id", turnId).eq("user_id", user.id).in("status", ["reserved", "needs_reconciliation"]);
+      await admin.from("chat_turn_events").insert({
+        turn_id: turnId, user_id: user.id, event_type: "reconciliation_blocked_soft_deleted_reply",
+        stage: "persistence", error_code: "expected_reply_soft_deleted",
+      });
+      return json({ status: "needs_reconciliation", error: "expected_reply_soft_deleted", retryAllowed: false }, 409);
+    }
+
     if (recoveredReply && String(recoveredReply.content || "").trim()) {
       if (String(recoveredReply.content) !== demoReply) {
         return json({ status: "needs_reconciliation", error: "assistant_message_id_collision", retryAllowed: false }, 409);
@@ -211,9 +245,9 @@ Deno.serve(async (request) => {
     });
     // Do not refund until a follow-up read confirms the reply is absent.
     const { data: possibleReply, error: verifyError } = await admin
-      .from("chat_messages").select("id,content")
+      .from("chat_messages").select("id,content,role,deleted_at")
       .eq("id", assistantMessageId).eq("session_id", sessionId)
-      .eq("role", "assistant").is("deleted_at", null).maybeSingle();
+      .eq("role", "assistant").maybeSingle();
 
     if (verifyError) {
       await admin.from("chat_turn_charges").update({
@@ -226,6 +260,19 @@ Deno.serve(async (request) => {
         stage: "persistence", error_code: "reply_write_outcome_unknown",
       });
       return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
+    }
+
+    if (possibleReply && possibleReply.deleted_at !== null) {
+      await admin.from("chat_turn_charges").update({
+        status: "needs_reconciliation",
+        failure_code: "expected_reply_soft_deleted",
+        updated_at: new Date().toISOString(),
+      }).eq("turn_id", turnId).eq("user_id", user.id).eq("status", "reserved");
+      await admin.from("chat_turn_events").insert({
+        turn_id: turnId, user_id: user.id, event_type: "reconciliation_blocked_soft_deleted_reply",
+        stage: "persistence", error_code: "expected_reply_soft_deleted",
+      });
+      return json({ status: "needs_reconciliation", error: "expected_reply_soft_deleted", retryAllowed: false }, 409);
     }
 
     if (possibleReply && String(possibleReply.content || "").trim()) {
@@ -284,9 +331,22 @@ Deno.serve(async (request) => {
     // only if the exact deterministic reply is now durable; otherwise keep the
     // turn unresolved rather than refunding or claiming success.
     const { data: finalReply, error: finalReplyError } = await admin
-      .from("chat_messages").select("id,content")
+      .from("chat_messages").select("id,content,role,deleted_at")
       .eq("id", assistantMessageId).eq("session_id", sessionId)
-      .eq("role", "assistant").is("deleted_at", null).maybeSingle();
+      .eq("role", "assistant").maybeSingle();
+
+    if (!finalReplyError && finalReply && finalReply.deleted_at !== null) {
+      await admin.from("chat_turn_charges").update({
+        status: "needs_reconciliation",
+        failure_code: "expected_reply_soft_deleted",
+        updated_at: new Date().toISOString(),
+      }).eq("turn_id", turnId).eq("user_id", user.id).in("status", ["reserved", "needs_reconciliation"]);
+      await admin.from("chat_turn_events").insert({
+        turn_id: turnId, user_id: user.id, event_type: "reconciliation_blocked_soft_deleted_reply",
+        stage: "persistence", error_code: "expected_reply_soft_deleted",
+      });
+      return json({ status: "needs_reconciliation", error: "expected_reply_soft_deleted", retryAllowed: false }, 409);
+    }
 
     if (!finalReplyError && finalReply && String(finalReply.content || "").trim() === demoReply) {
       const { data: finalSettlement, error: finalSettlementError } = await admin.rpc("settle_chat_turn", {
