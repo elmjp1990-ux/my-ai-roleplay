@@ -1953,11 +1953,21 @@ async function runPendingChatTurn(s) {
   // A settled reply can have been soft-deleted after successful delivery.
   // Resolve the pending UI state without rendering hidden content or charging again.
   if (result.replyHidden === true) {
+    // Remove any stale local copy as well as the pending marker: the server is
+    // authoritative about visibility, and a reload must not resurrect this reply.
+    s.messages = s.messages.filter(message =>
+      !(message.id === turn.assistantMessageId && message.role === 'assistant')
+    );
     delete s.pendingTurn;
     persist();
     renderMessages();
+    const metadataSaved = await saveChatSessionSafely(s);
     await refreshWalletBalance();
-    toast('這回合已扣款完成，但回覆已被隱藏；不會再次扣款。');
+    if (!metadataSaved) {
+      toast('這回合已扣款完成且回覆已隱藏，但聊天狀態同步失敗；不會再次扣款。');
+    } else {
+      toast('這回合已扣款完成，但回覆已被隱藏；不會再次扣款。');
+    }
     return;
   }
 
