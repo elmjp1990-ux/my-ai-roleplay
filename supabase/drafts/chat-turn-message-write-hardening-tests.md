@@ -33,6 +33,7 @@ Run only against a disposable Supabase branch/project. Do not execute fixture wr
 | U3 | Change ID or session on a charged assistant reply | Rejected |
 | U4 | Client upsert uses an existing charged assistant ID but supplies role=user | Rejected by UPDATE guard |
 | U5 | Change ordinary user-message content | Allowed; existing version-history behavior preserved |
+| U20 | Change the ID or session_id of an ordinary user message, while keeping its role unchanged | Rejected; user message content edits remain allowed, but identity and session ownership cannot change |
 | U6 | Convert ordinary user message to assistant | Rejected |
 | U7 | Convert uncharged assistant row to user | Rejected |
 | U8 | Soft-delete a charged assistant reply after its charge is `settled`, changing only `deleted_at` | Allowed; protected fields remain unchanged |
