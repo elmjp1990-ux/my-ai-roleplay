@@ -62,6 +62,7 @@ Message roles are immutable for every row, including user -> system changes, so 
 - F8: A failed user-message sync aborts before invoking `chat-turn`, so no wallet reservation occurs.
 - F9: The Edge Function returns `status='settled'` but an assistant message ID different from the pending turn's expected ID; the UI does not render it or clear the pending turn.
 - F10: The Edge Function returns a non-assistant role or empty content; the UI does not render it or clear the pending turn.
+- F11: A recovered/idempotent settled response omits `role`; the UI rejects it, keeps the pending turn, and does not render the reply.
 
 ## Acceptance criteria
 
