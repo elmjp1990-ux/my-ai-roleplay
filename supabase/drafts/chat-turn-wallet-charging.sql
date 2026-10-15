@@ -1,5 +1,6 @@
--- PersonaX chat-turn wallet charging draft.
--- REVIEW ONLY: this file is outside supabase/migrations and has NOT been applied.
+-- PersonaX chat-turn wallet charging SQL reference source.
+-- The equivalent SQL was applied to production as migration wallet_chat_turn_charging on 2026-10-15.
+-- This file remains outside supabase/migrations; edits here do not change production.
 -- Server orchestration must call these RPCs with the service-role client only.
 -- Never expose reserve/settle/refund to browser-authenticated users.
 
