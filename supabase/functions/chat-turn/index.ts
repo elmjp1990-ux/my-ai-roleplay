@@ -113,7 +113,31 @@ Deno.serve(async (request) => {
   }
   if (charge.status === "refunded") return json({ error: "turn_already_refunded" }, 409);
   if (charge.status === "needs_reconciliation") {
-    return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
+    // This deterministic demo has no external generation job. Reconcile by
+    // checking whether the stable assistant message was durably stored.
+    // A real AI provider integration must also query the provider/job status
+    // before refunding an absent reply.
+    const { data: recoveredReply, error: recoveredReplyError } = await admin
+      .from("chat_messages").select("id,content")
+      .eq("id", assistantMessageId).eq("session_id", sessionId)
+      .eq("role", "assistant").is("deleted_at", null).maybeSingle();
+
+    if (recoveredReplyError) {
+      return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
+    }
+    if (recoveredReply && String(recoveredReply.content || "").trim()) {
+      const { data: settledAgain, error: settleAgainError } = await admin.rpc("settle_chat_turn", {
+        p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
+      });
+      if (settleAgainError) return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
+      return json({ status: settledAgain, assistantMessage: recoveredReply, recovered: true });
+    }
+
+    const { error: refundAgainError } = await admin.rpc("refund_chat_turn", {
+      p_user_id: user.id, p_turn_id: turnId, p_failure_code: "demo_reply_not_persisted",
+    });
+    if (refundAgainError) return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
+    return json({ status: "refunded", error: "demo_reply_not_persisted", recovered: true }, 503);
   }
   if (charge.status !== "reserved") return json({ error: "turn_not_processable" }, 409);
 
