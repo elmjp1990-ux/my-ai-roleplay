@@ -9,3 +9,6 @@ WITH CHECK (
       AND c.deleted_at IS NULL
   )
 );
+
+-- The helper is not an API security boundary; run it with caller privileges if retained.
+ALTER FUNCTION public.character_is_not_soft_deleted(uuid) SECURITY INVOKER;
