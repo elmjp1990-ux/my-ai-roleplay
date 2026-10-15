@@ -54,6 +54,12 @@ begin
     return;
   end if;
 
+  -- A missing deadline is malformed state, not proof that the request expired.
+  if v_scheduled_for is null then
+    return query select false, 'manual_review_required'::text;
+    return;
+  end if;
+
   if v_scheduled_for > pg_catalog.statement_timestamp() then
     return query select false, 'use_cancel_before_deadline'::text;
     return;
@@ -158,9 +164,10 @@ commit;
 
 -- Important pre-application review items:
 -- 1. Confirm actual table column types, PKs, FK requirements, and enum/status constraints.
--- 2. Decide whether repeated calls after successful recovery should return a distinct idempotent success; this draft currently returns no_request.
--- 3. Test row-lock coordination against the real worker before any worker is enabled.
--- 4. Validate every archived batch row and status transition; this draft fails closed for multiple archived batches.
--- 5. Verify source-table row visibility under SECURITY DEFINER and exact archive payload schema.
--- 6. Confirm the product/legal retention policy and whether audit events need FK/retention constraints.
--- 7. Do not apply to production until reviewed and explicitly approved.
+-- 2. Verify a NULL scheduled_for fails closed as manual_review_required.
+-- 3. Decide whether repeated calls after successful recovery should return a distinct idempotent success; this draft currently returns no_request.
+-- 4. Test row-lock coordination against the real worker before any worker is enabled.
+-- 5. Validate every archived batch row and status transition; this draft fails closed for multiple archived batches.
+-- 6. Verify source-table row visibility under SECURITY DEFINER and exact archive payload schema.
+-- 7. Confirm the product/legal retention policy and whether audit events need FK/retention constraints.
+-- 8. Do not apply to production until reviewed and explicitly approved.
