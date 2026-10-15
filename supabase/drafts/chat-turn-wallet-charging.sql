@@ -54,7 +54,7 @@ alter table public.chat_turn_events enable row level security;
 revoke all on public.chat_turn_charges from anon, authenticated;
 revoke all on public.chat_turn_events from anon, authenticated;
 grant select, insert, update, delete on public.chat_turn_charges to service_role;
-grant select, insert, update, delete on public.chat_turn_events to service_role;
+grant select, insert on public.chat_turn_events to service_role;
 grant usage, select on sequence public.chat_turn_events_event_id_seq to service_role;
 
 create or replace function public.reserve_chat_turn(
