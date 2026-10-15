@@ -2171,7 +2171,11 @@ function renderDetail() {
     return;
   }
   const offline = characterIsOffline(c);
-  const a = author(c.authorId);
+  // 作者正在查看自己建立的角色時，以已登入帳號的真實會員資料為後備，
+  // 避免私密角色因 profiles RLS 或作者快取未載入而顯示「故事創作者」。
+  const a = (c.owner || state.account?.uid === c.authorId)
+    ? author(state.account?.uid || c.authorId)
+    : author(c.authorId);
   $('view').innerHTML = `
     <div class="stack">
       <button class="ghost" data-action="back">← 返回上一頁</button>
@@ -3240,7 +3244,7 @@ document.addEventListener('click',async event => {
       case 'remove-session': {
         const item=state.sessions[key];
         if (!item) break;
-        if (!confirm('確定刪除此對話？相關日記與相簿將從列表移除；資料庫會保留刪除標記以供必要時查核。')) break;
+        if (!confirm('確定刪除此對話與回憶，操作後無法復原哦')) break;
         const uid=currentUser()?.uid;
         if (item.cloudOwned && uid && item.cloudOwnerUid === uid && window.mySupabase) {
           const deletedAt=new Date().toISOString();
