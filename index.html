@@ -3713,10 +3713,25 @@ document.addEventListener('submit',async event => {
         await saveChatSessionSafely(s);
         break;
       }
-      case 'persona':
+      case 'persona': {
         if (!s) return;
+        const previousPersona=s.persona || '';
         s.persona=String(f.get('persona'));
-        persist();back();break;
+        if (!persist()) {
+          s.persona=previousPersona;
+          break;
+        }
+        if (s.cloudOwned && currentUser()?.uid===s.cloudOwnerUid) {
+          const synced=await saveChatSessionSafely(s);
+          if (!synced) {
+            s.persona=previousPersona;
+            persist();render();
+            toast('專屬人設同步失敗，已還原原設定。');
+            break;
+          }
+        }
+        back();break;
+      }
       case 'rename': {
         const item=state.sessions[o.id];
         const name=String(f.get('name')).trim();
@@ -3725,8 +3740,21 @@ document.addEventListener('submit',async event => {
           other.id !== item.id && sessionTitle(other) === name
         );
         if (duplicate) return alert('這個檔名已被你自己的其他聊天或角色使用，請換一個名稱。');
-        item.name=name;persist();
-        if (hasUserMessage(item)) await saveChatSessionSafely(item);
+        const previousName=item.name;
+        item.name=name;
+        if (!persist()) {
+          item.name=previousName;
+          break;
+        }
+        if (item.cloudOwned && currentUser()?.uid===item.cloudOwnerUid && hasUserMessage(item)) {
+          const synced=await saveChatSessionSafely(item);
+          if (!synced) {
+            item.name=previousName;
+            persist();render();
+            toast('聊天名稱同步失敗，已還原原名稱。');
+            break;
+          }
+        }
         openModal('archives');break;
       }
       case 'memory': {
@@ -3858,10 +3886,22 @@ document.addEventListener('change',async event => {
     if (target.id==='backgroundSetting') {
       const s=(target.dataset.sessionId && state.sessions[target.dataset.sessionId]) || currentSession();
       if (s && ['avatar','none'].includes(target.value)) {
+        const previousBackground=s.background || 'avatar';
         s.background=target.value;
-        persist();
+        if (!persist()) {
+          s.background=previousBackground;
+          target.value=previousBackground;
+          return;
+        }
         if (s.cloudOwned && currentUser()?.uid === s.cloudOwnerUid) {
-          await saveChatSessionToCloud(s);
+          const synced=await saveChatSessionSafely(s);
+          if (!synced) {
+            s.background=previousBackground;
+            persist();render();
+            target.value=previousBackground;
+            toast('聊天背景同步失敗，已還原原設定。');
+            return;
+          }
         }
         const panel=$('view').querySelector('.chat-main');
         if (panel && route.id === s.id) {
