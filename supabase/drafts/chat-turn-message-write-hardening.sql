@@ -69,6 +69,13 @@ begin
     raise exception 'charged_assistant_reply_is_immutable';
   end if;
 
+  -- A reply may be soft-deleted only after the charge is settled. While reserved
+  -- or awaiting reconciliation, refund logic must still see the persisted reply.
+  if new.deleted_at is distinct from old.deleted_at
+     and v_old_charge.status is distinct from 'settled' then
+    raise exception 'chat_turn_reply_delete_requires_settled_charge';
+  end if;
+
   if not v_has_old_charge
      or old.id is distinct from v_old_charge.expected_assistant_message_id then
     raise exception 'assistant_message_turn_id_conflict';
@@ -83,7 +90,7 @@ grant execute on function public.guard_chat_turn_assistant_update() to service_r
 
 drop trigger if exists guard_chat_turn_assistant_update on public.chat_messages;
 create trigger guard_chat_turn_assistant_update
-before update of id, session_id, role, content on public.chat_messages
+before update of id, session_id, role, content, deleted_at on public.chat_messages
 for each row
 execute function public.guard_chat_turn_assistant_update();
 
