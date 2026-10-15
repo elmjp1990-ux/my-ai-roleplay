@@ -5,6 +5,8 @@ Status: partial source implementation on the feature branch only. No production 
 ## Priority order
 
 ### P0 — Correctness and wallet safety (do first)
+
+Draft status: reservation/settlement/refund RPCs, stable turn ledger, wallet row locking, and service-role-only grants are present in the SQL draft, but remain **unexecuted and unverified**. The Edge Function now uses insert-only reply persistence and does not refund merely because one read temporarily finds no reply; it keeps the turn in reconciliation so the same stable IDs can be retried safely. This is intentionally fail-closed, but a server-side stale-turn reconciliation process is still required to resolve permanently failed writes.
 - [ ] Add a server-enforced charge ledger keyed by a stable UUID for each logical turn.
 - [ ] Implement atomic reservation for cost 2, silver first and diamonds for the remainder.
 - [ ] Enforce wallet row locking and non-negative balances for concurrent turns.
@@ -16,7 +18,7 @@ Status: partial source implementation on the feature branch only. No production 
 - [ ] Ensure insufficient balance never calls generation and makes no debit; record a sanitized attempt event.
 - [ ] Confirm a reply is non-empty and durably stored before settlement.
 - [ ] Confirm failure before a usable reply refunds the exact original silver/diamond split once.
-- [ ] Treat ambiguous provider/network timeouts as reconciliation work, not immediate refunds or automatic duplicate generation.
+- [ ] Treat ambiguous provider/network timeouts as reconciliation work, not immediate refunds or automatic duplicate generation. The demo path now retains the reservation when a reply write outcome is uncertain; real AI integration must also query provider/job state.
 - [ ] Add a scheduled server-side reconciliation job for stale reservations if the browser closes or acknowledgement is lost; the current Edge Function can reconcile retries for the deterministic demo reply, but not yet stale turns without a retry.
 
 ### P1 — Persistent operational audit (part of wallet safety)
@@ -62,4 +64,4 @@ Do not merge or deploy until:
 
 ## Current boundary
 
-This checklist is committed only to `feat/ayet-rewarded-video-callback`. The chat persistence rollback fix, draft wallet RPC SQL, demo Edge Function source, and frontend invocation path now exist on the branch. The SQL has not been applied and the function is not deployed. The source review corrected an assistant-message ID collision risk by replacing upsert with insert plus exact-content recovery checks. SQL/function semantics still need repeatable tests before deployment. P3 UI polish remains explicitly lower priority.
+This checklist is committed only to `feat/ayet-rewarded-video-callback`. The chat persistence rollback fix, draft wallet RPC SQL, demo Edge Function source, and frontend invocation path now exist on the branch. The SQL has not been applied and the function is not deployed. The source review corrected an assistant-message ID collision risk by replacing upsert with insert plus exact-content recovery checks, and changed ambiguous persistence recovery to avoid refunding based only on a point-in-time missing reply. This prevents a concurrent retry from being refunded while another request may still save the reply, but can leave a reservation pending until a safe retry or reconciliation process resolves it. SQL/function semantics still need repeatable tests before deployment. P3 UI polish remains explicitly lower priority.
