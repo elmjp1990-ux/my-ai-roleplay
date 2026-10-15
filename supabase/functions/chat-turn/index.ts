@@ -135,7 +135,19 @@ Deno.serve(async (request) => {
       .from("chat_messages").select("id,content")
       .eq("id", assistantMessageId).eq("session_id", sessionId)
       .eq("role", "assistant").is("deleted_at", null).maybeSingle();
-    if (savedReplyError || !savedReply) return json({ error: "settled_reply_lookup_failed" }, 503);
+    if (savedReplyError || !savedReply) {
+      return json({ status: "needs_reconciliation", error: "settled_reply_lookup_failed", retryAllowed: false }, 503);
+    }
+    // A settled charge is not enough to report success if the durable reply is
+    // empty. Keep the state unresolved for diagnosis instead of returning a
+    // successful turn that the client cannot display.
+    if (!String(savedReply.content || "").trim()) {
+      await admin.from("chat_turn_events").insert({
+        turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
+        stage: "settled_reply_lookup", error_code: "settled_reply_empty",
+      });
+      return json({ status: "needs_reconciliation", error: "settled_reply_empty", retryAllowed: false }, 503);
+    }
     return json({ status: "settled", assistantMessage: savedReply, idempotent: true });
   }
   if (charge.status === "refunded") return json({ error: "turn_already_refunded" }, 409);
