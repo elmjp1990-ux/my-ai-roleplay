@@ -1654,7 +1654,9 @@ async function saveChatSessionToCloud(s, options = {}) {
     age:character?.age ?? priorSnapshot.age ?? '',
     image:character?.image || priorSnapshot.image || '',
     intro:character?.intro ?? priorSnapshot.intro ?? '',
-    privateInfo:character?.privateInfo ?? priorSnapshot.privateInfo ?? '',
+    // 公開角色載入資料會刻意把 privateInfo 留空；空字串不代表角色私密設定已被清除。
+    // 若既有聊天快照已有內容，避免後續同步將其覆寫成空字串；新快照仍不會從公開角色資料取得私密設定。
+    privateInfo:character?.privateInfo || priorSnapshot.privateInfo || '',
     opening:character?.opening ?? priorSnapshot.opening ?? '',
     race:character?.race ?? priorSnapshot.race ?? '',
     style:character?.style ?? priorSnapshot.style ?? '',
