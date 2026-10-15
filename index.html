@@ -3358,7 +3358,7 @@ function renderModal(o) {
         </form>`);
       break;
     case 'account-deletion-pending': {
-      const scheduled = o.scheduledFor ? new Date(o.scheduledFor).toLocaleString('zh-TW') : '30 天期限後';
+      const scheduled = o.scheduledFor ? new Date(o.scheduledFor).toLocaleString('zh-TW') : '尚未取得後端設定的期限';
       showDialog('帳號正在等待刪除',`
         <p>你的帳號已進入待刪除期。期限內不能使用 PersonaX 功能，但可以取消刪除並保留原本的帳號與錢包餘額。</p>
         <p><strong>預定刪除時間：</strong>${e(scheduled)}</p>
