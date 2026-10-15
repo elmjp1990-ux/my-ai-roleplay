@@ -66,13 +66,26 @@ begin
   end if;
 
   -- Fail closed if any batch suggests processing has started or finished.
-  -- Only a verified 'archived' batch (the current archive function retains
-  -- source rows) or a cancelled batch is eligible for further checks.
+  -- Only archived batches (subject to full reconciliation) and empty cancelled
+  -- batches are potentially eligible. Unknown and terminal states stop recovery.
   if exists (
     select 1
     from public.account_deletion_archive_batches b
     where b.target_user_id = v_user_id
       and (b.status is null or b.status not in ('archived', 'cancelled'))
+  ) then
+    return query select false, 'manual_review_required'::text;
+    return;
+  end if;
+
+  -- A cancelled batch containing any archive item may represent partial work.
+  -- Do not unlock the account until an operator reconciles that state.
+  if exists (
+    select 1
+    from public.account_deletion_archive_batches b
+    join public.account_deletion_archive_items i on i.batch_id = b.id
+    where b.target_user_id = v_user_id
+      and b.status = 'cancelled'
   ) then
     return query select false, 'manual_review_required'::text;
     return;
@@ -89,7 +102,7 @@ begin
     return;
   end if;
 
-  -- Select the archived batch explicitly. A newer cancelled batch must not
+  -- Select the archived batch explicitly. A newer empty cancelled batch must not
   -- hide an older archived batch from the integrity check.
   select b.id, b.status
     into v_batch_id, v_batch_status
@@ -167,7 +180,7 @@ commit;
 -- 2. Verify a NULL scheduled_for fails closed as manual_review_required.
 -- 3. Decide whether repeated calls after successful recovery should return a distinct idempotent success; this draft currently returns no_request.
 -- 4. Test row-lock coordination against the real worker before any worker is enabled.
--- 5. Validate every archived batch row and status transition; this draft fails closed for multiple archived batches.
+-- 5. Validate every archived batch row and status transition; this draft fails closed for multiple archived batches and cancelled batches with residual items.
 -- 6. Verify source-table row visibility under SECURITY DEFINER and exact archive payload schema.
 -- 7. Confirm the product/legal retention policy and whether audit events need FK/retention constraints.
 -- 8. Do not apply to production until reviewed and explicitly approved.
