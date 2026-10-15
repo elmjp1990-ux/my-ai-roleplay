@@ -2507,7 +2507,7 @@ function renderConversation() {
               </button>
               <span class="chat-name ellipsis">${e(s.name || c.name)}</span>
               <span class="character-status-label" title="${characterIsOffline(c) ? '角色離線或已下架' : '角色公開中'}">
-                <span class="character-status-dot" style="position:static"></span>
+                <span class="character-status-dot" style="position:static;background:${characterIsOffline(c) ? '#8993a4' : '#22c55e'}"></span>
                 ${characterIsOffline(c) ? '離線／已下架' : '公開中'}
               </span>
             </div>
