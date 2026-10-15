@@ -14,7 +14,13 @@ as $function$
 declare
   v_charge public.chat_turn_charges%rowtype;
 begin
-  if old.role <> 'assistant' and new.role <> 'assistant' then
+  -- Superseded standalone reference: role changes must never promote
+  -- player-controlled content to system/assistant semantics.
+  if new.role is distinct from old.role then
+    raise exception 'chat_message_role_is_immutable';
+  end if;
+
+  if old.role <> 'assistant' then
     return new;
   end if;
 
