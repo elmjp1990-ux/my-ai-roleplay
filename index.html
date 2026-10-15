@@ -1654,15 +1654,18 @@ async function saveChatSessionToCloud(s, options = {}) {
   if (s.cloudOwned && s.cloudOwnerUid === localUser.uid) {
     // 已存在的聊天使用 UPDATE；即使角色已下架，也可繼續保存原有劇情。
     sessionWrite = await client.from('chat_sessions').update(row)
-      .eq('id', s.id).eq('user_id', localUser.uid);
+      .eq('id', s.id).eq('user_id', localUser.uid).select('id').maybeSingle();
   } else {
     // 新聊天只能在角色仍可建立新對話時 INSERT。
     if (character.deletedAt || (character.visibility !== 'public' && character.firstPublishedAt)) {
       throw new Error('此角色已被作者調整為私密或刪除狀態，不支持開啟新對話');
     }
-    sessionWrite = await client.from('chat_sessions').insert(row);
+    sessionWrite = await client.from('chat_sessions').insert(row).select('id').maybeSingle();
   }
   if (sessionWrite.error) throw new Error('聊天基本資料同步失敗：'+sessionWrite.error.message);
+  if (!sessionWrite.data?.id) {
+    throw new Error('資料庫未確認聊天基本資料已寫入；本次不會標記同步成功。');
+  }
   s.cloudOwned = true;
   s.cloudOwnerUid = localUser.uid;
   s.cloudCharacterSnapshot = snapshot;
@@ -1672,8 +1675,12 @@ async function saveChatSessionToCloud(s, options = {}) {
     content:String(m.text ?? ''), created_at:new Date(Number(m.at) || Date.now()).toISOString()
   }));
   if (messages.length) {
-    const { error: messageError } = await client.from('chat_messages').upsert(messages,{onConflict:'id'});
+    const { data: savedMessages, error: messageError } = await client.from('chat_messages')
+      .upsert(messages,{onConflict:'id'}).select('id');
     if (messageError) throw new Error('聊天訊息同步失敗：'+messageError.message);
+    if (!Array.isArray(savedMessages) || savedMessages.length !== messages.length) {
+      throw new Error('資料庫回報的已儲存訊息數量不符；請重新整理確認，勿視為同步完成。');
+    }
   }
   return true;
 }
