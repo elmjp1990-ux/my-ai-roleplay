@@ -105,6 +105,8 @@ Deno.serve(async (request) => {
   const charge = Array.isArray(reservation) ? reservation[0] : reservation;
   if (!charge) return json({ error: "reservation_state_missing" }, 503);
 
+  const demoReply = "**他將目光移向你，耐心等待你繼續說下去。**\n「我在聽，你可以慢慢說。」";
+
   if (charge.status === "insufficient_funds") {
     return json({
       status: "insufficient_funds",
@@ -158,7 +160,6 @@ Deno.serve(async (request) => {
 
   // Stable demo output: a repeated request uses the same assistantMessageId,
   // so it cannot create a second billable reply for this turn.
-  const demoReply = "**他將目光移向你，耐心等待你繼續說下去。**\n「我在聽，你可以慢慢說。」";
   const assistantRow = {
     id: assistantMessageId,
     session_id: sessionId,
