@@ -115,6 +115,25 @@ BEGIN
     RETURN QUERY SELECT v_batch_id, p_user_id, 'deleting'::text;
     RETURN;
   ELSIF FOUND THEN
+    -- Backfill billing/audit snapshots for older batches created before these source
+    -- tables were added to the archive. ON CONFLICT preserves any prior payload so the
+    -- exact-payload checks below still fail closed on a conflicting existing snapshot.
+    INSERT INTO public.account_deletion_archive_items
+      (batch_id, source_table, source_record_id, payload)
+    SELECT v_batch_id, 'chat_turn_charges', c.turn_id::text, pg_catalog.to_jsonb(c)
+    FROM public.chat_turn_charges AS c
+    WHERE c.user_id = p_user_id
+    ON CONFLICT ON CONSTRAINT account_deletion_archive_item_batch_id_source_table_source__key
+    DO NOTHING;
+
+    INSERT INTO public.account_deletion_archive_items
+      (batch_id, source_table, source_record_id, payload)
+    SELECT v_batch_id, 'chat_turn_events', e.event_id::text, pg_catalog.to_jsonb(e)
+    FROM public.chat_turn_events AS e
+    WHERE e.user_id = p_user_id
+    ON CONFLICT ON CONSTRAINT account_deletion_archive_item_batch_id_source_table_source__key
+    DO NOTHING;
+
     -- A failed or interrupted archive can be retried only if every remaining source row
     -- is exactly represented in the existing archive. Any mismatch fails closed.
     SELECT count(*) INTO v_ai_source
