@@ -17,10 +17,10 @@ Scope: live Supabase metadata and GitHub `main` frontend source. No database wri
 - `archive_account_deletion_data(p_user_id)`: checks that the target has an expired request, archives AI-generation rows and wallet transactions, and marks the batch `archived`. It does not delete source rows or the Auth user. It is not a full deletion processor.
 
 ## RLS finding requiring priority review
-- Several tables have an `account_must_be_active` permissive policy that checks `account_is_active()`, but the same tables also have a separate permissive `ALL` policy for the owner with no active-account condition (for example `characters`, `character_stories`, `conversations`, and `messages`).
+- Three tables have an `account_must_be_active` permissive policy that checks `account_is_active()`, but the same tables also have a separate permissive `ALL` policy for the owner with no active-account condition: `characters`, `character_stories`, and `conversations`.
 - PostgreSQL combines permissive policies with OR. Therefore, the active-account policy can be bypassed by the owner policy on those tables; the frontend block is not enough to guarantee a pending-deletion account cannot mutate data through the Data API.
 - This must be corrected by safely consolidating/adjusting policies or adding active-account checks to the owner policies, after reviewing each table's intended public-read and owner-write behavior. Do not blanket-replace policies or change them without a table-by-table check.
-- Some tables already include `account_is_active()` directly in their ownership policies, such as `chat_sessions` and `chat_messages` policies shown in the audit. Each table must be checked independently.
+- The `messages` table's reported policy was `account_must_be_active`; no parallel owner `ALL` policy appeared in this query. `chat_sessions`, `chat_messages`, `chat_message_versions`, and `ai_generation_records` have active-account checks directly in their relevant policies. Each table must still be checked independently.
 
 ## FK inventory relevant to eventual deletion
 - `ai_generation_records.user_id -> profiles.id` has the default NO ACTION behavior and is NOT NULL.
