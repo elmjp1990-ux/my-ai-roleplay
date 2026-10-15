@@ -4,8 +4,6 @@
 -- Apply this combined transaction rather than either standalone draft:
 --   - chat-turn-assistant-update-guard.sql
 --   - chat-message-client-insert-policy.sql
--- It closes the gap where a client can insert an arbitrary assistant-role row and
--- avoids a window in which client INSERT restrictions exist without reply UPDATE guards.
 -- The browser writes user-authored messages only. The trusted chat-turn Edge Function
 -- persists assistant replies with service_role. The character opening is reconstructed
 -- from the session snapshot by the frontend and is not inserted by the browser.
@@ -19,6 +17,8 @@ security definer
 set search_path = ''
 as $function$
 declare
+  v_charge public.chat_turn_charges%rowtype;
+  v_locked_charge public.chat_turn_charges%rowtype;
   v_old_charge public.chat_turn_charges%rowtype;
   v_new_charge public.chat_turn_charges%rowtype;
   v_has_old_charge boolean := false;
@@ -28,27 +28,28 @@ begin
     return new;
   end if;
 
-  -- Lock both possible turn records independently. An OR + ORDER BY + LIMIT
-  -- can select only one row when an ID swap crosses two different turns.
-  select c.* into v_old_charge
-  from public.chat_turn_charges c
-  where c.expected_assistant_message_id = old.id
-  for update;
-  v_has_old_charge := found;
-
-  if new.id is distinct from old.id then
-    select c.* into v_new_charge
+  -- Lock matching charge rows in a deterministic ID order. This both detects
+  -- cross-turn ID swaps and avoids opposite-order locks for concurrent A<->B swaps.
+  for v_locked_charge in
+    select c.*
     from public.chat_turn_charges c
-    where c.expected_assistant_message_id = new.id
-    for update;
-    v_has_new_charge := found;
-  else
-    v_new_charge := v_old_charge;
-    v_has_new_charge := v_has_old_charge;
-  end if;
+    where c.expected_assistant_message_id = old.id
+       or c.expected_assistant_message_id = new.id
+    order by c.expected_assistant_message_id
+    for update
+  loop
+    if v_locked_charge.expected_assistant_message_id = old.id then
+      v_old_charge := v_locked_charge;
+      v_has_old_charge := true;
+    end if;
+    if v_locked_charge.expected_assistant_message_id = new.id then
+      v_new_charge := v_locked_charge;
+      v_has_new_charge := true;
+    end if;
+  end loop;
 
   if v_has_old_charge and v_has_new_charge
-     and v_old_charge.id is distinct from v_new_charge.id then
+     and v_old_charge.turn_id is distinct from v_new_charge.turn_id then
     raise exception 'assistant_message_turn_id_conflict';
   end if;
 
