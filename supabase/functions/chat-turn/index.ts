@@ -134,7 +134,8 @@ Deno.serve(async (request) => {
     }
 
     const { error: refundAgainError } = await admin.rpc("refund_chat_turn", {
-      p_user_id: user.id, p_turn_id: turnId, p_failure_code: "demo_reply_not_persisted",
+      p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
+      p_failure_code: "demo_reply_not_persisted",
     });
     if (refundAgainError) return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
     return json({ status: "refunded", error: "demo_reply_not_persisted", recovered: true }, 503);
@@ -185,7 +186,8 @@ Deno.serve(async (request) => {
     }
 
     const { error: refundError } = await admin.rpc("refund_chat_turn", {
-      p_user_id: user.id, p_turn_id: turnId, p_failure_code: "assistant_persistence_failed",
+      p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
+      p_failure_code: "assistant_persistence_failed",
     });
     if (refundError) return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
     return json({ status: "refunded", error: "assistant_persistence_failed" }, 503);
