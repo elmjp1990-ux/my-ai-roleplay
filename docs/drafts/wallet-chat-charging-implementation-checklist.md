@@ -27,9 +27,9 @@ Status: partial source implementation on the feature branch only. No production 
 - [ ] Ensure every failed send reaches a terminal failure/refund outcome or explicit `needs_reconciliation` state.
 
 ### P2 — Functional integration and verification
-- [ ] Route the current fixed demo response through the same charge lifecycle; do not wait for real AI integration.
+- [x] Route the current fixed demo response through the same charge lifecycle; do not wait for real AI integration.
 - [x] Stop treating a chat turn as complete when `saveChatSessionSafely` fails: the feature-branch handler rolls back the local reply and newly added memories.
-- [ ] Route the fixed demo response through the server-side charge lifecycle; the browser handler is not yet wired to the new Edge Function.
+- [x] Wire the browser handler to the server-side fixed-demo `chat-turn` Edge Function using stable turn/message IDs.
 - [ ] Keep edit-without-regeneration free; a new generation is a new billable turn.
 - [ ] Verify the authoritative wallet balance after success/refund.
 - [ ] Test silver-only, diamond-only, mixed payment, insufficient balance, double-click, concurrent turns, retries, refresh/relogin, provider failure, empty response, persistence failure, stale reservation, and lost acknowledgement.
@@ -62,4 +62,4 @@ Do not merge or deploy until:
 
 ## Current boundary
 
-This checklist is committed only to `feat/ayet-rewarded-video-callback`. The chat persistence rollback fix, draft atomic wallet RPC SQL, and demo Edge Function source now exist on the branch, but the SQL has not been applied, the function is not deployed, and the frontend is not yet wired to it. The SQL/function pair still needs review and repeatable tests before any deployment. P3 UI polish remains explicitly lower priority.
+This checklist is committed only to `feat/ayet-rewarded-video-callback`. The chat persistence rollback fix, draft wallet RPC SQL, demo Edge Function source, and frontend invocation path now exist on the branch. The SQL has not been applied and the function is not deployed. The source review corrected an assistant-message ID collision risk by replacing upsert with insert plus exact-content recovery checks. SQL/function semantics still need repeatable tests before deployment. P3 UI polish remains explicitly lower priority.
