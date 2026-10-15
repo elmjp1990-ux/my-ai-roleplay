@@ -209,6 +209,7 @@ $function$;
 create or replace function public.refund_chat_turn(
   p_user_id uuid,
   p_turn_id uuid,
+  p_assistant_message_id uuid,
   p_failure_code text
 )
 returns table(status text, balance_silver integer, balance_diamonds integer)
@@ -230,7 +231,12 @@ begin
     return;
   end if;
   if v_charge.status = 'settled' then raise exception 'settled_turn_cannot_be_refunded'; end if;
-  if v_charge.status <> 'reserved' then raise exception 'turn_not_refundable'; end if;
+  if v_charge.status not in ('reserved','needs_reconciliation') then raise exception 'turn_not_refundable'; end if;
+  if p_assistant_message_id is not null and exists (
+    select 1 from public.chat_messages m
+    where m.id=p_assistant_message_id and m.session_id=v_charge.session_id
+      and m.role='assistant' and m.deleted_at is null and length(btrim(m.content)) > 0
+  ) then raise exception 'reply_already_persisted'; end if;
 
   select w.* into v_wallet from public.wallet_accounts w
     where w.user_id=p_user_id for update;
@@ -266,9 +272,9 @@ $function$;
 
 revoke all on function public.reserve_chat_turn(uuid,uuid,uuid,uuid) from public, anon, authenticated;
 revoke all on function public.settle_chat_turn(uuid,uuid,uuid) from public, anon, authenticated;
-revoke all on function public.refund_chat_turn(uuid,uuid,text) from public, anon, authenticated;
+revoke all on function public.refund_chat_turn(uuid,uuid,uuid,text) from public, anon, authenticated;
 grant execute on function public.reserve_chat_turn(uuid,uuid,uuid,uuid) to service_role;
 grant execute on function public.settle_chat_turn(uuid,uuid,uuid) to service_role;
-grant execute on function public.refund_chat_turn(uuid,uuid,text) to service_role;
+grant execute on function public.refund_chat_turn(uuid,uuid,uuid,text) to service_role;
 
 commit;
