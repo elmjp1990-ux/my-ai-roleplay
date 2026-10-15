@@ -871,6 +871,21 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       if (error) throw new Error(error.message);
 
       const ids = (rows || []).map(row => row.id);
+      const authorIds = [...new Set((rows || []).map(row => row.author_id).filter(Boolean))];
+      if (authorIds.length) {
+        const profileResult = await client.from('profiles')
+          .select('id, handle, nickname, avatar_url, bio')
+          .in('id', authorIds);
+        if (profileResult.error) throw new Error('讀取角色作者資料失敗：' + profileResult.error.message);
+        for (const profile of profileResult.data || []) {
+          state.authors[profile.id] = {
+            uid:profile.id, handle:profile.handle || '',
+            nickname:profile.nickname || profile.handle || 'PersonaX 使用者',
+            avatar:profile.avatar_url || '', bio:profile.bio || '',
+            fans:state.authors[profile.id]?.fans || 0
+          };
+        }
+      }
       let stories = [];
       if (ids.length) {
         const result = await client
@@ -2514,7 +2529,7 @@ function renderConversation() {
             <div class="row" style="gap:1px">
               <button class="ghost" data-action="chat-overlay" data-kind="album" aria-label="回憶相簿">${ICON.album}</button>
               <button class="ghost" data-action="chat-overlay" data-kind="diary" aria-label="甜蜜日記">${ICON.diary}</button>
-              <button class="ghost" data-action="chat-settings" aria-label="聊天功能">${ICON.menu}</button>
+              <button class="ghost" data-action="chat-settings" data-id="${e(s.id)}" aria-label="聊天功能">${ICON.menu}</button>
             </div>
           </div>
           <div class="chat-meta">${environment()}${wallet()}</div>
@@ -2802,30 +2817,24 @@ function renderModal(o) {
     case 'group':
       showDialog('創建群組','<p>群組功能將限定月費會員使用，目前尚未接入會員驗證與多角色聊天。</p>');
       break;
-    case 'session-menu': {
-      const selected = state.sessions[o.id];
+    case 'session-menu':
+    case 'chat-settings': {
+      const selected = state.sessions[o.id] || s;
       if (!selected) return;
-      showDialog('聊天管理',`
+      showDialog('聊天功能',`
         <div class="stack">
-          <button class="danger" style="width:100%" data-action="remove-session" data-id="${e(o.id)}">刪除這段對話與回憶</button>
+          <label class="field"><span>聊天背景</span>
+            <select id="backgroundSetting" data-session-id="${e(selected.id)}">
+              <option value="avatar" ${selected.background !== 'none' ? 'selected' : ''}>角色頭像</option>
+              <option value="none" ${selected.background === 'none' ? 'selected' : ''}>無背景</option>
+            </select>
+          </label>
+          <button class="primary" style="width:100%" data-action="new-conversation" data-id="${e(selected.id)}">開始新對話</button>
+          <button style="width:100%" data-action="archives" data-id="${e(selected.id)}">舊的回憶</button>
+          <button class="danger" style="width:100%" data-action="remove-session" data-id="${e(selected.id)}">刪除這段對話與回憶</button>
         </div>`);
       break;
     }
-    case 'chat-settings':
-      if (!s) return;
-      showDialog('聊天功能',`
-        <div class="stack">
-          <button style="width:100%" data-action="session-menu" data-id="${e(s.id)}">聊天管理</button>
-          <label class="field"><span>聊天背景</span>
-            <select id="backgroundSetting">
-              <option value="avatar" ${s.background !== 'none' ? 'selected' : ''}>角色頭像</option>
-              <option value="none" ${s.background === 'none' ? 'selected' : ''}>無背景</option>
-            </select>
-          </label>
-          <button class="primary" style="width:100%" data-action="new-conversation">開始新對話</button>
-          <button style="width:100%" data-action="archives">舊的回憶</button>
-        </div>`);
-      break;
     case 'persona':
       if (!s) return;
       showDialog('專屬人設',`
@@ -2836,7 +2845,7 @@ function renderModal(o) {
         </form>`);
       break;
     case 'archives':
-      renderArchives();
+      renderArchives(o.id);
       break;
     case 'archive':
       renderArchive(o.id,o.tab || 'messages');
@@ -2947,8 +2956,8 @@ function renderModal(o) {
     }
   }
 }
-function renderArchives() {
-  const s = currentSession();
+function renderArchives(sessionId) {
+  const s = (sessionId && state.sessions[sessionId]) || currentSession();
   if (!s) return;
   const list = Object.values(state.sessions).filter(item =>
     item.characterId === s.characterId && item.archived
@@ -3010,7 +3019,7 @@ document.addEventListener('click',async event => {
   }
   const action = button.dataset.action;
   const key = button.dataset.id;
-  const s = currentSession();
+  const s = (key && state.sessions[key]) || currentSession();
 
   if (state.account?.accountDeletionPending &&
       !['home','pending-dismiss-deletion-modal','pending-show-deletion-modal','cancel-account-deletion','logout','pending-switch-account'].includes(action)) {
@@ -3208,7 +3217,7 @@ document.addEventListener('click',async event => {
         persist();render();break;
       case 'snapshot':openModal('snapshot');break;
       case 'persona':openModal('persona');break;
-      case 'archives':openModal('archives');break;
+      case 'archives':openModal('archives',{id:key});break;
       case 'new-conversation': {
         let c=sessionCharacter(s);
         if (!s || !c) break;
@@ -3687,13 +3696,15 @@ document.addEventListener('change',async event => {
       toast('頭像已讀取，儲存後套用。');
     }
     if (target.id==='backgroundSetting') {
-      const s=currentSession();
+      const s=(target.dataset.sessionId && state.sessions[target.dataset.sessionId]) || currentSession();
       if (s && ['avatar','none'].includes(target.value)) {
         s.background=target.value;
         persist();
         const panel=$('view').querySelector('.chat-main');
-        panel?.style.setProperty('--chat-photo',target.value==='none' ? 'none' :
-          `url(${JSON.stringify(safeImage(sessionCharacter(s).image))})`);
+        if (panel && route.id === s.id) {
+          panel.style.setProperty('--chat-photo',target.value==='none' ? 'none' :
+            `url(${JSON.stringify(safeImage(sessionCharacter(s).image))})`);
+        }
       }
     }
     if (target.dataset.memory) {
