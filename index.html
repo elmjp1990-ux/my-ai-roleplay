@@ -1505,8 +1505,11 @@ function sessionCharacter(s) {
     owner:false, cloudSnapshotOnly:true};
 }
 function canAccessSessionCharacter(s,c) {
-  return !!c && (accessible(c) ||
-    (!!s?.cloudOwned && !!currentUser()?.uid && s.cloudOwnerUid === currentUser().uid));
+  const uid = currentUser()?.uid;
+  const ownedCloudSession = !!s?.cloudOwned && !!uid && s.cloudOwnerUid === uid;
+  const existingLocalSession = !!s?.id && !!uid && !s.cloudOwned &&
+    state.sessions?.[s.id]?.characterId === s.characterId;
+  return !!c && (accessible(c) || ownedCloudSession || existingLocalSession);
 }
 const isMobile = () => matchMedia('(max-width:767px)').matches;
 
@@ -2138,7 +2141,7 @@ function renderDetail() {
               </div>`}
         </section>
       </div>
-      ${offline ? '' : `<section class="panel">
+      ${offline || route.page === 'session-detail' ? '' : `<section class="panel">
         <h2>評論</h2>
         <div id="comments"></div>
         <div id="replyHint" class="small muted" style="margin-top:15px"></div>
@@ -2151,7 +2154,7 @@ function renderDetail() {
         </form>
       </section>`}
     </div>`;
-  if (!offline) renderComments();
+  if (!offline && route.page !== 'session-detail') renderComments();
 }
 function renderComments() {
   if (!$('comments')) return;
@@ -3228,6 +3231,10 @@ document.addEventListener('click',async event => {
           }
         }
         if (c.deletedAt || (c.visibility !== 'public' && (!owned(c) || c.firstPublishedAt))) {
+          // 先關閉設定對話框；原生 dialog 位於 top layer，單純提高 toast 的 z-index 仍可能被遮住。
+          const cleanRoute={...route};
+          delete cleanRoute.overlay;
+          go(cleanRoute,true);
           toast('此角色已被作者調整為私密或刪除狀態，不支持開啟新對話');
           break;
         }
