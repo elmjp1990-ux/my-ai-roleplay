@@ -41,6 +41,34 @@ Create a dedicated `chat_turn_charges` table, separate from the wallet transacti
 
 Add database uniqueness for the logical turn ID and unique wallet-ledger references per turn and currency/transaction kind, so accidental duplicate ledger writes are rejected by the database rather than relying on JavaScript.
 
+## Persistent failure and attempt audit (new requirement)
+
+The owner requested that failed sends also be recorded in the database. Implement this as a server-owned append-only `chat_turn_events` audit log linked to `turn_id` and the charge row, rather than relying on browser console logs or overwriting one last-error field.
+
+Recommended event fields:
+
+- Event UUID, `turn_id`, `user_id`, `session_id`, event type, stage, occurred-at timestamp.
+- Sanitized stable error code/category, retryable flag, attempt number, duration in milliseconds, and provider request/job ID when safe and available.
+- Examples: `request_received`, `reserved`, `generation_started`, `provider_timeout`, `provider_error`, `empty_response`, `message_persist_failed`, `settled`, `refund_started`, `refunded`, `needs_reconciliation`, `reconciled`.
+- Do not store API keys, authorization headers, HMAC/signature values, raw stack traces, full prompts, or full generated content in this operational log. Chat content remains in the existing message/version records; logs should reference stable IDs.
+- Log confirmed insufficient-balance attempts too, but do not create a charge or wallet ledger debit for them. Rate-limit or aggregate unauthenticated noise to prevent log flooding.
+- Enable RLS; clients may only read their own sanitized history if a user-facing history is needed. All event inserts must be server-side only. Restrict service-role access and retention; define a retention period before public launch.
+- A failed request must have an explicit final outcome or `needs_reconciliation`; failures must not be recorded only in localStorage. The charge row remains the source of truth for money state, while events explain how it reached that state.
+
+## Frontend interaction: typing / generating state (new requirement)
+
+The owner requested a roleplay-style typing indicator while waiting for a reply. Add this as a separate, reusable chat UI component, but keep its state driven by the same server turn state machine so the animation cannot claim success on its own.
+
+- Immediately after the send is accepted and reservation begins, disable the send button and show a spinner on the paper-plane button.
+- In the message area show a subtle typing indicator, such as three animated dots and muted italic text like `角色正在輸入…`; use the character's display name when available.
+- Respect both dark and light themes; use muted theme variables and accessible status text (e.g. `role=status`, `aria-live=polite`). Honor reduced-motion preferences; provide a non-animated fallback.
+- At 45 seconds, change the text to a calm waiting message (e.g. `回覆需要一點時間，請稍候…`) without launching another request.
+- At 90 seconds, show a delayed state and query the authoritative turn status. Do not automatically refund, regenerate, or enable a second generation merely because the browser timer elapsed.
+- On confirmed success, replace the typing indicator with the persisted assistant message only after settlement is confirmed.
+- On confirmed failure/refund, remove the typing indicator, preserve the user's text as failed/not delivered, show a concise error and a retry action that reuses the same logical turn only if the server says retry/recovery is safe.
+- If outcome is unknown, keep a recoverable pending state and let server reconciliation resolve it. On refresh/relogin, reconstruct the indicator from server state rather than from a client-only timer.
+- Animation is decorative only: it must not determine charge, refund, or AI success.
+
 ## Trusted processing architecture
 
 For real AI integration, a server-side Edge Function should own the complete lifecycle: authenticate the caller, validate ownership/account status, reserve, invoke the AI provider, persist the result, then settle or refund. The browser must not be trusted to report “AI succeeded” or choose a refund amount.
@@ -76,6 +104,7 @@ The existing application creates a cloud session only after the first user messa
 2. The same `turn_id` must not initiate a second provider generation after a result is already stored. Reuse provider idempotency support if available; otherwise persist an explicit in-progress state and reconcile ambiguous timeouts before retrying.
 3. Treat provider errors, invalid/empty responses, and failed durable message persistence as failures.
 4. Persist the assistant message with a stable ID and associate it with the charge. Do not rely on localStorage as proof of a successful paid reply.
+5. Record each meaningful stage transition and sanitized failure in `chat_turn_events`, including failures that happen before a charge is reserved.
 
 ### Settle
 
@@ -110,13 +139,14 @@ The existing application creates a cloud session only after the first user messa
 - Concurrent distinct turns cannot overdraw the wallet.
 - Session ownership, soft deletion, character status, and account-deletion-pending are enforced server-side.
 - First message/session creation followed by insufficient balance has a clear, recoverable state.
-- Provider error, empty response, persistence failure, and server crash refund at most once.
+- Provider error, empty response, persistence failure, and server crash refund at most once and write an audit event.
 - Timeout with unknown provider result enters reconciliation instead of blindly retrying/refunding.
 - Saved response with lost settlement acknowledgement recovers without another generation or charge.
 - Settled turns cannot be refunded; refunded turns cannot later settle/deliver as successful.
 - Editing without regeneration does not charge.
-- Refresh/relogin shows balances and turn status consistent with the database ledger.
+- Typing indicator reflects server state, handles 45/90-second thresholds, and respects reduced-motion preference.
+- Refresh/relogin shows balances and turn status consistent with the database ledger and failure log.
 
 ## Safety boundary
 
-This is a design document committed to `feat/ayet-rewarded-video-callback` only. It has not been applied to Supabase, merged to main, or deployed. No production data or schema has been changed. The next implementation step is to draft the idempotent ledger/RPC contract and frontend/server orchestration against the current schema, then review it before any database migration or deployment.
+This is a design document committed to `feat/ayet-rewarded-video-callback` only. It has not been applied to Supabase, merged to main, or deployed. No production data or schema has been changed. Next step is to implement and review the audit/ledger contract and frontend/server orchestration against current schema before any database migration or deployment.
