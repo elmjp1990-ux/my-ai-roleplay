@@ -3206,7 +3206,7 @@ document.addEventListener('click',async event => {
         else closeModal();
         break;
       }
-      case 'chat-settings':openModal('chat-settings');break;
+      case 'chat-settings':openModal('chat-settings',{id:key});break;
       case 'suggestion':
         $('messageInput').value=button.dataset.text;
         drafts[route.id]=button.dataset.text;
