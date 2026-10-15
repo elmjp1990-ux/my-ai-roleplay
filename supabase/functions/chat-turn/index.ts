@@ -147,14 +147,15 @@ Deno.serve(async (request) => {
       return json({ status: settledAgain, assistantMessage: recoveredReply, recovered: true });
     }
 
-    const { error: refundAgainError } = await admin.rpc("refund_chat_turn", {
-      p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
-      p_failure_code: "demo_reply_not_persisted",
+    // A missing reply alone does not prove that another concurrent attempt
+    // is no longer writing it. Keep the reservation and retry the same stable
+    // demo message ID; never refund based only on a point-in-time absence.
+    await admin.from("chat_turn_events").insert({
+      turn_id: turnId, user_id: user.id, event_type: "reconciliation_retry_started",
+      stage: "demo_generation",
     });
-    if (refundAgainError) return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
-    return json({ status: "refunded", error: "demo_reply_not_persisted", recovered: true }, 503);
   }
-  if (charge.status !== "reserved") return json({ error: "turn_not_processable" }, 409);
+  if (charge.status !== "reserved" && charge.status !== "needs_reconciliation") return json({ error: "turn_not_processable" }, 409);
 
   await admin.from("chat_turn_events").insert({
     turn_id: turnId, user_id: user.id, event_type: "generation_started",
