@@ -1697,6 +1697,31 @@ async function loadCloudChatSessions(user) {
       messageRows = result.data || [];
     }
     if (state.account?.uid !== user.id) return;
+
+    // 私密／已下架角色不會出現在公開角色清單；從既有聊天快照恢復作者 ID，
+    // 並只讀取作者公開的 profiles 欄位，讓其他帳號也能正確顯示 BY 名稱。
+    const snapshotAuthorIds = [...new Set(sessions
+      .map(row => row.character_snapshot && typeof row.character_snapshot === 'object'
+        ? row.character_snapshot.authorId : null)
+      .filter(Boolean))];
+    if (snapshotAuthorIds.length) {
+      const profileResult = await client.from('profiles')
+        .select('id, handle, nickname, avatar_url, bio')
+        .in('id', snapshotAuthorIds);
+      if (profileResult.error) {
+        console.warn('既有聊天作者資料載入失敗：', profileResult.error.message);
+      } else {
+        for (const profile of profileResult.data || []) {
+          state.authors[profile.id] = {
+            uid:profile.id, handle:profile.handle || '',
+            nickname:profile.nickname || profile.handle || 'PersonaX 使用者',
+            avatar:profile.avatar_url || '', bio:profile.bio || '',
+            fans:state.authors[profile.id]?.fans || 0
+          };
+        }
+      }
+    }
+
     const bySession = new Map();
     for (const row of messageRows) {
       if (!bySession.has(row.session_id)) bySession.set(row.session_id, []);
@@ -1722,9 +1747,20 @@ async function loadCloudChatSessions(user) {
         messages:cloudMessages.length ? cloudMessages : (existing?.messages || []),
         cloudOwned:true, cloudOwnerUid:user.id, cloudCharacterSnapshot:snapshot
       };
-      if (!state.characters.some(character => character.id === row.character_id) && snapshot.id === row.character_id) {
-        state.characters.push({...snapshot, id:row.character_id, name:snapshot.name || row.character_name || '角色',
-          visibility:'private', reviewStatus:'draft', authorId:'', owner:false, cloudSnapshotOnly:true});
+      if (snapshot.id === row.character_id) {
+        const existingCharacterIndex = state.characters.findIndex(character => character.id === row.character_id);
+        if (existingCharacterIndex >= 0) {
+          const existingCharacter = state.characters[existingCharacterIndex];
+          // 既有本機角色資料若缺作者 ID，以雲端聊天快照補齊，不覆蓋已存在的作者 ID。
+          if (!existingCharacter.authorId && snapshot.authorId) {
+            state.characters[existingCharacterIndex] = {
+              ...existingCharacter, authorId:snapshot.authorId
+            };
+          }
+        } else {
+          state.characters.push({...snapshot, id:row.character_id, name:snapshot.name || row.character_name || '角色',
+            visibility:'private', reviewStatus:'draft', authorId:snapshot.authorId || '', owner:false, cloudSnapshotOnly:true});
+        }
       }
       changed = true;
     }
