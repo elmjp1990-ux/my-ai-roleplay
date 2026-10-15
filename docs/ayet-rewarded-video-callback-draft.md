@@ -48,3 +48,22 @@ This URL is only a planned format. Do not enter it into the publisher dashboard 
 4. In one database transaction, record the unique provider event, validate user mapping and active-account rules, update `wallet_accounts`, and insert the `wallet_transactions` ledger entry.
 5. Test invalid signatures, tampered amounts, wrong AdSlot IDs, duplicate and concurrent deliveries, unknown users, account deletion-pending users, and database errors without granting real rewards.
 6. Deploy only after review and explicit approval.
+
+
+## Read-only schema findings (2026-10-15)
+
+Checked the connected Supabase schema without changing data or deploying code:
+
+- `wallet_accounts` stores one row per user with non-negative `diamonds` and `silver_coins` balances.
+- `wallet_transactions` currently has only its primary-key unique index; there is no unique idempotency key on `(user_id, biz_type, reference_id)`. Its existing observed transaction type is `signup_bonus` / `silver_coins`; no chat-spend or ad-reward transaction types have been written yet.
+- `chat_sessions` has `id`, `user_id`, `status`, and `deleted_at`; `chat_messages` has `id`, `session_id`, `role`, and `deleted_at`, but no direct `user_id`. A secure charge must verify session ownership by joining `chat_sessions.user_id = auth.uid()`, and must define a stable unique key for the billable user turn.
+- `account_is_active()` currently returns false when no user is authenticated or when an `account_deletion_requests` row exists for the signed-in user. The existing wallet initializer uses this guard.
+- No Supabase Edge Functions are currently deployed in this project.
+
+## Consequences for implementation
+
+1. Do not add client-side balance updates or allow the browser to choose an arbitrary account ID.
+2. A database transaction must lock the wallet row, validate active account and owned/non-deleted chat session, and deduct exactly two units atomically. Proposed default ordering is silver coins first, then diamonds for any remainder, allowing mixed payment; confirm product semantics before release.
+3. A server-generated stable turn/request UUID must be reused for retries. The database must enforce idempotency for that charge key, and the charge ledger and wallet update must commit or roll back together. Do not assume `ai_generation_records.request_id` is suitable until the generation flow proves it is generated once per user turn and reused on retry.
+4. Reward callback idempotency needs a separate unique provider transaction ID and must credit only a fixed server-side silver amount after signature and approved rewarded-video AdSlot validation.
+5. These are design findings only. No SQL was applied, no Edge Function was deployed, and no live wallet rows were changed.
