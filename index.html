@@ -2815,6 +2815,18 @@ function groupRenderScenes() {
   const n=g.draft.mode==='shared'?1:3;
   return Array.from({length:n},(_,i)=>'<label class="group-field"><span>場景 '+(i+1)+' 名稱</span><input id="groupSceneName'+i+'" maxlength="80" value="'+e(g.draft.scenes[i]?.name||('場景 '+(i+1)))+'" placeholder="輸入場景名稱"></label><label class="group-field"><span>場景 '+(i+1)+' 描述</span><textarea id="groupSceneDesc'+i+'" maxlength="5000" placeholder="地點、時間與目前情況">'+e(g.draft.scenes[i]?.description||'')+'</textarea></label>').join('');
 }
+document.addEventListener('change',event => {
+  if (event.target?.id !== 'groupModeInput' || route.page !== 'group' || groupPrototype.step !== 2) return;
+  const oldMode=groupPrototype.draft.mode;
+  const oldCount=oldMode==='shared'?1:3;
+  const captured=Array.from({length:oldCount},(_,i)=>({
+    name:$('groupSceneName'+i)?.value.trim()||groupPrototype.draft.scenes[i]?.name||'',
+    description:$('groupSceneDesc'+i)?.value||groupPrototype.draft.scenes[i]?.description||''
+  }));
+  groupPrototype.draft.scenes=captured.concat(groupPrototype.draft.scenes.slice(captured.length));
+  groupPrototype.draft.mode=event.target.value;
+  render();
+});
 function groupRenderCharacters() {
   const chars=groupAvailableCharacters();
   if (!chars.length) return '<div class="group-alert">目前找不到可選角色。請先登入並建立角色，或讓測試環境載入公開示範角色。這個原型不會自動新增角色。</div>';
