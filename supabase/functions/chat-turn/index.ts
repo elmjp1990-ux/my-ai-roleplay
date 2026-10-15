@@ -115,7 +115,7 @@ Deno.serve(async (request) => {
   }
   if (charge.status === "settled") {
     const { data: savedReply, error: savedReplyError } = await admin
-      .from("chat_messages").select("id,content")
+      .from("chat_messages").select("id,content,role")
       .eq("id", assistantMessageId).eq("session_id", sessionId)
       .eq("role", "assistant").is("deleted_at", null).maybeSingle();
     if (savedReplyError || !savedReply) return json({ error: "settled_reply_lookup_failed" }, 503);
@@ -128,7 +128,7 @@ Deno.serve(async (request) => {
     // A real AI provider integration must also query the provider/job status
     // before refunding an absent reply.
     const { data: recoveredReply, error: recoveredReplyError } = await admin
-      .from("chat_messages").select("id,content")
+      .from("chat_messages").select("id,content,role")
       .eq("id", assistantMessageId).eq("session_id", sessionId)
       .eq("role", "assistant").is("deleted_at", null).maybeSingle();
 
@@ -182,7 +182,7 @@ Deno.serve(async (request) => {
     });
     // Do not refund until a follow-up read confirms the reply is absent.
     const { data: possibleReply, error: verifyError } = await admin
-      .from("chat_messages").select("id,content")
+      .from("chat_messages").select("id,content,role")
       .eq("id", assistantMessageId).eq("session_id", sessionId)
       .eq("role", "assistant").is("deleted_at", null).maybeSingle();
 
@@ -255,7 +255,7 @@ Deno.serve(async (request) => {
     // only if the exact deterministic reply is now durable; otherwise keep the
     // turn unresolved rather than refunding or claiming success.
     const { data: finalReply, error: finalReplyError } = await admin
-      .from("chat_messages").select("id,content")
+      .from("chat_messages").select("id,content,role")
       .eq("id", assistantMessageId).eq("session_id", sessionId)
       .eq("role", "assistant").is("deleted_at", null).maybeSingle();
 
