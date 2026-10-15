@@ -220,7 +220,10 @@ BEGIN
   FOR v_scene IN SELECT value FROM jsonb_array_elements(p_scenes)
   LOOP
     v_position := v_position + 1;
-    IF char_length(btrim(COALESCE(v_scene->>'name',''))) NOT BETWEEN 1 AND 80
+    IF jsonb_typeof(v_scene) IS DISTINCT FROM 'object'
+      OR jsonb_typeof(v_scene->'name') IS DISTINCT FROM 'string'
+      OR (v_scene ? 'description' AND jsonb_typeof(v_scene->'description') IS DISTINCT FROM 'string')
+      OR char_length(btrim(COALESCE(v_scene->>'name',''))) NOT BETWEEN 1 AND 80
       OR char_length(COALESCE(v_scene->>'description','')) > 5000 THEN
       RAISE EXCEPTION 'invalid_scene_payload' USING ERRCODE = '22023';
     END IF;
@@ -232,6 +235,12 @@ BEGIN
   FOR v_member IN SELECT value FROM jsonb_array_elements(p_members)
   LOOP
     v_position := v_position + 1;
+    IF jsonb_typeof(v_member) IS DISTINCT FROM 'object'
+      OR jsonb_typeof(v_member->'character_id') IS DISTINCT FROM 'string'
+      OR NULLIF(v_member->>'character_id', '') IS NULL THEN
+      RAISE EXCEPTION 'invalid_member_payload' USING ERRCODE = '22023';
+    END IF;
+
     BEGIN
       v_character_id := (v_member->>'character_id')::uuid;
     EXCEPTION WHEN invalid_text_representation THEN
@@ -253,11 +262,6 @@ BEGIN
       WHERE m.group_id = v_group_id AND m.character_id = v_character_id
     ) THEN
       RAISE EXCEPTION 'duplicate_character' USING ERRCODE = '22023';
-    END IF;
-
-    IF jsonb_typeof(v_member) IS DISTINCT FROM 'object'
-      OR NULLIF(v_member->>'character_id', '') IS NULL THEN
-      RAISE EXCEPTION 'invalid_member_payload' USING ERRCODE = '22023';
     END IF;
 
     IF p_scene_mode = 'shared' THEN
