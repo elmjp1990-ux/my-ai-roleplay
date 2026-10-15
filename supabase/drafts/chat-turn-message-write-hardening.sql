@@ -24,7 +24,13 @@ declare
   v_has_old_charge boolean := false;
   v_has_new_charge boolean := false;
 begin
-  if old.role <> 'assistant' and new.role <> 'assistant' then
+  -- A message's semantic role is immutable, including user -> system. Otherwise
+  -- a client with UPDATE access could turn player text into a privileged prompt.
+  if new.role is distinct from old.role then
+    raise exception 'chat_message_role_is_immutable';
+  end if;
+
+  if old.role <> 'assistant' then
     return new;
   end if;
 
