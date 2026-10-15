@@ -66,7 +66,7 @@ begin
     select 1
     from public.account_deletion_archive_batches b
     where b.target_user_id = v_user_id
-      and b.status not in ('archived', 'cancelled')
+      and (b.status is null or b.status not in ('archived', 'cancelled'))
   ) then
     return query select false, 'manual_review_required'::text;
     return;
@@ -83,15 +83,18 @@ begin
     return;
   end if;
 
+  -- Select the archived batch explicitly. A newer cancelled batch must not
+  -- hide an older archived batch from the integrity check.
   select b.id, b.status
     into v_batch_id, v_batch_status
   from public.account_deletion_archive_batches b
   where b.target_user_id = v_user_id
+    and b.status = 'archived'
   order by b.created_at desc
   limit 1
   for update;
 
-  if v_batch_status = 'archived' then
+  if v_archived_batch_count = 1 and v_batch_status = 'archived' then
     select count(*) into v_ai_source
     from public.ai_generation_records a where a.user_id = v_user_id;
     select count(*) into v_ai_archived
@@ -157,6 +160,7 @@ commit;
 -- 1. Confirm actual table column types, PKs, FK requirements, and enum/status constraints.
 -- 2. Decide whether repeated calls after successful recovery should return a distinct idempotent success; this draft currently returns no_request.
 -- 3. Test row-lock coordination against the real worker before any worker is enabled.
--- 4. Verify source-table row visibility under SECURITY DEFINER and exact archive payload schema.
--- 5. Confirm the product/legal retention policy and whether audit events need FK/retention constraints.
--- 6. Do not apply to production until reviewed and explicitly approved.
+-- 4. Validate every archived batch row and status transition; this draft fails closed for multiple archived batches.
+-- 5. Verify source-table row visibility under SECURITY DEFINER and exact archive payload schema.
+-- 6. Confirm the product/legal retention policy and whether audit events need FK/retention constraints.
+-- 7. Do not apply to production until reviewed and explicitly approved.
