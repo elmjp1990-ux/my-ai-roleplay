@@ -1621,6 +1621,9 @@ async function saveChatSessionToCloud(s, options = {}) {
   }
   const priorSnapshot = s.cloudCharacterSnapshot && typeof s.cloudCharacterSnapshot === 'object'
     ? s.cloudCharacterSnapshot : {};
+  if (priorSnapshot.id && priorSnapshot.id !== s.characterId) {
+    throw new Error('既有聊天角色快照與角色 ID 不一致，已停止同步以避免覆寫錯誤角色資料。');
+  }
   if (!character && (!s.cloudOwned || !priorSnapshot.id)) {
     throw new Error('找不到這段聊天所屬的正式角色或既有角色快照。');
   }
@@ -1648,9 +1651,13 @@ async function saveChatSessionToCloud(s, options = {}) {
       .eq('id',s.id).eq('user_id',localUser.uid).maybeSingle();
     if (existing.error) throw new Error('檢查既有聊天失敗：'+existing.error.message);
     if (existing.data) {
+      const existingSnapshot = existing.data.character_snapshot;
+      if (existingSnapshot?.id && existingSnapshot.id !== s.characterId) {
+        throw new Error('雲端既有聊天的角色快照與角色 ID 不一致，已停止同步以避免覆寫錯誤角色資料。');
+      }
       s.cloudOwned = true;
       s.cloudOwnerUid = localUser.uid;
-      s.cloudCharacterSnapshot = existing.data.character_snapshot || snapshot;
+      s.cloudCharacterSnapshot = existingSnapshot || snapshot;
       const canonical = s.cloudCharacterSnapshot;
       snapshot.authorId = canonical.authorId || snapshot.authorId;
       snapshot.visibility = canonical.visibility || snapshot.visibility;
