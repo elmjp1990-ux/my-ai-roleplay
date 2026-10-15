@@ -279,6 +279,59 @@ begin
 end;
 $function$;
 
+-- Serialize assistant-message persistence against refunds. This closes the race where
+-- a refund checks for no reply while a concurrent request is still inserting it.
+create or replace function public.guard_chat_turn_assistant_insert()
+returns trigger
+language plpgsql
+security definer
+set search_path to ''
+as $function$
+declare
+  v_charge public.chat_turn_charges%rowtype;
+begin
+  if new.role <> 'assistant' then
+    return new;
+  end if;
+
+  if length(btrim(coalesce(new.content, ''))) = 0 then
+    raise exception 'assistant_reply_must_be_nonempty';
+  end if;
+
+  select c.* into v_charge
+  from public.chat_turn_charges c
+  where c.expected_assistant_message_id = new.id
+  for update;
+
+  if found then
+    if new.session_id is distinct from v_charge.session_id then
+      raise exception 'assistant_message_session_conflict';
+    end if;
+    if v_charge.status in ('refunded', 'insufficient_funds') then
+      raise exception 'turn_not_allowed_to_deliver_reply';
+    end if;
+    if v_charge.status = 'settled' then
+      raise exception 'turn_already_settled';
+    end if;
+    if v_charge.status not in ('reserved', 'needs_reconciliation') then
+      raise exception 'turn_not_ready_for_reply';
+    end if;
+  end if;
+
+  return new;
+end;
+$function$;
+
+revoke all on function public.guard_chat_turn_assistant_insert() from public, anon, authenticated;
+grant execute on function public.guard_chat_turn_assistant_insert() to service_role;
+
+drop trigger if exists guard_chat_turn_assistant_insert on public.chat_messages;
+create trigger guard_chat_turn_assistant_insert
+before insert on public.chat_messages
+for each row
+when (new.role = 'assistant')
+execute function public.guard_chat_turn_assistant_insert();
+
 revoke all on function public.reserve_chat_turn(uuid,uuid,uuid,uuid,uuid) from public, anon, authenticated;
 revoke all on function public.settle_chat_turn(uuid,uuid,uuid) from public, anon, authenticated;
 revoke all on function public.refund_chat_turn(uuid,uuid,uuid,text) from public, anon, authenticated;
