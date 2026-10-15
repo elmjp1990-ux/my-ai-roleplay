@@ -1932,7 +1932,7 @@ function showDialog(title,content) {
     });
   }
 
-  const pendingDeletionDialog = route?.overlay?.name === 'account-deletion-pending';
+  const pendingDeletionDialog = route?.overlay?.name === 'account-deletion-pending' && title === '帳號正在等待刪除';
   modal.innerHTML = `
     <div class="row between modal-heading">
       <h2>${e(title)}</h2>
@@ -3754,7 +3754,17 @@ document.addEventListener('submit',async event => {
       }
     }
   } catch(error) {
-    toast(error.message || '儲存未完成。');
+    if (type === 'cancel-account-deletion') {
+      console.error('PersonaX 帳號復原失敗：', error);
+      showDialog('復原帳號失敗', `
+        <p>系統目前無法取消這筆刪除申請。</p>
+        <div class="notice" role="alert" style="white-space:pre-wrap;overflow-wrap:anywhere">${e(error.message || '操作未完成，請稍後再試。')}</div>
+        <p class="muted small">這個錯誤視窗會一直保留，直到你手動關閉。此訊息不代表帳號已刪除；請先不要重新申請刪除或修改資料庫。</p>
+        <button class="primary" type="button" data-action="back">知道了</button>
+      `);
+    } else {
+      toast(error.message || '儲存未完成。');
+    }
   }
 });
 
