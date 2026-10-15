@@ -137,6 +137,9 @@ Deno.serve(async (request) => {
       return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
     }
     if (recoveredReply && String(recoveredReply.content || "").trim()) {
+      if (String(recoveredReply.content) !== demoReply) {
+        return json({ status: "needs_reconciliation", error: "assistant_message_id_collision", retryAllowed: false }, 409);
+      }
       const { data: settledAgain, error: settleAgainError } = await admin.rpc("settle_chat_turn", {
         p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
       });
