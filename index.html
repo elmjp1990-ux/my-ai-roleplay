@@ -1618,6 +1618,7 @@ async function saveChatSessionToCloud(s, options = {}) {
     age:character?.age ?? priorSnapshot.age ?? '',
     image:character?.image || priorSnapshot.image || '',
     intro:character?.intro ?? priorSnapshot.intro ?? '',
+    privateInfo:character?.privateInfo ?? priorSnapshot.privateInfo ?? '',
     opening:character?.opening ?? priorSnapshot.opening ?? '',
     race:character?.race ?? priorSnapshot.race ?? '',
     style:character?.style ?? priorSnapshot.style ?? '',
@@ -3622,7 +3623,8 @@ document.addEventListener('submit',async event => {
             session.cloudCharacterSnapshot={
               ...(session.cloudCharacterSnapshot || {}),
               id:c.id,name:c.name,gender:c.gender,age:c.age,image:c.image,intro:c.intro,
-              opening:c.opening,race:c.race,style:c.style,tags:Array.isArray(c.tags)?c.tags:[],
+              opening:c.opening,privateInfo:c.privateInfo ?? session.cloudCharacterSnapshot?.privateInfo ?? '',
+              race:c.race,style:c.style,tags:Array.isArray(c.tags)?c.tags:[],
               authorId:c.authorId,visibility:'private',
               firstPublishedAt:c.firstPublishedAt || session.cloudCharacterSnapshot?.firstPublishedAt || null,
               deletedAt
