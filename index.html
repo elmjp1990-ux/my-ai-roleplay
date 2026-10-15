@@ -1951,9 +1951,16 @@ async function runPendingChatTurn(s) {
   }
 
   const reply = result.assistantMessage;
-  if (!reply?.id || !String(reply.content || '').trim()) {
+  if (
+    !reply?.id ||
+    reply.id !== turn.assistantMessageId ||
+    (reply.role && reply.role !== 'assistant') ||
+    !String(reply.content || '').trim()
+  ) {
+    // A settled status is not enough to render an arbitrary response. Keep the
+    // stable pending IDs so the same turn can be safely re-read from the server.
     persist();
-    toast('扣款狀態已回報成功，但回覆資料尚待確認；請勿重複發送。');
+    toast('扣款狀態已回報成功，但回覆 ID、角色或內容不符；請勿重複發送。');
     return;
   }
 
