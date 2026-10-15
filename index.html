@@ -1587,7 +1587,18 @@ function chatSessionData(s) {
     suggestions:s.suggestions !== false, background:s.background || 'avatar',
     startedAt:s.startedAt || Date.now(), archivedAt:s.archivedAt || null,
     memories:Array.isArray(s.memories) ? s.memories : [],
-    album:Array.isArray(s.album) ? s.album : []
+    album:Array.isArray(s.album) ? s.album : [],
+    pendingTurn:s.pendingTurn &&
+      isUuid(s.pendingTurn.turnId) &&
+      isUuid(s.pendingTurn.userMessageId) &&
+      isUuid(s.pendingTurn.assistantMessageId)
+      ? {
+          turnId:s.pendingTurn.turnId,
+          userMessageId:s.pendingTurn.userMessageId,
+          assistantMessageId:s.pendingTurn.assistantMessageId,
+          createdAt:Number(s.pendingTurn.createdAt) || Date.now()
+        }
+      : null
   };
 }
 async function saveChatSessionToCloud(s, options = {}) {
@@ -1771,6 +1782,17 @@ async function loadCloudChatSessions(user) {
         suggestions:data.suggestions !== false, background:data.background || 'avatar',
         memories:Array.isArray(data.memories) ? data.memories : [],
         album:Array.isArray(data.album) ? data.album : [],
+        pendingTurn:data.pendingTurn &&
+          isUuid(data.pendingTurn.turnId) &&
+          isUuid(data.pendingTurn.userMessageId) &&
+          isUuid(data.pendingTurn.assistantMessageId)
+          ? {
+              turnId:data.pendingTurn.turnId,
+              userMessageId:data.pendingTurn.userMessageId,
+              assistantMessageId:data.pendingTurn.assistantMessageId,
+              createdAt:Number(data.pendingTurn.createdAt) || Date.now()
+            }
+          : null,
         messages:cloudMessages,
         cloudOwned:true, cloudOwnerUid:user.id, cloudCharacterSnapshot:snapshot
       };
@@ -1806,6 +1828,145 @@ async function saveChatSessionSafely(s) {
     console.error('PersonaX 聊天同步失敗：',error);
     toast(error.message || '聊天已保存在本機，但雲端同步失敗。');
     return false;
+  }
+}
+
+async function refreshWalletBalance() {
+  const user = currentUser();
+  if (!user || !window.mySupabase) return;
+  const { data, error } = await window.mySupabase.rpc('ensure_wallet_account');
+  if (error) {
+    console.warn('聊天扣款後錢包餘額同步失敗：', error.message);
+    return;
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || state.account?.uid !== user.uid) return;
+  state.account.diamonds = Number(row.diamonds ?? 0);
+  state.account.silver = Number(row.silver_coins ?? 0);
+  persist();
+  renderShell();
+}
+
+async function clearCloudPendingTurn(s) {
+  const user = currentUser();
+  const client = window.mySupabase;
+  if (!s || !user || !client || !s.cloudOwned || s.cloudOwnerUid !== user.uid) return;
+  const { error } = await client.from('chat_sessions')
+    .update({session_data:chatSessionData(s),updated_at:new Date().toISOString()})
+    .eq('id',s.id).eq('user_id',user.uid);
+  if (error) console.warn('清除雲端待處理回合標記失敗：',error.message);
+}
+
+async function runPendingChatTurn(s) {
+  const turn = s?.pendingTurn;
+  const user = currentUser();
+  const client = window.mySupabase;
+  if (!turn || !user || !client) return;
+
+  let result = null;
+  let invokeError = null;
+  try {
+    const response = await client.functions.invoke('chat-turn', {
+      body: {
+        turnId: turn.turnId,
+        sessionId: s.id,
+        userMessageId: turn.userMessageId,
+        assistantMessageId: turn.assistantMessageId
+      }
+    });
+    result = response.data;
+    invokeError = response.error;
+    if (invokeError && !result) {
+      const context = invokeError.context;
+      if (context && typeof context.json === 'function') {
+        try { result = await context.json(); } catch (_) {}
+      }
+    }
+  } catch (error) {
+    invokeError = error;
+  }
+
+  if (result?.status === 'insufficient_funds' || result?.error === 'insufficient_funds') {
+    delete s.pendingTurn;
+    persist();
+    renderMessages();
+    await saveChatSessionSafely(s);
+    await clearCloudPendingTurn(s);
+    await refreshWalletBalance();
+    openModal('wallet-insufficient');
+    return;
+  }
+
+  if (
+    result?.status === 'refunded' ||
+    result?.error === 'assistant_persistence_failed' ||
+    result?.error === 'turn_already_refunded'
+  ) {
+    delete s.pendingTurn;
+    persist();
+    renderMessages();
+    await saveChatSessionSafely(s);
+    await clearCloudPendingTurn(s);
+    await refreshWalletBalance();
+    toast('這次回覆未能保存，系統已退回本回合預扣的銀幣／鑽石。');
+    return;
+  }
+
+  if (
+    result?.error === 'user_message_not_found' ||
+    result?.error === 'chat_session_not_owned_or_active' ||
+    result?.error === 'account_not_active' ||
+    result?.error === 'wallet_not_ready'
+  ) {
+    s.messages = s.messages.filter(message => message.id !== turn.userMessageId);
+    delete s.pendingTurn;
+    persist();
+    await clearCloudPendingTurn(s);
+    renderMessages();
+    toast('這則訊息尚未進入扣款流程，請重新輸入後再送出。');
+    return;
+  }
+
+  if (result?.status !== 'settled' || invokeError) {
+    // Keep stable IDs locally. The next send action retries the same logical turn;
+    // it must not append another user message or create another charge.
+    persist();
+    toast('上一回合的結果尚未確認。再次按發送會沿用同一回合查詢／恢復，請勿另開重複訊息。');
+    return;
+  }
+
+  const reply = result.assistantMessage;
+  if (!reply?.id || !String(reply.content || '').trim()) {
+    persist();
+    toast('扣款狀態已回報成功，但回覆資料尚待確認；請勿重複發送。');
+    return;
+  }
+
+  if (!s.messages.some(message => message.id === reply.id)) {
+    s.messages.push({
+      id:reply.id,
+      role:'assistant',
+      text:String(reply.content),
+      at:Date.now()
+    });
+  }
+  delete s.pendingTurn;
+
+  const users = s.messages.filter(message => message.role === 'user');
+  if (users.length && users.length % 5 === 0) {
+    const snippets = users.slice(-5).map(message => [...message.text].slice(0,7).join('')).join('、');
+    addMemory(s,[...('本輪對話摘錄：'+snippets+'。')].slice(0,50).join(''));
+  }
+
+  persist();
+  renderMessages();
+  await refreshWalletBalance();
+
+  // The server has already durably saved and settled the assistant reply.
+  // A later session-metadata sync failure must never trigger a refund.
+  const metadataSaved = await saveChatSessionSafely(s);
+  if (!metadataSaved) {
+    toast('回覆與扣款已完成，但聊天附加資料同步失敗；回覆不會因此重複扣款。');
   }
 }
 
@@ -2836,6 +2997,13 @@ function renderModal(o) {
         <p class="muted">鑽石與銀幣為本機測試資料，不代表付費資產。
           清除瀏覽器資料會失去角色、聊天與回憶。請勿輸入真正機密。</p>`);
       break;
+    case 'wallet-insufficient':
+      showDialog('銀幣／鑽石不足',`
+        <p>每次新的角色回覆需要 2 點，會先使用銀幣，再以鑽石補足。</p>
+        <p>目前餘額不足，本回合沒有扣款，也沒有產生角色回覆。</p>
+        <p class="muted">獎勵影片功能尚未完成設定，現在不能播放影片或發放銀幣。請稍後再試，或先確認錢包餘額。</p>
+        <button class="primary" type="button" data-action="back">知道了</button>`);
+      break;
     case 'login':
       showDialog('登入 PersonaX',`
         <p class="muted">已連線至雲端資料庫，可使用 Google 帳號登入。</p>
@@ -3789,21 +3957,44 @@ document.addEventListener('submit',async event => {
       }
       case 'message': {
         if (!s || !currentUser()) return;
-        if (text) s.messages.push({id:id(),role:'user',text,at:Date.now()});
-        s.messages.push({
-          id:id(),role:'assistant',at:Date.now()+1,
-          text:text
-            ? '**他將目光移向你，耐心等待你繼續說下去。**\n「我在聽，你可以慢慢說。」'
-            : '**短暫的沉默後，他再次開口。**\n「如果你還不想說，我可以先陪你待一會兒。」'
-        });
-        const users=s.messages.filter(m=>m.role==='user');
-        if (text && users.length%5===0) {
-          const snippets=users.slice(-5).map(m=>[...m.text].slice(0,7).join('')).join('、');
-          addMemory(s,[...('本輪對話摘錄：'+snippets+'。')].slice(0,50).join(''));
+        // Reuse the same turn IDs after an ambiguous response; never create a new
+        // charge attempt until the prior turn has an authoritative outcome.
+        if (s.pendingTurn) {
+          await runPendingChatTurn(s);
+          break;
         }
-        drafts[s.id]='';$('messageInput').value='';
-        persist();renderMessages();
-        await saveChatSessionSafely(s);
+        if (!text.trim()) return toast('請先輸入訊息，再開始新的聊天回合。');
+
+        const previousMessages = s.messages.slice();
+        const previousMemories = (s.memories || []).map(memory => ({...memory}));
+        const userMessage = {id:id(),role:'user',text,at:Date.now()};
+        s.messages.push(userMessage);
+        s.pendingTurn = {
+          turnId:id(),
+          userMessageId:userMessage.id,
+          assistantMessageId:id(),
+          createdAt:Date.now()
+        };
+
+        // First persist only the user message so a first-time local chat obtains
+        // an owned cloud session before the trusted server reserves wallet funds.
+        const userSaved = await saveChatSessionSafely(s);
+        if (!userSaved) {
+          s.messages = previousMessages;
+          s.memories = previousMemories;
+          delete s.pendingTurn;
+          persist();
+          await clearCloudPendingTurn(s);
+          renderMessages();
+          toast('訊息尚未保存到雲端，本次沒有扣款；請確認網路後再試。');
+          break;
+        }
+
+        drafts[s.id]='';
+        $('messageInput').value='';
+        persist();
+        renderMessages();
+        await runPendingChatTurn(s);
         break;
       }
       case 'persona': {
