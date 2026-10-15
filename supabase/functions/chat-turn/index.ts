@@ -40,8 +40,16 @@ Deno.serve(async (request) => {
     return json({ error: "invalid_json" }, 400);
   }
 
-  const { turnId, sessionId, userMessageId, assistantMessageId } = body;
-  if (![turnId, sessionId, userMessageId, assistantMessageId].every(isUuid)) {
+  const turnId = body.turnId;
+  const sessionId = body.sessionId;
+  const userMessageId = body.userMessageId;
+  const assistantMessageId = body.assistantMessageId;
+  if (
+    !isUuid(turnId) ||
+    !isUuid(sessionId) ||
+    !isUuid(userMessageId) ||
+    !isUuid(assistantMessageId)
+  ) {
     return json({ error: "invalid_turn_identifiers" }, 400);
   }
 
