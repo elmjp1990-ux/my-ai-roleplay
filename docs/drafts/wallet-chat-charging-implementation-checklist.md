@@ -1,6 +1,6 @@
 # PersonaX wallet and chat charging — implementation checklist
 
-Status: planning/checklist only. No production database, balances, main branch, or deployment changed.
+Status: partial source implementation on the feature branch only. No production database, balances, main branch, or deployment changed.
 
 ## Priority order
 
@@ -28,7 +28,8 @@ Status: planning/checklist only. No production database, balances, main branch, 
 
 ### P2 — Functional integration and verification
 - [ ] Route the current fixed demo response through the same charge lifecycle; do not wait for real AI integration.
-- [ ] Check and handle `saveChatSessionSafely` failure instead of ignoring its result.
+- [x] Stop treating a chat turn as complete when `saveChatSessionSafely` fails: the feature-branch handler rolls back the local reply and newly added memories.
+- [ ] Route the fixed demo response through the server-side charge lifecycle; the browser handler is not yet wired to the new Edge Function.
 - [ ] Keep edit-without-regeneration free; a new generation is a new billable turn.
 - [ ] Verify the authoritative wallet balance after success/refund.
 - [ ] Test silver-only, diamond-only, mixed payment, insufficient balance, double-click, concurrent turns, retries, refresh/relogin, provider failure, empty response, persistence failure, stale reservation, and lost acknowledgement.
@@ -61,4 +62,4 @@ Do not merge or deploy until:
 
 ## Current boundary
 
-This checklist is committed only to `feat/ayet-rewarded-video-callback`. It is not an applied migration or deployable implementation. The next work should focus on P0 wallet correctness and P1 failure audit; P3 UI polish is explicitly lower priority.
+This checklist is committed only to `feat/ayet-rewarded-video-callback`. The chat persistence rollback fix, draft atomic wallet RPC SQL, and demo Edge Function source now exist on the branch, but the SQL has not been applied, the function is not deployed, and the frontend is not yet wired to it. The SQL/function pair still needs review and repeatable tests before any deployment. P3 UI polish remains explicitly lower priority.
