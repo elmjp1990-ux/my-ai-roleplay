@@ -142,6 +142,11 @@ Deno.serve(async (request) => {
   }
   if (charge.status !== "reserved") return json({ error: "turn_not_processable" }, 409);
 
+  await admin.from("chat_turn_events").insert({
+    turn_id: turnId, user_id: user.id, event_type: "generation_started",
+    stage: "demo_generation",
+  });
+
   // Stable demo output: a repeated request uses the same assistantMessageId,
   // so it cannot create a second billable reply for this turn.
   const demoReply = "**他將目光移向你，耐心等待你繼續說下去。**\n「我在聽，你可以慢慢說。」";
@@ -158,6 +163,10 @@ Deno.serve(async (request) => {
     .upsert(assistantRow, { onConflict: "id" });
 
   if (saveReplyError) {
+    await admin.from("chat_turn_events").insert({
+      turn_id: turnId, user_id: user.id, event_type: "persistence_failed",
+      stage: "assistant_message", error_code: "assistant_persistence_failed",
+    });
     // Do not refund until a follow-up read confirms the reply is absent.
     const { data: possibleReply, error: verifyError } = await admin
       .from("chat_messages").select("id,content")
@@ -178,7 +187,12 @@ Deno.serve(async (request) => {
     }
 
     if (possibleReply && String(possibleReply.content || "").trim()) {
-      const { data: settled, error: settleError } = await admin.rpc("settle_chat_turn", {
+      await admin.from("chat_turn_events").insert({
+    turn_id: turnId, user_id: user.id, event_type: "assistant_reply_saved",
+    stage: "persistence",
+  });
+
+  const { data: settled, error: settleError } = await admin.rpc("settle_chat_turn", {
         p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
       });
       if (settleError) return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
