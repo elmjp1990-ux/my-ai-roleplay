@@ -3653,21 +3653,34 @@ document.addEventListener('submit',async event => {
       }
       case 'message': {
         if (!s || !currentUser()) return;
+        // Keep a rollback point: a locally rendered reply must not masquerade as a
+        // completed turn when the cloud write fails. Server-side billing will later
+        // wrap this persistence boundary with reserve/settle/refund operations.
+        const previousMessages = s.messages.slice();
+        const previousMemories = (s.memories || []).map(memory => ({...memory}));
         if (text) s.messages.push({id:id(),role:'user',text,at:Date.now()});
         s.messages.push({
           id:id(),role:'assistant',at:Date.now()+1,
           text:text
-            ? '**他將目光移向你，耐心等待你繼續說下去。**\n「我在聽，你可以慢慢說。」'
-            : '**短暫的沉默後，他再次開口。**\n「如果你還不想說，我可以先陪你待一會兒。」'
+            ? '**他將目光移向你，耐心等待你繼續說下去。**\\n「我在聽，你可以慢慢說。」'
+            : '**短暫的沉默後，他再次開口。**\\n「如果你還不想說，我可以先陪你待一會兒。」'
         });
         const users=s.messages.filter(m=>m.role==='user');
         if (text && users.length%5===0) {
           const snippets=users.slice(-5).map(m=>[...m.text].slice(0,7).join('')).join('、');
           addMemory(s,[...('本輪對話摘錄：'+snippets+'。')].slice(0,50).join(''));
         }
+        const saved = await saveChatSessionSafely(s);
+        if (!saved) {
+          s.messages = previousMessages;
+          s.memories = previousMemories;
+          persist();
+          renderMessages();
+          toast('回覆尚未保存到雲端，本次未完成；請確認網路後再試。');
+          break;
+        }
         drafts[s.id]='';$('messageInput').value='';
         persist();renderMessages();
-        await saveChatSessionSafely(s);
         break;
       }
       case 'persona':
