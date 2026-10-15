@@ -1684,9 +1684,11 @@ async function saveChatSessionToCloud(s, options = {}) {
   s.cloudOwned = true;
   s.cloudOwnerUid = localUser.uid;
   s.cloudCharacterSnapshot = snapshot;
-  const messages = (s.messages || []).filter(m => isUuid(m.id)).map(m => ({
-    id:m.id, session_id:s.id,
-    role:m.role === 'user' ? 'user' : 'assistant',
+  // User-authored messages are the only chat rows written from the browser.
+  // Assistant replies are persisted and billed by the trusted chat-turn Edge Function;
+  // re-upserting them here can bypass billing or conflict with reply immutability guards.
+  const messages = (s.messages || []).filter(m => m.role === 'user' && isUuid(m.id)).map(m => ({
+    id:m.id, session_id:s.id, role:'user',
     content:String(m.text ?? ''), created_at:new Date(Number(m.at) || Date.now()).toISOString()
   }));
   if (messages.length) {
@@ -1694,7 +1696,7 @@ async function saveChatSessionToCloud(s, options = {}) {
       .upsert(messages,{onConflict:'id'}).select('id');
     if (messageError) throw new Error('聊天訊息同步失敗：'+messageError.message);
     if (!Array.isArray(savedMessages) || savedMessages.length !== messages.length) {
-      throw new Error('資料庫回報的已儲存訊息數量不符；請重新整理確認，勿視為同步完成。');
+      throw new Error('資料庫回報的已儲存使用者訊息數量不符；請重新整理確認，勿視為同步完成。');
     }
   }
   return true;
@@ -1771,7 +1773,20 @@ async function loadCloudChatSessions(user) {
       const data = row.session_data && typeof row.session_data === 'object' ? row.session_data : {};
       const snapshot = row.character_snapshot && typeof row.character_snapshot === 'object' ? row.character_snapshot : {};
       const existing = state.sessions[row.id];
-      const cloudMessages = bySession.get(row.id) || [];
+      const cloudMessages = [...(bySession.get(row.id) || [])];
+      // Opening text is character/session snapshot data, not a billable assistant turn.
+      // Reconstruct it locally when no assistant message exists before the first user turn;
+      // do not write it from the browser as an assistant-role database row.
+      const firstUserIndex = cloudMessages.findIndex(message => message.role === 'user');
+      const hasOpeningMessage = cloudMessages.some((message, index) =>
+        message.role === 'assistant' && (firstUserIndex < 0 || index < firstUserIndex)
+      );
+      if (!hasOpeningMessage && typeof snapshot.opening === 'string' && snapshot.opening.trim()) {
+        cloudMessages.unshift({
+          id:'opening:' + row.id, role:'assistant', text:snapshot.opening,
+          at:row.created_at ? new Date(row.created_at).getTime() : Date.now()
+        });
+      }
       state.sessions[row.id] = {
         ...(existing || {}), id:row.id, characterId:row.character_id,
         characterName:row.character_name || snapshot.name || '角色',
