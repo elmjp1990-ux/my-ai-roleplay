@@ -1896,7 +1896,7 @@ function renderShell() {
 
 function render() {
   if ($('modal').open) $('modal').close();
-  const allowed = ['home','detail','author','chat','conversation','create',
+  const allowed = ['home','detail','session-detail','author','chat','conversation','create',
     'editor','ai','notifications','favorites','profile'];
   if (!allowed.includes(route.page)) route = {page:'home'};
 
