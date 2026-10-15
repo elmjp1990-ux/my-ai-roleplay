@@ -1572,6 +1572,9 @@ function persist() {
   }
 }
 
+// 僅在網址明確帶上 ?chatDataTest=1 時顯示無成本測試控制項。
+const CHAT_DATA_TEST_MODE = new URLSearchParams(location.search).get('chatDataTest') === '1';
+
 // Chat cloud persistence (official UUID characters only).
 function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
@@ -2719,8 +2722,17 @@ function renderChatOverlay(kind) {
   const panel = $('view').querySelector('.chat-main');
   if (!s || !panel) return;
   const photos = s.album.filter(p => safeImage(p.url));
+  const canTestCloudData = CHAT_DATA_TEST_MODE && s.cloudOwned &&
+    currentUser()?.uid === s.cloudOwnerUid && hasUserMessage(s);
+  const testControls = canTestCloudData
+    ? `<div class="row wrap" style="margin:10px 0">
+        <button type="button" data-action="test-chat-memory">新增測試回憶</button>
+        <button type="button" data-action="test-chat-photo">加入測試相片</button>
+        <button type="button" data-action="clear-chat-test-data">清除測試資料</button>
+      </div><p class="small muted">測試模式：不呼叫 AI、不生圖、不扣鑽石或銀幣。</p>`
+    : '';
   const content = kind === 'diary'
-    ? `<p class="small muted">${memorySize(s.memories)} / 3000字</p>
+    ? `${testControls}<p class="small muted">${memorySize(s.memories)} / 3000字</p>
       ${s.memories.map(m => `<article class="memory-item">
         <label class="check">
           <input type="checkbox" data-memory="${e(m.id)}" ${m.important ? 'checked' : ''}>
@@ -2731,10 +2743,10 @@ function renderChatOverlay(kind) {
         <button ${m.important ? 'disabled' : ''} data-action="edit-memory"
                 data-id="${e(m.id)}" style="margin-top:10px">編輯</button>
       </article>`).join('') || '<div class="empty">尚未產生日記。</div>'}`
-    : `<div class="album-grid">${photos.map(p => `
+    : `${testControls}<div class="album-grid">${photos.map(p => `
         <button class="photo-button" data-action="photo" data-id="${e(p.id)}">
           <img src="${e(safeImage(p.url))}" alt="回憶快照">
-          <span class="photo-date">${e(timeText(p.at))}</span>
+          <span class="photo-date">${p.testData ? '測試相片 · ' : ''}${e(timeText(p.at))}</span>
         </button>`).join('') || '<div class="empty">OH NO，你現在還沒有跟他有回憶哦。</div>'}
       </div>`;
   panel.insertAdjacentHTML('beforeend',`
@@ -3465,6 +3477,46 @@ document.addEventListener('click',async event => {
         break;
       }
       case 'photo':openModal('photo',{id:key});break;
+      case 'test-chat-memory':
+      case 'test-chat-photo':
+      case 'clear-chat-test-data': {
+        if (!CHAT_DATA_TEST_MODE || !s || !s.cloudOwned ||
+            currentUser()?.uid !== s.cloudOwnerUid || !hasUserMessage(s)) {
+          return toast('測試工具只適用於已同步且由目前帳號擁有的聊天。');
+        }
+        const previousMemories=clone(s.memories);
+        const previousAlbum=clone(s.album);
+        if (type === 'test-chat-memory') {
+          const text='[測試資料] PersonaX 回憶同步測試：新增、重新載入與跨裝置保存。';
+          if (memorySize(s.memories)+countChars(text)>3000) {
+            return toast('回憶容量不足，請先清除部分測試回憶。');
+          }
+          s.memories.push({id:id(),text,important:false,at:Date.now(),testData:true});
+        } else if (type === 'test-chat-photo') {
+          const character=sessionCharacter(s);
+          const url=safeImage(character?.image);
+          if (!url) return toast('目前角色沒有可用的安全圖片網址，無法建立相簿測試項目。');
+          s.album.push({id:id(),url,at:Date.now(),testData:true});
+        } else {
+          s.memories=s.memories.filter(item=>!item.testData);
+          s.album=s.album.filter(item=>!item.testData);
+        }
+        if (!persist()) {
+          s.memories=previousMemories;s.album=previousAlbum;
+          return;
+        }
+        const synced=await saveChatSessionSafely(s);
+        if (!synced) {
+          s.memories=previousMemories;s.album=previousAlbum;
+          persist();render();
+          toast('測試資料同步失敗，已還原本機內容。');
+          break;
+        }
+        render();
+        toast(type==='clear-chat-test-data' ? '測試資料已清除並同步。' :
+          '測試資料已寫入雲端；可重新整理後確認是否仍存在。');
+        break;
+      }
       case 'fullscreen':
         await $('modal').querySelector('img')?.requestFullscreen?.();break;
       case 'edit-profile':profileImage=currentUser()?.avatar || '';openModal('edit-profile');break;
