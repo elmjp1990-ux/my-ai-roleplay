@@ -2724,12 +2724,24 @@ function renderChatOverlay(kind) {
   const photos = s.album.filter(p => safeImage(p.url));
   const canTestCloudData = CHAT_DATA_TEST_MODE && s.cloudOwned &&
     currentUser()?.uid === s.cloudOwnerUid && hasUserMessage(s);
-  const testControls = canTestCloudData
-    ? `<div class="row wrap" style="margin:10px 0">
-        <button type="button" data-action="test-chat-memory">新增測試回憶</button>
-        <button type="button" data-action="test-chat-photo">加入測試相片</button>
-        <button type="button" data-action="clear-chat-test-data">清除測試資料</button>
-      </div><p class="small muted">測試模式：不呼叫 AI、不生圖、不扣鑽石或銀幣。</p>`
+  const testBlockReason = !s.cloudOwned
+    ? '目前聊天尚未確認為雲端同步聊天。請先使用已同步到雲端的聊天。'
+    : currentUser()?.uid !== s.cloudOwnerUid
+      ? '目前登入帳號不是這個雲端聊天的擁有者。'
+      : !hasUserMessage(s)
+        ? '這個聊天尚無玩家發送的訊息，請先送出一則訊息後再測試。'
+        : '條件已符合，可以測試回憶與相簿同步。';
+  const testControls = CHAT_DATA_TEST_MODE
+    ? `<section class="panel stack" style="margin:10px 0;padding:12px">
+        <strong>回憶／相簿同步測試工具</strong>
+        <p class="small muted">${e(testBlockReason)}</p>
+        <div class="row wrap">
+          <button type="button" data-action="test-chat-memory" ${canTestCloudData ? '' : 'disabled'}>新增測試回憶</button>
+          <button type="button" data-action="test-chat-photo" ${canTestCloudData ? '' : 'disabled'}>加入測試相片</button>
+          <button type="button" data-action="clear-chat-test-data" ${canTestCloudData ? '' : 'disabled'}>清除測試資料</button>
+        </div>
+        <p class="small muted">測試模式：不呼叫 AI、不生圖、不扣鑽石或銀幣。這些按鈕只測試同步，不是下方相機圖示的產圖功能。</p>
+      </section>`
     : '';
   const content = kind === 'diary'
     ? `${testControls}<p class="small muted">${memorySize(s.memories)} / 3000字</p>
