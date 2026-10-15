@@ -236,6 +236,7 @@ Deno.serve(async (request) => {
     });
     // Do not refund on a point-in-time absence: a concurrent retry may still
     // persist the same stable assistant ID. The same turn can safely retry.
+    return json({ status: "needs_reconciliation", retryAllowed: true }, 503);
   }
 
   const { data: settled, error: settleError } = await admin.rpc("settle_chat_turn", {
