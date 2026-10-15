@@ -1028,6 +1028,8 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
           .select('character_id, private_info')
           .in('character_id', ids);
         if (privateResult.error) throw new Error('讀取角色私密設定失敗：' + privateResult.error.message);
+        // 私密資料查詢期間可能發生登出或切換帳號；舊請求不得繼續處理上一位使用者的資料。
+        if (state.account?.uid !== user.id) return;
         privateInfoByCharacterId = new Map((privateResult.data || []).map(item => [item.character_id, item.private_info || '']));
       }
       const localOwnedForMerge = state.characters.filter(c => c.authorId === user.id);
@@ -1049,6 +1051,8 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
           console.warn('角色私密設定補同步失敗，已保留本機內容：', local.name, repairPrivateInfoError.message);
         }
       }
+      // 補同步過程包含 await；合併或 persist 前再次確認帳號仍相同，避免舊請求覆蓋新帳號畫面。
+      if (state.account?.uid !== user.id) return;
       const cloudCharacters = (rows || []).filter(row => !row.deleted_at).map(row => {
         const local = localOwnedForMerge.find(c => c.id === row.id) || {};
         const story = latestStory.get(row.id);
