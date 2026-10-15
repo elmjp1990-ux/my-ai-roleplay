@@ -67,3 +67,37 @@ Checked the connected Supabase schema without changing data or deploying code:
 3. A server-generated stable turn/request UUID must be reused for retries. The database must enforce idempotency for that charge key, and the charge ledger and wallet update must commit or roll back together. Do not assume `ai_generation_records.request_id` is suitable until the generation flow proves it is generated once per user turn and reused on retry.
 4. Reward callback idempotency needs a separate unique provider transaction ID and must credit only a fixed server-side silver amount after signature and approved rewarded-video AdSlot validation.
 5. These are design findings only. No SQL was applied, no Edge Function was deployed, and no live wallet rows were changed.
+
+
+## Chat-turn charging design gate (draft; not yet implemented)
+
+### Why a direct “deduct then call AI” implementation is unsafe
+
+The AI request is an external network operation and cannot be part of the same PostgreSQL transaction as the wallet update. If the wallet is charged before generation and the model call fails, the user could lose currency without receiving a reply. If the wallet is charged only after generation, concurrent retries could generate multiple replies before the charge is settled. The implementation must explicitly model a billable turn and its outcome rather than rely on frontend button state.
+
+### Proposed state machine
+
+- Create one server-controlled `turn_id` (UUID) for a user-initiated generation attempt; every retry of that same attempt must reuse it. Editing a previous message without regenerating must not create a charge.
+- Reserve the cost atomically before starting generation, using one DB transaction and a unique constraint on the reservation/turn key. Lock the wallet row, verify `auth.uid()` owns the non-deleted `chat_sessions` row, verify `account_is_active()`, and calculate the deduction deterministically.
+- Currency rule proposed for review: spend silver coins first, then diamonds for the remaining cost, with total cost exactly 2. Examples: 2 silver → 2 silver; 1 silver + 1 diamond → 1 each; 2 diamonds → 2 diamonds. If combined balance is below 2, make no wallet change and return a structured insufficient-balance result for the UI to show the rewarded-video modal.
+- If generation succeeds, mark the reservation settled and link it to the resulting `ai_generation_records` / assistant message. If generation fails before a usable reply is committed, refund the exact reserved currency split once, using the same turn key and a transactional state transition. A failed or repeated refund must not credit twice.
+- The turn state and wallet ledger need database-enforced uniqueness and valid transitions (for example `reserved → settled` or `reserved → refunded`). Never trust the browser to supply user_id, currency split, amount, or final status.
+
+### Required edge cases before release
+
+1. Two concurrent requests with the same `turn_id` reserve/charge only once.
+2. Two concurrent distinct turns cannot spend the same last coins into a negative balance.
+3. Duplicate success/failure callbacks or HTTP retries cannot settle/refund twice.
+4. If a session is deleted or the account enters deletion-pending state before reservation, reject without charge.
+5. If AI generation fails, refund exactly the original currency split; if a reply is committed, do not refund due only to a client disconnect.
+6. Editing a prior message without regeneration does not call the charge/reservation endpoint.
+7. An insufficient balance does not create a partial reservation or partial deduction.
+8. The UI must distinguish insufficient balance from network/server errors; only the former should prompt rewarded ads.
+
+### Implementation blocker
+
+The actual chat-send JavaScript path and its request/retry behavior still need to be identified in the repository before wiring this state machine into the UI. A guessed integration point risks double charging or charging edits, so no charging function or frontend hook is being deployed at this stage.
+
+### Current action boundary
+
+This document is a design draft committed only to `feat/ayet-rewarded-video-callback`. No production SQL, wallet balance, deployed Edge Function, or production frontend was changed.
