@@ -1541,7 +1541,7 @@ let pendingDeletionWalletSyncUid =
     ? state.account.uid
     : null;
 let route = {page:'home'};
-let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]},active:null,turn:0,messages:[],groups:[],groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,formError:'',loadError:''};
+let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]},active:null,turn:0,messages:[],groups:[],groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:''};
 let search = '';
 let filter = 'latest';
 let exploreTags = [];
@@ -2863,6 +2863,28 @@ function groupRenderCharacters() {
   if (!chars.length) return '<div class="group-alert">目前沒有可選的雲端角色。請先登入並確認角色已儲存在 Supabase，且你擁有該角色或該角色已公開核准。</div>';
   return '<div class="group-character-grid">'+chars.map(c=>'<label class="group-character-option"><input type="checkbox" data-action="group-toggle-character" data-id="'+e(c.id)+'" '+(groupPrototype.draft.memberIds.includes(c.id)?'checked':'')+' '+(groupPrototype.draft.memberIds.length>=3&&!groupPrototype.draft.memberIds.includes(c.id)?'disabled':'')+'><span><strong>'+e(c.name)+'</strong><span class="muted small" style="display:block">'+e(c.intro||'尚無角色介紹')+'</span></span></label>').join('')+'</div><p class="muted small">已選 '+groupPrototype.draft.memberIds.length+' / 3 名。後端會再次驗證角色權限與數量。</p>';
 }
+function groupResetForAccount(uid) {
+  const g=groupPrototype;
+  if(g.ownerUid && g.ownerUid!==uid) {
+    g.step=1;
+    g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]};
+    g.active=null;g.turn=0;g.messages=[];g.groups=[];g.groupsLoaded=false;
+    g.loadingGroups=false;g.loading=false;g.sending=false;g.pendingRequest=null;
+    g.formError='';g.loadError='';g.ownerUid=null;
+  }
+}
+function groupFriendlyError(error) {
+  const message=String(typeof error==='string'?error:(error?.message||''));
+  if(message.includes('character_not_accessible')) return '有角色目前不可使用，請重新選擇你擁有或已公開核准的角色。';
+  if(message.includes('invalid_group_name')) return '群組名稱需為 1–80 字。';
+  if(message.includes('invalid_world_background')) return '世界背景超過允許長度。';
+  if(message.includes('invalid_scenes')||message.includes('invalid_scene_payload')||message.includes('invalid_scene_position')) return '場景資料不完整或角色場景指派不正確，請檢查後重試。';
+  if(message.includes('group_not_found_or_not_accessible')) return '找不到群組，或目前帳號沒有存取權限。';
+  if(message.includes('idempotency_key_reused_with_different_content')) return '這次送出識別碼已對應其他內容，請重新送出。';
+  if(message.includes('invalid_message_content')) return '訊息需為 1–2000 字。';
+  if(message.includes('authentication_required')||message.includes('JWT')||message.includes('登入狀態')) return '登入狀態已失效，請重新登入後再試。';
+  return message||'操作失敗，請稍後再試。';
+}
 async function groupLoadList(force=false) {
   const g=groupPrototype;
   if(g.loadingGroups||(!force&&g.groupsLoaded)) return;
@@ -2881,9 +2903,10 @@ async function groupLoadList(force=false) {
       .select('id,name,world_background,scene_mode,created_at,updated_at')
       .is('archived_at',null).order('updated_at',{ascending:false});
     if(error) throw error;
-    g.groups=data||[];g.groupsLoaded=true;g.loadingGroups=false;
+    if(user.id!==currentUser()?.uid) { groupResetForAccount(currentUser()?.uid||null); return; }
+    g.ownerUid=user.id;g.groups=data||[];g.groupsLoaded=true;g.loadingGroups=false;
   } catch(error) {
-    g.groupsLoaded=true;g.loadingGroups=false;g.loadError=error?.message||'讀取群組清單失敗。';
+    g.groupsLoaded=true;g.loadingGroups=false;g.loadError=groupFriendlyError(error)||'讀取群組清單失敗。';
   }
   if(route.page==='group'&&!g.active) render();
 }
@@ -2898,9 +2921,13 @@ function groupRenderList() {
 }
 async function groupOpen(groupId) {
   const g=groupPrototype;
+  groupResetForAccount(currentUser()?.uid||null);
   if(!isUuid(groupId)||!window.mySupabase) { toast('群組識別碼無效。');return; }
   g.loading=true;g.formError='';g.active=null;render();
   try {
+    const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
+    if(authError||!user||user.id!==currentUser()?.uid) throw new Error('請重新登入後再開啟群組。');
+    g.ownerUid=user.id;
     const [groupRes,sceneRes,memberRes,messageRes]=await Promise.all([
       window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,created_at,updated_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
@@ -2909,6 +2936,7 @@ async function groupOpen(groupId) {
     ]);
     const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error;
     if(error) throw error;
+    if(user.id!==currentUser()?.uid) throw new Error('帳號已切換，已停止顯示先前帳號的群組。');
     const group=groupRes.data, scenes=sceneRes.data||[], memberRows=memberRes.data||[];
     if(memberRows.length<1||memberRows.length>3) throw new Error('群組成員資料不完整，請重新整理或重新建立群組。');
     const members=memberRows.map(m=>({...m.character_snapshot,id:m.character_id,characterId:m.character_id,position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'}));
@@ -2922,11 +2950,12 @@ async function groupOpen(groupId) {
     g.loading=false;g.groupsLoaded=false;
     await groupLoadList(true);
   } catch(error) {
-    g.loading=false;g.formError=error?.message||'開啟群組失敗。';
+    g.loading=false;g.formError=groupFriendlyError(error)||'開啟群組失敗。';
   }
   render();
 }
 function renderGroupPrototype() {
+  groupResetForAccount(currentUser()?.uid||null);
   const g=groupPrototype;
   if(!g.groupsLoaded&&!g.loadingGroups&&!g.active) groupLoadList();
   if(g.loading) {
@@ -2982,6 +3011,7 @@ async function groupCreateMock() {
   try {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('請使用已連結 Supabase 的帳號登入，才能建立雲端群組。');
+    g.ownerUid=user.id;
     const members=groupSelectedCharacters();
     const scenes=(g.draft.mode==='shared'?[g.draft.scenes[0]]:g.draft.scenes.slice(0,members.length))
       .map(x=>({name:x.name.trim(),description:x.description||''}));
@@ -2993,7 +3023,7 @@ async function groupCreateMock() {
     g.loading=false;
     await groupOpen(groupId);
   } catch(error) {
-    g.loading=false;g.formError=error?.message||'建立群組失敗。';render();
+    g.loading=false;g.formError=groupFriendlyError(error)||'建立群組失敗。';render();
   }
 }
 function groupBack() { if(groupPrototype.active||groupPrototype.loading) return; if(groupPrototype.step>1){groupPrototype.step--;groupPrototype.formError='';render();} }
@@ -3026,7 +3056,7 @@ async function groupSendMock() {
     g.sending=false;
     await groupOpen(g.active.id);
   } catch(error) {
-    g.sending=false;g.formError=error?.message||'訊息保存失敗，請重試。';render();
+    g.sending=false;g.formError=groupFriendlyError(error)||'訊息保存失敗，請重試。';render();
   }
 }
 async function groupRefreshList() { groupPrototype.groupsLoaded=false;await groupLoadList(true);if(route.page==='group'&&!groupPrototype.active)render(); }
