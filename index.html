@@ -1777,6 +1777,12 @@ async function loadCloudChatSessions(user) {
       if (!isUuid(row.id) || !isUuid(row.character_id)) continue;
       const data = row.session_data && typeof row.session_data === 'object' ? row.session_data : {};
       const snapshot = row.character_snapshot && typeof row.character_snapshot === 'object' ? row.character_snapshot : {};
+      // Never hydrate a chat with a snapshot belonging to a different role.
+      // The server also rejects this metadata before billing; fail closed in the UI too.
+      if (snapshot.id && snapshot.id !== row.character_id) {
+        console.error('雲端聊天角色快照 ID 不一致，已略過此聊天：', row.id);
+        continue;
+      }
       const existing = state.sessions[row.id];
       const cloudMessages = bySession.get(row.id) || [];
       state.sessions[row.id] = {
