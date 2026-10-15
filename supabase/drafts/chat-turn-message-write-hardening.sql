@@ -6,7 +6,6 @@
 --   - chat-message-client-insert-policy.sql
 -- It closes the gap where a client can insert an arbitrary assistant-role row and
 -- avoids a window in which client INSERT restrictions exist without reply UPDATE guards.
---
 -- The browser writes user-authored messages only. The trusted chat-turn Edge Function
 -- persists assistant replies with service_role. The character opening is reconstructed
 -- from the session snapshot by the frontend and is not inserted by the browser.
@@ -20,21 +19,40 @@ security definer
 set search_path = ''
 as $function$
 declare
-  v_charge public.chat_turn_charges%rowtype;
+  v_old_charge public.chat_turn_charges%rowtype;
+  v_new_charge public.chat_turn_charges%rowtype;
+  v_has_old_charge boolean := false;
+  v_has_new_charge boolean := false;
 begin
   if old.role <> 'assistant' and new.role <> 'assistant' then
     return new;
   end if;
 
-  select c.* into v_charge
+  -- Lock both possible turn records independently. An OR + ORDER BY + LIMIT
+  -- can select only one row when an ID swap crosses two different turns.
+  select c.* into v_old_charge
   from public.chat_turn_charges c
   where c.expected_assistant_message_id = old.id
-     or c.expected_assistant_message_id = new.id
-  order by c.created_at
-  limit 1
   for update;
+  v_has_old_charge := found;
 
-  if not found then
+  if new.id is distinct from old.id then
+    select c.* into v_new_charge
+    from public.chat_turn_charges c
+    where c.expected_assistant_message_id = new.id
+    for update;
+    v_has_new_charge := found;
+  else
+    v_new_charge := v_old_charge;
+    v_has_new_charge := v_has_old_charge;
+  end if;
+
+  if v_has_old_charge and v_has_new_charge
+     and v_old_charge.id is distinct from v_new_charge.id then
+    raise exception 'assistant_message_turn_id_conflict';
+  end if;
+
+  if not v_has_old_charge and not v_has_new_charge then
     -- Do not allow role escalation to or from assistant without a billable turn.
     if new.role is distinct from old.role
        and (old.role = 'assistant' or new.role = 'assistant') then
@@ -50,7 +68,8 @@ begin
     raise exception 'charged_assistant_reply_is_immutable';
   end if;
 
-  if old.id is distinct from v_charge.expected_assistant_message_id then
+  if not v_has_old_charge
+     or old.id is distinct from v_old_charge.expected_assistant_message_id then
     raise exception 'assistant_message_turn_id_conflict';
   end if;
 
