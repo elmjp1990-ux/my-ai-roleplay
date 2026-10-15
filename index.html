@@ -1543,7 +1543,7 @@ let pendingDeletionWalletSyncUid =
     ? state.account.uid
     : null;
 let route = {page:'home'};
-let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]},active:null,turn:0,messages:[],groups:[],groupsLoaded:false,loadingGroups:false,loading:false,sending:false,formError:'',loadError:''};
+let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]},active:null,turn:0,messages:[],groups:[],groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,formError:'',loadError:''};
 let search = '';
 let filter = 'latest';
 let exploreTags = [];
@@ -2985,10 +2985,14 @@ async function groupSendMock() {
   try {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('登入狀態已失效，請重新登入。');
+    if(!g.pendingRequest || g.pendingRequest.groupId!==g.active.id || g.pendingRequest.content!==content) {
+      g.pendingRequest={groupId:g.active.id,content,requestKey:window.crypto.randomUUID()};
+    }
     const {error}=await window.mySupabase.rpc('append_chat_group_mock_turn',{
-      p_group_id:g.active.id,p_request_key:window.crypto.randomUUID(),p_content:content
+      p_group_id:g.active.id,p_request_key:g.pendingRequest.requestKey,p_content:content
     });
     if(error) throw error;
+    g.pendingRequest=null;
     g.sending=false;
     await groupOpen(g.active.id);
   } catch(error) {
