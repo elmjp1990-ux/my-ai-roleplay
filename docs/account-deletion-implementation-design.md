@@ -67,3 +67,11 @@ Do not call this feature repaired until:
 - dry-run worker and retry behavior pass,
 - a disposable-account end-to-end test passes,
 - production changes are reviewed and explicitly approved.
+
+
+## Additional frontend integration findings (2026-10-15)
+- The deployed UI only renders a generic pending-deletion dialog with a `cancel_account_deletion()` action. When `scheduled_for` has passed, that action necessarily fails; there is no dedicated expired-recovery action in the current UI.
+- `get_account_deletion_status()` reports only request existence and timestamps. It does not report a trusted lifecycle state or whether a safe recovery is allowed. A frontend timestamp comparison may decide which explanatory button to show, but must never authorize recovery.
+- After the recovery RPC is reviewed and installed in a disposable project, the frontend should show an explicit recovery option only when the server-reported deadline is expired. The RPC must remain the authority and may return a safe refusal such as manual review required, archive mismatch, or no request.
+- On RPC refusal/error, keep the pending account state and dialog intact; do not clear local flags optimistically. On success, clear only the local pending UI state, refresh the signed-in user and wallet from Supabase, and show success only after the RPC confirms `recovered=true`.
+- The SQL draft is not ready to apply: the schema has no durable request lifecycle columns, no worker coordination contract is deployed, and the current archive status `archived` is not deletion completion. The draft intentionally stops when batch history is ambiguous.
