@@ -3,11 +3,12 @@
 Date: 2026-10-15
 Scope: live Supabase metadata and GitHub `main` frontend source. No database writes were performed.
 
-## Frontend behavior
+## Frontend and deadline behavior
 - `index.html` calls `get_account_deletion_status()` during account initialization and displays a pending-deletion modal when the RPC reports a request.
-- A pending account is blocked from most UI actions by a client-side action allowlist. The same file calls `request_account_deletion()` and `cancel_account_deletion()`.
-- Client-side gating alone is not a security boundary. Database mutations and any backend endpoints must independently enforce the active-account rule where appropriate.
-- The frontend currently presents a 30-day deletion period in its confirmation text. The five-minute schedule appears to be a test configuration, so the production duration and test duration must be explicitly separated rather than silently conflated.
+- The frontend confirmation text says the account can be restored within 30 days.
+- The live `account_deletion_requests.scheduled_for` column default is currently `now() + interval '5 minutes'`. This conflicts with the 30-day UI promise. The five-minute interval must be treated as test-only, while the production default should be made explicit and aligned with the intended product rule before enabling the worker.
+- A pending account is blocked from most UI actions by a client-side action allowlist. Client-side gating alone is not a security boundary.
+- The frontend calls `request_account_deletion()` and `cancel_account_deletion()`.
 
 ## Current RPC behavior confirmed from live definitions
 - `request_account_deletion()`: authenticated user only; inserts a request and uses `ON CONFLICT (user_id) DO NOTHING`, then returns the existing row. It does not refresh an expired row.
@@ -15,12 +16,14 @@ Scope: live Supabase metadata and GitHub `main` frontend source. No database wri
 - `get_account_deletion_status()`: reports whether the current authenticated user's request row exists; it does not distinguish pending, expired, archived, or failed states.
 - `account_is_active()`: returns false whenever a request row exists, even if the deadline has passed. It must be reviewed wherever used by RLS policies or RPCs.
 - `archive_account_deletion_data(p_user_id)`: checks that the target has an expired request, archives AI-generation rows and wallet transactions, and marks the batch `archived`. It does not delete source rows or the Auth user. It is not a full deletion processor.
+- Archive batch columns already include `attempt_count`, `completed_at`, and `last_error`, but the current archive function does not populate a completed timestamp or provide a complete processing lifecycle.
 
 ## RLS finding requiring priority review
 - Three tables have an `account_must_be_active` permissive policy that checks `account_is_active()`, but the same tables also have a separate permissive `ALL` policy for the owner with no active-account condition: `characters`, `character_stories`, and `conversations`.
 - PostgreSQL combines permissive policies with OR. Therefore, the active-account policy can be bypassed by the owner policy on those tables; the frontend block is not enough to guarantee a pending-deletion account cannot mutate data through the Data API.
 - This must be corrected by safely consolidating/adjusting policies or adding active-account checks to the owner policies, after reviewing each table's intended public-read and owner-write behavior. Do not blanket-replace policies or change them without a table-by-table check.
 - The `messages` table's reported policy was `account_must_be_active`; no parallel owner `ALL` policy appeared in this query. `chat_sessions`, `chat_messages`, `chat_message_versions`, and `ai_generation_records` have active-account checks directly in their relevant policies. Each table must still be checked independently.
+- RLS is enabled on the main audited tables. The three account-deletion tables have RLS enabled and are not forced; direct table access still needs a privilege/policy review.
 
 ## FK inventory relevant to eventual deletion
 - `ai_generation_records.user_id -> profiles.id` has the default NO ACTION behavior and is NOT NULL.
@@ -35,8 +38,9 @@ Scope: live Supabase metadata and GitHub `main` frontend source. No database wri
 2. Decide product policy for user-created characters and stories: delete, transfer, anonymize, or retain. Existing cascade rules can delete these implicitly.
 3. Decide retention and access controls for chat contents, AI-generation logs, wallet transactions, and archived payloads.
 4. Define distinct request/processing states and explicit recovery for legacy expired requests.
-5. Implement a dry-run-only processor first; do not call Auth Admin delete or remove source rows in the initial repair.
-6. Test only with a disposable account after the migration and worker are reviewed.
+5. Separate production 30-day timing from a controlled five-minute test configuration.
+6. Implement a dry-run-only processor first; do not call Auth Admin delete or remove source rows in the initial repair.
+7. Test only with a disposable account after the migration and worker are reviewed.
 
 ## No-go conditions
 - Do not ask the user to resubmit the five-minute test until the request lifecycle has a safe recovery path and a dry-run verifies what would be changed.
