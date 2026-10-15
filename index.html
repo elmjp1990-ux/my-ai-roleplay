@@ -986,6 +986,25 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       }
 
       const ids = (rows || []).map(row => row.id);
+      // 私密角色不會經過公開角色載入器；在作者自己的角色載入流程也補齊作者 profile。
+      const authorIds = [...new Set((rows || []).map(row => row.author_id).filter(Boolean))];
+      if (authorIds.length) {
+        const profileResult = await client.from('profiles')
+          .select('id, handle, nickname, avatar_url, bio')
+          .in('id', authorIds);
+        if (profileResult.error) {
+          console.warn('私密角色作者資料載入失敗：', profileResult.error.message);
+        } else {
+          for (const profile of profileResult.data || []) {
+            state.authors[profile.id] = {
+              uid:profile.id, handle:profile.handle || '',
+              nickname:profile.nickname || profile.handle || 'PersonaX 使用者',
+              avatar:profile.avatar_url || '', bio:profile.bio || '',
+              fans:state.authors[profile.id]?.fans || 0
+            };
+          }
+        }
+      }
       let stories = [];
       if (ids.length) {
         const result = await client
@@ -1723,10 +1742,19 @@ function toast(text) {
   toastTimer = setTimeout(() => $('toast').classList.add('hidden'),3500);
 }
 function author(uid) {
+  const profile = state.authors[uid] || null;
   if (state.account?.uid === uid) {
-    return {...state.account, fans:state.authors[uid]?.fans || 0};
+    return {
+      ...state.account,
+      ...(profile || {}),
+      uid,
+      nickname:profile?.nickname || state.account.nickname || state.account.name || 'PersonaX 使用者',
+      bio:profile?.bio ?? state.account.bio ?? '',
+      avatar:profile?.avatar || state.account.avatar || '',
+      fans:profile?.fans || 0
+    };
   }
-  return state.authors[uid] || {
+  return profile || {
     uid, nickname:'故事創作者', bio:'', avatar:'', fans:0
   };
 }
@@ -3201,7 +3229,18 @@ document.addEventListener('click',async event => {
       case 'remove-session': {
         const item=state.sessions[key];
         if (!item) break;
-        if (!confirm('確定刪除此對話？相關日記與相簿也會移除。')) break;
+        if (!confirm('確定刪除此對話？相關日記與相簿將從列表移除；資料庫會保留刪除標記以供必要時查核。')) break;
+        const uid=currentUser()?.uid;
+        if (item.cloudOwned && uid && item.cloudOwnerUid === uid && window.mySupabase) {
+          const deletedAt=new Date().toISOString();
+          const {data,error}=await window.mySupabase.from('chat_sessions')
+            .update({deleted_at:deletedAt,updated_at:deletedAt})
+            .eq('id',key).eq('user_id',uid).is('deleted_at',null)
+            .select('id').maybeSingle();
+          if (error) throw new Error('對話刪除標記寫入資料庫失敗：'+error.message);
+          if (!data) throw new Error('資料庫沒有確認這段對話的刪除狀態，請重新整理後再試。');
+        }
+        // 本機介面移除；雲端 chat_sessions.deleted_at 保留軟刪除記錄與完整內容。
         delete state.sessions[key];
         persist();
         if (route.id === key) go({page:'chat'});
@@ -3702,6 +3741,9 @@ document.addEventListener('change',async event => {
       if (s && ['avatar','none'].includes(target.value)) {
         s.background=target.value;
         persist();
+        if (s.cloudOwned && currentUser()?.uid === s.cloudOwnerUid) {
+          await saveChatSessionToCloud(s);
+        }
         const panel=$('view').querySelector('.chat-main');
         if (panel && route.id === s.id) {
           panel.style.setProperty('--chat-photo',target.value==='none' ? 'none' :
