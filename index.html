@@ -952,7 +952,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       // 這可修復舊版匯入只存 localStorage 的資料；不會上傳其他帳號的本機角色。
       let { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, private_info, style, tags, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
         .eq('author_id', user.id)
         .order('created_at', { ascending: false });
       if (error) throw new Error('讀取雲端角色失敗：' + error.message);
@@ -978,7 +978,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       if (migratedCount > 0) {
         const refreshed = await client
           .from('characters')
-          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, private_info, style, tags, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
           .eq('author_id', user.id)
           .order('created_at', { ascending: false });
         if (refreshed.error) throw new Error('角色補傳後重新讀取失敗：' + refreshed.error.message);
@@ -1020,6 +1020,16 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         if (!latestStory.has(story.character_id)) latestStory.set(story.character_id, story);
       }
       if (state.account?.uid !== user.id) return;
+      // 私密設定獨立存放，只從作者專用資料表載入，避免公開角色查詢碰觸私密欄位。
+      let privateInfoByCharacterId = new Map();
+      if (ids.length) {
+        const privateResult = await client
+          .from('character_private_info')
+          .select('character_id, private_info')
+          .in('character_id', ids);
+        if (privateResult.error) throw new Error('讀取角色私密設定失敗：' + privateResult.error.message);
+        privateInfoByCharacterId = new Map((privateResult.data || []).map(item => [item.character_id, item.private_info || '']));
+      }
       const localOwnedForMerge = state.characters.filter(c => c.authorId === user.id);
       const cloudCharacters = (rows || []).filter(row => !row.deleted_at).map(row => {
         const local = localOwnedForMerge.find(c => c.id === row.id) || {};
@@ -1035,7 +1045,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
           intro: row.intro ?? local.intro ?? '',
           opening: story?.opening_message ?? local.opening ?? '',
           race: row.race ?? local.race ?? '',
-          privateInfo: row.private_info ?? local.privateInfo ?? '',
+          privateInfo: privateInfoByCharacterId.get(row.id) ?? '',
           style: row.style ?? local.style ?? '',
           tags: Array.isArray(row.tags) ? row.tags : (local.tags || []),
           authorId: row.author_id,
@@ -1127,7 +1137,6 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       rights_confirmed: rightsConfirmed || existingCharacter?.rights_confirmed === true,
       intro: character.intro || '',
       race: character.race || '',
-      private_info: character.privateInfo || '',
       style: character.style || '',
       tags: Array.isArray(character.tags) ? character.tags : []
     };
@@ -1138,6 +1147,18 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     if (characterError) {
       throw new Error('角色資料寫入 Supabase 失敗：' + characterError.message);
     }
+    // 私密設定另存於作者專用資料表，不再寫入公開角色資料列。
+    const { error: privateInfoError } = await client
+      .from('character_private_info')
+      .upsert({
+        character_id: character.id,
+        author_id: expectedUserId,
+        private_info: String(character.privateInfo || '')
+      }, { onConflict: 'character_id' });
+    if (privateInfoError) {
+      throw new Error('角色基本資料已儲存，但私密設定同步失敗：' + privateInfoError.message);
+    }
+
     // 重新讀取資料庫，避免 RLS／trigger／資料庫規則拒絕公開卻讓前端顯示成功。
     const { data: savedCharacter, error: verifyError } = await client
       .from('characters')
