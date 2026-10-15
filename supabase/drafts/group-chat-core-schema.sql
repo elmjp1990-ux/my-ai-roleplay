@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS public.chat_group_members (
   UNIQUE (group_id, character_id),
   UNIQUE (group_id, position),
   FOREIGN KEY (scene_id, group_id)
-    REFERENCES public.chat_group_scenes(id, group_id) ON DELETE RESTRICT
+    REFERENCES public.chat_group_scenes(id, group_id) ON DELETE CASCADE
 );
 
 -- Enforce the 3-character cap even when clients race to insert concurrently.
@@ -116,39 +116,34 @@ CREATE POLICY chat_groups_owner_delete ON public.chat_groups
 
 DROP POLICY IF EXISTS chat_group_scenes_owner_access ON public.chat_group_scenes;
 CREATE POLICY chat_group_scenes_owner_access ON public.chat_group_scenes
-  FOR ALL TO authenticated
+  FOR SELECT TO authenticated
   USING (EXISTS (
-    SELECT 1 FROM public.chat_groups g
-    WHERE g.id = group_id AND g.owner_id = (SELECT auth.uid())
-  ))
-  WITH CHECK (EXISTS (
     SELECT 1 FROM public.chat_groups g
     WHERE g.id = group_id AND g.owner_id = (SELECT auth.uid())
   ));
 
 DROP POLICY IF EXISTS chat_group_members_owner_access ON public.chat_group_members;
 CREATE POLICY chat_group_members_owner_access ON public.chat_group_members
-  FOR ALL TO authenticated
+  FOR SELECT TO authenticated
   USING (EXISTS (
-    SELECT 1 FROM public.chat_groups g
-    WHERE g.id = group_id AND g.owner_id = (SELECT auth.uid())
-  ))
-  WITH CHECK (EXISTS (
     SELECT 1 FROM public.chat_groups g
     WHERE g.id = group_id AND g.owner_id = (SELECT auth.uid())
   ));
 
 DROP POLICY IF EXISTS chat_group_messages_owner_access ON public.chat_group_messages;
 CREATE POLICY chat_group_messages_owner_access ON public.chat_group_messages
-  FOR ALL TO authenticated
+  FOR SELECT TO authenticated
   USING (EXISTS (
     SELECT 1 FROM public.chat_groups g
     WHERE g.id = group_id AND g.owner_id = (SELECT auth.uid())
-  ))
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM public.chat_groups g
-    WHERE g.id = group_id AND g.owner_id = (SELECT auth.uid())
   ));
+
+-- Explicit least-privilege grants: creation/writes go through checked RPCs only.
+REVOKE ALL ON TABLE public.chat_groups, public.chat_group_scenes,
+  public.chat_group_members, public.chat_group_messages FROM anon, authenticated;
+GRANT SELECT ON TABLE public.chat_groups, public.chat_group_scenes,
+  public.chat_group_members, public.chat_group_messages TO authenticated;
+GRANT UPDATE, DELETE ON TABLE public.chat_groups TO authenticated;
 
 -- Create group, scenes, and member snapshots in one transaction.
 -- Expected p_members format:
@@ -294,7 +289,15 @@ BEGIN
         'gender', v_character.gender,
         'age', v_character.age,
         'intro', v_character.intro,
-        'opening', v_character.opening,
+        -- Opening text lives in character_stories, not public.characters.
+        'opening', COALESCE((
+          SELECT cs.opening_message
+          FROM public.character_stories cs
+          WHERE cs.character_id = v_character.id
+            AND (v_character.author_id = v_user_id OR cs.visibility = 'public')
+          ORDER BY cs.created_at ASC
+          LIMIT 1
+        ), ''),
         'race', v_character.race,
         'style', v_character.style,
         'tags', v_character.tags
