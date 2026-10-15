@@ -100,7 +100,26 @@ Deno.serve(async (request) => {
     p_user_message_id: userMessageId,
     p_assistant_message_id: assistantMessageId,
   });
-  if (reserveError) return json({ error: "reservation_failed" }, 503);
+  if (reserveError) {
+    // Preserve known domain failures so the client can safely clear only turns
+    // that provably never reserved funds. Conflicts/unknown errors stay unresolved.
+    const reserveMessage = String(reserveError.message || "");
+    if (reserveMessage.includes("account_not_active")) {
+      return json({ error: "account_not_active" }, 403);
+    }
+    if (reserveMessage.includes("chat_session_not_owned_or_active")) {
+      return json({ error: "chat_session_not_owned_or_active" }, 403);
+    }
+    if (reserveMessage.includes("user_message_not_found")) {
+      return json({ error: "user_message_not_found" }, 400);
+    }
+    if (reserveMessage.includes("wallet_not_initialized")) {
+      return json({ error: "wallet_not_ready" }, 409);
+    }
+    // turn_id_reuse_conflict and unexpected database errors must not be
+    // translated into a confirmed failure/refund; keep the stable turn pending.
+    return json({ error: "reservation_failed" }, 503);
+  }
   const charge = Array.isArray(reservation) ? reservation[0] : reservation;
   if (!charge) return json({ error: "reservation_state_missing" }, 503);
 
