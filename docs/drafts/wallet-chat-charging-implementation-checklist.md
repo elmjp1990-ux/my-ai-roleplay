@@ -17,7 +17,7 @@ Status: partial source implementation on the feature branch only. No production 
 - [ ] Confirm a reply is non-empty and durably stored before settlement.
 - [ ] Confirm failure before a usable reply refunds the exact original silver/diamond split once.
 - [ ] Treat ambiguous provider/network timeouts as reconciliation work, not immediate refunds or automatic duplicate generation.
-- [ ] Add server-side reconciliation for stale reservations if the browser closes or acknowledgement is lost.
+- [ ] Add a scheduled server-side reconciliation job for stale reservations if the browser closes or acknowledgement is lost; the current Edge Function can reconcile retries for the deterministic demo reply, but not yet stale turns without a retry.
 
 ### P1 — Persistent operational audit (part of wallet safety)
 - [ ] Add append-only `chat_turn_events` events for received, reserved, generation started, provider error/timeout, empty response, persistence failure, settlement, refund, and reconciliation.
