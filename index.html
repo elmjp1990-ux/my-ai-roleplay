@@ -730,7 +730,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 
   // 從 Supabase Database 讀取真正的會員資料與錢包餘額。
   // 表名與欄位依目前提供的資料庫截圖：profiles / wallet_accounts。
-  async function loadSupabaseProfileAndWallet(user) {
+  async function loadSupabaseProfileAndWallet(user, throwOnError = false) {
     if (!user?.id || !window.mySupabase) return;
     const client = window.mySupabase;
 
@@ -848,7 +848,8 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       render();
     } catch (error) {
       console.error('PersonaX 資料庫同步失敗：', error);
-      // 登入本身仍可使用；提示使用者檢查 RLS/資料表權限，而不使用假餘額。
+      // 取消申請後的刷新由呼叫端顯示專屬訊息；一般登入流程仍使用原本提示。
+      if (throwOnError) throw error;
       if (state.account?.uid === user.id) {
         toast('已登入，但會員資料或錢包同步失敗。請檢查 Supabase RLS 權限與資料表設定。');
       }
@@ -3650,7 +3651,7 @@ document.addEventListener('submit',async event => {
         persist();
         go({page:'home'}, true);
         try {
-          await loadSupabaseProfileAndWallet(authData.user);
+          await loadSupabaseProfileAndWallet(authData.user, true);
         } catch (refreshError) {
           console.error('帳號已恢復，但個人資料／錢包重新載入失敗：', refreshError);
           toast('已取消刪除申請，但個人資料或錢包重新載入失敗。請重新整理頁面；目前不需要重新申請刪除。');
