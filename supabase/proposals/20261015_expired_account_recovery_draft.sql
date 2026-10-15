@@ -79,7 +79,6 @@ begin
   end if;
 
   -- A cancelled batch containing any archive item may represent partial work.
-  -- Do not unlock the account until an operator reconciles that state.
   if exists (
     select 1
     from public.account_deletion_archive_batches b
@@ -95,8 +94,6 @@ begin
   from public.account_deletion_archive_batches b
   where b.target_user_id = v_user_id and b.status = 'archived';
 
-  -- Multiple archived batches require an operator to reconcile every batch;
-  -- do not assume the latest batch alone represents the full archive history.
   if v_archived_batch_count > 1 then
     return query select false, 'manual_review_required'::text;
     return;
@@ -114,6 +111,17 @@ begin
   for update;
 
   if v_archived_batch_count = 1 and v_batch_status = 'archived' then
+    -- Do not silently accept payload categories the recovery verifier does not know how to reconcile.
+    if exists (
+      select 1
+      from public.account_deletion_archive_items i
+      where i.batch_id = v_batch_id
+        and i.source_table not in ('ai_generation_records', 'wallet_transactions')
+    ) then
+      return query select false, 'manual_review_required'::text;
+      return;
+    end if;
+
     select count(*) into v_ai_source
     from public.ai_generation_records a where a.user_id = v_user_id;
     select count(*) into v_ai_archived
@@ -180,7 +188,7 @@ commit;
 -- 2. Verify a NULL scheduled_for fails closed as manual_review_required.
 -- 3. Decide whether repeated calls after successful recovery should return a distinct idempotent success; this draft currently returns no_request.
 -- 4. Test row-lock coordination against the real worker before any worker is enabled.
--- 5. Validate every archived batch row and status transition; this draft fails closed for multiple archived batches and cancelled batches with residual items.
+-- 5. Validate every archived batch row and status transition; fail closed for multiple archived batches, cancelled batches with residual items, and unknown payload categories.
 -- 6. Verify source-table row visibility under SECURITY DEFINER and exact archive payload schema.
 -- 7. Confirm the product/legal retention policy and whether audit events need FK/retention constraints.
 -- 8. Do not apply to production until reviewed and explicitly approved.
