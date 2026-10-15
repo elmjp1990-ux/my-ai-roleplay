@@ -60,10 +60,13 @@ begin
   end if;
 
   if not v_has_old_charge and not v_has_new_charge then
-    -- Do not allow role escalation to or from assistant without a billable turn.
-    if new.role is distinct from old.role
-       and (old.role = 'assistant' or new.role = 'assistant') then
-      raise exception 'assistant_role_change_requires_chat_turn';
+    -- Legacy/unbilled assistant rows must not remain client-editable just because
+    -- they predate the charge ledger. Keep their identity and content immutable;
+    -- allow only a deleted_at-only change for legacy cleanup.
+    if new.id is distinct from old.id
+       or new.session_id is distinct from old.session_id
+       or new.content is distinct from old.content then
+      raise exception 'uncharged_assistant_reply_is_immutable';
     end if;
     return new;
   end if;
