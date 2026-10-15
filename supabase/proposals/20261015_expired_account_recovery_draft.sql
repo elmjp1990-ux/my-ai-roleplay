@@ -36,6 +36,7 @@ declare
   v_ai_archived bigint;
   v_wallet_source bigint;
   v_wallet_archived bigint;
+  v_archived_batch_count bigint;
 begin
   if v_user_id is null then
     raise exception '請先登入';
@@ -67,6 +68,17 @@ begin
     where b.target_user_id = v_user_id
       and b.status not in ('archived', 'cancelled')
   ) then
+    return query select false, 'manual_review_required'::text;
+    return;
+  end if;
+
+  select count(*) into v_archived_batch_count
+  from public.account_deletion_archive_batches b
+  where b.target_user_id = v_user_id and b.status = 'archived';
+
+  -- Multiple archived batches require an operator to reconcile every batch;
+  -- do not assume the latest batch alone represents the full archive history.
+  if v_archived_batch_count > 1 then
     return query select false, 'manual_review_required'::text;
     return;
   end if;
@@ -143,7 +155,7 @@ commit;
 
 -- Important pre-application review items:
 -- 1. Confirm actual table column types, PKs, FK requirements, and enum/status constraints.
--- 2. Add idempotent semantics for retries after a successful recovery (currently returns no_request).
+-- 2. Decide whether repeated calls after successful recovery should return a distinct idempotent success; this draft currently returns no_request.
 -- 3. Test row-lock coordination against the real worker before any worker is enabled.
 -- 4. Verify source-table row visibility under SECURITY DEFINER and exact archive payload schema.
 -- 5. Confirm the product/legal retention policy and whether audit events need FK/retention constraints.
