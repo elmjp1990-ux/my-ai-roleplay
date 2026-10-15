@@ -1,78 +1,38 @@
--- PROPOSAL ONLY — NOT APPLIED TO SUPABASE.
--- Purpose: ensure an account with any account_deletion_requests row cannot
--- use permissive owner policies to bypass the separate account_must_be_active policy.
--- Review policy names and intended owner behavior against the live database before execution.
--- Run only in a controlled test project first; this file is not a migration.
-
-BEGIN;
-
-DROP POLICY IF EXISTS "作者可管理自己的角色" ON public.characters;
-CREATE POLICY "作者可管理自己的角色"
-ON public.characters
-AS PERMISSIVE
-FOR ALL
-TO public
-USING (
-  auth.uid() = author_id
-  AND public.account_is_active()
-)
-WITH CHECK (
-  auth.uid() = author_id
-  AND public.account_is_active()
-);
-
-DROP POLICY IF EXISTS "作者可管理故事" ON public.character_stories;
-CREATE POLICY "作者可管理故事"
-ON public.character_stories
-AS PERMISSIVE
-FOR ALL
-TO public
-USING (
-  auth.uid() IN (
-    SELECT c.author_id
-    FROM public.characters AS c
-    WHERE c.id = character_stories.character_id
-  )
-  AND public.account_is_active()
-)
-WITH CHECK (
-  auth.uid() IN (
-    SELECT c.author_id
-    FROM public.characters AS c
-    WHERE c.id = character_stories.character_id
-  )
-  AND public.account_is_active()
-);
-
-DROP POLICY IF EXISTS "玩家僅能存取自己的聊天" ON public.conversations;
-CREATE POLICY "玩家僅能存取自己的聊天"
-ON public.conversations
-AS PERMISSIVE
-FOR ALL
-TO public
-USING (
-  auth.uid() = user_id
-  AND public.account_is_active()
-)
-WITH CHECK (
-  auth.uid() = user_id
-  AND public.account_is_active()
-);
-
-COMMIT;
-
--- READ-ONLY VERIFICATION AFTER A CONTROLLED TEST:
--- SELECT schemaname, tablename, policyname, roles, cmd, qual, with_check
--- FROM pg_policies
--- WHERE schemaname = 'public'
---   AND tablename IN ('characters', 'character_stories', 'conversations')
--- ORDER BY tablename, policyname;
+-- READ-ONLY DIAGNOSTICS ONLY.
+-- This file intentionally contains no DROP/CREATE/ALTER/UPDATE/DELETE statements.
 --
--- Test with a disposable account:
--- 1. Confirm normal owner CRUD works when no deletion request exists.
--- 2. Insert a deletion request only in a disposable test environment.
--- 3. Confirm owner writes to these tables are denied while the request exists.
--- 4. Confirm public approved-character/story reads remain available according to their
---    separate SELECT policies.
--- 5. Cancel the request before the test deadline and confirm owner CRUD is restored.
--- Never use a real user's account or delete any user data for this policy test.
+-- Earlier draft proposed replacing owner policies on characters,
+-- character_stories, and conversations based on the assumption that
+-- account_must_be_active was permissive. Live metadata checked 2026-10-15
+-- shows those policies are RESTRICTIVE for role authenticated. Do not apply
+-- the old policy-replacement proposal without a fresh, command-by-command
+-- RLS review. This diagnostic file does not prove effective access behavior;
+-- use a disposable test account in a separate test project for behavioral tests.
+
+-- 1) Inspect policies and role applicability on the three tables.
+SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual, with_check
+FROM pg_policies
+WHERE schemaname = 'public'
+  AND tablename IN ('characters', 'character_stories', 'conversations')
+ORDER BY tablename, policyname;
+
+-- 2) Check RLS enablement and FORCE RLS state.
+SELECT n.nspname AS schema_name,
+       c.relname AS table_name,
+       c.relrowsecurity AS rls_enabled,
+       c.relforcerowsecurity AS force_rls
+FROM pg_class AS c
+JOIN pg_namespace AS n ON n.oid = c.relnamespace
+WHERE n.nspname = 'public'
+  AND c.relname IN ('characters', 'character_stories', 'conversations')
+ORDER BY c.relname;
+
+-- 3) Read-only checklist for disposable-test validation (do not run against a real account):
+-- - Active account: intended owner CRUD succeeds.
+-- - Account with a deletion request: owner INSERT/UPDATE/DELETE is denied where required.
+-- - Public approved-character/story reads remain available according to product policy.
+-- - After a safe cancellation/recovery in the test project, intended owner access returns.
+-- - Repeat for anon and authenticated roles separately; do not infer runtime behavior from
+--   policy names alone.
+--
+-- No policy changes have been applied to Supabase.
