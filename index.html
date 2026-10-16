@@ -2943,7 +2943,7 @@ function groupResetForAccount(uid) {
 }
 function groupFriendlyError(error) {
   const message=String(typeof error==='string'?error:(error?.message||''));
-  if(message.includes('character_not_public_and_approved')) return '群組只能加入已公開且未下架的角色，請重新選擇。';
+  if(message.includes('character_not_public_and_approved') || message.includes('character_not_public_or_unavailable')) return '群組只能加入已公開且未下架的角色，請重新選擇。';
   if(message.includes('character_not_accessible')) return '有角色目前不可使用，請重新選擇已公開且未下架的角色。';
   if(message.includes('invalid_group_name')) return '群組名稱需為 1–80 字。';
   if(message.includes('invalid_world_background')) return '世界背景超過允許長度。';
