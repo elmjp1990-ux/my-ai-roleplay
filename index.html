@@ -3138,6 +3138,7 @@ async function groupSendMock() {
       p_group_id:g.active.id,p_request_key:g.pendingRequest.requestKey,p_content:content
     });
     if(error) throw error;
+    groupClearPendingRequest(user.id,g.active.id);
     g.pendingRequest=null;
     g.sending=false;
     await groupOpen(g.active.id);
