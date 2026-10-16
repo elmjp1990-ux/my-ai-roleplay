@@ -533,7 +533,15 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .environment { font-size:8px; }
   .wallet-button { padding:4px 6px; gap:5px; font-size:10px; }
   .wallet-button .avatar { width:24px; height:24px; }
-  main { padding:16px 12px 98px; }
+  /*
+   * 手機底部導覽需與六個入口同列，避免新增「群組聊天」後自動換行，
+   * 導致固定導覽列變高並遮住個人帳號頁底部操作。
+   */
+  .app { min-height:100dvh; }
+  main {
+    padding:16px 12px calc(104px + env(safe-area-inset-bottom));
+    min-height:calc(100dvh - 58px);
+  }
   .hero { padding:24px; min-height:275px; }
   .grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:11px; }
   .card-body { padding:10px; }
@@ -542,7 +550,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .panel { padding:18px; }
   .mobile-nav {
     display:grid;
-    grid-template-columns:repeat(5,1fr);
+    grid-template-columns:repeat(6,minmax(0,1fr));
     position:fixed;
     bottom:0;
     left:0;
@@ -553,7 +561,22 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     backdrop-filter:blur(15px);
     padding:7px 3px calc(7px + env(safe-area-inset-bottom));
   }
-  .mobile-nav .nav-btn { flex-direction:column; gap:4px; font-size:10px; padding:6px 2px; }
+  .mobile-nav .nav-btn {
+    min-width:0;
+    flex-direction:column;
+    justify-content:center;
+    gap:4px;
+    font-size:clamp(8px,2.4vw,10px);
+    line-height:1.2;
+    white-space:nowrap;
+    padding:6px 1px;
+  }
+  .mobile-nav .nav-btn .nav-label {
+    display:block;
+    max-width:100%;
+    overflow:hidden;
+    text-overflow:clip;
+  }
   .mobile-nav .nav-btn.active { color:var(--text); }
   body:not(.day) .mobile-nav .nav-btn.active { color:white; }
   .chat-layout { display:block; height:auto; }
