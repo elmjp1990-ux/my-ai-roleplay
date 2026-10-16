@@ -7,13 +7,31 @@ ALTER TABLE public.chat_group_messages
 -- so a message is not left without a display name if its member row is missing.
 UPDATE public.chat_group_messages AS msg
 SET speaker_snapshot = jsonb_build_object(
-  'id', COALESCE(member.character_snapshot->>'id', msg.character_id::text),
-  'name', COALESCE(member.character_snapshot->>'name', character_row.name, '角色')
+  'id', COALESCE(
+    (
+      SELECT member.character_snapshot->>'id'
+      FROM public.chat_group_members AS member
+      WHERE member.group_id = msg.group_id
+        AND member.character_id = msg.character_id
+      ORDER BY member.position
+      LIMIT 1
+    ),
+    msg.character_id::text
+  ),
+  'name', COALESCE(
+    (
+      SELECT member.character_snapshot->>'name'
+      FROM public.chat_group_members AS member
+      WHERE member.group_id = msg.group_id
+        AND member.character_id = msg.character_id
+      ORDER BY member.position
+      LIMIT 1
+    ),
+    character_row.name,
+    '角色'
+  )
 )
 FROM public.characters AS character_row
-LEFT JOIN public.chat_group_members AS member
-  ON member.group_id = msg.group_id
- AND member.character_id = msg.character_id
 WHERE msg.speaker_type = 'character'
   AND msg.character_id = character_row.id
   AND msg.speaker_snapshot IS NULL;
