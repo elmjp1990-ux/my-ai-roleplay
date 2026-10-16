@@ -4083,8 +4083,17 @@ document.addEventListener('click',async event => {
       case 'edit-profile':profileImage=currentUser()?.avatar || '';openModal('edit-profile');break;
       case 'shop':openModal('shop',{tab:'monthly'});break;
       case 'shop-tab':openModal('shop',{tab:button.dataset.value});break;
-      case 'ledger':openModal('ledger',{currency:'diamond'});break;
-      case 'ledger-tab':openModal('ledger',{currency:button.dataset.value});break;
+      case 'ledger': {
+        await loadWalletLedger('diamond');
+        openModal('ledger',{currency:'diamond'});
+        break;
+      }
+      case 'ledger-tab': {
+        const currency = button.dataset.value;
+        await loadWalletLedger(currency);
+        openModal('ledger',{currency});
+        break;
+      }
       case 'purchases':openModal('purchases');break;
       case 'delete-account':openModal('delete-account');break;
       case 'bug':openModal('bug');break;
