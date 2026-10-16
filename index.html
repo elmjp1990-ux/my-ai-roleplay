@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#090d16">
 <title>PersonaX｜AI 角色世界</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%E2%9C%A6%3C/text%3E%3C/svg%3E">
 
 <style>
 :root {
@@ -631,7 +632,45 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 @media(max-width:560px){.group-panel{padding:14px}.group-steps{font-size:12px}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+<aside class="sidebar">
+  <div class="sidebar-heading">
+    <button class="ghost logo-button" data-action="home" aria-label="首頁">
+      <img class="logo-img" alt="PersonaX">
+    </button>
+    <button class="ghost" data-action="collapse" aria-label="收合或展開網站選單">☰</button>
+  </div>
+  <nav id="desktopNav"></nav>
+  <div class="sidebar-footer">
+    <button class="ghost" data-action="home" aria-label="首頁">
+      <img class="logo-img" alt="PersonaX">
+    </button>
+  </div>
+</aside>
+
+<div class="app">
+  <header>
+    <div class="row">
+      <button class="ghost mobile-logo" data-action="home" aria-label="首頁">
+        <img class="logo-img" alt="PersonaX">
+      </button>
+      <strong class="desktop-title" id="pageTitle"></strong>
+    </div>
+    <div id="accountArea" class="row"></div>
+  </header>
+  <main id="view"></main>
+</div>
+
+<nav id="mobileNav" class="mobile-nav" aria-label="主要選單"></nav>
+<dialog id="modal"></dialog>
+<div id="toast" class="hidden" role="status"></div>
+<input id="jsonFile" class="hidden" type="file" accept=".json,application/json">
+
 <script>
+'use strict';
+
   const SUPABASE_URL = 'https://ouyewoagbmtqehbofrje.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_MyTDqAKNTkK4zo7eap8gZA_ZGozHRMd';
 
@@ -1317,45 +1356,7 @@ if (characterError) {
       console.error('Supabase Auth 初始化失敗：', error);
     }
   });
-</script>
-</head>
 
-<body>
-<aside class="sidebar">
-  <div class="sidebar-heading">
-    <button class="ghost logo-button" data-action="home" aria-label="首頁">
-      <img class="logo-img" alt="PersonaX">
-    </button>
-    <button class="ghost" data-action="collapse" aria-label="收合或展開網站選單">☰</button>
-  </div>
-  <nav id="desktopNav"></nav>
-  <div class="sidebar-footer">
-    <button class="ghost" data-action="home" aria-label="首頁">
-      <img class="logo-img" alt="PersonaX">
-    </button>
-  </div>
-</aside>
-
-<div class="app">
-  <header>
-    <div class="row">
-      <button class="ghost mobile-logo" data-action="home" aria-label="首頁">
-        <img class="logo-img" alt="PersonaX">
-      </button>
-      <strong class="desktop-title" id="pageTitle"></strong>
-    </div>
-    <div id="accountArea" class="row"></div>
-  </header>
-  <main id="view"></main>
-</div>
-
-<nav id="mobileNav" class="mobile-nav" aria-label="主要選單"></nav>
-<dialog id="modal"></dialog>
-<div id="toast" class="hidden" role="status"></div>
-<input id="jsonFile" class="hidden" type="file" accept=".json,application/json">
-
-<script>
-'use strict';
 
 /* Local prototype. Never use local balances or IDs as server authorization. */
 const STORE_KEY = 'personax-v3';
@@ -4300,7 +4301,7 @@ document.addEventListener('submit',async event => {
         c.visibility='private';c.deletedAt=deletedAt;c.deletionReason='author_deleted';
         for (const session of Object.values(state.sessions)) {
           if (session.characterId===c.id) {
-const { privateInfo: _legacyPrivateInfo, ...(safeCloudSnapshot) } = session.cloudCharacterSnapshot || {};
+const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudCharacterSnapshot || {};
             session.cloudCharacterSnapshot={
               ...safeCloudSnapshot,
               id:c.id,name:c.name,gender:c.gender,age:c.age,image:c.image,intro:c.intro,
