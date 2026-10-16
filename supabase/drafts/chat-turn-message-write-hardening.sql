@@ -215,6 +215,61 @@ $function$;
 revoke all on function public.refund_chat_turn(uuid, uuid, uuid, text) from public, anon, authenticated;
 grant execute on function public.refund_chat_turn(uuid, uuid, uuid, text) to service_role;
 
+-- RLS does not constrain service_role, so assistant-row integrity must be
+-- enforced by a database trigger as well as the authenticated INSERT policy.
+-- Lock the charge row before allowing an assistant INSERT; this shares the
+-- charge-row serialization point with refund_chat_turn().
+create or replace function public.guard_chat_turn_assistant_insert()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_charge public.chat_turn_charges%rowtype;
+begin
+  -- If this ID is already reserved as a turn's expected assistant ID, no
+  -- other role/session may occupy it. This also fails closed on ID collisions.
+  select c.* into v_charge
+  from public.chat_turn_charges c
+  where c.expected_assistant_message_id = new.id
+  for update;
+
+  if found then
+    if new.role is distinct from 'assistant' then
+      raise exception 'expected_assistant_message_id_role_conflict';
+    end if;
+    if new.session_id is distinct from v_charge.session_id then
+      raise exception 'expected_assistant_message_session_conflict';
+    end if;
+    if v_charge.status not in ('reserved', 'needs_reconciliation') then
+      raise exception 'assistant_insert_requires_unresolved_charge';
+    end if;
+    if char_length(btrim(coalesce(new.content, ''))) = 0 then
+      raise exception 'assistant_reply_content_required';
+    end if;
+    return new;
+  end if;
+
+  -- No client or service-role path may create an assistant reply outside the
+  -- billable turn ledger. Character openings are snapshot-only, not chat rows.
+  if new.role = 'assistant' then
+    raise exception 'assistant_reply_requires_chat_turn';
+  end if;
+
+  return new;
+end;
+$function$;
+
+revoke all on function public.guard_chat_turn_assistant_insert() from public, anon, authenticated;
+grant execute on function public.guard_chat_turn_assistant_insert() to service_role;
+
+drop trigger if exists guard_chat_turn_assistant_insert on public.chat_messages;
+create trigger guard_chat_turn_assistant_insert
+before insert on public.chat_messages
+for each row
+execute function public.guard_chat_turn_assistant_insert();
+
 drop policy if exists chat_messages_insert_own on public.chat_messages;
 
 create policy chat_messages_insert_own
