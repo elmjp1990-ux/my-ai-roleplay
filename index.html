@@ -3218,10 +3218,12 @@ function renderModal(o) {
       if (!m) return;
       const latestUserMessage = m.role === 'user' &&
         s.messages.filter(item => item.role === 'user').at(-1)?.id === m.id;
+      const editableAssistantReply = m.role === 'assistant';
       showDialog('訊息操作',`
         <div class="stack">
           <button style="width:100%" data-action="copy-message" data-id="${e(m.id)}">複製</button>
           ${latestUserMessage ? `<button style="width:100%" data-action="edit-message" data-id="${e(m.id)}">編輯</button>` : ''}
+          ${editableAssistantReply ? `<button style="width:100%" data-action="edit-message" data-id="${e(m.id)}">修改 AI 回覆</button>` : ''}
           <button class="danger" style="width:100%" data-action="delete-message" data-id="${e(m.id)}">刪除</button>
           ${m.role === 'assistant' ? `<button style="width:100%" data-action="report"
             data-kind="AI訊息" data-id="${e(m.id)}">舉報</button>` : ''}
@@ -3232,10 +3234,12 @@ function renderModal(o) {
       const m = s?.messages.find(m => m.id === o.id);
       const latestUserMessage = m?.role === 'user' &&
         s.messages.filter(item => item.role === 'user').at(-1)?.id === m.id;
-      if (!m || !latestUserMessage) return;
-      showDialog('編輯最新輸入',`
+      const editableAssistantReply = m?.role === 'assistant';
+      if (!m || (!latestUserMessage && !editableAssistantReply)) return;
+      showDialog(editableAssistantReply ? '修改 AI 回覆' : '編輯最新輸入',`
         <form data-form="message-edit">
           <textarea name="text" required maxlength="10000">${e(m.text)}</textarea>
+          <p class="small muted">${editableAssistantReply ? '修改不會重新呼叫 AI 或再次扣款；原始版本會保留供客服核對。' : '修改玩家訊息不會重新生成回覆或扣款。'}</p>
           <button class="primary" style="margin-top:15px">儲存</button>
         </form>`);
       break;
@@ -4117,16 +4121,47 @@ document.addEventListener('submit',async event => {
         const m=s?.messages.find(m=>m.id===o.id);
         const latestUserMessage = m?.role === 'user' &&
           s.messages.filter(item=>item.role==='user').at(-1)?.id===m.id;
-        if (!m || !latestUserMessage) return;
+        const editableAssistantReply = m?.role === 'assistant';
+        if (!m || (!latestUserMessage && !editableAssistantReply)) return;
         if (!text) return toast('訊息不可為空。');
+        if (text === m.text) { back(); break; }
+
         const previousText=m.text;
         const wasEdited=!!m.edited;
+        const cloudAssistantReply = editableAssistantReply && s.cloudOwned &&
+          currentUser()?.uid === s.cloudOwnerUid && window.mySupabase && isUuid(m.id);
+
+        // Persist local state first. If local persistence fails, no cloud write occurs.
         m.text=text;m.edited=true;
         if (!persist()) {
           m.text=previousText;
           m.edited=wasEdited;
           break;
         }
+
+        if (cloudAssistantReply) {
+          // Update only the existing assistant row. The database version trigger
+          // records OLD.content; this never inserts a new assistant row or charges.
+          const { data, error } = await window.mySupabase.from('chat_messages')
+            .update({content:text})
+            .eq('id',m.id).eq('session_id',s.id).eq('role','assistant')
+            .is('deleted_at',null).select('id').maybeSingle();
+          if (error || !data) {
+            m.text=previousText;
+            m.edited=wasEdited;
+            persist();renderMessages();
+            toast(error
+              ? 'AI 回覆修改同步失敗，已還原原訊息：'+error.message
+              : '找不到可修改的雲端 AI 回覆，已還原原訊息。');
+            break;
+          }
+          // Assistant rows are intentionally excluded from browser upserts. The
+          // direct UPDATE above is the sole edit path and the version trigger audits it.
+          renderMessages();
+          toast('AI 回覆已修改；原始版本已保留，且未再次扣款。');
+          back();break;
+        }
+
         const synced = await saveChatSessionSafely(s);
         if (!synced) {
           m.text=previousText;
