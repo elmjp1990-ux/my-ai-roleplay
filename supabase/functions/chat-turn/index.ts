@@ -125,25 +125,29 @@ Deno.serve(async (request) => {
 
   // Prefer durable generation identity over reply text. Real AI output is not
   // deterministic; matching content to demoReply is only a legacy demo fallback.
-  const replyIdentityMatchesCurrentTurn = async (content: unknown): Promise<boolean> => {
-    if (!String(content || "").trim()) return false;
+  type ReplyIdentityResult = "match" | "mismatch" | "unknown";
+  const replyIdentityMatchesCurrentTurn = async (content: unknown): Promise<ReplyIdentityResult> => {
+    if (!String(content || "").trim()) return "mismatch";
     const { data: generationRecord, error: generationRecordError } = await admin
       .from("ai_generation_records")
       .select("user_id,session_id,user_message_id,assistant_message_id,original_content")
       .eq("assistant_message_id", assistantMessageId)
       .maybeSingle();
 
-    if (!generationRecordError && generationRecord) {
-      return generationRecord.user_id === user.id &&
+    if (generationRecordError) return "unknown";
+    if (generationRecord) {
+      const matches = generationRecord.user_id === user.id &&
         generationRecord.session_id === sessionId &&
         generationRecord.user_message_id === userMessageId &&
         generationRecord.assistant_message_id === assistantMessageId &&
         String(generationRecord.original_content || "").trim().length > 0;
+      return matches ? "match" : "mismatch";
     }
 
-    // If the generation record is not yet available, preserve the strict
-    // deterministic-demo check. Never treat arbitrary content as a valid reply.
-    return String(content) === demoReply;
+    // The demo fallback is valid only for the known deterministic test reply.
+    // Once real AI is connected, every billable reply must have a durable
+    // generation record; arbitrary content without that record is not trusted.
+    return String(content) === demoReply ? "match" : "mismatch";
   };
 
   if (charge.status === "insufficient_funds") {
@@ -188,7 +192,15 @@ Deno.serve(async (request) => {
       return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
     }
     if (recoveredReply && String(recoveredReply.content || "").trim()) {
-      if (!(await replyIdentityMatchesCurrentTurn(recoveredReply.content))) {
+      const identityResult = await replyIdentityMatchesCurrentTurn(recoveredReply.content);
+      if (identityResult === "unknown") {
+        await admin.from("chat_turn_events").insert({
+          turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
+          stage: "reply_identity", error_code: "generation_record_lookup_failed",
+        });
+        return json({ status: "needs_reconciliation", error: "generation_record_lookup_failed", retryAllowed: false }, 503);
+      }
+      if (identityResult === "mismatch") {
         return json({ status: "needs_reconciliation", error: "assistant_message_id_collision", retryAllowed: false }, 409);
       }
       const { data: settledAgain, error: settleAgainError } = await admin.rpc("settle_chat_turn", {
@@ -252,7 +264,20 @@ Deno.serve(async (request) => {
     }
 
     if (possibleReply && String(possibleReply.content || "").trim()) {
-      if (!(await replyIdentityMatchesCurrentTurn(possibleReply.content))) {
+      const identityResult = await replyIdentityMatchesCurrentTurn(possibleReply.content);
+      if (identityResult === "unknown") {
+        await admin.from("chat_turn_charges").update({
+          status: "needs_reconciliation",
+          failure_code: "generation_record_lookup_failed",
+          updated_at: new Date().toISOString(),
+        }).eq("turn_id", turnId).eq("user_id", user.id).eq("status", "reserved");
+        await admin.from("chat_turn_events").insert({
+          turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
+          stage: "reply_identity", error_code: "generation_record_lookup_failed",
+        });
+        return json({ status: "needs_reconciliation", error: "generation_record_lookup_failed", retryAllowed: false }, 503);
+      }
+      if (identityResult === "mismatch") {
         await admin.from("chat_turn_charges").update({
           status: "needs_reconciliation",
           failure_code: "assistant_message_id_collision",
@@ -262,7 +287,7 @@ Deno.serve(async (request) => {
           turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
           stage: "persistence", error_code: "assistant_message_id_collision",
         });
-        return json({ status: "needs_reconciliation", retryAllowed: false }, 409);
+        return json({ status: "needs_reconciliation", error: "assistant_message_id_collision", retryAllowed: false }, 409);
       }
 
       await admin.from("chat_turn_events").insert({
