@@ -42,6 +42,12 @@ with check (
   )
 );
 
+-- Remove legacy secrets copied into client-readable chat snapshots by earlier versions.
+update public.chat_sessions
+set character_snapshot = character_snapshot - 'privateInfo'
+where jsonb_typeof(character_snapshot) = 'object'
+  and character_snapshot ? 'privateInfo';
+
 alter table public.characters drop column if exists private_info;
 
 commit;
