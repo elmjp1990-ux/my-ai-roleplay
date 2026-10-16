@@ -3032,6 +3032,7 @@ async function groupOpen(groupId) {
       return {id:m.id,type:m.speaker_type==='user'?'user':m.speaker_type==='system'?'system':'character',speaker:m.speaker_type==='user'?'你':(member?.name||'角色')+(scene?' · '+scene.name:''),content:m.content,createdAt:m.created_at};
     });
     g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,scenes,members};
+    g.pendingRequest=groupReadPendingRequest(user.id,groupId);
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;g.formError='';
     g.loading=false;g.groupsLoaded=false;
     await groupLoadList(true);
