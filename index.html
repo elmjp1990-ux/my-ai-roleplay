@@ -2888,9 +2888,14 @@ function phoneHTML(c) {
 }
 /* GROUP-01: Supabase-persisted group core with deterministic mock director; no AI or wallet calls. */
 function groupAvailableCharacters() {
-  return state.characters.filter(c => isUuid(c.id) && !c.deletedAt && (
-    owned(c) || (c.visibility === 'public' && (!c.reviewStatus || c.reviewStatus === 'approved'))
-  ));
+  // Group membership is limited to publicly visible, approved, non-deleted characters.
+  // Authors cannot add their own private or draft characters to a group.
+  return state.characters.filter(c =>
+    isUuid(c.id) &&
+    !c.deletedAt &&
+    c.visibility === 'public' &&
+    c.reviewStatus === 'approved'
+  );
 }
 function groupSelectedCharacters() {
   return groupPrototype.draft.memberIds.map(id => groupAvailableCharacters().find(c => c.id === id)).filter(Boolean);
@@ -2922,7 +2927,8 @@ function groupResetForAccount(uid) {
 }
 function groupFriendlyError(error) {
   const message=String(typeof error==='string'?error:(error?.message||''));
-  if(message.includes('character_not_accessible')) return '有角色目前不可使用，請重新選擇你擁有或已公開核准的角色。';
+  if(message.includes('character_not_public_and_approved')) return '群組只能加入已公開且審核通過的角色，請重新選擇。';
+  if(message.includes('character_not_accessible')) return '有角色目前不可使用，請重新選擇已公開且審核通過的角色。';
   if(message.includes('invalid_group_name')) return '群組名稱需為 1–80 字。';
   if(message.includes('invalid_world_background')) return '世界背景超過允許長度。';
   if(message.includes('invalid_scenes')||message.includes('invalid_scene_payload')||message.includes('invalid_scene_position')) return '場景資料不完整或角色場景指派不正確，請檢查後重試。';
