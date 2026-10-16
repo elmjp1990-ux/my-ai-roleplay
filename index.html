@@ -472,20 +472,23 @@ body.chat-page main { max-width:none; padding:12px; }
 /* Composer */
 .composer { flex:0 0 auto; padding:8px 12px 10px; border-top:1px solid var(--border); background:var(--header); }
 .composer textarea { resize:none; height:42px; min-height:42px; max-height:110px; font-size:12px; padding:8px 10px; }
-.suggestions { margin-bottom:7px; min-width:0; }
-.suggestions-panel { border:1px solid var(--border); border-radius:12px; background:var(--panel); overflow:hidden; }
-.suggestions-panel > summary { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:40px; padding:9px 11px; cursor:pointer; list-style:none; font-size:12px; font-weight:600; }
+.suggestions { margin-bottom:5px; min-width:0; }
+.suggestions-panel { border:1px solid var(--border); border-radius:10px; background:var(--panel); overflow:hidden; }
+.suggestions-panel > summary { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:30px; padding:5px 9px; cursor:pointer; list-style:none; font-size:11px; font-weight:600; }
 .suggestions-panel > summary::-webkit-details-marker { display:none; }
-.suggestions-panel > summary::after { content:"⌄"; color:var(--muted); font-size:16px; line-height:1; transition:transform .15s ease; }
+.suggestions-panel > summary::after { content:"⌄"; color:var(--muted); font-size:14px; line-height:1; transition:transform .15s ease; }
 .suggestions-panel[open] > summary::after { transform:rotate(180deg); }
-.suggestions-count { color:var(--muted); font-size:11px; font-weight:400; }
-.suggestion-options { display:grid; gap:8px; padding:0 8px 8px; }
-.suggestion-card { display:block; width:100%; min-width:0; padding:11px 12px; border:1px solid var(--border); border-radius:10px; background:var(--card); color:var(--text); text-align:left; font:inherit; white-space:normal; line-height:1.55; }
+.suggestions-count { color:var(--muted); font-size:10px; font-weight:400; }
+.suggestion-options { display:flex; align-items:center; gap:5px; padding:0 8px 5px; }
+.suggestion-light { width:10px; height:10px; min-width:10px; padding:0; border:0; border-radius:50%; background:var(--border); box-shadow:inset 0 0 0 1px var(--muted); }
+.suggestion-light[aria-pressed="true"] { background:#34d399; box-shadow:0 0 6px #34d399aa; }
+.suggestion-card { display:none; width:100%; min-width:0; max-height:58px; overflow:hidden; padding:5px 8px; border:1px solid var(--border); border-radius:8px; background:var(--card); color:var(--text); text-align:left; font:inherit; white-space:normal; line-height:1.25; }
+.suggestion-card.active { display:block; }
 .suggestion-card:active { transform:scale(.995); }
-.suggestion-card-title { display:block; margin-bottom:6px; font-size:12px; font-weight:700; }
-.suggestion-card-action { display:block; margin-bottom:6px; color:var(--muted); font-size:12px; white-space:pre-wrap; overflow-wrap:anywhere; }
-.suggestion-card-dialogue { display:block; font-size:13px; white-space:pre-wrap; overflow-wrap:anywhere; }
-.suggestion-card-hint { display:block; margin-top:8px; color:var(--muted); font-size:10px; }
+.suggestion-card-title { display:block; margin-bottom:2px; font-size:10px; font-weight:700; }
+.suggestion-card-action,.suggestion-card-dialogue { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; font-size:10px; line-height:1.25; }
+.suggestion-card-action { color:var(--muted); }
+.suggestion-card-dialogue { display:none; }
 .chat-tools { display:flex; gap:6px; overflow-x:auto; margin-top:6px; padding-bottom:2px; }
 .chat-tools button { white-space:nowrap; font-size:10px; padding:4px 7px; flex-shrink:0; }
 .reply-draft-entry { margin-top:7px; gap:8px; }
@@ -615,13 +618,12 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .phone summary { padding:4px 9px; font-size:9px; }
   .composer { padding:5px 8px calc(5px + env(safe-area-inset-bottom)); }
   .composer textarea { height:36px; min-height:36px; padding:6px 8px; }
-  .suggestions { margin-bottom:5px; }
-  .suggestions-panel > summary { min-height:42px; padding:10px 11px; font-size:12px; }
-  .suggestion-options { gap:7px; padding:0 7px 7px; }
-  .suggestion-card { min-height:44px; padding:12px; }
-  .suggestion-card-title { font-size:12px; }
-  .suggestion-card-action { font-size:12px; }
-  .suggestion-card-dialogue { font-size:13px; }
+  .suggestions { margin-bottom:4px; }
+  .suggestions-panel > summary { min-height:30px; padding:5px 8px; font-size:11px; }
+  .suggestion-options { gap:6px; padding:0 8px 4px; }
+  .suggestion-card { max-height:54px; padding:4px 7px; }
+  .suggestion-card-title { font-size:10px; }
+  .suggestion-card-action { font-size:10px; }
   .chat-tools button { font-size:9px; padding:3px 6px; }
   .chat-tools { margin-top:4px; }
   .message-content { max-width:80%; }
@@ -3170,36 +3172,32 @@ function renderConversation() {
         <form class="composer" data-form="message">
           ${s.suggestions ? `<div class="suggestions">
             <details class="suggestions-panel">
-              <summary>建議回覆 <span class="suggestions-count">3 種回應可選</span></summary>
-              <div class="suggestion-options">
-                <button type="button" class="suggestion-card" data-action="suggestion" data-text="${e('我先是微微一怔，隨後放下手邊的事情，仔細端詳你的神情，像是想從你的表情裡猜出真正的心思。\n\n「你今天看起來有點不一樣，是發生什麼事了嗎？如果你願意，我可以好好聽你說。」')}">
-                  <span class="suggestion-card-title">① 溫柔關心</span>
-                  <span class="suggestion-card-action">我先是微微一怔，隨後放下手邊的事情，仔細端詳你的神情，像是想從你的表情裡猜出真正的心思。</span>
-                  <span class="suggestion-card-dialogue">「你今天看起來有點不一樣，是發生什麼事了嗎？如果你願意，我可以好好聽你說。」</span>
-                  <span class="suggestion-card-hint">點擊後帶入輸入框，可自行修改</span>
-                </button>
-                <button type="button" class="suggestion-card" data-action="suggestion" data-text="${e('我挑了挑眉，故意往你面前靠近半步，嘴角揚起一抹藏不住的笑，語氣裡帶著一點逗弄。\n\n「突然這麼主動來找我？先讓我猜猜看……你是有事拜託我，還是單純想我了？」')}">
-                  <span class="suggestion-card-title">② 俏皮逗弄</span>
-                  <span class="suggestion-card-action">我挑了挑眉，故意往你面前靠近半步，嘴角揚起一抹藏不住的笑，語氣裡帶著一點逗弄。</span>
-                  <span class="suggestion-card-dialogue">「突然這麼主動來找我？先讓我猜猜看……你是有事拜託我，還是單純想我了？」</span>
-                  <span class="suggestion-card-hint">點擊後帶入輸入框，可自行修改</span>
-                </button>
-                <button type="button" class="suggestion-card" data-action="suggestion" data-text="${e('我收起原本輕鬆的神情，安靜地看著你，指尖不自覺地收緊，似乎猶豫了片刻才終於決定坦白。\n\n「其實有件事我一直想告訴你，只是不確定你會怎麼想。你願意聽我說完嗎？」')}">
-                  <span class="suggestion-card-title">③ 坦率表達</span>
-                  <span class="suggestion-card-action">我收起原本輕鬆的神情，安靜地看著你，指尖不自覺地收緊，似乎猶豫了片刻才終於決定坦白。</span>
-                  <span class="suggestion-card-dialogue">「其實有件事我一直想告訴你，只是不確定你會怎麼想。你願意聽我說完嗎？」</span>
-                  <span class="suggestion-card-hint">點擊後帶入輸入框，可自行修改</span>
-                </button>
+              <summary>建議回覆 <span class="suggestions-count">選擇燈號切換</span></summary>
+              <div class="suggestion-options" aria-label="選擇建議回覆">
+                <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="0" aria-label="第 1 則建議" aria-pressed="true"></button>
+                <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="1" aria-label="第 2 則建議" aria-pressed="false"></button>
+                <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="2" aria-label="第 3 則建議" aria-pressed="false"></button>
               </div>
+              <button type="button" class="suggestion-card active" data-action="suggestion" data-index="0" data-text="${e('我先是微微一怔，隨後放下手邊的事情，仔細端詳你的神情，像是想從你的表情裡猜出真正的心思。\n\n「你今天看起來有點不一樣，是發生什麼事了嗎？如果你願意，我可以好好聽你說。」')}">
+                <span class="suggestion-card-title">① 溫柔關心</span>
+                <span class="suggestion-card-action">我先是微微一怔，隨後放下手邊的事情，仔細端詳你的神情，像是想從你的表情裡猜出真正的心思。</span>
+                <span class="suggestion-card-dialogue">「你今天看起來有點不一樣，是發生什麼事了嗎？如果你願意，我可以好好聽你說。」</span>
+              </button>
+              <button type="button" class="suggestion-card" data-action="suggestion" data-index="1" data-text="${e('我挑了挑眉，故意往你面前靠近半步，嘴角揚起一抹藏不住的笑，語氣裡帶著一點逗弄。\n\n「突然這麼主動來找我？先讓我猜猜看……你是有事拜託我，還是單純想我了？」')}">
+                <span class="suggestion-card-title">② 俏皮逗弄</span>
+                <span class="suggestion-card-action">我挑了挑眉，故意往你面前靠近半步，嘴角揚起一抹藏不住的笑，語氣裡帶著一點逗弄。</span>
+                <span class="suggestion-card-dialogue">「突然這麼主動來找我？先讓我猜猜看……你是有事拜託我，還是單純想我了？」</span>
+              </button>
+              <button type="button" class="suggestion-card" data-action="suggestion" data-index="2" data-text="${e('我收起原本輕鬆的神情，安靜地看著你，指尖不自覺地收緊，似乎猶豫了片刻才終於決定坦白。\n\n「其實有件事我一直想告訴你，只是不確定你會怎麼想。你願意聽我說完嗎？」')}">
+                <span class="suggestion-card-title">③ 坦率表達</span>
+                <span class="suggestion-card-action">我收起原本輕鬆的神情，安靜地看著你，指尖不自覺地收緊，似乎猶豫了片刻才終於決定坦白。</span>
+                <span class="suggestion-card-dialogue">「其實有件事我一直想告訴你，只是不確定你會怎麼想。你願意聽我說完嗎？」</span>
+              </button>
             </details>
           </div>` : ''}
           <div class="row" style="gap:7px">
             <textarea id="messageInput" name="text" maxlength="3000" placeholder="輸入對話…">${e(drafts[s.id] || '')}</textarea>
             <button class="primary" aria-label="送出或接續回應">➤</button>
-          </div>
-          <div class="row between reply-draft-entry">
-            <span class="reply-draft-hint">先草擬 USER 的反應與一句台詞，再由你修改確認</span>
-            <button type="button" data-action="draft-reply">✨ AI 幫我寫回覆</button>
           </div>
           <div class="chat-tools">
             <button type="button" data-action="snapshot">📷 快照</button>
