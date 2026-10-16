@@ -4052,7 +4052,7 @@ document.addEventListener('click',async event => {
         break;
       }
       case 'list-menu':openModal('list-menu');break;
-      case 'group':openModal('group');break;
+      case 'group':go({page:'group'});break;
       case 'session-menu':openModal('session-menu',{id:key});break;
       case 'remove-session': {
         const item=state.sessions[key];
