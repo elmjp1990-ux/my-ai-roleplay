@@ -476,6 +476,11 @@ body.chat-page main { max-width:none; padding:12px; }
 .suggestions button { white-space:nowrap; font-size:10px; padding:4px 7px; }
 .chat-tools { display:flex; gap:6px; overflow-x:auto; margin-top:6px; padding-bottom:2px; }
 .chat-tools button { white-space:nowrap; font-size:10px; padding:4px 7px; flex-shrink:0; }
+.reply-draft-entry { margin-top:7px; gap:8px; }
+.reply-draft-entry .reply-draft-hint { color:var(--muted); font-size:11px; line-height:1.5; }
+.reply-draft-entry button { white-space:nowrap; flex-shrink:0; background:var(--soft); border-color:#818cf866; }
+.reply-draft-editor { min-height:170px; max-height:42dvh; font-size:14px; }
+.reply-draft-notice { padding:10px 12px; border:1px solid var(--border); border-radius:12px; color:var(--muted); font-size:12px; line-height:1.7; background:var(--panel2); }
 .chat-overlay { position:absolute; inset:0; z-index:15; background:var(--header); backdrop-filter:blur(20px); padding:18px; overflow-y:auto; }
 .overlay-heading { display:flex; align-items:center; gap:10px; margin-bottom:18px; }
 .overlay-heading h2 { margin:0; }
@@ -1604,6 +1609,7 @@ let draftTags = [];
 let draftImage = '';
 let profileImage = '';
 let replyId = null;
+let replyDraftVariant = 0;
 let toastTimer;
 let gridObserver;
 
@@ -3160,6 +3166,10 @@ function renderConversation() {
             <textarea id="messageInput" name="text" maxlength="3000" placeholder="輸入對話…">${e(drafts[s.id] || '')}</textarea>
             <button class="primary" aria-label="送出或接續回應">➤</button>
           </div>
+          <div class="row between reply-draft-entry">
+            <span class="reply-draft-hint">先草擬 USER 的反應與一句台詞，再由你修改確認</span>
+            <button type="button" data-action="draft-reply">✨ AI 幫我寫回覆</button>
+          </div>
           <div class="chat-tools">
             <button type="button" data-action="snapshot">📷 快照</button>
             <button type="button" data-action="persona">⚙ 人設</button>
@@ -3940,6 +3950,65 @@ document.addEventListener('click',async event => {
         break;
       }
       case 'chat-settings':openModal('chat-settings',{id:key});break;
+      case 'draft-reply': {
+        if (!s || !currentUser()) return toast('請先登入，再使用回覆草稿功能。');
+        replyDraftVariant = 0;
+        const samples = [
+          '我愣了一下，仔細看了看你的神情，原本想說的話又吞回去，最後還是鼓起勇氣望向你。\n\n「你這麼說……是想知道我的真心話嗎？」',
+          '我下意識地避開你的目光，指尖不自在地輕輕摩挲，沉默片刻後才重新看向你，語氣裡多了幾分認真。\n\n「那你呢？你心裡真正的想法是什麼？」',
+          '我先是怔住，隨後慢慢放鬆緊繃的肩膀，試著從你的表情裡確認這不是玩笑，才小聲地開口。\n\n「如果我說我有一點在意你，你會怎麼回答？」'
+        ];
+        showDialog('AI 輔助 USER 回覆草稿', `
+          <p class="muted">草稿約 50～100 字，可直接修改動作、表情、反應與台詞。</p>
+          <div class="reply-draft-notice" role="status">目前 AI 服務尚未正式串接，這裡先提供測試範例來驗證「編輯後再送出」流程；不會在產生草稿時建立訊息或扣款。</div>
+          <label class="field" for="replyDraftEditor"><span>你的回覆草稿</span>
+            <textarea id="replyDraftEditor" class="reply-draft-editor" maxlength="3000">${e(samples[replyDraftVariant])}</textarea>
+          </label>
+          <div class="row wrap" style="justify-content:flex-end;gap:8px">
+            <button type="button" data-action="draft-reply-close">取消</button>
+            <button type="button" data-action="draft-reply-regenerate">換一版範例</button>
+            <button type="button" data-action="draft-reply-use">放入輸入框</button>
+            <button type="button" class="primary" data-action="draft-reply-send">確認並送出</button>
+          </div>
+        `);
+        break;
+      }
+      case 'draft-reply-regenerate': {
+        const samples = [
+          '我愣了一下，仔細看了看你的神情，原本想說的話又吞回去，最後還是鼓起勇氣望向你。\n\n「你這麼說……是想知道我的真心話嗎？」',
+          '我下意識地避開你的目光，指尖不自在地輕輕摩挲，沉默片刻後才重新看向你，語氣裡多了幾分認真。\n\n「那你呢？你心裡真正的想法是什麼？」',
+          '我先是怔住，隨後慢慢放鬆緊繃的肩膀，試著從你的表情裡確認這不是玩笑，才小聲地開口。\n\n「如果我說我有一點在意你，你會怎麼回答？」'
+        ];
+        replyDraftVariant = (replyDraftVariant + 1) % samples.length;
+        const editor = $('replyDraftEditor');
+        if (editor) editor.value = samples[replyDraftVariant];
+        break;
+      }
+      case 'draft-reply-close': {
+        $('modal')?.close();
+        break;
+      }
+      case 'draft-reply-use':
+      case 'draft-reply-send': {
+        const draft = String($('replyDraftEditor')?.value || '').trim();
+        if (!draft) return toast('請先填寫回覆草稿。');
+        const input = $('messageInput');
+        const form = $('view').querySelector('form[data-form="message"]');
+        if (!input || !form || !s) {
+          $('modal')?.close();
+          return toast('找不到目前的聊天輸入框，請重新開啟草稿。');
+        }
+        input.value = draft;
+        drafts[s.id] = draft;
+        $('modal')?.close();
+        if (action === 'draft-reply-send') {
+          form.requestSubmit();
+        } else {
+          input.focus();
+          toast('草稿已放入輸入框；修改後按送出才會建立 USER 訊息。');
+        }
+        break;
+      }
       case 'suggestion':
         $('messageInput').value=button.dataset.text;
         drafts[route.id]=button.dataset.text;
