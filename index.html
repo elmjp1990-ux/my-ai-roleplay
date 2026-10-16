@@ -634,6 +634,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 .group-bubble.user{margin-left:auto;background:#3730a3;color:#fff;max-width:88%}
 .group-bubble small{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}
 .group-alert{background:var(--soft);border:1px solid var(--border);border-radius:10px;padding:11px;color:var(--muted);font-size:13px}
+.group-scene-input-wrap{position:relative}.group-scene-input-wrap textarea{padding-right:110px}.group-inspiration{position:absolute;right:8px;top:8px;padding:6px 9px;font-size:12px;background:var(--soft);border-color:#818cf866}.group-scene-help{font-size:12px;color:var(--muted);line-height:1.7}
 @media(max-width:560px){.group-panel{padding:14px}.group-steps{font-size:12px}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -2901,20 +2902,9 @@ function groupRenderSteps() {
 }
 function groupRenderScenes() {
   const g=groupPrototype;
-  const n=g.draft.mode==='shared'?1:3;
-  return Array.from({length:n},(_,i)=>'<label class="group-field"><span>場景 '+(i+1)+' 名稱</span><input id="groupSceneName'+i+'" maxlength="80" value="'+e(g.draft.scenes[i]?.name||('場景 '+(i+1)))+'" placeholder="輸入場景名稱"></label><label class="group-field"><span>場景 '+(i+1)+' 描述</span><textarea id="groupSceneDesc'+i+'" maxlength="5000" placeholder="地點、時間與目前情況">'+e(g.draft.scenes[i]?.description||'')+'</textarea></label>').join('');
+  const scene=g.draft.scenes[0]||{name:'初始相遇',description:''};
+  return '<label class="group-field"><span>共同場景名稱</span><input id="groupSceneName0" maxlength="80" value="'+e(scene.name||'')+'" placeholder="例如：深夜花店、博物館特展之夜"></label><div class="group-field"><span>共同場景與開場情境</span><div class="group-scene-input-wrap"><textarea id="groupSceneDesc0" maxlength="5000" placeholder="由你決定故事從哪裡開始：時間、地點、角色如何相遇，以及當下發生什麼事。">'+e(scene.description||'')+'</textarea><button type="button" class="group-inspiration" data-action="group-inspiration">✨ AI 靈感</button></div><small class="group-scene-help">你可以完全自行撰寫或修改。只有主動點擊「AI 靈感」時才會嘗試生成；目前 AI 尚未串接，按鈕會提示狀態，不會自動呼叫或扣款。</small></div>';
 }
-document.addEventListener('change',event => {
-  if (event.target?.id !== 'groupModeInput' || route.page !== 'group' || groupPrototype.step !== 2) return;
-  const oldCount=groupPrototype.draft.mode==='shared'?1:3;
-  const captured=Array.from({length:oldCount},(_,i)=>({
-    name:$('groupSceneName'+i)?.value.trim()||groupPrototype.draft.scenes[i]?.name||'',
-    description:$('groupSceneDesc'+i)?.value||groupPrototype.draft.scenes[i]?.description||''
-  }));
-  groupPrototype.draft.scenes=captured.concat(groupPrototype.draft.scenes.slice(captured.length));
-  groupPrototype.draft.mode=event.target.value;
-  render();
-});
 function groupRenderCharacters() {
   const chars=groupAvailableCharacters();
   if (!chars.length) return '<div class="group-alert">目前沒有可選的雲端角色。請先登入並確認角色已儲存在 Supabase，且你擁有該角色或該角色已公開核准。</div>';
@@ -3025,7 +3015,7 @@ function renderGroupPrototype() {
   }
   let body='';
   if(g.step===1) body='<h2>群組基本資料</h2><label class="group-field"><span>群組名稱（1–80 字）</span><input id="groupNameInput" maxlength="80" value="'+e(g.draft.name)+'" placeholder="例如：月影旅團"></label><label class="group-field"><span>世界背景（最多 10000 字）</span><textarea id="groupWorldInput" maxlength="10000" placeholder="故事世界、時代、規則與氛圍">'+e(g.draft.world)+'</textarea></label>';
-  if(g.step===2) body='<h2>世界與初始場景</h2><label class="group-field"><span>場景模式</span><select id="groupModeInput"><option value="shared" '+(g.draft.mode==='shared'?'selected':'')+'>所有角色在同一場景</option><option value="separate" '+(g.draft.mode==='separate'?'selected':'')+'>角色分開場景</option></select></label><div class="group-alert">分開場景模式會為每名角色分配場景；確認時依角色數量使用對應場景。</div>'+groupRenderScenes();
+  if(g.step===2) body='<h2>共同世界與初始場景</h2><div class="group-alert">所有 AI 角色共享同一個世界觀與共同開場。場景由你決定；沒有靈感時，可以主動使用 AI 靈感按鈕，不會自動呼叫 AI。</div>'+groupRenderScenes();
   if(g.step===3) body='<h2>選擇角色</h2><p class="muted">最多三名角色。只能選擇雲端 UUID 角色，後端會再次驗證所有權及公開核准狀態。</p>'+groupRenderCharacters();
   $('view').innerHTML='<div class="group-wizard"><div><h1>建立群組聊天</h1><p class="muted">建立資料與 Mock 回覆會保存於測試 Supabase；不呼叫 AI、不扣款。</p></div>'+groupRenderList()+groupRenderSteps()+'<section class="group-panel">'+body+'<div id="groupFormError" class="error" role="alert" aria-live="polite">'+e(g.formError)+'</div><div class="group-actions"><button data-action="group-back" '+(g.step===1||g.loading?'disabled':'')+'>上一步</button><button class="primary" data-action="group-next" '+(g.loading?'disabled':'')+'>'+(g.loading?'正在建立…':g.step===3?'確認並保存群組':'下一步')+'</button></div></section></div>';
 }
@@ -3037,11 +3027,10 @@ function groupReadStep() {
     if(!g.draft.name||g.draft.name.length>80) return '請輸入 1–80 字的群組名稱。';
     if(g.draft.world.length>10000) return '世界背景不可超過 10000 字。';
   } else if(g.step===2) {
-    g.draft.mode=$('groupModeInput')?.value||'shared';
-    const n=g.draft.mode==='shared'?1:3;
-    g.draft.scenes=Array.from({length:n},(_,i)=>({name:$('groupSceneName'+i)?.value.trim()||'',description:$('groupSceneDesc'+i)?.value||''}));
-    if(g.draft.mode==='shared' && !g.draft.scenes[0]?.name) return '請填寫共用場景名稱。';
-    if(g.draft.scenes.some(x=>x.name.length>80||x.description.length>5000)) return '場景名稱或描述超過字數限制。';
+    g.draft.mode='shared';
+    g.draft.scenes=[{name:$('groupSceneName0')?.value.trim()||'',description:$('groupSceneDesc0')?.value||''}];
+    if(!g.draft.scenes[0].name) return '請填寫共同場景名稱。';
+    if(g.draft.scenes[0].name.length>80||g.draft.scenes[0].description.length>5000) return '場景名稱或描述超過字數限制。';
   } else if(g.step===3) {
     const availableIds=new Set(groupAvailableCharacters().map(c=>c.id));
     g.draft.memberIds=[...new Set(g.draft.memberIds.filter(id=>availableIds.has(id)))];
@@ -3070,9 +3059,8 @@ async function groupCreateMock() {
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('請使用已連結 Supabase 的帳號登入，才能建立雲端群組。');
     g.ownerUid=user.id;
     const members=groupSelectedCharacters();
-    const scenes=(g.draft.mode==='shared'?[g.draft.scenes[0]]:g.draft.scenes.slice(0,members.length))
-      .map(x=>({name:x.name.trim(),description:x.description||''}));
-    const pMembers=members.map((m,i)=>({character_id:m.id,scene_position:g.draft.mode==='shared'?1:i+1}));
+    const scenes=[g.draft.scenes[0]].map(x=>({name:x.name.trim(),description:x.description||''}));
+    const pMembers=members.map(m=>({character_id:m.id,scene_position:1}));
     const {data:groupId,error}=await window.mySupabase.rpc('create_chat_group',{
       p_name:g.draft.name.trim(),p_world_background:g.draft.world,p_scene_mode:g.draft.mode,p_scenes:scenes,p_members:pMembers
     });
@@ -3740,6 +3728,7 @@ document.addEventListener('click',async event => {
     switch(action) {
       case 'home':go({page:'home'});break;
       case 'group-next':groupNext();break;
+      case 'group-inspiration':toast('AI 靈感功能尚在串接中；你可以先自行撰寫或修改場景。此操作不會呼叫 AI 或扣款。');break;
       case 'group-open':groupOpen(key);break;
       case 'group-refresh-list':groupRefreshList();break;
       case 'group-list':groupList();break;
