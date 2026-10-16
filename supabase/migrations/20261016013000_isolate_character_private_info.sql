@@ -2,14 +2,14 @@
 -- Backfill legacy values before removing the legacy column.
 begin;
 
-insert into public.character_private_info (character_id, author_id, private_info)
+insert into public.character_private_info as existing (character_id, author_id, private_info)
 select c.id, c.author_id, c.private_info
 from public.characters c
 where coalesce(c.private_info, '') <> ''
 on conflict (character_id) do update
 set author_id = excluded.author_id,
     private_info = excluded.private_info
-where coalesce(public.character_private_info.private_info, '') = '';
+where coalesce(existing.private_info, '') = '';
 
 alter table public.character_private_info enable row level security;
 
