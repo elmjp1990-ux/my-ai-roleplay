@@ -3001,7 +3001,7 @@ function groupRenderList() {
   let body='';
   if(g.loadingGroups) body='<p class="muted">正在讀取雲端群組…</p>';
   else if(g.loadError) body='<div class="group-alert">'+e(g.loadError)+'</div><button data-action="group-refresh-list">重新載入</button>';
-  else if(!g.groups.length) body='<p class="muted">目前還沒有已保存的群組。建立後即可在這裡重新開啟。</p>';
+  else if(!(g.showArchived?g.archivedGroups:g.groups).length) body='<p class="muted">'+(g.showArchived?'目前沒有已封存的群組。':'目前還沒有已保存的群組。建立後即可在這裡重新開啟。')+'</p>';
   else body='<div class="group-character-grid">'+(g.showArchived?g.archivedGroups:g.groups).map(x=>'<div class="group-character-option"><span style="flex:1;min-width:0;overflow:hidden"><strong class="ellipsis" style="display:block;max-width:100%">'+e(x.name)+'</strong><span class="muted small" style="display:block">'+(x.scene_mode==='shared'?'共用場景':'分開場景')+' · '+e(String(x.created_at||'').slice(0,10))+(g.showArchived?' · 已封存':'')+'</span></span><div class="row wrap" style="gap:6px">'+(g.showArchived?'<button data-action="group-restore" data-id="'+e(x.id)+'">取消封存</button>':'<button data-action="group-open" data-id="'+e(x.id)+'">開啟</button><button data-action="group-rename" data-id="'+e(x.id)+'">重新命名</button><button data-action="group-archive" data-id="'+e(x.id)+'">封存</button>')+'</div></div>').join('')+'</div>';
   return '<section class="group-panel"><div class="row between wrap"><h2>'+(g.showArchived?'已封存的群組':'已保存的群組')+'</h2><div class="row wrap"><button data-action="group-toggle-archived">'+(g.showArchived?'返回目前群組':'查看封存群組')+'</button><button data-action="group-refresh-list">重新載入</button></div></div>'+body+'</section>';
 }
