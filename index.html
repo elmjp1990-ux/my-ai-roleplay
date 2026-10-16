@@ -4039,6 +4039,14 @@ document.addEventListener('click',async event => {
         }
         break;
       }
+      case 'suggestion-select': {
+        const panel = button.closest('.suggestions-panel');
+        const index = Number(button.dataset.index);
+        if (!panel || !Number.isInteger(index)) break;
+        panel.querySelectorAll('.suggestion-card').forEach((card, i) => card.classList.toggle('active', i === index));
+        panel.querySelectorAll('.suggestion-light').forEach((light, i) => light.setAttribute('aria-pressed', String(i === index)));
+        break;
+      }
       case 'suggestion': {
         const input = $('messageInput');
         const nextText = String(button.dataset.text || '');
