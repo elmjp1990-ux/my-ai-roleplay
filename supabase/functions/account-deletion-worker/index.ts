@@ -101,7 +101,12 @@ Deno.serve(async (request) => {
           summary.completed += 1;
           continue;
         }
-        if (verifyError || verifyUser?.user) throw new Error("auth_delete_failed");
+
+        // Only an explicit user record proves deletion did not happen. A lookup error,
+        // empty response, or missing user without a recognized not-found error is ambiguous.
+        if (verifyError) throw new Error("auth_delete_verification_failed");
+        if (!verifyUser?.user) throw new Error("auth_delete_verification_ambiguous");
+        throw new Error("auth_delete_failed");
       }
 
       const { error: finalizeError } = await admin.rpc("finalize_account_deletion", {
