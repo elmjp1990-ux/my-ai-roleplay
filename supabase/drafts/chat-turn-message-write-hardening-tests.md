@@ -3,6 +3,13 @@
 Status: test plan; partial manual checks have run against the configured test Supabase project, but the cases below are NOT fully executed.
 Run fixture-based tests only against a disposable Supabase branch/project. Do not execute fixture writes on a production project.
 
+## Verified checks (2026-10-16; configured test project)
+
+- **P10 PASS:** A rollback-safe negative test attempted to insert an assistant row with a random ID and no matching charge; the database rejected it with `assistant_reply_requires_chat_turn`. The attempted row was not persisted.
+- **U1 PASS (database trigger/version-history portion):** Within an explicit transaction, a settled assistant reply was edited and `chat_message_versions` recorded the prior content. The transaction was rolled back, so the temporary edit and test version row were not persisted. This verifies trigger behavior, not browser RLS or full end-to-end UI behavior.
+- **Schema check:** `chat_turn_charges.status` is `NOT NULL`; P14 should verify that constraint. The SQL guard also uses NULL-safe status comparisons as defense in depth.
+- All other cases below remain unverified unless separately recorded here. These checks do not establish that the complete draft can be reapplied safely or rolled back.
+
 ## Before testing
 
 - Apply the full migration set to a disposable project.
