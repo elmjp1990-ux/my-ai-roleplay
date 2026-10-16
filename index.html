@@ -1537,6 +1537,7 @@ function load() {
 }
 
 let state = load();
+let walletLedgerLoadError = '';
 
 // 一次性清除舊版共用 localStorage 中無法確認所屬帳號的聊天，避免升級後仍顯示跨帳號紀錄。
 // 已同步的正式聊天會在登入後依目前 UID 從 Supabase 重新載入。
@@ -3307,6 +3308,7 @@ function renderNotifications() {
 
 /* Cloud wallet ledger: read the authoritative transaction journal from Supabase. */
 async function loadWalletLedger(currency) {
+  walletLedgerLoadError = '';
   const uid = state.account?.uid;
   const client = window.mySupabase;
   if (!uid || !client) return false;
@@ -3319,6 +3321,7 @@ async function loadWalletLedger(currency) {
     .limit(100);
   if (error) {
     console.error('讀取錢包花費日誌失敗：', error);
+    walletLedgerLoadError = currency;
     toast('花費日誌讀取失敗，請稍後再試。');
     return false;
   }
@@ -3462,7 +3465,10 @@ function renderModal(o) {
           <button class="tab ${currency === 'diamond' ? 'active' : ''}" data-action="ledger-tab" data-value="diamond">鑽石</button>
           <button class="tab ${currency === 'silver' ? 'active' : ''}" data-action="ledger-tab" data-value="silver">銀幣</button>
         </div>
-        ${logs.slice().reverse().map(l => `<article class="log-row">
+        ${walletLedgerLoadError === currency
+          ? `<div class="empty" style="margin-top:15px">雲端交易紀錄暫時無法讀取，為避免顯示過期資料，請重新載入。</div>
+             <button style="width:100%;margin-top:12px" data-action="ledger-retry" data-value="${e(currency)}">重新載入</button>`
+          : logs.slice().reverse().map(l => `<article class="log-row">
           <div class="row between"><strong>${e(l.reason)}</strong>
             <strong>${l.change >= 0 ? '+' : ''}${e(l.change)}</strong></div>
           <p class="small muted" style="margin:6px 0">
@@ -4090,6 +4096,12 @@ document.addEventListener('click',async event => {
       }
       case 'ledger-tab': {
         const currency = button.dataset.value;
+        await loadWalletLedger(currency);
+        openModal('ledger',{currency});
+        break;
+      }
+      case 'ledger-retry': {
+        const currency = button.dataset.value === 'silver' ? 'silver' : 'diamond';
         await loadWalletLedger(currency);
         openModal('ledger',{currency});
         break;
