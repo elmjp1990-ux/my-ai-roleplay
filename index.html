@@ -2933,7 +2933,7 @@ function groupRenderScenes() {
 }
 function groupRenderCharacters() {
   const chars=groupAvailableCharacters();
-  if (!chars.length) return '<div class="group-alert">目前沒有可選的雲端角色。請先登入並確認角色已儲存在 Supabase，且你擁有該角色或該角色已公開核准。</div>';
+  if (!chars.length) return '<div class="group-alert">目前沒有可選的雲端角色。請先登入並確認角色已儲存在 Supabase，且角色目前為公開狀態、尚未刪除或下架。</div>';
   return '<div class="group-character-grid">'+chars.map(c=>'<label class="group-character-option"><input type="checkbox" data-action="group-toggle-character" data-id="'+e(c.id)+'" '+(groupPrototype.draft.memberIds.includes(c.id)?'checked':'')+' '+(groupPrototype.draft.memberIds.length>=3&&!groupPrototype.draft.memberIds.includes(c.id)?'disabled':'')+'><span><strong>'+e(c.name)+'</strong><span class="muted small" style="display:block">'+e(c.intro||'尚無角色介紹')+'</span></span></label>').join('')+'</div><p class="muted small">已選 '+groupPrototype.draft.memberIds.length+' / 3 名。後端會再次驗證角色權限與數量。</p>';
 }
 function groupResetForAccount(uid) {
@@ -3043,7 +3043,7 @@ function renderGroupPrototype() {
   let body='';
   if(g.step===1) body='<h2>群組基本資料</h2><label class="group-field"><span>群組名稱（1–80 字）</span><input id="groupNameInput" maxlength="80" value="'+e(g.draft.name)+'" placeholder="例如：月影旅團"></label><label class="group-field"><span>世界背景（最多 10000 字）</span><textarea id="groupWorldInput" maxlength="10000" placeholder="故事世界、時代、規則與氛圍">'+e(g.draft.world)+'</textarea></label>';
   if(g.step===2) body='<h2>共同世界與初始場景</h2><div class="group-alert">所有 AI 角色共享同一個世界觀與共同開場。場景由你決定；沒有靈感時，可以主動使用 AI 靈感按鈕，不會自動呼叫 AI。</div>'+groupRenderScenes();
-  if(g.step===3) body='<h2>選擇角色</h2><p class="muted">最多三名角色。只能選擇雲端 UUID 角色，後端會再次驗證所有權及公開核准狀態。</p>'+groupRenderCharacters();
+  if(g.step===3) body='<h2>選擇角色</h2><p class="muted">最多三名角色。只能選擇雲端 UUID 角色；後端會再次驗證角色是否公開且未刪除／下架，不要求管理員事前審核。</p>'+groupRenderCharacters();
   $('view').innerHTML='<div class="group-wizard"><div><h1>建立群組聊天</h1><p class="muted">建立資料與 Mock 回覆會保存於測試 Supabase；不呼叫 AI、不扣款。</p></div>'+groupRenderList()+groupRenderSteps()+'<section class="group-panel">'+body+'<div id="groupFormError" class="error" role="alert" aria-live="polite">'+e(g.formError)+'</div><div class="group-actions"><button data-action="group-back" '+(g.step===1||g.loading?'disabled':'')+'>上一步</button><button class="primary" data-action="group-next" '+(g.loading?'disabled':'')+'>'+(g.loading?'正在建立…':g.step===3?'確認並保存群組':'下一步')+'</button></div></section></div>';
 }
 function groupReadStep() {
