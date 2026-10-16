@@ -1,5 +1,7 @@
 -- Allow an authenticated player to resolve their own wallet charge to a chat session title.
 -- Keep this scoped to the current user and block accounts pending deletion.
+GRANT SELECT ON TABLE public.chat_turn_charges TO authenticated;
+
 DO $$
 BEGIN
   IF NOT EXISTS (
