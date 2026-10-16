@@ -3132,6 +3132,7 @@ async function groupSendMock() {
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('登入狀態已失效，請重新登入。');
     if(!g.pendingRequest || g.pendingRequest.groupId!==g.active.id || g.pendingRequest.content!==content) {
       g.pendingRequest={groupId:g.active.id,content,requestKey:window.crypto.randomUUID()};
+      groupSavePendingRequest(g.pendingRequest);
     }
     const {error}=await window.mySupabase.rpc('append_chat_group_mock_turn',{
       p_group_id:g.active.id,p_request_key:g.pendingRequest.requestKey,p_content:content
