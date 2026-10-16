@@ -2936,6 +2936,17 @@ function groupRenderCharacters() {
   if (!chars.length) return '<div class="group-alert">目前沒有可選的雲端角色。請先登入並確認角色已儲存在 Supabase，且角色目前為公開狀態、尚未刪除或下架。</div>';
   return '<div class="group-character-grid">'+chars.map(c=>'<label class="group-character-option"><input type="checkbox" data-action="group-toggle-character" data-id="'+e(c.id)+'" '+(groupPrototype.draft.memberIds.includes(c.id)?'checked':'')+' '+(groupPrototype.draft.memberIds.length>=3&&!groupPrototype.draft.memberIds.includes(c.id)?'disabled':'')+'><span><strong>'+e(c.name)+'</strong><span class="muted small" style="display:block">'+e(c.intro||'尚無角色介紹')+'</span></span></label>').join('')+'</div><p class="muted small">已選 '+groupPrototype.draft.memberIds.length+' / 3 名。後端會再次驗證角色權限與數量。</p>';
 }
+function groupPendingStorageKey(uid,groupId) { return 'personax-group-pending-v1:'+uid+':'+groupId; }
+function groupSavePendingRequest(request) {
+  const uid=currentUser()?.uid;
+  if(!uid||!request?.groupId||!request?.requestKey||!request?.content) return;
+  try { localStorage.setItem(groupPendingStorageKey(uid,request.groupId),JSON.stringify({uid,groupId:request.groupId,requestKey:request.requestKey,content:request.content})); } catch(error) { console.warn('群組待重試訊息無法保存到本機：',error); }
+}
+function groupReadPendingRequest(uid,groupId) {
+  if(!uid||!groupId) return null;
+  try { const value=JSON.parse(localStorage.getItem(groupPendingStorageKey(uid,groupId))||'null'); return value&&value.uid===uid&&value.groupId===groupId&&typeof value.requestKey==='string'&&typeof value.content==='string'&&value.content.trim().length>0&&value.content.length<=2000?value:null; } catch(_) { return null; }
+}
+function groupClearPendingRequest(uid,groupId) { if(!uid||!groupId) return; try { localStorage.removeItem(groupPendingStorageKey(uid,groupId)); } catch(_) {} }
 function groupResetForAccount(uid) {
   const g=groupPrototype;
   if(g.ownerUid && g.ownerUid!==uid) {
