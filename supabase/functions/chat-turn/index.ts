@@ -336,12 +336,28 @@ Deno.serve(async (request) => {
       .eq("id", assistantMessageId).eq("session_id", sessionId)
       .eq("role", "assistant").is("deleted_at", null).maybeSingle();
 
-    if (!finalReplyError && finalReply && await replyIdentityMatchesCurrentTurn(finalReply.content)) {
-      const { data: finalSettlement, error: finalSettlementError } = await admin.rpc("settle_chat_turn", {
-        p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
-      });
-      if (!finalSettlementError) {
-        return json({ status: finalSettlement, assistantMessage: finalReply, recovered: true });
+    if (!finalReplyError && finalReply) {
+      const finalIdentityResult = await replyIdentityMatchesCurrentTurn(finalReply.content);
+      if (finalIdentityResult === "match") {
+        const { data: finalSettlement, error: finalSettlementError } = await admin.rpc("settle_chat_turn", {
+          p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
+        });
+        if (!finalSettlementError) {
+          return json({ status: finalSettlement, assistantMessage: finalReply, recovered: true });
+        }
+      } else {
+        const identityError = finalIdentityResult === "unknown"
+          ? "generation_record_lookup_failed"
+          : "assistant_message_id_collision";
+        await admin.from("chat_turn_events").insert({
+          turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
+          stage: "reply_identity", error_code: identityError,
+        });
+        return json({
+          status: "needs_reconciliation",
+          error: identityError,
+          retryAllowed: false,
+        }, finalIdentityResult === "unknown" ? 503 : 409);
       }
     }
 
