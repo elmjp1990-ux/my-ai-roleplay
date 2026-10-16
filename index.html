@@ -1934,6 +1934,13 @@ async function refreshWalletBalance() {
   state.account.silver = Number(row.silver_coins ?? 0);
   persist();
   renderShell();
+
+  // WALLET-01-12: the conversation header is rendered separately from the app shell.
+  // Refresh its wallet display immediately after the server confirms the balance.
+  const chatMeta = document.querySelector('.chat-meta');
+  if (chatMeta && route.page === 'conversation') {
+    chatMeta.innerHTML = environment() + wallet();
+  }
 }
 
 async function clearCloudPendingTurn(s) {
