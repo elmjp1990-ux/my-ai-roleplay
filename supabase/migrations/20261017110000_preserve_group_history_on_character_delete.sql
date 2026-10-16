@@ -3,15 +3,19 @@
 ALTER TABLE public.chat_group_messages
   ADD COLUMN IF NOT EXISTS speaker_snapshot jsonb;
 
+-- Prefer the immutable member snapshot, but fall back to the live character row
+-- so a message is not left without a display name if its member row is missing.
 UPDATE public.chat_group_messages AS msg
 SET speaker_snapshot = jsonb_build_object(
-  'id', member.character_snapshot->>'id',
-  'name', member.character_snapshot->>'name'
+  'id', COALESCE(member.character_snapshot->>'id', msg.character_id::text),
+  'name', COALESCE(member.character_snapshot->>'name', character_row.name, '角色')
 )
-FROM public.chat_group_members AS member
+FROM public.characters AS character_row
+LEFT JOIN public.chat_group_members AS member
+  ON member.group_id = msg.group_id
+ AND member.character_id = msg.character_id
 WHERE msg.speaker_type = 'character'
-  AND msg.group_id = member.group_id
-  AND msg.character_id = member.character_id
+  AND msg.character_id = character_row.id
   AND msg.speaker_snapshot IS NULL;
 
 ALTER TABLE public.chat_group_members
@@ -22,7 +26,7 @@ DECLARE
   v_constraint text;
 BEGIN
   FOR v_constraint IN
-    SELECT c.conname
+    SELECT DISTINCT c.conname
     FROM pg_catalog.pg_constraint AS c
     JOIN pg_catalog.pg_attribute AS a
       ON a.attrelid = c.conrelid
@@ -45,7 +49,7 @@ DECLARE
   v_constraint text;
 BEGIN
   FOR v_constraint IN
-    SELECT c.conname
+    SELECT DISTINCT c.conname
     FROM pg_catalog.pg_constraint AS c
     JOIN pg_catalog.pg_attribute AS a
       ON a.attrelid = c.conrelid
