@@ -3218,7 +3218,7 @@ function renderModal(o) {
       if (!m) return;
       const latestUserMessage = m.role === 'user' &&
         s.messages.filter(item => item.role === 'user').at(-1)?.id === m.id;
-      const editableAssistantReply = m.role === 'assistant';
+      const editableAssistantReply = m.role === 'assistant' && isUuid(m.id);
       showDialog('訊息操作',`
         <div class="stack">
           <button style="width:100%" data-action="copy-message" data-id="${e(m.id)}">複製</button>
@@ -3234,7 +3234,7 @@ function renderModal(o) {
       const m = s?.messages.find(m => m.id === o.id);
       const latestUserMessage = m?.role === 'user' &&
         s.messages.filter(item => item.role === 'user').at(-1)?.id === m.id;
-      const editableAssistantReply = m?.role === 'assistant';
+      const editableAssistantReply = m?.role === 'assistant' && isUuid(m.id);
       if (!m || (!latestUserMessage && !editableAssistantReply)) return;
       showDialog(editableAssistantReply ? '修改 AI 回覆' : '編輯最新輸入',`
         <form data-form="message-edit">
