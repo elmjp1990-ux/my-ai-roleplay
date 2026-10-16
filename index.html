@@ -3144,6 +3144,21 @@ async function groupSendMock() {
   }
 }
 async function groupRefreshList() { groupPrototype.groupsLoaded=false;await groupLoadList(true);if(route.page==='group'&&!groupPrototype.active)render(); }
+async function groupToggleArchived() { const g=groupPrototype;g.showArchived=!g.showArchived;g.groupsLoaded=false;g.loadError='';await groupLoadList(true);if(route.page==='group'&&!g.active)render(); }
+async function groupRestore(groupId) {
+  const g=groupPrototype;const target=g.archivedGroups.find(x=>x.id===groupId);
+  if(!target||!window.mySupabase) { toast('找不到封存群組，請重新載入清單。');return; }
+  if(!window.confirm('要取消封存「'+target.name+'」並將它放回目前群組清單嗎？')) return;
+  try {
+    const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
+    if(authError||!user||user.id!==currentUser()?.uid) throw new Error('登入狀態已失效，請重新登入。');
+    const {data,error}=await window.mySupabase.from('chat_groups').update({archived_at:null,updated_at:new Date().toISOString()}).eq('id',groupId).eq('owner_id',user.id).not('archived_at','is',null).select('id');
+    if(error) throw error;
+    if(!data?.length) throw new Error('群組可能已恢復，或目前帳號沒有操作權限。請重新載入清單。');
+    await groupRefreshList();
+    toast('群組已取消封存，歷史資料已保留。');
+  } catch(error) { toast(groupFriendlyError(error)||'取消封存失敗，請稍後重試。'); }
+}
 async function groupRename(groupId) {
   const g=groupPrototype;
   const target=g.groups.find(x=>x.id===groupId);
