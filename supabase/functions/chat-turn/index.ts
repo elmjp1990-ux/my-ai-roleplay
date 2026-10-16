@@ -123,6 +123,29 @@ Deno.serve(async (request) => {
 
   const demoReply = "**他將目光移向你，耐心等待你繼續說下去。**\n「我在聽，你可以慢慢說。」";
 
+  // Prefer durable generation identity over reply text. Real AI output is not
+  // deterministic; matching content to demoReply is only a legacy demo fallback.
+  const replyIdentityMatchesCurrentTurn = async (content: unknown): Promise<boolean> => {
+    if (!String(content || "").trim()) return false;
+    const { data: generationRecord, error: generationRecordError } = await admin
+      .from("ai_generation_records")
+      .select("user_id,session_id,user_message_id,assistant_message_id,original_content")
+      .eq("assistant_message_id", assistantMessageId)
+      .maybeSingle();
+
+    if (!generationRecordError && generationRecord) {
+      return generationRecord.user_id === user.id &&
+        generationRecord.session_id === sessionId &&
+        generationRecord.user_message_id === userMessageId &&
+        generationRecord.assistant_message_id === assistantMessageId &&
+        String(generationRecord.original_content || "").trim().length > 0;
+    }
+
+    // If the generation record is not yet available, preserve the strict
+    // deterministic-demo check. Never treat arbitrary content as a valid reply.
+    return String(content) === demoReply;
+  };
+
   if (charge.status === "insufficient_funds") {
     return json({
       status: "insufficient_funds",
@@ -165,7 +188,7 @@ Deno.serve(async (request) => {
       return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
     }
     if (recoveredReply && String(recoveredReply.content || "").trim()) {
-      if (String(recoveredReply.content) !== demoReply) {
+      if (!(await replyIdentityMatchesCurrentTurn(recoveredReply.content))) {
         return json({ status: "needs_reconciliation", error: "assistant_message_id_collision", retryAllowed: false }, 409);
       }
       const { data: settledAgain, error: settleAgainError } = await admin.rpc("settle_chat_turn", {
@@ -229,7 +252,7 @@ Deno.serve(async (request) => {
     }
 
     if (possibleReply && String(possibleReply.content || "").trim()) {
-      if (String(possibleReply.content) !== demoReply) {
+      if (!(await replyIdentityMatchesCurrentTurn(possibleReply.content))) {
         await admin.from("chat_turn_charges").update({
           status: "needs_reconciliation",
           failure_code: "assistant_message_id_collision",
@@ -288,7 +311,7 @@ Deno.serve(async (request) => {
       .eq("id", assistantMessageId).eq("session_id", sessionId)
       .eq("role", "assistant").is("deleted_at", null).maybeSingle();
 
-    if (!finalReplyError && finalReply && String(finalReply.content || "").trim() === demoReply) {
+    if (!finalReplyError && finalReply && await replyIdentityMatchesCurrentTurn(finalReply.content)) {
       const { data: finalSettlement, error: finalSettlementError } = await admin.rpc("settle_chat_turn", {
         p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
       });
