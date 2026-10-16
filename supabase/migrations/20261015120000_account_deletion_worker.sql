@@ -276,14 +276,27 @@ BEGIN
   -- Remove non-cascading references before chat/profile/Auth deletion.
   DELETE FROM public.ai_generation_records WHERE user_id = p_user_id;
 
+  -- Delete version history only for messages owned by the account being deleted.
+  -- If this user edited another player's message, preserve that player's version rows
+  -- and anonymize the editor reference instead of deleting someone else's history.
   DELETE FROM public.chat_message_versions AS v
+  WHERE v.message_id IN (
+    SELECT m.id
+    FROM public.chat_messages AS m
+    JOIN public.chat_sessions AS s ON s.id = m.session_id
+    WHERE s.user_id = p_user_id
+  );
+
+  UPDATE public.chat_message_versions AS v
+  SET edited_by = NULL
   WHERE v.edited_by = p_user_id
-     OR v.message_id IN (
-       SELECT m.id
-       FROM public.chat_messages AS m
-       JOIN public.chat_sessions AS s ON s.id = m.session_id
-       WHERE s.user_id = p_user_id
-     );
+    AND NOT EXISTS (
+      SELECT 1
+      FROM public.chat_messages AS m
+      JOIN public.chat_sessions AS s ON s.id = m.session_id
+      WHERE m.id = v.message_id
+        AND s.user_id = p_user_id
+    );
 
   -- user_message_id uses ON DELETE RESTRICT, so charges must be removed before messages.
   DELETE FROM public.chat_turn_charges WHERE user_id = p_user_id;
