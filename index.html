@@ -522,6 +522,12 @@ dialog {
   border-radius:20px;
   box-shadow:0 25px 100px #0008;
 }
+/* WALLET-01-11: keep the wallet ledger dialog stable when entry counts change. */
+dialog.wallet-ledger-dialog {
+  height:min(620px,78dvh);
+  min-height:min(420px,78dvh);
+  overflow-y:auto;
+}
 dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 .modal-heading { margin-bottom:20px; }
 .modal-heading h2 { margin:0; }
@@ -1957,6 +1963,13 @@ async function refreshWalletBalance() {
   state.account.silver = Number(row.silver_coins ?? 0);
   persist();
   renderShell();
+
+  // WALLET-01-12: the conversation header is rendered separately from the app shell.
+  // Refresh its wallet display immediately after the server confirms the balance.
+  const chatMeta = document.querySelector('.chat-meta');
+  if (chatMeta && route.page === 'conversation') {
+    chatMeta.innerHTML = environment() + wallet();
+  }
 }
 
 async function clearCloudPendingTurn(s) {
@@ -2258,6 +2271,9 @@ function showDialog(title,content) {
           event.clientY < r.top || event.clientY > r.bottom) back();
     });
   }
+
+  // 錢包明細固定視窗尺寸，避免交易筆數變動時彈窗忽大忽小。
+  modal.classList.toggle('wallet-ledger-dialog', title === '花費日誌');
 
   const pendingDeletionDialog = route?.overlay?.name === 'account-deletion-pending' && title === '帳號正在等待刪除';
   modal.innerHTML = `
@@ -3431,6 +3447,63 @@ async function loadWalletLedger(currency) {
     return false;
   }
 
+  // Resolve charges to their originating individual conversation or group.
+  const chargeRefs = [...new Set((data || []).filter(row => row.biz_type === 'chat_turn_charge' && row.reference_id).map(row => row.reference_id))];
+  const conversationLabels = new Map();
+  if (chargeRefs.length) {
+    const { data: individualTurns, error: individualError } = await client.from('chat_turn_charges').select('turn_id, session_id').in('turn_id', chargeRefs);
+    if (individualError) {
+      console.error('[wallet-ledger] 無法讀取聊天扣款關聯資料', {
+        code: individualError.code, message: individualError.message,
+        details: individualError.details, hint: individualError.hint,
+        chargeRefCount: chargeRefs.length
+      });
+    } else if (individualTurns?.length) {
+      const sessionIds = [...new Set(individualTurns.map(turn => turn.session_id).filter(Boolean))];
+      let sessions = [];
+      if (sessionIds.length) {
+        const result = await client.from('chat_sessions').select('id, character_name, session_data').in('id', sessionIds);
+        if (result.error) {
+          console.error('[wallet-ledger] 無法讀取聊天標題', {
+            code: result.error.code, message: result.error.message,
+            details: result.error.details, hint: result.error.hint,
+            sessionCount: sessionIds.length
+          });
+        } else {
+          sessions = result.data || [];
+        }
+      }
+      const sessionsById = new Map(sessions.map(session => [session.id, session]));
+      individualTurns.forEach(turn => {
+        const session = sessionsById.get(turn.session_id);
+        const title = session?.session_data?.name?.trim() || session?.character_name?.trim();
+        if (title) conversationLabels.set(turn.turn_id, `對話：${title}`);
+        else console.warn('[wallet-ledger] 查到扣款但無可用聊天標題', {
+          turnId: turn.turn_id, sessionId: turn.session_id,
+          sessionFound: !!session, characterName: session?.character_name || null
+        });
+      });
+    } else {
+      console.warn('[wallet-ledger] 扣款 reference_id 未匹配到個人聊天回合', {
+        chargeRefCount: chargeRefs.length
+      });
+    }
+    const { data: groupTurns, error: groupError } = await client.from('chat_group_turns').select('id, group_id').in('id', chargeRefs);
+    if (!groupError && groupTurns?.length) {
+      const groupIds = [...new Set(groupTurns.map(turn => turn.group_id).filter(Boolean))];
+      if (groupIds.length) {
+        const result = await client.from('chat_groups').select('id, name').in('id', groupIds);
+        if (!result.error) {
+          const groupsById = new Map((result.data || []).map(group => [group.id, group]));
+          groupTurns.forEach(turn => {
+            const group = groupsById.get(turn.group_id);
+            if (group?.name?.trim()) conversationLabels.set(turn.id, `群組：${group.name.trim()}`);
+          });
+        }
+      }
+    }
+  }
+
   const selectedType = currency === 'silver' ? 'silver_coins' : 'diamonds';
   let runningBalance = Number(currency === 'silver'
     ? state.account.silver : state.account.diamonds) || 0;
@@ -3443,7 +3516,7 @@ async function loadWalletLedger(currency) {
       change: amount,
       reason: ({
         signup_bonus: '註冊贈送',
-        chat_turn_charge: '聊天回覆扣款',
+        chat_turn_charge: conversationLabels.get(row.reference_id) || '聊天回覆扣款',
         chat_turn_refund: '聊天失敗退款',
         daily_checkin: '每日簽到',
         reward_ad: '觀看獎勵廣告',
@@ -3564,15 +3637,20 @@ function renderModal(o) {
       break;
     case 'ledger': {
       const currency = o.currency || 'diamond';
-      const logs = state.ledger.filter(l => l.currency === currency);
+      const kind = o.kind || 'usage';
+      const logs = state.ledger.filter(l => l.currency === currency && (kind === 'increase' ? l.change > 0 : l.change < 0));
       showDialog('花費日誌',`
         <div class="tabs">
-          <button class="tab ${currency === 'diamond' ? 'active' : ''}" data-action="ledger-tab" data-value="diamond">鑽石</button>
-          <button class="tab ${currency === 'silver' ? 'active' : ''}" data-action="ledger-tab" data-value="silver">銀幣</button>
+          <button class="tab ${currency === 'diamond' ? 'active' : ''}" data-action="ledger-tab" data-value="diamond" data-kind="${e(kind)}">鑽石</button>
+          <button class="tab ${currency === 'silver' ? 'active' : ''}" data-action="ledger-tab" data-value="silver" data-kind="${e(kind)}">銀幣</button>
+        </div>
+        <div class="tabs" style="margin-top:10px">
+          <button class="tab ${kind === 'increase' ? 'active' : ''}" data-action="ledger-kind" data-value="increase" data-currency="${e(currency)}">增加</button>
+          <button class="tab ${kind === 'usage' ? 'active' : ''}" data-action="ledger-kind" data-value="usage" data-currency="${e(currency)}">使用</button>
         </div>
         ${walletLedgerLoadError === currency
           ? `<div class="empty" style="margin-top:15px">雲端交易紀錄暫時無法讀取，為避免顯示過期資料，請重新載入。</div>
-             <button style="width:100%;margin-top:12px" data-action="ledger-retry" data-value="${e(currency)}">重新載入</button>`
+             <button style="width:100%;margin-top:12px" data-action="ledger-retry" data-value="${e(currency)}" data-kind="${e(kind)}">重新載入</button>`
           : logs.slice().reverse().map(l => `<article class="log-row">
           <div class="row between"><strong>${e(l.reason)}</strong>
             <strong>${l.change >= 0 ? '+' : ''}${e(l.change)}</strong></div>
@@ -4276,19 +4354,28 @@ document.addEventListener('click',async event => {
       case 'shop-tab':openModal('shop',{tab:button.dataset.value});break;
       case 'ledger': {
         await loadWalletLedger('diamond');
-        openModal('ledger',{currency:'diamond'});
+        openModal('ledger',{currency:'diamond',kind:'usage'});
         break;
       }
       case 'ledger-tab': {
         const currency = button.dataset.value;
+        const kind = button.dataset.kind === 'increase' ? 'increase' : 'usage';
         await loadWalletLedger(currency);
-        openModal('ledger',{currency});
+        openModal('ledger',{currency,kind});
+        break;
+      }
+      case 'ledger-kind': {
+        const currency = button.dataset.currency === 'silver' ? 'silver' : 'diamond';
+        const kind = button.dataset.value === 'increase' ? 'increase' : 'usage';
+        await loadWalletLedger(currency);
+        openModal('ledger',{currency,kind});
         break;
       }
       case 'ledger-retry': {
         const currency = button.dataset.value === 'silver' ? 'silver' : 'diamond';
+        const kind = button.dataset.kind === 'increase' ? 'increase' : 'usage';
         await loadWalletLedger(currency);
-        openModal('ledger',{currency});
+        openModal('ledger',{currency,kind});
         break;
       }
       case 'purchases':openModal('purchases');break;
