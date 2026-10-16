@@ -114,6 +114,107 @@ before update of id, session_id, role, content, deleted_at on public.chat_messag
 for each row
 execute function public.guard_chat_turn_assistant_update();
 
+create or replace function public.refund_chat_turn(
+  p_user_id uuid,
+  p_turn_id uuid,
+  p_assistant_message_id uuid,
+  p_failure_code text
+)
+returns table(status text, balance_silver integer, balance_diamonds integer)
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_charge public.chat_turn_charges%rowtype;
+  v_wallet public.wallet_accounts%rowtype;
+begin
+  select c.* into v_charge
+  from public.chat_turn_charges c
+  where c.turn_id = p_turn_id
+  for update;
+
+  if not found or v_charge.user_id <> p_user_id then
+    raise exception 'turn_not_found';
+  end if;
+  if v_charge.expected_assistant_message_id is distinct from p_assistant_message_id then
+    raise exception 'turn_assistant_id_conflict';
+  end if;
+
+  -- Idempotent retry after an already completed refund never credits twice.
+  if v_charge.status = 'refunded' then
+    select w.silver_coins, w.diamonds
+      into v_wallet.silver_coins, v_wallet.diamonds
+    from public.wallet_accounts w
+    where w.user_id = p_user_id;
+    return query select 'refunded'::text, v_wallet.silver_coins, v_wallet.diamonds;
+    return;
+  end if;
+
+  if v_charge.status = 'settled' then
+    raise exception 'settled_turn_cannot_be_refunded';
+  end if;
+  if v_charge.status not in ('reserved', 'needs_reconciliation') then
+    raise exception 'turn_not_refundable';
+  end if;
+
+  -- Fail closed: any persisted row occupying the expected assistant message ID
+  -- blocks automatic refund, even if it is soft-deleted, empty, or has a
+  -- mismatched role/session. Such a state requires explicit reconciliation.
+  if p_assistant_message_id is not null and exists (
+    select 1
+    from public.chat_messages m
+    where m.id = p_assistant_message_id
+  ) then
+    raise exception 'reply_already_persisted_or_integrity_conflict';
+  end if;
+
+  select w.* into v_wallet
+  from public.wallet_accounts w
+  where w.user_id = p_user_id
+  for update;
+  if not found then
+    raise exception 'wallet_not_initialized';
+  end if;
+
+  update public.wallet_accounts w
+  set silver_coins = w.silver_coins + v_charge.silver_reserved,
+      diamonds = w.diamonds + v_charge.diamonds_reserved,
+      updated_at = now()
+  where w.user_id = p_user_id;
+
+  if v_charge.silver_reserved > 0 then
+    insert into public.wallet_transactions(user_id, currency_type, amount, biz_type, reference_id)
+    values (p_user_id, 'silver_coins', v_charge.silver_reserved, 'chat_turn_refund', p_turn_id::text);
+  end if;
+  if v_charge.diamonds_reserved > 0 then
+    insert into public.wallet_transactions(user_id, currency_type, amount, biz_type, reference_id)
+    values (p_user_id, 'diamonds', v_charge.diamonds_reserved, 'chat_turn_refund', p_turn_id::text);
+  end if;
+
+  update public.chat_turn_charges c
+  set status = 'refunded',
+      failure_code = left(coalesce(p_failure_code, 'confirmed_failure'), 80),
+      refunded_at = now(),
+      updated_at = now()
+  where c.turn_id = p_turn_id;
+
+  insert into public.chat_turn_events(turn_id, user_id, event_type, stage, error_code)
+  values (p_turn_id, p_user_id, 'refunded', 'recovery',
+          left(coalesce(p_failure_code, 'confirmed_failure'), 80));
+
+  select w.silver_coins, w.diamonds
+    into v_wallet.silver_coins, v_wallet.diamonds
+  from public.wallet_accounts w
+  where w.user_id = p_user_id;
+
+  return query select 'refunded'::text, v_wallet.silver_coins, v_wallet.diamonds;
+end;
+$function$;
+
+revoke all on function public.refund_chat_turn(uuid, uuid, uuid, text) from public, anon, authenticated;
+grant execute on function public.refund_chat_turn(uuid, uuid, uuid, text) to service_role;
+
 drop policy if exists chat_messages_insert_own on public.chat_messages;
 
 create policy chat_messages_insert_own
