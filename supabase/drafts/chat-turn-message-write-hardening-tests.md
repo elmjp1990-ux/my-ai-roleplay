@@ -1,7 +1,7 @@
 # Message-write hardening test plan
 
-Status: test plan only. No database tests have run.
-Run only against a disposable Supabase branch/project. Do not execute fixture writes on the connected production project.
+Status: test plan; partial manual checks have run against the configured test Supabase project, but the cases below are NOT fully executed.
+Run fixture-based tests only against a disposable Supabase branch/project. Do not execute fixture writes on a production project.
 
 ## Before testing
 
@@ -27,6 +27,7 @@ Run only against a disposable Supabase branch/project. Do not execute fixture wr
 | P11 | Service-role Edge Function inserts expected assistant ID into a different session | Rejected; charge session and message session must match |
 | P12 | Insert a user/system row using an ID already reserved as `expected_assistant_message_id` | Rejected as role/identity conflict |
 | P13 | Race assistant INSERT against refund for the same reserved turn | The insert trigger and refund RPC serialize on the same charge row; either the row persists and refund fails, or refund commits and the late assistant insert fails |
+| P14 | Attempt assistant INSERT when the matching charge has a NULL status (only if the test schema permits NULL; otherwise verify the column is `NOT NULL`) | Rejected by the insert guard; only explicit `reserved` or `needs_reconciliation` statuses are accepted |
 
 ## UPDATE protection tests
 
