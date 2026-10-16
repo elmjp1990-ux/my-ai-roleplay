@@ -1,12 +1,12 @@
--- REVIEW ONLY: atomic hardening for client message writes and charged assistant replies.
--- Do not apply to production without owner approval, isolated test results, and a rollback review.
+-- REVIEW ONLY: atomic hardening for client message writes and assistant replies.
+-- Do not apply until isolated tests pass and rollback has been reviewed.
 --
--- Apply this combined transaction rather than either standalone draft:
---   - chat-turn-assistant-update-guard.sql
---   - chat-message-client-insert-policy.sql
--- The browser writes user-authored messages only. The trusted chat-turn Edge Function
--- persists assistant replies with service_role. The character opening is reconstructed
--- from the session snapshot by the frontend and is not inserted by the browser.
+-- Browser clients may write user-authored messages only. The trusted chat-turn
+-- Edge Function creates assistant replies after reservation. Players MAY edit
+-- the displayed content of a persisted assistant reply; the existing
+-- chat_messages_save_version_before_update trigger must preserve each prior
+-- content value in chat_message_versions. This guard protects identity/role and
+-- billing state, not the player's ability to edit their own conversation.
 
 begin;
 
@@ -17,32 +17,39 @@ security definer
 set search_path = ''
 as $function$
 declare
-  v_charge public.chat_turn_charges%rowtype;
   v_locked_charge public.chat_turn_charges%rowtype;
   v_old_charge public.chat_turn_charges%rowtype;
   v_new_charge public.chat_turn_charges%rowtype;
   v_has_old_charge boolean := false;
   v_has_new_charge boolean := false;
+  v_content_changed boolean;
+  v_deleted_changed boolean;
 begin
-  -- A message's semantic role is immutable, including user -> system. Otherwise
-  -- a client with UPDATE access could turn player text into a privileged prompt.
+  -- Never let a client change prompt semantics (user/system/assistant).
   if new.role is distinct from old.role then
     raise exception 'chat_message_role_is_immutable';
   end if;
 
-  if old.role <> 'assistant' then
-    -- User-authored message content may be edited, but its identity and owning
-    -- session must remain stable so a client cannot move a billed input between
-    -- sessions or detach it from an existing charge's user_message_id.
-    if new.id is distinct from old.id
-       or new.session_id is distinct from old.session_id then
+  -- IDs and session ownership are stable for every message, including user
+  -- messages. Content editing is a separate operation from identity changes.
+  if new.id is distinct from old.id
+     or new.session_id is distinct from old.session_id then
+    if old.role = 'assistant' then
+      raise exception 'assistant_message_identity_is_immutable';
+    else
       raise exception 'user_message_identity_is_immutable';
     end if;
+  end if;
+
+  if old.role <> 'assistant' then
     return new;
   end if;
 
-  -- Lock matching charge rows in a deterministic ID order. This both detects
-  -- cross-turn ID swaps and avoids opposite-order locks for concurrent A<->B swaps.
+  v_content_changed := new.content is distinct from old.content;
+  v_deleted_changed := new.deleted_at is distinct from old.deleted_at;
+
+  -- Lock every charge row tied to either identity in deterministic order. This
+  -- detects cross-turn ID swaps and serializes edits against settlement/refund.
   for v_locked_charge in
     select c.*
     from public.chat_turn_charges c
@@ -66,35 +73,32 @@ begin
     raise exception 'assistant_message_turn_id_conflict';
   end if;
 
-  if not v_has_old_charge and not v_has_new_charge then
-    -- Legacy/unbilled assistant rows must not remain client-editable just because
-    -- they predate the charge ledger. Keep their identity and content immutable;
-    -- allow only a deleted_at-only change for legacy cleanup.
-    if new.id is distinct from old.id
-       or new.session_id is distinct from old.session_id
-       or new.content is distinct from old.content then
-      raise exception 'uncharged_assistant_reply_is_immutable';
+  if v_has_old_charge
+     and old.id is distinct from v_old_charge.expected_assistant_message_id then
+    raise exception 'assistant_message_turn_id_conflict';
+  end if;
+
+  -- Do not combine hiding a reply with content edits. A soft delete is allowed
+  -- only after settlement; reserved/unresolved replies must remain visible to
+  -- reconciliation so they cannot be mistaken for a missing generation.
+  if v_deleted_changed then
+    if v_content_changed then
+      raise exception 'assistant_reply_edit_and_delete_must_be_separate';
+    end if;
+    if v_has_old_charge and v_old_charge.status is distinct from 'settled' then
+      raise exception 'chat_turn_reply_delete_requires_settled_charge';
     end if;
     return new;
   end if;
 
-  if new.id is distinct from old.id
-     or new.session_id is distinct from old.session_id
-     or new.role is distinct from old.role
-     or new.content is distinct from old.content then
-    raise exception 'charged_assistant_reply_is_immutable';
-  end if;
-
-  -- A reply may be soft-deleted only after the charge is settled. While reserved
-  -- or awaiting reconciliation, refund logic must still see the persisted reply.
-  if new.deleted_at is distinct from old.deleted_at
+  -- Editing a charged reply is a supported player feature, but only after the
+  -- turn has settled. The existing version trigger stores OLD.content in the
+  -- same transaction before the update; if this guard raises, that insert rolls
+  -- back too. Legacy assistant rows without a charge ledger remain editable as
+  -- well, with the same version-history trigger.
+  if v_content_changed and v_has_old_charge
      and v_old_charge.status is distinct from 'settled' then
-    raise exception 'chat_turn_reply_delete_requires_settled_charge';
-  end if;
-
-  if not v_has_old_charge
-     or old.id is distinct from v_old_charge.expected_assistant_message_id then
-    raise exception 'assistant_message_turn_id_conflict';
+    raise exception 'assistant_reply_edit_requires_settled_charge';
   end if;
 
   return new;
@@ -129,11 +133,11 @@ with check (
 );
 
 comment on policy chat_messages_insert_own on public.chat_messages is
-  'Authenticated clients may insert only user-authored messages into their own active chat session. Assistant replies must be persisted by the trusted chat-turn server function.';
+  'Authenticated clients may insert only user-authored messages into their own active chat session. Assistant replies must be created by the trusted chat-turn server function.';
 
 commit;
 
--- Rollback sketch (review before use; never blindly run after data changes):
+-- Rollback sketch (review before use; do not blindly run after data changes):
 -- begin;
 -- drop trigger if exists guard_chat_turn_assistant_update on public.chat_messages;
 -- drop function if exists public.guard_chat_turn_assistant_update();
