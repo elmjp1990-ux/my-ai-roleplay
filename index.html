@@ -1625,6 +1625,7 @@ let exploreTags = [];
 let limit = 24;
 let batch = 0;
 let chatSearch = '';
+let groupCharacterSearch = '';
 let hideList = false;
 let banner = 0;
 let draftCharacter = null;
@@ -2931,10 +2932,37 @@ function groupRenderScenes() {
   const scene=g.draft.scenes[0]||{name:'初始相遇',description:''};
   return '<label class="group-field"><span>共同場景名稱</span><input id="groupSceneName0" maxlength="80" value="'+e(scene.name||'')+'" placeholder="例如：深夜花店、博物館特展之夜"></label><div class="group-field"><span>共同場景與開場情境</span><div class="group-scene-input-wrap"><textarea id="groupSceneDesc0" maxlength="5000" placeholder="由你決定故事從哪裡開始：時間、地點、角色如何相遇，以及當下發生什麼事。">'+e(scene.description||'')+'</textarea><button type="button" class="group-inspiration" data-action="group-inspiration">✨ AI 靈感</button></div><small class="group-scene-help">你可以完全自行撰寫或修改。只有主動點擊「AI 靈感」時才會嘗試生成；目前 AI 尚未串接，按鈕會提示狀態，不會自動呼叫或扣款。</small></div>';
 }
+function groupRenderCharacterResults() {
+  const all=groupAvailableCharacters();
+  const q=groupCharacterSearch.trim().toLocaleLowerCase();
+  const matches=all.filter(c=>!q||String(c.name||'').toLocaleLowerCase().includes(q)||
+    String(c.intro||'').toLocaleLowerCase().includes(q)||
+    (c.tags||[]).some(tag=>String(tag).toLocaleLowerCase().includes(q)));
+  const recentAt=new Map();
+  for(const s of Object.values(state.sessions||{})) {
+    if(!s||s.archived||!s.characterId) continue;
+    const last=s.messages?.at(-1);
+    const at=Number(last?.at||s.startedAt||0);
+    if(at>0&&(!recentAt.has(s.characterId)||at>recentAt.get(s.characterId))) recentAt.set(s.characterId,at);
+  }
+  const byRecent=matches.filter(c=>recentAt.has(c.id)).sort((a,b)=>recentAt.get(b.id)-recentAt.get(a.id));
+  const recentIds=new Set(byRecent.map(c=>c.id));
+  const byFavorite=matches.filter(c=>!recentIds.has(c.id)&&state.favorites.includes(c.id));
+  const favoriteIds=new Set(byFavorite.map(c=>c.id));
+  const byPublic=matches.filter(c=>!recentIds.has(c.id)&&!favoriteIds.has(c.id));
+  const ordered=[...byRecent,...byFavorite,...byPublic].slice(0,500);
+  if(!ordered.length) return '<div class="group-alert">'+(q?'找不到符合搜尋條件的公開角色。':'目前沒有可選的雲端角色。請先確認角色已儲存在 Supabase，且目前為公開狀態、尚未刪除或下架。')+'</div>';
+  const renderRows=rows=>rows.map(c=>'<label class="group-character-option"><input type="checkbox" data-action="group-toggle-character" data-id="'+e(c.id)+'" '+(groupPrototype.draft.memberIds.includes(c.id)?'checked':'')+' '+(groupPrototype.draft.memberIds.length>=3&&!groupPrototype.draft.memberIds.includes(c.id)?'disabled':'')+'><span style="min-width:0;overflow-wrap:anywhere"><strong>'+e(c.name)+'</strong><span class="muted small" style="display:block">'+e(c.intro||'尚無角色介紹')+'</span></span></label>').join('');
+  const section=(title,rows)=>rows.length?'<h3 class="group-character-section-title">'+e(title)+' ('+rows.length+')</h3><div class="group-character-grid">'+renderRows(rows)+'</div>':'';
+  return section('最近聊天',byRecent.filter(c=>ordered.some(x=>x.id===c.id)))+
+    section('喜愛角色',byFavorite.filter(c=>ordered.some(x=>x.id===c.id)))+
+    section('公開角色',byPublic.filter(c=>ordered.some(x=>x.id===c.id)))+
+    '<p class="muted small">目前顯示 '+ordered.length+' 位（最多 500 位）；已選 '+groupPrototype.draft.memberIds.length+' / 3 名。只列出公開且未刪除的雲端角色，後端會再次驗證權限與數量。</p>';
+}
 function groupRenderCharacters() {
   const chars=groupAvailableCharacters();
   if (!chars.length) return '<div class="group-alert">目前沒有可選的雲端角色。請先登入並確認角色已儲存在 Supabase，且角色目前為公開狀態、尚未刪除或下架。</div>';
-  return '<div class="group-character-grid">'+chars.map(c=>'<label class="group-character-option"><input type="checkbox" data-action="group-toggle-character" data-id="'+e(c.id)+'" '+(groupPrototype.draft.memberIds.includes(c.id)?'checked':'')+' '+(groupPrototype.draft.memberIds.length>=3&&!groupPrototype.draft.memberIds.includes(c.id)?'disabled':'')+'><span><strong>'+e(c.name)+'</strong><span class="muted small" style="display:block">'+e(c.intro||'尚無角色介紹')+'</span></span></label>').join('')+'</div><p class="muted small">已選 '+groupPrototype.draft.memberIds.length+' / 3 名。後端會再次驗證角色權限與數量。</p>';
+  return '<div id="groupCharacterPicker"><label class="group-field"><span>搜尋角色名稱、介紹或標籤</span><input id="groupCharacterSearch" type="search" maxlength="100" value="'+e(groupCharacterSearch)+'" placeholder="輸入角色名稱…"></label><div id="groupCharacterResults">'+groupRenderCharacterResults()+'</div></div>';
 }
 function groupResetForAccount(uid) {
   const g=groupPrototype;
@@ -4732,6 +4760,11 @@ document.addEventListener('input',event => {
   if (target.id==='chatSearch') {
     chatSearch=target.value;
     $('chatEntries').innerHTML=chatEntries();
+  }
+  if (target.id==='groupCharacterSearch') {
+    groupCharacterSearch=target.value;
+    const results=$('groupCharacterResults');
+    if(results) results.innerHTML=groupRenderCharacterResults();
   }
   if (target.id==='messageInput') drafts[route.id]=target.value;
 });
