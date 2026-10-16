@@ -500,6 +500,12 @@ dialog {
   border-radius:20px;
   box-shadow:0 25px 100px #0008;
 }
+/* WALLET-01-11: keep the wallet ledger dialog stable when entry counts change. */
+dialog.wallet-ledger-dialog {
+  height:min(620px,78dvh);
+  min-height:min(420px,78dvh);
+  overflow-y:auto;
+}
 dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 .modal-heading { margin-bottom:20px; }
 .modal-heading h2 { margin:0; }
@@ -2229,6 +2235,9 @@ function showDialog(title,content) {
           event.clientY < r.top || event.clientY > r.bottom) back();
     });
   }
+
+  // 錢包明細固定視窗尺寸，避免交易筆數變動時彈窗忽大忽小。
+  modal.classList.toggle('wallet-ledger-dialog', title === '花費日誌');
 
   const pendingDeletionDialog = route?.overlay?.name === 'account-deletion-pending' && title === '帳號正在等待刪除';
   modal.innerHTML = `
