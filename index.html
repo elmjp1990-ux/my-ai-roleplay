@@ -2984,12 +2984,13 @@ async function groupLoadList(force=false) {
       if(route.page==='group'&&!g.active) render();
       return;
     }
-    const {data,error}=await window.mySupabase.from('chat_groups')
-      .select('id,name,world_background,scene_mode,created_at,updated_at')
-      .is('archived_at',null).order('updated_at',{ascending:false});
+    const query=window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,created_at,updated_at,archived_at');
+    const {data,error}=await (g.showArchived?query.not('archived_at','is',null):query.is('archived_at',null)).order('updated_at',{ascending:false});
     if(error) throw error;
     if(user.id!==currentUser()?.uid) { groupResetForAccount(currentUser()?.uid||null); return; }
-    g.ownerUid=user.id;g.groups=data||[];g.groupsLoaded=true;g.loadingGroups=false;
+    g.ownerUid=user.id;
+    if(g.showArchived) g.archivedGroups=data||[]; else g.groups=data||[];
+    g.groupsLoaded=true;g.loadingGroups=false;
   } catch(error) {
     g.groupsLoaded=true;g.loadingGroups=false;g.loadError=groupFriendlyError(error)||'讀取群組清單失敗。';
   }
