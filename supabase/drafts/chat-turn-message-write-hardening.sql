@@ -298,19 +298,21 @@ comment on policy chat_messages_insert_own on public.chat_messages is
 
 commit;
 
--- Rollback sketch (review before use; do not blindly run after data changes):
--- begin;
--- drop trigger if exists guard_chat_turn_assistant_update on public.chat_messages;
--- drop function if exists public.guard_chat_turn_assistant_update();
--- drop policy if exists chat_messages_insert_own on public.chat_messages;
--- create policy chat_messages_insert_own on public.chat_messages
--- for insert to authenticated
--- with check (
---   (select public.account_is_active())
---   and exists (
---     select 1 from public.chat_sessions s
---     where s.id = chat_messages.session_id
---       and s.user_id = (select auth.uid())
---   )
--- );
--- commit;
+-- ROLLBACK WARNING — NOT AN EXECUTABLE ROLLBACK SCRIPT.
+-- Do not run a partial rollback. This draft replaces both the assistant UPDATE
+-- guard and refund_chat_turn(), adds an assistant INSERT guard, and replaces
+-- chat_messages_insert_own. Dropping only one trigger/function would leave the
+-- database in a mixed and potentially unsafe state.
+--
+-- Before applying in an isolated test project, save exact definitions and state:
+--   1. pg_get_functiondef() for the current guard_chat_turn_assistant_update(),
+--      refund_chat_turn(uuid, uuid, uuid, text), and any existing insert guard.
+--   2. The original chat_messages_insert_own policy definition.
+--   3. Existing trigger definitions and enabled states for chat_messages.
+--
+-- A reviewed rollback must restore the captured refund_chat_turn() body and
+-- original policy exactly, restore the prior UPDATE guard/trigger behavior,
+-- remove guard_chat_turn_assistant_insert and its trigger only after verifying
+-- no in-flight reserved turns depend on it, and run post-rollback regression
+-- checks. This repository draft intentionally does not invent the old function
+-- body or present a partial sequence as a safe rollback.
