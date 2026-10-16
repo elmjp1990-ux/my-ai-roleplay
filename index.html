@@ -658,7 +658,16 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 .group-bubble small{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}
 .group-alert{background:var(--soft);border:1px solid var(--border);border-radius:10px;padding:11px;color:var(--muted);font-size:13px}
 .group-scene-input-wrap{position:relative}.group-scene-input-wrap textarea{padding-right:110px}.group-inspiration{position:absolute;right:8px;top:8px;padding:6px 9px;font-size:12px;background:var(--soft);border-color:#818cf866}.group-scene-help{font-size:12px;color:var(--muted);line-height:1.7}
-@media(max-width:560px){.group-panel{padding:14px}.group-steps{font-size:12px}}
+.group-member-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
+.group-member-card{min-width:0;border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--panel)}
+.group-member-head{display:flex;align-items:center;gap:9px;width:100%;min-width:0;text-align:left}
+.group-member-avatar{width:48px;height:48px;flex:0 0 48px;display:grid;place-items:center;overflow:hidden;border-radius:12px;background:var(--soft);font-size:19px;font-weight:750}
+.group-member-avatar img{width:100%;height:100%;object-fit:cover}
+.group-member-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.group-member-details{margin-top:10px;padding-top:9px;border-top:1px solid var(--border);font-size:13px;line-height:1.65;overflow-wrap:anywhere}
+.group-member-details[hidden]{display:none}
+.group-member-card button{min-width:0}
+@media(max-width:560px){.group-panel{padding:14px}.group-steps{font-size:12px}.group-member-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.group-member-card{padding:8px}.group-member-avatar{width:40px;height:40px;flex-basis:40px;border-radius:10px}.group-member-name{font-size:13px}.group-member-head{gap:7px}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1626,6 +1635,7 @@ let limit = 24;
 let batch = 0;
 let chatSearch = '';
 let groupCharacterSearch = '';
+let groupExpandedMemberId = null;
 let hideList = false;
 let banner = 0;
 let draftCharacter = null;
@@ -3041,7 +3051,14 @@ async function groupOpen(groupId) {
     if(user.id!==currentUser()?.uid) throw new Error('帳號已切換，已停止顯示先前帳號的群組。');
     const group=groupRes.data, scenes=sceneRes.data||[], memberRows=memberRes.data||[];
     if(memberRows.length<1||memberRows.length>3) throw new Error('群組成員資料不完整，請重新整理或重新建立群組。');
-    const members=memberRows.map(m=>({...m.character_snapshot,id:m.character_id,characterId:m.character_id,position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'}));
+    let avatarById={};
+    const characterIds=memberRows.map(m=>m.character_id).filter(isUuid);
+    if(characterIds.length) {
+      const avatarRes=await window.mySupabase.from('characters').select('id,avatar_url').in('id',characterIds);
+      if(!avatarRes.error) avatarById=Object.fromEntries((avatarRes.data||[]).map(x=>[x.id,x.avatar_url||'']));
+    }
+    const members=memberRows.map(m=>({...m.character_snapshot,id:m.character_id,characterId:m.character_id,avatar_url:avatarById[m.character_id]||'',position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'}));
+    groupExpandedMemberId=null;
     const messages=(messageRes.data||[]).map(m=>{
       const member=members.find(x=>x.characterId===m.character_id);
       const scene=scenes.find(x=>x.id===m.scene_id);
@@ -3065,7 +3082,14 @@ function renderGroupPrototype() {
     return;
   }
   if(g.active) {
-    $('view').innerHTML='<div class="group-wizard"><div class="row between wrap"><div><h1>'+e(g.active.name)+'</h1><p class="muted">群組聊天 · 持久化 Mock 導演模式</p></div><button data-action="group-list">返回群組清單</button></div><div class="group-panel"><div class="group-alert">訊息已保存於測試 Supabase。回覆由固定 Mock 導演產生，不呼叫 AI、不扣款。</div><p><strong>世界背景：</strong>'+e(g.active.world||'（未設定）')+'</p><p><strong>場景模式：</strong>'+(g.active.mode==='shared'?'共用場景':'分開場景')+' · '+g.active.members.length+' 名角色</p><div class="group-chat-log">'+g.messages.map(m=>'<div class="group-bubble '+(m.type==='user'?'user':'')+'"><small>'+e(m.speaker)+'</small>'+e(m.content)+'</div>').join('')+'</div><div class="error" role="alert" aria-live="polite">'+e(g.formError)+'</div><label class="group-field"><span>輸入訊息</span><textarea id="groupMessageInput" maxlength="2000" placeholder="輸入故事內容" '+((g.sending||g.pendingRequest?.groupId===g.active.id)?'disabled':'')+'>'+e(g.pendingRequest?.groupId===g.active.id?g.pendingRequest.content:'')+'</textarea></label><div class="group-actions"><span class="muted small">'+g.turn+' 個已保存回合</span><button class="primary" data-action="group-send" '+(g.sending?'disabled':'')+'>'+(g.sending?'正在保存…':g.pendingRequest?.groupId===g.active.id?'重試保存同一訊息':'送出給 Mock 導演')+'</button></div></div></div>';
+    const memberCards=g.active.members.map(m=>{
+      const avatar=String(m.avatar_url||'');
+      const safeAvatar=/^https?:\\/\\//i.test(avatar);
+      const expanded=groupExpandedMemberId===m.characterId;
+      const detail=[m.intro||'',m.style?'風格：'+m.style:'',m.age?'年齡：'+m.age:'',m.gender?'性別：'+m.gender:'',Array.isArray(m.tags)&&m.tags.length?'標籤：'+m.tags.join('、'):''].filter(Boolean).map(e).join('<br>');
+      return '<article class="group-member-card"><button class="ghost group-member-head" data-action="group-toggle-member" data-id="'+e(m.characterId)+'" aria-expanded="'+expanded+'"><span class="group-member-avatar">'+(safeAvatar?'<img src="'+e(avatar)+'" alt="" loading="lazy">':e(String(m.name||'角').trim().slice(0,1)||'角'))+'</span><span class="group-member-name" title="'+e(m.name||'角色')+'">'+e(m.name||'角色')+'</span></button><div class="group-member-details" '+(expanded?'':'hidden')+'>'+ (detail||'尚無角色補充資料')+'</div></article>';
+    }).join('');
+    $('view').innerHTML='<div class="group-wizard"><div class="row between wrap"><div><h1>'+e(g.active.name)+'</h1><p class="muted">群組聊天 · 持久化 Mock 導演模式</p></div><button data-action="group-list">返回群組清單</button></div><div class="group-panel"><div class="group-alert">訊息已保存於測試 Supabase。回覆由固定 Mock 導演產生，不呼叫 AI、不扣款。</div><p><strong>世界背景：</strong>'+e(g.active.world||'（未設定）')+'</p><p><strong>場景模式：</strong>'+(g.active.mode==='shared'?'共用場景':'分開場景')+' · '+g.active.members.length+' 名角色</p><h3>群組角色</h3><div class="group-member-grid">'+memberCards+'</div><div class="group-chat-log">'+g.messages.map(m=>'<div class="group-bubble '+(m.type==='user'?'user':'')+'"><small>'+e(m.speaker)+'</small>'+e(m.content)+'</div>').join('')+'</div><div class="error" role="alert" aria-live="polite">'+e(g.formError)+'</div><label class="group-field"><span>輸入訊息</span><textarea id="groupMessageInput" maxlength="2000" placeholder="輸入故事內容" '+((g.sending||g.pendingRequest?.groupId===g.active.id)?'disabled':'')+'>'+e(g.pendingRequest?.groupId===g.active.id?g.pendingRequest.content:'')+'</textarea></label><div class="group-actions"><span class="muted small">'+g.turn+' 個已保存回合</span><button class="primary" data-action="group-send" '+(g.sending?'disabled':'')+'>'+(g.sending?'正在保存…':g.pendingRequest?.groupId===g.active.id?'重試保存同一訊息':'送出給 Mock 導演')+'</button></div></div></div>';
     return;
   }
   let body='';
@@ -3848,6 +3872,7 @@ document.addEventListener('click',async event => {
       case 'group-toggle-character':groupToggleCharacter(key);break;
       case 'group-create':groupCreateMock();break;
       case 'group-send':groupSendMock();break;
+      case 'group-toggle-member':groupExpandedMemberId=groupExpandedMemberId===key?null:key;render();break;
       case 'group-restart':groupRestart();break;
       case 'nav':visit(button.dataset.page);break;
       case 'back':back();break;
