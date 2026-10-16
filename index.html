@@ -3431,6 +3431,41 @@ async function loadWalletLedger(currency) {
     return false;
   }
 
+  // Resolve charges to their originating individual conversation or group.
+  const chargeRefs = [...new Set((data || []).filter(row => row.biz_type === 'chat_turn_charge' && row.reference_id).map(row => row.reference_id))];
+  const conversationLabels = new Map();
+  if (chargeRefs.length) {
+    const { data: individualTurns, error: individualError } = await client.from('chat_turn_charges').select('turn_id, session_id').in('turn_id', chargeRefs);
+    if (!individualError && individualTurns?.length) {
+      const sessionIds = [...new Set(individualTurns.map(turn => turn.session_id).filter(Boolean))];
+      let sessions = [];
+      if (sessionIds.length) {
+        const result = await client.from('chat_sessions').select('id, character_name, session_data').in('id', sessionIds);
+        if (!result.error) sessions = result.data || [];
+      }
+      const sessionsById = new Map(sessions.map(session => [session.id, session]));
+      individualTurns.forEach(turn => {
+        const session = sessionsById.get(turn.session_id);
+        const title = session?.session_data?.name?.trim() || session?.character_name?.trim();
+        if (title) conversationLabels.set(turn.turn_id, `對話：${title}`);
+      });
+    }
+    const { data: groupTurns, error: groupError } = await client.from('chat_group_turns').select('id, group_id').in('id', chargeRefs);
+    if (!groupError && groupTurns?.length) {
+      const groupIds = [...new Set(groupTurns.map(turn => turn.group_id).filter(Boolean))];
+      if (groupIds.length) {
+        const result = await client.from('chat_groups').select('id, name').in('id', groupIds);
+        if (!result.error) {
+          const groupsById = new Map((result.data || []).map(group => [group.id, group]));
+          groupTurns.forEach(turn => {
+            const group = groupsById.get(turn.group_id);
+            if (group?.name?.trim()) conversationLabels.set(turn.id, `群組：${group.name.trim()}`);
+          });
+        }
+      }
+    }
+  }
+
   const selectedType = currency === 'silver' ? 'silver_coins' : 'diamonds';
   let runningBalance = Number(currency === 'silver'
     ? state.account.silver : state.account.diamonds) || 0;
@@ -3443,7 +3478,7 @@ async function loadWalletLedger(currency) {
       change: amount,
       reason: ({
         signup_bonus: '註冊贈送',
-        chat_turn_charge: '聊天回覆扣款',
+        chat_turn_charge: conversationLabels.get(row.reference_id) || '聊天回覆扣款',
         chat_turn_refund: '聊天失敗退款',
         daily_checkin: '每日簽到',
         reward_ad: '觀看獎勵廣告',
@@ -3564,15 +3599,20 @@ function renderModal(o) {
       break;
     case 'ledger': {
       const currency = o.currency || 'diamond';
-      const logs = state.ledger.filter(l => l.currency === currency);
+      const kind = o.kind || 'usage';
+      const logs = state.ledger.filter(l => l.currency === currency && (kind === 'increase' ? l.change > 0 : l.change < 0));
       showDialog('花費日誌',`
         <div class="tabs">
-          <button class="tab ${currency === 'diamond' ? 'active' : ''}" data-action="ledger-tab" data-value="diamond">鑽石</button>
-          <button class="tab ${currency === 'silver' ? 'active' : ''}" data-action="ledger-tab" data-value="silver">銀幣</button>
+          <button class="tab ${currency === 'diamond' ? 'active' : ''}" data-action="ledger-tab" data-value="diamond" data-kind="${e(kind)}">鑽石</button>
+          <button class="tab ${currency === 'silver' ? 'active' : ''}" data-action="ledger-tab" data-value="silver" data-kind="${e(kind)}">銀幣</button>
+        </div>
+        <div class="tabs" style="margin-top:10px">
+          <button class="tab ${kind === 'increase' ? 'active' : ''}" data-action="ledger-kind" data-value="increase" data-currency="${e(currency)}">增加</button>
+          <button class="tab ${kind === 'usage' ? 'active' : ''}" data-action="ledger-kind" data-value="usage" data-currency="${e(currency)}">使用</button>
         </div>
         ${walletLedgerLoadError === currency
           ? `<div class="empty" style="margin-top:15px">雲端交易紀錄暫時無法讀取，為避免顯示過期資料，請重新載入。</div>
-             <button style="width:100%;margin-top:12px" data-action="ledger-retry" data-value="${e(currency)}">重新載入</button>`
+             <button style="width:100%;margin-top:12px" data-action="ledger-retry" data-value="${e(currency)}" data-kind="${e(kind)}">重新載入</button>`
           : logs.slice().reverse().map(l => `<article class="log-row">
           <div class="row between"><strong>${e(l.reason)}</strong>
             <strong>${l.change >= 0 ? '+' : ''}${e(l.change)}</strong></div>
@@ -4281,14 +4321,23 @@ document.addEventListener('click',async event => {
       }
       case 'ledger-tab': {
         const currency = button.dataset.value;
+        const kind = button.dataset.kind === 'increase' ? 'increase' : 'usage';
         await loadWalletLedger(currency);
-        openModal('ledger',{currency});
+        openModal('ledger',{currency,kind});
+        break;
+      }
+      case 'ledger-kind': {
+        const currency = button.dataset.currency === 'silver' ? 'silver' : 'diamond';
+        const kind = button.dataset.value === 'increase' ? 'increase' : 'usage';
+        await loadWalletLedger(currency);
+        openModal('ledger',{currency,kind});
         break;
       }
       case 'ledger-retry': {
         const currency = button.dataset.value === 'silver' ? 'silver' : 'diamond';
+        const kind = button.dataset.kind === 'increase' ? 'increase' : 'usage';
         await loadWalletLedger(currency);
-        openModal('ledger',{currency});
+        openModal('ledger',{currency,kind});
         break;
       }
       case 'purchases':openModal('purchases');break;
