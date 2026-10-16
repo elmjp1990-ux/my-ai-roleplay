@@ -3522,7 +3522,7 @@ function renderModal(o) {
       const logs = state.ledger.filter(l => l.currency === currency && (kind === 'increase' ? l.change > 0 : l.change < 0));
       showDialog('花費日誌',`
         <div class="tabs">
-          <button class="tab ${currency === 'diamond' ? 'active' : ''}" data-action="ledger-tab" data-value="diamond">鑽石</button>
+          <button class="tab ${currency === 'diamond' ? 'active' : ''}" data-action="ledger-tab" data-value="diamond" data-kind="${e(kind)}">鑽石</button>
           <button class="tab ${currency === 'silver' ? 'active' : ''}" data-action="ledger-tab" data-value="silver" data-kind="${e(kind)}">銀幣</button>
         </div>
         <div class="tabs" style="margin-top:10px">
