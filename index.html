@@ -1019,7 +1019,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       if (migratedCount > 0) {
         const refreshed = await client
           .from('characters')
-          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, private_info, style, tags, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
           .eq('author_id', user.id)
           .order('created_at', { ascending: false });
         if (refreshed.error) throw new Error('角色補傳後重新讀取失敗：' + refreshed.error.message);
@@ -1725,7 +1725,8 @@ async function saveChatSessionToCloud(s, options = {}) {
       }
       s.cloudOwned = true;
       s.cloudOwnerUid = localUser.uid;
-      s.cloudCharacterSnapshot = existingSnapshot || snapshot;
+      const { privateInfo: _legacyExistingPrivateInfo, ...safeExistingSnapshot } = existingSnapshot || {};
+      s.cloudCharacterSnapshot = existingSnapshot ? safeExistingSnapshot : snapshot;
       const canonical = s.cloudCharacterSnapshot;
       snapshot.authorId = canonical.authorId || snapshot.authorId;
       snapshot.visibility = canonical.visibility || snapshot.visibility;
