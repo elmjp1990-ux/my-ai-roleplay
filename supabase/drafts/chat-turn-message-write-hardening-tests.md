@@ -20,9 +20,13 @@ Run only against a disposable Supabase branch/project. Do not execute fixture wr
 | P4 | Insert a user message into another user's session | Rejected by RLS |
 | P5 | Insert a user message into a soft-deleted session | Rejected by RLS |
 | P6 | Insert any message while account is inactive | Rejected by RLS |
-| P7 | Service-role Edge Function inserts the expected assistant reply while turn is reserved | Allowed by RLS bypass and INSERT guard |
-| P8 | Service-role Edge Function inserts assistant reply for refunded/insufficient turn | Rejected by INSERT guard |
-| P9 | Service-role Edge Function inserts empty assistant reply for reserved turn | Rejected by INSERT guard |
+| P7 | Service-role Edge Function inserts the expected non-empty assistant reply into the charge's session while status is `reserved` | Allowed by the `BEFORE INSERT` guard |
+| P8 | Service-role Edge Function inserts assistant reply for a `refunded`/`settled`/`insufficient_funds` turn | Rejected by the `BEFORE INSERT` guard |
+| P9 | Service-role Edge Function inserts an empty assistant reply for a reserved turn | Rejected by the `BEFORE INSERT` guard |
+| P10 | Service-role Edge Function inserts an assistant row with no matching `chat_turn_charges.expected_assistant_message_id` | Rejected; assistant rows must be tied to the billing ledger |
+| P11 | Service-role Edge Function inserts expected assistant ID into a different session | Rejected; charge session and message session must match |
+| P12 | Insert a user/system row using an ID already reserved as `expected_assistant_message_id` | Rejected as role/identity conflict |
+| P13 | Race assistant INSERT against refund for the same reserved turn | The insert trigger and refund RPC serialize on the same charge row; either the row persists and refund fails, or refund commits and the late assistant insert fails |
 
 ## UPDATE protection tests
 
@@ -49,7 +53,7 @@ Run only against a disposable Supabase branch/project. Do not execute fixture wr
 | U18 | Edit content on a legacy assistant row with no charge-ledger row | Allowed for the owning user with prior content saved in `chat_message_versions`; ID, session, and role remain immutable |
 | U19 | A reserved turn's expected assistant ID is occupied by a same-session row with a non-assistant role, empty content, or soft-deleted state; attempt refund | Refund is rejected as an integrity conflict; balance and charge state remain unchanged for manual reconciliation |
 
-The existing `chat_messages_save_version_before_update` trigger runs on `UPDATE OF content`. Verify that every successful player edit writes the prior content to `chat_message_versions` and that any rejected edit rolls back the version insert. Players must be able to edit their own settled assistant replies; the guard protects ID/session/role and prevents editing a charged reply before settlement. Legacy assistant content remains editable with version history, while its ID/session/role remain immutable.
+The `guard_chat_turn_assistant_insert` BEFORE INSERT trigger is required because `service_role` bypasses RLS. It locks the matching charge row and checks expected message ID, role, session, unresolved charge status, and non-empty content; assistant rows without a matching charge are rejected. This makes P7-P13 database-trigger tests, not RLS-only tests. The existing `chat_messages_save_version_before_update` trigger runs on `UPDATE OF content`. Verify that every successful player edit writes the prior content to `chat_message_versions` and that any rejected edit rolls back the version insert. Players must be able to edit their own settled assistant replies; the guard protects ID/session/role and prevents editing a charged reply before settlement. Legacy assistant content remains editable with version history, while its ID/session/role remain immutable.
 
 Message roles are immutable for every row, including user -> system changes, so an authenticated UPDATE cannot promote player-controlled text into a privileged prompt role. The UPDATE guard must lock all matching old/new charge rows in deterministic `expected_assistant_message_id` order. This both detects cross-turn ID swaps and avoids opposite-order locks for concurrent swaps. The guard trigger must include `deleted_at`; only a `settled` turn may soft-delete its charged assistant reply. The refund RPC must also be hardened to detect an expected assistant row regardless of `deleted_at`, so legacy hidden replies cannot be refunded as if absent.
 
@@ -102,7 +106,7 @@ The worker is a source-only draft and is safe only for the deterministic demo re
 
 - All tests pass in isolation, including an authenticated client and service-role request.
 - User-message insert/edit and chat reload still work.
-- Client cannot create arbitrary assistant messages, change an assistant reply's identity/role, or edit a charged reply before settlement.
+- Browser clients cannot create assistant messages through RLS; service-role assistant INSERTs must pass the BEFORE INSERT billing-ledger guard. Clients cannot change an assistant reply's identity/role or edit a charged reply before settlement.
 - Owner can edit a settled assistant reply; the original and prior versions remain available for customer-support review.
 - Failed UPDATE does not leave a message-version side effect.
 - No production policy/function/trigger changes until isolated results and rollback SQL are reviewed and explicitly approved.
