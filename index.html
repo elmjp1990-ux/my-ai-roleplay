@@ -3143,8 +3143,9 @@ async function groupRename(groupId) {
   try {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('登入狀態已失效，請重新登入。');
-    const {error}=await window.mySupabase.from('chat_groups').update({name,updated_at:new Date().toISOString()}).eq('id',groupId).eq('owner_id',user.id).is('archived_at',null);
+    const {data,error}=await window.mySupabase.from('chat_groups').update({name,updated_at:new Date().toISOString()}).eq('id',groupId).eq('owner_id',user.id).is('archived_at',null).select('id');
     if(error) throw error;
+    if(!data?.length) throw new Error('群組可能已封存，或目前帳號沒有操作權限。請重新載入清單。');
     await groupRefreshList();
     toast('群組已重新命名。');
   } catch(error) {
