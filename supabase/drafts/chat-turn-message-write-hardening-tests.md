@@ -28,7 +28,7 @@ Run only against a disposable Supabase branch/project. Do not execute fixture wr
 
 | Case | Operation | Expected result |
 |---|---|---|
-| U1 | Change content on a charged assistant reply | Rejected; no message-version row remains |
+| U1 | Edit content on a charged assistant reply after the charge is `settled` | Allowed for the owning user; prior content is recorded in `chat_message_versions` and the current row displays the edited content |
 | U2 | Change role on a charged assistant reply | Rejected |
 | U3 | Change ID or session on a charged assistant reply | Rejected |
 | U4 | Client upsert uses an existing charged assistant ID but supplies role=user | Rejected by UPDATE guard |
@@ -38,7 +38,7 @@ Run only against a disposable Supabase branch/project. Do not execute fixture wr
 | U7 | Convert uncharged assistant row to user | Rejected |
 | U8 | Soft-delete a charged assistant reply after its charge is `settled`, changing only `deleted_at` | Allowed; protected fields remain unchanged |
 | U9 | Attempt to target another turn's expected assistant ID | Rejected; neither turn/message changes |
-| U10 | Two concurrent transactions attempt content edit and soft-delete on a settled reply | Protected content/identity cannot change; soft-delete may succeed |
+| U10 | Two concurrent transactions attempt content edit and soft-delete on a settled reply | Each operation is serialized; edit history is preserved, identity/role cannot change, and the delete cannot overwrite edited content |
 | U14 | Soft-delete a reply while its charge is `reserved` after the assistant row was inserted | Rejected; row remains visible so refund logic cannot mistake a persisted reply for no reply |
 | U15 | Soft-delete a reply while its charge is `needs_reconciliation` or `refunded` | Rejected; only `settled` permits soft-delete |
 | U16 | Attempt refund after a reply row exists but was hidden by legacy `deleted_at` before hardening | Refund must still be rejected after the refund RPC is hardened to detect any persisted expected assistant row, including soft-deleted rows |
@@ -46,10 +46,10 @@ Run only against a disposable Supabase branch/project. Do not execute fixture wr
 | U11 | Failed protected content edit with version trigger enabled | Transaction rollback leaves no new `chat_message_versions` row |
 | U12 | Change message A's ID to the expected assistant ID of charged turn B while A belongs to charged turn A | Rejected as cross-turn conflict; both charge rows and messages remain unchanged |
 | U13 | Run simultaneous opposite-direction ID swaps between two charged assistant messages | Both swaps rejected; charge rows are locked in deterministic expected-message-ID order, and neither transaction changes message/charge data |
-| U18 | Change the content, ID, or session of a legacy assistant row that has no charge-ledger row | Rejected; legacy assistant content/identity is immutable, while a `deleted_at`-only cleanup may proceed |
+| U18 | Edit content on a legacy assistant row with no charge-ledger row | Allowed for the owning user with prior content saved in `chat_message_versions`; ID, session, and role remain immutable |
 | U19 | A reserved turn's expected assistant ID is occupied by a same-session row with a non-assistant role, empty content, or soft-deleted state; attempt refund | Refund is rejected as an integrity conflict; balance and charge state remain unchanged for manual reconciliation |
 
-The existing `chat_messages_save_version_before_update` trigger runs on `UPDATE OF content`. Verify PostgreSQL trigger order and confirm that if it fires before the guard, the guard exception rolls back the version insert as part of the same statement. The guard also makes legacy assistant rows without charge-ledger entries immutable for content and identity, preventing old rows from becoming an UPDATE bypass; only a `deleted_at`-only cleanup may proceed.
+The existing `chat_messages_save_version_before_update` trigger runs on `UPDATE OF content`. Verify that every successful player edit writes the prior content to `chat_message_versions` and that any rejected edit rolls back the version insert. Players must be able to edit their own settled assistant replies; the guard protects ID/session/role and prevents editing a charged reply before settlement. Legacy assistant content remains editable with version history, while its ID/session/role remain immutable.
 
 Message roles are immutable for every row, including user -> system changes, so an authenticated UPDATE cannot promote player-controlled text into a privileged prompt role. The UPDATE guard must lock all matching old/new charge rows in deterministic `expected_assistant_message_id` order. This both detects cross-turn ID swaps and avoids opposite-order locks for concurrent swaps. The guard trigger must include `deleted_at`; only a `settled` turn may soft-delete its charged assistant reply. The refund RPC must also be hardened to detect an expected assistant row regardless of `deleted_at`, so legacy hidden replies cannot be refunded as if absent.
 
@@ -86,6 +86,9 @@ The worker is a source-only draft and is safe only for the deterministic demo re
 - F5: When no opening assistant row exists before the first user message, the UI reconstructs the opening text from `character_snapshot.opening` without inserting a database assistant row.
 - F6: When an opening assistant row already exists, reload does not duplicate it.
 - F7: Editing a user message remains free and persists normally.
+- F16: Editing a settled assistant reply updates the visible content without a new AI call or charge, while the prior original content and each subsequent prior version are saved to `chat_message_versions`.
+- F17: Attempting to edit a reserved or `needs_reconciliation` assistant reply is rejected without leaving a version-history side effect.
+- F18: Attempting to change an assistant message ID, session ID, or role remains rejected even when content editing is allowed.
 - F8: A failed user-message sync aborts before invoking `chat-turn`, so no wallet reservation occurs.
 - F9: The Edge Function returns `status='settled'` but an assistant message ID different from the pending turn's expected ID; the UI does not render it or clear the pending turn.
 - F10: The Edge Function returns a non-assistant role or empty content; the UI does not render it or clear the pending turn.
@@ -99,7 +102,8 @@ The worker is a source-only draft and is safe only for the deterministic demo re
 
 - All tests pass in isolation, including an authenticated client and service-role request.
 - User-message insert/edit and chat reload still work.
-- Client cannot create arbitrary assistant messages or mutate a charged assistant reply.
+- Client cannot create arbitrary assistant messages, change an assistant reply's identity/role, or edit a charged reply before settlement.
+- Owner can edit a settled assistant reply; the original and prior versions remain available for customer-support review.
 - Failed UPDATE does not leave a message-version side effect.
 - No production policy/function/trigger changes until isolated results and rollback SQL are reviewed and explicitly approved.
 
