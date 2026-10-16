@@ -2952,7 +2952,7 @@ function groupResetForAccount(uid) {
   if(g.ownerUid && g.ownerUid!==uid) {
     g.step=1;
     g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]};
-    g.active=null;g.turn=0;g.messages=[];g.groups=[];g.groupsLoaded=false;
+    g.active=null;g.turn=0;g.messages=[];g.groups=[];g.archivedGroups=[];g.showArchived=false;g.groupsLoaded=false;
     g.loadingGroups=false;g.loading=false;g.sending=false;g.pendingRequest=null;
     g.formError='';g.loadError='';g.ownerUid=null;
   }
