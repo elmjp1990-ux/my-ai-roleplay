@@ -631,7 +631,45 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 @media(max-width:560px){.group-panel{padding:14px}.group-steps{font-size:12px}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+<aside class="sidebar">
+  <div class="sidebar-heading">
+    <button class="ghost logo-button" data-action="home" aria-label="首頁">
+      <img class="logo-img" alt="PersonaX">
+    </button>
+    <button class="ghost" data-action="collapse" aria-label="收合或展開網站選單">☰</button>
+  </div>
+  <nav id="desktopNav"></nav>
+  <div class="sidebar-footer">
+    <button class="ghost" data-action="home" aria-label="首頁">
+      <img class="logo-img" alt="PersonaX">
+    </button>
+  </div>
+</aside>
+
+<div class="app">
+  <header>
+    <div class="row">
+      <button class="ghost mobile-logo" data-action="home" aria-label="首頁">
+        <img class="logo-img" alt="PersonaX">
+      </button>
+      <strong class="desktop-title" id="pageTitle"></strong>
+    </div>
+    <div id="accountArea" class="row"></div>
+  </header>
+  <main id="view"></main>
+</div>
+
+<nav id="mobileNav" class="mobile-nav" aria-label="主要選單"></nav>
+<dialog id="modal"></dialog>
+<div id="toast" class="hidden" role="status"></div>
+<input id="jsonFile" class="hidden" type="file" accept=".json,application/json">
+
 <script>
+'use strict';
+
   const SUPABASE_URL = 'https://ouyewoagbmtqehbofrje.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_MyTDqAKNTkK4zo7eap8gZA_ZGozHRMd';
 
@@ -1317,45 +1355,7 @@ if (characterError) {
       console.error('Supabase Auth 初始化失敗：', error);
     }
   });
-</script>
-</head>
 
-<body>
-<aside class="sidebar">
-  <div class="sidebar-heading">
-    <button class="ghost logo-button" data-action="home" aria-label="首頁">
-      <img class="logo-img" alt="PersonaX">
-    </button>
-    <button class="ghost" data-action="collapse" aria-label="收合或展開網站選單">☰</button>
-  </div>
-  <nav id="desktopNav"></nav>
-  <div class="sidebar-footer">
-    <button class="ghost" data-action="home" aria-label="首頁">
-      <img class="logo-img" alt="PersonaX">
-    </button>
-  </div>
-</aside>
-
-<div class="app">
-  <header>
-    <div class="row">
-      <button class="ghost mobile-logo" data-action="home" aria-label="首頁">
-        <img class="logo-img" alt="PersonaX">
-      </button>
-      <strong class="desktop-title" id="pageTitle"></strong>
-    </div>
-    <div id="accountArea" class="row"></div>
-  </header>
-  <main id="view"></main>
-</div>
-
-<nav id="mobileNav" class="mobile-nav" aria-label="主要選單"></nav>
-<dialog id="modal"></dialog>
-<div id="toast" class="hidden" role="status"></div>
-<input id="jsonFile" class="hidden" type="file" accept=".json,application/json">
-
-<script>
-'use strict';
 
 /* Local prototype. Never use local balances or IDs as server authorization. */
 const STORE_KEY = 'personax-v3';
