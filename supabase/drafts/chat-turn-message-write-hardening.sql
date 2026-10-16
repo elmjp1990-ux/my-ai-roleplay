@@ -154,7 +154,8 @@ begin
   if v_charge.status = 'settled' then
     raise exception 'settled_turn_cannot_be_refunded';
   end if;
-  if v_charge.status not in ('reserved', 'needs_reconciliation') then
+  if v_charge.status is distinct from 'reserved'
+       and v_charge.status is distinct from 'needs_reconciliation' then
     raise exception 'turn_not_refundable';
   end if;
 
