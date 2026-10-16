@@ -243,7 +243,11 @@ begin
     if new.session_id is distinct from v_charge.session_id then
       raise exception 'expected_assistant_message_session_conflict';
     end if;
-    if v_charge.status not in ('reserved', 'needs_reconciliation') then
+    -- Use NULL-safe comparisons: SQL's NOT IN returns NULL when status is NULL,
+    -- and an IF NULL does not reject the insert. Only the two explicit unresolved
+    -- states are allowed, even if a legacy/corrupt row has a NULL status.
+    if v_charge.status is distinct from 'reserved'
+       and v_charge.status is distinct from 'needs_reconciliation' then
       raise exception 'assistant_insert_requires_unresolved_charge';
     end if;
     if char_length(btrim(coalesce(new.content, ''))) = 0 then
