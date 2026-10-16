@@ -3356,18 +3356,40 @@ async function loadWalletLedger(currency) {
   const conversationLabels = new Map();
   if (chargeRefs.length) {
     const { data: individualTurns, error: individualError } = await client.from('chat_turn_charges').select('turn_id, session_id').in('turn_id', chargeRefs);
-    if (!individualError && individualTurns?.length) {
+    if (individualError) {
+      console.error('[wallet-ledger] 無法讀取聊天扣款關聯資料', {
+        code: individualError.code, message: individualError.message,
+        details: individualError.details, hint: individualError.hint,
+        chargeRefCount: chargeRefs.length
+      });
+    } else if (individualTurns?.length) {
       const sessionIds = [...new Set(individualTurns.map(turn => turn.session_id).filter(Boolean))];
       let sessions = [];
       if (sessionIds.length) {
         const result = await client.from('chat_sessions').select('id, character_name, session_data').in('id', sessionIds);
-        if (!result.error) sessions = result.data || [];
+        if (result.error) {
+          console.error('[wallet-ledger] 無法讀取聊天標題', {
+            code: result.error.code, message: result.error.message,
+            details: result.error.details, hint: result.error.hint,
+            sessionCount: sessionIds.length
+          });
+        } else {
+          sessions = result.data || [];
+        }
       }
       const sessionsById = new Map(sessions.map(session => [session.id, session]));
       individualTurns.forEach(turn => {
         const session = sessionsById.get(turn.session_id);
         const title = session?.session_data?.name?.trim() || session?.character_name?.trim();
         if (title) conversationLabels.set(turn.turn_id, `對話：${title}`);
+        else console.warn('[wallet-ledger] 查到扣款但無可用聊天標題', {
+          turnId: turn.turn_id, sessionId: turn.session_id,
+          sessionFound: !!session, characterName: session?.character_name || null
+        });
+      });
+    } else {
+      console.warn('[wallet-ledger] 扣款 reference_id 未匹配到個人聊天回合', {
+        chargeRefCount: chargeRefs.length
       });
     }
     const { data: groupTurns, error: groupError } = await client.from('chat_group_turns').select('id, group_id').in('id', chargeRefs);
