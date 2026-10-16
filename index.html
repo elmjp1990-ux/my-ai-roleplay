@@ -3084,7 +3084,7 @@ function renderGroupPrototype() {
   if(g.active) {
     const memberCards=g.active.members.map(m=>{
       const avatar=String(m.avatar_url||'');
-      const safeAvatar=/^https?:\\/\\//i.test(avatar);
+      const safeAvatar=avatar.startsWith('https://')||avatar.startsWith('http://');
       const expanded=groupExpandedMemberId===m.characterId;
       const detail=[m.intro||'',m.style?'風格：'+m.style:'',m.age?'年齡：'+m.age:'',m.gender?'性別：'+m.gender:'',Array.isArray(m.tags)&&m.tags.length?'標籤：'+m.tags.join('、'):''].filter(Boolean).map(e).join('<br>');
       return '<article class="group-member-card"><button class="ghost group-member-head" data-action="group-toggle-member" data-id="'+e(m.characterId)+'" aria-expanded="'+expanded+'"><span class="group-member-avatar">'+(safeAvatar?'<img src="'+e(avatar)+'" alt="" loading="lazy">':e(String(m.name||'角').trim().slice(0,1)||'角'))+'</span><span class="group-member-name" title="'+e(m.name||'角色')+'">'+e(m.name||'角色')+'</span></button><div class="group-member-details" '+(expanded?'':'hidden')+'>'+ (detail||'尚無角色補充資料')+'</div></article>';
