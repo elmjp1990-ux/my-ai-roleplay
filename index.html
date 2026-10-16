@@ -2990,7 +2990,7 @@ function groupRenderList() {
   if(g.loadingGroups) body='<p class="muted">正在讀取雲端群組…</p>';
   else if(g.loadError) body='<div class="group-alert">'+e(g.loadError)+'</div><button data-action="group-refresh-list">重新載入</button>';
   else if(!g.groups.length) body='<p class="muted">目前還沒有已保存的群組。建立後即可在這裡重新開啟。</p>';
-  else body='<div class="group-character-grid">'+g.groups.map(x=>'<div class="group-character-option"><span style="flex:1"><strong>'+e(x.name)+'</strong><span class="muted small" style="display:block">'+(x.scene_mode==='shared'?'共用場景':'分開場景')+' · '+e(String(x.created_at||'').slice(0,10))+'</span></span><button data-action="group-open" data-id="'+e(x.id)+'">開啟</button></div>').join('')+'</div>';
+  else body='<div class="group-character-grid">'+g.groups.map(x=>'<div class="group-character-option"><span style="flex:1"><strong>'+e(x.name)+'</strong><span class="muted small" style="display:block">'+(x.scene_mode==='shared'?'共用場景':'分開場景')+' · '+e(String(x.created_at||'').slice(0,10))+'</span></span><div class="row wrap" style="gap:6px"><button data-action="group-open" data-id="'+e(x.id)+'">開啟</button><button data-action="group-rename" data-id="'+e(x.id)+'">重新命名</button><button data-action="group-archive" data-id="'+e(x.id)+'">封存</button></div></div>').join('')+'</div>';
   return '<section class="group-panel"><div class="row between wrap"><h2>已保存的群組</h2><button data-action="group-refresh-list">重新載入</button></div>'+body+'</section>';
 }
 async function groupOpen(groupId) {
@@ -3132,6 +3132,44 @@ async function groupSendMock() {
   }
 }
 async function groupRefreshList() { groupPrototype.groupsLoaded=false;await groupLoadList(true);if(route.page==='group'&&!groupPrototype.active)render(); }
+async function groupRename(groupId) {
+  const g=groupPrototype;
+  const target=g.groups.find(x=>x.id===groupId);
+  if(!target||!window.mySupabase) { toast('找不到群組，請重新載入清單。');return; }
+  const proposed=window.prompt('請輸入新的群組名稱（1–80 字）',target.name||'');
+  if(proposed===null) return;
+  const name=proposed.trim();
+  if(!name||name.length>80) { toast('群組名稱需為 1–80 字。');return; }
+  try {
+    const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
+    if(authError||!user||user.id!==currentUser()?.uid) throw new Error('登入狀態已失效，請重新登入。');
+    const {data,error}=await window.mySupabase.from('chat_groups').update({name,updated_at:new Date().toISOString()}).eq('id',groupId).eq('owner_id',user.id).is('archived_at',null).select('id');
+    if(error) throw error;
+    if(!data?.length) throw new Error('群組可能已封存，或目前帳號沒有操作權限。請重新載入清單。');
+    await groupRefreshList();
+    toast('群組已重新命名。');
+  } catch(error) {
+    toast(groupFriendlyError(error)||'重新命名失敗，請稍後重試。');
+  }
+}
+async function groupArchive(groupId) {
+  const g=groupPrototype;
+  const target=g.groups.find(x=>x.id===groupId);
+  if(!target||!window.mySupabase) { toast('找不到群組，請重新載入清單。');return; }
+  if(!window.confirm('確定封存「'+target.name+'」？封存後會從目前群組清單隱藏，資料仍會保留。')) return;
+  try {
+    const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
+    if(authError||!user||user.id!==currentUser()?.uid) throw new Error('登入狀態已失效，請重新登入。');
+    const {data,error}=await window.mySupabase.from('chat_groups').update({archived_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',groupId).eq('owner_id',user.id).is('archived_at',null).select('id');
+    if(error) throw error;
+    if(!data?.length) throw new Error('群組可能已封存，或目前帳號沒有操作權限。請重新載入清單。');
+    if(g.active?.id===groupId) { g.active=null;g.messages=[];g.pendingRequest=null; }
+    await groupRefreshList();
+    toast('群組已封存；歷史資料仍保留。');
+  } catch(error) {
+    toast(groupFriendlyError(error)||'封存失敗，請稍後重試。');
+  }
+}
 function groupList() { const g=groupPrototype;g.active=null;g.step=1;g.formError='';g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]};render(); }
 function groupRestart() { groupList(); }
 function renderConversation() {
@@ -3774,6 +3812,8 @@ document.addEventListener('click',async event => {
       case 'group-next':groupNext();break;
       case 'group-inspiration':toast('AI 靈感功能尚在串接中；你可以先自行撰寫或修改場景。此操作不會呼叫 AI 或扣款。');break;
       case 'group-open':groupOpen(key);break;
+      case 'group-rename':groupRename(key);break;
+      case 'group-archive':groupArchive(key);break;
       case 'group-refresh-list':groupRefreshList();break;
       case 'group-list':groupList();break;
       case 'group-back':groupBack();break;
