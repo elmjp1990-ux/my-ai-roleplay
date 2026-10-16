@@ -993,7 +993,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       // 這可修復舊版匯入只存 localStorage 的資料；不會上傳其他帳號的本機角色。
       let { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, private_info, style, tags, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
         .eq('author_id', user.id)
         .order('created_at', { ascending: false });
       if (error) throw new Error('讀取雲端角色失敗：' + error.message);
@@ -1026,7 +1026,21 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         rows = refreshed.data || [];
       }
 
-      const ids = (rows || []).map(row => row.id);
+const ids = (rows || []).map(row => row.id);
+      // 隱藏設定只從作者專用資料表讀取，不再從公開 characters 資料列取得。
+      const privateInfoById = new Map();
+      if (ids.length) {
+        const privateInfoResult = await client.from('character_private_info')
+          .select('character_id, private_info')
+          .eq('author_id', user.id)
+          .in('character_id', ids);
+        if (privateInfoResult.error) {
+          throw new Error('讀取角色隱藏設定失敗：' + privateInfoResult.error.message);
+        }
+        for (const item of privateInfoResult.data || []) {
+          privateInfoById.set(item.character_id, item.private_info || '');
+        }
+      }
       // 私密角色不會經過公開角色載入器；在作者自己的角色載入流程也補齊作者 profile。
       const authorIds = [...new Set((rows || []).map(row => row.author_id).filter(Boolean))];
       if (authorIds.length) {
@@ -1076,7 +1090,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
           intro: row.intro ?? local.intro ?? '',
           opening: story?.opening_message ?? local.opening ?? '',
           race: row.race ?? local.race ?? '',
-          privateInfo: row.private_info ?? local.privateInfo ?? '',
+          privateInfo: privateInfoById.get(row.id) ?? local.privateInfo ?? '',
           style: row.style ?? local.style ?? '',
           tags: Array.isArray(row.tags) ? row.tags : (local.tags || []),
           authorId: row.author_id,
@@ -1168,7 +1182,6 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       rights_confirmed: rightsConfirmed || existingCharacter?.rights_confirmed === true,
       intro: character.intro || '',
       race: character.race || '',
-      private_info: character.privateInfo || '',
       style: character.style || '',
       tags: Array.isArray(character.tags) ? character.tags : []
     };
@@ -1176,8 +1189,19 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     const { error: characterError } = await client
       .from('characters')
       .upsert(row, { onConflict: 'id' });
-    if (characterError) {
+if (characterError) {
       throw new Error('角色資料寫入 Supabase 失敗：' + characterError.message);
+    }
+    // 隱藏設定獨立儲存，characters 公開資料列永遠不包含 privateInfo。
+    const { error: privateInfoError } = await client
+      .from('character_private_info')
+      .upsert({
+        character_id: character.id,
+        author_id: expectedUserId,
+        private_info: String(character.privateInfo || '').slice(0, 10000)
+      }, { onConflict: 'character_id' });
+    if (privateInfoError) {
+      throw new Error('角色基本資料已寫入，但隱藏設定儲存失敗：' + privateInfoError.message);
     }
     // 重新讀取資料庫，避免 RLS／trigger／資料庫規則拒絕公開卻讓前端顯示成功。
     const { data: savedCharacter, error: verifyError } = await client
@@ -1670,17 +1694,16 @@ async function saveChatSessionToCloud(s, options = {}) {
   if (!character && (!s.cloudOwned || !priorSnapshot.id)) {
     throw new Error('找不到這段聊天所屬的正式角色或既有角色快照。');
   }
+// 舊版快照可能曾含隱藏設定；同步前先剔除，避免再次寫回玩家可讀的 chat_sessions。
+  const { privateInfo: _legacyPrivateInfo, ...safePriorSnapshot } = priorSnapshot;
   const snapshot = {
-    ...priorSnapshot,
+    ...safePriorSnapshot,
     id:s.characterId,
     name:character?.name || priorSnapshot.name || s.characterName || '角色',
     gender:character?.gender || priorSnapshot.gender || 'ambiguous',
     age:character?.age ?? priorSnapshot.age ?? '',
     image:character?.image || priorSnapshot.image || '',
     intro:character?.intro ?? priorSnapshot.intro ?? '',
-    // 公開角色載入資料會刻意把 privateInfo 留空；空字串不代表角色私密設定已被清除。
-    // 若既有聊天快照已有內容，避免後續同步將其覆寫成空字串；新快照仍不會從公開角色資料取得私密設定。
-    privateInfo:character?.privateInfo || priorSnapshot.privateInfo || '',
     opening:character?.opening ?? priorSnapshot.opening ?? '',
     race:character?.race ?? priorSnapshot.race ?? '',
     style:character?.style ?? priorSnapshot.style ?? '',
@@ -4276,10 +4299,11 @@ document.addEventListener('submit',async event => {
         c.visibility='private';c.deletedAt=deletedAt;c.deletionReason='author_deleted';
         for (const session of Object.values(state.sessions)) {
           if (session.characterId===c.id) {
+const { privateInfo: _legacyPrivateInfo, ...(safeCloudSnapshot) } = session.cloudCharacterSnapshot || {};
             session.cloudCharacterSnapshot={
-              ...(session.cloudCharacterSnapshot || {}),
+              ...safeCloudSnapshot,
               id:c.id,name:c.name,gender:c.gender,age:c.age,image:c.image,intro:c.intro,
-              opening:c.opening,privateInfo:c.privateInfo ?? session.cloudCharacterSnapshot?.privateInfo ?? '',
+              opening:c.opening,
               race:c.race,style:c.style,tags:Array.isArray(c.tags)?c.tags:[],
               authorId:c.authorId,visibility:'private',
               firstPublishedAt:c.firstPublishedAt || session.cloudCharacterSnapshot?.firstPublishedAt || null,
