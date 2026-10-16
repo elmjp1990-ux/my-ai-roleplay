@@ -3305,6 +3305,57 @@ function renderNotifications() {
   </div>`;
 }
 
+/* Cloud wallet ledger: read the authoritative transaction journal from Supabase. */
+async function loadWalletLedger(currency) {
+  const uid = state.account?.uid;
+  const client = window.mySupabase;
+  if (!uid || !client) return false;
+
+  const { data, error } = await client
+    .from('wallet_transactions')
+    .select('id, currency_type, amount, biz_type, reference_id, created_at')
+    .eq('user_id', uid)
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (error) {
+    console.error('讀取錢包花費日誌失敗：', error);
+    toast('花費日誌讀取失敗，請稍後再試。');
+    return false;
+  }
+
+  const selectedType = currency === 'silver' ? 'silver_coins' : 'diamonds';
+  let runningBalance = Number(currency === 'silver'
+    ? state.account.silver : state.account.diamonds) || 0;
+  const rows = (data || []).filter(row => row.currency_type === selectedType);
+  const mappedNewestFirst = rows.map(row => {
+    const amount = Number(row.amount) || 0;
+    const entry = {
+      id: row.id,
+      currency: row.currency_type === 'silver_coins' ? 'silver' : 'diamond',
+      change: amount,
+      reason: ({
+        signup_bonus: '註冊贈送',
+        chat_turn_charge: '聊天回覆扣款',
+        chat_turn_refund: '聊天失敗退款',
+        daily_checkin: '每日簽到',
+        reward_ad: '觀看獎勵廣告',
+        purchase: '購買',
+        admin_adjustment: '餘額調整'
+      })[row.biz_type] || row.biz_type || '錢包交易',
+      at: Date.parse(row.created_at) || Date.now(),
+      balance: runningBalance,
+      referenceId: row.reference_id || null
+    };
+    runningBalance -= amount;
+    return entry;
+  });
+  state.ledger = [
+    ...state.ledger.filter(entry => entry.currency !== (currency === 'silver' ? 'silver' : 'diamond')),
+    ...mappedNewestFirst.reverse()
+  ];
+  return true;
+}
+
 /* Modal content */
 function renderModal(o) {
   const s = currentSession();
