@@ -3101,6 +3101,10 @@ async function groupOpen(groupId) {
   const g=groupPrototype;
   groupResetForAccount(currentUser()?.uid||null);
   if(!isUuid(groupId)||!window.mySupabase) { toast('群組識別碼無效。');return; }
+  // Group entries can be clicked from the shared character/chat list on any page.
+  // Switch the main route before rendering the loading state so the group view is
+  // actually mounted instead of leaving the user on the previous character list.
+  route={...route,page:'group'};
   g.loading=true;g.formError='';g.active=null;render();
   try {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
