@@ -2878,8 +2878,11 @@ function chatEntries() {
   }));
   items.push(...groupItems);
   items.sort((a,b)=>Number(b.pinned)-Number(a.pinned)||b.sortAt-a.sortAt);
-  if(!items.length) return '<div class="empty">還沒有符合條件的對話。</div>';
-  return items.map(item=>{
+  const errorNotice=groupPrototype.loadError
+    ? '<div class="group-alert">'+e(groupPrototype.loadError)+'</div><button data-action="group-refresh-list">重新載入群組</button>'
+    : '';
+  if(!items.length) return errorNotice || '<div class="empty">還沒有符合條件的對話。</div>';
+  const rows=items.map(item=>{
     if(item.kind==='group') {
       const group=item.value;
       const lastText=item.preview?.content||'尚未開始對話';
@@ -2920,6 +2923,7 @@ function chatEntries() {
       <button class="entry-menu" data-action="session-menu" data-id="${e(s.id)}" aria-label="聊天選項">⋯</button>
     </div>`;
   }).join('')||'<div class="empty">還沒有符合條件的對話。</div>';
+  return rows+errorNotice;
 }
 function chatListHTML() {
   if(currentUser()&&!groupPrototype.groupsLoaded&&!groupPrototype.loadingGroups) groupLoadList();
