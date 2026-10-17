@@ -152,6 +152,7 @@ body.day .tag { color:#4f46b8; }
   background:#312e81;
 }
 .avatar-fallback { display:grid; place-items:center; color:#ddd6fe; font-weight:bold; }
+.group-list-avatar { width:36px; height:36px; display:grid; place-items:center; border-radius:50%; flex-shrink:0; color:#e0e7ff; background:linear-gradient(135deg,#6366f1,#8b5cf6); font-weight:700; font-size:13px; }
 .ellipsis { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .character-avatar-status {
   position:relative;
@@ -1627,7 +1628,7 @@ let pendingDeletionWalletSyncUid =
     ? state.account.uid
     : null;
 let route = {page:'home'};
-let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]},active:null,turn:0,messages:[],groups:[],groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:''};
+let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:''};
 let search = '';
 let filter = 'latest';
 let exploreTags = [];
@@ -2862,29 +2863,70 @@ function relativeDate(at) {
   return new Date(at).toLocaleDateString('zh-TW');
 }
 function chatEntries() {
-  return visibleSessions().map(s => {
-    const c = sessionCharacter(s);
-    const last = s.messages.at(-1);
-    return `<div class="chat-entry ${route.id === s.id ? 'active' : ''}">
-      <button class="pin ${s.pinned ? 'on' : ''}" data-action="pin"
+  const q=chatSearch.trim().toLocaleLowerCase();
+  const items=visibleSessions().map(s=>({
+    kind:'session',value:s,sortAt:Number(s.messages?.at(-1)?.at||s.startedAt||0),pinned:!!s.pinned
+  }));
+  const groupItems=(groupPrototype.groups||[]).filter(group=>{
+    const preview=groupPrototype.groupPreviews?.[group.id];
+    return !q || String(group.name||'').toLocaleLowerCase().includes(q) ||
+      String(preview?.content||'').toLocaleLowerCase().includes(q);
+  }).map(group=>({
+    kind:'group',value:group,preview:groupPrototype.groupPreviews?.[group.id]||null,
+    sortAt:Date.parse(groupPrototype.groupPreviews?.[group.id]?.created_at||group.updated_at||group.created_at||'')||0,
+    pinned:false
+  }));
+  items.push(...groupItems);
+  items.sort((a,b)=>Number(b.pinned)-Number(a.pinned)||b.sortAt-a.sortAt);
+  const errorNotice=groupPrototype.loadError
+    ? '<div class="group-alert">'+e(groupPrototype.loadError)+'</div><button data-action="group-refresh-list">重新載入群組</button>'
+    : '';
+  if(!items.length) return errorNotice || '<div class="empty">還沒有符合條件的對話。</div>';
+  const rows=items.map(item=>{
+    if(item.kind==='group') {
+      const group=item.value;
+      const lastText=item.preview?.content||'尚未開始對話';
+      const lastAt=Date.parse(item.preview?.created_at||group.updated_at||group.created_at||'')||Date.now();
+      const active=route.page==='group'&&groupPrototype.active?.id===group.id;
+      return `<div class="chat-entry ${active?'active':''}">
+        <span class="pin" aria-label="群組聊天" title="群組聊天">👥</span>
+        <button class="ghost" style="padding:0" data-action="group-open" data-id="${e(group.id)}" aria-label="開啟群組 ${e(group.name)}">
+          <span class="group-list-avatar" aria-hidden="true">群</span>
+        </button>
+        <button class="select-chat" data-action="group-open" data-id="${e(group.id)}">
+          <div class="row between"><strong class="ellipsis">${e(group.name||'未命名群組')} <span class="small muted">· 群組</span></strong>
+            <span class="small muted">${relativeDate(lastAt)}</span></div>
+          <div class="ellipsis small muted">${e(lastText)}</div>
+        </button>
+        <span class="entry-menu" aria-hidden="true">⋯</span>
+      </div>`;
+    }
+    const s=item.value;
+    const c=sessionCharacter(s);
+    if(!c) return '';
+    const last=s.messages?.at(-1);
+    return `<div class="chat-entry ${route.page==='conversation'&&route.id===s.id?'active':''}">
+      <button class="pin ${s.pinned?'on':''}" data-action="pin"
               data-id="${e(s.id)}" aria-label="切換置頂">${ICON.pin}</button>
       <button class="ghost" style="padding:0" data-action="session-detail" data-id="${e(s.id)}"
               aria-label="查看${e(c.name)}角色簡介">
-        <span class="character-avatar-status ${characterIsOffline(c) ? 'is-offline' : ''}">
+        <span class="character-avatar-status ${characterIsOffline(c)?'is-offline':''}">
           <img class="avatar" src="${e(safeImage(c.image))}" alt="${e(c.name)}">
-          <span class="character-status-dot" title="${characterIsOffline(c) ? '角色離線／已下架' : '角色公開中'}"></span>
+          <span class="character-status-dot" title="${characterIsOffline(c)?'角色離線／已下架':'角色公開中'}"></span>
         </span>
       </button>
       <button class="select-chat" data-action="select-chat" data-id="${e(s.id)}">
-        <div class="row between"><strong class="ellipsis">${e(s.name || c.name)}</strong>
-          <span class="small muted">${relativeDate(last?.at || s.startedAt)}</span></div>
-        <div class="ellipsis small muted">${e(last?.text || '')}</div>
+        <div class="row between"><strong class="ellipsis">${e(s.name||c.name)}</strong>
+          <span class="small muted">${relativeDate(last?.at||s.startedAt)}</span></div>
+        <div class="ellipsis small muted">${e(last?.text||'')}</div>
       </button>
       <button class="entry-menu" data-action="session-menu" data-id="${e(s.id)}" aria-label="聊天選項">⋯</button>
     </div>`;
-  }).join('') || '<div class="empty">還沒有符合條件的對話。</div>';
+  }).join('')||'<div class="empty">還沒有符合條件的對話。</div>';
+  return rows+errorNotice;
 }
 function chatListHTML() {
+  if(currentUser()&&!groupPrototype.groupsLoaded&&!groupPrototype.loadingGroups) groupLoadList();
   return `<aside class="panel chat-list">
     <div class="list-top"><button class="ghost" data-action="list-menu">☰ 全部</button>
       <span class="small muted">聊天列表</span></div>
@@ -2977,12 +3019,16 @@ function groupRenderCharacters() {
   if (!chars.length) return '<div class="group-alert">目前沒有可選的雲端角色。請先登入並確認角色已儲存在 Supabase，且角色目前為公開狀態、尚未刪除或下架。</div>';
   return '<div id="groupCharacterPicker"><label class="group-field"><span>搜尋角色名稱、介紹或標籤</span><input id="groupCharacterSearch" type="search" maxlength="100" value="'+e(groupCharacterSearch)+'" placeholder="輸入角色名稱…"></label><div id="groupCharacterResults">'+groupRenderCharacterResults()+'</div></div>';
 }
+function refreshChatEntryList() {
+  const entries=$('chatEntries');
+  if(entries) entries.innerHTML=chatEntries();
+}
 function groupResetForAccount(uid) {
   const g=groupPrototype;
   if(g.ownerUid && g.ownerUid!==uid) {
     g.step=1;
     g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]};
-    g.active=null;g.turn=0;g.messages=[];g.groups=[];g.groupsLoaded=false;
+    g.active=null;g.turn=0;g.messages=[];g.groups=[];g.groupPreviews={};g.groupsLoaded=false;
     g.loadingGroups=false;g.loading=false;g.sending=false;g.pendingRequest=null;
     g.formError='';g.loadError='';g.ownerUid=null;
   }
@@ -3002,28 +3048,45 @@ function groupFriendlyError(error) {
 }
 async function groupLoadList(force=false) {
   const g=groupPrototype;
+  // Clear a prior account's cached group rows before rendering the shared chat list.
+  groupResetForAccount(currentUser()?.uid||null);
   if(g.loadingGroups||(!force&&g.groupsLoaded)) return;
   g.loadingGroups=true;g.loadError='';
   if(!window.mySupabase) {
-    g.groupsLoaded=true;g.loadingGroups=false;g.loadError='Supabase 用戶端尚未載入。';return;
+    g.groupsLoaded=true;g.loadingGroups=false;g.loadError='Supabase 用戶端尚未載入。';
+    refreshChatEntryList();return;
   }
   try {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
     if(authError||!user||user.id!==currentUser()?.uid) {
       g.groupsLoaded=true;g.loadingGroups=false;g.loadError='請使用已連結 Supabase 的帳號登入，才能讀取或建立雲端群組。';
       if(route.page==='group'&&!g.active) render();
-      return;
+      refreshChatEntryList();return;
     }
     const {data,error}=await window.mySupabase.from('chat_groups')
       .select('id,name,world_background,scene_mode,created_at,updated_at')
       .is('archived_at',null).order('updated_at',{ascending:false});
     if(error) throw error;
     if(user.id!==currentUser()?.uid) { groupResetForAccount(currentUser()?.uid||null); return; }
-    g.ownerUid=user.id;g.groups=data||[];g.groupsLoaded=true;g.loadingGroups=false;
+    g.ownerUid=user.id;g.groups=data||[];g.groupPreviews={};
+    if(g.groups.length) {
+      const groupIds=g.groups.map(group=>group.id);
+      const {data:messages,error:messageError}=await window.mySupabase.from('chat_group_messages')
+        .select('group_id,content,speaker_type,created_at,sequence_no')
+        .in('group_id',groupIds).order('created_at',{ascending:false}).order('sequence_no',{ascending:false});
+      if(!messageError) {
+        for(const message of messages||[]) {
+          if(!g.groupPreviews[message.group_id]) g.groupPreviews[message.group_id]=message;
+        }
+      }
+    }
+    if(user.id!==currentUser()?.uid) { groupResetForAccount(currentUser()?.uid||null); return; }
+    g.groupsLoaded=true;g.loadingGroups=false;g.loadError='';
   } catch(error) {
     g.groupsLoaded=true;g.loadingGroups=false;g.loadError=groupFriendlyError(error)||'讀取群組清單失敗。';
   }
   if(route.page==='group'&&!g.active) render();
+  refreshChatEntryList();
 }
 function groupRenderList() {
   const g=groupPrototype;
@@ -3038,6 +3101,10 @@ async function groupOpen(groupId) {
   const g=groupPrototype;
   groupResetForAccount(currentUser()?.uid||null);
   if(!isUuid(groupId)||!window.mySupabase) { toast('群組識別碼無效。');return; }
+  // Group entries can be clicked from the shared character/chat list on any page.
+  // Switch the main route before rendering the loading state so the group view is
+  // actually mounted instead of leaving the user on the previous character list.
+  route={...route,page:'group'};
   g.loading=true;g.formError='';g.active=null;render();
   try {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
