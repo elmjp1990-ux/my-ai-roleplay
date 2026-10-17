@@ -762,6 +762,8 @@ button:disabled .button-spinner{opacity:.9}
   // 避免 getSession() 與 onAuthStateChange(INITIAL_SESSION) 同時觸發相同帳號的整批雲端載入。
   // 此變數每次頁面載入都會重設，確保本機已有登入資料時仍會在首次驗證後同步。
   let lastSupabaseDataSyncUid = null;
+  // 避免雲端角色尚在載入時，把暫時空白誤顯示成「尚未建立角色」。
+  let characterSyncPendingUid = null;
 
   function syncSupabaseUser(user) {
     if (typeof state === 'undefined') {
@@ -1091,6 +1093,7 @@ button:disabled .button-spinner{opacity:.9}
       }
       return;
     }
+    characterSyncPendingUid = user.id;
     try {
       const { data: authResult, error: authError } = await client.auth.getUser();
       if (state.account?.uid !== user.id) return;
@@ -1225,6 +1228,7 @@ const ids = (rows || []).map(row => row.id);
         ...cloudCharacters,
         ...state.characters.filter(c => c.authorId !== user.id || !cloudIds.has(c.id))
       ];
+      if (characterSyncPendingUid === user.id) characterSyncPendingUid = null;
       persist();
       render();
       if (migrationErrors.length) {
@@ -1244,6 +1248,7 @@ const ids = (rows || []).map(row => row.id);
         }, retryAttempt === 0 ? 1000 : 2200);
       } else if (state.account?.uid === user.id) {
         // 最終仍失敗時允許後續 auth 事件重新觸發同步，而不是永久鎖住此 UID。
+        if (characterSyncPendingUid === user.id) characterSyncPendingUid = null;
         lastSupabaseDataSyncUid = null;
         toast('登入成功，但雲端角色載入失敗：' + error.message + '。可重新整理頁面再試。');
       }
@@ -2715,11 +2720,14 @@ function creationTabs() {
 }
 function owned(c) { return currentUser() && c?.authorId === currentUser().uid; }
 function renderCreate() {
+  const myCharacters = state.characters.filter(c => owned(c) && !c.deletedAt);
+  const listContent = myCharacters.length
+    ? myCharacters.map(c => card(c,true)).join('')
+    : (currentUser()?.uid && characterSyncPendingUid === currentUser().uid
+      ? '<div class="empty" role="status" aria-live="polite">正在載入你的角色，請稍候…</div>'
+      : '<div class="empty">尚未建立角色。</div>');
   $('view').innerHTML = `<div class="stack"><h1>創建角色</h1>${creationTabs()}
-    <h2>你的角色</h2><div class="grid">
-      ${state.characters.filter(c => owned(c) && !c.deletedAt).map(c => card(c,true)).join('') ||
-      '<div class="empty">尚未建立角色。</div>'}
-    </div></div>`;
+    <h2>你的角色</h2><div class="grid">${listContent}</div></div>`;
 }
 function startEditor(c = null) {
   draftCharacter = c ? clone(c) : null;
