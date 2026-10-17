@@ -2679,14 +2679,15 @@ function editorDraftKey() {
 function readEditorDraft() {
   const key = editorDraftKey();
   if (!key) return null;
-  try {
-    const raw = sessionStorage.getItem(key);
-    if (!raw) return null;
-    const value = JSON.parse(raw);
-    return value && typeof value === 'object' ? value : null;
-  } catch (_) {
-    return null;
+  for (const storage of [localStorage, sessionStorage]) {
+    try {
+      const raw = storage.getItem(key);
+      if (!raw) continue;
+      const value = JSON.parse(raw);
+      if (value && typeof value === 'object') return value;
+    } catch (_) {}
   }
+  return null;
 }
 function saveEditorDraft() {
   const form = $('view')?.querySelector('form[data-form="character"]');
@@ -2708,19 +2709,25 @@ function saveEditorDraft() {
     image:draftImage,
     savedAt:Date.now()
   };
+  const serialized = JSON.stringify(draft);
+  // localStorage survives mobile browsers discarding and recreating a background tab.
   try {
-    sessionStorage.setItem(key, JSON.stringify(draft));
+    localStorage.setItem(key, serialized);
+    try { sessionStorage.setItem(key, serialized); } catch (_) {}
   } catch (_) {
-    // Keep text inputs recoverable even if a large image exhausts session storage.
+    // Large avatar data may exceed quota; retain all text fields without the image.
     try {
       delete draft.image;
-      sessionStorage.setItem(key, JSON.stringify(draft));
+      const textOnly = JSON.stringify(draft);
+      localStorage.setItem(key, textOnly);
+      try { sessionStorage.setItem(key, textOnly); } catch (_) {}
     } catch (_) {}
   }
 }
 function clearEditorDraft() {
   const key = editorDraftKey();
   if (key) {
+    try { localStorage.removeItem(key); } catch (_) {}
     try { sessionStorage.removeItem(key); } catch (_) {}
   }
 }
@@ -4844,6 +4851,12 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
 });
 
 /* Inputs */
+// Mobile browsers may discard a background page and recreate it when returning.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') saveEditorDraft();
+});
+window.addEventListener('pagehide', saveEditorDraft);
+window.addEventListener('blur', saveEditorDraft);
 document.addEventListener('input',event => {
   const target=event.target;
   if (target.closest('form[data-form="character"]')) saveEditorDraft();
