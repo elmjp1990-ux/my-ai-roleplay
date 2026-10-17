@@ -4484,13 +4484,15 @@ document.addEventListener('submit',async event => {
   }
   form.setAttribute('aria-busy', 'true');
 
-  const f=new FormData(form);
-  const type=form.dataset.form;
-  const o=route.overlay || {};
-  const s=currentSession();
-  const text=String(f.get('text') || '').trim();
-
   try {
+    // Include form-data extraction and route/session reads in the guarded block,
+    // so an unexpected setup error cannot leave the submit button locked forever.
+    const f=new FormData(form);
+    const type=form.dataset.form;
+    const o=route.overlay || {};
+    const s=currentSession();
+    const text=String(f.get('text') || '').trim();
+
     switch(type) {
       case 'character': {
         const user = currentUser();
