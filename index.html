@@ -667,6 +667,9 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 .group-member-details{margin-top:10px;padding-top:9px;border-top:1px solid var(--border);font-size:13px;line-height:1.65;overflow-wrap:anywhere}
 .group-member-details[hidden]{display:none}
 .group-member-card button{min-width:0}
+.button-spinner{display:inline-block;width:14px;height:14px;margin-right:8px;vertical-align:-2px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:button-spinner-rotate .7s linear infinite}
+button:disabled .button-spinner{opacity:.9}
+@keyframes button-spinner-rotate{to{transform:rotate(360deg)}}
 @media(max-width:560px){.group-panel{padding:14px}.group-steps{font-size:12px}.group-member-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.group-member-card{padding:8px}.group-member-avatar{width:40px;height:40px;flex-basis:40px;border-radius:10px}.group-member-name{font-size:13px}.group-member-head{gap:7px}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -756,6 +759,12 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     if (route?.page === 'conversation') route = {page:'home'};
   }
 
+  // 避免 getSession() 與 onAuthStateChange(INITIAL_SESSION) 同時觸發相同帳號的整批雲端載入。
+  // 此變數每次頁面載入都會重設，確保本機已有登入資料時仍會在首次驗證後同步。
+  let lastSupabaseDataSyncUid = null;
+  // 避免雲端角色尚在載入時，把暫時空白誤顯示成「尚未建立角色」。
+  let characterSyncPendingUid = null;
+
   function syncSupabaseUser(user) {
     if (typeof state === 'undefined') {
       window.__pendingSupabaseUser = user || null;
@@ -763,6 +772,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     }
 
     if (!user) {
+      lastSupabaseDataSyncUid = null;
       isolateSessionsForUser(null);
       pendingDeletionWalletSyncUid = null;
       state.signedIn = false;
@@ -816,11 +826,15 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     if (wasPendingDeletion) pendingDeletionWalletSyncUid = user.id;
 
     persist();
-    // 真實會員資料與錢包由資料庫載入；不可把 user_metadata 當成正式餘額。
-    void loadSupabaseProfileAndWallet(user);
-    void loadPublicSupabaseCharacters();
-    void loadSupabaseCharacters(user);
+    // 首次驗證此帳號時載入雲端資料；避免 INITIAL_SESSION／TOKEN_REFRESHED 等重複事件
+    // 同時觸發昂貴的角色清單查詢，導致 Supabase SELECT timeout 與畫面誤報。
+    if (lastSupabaseDataSyncUid !== user.id) {
+      lastSupabaseDataSyncUid = user.id;
+      void loadSupabaseProfileAndWallet(user);
+      void loadPublicSupabaseCharacters();
+      void loadSupabaseCharacters(user);
       void loadCloudChatSessions(user);
+    }
 
     // OAuth 返回後，不要把使用者留在登入遮罩；回到登入前想去的頁面。
     const next = localStorage.getItem('personaX_login_next');
@@ -979,6 +993,8 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   async function loadPublicSupabaseCharacters() {
     const client = window.mySupabase;
     if (!client) return;
+    // 公開清單是非同步請求；記錄啟動時的帳號，避免舊請求在登入／登出切換後覆寫角色狀態。
+    const requestedUid = state.account?.uid || null;
     try {
       const { data: rows, error } = await client
         .from('characters')
@@ -1014,21 +1030,31 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
           .in('character_id', ids)
           .eq('visibility', 'public')
           .order('created_at', { ascending: false });
-        if (result.error) throw new Error(result.error.message);
-        stories = result.data || [];
+        if (result.error) {
+          // 公開角色本體可獨立呈現；故事載入失敗不應讓整份公開清單保持舊狀態或空白。
+          console.warn('公開角色故事載入失敗，仍繼續顯示公開角色：', result.error.message);
+        } else {
+          stories = result.data || [];
+        }
       }
       const latestStory = new Map();
       for (const story of stories) {
         if (!latestStory.has(story.character_id)) latestStory.set(story.character_id, story);
       }
 
-      const publicCharacters = (rows || []).map(row => {
+      const publicCharacters = await Promise.all((rows || []).map(async row => {
         const story = latestStory.get(row.id);
+        let image = row.avatar_url || '';
+        try {
+          image = await compactCharacterImage(image);
+        } catch (imageError) {
+          console.warn('公開角色圖片壓縮失敗，暫時使用原圖：', row.name, imageError);
+        }
         return {
           id: row.id, name: row.name || '未命名角色',
           gender: row.gender || 'ambiguous',
           age: row.age == null ? '' : String(row.age),
-          image: row.avatar_url || '', visibility: 'public',
+          image, visibility: 'public',
           reviewStatus: row.review_status, intro: row.intro || '',
           opening: story?.opening_message || '', race: row.race || '',
           privateInfo: '', style: row.style || '',
@@ -1040,10 +1066,12 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
           latestEligible: row.latest_eligible !== false,
           rightsConfirmed: false, cloudPublic: true
         };
-      });
+      }));
 
-      const publicIds = new Set(publicCharacters.map(character => character.id));
+      // 若請求期間登入帳號改變，丟棄舊請求結果，避免過期資料覆寫目前帳號的角色。
       const currentUid = state.account?.uid || null;
+      if (currentUid !== requestedUid) return;
+      const publicIds = new Set(publicCharacters.map(character => character.id));
       // 只保留示範角色與目前登入帳號自己的未刪除角色，避免帳號切換時顯示其他帳號的本機私密草稿。
       const keepLocal = state.characters.filter(character =>
         String(character.id).startsWith('seed-') ||
@@ -1058,12 +1086,28 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     }
   }
 
-  async function loadSupabaseCharacters(user) {
+  async function loadSupabaseCharacters(user, retryAttempt = 0) {
     const client = window.mySupabase;
-    if (!client || !user?.id) return;
+    if (!user?.id) return;
+    if (!client) {
+      // Auth callback 有機會早於 Supabase client 初始化；不要讓 UID 去重鎖永久阻止角色同步。
+      if (state.account?.uid === user.id) {
+        lastSupabaseDataSyncUid = null;
+        setTimeout(() => {
+          if (window.mySupabase && state.account?.uid === user.id) syncSupabaseUser(user);
+        }, 800);
+      }
+      return;
+    }
+    characterSyncPendingUid = user.id;
     try {
       const { data: authResult, error: authError } = await client.auth.getUser();
-      if (authError || authResult?.user?.id !== user.id) return;
+      if (state.account?.uid !== user.id) return;
+      if (authError) throw new Error('驗證登入狀態失敗：' + authError.message);
+      if (authResult?.user?.id !== user.id) {
+        // getUser 偶發尚未取得已登入 session 時，不可靜默結束並留下已鎖定的 UID。
+        throw new Error('目前登入 session 尚未就緒，角色清單稍後重試。');
+      }
 
       // 先讀取雲端角色；將此裝置上屬於目前帳號、但雲端尚不存在的舊角色補上雲端。
       // 這可修復舊版匯入只存 localStorage 的資料；不會上傳其他帳號的本機角色。
@@ -1075,6 +1119,22 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       if (error) throw new Error('讀取雲端角色失敗：' + error.message);
 
       if (state.account?.uid !== user.id) return;
+      // 先壓縮舊版雲端中的超大 Data URL，並回寫目前帳號自己的角色，修復已存在的超大圖片。
+      rows = await Promise.all((rows || []).map(async row => {
+        if (!row.avatar_url || !row.avatar_url.startsWith('data:image/') || row.avatar_url.length < 350000) return row;
+        try {
+          const compactImage = await compactCharacterImage(row.avatar_url);
+          if (compactImage !== row.avatar_url && row.author_id === user.id) {
+            const { error: imageUpdateError } = await client.from('characters')
+              .update({avatar_url:compactImage}).eq('id',row.id).eq('author_id',user.id);
+            if (imageUpdateError) console.warn('角色圖片已在本機縮小，但雲端圖片壓縮回寫失敗：', row.name, imageUpdateError.message);
+          }
+          return {...row, avatar_url:compactImage};
+        } catch (imageError) {
+          console.warn('角色圖片壓縮失敗，暫時保留原圖：', row.name, imageError);
+          return row;
+        }
+      }));
       const localOwned = state.characters.filter(c => c.authorId === user.id && c.id);
       const cloudIdsBeforeMigration = new Set((rows || []).map(row => row.id));
       const localOnly = localOwned.filter(c => !cloudIdsBeforeMigration.has(c.id));
@@ -1111,10 +1171,12 @@ const ids = (rows || []).map(row => row.id);
           .eq('author_id', user.id)
           .in('character_id', ids);
         if (privateInfoResult.error) {
-          throw new Error('讀取角色隱藏設定失敗：' + privateInfoResult.error.message);
-        }
-        for (const item of privateInfoResult.data || []) {
-          privateInfoById.set(item.character_id, item.private_info || '');
+          // 隱藏設定是角色的附屬資料；其查詢失敗不能讓整份角色清單消失。
+          console.warn('角色隱藏設定載入失敗，先保留角色並沿用本機內容：', privateInfoResult.error.message);
+        } else {
+          for (const item of privateInfoResult.data || []) {
+            privateInfoById.set(item.character_id, item.private_info || '');
+          }
         }
       }
       // 私密角色不會經過公開角色載入器；在作者自己的角色載入流程也補齊作者 profile。
@@ -1143,8 +1205,12 @@ const ids = (rows || []).map(row => row.id);
           .select('id, character_id, story_name, description, opening_message, visibility, created_at')
           .in('character_id', ids)
           .order('created_at', { ascending: false });
-        if (result.error) throw new Error('讀取雲端角色故事失敗：' + result.error.message);
-        stories = result.data || [];
+        if (result.error) {
+          // 故事／開場白屬於附屬資料；讀取失敗時仍顯示角色本體及本機已保存的開場白。
+          console.warn('雲端角色故事載入失敗，先保留角色清單：', result.error.message);
+        } else {
+          stories = result.data || [];
+        }
       }
       const latestStory = new Map();
       for (const story of stories) {
@@ -1184,6 +1250,7 @@ const ids = (rows || []).map(row => row.id);
         ...cloudCharacters,
         ...state.characters.filter(c => c.authorId !== user.id || !cloudIds.has(c.id))
       ];
+      if (characterSyncPendingUid === user.id) characterSyncPendingUid = null;
       persist();
       render();
       if (migrationErrors.length) {
@@ -1194,8 +1261,18 @@ const ids = (rows || []).map(row => row.id);
       }
     } catch (error) {
       console.error('PersonaX 雲端角色載入失敗：', error);
-      if (state.account?.uid === user.id) {
-        toast('登入成功，但雲端角色載入失敗：' + error.message);
+      if (state.account?.uid === user.id && retryAttempt < 2) {
+        // 雲端查詢偶發 timeout／初始化競態時，短暫等待後最多重試兩次。
+        // 不清除現有角色；成功後以雲端資料合併，避免短暫失敗被誤認為角色已消失。
+        console.warn('角色雲端同步將自動重試（第 ' + (retryAttempt + 1) + ' 次）。');
+        setTimeout(() => {
+          if (state.account?.uid === user.id) void loadSupabaseCharacters(user, retryAttempt + 1);
+        }, retryAttempt === 0 ? 1000 : 2200);
+      } else if (state.account?.uid === user.id) {
+        // 最終仍失敗時允許後續 auth 事件重新觸發同步，而不是永久鎖住此 UID。
+        if (characterSyncPendingUid === user.id) characterSyncPendingUid = null;
+        lastSupabaseDataSyncUid = null;
+        toast('登入成功，但雲端角色載入失敗：' + error.message + '。可重新整理頁面再試。');
       }
     }
   }
@@ -1679,6 +1756,43 @@ function persist() {
     toast('儲存失敗，請檢查瀏覽器儲存空間或縮小圖片。');
     return false;
   }
+}
+
+// 舊版角色可能已將數 MB 的原始圖片存進 Supabase；載入時先縮圖，避免整份 state 超過 localStorage 配額。
+async function compactCharacterImage(dataUrl, maxBytes = 240 * 1024) {
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/') || dataUrl.length < 350000) {
+    return dataUrl || '';
+  }
+  const img = await new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('既有角色圖片無法讀取，暫時保留原圖。'));
+    image.src = dataUrl;
+  });
+  const scale = Math.min(1, 1000 / img.naturalWidth, 1250 / img.naturalHeight);
+  const canvas = document.createElement('canvas');
+  for (const factor of [1, 0.82, 0.66, 0.5, 0.38]) {
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale * factor));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale * factor));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('瀏覽器無法壓縮既有角色圖片。');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    for (const quality of [0.72, 0.58, 0.45, 0.35]) {
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+      if (!blob) continue;
+      if (blob.size <= maxBytes) {
+        return await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error('讀取壓縮圖片失敗。'));
+          reader.readAsDataURL(blob);
+        });
+      }
+    }
+  }
+  throw new Error('既有角色圖片壓縮後仍超過本機儲存上限。');
 }
 
 // 僅在網址明確帶上 ?chatDataTest=1 時顯示無成本測試控制項。
@@ -2665,11 +2779,14 @@ function creationTabs() {
 }
 function owned(c) { return currentUser() && c?.authorId === currentUser().uid; }
 function renderCreate() {
+  const myCharacters = state.characters.filter(c => owned(c) && !c.deletedAt);
+  const listContent = myCharacters.length
+    ? myCharacters.map(c => card(c,true)).join('')
+    : (currentUser()?.uid && characterSyncPendingUid === currentUser().uid
+      ? '<div class="empty" role="status" aria-live="polite">正在載入你的角色，請稍候…</div>'
+      : '<div class="empty">尚未建立角色。</div>');
   $('view').innerHTML = `<div class="stack"><h1>創建角色</h1>${creationTabs()}
-    <h2>你的角色</h2><div class="grid">
-      ${state.characters.filter(c => owned(c) && !c.deletedAt).map(c => card(c,true)).join('') ||
-      '<div class="empty">尚未建立角色。</div>'}
-    </div></div>`;
+    <h2>你的角色</h2><div class="grid">${listContent}</div></div>`;
 }
 function startEditor(c = null) {
   draftCharacter = c ? clone(c) : null;
@@ -2769,13 +2886,54 @@ function updateAICost() {
   $('aiSubmit').disabled = Number(currentUser()?.diamonds || 0) < cost;
 }
 async function readImage(file) {
-  if (!file || !['image/png','image/jpeg','image/webp'].includes(file.type)) throw Error('請選擇PNG、JPG或WebP。');
-  return await new Promise((resolve,reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(Error('圖片讀取失敗。'));
-    reader.readAsDataURL(file);
-  });
+  if (!file || !['image/png','image/jpeg','image/webp'].includes(file.type)) {
+    throw Error('請選擇PNG、JPG或WebP。');
+  }
+  if (file.size > 15 * 1024 * 1024) {
+    throw Error('原始圖片超過15 MB，請先縮小圖片再上傳。');
+  }
+
+  // 圖片以 Data URL 儲存在角色資料中；未壓縮的手機照片容易超過
+  // localStorage 容量，導致儲存失敗，刷新後本機資料看起來全部消失。
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise((resolve,reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(Error('圖片讀取失敗，請換一張圖片再試。'));
+      img.src = objectUrl;
+    });
+    const maxWidth = 1200;
+    const maxHeight = 1500;
+    const baseScale = Math.min(1, maxWidth / image.naturalWidth, maxHeight / image.naturalHeight);
+    const canvas = document.createElement('canvas');
+
+    for (const scaleFactor of [1, 0.82, 0.66]) {
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * baseScale * scaleFactor));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * baseScale * scaleFactor));
+      const context = canvas.getContext('2d');
+      if (!context) throw Error('瀏覽器無法處理這張圖片，請換一張再試。');
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+      for (const quality of [0.82, 0.72, 0.62]) {
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+        if (!blob) throw Error('圖片壓縮失敗，請換一張圖片再試。');
+        if (blob.size <= 240 * 1024) {
+          return await new Promise((resolve,reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(Error('壓縮後的圖片讀取失敗。'));
+            reader.readAsDataURL(blob);
+          });
+        }
+      }
+    }
+    throw Error('圖片仍然太大，請選擇尺寸較小的圖片。');
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
 
 /* Chat sessions: character identity stays separate from conversation identity. */
@@ -4418,13 +4576,36 @@ document.addEventListener('submit',async event => {
   const form=event.target.closest('[data-form]');
   if (!form) return;
   event.preventDefault();
-  const f=new FormData(form);
-  const type=form.dataset.form;
-  const o=route.overlay || {};
-  const s=currentSession();
-  const text=String(f.get('text') || '').trim();
+
+  // Prevent rapid double taps from creating multiple records while a request is pending.
+  if (form.dataset.submitting === 'true') return;
+  let submitButton = null;
+  let originalSubmitHTML;
+  let originalSubmitDisabled = false;
+  let type;
 
   try {
+    // Guard all submit-state setup as well as form-data extraction. If setup throws,
+    // the finally block below can still release the lock and restore any saved button state.
+    form.dataset.submitting = 'true';
+    submitButton = form.querySelector('button[type="submit"], button:not([type])');
+    originalSubmitHTML = submitButton?.innerHTML;
+    originalSubmitDisabled = submitButton?.disabled ?? false;
+    type = form.dataset.form;
+    if (submitButton) {
+      submitButton.disabled = true;
+      const progressLabel = type === 'character'
+        ? (route.id ? '正在儲存…' : '正在建立角色…')
+        : '處理中…';
+      submitButton.innerHTML = '<span class="button-spinner" aria-hidden="true"></span>' + progressLabel;
+    }
+    form.setAttribute('aria-busy', 'true');
+
+    const f=new FormData(form);
+    const o=route.overlay || {};
+    const s=currentSession();
+    const text=String(f.get('text') || '').trim();
+
     switch(type) {
       case 'character': {
         const user = currentUser();
@@ -4777,6 +4958,13 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
       `);
     } else {
       toast(error.message || '儲存未完成。');
+    }
+  } finally {
+    form.dataset.submitting = 'false';
+    form.removeAttribute('aria-busy');
+    if (submitButton) {
+      submitButton.disabled = originalSubmitDisabled;
+      if (originalSubmitHTML !== undefined) submitButton.innerHTML = originalSubmitHTML;
     }
   }
 });
