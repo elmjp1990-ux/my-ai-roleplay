@@ -1222,7 +1222,7 @@ const ids = (rows || []).map(row => row.id);
     } catch (error) {
       console.error('PersonaX 雲端角色載入失敗：', error);
       if (state.account?.uid === user.id && retryAttempt < 2) {
-        // 雲端查詢偶發 timeout／初始化競態時，短暫等待後重試整個讀取流程一次。
+        // 雲端查詢偶發 timeout／初始化競態時，短暫等待後最多重試兩次。
         // 不清除現有角色；成功後以雲端資料合併，避免短暫失敗被誤認為角色已消失。
         console.warn('角色雲端同步將自動重試（第 ' + (retryAttempt + 1) + ' 次）。');
         setTimeout(() => {
