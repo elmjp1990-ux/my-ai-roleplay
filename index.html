@@ -1085,7 +1085,12 @@ button:disabled .button-spinner{opacity:.9}
     }
     try {
       const { data: authResult, error: authError } = await client.auth.getUser();
-      if (authError || authResult?.user?.id !== user.id) return;
+      if (state.account?.uid !== user.id) return;
+      if (authError) throw new Error('驗證登入狀態失敗：' + authError.message);
+      if (authResult?.user?.id !== user.id) {
+        // getUser 偶發尚未取得已登入 session 時，不可靜默結束並留下已鎖定的 UID。
+        throw new Error('目前登入 session 尚未就緒，角色清單稍後重試。');
+      }
 
       // 先讀取雲端角色；將此裝置上屬於目前帳號、但雲端尚不存在的舊角色補上雲端。
       // 這可修復舊版匯入只存 localStorage 的資料；不會上傳其他帳號的本機角色。
@@ -1216,13 +1221,13 @@ const ids = (rows || []).map(row => row.id);
       }
     } catch (error) {
       console.error('PersonaX 雲端角色載入失敗：', error);
-      if (state.account?.uid === user.id && retryAttempt < 1) {
+      if (state.account?.uid === user.id && retryAttempt < 2) {
         // 雲端查詢偶發 timeout／初始化競態時，短暫等待後重試整個讀取流程一次。
         // 不清除現有角色；成功後以雲端資料合併，避免短暫失敗被誤認為角色已消失。
-        console.warn('角色雲端同步將自動重試一次。');
+        console.warn('角色雲端同步將自動重試（第 ' + (retryAttempt + 1) + ' 次）。');
         setTimeout(() => {
           if (state.account?.uid === user.id) void loadSupabaseCharacters(user, retryAttempt + 1);
-        }, 1200);
+        }, retryAttempt === 0 ? 1000 : 2200);
       } else if (state.account?.uid === user.id) {
         // 最終仍失敗時允許後續 auth 事件重新觸發同步，而不是永久鎖住此 UID。
         lastSupabaseDataSyncUid = null;
