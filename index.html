@@ -991,6 +991,8 @@ button:disabled .button-spinner{opacity:.9}
   async function loadPublicSupabaseCharacters() {
     const client = window.mySupabase;
     if (!client) return;
+    // 公開清單是非同步請求；記錄啟動時的帳號，避免舊請求在登入／登出切換後覆寫角色狀態。
+    const requestedUid = state.account?.uid || null;
     try {
       const { data: rows, error } = await client
         .from('characters')
@@ -1026,8 +1028,12 @@ button:disabled .button-spinner{opacity:.9}
           .in('character_id', ids)
           .eq('visibility', 'public')
           .order('created_at', { ascending: false });
-        if (result.error) throw new Error(result.error.message);
-        stories = result.data || [];
+        if (result.error) {
+          // 公開角色本體可獨立呈現；故事載入失敗不應讓整份公開清單保持舊狀態或空白。
+          console.warn('公開角色故事載入失敗，仍繼續顯示公開角色：', result.error.message);
+        } else {
+          stories = result.data || [];
+        }
       }
       const latestStory = new Map();
       for (const story of stories) {
@@ -1054,8 +1060,10 @@ button:disabled .button-spinner{opacity:.9}
         };
       });
 
-      const publicIds = new Set(publicCharacters.map(character => character.id));
+      // 若請求期間登入帳號改變，丟棄舊請求結果，避免過期資料覆寫目前帳號的角色。
       const currentUid = state.account?.uid || null;
+      if (currentUid !== requestedUid) return;
+      const publicIds = new Set(publicCharacters.map(character => character.id));
       // 只保留示範角色與目前登入帳號自己的未刪除角色，避免帳號切換時顯示其他帳號的本機私密草稿。
       const keepLocal = state.characters.filter(character =>
         String(character.id).startsWith('seed-') ||
