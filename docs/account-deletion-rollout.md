@@ -6,7 +6,7 @@ Do not deploy or schedule the account-deletion worker until all three migrations
 
 ## Environment-specific grace period
 
-After applying `20261017010100_account_deletion_grace_period_config.sql`, configure exactly one row per Supabase environment using the SQL editor:
+After applying `20261017010841_account_deletion_grace_period_config.sql`, configure exactly one row per Supabase environment using the SQL editor:
 
 Test environment (short test window):
 ```sql
