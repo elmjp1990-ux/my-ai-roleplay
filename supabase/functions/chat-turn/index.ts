@@ -226,242 +226,97 @@ Deno.serve(async (request) => {
     stage: "demo_generation",
   });
 
-  // Persist durable generation identity before the assistant message. Matching
-  // only the deterministic demo text is not sufficient: a reused assistant ID
-  // could otherwise make a different turn settle against an old identical reply.
-  const generationRecordPayload = {
-    user_id: user.id,
-    session_id: sessionId,
-    user_message_id: userMessageId,
-    assistant_message_id: assistantMessageId,
-    request_id: turnId,
-    original_content: demoReply,
-    status: "success",
-  };
-  const generationRecordMatches = (record: Record<string, unknown> | null | undefined) =>
-    !!record &&
-    record.user_id === user.id &&
-    record.session_id === sessionId &&
-    record.user_message_id === userMessageId &&
-    record.assistant_message_id === assistantMessageId &&
-    record.request_id === turnId &&
-    String(record.original_content || "").trim() === demoReply;
-
-  const { data: existingGenerationRecord, error: generationRecordLookupError } = await admin
-    .from("ai_generation_records")
-    .select("user_id,session_id,user_message_id,assistant_message_id,request_id,original_content")
-    .eq("assistant_message_id", assistantMessageId)
-    .maybeSingle();
-  if (generationRecordLookupError) {
-    return json({ status: "needs_reconciliation", error: "generation_record_lookup_failed", retryAllowed: false }, 503);
-  }
-  if (existingGenerationRecord && !generationRecordMatches(existingGenerationRecord)) {
-    await admin.from("chat_turn_charges").update({
-      status: "needs_reconciliation",
-      failure_code: "assistant_message_id_collision",
-      updated_at: new Date().toISOString(),
-    }).eq("turn_id", turnId).eq("user_id", user.id).eq("status", "reserved");
-    await admin.from("chat_turn_events").insert({
-      turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
-      stage: "generation_record", error_code: "assistant_message_id_collision",
-    });
-    return json({ status: "needs_reconciliation", error: "assistant_message_id_collision", retryAllowed: false }, 409);
-  }
-  if (!existingGenerationRecord) {
-    // Never claim an already-existing assistant row for a new turn. This
-    // closes the collision case where identical demo text could otherwise
-    // be paired with a newly inserted generation record after the fact.
-    const { data: preexistingAssistantRow, error: preexistingAssistantLookupError } = await admin
-      .from("chat_messages")
-      .select("id")
-      .eq("id", assistantMessageId)
-      .maybeSingle();
-    if (preexistingAssistantLookupError) {
-      return json({ status: "needs_reconciliation", error: "assistant_message_lookup_failed", retryAllowed: false }, 503);
-    }
-    if (preexistingAssistantRow) {
-      await admin.from("chat_turn_charges").update({
-        status: "needs_reconciliation",
-        failure_code: "assistant_message_id_collision",
-        updated_at: new Date().toISOString(),
-      }).eq("turn_id", turnId).eq("user_id", user.id).eq("status", "reserved");
-      await admin.from("chat_turn_events").insert({
-        turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
-        stage: "generation_record", error_code: "assistant_message_id_collision",
-      });
-      return json({ status: "needs_reconciliation", error: "assistant_message_id_collision", retryAllowed: false }, 409);
-    }
-
-    const { error: generationRecordInsertError } = await admin
-      .from("ai_generation_records")
-      .insert(generationRecordPayload);
-    if (generationRecordInsertError) {
-      // An insert response can be lost after the database committed. Re-read
-      // the stable assistant ID and accept only the exact same turn identity.
-      const { data: confirmedGenerationRecord, error: confirmGenerationRecordError } = await admin
-        .from("ai_generation_records")
-        .select("user_id,session_id,user_message_id,assistant_message_id,request_id,original_content")
-        .eq("assistant_message_id", assistantMessageId)
-        .maybeSingle();
-      if (confirmGenerationRecordError) {
-        return json({ status: "needs_reconciliation", error: "generation_record_write_outcome_unknown", retryAllowed: false }, 503);
-      }
-      if (!generationRecordMatches(confirmedGenerationRecord)) {
-        await admin.from("chat_turn_charges").update({
-          status: "needs_reconciliation",
-          failure_code: "generation_record_write_failed",
-          updated_at: new Date().toISOString(),
-        }).eq("turn_id", turnId).eq("user_id", user.id).eq("status", "reserved");
-        await admin.from("chat_turn_events").insert({
-          turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
-          stage: "generation_record", error_code: "generation_record_write_failed",
-        });
-        return json({ status: "needs_reconciliation", error: "generation_record_write_failed", retryAllowed: false }, 503);
-      }
-    }
-  }
-
-  // Stable demo output: a repeated request uses the same assistantMessageId,
-  // so it cannot create a second billable reply for this turn.
-  const assistantRow = {
-    id: assistantMessageId,
-    session_id: sessionId,
-    role: "assistant",
-    content: demoReply,
-    created_at: new Date().toISOString(),
-  };
-
-  const { error: saveReplyError } = await admin
-    .from("chat_messages")
-    .insert(assistantRow);
-
-  if (saveReplyError) {
-    await admin.from("chat_turn_events").insert({
-      turn_id: turnId, user_id: user.id, event_type: "persistence_failed",
-      stage: "assistant_message", error_code: "assistant_persistence_failed",
-    });
-    // Do not refund until a follow-up read confirms the reply is absent.
-    const { data: possibleReply, error: verifyError } = await admin
-      .from("chat_messages").select("id,content")
-      .eq("id", assistantMessageId).eq("session_id", sessionId)
-      .eq("role", "assistant").is("deleted_at", null).maybeSingle();
-
-    if (verifyError) {
-      await admin.from("chat_turn_charges").update({
-        status: "needs_reconciliation",
-        failure_code: "reply_write_outcome_unknown",
-        updated_at: new Date().toISOString(),
-      }).eq("turn_id", turnId).eq("user_id", user.id).eq("status", "reserved");
-      await admin.from("chat_turn_events").insert({
-        turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
-        stage: "persistence", error_code: "reply_write_outcome_unknown",
-      });
-      return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
-    }
-
-    if (possibleReply && String(possibleReply.content || "").trim()) {
-      const identityResult = await replyIdentityMatchesCurrentTurn(possibleReply.content);
-      if (identityResult === "unknown") {
-        await admin.from("chat_turn_charges").update({
-          status: "needs_reconciliation",
-          failure_code: "generation_record_lookup_failed",
-          updated_at: new Date().toISOString(),
-        }).eq("turn_id", turnId).eq("user_id", user.id).eq("status", "reserved");
-        await admin.from("chat_turn_events").insert({
-          turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
-          stage: "reply_identity", error_code: "generation_record_lookup_failed",
-        });
-        return json({ status: "needs_reconciliation", error: "generation_record_lookup_failed", retryAllowed: false }, 503);
-      }
-      if (identityResult === "mismatch") {
-        await admin.from("chat_turn_charges").update({
-          status: "needs_reconciliation",
-          failure_code: "assistant_message_id_collision",
-          updated_at: new Date().toISOString(),
-        }).eq("turn_id", turnId).eq("user_id", user.id).eq("status", "reserved");
-        await admin.from("chat_turn_events").insert({
-          turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
-          stage: "persistence", error_code: "assistant_message_id_collision",
-        });
-        return json({ status: "needs_reconciliation", error: "assistant_message_id_collision", retryAllowed: false }, 409);
-      }
-
-      await admin.from("chat_turn_events").insert({
-        turn_id: turnId, user_id: user.id, event_type: "assistant_reply_saved",
-        stage: "persistence",
-      });
-      const { data: settled, error: settleError } = await admin.rpc("settle_chat_turn", {
-        p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
-      });
-      if (settleError) return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
-      return json({ status: settled, assistantMessage: possibleReply, recovered: true });
-    }
-
-    // The refund RPC locks the charge row and rechecks durable reply presence.
-    // The SQL draft's BEFORE INSERT trigger takes the same row lock, preventing
-    // a late assistant insert from racing past a successful refund.
-    const { data: refunded, error: refundError } = await admin.rpc("refund_chat_turn", {
+  // Persist the assistant reply and its durable generation identity atomically.
+  // The database RPC locks the charge row, inserts chat_messages first to satisfy
+  // the FK, then inserts ai_generation_records in the same transaction. Any
+  // constraint failure rolls back both writes; a retry cannot adopt a lone row.
+  const { data: persistenceResult, error: persistenceError } = await admin.rpc(
+    "persist_chat_turn_reply",
+    {
       p_user_id: user.id,
       p_turn_id: turnId,
+      p_session_id: sessionId,
+      p_user_message_id: userMessageId,
       p_assistant_message_id: assistantMessageId,
-      p_failure_code: "assistant_persistence_failed",
-    });
+      p_content: demoReply,
+    },
+  );
 
-    if (!refundError) {
-      const refundResult = Array.isArray(refunded) ? refunded[0] : refunded;
-      if (refundResult?.status === "refunded") {
-        await admin.from("chat_turn_events").insert({
-          turn_id: turnId, user_id: user.id, event_type: "refunded",
-          stage: "persistence", error_code: "assistant_persistence_failed",
-        });
-        return json({
-          status: "refunded",
-          balance: {
-            silver_coins: refundResult.balance_silver,
-            diamonds: refundResult.balance_diamonds,
-          },
-        }, 200);
-      }
+  let persistedAssistantMessage: { id: string; content: string; role: string } | null = null;
+  if (persistenceError) {
+    // The RPC response can be lost after a successful commit. Accept recovery
+    // only when both the reply row and exact durable turn identity can be read.
+    const { data: possibleReply, error: replyLookupError } = await admin
+      .from("chat_messages")
+      .select("id,session_id,role,content,deleted_at")
+      .eq("id", assistantMessageId)
+      .maybeSingle();
+    const identityResult = !replyLookupError && possibleReply &&
+      possibleReply.session_id === sessionId &&
+      possibleReply.role === "assistant" &&
+      possibleReply.deleted_at === null
+      ? await replyIdentityMatchesCurrentTurn(possibleReply.content)
+      : replyLookupError ? "unknown" : "mismatch";
+
+    if (identityResult === "match" && possibleReply) {
+      persistedAssistantMessage = {
+        id: possibleReply.id,
+        content: possibleReply.content,
+        role: possibleReply.role,
+      };
+    } else {
+      await admin.from("chat_turn_charges").update({
+        status: "needs_reconciliation",
+        failure_code: identityResult === "unknown"
+          ? "reply_persistence_outcome_unknown"
+          : "reply_persistence_identity_unverified",
+        updated_at: new Date().toISOString(),
+      }).eq("turn_id", turnId).eq("user_id", user.id)
+        .in("status", ["reserved", "needs_reconciliation"]);
+      await admin.from("chat_turn_events").insert({
+        turn_id: turnId,
+        user_id: user.id,
+        event_type: "needs_reconciliation",
+        stage: "atomic_reply_persistence",
+        error_code: identityResult === "unknown"
+          ? "reply_persistence_outcome_unknown"
+          : "reply_persistence_identity_unverified",
+      });
+      return json({
+        status: "needs_reconciliation",
+        error: identityResult === "unknown"
+          ? "reply_persistence_outcome_unknown"
+          : "reply_persistence_identity_unverified",
+        retryAllowed: false,
+      }, 503);
     }
-
-    // A concurrent insert may have won the charge-row lock. Re-read and settle
-    // only if the exact deterministic reply is now durable; otherwise keep the
-    // turn unresolved rather than refunding or claiming success.
-    const { data: finalReply, error: finalReplyError } = await admin
-      .from("chat_messages").select("id,content")
-      .eq("id", assistantMessageId).eq("session_id", sessionId)
-      .eq("role", "assistant").is("deleted_at", null).maybeSingle();
-
-    if (!finalReplyError && finalReply) {
-      const finalIdentityResult = await replyIdentityMatchesCurrentTurn(finalReply.content);
-      if (finalIdentityResult === "match") {
-        const { data: finalSettlement, error: finalSettlementError } = await admin.rpc("settle_chat_turn", {
-          p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
-        });
-        if (!finalSettlementError) {
-          return json({ status: finalSettlement, assistantMessage: finalReply, recovered: true });
-        }
-      } else {
-        const identityError = finalIdentityResult === "unknown"
-          ? "generation_record_lookup_failed"
-          : "assistant_message_id_collision";
-        await admin.from("chat_turn_events").insert({
-          turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
-          stage: "reply_identity", error_code: identityError,
-        });
-        return json({
-          status: "needs_reconciliation",
-          error: identityError,
-          retryAllowed: false,
-        }, finalIdentityResult === "unknown" ? 503 : 409);
-      }
+  } else {
+    const result = Array.isArray(persistenceResult)
+      ? persistenceResult[0]
+      : persistenceResult;
+    if (
+      !result ||
+      result.assistant_message_id !== assistantMessageId ||
+      typeof result.assistant_content !== "string" ||
+      !result.assistant_content.trim()
+    ) {
+      await admin.from("chat_turn_charges").update({
+        status: "needs_reconciliation",
+        failure_code: "reply_persistence_result_invalid",
+        updated_at: new Date().toISOString(),
+      }).eq("turn_id", turnId).eq("user_id", user.id)
+        .in("status", ["reserved", "needs_reconciliation"]);
+      return json({
+        status: "needs_reconciliation",
+        error: "reply_persistence_result_invalid",
+        retryAllowed: false,
+      }, 503);
     }
-
-    await admin.from("chat_turn_events").insert({
-      turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
-      stage: "persistence", error_code: refundError ? "refund_or_reply_outcome_unknown" : "assistant_persistence_failed",
-    });
-    return json({ status: "needs_reconciliation", retryAllowed: true }, 503);
+    persistedAssistantMessage = {
+      id: result.assistant_message_id,
+      content: result.assistant_content,
+      role: "assistant",
+    };
   }
 
   const { data: settled, error: settleError } = await admin.rpc("settle_chat_turn", {
@@ -485,7 +340,7 @@ Deno.serve(async (request) => {
 
   return json({
     status: settled,
-    assistantMessage: { id: assistantMessageId, content: demoReply, role: "assistant" },
+    assistantMessage: persistedAssistantMessage,
     billing: { cost: 2, silver_reserved: charge.silver_reserved, diamonds_reserved: charge.diamonds_reserved },
   });
 });
