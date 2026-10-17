@@ -142,3 +142,18 @@ The worker is a source-only draft and is safe only for the deterministic demo re
 | W16 | Inspect effective table privileges for `anon`, `authenticated`, and `service_role` on `public.chat_messages`; attempt anonymous reads/writes and authenticated `DELETE`/`TRUNCATE` in an isolated transaction | `anon` has no table privileges; `authenticated` retains only `SELECT`/`INSERT`/`UPDATE` needed by the current browser sync path; `DELETE`, `TRUNCATE`, `REFERENCES`, and `TRIGGER` are unavailable to browser roles; RLS and message guards still reject unauthorized row/role changes |
 
 These are required database integration tests, not assertions that have already passed. The hardened refund RPC must fail closed if any row occupies the expected assistant message ID, not only a visible non-empty assistant row in the expected session. Capture the pre-change refund function definition before applying the draft; the rollback sketch does not recreate that prior function body. Use separate database sessions for concurrency cases and verify charge rows, wallet balances, and wallet_transactions after both sessions complete.
+
+
+## Recovery ordering regression tests (CHAT-01-05; added 2026-10-17)
+
+These cases specifically guard against rejecting an already-reserved stable turn merely because its user message was soft-deleted before the retry. They remain **NOT RUN** until executed with disposable users and real authenticated JWTs against the test project.
+
+| Case | Setup / operation | Expected result |
+|---|---|---|
+| R1 | Reserve a turn successfully; soft-delete its user message; retry `chat-turn` with the exact same user/session/turn/assistant IDs | Existing charge state is returned idempotently; no second debit or charge row; existing account and active-session checks still apply |
+| R2 | Soft-delete a user message before first submission; submit a brand-new turn ID | Reject with `user_message_not_found`; transaction rolls back the provisional `created` row; wallet and transaction ledger remain unchanged |
+| R3 | Retry an existing turn using a different user, session, user-message ID, or expected assistant ID | Reject with `turn_id_reuse_conflict`; original charge and wallet remain unchanged |
+| R4 | Retry an existing reserved turn after its session is soft-deleted or account is marked for deletion | Reject before recovery; do not expose reply or permit further processing |
+| R5 | Retry a turn whose charge status is `settled`, `refunded`, `insufficient_funds`, or `needs_reconciliation` after soft-deleting the user message | Return the recorded status through the existing idempotent state path; do not reserve/debit again; downstream state-specific handling remains unchanged |
+| R6 | Concurrently retry the same turn while another request is reserving it, after the user message is soft-deleted | Charge-row lock serializes the requests; at most one reservation/debit occurs and neither request can substitute different stable IDs |
+
