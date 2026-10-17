@@ -4717,6 +4717,10 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         toast('已取消刪除申請，原帳號與錢包餘額已保留。');
         break;
       }
+      case 'group-message': {
+        await groupSendMock();
+        break;
+      }
       case 'message': {
         if (!s || !currentUser()) return;
         // Reuse the same turn IDs after an ambiguous response; never create a new
