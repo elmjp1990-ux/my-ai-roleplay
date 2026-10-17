@@ -225,6 +225,77 @@ Deno.serve(async (request) => {
     stage: "demo_generation",
   });
 
+  // Persist durable generation identity before the assistant message. Matching
+  // only the deterministic demo text is not sufficient: a reused assistant ID
+  // could otherwise make a different turn settle against an old identical reply.
+  const generationRecordPayload = {
+    user_id: user.id,
+    session_id: sessionId,
+    user_message_id: userMessageId,
+    assistant_message_id: assistantMessageId,
+    request_id: turnId,
+    original_content: demoReply,
+    status: "success",
+  };
+  const generationRecordMatches = (record: Record<string, unknown> | null | undefined) =>
+    !!record &&
+    record.user_id === user.id &&
+    record.session_id === sessionId &&
+    record.user_message_id === userMessageId &&
+    record.assistant_message_id === assistantMessageId &&
+    record.request_id === turnId &&
+    String(record.original_content || "").trim() === demoReply;
+
+  const { data: existingGenerationRecord, error: generationRecordLookupError } = await admin
+    .from("ai_generation_records")
+    .select("user_id,session_id,user_message_id,assistant_message_id,request_id,original_content")
+    .eq("assistant_message_id", assistantMessageId)
+    .maybeSingle();
+  if (generationRecordLookupError) {
+    return json({ status: "needs_reconciliation", error: "generation_record_lookup_failed", retryAllowed: false }, 503);
+  }
+  if (existingGenerationRecord && !generationRecordMatches(existingGenerationRecord)) {
+    await admin.from("chat_turn_charges").update({
+      status: "needs_reconciliation",
+      failure_code: "assistant_message_id_collision",
+      updated_at: new Date().toISOString(),
+    }).eq("turn_id", turnId).eq("user_id", user.id).eq("status", "reserved");
+    await admin.from("chat_turn_events").insert({
+      turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
+      stage: "generation_record", error_code: "assistant_message_id_collision",
+    });
+    return json({ status: "needs_reconciliation", error: "assistant_message_id_collision", retryAllowed: false }, 409);
+  }
+  if (!existingGenerationRecord) {
+    const { error: generationRecordInsertError } = await admin
+      .from("ai_generation_records")
+      .insert(generationRecordPayload);
+    if (generationRecordInsertError) {
+      // An insert response can be lost after the database committed. Re-read
+      // the stable assistant ID and accept only the exact same turn identity.
+      const { data: confirmedGenerationRecord, error: confirmGenerationRecordError } = await admin
+        .from("ai_generation_records")
+        .select("user_id,session_id,user_message_id,assistant_message_id,request_id,original_content")
+        .eq("assistant_message_id", assistantMessageId)
+        .maybeSingle();
+      if (confirmGenerationRecordError) {
+        return json({ status: "needs_reconciliation", error: "generation_record_write_outcome_unknown", retryAllowed: false }, 503);
+      }
+      if (!generationRecordMatches(confirmedGenerationRecord)) {
+        await admin.from("chat_turn_charges").update({
+          status: "needs_reconciliation",
+          failure_code: "generation_record_write_failed",
+          updated_at: new Date().toISOString(),
+        }).eq("turn_id", turnId).eq("user_id", user.id).eq("status", "reserved");
+        await admin.from("chat_turn_events").insert({
+          turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
+          stage: "generation_record", error_code: "generation_record_write_failed",
+        });
+        return json({ status: "needs_reconciliation", error: "generation_record_write_failed", retryAllowed: false }, 503);
+      }
+    }
+  }
+
   // Stable demo output: a repeated request uses the same assistantMessageId,
   // so it cannot create a second billable reply for this turn.
   const assistantRow = {
