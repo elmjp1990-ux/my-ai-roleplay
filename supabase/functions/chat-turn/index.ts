@@ -86,9 +86,12 @@ Deno.serve(async (request) => {
     .eq("id", userMessageId)
     .eq("session_id", sessionId)
     .eq("role", "user")
-    .is("deleted_at", null)
     .maybeSingle();
   if (messageError) return json({ error: "user_message_lookup_failed" }, 503);
+  // Soft-deleted messages may still belong to a previously reserved turn.
+  // Let reserve_chat_turn validate new turns, while existing turns follow the
+  // stable-ID/idempotent recovery path. Hard-deleted charged rows are blocked
+  // by the charge ledger's foreign key.
   if (!userMessage || !String(userMessage.content || "").trim()) {
     return json({ error: "user_message_not_found" }, 400);
   }
