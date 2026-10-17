@@ -296,6 +296,13 @@ with check (
 comment on policy chat_messages_insert_own on public.chat_messages is
   'Authenticated clients may insert only user-authored messages into their own active chat session. Assistant replies must be created by the trusted chat-turn server function.';
 
+-- Least-privilege table grants: browser clients require SELECT/INSERT/UPDATE
+-- for owned-session sync, user-message upsert, soft deletion, and assistant edits.
+-- RLS still enforces row ownership; anon has no supported chat-message path.
+-- TRUNCATE bypasses RLS, so never leave it available to browser roles.
+revoke all privileges on table public.chat_messages from anon;
+revoke delete, truncate, references, trigger on table public.chat_messages from authenticated;
+
 commit;
 
 -- ROLLBACK WARNING — NOT AN EXECUTABLE ROLLBACK SCRIPT.
