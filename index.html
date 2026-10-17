@@ -3071,12 +3071,20 @@ async function groupLoadList(force=false) {
     g.ownerUid=user.id;g.groups=data||[];g.groupPreviews={};
     if(g.groups.length) {
       const groupIds=g.groups.map(group=>group.id);
-      const {data:messages,error:messageError}=await window.mySupabase.from('chat_group_messages')
-        .select('group_id,content,speaker_type,created_at,sequence_no')
-        .in('group_id',groupIds).order('created_at',{ascending:false}).order('sequence_no',{ascending:false});
-      if(!messageError) {
-        for(const message of messages||[]) {
-          if(!g.groupPreviews[message.group_id]) g.groupPreviews[message.group_id]=message;
+      // Fetch at most one newest message per group. Batch requests to avoid an
+      // unbounded all-history read and to keep concurrent requests modest.
+      for(let i=0;i<groupIds.length;i+=10) {
+        const batchIds=groupIds.slice(i,i+10);
+        const previews=await Promise.all(batchIds.map(async groupId=>{
+          const {data:message,error:messageError}=await window.mySupabase.from('chat_group_messages')
+            .select('group_id,content,speaker_type,created_at,sequence_no')
+            .eq('group_id',groupId).order('created_at',{ascending:false})
+            .order('sequence_no',{ascending:false}).limit(1).maybeSingle();
+          if(messageError) throw messageError;
+          return [groupId,message||null];
+        }));
+        for(const [groupId,message] of previews) {
+          if(message) g.groupPreviews[groupId]=message;
         }
       }
     }
