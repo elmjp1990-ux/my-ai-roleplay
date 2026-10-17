@@ -123,8 +123,8 @@ Deno.serve(async (request) => {
 
   const demoReply = "**他將目光移向你，耐心等待你繼續說下去。**\n「我在聽，你可以慢慢說。」";
 
-  // Prefer durable generation identity over reply text. Real AI output is not
-  // deterministic; matching content to demoReply is only a legacy demo fallback.
+  // Durable generation identity is the only acceptable proof that a recovered
+  // assistant reply belongs to this turn; reply text is never an identity key.
   type ReplyIdentityResult = "match" | "mismatch" | "unknown";
   const replyIdentityMatchesCurrentTurn = async (content: unknown): Promise<ReplyIdentityResult> => {
     if (!String(content || "").trim()) return "mismatch";
