@@ -4471,24 +4471,28 @@ document.addEventListener('submit',async event => {
 
   // Prevent rapid double taps from creating multiple records while a request is pending.
   if (form.dataset.submitting === 'true') return;
-  form.dataset.submitting = 'true';
-  const submitButton = form.querySelector('button[type="submit"], button:not([type])');
-  const originalSubmitHTML = submitButton?.innerHTML;
-  const originalSubmitDisabled = submitButton?.disabled ?? false;
-  if (submitButton) {
-    submitButton.disabled = true;
-    const progressLabel = form.dataset.form === 'character'
-      ? (route.id ? '正在儲存…' : '正在建立角色…')
-      : '處理中…';
-    submitButton.innerHTML = '<span class="button-spinner" aria-hidden="true"></span>' + progressLabel;
-  }
-  form.setAttribute('aria-busy', 'true');
-  // Keep the form type available to the catch handler even if FormData construction fails.
-  const type=form.dataset.form;
+  let submitButton = null;
+  let originalSubmitHTML;
+  let originalSubmitDisabled = false;
+  let type;
 
   try {
-    // Include form-data extraction and route/session reads in the guarded block,
-    // so an unexpected setup error cannot leave the submit button locked forever.
+    // Guard all submit-state setup as well as form-data extraction. If setup throws,
+    // the finally block below can still release the lock and restore any saved button state.
+    form.dataset.submitting = 'true';
+    submitButton = form.querySelector('button[type="submit"], button:not([type])');
+    originalSubmitHTML = submitButton?.innerHTML;
+    originalSubmitDisabled = submitButton?.disabled ?? false;
+    type = form.dataset.form;
+    if (submitButton) {
+      submitButton.disabled = true;
+      const progressLabel = type === 'character'
+        ? (route.id ? '正在儲存…' : '正在建立角色…')
+        : '處理中…';
+      submitButton.innerHTML = '<span class="button-spinner" aria-hidden="true"></span>' + progressLabel;
+    }
+    form.setAttribute('aria-busy', 'true');
+
     const f=new FormData(form);
     const o=route.overlay || {};
     const s=currentSession();
