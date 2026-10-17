@@ -144,10 +144,10 @@ Deno.serve(async (request) => {
       return matches ? "match" : "mismatch";
     }
 
-    // The demo fallback is valid only for the known deterministic test reply.
-    // Once real AI is connected, every billable reply must have a durable
-    // generation record; arbitrary content without that record is not trusted.
-    return String(content) === demoReply ? "match" : "mismatch";
+    // Never infer turn ownership from reply text, even in the deterministic
+    // demo. A recovered reply without its durable generation identity could
+    // be an old message with identical content, so it must not be settled.
+    return "mismatch";
   };
 
   if (charge.status === "insufficient_funds") {
