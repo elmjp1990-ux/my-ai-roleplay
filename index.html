@@ -759,6 +759,10 @@ button:disabled .button-spinner{opacity:.9}
     if (route?.page === 'conversation') route = {page:'home'};
   }
 
+  // 避免 getSession() 與 onAuthStateChange(INITIAL_SESSION) 同時觸發相同帳號的整批雲端載入。
+  // 此變數每次頁面載入都會重設，確保本機已有登入資料時仍會在首次驗證後同步。
+  let lastSupabaseDataSyncUid = null;
+
   function syncSupabaseUser(user) {
     if (typeof state === 'undefined') {
       window.__pendingSupabaseUser = user || null;
@@ -766,6 +770,7 @@ button:disabled .button-spinner{opacity:.9}
     }
 
     if (!user) {
+      lastSupabaseDataSyncUid = null;
       isolateSessionsForUser(null);
       pendingDeletionWalletSyncUid = null;
       state.signedIn = false;
@@ -819,11 +824,15 @@ button:disabled .button-spinner{opacity:.9}
     if (wasPendingDeletion) pendingDeletionWalletSyncUid = user.id;
 
     persist();
-    // 真實會員資料與錢包由資料庫載入；不可把 user_metadata 當成正式餘額。
-    void loadSupabaseProfileAndWallet(user);
-    void loadPublicSupabaseCharacters();
-    void loadSupabaseCharacters(user);
+    // 首次驗證此帳號時載入雲端資料；避免 INITIAL_SESSION／TOKEN_REFRESHED 等重複事件
+    // 同時觸發昂貴的角色清單查詢，導致 Supabase SELECT timeout 與畫面誤報。
+    if (lastSupabaseDataSyncUid !== user.id) {
+      lastSupabaseDataSyncUid = user.id;
+      void loadSupabaseProfileAndWallet(user);
+      void loadPublicSupabaseCharacters();
+      void loadSupabaseCharacters(user);
       void loadCloudChatSessions(user);
+    }
 
     // OAuth 返回後，不要把使用者留在登入遮罩；回到登入前想去的頁面。
     const next = localStorage.getItem('personaX_login_next');
