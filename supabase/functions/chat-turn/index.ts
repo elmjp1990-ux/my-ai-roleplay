@@ -130,7 +130,7 @@ Deno.serve(async (request) => {
     if (!String(content || "").trim()) return "mismatch";
     const { data: generationRecord, error: generationRecordError } = await admin
       .from("ai_generation_records")
-      .select("user_id,session_id,user_message_id,assistant_message_id,original_content")
+      .select("user_id,session_id,user_message_id,assistant_message_id,request_id,original_content")
       .eq("assistant_message_id", assistantMessageId)
       .maybeSingle();
 
@@ -140,6 +140,7 @@ Deno.serve(async (request) => {
         generationRecord.session_id === sessionId &&
         generationRecord.user_message_id === userMessageId &&
         generationRecord.assistant_message_id === assistantMessageId &&
+        generationRecord.request_id === turnId &&
         String(generationRecord.original_content || "").trim().length > 0;
       return matches ? "match" : "mismatch";
     }
