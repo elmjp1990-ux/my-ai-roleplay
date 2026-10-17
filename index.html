@@ -4418,6 +4418,21 @@ document.addEventListener('submit',async event => {
   const form=event.target.closest('[data-form]');
   if (!form) return;
   event.preventDefault();
+
+  // Prevent rapid double taps from creating multiple records while a request is pending.
+  if (form.dataset.submitting === 'true') return;
+  form.dataset.submitting = 'true';
+  const submitButton = form.querySelector('button[type="submit"], button:not([type])');
+  const originalSubmitHTML = submitButton?.innerHTML;
+  const originalSubmitDisabled = submitButton?.disabled ?? false;
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = form.dataset.form === 'character'
+      ? (route.id ? '正在儲存…' : '正在建立角色…')
+      : '處理中…';
+  }
+  form.setAttribute('aria-busy', 'true');
+
   const f=new FormData(form);
   const type=form.dataset.form;
   const o=route.overlay || {};
@@ -4777,6 +4792,13 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
       `);
     } else {
       toast(error.message || '儲存未完成。');
+    }
+  } finally {
+    form.dataset.submitting = 'false';
+    form.removeAttribute('aria-busy');
+    if (submitButton) {
+      submitButton.disabled = originalSubmitDisabled;
+      if (originalSubmitHTML !== undefined) submitButton.innerHTML = originalSubmitHTML;
     }
   }
 });
