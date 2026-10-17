@@ -89,12 +89,10 @@ begin
     where s.id = p_session_id and s.user_id = p_user_id and s.deleted_at is null
   ) then raise exception 'chat_session_not_owned_or_active'; end if;
 
-  if not exists (
-    select 1 from public.chat_messages m
-    where m.id = p_user_message_id and m.session_id = p_session_id
-      and m.role = 'user' and m.deleted_at is null
-  ) then raise exception 'user_message_not_found'; end if;
-
+  -- Create-or-find the stable turn before checking whether its user message
+  -- is still visible. A retry may arrive after that message was soft-deleted.
+  -- Existing turns must first pass ownership and all stable-ID checks, then
+  -- return their recorded state without reserving or charging a second time.
   insert into public.chat_turn_charges(turn_id,user_id,session_id,user_message_id,expected_assistant_message_id,cost,status)
   values (p_turn_id,p_user_id,p_session_id,p_user_message_id,p_assistant_message_id,2,'created')
   on conflict (turn_id) do nothing;
@@ -104,6 +102,7 @@ begin
   where c.turn_id = p_turn_id
   for update;
 
+  if not found then raise exception 'turn_not_found'; end if;
   if v_charge.user_id <> p_user_id
      or v_charge.session_id <> p_session_id
      or v_charge.user_message_id <> p_user_message_id
@@ -118,6 +117,14 @@ begin
       v_charge.silver_reserved, v_charge.diamonds_reserved, v_silver, v_diamonds;
     return;
   end if;
+
+  -- Only a turn that has not reserved funds may proceed as a new reservation.
+  -- A soft-deleted or missing user message therefore cannot start a new charge.
+  if not exists (
+    select 1 from public.chat_messages m
+    where m.id = p_user_message_id and m.session_id = p_session_id
+      and m.role = 'user' and m.deleted_at is null
+  ) then raise exception 'user_message_not_found'; end if;
 
   select w.* into v_wallet
   from public.wallet_accounts w where w.user_id = p_user_id for update;
