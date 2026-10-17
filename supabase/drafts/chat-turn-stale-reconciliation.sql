@@ -54,13 +54,42 @@ begin
           and m.deleted_at is null
           and length(btrim(coalesce(m.content, ''))) > 0
       ) then
-        v_result := public.settle_chat_turn(
-          v_charge.user_id,
-          v_charge.turn_id,
-          v_charge.expected_assistant_message_id
-        );
-        if v_result = 'settled' then
-          v_settled := v_settled + 1;
+        -- A stored assistant row is not enough to prove which turn generated it.
+        -- Require the durable generation record to match every turn identifier
+        -- before settling; otherwise leave the reservation for manual/retry reconciliation.
+        if exists (
+          select 1
+          from public.ai_generation_records g
+          where g.user_id = v_charge.user_id
+            and g.session_id = v_charge.session_id
+            and g.user_message_id = v_charge.user_message_id
+            and g.assistant_message_id = v_charge.expected_assistant_message_id
+            and g.request_id = v_charge.turn_id
+            and length(btrim(coalesce(g.original_content, ''))) > 0
+        ) then
+          v_result := public.settle_chat_turn(
+            v_charge.user_id,
+            v_charge.turn_id,
+            v_charge.expected_assistant_message_id
+          );
+          if v_result = 'settled' then
+            v_settled := v_settled + 1;
+          end if;
+        else
+          update public.chat_turn_charges
+          set status = 'needs_reconciliation',
+              failure_code = 'assistant_reply_identity_unverified',
+              updated_at = now()
+          where turn_id = v_charge.turn_id
+            and user_id = v_charge.user_id
+            and status in ('reserved', 'needs_reconciliation');
+          insert into public.chat_turn_events(
+            turn_id, user_id, event_type, stage, error_code
+          ) values (
+            v_charge.turn_id, v_charge.user_id, 'needs_reconciliation',
+            'stale_demo_reconciliation', 'assistant_reply_identity_unverified'
+          );
+          v_failed := v_failed + 1;
         end if;
       else
         perform public.refund_chat_turn(
