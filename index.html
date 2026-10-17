@@ -4483,12 +4483,13 @@ document.addEventListener('submit',async event => {
     submitButton.innerHTML = '<span class="button-spinner" aria-hidden="true"></span>' + progressLabel;
   }
   form.setAttribute('aria-busy', 'true');
+  // Keep the form type available to the catch handler even if FormData construction fails.
+  const type=form.dataset.form;
 
   try {
     // Include form-data extraction and route/session reads in the guarded block,
     // so an unexpected setup error cannot leave the submit button locked forever.
     const f=new FormData(form);
-    const type=form.dataset.form;
     const o=route.overlay || {};
     const s=currentSession();
     const text=String(f.get('text') || '').trim();
