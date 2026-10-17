@@ -2819,13 +2819,54 @@ function updateAICost() {
   $('aiSubmit').disabled = Number(currentUser()?.diamonds || 0) < cost;
 }
 async function readImage(file) {
-  if (!file || !['image/png','image/jpeg','image/webp'].includes(file.type)) throw Error('請選擇PNG、JPG或WebP。');
-  return await new Promise((resolve,reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(Error('圖片讀取失敗。'));
-    reader.readAsDataURL(file);
-  });
+  if (!file || !['image/png','image/jpeg','image/webp'].includes(file.type)) {
+    throw Error('請選擇PNG、JPG或WebP。');
+  }
+  if (file.size > 15 * 1024 * 1024) {
+    throw Error('原始圖片超過15 MB，請先縮小圖片再上傳。');
+  }
+
+  // 圖片以 Data URL 儲存在角色資料中；未壓縮的手機照片容易超過
+  // localStorage 容量，導致儲存失敗，刷新後本機資料看起來全部消失。
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise((resolve,reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(Error('圖片讀取失敗，請換一張圖片再試。'));
+      img.src = objectUrl;
+    });
+    const maxWidth = 1200;
+    const maxHeight = 1500;
+    const baseScale = Math.min(1, maxWidth / image.naturalWidth, maxHeight / image.naturalHeight);
+    const canvas = document.createElement('canvas');
+
+    for (const scaleFactor of [1, 0.82, 0.66]) {
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * baseScale * scaleFactor));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * baseScale * scaleFactor));
+      const context = canvas.getContext('2d');
+      if (!context) throw Error('瀏覽器無法處理這張圖片，請換一張再試。');
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+      for (const quality of [0.82, 0.72, 0.62]) {
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+        if (!blob) throw Error('圖片壓縮失敗，請換一張圖片再試。');
+        if (blob.size <= 850 * 1024) {
+          return await new Promise((resolve,reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(Error('壓縮後的圖片讀取失敗。'));
+            reader.readAsDataURL(blob);
+          });
+        }
+      }
+    }
+    throw Error('圖片仍然太大，請選擇尺寸較小的圖片。');
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
 
 /* Chat sessions: character identity stays separate from conversation identity. */
