@@ -1070,9 +1070,19 @@ button:disabled .button-spinner{opacity:.9}
     }
   }
 
-  async function loadSupabaseCharacters(user) {
+  async function loadSupabaseCharacters(user, retryAttempt = 0) {
     const client = window.mySupabase;
-    if (!client || !user?.id) return;
+    if (!user?.id) return;
+    if (!client) {
+      // Auth callback 有機會早於 Supabase client 初始化；不要讓 UID 去重鎖永久阻止角色同步。
+      if (state.account?.uid === user.id) {
+        lastSupabaseDataSyncUid = null;
+        setTimeout(() => {
+          if (window.mySupabase && state.account?.uid === user.id) syncSupabaseUser(user);
+        }, 800);
+      }
+      return;
+    }
     try {
       const { data: authResult, error: authError } = await client.auth.getUser();
       if (authError || authResult?.user?.id !== user.id) return;
@@ -1206,8 +1216,17 @@ const ids = (rows || []).map(row => row.id);
       }
     } catch (error) {
       console.error('PersonaX 雲端角色載入失敗：', error);
-      if (state.account?.uid === user.id) {
-        toast('登入成功，但雲端角色載入失敗：' + error.message);
+      if (state.account?.uid === user.id && retryAttempt < 1) {
+        // 雲端查詢偶發 timeout／初始化競態時，短暫等待後重試整個讀取流程一次。
+        // 不清除現有角色；成功後以雲端資料合併，避免短暫失敗被誤認為角色已消失。
+        console.warn('角色雲端同步將自動重試一次。');
+        setTimeout(() => {
+          if (state.account?.uid === user.id) void loadSupabaseCharacters(user, retryAttempt + 1);
+        }, 1200);
+      } else if (state.account?.uid === user.id) {
+        // 最終仍失敗時允許後續 auth 事件重新觸發同步，而不是永久鎖住此 UID。
+        lastSupabaseDataSyncUid = null;
+        toast('登入成功，但雲端角色載入失敗：' + error.message + '。可重新整理頁面再試。');
       }
     }
   }
