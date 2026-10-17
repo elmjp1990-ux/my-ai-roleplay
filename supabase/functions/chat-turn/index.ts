@@ -267,6 +267,30 @@ Deno.serve(async (request) => {
     return json({ status: "needs_reconciliation", error: "assistant_message_id_collision", retryAllowed: false }, 409);
   }
   if (!existingGenerationRecord) {
+    // Never claim an already-existing assistant row for a new turn. This
+    // closes the collision case where identical demo text could otherwise
+    // be paired with a newly inserted generation record after the fact.
+    const { data: preexistingAssistantRow, error: preexistingAssistantLookupError } = await admin
+      .from("chat_messages")
+      .select("id")
+      .eq("id", assistantMessageId)
+      .maybeSingle();
+    if (preexistingAssistantLookupError) {
+      return json({ status: "needs_reconciliation", error: "assistant_message_lookup_failed", retryAllowed: false }, 503);
+    }
+    if (preexistingAssistantRow) {
+      await admin.from("chat_turn_charges").update({
+        status: "needs_reconciliation",
+        failure_code: "assistant_message_id_collision",
+        updated_at: new Date().toISOString(),
+      }).eq("turn_id", turnId).eq("user_id", user.id).eq("status", "reserved");
+      await admin.from("chat_turn_events").insert({
+        turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
+        stage: "generation_record", error_code: "assistant_message_id_collision",
+      });
+      return json({ status: "needs_reconciliation", error: "assistant_message_id_collision", retryAllowed: false }, 409);
+    }
+
     const { error: generationRecordInsertError } = await admin
       .from("ai_generation_records")
       .insert(generationRecordPayload);
