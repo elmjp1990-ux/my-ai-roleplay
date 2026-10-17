@@ -667,6 +667,9 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 .group-member-details{margin-top:10px;padding-top:9px;border-top:1px solid var(--border);font-size:13px;line-height:1.65;overflow-wrap:anywhere}
 .group-member-details[hidden]{display:none}
 .group-member-card button{min-width:0}
+.button-spinner{display:inline-block;width:14px;height:14px;margin-right:8px;vertical-align:-2px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:button-spinner-rotate .7s linear infinite}
+button:disabled .button-spinner{opacity:.9}
+@keyframes button-spinner-rotate{to{transform:rotate(360deg)}}
 @media(max-width:560px){.group-panel{padding:14px}.group-steps{font-size:12px}.group-member-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.group-member-card{padding:8px}.group-member-avatar{width:40px;height:40px;flex-basis:40px;border-radius:10px}.group-member-name{font-size:13px}.group-member-head{gap:7px}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -4427,9 +4430,10 @@ document.addEventListener('submit',async event => {
   const originalSubmitDisabled = submitButton?.disabled ?? false;
   if (submitButton) {
     submitButton.disabled = true;
-    submitButton.textContent = form.dataset.form === 'character'
+    const progressLabel = form.dataset.form === 'character'
       ? (route.id ? '正在儲存…' : '正在建立角色…')
       : '處理中…';
+    submitButton.innerHTML = '<span class="button-spinner" aria-hidden="true"></span>' + progressLabel;
   }
   form.setAttribute('aria-busy', 'true');
 
