@@ -1138,10 +1138,12 @@ const ids = (rows || []).map(row => row.id);
           .eq('author_id', user.id)
           .in('character_id', ids);
         if (privateInfoResult.error) {
-          throw new Error('讀取角色隱藏設定失敗：' + privateInfoResult.error.message);
-        }
-        for (const item of privateInfoResult.data || []) {
-          privateInfoById.set(item.character_id, item.private_info || '');
+          // 隱藏設定是角色的附屬資料；其查詢失敗不能讓整份角色清單消失。
+          console.warn('角色隱藏設定載入失敗，先保留角色並沿用本機內容：', privateInfoResult.error.message);
+        } else {
+          for (const item of privateInfoResult.data || []) {
+            privateInfoById.set(item.character_id, item.private_info || '');
+          }
         }
       }
       // 私密角色不會經過公開角色載入器；在作者自己的角色載入流程也補齊作者 profile。
@@ -1170,8 +1172,12 @@ const ids = (rows || []).map(row => row.id);
           .select('id, character_id, story_name, description, opening_message, visibility, created_at')
           .in('character_id', ids)
           .order('created_at', { ascending: false });
-        if (result.error) throw new Error('讀取雲端角色故事失敗：' + result.error.message);
-        stories = result.data || [];
+        if (result.error) {
+          // 故事／開場白屬於附屬資料；讀取失敗時仍顯示角色本體及本機已保存的開場白。
+          console.warn('雲端角色故事載入失敗，先保留角色清單：', result.error.message);
+        } else {
+          stories = result.data || [];
+        }
       }
       const latestStory = new Map();
       for (const story of stories) {
