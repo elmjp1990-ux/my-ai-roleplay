@@ -1042,13 +1042,19 @@ button:disabled .button-spinner{opacity:.9}
         if (!latestStory.has(story.character_id)) latestStory.set(story.character_id, story);
       }
 
-      const publicCharacters = (rows || []).map(row => {
+      const publicCharacters = await Promise.all((rows || []).map(async row => {
         const story = latestStory.get(row.id);
+        let image = row.avatar_url || '';
+        try {
+          image = await compactCharacterImage(image);
+        } catch (imageError) {
+          console.warn('公開角色圖片壓縮失敗，暫時使用原圖：', row.name, imageError);
+        }
         return {
           id: row.id, name: row.name || '未命名角色',
           gender: row.gender || 'ambiguous',
           age: row.age == null ? '' : String(row.age),
-          image: row.avatar_url || '', visibility: 'public',
+          image, visibility: 'public',
           reviewStatus: row.review_status, intro: row.intro || '',
           opening: story?.opening_message || '', race: row.race || '',
           privateInfo: '', style: row.style || '',
@@ -1060,7 +1066,7 @@ button:disabled .button-spinner{opacity:.9}
           latestEligible: row.latest_eligible !== false,
           rightsConfirmed: false, cloudPublic: true
         };
-      });
+      }));
 
       // 若請求期間登入帳號改變，丟棄舊請求結果，避免過期資料覆寫目前帳號的角色。
       const currentUid = state.account?.uid || null;
@@ -1113,6 +1119,22 @@ button:disabled .button-spinner{opacity:.9}
       if (error) throw new Error('讀取雲端角色失敗：' + error.message);
 
       if (state.account?.uid !== user.id) return;
+      // 先壓縮舊版雲端中的超大 Data URL，並回寫目前帳號自己的角色，修復已存在的超大圖片。
+      rows = await Promise.all((rows || []).map(async row => {
+        if (!row.avatar_url || !row.avatar_url.startsWith('data:image/') || row.avatar_url.length < 350000) return row;
+        try {
+          const compactImage = await compactCharacterImage(row.avatar_url);
+          if (compactImage !== row.avatar_url && row.author_id === user.id) {
+            const { error: imageUpdateError } = await client.from('characters')
+              .update({avatar_url:compactImage}).eq('id',row.id).eq('author_id',user.id);
+            if (imageUpdateError) console.warn('角色圖片已在本機縮小，但雲端圖片壓縮回寫失敗：', row.name, imageUpdateError.message);
+          }
+          return {...row, avatar_url:compactImage};
+        } catch (imageError) {
+          console.warn('角色圖片壓縮失敗，暫時保留原圖：', row.name, imageError);
+          return row;
+        }
+      }));
       const localOwned = state.characters.filter(c => c.authorId === user.id && c.id);
       const cloudIdsBeforeMigration = new Set((rows || []).map(row => row.id));
       const localOnly = localOwned.filter(c => !cloudIdsBeforeMigration.has(c.id));
@@ -1734,6 +1756,43 @@ function persist() {
     toast('儲存失敗，請檢查瀏覽器儲存空間或縮小圖片。');
     return false;
   }
+}
+
+// 舊版角色可能已將數 MB 的原始圖片存進 Supabase；載入時先縮圖，避免整份 state 超過 localStorage 配額。
+async function compactCharacterImage(dataUrl, maxBytes = 240 * 1024) {
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/') || dataUrl.length < 350000) {
+    return dataUrl || '';
+  }
+  const img = await new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('既有角色圖片無法讀取，暫時保留原圖。'));
+    image.src = dataUrl;
+  });
+  const scale = Math.min(1, 1000 / img.naturalWidth, 1250 / img.naturalHeight);
+  const canvas = document.createElement('canvas');
+  for (const factor of [1, 0.82, 0.66, 0.5, 0.38]) {
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale * factor));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale * factor));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('瀏覽器無法壓縮既有角色圖片。');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    for (const quality of [0.72, 0.58, 0.45, 0.35]) {
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+      if (!blob) continue;
+      if (blob.size <= maxBytes) {
+        return await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error('讀取壓縮圖片失敗。'));
+          reader.readAsDataURL(blob);
+        });
+      }
+    }
+  }
+  throw new Error('既有角色圖片壓縮後仍超過本機儲存上限。');
 }
 
 // 僅在網址明確帶上 ?chatDataTest=1 時顯示無成本測試控制項。
@@ -2861,7 +2920,7 @@ async function readImage(file) {
       for (const quality of [0.82, 0.72, 0.62]) {
         const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
         if (!blob) throw Error('圖片壓縮失敗，請換一張圖片再試。');
-        if (blob.size <= 850 * 1024) {
+        if (blob.size <= 240 * 1024) {
           return await new Promise((resolve,reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result);
