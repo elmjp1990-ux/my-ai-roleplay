@@ -573,7 +573,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .panel { padding:18px; }
   .mobile-nav {
     display:grid;
-    grid-template-columns:repeat(6,minmax(0,1fr));
+    grid-template-columns:repeat(5,minmax(0,1fr));
     position:fixed;
     bottom:0;
     left:0;
@@ -2301,7 +2301,7 @@ function renderShell() {
     : ['detail','session-detail'].includes(route.page) ? 'home'
     : route.page === 'group' ? 'group' : route.page;
   const labels = [
-    ['home','探索角色'],['chat','開始暢聊'],['group','群組聊天'],['create','創建角色'],
+    ['home','探索角色'],['chat','開始暢聊'],['create','創建角色'],
     ['notifications','系統通知'],['favorites','喜愛角色']
   ];
   const html = labels.map(([page,label]) => `
@@ -2313,7 +2313,7 @@ function renderShell() {
   $('mobileNav').innerHTML = html;
 
   const titles = {
-    home:'探索角色',chat:'開始暢聊',conversation:'開始暢聊',group:'群組聊天（測試）',
+    home:'探索角色',chat:'開始暢聊',conversation:'開始暢聊',group:'群組聊天',
     create:'創建角色',editor:'編輯角色',ai:'AI 創建',
     notifications:'系統通知',favorites:'喜愛角色',
     profile:'個人帳號',author:'作者主頁',detail:'角色介紹',
@@ -2888,7 +2888,10 @@ function chatListHTML() {
   return `<aside class="panel chat-list">
     <div class="list-top"><button class="ghost" data-action="list-menu">☰ 全部</button>
       <span class="small muted">聊天列表</span></div>
-    <input id="chatSearch" value="${e(chatSearch)}" placeholder="搜尋角色或回憶名稱">
+    <div class="row" style="gap:8px;margin-bottom:12px">
+      <input id="chatSearch" value="${e(chatSearch)}" placeholder="搜尋角色或回憶名稱" aria-label="搜尋角色或回憶名稱">
+      <button class="primary" type="button" data-action="nav" data-page="group" aria-label="建立群組聊天" title="建立群組聊天" style="flex:0 0 auto;min-width:42px;padding:10px 13px">＋</button>
+    </div>
     <div id="chatEntries">${chatEntries()}</div>
   </aside>`;
 }
@@ -3646,7 +3649,7 @@ function renderModal(o) {
         <button style="width:100%;margin-top:12px" data-action="nav" data-page="chat">查看全部對話</button>`);
       break;
     case 'group':
-      showDialog('創建群組','<p>群組功能將限定月費會員使用，目前尚未接入會員驗證與多角色聊天。</p>');
+      visit('group');
       break;
     case 'session-menu':
     case 'chat-settings': {
