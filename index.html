@@ -3047,7 +3047,7 @@ async function groupOpen(groupId) {
       window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,created_at,updated_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position'),
-      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,content,created_at').eq('group_id',groupId).order('created_at',{ascending:true}).order('sequence_no',{ascending:true})
+      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).order('created_at',{ascending:true}).order('sequence_no',{ascending:true})
     ]);
     const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error;
     if(error) throw error;
@@ -3060,12 +3060,15 @@ async function groupOpen(groupId) {
       const avatarRes=await window.mySupabase.from('characters').select('id,avatar_url').in('id',characterIds);
       if(!avatarRes.error) avatarById=Object.fromEntries((avatarRes.data||[]).map(x=>[x.id,x.avatar_url||'']));
     }
-    const members=memberRows.map(m=>({...m.character_snapshot,id:m.character_id,characterId:m.character_id,avatar_url:avatarById[m.character_id]||'',position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'}));
+    const members=memberRows.map(m=>{const snapshot=m.character_snapshot||{};const characterId=m.character_id||null;const snapshotId=snapshot.id||characterId||null;const displayId=characterId||snapshotId||m.id;return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,avatar_url:avatarById[characterId]||'',position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};});
     groupExpandedMemberId=null;
     const messages=(messageRes.data||[]).map(m=>{
-      const member=members.find(x=>x.characterId===m.character_id);
-      const scene=scenes.find(x=>x.id===m.scene_id);
-      return {id:m.id,type:m.speaker_type==='user'?'user':m.speaker_type==='system'?'system':'character',speaker:m.speaker_type==='user'?'你':(member?.name||'角色')+(scene?' · '+scene.name:''),content:m.content,createdAt:m.created_at};
+      const speakerSnapshot=m.speaker_snapshot||{};
+      const member=members.find(x=>x.characterId===m.character_id)||members.find(x=>x.characterSnapshotId===speakerSnapshot.id||x.id===speakerSnapshot.id);
+      const scene=scenes.find(s=>s.id===m.scene_id);
+      const type=m.speaker_type==='user'?'user':m.speaker_type==='system'?'system':'character';
+      const speaker=type==='user'?'你':type==='system'?'系統':(speakerSnapshot.name||member?.name||'角色')+(scene?' · '+scene.name:'');
+      return {id:m.id,type,speaker,content:m.content,createdAt:m.created_at};
     });
     g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,scenes,members};
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;g.formError='';
@@ -3088,9 +3091,9 @@ function renderGroupPrototype() {
     const memberCards=g.active.members.map(m=>{
       const avatar=String(m.avatar_url||'');
       const safeAvatar=avatar.startsWith('https://')||avatar.startsWith('http://');
-      const expanded=groupExpandedMemberId===m.characterId;
+      const expanded=groupExpandedMemberId===(m.characterId||m.displayId||m.id);
       const detail=[m.intro||'',m.style?'風格：'+m.style:'',m.age?'年齡：'+m.age:'',m.gender?'性別：'+m.gender:'',Array.isArray(m.tags)&&m.tags.length?'標籤：'+m.tags.join('、'):''].filter(Boolean).map(e).join('<br>');
-      return '<article class="group-member-card"><button class="ghost group-member-head" data-action="group-toggle-member" data-id="'+e(m.characterId)+'" aria-expanded="'+expanded+'"><span class="group-member-avatar">'+(safeAvatar?'<img src="'+e(avatar)+'" alt="" loading="lazy">':e(String(m.name||'角').trim().slice(0,1)||'角'))+'</span><span class="group-member-name" title="'+e(m.name||'角色')+'">'+e(m.name||'角色')+'</span></button><div class="group-member-details" '+(expanded?'':'hidden')+'>'+ (detail||'尚無角色補充資料')+'</div></article>';
+      return '<article class="group-member-card"><button class="ghost group-member-head" data-action="group-toggle-member" data-id="'+e(m.characterId||m.displayId||m.id)+'" aria-expanded="'+expanded+'"><span class="group-member-avatar">'+(safeAvatar?'<img src="'+e(avatar)+'" alt="" loading="lazy">':e(String(m.name||'角').trim().slice(0,1)||'角'))+'</span><span class="group-member-name" title="'+e(m.name||'角色')+'">'+e(m.name||'角色')+'</span></button><div class="group-member-details" '+(expanded?'':'hidden')+'>'+ (detail||'尚無角色補充資料')+'</div></article>';
     }).join('');
     $('view').innerHTML='<div class="group-wizard"><div class="row between wrap"><div><h1>'+e(g.active.name)+'</h1><p class="muted">群組聊天 · 持久化 Mock 導演模式</p></div><button data-action="group-list">返回群組清單</button></div><div class="group-panel"><div class="group-alert">訊息已保存於測試 Supabase。回覆由固定 Mock 導演產生，不呼叫 AI、不扣款。</div><p><strong>世界背景：</strong>'+e(g.active.world||'（未設定）')+'</p><p><strong>場景模式：</strong>'+(g.active.mode==='shared'?'共用場景':'分開場景')+' · '+g.active.members.length+' 名角色</p><h3>群組角色</h3><div class="group-member-grid">'+memberCards+'</div><div class="group-chat-log">'+g.messages.map(m=>'<div class="group-bubble '+(m.type==='user'?'user':'')+'"><small>'+e(m.speaker)+'</small>'+e(m.content)+'</div>').join('')+'</div><div class="error" role="alert" aria-live="polite">'+e(g.formError)+'</div><label class="group-field"><span>輸入訊息</span><textarea id="groupMessageInput" maxlength="2000" placeholder="輸入故事內容" '+((g.sending||g.pendingRequest?.groupId===g.active.id)?'disabled':'')+'>'+e(g.pendingRequest?.groupId===g.active.id?g.pendingRequest.content:'')+'</textarea></label><div class="group-actions"><span class="muted small">'+g.turn+' 個已保存回合</span><button class="primary" data-action="group-send" '+(g.sending?'disabled':'')+'>'+(g.sending?'正在保存…':g.pendingRequest?.groupId===g.active.id?'重試保存同一訊息':'送出給 Mock 導演')+'</button></div></div></div>';
     return;
