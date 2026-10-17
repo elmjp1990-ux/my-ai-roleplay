@@ -3044,6 +3044,8 @@ function groupFriendlyError(error) {
 }
 async function groupLoadList(force=false) {
   const g=groupPrototype;
+  // Clear a prior account's cached group rows before rendering the shared chat list.
+  groupResetForAccount(currentUser()?.uid||null);
   if(g.loadingGroups||(!force&&g.groupsLoaded)) return;
   g.loadingGroups=true;g.loadError='';
   if(!window.mySupabase) {
