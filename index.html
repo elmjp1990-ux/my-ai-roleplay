@@ -1783,7 +1783,7 @@ function isUuid(value) {
 function chatSessionData(s) {
   return {
     name:s.name || '', archived:!!s.archived, hidden:!!s.hidden,
-    pinned:!!s.pinned, persona:s.persona || '',
+    pinned:!!s.pinned, persona:s.persona || '', personaCustom: s.personaCustom === true || (s.personaCustom !== false && !!s.persona),
     suggestions:s.suggestions !== false, background:s.background || 'avatar',
     startedAt:s.startedAt || Date.now(), archivedAt:s.archivedAt || null,
     memories:Array.isArray(s.memories) ? s.memories : [],
@@ -1994,6 +1994,7 @@ async function loadCloudChatSessions(user) {
         hidden:data.hidden === true, pinned:data.pinned === true,
         startedAt:Number(data.startedAt) || (row.created_at ? new Date(row.created_at).getTime() : Date.now()),
         archivedAt:data.archivedAt || null, persona:data.persona || '',
+        personaCustom: data.personaCustom === true || (data.personaCustom !== false && !!data.persona),
         suggestions:data.suggestions !== false, background:data.background || 'avatar',
         memories:Array.isArray(data.memories) ? data.memories : [],
         album:Array.isArray(data.album) ? data.album : [],
@@ -3923,10 +3924,12 @@ function renderModal(o) {
       if (!s) return;
       {
         const defaultPersona=(Array.isArray(currentUser()?.personas)?currentUser().personas:[]).find(item=>item.isDefault);
-        const initialPersona=Object.prototype.hasOwnProperty.call(o,'draftPersona') ? String(o.draftPersona || '') : (s.persona || defaultPersona?.text || '');
+        // 未手動儲存的聊天永遠跟隨目前預設人設；手動儲存的聊天保留自己的內容。
+        const hasCustomPersona=s.personaCustom === true || (s.personaCustom !== false && !!s.persona);
+        const initialPersona=Object.prototype.hasOwnProperty.call(o,'draftPersona') ? String(o.draftPersona || '') : (hasCustomPersona ? (s.persona || '') : (defaultPersona?.text || ''));
         showDialog('專屬人設',`
           <form data-form="persona">
-            ${!s.persona && !Object.prototype.hasOwnProperty.call(o,'draftPersona') && defaultPersona ? `<p class="small" style="color:var(--primary)">已帶入預設人設：${e(defaultPersona.name)}</p>` : ''}
+            ${!hasCustomPersona && !Object.prototype.hasOwnProperty.call(o,'draftPersona') && defaultPersona ? `<p class="small" style="color:var(--primary)">已帶入預設人設：${e(defaultPersona.name)}</p>` : ''}
             <textarea name="persona" maxlength="1000">${e(initialPersona)}</textarea>
             <p class="small muted">最多 1000 字。</p>
             <div class="row wrap"><button type="button" data-action="persona-choose">選擇其他人設</button><button type="submit" class="primary">儲存</button></div>
@@ -5013,15 +5016,19 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
       case 'persona': {
         if (!s) return;
         const previousPersona=s.persona || '';
+        const previousPersonaCustom=s.personaCustom === true;
         s.persona=String(f.get('persona'));
+        s.personaCustom=true;
         if (!persist()) {
           s.persona=previousPersona;
+          s.personaCustom=previousPersonaCustom;
           break;
         }
         if (s.cloudOwned && currentUser()?.uid===s.cloudOwnerUid) {
           const synced=await saveChatSessionSafely(s);
           if (!synced) {
             s.persona=previousPersona;
+            s.personaCustom=previousPersonaCustom;
             persist();render();
             toast('專屬人設同步失敗，已還原原設定。');
             break;
