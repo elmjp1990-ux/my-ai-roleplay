@@ -4575,6 +4575,21 @@ document.addEventListener('click',async event => {
         openModal('ledger',{currency});
         break;
       }
+      case 'ledger-filter': {
+        const kind = ['all','gain','spend'].includes(button.dataset.value) ? button.dataset.value : 'all';
+        openModal('ledger',{currency:route.overlay?.currency || 'diamond',kind});
+        break;
+      }
+      case 'personas':openModal('personas');break;
+      case 'theme-setting':openModal('theme-setting');break;
+      case 'birthdate':openModal('birthdate');break;
+      case 'persona-delete': {
+        const list=Array.isArray(state.account?.personas) ? state.account.personas : [];
+        const index=list.findIndex(item=>item.id===key);
+        if(index<0 || !confirm('確定刪除此組人設？')) break;
+        list.splice(index,1);state.account.personas=list;persist();openModal('personas');break;
+      }
+
       case 'ledger-retry': {
         const currency = button.dataset.value === 'silver' ? 'silver' : 'diamond';
         await loadWalletLedger(currency);
