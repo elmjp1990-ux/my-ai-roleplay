@@ -3011,8 +3011,7 @@ function groupRenderCharacterResults() {
   const section=(title,rows)=>rows.length?'<h3 class="group-character-section-title">'+e(title)+' ('+rows.length+')</h3><div class="group-character-grid">'+renderRows(rows)+'</div>':'';
   return '<div class="group-alert"><strong>已選 '+groupPrototype.draft.memberIds.length+' / 3 位角色</strong><br>預估每次對話 '+(groupPrototype.draft.memberIds.length*3)+' 銀幣（每位角色暫估 3 銀幣）。目前只顯示預估費用，不會實際扣款。</div>'+section('最近聊天',byRecent.filter(c=>ordered.some(x=>x.id===c.id)))+section('喜愛角色',byFavorite.filter(c=>ordered.some(x=>x.id===c.id)))+section('公開角色',byPublic.filter(c=>ordered.some(x=>x.id===c.id)))+'<p class="muted small">目前顯示 '+ordered.length+' 位（最多 500 位）；只列出公開且未刪除的角色，後端會再次驗證權限與數量。</p>';
 }
-;
-}
+
 function groupRenderCharacters() {
   const chars=groupAvailableCharacters();
   if (!chars.length) return '<div class="group-alert">目前沒有可選的雲端角色。請先登入並確認角色已儲存在 Supabase，且角色目前為公開狀態、尚未刪除或下架。</div>';
