@@ -2473,11 +2473,6 @@ function renderHome() {
         <button data-action="clear-search" aria-label="清除搜尋">×</button>
       </div>
       <div class="row wrap" id="selectedTags"></div>
-      <div class="tabs">
-        ${[['latest','最新角色'],['recommended','推薦角色'],['male','男生'],['female','女生']]
-          .map(([key,label]) => `<button class="tab ${filter === key ? 'active' : ''}"
-            data-action="filter" data-filter="${key}">${label}</button>`).join('')}
-      </div>
       <p id="exploreHint" class="muted small"></p>
       <div id="characterGrid" class="grid"></div>
       <div id="moreArea" style="text-align:center"></div>
