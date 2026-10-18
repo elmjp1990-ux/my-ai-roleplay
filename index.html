@@ -987,7 +987,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 
       let { data: profile, error: profileError } = await client
         .from('profiles')
-        .select('id, handle, nickname, avatar_url, bio')
+        .select('id, handle, nickname, avatar_url, bio, persona_presets')
         .eq('id', user.id)
         .maybeSingle();
 
@@ -1003,8 +1003,9 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
           handle,
           nickname: String(baseName).slice(0, 25),
           avatar_url: metadata.avatar_url || metadata.picture || null,
-          bio: ''
-        }, { onConflict: 'id' }).select('id, handle, nickname, avatar_url, bio').single();
+          bio: '',
+          persona_presets: []
+        }, { onConflict: 'id' }).select('id, handle, nickname, avatar_url, bio, persona_presets').single();
         if (result.error) throw new Error('建立 profiles 失敗：' + result.error.message);
         profile = result.data;
       }
@@ -1034,6 +1035,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         handle: profile.handle || '',
         avatar: profile.avatar_url || state.account.avatar || '',
         bio: profile.bio || '',
+        personas: Array.isArray(profile.persona_presets) ? profile.persona_presets : [],
         diamonds: Number(walletRow.diamonds ?? 0),
         silver: Number(walletRow.silver_coins ?? 0)
       };
@@ -1417,7 +1419,8 @@ if (characterError) {
       handle: account.handle || ('user_' + account.uid.replace(/-/g, '').slice(0, 12)),
       nickname: account.nickname,
       avatar_url: account.avatar || null,
-      bio: account.bio || ''
+      bio: account.bio || '',
+      persona_presets: Array.isArray(account.personas) ? account.personas : []
     }, { onConflict: 'id' });
     if (error) throw new Error('儲存 profiles 失敗：' + error.message);
   }
