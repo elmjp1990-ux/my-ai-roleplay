@@ -4572,7 +4572,7 @@ document.addEventListener('click',async event => {
         const c=(state.comments[route.id] || []).find(c=>c.id===key);
         if (!c || c.authorId!==currentUser()?.uid || !confirm('確定刪除此評論？')) break;
         if (c.cloud && window.mySupabase) {
-          const {error}=await window.mySupabase.from('character_comments').update({is_deleted:true,content:'',updated_at:new Date().toISOString()}).eq('id',c.id).eq('author_id',currentUser().uid);
+          const {error}=await window.mySupabase.from('character_comments').update({is_deleted:true,updated_at:new Date().toISOString()}).eq('id',c.id).eq('author_id',currentUser().uid);
           if(error)throw new Error('評論刪除失敗：'+error.message);
           await loadCloudComments(route.id);closeModal();break;
         }
