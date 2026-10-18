@@ -1628,7 +1628,7 @@ let pendingDeletionWalletSyncUid =
     ? state.account.uid
     : null;
 let route = {page:'home'};
-let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:''};
+let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null};
 let search = '';
 let filter = 'latest';
 let exploreTags = [];
@@ -2932,7 +2932,7 @@ function chatListHTML() {
       <span class="small muted">聊天列表</span></div>
     <div class="row" style="gap:8px;margin-bottom:12px">
       <input id="chatSearch" value="${e(chatSearch)}" placeholder="搜尋角色或回憶名稱" aria-label="搜尋角色或回憶名稱">
-      <button class="primary" type="button" data-action="nav" data-page="group" aria-label="建立群組聊天" title="建立群組聊天" style="flex:0 0 auto;min-width:42px;padding:10px 13px">＋</button>
+      <button class="primary" type="button" data-action="group-list" aria-label="建立群組聊天" title="建立群組聊天" style="flex:0 0 auto;min-width:42px;padding:10px 13px">＋</button>
     </div>
     <div id="chatEntries">${chatEntries()}</div>
   </aside>`;
@@ -3030,7 +3030,7 @@ function groupResetForAccount(uid) {
     g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]};
     g.active=null;g.turn=0;g.messages=[];g.groups=[];g.groupPreviews={};g.groupsLoaded=false;
     g.loadingGroups=false;g.loading=false;g.sending=false;g.pendingRequest=null;
-    g.formError='';g.loadError='';g.ownerUid=null;
+    g.formError='';g.loadError='';g.openError='';g.failedGroupId=null;g.ownerUid=null;
   }
 }
 function groupFriendlyError(error) {
@@ -3108,12 +3108,10 @@ function groupRenderList() {
 async function groupOpen(groupId) {
   const g=groupPrototype;
   groupResetForAccount(currentUser()?.uid||null);
-  if(!isUuid(groupId)||!window.mySupabase) { toast('群組識別碼無效。');return; }
-  // Group entries can be clicked from the shared character/chat list on any page.
-  // Switch the main route before rendering the loading state so the group view is
-  // actually mounted instead of leaving the user on the previous character list.
-  route={...route,page:'group'};
-  g.loading=true;g.formError='';g.active=null;render();
+  if(!isUuid(groupId)||!window.mySupabase) { toast('群組識別碼無效或 Supabase 尚未載入。');return; }
+  g.loading=true;g.formError='';g.openError='';g.failedGroupId=groupId;g.active=null;
+  if(route.page!=='group'||route.id||route.overlay) go({page:'group'});
+  else render();
   try {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('請重新登入後再開啟群組。');
@@ -3128,6 +3126,7 @@ async function groupOpen(groupId) {
     if(error) throw error;
     if(user.id!==currentUser()?.uid) throw new Error('帳號已切換，已停止顯示先前帳號的群組。');
     const group=groupRes.data, scenes=sceneRes.data||[], memberRows=memberRes.data||[];
+    if(!group) throw new Error('找不到這個群組，或目前帳號沒有存取權限。');
     if(memberRows.length<1||memberRows.length>3) throw new Error('群組成員資料不完整，請重新整理或重新建立群組。');
     let avatarById={};
     const characterIds=memberRows.map(m=>m.character_id).filter(isUuid);
@@ -3144,12 +3143,14 @@ async function groupOpen(groupId) {
     });
     g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,scenes,members};
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;g.formError='';
-    g.loading=false;g.groupsLoaded=false;
-    await groupLoadList(true);
+    g.loading=false;g.openError='';g.failedGroupId=null;g.groupsLoaded=false;
+    render();
+    void groupLoadList(true);
   } catch(error) {
-    g.loading=false;g.formError=groupFriendlyError(error)||'開啟群組失敗。';
+    g.loading=false;g.active=null;g.openError=groupFriendlyError(error)||'開啟群組失敗。';g.failedGroupId=groupId;
+    console.error('PersonaX 群組載入失敗：',error);
+    render();
   }
-  render();
 }
 function renderGroupConversation() {
   const g=groupPrototype, group=g.active;
@@ -3205,7 +3206,11 @@ function renderGroupPrototype() {
   const g=groupPrototype;
   if(!g.loading&&!g.groupsLoaded&&!g.loadingGroups&&!g.active) groupLoadList();
   if(g.loading) {
-    $('view').innerHTML='<div class="group-wizard"><div class="group-panel">正在讀取群組資料…</div></div>';
+    $('view').innerHTML='<div class="group-wizard"><div class="group-panel" role="status" aria-live="polite">正在讀取群組資料…</div></div>';
+    return;
+  }
+  if(g.openError) {
+    $('view').innerHTML='<div class="group-wizard"><section class="group-panel"><h2>無法開啟這個群組</h2><p class="group-alert" role="alert">'+e(g.openError)+'</p><p class="muted small">群組資料仍保留。你可以重試載入，或返回群組建立頁。</p><div class="group-actions"><button data-action="group-list">返回群組頁</button><button class="primary" data-action="group-open" data-id="'+e(g.failedGroupId||'')+'">重試載入</button></div></section></div>';
     return;
   }
   if(g.active) {
