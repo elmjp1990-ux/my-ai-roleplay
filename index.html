@@ -3905,12 +3905,17 @@ function renderModal(o) {
     }
     case 'persona':
       if (!s) return;
-      showDialog('專屬人設',`
-        <form data-form="persona">
-          <textarea name="persona" maxlength="3000">${e(s.persona || '')}</textarea>
-          <p class="small muted">最多3000字。</p>
-          <button class="primary">儲存</button>
-        </form>`);
+      {
+        const defaultPersona=(Array.isArray(currentUser()?.personas)?currentUser().personas:[]).find(item=>item.isDefault);
+        const initialPersona=s.persona || defaultPersona?.text || '';
+        showDialog('專屬人設',`
+          <form data-form="persona">
+            ${!s.persona && defaultPersona ? `<p class="small" style="color:var(--primary)">已帶入預設人設：${e(defaultPersona.name)}</p>` : ''}
+            <textarea name="persona" maxlength="3000">${e(initialPersona)}</textarea>
+            <p class="small muted">最多 3000 字。</p>
+            <button class="primary">儲存</button>
+          </form>`);
+      }
       break;
     case 'archives':
       renderArchives(o.id);
