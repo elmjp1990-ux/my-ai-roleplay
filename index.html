@@ -472,9 +472,24 @@ body.chat-page main { max-width:none; padding:12px; }
 .phone-notices p { margin:5px 0; font-size:11px; }
 .phone-bar { width:85px; height:3px; background:var(--muted); border-radius:5px; margin:12px auto 0; }
 
-/* Composer */
+/* Composer: compact tools and wallet share the same bottom row. */
 .composer { flex:0 0 auto; padding:8px 12px 10px; border-top:1px solid var(--border); background:var(--header); }
-.composer textarea { resize:none; height:42px; min-height:42px; max-height:110px; font-size:12px; padding:8px 10px; }
+.composer-input-row { display:flex; align-items:flex-end; }
+.composer-input-row textarea { flex:1; min-width:0; width:100%; resize:none; height:42px; min-height:42px; max-height:144px; font-size:13px; padding:9px 11px; line-height:1.55; overflow-y:auto; }
+.composer-bottom-row { display:flex; align-items:center; gap:7px; margin-top:7px; min-width:0; }
+.composer-bottom-left { display:flex; align-items:center; min-width:0; }
+.composer-bottom-right { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-left:auto; min-width:0; }
+.composer-icon-button { width:30px; height:30px; min-width:30px; padding:5px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; background:transparent; border:1px solid var(--border); }
+.composer-icon-button .icon { width:16px; height:16px; }
+.composer-send { width:38px; height:38px; min-width:38px; padding:7px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; }
+.composer-wallet { display:flex; align-items:center; gap:8px; font-size:11px; white-space:nowrap; }
+.composer-wallet .wallet-value { display:inline-flex; align-items:center; gap:3px; }
+.composer-wallet .wallet-diamond { color:#dcad35; }
+.composer-wallet .wallet-silver { color:var(--muted); }
+.composer-wallet button { padding:0; border:0; background:transparent; font-size:11px; }
+.composer .chat-tools { display:flex; gap:6px; overflow-x:auto; margin-top:7px; padding-bottom:2px; }
+.composer .chat-tools.hidden { display:none !important; }
+.composer .chat-tools button { white-space:nowrap; font-size:10px; padding:4px 7px; flex-shrink:0; }
 .suggestions { margin-bottom:5px; min-width:0; }
 .suggestions-panel { border:1px solid var(--border); border-radius:10px; background:var(--panel); overflow:hidden; }
 .suggestions-panel > summary { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:30px; padding:5px 9px; cursor:pointer; list-style:none; font-size:11px; font-weight:600; }
@@ -617,10 +632,14 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .chat-meta .wallet-button { padding:2px 6px; }
   .chat-meta .avatar { display:none; }
   .messages { padding:14px 10px; }
-  .phone { margin:0 8px 4px; }
-  .phone summary { padding:4px 9px; font-size:9px; }
   .composer { padding:5px 8px calc(5px + env(safe-area-inset-bottom)); }
-  .composer textarea { height:36px; min-height:36px; padding:6px 8px; }
+  .composer-input-row textarea { height:36px; min-height:36px; padding:7px 9px; font-size:13px; }
+  .composer-bottom-row { gap:5px; margin-top:6px; }
+  .composer-bottom-right { gap:6px; }
+  .composer-icon-button { width:28px; height:28px; min-width:28px; padding:4px; }
+  .composer-send { width:34px; height:34px; min-width:34px; }
+  .composer-wallet { gap:6px; font-size:10px; }
+  .composer-wallet button { font-size:10px; }
   .suggestions { margin-bottom:4px; }
   .suggestions-panel > summary { min-height:30px; padding:5px 8px; font-size:11px; }
   .suggestion-options { gap:6px; padding:0 8px 4px; }
@@ -1453,6 +1472,9 @@ const ICON = {
   back:svg('<path d="m14 5-7 7 7 7"></path>'),
   album:svg('<rect x="3" y="4" width="18" height="16" rx="3"></rect><circle cx="8" cy="9" r="1.5"></circle><path d="m4 17 5-5 4 4 3-3 5 5"></path>'),
   diary:svg('<path d="M5 3h14v18H5zM3 7h4M3 12h4M3 17h4M10 8h5M10 12h5M10 16h3"></path>'),
+  search:svg('<circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path>'),
+  plus:svg('<path d="M12 5v14M5 12h14"></path>'),
+  send:svg('<path d="m3 11 18-8-8 18-2.5-7.5L3 11Z"></path><path d="m10.5 13.5 4-4"></path>'),
   menu:svg('<path d="M4 6h16M4 12h16M4 18h16"></path>'),
   pin:svg('<path d="M9 3h6l-1 6 4 4v2H6v-2l4-4-1-6ZM12 15v7"></path>')
 };
@@ -3445,14 +3467,12 @@ function renderConversation() {
             </div>
             <div class="row" style="gap:1px">
               <button class="ghost" data-action="chat-overlay" data-kind="album" aria-label="回憶相簿">${ICON.album}</button>
-              <button class="ghost" data-action="chat-overlay" data-kind="diary" aria-label="甜蜜日記">${ICON.diary}</button>
+              <button class="ghost" data-action="archives" data-id="${e(s.id)}" aria-label="搜尋過往聊天記錄">${ICON.search}</button>
               <button class="ghost" data-action="chat-settings" data-id="${e(s.id)}" aria-label="聊天功能">${ICON.menu}</button>
             </div>
           </div>
-          <div class="chat-meta">${environment()}${wallet()}</div>
         </div>
         <div class="messages" id="messages"></div>
-        ${phoneHTML(c)}
         <form class="composer" data-form="message">
           ${s.suggestions ? `<div class="suggestions">
             <details class="suggestions-panel">
@@ -3479,13 +3499,23 @@ function renderConversation() {
               </button>
             </details>
           </div>` : ''}
-          <div class="row" style="gap:7px">
-            <textarea id="messageInput" name="text" maxlength="3000" placeholder="輸入對話…">${e(drafts[s.id] || '')}</textarea>
-            <button class="primary" aria-label="送出或接續回應">➤</button>
+          <div class="composer-input-row">
+            <textarea id="messageInput" name="text" maxlength="1000" rows="1" placeholder="留空發送，角色會繼續說下去" aria-label="輸入對話">${e(drafts[s.id] || '')}</textarea>
           </div>
-          <div class="chat-tools">
+          <div class="composer-bottom-row">
+            <div class="composer-bottom-left">
+              <button type="button" class="composer-icon-button" data-action="toggle-chat-tools" aria-label="展開聊天功能" aria-expanded="false" title="更多功能">${ICON.plus}</button>
+            </div>
+            <div class="composer-bottom-right">
+              <div class="composer-wallet" aria-label="目前錢包餘額">
+                <button type="button" data-action="profile" title="查看錢包"><span class="wallet-value wallet-diamond">💎 ${Number(currentUser()?.diamonds || 0).toLocaleString()}</span></button>
+                <button type="button" data-action="profile" title="查看錢包"><span class="wallet-value wallet-silver">◉ ${Number(currentUser()?.silver || 0).toLocaleString()}</span></button>
+              </div>
+              <button type="submit" class="primary composer-send" aria-label="送出或接續回應" title="送出">${ICON.send}</button>
+            </div>
+          </div>
+          <div class="chat-tools hidden" id="chatTools">
             <button type="button" data-action="snapshot">📷 快照</button>
-            <button type="button" data-action="persona">⚙ 人設</button>
             <button type="button" data-action="suggestions">建議回覆 ${s.suggestions ? 'ON' : 'OFF'}</button>
             <button type="button" disabled>圖片上傳</button>
           </div>
@@ -4383,6 +4413,16 @@ document.addEventListener('click',async event => {
         if (!s) break;
         captureDraft();s.suggestions=!s.suggestions;
         persist();render();break;
+      case 'toggle-chat-tools': {
+        const toolsPanel=$('chatTools');
+        const toggle=$('view').querySelector('[data-action="toggle-chat-tools"]');
+        if (toolsPanel && toggle) {
+          const isHidden=toolsPanel.classList.toggle('hidden');
+          toggle.setAttribute('aria-expanded',String(!isHidden));
+          toggle.setAttribute('aria-label',isHidden?'展開聊天功能':'收合聊天功能');
+        }
+        break;
+      }
       case 'snapshot':openModal('snapshot');break;
       case 'persona':openModal('persona');break;
       case 'archives':openModal('archives',{id:key});break;
@@ -5017,7 +5057,15 @@ document.addEventListener('input',event => {
     const results=$('groupCharacterResults');
     if(results) results.innerHTML=groupRenderCharacterResults();
   }
-  if (target.id==='messageInput') drafts[route.id]=target.value;
+  if (target.id==='messageInput') {
+    drafts[route.id]=target.value;
+    target.style.height='auto';
+    target.style.height=Math.min(target.scrollHeight,144)+'px';
+  }
+  if (target.id==='groupMessageInput') {
+    target.style.height='auto';
+    target.style.height=Math.min(target.scrollHeight,144)+'px';
+  }
 });
 document.addEventListener('keydown',event => {
   if (['messageInput','groupMessageInput'].includes(event.target.id) &&
