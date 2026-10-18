@@ -153,6 +153,7 @@ body.day .tag { color:#4f46b8; }
   background:#312e81;
 }
 .avatar-fallback { display:grid; place-items:center; color:#ddd6fe; font-weight:bold; }
+.group-list-avatar { width:36px; height:36px; display:grid; place-items:center; border-radius:50%; flex-shrink:0; color:#e0e7ff; background:linear-gradient(135deg,#6366f1,#8b5cf6); font-weight:700; font-size:13px; }
 .ellipsis { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .character-avatar-status {
   position:relative;
@@ -404,10 +405,29 @@ body.chat-page main { max-width:none; padding:12px; }
 .chat-layout.list-only { grid-template-columns:1fr; }
 .chat-layout.hide-list { grid-template-columns:1fr; }
 .chat-layout.hide-list .chat-list { display:none; }
-.chat-list { overflow-y:auto; padding:14px; min-height:0; }
-.list-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-.chat-entry { display:flex; gap:7px; align-items:center; padding:9px 6px; margin-top:7px; border-radius:12px; }
-.chat-entry.active { background:var(--soft); }
+.chat-list { overflow-y:auto; padding:clamp(14px,2.4vw,22px); min-height:0; background:linear-gradient(180deg,var(--panel),color-mix(in srgb,var(--panel) 94%,var(--primary))); }
+.chat-list-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; }
+.chat-brand { display:inline-flex; align-items:center; gap:9px; padding:0; border:0; background:transparent; color:var(--text); font-size:18px; font-weight:800; letter-spacing:.02em; }
+.chat-brand-mark { display:grid; place-items:center; width:34px; height:34px; border-radius:12px; background:linear-gradient(135deg,#6366f1,#8b5cf6); color:white; box-shadow:0 5px 18px #6366f133; }
+.chat-list-actions { display:flex; align-items:center; gap:6px; }
+.chat-list-icon { display:grid; place-items:center; width:40px; height:40px; border:1px solid var(--border); border-radius:13px; background:var(--panel2); color:var(--text); }
+.chat-list-icon svg { width:19px; height:19px; }
+.chat-list-search { display:flex; gap:9px; margin-bottom:13px; }
+.chat-list-search input { min-width:0; width:100%; border-radius:14px; padding:12px 14px; background:var(--input); }
+.chat-list-search.collapsed { display:none; }
+.chat-top-actions { display:flex; align-items:center; gap:7px; }
+.chat-top-action { width:38px; height:38px; display:grid; place-items:center; padding:0; border:1px solid var(--border); border-radius:12px; background:var(--panel2); color:var(--text); }
+.chat-top-action svg { width:19px; height:19px; }
+@media (max-width:520px) { .chat-top-actions { gap:5px; } .chat-top-action { width:35px; height:35px; border-radius:11px; } }
+.chat-announcement { display:flex; align-items:center; gap:11px; padding:12px 13px; margin-bottom:15px; border:1px solid color-mix(in srgb,var(--primary) 35%,var(--border)); border-radius:15px; background:linear-gradient(110deg,var(--soft),transparent); text-align:left; width:100%; }
+.chat-announcement-mark { display:grid; place-items:center; flex:0 0 38px; height:38px; border-radius:12px; background:#16a34a22; color:#4ade80; font-size:18px; }
+.chat-announcement-copy { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.chat-announcement-copy strong { font-size:13px; }
+.chat-announcement-copy span { color:var(--muted); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.chat-list-section { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:17px 2px 8px; color:var(--muted); font-size:12px; font-weight:700; letter-spacing:.04em; }
+.chat-entry { display:flex; gap:10px; align-items:center; padding:10px 8px; margin-top:5px; border:1px solid transparent; border-radius:15px; transition:background .16s,border-color .16s; }
+.chat-entry:hover { background:var(--panel2); }
+.chat-entry.active { background:var(--soft); border-color:color-mix(in srgb,var(--primary) 32%,transparent); }
 .select-chat { flex:1; min-width:0; border:0; background:transparent; text-align:left; padding:2px; }
 .pin { padding:3px; border:0; background:transparent; color:var(--muted); }
 .pin.on { color:#fb7185; }
@@ -513,9 +533,24 @@ body.chat-page main { max-width:none; padding:12px; }
 .phone-notices p { margin:5px 0; font-size:11px; }
 .phone-bar { width:85px; height:3px; background:var(--muted); border-radius:5px; margin:12px auto 0; }
 
-/* Composer */
+/* Composer: compact tools and wallet share the same bottom row. */
 .composer { flex:0 0 auto; padding:8px 12px 10px; border-top:1px solid var(--border); background:var(--header); }
-.composer textarea { resize:none; height:42px; min-height:42px; max-height:110px; font-size:12px; padding:8px 10px; }
+.composer-input-row { display:flex; align-items:flex-end; }
+.composer-input-row textarea { flex:1; min-width:0; width:100%; resize:none; height:42px; min-height:42px; max-height:120px; font-size:13px; padding:9px 11px; line-height:1.55; overflow-y:auto; }
+.composer-bottom-row { display:flex; align-items:center; gap:7px; margin-top:7px; min-width:0; }
+.composer-bottom-left { display:flex; align-items:center; min-width:0; }
+.composer-bottom-right { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-left:auto; min-width:0; }
+.composer-icon-button { width:30px; height:30px; min-width:30px; padding:5px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; background:transparent; border:1px solid var(--border); }
+.composer-icon-button .icon { width:16px; height:16px; }
+.composer-send { width:38px; height:38px; min-width:38px; padding:7px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; }
+.composer-wallet { display:flex; align-items:center; gap:8px; font-size:11px; white-space:nowrap; }
+.composer-wallet .wallet-value { display:inline-flex; align-items:center; gap:3px; }
+.composer-wallet .wallet-diamond { color:#dcad35; }
+.composer-wallet .wallet-silver { color:var(--muted); }
+.composer-wallet button { padding:0; border:0; background:transparent; font-size:11px; }
+.composer .chat-tools { display:flex; gap:6px; overflow-x:auto; margin-top:7px; padding-bottom:2px; }
+.composer .chat-tools.hidden { display:none !important; }
+.composer .chat-tools button { white-space:nowrap; font-size:10px; padding:4px 7px; flex-shrink:0; }
 .suggestions { margin-bottom:5px; min-width:0; }
 .suggestions-panel { border:1px solid var(--border); border-radius:10px; background:var(--panel); overflow:hidden; }
 .suggestions-panel > summary { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:30px; padding:5px 9px; cursor:pointer; list-style:none; font-size:11px; font-weight:600; }
@@ -695,10 +730,14 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .chat-meta .wallet-button { padding:2px 6px; }
   .chat-meta .avatar { display:none; }
   .messages { padding:14px 10px; }
-  .phone { margin:0 8px 4px; }
-  .phone summary { padding:4px 9px; font-size:9px; }
   .composer { padding:5px 8px calc(5px + env(safe-area-inset-bottom)); }
-  .composer textarea { height:36px; min-height:36px; padding:6px 8px; }
+  .composer-input-row textarea { height:36px; min-height:36px; padding:7px 9px; font-size:13px; }
+  .composer-bottom-row { gap:5px; margin-top:6px; }
+  .composer-bottom-right { gap:6px; }
+  .composer-icon-button { width:28px; height:28px; min-width:28px; padding:4px; }
+  .composer-send { width:34px; height:34px; min-width:34px; }
+  .composer-wallet { gap:6px; font-size:10px; }
+  .composer-wallet button { font-size:10px; }
   .suggestions { margin-bottom:4px; }
   .suggestions-panel > summary { min-height:30px; padding:5px 8px; font-size:11px; }
   .suggestion-options { gap:6px; padding:0 8px 4px; }
@@ -1547,6 +1586,9 @@ const ICON = {
   back:svg('<path d="m14 5-7 7 7 7"></path>'),
   album:svg('<rect x="3" y="4" width="18" height="16" rx="3"></rect><circle cx="8" cy="9" r="1.5"></circle><path d="m4 17 5-5 4 4 3-3 5 5"></path>'),
   diary:svg('<path d="M5 3h14v18H5zM3 7h4M3 12h4M3 17h4M10 8h5M10 12h5M10 16h3"></path>'),
+  search:svg('<circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path>'),
+  plus:svg('<path d="M12 5v14M5 12h14"></path>'),
+  send:svg('<path d="m3 11 18-8-8 18-2.5-7.5L3 11Z"></path><path d="m10.5 13.5 4-4"></path>'),
   menu:svg('<path d="M4 6h16M4 12h16M4 18h16"></path>'),
   pin:svg('<path d="M9 3h6l-1 6 4 4v2H6v-2l4-4-1-6ZM12 15v7"></path>')
 };
@@ -1722,13 +1764,14 @@ let pendingDeletionWalletSyncUid =
     ? state.account.uid
     : null;
 let route = {page:'home'};
-let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]},active:null,turn:0,messages:[],groups:[],groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:''};
+let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null,openRequestId:0};
 let search = '';
 let filter = 'recommended';
 let exploreTags = [];
 let limit = 24;
 let batch = 0;
 let chatSearch = '';
+let chatSearchExpanded = false;
 let groupCharacterSearch = '';
 let groupExpandedMemberId = null;
 let hideList = false;
@@ -2420,12 +2463,26 @@ function renderShell() {
   const titles = {
     home:'探索角色',chat:'開始暢聊',conversation:'開始暢聊',group:'群組聊天',shop:'商店',
     create:'創建角色',editor:'編輯角色',ai:'AI 創建',
-    notifications:'系統通知',favorites:'喜愛角色',
+    notifications:'系統通知',favorites:'喜愛角色',album:'相簿總覽',
     profile:'個人帳號',author:'作者主頁',detail:'角色介紹',
     'session-detail':'角色介紹'
   };
   $('pageTitle').textContent = titles[route.page] || 'PersonaX';
-  $('accountArea').innerHTML = environment() + wallet();
+  if (route.page === 'chat') {
+    $('accountArea').innerHTML = `<div class="chat-top-actions">
+      <button class="chat-top-action" type="button" data-action="chat-list-search-toggle" aria-label="搜尋聊天" title="搜尋" aria-expanded="${chatSearchExpanded}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg>
+      </button>
+      <button class="chat-top-action" type="button" data-action="chat-list-album" aria-label="相簿總覽" title="相簿">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m21 15-5-5L5 20"></path></svg>
+      </button>
+      <button class="chat-top-action" type="button" data-action="group-list" aria-label="建立群組" title="建立群組">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><path d="M3.5 19v-1.5a5.5 5.5 0 0 1 11 0V19"></path><path d="M16 5.5a3 3 0 0 1 0 5.8M17 14a4.5 4.5 0 0 1 3.5 4.4V19"></path></svg>
+      </button>
+    </div>`;
+  } else {
+    $('accountArea').innerHTML = environment() + wallet();
+  }
   document.body.classList.toggle('day',state.theme === 'day');
   document.body.classList.toggle('chat-page',['chat','conversation'].includes(route.page));
   document.body.classList.toggle('conversation',route.page === 'conversation');
@@ -2436,7 +2493,7 @@ function renderShell() {
 function render() {
   if ($('modal').open) $('modal').close();
   const allowed = ['home','detail','session-detail','author','chat','conversation','group','create',
-    'editor','ai','notifications','favorites','shop','profile'];
+    'editor','ai','notifications','favorites','shop','profile','album'];
   if (!allowed.includes(route.page)) route = {page:'home'};
 
   if (!['home','detail','author'].includes(route.page) && !currentUser()) {
@@ -2480,6 +2537,7 @@ function render() {
     case 'favorites':renderFavorites();break;
     case 'shop':renderShop();break;
     case 'profile':renderProfile();break;
+    case 'album':renderChatAlbumPage();break;
   }
   if (route.overlay) renderModal(route.overlay);
 }
@@ -3078,66 +3136,104 @@ function relativeDate(at) {
   if (at >= today-DAY) return '昨天';
   return new Date(at).toLocaleDateString('zh-TW');
 }
+function chatListDate(at) {
+  const timestamp=Number(at||0);
+  if(!timestamp) return '';
+  if(Date.now()-timestamp<24*60*60*1000) return '今天';
+  return new Date(timestamp).toLocaleDateString('zh-TW',{month:'numeric',day:'numeric'});
+}
 function chatEntries() {
-  return visibleSessions().map(s => {
-    const c = sessionCharacter(s);
-    const last = s.messages.at(-1);
-    return `<div class="chat-entry ${route.id === s.id ? 'active' : ''}">
-      <button class="pin ${s.pinned ? 'on' : ''}" data-action="pin"
+  const q=chatSearch.trim().toLocaleLowerCase();
+  const items=visibleSessions().map(s=>({
+    kind:'session',value:s,sortAt:Number(s.messages?.at(-1)?.at||s.startedAt||0),pinned:!!s.pinned
+  }));
+  const groupItems=(groupPrototype.groups||[]).filter(group=>{
+    const preview=groupPrototype.groupPreviews?.[group.id];
+    return !q || String(group.name||'').toLocaleLowerCase().includes(q) ||
+      String(preview?.content||'').toLocaleLowerCase().includes(q);
+  }).map(group=>({
+    kind:'group',value:group,preview:groupPrototype.groupPreviews?.[group.id]||null,
+    sortAt:Date.parse(groupPrototype.groupPreviews?.[group.id]?.created_at||group.updated_at||group.created_at||'')||0,
+    pinned:false
+  }));
+  items.push(...groupItems);
+  items.sort((a,b)=>Number(b.pinned)-Number(a.pinned)||b.sortAt-a.sortAt);
+  const errorNotice=groupPrototype.loadError
+    ? '<div class="group-alert">'+e(groupPrototype.loadError)+'</div><button data-action="group-refresh-list">重新載入群組</button>'
+    : '';
+  if(!items.length) return errorNotice || '<div class="empty">還沒有符合條件的對話。</div>';
+  const rows=items.map(item=>{
+    if(item.kind==='group') {
+      const group=item.value;
+      const lastText=item.preview?.content||'尚未開始對話';
+      const lastAt=Date.parse(item.preview?.created_at||group.updated_at||group.created_at||'')||Date.now();
+      const active=route.page==='group'&&groupPrototype.active?.id===group.id;
+      return `<div class="chat-entry ${active?'active':''}">
+        <span class="pin" aria-label="群組聊天" title="群組聊天">👥</span>
+        <button class="ghost" style="padding:0" data-action="group-open" data-id="${e(group.id)}" aria-label="開啟群組 ${e(group.name)}">
+          <span class="group-list-avatar" aria-hidden="true">群</span>
+        </button>
+        <button class="select-chat" data-action="group-open" data-id="${e(group.id)}">
+          <div class="row between"><strong class="ellipsis">${e(group.name||'未命名群組')} <span class="small muted">· 群組</span></strong>
+            <span class="small muted">${chatListDate(lastAt)}</span></div>
+          <div class="ellipsis small muted">${e(lastText)}</div>
+        </button>
+        <span class="entry-menu" aria-hidden="true">⋯</span>
+      </div>`;
+    }
+    const s=item.value;
+    const c=sessionCharacter(s);
+    if(!c) return '';
+    const last=s.messages?.at(-1);
+    return `<div class="chat-entry ${route.page==='conversation'&&route.id===s.id?'active':''}">
+      <button class="pin ${s.pinned?'on':''}" data-action="pin"
               data-id="${e(s.id)}" aria-label="切換置頂">${ICON.pin}</button>
       <button class="ghost" style="padding:0" data-action="session-detail" data-id="${e(s.id)}"
               aria-label="查看${e(c.name)}角色簡介">
-        <span class="character-avatar-status ${characterIsOffline(c) ? 'is-offline' : ''}">
+        <span class="character-avatar-status ${characterIsOffline(c)?'is-offline':''}">
           <img class="avatar" src="${e(safeImage(c.image))}" alt="${e(c.name)}">
-          <span class="character-status-dot" title="${characterIsOffline(c) ? '角色離線／已下架' : '角色公開中'}"></span>
+          <span class="character-status-dot" title="${characterIsOffline(c)?'角色離線／已下架':'角色公開中'}"></span>
         </span>
       </button>
       <button class="select-chat" data-action="select-chat" data-id="${e(s.id)}">
-        <div class="row between"><strong class="ellipsis">${e(s.name || c.name)}</strong>
-          <span class="small muted">${relativeDate(last?.at || s.startedAt)}</span></div>
-        <div class="ellipsis small muted">${e(last?.text || '')}</div>
+        <div class="row between"><strong class="ellipsis">${e(s.name||c.name)}</strong>
+          <span class="small muted">${chatListDate(last?.at||s.startedAt)}</span></div>
+        <div class="ellipsis small muted">${e(last?.text||'')}</div>
       </button>
       <button class="entry-menu" data-action="session-menu" data-id="${e(s.id)}" aria-label="聊天選項">⋯</button>
     </div>`;
-  }).join('') || '<div class="empty">還沒有符合條件的對話。</div>';
+  }).join('')||'<div class="empty">還沒有符合條件的對話。</div>';
+  return rows+errorNotice;
 }
 function chatListHTML() {
-  return `<aside class="panel chat-list">
-    <div class="list-top"><button class="ghost" data-action="list-menu">☰ 全部</button>
-      <span class="small muted">聊天列表</span></div>
-    <div class="row" style="gap:8px;margin-bottom:12px">
-      <input id="chatSearch" value="${e(chatSearch)}" placeholder="搜尋角色或回憶名稱" aria-label="搜尋角色或回憶名稱">
-      <button class="primary" type="button" data-action="nav" data-page="group" aria-label="建立群組聊天" title="建立群組聊天" style="flex:0 0 auto;min-width:42px;padding:10px 13px">＋</button>
+  if(currentUser()&&!groupPrototype.groupsLoaded&&!groupPrototype.loadingGroups) groupLoadList();
+  return `<aside class="panel chat-list" aria-label="聊天清單">
+    <div class="chat-list-search ${chatSearchExpanded ? '' : 'collapsed'}">
+      <input id="chatSearch" type="search" value="${e(chatSearch)}" placeholder="搜尋角色或對話…" aria-label="搜尋已聊過的角色或對話" autocomplete="off">
     </div>
+    <button class="chat-announcement" type="button" data-action="nav" data-page="notifications" aria-label="查看客服與系統公告">
+      <span class="chat-announcement-mark" aria-hidden="true">▣</span>
+      <span class="chat-announcement-copy"><strong>客服與系統公告</strong><span>查看平台通知與最新消息</span></span>
+      <span class="small muted" aria-hidden="true">›</span>
+    </button>
+    <div class="chat-list-section"><span>最近對話</span><span>${(visibleSessions().length+(groupPrototype.groups||[]).length)||0}</span></div>
     <div id="chatEntries">${chatEntries()}</div>
   </aside>`;
 }
+function renderChatAlbumPage() {
+  $('view').innerHTML = `<div class="stack form-width">
+    <div class="row between" style="align-items:center;gap:12px">
+      <div><div class="explore-eyebrow">PERSONAX</div><h1 style="margin:4px 0 0">相簿總覽</h1></div>
+      <button type="button" data-action="nav" data-page="chat">返回聊天</button>
+    </div>
+    <section class="panel stack" style="gap:8px">
+      <h2 style="margin:0">總相簿</h2>
+      <p class="muted" style="margin:0">相簿總覽頁面尚未完成。本階段先建立入口與導覽，下一階段再整合各段聊天中儲存的圖片。</p>
+    </section>
+  </div>`;
+}
 function renderChatListPage() {
   $('view').innerHTML = `<div class="chat-layout list-only">${chatListHTML()}</div>`;
-}
-function phoneHTML(c) {
-  const now = new Date();
-  const hour = now.getHours();
-  const period = hour < 6 ? '深夜' : hour < 12 ? '上午' : hour < 18 ? '下午' : '晚上';
-  const clock = now.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
-  return `<details class="phone">
-    <summary><span>♥ ${e(c.name)}的手機 ▾</span>
-      <span>${e(clock)} · ▰</span></summary>
-    <div class="phone-content">
-      <div class="row between">
-        <div class="phone-time">${e(clock)} <span class="small">(${period})</span></div>
-        <span>${e(now.toLocaleDateString('zh-TW',{weekday:'long'}))} ▥ ▰</span>
-      </div>
-      <strong>♥ ${e(c.name)}的手機</strong>
-      <div class="small muted" style="margin-top:6px">📍 初始場景</div>
-      <div class="phone-notices">
-        <strong>🔔 最近通知</strong>
-        <p>✉ 對話｜等待你的下一則訊息。</p>
-        <p>📝 備忘｜留一點時間，慢慢展開故事。</p>
-      </div>
-      <div class="phone-bar"></div>
-    </div>
-  </details>`;
 }
 /* GROUP-01: Supabase-persisted group core with deterministic mock director; no AI or wallet calls. */
 function groupAvailableCharacters() {
@@ -3154,13 +3250,13 @@ function groupSelectedCharacters() {
 }
 function groupRenderSteps() {
   const g=groupPrototype;
-  const labels=['群組資料','世界與場景','選擇角色'];
+  const labels=['選擇角色','設立群組檔案'];
   return '<div class="group-steps">'+labels.map((x,i)=>'<div class="group-step '+(g.step===i+1?'active':'')+'">'+(i+1)+' · '+x+'</div>').join('')+'</div>';
 }
 function groupRenderScenes() {
   const g=groupPrototype;
   const scene=g.draft.scenes[0]||{name:'初始相遇',description:''};
-  return '<label class="group-field"><span>共同場景名稱</span><input id="groupSceneName0" maxlength="80" value="'+e(scene.name||'')+'" placeholder="例如：深夜花店、博物館特展之夜"></label><div class="group-field"><span>共同場景與開場情境</span><div class="group-scene-input-wrap"><textarea id="groupSceneDesc0" maxlength="5000" placeholder="由你決定故事從哪裡開始：時間、地點、角色如何相遇，以及當下發生什麼事。">'+e(scene.description||'')+'</textarea><button type="button" class="group-inspiration" data-action="group-inspiration">✨ AI 靈感</button></div><small class="group-scene-help">你可以完全自行撰寫或修改。只有主動點擊「AI 靈感」時才會嘗試生成；目前 AI 尚未串接，按鈕會提示狀態，不會自動呼叫或扣款。</small></div>';
+  return '<label class="group-field"><span>初始場景名稱</span><input id="groupSceneName0" maxlength="80" value="'+e(scene.name||'')+'" placeholder="例如：深夜花店、博物館特展之夜"></label><div class="group-field"><span>初始開場情境（最多 1000 字）</span><div class="group-scene-input-wrap"><textarea id="groupSceneDesc0" maxlength="1000" placeholder="描寫時間、地點、角色如何相遇，以及故事此刻正在發生什麼。">'+e(scene.description||'')+'</textarea><button type="button" class="group-inspiration" data-action="group-inspiration">✨ AI 靈感</button></div><small class="group-scene-help">AI 尚未串接，點擊後會填入測試用 Mock 範例文字，可再自由修改；不呼叫 AI、不扣款。</small></div>';
 }
 function groupRenderCharacterResults() {
   const all=groupAvailableCharacters();
@@ -3182,27 +3278,36 @@ function groupRenderCharacterResults() {
   const byPublic=matches.filter(c=>!recentIds.has(c.id)&&!favoriteIds.has(c.id));
   const ordered=[...byRecent,...byFavorite,...byPublic].slice(0,500);
   if(!ordered.length) return '<div class="group-alert">'+(q?'找不到符合搜尋條件的公開角色。':'目前沒有可選的雲端角色。請先確認角色已儲存在 Supabase，且目前為公開狀態、尚未刪除或下架。')+'</div>';
-  const renderRows=rows=>rows.map(c=>'<label class="group-character-option"><input type="checkbox" data-action="group-toggle-character" data-id="'+e(c.id)+'" '+(groupPrototype.draft.memberIds.includes(c.id)?'checked':'')+' '+(groupPrototype.draft.memberIds.length>=3&&!groupPrototype.draft.memberIds.includes(c.id)?'disabled':'')+'><span style="min-width:0;overflow-wrap:anywhere"><strong>'+e(c.name)+'</strong><span class="muted small" style="display:block">'+e(c.intro||'尚無角色介紹')+'</span></span></label>').join('');
+  const renderRows=rows=>rows.map(c=>'<label class="group-character-option"><input type="checkbox" data-action="group-toggle-character" data-id="'+e(c.id)+'" '+(groupPrototype.draft.memberIds.includes(c.id)?'checked':'')+' '+(groupPrototype.draft.memberIds.length>=3&&!groupPrototype.draft.memberIds.includes(c.id)?'disabled':'')+'><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt="" style="width:46px;height:46px"><span style="min-width:0;overflow-wrap:anywhere"><strong>'+e(c.name)+'</strong><span class="muted small" style="display:block">'+e(c.intro||'尚無角色介紹')+'</span></span></label>').join('');
   const section=(title,rows)=>rows.length?'<h3 class="group-character-section-title">'+e(title)+' ('+rows.length+')</h3><div class="group-character-grid">'+renderRows(rows)+'</div>':'';
-  return section('最近聊天',byRecent.filter(c=>ordered.some(x=>x.id===c.id)))+
-    section('喜愛角色',byFavorite.filter(c=>ordered.some(x=>x.id===c.id)))+
-    section('公開角色',byPublic.filter(c=>ordered.some(x=>x.id===c.id)))+
-    '<p class="muted small">目前顯示 '+ordered.length+' 位（最多 500 位）；已選 '+groupPrototype.draft.memberIds.length+' / 3 名。只列出公開且未刪除的雲端角色，後端會再次驗證權限與數量。</p>';
+  return '<div class="group-alert"><strong>已選 '+groupPrototype.draft.memberIds.length+' / 3 位角色</strong><br>預估每次對話 '+(groupPrototype.draft.memberIds.length*3)+' 銀幣（每位角色暫估 3 銀幣）。目前只顯示預估費用，不會實際扣款。</div>'+section('最近聊天',byRecent.filter(c=>ordered.some(x=>x.id===c.id)))+section('喜愛角色',byFavorite.filter(c=>ordered.some(x=>x.id===c.id)))+section('公開角色',byPublic.filter(c=>ordered.some(x=>x.id===c.id)))+'<p class="muted small">目前顯示 '+ordered.length+' 位（最多 500 位）；只列出公開且未刪除的角色，後端會再次驗證權限與數量。</p>';
 }
+
 function groupRenderCharacters() {
   const chars=groupAvailableCharacters();
   if (!chars.length) return '<div class="group-alert">目前沒有可選的雲端角色。請先登入並確認角色已儲存在 Supabase，且角色目前為公開狀態、尚未刪除或下架。</div>';
   return '<div id="groupCharacterPicker"><label class="group-field"><span>搜尋角色名稱、介紹或標籤</span><input id="groupCharacterSearch" type="search" maxlength="100" value="'+e(groupCharacterSearch)+'" placeholder="輸入角色名稱…"></label><div id="groupCharacterResults">'+groupRenderCharacterResults()+'</div></div>';
 }
+function refreshChatEntryList() {
+  const entries=$('chatEntries');
+  if(entries) entries.innerHTML=chatEntries();
+}
 function groupResetForAccount(uid) {
   const g=groupPrototype;
   if(g.ownerUid && g.ownerUid!==uid) {
     g.step=1;
-    g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]};
-    g.active=null;g.turn=0;g.messages=[];g.groups=[];g.groupsLoaded=false;
+    g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''};
+    g.active=null;g.turn=0;g.messages=[];g.groups=[];g.groupPreviews={};g.groupsLoaded=false;
     g.loadingGroups=false;g.loading=false;g.sending=false;g.pendingRequest=null;
-    g.formError='';g.loadError='';g.ownerUid=null;
+    g.formError='';g.loadError='';g.openError='';g.failedGroupId=null;g.ownerUid=null;
   }
+}
+function groupWithTimeout(promise, milliseconds, message) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(message)),milliseconds)})
+  ]).finally(()=>clearTimeout(timer));
 }
 function groupFriendlyError(error) {
   const message=String(typeof error==='string'?error:(error?.message||''));
@@ -3219,28 +3324,53 @@ function groupFriendlyError(error) {
 }
 async function groupLoadList(force=false) {
   const g=groupPrototype;
+  // Clear a prior account's cached group rows before rendering the shared chat list.
+  groupResetForAccount(currentUser()?.uid||null);
   if(g.loadingGroups||(!force&&g.groupsLoaded)) return;
   g.loadingGroups=true;g.loadError='';
   if(!window.mySupabase) {
-    g.groupsLoaded=true;g.loadingGroups=false;g.loadError='Supabase 用戶端尚未載入。';return;
+    g.groupsLoaded=true;g.loadingGroups=false;g.loadError='Supabase 用戶端尚未載入。';
+    refreshChatEntryList();return;
   }
   try {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
     if(authError||!user||user.id!==currentUser()?.uid) {
       g.groupsLoaded=true;g.loadingGroups=false;g.loadError='請使用已連結 Supabase 的帳號登入，才能讀取或建立雲端群組。';
       if(route.page==='group'&&!g.active) render();
-      return;
+      refreshChatEntryList();return;
     }
     const {data,error}=await window.mySupabase.from('chat_groups')
       .select('id,name,world_background,scene_mode,created_at,updated_at')
       .is('archived_at',null).order('updated_at',{ascending:false});
     if(error) throw error;
     if(user.id!==currentUser()?.uid) { groupResetForAccount(currentUser()?.uid||null); return; }
-    g.ownerUid=user.id;g.groups=data||[];g.groupsLoaded=true;g.loadingGroups=false;
+    g.ownerUid=user.id;g.groups=data||[];g.groupPreviews={};
+    if(g.groups.length) {
+      const groupIds=g.groups.map(group=>group.id);
+      // Fetch at most one newest message per group. Batch requests to avoid an
+      // unbounded all-history read and to keep concurrent requests modest.
+      for(let i=0;i<groupIds.length;i+=10) {
+        const batchIds=groupIds.slice(i,i+10);
+        const previews=await Promise.all(batchIds.map(async groupId=>{
+          const {data:message,error:messageError}=await window.mySupabase.from('chat_group_messages')
+            .select('group_id,content,speaker_type,created_at,sequence_no')
+            .eq('group_id',groupId).order('created_at',{ascending:false})
+            .order('sequence_no',{ascending:false}).limit(1).maybeSingle();
+          if(messageError) throw messageError;
+          return [groupId,message||null];
+        }));
+        for(const [groupId,message] of previews) {
+          if(message) g.groupPreviews[groupId]=message;
+        }
+      }
+    }
+    if(user.id!==currentUser()?.uid) { groupResetForAccount(currentUser()?.uid||null); return; }
+    g.groupsLoaded=true;g.loadingGroups=false;g.loadError='';
   } catch(error) {
     g.groupsLoaded=true;g.loadingGroups=false;g.loadError=groupFriendlyError(error)||'讀取群組清單失敗。';
   }
   if(route.page==='group'&&!g.active) render();
+  refreshChatEntryList();
 }
 function groupRenderList() {
   const g=groupPrototype;
@@ -3254,22 +3384,29 @@ function groupRenderList() {
 async function groupOpen(groupId) {
   const g=groupPrototype;
   groupResetForAccount(currentUser()?.uid||null);
-  if(!isUuid(groupId)||!window.mySupabase) { toast('群組識別碼無效。');return; }
-  g.loading=true;g.formError='';g.active=null;render();
+  if(!isUuid(groupId)||!window.mySupabase) { g.loading=false;g.openError='群組識別碼無效或 Supabase 尚未載入。';g.failedGroupId=groupId;render();toast(g.openError);return; }
+  // Keep the group ID in the URL so rerenders, auth refreshes, and post-send reloads
+  // can recover the same group instead of silently falling back to the creation wizard.
+  const requestId=g.openRequestId=(g.openRequestId||0)+1;
+  g.loading=true;g.formError='';g.openError='';g.failedGroupId=groupId;g.active=null;
+  if(route.page!=='group'||route.id!==groupId||route.overlay) go({page:'group',id:groupId});
+  else render();
   try {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('請重新登入後再開啟群組。');
     g.ownerUid=user.id;
-    const [groupRes,sceneRes,memberRes,messageRes]=await Promise.all([
-      window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,created_at,updated_at').eq('id',groupId).single(),
+    const [groupRes,sceneRes,memberRes,messageRes]=await groupWithTimeout(Promise.all([
+      window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,created_at,updated_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,content,created_at').eq('group_id',groupId).order('created_at',{ascending:true}).order('sequence_no',{ascending:true})
-    ]);
+    ]),15000,'群組資料讀取逾時，請檢查網路後重試。');
+    if(requestId!==g.openRequestId) return;
     const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error;
     if(error) throw error;
     if(user.id!==currentUser()?.uid) throw new Error('帳號已切換，已停止顯示先前帳號的群組。');
     const group=groupRes.data, scenes=sceneRes.data||[], memberRows=memberRes.data||[];
+    if(!group) throw new Error('找不到這個群組，或目前帳號沒有存取權限。');
     if(memberRows.length<1||memberRows.length>3) throw new Error('群組成員資料不完整，請重新整理或重新建立群組。');
     let avatarById={};
     const characterIds=memberRows.map(m=>m.character_id).filter(isUuid);
@@ -3282,73 +3419,187 @@ async function groupOpen(groupId) {
     const messages=(messageRes.data||[]).map(m=>{
       const member=members.find(x=>x.characterId===m.character_id);
       const scene=scenes.find(x=>x.id===m.scene_id);
-      return {id:m.id,type:m.speaker_type==='user'?'user':m.speaker_type==='system'?'system':'character',speaker:m.speaker_type==='user'?'你':(member?.name||'角色')+(scene?' · '+scene.name:''),content:m.content,createdAt:m.created_at};
+      return {id:m.id,type:m.speaker_type==='user'?'user':m.speaker_type==='system'?'system':'character',speaker:m.speaker_type==='user'?'你':(member?.name||'角色')+(scene?' · '+scene.name:''),characterId:m.character_id||null,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:m.content,createdAt:m.created_at};
     });
-    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,scenes,members};
+    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',scenes,members};
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;g.formError='';
-    g.loading=false;g.groupsLoaded=false;
-    await groupLoadList(true);
+    g.loading=false;g.openError='';g.failedGroupId=null;g.groupsLoaded=false;
+    render();
+    void groupLoadList(true);
   } catch(error) {
-    g.loading=false;g.formError=groupFriendlyError(error)||'開啟群組失敗。';
+    if(requestId!==g.openRequestId) return;
+    g.loading=false;g.active=null;g.openError=groupFriendlyError(error)||'開啟群組失敗。';g.failedGroupId=groupId;
+    console.error('PersonaX 群組載入失敗：',error);
+    render();
   }
-  render();
+}
+function renderGroupConversation() {
+  const g=groupPrototype, group=g.active;
+  if(!group) return;
+  const avatarURL=value=>{const url=String(value||'');return /^https?:\/\//i.test(url)?url:'';};
+  const memberAvatars=group.members.map(m=>{
+    const avatar=avatarURL(m.avatar_url);
+    return '<span class="character-avatar-status" title="'+e(m.name||'角色')+'">'+
+      (avatar?'<img class="avatar" src="'+e(avatar)+'" alt="">':'<span class="group-list-avatar">'+e(String(m.name||'角').trim().slice(0,1)||'角')+'</span>')+
+      '</span>';
+  }).join('');
+  const messageRows=g.messages.map(m=>{
+    const member=group.members.find(x=>m.characterId&&x.characterId===m.characterId) ||
+      group.members.find(x=>m.speaker===x.name || String(m.speaker||'').startsWith((x.name||'')+' · '));
+    const avatar=avatarURL(member?.avatar_url);
+    const isUser=m.type==='user', isSystem=m.type==='system';
+    const who=isUser?'你':isSystem?'系統':(member?.name||m.speaker||'角色');
+    const avatarHTML=isUser
+      ? '<span class="avatar avatar-fallback" style="background:#4f46e5">你</span>'
+      : avatar?'<img class="avatar" src="'+e(avatar)+'" alt="">':'<span class="avatar avatar-fallback">'+e(String(who).trim().slice(0,1)||'角')+'</span>';
+    return '<div class="message '+(isUser?'user':'')+'">'+avatarHTML+
+      '<div class="message-content"><div class="message-name">'+e(who)+'</div><div class="bubble">'+e(m.content||'')+'</div></div></div>';
+  }).join('') || '<div class="empty">這段群組對話還沒有訊息，輸入第一句話開始故事。</div>';
+  const sceneNames=(group.scenes||[]).map(x=>x.name).filter(Boolean).join('、');
+  const initialScene=(group.scenes||[]).find(x=>Number(x.position||1)===1)||(group.scenes||[])[0];
+  const sceneContext=initialScene
+    ? '<div class="group-scene-context" style="margin:0 0 16px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel-2,rgba(127,127,127,.08))"><div class="small muted" style="margin-bottom:6px">📍 '+e(initialScene.name||'初始場景')+'</div>'+
+      (initialScene.description?.trim()?'<div style="white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.65">'+e(initialScene.description)+'</div>':'<div class="small muted">尚未填寫場景描述。</div>')+'</div>'
+    : '';
+  $('view').innerHTML=`
+    <div class="chat-layout ${hideList?'hide-list':''}">
+      ${chatListHTML()}
+      <section class="panel chat-main">
+        <div class="chat-heading">
+          <div class="row between">
+            <div class="row grow" style="gap:7px;min-width:0">
+              <button class="ghost" data-action="group-return-list" aria-label="返回聊天列表">${ICON.back}</button>
+              <div class="row" style="gap:3px;flex:0 0 auto">${memberAvatars}</div>
+              <div class="grow" style="min-width:0"><div class="chat-name ellipsis">${e(group.name)}</div><div class="small muted ellipsis">${group.members.length} 名角色 · ${e(sceneNames||'共同場景')}</div></div>
+            </div>
+            <div class="row" style="gap:1px">
+              <button class="ghost" data-action="group-info" aria-label="群組資訊" title="群組資訊">${ICON.menu}</button>
+              <button class="ghost" data-action="group-archive" data-id="${e(group.id)}" aria-label="封存群組" title="封存群組">⋯</button>
+            </div>
+          </div>
+          <div class="small muted" style="padding:6px 4px 0;line-height:1.5">世界背景：${e(group.world||'尚未設定')} · 測試模式：不呼叫 AI、不扣款</div>
+        </div>
+        <div class="messages" id="groupMessages">${sceneContext}${messageRows}</div>
+        <form class="composer" data-form="group-message">
+          <div class="composer-input-row">
+            <textarea id="groupMessageInput" name="text" maxlength="1000" rows="1" placeholder="留空發送，角色會繼續說下去" aria-label="輸入群組訊息" ${g.sending?'disabled':''}>${e(g.pendingRequest?.groupId===group.id?g.pendingRequest.content:'')}</textarea>
+          </div>
+          <div class="composer-bottom-row">
+            <div class="composer-bottom-left">
+              <button type="button" class="composer-icon-button" data-action="toggle-chat-tools" aria-label="展開聊天功能" aria-expanded="false" title="更多功能">${ICON.plus}</button>
+              <span class="small muted">${g.turn} 回合</span>
+            </div>
+            <div class="composer-bottom-right">
+              <div class="composer-wallet" aria-label="目前錢包餘額">
+                <button type="button" data-action="profile" title="查看錢包"><span class="wallet-value wallet-diamond">💎 ${Number(currentUser()?.diamonds || 0).toLocaleString()}</span></button>
+                <button type="button" data-action="profile" title="查看錢包"><span class="wallet-value wallet-silver">◉ ${Number(currentUser()?.silver || 0).toLocaleString()}</span></button>
+              </div>
+              <button class="primary composer-send" type="button" data-action="group-send" aria-label="送出群組訊息" ${g.sending?'disabled':''}>${ICON.send}</button>
+            </div>
+          </div>
+          <div class="chat-tools hidden" id="groupChatTools">
+            <button type="button" data-action="group-info">群組資訊</button>
+            <button type="button" data-action="group-archive" data-id="${e(group.id)}">群組管理</button>
+            <button type="button" disabled>圖片上傳</button>
+          </div>
+          <div class="small muted" role="status" aria-live="polite">${e(g.formError||'')}</div>
+        </form>
+      </section>
+    </div>`;
+}
+function renderGroupStatusShell({title,message,error=false,groupId=''}) {
+  const safeMessage=e(message||'');
+  const actions=error
+    ? '<button class="ghost" data-action="group-return-list">返回聊天列表</button><button class="primary" data-action="group-open" data-id="'+e(groupId||'')+'">重試載入</button>'
+    : '';
+  $('view').innerHTML='<div class="chat-layout '+(hideList?'hide-list':'')+'">'+chatListHTML()+
+    '<section class="panel chat-main"><div class="chat-heading"><div class="row between">'+
+    '<div class="row grow" style="gap:8px;min-width:0"><button class="ghost" data-action="group-return-list" aria-label="返回聊天列表">'+ICON.back+'</button>'+
+    '<div class="grow" style="min-width:0"><div class="chat-name ellipsis">'+e(title||'群組聊天')+'</div><div class="small muted">群組對話</div></div></div></div></div>'+
+    '<div class="messages"><div class="'+(error?'group-alert':'empty')+'" role="'+(error?'alert':'status')+'" aria-live="polite">'+safeMessage+'</div>'+
+    (actions?'<div class="row wrap" style="padding:12px">'+actions+'</div>':'')+'</div>'+
+    '<form class="composer" onsubmit="return false"><textarea disabled placeholder="'+(error?'請先解決載入問題':'正在載入群組對話…')+'" aria-label="群組訊息輸入"></textarea>'+
+    '<div class="row between" style="margin-top:7px"><span class="small muted">'+(error?'目前無法送出訊息':'正在載入群組資料')+'</span><button class="primary" type="button" disabled>送出</button></div></form></section></div>';
 }
 function renderGroupPrototype() {
   groupResetForAccount(currentUser()?.uid||null);
   const g=groupPrototype;
-  if(!g.groupsLoaded&&!g.loadingGroups&&!g.active) groupLoadList();
+  // A group route is recoverable from its URL even after an incidental rerender.
+  if(route.id && !g.loading && !g.active && !g.openError) {
+    void groupOpen(route.id);
+    return;
+  }
   if(g.loading) {
-    $('view').innerHTML='<div class="group-wizard"><div class="group-panel">正在讀取群組資料…</div></div>';
+    renderGroupStatusShell({title:g.active?.name||g.groups.find(x=>x.id===route.id)?.name||'群組聊天',message:'正在載入群組對話…'});
     return;
   }
-  if(g.active) {
-    const memberCards=g.active.members.map(m=>{
-      const avatar=String(m.avatar_url||'');
-      const safeAvatar=avatar.startsWith('https://')||avatar.startsWith('http://');
-      const expanded=groupExpandedMemberId===m.characterId;
-      const detail=[m.intro||'',m.style?'風格：'+m.style:'',m.age?'年齡：'+m.age:'',m.gender?'性別：'+m.gender:'',Array.isArray(m.tags)&&m.tags.length?'標籤：'+m.tags.join('、'):''].filter(Boolean).map(e).join('<br>');
-      return '<article class="group-member-card"><button class="ghost group-member-head" data-action="group-toggle-member" data-id="'+e(m.characterId)+'" aria-expanded="'+expanded+'"><span class="group-member-avatar">'+(safeAvatar?'<img src="'+e(avatar)+'" alt="" loading="lazy">':e(String(m.name||'角').trim().slice(0,1)||'角'))+'</span><span class="group-member-name" title="'+e(m.name||'角色')+'">'+e(m.name||'角色')+'</span></button><div class="group-member-details" '+(expanded?'':'hidden')+'>'+ (detail||'尚無角色補充資料')+'</div></article>';
-    }).join('');
-    $('view').innerHTML='<div class="group-wizard"><div class="row between wrap"><div><h1>'+e(g.active.name)+'</h1><p class="muted">群組聊天 · 持久化 Mock 導演模式</p></div><button data-action="group-list">返回群組清單</button></div><div class="group-panel"><div class="group-alert">訊息已保存於測試 Supabase。回覆由固定 Mock 導演產生，不呼叫 AI、不扣款。</div><p><strong>世界背景：</strong>'+e(g.active.world||'（未設定）')+'</p><p><strong>場景模式：</strong>'+(g.active.mode==='shared'?'共用場景':'分開場景')+' · '+g.active.members.length+' 名角色</p><h3>群組角色</h3><div class="group-member-grid">'+memberCards+'</div><div class="group-chat-log">'+g.messages.map(m=>'<div class="group-bubble '+(m.type==='user'?'user':'')+'"><small>'+e(m.speaker)+'</small>'+e(m.content)+'</div>').join('')+'</div><div class="error" role="alert" aria-live="polite">'+e(g.formError)+'</div><label class="group-field"><span>輸入訊息</span><textarea id="groupMessageInput" maxlength="2000" placeholder="輸入故事內容" '+((g.sending||g.pendingRequest?.groupId===g.active.id)?'disabled':'')+'>'+e(g.pendingRequest?.groupId===g.active.id?g.pendingRequest.content:'')+'</textarea></label><div class="group-actions"><span class="muted small">'+g.turn+' 個已保存回合</span><button class="primary" data-action="group-send" '+(g.sending?'disabled':'')+'>'+(g.sending?'正在保存…':g.pendingRequest?.groupId===g.active.id?'重試保存同一訊息':'送出給 Mock 導演')+'</button></div></div></div>';
+  if(g.openError) {
+    renderGroupStatusShell({title:g.groups.find(x=>x.id===(g.failedGroupId||route.id))?.name||'群組聊天',message:g.openError,error:true,groupId:g.failedGroupId||route.id||''});
     return;
   }
+  if(g.active) { renderGroupConversation(); return; }
   let body='';
-  if(g.step===1) body='<h2>群組基本資料</h2><label class="group-field"><span>群組名稱（1–25 字）</span><input id="groupNameInput" maxlength="25" value="'+e(g.draft.name)+'" placeholder="例如：月影旅團"></label><label class="group-field"><span>世界背景（最多 10000 字）</span><textarea id="groupWorldInput" maxlength="10000" placeholder="故事世界、時代、規則與氛圍">'+e(g.draft.world)+'</textarea></label>';
-  if(g.step===2) body='<h2>共同世界與初始場景</h2><div class="group-alert">所有 AI 角色共享同一個世界觀與共同開場。場景由你決定；沒有靈感時，可以主動使用 AI 靈感按鈕，不會自動呼叫 AI。</div>'+groupRenderScenes();
-  if(g.step===3) body='<h2>選擇角色</h2><p class="muted">最多三名角色。只能選擇雲端 UUID 角色；後端會再次驗證角色是否公開且未刪除／下架，不要求管理員事前審核。</p>'+groupRenderCharacters();
-  $('view').innerHTML='<div class="group-wizard"><div><h1>建立群組聊天</h1><p class="muted">建立資料與 Mock 回覆會保存於測試 Supabase；不呼叫 AI、不扣款。</p></div>'+groupRenderList()+groupRenderSteps()+'<section class="group-panel">'+body+'<div id="groupFormError" class="error" role="alert" aria-live="polite">'+e(g.formError)+'</div><div class="group-actions"><button data-action="group-back" '+(g.step===1||g.loading?'disabled':'')+'>上一步</button><button class="primary" data-action="group-next" '+(g.loading?'disabled':'')+'>'+(g.loading?'正在建立…':g.step===3?'確認並保存群組':'下一步')+'</button></div></section></div>';
+  if(g.step===1) {
+    body='<h2>選擇角色</h2><p class="muted">最多選擇 3 位公開角色。群組建立後會直接開啟共用聊天介面的群組對話。</p>'+groupRenderCharacters();
+  } else {
+    const members=groupSelectedCharacters();
+    const suggestedName=members.map(c=>c.name).join('、').slice(0,25);
+    const nameValue=g.draft.name||suggestedName;
+    const worldId=g.draft.worldCharacterId||members[0]?.id||'';
+    const avatarPieces=members.map(c=>'<span title="'+e(c.name)+'" class="group-list-avatar" style="width:42px;height:42px;border-radius:50%;overflow:hidden">'+(safeImage(c.image||c.avatar_url)?'<img src="'+e(safeImage(c.image||c.avatar_url))+'" alt="" style="width:100%;height:100%;object-fit:cover">':e((c.name||'角').slice(0,1)))+'</span>').join('');
+    const worldChoices=members.map(c=>'<label class="group-character-option"><input type="radio" name="groupWorldCharacter" data-action="group-world-character" value="'+e(c.id)+'" '+(worldId===c.id?'checked':'')+'><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt=""><span><strong>'+e(c.name)+'</strong><span class="muted small" style="display:block">以此角色的現有介紹作為背景參考</span></span></label>').join('');
+    body='<h2>設立群組檔案</h2>'+
+      '<div class="group-panel" style="padding:12px;margin-bottom:16px"><div class="row" style="gap:8px;align-items:center">'+avatarPieces+'</div><p class="muted small" style="margin:8px 0 0">群組頭像依照已選角色組合顯示，現階段不可自行更換。</p></div>'+
+      '<label class="group-field"><span>群組名稱（最多 25 字）</span><input id="groupNameInput" maxlength="25" value="'+e(nameValue)+'" placeholder="輸入群組名稱"></label>'+
+      '<label class="group-field"><span>玩家角色名稱（提供給 AI）</span><input id="groupPlayerName" maxlength="80" value="'+e(g.draft.playerName||state.account?.nickname||"玩家")+'" placeholder="你的角色名稱"></label>'+
+      '<label class="group-field"><span>玩家角色與人設</span><textarea id="groupPlayerPersona" maxlength="3000" placeholder="描述你在這個故事中的身分、個性、背景與說話方式。">'+e(g.draft.playerPersona||state.account?.bio||'')+'</textarea><small>目前先保存於群組檔案，之後可沿用單人聊天的人設編輯邏輯。</small></label>'+
+      '<div class="group-field"><span>選擇哪位角色的世界觀作為整體背景？</span><div class="group-character-grid">'+worldChoices+'</div></div>'+
+      '<div class="group-field"><span>背景參考</span><div class="group-alert" id="groupWorldReference">'+e((members.find(c=>c.id===worldId)?.worldBackground||members.find(c=>c.id===worldId)?.world||members.find(c=>c.id===worldId)?.intro)||'所選角色目前沒有可用的公開介紹；可先繼續建立，後續再完善世界觀資料。')+'</div></div>'+
+      groupRenderScenes()+
+      '<div class="group-field"><span>確認群組成員（返回上一步才能增減）</span><div class="group-character-grid">'+members.map(c=>'<div class="group-character-option"><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt=""><strong>'+e(c.name)+'</strong></div>').join('')+'</div></div>';
+  }
+  const topNext=g.step===1?'<button class="primary" type="button" data-action="group-next" '+(g.loading?'disabled':'')+'>下一步 →</button>':'';
+  $('view').innerHTML='<div class="group-wizard"><div class="row between wrap"><div><h1>建立群組聊天</h1><p class="muted">選擇角色後設定群組檔案；目前為測試模式，不呼叫 AI、不扣款。</p></div>'+topNext+'</div>'+groupRenderSteps()+'<section class="group-panel">'+body+'<div id="groupFormError" class="error" role="alert" aria-live="polite">'+e(g.formError)+'</div><div class="group-actions"><button data-action="group-back" '+(g.step===1||g.loading?'disabled':'')+'>上一步</button><button class="primary" data-action="group-next" '+(g.loading?'disabled':'')+'>'+(g.loading?'正在建立…':g.step===2?'建立群組':'下一步')+'</button></div></section></div>';
 }
 function groupReadStep() {
   const g=groupPrototype;
   if(g.step===1) {
-    g.draft.name=$('groupNameInput')?.value.trim()||'';
-    g.draft.world=$('groupWorldInput')?.value||'';
-    if(!g.draft.name||g.draft.name.length>25) return '請輸入 1–25 字的群組名稱。';
-    if(g.draft.world.length>10000) return '世界背景不可超過 10000 字。';
-  } else if(g.step===2) {
-    g.draft.mode='shared';
-    g.draft.scenes=[{name:$('groupSceneName0')?.value.trim()||'',description:$('groupSceneDesc0')?.value||''}];
-    if(!g.draft.scenes[0].name) return '請填寫共同場景名稱。';
-    if(g.draft.scenes[0].name.length>80||g.draft.scenes[0].description.length>5000) return '場景名稱或描述超過字數限制。';
-  } else if(g.step===3) {
     const availableIds=new Set(groupAvailableCharacters().map(c=>c.id));
     g.draft.memberIds=[...new Set(g.draft.memberIds.filter(id=>availableIds.has(id)))];
     const members=groupSelectedCharacters();
-    if(members.length<1||members.length>3) return '請選擇 1–3 名可用角色。';
+    if(members.length<1||members.length>3) return '請選擇 1–3 位已公開且未下架的角色。';
     if(members.length!==g.draft.memberIds.length) return '角色清單已變更，請重新選擇角色。';
-    if(g.draft.mode==='separate' && g.draft.scenes.slice(0,members.length).some(x=>!x.name.trim())) return '分開場景模式下，每位角色都需要有場景名稱。';
+    if(!g.draft.name) g.draft.name=members.map(c=>c.name).join('、').slice(0,25);
+    if(!g.draft.playerName) g.draft.playerName=state.account?.nickname||'玩家';
+    if(!g.draft.playerPersona) g.draft.playerPersona=state.account?.bio||'';
+    if(!g.draft.worldCharacterId||!members.some(c=>c.id===g.draft.worldCharacterId)) g.draft.worldCharacterId=members[0].id;
+  } else if(g.step===2) {
+    const members=groupSelectedCharacters();
+    g.draft.name=$('groupNameInput')?.value.trim()||'';
+    g.draft.playerName=$('groupPlayerName')?.value.trim()||'';
+    g.draft.playerPersona=$('groupPlayerPersona')?.value||'';
+    g.draft.worldCharacterId=$('view').querySelector('input[name="groupWorldCharacter"]:checked')?.value||members[0]?.id||'';
+    const worldCharacter=members.find(c=>c.id===g.draft.worldCharacterId);
+    g.draft.world=String(worldCharacter?.worldBackground||worldCharacter?.world||worldCharacter?.intro||'').slice(0,10000);
+    g.draft.scenes=[{name:$('groupSceneName0')?.value.trim()||'',description:$('groupSceneDesc0')?.value||''}];
+    if(!g.draft.name||g.draft.name.length>25) return '群組名稱需為 1–25 字。';
+    if(!g.draft.playerName||g.draft.playerName.length>80) return '請填寫 1–80 字的玩家角色名稱。';
+    if(g.draft.playerPersona.length>3000) return '玩家人設不可超過 3000 字。';
+    if(!worldCharacter) return '請選擇一位角色作為整體世界觀背景。';
+    if(g.draft.scenes[0].name.length>80||g.draft.scenes[0].description.length>1000) return '初始場景名稱最多 80 字，開場內容最多 1000 字。';
   }
   return '';
 }
 async function groupNext() {
   const err=groupReadStep();
-  if(err) { groupPrototype.formError=err;render();return; }
+  if(err) {groupPrototype.formError=err;render();return;}
   groupPrototype.formError='';
-  if(groupPrototype.step<3) { groupPrototype.step++;render();return; }
+  if(groupPrototype.step===1) {groupPrototype.step=2;render();return;}
   await groupCreateMock();
 }
 async function groupCreateMock() {
   const g=groupPrototype;
+  if(g.loading) return;
   const err=groupReadStep();
   if(err) {g.formError=err;render();return;}
   if(!window.mySupabase) {g.formError='Supabase 用戶端尚未載入。';render();return;}
@@ -3358,12 +3609,16 @@ async function groupCreateMock() {
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('請使用已連結 Supabase 的帳號登入，才能建立雲端群組。');
     g.ownerUid=user.id;
     const members=groupSelectedCharacters();
-    const scenes=[g.draft.scenes[0]].map(x=>({name:x.name.trim(),description:x.description||''}));
+    const scenes=[{name:g.draft.scenes[0].name.trim(),description:g.draft.scenes[0].description||''}];
     const pMembers=members.map(m=>({character_id:m.id,scene_position:1}));
-    const {data:groupId,error}=await window.mySupabase.rpc('create_chat_group',{
-      p_name:g.draft.name.trim(),p_world_background:g.draft.world,p_scene_mode:g.draft.mode,p_scenes:scenes,p_members:pMembers
-    });
+    const {data:groupId,error}=await groupWithTimeout(window.mySupabase.rpc('create_chat_group',{
+      p_name:g.draft.name.trim(),p_world_background:g.draft.world,p_scene_mode:'shared',p_scenes:scenes,p_members:pMembers
+    }),15000,'建立群組逾時，請重新載入群組清單確認是否已建立，避免重複建立。');
     if(error) throw error;
+    const {data:updated,error:updateError}=await window.mySupabase.from('chat_groups')
+      .update({player_name:g.draft.playerName,player_persona:g.draft.playerPersona,world_character_id:g.draft.worldCharacterId,updated_at:new Date().toISOString()})
+      .eq('id',groupId).eq('owner_id',user.id).select('id').maybeSingle();
+    if(updateError||!updated) throw new Error('群組已建立，但玩家人設與世界觀選擇未能保存。請重新開啟群組並確認資料。');
     g.loading=false;
     await groupOpen(groupId);
   } catch(error) {
@@ -3376,12 +3631,18 @@ function groupToggleCharacter(idValue) {
   if(g.draft.memberIds.includes(idValue)) g.draft.memberIds=g.draft.memberIds.filter(x=>x!==idValue);
   else if(g.draft.memberIds.length<3) g.draft.memberIds.push(idValue);
   else toast('每個群組最多三名角色。');
+  const members=groupSelectedCharacters();
+  if(!g.draft.name||g.draft.name===g._suggestedName) g.draft.name=members.map(c=>c.name).join('、').slice(0,25);
+  g._suggestedName=g.draft.name;
+  if(!members.some(c=>c.id===g.draft.worldCharacterId)) g.draft.worldCharacterId=members[0]?.id||'';
   g.formError='';render();
 }
 async function groupSendMock() {
   const input=$('groupMessageInput');
   const content=input?.value.trim();
   const g=groupPrototype;
+  if(g.sending) return;
+  if(!window.mySupabase) { g.formError='Supabase 用戶端尚未載入。';render();return; }
   if(!content) {g.formError='請先輸入訊息。';render();return;}
   if(!g.active?.id) {g.formError='群組尚未保存，請重新開啟群組。';render();return;}
   if(!window.crypto?.randomUUID) {g.formError='此瀏覽器無法產生安全的回合識別碼，請更新瀏覽器後重試。';render();return;}
@@ -3392,9 +3653,9 @@ async function groupSendMock() {
     if(!g.pendingRequest || g.pendingRequest.groupId!==g.active.id || g.pendingRequest.content!==content) {
       g.pendingRequest={groupId:g.active.id,content,requestKey:window.crypto.randomUUID()};
     }
-    const {error}=await window.mySupabase.rpc('append_chat_group_mock_turn',{
+    const {error}=await groupWithTimeout(window.mySupabase.rpc('append_chat_group_mock_turn',{
       p_group_id:g.active.id,p_request_key:g.pendingRequest.requestKey,p_content:content
-    });
+    }),15000,'訊息保存逾時。請重新開啟群組確認訊息是否已保存，再決定是否重試。');
     if(error) throw error;
     g.pendingRequest=null;
     g.sending=false;
@@ -3442,7 +3703,7 @@ async function groupArchive(groupId) {
     toast(groupFriendlyError(error)||'封存失敗，請稍後重試。');
   }
 }
-function groupList() { const g=groupPrototype;g.active=null;g.step=1;g.formError='';g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]};render(); }
+function groupList() { const g=groupPrototype;g.openRequestId=(g.openRequestId||0)+1;g.active=null;g.loading=false;g.sending=false;g.pendingRequest=null;g.openError='';g.failedGroupId=null;g.step=1;g.formError='';g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:state.account?.nickname||'玩家',playerPersona:state.account?.bio||'',worldCharacterId:''};groupCharacterSearch='';if(route.page!=='group'||route.id||route.overlay) go({page:'group'}); else render(); }
 function groupRestart() { groupList(); }
 function renderConversation() {
   const s = currentSession();
@@ -3474,14 +3735,12 @@ function renderConversation() {
             </div>
             <div class="row" style="gap:1px">
               <button class="ghost" data-action="chat-overlay" data-kind="album" aria-label="回憶相簿">${ICON.album}</button>
-              <button class="ghost" data-action="chat-overlay" data-kind="diary" aria-label="甜蜜日記">${ICON.diary}</button>
+              <button class="ghost" data-action="chat-overlay" data-kind="search" aria-label="搜尋過往聊天記錄">${ICON.search}</button>
               <button class="ghost" data-action="chat-settings" data-id="${e(s.id)}" aria-label="聊天功能">${ICON.menu}</button>
             </div>
           </div>
-          <div class="chat-meta">${environment()}${wallet()}</div>
         </div>
         <div class="messages" id="messages"></div>
-        ${phoneHTML(c)}
         <form class="composer" data-form="message">
           ${s.suggestions ? `<div class="suggestions">
             <details class="suggestions-panel">
@@ -3508,13 +3767,23 @@ function renderConversation() {
               </button>
             </details>
           </div>` : ''}
-          <div class="row" style="gap:7px">
-            <textarea id="messageInput" name="text" maxlength="3000" placeholder="輸入對話…">${e(drafts[s.id] || '')}</textarea>
-            <button class="primary" aria-label="送出或接續回應">➤</button>
+          <div class="composer-input-row">
+            <textarea id="messageInput" name="text" maxlength="1000" rows="1" placeholder="留空發送，角色會繼續說下去" aria-label="輸入對話">${e(drafts[s.id] || '')}</textarea>
           </div>
-          <div class="chat-tools">
+          <div class="composer-bottom-row">
+            <div class="composer-bottom-left">
+              <button type="button" class="composer-icon-button" data-action="toggle-chat-tools" aria-label="展開聊天功能" aria-expanded="false" title="更多功能">${ICON.plus}</button>
+            </div>
+            <div class="composer-bottom-right">
+              <div class="composer-wallet" aria-label="目前錢包餘額">
+                <button type="button" data-action="profile" title="查看錢包"><span class="wallet-value wallet-diamond">💎 ${Number(currentUser()?.diamonds || 0).toLocaleString()}</span></button>
+                <button type="button" data-action="profile" title="查看錢包"><span class="wallet-value wallet-silver">◉ ${Number(currentUser()?.silver || 0).toLocaleString()}</span></button>
+              </div>
+              <button type="submit" class="primary composer-send" aria-label="送出或接續回應" title="送出">${ICON.send}</button>
+            </div>
+          </div>
+          <div class="chat-tools hidden" id="chatTools">
             <button type="button" data-action="snapshot">📷 快照</button>
-            <button type="button" data-action="persona">⚙ 人設</button>
             <button type="button" data-action="suggestions">建議回覆 ${s.suggestions ? 'ON' : 'OFF'}</button>
             <button type="button" disabled>圖片上傳</button>
           </div>
@@ -3577,6 +3846,23 @@ function addMemory(s,text) {
   }
   s.memories = next;
 }
+function archiveSearchResults(query) {
+  const q=String(query||'').trim().toLocaleLowerCase();
+  const items=Object.values(state.sessions||{}).filter(item => {
+    if (!item || item.hidden) return false;
+    const character=sessionCharacter(item);
+    return !q || [item.name,character?.name].filter(Boolean).join(' ').toLocaleLowerCase().includes(q);
+  }).sort((a,b)=>(b.startedAt||0)-(a.startedAt||0));
+  return items.map(item => {
+    const character=sessionCharacter(item);
+    const last=[...(item.messages||[])].reverse().find(m=>String(m.text||'').trim());
+    return `<article class="memory-item"><div class="row" style="gap:9px">
+      ${avatar(character)}<div class="grow" style="min-width:0"><strong class="ellipsis">${e(item.name||character?.name||'聊天')}</strong>
+      <div class="small muted ellipsis">${e(last?.text||'尚未開始的聊天')}</div></div>
+      <button type="button" data-action="resume-chat" data-id="${e(item.id)}">續聊</button>
+    </div></article>`;
+  }).join('') || '<div class="empty">找不到符合的聊天記錄。</div>';
+}
 function renderChatOverlay(kind) {
   const s = currentSession();
   const panel = $('view').querySelector('.chat-main');
@@ -3603,8 +3889,11 @@ function renderChatOverlay(kind) {
         <p class="small muted">測試模式：不呼叫 AI、不生圖、不扣鑽石或銀幣。這些按鈕只測試同步，不是下方相機圖示的產圖功能。</p>
       </section>`
     : '';
-  const content = kind === 'diary'
-    ? `${testControls}<p class="small muted">${memorySize(s.memories)} / 3000字</p>
+  const content = kind === 'search'
+    ? `<label class="field"><span>搜尋過往聊天記錄</span><input id="archiveSearchInput" type="search" placeholder="輸入聊天名稱或角色名稱…" autocomplete="off"></label>
+      <div id="archiveSearchResults">${archiveSearchResults('')}</div>`
+    : kind === 'diary'
+      ? `${testControls}<p class="small muted">${memorySize(s.memories)} / 3000字</p>
       ${s.memories.map(m => `<article class="memory-item">
         <label class="check">
           <input type="checkbox" data-memory="${e(m.id)}" ${m.important ? 'checked' : ''}>
@@ -3622,11 +3911,11 @@ function renderChatOverlay(kind) {
         </button>`).join('') || '<div class="empty">OH NO，你現在還沒有跟他有回憶哦。</div>'}
       </div>`;
   panel.insertAdjacentHTML('beforeend',`
-    <section class="chat-overlay" aria-label="${kind === 'diary' ? '甜蜜日記' : '回憶相簿'}">
+    <section class="chat-overlay" aria-label="${kind === 'diary' ? '甜蜜日記' : kind === 'search' ? '搜尋過往聊天' : '回憶相簿'}">
       <div class="overlay-heading">
         <button class="ghost" data-action="back" aria-label="返回">${ICON.back}</button>
-        <h2>${kind === 'diary' ? '甜蜜日記' : '回憶相簿'}</h2>
-      </div>${content}
+        <h2>${kind === 'diary' ? '甜蜜日記' : kind === 'search' ? '搜尋過往聊天' : '回憶相簿'}</h2>
+      </div>${kind === 'album' ? '<div class="row wrap" style="margin-bottom:12px"><button type="button" data-action="persona">專屬人設設定</button><button type="button" data-action="chat-overlay" data-kind="diary">甜蜜日記</button></div>' : ''}${content}
     </section>`);
 }
 
@@ -4191,14 +4480,52 @@ document.addEventListener('click',async event => {
     switch(action) {
       case 'home':go({page:'home'});break;
       case 'group-next':groupNext();break;
-      case 'group-inspiration':toast('AI 靈感功能尚在串接中；你可以先自行撰寫或修改場景。此操作不會呼叫 AI 或扣款。');break;
+      case 'group-inspiration': {
+        const members=groupSelectedCharacters();
+        const names=members.map(c=>c.name).join('、')||'角色們';
+        const sceneName=$('groupSceneName0')?.value.trim()||'初始相遇';
+        const sample='【測試用靈感範例，非 AI 生成】故事從「'+sceneName+'」開始。'+names+'在同一個時空中意外相遇，周遭的環境藏著尚未揭曉的線索。有人率先打破沉默，有人則保持觀望，每個人都帶著自己的目的與過往。此刻，一個突如其來的事件讓眾人的目光交會，也讓原本平靜的氣氛開始改變。你可以接著補上時間、地點、角色之間的關係，以及玩家角色如何加入這場故事。';
+        const scene=$('groupSceneDesc0');if(scene){scene.value=sample;scene.dispatchEvent(new Event('input',{bubbles:true}));toast('已填入測試用 Mock 靈感文字，可自行修改；未呼叫 AI、未扣款。');}
+        break;
+      }
       case 'group-open':groupOpen(key);break;
+      case 'group-return-list':groupPrototype.active=null;go({page:'chat'});break;
+      case 'group-info': {
+        const group=groupPrototype.active;
+        if(!group) break;
+        const sceneLabel=sceneId=>group.scenes.find(scene=>scene.id===sceneId)?.name||'共用場景';
+        const memberRows=group.members.map(member=>{
+          const avatar=String(member.avatar_url||'');
+          const image=/^https?:\/\//i.test(avatar)
+            ? '<img class="avatar" src="'+e(avatar)+'" alt="">'
+            : '<span class="avatar avatar-fallback">'+e(String(member.name||'角').slice(0,1))+'</span>';
+          return '<div class="row" style="gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)">'+image+
+            '<div class="grow" style="min-width:0"><strong>'+e(member.name||'角色')+'</strong><div class="small muted">'+e(sceneLabel(member.sceneId))+'</div></div></div>';
+        }).join('');
+        const scenes=(group.scenes||[]).map(scene=>'<div class="group-panel" style="padding:10px;margin:8px 0"><strong>'+e(scene.name||'未命名場景')+'</strong>'+
+          (scene.description?'<p style="white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0 0">'+e(scene.description)+'</p>':'<p class="small muted" style="margin:6px 0 0">尚未填寫場景描述。</p>')+'</div>').join('');
+        showDialog('群組資訊','<div class="stack"><p><strong>群組名稱：</strong>'+e(group.name||'')+'</p>'+
+          '<p><strong>世界背景：</strong></p><div class="group-panel" style="padding:10px;white-space:pre-wrap;overflow-wrap:anywhere">'+e(group.world||'尚未設定')+'</div>'+
+          '<div><strong>參與角色（'+group.members.length+'/3）</strong>'+memberRows+'</div>'+
+          '<div><strong>場景設定</strong>'+scenes+'</div>'+
+          '<div><strong>玩家角色</strong><p style="margin:6px 0"><strong>'+e(group.playerName||'玩家')+'</strong></p><div class="group-panel" style="padding:10px;white-space:pre-wrap;overflow-wrap:anywhere">'+e(group.playerPersona||'尚未設定玩家人設。')+'</div></div>'+
+          '<p class="muted small">群組對話獨立保存；目前為測試模式，AI 尚未串接且不會扣款。</p></div>');
+        break;
+      }
       case 'group-rename':groupRename(key);break;
       case 'group-archive':groupArchive(key);break;
       case 'group-refresh-list':groupRefreshList();break;
       case 'group-list':groupList();break;
+      case 'chat-list-search-toggle': {
+        chatSearchExpanded = !chatSearchExpanded;
+        if (!chatSearchExpanded) chatSearch = '';
+        render();
+        if (chatSearchExpanded) $('chatSearch')?.focus();
+        break;
+      }
       case 'group-back':groupBack();break;
       case 'group-toggle-character':groupToggleCharacter(key);break;
+      case 'group-world-character': { groupPrototype.draft.worldCharacterId=button.value||button.dataset.value||'';const selected=groupSelectedCharacters().find(c=>c.id===groupPrototype.draft.worldCharacterId);const preview=$('groupWorldReference');if(preview) preview.textContent=selected?.worldBackground||selected?.world||selected?.intro||'所選角色目前沒有可用的公開介紹；可先繼續建立，後續再完善世界觀資料。';break; }
       case 'group-create':groupCreateMock();break;
       case 'group-send':groupSendMock();break;
       case 'group-toggle-member':groupExpandedMemberId=groupExpandedMemberId===key?null:key;render();break;
@@ -4413,6 +4740,10 @@ document.addEventListener('click',async event => {
         go(next);
         break;
       }
+      case 'chat-list-album': {
+        go({page:'album'});
+        break;
+      }
       case 'list-menu':openModal('list-menu');break;
       case 'group':go({page:'group'});break;
       case 'session-menu':openModal('session-menu',{id:key});break;
@@ -4523,6 +4854,16 @@ document.addEventListener('click',async event => {
         if (!s) break;
         captureDraft();s.suggestions=!s.suggestions;
         persist();render();break;
+      case 'toggle-chat-tools': {
+        const toolsPanel=$('chatTools') || $('groupChatTools');
+        const toggle=$('view').querySelector('[data-action="toggle-chat-tools"]');
+        if (toolsPanel && toggle) {
+          const isHidden=toolsPanel.classList.toggle('hidden');
+          toggle.setAttribute('aria-expanded',String(!isHidden));
+          toggle.setAttribute('aria-label',isHidden?'展開聊天功能':'收合聊天功能');
+        }
+        break;
+      }
       case 'snapshot':openModal('snapshot');break;
       case 'persona':openModal('persona');break;
       case 'archives':openModal('archives',{id:key});break;
@@ -4581,6 +4922,12 @@ document.addEventListener('click',async event => {
           persist();
           go({page:'conversation',id:next.id});
         }
+        break;
+      }
+      case 'resume-chat': {
+        const item=state.sessions[key];
+        if (!item || !canAccessSessionCharacter(item,sessionCharacter(item))) break;
+        go({page:'conversation',id:item.id});
         break;
       }
       case 'view-archive':openModal('archive',{id:key});break;
@@ -5088,6 +5435,10 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         toast('已取消刪除申請，原帳號與錢包餘額已保留。');
         break;
       }
+      case 'group-message': {
+        await groupSendMock();
+        break;
+      }
       case 'message': {
         if (!s || !currentUser()) return;
         // Reuse the same turn IDs after an ambiguous response; never create a new
@@ -5296,18 +5647,31 @@ document.addEventListener('input',event => {
     chatSearch=target.value;
     $('chatEntries').innerHTML=chatEntries();
   }
+  if (target.id==='archiveSearchInput') {
+    const results=$('archiveSearchResults');
+    if (results) results.innerHTML=archiveSearchResults(target.value);
+  }
   if (target.id==='groupCharacterSearch') {
     groupCharacterSearch=target.value;
     const results=$('groupCharacterResults');
     if(results) results.innerHTML=groupRenderCharacterResults();
   }
-  if (target.id==='messageInput') drafts[route.id]=target.value;
+  if (target.id==='messageInput') {
+    drafts[route.id]=target.value;
+    target.style.height='auto';
+    target.style.height=Math.min(target.scrollHeight,144)+'px';
+  }
+  if (target.id==='groupMessageInput') {
+    target.style.height='auto';
+    target.style.height=Math.min(target.scrollHeight,144)+'px';
+  }
 });
 document.addEventListener('keydown',event => {
-  if (event.target.id==='messageInput' &&
+  if (['messageInput','groupMessageInput'].includes(event.target.id) &&
       event.key==='Enter' && !event.shiftKey && !event.isComposing) {
     event.preventDefault();
-    event.target.form.requestSubmit();
+    if(event.target.id==='groupMessageInput') void groupSendMock();
+    else event.target.form.requestSubmit();
   }
 });
 document.addEventListener('change',async event => {
