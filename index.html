@@ -1417,17 +1417,12 @@ if (characterError) {
   }
 
   async function saveSupabaseProfile(account) {
-    if (!account?.uid || !window.mySupabase) return;
-    const { error } = await window.mySupabase.from('profiles').upsert({
-      id: account.uid,
-      handle: account.handle || ('user_' + account.uid.replace(/-/g, '').slice(0, 12)),
-      nickname: account.nickname,
-      avatar_url: account.avatar || null,
-      bio: account.bio || '',
-      birthdate: account.birthdate || null,
-      persona_presets: Array.isArray(account.personas) ? account.personas : []
-    }, { onConflict: 'id' });
+    if (!account?.uid || !window.mySupabase) throw new Error('無法確認登入帳號或 Supabase 連線。');
+    const payload = { id: account.uid, handle: account.handle || ('user_' + account.uid.replace(/-/g, '').slice(0, 12)), nickname: account.nickname, avatar_url: account.avatar || null, bio: account.bio || '', birthdate: account.birthdate || null, persona_presets: Array.isArray(account.personas) ? account.personas : [] };
+    const { data, error } = await window.mySupabase.from('profiles').upsert(payload, { onConflict: 'id' }).select('id, persona_presets').single();
     if (error) throw new Error('儲存 profiles 失敗：' + error.message);
+    if (!data || data.id !== account.uid) throw new Error('雲端未確認儲存結果，請稍後重試。');
+    if (JSON.stringify(data.persona_presets || []) !== JSON.stringify(payload.persona_presets)) throw new Error('雲端回讀的人設內容與送出內容不一致，請重新儲存。');
   }
 
   async function loginWithGoogle() {
