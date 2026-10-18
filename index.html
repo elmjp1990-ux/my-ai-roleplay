@@ -2747,9 +2747,9 @@ function renderComments() {
     return `
       <article class="comment ${c.parentId ? 'reply' : ''}">
         <div class="row">
-          ${c.redacted && c.whisper ? '<div class="avatar whisper-redacted-avatar" aria-label="悄悄話">悄</div>' : avatar(a)}
+          ${c.redacted && c.whisper && !c.parentId ? '<div class="avatar whisper-redacted-avatar" aria-label="悄悄話">悄</div>' : avatar(a)}
           <div class="grow">
-            <button class="author-link" data-action="author" data-id="${e(a.uid)}">@${e(a.nickname)}</button>
+            ${c.redacted && c.whisper && !c.parentId ? '<span class="small muted">悄悄話</span>' : '<button class="author-link" data-action="author" data-id="${e(a.uid)}">@${e(a.nickname)}</button>'}
             <div class="small muted">${e(timeText(c.at))}${c.edited ? ' · 已修改' : ''}${c.whisper ? '<span class="comment-whisper-label">悄悄話</span>' : ''}</div>
           </div>
         </div>
