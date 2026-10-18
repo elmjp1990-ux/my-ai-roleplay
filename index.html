@@ -2955,6 +2955,21 @@ async function readImage(file) {
     reader.readAsDataURL(file);
   });
 }
+async function compressProfileImage(file) {
+  if (!file || !['image/png','image/jpeg','image/webp'].includes(file.type)) throw Error('請選擇 PNG、JPG 或 WebP 圖片。');
+  if (file.size > 15 * 1024 * 1024) throw Error('頭像原始檔請小於 15 MB。');
+  const source=await readImage(file);
+  const image=await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(Error('無法讀取這張圖片。'));img.src=source;});
+  const size=256, canvas=document.createElement('canvas');canvas.width=size;canvas.height=size;
+  const ctx=canvas.getContext('2d');if(!ctx)throw Error('目前瀏覽器無法壓縮圖片。');
+  const scale=Math.max(size/image.width,size/image.height),width=image.width*scale,height=image.height*scale;
+  ctx.drawImage(image,(size-width)/2,(size-height)/2,width,height);
+  let result=canvas.toDataURL('image/webp',0.62);
+  if(result.length>120000)result=canvas.toDataURL('image/jpeg',0.55);
+  if(result.length>180000)result=canvas.toDataURL('image/jpeg',0.38);
+  if(result.length>220000)throw Error('壓縮後圖片仍太大，請改用較簡單的圖片。');
+  return result;
+}
 
 /* Chat sessions: character identity stays separate from conversation identity. */
 function newSession(character,options = {}) {
@@ -4757,21 +4772,21 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
       case 'profile': {
         const name=String(f.get('nickname')).trim();
         if (!validName(name)) return toast('暱稱不符合規則。'+NAME_HELP);
+        const previous={...state.account};
         state.account.nickname=name;
         state.account.bio=String(f.get('bio')).trim();
-        state.account.avatar=profileImage;
-        state.theme=f.get('day') ? 'day' : 'night';
+        state.account.avatar=profileImage || state.account.avatar || '';
         persist();
         try {
           if (window.mySupabase?.auth) {
-            const { data } = await window.mySupabase.auth.getUser();
-            if (data?.user?.id === state.account.uid) await saveSupabaseProfile(state.account);
+            const { data, error } = await window.mySupabase.auth.getUser();
+            if (error || data?.user?.id !== state.account.uid) throw new Error('登入狀態驗證失敗，請重新登入。');
+            await saveSupabaseProfile(state.account);
           }
-          back();
-          toast('個人資料已儲存。');
+          back();render();toast('個人資料已儲存。');
         } catch (error) {
-          console.error(error);
-          toast('本機已更新，但資料庫儲存失敗；請檢查 RLS 權限。');
+          state.account={...previous};persist();render();
+          toast('個人資料未能同步：'+(error.message || '請稍後再試。'));
         }
         break;
       }
@@ -5037,8 +5052,11 @@ document.addEventListener('change',async event => {
       $('imagePreview').classList.remove('hidden');
     }
     if (target.id==='profileImage') {
-      profileImage=await readImage(target.files[0]);
-      toast('頭像已讀取，儲存後套用。');
+      if (!target.files?.[0]) return;
+      profileImage=await compressProfileImage(target.files[0]);
+      const preview=$('profileImagePreview');
+      if (preview) { preview.src=profileImage; preview.style.display='block'; }
+      toast('頭像已壓縮，儲存後套用。');
     }
     if (target.id==='backgroundSetting') {
       const s=(target.dataset.sessionId && state.sessions[target.dataset.sessionId]) || currentSession();
