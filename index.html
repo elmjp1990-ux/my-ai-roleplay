@@ -3107,9 +3107,11 @@ async function groupOpen(groupId) {
   const g=groupPrototype;
   groupResetForAccount(currentUser()?.uid||null);
   if(!isUuid(groupId)||!window.mySupabase) { g.loading=false;g.openError='群組識別碼無效或 Supabase 尚未載入。';g.failedGroupId=groupId;render();toast(g.openError);return; }
+  // Keep the group ID in the URL so rerenders, auth refreshes, and post-send reloads
+  // can recover the same group instead of silently falling back to the creation wizard.
   const requestId=g.openRequestId=(g.openRequestId||0)+1;
   g.loading=true;g.formError='';g.openError='';g.failedGroupId=groupId;g.active=null;
-  if(route.page!=='group'||route.id||route.overlay) go({page:'group'});
+  if(route.page!=='group'||route.id!==groupId||route.overlay) go({page:'group',id:groupId});
   else render();
   try {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
@@ -3205,6 +3207,11 @@ function renderGroupConversation() {
 function renderGroupPrototype() {
   groupResetForAccount(currentUser()?.uid||null);
   const g=groupPrototype;
+  // A group route is recoverable from its URL even after an incidental rerender.
+  if(route.id && !g.loading && !g.active && !g.openError) {
+    void groupOpen(route.id);
+    return;
+  }
   if(g.loading) {
     $('view').innerHTML='<div class="group-wizard"><div class="group-panel" role="status" aria-live="polite">正在讀取群組資料…</div></div>';
     return;
@@ -3275,6 +3282,7 @@ async function groupNext() {
 }
 async function groupCreateMock() {
   const g=groupPrototype;
+  if(g.loading) return;
   const err=groupReadStep();
   if(err) {g.formError=err;render();return;}
   if(!window.mySupabase) {g.formError='Supabase 用戶端尚未載入。';render();return;}
@@ -3316,6 +3324,8 @@ async function groupSendMock() {
   const input=$('groupMessageInput');
   const content=input?.value.trim();
   const g=groupPrototype;
+  if(g.sending) return;
+  if(!window.mySupabase) { g.formError='Supabase 用戶端尚未載入。';render();return; }
   if(!content) {g.formError='請先輸入訊息。';render();return;}
   if(!g.active?.id) {g.formError='群組尚未保存，請重新開啟群組。';render();return;}
   if(!window.crypto?.randomUUID) {g.formError='此瀏覽器無法產生安全的回合識別碼，請更新瀏覽器後重試。';render();return;}
@@ -3376,7 +3386,7 @@ async function groupArchive(groupId) {
     toast(groupFriendlyError(error)||'封存失敗，請稍後重試。');
   }
 }
-function groupList() { const g=groupPrototype;g.openRequestId=(g.openRequestId||0)+1;g.active=null;g.loading=false;g.sending=false;g.pendingRequest=null;g.openError='';g.failedGroupId=null;g.step=1;g.formError='';g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:state.account?.nickname||'玩家',playerPersona:state.account?.bio||'',worldCharacterId:''};groupCharacterSearch='';render(); }
+function groupList() { const g=groupPrototype;g.openRequestId=(g.openRequestId||0)+1;g.active=null;g.loading=false;g.sending=false;g.pendingRequest=null;g.openError='';g.failedGroupId=null;g.step=1;g.formError='';g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:state.account?.nickname||'玩家',playerPersona:state.account?.bio||'',worldCharacterId:''};groupCharacterSearch='';if(route.page!=='group'||route.id||route.overlay) go({page:'group'}); else render(); }
 function groupRestart() { groupList(); }
 function renderConversation() {
   const s = currentSession();
@@ -4962,10 +4972,11 @@ document.addEventListener('input',event => {
   if (target.id==='messageInput') drafts[route.id]=target.value;
 });
 document.addEventListener('keydown',event => {
-  if (event.target.id==='messageInput' &&
+  if (['messageInput','groupMessageInput'].includes(event.target.id) &&
       event.key==='Enter' && !event.shiftKey && !event.isComposing) {
     event.preventDefault();
-    event.target.form.requestSubmit();
+    if(event.target.id==='groupMessageInput') void groupSendMock();
+    else event.target.form.requestSubmit();
   }
 });
 document.addEventListener('change',async event => {
