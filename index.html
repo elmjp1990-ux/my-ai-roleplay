@@ -3806,7 +3806,8 @@ function renderModal(o) {
       break;
     case 'personas': {
       const personas = Array.isArray(u.personas) ? u.personas : [];
-      showDialog('人物設定',`<p class="small muted">最多儲存 30 組人設預設。人設目前保存在此瀏覽器，可查看及刪除。</p><form data-form="personas" class="stack"><label class="field"><span>人設名稱</span><input name="personaName" maxlength="40" required></label><label class="field"><span>人設內容</span><textarea name="personaText" maxlength="3000" required></textarea></label><button class="primary" ${personas.length >= 30 ? 'disabled' : ''}>儲存人設（${personas.length}/30）</button></form><div class="ledger-scroll" style="height:min(300px,36dvh)">${personas.map(p => `<article class="log-row"><div class="row between"><strong>${e(p.name)}</strong><button type="button" data-action="persona-delete" data-id="${e(p.id)}">刪除</button></div><p class="small muted" style="white-space:pre-wrap">${e(p.text)}</p></article>`).join('') || '<div class="empty">尚未儲存人設。</div>'}</div>`);
+      const editing = personas.find(p => p.id === o.editId);
+      showDialog('人物設定',`<p class="small muted">最多儲存 30 組人設預設。人設目前保存在此瀏覽器，可新增、編輯及刪除。</p><form data-form="personas" class="stack"><input type="hidden" name="personaId" value="${e(editing?.id || '')}"><label class="field"><span>人設名稱</span><input name="personaName" maxlength="40" required value="${e(editing?.name || '')}"></label><label class="field"><span>人設內容</span><textarea name="personaText" maxlength="3000" required>${e(editing?.text || '')}</textarea></label><button class="primary" ${!editing && personas.length >= 30 ? 'disabled' : ''}>${editing ? '儲存修改' : `新增人設（${personas.length}/30）`}</button></form><div class="ledger-scroll" style="height:min(300px,36dvh)">${personas.map(p => `<article class="log-row"><div class="row between"><strong>${e(p.name)}</strong><div class="row"><button type="button" data-action="persona-edit" data-id="${e(p.id)}">編輯</button><button type="button" data-action="persona-delete" data-id="${e(p.id)}">刪除</button></div></div><p class="small muted" style="white-space:pre-wrap">${e(p.text)}</p></article>`).join('') || '<div class="empty">尚未儲存人設。</div>'}</div>`);
       break;
     }
     case 'delete-account':
@@ -4574,6 +4575,7 @@ document.addEventListener('click',async event => {
       case 'personas':openModal('personas');break;
       case 'theme-setting':openModal('theme-setting');break;
       case 'birthdate':openModal('birthdate');break;
+      case 'persona-edit':openModal('personas',{editId:key});break;
       case 'persona-delete': {
         const list=Array.isArray(state.account?.personas) ? state.account.personas : [];
         const index=list.findIndex(item=>item.id===key);
@@ -4819,10 +4821,18 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         const name=String(f.get('personaName') || '').trim(), value=String(f.get('personaText') || '').trim();
         if(!name || !value) return toast('請填寫人設名稱與內容。');
         const list=Array.isArray(state.account.personas) ? state.account.personas : [];
-        if(list.length>=30) return toast('最多只能儲存 30 組人設。');
-        list.push({id:id(),name,text:value,createdAt:Date.now()});state.account.personas=list;
-        if(!persist()) { list.pop(); return; }
-        openModal('personas');toast('人設已儲存。');break;
+        const personaId=String(f.get('personaId') || '');
+        if(personaId) {
+          const existing=list.find(item=>item.id===personaId);
+          if(!existing) return toast('找不到這組人設，請重新整理。');
+          existing.name=name;existing.text=value;existing.updatedAt=Date.now();
+        } else {
+          if(list.length>=30) return toast('最多只能儲存 30 組人設。');
+          list.push({id:id(),name,text:value,createdAt:Date.now()});
+        }
+        state.account.personas=list;
+        if(!persist()) return;
+        openModal('personas');toast(personaId ? '人設已更新。' : '人設已儲存。');break;
       }
       case 'delete-account': {
         if (String(f.get('confirm')).trim() !== 'DELETE') return toast('請輸入「DELETE」。');
