@@ -571,6 +571,8 @@ dialog {
 dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 .modal-heading { margin-bottom:20px; }
 .modal-heading h2 { margin:0; }
+.profile-account-header { position:relative; display:flex; align-items:center; justify-content:space-between; gap:8px; padding-top:4px; }
+.profile-edit-button { position:absolute; top:0; right:0; padding:5px 9px; min-height:28px; font-size:12px; line-height:1.2; border-radius:8px; white-space:nowrap; }
 #toast {
   position:fixed;
   left:50%;
@@ -987,7 +989,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 
       let { data: profile, error: profileError } = await client
         .from('profiles')
-        .select('id, handle, nickname, avatar_url, bio, persona_presets')
+        .select('id, handle, nickname, avatar_url, bio, persona_presets, birthdate')
         .eq('id', user.id)
         .maybeSingle();
 
@@ -1004,8 +1006,9 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
           nickname: String(baseName).slice(0, 25),
           avatar_url: metadata.avatar_url || metadata.picture || null,
           bio: '',
-          persona_presets: []
-        }, { onConflict: 'id' }).select('id, handle, nickname, avatar_url, bio, persona_presets').single();
+          persona_presets: [],
+          birthdate: null
+        }, { onConflict: 'id' }).select('id, handle, nickname, avatar_url, bio, persona_presets, birthdate').single();
         if (result.error) throw new Error('建立 profiles 失敗：' + result.error.message);
         profile = result.data;
       }
@@ -1035,6 +1038,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         handle: profile.handle || '',
         avatar: profile.avatar_url || state.account.avatar || '',
         bio: profile.bio || '',
+        birthdate: profile.birthdate || '',
         personas: Array.isArray(profile.persona_presets) ? profile.persona_presets : [],
         diamonds: Number(walletRow.diamonds ?? 0),
         silver: Number(walletRow.silver_coins ?? 0)
@@ -1420,6 +1424,7 @@ if (characterError) {
       nickname: account.nickname,
       avatar_url: account.avatar || null,
       bio: account.bio || '',
+      birthdate: account.birthdate || null,
       persona_presets: Array.isArray(account.personas) ? account.personas : []
     }, { onConflict: 'id' });
     if (error) throw new Error('儲存 profiles 失敗：' + error.message);
@@ -2203,9 +2208,14 @@ async function runPendingChatTurn(s) {
 
 function toast(text) {
   clearTimeout(toastTimer);
-  $('toast').textContent = text;
-  $('toast').classList.remove('hidden');
-  toastTimer = setTimeout(() => $('toast').classList.add('hidden'),3500);
+  const notice = $('toast');
+  const modal = $('modal');
+  // Native dialog occupies the browser top layer, so place notifications inside it when open.
+  if (modal?.open && notice.parentElement !== modal) modal.appendChild(notice);
+  else if (!modal?.open && notice.parentElement !== document.body) document.body.appendChild(notice);
+  notice.textContent = text;
+  notice.classList.remove('hidden');
+  toastTimer = setTimeout(() => notice.classList.add('hidden'),3500);
 }
 function author(uid) {
   const profile = state.authors[uid] || null;
@@ -3674,7 +3684,7 @@ function renderProfile() {
   const u = currentUser();
   $('view').innerHTML = `<div class="stack form-width profile-page" style="gap:16px">
     <div class="row between" style="align-items:flex-start"><div><div class="explore-eyebrow">PERSONAX</div><h1 style="margin:4px 0 0">我的</h1></div><span class="small muted">測試環境，非正式網頁</span></div>
-    <section class="panel stack" style="gap:14px"><div class="row between" style="align-items:center;gap:12px"><div class="row" style="align-items:center;min-width:0;gap:12px">${avatar(u)}<div style="min-width:0"><div class="small muted">個人帳號</div><h2 style="margin:3px 0;overflow-wrap:anywhere">${e(u.nickname)}</h2><button class="author-link" data-action="author" data-id="${e(u.uid)}">@${e(u.nickname)}</button><p class="small muted" style="margin:6px 0;overflow-wrap:anywhere">UID：${e(u.uid)}</p></div></div><button data-action="edit-profile">⚙ 編輯</button></div><div><h3 style="margin-bottom:4px">帳號簡介</h3><p class="prose muted" style="margin:0">${e(u.bio || '尚未填寫')}</p></div></section>
+    <section class="panel stack" style="gap:14px"><div class="profile-account-header"><div class="row" style="align-items:center;min-width:0;gap:12px">${avatar(u)}<div style="min-width:0;padding-right:56px"><div class="small muted">個人帳號</div><h2 style="margin:3px 0;overflow-wrap:anywhere">${e(u.nickname)}</h2><button class="author-link" data-action="author" data-id="${e(u.uid)}">@${e(u.nickname)}</button><p class="small muted" style="margin:6px 0;overflow-wrap:anywhere">UID：${e(u.uid)}</p></div></div><button class="profile-edit-button" data-action="edit-profile">⚙ 編輯</button></div><div><h3 style="margin-bottom:4px">帳號簡介</h3><p class="prose muted" style="margin:0">${e(u.bio || '尚未填寫')}</p></div></section>
     <section class="panel stack" style="gap:12px"><div class="row between"><span>會員等級</span><strong>${u.member === 'monthly' ? '月費會員' : '免費會員'}</strong></div><div class="row between"><span>鑽石數量</span><strong>💎 ${Number(u.diamonds || 0).toLocaleString()}</strong></div><div class="row between"><span>銀幣數量</span><strong>◉ ${Number(u.silver || 0).toLocaleString()}</strong></div><button data-action="ledger" style="width:100%">花費日誌與交易紀錄</button></section>
     <section class="stack" style="gap:0"><button class="profile-setting" data-action="personas"><span><strong>人物設定</strong><small>管理多組人設預設（最多 30 組）</small></span><span>›</span></button><button class="profile-setting" data-action="theme-setting"><span><strong>版面顏色</strong><small>目前：${state.theme === 'day' ? '白天' : '黑夜'}</small></span><span>›</span></button><button class="profile-setting" data-action="birthdate"><span><strong>出生日期</strong><small>${e(u.birthdate || '尚未設定')}</small></span><span>›</span></button><button class="profile-setting" data-action="bug"><span><strong>BUG 回報</strong><small>回報網站問題（目前僅檢查表單）</small></span><span>›</span></button><div style="padding:16px 0 8px"><button data-action="logout" class="primary" style="width:100%;min-height:46px">登出帳號</button><p style="margin:14px 0 0;text-align:center"><button type="button" data-action="delete-account" style="border:0;background:transparent;padding:6px 10px;color:var(--muted);font-size:12px;text-decoration:underline;text-underline-offset:3px">提出帳號刪除申請</button></p></div></section>
   </div>`;
@@ -4836,7 +4846,20 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
       case 'birthdate': {
         const value=String(f.get('birthdate') || '');
         if(value && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value > new Date().toISOString().slice(0,10))) return toast('請選擇有效的出生日期。');
-        state.account.birthdate=value;persist();back();render();toast('出生日期已儲存。');break;
+        const previousBirthdate=state.account.birthdate || '';
+        state.account.birthdate=value;
+        persist();
+        try {
+          if (!window.mySupabase?.auth) throw new Error('請先登入 Google 帳號。');
+          const {data,error}=await window.mySupabase.auth.getUser();
+          if(error || data?.user?.id!==state.account?.uid) throw new Error('登入狀態驗證失敗，請重新登入。');
+          await saveSupabaseProfile(state.account);
+          back();render();toast('生日儲存成功。');
+        } catch(error) {
+          state.account.birthdate=previousBirthdate;persist();openModal('birthdate');
+          toast('生日未能同步到雲端：'+(error.message || '請稍後再試。'));
+        }
+        break;
       }
       case 'personas': {
         const name=String(f.get('personaName') || '').trim(), value=String(f.get('personaText') || '').trim();
@@ -4859,7 +4882,7 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
           const {data,error}=await window.mySupabase.auth.getUser();
           if(error || data?.user?.id!==state.account?.uid) throw new Error('登入狀態驗證失敗，請重新登入。');
           await saveSupabaseProfile(state.account);
-          route.overlay={name:'personas'};render();toast(personaId ? '人設已更新並同步到雲端。' : '人設已儲存並同步到雲端。');
+          route.overlay={name:'personas'};render();toast('儲存成功');
         } catch(error) {
           state.account.personas=previous;
           persist();openModal('personas');toast('人設未能同步到資料庫：'+(error.message||'請稍後再試。'));
