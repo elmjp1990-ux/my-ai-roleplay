@@ -3148,7 +3148,7 @@ async function groupOpen(groupId) {
     const messages=(messageRes.data||[]).map(m=>{
       const member=members.find(x=>x.characterId===m.character_id);
       const scene=scenes.find(x=>x.id===m.scene_id);
-      return {id:m.id,type:m.speaker_type==='user'?'user':m.speaker_type==='system'?'system':'character',speaker:m.speaker_type==='user'?'你':(member?.name||'角色')+(scene?' · '+scene.name:''),content:m.content,createdAt:m.created_at};
+      return {id:m.id,type:m.speaker_type==='user'?'user':m.speaker_type==='system'?'system':'character',speaker:m.speaker_type==='user'?'你':(member?.name||'角色')+(scene?' · '+scene.name:''),characterId:m.character_id||null,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:m.content,createdAt:m.created_at};
     });
     g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',scenes,members};
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;g.formError='';
@@ -3173,7 +3173,8 @@ function renderGroupConversation() {
       '</span>';
   }).join('');
   const messageRows=g.messages.map(m=>{
-    const member=group.members.find(x=>m.speaker===x.name || String(m.speaker||'').startsWith((x.name||'')+' · '));
+    const member=group.members.find(x=>m.characterId&&x.characterId===m.characterId) ||
+      group.members.find(x=>m.speaker===x.name || String(m.speaker||'').startsWith((x.name||'')+' · '));
     const avatar=avatarURL(member?.avatar_url);
     const isUser=m.type==='user', isSystem=m.type==='system';
     const who=isUser?'你':isSystem?'系統':(member?.name||m.speaker||'角色');
@@ -3184,6 +3185,10 @@ function renderGroupConversation() {
       '<div class="message-content"><div class="message-name">'+e(who)+'</div><div class="bubble">'+e(m.content||'')+'</div></div></div>';
   }).join('') || '<div class="empty">這段群組對話還沒有訊息，輸入第一句話開始故事。</div>';
   const sceneNames=(group.scenes||[]).map(x=>x.name).filter(Boolean).join('、');
+  const initialScene=(group.scenes||[]).find(x=>Number(x.position||1)===1)||(group.scenes||[])[0];
+  const sceneContext=initialScene?.description?.trim()
+    ? '<div class="group-scene-context" style="margin:0 0 16px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel-2,rgba(127,127,127,.08))"><div class="small muted" style="margin-bottom:6px">📍 '+e(initialScene.name||'初始場景')+'</div><div style="white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.65">'+e(initialScene.description)+'</div></div>'
+    : '';
   $('view').innerHTML=`
     <div class="chat-layout ${hideList?'hide-list':''}">
       ${chatListHTML()}
@@ -3202,7 +3207,7 @@ function renderGroupConversation() {
           </div>
           <div class="small muted" style="padding:6px 4px 0;line-height:1.5">世界背景：${e(group.world||'尚未設定')} · 測試模式：不呼叫 AI、不扣款</div>
         </div>
-        <div class="messages" id="groupMessages">${messageRows}</div>
+        <div class="messages" id="groupMessages">${sceneContext}${messageRows}</div>
         <form class="composer" data-form="group-message">
           <textarea id="groupMessageInput" name="text" maxlength="2000" placeholder="輸入故事內容…" aria-label="輸入群組訊息" ${g.sending?'disabled':''}>${e(g.pendingRequest?.groupId===group.id?g.pendingRequest.content:'')}</textarea>
           <div class="row between" style="margin-top:7px"><span class="small muted">${g.turn} 個已保存回合</span><button class="primary" type="button" data-action="group-send" ${g.sending?'disabled':''}>${g.sending?'正在保存…':'送出'}</button></div>
