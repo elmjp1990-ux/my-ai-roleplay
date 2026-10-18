@@ -3211,6 +3211,20 @@ function renderGroupConversation() {
       </section>
     </div>`;
 }
+function renderGroupStatusShell({title,message,error=false,groupId=''}) {
+  const safeMessage=e(message||'');
+  const actions=error
+    ? '<button class="ghost" data-action="group-return-list">返回聊天列表</button><button class="primary" data-action="group-open" data-id="'+e(groupId||'')+'">重試載入</button>'
+    : '';
+  $('view').innerHTML='<div class="chat-layout '+(hideList?'hide-list':'')+'">'+chatListHTML()+
+    '<section class="panel chat-main"><div class="chat-heading"><div class="row between">'+
+    '<div class="row grow" style="gap:8px;min-width:0"><button class="ghost" data-action="group-return-list" aria-label="返回聊天列表">'+ICON.back+'</button>'+
+    '<div class="grow" style="min-width:0"><div class="chat-name ellipsis">'+e(title||'群組聊天')+'</div><div class="small muted">群組對話</div></div></div></div></div>'+
+    '<div class="messages"><div class="'+(error?'group-alert':'empty')+'" role="'+(error?'alert':'status')+'" aria-live="polite">'+safeMessage+'</div>'+
+    (actions?'<div class="row wrap" style="padding:12px">'+actions+'</div>':'')+'</div>'+
+    '<form class="composer" onsubmit="return false"><textarea disabled placeholder="'+(error?'請先解決載入問題':'正在載入群組對話…')+'" aria-label="群組訊息輸入"></textarea>'+
+    '<div class="row between" style="margin-top:7px"><span class="small muted">'+(error?'目前無法送出訊息':'正在載入群組資料')+'</span><button class="primary" type="button" disabled>送出</button></div></form></section></div>';
+}
 function renderGroupPrototype() {
   groupResetForAccount(currentUser()?.uid||null);
   const g=groupPrototype;
@@ -3220,11 +3234,11 @@ function renderGroupPrototype() {
     return;
   }
   if(g.loading) {
-    $('view').innerHTML='<div class="group-wizard"><div class="group-panel" role="status" aria-live="polite">正在讀取群組資料…</div></div>';
+    renderGroupStatusShell({title:g.active?.name||g.groups.find(x=>x.id===route.id)?.name||'群組聊天',message:'正在載入群組對話…'});
     return;
   }
   if(g.openError) {
-    $('view').innerHTML='<div class="group-wizard"><section class="group-panel"><h2>無法開啟這個群組</h2><p class="group-alert" role="alert">'+e(g.openError)+'</p><div class="group-actions"><button data-action="group-list">返回建立群組</button><button class="primary" data-action="group-open" data-id="'+e(g.failedGroupId||'')+'">重試載入</button></div></section></div>';
+    renderGroupStatusShell({title:g.groups.find(x=>x.id===(g.failedGroupId||route.id))?.name||'群組聊天',message:g.openError,error:true,groupId:g.failedGroupId||route.id||''});
     return;
   }
   if(g.active) { renderGroupConversation(); return; }
