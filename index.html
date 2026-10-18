@@ -2458,12 +2458,19 @@ function renderHome() {
           <p class="muted small" style="margin:6px 0 10px">此帳號目前無法使用 PersonaX 功能。若要保留帳號與錢包餘額，請在後端設定的期限內取消刪除申請。</p>
           <button class="primary" data-action="pending-show-deletion-modal">查看狀態／取消刪除</button>
         </section>` : ''}
+      <div class="explore-topline"><div><div class="explore-eyebrow">YOUR NEXT STORY</div><h1 class="explore-title">探索角色</h1><p class="explore-subtitle">每一次相遇，都可以是故事的開始。</p></div></div>
       <section class="hero" id="hero"></section>
-      <h2>探索角色</h2>
-      <div class="toolbar">
-        <input id="searchInput" placeholder="搜尋角色名稱或標籤…" value="${e(search)}">
-        <button data-action="tags" data-mode="explore"># 標籤</button>
-        <button data-action="clear-filter">清除篩選</button>
+      <div class="explore-shortcuts" aria-label="角色探索分類">
+        <button class="explore-shortcut" data-action="filter" data-filter="recommended"><span class="shortcut-icon">✧</span><span>推薦</span></button>
+        <button class="explore-shortcut" data-action="filter" data-filter="popular"><span class="shortcut-icon">↗</span><span>熱門</span></button>
+        <button class="explore-shortcut" data-action="filter" data-filter="latest"><span class="shortcut-icon">◷</span><span>新登場</span></button>
+        <button class="explore-shortcut" data-action="filter" data-filter="favorites"><span class="shortcut-icon">♡</span><span>喜愛</span></button>
+        <button class="explore-shortcut" data-action="tags" data-mode="explore"><span class="shortcut-icon">#</span><span>標籤</span></button>
+        <button class="explore-shortcut" data-action="toggle-search"><span class="shortcut-icon">⌕</span><span>搜尋</span></button>
+      </div>
+      <div class="toolbar explore-search-row hidden" id="exploreSearch">
+        <input id="searchInput" placeholder="搜尋角色名稱或標籤…" value="${e(search)}" aria-label="搜尋角色名稱或標籤">
+        <button data-action="clear-search" aria-label="清除搜尋">×</button>
       </div>
       <div class="row wrap" id="selectedTags"></div>
       <div class="tabs">
@@ -2507,6 +2514,10 @@ function exploreList() {
       Date.now()-Number(c.firstPublishedAt ?? c.createdAt) >= 0 &&
       Date.now()-Number(c.firstPublishedAt ?? c.createdAt) <= DAY)
       .sort((a,b) => (b.firstPublishedAt ?? b.createdAt)-(a.firstPublishedAt ?? a.createdAt)).slice(0,30);
+  } else if (filter === 'favorites') {
+    list = list.filter(c => state.favorites.includes(c.id));
+  } else if (filter === 'popular') {
+    list.sort((a,b) => Number(b.chats || 0)-Number(a.chats || 0));
   } else if (['male','female'].includes(filter)) {
     list = list.filter(c => c.gender === filter);
   } else {
@@ -2533,18 +2544,16 @@ function card(c,owner = false) {
                 aria-label="查看${e(c.name)}">
           <img src="${e(safeImage(c.image))}" alt="${e(c.name)}" loading="lazy">
         </button>
+        <span class="card-stats">▤ ${e(c.chats || 0)} 次對話</span>
+        <button class="heart ${favorite ? 'on' : ''}" data-action="favorite"
+                data-id="${e(c.id)}" aria-label="切換喜愛角色"
+                aria-pressed="${favorite}">${favorite ? '♥' : '♡'}</button>
         <button class="card-chat" data-action="start-chat" data-id="${e(c.id)}">開始聊天</button>
       </div>
       <div class="card-body">
-        <div class="row between">
-          <span class="small muted">💬 ${e(c.chats || '0')}</span>
-          <button class="heart ${favorite ? 'on' : ''}" data-action="favorite"
-                  data-id="${e(c.id)}" aria-label="切換喜愛角色"
-                  aria-pressed="${favorite}">${favorite ? '♥' : '♡'}</button>
-        </div>
         <h3>${e(c.name)}</h3>
         <p class="card-intro">${e(c.intro)}</p>
-        <div class="row wrap" style="gap:5px">${(c.tags || []).slice(0,3).map(tagButton).join('')}</div>
+        <div class="card-tags">${(c.tags || []).slice(0,5).map(tagButton).join('')}</div>
         ${owner ? `
           <div class="owner-actions">
             <button data-action="visibility" data-id="${e(c.id)}" data-value="public"
@@ -2571,7 +2580,10 @@ function renderGrid() {
   $('selectedTags').innerHTML = exploreTags.map(tagButton).join('');
   $('exploreHint').textContent = filter === 'latest'
     ? '最近24小時公開上架的角色，最多30位。'
+    : filter === 'popular' ? '目前依角色資料中的聊天數排序；全站回合統計仍待後端實作。'
     : `共有${list.length}位符合條件的角色。`;
+  const sectionTitle = document.querySelector('.explore-section-heading h2');
+  if (sectionTitle) sectionTitle.textContent = filter === 'popular' ? '熱門角色' : filter === 'favorites' ? '喜愛的角色' : filter === 'latest' ? '新登場角色' : '為你推薦';
 
   $('moreArea').innerHTML = recommended && list.length
     ? shown.length < maximum
@@ -4063,6 +4075,14 @@ document.addEventListener('click',async event => {
           go(next,true);
         } else renderHome();
         break;
+      case 'toggle-search': {
+        const searchRow = $('exploreSearch');
+        if (searchRow) searchRow.classList.toggle('hidden');
+        if (searchRow && !searchRow.classList.contains('hidden')) $('searchInput')?.focus();
+        break;
+      }
+      case 'clear-search':
+        search='';renderHome();$('exploreSearch')?.classList.remove('hidden');$('searchInput')?.focus();break;
       case 'clear-filter':
         search='';exploreTags=[];limit=24;
         go({page:'home'},true);
