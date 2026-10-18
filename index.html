@@ -3690,8 +3690,8 @@ function renderProfile() {
   $('view').innerHTML = `<div class="stack form-width profile-page" style="gap:16px">
     <div class="row between" style="align-items:flex-start"><div><div class="explore-eyebrow">PERSONAX</div><h1 style="margin:4px 0 0">帳號管理</h1></div><span class="small muted">測試環境，非正式網頁</span></div>
     <section class="panel stack" style="gap:14px"><div class="profile-account-header"><div class="row" style="align-items:center;min-width:0;gap:12px">${avatar(u)}<div style="min-width:0;padding-right:56px"><div class="small muted">個人帳號</div><h2 style="margin:3px 0;overflow-wrap:anywhere">${e(u.nickname)}</h2><button class="author-link" data-action="author" data-id="${e(u.uid)}">@${e(u.nickname)}</button><p class="small muted" style="margin:6px 0;overflow-wrap:anywhere">UID：${e(u.uid)}</p></div></div><button class="profile-edit-button" data-action="edit-profile">⚙ 編輯</button></div><div><h3 style="margin-bottom:4px">帳號簡介</h3><p class="prose muted bio-scroll" style="margin:0">${e(u.bio || '尚未填寫')}</p></div></section>
+    <section class="panel stack" id="daily-checkin-card" style="gap:12px"><div class="row between"><h2 style="margin:0">每日簽到</h2><span class="small muted">正在載入…</span></div><p class="small muted" style="margin:0">正在載入簽到狀態…</p></section>
     <section class="panel stack" style="gap:12px"><div class="row between"><span>會員等級</span><strong>${u.member === 'monthly' ? '月費會員' : '免費會員'}</strong></div><div class="row between"><span>鑽石數量</span><strong>💎 ${Number(u.diamonds || 0).toLocaleString()}</strong></div><div class="row between"><span>銀幣數量</span><strong>◉ ${Number(u.silver || 0).toLocaleString()}</strong></div><button data-action="ledger" style="width:100%">花費日誌與交易紀錄</button></section>
-    <section class="panel stack" id="daily-checkin-card" style="gap:12px"><div class="row between"><h2 style="margin:0">每日簽到</h2><span class="small muted">7 天循環</span></div><p class="small muted" style="margin:0">正在載入簽到狀態…</p></section>
     <section class="stack" style="gap:0"><button class="profile-setting" data-action="personas"><span><strong>人設管理</strong><small></small></span><span>›</span></button><button class="profile-setting" data-action="theme-setting"><span><strong>版面顏色</strong><small>目前：${state.theme === 'day' ? '白天' : '黑夜'}</small></span><span>›</span></button><button class="profile-setting" data-action="birthdate"><span><strong>出生日期</strong><small>${e(u.birthdate || '尚未設定')}</small></span><span>›</span></button><button class="profile-setting" data-action="bug"><span><strong>BUG 回報</strong><small>回報網站問題（目前僅檢查表單）</small></span><span>›</span></button><div style="padding:16px 0 8px"><button data-action="logout" class="primary" style="width:100%;min-height:46px">登出帳號</button><p style="margin:14px 0 0;text-align:center"><button type="button" data-action="delete-account" style="border:0;background:transparent;padding:6px 10px;color:var(--muted);font-size:12px;text-decoration:underline;text-underline-offset:3px">刪除帳號</button></p></div></section>
   </div>`;
   void refreshDailyCheckinCard();
@@ -3713,9 +3713,20 @@ function renderDailyCheckinMarkup(status) {
     return '<div style="min-width:0;text-align:center;padding:8px 1px;border-radius:10px;'+style+'"><div style="font-size:11px">第'+(i+1)+'天</div><div style="font-size:13px;font-weight:700;margin-top:3px">'+(completed || todayDone ? '✓' : '+'+reward)+'</div></div>';
   }).join('');
   const buttonLabel = !enabled ? '簽到暫停中' : claimed ? '今日已簽到' : '簽到領取 +' + reward + ' 銀幣';
-  return '<div class="row between" style="align-items:center;gap:8px"><div><h2 style="margin:0">每日簽到</h2><p class="small muted" style="margin:4px 0 0">每次簽到獲得 '+reward+' 銀幣，完成 7 次後重新循環</p></div><span class="small muted" style="white-space:nowrap">第 '+day+'/7 天</span></div><div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px">'+days+'</div><button data-action="daily-checkin" '+(!enabled || claimed ? 'disabled aria-disabled="true"' : 'class="primary"')+' style="width:100%;min-height:44px">'+buttonLabel+'</button><p class="small muted" style="margin:0">以台灣時間每日計算；漏簽不扣回已領銀幣。</p>';
+  return '<div class="row between" style="align-items:center;gap:8px"><h2 style="margin:0">每日簽到</h2><span class="small muted" style="white-space:nowrap">第 '+day+'/7 天</span></div><div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px">'+days+'</div><button data-action="daily-checkin" '+(!enabled || claimed ? 'disabled aria-disabled="true"' : 'class="primary"')+' style="width:100%;min-height:44px">'+buttonLabel+'</button>';
+}
+function scheduleDailyCheckinMidnightRefresh() {
+  if (window.dailyCheckinMidnightTimer) clearTimeout(window.dailyCheckinMidnightTimer);
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+    const part = Object.fromEntries(parts.map(p => [p.type,p.value]));
+    const nextTaipeiMidnight = Date.UTC(Number(part.year), Number(part.month)-1, Number(part.day)+1) - 8*60*60*1000;
+    const delay = Math.max(1000, nextTaipeiMidnight - Date.now() + 1200);
+    window.dailyCheckinMidnightTimer = setTimeout(() => { void refreshDailyCheckinCard(); }, delay);
+  } catch (error) { console.warn('無法排定台灣時間簽到更新：', error); }
 }
 async function refreshDailyCheckinCard() {
+  scheduleDailyCheckinMidnightRefresh();
   const card = $('daily-checkin-card');
   if (!card) return;
   if (!window.mySupabase || !state.account?.uid || state.account.uid === 'demo-local-account') {
