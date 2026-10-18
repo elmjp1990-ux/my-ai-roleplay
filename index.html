@@ -4812,7 +4812,7 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
       }
       case 'birthdate': {
         const value=String(f.get('birthdate') || '');
-        if(value && (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value) || value > new Date().toISOString().slice(0,10))) return toast('請選擇有效的出生日期。');
+        if(value && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value > new Date().toISOString().slice(0,10))) return toast('請選擇有效的出生日期。');
         state.account.birthdate=value;persist();back();render();toast('出生日期已儲存。');break;
       }
       case 'personas': {
