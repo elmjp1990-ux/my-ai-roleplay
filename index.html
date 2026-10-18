@@ -548,6 +548,11 @@ body.chat-page main { max-width:none; padding:12px; }
 .photo-button img { width:100%; height:100%; object-fit:cover; }
 .photo-date { position:absolute; bottom:0; left:0; right:0; padding:10px; font-size:10px; color:white; background:linear-gradient(transparent,#000d); }
 .log-row { padding:14px 0; border-bottom:1px solid var(--border); }
+.profile-setting { width:100%; display:flex; align-items:center; justify-content:space-between; text-align:left; gap:12px; padding:15px 4px; border:0; border-bottom:1px solid var(--border); border-radius:0; background:transparent; }
+.profile-setting span:first-child { display:grid; gap:4px; }
+.profile-setting small { color:var(--muted); font-size:12px; font-weight:400; }
+.profile-setting.danger { color:#ef7373; }
+.ledger-scroll { height:min(360px,44dvh); min-height:180px; overflow-y:auto; overscroll-behavior:contain; margin-top:10px; padding-right:4px; }
 .switch-row { display:flex; gap:12px; align-items:center; padding:12px 0; }
 .notice { padding:18px; border:1px solid var(--border); border-radius:16px; margin-top:12px; background:var(--panel); }
 
@@ -3647,36 +3652,12 @@ function renderShop() {
 
 function renderProfile() {
   const u = currentUser();
-  $('view').innerHTML = `<div class="stack form-width">
-    <h1>個人帳號</h1>
-    <section class="panel stack">
-      <div class="row between">
-        <div class="row">${avatar(u)}<div>
-          <h2 style="margin:0">${e(u.nickname)}</h2>
-          <button class="author-link" data-action="author" data-id="${e(u.uid)}">@${e(u.nickname)}</button>
-          <p class="small muted" style="margin:6px 0">UID：${e(u.uid)}</p>
-        </div></div>
-        <button data-action="edit-profile">⚙ 編輯</button>
-      </div>
-      <div><h3>帳號簡介</h3><p class="prose muted">${e(u.bio || '尚未填寫')}</p></div>
-    </section>
-    <section class="panel stack">
-      <div class="row between"><span>會員等級</span><strong>${u.member === 'monthly' ? '月費會員' : '免費會員'}</strong></div>
-      <div class="row between"><span>鑽石數量</span><strong>💎 ${Number(u.diamonds || 0).toLocaleString()}</strong></div>
-      <div class="row between"><span>銀幣數量</span><strong>◉ ${Number(u.silver || 0).toLocaleString()}</strong></div>
-      <div class="row wrap">
-        <button data-action="shop">購買鑽石</button>
-        <button data-action="ledger">花費日誌</button>
-        <button data-action="purchases">購買紀錄</button>
-      </div>
-    </section>
-    <section class="panel"><h3>BUG 回報</h3>
-      <button data-action="bug">回報問題</button></section>
-    <div class="row wrap">
-      <button data-action="logout">登出</button>
-      <button class="danger" data-action="delete-account">刪除帳號</button>
-    </div>
-  </div>`;
+  $('view').innerHTML = \`<div class="stack form-width profile-page" style="gap:16px">
+    <div class="row between" style="align-items:flex-start"><div><div class="explore-eyebrow">PERSONAX</div><h1 style="margin:4px 0 0">我的</h1></div><span class="small muted">測試環境，非正式網頁</span></div>
+    <section class="panel stack" style="gap:14px"><div class="row between" style="align-items:center;gap:12px"><div class="row" style="align-items:center;min-width:0;gap:12px">${avatar(u)}<div style="min-width:0"><div class="small muted">個人帳號</div><h2 style="margin:3px 0;overflow-wrap:anywhere">${e(u.nickname)}</h2><button class="author-link" data-action="author" data-id="${e(u.uid)}">@${e(u.handle || u.nickname)}</button><p class="small muted" style="margin:6px 0;overflow-wrap:anywhere">UID：${e(u.uid)}</p></div></div><button data-action="edit-profile">⚙ 編輯</button></div><div><h3 style="margin-bottom:4px">帳號簡介</h3><p class="prose muted" style="margin:0">${e(u.bio || '尚未填寫')}</p></div></section>
+    <section class="panel stack" style="gap:12px"><div class="row between"><span>會員等級</span><strong>${u.member === 'monthly' ? '月費會員' : '免費會員'}</strong></div><div class="row between"><span>鑽石數量</span><strong>💎 ${Number(u.diamonds || 0).toLocaleString()}</strong></div><div class="row between"><span>銀幣數量</span><strong>◉ ${Number(u.silver || 0).toLocaleString()}</strong></div><button data-action="ledger" style="width:100%">花費日誌與交易紀錄</button></section>
+    <section class="stack" style="gap:0"><button class="profile-setting" data-action="personas"><span><strong>人物設定</strong><small>管理多組人設預設（最多 30 組）</small></span><span>›</span></button><button class="profile-setting" data-action="theme-setting"><span><strong>版面顏色</strong><small>目前：${state.theme === 'day' ? '白天' : '黑夜'}</small></span><span>›</span></button><button class="profile-setting" data-action="birthdate"><span><strong>出生日期</strong><small>${e(u.birthdate || '尚未設定')}</small></span><span>›</span></button><button class="profile-setting" data-action="bug"><span><strong>BUG 回報</strong><small>回報網站問題（目前僅檢查表單）</small></span><span>›</span></button><button class="profile-setting" data-action="logout"><span><strong>登出</strong><small>登出目前 Google 帳號</small></span><span>›</span></button><button class="profile-setting danger" data-action="delete-account"><span><strong>刪除帳號</strong><small>提出帳號刪除申請</small></span><span>›</span></button></section>
+  </div>\`;
 }
 function renderNotifications() {
   const unread = route.unread;
