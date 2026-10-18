@@ -2328,6 +2328,8 @@ $('modal').addEventListener('click',event => {
 });
 function showDialog(title,content) {
   let modal = $('modal');
+  modal.style.height='';
+  modal.style.overflowY='';
 
   // 防呆：登入流程或第三方程式不得讓主要 dialog 永久消失。
   if (!modal) {
@@ -4561,7 +4563,7 @@ document.addEventListener('click',async event => {
       case 'ledger-tab': {
         const currency = button.dataset.value;
         await loadWalletLedger(currency);
-        openModal('ledger',{currency});
+        openModal('ledger',{currency,kind:route.overlay?.kind || 'all'});
         break;
       }
       case 'ledger-filter': {
