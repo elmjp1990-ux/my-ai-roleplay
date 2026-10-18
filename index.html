@@ -3232,8 +3232,27 @@ function renderGroupConversation() {
         </div>
         <div class="messages" id="groupMessages">${sceneContext}${messageRows}</div>
         <form class="composer" data-form="group-message">
-          <textarea id="groupMessageInput" name="text" maxlength="2000" placeholder="輸入故事內容…" aria-label="輸入群組訊息" ${g.sending?'disabled':''}>${e(g.pendingRequest?.groupId===group.id?g.pendingRequest.content:'')}</textarea>
-          <div class="row between" style="margin-top:7px"><span class="small muted">${g.turn} 個已保存回合</span><button class="primary" type="button" data-action="group-send" ${g.sending?'disabled':''}>${g.sending?'正在保存…':'送出'}</button></div>
+          <div class="composer-input-row">
+            <textarea id="groupMessageInput" name="text" maxlength="1000" rows="1" placeholder="留空發送，角色會繼續說下去" aria-label="輸入群組訊息" ${g.sending?'disabled':''}>${e(g.pendingRequest?.groupId===group.id?g.pendingRequest.content:'')}</textarea>
+          </div>
+          <div class="composer-bottom-row">
+            <div class="composer-bottom-left">
+              <button type="button" class="composer-icon-button" data-action="toggle-chat-tools" aria-label="展開聊天功能" aria-expanded="false" title="更多功能">${ICON.plus}</button>
+              <span class="small muted">${g.turn} 回合</span>
+            </div>
+            <div class="composer-bottom-right">
+              <div class="composer-wallet" aria-label="目前錢包餘額">
+                <button type="button" data-action="profile" title="查看錢包"><span class="wallet-value wallet-diamond">💎 ${Number(currentUser()?.diamonds || 0).toLocaleString()}</span></button>
+                <button type="button" data-action="profile" title="查看錢包"><span class="wallet-value wallet-silver">◉ ${Number(currentUser()?.silver || 0).toLocaleString()}</span></button>
+              </div>
+              <button class="primary composer-send" type="button" data-action="group-send" aria-label="送出群組訊息" ${g.sending?'disabled':''}>${ICON.send}</button>
+            </div>
+          </div>
+          <div class="chat-tools hidden" id="groupChatTools">
+            <button type="button" data-action="group-info">群組資訊</button>
+            <button type="button" data-action="group-archive" data-id="${e(group.id)}">群組管理</button>
+            <button type="button" disabled>圖片上傳</button>
+          </div>
           <div class="small muted" role="status" aria-live="polite">${e(g.formError||'')}</div>
         </form>
       </section>
@@ -3627,7 +3646,7 @@ function renderChatOverlay(kind) {
       <div class="overlay-heading">
         <button class="ghost" data-action="back" aria-label="返回">${ICON.back}</button>
         <h2>${kind === 'diary' ? '甜蜜日記' : '回憶相簿'}</h2>
-      </div>${content}
+      </div>${kind === 'album' ? '<div class="row wrap" style="margin-bottom:12px"><button type="button" data-action="persona">專屬人設設定</button><button type="button" data-action="chat-overlay" data-kind="diary">甜蜜日記</button></div>' : ''}${content}
     </section>`);
 }
 
@@ -4414,7 +4433,7 @@ document.addEventListener('click',async event => {
         captureDraft();s.suggestions=!s.suggestions;
         persist();render();break;
       case 'toggle-chat-tools': {
-        const toolsPanel=$('chatTools');
+        const toolsPanel=$('chatTools') || $('groupChatTools');
         const toggle=$('view').querySelector('[data-action="toggle-chat-tools"]');
         if (toolsPanel && toggle) {
           const isHidden=toolsPanel.classList.toggle('hidden');
