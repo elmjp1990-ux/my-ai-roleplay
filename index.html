@@ -3802,6 +3802,11 @@ function renderModal(o) {
     case 'birthdate':
       showDialog('出生日期',`<form data-form="birthdate"><label class="field"><span>出生日期（年月日）</span><input name="birthdate" type="date" max="${new Date().toISOString().slice(0,10)}" value="${e(u.birthdate || '')}"></label><p class="small muted">目前先儲存在此瀏覽器的帳號設定中。</p><button class="primary">儲存日期</button></form>`);
       break;
+    case 'personas': {
+      const personas = Array.isArray(u.personas) ? u.personas : [];
+      showDialog('人物設定',`<p class="small muted">最多儲存 30 組人設預設。人設目前保存在此瀏覽器，可查看及刪除。</p><form data-form="personas" class="stack"><label class="field"><span>人設名稱</span><input name="personaName" maxlength="40" required></label><label class="field"><span>人設內容</span><textarea name="personaText" maxlength="3000" required></textarea></label><button class="primary" ${personas.length >= 30 ? 'disabled' : ''}>儲存人設（${personas.length}/30）</button></form><div class="ledger-scroll" style="height:min(300px,36dvh)">${personas.map(p => `<article class="log-row"><div class="row between"><strong>${e(p.name)}</strong><button type="button" data-action="persona-delete" data-id="${e(p.id)}">刪除</button></div><p class="small muted" style="white-space:pre-wrap">${e(p.text)}</p></article>`).join('') || '<div class="empty">尚未儲存人設。</div>'}</div>`);
+      break;
+    }
     case 'delete-account':
       showDialog('申請刪除帳號',`
         <form data-form="delete-account">
