@@ -5028,7 +5028,9 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
           }
         }
         toast('儲存成功');
-        back();break;
+        if (Object.prototype.hasOwnProperty.call(o,'draftPersona')) { const cleanRoute={...route}; delete cleanRoute.overlay; go(cleanRoute,true); }
+        else back();
+        break;
       }
       case 'rename': {
         const item=state.sessions[o.id];
