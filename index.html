@@ -3826,7 +3826,7 @@ function renderModal(o) {
     case 'personas': {
       const personas = Array.isArray(u.personas) ? u.personas : [];
       const editing = personas.find(p => p.id === o.editId);
-      showDialog('人物設定',`<p class="small muted">最多儲存 30 組人設預設，會同步保存至你的 PersonaX 帳號。</p><form data-form="personas" class="stack"><input type="hidden" name="personaId" value="${e(editing?.id || '')}"><label class="field"><span>人設名稱</span><input name="personaName" maxlength="40" required value="${e(editing?.name || '')}"></label><label class="field"><span>人設內容</span><textarea name="personaText" maxlength="3000" required>${e(editing?.text || '')}</textarea></label><button class="primary" ${!editing && personas.length >= 30 ? 'disabled' : ''}>${editing ? '儲存修改' : `新增人設（${personas.length}/30）`}</button></form><div class="ledger-scroll" style="height:min(300px,36dvh)">${personas.map(p => `<article class="log-row"><div class="row between"><strong>${e(p.name)}</strong><div class="row"><button type="button" data-action="persona-edit" data-id="${e(p.id)}">編輯</button><button type="button" data-action="persona-delete" data-id="${e(p.id)}">刪除</button></div></div><p class="small muted" style="white-space:pre-wrap">${e(p.text)}</p></article>`).join('') || '<div class="empty">尚未儲存人設。</div>'}</div>`);
+      showDialog('人物設定',`<form data-form="personas" class="stack"><input type="hidden" name="personaId" value="${e(editing?.id || '')}"><label class="field"><span>人設名稱</span><input name="personaName" maxlength="25" required value="${e(editing?.name || '')}"></label><label class="field"><span>人設內容</span><textarea name="personaText" maxlength="1000" required>${e(editing?.text || '')}</textarea></label><button class="primary" ${!editing && personas.length >= 30 ? 'disabled' : ''}>${editing ? '儲存修改' : `新增人設（${personas.length}/30）`}</button></form><div class="ledger-scroll" style="height:min(300px,36dvh)">${personas.map(p => `<article class="log-row"><div class="row between"><strong>${e(p.name)}</strong><div class="row"><button type="button" data-action="persona-edit" data-id="${e(p.id)}">編輯</button><button type="button" data-action="persona-delete" data-id="${e(p.id)}">刪除</button></div></div><p class="small muted" style="white-space:pre-wrap">${e(p.text)}</p></article>`).join('') || '<div class="empty">尚未儲存人設。</div>'}</div>`);
       break;
     }
     case 'delete-account':
@@ -4601,7 +4601,7 @@ document.addEventListener('click',async event => {
         const list=Array.isArray(state.account?.personas) ? state.account.personas : [];
         const index=list.findIndex(item=>item.id===key);
         if(index<0 || !confirm('確定刪除此組人設？')) break;
-        const previous=clone(list);list.splice(index,1);state.account.personas=list;persist();try { if(!window.mySupabase?.auth)throw new Error('請先登入。');const {data,error}=await window.mySupabase.auth.getUser();if(error||data?.user?.id!==state.account?.uid)throw new Error('登入狀態驗證失敗，請重新登入。');await saveSupabaseProfile(state.account);route.overlay={name:'personas'};render();toast('人設已刪除並同步。');}catch(error){state.account.personas=previous;persist();openModal('personas');toast('人設刪除未能同步：'+(error.message||'請稍後再試。'));}break;
+        const previous=clone(list);list.splice(index,1);if(!list.some(item=>item.isDefault)&&list.length)list[0].isDefault=true;state.account.personas=list;persist();try { if(!window.mySupabase?.auth)throw new Error('請先登入。');const {data,error}=await window.mySupabase.auth.getUser();if(error||data?.user?.id!==state.account?.uid)throw new Error('登入狀態驗證失敗，請重新登入。');await saveSupabaseProfile(state.account);route.overlay={name:'personas'};render();toast('儲存成功');}catch(error){state.account.personas=previous;persist();openModal('personas');toast('人設刪除未能同步：'+(error.message||'請稍後再試。'));}break;
       }
 
       case 'ledger-retry': {
@@ -4859,6 +4859,8 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
       case 'personas': {
         const name=String(f.get('personaName') || '').trim(), value=String(f.get('personaText') || '').trim();
         if(!name || !value) return toast('請填寫人設名稱與內容。');
+        if(Array.from(name).length>25) return toast('人設名稱最多 25 字。');
+        if(Array.from(value).length>1000) return toast('人設內容最多 1000 字。');
         const previous=clone(Array.isArray(state.account.personas) ? state.account.personas : []);
         const list=clone(previous);
         const personaId=String(f.get('personaId') || '');
@@ -4866,9 +4868,10 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
           const existing=list.find(item=>item.id===personaId);
           if(!existing) return toast('找不到這組人設，請重新整理。');
           existing.name=name;existing.text=value;existing.updatedAt=Date.now();
+          if(f.get('saveDefault') === '1') { list.forEach(item=>item.isDefault=false); existing.isDefault=true; existing.defaultAt=Date.now(); }
         } else {
           if(list.length>=30) return toast('最多只能儲存 30 組人設。');
-          list.push({id:id(),name,text:value,createdAt:Date.now()});
+          list.push({id:id(),name,text:value,createdAt:Date.now(),isDefault:false});
         }
         state.account.personas=list;
         if(!persist()) { state.account.personas=previous; return; }
