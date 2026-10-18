@@ -108,6 +108,7 @@ svg { pointer-events:none; }
   padding:22px;
 }
 .prose { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.9; }
+.bio-scroll { max-height:9.5em; overflow-y:auto; overscroll-behavior:contain; padding-right:5px; }
 .empty {
   padding:35px 18px;
   text-align:center;
@@ -2820,7 +2821,7 @@ function renderAuthor() {
             <p class="small muted" style="margin:6px 0">UID：${e(a.uid)}</p>
           </div>
         </div>
-        <p class="prose muted">${e(a.bio || '尚未填寫簡介')}</p>
+        <p class="prose muted bio-scroll">${e(a.bio || '尚未填寫簡介')}</p>
         <div class="row between wrap">
           <strong>粉絲 ${(a.fans || 0)+(following ? 1 : 0)}</strong>
           <div class="row">
@@ -3691,7 +3692,7 @@ function renderProfile() {
   const u = currentUser();
   $('view').innerHTML = `<div class="stack form-width profile-page" style="gap:16px">
     <div class="row between" style="align-items:flex-start"><div><div class="explore-eyebrow">PERSONAX</div><h1 style="margin:4px 0 0">我的</h1></div><span class="small muted">測試環境，非正式網頁</span></div>
-    <section class="panel stack" style="gap:14px"><div class="profile-account-header"><div class="row" style="align-items:center;min-width:0;gap:12px">${avatar(u)}<div style="min-width:0;padding-right:56px"><div class="small muted">個人帳號</div><h2 style="margin:3px 0;overflow-wrap:anywhere">${e(u.nickname)}</h2><button class="author-link" data-action="author" data-id="${e(u.uid)}">@${e(u.nickname)}</button><p class="small muted" style="margin:6px 0;overflow-wrap:anywhere">UID：${e(u.uid)}</p></div></div><button class="profile-edit-button" data-action="edit-profile">⚙ 編輯</button></div><div><h3 style="margin-bottom:4px">帳號簡介</h3><p class="prose muted" style="margin:0">${e(u.bio || '尚未填寫')}</p></div></section>
+    <section class="panel stack" style="gap:14px"><div class="profile-account-header"><div class="row" style="align-items:center;min-width:0;gap:12px">${avatar(u)}<div style="min-width:0;padding-right:56px"><div class="small muted">個人帳號</div><h2 style="margin:3px 0;overflow-wrap:anywhere">${e(u.nickname)}</h2><button class="author-link" data-action="author" data-id="${e(u.uid)}">@${e(u.nickname)}</button><p class="small muted" style="margin:6px 0;overflow-wrap:anywhere">UID：${e(u.uid)}</p></div></div><button class="profile-edit-button" data-action="edit-profile">⚙ 編輯</button></div><div><h3 style="margin-bottom:4px">帳號簡介</h3><p class="prose muted bio-scroll" style="margin:0">${e(u.bio || '尚未填寫')}</p></div></section>
     <section class="panel stack" style="gap:12px"><div class="row between"><span>會員等級</span><strong>${u.member === 'monthly' ? '月費會員' : '免費會員'}</strong></div><div class="row between"><span>鑽石數量</span><strong>💎 ${Number(u.diamonds || 0).toLocaleString()}</strong></div><div class="row between"><span>銀幣數量</span><strong>◉ ${Number(u.silver || 0).toLocaleString()}</strong></div><button data-action="ledger" style="width:100%">花費日誌與交易紀錄</button></section>
     <section class="stack" style="gap:0"><button class="profile-setting" data-action="personas"><span><strong>人設管理</strong><small></small></span><span>›</span></button><button class="profile-setting" data-action="theme-setting"><span><strong>版面顏色</strong><small>目前：${state.theme === 'day' ? '白天' : '黑夜'}</small></span><span>›</span></button><button class="profile-setting" data-action="birthdate"><span><strong>出生日期</strong><small>${e(u.birthdate || '尚未設定')}</small></span><span>›</span></button><button class="profile-setting" data-action="bug"><span><strong>BUG 回報</strong><small>回報網站問題（目前僅檢查表單）</small></span><span>›</span></button><div style="padding:16px 0 8px"><button data-action="logout" class="primary" style="width:100%;min-height:46px">登出帳號</button><p style="margin:14px 0 0;text-align:center"><button type="button" data-action="delete-account" style="border:0;background:transparent;padding:6px 10px;color:var(--muted);font-size:12px;text-decoration:underline;text-underline-offset:3px">提出帳號刪除申請</button></p></div></section>
   </div>`;
@@ -3827,7 +3828,7 @@ function renderModal(o) {
       break;
     case 'edit-profile':
       profileImage = u.avatar || '';
-      showDialog('編輯個人資料',`<form data-form="profile"><div class="field"><span>主頭像</span><div class="row" style="align-items:center;gap:12px"><img id="profileImagePreview" src="${e(safeImage(u.avatar))}" alt="目前頭像" class="avatar" style="width:72px;height:72px;${safeImage(u.avatar) ? '' : 'display:none'}"><span class="small muted">預設使用 Google 頭像，可在此更換。</span></div><input id="profileImage" type="file" accept="image/png,image/jpeg,image/webp"><small class="muted">自動裁切縮放至 256×256，壓縮後再儲存。</small></div><label class="field"><span>暱稱</span><input name="nickname" required maxlength="25" value="${e(u.nickname)}"><small>${NAME_HELP}</small></label><label class="field"><span>帳號簡介</span><textarea name="bio" maxlength="1000">${e(u.bio || '')}</textarea></label><button class="primary">儲存修改</button></form>`);
+      showDialog('編輯個人資料',`<form data-form="profile"><div class="field"><span>主頭像</span><div class="row" style="align-items:center;gap:12px"><img id="profileImagePreview" src="${e(safeImage(u.avatar))}" alt="目前頭像" class="avatar" style="width:72px;height:72px;${safeImage(u.avatar) ? '' : 'display:none'}"><span class="small muted">預設使用 Google 頭像，可在此更換。</span></div><input id="profileImage" type="file" accept="image/png,image/jpeg,image/webp"><small class="muted">自動裁切縮放至 256×256，壓縮後再儲存。</small></div><label class="field"><span>暱稱</span><input name="nickname" required maxlength="25" value="${e(u.nickname)}"><small>${NAME_HELP}</small></label><label class="field"><span>帳號簡介</span><textarea name="bio" maxlength="500">${e(u.bio || '')}</textarea><small>最多 500 字。</small></label><button class="primary">儲存修改</button></form>`);
       break;
     case 'theme-setting':
       showDialog('版面顏色',`<form data-form="theme-setting" class="stack"><label class="row" style="justify-content:flex-start;gap:10px;padding:12px;border:1px solid var(--border);border-radius:12px;cursor:pointer"><input name="theme" type="radio" value="night" style="width:18px;height:18px;flex:0 0 18px" ${state.theme !== 'day' ? 'checked' : ''}><span><strong>黑夜</strong><small class="muted" style="display:block">深色背景，適合夜間使用</small></span></label><label class="row" style="justify-content:flex-start;gap:10px;padding:12px;border:1px solid var(--border);border-radius:12px;cursor:pointer"><input name="theme" type="radio" value="day" style="width:18px;height:18px;flex:0 0 18px" ${state.theme === 'day' ? 'checked' : ''}><span><strong>白天</strong><small class="muted" style="display:block">明亮背景，適合日間使用</small></span></label><p class="small muted">選擇後會套用至整個網站。</p><button class="primary">儲存版面</button></form>`);
@@ -4867,7 +4868,9 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         if (!validName(name)) return toast('暱稱不符合規則。'+NAME_HELP);
         const previous={...state.account};
         state.account.nickname=name;
-        state.account.bio=String(f.get('bio')).trim();
+        const bio=String(f.get('bio') || '').trim();
+        if(Array.from(bio).length>500) return toast('帳號簡介最多 500 字。');
+        state.account.bio=bio;
         state.account.avatar=profileImage || state.account.avatar || '';
         persist();
         try {
