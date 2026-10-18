@@ -4816,6 +4816,23 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         }
         break;
       }
+      case 'theme-setting': {
+        state.theme=f.get('day') ? 'day' : 'night';persist();back();render();toast('版面顏色已更新。');break;
+      }
+      case 'birthdate': {
+        const value=String(f.get('birthdate') || '');
+        if(value && (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value) || value > new Date().toISOString().slice(0,10))) return toast('請選擇有效的出生日期。');
+        state.account.birthdate=value;persist();back();render();toast('出生日期已儲存。');break;
+      }
+      case 'personas': {
+        const name=String(f.get('personaName') || '').trim(), value=String(f.get('personaText') || '').trim();
+        if(!name || !value) return toast('請填寫人設名稱與內容。');
+        const list=Array.isArray(state.account.personas) ? state.account.personas : [];
+        if(list.length>=30) return toast('最多只能儲存 30 組人設。');
+        list.push({id:id(),name,text:value,createdAt:Date.now()});state.account.personas=list;
+        if(!persist()) { list.pop(); return; }
+        openModal('personas');toast('人設已儲存。');break;
+      }
       case 'delete-account': {
         if (String(f.get('confirm')).trim() !== 'DELETE') return toast('請輸入「DELETE」。');
         if (!state.account?.uid || !window.mySupabase) return toast('請先使用 Google 帳號登入。');
