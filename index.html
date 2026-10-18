@@ -3227,7 +3227,7 @@ function renderGroupPrototype() {
       '<label class="group-field"><span>玩家角色名稱（提供給 AI）</span><input id="groupPlayerName" maxlength="80" value="'+e(g.draft.playerName||state.account?.nickname||"玩家")+'" placeholder="你的角色名稱"></label>'+
       '<label class="group-field"><span>玩家角色與人設</span><textarea id="groupPlayerPersona" maxlength="3000" placeholder="描述你在這個故事中的身分、個性、背景與說話方式。">'+e(g.draft.playerPersona||state.account?.bio||'')+'</textarea><small>目前先保存於群組檔案，之後可沿用單人聊天的人設編輯邏輯。</small></label>'+
       '<div class="group-field"><span>選擇哪位角色的世界觀作為整體背景？</span><div class="group-character-grid">'+worldChoices+'</div></div>'+
-      '<div class="group-field"><span>背景參考</span><div class="group-alert">'+e((members.find(c=>c.id===worldId)?.intro)||'所選角色目前沒有可用的公開介紹；可先繼續建立，後續再完善世界觀資料。')+'</div></div>'+
+      '<div class="group-field"><span>背景參考</span><div class="group-alert" id="groupWorldReference">'+e((members.find(c=>c.id===worldId)?.worldBackground||members.find(c=>c.id===worldId)?.world||members.find(c=>c.id===worldId)?.intro)||'所選角色目前沒有可用的公開介紹；可先繼續建立，後續再完善世界觀資料。')+'</div></div>'+
       groupRenderScenes()+
       '<div class="group-field"><span>確認群組成員（返回上一步才能增減）</span><div class="group-character-grid">'+members.map(c=>'<div class="group-character-option"><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt=""><strong>'+e(c.name)+'</strong></div>').join('')+'</div></div>';
   }
@@ -4030,7 +4030,7 @@ document.addEventListener('click',async event => {
       case 'group-list':groupList();break;
       case 'group-back':groupBack();break;
       case 'group-toggle-character':groupToggleCharacter(key);break;
-      case 'group-world-character': { groupPrototype.draft.worldCharacterId=button.value||button.dataset.value||'';render();break; }
+      case 'group-world-character': { groupPrototype.draft.worldCharacterId=button.value||button.dataset.value||'';const selected=groupSelectedCharacters().find(c=>c.id===groupPrototype.draft.worldCharacterId);const preview=$('groupWorldReference');if(preview) preview.textContent=selected?.worldBackground||selected?.world||selected?.intro||'所選角色目前沒有可用的公開介紹；可先繼續建立，後續再完善世界觀資料。';break; }
       case 'group-create':groupCreateMock();break;
       case 'group-send':groupSendMock();break;
       case 'group-toggle-member':groupExpandedMemberId=groupExpandedMemberId===key?null:key;render();break;
