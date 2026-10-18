@@ -2328,8 +2328,6 @@ $('modal').addEventListener('click',event => {
 });
 function showDialog(title,content) {
   let modal = $('modal');
-  modal.style.height='';
-  modal.style.overflowY='';
 
   // 防呆：登入流程或第三方程式不得讓主要 dialog 永久消失。
   if (!modal) {
@@ -2350,6 +2348,8 @@ function showDialog(title,content) {
     });
   }
 
+  modal.style.height='';
+  modal.style.overflowY='';
   const pendingDeletionDialog = route?.overlay?.name === 'account-deletion-pending' && title === '帳號正在等待刪除';
   modal.innerHTML = `
     <div class="row between modal-heading">
