@@ -2815,6 +2815,7 @@ function renderFavorites() {
 }
 
 /* Characters */
+let createVisibilityFilter = 'all';
 function creationTabs() {
   return `<div class="tabs">
     <button data-action="new-character">建立新角色</button>
@@ -2824,10 +2825,23 @@ function creationTabs() {
 }
 function owned(c) { return currentUser() && c?.authorId === currentUser().uid; }
 function renderCreate() {
+  const ownedCharacters = state.characters.filter(c => owned(c) && !c.deletedAt);
+  const visibleCharacters = ownedCharacters.filter(c =>
+    createVisibilityFilter === 'all' ||
+    (createVisibilityFilter === 'public' ? c.visibility === 'public' : c.visibility !== 'public')
+  );
   $('view').innerHTML = `<div class="stack"><h1>創建角色</h1>${creationTabs()}
-    <h2>你的角色</h2><div class="grid">
-      ${state.characters.filter(c => owned(c) && !c.deletedAt).map(c => card(c,true)).join('') ||
-      '<div class="empty">尚未建立角色。</div>'}
+    <div class="row between wrap" style="align-items:center;gap:12px">
+      <h2 style="margin:0">你的角色</h2>
+      <div class="tabs" role="tablist" aria-label="角色權限篩選">
+        <button class="tab ${createVisibilityFilter === 'all' ? 'active' : ''}" role="tab" aria-selected="${createVisibilityFilter === 'all'}" data-action="create-visibility" data-value="all">全部</button>
+        <button class="tab ${createVisibilityFilter === 'public' ? 'active' : ''}" role="tab" aria-selected="${createVisibilityFilter === 'public'}" data-action="create-visibility" data-value="public">公開</button>
+        <button class="tab ${createVisibilityFilter === 'private' ? 'active' : ''}" role="tab" aria-selected="${createVisibilityFilter === 'private'}" data-action="create-visibility" data-value="private">私密</button>
+      </div>
+    </div>
+    <div class="grid">
+      ${visibleCharacters.map(c => card(c,true)).join('') ||
+      (createVisibilityFilter === 'public' ? '<div class="empty">目前沒有公開角色。</div>' : createVisibilityFilter === 'private' ? '<div class="empty">目前沒有私密角色。</div>' : '<div class="empty">尚未建立角色。</div>')}
     </div></div>`;
 }
 function startEditor(c = null) {
@@ -4067,6 +4081,10 @@ document.addEventListener('click',async event => {
       case 'group-toggle-member':groupExpandedMemberId=groupExpandedMemberId===key?null:key;render();break;
       case 'group-restart':groupRestart();break;
       case 'nav':visit(button.dataset.page);break;
+      case 'create-visibility':
+        createVisibilityFilter = ['all','public','private'].includes(button.dataset.value) ? button.dataset.value : 'all';
+        renderCreate();
+        break;
       case 'back':back();break;
       case 'collapse':document.body.classList.toggle('collapsed');break;
       case 'environment':openModal('environment');break;
