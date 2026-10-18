@@ -2749,7 +2749,7 @@ function renderComments() {
         <div class="row">
           ${c.redacted && c.whisper && !c.parentId ? '<div class="avatar whisper-redacted-avatar" aria-label="悄悄話">悄</div>' : avatar(a)}
           <div class="grow">
-            ${c.redacted && c.whisper && !c.parentId ? '<span class="small muted">悄悄話</span>' : `<button class="author-link" data-action="author" data-id="${e(a.uid)}">@${e(a.nickname)}</button>`}
+            ${c.redacted && c.whisper && !c.parentId ? '<span class="small muted">悄悄話</span>' : `<button class="author-link" data-action="author" data-id="${e(a.uid)}">@${e(a.nickname)}</button>${character && c.authorId === character.authorId ? '<span class="small muted" style="margin-left:6px">(作者)</span>' : ''}`}
             <div class="small muted">${e(timeText(c.at))}${c.edited ? ' · 已修改' : ''}${c.whisper ? '<span class="comment-whisper-label">悄悄話</span>' : ''}</div>
           </div>
         </div>
@@ -3717,10 +3717,7 @@ function renderModal(o) {
       break;
     case 'login':
       showDialog('登入 PersonaX',`
-        <p class="muted">已連線至雲端資料庫，可使用 Google 帳號登入。</p>
-        <button onclick="loginWithGoogle()" class="primary" style="width:100%">Google登入</button>
-        <button disabled style="width:100%;margin-top:10px">Email登入 (建置中)</button>
-        <button class="muted" style="width:100%;margin-top:18px" data-action="local-login">進入測試帳號</button>`);
+        <button onclick="loginWithGoogle()" class="primary" style="width:100%">Google登入</button>`);
       break;
       break;
     case 'tags':
