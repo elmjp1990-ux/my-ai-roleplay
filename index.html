@@ -3593,28 +3593,46 @@ function renderShop() {
   const diamonds = Number(u?.diamonds || 0).toLocaleString();
   $('view').innerHTML = `
     <div class="stack">
-      <div>
-        <h1 style="margin-bottom:8px">商店</h1>
-        <p class="muted">管理你的故事資源。銀幣與鑽石分開顯示；目前先建立介面骨架，付款尚未開放。</p>
-      </div>
-      <div class="two-col shop-balance-grid">
-        <section class="panel stack">
-          <div class="row between"><span class="muted">活動／免費資源</span><span>◉</span></div>
-          <div><h2 style="margin-bottom:5px">${silver}</h2><strong>銀幣</strong></div>
-          <p class="muted small" style="margin:0">用於免費贈送、簽到與活動等資源。</p>
-        </section>
-        <section class="panel stack">
-          <div class="row between"><span class="muted">付費資源</span><span>💎</span></div>
-          <div><h2 style="margin-bottom:5px">${diamonds}</h2><strong>鑽石</strong></div>
-          <p class="muted small" style="margin:0">付費貨幣餘額；本頁不會觸發實際付款。</p>
-        </section>
-      </div>
+      <section class="panel stack" style="gap:10px;background:linear-gradient(135deg,var(--panel),var(--soft))">
+        <span class="small muted" style="letter-spacing:.12em">PERSONAX STORE</span>
+        <h1 style="margin:0">商店</h1>
+        <p class="muted" style="margin:0;max-width:620px;line-height:1.8">管理你的故事資源，查看貨幣餘額與未來的會員方案。付款功能尚未開放，目前不會產生任何實際交易。</p>
+      </section>
+      <section class="stack">
+        <div class="row between"><h2 style="margin:0">我的資源</h2><button data-action="ledger">交易紀錄</button></div>
+        <div class="two-col shop-balance-grid">
+          <article class="panel stack" style="gap:12px">
+            <div class="row between"><span class="muted">活動／免費資源</span><span aria-hidden="true">◉</span></div>
+            <div><div class="small muted">目前餘額</div><div class="row" style="align-items:baseline;gap:8px"><h2 style="font-size:clamp(28px,4vw,36px);margin:4px 0">${silver}</h2><strong>銀幣</strong></div></div>
+            <p class="muted small" style="margin:0;line-height:1.7">可用於免費贈送、簽到與活動等資源。</p>
+          </article>
+          <article class="panel stack" style="gap:12px">
+            <div class="row between"><span class="muted">付費資源</span><span aria-hidden="true">💎</span></div>
+            <div><div class="small muted">目前餘額</div><div class="row" style="align-items:baseline;gap:8px"><h2 style="font-size:clamp(28px,4vw,36px);margin:4px 0">${diamonds}</h2><strong>鑽石</strong></div></div>
+            <p class="muted small" style="margin:0;line-height:1.7">未來可用於付費功能；目前尚未開放購買。</p>
+          </article>
+        </div>
+      </section>
+      <section class="stack">
+        <h2 style="margin:0">探索商店方案</h2>
+        <div class="two-col">
+          <article class="panel stack" style="gap:12px">
+            <div class="row between"><span style="font-size:24px" aria-hidden="true">💎</span><span class="badge">尚未開放</span></div>
+            <div><h3 style="margin:0 0 6px">鑽石商城</h3><p class="muted small" style="margin:0;line-height:1.7">未來可查看鑽石方案與購買紀錄。正式價格與付款方式確認後才會上架。</p></div>
+            <button data-action="shop-tab" data-value="diamond" style="width:100%">查看鑽石方案</button>
+          </article>
+          <article class="panel stack" style="gap:12px">
+            <div class="row between"><span style="font-size:24px" aria-hidden="true">✦</span><span class="badge">尚未開放</span></div>
+            <div><h3 style="margin:0 0 6px">會員方案</h3><p class="muted small" style="margin:0;line-height:1.7">未來提供會員權益與方案比較；目前尚無可購買方案。</p></div>
+            <button data-action="shop-tab" data-value="monthly" style="width:100%">查看會員方案</button>
+          </article>
+        </div>
+      </section>
       <section class="panel stack">
-        <div><h2 style="margin-bottom:6px">貨幣方案</h2><p class="muted small" style="margin:0">商品、價格與付款串接尚待規劃，暫不顯示可購買方案。</p></div>
-        <div class="empty">方案與付款功能尚未開放<br>目前僅顯示帳戶現有餘額。</div>
+        <div><h2 style="margin:0 0 6px">帳務管理</h2><p class="muted small" style="margin:0">需要確認資源變動時，可查看交易明細或過往購買紀錄。</p></div>
         <div class="row wrap">
-          <button data-action="shop">查看既有方案預留頁</button>
-          <button data-action="ledger">查看花費紀錄</button>
+          <button data-action="ledger">查看交易紀錄</button>
+          <button data-action="purchases">查看購買紀錄</button>
         </div>
       </section>
     </div>`;
