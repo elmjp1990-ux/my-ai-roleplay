@@ -2705,6 +2705,21 @@ async function loadCloudComments(characterId) {
     const {data:rows,error}=await client.rpc('get_character_comments_safe',{p_character_id:characterId});
     if(error)throw error;
     const safeRows=(rows||[]).sort((a,b)=>Date.parse(a.created_at)-Date.parse(b.created_at));
+    // 評論 RPC 只回傳安全的留言內容；另取公開個人資料，避免其他帳號的留言者被錯誤顯示成「故事創作者」。
+    const profileIds=[...new Set(safeRows.map(row=>row.author_id).filter(Boolean))];
+    if(profileIds.length){
+      const {data:profiles,error:profilesError}=await client.from('profiles')
+        .select('id,nickname,avatar_url,bio').in('id',profileIds);
+      if(profilesError)console.warn('PersonaX 評論作者資料載入失敗：',profilesError);
+      else (profiles||[]).forEach(profile=>{
+        state.authors[profile.id]={
+          ...(state.authors[profile.id]||{}),uid:profile.id,
+          nickname:profile.nickname||state.authors[profile.id]?.nickname||'PersonaX 使用者',
+          avatar:profile.avatar_url||state.authors[profile.id]?.avatar||'',
+          bio:profile.bio||state.authors[profile.id]?.bio||''
+        };
+      });
+    }
     const ids=safeRows.filter(row=>!row.is_redacted).map(row=>row.id);
     let likes=[];
     if(ids.length){
@@ -2749,8 +2764,8 @@ function renderComments() {
         <div class="row">
           ${c.redacted && c.whisper && !c.parentId ? '<div class="avatar whisper-redacted-avatar" aria-label="悄悄話">悄</div>' : avatar(a)}
           <div class="grow">
-            ${c.redacted && c.whisper && !c.parentId ? '<span class="small muted">悄悄話</span>' : `<button class="author-link" data-action="author" data-id="${e(a.uid)}">@${e(a.nickname)}</button>${character && c.authorId === character.authorId ? '<span class="small muted" style="margin-left:6px">(作者)</span>' : ''}`}
-            <div class="small muted">${e(timeText(c.at))}${c.edited ? ' · 已修改' : ''}${c.whisper ? '<span class="comment-whisper-label">悄悄話</span>' : ''}</div>
+            ${c.redacted && c.whisper && !c.parentId ? '<span class="small muted">悄悄話</span>' : `<button class="author-link" data-action="author" data-id="${e(a.uid)}">@${e(a.nickname)}</button>${character && c.authorId === character.authorId ? '<span class="small muted" style="margin-left:6px">(作者)</span>' : ''}${c.whisper ? '<span class="comment-whisper-label" style="margin-left:6px">悄悄話</span>' : ''}`}
+            <div class="small muted">${e(timeText(c.at))}${c.edited ? ' · 已修改' : ''}</div>
           </div>
         </div>
         ${parent && !c.redacted ? `<p class="small muted" style="margin:10px 0">回覆 @${e(author(parent.authorId).nickname)}</p>` : ''}
