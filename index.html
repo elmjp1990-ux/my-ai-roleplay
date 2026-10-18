@@ -474,7 +474,18 @@ body.chat-page main { max-width:none; padding:12px; }
 
 /* Composer */
 .composer { flex:0 0 auto; padding:8px 12px 10px; border-top:1px solid var(--border); background:var(--header); }
-.composer textarea { resize:none; height:42px; min-height:42px; max-height:110px; font-size:12px; padding:8px 10px; }
+.composer-input-row { display:flex; align-items:flex-end; gap:8px; min-width:0; }
+.composer-input-row textarea { flex:1 1 auto; width:100%; min-width:0; resize:none; height:42px; min-height:42px; max-height:144px; font-size:14px; line-height:1.5; padding:10px 12px; overflow-y:hidden; }
+.composer-plus { width:40px; height:42px; flex:0 0 40px; display:grid; place-items:center; padding:0; border-radius:13px; font-size:24px; line-height:1; }
+.composer-toolbar { display:flex; align-items:center; justify-content:space-between; gap:8px; min-width:0; margin-top:7px; }
+.composer-toolbar .chat-tools { flex:1 1 auto; min-width:0; margin-top:0; }
+.composer-actions { display:flex; align-items:center; justify-content:flex-end; gap:10px; flex:0 0 auto; }
+.composer-wallet { display:flex; align-items:center; gap:8px; padding:4px 0; border:0; background:transparent; font-size:12px; white-space:nowrap; }
+.composer-wallet .wallet-silver { color:var(--muted); }
+.composer-wallet .wallet-diamond { color:#dcad35; }
+.composer-send { width:40px; height:40px; flex:0 0 40px; display:grid; place-items:center; padding:0; border-radius:13px; font-size:19px; }
+.composer .chat-tools { display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; }
+.composer .chat-tools button { white-space:nowrap; font-size:11px; padding:6px 8px; flex-shrink:0; }
 .suggestions { margin-bottom:5px; min-width:0; }
 .suggestions-panel { border:1px solid var(--border); border-radius:10px; background:var(--panel); overflow:hidden; }
 .suggestions-panel > summary { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:30px; padding:5px 9px; cursor:pointer; list-style:none; font-size:11px; font-weight:600; }
@@ -619,8 +630,14 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .messages { padding:14px 10px; }
   .phone { margin:0 8px 4px; }
   .phone summary { padding:4px 9px; font-size:9px; }
-  .composer { padding:5px 8px calc(5px + env(safe-area-inset-bottom)); }
-  .composer textarea { height:36px; min-height:36px; padding:6px 8px; }
+  .composer { padding:7px 8px calc(7px + env(safe-area-inset-bottom)); }
+  .composer-input-row { gap:6px; }
+  .composer-input-row textarea { height:42px; min-height:42px; max-height:144px; padding:10px; font-size:14px; }
+  .composer-plus { width:38px; height:42px; flex-basis:38px; }
+  .composer-toolbar { gap:6px; margin-top:6px; }
+  .composer-actions { gap:7px; }
+  .composer-wallet { gap:5px; font-size:11px; }
+  .composer-send { width:38px; height:38px; flex-basis:38px; }
   .suggestions { margin-bottom:4px; }
   .suggestions-panel > summary { min-height:30px; padding:5px 8px; font-size:11px; }
   .suggestion-options { gap:6px; padding:0 8px 4px; }
@@ -3210,9 +3227,19 @@ function renderGroupConversation() {
         </div>
         <div class="messages" id="groupMessages">${sceneContext}${messageRows}</div>
         <form class="composer" data-form="group-message">
-          <textarea id="groupMessageInput" name="text" maxlength="2000" placeholder="輸入故事內容…" aria-label="輸入群組訊息" ${g.sending?'disabled':''}>${e(g.pendingRequest?.groupId===group.id?g.pendingRequest.content:'')}</textarea>
-          <div class="row between" style="margin-top:7px"><span class="small muted">${g.turn} 個已保存回合</span><button class="primary" type="button" data-action="group-send" ${g.sending?'disabled':''}>${g.sending?'正在保存…':'送出'}</button></div>
-          <div class="small muted" role="status" aria-live="polite">${e(g.formError||'')}</div>
+          <div class="composer-input-row">
+            <button type="button" class="composer-plus" data-action="composer-tools-toggle" aria-expanded="false" aria-controls="groupChatTools" aria-label="展開聊天工具">＋</button>
+            <textarea id="groupMessageInput" name="text" rows="1" maxlength="1000" placeholder="輸入故事內容…（最多 1000 字）" aria-label="輸入群組訊息" ${g.sending?'disabled':''}>${e(g.pendingRequest?.groupId===group.id?g.pendingRequest.content:'')}</textarea>
+          </div>
+          <div class="composer-toolbar">
+            <div class="chat-tools hidden" id="groupChatTools">
+              <button type="button" data-action="group-info">群組資訊</button>
+              <button type="button" data-action="group-inspiration">✨ 場景靈感</button>
+              <button type="button" disabled>📷 快照（尚未開放）</button>
+            </div>
+            <div class="composer-actions">${composerWallet()}<button class="primary composer-send" type="button" data-action="group-send" aria-label="送出群組訊息" ${g.sending?'disabled':''}>➤</button></div>
+          </div>
+          <div class="small muted" role="status" aria-live="polite">${e(g.turn)} 個已保存回合 · ${e(g.formError||'')}</div>
         </form>
       </section>
     </div>`;
@@ -3415,6 +3442,21 @@ async function groupArchive(groupId) {
 }
 function groupList() { const g=groupPrototype;g.openRequestId=(g.openRequestId||0)+1;g.active=null;g.loading=false;g.sending=false;g.pendingRequest=null;g.openError='';g.failedGroupId=null;g.step=1;g.formError='';g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:state.account?.nickname||'玩家',playerPersona:state.account?.bio||'',worldCharacterId:''};groupCharacterSearch='';if(route.page!=='group'||route.id||route.overlay) go({page:'group'}); else render(); }
 function groupRestart() { groupList(); }
+function composerWallet() {
+  const u=currentUser();
+  return u
+    ? '<button type="button" class="composer-wallet" data-action="nav" data-page="profile" aria-label="查看銀幣與鑽石餘額">'+
+      '<span class="wallet-silver">◉ '+Number(u.silver||0).toLocaleString()+'</span>'+
+      '<span class="wallet-diamond">💎 '+Number(u.diamonds||0).toLocaleString()+'</span></button>'
+    : '<button type="button" class="composer-wallet" data-action="login">登入後查看餘額</button>';
+}
+function resizeComposerInput(input) {
+  if(!input) return;
+  input.style.height='auto';
+  const maxHeight=144;
+  input.style.height=Math.min(input.scrollHeight,maxHeight)+'px';
+  input.style.overflowY=input.scrollHeight>maxHeight?'auto':'hidden';
+}
 function renderConversation() {
   const s = currentSession();
   const c = sessionCharacter(s);
@@ -3479,15 +3521,18 @@ function renderConversation() {
               </button>
             </details>
           </div>` : ''}
-          <div class="row" style="gap:7px">
-            <textarea id="messageInput" name="text" maxlength="3000" placeholder="輸入對話…">${e(drafts[s.id] || '')}</textarea>
-            <button class="primary" aria-label="送出或接續回應">➤</button>
+          <div class="composer-input-row">
+            <button type="button" class="composer-plus" data-action="composer-tools-toggle" aria-expanded="false" aria-controls="chatTools" aria-label="展開聊天工具">＋</button>
+            <textarea id="messageInput" name="text" rows="1" maxlength="1000" placeholder="輸入對話…（最多 1000 字）" aria-label="輸入聊天訊息">${e(drafts[s.id] || '')}</textarea>
           </div>
-          <div class="chat-tools">
-            <button type="button" data-action="snapshot">📷 快照</button>
-            <button type="button" data-action="persona">⚙ 人設</button>
-            <button type="button" data-action="suggestions">建議回覆 ${s.suggestions ? 'ON' : 'OFF'}</button>
-            <button type="button" disabled>圖片上傳</button>
+          <div class="composer-toolbar">
+            <div class="chat-tools hidden" id="chatTools">
+              <button type="button" data-action="snapshot">📷 快照</button>
+              <button type="button" data-action="persona">⚙ 人設</button>
+              <button type="button" data-action="suggestions">建議回覆 ${s.suggestions ? 'ON' : 'OFF'}</button>
+              <button type="button" disabled>圖片上傳（尚未開放）</button>
+            </div>
+            <div class="composer-actions">${composerWallet()}<button type="submit" class="primary composer-send" aria-label="送出訊息">➤</button></div>
           </div>
         </form>
       </section>
@@ -3496,6 +3541,7 @@ function renderConversation() {
   panel.style.setProperty('--chat-photo',
     s.background === 'none' ? 'none' : `url(${JSON.stringify(safeImage(c.image))})`);
   renderMessages();
+  resizeComposerInput($('messageInput'));
 
   if (route.chatOverlay) renderChatOverlay(route.chatOverlay);
 }
@@ -4094,6 +4140,18 @@ document.addEventListener('click',async event => {
       case 'group-world-character': { groupPrototype.draft.worldCharacterId=button.value||button.dataset.value||'';const selected=groupSelectedCharacters().find(c=>c.id===groupPrototype.draft.worldCharacterId);const preview=$('groupWorldReference');if(preview) preview.textContent=selected?.worldBackground||selected?.world||selected?.intro||'所選角色目前沒有可用的公開介紹；可先繼續建立，後續再完善世界觀資料。';break; }
       case 'group-create':groupCreateMock();break;
       case 'group-send':groupSendMock();break;
+      case 'composer-tools-toggle': {
+        const toolsId=button.getAttribute('aria-controls');
+        const tools=toolsId ? $(toolsId) : null;
+        if(tools) {
+          const opening=tools.classList.contains('hidden');
+          tools.classList.toggle('hidden',!opening);
+          button.setAttribute('aria-expanded',String(opening));
+          button.setAttribute('aria-label',opening?'收合聊天工具':'展開聊天工具');
+          button.textContent=opening?'−':'＋';
+        }
+        break;
+      }
       case 'group-toggle-member':groupExpandedMemberId=groupExpandedMemberId===key?null:key;render();break;
       case 'group-restart':groupRestart();break;
       case 'nav':visit(button.dataset.page);break;
@@ -5017,7 +5075,11 @@ document.addEventListener('input',event => {
     const results=$('groupCharacterResults');
     if(results) results.innerHTML=groupRenderCharacterResults();
   }
-  if (target.id==='messageInput') drafts[route.id]=target.value;
+  if (target.id==='messageInput') {
+    drafts[route.id]=target.value;
+    resizeComposerInput(target);
+  }
+  if (target.id==='groupMessageInput') resizeComposerInput(target);
 });
 document.addEventListener('keydown',event => {
   if (['messageInput','groupMessageInput'].includes(event.target.id) &&
