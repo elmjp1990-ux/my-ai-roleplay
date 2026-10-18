@@ -3486,7 +3486,7 @@ function renderConversation() {
             </div>
             <div class="row" style="gap:1px">
               <button class="ghost" data-action="chat-overlay" data-kind="album" aria-label="回憶相簿">${ICON.album}</button>
-              <button class="ghost" data-action="archives" data-id="${e(s.id)}" aria-label="搜尋過往聊天記錄">${ICON.search}</button>
+              <button class="ghost" data-action="chat-overlay" data-kind="search" aria-label="搜尋過往聊天記錄">${ICON.search}</button>
               <button class="ghost" data-action="chat-settings" data-id="${e(s.id)}" aria-label="聊天功能">${ICON.menu}</button>
             </div>
           </div>
@@ -3597,6 +3597,23 @@ function addMemory(s,text) {
   }
   s.memories = next;
 }
+function archiveSearchResults(query) {
+  const q=String(query||'').trim().toLocaleLowerCase();
+  const items=Object.values(state.sessions||{}).filter(item => {
+    if (!item || item.hidden) return false;
+    const character=sessionCharacter(item);
+    return !q || [item.name,character?.name].filter(Boolean).join(' ').toLocaleLowerCase().includes(q);
+  }).sort((a,b)=>(b.startedAt||0)-(a.startedAt||0));
+  return items.map(item => {
+    const character=sessionCharacter(item);
+    const last=[...(item.messages||[])].reverse().find(m=>String(m.text||'').trim());
+    return `<article class="memory-item"><div class="row" style="gap:9px">
+      ${avatar(character)}<div class="grow" style="min-width:0"><strong class="ellipsis">${e(item.name||character?.name||'聊天')}</strong>
+      <div class="small muted ellipsis">${e(last?.text||'尚未開始的聊天')}</div></div>
+      <button type="button" data-action="resume-chat" data-id="${e(item.id)}">續聊</button>
+    </div></article>`;
+  }).join('') || '<div class="empty">找不到符合的聊天記錄。</div>';
+}
 function renderChatOverlay(kind) {
   const s = currentSession();
   const panel = $('view').querySelector('.chat-main');
@@ -3623,8 +3640,11 @@ function renderChatOverlay(kind) {
         <p class="small muted">測試模式：不呼叫 AI、不生圖、不扣鑽石或銀幣。這些按鈕只測試同步，不是下方相機圖示的產圖功能。</p>
       </section>`
     : '';
-  const content = kind === 'diary'
-    ? `${testControls}<p class="small muted">${memorySize(s.memories)} / 3000字</p>
+  const content = kind === 'search'
+    ? `<label class="field"><span>搜尋過往聊天記錄</span><input id="archiveSearchInput" type="search" placeholder="輸入聊天名稱或角色名稱…" autocomplete="off"></label>
+      <div id="archiveSearchResults">${archiveSearchResults('')}</div>`
+    : kind === 'diary'
+      ? `${testControls}<p class="small muted">${memorySize(s.memories)} / 3000字</p>
       ${s.memories.map(m => `<article class="memory-item">
         <label class="check">
           <input type="checkbox" data-memory="${e(m.id)}" ${m.important ? 'checked' : ''}>
@@ -3642,10 +3662,10 @@ function renderChatOverlay(kind) {
         </button>`).join('') || '<div class="empty">OH NO，你現在還沒有跟他有回憶哦。</div>'}
       </div>`;
   panel.insertAdjacentHTML('beforeend',`
-    <section class="chat-overlay" aria-label="${kind === 'diary' ? '甜蜜日記' : '回憶相簿'}">
+    <section class="chat-overlay" aria-label="${kind === 'diary' ? '甜蜜日記' : kind === 'search' ? '搜尋過往聊天' : '回憶相簿'}">
       <div class="overlay-heading">
         <button class="ghost" data-action="back" aria-label="返回">${ICON.back}</button>
-        <h2>${kind === 'diary' ? '甜蜜日記' : '回憶相簿'}</h2>
+        <h2>${kind === 'diary' ? '甜蜜日記' : kind === 'search' ? '搜尋過往聊天' : '回憶相簿'}</h2>
       </div>${kind === 'album' ? '<div class="row wrap" style="margin-bottom:12px"><button type="button" data-action="persona">專屬人設設定</button><button type="button" data-action="chat-overlay" data-kind="diary">甜蜜日記</button></div>' : ''}${content}
     </section>`);
 }
@@ -4502,6 +4522,12 @@ document.addEventListener('click',async event => {
         }
         break;
       }
+      case 'resume-chat': {
+        const item=state.sessions[key];
+        if (!item || !canAccessSessionCharacter(item,sessionCharacter(item))) break;
+        go({page:'conversation',id:item.id});
+        break;
+      }
       case 'view-archive':openModal('archive',{id:key});break;
       case 'archive-tab':openModal('archive',{id:key,tab:button.dataset.value});break;
       case 'rename-archive':openModal('rename-archive',{id:key});break;
@@ -5070,6 +5096,10 @@ document.addEventListener('input',event => {
   if (target.id==='chatSearch') {
     chatSearch=target.value;
     $('chatEntries').innerHTML=chatEntries();
+  }
+  if (target.id==='archiveSearchInput') {
+    const results=$('archiveSearchResults');
+    if (results) results.innerHTML=archiveSearchResults(target.value);
   }
   if (target.id==='groupCharacterSearch') {
     groupCharacterSearch=target.value;
