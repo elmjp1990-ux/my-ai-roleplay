@@ -475,7 +475,7 @@ body.chat-page main { max-width:none; padding:12px; }
 /* Composer: compact tools and wallet share the same bottom row. */
 .composer { flex:0 0 auto; padding:8px 12px 10px; border-top:1px solid var(--border); background:var(--header); }
 .composer-input-row { display:flex; align-items:flex-end; }
-.composer-input-row textarea { flex:1; min-width:0; width:100%; resize:none; height:42px; min-height:42px; max-height:144px; font-size:13px; padding:9px 11px; line-height:1.55; overflow-y:auto; }
+.composer-input-row textarea { flex:1; min-width:0; width:100%; resize:none; height:42px; min-height:42px; max-height:120px; font-size:13px; padding:9px 11px; line-height:1.55; overflow-y:auto; }
 .composer-bottom-row { display:flex; align-items:center; gap:7px; margin-top:7px; min-width:0; }
 .composer-bottom-left { display:flex; align-items:center; min-width:0; }
 .composer-bottom-right { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-left:auto; min-width:0; }
@@ -2961,30 +2961,6 @@ function chatListHTML() {
 }
 function renderChatListPage() {
   $('view').innerHTML = `<div class="chat-layout list-only">${chatListHTML()}</div>`;
-}
-function phoneHTML(c) {
-  const now = new Date();
-  const hour = now.getHours();
-  const period = hour < 6 ? '深夜' : hour < 12 ? '上午' : hour < 18 ? '下午' : '晚上';
-  const clock = now.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
-  return `<details class="phone">
-    <summary><span>♥ ${e(c.name)}的手機 ▾</span>
-      <span>${e(clock)} · ▰</span></summary>
-    <div class="phone-content">
-      <div class="row between">
-        <div class="phone-time">${e(clock)} <span class="small">(${period})</span></div>
-        <span>${e(now.toLocaleDateString('zh-TW',{weekday:'long'}))} ▥ ▰</span>
-      </div>
-      <strong>♥ ${e(c.name)}的手機</strong>
-      <div class="small muted" style="margin-top:6px">📍 初始場景</div>
-      <div class="phone-notices">
-        <strong>🔔 最近通知</strong>
-        <p>✉ 對話｜等待你的下一則訊息。</p>
-        <p>📝 備忘｜留一點時間，慢慢展開故事。</p>
-      </div>
-      <div class="phone-bar"></div>
-    </div>
-  </details>`;
 }
 /* GROUP-01: Supabase-persisted group core with deterministic mock director; no AI or wallet calls. */
 function groupAvailableCharacters() {
