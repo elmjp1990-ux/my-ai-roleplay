@@ -3778,22 +3778,8 @@ function renderModal(o) {
         </form>`);
       break;
     case 'edit-profile':
-      showDialog('編輯個人資料',`
-        <form data-form="profile">
-          <label class="field"><span>主頭像</span>
-            <input id="profileImage" type="file" accept="image/png,image/jpeg,image/webp"></label>
-          <label class="field"><span>暱稱</span><input name="nickname" required value="${e(u.nickname)}">
-            <small>${NAME_HELP}</small></label>
-          <label class="field"><span>帳號簡介</span><textarea name="bio" maxlength="1000">${e(u.bio || '')}</textarea></label>
-          <div class="field"><span>版面顏色</span>
-            <label class="switch-row">
-              <span>黑夜</span>
-              <input name="day" type="checkbox" role="switch" ${state.theme === 'day' ? 'checked' : ''}>
-              <span>白天</span>
-            </label>
-          </div>
-          <button class="primary">儲存修改</button>
-        </form>`);
+      profileImage = u.avatar || '';
+      showDialog('編輯個人資料',`<form data-form="profile"><div class="field"><span>主頭像</span><div class="row" style="align-items:center;gap:12px"><img id="profileImagePreview" src="${e(safeImage(u.avatar))}" alt="目前頭像" class="avatar" style="width:72px;height:72px;${safeImage(u.avatar) ? '' : 'display:none'}"><span class="small muted">預設使用 Google 頭像，可在此更換。</span></div><input id="profileImage" type="file" accept="image/png,image/jpeg,image/webp"><small class="muted">自動裁切縮放至 256×256，壓縮後再儲存。</small></div><label class="field"><span>暱稱</span><input name="nickname" required maxlength="25" value="${e(u.nickname)}"><small>${NAME_HELP}</small></label><label class="field"><span>帳號簡介</span><textarea name="bio" maxlength="1000">${e(u.bio || '')}</textarea></label><button class="primary">儲存修改</button></form>`);
       break;
     case 'delete-account':
       showDialog('申請刪除帳號',`
