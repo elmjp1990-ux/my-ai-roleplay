@@ -2749,11 +2749,11 @@ function renderComments() {
         <div class="row">
           ${c.redacted && c.whisper && !c.parentId ? '<div class="avatar whisper-redacted-avatar" aria-label="悄悄話">悄</div>' : avatar(a)}
           <div class="grow">
-            ${c.redacted && c.whisper && !c.parentId ? '<span class="small muted">悄悄話</span>' : '<button class="author-link" data-action="author" data-id="${e(a.uid)}">@${e(a.nickname)}</button>'}
+            ${c.redacted && c.whisper && !c.parentId ? '<span class="small muted">悄悄話</span>' : `<button class="author-link" data-action="author" data-id="${e(a.uid)}">@${e(a.nickname)}</button>`}
             <div class="small muted">${e(timeText(c.at))}${c.edited ? ' · 已修改' : ''}${c.whisper ? '<span class="comment-whisper-label">悄悄話</span>' : ''}</div>
           </div>
         </div>
-        ${parent ? `<p class="small muted" style="margin:10px 0">回覆 @${e(author(parent.authorId).nickname)}</p>` : ''}
+        ${parent && !c.redacted ? `<p class="small muted" style="margin:10px 0">回覆 @${e(author(parent.authorId).nickname)}</p>` : ''}
         <p class="prose ${c.deleted ? 'muted' : ''}" style="margin:12px 0">
           ${c.deleted ? '該筆評論已被刪除' : e(c.text)}
         </p>
