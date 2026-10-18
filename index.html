@@ -3715,6 +3715,11 @@ async function loadWalletLedger(currency) {
     return false;
   }
 
+  // Resolve a chat charge/refund to the character through the secure, user-scoped RPC.
+  const { data: roleNameRows, error: roleNameError } = await client.rpc('get_my_wallet_transaction_character_names');
+  if (roleNameError) console.warn('讀取交易對應角色名稱失敗：', roleNameError.message);
+  const roleNames = new Map((roleNameRows || []).map(item => [item.reference_id, item.character_name]));
+
   const selectedType = currency === 'silver' ? 'silver_coins' : 'diamonds';
   let runningBalance = Number(currency === 'silver'
     ? state.account.silver : state.account.diamonds) || 0;
@@ -3725,15 +3730,21 @@ async function loadWalletLedger(currency) {
       id: row.id,
       currency: row.currency_type === 'silver_coins' ? 'silver' : 'diamond',
       change: amount,
-      reason: ({
-        signup_bonus: '註冊贈送',
-        chat_turn_charge: '聊天回覆扣款',
-        chat_turn_refund: '聊天失敗退款',
-        daily_checkin: '每日簽到',
-        reward_ad: '觀看獎勵廣告',
-        purchase: '購買',
-        admin_adjustment: '餘額調整'
-      })[row.biz_type] || row.biz_type || '錢包交易',
+      reason: (() => {
+        const baseReason = ({
+          signup_bonus: '註冊贈送',
+          chat_turn_charge: '聊天回覆扣款',
+          chat_turn_refund: '聊天失敗退款',
+          daily_checkin: '每日簽到',
+          reward_ad: '觀看獎勵廣告',
+          purchase: '購買',
+          admin_adjustment: '餘額調整'
+        })[row.biz_type] || row.biz_type || '錢包交易';
+        const characterName = roleNames.get(row.reference_id);
+        return characterName && ['chat_turn_charge', 'chat_turn_refund'].includes(row.biz_type)
+          ? baseReason + ' · ' + characterName
+          : baseReason;
+      })(),
       at: Date.parse(row.created_at) || Date.now(),
       balance: runningBalance,
       referenceId: row.reference_id || null
