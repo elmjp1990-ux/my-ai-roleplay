@@ -108,6 +108,7 @@ svg { pointer-events:none; }
   padding:22px;
 }
 .prose { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.9; }
+.bio-scroll { max-height:9.5em; overflow-y:auto; overscroll-behavior:contain; padding-right:5px; }
 .empty {
   padding:35px 18px;
   text-align:center;
@@ -315,17 +316,11 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .card-image { position:relative; aspect-ratio:4/5; }
 .image-button { width:100%; height:100%; padding:0; border:0; border-radius:0; background:var(--panel2); overflow:hidden; }
 .image-button img { width:100%; height:100%; object-fit:cover; }
-.card-chat {
-  position:absolute;
-  left:12px;
-  right:12px;
-  bottom:12px;
-  background:var(--primary);
-  color:white;
-  border:0;
-  opacity:0;
-}
-.card:hover .card-chat,.card:focus-within .card-chat { opacity:1; }
+.card-chat{position:absolute;z-index:4;left:10px;right:10px;bottom:10px;min-height:39px;border:1px solid #ffffff40;border-radius:12px;background:linear-gradient(135deg,#7778f5ed,#5146cbed);color:#fff;font-size:12px;font-weight:700;letter-spacing:.04em;box-shadow:0 8px 22px #080b1280,inset 0 1px #ffffff35;backdrop-filter:blur(14px);opacity:1;transition:transform .18s ease,filter .18s ease,box-shadow .18s ease}
+.card-chat::after{content:"↗";margin-left:8px;font-size:14px}
+.card:hover .card-chat,.card:focus-within .card-chat{opacity:1}
+.card-chat:hover{filter:brightness(1.12);box-shadow:0 10px 25px #080b128a,inset 0 1px #ffffff45}
+.card-chat:active{transform:scale(.985)}
 .card-body { padding:13px; }
 .card-body h3 { margin:9px 0 6px; }
 .card-intro {
@@ -343,12 +338,59 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .owner-actions { display:flex; gap:7px; margin-top:12px; }
 .owner-actions button { flex:1; font-size:12px; padding:8px; }
 .detail-layout { display:grid; grid-template-columns:minmax(230px,360px) 1fr; gap:25px; }
-.detail-image { width:100%; max-height:580px; object-fit:cover; border-radius:19px; }
+.detail-portrait{position:relative;align-self:start;overflow:hidden;border-radius:19px;background:var(--panel2);isolation:isolate}
+.detail-image { display:block;width:100%;height:min(72vh,580px);min-height:360px;object-fit:cover;border-radius:19px; }
+.detail-portrait::after{content:"";position:absolute;inset:35% 0 0;z-index:0;pointer-events:none;background:linear-gradient(transparent,#080b12ed)}
+.detail-portrait-meta{position:absolute;z-index:1;left:22px;right:18px;bottom:20px;color:#fff;text-shadow:0 2px 12px #000b}
+.detail-portrait-meta h1{font-size:clamp(25px,3vw,38px);line-height:1.15;margin:0 0 8px;letter-spacing:-.035em}
+.detail-portrait-meta .author-link{color:#f1f5ff;padding:0;text-shadow:0 1px 8px #000}
+.detail-portrait-meta .detail-chat-count{font-size:12px;margin-top:10px;color:#f8fafc;opacity:.95}
+.comment-like-row{display:flex;align-items:center;justify-content:flex-start;margin:0 0 8px}
+.comment-like-button{display:inline-flex;align-items:center;gap:5px;padding:2px 5px;border:0;background:transparent;color:var(--muted);font-size:12px;line-height:1.2;min-height:24px;box-shadow:none}
+.comment-like-button .like-symbol{font-size:15px;line-height:1}
+.comment-like-button.on{color:#fb7185}
 .author-link { border:0; background:transparent; color:#a5a8ff; padding:0; }
 .comment { padding:18px 0; border-bottom:1px solid var(--border); }
 .comment.reply { margin-left:24px; border-left:2px solid var(--soft); padding-left:14px; }
 .comment-tools { display:flex; gap:7px; flex-wrap:wrap; }
 .comment-tools button { padding:5px 8px; font-size:11px; }
+.whisper-option{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;color:#c4b5fd;font-size:12px;cursor:pointer}
+.whisper-option input{width:14px;height:14px;margin:0;accent-color:#8b5cf6}
+.whisper-option small{color:var(--muted);font-size:10px}
+.comment-whisper-label{display:inline-flex;align-items:center;gap:4px;margin-left:7px;padding:2px 6px;border:1px solid #a78bfa55;border-radius:999px;color:#c4b5fd;font-size:10px}
+
+
+/* UI-02-01: premium mobile-first exploration polish */
+.explore-topline{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 4px}
+.explore-eyebrow{color:var(--muted);font-size:10px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:7px}
+.explore-title{margin:0;font-size:clamp(24px,3vw,31px);letter-spacing:-.04em}
+.explore-subtitle{margin:7px 0 0;color:var(--muted);font-size:12px}
+.explore-shortcuts{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.explore-shortcut{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:13px 4px 11px;border-radius:15px;background:linear-gradient(155deg,var(--panel2),var(--panel));border:1px solid var(--border);color:var(--muted);font-size:11px;transition:transform .18s ease,border-color .18s ease,background .18s ease}
+.explore-shortcut .icon{width:19px;height:19px;color:var(--text)}
+.explore-shortcut.active{border-color:#818cf8a8;background:var(--soft);color:var(--text);box-shadow:inset 0 0 0 1px #818cf822}
+.explore-shortcut:active{transform:scale(.97)}
+.explore-search-row{display:flex;gap:8px;align-items:center}
+.explore-search-row input{min-width:0;flex:1}
+.explore-search-row .icon-button{flex:0 0 auto;width:42px;height:42px;display:grid;place-items:center;padding:0}
+.explore-section-heading{display:flex;align-items:end;justify-content:space-between;gap:12px;margin:24px 0 12px}
+.explore-section-heading h2{margin:0;font-size:19px;letter-spacing:-.02em}
+.explore-section-heading p{margin:5px 0 0;font-size:11px;color:var(--muted)}
+.card{box-shadow:0 5px 22px #0000000a;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.card:hover{transform:translateY(-2px);border-color:#818cf855;box-shadow:0 12px 30px #00000018}
+.card-image{position:relative}
+.card-image::after{content:"";position:absolute;inset:45% 0 0;pointer-events:none;background:linear-gradient(transparent,#080b12a8)}
+.card-image .image-button{display:block}
+.card-body h3{letter-spacing:-.02em}
+.card-stats{position:absolute;z-index:2;left:10px;bottom:10px;display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid #ffffff30;border-radius:999px;background:#090d16b8;color:#f8fafc;font-size:10px;backdrop-filter:blur(12px)}
+.card-image .heart,.card-image .card-chat-count{position:absolute;z-index:4;top:9px;height:29px;display:flex;align-items:center;justify-content:center;padding:0;border:0;background:transparent;color:#fff;font-size:16px;text-shadow:0 1px 4px #000b;backdrop-filter:none;box-shadow:none}
+.card-image .heart{right:9px;width:29px;font-size:19px}
+.card-image .heart.on{color:#fb7185;background:transparent}
+.card-image .card-chat-count{left:9px;right:auto;gap:4px;width:auto;min-width:0;padding:0;font-size:11px;border-radius:0;color:#fff}
+.card-image .card-chat-count svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8}
+.card-image .card-stats{display:none}
+.card-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.card-tags .tag{padding:4px 7px;font-size:10px}
 
 /* Chat */
 body.chat-page main { max-width:none; padding:12px; }
@@ -507,6 +549,11 @@ body.chat-page main { max-width:none; padding:12px; }
 .photo-button img { width:100%; height:100%; object-fit:cover; }
 .photo-date { position:absolute; bottom:0; left:0; right:0; padding:10px; font-size:10px; color:white; background:linear-gradient(transparent,#000d); }
 .log-row { padding:14px 0; border-bottom:1px solid var(--border); }
+.profile-setting { width:100%; display:flex; align-items:center; justify-content:space-between; text-align:left; gap:12px; padding:15px 4px; border:0; border-bottom:1px solid var(--border); border-radius:0; background:transparent; }
+.profile-setting span:first-child { display:grid; gap:4px; }
+.profile-setting small { color:var(--muted); font-size:12px; font-weight:400; }
+.profile-setting.danger { color:#ef7373; }
+.ledger-scroll { height:min(360px,44dvh); min-height:180px; overflow-y:auto; overscroll-behavior:contain; margin-top:10px; padding-right:4px; }
 .switch-row { display:flex; gap:12px; align-items:center; padding:12px 0; }
 .notice { padding:18px; border:1px solid var(--border); border-radius:16px; margin-top:12px; background:var(--panel); }
 
@@ -525,6 +572,8 @@ dialog {
 dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 .modal-heading { margin-bottom:20px; }
 .modal-heading h2 { margin:0; }
+.profile-account-header { position:relative; display:flex; align-items:center; justify-content:space-between; gap:8px; padding-top:4px; }
+.profile-edit-button { position:absolute; top:0; right:0; padding:5px 9px; min-height:28px; font-size:12px; line-height:1.2; border-radius:8px; white-space:nowrap; }
 #toast {
   position:fixed;
   left:50%;
@@ -565,11 +614,41 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     padding:16px 12px calc(104px + env(safe-area-inset-bottom));
     min-height:calc(100dvh - 58px);
   }
-  .hero { padding:24px; min-height:275px; }
+
+  main { padding-top:13px; }
+  .hero { padding:22px 20px 18px; min-height:0; border-radius:21px; }
+  .hero h1 { font-size:25px; line-height:1.3; margin:17px 0 10px; }
+  .hero p { font-size:12px; line-height:1.8; margin-bottom:14px; }
+  .hero .primary { font-size:12px; padding:9px 12px; }
+  .explore-topline { margin:1px 2px 13px; }
+  .explore-eyebrow { font-size:9px; }
+  .explore-title { font-size:25px; }
+  .explore-subtitle { font-size:11px; }
+  .explore-shortcuts { grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
+  .explore-shortcut { flex-direction:row; justify-content:flex-start; padding:12px 13px; gap:9px; font-size:12px; border-radius:13px; }
+  .explore-shortcut .icon { width:17px;height:17px; }
+  .explore-search-row { margin-top:2px; }
+  .explore-section-heading { margin:20px 1px 10px; }
+  .explore-section-heading h2 { font-size:18px; }
+  .explore-section-heading p { font-size:10px; }
+  .grid { gap:10px; }
+  .card { border-radius:15px; }
+  .card-image { aspect-ratio:3/4; }
+  .card-body { padding:10px 10px 12px; }
+  .card-body h3 { font-size:14px; margin:2px 0 6px; }
+  .card-intro { font-size:11px; line-height:1.65; min-height:36px; }
+  .card-tags { gap:4px; margin-top:8px; }
+  .card-tags .tag { font-size:9px; padding:4px 6px; }
+  .card-stats { left:7px;bottom:7px;font-size:9px;padding:4px 7px; }
+  .card-image .heart { top:7px;right:7px;width:31px;height:31px;font-size:19px; }
+
   .grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:11px; }
   .card-body { padding:10px; }
   .card-chat { opacity:1; font-size:12px; padding:8px; }
   .detail-layout,.two-col { grid-template-columns:1fr; }
+  .detail-image{height:min(66vh,620px);min-height:340px}
+  .detail-portrait-meta{left:18px;bottom:18px}
+  .detail-portrait-meta h1{font-size:30px}
   .panel { padding:18px; }
   .mobile-nav {
     display:grid;
@@ -911,7 +990,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 
       let { data: profile, error: profileError } = await client
         .from('profiles')
-        .select('id, handle, nickname, avatar_url, bio')
+        .select('id, handle, nickname, avatar_url, bio, persona_presets, birthdate')
         .eq('id', user.id)
         .maybeSingle();
 
@@ -927,8 +1006,10 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
           handle,
           nickname: String(baseName).slice(0, 25),
           avatar_url: metadata.avatar_url || metadata.picture || null,
-          bio: ''
-        }, { onConflict: 'id' }).select('id, handle, nickname, avatar_url, bio').single();
+          bio: '',
+          persona_presets: [],
+          birthdate: null
+        }, { onConflict: 'id' }).select('id, handle, nickname, avatar_url, bio, persona_presets, birthdate').single();
         if (result.error) throw new Error('建立 profiles 失敗：' + result.error.message);
         profile = result.data;
       }
@@ -958,6 +1039,8 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         handle: profile.handle || '',
         avatar: profile.avatar_url || state.account.avatar || '',
         bio: profile.bio || '',
+        birthdate: profile.birthdate || '',
+        personas: Array.isArray(profile.persona_presets) ? profile.persona_presets : [],
         diamonds: Number(walletRow.diamonds ?? 0),
         silver: Number(walletRow.silver_coins ?? 0)
       };
@@ -1334,16 +1417,24 @@ if (characterError) {
     return { storyError: null, visibility: savedCharacter.visibility, rightsConfirmed: savedCharacter.rights_confirmed === true, firstPublishedAt: savedCharacter.first_published_at ? new Date(savedCharacter.first_published_at).getTime() : null, latestEligible: savedCharacter.latest_eligible !== false };
   }
 
+  const stablePersonaJson = value => JSON.stringify(value, (key, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a],[b])=>a.localeCompare(b))) : item);
+
   async function saveSupabaseProfile(account) {
-    if (!account?.uid || !window.mySupabase) return;
-    const { error } = await window.mySupabase.from('profiles').upsert({
-      id: account.uid,
-      handle: account.handle || ('user_' + account.uid.replace(/-/g, '').slice(0, 12)),
-      nickname: account.nickname,
-      avatar_url: account.avatar || null,
-      bio: account.bio || ''
-    }, { onConflict: 'id' });
+    if (!account?.uid || !window.mySupabase) throw new Error('無法確認登入帳號或 Supabase 連線。');
+    const payload = { id: account.uid, handle: account.handle || ('user_' + account.uid.replace(/-/g, '').slice(0, 12)), nickname: account.nickname, avatar_url: account.avatar || null, bio: account.bio || '', birthdate: account.birthdate || null, persona_presets: Array.isArray(account.personas) ? account.personas : [] };
+    const { data, error } = await window.mySupabase.from('profiles').upsert(payload, { onConflict: 'id' }).select('id, handle, nickname, avatar_url, bio, birthdate, persona_presets').single();
     if (error) throw new Error('儲存 profiles 失敗：' + error.message);
+    if (!data || data.id !== account.uid) throw new Error('雲端未確認儲存結果，請稍後重試。');
+    if (stablePersonaJson(data.persona_presets || []) !== stablePersonaJson(payload.persona_presets)) throw new Error('雲端回讀的人設內容與送出內容不一致，請重新儲存。');
+  }
+
+  async function savePersonaPresets(account) {
+    if (!account?.uid || !window.mySupabase) throw new Error('無法確認登入帳號或 Supabase 連線。');
+    const presets = Array.isArray(account.personas) ? account.personas : [];
+    const { data, error } = await window.mySupabase.from('profiles').update({ persona_presets: presets }).eq('id', account.uid).select('id, persona_presets').maybeSingle();
+    if (error) throw new Error('儲存人設失敗：' + error.message);
+    if (!data || data.id !== account.uid) throw new Error('雲端沒有更新這個帳號的人設資料，請重新登入後再試。');
+    if (stablePersonaJson(data.persona_presets || []) !== stablePersonaJson(presets)) throw new Error('雲端回讀的人設內容與送出內容不一致，請重新儲存。');
   }
 
   async function loginWithGoogle() {
@@ -1447,6 +1538,8 @@ const ICON = {
   home:svg('<circle cx="11" cy="11" r="7"></circle><path d="m16 16 5 5"></path>'),
   chat:svg('<path d="M21 11a9 9 0 0 1-9 9H4l-2 2V11a9 9 0 0 1 19 0Z"></path>','chat-nav-icon'),
   create:svg('<circle cx="9" cy="7" r="4"></circle><path d="M2 21v-2a7 7 0 0 1 12-5M18 13v8M14 17h8"></path>'),
+  shop:svg('<path d="M3 9h18l-1.5 12h-15L3 9Z"></path><path d="M8 9V6a4 4 0 0 1 8 0v3"></path>'),
+  profile:svg('<circle cx="12" cy="8" r="4"></circle><path d="M4 21v-2a8 8 0 0 1 16 0v2Z"></path>'),
   notifications:svg('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4"></path>'),
   favorites:svg('<path d="M12 21 3 12a5 5 0 0 1 9-6 5 5 0 0 1 9 6Z"></path>'),
   back:svg('<path d="m14 5-7 7 7 7"></path>'),
@@ -1629,7 +1722,7 @@ let pendingDeletionWalletSyncUid =
 let route = {page:'home'};
 let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]},active:null,turn:0,messages:[],groups:[],groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:''};
 let search = '';
-let filter = 'latest';
+let filter = 'recommended';
 let exploreTags = [];
 let limit = 24;
 let batch = 0;
@@ -1691,7 +1784,7 @@ function isUuid(value) {
 function chatSessionData(s) {
   return {
     name:s.name || '', archived:!!s.archived, hidden:!!s.hidden,
-    pinned:!!s.pinned, persona:s.persona || '',
+    pinned:!!s.pinned, persona:s.persona || '', personaCustom: s.personaCustom === true || (s.personaCustom !== false && !!s.persona),
     suggestions:s.suggestions !== false, background:s.background || 'avatar',
     startedAt:s.startedAt || Date.now(), archivedAt:s.archivedAt || null,
     memories:Array.isArray(s.memories) ? s.memories : [],
@@ -1902,6 +1995,7 @@ async function loadCloudChatSessions(user) {
         hidden:data.hidden === true, pinned:data.pinned === true,
         startedAt:Number(data.startedAt) || (row.created_at ? new Date(row.created_at).getTime() : Date.now()),
         archivedAt:data.archivedAt || null, persona:data.persona || '',
+        personaCustom: data.personaCustom === true || (data.personaCustom !== false && !!data.persona),
         suggestions:data.suggestions !== false, background:data.background || 'avatar',
         memories:Array.isArray(data.memories) ? data.memories : [],
         album:Array.isArray(data.album) ? data.album : [],
@@ -2122,9 +2216,14 @@ async function runPendingChatTurn(s) {
 
 function toast(text) {
   clearTimeout(toastTimer);
-  $('toast').textContent = text;
-  $('toast').classList.remove('hidden');
-  toastTimer = setTimeout(() => $('toast').classList.add('hidden'),3500);
+  const notice = $('toast');
+  const modal = $('modal');
+  // Native dialog occupies the browser top layer, so place notifications inside it when open.
+  if (modal?.open && notice.parentElement !== modal) modal.appendChild(notice);
+  else if (!modal?.open && notice.parentElement !== document.body) document.body.appendChild(notice);
+  notice.textContent = text;
+  notice.classList.remove('hidden');
+  toastTimer = setTimeout(() => notice.classList.add('hidden'),3500);
 }
 function author(uid) {
   const profile = state.authors[uid] || null;
@@ -2270,6 +2369,8 @@ function showDialog(title,content) {
     });
   }
 
+  modal.style.height='';
+  modal.style.overflowY='';
   const pendingDeletionDialog = route?.overlay?.name === 'account-deletion-pending' && title === '帳號正在等待刪除';
   modal.innerHTML = `
     <div class="row between modal-heading">
@@ -2299,21 +2400,23 @@ function renderShell() {
   const navPage = route.page === 'conversation' ? 'chat'
     : ['editor','ai'].includes(route.page) ? 'create'
     : ['detail','session-detail'].includes(route.page) ? 'home'
-    : route.page === 'group' ? 'group' : route.page;
+    : route.page === 'group' ? 'chat' : route.page;
+  // 五大主入口固定順序：探索、創建、聊天、商店、我的。
+  // 通知、收藏、群組仍保留既有次級頁面路徑，不再占用主導覽位置。
   const labels = [
-    ['home','探索角色'],['chat','開始暢聊'],['create','創建角色'],
-    ['notifications','系統通知'],['favorites','喜愛角色']
+    ['home','探索'],['create','創建'],['chat','聊天'],
+    ['shop','商店'],['profile','我的']
   ];
   const html = labels.map(([page,label]) => `
     <button class="nav-btn ${navPage === page ? 'active' : ''}"
             data-action="nav" data-page="${page}">
-      ${page === 'group' ? '👥' : ICON[page]}<span class="nav-label">${label}</span>
+      ${ICON[page]}<span class="nav-label">${label}</span>
     </button>`).join('');
   $('desktopNav').innerHTML = html;
   $('mobileNav').innerHTML = html;
 
   const titles = {
-    home:'探索角色',chat:'開始暢聊',conversation:'開始暢聊',group:'群組聊天',
+    home:'探索角色',chat:'開始暢聊',conversation:'開始暢聊',group:'群組聊天',shop:'商店',
     create:'創建角色',editor:'編輯角色',ai:'AI 創建',
     notifications:'系統通知',favorites:'喜愛角色',
     profile:'個人帳號',author:'作者主頁',detail:'角色介紹',
@@ -2331,7 +2434,7 @@ function renderShell() {
 function render() {
   if ($('modal').open) $('modal').close();
   const allowed = ['home','detail','session-detail','author','chat','conversation','group','create',
-    'editor','ai','notifications','favorites','profile'];
+    'editor','ai','notifications','favorites','shop','profile'];
   if (!allowed.includes(route.page)) route = {page:'home'};
 
   if (!['home','detail','author'].includes(route.page) && !currentUser()) {
@@ -2373,6 +2476,7 @@ function render() {
     case 'ai':renderAI();break;
     case 'notifications':renderNotifications();break;
     case 'favorites':renderFavorites();break;
+    case 'shop':renderShop();break;
     case 'profile':renderProfile();break;
   }
   if (route.overlay) renderModal(route.overlay);
@@ -2397,19 +2501,21 @@ function renderHome() {
           <p class="muted small" style="margin:6px 0 10px">此帳號目前無法使用 PersonaX 功能。若要保留帳號與錢包餘額，請在後端設定的期限內取消刪除申請。</p>
           <button class="primary" data-action="pending-show-deletion-modal">查看狀態／取消刪除</button>
         </section>` : ''}
+      <div class="explore-topline"><div><div class="explore-eyebrow">YOUR NEXT STORY</div><h1 class="explore-title">探索角色</h1><p class="explore-subtitle">每一次相遇，都可以是故事的開始。</p></div></div>
       <section class="hero" id="hero"></section>
-      <h2>探索角色</h2>
-      <div class="toolbar">
-        <input id="searchInput" placeholder="搜尋角色名稱或標籤…" value="${e(search)}">
-        <button data-action="tags" data-mode="explore"># 標籤</button>
-        <button data-action="clear-filter">清除篩選</button>
+      <div class="explore-shortcuts" aria-label="角色探索分類">
+        <button class="explore-shortcut" data-action="filter" data-filter="recommended"><span class="shortcut-icon">✧</span><span>推薦</span></button>
+        <button class="explore-shortcut" data-action="filter" data-filter="popular"><span class="shortcut-icon">↗</span><span>熱門</span></button>
+        <button class="explore-shortcut" data-action="filter" data-filter="latest"><span class="shortcut-icon">◷</span><span>新登場</span></button>
+        <button class="explore-shortcut" data-action="filter" data-filter="favorites"><span class="shortcut-icon">♡</span><span>喜愛</span></button>
+        <button class="explore-shortcut" data-action="tags" data-mode="explore"><span class="shortcut-icon">#</span><span>標籤</span></button>
+        <button class="explore-shortcut" data-action="toggle-search"><span class="shortcut-icon">⌕</span><span>搜尋</span></button>
+      </div>
+      <div class="toolbar explore-search-row hidden" id="exploreSearch">
+        <input id="searchInput" placeholder="搜尋角色名稱或標籤…" value="${e(search)}" aria-label="搜尋角色名稱或標籤">
+        <button data-action="clear-search" aria-label="清除搜尋">×</button>
       </div>
       <div class="row wrap" id="selectedTags"></div>
-      <div class="tabs">
-        ${[['latest','最新角色'],['recommended','推薦角色'],['male','男生'],['female','女生']]
-          .map(([key,label]) => `<button class="tab ${filter === key ? 'active' : ''}"
-            data-action="filter" data-filter="${key}">${label}</button>`).join('')}
-      </div>
       <p id="exploreHint" class="muted small"></p>
       <div id="characterGrid" class="grid"></div>
       <div id="moreArea" style="text-align:center"></div>
@@ -2437,7 +2543,13 @@ setInterval(() => {
 },6000);
 
 function exploreList() {
-  let list = state.characters.filter(c => c.visibility === 'public');
+  // 探索頁只顯示正式雲端公開角色；內建 seed 展示資料與未同步的本機測試角色不在公開版面出現。
+  let list = state.characters.filter(c =>
+    c.visibility === 'public' &&
+    !String(c.id).startsWith('seed-') &&
+    c.cloudPublic !== false &&
+    c.localOnly !== true
+  );
   if (filter === 'latest') {
     // 內建展示用 seed 角色不是實際上架紀錄，永遠不可列入「最新角色」。
     // 其 createdAt 會在全新本機資料初始化時重新產生，不能用來判斷真正上架時間。
@@ -2446,6 +2558,10 @@ function exploreList() {
       Date.now()-Number(c.firstPublishedAt ?? c.createdAt) >= 0 &&
       Date.now()-Number(c.firstPublishedAt ?? c.createdAt) <= DAY)
       .sort((a,b) => (b.firstPublishedAt ?? b.createdAt)-(a.firstPublishedAt ?? a.createdAt)).slice(0,30);
+  } else if (filter === 'favorites') {
+    list = list.filter(c => state.favorites.includes(c.id));
+  } else if (filter === 'popular') {
+    list.sort((a,b) => Number(b.chats || 0)-Number(a.chats || 0));
   } else if (['male','female'].includes(filter)) {
     list = list.filter(c => c.gender === filter);
   } else {
@@ -2472,18 +2588,19 @@ function card(c,owner = false) {
                 aria-label="查看${e(c.name)}">
           <img src="${e(safeImage(c.image))}" alt="${e(c.name)}" loading="lazy">
         </button>
+        <span class="card-chat-count" aria-label="${e(c.chats || 0)} 次對話" title="${e(c.chats || 0)} 次對話">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
+          <span>${e(c.chats || 0)}</span>
+        </span>
+        <button class="heart ${favorite ? 'on' : ''}" data-action="favorite"
+                data-id="${e(c.id)}" aria-label="切換喜愛角色"
+                aria-pressed="${favorite}">${favorite ? '♥' : '♡'}</button>
         <button class="card-chat" data-action="start-chat" data-id="${e(c.id)}">開始聊天</button>
       </div>
       <div class="card-body">
-        <div class="row between">
-          <span class="small muted">💬 ${e(c.chats || '0')}</span>
-          <button class="heart ${favorite ? 'on' : ''}" data-action="favorite"
-                  data-id="${e(c.id)}" aria-label="切換喜愛角色"
-                  aria-pressed="${favorite}">${favorite ? '♥' : '♡'}</button>
-        </div>
         <h3>${e(c.name)}</h3>
         <p class="card-intro">${e(c.intro)}</p>
-        <div class="row wrap" style="gap:5px">${(c.tags || []).slice(0,3).map(tagButton).join('')}</div>
+        <div class="card-tags">${(c.tags || []).slice(0,5).map(tagButton).join('')}</div>
         ${owner ? `
           <div class="owner-actions">
             <button data-action="visibility" data-id="${e(c.id)}" data-value="public"
@@ -2506,11 +2623,19 @@ function renderGrid() {
   const maximum = Math.min(150,list.length);
   const shown = recommended ? list.slice(0,Math.min(limit,150)) : list;
   $('characterGrid').innerHTML = shown.map(c => card(c)).join('') ||
-    '<div class="empty">找不到符合條件的角色。</div>';
+    '<div class="empty">目前還沒有符合條件的公開角色。稍後再來看看，或試試其他標籤。</div>';
+  document.querySelectorAll('.explore-shortcut[data-filter]').forEach(button => {
+    button.classList.toggle('active', button.dataset.filter === filter);
+  });
+  document.querySelector('.explore-shortcut[data-action="tags"]')?.classList.toggle('active', exploreTags.length > 0);
+  document.querySelector('.explore-shortcut[data-action="toggle-search"]')?.classList.toggle('active', !!search || !!($('exploreSearch') && !$('exploreSearch').classList.contains('hidden')));
   $('selectedTags').innerHTML = exploreTags.map(tagButton).join('');
   $('exploreHint').textContent = filter === 'latest'
     ? '最近24小時公開上架的角色，最多30位。'
+    : filter === 'popular' ? '目前依角色資料中的聊天數排序；全站回合統計仍待後端實作。'
     : `共有${list.length}位符合條件的角色。`;
+  const sectionTitle = document.querySelector('.explore-section-heading h2');
+  if (sectionTitle) sectionTitle.textContent = filter === 'popular' ? '熱門角色' : filter === 'favorites' ? '喜愛的角色' : filter === 'latest' ? '新登場角色' : '為你推薦';
 
   $('moreArea').innerHTML = recommended && list.length
     ? shown.length < maximum
@@ -2557,11 +2682,15 @@ function renderDetail() {
       <button class="ghost" data-action="back">← 返回上一頁</button>
       ${offline ? '<div class="character-status-banner">● 此角色目前離線或已下架。你仍可查看這段既有聊天所保留的角色簡介與開場白，但不能開啟新對話。</div>' : ''}
       <div class="detail-layout">
-        <img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" alt="${e(c.name)}">
+        <div class="detail-portrait">
+          <img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" alt="${e(c.name)}">
+          <div class="detail-portrait-meta">
+            <h1>${e(c.name)}</h1>
+            <button class="author-link" data-action="author" data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>
+            <div class="detail-chat-count">💬 ${e(c.chats || '0')} 次對話</div>
+          </div>
+        </div>
         <section class="panel stack">
-          <h1>${e(c.name)}</h1>
-          <button class="author-link" data-action="author" data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>
-          <p class="small muted">👥 ${c.users == null ? '尚未統計' : e(c.users)} 位用戶 ｜ 💬 ${e(c.chats || '0')} 次對話</p>
           <p class="muted">${c.gender === 'male' ? '男' : c.gender === 'female' ? '女' : '模糊'}
             · ${e(c.age || '未設定')} 歲 · ${e(c.race || '未設定種族')}</p>
           <div><h3>角色介紹</h3><div class="prose">${e(c.intro)}</div></div>
@@ -2583,38 +2712,95 @@ function renderDetail() {
         <div id="replyHint" class="small muted" style="margin-top:15px"></div>
         <form data-form="comment" style="margin-top:12px">
           <textarea name="text" maxlength="2000" required placeholder="輸入評論…"></textarea>
-          <div class="row between" style="margin-top:10px">
+          <div class="row between wrap" style="margin-top:10px;gap:10px">
+            <label class="whisper-option"><input type="checkbox" name="whisper" value="true"> <span>悄悄話</span> <small>僅你與角色作者可見</small></label>
             <span class="small muted">最多2000字</span>
             <button class="primary">送出</button>
           </div>
         </form>
       </section>`}
     </div>`;
-  if (!offline && route.page !== 'session-detail') renderComments();
+  if (!offline && route.page !== 'session-detail') {
+    renderComments();
+    if (window.mySupabase && c.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(c.id)) void loadCloudComments(c.id);
+  }
 }
+
+async function loadCloudComments(characterId) {
+  const client=window.mySupabase;
+  if(!client||!characterId)return;
+  try {
+    const {data:rows,error}=await client.rpc('get_character_comments_safe',{p_character_id:characterId});
+    if(error)throw error;
+    const safeRows=(rows||[]).sort((a,b)=>Date.parse(a.created_at)-Date.parse(b.created_at));
+    // 評論 RPC 只回傳安全的留言內容；另取公開個人資料，避免其他帳號的留言者被錯誤顯示成「故事創作者」。
+    const profileIds=[...new Set(safeRows.map(row=>row.author_id).filter(Boolean))];
+    if(profileIds.length){
+      const {data:profiles,error:profilesError}=await client.from('profiles')
+        .select('id,nickname,avatar_url,bio').in('id',profileIds);
+      if(profilesError)console.warn('PersonaX 評論作者資料載入失敗：',profilesError);
+      else (profiles||[]).forEach(profile=>{
+        state.authors[profile.id]={
+          ...(state.authors[profile.id]||{}),uid:profile.id,
+          nickname:profile.nickname||state.authors[profile.id]?.nickname||'PersonaX 使用者',
+          avatar:profile.avatar_url||state.authors[profile.id]?.avatar||'',
+          bio:profile.bio||state.authors[profile.id]?.bio||''
+        };
+      });
+    }
+    const ids=safeRows.filter(row=>!row.is_redacted).map(row=>row.id);
+    let likes=[];
+    if(ids.length){
+      const {data,error:likesError}=await client.from('character_comment_likes')
+        .select('comment_id,user_id').in('comment_id',ids);
+      if(likesError)throw likesError;
+      likes=data||[];
+    }
+    const mapped=safeRows.map(row=>({
+      id:row.id,authorId:row.author_id,text:row.content,parentId:row.parent_id,
+      whisper:!!row.is_whisper,redacted:!!row.is_redacted,deleted:!!row.is_deleted,edited:row.updated_at!==row.created_at,
+      at:Date.parse(row.created_at)||Date.now(),
+      likes:likes.filter(item=>item.comment_id===row.id).map(item=>item.user_id),cloud:true
+    }));
+    if(route.page!=='detail'||route.id!==characterId)return;
+    state.comments[characterId]=mapped;
+    renderComments();
+  } catch(error) {
+    console.error('PersonaX 雲端評論載入失敗：',error);
+    const target=$('comments');
+    if(target&&route.id===characterId)target.innerHTML='<div class="empty">雲端評論載入失敗，請重新整理或稍後再試。</div>';
+  }
+}
+
 function renderComments() {
+  if (!document.getElementById('whisper-redacted-style')) {
+    const style=document.createElement('style');style.id='whisper-redacted-style';
+    style.textContent='.whisper-redacted-avatar{background:#e5e7eb!important;color:#6b7280!important;display:flex;align-items:center;justify-content:center;font-weight:700;border:1px solid #d1d5db}';
+    document.head.appendChild(style);
+  }
   if (!$('comments')) return;
-  const list = state.comments[route.id] || [];
+  const allComments = state.comments[route.id] || [];
+  const character = currentCharacter();
+  const uid = currentUser()?.uid;
+  const list = allComments;
   $('comments').innerHTML = list.map(c => {
     const a = author(c.authorId);
-    const liked = (c.likes || []).includes(currentUser()?.uid);
-    const parent = list.find(p => p.id === c.parentId);
+    const liked = (c.likes || []).includes(uid);
+    const parent = allComments.find(p => p.id === c.parentId);
     return `
       <article class="comment ${c.parentId ? 'reply' : ''}">
         <div class="row">
-          ${avatar(a)}
+          ${c.redacted && c.whisper && !c.parentId ? '<div class="avatar whisper-redacted-avatar" aria-label="悄悄話">悄</div>' : avatar(a)}
           <div class="grow">
-            <button class="author-link" data-action="author" data-id="${e(a.uid)}">@${e(a.nickname)}</button>
+            ${c.redacted && c.whisper && !c.parentId ? '<span class="small muted">悄悄話</span>' : `<button class="author-link" data-action="author" data-id="${e(a.uid)}">@${e(a.nickname)}</button>${character && c.authorId === character.authorId ? '<span class="small muted" style="margin-left:6px">(作者)</span>' : ''}${c.whisper ? '<span class="comment-whisper-label" style="margin-left:6px">悄悄話</span>' : ''}`}
             <div class="small muted">${e(timeText(c.at))}${c.edited ? ' · 已修改' : ''}</div>
           </div>
-          ${!c.deleted ? `<button class="heart ${liked ? 'on' : ''}" data-action="comment-like"
-            data-id="${e(c.id)}">${liked ? '♥' : '♡'} ${(c.likes || []).length}</button>` : ''}
         </div>
-        ${parent ? `<p class="small muted" style="margin:10px 0">回覆 @${e(author(parent.authorId).nickname)}</p>` : ''}
+        ${parent && !c.redacted ? `<p class="small muted" style="margin:10px 0">回覆 @${e(author(parent.authorId).nickname)}</p>` : ''}
         <p class="prose ${c.deleted ? 'muted' : ''}" style="margin:12px 0">
           ${c.deleted ? '該筆評論已被刪除' : e(c.text)}
         </p>
-        ${!c.deleted ? `<div class="comment-tools">
+        ${!c.deleted && !c.redacted ? `<div class="comment-like-row"><button class="comment-like-button ${liked ? 'on' : ''}" data-action="comment-like" data-id="${e(c.id)}" aria-pressed="${liked}"><span class="like-symbol">${liked ? '♥' : '♡'}</span><span>${(c.likes || []).length}</span></button></div><div class="comment-tools">
           <button data-action="reply" data-id="${e(c.id)}">回覆</button>
           <button data-action="translation">翻譯</button>
           <button data-action="comment-menu" data-id="${e(c.id)}">⋯</button>
@@ -2625,7 +2811,8 @@ function renderComments() {
 function renderAuthor() {
   const a = author(route.id);
   const following = state.following.includes(a.uid);
-  const list = state.characters.filter(c => c.visibility === 'public' && c.authorId === a.uid);
+  const list = state.characters.filter(c => c.visibility === 'public' && c.authorId === a.uid &&
+    !String(c.id).startsWith('seed-') && c.cloudPublic !== false && c.localOnly !== true);
   $('view').innerHTML = `
     <div class="stack">
       <section class="panel stack">
@@ -2634,7 +2821,7 @@ function renderAuthor() {
             <p class="small muted" style="margin:6px 0">UID：${e(a.uid)}</p>
           </div>
         </div>
-        <p class="prose muted">${e(a.bio || '尚未填寫簡介')}</p>
+        <p class="prose muted bio-scroll">${e(a.bio || '尚未填寫簡介')}</p>
         <div class="row between wrap">
           <strong>粉絲 ${(a.fans || 0)+(following ? 1 : 0)}</strong>
           <div class="row">
@@ -2656,6 +2843,7 @@ function renderFavorites() {
 }
 
 /* Characters */
+let createVisibilityFilter = 'all';
 function creationTabs() {
   return `<div class="tabs">
     <button data-action="new-character">建立新角色</button>
@@ -2665,10 +2853,23 @@ function creationTabs() {
 }
 function owned(c) { return currentUser() && c?.authorId === currentUser().uid; }
 function renderCreate() {
+  const ownedCharacters = state.characters.filter(c => owned(c) && !c.deletedAt);
+  const visibleCharacters = ownedCharacters.filter(c =>
+    createVisibilityFilter === 'all' ||
+    (createVisibilityFilter === 'public' ? c.visibility === 'public' : c.visibility !== 'public')
+  );
   $('view').innerHTML = `<div class="stack"><h1>創建角色</h1>${creationTabs()}
-    <h2>你的角色</h2><div class="grid">
-      ${state.characters.filter(c => owned(c) && !c.deletedAt).map(c => card(c,true)).join('') ||
-      '<div class="empty">尚未建立角色。</div>'}
+    <div class="row between wrap" style="align-items:center;gap:12px">
+      <h2 style="margin:0">你的角色</h2>
+      <div class="tabs" role="tablist" aria-label="角色權限篩選">
+        <button class="tab ${createVisibilityFilter === 'all' ? 'active' : ''}" role="tab" aria-selected="${createVisibilityFilter === 'all'}" data-action="create-visibility" data-value="all">全部</button>
+        <button class="tab ${createVisibilityFilter === 'public' ? 'active' : ''}" role="tab" aria-selected="${createVisibilityFilter === 'public'}" data-action="create-visibility" data-value="public">公開</button>
+        <button class="tab ${createVisibilityFilter === 'private' ? 'active' : ''}" role="tab" aria-selected="${createVisibilityFilter === 'private'}" data-action="create-visibility" data-value="private">私密</button>
+      </div>
+    </div>
+    <div class="grid">
+      ${visibleCharacters.map(c => card(c,true)).join('') ||
+      (createVisibilityFilter === 'public' ? '<div class="empty">目前沒有公開角色。</div>' : createVisibilityFilter === 'private' ? '<div class="empty">目前沒有私密角色。</div>' : '<div class="empty">尚未建立角色。</div>')}
     </div></div>`;
 }
 function startEditor(c = null) {
@@ -2776,6 +2977,21 @@ async function readImage(file) {
     reader.onerror = () => reject(Error('圖片讀取失敗。'));
     reader.readAsDataURL(file);
   });
+}
+async function compressProfileImage(file) {
+  if (!file || !['image/png','image/jpeg','image/webp'].includes(file.type)) throw Error('請選擇 PNG、JPG 或 WebP 圖片。');
+  if (file.size > 15 * 1024 * 1024) throw Error('頭像原始檔請小於 15 MB。');
+  const source=await readImage(file);
+  const image=await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(Error('無法讀取這張圖片。'));img.src=source;});
+  const size=256, canvas=document.createElement('canvas');canvas.width=size;canvas.height=size;
+  const ctx=canvas.getContext('2d');if(!ctx)throw Error('目前瀏覽器無法壓縮圖片。');
+  const scale=Math.max(size/image.width,size/image.height),width=image.width*scale,height=image.height*scale;
+  ctx.drawImage(image,(size-width)/2,(size-height)/2,width,height);
+  let result=canvas.toDataURL('image/webp',0.62);
+  if(result.length>120000)result=canvas.toDataURL('image/jpeg',0.55);
+  if(result.length>180000)result=canvas.toDataURL('image/jpeg',0.38);
+  if(result.length>220000)throw Error('壓縮後圖片仍太大，請改用較簡單的圖片。');
+  return result;
 }
 
 /* Chat sessions: character identity stays separate from conversation identity. */
@@ -3414,37 +3630,71 @@ function renderChatOverlay(kind) {
 }
 
 /* Account */
+function renderShop() {
+  const u = currentUser();
+  const silver = Number(u?.silver || 0).toLocaleString();
+  const diamonds = Number(u?.diamonds || 0).toLocaleString();
+  const diamondPackages = [
+    { amount: 200, price: 60 },
+    { amount: 490, price: 150 },
+    { amount: 960, price: 290 },
+    { amount: 2800, price: 850 },
+    { amount: 4600, price: 1390 },
+    { amount: 9000, price: 2690 }
+  ];
+  $('view').innerHTML = `
+    <div class="stack store-page" style="gap:22px">
+      <section class="store-heading" style="display:block;height:auto;padding:0;background:transparent;border:0;box-shadow:none">
+        <div class="explore-eyebrow" style="letter-spacing:.14em">STORE</div>
+        <h1 style="margin:5px 0 0">商店</h1>
+      </section>
+      <section class="stack" style="gap:10px">
+        <div class="row between" style="align-items:center;gap:12px;flex-wrap:wrap">
+          <h2 style="margin:0">我的資源</h2>
+          <button data-action="ledger">儲值紀錄</button>
+        </div>
+        <div class="two-col" style="gap:10px">
+          <article class="panel" style="padding:12px 15px;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:76px">
+            <div><div class="small muted">鑽石</div><strong style="font-size:clamp(22px,3vw,28px);line-height:1.3">💎 ${diamonds}</strong></div>
+            <span aria-hidden="true" class="muted">付費資源</span>
+          </article>
+          <article class="panel" style="padding:12px 15px;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:76px">
+            <div><div class="small muted">銀幣</div><strong style="font-size:clamp(22px,3vw,28px);line-height:1.3">◉ ${silver}</strong></div>
+            <span aria-hidden="true" class="muted">免費資源</span>
+          </article>
+        </div>
+      </section>
+      <section class="stack" style="gap:12px">
+        <div><h2 style="margin:0">鑽石儲值</h2><p class="small muted" style="margin:5px 0 0">選擇適合你的鑽石方案</p></div>
+        <div class="two-col" style="gap:12px">
+          ${diamondPackages.map((item) => `
+            <article class="panel stack" style="padding:15px;gap:12px;justify-content:space-between">
+              <div class="row between" style="align-items:center;gap:8px">
+                <strong style="font-size:clamp(18px,2.5vw,24px);white-space:nowrap">💎 ${item.amount.toLocaleString()}</strong>
+                <strong style="font-size:clamp(16px,2.2vw,20px);white-space:nowrap">$${item.price.toLocaleString()}</strong>
+              </div>
+              <button type="button" disabled aria-disabled="true" style="width:100%;opacity:.65;cursor:not-allowed">尚未開放</button>
+            </article>`).join('')}
+        </div>
+        <p class="small muted" style="margin:0;line-height:1.7">以上為預留方案展示；付款功能尚未開放，按鈕目前不會建立訂單或產生實際交易。</p>
+      </section>
+      <section class="panel stack" style="gap:12px;border:1px solid var(--border)">
+        <div class="row between" style="align-items:center;gap:12px;flex-wrap:wrap">
+          <div><h2 style="margin:0 0 5px">月費方案</h2><p class="small muted" style="margin:0;line-height:1.7">會員方案內容與權益將於未來公布。</p></div>
+          <span class="badge">敬請期待</span>
+        </div>
+        <div style="min-height:42px;border:1px dashed var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;padding:10px;color:var(--muted)">會員方案即將推出</div>
+      </section>
+    </div>`;
+}
+
 function renderProfile() {
   const u = currentUser();
-  $('view').innerHTML = `<div class="stack form-width">
-    <h1>個人帳號</h1>
-    <section class="panel stack">
-      <div class="row between">
-        <div class="row">${avatar(u)}<div>
-          <h2 style="margin:0">${e(u.nickname)}</h2>
-          <button class="author-link" data-action="author" data-id="${e(u.uid)}">@${e(u.nickname)}</button>
-          <p class="small muted" style="margin:6px 0">UID：${e(u.uid)}</p>
-        </div></div>
-        <button data-action="edit-profile">⚙ 編輯</button>
-      </div>
-      <div><h3>帳號簡介</h3><p class="prose muted">${e(u.bio || '尚未填寫')}</p></div>
-    </section>
-    <section class="panel stack">
-      <div class="row between"><span>會員等級</span><strong>${u.member === 'monthly' ? '月費會員' : '免費會員'}</strong></div>
-      <div class="row between"><span>鑽石數量</span><strong>💎 ${Number(u.diamonds || 0).toLocaleString()}</strong></div>
-      <div class="row between"><span>銀幣數量</span><strong>◉ ${Number(u.silver || 0).toLocaleString()}</strong></div>
-      <div class="row wrap">
-        <button data-action="shop">購買鑽石</button>
-        <button data-action="ledger">花費日誌</button>
-        <button data-action="purchases">購買紀錄</button>
-      </div>
-    </section>
-    <section class="panel"><h3>BUG 回報</h3>
-      <button data-action="bug">回報問題</button></section>
-    <div class="row wrap">
-      <button data-action="logout">登出</button>
-      <button class="danger" data-action="delete-account">刪除帳號</button>
-    </div>
+  $('view').innerHTML = `<div class="stack form-width profile-page" style="gap:16px">
+    <div class="row between" style="align-items:flex-start"><div><div class="explore-eyebrow">PERSONAX</div><h1 style="margin:4px 0 0">我的</h1></div><span class="small muted">測試環境，非正式網頁</span></div>
+    <section class="panel stack" style="gap:14px"><div class="profile-account-header"><div class="row" style="align-items:center;min-width:0;gap:12px">${avatar(u)}<div style="min-width:0;padding-right:56px"><div class="small muted">個人帳號</div><h2 style="margin:3px 0;overflow-wrap:anywhere">${e(u.nickname)}</h2><button class="author-link" data-action="author" data-id="${e(u.uid)}">@${e(u.nickname)}</button><p class="small muted" style="margin:6px 0;overflow-wrap:anywhere">UID：${e(u.uid)}</p></div></div><button class="profile-edit-button" data-action="edit-profile">⚙ 編輯</button></div><div><h3 style="margin-bottom:4px">帳號簡介</h3><p class="prose muted bio-scroll" style="margin:0">${e(u.bio || '尚未填寫')}</p></div></section>
+    <section class="panel stack" style="gap:12px"><div class="row between"><span>會員等級</span><strong>${u.member === 'monthly' ? '月費會員' : '免費會員'}</strong></div><div class="row between"><span>鑽石數量</span><strong>💎 ${Number(u.diamonds || 0).toLocaleString()}</strong></div><div class="row between"><span>銀幣數量</span><strong>◉ ${Number(u.silver || 0).toLocaleString()}</strong></div><button data-action="ledger" style="width:100%">花費日誌與交易紀錄</button></section>
+    <section class="stack" style="gap:0"><button class="profile-setting" data-action="personas"><span><strong>人設管理</strong><small></small></span><span>›</span></button><button class="profile-setting" data-action="theme-setting"><span><strong>版面顏色</strong><small>目前：${state.theme === 'day' ? '白天' : '黑夜'}</small></span><span>›</span></button><button class="profile-setting" data-action="birthdate"><span><strong>出生日期</strong><small>${e(u.birthdate || '尚未設定')}</small></span><span>›</span></button><button class="profile-setting" data-action="bug"><span><strong>BUG 回報</strong><small>回報網站問題（目前僅檢查表單）</small></span><span>›</span></button><div style="padding:16px 0 8px"><button data-action="logout" class="primary" style="width:100%;min-height:46px">登出帳號</button><p style="margin:14px 0 0;text-align:center"><button type="button" data-action="delete-account" style="border:0;background:transparent;padding:6px 10px;color:var(--muted);font-size:12px;text-decoration:underline;text-underline-offset:3px">刪除帳號</button></p></div></section>
   </div>`;
 }
 function renderNotifications() {
@@ -3486,6 +3736,11 @@ async function loadWalletLedger(currency) {
     return false;
   }
 
+  // Resolve a chat charge/refund to the character through the secure, user-scoped RPC.
+  const { data: roleNameRows, error: roleNameError } = await client.rpc('get_my_wallet_transaction_character_names');
+  if (roleNameError) console.warn('讀取交易對應角色名稱失敗：', roleNameError.message);
+  const roleNames = new Map((roleNameRows || []).map(item => [item.reference_id, item.character_name]));
+
   const selectedType = currency === 'silver' ? 'silver_coins' : 'diamonds';
   let runningBalance = Number(currency === 'silver'
     ? state.account.silver : state.account.diamonds) || 0;
@@ -3496,15 +3751,21 @@ async function loadWalletLedger(currency) {
       id: row.id,
       currency: row.currency_type === 'silver_coins' ? 'silver' : 'diamond',
       change: amount,
-      reason: ({
-        signup_bonus: '註冊贈送',
-        chat_turn_charge: '聊天回覆扣款',
-        chat_turn_refund: '聊天失敗退款',
-        daily_checkin: '每日簽到',
-        reward_ad: '觀看獎勵廣告',
-        purchase: '購買',
-        admin_adjustment: '餘額調整'
-      })[row.biz_type] || row.biz_type || '錢包交易',
+      reason: (() => {
+        const baseReason = ({
+          signup_bonus: '註冊贈送',
+          chat_turn_charge: '聊天回覆扣款',
+          chat_turn_refund: '聊天失敗退款',
+          daily_checkin: '每日簽到',
+          reward_ad: '觀看獎勵廣告',
+          purchase: '購買',
+          admin_adjustment: '餘額調整'
+        })[row.biz_type] || row.biz_type || '錢包交易';
+        const characterName = roleNames.get(row.reference_id);
+        return characterName && ['chat_turn_charge', 'chat_turn_refund'].includes(row.biz_type)
+          ? baseReason + ' · ' + characterName
+          : baseReason;
+      })(),
       at: Date.parse(row.created_at) || Date.now(),
       balance: runningBalance,
       referenceId: row.reference_id || null
@@ -3540,10 +3801,7 @@ function renderModal(o) {
       break;
     case 'login':
       showDialog('登入 PersonaX',`
-        <p class="muted">已連線至雲端資料庫，可使用 Google 帳號登入。</p>
-        <button onclick="loginWithGoogle()" class="primary" style="width:100%">Google登入</button>
-        <button disabled style="width:100%;margin-top:10px">Email登入 (建置中)</button>
-        <button class="muted" style="width:100%;margin-top:18px" data-action="local-login">進入測試帳號</button>`);
+        <button onclick="loginWithGoogle()" class="primary" style="width:100%">Google登入</button>`);
       break;
       break;
     case 'tags':
@@ -3569,23 +3827,26 @@ function renderModal(o) {
         </form>`);
       break;
     case 'edit-profile':
-      showDialog('編輯個人資料',`
-        <form data-form="profile">
-          <label class="field"><span>主頭像</span>
-            <input id="profileImage" type="file" accept="image/png,image/jpeg,image/webp"></label>
-          <label class="field"><span>暱稱</span><input name="nickname" required value="${e(u.nickname)}">
-            <small>${NAME_HELP}</small></label>
-          <label class="field"><span>帳號簡介</span><textarea name="bio" maxlength="1000">${e(u.bio || '')}</textarea></label>
-          <div class="field"><span>版面顏色</span>
-            <label class="switch-row">
-              <span>黑夜</span>
-              <input name="day" type="checkbox" role="switch" ${state.theme === 'day' ? 'checked' : ''}>
-              <span>白天</span>
-            </label>
-          </div>
-          <button class="primary">儲存修改</button>
-        </form>`);
+      profileImage = u.avatar || '';
+      showDialog('編輯個人資料',`<form data-form="profile"><div class="field"><span>主頭像</span><div class="row" style="align-items:center;gap:12px"><img id="profileImagePreview" src="${e(safeImage(u.avatar))}" alt="目前頭像" class="avatar" style="width:72px;height:72px;${safeImage(u.avatar) ? '' : 'display:none'}"><span class="small muted">預設使用 Google 頭像，可在此更換。</span></div><input id="profileImage" type="file" accept="image/png,image/jpeg,image/webp"><small class="muted">自動裁切縮放至 256×256，壓縮後再儲存。</small></div><label class="field"><span>暱稱</span><input name="nickname" required maxlength="25" value="${e(u.nickname)}"><small>${NAME_HELP}</small></label><label class="field"><span>帳號簡介</span><textarea name="bio" maxlength="500">${e(u.bio || '')}</textarea><small>最多 500 字。</small></label><button class="primary">儲存修改</button></form>`);
       break;
+    case 'theme-setting':
+      showDialog('版面顏色',`<form data-form="theme-setting" class="stack"><label class="row" style="justify-content:flex-start;gap:10px;padding:12px;border:1px solid var(--border);border-radius:12px;cursor:pointer"><input name="theme" type="radio" value="night" style="width:18px;height:18px;flex:0 0 18px" ${state.theme !== 'day' ? 'checked' : ''}><span><strong>黑夜</strong><small class="muted" style="display:block">深色背景，適合夜間使用</small></span></label><label class="row" style="justify-content:flex-start;gap:10px;padding:12px;border:1px solid var(--border);border-radius:12px;cursor:pointer"><input name="theme" type="radio" value="day" style="width:18px;height:18px;flex:0 0 18px" ${state.theme === 'day' ? 'checked' : ''}><span><strong>白天</strong><small class="muted" style="display:block">明亮背景，適合日間使用</small></span></label><p class="small muted">選擇後會套用至整個網站。</p><button class="primary">儲存版面</button></form>`);
+      break;
+    case 'birthdate':
+      showDialog('出生日期',`<form data-form="birthdate"><label class="field"><span>出生日期（年月日）</span><input name="birthdate" type="date" max="${new Date().toISOString().slice(0,10)}" value="${e(u.birthdate || '')}"></label><p class="small muted">目前先儲存在此瀏覽器的帳號設定中。</p><button class="primary">儲存日期</button></form>`);
+      break;
+    case 'personas': {
+      const personas = Array.isArray(u.personas) ? u.personas : [];
+      const editing = personas.find(p => p.id === o.editId);
+      showDialog('人設管理',`<form data-form="personas" class="stack"><input type="hidden" name="personaId" value="${e(editing?.id || '')}"><label class="field"><span>人設名稱</span><input name="personaName" maxlength="25" required value="${e(editing?.name || '')}"><small>最多 25 字。</small></label><label class="field"><span>人設內容</span><textarea name="personaText" maxlength="1000" required>${e(editing?.text || '')}</textarea><small>最多 1000 字。</small></label><div class="row wrap"><button class="primary" ${!editing && personas.length >= 30 ? 'disabled' : ''}>${editing ? '儲存修改' : `新增人設（${personas.length}/30）`}</button>${editing ? '<button type="submit" name="saveDefault" value="1">設為預設</button>' : ''}</div></form><div class="ledger-scroll" style="height:min(300px,36dvh)">${personas.slice().sort((a,b)=>Number(!!b.isDefault)-Number(!!a.isDefault)).map(p => `
+<article class="log-row" role="button" tabindex="0" data-action="persona-edit" data-id="${e(p.id)}" aria-label="選取人設：${e(p.name)}" style="cursor:pointer;border:1px solid ${p.isDefault ? 'var(--primary)' : 'var(--border)'};border-radius:12px;padding:12px;margin-bottom:10px;background:${p.isDefault ? 'var(--soft)' : 'var(--panel)'};transition:border-color .15s,background .15s">
+${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;margin-bottom:6px">預設人設</div>' : ''}
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0"><strong style="min-width:0;overflow-wrap:anywhere">${e(p.name)}</strong><button type="button" data-action="persona-delete" data-id="${e(p.id)}" aria-label="刪除人設：${e(p.name)}" title="刪除人設" style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:5px;border:0;background:transparent;color:#fff;border-radius:6px;cursor:pointer"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 10v6M14 10v6"/></svg></button></div>
+<div class="small muted" style="white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;max-height:7.5em;overflow-y:auto;margin-top:8px;padding:7px 8px;border:1px solid var(--border);border-radius:8px;background:var(--input)">${e(p.text)}</div>
+</article>`).join('') || '<div class="empty">尚未儲存人設。</div>'}</div>`);
+      break;
+    }
     case 'delete-account':
       showDialog('申請刪除帳號',`
         <form data-form="delete-account">
@@ -3619,22 +3880,13 @@ function renderModal(o) {
       break;
     case 'ledger': {
       const currency = o.currency || 'diamond';
-      const logs = state.ledger.filter(l => l.currency === currency);
-      showDialog('花費日誌',`
-        <div class="tabs">
-          <button class="tab ${currency === 'diamond' ? 'active' : ''}" data-action="ledger-tab" data-value="diamond">鑽石</button>
-          <button class="tab ${currency === 'silver' ? 'active' : ''}" data-action="ledger-tab" data-value="silver">銀幣</button>
-        </div>
-        ${walletLedgerLoadError === currency
-          ? `<div class="empty" style="margin-top:15px">雲端交易紀錄暫時無法讀取，為避免顯示過期資料，請重新載入。</div>
-             <button style="width:100%;margin-top:12px" data-action="ledger-retry" data-value="${e(currency)}">重新載入</button>`
-          : logs.slice().reverse().map(l => `<article class="log-row">
-          <div class="row between"><strong>${e(l.reason)}</strong>
-            <strong>${l.change >= 0 ? '+' : ''}${e(l.change)}</strong></div>
-          <p class="small muted" style="margin:6px 0">
-            ${e(timeText(l.at))} · 餘額 ${e(l.balance)}
-          </p>
-        </article>`).join('') || '<div class="empty" style="margin-top:15px">目前沒有紀錄。</div>'}`);
+      const kind = o.kind || 'all';
+      const walletLogs = state.ledger.filter(l => l.currency === currency && (kind === 'all' || (kind === 'gain' && Number(l.change) > 0) || (kind === 'spend' && Number(l.change) < 0)));
+      const purchaseLogs = currency === 'diamond' && kind !== 'spend' ? (state.purchases || []).map(p => ({...p, reason: '購買紀錄 · ' + (p.title || '方案'), at: p.at || Date.now(), isPurchase: true, change: null, balance: p.status || '紀錄'})) : [];
+      const logs = [...walletLogs, ...purchaseLogs];
+      const listMarkup = walletLedgerLoadError === currency ? `<div class="empty">雲端交易紀錄暫時無法讀取，請重新載入。</div><button style="width:100%;margin-top:12px" data-action="ledger-retry" data-value="${e(currency)}">重新載入</button>` : (logs.slice().reverse().map(l => `<article class="log-row"><div class="row between" style="gap:10px"><strong>${e(l.reason)}</strong>${l.isPurchase ? `<strong>${e(l.status || '已記錄')}</strong>` : `<strong>${Number(l.change) >= 0 ? '+' : ''}${e(l.change)}</strong>`}</div><p class="small muted" style="margin:6px 0">${e(timeText(l.at))}${l.isPurchase ? '' : ' · 餘額 ' + e(l.balance)}</p></article>`).join('') || '<div class="empty">目前沒有紀錄。</div>');
+      showDialog('交易紀錄',`<div class="tabs"><button class="tab ${currency === 'diamond' ? 'active' : ''}" data-action="ledger-tab" data-value="diamond">鑽石</button><button class="tab ${currency === 'silver' ? 'active' : ''}" data-action="ledger-tab" data-value="silver">銀幣</button></div><div class="tabs" style="margin-top:10px"><button class="tab ${kind === 'all' ? 'active' : ''}" data-action="ledger-filter" data-value="all">全部</button><button class="tab ${kind === 'gain' ? 'active' : ''}" data-action="ledger-filter" data-value="gain">獲得</button><button class="tab ${kind === 'spend' ? 'active' : ''}" data-action="ledger-filter" data-value="spend">花費</button></div><div class="ledger-scroll">${listMarkup}</div>`);
+      $('modal').style.height='min(590px,82dvh)'; $('modal').style.overflowY='hidden';
       break;
     }
     case 'purchases':
@@ -3669,14 +3921,26 @@ function renderModal(o) {
         </div>`);
       break;
     }
+    case 'persona-picker': {
+      const personas=Array.isArray(currentUser()?.personas)?currentUser().personas:[];
+      showDialog('選擇其他人設',`<div class="stack"><p class="small muted">選擇後會帶入目前聊天的人設編輯框，按「儲存」才會套用到這個聊天，不會修改其他聊天。</p><button type="button" data-action="personas">人設管理／新增人設</button><div class="ledger-scroll" style="max-height:min(50dvh,420px)">${personas.slice().sort((a,b)=>Number(!!b.isDefault)-Number(!!a.isDefault)).map(p=>`<button type="button" data-action="persona-select" data-id="${e(p.id)}" style="display:block;width:100%;text-align:left;margin:6px 0;padding:12px;border:${p.isDefault?'1px dashed var(--primary)':'1px solid var(--border)'};border-radius:10px"><strong>${e(p.name)}</strong>${p.isDefault?'<span class="small" style="display:block;color:var(--primary)">預設人設</span>':''}<span class="small muted" style="display:block;white-space:pre-wrap;margin-top:5px">${e(p.text)}</span></button>`).join('')||'<div class="empty">目前沒有儲存的人設，請先新增。</div>'}</div></div>`);
+      break;
+    }
     case 'persona':
       if (!s) return;
-      showDialog('專屬人設',`
-        <form data-form="persona">
-          <textarea name="persona" maxlength="3000">${e(s.persona || '')}</textarea>
-          <p class="small muted">最多3000字。</p>
-          <button class="primary">儲存</button>
-        </form>`);
+      {
+        const defaultPersona=(Array.isArray(currentUser()?.personas)?currentUser().personas:[]).find(item=>item.isDefault);
+        // 未手動儲存的聊天永遠跟隨目前預設人設；手動儲存的聊天保留自己的內容。
+        const hasCustomPersona=s.personaCustom === true || (s.personaCustom !== false && !!s.persona);
+        const initialPersona=Object.prototype.hasOwnProperty.call(o,'draftPersona') ? String(o.draftPersona || '') : (hasCustomPersona ? (s.persona || '') : (defaultPersona?.text || ''));
+        showDialog('專屬人設',`
+          <form data-form="persona">
+            ${!hasCustomPersona && !Object.prototype.hasOwnProperty.call(o,'draftPersona') && defaultPersona ? `<p class="small" style="color:var(--primary)">已帶入預設人設：${e(defaultPersona.name)}</p>` : ''}
+            <textarea name="persona" maxlength="1000">${e(initialPersona)}</textarea>
+            <p class="small muted">最多 1000 字。</p>
+            <div class="row wrap"><button type="button" data-action="persona-choose">選擇其他人設</button><button type="submit" class="primary">儲存</button></div>
+          </form>`);
+      }
       break;
     case 'archives':
       renderArchives(o.id);
@@ -3878,6 +4142,10 @@ document.addEventListener('click',async event => {
       case 'group-toggle-member':groupExpandedMemberId=groupExpandedMemberId===key?null:key;render();break;
       case 'group-restart':groupRestart();break;
       case 'nav':visit(button.dataset.page);break;
+      case 'create-visibility':
+        createVisibilityFilter = ['all','public','private'].includes(button.dataset.value) ? button.dataset.value : 'all';
+        renderCreate();
+        break;
       case 'back':back();break;
       case 'collapse':document.body.classList.toggle('collapsed');break;
       case 'environment':openModal('environment');break;
@@ -3964,11 +4232,20 @@ document.addEventListener('click',async event => {
         break;
       case 'filter':
         filter = button.dataset.filter;limit = 24;
+        exploreTags = [];
         if (route.tag) {
           const next = {...route};delete next.tag;
           go(next,true);
         } else renderHome();
         break;
+      case 'toggle-search': {
+        const searchRow = $('exploreSearch');
+        if (searchRow) searchRow.classList.toggle('hidden');
+        if (searchRow && !searchRow.classList.contains('hidden')) $('searchInput')?.focus();
+        break;
+      }
+      case 'clear-search':
+        search='';renderHome();$('exploreSearch')?.classList.remove('hidden');$('searchInput')?.focus();break;
       case 'clear-filter':
         search='';exploreTags=[];limit=24;
         go({page:'home'},true);
@@ -4338,9 +4615,43 @@ document.addEventListener('click',async event => {
       case 'ledger-tab': {
         const currency = button.dataset.value;
         await loadWalletLedger(currency);
-        openModal('ledger',{currency});
+        openModal('ledger',{currency,kind:route.overlay?.kind || 'all'});
         break;
       }
+      case 'ledger-filter': {
+        const kind = ['all','gain','spend'].includes(button.dataset.value) ? button.dataset.value : 'all';
+        openModal('ledger',{currency:route.overlay?.currency || 'diamond',kind});
+        break;
+      }
+      case 'personas': {
+        if (state.account?.uid && window.mySupabase) {
+          try {
+            const {data,error}=await window.mySupabase.from('profiles').select('persona_presets').eq('id',state.account.uid).maybeSingle();
+            if(error) throw error;
+            if(!data) throw new Error('找不到雲端人設資料。');
+            state.account.personas=Array.isArray(data.persona_presets)?data.persona_presets:[];
+            persist();
+          } catch(error) { toast('讀取雲端人設失敗：'+(error.message||'請稍後再試。')); break; }
+        }
+        openModal('personas');break;
+      }
+      case 'theme-setting':openModal('theme-setting');break;
+      case 'birthdate':openModal('birthdate');break;
+      case 'persona-edit':openModal('personas',{editId:key});break;
+      case 'persona-choose':openModal('persona-picker');break;
+      case 'persona-select': {
+        const selected=(Array.isArray(currentUser()?.personas)?currentUser().personas:[]).find(item=>item.id===key);
+        if(!selected) { toast('找不到這組人設，請重新整理。'); break; }
+        openModal('persona',{draftPersona:selected.text,selectedPersonaName:selected.name});
+        break;
+      }
+      case 'persona-delete': {
+        const list=Array.isArray(state.account?.personas) ? state.account.personas : [];
+        const index=list.findIndex(item=>item.id===key);
+        if(index<0 || !confirm('確定刪除此組人設？')) break;
+        const previous=clone(list);list.splice(index,1);if(!list.some(item=>item.isDefault)&&list.length)list[0].isDefault=true;state.account.personas=list;persist();try { if(!window.mySupabase?.auth)throw new Error('請先登入。');const {data,error}=await window.mySupabase.auth.getUser();if(error||data?.user?.id!==state.account?.uid)throw new Error('登入狀態驗證失敗，請重新登入。');await savePersonaPresets(state.account);route.overlay={name:'personas'};render();toast('儲存成功');}catch(error){state.account.personas=previous;persist();openModal('personas');toast('人設刪除未能同步：'+(error.message||'請稍後再試。'));}break;
+      }
+
       case 'ledger-retry': {
         const currency = button.dataset.value === 'silver' ? 'silver' : 'diamond';
         await loadWalletLedger(currency);
@@ -4371,18 +4682,28 @@ document.addEventListener('click',async event => {
       case 'cancel-reply':replyId=null;$('replyHint').textContent='';break;
       case 'comment-like': {
         if (!requireLogin({page:'detail',id:route.id})) break;
-        const c=(state.comments[route.id] || []).find(c=>c.id===key);
-        if (!c || c.deleted) break;
-        c.likes ||= [];
-        const i=c.likes.indexOf(currentUser().uid);
-        if (i<0)c.likes.push(currentUser().uid);else c.likes.splice(i,1);
-        persist();renderComments();break;
+        const c=(state.comments[route.id]||[]).find(c=>c.id===key);
+        if(!c||c.deleted)break;
+        if(!c.cloud||!window.mySupabase)return toast('此評論尚未同步到雲端。');
+        const uid=currentUser().uid;
+        const {data:existing,error:findError}=await window.mySupabase.from('character_comment_likes').select('comment_id').eq('comment_id',c.id).eq('user_id',uid).maybeSingle();
+        if(findError)throw findError;
+        const result=existing
+          ?await window.mySupabase.from('character_comment_likes').delete().eq('comment_id',c.id).eq('user_id',uid)
+          :await window.mySupabase.from('character_comment_likes').insert({comment_id:c.id,user_id:uid});
+        if(result.error)throw new Error('評論愛心更新失敗：'+result.error.message);
+        await loadCloudComments(route.id);break;
       }
       case 'comment-menu':openModal('comment-menu',{id:key});break;
       case 'edit-comment':openModal('edit-comment',{id:key});break;
       case 'delete-comment': {
         const c=(state.comments[route.id] || []).find(c=>c.id===key);
         if (!c || c.authorId!==currentUser()?.uid || !confirm('確定刪除此評論？')) break;
+        if (c.cloud && window.mySupabase) {
+          const {error}=await window.mySupabase.from('character_comments').update({is_deleted:true,updated_at:new Date().toISOString()}).eq('id',c.id).eq('author_id',currentUser().uid);
+          if(error)throw new Error('評論刪除失敗：'+error.message);
+          await loadCloudComments(route.id);closeModal();break;
+        }
         c.deleted=true;c.text='';c.likes=[];
         persist();closeModal();break;
       }
@@ -4418,7 +4739,13 @@ document.addEventListener('submit',async event => {
   const form=event.target.closest('[data-form]');
   if (!form) return;
   event.preventDefault();
+  if (form.dataset.submitting === 'true') return;
+  form.dataset.submitting = 'true';
+  const submitButton = event.submitter || form.querySelector('button[type="submit"], button:not([type])');
+  const originalButtonText = submitButton?.textContent || '';
+  if (submitButton) { submitButton.disabled = true; submitButton.textContent = '儲存中…'; }
   const f=new FormData(form);
+  if (event.submitter?.name) f.set(event.submitter.name, event.submitter.value);
   const type=form.dataset.form;
   const o=route.overlay || {};
   const s=currentSession();
@@ -4539,21 +4866,75 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
       case 'profile': {
         const name=String(f.get('nickname')).trim();
         if (!validName(name)) return toast('暱稱不符合規則。'+NAME_HELP);
+        const previous={...state.account};
         state.account.nickname=name;
-        state.account.bio=String(f.get('bio')).trim();
-        state.account.avatar=profileImage;
-        state.theme=f.get('day') ? 'day' : 'night';
+        const bio=String(f.get('bio') || '').trim();
+        if(Array.from(bio).length>500) return toast('帳號簡介最多 500 字。');
+        state.account.bio=bio;
+        state.account.avatar=profileImage || state.account.avatar || '';
         persist();
         try {
           if (window.mySupabase?.auth) {
-            const { data } = await window.mySupabase.auth.getUser();
-            if (data?.user?.id === state.account.uid) await saveSupabaseProfile(state.account);
+            const { data, error } = await window.mySupabase.auth.getUser();
+            if (error || data?.user?.id !== state.account.uid) throw new Error('登入狀態驗證失敗，請重新登入。');
+            await saveSupabaseProfile(state.account);
           }
-          back();
-          toast('個人資料已儲存。');
+          back();render();toast('個人資料已儲存。');
         } catch (error) {
-          console.error(error);
-          toast('本機已更新，但資料庫儲存失敗；請檢查 RLS 權限。');
+          state.account={...previous};persist();render();
+          toast('個人資料未能同步：'+(error.message || '請稍後再試。'));
+        }
+        break;
+      }
+      case 'theme-setting': {
+        state.theme=f.get('theme') === 'day' ? 'day' : 'night';persist();back();render();toast('版面顏色已更新。');break;
+      }
+      case 'birthdate': {
+        const value=String(f.get('birthdate') || '');
+        if(value && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value > new Date().toISOString().slice(0,10))) return toast('請選擇有效的出生日期。');
+        const previousBirthdate=state.account.birthdate || '';
+        state.account.birthdate=value;
+        persist();
+        try {
+          if (!window.mySupabase?.auth) throw new Error('請先登入 Google 帳號。');
+          const {data,error}=await window.mySupabase.auth.getUser();
+          if(error || data?.user?.id!==state.account?.uid) throw new Error('登入狀態驗證失敗，請重新登入。');
+          await saveSupabaseProfile(state.account);
+          back();render();toast('生日儲存成功。');
+        } catch(error) {
+          state.account.birthdate=previousBirthdate;persist();openModal('birthdate');
+          toast('生日未能同步到雲端：'+(error.message || '請稍後再試。'));
+        }
+        break;
+      }
+      case 'personas': {
+        const name=String(f.get('personaName') || '').trim(), value=String(f.get('personaText') || '').trim();
+        if(!name || !value) return toast('請填寫人設名稱與內容。');
+        if(Array.from(name).length>25) return toast('人設名稱最多 25 字。');
+        if(Array.from(value).length>1000) return toast('人設內容最多 1000 字。');
+        const previous=clone(Array.isArray(state.account.personas) ? state.account.personas : []);
+        const list=clone(previous);
+        const personaId=String(f.get('personaId') || '');
+        if(personaId) {
+          const existing=list.find(item=>item.id===personaId);
+          if(!existing) return toast('找不到這組人設，請重新整理。');
+          existing.name=name;existing.text=value;existing.updatedAt=Date.now();
+          if(f.get('saveDefault') === '1') { list.forEach(item=>item.isDefault=false); existing.isDefault=true; existing.defaultAt=Date.now(); }
+        } else {
+          if(list.length>=30) return toast('最多只能儲存 30 組人設。');
+          list.push({id:id(),name,text:value,createdAt:Date.now(),isDefault:false});
+        }
+        state.account.personas=list;
+        if(!persist()) { state.account.personas=previous; return; }
+        try {
+          if (!window.mySupabase?.auth) throw new Error('請先使用 Google 帳號登入，才能將人設保存到雲端。');
+          const {data,error}=await window.mySupabase.auth.getUser();
+          if(error || data?.user?.id!==state.account?.uid) throw new Error('登入狀態驗證失敗，請重新登入。');
+          await savePersonaPresets(state.account);
+          route.overlay={name:'personas'};render();toast('儲存成功');
+        } catch(error) {
+          state.account.personas=previous;
+          persist();openModal('personas');toast('人設未能同步到資料庫：'+(error.message||'請稍後再試。'));
         }
         break;
       }
@@ -4643,21 +5024,28 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
       case 'persona': {
         if (!s) return;
         const previousPersona=s.persona || '';
+        const previousPersonaCustom=s.personaCustom === true;
         s.persona=String(f.get('persona'));
+        s.personaCustom=true;
         if (!persist()) {
           s.persona=previousPersona;
+          s.personaCustom=previousPersonaCustom;
           break;
         }
         if (s.cloudOwned && currentUser()?.uid===s.cloudOwnerUid) {
           const synced=await saveChatSessionSafely(s);
           if (!synced) {
             s.persona=previousPersona;
+            s.personaCustom=previousPersonaCustom;
             persist();render();
             toast('專屬人設同步失敗，已還原原設定。');
             break;
           }
         }
-        back();break;
+        toast('儲存成功');
+        if (Object.prototype.hasOwnProperty.call(o,'draftPersona')) { const cleanRoute={...route}; delete cleanRoute.overlay; go(cleanRoute,true); }
+        else back();
+        break;
       }
       case 'rename': {
         const item=state.sessions[o.id];
@@ -4738,22 +5126,29 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         }
         back();break;
       }
-      case 'comment':
+      case 'comment': {
         if (!requireLogin({page:'detail',id:route.id})) return;
         if (!text) return toast('請輸入評論。');
-        state.comments[route.id] ||= [];
-        state.comments[route.id].push({
-          id:id(),authorId:currentUser().uid,text,
-          parentId:replyId,likes:[],deleted:false,at:Date.now()
+        if (!window.mySupabase || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(route.id)) return toast('此角色尚未連結雲端，評論無法跨帳號保存。');
+        const parent=replyId?(state.comments[route.id]||[]).find(c=>c.id===replyId):null;
+        const {error}=await window.mySupabase.from('character_comments').insert({
+          character_id:route.id,author_id:currentUser().uid,content:text,parent_id:replyId,
+          is_whisper:!!f.get('whisper')||!!parent?.whisper
         });
+        if(error)throw new Error('評論雲端保存失敗：'+error.message);
         replyId=null;form.reset();$('replyHint').textContent='';
-        persist();renderComments();break;
+        await loadCloudComments(route.id);toast('評論已保存到雲端。');break;
+      }
       case 'comment-edit': {
-        const c=(state.comments[route.id] || []).find(c=>c.id===o.id);
-        if (!c || c.deleted || c.authorId!==currentUser()?.uid) return;
-        if (!text) return toast('評論不可為空。');
-        c.text=text;c.edited=true;
-        persist();back();break;
+        const c=(state.comments[route.id]||[]).find(c=>c.id===o.id);
+        if(!c||c.deleted||c.authorId!==currentUser()?.uid)return;
+        if(!text)return toast('評論不可為空。');
+        if(c.cloud&&window.mySupabase){
+          const {error}=await window.mySupabase.from('character_comments').update({content:text,updated_at:new Date().toISOString()}).eq('id',c.id).eq('author_id',currentUser().uid);
+          if(error)throw new Error('評論修改失敗：'+error.message);
+          await loadCloudComments(route.id);back();break;
+        }
+        c.text=text;c.edited=true;persist();back();break;
       }
       case 'report':
       case 'bug': {
@@ -4778,6 +5173,9 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
     } else {
       toast(error.message || '儲存未完成。');
     }
+  } finally {
+    form.dataset.submitting = 'false';
+    if (submitButton?.isConnected) { submitButton.disabled = false; submitButton.textContent = originalButtonText; }
   }
 });
 
@@ -4812,8 +5210,11 @@ document.addEventListener('change',async event => {
       $('imagePreview').classList.remove('hidden');
     }
     if (target.id==='profileImage') {
-      profileImage=await readImage(target.files[0]);
-      toast('頭像已讀取，儲存後套用。');
+      if (!target.files?.[0]) return;
+      profileImage=await compressProfileImage(target.files[0]);
+      const preview=$('profileImagePreview');
+      if (preview) { preview.src=profileImage; preview.style.display='block'; }
+      toast('頭像已壓縮，儲存後套用。');
     }
     if (target.id==='backgroundSetting') {
       const s=(target.dataset.sessionId && state.sessions[target.dataset.sessionId]) || currentSession();
