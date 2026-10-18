@@ -315,17 +315,11 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .card-image { position:relative; aspect-ratio:4/5; }
 .image-button { width:100%; height:100%; padding:0; border:0; border-radius:0; background:var(--panel2); overflow:hidden; }
 .image-button img { width:100%; height:100%; object-fit:cover; }
-.card-chat {
-  position:absolute;
-  left:12px;
-  right:12px;
-  bottom:12px;
-  background:var(--primary);
-  color:white;
-  border:0;
-  opacity:0;
-}
-.card:hover .card-chat,.card:focus-within .card-chat { opacity:1; }
+.card-chat{position:absolute;z-index:4;left:10px;right:10px;bottom:10px;min-height:39px;border:1px solid #ffffff40;border-radius:12px;background:linear-gradient(135deg,#7778f5ed,#5146cbed);color:#fff;font-size:12px;font-weight:700;letter-spacing:.04em;box-shadow:0 8px 22px #080b1280,inset 0 1px #ffffff35;backdrop-filter:blur(14px);opacity:1;transition:transform .18s ease,filter .18s ease,box-shadow .18s ease}
+.card-chat::after{content:"↗";margin-left:8px;font-size:14px}
+.card:hover .card-chat,.card:focus-within .card-chat{opacity:1}
+.card-chat:hover{filter:brightness(1.12);box-shadow:0 10px 25px #080b128a,inset 0 1px #ffffff45}
+.card-chat:active{transform:scale(.985)}
 .card-body { padding:13px; }
 .card-body h3 { margin:9px 0 6px; }
 .card-intro {
@@ -349,6 +343,10 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .comment.reply { margin-left:24px; border-left:2px solid var(--soft); padding-left:14px; }
 .comment-tools { display:flex; gap:7px; flex-wrap:wrap; }
 .comment-tools button { padding:5px 8px; font-size:11px; }
+.whisper-option{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;color:#c4b5fd;font-size:12px;cursor:pointer}
+.whisper-option input{width:14px;height:14px;margin:0;accent-color:#8b5cf6}
+.whisper-option small{color:var(--muted);font-size:10px}
+.comment-whisper-label{display:inline-flex;align-items:center;gap:4px;margin-left:7px;padding:2px 6px;border:1px solid #a78bfa55;border-radius:999px;color:#c4b5fd;font-size:10px}
 
 
 /* UI-02-01: premium mobile-first exploration polish */
@@ -374,8 +372,14 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .card-image .image-button{display:block}
 .card-body h3{letter-spacing:-.02em}
 .card-stats{position:absolute;z-index:2;left:10px;bottom:10px;display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid #ffffff30;border-radius:999px;background:#090d16b8;color:#f8fafc;font-size:10px;backdrop-filter:blur(12px)}
-.card-image .heart{position:absolute;z-index:3;top:9px;right:9px;width:34px;height:34px;display:grid;place-items:center;padding:0;border:1px solid #ffffff3d;border-radius:50%;background:#090d16a8;color:white;font-size:20px;backdrop-filter:blur(12px)}
+.card-image .heart,.card-image .card-chat-count{position:absolute;z-index:4;top:9px;height:29px;display:grid;place-items:center;padding:0;border:1px solid #ffffff3d;border-radius:50%;background:#090d16b8;color:white;font-size:16px;backdrop-filter:blur(12px)}
+.card-image .heart{right:9px;width:29px;font-size:17px}
 .card-image .heart.on{color:#fb7185;background:#090d16df}
+.card-image .card-chat-count{right:44px;display:flex;gap:3px;width:auto;min-width:29px;padding:0 7px;font-size:10px;border-radius:999px}
+.card-image .card-chat-count svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8}
+.card-image .card-name-overlay{position:absolute;z-index:3;left:12px;right:12px;bottom:58px;margin:0;color:#fff;font-size:clamp(16px,2vw,20px);font-weight:800;letter-spacing:-.025em;line-height:1.25;text-shadow:0 2px 12px #000,0 1px 3px #000;overflow-wrap:anywhere}
+.card-image .card-stats{display:none}
+.card-body h3{display:none}
 .card-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
 .card-tags .tag{padding:4px 7px;font-size:10px}
 
@@ -2545,14 +2549,17 @@ function card(c,owner = false) {
                 aria-label="查看${e(c.name)}">
           <img src="${e(safeImage(c.image))}" alt="${e(c.name)}" loading="lazy">
         </button>
-        <span class="card-stats">▤ ${e(c.chats || 0)} 次對話</span>
+        <span class="card-name-overlay">${e(c.name)}</span>
+        <span class="card-chat-count" aria-label="${e(c.chats || 0)} 次對話" title="${e(c.chats || 0)} 次對話">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
+          <span>${e(c.chats || 0)}</span>
+        </span>
         <button class="heart ${favorite ? 'on' : ''}" data-action="favorite"
                 data-id="${e(c.id)}" aria-label="切換喜愛角色"
                 aria-pressed="${favorite}">${favorite ? '♥' : '♡'}</button>
         <button class="card-chat" data-action="start-chat" data-id="${e(c.id)}">開始聊天</button>
       </div>
       <div class="card-body">
-        <h3>${e(c.name)}</h3>
         <p class="card-intro">${e(c.intro)}</p>
         <div class="card-tags">${(c.tags || []).slice(0,5).map(tagButton).join('')}</div>
         ${owner ? `
@@ -2640,7 +2647,7 @@ function renderDetail() {
         <section class="panel stack">
           <h1>${e(c.name)}</h1>
           <button class="author-link" data-action="author" data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>
-          <p class="small muted">👥 ${c.users == null ? '尚未統計' : e(c.users)} 位用戶 ｜ 💬 ${e(c.chats || '0')} 次對話</p>
+          <p class="small muted">💬 ${e(c.chats || '0')} 次對話</p>
           <p class="muted">${c.gender === 'male' ? '男' : c.gender === 'female' ? '女' : '模糊'}
             · ${e(c.age || '未設定')} 歲 · ${e(c.race || '未設定種族')}</p>
           <div><h3>角色介紹</h3><div class="prose">${e(c.intro)}</div></div>
@@ -2662,7 +2669,8 @@ function renderDetail() {
         <div id="replyHint" class="small muted" style="margin-top:15px"></div>
         <form data-form="comment" style="margin-top:12px">
           <textarea name="text" maxlength="2000" required placeholder="輸入評論…"></textarea>
-          <div class="row between" style="margin-top:10px">
+          <div class="row between wrap" style="margin-top:10px;gap:10px">
+            <label class="whisper-option"><input type="checkbox" name="whisper" value="true"> <span>悄悄話</span> <small>僅你與角色作者可見</small></label>
             <span class="small muted">最多2000字</span>
             <button class="primary">送出</button>
           </div>
@@ -2673,18 +2681,22 @@ function renderDetail() {
 }
 function renderComments() {
   if (!$('comments')) return;
-  const list = state.comments[route.id] || [];
+  const allComments = state.comments[route.id] || [];
+  const character = currentCharacter();
+  const uid = currentUser()?.uid;
+  const canSeeWhisper = c => !c.whisper || c.authorId === uid || character?.authorId === uid;
+  const list = allComments.filter(canSeeWhisper);
   $('comments').innerHTML = list.map(c => {
     const a = author(c.authorId);
-    const liked = (c.likes || []).includes(currentUser()?.uid);
-    const parent = list.find(p => p.id === c.parentId);
+    const liked = (c.likes || []).includes(uid);
+    const parent = allComments.find(p => p.id === c.parentId);
     return `
       <article class="comment ${c.parentId ? 'reply' : ''}">
         <div class="row">
           ${avatar(a)}
           <div class="grow">
             <button class="author-link" data-action="author" data-id="${e(a.uid)}">@${e(a.nickname)}</button>
-            <div class="small muted">${e(timeText(c.at))}${c.edited ? ' · 已修改' : ''}</div>
+            <div class="small muted">${e(timeText(c.at))}${c.edited ? ' · 已修改' : ''}${c.whisper ? '<span class="comment-whisper-label">悄悄話</span>' : ''}</div>
           </div>
           ${!c.deleted ? `<button class="heart ${liked ? 'on' : ''}" data-action="comment-like"
             data-id="${e(c.id)}">${liked ? '♥' : '♡'} ${(c.likes || []).length}</button>` : ''}
@@ -2704,7 +2716,8 @@ function renderComments() {
 function renderAuthor() {
   const a = author(route.id);
   const following = state.following.includes(a.uid);
-  const list = state.characters.filter(c => c.visibility === 'public' && c.authorId === a.uid);
+  const list = state.characters.filter(c => c.visibility === 'public' && c.authorId === a.uid &&
+    !String(c.id).startsWith('seed-') && c.cloudPublic !== false && c.localOnly !== true);
   $('view').innerHTML = `
     <div class="stack">
       <section class="panel stack">
@@ -4076,6 +4089,7 @@ document.addEventListener('click',async event => {
         break;
       case 'filter':
         filter = button.dataset.filter;limit = 24;
+        exploreTags = [];
         if (route.tag) {
           const next = {...route};delete next.tag;
           go(next,true);
@@ -4864,7 +4878,9 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         state.comments[route.id] ||= [];
         state.comments[route.id].push({
           id:id(),authorId:currentUser().uid,text,
-          parentId:replyId,likes:[],deleted:false,at:Date.now()
+          parentId:replyId,
+          whisper:!!f.get('whisper') || !!(replyId && (state.comments[route.id] || []).find(c=>c.id===replyId)?.whisper),
+          likes:[],deleted:false,at:Date.now()
         });
         replyId=null;form.reset();$('replyHint').textContent='';
         persist();renderComments();break;
