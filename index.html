@@ -3031,6 +3031,13 @@ function groupResetForAccount(uid) {
     g.formError='';g.loadError='';g.openError='';g.failedGroupId=null;g.ownerUid=null;
   }
 }
+function groupWithTimeout(promise, milliseconds, message) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(message)),milliseconds)})
+  ]).finally(()=>clearTimeout(timer));
+}
 function groupFriendlyError(error) {
   const message=String(typeof error==='string'?error:(error?.message||''));
   if(message.includes('character_not_public_and_approved') || message.includes('character_not_public_or_unavailable')) return '群組只能加入已公開且未下架的角色，請重新選擇。';
@@ -3117,12 +3124,12 @@ async function groupOpen(groupId) {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('請重新登入後再開啟群組。');
     g.ownerUid=user.id;
-    const [groupRes,sceneRes,memberRes,messageRes]=await Promise.all([
+    const [groupRes,sceneRes,memberRes,messageRes]=await groupWithTimeout(Promise.all([
       window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,created_at,updated_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,content,created_at').eq('group_id',groupId).order('created_at',{ascending:true}).order('sequence_no',{ascending:true})
-    ]);
+    ]),15000,'群組資料讀取逾時，請檢查網路後重試。');
     if(requestId!==g.openRequestId) return;
     const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error;
     if(error) throw error;
@@ -3294,9 +3301,9 @@ async function groupCreateMock() {
     const members=groupSelectedCharacters();
     const scenes=[{name:g.draft.scenes[0].name.trim(),description:g.draft.scenes[0].description||''}];
     const pMembers=members.map(m=>({character_id:m.id,scene_position:1}));
-    const {data:groupId,error}=await window.mySupabase.rpc('create_chat_group',{
+    const {data:groupId,error}=await groupWithTimeout(window.mySupabase.rpc('create_chat_group',{
       p_name:g.draft.name.trim(),p_world_background:g.draft.world,p_scene_mode:'shared',p_scenes:scenes,p_members:pMembers
-    });
+    }),15000,'建立群組逾時，請重新載入群組清單確認是否已建立，避免重複建立。');
     if(error) throw error;
     const {data:updated,error:updateError}=await window.mySupabase.from('chat_groups')
       .update({player_name:g.draft.playerName,player_persona:g.draft.playerPersona,world_character_id:g.draft.worldCharacterId,updated_at:new Date().toISOString()})
@@ -3336,9 +3343,9 @@ async function groupSendMock() {
     if(!g.pendingRequest || g.pendingRequest.groupId!==g.active.id || g.pendingRequest.content!==content) {
       g.pendingRequest={groupId:g.active.id,content,requestKey:window.crypto.randomUUID()};
     }
-    const {error}=await window.mySupabase.rpc('append_chat_group_mock_turn',{
+    const {error}=await groupWithTimeout(window.mySupabase.rpc('append_chat_group_mock_turn',{
       p_group_id:g.active.id,p_request_key:g.pendingRequest.requestKey,p_content:content
-    });
+    }),15000,'訊息保存逾時。請重新開啟群組確認訊息是否已保存，再決定是否重試。');
     if(error) throw error;
     g.pendingRequest=null;
     g.sending=false;
