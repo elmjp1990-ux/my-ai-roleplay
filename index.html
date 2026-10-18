@@ -3203,7 +3203,7 @@ function renderGroupConversation() {
 function renderGroupPrototype() {
   groupResetForAccount(currentUser()?.uid||null);
   const g=groupPrototype;
-  if(!g.groupsLoaded&&!g.loadingGroups&&!g.active) groupLoadList();
+  if(!g.loading&&!g.groupsLoaded&&!g.loadingGroups&&!g.active) groupLoadList();
   if(g.loading) {
     $('view').innerHTML='<div class="group-wizard"><div class="group-panel">正在讀取群組資料…</div></div>';
     return;
