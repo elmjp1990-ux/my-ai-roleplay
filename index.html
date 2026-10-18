@@ -1422,7 +1422,8 @@ if (characterError) {
     const { data, error } = await window.mySupabase.from('profiles').upsert(payload, { onConflict: 'id' }).select('id, persona_presets').single();
     if (error) throw new Error('儲存 profiles 失敗：' + error.message);
     if (!data || data.id !== account.uid) throw new Error('雲端未確認儲存結果，請稍後重試。');
-    if (JSON.stringify(data.persona_presets || []) !== JSON.stringify(payload.persona_presets)) throw new Error('雲端回讀的人設內容與送出內容不一致，請重新儲存。');
+    const stableJson = value => JSON.stringify(value, (key, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a],[b])=>a.localeCompare(b))) : item);
+    if (stableJson(data.persona_presets || []) !== stableJson(payload.persona_presets)) throw new Error('雲端回讀的人設內容與送出內容不一致，請重新儲存。');
   }
 
   async function loginWithGoogle() {
