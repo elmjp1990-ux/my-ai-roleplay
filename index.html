@@ -377,9 +377,7 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .card-image .heart.on{color:#fb7185;background:#090d16df}
 .card-image .card-chat-count{right:44px;display:flex;gap:3px;width:auto;min-width:29px;padding:0 7px;font-size:10px;border-radius:999px}
 .card-image .card-chat-count svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8}
-.card-image .card-name-overlay{position:absolute;z-index:3;left:12px;right:12px;bottom:58px;margin:0;color:#fff;font-size:clamp(16px,2vw,20px);font-weight:800;letter-spacing:-.025em;line-height:1.25;text-shadow:0 2px 12px #000,0 1px 3px #000;overflow-wrap:anywhere}
 .card-image .card-stats{display:none}
-.card-body h3{display:none}
 .card-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
 .card-tags .tag{padding:4px 7px;font-size:10px}
 
@@ -2549,7 +2547,6 @@ function card(c,owner = false) {
                 aria-label="查看${e(c.name)}">
           <img src="${e(safeImage(c.image))}" alt="${e(c.name)}" loading="lazy">
         </button>
-        <span class="card-name-overlay">${e(c.name)}</span>
         <span class="card-chat-count" aria-label="${e(c.chats || 0)} 次對話" title="${e(c.chats || 0)} 次對話">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
           <span>${e(c.chats || 0)}</span>
@@ -2560,6 +2557,7 @@ function card(c,owner = false) {
         <button class="card-chat" data-action="start-chat" data-id="${e(c.id)}">開始聊天</button>
       </div>
       <div class="card-body">
+        <h3>${e(c.name)}</h3>
         <p class="card-intro">${e(c.intro)}</p>
         <div class="card-tags">${(c.tags || []).slice(0,5).map(tagButton).join('')}</div>
         ${owner ? `
