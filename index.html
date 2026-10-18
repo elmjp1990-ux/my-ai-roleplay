@@ -350,6 +350,35 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .comment-tools { display:flex; gap:7px; flex-wrap:wrap; }
 .comment-tools button { padding:5px 8px; font-size:11px; }
 
+
+/* UI-02-01: premium mobile-first exploration polish */
+.explore-topline{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 4px}
+.explore-eyebrow{color:var(--muted);font-size:10px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:7px}
+.explore-title{margin:0;font-size:clamp(24px,3vw,31px);letter-spacing:-.04em}
+.explore-subtitle{margin:7px 0 0;color:var(--muted);font-size:12px}
+.explore-shortcuts{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.explore-shortcut{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:13px 4px 11px;border-radius:15px;background:linear-gradient(155deg,var(--panel2),var(--panel));border:1px solid var(--border);color:var(--muted);font-size:11px;transition:transform .18s ease,border-color .18s ease,background .18s ease}
+.explore-shortcut .icon{width:19px;height:19px;color:var(--text)}
+.explore-shortcut.active{border-color:#818cf8a8;background:var(--soft);color:var(--text);box-shadow:inset 0 0 0 1px #818cf822}
+.explore-shortcut:active{transform:scale(.97)}
+.explore-search-row{display:flex;gap:8px;align-items:center}
+.explore-search-row input{min-width:0;flex:1}
+.explore-search-row .icon-button{flex:0 0 auto;width:42px;height:42px;display:grid;place-items:center;padding:0}
+.explore-section-heading{display:flex;align-items:end;justify-content:space-between;gap:12px;margin:24px 0 12px}
+.explore-section-heading h2{margin:0;font-size:19px;letter-spacing:-.02em}
+.explore-section-heading p{margin:5px 0 0;font-size:11px;color:var(--muted)}
+.card{box-shadow:0 5px 22px #0000000a;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.card:hover{transform:translateY(-2px);border-color:#818cf855;box-shadow:0 12px 30px #00000018}
+.card-image{position:relative}
+.card-image::after{content:"";position:absolute;inset:45% 0 0;pointer-events:none;background:linear-gradient(transparent,#080b12a8)}
+.card-image .image-button{display:block}
+.card-body h3{letter-spacing:-.02em}
+.card-stats{position:absolute;z-index:2;left:10px;bottom:10px;display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid #ffffff30;border-radius:999px;background:#090d16b8;color:#f8fafc;font-size:10px;backdrop-filter:blur(12px)}
+.card-image .heart{position:absolute;z-index:3;top:9px;right:9px;width:34px;height:34px;display:grid;place-items:center;padding:0;border:1px solid #ffffff3d;border-radius:50%;background:#090d16a8;color:white;font-size:20px;backdrop-filter:blur(12px)}
+.card-image .heart.on{color:#fb7185;background:#090d16df}
+.card-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.card-tags .tag{padding:4px 7px;font-size:10px}
+
 /* Chat */
 body.chat-page main { max-width:none; padding:12px; }
 .chat-layout {
@@ -565,7 +594,34 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     padding:16px 12px calc(104px + env(safe-area-inset-bottom));
     min-height:calc(100dvh - 58px);
   }
-  .hero { padding:24px; min-height:275px; }
+
+  main { padding-top:13px; }
+  .hero { padding:22px 20px 18px; min-height:0; border-radius:21px; }
+  .hero h1 { font-size:25px; line-height:1.3; margin:17px 0 10px; }
+  .hero p { font-size:12px; line-height:1.8; margin-bottom:14px; }
+  .hero .primary { font-size:12px; padding:9px 12px; }
+  .explore-topline { margin:1px 2px 13px; }
+  .explore-eyebrow { font-size:9px; }
+  .explore-title { font-size:25px; }
+  .explore-subtitle { font-size:11px; }
+  .explore-shortcuts { grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
+  .explore-shortcut { flex-direction:row; justify-content:flex-start; padding:12px 13px; gap:9px; font-size:12px; border-radius:13px; }
+  .explore-shortcut .icon { width:17px;height:17px; }
+  .explore-search-row { margin-top:2px; }
+  .explore-section-heading { margin:20px 1px 10px; }
+  .explore-section-heading h2 { font-size:18px; }
+  .explore-section-heading p { font-size:10px; }
+  .grid { gap:10px; }
+  .card { border-radius:15px; }
+  .card-image { aspect-ratio:3/4; }
+  .card-body { padding:10px 10px 12px; }
+  .card-body h3 { font-size:14px; margin:2px 0 6px; }
+  .card-intro { font-size:11px; line-height:1.65; min-height:36px; }
+  .card-tags { gap:4px; margin-top:8px; }
+  .card-tags .tag { font-size:9px; padding:4px 6px; }
+  .card-stats { left:7px;bottom:7px;font-size:9px;padding:4px 7px; }
+  .card-image .heart { top:7px;right:7px;width:31px;height:31px;font-size:19px; }
+
   .grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:11px; }
   .card-body { padding:10px; }
   .card-chat { opacity:1; font-size:12px; padding:8px; }
