@@ -1628,7 +1628,7 @@ let pendingDeletionWalletSyncUid =
     ? state.account.uid
     : null;
 let route = {page:'home'};
-let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null};
+let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null};
 let search = '';
 let filter = 'latest';
 let exploreTags = [];
@@ -2932,7 +2932,7 @@ function chatListHTML() {
       <span class="small muted">聊天列表</span></div>
     <div class="row" style="gap:8px;margin-bottom:12px">
       <input id="chatSearch" value="${e(chatSearch)}" placeholder="搜尋角色或回憶名稱" aria-label="搜尋角色或回憶名稱">
-      <button class="primary" type="button" data-action="group-list" aria-label="建立群組聊天" title="建立群組聊天" style="flex:0 0 auto;min-width:42px;padding:10px 13px">＋</button>
+      <button class="primary" type="button" data-action="group-list" aria-label="建立群組聊天" title="建立群組聊天" style="flex:0 0 auto;min-width:42px;padding:10px 13px"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><path d="M3.5 19v-1.5a5.5 5.5 0 0 1 11 0V19"></path><path d="M16 5.5a3 3 0 0 1 0 5.8M17 14a4.5 4.5 0 0 1 3.5 4.4V19"></path></svg></button>
     </div>
     <div id="chatEntries">${chatEntries()}</div>
   </aside>`;
@@ -2979,13 +2979,13 @@ function groupSelectedCharacters() {
 }
 function groupRenderSteps() {
   const g=groupPrototype;
-  const labels=['群組資料','世界與場景','選擇角色'];
+  const labels=['選擇角色','設立群組檔案'];
   return '<div class="group-steps">'+labels.map((x,i)=>'<div class="group-step '+(g.step===i+1?'active':'')+'">'+(i+1)+' · '+x+'</div>').join('')+'</div>';
 }
 function groupRenderScenes() {
   const g=groupPrototype;
   const scene=g.draft.scenes[0]||{name:'初始相遇',description:''};
-  return '<label class="group-field"><span>共同場景名稱</span><input id="groupSceneName0" maxlength="80" value="'+e(scene.name||'')+'" placeholder="例如：深夜花店、博物館特展之夜"></label><div class="group-field"><span>共同場景與開場情境</span><div class="group-scene-input-wrap"><textarea id="groupSceneDesc0" maxlength="5000" placeholder="由你決定故事從哪裡開始：時間、地點、角色如何相遇，以及當下發生什麼事。">'+e(scene.description||'')+'</textarea><button type="button" class="group-inspiration" data-action="group-inspiration">✨ AI 靈感</button></div><small class="group-scene-help">你可以完全自行撰寫或修改。只有主動點擊「AI 靈感」時才會嘗試生成；目前 AI 尚未串接，按鈕會提示狀態，不會自動呼叫或扣款。</small></div>';
+  return '<label class="group-field"><span>初始場景名稱</span><input id="groupSceneName0" maxlength="80" value="'+e(scene.name||'')+'" placeholder="例如：深夜花店、博物館特展之夜"></label><div class="group-field"><span>初始開場情境（最多 1000 字）</span><div class="group-scene-input-wrap"><textarea id="groupSceneDesc0" maxlength="1000" placeholder="描寫時間、地點、角色如何相遇，以及故事此刻正在發生什麼。">'+e(scene.description||'')+'</textarea><button type="button" class="group-inspiration" data-action="group-inspiration">✨ AI 靈感</button></div><small class="group-scene-help">AI 尚未串接，點擊後會填入測試用 Mock 範例文字，可再自由修改；不呼叫 AI、不扣款。</small></div>';
 }
 function groupRenderCharacterResults() {
   const all=groupAvailableCharacters();
@@ -3007,12 +3007,11 @@ function groupRenderCharacterResults() {
   const byPublic=matches.filter(c=>!recentIds.has(c.id)&&!favoriteIds.has(c.id));
   const ordered=[...byRecent,...byFavorite,...byPublic].slice(0,500);
   if(!ordered.length) return '<div class="group-alert">'+(q?'找不到符合搜尋條件的公開角色。':'目前沒有可選的雲端角色。請先確認角色已儲存在 Supabase，且目前為公開狀態、尚未刪除或下架。')+'</div>';
-  const renderRows=rows=>rows.map(c=>'<label class="group-character-option"><input type="checkbox" data-action="group-toggle-character" data-id="'+e(c.id)+'" '+(groupPrototype.draft.memberIds.includes(c.id)?'checked':'')+' '+(groupPrototype.draft.memberIds.length>=3&&!groupPrototype.draft.memberIds.includes(c.id)?'disabled':'')+'><span style="min-width:0;overflow-wrap:anywhere"><strong>'+e(c.name)+'</strong><span class="muted small" style="display:block">'+e(c.intro||'尚無角色介紹')+'</span></span></label>').join('');
+  const renderRows=rows=>rows.map(c=>'<label class="group-character-option"><input type="checkbox" data-action="group-toggle-character" data-id="'+e(c.id)+'" '+(groupPrototype.draft.memberIds.includes(c.id)?'checked':'')+' '+(groupPrototype.draft.memberIds.length>=3&&!groupPrototype.draft.memberIds.includes(c.id)?'disabled':'')+'><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt="" style="width:46px;height:46px"><span style="min-width:0;overflow-wrap:anywhere"><strong>'+e(c.name)+'</strong><span class="muted small" style="display:block">'+e(c.intro||'尚無角色介紹')+'</span></span></label>').join('');
   const section=(title,rows)=>rows.length?'<h3 class="group-character-section-title">'+e(title)+' ('+rows.length+')</h3><div class="group-character-grid">'+renderRows(rows)+'</div>':'';
-  return section('最近聊天',byRecent.filter(c=>ordered.some(x=>x.id===c.id)))+
-    section('喜愛角色',byFavorite.filter(c=>ordered.some(x=>x.id===c.id)))+
-    section('公開角色',byPublic.filter(c=>ordered.some(x=>x.id===c.id)))+
-    '<p class="muted small">目前顯示 '+ordered.length+' 位（最多 500 位）；已選 '+groupPrototype.draft.memberIds.length+' / 3 名。只列出公開且未刪除的雲端角色，後端會再次驗證權限與數量。</p>';
+  return '<div class="group-alert"><strong>已選 '+groupPrototype.draft.memberIds.length+' / 3 位角色</strong><br>預估每次對話 '+(groupPrototype.draft.memberIds.length*3)+' 銀幣（每位角色暫估 3 銀幣）。目前只顯示預估費用，不會實際扣款。</div>'+section('最近聊天',byRecent.filter(c=>ordered.some(x=>x.id===c.id)))+section('喜愛角色',byFavorite.filter(c=>ordered.some(x=>x.id===c.id)))+section('公開角色',byPublic.filter(c=>ordered.some(x=>x.id===c.id)))+'<p class="muted small">目前顯示 '+ordered.length+' 位（最多 500 位）；只列出公開且未刪除的角色，後端會再次驗證權限與數量。</p>';
+}
+;
 }
 function groupRenderCharacters() {
   const chars=groupAvailableCharacters();
@@ -3027,7 +3026,7 @@ function groupResetForAccount(uid) {
   const g=groupPrototype;
   if(g.ownerUid && g.ownerUid!==uid) {
     g.step=1;
-    g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]};
+    g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''};
     g.active=null;g.turn=0;g.messages=[];g.groups=[];g.groupPreviews={};g.groupsLoaded=false;
     g.loadingGroups=false;g.loading=false;g.sending=false;g.pendingRequest=null;
     g.formError='';g.loadError='';g.openError='';g.failedGroupId=null;g.ownerUid=null;
@@ -3117,7 +3116,7 @@ async function groupOpen(groupId) {
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('請重新登入後再開啟群組。');
     g.ownerUid=user.id;
     const [groupRes,sceneRes,memberRes,messageRes]=await Promise.all([
-      window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,created_at,updated_at').eq('id',groupId).single(),
+      window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,created_at,updated_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,content,created_at').eq('group_id',groupId).order('created_at',{ascending:true}).order('sequence_no',{ascending:true})
@@ -3141,7 +3140,7 @@ async function groupOpen(groupId) {
       const scene=scenes.find(x=>x.id===m.scene_id);
       return {id:m.id,type:m.speaker_type==='user'?'user':m.speaker_type==='system'?'system':'character',speaker:m.speaker_type==='user'?'你':(member?.name||'角色')+(scene?' · '+scene.name:''),content:m.content,createdAt:m.created_at};
     });
-    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,scenes,members};
+    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',scenes,members};
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;g.formError='';
     g.loading=false;g.openError='';g.failedGroupId=null;g.groupsLoaded=false;
     render();
@@ -3204,52 +3203,72 @@ function renderGroupConversation() {
 function renderGroupPrototype() {
   groupResetForAccount(currentUser()?.uid||null);
   const g=groupPrototype;
-  // Creation wizard is create-only; existing groups are opened from the shared chat list.
   if(g.loading) {
     $('view').innerHTML='<div class="group-wizard"><div class="group-panel" role="status" aria-live="polite">正在讀取群組資料…</div></div>';
     return;
   }
   if(g.openError) {
-    $('view').innerHTML='<div class="group-wizard"><section class="group-panel"><h2>無法開啟這個群組</h2><p class="group-alert" role="alert">'+e(g.openError)+'</p><p class="muted small">群組資料仍保留。你可以重試載入，或返回群組建立頁。</p><div class="group-actions"><button data-action="group-list">返回群組頁</button><button class="primary" data-action="group-open" data-id="'+e(g.failedGroupId||'')+'">重試載入</button></div></section></div>';
+    $('view').innerHTML='<div class="group-wizard"><section class="group-panel"><h2>無法開啟這個群組</h2><p class="group-alert" role="alert">'+e(g.openError)+'</p><div class="group-actions"><button data-action="group-list">返回建立群組</button><button class="primary" data-action="group-open" data-id="'+e(g.failedGroupId||'')+'">重試載入</button></div></section></div>';
     return;
   }
-  if(g.active) {
-    renderGroupConversation();
-    return;
-  }
+  if(g.active) { renderGroupConversation(); return; }
   let body='';
-  if(g.step===1) body='<h2>群組基本資料</h2><label class="group-field"><span>群組名稱（1–25 字）</span><input id="groupNameInput" maxlength="25" value="'+e(g.draft.name)+'" placeholder="例如：月影旅團"></label><label class="group-field"><span>世界背景（最多 10000 字）</span><textarea id="groupWorldInput" maxlength="10000" placeholder="故事世界、時代、規則與氛圍">'+e(g.draft.world)+'</textarea></label>';
-  if(g.step===2) body='<h2>共同世界與初始場景</h2><div class="group-alert">所有 AI 角色共享同一個世界觀與共同開場。場景由你決定；沒有靈感時，可以主動使用 AI 靈感按鈕，不會自動呼叫 AI。</div>'+groupRenderScenes();
-  if(g.step===3) body='<h2>選擇角色</h2><p class="muted">最多三名角色。只能選擇雲端 UUID 角色；後端會再次驗證角色是否公開且未刪除／下架，不要求管理員事前審核。</p>'+groupRenderCharacters();
-  $('view').innerHTML='<div class="group-wizard"><div><h1>建立群組聊天</h1><p class="muted">建立資料與 Mock 回覆會保存於測試 Supabase；不呼叫 AI、不扣款。</p></div>'+groupRenderSteps()+'<section class="group-panel">'+body+'<div id="groupFormError" class="error" role="alert" aria-live="polite">'+e(g.formError)+'</div><div class="group-actions"><button data-action="group-back" '+(g.step===1||g.loading?'disabled':'')+'>上一步</button><button class="primary" data-action="group-next" '+(g.loading?'disabled':'')+'>'+(g.loading?'正在建立…':g.step===3?'確認並保存群組':'下一步')+'</button></div></section></div>';
+  if(g.step===1) {
+    body='<h2>選擇角色</h2><p class="muted">最多選擇 3 位公開角色。群組建立後會直接開啟共用聊天介面的群組對話。</p>'+groupRenderCharacters();
+  } else {
+    const members=groupSelectedCharacters();
+    const suggestedName=members.map(c=>c.name).join('、').slice(0,25);
+    const nameValue=g.draft.name||suggestedName;
+    const worldId=g.draft.worldCharacterId||members[0]?.id||'';
+    const avatarPieces=members.map(c=>'<span title="'+e(c.name)+'" class="group-list-avatar" style="width:42px;height:42px;border-radius:50%;overflow:hidden">'+(safeImage(c.image||c.avatar_url)?'<img src="'+e(safeImage(c.image||c.avatar_url))+'" alt="" style="width:100%;height:100%;object-fit:cover">':e((c.name||'角').slice(0,1)))+'</span>').join('');
+    const worldChoices=members.map(c=>'<label class="group-character-option"><input type="radio" name="groupWorldCharacter" data-action="group-world-character" value="'+e(c.id)+'" '+(worldId===c.id?'checked':'')+'><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt=""><span><strong>'+e(c.name)+'</strong><span class="muted small" style="display:block">以此角色的現有介紹作為背景參考</span></span></label>').join('');
+    body='<h2>設立群組檔案</h2>'+
+      '<div class="group-panel" style="padding:12px;margin-bottom:16px"><div class="row" style="gap:8px;align-items:center">'+avatarPieces+'</div><p class="muted small" style="margin:8px 0 0">群組頭像依照已選角色組合顯示，現階段不可自行更換。</p></div>'+
+      '<label class="group-field"><span>群組名稱（最多 25 字）</span><input id="groupNameInput" maxlength="25" value="'+e(nameValue)+'" placeholder="輸入群組名稱"></label>'+
+      '<label class="group-field"><span>玩家角色名稱（提供給 AI）</span><input id="groupPlayerName" maxlength="80" value="'+e(g.draft.playerName||state.account?.nickname||"玩家")+'" placeholder="你的角色名稱"></label>'+
+      '<label class="group-field"><span>玩家角色與人設</span><textarea id="groupPlayerPersona" maxlength="3000" placeholder="描述你在這個故事中的身分、個性、背景與說話方式。">'+e(g.draft.playerPersona||state.account?.bio||'')+'</textarea><small>目前先保存於群組檔案，之後可沿用單人聊天的人設編輯邏輯。</small></label>'+
+      '<div class="group-field"><span>選擇哪位角色的世界觀作為整體背景？</span><div class="group-character-grid">'+worldChoices+'</div></div>'+
+      '<div class="group-field"><span>背景參考</span><div class="group-alert">'+e((members.find(c=>c.id===worldId)?.intro)||'所選角色目前沒有可用的公開介紹；可先繼續建立，後續再完善世界觀資料。')+'</div></div>'+
+      groupRenderScenes()+
+      '<div class="group-field"><span>確認群組成員（返回上一步才能增減）</span><div class="group-character-grid">'+members.map(c=>'<div class="group-character-option"><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt=""><strong>'+e(c.name)+'</strong></div>').join('')+'</div></div>';
+  }
+  const topNext=g.step===1?'<button class="primary" type="button" data-action="group-next" '+(g.loading?'disabled':'')+'>下一步 →</button>':'';
+  $('view').innerHTML='<div class="group-wizard"><div class="row between wrap"><div><h1>建立群組聊天</h1><p class="muted">選擇角色後設定群組檔案；目前為測試模式，不呼叫 AI、不扣款。</p></div>'+topNext+'</div>'+groupRenderSteps()+'<section class="group-panel">'+body+'<div id="groupFormError" class="error" role="alert" aria-live="polite">'+e(g.formError)+'</div><div class="group-actions"><button data-action="group-back" '+(g.step===1||g.loading?'disabled':'')+'>上一步</button><button class="primary" data-action="group-next" '+(g.loading?'disabled':'')+'>'+(g.loading?'正在建立…':g.step===2?'建立群組':'下一步')+'</button></div></section></div>';
 }
 function groupReadStep() {
   const g=groupPrototype;
   if(g.step===1) {
-    g.draft.name=$('groupNameInput')?.value.trim()||'';
-    g.draft.world=$('groupWorldInput')?.value||'';
-    if(!g.draft.name||g.draft.name.length>25) return '請輸入 1–25 字的群組名稱。';
-    if(g.draft.world.length>10000) return '世界背景不可超過 10000 字。';
-  } else if(g.step===2) {
-    g.draft.mode='shared';
-    g.draft.scenes=[{name:$('groupSceneName0')?.value.trim()||'',description:$('groupSceneDesc0')?.value||''}];
-    if(!g.draft.scenes[0].name) return '請填寫共同場景名稱。';
-    if(g.draft.scenes[0].name.length>80||g.draft.scenes[0].description.length>5000) return '場景名稱或描述超過字數限制。';
-  } else if(g.step===3) {
     const availableIds=new Set(groupAvailableCharacters().map(c=>c.id));
     g.draft.memberIds=[...new Set(g.draft.memberIds.filter(id=>availableIds.has(id)))];
     const members=groupSelectedCharacters();
-    if(members.length<1||members.length>3) return '請選擇 1–3 名可用角色。';
+    if(members.length<1||members.length>3) return '請選擇 1–3 位已公開且未下架的角色。';
     if(members.length!==g.draft.memberIds.length) return '角色清單已變更，請重新選擇角色。';
-    if(g.draft.mode==='separate' && g.draft.scenes.slice(0,members.length).some(x=>!x.name.trim())) return '分開場景模式下，每位角色都需要有場景名稱。';
+    if(!g.draft.name) g.draft.name=members.map(c=>c.name).join('、').slice(0,25);
+    if(!g.draft.playerName) g.draft.playerName=state.account?.nickname||'玩家';
+    if(!g.draft.playerPersona) g.draft.playerPersona=state.account?.bio||'';
+    if(!g.draft.worldCharacterId||!members.some(c=>c.id===g.draft.worldCharacterId)) g.draft.worldCharacterId=members[0].id;
+  } else if(g.step===2) {
+    const members=groupSelectedCharacters();
+    g.draft.name=$('groupNameInput')?.value.trim()||'';
+    g.draft.playerName=$('groupPlayerName')?.value.trim()||'';
+    g.draft.playerPersona=$('groupPlayerPersona')?.value||'';
+    g.draft.worldCharacterId=$('view').querySelector('input[name="groupWorldCharacter"]:checked')?.value||members[0]?.id||'';
+    const worldCharacter=members.find(c=>c.id===g.draft.worldCharacterId);
+    g.draft.world=String(worldCharacter?.worldBackground||worldCharacter?.world||worldCharacter?.intro||'').slice(0,10000);
+    g.draft.scenes=[{name:$('groupSceneName0')?.value.trim()||'',description:$('groupSceneDesc0')?.value||''}];
+    if(!g.draft.name||g.draft.name.length>25) return '群組名稱需為 1–25 字。';
+    if(!g.draft.playerName||g.draft.playerName.length>80) return '請填寫 1–80 字的玩家角色名稱。';
+    if(g.draft.playerPersona.length>3000) return '玩家人設不可超過 3000 字。';
+    if(!worldCharacter) return '請選擇一位角色作為整體世界觀背景。';
+    if(g.draft.scenes[0].name.length>80||g.draft.scenes[0].description.length>1000) return '初始場景名稱最多 80 字，開場內容最多 1000 字。';
   }
   return '';
 }
 async function groupNext() {
   const err=groupReadStep();
-  if(err) { groupPrototype.formError=err;render();return; }
+  if(err) {groupPrototype.formError=err;render();return;}
   groupPrototype.formError='';
-  if(groupPrototype.step<3) { groupPrototype.step++;render();return; }
+  if(groupPrototype.step===1) {groupPrototype.step=2;render();return;}
   await groupCreateMock();
 }
 async function groupCreateMock() {
@@ -3263,12 +3282,16 @@ async function groupCreateMock() {
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('請使用已連結 Supabase 的帳號登入，才能建立雲端群組。');
     g.ownerUid=user.id;
     const members=groupSelectedCharacters();
-    const scenes=[g.draft.scenes[0]].map(x=>({name:x.name.trim(),description:x.description||''}));
+    const scenes=[{name:g.draft.scenes[0].name.trim(),description:g.draft.scenes[0].description||''}];
     const pMembers=members.map(m=>({character_id:m.id,scene_position:1}));
     const {data:groupId,error}=await window.mySupabase.rpc('create_chat_group',{
-      p_name:g.draft.name.trim(),p_world_background:g.draft.world,p_scene_mode:g.draft.mode,p_scenes:scenes,p_members:pMembers
+      p_name:g.draft.name.trim(),p_world_background:g.draft.world,p_scene_mode:'shared',p_scenes:scenes,p_members:pMembers
     });
     if(error) throw error;
+    const {data:updated,error:updateError}=await window.mySupabase.from('chat_groups')
+      .update({player_name:g.draft.playerName,player_persona:g.draft.playerPersona,world_character_id:g.draft.worldCharacterId,updated_at:new Date().toISOString()})
+      .eq('id',groupId).eq('owner_id',user.id).select('id').maybeSingle();
+    if(updateError||!updated) throw new Error('群組已建立，但玩家人設與世界觀選擇未能保存。請重新開啟群組並確認資料。');
     g.loading=false;
     await groupOpen(groupId);
   } catch(error) {
@@ -3281,6 +3304,10 @@ function groupToggleCharacter(idValue) {
   if(g.draft.memberIds.includes(idValue)) g.draft.memberIds=g.draft.memberIds.filter(x=>x!==idValue);
   else if(g.draft.memberIds.length<3) g.draft.memberIds.push(idValue);
   else toast('每個群組最多三名角色。');
+  const members=groupSelectedCharacters();
+  if(!g.draft.name||g.draft.name===g._suggestedName) g.draft.name=members.map(c=>c.name).join('、').slice(0,25);
+  g._suggestedName=g.draft.name;
+  if(!members.some(c=>c.id===g.draft.worldCharacterId)) g.draft.worldCharacterId=members[0]?.id||'';
   g.formError='';render();
 }
 async function groupSendMock() {
@@ -3347,7 +3374,7 @@ async function groupArchive(groupId) {
     toast(groupFriendlyError(error)||'封存失敗，請稍後重試。');
   }
 }
-function groupList() { const g=groupPrototype;g.active=null;g.step=1;g.formError='';g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]};render(); }
+function groupList() { const g=groupPrototype;g.active=null;g.step=1;g.formError='';g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:state.account?.nickname||'玩家',playerPersona:state.account?.bio||'',worldCharacterId:''};groupCharacterSearch='';render(); }
 function groupRestart() { groupList(); }
 function renderConversation() {
   const s = currentSession();
@@ -3987,7 +4014,14 @@ document.addEventListener('click',async event => {
     switch(action) {
       case 'home':go({page:'home'});break;
       case 'group-next':groupNext();break;
-      case 'group-inspiration':toast('AI 靈感功能尚在串接中；你可以先自行撰寫或修改場景。此操作不會呼叫 AI 或扣款。');break;
+      case 'group-inspiration': {
+        const members=groupSelectedCharacters();
+        const names=members.map(c=>c.name).join('、')||'角色們';
+        const sceneName=$('groupSceneName0')?.value.trim()||'初始相遇';
+        const sample='【測試用靈感範例，非 AI 生成】故事從「'+sceneName+'」開始。'+names+'在同一個時空中意外相遇，周遭的環境藏著尚未揭曉的線索。有人率先打破沉默，有人則保持觀望，每個人都帶著自己的目的與過往。此刻，一個突如其來的事件讓眾人的目光交會，也讓原本平靜的氣氛開始改變。你可以接著補上時間、地點、角色之間的關係，以及玩家角色如何加入這場故事。';
+        const scene=$('groupSceneDesc0');if(scene){scene.value=sample;scene.dispatchEvent(new Event('input',{bubbles:true}));toast('已填入測試用 Mock 靈感文字，可自行修改；未呼叫 AI、未扣款。');}
+        break;
+      }
       case 'group-open':groupOpen(key);break;
       case 'group-return-list':groupPrototype.active=null;go({page:'chat'});break;
       case 'group-info':showDialog('群組資訊', '<div class="stack"><p><strong>群組名稱：</strong>'+e(groupPrototype.active?.name||'')+'</p><p><strong>世界背景：</strong>'+e(groupPrototype.active?.world||'尚未設定')+'</p><p><strong>參與角色：</strong>'+e((groupPrototype.active?.members||[]).map(m=>m.name).join('、'))+'</p><p class="muted small">群組對話獨立保存；AI 尚未串接。</p></div>');break;
@@ -3997,6 +4031,7 @@ document.addEventListener('click',async event => {
       case 'group-list':groupList();break;
       case 'group-back':groupBack();break;
       case 'group-toggle-character':groupToggleCharacter(key);break;
+      case 'group-world-character': { groupPrototype.draft.worldCharacterId=button.value||button.dataset.value||'';render();break; }
       case 'group-create':groupCreateMock();break;
       case 'group-send':groupSendMock();break;
       case 'group-toggle-member':groupExpandedMemberId=groupExpandedMemberId===key?null:key;render();break;
