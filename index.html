@@ -2505,7 +2505,13 @@ setInterval(() => {
 },6000);
 
 function exploreList() {
-  let list = state.characters.filter(c => c.visibility === 'public');
+  // 探索頁只顯示正式雲端公開角色；內建 seed 展示資料與未同步的本機測試角色不在公開版面出現。
+  let list = state.characters.filter(c =>
+    c.visibility === 'public' &&
+    !String(c.id).startsWith('seed-') &&
+    c.cloudPublic !== false &&
+    c.localOnly !== true
+  );
   if (filter === 'latest') {
     // 內建展示用 seed 角色不是實際上架紀錄，永遠不可列入「最新角色」。
     // 其 createdAt 會在全新本機資料初始化時重新產生，不能用來判斷真正上架時間。
@@ -2576,7 +2582,12 @@ function renderGrid() {
   const maximum = Math.min(150,list.length);
   const shown = recommended ? list.slice(0,Math.min(limit,150)) : list;
   $('characterGrid').innerHTML = shown.map(c => card(c)).join('') ||
-    '<div class="empty">找不到符合條件的角色。</div>';
+    '<div class="empty">目前還沒有符合條件的公開角色。稍後再來看看，或試試其他標籤。</div>';
+  document.querySelectorAll('.explore-shortcut[data-filter]').forEach(button => {
+    button.classList.toggle('active', button.dataset.filter === filter);
+  });
+  document.querySelector('.explore-shortcut[data-action="tags"]')?.classList.toggle('active', exploreTags.length > 0);
+  document.querySelector('.explore-shortcut[data-action="toggle-search"]')?.classList.toggle('active', !!search || !!($('exploreSearch') && !$('exploreSearch').classList.contains('hidden')));
   $('selectedTags').innerHTML = exploreTags.map(tagButton).join('');
   $('exploreHint').textContent = filter === 'latest'
     ? '最近24小時公開上架的角色，最多30位。'
