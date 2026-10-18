@@ -2702,11 +2702,10 @@ async function loadCloudComments(characterId) {
   const client=window.mySupabase;
   if(!client||!characterId)return;
   try {
-    const {data:rows,error}=await client.from('character_comments')
-      .select('id,character_id,author_id,content,parent_id,is_whisper,is_deleted,created_at,updated_at')
-      .eq('character_id',characterId).order('created_at',{ascending:true});
+    const {data:rows,error}=await client.rpc('get_character_comments_safe',{p_character_id:characterId});
     if(error)throw error;
-    const ids=(rows||[]).map(row=>row.id);
+    const safeRows=(rows||[]).sort((a,b)=>Date.parse(a.created_at)-Date.parse(b.created_at));
+    const ids=safeRows.filter(row=>!row.is_redacted).map(row=>row.id);
     let likes=[];
     if(ids.length){
       const {data,error:likesError}=await client.from('character_comment_likes')
@@ -2714,9 +2713,9 @@ async function loadCloudComments(characterId) {
       if(likesError)throw likesError;
       likes=data||[];
     }
-    const mapped=(rows||[]).map(row=>({
+    const mapped=safeRows.map(row=>({
       id:row.id,authorId:row.author_id,text:row.content,parentId:row.parent_id,
-      whisper:!!row.is_whisper,deleted:!!row.is_deleted,edited:row.updated_at!==row.created_at,
+      whisper:!!row.is_whisper,redacted:!!row.is_redacted,deleted:!!row.is_deleted,edited:row.updated_at!==row.created_at,
       at:Date.parse(row.created_at)||Date.now(),
       likes:likes.filter(item=>item.comment_id===row.id).map(item=>item.user_id),cloud:true
     }));
@@ -2731,12 +2730,16 @@ async function loadCloudComments(characterId) {
 }
 
 function renderComments() {
+  if (!document.getElementById('whisper-redacted-style')) {
+    const style=document.createElement('style');style.id='whisper-redacted-style';
+    style.textContent='.whisper-redacted-avatar{background:#e5e7eb!important;color:#6b7280!important;display:flex;align-items:center;justify-content:center;font-weight:700;border:1px solid #d1d5db}';
+    document.head.appendChild(style);
+  }
   if (!$('comments')) return;
   const allComments = state.comments[route.id] || [];
   const character = currentCharacter();
   const uid = currentUser()?.uid;
-  const canSeeWhisper = c => !c.whisper || c.authorId === uid || character?.authorId === uid;
-  const list = allComments.filter(canSeeWhisper);
+  const list = allComments;
   $('comments').innerHTML = list.map(c => {
     const a = author(c.authorId);
     const liked = (c.likes || []).includes(uid);
@@ -2744,7 +2747,7 @@ function renderComments() {
     return `
       <article class="comment ${c.parentId ? 'reply' : ''}">
         <div class="row">
-          ${avatar(a)}
+          ${c.redacted && c.whisper ? '<div class="avatar whisper-redacted-avatar" aria-label="悄悄話">悄</div>' : avatar(a)}
           <div class="grow">
             <button class="author-link" data-action="author" data-id="${e(a.uid)}">@${e(a.nickname)}</button>
             <div class="small muted">${e(timeText(c.at))}${c.edited ? ' · 已修改' : ''}${c.whisper ? '<span class="comment-whisper-label">悄悄話</span>' : ''}</div>
@@ -2754,7 +2757,7 @@ function renderComments() {
         <p class="prose ${c.deleted ? 'muted' : ''}" style="margin:12px 0">
           ${c.deleted ? '該筆評論已被刪除' : e(c.text)}
         </p>
-        ${!c.deleted ? `<div class="comment-like-row"><button class="comment-like-button ${liked ? 'on' : ''}" data-action="comment-like" data-id="${e(c.id)}" aria-pressed="${liked}"><span class="like-symbol">${liked ? '♥' : '♡'}</span><span>${(c.likes || []).length}</span></button></div><div class="comment-tools">
+        ${!c.deleted && !c.redacted ? `<div class="comment-like-row"><button class="comment-like-button ${liked ? 'on' : ''}" data-action="comment-like" data-id="${e(c.id)}" aria-pressed="${liked}"><span class="like-symbol">${liked ? '♥' : '♡'}</span><span>${(c.likes || []).length}</span></button></div><div class="comment-tools">
           <button data-action="reply" data-id="${e(c.id)}">回覆</button>
           <button data-action="translation">翻譯</button>
           <button data-action="comment-menu" data-id="${e(c.id)}">⋯</button>
