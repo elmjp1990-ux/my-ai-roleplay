@@ -363,10 +363,24 @@ body.chat-page main { max-width:none; padding:12px; }
 .chat-layout.list-only { grid-template-columns:1fr; }
 .chat-layout.hide-list { grid-template-columns:1fr; }
 .chat-layout.hide-list .chat-list { display:none; }
-.chat-list { overflow-y:auto; padding:14px; min-height:0; }
-.list-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-.chat-entry { display:flex; gap:7px; align-items:center; padding:9px 6px; margin-top:7px; border-radius:12px; }
-.chat-entry.active { background:var(--soft); }
+.chat-list { overflow-y:auto; padding:clamp(14px,2.4vw,22px); min-height:0; background:linear-gradient(180deg,var(--panel),color-mix(in srgb,var(--panel) 94%,var(--primary))); }
+.chat-list-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; }
+.chat-brand { display:inline-flex; align-items:center; gap:9px; padding:0; border:0; background:transparent; color:var(--text); font-size:18px; font-weight:800; letter-spacing:.02em; }
+.chat-brand-mark { display:grid; place-items:center; width:34px; height:34px; border-radius:12px; background:linear-gradient(135deg,#6366f1,#8b5cf6); color:white; box-shadow:0 5px 18px #6366f133; }
+.chat-list-actions { display:flex; align-items:center; gap:6px; }
+.chat-list-icon { display:grid; place-items:center; width:40px; height:40px; border:1px solid var(--border); border-radius:13px; background:var(--panel2); color:var(--text); }
+.chat-list-icon svg { width:19px; height:19px; }
+.chat-list-search { display:flex; gap:9px; margin-bottom:13px; }
+.chat-list-search input { min-width:0; width:100%; border-radius:14px; padding:12px 14px; background:var(--input); }
+.chat-announcement { display:flex; align-items:center; gap:11px; padding:12px 13px; margin-bottom:15px; border:1px solid color-mix(in srgb,var(--primary) 35%,var(--border)); border-radius:15px; background:linear-gradient(110deg,var(--soft),transparent); text-align:left; width:100%; }
+.chat-announcement-mark { display:grid; place-items:center; flex:0 0 38px; height:38px; border-radius:12px; background:#16a34a22; color:#4ade80; font-size:18px; }
+.chat-announcement-copy { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.chat-announcement-copy strong { font-size:13px; }
+.chat-announcement-copy span { color:var(--muted); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.chat-list-section { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:17px 2px 8px; color:var(--muted); font-size:12px; font-weight:700; letter-spacing:.04em; }
+.chat-entry { display:flex; gap:10px; align-items:center; padding:10px 8px; margin-top:5px; border:1px solid transparent; border-radius:15px; transition:background .16s,border-color .16s; }
+.chat-entry:hover { background:var(--panel2); }
+.chat-entry.active { background:var(--soft); border-color:color-mix(in srgb,var(--primary) 32%,transparent); }
 .select-chat { flex:1; min-width:0; border:0; background:transparent; text-align:left; padding:2px; }
 .pin { padding:3px; border:0; background:transparent; color:var(--muted); }
 .pin.on { color:#fb7185; }
@@ -2884,6 +2898,12 @@ function relativeDate(at) {
   if (at >= today-DAY) return '昨天';
   return new Date(at).toLocaleDateString('zh-TW');
 }
+function chatListDate(at) {
+  const timestamp=Number(at||0);
+  if(!timestamp) return '';
+  if(Date.now()-timestamp<24*60*60*1000) return '今天';
+  return new Date(timestamp).toLocaleDateString('zh-TW',{month:'numeric',day:'numeric'});
+}
 function chatEntries() {
   const q=chatSearch.trim().toLocaleLowerCase();
   const items=visibleSessions().map(s=>({
@@ -2917,7 +2937,7 @@ function chatEntries() {
         </button>
         <button class="select-chat" data-action="group-open" data-id="${e(group.id)}">
           <div class="row between"><strong class="ellipsis">${e(group.name||'未命名群組')} <span class="small muted">· 群組</span></strong>
-            <span class="small muted">${relativeDate(lastAt)}</span></div>
+            <span class="small muted">${chatListDate(lastAt)}</span></div>
           <div class="ellipsis small muted">${e(lastText)}</div>
         </button>
         <span class="entry-menu" aria-hidden="true">⋯</span>
@@ -2939,7 +2959,7 @@ function chatEntries() {
       </button>
       <button class="select-chat" data-action="select-chat" data-id="${e(s.id)}">
         <div class="row between"><strong class="ellipsis">${e(s.name||c.name)}</strong>
-          <span class="small muted">${relativeDate(last?.at||s.startedAt)}</span></div>
+          <span class="small muted">${chatListDate(last?.at||s.startedAt)}</span></div>
         <div class="ellipsis small muted">${e(last?.text||'')}</div>
       </button>
       <button class="entry-menu" data-action="session-menu" data-id="${e(s.id)}" aria-label="聊天選項">⋯</button>
@@ -2949,13 +2969,29 @@ function chatEntries() {
 }
 function chatListHTML() {
   if(currentUser()&&!groupPrototype.groupsLoaded&&!groupPrototype.loadingGroups) groupLoadList();
-  return `<aside class="panel chat-list">
-    <div class="list-top"><button class="ghost" data-action="list-menu">☰ 全部</button>
-      <span class="small muted">聊天列表</span></div>
-    <div class="row" style="gap:8px;margin-bottom:12px">
-      <input id="chatSearch" value="${e(chatSearch)}" placeholder="搜尋角色或回憶名稱" aria-label="搜尋角色或回憶名稱">
-      <button class="primary" type="button" data-action="group-list" aria-label="建立群組聊天" title="建立群組聊天" style="flex:0 0 auto;min-width:42px;padding:10px 13px"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><path d="M3.5 19v-1.5a5.5 5.5 0 0 1 11 0V19"></path><path d="M16 5.5a3 3 0 0 1 0 5.8M17 14a4.5 4.5 0 0 1 3.5 4.4V19"></path></svg></button>
+  return `<aside class="panel chat-list" aria-label="聊天清單">
+    <div class="chat-list-head">
+      <button class="chat-brand" type="button" data-action="nav" data-page="home" aria-label="PersonaX，返回探索首頁">
+        <span class="chat-brand-mark" aria-hidden="true">✦</span><span>PersonaX</span>
+      </button>
+      <div class="chat-list-actions">
+        <button class="chat-list-icon" type="button" data-action="chat-list-album" aria-label="開啟相簿" title="相簿">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m21 15-5-5L5 20"></path></svg>
+        </button>
+        <button class="chat-list-icon" type="button" data-action="group-list" aria-label="建立群組聊天" title="建立群組">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><path d="M3.5 19v-1.5a5.5 5.5 0 0 1 11 0V19"></path><path d="M16 5.5a3 3 0 0 1 0 5.8M17 14a4.5 4.5 0 0 1 3.5 4.4V19"></path></svg>
+        </button>
+      </div>
     </div>
+    <div class="chat-list-search">
+      <input id="chatSearch" type="search" value="${e(chatSearch)}" placeholder="搜尋角色或對話…" aria-label="搜尋已聊過的角色或對話" autocomplete="off">
+    </div>
+    <button class="chat-announcement" type="button" data-action="nav" data-page="notifications" aria-label="查看客服與系統公告">
+      <span class="chat-announcement-mark" aria-hidden="true">▣</span>
+      <span class="chat-announcement-copy"><strong>客服與系統公告</strong><span>查看平台通知與最新消息</span></span>
+      <span class="small muted" aria-hidden="true">›</span>
+    </button>
+    <div class="chat-list-section"><span>最近對話</span><span>${(visibleSessions().length+(groupPrototype.groups||[]).length)||0}</span></div>
     <div id="chatEntries">${chatEntries()}</div>
   </aside>`;
 }
@@ -4316,6 +4352,15 @@ document.addEventListener('click',async event => {
         const next={...route,chatOverlay:button.dataset.kind};
         delete next.overlay;
         go(next);
+        break;
+      }
+      case 'chat-list-album': {
+        const photos=Object.values(state.sessions||{}).flatMap(session=>
+          (session.album||[]).filter(photo=>safeImage(photo.url)).map(photo=>({photo,session}))
+        );
+        showDialog('相簿', photos.length
+          ? `<p class="small muted">這裡整理目前已儲存於聊天中的圖片。</p><div class="album-grid">${photos.map(({photo,session})=>`<figure class="memory-item" style="margin:0;padding:7px"><img src="${e(safeImage(photo.url))}" alt="聊天圖片" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px"><figcaption class="small muted" style="margin-top:6px">${e(session.name||sessionCharacter(session)?.name||'聊天圖片')}</figcaption></figure>`).join('')}</div>`
+          : '<div class="empty">目前還沒有已儲存的聊天圖片。</div>');
         break;
       }
       case 'list-menu':openModal('list-menu');break;
