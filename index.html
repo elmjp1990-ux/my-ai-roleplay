@@ -2299,15 +2299,17 @@ function renderShell() {
   const navPage = route.page === 'conversation' ? 'chat'
     : ['editor','ai'].includes(route.page) ? 'create'
     : ['detail','session-detail'].includes(route.page) ? 'home'
-    : route.page === 'group' ? 'group' : route.page;
+    : route.page === 'group' ? 'chat' : route.page;
+  // 五大主入口固定順序：探索、創建、聊天、商店、我的。
+  // 通知、收藏、群組仍保留既有次級頁面路徑，不再占用主導覽位置。
   const labels = [
-    ['home','探索角色'],['chat','開始暢聊'],['create','創建角色'],
-    ['notifications','系統通知'],['favorites','喜愛角色']
+    ['home','探索'],['create','創建'],['chat','聊天'],
+    ['shop','商店'],['profile','我的']
   ];
   const html = labels.map(([page,label]) => `
     <button class="nav-btn ${navPage === page ? 'active' : ''}"
             data-action="nav" data-page="${page}">
-      ${page === 'group' ? '👥' : ICON[page]}<span class="nav-label">${label}</span>
+      ${page === 'shop' ? '🛍️' : page === 'profile' ? '👤' : ICON[page]}<span class="nav-label">${label}</span>
     </button>`).join('');
   $('desktopNav').innerHTML = html;
   $('mobileNav').innerHTML = html;
@@ -2331,7 +2333,7 @@ function renderShell() {
 function render() {
   if ($('modal').open) $('modal').close();
   const allowed = ['home','detail','session-detail','author','chat','conversation','group','create',
-    'editor','ai','notifications','favorites','profile'];
+    'editor','ai','notifications','favorites','shop','profile'];
   if (!allowed.includes(route.page)) route = {page:'home'};
 
   if (!['home','detail','author'].includes(route.page) && !currentUser()) {
@@ -2373,6 +2375,7 @@ function render() {
     case 'ai':renderAI();break;
     case 'notifications':renderNotifications();break;
     case 'favorites':renderFavorites();break;
+    case 'shop':renderShop();break;
     case 'profile':renderProfile();break;
   }
   if (route.overlay) renderModal(route.overlay);
@@ -3414,6 +3417,39 @@ function renderChatOverlay(kind) {
 }
 
 /* Account */
+function renderShop() {
+  const u = currentUser();
+  const silver = Number(u?.silver || 0).toLocaleString();
+  const diamonds = Number(u?.diamonds || 0).toLocaleString();
+  $('view').innerHTML = `
+    <div class="stack">
+      <div>
+        <h1 style="margin-bottom:8px">商店</h1>
+        <p class="muted">管理你的故事資源。銀幣與鑽石分開顯示；目前先建立介面骨架，付款尚未開放。</p>
+      </div>
+      <div class="two-col shop-balance-grid">
+        <section class="panel stack">
+          <div class="row between"><span class="muted">活動／免費資源</span><span>◉</span></div>
+          <div><h2 style="margin-bottom:5px">${silver}</h2><strong>銀幣</strong></div>
+          <p class="muted small" style="margin:0">用於免費贈送、簽到與活動等資源。</p>
+        </section>
+        <section class="panel stack">
+          <div class="row between"><span class="muted">付費資源</span><span>💎</span></div>
+          <div><h2 style="margin-bottom:5px">${diamonds}</h2><strong>鑽石</strong></div>
+          <p class="muted small" style="margin:0">付費貨幣餘額；本頁不會觸發實際付款。</p>
+        </section>
+      </div>
+      <section class="panel stack">
+        <div><h2 style="margin-bottom:6px">貨幣方案</h2><p class="muted small" style="margin:0">商品、價格與付款串接尚待規劃，暫不顯示可購買方案。</p></div>
+        <div class="empty">方案與付款功能尚未開放<br>目前僅顯示帳戶現有餘額。</div>
+        <div class="row wrap">
+          <button data-action="shop">查看既有方案預留頁</button>
+          <button data-action="ledger">查看花費紀錄</button>
+        </div>
+      </section>
+    </div>`;
+}
+
 function renderProfile() {
   const u = currentUser();
   $('view').innerHTML = `<div class="stack form-width">
