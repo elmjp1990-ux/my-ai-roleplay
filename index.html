@@ -3186,8 +3186,9 @@ function renderGroupConversation() {
   }).join('') || '<div class="empty">這段群組對話還沒有訊息，輸入第一句話開始故事。</div>';
   const sceneNames=(group.scenes||[]).map(x=>x.name).filter(Boolean).join('、');
   const initialScene=(group.scenes||[]).find(x=>Number(x.position||1)===1)||(group.scenes||[])[0];
-  const sceneContext=initialScene?.description?.trim()
-    ? '<div class="group-scene-context" style="margin:0 0 16px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel-2,rgba(127,127,127,.08))"><div class="small muted" style="margin-bottom:6px">📍 '+e(initialScene.name||'初始場景')+'</div><div style="white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.65">'+e(initialScene.description)+'</div></div>'
+  const sceneContext=initialScene
+    ? '<div class="group-scene-context" style="margin:0 0 16px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel-2,rgba(127,127,127,.08))"><div class="small muted" style="margin-bottom:6px">📍 '+e(initialScene.name||'初始場景')+'</div>'+
+      (initialScene.description?.trim()?'<div style="white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.65">'+e(initialScene.description)+'</div>':'<div class="small muted">尚未填寫場景描述。</div>')+'</div>'
     : '';
   $('view').innerHTML=`
     <div class="chat-layout ${hideList?'hide-list':''}">
