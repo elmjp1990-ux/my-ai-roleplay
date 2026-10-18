@@ -337,7 +337,17 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .owner-actions { display:flex; gap:7px; margin-top:12px; }
 .owner-actions button { flex:1; font-size:12px; padding:8px; }
 .detail-layout { display:grid; grid-template-columns:minmax(230px,360px) 1fr; gap:25px; }
-.detail-image { width:100%; max-height:580px; object-fit:cover; border-radius:19px; }
+.detail-portrait{position:relative;align-self:start;overflow:hidden;border-radius:19px;background:var(--panel2);isolation:isolate}
+.detail-image { display:block;width:100%;height:min(72vh,580px);min-height:360px;object-fit:cover;border-radius:19px; }
+.detail-portrait::after{content:"";position:absolute;inset:35% 0 0;z-index:0;pointer-events:none;background:linear-gradient(transparent,#080b12ed)}
+.detail-portrait-meta{position:absolute;z-index:1;left:22px;right:18px;bottom:20px;color:#fff;text-shadow:0 2px 12px #000b}
+.detail-portrait-meta h1{font-size:clamp(25px,3vw,38px);line-height:1.15;margin:0 0 8px;letter-spacing:-.035em}
+.detail-portrait-meta .author-link{color:#f1f5ff;padding:0;text-shadow:0 1px 8px #000}
+.detail-portrait-meta .detail-chat-count{font-size:12px;margin-top:10px;color:#f8fafc;opacity:.95}
+.comment-like-row{display:flex;align-items:center;justify-content:flex-start;margin:0 0 8px}
+.comment-like-button{display:inline-flex;align-items:center;gap:5px;padding:2px 5px;border:0;background:transparent;color:var(--muted);font-size:12px;line-height:1.2;min-height:24px;box-shadow:none}
+.comment-like-button .like-symbol{font-size:15px;line-height:1}
+.comment-like-button.on{color:#fb7185}
 .author-link { border:0; background:transparent; color:#a5a8ff; padding:0; }
 .comment { padding:18px 0; border-bottom:1px solid var(--border); }
 .comment.reply { margin-left:24px; border-left:2px solid var(--soft); padding-left:14px; }
@@ -372,10 +382,10 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .card-image .image-button{display:block}
 .card-body h3{letter-spacing:-.02em}
 .card-stats{position:absolute;z-index:2;left:10px;bottom:10px;display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid #ffffff30;border-radius:999px;background:#090d16b8;color:#f8fafc;font-size:10px;backdrop-filter:blur(12px)}
-.card-image .heart,.card-image .card-chat-count{position:absolute;z-index:4;top:9px;height:29px;display:grid;place-items:center;padding:0;border:1px solid #ffffff3d;border-radius:50%;background:#090d16b8;color:white;font-size:16px;backdrop-filter:blur(12px)}
-.card-image .heart{right:9px;width:29px;font-size:17px}
-.card-image .heart.on{color:#fb7185;background:#090d16df}
-.card-image .card-chat-count{right:44px;display:flex;gap:3px;width:auto;min-width:29px;padding:0 7px;font-size:10px;border-radius:999px}
+.card-image .heart,.card-image .card-chat-count{position:absolute;z-index:4;top:9px;height:29px;display:flex;align-items:center;justify-content:center;padding:0;border:0;background:transparent;color:#fff;font-size:16px;text-shadow:0 1px 4px #000b;backdrop-filter:none;box-shadow:none}
+.card-image .heart{right:9px;width:29px;font-size:19px}
+.card-image .heart.on{color:#fb7185;background:transparent}
+.card-image .card-chat-count{left:9px;right:auto;gap:4px;width:auto;min-width:0;padding:0;font-size:11px;border-radius:0;color:#fff}
 .card-image .card-chat-count svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8}
 .card-image .card-stats{display:none}
 .card-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
@@ -1689,7 +1699,7 @@ let pendingDeletionWalletSyncUid =
 let route = {page:'home'};
 let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''},{name:'角色場景 2',description:''},{name:'角色場景 3',description:''}],memberIds:[]},active:null,turn:0,messages:[],groups:[],groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:''};
 let search = '';
-let filter = 'latest';
+let filter = 'recommended';
 let exploreTags = [];
 let limit = 24;
 let batch = 0;
@@ -2641,11 +2651,15 @@ function renderDetail() {
       <button class="ghost" data-action="back">← 返回上一頁</button>
       ${offline ? '<div class="character-status-banner">● 此角色目前離線或已下架。你仍可查看這段既有聊天所保留的角色簡介與開場白，但不能開啟新對話。</div>' : ''}
       <div class="detail-layout">
-        <img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" alt="${e(c.name)}">
+        <div class="detail-portrait">
+          <img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" alt="${e(c.name)}">
+          <div class="detail-portrait-meta">
+            <h1>${e(c.name)}</h1>
+            <button class="author-link" data-action="author" data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>
+            <div class="detail-chat-count">💬 ${e(c.chats || '0')} 次對話</div>
+          </div>
+        </div>
         <section class="panel stack">
-          <h1>${e(c.name)}</h1>
-          <button class="author-link" data-action="author" data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>
-          <p class="small muted">💬 ${e(c.chats || '0')} 次對話</p>
           <p class="muted">${c.gender === 'male' ? '男' : c.gender === 'female' ? '女' : '模糊'}
             · ${e(c.age || '未設定')} 歲 · ${e(c.race || '未設定種族')}</p>
           <div><h3>角色介紹</h3><div class="prose">${e(c.intro)}</div></div>
@@ -2675,8 +2689,44 @@ function renderDetail() {
         </form>
       </section>`}
     </div>`;
-  if (!offline && route.page !== 'session-detail') renderComments();
+  if (!offline && route.page !== 'session-detail') {
+    renderComments();
+    if (window.mySupabase && c.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(c.id)) void loadCloudComments(c.id);
+  }
 }
+
+async function loadCloudComments(characterId) {
+  const client=window.mySupabase;
+  if(!client||!characterId)return;
+  try {
+    const {data:rows,error}=await client.from('character_comments')
+      .select('id,character_id,author_id,content,parent_id,is_whisper,is_deleted,created_at,updated_at')
+      .eq('character_id',characterId).order('created_at',{ascending:true});
+    if(error)throw error;
+    const ids=(rows||[]).map(row=>row.id);
+    let likes=[];
+    if(ids.length){
+      const {data,error:likesError}=await client.from('character_comment_likes')
+        .select('comment_id,user_id').in('comment_id',ids);
+      if(likesError)throw likesError;
+      likes=data||[];
+    }
+    const mapped=(rows||[]).map(row=>({
+      id:row.id,authorId:row.author_id,text:row.content,parentId:row.parent_id,
+      whisper:!!row.is_whisper,deleted:!!row.is_deleted,edited:row.updated_at!==row.created_at,
+      at:Date.parse(row.created_at)||Date.now(),
+      likes:likes.filter(item=>item.comment_id===row.id).map(item=>item.user_id),cloud:true
+    }));
+    if(route.page!=='detail'||route.id!==characterId)return;
+    state.comments[characterId]=mapped;
+    renderComments();
+  } catch(error) {
+    console.error('PersonaX 雲端評論載入失敗：',error);
+    const target=$('comments');
+    if(target&&route.id===characterId)target.innerHTML='<div class="empty">雲端評論載入失敗，請重新整理或稍後再試。</div>';
+  }
+}
+
 function renderComments() {
   if (!$('comments')) return;
   const allComments = state.comments[route.id] || [];
@@ -2696,14 +2746,12 @@ function renderComments() {
             <button class="author-link" data-action="author" data-id="${e(a.uid)}">@${e(a.nickname)}</button>
             <div class="small muted">${e(timeText(c.at))}${c.edited ? ' · 已修改' : ''}${c.whisper ? '<span class="comment-whisper-label">悄悄話</span>' : ''}</div>
           </div>
-          ${!c.deleted ? `<button class="heart ${liked ? 'on' : ''}" data-action="comment-like"
-            data-id="${e(c.id)}">${liked ? '♥' : '♡'} ${(c.likes || []).length}</button>` : ''}
         </div>
         ${parent ? `<p class="small muted" style="margin:10px 0">回覆 @${e(author(parent.authorId).nickname)}</p>` : ''}
         <p class="prose ${c.deleted ? 'muted' : ''}" style="margin:12px 0">
           ${c.deleted ? '該筆評論已被刪除' : e(c.text)}
         </p>
-        ${!c.deleted ? `<div class="comment-tools">
+        ${!c.deleted ? `<div class="comment-like-row"><button class="comment-like-button ${liked ? 'on' : ''}" data-action="comment-like" data-id="${e(c.id)}" aria-pressed="${liked}"><span class="like-symbol">${liked ? '♥' : '♡'}</span><span>${(c.likes || []).length}</span></button></div><div class="comment-tools">
           <button data-action="reply" data-id="${e(c.id)}">回覆</button>
           <button data-action="translation">翻譯</button>
           <button data-action="comment-menu" data-id="${e(c.id)}">⋯</button>
@@ -4503,12 +4551,17 @@ document.addEventListener('click',async event => {
       case 'cancel-reply':replyId=null;$('replyHint').textContent='';break;
       case 'comment-like': {
         if (!requireLogin({page:'detail',id:route.id})) break;
-        const c=(state.comments[route.id] || []).find(c=>c.id===key);
-        if (!c || c.deleted) break;
-        c.likes ||= [];
-        const i=c.likes.indexOf(currentUser().uid);
-        if (i<0)c.likes.push(currentUser().uid);else c.likes.splice(i,1);
-        persist();renderComments();break;
+        const c=(state.comments[route.id]||[]).find(c=>c.id===key);
+        if(!c||c.deleted)break;
+        if(!c.cloud||!window.mySupabase)return toast('此評論尚未同步到雲端。');
+        const uid=currentUser().uid;
+        const {data:existing,error:findError}=await window.mySupabase.from('character_comment_likes').select('comment_id').eq('comment_id',c.id).eq('user_id',uid).maybeSingle();
+        if(findError)throw findError;
+        const result=existing
+          ?await window.mySupabase.from('character_comment_likes').delete().eq('comment_id',c.id).eq('user_id',uid)
+          :await window.mySupabase.from('character_comment_likes').insert({comment_id:c.id,user_id:uid});
+        if(result.error)throw new Error('評論愛心更新失敗：'+result.error.message);
+        await loadCloudComments(route.id);break;
       }
       case 'comment-menu':openModal('comment-menu',{id:key});break;
       case 'edit-comment':openModal('edit-comment',{id:key});break;
@@ -4870,24 +4923,29 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         }
         back();break;
       }
-      case 'comment':
+      case 'comment': {
         if (!requireLogin({page:'detail',id:route.id})) return;
         if (!text) return toast('請輸入評論。');
-        state.comments[route.id] ||= [];
-        state.comments[route.id].push({
-          id:id(),authorId:currentUser().uid,text,
-          parentId:replyId,
-          whisper:!!f.get('whisper') || !!(replyId && (state.comments[route.id] || []).find(c=>c.id===replyId)?.whisper),
-          likes:[],deleted:false,at:Date.now()
+        if (!window.mySupabase || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(route.id)) return toast('此角色尚未連結雲端，評論無法跨帳號保存。');
+        const parent=replyId?(state.comments[route.id]||[]).find(c=>c.id===replyId):null;
+        const {error}=await window.mySupabase.from('character_comments').insert({
+          character_id:route.id,author_id:currentUser().uid,content:text,parent_id:replyId,
+          is_whisper:!!f.get('whisper')||!!parent?.whisper
         });
+        if(error)throw new Error('評論雲端保存失敗：'+error.message);
         replyId=null;form.reset();$('replyHint').textContent='';
-        persist();renderComments();break;
+        await loadCloudComments(route.id);toast('評論已保存到雲端。');break;
+      }
       case 'comment-edit': {
-        const c=(state.comments[route.id] || []).find(c=>c.id===o.id);
-        if (!c || c.deleted || c.authorId!==currentUser()?.uid) return;
-        if (!text) return toast('評論不可為空。');
-        c.text=text;c.edited=true;
-        persist();back();break;
+        const c=(state.comments[route.id]||[]).find(c=>c.id===o.id);
+        if(!c||c.deleted||c.authorId!==currentUser()?.uid)return;
+        if(!text)return toast('評論不可為空。');
+        if(c.cloud&&window.mySupabase){
+          const {error}=await window.mySupabase.from('character_comments').update({content:text,updated_at:new Date().toISOString()}).eq('id',c.id).eq('author_id',currentUser().uid);
+          if(error)throw new Error('評論修改失敗：'+error.message);
+          await loadCloudComments(route.id);back();break;
+        }
+        c.text=text;c.edited=true;persist();back();break;
       }
       case 'report':
       case 'bug': {
