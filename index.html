@@ -1628,7 +1628,7 @@ let pendingDeletionWalletSyncUid =
     ? state.account.uid
     : null;
 let route = {page:'home'};
-let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null};
+let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null,openRequestId:0};
 let search = '';
 let filter = 'latest';
 let exploreTags = [];
@@ -3106,7 +3106,8 @@ function groupRenderList() {
 async function groupOpen(groupId) {
   const g=groupPrototype;
   groupResetForAccount(currentUser()?.uid||null);
-  if(!isUuid(groupId)||!window.mySupabase) { toast('群組識別碼無效或 Supabase 尚未載入。');return; }
+  if(!isUuid(groupId)||!window.mySupabase) { g.loading=false;g.openError='群組識別碼無效或 Supabase 尚未載入。';g.failedGroupId=groupId;render();toast(g.openError);return; }
+  const requestId=g.openRequestId=(g.openRequestId||0)+1;
   g.loading=true;g.formError='';g.openError='';g.failedGroupId=groupId;g.active=null;
   if(route.page!=='group'||route.id||route.overlay) go({page:'group'});
   else render();
@@ -3120,6 +3121,7 @@ async function groupOpen(groupId) {
       window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,content,created_at').eq('group_id',groupId).order('created_at',{ascending:true}).order('sequence_no',{ascending:true})
     ]);
+    if(requestId!==g.openRequestId) return;
     const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error;
     if(error) throw error;
     if(user.id!==currentUser()?.uid) throw new Error('帳號已切換，已停止顯示先前帳號的群組。');
@@ -3145,6 +3147,7 @@ async function groupOpen(groupId) {
     render();
     void groupLoadList(true);
   } catch(error) {
+    if(requestId!==g.openRequestId) return;
     g.loading=false;g.active=null;g.openError=groupFriendlyError(error)||'開啟群組失敗。';g.failedGroupId=groupId;
     console.error('PersonaX 群組載入失敗：',error);
     render();
@@ -3373,7 +3376,7 @@ async function groupArchive(groupId) {
     toast(groupFriendlyError(error)||'封存失敗，請稍後重試。');
   }
 }
-function groupList() { const g=groupPrototype;g.active=null;g.step=1;g.formError='';g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:state.account?.nickname||'玩家',playerPersona:state.account?.bio||'',worldCharacterId:''};groupCharacterSearch='';render(); }
+function groupList() { const g=groupPrototype;g.openRequestId=(g.openRequestId||0)+1;g.active=null;g.loading=false;g.sending=false;g.pendingRequest=null;g.openError='';g.failedGroupId=null;g.step=1;g.formError='';g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:state.account?.nickname||'玩家',playerPersona:state.account?.bio||'',worldCharacterId:''};groupCharacterSearch='';render(); }
 function groupRestart() { groupList(); }
 function renderConversation() {
   const s = currentSession();
