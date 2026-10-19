@@ -4452,6 +4452,25 @@ function renderArchive(sessionId,tab) {
     </div>`);
 }
 
+/* GROUP-01-OPEN: capture group-open clicks before other delegated handlers.
+   This makes group navigation independent of nested list markup or another handler
+   stopping propagation. The normal bubble handler is skipped to prevent double-open. */
+document.addEventListener('click', event => {
+  const target = event.target instanceof Element
+    ? event.target.closest('[data-action="group-open"]')
+    : null;
+  if (!target || target.disabled) return;
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation();
+  const groupId = target.dataset.id;
+  if (!groupId) {
+    toast('這個群組缺少識別碼，請重新載入群組清單。');
+    return;
+  }
+  void groupOpen(groupId);
+}, true);
+
 /* Delegated click actions */
 document.addEventListener('click',async event => {
   const button = event.target.closest('[data-action]');
