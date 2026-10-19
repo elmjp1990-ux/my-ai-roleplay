@@ -3172,27 +3172,51 @@ function chatListDate(at) {
   if(Date.now()-timestamp<24*60*60*1000) return '今天';
   return new Date(timestamp).toLocaleDateString('zh-TW',{month:'numeric',day:'numeric'});
 }
-function groupPinsStorageKey() {
-  const uid=currentUser()?.uid;
-  return uid ? 'personax_group_pins_v1_'+uid : '';
-}
 function readGroupPins() {
-  const key=groupPinsStorageKey();
-  if(!key) return [];
-  try {
-    const value=JSON.parse(localStorage.getItem(key)||'[]');
-    return Array.isArray(value)?value.filter(id=>typeof id==='string'):[];
-  } catch (_) { return []; }
+  const uid=currentUser()?.uid;
+  if(!uid||groupPrototype.ownerUid!==uid) return [];
+  return (groupPrototype.groups||[]).filter(group=>group.pinned===true).map(group=>group.id);
 }
-function toggleGroupPin(groupId) {
-  if(!groupId||!currentUser()?.uid) return;
-  const prior=readGroupPins();
-  const next=prior.includes(groupId)?prior.filter(id=>id!==groupId):[...prior,groupId];
+async function toggleGroupPin(groupId) {
+  const uid=currentUser()?.uid;
+  const client=window.mySupabase;
+  if(!groupId||!uid||!client||groupPrototype.ownerUid!==uid) {
+    toast('請重新登入並載入群組後，再變更置頂。');
+    return;
+  }
+  const group=(groupPrototype.groups||[]).find(item=>item.id===groupId);
+  if(!group) {
+    toast('找不到此群組，請重新載入後再試。');
+    return;
+  }
+  const previous=group.pinned===true;
+  const next=!previous;
+  // 先更新畫面，雲端失敗時回復；資料以 Supabase 為準，可跨裝置同步。
+  group.pinned=next;
+  render();
   try {
-    localStorage.setItem(groupPinsStorageKey(),JSON.stringify(next));
+    const {data:authData,error:authError}=await client.auth.getUser();
+    if(authError||authData?.user?.id!==uid||currentUser()?.uid!==uid) {
+      throw new Error('登入狀態已變更，請重新登入後再試。');
+    }
+    const {data,error}=await client.from('chat_groups')
+      .update({pinned:next})
+      .eq('id',groupId).eq('owner_id',uid)
+      .select('id,pinned').maybeSingle();
+    if(error) throw error;
+    if(!data||data.id!==groupId||data.pinned!==next) {
+      throw new Error('雲端沒有確認群組置頂變更，請重新載入後再試。');
+    }
+    if(currentUser()?.uid!==uid) return;
+    group.pinned=data.pinned;
     render();
-  } catch (_) {
-    toast('群組置頂儲存失敗，請檢查瀏覽器儲存空間。');
+  } catch(error) {
+    if(currentUser()?.uid===uid) {
+      group.pinned=previous;
+      render();
+      toast('群組置頂同步失敗，已還原原設定。');
+    }
+    console.error('群組置頂同步失敗：',error);
   }
 }
 function chatEntries() {
@@ -3404,7 +3428,7 @@ async function groupLoadList(force=false) {
       refreshChatEntryList();return;
     }
     const {data,error}=await window.mySupabase.from('chat_groups')
-      .select('id,name,world_background,scene_mode,created_at,updated_at')
+      .select('id,name,world_background,scene_mode,created_at,updated_at,pinned')
       .is('archived_at',null).order('updated_at',{ascending:false});
     if(error) throw error;
     if(user.id!==currentUser()?.uid) { groupResetForAccount(currentUser()?.uid||null); return; }
