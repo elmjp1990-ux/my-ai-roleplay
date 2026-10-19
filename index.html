@@ -3495,7 +3495,7 @@ function groupRenderList() {
   else body='<div class="group-character-grid">'+g.groups.map(x=>'<div class="group-character-option"><span style="flex:1;min-width:0;overflow:hidden"><strong class="ellipsis" style="display:block;max-width:100%">'+e(x.name)+'</strong><span class="muted small" style="display:block">'+(x.scene_mode==='shared'?'共用場景':'分開場景')+' · '+e(String(x.created_at||'').slice(0,10))+'</span></span><div class="row wrap" style="gap:6px"><button data-action="group-open" data-id="'+e(x.id)+'">開啟</button><button data-action="group-rename" data-id="'+e(x.id)+'">重新命名</button><button data-action="group-archive" data-id="'+e(x.id)+'">封存</button></div></div>').join('')+'</div>';
   return '<section class="group-panel"><div class="row between wrap"><h2>已保存的群組</h2><button data-action="group-refresh-list">重新載入</button></div>'+body+'</section>';
 }
-async function groupOpen(groupId) {
+async function groupOpen(groupId, {navigate=true} = {}) {
   const g=groupPrototype;
   groupResetForAccount(currentUser()?.uid||null);
   if(!isUuid(groupId)||!window.mySupabase) { g.loading=false;g.openError='群組識別碼無效或 Supabase 尚未載入。';g.failedGroupId=groupId;render();toast(g.openError);return; }
@@ -3503,7 +3503,7 @@ async function groupOpen(groupId) {
   // can recover the same group instead of silently falling back to the creation wizard.
   const requestId=g.openRequestId=(g.openRequestId||0)+1;
   g.loading=true;g.formError='';g.openError='';g.failedGroupId=groupId;g.active=null;
-  if(route.page!=='group'||route.id!==groupId||route.overlay) go({page:'group',id:groupId});
+  if(navigate && (route.page!=='group'||route.id!==groupId||route.overlay)) go({page:'group',id:groupId});
   else render();
   try {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
@@ -4712,7 +4712,7 @@ document.addEventListener('click',async event => {
       case 'group-settings': {
         const targetGroupId=key||'';
         if(targetGroupId&&groupPrototype.active?.id!==targetGroupId){
-          await groupOpen(targetGroupId);
+          await groupOpen(targetGroupId,{navigate:false});
           if(groupPrototype.active?.id===targetGroupId) openModal('group-settings');
         } else openModal('group-settings');
         break;
