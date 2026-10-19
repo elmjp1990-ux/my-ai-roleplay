@@ -2984,7 +2984,7 @@ function renderEditor() {
         <h2>${route.id ? '修改角色' : '建立新角色'}</h2>
         <label class="field"><span>角色頭像 *</span>
           <input id="characterImage" type="file" accept="image/png,image/jpeg,image/webp">
-          <small>支援 PNG、JPG、WebP 格式。</small>
+          <small>支援 PNG、JPG、WebP；選取後會自動縮圖與壓縮，原始檔上限 15 MB，目標約 500 KB。</small>
         </label>
         <img id="imagePreview" ${draftImage ? `src="${e(safeImage(draftImage))}"` : ''}
              class="${draftImage ? '' : 'hidden'}"
