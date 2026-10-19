@@ -154,7 +154,7 @@ body.day .tag { color:#4f46b8; }
 }
 .avatar-fallback { display:grid; place-items:center; color:#ddd6fe; font-weight:bold; }
 .group-list-avatar { width:36px; height:36px; display:grid; place-items:center; border-radius:50%; flex-shrink:0; color:#e0e7ff; background:linear-gradient(135deg,#6366f1,#8b5cf6); font-weight:700; font-size:13px; }
-.group-avatar-stack{width:40px;height:40px;flex:0 0 40px;position:relative;display:block}
+.group-avatar-stack{width:36px;height:36px;flex:0 0 36px;position:relative;display:block}
 .group-avatar-stack .group-avatar-image{position:absolute;width:25px;height:25px;border-radius:50%;object-fit:cover;border:2px solid var(--panel);background:var(--panel2)}
 .group-avatar-stack .group-avatar-image:nth-child(1){left:0;top:0}
 .group-avatar-stack .group-avatar-image:nth-child(2){right:0;top:0}
@@ -168,8 +168,9 @@ body.day .tag { color:#4f46b8; }
 .group-chat-entry .group-chat-copy{display:block;flex:1;min-width:0;overflow:hidden}
 .group-chat-entry .group-chat-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
 .group-chat-entry .group-chat-title{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.group-chat-entry .group-chat-preview{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-sizing:border-box;padding-right:3em}
+.group-chat-entry .group-chat-preview{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .group-chat-entry .group-chat-date{flex:0 0 auto;white-space:nowrap}
+.group-chat-entry .group-entry-menu-spacer{visibility:hidden;pointer-events:none;flex:0 0 auto}
 .ellipsis { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .character-avatar-status {
   position:relative;
@@ -3241,6 +3242,7 @@ function chatEntries() {
             <span class="small muted group-chat-preview" title="${e(lastText)}">${e(lastText)}</span>
           </span>
         </button>
+        <span class="entry-menu group-entry-menu-spacer" aria-hidden="true">⋯</span>
       </div>`;
     }
     const s=item.value;
