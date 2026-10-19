@@ -4450,7 +4450,7 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
       const album=Array.isArray(selected.album)?selected.album:[];
       const photoOptions=album.map((photo,index)=>{
         const url=typeof photo==='string'?photo:(photo?.url||photo?.image_url||photo?.src||'');
-        if(!/^https?:\\/\\//i.test(String(url))) return '';
+        if(!/^https?:\/\//i.test(String(url))) return '';
         return '<option value="memory:'+index+'" '+(background==='memory:'+index?'selected':'')+'>回憶相片 '+(index+1)+'</option>';
       }).join('');
       showDialog('聊天功能',`
