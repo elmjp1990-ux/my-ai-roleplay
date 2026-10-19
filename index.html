@@ -4850,14 +4850,36 @@ document.addEventListener('click',async event => {
         const item = state.sessions[key];
         if (!item) break;
         const previousPinned=!!item.pinned;
-        captureDraft();item.pinned=!previousPinned;
+        captureDraft();
+        item.pinned=!previousPinned;
         if (!persist()) {
           item.pinned=previousPinned;
           break;
         }
         if (item.cloudOwned && currentUser()?.uid===item.cloudOwnerUid && hasUserMessage(item)) {
-          const synced=await saveChatSessionSafely(item);
-          if (!synced) {
+          try {
+            const client=window.mySupabase;
+            const uid=currentUser()?.uid;
+            if (!client || !uid || uid!==item.cloudOwnerUid) {
+              throw new Error('登入狀態已變更，請重新整理後再試。');
+            }
+            // 置頂只需更新 session_data.pinned；不要重傳訊息，避免無關的訊息同步失敗阻擋置頂。
+            const {data:cloudRow,error:readError}=await client.from('chat_sessions')
+              .select('session_data').eq('id',item.id).eq('user_id',uid).maybeSingle();
+            if (readError) throw new Error(readError.message);
+            if (!cloudRow) throw new Error('找不到這筆雲端聊天紀錄。');
+            const currentData=cloudRow.session_data && typeof cloudRow.session_data==='object'
+              ? cloudRow.session_data : {};
+            const {data:updatedRow,error:updateError}=await client.from('chat_sessions')
+              .update({
+                session_data:{...currentData,pinned:!!item.pinned},
+                updated_at:new Date().toISOString()
+              })
+              .eq('id',item.id).eq('user_id',uid).select('id').maybeSingle();
+            if (updateError) throw new Error(updateError.message);
+            if (!updatedRow?.id) throw new Error('雲端未確認置頂設定已儲存。');
+          } catch (error) {
+            console.error('PersonaX 單人聊天置頂同步失敗：',error);
             item.pinned=previousPinned;
             persist();render();
             toast('聊天置頂同步失敗，已還原原設定。');
