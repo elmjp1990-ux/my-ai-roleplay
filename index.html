@@ -4461,12 +4461,14 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
           <label class="field"><span>聊天背景</span>
             <select id="backgroundSetting" data-session-id="${e(selected.id)}">
               <option value="avatar" ${background==='avatar'?'selected':''}>角色頭像</option>
-              <option value="memory" disabled>回憶相片（請先新增或選擇相片）</option>
-              ${photoOptions}
+              <option value="memory" ${album.length?'':'disabled'} ${String(background).startsWith('memory:')?'selected':''}>回憶相片</option>
               <option value="none" ${background==='none'?'selected':''}>無背景</option>
             </select>
             ${album.length?'':'<small class="muted">這段對話目前沒有可用的回憶相片。</small>'}
           </label>
+          <label class="field"><span>選擇回憶相片</span><select id="singleMemoryPhotoSetting" data-session-id="${e(selected.id)}" ${album.length?'':'disabled'}>
+            ${album.map((photo,index)=>{const url=typeof photo==='string'?photo:(photo?.url||photo?.image_url||photo?.src||'');return /^https?:\\/\\//i.test(String(url))?'<option value="'+index+'" '+(background==='memory:'+index?'selected':'')+'>'+(e(photo?.caption||('回憶相片 '+(index+1))))+'</option>':'';}).join('')}
+          </select></label>
           <label class="field"><span>新增回憶相片（圖片網址）</span><input id="singleMemoryPhotoUrl" data-session-id="${e(selected.id)}" type="url" placeholder="https://…"></label>
           <label class="field"><span>相片名稱（選填）</span><input id="singleMemoryPhotoCaption" maxlength="80" placeholder="例如：第一次相遇"></label>
           <button type="button" data-action="single-memory-photo-add" data-id="${e(selected.id)}">新增回憶相片</button>
@@ -6019,12 +6021,15 @@ document.addEventListener('change',async event => {
     }
     if (target.id==='backgroundSetting') {
       const s=(target.dataset.sessionId && state.sessions[target.dataset.sessionId]) || currentSession();
-      if (s && /^(avatar|none|memory:\\d+)$/.test(target.value)) {
+      const nextBackground=target.value==='memory'
+        ? 'memory:'+Math.max(0,Number($('singleMemoryPhotoSetting')?.value||0))
+        : target.value;
+      if (s && /^(avatar|none|memory:\\d+)$/.test(nextBackground)) {
         const previousBackground=s.background || 'avatar';
-        s.background=target.value;
+        s.background=nextBackground;
         if (!persist()) {
           s.background=previousBackground;
-          target.value=previousBackground;
+          target.value=previousBackground.startsWith('memory:')?'memory':previousBackground;
           return;
         }
         if (s.cloudOwned && currentUser()?.uid === s.cloudOwnerUid) {
@@ -6032,7 +6037,7 @@ document.addEventListener('change',async event => {
           if (!synced) {
             s.background=previousBackground;
             persist();render();
-            target.value=previousBackground;
+            target.value=previousBackground.startsWith('memory:')?'memory':previousBackground;
             toast('聊天背景同步失敗，已還原原設定。');
             return;
           }
@@ -6047,6 +6052,25 @@ document.addEventListener('change',async event => {
           }
           panel.style.setProperty('--chat-photo',target.value==='none' ? 'none' :
             (image? `url(${JSON.stringify(safeImage(image))})` : 'none'));
+        }
+      }
+    }
+    if (target.id==='singleMemoryPhotoSetting') {
+      const sessionId=target.dataset.sessionId;
+      const session=state.sessions[sessionId];
+      if(session&&/^\\d+$/.test(target.value)) {
+        const previousBackground=session.background||'avatar';
+        session.background='memory:'+Number(target.value);
+        if(!persist()) { session.background=previousBackground;return; }
+        if(session.cloudOwned&&currentUser()?.uid===session.cloudOwnerUid) {
+          const synced=await saveChatSessionSafely(session);
+          if(!synced) { session.background=previousBackground;persist();render();toast('聊天背景同步失敗，已還原原設定。');return; }
+        }
+        const panel=$('view').querySelector('.chat-main');
+        if(panel&&route.id===session.id) {
+          const photo=session.album?.[Number(target.value)];
+          const image=typeof photo==='string'?photo:(photo?.url||photo?.image_url||photo?.src||'');
+          panel.style.setProperty('--chat-photo',image? `url(${JSON.stringify(safeImage(image))})`:'none');
         }
       }
     }
