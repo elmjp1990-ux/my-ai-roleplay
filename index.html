@@ -4461,11 +4461,15 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
           <label class="field"><span>聊天背景</span>
             <select id="backgroundSetting" data-session-id="${e(selected.id)}">
               <option value="avatar" ${background==='avatar'?'selected':''}>角色頭像</option>
+              <option value="memory" disabled>回憶相片（請先新增或選擇相片）</option>
               ${photoOptions}
               <option value="none" ${background==='none'?'selected':''}>無背景</option>
             </select>
             ${album.length?'':'<small class="muted">這段對話目前沒有可用的回憶相片。</small>'}
           </label>
+          <label class="field"><span>新增回憶相片（圖片網址）</span><input id="singleMemoryPhotoUrl" data-session-id="${e(selected.id)}" type="url" placeholder="https://…"></label>
+          <label class="field"><span>相片名稱（選填）</span><input id="singleMemoryPhotoCaption" maxlength="80" placeholder="例如：第一次相遇"></label>
+          <button type="button" data-action="single-memory-photo-add" data-id="${e(selected.id)}">新增回憶相片</button>
           <button class="primary" style="width:100%" data-action="new-conversation" data-id="${e(selected.id)}">開始新對話</button>
           <button style="width:100%" data-action="archives" data-id="${e(selected.id)}">舊的回憶</button>
           <button class="danger" style="width:100%" data-action="remove-session" data-id="${e(selected.id)}">刪除這段對話與回憶</button>
@@ -4743,6 +4747,32 @@ document.addEventListener('click',async event => {
           if(updateError) throw updateError;
           group.memoryPhotos=[data,...(group.memoryPhotos||[])];group.backgroundMemoryPhotoId=data.id;group.backgroundMode='memory';applyGroupChatBackground();openModal('group-settings');toast('已新增群組回憶相片。');
         } catch(error) { toast(groupFriendlyError(error)||'新增群組回憶相片失敗。'); }
+        break;
+      }
+      case 'single-memory-photo-add': {
+        const sessionId=key||$('singleMemoryPhotoUrl')?.dataset.sessionId||'';
+        const session=state.sessions[sessionId];
+        const imageUrl=String($('singleMemoryPhotoUrl')?.value||'').trim();
+        const caption=String($('singleMemoryPhotoCaption')?.value||'').trim();
+        if(!session) { toast('找不到這段對話，請重新開啟設定。');break; }
+        if(!/^https?:\\/\\//i.test(imageUrl)) { toast('請輸入有效的圖片網址。');break; }
+        const previousAlbum=Array.isArray(session.album)?session.album.slice():[];
+        const previousBackground=session.background||'avatar';
+        session.album=[{url:imageUrl,image_url:imageUrl,caption:caption||('回憶相片 '+(previousAlbum.length+1))},...previousAlbum];
+        session.background='memory:0';
+        if(!persist()) {
+          session.album=previousAlbum;session.background=previousBackground;
+          toast('回憶相片暫存失敗，未套用設定。');break;
+        }
+        if(session.cloudOwned&&currentUser()?.uid===session.cloudOwnerUid) {
+          const synced=await saveChatSessionSafely(session);
+          if(!synced) {
+            session.album=previousAlbum;session.background=previousBackground;persist();render();
+            toast('回憶相片同步失敗，已還原原設定。');break;
+          }
+        }
+        openModal('chat-settings',{id:sessionId});
+        toast('已新增回憶相片，並套用為聊天背景。');
         break;
       }
       case 'group-info': {
