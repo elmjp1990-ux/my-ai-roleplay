@@ -3519,7 +3519,7 @@ function renderGroupChatOverlay(kind) {
   const panel=$('view').querySelector('.chat-main');
   if(!group||!panel) return;
   const members=group.members||[];
-  const imageURL=value=>{const url=String(value||'');return /^https?:\\/\\//i.test(url)?url:'';};
+  const imageURL=value=>{const url=String(value||'');return /^https?:\/\//i.test(url)?url:'';};
   const avatarCard=member=>{
     const src=imageURL(member.avatar_url);
     return '<article class="memory-item" style="display:flex;align-items:center;gap:12px">'+
