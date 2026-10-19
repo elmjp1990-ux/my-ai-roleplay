@@ -1809,6 +1809,8 @@ let draftCharacter = null;
 let draftTags = [];
 let draftImage = '';
 let profileImage = '';
+let isCompressingCharacterImage = false;
+let characterImageCompressionRequest = 0;
 let replyId = null;
 let replyDraftVariant = 0;
 let toastTimer;
@@ -5458,6 +5460,10 @@ document.addEventListener('submit',async event => {
   const form=event.target.closest('[data-form]');
   if (!form) return;
   event.preventDefault();
+  if (form.dataset.form === 'character' && isCompressingCharacterImage) {
+    toast('角色圖片仍在壓縮，請稍候完成後再儲存。');
+    return;
+  }
   if (form.dataset.submitting === 'true') return;
   form.dataset.submitting = 'true';
   const submitButton = event.submitter || form.querySelector('button[type="submit"], button:not([type])');
@@ -5947,16 +5953,24 @@ document.addEventListener('change',async event => {
     if (target.id==='characterImage') {
       const file=target.files?.[0];
       if (!file) return;
+      const requestId=++characterImageCompressionRequest;
+      isCompressingCharacterImage=true;
+      toast('正在壓縮角色圖片，請稍候…');
       try {
         const compressed=await compressUploadImage(file,{maxEdge:1600,targetBytes:500*1024});
+        // Ignore stale results if the user selected another file while this one was processing.
+        if(requestId!==characterImageCompressionRequest) return;
         draftImage=compressed.dataUrl;
         $('imagePreview').src=draftImage;
         $('imagePreview').classList.remove('hidden');
         const before=(compressed.originalBytes/1024).toFixed(0),after=(compressed.compressedBytes/1024).toFixed(0);
         toast(`角色頭像已自動壓縮：${before} KB → ${after} KB。`);
       } catch(error) {
+        if(requestId!==characterImageCompressionRequest) return;
         target.value='';
         throw error;
+      } finally {
+        if(requestId===characterImageCompressionRequest) isCompressingCharacterImage=false;
       }
     }
     if (target.id==='profileImage') {
