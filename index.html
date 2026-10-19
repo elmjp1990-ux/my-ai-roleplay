@@ -3519,6 +3519,8 @@ function renderGroupStatusShell({title,message,error=false,groupId=''}) {
     '<div class="row between" style="margin-top:7px"><span class="small muted">'+(error?'目前無法送出訊息':'正在載入群組資料')+'</span><button class="primary" type="button" disabled>送出</button></div></form></section></div>';
 }
 function renderGroupPrototype() {
+  // On mobile, opening a group must show the conversation pane instead of leaving the list in view.
+  if (window.matchMedia && window.matchMedia('(max-width: 767px)').matches) hideList = true;
   groupResetForAccount(currentUser()?.uid||null);
   const g=groupPrototype;
   // A group route is recoverable from its URL even after an incidental rerender.
@@ -4505,7 +4507,7 @@ document.addEventListener('click',async event => {
         break;
       }
       case 'group-open':groupOpen(key);break;
-      case 'group-return-list':groupPrototype.active=null;go({page:'chat'});break;
+      case 'group-return-list':hideList=false;groupPrototype.active=null;go({page:'chat'});break;
       case 'group-info': {
         const group=groupPrototype.active;
         if(!group) break;
