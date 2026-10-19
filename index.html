@@ -6045,12 +6045,12 @@ document.addEventListener('change',async event => {
         const panel=$('view').querySelector('.chat-main');
         if (panel && route.id === s.id) {
           let image='';
-          if(target.value==='avatar') image=sessionCharacter(s).image;
-          else if(target.value.startsWith('memory:')) {
-            const photo=s.album?.[Number(target.value.slice(7))];
+          if(nextBackground==='avatar') image=sessionCharacter(s).image;
+          else if(nextBackground.startsWith('memory:')) {
+            const photo=s.album?.[Number(nextBackground.slice(7))];
             image=typeof photo==='string'?photo:(photo?.url||photo?.image_url||photo?.src||'');
           }
-          panel.style.setProperty('--chat-photo',target.value==='none' ? 'none' :
+          panel.style.setProperty('--chat-photo',nextBackground==='none' ? 'none' :
             (image? `url(${JSON.stringify(safeImage(image))})` : 'none'));
         }
       }
