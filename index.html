@@ -4710,7 +4710,7 @@ document.addEventListener('click',async event => {
       case 'group-open':groupOpen(key);break;
       case 'group-return-list':hideList=false;groupPrototype.active=null;go({page:'chat'});break;
       case 'group-settings': {
-        const targetGroupId=o.id||'';
+        const targetGroupId=key||'';
         if(targetGroupId&&groupPrototype.active?.id!==targetGroupId){
           await groupOpen(targetGroupId);
           if(groupPrototype.active?.id===targetGroupId) openModal('group-settings');
