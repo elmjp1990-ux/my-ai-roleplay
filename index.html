@@ -395,6 +395,14 @@ main { max-width:1500px; margin:auto; padding:25px; }
 
 /* Chat */
 body.chat-page main { max-width:none; padding:12px; }
+body.group-chat-page .sidebar,body.group-chat-page .app > header,body.group-chat-page .mobile-nav { display:none !important; }
+body.group-chat-page .app { margin-left:0; }
+body.group-chat-page main { max-width:none; height:100dvh; min-height:0; padding:0; overflow:hidden; }
+body.group-chat-page .chat-layout { height:100dvh; }
+body.group-chat-page .chat-main { height:100%; border:0; border-radius:0; }
+body.group-chat-page .chat-heading { padding-top:calc(8px + env(safe-area-inset-top)); }
+body.group-chat-page .messages { padding:14px 10px; }
+body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-bottom)); }
 .chat-layout {
   display:grid;
   grid-template-columns:250px minmax(0,1fr);
@@ -2490,6 +2498,7 @@ function renderShell() {
   document.body.classList.toggle('day',state.theme === 'day');
   document.body.classList.toggle('chat-page',['chat','conversation'].includes(route.page));
   document.body.classList.toggle('conversation',route.page === 'conversation');
+  document.body.classList.toggle('group-chat-page',route.page === 'group');
   document.querySelector('meta[name="theme-color"]').content =
     state.theme === 'day' ? '#f3f5fa' : '#090d16';
 }
@@ -3412,10 +3421,10 @@ async function groupOpen(groupId) {
     let avatarById={};
     const characterIds=memberRows.map(m=>m.character_id).filter(isUuid);
     if(characterIds.length) {
-      const avatarRes=await window.mySupabase.from('characters').select('id,avatar_url').in('id',characterIds);
-      if(!avatarRes.error) avatarById=Object.fromEntries((avatarRes.data||[]).map(x=>[x.id,x.avatar_url||'']));
+      const avatarRes=await window.mySupabase.from('characters').select('id,image,avatar_url').in('id',characterIds);
+      if(!avatarRes.error) avatarById=Object.fromEntries((avatarRes.data||[]).map(x=>[x.id,x.avatar_url||x.image||'']));
     }
-    const members=memberRows.map(m=>({...m.character_snapshot,id:m.character_id,characterId:m.character_id,avatar_url:avatarById[m.character_id]||'',position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'}));
+    const members=memberRows.map(m=>({...m.character_snapshot,id:m.character_id,characterId:m.character_id,avatar_url:avatarById[m.character_id]||m.character_snapshot?.avatar_url||m.character_snapshot?.image||'',position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'}));
     groupExpandedMemberId=null;
     const messages=(messageRes.data||[]).map(m=>{
       const member=members.find(x=>x.characterId===m.character_id);
@@ -3503,6 +3512,36 @@ function renderGroupConversation() {
         </form>
       </section>
     </div>`;
+  if (route.chatOverlay) renderGroupChatOverlay(route.chatOverlay);
+}
+function renderGroupChatOverlay(kind) {
+  const group=groupPrototype.active;
+  const panel=$('view').querySelector('.chat-main');
+  if(!group||!panel) return;
+  const members=group.members||[];
+  const imageURL=value=>{const url=String(value||'');return /^https?:\\/\\//i.test(url)?url:'';};
+  const avatarCard=member=>{
+    const src=imageURL(member.avatar_url);
+    return '<article class="memory-item" style="display:flex;align-items:center;gap:12px">'+
+      (src?'<img class="avatar" style="width:54px;height:54px" src="'+e(src)+'" alt="">':'<span class="avatar avatar-fallback">'+e(String(member.name||'角').slice(0,1))+'</span>')+
+      '<strong>'+e(member.name||'角色')+'</strong></article>';
+  };
+  let content='';
+  if(kind==='search') {
+    const results=groupPrototype.messages||[];
+    content='<label class="field"><span>搜尋這個群組的對話</span><input id="groupArchiveSearchInput" type="search" placeholder="輸入角色名稱或訊息內容…" autocomplete="off"></label>'+
+      '<div id="groupArchiveSearchResults">'+groupArchiveSearchResults('')+'</div>';
+  } else {
+    content='<p class="small muted">這裡顯示目前群組內角色的頭像。群組專屬回憶照片尚未有資料來源，因此不會把單人聊天的相簿誤顯示在群組中。</p>'+
+      (members.map(avatarCard).join('')||'<div class="empty">目前沒有角色頭像。</div>');
+  }
+  panel.insertAdjacentHTML('beforeend','<section class="chat-overlay" aria-label="'+(kind==='search'?'搜尋群組聊天':'群組相簿')+'"><div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回">'+ICON.back+'</button><h2>'+(kind==='search'?'搜尋群組聊天':'群組相簿')+'</h2></div>'+content+'</section>');
+}
+function groupArchiveSearchResults(query) {
+  const q=String(query||'').trim().toLocaleLowerCase();
+  const rows=(groupPrototype.messages||[]).filter(m=>!q||String(m.content||'').toLocaleLowerCase().includes(q)||String(m.speaker||'').toLocaleLowerCase().includes(q));
+  if(!rows.length) return '<div class="empty">'+(q?'沒有符合的群組訊息。':'目前還沒有可搜尋的群組訊息。')+'</div>';
+  return rows.map(m=>'<article class="archive-card"><div class="message-name">'+e(m.speaker||'角色')+'</div><p style="white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0">'+e(m.content||'')+'</p></article>').join('');
 }
 function renderGroupStatusShell({title,message,error=false,groupId=''}) {
   const safeMessage=e(message||'');
@@ -5668,6 +5707,10 @@ document.addEventListener('input',event => {
   if (target.id==='archiveSearchInput') {
     const results=$('archiveSearchResults');
     if (results) results.innerHTML=archiveSearchResults(target.value);
+  }
+  if (target.id==='groupArchiveSearchInput') {
+    const results=$('groupArchiveSearchResults');
+    if (results) results.innerHTML=groupArchiveSearchResults(target.value);
   }
   if (target.id==='groupCharacterSearch') {
     groupCharacterSearch=target.value;
