@@ -4397,13 +4397,22 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
     case 'chat-settings': {
       const selected = state.sessions[o.id] || s;
       if (!selected) return;
+      const background=selected.background || 'avatar';
+      const album=Array.isArray(selected.album)?selected.album:[];
+      const photoOptions=album.map((photo,index)=>{
+        const url=typeof photo==='string'?photo:(photo?.url||photo?.image_url||photo?.src||'');
+        if(!/^https?:\\/\\//i.test(String(url))) return '';
+        return '<option value="memory:'+index+'" '+(background==='memory:'+index?'selected':'')+'>回憶相片 '+(index+1)+'</option>';
+      }).join('');
       showDialog('聊天功能',`
         <div class="stack">
           <label class="field"><span>聊天背景</span>
             <select id="backgroundSetting" data-session-id="${e(selected.id)}">
-              <option value="avatar" ${selected.background !== 'none' ? 'selected' : ''}>角色頭像</option>
-              <option value="none" ${selected.background === 'none' ? 'selected' : ''}>無背景</option>
+              <option value="avatar" ${background==='avatar'?'selected':''}>角色頭像</option>
+              ${photoOptions}
+              <option value="none" ${background==='none'?'selected':''}>無背景</option>
             </select>
+            ${album.length?'':'<small class="muted">這段對話目前沒有可用的回憶相片。</small>'}
           </label>
           <button class="primary" style="width:100%" data-action="new-conversation" data-id="${e(selected.id)}">開始新對話</button>
           <button style="width:100%" data-action="archives" data-id="${e(selected.id)}">舊的回憶</button>
@@ -5879,7 +5888,7 @@ document.addEventListener('change',async event => {
     }
     if (target.id==='backgroundSetting') {
       const s=(target.dataset.sessionId && state.sessions[target.dataset.sessionId]) || currentSession();
-      if (s && ['avatar','none'].includes(target.value)) {
+      if (s && /^(avatar|none|memory:\\d+)$/.test(target.value)) {
         const previousBackground=s.background || 'avatar';
         s.background=target.value;
         if (!persist()) {
@@ -5899,8 +5908,14 @@ document.addEventListener('change',async event => {
         }
         const panel=$('view').querySelector('.chat-main');
         if (panel && route.id === s.id) {
+          let image='';
+          if(target.value==='avatar') image=sessionCharacter(s).image;
+          else if(target.value.startsWith('memory:')) {
+            const photo=s.album?.[Number(target.value.slice(7))];
+            image=typeof photo==='string'?photo:(photo?.url||photo?.image_url||photo?.src||'');
+          }
           panel.style.setProperty('--chat-photo',target.value==='none' ? 'none' :
-            `url(${JSON.stringify(safeImage(sessionCharacter(s).image))})`);
+            (image? `url(${JSON.stringify(safeImage(image))})` : 'none'));
         }
       }
     }
