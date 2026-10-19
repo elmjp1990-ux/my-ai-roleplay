@@ -3083,6 +3083,60 @@ async function compressProfileImage(file) {
   return result;
 }
 
+// IMG-01: compress user-selected upload images before they enter app state.
+async function compressUploadImage(file, options = {}) {
+  const allowedTypes=['image/png','image/jpeg','image/webp'];
+  if (!file || !allowedTypes.includes(file.type)) throw Error('請選擇 PNG、JPG 或 WebP 圖片。');
+  if (file.size > 15 * 1024 * 1024) throw Error('圖片原始檔請小於 15 MB。');
+  const source=await readImage(file);
+  const image=await new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>resolve(img);
+    img.onerror=()=>reject(Error('無法讀取這張圖片，請換一張再試。'));
+    img.src=source;
+  });
+  if (!image.naturalWidth || !image.naturalHeight) throw Error('圖片尺寸無效，請換一張再試。');
+  const targetBytes=Number(options.targetBytes)||500*1024;
+  const maxEdge=Number(options.maxEdge)||1600;
+  let scale=Math.min(1,maxEdge/Math.max(image.naturalWidth,image.naturalHeight));
+  const formats=[{type:'image/webp',qualities:[0.84,0.76,0.68,0.60,0.52]},{type:'image/jpeg',qualities:[0.82,0.72,0.62,0.52]}];
+  let bestBlob=null,bestWidth=0,bestHeight=0;
+  while(scale>=0.35) {
+    const width=Math.max(1,Math.round(image.naturalWidth*scale));
+    const height=Math.max(1,Math.round(image.naturalHeight*scale));
+    const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+    const ctx=canvas.getContext('2d');
+    if(!ctx) throw Error('目前瀏覽器無法壓縮圖片。');
+    ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+    ctx.drawImage(image,0,0,width,height);
+    for(const format of formats) {
+      for(const quality of format.qualities) {
+        const blob=await new Promise(resolve=>canvas.toBlob(resolve,format.type,quality));
+        if(!blob) continue;
+        if(!bestBlob || blob.size<bestBlob.size) {bestBlob=blob;bestWidth=width;bestHeight=height;}
+        if(blob.size<=targetBytes) {
+          const dataUrl=await new Promise((resolve,reject)=>{
+            const reader=new FileReader();
+            reader.onload=()=>resolve(reader.result);
+            reader.onerror=()=>reject(Error('壓縮圖片讀取失敗，請再試一次。'));
+            reader.readAsDataURL(blob);
+          });
+          return {dataUrl,originalBytes:file.size,compressedBytes:blob.size,width,height,mimeType:blob.type};
+        }
+      }
+    }
+    scale*=0.85;
+  }
+  if(!bestBlob || bestBlob.size>2*1024*1024) throw Error('圖片壓縮後仍過大，請改選較小的圖片。');
+  const dataUrl=await new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=()=>reject(Error('壓縮圖片讀取失敗，請再試一次。'));
+    reader.readAsDataURL(bestBlob);
+  });
+  return {dataUrl,originalBytes:file.size,compressedBytes:bestBlob.size,width:bestWidth,height:bestHeight,mimeType:bestBlob.type};
+}
+
 /* Chat sessions: character identity stays separate from conversation identity. */
 function newSession(character,options = {}) {
   const sessionId = id();
@@ -5866,9 +5920,14 @@ document.addEventListener('change',async event => {
   const target=event.target;
   try {
     if (target.id==='characterImage') {
-      draftImage=await readImage(target.files[0]);
+      const file=target.files?.[0];
+      if (!file) return;
+      const compressed=await compressUploadImage(file,{maxEdge:1600,targetBytes:500*1024});
+      draftImage=compressed.dataUrl;
       $('imagePreview').src=draftImage;
       $('imagePreview').classList.remove('hidden');
+      const before=(compressed.originalBytes/1024).toFixed(0),after=(compressed.compressedBytes/1024).toFixed(0);
+      toast(`角色頭像已自動壓縮：${before} KB → ${after} KB。`);
     }
     if (target.id==='profileImage') {
       if (!target.files?.[0]) return;
