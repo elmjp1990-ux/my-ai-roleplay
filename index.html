@@ -786,6 +786,10 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 .group-member-details[hidden]{display:none}
 .group-member-card button{min-width:0}
 @media(max-width:560px){.group-panel{padding:14px}.group-steps{font-size:12px}.group-member-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.group-member-card{padding:8px}.group-member-avatar{width:40px;height:40px;flex-basis:40px;border-radius:10px}.group-member-name{font-size:13px}.group-member-head{gap:7px}}
+
+.group-chat-entry{width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer;border:0;background:transparent;}
+.group-chat-entry .select-chat{display:block;min-width:0;flex:1;}
+.group-chat-entry:focus-visible{outline:2px solid var(--accent,#7c6cf2);outline-offset:2px;}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -3168,7 +3172,7 @@ function chatEntries() {
       const lastText=item.preview?.content||'尚未開始對話';
       const lastAt=Date.parse(item.preview?.created_at||group.updated_at||group.created_at||'')||Date.now();
       const active=route.page==='group'&&groupPrototype.active?.id===group.id;
-      return `<div class="chat-entry ${active?'active':''}" data-action="group-open" data-id="${e(group.id)}" role="button" tabindex="0" aria-label="開啟群組 ${e(group.name)}">
+      return `<button type="button" class="chat-entry group-chat-entry ${active?'active':''}" data-action="group-open" data-id="${e(group.id)}" aria-label="開啟群組 ${e(group.name)}">
         <span class="pin" aria-hidden="true" title="群組聊天">👥</span>
         <span class="group-list-avatar" aria-hidden="true">群</span>
         <span class="select-chat">
@@ -3176,8 +3180,7 @@ function chatEntries() {
             <span class="small muted">${chatListDate(lastAt)}</span></span>
           <span class="ellipsis small muted">${e(lastText)}</span>
         </span>
-        <span class="entry-menu" aria-hidden="true">⋯</span>
-      </div>`;
+      </button>`;
     }
     const s=item.value;
     const c=sessionCharacter(s);
