@@ -154,6 +154,23 @@ body.day .tag { color:#4f46b8; }
 }
 .avatar-fallback { display:grid; place-items:center; color:#ddd6fe; font-weight:bold; }
 .group-list-avatar { width:36px; height:36px; display:grid; place-items:center; border-radius:50%; flex-shrink:0; color:#e0e7ff; background:linear-gradient(135deg,#6366f1,#8b5cf6); font-weight:700; font-size:13px; }
+.group-avatar-stack{width:36px;height:36px;flex:0 0 36px;position:relative;display:block}
+.group-avatar-stack .group-avatar-image{position:absolute;width:25px;height:25px;border-radius:50%;object-fit:cover;border:2px solid var(--panel);background:var(--panel2)}
+.group-avatar-stack .group-avatar-image:nth-child(1){left:0;top:0}
+.group-avatar-stack .group-avatar-image:nth-child(2){right:0;top:0}
+.group-avatar-stack .group-avatar-image:nth-child(3){left:7px;bottom:0}
+.group-avatar-stack .group-avatar-fallback{position:absolute;width:25px;height:25px;border-radius:50%;display:grid;place-items:center;font-size:10px;border:2px solid var(--panel);background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#e0e7ff}
+.group-avatar-stack .group-avatar-fallback:nth-child(1){left:0;top:0}
+.group-avatar-stack .group-avatar-fallback:nth-child(2){right:0;top:0}
+.group-avatar-stack .group-avatar-fallback:nth-child(3){left:7px;bottom:0}
+.group-pin{flex:0 0 auto}
+.group-chat-entry .group-chat-open{display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-align:left;border:0;background:transparent;color:inherit;font:inherit;padding:2px;cursor:pointer}
+.group-chat-entry .group-chat-copy{display:block;flex:1;min-width:0;overflow:hidden}
+.group-chat-entry .group-chat-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.group-chat-entry .group-chat-title{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.group-chat-entry .group-chat-preview{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.group-chat-entry .group-chat-date{flex:0 0 auto;white-space:nowrap}
+.group-chat-entry .group-entry-menu-spacer{visibility:hidden;pointer-events:none;flex:0 0 auto}
 .ellipsis { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .character-avatar-status {
   position:relative;
@@ -1776,7 +1793,7 @@ let pendingDeletionWalletSyncUid =
     ? state.account.uid
     : null;
 let route = {page:'home'};
-let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null,openRequestId:0};
+let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupMembers:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null,openRequestId:0};
 let search = '';
 let filter = 'recommended';
 let exploreTags = [];
@@ -3155,11 +3172,35 @@ function chatListDate(at) {
   if(Date.now()-timestamp<24*60*60*1000) return '今天';
   return new Date(timestamp).toLocaleDateString('zh-TW',{month:'numeric',day:'numeric'});
 }
+function groupPinsStorageKey() {
+  const uid=currentUser()?.uid;
+  return uid ? 'personax_group_pins_v1_'+uid : '';
+}
+function readGroupPins() {
+  const key=groupPinsStorageKey();
+  if(!key) return [];
+  try {
+    const value=JSON.parse(localStorage.getItem(key)||'[]');
+    return Array.isArray(value)?value.filter(id=>typeof id==='string'):[];
+  } catch (_) { return []; }
+}
+function toggleGroupPin(groupId) {
+  if(!groupId||!currentUser()?.uid) return;
+  const prior=readGroupPins();
+  const next=prior.includes(groupId)?prior.filter(id=>id!==groupId):[...prior,groupId];
+  try {
+    localStorage.setItem(groupPinsStorageKey(),JSON.stringify(next));
+    render();
+  } catch (_) {
+    toast('群組置頂儲存失敗，請檢查瀏覽器儲存空間。');
+  }
+}
 function chatEntries() {
   const q=chatSearch.trim().toLocaleLowerCase();
   const items=visibleSessions().map(s=>({
     kind:'session',value:s,sortAt:Number(s.messages?.at(-1)?.at||s.startedAt||0),pinned:!!s.pinned
   }));
+  const groupPinned=readGroupPins();
   const groupItems=(groupPrototype.groups||[]).filter(group=>{
     const preview=groupPrototype.groupPreviews?.[group.id];
     return !q || String(group.name||'').toLocaleLowerCase().includes(q) ||
@@ -3167,7 +3208,7 @@ function chatEntries() {
   }).map(group=>({
     kind:'group',value:group,preview:groupPrototype.groupPreviews?.[group.id]||null,
     sortAt:Date.parse(groupPrototype.groupPreviews?.[group.id]?.created_at||group.updated_at||group.created_at||'')||0,
-    pinned:false
+    pinned:groupPinned.includes(group.id)
   }));
   items.push(...groupItems);
   items.sort((a,b)=>Number(b.pinned)-Number(a.pinned)||b.sortAt-a.sortAt);
@@ -3181,15 +3222,28 @@ function chatEntries() {
       const lastText=item.preview?.content||'尚未開始對話';
       const lastAt=Date.parse(item.preview?.created_at||group.updated_at||group.created_at||'')||Date.now();
       const active=route.page==='group'&&groupPrototype.active?.id===group.id;
-      return `<button type="button" class="chat-entry group-chat-entry ${active?'active':''}" data-action="group-open" data-id="${e(group.id)}" aria-label="開啟群組 ${e(group.name)}">
-        <span class="pin" aria-hidden="true" title="群組聊天">👥</span>
-        <span class="group-list-avatar" aria-hidden="true">群</span>
-        <span class="select-chat">
-          <span class="row between"><strong class="ellipsis">${e(group.name||'未命名群組')} <span class="small muted">· 群組</span></strong>
-            <span class="small muted">${chatListDate(lastAt)}</span></span>
-          <span class="ellipsis small muted">${e(lastText)}</span>
-        </span>
-      </button>`;
+      const memberList=groupPrototype.groupMembers?.[group.id]||[];
+      const avatarMarkup=memberList.slice(0,3).map(member=>{
+        const image=safeImage(member.avatar_url||member.image||member.character_snapshot?.avatar_url||member.character_snapshot?.image);
+        return image
+          ? '<img class="group-avatar-image" src="'+e(image)+'" alt="">'
+          : '<span class="group-avatar-fallback" aria-hidden="true">'+e(String(member.name||member.character_snapshot?.name||'角').trim().slice(0,1)||'角')+'</span>';
+      }).join('');
+      const groupAvatar=avatarMarkup
+        ? '<span class="group-avatar-stack" aria-hidden="true">'+avatarMarkup+'</span>'
+        : '<span class="group-list-avatar" aria-hidden="true">群</span>';
+      return `<div class="chat-entry group-chat-entry ${active?'active':''}">
+        <button class="pin group-pin ${item.pinned?'on':''}" data-action="group-pin" data-id="${e(group.id)}" aria-label="${item.pinned?'取消群組置頂':'置頂群組'}" title="${item.pinned?'取消置頂':'置頂'}">${ICON.pin}</button>
+        <button type="button" class="group-chat-open" data-action="group-open" data-id="${e(group.id)}" aria-label="開啟群組 ${e(group.name)}">
+          ${groupAvatar}
+          <span class="group-chat-copy">
+            <span class="group-chat-title-row"><strong class="group-chat-title">${e(group.name||'未命名群組')} <span class="small muted">· 群組</span></strong>
+              <span class="small muted group-chat-date">${chatListDate(lastAt)}</span></span>
+            <span class="small muted group-chat-preview" title="${e(lastText)}">${e(lastText)}</span>
+          </span>
+        </button>
+        <span class="entry-menu group-entry-menu-spacer" aria-hidden="true">⋯</span>
+      </div>`;
     }
     const s=item.value;
     const c=sessionCharacter(s);
@@ -3354,8 +3408,31 @@ async function groupLoadList(force=false) {
       .is('archived_at',null).order('updated_at',{ascending:false});
     if(error) throw error;
     if(user.id!==currentUser()?.uid) { groupResetForAccount(currentUser()?.uid||null); return; }
-    g.ownerUid=user.id;g.groups=data||[];g.groupPreviews={};
+    g.ownerUid=user.id;g.groups=data||[];g.groupPreviews={};g.groupMembers={};
     if(g.groups.length) {
+      try {
+        const groupIdsForMembers=g.groups.map(group=>group.id);
+        const {data:memberRows,error:memberError}=await window.mySupabase.from('chat_group_members')
+          .select('group_id,character_id,position,character_snapshot').in('group_id',groupIdsForMembers).order('position');
+        if(memberError) throw memberError;
+        const characterIds=[...new Set((memberRows||[]).map(row=>row.character_id).filter(isUuid))];
+        let avatars={};
+        if(characterIds.length) {
+          const {data:characterRows,error:avatarError}=await window.mySupabase.from('characters')
+            .select('id,avatar_url').in('id',characterIds);
+          if(avatarError) console.warn('讀取群組列表角色頭像失敗：',avatarError.message);
+          else avatars=Object.fromEntries((characterRows||[]).map(row=>[row.id,row.avatar_url||'']));
+        }
+        for(const row of memberRows||[]) {
+          (g.groupMembers[row.group_id] ||= []).push({
+            name:row.character_snapshot?.name||'角色',
+            avatar_url:avatars[row.character_id]||row.character_snapshot?.avatar_url||'',
+            character_snapshot:row.character_snapshot||{}
+          });
+        }
+      } catch(memberLoadError) {
+        console.warn('讀取群組列表成員頭像失敗：',memberLoadError.message);
+      }
       const groupIds=g.groups.map(group=>group.id);
       // Fetch at most one newest message per group. Batch requests to avoid an
       // unbounded all-history read and to keep concurrent requests modest.
@@ -4765,18 +4842,44 @@ document.addEventListener('click',async event => {
         go({page:'conversation',id:key});
         break;
       }
+      case 'group-pin': {
+        toggleGroupPin(key);
+        break;
+      }
       case 'pin': {
         const item = state.sessions[key];
         if (!item) break;
         const previousPinned=!!item.pinned;
-        captureDraft();item.pinned=!previousPinned;
+        captureDraft();
+        item.pinned=!previousPinned;
         if (!persist()) {
           item.pinned=previousPinned;
           break;
         }
         if (item.cloudOwned && currentUser()?.uid===item.cloudOwnerUid && hasUserMessage(item)) {
-          const synced=await saveChatSessionSafely(item);
-          if (!synced) {
+          try {
+            const client=window.mySupabase;
+            const uid=currentUser()?.uid;
+            if (!client || !uid || uid!==item.cloudOwnerUid) {
+              throw new Error('登入狀態已變更，請重新整理後再試。');
+            }
+            // 置頂只需更新 session_data.pinned；不要重傳訊息，避免無關的訊息同步失敗阻擋置頂。
+            const {data:cloudRow,error:readError}=await client.from('chat_sessions')
+              .select('session_data').eq('id',item.id).eq('user_id',uid).maybeSingle();
+            if (readError) throw new Error(readError.message);
+            if (!cloudRow) throw new Error('找不到這筆雲端聊天紀錄。');
+            const currentData=cloudRow.session_data && typeof cloudRow.session_data==='object'
+              ? cloudRow.session_data : {};
+            const {data:updatedRow,error:updateError}=await client.from('chat_sessions')
+              .update({
+                session_data:{...currentData,pinned:!!item.pinned},
+                updated_at:new Date().toISOString()
+              })
+              .eq('id',item.id).eq('user_id',uid).select('id').maybeSingle();
+            if (updateError) throw new Error(updateError.message);
+            if (!updatedRow?.id) throw new Error('雲端未確認置頂設定已儲存。');
+          } catch (error) {
+            console.error('PersonaX 單人聊天置頂同步失敗：',error);
             item.pinned=previousPinned;
             persist();render();
             toast('聊天置頂同步失敗，已還原原設定。');
