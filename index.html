@@ -457,8 +457,11 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .pin { padding:3px; border:0; background:transparent; color:var(--muted); }
 .pin.on { color:#fb7185; }
 .pin.on svg { fill:#fb718535; }
-.entry-menu { opacity:0; padding:4px; background:transparent; border:0; }
+.entry-menu { display:grid;place-items:center;flex:0 0 30px;width:30px;height:30px;padding:0;border:1px solid transparent;border-radius:50%;background:transparent;color:var(--muted);font-size:20px;line-height:1;opacity:0;cursor:pointer;transition:opacity .16s,background .16s,border-color .16s,color .16s; }
 .chat-entry:hover .entry-menu,.chat-entry:focus-within .entry-menu { opacity:1; }
+.entry-menu:hover,.entry-menu:focus-visible { opacity:1;background:var(--soft);border-color:var(--border);color:var(--text);outline:none; }
+.group-entry-menu{margin-left:auto;}
+@media (hover:none){.entry-menu{opacity:1;}}
 .chat-main {
   min-width:0;
   min-height:0;
@@ -3266,7 +3269,7 @@ function chatEntries() {
             <span class="small muted group-chat-preview" title="${e(lastText)}">${e(lastText)}</span>
           </span>
         </button>
-        <span class="entry-menu group-entry-menu-spacer" aria-hidden="true">⋯</span>
+        <button type="button" class="entry-menu group-entry-menu" data-action="group-settings" data-id="${e(group.id)}" aria-label="群組聊天選項" title="群組聊天選項">⋯</button>
       </div>`;
     }
     const s=item.value;
@@ -4706,7 +4709,14 @@ document.addEventListener('click',async event => {
       }
       case 'group-open':groupOpen(key);break;
       case 'group-return-list':hideList=false;groupPrototype.active=null;go({page:'chat'});break;
-      case 'group-settings':openModal('group-settings');break;
+      case 'group-settings': {
+        const targetGroupId=o.id||'';
+        if(targetGroupId&&groupPrototype.active?.id!==targetGroupId){
+          await groupOpen(targetGroupId);
+          if(groupPrototype.active?.id===targetGroupId) openModal('group-settings');
+        } else openModal('group-settings');
+        break;
+      }
       case 'group-background-save': {
         const group=groupPrototype.active;if(!group||!window.mySupabase) break;
         const mode=$('groupBackgroundSetting')?.value||'avatar', photoId=$('groupMemoryPhotoSetting')?.value||null;
