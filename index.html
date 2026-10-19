@@ -3446,7 +3446,7 @@ async function groupOpen(groupId) {
 function renderGroupConversation() {
   const g=groupPrototype, group=g.active;
   if(!group) return;
-  const avatarURL=value=>{const url=String(value||'');return /^https?:\/\//i.test(url)?url:'';};
+  const avatarURL=value=>{const url=String(value||'').trim();return (/^https?:\/\//i.test(url)||/^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(url))?url:'';};
   const memberAvatars=group.members.map(m=>{
     const avatar=avatarURL(m.avatar_url);
     return '<span class="character-avatar-status" title="'+e(m.name||'角色')+'">'+
@@ -3519,7 +3519,7 @@ function renderGroupChatOverlay(kind) {
   const panel=$('view').querySelector('.chat-main');
   if(!group||!panel) return;
   const members=group.members||[];
-  const imageURL=value=>{const url=String(value||'');return /^https?:\/\//i.test(url)?url:'';};
+  const imageURL=value=>{const url=String(value||'').trim();return (/^https?:\/\//i.test(url)||/^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(url))?url:'';};
   const avatarCard=member=>{
     const src=imageURL(member.avatar_url);
     return '<article class="memory-item" style="display:flex;align-items:center;gap:12px">'+
