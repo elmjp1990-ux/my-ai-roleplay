@@ -3421,8 +3421,8 @@ async function groupOpen(groupId) {
     let avatarById={};
     const characterIds=memberRows.map(m=>m.character_id).filter(isUuid);
     if(characterIds.length) {
-      const avatarRes=await window.mySupabase.from('characters').select('id,image,avatar_url').in('id',characterIds);
-      if(!avatarRes.error) avatarById=Object.fromEntries((avatarRes.data||[]).map(x=>[x.id,x.avatar_url||x.image||'']));
+      const avatarRes=await window.mySupabase.from('characters').select('id,image').in('id',characterIds);
+      if(!avatarRes.error) avatarById=Object.fromEntries((avatarRes.data||[]).map(x=>[x.id,x.image||'']));
     }
     const members=memberRows.map(m=>({...m.character_snapshot,id:m.character_id,characterId:m.character_id,avatar_url:avatarById[m.character_id]||m.character_snapshot?.avatar_url||m.character_snapshot?.image||'',position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'}));
     groupExpandedMemberId=null;
