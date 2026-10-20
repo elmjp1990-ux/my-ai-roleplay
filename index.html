@@ -3683,7 +3683,7 @@ async function groupOpen(groupId) {
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).order('created_at',{ascending:true}).order('sequence_no',{ascending:true}),
-      window.mySupabase.from('chat_memory_photos').select('id,owner_id,chat_type,group_id,storage_path,caption,created_at,expires_at').eq('chat_type','group').eq('group_id',groupId).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false})
+      window.mySupabase.from('chat_memory_photos').select('id,owner_id,chat_type,group_id,storage_path,caption,created_at,expires_at').eq('chat_type','group').eq('group_id',groupId).eq('owner_id',user.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false})
     ]),15000,'群組資料讀取逾時，請檢查網路後重試。')
     if(requestId!==g.openRequestId) return;
     const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error||photoRes.error;
@@ -4895,7 +4895,7 @@ document.addEventListener('click',async event => {
       case 'group-background-save': {
         const group=groupPrototype.active,client=window.mySupabase;if(!group||!client)break;
         const mode=$('groupBackgroundSetting')?.value||'avatar',photoId=$('groupMemoryPhotoSetting')?.value||null;
-        if(mode==='memory'&&!(group.memoryPhotos||[]).some(p=>p.id===photoId&&p.group_id===group.id)){toast('請先從這個群組的回憶相簿選擇有效相片。');break;}
+        if(mode==='memory'&&!(group.memoryPhotos||[]).some(p=>p.id===photoId&&p.group_id===group.id&&p.image_url)){toast('請先從這個群組的回憶相簿選擇可讀取的相片。');break;}
         try{const {data:{user},error:authError}=await client.auth.getUser();if(authError||!user||user.id!==currentUser()?.uid)throw new Error('登入狀態已失效，請重新登入。');
           const {data,error}=await client.from('chat_groups').update({background_mode:mode,background_memory_photo_id:mode==='memory'?photoId:null,updated_at:new Date().toISOString()}).eq('id',group.id).eq('owner_id',user.id).select('id').maybeSingle();
           if(error||!data)throw error||new Error('資料庫未確認背景設定已儲存。');group.backgroundMode=mode;group.backgroundMemoryPhotoId=mode==='memory'?photoId:null;applyGroupChatBackground();$('modal')?.close();toast('群組聊天背景已儲存。');
