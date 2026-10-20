@@ -4573,14 +4573,22 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
         <div class="stack">
           <label class="field"><span>聊天背景</span>
             <select id="backgroundSetting" data-session-id="${e(selected.id)}">
-              <option value="avatar" ${selected.background !== 'none' ? 'selected' : ''}>角色頭像</option>
+              <option value="avatar" ${selected.background === 'avatar' || !String(selected.background||'').startsWith('memory-photo:') && selected.background !== 'none' ? 'selected' : ''}>角色頭像</option>
               <option value="none" ${selected.background === 'none' ? 'selected' : ''}>無背景</option>
+              ${String(selected.background||'').startsWith('memory-photo:') ? '<option value="'+e(selected.background)+'" selected>目前的回憶相片背景</option>' : ''}
             </select>
           </label>
           <button class="primary" style="width:100%" data-action="new-conversation" data-id="${e(selected.id)}">開始新對話</button>
           <button style="width:100%" data-action="archives" data-id="${e(selected.id)}">舊的回憶</button>
           <button class="danger" style="width:100%" data-action="remove-session" data-id="${e(selected.id)}">刪除這段對話與回憶</button>
         </div>`);
+      void (async()=>{
+        const select=$('backgroundSetting'),client=window.mySupabase,uid=currentUser()?.uid;
+        if(!select||!client||!uid||!selected.cloudOwned||selected.cloudOwnerUid!==uid)return;
+        const {data,error}=await client.from('chat_memory_photos').select('id,caption').eq('owner_id',uid).eq('chat_type','single').eq('session_id',selected.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false});
+        if(error){console.warn('載入聊天背景選項失敗',error.message);return;}
+        for(const photo of data||[]){const value='memory-photo:'+photo.id;let option=Array.from(select.options).find(item=>item.value===value);if(!option){option=document.createElement('option');option.value=value;option.textContent='回憶相片：'+(photo.caption||'回憶快照');select.appendChild(option);}if(selected.background===value)option.selected=true;}
+      })();
       break;
     }
     case 'persona-picker': {
@@ -6088,7 +6096,20 @@ document.addEventListener('change',async event => {
     }
     if (target.id==='backgroundSetting') {
       const s=(target.dataset.sessionId && state.sessions[target.dataset.sessionId]) || currentSession();
-      if (s && ['avatar','none'].includes(target.value)) {
+      if (s && /^memory-photo:[0-9a-f-]{36}$/i.test(target.value)) {
+        const previousBackground=s.background||'avatar',photoId=target.value.slice('memory-photo:'.length),client=window.mySupabase,uid=currentUser()?.uid;
+        try {
+          if(!client||!uid||!s.cloudOwned||s.cloudOwnerUid!==uid)throw new Error('請先使用目前帳號擁有的已同步聊天。');
+          const {data:photo,error:photoError}=await client.from('chat_memory_photos').select('id').eq('id',photoId).eq('owner_id',uid).eq('chat_type','single').eq('session_id',s.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).maybeSingle();
+          if(photoError||!photo)throw photoError||new Error('找不到這張有效的回憶相片。');
+          const {data:row,error:readError}=await client.from('chat_sessions').select('session_data').eq('id',s.id).eq('user_id',uid).maybeSingle();
+          if(readError||!row)throw readError||new Error('讀取聊天設定失敗。');
+          const nextData={...(row.session_data||{}),background:target.value};
+          const {data:saved,error:saveError}=await client.from('chat_sessions').update({session_data:nextData,updated_at:new Date().toISOString()}).eq('id',s.id).eq('user_id',uid).select('id').maybeSingle();
+          if(saveError||!saved)throw saveError||new Error('資料庫未確認背景設定已儲存。');
+          s.background=target.value;persist();const panel=$('view').querySelector('.chat-main');if(panel)void window.applySingleMemoryPhotoBackground?.(s,panel);toast('已更新聊天背景。');
+        } catch(err) {s.background=previousBackground;target.value=previousBackground;console.error('回憶相片背景設定失敗',err);toast('背景設定失敗：'+(err.message||'請稍後再試。')); }
+      } else if (s && ['avatar','none'].includes(target.value)) {
         const previousBackground=s.background || 'avatar';
         s.background=target.value;
         if (!persist()) {
