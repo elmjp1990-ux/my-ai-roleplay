@@ -1,7 +1,7 @@
 -- Run only after the migration and Edge Function are deployed.
 -- Replace the two placeholders below with server-side secrets; never commit real keys.
 -- Enable pg_net first if it is not already enabled.
-create extension if not exists pg_net with schema extensions;
+create extension if not exists pg_net;
 
 select vault.create_secret(
   'https://ouyewoagbmtqehbofrje.supabase.co',
