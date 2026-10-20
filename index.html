@@ -3816,17 +3816,31 @@ function renderGroupConversation() {
       (avatar?'<img class="avatar" src="'+e(avatar)+'" alt="">':'<span class="group-list-avatar">'+e(String(m.name||'角').trim().slice(0,1)||'角')+'</span>')+
       '</span>';
   }).join('');
+  const roleplayRoles=group.members.map(member=>({
+    id:member.characterId || member.id,
+    name:member.name,
+    image:member.avatar_url || member.image || ''
+  }));
   const messageRows=g.messages.map(m=>{
     const member=group.members.find(x=>m.characterId&&x.characterId===m.characterId) ||
       group.members.find(x=>m.speaker===x.name || String(m.speaker||'').startsWith((x.name||'')+' · '));
-    const avatar=avatarURL(member?.avatar_url);
+    const avatar=avatarURL(member?.avatar_url || member?.image);
     const isUser=m.type==='user', isSystem=m.type==='system';
     const who=isUser?'你':isSystem?'系統':(member?.name||m.speaker||'角色');
+    // Group replies use m.content (not m.text), so they must be parsed here separately.
+    // Otherwise “夜辰：...” stays plain text and never renders the character portrait.
+    const segments=!isUser&&!isSystem ? parseRoleplaySegments(m.content || '',roleplayRoles) : [];
+    const hasSpeaker=segments.some(segment=>segment.kind!=='user');
     const avatarHTML=isUser
       ? '<span class="avatar avatar-fallback" style="background:#4f46e5">你</span>'
-      : avatar?'<img class="avatar" src="'+e(avatar)+'" alt="">':'<span class="avatar avatar-fallback">'+e(String(who).trim().slice(0,1)||'角')+'</span>';
-    return '<div class="message '+(isUser?'user':'')+'">'+avatarHTML+
-      '<div class="message-content"><div class="message-name">'+e(who)+'</div><div class="bubble">'+e(m.content||'')+'</div></div></div>';
+      : isSystem
+        ? '<span class="avatar avatar-fallback">系</span>'
+        : (hasSpeaker ? '' : avatar?'<img class="avatar" src="'+e(avatar)+'" alt="">':'<span class="avatar avatar-fallback">'+e(String(who).trim().slice(0,1)||'角')+'</span>');
+    const bodyHTML=hasSpeaker
+      ? '<div class="roleplay-segments">'+segments.map(roleplaySegmentHTML).join('')+'</div>'
+      : '<div class="message-name">'+e(who)+'</div><div class="bubble">'+e(m.content||'')+'</div>';
+    return '<div class="message '+(isUser?'user':'')+(hasSpeaker?' roleplay-prefixed-message':'')+'">'+avatarHTML+
+      '<div class="message-content">'+bodyHTML+'</div></div>';
   }).join('') || '<div class="empty">這段群組對話還沒有訊息，輸入第一句話開始故事。</div>';
   const sceneNames=(group.scenes||[]).map(x=>x.name).filter(Boolean).join('、');
   const initialScene=(group.scenes||[]).find(x=>Number(x.position||1)===1)||(group.scenes||[])[0];
