@@ -63,6 +63,8 @@ create index if not exists chat_memory_photos_expiry_idx
   where status in ('active','delete_failed') and deleted_at is null;
 
 alter table public.chat_memory_photos enable row level security;
+revoke all on public.chat_memory_photos from anon;
+grant select, insert, delete on public.chat_memory_photos to authenticated;
 
 drop policy if exists "memory_photos_select_owner" on public.chat_memory_photos;
 create policy "memory_photos_select_owner" on public.chat_memory_photos
