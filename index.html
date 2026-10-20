@@ -6201,6 +6201,8 @@ if (window.__pendingSupabaseUser) {
 .memory-album-stack{display:grid;gap:12px}
 .memory-album-items{display:grid;gap:10px}
 .memory-photo-row{display:grid;grid-template-columns:88px minmax(0,1fr) 38px;align-items:center;gap:12px;padding:10px;border:1px solid var(--border);border-radius:14px;background:var(--panel)}
+.memory-photo-actions{display:grid;gap:8px;justify-items:center}.memory-photo-icon{width:34px;height:34px;padding:0;border-radius:50%;display:grid;place-items:center}.memory-photo-title-edit{display:flex;gap:6px;align-items:center;min-width:0}.memory-photo-title-edit strong{min-width:0}.memory-photo-title-edit input{width:100%;min-width:0}.memory-photo-expiry{font-size:12px;color:var(--muted)}
+.memory-viewer{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.94);display:flex;align-items:center;justify-content:center;padding:14px}.memory-viewer img{max-width:100%;max-height:94dvh;object-fit:contain;cursor:pointer}.memory-viewer-controls{position:absolute;right:18px;top:18px;display:flex;gap:10px;opacity:0;pointer-events:none;transition:opacity .18s}.memory-viewer-controls.visible{opacity:1;pointer-events:auto}.memory-viewer-controls button{width:42px;height:42px;border:1px solid rgba(255,255,255,.28);border-radius:50%;background:rgba(120,120,120,.52);color:#fff;backdrop-filter:blur(8px)}
 .memory-photo-thumb{width:88px;height:88px;padding:0;overflow:hidden;border:0;border-radius:10px;background:var(--panel2)}
 .memory-photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .memory-photo-details{display:grid;gap:6px;min-width:0}
@@ -6238,12 +6240,19 @@ if (window.__pendingSupabaseUser) {
         urlCache.set(photo.id,{url:signed.signedUrl,photo});
         return '<article class="memory-photo-row"><button type="button" class="memory-photo-thumb" data-action="memory-photo-open" data-id="'+e(photo.id)+'" aria-label="開啟相片">'+
           '<img src="'+e(signed.signedUrl)+'" alt="'+e(photo.caption||'回憶相片')+'" loading="lazy"></button>'+
-          '<div class="memory-photo-details"><strong>'+e(photo.caption||'回憶快照')+'</strong><span class="small muted">'+e(dateLabel(photo.created_at))+'</span><button type="button" data-action="memory-photo-background" data-id="'+e(photo.id)+'">設為聊天背景</button></div>'+
-          '<button type="button" class="memory-photo-download" data-action="memory-photo-download" data-id="'+e(photo.id)+'" aria-label="下載原始相片" title="下載原始相片">⬇</button></article>';
+          '<div class="memory-photo-details"><div class="memory-photo-title-edit"><strong>'+e(photo.caption||'回憶快照')+'</strong><button type="button" class="ghost memory-photo-icon" data-action="memory-photo-edit" data-id="'+e(photo.id)+'" aria-label="修改標題" title="修改標題">✎</button></div><span class="small muted">'+e(dateLabel(photo.created_at))+'</span><span class="memory-photo-expiry">到期日：'+e(dateLabel(photo.expires_at))+'</span></div>'+
+          '<div class="memory-photo-actions"><button type="button" class="ghost memory-photo-icon" data-action="memory-photo-delete" data-id="'+e(photo.id)+'" aria-label="刪除相片" title="刪除相片">🗑</button></div></article>';
       }));
       if(!mount.isConnected)return;
       mount.innerHTML=cards.filter(Boolean).join('')||'<div class="empty">目前還沒有回憶相片哦</div>';
     }catch(err){console.error('讀取回憶相簿失敗',err);mount.innerHTML='<div class="empty">相簿讀取失敗：'+e(err.message||'請稍後重試。')+'</div>';}
+  }
+  async function compressMemoryImage(file){
+    const image=await createImageBitmap(file);const maxSide=1920;const scale=Math.min(1,maxSide/Math.max(image.width,image.height));
+    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));
+    const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw new Error('目前裝置無法壓縮圖片。');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(image,0,0,canvas.width,canvas.height);image.close?.();
+    const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('圖片壓縮失敗。')),'image/webp',.86));
+    return new File([blob],(file.name.replace(/\\.[^.]+$/,'')||'memory-photo')+'.webp',{type:'image/webp',lastModified:Date.now()});
   }
   async function uploadAlbum(input){
     const type=input.dataset.albumType,chatId=input.dataset.albumId,file=input.files?.[0];
@@ -6258,9 +6267,10 @@ if (window.__pendingSupabaseUser) {
     try{
       const {data:{user},error:authError}=await client.auth.getUser();
       if(authError||!user||user.id!==currentUser()?.uid)throw new Error('登入狀態驗證失敗，請重新登入。');
-      const ext=file.type==='image/jpeg'?'jpg':file.type==='image/png'?'png':'webp';
+      const compressed=await compressMemoryImage(file);
+      const ext='webp';
       path=user.id+'/'+type+'/'+chatId+'/'+(crypto.randomUUID?crypto.randomUUID():id())+'.'+ext;
-      const {error:upError}=await client.storage.from(BUCKET).upload(path,file,{contentType:file.type,upsert:false});
+      const {error:upError}=await client.storage.from(BUCKET).upload(path,compressed,{contentType:'image/webp',upsert:false});
       if(upError)throw upError;
       const created=new Date(),expires=new Date(created);expires.setFullYear(expires.getFullYear()+1);
       const {error:dbError}=await client.from('chat_memory_photos').insert({
@@ -6349,15 +6359,38 @@ if (window.__pendingSupabaseUser) {
   if(route.page==='conversation'&&String(currentSession()?.background||'').startsWith('memory-photo:')){
     const panel=$('view').querySelector('.chat-main');if(panel)void applySingleMemoryPhotoBackground(currentSession(),panel);
   }
+  async function downloadCompressedMemoryPhoto(cached){
+    try{const client=window.mySupabase;let url=cached.url;let response=await fetch(url);if(!response.ok){const {data,error}=await client.storage.from(BUCKET).createSignedUrl(cached.photo.storage_path,3600);if(error||!data?.signedUrl)throw error||new Error('下載連結失效。');url=data.signedUrl;response=await fetch(url);}if(!response.ok)throw new Error('下載連結已失效，請重新開啟相簿後再試。');const blob=await response.blob(),objectUrl=URL.createObjectURL(blob);const a=document.createElement('a');a.href=objectUrl;a.download=(cached.photo.caption||'personax-memory')+'.webp';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),1500);}catch(error){toast('下載失敗：'+(error.message||'請重新開啟相簿後再試。'));}
+  }
   document.addEventListener('change',event=>{
     const input=event.target;
     if(input?.id==='memoryAlbumFile')void uploadAlbum(input);
   });
   document.addEventListener('click',async event=>{
-    const button=event.target.closest('[data-action="memory-photo-open"],[data-action="memory-photo-download"],[data-action="memory-photo-background"]');
+    const button=event.target.closest('[data-action="memory-photo-open"],[data-action="memory-photo-download"],[data-action="memory-photo-background"],[data-action="memory-photo-edit"],[data-action="memory-photo-delete"],[data-action="memory-photo-save-title"],[data-action="memory-photo-cancel-title"]);
     if(!button)return;
     const cached=urlCache.get(button.dataset.id);
     if(!cached?.url){toast('相片網址已失效，請重新開啟相簿。');return;}
+    if(button.dataset.action==='memory-photo-edit'){
+      const row=button.closest('.memory-photo-row'),details=row?.querySelector('.memory-photo-details');if(!details)return;const photo=cached.photo;
+      details.innerHTML='<div class="memory-photo-title-edit"><input class="field" maxlength="80" value="'+e(photo.caption||'')+'" aria-label="相片標題" data-memory-title-input="'+e(photo.id)+'"><button type="button" class="ghost memory-photo-icon" data-action="memory-photo-save-title" data-id="'+e(photo.id)+'" title="儲存">✓</button><button type="button" class="ghost memory-photo-icon" data-action="memory-photo-cancel-title" data-id="'+e(photo.id)+'" title="取消">✕</button></div><span class="small muted">'+e(dateLabel(photo.created_at))+'</span><span class="memory-photo-expiry">到期日：'+e(dateLabel(photo.expires_at))+'</span>';details.querySelector('input')?.focus();return;
+    }
+    if(button.dataset.action==='memory-photo-cancel-title'){void loadAlbum(cached.photo.chat_type,cached.photo.session_id||cached.photo.group_id);return;}
+    if(button.dataset.action==='memory-photo-save-title'){
+      const value=button.closest('.memory-photo-row')?.querySelector('[data-memory-title-input]')?.value.trim();if(!value){toast('請輸入相片名稱。');return;}
+      const client=window.mySupabase;const {data:{user},error:authError}=await client.auth.getUser();if(authError||!user||user.id!==cached.photo.owner_id){toast('請確認登入帳號。');return;}
+      const {data,error}=await client.from('chat_memory_photos').update({caption:value.slice(0,80)}).eq('id',cached.photo.id).eq('owner_id',user.id).select('id,caption').maybeSingle();
+      if(error||!data){toast('標題儲存失敗：'+(error?.message||'資料庫未確認更新。'));return;}cached.photo.caption=data.caption;toast('相片名稱已更新。');void loadAlbum(cached.photo.chat_type,cached.photo.session_id||cached.photo.group_id);return;
+    }
+    if(button.dataset.action==='memory-photo-delete'){
+      if(!confirm('刪除後不可復原哦，確認要刪除嗎?'))return;const client=window.mySupabase,uid=currentUser()?.uid,photo=cached.photo;if(!client||uid!==photo.owner_id){toast('請確認登入帳號。');return;}
+      const {data,error}=await client.from('chat_memory_photos').update({status:'deleted',deleted_at:new Date().toISOString()}).eq('id',photo.id).eq('owner_id',uid).select('id').maybeSingle();
+      if(error||!data){toast('刪除失敗：'+(error?.message||'資料庫未確認更新。'));return;}
+      const {error:removeError}=await client.storage.from(BUCKET).remove([photo.storage_path]);if(removeError)console.warn('相片已從相簿移除，但儲存檔案清理失敗',removeError.message);
+      if(photo.chat_type==='single'){const session=state.sessions[photo.session_id];if(session?.background==='memory-photo:'+photo.id){session.background='none';persist();}}
+      else{const group=groupPrototype.active;if(group?.backgroundMemoryPhotoId===photo.id){const {error:bgError}=await client.from('chat_groups').update({background_mode:'none',background_memory_photo_id:null}).eq('id',group.id).eq('owner_id',uid);if(!bgError){group.backgroundMode='none';group.backgroundMemoryPhotoId=null;}}}
+      urlCache.delete(photo.id);toast('回憶相片已刪除。');void loadAlbum(photo.chat_type,photo.session_id||photo.group_id);return;
+    }
     if(button.dataset.action==='memory-photo-background'){
       const photo=cached.photo,client=window.mySupabase,uid=currentUser()?.uid;
       if(!client||!uid||photo.owner_id!==uid){toast('請確認登入帳號與相片擁有者一致。');return;}
@@ -6382,7 +6415,10 @@ if (window.__pendingSupabaseUser) {
       return;
     }
     if(button.dataset.action==='memory-photo-open'){
-      showDialog(cached.photo.caption||'回憶相片','<img src="'+e(cached.url)+'" alt="'+e(cached.photo.caption||'回憶相片')+'" style="width:100%;max-height:72dvh;object-fit:contain;border-radius:14px"><p class="small muted">'+e(dateLabel(cached.photo.created_at))+' · 保存一年</p><button type="button" data-action="memory-photo-download" data-id="'+e(cached.photo.id)+'">下載原始相片</button>');
+      let viewer=document.querySelector('.memory-viewer');if(viewer){viewer.remove();return;}
+      viewer=document.createElement('div');viewer.className='memory-viewer';viewer.innerHTML='<img src="'+e(cached.url)+'" alt="回憶相片" data-memory-viewer-image><div class="memory-viewer-controls"><button type="button" data-action="memory-viewer-download" aria-label="下載壓縮相片" title="下載">⬇</button><button type="button" data-action="memory-viewer-close" aria-label="關閉" title="關閉">✕</button></div>';
+      viewer.addEventListener('click',ev=>{if(ev.target===viewer){viewer.remove();return;}if(ev.target.matches('[data-memory-viewer-image]'))viewer.querySelector('.memory-viewer-controls')?.classList.toggle('visible');});
+      viewer.querySelector('[data-action="memory-viewer-close"]').addEventListener('click',()=>viewer.remove());viewer.querySelector('[data-action="memory-viewer-download"]').addEventListener('click',()=>downloadCompressedMemoryPhoto(cached));document.body.appendChild(viewer);return;
     }else{
       const ext=(cached.photo.storage_path.split('.').pop()||'jpg').replace(/[^a-z0-9]/gi,'')||'jpg';
       try {
