@@ -1509,18 +1509,23 @@ if (characterError) {
   async function saveSupabaseProfile(account) {
     if (!account?.uid || !window.mySupabase) throw new Error('無法確認登入帳號或 Supabase 連線。');
     const payload = { id: account.uid, handle: account.handle || ('user_' + account.uid.replace(/-/g, '').slice(0, 12)), nickname: account.nickname, avatar_url: account.avatar || null, bio: account.bio || '', birthdate: account.birthdate || null, persona_presets: Array.isArray(account.personas) ? account.personas : [] };
-    const { data, error } = await window.mySupabase.from('profiles').upsert(payload, { onConflict: 'id' }).select('id, handle, nickname, avatar_url, bio, birthdate, persona_presets').single();
+    const { data, error } = await window.mySupabase.from('profiles').upsert(payload, { onConflict: 'id' }).select('id, handle, nickname, avatar_url, bio').single();
     if (error) throw new Error('儲存 profiles 失敗：' + error.message);
     if (!data || data.id !== account.uid) throw new Error('雲端未確認儲存結果，請稍後重試。');
-    if (stablePersonaJson(data.persona_presets || []) !== stablePersonaJson(payload.persona_presets)) throw new Error('雲端回讀的人設內容與送出內容不一致，請重新儲存。');
+    const { data: privateData, error: privateError } = await window.mySupabase.rpc('get_my_private_profile_data');
+    if (privateError) throw new Error('驗證個人專屬資料失敗：' + privateError.message);
+    if (!privateData || String(privateData.birthdate || '') !== String(payload.birthdate || '')) throw new Error('雲端回讀的出生日期與送出內容不一致，請重新儲存。');
+    if (stablePersonaJson(privateData.persona_presets || []) !== stablePersonaJson(payload.persona_presets)) throw new Error('雲端回讀的人設內容與送出內容不一致，請重新儲存。');
   }
 
   async function savePersonaPresets(account) {
     if (!account?.uid || !window.mySupabase) throw new Error('無法確認登入帳號或 Supabase 連線。');
     const presets = Array.isArray(account.personas) ? account.personas : [];
-    const { data, error } = await window.mySupabase.from('profiles').update({ persona_presets: presets }).eq('id', account.uid).select('id, persona_presets').maybeSingle();
+    const { error } = await window.mySupabase.from('profiles').update({ persona_presets: presets }).eq('id', account.uid);
     if (error) throw new Error('儲存人設失敗：' + error.message);
-    if (!data || data.id !== account.uid) throw new Error('雲端沒有更新這個帳號的人設資料，請重新登入後再試。');
+    const { data, error: verifyError } = await window.mySupabase.rpc('get_my_private_profile_data');
+    if (verifyError) throw new Error('驗證人設儲存結果失敗：' + verifyError.message);
+    if (!data) throw new Error('雲端沒有更新這個帳號的人設資料，請重新登入後再試。');
     if (stablePersonaJson(data.persona_presets || []) !== stablePersonaJson(presets)) throw new Error('雲端回讀的人設內容與送出內容不一致，請重新儲存。');
   }
 
@@ -5430,7 +5435,7 @@ document.addEventListener('click',async event => {
       case 'personas': {
         if (state.account?.uid && window.mySupabase) {
           try {
-            const {data,error}=await window.mySupabase.from('profiles').select('persona_presets').eq('id',state.account.uid).maybeSingle();
+            const {data,error}=await window.mySupabase.rpc('get_my_private_profile_data');
             if(error) throw error;
             if(!data) throw new Error('找不到雲端人設資料。');
             state.account.personas=Array.isArray(data.persona_presets)?data.persona_presets:[];
