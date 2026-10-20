@@ -3785,9 +3785,6 @@ function renderGroupConversation() {
         </form>
       </section>
     </div>`;
-  const groupPanel=$('view').querySelector('.chat-main');
-  if(groupPanel&&g.active?.backgroundMode==='memory'&&g.active.backgroundMemoryPhotoId) void applyGroupMemoryPhotoBackground(g.active,groupPanel);
-  else if(groupPanel) groupPanel.style.setProperty('--chat-photo','none');
   if (route.chatOverlay) renderGroupChatOverlay(route.chatOverlay);
 }
 function renderGroupChatOverlay(kind) {
@@ -4105,12 +4102,8 @@ function renderConversation() {
       </section>
     </div>`;
   const panel = $('view').querySelector('.chat-main');
-  if(String(s.background||'').startsWith('memory-photo:')) {
-    void applySingleMemoryPhotoBackground(s,panel);
-  } else {
-    panel.style.setProperty('--chat-photo',
-      s.background === 'none' ? 'none' : `url(${JSON.stringify(safeImage(c.image))})`);
-  }
+  panel.style.setProperty('--chat-photo',
+    s.background === 'none' ? 'none' : `url(${JSON.stringify(safeImage(c.image))})`);
   renderMessages();
 
   if (route.chatOverlay) renderChatOverlay(route.chatOverlay);
@@ -6314,6 +6307,20 @@ if (window.__pendingSupabaseUser) {
   }
   window.applySingleMemoryPhotoBackground=applySingleMemoryPhotoBackground;
   window.applyGroupMemoryPhotoBackground=applyGroupMemoryPhotoBackground;
+  const oldRenderConversation=renderConversation;
+  renderConversation=function(){
+    oldRenderConversation.apply(this,arguments);
+    const session=currentSession(),panel=$('view').querySelector('.chat-main');
+    if(panel&&String(session?.background||'').startsWith('memory-photo:'))void applySingleMemoryPhotoBackground(session,panel);
+  };
+  const oldRenderGroupConversation=renderGroupConversation;
+  renderGroupConversation=function(){
+    oldRenderGroupConversation.apply(this,arguments);
+    const group=groupPrototype.active,panel=$('view').querySelector('.chat-main');
+    if(!panel)return;
+    if(group?.backgroundMode==='memory'&&group.backgroundMemoryPhotoId)void applyGroupMemoryPhotoBackground(group,panel);
+    else panel.style.setProperty('--chat-photo','none');
+  };
   const oldSingle=renderChatOverlay;
   renderChatOverlay=function(kind){
     oldSingle(kind);
@@ -6339,6 +6346,9 @@ if (window.__pendingSupabaseUser) {
     $('view').innerHTML='<div class="stack form-width"><div class="row between" style="align-items:center;gap:12px"><h1 style="margin:4px 0 0">回憶相簿</h1><button type="button" data-action="nav" data-page="chat">返回聊天</button></div>'+content+'</div>';
     if(s&&s.cloudOwned&&s.cloudOwnerUid===currentUser()?.uid)void loadAlbum('single',s.id);
   };
+  if(route.page==='conversation'&&String(currentSession()?.background||'').startsWith('memory-photo:')){
+    const panel=$('view').querySelector('.chat-main');if(panel)void applySingleMemoryPhotoBackground(currentSession(),panel);
+  }
   document.addEventListener('change',event=>{
     const input=event.target;
     if(input?.id==='memoryAlbumFile')void uploadAlbum(input);
