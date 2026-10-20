@@ -6691,7 +6691,16 @@ if (window.__pendingSupabaseUser) {
         .eq('id',photoId).eq('owner_id',uid).eq('chat_type','group').eq('group_id',group.id)
         .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).maybeSingle();
       if(error)throw error;
-      if(!photo){panel.style.setProperty('--chat-photo','none');return;}
+      if(!photo){
+        panel.style.setProperty('--chat-photo','none');
+        const {data:cleared,error:clearError}=await client.from('chat_groups')
+          .update({background_mode:'none',background_memory_photo_id:null,updated_at:new Date().toISOString()})
+          .eq('id',group.id).eq('owner_id',uid).eq('background_mode','memory').eq('background_memory_photo_id',photoId)
+          .select('id').maybeSingle();
+        if(clearError)console.warn('失效群組背景已回退畫面，但資料庫設定清理失敗',clearError.message);
+        if(cleared&&groupPrototype.active?.id===group.id){group.backgroundMode='none';group.backgroundMemoryPhotoId=null;}
+        return;
+      }
       const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,3600);
       if(signedError||!signed?.signedUrl)throw signedError||new Error('無法取得群組背景圖片。');
       if(groupPrototype.active?.id===group.id)panel.style.setProperty('--chat-photo','url('+JSON.stringify(signed.signedUrl)+')');
@@ -6777,7 +6786,16 @@ if (window.__pendingSupabaseUser) {
       if(error){console.error('相簿刪除 RPC 失敗',error);toast('刪除失敗：'+error.message);return;}
       const {error:removeError}=await client.storage.from(BUCKET).remove([photo.storage_path]);if(removeError)console.warn('相片紀錄已移出相簿，但儲存檔案清理失敗',removeError.message);
       if(photo.chat_type==='single'){const session=state.sessions[photo.session_id];if(session?.background==='memory-photo:'+photo.id){session.background='none';persist();}}
-      else{const group=groupPrototype.active;if(group?.backgroundMemoryPhotoId===photo.id){group.backgroundMode='none';group.backgroundMemoryPhotoId=null;applyGroupChatBackground();}}
+      else{
+        const group=groupPrototype.active;
+        if(group?.backgroundMemoryPhotoId===photo.id){
+          group.backgroundMode='none';group.backgroundMemoryPhotoId=null;applyGroupChatBackground();
+        }
+        const {error:backgroundClearError}=await client.from('chat_groups')
+          .update({background_mode:'none',background_memory_photo_id:null,updated_at:new Date().toISOString()})
+          .eq('id',photo.group_id).eq('owner_id',uid).eq('background_mode','memory').eq('background_memory_photo_id',photo.id);
+        if(backgroundClearError)console.warn('相片已刪除，但群組背景設定清理失敗',backgroundClearError.message);
+      }
       urlCache.delete(photo.id);toast('回憶相片已刪除。');void loadAlbum(photo.chat_type,photo.session_id||photo.group_id);return;
     }
     if(button.dataset.action==='memory-photo-background'){
