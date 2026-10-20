@@ -4349,31 +4349,20 @@ function renderMessages(scroll = true) {
   $('messages').innerHTML = s.messages.map(m => {
     const user = m.role === 'user';
     const roles = [{id:c.id,name:c.name,image:c.image}];
-    if (user) {
-      const segments = parseRoleplaySegments(m.text, roles);
-      const hasSpeaker = segments.some(segment => segment.kind !== 'user');
-      if (hasSpeaker) {
-        return segments.map((segment, index) => {
-          const isPlayer = segment.kind === 'user';
-          const speaker = isPlayer ? (currentUser()?.nickname || '你') : segment.speakerName;
-          const role = roles.find(item => item.id === segment.characterId);
-          const image = safeImage(segment.avatar || role?.image || '');
-          const segmentAvatar = image
-            ? '<img class="avatar" src="' + e(image) + '" alt="">'
-            : '<span class="avatar avatar-fallback">' + e([...String(speaker || '?')][0] || '?') + '</span>';
-          const rowClass = isPlayer ? 'message user roleplay-message-player' : 'message roleplay-message-character';
-          return '<article class="' + rowClass + '" data-message="' + e(m.id) + '">' +
-            (isPlayer ? avatar(currentUser()) : segmentAvatar) +
-            '<div class="message-content"><div class="message-name">' + e(speaker) + '</div>' +
-            formatMessage(segment.text) + '</div>' +
-            (index === segments.length - 1 ? '<button class="message-more" data-action="message-menu" data-id="' + e(m.id) + '" aria-label="訊息操作">⋯</button>' : '') +
-            '</article>';
-        }).join('');
-      }
-    }
+    const segments = user
+      ? (Array.isArray(m.displaySegments)
+          ? m.displaySegments.map(segment => ({
+              ...segment,
+              avatar:segment.avatar || roles.find(role => role.id === segment.characterId)?.image || ''
+            }))
+          : parseRoleplaySegments(m.text, roles))
+      : null;
+    const contentHTML = user && segments?.some(segment => segment.kind !== 'user')
+      ? '<div class="roleplay-segments">' + segments.map(roleplaySegmentHTML).join('') + '</div>'
+      : '<div class="message-name">' + e(user ? (currentUser()?.nickname || '你') : c.name) + '</div>' + formatMessage(m.text);
     return `<article class="message ${user ? 'user' : ''}" data-message="${e(m.id)}">
       ${user ? avatar(currentUser()) : `<img class="avatar" src="${e(safeImage(c.image))}" alt="">`}
-      <div class="message-content"><div class="message-name">${e(user ? (currentUser()?.nickname || '你') : c.name)}</div>${formatMessage(m.text)}</div>
+      <div class="message-content">${contentHTML}</div>
       <button class="message-more" data-action="message-menu" data-id="${e(m.id)}" aria-label="訊息操作">⋯</button>
     </article>`;
   }).join('');
