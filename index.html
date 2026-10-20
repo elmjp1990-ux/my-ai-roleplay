@@ -934,11 +934,9 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 
     // profiles.avatar_url 才是使用者在 PersonaX 編輯後的主頭像來源。
     // OAuth metadata 可能仍保留 Google 舊頭像，不能在登入初始 render 覆蓋已同步的頭像。
-    const avatarUrl =
-      previous.avatar ||
-      metadata.avatar_url ||
-      metadata.picture ||
-      '';
+    // 登入初始階段不顯示 OAuth 的 Google 頭像，也不信任舊快取作為最新頭像。
+    // 先用預設字母頭像，等 profiles.avatar_url 讀回後再顯示 PersonaX 主頭像。
+    const avatarUrl = '';
 
     state.account = {
       ...previous,
@@ -946,6 +944,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       nickname,
       email: user.email || previous.email || '',
       avatar: avatarUrl,
+      profileReady: false,
       bio: previous.bio || '',
       diamonds: Number(
         metadata.diamonds ??
@@ -1107,7 +1106,8 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         ...state.account,
         nickname: profile.nickname || state.account.nickname,
         handle: profile.handle || '',
-        avatar: profile.avatar_url || state.account.avatar || '',
+        avatar: profile.avatar_url || '',
+        profileReady: true,
         bio: profile.bio || '',
         birthdate: profile.birthdate || '',
         personas: Array.isArray(profile.persona_presets) ? profile.persona_presets : [],
