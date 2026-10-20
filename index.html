@@ -6354,20 +6354,24 @@ if (window.__pendingSupabaseUser) {
   };
   const oldSingle=renderChatOverlay;
   renderChatOverlay=function(kind){
-    oldSingle(kind);
-    if(kind!=='album')return;
-    const s=currentSession(),overlay=$('view').querySelector('.chat-overlay');
-    if(!s||!overlay)return;
+    if(kind!=='album'){oldSingle(kind);return;}
+    const s=currentSession(),panel=$('view').querySelector('.chat-main');
+    if(!s||!panel)return;
+    panel.querySelectorAll('.chat-overlay').forEach(node=>node.remove());
+    const overlay=document.createElement('section');overlay.className='chat-overlay';overlay.setAttribute('aria-label','回憶相簿');
     overlay.innerHTML='<div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回">'+ICON.back+'</button><div><h2>回憶相簿</h2><p class="small muted" style="margin:0">回憶相簿可保存一年，請記得即時下載哦</p></div></div>'+albumMount('single',s.id);
+    panel.appendChild(overlay);
     void loadAlbum('single',s.id);
   };
   const oldGroup=renderGroupChatOverlay;
   renderGroupChatOverlay=function(kind){
-    oldGroup(kind);
-    if(kind!=='album')return;
-    const g=groupPrototype.active,overlay=$('view').querySelector('.chat-overlay');
-    if(!g||!overlay)return;
+    if(kind!=='album'){oldGroup(kind);return;}
+    const g=groupPrototype.active,panel=$('view').querySelector('.chat-main');
+    if(!g||!panel)return;
+    panel.querySelectorAll('.chat-overlay').forEach(node=>node.remove());
+    const overlay=document.createElement('section');overlay.className='chat-overlay';overlay.setAttribute('aria-label','群組回憶相簿');
     overlay.innerHTML='<div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回">'+ICON.back+'</button><div><h2>回憶相簿</h2><p class="small muted" style="margin:0">回憶相簿可保存一年，請記得即時下載哦</p></div></div>'+albumMount('group',g.id);
+    panel.appendChild(overlay);
     void loadAlbum('group',g.id);
   };
   renderChatAlbumPage=function(){
