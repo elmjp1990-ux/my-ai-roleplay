@@ -6312,6 +6312,8 @@ if (window.__pendingSupabaseUser) {
       if(groupPrototype.active?.id===group.id)panel.style.setProperty('--chat-photo','url('+JSON.stringify(signed.signedUrl)+')');
     }catch(err){console.error('讀取群組相簿背景失敗',err);panel.style.setProperty('--chat-photo','none');}
   }
+  window.applySingleMemoryPhotoBackground=applySingleMemoryPhotoBackground;
+  window.applyGroupMemoryPhotoBackground=applyGroupMemoryPhotoBackground;
   const oldSingle=renderChatOverlay;
   renderChatOverlay=function(kind){
     oldSingle(kind);
