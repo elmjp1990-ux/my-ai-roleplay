@@ -497,6 +497,13 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .message-content { max-width:85%; min-width:0; }
 .message-name { color:var(--muted); font-size:10px; margin-bottom:5px; }
 .user .message-name { text-align:right; }
+.roleplay-segments { display:grid; gap:5px; }
+.roleplay-segment { min-width:0; }
+.roleplay-segment-heading { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:11px; margin:4px 0 5px; }
+.roleplay-segment-heading .avatar { width:22px; height:22px; }
+.roleplay-segment.is-character .bubble { background:var(--bubble); color:var(--text); border-color:var(--border); }
+.roleplay-segment.is-temporary .bubble { background:var(--panel2); color:var(--text); border:1px dashed var(--border); }
+.roleplay-segment.is-user .bubble { background:var(--primary); color:white; border-color:transparent; }
 .bubble {
   font-size:16px;
   padding:12px 14px;
@@ -1887,6 +1894,7 @@ function chatSessionData(s) {
     startedAt:s.startedAt || Date.now(), archivedAt:s.archivedAt || null,
     memories:Array.isArray(s.memories) ? s.memories : [],
     album:Array.isArray(s.album) ? s.album : [],
+    roleplayMeta:Object.fromEntries((s.messages || []).filter(message => message.role === 'user' && (Array.isArray(message.displaySegments) || message.aiTargetId || message.commandType)).map(message => [message.id,{displaySegments:message.displaySegments || null,aiTargetId:message.aiTargetId || null,commandType:message.commandType || null}])),
     pendingTurn:s.pendingTurn &&
       isUuid(s.pendingTurn.turnId) &&
       isUuid(s.pendingTurn.userMessageId) &&
@@ -2086,6 +2094,11 @@ async function loadCloudChatSessions(user) {
       }
       const existing = state.sessions[row.id];
       const cloudMessages = bySession.get(row.id) || [];
+      const roleplayMeta = data.roleplayMeta && typeof data.roleplayMeta === 'object' ? data.roleplayMeta : {};
+      for (const message of cloudMessages) {
+        const metadata = roleplayMeta[message.id];
+        if (metadata && typeof metadata === 'object') Object.assign(message, metadata);
+      }
       state.sessions[row.id] = {
         ...(existing || {}), id:row.id, characterId:row.character_id,
         characterName:row.character_name || snapshot.name || '角色',
@@ -3735,8 +3748,12 @@ function renderGroupConversation() {
     const avatarHTML=isUser
       ? '<span class="avatar avatar-fallback" style="background:#4f46e5">你</span>'
       : avatar?'<img class="avatar" src="'+e(avatar)+'" alt="">':'<span class="avatar avatar-fallback">'+e(String(who).trim().slice(0,1)||'角')+'</span>';
-    return '<div class="message '+(isUser?'user':'')+'">'+avatarHTML+
-      '<div class="message-content"><div class="message-name">'+e(who)+'</div><div class="bubble">'+e(m.content||'')+'</div></div></div>';
+    const groupRoles=group.members.map(x=>({id:x.characterId||x.id,name:x.name,image:x.avatar_url}));
+    const segments=isUser?parseRoleplaySegments(m.content||'',groupRoles):null;
+    const contentHTML=isUser&&segments?.some(segment=>segment.kind!=='user')
+      ? '<div class="roleplay-segments">'+segments.map(roleplaySegmentHTML).join('')+'</div>'
+      : '<div class="message-name">'+e(who)+'</div><div class="bubble">'+e(m.content||'')+'</div>';
+    return '<div class="message '+(isUser?'user':'')+'">'+avatarHTML+'<div class="message-content">'+contentHTML+'</div></div>';
   }).join('') || '<div class="empty">這段群組對話還沒有訊息，輸入第一句話開始故事。</div>';
   const sceneNames=(group.scenes||[]).map(x=>x.name).filter(Boolean).join('、');
   const initialScene=(group.scenes||[]).find(x=>Number(x.position||1)===1)||(group.scenes||[])[0];
@@ -3955,6 +3972,14 @@ async function groupSendMock() {
   if(g.sending) return;
   if(!window.mySupabase) { g.formError='Supabase 用戶端尚未載入。';render();return; }
   if(!content) {g.formError='請先輸入訊息。';render();return;}
+  const platformCommand=parsePlatformCommand(content);
+  if(platformCommand.type==='platform') {
+    if(platformCommand.name==='help') toast('群組語法：@角色 指定 AI 回覆；:人名:內容 指定玩家發言顯示；!指令 呼叫角色自訂行為；/help 查看平台指令。');
+    else toast('尚未支援平台指令 /'+platformCommand.name+'；本次沒有保存訊息。');
+    return;
+  }
+  const mention=parseMentionTarget(content,(g.active?.members||[]).map(member=>({id:member.characterId||member.id,name:member.name})));
+  if(mention.mentioned&&!mention.valid) {g.formError=mention.reason+'，本次沒有保存訊息。';render();return;}
   if(!g.active?.id) {g.formError='群組尚未保存，請重新開啟群組。';render();return;}
   if(!window.crypto?.randomUUID) {g.formError='此瀏覽器無法產生安全的回合識別碼，請更新瀏覽器後重試。';render();return;}
   g.sending=true;g.formError='';render();
@@ -4108,6 +4133,68 @@ function renderConversation() {
 
   if (route.chatOverlay) renderChatOverlay(route.chatOverlay);
 }
+// Chat control syntax helpers. Display identity never changes the authenticated message author.
+function parseRoleplaySegments(raw, roles = []) {
+  const text = String(raw ?? '');
+  const lines = text.split('\n');
+  const segments = [];
+  let current = null;
+  let foundPrefix = false;
+  const flush = () => {
+    if (current && current.text.length) segments.push(current);
+    current = null;
+  };
+  for (const line of lines) {
+    const match = line.match(/^\s*[:：]([^:：\n]{1,40})[:：]\s?(.*)$/u);
+    if (match) {
+      foundPrefix = true;
+      flush();
+      const speakerName = match[1].trim();
+      const exact = roles.filter(role => String(role.name || '').trim() === speakerName);
+      const role = exact.length === 1 ? exact[0] : null;
+      current = {
+        kind: role ? 'character' : 'temporary',
+        speakerName: role?.name || speakerName,
+        characterId: role?.id || null,
+        avatar: role?.image || role?.avatar_url || '',
+        text: match[2] || ''
+      };
+    } else if (current) {
+      current.text += (current.text ? '\n' : '') + line;
+    } else {
+      current = {kind:'user',speakerName:'',characterId:null,avatar:'',text:line};
+    }
+  }
+  flush();
+  if (!foundPrefix) return [{kind:'user',speakerName:'',characterId:null,avatar:'',text}];
+  return segments.filter(segment => segment.text.trim() || segment.speakerName);
+}
+function roleplaySegmentHTML(segment) {
+  const name = segment.kind === 'user' ? (currentUser()?.nickname || '你') : segment.speakerName;
+  const avatarHTML = segment.kind === 'character' && segment.avatar
+    ? '<img class="avatar" src="' + e(safeImage(segment.avatar)) + '" alt="">'
+    : '<span class="avatar avatar-fallback">' + e(segment.kind === 'user' ? '你' : [...String(name || '?')][0] || '?') + '</span>';
+  const typeClass = segment.kind === 'user' ? 'is-user' : segment.kind === 'character' ? 'is-character' : 'is-temporary';
+  return '<div class="roleplay-segment ' + typeClass + '"><div class="roleplay-segment-heading">' + avatarHTML + '<span>' + e(name) + '</span></div>' + formatMessage(segment.text) + '</div>';
+}
+function parseMentionTarget(raw, roles = []) {
+  const match = String(raw || '').match(/^@(.+?)(?:\s+|$)/u);
+  if (!match) return {mentioned:false};
+  const name = match[1].trim();
+  const matches = roles.filter(role => String(role.name || '').trim() === name);
+  if (matches.length === 1) return {mentioned:true,valid:true,name,characterId:matches[0].id || matches[0].characterId || null};
+  return {mentioned:true,valid:false,name,reason:matches.length ? '同名角色無法唯一判定' : '找不到這位群組角色'};
+}
+function parsePlatformCommand(raw) {
+  const match = String(raw || '').trim().match(/^\/([a-zA-Z][\w-]*)(?:\s+([\s\S]*))?$/u);
+  return match ? {type:'platform',name:match[1].toLowerCase(),args:match[2] || ''} : {type:'none'};
+}
+function replacePromptVariables(template, values = {}) {
+  // Replace only known uppercase snake-case variables, once; unknown placeholders remain literal.
+  return String(template ?? '').replace(/\{([A-Z][A-Z0-9_]*)\}/g, (literal, key) =>
+    Object.prototype.hasOwnProperty.call(values, key) && values[key] != null ? String(values[key]) : literal
+  );
+}
 function formatMessage(text) {
   return String(text).split(/(\*\*[\s\S]*?\*\*|\*[\s\S]*?\*)/g).filter(Boolean).map(part => {
     if (part.startsWith('**') && part.endsWith('**')) {
@@ -4127,14 +4214,16 @@ function renderMessages(scroll = true) {
   const oldScroll = $('messages').scrollTop;
   $('messages').innerHTML = s.messages.map(m => {
     const user = m.role === 'user';
+    const roles = [{id:c.id,name:c.name,image:c.image}];
+    const segments = user ? (Array.isArray(m.displaySegments) ? m.displaySegments : parseRoleplaySegments(m.text, roles)) : null;
+    const contentHTML = user && segments?.some(segment => segment.kind !== 'user')
+      ? '<div class="roleplay-segments">' + segments.map(roleplaySegmentHTML).join('') + '</div>'
+      : '<div class="message-name">' + e(user ? currentUser().nickname : c.name) + '</div>' + formatMessage(m.text);
     return `<article class="message ${user ? 'user' : ''}"
                       data-message="${e(m.id)}">
       ${user ? avatar(currentUser()) :
         `<img class="avatar" src="${e(safeImage(c.image))}" alt="">`}
-      <div class="message-content">
-        <div class="message-name">${e(user ? currentUser().nickname : c.name)}</div>
-        ${formatMessage(m.text)}
-      </div>
+      <div class="message-content">${contentHTML}</div>
       <button class="message-more" data-action="message-menu" data-id="${e(m.id)}"
               aria-label="訊息操作">⋯</button>
     </article>`;
@@ -5823,10 +5912,25 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
           break;
         }
         if (!text.trim()) return toast('請先輸入訊息，再開始新的聊天回合。');
+        const platformCommand = parsePlatformCommand(text);
+        if (platformCommand.type === 'platform') {
+          if (platformCommand.name === 'help') {
+            toast('PersonaX 語法：@角色 指定 AI 回覆；:人名:內容 指定玩家發言顯示；!指令 呼叫角色自訂行為；/help 查看平台指令；{USER} 等變數只用於提示詞模板。');
+          } else {
+            toast('尚未支援平台指令 /' + platformCommand.name + '；本次沒有送出或扣款。');
+          }
+          break;
+        }
 
         const previousMessages = s.messages.slice();
         const previousMemories = (s.memories || []).map(memory => ({...memory}));
-        const userMessage = {id:id(),role:'user',text,at:Date.now()};
+        const availableRoles = [{id:c?.id,name:c?.name,image:c?.image}].filter(role => role.id && role.name);
+        const displaySegments = parseRoleplaySegments(text, availableRoles);
+        const mention = parseMentionTarget(text, availableRoles);
+        const userMessage = {id:id(),role:'user',text,at:Date.now(),displaySegments,
+          aiTargetId:mention.mentioned && mention.valid ? mention.characterId : null,
+          commandType:text.trim().startsWith('!') ? 'custom' : null};
+        if (mention.mentioned && !mention.valid) return toast(mention.reason + '，請確認角色名稱；本次沒有送出或扣款。');
         s.messages.push(userMessage);
         s.pendingTurn = {
           turnId:id(),
