@@ -604,6 +604,7 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .reply-draft-editor { min-height:170px; max-height:42dvh; font-size:14px; }
 .reply-draft-notice { padding:10px 12px; border:1px solid var(--border); border-radius:12px; color:var(--muted); font-size:12px; line-height:1.7; background:var(--panel2); }
 .chat-overlay { position:absolute; inset:0; z-index:15; background:var(--header); backdrop-filter:blur(20px); padding:18px; padding-bottom:calc(18px + env(safe-area-inset-bottom)); overflow-y:auto; }
+.chat-settings-overlay { position:fixed; inset:0; z-index:10000; width:100vw; height:100dvh; max-height:100dvh; overflow-y:auto; border:0; border-radius:0; padding:calc(18px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom)); background:var(--bg); backdrop-filter:blur(20px); }
 .chat-settings-options,.chat-background-options { gap:8px; }
 .chat-settings-overlay .profile-setting { padding:18px 6px; }
 .chat-background-mode { width:100%; text-align:left; color:var(--text); cursor:pointer; }
@@ -3904,12 +3905,12 @@ function renderGroupChatOverlay(kind) {
     const group=groupPrototype.active,sceneLabel=id=>group.scenes.find(x=>x.id===id)?.name||'共用場景';
     const members=group.members.map(m=>'<article class="memory-item"><strong>'+e(m.name||'角色')+'</strong><p class="small muted">'+e(sceneLabel(m.sceneId))+'</p></article>').join('');
     const scenes=(group.scenes||[]).map(x=>'<article class="memory-item"><strong>'+e(x.name||'未命名場景')+'</strong><p style="white-space:pre-wrap">'+e(x.description||'尚未填寫場景描述。')+'</p></article>').join('');
-    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay" aria-label="群組資訊"><div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回">'+ICON.back+'</button><h2>群組資訊</h2></div><p><strong>群組名稱：</strong>'+e(group.name||'')+'</p><p><strong>世界背景</strong></p><article class="memory-item" style="white-space:pre-wrap">'+e(group.world||'尚未設定')+'</article><h3>參與角色（'+group.members.length+'/3）</h3>'+members+'<h3>場景設定</h3>'+scenes+'</section>');
+    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="群組資訊"><div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回">'+ICON.back+'</button><h2>群組資訊</h2></div><p><strong>群組名稱：</strong>'+e(group.name||'')+'</p><p><strong>世界背景</strong></p><article class="memory-item" style="white-space:pre-wrap">'+e(group.world||'尚未設定')+'</article><h3>參與角色（'+group.members.length+'/3）</h3>'+members+'<h3>場景設定</h3>'+scenes+'</section>');
     return;
   }
   if(kind==='diary'){
     const rows=(groupPrototype.messages||[]).map(m=>'<article class="memory-item"><strong>'+e(m.speaker||'角色')+'</strong><p style="white-space:pre-wrap;overflow-wrap:anywhere">'+e(m.content||'')+'</p><span class="small muted">'+e(timeText(m.created_at||m.at||Date.now()))+'</span></article>').join('');
-    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay" aria-label="甜蜜日記"><div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回">'+ICON.back+'</button><h2>甜蜜日記</h2></div><p class="small muted">目前顯示群組對話紀錄。AI 摘要與長期日記封存尚未串接；此頁不會假裝已完成摘要生成。</p>'+(rows||'<div class="empty">目前還沒有可整理的群組記錄。</div>')+'</section>');
+    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="甜蜜日記"><div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回">'+ICON.back+'</button><h2>甜蜜日記</h2></div><p class="small muted">目前顯示群組對話紀錄。AI 摘要與長期日記封存尚未串接；此頁不會假裝已完成摘要生成。</p>'+(rows||'<div class="empty">目前還沒有可整理的群組記錄。</div>')+'</section>');
     return;
   }
   const members=group.members||[];
@@ -4344,7 +4345,7 @@ function renderChatOverlay(kind) {
         </button>`).join('') || '<div class="empty">OH NO，你現在還沒有跟他有回憶哦。</div>'}
       </div>`;
   panel.insertAdjacentHTML('beforeend',`
-    <section class="chat-overlay" aria-label="${kind === 'diary' ? '甜蜜日記' : kind === 'search' ? '搜尋過往聊天' : '回憶相簿'}">
+    <section class="chat-overlay ${kind === 'diary' ? 'chat-settings-overlay' : ''}" aria-label="${kind === 'diary' ? '甜蜜日記' : kind === 'search' ? '搜尋過往聊天' : '回憶相簿'}">
       <div class="overlay-heading">
         <button class="ghost" data-action="back" aria-label="返回">${ICON.back}</button>
         <h2>${kind === 'diary' ? '甜蜜日記' : kind === 'search' ? '搜尋過往聊天' : '回憶相簿'}</h2>
