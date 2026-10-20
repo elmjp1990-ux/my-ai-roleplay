@@ -13,11 +13,6 @@ select vault.create_secret(
   'personax_service_role_key'
 );
 
-select vault.create_secret(
-  '<RANDOM_LONG_MEMORY_ALBUM_CRON_SECRET>',
-  'personax_memory_album_cron_secret'
-);
-
 select cron.schedule(
   'personax-memory-album-expiry',
   '17 3 * * *',
@@ -28,8 +23,7 @@ select cron.schedule(
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'personax_service_role_key'),
-      'apikey', (select decrypted_secret from vault.decrypted_secrets where name = 'personax_service_role_key'),
-      'x-memory-album-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'personax_memory_album_cron_secret')
+      'apikey', (select decrypted_secret from vault.decrypted_secrets where name = 'personax_service_role_key')
     ),
     body := jsonb_build_object('scheduled_at', now()),
     timeout_milliseconds := 10000
