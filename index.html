@@ -4274,7 +4274,8 @@ function buildPromptVariableValues(context = {}) {
     TURN_COUNT: String((() => {
       const players = messages.filter(message => ['user', 'player'].includes(promptText(message?.role ?? message?.speaker_type).toLowerCase()));
       const current = promptText(currentUserMessage).trim();
-      const hasCurrent = current && players.some(message => promptText(message?.text ?? message?.content).trim() === current);
+      const lastPlayer = players[players.length - 1];
+      const hasCurrent = current && lastPlayer && promptText(lastPlayer?.text ?? lastPlayer?.content).trim() === current;
       const counted = hasCurrent || !current ? players : [...players, { role: 'user', content: current }];
       return new Set(counted.map((message, index) => message?.turn_id ? 'turn:' + message.turn_id : 'message:' + index)).size;
     })()),
