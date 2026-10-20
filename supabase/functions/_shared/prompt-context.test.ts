@@ -33,6 +33,9 @@ Deno.test("counts a group turn once even when multiple speakers share it", () =>
   assertEquals(values.CHAR_LIST, "A、B");
   assertEquals(values.OTHER_CHARS, "B");
   assertEquals(values.GROUP_WORLD, "W");
+  const groupPlayer = buildPromptVariableValues({ profile: { nickname: "Account nickname" }, group: { player_name: "Story name", player_persona: "Group persona" } });
+  assertEquals(groupPlayer.USER, "Story name");
+  assertEquals(groupPlayer.USER_DESC, "Group persona");
 });
 
 Deno.test("substitutes known tokens once and preserves unknown tokens", () => {
