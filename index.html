@@ -969,7 +969,8 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       // 取消申請後的刷新由呼叫端顯示專屬訊息；一般登入流程仍使用原本提示。
       if (throwOnError) throw error;
       if (state.account?.uid === user.id) {
-        toast('已登入，但會員資料或錢包同步失敗。請檢查 Supabase RLS 權限與資料表設定。');
+        const detail = String(error?.message || '未知錯誤').replace(/\\s+/g, ' ').slice(0, 180);
+        toast('已登入，但會員資料或錢包同步失敗：' + detail);
       }
     }
   }
