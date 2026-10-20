@@ -12,16 +12,14 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: "POST required" }), { status: 405, headers: corsHeaders });
   }
 
-  // Keep platform JWT verification enabled. The scheduler sends a server-side
-  // service-role JWT plus a separate secret header stored in Supabase Vault.
-  const cronSecret = Deno.env.get("MEMORY_ALBUM_CRON_SECRET");
-  const suppliedSecret = req.headers.get("x-memory-album-cron-secret") || "";
-  if (!cronSecret || suppliedSecret !== cronSecret) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
-  }
-
+  // Keep platform JWT verification enabled and accept only the server-side service-role JWT.
+  // The scheduler must retrieve this value from Vault; never expose it to browser clients.
   const url = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const authHeader = req.headers.get("Authorization") || "";
+  if (!serviceRoleKey || authHeader !== `Bearer ${serviceRoleKey}`) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+  }
   if (!url || !serviceRoleKey) {
     return new Response(JSON.stringify({ error: "Server environment is incomplete" }), { status: 500, headers: corsHeaders });
   }
