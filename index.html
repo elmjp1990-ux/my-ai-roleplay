@@ -4947,7 +4947,7 @@ document.addEventListener('click',async event => {
         }
         const activePanel=$('view').querySelector('.chat-main');
         if(activePanel && route.page==='chat' && route.id===sessionId) {
-          activePanel.style.setProperty('--chat-photo',`url("${imageUrl.replace(/["\\\\\n\r]/g,'') }")`);
+          activePanel.style.setProperty('--chat-photo','url('+JSON.stringify(safeImage(imageUrl))+')');
         }
         openModal('chat-settings',{id:sessionId});
         toast('已新增回憶相片，並套用為聊天背景。');
