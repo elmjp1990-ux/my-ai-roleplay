@@ -4316,21 +4316,27 @@ function renderConversation() {
 }
 function formatMessage(text) {
   // PersonaX action syntax is single-asterisk only: *action*.
-  // Keep **double-asterisk text** as ordinary dialogue instead of treating it as an action.
+  // Double-asterisk text stays ordinary dialogue; it is not an action marker.
   const source = String(text ?? '');
   const parts = [];
-  const actionPattern = /\*([^*\n]+?)\*/g;
   let cursor = 0;
-  let match;
-  while ((match = actionPattern.exec(source))) {
-    const start = match.index;
-    const end = actionPattern.lastIndex;
-    // A single asterisk pair must not be part of a double-asterisk pair.
-    if (source[start - 1] === '*' || source[end] === '*') continue;
-    const dialogue = source.slice(cursor, start);
+  let i = 0;
+  while (i < source.length) {
+    if (source[i] !== '*' || source[i - 1] === '*' || source[i + 1] === '*') {
+      i++;
+      continue;
+    }
+    let end = source.indexOf('*', i + 1);
+    while (end !== -1 && (source[end - 1] === '*' || source[end + 1] === '*')) {
+      end = source.indexOf('*', end + 1);
+    }
+    if (end === -1) break;
+    const dialogue = source.slice(cursor, i);
     if (dialogue.trim()) parts.push('<div class="bubble">' + e(dialogue.trim()) + '</div>');
-    parts.push('<em class="narration">' + e(match[1].trim()) + '</em>');
-    cursor = end;
+    const action = source.slice(i + 1, end).trim();
+    if (action) parts.push('<em class="narration">' + e(action) + '</em>');
+    cursor = end + 1;
+    i = cursor;
   }
   const tail = source.slice(cursor);
   if (tail.trim()) parts.push('<div class="bubble">' + e(tail.trim()) + '</div>');
