@@ -4212,16 +4212,20 @@ function promptTaipeiDate(now = new Date()) {
 function promptHistory(messages = [], currentUserMessage = '') {
   const list = Array.isArray(messages) ? [...messages] : [];
   const current = promptText(currentUserMessage).trim();
-  // Keep the current player turn in USER_MESSAGE, not duplicated in CHAT_HISTORY.
+  // Group DB rows use speaker_type; single-chat rows use role. Normalize only for prompt display.
+  const isPlayer = message => ['user','player'].includes(promptText(message?.role ?? message?.speaker_type).toLowerCase());
   if (current) {
-    const lastUserIndex = list.map(message => message?.role).lastIndexOf('user');
+    const lastUserIndex = list.map(isPlayer).lastIndexOf(true);
     if (lastUserIndex >= 0) {
       const lastUser = list[lastUserIndex];
       if (promptText(lastUser?.text ?? lastUser?.content).trim() === current) list.splice(lastUserIndex, 1);
     }
   }
   return list.slice(-10).map(message => {
-    const role = message?.role === 'assistant' ? '角色' : '玩家';
+    const rawRole = promptText(message?.role ?? message?.speaker_type).toLowerCase();
+    const role = ['assistant','character','ai'].includes(rawRole) ? '角色'
+      : ['user','player'].includes(rawRole) ? '玩家'
+      : promptText(message?.speaker_snapshot?.name ?? message?.character_snapshot?.name ?? message?.speaker_name ?? '角色');
     const content = promptText(message?.text ?? message?.content).trim();
     return content ? role + '：' + content : '';
   }).filter(Boolean).join('\\n');
@@ -4240,16 +4244,19 @@ function buildPromptVariableValues(context = {}) {
   const session = context.session && typeof context.session === 'object' ? context.session : {};
   const group = context.group && typeof context.group === 'object' ? context.group : null;
   const members = Array.isArray(group?.members) ? group.members : [];
+  const memberCharacter = member => member?.character_snapshot && typeof member.character_snapshot === 'object'
+    ? member.character_snapshot : member?.characterSnapshot && typeof member.characterSnapshot === 'object'
+      ? member.characterSnapshot : member;
   const active = context.activeCharacter || character;
   const messages = Array.isArray(context.messages) ? context.messages : Array.isArray(session.messages) ? session.messages : [];
-  const world = promptText(group?.world ?? group?.worldBackground ?? session.world ?? session.worldBackground ?? character.worldBackground ?? character.world);
+  const world = promptText(group?.world_background ?? group?.worldBackground ?? group?.world ?? session.world_background ?? session.worldBackground ?? session.world ?? character.worldBackground ?? character.world);
   const scenes = Array.isArray(group?.scenes) ? group.scenes : [];
   const scene = promptText(context.scene ?? session.scene ?? scenes.map(item => item?.name).filter(Boolean).join('、'));
   const currentUserMessage = promptText(context.userMessage ?? messages.filter(message => message?.role === 'user').slice(-1)[0]?.text ?? messages.filter(message => message?.role === 'user').slice(-1)[0]?.content);
   const values = {
     USER: promptText(user.nickname ?? user.name),
     CHAR: promptText(character.name),
-    USER_DESC: promptText(session.persona ?? user.roleplayDescription ?? user.personaDescription),
+    USER_DESC: promptText(group?.player_persona ?? group?.playerPersona ?? session.persona ?? user.roleplayDescription ?? user.personaDescription),
     CHAR_DESC: promptText(character.description ?? character.intro),
     USER_GENDER: promptText(user.gender),
     USER_PRONOUN: promptText(user.pronouns ?? user.pronoun),
@@ -4265,9 +4272,9 @@ function buildPromptVariableValues(context = {}) {
     SUMMARY: promptText(context.summary ?? session.summary),
     TURN_COUNT: String(messages.filter(message => message?.role === 'user').length),
     CURRENT_DATE: promptTaipeiDate(context.now instanceof Date ? context.now : new Date()),
-    CHAR_LIST: members.map(member => promptText(member?.name)).filter(Boolean).join('、'),
+    CHAR_LIST: members.map(member => promptText(memberCharacter(member)?.name)).filter(Boolean).join('、'),
     ACTIVE_CHAR: promptText(active?.name),
-    OTHER_CHARS: members.filter(member => member?.id !== active?.id && member?.characterId !== active?.id).map(member => promptText(member?.name)).filter(Boolean).join('、'),
+    OTHER_CHARS: members.filter(member => { const snapshot = memberCharacter(member); return (member?.character_id ?? member?.characterId ?? snapshot?.id) !== active?.id; }).map(member => promptText(memberCharacter(member)?.name)).filter(Boolean).join('、'),
     GROUP_NAME: promptText(group?.name),
     GROUP_WORLD: world,
     GROUP_SCENE: scene
