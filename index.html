@@ -4912,15 +4912,26 @@ document.addEventListener('click',async event => {
         const group=groupPrototype.active,imageUrl=String($('groupMemoryPhotoUrl')?.value||'').trim(),caption=String($('groupMemoryPhotoCaption')?.value||'').trim();
         if(!group||!window.mySupabase) break;
         if(!/^https?:\/\//i.test(imageUrl)) { toast('請輸入有效的圖片網址。');break; }
+        let createdPhotoId=null,groupBackgroundSaved=false;
         try {
           const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
           if(authError||!user||user.id!==currentUser()?.uid) throw new Error('登入狀態已失效，請重新登入。');
           const {data,error}=await window.mySupabase.from('chat_group_memory_photos').insert({group_id:group.id,owner_id:user.id,image_url:imageUrl,caption}).select('id,image_url,caption,created_at').single();
           if(error) throw error;
-          const {error:updateError}=await window.mySupabase.from('chat_groups').update({background_mode:'memory',background_memory_photo_id:data.id,updated_at:new Date().toISOString()}).eq('id',group.id).eq('owner_id',user.id);
+          if(!data?.id) throw new Error('資料庫未回傳相片 ID，無法確認新增結果。');
+          createdPhotoId=data.id;
+          const {data:updatedGroup,error:updateError}=await window.mySupabase.from('chat_groups').update({background_mode:'memory',background_memory_photo_id:data.id,updated_at:new Date().toISOString()}).eq('id',group.id).eq('owner_id',user.id).select('id').maybeSingle();
           if(updateError) throw updateError;
+          if(!updatedGroup) throw new Error('群組背景未確認儲存，請確認群組權限後重試。');
+          groupBackgroundSaved=true;
           group.memoryPhotos=[data,...(group.memoryPhotos||[])];group.backgroundMemoryPhotoId=data.id;group.backgroundMode='memory';applyGroupChatBackground();openModal('group-settings');toast('已新增群組回憶相片。');
-        } catch(error) { toast(groupFriendlyError(error)||'新增群組回憶相片失敗。'); }
+        } catch(error) {
+          if(createdPhotoId&&!groupBackgroundSaved) {
+            const {error:cleanupError}=await window.mySupabase.from('chat_group_memory_photos').delete().eq('id',createdPhotoId).eq('group_id',group.id);
+            if(cleanupError) toast('背景儲存失敗；相片清理也失敗，請稍後檢查群組回憶相簿。');
+          }
+          toast(groupFriendlyError(error)||'新增群組回憶相片失敗。');
+        }
         break;
       }
       case 'single-memory-photo-add': {
