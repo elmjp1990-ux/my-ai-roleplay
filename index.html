@@ -852,6 +852,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     if (!user?.id || !window.mySupabase) return;
     const client = window.mySupabase;
 
+    let syncStage = '檢查帳號狀態';
     try {
       // 先檢查後端帳號刪除期限；待刪除帳號只能取消申請，不能繼續使用功能。
       const { data: deletionData, error: deletionError } = await client.rpc(
@@ -909,6 +910,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         pendingDeletionWalletSyncUid = null;
       }
 
+      syncStage = '讀取公開會員資料';
       let { data: profile, error: profileError } = await client
         .from('profiles')
         .select('id, handle, nickname, avatar_url, bio')
@@ -918,6 +920,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       if (profileError) throw new Error('讀取 profiles 失敗：' + profileError.message);
 
       if (!profile) {
+        syncStage = '建立會員資料';
         const metadata = user.user_metadata || {};
         const baseName = metadata.full_name || metadata.name ||
           metadata.user_name || user.email?.split('@')[0] || 'PersonaX 使用者';
@@ -933,6 +936,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         profile = result.data;
       }
 
+      syncStage = '初始化錢包';
       // 安全初始化：由資料庫依 auth.uid() 建立新錢包（0 鑽石、100 銀幣），
       // 舊會員則保留原餘額。前端不再直接 INSERT/UPSERT wallet_accounts。
       const { data: walletData, error: walletError } = await client.rpc(
@@ -950,6 +954,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         throw new Error('錢包初始化函式沒有回傳有效的鑽石與銀幣餘額。');
       }
 
+      syncStage = '更新登入狀態';
       // 避免較早發出的請求覆蓋另一個已登入帳號。
       if (state.account?.uid !== user.id) return;
       state.account = {
@@ -965,12 +970,12 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       persist();
       render();
     } catch (error) {
-      console.error('PersonaX 資料庫同步失敗：', error);
+      console.error('PersonaX 資料庫同步失敗（階段：' + syncStage + '）：', error);
       // 取消申請後的刷新由呼叫端顯示專屬訊息；一般登入流程仍使用原本提示。
       if (throwOnError) throw error;
       if (state.account?.uid === user.id) {
         const detail = String(error?.message || '未知錯誤').replace(/\s+/g, ' ').slice(0, 180);
-        toast('已登入，但會員資料或錢包同步失敗：' + detail);
+        toast('已登入，但同步在「' + syncStage + '」階段失敗：' + detail);
       }
     }
   }
