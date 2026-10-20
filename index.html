@@ -1000,6 +1000,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     if (!user?.id || !window.mySupabase) return;
     const client = window.mySupabase;
 
+    let syncStage = '檢查帳號狀態';
     try {
       // 先檢查後端帳號刪除期限；待刪除帳號只能取消申請，不能繼續使用功能。
       const { data: deletionData, error: deletionError } = await client.rpc(
@@ -1057,15 +1058,17 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         pendingDeletionWalletSyncUid = null;
       }
 
+      syncStage = '讀取公開會員資料';
       let { data: profile, error: profileError } = await client
         .from('profiles')
-        .select('id, handle, nickname, avatar_url, bio, persona_presets, birthdate')
+        .select('id, handle, nickname, avatar_url, bio')
         .eq('id', user.id)
         .maybeSingle();
 
       if (profileError) throw new Error('讀取 profiles 失敗：' + profileError.message);
 
       if (!profile) {
+        syncStage = '建立會員資料';
         const metadata = user.user_metadata || {};
         const baseName = metadata.full_name || metadata.name ||
           metadata.user_name || user.email?.split('@')[0] || 'PersonaX 使用者';
@@ -1078,13 +1081,25 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
           bio: '',
           persona_presets: [],
           birthdate: null
-        }, { onConflict: 'id' }).select('id, handle, nickname, avatar_url, bio, persona_presets, birthdate').single();
+        }, { onConflict: 'id' }).select('id, handle, nickname, avatar_url, bio').single();
         if (result.error) throw new Error('建立 profiles 失敗：' + result.error.message);
         profile = result.data;
       }
 
+      // 私密欄位只透過依 auth.uid() 限定的 RPC 讀取，避免公開 profiles 查詢暴露生日／人設。
+      syncStage = '讀取個人專屬資料';
+      const { data: privateProfileData, error: privateProfileError } = await client.rpc(
+        'get_my_private_profile_data'
+      );
+      if (privateProfileError) {
+        throw new Error('讀取個人專屬資料失敗：' + privateProfileError.message);
+      }
+      const privateProfile = privateProfileData && typeof privateProfileData === 'object'
+        ? privateProfileData : {};
+
       // 安全初始化：由資料庫依 auth.uid() 建立新錢包（0 鑽石、100 銀幣），
       // 舊會員則保留原餘額。前端不再直接 INSERT/UPSERT wallet_accounts。
+      syncStage = '初始化錢包';
       const { data: walletData, error: walletError } = await client.rpc(
         'ensure_wallet_account'
       );
@@ -1101,6 +1116,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       }
 
       // 避免較早發出的請求覆蓋另一個已登入帳號。
+      syncStage = '更新登入狀態';
       if (state.account?.uid !== user.id) return;
       state.account = {
         ...state.account,
@@ -1109,8 +1125,8 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         avatar: profile.avatar_url || '',
         profileReady: true,
         bio: profile.bio || '',
-        birthdate: profile.birthdate || '',
-        personas: Array.isArray(profile.persona_presets) ? profile.persona_presets : [],
+        birthdate: privateProfile.birthdate || '',
+        personas: Array.isArray(privateProfile.persona_presets) ? privateProfile.persona_presets : [],
         diamonds: Number(walletRow.diamonds ?? 0),
         silver: Number(walletRow.silver_coins ?? 0)
       };
@@ -1118,11 +1134,12 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       persist();
       render();
     } catch (error) {
-      console.error('PersonaX 資料庫同步失敗：', error);
+      console.error('PersonaX 資料庫同步失敗（階段：' + syncStage + '）：', error);
       // 取消申請後的刷新由呼叫端顯示專屬訊息；一般登入流程仍使用原本提示。
       if (throwOnError) throw error;
       if (state.account?.uid === user.id) {
-        toast('已登入，但會員資料或錢包同步失敗。請檢查 Supabase RLS 權限與資料表設定。');
+        const detail = String(error?.message || '未知錯誤').replace(/\s+/g, ' ').slice(0, 180);
+        toast('已登入，但同步在「' + syncStage + '」階段失敗：' + detail);
       }
     }
   }
