@@ -3851,7 +3851,7 @@ function renderGroupConversation() {
         : (hasSpeaker ? '' : avatar?'<img class="avatar" src="'+e(avatar)+'" alt="">':'<span class="avatar avatar-fallback">'+e(String(who).trim().slice(0,1)||'角')+'</span>');
     const bodyHTML=hasSpeaker
       ? '<div class="roleplay-segments">'+segments.map(roleplaySegmentHTML).join('')+'</div>'
-      : '<div class="message-name">'+e(who)+'</div>'+(isUser||isSystem?'<div class="bubble">'+e(m.content||'')+'</div>':formatMessage(m.content||''));
+      : '<div class="message-name">'+e(who)+'</div>'+(isSystem?'<div class="bubble">'+e(m.content||'')+'</div>':formatMessage(m.content||''));
     return '<div class="message '+(isUser?'user':'')+(hasSpeaker?' roleplay-prefixed-message':'')+'">'+avatarHTML+
       '<div class="message-content">'+bodyHTML+'</div></div>';
   }).join('') || '<div class="empty">這段群組對話還沒有訊息，輸入第一句話開始故事。</div>';
