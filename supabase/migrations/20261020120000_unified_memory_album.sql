@@ -33,7 +33,7 @@ create or replace function public.enforce_chat_memory_photo_expiry()
 returns trigger
 language plpgsql
 set search_path = ''
-as $
+as $function$
 begin
   new.created_at := pg_catalog.now();
   new.expires_at := new.created_at + interval '1 year';
@@ -43,7 +43,7 @@ begin
   new.deleted_at := null;
   return new;
 end;
-$;
+$function$;
 
 revoke all on function public.enforce_chat_memory_photo_expiry() from public, anon, authenticated;
 
