@@ -4290,7 +4290,8 @@ function renderMessages(scroll = true) {
     const user = m.role === 'user';
     return `<article class="message ${user ? 'user' : ''}"
                       data-message="${e(m.id)}">
-      ${user ? avatar(currentUser()) : ''}
+      ${user ? avatar(currentUser()) :
+        `<img class="avatar" src="${e(safeImage(c.image))}" alt="">`}
       <div class="message-content">
         <div class="message-name">${e(user ? currentUser().nickname : c.name)}</div>
         ${formatMessage(m.text)}
