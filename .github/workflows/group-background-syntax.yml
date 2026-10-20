@@ -1,0 +1,47 @@
+name: Group background UI syntax check
+
+on:
+  pull_request:
+    paths:
+      - "index.html"
+      - ".github/workflows/group-background-syntax.yml"
+      - "supabase/migrations/**"
+  push:
+    branches:
+      - main
+      - feat/group-background-unified-album
+
+jobs:
+  inline-javascript-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Parse inline JavaScript in index.html
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const { spawnSync } = require('node:child_process');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const blocks = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)]
+            .filter(match => !/\bsrc\s*=/.test(match[1]))
+            .map(match => match[2]);
+          if (!blocks.length) {
+            console.error('No inline JavaScript blocks found.');
+            process.exit(1);
+          }
+          for (let i = 0; i < blocks.length; i++) {
+            const file = path.join('/tmp', 'personax-inline-' + i + '.js');
+            fs.writeFileSync(file, blocks[i]);
+            const result = spawnSync(process.execPath, ['--check', file], { encoding: 'utf8' });
+            if (result.status !== 0) {
+              console.error('Syntax error in inline script block #' + (i + 1));
+              process.stderr.write(result.stderr || result.stdout || '');
+              process.exit(result.status || 1);
+            }
+          }
+          console.log('Parsed ' + blocks.length + ' inline JavaScript blocks.');
+          NODE
