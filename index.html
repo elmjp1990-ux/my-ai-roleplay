@@ -4223,9 +4223,10 @@ function promptHistory(messages = [], currentUserMessage = '') {
   }
   return list.slice(-10).map(message => {
     const rawRole = promptText(message?.role ?? message?.speaker_type).toLowerCase();
-    const role = ['assistant','character','ai'].includes(rawRole) ? '角色'
+    const speakerName = promptText(message?.speaker_snapshot?.name ?? message?.character_snapshot?.name ?? message?.speaker_name ?? '角色');
+    const role = ['assistant','character','ai'].includes(rawRole) ? speakerName
       : ['user','player'].includes(rawRole) ? '玩家'
-      : promptText(message?.speaker_snapshot?.name ?? message?.character_snapshot?.name ?? message?.speaker_name ?? '角色');
+      : speakerName;
     const content = promptText(message?.text ?? message?.content).trim();
     return content ? role + '：' + content : '';
   }).filter(Boolean).join('\\n');
@@ -4270,7 +4271,13 @@ function buildPromptVariableValues(context = {}) {
     CHAT_HISTORY: promptHistory(messages, currentUserMessage),
     MEMORY: promptMemory(context.memory ?? session.memories),
     SUMMARY: promptText(context.summary ?? session.summary),
-    TURN_COUNT: String(messages.filter(message => message?.role === 'user').length),
+    TURN_COUNT: String((() => {
+      const players = messages.filter(message => ['user', 'player'].includes(promptText(message?.role ?? message?.speaker_type).toLowerCase()));
+      const current = promptText(currentUserMessage).trim();
+      const hasCurrent = current && players.some(message => promptText(message?.text ?? message?.content).trim() === current);
+      const counted = hasCurrent || !current ? players : [...players, { role: 'user', content: current }];
+      return new Set(counted.map((message, index) => message?.turn_id ? 'turn:' + message.turn_id : 'message:' + index)).size;
+    })()),
     CURRENT_DATE: promptTaipeiDate(context.now instanceof Date ? context.now : new Date()),
     CHAR_LIST: members.map(member => promptText(memberCharacter(member)?.name)).filter(Boolean).join('、'),
     ACTIVE_CHAR: promptText(active?.name),
