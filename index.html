@@ -4315,15 +4315,26 @@ function renderConversation() {
   if (route.chatOverlay) renderChatOverlay(route.chatOverlay);
 }
 function formatMessage(text) {
-  return String(text).split(/(\*\*[\s\S]*?\*\*|\*[\s\S]*?\*)/g).filter(Boolean).map(part => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return `<em class="narration">${e(part.slice(2,-2))}</em>`;
-    }
-    if (part.startsWith('*') && part.endsWith('*')) {
-      return `<em class="narration">${e(part.slice(1,-1))}</em>`;
-    }
-    return part.trim() ? `<div class="bubble">${e(part.trim())}</div>` : '';
-  }).join('');
+  // PersonaX action syntax is single-asterisk only: *action*.
+  // Keep **double-asterisk text** as ordinary dialogue instead of treating it as an action.
+  const source = String(text ?? '');
+  const parts = [];
+  const actionPattern = /\*([^*\n]+?)\*/g;
+  let cursor = 0;
+  let match;
+  while ((match = actionPattern.exec(source))) {
+    const start = match.index;
+    const end = actionPattern.lastIndex;
+    // A single asterisk pair must not be part of a double-asterisk pair.
+    if (source[start - 1] === '*' || source[end] === '*') continue;
+    const dialogue = source.slice(cursor, start);
+    if (dialogue.trim()) parts.push('<div class="bubble">' + e(dialogue.trim()) + '</div>');
+    parts.push('<em class="narration">' + e(match[1].trim()) + '</em>');
+    cursor = end;
+  }
+  const tail = source.slice(cursor);
+  if (tail.trim()) parts.push('<div class="bubble">' + e(tail.trim()) + '</div>');
+  return parts.join('');
 }
 // Roleplay speaker prefix display. The message author remains the authenticated player.
 function parseRoleplaySegments(raw, roles = []) {
