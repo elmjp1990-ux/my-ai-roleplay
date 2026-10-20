@@ -6257,11 +6257,14 @@ if (window.__pendingSupabaseUser) {
       if(error)throw error;
       const cards=await Promise.all((data||[]).map(async photo=>{
         const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,3600);
-        if(signedError||!signed?.signedUrl){console.warn('相簿簽名網址取得失敗',signedError?.message);return '';}
-        urlCache.set(photo.id,{url:signed.signedUrl,photo});
-        return '<article class="memory-photo-row"><button type="button" class="memory-photo-thumb" data-action="memory-photo-open" data-id="'+e(photo.id)+'" aria-label="開啟相片">'+
-          '<img src="'+e(signed.signedUrl)+'" alt="'+e(photo.caption||'回憶相片')+'" loading="lazy"></button>'+
-          '<div class="memory-photo-details"><div class="memory-photo-title-edit"><strong>'+e(photo.caption||'回憶快照')+'</strong><button type="button" class="ghost memory-photo-icon" data-action="memory-photo-edit" data-id="'+e(photo.id)+'" aria-label="修改標題" title="修改標題">✎</button></div><span class="small muted">'+e(dateLabel(photo.created_at))+'</span><span class="memory-photo-expiry">到期日：'+e(dateLabel(photo.expires_at))+'</span></div>'+
+        const imageUrl=!signedError&&signed?.signedUrl?signed.signedUrl:'';
+        if(!imageUrl)console.warn('相簿簽名網址取得失敗',signedError?.message);
+        urlCache.set(photo.id,{url:imageUrl,photo});
+        const thumbnail=imageUrl
+          ? '<button type="button" class="memory-photo-thumb" data-action="memory-photo-open" data-id="'+e(photo.id)+'" aria-label="開啟相片"><img src="'+e(imageUrl)+'" alt="'+e(photo.caption||'回憶相片')+'" loading="lazy"></button>'
+          : '<div class="memory-photo-thumb" style="display:grid;place-items:center;color:var(--muted);font-size:11px;padding:6px;text-align:center">圖片檔案遺失<br>仍可刪除紀錄</div>';
+        return '<article class="memory-photo-row">'+thumbnail+
+          '<div class="memory-photo-details"><div class="memory-photo-title-edit"><strong>'+e(photo.caption||'回憶快照')+'</strong>'+(imageUrl?'<button type="button" class="ghost memory-photo-icon" data-action="memory-photo-edit" data-id="'+e(photo.id)+'" aria-label="修改標題" title="修改標題">✎</button>':'')+'</div><span class="small muted">'+e(dateLabel(photo.created_at))+'</span><span class="memory-photo-expiry">到期日：'+e(dateLabel(photo.expires_at))+'</span></div>'+
           '<div class="memory-photo-actions"><button type="button" class="ghost memory-photo-icon" data-action="memory-photo-delete" data-id="'+e(photo.id)+'" aria-label="刪除相片" title="刪除相片">🗑</button></div></article>';
       }));
       if(!mount.isConnected)return;
@@ -6417,7 +6420,9 @@ if (window.__pendingSupabaseUser) {
     const button=event.target.closest('[data-action="memory-photo-open"],[data-action="memory-photo-download"],[data-action="memory-photo-background"],[data-action="memory-photo-edit"],[data-action="memory-photo-delete"],[data-action="memory-photo-save-title"],[data-action="memory-photo-cancel-title"]');
     if(!button)return;
     const cached=urlCache.get(button.dataset.id);
-    if(!cached?.url){toast('相片網址已失效，請重新開啟相簿。');return;}
+    const action=button.dataset.action;
+    if(!cached){toast('相簿資料已更新，請重新開啟相簿後再試。');return;}
+    if(!cached.url && action!=='memory-photo-delete'){toast('圖片檔案目前無法讀取，仍可刪除這筆相簿紀錄。');return;}
     if(button.dataset.action==='memory-photo-edit'){
       const row=button.closest('.memory-photo-row'),details=row?.querySelector('.memory-photo-details');if(!details)return;const photo=cached.photo;
       details.innerHTML='<div class="memory-photo-title-edit"><input class="field" maxlength="80" value="'+e(photo.caption||'')+'" aria-label="相片標題" data-memory-title-input="'+e(photo.id)+'"><button type="button" class="ghost memory-photo-icon" data-action="memory-photo-save-title" data-id="'+e(photo.id)+'" title="儲存">✓</button><button type="button" class="ghost memory-photo-icon" data-action="memory-photo-cancel-title" data-id="'+e(photo.id)+'" title="取消">✕</button></div><span class="small muted">'+e(dateLabel(photo.created_at))+'</span><span class="memory-photo-expiry">到期日：'+e(dateLabel(photo.expires_at))+'</span>';details.querySelector('input')?.focus();return;
@@ -6431,11 +6436,11 @@ if (window.__pendingSupabaseUser) {
     }
     if(button.dataset.action==='memory-photo-delete'){
       if(!confirm('刪除後不可復原哦，確認要刪除嗎?'))return;const client=window.mySupabase,uid=currentUser()?.uid,photo=cached.photo;if(!client||uid!==photo.owner_id){toast('請確認登入帳號。');return;}
-      const {error}=await client.from('chat_memory_photos').update({status:'deleting',deleted_at:new Date().toISOString()}).eq('id',photo.id).eq('owner_id',uid);
-      if(error){toast('刪除失敗：'+error.message);return;}
-      const {error:removeError}=await client.storage.from(BUCKET).remove([photo.storage_path]);if(removeError)console.warn('相片已從相簿移除，但儲存檔案清理失敗',removeError.message);
+      const {data:deleted,error}=await client.rpc('soft_delete_chat_memory_photo',{p_photo_id:photo.id});
+      if(error){console.error('相簿刪除 RPC 失敗',error);toast('刪除失敗：'+error.message);return;}
+      const {error:removeError}=await client.storage.from(BUCKET).remove([photo.storage_path]);if(removeError)console.warn('相片紀錄已移出相簿，但儲存檔案清理失敗',removeError.message);
       if(photo.chat_type==='single'){const session=state.sessions[photo.session_id];if(session?.background==='memory-photo:'+photo.id){session.background='none';persist();}}
-      else{const group=groupPrototype.active;if(group?.backgroundMemoryPhotoId===photo.id){const {error:bgError}=await client.from('chat_groups').update({background_mode:'none',background_memory_photo_id:null}).eq('id',group.id).eq('owner_id',uid);if(!bgError){group.backgroundMode='none';group.backgroundMemoryPhotoId=null;}}}
+      else{const group=groupPrototype.active;if(group?.backgroundMemoryPhotoId===photo.id){group.backgroundMode='none';group.backgroundMemoryPhotoId=null;}}
       urlCache.delete(photo.id);toast('回憶相片已刪除。');void loadAlbum(photo.chat_type,photo.session_id||photo.group_id);return;
     }
     if(button.dataset.action==='memory-photo-background'){
