@@ -6431,7 +6431,7 @@ if (window.__pendingSupabaseUser) {
     }
     if(button.dataset.action==='memory-photo-delete'){
       if(!confirm('刪除後不可復原哦，確認要刪除嗎?'))return;const client=window.mySupabase,uid=currentUser()?.uid,photo=cached.photo;if(!client||uid!==photo.owner_id){toast('請確認登入帳號。');return;}
-      const {error}=await client.from('chat_memory_photos').update({status:'deleted',deleted_at:new Date().toISOString()}).eq('id',photo.id).eq('owner_id',uid);
+      const {error}=await client.from('chat_memory_photos').update({status:'deleting',deleted_at:new Date().toISOString()}).eq('id',photo.id).eq('owner_id',uid);
       if(error){toast('刪除失敗：'+error.message);return;}
       const {error:removeError}=await client.storage.from(BUCKET).remove([photo.storage_path]);if(removeError)console.warn('相片已從相簿移除，但儲存檔案清理失敗',removeError.message);
       if(photo.chat_type==='single'){const session=state.sessions[photo.session_id];if(session?.background==='memory-photo:'+photo.id){session.background='none';persist();}}
