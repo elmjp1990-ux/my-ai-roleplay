@@ -3679,7 +3679,7 @@ async function groupOpen(groupId) {
       window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,created_at,updated_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position'),
-      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,content,created_at').eq('group_id',groupId).order('created_at',{ascending:true}).order('sequence_no',{ascending:true})
+      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).order('created_at',{ascending:true}).order('sequence_no',{ascending:true})
     ]),15000,'群組資料讀取逾時，請檢查網路後重試。');
     if(requestId!==g.openRequestId) return;
     const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error;
@@ -3694,12 +3694,15 @@ async function groupOpen(groupId) {
       const avatarRes=await window.mySupabase.from('characters').select('id,avatar_url').in('id',characterIds);
       if(!avatarRes.error) avatarById=Object.fromEntries((avatarRes.data||[]).map(x=>[x.id,x.avatar_url||'']));
     }
-    const members=memberRows.map(m=>({...m.character_snapshot,id:m.character_id,characterId:m.character_id,avatar_url:avatarById[m.character_id]||m.character_snapshot?.avatar_url||m.character_snapshot?.image||'',position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'}));
+    const members=memberRows.map(m=>{const snapshot=m.character_snapshot||{};const characterId=m.character_id||null;const snapshotId=snapshot.id||characterId||null;const displayId=characterId||snapshotId||m.id;return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,avatar_url:avatarById[characterId]||snapshot.avatar_url||snapshot.image||'',position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};});
     groupExpandedMemberId=null;
     const messages=(messageRes.data||[]).map(m=>{
-      const member=members.find(x=>x.characterId===m.character_id);
+      const speakerSnapshot=m.speaker_snapshot||{};
+      const member=members.find(x=>x.characterId===m.character_id)||members.find(x=>x.characterSnapshotId===speakerSnapshot.id||x.id===speakerSnapshot.id);
       const scene=scenes.find(x=>x.id===m.scene_id);
-      return {id:m.id,type:m.speaker_type==='user'?'user':m.speaker_type==='system'?'system':'character',speaker:m.speaker_type==='user'?'你':(member?.name||'角色')+(scene?' · '+scene.name:''),characterId:m.character_id||null,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:m.content,createdAt:m.created_at};
+      const type=m.speaker_type==='user'?'user':m.speaker_type==='system'?'system':'character';
+      const speaker=type==='user'?'你':type==='system'?'系統':(speakerSnapshot.name||member?.name||'角色')+(scene?' · '+scene.name:'');
+      return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:m.content,createdAt:m.created_at};
     });
     g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',scenes,members};
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;g.formError='';
