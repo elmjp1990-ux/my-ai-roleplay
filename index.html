@@ -607,8 +607,16 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .chat-settings-overlay { position:fixed; inset:0; z-index:10000; width:100vw; height:100dvh; max-height:100dvh; overflow-y:auto; border:0; border-radius:0; padding:calc(18px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom)); background:var(--bg); backdrop-filter:blur(20px); }
 .chat-settings-options,.chat-background-options { gap:8px; }
 .chat-settings-overlay .profile-setting { padding:18px 6px; }
-.overlay-heading > button.ghost { width:44px; height:44px; min-width:44px; padding:0; display:grid; place-items:center; flex:0 0 44px; border-radius:12px; }
-.overlay-heading > button.ghost .icon { width:20px; height:20px; }
+/* 全站返回箭頭統一尺寸、點擊區與 SVG 大小，手機也容易點按。 */
+button[aria-label^="返回"], button[data-action="chat-back"], button[data-action="group-return-list"],
+.overlay-heading > button.ghost {
+  box-sizing:border-box; width:44px; height:44px; min-width:44px; min-height:44px;
+  padding:0; display:inline-grid; place-items:center; flex:0 0 44px; border-radius:12px;
+}
+button[aria-label^="返回"] .icon, button[data-action="chat-back"] .icon,
+button[data-action="group-return-list"] .icon, .overlay-heading > button.ghost .icon {
+  display:block; width:20px; height:20px; flex:0 0 20px;
+}
 .chat-background-mode { width:100%; text-align:left; color:var(--text); cursor:pointer; }
 .chat-background-mode.is-selected,.photo-button.is-selected { border:2px solid var(--primary); box-shadow:0 0 0 2px var(--soft); }
 .chat-settings-save-row { display:flex; gap:10px; justify-content:flex-end; margin-top:20px; padding-bottom:8px; }
@@ -2291,7 +2299,9 @@ async function runPendingChatTurn(s) {
     // Keep stable IDs locally. The next send action retries the same logical turn;
     // it must not append another user message or create another charge.
     persist();
-    toast('上一回合的結果尚未確認。再次按發送會沿用同一回合查詢／恢復，請勿另開重複訊息。');
+    const detail=String(result?.message||result?.error||invokeError?.message||'回覆服務未回傳可確認的結果').replace(/\s+/g,' ').slice(0,180);
+    const status=Number(invokeError?.context?.status||invokeError?.status||0);
+    toast('訊息已保存，但角色回覆未完成：'+detail+(status?'（HTTP '+status+'）':'')+'。再次按送出會沿用同一回合，不會新增訊息或重複扣款。');
     return;
   }
 
@@ -3860,7 +3870,7 @@ function applyGroupChatBackground() {
   if(groupBackgroundTimer){clearInterval(groupBackgroundTimer);groupBackgroundTimer=null;}
   const group=groupPrototype.active,panel=$('view').querySelector('.chat-main');
   if(!group||!panel||route.page!=='group')return;
-  const safeURL=value=>{const url=String(value||'').trim();return (url.startsWith('https://')||url.startsWith('http://'))?url:'';};
+  const safeURL=value=>{const url=String(value||'').trim();return (/^https?:\/\//i.test(url)||/^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(url))?url:'';};
   const mode=group.backgroundMode||'avatar';
   if(mode==='none'){panel.style.setProperty('--chat-photo','none');return;}
   if(mode==='memory'){
@@ -3924,12 +3934,12 @@ function renderGroupChatOverlay(kind) {
     const group=groupPrototype.active,sceneLabel=id=>group.scenes.find(x=>x.id===id)?.name||'共用場景';
     const members=group.members.map(m=>'<article class="memory-item"><strong>'+e(m.name||'角色')+'</strong><p class="small muted">'+e(sceneLabel(m.sceneId))+'</p></article>').join('');
     const scenes=(group.scenes||[]).map(x=>'<article class="memory-item"><strong>'+e(x.name||'未命名場景')+'</strong><p style="white-space:pre-wrap">'+e(x.description||'尚未填寫場景描述。')+'</p></article>').join('');
-    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="群組資訊"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-close" aria-label="返回" title="返回">'+ICON.back+'</button><h2>群組資訊</h2></div><p><strong>群組名稱：</strong>'+e(group.name||'')+'</p><p><strong>世界背景</strong></p><article class="memory-item" style="white-space:pre-wrap">'+e(group.world||'尚未設定')+'</article><h3>參與角色（'+group.members.length+'/3）</h3>'+members+'<h3>場景設定</h3>'+scenes+'</section>');
+    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="群組資訊"><div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回" title="返回">'+ICON.back+'</button><h2>群組資訊</h2></div><p><strong>群組名稱：</strong>'+e(group.name||'')+'</p><p><strong>世界背景</strong></p><article class="memory-item" style="white-space:pre-wrap">'+e(group.world||'尚未設定')+'</article><h3>參與角色（'+group.members.length+'/3）</h3>'+members+'<h3>場景設定</h3>'+scenes+'</section>');
     return;
   }
   if(kind==='diary'){
     const rows=(groupPrototype.messages||[]).map(m=>'<article class="memory-item"><strong>'+e(m.speaker||'角色')+'</strong><p style="white-space:pre-wrap;overflow-wrap:anywhere">'+e(m.content||'')+'</p><span class="small muted">'+e(timeText(m.created_at||m.at||Date.now()))+'</span></article>').join('');
-    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="甜蜜日記"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-close" aria-label="返回" title="返回">'+ICON.back+'</button><h2>甜蜜日記</h2></div><p class="small muted">目前顯示群組對話紀錄。AI 摘要與長期日記封存尚未串接；此頁不會假裝已完成摘要生成。</p>'+(rows||'<div class="empty">目前還沒有可整理的群組記錄。</div>')+'</section>');
+    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="甜蜜日記"><div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回" title="返回">'+ICON.back+'</button><h2>甜蜜日記</h2></div><p class="small muted">目前顯示群組對話紀錄。AI 摘要與長期日記封存尚未串接；此頁不會假裝已完成摘要生成。</p>'+(rows||'<div class="empty">目前還沒有可整理的群組記錄。</div>')+'</section>');
     return;
   }
   const members=group.members||[];
@@ -4978,8 +4988,8 @@ document.addEventListener('click',async event => {
         if(option==='delete'){if(route.page==='group'){toast('群組刪除尚未接入安全的雲端軟刪除流程，暫不提供會造成資料風險的按鈕。');break;}const next={...route,chatOverlay:'delete-confirm'};delete next.overlay;go(next);break;}
         break;
       }
-      case 'chat-settings-back': {const next={...route,chatOverlay:'settings'};delete next.overlay;go(next,true);break;}
-      case 'chat-settings-close': {const next={...route};delete next.chatOverlay;delete next.overlay;go(next,true);break;}
+      case 'chat-settings-back': {back();break;}
+      case 'chat-settings-close': {back();break;}
       case 'chat-background-mode': {if(chatBackgroundDraft&&['none','avatar','memory'].includes(button.dataset.value)){chatBackgroundDraft.mode=button.dataset.value;if(chatBackgroundDraft.mode==='memory'){chatBackgroundDraft.loaded=false;chatBackgroundDraft.error='';}render();}break;}
       case 'chat-background-select-photo': {if(chatBackgroundDraft&&chatBackgroundDraft.photos.some(p=>p.id===key)){chatBackgroundDraft.photoId=key;render();}break;}
       case 'chat-background-cancel': {chatBackgroundDraft=null;const next={...route};delete next.chatOverlay;delete next.overlay;go(next);break;}
@@ -6032,6 +6042,19 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
           break;
         }
         if (!text.trim()) return toast('請先輸入訊息，再開始新的聊天回合。');
+        // Local seed/mock characters cannot be written to the UUID-constrained
+        // cloud chat schema. Keep their test messages usable locally and never charge.
+        if (!window.mySupabase || !isUuid(s.characterId) || !isUuid(s.id)) {
+          s.messages.push({id:id(),role:'user',text,at:Date.now(),localOnly:true});
+          drafts[s.id]='';
+          if($('messageInput')) $('messageInput').value='';
+          const saved=persist();
+          renderMessages();
+          toast(saved
+            ? '訊息已保存在本機測試聊天；此角色尚未完成雲端聊天／AI 串接，本次不會扣款。'
+            : '訊息無法保存，請檢查瀏覽器儲存空間。');
+          break;
+        }
 
         const previousMessages = s.messages.slice();
         const previousMemories = (s.memories || []).map(memory => ({...memory}));
