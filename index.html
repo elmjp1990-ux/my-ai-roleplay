@@ -500,6 +500,13 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .message-content { max-width:85%; min-width:0; }
 .message-name { color:var(--muted); font-size:10px; margin-bottom:5px; }
 .user .message-name { text-align:right; }
+.roleplay-segments { display:grid; gap:5px; }
+.roleplay-segment { min-width:0; }
+.roleplay-segment-heading { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:11px; margin:4px 0 5px; }
+.roleplay-segment-heading .avatar { width:22px; height:22px; }
+.roleplay-segment.is-character .bubble { background:var(--bubble); color:var(--text); border-color:var(--border); }
+.roleplay-segment.is-temporary .bubble { background:var(--panel2); color:var(--text); border:1px dashed var(--border); }
+.roleplay-segment.is-user .bubble { background:var(--primary); color:white; border-color:transparent; }
 .bubble {
   font-size:16px;
   padding:12px 14px;
@@ -4280,6 +4287,50 @@ function formatMessage(text) {
     return part.trim() ? `<div class="bubble">${e(part.trim())}</div>` : '';
   }).join('');
 }
+// Roleplay speaker prefix display. The message author remains the authenticated player.
+function parseRoleplaySegments(raw, roles = []) {
+  const text = String(raw ?? '');
+  const lines = text.split('\n');
+  const segments = [];
+  let current = null;
+  let foundPrefix = false;
+  const flush = () => {
+    if (current && current.text.length) segments.push(current);
+    current = null;
+  };
+  for (const line of lines) {
+    const match = line.match(/^\s*[:：]([^:：\n]{1,40})[:：]\s?(.*)$/u);
+    if (match) {
+      foundPrefix = true;
+      flush();
+      const speakerName = match[1].trim();
+      const exact = roles.filter(role => String(role.name || '').trim() === speakerName);
+      const role = exact.length === 1 ? exact[0] : null;
+      current = {
+        kind: role ? 'character' : 'temporary',
+        speakerName: role?.name || speakerName,
+        characterId: role?.id || null,
+        avatar: role?.image || role?.avatar_url || '',
+        text: match[2] || ''
+      };
+    } else if (current) {
+      current.text += (current.text ? '\n' : '') + line;
+    } else {
+      current = {kind:'user',speakerName:'',characterId:null,avatar:'',text:line};
+    }
+  }
+  flush();
+  if (!foundPrefix) return [{kind:'user',speakerName:'',characterId:null,avatar:'',text}];
+  return segments.filter(segment => segment.text.trim() || segment.speakerName);
+}
+function roleplaySegmentHTML(segment) {
+  const name = segment.kind === 'user' ? (currentUser()?.nickname || '你') : segment.speakerName;
+  const avatarHTML = segment.kind === 'character' && segment.avatar
+    ? '<img class="avatar" src="' + e(safeImage(segment.avatar)) + '" alt="">'
+    : '<span class="avatar avatar-fallback">' + e(segment.kind === 'user' ? '你' : [...String(name || '?')][0] || '?') + '</span>';
+  const typeClass = segment.kind === 'user' ? 'is-user' : segment.kind === 'character' ? 'is-character' : 'is-temporary';
+  return '<div class="roleplay-segment ' + typeClass + '"><div class="roleplay-segment-heading">' + avatarHTML + '<span>' + e(name) + '</span></div>' + formatMessage(segment.text) + '</div>';
+}
 function renderMessages(scroll = true) {
   if (!$('messages')) return;
   const s = currentSession();
@@ -4288,16 +4339,15 @@ function renderMessages(scroll = true) {
   const oldScroll = $('messages').scrollTop;
   $('messages').innerHTML = s.messages.map(m => {
     const user = m.role === 'user';
-    return `<article class="message ${user ? 'user' : ''}"
-                      data-message="${e(m.id)}">
-      ${user ? avatar(currentUser()) :
-        `<img class="avatar" src="${e(safeImage(c.image))}" alt="">`}
-      <div class="message-content">
-        <div class="message-name">${e(user ? currentUser().nickname : c.name)}</div>
-        ${formatMessage(m.text)}
-      </div>
-      <button class="message-more" data-action="message-menu" data-id="${e(m.id)}"
-              aria-label="訊息操作">⋯</button>
+    const roles = [{id:c.id,name:c.name,image:c.image}];
+    const segments = user ? parseRoleplaySegments(m.text, roles) : null;
+    const contentHTML = user && segments.some(segment => segment.kind !== 'user')
+      ? '<div class="roleplay-segments">' + segments.map(roleplaySegmentHTML).join('') + '</div>'
+      : '<div class="message-name">' + e(user ? currentUser().nickname : c.name) + '</div>' + formatMessage(m.text);
+    return `<article class="message ${user ? 'user' : ''}" data-message="${e(m.id)}">
+      ${user ? avatar(currentUser()) : `<img class="avatar" src="${e(safeImage(c.image))}" alt="">`}
+      <div class="message-content">${contentHTML}</div>
+      <button class="message-more" data-action="message-menu" data-id="${e(m.id)}" aria-label="訊息操作">⋯</button>
     </article>`;
   }).join('');
   $('messages').scrollTop = scroll ? $('messages').scrollHeight : oldScroll;
