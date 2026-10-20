@@ -2939,8 +2939,15 @@ function groupRenderCharacters() {
 function groupPendingStorageKey(uid,groupId) { return 'personax-group-pending-v1:'+uid+':'+groupId; }
 function groupSavePendingRequest(request) {
   const uid=currentUser()?.uid;
-  if(!uid||!request?.groupId||!request?.requestKey||!request?.content) return;
-  try { localStorage.setItem(groupPendingStorageKey(uid,request.groupId),JSON.stringify({uid,groupId:request.groupId,requestKey:request.requestKey,content:request.content})); } catch(error) { console.warn('群組待重試訊息無法保存到本機：',error); }
+  if(!uid||!request?.groupId||!request?.requestKey||!request?.content) return false;
+  try {
+    localStorage.setItem(groupPendingStorageKey(uid,request.groupId),JSON.stringify({uid,groupId:request.groupId,requestKey:request.requestKey,content:request.content}));
+    const saved=groupReadPendingRequest(uid,request.groupId);
+    return Boolean(saved && saved.requestKey===request.requestKey && saved.content===request.content);
+  } catch(error) {
+    console.warn('群組待重試訊息無法保存到本機：',error);
+    return false;
+  }
 }
 function groupReadPendingRequest(uid,groupId) {
   if(!uid||!groupId) return null;
@@ -3132,7 +3139,13 @@ async function groupSendMock() {
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('登入狀態已失效，請重新登入。');
     if(!g.pendingRequest || g.pendingRequest.groupId!==g.active.id || g.pendingRequest.content!==content) {
       g.pendingRequest={groupId:g.active.id,content,requestKey:window.crypto.randomUUID()};
-      groupSavePendingRequest(g.pendingRequest);
+      if(!groupSavePendingRequest(g.pendingRequest)) {
+        g.pendingRequest=null;
+        g.sending=false;
+        g.formError='瀏覽器無法保存安全重試資料，為避免網路逾時後重複建立回合，本次訊息尚未送出。請清理瀏覽器儲存空間或稍後重試。';
+        render();
+        return;
+      }
     }
     const {error}=await window.mySupabase.rpc('append_chat_group_mock_turn',{
       p_group_id:g.active.id,p_request_key:g.pendingRequest.requestKey,p_content:content
