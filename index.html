@@ -6392,7 +6392,7 @@ if (window.__pendingSupabaseUser) {
     if(input?.id==='memoryAlbumFile')void uploadAlbum(input);
   });
   document.addEventListener('click',async event=>{
-    const button=event.target.closest('[data-action="memory-photo-open"],[data-action="memory-photo-download"],[data-action="memory-photo-background"],[data-action="memory-photo-edit"],[data-action="memory-photo-delete"],[data-action="memory-photo-save-title"],[data-action="memory-photo-cancel-title"]);
+    const button=event.target.closest('[data-action="memory-photo-open"],[data-action="memory-photo-download"],[data-action="memory-photo-background"],[data-action="memory-photo-edit"],[data-action="memory-photo-delete"],[data-action="memory-photo-save-title"],[data-action="memory-photo-cancel-title"]');
     if(!button)return;
     const cached=urlCache.get(button.dataset.id);
     if(!cached?.url){toast('相片網址已失效，請重新開啟相簿。');return;}
