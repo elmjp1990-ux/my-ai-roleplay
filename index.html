@@ -6314,7 +6314,13 @@ if (window.__pendingSupabaseUser) {
       showDialog(cached.photo.caption||'回憶相片','<img src="'+e(cached.url)+'" alt="'+e(cached.photo.caption||'回憶相片')+'" style="width:100%;max-height:72dvh;object-fit:contain;border-radius:14px"><p class="small muted">'+e(dateLabel(cached.photo.created_at))+' · 保存一年</p><button type="button" data-action="memory-photo-download" data-id="'+e(cached.photo.id)+'">下載原始相片</button>');
     }else{
       const ext=(cached.photo.storage_path.split('.').pop()||'jpg').replace(/[^a-z0-9]/gi,'')||'jpg';
-      const a=document.createElement('a');a.href=cached.url;a.download=(cached.photo.caption||'personax-memory')+'.'+ext;a.rel='noopener';document.body.appendChild(a);a.click();a.remove();
+      try {
+        const response=await fetch(cached.url);
+        if(!response.ok)throw new Error('下載連結已失效，請重新開啟相簿。');
+        const blob=await response.blob(),objectUrl=URL.createObjectURL(blob);
+        const a=document.createElement('a');a.href=objectUrl;a.download=(cached.photo.caption||'personax-memory')+'.'+ext;
+        document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),1000);
+      } catch(error) { toast('下載失敗：'+(error.message||'請重新開啟相簿後再試。')); }
     }
   });
 })();
