@@ -4278,7 +4278,7 @@ function replacePromptVariables(template, values = {}) {
   // Known variables only; missing known values become empty, unknown placeholders stay literal.
   // Single-pass replacement prevents replacement text from being parsed recursively.
   const safeValues = values && typeof values === 'object' ? values : {};
-  return String(template ?? '').replace(/\\{([A-Z][A-Z0-9_]*)\\}/g, (literal, key) => {
+  return String(template ?? '').replace(/\{([A-Z][A-Z0-9_]*)\}/g, (literal, key) => {
     if (!PROMPT_VARIABLE_KEY_SET.has(key)) return literal;
     return Object.prototype.hasOwnProperty.call(safeValues, key) && safeValues[key] != null
       ? String(safeValues[key]) : '';
