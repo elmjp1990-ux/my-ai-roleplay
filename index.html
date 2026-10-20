@@ -3882,8 +3882,8 @@ function applyGroupChatBackground() {
     panel.style.setProperty('--chat-photo',url?'url('+JSON.stringify(url)+')':'none');return;
   }
   const members=group.members||[];let index=0;
-  const setAvatar=()=>{if(!members.length){panel.style.setProperty('--chat-photo','none');return;}const url=safeURL(members[index%members.length]?.avatar_url);panel.style.setProperty('--chat-photo',url?'url('+JSON.stringify(url)+')':'none');index=(index+1)%members.length;};
-  setAvatar();if(members.length>1)groupBackgroundTimer=setInterval(setAvatar,60000);
+  const setAvatar=()=>{if(!members.length){panel.style.setProperty('--chat-photo','none');return;}const member=members[index%members.length];const url=safeURL(member?.avatar_url||member?.character_snapshot?.avatar_url||member?.character_snapshot?.image||member?.image||member?.avatar);panel.style.setProperty('--chat-photo',url?'url('+JSON.stringify(url)+')':'none');index=(index+1)%members.length;};
+  setAvatar();if(members.length>1)groupBackgroundTimer=setInterval(setAvatar,8000);
 }
 
 let chatBackgroundDraft=null;
@@ -4290,8 +4290,7 @@ function renderMessages(scroll = true) {
     const user = m.role === 'user';
     return `<article class="message ${user ? 'user' : ''}"
                       data-message="${e(m.id)}">
-      ${user ? avatar(currentUser()) :
-        `<img class="avatar" src="${e(safeImage(c.image))}" alt="">`}
+      ${user ? avatar(currentUser()) : ''}
       <div class="message-content">
         <div class="message-name">${e(user ? currentUser().nickname : c.name)}</div>
         ${formatMessage(m.text)}
