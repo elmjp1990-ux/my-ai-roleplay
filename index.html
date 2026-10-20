@@ -507,6 +507,9 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .roleplay-segment.is-character .bubble { background:var(--bubble); color:var(--text); border-color:var(--border); }
 .roleplay-segment.is-temporary .bubble { background:var(--panel2); color:var(--text); border:1px dashed var(--border); }
 .roleplay-segment.is-user .bubble { background:var(--primary); color:white; border-color:transparent; }
+.roleplay-message-character .message-content { text-align:left; }
+.roleplay-message-character .message-name { text-align:left; }
+.roleplay-message-player .message-name { text-align:right; }
 .bubble {
   font-size:16px;
   padding:12px 14px;
@@ -4299,19 +4302,23 @@ function parseRoleplaySegments(raw, roles = []) {
     current = null;
   };
   for (const line of lines) {
-    const match = line.match(/^\s*[:：]([^:：\n]{1,40})[:：]\s?(.*)$/u);
-    if (match) {
+    // Accept both “：夜辰：內容” and “夜辰：內容”.
+    // Without a leading colon, only treat an exact known character name as a speaker.
+    const match = line.match(/^\s*([：:]?)([^:：\n]{1,40})[:：]\s?(.*)$/u);
+    const speakerName = match?.[2]?.trim() || '';
+    const exact = match ? roles.filter(role => String(role.name || '').trim() === speakerName) : [];
+    const knownRole = exact.length === 1 ? exact[0] : null;
+    const isExplicitPrefix = Boolean(match && match[1]);
+    if (match && (knownRole || isExplicitPrefix)) {
       foundPrefix = true;
       flush();
-      const speakerName = match[1].trim();
-      const exact = roles.filter(role => String(role.name || '').trim() === speakerName);
-      const role = exact.length === 1 ? exact[0] : null;
+      const role = knownRole;
       current = {
         kind: role ? 'character' : 'temporary',
         speakerName: role?.name || speakerName,
         characterId: role?.id || null,
         avatar: role?.image || role?.avatar_url || '',
-        text: match[2] || ''
+        text: match[3] || ''
       };
     } else if (current) {
       current.text += (current.text ? '\n' : '') + line;
@@ -4340,13 +4347,31 @@ function renderMessages(scroll = true) {
   $('messages').innerHTML = s.messages.map(m => {
     const user = m.role === 'user';
     const roles = [{id:c.id,name:c.name,image:c.image}];
-    const segments = user ? parseRoleplaySegments(m.text, roles) : null;
-    const contentHTML = user && segments.some(segment => segment.kind !== 'user')
-      ? '<div class="roleplay-segments">' + segments.map(roleplaySegmentHTML).join('') + '</div>'
-      : '<div class="message-name">' + e(user ? currentUser().nickname : c.name) + '</div>' + formatMessage(m.text);
+    if (user) {
+      const segments = parseRoleplaySegments(m.text, roles);
+      const hasSpeaker = segments.some(segment => segment.kind !== 'user');
+      if (hasSpeaker) {
+        return segments.map((segment, index) => {
+          const isPlayer = segment.kind === 'user';
+          const speaker = isPlayer ? (currentUser()?.nickname || '你') : segment.speakerName;
+          const role = roles.find(item => item.id === segment.characterId);
+          const image = safeImage(segment.avatar || role?.image || '');
+          const segmentAvatar = image
+            ? '<img class="avatar" src="' + e(image) + '" alt="">'
+            : '<span class="avatar avatar-fallback">' + e([...String(speaker || '?')][0] || '?') + '</span>';
+          const rowClass = isPlayer ? 'message user roleplay-message-player' : 'message roleplay-message-character';
+          return '<article class="' + rowClass + '" data-message="' + e(m.id) + '">' +
+            (isPlayer ? avatar(currentUser()) : segmentAvatar) +
+            '<div class="message-content"><div class="message-name">' + e(speaker) + '</div>' +
+            formatMessage(segment.text) + '</div>' +
+            (index === segments.length - 1 ? '<button class="message-more" data-action="message-menu" data-id="' + e(m.id) + '" aria-label="訊息操作">⋯</button>' : '') +
+            '</article>';
+        }).join('');
+      }
+    }
     return `<article class="message ${user ? 'user' : ''}" data-message="${e(m.id)}">
       ${user ? avatar(currentUser()) : `<img class="avatar" src="${e(safeImage(c.image))}" alt="">`}
-      <div class="message-content">${contentHTML}</div>
+      <div class="message-content"><div class="message-name">${e(user ? (currentUser()?.nickname || '你') : c.name)}</div>${formatMessage(m.text)}</div>
       <button class="message-more" data-action="message-menu" data-id="${e(m.id)}" aria-label="訊息操作">⋯</button>
     </article>`;
   }).join('');
