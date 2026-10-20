@@ -6273,14 +6273,7 @@ if (window.__pendingSupabaseUser) {
     const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));
     const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw new Error('目前裝置無法壓縮圖片。');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(image,0,0,canvas.width,canvas.height);image.close?.();
     const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('圖片壓縮失敗。')),'image/webp',.86));
-    return new File([blob],(file.name.replace(/\\.[^.]+$/,'')||'memory-photo')+'.webp',{type:'image/webp',lastModified:Date.now()});
-  }
-  async function compressMemoryImage(file){
-    const image=await createImageBitmap(file);const maxSide=1920;const scale=Math.min(1,maxSide/Math.max(image.width,image.height));
-    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));
-    const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw new Error('目前裝置無法壓縮圖片。');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(image,0,0,canvas.width,canvas.height);image.close?.();
-    const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('圖片壓縮失敗。')),'image/webp',.86));
-    return new File([blob],(file.name.replace(/\\.[^.]+$/,'')||'memory-photo')+'.webp',{type:'image/webp',lastModified:Date.now()});
+    return new File([blob],(file.name.replace(/\.[^.]+$/,'')||'memory-photo')+'.webp',{type:'image/webp',lastModified:Date.now()});
   }
   async function uploadAlbum(input){
     const type=input.dataset.albumType,chatId=input.dataset.albumId,file=input.files?.[0];
@@ -6365,7 +6358,7 @@ if (window.__pendingSupabaseUser) {
     if(kind!=='album')return;
     const s=currentSession(),overlay=$('view').querySelector('.chat-overlay');
     if(!s||!overlay)return;
-    overlay.innerHTML='<div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回">'+ICON.back+'</button><h2>回憶相簿</h2></div>'+albumMount('single',s.id);
+    overlay.innerHTML='<div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回">'+ICON.back+'</button><div><h2>回憶相簿</h2><p class="small muted" style="margin:0">回憶相簿可保存一年，請記得即時下載哦</p></div></div>'+albumMount('single',s.id);
     void loadAlbum('single',s.id);
   };
   const oldGroup=renderGroupChatOverlay;
@@ -6374,7 +6367,7 @@ if (window.__pendingSupabaseUser) {
     if(kind!=='album')return;
     const g=groupPrototype.active,overlay=$('view').querySelector('.chat-overlay');
     if(!g||!overlay)return;
-    overlay.innerHTML='<div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回">'+ICON.back+'</button><h2>回憶相簿</h2></div>'+albumMount('group',g.id);
+    overlay.innerHTML='<div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回">'+ICON.back+'</button><div><h2>回憶相簿</h2><p class="small muted" style="margin:0">回憶相簿可保存一年，請記得即時下載哦</p></div></div>'+albumMount('group',g.id);
     void loadAlbum('group',g.id);
   };
   renderChatAlbumPage=function(){
