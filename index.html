@@ -503,7 +503,8 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .roleplay-segments { display:grid; gap:5px; }
 .roleplay-segment { min-width:0; }
 .roleplay-segment-heading { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:11px; margin:4px 0 5px; }
-.roleplay-segment-heading .avatar { width:36px; height:36px; }\n.roleplay-prefixed-message .message-content { max-width:calc(100% - 8px); }
+.roleplay-segment-heading .avatar { width:36px; height:36px; }
+.roleplay-prefixed-message .message-content { max-width:calc(100% - 8px); }
 .roleplay-segment.is-character .bubble { background:var(--bubble); color:var(--text); border-color:var(--border); }
 .roleplay-segment.is-temporary .bubble { background:var(--panel2); color:var(--text); border:1px dashed var(--border); }
 .roleplay-segment.is-user .bubble { background:var(--primary); color:white; border-color:transparent; }
@@ -3830,16 +3831,21 @@ function renderGroupConversation() {
     // Group replies use m.content (not m.text), so they must be parsed here separately.
     // Otherwise “夜辰：...” stays plain text and never renders the character portrait.
     const segments=!isUser&&!isSystem ? parseRoleplaySegments(m.content || '',roleplayRoles) : [];
+    const userSegments=isUser ? parseRoleplaySegments(m.content || '',roleplayRoles) : [];
     const hasSpeaker=segments.some(segment=>segment.kind!=='user');
+    const hasUserSpeaker=userSegments.some(segment=>segment.kind!=='user');
     const avatarHTML=isUser
-      ? '<span class="avatar avatar-fallback" style="background:#4f46e5">你</span>'
+      ? (hasUserSpeaker ? '' : '<span class="avatar avatar-fallback" style="background:#4f46e5">你</span>')
       : isSystem
         ? '<span class="avatar avatar-fallback">系</span>'
         : (hasSpeaker ? '' : avatar?'<img class="avatar" src="'+e(avatar)+'" alt="">':'<span class="avatar avatar-fallback">'+e(String(who).trim().slice(0,1)||'角')+'</span>');
-    const bodyHTML=hasSpeaker
-      ? '<div class="roleplay-segments">'+segments.map(roleplaySegmentHTML).join('')+'</div>'
-      : '<div class="message-name">'+e(who)+'</div><div class="bubble">'+e(m.content||'')+'</div>';
-    return '<div class="message '+(isUser?'user':'')+(hasSpeaker?' roleplay-prefixed-message':'')+'">'+avatarHTML+
+    const bodyHTML=hasUserSpeaker
+      ? '<div class="roleplay-segments">'+userSegments.map(roleplaySegmentHTML).join('')+'</div>'
+      : hasSpeaker
+        ? '<div class="roleplay-segments">'+segments.map(roleplaySegmentHTML).join('')+'</div>'
+        : '<div class="message-name">'+e(who)+'</div><div class="bubble">'+e(m.content||'')+'</div>';
+    const hasRoleplaySegments=hasSpeaker||hasUserSpeaker;
+    return '<div class="message '+(isUser?'user':'')+(hasRoleplaySegments?' roleplay-prefixed-message':'')+'">'+avatarHTML+
       '<div class="message-content">'+bodyHTML+'</div></div>';
   }).join('') || '<div class="empty">這段群組對話還沒有訊息，輸入第一句話開始故事。</div>';
   const sceneNames=(group.scenes||[]).map(x=>x.name).filter(Boolean).join('、');
