@@ -4370,7 +4370,7 @@ function roleplaySegmentHTML(segment) {
 }
 
 function parseMentionTarget(raw, roles = []) {
-  const match = String(raw || '').match(/^@(.+?)(?:\\s+|$)/u);
+  const match = String(raw || '').match(/^@(.+?)(?:\s+|$)/u);
   if (!match) return {mentioned:false};
   const name = match[1].trim();
   const matches = roles.filter(role => String(role.name || '').trim() === name);
@@ -4378,7 +4378,7 @@ function parseMentionTarget(raw, roles = []) {
   return {mentioned:true,valid:false,name,reason:matches.length ? '同名角色無法唯一判定' : '找不到這位群組角色'};
 }
 function parsePlatformCommand(raw) {
-  const match = String(raw || '').trim().match(/^\\/([a-zA-Z][\\w-]*)(?:\\s+([\\s\\S]*))?$/u);
+  const match = String(raw || '').trim().match(/^\/([a-zA-Z][\w-]*)(?:\s+([\s\S]*))?$/u);
   return match ? {type:'platform',name:match[1].toLowerCase(),args:match[2] || ''} : {type:'none'};
 }
 function renderMessages(scroll = true) {
