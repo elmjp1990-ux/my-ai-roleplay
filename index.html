@@ -3883,7 +3883,6 @@ function renderGroupConversation() {
           <div class="composer-bottom-row">
             <div class="composer-bottom-left">
               <button type="button" class="composer-icon-button" data-action="toggle-chat-tools" aria-label="展開聊天功能" aria-expanded="false" title="更多功能">${ICON.plus}</button>
-              <span class="small muted">${g.turn} 回合</span>
             </div>
             <div class="composer-bottom-right">
               <div class="composer-wallet" aria-label="目前錢包餘額">
@@ -6445,12 +6444,14 @@ document.addEventListener('input',event => {
   }
 });
 document.addEventListener('keydown',event => {
-  if (['messageInput','groupMessageInput'].includes(event.target.id) &&
-      event.key==='Enter' && !event.shiftKey && !event.isComposing) {
-    event.preventDefault();
-    if(event.target.id==='groupMessageInput') void groupSendMock();
-    else event.target.form.requestSubmit();
-  }
+  // Enter inserts a newline on desktop and mobile. Only an explicit
+  // Ctrl/Cmd+Enter submits, preventing accidental sends while composing text.
+  if (!['messageInput','groupMessageInput'].includes(event.target.id) ||
+      event.key!=='Enter' || event.isComposing ||
+      !(event.ctrlKey || event.metaKey)) return;
+  event.preventDefault();
+  if(event.target.id==='groupMessageInput') void groupSendMock();
+  else event.target.form?.requestSubmit();
 });
 document.addEventListener('change',async event => {
   const target=event.target;
