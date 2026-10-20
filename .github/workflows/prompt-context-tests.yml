@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "supabase/functions/_shared/prompt-variables.ts"
+      - "supabase/functions/_shared/prompt-variables.test.ts"
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/prompt-context.test.ts"
       - ".github/workflows/prompt-context-tests.yml"
@@ -13,6 +14,7 @@ on:
       - "feat/chat-control-syntax-role-bubbles"
     paths:
       - "supabase/functions/_shared/prompt-variables.ts"
+      - "supabase/functions/_shared/prompt-variables.test.ts"
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/prompt-context.test.ts"
       - ".github/workflows/prompt-context-tests.yml"
@@ -25,5 +27,5 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - name: Run prompt context tests
-        run: deno test --no-check supabase/functions/_shared/prompt-context.test.ts
+      - name: Run prompt context and variable tests
+        run: deno test --no-check supabase/functions/_shared/prompt-context.test.ts supabase/functions/_shared/prompt-variables.test.ts
