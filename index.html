@@ -4639,7 +4639,7 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
             ${album.length?'':'<small class="muted">這段對話目前沒有可用的回憶相片。</small>'}
           </label>
           <label class="field"><span>選擇回憶相片</span><select id="singleMemoryPhotoSetting" data-session-id="${e(selected.id)}" ${album.length?'':'disabled'}>
-            ${album.map((photo,index)=>{const url=typeof photo==='string'?photo:(photo?.url||photo?.image_url||photo?.src||'');return /^https?:\\/\\//i.test(String(url))?'<option value="'+index+'" '+(background==='memory:'+index?'selected':'')+'>'+(e(photo?.caption||('回憶相片 '+(index+1))))+'</option>':'';}).join('')}
+            ${album.map((photo,index)=>{const url=typeof photo==='string'?photo:(photo?.url||photo?.image_url||photo?.src||'');return /^https?:\/\//i.test(String(url))?'<option value="'+index+'" '+(background==='memory:'+index?'selected':'')+'>'+(e(photo?.caption||('回憶相片 '+(index+1))))+'</option>':'';}).join('')}
           </select></label>
           <label class="field"><span>新增回憶相片（圖片網址）</span><input id="singleMemoryPhotoUrl" data-session-id="${e(selected.id)}" type="url" placeholder="https://…"></label>
           <label class="field"><span>相片名稱（選填）</span><input id="singleMemoryPhotoCaption" maxlength="80" placeholder="例如：第一次相遇"></label>
@@ -4929,7 +4929,7 @@ document.addEventListener('click',async event => {
         const imageUrl=String($('singleMemoryPhotoUrl')?.value||'').trim();
         const caption=String($('singleMemoryPhotoCaption')?.value||'').trim();
         if(!session) { toast('找不到這段對話，請重新開啟設定。');break; }
-        if(!/^https?:\\/\\//i.test(imageUrl)) { toast('請輸入有效的圖片網址。');break; }
+        if(!/^https?:\/\//i.test(imageUrl)) { toast('請輸入有效的圖片網址。');break; }
         const previousAlbum=Array.isArray(session.album)?session.album.slice():[];
         const previousBackground=session.background||'avatar';
         session.album=[{url:imageUrl,image_url:imageUrl,caption:caption||('回憶相片 '+(previousAlbum.length+1))},...previousAlbum];
@@ -6233,7 +6233,7 @@ document.addEventListener('change',async event => {
       const nextBackground=target.value==='memory'
         ? 'memory:'+Math.max(0,Number($('singleMemoryPhotoSetting')?.value||0))
         : target.value;
-      if (s && /^(avatar|none|memory:\\d+)$/.test(nextBackground)) {
+      if (s && /^(avatar|none|memory:\d+)$/.test(nextBackground)) {
         const previousBackground=s.background || 'avatar';
         s.background=nextBackground;
         if (!persist()) {
@@ -6267,7 +6267,7 @@ document.addEventListener('change',async event => {
     if (target.id==='singleMemoryPhotoSetting') {
       const sessionId=target.dataset.sessionId;
       const session=state.sessions[sessionId];
-      if(session&&/^\\d+$/.test(target.value)) {
+      if(session&&/^\d+$/.test(target.value)) {
         const previousBackground=session.background||'avatar';
         session.background='memory:'+Number(target.value);
         if(!persist()) { session.background=previousBackground;return; }
