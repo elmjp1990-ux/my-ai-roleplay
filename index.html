@@ -934,11 +934,9 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 
     // profiles.avatar_url 才是使用者在 PersonaX 編輯後的主頭像來源。
     // OAuth metadata 可能仍保留 Google 舊頭像，不能在登入初始 render 覆蓋已同步的頭像。
-    const avatarUrl =
-      previous.avatar ||
-      metadata.avatar_url ||
-      metadata.picture ||
-      '';
+    // 登入初始階段不顯示 OAuth 的 Google 頭像，也不信任舊快取作為最新頭像。
+    // 先用預設字母頭像，等 profiles.avatar_url 讀回後再顯示 PersonaX 主頭像。
+    const avatarUrl = '';
 
     state.account = {
       ...previous,
@@ -946,6 +944,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       nickname,
       email: user.email || previous.email || '',
       avatar: avatarUrl,
+      profileReady: false,
       bio: previous.bio || '',
       diamonds: Number(
         metadata.diamonds ??
@@ -1107,7 +1106,8 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         ...state.account,
         nickname: profile.nickname || state.account.nickname,
         handle: profile.handle || '',
-        avatar: profile.avatar_url || state.account.avatar || '',
+        avatar: profile.avatar_url || '',
+        profileReady: true,
         bio: profile.bio || '',
         birthdate: profile.birthdate || '',
         personas: Array.isArray(profile.persona_presets) ? profile.persona_presets : [],
@@ -1809,6 +1809,8 @@ let draftCharacter = null;
 let draftTags = [];
 let draftImage = '';
 let profileImage = '';
+let isCompressingCharacterImage = false;
+let characterImageCompressionRequest = 0;
 let replyId = null;
 let replyDraftVariant = 0;
 let toastTimer;
@@ -2984,7 +2986,7 @@ function renderEditor() {
         <h2>${route.id ? '修改角色' : '建立新角色'}</h2>
         <label class="field"><span>角色頭像 *</span>
           <input id="characterImage" type="file" accept="image/png,image/jpeg,image/webp">
-          <small>支援 PNG、JPG、WebP 格式。</small>
+          <small>支援 PNG、JPG、WebP；選取後會自動縮圖與壓縮，原始檔上限 15 MB，目標約 500 KB。</small>
         </label>
         <img id="imagePreview" ${draftImage ? `src="${e(safeImage(draftImage))}"` : ''}
              class="${draftImage ? '' : 'hidden'}"
@@ -3081,6 +3083,85 @@ async function compressProfileImage(file) {
   if(result.length>180000)result=canvas.toDataURL('image/jpeg',0.38);
   if(result.length>220000)throw Error('壓縮後圖片仍太大，請改用較簡單的圖片。');
   return result;
+}
+
+// IMG-01: compress user-selected upload images before they enter app state.
+async function compressUploadImage(file, options = {}) {
+  const allowedTypes=['image/png','image/jpeg','image/webp'];
+  if (!file || !allowedTypes.includes(file.type)) throw Error('請選擇 PNG、JPG 或 WebP 圖片。');
+  if (file.size > 15 * 1024 * 1024) throw Error('圖片原始檔請小於 15 MB。');
+
+  // Use a temporary object URL instead of converting the full original file to Base64.
+  // Always revoke it so repeated mobile selections do not retain large source buffers.
+  const sourceUrl=URL.createObjectURL(file);
+  let image;
+  try {
+    image=await new Promise((resolve,reject)=>{
+      const img=new Image();
+      img.onload=()=>resolve(img);
+      img.onerror=()=>reject(Error('無法讀取這張圖片，請換一張再試。'));
+      img.src=sourceUrl;
+    });
+    if (!image.naturalWidth || !image.naturalHeight) throw Error('圖片尺寸無效，請換一張再試。');
+
+    const targetBytes=Number(options.targetBytes)||500*1024;
+    const maxEdge=Number(options.maxEdge)||1600;
+    let scale=Math.min(1,maxEdge/Math.max(image.naturalWidth,image.naturalHeight));
+    const formats=[
+      {type:'image/webp',qualities:[0.84,0.76,0.68,0.60,0.52]},
+      {type:'image/jpeg',qualities:[0.82,0.72,0.62,0.52]}
+    ];
+    let bestBlob=null,bestWidth=0,bestHeight=0;
+    while(scale>=0.35) {
+      const width=Math.max(1,Math.round(image.naturalWidth*scale));
+      const height=Math.max(1,Math.round(image.naturalHeight*scale));
+      const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+      const ctx=canvas.getContext('2d');
+      if(!ctx) throw Error('目前瀏覽器無法壓縮圖片。');
+      ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+      for(const format of formats) {
+        // JPEG has no alpha channel. Fill it white first so transparent PNGs
+        // do not unexpectedly turn black when the fallback format is used.
+        if(format.type==='image/jpeg') {
+          ctx.fillStyle='#ffffff';
+          ctx.fillRect(0,0,width,height);
+        } else {
+          ctx.clearRect(0,0,width,height);
+        }
+        ctx.drawImage(image,0,0,width,height);
+        for(const quality of format.qualities) {
+          const blob=await new Promise(resolve=>canvas.toBlob(resolve,format.type,quality));
+          if(!blob || blob.type!==format.type) continue;
+          if(!bestBlob || blob.size<bestBlob.size) {
+            bestBlob=blob;bestWidth=width;bestHeight=height;
+          }
+          if(blob.size<=targetBytes) {
+            const dataUrl=await new Promise((resolve,reject)=>{
+              const reader=new FileReader();
+              reader.onload=()=>resolve(reader.result);
+              reader.onerror=()=>reject(Error('壓縮圖片讀取失敗，請再試一次。'));
+              reader.readAsDataURL(blob);
+            });
+            return {dataUrl,originalBytes:file.size,compressedBytes:blob.size,width,height,mimeType:blob.type};
+          }
+        }
+      }
+      scale*=0.85;
+    }
+    if(!bestBlob || bestBlob.size>2*1024*1024) {
+      throw Error('圖片壓縮後仍過大，請改選較小的圖片。');
+    }
+    const dataUrl=await new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onload=()=>resolve(reader.result);
+      reader.onerror=()=>reject(Error('壓縮圖片讀取失敗，請再試一次。'));
+      reader.readAsDataURL(bestBlob);
+    });
+    return {dataUrl,originalBytes:file.size,compressedBytes:bestBlob.size,width:bestWidth,height:bestHeight,mimeType:bestBlob.type};
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+    if(image) image.src='';
+  }
 }
 
 /* Chat sessions: character identity stays separate from conversation identity. */
@@ -5379,6 +5460,10 @@ document.addEventListener('submit',async event => {
   const form=event.target.closest('[data-form]');
   if (!form) return;
   event.preventDefault();
+  if (form.dataset.form === 'character' && isCompressingCharacterImage) {
+    toast('角色圖片仍在壓縮，請稍候完成後再儲存。');
+    return;
+  }
   if (form.dataset.submitting === 'true') return;
   form.dataset.submitting = 'true';
   const submitButton = event.submitter || form.querySelector('button[type="submit"], button:not([type])');
@@ -5519,7 +5604,13 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
             if (error || data?.user?.id !== state.account.uid) throw new Error('登入狀態驗證失敗，請重新登入。');
             await saveSupabaseProfile(state.account);
           }
-          back();render();toast('個人資料已儲存。');
+          // 不依賴 history.back() 的非同步 popstate；直接移除編輯視窗並立即重繪主畫面，
+          // 確保剛上傳的 PersonaX 頭像即時更新到右上角與個人帳號頁。
+          const returnRoute = {...route};
+          delete returnRoute.overlay;
+          go(returnRoute, true);
+          render();
+          toast('個人資料與頭像已儲存並立即更新。');
         } catch (error) {
           state.account={...previous};persist();render();
           toast('個人資料未能同步：'+(error.message || '請稍後再試。'));
@@ -5866,9 +5957,27 @@ document.addEventListener('change',async event => {
   const target=event.target;
   try {
     if (target.id==='characterImage') {
-      draftImage=await readImage(target.files[0]);
-      $('imagePreview').src=draftImage;
-      $('imagePreview').classList.remove('hidden');
+      const file=target.files?.[0];
+      if (!file) return;
+      const requestId=++characterImageCompressionRequest;
+      isCompressingCharacterImage=true;
+      toast('正在壓縮角色圖片，請稍候…');
+      try {
+        const compressed=await compressUploadImage(file,{maxEdge:1600,targetBytes:500*1024});
+        // Ignore stale results if the user selected another file while this one was processing.
+        if(requestId!==characterImageCompressionRequest) return;
+        draftImage=compressed.dataUrl;
+        $('imagePreview').src=draftImage;
+        $('imagePreview').classList.remove('hidden');
+        const before=(compressed.originalBytes/1024).toFixed(0),after=(compressed.compressedBytes/1024).toFixed(0);
+        toast(`角色頭像已自動壓縮：${before} KB → ${after} KB。`);
+      } catch(error) {
+        if(requestId!==characterImageCompressionRequest) return;
+        target.value='';
+        throw error;
+      } finally {
+        if(requestId===characterImageCompressionRequest) isCompressingCharacterImage=false;
+      }
     }
     if (target.id==='profileImage') {
       if (!target.files?.[0]) return;
