@@ -2963,6 +2963,64 @@ function renderCreate() {
       (createVisibilityFilter === 'public' ? '<div class="empty">目前沒有公開角色。</div>' : createVisibilityFilter === 'private' ? '<div class="empty">目前沒有私密角色。</div>' : '<div class="empty">尚未建立角色。</div>')}
     </div></div>`;
 }
+function editorDraftKey() {
+  const uid = currentUser()?.uid;
+  if (!uid) return null;
+  return 'personax:character-editor-draft:' + uid + ':' + (route.id || 'new');
+}
+function readEditorDraft() {
+  const key = editorDraftKey();
+  if (!key) return null;
+  for (const storage of [localStorage, sessionStorage]) {
+    try {
+      const raw = storage.getItem(key);
+      if (!raw) continue;
+      const value = JSON.parse(raw);
+      if (value && typeof value === 'object' && value.savedAt && Date.now() - value.savedAt < 7 * 24 * 60 * 60 * 1000) return value;
+    } catch (_) {}
+  }
+  return null;
+}
+function saveEditorDraft() {
+  const form = $('view')?.querySelector('form[data-form="character"]');
+  const key = editorDraftKey();
+  if (!form || !key || form.dataset.submitting === 'true') return;
+  const values = new FormData(form);
+  const draft = {
+    name:String(values.get('name') || ''),
+    gender:String(values.get('gender') || 'ambiguous'),
+    age:String(values.get('age') || ''),
+    race:String(values.get('race') || ''),
+    intro:String(values.get('intro') || ''),
+    opening:String(values.get('opening') || ''),
+    privateInfo:String(values.get('privateInfo') || ''),
+    style:String(values.get('style') || ''),
+    visibility:String(values.get('visibility') || 'private'),
+    rightsConfirmed:values.get('rightsConfirmed') === 'on',
+    tags:[...draftTags],
+    image:draftImage,
+    savedAt:Date.now()
+  };
+  const serialized = JSON.stringify(draft);
+  try {
+    localStorage.setItem(key, serialized);
+    try { sessionStorage.setItem(key, serialized); } catch (_) {}
+  } catch (_) {
+    // If the image exceeds storage quota, preserve all text fields and tags.
+    try {
+      delete draft.image;
+      const textOnly = JSON.stringify(draft);
+      localStorage.setItem(key, textOnly);
+      try { sessionStorage.setItem(key, textOnly); } catch (_) {}
+    } catch (_) {}
+  }
+}
+function clearEditorDraft() {
+  const key = editorDraftKey();
+  if (!key) return;
+  try { localStorage.removeItem(key); } catch (_) {}
+  try { sessionStorage.removeItem(key); } catch (_) {}
+}
 function startEditor(c = null) {
   draftCharacter = c ? clone(c) : null;
   draftTags = [...(c?.tags || [])];
@@ -2970,11 +3028,19 @@ function startEditor(c = null) {
   visit('editor',c?.id);
 }
 function renderEditor() {
-  const c = draftCharacter || state.characters.find(c => c.id === route.id) || {};
+  const savedDraft = readEditorDraft();
+  const original = draftCharacter || state.characters.find(c => c.id === route.id) || {};
+  const c = savedDraft ? {...original, ...savedDraft} : original;
+  if (savedDraft) {
+    draftTags = Array.isArray(savedDraft.tags) ? [...savedDraft.tags] : draftTags;
+    draftImage = savedDraft.image || draftImage || '';
+  }
   if (!draftCharacter && route.id) {
-    draftCharacter = clone(c);
-    draftTags = [...(c.tags || [])];
-    draftImage = c.image || '';
+    draftCharacter = clone(original);
+    if (!savedDraft) {
+      draftTags = [...(original.tags || [])];
+      draftImage = original.image || '';
+    }
   }
   if (route.id && !owned(c)) {
     $('view').innerHTML = '<div class="empty">無法修改此角色。</div>';
@@ -5506,6 +5572,7 @@ document.addEventListener('submit',async event => {
 
         // 先寫入雲端；只有角色資料成功後才更新本機畫面狀態。
         const saveResult = await saveSupabaseCharacter(c, user.uid);
+        clearEditorDraft();
         if (old) state.characters[state.characters.indexOf(old)]=c;
         else state.characters.unshift(c);
         persist();
@@ -5915,8 +5982,14 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
 });
 
 /* Inputs */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') saveEditorDraft();
+});
+window.addEventListener('pagehide', saveEditorDraft);
+window.addEventListener('blur', saveEditorDraft);
 document.addEventListener('input',event => {
   const target=event.target;
+  if (target.closest('form[data-form="character"]')) saveEditorDraft();
   if (target.id==='searchInput') {search=target.value;renderGrid();}
   if (target.id==='chatSearch') {
     chatSearch=target.value;
@@ -5955,6 +6028,7 @@ document.addEventListener('keydown',event => {
 });
 document.addEventListener('change',async event => {
   const target=event.target;
+  if (target.closest('form[data-form="character"]')) saveEditorDraft();
   try {
     if (target.id==='characterImage') {
       const file=target.files?.[0];
@@ -5971,6 +6045,7 @@ document.addEventListener('change',async event => {
         $('imagePreview').classList.remove('hidden');
         const before=(compressed.originalBytes/1024).toFixed(0),after=(compressed.compressedBytes/1024).toFixed(0);
         toast(`角色頭像已自動壓縮：${before} KB → ${after} KB。`);
+        saveEditorDraft();
       } catch(error) {
         if(requestId!==characterImageCompressionRequest) return;
         target.value='';
