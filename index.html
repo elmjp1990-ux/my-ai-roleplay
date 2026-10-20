@@ -4215,7 +4215,7 @@ function renderMessages(scroll = true) {
   $('messages').innerHTML = s.messages.map(m => {
     const user = m.role === 'user';
     const roles = [{id:c.id,name:c.name,image:c.image}];
-    const segments = user ? (Array.isArray(m.displaySegments) ? m.displaySegments : parseRoleplaySegments(m.text, roles)) : null;
+    const segments = user ? (Array.isArray(m.displaySegments) ? m.displaySegments.map(segment => ({...segment,avatar:segment.avatar || roles.find(role => role.id === segment.characterId)?.image || ''})) : parseRoleplaySegments(m.text, roles)) : null;
     const contentHTML = user && segments?.some(segment => segment.kind !== 'user')
       ? '<div class="roleplay-segments">' + segments.map(roleplaySegmentHTML).join('') + '</div>'
       : '<div class="message-name">' + e(user ? currentUser().nickname : c.name) + '</div>' + formatMessage(m.text);
@@ -5927,7 +5927,7 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         const availableRoles = [{id:c?.id,name:c?.name,image:c?.image}].filter(role => role.id && role.name);
         const displaySegments = parseRoleplaySegments(text, availableRoles);
         const mention = parseMentionTarget(text, availableRoles);
-        const userMessage = {id:id(),role:'user',text,at:Date.now(),displaySegments,
+        const userMessage = {id:id(),role:'user',text,at:Date.now(),displaySegments:displaySegments.map(({avatar:_avatar,...segment})=>segment),
           aiTargetId:mention.mentioned && mention.valid ? mention.characterId : null,
           commandType:text.trim().startsWith('!') ? 'custom' : null};
         if (mention.mentioned && !mention.valid) return toast(mention.reason + '，請確認角色名稱；本次沒有送出或扣款。');
