@@ -23,4 +23,4 @@ This feature is staged in Draft PR #99. The migration has **not** been applied t
 
 ## Important current limitation
 
-The new album UI/upload and the expiry worker are separate from the existing background picker. The background picker still needs to write stable references like `memory-photo:<photo UUID>` for single chats and the new photo UUID for groups before the background-expiry acceptance test can pass. Do not describe one-year deletion as active until the worker is deployed, scheduled, and verified.
+The album UI now includes a “設為聊天背景” action for single and group chats. Single-chat references use `memory-photo:<photo UUID>`; group chats store the photo UUID in `background_memory_photo_id`. The expiry worker clears matching references and switches to no background without choosing a replacement. This wiring is not browser-tested yet. Do not describe one-year deletion as active until the migration is applied, worker deployed, schedule configured, and expiry/retry behavior verified.
