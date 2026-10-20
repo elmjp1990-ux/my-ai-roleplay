@@ -3864,7 +3864,7 @@ function chatSettingsContext(isGroup){
 function renderChatSettingsOverlay(panel,isGroup,kind){
   const ctx=chatSettingsContext(isGroup);if(!ctx||!panel)return;
   if(kind==='delete-confirm'){
-    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="刪除對話確認"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回">‹</button><h2>刪除對話</h2></div><p>確定刪除此對話與回憶，操作後無法復原哦。</p><div class="chat-settings-save-row"><button type="button" class="ghost" data-action="chat-settings-back" aria-label="返回" title="返回">'+ICON.back+'</button><button type="button" data-action="chat-settings-back">取消</button><button type="button" class="danger" data-action="remove-session" data-id="'+e(ctx.id)+'">確認刪除</button></div></section>');
+    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="刪除對話確認"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回" title="返回">'+ICON.back+'</button><h2>刪除對話</h2></div><p>確定刪除此對話與回憶，操作後無法復原哦。</p><div class="chat-settings-save-row"><button type="button" data-action="chat-settings-back">取消</button><button type="button" class="danger" data-action="remove-session" data-id="'+e(ctx.id)+'">確認刪除</button></div></section>');
     return;
   }
   if(kind==='settings'){
