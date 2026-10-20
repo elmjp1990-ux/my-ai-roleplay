@@ -6275,6 +6275,19 @@ if (window.__pendingSupabaseUser) {
     const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('圖片壓縮失敗。')),'image/webp',.86));
     return new File([blob],(file.name.replace(/\.[^.]+$/,'')||'memory-photo')+'.webp',{type:'image/webp',lastModified:Date.now()});
   }
+  function setAlbumUploadStatus(input,message,isError=false){
+    const stack=input.closest('.memory-album-stack');
+    if(!stack)return;
+    let status=stack.querySelector('[data-memory-upload-status]');
+    if(!status){
+      status=document.createElement('div');status.dataset.memoryUploadStatus='true';
+      status.className='small';status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+      const items=stack.querySelector('#memoryAlbumItems');
+      if(items)stack.insertBefore(status,items);else stack.appendChild(status);
+    }
+    status.textContent=message;
+    status.style.color=isError?'var(--danger, #b42318)':'var(--muted, #667085)';
+  }
   async function uploadAlbum(input){
     const type=input.dataset.albumType,chatId=input.dataset.albumId,file=input.files?.[0];
     if(!file)return;
@@ -6285,6 +6298,9 @@ if (window.__pendingSupabaseUser) {
     const client=window.mySupabase;
     if(!client||!currentUser()?.uid){input.value='';toast('請先登入後再上傳相片。');return;}
     let path='';
+    input.disabled=true;
+    setAlbumUploadStatus(input,'正在壓縮並上傳相片，請稍候…');
+    toast('正在上傳回憶相片，請稍候…');
     try{
       const {data:{user},error:authError}=await client.auth.getUser();
       if(authError||!user||user.id!==currentUser()?.uid)throw new Error('登入狀態驗證失敗，請重新登入。');
@@ -6301,10 +6317,16 @@ if (window.__pendingSupabaseUser) {
       if(dbError)throw dbError;
       input.value='';if($('memoryAlbumCaption'))$('memoryAlbumCaption').value='';
       toast('回憶相片已保存。保存期限為一年，實際自動清理排程仍待完成。');
+      setAlbumUploadStatus(input,'上傳成功，正在更新相簿…');
       await loadAlbum(type,chatId);
+      setAlbumUploadStatus(input,'相片已保存並更新相簿。');
     }catch(err){
       if(path){const {error:cleanup}=await client.storage.from(BUCKET).remove([path]);if(cleanup)console.error('清理未完成上傳檔案失敗',cleanup.message);}
-      input.value='';console.error('回憶相片上傳失敗',err);toast('相片上傳失敗：'+(err.message||'請稍後重試。'));
+      console.error('回憶相片上傳失敗',err);
+      setAlbumUploadStatus(input,'上傳失敗：'+(err.message||'請稍後重試。'),true);
+      toast('相片上傳失敗：'+(err.message||'請稍後重試。'));
+    }finally{
+      input.disabled=false;
     }
   }
   async function applySingleMemoryPhotoBackground(session,panel){
