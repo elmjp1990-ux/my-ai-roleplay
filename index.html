@@ -503,7 +503,7 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .roleplay-segments { display:grid; gap:5px; }
 .roleplay-segment { min-width:0; }
 .roleplay-segment-heading { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:11px; margin:4px 0 5px; }
-.roleplay-segment-heading .avatar { width:22px; height:22px; }
+.roleplay-segment-heading .avatar { width:36px; height:36px; }\n.roleplay-prefixed-message .message-content { max-width:calc(100% - 8px); }
 .roleplay-segment.is-character .bubble { background:var(--bubble); color:var(--text); border-color:var(--border); }
 .roleplay-segment.is-temporary .bubble { background:var(--panel2); color:var(--text); border:1px dashed var(--border); }
 .roleplay-segment.is-user .bubble { background:var(--primary); color:white; border-color:transparent; }
@@ -4348,20 +4348,24 @@ function renderMessages(scroll = true) {
   const oldScroll = $('messages').scrollTop;
   $('messages').innerHTML = s.messages.map(m => {
     const user = m.role === 'user';
-    const roles = [{id:c.id,name:c.name,image:c.image}];
-    const segments = user
-      ? (Array.isArray(m.displaySegments)
-          ? m.displaySegments.map(segment => ({
-              ...segment,
-              avatar:segment.avatar || roles.find(role => role.id === segment.characterId)?.image || ''
-            }))
-          : parseRoleplaySegments(m.text, roles))
-      : null;
-    const contentHTML = user && segments?.some(segment => segment.kind !== 'user')
+    const roles = [{id:c.id,name:c.name,image:c.image || c.avatar_url}];
+    // Role prefixes can appear in AI replies as well as player-authored text.
+    // Previously only user messages were parsed, so an AI reply like “夜辰：...” never got its role avatar.
+    const segments = user && Array.isArray(m.displaySegments)
+      ? m.displaySegments.map(segment => ({
+          ...segment,
+          avatar:segment.avatar || roles.find(role => role.id === segment.characterId)?.image || ''
+        }))
+      : parseRoleplaySegments(m.text, roles);
+    const hasSpeaker = segments.some(segment => segment.kind !== 'user');
+    const contentHTML = hasSpeaker
       ? '<div class="roleplay-segments">' + segments.map(roleplaySegmentHTML).join('') + '</div>'
       : '<div class="message-name">' + e(user ? (currentUser()?.nickname || '你') : c.name) + '</div>' + formatMessage(m.text);
-    return `<article class="message ${user ? 'user' : ''}" data-message="${e(m.id)}">
-      ${user ? avatar(currentUser()) : `<img class="avatar" src="${e(safeImage(c.image))}" alt="">`}
+    const outerAvatar = user
+      ? avatar(currentUser())
+      : (hasSpeaker ? '' : `<img class="avatar" src="${e(safeImage(c.image || c.avatar_url))}" alt="">`);
+    return `<article class="message ${user ? 'user' : ''} ${hasSpeaker && !user ? 'roleplay-prefixed-message' : ''}" data-message="${e(m.id)}">
+      ${outerAvatar}
       <div class="message-content">${contentHTML}</div>
       <button class="message-more" data-action="message-menu" data-id="${e(m.id)}" aria-label="訊息操作">⋯</button>
     </article>`;
