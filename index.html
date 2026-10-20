@@ -606,6 +606,9 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .chat-overlay { position:absolute; inset:0; z-index:15; background:var(--header); backdrop-filter:blur(20px); padding:18px; padding-bottom:calc(18px + env(safe-area-inset-bottom)); overflow-y:auto; }
 .chat-settings-overlay { position:fixed; inset:0; z-index:10000; width:100vw; height:100dvh; max-height:100dvh; overflow-y:auto; border:0; border-radius:0; padding:calc(18px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom)); background:var(--bg); backdrop-filter:blur(20px); }
 .chat-settings-options,.chat-background-options { gap:8px; }
+.chat-settings-overlay .overlay-heading { display:flex; align-items:center; gap:10px; min-height:52px; }
+.chat-settings-overlay .overlay-heading > button.ghost { display:inline-flex; align-items:center; justify-content:center; flex:0 0 44px; width:44px; min-width:44px; height:44px; min-height:44px; padding:0; line-height:1; }
+.chat-settings-overlay .overlay-heading > button.ghost .icon { display:block; width:20px; height:20px; flex:0 0 20px; }
 .chat-settings-overlay .profile-setting { padding:18px 6px; }
 /* 全站返回箭頭統一尺寸、點擊區與 SVG 大小，手機也容易點按。 */
 button[aria-label^="返回"], button[data-action="chat-back"], button[data-action="group-return-list"],
@@ -3888,6 +3891,13 @@ function chatSettingsContext(isGroup){
   if(isGroup){const group=groupPrototype.active;return group?{isGroup:true,group,key:'group:'+group.id,id:group.id}:null;}
   const session=currentSession();return session?{isGroup:false,session,key:'single:'+session.id,id:session.id}:null;
 }
+function setChatOverlayRoute(next){
+  route=next;
+  const depth=history.state?.personax?history.state.depth:0;
+  history.replaceState({personax:true,depth,route:next},'',routeURL(next));
+  render();
+  window.scrollTo(0,0);
+}
 function renderChatSettingsOverlay(panel,isGroup,kind){
   const ctx=chatSettingsContext(isGroup);if(!ctx||!panel)return;
   if(kind==='delete-confirm'){
@@ -3934,12 +3944,12 @@ function renderGroupChatOverlay(kind) {
     const group=groupPrototype.active,sceneLabel=id=>group.scenes.find(x=>x.id===id)?.name||'共用場景';
     const members=group.members.map(m=>'<article class="memory-item"><strong>'+e(m.name||'角色')+'</strong><p class="small muted">'+e(sceneLabel(m.sceneId))+'</p></article>').join('');
     const scenes=(group.scenes||[]).map(x=>'<article class="memory-item"><strong>'+e(x.name||'未命名場景')+'</strong><p style="white-space:pre-wrap">'+e(x.description||'尚未填寫場景描述。')+'</p></article>').join('');
-    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="群組資訊"><div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回" title="返回">'+ICON.back+'</button><h2>群組資訊</h2></div><p><strong>群組名稱：</strong>'+e(group.name||'')+'</p><p><strong>世界背景</strong></p><article class="memory-item" style="white-space:pre-wrap">'+e(group.world||'尚未設定')+'</article><h3>參與角色（'+group.members.length+'/3）</h3>'+members+'<h3>場景設定</h3>'+scenes+'</section>');
+    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="群組資訊"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h2>群組資訊</h2></div><p><strong>群組名稱：</strong>'+e(group.name||'')+'</p><p><strong>世界背景</strong></p><article class="memory-item" style="white-space:pre-wrap">'+e(group.world||'尚未設定')+'</article><h3>參與角色（'+group.members.length+'/3）</h3>'+members+'<h3>場景設定</h3>'+scenes+'</section>');
     return;
   }
   if(kind==='diary'){
     const rows=(groupPrototype.messages||[]).map(m=>'<article class="memory-item"><strong>'+e(m.speaker||'角色')+'</strong><p style="white-space:pre-wrap;overflow-wrap:anywhere">'+e(m.content||'')+'</p><span class="small muted">'+e(timeText(m.created_at||m.at||Date.now()))+'</span></article>').join('');
-    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="甜蜜日記"><div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回" title="返回">'+ICON.back+'</button><h2>甜蜜日記</h2></div><p class="small muted">目前顯示群組對話紀錄。AI 摘要與長期日記封存尚未串接；此頁不會假裝已完成摘要生成。</p>'+(rows||'<div class="empty">目前還沒有可整理的群組記錄。</div>')+'</section>');
+    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="甜蜜日記"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h2>甜蜜日記</h2></div><p class="small muted">目前顯示群組對話紀錄。AI 摘要與長期日記封存尚未串接；此頁不會假裝已完成摘要生成。</p>'+(rows||'<div class="empty">目前還沒有可整理的群組記錄。</div>')+'</section>');
     return;
   }
   const members=group.members||[];
@@ -4376,7 +4386,7 @@ function renderChatOverlay(kind) {
   panel.insertAdjacentHTML('beforeend',`
     <section class="chat-overlay ${kind === 'diary' ? 'chat-settings-overlay' : ''}" aria-label="${kind === 'diary' ? '甜蜜日記' : kind === 'search' ? '搜尋過往聊天' : '回憶相簿'}">
       <div class="overlay-heading">
-        <button class="ghost" data-action="back" aria-label="返回">${ICON.back}</button>
+        <button class="ghost" data-action="${kind === 'diary' ? 'chat-settings-back' : 'back'}" aria-label="返回">${ICON.back}</button>
         <h2>${kind === 'diary' ? '甜蜜日記' : kind === 'search' ? '搜尋過往聊天' : '回憶相簿'}</h2>
       </div>${kind === 'album' ? '<div class="row wrap" style="margin-bottom:12px"><button type="button" data-action="persona">專屬人設設定</button><button type="button" data-action="chat-overlay" data-kind="diary">甜蜜日記</button></div>' : ''}${content}
     </section>`);
@@ -4988,11 +4998,21 @@ document.addEventListener('click',async event => {
         if(option==='delete'){if(route.page==='group'){toast('群組刪除尚未接入安全的雲端軟刪除流程，暫不提供會造成資料風險的按鈕。');break;}const next={...route,chatOverlay:'delete-confirm'};delete next.overlay;go(next);break;}
         break;
       }
-      case 'chat-settings-back': {back();break;}
-      case 'chat-settings-close': {back();break;}
+      case 'chat-settings-back': {
+        const next={...route,chatOverlay:'settings'};delete next.overlay;
+        setChatOverlayRoute(next);break;
+      }
+      case 'chat-settings-close': {
+        const next={...route};delete next.chatOverlay;delete next.overlay;
+        setChatOverlayRoute(next);break;
+      }
       case 'chat-background-mode': {if(chatBackgroundDraft&&['none','avatar','memory'].includes(button.dataset.value)){chatBackgroundDraft.mode=button.dataset.value;if(chatBackgroundDraft.mode==='memory'){chatBackgroundDraft.loaded=false;chatBackgroundDraft.error='';}render();}break;}
       case 'chat-background-select-photo': {if(chatBackgroundDraft&&chatBackgroundDraft.photos.some(p=>p.id===key)){chatBackgroundDraft.photoId=key;render();}break;}
-      case 'chat-background-cancel': {chatBackgroundDraft=null;const next={...route};delete next.chatOverlay;delete next.overlay;go(next);break;}
+      case 'chat-background-cancel': {
+        chatBackgroundDraft=null;
+        const next={...route,chatOverlay:'settings'};delete next.overlay;
+        setChatOverlayRoute(next);break;
+      }
       case 'group-open':groupOpen(key);break;
       case 'group-settings': {
         if(!isUuid(key))break;
