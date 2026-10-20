@@ -7,9 +7,8 @@ This feature is staged in Draft PR #99. The migration has **not** been applied t
 1. Review and merge/deploy the PR only when ready for the test environment.
 2. Apply `supabase/migrations/20261020120000_unified_memory_album.sql` to the test project.
 3. Deploy `supabase/functions/expire-memory-album-photos/index.ts`.
-4. Set the Edge Function secret `MEMORY_ALBUM_CRON_SECRET` to a newly generated long random value. Keep it out of Git and browser code.
-5. Run `supabase/operations/schedule-memory-album-expiry.sql` only after replacing its placeholders with server-side secrets. It stores the project URL, service-role key, and the same cron secret in Supabase Vault, then schedules the cleanup worker daily at 03:17 UTC.
-6. Confirm `pg_cron`, `pg_net`, and Vault are available in the project before running the schedule SQL. Never put a real service-role key or cron secret in this repository.
+4. Run `supabase/operations/schedule-memory-album-expiry.sql` only after replacing the service-role placeholder with the server-side key. It stores the project URL and service-role key in Supabase Vault, then schedules the cleanup worker daily at 03:17 UTC.
+5. Confirm `pg_cron`, `pg_net`, and Vault are available in the project before running the schedule SQL. Never put a real service-role key in this repository or browser code.
 
 ## Minimum acceptance tests
 
