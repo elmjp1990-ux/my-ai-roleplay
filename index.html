@@ -3792,7 +3792,7 @@ async function openGroupBackgroundSettings() {
     showDialog('群組聊天背景',
       '<div class="stack">'+
       '<label class="field"><span>聊天背景</span><select id="groupBackgroundSetting">'+
-      '<option value="avatar" '+(mode==='avatar'?'selected':'')+'>角色頭像（每分鐘輪播）</option>'+
+      '<option value="avatar" '+(mode==='avatar'?'selected':'')+'>角色頭像（每 8 秒輪播）</option>'+
       '<option value="memory" '+(mode==='memory'?'selected':'')+(photos.length?'':' disabled')+'>群組回憶相片</option>'+
       '<option value="none" '+(mode==='none'?'selected':'')+'>無背景</option></select></label>'+
       '<label class="field"><span>選擇群組回憶相片</span><select id="groupMemoryPhotoSetting" '+(photos.length?'':'disabled')+'>'+
