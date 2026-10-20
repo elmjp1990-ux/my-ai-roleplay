@@ -3676,7 +3676,7 @@ async function groupOpen(groupId) {
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('請重新登入後再開啟群組。');
     g.ownerUid=user.id;
     const [groupRes,sceneRes,memberRes,messageRes]=await groupWithTimeout(Promise.all([
-      window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,created_at,updated_at').eq('id',groupId).single(),
+      window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,background_mode,background_memory_photo_id,created_at,updated_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).order('created_at',{ascending:true}).order('sequence_no',{ascending:true})
@@ -3704,7 +3704,7 @@ async function groupOpen(groupId) {
       const speaker=type==='user'?'你':type==='system'?'系統':(speakerSnapshot.name||member?.name||'角色')+(scene?' · '+scene.name:'');
       return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:m.content,createdAt:m.created_at};
     });
-    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',scenes,members};
+    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'none',backgroundMemoryPhotoId:group.background_memory_photo_id||null,scenes,members};
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;g.formError='';
     g.loading=false;g.openError='';g.failedGroupId=null;g.groupsLoaded=false;
     render();
@@ -3785,6 +3785,9 @@ function renderGroupConversation() {
         </form>
       </section>
     </div>`;
+  const groupPanel=$('view').querySelector('.chat-main');
+  if(groupPanel&&g.active?.backgroundMode==='memory'&&g.active.backgroundMemoryPhotoId) void applyGroupMemoryPhotoBackground(g.active,groupPanel);
+  else if(groupPanel) groupPanel.style.setProperty('--chat-photo','none');
   if (route.chatOverlay) renderGroupChatOverlay(route.chatOverlay);
 }
 function renderGroupChatOverlay(kind) {
@@ -4102,8 +4105,12 @@ function renderConversation() {
       </section>
     </div>`;
   const panel = $('view').querySelector('.chat-main');
-  panel.style.setProperty('--chat-photo',
-    s.background === 'none' ? 'none' : `url(${JSON.stringify(safeImage(c.image))})`);
+  if(String(s.background||'').startsWith('memory-photo:')) {
+    void applySingleMemoryPhotoBackground(s,panel);
+  } else {
+    panel.style.setProperty('--chat-photo',
+      s.background === 'none' ? 'none' : `url(${JSON.stringify(safeImage(c.image))})`);
+  }
   renderMessages();
 
   if (route.chatOverlay) renderChatOverlay(route.chatOverlay);
@@ -6238,7 +6245,7 @@ if (window.__pendingSupabaseUser) {
         urlCache.set(photo.id,{url:signed.signedUrl,photo});
         return '<article class="memory-photo-row"><button type="button" class="memory-photo-thumb" data-action="memory-photo-open" data-id="'+e(photo.id)+'" aria-label="開啟相片">'+
           '<img src="'+e(signed.signedUrl)+'" alt="'+e(photo.caption||'回憶相片')+'" loading="lazy"></button>'+
-          '<div class="memory-photo-details"><strong>'+e(photo.caption||'回憶快照')+'</strong><span class="small muted">'+e(dateLabel(photo.created_at))+'</span></div>'+
+          '<div class="memory-photo-details"><strong>'+e(photo.caption||'回憶快照')+'</strong><span class="small muted">'+e(dateLabel(photo.created_at))+'</span><button type="button" data-action="memory-photo-background" data-id="'+e(photo.id)+'">設為聊天背景</button></div>'+
           '<button type="button" class="memory-photo-download" data-action="memory-photo-download" data-id="'+e(photo.id)+'" aria-label="下載原始相片" title="下載原始相片">⬇</button></article>';
       }));
       if(!mount.isConnected)return;
@@ -6276,6 +6283,35 @@ if (window.__pendingSupabaseUser) {
       input.value='';console.error('回憶相片上傳失敗',err);toast('相片上傳失敗：'+(err.message||'請稍後重試。'));
     }
   }
+  async function applySingleMemoryPhotoBackground(session,panel){
+    const client=window.mySupabase,uid=currentUser()?.uid;
+    const match=String(session?.background||'').match(/^memory-photo:([0-9a-f-]{36})$/i);
+    if(!client||!uid||!match||session.cloudOwnerUid!==uid){panel.style.setProperty('--chat-photo','none');return;}
+    try{
+      const {data:photo,error}=await client.from('chat_memory_photos').select('id,storage_path')
+        .eq('id',match[1]).eq('owner_id',uid).eq('chat_type','single').eq('session_id',session.id)
+        .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).maybeSingle();
+      if(error)throw error;
+      if(!photo){session.background='none';persist();panel.style.setProperty('--chat-photo','none');return;}
+      const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,3600);
+      if(signedError||!signed?.signedUrl)throw signedError||new Error('無法取得背景圖片。');
+      if(currentSession()?.id===session.id)panel.style.setProperty('--chat-photo','url('+JSON.stringify(signed.signedUrl)+')');
+    }catch(err){console.error('讀取單聊相簿背景失敗',err);panel.style.setProperty('--chat-photo','none');}
+  }
+  async function applyGroupMemoryPhotoBackground(group,panel){
+    const client=window.mySupabase,uid=currentUser()?.uid,photoId=group?.backgroundMemoryPhotoId;
+    if(!client||!uid||!photoId||groupPrototype.active?.id!==group.id){panel.style.setProperty('--chat-photo','none');return;}
+    try{
+      const {data:photo,error}=await client.from('chat_memory_photos').select('id,storage_path')
+        .eq('id',photoId).eq('owner_id',uid).eq('chat_type','group').eq('group_id',group.id)
+        .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).maybeSingle();
+      if(error)throw error;
+      if(!photo){panel.style.setProperty('--chat-photo','none');return;}
+      const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,3600);
+      if(signedError||!signed?.signedUrl)throw signedError||new Error('無法取得群組背景圖片。');
+      if(groupPrototype.active?.id===group.id)panel.style.setProperty('--chat-photo','url('+JSON.stringify(signed.signedUrl)+')');
+    }catch(err){console.error('讀取群組相簿背景失敗',err);panel.style.setProperty('--chat-photo','none');}
+  }
   const oldSingle=renderChatOverlay;
   renderChatOverlay=function(kind){
     oldSingle(kind);
@@ -6305,11 +6341,34 @@ if (window.__pendingSupabaseUser) {
     const input=event.target;
     if(input?.id==='memoryAlbumFile')void uploadAlbum(input);
   });
-  document.addEventListener('click',event=>{
-    const button=event.target.closest('[data-action="memory-photo-open"],[data-action="memory-photo-download"]');
+  document.addEventListener('click',async event=>{
+    const button=event.target.closest('[data-action="memory-photo-open"],[data-action="memory-photo-download"],[data-action="memory-photo-background"]');
     if(!button)return;
     const cached=urlCache.get(button.dataset.id);
     if(!cached?.url){toast('相片網址已失效，請重新開啟相簿。');return;}
+    if(button.dataset.action==='memory-photo-background'){
+      const photo=cached.photo,client=window.mySupabase,uid=currentUser()?.uid;
+      if(!client||!uid||photo.owner_id!==uid){toast('請確認登入帳號與相片擁有者一致。');return;}
+      try{
+        if(photo.chat_type==='single'){
+          const session=state.sessions[photo.session_id];
+          if(!session||!session.cloudOwned||session.cloudOwnerUid!==uid){toast('這不是目前帳號擁有的已同步聊天。');return;}
+          const previous=session.background;session.background='memory-photo:'+photo.id;
+          if(!persist()){session.background=previous;return;}
+          const synced=await saveChatSessionSafely(session);
+          if(!synced){session.background=previous;persist();render();toast('背景同步失敗，已還原原設定。');return;}
+          render();toast('已將這張回憶相片設為聊天背景。');
+        }else{
+          const group=groupPrototype.active;
+          if(!group||group.id!==photo.group_id){toast('請先開啟這張照片所屬的群組。');return;}
+          const {data,error}=await client.from('chat_groups').update({background_mode:'memory',background_memory_photo_id:photo.id,updated_at:new Date().toISOString()})
+            .eq('id',group.id).eq('owner_id',uid).select('id').maybeSingle();
+          if(error||!data)throw error||new Error('資料庫未確認群組背景已儲存。');
+          group.backgroundMode='memory';group.backgroundMemoryPhotoId=photo.id;render();toast('已將這張回憶相片設為群組背景。');
+        }
+      }catch(err){console.error('設定回憶相片背景失敗',err);toast('背景設定失敗：'+(err.message||'請稍後再試。'));}
+      return;
+    }
     if(button.dataset.action==='memory-photo-open'){
       showDialog(cached.photo.caption||'回憶相片','<img src="'+e(cached.url)+'" alt="'+e(cached.photo.caption||'回憶相片')+'" style="width:100%;max-height:72dvh;object-fit:contain;border-radius:14px"><p class="small muted">'+e(dateLabel(cached.photo.created_at))+' · 保存一年</p><button type="button" data-action="memory-photo-download" data-id="'+e(cached.photo.id)+'">下載原始相片</button>');
     }else{
