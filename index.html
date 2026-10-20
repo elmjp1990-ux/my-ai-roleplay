@@ -4189,11 +4189,89 @@ function parsePlatformCommand(raw) {
   const match = String(raw || '').trim().match(/^\/([a-zA-Z][\w-]*)(?:\s+([\s\S]*))?$/u);
   return match ? {type:'platform',name:match[1].toLowerCase(),args:match[2] || ''} : {type:'none'};
 }
+const PROMPT_VARIABLE_KEYS = Object.freeze([
+  'USER','CHAR','USER_DESC','CHAR_DESC','USER_GENDER','USER_PRONOUN',
+  'WORLD','SETTING','SCENE','RELATIONSHIP','TIME','LOCATION',
+  'USER_MESSAGE','CHAT_HISTORY','MEMORY','SUMMARY','TURN_COUNT','CURRENT_DATE',
+  'CHAR_LIST','ACTIVE_CHAR','OTHER_CHARS','GROUP_NAME','GROUP_WORLD','GROUP_SCENE'
+]);
+const PROMPT_VARIABLE_KEY_SET = new Set(PROMPT_VARIABLE_KEYS);
+
+function promptText(value) {
+  if (value == null) return '';
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return '';
+}
+function promptTaipeiDate(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit'
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return values.year + '-' + values.month + '-' + values.day;
+}
+function promptHistory(messages = []) {
+  return (Array.isArray(messages) ? messages : []).slice(-10).map(message => {
+    const role = message?.role === 'assistant' ? '角色' : '玩家';
+    const content = promptText(message?.text ?? message?.content).trim();
+    return content ? role + '：' + content : '';
+  }).filter(Boolean).join('\\n');
+}
+function promptMemory(memories = []) {
+  const items = Array.isArray(memories) ? memories : memories ? [memories] : [];
+  return items.map(item => {
+    if (typeof item === 'string') return item.trim();
+    if (!item || typeof item !== 'object') return '';
+    return promptText(item.summary ?? item.content ?? item.text).trim();
+  }).filter(Boolean).join('\\n').slice(0, 3000);
+}
+function buildPromptVariableValues(context = {}) {
+  const user = context.user && typeof context.user === 'object' ? context.user : {};
+  const character = context.character && typeof context.character === 'object' ? context.character : {};
+  const session = context.session && typeof context.session === 'object' ? context.session : {};
+  const group = context.group && typeof context.group === 'object' ? context.group : null;
+  const members = Array.isArray(group?.members) ? group.members : [];
+  const active = context.activeCharacter || character;
+  const messages = Array.isArray(context.messages) ? context.messages : Array.isArray(session.messages) ? session.messages : [];
+  const world = promptText(group?.world ?? group?.worldBackground ?? session.world ?? session.worldBackground ?? character.worldBackground ?? character.world);
+  const scenes = Array.isArray(group?.scenes) ? group.scenes : [];
+  const scene = promptText(context.scene ?? session.scene ?? scenes.map(item => item?.name).filter(Boolean).join('、'));
+  const values = {
+    USER: promptText(user.nickname ?? user.name),
+    CHAR: promptText(character.name),
+    USER_DESC: promptText(user.roleplayDescription ?? user.personaDescription ?? user.bio),
+    CHAR_DESC: promptText(character.description ?? character.intro),
+    USER_GENDER: promptText(user.gender),
+    USER_PRONOUN: promptText(user.pronouns ?? user.pronoun),
+    WORLD: world,
+    SETTING: promptText(session.setting ?? character.setting ?? world),
+    SCENE: scene,
+    RELATIONSHIP: promptText(session.relationship ?? context.relationship),
+    TIME: promptText(context.time ?? session.time),
+    LOCATION: promptText(context.location ?? session.location),
+    USER_MESSAGE: promptText(context.userMessage ?? messages.filter(message => message?.role === 'user').slice(-1)[0]?.text ?? messages.filter(message => message?.role === 'user').slice(-1)[0]?.content),
+    CHAT_HISTORY: promptHistory(messages),
+    MEMORY: promptMemory(context.memory ?? session.memories),
+    SUMMARY: promptText(context.summary ?? session.summary),
+    TURN_COUNT: String(messages.filter(message => message?.role === 'user').length),
+    CURRENT_DATE: promptTaipeiDate(context.now instanceof Date ? context.now : new Date()),
+    CHAR_LIST: members.map(member => promptText(member?.name)).filter(Boolean).join('、'),
+    ACTIVE_CHAR: promptText(active?.name),
+    OTHER_CHARS: members.filter(member => member?.id !== active?.id && member?.characterId !== active?.id).map(member => promptText(member?.name)).filter(Boolean).join('、'),
+    GROUP_NAME: promptText(group?.name),
+    GROUP_WORLD: world,
+    GROUP_SCENE: scene
+  };
+  return Object.fromEntries(PROMPT_VARIABLE_KEYS.map(key => [key, values[key] ?? '']));
+}
 function replacePromptVariables(template, values = {}) {
-  // Replace only known uppercase snake-case variables, once; unknown placeholders remain literal.
-  return String(template ?? '').replace(/\{([A-Z][A-Z0-9_]*)\}/g, (literal, key) =>
-    Object.prototype.hasOwnProperty.call(values, key) && values[key] != null ? String(values[key]) : literal
-  );
+  // Known variables only; missing known values become empty, unknown placeholders stay literal.
+  // Single-pass replacement prevents replacement text from being parsed recursively.
+  const safeValues = values && typeof values === 'object' ? values : {};
+  return String(template ?? '').replace(/\\{([A-Z][A-Z0-9_]*)\\}/g, (literal, key) => {
+    if (!PROMPT_VARIABLE_KEY_SET.has(key)) return literal;
+    return Object.prototype.hasOwnProperty.call(safeValues, key) && safeValues[key] != null
+      ? String(safeValues[key]) : '';
+  });
 }
 function formatMessage(text) {
   return String(text).split(/(\*\*[\s\S]*?\*\*|\*[\s\S]*?\*)/g).filter(Boolean).map(part => {
