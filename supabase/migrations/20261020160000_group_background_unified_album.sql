@@ -24,14 +24,6 @@ SECURITY INVOKER
 SET search_path = ''
 AS $function$
 BEGIN
-  -- Do not block unrelated group edits because of a stale legacy background reference.
-  IF TG_OP = 'UPDATE'
-     AND NEW.background_mode IS NOT DISTINCT FROM OLD.background_mode
-     AND NEW.background_memory_photo_id IS NOT DISTINCT FROM OLD.background_memory_photo_id
-     AND NEW.owner_id IS NOT DISTINCT FROM OLD.owner_id THEN
-    RETURN NEW;
-  END IF;
-
   IF NEW.background_mode NOT IN ('avatar','none','memory') THEN
     RAISE EXCEPTION 'invalid_group_background_mode';
   END IF;
@@ -62,7 +54,7 @@ REVOKE ALL ON FUNCTION public.validate_chat_group_background_photo() FROM PUBLIC
 
 DROP TRIGGER IF EXISTS validate_chat_group_background_photo ON public.chat_groups;
 CREATE TRIGGER validate_chat_group_background_photo
-BEFORE INSERT OR UPDATE ON public.chat_groups
+BEFORE INSERT OR UPDATE OF background_mode, background_memory_photo_id, owner_id ON public.chat_groups
 FOR EACH ROW
 EXECUTE FUNCTION public.validate_chat_group_background_photo();
 
