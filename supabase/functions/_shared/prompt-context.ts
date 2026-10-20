@@ -44,11 +44,11 @@ export function buildPromptVariableValues(input: PromptContextInput): PromptVari
   const world = str(group.world_background ?? session.world_background ?? session.world ?? character.worldBackground);
   const personaPresets = Array.isArray(profile.persona_presets) ? profile.persona_presets.map(obj) : [];
   const defaultPersona = personaPresets.find(p => p.isDefault === true);
-  const playerPersona = str(session.persona) || str(defaultPersona?.text);
+  const playerPersona = str(session.persona) || str(group.player_persona ?? group.playerPersona) || str(defaultPersona?.text);
   const memorySource = session.memories ?? session.memory;
   const memory = Array.isArray(memorySource) ? capMemory(memorySource.map(v => typeof v === "string" ? v : str(obj(v).summary ?? obj(v).content ?? obj(v).text)).filter(Boolean).join("\n")) : capMemory(memorySource);
   const values: PromptVariableValues = {
-    USER: str(profile.nickname ?? profile.handle), CHAR: str(character.name),
+    USER: str(group.player_name ?? group.playerName ?? profile.nickname ?? profile.handle), CHAR: str(character.name),
     USER_DESC: playerPersona, CHAR_DESC: str(character.intro ?? character.description),
     USER_GENDER: str(profile.gender), USER_PRONOUN: str(profile.pronoun),
     WORLD: world, SETTING: str(session.setting ?? character.setting ?? world),
