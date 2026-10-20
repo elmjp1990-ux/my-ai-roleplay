@@ -42,11 +42,14 @@ export function buildPromptVariableValues(input: PromptContextInput): PromptVari
   const activeId = str(character.id);
   const otherNames = members.filter(m => str(m.character_id ?? snapshotOf(m).id) !== activeId).map(m => str(snapshotOf(m).name)).filter(Boolean);
   const world = str(group.world_background ?? session.world_background ?? session.world ?? character.worldBackground);
+  const personaPresets = Array.isArray(profile.persona_presets) ? profile.persona_presets.map(obj) : [];
+  const defaultPersona = personaPresets.find(p => p.isDefault === true);
+  const playerPersona = str(session.persona) || str(defaultPersona?.text);
   const memorySource = session.memories ?? session.memory;
   const memory = Array.isArray(memorySource) ? capMemory(memorySource.map(v => typeof v === "string" ? v : str(obj(v).summary ?? obj(v).content ?? obj(v).text)).filter(Boolean).join("\n")) : capMemory(memorySource);
   const values: PromptVariableValues = {
     USER: str(profile.nickname ?? profile.handle), CHAR: str(character.name),
-    USER_DESC: str(profile.persona_description ?? profile.persona ?? profile.bio), CHAR_DESC: str(character.intro ?? character.description),
+    USER_DESC: playerPersona, CHAR_DESC: str(character.intro ?? character.description),
     USER_GENDER: str(profile.gender), USER_PRONOUN: str(profile.pronoun),
     WORLD: world, SETTING: str(session.setting ?? character.setting ?? world),
     SCENE: str(session.scene ?? group.scene ?? group.initial_scene),
