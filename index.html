@@ -4209,8 +4209,18 @@ function promptTaipeiDate(now = new Date()) {
   const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
   return values.year + '-' + values.month + '-' + values.day;
 }
-function promptHistory(messages = []) {
-  return (Array.isArray(messages) ? messages : []).slice(-10).map(message => {
+function promptHistory(messages = [], currentUserMessage = '') {
+  const list = Array.isArray(messages) ? [...messages] : [];
+  const current = promptText(currentUserMessage).trim();
+  // Keep the current player turn in USER_MESSAGE, not duplicated in CHAT_HISTORY.
+  if (current) {
+    const lastUserIndex = list.map(message => message?.role).lastIndexOf('user');
+    if (lastUserIndex >= 0) {
+      const lastUser = list[lastUserIndex];
+      if (promptText(lastUser?.text ?? lastUser?.content).trim() === current) list.splice(lastUserIndex, 1);
+    }
+  }
+  return list.slice(-10).map(message => {
     const role = message?.role === 'assistant' ? '角色' : '玩家';
     const content = promptText(message?.text ?? message?.content).trim();
     return content ? role + '：' + content : '';
@@ -4235,10 +4245,11 @@ function buildPromptVariableValues(context = {}) {
   const world = promptText(group?.world ?? group?.worldBackground ?? session.world ?? session.worldBackground ?? character.worldBackground ?? character.world);
   const scenes = Array.isArray(group?.scenes) ? group.scenes : [];
   const scene = promptText(context.scene ?? session.scene ?? scenes.map(item => item?.name).filter(Boolean).join('、'));
+  const currentUserMessage = promptText(context.userMessage ?? messages.filter(message => message?.role === 'user').slice(-1)[0]?.text ?? messages.filter(message => message?.role === 'user').slice(-1)[0]?.content);
   const values = {
     USER: promptText(user.nickname ?? user.name),
     CHAR: promptText(character.name),
-    USER_DESC: promptText(user.roleplayDescription ?? user.personaDescription ?? user.bio),
+    USER_DESC: promptText(session.persona ?? user.roleplayDescription ?? user.personaDescription),
     CHAR_DESC: promptText(character.description ?? character.intro),
     USER_GENDER: promptText(user.gender),
     USER_PRONOUN: promptText(user.pronouns ?? user.pronoun),
@@ -4248,8 +4259,8 @@ function buildPromptVariableValues(context = {}) {
     RELATIONSHIP: promptText(session.relationship ?? context.relationship),
     TIME: promptText(context.time ?? session.time),
     LOCATION: promptText(context.location ?? session.location),
-    USER_MESSAGE: promptText(context.userMessage ?? messages.filter(message => message?.role === 'user').slice(-1)[0]?.text ?? messages.filter(message => message?.role === 'user').slice(-1)[0]?.content),
-    CHAT_HISTORY: promptHistory(messages),
+    USER_MESSAGE: currentUserMessage,
+    CHAT_HISTORY: promptHistory(messages, currentUserMessage),
     MEMORY: promptMemory(context.memory ?? session.memories),
     SUMMARY: promptText(context.summary ?? session.summary),
     TURN_COUNT: String(messages.filter(message => message?.role === 'user').length),
