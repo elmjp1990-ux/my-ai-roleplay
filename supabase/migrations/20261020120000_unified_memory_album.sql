@@ -28,6 +28,30 @@ create table if not exists public.chat_memory_photos (
   )
 );
 
+-- Enforce the retention window server-side; clients cannot choose a later expiry.
+create or replace function public.enforce_chat_memory_photo_expiry()
+returns trigger
+language plpgsql
+set search_path = ''
+as $
+begin
+  new.created_at := pg_catalog.now();
+  new.expires_at := new.created_at + interval '1 year';
+  new.status := 'active';
+  new.deletion_attempts := 0;
+  new.last_deletion_error := null;
+  new.deleted_at := null;
+  return new;
+end;
+$;
+
+revoke all on function public.enforce_chat_memory_photo_expiry() from public, anon, authenticated;
+
+drop trigger if exists enforce_chat_memory_photo_expiry on public.chat_memory_photos;
+create trigger enforce_chat_memory_photo_expiry
+before insert on public.chat_memory_photos
+for each row execute function public.enforce_chat_memory_photo_expiry();
+
 create index if not exists chat_memory_photos_single_active_idx
   on public.chat_memory_photos (owner_id, session_id, created_at desc)
   where status = 'active' and deleted_at is null;
