@@ -1927,6 +1927,14 @@ function chatSessionData(s) {
     startedAt:s.startedAt || Date.now(), archivedAt:s.archivedAt || null,
     memories:Array.isArray(s.memories) ? s.memories : [],
     album:Array.isArray(s.album) ? s.album : [],
+    roleplayMeta:Object.fromEntries((s.messages || [])
+      .filter(message => message.role === 'user' &&
+        (Array.isArray(message.displaySegments) || message.aiTargetId || message.commandType))
+      .map(message => [message.id, {
+        displaySegments:message.displaySegments || null,
+        aiTargetId:message.aiTargetId || null,
+        commandType:message.commandType || null
+      }])),
     pendingTurn:s.pendingTurn &&
       isUuid(s.pendingTurn.turnId) &&
       isUuid(s.pendingTurn.userMessageId) &&
@@ -2127,6 +2135,11 @@ async function loadCloudChatSessions(user) {
       }
       const existing = state.sessions[row.id];
       const cloudMessages = bySession.get(row.id) || [];
+      const roleplayMeta = data.roleplayMeta && typeof data.roleplayMeta === 'object' ? data.roleplayMeta : {};
+      for (const message of cloudMessages) {
+        const metadata = roleplayMeta[message.id];
+        if (metadata && typeof metadata === 'object') Object.assign(message, metadata);
+      }
       state.sessions[row.id] = {
         ...(existing || {}), id:row.id, characterId:row.character_id,
         characterName:row.character_name || snapshot.name || '角色',
@@ -3829,7 +3842,7 @@ function renderGroupConversation() {
     const who=isUser?'你':isSystem?'系統':(member?.name||m.speaker||'角色');
     // Group replies use m.content (not m.text), so they must be parsed here separately.
     // Otherwise “夜辰：...” stays plain text and never renders the character portrait.
-    const segments=!isUser&&!isSystem ? parseRoleplaySegments(m.content || '',roleplayRoles) : [];
+    const segments=!isSystem ? parseRoleplaySegments(m.content || '',roleplayRoles) : [];
     const hasSpeaker=segments.some(segment=>segment.kind!=='user');
     const avatarHTML=isUser
       ? '<span class="avatar avatar-fallback" style="background:#4f46e5">你</span>'
@@ -4140,6 +4153,14 @@ async function groupSendMock() {
   if(g.sending) return;
   if(!window.mySupabase) { g.formError='Supabase 用戶端尚未載入。';render();return; }
   if(!content) {g.formError='請先輸入訊息。';render();return;}
+  const platformCommand=parsePlatformCommand(content);
+  if(platformCommand.type==='platform') {
+    if(platformCommand.name==='help') toast('群組語法：@角色 指定 AI 回覆；:人名:內容 指定玩家發言顯示；/help 查看平台指令。AI 尚未串接，指定角色目前只做語法驗證。');
+    else toast('尚未支援平台指令 /'+platformCommand.name+'；本次沒有保存訊息。');
+    return;
+  }
+  const mention=parseMentionTarget(content,(g.active?.members||[]).map(member=>({id:member.characterId||member.id,name:member.name})));
+  if(mention.mentioned&&!mention.valid) {g.formError=mention.reason+'，本次沒有保存訊息。';render();return;}
   if(!g.active?.id) {g.formError='群組尚未保存，請重新開啟群組。';render();return;}
   if(!window.crypto?.randomUUID) {g.formError='此瀏覽器無法產生安全的回合識別碼，請更新瀏覽器後重試。';render();return;}
   g.sending=true;g.formError='';render();
@@ -4353,6 +4374,19 @@ function roleplaySegmentHTML(segment) {
     : '<span class="avatar avatar-fallback">' + e(segment.kind === 'user' ? '你' : [...String(name || '?')][0] || '?') + '</span>';
   const typeClass = segment.kind === 'user' ? 'is-user' : segment.kind === 'character' ? 'is-character' : 'is-temporary';
   return '<div class="roleplay-segment ' + typeClass + '"><div class="roleplay-segment-heading">' + avatarHTML + '<span>' + e(name) + '</span></div>' + formatMessage(segment.text) + '</div>';
+}
+// Chat syntax helpers are UI validation only; they do not invoke or route an AI model.
+function parseMentionTarget(raw, roles = []) {
+  const match = String(raw || '').match(/^@(.+?)(?:\s+|$)/u);
+  if (!match) return {mentioned:false};
+  const name = match[1].trim();
+  const matches = roles.filter(role => String(role.name || '').trim() === name);
+  if (matches.length === 1) return {mentioned:true,valid:true,name,characterId:matches[0].id || matches[0].characterId || null};
+  return {mentioned:true,valid:false,name,reason:matches.length ? '同名角色無法唯一判定' : '找不到這位群組角色'};
+}
+function parsePlatformCommand(raw) {
+  const match = String(raw || '').trim().match(/^\/([a-zA-Z][\w-]*)(?:\s+([\s\S]*))?$/u);
+  return match ? {type:'platform',name:match[1].toLowerCase(),args:match[2] || ''} : {type:'none'};
 }
 function renderMessages(scroll = true) {
   if (!$('messages')) return;
@@ -6146,10 +6180,33 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
           break;
         }
         if (!text.trim()) return toast('請先輸入訊息，再開始新的聊天回合。');
+        const platformCommand = parsePlatformCommand(text);
+        if (platformCommand.type === 'platform') {
+          if (platformCommand.name === 'help') {
+            toast('PersonaX 語法：@角色 指定 AI 回覆；:人名:內容 指定玩家發言顯示；/help 查看平台指令。AI 尚未串接，指定角色目前只做語法驗證。');
+          } else {
+            toast('尚未支援平台指令 /' + platformCommand.name + '；本次沒有送出或扣款。');
+          }
+          break;
+        }
+        const currentCharacter = sessionCharacter(s);
+        const availableRoles = [{id:currentCharacter?.id,name:currentCharacter?.name,image:currentCharacter?.image || currentCharacter?.avatar_url}].filter(role => role.id && role.name);
+        const mention = parseMentionTarget(text, availableRoles);
+        if (mention.mentioned && !mention.valid) {
+          toast(mention.reason + '，請確認角色名稱；本次沒有送出或扣款。');
+          break;
+        }
+        const displaySegments = parseRoleplaySegments(text, availableRoles)
+          .map(({avatar:_avatar,...segment})=>segment);
+        const messageMeta = {
+          displaySegments,
+          aiTargetId:mention.mentioned && mention.valid ? mention.characterId : null,
+          commandType:text.trim().startsWith('!') ? 'custom' : null
+        };
         // Local seed/mock characters cannot be written to the UUID-constrained
         // cloud chat schema. Keep their test messages usable locally and never charge.
         if (!window.mySupabase || !isUuid(s.characterId) || !isUuid(s.id)) {
-          s.messages.push({id:id(),role:'user',text,at:Date.now(),localOnly:true});
+          s.messages.push({id:id(),role:'user',text,at:Date.now(),localOnly:true,...messageMeta});
           drafts[s.id]='';
           if($('messageInput')) $('messageInput').value='';
           const saved=persist();
@@ -6162,7 +6219,7 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
 
         const previousMessages = s.messages.slice();
         const previousMemories = (s.memories || []).map(memory => ({...memory}));
-        const userMessage = {id:id(),role:'user',text,at:Date.now()};
+        const userMessage = {id:id(),role:'user',text,at:Date.now(),...messageMeta};
         s.messages.push(userMessage);
         s.pendingTurn = {
           turnId:id(),
