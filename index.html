@@ -4140,6 +4140,14 @@ async function groupSendMock() {
   if(g.sending) return;
   if(!window.mySupabase) { g.formError='Supabase 用戶端尚未載入。';render();return; }
   if(!content) {g.formError='請先輸入訊息。';render();return;}
+  const platformCommand=parsePlatformCommand(content);
+  if(platformCommand.type==='platform') {
+    if(platformCommand.name==='help') toast('群組語法：@角色 指定目標角色（目前僅驗證語法）；:人名:內容 顯示角色氣泡；/help 查看平台指令。');
+    else toast('尚未支援平台指令 /'+platformCommand.name+'；本次沒有保存訊息。');
+    return;
+  }
+  const mention=parseMentionTarget(content,(g.active?.members||[]).map(member=>({id:member.characterId||member.id,name:member.name})));
+  if(mention.mentioned&&!mention.valid) {g.formError=mention.reason+'，本次沒有保存訊息。';render();return;}
   if(!g.active?.id) {g.formError='群組尚未保存，請重新開啟群組。';render();return;}
   if(!window.crypto?.randomUUID) {g.formError='此瀏覽器無法產生安全的回合識別碼，請更新瀏覽器後重試。';render();return;}
   g.sending=true;g.formError='';render();
@@ -4304,6 +4312,21 @@ function formatMessage(text) {
     return part.trim() ? `<div class="bubble">${e(part.trim())}</div>` : '';
   }).join('');
 }
+// PR-101 integration: validate platform commands and group character mentions before saving.
+// This is syntax validation only; it does not route requests to an AI provider.
+function parseMentionTarget(raw, roles = []) {
+  const match = String(raw || '').match(/^@(.+?)(?:\\s+|$)/u);
+  if (!match) return {mentioned:false};
+  const name = match[1].trim();
+  const matches = roles.filter(role => String(role.name || '').trim() === name);
+  if (matches.length === 1) return {mentioned:true,valid:true,name,characterId:matches[0].id || matches[0].characterId || null};
+  return {mentioned:true,valid:false,name,reason:matches.length ? '同名角色無法唯一判定' : '找不到這位群組角色'};
+}
+function parsePlatformCommand(raw) {
+  const match = String(raw || '').trim().match(/^\\/([a-zA-Z][\\w-]*)(?:\\s+([\\s\\S]*))?$/u);
+  return match ? {type:'platform',name:match[1].toLowerCase(),args:match[2] || ''} : {type:'none'};
+}
+
 // Roleplay speaker prefix display. The message author remains the authenticated player.
 function parseRoleplaySegments(raw, roles = []) {
   const text = String(raw ?? '');
