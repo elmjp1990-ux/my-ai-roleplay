@@ -63,8 +63,8 @@ create index if not exists chat_memory_photos_expiry_idx
   where status in ('active','delete_failed') and deleted_at is null;
 
 alter table public.chat_memory_photos enable row level security;
-revoke all on public.chat_memory_photos from anon;
-grant select, insert, delete on public.chat_memory_photos to authenticated;
+revoke all on public.chat_memory_photos from anon, authenticated;
+grant select, insert on public.chat_memory_photos to authenticated;
 
 drop policy if exists "memory_photos_select_owner" on public.chat_memory_photos;
 create policy "memory_photos_select_owner" on public.chat_memory_photos
@@ -108,10 +108,8 @@ with check (
 -- No client UPDATE policy: immutable photo scope/path/expiry fields are managed by trusted server-side cleanup only.
 drop policy if exists "memory_photos_update_owner" on public.chat_memory_photos;
 
+-- Photo deletion is performed by the trusted expiry worker so Storage and metadata stay consistent.
 drop policy if exists "memory_photos_delete_owner" on public.chat_memory_photos;
-create policy "memory_photos_delete_owner" on public.chat_memory_photos
-for delete to authenticated
-using (owner_id = (select auth.uid()));
 
 -- Storage paths are {owner UUID}/{single|group}/{session or group UUID}/{random filename}.
 drop policy if exists "memory_photo_objects_select_owner" on storage.objects;
@@ -156,23 +154,5 @@ with check (
   )
 );
 
+-- No client DELETE policy: the trusted expiry worker deletes object + metadata together.
 drop policy if exists "memory_photo_objects_delete_owner" on storage.objects;
-create policy "memory_photo_objects_delete_owner" on storage.objects
-for delete to authenticated
-using (
-  bucket_id = 'personax-memory-photos'
-  and split_part(name, '/', 1) = (select auth.uid())::text
-  and (
-    (split_part(name, '/', 2) = 'single' and exists (
-      select 1 from public.chat_sessions s
-      where s.id::text = split_part(name, '/', 3)
-        and s.user_id = (select auth.uid())
-    ))
-    or
-    (split_part(name, '/', 2) = 'group' and exists (
-      select 1 from public.chat_groups g
-      where g.id::text = split_part(name, '/', 3)
-        and g.owner_id = (select auth.uid())
-    ))
-  )
-);
