@@ -5924,7 +5924,8 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
 
         const previousMessages = s.messages.slice();
         const previousMemories = (s.memories || []).map(memory => ({...memory}));
-        const availableRoles = [{id:c?.id,name:c?.name,image:c?.image}].filter(role => role.id && role.name);
+        const currentCharacter = sessionCharacter(s);
+        const availableRoles = [{id:currentCharacter?.id,name:currentCharacter?.name,image:currentCharacter?.image}].filter(role => role.id && role.name);
         const displaySegments = parseRoleplaySegments(text, availableRoles);
         const mention = parseMentionTarget(text, availableRoles);
         const userMessage = {id:id(),role:'user',text,at:Date.now(),displaySegments:displaySegments.map(({avatar:_avatar,...segment})=>segment),
