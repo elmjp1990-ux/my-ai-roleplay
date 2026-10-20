@@ -5604,7 +5604,13 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
             if (error || data?.user?.id !== state.account.uid) throw new Error('登入狀態驗證失敗，請重新登入。');
             await saveSupabaseProfile(state.account);
           }
-          back();render();toast('個人資料已儲存。');
+          // 不依賴 history.back() 的非同步 popstate；直接移除編輯視窗並立即重繪主畫面，
+          // 確保剛上傳的 PersonaX 頭像即時更新到右上角與個人帳號頁。
+          const returnRoute = {...route};
+          delete returnRoute.overlay;
+          go(returnRoute, true);
+          render();
+          toast('個人資料與頭像已儲存並立即更新。');
         } catch (error) {
           state.account={...previous};persist();render();
           toast('個人資料未能同步：'+(error.message || '請稍後再試。'));
