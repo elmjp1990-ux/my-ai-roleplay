@@ -475,7 +475,7 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
   position:absolute;
   inset:0;
   z-index:-1;
-  background-image:linear-gradient(var(--shade),var(--shade)),var(--chat-photo,none);
+  background-image:linear-gradient(rgba(0,0,0,.18),rgba(0,0,0,.18)),var(--chat-photo,none);
   background-size:cover;
   background-position:center;
 }
@@ -3676,7 +3676,7 @@ async function groupOpen(groupId) {
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('請重新登入後再開啟群組。');
     g.ownerUid=user.id;
     const [groupRes,sceneRes,memberRes,messageRes]=await groupWithTimeout(Promise.all([
-      window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,created_at,updated_at').eq('id',groupId).single(),
+      window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,background_mode,background_memory_photo_id,created_at,updated_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).order('created_at',{ascending:true}).order('sequence_no',{ascending:true})
@@ -3704,7 +3704,7 @@ async function groupOpen(groupId) {
       const speaker=type==='user'?'你':type==='system'?'系統':(speakerSnapshot.name||member?.name||'角色')+(scene?' · '+scene.name:'');
       return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:m.content,createdAt:m.created_at};
     });
-    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',scenes,members};
+    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'none',backgroundMemoryPhotoId:group.background_memory_photo_id||null,scenes,members};
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;g.formError='';
     g.loading=false;g.openError='';g.failedGroupId=null;g.groupsLoaded=false;
     render();
@@ -4573,14 +4573,22 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
         <div class="stack">
           <label class="field"><span>聊天背景</span>
             <select id="backgroundSetting" data-session-id="${e(selected.id)}">
-              <option value="avatar" ${selected.background !== 'none' ? 'selected' : ''}>角色頭像</option>
+              <option value="avatar" ${selected.background === 'avatar' || !String(selected.background||'').startsWith('memory-photo:') && selected.background !== 'none' ? 'selected' : ''}>角色頭像</option>
               <option value="none" ${selected.background === 'none' ? 'selected' : ''}>無背景</option>
+              ${String(selected.background||'').startsWith('memory-photo:') ? '<option value="'+e(selected.background)+'" selected>目前的回憶相片背景</option>' : ''}
             </select>
           </label>
           <button class="primary" style="width:100%" data-action="new-conversation" data-id="${e(selected.id)}">開始新對話</button>
           <button style="width:100%" data-action="archives" data-id="${e(selected.id)}">舊的回憶</button>
           <button class="danger" style="width:100%" data-action="remove-session" data-id="${e(selected.id)}">刪除這段對話與回憶</button>
         </div>`);
+      void (async()=>{
+        const select=$('backgroundSetting'),client=window.mySupabase,uid=currentUser()?.uid;
+        if(!select||!client||!uid||!selected.cloudOwned||selected.cloudOwnerUid!==uid)return;
+        const {data,error}=await client.from('chat_memory_photos').select('id,caption').eq('owner_id',uid).eq('chat_type','single').eq('session_id',selected.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false});
+        if(error){console.warn('載入聊天背景選項失敗',error.message);return;}
+        for(const photo of data||[]){const value='memory-photo:'+photo.id;let option=Array.from(select.options).find(item=>item.value===value);if(!option){option=document.createElement('option');option.value=value;option.textContent='回憶相片：'+(photo.caption||'回憶快照');select.appendChild(option);}if(selected.background===value)option.selected=true;}
+      })();
       break;
     }
     case 'persona-picker': {
@@ -6088,7 +6096,20 @@ document.addEventListener('change',async event => {
     }
     if (target.id==='backgroundSetting') {
       const s=(target.dataset.sessionId && state.sessions[target.dataset.sessionId]) || currentSession();
-      if (s && ['avatar','none'].includes(target.value)) {
+      if (s && /^memory-photo:[0-9a-f-]{36}$/i.test(target.value)) {
+        const previousBackground=s.background||'avatar',photoId=target.value.slice('memory-photo:'.length),client=window.mySupabase,uid=currentUser()?.uid;
+        try {
+          if(!client||!uid||!s.cloudOwned||s.cloudOwnerUid!==uid)throw new Error('請先使用目前帳號擁有的已同步聊天。');
+          const {data:photo,error:photoError}=await client.from('chat_memory_photos').select('id').eq('id',photoId).eq('owner_id',uid).eq('chat_type','single').eq('session_id',s.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).maybeSingle();
+          if(photoError||!photo)throw photoError||new Error('找不到這張有效的回憶相片。');
+          const {data:row,error:readError}=await client.from('chat_sessions').select('session_data').eq('id',s.id).eq('user_id',uid).maybeSingle();
+          if(readError||!row)throw readError||new Error('讀取聊天設定失敗。');
+          const nextData={...(row.session_data||{}),background:target.value};
+          const {data:saved,error:saveError}=await client.from('chat_sessions').update({session_data:nextData,updated_at:new Date().toISOString()}).eq('id',s.id).eq('user_id',uid).select('id').maybeSingle();
+          if(saveError||!saved)throw saveError||new Error('資料庫未確認背景設定已儲存。');
+          s.background=target.value;persist();const panel=$('view').querySelector('.chat-main');if(panel)void window.applySingleMemoryPhotoBackground?.(s,panel);toast('已更新聊天背景。');
+        } catch(err) {s.background=previousBackground;target.value=previousBackground;console.error('回憶相片背景設定失敗',err);toast('背景設定失敗：'+(err.message||'請稍後再試。')); }
+      } else if (s && ['avatar','none'].includes(target.value)) {
         const previousBackground=s.background || 'avatar';
         s.background=target.value;
         if (!persist()) {
@@ -6196,5 +6217,273 @@ if (window.__pendingSupabaseUser) {
   window.__pendingSupabaseUser = null;
 }
 </script>
+
+<style>
+.memory-album-stack{display:grid;gap:12px}
+.memory-album-items{display:grid;gap:10px}
+.memory-photo-row{display:grid;grid-template-columns:88px minmax(0,1fr) 38px;align-items:center;gap:12px;padding:10px;border:1px solid var(--border);border-radius:14px;background:var(--panel)}
+.memory-photo-actions{display:grid;gap:8px;justify-items:center}.memory-photo-icon{width:34px;height:34px;padding:0;border-radius:50%;display:grid;place-items:center}.memory-photo-title-edit{display:flex;gap:6px;align-items:center;min-width:0}.memory-photo-title-edit strong{min-width:0}.memory-photo-title-edit input{width:100%;min-width:0}.memory-photo-expiry{font-size:12px;color:var(--muted)}
+.memory-viewer{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.94);display:flex;align-items:center;justify-content:center;padding:14px}.memory-viewer img{max-width:100%;max-height:94dvh;object-fit:contain;cursor:pointer}.memory-viewer-controls{position:absolute;right:18px;top:18px;display:flex;gap:10px;opacity:0;pointer-events:none;transition:opacity .18s}.memory-viewer-controls.visible{opacity:1;pointer-events:auto}.memory-viewer-controls button{width:42px;height:42px;border:1px solid rgba(255,255,255,.28);border-radius:50%;background:rgba(120,120,120,.52);color:#fff;backdrop-filter:blur(8px)}
+.memory-photo-thumb{width:88px;height:88px;padding:0;overflow:hidden;border:0;border-radius:10px;background:var(--panel2)}
+.memory-photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.memory-photo-details{display:grid;gap:6px;min-width:0}
+.memory-photo-details strong{overflow-wrap:anywhere}
+.memory-photo-download{width:36px;height:36px;padding:0;border-radius:50%}
+@media(max-width:420px){.memory-photo-row{grid-template-columns:72px minmax(0,1fr) 34px;gap:9px;padding:8px}.memory-photo-thumb{width:72px;height:72px}}
+</style>
+<script>
+(function(){
+  const BUCKET='personax-memory-photos';
+  const urlCache=new Map();
+  const dateLabel=value=>{const d=new Date(value);return Number.isNaN(d.getTime())?'日期不明':d.toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'});};
+  function albumMount(type,id){
+    return '<section class="memory-album-stack" data-memory-album-type="'+e(type)+'" data-memory-album-id="'+e(id)+'">'+
+      '<p class="small muted" style="margin:0 0 12px">回憶相簿可保存一年，請記得即時下載哦</p>'+
+      '<div class="panel stack" style="gap:10px;padding:12px;margin-bottom:14px">'+
+      '<label class="field"><span>回憶名稱</span><input id="memoryAlbumCaption" maxlength="80" placeholder="例如：第一次遇見"></label>'+
+      '<label class="field"><span>上傳回憶相片（JPEG、PNG、WebP，單張上限 10 MB）</span><input id="memoryAlbumFile" type="file" accept="image/jpeg,image/png,image/webp" data-album-type="'+e(type)+'" data-album-id="'+e(id)+'"></label></div>'+
+      '<div id="memoryAlbumItems" class="memory-album-items"><div class="empty">正在讀取回憶相簿…</div></div></section>';
+  }
+  async function loadAlbum(type,chatId){
+    const mount=$('memoryAlbumItems');if(!mount)return;
+    const client=window.mySupabase;
+    if(!client||!currentUser()?.uid){mount.innerHTML='<div class="empty">請先登入，才能查看與保存回憶相片。</div>';return;}
+    try{
+      const {data:{user},error:authError}=await client.auth.getUser();
+      if(authError||!user||user.id!==currentUser()?.uid)throw new Error('登入狀態驗證失敗，請重新登入。');
+      const {data,error}=await client.from('chat_memory_photos').select('id,owner_id,chat_type,session_id,group_id,storage_path,caption,created_at,expires_at')
+        .eq('owner_id',user.id).eq('chat_type',type).eq(type==='single'?'session_id':'group_id',chatId)
+        .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false});
+      if(error)throw error;
+      const cards=await Promise.all((data||[]).map(async photo=>{
+        const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,3600);
+        const imageUrl=!signedError&&signed?.signedUrl?signed.signedUrl:'';
+        if(!imageUrl)console.warn('相簿簽名網址取得失敗',signedError?.message);
+        urlCache.set(photo.id,{url:imageUrl,photo});
+        const thumbnail=imageUrl
+          ? '<button type="button" class="memory-photo-thumb" data-action="memory-photo-open" data-id="'+e(photo.id)+'" aria-label="開啟相片"><img src="'+e(imageUrl)+'" alt="'+e(photo.caption||'回憶相片')+'" loading="lazy"></button>'
+          : '<div class="memory-photo-thumb" style="display:grid;place-items:center;color:var(--muted);font-size:11px;padding:6px;text-align:center">圖片檔案遺失<br>仍可刪除紀錄</div>';
+        return '<article class="memory-photo-row">'+thumbnail+
+          '<div class="memory-photo-details"><div class="memory-photo-title-edit"><strong>'+e(photo.caption||'回憶快照')+'</strong>'+(imageUrl?'<button type="button" class="ghost memory-photo-icon" data-action="memory-photo-edit" data-id="'+e(photo.id)+'" aria-label="修改標題" title="修改標題">✎</button>':'')+'</div><span class="small muted">'+e(dateLabel(photo.created_at))+'</span><span class="memory-photo-expiry">到期日：'+e(dateLabel(photo.expires_at))+'</span></div>'+
+          '<div class="memory-photo-actions"><button type="button" class="ghost memory-photo-icon" data-action="memory-photo-delete" data-id="'+e(photo.id)+'" aria-label="刪除相片" title="刪除相片">🗑</button></div></article>';
+      }));
+      if(!mount.isConnected)return;
+      mount.innerHTML=cards.filter(Boolean).join('')||'<div class="empty">目前還沒有回憶相片哦</div>';
+    }catch(err){console.error('讀取回憶相簿失敗',err);mount.innerHTML='<div class="empty">相簿讀取失敗：'+e(err.message||'請稍後重試。')+'</div>';}
+  }
+  async function compressMemoryImage(file){
+    const image=await createImageBitmap(file);const maxSide=1920;const scale=Math.min(1,maxSide/Math.max(image.width,image.height));
+    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));
+    const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw new Error('目前裝置無法壓縮圖片。');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(image,0,0,canvas.width,canvas.height);image.close?.();
+    const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('圖片壓縮失敗。')),'image/webp',.86));
+    return new File([blob],(file.name.replace(/\.[^.]+$/,'')||'memory-photo')+'.webp',{type:'image/webp',lastModified:Date.now()});
+  }
+  function setAlbumUploadStatus(input,message,isError=false){
+    const stack=input.closest('.memory-album-stack');
+    if(!stack)return;
+    let status=stack.querySelector('[data-memory-upload-status]');
+    if(!status){
+      status=document.createElement('div');status.dataset.memoryUploadStatus='true';
+      status.className='small';status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+      const items=stack.querySelector('#memoryAlbumItems');
+      if(items)stack.insertBefore(status,items);else stack.appendChild(status);
+    }
+    status.textContent=message;
+    status.style.color=isError?'var(--danger, #b42318)':'var(--muted, #667085)';
+  }
+  async function uploadAlbum(input){
+    const type=input.dataset.albumType,chatId=input.dataset.albumId,file=input.files?.[0];
+    if(!file)return;
+    const caption=$('memoryAlbumCaption')?.value.trim()||'回憶快照';
+    if(!['single','group'].includes(type)||!isUuid(chatId)){input.value='';toast('無法確認相片所屬聊天，請重新開啟相簿。');return;}
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type)){input.value='';toast('相片格式僅支援 JPEG、PNG 或 WebP。');return;}
+    if(file.size>10*1024*1024){input.value='';toast('單張相片不可超過 10 MB，請先壓縮後再上傳。');return;}
+    const client=window.mySupabase;
+    if(!client||!currentUser()?.uid){input.value='';toast('請先登入後再上傳相片。');return;}
+    let path='';
+    input.disabled=true;
+    setAlbumUploadStatus(input,'正在壓縮並上傳相片，請稍候…');
+    toast('正在上傳回憶相片，請稍候…');
+    try{
+      const {data:{user},error:authError}=await client.auth.getUser();
+      if(authError||!user||user.id!==currentUser()?.uid)throw new Error('登入狀態驗證失敗，請重新登入。');
+      const compressed=await compressMemoryImage(file);
+      const ext='webp';
+      path=user.id+'/'+type+'/'+chatId+'/'+(crypto.randomUUID?crypto.randomUUID():id())+'.'+ext;
+      const {error:upError}=await client.storage.from(BUCKET).upload(path,compressed,{contentType:'image/webp',upsert:false});
+      if(upError)throw upError;
+      const created=new Date(),expires=new Date(created);expires.setFullYear(expires.getFullYear()+1);
+      const {error:dbError}=await client.from('chat_memory_photos').insert({
+        owner_id:user.id,chat_type:type,session_id:type==='single'?chatId:null,group_id:type==='group'?chatId:null,
+        storage_path:path,caption:caption.slice(0,80),created_at:created.toISOString(),expires_at:expires.toISOString(),status:'active'
+      });
+      if(dbError)throw dbError;
+      input.value='';if($('memoryAlbumCaption'))$('memoryAlbumCaption').value='';
+      toast('回憶相片已保存。保存期限為一年，實際自動清理排程仍待完成。');
+      setAlbumUploadStatus(input,'上傳成功，正在更新相簿…');
+      await loadAlbum(type,chatId);
+      setAlbumUploadStatus(input,'相片已保存並更新相簿。');
+    }catch(err){
+      if(path){const {error:cleanup}=await client.storage.from(BUCKET).remove([path]);if(cleanup)console.error('清理未完成上傳檔案失敗',cleanup.message);}
+      console.error('回憶相片上傳失敗',err);
+      setAlbumUploadStatus(input,'上傳失敗：'+(err.message||'請稍後重試。'),true);
+      toast('相片上傳失敗：'+(err.message||'請稍後重試。'));
+    }finally{
+      input.disabled=false;
+    }
+  }
+  async function applySingleMemoryPhotoBackground(session,panel){
+    const client=window.mySupabase,uid=currentUser()?.uid;
+    const match=String(session?.background||'').match(/^memory-photo:([0-9a-f-]{36})$/i);
+    if(!client||!uid||!match||session.cloudOwnerUid!==uid){panel.style.setProperty('--chat-photo','none');return;}
+    try{
+      const {data:photo,error}=await client.from('chat_memory_photos').select('id,storage_path')
+        .eq('id',match[1]).eq('owner_id',uid).eq('chat_type','single').eq('session_id',session.id)
+        .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).maybeSingle();
+      if(error)throw error;
+      if(!photo){session.background='none';persist();panel.style.setProperty('--chat-photo','none');return;}
+      const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,3600);
+      if(signedError||!signed?.signedUrl)throw signedError||new Error('無法取得背景圖片。');
+      if(currentSession()?.id===session.id)panel.style.setProperty('--chat-photo','url('+JSON.stringify(signed.signedUrl)+')');
+    }catch(err){console.error('讀取單聊相簿背景失敗',err);panel.style.setProperty('--chat-photo','none');}
+  }
+  async function applyGroupMemoryPhotoBackground(group,panel){
+    const client=window.mySupabase,uid=currentUser()?.uid,photoId=group?.backgroundMemoryPhotoId;
+    if(!client||!uid||!photoId||groupPrototype.active?.id!==group.id){panel.style.setProperty('--chat-photo','none');return;}
+    try{
+      const {data:photo,error}=await client.from('chat_memory_photos').select('id,storage_path')
+        .eq('id',photoId).eq('owner_id',uid).eq('chat_type','group').eq('group_id',group.id)
+        .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).maybeSingle();
+      if(error)throw error;
+      if(!photo){panel.style.setProperty('--chat-photo','none');return;}
+      const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,3600);
+      if(signedError||!signed?.signedUrl)throw signedError||new Error('無法取得群組背景圖片。');
+      if(groupPrototype.active?.id===group.id)panel.style.setProperty('--chat-photo','url('+JSON.stringify(signed.signedUrl)+')');
+    }catch(err){console.error('讀取群組相簿背景失敗',err);panel.style.setProperty('--chat-photo','none');}
+  }
+  window.applySingleMemoryPhotoBackground=applySingleMemoryPhotoBackground;
+  window.applyGroupMemoryPhotoBackground=applyGroupMemoryPhotoBackground;
+  const oldRenderConversation=renderConversation;
+  renderConversation=function(){
+    oldRenderConversation.apply(this,arguments);
+    const session=currentSession(),panel=$('view').querySelector('.chat-main');
+    if(panel&&String(session?.background||'').startsWith('memory-photo:'))void applySingleMemoryPhotoBackground(session,panel);
+  };
+  const oldRenderGroupConversation=renderGroupConversation;
+  renderGroupConversation=function(){
+    oldRenderGroupConversation.apply(this,arguments);
+    const group=groupPrototype.active,panel=$('view').querySelector('.chat-main');
+    if(!panel)return;
+    if(group?.backgroundMode==='memory'&&group.backgroundMemoryPhotoId)void applyGroupMemoryPhotoBackground(group,panel);
+    else panel.style.setProperty('--chat-photo','none');
+  };
+  const oldSingle=renderChatOverlay;
+  renderChatOverlay=function(kind){
+    if(kind!=='album'){oldSingle(kind);return;}
+    const s=currentSession(),panel=$('view').querySelector('.chat-main');
+    if(!s||!panel)return;
+    panel.querySelectorAll('.chat-overlay').forEach(node=>node.remove());
+    const overlay=document.createElement('section');overlay.className='chat-overlay';overlay.setAttribute('aria-label','回憶相簿');
+    overlay.innerHTML='<div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回">'+ICON.back+'</button><div><h2>回憶相簿</h2><p class="small muted" style="margin:0">回憶相簿可保存一年，請記得即時下載哦</p></div></div>'+albumMount('single',s.id);
+    panel.appendChild(overlay);
+    void loadAlbum('single',s.id);
+  };
+  const oldGroup=renderGroupChatOverlay;
+  renderGroupChatOverlay=function(kind){
+    if(kind!=='album'){oldGroup(kind);return;}
+    const g=groupPrototype.active,panel=$('view').querySelector('.chat-main');
+    if(!g||!panel)return;
+    panel.querySelectorAll('.chat-overlay').forEach(node=>node.remove());
+    const overlay=document.createElement('section');overlay.className='chat-overlay';overlay.setAttribute('aria-label','群組回憶相簿');
+    overlay.innerHTML='<div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回">'+ICON.back+'</button><div><h2>回憶相簿</h2><p class="small muted" style="margin:0">回憶相簿可保存一年，請記得即時下載哦</p></div></div>'+albumMount('group',g.id);
+    panel.appendChild(overlay);
+    void loadAlbum('group',g.id);
+  };
+  renderChatAlbumPage=function(){
+    const s=currentSession();
+    const content=s&&s.cloudOwned&&s.cloudOwnerUid===currentUser()?.uid?albumMount('single',s.id):
+      '<section class="panel"><p class="muted">請先開啟一段已同步的聊天，再從聊天頁進入該段對話的回憶相簿。</p></section>';
+    $('view').innerHTML='<div class="stack form-width"><div class="row between" style="align-items:center;gap:12px"><h1 style="margin:4px 0 0">回憶相簿</h1><button type="button" data-action="nav" data-page="chat">返回聊天</button></div>'+content+'</div>';
+    if(s&&s.cloudOwned&&s.cloudOwnerUid===currentUser()?.uid)void loadAlbum('single',s.id);
+  };
+  if(route.page==='conversation'&&String(currentSession()?.background||'').startsWith('memory-photo:')){
+    const panel=$('view').querySelector('.chat-main');if(panel)void applySingleMemoryPhotoBackground(currentSession(),panel);
+  }
+  async function downloadCompressedMemoryPhoto(cached){
+    try{const client=window.mySupabase;let url=cached.url;let response=await fetch(url);if(!response.ok){const {data,error}=await client.storage.from(BUCKET).createSignedUrl(cached.photo.storage_path,3600);if(error||!data?.signedUrl)throw error||new Error('下載連結失效。');url=data.signedUrl;response=await fetch(url);}if(!response.ok)throw new Error('下載連結已失效，請重新開啟相簿後再試。');const blob=await response.blob(),objectUrl=URL.createObjectURL(blob);const a=document.createElement('a');a.href=objectUrl;a.download=(cached.photo.caption||'personax-memory')+'.webp';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),1500);}catch(error){toast('下載失敗：'+(error.message||'請重新開啟相簿後再試。'));}
+  }
+  document.addEventListener('change',event=>{
+    const input=event.target;
+    if(input?.id==='memoryAlbumFile')void uploadAlbum(input);
+  });
+  document.addEventListener('click',async event=>{
+    const button=event.target.closest('[data-action="memory-photo-open"],[data-action="memory-photo-download"],[data-action="memory-photo-background"],[data-action="memory-photo-edit"],[data-action="memory-photo-delete"],[data-action="memory-photo-save-title"],[data-action="memory-photo-cancel-title"]');
+    if(!button)return;
+    const cached=urlCache.get(button.dataset.id);
+    const action=button.dataset.action;
+    if(!cached){toast('相簿資料已更新，請重新開啟相簿後再試。');return;}
+    if(!cached.url && action!=='memory-photo-delete'){toast('圖片檔案目前無法讀取，仍可刪除這筆相簿紀錄。');return;}
+    if(button.dataset.action==='memory-photo-edit'){
+      const row=button.closest('.memory-photo-row'),details=row?.querySelector('.memory-photo-details');if(!details)return;const photo=cached.photo;
+      details.innerHTML='<div class="memory-photo-title-edit"><input class="field" maxlength="80" value="'+e(photo.caption||'')+'" aria-label="相片標題" data-memory-title-input="'+e(photo.id)+'"><button type="button" class="ghost memory-photo-icon" data-action="memory-photo-save-title" data-id="'+e(photo.id)+'" title="儲存">✓</button><button type="button" class="ghost memory-photo-icon" data-action="memory-photo-cancel-title" data-id="'+e(photo.id)+'" title="取消">✕</button></div><span class="small muted">'+e(dateLabel(photo.created_at))+'</span><span class="memory-photo-expiry">到期日：'+e(dateLabel(photo.expires_at))+'</span>';details.querySelector('input')?.focus();return;
+    }
+    if(button.dataset.action==='memory-photo-cancel-title'){void loadAlbum(cached.photo.chat_type,cached.photo.session_id||cached.photo.group_id);return;}
+    if(button.dataset.action==='memory-photo-save-title'){
+      const value=button.closest('.memory-photo-row')?.querySelector('[data-memory-title-input]')?.value.trim();if(!value){toast('請輸入相片名稱。');return;}
+      const client=window.mySupabase;const {data:{user},error:authError}=await client.auth.getUser();if(authError||!user||user.id!==cached.photo.owner_id){toast('請確認登入帳號。');return;}
+      const {data,error}=await client.from('chat_memory_photos').update({caption:value.slice(0,80)}).eq('id',cached.photo.id).eq('owner_id',user.id).select('id,caption').maybeSingle();
+      if(error||!data){toast('標題儲存失敗：'+(error?.message||'資料庫未確認更新。'));return;}cached.photo.caption=data.caption;toast('相片名稱已更新。');void loadAlbum(cached.photo.chat_type,cached.photo.session_id||cached.photo.group_id);return;
+    }
+    if(button.dataset.action==='memory-photo-delete'){
+      if(!confirm('刪除後不可復原哦，確認要刪除嗎?'))return;const client=window.mySupabase,uid=currentUser()?.uid,photo=cached.photo;if(!client||uid!==photo.owner_id){toast('請確認登入帳號。');return;}
+      const {data:deleted,error}=await client.rpc('soft_delete_chat_memory_photo',{p_photo_id:photo.id});
+      if(error){console.error('相簿刪除 RPC 失敗',error);toast('刪除失敗：'+error.message);return;}
+      const {error:removeError}=await client.storage.from(BUCKET).remove([photo.storage_path]);if(removeError)console.warn('相片紀錄已移出相簿，但儲存檔案清理失敗',removeError.message);
+      if(photo.chat_type==='single'){const session=state.sessions[photo.session_id];if(session?.background==='memory-photo:'+photo.id){session.background='none';persist();}}
+      else{const group=groupPrototype.active;if(group?.backgroundMemoryPhotoId===photo.id){group.backgroundMode='none';group.backgroundMemoryPhotoId=null;}}
+      urlCache.delete(photo.id);toast('回憶相片已刪除。');void loadAlbum(photo.chat_type,photo.session_id||photo.group_id);return;
+    }
+    if(button.dataset.action==='memory-photo-background'){
+      const photo=cached.photo,client=window.mySupabase,uid=currentUser()?.uid;
+      if(!client||!uid||photo.owner_id!==uid){toast('請確認登入帳號與相片擁有者一致。');return;}
+      try{
+        if(photo.chat_type==='single'){
+          const session=state.sessions[photo.session_id];
+          if(!session||!session.cloudOwned||session.cloudOwnerUid!==uid){toast('這不是目前帳號擁有的已同步聊天。');return;}
+          const previous=session.background;session.background='memory-photo:'+photo.id;
+          if(!persist()){session.background=previous;return;}
+          const synced=await saveChatSessionSafely(session);
+          if(!synced){session.background=previous;persist();render();toast('背景同步失敗，已還原原設定。');return;}
+          render();toast('已將這張回憶相片設為聊天背景。');
+        }else{
+          const group=groupPrototype.active;
+          if(!group||group.id!==photo.group_id){toast('請先開啟這張照片所屬的群組。');return;}
+          const {data,error}=await client.from('chat_groups').update({background_mode:'memory',background_memory_photo_id:photo.id,updated_at:new Date().toISOString()})
+            .eq('id',group.id).eq('owner_id',uid).select('id').maybeSingle();
+          if(error||!data)throw error||new Error('資料庫未確認群組背景已儲存。');
+          group.backgroundMode='memory';group.backgroundMemoryPhotoId=photo.id;render();toast('已將這張回憶相片設為群組背景。');
+        }
+      }catch(err){console.error('設定回憶相片背景失敗',err);toast('背景設定失敗：'+(err.message||'請稍後再試。'));}
+      return;
+    }
+    if(button.dataset.action==='memory-photo-open'){
+      let viewer=document.querySelector('.memory-viewer');if(viewer){viewer.remove();return;}
+      viewer=document.createElement('div');viewer.className='memory-viewer';viewer.innerHTML='<img src="'+e(cached.url)+'" alt="回憶相片" data-memory-viewer-image><div class="memory-viewer-controls"><button type="button" data-action="memory-viewer-download" aria-label="下載壓縮相片" title="下載">⬇</button><button type="button" data-action="memory-viewer-close" aria-label="關閉" title="關閉">✕</button></div>';
+      viewer.addEventListener('click',ev=>{if(ev.target===viewer){viewer.remove();return;}if(ev.target.matches('[data-memory-viewer-image]'))viewer.querySelector('.memory-viewer-controls')?.classList.toggle('visible');});
+      viewer.querySelector('[data-action="memory-viewer-close"]').addEventListener('click',()=>viewer.remove());viewer.querySelector('[data-action="memory-viewer-download"]').addEventListener('click',()=>downloadCompressedMemoryPhoto(cached));document.body.appendChild(viewer);return;
+    }else{
+      const ext=(cached.photo.storage_path.split('.').pop()||'jpg').replace(/[^a-z0-9]/gi,'')||'jpg';
+      try {
+        const response=await fetch(cached.url);
+        if(!response.ok)throw new Error('下載連結已失效，請重新開啟相簿。');
+        const blob=await response.blob(),objectUrl=URL.createObjectURL(blob);
+        const a=document.createElement('a');a.href=objectUrl;a.download=(cached.photo.caption||'personax-memory')+'.'+ext;
+        document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),1000);
+      } catch(error) { toast('下載失敗：'+(error.message||'請重新開啟相簿後再試。')); }
+    }
+  });
+})();
+</script>
+
 </body>
 </html>
