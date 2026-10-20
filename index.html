@@ -4253,7 +4253,9 @@ function buildPromptVariableValues(context = {}) {
   const world = promptText(group?.world_background ?? group?.worldBackground ?? group?.world ?? session.world_background ?? session.worldBackground ?? session.world ?? character.worldBackground ?? character.world);
   const scenes = Array.isArray(group?.scenes) ? group.scenes : [];
   const scene = promptText(context.scene ?? session.scene ?? scenes.map(item => item?.name).filter(Boolean).join('、'));
-  const currentUserMessage = promptText(context.userMessage ?? messages.filter(message => message?.role === 'user').slice(-1)[0]?.text ?? messages.filter(message => message?.role === 'user').slice(-1)[0]?.content);
+  const playerMessages = messages.filter(message => ['user', 'player'].includes(promptText(message?.role ?? message?.speaker_type).toLowerCase()));
+  const lastPlayerMessage = playerMessages[playerMessages.length - 1];
+  const currentUserMessage = promptText(context.userMessage ?? lastPlayerMessage?.text ?? lastPlayerMessage?.content);
   const values = {
     USER: promptText(user.nickname ?? user.name),
     CHAR: promptText(character.name),
