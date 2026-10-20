@@ -6196,5 +6196,129 @@ if (window.__pendingSupabaseUser) {
   window.__pendingSupabaseUser = null;
 }
 </script>
+
+<style>
+.memory-album-stack{display:grid;gap:12px}
+.memory-album-items{display:grid;gap:10px}
+.memory-photo-row{display:grid;grid-template-columns:88px minmax(0,1fr) 38px;align-items:center;gap:12px;padding:10px;border:1px solid var(--border);border-radius:14px;background:var(--panel)}
+.memory-photo-thumb{width:88px;height:88px;padding:0;overflow:hidden;border:0;border-radius:10px;background:var(--panel2)}
+.memory-photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.memory-photo-details{display:grid;gap:6px;min-width:0}
+.memory-photo-details strong{overflow-wrap:anywhere}
+.memory-photo-download{width:36px;height:36px;padding:0;border-radius:50%}
+@media(max-width:420px){.memory-photo-row{grid-template-columns:72px minmax(0,1fr) 34px;gap:9px;padding:8px}.memory-photo-thumb{width:72px;height:72px}}
+</style>
+<script>
+(function(){
+  const BUCKET='personax-memory-photos';
+  const urlCache=new Map();
+  const dateLabel=value=>{const d=new Date(value);return Number.isNaN(d.getTime())?'日期不明':d.toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'});};
+  function albumMount(type,id){
+    return '<section class="memory-album-stack" data-memory-album-type="'+e(type)+'" data-memory-album-id="'+e(id)+'">'+
+      '<p class="small muted" style="margin:0 0 12px">回憶相簿可保存一年，請記得即時下載哦</p>'+
+      '<div class="panel stack" style="gap:10px;padding:12px;margin-bottom:14px">'+
+      '<label class="field"><span>回憶名稱</span><input id="memoryAlbumCaption" maxlength="80" placeholder="例如：第一次遇見"></label>'+
+      '<label class="field"><span>上傳回憶相片（JPEG、PNG、WebP，單張上限 10 MB）</span><input id="memoryAlbumFile" type="file" accept="image/jpeg,image/png,image/webp" data-album-type="'+e(type)+'" data-album-id="'+e(id)+'"></label></div>'+
+      '<div id="memoryAlbumItems" class="memory-album-items"><div class="empty">正在讀取回憶相簿…</div></div></section>';
+  }
+  async function loadAlbum(type,chatId){
+    const mount=$('memoryAlbumItems');if(!mount)return;
+    const client=window.mySupabase;
+    if(!client||!currentUser()?.uid){mount.innerHTML='<div class="empty">請先登入，才能查看與保存回憶相片。</div>';return;}
+    try{
+      const {data:{user},error:authError}=await client.auth.getUser();
+      if(authError||!user||user.id!==currentUser()?.uid)throw new Error('登入狀態驗證失敗，請重新登入。');
+      const {data,error}=await client.from('chat_memory_photos').select('id,owner_id,chat_type,session_id,group_id,storage_path,caption,created_at,expires_at')
+        .eq('owner_id',user.id).eq('chat_type',type).eq(type==='single'?'session_id':'group_id',chatId)
+        .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false});
+      if(error)throw error;
+      const cards=await Promise.all((data||[]).map(async photo=>{
+        const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,3600);
+        if(signedError||!signed?.signedUrl){console.warn('相簿簽名網址取得失敗',signedError?.message);return '';}
+        urlCache.set(photo.id,{url:signed.signedUrl,photo});
+        return '<article class="memory-photo-row"><button type="button" class="memory-photo-thumb" data-action="memory-photo-open" data-id="'+e(photo.id)+'" aria-label="開啟相片">'+
+          '<img src="'+e(signed.signedUrl)+'" alt="'+e(photo.caption||'回憶相片')+'" loading="lazy"></button>'+
+          '<div class="memory-photo-details"><strong>'+e(photo.caption||'回憶快照')+'</strong><span class="small muted">'+e(dateLabel(photo.created_at))+'</span></div>'+
+          '<button type="button" class="memory-photo-download" data-action="memory-photo-download" data-id="'+e(photo.id)+'" aria-label="下載原始相片" title="下載原始相片">⬇</button></article>';
+      }));
+      if(!mount.isConnected)return;
+      mount.innerHTML=cards.filter(Boolean).join('')||'<div class="empty">目前還沒有回憶相片哦</div>';
+    }catch(err){console.error('讀取回憶相簿失敗',err);mount.innerHTML='<div class="empty">相簿讀取失敗：'+e(err.message||'請稍後重試。')+'</div>';}
+  }
+  async function uploadAlbum(input){
+    const type=input.dataset.albumType,chatId=input.dataset.albumId,file=input.files?.[0];
+    if(!file)return;
+    const caption=$('memoryAlbumCaption')?.value.trim()||'回憶快照';
+    if(!['single','group'].includes(type)||!isUuid(chatId)){input.value='';toast('無法確認相片所屬聊天，請重新開啟相簿。');return;}
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type)){input.value='';toast('相片格式僅支援 JPEG、PNG 或 WebP。');return;}
+    if(file.size>10*1024*1024){input.value='';toast('單張相片不可超過 10 MB，請先壓縮後再上傳。');return;}
+    const client=window.mySupabase;
+    if(!client||!currentUser()?.uid){input.value='';toast('請先登入後再上傳相片。');return;}
+    let path='';
+    try{
+      const {data:{user},error:authError}=await client.auth.getUser();
+      if(authError||!user||user.id!==currentUser()?.uid)throw new Error('登入狀態驗證失敗，請重新登入。');
+      const ext=file.type==='image/jpeg'?'jpg':file.type==='image/png'?'png':'webp';
+      path=user.id+'/'+type+'/'+chatId+'/'+(crypto.randomUUID?crypto.randomUUID():id())+'.'+ext;
+      const {error:upError}=await client.storage.from(BUCKET).upload(path,file,{contentType:file.type,upsert:false});
+      if(upError)throw upError;
+      const created=new Date(),expires=new Date(created);expires.setFullYear(expires.getFullYear()+1);
+      const {error:dbError}=await client.from('chat_memory_photos').insert({
+        owner_id:user.id,chat_type:type,session_id:type==='single'?chatId:null,group_id:type==='group'?chatId:null,
+        storage_path:path,caption:caption.slice(0,80),created_at:created.toISOString(),expires_at:expires.toISOString(),status:'active'
+      });
+      if(dbError)throw dbError;
+      input.value='';if($('memoryAlbumCaption'))$('memoryAlbumCaption').value='';
+      toast('回憶相片已保存。保存期限為一年，實際自動清理排程仍待完成。');
+      await loadAlbum(type,chatId);
+    }catch(err){
+      if(path){const {error:cleanup}=await client.storage.from(BUCKET).remove([path]);if(cleanup)console.error('清理未完成上傳檔案失敗',cleanup.message);}
+      input.value='';console.error('回憶相片上傳失敗',err);toast('相片上傳失敗：'+(err.message||'請稍後重試。'));
+    }
+  }
+  const oldSingle=renderChatOverlay;
+  renderChatOverlay=function(kind){
+    oldSingle(kind);
+    if(kind!=='album')return;
+    const s=currentSession(),overlay=$('view').querySelector('.chat-overlay');
+    if(!s||!overlay)return;
+    overlay.innerHTML='<div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回">'+ICON.back+'</button><h2>回憶相簿</h2></div>'+albumMount('single',s.id);
+    void loadAlbum('single',s.id);
+  };
+  const oldGroup=renderGroupChatOverlay;
+  renderGroupChatOverlay=function(kind){
+    oldGroup(kind);
+    if(kind!=='album')return;
+    const g=groupPrototype.active,overlay=$('view').querySelector('.chat-overlay');
+    if(!g||!overlay)return;
+    overlay.innerHTML='<div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回">'+ICON.back+'</button><h2>回憶相簿</h2></div>'+albumMount('group',g.id);
+    void loadAlbum('group',g.id);
+  };
+  renderChatAlbumPage=function(){
+    const s=currentSession();
+    const content=s&&s.cloudOwned&&s.cloudOwnerUid===currentUser()?.uid?albumMount('single',s.id):
+      '<section class="panel"><p class="muted">請先開啟一段已同步的聊天，再從聊天頁進入該段對話的回憶相簿。</p></section>';
+    $('view').innerHTML='<div class="stack form-width"><div class="row between" style="align-items:center;gap:12px"><h1 style="margin:4px 0 0">回憶相簿</h1><button type="button" data-action="nav" data-page="chat">返回聊天</button></div>'+content+'</div>';
+    if(s&&s.cloudOwned&&s.cloudOwnerUid===currentUser()?.uid)void loadAlbum('single',s.id);
+  };
+  document.addEventListener('change',event=>{
+    const input=event.target;
+    if(input?.id==='memoryAlbumFile')void uploadAlbum(input);
+  });
+  document.addEventListener('click',event=>{
+    const button=event.target.closest('[data-action="memory-photo-open"],[data-action="memory-photo-download"]');
+    if(!button)return;
+    const cached=urlCache.get(button.dataset.id);
+    if(!cached?.url){toast('相片網址已失效，請重新開啟相簿。');return;}
+    if(button.dataset.action==='memory-photo-open'){
+      showDialog(cached.photo.caption||'回憶相片','<img src="'+e(cached.url)+'" alt="'+e(cached.photo.caption||'回憶相片')+'" style="width:100%;max-height:72dvh;object-fit:contain;border-radius:14px"><p class="small muted">'+e(dateLabel(cached.photo.created_at))+' · 保存一年</p><button type="button" data-action="memory-photo-download" data-id="'+e(cached.photo.id)+'">下載原始相片</button>');
+    }else{
+      const ext=(cached.photo.storage_path.split('.').pop()||'jpg').replace(/[^a-z0-9]/gi,'')||'jpg';
+      const a=document.createElement('a');a.href=cached.url;a.download=(cached.photo.caption||'personax-memory')+'.'+ext;a.rel='noopener';document.body.appendChild(a);a.click();a.remove();
+    }
+  });
+})();
+</script>
+
 </body>
 </html>
