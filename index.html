@@ -4309,13 +4309,15 @@ function parseRoleplaySegments(raw, roles = []) {
     const exact = match ? roles.filter(role => String(role.name || '').trim() === speakerName) : [];
     const knownRole = exact.length === 1 ? exact[0] : null;
     const isExplicitPrefix = Boolean(match && match[1]);
+    // In a single-character chat, an explicitly marked speaker still belongs
+    // to the active character even if the prompt uses an alias/role label.
+    const role = knownRole || (isExplicitPrefix && roles.length === 1 ? roles[0] : null);
     if (match && (knownRole || isExplicitPrefix)) {
       foundPrefix = true;
       flush();
-      const role = knownRole;
       current = {
         kind: role ? 'character' : 'temporary',
-        speakerName: role?.name || speakerName,
+        speakerName: knownRole?.name || speakerName,
         characterId: role?.id || null,
         avatar: role?.image || role?.avatar_url || '',
         text: match[3] || ''
