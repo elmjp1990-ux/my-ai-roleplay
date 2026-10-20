@@ -12,9 +12,11 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: "POST required" }), { status: 405, headers: corsHeaders });
   }
 
+  // Keep platform JWT verification enabled. The scheduler sends a server-side
+  // service-role JWT plus a separate secret header stored in Supabase Vault.
   const cronSecret = Deno.env.get("MEMORY_ALBUM_CRON_SECRET");
-  const authHeader = req.headers.get("Authorization") || "";
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  const suppliedSecret = req.headers.get("x-memory-album-cron-secret") || "";
+  if (!cronSecret || suppliedSecret !== cronSecret) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
   }
 
