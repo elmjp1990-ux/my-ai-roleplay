@@ -1893,8 +1893,14 @@ function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
 }
 function chatSessionData(s) {
+  const initialOpening = s.messages?.[0]?.role === 'assistant'
+    ? s.messages[0]
+    : s.initialOpeningMessage;
   return {
     name:s.name || '', archived:!!s.archived, hidden:!!s.hidden,
+    openingMessage:initialOpening && String(initialOpening.text || '').trim()
+      ? {text:String(initialOpening.text),at:Number(initialOpening.at) || Date.now()}
+      : null,
     pinned:!!s.pinned, persona:s.persona || '', personaCustom: s.personaCustom === true || (s.personaCustom !== false && !!s.persona),
     suggestions:s.suggestions !== false, background:s.background || 'avatar',
     startedAt:s.startedAt || Date.now(), archivedAt:s.archivedAt || null,
@@ -2005,9 +2011,10 @@ async function saveChatSessionToCloud(s, options = {}) {
   s.cloudOwned = true;
   s.cloudOwnerUid = localUser.uid;
   s.cloudCharacterSnapshot = snapshot;
-  const messages = (s.messages || []).filter(m => isUuid(m.id)).map(m => ({
-    id:m.id, session_id:s.id,
-    role:m.role === 'user' ? 'user' : 'assistant',
+  // Client writes only player messages. Assistant rows are inserted by the trusted
+  // chat-turn Edge Function; the database trigger intentionally rejects client writes.
+  const messages = (s.messages || []).filter(m => m.role === 'user' && isUuid(m.id)).map(m => ({
+    id:m.id, session_id:s.id, role:'user',
     content:String(m.text ?? ''), created_at:new Date(Number(m.at) || Date.now()).toISOString()
   }));
   if (messages.length) {
@@ -2121,7 +2128,17 @@ async function loadCloudChatSessions(user) {
               createdAt:Number(data.pendingTurn.createdAt) || Date.now()
             }
           : null,
-        messages:cloudMessages,
+        messages:(()=>{
+          const opening=data.openingMessage && String(data.openingMessage.text || '').trim()
+            ? {id:'opening-'+row.id,role:'assistant',text:String(data.openingMessage.text),at:Number(data.openingMessage.at)||Date.now()}
+            : null;
+          const firstCloud=cloudMessages[0];
+          const alreadyStored=opening && firstCloud?.role==='assistant' && firstCloud.text===opening.text;
+          return opening && !alreadyStored ? [opening,...cloudMessages] : cloudMessages;
+        })(),
+        initialOpeningMessage:data.openingMessage && String(data.openingMessage.text || '').trim()
+          ? {text:String(data.openingMessage.text),at:Number(data.openingMessage.at)||Date.now()}
+          : null,
         cloudOwned:true, cloudOwnerUid:user.id, cloudCharacterSnapshot:snapshot
       };
       if (snapshot.id === row.character_id) {
