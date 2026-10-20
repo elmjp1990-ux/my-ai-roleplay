@@ -79,11 +79,8 @@ with check (
   )
 );
 
+-- No client UPDATE policy: immutable photo scope/path/expiry fields are managed by trusted server-side cleanup only.
 drop policy if exists "memory_photos_update_owner" on public.chat_memory_photos;
-create policy "memory_photos_update_owner" on public.chat_memory_photos
-for update to authenticated
-using (owner_id = (select auth.uid()) and deleted_at is null)
-with check (owner_id = (select auth.uid()) and deleted_at is null);
 
 drop policy if exists "memory_photos_delete_owner" on public.chat_memory_photos;
 create policy "memory_photos_delete_owner" on public.chat_memory_photos
