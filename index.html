@@ -3971,7 +3971,11 @@ function renderGroupConversation() {
   applyGroupChatBackground();
   // Keep the newest group messages in view when opening or re-rendering the chat.
   const groupMessages=$('groupMessages');
-  if(groupMessages) requestAnimationFrame(()=>{ if(groupMessages.isConnected) groupMessages.scrollTop=groupMessages.scrollHeight; });
+  if(groupMessages) {
+    const scrollToLatest=()=>{if(groupMessages.isConnected) groupMessages.scrollTop=groupMessages.scrollHeight;};
+    requestAnimationFrame(()=>{scrollToLatest();requestAnimationFrame(scrollToLatest);});
+    setTimeout(scrollToLatest,80);
+  }
 }
 let groupBackgroundTimer=null;
 function applyGroupChatBackground() {
@@ -4242,9 +4246,33 @@ async function groupSendMock() {
       p_group_id:g.active.id,p_request_key:g.pendingRequest.requestKey,p_content:content
     }),15000,'訊息保存逾時。請重新開啟群組確認訊息是否已保存，再決定是否重試。');
     if(error) throw error;
+    const activeGroupId=g.active.id;
     g.pendingRequest=null;
-    g.sending=false;
-    await groupOpen(g.active.id);
+    // Refresh only the message rows; do not reopen the entire group, clear its active
+    // state, or flash the loading screen after every send.
+    const {data:rows,error:rowsError}=await groupWithTimeout(
+      window.mySupabase.from('chat_group_messages')
+        .select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at')
+        .eq('group_id',activeGroupId).is('deleted_at',null)
+        .order('created_at',{ascending:true}).order('sequence_no',{ascending:true}),
+      15000,'訊息已送出，但重新整理訊息清單逾時。請稍後重新開啟群組確認。'
+    );
+    if(rowsError) throw rowsError;
+    if(g.active?.id!==activeGroupId) return;
+    const members=g.active.members||[], scenes=g.active.scenes||[];
+    g.messages=(rows||[]).map(m=>{
+      const speakerSnapshot=m.speaker_snapshot||{};
+      const member=members.find(x=>x.characterId===m.character_id)||members.find(x=>x.characterSnapshotId===speakerSnapshot.id||x.id===speakerSnapshot.id);
+      const scene=scenes.find(x=>x.id===m.scene_id);
+      const type=m.speaker_type==='user'?'user':m.speaker_type==='system'?'system':'character';
+      const speaker=type==='user'?'你':type==='system'?'系統':(speakerSnapshot.name||member?.name||'角色')+(scene?' · '+scene.name:'');
+      return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:m.content,createdAt:m.created_at};
+    });
+    g.turn=g.messages.filter(m=>m.type==='user').length;
+    g.sending=false;g.formError='';
+    renderGroupConversation();
+    const messagePane=$('groupMessages');
+    if(messagePane) requestAnimationFrame(()=>{if(messagePane.isConnected) messagePane.scrollTop=messagePane.scrollHeight;});
   } catch(error) {
     g.sending=false;g.formError=groupFriendlyError(error)||'訊息保存失敗，請重試。';render();
   }
