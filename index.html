@@ -6434,6 +6434,12 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         break;
       }
       case 'message': {
+        // Defensive routing: if a group composer is present, never run single-chat
+        // empty-message validation for its blank-send/continue action.
+        if (route.page === 'group' || $('groupMessageInput')) {
+          await groupSendMock();
+          break;
+        }
         if (!s || !currentUser()) return;
         // Reuse the same turn IDs after an ambiguous response; never create a new
         // charge attempt until the prior turn has an authoritative outcome.
