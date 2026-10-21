@@ -1624,6 +1624,12 @@ const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, char => ({
   '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
 }[char]));
 const e = escapeHTML;
+// Roleplay template variables are presentation-only: never mutate saved character or chat data.
+function replaceRoleplayVariables(value, userName = '你', charName = '角色') {
+  return String(value ?? '').replace(/\{\s*(USER|CHAR)\s*\}/giu, (_, token) =>
+    token.toUpperCase() === 'USER' ? String(userName || '你') : String(charName || '角色')
+  );
+}
 const id = () => {
   if (window.crypto?.randomUUID) return window.crypto.randomUUID();
   // 舊版瀏覽器若沒有 randomUUID，也必須產生資料庫可接受的 UUID，
@@ -2782,7 +2788,7 @@ function card(c,owner = false) {
       </div>
       <div class="card-body">
         <h3>${e(c.name)}</h3>
-        <p class="card-intro">${e(c.intro)}</p>
+        <p class="card-intro">${e(replaceRoleplayVariables(c.intro, currentUser()?.nickname || '你', c.name))}</p>
         <div class="card-tags">${(c.tags || []).slice(0,5).map(tagButton).join('')}</div>
         ${owner ? `
           <div class="owner-actions">
@@ -2880,9 +2886,9 @@ function renderDetail() {
         <section class="panel stack">
           <p class="muted">${c.gender === 'male' ? '男' : c.gender === 'female' ? '女' : '模糊'}
             · ${e(c.age || '未設定')} 歲 · ${e(c.race || '未設定種族')}</p>
-          <div><h3>角色介紹</h3><div class="prose">${e(c.intro)}</div></div>
+          <div><h3>角色介紹</h3><div class="prose">${e(replaceRoleplayVariables(c.intro, currentUser()?.nickname || '你', c.name))}</div></div>
           <div class="row wrap">${(c.tags || []).map(tagButton).join('')}</div>
-          <div><h3>開場白</h3><div class="prose muted">${e(c.opening)}</div></div>
+          <div><h3>開場白</h3><div class="prose muted">${e(replaceRoleplayVariables(c.opening, currentUser()?.nickname || '你', c.name))}</div></div>
           ${offline
             ? '<div class="character-status-label"><span class="character-status-dot" style="position:static;background:#8993a4"></span>離線／已下架</div>'
             : `<div class="row wrap">
@@ -3897,7 +3903,8 @@ function renderGroupConversation() {
     const who=isUser?'你':isSystem?'系統':(member?.name||m.speaker||'角色');
     // Group replies use m.content (not m.text), so they must be parsed here separately.
     // Otherwise “夜辰：...” stays plain text and never renders the character portrait.
-    const segments=!isSystem ? parseRoleplaySegments(m.content || '',roleplayRoles) : [];
+    const displayContent=replaceRoleplayVariables(m.content || '',group.playerName || state.account?.nickname || '你',member?.name || '角色');
+    const segments=!isSystem ? parseRoleplaySegments(displayContent,roleplayRoles) : [];
     const hasSpeaker=segments.some(segment=>segment.kind!=='user');
     const avatarHTML=isUser
       ? '<span class="avatar avatar-fallback" style="background:#4f46e5">你</span>'
@@ -3906,7 +3913,7 @@ function renderGroupConversation() {
         : (hasSpeaker ? '' : avatar?'<img class="avatar" src="'+e(avatar)+'" alt="">':'<span class="avatar avatar-fallback">'+e(String(who).trim().slice(0,1)||'角')+'</span>');
     const bodyHTML=hasSpeaker
       ? '<div class="roleplay-segments">'+segments.map(roleplaySegmentHTML).join('')+'</div>'
-      : '<div class="message-name">'+e(who)+'</div>'+(isSystem?'<div class="bubble">'+e(m.content||'')+'</div>':formatMessage(m.content||''));
+      : '<div class="message-name">'+e(who)+'</div>'+(isSystem?'<div class="bubble">'+e(displayContent)+'</div>':formatMessage(displayContent));
     return '<div class="message '+(isUser?'user':'')+(hasSpeaker?' roleplay-prefixed-message':'')+'">'+avatarHTML+
       '<div class="message-content">'+bodyHTML+'</div></div>';
   }).join('') || '<div class="empty">這段群組對話還沒有訊息，輸入第一句話開始故事。</div>';
@@ -4475,16 +4482,17 @@ function renderMessages(scroll = true) {
     const roles = [{id:c.id,name:c.name,image:c.image || c.avatar_url}];
     // Role prefixes can appear in AI replies as well as player-authored text.
     // Previously only user messages were parsed, so an AI reply like “夜辰：...” never got its role avatar.
+    const displayText = replaceRoleplayVariables(m.text, currentUser()?.nickname || '你', c.name);
     const segments = user && Array.isArray(m.displaySegments)
       ? m.displaySegments.map(segment => ({
           ...segment,
           avatar:segment.avatar || roles.find(role => role.id === segment.characterId)?.image || ''
         }))
-      : parseRoleplaySegments(m.text, roles);
+      : parseRoleplaySegments(displayText, roles);
     const hasSpeaker = segments.some(segment => segment.kind !== 'user');
     const contentHTML = hasSpeaker
       ? '<div class="roleplay-segments">' + segments.map(roleplaySegmentHTML).join('') + '</div>'
-      : '<div class="message-name">' + e(user ? (currentUser()?.nickname || '你') : c.name) + '</div>' + formatMessage(m.text);
+      : '<div class="message-name">' + e(user ? (currentUser()?.nickname || '你') : c.name) + '</div>' + formatMessage(displayText);
     const outerAvatar = user
       ? avatar(currentUser())
       : (hasSpeaker ? '' : `<img class="avatar" src="${e(safeImage(c.image || c.avatar_url))}" alt="">`);
