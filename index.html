@@ -519,7 +519,7 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
   white-space:pre-wrap;
   overflow-wrap:anywhere;
   line-height:1.85;
-  margin-bottom:7px;
+  margin-bottom:3px;
 }
 .user .bubble { background:var(--primary); color:white; border-color:transparent; }
 .narration {
@@ -530,7 +530,7 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
   white-space:pre-wrap;
   overflow-wrap:anywhere;
   line-height:1.85;
-  margin:8px 0;
+  margin:3px 0;
 }
 .user .narration { text-align:right; }
 .message-more {
@@ -4342,10 +4342,33 @@ function parseRoleplaySegments(raw, roles = []) {
     const exact = match ? roles.filter(role => String(role.name || '').trim() === speakerName) : [];
     const knownRole = exact.length === 1 ? exact[0] : null;
     const isExplicitPrefix = Boolean(match && match[1]);
+    // Some group replies prepend narration before a role label, e.g.
+    // “聽見你的話，寒川（1016測試）回應：實際台詞”.
+    // Strip only when a known member name is followed by a recognized response marker.
+    const embeddedResponse = roles.map(role => {
+      const name = String(role.name || '').trim();
+      if (!name) return null;
+      const nameIndex = line.indexOf(name);
+      if (nameIndex < 0) return null;
+      const tail = line.slice(nameIndex + name.length);
+      const response = tail.match(/^[^:：\n]{0,40}?(?:回應|回答|說|表示)[:：]\s*(.*)$/u);
+      return response ? {role, text:response[1] || ''} : null;
+    }).filter(Boolean);
+    const embedded = embeddedResponse.length === 1 ? embeddedResponse[0] : null;
     // In a single-character chat, an explicitly marked speaker still belongs
     // to the active character even if the prompt uses an alias/role label.
     const role = knownRole || (isExplicitPrefix && roles.length === 1 ? roles[0] : null);
-    if (match && (knownRole || isExplicitPrefix)) {
+    if (embedded) {
+      foundPrefix = true;
+      flush();
+      current = {
+        kind:'character',
+        speakerName:String(embedded.role.name || '').trim(),
+        characterId:embedded.role.id || null,
+        avatar:embedded.role.image || embedded.role.avatar_url || '',
+        text:embedded.text
+      };
+    } else if (match && (knownRole || isExplicitPrefix)) {
       foundPrefix = true;
       flush();
       current = {
