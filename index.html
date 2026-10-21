@@ -2762,6 +2762,8 @@ function exploreList() {
 }
 function card(c,owner = false) {
   const favorite = state.favorites.includes(c.id);
+  const knownTurnCount = characterTurnCountCache.get(c.id);
+  const initialTurnCount = Number.isSafeInteger(knownTurnCount) ? knownTurnCount : (Number(c.chats) || 0);
   return `
     <article class="card">
       <div class="card-image">
@@ -2769,9 +2771,9 @@ function card(c,owner = false) {
                 aria-label="查看${e(c.name)}">
           <img src="${e(safeImage(c.image))}" alt="${e(c.name)}" loading="lazy">
         </button>
-        <span class="card-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(c.chats || 0)}" title="對話回合數">
+        <span class="card-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(initialTurnCount)}" title="對話回合數">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
-          <span>${e(c.chats || 0)}</span>
+          <span>${e(initialTurnCount)}</span>
         </span>
         <button class="heart ${favorite ? 'on' : ''}" data-action="favorite"
                 data-id="${e(c.id)}" aria-label="切換喜愛角色"
@@ -2914,9 +2916,15 @@ function renderDetail() {
 
 async function loadCharacterTurnCounts(characterIds) {
   const ids = [...new Set((Array.isArray(characterIds) ? characterIds : [characterIds])
-    .filter(isUuid))];
-  if (!ids.length || !window.mySupabase) return;
-  try {
+    .filter(isUuid))].filter(id => !characterTurnCountCache.has(id) && !characterTurnCountRequests.has(id));
+  if (!ids.length || !window.mySupabase) {
+    for (const id of (Array.isArray(characterIds) ? characterIds : [characterIds])) {
+      if (characterTurnCountCache.has(id)) updateCharacterTurnCountElements(id, characterTurnCountCache.get(id));
+    }
+    return;
+  }
+  const requestKey = ids.join(',');
+  const request = (async () => {
     const {data,error} = await window.mySupabase.rpc('get_character_turn_counts',{p_character_ids:ids});
     if (error) throw error;
     if (!Array.isArray(data)) throw new Error('角色回合統計回傳格式無效');
@@ -2924,20 +2932,29 @@ async function loadCharacterTurnCounts(characterIds) {
       if (!isUuid(row.character_id)) continue;
       const count = Number(row.turn_count);
       if (!Number.isSafeInteger(count) || count < 0) continue;
-      document.querySelectorAll('[data-character-turn-count]').forEach(element => {
-        if (element.dataset.characterTurnCount !== row.character_id) return;
-        const number = element.matches('.card-chat-count')
-          ? element.querySelector('span')
-          : element.querySelector('span');
-        if (number) number.textContent = count.toLocaleString('zh-TW');
-        element.setAttribute('aria-label','對話回合數 ' + count.toLocaleString('zh-TW'));
-        element.setAttribute('title','對話回合數 ' + count.toLocaleString('zh-TW'));
-      });
+      characterTurnCountCache.set(row.character_id,count);
+      updateCharacterTurnCountElements(row.character_id,count);
     }
+  })();
+  ids.forEach(id => characterTurnCountRequests.set(id,request));
+  try {
+    await request;
   } catch (error) {
     // 統計載入失敗時保留現有數字，不留下「載入中」或額外統計列。
     console.warn('角色對話回合統計載入失敗：',error?.message || error);
+  } finally {
+    ids.forEach(id => characterTurnCountRequests.delete(id));
   }
+}
+function updateCharacterTurnCountElements(characterId,count) {
+  document.querySelectorAll('[data-character-turn-count]').forEach(element => {
+    if (element.dataset.characterTurnCount !== characterId) return;
+    const number = element.querySelector('span');
+    const formatted = count.toLocaleString('zh-TW');
+    if (number && number.textContent !== formatted) number.textContent = formatted;
+    element.setAttribute('aria-label','對話回合數 ' + formatted);
+    element.setAttribute('title','對話回合數 ' + formatted);
+  });
 }
 
 async function loadCloudComments(characterId) {
@@ -3058,6 +3075,8 @@ function renderFavorites() {
 
 /* Characters */
 let createVisibilityFilter = 'all';
+const characterTurnCountCache = new Map();
+const characterTurnCountRequests = new Map();
 function creationTabs() {
   return `<div class="tabs">
     <button data-action="new-character">建立新角色</button>
@@ -3085,6 +3104,7 @@ function renderCreate() {
       ${visibleCharacters.map(c => card(c,true)).join('') ||
       (createVisibilityFilter === 'public' ? '<div class="empty">目前沒有公開角色。</div>' : createVisibilityFilter === 'private' ? '<div class="empty">目前沒有私密角色。</div>' : '<div class="empty">尚未建立角色。</div>')}
     </div></div>`;
+  void loadCharacterTurnCounts(visibleCharacters.map(c => c.id));
 }
 function editorDraftKey() {
   const uid = currentUser()?.uid;
