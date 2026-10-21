@@ -2769,7 +2769,7 @@ function card(c,owner = false) {
                 aria-label="查看${e(c.name)}">
           <img src="${e(safeImage(c.image))}" alt="${e(c.name)}" loading="lazy">
         </button>
-        <span class="card-chat-count" aria-label="${e(c.chats || 0)} 次對話" title="${e(c.chats || 0)} 次對話">
+        <span class="card-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(c.chats || 0)}" title="對話回合數">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
           <span>${e(c.chats || 0)}</span>
         </span>
@@ -2805,6 +2805,7 @@ function renderGrid() {
   const shown = recommended ? list.slice(0,Math.min(limit,150)) : list;
   $('characterGrid').innerHTML = shown.map(c => card(c)).join('') ||
     '<div class="empty">目前還沒有符合條件的公開角色。稍後再來看看，或試試其他標籤。</div>';
+  void loadCharacterTurnCounts(shown.map(c => c.id));
   document.querySelectorAll('.explore-shortcut[data-filter]').forEach(button => {
     button.classList.toggle('active', button.dataset.filter === filter);
   });
@@ -2868,8 +2869,10 @@ function renderDetail() {
           <div class="detail-portrait-meta">
             <h1>${e(c.name)}</h1>
             <button class="author-link" data-action="author" data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>
-            <div class="detail-chat-count">💬 ${e(c.chats || '0')} 次對話</div>
-            <div class="detail-turn-count" data-character-turn-count="${e(c.id)}">↻ 對話回合：載入中</div>
+            <div class="detail-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(c.chats || 0)}" title="對話回合數">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
+              <span>${e(c.chats || 0)}</span>
+            </div>
           </div>
         </div>
         <section class="panel stack">
@@ -2902,33 +2905,38 @@ function renderDetail() {
         </form>
       </section>`}
     </div>`;
-  if (!offline) void loadPublicCharacterTurnCount(c.id);
+  void loadCharacterTurnCounts([c.id]);
   if (!offline && route.page !== 'session-detail') {
     renderComments();
     if (window.mySupabase && c.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(c.id)) void loadCloudComments(c.id);
   }
 }
 
-async function loadPublicCharacterTurnCount(characterId) {
-  const updateLabel = value => {
-    const target = [...document.querySelectorAll('[data-character-turn-count]')]
-      .find(element => element.dataset.characterTurnCount === characterId);
-    if (target) target.textContent = value;
-  };
-  const client = window.mySupabase;
-  if (!client || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(characterId || ''))) {
-    updateLabel('↻ 對話回合：暫無資料');
-    return;
-  }
+async function loadCharacterTurnCounts(characterIds) {
+  const ids = [...new Set((Array.isArray(characterIds) ? characterIds : [characterIds])
+    .filter(isUuid))];
+  if (!ids.length || !window.mySupabase) return;
   try {
-    const {data,error} = await client.rpc('get_public_character_turn_count',{p_character_id:characterId});
+    const {data,error} = await window.mySupabase.rpc('get_character_turn_counts',{p_character_ids:ids});
     if (error) throw error;
-    const count = Number(data);
-    if (!Number.isSafeInteger(count) || count < 0) throw new Error('角色回合數回傳格式無效');
-    updateLabel('↻ 對話回合：' + count.toLocaleString('zh-TW'));
+    if (!Array.isArray(data)) throw new Error('角色回合統計回傳格式無效');
+    for (const row of data) {
+      if (!isUuid(row.character_id)) continue;
+      const count = Number(row.turn_count);
+      if (!Number.isSafeInteger(count) || count < 0) continue;
+      document.querySelectorAll('[data-character-turn-count]').forEach(element => {
+        if (element.dataset.characterTurnCount !== row.character_id) return;
+        const number = element.matches('.card-chat-count')
+          ? element.querySelector('span')
+          : element.querySelector('span');
+        if (number) number.textContent = count.toLocaleString('zh-TW');
+        element.setAttribute('aria-label','對話回合數 ' + count.toLocaleString('zh-TW'));
+        element.setAttribute('title','對話回合數 ' + count.toLocaleString('zh-TW'));
+      });
+    }
   } catch (error) {
+    // 統計載入失敗時保留現有數字，不留下「載入中」或額外統計列。
     console.warn('角色對話回合統計載入失敗：',error?.message || error);
-    updateLabel('↻ 對話回合：暫無資料');
   }
 }
 
