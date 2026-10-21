@@ -562,9 +562,6 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .phone-member-switch button{min-width:32px;height:30px;padding:3px 9px;font-size:13px}
 .phone-member-name{flex:1;min-width:0;text-align:center;font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .phone-location{padding:9px 11px;border-radius:12px;background:var(--soft);margin-top:10px;font-size:10px;line-height:1.6}
-.phone-affection{display:flex;align-items:center;gap:8px;margin-top:10px;padding:9px 10px;border:1px solid var(--border);border-radius:12px;font-size:10px}
-.phone-affection input{width:72px;min-width:0;padding:6px;font-size:11px}
-.phone-affection button{padding:6px 9px;font-size:10px;white-space:nowrap}
 .phone-close-row{display:flex;justify-content:flex-end;margin-top:12px}
 .phone-warning{border-color:#e5a34b;background:rgba(229,163,75,.12)}
 .phone {
@@ -4677,14 +4674,11 @@ function renderPhoneModal() {
   const diaryList=isGroup?(group.memoriesByCharacter?.[String(character.id)]||groupPrototype.memoriesByCharacter?.[String(character.id)]||[]):(session.memories||[]);
   const diaryChars=Array.isArray(diaryList)?(isGroup?diaryList.reduce((n,item)=>n+countChars(typeof item==='string'?item:(item.text||'')),0):memorySize(diaryList)):0;
   const capacity=10000,battery=Math.max(0,Math.min(100,Math.round((1-Math.min(diaryChars,capacity)/capacity)*100))),warning=battery<=20,batteryColor=warning?'#e07b39':battery<=50?'#d5b34a':'#4eaf78';
-  const affectionKey=String(character.id||session?.characterId||'character');
-  const raw=phoneState.affectionByCharacter[affectionKey]??(isGroup?0:(session?.affection??0));
-  const affection=Math.max(0,Math.min(100,Number.isFinite(Number(raw))?Number(raw):0));
   const title=(character.name||group?.name||'角色')+' 的手機';
   const noticeHTML=notices.length?notices.map(line=>'<p>'+e(String(line))+'</p>').join(''):'<p>角色還沒有新的手機通知。</p>';
   const memberSwitch=isGroup?'<div class="phone-member-switch"><button type="button" data-phone-action="prev" aria-label="上一位群組成員">‹</button><span class="phone-member-name">'+e(character.name)+'</span><button type="button" data-phone-action="next" aria-label="下一位群組成員">›</button></div>':'';
   const modal=document.createElement('div');modal.className='phone-modal-backdrop';modal.setAttribute('role','presentation');
-  modal.innerHTML='<section class="phone-device" role="dialog" aria-modal="true" aria-label="'+e(title)+'"><div class="phone-device-head"><span>'+e(title)+'</span><div class="phone-battery" style="color:'+batteryColor+'" aria-label="電量 '+battery+'%"><span>'+battery+'%</span><span class="phone-battery-shape"><span class="phone-battery-fill" style="display:block;width:'+battery+'%"></span></span></div></div>'+memberSwitch+'<div class="phone-content"><div class="phone-time">'+e(gameTime)+'</div><div class="phone-location"><strong>📍 所在地</strong><div style="margin-top:3px;overflow-wrap:anywhere">'+e(location)+'</div></div><div class="phone-notices '+(warning?'phone-warning':'')+'">'+(warning?'<p><strong>回憶相簿快滿拉，趕緊清理幫角色恢復電量吧</strong></p>':'')+noticeHTML+'</div><p class="small muted" style="margin-top:10px;font-size:9px">電量依甜蜜日記容量計算：'+Math.min(diaryChars,capacity)+' / '+capacity+' 字</p><div class="phone-affection"><label for="phoneAffectionValue">玩家設定好感度</label><input id="phoneAffectionValue" data-phone-affection type="number" min="0" max="100" step="1" value="'+affection+'" aria-label="玩家設定好感度"><button type="button" data-phone-action="save-affection">儲存</button></div><p class="small muted" style="margin:5px 0 0;font-size:9px">好感度由玩家控制，預設 0；AI 串接後會納入角色狀態。</p></div><div class="phone-bar"></div><div class="phone-close-row"><button type="button" data-phone-action="close">關閉手機</button></div></section>';
+  modal.innerHTML='<section class="phone-device" role="dialog" aria-modal="true" aria-label="'+e(title)+'"><div class="phone-device-head"><span>'+e(title)+'</span><div class="phone-battery" style="color:'+batteryColor+'" aria-label="電量 '+battery+'%"><span>'+battery+'%</span><span class="phone-battery-shape"><span class="phone-battery-fill" style="display:block;width:'+battery+'%"></span></span></div></div>'+memberSwitch+'<div class="phone-content"><div class="phone-time">'+e(gameTime)+'</div><div class="phone-location"><strong>📍 所在地</strong><div style="margin-top:3px;overflow-wrap:anywhere">'+e(location)+'</div></div><div class="phone-notices '+(warning?'phone-warning':'')+'">'+(warning?'<p><strong>回憶相簿快滿拉，趕緊清理幫角色恢復電量吧</strong></p>':'')+noticeHTML+'</div><p class="small muted" style="margin-top:10px;font-size:9px">電量依甜蜜日記容量計算：'+Math.min(diaryChars,capacity)+' / '+capacity+' 字</p></div><div class="phone-bar"></div><div class="phone-close-row"><button type="button" data-phone-action="close">關閉手機</button></div></section>';
   modal.addEventListener('click',event=>{
     if(event.target===modal){savePhoneState();modal.remove();return;}
     const button=event.target.closest('[data-phone-action]');if(!button)return;
@@ -4694,13 +4688,6 @@ function renderPhoneModal() {
       if(!isGroup||!members.length)return;
       const i=Math.max(0,members.findIndex(member=>String(member.id)===String(phoneState.selectedCharacterId)));
       phoneState.selectedCharacterId=String(members[(i+(action==='next'?1:members.length-1))%members.length].id);savePhoneState();renderPhoneModal();return;
-    }
-    if(action==='save-affection'){
-      const field=modal.querySelector('[data-phone-affection]'),value=Math.max(0,Math.min(100,Math.round(Number(field?.value)||0)));
-      phoneState.affectionByCharacter[affectionKey]=value;savePhoneState();
-      if(!isGroup){session.affection=value;persist();}
-      else{group.phoneAffectionByCharacter=group.phoneAffectionByCharacter||{};group.phoneAffectionByCharacter[affectionKey]=value;}
-      toast('已保存玩家好感度 '+value+'。');renderPhoneModal();
     }
   });
   document.body.appendChild(modal);modal.querySelector('[data-phone-action="close"]')?.focus();
