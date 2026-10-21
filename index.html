@@ -498,6 +498,7 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .messages { flex:1 1 0; min-height:0; overflow-y:auto; padding:20px; overscroll-behavior:contain; }
 .message { display:flex; gap:8px; margin-bottom:19px; position:relative; }
 .message.user { flex-direction:row-reverse; }
+.message.user > .avatar { display:none !important; }
 .message .avatar { width:30px; height:30px; }
 .message-content { max-width:85%; min-width:0; }
 .message-name { color:var(--muted); font-size:10px; margin-bottom:5px; }
@@ -4545,7 +4546,16 @@ function renderMessages(scroll = true) {
     // Role prefixes can appear in AI replies as well as player-authored text.
     // Previously only user messages were parsed, so an AI reply like “夜辰：...” never got its role avatar.
     const displayText = replaceRoleplayVariables(m.text, currentUser()?.nickname || '你', c.name);
-    const segments = user && Array.isArray(m.displaySegments)
+    // Re-parse explicit active-character prefixes at render time. Older stored
+    // displaySegments may have been saved before the single-chat character was
+    // available to the prefix parser, leaving the summon as a plain user segment.
+    const startsWithActiveCharacter = user && new RegExp('^\\s*' + String(c.name || '').replace(/[.*+?^${}()|[\\]\\\\]/g, '\\    const segments = user && Array.isArray(m.displaySegments)
+      ? m.displaySegments.map(segment => ({
+          ...segment,
+          avatar:segment.avatar || roles.find(role => role.id === segment.characterId)?.image || ''
+        }))
+      : parseRoleplaySegments(displayText, roles);') + '\\s*[:：]').test(displayText);
+    const segments = user && Array.isArray(m.displaySegments) && !startsWithActiveCharacter
       ? m.displaySegments.map(segment => ({
           ...segment,
           avatar:segment.avatar || roles.find(role => role.id === segment.characterId)?.image || ''
