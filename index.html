@@ -6437,7 +6437,7 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
       case 'message-edit': {
         const m=s?.messages.find(m=>m.id===o.id);
         const latestEditableMessage = m && (m.role==='user'||m.role==='assistant') &&
-          s.messages.filter(item=>item.role==='user'||item.role==='assistant').at(-1)?.id===m.id;
+          s.messages.filter(item=>item.role===m.role).at(-1)?.id===m.id;
         if (!m || !latestEditableMessage) return;
         if (!text) return toast('訊息不可為空。');
         const previousText=m.text, wasEdited=!!m.edited;
