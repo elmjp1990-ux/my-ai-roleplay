@@ -4276,7 +4276,7 @@ async function groupSendMock() {
       const scene=scenes.find(x=>x.id===m.scene_id);
       const type=m.speaker_type==='user'?'user':m.speaker_type==='system'?'system':'character';
       const speaker=type==='user'?'你':type==='system'?'系統':(speakerSnapshot.name||member?.name||'角色')+(scene?' · '+scene.name:'');
-      return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:m.content,createdAt:m.created_at};
+      return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user' && m.content===GROUP_CONTINUE_SENTINEL ? '' : m.content,createdAt:m.created_at};
     });
     g.turn=g.messages.filter(m=>m.type==='user').length;
     g.sending=false;g.formError='';
