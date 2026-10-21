@@ -3914,8 +3914,12 @@ function renderGroupConversation() {
     const bodyHTML=hasSpeaker
       ? '<div class="roleplay-segments">'+segments.map(roleplaySegmentHTML).join('')+'</div>'
       : '<div class="message-name">'+e(who)+'</div>'+(isSystem?'<div class="bubble">'+e(displayContent)+'</div>':formatMessage(displayContent));
-    return '<div class="message '+(isUser?'user':'')+(hasSpeaker?' roleplay-prefixed-message':'')+'">'+avatarHTML+
-      '<div class="message-content">'+bodyHTML+'</div></div>';
+    const latestEditableGroupMessage = !isSystem &&
+      g.messages.filter(item=>item.type==='user'||item.type==='character').at(-1)?.id===m.id;
+    const editButton = latestEditableGroupMessage
+      ? '<button class="message-more" data-action="group-message-menu" data-id="'+e(m.id)+'" aria-label="訊息操作">⋯</button>' : '';
+    return '<div class="message '+(isUser?'user':'')+(hasSpeaker?' roleplay-prefixed-message':'')+'" data-message="'+e(m.id)+'">'+avatarHTML+
+      '<div class="message-content">'+bodyHTML+'</div>'+editButton+'</div>';
   }).join('') || '<div class="empty">這段群組對話還沒有訊息，輸入第一句話開始故事。</div>';
   const sceneNames=(group.scenes||[]).map(x=>x.name).filter(Boolean).join('、');
   const initialScene=(group.scenes||[]).find(x=>Number(x.position||1)===1)||(group.scenes||[])[0];
@@ -5008,12 +5012,12 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
     case 'message-menu': {
       const m = s?.messages.find(m => m.id === o.id);
       if (!m) return;
-      const latestUserMessage = m.role === 'user' &&
-        s.messages.filter(item => item.role === 'user').at(-1)?.id === m.id;
+      const latestEditableMessage = (m.role === 'user' || m.role === 'assistant') &&
+        s.messages.filter(item => item.role === 'user' || item.role === 'assistant').at(-1)?.id === m.id;
       showDialog('訊息操作',`
         <div class="stack">
           <button style="width:100%" data-action="copy-message" data-id="${e(m.id)}">複製</button>
-          ${latestUserMessage ? `<button style="width:100%" data-action="edit-message" data-id="${e(m.id)}">編輯</button>` : ''}
+          ${latestEditableMessage ? `<button style="width:100%" data-action="edit-message" data-id="${e(m.id)}">編輯</button>` : ''}
           <button class="danger" style="width:100%" data-action="delete-message" data-id="${e(m.id)}">刪除</button>
           ${m.role === 'assistant' ? `<button style="width:100%" data-action="report"
             data-kind="AI訊息" data-id="${e(m.id)}">舉報</button>` : ''}
@@ -5022,10 +5026,10 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
     }
     case 'edit-message': {
       const m = s?.messages.find(m => m.id === o.id);
-      const latestUserMessage = m?.role === 'user' &&
-        s.messages.filter(item => item.role === 'user').at(-1)?.id === m.id;
-      if (!m || !latestUserMessage) return;
-      showDialog('編輯最新輸入',`
+      const latestEditableMessage = m && (m.role === 'user' || m.role === 'assistant') &&
+        s.messages.filter(item => item.role === 'user' || item.role === 'assistant').at(-1)?.id === m.id;
+      if (!m || !latestEditableMessage) return;
+      showDialog('編輯最後一則訊息',`
         <form data-form="message-edit">
           <textarea name="text" required maxlength="10000">${e(m.text)}</textarea>
           <button class="primary" style="margin-top:15px">儲存</button>
@@ -5307,6 +5311,20 @@ document.addEventListener('click',async event => {
       case 'group-world-character': { groupPrototype.draft.worldCharacterId=button.value||button.dataset.value||'';const selected=groupSelectedCharacters().find(c=>c.id===groupPrototype.draft.worldCharacterId);const preview=$('groupWorldReference');if(preview) preview.textContent=selected?.worldBackground||selected?.world||selected?.intro||'所選角色目前沒有可用的公開介紹；可先繼續建立，後續再完善世界觀資料。';break; }
       case 'group-create':groupCreateMock();break;
       case 'group-send':groupSendMock();break;
+      case 'group-message-menu': {
+        const message=groupPrototype.messages.find(item=>item.id===key);
+        const latest=groupPrototype.messages.filter(item=>item.type==='user'||item.type==='character').at(-1);
+        if(!message||message.id!==latest?.id||!['user','character'].includes(message.type)) break;
+        showDialog('訊息操作','<div class="stack"><button style="width:100%" data-action="edit-group-message" data-id="'+e(message.id)+'">編輯</button></div>');
+        break;
+      }
+      case 'edit-group-message': {
+        const message=groupPrototype.messages.find(item=>item.id===key);
+        const latest=groupPrototype.messages.filter(item=>item.type==='user'||item.type==='character').at(-1);
+        if(!message||message.id!==latest?.id||!['user','character'].includes(message.type)) break;
+        showDialog('編輯最後一則訊息','<form data-form="group-message-edit"><textarea name="text" required maxlength="10000">'+e(message.content||'')+'</textarea><button class="primary" style="margin-top:15px">儲存</button></form>');
+        break;
+      }
       case 'group-toggle-member':groupExpandedMemberId=groupExpandedMemberId===key?null:key;render();break;
       case 'group-restart':groupRestart();break;
       case 'nav':visit(button.dataset.page);break;
@@ -6415,28 +6433,46 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
       }
       case 'message-edit': {
         const m=s?.messages.find(m=>m.id===o.id);
-        const latestUserMessage = m?.role === 'user' &&
-          s.messages.filter(item=>item.role==='user').at(-1)?.id===m.id;
-        if (!m || !latestUserMessage) return;
+        const latestEditableMessage = m && (m.role==='user'||m.role==='assistant') &&
+          s.messages.filter(item=>item.role==='user'||item.role==='assistant').at(-1)?.id===m.id;
+        if (!m || !latestEditableMessage) return;
         if (!text) return toast('訊息不可為空。');
-        const previousText=m.text;
-        const wasEdited=!!m.edited;
+        const previousText=m.text, wasEdited=!!m.edited;
+        const client=window.mySupabase, user=currentUser();
+        const isCloudMessage=!!(s.cloudOwned&&user?.uid===s.cloudOwnerUid&&client&&isUuid(m.id)&&isUuid(s.id));
+        if(isCloudMessage) {
+          const {data,error}=await client.from('chat_messages').update({content:text})
+            .eq('id',m.id).eq('session_id',s.id).is('deleted_at',null).select('id').maybeSingle();
+          if(error) throw new Error('訊息雲端更新失敗：'+error.message);
+          if(!data) throw new Error('雲端未確認這則訊息的更新，原內容已保留。');
+        }
         m.text=text;m.edited=true;
         if (!persist()) {
-          m.text=previousText;
-          m.edited=wasEdited;
+          m.text=previousText;m.edited=wasEdited;persist();
+          if(isCloudMessage) await client.from('chat_messages').update({content:previousText}).eq('id',m.id).eq('session_id',s.id);
           break;
         }
-        const synced = await saveChatSessionSafely(s);
-        if (!synced) {
-          m.text=previousText;
-          m.edited=wasEdited;
-          persist();
-          renderMessages();
-          toast('雲端同步失敗，已還原原訊息；請確認網路後再重新編輯。');
-          break;
+        back();renderMessages();
+        toast('訊息已更新；未重新生成 AI，也未扣款。');
+        break;
+      }
+      case 'group-message-edit': {
+        const group=groupPrototype.active, message=groupPrototype.messages.find(item=>item.id===o.id);
+        const latest=groupPrototype.messages.filter(item=>item.type==='user'||item.type==='character').at(-1);
+        const user=currentUser(), client=window.mySupabase;
+        if(!group||!message||message.id!==latest?.id||!['user','character'].includes(message.type)) {
+          toast('只有最後一則玩家／角色訊息可以編輯。');break;
         }
-        back();break;
+        if(!text) return toast('訊息不可為空。');
+        if(!user?.uid||!client||!isUuid(group.id)||!isUuid(message.id)) throw new Error('群組尚未連結有效的雲端資料，無法更新訊息。');
+        const {data,error}=await client.from('chat_group_messages').update({content:text})
+          .eq('id',message.id).eq('group_id',group.id).select('id').maybeSingle();
+        if(error) throw new Error('群組訊息雲端更新失敗：'+error.message);
+        if(!data) throw new Error('雲端未確認這則群組訊息的更新，請重新載入後再試。');
+        message.content=text;message.edited=true;
+        back();renderGroupConversation();
+        toast('群組訊息已更新；未重新生成 AI，也未扣款。');
+        break;
       }
       case 'comment': {
         if (!requireLogin({page:'detail',id:route.id})) return;
