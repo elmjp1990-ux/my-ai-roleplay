@@ -4549,12 +4549,11 @@ function renderMessages(scroll = true) {
     // Re-parse explicit active-character prefixes at render time. Older stored
     // displaySegments may have been saved before the single-chat character was
     // available to the prefix parser, leaving the summon as a plain user segment.
-    const startsWithActiveCharacter = user && new RegExp('^\\s*' + String(c.name || '').replace(/[.*+?^${}()|[\\]\\\\]/g, '\\    const segments = user && Array.isArray(m.displaySegments)
-      ? m.displaySegments.map(segment => ({
-          ...segment,
-          avatar:segment.avatar || roles.find(role => role.id === segment.characterId)?.image || ''
-        }))
-      : parseRoleplaySegments(displayText, roles);') + '\\s*[:：]').test(displayText);
+    const trimmedDisplayText = String(displayText || '').trimStart();
+    const startsWithActiveCharacter = user && (
+      trimmedDisplayText.startsWith(String(c.name || '') + ':') ||
+      trimmedDisplayText.startsWith(String(c.name || '') + '：')
+    );
     const segments = user && Array.isArray(m.displaySegments) && !startsWithActiveCharacter
       ? m.displaySegments.map(segment => ({
           ...segment,
