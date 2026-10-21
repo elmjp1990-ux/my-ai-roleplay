@@ -3969,6 +3969,9 @@ function renderGroupConversation() {
     </div>`;
   if (route.chatOverlay) renderGroupChatOverlay(route.chatOverlay);
   applyGroupChatBackground();
+  // Keep the newest group messages in view when opening or re-rendering the chat.
+  const groupMessages=$('groupMessages');
+  if(groupMessages) requestAnimationFrame(()=>{ if(groupMessages.isConnected) groupMessages.scrollTop=groupMessages.scrollHeight; });
 }
 let groupBackgroundTimer=null;
 function applyGroupChatBackground() {
@@ -6489,7 +6492,8 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         if(error) throw new Error('群組訊息刪除同步失敗：'+error.message);
         if(!data) throw new Error('雲端未確認這則群組訊息的刪除狀態，請重新載入後再試。');
         groupPrototype.messages=groupPrototype.messages.filter(item=>item.id!==message.id);
-        back();renderGroupConversation();
+        $('modal')?.close();
+        renderGroupConversation();
         toast('群組訊息已刪除。');
         break;
       }
@@ -6508,7 +6512,8 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         if(error) throw new Error('群組訊息雲端更新失敗：'+error.message);
         if(!data) throw new Error('雲端未確認這則群組訊息的更新，請重新載入後再試。');
         message.content=text;message.edited=true;
-        back();renderGroupConversation();
+        $('modal')?.close();
+        renderGroupConversation();
         toast('群組訊息已更新；未重新生成 AI，也未扣款。');
         break;
       }
