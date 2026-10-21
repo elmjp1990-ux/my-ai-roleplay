@@ -6035,6 +6035,9 @@ document.addEventListener('submit',async event => {
   const type=form.dataset.form;
   const o=route.overlay || {};
   const s=currentSession();
+  // Dialogs opened through showDialog do not populate route.overlay; keep the
+  // target message ID on the form itself so group edits can resolve it.
+  const messageId=String(form.dataset.id || f.get('messageId') || o.id || '');
   const text=String(f.get('text') || '').trim();
 
   try {
@@ -6491,6 +6494,7 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         break;
       }
       case 'group-message-edit': {
+        const group=groupPrototype.active;
         const message=groupPrototype.messages.find(item=>item.id===messageId);
         const latest=message&&groupPrototype.messages.filter(item=>item.type===message.type).at(-1);
         const user=currentUser(), client=window.mySupabase;
