@@ -4320,7 +4320,7 @@ function formatMessage(text) {
     if (part.startsWith('*') && !part.startsWith('**') && part.endsWith('*') && !part.endsWith('**')) {
       return `<em class="narration">${e(part.slice(1,-1))}</em>`;
     }
-    return part.trim() ? `<div class="bubble">${e(part)}</div>` : '';
+    return part.trim() ? `<div class="bubble">${e(part.trim())}</div>` : '';
   }).join('');
 }
 // Roleplay speaker prefix display. The message author remains the authenticated player.
