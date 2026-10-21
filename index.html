@@ -3951,7 +3951,7 @@ function renderGroupConversation() {
         <div class="messages" id="groupMessages">${messageRows}</div>
         <form class="composer" data-form="group-message">
           <div class="composer-input-row">
-            <textarea id="groupMessageInput" name="text" maxlength="1000" rows="1" placeholder="留空發送，角色會繼續說下去" aria-label="輸入群組訊息" ${g.sending?'disabled':''}>${e(g.pendingRequest?.groupId===group.id?g.pendingRequest.content:'')}</textarea>
+            <textarea id="groupMessageInput" name="text" maxlength="1000" rows="1" placeholder="留空發送，角色會繼續說下去" aria-label="輸入群組訊息" ${g.sending?'disabled':''}>${e(g.pendingRequest?.groupId===group.id && g.pendingRequest.content!==GROUP_CONTINUE_SENTINEL?g.pendingRequest.content:'')}</textarea>
           </div>
           <div class="composer-bottom-row">
             <div class="composer-bottom-left">
