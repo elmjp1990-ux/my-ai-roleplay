@@ -505,10 +505,12 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .roleplay-segments { display:grid; gap:5px; }
 .roleplay-segment { min-width:0; }
 .roleplay-segment-heading { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:11px; margin:4px 0 5px; }
-.roleplay-segment-heading .avatar { width:30px; height:30px; }
-.roleplay-avatar-wrap { position:relative; display:inline-flex; flex:0 0 30px; width:30px; height:30px; }
-.roleplay-avatar-wrap > .avatar { width:30px; height:30px; }
-.roleplay-player-badge { position:absolute; right:-3px; bottom:-3px; width:15px !important; height:15px !important; border:2px solid var(--panel); border-radius:50%; object-fit:cover; background:var(--primary); font-size:8px; display:flex; align-items:center; justify-content:center; line-height:1; }\n.roleplay-prefixed-message .message-content { max-width:calc(100% - 8px); }
+.roleplay-segment-heading .avatar { width:30px !important; height:30px !important; flex:0 0 30px; object-fit:cover; }
+.roleplay-avatar-wrap { position:relative; display:block; flex:0 0 30px; width:30px; min-width:30px; height:30px; min-height:30px; overflow:visible; }
+.roleplay-avatar-wrap > .avatar { display:block; box-sizing:border-box; width:30px !important; height:30px !important; min-width:30px; min-height:30px; max-width:30px; max-height:30px; }
+.roleplay-player-badge { position:absolute; z-index:2; right:0; bottom:0; display:block; box-sizing:border-box; width:12px !important; height:12px !important; min-width:12px; min-height:12px; max-width:12px; max-height:12px; padding:0; border:1.5px solid var(--panel); border-radius:3px; object-fit:cover; background:var(--primary); font-size:7px; line-height:1; }
+.roleplay-player-badge[aria-label] { display:flex; align-items:center; justify-content:center; }
+.roleplay-prefixed-message .message-content { max-width:calc(100% - 8px); }
 .roleplay-segment.is-character .bubble { background:var(--bubble); color:var(--text); border-color:var(--border); }
 .roleplay-segment.is-temporary .bubble { background:var(--panel2); color:var(--text); border:1px dashed var(--border); }
 .roleplay-segment.is-user .bubble { background:var(--primary); color:white; border-color:transparent; }
