@@ -4588,7 +4588,7 @@ function memorySize(list) {
 function addMemory(s,text) {
   const item = {id:id(),text,important:false,at:Date.now()};
   const next = [...s.memories,item];
-  while (memorySize(next)>3000) {
+  while (memorySize(next)>10000) {
     const i = next.findIndex(m => !m.important);
     if (i<0 || next[i].id === item.id) {
       toast('重大記憶占滿容量，本次無法新增日記。');
@@ -4646,7 +4646,7 @@ function renderChatOverlay(kind) {
     ? `<label class="field"><span>搜尋過往聊天記錄</span><input id="archiveSearchInput" type="search" placeholder="輸入聊天名稱或角色名稱…" autocomplete="off"></label>
       <div id="archiveSearchResults">${archiveSearchResults('')}</div>`
     : kind === 'diary'
-      ? `${testControls}<p class="small muted">${memorySize(s.memories)} / 3000字</p>
+      ? `${testControls}<p class="small muted">${memorySize(s.memories)} / 10000字</p>
       ${s.memories.map(m => `<article class="memory-item">
         <label class="check">
           <input type="checkbox" data-memory="${e(m.id)}" ${m.important ? 'checked' : ''}>
@@ -5076,7 +5076,7 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
       if (!m || m.important) return;
       showDialog('編輯記憶',`
         <form data-form="memory">
-          <textarea name="text" maxlength="3000">${e(m.text)}</textarea>
+          <textarea name="text" maxlength="10000">${e(m.text)}</textarea>
           <p class="small muted">內容清空後儲存，會刪除此筆記憶。</p>
           <div class="row"><button type="button" data-action="back">取消</button>
             <button class="primary">存檔</button></div>
@@ -5977,8 +5977,8 @@ document.addEventListener('click',async event => {
         const previousAlbum=clone(s.album);
         if (action === 'test-chat-memory') {
           const text='[測試資料] PersonaX 回憶同步測試：新增、重新載入與跨裝置保存。';
-          if (memorySize(s.memories)+countChars(text)>3000) {
-            return toast('回憶容量不足，請先清除部分測試回憶。');
+          if (memorySize(s.memories)+countChars(text)>10000) {
+            return toast('回憶容量已達10000字，請先清除部分非重大記憶。');
           }
           s.memories.push({id:id(),text,important:false,at:Date.now(),testData:true});
         } else if (action === 'test-chat-photo') {
@@ -6565,8 +6565,8 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
           if (!confirm('內容為空，確定刪除此記憶？')) return;
           s.memories=s.memories.filter(m=>m.id!==o.id);
         } else {
-          if (memorySize(s.memories)-countChars(m.text)+countChars(text)>3000) {
-            return toast('記憶總長度超過3000字。');
+          if (memorySize(s.memories)-countChars(m.text)+countChars(text)>10000) {
+            return toast('日記總長度不可超過10000字。');
           }
           m.text=text;
         }
