@@ -505,7 +505,10 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .roleplay-segments { display:grid; gap:5px; }
 .roleplay-segment { min-width:0; }
 .roleplay-segment-heading { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:11px; margin:4px 0 5px; }
-.roleplay-segment-heading .avatar { width:36px; height:36px; }\n.roleplay-prefixed-message .message-content { max-width:calc(100% - 8px); }
+.roleplay-segment-heading .avatar { width:30px; height:30px; }
+.roleplay-avatar-wrap { position:relative; display:inline-flex; flex:0 0 30px; width:30px; height:30px; }
+.roleplay-avatar-wrap > .avatar { width:30px; height:30px; }
+.roleplay-player-badge { position:absolute; right:-3px; bottom:-3px; width:15px !important; height:15px !important; border:2px solid var(--panel); border-radius:50%; object-fit:cover; background:var(--primary); font-size:8px; display:flex; align-items:center; justify-content:center; line-height:1; }\n.roleplay-prefixed-message .message-content { max-width:calc(100% - 8px); }
 .roleplay-segment.is-character .bubble { background:var(--bubble); color:var(--text); border-color:var(--border); }
 .roleplay-segment.is-temporary .bubble { background:var(--panel2); color:var(--text); border:1px dashed var(--border); }
 .roleplay-segment.is-user .bubble { background:var(--primary); color:white; border-color:transparent; }
@@ -4485,11 +4488,18 @@ function parseRoleplaySegments(raw, roles = []) {
   if (!foundPrefix) return [{kind:'user',speakerName:'',characterId:null,avatar:'',text}];
   return segments.filter(segment => segment.text.trim() || segment.speakerName);
 }
-function roleplaySegmentHTML(segment) {
+function roleplaySegmentHTML(segment, options = {}) {
   const name = segment.kind === 'user' ? (currentUser()?.nickname || '你') : segment.speakerName;
-  const avatarHTML = segment.kind === 'character' && segment.avatar
+  const characterAvatar = segment.kind === 'character' && segment.avatar
     ? '<img class="avatar" src="' + e(safeImage(segment.avatar)) + '" alt="">'
     : '<span class="avatar avatar-fallback">' + e(segment.kind === 'user' ? '你' : [...String(name || '?')][0] || '?') + '</span>';
+  const player = currentUser();
+  const playerAvatar = player?.avatar
+    ? '<img class="roleplay-player-badge" src="' + e(safeImage(player.avatar)) + '" alt="玩家">'
+    : '<span class="roleplay-player-badge" aria-label="玩家">你</span>';
+  const avatarHTML = options.summonedByPlayer && segment.kind === 'character'
+    ? '<span class="roleplay-avatar-wrap">' + characterAvatar + playerAvatar + '</span>'
+    : characterAvatar;
   const typeClass = segment.kind === 'user' ? 'is-user' : segment.kind === 'character' ? 'is-character' : 'is-temporary';
   return '<div class="roleplay-segment ' + typeClass + '"><div class="roleplay-segment-heading">' + avatarHTML + '<span>' + e(name) + '</span></div>' + formatMessage(segment.text) + '</div>';
 }
@@ -4525,11 +4535,15 @@ function renderMessages(scroll = true) {
         }))
       : parseRoleplaySegments(displayText, roles);
     const hasSpeaker = segments.some(segment => segment.kind !== 'user');
+    const summonedByPlayer = user && segments.some(segment => segment.kind === 'character');
     const contentHTML = hasSpeaker
-      ? '<div class="roleplay-segments">' + segments.map(roleplaySegmentHTML).join('') + '</div>'
+      ? '<div class="roleplay-segments">' + segments.map(segment => roleplaySegmentHTML(segment, {summonedByPlayer})).join('') + '</div>'
       : '<div class="message-name">' + e(user ? (currentUser()?.nickname || '你') : c.name) + '</div>' + formatMessage(displayText);
+    // When the player explicitly summons a character with a role prefix, move the
+    // player identity onto that portrait as a small badge instead of showing a
+    // second, separate player avatar beside it.
     const outerAvatar = user
-      ? avatar(currentUser())
+      ? (summonedByPlayer ? '' : avatar(currentUser()))
       : (hasSpeaker ? '' : `<img class="avatar" src="${e(safeImage(c.image || c.avatar_url))}" alt="">`);
     return `<article class="message ${user ? 'user' : ''} ${hasSpeaker && !user ? 'roleplay-prefixed-message' : ''}" data-message="${e(m.id)}">
       ${outerAvatar}
