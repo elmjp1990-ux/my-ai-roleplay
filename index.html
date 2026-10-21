@@ -519,7 +519,7 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
   white-space:pre-wrap;
   overflow-wrap:anywhere;
   line-height:1.85;
-  margin-bottom:7px;
+  margin-bottom:3px;
 }
 .user .bubble { background:var(--primary); color:white; border-color:transparent; }
 .narration {
@@ -530,7 +530,7 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
   white-space:pre-wrap;
   overflow-wrap:anywhere;
   line-height:1.85;
-  margin:8px 0;
+  margin:3px 0;
 }
 .user .narration { text-align:right; }
 .message-more {
@@ -3851,7 +3851,7 @@ function renderGroupConversation() {
         : (hasSpeaker ? '' : avatar?'<img class="avatar" src="'+e(avatar)+'" alt="">':'<span class="avatar avatar-fallback">'+e(String(who).trim().slice(0,1)||'角')+'</span>');
     const bodyHTML=hasSpeaker
       ? '<div class="roleplay-segments">'+segments.map(roleplaySegmentHTML).join('')+'</div>'
-      : '<div class="message-name">'+e(who)+'</div><div class="bubble">'+e(m.content||'')+'</div>';
+      : '<div class="message-name">'+e(who)+'</div>'+(isSystem?'<div class="bubble">'+e(m.content||'')+'</div>':formatMessage(m.content||''));
     return '<div class="message '+(isUser?'user':'')+(hasSpeaker?' roleplay-prefixed-message':'')+'">'+avatarHTML+
       '<div class="message-content">'+bodyHTML+'</div></div>';
   }).join('') || '<div class="empty">這段群組對話還沒有訊息，輸入第一句話開始故事。</div>';
@@ -3883,7 +3883,6 @@ function renderGroupConversation() {
           <div class="composer-bottom-row">
             <div class="composer-bottom-left">
               <button type="button" class="composer-icon-button" data-action="toggle-chat-tools" aria-label="展開聊天功能" aria-expanded="false" title="更多功能">${ICON.plus}</button>
-              <span class="small muted">${g.turn} 回合</span>
             </div>
             <div class="composer-bottom-right">
               <div class="composer-wallet" aria-label="目前錢包餘額">
@@ -4315,11 +4314,10 @@ function renderConversation() {
   if (route.chatOverlay) renderChatOverlay(route.chatOverlay);
 }
 function formatMessage(text) {
-  return String(text).split(/(\*\*[\s\S]*?\*\*|\*[\s\S]*?\*)/g).filter(Boolean).map(part => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return `<em class="narration">${e(part.slice(2,-2))}</em>`;
-    }
-    if (part.startsWith('*') && part.endsWith('*')) {
+  // PersonaX roleplay action syntax is single-asterisk only: *action*.
+  // Double-asterisk text is ordinary literal content, not an action marker.
+  return String(text).split(/(\*\*[\s\S]*?\*\*|\*(?!\*)[^*\n]+\*(?!\*))/g).filter(Boolean).map(part => {
+    if (part.startsWith('*') && !part.startsWith('**') && part.endsWith('*') && !part.endsWith('**')) {
       return `<em class="narration">${e(part.slice(1,-1))}</em>`;
     }
     return part.trim() ? `<div class="bubble">${e(part.trim())}</div>` : '';
@@ -4344,10 +4342,33 @@ function parseRoleplaySegments(raw, roles = []) {
     const exact = match ? roles.filter(role => String(role.name || '').trim() === speakerName) : [];
     const knownRole = exact.length === 1 ? exact[0] : null;
     const isExplicitPrefix = Boolean(match && match[1]);
+    // Some group replies prepend narration before a role label, e.g.
+    // “聽見你的話，寒川（1016測試）回應：實際台詞”.
+    // Strip only when a known member name is followed by a recognized response marker.
+    const embeddedResponse = roles.map(role => {
+      const name = String(role.name || '').trim();
+      if (!name) return null;
+      const nameIndex = line.indexOf(name);
+      if (nameIndex < 0) return null;
+      const tail = line.slice(nameIndex + name.length);
+      const response = tail.match(/^[^:：\n]{0,40}?(?:回應|回答|說|表示)[:：]\s*(.*)$/u);
+      return response ? {role, text:response[1] || ''} : null;
+    }).filter(Boolean);
+    const embedded = embeddedResponse.length === 1 ? embeddedResponse[0] : null;
     // In a single-character chat, an explicitly marked speaker still belongs
     // to the active character even if the prompt uses an alias/role label.
     const role = knownRole || (isExplicitPrefix && roles.length === 1 ? roles[0] : null);
-    if (match && (knownRole || isExplicitPrefix)) {
+    if (embedded) {
+      foundPrefix = true;
+      flush();
+      current = {
+        kind:'character',
+        speakerName:String(embedded.role.name || '').trim(),
+        characterId:embedded.role.id || null,
+        avatar:embedded.role.image || embedded.role.avatar_url || '',
+        text:embedded.text
+      };
+    } else if (match && (knownRole || isExplicitPrefix)) {
       foundPrefix = true;
       flush();
       current = {
@@ -6445,12 +6466,14 @@ document.addEventListener('input',event => {
   }
 });
 document.addEventListener('keydown',event => {
-  if (['messageInput','groupMessageInput'].includes(event.target.id) &&
-      event.key==='Enter' && !event.shiftKey && !event.isComposing) {
-    event.preventDefault();
-    if(event.target.id==='groupMessageInput') void groupSendMock();
-    else event.target.form.requestSubmit();
-  }
+  // Enter inserts a newline on desktop and mobile. Only an explicit
+  // Ctrl/Cmd+Enter submits, preventing accidental sends while composing text.
+  if (!['messageInput','groupMessageInput'].includes(event.target.id) ||
+      event.key!=='Enter' || event.isComposing ||
+      !(event.ctrlKey || event.metaKey)) return;
+  event.preventDefault();
+  if(event.target.id==='groupMessageInput') void groupSendMock();
+  else event.target.form?.requestSubmit();
 });
 document.addEventListener('change',async event => {
   const target=event.target;
