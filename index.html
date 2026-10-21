@@ -552,24 +552,24 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 
 /* Character phone */
 .phone-modal-backdrop{position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(7,10,22,.68);backdrop-filter:blur(8px)}
-.phone-device{width:min(360px,100%);max-height:min(760px,90dvh);overflow:auto;padding:17px;border:1px solid #c9b9ff88;border-radius:30px;background:linear-gradient(155deg,#fffaff 0%,#f4f0ff 48%,#eef5ff 100%);color:#30294b;box-shadow:0 24px 90px #0008,inset 0 1px #fff;border-top:4px solid #b6a0f4}
-.phone-device-head{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px;font-weight:650;letter-spacing:.01em;color:#4b3c71}
-.phone-battery{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:500;font-variant-numeric:tabular-nums;color:#5b9b7d!important}
-.phone-battery-shape{width:28px;height:13px;border:1px solid currentColor;border-radius:4px;padding:2px;position:relative;box-shadow:inset 0 0 0 1px #ffffff88;background:#ffffffaa}
+.phone-device{width:min(360px,100%);max-height:min(760px,90dvh);overflow:auto;padding:17px;border:1px solid var(--border);border-radius:30px;background:linear-gradient(155deg,var(--panel) 0%,var(--panel2) 100%);color:var(--text);box-shadow:0 24px 90px #0008,inset 0 1px #ffffff12;border-top:4px solid var(--primary)}
+.phone-device-head{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px;font-weight:650;letter-spacing:.01em;color:var(--text)}
+.phone-battery{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:500;font-variant-numeric:tabular-nums;color:var(--primary)!important}
+.phone-battery-shape{width:28px;height:13px;border:1px solid currentColor;border-radius:4px;padding:2px;position:relative;box-shadow:inset 0 0 0 1px #ffffff88;background:var(--panel2)}
 .phone-battery-shape:after{content:"";position:absolute;right:-3px;top:3px;width:2px;height:5px;background:currentColor;border-radius:0 2px 2px 0}
 .phone-battery-fill{height:100%;min-width:0;border-radius:2px;background:linear-gradient(90deg,#80c9a4,#4eaf78);transition:width .18s ease}
 .phone-member-switch{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0 4px}
-.phone-member-switch button{min-width:30px;height:28px;padding:3px 9px;font-size:13px;border:1px solid #ded4fa;background:#fff8;border-radius:10px;color:#65528e}
+.phone-member-switch button{min-width:30px;height:28px;padding:3px 9px;font-size:13px;border:1px solid #ded4fa;background:var(--panel2);border-radius:10px;color:var(--text)}
 .phone-member-name{flex:1;min-width:0;text-align:center;font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .phone-content{padding:13px 2px 7px;font-size:11px}
 .phone-time{font-size:12px;font-weight:600;letter-spacing:.01em;margin-bottom:9px;color:#51416f}
-.phone-location{padding:9px 11px;border-radius:13px;background:#ffffffb8;border:1px solid #e3dcf6;margin-top:9px;font-size:10px;line-height:1.65;color:#64577e}
-.phone-notices{margin-top:10px;padding:11px 12px;border:1px solid #e1d7f8;border-radius:15px;background:#ffffffb8;color:#5a4d73}
+.phone-location{padding:9px 11px;border-radius:13px;background:var(--panel2);border:1px solid var(--border);margin-top:9px;font-size:10px;line-height:1.65;color:var(--text)}
+.phone-notices{margin-top:10px;padding:11px 12px;border:1px solid var(--border);border-radius:15px;background:var(--panel2);color:var(--text)}
 .phone-notices p{margin:6px 0;font-size:10px;line-height:1.65}
-.phone-notice-title{font-size:11px;font-weight:650;color:#6d58a1;margin-bottom:7px}
+.phone-notice-title{font-size:11px;font-weight:650;color:var(--primary);margin-bottom:7px}
 .phone-close-row{display:flex;justify-content:center;margin-top:12px}
-.phone-close-row button{border:1px solid #ded4f5;background:#fff9;color:#65528e;border-radius:999px;padding:7px 18px;font-size:10px}
-.phone-bar{width:85px;height:3px;background:#b6a8d3;border-radius:5px;margin:12px auto 0}
+.phone-close-row button{border:1px solid #ded4f5;background:var(--panel2);color:var(--text);border-radius:999px;padding:7px 18px;font-size:10px}
+.phone-bar{width:85px;height:3px;background:var(--muted);border-radius:5px;margin:12px auto 0}
 .phone-warning{border-color:#e5a34b;background:rgba(229,163,75,.12)}
 .phone {
   flex:0 0 auto;
