@@ -557,8 +557,14 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .phone-battery{display:inline-flex;align-items:center;gap:5px;font-variant-numeric:tabular-nums}
 .phone-battery-shape{width:27px;height:13px;border:1.5px solid currentColor;border-radius:3px;padding:2px;position:relative}
 .phone-battery-shape:after{content:"";position:absolute;right:-4px;top:3px;width:2px;height:5px;background:currentColor;border-radius:0 2px 2px 0}
-.phone-battery-fill{height:100%;border-radius:1px;background:currentColor}
-.phone-location{padding:10px 12px;border-radius:12px;background:var(--soft);margin-top:10px}
+.phone-battery-fill{height:100%;min-width:0;border-radius:2px;background:linear-gradient(90deg,currentColor,#ffffff66);transition:width .18s ease}
+.phone-member-switch{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0 4px}
+.phone-member-switch button{min-width:32px;height:30px;padding:3px 9px;font-size:13px}
+.phone-member-name{flex:1;min-width:0;text-align:center;font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.phone-location{padding:9px 11px;border-radius:12px;background:var(--soft);margin-top:10px;font-size:10px;line-height:1.6}
+.phone-affection{display:flex;align-items:center;gap:8px;margin-top:10px;padding:9px 10px;border:1px solid var(--border);border-radius:12px;font-size:10px}
+.phone-affection input{width:72px;min-width:0;padding:6px;font-size:11px}
+.phone-affection button{padding:6px 9px;font-size:10px;white-space:nowrap}
 .phone-close-row{display:flex;justify-content:flex-end;margin-top:12px}
 .phone-warning{border-color:#e5a34b;background:rgba(229,163,75,.12)}
 .phone {
@@ -1482,7 +1488,7 @@ const ids = (rows || []).map(row => row.id);
       intro: character.intro || '',
       race: character.race || '',
       style: character.style || '',
-      phone_settings:character.phoneSettings && typeof character.phoneSettings==='object' ? {gameTime:String(character.phoneSettings.gameTime||'').slice(0,60),location:String(character.phoneSettings.location||'').slice(0,120),notices:Array.isArray(character.phoneSettings.notices)?character.phoneSettings.notices.slice(0,10).map(x=>String(x).slice(0,150)):[]} : {},
+      phone_settings:character.phoneSettings && typeof character.phoneSettings==='object' ? {gameTime:String(character.phoneSettings.gameTime||'').slice(0,60),location:String(character.phoneSettings.location||'').slice(0,120),noticePrompts:Array.isArray(character.phoneSettings.noticePrompts)?character.phoneSettings.noticePrompts.slice(0,10).map(x=>String(x).slice(0,150)):Array.isArray(character.phoneSettings.notices)?character.phoneSettings.notices.slice(0,10).map(x=>String(x).slice(0,150)):[]} : {},
       tags: Array.isArray(character.tags) ? character.tags : []
     };
 
@@ -3248,9 +3254,9 @@ function renderEditor() {
           <small>最多10000字，不顯示在公開介紹；勿填真實機密。</small></label>
         <label class="field"><span>對話風格</span><textarea name="style" maxlength="1000">${e(c.style || '')}</textarea></label>
         <section class="memory-item stack" style="gap:10px"><strong>角色手機設定</strong><p class="small muted">以下是故事中的虛構資訊，不會使用現實時間。</p>
-          <label class="field"><span>遊戲內時間／星期／時段</span><input name="phoneGameTime" maxlength="60" value="${e(savedDraft?.phoneGameTime ?? c.phoneSettings?.gameTime ?? '星期五 19:30（傍晚）')}" placeholder="例如：星期五 19:30（傍晚）"></label>
+          <label class="field"><span>遊戲內固定時間／星期／時段</span><input name="phoneGameTime" maxlength="60" value="${e(savedDraft?.phoneGameTime ?? c.phoneSettings?.gameTime ?? '📆 星期五 🕧 19:30（傍晚）')}" placeholder="例如：📆 星期五 🕧 19:30（傍晚）"><small>只代表故事內時間，不會跟隨現實時間變動。</small></label>
           <label class="field"><span>角色所在地</span><input name="phoneLocation" maxlength="120" value="${e(savedDraft?.phoneLocation ?? c.phoneSettings?.location ?? '')}" placeholder="例如：市中心花店二樓"></label>
-          <label class="field"><span>手機通知內容（每行一則）</span><textarea name="phoneNotices" maxlength="1500" placeholder="例如：心裡話：今天有點想你\n好感度：68">${e(savedDraft?.phoneNotices ?? (Array.isArray(c.phoneSettings?.notices) ? c.phoneSettings.notices.join('\n') : ''))}</textarea><small>可設定角色心裡話、好感度等資訊；最多10則。</small></label></section>
+          <label class="field"><span>AI 手機通知揭露指示（每行一則）</span><textarea name="phoneNotices" maxlength="1500" placeholder="例如：當角色想念玩家時，揭露一則簡短心裡話。\n當劇情出現新線索時，揭露線索通知。">${e(savedDraft?.phoneNotices ?? (Array.isArray(c.phoneSettings?.noticePrompts) ? c.phoneSettings.noticePrompts.join('\n') : Array.isArray(c.phoneSettings?.notices) ? c.phoneSettings.notices.join('\n') : ''))}</textarea><small>每行描述一種 AI 可揭露的通知條件／內容，不是固定顯示文字；最多10則。時間與所在地由角色設定固定揭露。</small></label></section>
         <label class="field"><span>權限</span><select name="visibility">
           <option value="private" ${c.visibility !== 'public' ? 'selected' : ''}>私密</option>
           <option value="public" ${c.visibility === 'public' ? 'selected' : ''}>公開</option>
@@ -6296,7 +6302,7 @@ document.addEventListener('submit',async event => {
           race:String(f.get('race')).trim(),intro,opening,
           privateInfo:String(f.get('privateInfo')).trim(),
           style:String(f.get('style')).trim(),
-          phoneSettings:{gameTime:String(f.get('phoneGameTime')||'').trim().slice(0,60),location:String(f.get('phoneLocation')||'').trim().slice(0,120),notices:String(f.get('phoneNotices')||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,10).map(x=>x.slice(0,150))},
+          phoneSettings:{gameTime:String(f.get('phoneGameTime')||'').trim().slice(0,60),location:String(f.get('phoneLocation')||'').trim().slice(0,120),noticePrompts:String(f.get('phoneNotices')||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,10).map(x=>x.slice(0,150))},
           visibility:String(f.get('visibility')),image:draftImage,
           rightsConfirmed:f.get('rightsConfirmed') === 'on',
           tags:[...draftTags],authorId:user.uid,owner:true,
