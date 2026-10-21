@@ -2869,6 +2869,7 @@ function renderDetail() {
             <h1>${e(c.name)}</h1>
             <button class="author-link" data-action="author" data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>
             <div class="detail-chat-count">💬 ${e(c.chats || '0')} 次對話</div>
+            <div class="detail-turn-count" data-character-turn-count="${e(c.id)}">↻ 對話回合：載入中</div>
           </div>
         </div>
         <section class="panel stack">
@@ -2901,9 +2902,33 @@ function renderDetail() {
         </form>
       </section>`}
     </div>`;
+  if (!offline) void loadPublicCharacterTurnCount(c.id);
   if (!offline && route.page !== 'session-detail') {
     renderComments();
     if (window.mySupabase && c.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(c.id)) void loadCloudComments(c.id);
+  }
+}
+
+async function loadPublicCharacterTurnCount(characterId) {
+  const updateLabel = value => {
+    const target = [...document.querySelectorAll('[data-character-turn-count]')]
+      .find(element => element.dataset.characterTurnCount === characterId);
+    if (target) target.textContent = value;
+  };
+  const client = window.mySupabase;
+  if (!client || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(characterId || ''))) {
+    updateLabel('↻ 對話回合：暫無資料');
+    return;
+  }
+  try {
+    const {data,error} = await client.rpc('get_public_character_turn_count',{p_character_id:characterId});
+    if (error) throw error;
+    const count = Number(data);
+    if (!Number.isSafeInteger(count) || count < 0) throw new Error('角色回合數回傳格式無效');
+    updateLabel('↻ 對話回合：' + count.toLocaleString('zh-TW'));
+  } catch (error) {
+    console.warn('角色對話回合統計載入失敗：',error?.message || error);
+    updateLabel('↻ 對話回合：暫無資料');
   }
 }
 
