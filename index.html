@@ -5322,7 +5322,7 @@ document.addEventListener('click',async event => {
         const message=groupPrototype.messages.find(item=>item.id===key);
         const latest=groupPrototype.messages.filter(item=>item.type==='user'||item.type==='character').at(-1);
         if(!message||message.id!==latest?.id||!['user','character'].includes(message.type)) break;
-        showDialog('編輯最後一則訊息','<form data-form="group-message-edit"><textarea name="text" required maxlength="10000">'+e(message.content||'')+'</textarea><button class="primary" style="margin-top:15px">儲存</button></form>');
+        showDialog('編輯最後一則訊息','<form data-form="group-message-edit" data-id="'+e(message.id)+'"><textarea name="text" required maxlength="10000">'+e(message.content||'')+'</textarea><button class="primary" style="margin-top:15px">儲存</button></form>');
         break;
       }
       case 'group-toggle-member':groupExpandedMemberId=groupExpandedMemberId===key?null:key;render();break;
@@ -6457,7 +6457,8 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         break;
       }
       case 'group-message-edit': {
-        const group=groupPrototype.active, message=groupPrototype.messages.find(item=>item.id===o.id);
+        const group=groupPrototype.active, messageId=form.dataset.id||o.id;
+        const message=groupPrototype.messages.find(item=>item.id===messageId);
         const latest=groupPrototype.messages.filter(item=>item.type==='user'||item.type==='character').at(-1);
         const user=currentUser(), client=window.mySupabase;
         if(!group||!message||message.id!==latest?.id||!['user','character'].includes(message.type)) {
