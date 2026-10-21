@@ -551,6 +551,16 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .message:hover .message-more,.message:focus-within .message-more,.message.selected .message-more { opacity:1; }
 
 /* Character phone */
+.phone-modal-backdrop{position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(7,10,22,.68);backdrop-filter:blur(5px)}
+.phone-device{width:min(360px,100%);max-height:min(760px,90dvh);overflow:auto;padding:14px;border:2px solid #b4bfd366;border-radius:32px;background:var(--panel);box-shadow:0 22px 80px #0007}
+.phone-device-head{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px;font-weight:700}
+.phone-battery{display:inline-flex;align-items:center;gap:5px;font-variant-numeric:tabular-nums}
+.phone-battery-shape{width:27px;height:13px;border:1.5px solid currentColor;border-radius:3px;padding:2px;position:relative}
+.phone-battery-shape:after{content:"";position:absolute;right:-4px;top:3px;width:2px;height:5px;background:currentColor;border-radius:0 2px 2px 0}
+.phone-battery-fill{height:100%;border-radius:1px;background:currentColor}
+.phone-location{padding:10px 12px;border-radius:12px;background:var(--soft);margin-top:10px}
+.phone-close-row{display:flex;justify-content:flex-end;margin-top:12px}
+.phone-warning{border-color:#e5a34b;background:rgba(229,163,75,.12)}
 .phone {
   flex:0 0 auto;
   margin:0 12px 7px;
@@ -1193,7 +1203,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     try {
       const { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible')
+        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, phone_settings, created_at, first_published_at, latest_eligible')
         .eq('visibility', 'public')
         .is('deleted_at', null)
         .order('first_published_at', { ascending: false, nullsFirst: false });
@@ -1243,6 +1253,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
           reviewStatus: row.review_status, intro: row.intro || '',
           opening: story?.opening_message || '', race: row.race || '',
           privateInfo: '', style: row.style || '',
+          phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : {},
           tags: Array.isArray(row.tags) ? row.tags : [],
           authorId: row.author_id, owner: state.account?.uid === row.author_id,
           chats: '0', users: null,
@@ -1280,7 +1291,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       // 這可修復舊版匯入只存 localStorage 的資料；不會上傳其他帳號的本機角色。
       let { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, phone_settings, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
         .eq('author_id', user.id)
         .order('created_at', { ascending: false });
       if (error) throw new Error('讀取雲端角色失敗：' + error.message);
@@ -1306,7 +1317,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       if (migratedCount > 0) {
         const refreshed = await client
           .from('characters')
-          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, phone_settings, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
           .eq('author_id', user.id)
           .order('created_at', { ascending: false });
         if (refreshed.error) throw new Error('角色補傳後重新讀取失敗：' + refreshed.error.message);
@@ -1379,6 +1390,7 @@ const ids = (rows || []).map(row => row.id);
           race: row.race ?? local.race ?? '',
           privateInfo: privateInfoById.get(row.id) ?? local.privateInfo ?? '',
           style: row.style ?? local.style ?? '',
+          phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : (local.phoneSettings || {}),
           tags: Array.isArray(row.tags) ? row.tags : (local.tags || []),
           authorId: row.author_id,
           owner: true,
@@ -1470,6 +1482,7 @@ const ids = (rows || []).map(row => row.id);
       intro: character.intro || '',
       race: character.race || '',
       style: character.style || '',
+      phone_settings:character.phoneSettings && typeof character.phoneSettings==='object' ? {gameTime:String(character.phoneSettings.gameTime||'').slice(0,60),location:String(character.phoneSettings.location||'').slice(0,120),notices:Array.isArray(character.phoneSettings.notices)?character.phoneSettings.notices.slice(0,10).map(x=>String(x).slice(0,150)):[]} : {},
       tags: Array.isArray(character.tags) ? character.tags : []
     };
 
@@ -2001,6 +2014,7 @@ async function saveChatSessionToCloud(s, options = {}) {
     opening:character?.opening ?? priorSnapshot.opening ?? '',
     race:character?.race ?? priorSnapshot.race ?? '',
     style:character?.style ?? priorSnapshot.style ?? '',
+    phoneSettings:character?.phoneSettings ?? priorSnapshot.phoneSettings ?? {},
     tags:Array.isArray(character?.tags) ? character.tags : (Array.isArray(priorSnapshot.tags) ? priorSnapshot.tags : []),
     authorId:character?.authorId || priorSnapshot.authorId || '',
     visibility:priorSnapshot.visibility || character?.visibility || 'private',
@@ -3150,6 +3164,7 @@ function saveEditorDraft() {
     opening:String(values.get('opening') || ''),
     privateInfo:String(values.get('privateInfo') || ''),
     style:String(values.get('style') || ''),
+    phoneGameTime:String(values.get('phoneGameTime') || ''), phoneLocation:String(values.get('phoneLocation') || ''), phoneNotices:String(values.get('phoneNotices') || ''),
     visibility:String(values.get('visibility') || 'private'),
     rightsConfirmed:values.get('rightsConfirmed') === 'on',
     tags:[...draftTags],
@@ -3231,6 +3246,10 @@ function renderEditor() {
         <label class="field"><span>私密資訊</span><textarea name="privateInfo" maxlength="10000">${e(c.privateInfo || '')}</textarea>
           <small>最多10000字，不顯示在公開介紹；勿填真實機密。</small></label>
         <label class="field"><span>對話風格</span><textarea name="style" maxlength="1000">${e(c.style || '')}</textarea></label>
+        <section class="memory-item stack" style="gap:10px"><strong>角色手機設定</strong><p class="small muted">以下是故事中的虛構資訊，不會使用現實時間。</p>
+          <label class="field"><span>遊戲內時間／星期／時段</span><input name="phoneGameTime" maxlength="60" value="${e(savedDraft?.phoneGameTime ?? c.phoneSettings?.gameTime ?? '星期五 19:30（傍晚）')}" placeholder="例如：星期五 19:30（傍晚）"></label>
+          <label class="field"><span>角色所在地</span><input name="phoneLocation" maxlength="120" value="${e(savedDraft?.phoneLocation ?? c.phoneSettings?.location ?? '')}" placeholder="例如：市中心花店二樓"></label>
+          <label class="field"><span>手機通知內容（每行一則）</span><textarea name="phoneNotices" maxlength="1500" placeholder="例如：心裡話：今天有點想你\n好感度：68">${e(savedDraft?.phoneNotices ?? (Array.isArray(c.phoneSettings?.notices) ? c.phoneSettings.notices.join('\n') : ''))}</textarea><small>可設定角色心裡話、好感度等資訊；最多10則。</small></label></section>
         <label class="field"><span>權限</span><select name="visibility">
           <option value="private" ${c.visibility !== 'public' ? 'selected' : ''}>私密</option>
           <option value="public" ${c.visibility === 'public' ? 'selected' : ''}>公開</option>
@@ -3942,8 +3961,9 @@ function renderGroupConversation() {
               <div class="grow" style="min-width:0"><div class="chat-name ellipsis">${e(group.name)}</div><div class="small muted ellipsis">${group.members.length} 名角色 · ${e(sceneNames||'共同場景')}</div></div>
             </div>
             <div class="row" style="gap:1px">
-              <button class="ghost" data-action="chat-overlay" data-kind="album" aria-label="回憶相簿">${ICON.album}</button>
               <button class="ghost" data-action="chat-overlay" data-kind="search" aria-label="搜尋過往聊天記錄">${ICON.search}</button>
+              <button class="ghost" data-action="phone-open" aria-label="角色手機" title="角色手機">${ICON.phone || '▣'}</button>
+              <button class="ghost" data-action="chat-overlay" data-kind="album" aria-label="回憶相簿">${ICON.album}</button>
               <button class="ghost" data-action="chat-settings-menu" aria-label="聊天功能選單" title="聊天功能選單">${ICON.menu}</button>
             </div>
           </div>
@@ -4357,8 +4377,9 @@ function renderConversation() {
               </span>
             </div>
             <div class="row" style="gap:1px">
-              <button class="ghost" data-action="chat-overlay" data-kind="album" aria-label="回憶相簿">${ICON.album}</button>
               <button class="ghost" data-action="chat-overlay" data-kind="search" aria-label="搜尋過往聊天記錄">${ICON.search}</button>
+              <button class="ghost" data-action="phone-open" aria-label="角色手機" title="角色手機">${ICON.phone || '▣'}</button>
+              <button class="ghost" data-action="chat-overlay" data-kind="album" aria-label="回憶相簿">${ICON.album}</button>
               <button class="ghost" data-action="chat-settings-menu" aria-label="聊天功能選單" title="聊天功能選單">${ICON.menu}</button>
             </div>
           </div>
@@ -4619,6 +4640,20 @@ function archiveSearchResults(query) {
       <button type="button" data-action="resume-chat" data-id="${e(item.id)}">續聊</button>
     </div></article>`;
   }).join('') || '<div class="empty">找不到符合的聊天記錄。</div>';
+}
+function renderPhoneModal() {
+  document.querySelector('.phone-modal-backdrop')?.remove();
+  const isGroup=route.page==='group',session=isGroup?null:currentSession(),group=isGroup?groupPrototype.active:null;
+  if(isGroup&&!group){toast('請先開啟群組聊天。');return;} if(!isGroup&&!session){toast('請先開啟聊天。');return;}
+  const character=isGroup?(state.characters.find(item=>item.id===group.worldCharacterId)||state.characters.find(item=>item.id===(group.members||[])[0]?.characterId)||{}):(sessionCharacter(session)||{});
+  const settings=character.phoneSettings||character.phone_settings||{},gameTime=String(settings.gameTime||'星期五 19:30（傍晚）').slice(0,60),location=String(settings.location||'尚未設定所在地').slice(0,120);
+  const notices=Array.isArray(settings.notices)?settings.notices.filter(Boolean).slice(0,10):[];
+  const diaryChars=isGroup?(groupPrototype.messages||[]).reduce((sum,item)=>sum+Array.from(String(item.content||'')).length,0):memorySize(session.memories||[]);
+  const capacity=10000,battery=Math.max(0,Math.min(100,Math.round((1-Math.min(diaryChars,capacity)/capacity)*100))),warning=battery<=20,batteryColor=warning?'#e07b39':battery<=50?'#d5b34a':'#4eaf78';
+  const noticeHTML=notices.length?notices.map(line=>'<p>'+e(line)+'</p>').join(''):'<p>角色還沒有新的手機通知。</p>',title=(character.name||group?.name||'角色')+' 的手機';
+  const modal=document.createElement('div');modal.className='phone-modal-backdrop';modal.setAttribute('role','presentation');
+  modal.innerHTML='<section class="phone-device" role="dialog" aria-modal="true" aria-label="'+e(title)+'"><div class="phone-device-head"><span>'+e(title)+'</span><div class="phone-battery" style="color:'+batteryColor+'" aria-label="電量 '+battery+'%"><span>'+battery+'%</span><span class="phone-battery-shape"><span class="phone-battery-fill" style="display:block;width:'+battery+'%"></span></span></div></div><div class="phone-content"><div class="phone-time">'+e(gameTime)+'</div><div class="phone-location"><strong>所在地</strong><div style="margin-top:5px;overflow-wrap:anywhere">'+e(location)+'</div></div><div class="phone-notices '+(warning?'phone-warning':'')+'">'+(warning?'<p><strong>回憶相簿快滿拉，趕緊清理幫角色恢復電量吧</strong></p>':'')+noticeHTML+'</div><p class="small muted" style="margin-top:10px">電量依甜蜜日記容量計算：'+Math.min(diaryChars,capacity)+' / '+capacity+' 字'+(isGroup?'（群組以目前對話內容估算）':'')+'</p></div><div class="phone-bar"></div><div class="phone-close-row"><button type="button" data-action="phone-close">關閉手機</button></div></section>';
+  modal.addEventListener('click',event=>{if(event.target===modal)modal.remove();});document.body.appendChild(modal);modal.querySelector('[data-action="phone-close"]')?.focus();
 }
 function renderChatOverlay(kind) {
   const s = currentSession();
@@ -5339,6 +5374,8 @@ document.addEventListener('click',async event => {
   try {
     switch(action) {
       case 'home':go({page:'home'});break;
+      case 'phone-open':renderPhoneModal();break;
+      case 'phone-close':document.querySelector('.phone-modal-backdrop')?.remove();break;
       case 'group-next':groupNext();break;
       case 'group-inspiration': {
         const members=groupSelectedCharacters();
@@ -6215,6 +6252,7 @@ document.addEventListener('submit',async event => {
           race:String(f.get('race')).trim(),intro,opening,
           privateInfo:String(f.get('privateInfo')).trim(),
           style:String(f.get('style')).trim(),
+          phoneSettings:{gameTime:String(f.get('phoneGameTime')||'').trim().slice(0,60),location:String(f.get('phoneLocation')||'').trim().slice(0,120),notices:String(f.get('phoneNotices')||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,10).map(x=>x.slice(0,150))},
           visibility:String(f.get('visibility')),image:draftImage,
           rightsConfirmed:f.get('rightsConfirmed') === 'on',
           tags:[...draftTags],authorId:user.uid,owner:true,
