@@ -4503,11 +4503,11 @@ function roleplaySegmentHTML(segment, options = {}) {
   // Split character speech around *actions*: every speech portion gets its own
   // character heading/avatar, while the action remains narration between them.
   if (segment.kind === 'character') {
-    const parts = String(segment.text || '').split(/(\\*[^*]+\\*)/gu).filter(Boolean);
+    const parts = String(segment.text || '').split(/(\*[^*]+\*)/gu).filter(Boolean);
     if (parts.length > 1) {
       let badgeUsed = false;
       return parts.map(part => {
-        const isAction = /^\\*[^*]+\\*$/u.test(part);
+        const isAction = /^\*[^*]+\*$/u.test(part);
         if (isAction) return '<div class="roleplay-segment is-action"><div class="narration">' + formatMessage(part) + '</div></div>';
         const withBadge = options.summonedByPlayer && !badgeUsed;
         if (withBadge) badgeUsed = true;
