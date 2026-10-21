@@ -1862,6 +1862,7 @@ let pendingDeletionWalletSyncUid =
     ? state.account.uid
     : null;
 let route = {page:'home'};
+const GROUP_CONTINUE_SENTINEL = '（請接續目前的故事。）';
 let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupMembers:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null,openRequestId:0};
 let search = '';
 let filter = 'recommended';
@@ -3836,7 +3837,7 @@ async function groupOpen(groupId) {
       const scene=scenes.find(x=>x.id===m.scene_id);
       const type=m.speaker_type==='user'?'user':m.speaker_type==='system'?'system':'character';
       const speaker=type==='user'?'你':type==='system'?'系統':(speakerSnapshot.name||member?.name||'角色')+(scene?' · '+scene.name:'');
-      return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:m.content,createdAt:m.created_at};
+      return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user' && m.content===GROUP_CONTINUE_SENTINEL ? '' : m.content,createdAt:m.created_at};
     });
     g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,memoryPhotos,scenes,members};
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;g.formError='';
@@ -3905,6 +3906,7 @@ function renderGroupConversation() {
       group.members.find(x=>m.speaker===x.name || String(m.speaker||'').startsWith((x.name||'')+' · '));
     const avatar=avatarURL(member?.avatar_url || member?.image);
     const isUser=m.type==='user', isSystem=m.type==='system';
+    if (isUser && !String(m.content || '').trim()) return '';
     const who=isUser?'你':isSystem?'系統':(member?.name||m.speaker||'角色');
     // Group replies use m.content (not m.text), so they must be parsed here separately.
     // Otherwise “夜辰：...” stays plain text and never renders the character portrait.
@@ -3949,7 +3951,7 @@ function renderGroupConversation() {
         <div class="messages" id="groupMessages">${messageRows}</div>
         <form class="composer" data-form="group-message">
           <div class="composer-input-row">
-            <textarea id="groupMessageInput" name="text" maxlength="1000" rows="1" placeholder="留空發送，角色會繼續說下去" aria-label="輸入群組訊息" ${g.sending?'disabled':''}>${e(g.pendingRequest?.groupId===group.id?g.pendingRequest.content:'')}</textarea>
+            <textarea id="groupMessageInput" name="text" maxlength="1000" rows="1" placeholder="留空發送，角色會繼續說下去" aria-label="輸入群組訊息" ${g.sending?'disabled':''}>${e(g.pendingRequest?.groupId===group.id && g.pendingRequest.content!==GROUP_CONTINUE_SENTINEL?g.pendingRequest.content:'')}</textarea>
           </div>
           <div class="composer-bottom-row">
             <div class="composer-bottom-left">
@@ -4225,19 +4227,22 @@ function groupToggleCharacter(idValue) {
 }
 async function groupSendMock() {
   const input=$('groupMessageInput');
-  const content=input?.value.trim();
+  const typedContent=input?.value.trim() || '';
+  const isContinueRequest=!typedContent;
+  const content=typedContent || GROUP_CONTINUE_SENTINEL;
   const g=groupPrototype;
   if(g.sending) return;
   if(!window.mySupabase) { g.formError='Supabase 用戶端尚未載入。';render();return; }
-  if(!content) {g.formError='請先輸入訊息。';render();return;}
-  const platformCommand=parsePlatformCommand(content);
-  if(platformCommand.type==='platform') {
-    if(platformCommand.name==='help') toast('群組語法：@角色 指定 AI 回覆；:人名:內容 指定玩家發言顯示；/help 查看平台指令。AI 尚未串接，指定角色目前只做語法驗證。');
-    else toast('尚未支援平台指令 /'+platformCommand.name+'；本次沒有保存訊息。');
-    return;
+  if(!isContinueRequest) {
+    const platformCommand=parsePlatformCommand(content);
+    if(platformCommand.type==='platform') {
+      if(platformCommand.name==='help') toast('群組語法：@角色 指定 AI 回覆；:人名:內容 指定玩家發言顯示；/help 查看平台指令。AI 尚未串接，指定角色目前只做語法驗證。');
+      else toast('尚未支援平台指令 /'+platformCommand.name+'；本次沒有保存訊息。');
+      return;
+    }
+    const mention=parseMentionTarget(content,(g.active?.members||[]).map(member=>({id:member.characterId||member.id,name:member.name})));
+    if(mention.mentioned&&!mention.valid) {g.formError=mention.reason+'，本次沒有保存訊息。';render();return;}
   }
-  const mention=parseMentionTarget(content,(g.active?.members||[]).map(member=>({id:member.characterId||member.id,name:member.name})));
-  if(mention.mentioned&&!mention.valid) {g.formError=mention.reason+'，本次沒有保存訊息。';render();return;}
   if(!g.active?.id) {g.formError='群組尚未保存，請重新開啟群組。';render();return;}
   if(!window.crypto?.randomUUID) {g.formError='此瀏覽器無法產生安全的回合識別碼，請更新瀏覽器後重試。';render();return;}
   g.sending=true;g.formError='';render();
@@ -4271,7 +4276,7 @@ async function groupSendMock() {
       const scene=scenes.find(x=>x.id===m.scene_id);
       const type=m.speaker_type==='user'?'user':m.speaker_type==='system'?'system':'character';
       const speaker=type==='user'?'你':type==='system'?'系統':(speakerSnapshot.name||member?.name||'角色')+(scene?' · '+scene.name:'');
-      return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:m.content,createdAt:m.created_at};
+      return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user' && m.content===GROUP_CONTINUE_SENTINEL ? '' : m.content,createdAt:m.created_at};
     });
     g.turn=g.messages.filter(m=>m.type==='user').length;
     g.sending=false;g.formError='';
@@ -6429,6 +6434,12 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         break;
       }
       case 'message': {
+        // Defensive routing: if a group composer is present, never run single-chat
+        // empty-message validation for its blank-send/continue action.
+        if (route.page === 'group' || $('groupMessageInput')) {
+          await groupSendMock();
+          break;
+        }
         if (!s || !currentUser()) return;
         // Reuse the same turn IDs after an ambiguous response; never create a new
         // charge attempt until the prior turn has an authoritative outcome.
