@@ -509,7 +509,7 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .roleplay-segment-heading .avatar { width:30px !important; height:30px !important; flex:0 0 30px; object-fit:cover; }
 .roleplay-avatar-wrap { position:relative; display:block; flex:0 0 30px; width:30px; min-width:30px; height:30px; min-height:30px; overflow:visible; }
 .roleplay-avatar-wrap > .avatar { display:block; box-sizing:border-box; width:30px !important; height:30px !important; min-width:30px; min-height:30px; max-width:30px; max-height:30px; }
-.roleplay-player-badge { position:absolute !important; z-index:10; right:-2px; bottom:-2px; display:flex !important; box-sizing:border-box; width:14px !important; height:14px !important; min-width:14px; min-height:14px; max-width:14px; max-height:14px; padding:0; margin:0; border:1px solid var(--panel); border-radius:3px; align-items:center; justify-content:center; background:var(--primary); color:#fff; font-size:7px; font-weight:700; line-height:1; white-space:nowrap; pointer-events:none; }
+.roleplay-avatar-wrap.has-player-badge::after { content:'你'; position:absolute; z-index:20; right:-3px; bottom:-3px; display:flex; box-sizing:border-box; width:16px; height:16px; min-width:16px; min-height:16px; align-items:center; justify-content:center; border:1px solid var(--panel); border-radius:3px; background:var(--primary); color:#fff; font-size:8px; font-weight:700; line-height:1; white-space:nowrap; pointer-events:none; }
 .roleplay-prefixed-message .message-content { max-width:calc(100% - 8px); }
 .roleplay-segment.is-character .bubble { background:var(--bubble); color:var(--text); border-color:var(--border); }
 .roleplay-segment.is-temporary .bubble { background:var(--panel2); color:var(--text); border:1px dashed var(--border); }
@@ -4496,9 +4496,9 @@ function roleplaySegmentHTML(segment, options = {}) {
     ? '<img class="avatar" src="' + e(safeImage(segment.avatar)) + '" alt="">'
     : '<span class="avatar avatar-fallback">' + e(segment.kind === 'user' ? '你' : [...String(name || '?')][0] || '?') + '</span>';
   // The summon marker is a text label, not the player's profile photo.
-  const playerBadge = '<span class="roleplay-player-badge" aria-label="你">你</span>';
+  const playerBadge = ''; // The visible badge is drawn by the wrapper's ::after pseudo-element.
   const avatarHTML = options.summonedByPlayer && segment.kind === 'character'
-    ? '<span class="roleplay-avatar-wrap">' + characterAvatar + playerBadge + '</span>'
+    ? '<span class="roleplay-avatar-wrap has-player-badge" aria-label="夜辰，你正在以此角色發言">' + characterAvatar + playerBadge + '</span>'
     : characterAvatar;
   const typeClass = segment.kind === 'user' ? 'is-user' : segment.kind === 'character' ? 'is-character' : 'is-temporary';
   // Split character speech around *actions*: every speech portion gets its own
@@ -4513,7 +4513,7 @@ function roleplaySegmentHTML(segment, options = {}) {
         const withBadge = options.summonedByPlayer && !badgeUsed;
         if (withBadge) badgeUsed = true;
         const speechAvatar = withBadge
-          ? '<span class="roleplay-avatar-wrap">' + characterAvatar + playerBadge + '</span>'
+          ? '<span class="roleplay-avatar-wrap has-player-badge" aria-label="夜辰，你正在以此角色發言">' + characterAvatar + playerBadge + '</span>'
           : characterAvatar;
         return '<div class="roleplay-segment is-character"><div class="roleplay-segment-heading">' + speechAvatar + '<span>' + e(name) + '</span></div>' + formatMessage(part) + '</div>';
       }).join('');
