@@ -3761,7 +3761,7 @@ async function groupLoadList(force=false) {
         const previews=await Promise.all(batchIds.map(async groupId=>{
           const {data:message,error:messageError}=await window.mySupabase.from('chat_group_messages')
             .select('group_id,content,speaker_type,created_at,sequence_no')
-            .eq('group_id',groupId).order('created_at',{ascending:false})
+            .eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:false})
             .order('sequence_no',{ascending:false}).limit(1).maybeSingle();
           if(messageError) throw messageError;
           return [groupId,message||null];
@@ -3806,7 +3806,7 @@ async function groupOpen(groupId) {
       window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,background_mode,background_memory_photo_id,created_at,updated_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position'),
-      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).order('created_at',{ascending:true}).order('sequence_no',{ascending:true}),
+      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:true}).order('sequence_no',{ascending:true}),
       window.mySupabase.from('chat_memory_photos').select('id,owner_id,chat_type,group_id,storage_path,caption,created_at,expires_at').eq('chat_type','group').eq('group_id',groupId).eq('owner_id',user.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false})
     ]),15000,'群組資料讀取逾時，請檢查網路後重試。')
     if(requestId!==g.openRequestId) return;
@@ -3914,8 +3914,8 @@ function renderGroupConversation() {
     const bodyHTML=hasSpeaker
       ? '<div class="roleplay-segments">'+segments.map(roleplaySegmentHTML).join('')+'</div>'
       : '<div class="message-name">'+e(who)+'</div>'+(isSystem?'<div class="bubble">'+e(displayContent)+'</div>':formatMessage(displayContent));
-    const latestEditableGroupMessage = !isSystem &&
-      g.messages.filter(item=>item.type==='user'||item.type==='character').at(-1)?.id===m.id;
+    const latestEditableGroupMessage = !isSystem && ['user','character'].includes(m.type) &&
+      g.messages.filter(item=>item.type===m.type).at(-1)?.id===m.id;
     const editButton = latestEditableGroupMessage
       ? '<button class="message-more" data-action="group-message-menu" data-id="'+e(m.id)+'" aria-label="訊息操作">⋯</button>' : '';
     return '<div class="message '+(isUser?'user':'')+(hasSpeaker?' roleplay-prefixed-message':'')+'" data-message="'+e(m.id)+'">'+avatarHTML+
@@ -5013,7 +5013,7 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
       const m = s?.messages.find(m => m.id === o.id);
       if (!m) return;
       const latestEditableMessage = (m.role === 'user' || m.role === 'assistant') &&
-        s.messages.filter(item => item.role === 'user' || item.role === 'assistant').at(-1)?.id === m.id;
+        s.messages.filter(item => item.role === m.role).at(-1)?.id === m.id;
       showDialog('訊息操作',`
         <div class="stack">
           <button style="width:100%" data-action="copy-message" data-id="${e(m.id)}">複製</button>
@@ -5027,7 +5027,7 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
     case 'edit-message': {
       const m = s?.messages.find(m => m.id === o.id);
       const latestEditableMessage = m && (m.role === 'user' || m.role === 'assistant') &&
-        s.messages.filter(item => item.role === 'user' || item.role === 'assistant').at(-1)?.id === m.id;
+        s.messages.filter(item => item.role === m.role).at(-1)?.id === m.id;
       if (!m || !latestEditableMessage) return;
       showDialog('編輯最後一則訊息',`
         <form data-form="message-edit">
@@ -5313,14 +5313,17 @@ document.addEventListener('click',async event => {
       case 'group-send':groupSendMock();break;
       case 'group-message-menu': {
         const message=groupPrototype.messages.find(item=>item.id===key);
-        const latest=groupPrototype.messages.filter(item=>item.type==='user'||item.type==='character').at(-1);
+        const latest=message&&groupPrototype.messages.filter(item=>item.type===message.type).at(-1);
         if(!message||message.id!==latest?.id||!['user','character'].includes(message.type)) break;
-        showDialog('訊息操作','<div class="stack"><button style="width:100%" data-action="edit-group-message" data-id="'+e(message.id)+'">編輯</button></div>');
+        showDialog('訊息操作','<div class="stack">'+
+          '<button style="width:100%" data-action="copy-group-message" data-id="'+e(message.id)+'">複製</button>'+
+          '<button style="width:100%" data-action="edit-group-message" data-id="'+e(message.id)+'">編輯</button>'+
+          '<button class="danger" style="width:100%" data-action="delete-group-message" data-id="'+e(message.id)+'">刪除</button></div>');
         break;
       }
       case 'edit-group-message': {
         const message=groupPrototype.messages.find(item=>item.id===key);
-        const latest=groupPrototype.messages.filter(item=>item.type==='user'||item.type==='character').at(-1);
+        const latest=message&&groupPrototype.messages.filter(item=>item.type===message.type).at(-1);
         if(!message||message.id!==latest?.id||!['user','character'].includes(message.type)) break;
         showDialog('編輯最後一則訊息','<form data-form="group-message-edit" data-id="'+e(message.id)+'"><textarea name="text" required maxlength="10000">'+e(message.content||'')+'</textarea><button class="primary" style="margin-top:15px">儲存</button></form>');
         break;
@@ -6456,13 +6459,43 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         toast('訊息已更新；未重新生成 AI，也未扣款。');
         break;
       }
+      case 'copy-group-message': {
+        const message=groupPrototype.messages.find(item=>item.id===key);
+        if(!message) break;
+        const content=String(message.content||'');
+        if(navigator.clipboard && isSecureContext) {
+          await navigator.clipboard.writeText(content);
+          toast('已複製訊息。');
+        } else {
+          showDialog('複製訊息','<textarea readonly>'+e(content)+'</textarea>');
+          $('modal').querySelector('textarea').select();
+        }
+        break;
+      }
+      case 'delete-group-message': {
+        const group=groupPrototype.active, message=groupPrototype.messages.find(item=>item.id===key);
+        const user=currentUser(), client=window.mySupabase;
+        if(!group||!message||!['user','character'].includes(message.type)) break;
+        const latest=groupPrototype.messages.filter(item=>item.type===message.type).at(-1);
+        if(message.id!==latest?.id) { toast('只能刪除各自最新的一則玩家或角色訊息。'); break; }
+        if(!confirm('確定刪除此訊息？此操作無法復原。')) break;
+        if(!user?.uid||!client||!isUuid(group.id)||!isUuid(message.id)) throw new Error('群組尚未連結有效的雲端資料，無法刪除訊息。');
+        const deletedAt=new Date().toISOString();
+        const {data,error}=await client.from('chat_group_messages').update({deleted_at:deletedAt})
+          .eq('id',message.id).eq('group_id',group.id).is('deleted_at',null).select('id').maybeSingle();
+        if(error) throw new Error('群組訊息刪除同步失敗：'+error.message);
+        if(!data) throw new Error('雲端未確認這則群組訊息的刪除狀態，請重新載入後再試。');
+        groupPrototype.messages=groupPrototype.messages.filter(item=>item.id!==message.id);
+        back();renderGroupConversation();
+        toast('群組訊息已刪除。');
+        break;
+      }
       case 'group-message-edit': {
-        const group=groupPrototype.active, messageId=form.dataset.id||o.id;
         const message=groupPrototype.messages.find(item=>item.id===messageId);
-        const latest=groupPrototype.messages.filter(item=>item.type==='user'||item.type==='character').at(-1);
+        const latest=message&&groupPrototype.messages.filter(item=>item.type===message.type).at(-1);
         const user=currentUser(), client=window.mySupabase;
         if(!group||!message||message.id!==latest?.id||!['user','character'].includes(message.type)) {
-          toast('只有最後一則玩家／角色訊息可以編輯。');break;
+          toast('只能編輯各自最新的一則玩家或角色訊息。');break;
         }
         if(!text) return toast('訊息不可為空。');
         if(!user?.uid||!client||!isUuid(group.id)||!isUuid(message.id)) throw new Error('群組尚未連結有效的雲端資料，無法更新訊息。');
