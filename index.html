@@ -6295,16 +6295,22 @@ document.addEventListener('click',async event => {
         try {
           const {data:{user},error:authError}=await client.auth.getUser();
           if(authError||user?.id!==uid) throw new Error('登入狀態已失效，請重新登入。');
-          const {data:owned,error:readError}=await client.from('chat_groups').select('id').eq('id',groupId).eq('owner_id',uid).is('archived_at',null).maybeSingle();
-          if(readError||!owned) throw readError||new Error('找不到可刪除的群組，或目前帳號沒有操作權限。');
-          const deletedAt=new Date().toISOString();
-          const {data,error}=await client.from('chat_groups').update({archived_at:deletedAt,updated_at:deletedAt}).eq('id',groupId).eq('owner_id',uid).is('archived_at',null).select('id').maybeSingle();
-          if(error||!data) throw error||new Error('資料庫未確認群組刪除狀態。');
+          const {data:removedPaths,error:deleteError}=await client.rpc('delete_chat_group_with_related_data',{p_group_id:groupId});
+          if(deleteError) throw new Error('群組與關聯資料刪除失敗：'+deleteError.message);
+          const storagePaths=(removedPaths||[]).map(item=>item.storage_path).filter(Boolean);
+          let storageCleanupFailed=false;
+          if(storagePaths.length) {
+            const {error:storageError}=await client.storage.from('personax-memory-photos').remove(storagePaths);
+            if(storageError) {
+              storageCleanupFailed=true;
+              console.error('群組資料已刪除，但部分相片儲存檔清理失敗',storageError.message);
+            }
+          }
           if(g.active?.id===groupId) { g.active=null;g.messages=[];g.pendingRequest=null;g.loading=false; }
           $('modal')?.close();
           await groupRefreshList();
           if(route.page==='group'&&route.id===groupId) go({page:'chat'});
-          toast('群組已從聊天列表移除；雲端關聯資料仍保留，完整清理需後端交易流程。');
+          toast(storageCleanupFailed?'群組與資料庫關聯內容已刪除，但部分相片檔案清理失敗，需後續補清。':'群組、訊息、日記、相簿紀錄與關聯資料已刪除。');
         } catch(error) { toast(error?.message||'群組刪除失敗，請稍後重試。'); }
         break;
       }
