@@ -638,7 +638,13 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .composer .chat-tools { display:flex; align-items:center; gap:5px; flex:1 1 auto; min-width:0; overflow-x:auto; overflow-y:hidden; margin:0; padding:0 0 2px; scrollbar-width:none; }
 .composer .chat-tools::-webkit-scrollbar { display:none; }
 .composer .chat-tools.hidden { display:none !important; }
-.composer .chat-tools button { white-space:nowrap; font-size:10px; line-height:1.25; padding:5px 7px; flex:0 0 auto; }
+ .composer .chat-tools button { white-space:nowrap; font-size:10px; line-height:1.25; padding:5px 7px; flex:0 0 auto; }
+.chat-tools button[data-action="suggestions"] { display:flex; align-items:center; justify-content:space-between; gap:10px; min-width:142px; text-align:left; }
+.chat-tools .suggestion-toggle-track { display:inline-flex; align-items:center; width:30px; height:17px; padding:2px; border-radius:999px; background:var(--border); transition:background .15s ease; flex:0 0 auto; }
+.chat-tools .suggestion-toggle-thumb { display:block; width:13px; height:13px; border-radius:50%; background:var(--panel); box-shadow:0 1px 2px #0003; transform:translateX(0); transition:transform .15s ease; }
+.chat-tools button[data-action="suggestions"][aria-pressed="true"] .suggestion-toggle-track { background:#34d399; }
+.chat-tools button[data-action="suggestions"][aria-pressed="true"] .suggestion-toggle-thumb { transform:translateX(13px); }
+.chat-tools .suggestion-toggle-state { min-width:22px; font-size:10px; font-weight:700; }
 .suggestions { margin-bottom:5px; min-width:0; }
 .suggestions-panel { border:1px solid var(--border); border-radius:10px; background:var(--panel); overflow:hidden; }
 .suggestions-panel > summary { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:30px; padding:5px 9px; cursor:pointer; list-style:none; font-size:11px; font-weight:600; }
@@ -4198,7 +4204,7 @@ ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
               <button type="button" class="composer-icon-button" data-action="toggle-chat-tools" aria-label="展開聊天功能" aria-expanded="false" title="更多功能">${ICON.plus}</button>
               <div class="chat-tools hidden" id="groupChatTools">
                 <button type="button" data-action="snapshot">📷 拍照／快照</button>
-                <button type="button" data-action="suggestions" aria-pressed="${groupPrototype.active?.suggestions !== false ? 'true' : 'false'}">建議回覆 ${groupPrototype.active?.suggestions !== false ? 'ON' : 'OFF'}</button>
+                <button type="button" data-action="suggestions" aria-label="切換建議回覆" aria-pressed="${groupPrototype.active?.suggestions !== false ? 'true' : 'false'}"><span>建議回覆</span><span class="suggestion-toggle-track" aria-hidden="true"><span class="suggestion-toggle-thumb"></span></span><span class="suggestion-toggle-state">${groupPrototype.active?.suggestions !== false ? 'ON' : 'OFF'}</span></button>
                 <button type="button" data-action="group-info">群組資訊</button>
                 <button type="button" data-action="group-archive" data-id="${e(group.id)}">群組管理</button>
               </div>
@@ -4749,7 +4755,7 @@ function renderConversation() {
               <button type="button" class="composer-icon-button" data-action="toggle-chat-tools" aria-label="展開聊天功能" aria-expanded="false" title="更多功能">${ICON.plus}</button>
               <div class="chat-tools hidden" id="chatTools">
                 <button type="button" data-action="snapshot">📷 拍照／快照</button>
-                <button type="button" data-action="suggestions" aria-pressed="${s.suggestions ? 'true' : 'false'}">建議回覆 ${s.suggestions ? 'ON' : 'OFF'}</button>
+                <button type="button" data-action="suggestions" aria-label="切換建議回覆" aria-pressed="${s.suggestions ? 'true' : 'false'}"><span>建議回覆</span><span class="suggestion-toggle-track" aria-hidden="true"><span class="suggestion-toggle-thumb"></span></span><span class="suggestion-toggle-state">${s.suggestions ? 'ON' : 'OFF'}</span></button>
               </div>
             </div>
             <div class="composer-bottom-right">
