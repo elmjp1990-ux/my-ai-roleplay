@@ -4717,7 +4717,8 @@ function renderPhoneModal() {
     .map(item=>String(item||'').trim()).filter(Boolean).slice(0,8);
   const generated=isGroup?(group.phoneNotificationsByCharacter?.[String(character.id)]||[]):(session.phoneNotifications||[]);
   const notices=Array.isArray(generated)?generated.filter(Boolean).slice(0,10):[];
-  const diaryList=isGroup?(group.memoriesByCharacter?.[String(character.id)]||groupPrototype.memoriesByCharacter?.[String(character.id)]||[]):(session.memories||[]);
+  // Group sweet-diary excerpts are stored per group in localStorage, so use that same shared diary for every member phone's battery.
+  const diaryList=isGroup?loadGroupDiaryMemories(group.id):(session.memories||[]);
   const diaryChars=Array.isArray(diaryList)?(isGroup?diaryList.reduce((n,item)=>n+countChars(typeof item==='string'?item:(item.text||'')),0):memorySize(diaryList)):0;
   const capacity=10000,battery=Math.max(0,Math.min(100,Math.round((1-Math.min(diaryChars,capacity)/capacity)*100))),warning=battery<=20,batteryColor=warning?'#e07b39':battery<=50?'#d5b34a':'#4eaf78';
   const title=(character.name||group?.name||'角色')+' 的手機';
