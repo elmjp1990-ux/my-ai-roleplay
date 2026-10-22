@@ -5269,16 +5269,24 @@ function renderModal(o) {
       break;
     case 'tags':
       if (o.mode === 'explore') {
-        showDialog('選擇標籤',`
-          <form data-form="tags">
-            <p class="muted small">探索篩選可選擇現有分類，角色需包含全部勾選標籤。</p>
-            <div class="two-col">
-              ${availableExploreTags().map(t => `<label class="check">
-                <input type="checkbox" name="tag" value="${e(t)}" ${exploreTags.includes(t) ? 'checked' : ''}>
-                ${e(t)}</label>`).join('') || '<p class="small muted">目前還沒有公開角色標籤；角色公開後，自訂標籤會自動出現在這裡。</p>'}
+        const tagOptions = availableExploreTags()
+          .filter(validCharacterTag)
+          .sort((a,b) => a.localeCompare(b, 'zh-Hant'));
+        showDialog('標籤篩選',`
+          <form data-form="tags" class="tag-picker explore-tag-picker">
+            <label class="field tag-picker-search-field">
+              <input name="exploreTagSearch" type="search" maxlength="10" placeholder="搜尋現有標籤" autocomplete="off" aria-label="搜尋現有標籤">
+            </label>
+            <div id="exploreTagResults" class="tag-picker-chips" aria-live="polite"></div>
+            <div id="exploreTagList" class="tag-picker-options" aria-hidden="true">
+              ${tagOptions.map(t => `<input type="checkbox" name="tag" value="${e(t)}" ${exploreTags.includes(t) ? 'checked' : ''}>`).join('')}
             </div>
-            <button class="primary" style="margin-top:20px">套用</button>
+            <div class="tag-picker-selected-heading"><span>已選擇標籤</span><strong id="exploreTagCount">[${exploreTags.length}]</strong></div>
+            <div id="exploreTagSelected" class="tag-picker-chips tag-picker-selected"></div>
+            <p id="exploreTagEmpty" class="small muted" hidden>目前沒有符合的公開標籤。</p>
+            <button class="primary tag-picker-apply" style="margin-top:18px;width:100%">套用</button>
           </form>`);
+        refreshExploreTagPicker();
       } else {
         const tagOptions = [...new Set([...availableExploreTags(), ...draftTags])]
           .filter(validCharacterTag)
@@ -5697,6 +5705,39 @@ document.addEventListener('click', async event => {
     if (target.isConnected) target.disabled = false;
   }
 }, true);
+
+/* Homepage explore tag picker: search/select existing public tags only; never creates tags. */
+function refreshExploreTagPicker() {
+  const modal=$('modal');
+  const input=modal?.querySelector('input[name="exploreTagSearch"]');
+  const options=modal?.querySelector('#exploreTagList');
+  const results=modal?.querySelector('#exploreTagResults');
+  const selectedArea=modal?.querySelector('#exploreTagSelected');
+  const count=modal?.querySelector('#exploreTagCount');
+  const empty=modal?.querySelector('#exploreTagEmpty');
+  if(!input||!options||!results||!selectedArea||!count||!empty)return;
+  const query=String(input.value||'').trim().toLocaleLowerCase('zh-Hant');
+  const checkboxes=[...options.querySelectorAll('input[name="tag"]')];
+  const matches=checkboxes.filter(item=>!query||item.value.toLocaleLowerCase('zh-Hant').includes(query));
+  results.innerHTML=matches.map(item=>`<button type="button" class="tag-picker-chip ${item.checked?'selected':''}" data-action="toggle-explore-tag" data-tag="${e(item.value)}" aria-pressed="${item.checked}">${e(item.value)}${item.checked?' ✓':''}</button>`).join('');
+  empty.hidden=matches.length>0;
+  const chosen=checkboxes.filter(item=>item.checked);
+  count.textContent='['+chosen.length+']';
+  selectedArea.innerHTML=chosen.map(item=>`<button type="button" class="tag-picker-chip selected" data-action="toggle-explore-tag" data-tag="${e(item.value)}" aria-label="取消選擇 ${e(item.value)}">${e(item.value)} ×</button>`).join('') || '<span class="small muted">尚未選擇標籤</span>';
+}
+document.addEventListener('input', event => {
+  const input=event.target;
+  if(input instanceof HTMLInputElement && input.name==='exploreTagSearch' && input.closest('.explore-tag-picker')) refreshExploreTagPicker();
+});
+document.addEventListener('click', event => {
+  const button=event.target.closest('[data-action="toggle-explore-tag"]');
+  if(!button)return;
+  const options=$('modal')?.querySelector('#exploreTagList');
+  const input=options&&[...options.querySelectorAll('input[name="tag"]')].find(item=>item.value===button.dataset.tag);
+  if(!input)return;
+  input.checked=!input.checked;
+  refreshExploreTagPicker();
+});
 
 /* Shared character-tag picker: live-search chips, selected count, and a five-tag limit. */
 function refreshCustomTagPicker() {
