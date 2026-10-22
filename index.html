@@ -4231,7 +4231,7 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
   }
   if(kind==='manage-conversation'){
     if(ctx.isGroup)return;
-    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="管理對話"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回聊天功能" title="返回聊天功能">'+ICON.back+'</button><h2>管理對話</h2></div><p class="small muted">同一角色只會在聊天列表保留一個目前對話；切換歷史時，當前對話會先封存。</p><div class="stack"><button type="button" class="primary" data-action="new-conversation" data-id="'+e(ctx.id)+'">開始新對話</button><button type="button" data-action="archives" data-id="'+e(ctx.id)+'">選擇舊的回憶／歷史對話</button></div></section>');
+    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="管理對話"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回聊天功能" title="返回聊天功能">'+ICON.back+'</button><h2>管理對話</h2></div><p class="small muted">同一角色只會在聊天列表保留一個目前對話；切換歷史時，當前對話會先封存。</p><div class="stack"><button type="button" class="primary" data-action="new-conversation" data-id="'+e(ctx.id)+'">開始新對話</button></div></section>');
     return;
   }
   if(kind==='settings'){
