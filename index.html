@@ -3017,9 +3017,17 @@ function renderDetail() {
   }
 }
 
-async function loadCharacterTurnCounts(characterIds) {
-  const ids = [...new Set((Array.isArray(characterIds) ? characterIds : [characterIds])
-    .filter(isUuid))].filter(id => !characterTurnCountCache.has(id) && !characterTurnCountRequests.has(id));
+async function loadCharacterTurnCounts(characterIds, forceRefresh = false) {
+  const requestedIds = [...new Set((Array.isArray(characterIds) ? characterIds : [characterIds])
+    .filter(isUuid))];
+  // Group replies are saved asynchronously; wait for any older count request before
+  // invalidating the cache, otherwise a stale response could overwrite the new count.
+  if (forceRefresh) {
+    const pending = requestedIds.map(id => characterTurnCountRequests.get(id)).filter(Boolean);
+    if (pending.length) await Promise.all(pending.map(request => request.catch(() => {})));
+    requestedIds.forEach(id => characterTurnCountCache.delete(id));
+  }
+  const ids = requestedIds.filter(id => !characterTurnCountCache.has(id) && !characterTurnCountRequests.has(id));
   if (!ids.length || !window.mySupabase) {
     for (const id of (Array.isArray(characterIds) ? characterIds : [characterIds])) {
       if (characterTurnCountCache.has(id)) updateCharacterTurnCountElements(id, characterTurnCountCache.get(id));
@@ -4634,6 +4642,9 @@ async function groupSendMock() {
       return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user' && m.content===GROUP_CONTINUE_SENTINEL ? '' : m.content,createdAt:m.created_at};
     });
     g.turn=g.messages.filter(m=>m.type==='user').length;
+    // Refresh cumulative character-card counts after a group turn has been saved.
+    // The database RPC already includes group messages; invalidate the stale frontend cache.
+    void loadCharacterTurnCounts(members.map(member=>member.characterId||member.id), true);
     ensureGroupDiaryMemories();
     g.sending=false;g.formError='';
     renderGroupConversation();
