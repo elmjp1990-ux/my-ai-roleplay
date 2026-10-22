@@ -6030,13 +6030,22 @@ document.addEventListener('click',async event => {
         if (!input || !list) break;
         const value=String(input.value || '').trim();
         if (!validCharacterTag(value)) { toast('每個標籤需為2–10個字。'); input.focus(); break; }
-        const checked=[...list.querySelectorAll('input[name="tag"]:checked')].map(item=>item.value);
-        if (checked.length>=5) { toast('角色最多新增5個標籤。'); break; }
-        if (checked.includes(value)) { toast('這個標籤已存在。'); input.focus(); break; }
+        const options=[...list.querySelectorAll('input[name="tag"]')];
+        const existing=options.find(item=>item.value===value);
+        const checked=options.filter(item=>item.checked);
+        if (existing) {
+          if (!existing.checked && checked.length>=5) { toast('角色最多選擇5個標籤。'); break; }
+          existing.checked=true;
+          existing.closest('[data-tag-option]')?.classList.remove('hidden');
+          input.value='';input.focus();
+          break;
+        }
+        if (checked.length>=5) { toast('角色最多選擇5個標籤。'); break; }
         const empty=list.querySelector('p');
         if (empty) empty.remove();
         const label=document.createElement('label');
         label.className='check';
+        label.dataset.tagOption=value;
         label.innerHTML='<input type="checkbox" name="tag" checked value="' + e(value) + '"> ' + e(value);
         list.appendChild(label);
         input.value='';input.focus();
