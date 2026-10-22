@@ -6475,7 +6475,8 @@ document.addEventListener('click',async event => {
           break;
         }
         if (!hasUserMessage(s)) {
-          alert('這段聊天還沒開始：請先送出第一句訊息，才能封存並開始新對話。');
+          // 這個空白草稿本身就是新對話；只有玩家明確點選「開始新對話」後才顯示舊回憶清單。
+          openModal('archives',{id:s.id});
           break;
         }
         if (!confirm('封存目前劇情並開始新對話？')) break;
@@ -6491,15 +6492,17 @@ document.addEventListener('click',async event => {
         )[0];
         if (!persist()) {state=snapshot;break;}
         await saveChatSessionSafely(s);
+        let nextSession;
         if (existing) {
           existing.hidden=false;
           persist();
-          go({page:'conversation',id:existing.id});
+          nextSession=existing;
         } else {
-          const next=newSession(c,{persona:s.persona,background:s.background,suggestions:s.suggestions});
+          nextSession=newSession(c,{persona:s.persona,background:s.background,suggestions:s.suggestions});
           persist();
-          go({page:'conversation',id:next.id});
         }
+        go({page:'conversation',id:nextSession.id});
+        openModal('archives',{id:nextSession.id});
         break;
       }
       case 'resume-chat': {
