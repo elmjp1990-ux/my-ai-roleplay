@@ -1696,7 +1696,7 @@ function availableExploreTags() {
   for (const character of (state.characters || [])) {
     if (character.visibility !== 'public' || character.deletedAt ||
         character.cloudPublic === false || character.localOnly === true ||
-        String(character.id || '').startsWith('seed-') && character.localOnly === true) continue;
+        String(character.id || '').startsWith('seed-')) continue;
     for (const rawTag of (Array.isArray(character.tags) ? character.tags : [])) {
       const tag = String(rawTag || '').trim();
       if (validCharacterTag(tag)) tags.add(tag);
@@ -3117,13 +3117,19 @@ async function refreshAuthorFollowState(authorId) {
   const client = window.mySupabase;
   if (!client || !user?.uid || !isUuid(user.uid) || !isUuid(authorId) || user.uid === authorId) return;
   try {
-    const [followResult, profileResult] = await Promise.all([
+    const [followResult, profileResult, followerCountResult] = await Promise.all([
       client.from('author_follows').select('author_id')
         .eq('follower_id', user.uid).eq('author_id', authorId).maybeSingle(),
-      client.from('public_profiles').select('follower_count').eq('id', authorId).maybeSingle()
+      client.from('public_profiles').select('follower_count').eq('id', authorId).maybeSingle(),
+      client.from('author_follows').select('author_id', {count:'exact', head:true})
+        .eq('author_id', authorId)
     ]);
     if (followResult.error) throw followResult.error;
     if (profileResult.error) throw profileResult.error;
+    if (followerCountResult.error) throw followerCountResult.error;
+    const followerCount = Number.isFinite(followerCountResult.count)
+      ? followerCountResult.count
+      : Number(profileResult.data?.follower_count || 0);
     if (currentUser()?.uid !== user.uid || route.page !== 'author' || route.id !== authorId) return;
 
     const existingIndex = state.following.indexOf(authorId);
@@ -3132,12 +3138,12 @@ async function refreshAuthorFollowState(authorId) {
     state.authors[authorId] = {
       ...(state.authors[authorId] || {uid:authorId,nickname:'故事創作者',bio:'',avatar:''}),
       uid:authorId,
-      fans:Number(profileResult.data?.follower_count || 0)
+      fans:followerCount
     };
     persist();
 
     const count = document.getElementById('authorFollowerCount');
-    if (count) count.textContent = '粉絲 ' + Number(profileResult.data?.follower_count || 0);
+    if (count) count.textContent = '粉絲 ' + followerCount;
     const button = document.querySelector('[data-action="follow"][data-id="' + authorId + '"]');
     if (button) button.textContent = followResult.data ? '已追蹤' : '追蹤';
   } catch (error) {
