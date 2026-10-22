@@ -3658,7 +3658,7 @@ function visibleSessions() {
   const q = chatSearch.trim().toLowerCase();
   return Object.values(state.sessions).filter(s => {
     const c = sessionCharacter(s);
-    return c && !s.archived &&
+    return c && !s.archived && hasUserMessage(s) &&
       (!q || (s.name || c.name).toLowerCase().includes(q));
   }).sort((a,b) =>
     Number(b.pinned)-Number(a.pinned) ||
@@ -3772,7 +3772,7 @@ function chatEntries() {
             <span class="small muted group-chat-preview" title="${e(lastText)}">${e(lastText)}</span>
           </span>
         </button>
-        <button type="button" class="entry-menu group-entry-menu" data-action="group-open" data-id="${e(group.id)}" aria-label="開啟群組聊天" title="開啟群組聊天">⋯</button>
+        <button type="button" class="entry-menu group-entry-menu" data-action="group-entry-menu" data-id="${e(group.id)}" aria-label="群組對話選項" title="群組對話選項">⋯</button>
       </div>`;
     }
     const s=item.value;
@@ -4226,11 +4226,16 @@ function setChatOverlayRoute(next){
 function renderChatSettingsOverlay(panel,isGroup,kind){
   const ctx=chatSettingsContext(isGroup);if(!ctx||!panel)return;
   if(kind==='delete-confirm'){
-    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="刪除對話確認"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回" title="返回">'+ICON.back+'</button><h2>刪除對話</h2></div><p>確定刪除此對話與回憶，操作後無法復原哦。</p><div class="chat-settings-save-row"><button type="button" data-action="chat-settings-back">取消</button><button type="button" class="danger" data-action="remove-session" data-id="'+e(ctx.id)+'">確認刪除</button></div></section>');
+    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="刪除對話確認"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回" title="返回">'+ICON.back+'</button><h2>刪除對話</h2></div><p>確定刪除此對話與回憶，刪除後無法復原哦。</p><div class="chat-settings-save-row"><button type="button" data-action="chat-settings-back">取消</button><button type="button" class="danger" data-action="'+(ctx.isGroup?'group-delete-confirm':'remove-session')+'" data-id="'+e(ctx.id)+'">確認刪除</button></div></section>');
+    return;
+  }
+  if(kind==='manage-conversation'){
+    if(ctx.isGroup)return;
+    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="管理對話"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回聊天功能" title="返回聊天功能">'+ICON.back+'</button><h2>管理對話</h2></div><p class="small muted">同一角色只會在聊天列表保留一個目前對話；切換歷史時，當前對話會先封存。</p><div class="stack"><button type="button" class="primary" data-action="new-conversation" data-id="'+e(ctx.id)+'">開始新對話</button><button type="button" data-action="archives" data-id="'+e(ctx.id)+'">選擇舊的回憶／歷史對話</button></div></section>');
     return;
   }
   if(kind==='settings'){
-    const items=[...(isGroup?[['group-info','群組資訊','群組成員、世界背景與場景']]:[]),['diary','甜蜜日記','回憶摘要與長期保存'],['background','聊天背景','無背景、角色圖片或回憶相片'],['persona','人設管理','管理目前聊天使用的人設'],['delete','刪除對話','刪除這段對話與回憶']];
+    const items=[...(isGroup?[['group-info','群組資訊','群組成員、世界背景與場景']]:[]),['diary','甜蜜日記','回憶摘要與長期保存'],['background','聊天背景','無背景、角色圖片或回憶相片'],['persona','人設管理','管理目前聊天使用的人設'],...(!isGroup?[['manage-conversation','管理對話','開始新對話或切換舊的回憶']]:[]),['delete','刪除對話','刪除這段對話與回憶']];
     panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="聊天功能選單"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-close" aria-label="返回聊天" title="返回聊天">'+ICON.back+'</button><h2>聊天功能</h2></div><div class="stack chat-settings-options">'+items.map(([action,title,desc])=>'<button type="button" class="profile-setting" data-action="chat-settings-option" data-option="'+e(action)+'"><span><strong>'+e(title)+'</strong><small>'+e(desc)+'</small></span><span>›</span></button>').join('')+'</div></section>');
     return;
   }
@@ -5401,8 +5406,10 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
     case 'chat-settings': {
       const selected = state.sessions[o.id] || s;
       if (!selected) return;
-      showDialog('聊天功能',`
+      showDialog('管理對話',`
         <div class="stack">
+          <button class="primary" style="width:100%" data-action="new-conversation" data-id="${e(selected.id)}">開始新對話</button>
+          <button style="width:100%" data-action="archives" data-id="${e(selected.id)}">選擇舊的回憶／歷史對話</button>
           <label class="field"><span>聊天背景</span>
             <select id="backgroundSetting" data-session-id="${e(selected.id)}">
               <option value="avatar" ${selected.background === 'avatar' || !String(selected.background||'').startsWith('memory-photo:') && selected.background !== 'none' ? 'selected' : ''}>角色頭像</option>
@@ -5410,8 +5417,6 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
               ${String(selected.background||'').startsWith('memory-photo:') ? '<option value="'+e(selected.background)+'" selected>目前的回憶相片背景</option>' : ''}
             </select>
           </label>
-          <button class="primary" style="width:100%" data-action="new-conversation" data-id="${e(selected.id)}">開始新對話</button>
-          <button style="width:100%" data-action="archives" data-id="${e(selected.id)}">舊的回憶</button>
           <button class="danger" style="width:100%" data-action="remove-session" data-id="${e(selected.id)}">刪除這段對話與回憶</button>
         </div>`);
       void (async()=>{
@@ -5832,7 +5837,8 @@ document.addEventListener('click',async event => {
         if(option==='diary'){const next={...route,chatOverlay:'diary'};delete next.overlay;go(next);break;}
         if(option==='group-info'){const next={...route,chatOverlay:'group-info'};delete next.overlay;go(next);break;}
         if(option==='persona'){openModal('personas');break;}
-        if(option==='delete'){if(route.page==='group'){toast('群組刪除尚未接入安全的雲端軟刪除流程，暫不提供會造成資料風險的按鈕。');break;}const next={...route,chatOverlay:'delete-confirm'};delete next.overlay;go(next);break;}
+        if(option==='manage-conversation'){const next={...route,chatOverlay:'manage-conversation'};delete next.overlay;go(next);break;}
+        if(option==='delete'){const next={...route,chatOverlay:'delete-confirm'};delete next.overlay;go(next);break;}
         break;
       }
       case 'chat-settings-back': {
@@ -6265,19 +6271,68 @@ document.addEventListener('click',async event => {
       case 'list-menu':openModal('list-menu');break;
       case 'group':go({page:'group'});break;
       case 'session-menu':openModal('session-menu',{id:key});break;
+      case 'group-entry-menu': {
+        const group=(groupPrototype.groups||[]).find(item=>item.id===key);
+        if(!group) { toast('找不到這個群組，請重新載入清單。'); break; }
+        showDialog('群組對話選項', '<div class="stack"><button type="button" data-action="group-open" data-id="'+e(group.id)+'">開啟群組</button><button type="button" class="danger" data-action="group-delete-confirm" data-id="'+e(group.id)+'">刪除這段對話與回憶</button></div>');
+        break;
+      }
+      case 'group-delete-confirm': {
+        const group=(groupPrototype.groups||[]).find(item=>item.id===key);
+        if(!group) { toast('找不到這個群組，請重新載入清單。'); break; }
+        showDialog('確認刪除群組', '<p>確定刪除此對話與回憶，刪除後無法復原哦。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="group-delete" data-id="'+e(group.id)+'">確認刪除</button></div>');
+        break;
+      }
+      case 'group-delete': {
+        const groupId=key,g=groupPrototype,client=window.mySupabase,uid=currentUser()?.uid;
+        const group=(g.groups||[]).find(item=>item.id===groupId);
+        if(!group||!client||!uid||g.ownerUid!==uid) { toast('請重新載入群組並確認登入狀態後再刪除。'); break; }
+        try {
+          const {data:{user},error:authError}=await client.auth.getUser();
+          if(authError||user?.id!==uid) throw new Error('登入狀態已失效，請重新登入。');
+          const {data:owned,error:readError}=await client.from('chat_groups').select('id').eq('id',groupId).eq('owner_id',uid).is('archived_at',null).maybeSingle();
+          if(readError||!owned) throw readError||new Error('找不到可刪除的群組，或目前帳號沒有操作權限。');
+          const deletedAt=new Date().toISOString();
+          const {data,error}=await client.from('chat_groups').update({archived_at:deletedAt,updated_at:deletedAt}).eq('id',groupId).eq('owner_id',uid).is('archived_at',null).select('id').maybeSingle();
+          if(error||!data) throw error||new Error('資料庫未確認群組刪除狀態。');
+          if(g.active?.id===groupId) { g.active=null;g.messages=[];g.pendingRequest=null;g.loading=false; }
+          $('modal')?.close();
+          await groupRefreshList();
+          if(route.page==='group'&&route.id===groupId) go({page:'chat'});
+          toast('群組已從聊天列表移除；雲端關聯資料仍保留，完整清理需後端交易流程。');
+        } catch(error) { toast(error?.message||'群組刪除失敗，請稍後重試。'); }
+        break;
+      }
       case 'remove-session': {
         const item=state.sessions[key];
         if (!item) break;
         if (!confirm('確定刪除此對話與回憶，操作後無法復原哦')) break;
         const uid=currentUser()?.uid;
         if (item.cloudOwned && uid && item.cloudOwnerUid === uid && window.mySupabase) {
-          const deletedAt=new Date().toISOString();
-          const {data,error}=await window.mySupabase.from('chat_sessions')
-            .update({deleted_at:deletedAt,updated_at:deletedAt})
-            .eq('id',key).eq('user_id',uid).is('deleted_at',null)
-            .select('id').maybeSingle();
-          if (error) throw new Error('對話刪除標記寫入資料庫失敗：'+error.message);
-          if (!data) throw new Error('資料庫沒有確認這段對話的刪除狀態，請重新整理後再試。');
+          const client=window.mySupabase,deletedAt=new Date().toISOString();
+          const {data:photos,error:photoReadError}=await client.from('chat_memory_photos').select('id,storage_path')
+            .eq('owner_id',uid).eq('chat_type','single').eq('session_id',key).is('deleted_at',null);
+          if(photoReadError) throw new Error('讀取這段對話的相簿資料失敗：'+photoReadError.message);
+          const paths=(photos||[]).map(photo=>photo.storage_path).filter(Boolean);
+          if(paths.length) {
+            const {error:storageError}=await client.storage.from('personax-memory-photos').remove(paths);
+            if(storageError) throw new Error('相簿檔案尚未清理，這次未刪除對話：'+storageError.message);
+          }
+          if((photos||[]).length) {
+            const {error:photoError}=await client.from('chat_memory_photos').update({deleted_at:deletedAt,status:'deleted'})
+              .eq('owner_id',uid).eq('chat_type','single').eq('session_id',key).is('deleted_at',null);
+            if(photoError) throw new Error('更新相簿刪除狀態失敗：'+photoError.message);
+          }
+          const {error:messageError}=await client.from('chat_messages').update({deleted_at:deletedAt})
+            .eq('session_id',key).is('deleted_at',null);
+          if(messageError) throw new Error('更新這段對話的訊息刪除狀態失敗：'+messageError.message);
+          const {data:row,error:sessionReadError}=await client.from('chat_sessions').select('session_data')
+            .eq('id',key).eq('user_id',uid).is('deleted_at',null).maybeSingle();
+          if(sessionReadError||!row) throw sessionReadError||new Error('讀取對話回憶失敗。');
+          const {error:sessionError}=await client.from('chat_sessions')
+            .update({deleted_at:deletedAt,updated_at:deletedAt,session_data:{...(row.session_data||{}),memories:[]}})
+            .eq('id',key).eq('user_id',uid).is('deleted_at',null);
+          if(sessionError) throw new Error('對話刪除標記寫入資料庫失敗：'+sessionError.message);
         }
         // 本機介面移除；雲端 chat_sessions.deleted_at 保留軟刪除記錄與完整內容。
         delete state.sessions[key];
@@ -6454,11 +6509,20 @@ document.addEventListener('click',async event => {
       case 'resume-archive': {
         const item=state.sessions[key];
         if (!item || !canAccessSessionCharacter(item,sessionCharacter(item))) break;
-        if (!confirm('恢復這段回憶？它會以原檔名回到角色聊天列表。')) break;
-        item.name=uniqueSessionName(item.name || sessionTitle(item),item.id);
+        if (!confirm('恢復這段回憶？目前進行中的對話會先封存，這段歷史將接替聊天列表中的角色項目。')) break;
+        const snapshot=clone(state);
+        const active=Object.values(state.sessions).filter(candidate=>candidate.id!==item.id&&candidate.characterId===item.characterId&&!candidate.archived)
+          .sort((a,b)=>(b.messages?.at(-1)?.at||b.startedAt||0)-(a.messages?.at(-1)?.at||a.startedAt||0))[0];
+        if(active) {
+          active.archivedAt=Date.now();
+          active.name=uniqueSessionName(active.name||newArchiveName(sessionCharacter(active),active),active.id);
+          active.archived=true;
+          if(active.cloudOwned&&hasUserMessage(active)) await saveChatSessionSafely(active);
+        }
+        item.name=uniqueSessionName(item.name||sessionTitle(item),item.id);
         item.archived=false;item.hidden=false;
-        persist();
-        if (hasUserMessage(item)) await saveChatSessionSafely(item);
+        if(!persist()){state=snapshot;break;}
+        if(hasUserMessage(item)) await saveChatSessionSafely(item);
         go({page:'conversation',id:item.id});
         break;
       }
