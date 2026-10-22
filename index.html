@@ -6271,6 +6271,11 @@ document.addEventListener('click',async event => {
       case 'list-menu':openModal('list-menu');break;
       case 'group':go({page:'group'});break;
       case 'session-menu':openModal('session-menu',{id:key});break;
+      case 'group-open-from-menu': {
+        $('modal')?.close();
+        await groupOpen(key);
+        break;
+      }
       case 'group-entry-menu': {
         const group=(groupPrototype.groups||[]).find(item=>item.id===key);
         if(!group) { toast('找不到這個群組，請重新載入清單。'); break; }
