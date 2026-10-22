@@ -4686,7 +4686,7 @@ function renderConversation() {
         <div class="messages" id="messages"></div>
         <form class="composer" data-form="message">
           ${s.suggestions ? `<div class="suggestions">
-            <details class="suggestions-panel">
+            <details class="suggestions-panel" open>
               <summary>建議回覆 <span class="suggestions-count">選擇燈號切換</span></summary>
               <div class="suggestion-options" aria-label="選擇建議回覆">
                 <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="0" aria-label="第 1 則建議" aria-pressed="true"></button>
@@ -4726,9 +4726,8 @@ function renderConversation() {
             </div>
           </div>
           <div class="chat-tools hidden" id="chatTools">
-            <button type="button" data-action="snapshot">📷 快照</button>
-            <button type="button" data-action="suggestions">建議回覆 ${s.suggestions ? 'ON' : 'OFF'}</button>
-            <button type="button" disabled>圖片上傳</button>
+            <button type="button" data-action="snapshot">📷 拍照</button>
+            <button type="button" data-action="suggestions" aria-pressed="${s.suggestions ? 'true' : 'false'}">建議回覆 ${s.suggestions ? 'ON' : 'OFF'}</button>
           </div>
         </form>
       </section>
