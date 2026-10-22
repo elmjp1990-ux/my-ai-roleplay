@@ -4099,8 +4099,17 @@ function renderGroupChatOverlay(kind) {
     return;
   }
   if(kind==='diary'){
-    const rows=(groupPrototype.messages||[]).map(m=>'<article class="memory-item"><strong>'+e(m.speaker||'角色')+'</strong><p style="white-space:pre-wrap;overflow-wrap:anywhere">'+e(m.content||'')+'</p><span class="small muted">'+e(timeText(m.created_at||m.at||Date.now()))+'</span></article>').join('');
-    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="甜蜜日記"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h2>甜蜜日記</h2></div><p class="small muted">目前顯示群組對話紀錄。AI 摘要與長期日記封存尚未串接；此頁不會假裝已完成摘要生成。</p>'+(rows||'<div class="empty">目前還沒有可整理的群組記錄。</div>')+'</section>');
+    const diaryMessages=(groupPrototype.messages||[]).filter(m=>String(m.content||'').trim());
+    const diaryChars=diaryMessages.reduce((total,m)=>total+countChars(m.content||''),0);
+    const capacity=10000;
+    const rows=diaryMessages.map(m=>{
+      const speaker=String(m.speaker||'角色');
+      const stamp=m.created_at||m.at||Date.now();
+      return '<article class="memory-item diary-memory-card"><div class="diary-memory-head"><span class="diary-memory-speaker">'+e(speaker)+'</span><span class="diary-memory-date">'+e(timeText(stamp))+'</span></div><p class="prose diary-memory-text">'+e(m.content||'')+'</p></article>';
+    }).join('');
+    const percent=Math.min(100,diaryChars/capacity*100);
+    const summary='<section class="diary-summary"><div class="diary-summary-head"><div><p class="small muted diary-eyebrow">SWEET DIARY · GROUP STORY</p><h3>把你們共同的故事，好好收藏</h3><p class="small muted">這裡以日記卡片呈現群組對話；AI 摘要與長期日記封存尚未串接。</p></div><div class="diary-count"><strong>'+diaryChars.toLocaleString()+'</strong><span>/ 10,000 字</span></div></div><div class="diary-meter"><span style="width:'+percent+'%"></span></div><p class="small muted diary-hint">每張卡片保留發言角色與時間，方便回顧群組故事。</p></section>';
+    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="甜蜜日記"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h2>甜蜜日記</h2></div>'+summary+(rows||'<div class="empty diary-empty"><strong>你們的故事，正等待被收藏</strong><p>目前還沒有可整理的群組記錄。</p></div>')+'</section>');
     return;
   }
   const members=group.members||[];
