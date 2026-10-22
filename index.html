@@ -6992,7 +6992,12 @@ document.addEventListener('change',async event => {
         }
       }
     }
-    if(target.dataset.groupMemory) {\n      const memories=loadGroupDiaryMemories();\n      const memory=memories.find(item=>item.id===target.dataset.groupMemory);\n      if(memory) {const previous=memory.important;memory.important=target.checked;if(!saveGroupDiaryMemories(memories)){memory.important=previous;target.checked=previous;}else renderGroupConversation();}\n    }\n    if (target.dataset.memory) {
+    if(target.dataset.groupMemory) {
+      const memories=loadGroupDiaryMemories();
+      const memory=memories.find(item=>item.id===target.dataset.groupMemory);
+      if(memory) {const previous=memory.important;memory.important=target.checked;if(!saveGroupDiaryMemories(memories)){memory.important=previous;target.checked=previous;}else renderGroupConversation();}
+    }
+    if (target.dataset.memory) {
       const session=currentSession();
       const m=session?.memories.find(m=>m.id===target.dataset.memory);
       if (m) {
