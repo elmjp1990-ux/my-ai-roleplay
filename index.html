@@ -500,7 +500,7 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
   position:absolute;
   inset:0;
   z-index:-1;
-  background-image:linear-gradient(rgba(0,0,0,.18),rgba(0,0,0,.18)),var(--chat-photo,none);
+  background-image:linear-gradient(rgba(112,118,130,.30),rgba(112,118,130,.30)),var(--chat-photo,none);
   background-size:cover;
   background-position:center;
 }
@@ -553,7 +553,9 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
   display:block;
   font-size:16px;
   font-style:italic;
-  color:var(--muted);
+  color:#fff;
+  text-shadow:0 1px 3px rgba(0,0,0,.96),0 0 7px rgba(0,0,0,.62);
+  -webkit-text-stroke:.12px rgba(0,0,0,.45);
   white-space:pre-wrap;
   overflow-wrap:anywhere;
   line-height:1.85;
@@ -623,8 +625,8 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .composer-input-row { display:flex; align-items:flex-end; }
 .composer-input-row textarea { flex:1; min-width:0; width:100%; resize:none; height:42px; min-height:42px; max-height:120px; font-size:13px; padding:9px 11px; line-height:1.55; overflow-y:auto; }
 .composer-bottom-row { display:flex; align-items:center; gap:7px; margin-top:7px; min-width:0; }
-.composer-bottom-left { display:flex; align-items:center; min-width:0; }
-.composer-bottom-right { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-left:auto; min-width:0; }
+.composer-bottom-left { display:flex; align-items:center; gap:5px; flex:1 1 auto; min-width:0; overflow:hidden; }
+.composer-bottom-right { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-left:0; flex:0 0 auto; min-width:0; }
 .composer-icon-button { width:30px; height:30px; min-width:30px; padding:5px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; background:transparent; border:1px solid var(--border); }
 .composer-icon-button .icon { width:16px; height:16px; }
 .composer-send { width:38px; height:38px; min-width:38px; padding:7px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; }
@@ -633,9 +635,10 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .composer-wallet .wallet-diamond { color:#dcad35; }
 .composer-wallet .wallet-silver { color:var(--muted); }
 .composer-wallet button { padding:0; border:0; background:transparent; font-size:11px; }
-.composer .chat-tools { display:flex; gap:6px; overflow-x:auto; margin-top:7px; padding-bottom:2px; }
+.composer .chat-tools { display:flex; align-items:center; gap:5px; flex:1 1 auto; min-width:0; overflow-x:auto; overflow-y:hidden; margin:0; padding:0 0 2px; scrollbar-width:none; }
+.composer .chat-tools::-webkit-scrollbar { display:none; }
 .composer .chat-tools.hidden { display:none !important; }
-.composer .chat-tools button { white-space:nowrap; font-size:10px; padding:4px 7px; flex-shrink:0; }
+.composer .chat-tools button { white-space:nowrap; font-size:10px; line-height:1.25; padding:5px 7px; flex:0 0 auto; }
 .suggestions { margin-bottom:5px; min-width:0; }
 .suggestions-panel { border:1px solid var(--border); border-radius:10px; background:var(--panel); overflow:hidden; }
 .suggestions-panel > summary { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:30px; padding:5px 9px; cursor:pointer; list-style:none; font-size:11px; font-weight:600; }
@@ -856,8 +859,8 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .suggestion-card { max-height:120px; padding:6px 8px; }
   .suggestion-card-title { font-size:12px; }
   .suggestion-card-action,.suggestion-card-dialogue { font-size:15px; }
-  .chat-tools button { font-size:9px; padding:3px 6px; }
-  .chat-tools { margin-top:4px; }
+  .composer .chat-tools button { font-size:9px; padding:4px 6px; }
+  .chat-tools { margin-top:0; }
   .message-content { max-width:80%; }
   .bubble,.narration { font-size:16px; }
   .comment.reply { margin-left:12px; }
@@ -4129,7 +4132,9 @@ function renderGroupConversation() {
         : (hasSpeaker ? '' : avatar?'<img class="avatar" src="'+e(avatar)+'" alt="">':'<span class="avatar avatar-fallback">'+e(String(who).trim().slice(0,1)||'角')+'</span>');
     const bodyHTML=hasSpeaker
       ? '<div class="roleplay-segments">'+segments.map(roleplaySegmentHTML).join('')+'</div>'
-      : '<div class="message-name">'+e(who)+'</div>'+(isSystem?'<div class="bubble">'+e(displayContent)+'</div>':formatMessage(displayContent));
+      : (!isUser && !isSystem)
+        ? '<div class="roleplay-segments">'+renderCharacterSpeechSegments(displayContent,{name:who,image:member?.avatar_url||member?.image||''})+'</div>'
+        : '<div class="message-name">'+e(who)+'</div>'+(isSystem?'<div class="bubble">'+e(displayContent)+'</div>':formatMessage(displayContent));
     const latestEditableGroupMessage = !isSystem && ['user','character'].includes(m.type) &&
       g.messages.filter(item=>item.type===m.type).at(-1)?.id===m.id;
     const editButton = latestEditableGroupMessage
@@ -4740,12 +4745,13 @@ function renderConversation() {
   if (route.chatOverlay) renderChatOverlay(route.chatOverlay);
 }
 function formatMessage(text) {
-  // PersonaX roleplay action syntax is single-asterisk only: *action*.
-  // Double-asterisk text is ordinary literal content, not an action marker.
+  // Text wrapped in **...** is narration, never a dialogue bubble.
+  // Legacy single-asterisk *...* narration remains supported.
   return String(text).split(/(\*\*[\s\S]*?\*\*|\*(?!\*)[^*\n]+\*(?!\*))/g).filter(Boolean).map(part => {
-    if (part.startsWith('*') && !part.startsWith('**') && part.endsWith('*') && !part.endsWith('**')) {
-      return `<em class="narration">${e(part.slice(1,-1))}</em>`;
-    }
+    const isDoubleNarration = part.startsWith('**') && part.endsWith('**') && part.length >= 4;
+    const isSingleNarration = part.startsWith('*') && !part.startsWith('**') && part.endsWith('*') && !part.endsWith('**');
+    if (isDoubleNarration) return `<em class="narration">${e(part.slice(2,-2))}</em>`;
+    if (isSingleNarration) return `<em class="narration">${e(part.slice(1,-1))}</em>`;
     return part.trim() ? `<div class="bubble">${e(part.trim())}</div>` : '';
   }).join('');
 }
@@ -4813,6 +4819,25 @@ function parseRoleplaySegments(raw, roles = []) {
   flush();
   if (!foundPrefix) return [{kind:'user',speakerName:'',characterId:null,avatar:'',text}];
   return segments.filter(segment => segment.text.trim() || segment.speakerName);
+}
+function renderCharacterSpeechSegments(raw, role = {}) {
+  const name = String(role.name || '角色');
+  const image = role.image || role.avatar_url || '';
+  const avatar = image
+    ? '<img class="avatar" src="' + e(safeImage(image)) + '" alt="">'
+    : '<span class="avatar avatar-fallback">' + e([...name][0] || '角') + '</span>';
+  const parts = String(raw || '').split(/(\*\*[\s\S]*?\*\*|\*(?!\*)[^*\n]+\*(?!\*))/gu).filter(Boolean);
+  return parts.map(part => {
+    const isDoubleNarration = part.startsWith('**') && part.endsWith('**') && part.length >= 4;
+    const isSingleNarration = part.startsWith('*') && !part.startsWith('**') && part.endsWith('*') && !part.endsWith('**');
+    if (isDoubleNarration || isSingleNarration) {
+      const narration = isDoubleNarration ? part.slice(2,-2) : part.slice(1,-1);
+      return '<div class="roleplay-segment is-action"><div class="narration">' + e(narration) + '</div></div>';
+    }
+    return String(part).split(/\n+/u).map(line => line.trim()).filter(Boolean).map(line =>
+      '<div class="roleplay-segment is-character"><div class="roleplay-segment-heading">' + avatar + '<span>' + e(name) + '</span></div>' + formatMessage(line) + '</div>'
+    ).join('');
+  }).join('');
 }
 function roleplaySegmentHTML(segment, options = {}) {
   const name = segment.kind === 'user' ? (currentUser()?.nickname || '你') : segment.speakerName;
