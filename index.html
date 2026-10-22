@@ -3874,7 +3874,11 @@ async function groupOpen(groupId) {
       return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user' && m.content===GROUP_CONTINUE_SENTINEL ? '' : m.content,createdAt:m.created_at};
     });
     g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,memoryPhotos,scenes,members};
-    g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;ensureGroupDiaryMemories();g.formError='';
+    g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;
+    try { await syncGroupDiaryCloud(group.id); }
+    catch(syncError) { console.error('群組甜蜜日記雲端同步載入失敗：',syncError);toast('群組日記雲端同步暫時失敗，已保留本機資料；請檢查網路後重試。'); }
+    if(requestId!==g.openRequestId)return;
+    ensureGroupDiaryMemories();g.formError='';
     g.loading=false;g.openError='';g.failedGroupId=null;g.groupsLoaded=false;
     render();
     void groupLoadList(true);
@@ -4089,13 +4093,81 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
 function groupDiaryStorageKey(groupId=groupPrototype.active?.id) {
   const uid=currentUser()?.uid||'guest';return 'personax-group-diary-v1:'+uid+':'+String(groupId||'');
 }
+function readGroupDiaryLocalRecord(groupId) {
+  try {const value=JSON.parse(localStorage.getItem(groupDiaryStorageKey(groupId))||'{}');return {memories:Array.isArray(value.memories)?value.memories:[],updatedAt:Number(value.updatedAt)||0};}
+  catch(_){return {memories:[],updatedAt:0};}
+}
+function writeGroupDiaryLocalRecord(groupId,memories,updatedAt=Date.now()) {
+  localStorage.setItem(groupDiaryStorageKey(groupId),JSON.stringify({memories,updatedAt}));
+}
 function loadGroupDiaryMemories(groupId=groupPrototype.active?.id) {
   if(!groupId)return [];
-  try {const value=JSON.parse(localStorage.getItem(groupDiaryStorageKey(groupId))||'{}');return Array.isArray(value.memories)?value.memories:[];}catch(_){return [];}
+  return readGroupDiaryLocalRecord(groupId).memories;
+}
+const groupDiaryCloudReady=new Map();
+const groupDiaryCloudSaveTimers=new Map();
+const groupDiaryCloudSaveChains=new Map();
+async function syncGroupDiaryCloud(groupId) {
+  const client=window.mySupabase,uid=currentUser()?.uid;
+  if(!client||!groupId||!uid)throw new Error('登入後才能同步群組甜蜜日記。');
+  const {data:{user},error:authError}=await client.auth.getUser();
+  if(authError||!user||user.id!==uid)throw new Error('登入狀態已失效，請重新登入後同步日記。');
+  const local=readGroupDiaryLocalRecord(groupId);
+  const {data:cloud,error}=await client.from('chat_group_diary')
+    .select('group_id,owner_id,memories,updated_at').eq('group_id',groupId).maybeSingle();
+  if(error)throw error;
+  if(cloud) {
+    const cloudUpdatedAt=Date.parse(cloud.updated_at)||0;
+    // Preserve a newer local edit (for example, one made while temporarily offline);
+    // otherwise hydrate this device from the cloud copy.
+    if(local.updatedAt>cloudUpdatedAt && local.memories.length) {
+      await saveGroupDiaryCloudNow(groupId,local.memories,local.updatedAt,uid);
+    } else {
+      writeGroupDiaryLocalRecord(groupId,Array.isArray(cloud.memories)?cloud.memories:[],cloudUpdatedAt||Date.now());
+    }
+  } else {
+    // First device to open an existing group migrates its local diary to the cloud.
+    await saveGroupDiaryCloudNow(groupId,local.memories,local.updatedAt||Date.now(),uid);
+  }
+  groupDiaryCloudReady.set(groupId,true);
+  return loadGroupDiaryMemories(groupId);
+}
+async function saveGroupDiaryCloudNow(groupId,memories,updatedAt,uid=currentUser()?.uid) {
+  const client=window.mySupabase;
+  if(!client||!uid)throw new Error('登入後才能同步群組甜蜜日記。');
+  const {error}=await client.from('chat_group_diary').upsert({
+    group_id:groupId,owner_id:uid,memories,updated_at:new Date(Math.max(Number(updatedAt)||Date.now(),Date.now())).toISOString()
+  },{onConflict:'group_id'});
+  if(error)throw error;
+}
+function queueGroupDiaryCloudSave(groupId) {
+  const oldTimer=groupDiaryCloudSaveTimers.get(groupId);
+  if(oldTimer)clearTimeout(oldTimer);
+  const timer=setTimeout(()=>{
+    groupDiaryCloudSaveTimers.delete(groupId);
+    const previous=groupDiaryCloudSaveChains.get(groupId)||Promise.resolve();
+    const next=previous.catch(()=>{}).then(async()=>{
+      const uid=currentUser()?.uid;
+      if(!uid||!window.mySupabase)throw new Error('登入後才能同步群組甜蜜日記。');
+      if(!groupDiaryCloudReady.get(groupId))await syncGroupDiaryCloud(groupId);
+      const local=readGroupDiaryLocalRecord(groupId);
+      await saveGroupDiaryCloudNow(groupId,local.memories,local.updatedAt,uid);
+      writeGroupDiaryLocalRecord(groupId,local.memories,Date.now());
+    }).catch(error=>{
+      console.error('群組甜蜜日記雲端同步失敗：',error);
+      toast('日記已保存在此裝置，但雲端同步失敗；請確認網路後重新開啟群組重試。');
+    });
+    groupDiaryCloudSaveChains.set(groupId,next);
+  },350);
+  groupDiaryCloudSaveTimers.set(groupId,timer);
 }
 function saveGroupDiaryMemories(memories,groupId=groupPrototype.active?.id) {
   if(!groupId)return false;
-  try {localStorage.setItem(groupDiaryStorageKey(groupId),JSON.stringify({memories,updatedAt:Date.now()}));return true;}catch(_){toast('群組甜蜜日記儲存失敗，請檢查瀏覽器儲存空間。');return false;}
+  try {
+    writeGroupDiaryLocalRecord(groupId,memories,Date.now());
+    queueGroupDiaryCloudSave(groupId);
+    return true;
+  } catch(_){toast('群組甜蜜日記儲存失敗，請檢查瀏覽器儲存空間。');return false;}
 }
 function ensureGroupDiaryMemories() {
   const group=groupPrototype.active;if(!group?.id)return [];
