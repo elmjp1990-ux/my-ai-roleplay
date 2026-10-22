@@ -4165,6 +4165,56 @@ function renderGroupConversation() {
         </div>
         <div class="messages" id="groupMessages">${messageRows}</div>
         <form class="composer" data-form="group-message">
+          ${s.suggestions ? `<div class="suggestions">
+            <details class="suggestions-panel" open>
+              <summary>建議回覆 <span class="suggestions-count">選擇燈號切換</span></summary>
+              <div class="suggestion-options" aria-label="選擇建議回覆">
+                <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="0" aria-label="第 1 則建議" aria-pressed="true"></button>
+                <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="1" aria-label="第 2 則建議" aria-pressed="false"></button>
+                <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="2" aria-label="第 3 則建議" aria-pressed="false"></button>
+              </div>
+              <button type="button" class="suggestion-card active" data-action="suggestion" data-index="0" data-text="${e('我先是微微一怔，隨後放下手邊的事情，仔細端詳你的神情，像是想從你的表情裡猜出真正的心思。\n\n「你今天看起來有點不一樣，是發生什麼事了嗎？如果你願意，我可以好好聽你說。」')}">
+                <span class="suggestion-card-title">① 溫柔關心</span>
+                <span class="suggestion-card-action">我先是微微一怔，隨後放下手邊的事情，仔細端詳你的神情，像是想從你的表情裡猜出真正的心思。</span>
+                <span class="suggestion-card-dialogue">「你今天看起來有點不一樣，是發生什麼事了嗎？如果你願意，我可以好好聽你說。」</span>
+              </button>
+              <button type="button" class="suggestion-card" data-action="suggestion" data-index="1" data-text="${e('我挑了挑眉，故意往你面前靠近半步，嘴角揚起一抹藏不住的笑，語氣裡帶著一點逗弄。\n\n「突然這麼主動來找我？先讓我猜猜看……你是有事拜託我，還是單純想我了？」')}">
+                <span class="suggestion-card-title">② 俏皮逗弄</span>
+                <span class="suggestion-card-action">我挑了挑眉，故意往你面前靠近半步，嘴角揚起一抹藏不住的笑，語氣裡帶著一點逗弄。</span>
+                <span class="suggestion-card-dialogue">「突然這麼主動來找我？先讓我猜猜看……你是有事拜託我，還是單純想我了？」</span>
+              </button>
+              <button type="button" class="suggestion-card" data-action="suggestion" data-index="2" data-text="${e('我收起原本輕鬆的神情，安靜地看著你，指尖不自覺地收緊，似乎猶豫了片刻才終於決定坦白。\n\n「其實有件事我一直想告訴你，只是不確定你會怎麼想。你願意聽我說完嗎？」')}">
+                <span class="suggestion-card-title">③ 坦率表達</span>
+                <span class="suggestion-card-action">我收起原本輕鬆的神情，安靜地看著你，指尖不自覺地收緊，似乎猶豫了片刻才終於決定坦白。</span>
+                <span class="suggestion-card-dialogue">「其實有件事我一直想告訴你，只是不確定你會怎麼想。你願意聽我說完嗎？」</span>
+              </button>
+            </details>
+          </div>` : ''}
+          ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
+            <details class="suggestions-panel" open>
+              <summary>建議回覆 <span class="suggestions-count">點選建議帶入輸入框</span></summary>
+              <div class="suggestion-options" aria-label="選擇建議回覆">
+                <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="0" aria-label="第 1 則建議" aria-pressed="true"></button>
+                <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="1" aria-label="第 2 則建議" aria-pressed="false"></button>
+                <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="2" aria-label="第 3 則建議" aria-pressed="false"></button>
+              </div>
+              <button type="button" class="suggestion-card active" data-action="suggestion" data-index="0" data-text="${e('我先是微微一怔，隨後放下手邊的事情，仔細端詳你的神情，像是想從你的表情裡猜出真正的心思。\n\n「今天大家看起來都有話想說，不如慢慢來，我們一個一個聽。」')}">
+                <span class="suggestion-card-title">① 溫柔關心</span>
+                <span class="suggestion-card-action">我先是微微一怔，隨後放下手邊的事情，仔細端詳你的神情，像是想從你的表情裡猜出真正的心思。</span>
+                <span class="suggestion-card-dialogue">「今天大家看起來都有話想說，不如慢慢來，我們一個一個聽。」</span>
+              </button>
+              <button type="button" class="suggestion-card" data-action="suggestion" data-index="1" data-text="${e('我挑了挑眉，看看在場的每個人，嘴角揚起一抹藏不住的笑。\n\n「怎麼，今天是打算一起來考驗我嗎？」')}">
+                <span class="suggestion-card-title">② 活潑互動</span>
+                <span class="suggestion-card-action">我挑了挑眉，看看在場的每個人，嘴角揚起一抹藏不住的笑。</span>
+                <span class="suggestion-card-dialogue">「怎麼，今天是打算一起來考驗我嗎？」</span>
+              </button>
+              <button type="button" class="suggestion-card" data-action="suggestion" data-index="2" data-text="${e('我安靜地看著大家，放柔聲音開口。\n\n「不用急著回答，可以一個一個慢慢說，我會好好聽。」')}">
+                <span class="suggestion-card-title">③ 溫柔陪伴</span>
+                <span class="suggestion-card-action">我安靜地看著大家，放柔聲音開口。</span>
+                <span class="suggestion-card-dialogue">「不用急著回答，可以一個一個慢慢說，我會好好聽。」</span>
+              </button>
+            </details>
+          </div>` : ''}
           <div class="composer-input-row">
             <textarea id="groupMessageInput" name="text" maxlength="1000" rows="1" placeholder="留空發送，角色會繼續說下去" aria-label="輸入群組訊息" ${g.sending?'disabled':''}>${e(g.pendingRequest?.groupId===group.id && g.pendingRequest.content!==GROUP_CONTINUE_SENTINEL?g.pendingRequest.content:'')}</textarea>
           </div>
@@ -4173,9 +4223,7 @@ function renderGroupConversation() {
               <button type="button" class="composer-icon-button" data-action="toggle-chat-tools" aria-label="展開聊天功能" aria-expanded="false" title="更多功能">${ICON.plus}</button>
               <div class="chat-tools hidden" id="groupChatTools">
                 <button type="button" data-action="snapshot">📷 拍照／快照</button>
-                <button type="button" data-action="suggestion" data-text="${e('我先是微微一怔，隨後放下手邊的事情，仔細端詳大家的神情，像是想從你們的表情裡猜出真正的心思。\n\n「今天大家看起來都有話想說，不如慢慢來，我們一個一個聽。」')}">建議：溫柔</button>
-                <button type="button" data-action="suggestion" data-text="${e('我挑了挑眉，看看在場的每個人，嘴角揚起一抹藏不住的笑。\n\n「怎麼，今天是打算一起來考驗我嗎？」')}">建議：逗弄</button>
-                <button type="button" data-action="suggestion" data-text="${e('我安靜地看著大家，放柔聲音開口。\n\n「不用急著回答，可以一個一個慢慢說，我會好好聽。」')}">建議：陪伴</button>
+                <button type="button" data-action="suggestions" aria-pressed="${groupPrototype.active?.suggestions !== false ? 'true' : 'false'}">建議回覆 ${groupPrototype.active?.suggestions !== false ? 'ON' : 'OFF'}</button>
                 <button type="button" data-action="group-info">群組資訊</button>
                 <button type="button" data-action="group-archive" data-id="${e(group.id)}">群組管理</button>
               </div>
@@ -4701,9 +4749,7 @@ function renderConversation() {
               <button type="button" class="composer-icon-button" data-action="toggle-chat-tools" aria-label="展開聊天功能" aria-expanded="false" title="更多功能">${ICON.plus}</button>
               <div class="chat-tools hidden" id="chatTools">
                 <button type="button" data-action="snapshot">📷 拍照／快照</button>
-                <button type="button" data-action="suggestion" data-text="${e('我先是微微一怔，隨後放下手邊的事情，仔細端詳你的神情，像是想從你的表情裡猜出真正的心思。\n\n「你今天看起來有點不一樣，是發生什麼事了嗎？如果你願意，我可以好好聽你說。」')}">建議：溫柔</button>
-                <button type="button" data-action="suggestion" data-text="${e('我挑了挑眉，故意往你面前靠近半步，嘴角揚起一抹藏不住的笑，語氣裡帶著一點逗弄。\n\n「突然這麼主動來找我？先讓我猜猜看……你是有事拜託我，還是單純想我了？」')}">建議：逗弄</button>
-                <button type="button" data-action="suggestion" data-text="${e('我安靜地看著你，先替你留出一點思考的時間，才放柔聲音開口。\n\n「不用急著回答我。你可以慢慢說，我會在這裡陪著你。」')}">建議：陪伴</button>
+                <button type="button" data-action="suggestions" aria-pressed="${s.suggestions ? 'true' : 'false'}">建議回覆 ${s.suggestions ? 'ON' : 'OFF'}</button>
               </div>
             </div>
             <div class="composer-bottom-right">
@@ -6473,10 +6519,24 @@ document.addEventListener('click',async event => {
         }
         break;
       }
-      case 'suggestions':
+      case 'suggestions': {
+        if (route.page === 'group' && groupPrototype.active) {
+          const groupInput = $('groupMessageInput');
+          const typed = String(groupInput?.value || '');
+          groupPrototype.active.suggestions = groupPrototype.active.suggestions === false;
+          render();
+          const nextInput = $('groupMessageInput');
+          if (nextInput) {
+            nextInput.value = typed;
+            nextInput.style.height = 'auto';
+            nextInput.style.height = Math.min(nextInput.scrollHeight,144)+'px';
+          }
+          break;
+        }
         if (!s) break;
         captureDraft();s.suggestions=!s.suggestions;
         persist();render();break;
+      }
       case 'toggle-chat-tools': {
         const toolsPanel=$('chatTools') || $('groupChatTools');
         const toggle=$('view').querySelector('[data-action="toggle-chat-tools"]');
