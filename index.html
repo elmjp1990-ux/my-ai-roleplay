@@ -1442,6 +1442,7 @@ const ids = (rows || []).map(row => row.id);
   async function saveSupabaseCharacter(character, expectedUserId) {
     const client = window.mySupabase;
     if (!client || !expectedUserId) throw new Error('請先使用 Google 帳號登入，再儲存角色。');
+    character.tags = validateCharacterTags(Array.isArray(character.tags) ? character.tags : []);
 
     const { data: authResult, error: authError } = await client.auth.getUser();
     if (authError || authResult?.user?.id !== expectedUserId) {
@@ -2469,6 +2470,21 @@ function safeImage(value) {
 function tagButton(tag) {
   return `<button class="tag" data-action="tag" data-tag="${e(tag)}">#${e(tag)}</button>`;
 }
+function draftTagButton(tag) {
+  return `<button type="button" class="tag" data-action="remove-draft-tag" data-tag="${e(tag)}" aria-label="移除標籤 ${e(tag)}">#${e(tag)} ×</button>`;
+}
+function validCharacterTag(value) {
+  const tag = String(value ?? '').trim();
+  return countChars(tag) >= 2 && countChars(tag) <= 10;
+}
+function validateCharacterTags(tags) {
+  if (!Array.isArray(tags)) throw new Error('請使用自訂標籤。');
+  if (tags.length > 5) throw new Error('角色最多新增5個標籤。');
+  const normalized = tags.map(tag => String(tag ?? '').trim());
+  if (normalized.some(tag => !validCharacterTag(tag))) throw new Error('每個標籤需為2–10個字。');
+  if (new Set(normalized).size !== normalized.length) throw new Error('標籤不可重複。');
+  return normalized;
+}
 function environment() {
   return `<button class="environment" data-action="environment">
     測試環境，非正式網頁
@@ -3381,7 +3397,7 @@ function renderEditor() {
         </select></label>
         <div class="field"><span>標籤，最多5個</span>
           <button type="button" data-action="tags" data-mode="character">添加標籤</button>
-          <div id="formTags" class="row wrap" style="margin-top:10px">${draftTags.map(tagButton).join('')}</div>
+          <div id="formTags" class="row wrap" style="margin-top:10px">${draftTags.map(draftTagButton).join('')}</div>
         </div>
         <label class="check"><input name="rightsConfirmed" type="checkbox" required ${c.rightsConfirmed === true ? 'checked' : ''}>
           <span>我確認角色沒有侵犯智慧財產權、形象或其他任何權利。</span></label>
@@ -3402,7 +3418,7 @@ function renderAI() {
         <textarea name="outline" required maxlength="10000" placeholder="描寫背景、人物與故事走向…"></textarea>
       </label>
       <button type="button" data-action="tags" data-mode="character">添加標籤</button>
-      <div id="formTags" class="row wrap" style="margin-top:10px">${draftTags.map(tagButton).join('')}</div>
+      <div id="formTags" class="row wrap" style="margin-top:10px">${draftTags.map(draftTagButton).join('')}</div>
       <label class="check" style="margin-top:18px">
         <input id="aiImages" type="checkbox">同時生成圖片
       </label>
@@ -5207,17 +5223,31 @@ function renderModal(o) {
       break;
       break;
     case 'tags':
-      showDialog('選擇標籤',`
-        <form data-form="tags">
-          <p class="muted small">${o.mode === 'explore' ? '角色需包含全部勾選標籤。' : '最多選擇5個標籤。'}</p>
-          <div class="two-col">
-            ${TAGS.map(t => `<label class="check">
-              <input type="checkbox" name="tag" value="${e(t)}"
-                ${(o.mode === 'explore' ? exploreTags : draftTags).includes(t) ? 'checked' : ''}>
-              ${e(t)}</label>`).join('')}
-          </div>
-          <button class="primary" style="margin-top:20px">套用</button>
-        </form>`);
+      if (o.mode === 'explore') {
+        showDialog('選擇標籤',`
+          <form data-form="tags">
+            <p class="muted small">探索篩選可選擇現有分類，角色需包含全部勾選標籤。</p>
+            <div class="two-col">
+              ${TAGS.map(t => `<label class="check">
+                <input type="checkbox" name="tag" value="${e(t)}" ${exploreTags.includes(t) ? 'checked' : ''}>
+                ${e(t)}</label>`).join('')}
+            </div>
+            <button class="primary" style="margin-top:20px">套用</button>
+          </form>`);
+      } else {
+        showDialog('自訂角色標籤',`
+          <form data-form="tags">
+            <p class="muted small">自行輸入標籤，每個2–10個字，最多5個；不再提供預設標籤。</p>
+            <label class="field"><span>新增標籤</span><div class="row">
+              <input name="tagInput" maxlength="30" placeholder="例如：慢熱治癒、嘴硬心軟" autocomplete="off">
+              <button type="button" data-action="add-custom-tag">新增</button>
+            </div></label>
+            <div id="customTagList" class="stack" style="gap:8px">
+              ${draftTags.map(t => `<label class="check"><input type="checkbox" name="tag" value="${e(t)}" checked> ${e(t)}</label>`).join('') || '<p class="small muted">尚未新增標籤。</p>'}
+            </div>
+            <button class="primary" style="margin-top:20px">套用</button>
+          </form>`);
+      }
       break;
     case 'delete-character':
       showDialog('刪除角色',`
@@ -5943,6 +5973,31 @@ document.addEventListener('click',async event => {
       case 'load-more':limit=Math.min(150,limit+24);renderGrid();break;
       case 'new-batch':batch+=7;limit=24;renderGrid();break;
       case 'tags':openModal('tags',{mode:button.dataset.mode});break;
+      case 'add-custom-tag': {
+        const input=$('modal').querySelector('input[name="tagInput"]');
+        const list=$('modal').querySelector('#customTagList');
+        if (!input || !list) break;
+        const value=String(input.value || '').trim();
+        if (!validCharacterTag(value)) { toast('每個標籤需為2–10個字。'); input.focus(); break; }
+        const checked=[...list.querySelectorAll('input[name="tag"]:checked')].map(item=>item.value);
+        if (checked.length>=5) { toast('角色最多新增5個標籤。'); break; }
+        if (checked.includes(value)) { toast('這個標籤已存在。'); input.focus(); break; }
+        const empty=list.querySelector('p');
+        if (empty) empty.remove();
+        const label=document.createElement('label');
+        label.className='check';
+        label.innerHTML='<input type="checkbox" name="tag" checked value="' + e(value) + '"> ' + e(value);
+        list.appendChild(label);
+        input.value='';input.focus();
+        break;
+      }
+      case 'remove-draft-tag': {
+        const index=draftTags.indexOf(key);
+        if (index>=0) draftTags.splice(index,1);
+        if (route.page==='editor') renderEditor();
+        else if (route.page==='ai') renderAI();
+        break;
+      }
       case 'new-character':draftCharacter=null;draftTags=[];draftImage='';visit('editor');break;
       case 'edit-character': {
         const c = state.characters.find(c => c.id === key);
@@ -6534,6 +6589,8 @@ document.addEventListener('submit',async event => {
         if (!intro || !opening) return toast('介紹與開場白不能留空。');
         const old=state.characters.find(c=>c.id===route.id);
         if (old && !owned(old)) return;
+        try { draftTags=validateCharacterTags(draftTags); }
+        catch (error) { return toast(error.message); }
         const c={
           id:old?.id || id(),name,
           gender:String(f.get('gender')),age:String(f.get('age')).trim(),
@@ -6564,6 +6621,8 @@ document.addEventListener('submit',async event => {
         const outline=String(f.get('outline')).trim();
         if (!validName(name)) return toast('角色名稱不符合規則。'+NAME_HELP);
         if (!outline) return toast('請輸入故事大綱。');
+        try { draftTags=validateCharacterTags(draftTags); }
+        catch (error) { return toast(error.message); }
         if (!confirm('AI尚未串接，這次只建立可編輯草稿，不生成圖片、不扣鑽石。繼續嗎？')) return;
         state.characters.unshift({
           id:id(),name,gender:'ambiguous',age:'',race:'',
@@ -6577,14 +6636,14 @@ document.addEventListener('submit',async event => {
         persist();go({page:'create'});break;
       }
       case 'tags': {
-        const chosen=f.getAll('tag');
-        if (o.mode!=='explore' && chosen.length>5) return toast('最多選擇5個標籤。');
+        const chosen=f.getAll('tag').map(value => String(value).trim());
         if (o.mode==='explore') {
           exploreTags=chosen;
           state.preferences=[...new Set([...state.preferences,...chosen])];
           persist();
         } else {
-          draftTags=chosen;
+          try { draftTags=validateCharacterTags(chosen); }
+          catch (error) { return toast(error.message); }
           if (route.page==='editor') {
             const live=$('view').querySelector('form[data-form="character"]');
             if (live) {
