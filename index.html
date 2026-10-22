@@ -6320,30 +6320,17 @@ document.addEventListener('click',async event => {
         if (!confirm('確定刪除此對話與回憶，操作後無法復原哦')) break;
         const uid=currentUser()?.uid;
         if (item.cloudOwned && uid && item.cloudOwnerUid === uid && window.mySupabase) {
-          const client=window.mySupabase,deletedAt=new Date().toISOString();
-          const {data:photos,error:photoReadError}=await client.from('chat_memory_photos').select('id,storage_path')
-            .eq('owner_id',uid).eq('chat_type','single').eq('session_id',key).is('deleted_at',null);
-          if(photoReadError) throw new Error('讀取這段對話的相簿資料失敗：'+photoReadError.message);
-          const paths=(photos||[]).map(photo=>photo.storage_path).filter(Boolean);
+          const client=window.mySupabase;
+          const {data:removedPaths,error:deleteError}=await client.rpc('delete_chat_session_content',{p_session_id:key});
+          if(deleteError) throw new Error('對話與回憶刪除失敗：'+deleteError.message);
+          const paths=(removedPaths||[]).map(photo=>photo.storage_path).filter(Boolean);
           if(paths.length) {
             const {error:storageError}=await client.storage.from('personax-memory-photos').remove(paths);
-            if(storageError) throw new Error('相簿檔案尚未清理，這次未刪除對話：'+storageError.message);
+            if(storageError) {
+              console.error('對話內容已刪除，但部分相片檔案清理失敗',storageError.message);
+              toast('對話文字、日記與相簿紀錄已刪除；部分相片檔案清理失敗，需後續補清。');
+            }
           }
-          if((photos||[]).length) {
-            const {error:photoError}=await client.from('chat_memory_photos').update({deleted_at:deletedAt,status:'deleted'})
-              .eq('owner_id',uid).eq('chat_type','single').eq('session_id',key).is('deleted_at',null);
-            if(photoError) throw new Error('更新相簿刪除狀態失敗：'+photoError.message);
-          }
-          const {error:messageError}=await client.from('chat_messages').update({deleted_at:deletedAt})
-            .eq('session_id',key).is('deleted_at',null);
-          if(messageError) throw new Error('更新這段對話的訊息刪除狀態失敗：'+messageError.message);
-          const {data:row,error:sessionReadError}=await client.from('chat_sessions').select('session_data')
-            .eq('id',key).eq('user_id',uid).is('deleted_at',null).maybeSingle();
-          if(sessionReadError||!row) throw sessionReadError||new Error('讀取對話回憶失敗。');
-          const {error:sessionError}=await client.from('chat_sessions')
-            .update({deleted_at:deletedAt,updated_at:deletedAt,session_data:{...(row.session_data||{}),memories:[]}})
-            .eq('id',key).eq('user_id',uid).is('deleted_at',null);
-          if(sessionError) throw new Error('對話刪除標記寫入資料庫失敗：'+sessionError.message);
         }
         // 本機介面移除；雲端 chat_sessions.deleted_at 保留軟刪除記錄與完整內容。
         delete state.sessions[key];
