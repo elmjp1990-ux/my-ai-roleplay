@@ -141,7 +141,9 @@ body.day .tag { color:#4f46b8; }
 .field > span { display:block; font-weight:600; margin-bottom:8px; }
 .field small { display:block; color:var(--muted); margin-top:6px; line-height:1.7; }
 .tag-picker-search-field{margin-bottom:12px}
-.tag-picker-search-field input{width:100%;padding:12px 14px}
+.tag-picker-input-row{display:flex;align-items:center;gap:8px}
+.tag-picker-input-row input{width:100%;min-width:0;flex:1;padding:12px 14px}
+.tag-picker-input-row .tag-picker-add{flex:0 0 auto;font-size:11px;padding:8px 10px}
 .tag-picker-search-field small{font-size:11px;margin-top:4px}
 .tag-picker-chips{display:flex;flex-wrap:wrap;gap:8px;min-height:28px}
 .tag-picker-chip,.tag-picker-add{font-size:12px;padding:7px 11px;border-radius:9px;background:var(--panel2);border:1px solid var(--border);line-height:1.3}
@@ -5284,7 +5286,10 @@ function renderModal(o) {
         showDialog('角色標籤',`
           <form data-form="tags" class="tag-picker">
             <label class="field tag-picker-search-field">
-              <input name="tagSearch" type="search" maxlength="10" placeholder="輸入標籤關鍵字，例如：愛" autocomplete="off" aria-label="搜尋或新增角色標籤">
+              <div class="tag-picker-input-row">
+                <input name="tagSearch" type="search" maxlength="10" placeholder="輸入標籤關鍵字，例如：愛" autocomplete="off" aria-label="搜尋或新增角色標籤">
+                <button type="button" class="tag-picker-add" data-action="add-custom-tag" hidden>新增</button>
+              </div>
               <small>最多10字</small>
             </label>
             <div id="customTagResults" class="tag-picker-chips" aria-live="polite"></div>
@@ -5706,18 +5711,20 @@ function refreshCustomTagPicker() {
   const checkboxes=[...options.querySelectorAll('input[name="tag"]')];
   const matches=checkboxes.filter(item=>!query||item.value.toLocaleLowerCase('zh-Hant').includes(query));
   results.innerHTML=matches.map(item=>`<button type="button" class="tag-picker-chip ${item.checked?'selected':''}" data-action="toggle-custom-tag" data-tag="${e(item.value)}" aria-pressed="${item.checked}">${e(item.value)}${item.checked?' ✓':''}</button>`).join('');
-  if(!matches.length && validCharacterTag(input.value)) {
-    results.innerHTML='<button type="button" class="tag-picker-add" data-action="add-custom-tag">＋ 新增「'+e(String(input.value).trim())+'」</button>';
-  } else if(!matches.length && !query) {
+  if(!matches.length && !query) {
     results.innerHTML='<p class="small muted">尚無可用標籤，輸入至少2字即可新增。</p>';
   } else if(!matches.length) {
-    results.innerHTML='<p class="small muted">沒有符合的標籤。</p>';
+    results.innerHTML='<p class="small muted">沒有符合的標籤，可新增這個標籤。</p>';
   }
   const chosen=checkboxes.filter(item=>item.checked);
   count.textContent='['+chosen.length+'/5]';
   selectedArea.innerHTML=chosen.map(item=>`<button type="button" class="tag-picker-chip selected" data-action="toggle-custom-tag" data-tag="${e(item.value)}" aria-label="取消選擇 ${e(item.value)}">${e(item.value)} ×</button>`).join('') || '<span class="small muted">尚未選擇標籤</span>';
   const addButton=modal.querySelector('[data-action="add-custom-tag"]');
-  if(addButton) addButton.hidden=!(validCharacterTag(input.value)&&matches.length===0);
+  if(addButton) {
+    addButton.hidden=!(validCharacterTag(input.value)&&matches.length===0);
+    addButton.textContent='新增';
+    addButton.setAttribute('aria-label','新增標籤 '+String(input.value||'').trim());
+  }
 }
 document.addEventListener('input', event => {
   const input=event.target;
