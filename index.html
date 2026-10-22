@@ -2874,10 +2874,10 @@ function card(c,owner = false) {
                 aria-label="查看${e(c.name)}">
           <img src="${e(safeImage(c.image))}" alt="${e(c.name)}" loading="lazy">
         </button>
-        <span class="card-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(initialTurnCount)}" title="對話回合數">
+        ${c.deletedAt ? '' : `<span class="card-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(initialTurnCount)}" title="對話回合數">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
           <span>${e(initialTurnCount)}</span>
-        </span>
+        </span>`}
         <button class="heart ${favorite ? 'on' : ''}" data-action="favorite"
                 data-id="${e(c.id)}" aria-label="切換喜愛角色"
                 aria-pressed="${favorite}">♥</button>
@@ -2974,10 +2974,10 @@ function renderDetail() {
           <div class="detail-portrait-meta">
             <h1>${e(c.name)}</h1>
             <button class="author-link" data-action="author" data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>
-            <div class="detail-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(c.chats || 0)}" title="對話回合數">
+            ${c.deletedAt ? '' : `<div class="detail-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(c.chats || 0)}" title="對話回合數">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
               <span>${e(c.chats || 0)}</span>
-            </div>
+            </div>`}
           </div>
         </div>
         <section class="panel stack">
@@ -3046,6 +3046,14 @@ async function loadCharacterTurnCounts(characterIds, forceRefresh = false) {
       characterTurnCountCache.set(row.character_id,count);
       updateCharacterTurnCountElements(row.character_id,count);
     }
+    // A successful RPC omits private characters not owned by this caller and all deleted
+    // characters. Clear stale cached numbers and hide their count badges instead of showing 0.
+    const returnedIds = new Set(data.filter(row => isUuid(row.character_id)).map(row => row.character_id));
+    for (const id of ids) {
+      if (returnedIds.has(id)) continue;
+      characterTurnCountCache.delete(id);
+      updateCharacterTurnCountElements(id,null);
+    }
   })();
   ids.forEach(id => characterTurnCountRequests.set(id,request));
   try {
@@ -3060,6 +3068,13 @@ async function loadCharacterTurnCounts(characterIds, forceRefresh = false) {
 function updateCharacterTurnCountElements(characterId,count) {
   document.querySelectorAll('[data-character-turn-count]').forEach(element => {
     if (element.dataset.characterTurnCount !== characterId) return;
+    if (count === null || count === undefined) {
+      element.style.display = 'none';
+      element.removeAttribute('aria-label');
+      element.removeAttribute('title');
+      return;
+    }
+    element.style.display = '';
     const number = element.querySelector('span');
     const formatted = count.toLocaleString('zh-TW');
     if (number && number.textContent !== formatted) number.textContent = formatted;
