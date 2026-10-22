@@ -1228,7 +1228,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       const ids = (rows || []).map(row => row.id);
       const authorIds = [...new Set((rows || []).map(row => row.author_id).filter(Boolean))];
       if (authorIds.length) {
-        const profileResult = await client.from('profiles')
+        const profileResult = await client.from('public_profiles')
           .select('id, handle, nickname, avatar_url, bio, follower_count')
           .in('id', authorIds);
         if (profileResult.error) {
@@ -1359,7 +1359,7 @@ const ids = (rows || []).map(row => row.id);
       // 私密角色不會經過公開角色載入器；在作者自己的角色載入流程也補齊作者 profile。
       const authorIds = [...new Set((rows || []).map(row => row.author_id).filter(Boolean))];
       if (authorIds.length) {
-        const profileResult = await client.from('profiles')
+        const profileResult = await client.from('public_profiles')
           .select('id, handle, nickname, avatar_url, bio, follower_count')
           .in('id', authorIds);
         if (profileResult.error) {
@@ -2157,7 +2157,7 @@ async function loadCloudChatSessions(user) {
         ? row.character_snapshot.authorId : null)
       .filter(Boolean))];
     if (snapshotAuthorIds.length) {
-      const profileResult = await client.from('profiles')
+      const profileResult = await client.from('public_profiles')
         .select('id, handle, nickname, avatar_url, bio, follower_count')
         .in('id', snapshotAuthorIds);
       // 帳號可能在 profiles 查詢等待期間切換；舊帳號請求不得再寫入目前畫面狀態。
@@ -3120,7 +3120,7 @@ async function refreshAuthorFollowState(authorId) {
     const [followResult, profileResult] = await Promise.all([
       client.from('author_follows').select('author_id')
         .eq('follower_id', user.uid).eq('author_id', authorId).maybeSingle(),
-      client.from('profiles').select('follower_count').eq('id', authorId).maybeSingle()
+      client.from('public_profiles').select('follower_count').eq('id', authorId).maybeSingle()
     ]);
     if (followResult.error) throw followResult.error;
     if (profileResult.error) throw profileResult.error;
@@ -3197,7 +3197,7 @@ async function renderFollowedAuthors() {
       state.following = authorIds;
       if (authorIds.length) {
         const {data: profiles, error: profilesError} = await client
-          .from('profiles').select('id, handle, nickname, avatar_url, bio, follower_count')
+          .from('public_profiles').select('id, handle, nickname, avatar_url, bio, follower_count')
           .in('id', authorIds);
         if (profilesError) throw new Error('讀取作者資料失敗：' + profilesError.message);
         const byId = new Map((profiles || []).map(profile => [profile.id, profile]));
