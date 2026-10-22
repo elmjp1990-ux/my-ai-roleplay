@@ -1219,7 +1219,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     try {
       const { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, phone_settings, created_at, first_published_at, latest_eligible')
+        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible')
         .eq('visibility', 'public')
         .is('deleted_at', null)
         .order('first_published_at', { ascending: false, nullsFirst: false });
@@ -1270,6 +1270,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
           opening: story?.opening_message || '', race: row.race || '',
           privateInfo: '', style: row.style || '',
           phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : {},
+          nsfwWorkplaceWarning:row.nsfw_workplace_warning === true,
           tags: Array.isArray(row.tags) ? row.tags : [],
           authorId: row.author_id, owner: state.account?.uid === row.author_id,
           chats: '0', users: null,
@@ -1307,7 +1308,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       // 這可修復舊版匯入只存 localStorage 的資料；不會上傳其他帳號的本機角色。
       let { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, phone_settings, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
         .eq('author_id', user.id)
         .order('created_at', { ascending: false });
       if (error) throw new Error('讀取雲端角色失敗：' + error.message);
@@ -1333,7 +1334,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       if (migratedCount > 0) {
         const refreshed = await client
           .from('characters')
-          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, phone_settings, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
           .eq('author_id', user.id)
           .order('created_at', { ascending: false });
         if (refreshed.error) throw new Error('角色補傳後重新讀取失敗：' + refreshed.error.message);
@@ -1407,6 +1408,7 @@ const ids = (rows || []).map(row => row.id);
           privateInfo: privateInfoById.get(row.id) ?? local.privateInfo ?? '',
           style: row.style ?? local.style ?? '',
           phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : (local.phoneSettings || {}),
+          nsfwWorkplaceWarning:row.nsfw_workplace_warning === true,
           tags: Array.isArray(row.tags) ? row.tags : (local.tags || []),
           authorId: row.author_id,
           owner: true,
@@ -1463,7 +1465,7 @@ const ids = (rows || []).map(row => row.id);
     // 先讀取既有上架紀錄，避免 upsert 把首次公開時間或資格重設。
     const { data: existingCharacter, error: existingCharacterError } = await client
       .from('characters')
-      .select('visibility, first_published_at, latest_eligible, rights_confirmed, deleted_at')
+      .select('visibility, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, deleted_at')
       .eq('id', character.id)
       .eq('author_id', expectedUserId)
       .maybeSingle();
@@ -1500,6 +1502,7 @@ const ids = (rows || []).map(row => row.id);
       race: character.race || '',
       style: character.style || '',
       phone_settings:character.phoneSettings && typeof character.phoneSettings==='object' ? {noticePrompts:(Array.isArray(character.phoneSettings.noticePrompts)?character.phoneSettings.noticePrompts:Array.isArray(character.phoneSettings.notices)?character.phoneSettings.notices:[]).slice(0,8).map(x=>String(x).slice(0,150))} : {},
+      nsfw_workplace_warning: character.nsfwWorkplaceWarning === true,
       tags: Array.isArray(character.tags) ? character.tags : []
     };
 
@@ -1523,7 +1526,7 @@ if (characterError) {
     // 重新讀取資料庫，避免 RLS／trigger／資料庫規則拒絕公開卻讓前端顯示成功。
     const { data: savedCharacter, error: verifyError } = await client
       .from('characters')
-      .select('visibility, first_published_at, latest_eligible, rights_confirmed, deleted_at')
+      .select('visibility, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, deleted_at')
       .eq('id', character.id)
       .eq('author_id', expectedUserId)
       .maybeSingle();
@@ -1534,6 +1537,9 @@ if (characterError) {
     }
     if (nextVisibility === 'public' && savedCharacter.rights_confirmed !== true) {
       throw new Error('資料庫尚未記錄權利確認，角色不能公開。');
+    }
+    if (savedCharacter.nsfw_workplace_warning !== (character.nsfwWorkplaceWarning === true)) {
+      throw new Error('資料庫中的 NSFW 工作場所提醒未成功保存，請重試。');
     }
 
     // 每個角色先沿用最新的一筆故事；沒有故事時才新增，避免每次編輯都重複建立。
@@ -3401,6 +3407,8 @@ function renderEditor() {
         </div>
         <label class="check"><input name="rightsConfirmed" type="checkbox" required ${c.rightsConfirmed === true ? 'checked' : ''}>
           <span>我確認角色沒有侵犯智慧財產權、形象或其他任何權利。 <span aria-hidden="true" style="color:#ef4444;font-weight:800">*</span></span></label>
+        <label class="check" style="margin-top:12px"><input name="nsfwWorkplaceWarning" type="checkbox" ${c.nsfwWorkplaceWarning === true ? 'checked' : ''}>
+          <span>此角色為 NSFW，工作場所不宜 <span class="small muted">（非必填）</span></span></label>
         <div class="row" style="margin-top:22px">
           <button type="button" data-action="back">取消</button>
           <button class="primary">${route.id ? '儲存修改' : '創建角色'}</button>
@@ -6600,6 +6608,7 @@ document.addEventListener('submit',async event => {
           phoneSettings:{noticePrompts:String(f.get('phoneNotices')||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,8).map(x=>x.slice(0,150))},
           visibility:String(f.get('visibility')),image:draftImage,
           rightsConfirmed:f.get('rightsConfirmed') === 'on',
+          nsfwWorkplaceWarning:f.get('nsfwWorkplaceWarning') === 'on',
           tags:[...draftTags],authorId:user.uid,owner:true,
           chats:old?.chats || '0',users:old?.users ?? null,
           createdAt:old?.createdAt || Date.now()
