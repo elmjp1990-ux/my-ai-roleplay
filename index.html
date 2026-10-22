@@ -1614,9 +1614,25 @@ if (characterError) {
 
   async function saveSupabaseProfile(account) {
     if (!account?.uid || !window.mySupabase) throw new Error('無法確認登入帳號或 Supabase 連線。');
-    const payload = { id: account.uid, handle: account.handle || ('user_' + account.uid.replace(/-/g, '').slice(0, 12)), nickname: account.nickname, avatar_url: account.avatar || null, bio: account.bio || '', birthdate: account.birthdate || null, persona_presets: Array.isArray(account.personas) ? account.personas : [] };
-    const { data, error } = await window.mySupabase.from('profiles').upsert(payload, { onConflict: 'id' }).select('id, handle, nickname, avatar_url, bio, follower_count').single();
-    if (error) throw new Error('儲存 profiles 失敗：' + error.message);
+    const payload = {
+      handle: account.handle || ('user_' + account.uid.replace(/-/g, '').slice(0, 12)),
+      nickname: account.nickname,
+      avatar_url: account.avatar || null,
+      bio: account.bio || '',
+      birthdate: account.birthdate || null,
+      persona_presets: Array.isArray(account.personas) ? account.personas : []
+    };
+    // Profile writes go through an owner-checked RPC so private columns remain
+    // unreadable through the Data API while the owner can still update them.
+    const { data, error } = await window.mySupabase.rpc('save_my_profile', {
+      p_handle: payload.handle,
+      p_nickname: payload.nickname,
+      p_avatar_url: payload.avatar_url,
+      p_bio: payload.bio,
+      p_birthdate: payload.birthdate,
+      p_persona_presets: payload.persona_presets
+    });
+    if (error) throw new Error('儲存個人資料失敗：' + error.message);
     if (!data || data.id !== account.uid) throw new Error('雲端未確認儲存結果，請稍後重試。');
     const { data: privateData, error: privateError } = await window.mySupabase.rpc('get_my_private_profile_data');
     if (privateError) throw new Error('驗證個人專屬資料失敗：' + privateError.message);
@@ -1626,11 +1642,10 @@ if (characterError) {
 
   async function savePersonaPresets(account) {
     if (!account?.uid || !window.mySupabase) throw new Error('無法確認登入帳號或 Supabase 連線。');
-    const presets = Array.isArray(account.personas) ? account.personas : [];
-    const { error } = await window.mySupabase.from('profiles').update({ persona_presets: presets }).eq('id', account.uid);
-    if (error) throw new Error('儲存人設失敗：' + error.message);
+    await saveSupabaseProfile(account);
     const { data, error: verifyError } = await window.mySupabase.rpc('get_my_private_profile_data');
     if (verifyError) throw new Error('驗證人設儲存結果失敗：' + verifyError.message);
+    const presets = Array.isArray(account.personas) ? account.personas : [];
     if (!data) throw new Error('雲端沒有更新這個帳號的人設資料，請重新登入後再試。');
     if (stablePersonaJson(data.persona_presets || []) !== stablePersonaJson(presets)) throw new Error('雲端回讀的人設內容與送出內容不一致，請重新儲存。');
   }
