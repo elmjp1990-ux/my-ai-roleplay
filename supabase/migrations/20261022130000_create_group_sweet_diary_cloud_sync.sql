@@ -30,3 +30,5 @@ using (owner_id = (select auth.uid()) and exists (
 with check (owner_id = (select auth.uid()) and exists (
   select 1 from public.chat_groups g where g.id = chat_group_diary.group_id and g.owner_id = (select auth.uid())
 ));
+-- Support efficient owner-scoped foreign-key maintenance.
+create index if not exists chat_group_diary_owner_id_idx on public.chat_group_diary(owner_id);
