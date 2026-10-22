@@ -5422,7 +5422,7 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
               ${String(selected.background||'').startsWith('memory-photo:') ? '<option value="'+e(selected.background)+'" selected>目前的回憶相片背景</option>' : ''}
             </select>
           </label>
-          <button class="danger" style="width:100%" data-action="remove-session" data-id="${e(selected.id)}">刪除這段對話與回憶</button>
+          <button class="danger" style="width:100%" data-action="remove-session-confirm" data-id="${e(selected.id)}">刪除這段對話與回憶</button>
         </div>`);
       void (async()=>{
         const select=$('backgroundSetting'),client=window.mySupabase,uid=currentUser()?.uid;
@@ -6343,6 +6343,12 @@ document.addEventListener('click',async event => {
           if(route.page==='group'&&route.id===groupId) go({page:'chat'});
           toast(storageCleanupFailed?'群組與資料庫關聯內容已刪除，但部分相片檔案清理失敗，需後續補清。':'群組、訊息、日記、相簿紀錄與關聯資料已刪除。');
         } catch(error) { toast(error?.message||'群組刪除失敗，請稍後重試。'); }
+        break;
+      }
+      case 'remove-session-confirm': {
+        const item=state.sessions[key];
+        if(!item)break;
+        showDialog('刪除','<p>刪除這段對話與回憶</p><p class="small muted">確定要刪除嗎？此操作無法復原。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="remove-session" data-id="'+e(item.id)+'">確認刪除</button></div>');
         break;
       }
       case 'remove-session': {
