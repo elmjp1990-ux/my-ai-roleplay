@@ -140,6 +140,26 @@ body.day .tag { color:#4f46b8; }
 .field { display:block; margin-bottom:17px; }
 .field > span { display:block; font-weight:600; margin-bottom:8px; }
 .field small { display:block; color:var(--muted); margin-top:6px; line-height:1.7; }
+.tag-picker-search-field{margin-bottom:12px}
+.tag-picker-input-row{display:flex;align-items:center;gap:8px}
+.tag-picker-input-row input{width:100%;min-width:0;flex:1;padding:12px 14px}
+.tag-picker-input-row .tag-picker-add{flex:0 0 auto;font-size:11px;padding:8px 10px}
+.tag-picker-search-field small{font-size:11px;margin-top:4px}
+.tag-picker-chips{display:flex;flex-wrap:wrap;gap:8px;min-height:28px}
+.tag-picker-chip,.tag-picker-add{font-size:12px;padding:7px 11px;border-radius:9px;background:var(--panel2);border:1px solid var(--border);line-height:1.3}
+.tag-picker-chip.selected{color:#c7d2fe;background:var(--soft);border-color:#818cf8}
+.tag-picker-add{font-size:12px;color:#fff;background:var(--primary);border-color:transparent}
+.tag-picker-options{display:none!important}
+.tag-picker-selected-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:16px;font-size:12px;color:var(--muted)}
+.tag-picker-selected-heading strong{color:var(--text);font-size:13px;font-variant-numeric:tabular-nums}
+.tag-picker-selected{margin-top:8px;min-height:30px}
+.tag-picker-apply{padding:11px 14px}
+.followed-author-profile-link{flex:0 0 auto;display:inline-flex;padding:0;border:0;background:transparent;border-radius:50%}
+.followed-author-profile-link .avatar{width:44px;height:44px}
+.followed-author-name{display:block;max-width:100%;padding:0;border:0;background:transparent;text-align:left;font-weight:700;overflow-wrap:anywhere}
+.followed-author-name:hover{text-decoration:underline}
+.followed-author-more{flex:0 0 auto;padding:6px 10px;font-size:11px;letter-spacing:.08em;border-radius:9px}
+
 .check { display:flex; align-items:flex-start; gap:9px; line-height:1.7; }
 .check input { margin-top:5px; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
@@ -1228,7 +1248,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       const ids = (rows || []).map(row => row.id);
       const authorIds = [...new Set((rows || []).map(row => row.author_id).filter(Boolean))];
       if (authorIds.length) {
-        const profileResult = await client.from('profiles')
+        const profileResult = await client.from('public_profiles')
           .select('id, handle, nickname, avatar_url, bio, follower_count')
           .in('id', authorIds);
         if (profileResult.error) {
@@ -1359,7 +1379,7 @@ const ids = (rows || []).map(row => row.id);
       // 私密角色不會經過公開角色載入器；在作者自己的角色載入流程也補齊作者 profile。
       const authorIds = [...new Set((rows || []).map(row => row.author_id).filter(Boolean))];
       if (authorIds.length) {
-        const profileResult = await client.from('profiles')
+        const profileResult = await client.from('public_profiles')
           .select('id, handle, nickname, avatar_url, bio, follower_count')
           .in('id', authorIds);
         if (profileResult.error) {
@@ -1696,7 +1716,7 @@ function availableExploreTags() {
   for (const character of (state.characters || [])) {
     if (character.visibility !== 'public' || character.deletedAt ||
         character.cloudPublic === false || character.localOnly === true ||
-        String(character.id || '').startsWith('seed-') && character.localOnly === true) continue;
+        String(character.id || '').startsWith('seed-')) continue;
     for (const rawTag of (Array.isArray(character.tags) ? character.tags : [])) {
       const tag = String(rawTag || '').trim();
       if (validCharacterTag(tag)) tags.add(tag);
@@ -2157,7 +2177,7 @@ async function loadCloudChatSessions(user) {
         ? row.character_snapshot.authorId : null)
       .filter(Boolean))];
     if (snapshotAuthorIds.length) {
-      const profileResult = await client.from('profiles')
+      const profileResult = await client.from('public_profiles')
         .select('id, handle, nickname, avatar_url, bio, follower_count')
         .in('id', snapshotAuthorIds);
       // 帳號可能在 profiles 查詢等待期間切換；舊帳號請求不得再寫入目前畫面狀態。
@@ -2687,7 +2707,7 @@ function renderShell() {
 function render() {
   if ($('modal').open) $('modal').close();
   const allowed = ['home','detail','session-detail','author','chat','conversation','group','create',
-    'editor','ai','notifications','favorites','shop','profile','album'];
+    'editor','ai','notifications','favorites','followed-authors','shop','profile','album'];
   if (!allowed.includes(route.page)) route = {page:'home'};
 
   if (!['home','detail','author'].includes(route.page) && !currentUser()) {
@@ -3040,7 +3060,7 @@ async function loadCloudComments(characterId) {
     // 評論 RPC 只回傳安全的留言內容；另取公開個人資料，避免其他帳號的留言者被錯誤顯示成「故事創作者」。
     const profileIds=[...new Set(safeRows.map(row=>row.author_id).filter(Boolean))];
     if(profileIds.length){
-      const {data:profiles,error:profilesError}=await client.from('profiles')
+      const {data:profiles,error:profilesError}=await client.from('public_profiles')
         .select('id,nickname,avatar_url,bio').in('id',profileIds);
       if(profilesError)console.warn('PersonaX 評論作者資料載入失敗：',profilesError);
       else (profiles||[]).forEach(profile=>{
@@ -3117,13 +3137,19 @@ async function refreshAuthorFollowState(authorId) {
   const client = window.mySupabase;
   if (!client || !user?.uid || !isUuid(user.uid) || !isUuid(authorId) || user.uid === authorId) return;
   try {
-    const [followResult, profileResult] = await Promise.all([
+    const [followResult, profileResult, followerCountResult] = await Promise.all([
       client.from('author_follows').select('author_id')
         .eq('follower_id', user.uid).eq('author_id', authorId).maybeSingle(),
-      client.from('profiles').select('follower_count').eq('id', authorId).maybeSingle()
+      client.from('public_profiles').select('follower_count').eq('id', authorId).maybeSingle(),
+      client.from('author_follows').select('author_id', {count:'exact', head:true})
+        .eq('author_id', authorId)
     ]);
     if (followResult.error) throw followResult.error;
     if (profileResult.error) throw profileResult.error;
+    if (followerCountResult.error) throw followerCountResult.error;
+    const followerCount = Number.isFinite(followerCountResult.count)
+      ? followerCountResult.count
+      : Number(profileResult.data?.follower_count || 0);
     if (currentUser()?.uid !== user.uid || route.page !== 'author' || route.id !== authorId) return;
 
     const existingIndex = state.following.indexOf(authorId);
@@ -3132,12 +3158,12 @@ async function refreshAuthorFollowState(authorId) {
     state.authors[authorId] = {
       ...(state.authors[authorId] || {uid:authorId,nickname:'故事創作者',bio:'',avatar:''}),
       uid:authorId,
-      fans:Number(profileResult.data?.follower_count || 0)
+      fans:followerCount
     };
     persist();
 
     const count = document.getElementById('authorFollowerCount');
-    if (count) count.textContent = '粉絲 ' + Number(profileResult.data?.follower_count || 0);
+    if (count) count.textContent = '粉絲 ' + followerCount;
     const button = document.querySelector('[data-action="follow"][data-id="' + authorId + '"]');
     if (button) button.textContent = followResult.data ? '已追蹤' : '追蹤';
   } catch (error) {
@@ -3197,7 +3223,7 @@ async function renderFollowedAuthors() {
       state.following = authorIds;
       if (authorIds.length) {
         const {data: profiles, error: profilesError} = await client
-          .from('profiles').select('id, handle, nickname, avatar_url, bio, follower_count')
+          .from('public_profiles').select('id, handle, nickname, avatar_url, bio, follower_count')
           .in('id', authorIds);
         if (profilesError) throw new Error('讀取作者資料失敗：' + profilesError.message);
         const byId = new Map((profiles || []).map(profile => [profile.id, profile]));
@@ -3231,15 +3257,18 @@ async function renderFollowedAuthors() {
           !character.deletedAt)
         .sort((a,b) => Number(b.firstPublishedAt || b.createdAt || 0) -
           Number(a.firstPublishedAt || a.createdAt || 0));
-      const latest = characters.slice(0, 6);
-      return `<section class="panel stack" style="gap:14px">
+      const latest = characters.slice(0, 4);
+      const authorPageButton = `<button type="button" class="followed-author-profile-link" data-action="author" data-id="${e(authorInfo.uid)}" aria-label="前往作者 ${e(authorInfo.nickname || '作者')} 的頁面">${avatar(authorInfo)}</button>`;
+      return `<section class="panel stack followed-author-card" style="gap:14px">
         <div class="row between" style="align-items:center;gap:12px">
-          <div class="row" style="min-width:0;gap:10px">${avatar(authorInfo)}
-            <div style="min-width:0"><strong style="display:block;overflow-wrap:anywhere">@${e(authorInfo.handle || authorInfo.nickname)}</strong>
-              <span class="small muted">公開角色 ${characters.length} 名</span>
+          <div class="row" style="min-width:0;gap:10px">
+            ${authorPageButton}
+            <div style="min-width:0">
+              <button type="button" class="followed-author-name" data-action="author" data-id="${e(authorInfo.uid)}">${e(authorInfo.nickname || 'PersonaX 使用者')}</button>
+              <span class="small muted" style="display:block">公開角色 ${characters.length} 名</span>
             </div>
           </div>
-          <button data-action="author" data-id="${e(authorInfo.uid)}" style="white-space:nowrap">more...</button>
+          ${characters.length > 4 ? `<button type="button" class="followed-author-more" data-action="author" data-id="${e(authorInfo.uid)}">MORE</button>` : ''}
         </div>
         ${latest.length ? `<div class="grid">${latest.map(character => card(character)).join('')}</div>` : '<div class="empty">目前沒有公開角色。</div>'}
       </section>`;
@@ -5063,10 +5092,10 @@ function renderProfile() {
   $('view').innerHTML = `<div class="stack form-width profile-page" style="gap:16px">
     <div class="row between" style="align-items:flex-start"><div><div class="explore-eyebrow">PERSONAX</div><h1 style="margin:4px 0 0">帳號管理</h1></div><span class="small muted">測試環境，非正式網頁</span></div>
     <section class="panel stack" style="gap:14px"><div class="profile-account-header"><div class="row" style="align-items:center;min-width:0;gap:12px">${avatar(u)}<div style="min-width:0;padding-right:56px"><div class="small muted">個人帳號</div><h2 style="margin:3px 0;overflow-wrap:anywhere">${e(u.nickname)}</h2><button class="author-link" data-action="author" data-id="${e(u.uid)}">@${e(u.nickname)}</button><p class="small muted" style="margin:6px 0;overflow-wrap:anywhere">UID：${e(u.uid)}</p></div></div><button class="profile-edit-button" data-action="edit-profile">⚙ 編輯</button></div><div><h3 style="margin-bottom:4px">帳號簡介</h3><p class="prose muted bio-scroll" style="margin:0">${e(u.bio || '尚未填寫')}</p></div></section>
-    <button class="profile-setting" data-action="nav" data-page="followed-authors" style="width:100%;margin-top:2px"><span><strong>喜愛作者</strong><small>查看你追蹤的作者與最新公開角色</small></span><span>›</span></button>
+
     <section class="panel stack" id="daily-checkin-card" style="gap:12px;min-height:190px">${window.dailyCheckinStatusCache?.uid === state.account?.uid && window.dailyCheckinStatusCache?.data ? renderDailyCheckinMarkup(window.dailyCheckinStatusCache.data) : '<div class="row between" style="align-items:center;gap:8px"><h2 style="margin:0">每日簽到</h2><span class="small muted" style="white-space:nowrap">讀取中…</span></div><div aria-hidden="true" style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px">'+Array.from({length:7},()=>'<div style="height:56px;border:1px solid var(--border);border-radius:10px;opacity:.35"></div>').join('')+'</div><button type="button" disabled aria-disabled="true" style="width:100%;min-height:44px;opacity:.55">讀取簽到狀態…</button><p class="small muted" style="margin:0">每日於台灣時間 00:00 更新簽到日。</p>'}</section>
     <section class="panel stack" style="gap:12px"><div class="row between"><span>會員等級</span><strong>${u.member === 'monthly' ? '月費會員' : '免費會員'}</strong></div><div class="row between"><span>鑽石數量</span><strong>💎 ${Number(u.diamonds || 0).toLocaleString()}</strong></div><div class="row between"><span>銀幣數量</span><strong>◉ ${Number(u.silver || 0).toLocaleString()}</strong></div><button data-action="ledger" style="width:100%">花費日誌與交易紀錄</button></section>
-    <section class="stack" style="gap:0"><button class="profile-setting" data-action="personas"><span><strong>人設管理</strong><small></small></span><span>›</span></button><button class="profile-setting" data-action="theme-setting"><span><strong>版面顏色</strong><small>目前：${state.theme === 'day' ? '白天' : '黑夜'}</small></span><span>›</span></button><button class="profile-setting" data-action="birthdate"><span><strong>出生日期</strong><small>${e(u.birthdate || '尚未設定')}</small></span><span>›</span></button><button class="profile-setting" data-action="bug"><span><strong>BUG 回報</strong><small>回報網站問題（目前僅檢查表單）</small></span><span>›</span></button><div style="padding:16px 0 8px"><button data-action="logout" class="primary" style="width:100%;min-height:46px">登出帳號</button><p style="margin:14px 0 0;text-align:center"><button type="button" data-action="delete-account" style="border:0;background:transparent;padding:6px 10px;color:var(--muted);font-size:12px;text-decoration:underline;text-underline-offset:3px">刪除帳號</button></p></div></section>
+    <section class="stack" style="gap:0"><button class="profile-setting" data-action="personas"><span><strong>人設管理</strong><small></small></span><span>›</span></button><button class="profile-setting" data-action="nav" data-page="followed-authors" aria-label="查看喜愛作者"><span><strong>喜愛作者</strong><small>查看你追蹤的作者與最新公開角色</small></span><span>›</span></button><button class="profile-setting" data-action="theme-setting"><span><strong>版面顏色</strong><small>目前：${state.theme === 'day' ? '白天' : '黑夜'}</small></span><span>›</span></button><button class="profile-setting" data-action="birthdate"><span><strong>出生日期</strong><small>${e(u.birthdate || '尚未設定')}</small></span><span>›</span></button><button class="profile-setting" data-action="bug"><span><strong>BUG 回報</strong><small>回報網站問題（目前僅檢查表單）</small></span><span>›</span></button><div style="padding:16px 0 8px"><button data-action="logout" class="primary" style="width:100%;min-height:46px">登出帳號</button><p style="margin:14px 0 0;text-align:center"><button type="button" data-action="delete-account" style="border:0;background:transparent;padding:6px 10px;color:var(--muted);font-size:12px;text-decoration:underline;text-underline-offset:3px">刪除帳號</button></p></div></section>
   </div>`;
   void refreshDailyCheckinCard();
 }
@@ -5240,29 +5269,46 @@ function renderModal(o) {
       break;
     case 'tags':
       if (o.mode === 'explore') {
-        showDialog('選擇標籤',`
-          <form data-form="tags">
-            <p class="muted small">探索篩選可選擇現有分類，角色需包含全部勾選標籤。</p>
-            <div class="two-col">
-              ${availableExploreTags().map(t => `<label class="check">
-                <input type="checkbox" name="tag" value="${e(t)}" ${exploreTags.includes(t) ? 'checked' : ''}>
-                ${e(t)}</label>`).join('') || '<p class="small muted">目前還沒有公開角色標籤；角色公開後，自訂標籤會自動出現在這裡。</p>'}
+        const tagOptions = availableExploreTags()
+          .filter(validCharacterTag)
+          .sort((a,b) => a.localeCompare(b, 'zh-Hant'));
+        showDialog('標籤篩選',`
+          <form data-form="tags" class="tag-picker explore-tag-picker">
+            <label class="field tag-picker-search-field">
+              <input name="exploreTagSearch" type="search" maxlength="10" placeholder="搜尋現有標籤" autocomplete="off" aria-label="搜尋現有標籤">
+            </label>
+            <div id="exploreTagResults" class="tag-picker-chips" aria-live="polite"></div>
+            <div id="exploreTagList" class="tag-picker-options" aria-hidden="true">
+              ${tagOptions.map(t => `<input type="checkbox" name="tag" value="${e(t)}" ${exploreTags.includes(t) ? 'checked' : ''}>`).join('')}
             </div>
-            <button class="primary" style="margin-top:20px">套用</button>
+            <div class="tag-picker-selected-heading"><span>已選擇標籤</span><strong id="exploreTagCount">[${exploreTags.length}]</strong></div>
+            <div id="exploreTagSelected" class="tag-picker-chips tag-picker-selected"></div>
+            <p id="exploreTagEmpty" class="small muted" hidden>目前沒有符合的公開標籤。</p>
+            <button class="primary tag-picker-apply" style="margin-top:18px;width:100%">套用</button>
           </form>`);
+        refreshExploreTagPicker();
       } else {
-        showDialog('自訂角色標籤',`
-          <form data-form="tags">
-            <p class="muted small">自行輸入標籤，每個2–10個字，最多5個；不再提供預設標籤。</p>
-            <label class="field"><span>新增標籤</span><div class="row">
-              <input name="tagInput" maxlength="30" placeholder="例如：慢熱治癒、嘴硬心軟" autocomplete="off">
-              <button type="button" data-action="add-custom-tag">新增</button>
-            </div></label>
-            <div id="customTagList" class="stack" style="gap:8px">
-              ${draftTags.map(t => `<label class="check"><input type="checkbox" name="tag" value="${e(t)}" checked> ${e(t)}</label>`).join('') || '<p class="small muted">尚未新增標籤。</p>'}
+        const tagOptions = [...new Set([...availableExploreTags(), ...draftTags])]
+          .filter(validCharacterTag)
+          .sort((a,b) => a.localeCompare(b, 'zh-Hant'));
+        showDialog('角色標籤',`
+          <form data-form="tags" class="tag-picker">
+            <label class="field tag-picker-search-field">
+              <div class="tag-picker-input-row">
+                <input name="tagSearch" type="search" maxlength="10" placeholder="輸入標籤關鍵字" autocomplete="off" aria-label="搜尋或新增角色標籤">
+                <button type="button" class="tag-picker-add" data-action="add-custom-tag" hidden>新增</button>
+              </div>
+              <small>最多10字</small>
+            </label>
+            <div id="customTagResults" class="tag-picker-chips" aria-live="polite"></div>
+            <div id="customTagList" class="tag-picker-options" aria-hidden="true">
+              ${tagOptions.map(t => `<input type="checkbox" name="tag" value="${e(t)}" ${draftTags.includes(t) ? 'checked' : ''}>`).join('')}
             </div>
-            <button class="primary" style="margin-top:20px">套用</button>
+            <div class="tag-picker-selected-heading"><span>已選擇標籤</span><strong id="customTagCount">[${draftTags.length}/5]</strong></div>
+            <div id="customTagSelected" class="tag-picker-chips tag-picker-selected"></div>
+            <button class="primary tag-picker-apply" style="margin-top:18px;width:100%">套用</button>
           </form>`);
+        refreshCustomTagPicker();
       }
       break;
     case 'delete-character':
@@ -5660,6 +5706,90 @@ document.addEventListener('click', async event => {
   }
 }, true);
 
+/* Homepage explore tag picker: search/select existing public tags only; never creates tags. */
+function refreshExploreTagPicker() {
+  const modal=$('modal');
+  const input=modal?.querySelector('input[name="exploreTagSearch"]');
+  const options=modal?.querySelector('#exploreTagList');
+  const results=modal?.querySelector('#exploreTagResults');
+  const selectedArea=modal?.querySelector('#exploreTagSelected');
+  const count=modal?.querySelector('#exploreTagCount');
+  const empty=modal?.querySelector('#exploreTagEmpty');
+  if(!input||!options||!results||!selectedArea||!count||!empty)return;
+  const query=String(input.value||'').trim().toLocaleLowerCase('zh-Hant');
+  const checkboxes=[...options.querySelectorAll('input[name="tag"]')];
+  const matches=checkboxes.filter(item=>!query||item.value.toLocaleLowerCase('zh-Hant').includes(query));
+  results.innerHTML=matches.map(item=>`<button type="button" class="tag-picker-chip ${item.checked?'selected':''}" data-action="toggle-explore-tag" data-tag="${e(item.value)}" aria-pressed="${item.checked}">${e(item.value)}${item.checked?' ✓':''}</button>`).join('');
+  empty.hidden=matches.length>0;
+  const chosen=checkboxes.filter(item=>item.checked);
+  count.textContent='['+chosen.length+']';
+  selectedArea.innerHTML=chosen.map(item=>`<button type="button" class="tag-picker-chip selected" data-action="toggle-explore-tag" data-tag="${e(item.value)}" aria-label="取消選擇 ${e(item.value)}">${e(item.value)} ×</button>`).join('') || '<span class="small muted">尚未選擇標籤</span>';
+}
+document.addEventListener('input', event => {
+  const input=event.target;
+  if(input instanceof HTMLInputElement && input.name==='exploreTagSearch' && input.closest('.explore-tag-picker')) refreshExploreTagPicker();
+});
+document.addEventListener('click', event => {
+  const button=event.target.closest('[data-action="toggle-explore-tag"]');
+  if(!button)return;
+  const options=$('modal')?.querySelector('#exploreTagList');
+  const input=options&&[...options.querySelectorAll('input[name="tag"]')].find(item=>item.value===button.dataset.tag);
+  if(!input)return;
+  input.checked=!input.checked;
+  refreshExploreTagPicker();
+});
+
+/* Shared character-tag picker: live-search chips, selected count, and a five-tag limit. */
+function refreshCustomTagPicker() {
+  const modal=$('modal');
+  const input=modal?.querySelector('input[name="tagSearch"]');
+  const options=modal?.querySelector('#customTagList');
+  const results=modal?.querySelector('#customTagResults');
+  const selectedArea=modal?.querySelector('#customTagSelected');
+  const count=modal?.querySelector('#customTagCount');
+  if(!input||!options||!results||!selectedArea||!count)return;
+  const query=String(input.value||'').trim().toLocaleLowerCase('zh-Hant');
+  const checkboxes=[...options.querySelectorAll('input[name="tag"]')];
+  const matches=checkboxes.filter(item=>!query||item.value.toLocaleLowerCase('zh-Hant').includes(query));
+  results.innerHTML=matches.map(item=>`<button type="button" class="tag-picker-chip ${item.checked?'selected':''}" data-action="toggle-custom-tag" data-tag="${e(item.value)}" aria-pressed="${item.checked}">${e(item.value)}${item.checked?' ✓':''}</button>`).join('');
+  if(!matches.length && !query) {
+    results.innerHTML='<p class="small muted">尚無可用標籤，輸入至少2字即可新增。</p>';
+  } else if(!matches.length) {
+    results.innerHTML='<p class="small muted">沒有符合的標籤，可新增這個標籤。</p>';
+  }
+  const chosen=checkboxes.filter(item=>item.checked);
+  count.textContent='['+chosen.length+'/5]';
+  selectedArea.innerHTML=chosen.map(item=>`<button type="button" class="tag-picker-chip selected" data-action="toggle-custom-tag" data-tag="${e(item.value)}" aria-label="取消選擇 ${e(item.value)}">${e(item.value)} ×</button>`).join('') || '<span class="small muted">尚未選擇標籤</span>';
+  const addButton=modal.querySelector('[data-action="add-custom-tag"]');
+  if(addButton) {
+    addButton.hidden=!(validCharacterTag(input.value)&&matches.length===0);
+    addButton.textContent='新增';
+    addButton.setAttribute('aria-label','新增標籤 '+String(input.value||'').trim());
+  }
+}
+document.addEventListener('input', event => {
+  const input=event.target;
+  if(input instanceof HTMLInputElement && input.name==='tagSearch' && input.closest('.tag-picker')) refreshCustomTagPicker();
+});
+document.addEventListener('click', event => {
+  const button=event.target.closest('[data-action="toggle-custom-tag"]');
+  if(!button)return;
+  const options=$('modal')?.querySelector('#customTagList');
+  const input=options&&[...options.querySelectorAll('input[name="tag"]')].find(item=>item.value===button.dataset.tag);
+  if(!input)return;
+  const checked=[...options.querySelectorAll('input[name="tag"]:checked')];
+  if(!input.checked&&checked.length>=5){toast('角色最多選擇5個標籤。');return;}
+  input.checked=!input.checked;
+  refreshCustomTagPicker();
+});
+document.addEventListener('change', event => {
+  const input=event.target;
+  if(!(input instanceof HTMLInputElement)||input.name!=='tag'||!input.closest('#customTagList'))return;
+  const checked=[...document.querySelectorAll('#customTagList input[name="tag"]:checked')];
+  if(checked.length>5){input.checked=false;toast('角色最多選擇5個標籤。');}
+  refreshCustomTagPicker();
+});
+
 /* Delegated click actions */
 document.addEventListener('click',async event => {
   const button = event.target.closest('[data-action]');
@@ -5997,21 +6127,26 @@ document.addEventListener('click',async event => {
       case 'new-batch':batch+=7;limit=24;renderGrid();break;
       case 'tags':openModal('tags',{mode:button.dataset.mode});break;
       case 'add-custom-tag': {
-        const input=$('modal').querySelector('input[name="tagInput"]');
+        const input=$('modal').querySelector('input[name="tagSearch"]');
         const list=$('modal').querySelector('#customTagList');
         if (!input || !list) break;
         const value=String(input.value || '').trim();
         if (!validCharacterTag(value)) { toast('每個標籤需為2–10個字。'); input.focus(); break; }
-        const checked=[...list.querySelectorAll('input[name="tag"]:checked')].map(item=>item.value);
-        if (checked.length>=5) { toast('角色最多新增5個標籤。'); break; }
-        if (checked.includes(value)) { toast('這個標籤已存在。'); input.focus(); break; }
-        const empty=list.querySelector('p');
-        if (empty) empty.remove();
-        const label=document.createElement('label');
-        label.className='check';
-        label.innerHTML='<input type="checkbox" name="tag" checked value="' + e(value) + '"> ' + e(value);
-        list.appendChild(label);
-        input.value='';input.focus();
+        const options=[...list.querySelectorAll('input[name="tag"]')];
+        const existing=options.find(item=>item.value===value);
+        const checked=options.filter(item=>item.checked);
+        if (existing) {
+          if (!existing.checked && checked.length>=5) { toast('角色最多選擇5個標籤。'); break; }
+          existing.checked=true;
+        } else {
+          if (checked.length>=5) { toast('角色最多選擇5個標籤。'); break; }
+          const checkbox=document.createElement('input');
+          checkbox.type='checkbox';checkbox.name='tag';checkbox.value=value;checkbox.checked=true;
+          list.appendChild(checkbox);
+        }
+        input.value='';
+        refreshCustomTagPicker();
+        input.focus();
         break;
       }
       case 'remove-draft-tag': {
