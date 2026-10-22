@@ -3400,7 +3400,7 @@ function renderEditor() {
           <div id="formTags" class="row wrap" style="margin-top:10px">${draftTags.map(draftTagButton).join('')}</div>
         </div>
         <label class="check"><input name="rightsConfirmed" type="checkbox" required ${c.rightsConfirmed === true ? 'checked' : ''}>
-          <span>我確認角色沒有侵犯智慧財產權、形象或其他任何權利。</span></label>
+          <span>我確認角色沒有侵犯智慧財產權、形象或其他任何權利。 <span aria-hidden="true" style="color:#ef4444;font-weight:800">*</span></span></label>
         <div class="row" style="margin-top:22px">
           <button type="button" data-action="back">取消</button>
           <button class="primary">${route.id ? '儲存修改' : '創建角色'}</button>
