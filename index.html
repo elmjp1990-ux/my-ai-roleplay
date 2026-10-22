@@ -1128,7 +1128,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       syncStage = '讀取公開會員資料';
       let { data: profile, error: profileError } = await client
         .from('profiles')
-        .select('id, handle, nickname, avatar_url, bio')
+        .select('id, handle, nickname, avatar_url, bio, follower_count')
         .eq('id', user.id)
         .maybeSingle();
 
@@ -1148,7 +1148,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
           bio: '',
           persona_presets: [],
           birthdate: null
-        }, { onConflict: 'id' }).select('id, handle, nickname, avatar_url, bio').single();
+        }, { onConflict: 'id' }).select('id, handle, nickname, avatar_url, bio, follower_count').single();
         if (result.error) throw new Error('建立 profiles 失敗：' + result.error.message);
         profile = result.data;
       }
@@ -1229,7 +1229,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       const authorIds = [...new Set((rows || []).map(row => row.author_id).filter(Boolean))];
       if (authorIds.length) {
         const profileResult = await client.from('profiles')
-          .select('id, handle, nickname, avatar_url, bio')
+          .select('id, handle, nickname, avatar_url, bio, follower_count')
           .in('id', authorIds);
         if (profileResult.error) {
           console.warn('角色作者資料載入失敗，仍繼續顯示公開角色：', profileResult.error.message);
@@ -1239,7 +1239,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
             uid:profile.id, handle:profile.handle || '',
             nickname:profile.nickname || profile.handle || 'PersonaX 使用者',
             avatar:profile.avatar_url || '', bio:profile.bio || '',
-            fans:state.authors[profile.id]?.fans || 0
+            fans:Number(profile.follower_count || 0)
           };
         }
       }
@@ -1359,7 +1359,7 @@ const ids = (rows || []).map(row => row.id);
       const authorIds = [...new Set((rows || []).map(row => row.author_id).filter(Boolean))];
       if (authorIds.length) {
         const profileResult = await client.from('profiles')
-          .select('id, handle, nickname, avatar_url, bio')
+          .select('id, handle, nickname, avatar_url, bio, follower_count')
           .in('id', authorIds);
         if (profileResult.error) {
           console.warn('私密角色作者資料載入失敗：', profileResult.error.message);
@@ -1369,7 +1369,7 @@ const ids = (rows || []).map(row => row.id);
               uid:profile.id, handle:profile.handle || '',
               nickname:profile.nickname || profile.handle || 'PersonaX 使用者',
               avatar:profile.avatar_url || '', bio:profile.bio || '',
-              fans:state.authors[profile.id]?.fans || 0
+              fans:Number(profile.follower_count || 0)
             };
           }
         }
@@ -1579,7 +1579,7 @@ if (characterError) {
   async function saveSupabaseProfile(account) {
     if (!account?.uid || !window.mySupabase) throw new Error('無法確認登入帳號或 Supabase 連線。');
     const payload = { id: account.uid, handle: account.handle || ('user_' + account.uid.replace(/-/g, '').slice(0, 12)), nickname: account.nickname, avatar_url: account.avatar || null, bio: account.bio || '', birthdate: account.birthdate || null, persona_presets: Array.isArray(account.personas) ? account.personas : [] };
-    const { data, error } = await window.mySupabase.from('profiles').upsert(payload, { onConflict: 'id' }).select('id, handle, nickname, avatar_url, bio').single();
+    const { data, error } = await window.mySupabase.from('profiles').upsert(payload, { onConflict: 'id' }).select('id, handle, nickname, avatar_url, bio, follower_count').single();
     if (error) throw new Error('儲存 profiles 失敗：' + error.message);
     if (!data || data.id !== account.uid) throw new Error('雲端未確認儲存結果，請稍後重試。');
     const { data: privateData, error: privateError } = await window.mySupabase.rpc('get_my_private_profile_data');
@@ -2144,7 +2144,7 @@ async function loadCloudChatSessions(user) {
       .filter(Boolean))];
     if (snapshotAuthorIds.length) {
       const profileResult = await client.from('profiles')
-        .select('id, handle, nickname, avatar_url, bio')
+        .select('id, handle, nickname, avatar_url, bio, follower_count')
         .in('id', snapshotAuthorIds);
       // 帳號可能在 profiles 查詢等待期間切換；舊帳號請求不得再寫入目前畫面狀態。
       if (state.account?.uid !== user.id) return;
@@ -2156,7 +2156,7 @@ async function loadCloudChatSessions(user) {
             uid:profile.id, handle:profile.handle || '',
             nickname:profile.nickname || profile.handle || 'PersonaX 使用者',
             avatar:profile.avatar_url || '', bio:profile.bio || '',
-            fans:state.authors[profile.id]?.fans || 0
+            fans:Number(profile.follower_count || 0)
           };
         }
       }
@@ -3082,6 +3082,39 @@ function renderComments() {
       </article>`;
   }).join('') || '<div class="empty">還沒有評論。</div>';
 }
+async function refreshAuthorFollowState(authorId) {
+  const user = currentUser();
+  const client = window.mySupabase;
+  if (!client || !user?.uid || !isUuid(user.uid) || !isUuid(authorId) || user.uid === authorId) return;
+  try {
+    const [followResult, profileResult] = await Promise.all([
+      client.from('author_follows').select('author_id')
+        .eq('follower_id', user.uid).eq('author_id', authorId).maybeSingle(),
+      client.from('profiles').select('follower_count').eq('id', authorId).maybeSingle()
+    ]);
+    if (followResult.error) throw followResult.error;
+    if (profileResult.error) throw profileResult.error;
+    if (currentUser()?.uid !== user.uid || route.page !== 'author' || route.id !== authorId) return;
+
+    const existingIndex = state.following.indexOf(authorId);
+    if (followResult.data && existingIndex < 0) state.following.push(authorId);
+    if (!followResult.data && existingIndex >= 0) state.following.splice(existingIndex, 1);
+    state.authors[authorId] = {
+      ...(state.authors[authorId] || {uid:authorId,nickname:'故事創作者',bio:'',avatar:''}),
+      uid:authorId,
+      fans:Number(profileResult.data?.follower_count || 0)
+    };
+    persist();
+
+    const count = document.getElementById('authorFollowerCount');
+    if (count) count.textContent = '粉絲 ' + Number(profileResult.data?.follower_count || 0);
+    const button = document.querySelector('[data-action="follow"][data-id="' + authorId + '"]');
+    if (button) button.textContent = followResult.data ? '已追蹤' : '追蹤';
+  } catch (error) {
+    console.warn('作者追蹤狀態同步失敗：', error?.message || error);
+  }
+}
+
 function renderAuthor() {
   const a = author(route.id);
   const following = state.following.includes(a.uid);
@@ -3097,10 +3130,10 @@ function renderAuthor() {
         </div>
         <p class="prose muted bio-scroll">${e(a.bio || '尚未填寫簡介')}</p>
         <div class="row between wrap">
-          <strong>粉絲 ${(a.fans || 0)+(following ? 1 : 0)}</strong>
+          <strong id="authorFollowerCount">粉絲 ${Number(a.fans || 0)}</strong>
           <div class="row">
             ${currentUser()?.uid !== a.uid ? `<button data-action="follow"
-              data-id="${e(a.uid)}">${following ? '♥ 已追蹤' : '♡ 追蹤'}</button>` : ''}
+              data-id="${e(a.uid)}">${following ? '已追蹤' : '追蹤'}</button>` : ''}
             <button data-action="share" data-kind="author" data-id="${e(a.uid)}">↗ 分享</button>
           </div>
         </div>
@@ -3108,6 +3141,7 @@ function renderAuthor() {
       <h2>公開角色</h2>
       <div class="grid">${list.map(c => card(c)).join('') || '<div class="empty">目前沒有公開角色。</div>'}</div>
     </div>`;
+  void refreshAuthorFollowState(a.uid);
 }
 function renderFavorites() {
   const list = state.characters.filter(c => state.favorites.includes(c.id) && accessible(c));
@@ -5773,8 +5807,31 @@ document.addEventListener('click',async event => {
       }
       case 'follow': {
         if (!requireLogin({page:'author',id:key})) break;
-        const i = state.following.indexOf(key);
-        if (i<0) state.following.push(key); else state.following.splice(i,1);
+        const user = currentUser();
+        const client = window.mySupabase;
+        if (client && user?.uid && isUuid(user.uid) && isUuid(key)) {
+          const alreadyFollowing = state.following.includes(key);
+          if (alreadyFollowing) {
+            const {error} = await client.from('author_follows').delete()
+              .eq('follower_id', user.uid).eq('author_id', key);
+            if (error) throw new Error('取消追蹤失敗：' + error.message);
+          } else {
+            const {error} = await client.from('author_follows').insert({
+              follower_id:user.uid, author_id:key
+            });
+            if (error && error.code !== '23505') throw new Error('追蹤作者失敗：' + error.message);
+          }
+          await refreshAuthorFollowState(key);
+        } else {
+          const i = state.following.indexOf(key);
+          if (i < 0) {
+            state.following.push(key);
+            state.authors[key] = {...(state.authors[key] || {uid:key,nickname:'故事創作者',bio:'',avatar:'',fans:0}),fans:Number(state.authors[key]?.fans || 0)+1};
+          } else {
+            state.following.splice(i,1);
+            state.authors[key] = {...(state.authors[key] || {uid:key,nickname:'故事創作者',bio:'',avatar:'',fans:0}),fans:Math.max(0,Number(state.authors[key]?.fans || 0)-1)};
+          }
+        }
         persist();render();break;
       }
       case 'tag':
