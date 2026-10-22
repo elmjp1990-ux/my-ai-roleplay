@@ -140,6 +140,24 @@ body.day .tag { color:#4f46b8; }
 .field { display:block; margin-bottom:17px; }
 .field > span { display:block; font-weight:600; margin-bottom:8px; }
 .field small { display:block; color:var(--muted); margin-top:6px; line-height:1.7; }
+.tag-picker-search-field{margin-bottom:12px}
+.tag-picker-search-field input{width:100%;padding:12px 14px}
+.tag-picker-search-field small{font-size:11px;margin-top:4px}
+.tag-picker-chips{display:flex;flex-wrap:wrap;gap:8px;min-height:28px}
+.tag-picker-chip,.tag-picker-add{font-size:12px;padding:7px 11px;border-radius:9px;background:var(--panel2);border:1px solid var(--border);line-height:1.3}
+.tag-picker-chip.selected{color:#c7d2fe;background:var(--soft);border-color:#818cf8}
+.tag-picker-add{font-size:12px;color:#fff;background:var(--primary);border-color:transparent}
+.tag-picker-options{display:none!important}
+.tag-picker-selected-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:16px;font-size:12px;color:var(--muted)}
+.tag-picker-selected-heading strong{color:var(--text);font-size:13px;font-variant-numeric:tabular-nums}
+.tag-picker-selected{margin-top:8px;min-height:30px}
+.tag-picker-apply{padding:11px 14px}
+.followed-author-profile-link{flex:0 0 auto;display:inline-flex;padding:0;border:0;background:transparent;border-radius:50%}
+.followed-author-profile-link .avatar{width:44px;height:44px}
+.followed-author-name{display:block;max-width:100%;padding:0;border:0;background:transparent;text-align:left;font-weight:700;overflow-wrap:anywhere}
+.followed-author-name:hover{text-decoration:underline}
+.followed-author-more{flex:0 0 auto;padding:6px 10px;font-size:11px;letter-spacing:.08em;border-radius:9px}
+
 .check { display:flex; align-items:flex-start; gap:9px; line-height:1.7; }
 .check input { margin-top:5px; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
@@ -3237,15 +3255,18 @@ async function renderFollowedAuthors() {
           !character.deletedAt)
         .sort((a,b) => Number(b.firstPublishedAt || b.createdAt || 0) -
           Number(a.firstPublishedAt || a.createdAt || 0));
-      const latest = characters.slice(0, 6);
-      return `<section class="panel stack" style="gap:14px">
+      const latest = characters.slice(0, 4);
+      const authorPageButton = `<button type="button" class="followed-author-profile-link" data-action="author" data-id="${e(authorInfo.uid)}" aria-label="前往作者 ${e(authorInfo.nickname || '作者')} 的頁面">${avatar(authorInfo)}</button>`;
+      return `<section class="panel stack followed-author-card" style="gap:14px">
         <div class="row between" style="align-items:center;gap:12px">
-          <div class="row" style="min-width:0;gap:10px">${avatar(authorInfo)}
-            <div style="min-width:0"><strong style="display:block;overflow-wrap:anywhere">@${e(authorInfo.handle || authorInfo.nickname)}</strong>
-              <span class="small muted">公開角色 ${characters.length} 名</span>
+          <div class="row" style="min-width:0;gap:10px">
+            ${authorPageButton}
+            <div style="min-width:0">
+              <button type="button" class="followed-author-name" data-action="author" data-id="${e(authorInfo.uid)}">${e(authorInfo.nickname || 'PersonaX 使用者')}</button>
+              <span class="small muted" style="display:block">公開角色 ${characters.length} 名</span>
             </div>
           </div>
-          <button data-action="author" data-id="${e(authorInfo.uid)}" style="white-space:nowrap">more...</button>
+          ${characters.length > 4 ? `<button type="button" class="followed-author-more" data-action="author" data-id="${e(authorInfo.uid)}">MORE</button>` : ''}
         </div>
         ${latest.length ? `<div class="grid">${latest.map(character => card(character)).join('')}</div>` : '<div class="empty">目前沒有公開角色。</div>'}
       </section>`;
@@ -5257,20 +5278,24 @@ function renderModal(o) {
             <button class="primary" style="margin-top:20px">套用</button>
           </form>`);
       } else {
-        showDialog('自訂角色標籤',`
-          <form data-form="tags">
-            <p class="muted small">自行輸入標籤，每個2–10個字，最多5個；不再提供預設標籤。</p>
-            <label class="field"><span>新增標籤</span><div class="row">
-              <input name="tagInput" maxlength="30" placeholder="例如：慢熱治癒、嘴硬心軟" autocomplete="off">
-              <button type="button" data-action="add-custom-tag">新增</button>
-            </div></label>
-            <label class="field"><span>搜尋已存在的標籤</span><input name="tagSearch" type="search" placeholder="輸入關鍵字篩選，例如：慢熱" autocomplete="off"></label>
-            <p class="small muted">可直接選用其他公開角色使用過的標籤，也可以新增標籤。最多選擇5個。</p>
-            <div id="customTagList" class="stack" style="gap:8px">
-              ${[...new Set([...availableExploreTags(), ...draftTags])].sort((a,b) => a.localeCompare(b, 'zh-Hant')).map(t => `<label class="check" data-tag-option="${e(t)}"><input type="checkbox" name="tag" value="${e(t)}" ${draftTags.includes(t) ? 'checked' : ''}> ${e(t)}</label>`).join('') || '<p class="small muted">尚無已建立標籤，可在上方新增第一個標籤。</p>'}
+        const tagOptions = [...new Set([...availableExploreTags(), ...draftTags])]
+          .filter(validCharacterTag)
+          .sort((a,b) => a.localeCompare(b, 'zh-Hant'));
+        showDialog('角色標籤',`
+          <form data-form="tags" class="tag-picker">
+            <label class="field tag-picker-search-field">
+              <input name="tagSearch" type="search" maxlength="10" placeholder="輸入標籤關鍵字，例如：愛" autocomplete="off" aria-label="搜尋或新增角色標籤">
+              <small>最多10字</small>
+            </label>
+            <div id="customTagResults" class="tag-picker-chips" aria-live="polite"></div>
+            <div id="customTagList" class="tag-picker-options" aria-hidden="true">
+              ${tagOptions.map(t => `<input type="checkbox" name="tag" value="${e(t)}" ${draftTags.includes(t) ? 'checked' : ''}>`).join('')}
             </div>
-            <button class="primary" style="margin-top:20px">套用</button>
+            <div class="tag-picker-selected-heading"><span>已選擇標籤</span><strong id="customTagCount">[${draftTags.length}/5]</strong></div>
+            <div id="customTagSelected" class="tag-picker-chips tag-picker-selected"></div>
+            <button class="primary tag-picker-apply" style="margin-top:18px;width:100%">套用</button>
           </form>`);
+        refreshCustomTagPicker();
       }
       break;
     case 'delete-character':
@@ -5668,24 +5693,53 @@ document.addEventListener('click', async event => {
   }
 }, true);
 
-/* Shared character-tag picker: search global public tags and enforce the five-tag limit. */
+/* Shared character-tag picker: live-search chips, selected count, and a five-tag limit. */
+function refreshCustomTagPicker() {
+  const modal=$('modal');
+  const input=modal?.querySelector('input[name="tagSearch"]');
+  const options=modal?.querySelector('#customTagList');
+  const results=modal?.querySelector('#customTagResults');
+  const selectedArea=modal?.querySelector('#customTagSelected');
+  const count=modal?.querySelector('#customTagCount');
+  if(!input||!options||!results||!selectedArea||!count)return;
+  const query=String(input.value||'').trim().toLocaleLowerCase('zh-Hant');
+  const checkboxes=[...options.querySelectorAll('input[name="tag"]')];
+  const matches=checkboxes.filter(item=>!query||item.value.toLocaleLowerCase('zh-Hant').includes(query));
+  results.innerHTML=matches.map(item=>`<button type="button" class="tag-picker-chip ${item.checked?'selected':''}" data-action="toggle-custom-tag" data-tag="${e(item.value)}" aria-pressed="${item.checked}">${e(item.value)}${item.checked?' ✓':''}</button>`).join('');
+  if(!matches.length && validCharacterTag(input.value)) {
+    results.innerHTML='<button type="button" class="tag-picker-add" data-action="add-custom-tag">＋ 新增「'+e(String(input.value).trim())+'」</button>';
+  } else if(!matches.length && !query) {
+    results.innerHTML='<p class="small muted">尚無可用標籤，輸入至少2字即可新增。</p>';
+  } else if(!matches.length) {
+    results.innerHTML='<p class="small muted">沒有符合的標籤。</p>';
+  }
+  const chosen=checkboxes.filter(item=>item.checked);
+  count.textContent='['+chosen.length+'/5]';
+  selectedArea.innerHTML=chosen.map(item=>`<button type="button" class="tag-picker-chip selected" data-action="toggle-custom-tag" data-tag="${e(item.value)}" aria-label="取消選擇 ${e(item.value)}">${e(item.value)} ×</button>`).join('') || '<span class="small muted">尚未選擇標籤</span>';
+  const addButton=modal.querySelector('[data-action="add-custom-tag"]');
+  if(addButton) addButton.hidden=!(validCharacterTag(input.value)&&matches.length===0);
+}
 document.addEventListener('input', event => {
-  const input = event.target;
-  if (!(input instanceof HTMLInputElement) || input.name !== 'tagSearch') return;
-  const query = String(input.value || '').trim().toLocaleLowerCase('zh-Hant');
-  document.querySelectorAll('#customTagList [data-tag-option]').forEach(label => {
-    const value = String(label.dataset.tagOption || '').toLocaleLowerCase('zh-Hant');
-    label.classList.toggle('hidden', !!query && !value.includes(query));
-  });
+  const input=event.target;
+  if(input instanceof HTMLInputElement && input.name==='tagSearch' && input.closest('.tag-picker')) refreshCustomTagPicker();
+});
+document.addEventListener('click', event => {
+  const button=event.target.closest('[data-action="toggle-custom-tag"]');
+  if(!button)return;
+  const options=$('modal')?.querySelector('#customTagList');
+  const input=options&&[...options.querySelectorAll('input[name="tag"]')].find(item=>item.value===button.dataset.tag);
+  if(!input)return;
+  const checked=[...options.querySelectorAll('input[name="tag"]:checked')];
+  if(!input.checked&&checked.length>=5){toast('角色最多選擇5個標籤。');return;}
+  input.checked=!input.checked;
+  refreshCustomTagPicker();
 });
 document.addEventListener('change', event => {
-  const input = event.target;
-  if (!(input instanceof HTMLInputElement) || input.name !== 'tag' || !input.closest('#customTagList')) return;
-  const checked = [...document.querySelectorAll('#customTagList input[name="tag"]:checked')];
-  if (checked.length > 5) {
-    input.checked = false;
-    toast('角色最多選擇5個標籤。');
-  }
+  const input=event.target;
+  if(!(input instanceof HTMLInputElement)||input.name!=='tag'||!input.closest('#customTagList'))return;
+  const checked=[...document.querySelectorAll('#customTagList input[name="tag"]:checked')];
+  if(checked.length>5){input.checked=false;toast('角色最多選擇5個標籤。');}
+  refreshCustomTagPicker();
 });
 
 /* Delegated click actions */
@@ -6025,7 +6079,7 @@ document.addEventListener('click',async event => {
       case 'new-batch':batch+=7;limit=24;renderGrid();break;
       case 'tags':openModal('tags',{mode:button.dataset.mode});break;
       case 'add-custom-tag': {
-        const input=$('modal').querySelector('input[name="tagInput"]');
+        const input=$('modal').querySelector('input[name="tagSearch"]');
         const list=$('modal').querySelector('#customTagList');
         if (!input || !list) break;
         const value=String(input.value || '').trim();
@@ -6036,19 +6090,15 @@ document.addEventListener('click',async event => {
         if (existing) {
           if (!existing.checked && checked.length>=5) { toast('角色最多選擇5個標籤。'); break; }
           existing.checked=true;
-          existing.closest('[data-tag-option]')?.classList.remove('hidden');
-          input.value='';input.focus();
-          break;
+        } else {
+          if (checked.length>=5) { toast('角色最多選擇5個標籤。'); break; }
+          const checkbox=document.createElement('input');
+          checkbox.type='checkbox';checkbox.name='tag';checkbox.value=value;checkbox.checked=true;
+          list.appendChild(checkbox);
         }
-        if (checked.length>=5) { toast('角色最多選擇5個標籤。'); break; }
-        const empty=list.querySelector('p');
-        if (empty) empty.remove();
-        const label=document.createElement('label');
-        label.className='check';
-        label.dataset.tagOption=value;
-        label.innerHTML='<input type="checkbox" name="tag" checked value="' + e(value) + '"> ' + e(value);
-        list.appendChild(label);
-        input.value='';input.focus();
+        input.value='';
+        refreshCustomTagPicker();
+        input.focus();
         break;
       }
       case 'remove-draft-tag': {
