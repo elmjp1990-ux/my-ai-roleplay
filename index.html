@@ -3772,7 +3772,7 @@ function chatEntries() {
             <span class="small muted group-chat-preview" title="${e(lastText)}">${e(lastText)}</span>
           </span>
         </button>
-        <button type="button" class="entry-menu group-entry-menu" data-action="group-entry-menu" data-id="${e(group.id)}" aria-label="群組對話選項" title="群組對話選項">⋯</button>
+        <button type="button" class="entry-menu group-entry-menu" data-action="group-entry-menu" data-id="${e(group.id)}" aria-label="刪除這段對話與回憶" title="刪除這段對話與回憶">⋯</button>
       </div>`;
     }
     const s=item.value;
@@ -3794,7 +3794,7 @@ function chatEntries() {
           <span class="small muted">${chatListDate(last?.at||s.startedAt)}</span></div>
         <div class="ellipsis small muted">${e(last?.text||'')}</div>
       </button>
-      <button class="entry-menu" data-action="session-menu" data-id="${e(s.id)}" aria-label="聊天選項">⋯</button>
+      <button class="entry-menu" data-action="session-menu" data-id="${e(s.id)}" aria-label="刪除這段對話與回憶" title="刪除這段對話與回憶">⋯</button>
     </div>`;
   }).join('')||'<div class="empty">還沒有符合條件的對話。</div>';
   return rows+errorNotice;
@@ -4231,7 +4231,12 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
   }
   if(kind==='manage-conversation'){
     if(ctx.isGroup)return;
-    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="管理對話"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回聊天功能" title="返回聊天功能">'+ICON.back+'</button><h2>管理對話</h2></div><p class="small muted">同一角色只會在聊天列表保留一個目前對話；切換歷史時，當前對話會先封存。</p><div class="stack"><button type="button" class="primary" data-action="new-conversation" data-id="'+e(ctx.id)+'">開始新對話</button></div></section>');
+    const archives=Object.values(state.sessions).filter(item=>item.characterId===ctx.session.characterId&&item.archived).sort((a,b)=>(b.archivedAt||0)-(a.archivedAt||0));
+    const archiveCards=archives.map(item=>{
+      const messageCount=item.messages.filter(message=>message.role==='user'&&String(message.text||'').trim()).length;
+      return '<article class="archive-card"><strong>'+e(item.name||sessionTitle(item))+'</strong><p class="small muted" style="margin:8px 0">'+e(timeText(item.archivedAt||item.startedAt))+'<br>玩家訊息 '+messageCount+' 筆 · 日記 '+item.memories.length+' 筆 · 相片 '+item.album.length+' 張</p><div class="row wrap"><button data-action="view-archive" data-id="'+e(item.id)+'">查看回憶</button><button data-action="resume-archive" data-id="'+e(item.id)+'">繼續聊天</button><button data-action="rename-archive" data-id="'+e(item.id)+'">編輯檔名</button></div></article>';
+    }).join('');
+    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="管理對話"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回聊天功能" title="返回聊天功能">'+ICON.back+'</button><h2>管理對話</h2></div><p class="small muted">開始新對話後，舊劇情會封存於下方；切換歷史時，當前對話會先封存。同一角色只會在聊天列表保留一個目前對話。</p><div class="stack"><button type="button" class="primary" data-action="new-conversation" data-id="'+e(ctx.id)+'">開始新對話</button></div><h3 style="margin:18px 0 8px">舊的回憶</h3><div class="stack">'+(archiveCards||'<div class="empty">尚無封存對話；開始新對話後，舊劇情會顯示在這裡。</div>')+'</div></section>');
     return;
   }
   if(kind==='settings'){
@@ -5405,7 +5410,7 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
     case 'session-menu': {
       const selected=state.sessions[o.id]||s;
       if(!selected)return;
-      showDialog('對話選項',`<div class="stack"><button type="button" class="danger" style="width:100%" data-action="remove-session" data-id="${e(selected.id)}">刪除這段對話與回憶</button></div>`);
+      showDialog('刪除',`<p>刪除這段對話與回憶</p><p class="small muted">確定要刪除嗎？此操作無法復原。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="remove-session" data-id="${e(selected.id)}">確認刪除</button></div>`);
       break;
     }
     case 'chat-settings': {
@@ -6310,13 +6315,13 @@ document.addEventListener('click',async event => {
       case 'group-entry-menu': {
         const group=(groupPrototype.groups||[]).find(item=>item.id===key);
         if(!group) { toast('找不到這個群組，請重新載入清單。'); break; }
-        showDialog('群組對話選項', '<div class="stack"><button type="button" class="danger" style="width:100%" data-action="group-delete-confirm" data-id="'+e(group.id)+'">刪除這段對話與回憶</button></div>');
+        showDialog('刪除', '<p>刪除這段對話與回憶</p><p class="small muted">確定要刪除嗎？此操作無法復原。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="group-delete" data-id="'+e(group.id)+'">確認刪除</button></div>');
         break;
       }
       case 'group-delete-confirm': {
         const group=(groupPrototype.groups||[]).find(item=>item.id===key);
         if(!group) { toast('找不到這個群組，請重新載入清單。'); break; }
-        showDialog('確認刪除群組', '<p>確定刪除此對話與回憶，刪除後無法復原哦。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="group-delete" data-id="'+e(group.id)+'">確認刪除</button></div>');
+        showDialog('刪除', '<p>刪除這段對話與回憶</p><p class="small muted">確定要刪除嗎？此操作無法復原。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="group-delete" data-id="'+e(group.id)+'">確認刪除</button></div>');
         break;
       }
       case 'group-delete': {
@@ -6354,7 +6359,6 @@ document.addEventListener('click',async event => {
       case 'remove-session': {
         const item=state.sessions[key];
         if (!item) break;
-        if (!confirm('確定刪除此對話與回憶，操作後無法復原哦')) break;
         const uid=currentUser()?.uid;
         if (item.cloudOwned && uid && item.cloudOwnerUid === uid && window.mySupabase) {
           const client=window.mySupabase;
@@ -6505,8 +6509,8 @@ document.addEventListener('click',async event => {
           break;
         }
         if (!hasUserMessage(s)) {
-          // 這個空白草稿本身就是新對話；只有玩家明確點選「開始新對話」後才顯示舊回憶清單。
-          openModal('archives',{id:s.id});
+          // 空白草稿已是新對話；在同一管理視窗內顯示封存清單。
+          render();
           break;
         }
         if (!confirm('封存目前劇情並開始新對話？')) break;
@@ -6531,8 +6535,7 @@ document.addEventListener('click',async event => {
           nextSession=newSession(c,{persona:s.persona,background:s.background,suggestions:s.suggestions});
           persist();
         }
-        go({page:'conversation',id:nextSession.id});
-        openModal('archives',{id:nextSession.id});
+        go({page:'conversation',id:nextSession.id,chatOverlay:'manage-conversation'});
         break;
       }
       case 'resume-chat': {
