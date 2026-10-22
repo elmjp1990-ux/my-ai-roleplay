@@ -2630,10 +2630,11 @@ function showDialog(title,content) {
   modal.style.height='';
   modal.style.overflowY='';
   const pendingDeletionDialog = route?.overlay?.name === 'account-deletion-pending' && title === '帳號正在等待刪除';
+  const deleteConfirmDialog = title === '刪除';
   modal.innerHTML = `
     <div class="row between modal-heading">
       <h2>${e(title)}</h2>
-      <button class="ghost" data-action="${pendingDeletionDialog ? 'pending-switch-account' : 'back'}"
+      <button class="ghost" data-action="${pendingDeletionDialog ? 'pending-switch-account' : deleteConfirmDialog ? 'delete-dialog-back' : 'back'}"
               aria-label="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}"
               title="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}">✕</button>
     </div>${content}`;
@@ -6008,6 +6009,11 @@ document.addEventListener('click',async event => {
         createVisibilityFilter = ['all','public','private'].includes(button.dataset.value) ? button.dataset.value : 'all';
         renderCreate();
         break;
+      case 'delete-dialog-back': {
+        $('modal')?.close();
+        if (route.page === 'conversation' || route.page === 'group') go({page:'chat'});
+        break;
+      }
       case 'back':back();break;
       case 'collapse':document.body.classList.toggle('collapsed');break;
       case 'environment':openModal('environment');break;
@@ -6353,7 +6359,7 @@ document.addEventListener('click',async event => {
       case 'remove-session-confirm': {
         const item=state.sessions[key];
         if(!item)break;
-        showDialog('刪除','<p>刪除這段對話與回憶</p><p class="small muted">確定要刪除嗎？此操作無法復原。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="remove-session" data-id="'+e(item.id)+'">確認刪除</button></div>');
+        showDialog('刪除','<p>刪除這段對話與回憶</p><p class="small muted">確定要刪除嗎？此操作無法復原。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="delete-dialog-back">取消</button><button type="button" class="danger" data-action="remove-session" data-id="'+e(item.id)+'">確認刪除</button></div>');
         break;
       }
       case 'remove-session': {
