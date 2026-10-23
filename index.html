@@ -907,6 +907,26 @@ body.group-chat-page main:has(.group-wizard) {
   padding:16px 12px calc(32px + env(safe-area-inset-bottom));
 }
 
+/* Keep the creation wizard scrollable even when the surrounding mobile app shell is fixed. */
+@media(max-width:767px){
+  body.group-chat-page:has(.group-wizard) #view{
+    display:block!important;
+    height:100dvh!important;
+    min-height:0!important;
+    max-height:100dvh!important;
+    overflow-x:hidden!important;
+    overflow-y:auto!important;
+    overscroll-behavior-y:contain;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-y;
+    padding-bottom:calc(32px + env(safe-area-inset-bottom));
+  }
+  body.group-chat-page:has(.group-wizard) main{
+    overflow:visible!important;
+    height:auto!important;
+    max-height:none!important;
+  }
+}
 /* GROUP-01 integrated test-mode prototype */
 .group-wizard{max-width:850px;margin:0 auto;display:grid;gap:16px;min-height:0}
 @media(max-width:767px){
@@ -6117,7 +6137,7 @@ document.addEventListener('click',async event => {
           '<div><strong>參與角色（'+group.members.length+'/3）</strong>'+memberRows+'</div>'+
           '<div><strong>場景設定</strong>'+scenes+'</div>'+
           '<div><strong>玩家角色</strong><p style="margin:6px 0"><strong>'+e(group.playerName||'玩家')+'</strong></p><div class="group-panel" style="padding:10px;white-space:pre-wrap;overflow-wrap:anywhere">'+e(group.playerPersona||'尚未設定玩家人設。')+'</div></div>'+
-          '<p class="muted small">群組對話獨立保存；目前為測試模式，AI 尚未串接且不會扣款。</p></div>');
+          '<p class="muted small">群組對話獨立保存；目前 AI 尚未串接，群組每回合依成員數扣款（每位角色 3 點，銀幣優先、鑽石補足）。</p></div>');
         break;
       }
       case 'group-rename':groupRename(key);break;
