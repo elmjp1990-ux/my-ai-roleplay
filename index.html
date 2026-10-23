@@ -915,6 +915,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 .group-character-option{display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid var(--border);border-radius:12px}
 .group-character-option input{width:auto;margin-top:5px}
 .group-actions{display:flex;justify-content:space-between;gap:8px;margin-top:18px}
+.group-charge-note{display:block;padding:4px 10px 0;color:var(--muted);font-size:11px;line-height:1.5}
 .group-chat-log{display:grid;gap:10px;margin:18px 0}
 .group-bubble{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--panel2);padding:12px 14px;border-radius:13px}
 .group-bubble.user{margin-left:auto;background:#3730a3;color:#fff;max-width:88%}
@@ -4277,6 +4278,7 @@ ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
           <div class="composer-input-row">
             <textarea id="groupMessageInput" name="text" maxlength="1000" rows="1" placeholder="留空發送，角色會繼續說下去" aria-label="輸入群組訊息" ${g.sending?'disabled':''}>${e(g.pendingRequest?.groupId===group.id && g.pendingRequest.content!==GROUP_CONTINUE_SENTINEL?g.pendingRequest.content:'')}</textarea>
           </div>
+          <small class="group-charge-note">本回合需 ${(group.members||[]).length * 3} 點（每位角色 3 點）；建立群組免費，銀幣優先、不足由鑽石補足。</small>
           <div class="composer-bottom-row">
             <div class="composer-bottom-left">
               <button type="button" class="composer-icon-button" data-action="toggle-chat-tools" aria-label="展開聊天功能" aria-expanded="false" title="更多功能">${ICON.plus}</button>
@@ -4721,6 +4723,8 @@ async function groupSendMock() {
     ensureGroupDiaryMemories();
     g.sending=false;g.formError='';
     renderGroupConversation();
+    const chargedPoints=(members.length||0)*3;
+    toast(`本回合已扣除 ${chargedPoints} 點（${members.length} 位角色 × 3 點；銀幣優先）`);
     const messagePane=$('groupMessages');
     if(messagePane) requestAnimationFrame(()=>{if(messagePane.isConnected) messagePane.scrollTop=messagePane.scrollHeight;});
   } catch(error) {
