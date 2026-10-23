@@ -3998,6 +3998,7 @@ function groupFriendlyError(error) {
   if(message.includes('invalid_scenes')||message.includes('invalid_scene_payload')||message.includes('invalid_scene_position')) return '場景資料不完整或角色場景指派不正確，請檢查後重試。';
   if(message.includes('group_not_found_or_not_accessible')) return '找不到群組，或目前帳號沒有存取權限。';
   if(message.includes('idempotency_key_reused_with_different_content')) return '這次送出識別碼已對應其他內容，請重新送出。';
+  if(message.includes('group_insufficient_funds')) return '群組聊天點數不足：每位角色每回合需 3 點，2 位角色需 6 點、3 位需 9 點。系統會優先扣銀幣，不足部分再扣鑽石。請先補充點數。';
   if(message.includes('invalid_message_content')) return '訊息需為 1–2000 字。';
   if(message.includes('group_insufficient_funds')) return '錢包餘額不足，請先取得銀幣或鑽石後再送出群組訊息。';
   if(message.includes('authentication_required')||message.includes('JWT')||message.includes('登入狀態')) return '登入狀態已失效，請重新登入後再試。';
