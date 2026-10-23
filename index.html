@@ -910,19 +910,27 @@ body.group-chat-page main:has(.group-wizard) {
 /* GROUP-01 integrated test-mode prototype */
 .group-wizard{max-width:850px;margin:0 auto;display:grid;gap:16px;min-height:0}
 @media(max-width:767px){
-  /* Keep the wizard's content in a real touch-scroll container on mobile.
-     overflow-y:visible cancels scrolling and clips the lower creation controls
-     when the app shell has its own viewport/overflow rules. */
-  body.group-chat-page:has(.group-wizard) main:has(.group-wizard){
-    height:auto!important;min-height:100dvh;max-height:none!important;
-    overflow-x:hidden;overflow-y:auto!important;
-    -webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;touch-action:pan-y;
-    padding-bottom:calc(32px + env(safe-area-inset-bottom))
-  }
+  /* Use the wizard itself as the touch-scroll viewport. The group chat shell
+     normally locks main to 100dvh with overflow:hidden, so relying on page
+     scrolling alone can leave the lower creation fields unreachable. */
   body.group-chat-page:has(.group-wizard),
-  body.group-chat-page:has(.group-wizard) .app{height:auto!important;min-height:100dvh;overflow:visible!important}
-  .group-wizard{height:auto;max-height:none;overflow:visible;overscroll-behavior-y:auto;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
-  .group-panel{min-height:0}
+  body.group-chat-page:has(.group-wizard) .app{
+    height:100dvh!important;min-height:100dvh!important;overflow:hidden!important
+  }
+  body.group-chat-page:has(.group-wizard) main:has(.group-wizard){
+    height:100dvh!important;min-height:0!important;max-height:100dvh!important;
+    overflow:hidden!important;padding:calc(8px + env(safe-area-inset-top)) 12px 0!important
+  }
+  body.group-chat-page:has(.group-wizard) #view{
+    height:100%;min-height:0;overflow:hidden
+  }
+  body.group-chat-page:has(.group-wizard) .group-wizard{
+    display:grid;height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 8px)!important;
+    min-height:0!important;max-height:none!important;overflow-x:hidden!important;overflow-y:auto!important;
+    overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;
+    align-content:start;padding:8px 0 calc(24px + env(safe-area-inset-bottom));box-sizing:border-box
+  }
+  body.group-chat-page:has(.group-wizard) .group-panel{min-height:0;overflow:visible}
 }
 .group-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .group-step{padding:9px 6px;text-align:center;border:1px solid var(--border);border-radius:10px;color:var(--muted);background:var(--panel2)}
@@ -934,6 +942,7 @@ body.group-chat-page main:has(.group-wizard) {
 .group-character-option{display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid var(--border);border-radius:12px}
 .group-character-option input{width:auto;margin-top:5px}
 .group-actions{display:flex;justify-content:space-between;gap:8px;margin-top:18px}
+.group-charge-note{display:block;padding:4px 10px 0;color:var(--muted);font-size:11px;line-height:1.5}
 .group-chat-log{display:grid;gap:10px;margin:18px 0}
 .group-bubble{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--panel2);padding:12px 14px;border-radius:13px}
 .group-bubble.user{margin-left:auto;background:#3730a3;color:#fff;max-width:88%}
@@ -4287,6 +4296,7 @@ ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
           <div class="composer-input-row">
             <textarea id="groupMessageInput" name="text" maxlength="1000" rows="1" placeholder="留空發送，角色會繼續說下去" aria-label="輸入群組訊息" ${g.sending?'disabled':''}>${e(g.pendingRequest?.groupId===group.id && g.pendingRequest.content!==GROUP_CONTINUE_SENTINEL?g.pendingRequest.content:'')}</textarea>
           </div>
+          <small class="group-charge-note">本回合需 ${(group.members||[]).length * 3} 點（每位角色 3 點）；建立群組免費，銀幣優先、不足由鑽石補足。</small>
           <div class="composer-bottom-row">
             <div class="composer-bottom-left">
               <button type="button" class="composer-icon-button" data-action="toggle-chat-tools" aria-label="展開聊天功能" aria-expanded="false" title="更多功能">${ICON.plus}</button>
