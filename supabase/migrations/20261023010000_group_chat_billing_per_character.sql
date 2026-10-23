@@ -122,6 +122,10 @@ BEGIN
       updated_at = now()
   WHERE w.user_id = v_user_id;
 
+  SELECT count(*)::integer % v_member_count INTO v_pick
+  FROM public.chat_group_turns t
+  WHERE t.group_id = p_group_id;
+
   INSERT INTO public.chat_group_turns(group_id, user_id, request_key, request_content)
   VALUES (p_group_id, v_user_id, p_request_key, btrim(p_content))
   ON CONFLICT (group_id, request_key) DO NOTHING
@@ -132,10 +136,6 @@ BEGIN
   IF v_turn_id IS NULL THEN
     RAISE EXCEPTION 'group_turn_request_conflict' USING ERRCODE = '40001';
   END IF;
-
-  SELECT count(*)::integer % v_member_count INTO v_pick
-  FROM public.chat_group_turns t
-  WHERE t.group_id = p_group_id;
 
   SELECT
     m.character_id,
