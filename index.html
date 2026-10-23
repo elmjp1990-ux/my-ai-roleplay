@@ -638,14 +638,14 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 <aside class="sidebar">
   <div class="sidebar-heading">
     <button class="ghost logo-button" data-action="home" aria-label="首頁">
-      <img class="logo-img" alt="PersonaX">
+      <img class="logo-img" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%2240%22 viewBox=%220 0 180 40%22%3E%3Cpath fill=%22%23a5b4fc%22 d=%22M18 4 23 15 34 20 23 25 18 36 13 25 2 20 13 15Z%22/%3E%3Ctext x=%2243%22 y=%2228%22 fill=%22%23a5b4fc%22 font-family=%22Arial,sans-serif%22 font-size=%2225%22 font-weight=%22800%22%3EPersonaX%3C/text%3E%3C/svg%3E" alt="PersonaX">
     </button>
     <button class="ghost" data-action="collapse" aria-label="收合或展開網站選單">☰</button>
   </div>
   <nav id="desktopNav"></nav>
   <div class="sidebar-footer">
     <button class="ghost" data-action="home" aria-label="首頁">
-      <img class="logo-img" alt="PersonaX">
+      <img class="logo-img" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%2240%22 viewBox=%220 0 180 40%22%3E%3Cpath fill=%22%23a5b4fc%22 d=%22M18 4 23 15 34 20 23 25 18 36 13 25 2 20 13 15Z%22/%3E%3Ctext x=%2243%22 y=%2228%22 fill=%22%23a5b4fc%22 font-family=%22Arial,sans-serif%22 font-size=%2225%22 font-weight=%22800%22%3EPersonaX%3C/text%3E%3C/svg%3E" alt="PersonaX">
     </button>
   </div>
 </aside>
@@ -654,7 +654,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   <header>
     <div class="row">
       <button class="ghost mobile-logo" data-action="home" aria-label="首頁">
-        <img class="logo-img" alt="PersonaX">
+        <img class="logo-img" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%2240%22 viewBox=%220 0 180 40%22%3E%3Cpath fill=%22%23a5b4fc%22 d=%22M18 4 23 15 34 20 23 25 18 36 13 25 2 20 13 15Z%22/%3E%3Ctext x=%2243%22 y=%2228%22 fill=%22%23a5b4fc%22 font-family=%22Arial,sans-serif%22 font-size=%2225%22 font-weight=%22800%22%3EPersonaX%3C/text%3E%3C/svg%3E" alt="PersonaX">
       </button>
       <strong class="desktop-title" id="pageTitle"></strong>
     </div>
@@ -674,8 +674,16 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   const SUPABASE_URL = 'https://ouyewoagbmtqehbofrje.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_MyTDqAKNTkK4zo7eap8gZA_ZGozHRMd';
 
+  // Supabase CDN 暫時載入失敗時，不可因此中斷整份主程式、Logo 或首頁渲染。
+  // 公開瀏覽與本機示範頁仍可開啟；雲端登入／資料操作待 SDK 可用後才能使用。
+  let supabaseSdkUnavailable = false;
   if (!window.mySupabase) {
-    window.mySupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    if (window.supabase && typeof window.supabase.createClient === 'function') {
+      window.mySupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } else {
+      supabaseSdkUnavailable = true;
+      console.error('Supabase JS SDK 載入失敗：請檢查 CDN 連線。首頁仍會繼續載入。');
+    }
   }
 
   /*
@@ -4696,6 +4704,11 @@ route=parseRoute();
 history.replaceState({personax:true,depth:0,route},'',routeURL(route));
 persist();
 render();
+
+// SDK/CDN 不可用時保留可見頁面，並明確提示雲端功能暫不可用。
+if (supabaseSdkUnavailable) {
+  toast('首頁已載入，但雲端服務元件連線失敗；請稍後重新整理，登入與雲端資料暫不可用。');
+}
 
 // Supabase Auth 的 load 事件會在此之後恢復真正的登入身分。
 // 這裡不再另外建立第二套登入 UI，避免兩套狀態互相覆蓋。
