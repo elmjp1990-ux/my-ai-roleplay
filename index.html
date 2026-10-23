@@ -2668,7 +2668,7 @@ function showDialog(title,content) {
   modal.style.overflowY='';
   const pendingDeletionDialog = route?.overlay?.name === 'account-deletion-pending' && title === '帳號正在等待刪除';
   const deleteConfirmDialog = title === '刪除';
-  const walletDialog = title === '我的資源' || title === '銀幣或鑽石不足';
+  const walletDialog = title === '我的資源' || title === '銀幣或鑽石不足' || title === '廣告功能尚未串接';
   modal.dataset.walletDialog = walletDialog ? 'true' : 'false';
   modal.innerHTML = `
     <div class="row between modal-heading">
@@ -8103,9 +8103,7 @@ function openInsufficientFundsDialog(mode) {
   const diamondOption=enoughTotal
     ? '<button type="button" class="primary" data-action="wallet-confirm-diamonds" data-mode="'+mode+'">使用鑽石</button>'
     : '<button type="button" disabled title="銀幣與鑽石餘額不足">使用鑽石</button>';
-  const body=enoughTotal
-    ? '你的銀幣不足，繼續對話將花費以下：'
-    : '你的銀幣或鑽石不足，繼續對話將花費以下：';
+  const body='你的銀幣或鑽石不足，繼續對話將花費以下：';
   showDialog('銀幣或鑽石不足',`
     <p>${body}</p>
     <div class="wallet-modal-cost" aria-label="預計扣款">${chargePreview||'💎 −'+cost+' <small>(持有 '+diamonds+')</small>'}</div>
