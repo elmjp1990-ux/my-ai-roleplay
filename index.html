@@ -442,6 +442,29 @@ body.group-chat-page .chat-main { height:100%; border:0; border-radius:0; }
 body.group-chat-page .chat-heading { padding-top:calc(8px + env(safe-area-inset-top)); }
 body.group-chat-page .messages { padding:14px 10px; }
 body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-bottom)); }
+
+/* Group creation wizard must scroll independently from the full-screen chat shell. */
+body.group-chat-page:has(.group-wizard) {
+  height:auto;
+  min-height:100dvh;
+  overflow-y:auto;
+}
+body.group-chat-page:has(.group-wizard) .app {
+  height:auto;
+  min-height:100dvh;
+  overflow:visible;
+}
+body.group-chat-page:has(.group-wizard) main {
+  height:auto;
+  min-height:100dvh;
+  overflow:visible;
+  padding-bottom:calc(24px + env(safe-area-inset-bottom));
+}
+body.group-chat-page:has(.group-wizard) #view {
+  min-height:100%;
+  overflow:visible;
+}
+
 .chat-layout {
   display:grid;
   grid-template-columns:250px minmax(0,1fr);
