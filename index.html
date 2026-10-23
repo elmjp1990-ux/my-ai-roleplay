@@ -907,31 +907,30 @@ body.group-chat-page main:has(.group-wizard) {
   padding:16px 12px calc(32px + env(safe-area-inset-bottom));
 }
 
-/* Keep the group-creation wizard scrollable on mobile even when the chat shell normally locks the viewport. */
-body.group-wizard-page,
-body.group-wizard-page .app {
-  height:auto!important;
-  min-height:100dvh;
-  max-height:none!important;
-  overflow:visible!important;
-}
-body.group-wizard-page main {
-  height:auto!important;
-  min-height:100dvh;
-  max-height:none!important;
-  overflow-x:hidden!important;
-  overflow-y:auto!important;
-  overscroll-behavior-y:contain;
-  -webkit-overflow-scrolling:touch;
-  touch-action:pan-y;
-  padding-bottom:calc(32px + env(safe-area-inset-bottom));
-}
-body.group-wizard-page .group-wizard {
-  height:auto!important;
-  min-height:0;
-  max-height:none!important;
-  overflow:visible!important;
-  padding-bottom:calc(16px + env(safe-area-inset-bottom));
+/* Use the wizard itself as a mobile touch-scroll viewport. The chat route
+   normally locks main to 100dvh; scrolling the document alone can be clipped. */
+@media(max-width:767px) {
+  body.group-wizard-page,
+  body.group-wizard-page .app {
+    height:100dvh!important;min-height:100dvh!important;max-height:100dvh!important;
+    overflow:hidden!important
+  }
+  body.group-wizard-page main {
+    height:100dvh!important;min-height:0!important;max-height:100dvh!important;
+    overflow:hidden!important;
+    padding:calc(8px + env(safe-area-inset-top)) 12px 0!important
+  }
+  body.group-wizard-page #view {
+    height:100%;min-height:0;overflow:hidden
+  }
+  body.group-wizard-page .group-wizard {
+    display:grid;height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 8px)!important;
+    min-height:0!important;max-height:none!important;
+    overflow-x:hidden!important;overflow-y:auto!important;
+    overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;
+    align-content:start;padding:8px 0 calc(24px + env(safe-area-inset-bottom));box-sizing:border-box
+  }
+  body.group-wizard-page .group-panel {min-height:0;overflow:visible}
 }
 /* GROUP-01 integrated test-mode prototype */
 .group-wizard{max-width:850px;margin:0 auto;display:grid;gap:16px;min-height:0}
@@ -960,6 +959,7 @@ body.group-wizard-page .group-wizard {
 .group-character-option{display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid var(--border);border-radius:12px}
 .group-character-option input{width:auto;margin-top:5px}
 .group-actions{display:flex;justify-content:space-between;gap:8px;margin-top:18px}
+.group-charge-note{display:block;padding:4px 10px 0;color:var(--muted);font-size:11px;line-height:1.5}
 .group-chat-log{display:grid;gap:10px;margin:18px 0}
 .group-bubble{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--panel2);padding:12px 14px;border-radius:13px}
 .group-bubble.user{margin-left:auto;background:#3730a3;color:#fff;max-width:88%}
@@ -4314,6 +4314,7 @@ ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
           <div class="composer-input-row">
             <textarea id="groupMessageInput" name="text" maxlength="1000" rows="1" placeholder="留空發送，角色會繼續說下去" aria-label="輸入群組訊息" ${g.sending?'disabled':''}>${e(g.pendingRequest?.groupId===group.id && g.pendingRequest.content!==GROUP_CONTINUE_SENTINEL?g.pendingRequest.content:'')}</textarea>
           </div>
+          <small class="group-charge-note">本回合需 ${(group.members||[]).length * 3} 點（每位角色 3 點）；建立群組免費，銀幣優先、不足由鑽石補足。</small>
           <div class="composer-bottom-row">
             <div class="composer-bottom-left">
               <button type="button" class="composer-icon-button" data-action="toggle-chat-tools" aria-label="展開聊天功能" aria-expanded="false" title="更多功能">${ICON.plus}</button>
