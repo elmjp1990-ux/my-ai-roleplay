@@ -638,14 +638,14 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 <aside class="sidebar">
   <div class="sidebar-heading">
     <button class="ghost logo-button" data-action="home" aria-label="首頁">
-      <img class="logo-img" alt="PersonaX">
+      <img class="logo-img" alt="PersonaX" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='40' viewBox='0 0 180 40'%3E%3Cpath fill='%23a5b4fc' d='M18 4 23 15 34 20 23 25 18 36 13 25 2 20 13 15Z'/%3E%3Ctext x='43' y='28' fill='%23a5b4fc' font-family='Arial,sans-serif' font-size='25' font-weight='800'%3EPersonaX%3C/text%3E%3C/svg%3E">
     </button>
     <button class="ghost" data-action="collapse" aria-label="收合或展開網站選單">☰</button>
   </div>
   <nav id="desktopNav"></nav>
   <div class="sidebar-footer">
     <button class="ghost" data-action="home" aria-label="首頁">
-      <img class="logo-img" alt="PersonaX">
+      <img class="logo-img" alt="PersonaX" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='40' viewBox='0 0 180 40'%3E%3Cpath fill='%23a5b4fc' d='M18 4 23 15 34 20 23 25 18 36 13 25 2 20 13 15Z'/%3E%3Ctext x='43' y='28' fill='%23a5b4fc' font-family='Arial,sans-serif' font-size='25' font-weight='800'%3EPersonaX%3C/text%3E%3C/svg%3E">
     </button>
   </div>
 </aside>
@@ -654,7 +654,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   <header>
     <div class="row">
       <button class="ghost mobile-logo" data-action="home" aria-label="首頁">
-        <img class="logo-img" alt="PersonaX">
+        <img class="logo-img" alt="PersonaX" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='40' viewBox='0 0 180 40'%3E%3Cpath fill='%23a5b4fc' d='M18 4 23 15 34 20 23 25 18 36 13 25 2 20 13 15Z'/%3E%3Ctext x='43' y='28' fill='%23a5b4fc' font-family='Arial,sans-serif' font-size='25' font-weight='800'%3EPersonaX%3C/text%3E%3C/svg%3E">
       </button>
       <strong class="desktop-title" id="pageTitle"></strong>
     </div>
@@ -674,8 +674,14 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   const SUPABASE_URL = 'https://ouyewoagbmtqehbofrje.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_MyTDqAKNTkK4zo7eap8gZA_ZGozHRMd';
 
-  if (!window.mySupabase) {
-    window.mySupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // Supabase CDN 若暫時無法載入，不可讓整個首頁在初始化階段中止。
+  // 登入與雲端功能會在客戶端不可用時自然失敗，但本機首頁仍須可渲染。
+  if (!window.mySupabase && window.supabase?.createClient) {
+    try {
+      window.mySupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch (error) {
+      console.error('Supabase 客戶端初始化失敗：', error);
+    }
   }
 
   /*
