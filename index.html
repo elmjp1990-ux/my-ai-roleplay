@@ -8101,10 +8101,7 @@ function walletPreflight(mode) {
   }
   walletDiamondConsentOnce='';
   const remembered=getTodayWalletChoice(mode);
-  if(remembered==='diamonds' && diamonds>=neededDiamonds) {
-    walletDiamondConsentOnce=mode;
-    return true;
-  }
+  if(remembered==='diamonds' && diamonds>=neededDiamonds) return true;
   if(remembered==='ad' && mode==='single') {
     showWalletAdUnavailable();
     return false;
