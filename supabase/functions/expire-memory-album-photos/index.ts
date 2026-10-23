@@ -31,8 +31,9 @@ Deno.serve(async (req: Request) => {
   const { data: photos, error: listError } = await supabase
     .from("chat_memory_photos")
     .select("id,owner_id,chat_type,session_id,group_id,storage_path,expires_at,deletion_attempts")
-    .lte("expires_at", now)
-    .is("deleted_at", null)
+    // Expire active photos, but also retry explicit deletions even when deleted_at is set.
+    // soft_delete_chat_memory_photo marks rows as deleting and sets deleted_at immediately.
+    .or(`and(expires_at.lte.${now},deleted_at.is.null),status.eq.deleting,status.eq.delete_failed`)
     .in("status", ["active", "deleting", "delete_failed"])
     .order("expires_at", { ascending: true })
     .limit(100);
