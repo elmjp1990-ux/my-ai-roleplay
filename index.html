@@ -4649,6 +4649,9 @@ async function groupSendMock() {
       p_group_id:g.active.id,p_request_key:g.pendingRequest.requestKey,p_content:content
     }),15000,'訊息保存逾時。請重新開啟群組確認訊息是否已保存，再決定是否重試。');
     if(error) throw error;
+    // The RPC atomically charges the group turn; refresh the visible wallet immediately
+    // so the header and wallet UI do not misleadingly show the pre-charge balance.
+    await refreshWalletBalance();
     const activeGroupId=g.active.id;
     g.pendingRequest=null;
     // Refresh only the message rows; do not reopen the entire group, clear its active
