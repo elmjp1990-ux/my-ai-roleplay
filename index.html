@@ -630,6 +630,7 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .composer-icon-button { width:30px; height:30px; min-width:30px; padding:5px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; background:transparent; border:1px solid var(--border); }
 .composer-icon-button .icon { width:16px; height:16px; }
 .composer-send { width:38px; height:38px; min-width:38px; padding:7px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; }
+.composer-cost{display:inline-flex;align-items:center;white-space:nowrap;font-size:12px;line-height:1.2;color:var(--muted);padding:5px 7px;border:1px solid var(--border);border-radius:999px;background:var(--surface);}
 .composer-wallet { display:flex; align-items:center; gap:8px; font-size:11px; white-space:nowrap; }
 .composer-wallet .wallet-value { display:inline-flex; align-items:center; gap:3px; }
 .composer-wallet .wallet-diamond { color:#dcad35; }
@@ -2369,13 +2370,17 @@ async function runPendingChatTurn(s) {
   }
 
   if (result?.status === 'insufficient_funds' || result?.error === 'insufficient_funds') {
+    // A failed wallet reservation must not leave a USER message that looks sent.
+    s.messages = (s.messages || []).filter(message =>
+      message.id !== turn.userMessageId && message.id !== turn.assistantMessageId
+    );
     delete s.pendingTurn;
     persist();
     renderMessages();
     await saveChatSessionSafely(s);
     await clearCloudPendingTurn(s);
     await refreshWalletBalance();
-    openModal('wallet-insufficient');
+    openInsufficientFundsDialog('single');
     return;
   }
 
@@ -2620,6 +2625,11 @@ window.addEventListener('popstate',event => {
   render();
 });
 $('modal').addEventListener('cancel',event => {
+  if ($('modal').dataset.walletDialog === 'true') {
+    event.preventDefault();
+    $('modal').close();
+    return;
+  }
   event.preventDefault();
   dismissPendingDeletionModal();
 });
@@ -2627,7 +2637,10 @@ $('modal').addEventListener('click',event => {
   if (event.target !== $('modal')) return;
   const r = $('modal').getBoundingClientRect();
   if (event.clientX < r.left || event.clientX > r.right ||
-      event.clientY < r.top || event.clientY > r.bottom) dismissPendingDeletionModal();
+      event.clientY < r.top || event.clientY > r.bottom) {
+    if ($('modal').dataset.walletDialog === 'true') $('modal').close();
+    else dismissPendingDeletionModal();
+  }
 });
 function showDialog(title,content) {
   let modal = $('modal');
@@ -2655,10 +2668,12 @@ function showDialog(title,content) {
   modal.style.overflowY='';
   const pendingDeletionDialog = route?.overlay?.name === 'account-deletion-pending' && title === '帳號正在等待刪除';
   const deleteConfirmDialog = title === '刪除';
+  const walletDialog = title === '我的資源' || title === '銀幣或鑽石不足' || title === '廣告功能尚未串接';
+  modal.dataset.walletDialog = walletDialog ? 'true' : 'false';
   modal.innerHTML = `
     <div class="row between modal-heading">
       <h2>${e(title)}</h2>
-      <button class="ghost" data-action="${pendingDeletionDialog ? 'pending-switch-account' : deleteConfirmDialog ? 'delete-dialog-back' : 'back'}"
+      <button class="ghost" data-action="${walletDialog ? 'wallet-dialog-close' : pendingDeletionDialog ? 'pending-switch-account' : deleteConfirmDialog ? 'delete-dialog-back' : 'back'}"
               aria-label="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}"
               title="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}">✕</button>
     </div>${content}`;
@@ -3961,6 +3976,7 @@ function groupFriendlyError(error) {
   if(message.includes('group_not_found_or_not_accessible')) return '找不到群組，或目前帳號沒有存取權限。';
   if(message.includes('idempotency_key_reused_with_different_content')) return '這次送出識別碼已對應其他內容，請重新送出。';
   if(message.includes('invalid_message_content')) return '訊息需為 1–2000 字。';
+  if(message.includes('group_insufficient_funds')) return '錢包餘額不足，請先取得銀幣或鑽石後再送出群組訊息。';
   if(message.includes('authentication_required')||message.includes('JWT')||message.includes('登入狀態')) return '登入狀態已失效，請重新登入後再試。';
   return message||'操作失敗，請稍後再試。';
 }
@@ -4248,10 +4264,7 @@ ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
               </div>
             </div>
             <div class="composer-bottom-right">
-              <div class="composer-wallet" aria-label="目前錢包餘額">
-                <button type="button" data-action="profile" title="查看錢包"><span class="wallet-value wallet-diamond">💎 ${Number(currentUser()?.diamonds || 0).toLocaleString()}</span></button>
-                <button type="button" data-action="profile" title="查看錢包"><span class="wallet-value wallet-silver">◉ ${Number(currentUser()?.silver || 0).toLocaleString()}</span></button>
-              </div>
+              <button type="button" class="composer-cost wallet-cost-button" data-action="wallet-cost-details" aria-label="查看本次預計扣款與持有資源" title="查看本次預計扣款與持有資源">${walletCostPreviewHTML(Math.max(1,(group.members||[]).length)*3)}</button>
               <button class="primary composer-send" type="button" data-action="group-send" aria-label="送出群組訊息" ${g.sending?'disabled':''}>${ICON.send}</button>
             </div>
           </div>
@@ -4625,6 +4638,7 @@ async function groupSendMock() {
   const content=typedContent || GROUP_CONTINUE_SENTINEL;
   const g=groupPrototype;
   if(g.sending) return;
+  if(!walletPreflight('group')) return;
   if(!window.mySupabase) { g.formError='Supabase 用戶端尚未載入。';render();return; }
   if(!isContinueRequest) {
     const platformCommand=parsePlatformCommand(content);
@@ -4650,7 +4664,11 @@ async function groupSendMock() {
     }),15000,'訊息保存逾時。請重新開啟群組確認訊息是否已保存，再決定是否重試。');
     if(error) throw error;
     const activeGroupId=g.active.id;
-    g.pendingRequest=null;
+    // The RPC commits the group turn and wallet debit atomically. Refresh the visible
+    // wallet immediately so the header/composer never keeps showing the pre-charge balance.
+    await refreshWalletBalance();
+    // Keep the same request key until the saved messages are reloaded successfully. If
+    // that read times out, retrying the send reuses the key and cannot charge twice.
     // Refresh only the message rows; do not reopen the entire group, clear its active
     // state, or flash the loading screen after every send.
     const {data:rows,error:rowsError}=await groupWithTimeout(
@@ -4672,6 +4690,7 @@ async function groupSendMock() {
       return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user' && m.content===GROUP_CONTINUE_SENTINEL ? '' : m.content,createdAt:m.created_at};
     });
     g.turn=g.messages.filter(m=>m.type==='user').length;
+    g.pendingRequest=null;
     // Refresh cumulative character-card counts after a group turn has been saved.
     // The database RPC already includes group messages; invalidate the stale frontend cache.
     void loadCharacterTurnCounts(members.map(member=>member.characterId||member.id), true);
@@ -4681,7 +4700,15 @@ async function groupSendMock() {
     const messagePane=$('groupMessages');
     if(messagePane) requestAnimationFrame(()=>{if(messagePane.isConnected) messagePane.scrollTop=messagePane.scrollHeight;});
   } catch(error) {
-    g.sending=false;g.formError=groupFriendlyError(error)||'訊息保存失敗，請重試。';render();
+    g.sending=false;
+    const rawError=String(error?.message||error||'');
+    if(rawError.includes('group_insufficient_funds')||rawError.includes('insufficient_funds')) {
+      g.formError='';
+      openInsufficientFundsDialog('group');
+      renderGroupConversation();
+      return;
+    }
+    g.formError=groupFriendlyError(error)||'訊息保存失敗，請重試。';render();
   }
 }
 async function groupRefreshList() { groupPrototype.groupsLoaded=false;await groupLoadList(true);if(route.page==='group'&&!groupPrototype.active)render(); }
@@ -4789,7 +4816,7 @@ function renderConversation() {
             </details>
           </div>` : ''}
                     <div class="composer-input-row">
-            <textarea id="messageInput" name="text" maxlength="1000" rows="1" placeholder="輸入訊息後送出" aria-label="輸入對話">${e(drafts[s.id] || '')}</textarea>
+            <textarea id="messageInput" name="text" maxlength="1000" rows="1" placeholder="留空發送，角色會繼續說下去" aria-label="輸入對話">${e(drafts[s.id] || '')}</textarea>
           </div>
           <div class="composer-bottom-row">
             <div class="composer-bottom-left">
@@ -4800,10 +4827,7 @@ function renderConversation() {
               </div>
             </div>
             <div class="composer-bottom-right">
-              <div class="composer-wallet" aria-label="目前錢包餘額">
-                <button type="button" data-action="profile" title="查看錢包"><span class="wallet-value wallet-diamond">💎 ${Number(currentUser()?.diamonds || 0).toLocaleString()}</span></button>
-                <button type="button" data-action="profile" title="查看錢包"><span class="wallet-value wallet-silver">◉ ${Number(currentUser()?.silver || 0).toLocaleString()}</span></button>
-              </div>
+              <button type="button" class="composer-cost wallet-cost-button" data-action="wallet-cost-details" aria-label="查看本次預計扣款與持有資源" title="查看本次預計扣款與持有資源">${walletCostPreviewHTML(2)}</button>
               <button type="submit" class="primary composer-send" aria-label="送出或接續回應" title="送出">${ICON.send}</button>
             </div>
           </div>
@@ -5364,11 +5388,7 @@ function renderModal(o) {
           清除瀏覽器資料會失去角色、聊天與回憶。請勿輸入真正機密。</p>`);
       break;
     case 'wallet-insufficient':
-      showDialog('銀幣／鑽石不足',`
-        <p>每次新的角色回覆需要 2 點，會先使用銀幣，再以鑽石補足。</p>
-        <p>目前餘額不足，本回合沒有扣款，也沒有產生角色回覆。</p>
-        <p class="muted">獎勵影片功能尚未完成設定，現在不能播放影片或發放銀幣。請稍後再試，或先確認錢包餘額。</p>
-        <button class="primary" type="button" data-action="back">知道了</button>`);
+      openInsufficientFundsDialog('single');
       break;
     case 'login':
       showDialog('登入 PersonaX',`
@@ -6953,7 +6973,7 @@ document.addEventListener('submit',async event => {
   // Dialogs opened through showDialog do not populate route.overlay; keep the
   // target message ID on the form itself so group edits can resolve it.
   const messageId=String(form.dataset.id || f.get('messageId') || o.id || '');
-  const text=String(f.get('text') || '').trim();
+  let text=String(f.get('text') || '').trim();
 
   try {
     switch(type) {
@@ -7214,7 +7234,7 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
           await runPendingChatTurn(s);
           break;
         }
-        if (!text.trim()) return toast('請先輸入訊息，再開始新的聊天回合。');
+        if (!text.trim()) text = GROUP_CONTINUE_SENTINEL;
         const platformCommand = parsePlatformCommand(text);
         if (platformCommand.type === 'platform') {
           if (platformCommand.name === 'help') {
@@ -7252,6 +7272,7 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
           break;
         }
 
+        if (!walletPreflight('single')) break;
         const previousMessages = s.messages.slice();
         const previousMemories = (s.memories || []).map(memory => ({...memory}));
         const userMessage = {id:id(),role:'user',text,at:Date.now(),...messageMeta};
@@ -8013,6 +8034,155 @@ if (window.__pendingSupabaseUser) {
     }
   });
 })();
+</script>
+
+
+<style>
+.wallet-cost-button{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:72px;max-width:118px;white-space:nowrap;padding:8px 10px!important;font-variant-numeric:tabular-nums}
+.wallet-cost-part{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700}
+.wallet-cost-plus{display:inline-block;width:0}
+.wallet-modal-cost{display:flex;align-items:center;justify-content:center;gap:14px;padding:12px;margin:12px 0;border:1px solid var(--border);border-radius:12px;background:var(--panel2);font-size:16px;font-weight:700}
+.wallet-modal-actions{display:flex;gap:10px;margin-top:16px}
+.wallet-remember-choice{display:flex;align-items:flex-start;gap:7px;margin:12px 0;color:var(--muted);font-size:11px;line-height:1.5}
+.wallet-remember-choice input{width:auto;flex:0 0 auto;margin:2px 0 0}
+.wallet-modal-actions button{flex:1;min-width:0}
+.wallet-resource-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 14px;margin:8px 0;border:1px solid var(--border);border-radius:12px;background:var(--panel2)}
+.wallet-resource-row strong{font-variant-numeric:tabular-nums}
+@media(max-width:520px){.wallet-modal-actions{flex-direction:column}.wallet-cost-button{min-width:62px;padding:7px 8px!important}}
+</style>
+
+<script>
+/* Wallet-cost UI: compact currency deductions and a single-chat insufficient-balance choice. */
+function walletCostPreviewHTML(cost) {
+  const user=currentUser()||{};
+  const silver=Math.max(0,Number(user.silver||0));
+  const diamonds=Math.max(0,Number(user.diamonds||0));
+  const price=Math.max(0,Number(cost||0));
+  const fromSilver=Math.min(silver,price);
+  const fromDiamonds=Math.max(0,price-fromSilver);
+  const parts=[];
+  if(fromSilver>0) parts.push('<span class="wallet-cost-part" aria-label="銀幣扣除 '+fromSilver+'">🪙 −'+fromSilver+'</span>');
+  if(fromDiamonds>0) parts.push('<span class="wallet-cost-part" aria-label="鑽石扣除 '+fromDiamonds+'">💎 −'+fromDiamonds+'</span>');
+  if(!parts.length) parts.push('<span class="wallet-cost-part">🪙 −'+price+'</span>');
+  return parts.join('<span class="wallet-cost-plus" aria-hidden="true"> </span>');
+}
+let walletDiamondConsentOnce = '';
+function walletCostFor(mode) {
+  return mode==='group' ? Math.max(1,(groupPrototype.active?.members||[]).length)*3 : 2;
+}
+function walletChoiceStorageKey(mode) {
+  return 'personax-wallet-choice:'+String(currentUser()?.uid||'guest')+':'+mode;
+}
+function getTodayWalletChoice(mode) {
+  try {
+    const saved=JSON.parse(localStorage.getItem(walletChoiceStorageKey(mode))||'null');
+    if(!saved||saved.expiresAt<=Date.now()||!['diamonds','ad'].includes(saved.choice)) {
+      localStorage.removeItem(walletChoiceStorageKey(mode));
+      return '';
+    }
+    return saved.choice;
+  } catch (_) { return ''; }
+}
+function saveTodayWalletChoice(mode,choice) {
+  const now=new Date();
+  const expiresAt=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1).getTime()-1;
+  try { localStorage.setItem(walletChoiceStorageKey(mode),JSON.stringify({choice,expiresAt})); } catch (_) {}
+}
+function walletPreflight(mode) {
+  const user=currentUser()||{};
+  const silver=Math.max(0,Number(user.silver||0));
+  const diamonds=Math.max(0,Number(user.diamonds||0));
+  const cost=walletCostFor(mode);
+  if(silver>=cost) return true;
+  const neededDiamonds=Math.max(0,cost-silver);
+  if(walletDiamondConsentOnce===mode && diamonds>=neededDiamonds) {
+    walletDiamondConsentOnce='';
+    return true;
+  }
+  walletDiamondConsentOnce='';
+  const remembered=getTodayWalletChoice(mode);
+  if(remembered==='diamonds' && diamonds>=neededDiamonds) return true;
+  if(remembered==='ad' && mode==='single') {
+    showWalletAdUnavailable();
+    return false;
+  }
+  openInsufficientFundsDialog(mode);
+  return false;
+}
+function showWalletAdUnavailable() {
+  showDialog('廣告功能尚未串接','<p>目前尚未接入廣告播放器及後端完整播放驗證，因此不會發放銀幣，也不會放行對話。接入廣告服務後，才會在確認完整播放與後端廣告回饋成功後繼續對話。</p>');
+}
+function openInsufficientFundsDialog(mode) {
+  const user=currentUser()||{};
+  const silver=Math.max(0,Number(user.silver||0));
+  const diamonds=Math.max(0,Number(user.diamonds||0));
+  const cost=walletCostFor(mode);
+  const fromSilver=Math.min(silver,cost);
+  const fromDiamonds=Math.max(0,cost-fromSilver);
+  const enoughTotal=silver+diamonds>=cost;
+  const remembered=getTodayWalletChoice(mode);
+  const remember=remembered==='diamonds' || (mode==='single' && remembered==='ad');
+  const chargePreview=(fromSilver>0?'<span>🪙 −'+fromSilver+' <small>(持有 '+silver+')</small></span>':'')+
+    (fromDiamonds>0?'<span>💎 −'+fromDiamonds+' <small>(持有 '+diamonds+')</small></span>':'');
+  const adOption=mode==='single'
+    ? '<button type="button" class="primary" data-action="wallet-watch-ad">看廣告繼續聊</button>'
+    : '';
+  const diamondOption=enoughTotal
+    ? '<button type="button" class="primary" data-action="wallet-confirm-diamonds" data-mode="'+mode+'">使用鑽石</button>'
+    : '<button type="button" class="primary" data-action="wallet-open-shop">鑽石不足，前往商店</button>';
+  const rememberOption=mode==='single'
+    ? '<label class="wallet-remember-choice"><input type="checkbox" id="walletRememberChoice" '+(remember?'checked':'')+'> <span>今天都使用這個選擇，不要再提醒我</span></label>'
+    : '<label class="wallet-remember-choice"><input type="checkbox" id="walletRememberChoice" '+(remembered==='diamonds'?'checked':'')+'> <span>今天都使用這個選擇，不要再提醒我</span></label>';
+  const body='你的銀幣或鑽石不足，繼續對話將花費以下：';
+  showDialog('銀幣或鑽石不足',`
+    <p>${body}</p>
+    <div class="wallet-modal-cost" aria-label="預計扣款">${chargePreview||'💎 −'+cost+' <small>(持有 '+diamonds+')</small>'}</div>
+    ${mode==='single'?'<p>你也可以選擇觀看廣告，繼續對話。</p>':''}
+    <div class="wallet-modal-actions">${adOption}${diamondOption}</div>
+    ${rememberOption}
+  `);
+}
+document.addEventListener('click',async event=>{
+  const button=event.target.closest('[data-action="wallet-dialog-close"],[data-action="wallet-cost-details"],[data-action="wallet-confirm-diamonds"],[data-action="wallet-watch-ad"],[data-action="wallet-open-shop"]');
+  if(!button)return;
+  if(button.dataset.action==='wallet-dialog-close') {
+    $('modal')?.close();
+    return;
+  }
+  if(button.dataset.action==='wallet-cost-details') {
+    const u=currentUser()||{};
+    const silver=Math.max(0,Number(u.silver||0)),diamonds=Math.max(0,Number(u.diamonds||0));
+    const cost=route.page==='group'?Math.max(1,(groupPrototype.active?.members||[]).length)*3:2;
+    showDialog('我的資源',`
+      <div class="wallet-resource-row"><span>🪙 銀幣</span><strong>持有 ${silver.toLocaleString()}</strong></div>
+      <div class="wallet-resource-row"><span>💎 鑽石</span><strong>持有 ${diamonds.toLocaleString()}</strong></div>
+      <p class="small muted">本次預計扣除：${walletCostPreviewHTML(cost)}</p>
+    `);
+    return;
+  }
+  if(button.dataset.action==='wallet-open-shop') {
+    const modal=$('modal'); if(modal?.open) modal.close();
+    go({page:'shop'});
+    return;
+  }
+  if(button.dataset.action==='wallet-watch-ad') {
+    if($('walletRememberChoice')?.checked) saveTodayWalletChoice('single','ad');
+    showWalletAdUnavailable();
+    return;
+  }
+  if(button.dataset.action==='wallet-confirm-diamonds') {
+    const mode=button.dataset.mode || (route.page==='group'?'group':'single');
+    if($('walletRememberChoice')?.checked) saveTodayWalletChoice(mode,'diamonds');
+    walletDiamondConsentOnce=mode;
+    const modal=$('modal'); if(modal?.open) modal.close();
+    // Explicit player consent: only now retry the intended send action.
+    if(mode==='group') await groupSendMock();
+    else {
+      const form=$('view').querySelector('form[data-form="message"]');
+      if(form) form.requestSubmit();
+    }
+  }
+});
 </script>
 
 </body>
