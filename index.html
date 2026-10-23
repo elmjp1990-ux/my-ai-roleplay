@@ -891,6 +891,7 @@ body.group-chat-page main:has(.group-wizard) {
 
 /* GROUP-01 integrated test-mode prototype */
 .group-wizard{max-width:850px;margin:0 auto;display:grid;gap:16px}
+@media(max-width:767px){.group-wizard{max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 12px);overflow-y:auto;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;padding-bottom:calc(16px + env(safe-area-inset-bottom));}}
 .group-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .group-step{padding:9px 6px;text-align:center;border:1px solid var(--border);border-radius:10px;color:var(--muted);background:var(--panel2)}
 .group-step.active{background:var(--primary);color:#fff;border-color:transparent}
@@ -4665,6 +4666,8 @@ async function groupSendMock() {
       p_group_id:g.active.id,p_request_key:g.pendingRequest.requestKey,p_content:content
     }),15000,'訊息保存逾時。請重新開啟群組確認訊息是否已保存，再決定是否重試。');
     if(error) throw error;
+    // Group-turn billing is committed in the RPC; refresh the visible wallet balance immediately.
+    await refreshWalletBalance();
     const activeGroupId=g.active.id;
     g.pendingRequest=null;
     // Refresh only the message rows; do not reopen the entire group, clear its active
