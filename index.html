@@ -979,8 +979,14 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   const SUPABASE_URL = 'https://ouyewoagbmtqehbofrje.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_MyTDqAKNTkK4zo7eap8gZA_ZGozHRMd';
 
+  // 若 Supabase CDN 未載入，避免初始化錯誤中止最新首頁的主程式。
+  // 雲端登入與資料操作會暫不可用，但首頁 UI 仍應正常啟動。
   if (!window.mySupabase) {
-    window.mySupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    if (window.supabase && typeof window.supabase.createClient === 'function') {
+      window.mySupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } else {
+      console.error('Supabase JS SDK 載入失敗：請檢查 CDN 連線。首頁 UI 將繼續載入。');
+    }
   }
 
   /*
