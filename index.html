@@ -2370,6 +2370,10 @@ async function runPendingChatTurn(s) {
   }
 
   if (result?.status === 'insufficient_funds' || result?.error === 'insufficient_funds') {
+    // A failed wallet reservation must not leave a USER message that looks sent.
+    s.messages = (s.messages || []).filter(message =>
+      message.id !== turn.userMessageId && message.id !== turn.assistantMessageId
+    );
     delete s.pendingTurn;
     persist();
     renderMessages();
@@ -2621,6 +2625,11 @@ window.addEventListener('popstate',event => {
   render();
 });
 $('modal').addEventListener('cancel',event => {
+  if ($('modal').dataset.walletDialog === 'true') {
+    event.preventDefault();
+    $('modal').close();
+    return;
+  }
   event.preventDefault();
   dismissPendingDeletionModal();
 });
@@ -2628,7 +2637,10 @@ $('modal').addEventListener('click',event => {
   if (event.target !== $('modal')) return;
   const r = $('modal').getBoundingClientRect();
   if (event.clientX < r.left || event.clientX > r.right ||
-      event.clientY < r.top || event.clientY > r.bottom) dismissPendingDeletionModal();
+      event.clientY < r.top || event.clientY > r.bottom) {
+    if ($('modal').dataset.walletDialog === 'true') $('modal').close();
+    else dismissPendingDeletionModal();
+  }
 });
 function showDialog(title,content) {
   let modal = $('modal');
@@ -2656,10 +2668,12 @@ function showDialog(title,content) {
   modal.style.overflowY='';
   const pendingDeletionDialog = route?.overlay?.name === 'account-deletion-pending' && title === '帳號正在等待刪除';
   const deleteConfirmDialog = title === '刪除';
+  const walletDialog = title === '我的資源' || title === '銀幣或鑽石不足';
+  modal.dataset.walletDialog = walletDialog ? 'true' : 'false';
   modal.innerHTML = `
     <div class="row between modal-heading">
       <h2>${e(title)}</h2>
-      <button class="ghost" data-action="${pendingDeletionDialog ? 'pending-switch-account' : deleteConfirmDialog ? 'delete-dialog-back' : 'back'}"
+      <button class="ghost" data-action="${walletDialog ? 'wallet-dialog-close' : pendingDeletionDialog ? 'pending-switch-account' : deleteConfirmDialog ? 'delete-dialog-back' : 'back'}"
               aria-label="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}"
               title="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}">✕</button>
     </div>${content}`;
@@ -4628,6 +4642,7 @@ async function groupSendMock() {
   const content=typedContent || GROUP_CONTINUE_SENTINEL;
   const g=groupPrototype;
   if(g.sending) return;
+  if(!walletPreflight('group')) return;
   if(!window.mySupabase) { g.formError='Supabase 用戶端尚未載入。';render();return; }
   if(!isContinueRequest) {
     const platformCommand=parsePlatformCommand(content);
@@ -7261,6 +7276,7 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
           break;
         }
 
+        if (!walletPreflight('single')) break;
         const previousMessages = s.messages.slice();
         const previousMemories = (s.memories || []).map(memory => ({...memory}));
         const userMessage = {id:id(),role:'user',text,at:Date.now(),...messageMeta};
@@ -8052,32 +8068,58 @@ function walletCostPreviewHTML(cost) {
   if(!parts.length) parts.push('<span class="wallet-cost-part">🪙 −'+price+'</span>');
   return parts.join('<span class="wallet-cost-plus" aria-hidden="true"> </span>');
 }
+let walletDiamondConsentOnce = '';
+function walletCostFor(mode) {
+  return mode==='group' ? Math.max(1,(groupPrototype.active?.members||[]).length)*3 : 2;
+}
+function walletPreflight(mode) {
+  const user=currentUser()||{};
+  const silver=Math.max(0,Number(user.silver||0));
+  const diamonds=Math.max(0,Number(user.diamonds||0));
+  const cost=walletCostFor(mode);
+  if(silver>=cost) return true;
+  const neededDiamonds=Math.max(0,cost-silver);
+  if(walletDiamondConsentOnce===mode && diamonds>=neededDiamonds) {
+    walletDiamondConsentOnce='';
+    return true;
+  }
+  walletDiamondConsentOnce='';
+  openInsufficientFundsDialog(mode);
+  return false;
+}
 function openInsufficientFundsDialog(mode) {
   const user=currentUser()||{};
   const silver=Math.max(0,Number(user.silver||0));
   const diamonds=Math.max(0,Number(user.diamonds||0));
-  const cost=mode==='group'?Math.max(1,(groupPrototype.active?.members||[]).length)*3:2;
+  const cost=walletCostFor(mode);
   const fromSilver=Math.min(silver,cost);
   const fromDiamonds=Math.max(0,cost-fromSilver);
-  const hasDiamond=diamonds>=fromDiamonds && fromDiamonds>0;
-  const chargePreview=(fromSilver>0?'<span>🪙 −'+fromSilver+'</span>':'')+
-    (fromDiamonds>0?'<span>💎 −'+fromDiamonds+'</span>':'');
+  const enoughTotal=silver+diamonds>=cost;
+  const chargePreview=(fromSilver>0?'<span>🪙 −'+fromSilver+' <small>(持有 '+silver+')</small></span>':'')+
+    (fromDiamonds>0?'<span>💎 −'+fromDiamonds+' <small>(持有 '+diamonds+')</small></span>':'');
   const adOption=mode==='single'
     ? '<button type="button" class="primary" data-action="wallet-watch-ad">看廣告繼續聊</button>'
     : '';
-  const diamondOption=hasDiamond
-    ? '<button type="button" class="primary" data-action="wallet-confirm-diamonds" data-cost="'+cost+'">使用鑽石</button>'
-    : '<button type="button" disabled title="鑽石餘額不足">使用鑽石</button>';
-  showDialog('銀幣不足',`
-    <p>你的銀幣不足，繼續對話將使用鑽石。</p>
-    <div class="wallet-modal-cost" aria-label="預計扣款">${chargePreview||'🪙 −'+cost}</div>
-    <p>你也可以選擇觀看廣告，繼續對話。</p>
+  const diamondOption=enoughTotal
+    ? '<button type="button" class="primary" data-action="wallet-confirm-diamonds" data-mode="'+mode+'">使用鑽石</button>'
+    : '<button type="button" disabled title="銀幣與鑽石餘額不足">使用鑽石</button>';
+  const body=enoughTotal
+    ? '你的銀幣不足，繼續對話將花費以下：'
+    : '你的銀幣或鑽石不足，繼續對話將花費以下：';
+  showDialog('銀幣或鑽石不足',`
+    <p>${body}</p>
+    <div class="wallet-modal-cost" aria-label="預計扣款">${chargePreview||'💎 −'+cost+' <small>(持有 '+diamonds+')</small>'}</div>
+    ${mode==='single'?'<p>你也可以選擇觀看廣告，繼續對話。</p>':''}
     <div class="wallet-modal-actions">${adOption}${diamondOption}</div>
   `);
 }
 document.addEventListener('click',async event=>{
   const button=event.target.closest('[data-action="wallet-cost-details"],[data-action="wallet-confirm-diamonds"],[data-action="wallet-watch-ad"]');
   if(!button)return;
+  if(button.dataset.action==='wallet-dialog-close') {
+    $('modal')?.close();
+    return;
+  }
   if(button.dataset.action==='wallet-cost-details') {
     const u=currentUser()||{};
     const silver=Math.max(0,Number(u.silver||0)),diamonds=Math.max(0,Number(u.diamonds||0));
@@ -8094,12 +8136,12 @@ document.addEventListener('click',async event=>{
     return;
   }
   if(button.dataset.action==='wallet-confirm-diamonds') {
+    const mode=button.dataset.mode || (route.page==='group'?'group':'single');
+    walletDiamondConsentOnce=mode;
     const modal=$('modal'); if(modal?.open) modal.close();
-    // Explicit player consent: proceed with the existing single/group send path only after confirmation.
-    if(route.page==='group') {
-      const input=$('groupMessageInput');
-      if(input) await groupSendMock();
-    } else {
+    // Explicit player consent: only now retry the intended send action.
+    if(mode==='group') await groupSendMock();
+    else {
       const form=$('view').querySelector('form[data-form="message"]');
       if(form) form.requestSubmit();
     }
