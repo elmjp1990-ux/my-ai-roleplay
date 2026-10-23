@@ -4698,11 +4698,8 @@ async function groupSendMock() {
       p_group_id:g.active.id,p_request_key:g.pendingRequest.requestKey,p_content:content
     }),15000,'訊息保存逾時。請重新開啟群組確認訊息是否已保存，再決定是否重試。');
     if(error) throw error;
-    // The RPC commits the charge atomically with the group turn. Refresh the visible
-    // wallet immediately and make the debit explicit so the user can confirm it happened.
+    // The RPC commits the charge atomically with the group turn; refresh the visible wallet immediately.
     await refreshWalletBalance();
-    const chargedPoints=Math.max(1,(g.active.members||[]).length)*3;
-    toast(`群組回合已保存，已扣除 ${chargedPoints} 點（銀幣優先，鑽石補足）。`);
     const activeGroupId=g.active.id;
     g.pendingRequest=null;
     // Refresh only the message rows; do not reopen the entire group, clear its active
