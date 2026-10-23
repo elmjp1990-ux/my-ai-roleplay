@@ -8138,8 +8138,8 @@ function openInsufficientFundsDialog(mode) {
     <p>${body}</p>
     <div class="wallet-modal-cost" aria-label="預計扣款">${chargePreview||'💎 −'+cost+' <small>(持有 '+diamonds+')</small>'}</div>
     ${mode==='single'?'<p>你也可以選擇觀看廣告，繼續對話。</p>':''}
-    ${rememberOption}
     <div class="wallet-modal-actions">${adOption}${diamondOption}</div>
+    ${rememberOption}
   `);
 }
 document.addEventListener('click',async event=>{
