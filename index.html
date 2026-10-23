@@ -910,7 +910,17 @@ body.group-chat-page main:has(.group-wizard) {
 /* GROUP-01 integrated test-mode prototype */
 .group-wizard{max-width:850px;margin:0 auto;display:grid;gap:16px;min-height:0}
 @media(max-width:767px){
-  body.group-chat-page:has(.group-wizard) main:has(.group-wizard){height:auto!important;min-height:100dvh;max-height:none!important;overflow-x:hidden;overflow-y:visible!important;padding-bottom:calc(32px + env(safe-area-inset-bottom))}
+  /* Keep the wizard's content in a real touch-scroll container on mobile.
+     overflow-y:visible cancels scrolling and clips the lower creation controls
+     when the app shell has its own viewport/overflow rules. */
+  body.group-chat-page:has(.group-wizard) main:has(.group-wizard){
+    height:auto!important;min-height:100dvh;max-height:none!important;
+    overflow-x:hidden;overflow-y:auto!important;
+    -webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;touch-action:pan-y;
+    padding-bottom:calc(32px + env(safe-area-inset-bottom))
+  }
+  body.group-chat-page:has(.group-wizard),
+  body.group-chat-page:has(.group-wizard) .app{height:auto!important;min-height:100dvh;overflow:visible!important}
   .group-wizard{height:auto;max-height:none;overflow:visible;overscroll-behavior-y:auto;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
   .group-panel{min-height:0}
 }
@@ -4688,8 +4698,11 @@ async function groupSendMock() {
       p_group_id:g.active.id,p_request_key:g.pendingRequest.requestKey,p_content:content
     }),15000,'訊息保存逾時。請重新開啟群組確認訊息是否已保存，再決定是否重試。');
     if(error) throw error;
-    // Group-turn billing is committed in the RPC; refresh the visible wallet balance immediately.
+    // The RPC commits the charge atomically with the group turn. Refresh the visible
+    // wallet immediately and make the debit explicit so the user can confirm it happened.
     await refreshWalletBalance();
+    const chargedPoints=Math.max(1,(g.active.members||[]).length)*3;
+    toast(`群組回合已保存，已扣除 ${chargedPoints} 點（銀幣優先，鑽石補足）。`);
     const activeGroupId=g.active.id;
     g.pendingRequest=null;
     // Refresh only the message rows; do not reopen the entire group, clear its active
