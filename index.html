@@ -2376,7 +2376,7 @@ async function runPendingChatTurn(s) {
     await saveChatSessionSafely(s);
     await clearCloudPendingTurn(s);
     await refreshWalletBalance();
-    toast('餘額不足');
+    openInsufficientFundsDialog('single');
     return;
   }
 
@@ -4693,7 +4693,7 @@ async function groupSendMock() {
     const rawError=String(error?.message||error||'');
     if(rawError.includes('group_insufficient_funds')||rawError.includes('insufficient_funds')) {
       g.formError='';
-      toast('餘額不足');
+      openInsufficientFundsDialog('group');
       renderGroupConversation();
       return;
     }
@@ -4805,7 +4805,7 @@ function renderConversation() {
             </details>
           </div>` : ''}
                     <div class="composer-input-row">
-            <textarea id="messageInput" name="text" maxlength="1000" rows="1" placeholder="輸入訊息後送出" aria-label="輸入對話">${e(drafts[s.id] || '')}</textarea>
+            <textarea id="messageInput" name="text" maxlength="1000" rows="1" placeholder="留空發送，角色會繼續說下去" aria-label="輸入對話">${e(drafts[s.id] || '')}</textarea>
           </div>
           <div class="composer-bottom-row">
             <div class="composer-bottom-left">
@@ -4816,11 +4816,7 @@ function renderConversation() {
               </div>
             </div>
             <div class="composer-bottom-right">
-              <div class="composer-wallet" aria-label="目前錢包餘額">
-                <button type="button" data-action="profile" title="查看錢包"><span class="wallet-value wallet-diamond">💎 ${Number(currentUser()?.diamonds || 0).toLocaleString()}</span></button>
-                <button type="button" data-action="profile" title="查看錢包"><span class="wallet-value wallet-silver">◉ ${Number(currentUser()?.silver || 0).toLocaleString()}</span></button>
-              </div>
-              <span class="composer-cost" title="銀幣優先，不足時由鑽石補足" aria-label="單人聊天每回合費用 2 點">◉ 2 點/回合</span>
+              <button type="button" class="composer-cost wallet-cost-button" data-action="wallet-cost-details" aria-label="查看本次預計扣款與持有資源" title="查看本次預計扣款與持有資源">${walletCostPreviewHTML(2)}</button>
               <button type="submit" class="primary composer-send" aria-label="送出或接續回應" title="送出">${ICON.send}</button>
             </div>
           </div>
@@ -5381,11 +5377,7 @@ function renderModal(o) {
           清除瀏覽器資料會失去角色、聊天與回憶。請勿輸入真正機密。</p>`);
       break;
     case 'wallet-insufficient':
-      showDialog('銀幣／鑽石不足',`
-        <p>每次新的角色回覆需要 2 點，會先使用銀幣，再以鑽石補足。</p>
-        <p>目前餘額不足，本回合沒有扣款，也沒有產生角色回覆。</p>
-        <p class="muted">獎勵影片功能尚未完成設定，現在不能播放影片或發放銀幣。請稍後再試，或先確認錢包餘額。</p>
-        <button class="primary" type="button" data-action="back">知道了</button>`);
+      openInsufficientFundsDialog('single');
       break;
     case 'login':
       showDialog('登入 PersonaX',`
@@ -8030,6 +8022,89 @@ if (window.__pendingSupabaseUser) {
     }
   });
 })();
+</script>
+
+
+<style>
+.wallet-cost-button{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:72px;max-width:118px;white-space:nowrap;padding:8px 10px!important;font-variant-numeric:tabular-nums}
+.wallet-cost-part{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700}
+.wallet-cost-plus{display:inline-block;width:0}
+.wallet-modal-cost{display:flex;align-items:center;justify-content:center;gap:14px;padding:12px;margin:12px 0;border:1px solid var(--border);border-radius:12px;background:var(--panel2);font-size:16px;font-weight:700}
+.wallet-modal-actions{display:flex;gap:10px;margin-top:16px}
+.wallet-modal-actions button{flex:1;min-width:0}
+.wallet-resource-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 14px;margin:8px 0;border:1px solid var(--border);border-radius:12px;background:var(--panel2)}
+.wallet-resource-row strong{font-variant-numeric:tabular-nums}
+@media(max-width:520px){.wallet-modal-actions{flex-direction:column}.wallet-cost-button{min-width:62px;padding:7px 8px!important}}
+</style>
+
+<script>
+/* Wallet-cost UI: compact currency deductions and a single-chat insufficient-balance choice. */
+function walletCostPreviewHTML(cost) {
+  const user=currentUser()||{};
+  const silver=Math.max(0,Number(user.silver||0));
+  const diamonds=Math.max(0,Number(user.diamonds||0));
+  const price=Math.max(0,Number(cost||0));
+  const fromSilver=Math.min(silver,price);
+  const fromDiamonds=Math.max(0,price-fromSilver);
+  const parts=[];
+  if(fromSilver>0) parts.push('<span class="wallet-cost-part" aria-label="銀幣扣除 '+fromSilver+'">🪙 −'+fromSilver+'</span>');
+  if(fromDiamonds>0) parts.push('<span class="wallet-cost-part" aria-label="鑽石扣除 '+fromDiamonds+'">💎 −'+fromDiamonds+'</span>');
+  if(!parts.length) parts.push('<span class="wallet-cost-part">🪙 −'+price+'</span>');
+  return parts.join('<span class="wallet-cost-plus" aria-hidden="true"> </span>');
+}
+function openInsufficientFundsDialog(mode) {
+  const user=currentUser()||{};
+  const silver=Math.max(0,Number(user.silver||0));
+  const diamonds=Math.max(0,Number(user.diamonds||0));
+  const cost=mode==='group'?Math.max(1,(groupPrototype.active?.members||[]).length)*3:2;
+  const fromSilver=Math.min(silver,cost);
+  const fromDiamonds=Math.max(0,cost-fromSilver);
+  const hasDiamond=diamonds>=fromDiamonds && fromDiamonds>0;
+  const chargePreview=(fromSilver>0?'<span>🪙 −'+fromSilver+'</span>':'')+
+    (fromDiamonds>0?'<span>💎 −'+fromDiamonds+'</span>':'');
+  const adOption=mode==='single'
+    ? '<button type="button" class="primary" data-action="wallet-watch-ad">看廣告繼續聊</button>'
+    : '';
+  const diamondOption=hasDiamond
+    ? '<button type="button" class="primary" data-action="wallet-confirm-diamonds" data-cost="'+cost+'">使用鑽石</button>'
+    : '<button type="button" disabled title="鑽石餘額不足">使用鑽石</button>';
+  showDialog('銀幣不足',`
+    <p>你的銀幣不足，繼續對話將使用鑽石。</p>
+    <div class="wallet-modal-cost" aria-label="預計扣款">${chargePreview||'🪙 −'+cost}</div>
+    <p>你也可以選擇觀看廣告，繼續對話。</p>
+    <div class="wallet-modal-actions">${adOption}${diamondOption}</div>
+  `);
+}
+document.addEventListener('click',async event=>{
+  const button=event.target.closest('[data-action="wallet-cost-details"],[data-action="wallet-confirm-diamonds"],[data-action="wallet-watch-ad"]');
+  if(!button)return;
+  if(button.dataset.action==='wallet-cost-details') {
+    const u=currentUser()||{};
+    const silver=Math.max(0,Number(u.silver||0)),diamonds=Math.max(0,Number(u.diamonds||0));
+    const cost=route.page==='group'?Math.max(1,(groupPrototype.active?.members||[]).length)*3:2;
+    showDialog('我的資源',`
+      <div class="wallet-resource-row"><span>🪙 銀幣</span><strong>持有 ${silver.toLocaleString()}</strong></div>
+      <div class="wallet-resource-row"><span>💎 鑽石</span><strong>持有 ${diamonds.toLocaleString()}</strong></div>
+      <p class="small muted">本次預計扣除：${walletCostPreviewHTML(cost)}</p>
+    `);
+    return;
+  }
+  if(button.dataset.action==='wallet-watch-ad') {
+    showDialog('廣告功能尚未串接', '<p>目前尚未接入廣告播放器及後端完整播放驗證，因此不會發放銀幣，也不會放行對話。接入廣告服務後，會在後端確認完整播放與廣告回饋成功後才補發銀幣。</p>');
+    return;
+  }
+  if(button.dataset.action==='wallet-confirm-diamonds') {
+    const modal=$('modal'); if(modal?.open) modal.close();
+    // Explicit player consent: proceed with the existing single/group send path only after confirmation.
+    if(route.page==='group') {
+      const input=$('groupMessageInput');
+      if(input) await groupSendMock();
+    } else {
+      const form=$('view').querySelector('form[data-form="chat"]');
+      if(form) form.requestSubmit();
+    }
+  }
+});
 </script>
 
 </body>
