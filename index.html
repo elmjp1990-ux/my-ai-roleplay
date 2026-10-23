@@ -879,19 +879,34 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 @media(prefers-reduced-motion:reduce) {
   * { scroll-behavior:auto!important; transition:none!important; }
 }
-/* The group route normally locks main for the full-screen chat. The creation wizard is a long form and must remain scrollable on mobile. */
-body.group-chat-page main:has(.group-wizard) {
-  height:auto;
+/* The group route locks the chat viewport, but the multi-step creation wizard is a full page.
+   Make the page itself the single scroll container on touch devices; the chat-only fixed height
+   must not clip step 2's longer profile and scene fields. */
+body.group-chat-page:has(.group-wizard),
+body.group-chat-page:has(.group-wizard) .app {
+  height:auto!important;
   min-height:100dvh;
+  overflow:visible!important;
+}
+body.group-chat-page main:has(.group-wizard) {
+  height:auto!important;
+  min-height:100dvh;
+  max-height:none!important;
   overflow-x:hidden;
-  overflow-y:auto;
+  overflow-y:auto!important;
+  overscroll-behavior-y:contain;
   -webkit-overflow-scrolling:touch;
+  touch-action:pan-y;
   padding:16px 12px calc(32px + env(safe-area-inset-bottom));
 }
 
 /* GROUP-01 integrated test-mode prototype */
-.group-wizard{max-width:850px;margin:0 auto;display:grid;gap:16px}
-@media(max-width:767px){body.group-chat-page main:has(.group-wizard){max-height:none;overflow-y:auto;overscroll-behavior-y:auto;-webkit-overflow-scrolling:touch}.group-wizard{max-height:none;overflow:visible;overscroll-behavior-y:auto;padding-bottom:calc(16px + env(safe-area-inset-bottom));}}
+.group-wizard{max-width:850px;margin:0 auto;display:grid;gap:16px;min-height:0}
+@media(max-width:767px){
+  body.group-chat-page:has(.group-wizard) main:has(.group-wizard){height:auto!important;min-height:100dvh;max-height:none!important;overflow-x:hidden;overflow-y:visible!important;padding-bottom:calc(32px + env(safe-area-inset-bottom))}
+  .group-wizard{height:auto;max-height:none;overflow:visible;overscroll-behavior-y:auto;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+  .group-panel{min-height:0}
+}
 .group-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .group-step{padding:9px 6px;text-align:center;border:1px solid var(--border);border-radius:10px;color:var(--muted);background:var(--panel2)}
 .group-step.active{background:var(--primary);color:#fff;border-color:transparent}
@@ -4697,6 +4712,8 @@ async function groupSendMock() {
     ensureGroupDiaryMemories();
     g.sending=false;g.formError='';
     renderGroupConversation();
+    const chargedPoints=(members.length||0)*3;
+    toast(`本回合已扣除 ${chargedPoints} 點（${members.length} 位角色 × 3 點；銀幣優先）`);
     const messagePane=$('groupMessages');
     if(messagePane) requestAnimationFrame(()=>{if(messagePane.isConnected) messagePane.scrollTop=messagePane.scrollHeight;});
   } catch(error) {
