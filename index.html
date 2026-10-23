@@ -879,6 +879,16 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 @media(prefers-reduced-motion:reduce) {
   * { scroll-behavior:auto!important; transition:none!important; }
 }
+/* The group route normally locks main for the full-screen chat. The creation wizard is a long form and must remain scrollable on mobile. */
+body.group-chat-page main:has(.group-wizard) {
+  height:auto;
+  min-height:100dvh;
+  overflow-x:hidden;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  padding:16px 12px calc(32px + env(safe-area-inset-bottom));
+}
+
 /* GROUP-01 integrated test-mode prototype */
 .group-wizard{max-width:850px;margin:0 auto;display:grid;gap:16px}
 .group-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
