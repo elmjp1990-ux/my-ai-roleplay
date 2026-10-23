@@ -3961,6 +3961,7 @@ function groupFriendlyError(error) {
   if(message.includes('group_not_found_or_not_accessible')) return '找不到群組，或目前帳號沒有存取權限。';
   if(message.includes('idempotency_key_reused_with_different_content')) return '這次送出識別碼已對應其他內容，請重新送出。';
   if(message.includes('invalid_message_content')) return '訊息需為 1–2000 字。';
+  if(message.includes('group_insufficient_funds')) return '錢包餘額不足，請先取得銀幣或鑽石後再送出群組訊息。';
   if(message.includes('authentication_required')||message.includes('JWT')||message.includes('登入狀態')) return '登入狀態已失效，請重新登入後再試。';
   return message||'操作失敗，請稍後再試。';
 }
@@ -4650,7 +4651,11 @@ async function groupSendMock() {
     }),15000,'訊息保存逾時。請重新開啟群組確認訊息是否已保存，再決定是否重試。');
     if(error) throw error;
     const activeGroupId=g.active.id;
-    g.pendingRequest=null;
+    // The RPC commits the group turn and wallet debit atomically. Refresh the visible
+    // wallet immediately so the header/composer never keeps showing the pre-charge balance.
+    await refreshWalletBalance();
+    // Keep the same request key until the saved messages are reloaded successfully. If
+    // that read times out, retrying the send reuses the key and cannot charge twice.
     // Refresh only the message rows; do not reopen the entire group, clear its active
     // state, or flash the loading screen after every send.
     const {data:rows,error:rowsError}=await groupWithTimeout(
@@ -4672,6 +4677,7 @@ async function groupSendMock() {
       return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user' && m.content===GROUP_CONTINUE_SENTINEL ? '' : m.content,createdAt:m.created_at};
     });
     g.turn=g.messages.filter(m=>m.type==='user').length;
+    g.pendingRequest=null;
     // Refresh cumulative character-card counts after a group turn has been saved.
     // The database RPC already includes group messages; invalidate the stale frontend cache.
     void loadCharacterTurnCounts(members.map(member=>member.characterId||member.id), true);
