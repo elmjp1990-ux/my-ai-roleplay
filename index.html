@@ -4254,7 +4254,7 @@ ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
                 <button type="button" data-action="profile" title="查看錢包"><span class="wallet-value wallet-diamond">💎 ${Number(currentUser()?.diamonds || 0).toLocaleString()}</span></button>
                 <button type="button" data-action="profile" title="查看錢包"><span class="wallet-value wallet-silver">◉ ${Number(currentUser()?.silver || 0).toLocaleString()}</span></button>
               </div>
-              <span class="composer-cost" title="銀幣優先，不足時由鑽石補足" aria-label="本回合群組費用 ${Math.max(1,(group.members||[]).length)*3} 點">◉ ${Math.max(1,(group.members||[]).length)*3} 點/回合</span>
+              <button type="button" class="composer-cost wallet-cost-button" data-action="wallet-cost-details" aria-label="查看本次預計扣款與持有資源" title="查看本次預計扣款與持有資源">${walletCostPreviewHTML(Math.max(1,(group.members||[]).length)*3)}</button>
               <button class="primary composer-send" type="button" data-action="group-send" aria-label="送出群組訊息" ${g.sending?'disabled':''}>${ICON.send}</button>
             </div>
           </div>
@@ -8100,7 +8100,7 @@ document.addEventListener('click',async event=>{
       const input=$('groupMessageInput');
       if(input) await groupSendMock();
     } else {
-      const form=$('view').querySelector('form[data-form="chat"]');
+      const form=$('view').querySelector('form[data-form="message"]');
       if(form) form.requestSubmit();
     }
   }
