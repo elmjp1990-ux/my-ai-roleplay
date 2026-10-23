@@ -882,7 +882,14 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 /* The group route locks the chat viewport, but the multi-step creation wizard is a full page.
    Make the page itself the single scroll container on touch devices; the chat-only fixed height
    must not clip step 2's longer profile and scene fields. */
-body.group-chat-page:has(.group-wizard),
+body.group-chat-page:has(.group-wizard) {
+  height:auto!important;
+  min-height:100dvh;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  overscroll-behavior-y:contain;
+  -webkit-overflow-scrolling:touch;
+}
 body.group-chat-page:has(.group-wizard) .app {
   height:auto!important;
   min-height:100dvh;
