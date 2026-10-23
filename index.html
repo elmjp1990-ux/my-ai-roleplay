@@ -919,14 +919,14 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 <aside class="sidebar">
   <div class="sidebar-heading">
     <button class="ghost logo-button" data-action="home" aria-label="首頁">
-      <img class="logo-img" alt="PersonaX">
+      <img class="logo-img" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%2240%22 viewBox=%220 0 180 40%22%3E%3Cpath fill=%22%23a5b4fc%22 d=%22M18 4 23 15 34 20 23 25 18 36 13 25 2 20 13 15Z%22/%3E%3Ctext x=%2243%22 y=%2228%22 fill=%22%23a5b4fc%22 font-family=%22Arial,sans-serif%22 font-size=%2225%22 font-weight=%22800%22%3EPersonaX%3C/text%3E%3C/svg%3E" alt="PersonaX">
     </button>
     <button class="ghost" data-action="collapse" aria-label="收合或展開網站選單">☰</button>
   </div>
   <nav id="desktopNav"></nav>
   <div class="sidebar-footer">
     <button class="ghost" data-action="home" aria-label="首頁">
-      <img class="logo-img" alt="PersonaX">
+      <img class="logo-img" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%2240%22 viewBox=%220 0 180 40%22%3E%3Cpath fill=%22%23a5b4fc%22 d=%22M18 4 23 15 34 20 23 25 18 36 13 25 2 20 13 15Z%22/%3E%3Ctext x=%2243%22 y=%2228%22 fill=%22%23a5b4fc%22 font-family=%22Arial,sans-serif%22 font-size=%2225%22 font-weight=%22800%22%3EPersonaX%3C/text%3E%3C/svg%3E" alt="PersonaX">
     </button>
   </div>
 </aside>
@@ -935,7 +935,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   <header>
     <div class="row">
       <button class="ghost mobile-logo" data-action="home" aria-label="首頁">
-        <img class="logo-img" alt="PersonaX">
+        <img class="logo-img" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%2240%22 viewBox=%220 0 180 40%22%3E%3Cpath fill=%22%23a5b4fc%22 d=%22M18 4 23 15 34 20 23 25 18 36 13 25 2 20 13 15Z%22/%3E%3Ctext x=%2243%22 y=%2228%22 fill=%22%23a5b4fc%22 font-family=%22Arial,sans-serif%22 font-size=%2225%22 font-weight=%22800%22%3EPersonaX%3C/text%3E%3C/svg%3E" alt="PersonaX">
       </button>
       <strong class="desktop-title" id="pageTitle"></strong>
     </div>
@@ -955,8 +955,14 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   const SUPABASE_URL = 'https://ouyewoagbmtqehbofrje.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_MyTDqAKNTkK4zo7eap8gZA_ZGozHRMd';
 
+  // 若 Supabase CDN 未載入，避免初始化錯誤中止最新首頁的主程式。
+  // 雲端登入與資料操作會暫不可用，但首頁 UI 仍應正常啟動。
   if (!window.mySupabase) {
-    window.mySupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    if (window.supabase && typeof window.supabase.createClient === 'function') {
+      window.mySupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } else {
+      console.error('Supabase JS SDK 載入失敗：請檢查 CDN 連線。首頁 UI 將繼續載入。');
+    }
   }
 
   /*
