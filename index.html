@@ -6973,7 +6973,7 @@ document.addEventListener('submit',async event => {
   // Dialogs opened through showDialog do not populate route.overlay; keep the
   // target message ID on the form itself so group edits can resolve it.
   const messageId=String(form.dataset.id || f.get('messageId') || o.id || '');
-  const text=String(f.get('text') || '').trim();
+  let text=String(f.get('text') || '').trim();
 
   try {
     switch(type) {
@@ -8164,8 +8164,8 @@ document.addEventListener('click',async event=>{
     return;
   }
   if(button.dataset.action==='wallet-open-shop') {
-    if(route.page==='group') go({page:'shop'});
-    else go({page:'shop'});
+    const modal=$('modal'); if(modal?.open) modal.close();
+    go({page:'shop'});
     return;
   }
   if(button.dataset.action==='wallet-watch-ad') {
