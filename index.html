@@ -907,6 +907,32 @@ body.group-chat-page main:has(.group-wizard) {
   padding:16px 12px calc(32px + env(safe-area-inset-bottom));
 }
 
+/* Keep the group-creation wizard scrollable on mobile even when the chat shell normally locks the viewport. */
+body.group-wizard-page,
+body.group-wizard-page .app {
+  height:auto!important;
+  min-height:100dvh;
+  max-height:none!important;
+  overflow:visible!important;
+}
+body.group-wizard-page main {
+  height:auto!important;
+  min-height:100dvh;
+  max-height:none!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  overscroll-behavior-y:contain;
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-y;
+  padding-bottom:calc(32px + env(safe-area-inset-bottom));
+}
+body.group-wizard-page .group-wizard {
+  height:auto!important;
+  min-height:0;
+  max-height:none!important;
+  overflow:visible!important;
+  padding-bottom:calc(16px + env(safe-area-inset-bottom));
+}
 /* GROUP-01 integrated test-mode prototype */
 .group-wizard{max-width:850px;margin:0 auto;display:grid;gap:16px;min-height:0}
 @media(max-width:767px){
@@ -2774,6 +2800,7 @@ function renderShell() {
   document.body.classList.toggle('chat-page',['chat','conversation'].includes(route.page));
   document.body.classList.toggle('conversation',route.page === 'conversation');
   document.body.classList.toggle('group-chat-page',route.page === 'group');
+  document.body.classList.toggle('group-wizard-page',route.page === 'group' && !groupPrototype.active);
   document.querySelector('meta[name="theme-color"]').content =
     state.theme === 'day' ? '#f3f5fa' : '#090d16';
 }
