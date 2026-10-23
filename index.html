@@ -880,7 +880,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   * { scroll-behavior:auto!important; transition:none!important; }
 }
 /* GROUP-01 integrated test-mode prototype */
-.group-wizard{max-width:850px;margin:0 auto;display:grid;gap:16px}
+.group-wizard{width:min(100%,850px);max-width:850px;max-height:calc(100dvh - 112px);min-height:0;margin:0 auto;display:grid;gap:16px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:0 2px calc(20px + env(safe-area-inset-bottom));scrollbar-gutter:stable}
 .group-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .group-step{padding:9px 6px;text-align:center;border:1px solid var(--border);border-radius:10px;color:var(--muted);background:var(--panel2)}
 .group-step.active{background:var(--primary);color:#fff;border-color:transparent}
@@ -4540,7 +4540,7 @@ function renderGroupPrototype() {
       '<div class="group-field"><span>確認群組成員（返回上一步才能增減）</span><div class="group-character-grid">'+members.map(c=>'<div class="group-character-option"><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt=""><strong>'+e(c.name)+'</strong></div>').join('')+'</div></div>';
   }
   const topNext=g.step===1?'<button class="primary" type="button" data-action="group-next" '+(g.loading?'disabled':'')+'>下一步 →</button>':'';
-  $('view').innerHTML='<div class="group-wizard"><div class="row between wrap"><div><h1>建立群組聊天</h1><p class="muted">選擇角色後設定群組檔案；目前為測試模式，不呼叫 AI、不扣款。</p></div>'+topNext+'</div>'+groupRenderSteps()+'<section class="group-panel">'+body+'<div id="groupFormError" class="error" role="alert" aria-live="polite">'+e(g.formError)+'</div><div class="group-actions"><button data-action="group-back" '+(g.step===1||g.loading?'disabled':'')+'>上一步</button><button class="primary" data-action="group-next" '+(g.loading?'disabled':'')+'>'+(g.loading?'正在建立…':g.step===2?'建立群組':'下一步')+'</button></div></section></div>';
+  $('view').innerHTML='<div class="group-wizard"><div class="row between wrap"><div><h1>建立群組聊天</h1><p class="muted">選擇角色後設定群組檔案。AI 尚未串接；每次送出群組訊息仍會依角色人數扣款。</p></div>'+topNext+'</div>'+groupRenderSteps()+'<section class="group-panel">'+body+'<div id="groupFormError" class="error" role="alert" aria-live="polite">'+e(g.formError)+'</div><div class="group-actions"><button data-action="group-back" '+(g.step===1||g.loading?'disabled':'')+'>上一步</button><button class="primary" data-action="group-next" '+(g.loading?'disabled':'')+'>'+(g.loading?'正在建立…':g.step===2?'建立群組':'下一步')+'</button></div></section></div>';
 }
 function groupReadStep() {
   const g=groupPrototype;
