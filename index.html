@@ -630,6 +630,7 @@ body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-
 .composer-icon-button { width:30px; height:30px; min-width:30px; padding:5px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; background:transparent; border:1px solid var(--border); }
 .composer-icon-button .icon { width:16px; height:16px; }
 .composer-send { width:38px; height:38px; min-width:38px; padding:7px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; }
+.composer-cost{display:inline-flex;align-items:center;white-space:nowrap;font-size:12px;line-height:1.2;color:var(--muted);padding:5px 7px;border:1px solid var(--border);border-radius:999px;background:var(--surface);}
 .composer-wallet { display:flex; align-items:center; gap:8px; font-size:11px; white-space:nowrap; }
 .composer-wallet .wallet-value { display:inline-flex; align-items:center; gap:3px; }
 .composer-wallet .wallet-diamond { color:#dcad35; }
@@ -2375,7 +2376,7 @@ async function runPendingChatTurn(s) {
     await saveChatSessionSafely(s);
     await clearCloudPendingTurn(s);
     await refreshWalletBalance();
-    openModal('wallet-insufficient');
+    toast('餘額不足');
     return;
   }
 
@@ -4253,6 +4254,7 @@ ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
                 <button type="button" data-action="profile" title="查看錢包"><span class="wallet-value wallet-diamond">💎 ${Number(currentUser()?.diamonds || 0).toLocaleString()}</span></button>
                 <button type="button" data-action="profile" title="查看錢包"><span class="wallet-value wallet-silver">◉ ${Number(currentUser()?.silver || 0).toLocaleString()}</span></button>
               </div>
+              <span class="composer-cost" title="銀幣優先，不足時由鑽石補足" aria-label="本回合群組費用 ${Math.max(1,(group.members||[]).length)*3} 點">◉ ${Math.max(1,(group.members||[]).length)*3} 點/回合</span>
               <button class="primary composer-send" type="button" data-action="group-send" aria-label="送出群組訊息" ${g.sending?'disabled':''}>${ICON.send}</button>
             </div>
           </div>
@@ -4687,7 +4689,15 @@ async function groupSendMock() {
     const messagePane=$('groupMessages');
     if(messagePane) requestAnimationFrame(()=>{if(messagePane.isConnected) messagePane.scrollTop=messagePane.scrollHeight;});
   } catch(error) {
-    g.sending=false;g.formError=groupFriendlyError(error)||'訊息保存失敗，請重試。';render();
+    g.sending=false;
+    const rawError=String(error?.message||error||'');
+    if(rawError.includes('group_insufficient_funds')||rawError.includes('insufficient_funds')) {
+      g.formError='';
+      toast('餘額不足');
+      renderGroupConversation();
+      return;
+    }
+    g.formError=groupFriendlyError(error)||'訊息保存失敗，請重試。';render();
   }
 }
 async function groupRefreshList() { groupPrototype.groupsLoaded=false;await groupLoadList(true);if(route.page==='group'&&!groupPrototype.active)render(); }
@@ -4810,6 +4820,7 @@ function renderConversation() {
                 <button type="button" data-action="profile" title="查看錢包"><span class="wallet-value wallet-diamond">💎 ${Number(currentUser()?.diamonds || 0).toLocaleString()}</span></button>
                 <button type="button" data-action="profile" title="查看錢包"><span class="wallet-value wallet-silver">◉ ${Number(currentUser()?.silver || 0).toLocaleString()}</span></button>
               </div>
+              <span class="composer-cost" title="銀幣優先，不足時由鑽石補足" aria-label="單人聊天每回合費用 2 點">◉ 2 點/回合</span>
               <button type="submit" class="primary composer-send" aria-label="送出或接續回應" title="送出">${ICON.send}</button>
             </div>
           </div>
