@@ -10,19 +10,22 @@
 <style>
 :root {
   color-scheme: dark;
-  --bg:#080b12;
-  --panel:#101725;
-  --panel2:#172033;
-  --text:#eef2ff;
-  --muted:#95a3b9;
-  --border:#293348;
-  --primary:#6366f1;
-  --soft:#6366f124;
-  --input:#0b1220;
-  --header:#0b1120ef;
-  --bubble:#1b263b;
-  --shade:#080d17d9;
+  /* POYOZZ premium immersive palette preview */
+  --bg:#090c14;
+  --panel:#151c2d;
+  --panel2:#1b2440;
+  --text:#f4f3ff;
+  --muted:#a4adc2;
+  --border:#2a3349;
+  --primary:#8b7cff;
+  --soft:#272347;
+  --input:#101726;
+  --header:#101726ed;
+  --bubble:#20243b;
+  --shade:#090c14e8;
   --sidebar:232px;
+  --px-primary-hover:#a99bff;
+  --px-accent-pink:#e9b7e8;
 }
 body.day {
   color-scheme:light;
@@ -949,6 +952,129 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 .group-chat-entry .select-chat{display:block;min-width:0;flex:1;}
 .group-chat-entry:focus-visible{outline:2px solid var(--accent,#7c6cf2);outline-offset:2px;}
 .inline-help{display:inline-flex;position:relative;vertical-align:middle;margin-left:5px;font-size:12px}.inline-help summary{display:inline-grid;place-items:center;width:17px;height:17px;border:1px solid currentColor;border-radius:50%;cursor:pointer;list-style:none}.inline-help summary::-webkit-details-marker{display:none}.inline-help>span{position:absolute;z-index:30;left:22px;top:-6px;width:min(260px,70vw);padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--panel);box-shadow:0 8px 24px #0003;font-weight:400;line-height:1.5}.char-counter{display:block;font-variant-numeric:tabular-nums}
+
+/* POYOZZ premium immersive explore-page preview: color-only refinement */
+.hero {
+  color:var(--text);
+  background:
+    radial-gradient(circle at 84% 16%,#a99bff2b,transparent 34%),
+    radial-gradient(circle at 72% 100%,#e9b7e80d,transparent 42%),
+    linear-gradient(115deg,#101726 0%,#171b35 54%,#211936 100%);
+  border-color:#8b7cff45;
+  box-shadow:inset 0 1px 0 #ffffff08;
+}
+.hero p { color:#c6c9dc; }
+.hero-dot.active { background:var(--px-primary-hover); box-shadow:0 0 12px #a99bff65; }
+.card {
+  border-color:var(--border);
+  background:linear-gradient(180deg,#171e30 0%,#131a29 100%);
+  box-shadow:0 8px 28px #00000020;
+  transition:border-color .2s ease,box-shadow .2s ease,transform .2s ease;
+}
+.card:hover,.card:focus-within {
+  border-color:#7668d966;
+  box-shadow:0 12px 32px #00000032,0 0 0 1px #8b7cff12;
+}
+.chat-cta,.card-chat {
+  border:1px solid #6256a8;
+  background:linear-gradient(135deg,#30294f 0%,#24243f 58%,#1d263c 100%);
+  color:#f4f3ff;
+  box-shadow:0 5px 16px #05071155,inset 0 1px #ffffff12;
+}
+.chat-cta:hover,.card-chat:hover,
+.card:hover .card-chat,.card:focus-within .card-chat {
+  border-color:#8b7cff;
+  background:linear-gradient(135deg,#403563 0%,#2d2c4b 58%,#26334c 100%);
+  color:#ffffff;
+  box-shadow:0 7px 20px #05071170,inset 0 1px #ffffff18;
+}
+.heart.on { color:var(--px-accent-pink); }
+:where(button,a,input,textarea,select):focus-visible {
+  outline:2px solid var(--px-primary-hover);
+  outline-offset:2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card { transition:none; }
+}
+
+/* POYOZZ premium immersive system: carry the approved palette across all screens. */
+:root {
+  --px-surface-raised:#1a2235;
+  --px-surface-hover:#202a41;
+  --px-button-start:#30294f;
+  --px-button-end:#24243f;
+  --px-button-hover-start:#403563;
+  --px-button-hover-end:#26334c;
+}
+.primary {
+  color:#f4f3ff;
+  border:1px solid #6256a8;
+  background:linear-gradient(135deg,var(--px-button-start),var(--px-button-end));
+  box-shadow:0 4px 14px #05071135,inset 0 1px #ffffff10;
+}
+.primary:hover:not(:disabled) {
+  background:linear-gradient(135deg,var(--px-button-hover-start),var(--px-button-hover-end));
+  border-color:#8b7cff;
+  filter:none;
+}
+button:not(.ghost):not(.primary):not(.danger):not(.card-chat):not(.chat-cta):hover:not(:disabled) {
+  background-color:var(--px-surface-hover);
+  border-color:#465071;
+}
+.panel,.suggestions-panel {
+  background:linear-gradient(180deg,#151c2d 0%,#111827 100%);
+  border-color:var(--border);
+  box-shadow:0 8px 26px #00000018;
+}
+.tabs .tab[aria-selected="true"],.tabs .tab.active,
+.nav-btn.active,.nav-btn[aria-current="page"] {
+  color:#e4dfff;
+  background:linear-gradient(135deg,#30294f88,#24243f88);
+  border-color:#6256a8;
+}
+.tab:hover,.nav-btn:hover {
+  color:var(--text);
+  background-color:#202a41;
+}
+.chat-list,.chat-list-head,.chat-overlay {
+  background-color:var(--panel);
+}
+.chat-brand-mark,.group-list-avatar,.group-avatar-fallback {
+  background:linear-gradient(135deg,#6256a8,#30294f);
+  color:#f4f3ff;
+  box-shadow:0 4px 14px #080b1260;
+}
+.chat-list-icon,.chat-top-action,.composer-icon-button {
+  background:linear-gradient(145deg,#1b2440,#151c2d);
+  border-color:#303b54;
+}
+.chat-list-icon:hover,.chat-top-action:hover,.composer-icon-button:hover {
+  background:linear-gradient(145deg,#30294f,#202a41);
+  border-color:#6256a8;
+}
+input:focus,textarea:focus,select:focus {
+  border-color:#7668d9;
+  box-shadow:0 0 0 3px #8b7cff18;
+}
+:where(button,a,input,textarea,select):focus-visible {
+  outline-color:#a99bff;
+}
+.modal-heading,.modal-content {
+  color:var(--text);
+}
+body:not(.day) .modal,body:not(.day) dialog {
+  background:var(--panel);
+  color:var(--text);
+  border-color:var(--border);
+}
+body:not(.day) .chat-entry:hover,body:not(.day) .chat-entry.active {
+  background:#202a41;
+  border-color:#35415d;
+}
+body:not(.day) .chat-entry.active {
+  box-shadow:inset 3px 0 #8b7cff;
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
