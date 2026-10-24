@@ -4810,7 +4810,7 @@ function renderGroupPrototype() {
   if(g.active) { renderGroupConversation(); return; }
   let body='';
   if(g.step===1) {
-    body='<h2>選擇角色</h2><p class="muted">最多選擇 3 位公開角色。只能選擇目前公開且未刪除的角色；群組建立後會開啟共用聊天介面。</p>'+groupRenderCharacters();
+    body='<h2>選擇角色</h2><p class="muted">最多選擇 3 位公開角色。</p>'+groupRenderCharacters();
   } else {
     const members=groupSelectedCharacters();
     const suggestedName=members.map(c=>c.name).join('、').slice(0,25);
