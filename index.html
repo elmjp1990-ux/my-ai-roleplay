@@ -3548,7 +3548,8 @@ function renderEditor() {
           <span>我確認角色沒有侵犯智慧財產權、形象或其他任何權利。 <span aria-hidden="true" style="color:#ef4444;font-weight:800">*</span></span></label>
         <label class="check" style="margin-top:12px"><input name="isNSFW" type="checkbox" ${c.isNSFW === true ? 'checked' : ''}>
           <span>此角色含成人／敏感內容（NSFW，僅限 18 歲以上使用者）</span></label>
-        <small class="muted" style="display:block;margin:6px 0 12px 27px;line-height:1.7">若角色內容包含成人或露骨性描寫，請務必標示 NSFW。系統會檢查公開介紹、開場白、私密資訊及對話風格；偵測到限制詞但尚未勾選時，會提醒你確認分類。</small>
+        <small class="muted" style="display:block;margin:6px 0 8px 27px;line-height:1.7">若角色內容包含成人或露骨性描寫，請務必標示 NSFW。系統會檢查公開介紹、開場白、私密資訊及對話風格；偵測到限制詞但尚未勾選時，會提醒你確認分類。</small>
+        <button type="button" class="small" data-action="nsfw-term-manager" hidden style="margin:0 0 12px 27px">管理 NSFW 限制詞（管理員）</button>
         <label class="check" style="margin-top:12px"><input name="nsfwWorkplaceWarning" type="checkbox" ${c.nsfwWorkplaceWarning === true ? 'checked' : ''}>
           <span>此角色為 NSFW，工作場所不宜</span></label>
         <div class="row" style="margin-top:22px">
@@ -3557,6 +3558,7 @@ function renderEditor() {
         </div>
       </form>
     </div>`;
+  void isNsfwTermsAdmin().then(isAdmin=>{const button=$('view')?.querySelector('[data-action="nsfw-term-manager"]');if(button&&isAdmin)button.hidden=false;});
   if(c.aiGeneratedDraft)void (async()=>{
     const matches=findNsfwTerms(c,await loadNsfwTerms());
     if(matches.length&&!c.isNSFW)showDialog('AI 草稿需要確認 NSFW 分級','<p>這份 AI 私密草稿包含可能屬於成人／敏感內容的限制詞：</p><p><strong>'+e(matches.slice(0,8).join('、'))+'</strong></p><p>請審閱內容；若確實屬於成人／敏感內容，請勾選 NSFW 分級後再儲存。</p><div class="row" style="justify-content:flex-end"><button type="button" data-action="nsfw-focus">前往勾選 NSFW</button><button type="button" data-action="dialog-close">稍後確認</button></div>');
@@ -7206,6 +7208,47 @@ function focusNsfwCheckbox(){
   input.closest('label')?.classList.add('nsfw-attention');
   setTimeout(()=>input.closest('label')?.classList.remove('nsfw-attention'),2200);
 }
+
+async function isNsfwTermsAdmin(){
+  const client=window.mySupabase;
+  if(!client)return false;
+  const {data,error}=await client.auth.getSession();
+  return !error&&data?.session?.user?.app_metadata?.role==='admin';
+}
+async function refreshNsfwTermManager(){
+  const client=window.mySupabase;
+  const {data:sessionData}=await client.auth.getSession();
+  const user=sessionData?.session?.user;
+  if(!user||user.app_metadata?.role!=='admin'){toast('此功能僅限管理員使用。');$('modal')?.close();return;}
+  const {data,error}=await client.from('content_restriction_terms').select('id,term,is_active').order('term');
+  if(error){toast('限制詞清單讀取失敗：'+error.message);return;}
+  const rows=(data||[]).map(row=>'<div class="row between" style="padding:8px 0;border-bottom:1px solid var(--border);gap:12px"><span class="'+(row.is_active?'':'muted')+'">'+e(row.term)+(row.is_active?'':'（已停用）')+'</span><button type="button" data-action="nsfw-term-toggle" data-id="'+e(row.id)+'" data-active="'+(row.is_active?'true':'false')+'">'+(row.is_active?'停用':'啟用')+'</button></div>').join('');
+  showDialog('NSFW 限制詞管理','<p class="small muted">新增或停用詞彙後，建立角色與 AI 私密草稿審閱時會使用最新清單。限制詞只觸發提醒，不會自動判定角色必然屬於 NSFW。</p><form id="nsfwTermAddForm" class="row" style="gap:8px"><input name="term" maxlength="80" placeholder="輸入要新增的限制詞" required><button type="submit" class="primary">新增</button></form><div style="max-height:42vh;overflow:auto;margin-top:12px">'+(rows||'<p class="muted">目前沒有詞彙。</p>')+'</div>');
+}
+document.addEventListener('click',async event=>{
+  const manager=event.target.closest('[data-action="nsfw-term-manager"]');
+  if(manager){if(!(await isNsfwTermsAdmin())){toast('此功能僅限管理員使用。');return;}await refreshNsfwTermManager();return;}
+  const toggle=event.target.closest('[data-action="nsfw-term-toggle"]');
+  if(toggle){
+    if(!(await isNsfwTermsAdmin())){toast('此功能僅限管理員使用。');return;}
+    const active=toggle.dataset.active!=='true';
+    const {error}=await window.mySupabase.from('content_restriction_terms').update({is_active:active,updated_at:new Date().toISOString()}).eq('id',toggle.dataset.id);
+    if(error){toast('更新限制詞失敗：'+error.message);return;}
+    await refreshNsfwTermManager();return;
+  }
+});
+document.addEventListener('submit',async event=>{
+  const form=event.target.closest('#nsfwTermAddForm');
+  if(!form)return;
+  event.preventDefault();
+  if(!(await isNsfwTermsAdmin())){toast('此功能僅限管理員使用。');return;}
+  const term=String(new FormData(form).get('term')||'').trim();
+  if(!term||term.length>80){toast('限制詞需為 1–80 字。');return;}
+  const {data:sessionData}=await window.mySupabase.auth.getSession();
+  const {error}=await window.mySupabase.from('content_restriction_terms').insert({term,is_active:true,created_by:sessionData?.session?.user?.id||null});
+  if(error){toast(error.code==='23505'?'這個限制詞已存在。':'新增限制詞失敗：'+error.message);return;}
+  await refreshNsfwTermManager();
+});
 
 document.addEventListener('submit',async event => {
   const form=event.target.closest('[data-form]');
