@@ -4499,7 +4499,7 @@ function renderGroupChatOverlay(kind) {
     const group=groupPrototype.active,sceneLabel=id=>group.scenes.find(x=>x.id===id)?.name||'共用場景';
     const members=group.members.map(m=>{
       const avatar=String(m.avatar_url||m.image||'').trim();
-      const image=/^https?:\\/\\//i.test(avatar)
+      const image=/^https?:\/\//i.test(avatar)
         ? '<img class="avatar" style="width:44px;height:44px" src="'+e(avatar)+'" alt="">'
         : '<span class="avatar avatar-fallback" style="width:44px;height:44px">'+e(String(m.name||'角').trim().slice(0,1)||'角')+'</span>';
       const characterId=String(m.characterId||m.id||'');
