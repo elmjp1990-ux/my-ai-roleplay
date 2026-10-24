@@ -1525,10 +1525,12 @@ const ids = (rows || []).map(row => row.id);
 }
 async function hydrateCharacterVideo(video){
   const path=video?.dataset?.characterVideo;
-  if(!path||!window.mySupabase)return;
+  if(!path||!window.mySupabase||video.dataset.videoHydrated==='true')return;
+  video.dataset.videoHydrated='true';
   const {data,error}=await window.mySupabase.storage.from('character-avatar-videos').createSignedUrl(path,300);
-  if(error||!data?.signedUrl||!video.isConnected){console.warn('角色影片載入失敗',error);return;}
+  if(error||!data?.signedUrl||!video.isConnected){video.dataset.videoHydrated='false';console.warn('角色影片載入失敗',error);return;}
   video.src=data.signedUrl;video.load();
+  if(video.hasAttribute('autoplay'))video.play().catch(()=>{});
 }
 async function saveSupabaseCharacter(character, expectedUserId) {
     const client = window.mySupabase;
@@ -2856,6 +2858,8 @@ function render() {
   }
   if (route.overlay) renderModal(route.overlay);
   updateCharacterCounters($('view'));
+  // 公開卡片影片需取得私有儲存桶的短效簽名 URL，並在畫面渲染後啟動靜音循環播放。
+  $('view')?.querySelectorAll('.card-image video[data-character-video]').forEach(video=>void hydrateCharacterVideo(video));
 }
 
 /* Explore */
@@ -2963,7 +2967,7 @@ function card(c,owner = false) {
       <div class="card-image">
         <button class="image-button" data-action="detail" data-id="${e(c.id)}"
                 aria-label="查看${e(c.name)}">
-          <img src="${e(safeImage(c.image))}" alt="${e(c.name)}" loading="lazy">
+          ${c.avatarVideoPath ? `<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" muted autoplay loop playsinline preload="metadata" aria-label="${e(c.name)}影片預覽"></video>` : `<img src="${e(safeImage(c.image))}" alt="${e(c.name)}" loading="lazy">`}
         </button>
         ${c.deletedAt ? '' : `<span class="card-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(initialTurnCount)}" title="對話回合數">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
@@ -3544,9 +3548,9 @@ function renderEditor() {
           <small>支援 PNG、JPG、WebP，圖片上限 15 MB；也可上傳 10 秒內、15 MB 以下的 MP4、WebM 或 MOV 影片。圖片會自動壓縮；影片會擷取封面，並在角色介紹頁播放。請確認你擁有素材使用權。</small>
         </label>
         <img id="imagePreview" ${draftImage ? `src="${e(safeImage(draftImage))}"` : ''}
-             class="${draftImage ? '' : 'hidden'}"
+             class="${draftImage && !draftVideoPath ? '' : 'hidden'}"
              alt="角色頭像或影片封面預覽" style="width:120px;height:150px;object-fit:cover;border-radius:13px;margin-bottom:10px">
-        <video id="characterVideoPreview" class="hidden" controls muted playsinline style="width:180px;max-height:240px;object-fit:contain;border-radius:13px;margin-bottom:18px;background:#000"></video>
+        <video id="characterVideoPreview" class="${draftVideoPath ? '' : 'hidden'}" controls muted playsinline style="width:180px;max-height:240px;object-fit:contain;border-radius:13px;margin-bottom:18px;background:#000"></video>
         <label class="field"><span>角色名字 *</span>
           <input name="name" required maxlength="25" value="${e(c.name || '')}">
           <small>最多 25 字，可用中文、英文、數字、空格及 -：()_，支援對應全型符號。建議使用清楚好辨識的角色名稱，避免填入聯絡方式或宣傳資訊。</small>
@@ -3582,8 +3586,6 @@ function renderEditor() {
           <span>此角色含成人／敏感內容（NSFW，僅限 18 歲以上使用者）</span></label>
         <small class="muted" style="display:block;margin:6px 0 8px 27px;line-height:1.7">若角色內容包含成人或露骨性描寫，請務必標示 NSFW。系統會檢查公開介紹、開場白、私密資訊及對話風格；偵測到限制詞但尚未勾選時，會提醒你確認分類。</small>
         <button type="button" class="small" data-action="nsfw-term-manager" hidden style="margin:0 0 12px 27px">管理 NSFW 限制詞（管理員）</button>
-        <label class="check" style="margin-top:12px"><input name="nsfwWorkplaceWarning" type="checkbox" ${c.nsfwWorkplaceWarning === true ? 'checked' : ''}>
-          <span>此角色為 NSFW，工作場所不宜</span></label>
         <div class="row" style="margin-top:22px">
           <button type="button" data-action="back">取消</button>
           <button class="primary">${route.id ? '儲存修改' : '創建角色'}</button>
@@ -7225,10 +7227,19 @@ async function loadNsfwTerms(){
   if(cachedNsfwTerms)return cachedNsfwTerms;
   const client=window.mySupabase;
   if(!client)return DEFAULT_NSFW_TERMS;
-  const {data,error}=await client.from('content_restriction_terms').select('term').eq('is_active',true);
-  if(error){console.warn('限制詞清單載入失敗，使用內建提醒詞。',error.message);return DEFAULT_NSFW_TERMS;}
-  cachedNsfwTerms=(data||[]).map(row=>String(row.term||'').trim()).filter(Boolean);
-  return cachedNsfwTerms.length?cachedNsfwTerms:DEFAULT_NSFW_TERMS;
+  let databaseTerms=[];
+  if(client){
+    try{
+      const {data,error}=await client.from('content_restriction_terms').select('term').eq('is_active',true);
+      if(error)throw error;
+      databaseTerms=(data||[]).map(row=>String(row.term||'').trim()).filter(Boolean);
+    }catch(error){
+      console.warn('限制詞清單載入失敗，仍使用內建限制詞。',error.message);
+    }
+  }
+  // 管理員自訂詞只會補充，不會覆蓋內建詞；避免資料表有少數詞時漏掉常見敏感詞。
+  cachedNsfwTerms=[...new Set([...DEFAULT_NSFW_TERMS,...databaseTerms].map(term=>String(term).normalize('NFKC').trim()).filter(Boolean))];
+  return cachedNsfwTerms;
 }
 function findNsfwTerms(character,terms){
   const text=[character.name,character.intro,character.opening,character.privateInfo,character.style].filter(Boolean).join('\n').normalize('NFKC').toLocaleLowerCase('zh-Hant');
@@ -7340,7 +7351,7 @@ document.addEventListener('submit',async event => {
           avatarVideoPath:draftVideoPath || '',
           isNSFW:f.get('isNSFW') === 'on',
           rightsConfirmed:f.get('rightsConfirmed') === 'on',
-          nsfwWorkplaceWarning:f.get('nsfwWorkplaceWarning') === 'on',
+          nsfwWorkplaceWarning:false,
           tags:[...draftTags],authorId:user.uid,owner:true,
           chats:old?.chats || '0',users:old?.users ?? null,
           createdAt:old?.createdAt || Date.now()
@@ -7959,7 +7970,7 @@ document.addEventListener('change',async event => {
           const ctx=canvas.getContext('2d');if(!ctx)throw new Error('無法產生影片封面。');ctx.drawImage(frame,0,0,canvas.width,canvas.height);
           draftImage=canvas.toDataURL('image/jpeg',.82);draftVideoFile=file;draftVideoPath='';
           if(draftVideoPreviewUrl)URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl=url;
-          $('imagePreview').src=draftImage;$('imagePreview').classList.remove('hidden');
+          $('imagePreview').src=draftImage;$('imagePreview').classList.add('hidden');
           const preview=$('characterVideoPreview');preview.src=url;preview.classList.remove('hidden');
           toast('影片符合 10 秒與 15 MB 限制，已擷取角色卡封面。');saveEditorDraft();
         }else{
@@ -7967,6 +7978,7 @@ document.addEventListener('change',async event => {
           if(draftVideoPreviewUrl){URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl='';}
           draftVideoFile=null;draftVideoPath='';
           const preview=$('characterVideoPreview');preview.removeAttribute('src');preview.classList.add('hidden');
+          $('imagePreview').classList.remove('hidden');
           toast('正在壓縮角色圖片，請稍候…');
           const compressed=await compressUploadImage(file,{maxEdge:1600,targetBytes:500*1024});
           if(requestId!==characterImageCompressionRequest)return;
