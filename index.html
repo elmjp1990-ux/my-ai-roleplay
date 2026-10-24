@@ -1288,7 +1288,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     try {
       const { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible')
+        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible')
         .eq('visibility', 'public')
         .is('deleted_at', null)
         .order('first_published_at', { ascending: false, nullsFirst: false });
@@ -1334,7 +1334,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
           id: row.id, name: row.name || '未命名角色',
           gender: row.gender || 'ambiguous',
           age: row.age == null ? '' : String(row.age),
-          image: row.avatar_url || '', visibility: 'public',
+          image: row.avatar_url || '', avatarVideoPath:row.avatar_video_path || '', visibility: 'public',
           reviewStatus: row.review_status, intro: row.intro || '',
           opening: story?.opening_message || '', race: row.race || '',
           privateInfo: '', style: row.style || '',
@@ -1378,7 +1378,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       // 這可修復舊版匯入只存 localStorage 的資料；不會上傳其他帳號的本機角色。
       let { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
         .eq('author_id', user.id)
         .order('created_at', { ascending: false });
       if (error) throw new Error('讀取雲端角色失敗：' + error.message);
@@ -1471,6 +1471,7 @@ const ids = (rows || []).map(row => row.id);
           gender: row.gender || local.gender || 'ambiguous',
           age: row.age == null ? (local.age || '') : String(row.age),
           image: row.avatar_url || local.image || '',
+          avatarVideoPath:row.avatar_video_path || local.avatarVideoPath || '',
           visibility: row.visibility || 'private',
           intro: row.intro ?? local.intro ?? '',
           opening: story?.opening_message ?? local.opening ?? '',
@@ -1511,7 +1512,25 @@ const ids = (rows || []).map(row => row.id);
     }
   }
 
-  async function saveSupabaseCharacter(character, expectedUserId) {
+  async function uploadCharacterAvatarVideo(file,userId,characterId){
+  const client=window.mySupabase;
+  if(!client||!userId||!characterId)throw new Error('請先登入再上傳角色影片。');
+  if(file.size>15*1024*1024)throw new Error('影片不可超過 15 MB。');
+  const ext=({'video/mp4':'mp4','video/webm':'webm','video/quicktime':'mov'})[file.type];
+  if(!ext)throw new Error('影片格式僅支援 MP4、WebM 或 MOV。');
+  const path=userId+'/'+characterId+'/'+id()+'.'+ext;
+  const {error}=await client.storage.from('character-avatar-videos').upload(path,file,{upsert:false,contentType:file.type,cacheControl:'3600'});
+  if(error)throw new Error('角色影片上傳失敗：'+error.message);
+  return path;
+}
+async function hydrateCharacterVideo(video){
+  const path=video?.dataset?.characterVideo;
+  if(!path||!window.mySupabase)return;
+  const {data,error}=await window.mySupabase.storage.from('character-avatar-videos').createSignedUrl(path,300);
+  if(error||!data?.signedUrl||!video.isConnected){console.warn('角色影片載入失敗',error);return;}
+  video.src=data.signedUrl;video.load();
+}
+async function saveSupabaseCharacter(character, expectedUserId) {
     const client = window.mySupabase;
     if (!client || !expectedUserId) throw new Error('請先使用 Google 帳號登入，再儲存角色。');
     character.tags = validateCharacterTags(Array.isArray(character.tags) ? character.tags : []);
@@ -1563,6 +1582,7 @@ const ids = (rows || []).map(row => row.id);
       gender: character.gender || null,
       age,
       avatar_url: character.image || null,
+      avatar_video_path: character.avatarVideoPath || null,
       visibility: nextVisibility,
       review_status: nextVisibility === 'public' ? 'approved' : 'draft',
       first_published_at: firstPublishedAt,
@@ -2004,6 +2024,9 @@ let banner = 0;
 let draftCharacter = null;
 let draftTags = [];
 let draftImage = '';
+let draftVideoFile = null;
+let draftVideoPath = '';
+let draftVideoPreviewUrl = '';
 let profileImage = '';
 let isCompressingCharacterImage = false;
 let characterImageCompressionRequest = 0;
@@ -3038,7 +3061,7 @@ function renderDetail() {
       ${offline ? '<div class="character-status-banner">● 此角色目前離線或已下架。你仍可查看這段既有聊天所保留的角色簡介與開場白，但不能開啟新對話。</div>' : ''}
       <div class="detail-layout">
         <div class="detail-portrait">
-          <img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" alt="${e(c.name)}">
+${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline-image' : ''}" data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline controls aria-label="${e(c.name)} 的角色影片"></video>` : `<img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" alt="${e(c.name)}">`}
           <div class="detail-portrait-meta">
             <h1>${e(c.name)}</h1>
             <button class="author-link" data-action="author" data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>
@@ -3078,6 +3101,8 @@ function renderDetail() {
         </form>
       </section>`}
     </div>`;
+  const detailVideo=$('view').querySelector('[data-character-video]');
+  if(detailVideo)void hydrateCharacterVideo(detailVideo);
   void loadCharacterTurnCounts([c.id]);
   if (!offline && route.page !== 'session-detail') {
     renderComments();
@@ -3456,6 +3481,7 @@ function saveEditorDraft() {
     isNSFW:values.get('isNSFW') === 'on',
     tags:[...draftTags],
     image:draftImage,
+    avatarVideoPath:draftVideoPath,
     savedAt:Date.now()
   };
   const serialized = JSON.stringify(draft);
@@ -3482,6 +3508,9 @@ function startEditor(c = null) {
   draftCharacter = c ? clone(c) : null;
   draftTags = [...(c?.tags || [])];
   draftImage = c?.image || '';
+  draftVideoFile = null;
+  draftVideoPath = c?.avatarVideoPath || '';
+  if(draftVideoPreviewUrl){URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl='';}
   visit('editor',c?.id);
 }
 function renderEditor() {
@@ -3491,6 +3520,7 @@ function renderEditor() {
   if (savedDraft) {
     draftTags = Array.isArray(savedDraft.tags) ? [...savedDraft.tags] : draftTags;
     draftImage = savedDraft.image || draftImage || '';
+    draftVideoPath = savedDraft.avatarVideoPath || draftVideoPath || '';
   }
   if (!draftCharacter && route.id) {
     draftCharacter = clone(original);
@@ -3509,12 +3539,13 @@ function renderEditor() {
       <form class="panel form-width" data-form="character">
         <h2>${route.id ? '修改角色' : '建立新角色'}</h2>
         <label class="field"><span>角色頭像 *</span>
-          <input id="characterImage" type="file" accept="image/png,image/jpeg,image/webp">
-          <small>支援 PNG、JPG、WebP；選取後會自動縮圖與壓縮，原始檔上限 15 MB，目標約 500 KB。</small>
+          <input id="characterImage" type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime">
+          <small>支援 PNG、JPG、WebP，圖片上限 15 MB；也可上傳 10 秒內、15 MB 以下的 MP4、WebM 或 MOV 影片。圖片會自動壓縮；影片會擷取封面，並在角色介紹頁播放。請確認你擁有素材使用權。</small>
         </label>
         <img id="imagePreview" ${draftImage ? `src="${e(safeImage(draftImage))}"` : ''}
              class="${draftImage ? '' : 'hidden'}"
-             alt="頭像預覽" style="width:120px;height:150px;object-fit:cover;border-radius:13px;margin-bottom:18px">
+             alt="角色頭像或影片封面預覽" style="width:120px;height:150px;object-fit:cover;border-radius:13px;margin-bottom:10px">
+        <video id="characterVideoPreview" class="hidden" controls muted playsinline style="width:180px;max-height:240px;object-fit:contain;border-radius:13px;margin-bottom:18px;background:#000"></video>
         <label class="field"><span>角色名字 *</span>
           <input name="name" required maxlength="25" value="${e(c.name || '')}">
           <small>最多 25 字，可用中文、英文、數字、空格及 -：()_，支援對應全型符號。建議使用清楚好辨識的角色名稱，避免填入聯絡方式或宣傳資訊。</small>
@@ -7304,6 +7335,7 @@ document.addEventListener('submit',async event => {
           style:String(f.get('style')).trim(),
           phoneSettings:{noticePrompts:String(f.get('phoneNotices')||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,8).map(x=>x.slice(0,150))},
           visibility:String(f.get('visibility')),image:draftImage,
+          avatarVideoPath:draftVideoPath || '',
           isNSFW:f.get('isNSFW') === 'on',
           rightsConfirmed:f.get('rightsConfirmed') === 'on',
           nsfwWorkplaceWarning:f.get('nsfwWorkplaceWarning') === 'on',
@@ -7312,6 +7344,7 @@ document.addEventListener('submit',async event => {
           createdAt:old?.createdAt || Date.now()
         };
 
+        if(draftVideoFile)c.avatarVideoPath=await uploadCharacterAvatarVideo(draftVideoFile,user.uid,c.id);
         // 先寫入雲端；只有角色資料成功後才更新本機畫面狀態。
         const saveResult = await saveSupabaseCharacter(c, user.uid);
         // 以資料庫確認的公開狀態為準，避免非同步雲端角色載入替換 state.characters
@@ -7905,29 +7938,41 @@ document.addEventListener('change',async event => {
   const target=event.target;
   if (target.closest('form[data-form="character"]')) saveEditorDraft();
   try {
-    if (target.id==='characterImage') {
-      const file=target.files?.[0];
-      if (!file) return;
-      const requestId=++characterImageCompressionRequest;
-      isCompressingCharacterImage=true;
-      toast('正在壓縮角色圖片，請稍候…');
-      try {
-        const compressed=await compressUploadImage(file,{maxEdge:1600,targetBytes:500*1024});
-        // Ignore stale results if the user selected another file while this one was processing.
-        if(requestId!==characterImageCompressionRequest) return;
-        draftImage=compressed.dataUrl;
-        $('imagePreview').src=draftImage;
-        $('imagePreview').classList.remove('hidden');
-        const before=(compressed.originalBytes/1024).toFixed(0),after=(compressed.compressedBytes/1024).toFixed(0);
-        toast(`角色頭像已自動壓縮：${before} KB → ${after} KB。`);
-        saveEditorDraft();
-      } catch(error) {
-        if(requestId!==characterImageCompressionRequest) return;
-        target.value='';
-        throw error;
-      } finally {
-        if(requestId===characterImageCompressionRequest) isCompressingCharacterImage=false;
-      }
+    if(target.id==='characterImage'){
+      const file=target.files?.[0];if(!file)return;
+      const requestId=++characterImageCompressionRequest;isCompressingCharacterImage=true;
+      try{
+        if(file.size>15*1024*1024)throw new Error('檔案不可超過 15 MB。');
+        if(file.type.startsWith('video/')){
+          if(!['video/mp4','video/webm','video/quicktime'].includes(file.type))throw new Error('影片格式僅支援 MP4、WebM 或 MOV。');
+          const url=URL.createObjectURL(file),probe=document.createElement('video');probe.preload='metadata';probe.muted=true;probe.src=url;
+          const meta=await new Promise((resolve,reject)=>{probe.onloadedmetadata=()=>resolve({duration:probe.duration,width:probe.videoWidth,height:probe.videoHeight});probe.onerror=()=>reject(new Error('無法讀取影片，請確認格式正確。'));});
+          if(requestId!==characterImageCompressionRequest){URL.revokeObjectURL(url);return;}
+          if(!Number.isFinite(meta.duration)||meta.duration<=0||meta.duration>10){URL.revokeObjectURL(url);throw new Error('影片長度需在 10 秒內。');}
+          if(!meta.width||!meta.height){URL.revokeObjectURL(url);throw new Error('影片尺寸無效，請換一個影片檔案。');}
+          const frame=document.createElement('video');frame.preload='auto';frame.muted=true;frame.src=url;
+          await new Promise((resolve,reject)=>{frame.onseeked=resolve;frame.onerror=()=>reject(new Error('無法擷取影片封面。'));frame.onloadeddata=()=>{frame.currentTime=Math.min(.1,meta.duration/2);};});
+          if(requestId!==characterImageCompressionRequest){URL.revokeObjectURL(url);return;}
+          const canvas=document.createElement('canvas');canvas.width=Math.min(1200,meta.width);canvas.height=Math.max(1,Math.round(canvas.width*meta.height/meta.width));
+          const ctx=canvas.getContext('2d');if(!ctx)throw new Error('無法產生影片封面。');ctx.drawImage(frame,0,0,canvas.width,canvas.height);
+          draftImage=canvas.toDataURL('image/jpeg',.82);draftVideoFile=file;draftVideoPath='';
+          if(draftVideoPreviewUrl)URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl=url;
+          $('imagePreview').src=draftImage;$('imagePreview').classList.remove('hidden');
+          const preview=$('characterVideoPreview');preview.src=url;preview.classList.remove('hidden');
+          toast('影片符合 10 秒與 15 MB 限制，已擷取角色卡封面。');saveEditorDraft();
+        }else{
+          if(!['image/png','image/jpeg','image/webp'].includes(file.type))throw new Error('圖片格式僅支援 PNG、JPG 或 WebP。');
+          if(draftVideoPreviewUrl){URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl='';}
+          draftVideoFile=null;draftVideoPath='';
+          const preview=$('characterVideoPreview');preview.removeAttribute('src');preview.classList.add('hidden');
+          toast('正在壓縮角色圖片，請稍候…');
+          const compressed=await compressUploadImage(file,{maxEdge:1600,targetBytes:500*1024});
+          if(requestId!==characterImageCompressionRequest)return;
+          draftImage=compressed.dataUrl;$('imagePreview').src=draftImage;$('imagePreview').classList.remove('hidden');
+          toast('角色頭像已自動壓縮。');saveEditorDraft();
+        }
+      }catch(error){if(requestId!==characterImageCompressionRequest)return;target.value='';throw error;}
+      finally{if(requestId===characterImageCompressionRequest)isCompressingCharacterImage=false;}
     }
     if (target.id==='profileImage') {
       if (!target.files?.[0]) return;
