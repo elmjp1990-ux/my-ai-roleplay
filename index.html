@@ -6516,7 +6516,7 @@ document.addEventListener('click',async event => {
           const image=/^https?:\/\//i.test(avatar)
             ? '<img class="avatar" src="'+e(avatar)+'" alt="">'
             : '<span class="avatar avatar-fallback">'+e(String(member.name||'角').slice(0,1))+'</span>';
-          return '<div class="row" style="gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><button type="button" class="group-member-avatar-link" data-action="group-member-detail" data-id="'+e(member.characterId||member.id||'')+'" aria-label="查看'+e(member.name||'角色')+'角色卡">'+image+'</button>群組資訊頭像可點擊進入角色卡
+          return '<div class="row" style="gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><button type="button" class="group-member-avatar-link" data-action="group-member-detail" data-id="'+e(member.characterId||member.id||'')+'" aria-label="查看'+e(member.name||'角色')+'角色卡">'+image+'</button>'+
             '<div class="grow" style="min-width:0"><strong>'+e(member.name||'角色')+'</strong><div class="small muted">'+e(sceneLabel(member.sceneId))+'</div></div></div>';
         }).join('');
         const scenes=(group.scenes||[]).map(scene=>'<div class="group-panel" style="padding:10px;margin:8px 0"><strong>'+e(scene.name||'未命名場景')+'</strong>'+
