@@ -7033,9 +7033,19 @@ document.addEventListener('submit',async event => {
 
         // 先寫入雲端；只有角色資料成功後才更新本機畫面狀態。
         const saveResult = await saveSupabaseCharacter(c, user.uid);
+        // 以資料庫確認的公開狀態為準，避免非同步雲端角色載入替換 state.characters
+        // 後，indexOf(old) 回傳 -1，導致本機仍保留「私密」狀態而隱藏評論區。
+        c.visibility = saveResult.visibility;
+        c.rightsConfirmed = saveResult.rightsConfirmed;
+        c.firstPublishedAt = saveResult.firstPublishedAt;
+        c.latestEligible = saveResult.latestEligible;
         clearEditorDraft();
-        if (old) state.characters[state.characters.indexOf(old)]=c;
-        else state.characters.unshift(c);
+        const existingIndex = state.characters.findIndex(item => item.id === c.id);
+        if (existingIndex >= 0) {
+          state.characters[existingIndex] = {...state.characters[existingIndex], ...c};
+        } else {
+          state.characters.unshift(c);
+        }
         persist();
         go({page:'create'});
         if (saveResult.storyError) toast(saveResult.storyError);
