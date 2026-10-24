@@ -3513,7 +3513,7 @@ function renderFavorites() {
 async function renderFollowedAuthors() {
   const user = currentUser();
   if (!user) return;
-  $('view').innerHTML = '<div class="stack"><button type="button" class="ghost followed-authors-back" data-action="back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h1>喜愛作者</h1><div class="empty">正在載入追蹤作者…</div></div>';
+  $('view').innerHTML = '<div class="stack"><div class="followed-authors-title-row"><button type="button" class="ghost followed-authors-back" data-action="back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h1>喜愛作者</h1></div><div class="empty">正在載入追蹤作者…</div></div>';
 
   try {
     let authors = [];
@@ -3583,7 +3583,7 @@ async function renderFollowedAuthors() {
     persist();
   } catch (error) {
     console.error('喜愛作者載入失敗：', error);
-    $('view').innerHTML = '<div class="stack"><button type="button" class="ghost followed-authors-back" data-action="back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h1>喜愛作者</h1><div class="empty">讀取失敗，請重新整理後再試。</div></div>';
+    $('view').innerHTML = '<div class="stack"><div class="followed-authors-title-row"><button type="button" class="ghost followed-authors-back" data-action="back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h1>喜愛作者</h1></div><div class="empty">讀取失敗，請重新整理後再試。</div></div>';
     toast(error.message || '讀取喜愛作者失敗。');
   }
 }
@@ -4196,7 +4196,7 @@ function groupRenderCharacterResults() {
   if(!ordered.length) return '<div class="group-alert">'+(q?'找不到符合搜尋條件的公開角色。':'目前沒有可選的雲端角色。請先確認角色已儲存在 Supabase，且目前為公開狀態、尚未刪除或下架。')+'</div>';
   const renderRows=rows=>rows.map(c=>'<label class="group-character-option"><input type="checkbox" data-action="group-toggle-character" data-id="'+e(c.id)+'" '+(groupPrototype.draft.memberIds.includes(c.id)?'checked':'')+' '+(groupPrototype.draft.memberIds.length>=3&&!groupPrototype.draft.memberIds.includes(c.id)?'disabled':'')+'><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt="" style="width:46px;height:46px"><span style="min-width:0;overflow-wrap:anywhere"><strong>'+e(c.name)+'</strong><span class="muted small" style="display:block">'+e(c.intro||'尚無角色介紹')+'</span></span></label>').join('');
   const section=(title,rows)=>rows.length?'<h3 class="group-character-section-title">'+e(title)+' ('+rows.length+')</h3><div class="group-character-grid">'+renderRows(rows)+'</div>':'';
-  return '<div class="group-alert"><strong>已選 '+groupPrototype.draft.memberIds.length+' / 3 位角色</strong><br>預估每次對話 '+(groupPrototype.draft.memberIds.length*3)+' 銀幣（每位角色暫估 3 銀幣）。目前只顯示預估費用，不會實際扣款。</div>'+section('最近聊天',byRecent.filter(c=>ordered.some(x=>x.id===c.id)))+section('喜愛角色',byFavorite.filter(c=>ordered.some(x=>x.id===c.id)))+section('公開角色',byPublic.filter(c=>ordered.some(x=>x.id===c.id)))+'<p class="muted small">目前顯示 '+ordered.length+' 位；僅顯示公開且未刪除的角色，後端也會再次驗證權限與數量。</p>';
+  return '<div class="group-alert"><strong>已選 '+groupPrototype.draft.memberIds.length+' / 3 位角色</strong><br>💎 預估每次對話 '+(groupPrototype.draft.memberIds.length*3)+' 鑽石（預估費用，不會實際扣款）。</div>'+section('最近聊天',byRecent.filter(c=>ordered.some(x=>x.id===c.id)))+section('喜愛角色',byFavorite.filter(c=>ordered.some(x=>x.id===c.id)))+section('公開角色',byPublic.filter(c=>ordered.some(x=>x.id===c.id)))+'<p class="muted small">只能選擇公開的角色。</p>';
 }
 
 function groupRenderCharacters() {
@@ -4826,10 +4826,10 @@ function renderGroupPrototype() {
       '<div class="group-field"><span>選擇哪位角色的世界觀作為整體背景？</span><div class="group-character-grid">'+worldChoices+'</div></div>'+
       '<div class="group-field"><span>背景參考</span><div class="group-alert" id="groupWorldReference">'+e((members.find(c=>c.id===worldId)?.worldBackground||members.find(c=>c.id===worldId)?.world||members.find(c=>c.id===worldId)?.intro)||'所選角色目前沒有可用的公開介紹；可先繼續建立，後續再完善世界觀資料。')+'</div></div>'+
       groupRenderScenes()+
-      '<div class="group-field"><span>確認群組成員（點選頭像可查看角色卡）</span><div class="group-character-grid">'+members.map(c=>'<button type="button" class="group-character-option group-member-avatar-link" data-action="group-member-detail" data-id="'+e(c.id)+'" style="text-align:left;color:inherit;cursor:pointer"><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt=""><strong>'+e(c.name)+'</strong></button>').join('')+'</div></div>';
+      '<div class="group-field"><span>確認群組成員</span><div class="group-member-confirm-row">'+members.map(c=>'<button type="button" class="group-member-confirm-avatar" data-action="group-member-detail" data-id="'+e(c.id)+'" aria-label="查看 '+e(c.name)+' 的角色卡" title="'+e(c.name)+'"><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt=""></button>').join('')+'</div></div>';
   }
-  const topNext='';
-  $('view').innerHTML='<div class="group-wizard"><div class="row between wrap"><div><h1>建立群組聊天</h1><p class="muted">選擇角色後設定群組檔案；目前為測試模式，不呼叫 AI、不扣款。</p></div>'+topNext+'</div>'+groupRenderSteps()+'<section class="group-panel">'+body+'<div id="groupFormError" class="error" role="alert" aria-live="polite">'+e(g.formError)+'</div><div class="group-actions"><button data-action="group-back" '+(g.step===1||g.loading?'disabled':'')+'>上一步</button><button class="primary" data-action="group-next" '+(g.loading?'disabled':'')+'>'+(g.loading?'正在建立…':g.step===2?'建立群組':'下一步')+'</button></div></section></div>';
+  const topNext='<button type="button" class="ghost" data-action="group-back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button>';
+  $('view').innerHTML='<div class="group-wizard"><div class="row between wrap"><div class="group-wizard-title"><div class="row" style="align-items:center;gap:10px">'+topNext+'<h1 style="margin:0">建立群組聊天</h1></div><p class="muted">選擇角色後設定群組檔案</p></div></div>'+groupRenderSteps()+'<section class="group-panel">'+body+'<div id="groupFormError" class="error" role="alert" aria-live="polite">'+e(g.formError)+'</div><div class="group-actions"><button data-action="group-back" '+(g.step===1||g.loading?'disabled':'')+'>上一步</button><button class="primary" data-action="group-next" '+(g.loading?'disabled':'')+'>'+(g.loading?'正在建立…':g.step===2?'建立群組':'下一步')+'</button></div></section></div>';
 }
 function groupReadStep() {
   const g=groupPrototype;
@@ -8782,7 +8782,7 @@ document.addEventListener('submit',function(event){
 <style id="poyozz-ui-172-send-state">
 .composer-send[disabled]{opacity:1;cursor:progress;background:var(--panel2);color:var(--text);border-color:var(--border)}
 .composer-send[disabled] span[aria-hidden="true"],.composer-send.is-sending span[aria-hidden="true"]{font-size:17px;line-height:1}
-.followed-authors-back{align-self:flex-start;color:var(--muted);border:1px solid var(--border);background:var(--panel)}
+.followed-authors-back{display:inline-flex;align-items:center;justify-content:center;flex:0 0 40px;width:40px;height:40px;padding:8px;margin:0;color:var(--muted);border:1px solid var(--border);background:var(--panel)}.followed-authors-title-row{display:flex;align-items:center;gap:10px}.followed-authors-title-row h1{margin:0}.group-wizard-title{min-width:0;flex:1}.group-member-confirm-row{display:flex;align-items:center;gap:12px;flex-wrap:nowrap;overflow-x:auto;padding:4px 2px 8px}.group-member-confirm-avatar{display:inline-flex;align-items:center;justify-content:center;flex:0 0 58px;width:58px;height:58px;padding:4px;border-radius:50%;background:var(--panel2);border:1px solid var(--border)}.group-member-confirm-avatar .avatar{width:48px;height:48px;border-radius:50%}
 .followed-authors-back:hover{color:var(--text);background:var(--panel2)}
 @media(max-width:767px){body.group-chat-page .sidebar{display:none!important}body.group-chat-page .app{margin-left:0!important}body.group-chat-page .chat-layout{display:block;height:100dvh}body.group-chat-page .chat-layout.hide-list .chat-list{display:none!important}body.group-chat-page .chat-main{height:100dvh;border:0;border-radius:0}body.group-chat-page .chat-heading{padding:6px 8px}body.group-chat-page .messages{padding:14px 10px}body.group-chat-page .composer{padding:5px 8px calc(5px + env(safe-area-inset-bottom))}}
 </style>
