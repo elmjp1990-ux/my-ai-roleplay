@@ -3513,7 +3513,7 @@ function renderFavorites() {
 async function renderFollowedAuthors() {
   const user = currentUser();
   if (!user) return;
-  $('view').innerHTML = '<div class="stack"><h1>喜愛作者</h1><div class="empty">正在載入追蹤作者…</div></div>';
+  $('view').innerHTML = '<div class="stack"><button type="button" class="ghost followed-authors-back" data-action="nav" data-page="profile">← 返回 MY</button><h1>喜愛作者</h1><div class="empty">正在載入追蹤作者…</div></div>';
 
   try {
     let authors = [];
@@ -3577,13 +3577,13 @@ async function renderFollowedAuthors() {
         ${latest.length ? `<div class="grid">${latest.map(character => card(character)).join('')}</div>` : '<div class="empty">目前沒有公開角色。</div>'}
       </section>`;
     }).join('');
-    $('view').innerHTML = `<div class="stack"><div class="row between"><h1 style="margin:0">喜愛作者</h1><span class="small muted">${authors.length} 位作者</span></div>
+    $('view').innerHTML = `<div class="stack"><button type="button" class="ghost followed-authors-back" data-action="nav" data-page="profile">← 返回 MY</button><div class="row between"><h1 style="margin:0">喜愛作者</h1><span class="small muted">${authors.length} 位作者</span></div>
       ${html || '<div class="empty">你還沒有追蹤任何作者。到作者頁點擊「追蹤」，就會在這裡看到作者與最新公開角色。</div>'}
     </div>`;
     persist();
   } catch (error) {
     console.error('喜愛作者載入失敗：', error);
-    $('view').innerHTML = '<div class="stack"><h1>喜愛作者</h1><div class="empty">讀取失敗，請重新整理後再試。</div></div>';
+    $('view').innerHTML = '<div class="stack"><button type="button" class="ghost followed-authors-back" data-action="nav" data-page="profile">← 返回 MY</button><h1>喜愛作者</h1><div class="empty">讀取失敗，請重新整理後再試。</div></div>';
     toast(error.message || '讀取喜愛作者失敗。');
   }
 }
@@ -4530,7 +4530,7 @@ ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
             </div>
             <div class="composer-bottom-right">
               <button type="button" class="composer-cost wallet-cost-button" data-action="wallet-cost-details" aria-label="查看本次預計扣款與持有資源" title="查看本次預計扣款與持有資源">${walletCostPreviewHTML(Math.max(1,(group.members||[]).length)*3)}</button>
-              <button class="primary composer-send" type="button" data-action="group-send" aria-label="送出群組訊息" ${g.sending?'disabled':''}>${ICON.send}</button>
+              <button class="primary composer-send" type="button" data-action="group-send" aria-label="${g.sending?'停止生成':'送出群組訊息'}" title="${g.sending?'停止生成':'送出訊息'}" ${g.sending?'disabled':''}>${g.sending?'<span aria-hidden="true">■</span>':ICON.send}</button>
             </div>
           </div>
           <div class="small muted" role="status" aria-live="polite">${e(g.formError||'')}</div>
@@ -5509,7 +5509,7 @@ function renderProfile() {
 
     <section class="panel stack" id="daily-checkin-card" style="gap:12px;min-height:190px">${window.dailyCheckinStatusCache?.uid === state.account?.uid && window.dailyCheckinStatusCache?.data ? renderDailyCheckinMarkup(window.dailyCheckinStatusCache.data) : '<div class="row between" style="align-items:center;gap:8px"><h2 style="margin:0">每日簽到</h2><span class="small muted" style="white-space:nowrap">讀取中…</span></div><div aria-hidden="true" style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px">'+Array.from({length:7},()=>'<div style="height:56px;border:1px solid var(--border);border-radius:10px;opacity:.35"></div>').join('')+'</div><button type="button" disabled aria-disabled="true" style="width:100%;min-height:44px;opacity:.55">讀取簽到狀態…</button><p class="small muted" style="margin:0">每日於台灣時間 00:00 更新簽到日。</p>'}</section>
     <section class="panel stack" style="gap:12px"><div class="row between"><span>會員等級</span><strong>${u.member === 'monthly' ? '月費會員' : '免費會員'}</strong></div><div class="row between"><span>鑽石數量</span><strong>💎 ${Number(u.diamonds || 0).toLocaleString()}</strong></div><div class="row between"><span>銀幣數量</span><strong>◉ ${Number(u.silver || 0).toLocaleString()}</strong></div><button data-action="ledger" style="width:100%">花費日誌與交易紀錄</button></section>
-    <section class="stack" style="gap:0"><button class="profile-setting" data-action="personas"><span><strong>人設管理</strong><small></small></span><span>›</span></button><button class="profile-setting" data-action="nav" data-page="followed-authors" aria-label="查看喜愛作者"><span><strong>喜愛作者</strong><small>查看你追蹤的作者與最新公開角色</small></span><span>›</span></button><button class="profile-setting" data-action="theme-setting"><span><strong>版面顏色</strong><small>目前：${state.theme === 'day' ? '白天' : '黑夜'}</small></span><span>›</span></button><button class="profile-setting" data-action="birthdate"><span><strong>出生日期</strong><small>${e(u.birthdate || '尚未設定')}</small></span><span>›</span></button><button class="profile-setting" data-action="bug"><span><strong>BUG 回報</strong><small>回報網站問題（目前僅檢查表單）</small></span><span>›</span></button><div style="padding:16px 0 8px"><button data-action="logout" class="primary" style="width:100%;min-height:46px">登出帳號</button><p style="margin:14px 0 0;text-align:center"><button type="button" data-action="delete-account" style="border:0;background:transparent;padding:6px 10px;color:var(--muted);font-size:12px;text-decoration:underline;text-underline-offset:3px">刪除帳號</button></p></div></section>
+    <section class="stack" style="gap:0"><button class="profile-setting" data-action="personas"><span><strong>人設管理</strong><small></small></span><span>›</span></button><button class="profile-setting" data-action="nav" data-page="followed-authors" aria-label="查看喜愛作者"><span><strong>喜愛作者</strong><small>查看你追蹤的作者與最新公開角色</small></span><span>›</span></button><button class="profile-setting" data-action="theme-setting"><span><strong>版面顏色</strong><small>目前：${state.theme === 'day' ? '白天' : '黑夜'}</small></span><span>›</span></button><button class="profile-setting" data-action="birthdate"><span><strong>出生日期</strong><small>${e(u.birthdate || '尚未設定')}</small></span><span>›</span></button><button class="profile-setting" data-action="bug"><span><strong>BUG 回報</strong><small>回報網站問題</small></span><span>›</span></button><div style="padding:16px 0 8px"><button data-action="logout" class="primary" style="width:100%;min-height:46px">登出帳號</button><p style="margin:14px 0 0;text-align:center"><button type="button" data-action="delete-account" style="border:0;background:transparent;padding:6px 10px;color:var(--muted);font-size:12px;text-decoration:underline;text-underline-offset:3px">刪除帳號</button></p></div></section>
   </div>`;
   void refreshDailyCheckinCard();
 }
@@ -8774,6 +8774,14 @@ document.addEventListener('submit',function(event){
   if(file&&file.size>15728640){event.preventDefault();toast('截圖不可超過 15 MB，請選擇較小的圖片。');}
 },true);
 </script>
+
+
+<style id="poyozz-ui-172-send-state">
+.composer-send[disabled]{opacity:1;cursor:progress;background:var(--panel2);color:var(--text);border-color:var(--border)}
+.composer-send[disabled] span[aria-hidden="true"]{font-size:17px;line-height:1}
+.followed-authors-back{align-self:flex-start;color:var(--muted);border:1px solid var(--border);background:var(--panel)}
+.followed-authors-back:hover{color:var(--text);background:var(--panel2)}
+</style>
 
 </body>
 </html>
