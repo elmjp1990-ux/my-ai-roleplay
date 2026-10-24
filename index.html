@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#090d16">
 <title>PersonaX｜AI 角色世界</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%E2%9C%A6%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/png" href="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBICON.png">
 
 <style>
 :root {
@@ -245,6 +245,9 @@ body.day .tag { color:#4f46b8; }
 
 /* Logo / navigation */
 .logo-img { width:132px; height:29px; object-fit:contain; }
+.group-member-avatar-link{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;padding:0;border:0;border-radius:50%;background:transparent;line-height:0}
+.group-member-avatar-link:hover{filter:brightness(1.12)}
+.group-member-avatar-link:focus-visible{outline:2px solid #a5b4fc;outline-offset:3px}
 .sidebar {
   position:fixed;
   inset:0 auto 0 0;
@@ -278,7 +281,10 @@ body.collapsed .sidebar-heading .logo-button { display:none; }
 body.collapsed .sidebar-heading { justify-content:center; }
 body.collapsed .nav-label { display:none; }
 body.collapsed .nav-btn { justify-content:center; padding-inline:6px; }
-body.collapsed .sidebar-footer .logo-img { width:45px; height:22px; }
+.sidebar-iconmark { display:none; width:34px; height:34px; object-fit:contain; }
+body.collapsed .sidebar-footer-logo { display:flex; align-items:center; justify-content:center; width:44px; height:44px; padding:4px; }
+body.collapsed .sidebar-footer .sidebar-wordmark { display:none; }
+body.collapsed .sidebar-footer .sidebar-iconmark { display:block; }
 header {
   height:64px;
   padding:0 22px;
@@ -433,9 +439,16 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .card-tags .tag{padding:4px 7px;font-size:10px}
 
 /* Chat */
+/* 單人對話使用完整視窗高度，不顯示全站標頭（頁名／測試環境／錢包／帳號）。 */
+body.conversation .app > header { display:none !important; }
+body.conversation main { max-width:none; height:100dvh; padding:0; }
+body.conversation .chat-layout { height:100dvh; }
 body.chat-page main { max-width:none; padding:12px; }
-body.group-chat-page .sidebar,body.group-chat-page .app > header,body.group-chat-page .mobile-nav { display:none !important; }
-body.group-chat-page .app { margin-left:0; }
+body.group-chat-page .app > header,body.group-chat-page .mobile-nav { display:none !important; }
+body.group-chat-page .sidebar { display:flex; }
+body.group-chat-page .app { margin-left:var(--sidebar); }
+body.group-chat-page:has(.group-wizard) .sidebar { display:none !important; }
+body.group-chat-page:has(.group-wizard) .app { margin-left:0; }
 body.group-chat-page main { max-width:none; height:100dvh; min-height:0; padding:0; overflow:hidden; }
 body.group-chat-page .chat-layout { height:100dvh; }
 body.group-chat-page .chat-main { height:100%; border:0; border-radius:0; }
@@ -944,14 +957,15 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 <aside class="sidebar">
   <div class="sidebar-heading">
     <button class="ghost logo-button" data-action="home" aria-label="首頁">
-      <img class="logo-img" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%2240%22 viewBox=%220 0 180 40%22%3E%3Cpath fill=%22%23a5b4fc%22 d=%22M18 4 23 15 34 20 23 25 18 36 13 25 2 20 13 15Z%22/%3E%3Ctext x=%2243%22 y=%2228%22 fill=%22%23a5b4fc%22 font-family=%22Arial,sans-serif%22 font-size=%2225%22 font-weight=%22800%22%3EPersonaX%3C/text%3E%3C/svg%3E" alt="PersonaX">
+      <img class="logo-img" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="PersonaX">
     </button>
     <button class="ghost" data-action="collapse" aria-label="收合或展開網站選單">☰</button>
   </div>
   <nav id="desktopNav"></nav>
   <div class="sidebar-footer">
-    <button class="ghost" data-action="home" aria-label="首頁">
-      <img class="logo-img" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%2240%22 viewBox=%220 0 180 40%22%3E%3Cpath fill=%22%23a5b4fc%22 d=%22M18 4 23 15 34 20 23 25 18 36 13 25 2 20 13 15Z%22/%3E%3Ctext x=%2243%22 y=%2228%22 fill=%22%23a5b4fc%22 font-family=%22Arial,sans-serif%22 font-size=%2225%22 font-weight=%22800%22%3EPersonaX%3C/text%3E%3C/svg%3E" alt="PersonaX">
+    <button class="ghost sidebar-footer-logo" data-action="home" aria-label="首頁">
+      <img class="logo-img sidebar-wordmark" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="PersonaX">
+      <img class="sidebar-iconmark" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBICON.png?v=20261024-1" alt="PersonaX">
     </button>
   </div>
 </aside>
@@ -960,7 +974,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   <header>
     <div class="row">
       <button class="ghost mobile-logo" data-action="home" aria-label="首頁">
-        <img class="logo-img" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%2240%22 viewBox=%220 0 180 40%22%3E%3Cpath fill=%22%23a5b4fc%22 d=%22M18 4 23 15 34 20 23 25 18 36 13 25 2 20 13 15Z%22/%3E%3Ctext x=%2243%22 y=%2228%22 fill=%22%23a5b4fc%22 font-family=%22Arial,sans-serif%22 font-size=%2225%22 font-weight=%22800%22%3EPersonaX%3C/text%3E%3C/svg%3E" alt="PersonaX">
+        <img class="logo-img" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="PersonaX">
       </button>
       <strong class="desktop-title" id="pageTitle"></strong>
     </div>
@@ -1794,6 +1808,7 @@ const ICON = {
   notifications:svg('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4"></path>'),
   favorites:svg('<path d="M12 21 3 12a5 5 0 0 1 9-6 5 5 0 0 1 9 6Z"></path>'),
   back:svg('<path d="m14 5-7 7 7 7"></path>'),
+  forward:svg('<path d="m10 5 7 7-7 7"></path>'),
   album:svg('<rect x="3" y="4" width="18" height="16" rx="3"></rect><circle cx="8" cy="9" r="1.5"></circle><path d="m4 17 5-5 4 4 3-3 5 5"></path>'),
   diary:svg('<path d="M5 3h14v18H5zM3 7h4M3 12h4M3 17h4M10 8h5M10 12h5M10 16h3"></path>'),
   phone:svg('<rect x="6" y="2" width="12" height="20" rx="2"></rect><path d="M10 18h4"></path>'),
@@ -1804,12 +1819,7 @@ const ICON = {
   pin:svg('<path d="M9 3h6l-1 6 4 4v2H6v-2l4-4-1-6ZM12 15v7"></path>')
 };
 
-const LOGO_SVG = `
-<svg xmlns="http://www.w3.org/2000/svg" width="180" height="40" viewBox="0 0 180 40">
-<path fill="#a5b4fc" d="M18 4 23 15 34 20 23 25 18 36 13 25 2 20 13 15Z"/>
-<text x="43" y="28" fill="#a5b4fc" font-family="Arial,sans-serif" font-size="25" font-weight="800">PersonaX</text>
-</svg>`;
-const LOGO_URL = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(LOGO_SVG);
+const LOGO_URL = 'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4';
 document.querySelectorAll('.logo-img').forEach(img => img.src = LOGO_URL);
 
 const seeds = [
@@ -2005,7 +2015,7 @@ const currentSession = () => state.sessions[route.id] || null;
 const currentCharacter = () => state.characters.find(c => c.id === route.id);
 function sessionCharacter(s) {
   if (!s) return null;
-  const found = state.characters.find(c => c.id === s.characterId);
+  const found = s.forceCloudSnapshot ? null : state.characters.find(c => c.id === s.characterId);
   if (found) return found;
   const snap = s.cloudCharacterSnapshot;
   if (!snap || snap.id !== s.characterId) return null;
@@ -4190,10 +4200,15 @@ function renderGroupConversation() {
   if(!group) return;
   const avatarURL=value=>{const url=String(value||'').trim();return (/^https?:\/\//i.test(url)||/^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(url))?url:'';};
   const memberAvatars=group.members.map(m=>{
-    const avatar=avatarURL(m.avatar_url);
-    return '<span class="character-avatar-status" title="'+e(m.name||'角色')+'">'+
+    const avatar=avatarURL(m.avatar_url||m.image||m.characterSnapshot?.avatar_url||m.characterSnapshot?.image);
+    const characterId=String(m.characterId||m.id||'');
+    const canLink=isUuid(characterId)&&!characterId.startsWith('seed-');
+    const portrait='<span class="character-avatar-status" title="'+e(m.name||'角色')+'">'+
       (avatar?'<img class="avatar" src="'+e(avatar)+'" alt="">':'<span class="group-list-avatar">'+e(String(m.name||'角').trim().slice(0,1)||'角')+'</span>')+
       '</span>';
+    return canLink
+      ? '<button type="button" class="group-member-avatar-link" data-action="group-member-detail" data-id="'+e(characterId)+'" aria-label="查看角色 '+e(m.name||'角色')+' 的角色卡" title="查看 '+e(m.name||'角色')+' 的角色卡">'+portrait+'</button>'
+      : portrait;
   }).join('');
   const roleplayRoles=group.members.map(member=>({
     id:member.characterId || member.id,
@@ -4238,7 +4253,7 @@ function renderGroupConversation() {
         <div class="chat-heading">
           <div class="row between">
             <div class="row grow" style="gap:7px;min-width:0">
-              <button class="ghost" data-action="group-return-list" aria-label="返回聊天列表">${ICON.back}</button>
+              ${chatSidebarToggleButton('group-return-list')}
               <div class="row" style="gap:3px;flex:0 0 auto">${memberAvatars}</div>
               <div class="grow" style="min-width:0"><div class="chat-name ellipsis">${e(group.name)}</div><div class="small muted ellipsis">${group.members.length} 名角色 · ${e(sceneNames||'共同場景')}</div></div>
             </div>
@@ -4489,7 +4504,18 @@ function renderGroupChatOverlay(kind) {
   if(kind==='settings'||kind==='settings-background'||kind==='delete-confirm'){renderChatSettingsOverlay(panel,true,kind);return;}
   if(kind==='group-info'){
     const group=groupPrototype.active,sceneLabel=id=>group.scenes.find(x=>x.id===id)?.name||'共用場景';
-    const members=group.members.map(m=>'<article class="memory-item"><strong>'+e(m.name||'角色')+'</strong><p class="small muted">'+e(sceneLabel(m.sceneId))+'</p></article>').join('');
+    const members=group.members.map(m=>{
+      const avatar=String(m.avatar_url||m.image||'').trim();
+      const image=/^https?:\/\//i.test(avatar)
+        ? '<img class="avatar" style="width:44px;height:44px" src="'+e(avatar)+'" alt="">'
+        : '<span class="avatar avatar-fallback" style="width:44px;height:44px">'+e(String(m.name||'角').trim().slice(0,1)||'角')+'</span>';
+      const characterId=String(m.characterId||m.id||'');
+      const canLink=isUuid(characterId)&&!String(characterId).startsWith('seed-');
+      return '<article class="memory-item" style="display:flex;align-items:center;gap:12px">'+
+        (canLink?'<button type="button" class="ghost" style="padding:0;border-radius:50%" data-action="group-member-detail" data-id="'+e(characterId)+'" aria-label="查看角色 '+e(m.name||'角色')+' 的公開角色卡">'+image+'</button>':image)+
+        '<div class="grow" style="min-width:0">'+(canLink?'<button type="button" class="ghost" style="padding:0;text-align:left;font-weight:700" data-action="group-member-detail" data-id="'+e(characterId)+'">'+e(m.name||'角色')+'</button>':'<strong>'+e(m.name||'角色')+'</strong>')+
+        '<p class="small muted" style="margin:4px 0 0">'+e(sceneLabel(m.sceneId))+'</p></div></article>';
+    }).join('');
     const scenes=(group.scenes||[]).map(x=>'<article class="memory-item"><strong>'+e(x.name||'未命名場景')+'</strong><p style="white-space:pre-wrap">'+e(x.description||'尚未填寫場景描述。')+'</p></article>').join('');
     panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="群組資訊"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h2>群組資訊</h2></div><p><strong>群組名稱：</strong>'+e(group.name||'')+'</p><p><strong>世界背景</strong></p><article class="memory-item" style="white-space:pre-wrap">'+e(group.world||'尚未設定')+'</article><h3>參與角色（'+group.members.length+'/3）</h3>'+members+'<h3>場景設定</h3>'+scenes+'</section>');
     return;
@@ -4533,7 +4559,7 @@ function renderGroupStatusShell({title,message,error=false,groupId=''}) {
     : '';
   $('view').innerHTML='<div class="chat-layout '+(hideList?'hide-list':'')+'">'+chatListHTML()+
     '<section class="panel chat-main"><div class="chat-heading"><div class="row between">'+
-    '<div class="row grow" style="gap:8px;min-width:0"><button class="ghost" data-action="group-return-list" aria-label="返回聊天列表">'+ICON.back+'</button>'+
+    '<div class="row grow" style="gap:8px;min-width:0">'+chatSidebarToggleButton('group-return-list')+
     '<div class="grow" style="min-width:0"><div class="chat-name ellipsis">'+e(title||'群組聊天')+'</div><div class="small muted">群組對話</div></div></div></div></div>'+
     '<div class="messages"><div class="'+(error?'group-alert':'empty')+'" role="'+(error?'alert':'status')+'" aria-live="polite">'+safeMessage+'</div>'+
     (actions?'<div class="row wrap" style="padding:12px">'+actions+'</div>':'')+'</div>'+
@@ -4779,6 +4805,12 @@ async function groupArchive(groupId) {
 }
 function groupList() { const g=groupPrototype;g.openRequestId=(g.openRequestId||0)+1;g.active=null;g.loading=false;g.sending=false;g.pendingRequest=null;g.openError='';g.failedGroupId=null;g.step=1;g.formError='';g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:state.account?.nickname||'玩家',playerPersona:state.account?.bio||'',worldCharacterId:''};groupCharacterSearch='';if(route.page!=='group'||route.id||route.overlay) go({page:'group'}); else render(); }
 function groupRestart() { groupList(); }
+function chatSidebarToggleButton(mobileAction) {
+  const isMobile=window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
+  const label=isMobile?'返回聊天列表':(hideList?'展開聊天列表':'收合聊天列表');
+  const icon=isMobile?ICON.back:(hideList?ICON.forward:ICON.back);
+  return `<button class="ghost" data-action="chat-sidebar-toggle" data-mobile-action="${mobileAction}" aria-label="${label}" title="${label}" aria-expanded="${hideList?'false':'true'}">${icon}</button>`;
+}
 function renderConversation() {
   const s = currentSession();
   const c = sessionCharacter(s);
@@ -4793,7 +4825,7 @@ function renderConversation() {
         <div class="chat-heading">
           <div class="row between">
             <div class="row grow" style="gap:6px">
-              <button class="ghost" data-action="chat-back" aria-label="返回或切換角色列表">${ICON.back}</button>
+              ${chatSidebarToggleButton('chat-back')}
               <button class="ghost" data-action="session-detail" data-id="${e(s.id)}" style="padding:0"
                       aria-label="查看角色簡介">
                 <span class="character-avatar-status ${characterIsOffline(c) ? 'is-offline' : ''}">
@@ -6180,7 +6212,77 @@ document.addEventListener('click',async event => {
       case 'group-album-open': {
         const next={...route,chatOverlay:'album'};delete next.overlay;go(next);break;
       }
+      case 'chat-sidebar-toggle': {
+        if(window.matchMedia && window.matchMedia('(max-width: 767px)').matches) {
+          if(button.dataset.mobileAction==='group-return-list') { hideList=false;groupPrototype.active=null;go({page:'chat'}); }
+          else { captureDraft();hideList=false;go({page:'chat'}); }
+          break;
+        }
+        hideList=!hideList;
+        const layout=button.closest('.chat-layout');
+        if(layout) layout.classList.toggle('hide-list',hideList);
+        const label=hideList?'展開聊天列表':'收合聊天列表';
+        button.innerHTML=hideList?ICON.forward:ICON.back;
+        button.setAttribute('aria-label',label);button.title=label;button.setAttribute('aria-expanded',String(!hideList));
+        break;
+      }
       case 'group-return-list':hideList=false;groupPrototype.active=null;go({page:'chat'});break;
+      case 'group-member-detail': {
+        const characterId=key;
+        const group=groupPrototype.active;
+        const member=group?.members?.find(item=>String(item.characterId||item.id||'')===characterId);
+        if(!isUuid(characterId)||!member){toast('找不到這個群組成員的既有角色資料。');break;}
+        const client=window.mySupabase;
+        let publicCharacter=false;
+        if(client&&currentUser()?.uid){
+          try{
+            const {data:{user},error:authError}=await client.auth.getUser();
+            if(!authError&&user&&user.id===currentUser().uid){
+              const {data:row,error}=await client.from('characters')
+                .select('id,visibility,review_status,deleted_at,latest_eligible')
+                .eq('id',characterId).maybeSingle();
+              publicCharacter=!error&&!!row&&row.visibility==='public'&&!row.deleted_at;
+            }
+          }catch(error){console.warn('確認群組角色公開狀態失敗，改顯示既有快照。',error);}
+        }
+        if(publicCharacter){
+          await loadPublicSupabaseCharacters();
+          const character=state.characters.find(item=>String(item.id)===characterId);
+          if(character&&accessible(character)&&character.visibility==='public'){
+            visit('detail',characterId);
+            break;
+          }
+        }
+        // 角色私密、刪除或目前無法公開讀取時，僅顯示群組建立時保存的角色快照。
+        // 僅白名單欄位可進入既有單人離線角色卡呈現，避免攜帶隱藏設定。
+        const source=member.characterSnapshot&&typeof member.characterSnapshot==='object'
+          ? member.characterSnapshot : member;
+        const snapshot={
+          id:characterId,
+          name:String(source.name||member.name||'角色'),
+          image:String(source.image||source.avatar_url||member.avatar_url||''),
+          avatar_url:String(source.avatar_url||member.avatar_url||''),
+          gender:String(source.gender||'ambiguous'),
+          age:source.age??'',
+          intro:String(source.intro||''),
+          opening:String(source.opening||''),
+          race:String(source.race||''),
+          style:String(source.style||''),
+          tags:Array.isArray(source.tags)?source.tags:[],
+          authorId:String(source.authorId||source.author_id||''),
+          visibility:'private',
+          deletedAt:source.deletedAt||source.deleted_at||'offline',
+          firstPublishedAt:source.firstPublishedAt||source.first_published_at||null
+        };
+        const snapshotSessionId='group-offline-snapshot-'+characterId;
+        state.sessions[snapshotSessionId]={
+          id:snapshotSessionId,characterId,characterName:snapshot.name,
+          cloudCharacterSnapshot:snapshot,forceCloudSnapshot:true,
+          messages:[],memories:[],album:[],startedAt:Date.now()
+        };
+        go({page:'session-detail',id:snapshotSessionId});
+        break;
+      }
       case 'group-info': {
         const group=groupPrototype.active;
         if(!group) break;
