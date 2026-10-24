@@ -5798,6 +5798,49 @@ function renderArchive(sessionId,tab) {
     </div>`);
 }
 
+/* UI-1024: enable real horizontal swipe navigation for single/group suggested replies.
+   Use delegated pointer events so the behavior survives chat rerenders. */
+(function installSuggestionSwipe(){
+  let gesture = null;
+  let suppressNextSuggestionClick = false;
+  const getPanel = target => target instanceof Element ? target.closest('.suggestions-panel') : null;
+  document.addEventListener('pointerdown', event => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    const card = event.target instanceof Element ? event.target.closest('.suggestion-card') : null;
+    const panel = card?.closest('.suggestions-panel');
+    if (!card || !panel || !panel.open) return;
+    gesture = { panel, startX:event.clientX, startY:event.clientY, pointerId:event.pointerId, moved:false };
+  }, {passive:true});
+  document.addEventListener('pointerup', event => {
+    if (!gesture || event.pointerId !== gesture.pointerId) return;
+    const current = gesture;
+    gesture = null;
+    const dx = event.clientX - current.startX;
+    const dy = event.clientY - current.startY;
+    if (Math.abs(dx) < 36 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+    const cards = Array.from(current.panel.querySelectorAll('.suggestion-card'));
+    if (cards.length < 2) return;
+    const activeIndex = Math.max(0, cards.findIndex(card => card.classList.contains('active')));
+    const nextIndex = Math.max(0, Math.min(cards.length - 1, activeIndex + (dx < 0 ? 1 : -1)));
+    if (nextIndex === activeIndex) return;
+    current.panel.querySelectorAll('.suggestion-card').forEach((card, index) => card.classList.toggle('active', index === nextIndex));
+    current.panel.querySelectorAll('.suggestion-light').forEach((light, index) => light.setAttribute('aria-pressed', String(index === nextIndex)));
+    suppressNextSuggestionClick = true;
+    setTimeout(() => { suppressNextSuggestionClick = false; }, 0);
+    event.preventDefault();
+  }, {passive:false});
+  document.addEventListener('pointercancel', () => { gesture = null; }, {passive:true});
+  document.addEventListener('click', event => {
+    if (!suppressNextSuggestionClick) return;
+    const target = event.target instanceof Element ? event.target.closest('.suggestion-card') : null;
+    if (!target) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    suppressNextSuggestionClick = false;
+  }, true);
+})();
+ 
 /* GROUP-01-OPEN: capture group-open clicks before other delegated handlers.
    This makes group navigation independent of nested list markup or another handler
    stopping propagation. The normal bubble handler is skipped to prevent double-open. */
