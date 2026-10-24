@@ -164,6 +164,7 @@ body.day .tag { color:#4f46b8; }
 .followed-author-more{flex:0 0 auto;padding:6px 10px;font-size:11px;letter-spacing:.08em;border-radius:9px}
 
 .check { display:flex; align-items:flex-start; gap:9px; line-height:1.7; }
+.nsfw-attention{outline:2px solid #f59e0b;outline-offset:5px;border-radius:8px;background:#f59e0b12;}
 .check input { margin-top:5px; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 .form-width { max-width:820px; }
@@ -363,12 +364,14 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .card-image { position:relative; aspect-ratio:4/5; }
 .image-button { width:100%; height:100%; padding:0; border:0; border-radius:0; background:var(--panel2); overflow:hidden; }
 .image-button img { width:100%; height:100%; object-fit:cover; }
+.image-button video { display:block; width:100%; height:100%; object-fit:cover; background:var(--panel2); }
 .chat-cta{min-height:42px;border:1px solid #cbd0dc;border-radius:12px;background:linear-gradient(135deg,#f1f3f7,#dfe3eb);color:#252a36;font-size:13px;font-weight:650;letter-spacing:.02em;box-shadow:0 3px 10px #080b1218,inset 0 1px #ffffffb8;transition:transform .18s ease,background .18s ease,border-color .18s ease}
 .chat-cta:hover{background:linear-gradient(135deg,#fff,#e8ebf2);border-color:#aeb5c4}
 .chat-cta:active{transform:scale(.985)}
 .card-chat{position:absolute;z-index:4;left:10px;right:10px;bottom:10px;min-height:40px;border-color:#ffffff55;background:linear-gradient(135deg,#e7e9ef38,#8d95a733);color:#f7f8fc;font-size:12px;letter-spacing:.08em;box-shadow:0 8px 22px #080b1260,inset 0 1px #ffffff28;backdrop-filter:blur(18px) saturate(120%);-webkit-backdrop-filter:blur(18px) saturate(120%);opacity:1}
 .card:hover .card-chat,.card:focus-within .card-chat{background:linear-gradient(135deg,#e7e9ef55,#8d95a744);border-color:#ffffff80}
 .card-chat:hover{background:linear-gradient(135deg,#e7e9ef65,#8d95a755);border-color:#ffffff90}
+.nsfw-card-badge{position:static;display:inline-flex;align-items:center;gap:5px;margin-top:8px;padding:4px 8px;border:1px solid var(--border);border-radius:999px;background:var(--soft);color:var(--muted);font-size:10px;font-weight:650;letter-spacing:.035em;box-shadow:none;line-height:1.4}
 .card-body { padding:13px; }
 .card-body h3 { margin:9px 0 6px; }
 .card-intro {
@@ -1413,7 +1416,7 @@ body:not(.day) .chat-entry.active {
     try {
       const { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible')
+        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible')
         .eq('visibility', 'public')
         .is('deleted_at', null)
         .order('first_published_at', { ascending: false, nullsFirst: false });
@@ -1459,12 +1462,13 @@ body:not(.day) .chat-entry.active {
           id: row.id, name: row.name || '未命名角色',
           gender: row.gender || 'ambiguous',
           age: row.age == null ? '' : String(row.age),
-          image: row.avatar_url || '', visibility: 'public',
+          image: row.avatar_url || '', avatarVideoPath:row.avatar_video_path || '', visibility: 'public',
           reviewStatus: row.review_status, intro: row.intro || '',
           opening: story?.opening_message || '', race: row.race || '',
           privateInfo: '', style: row.style || '',
           phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : {},
           nsfwWorkplaceWarning:row.nsfw_workplace_warning === true,
+          isNSFW:row.is_nsfw === true,
           tags: Array.isArray(row.tags) ? row.tags : [],
           authorId: row.author_id, owner: state.account?.uid === row.author_id,
           chats: '0', users: null,
@@ -1502,7 +1506,7 @@ body:not(.day) .chat-entry.active {
       // 這可修復舊版匯入只存 localStorage 的資料；不會上傳其他帳號的本機角色。
       let { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
         .eq('author_id', user.id)
         .order('created_at', { ascending: false });
       if (error) throw new Error('讀取雲端角色失敗：' + error.message);
@@ -1595,6 +1599,7 @@ const ids = (rows || []).map(row => row.id);
           gender: row.gender || local.gender || 'ambiguous',
           age: row.age == null ? (local.age || '') : String(row.age),
           image: row.avatar_url || local.image || '',
+          avatarVideoPath:row.avatar_video_path || local.avatarVideoPath || '',
           visibility: row.visibility || 'private',
           intro: row.intro ?? local.intro ?? '',
           opening: story?.opening_message ?? local.opening ?? '',
@@ -1635,10 +1640,56 @@ const ids = (rows || []).map(row => row.id);
     }
   }
 
-  async function saveSupabaseCharacter(character, expectedUserId) {
+  async function uploadCharacterAvatarVideo(file,userId,characterId){
+  const client=window.mySupabase;
+  if(!client||!userId||!characterId)throw new Error('請先登入再上傳角色影片。');
+  if(file.size>15*1024*1024)throw new Error('影片不可超過 15 MB。');
+  const ext=({'video/mp4':'mp4','video/webm':'webm','video/quicktime':'mov'})[file.type];
+  if(!ext)throw new Error('影片格式僅支援 MP4、WebM 或 MOV。');
+  const path=userId+'/'+characterId+'/'+id()+'.'+ext;
+  const {error}=await client.storage.from('character-avatar-videos').upload(path,file,{upsert:false,contentType:file.type,cacheControl:'3600'});
+  if(error)throw new Error('角色影片上傳失敗：'+error.message);
+  return path;
+}
+async function hydrateCharacterVideo(video){
+  const path=video?.dataset?.characterVideo;
+  if(!path||!window.mySupabase||video.dataset.videoHydrated==='true')return;
+  // 所有角色影片（卡片與詳情頁）都固定靜音，並移除原生控制列。
+  video.controls=false;
+  video.removeAttribute('controls');
+  video.muted=true;
+  video.defaultMuted=true;
+  video.volume=0;
+  if(video.dataset.muteLock!=='true'){
+    video.dataset.muteLock='true';
+    video.addEventListener('volumechange',()=>{
+      if(!video.muted||video.volume!==0){video.muted=true;video.volume=0;}
+    });
+  }
+  video.dataset.videoHydrated='true';
+  const {data,error}=await window.mySupabase.storage.from('character-avatar-videos').createSignedUrl(path,300);
+  if(error||!data?.signedUrl||!video.isConnected){video.dataset.videoHydrated='false';console.warn('角色影片載入失敗',error);return;}
+  video.src=data.signedUrl;video.load();
+  if(video.hasAttribute('autoplay'))video.play().catch(()=>{});
+}
+async function saveSupabaseCharacter(character, expectedUserId) {
     const client = window.mySupabase;
     if (!client || !expectedUserId) throw new Error('請先使用 Google 帳號登入，再儲存角色。');
     character.tags = validateCharacterTags(Array.isArray(character.tags) ? character.tags : []);
+
+    // 先用登入者專屬 RPC 取得生日，避免未成年作者勾選 NSFW 後才收到泛用的 RLS 寫入錯誤。
+    // 資料庫 INSERT／UPDATE 年齡政策仍是最終安全防線。
+    if (character.isNSFW === true) {
+      const { data: privateProfile, error: privateProfileError } = await client.rpc('get_my_private_profile_data');
+      if (privateProfileError) throw new Error('讀取年齡資格失敗，請重新登入後再試。');
+      const birthdate = String(privateProfile?.birthdate || '');
+      const today = new Date();
+      const cutoff = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
+      const cutoffDate = cutoff.getFullYear() + '-' + String(cutoff.getMonth()+1).padStart(2,'0') + '-' + String(cutoff.getDate()).padStart(2,'0');
+      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(birthdate) || birthdate > cutoffDate) {
+        throw new Error('[年齡未達許可] 此帳號未滿 18 歲或尚未完成生日驗證，無法建立或修改 NSFW 角色。');
+      }
+    }
 
     const { data: authResult, error: authError } = await client.auth.getUser();
     if (authError || authResult?.user?.id !== expectedUserId) {
@@ -1659,7 +1710,7 @@ const ids = (rows || []).map(row => row.id);
     // 先讀取既有上架紀錄，避免 upsert 把首次公開時間或資格重設。
     const { data: existingCharacter, error: existingCharacterError } = await client
       .from('characters')
-      .select('visibility, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, deleted_at')
+      .select('visibility, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, is_nsfw, deleted_at')
       .eq('id', character.id)
       .eq('author_id', expectedUserId)
       .maybeSingle();
@@ -1687,6 +1738,7 @@ const ids = (rows || []).map(row => row.id);
       gender: character.gender || null,
       age,
       avatar_url: character.image || null,
+      avatar_video_path: character.avatarVideoPath || null,
       visibility: nextVisibility,
       review_status: nextVisibility === 'public' ? 'approved' : 'draft',
       first_published_at: firstPublishedAt,
@@ -1697,6 +1749,7 @@ const ids = (rows || []).map(row => row.id);
       style: character.style || '',
       phone_settings:character.phoneSettings && typeof character.phoneSettings==='object' ? {noticePrompts:(Array.isArray(character.phoneSettings.noticePrompts)?character.phoneSettings.noticePrompts:Array.isArray(character.phoneSettings.notices)?character.phoneSettings.notices:[]).slice(0,8).map(x=>String(x).slice(0,150))} : {},
       nsfw_workplace_warning: character.nsfwWorkplaceWarning === true,
+      is_nsfw: character.isNSFW === true,
       tags: Array.isArray(character.tags) ? character.tags : []
     };
 
@@ -1900,10 +1953,27 @@ const countChars = value => [...String(value)].length;
 const timeText = value => new Date(value).toLocaleString('zh-TW');
 const clone = value => JSON.parse(JSON.stringify(value));
 
+function currentUserCanViewNsfw() {
+  const birthdate = String(state.account?.birthdate || '');
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(birthdate)) return false;
+  const today = new Date();
+  const cutoff = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
+  const cutoffDate = cutoff.getFullYear() + '-' + String(cutoff.getMonth()+1).padStart(2,'0') + '-' + String(cutoff.getDate()).padStart(2,'0');
+  return birthdate <= cutoffDate;
+}
+function canViewCharacterNsfw(character) {
+  if (character?.isNSFW !== true) return true;
+  // 作者可以在自己的介面辨識／管理自己建立的 NSFW 角色；其他人的公開 NSFW 內容，
+  // 以 Supabase RLS 已完成的伺服器端成年資格判定為準。
+  if (currentUser()?.uid && currentUser().uid === character.authorId) return true;
+  if (character?.cloudPublic === true) return true;
+  return currentUserCanViewNsfw();
+}
 function availableExploreTags() {
   const tags = new Set();
   for (const character of (state.characters || [])) {
-    if (character.visibility !== 'public' || character.deletedAt ||
+    if (!canViewCharacterNsfw(character) ||
+        character.visibility !== 'public' || character.deletedAt ||
         character.cloudPublic === false || character.localOnly === true ||
         String(character.id || '').startsWith('seed-')) continue;
     for (const rawTag of (Array.isArray(character.tags) ? character.tags : [])) {
@@ -2127,6 +2197,9 @@ let banner = 0;
 let draftCharacter = null;
 let draftTags = [];
 let draftImage = '';
+let draftVideoFile = null;
+let draftVideoPath = '';
+let draftVideoPreviewUrl = '';
 let profileImage = '';
 let isCompressingCharacterImage = false;
 let characterImageCompressionRequest = 0;
@@ -2956,6 +3029,8 @@ function render() {
   }
   if (route.overlay) renderModal(route.overlay);
   updateCharacterCounters($('view'));
+  // 公開卡片影片需取得私有儲存桶的短效簽名 URL，並在畫面渲染後啟動靜音循環播放。
+  $('view')?.querySelectorAll('.card-image video[data-character-video]').forEach(video=>void hydrateCharacterVideo(video));
 }
 
 /* Explore */
@@ -3020,6 +3095,7 @@ setInterval(() => {
 function exploreList() {
   // 探索頁只顯示正式雲端公開角色；內建 seed 展示資料與未同步的本機測試角色不在公開版面出現。
   let list = state.characters.filter(c =>
+    canViewCharacterNsfw(c) &&
     c.visibility === 'public' &&
     !String(c.id).startsWith('seed-') &&
     c.cloudPublic !== false &&
@@ -3063,7 +3139,7 @@ function card(c,owner = false) {
       <div class="card-image">
         <button class="image-button" data-action="detail" data-id="${e(c.id)}"
                 aria-label="查看${e(c.name)}">
-          <img src="${e(safeImage(c.image))}" alt="${e(c.name)}" loading="lazy">
+          ${c.avatarVideoPath ? `<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" muted autoplay loop playsinline preload="metadata" aria-label="${e(c.name)}影片預覽"></video>` : `<img src="${e(safeImage(c.image))}" alt="${e(c.name)}" loading="lazy">`}
         </button>
         ${c.deletedAt ? '' : `<span class="card-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(initialTurnCount)}" title="對話回合數">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
@@ -3078,6 +3154,7 @@ function card(c,owner = false) {
         <h3>${e(c.name)}</h3>
         <p class="card-intro">${e(replaceRoleplayVariables(c.intro, currentUser()?.nickname || '你', c.name))}</p>
         <div class="card-tags">${(c.tags || []).slice(0,5).map(tagButton).join('')}</div>
+         ${c.isNSFW === true ? '<div class="nsfw-card-badge" aria-label="成人敏感內容，限 18 歲以上">18+ NSFW</div>' : ''}
         ${owner ? `
           <div class="owner-actions">
             <button data-action="visibility" data-id="${e(c.id)}" data-value="public"
@@ -3134,7 +3211,7 @@ function renderGrid() {
 
 /* Detail, author and comments */
 function accessible(c) {
-  return !!c && !c.deletedAt && (c.visibility === 'public' ||
+  return !!c && canViewCharacterNsfw(c) && !c.deletedAt && (c.visibility === 'public' ||
     currentUser()?.uid === c.authorId);
 }
 function characterIsOffline(c) {
@@ -3161,7 +3238,7 @@ function renderDetail() {
       ${offline ? '<div class="character-status-banner">● 此角色目前離線或已下架。你仍可查看這段既有聊天所保留的角色簡介與開場白，但不能開啟新對話。</div>' : ''}
       <div class="detail-layout">
         <div class="detail-portrait">
-          <img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" alt="${e(c.name)}">
+${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline-image' : ''}" data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline aria-label="${e(c.name)} 的角色影片"></video>` : `<img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" alt="${e(c.name)}">`}
           <div class="detail-portrait-meta">
             <h1>${e(c.name)}</h1>
             <button class="author-link" data-action="author" data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>
@@ -3176,6 +3253,7 @@ function renderDetail() {
             · ${e(c.age || '未設定')} 歲 · ${e(c.race || '未設定種族')}</p>
           <div><h3>角色介紹</h3><div class="prose">${e(replaceRoleplayVariables(c.intro, currentUser()?.nickname || '你', c.name))}</div></div>
           <div class="row wrap">${(c.tags || []).map(tagButton).join('')}</div>
+           ${c.isNSFW === true ? '<div class="nsfw-card-badge nsfw-detail-badge" aria-label="成人敏感內容，限 18 歲以上">18+ NSFW</div>' : ''}
           <div><h3>開場白</h3><div class="prose muted">${e(replaceRoleplayVariables(c.opening, currentUser()?.nickname || '你', c.name))}</div></div>
           ${offline
             ? '<div class="character-status-label"><span class="character-status-dot" style="position:static;background:#8993a4"></span>離線／已下架</div>'
@@ -3201,6 +3279,8 @@ function renderDetail() {
         </form>
       </section>`}
     </div>`;
+  const detailVideo=$('view').querySelector('[data-character-video]');
+  if(detailVideo)void hydrateCharacterVideo(detailVideo);
   void loadCharacterTurnCounts([c.id]);
   if (!offline && route.page !== 'session-detail') {
     renderComments();
@@ -3576,8 +3656,10 @@ function saveEditorDraft() {
     phoneNotices:String(values.get('phoneNotices') || ''),
     visibility:String(values.get('visibility') || 'private'),
     rightsConfirmed:values.get('rightsConfirmed') === 'on',
+    isNSFW:values.get('isNSFW') === 'on',
     tags:[...draftTags],
     image:draftImage,
+    avatarVideoPath:draftVideoPath,
     savedAt:Date.now()
   };
   const serialized = JSON.stringify(draft);
@@ -3604,6 +3686,9 @@ function startEditor(c = null) {
   draftCharacter = c ? clone(c) : null;
   draftTags = [...(c?.tags || [])];
   draftImage = c?.image || '';
+  draftVideoFile = null;
+  draftVideoPath = c?.avatarVideoPath || '';
+  if(draftVideoPreviewUrl){URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl='';}
   visit('editor',c?.id);
 }
 function renderEditor() {
@@ -3613,32 +3698,36 @@ function renderEditor() {
   if (savedDraft) {
     draftTags = Array.isArray(savedDraft.tags) ? [...savedDraft.tags] : draftTags;
     draftImage = savedDraft.image || draftImage || '';
+    draftVideoPath = savedDraft.avatarVideoPath || draftVideoPath || '';
   }
   if (!draftCharacter && route.id) {
     draftCharacter = clone(original);
     if (!savedDraft) {
       draftTags = [...(original.tags || [])];
       draftImage = original.image || '';
+      draftVideoPath = original.avatarVideoPath || '';
     }
   }
   if (route.id && !owned(c)) {
     $('view').innerHTML = '<div class="empty">無法修改此角色。</div>';
     return;
   }
+  if(savedDraft&&typeof savedDraft.isNSFW==='boolean')c.isNSFW=savedDraft.isNSFW;
   $('view').innerHTML = `
     <div class="stack">${creationTabs()}
       <form class="panel form-width" data-form="character">
         <h2>${route.id ? '修改角色' : '建立新角色'}</h2>
         <label class="field"><span>角色頭像 *</span>
-          <input id="characterImage" type="file" accept="image/png,image/jpeg,image/webp">
-          <small>支援 PNG、JPG、WebP；選取後會自動縮圖與壓縮，原始檔上限 15 MB，目標約 500 KB。</small>
+          <input id="characterImage" type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime">
+          <small>支援 PNG、JPG、WebP，圖片上限 15 MB；也可上傳 10 秒內、15 MB 以下的 MP4、WebM 或 MOV 影片。圖片會自動壓縮；影片會擷取封面，並在角色介紹頁播放。請確認你擁有素材使用權。</small>
         </label>
         <img id="imagePreview" ${draftImage ? `src="${e(safeImage(draftImage))}"` : ''}
-             class="${draftImage ? '' : 'hidden'}"
-             alt="頭像預覽" style="width:120px;height:150px;object-fit:cover;border-radius:13px;margin-bottom:18px">
+             class="${draftImage && !draftVideoPath ? '' : 'hidden'}"
+             alt="角色頭像或影片封面預覽" style="width:120px;height:150px;object-fit:cover;border-radius:13px;margin-bottom:10px">
+        <video id="characterVideoPreview" class="${draftVideoPath ? '' : 'hidden'}" controls muted playsinline style="width:180px;max-height:240px;object-fit:contain;border-radius:13px;margin-bottom:18px;background:#000"></video>
         <label class="field"><span>角色名字 *</span>
-          <input name="name" required value="${e(c.name || '')}">
-          <small>角色名字至少3字。${NAME_HELP}</small>
+          <input name="name" required maxlength="25" value="${e(c.name || '')}">
+          <small>最多 25 字，可用中文、英文、數字、空格及 -：()_，支援對應全型符號。建議使用清楚好辨識的角色名稱，避免填入聯絡方式或宣傳資訊。</small>
         </label>
         <div class="two-col">
           <label class="field"><span>性別 *</span><select name="gender">
@@ -3667,14 +3756,22 @@ function renderEditor() {
         </div>
         <label class="check"><input name="rightsConfirmed" type="checkbox" required ${c.rightsConfirmed === true ? 'checked' : ''}>
           <span>我確認角色沒有侵犯智慧財產權、形象或其他任何權利。 <span aria-hidden="true" style="color:#ef4444;font-weight:800">*</span></span></label>
-        <label class="check" style="margin-top:12px"><input name="nsfwWorkplaceWarning" type="checkbox" ${c.nsfwWorkplaceWarning === true ? 'checked' : ''}>
-          <span>此角色為 NSFW，工作場所不宜</span></label>
+        <label class="check" style="margin-top:12px"><input name="isNSFW" type="checkbox" ${c.isNSFW === true ? 'checked' : ''}>
+          <span>此角色含成人／敏感內容（NSFW，僅限 18 歲以上使用者）</span></label>
+        <small class="muted" style="display:block;margin:6px 0 8px 27px;line-height:1.7">若角色內容包含成人或露骨性描寫，請務必標示 NSFW。系統會檢查公開介紹、開場白、私密資訊及對話風格；偵測到限制詞但尚未勾選時，會提醒你確認分類。</small>
+        <button type="button" class="small" data-action="nsfw-term-manager" hidden style="margin:0 0 12px 27px">管理 NSFW 限制詞（管理員）</button>
         <div class="row" style="margin-top:22px">
           <button type="button" data-action="back">取消</button>
           <button class="primary">${route.id ? '儲存修改' : '創建角色'}</button>
         </div>
       </form>
     </div>`;
+  if(draftVideoPath){const preview=$('characterVideoPreview');void window.mySupabase?.storage.from('character-avatar-videos').createSignedUrl(draftVideoPath,300).then(({data,error})=>{if(!error&&data?.signedUrl&&preview?.isConnected){preview.src=data.signedUrl;preview.classList.remove('hidden');}});}
+  void isNsfwTermsAdmin().then(isAdmin=>{const button=$('view')?.querySelector('[data-action="nsfw-term-manager"]');if(button&&isAdmin)button.hidden=false;});
+  if(c.aiGeneratedDraft)void (async()=>{
+    const matches=findNsfwTerms(c,await loadNsfwTerms());
+    if(matches.length&&!c.isNSFW)showDialog('AI 草稿需要確認 NSFW 分級','<p>這份 AI 私密草稿包含可能屬於成人／敏感內容的限制詞：</p><p><strong>'+e(matches.slice(0,8).join('、'))+'</strong></p><p>請審閱內容；若確實屬於成人／敏感內容，請勾選 NSFW 分級後再儲存。</p><div class="row" style="justify-content:flex-end"><button type="button" data-action="nsfw-focus">前往勾選 NSFW</button><button type="button" data-action="dialog-close">稍後確認</button></div>');
+  })();
 }
 function renderAI() {
   $('view').innerHTML = `<div class="stack">${creationTabs()}
@@ -6151,7 +6248,8 @@ function updateCharacterCounters(root=document) {
     const field=name==='groupSceneDesc0' ? root.querySelector('#groupSceneDesc0') : root.querySelector('[name="'+name+'"]');
     if(!field) return;
     const max=field.maxLength > 0 ? field.maxLength : 3000;
-    counter.textContent=field.value.length+'/'+max+(name==='privateInfo'?'，不會顯示在公開介紹，請勿填寫真實機密':'');
+    const actualCount=typeof Intl!=='undefined'&&Intl.Segmenter?[...new Intl.Segmenter('zh-Hant',{granularity:'grapheme'}).segment(field.value)].length:Array.from(field.value).length;
+    counter.textContent=actualCount+'/'+max+(name==='privateInfo'?'，不會顯示在公開介紹，請勿填寫真實機密':'');
   });
 }
 document.addEventListener('input', event => {
@@ -7297,6 +7395,82 @@ document.addEventListener('click',async event => {
 });
 
 /* Form submissions */
+const DEFAULT_NSFW_TERMS=['18禁','成人','成人內容','成人向','成人情節','性愛','性行為','性暗示','性幻想','性器','性器官','性描寫','露骨','露骨性','情色','色情','色情內容','性交','做愛','約炮','口交','肛交','自慰','手淫','高潮','裸露','裸身','裸體','全裸','露點','乳房','乳頭','陰莖','陰道','性奴','性侵','強姦','亂倫','猥褻','淫亂','NSFW'];
+let cachedNsfwTerms=null;
+async function loadNsfwTerms(){
+  if(cachedNsfwTerms)return cachedNsfwTerms;
+  const client=window.mySupabase;
+  if(!client)return DEFAULT_NSFW_TERMS;
+  let databaseTerms=[];
+  if(client){
+    try{
+      const {data,error}=await client.from('content_restriction_terms').select('term').eq('is_active',true);
+      if(error)throw error;
+      databaseTerms=(data||[]).map(row=>String(row.term||'').trim()).filter(Boolean);
+    }catch(error){
+      console.warn('限制詞清單載入失敗，仍使用內建限制詞。',error.message);
+    }
+  }
+  // 管理員自訂詞只會補充，不會覆蓋內建詞；避免資料表有少數詞時漏掉常見敏感詞。
+  cachedNsfwTerms=[...new Set([...DEFAULT_NSFW_TERMS,...databaseTerms].map(term=>String(term).normalize('NFKC').trim()).filter(Boolean))];
+  return cachedNsfwTerms;
+}
+function findNsfwTerms(character,terms){
+  const normalize=value=>String(value||'').normalize('NFKC').toLocaleLowerCase('zh-Hant');
+  // 移除中英文字間常見空白與標點的影響，避免「成 人」「性-描寫」等寫法繞過基本字串偵測。
+  const text=normalize([character.name,character.intro,character.opening,character.privateInfo,character.style].filter(Boolean).join('\n'))
+    .replace(/[\s\p{P}\p{S}]+/gu,'');
+  return [...new Set(terms.map(normalize).filter(Boolean))].filter(term=>text.includes(term.replace(/[\s\p{P}\p{S}]+/gu,'')));
+}
+function focusNsfwCheckbox(){
+  const input=$('view')?.querySelector('input[name="isNSFW"]');
+  if(!input)return;
+  input.scrollIntoView({behavior:'smooth',block:'center'});input.focus({preventScroll:true});
+  input.closest('label')?.classList.add('nsfw-attention');
+  setTimeout(()=>input.closest('label')?.classList.remove('nsfw-attention'),2200);
+}
+
+async function isNsfwTermsAdmin(){
+  const client=window.mySupabase;
+  if(!client)return false;
+  const {data,error}=await client.auth.getSession();
+  return !error&&data?.session?.user?.app_metadata?.role==='admin';
+}
+async function refreshNsfwTermManager(){
+  const client=window.mySupabase;
+  const {data:sessionData}=await client.auth.getSession();
+  const user=sessionData?.session?.user;
+  if(!user||user.app_metadata?.role!=='admin'){toast('此功能僅限管理員使用。');$('modal')?.close();return;}
+  const {data,error}=await client.from('content_restriction_terms').select('id,term,is_active').order('term');
+  if(error){toast('限制詞清單讀取失敗：'+error.message);return;}
+  const rows=(data||[]).map(row=>'<div class="row between" style="padding:8px 0;border-bottom:1px solid var(--border);gap:12px"><span class="'+(row.is_active?'':'muted')+'">'+e(row.term)+(row.is_active?'':'（已停用）')+'</span><button type="button" data-action="nsfw-term-toggle" data-id="'+e(row.id)+'" data-active="'+(row.is_active?'true':'false')+'">'+(row.is_active?'停用':'啟用')+'</button></div>').join('');
+  showDialog('NSFW 限制詞管理','<p class="small muted">新增或停用詞彙後，建立角色與 AI 私密草稿審閱時會使用最新清單。限制詞只觸發提醒，不會自動判定角色必然屬於 NSFW。</p><form id="nsfwTermAddForm" class="row" style="gap:8px"><input name="term" maxlength="80" placeholder="輸入要新增的限制詞" required><button type="submit" class="primary">新增</button></form><div style="max-height:42vh;overflow:auto;margin-top:12px">'+(rows||'<p class="muted">目前沒有詞彙。</p>')+'</div>');
+}
+document.addEventListener('click',async event=>{
+  const manager=event.target.closest('[data-action="nsfw-term-manager"]');
+  if(manager){if(!(await isNsfwTermsAdmin())){toast('此功能僅限管理員使用。');return;}await refreshNsfwTermManager();return;}
+  const toggle=event.target.closest('[data-action="nsfw-term-toggle"]');
+  if(toggle){
+    if(!(await isNsfwTermsAdmin())){toast('此功能僅限管理員使用。');return;}
+    const active=toggle.dataset.active!=='true';
+    const {error}=await window.mySupabase.from('content_restriction_terms').update({is_active:active,updated_at:new Date().toISOString()}).eq('id',toggle.dataset.id);
+    if(error){toast('更新限制詞失敗：'+error.message);return;}
+    await refreshNsfwTermManager();return;
+  }
+});
+document.addEventListener('submit',async event=>{
+  const form=event.target.closest('#nsfwTermAddForm');
+  if(!form)return;
+  event.preventDefault();
+  if(!(await isNsfwTermsAdmin())){toast('此功能僅限管理員使用。');return;}
+  const term=String(new FormData(form).get('term')||'').trim();
+  if(!term||term.length>80){toast('限制詞需為 1–80 字。');return;}
+  const {data:sessionData}=await window.mySupabase.auth.getSession();
+  const {error}=await window.mySupabase.from('content_restriction_terms').insert({term,is_active:true,created_by:sessionData?.session?.user?.id||null});
+  if(error){toast(error.code==='23505'?'這個限制詞已存在。':'新增限制詞失敗：'+error.message);return;}
+  await refreshNsfwTermManager();
+});
+
 document.addEventListener('submit',async event => {
   const form=event.target.closest('[data-form]');
   if (!form) return;
@@ -7332,7 +7506,13 @@ document.addEventListener('submit',async event => {
         if (!draftImage) return toast('請上傳角色頭像。');
         const intro=String(f.get('intro')).trim();
         const opening=String(f.get('opening')).trim();
-        if (!intro || !opening) return toast('介紹與開場白不能留空。');
+        if (!intro || !opening) return toast('公開介紹與開場白不能留空。');
+        const nsfwCandidate={name,intro,opening,privateInfo:String(f.get('privateInfo')||''),style:String(f.get('style')||'')};
+        const matchedTerms=findNsfwTerms(nsfwCandidate,await loadNsfwTerms());
+        if(matchedTerms.length&&f.get('isNSFW')!=='on'){
+          showDialog('請確認角色的 NSFW 分級','<p>系統在角色內容中偵測到可能屬於成人／敏感內容</p><p>若內容確實涉及成人或露骨描寫，請勾選「此角色含成人／敏感內容（NSFW，僅限 18 歲以上使用者）」。若為一般語境或誤判，請修改內容後再儲存。</p><div class="row" style="justify-content:flex-end;margin-top:14px"><button type="button" data-action="nsfw-focus">返回勾選 NSFW</button><button type="button" data-action="dialog-close">我先修改內容</button></div>');
+          return;
+        }
         const old=state.characters.find(c=>c.id===route.id);
         if (old && !owned(old)) return;
         try { draftTags=validateCharacterTags(draftTags); }
@@ -7345,13 +7525,16 @@ document.addEventListener('submit',async event => {
           style:String(f.get('style')).trim(),
           phoneSettings:{noticePrompts:String(f.get('phoneNotices')||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,8).map(x=>x.slice(0,150))},
           visibility:String(f.get('visibility')),image:draftImage,
+          avatarVideoPath:draftVideoPath || '',
+          isNSFW:f.get('isNSFW') === 'on',
           rightsConfirmed:f.get('rightsConfirmed') === 'on',
-          nsfwWorkplaceWarning:f.get('nsfwWorkplaceWarning') === 'on',
+          nsfwWorkplaceWarning:false,
           tags:[...draftTags],authorId:user.uid,owner:true,
           chats:old?.chats || '0',users:old?.users ?? null,
           createdAt:old?.createdAt || Date.now()
         };
 
+        if(draftVideoFile)c.avatarVideoPath=await uploadCharacterAvatarVideo(draftVideoFile,user.uid,c.id);
         // 先寫入雲端；只有角色資料成功後才更新本機畫面狀態。
         const saveResult = await saveSupabaseCharacter(c, user.uid);
         // 以資料庫確認的公開狀態為準，避免非同步雲端角色載入替換 state.characters
@@ -7382,7 +7565,7 @@ document.addEventListener('submit',async event => {
         catch (error) { return toast(error.message); }
         if (!confirm('AI尚未串接，這次只建立可編輯草稿，不生成圖片、不扣鑽石。繼續嗎？')) return;
         state.characters.unshift({
-          id:id(),name,gender:'ambiguous',age:'',race:'',
+          id:id(),name,gender:'ambiguous',age:'',race:'',aiGeneratedDraft:true,isNSFW:false,
           intro:outline.slice(0,2000),
           opening:'**新的故事開始了。**\n「你好。」',
           privateInfo:outline,style:'',tags:[...draftTags],
@@ -7945,29 +8128,42 @@ document.addEventListener('change',async event => {
   const target=event.target;
   if (target.closest('form[data-form="character"]')) saveEditorDraft();
   try {
-    if (target.id==='characterImage') {
-      const file=target.files?.[0];
-      if (!file) return;
-      const requestId=++characterImageCompressionRequest;
-      isCompressingCharacterImage=true;
-      toast('正在壓縮角色圖片，請稍候…');
-      try {
-        const compressed=await compressUploadImage(file,{maxEdge:1600,targetBytes:500*1024});
-        // Ignore stale results if the user selected another file while this one was processing.
-        if(requestId!==characterImageCompressionRequest) return;
-        draftImage=compressed.dataUrl;
-        $('imagePreview').src=draftImage;
-        $('imagePreview').classList.remove('hidden');
-        const before=(compressed.originalBytes/1024).toFixed(0),after=(compressed.compressedBytes/1024).toFixed(0);
-        toast(`角色頭像已自動壓縮：${before} KB → ${after} KB。`);
-        saveEditorDraft();
-      } catch(error) {
-        if(requestId!==characterImageCompressionRequest) return;
-        target.value='';
-        throw error;
-      } finally {
-        if(requestId===characterImageCompressionRequest) isCompressingCharacterImage=false;
-      }
+    if(target.id==='characterImage'){
+      const file=target.files?.[0];if(!file)return;
+      const requestId=++characterImageCompressionRequest;isCompressingCharacterImage=true;
+      try{
+        if(file.size>15*1024*1024)throw new Error('檔案不可超過 15 MB。');
+        if(file.type.startsWith('video/')){
+          if(!['video/mp4','video/webm','video/quicktime'].includes(file.type))throw new Error('影片格式僅支援 MP4、WebM 或 MOV。');
+          const url=URL.createObjectURL(file),probe=document.createElement('video');probe.preload='metadata';probe.muted=true;probe.src=url;
+          const meta=await new Promise((resolve,reject)=>{probe.onloadedmetadata=()=>resolve({duration:probe.duration,width:probe.videoWidth,height:probe.videoHeight});probe.onerror=()=>reject(new Error('無法讀取影片，請確認格式正確。'));});
+          if(requestId!==characterImageCompressionRequest){URL.revokeObjectURL(url);return;}
+          if(!Number.isFinite(meta.duration)||meta.duration<=0||meta.duration>10){URL.revokeObjectURL(url);throw new Error('影片長度需在 10 秒內。');}
+          if(!meta.width||!meta.height){URL.revokeObjectURL(url);throw new Error('影片尺寸無效，請換一個影片檔案。');}
+          const frame=document.createElement('video');frame.preload='auto';frame.muted=true;frame.src=url;
+          await new Promise((resolve,reject)=>{frame.onseeked=resolve;frame.onerror=()=>reject(new Error('無法擷取影片封面。'));frame.onloadeddata=()=>{frame.currentTime=Math.min(.1,meta.duration/2);};});
+          if(requestId!==characterImageCompressionRequest){URL.revokeObjectURL(url);return;}
+          const canvas=document.createElement('canvas');canvas.width=Math.min(1200,meta.width);canvas.height=Math.max(1,Math.round(canvas.width*meta.height/meta.width));
+          const ctx=canvas.getContext('2d');if(!ctx)throw new Error('無法產生影片封面。');ctx.drawImage(frame,0,0,canvas.width,canvas.height);
+          draftImage=canvas.toDataURL('image/jpeg',.82);draftVideoFile=file;draftVideoPath='';
+          if(draftVideoPreviewUrl)URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl=url;
+          $('imagePreview').src=draftImage;$('imagePreview').classList.add('hidden');
+          const preview=$('characterVideoPreview');preview.src=url;preview.classList.remove('hidden');
+          toast('影片符合 10 秒與 15 MB 限制，已擷取角色卡封面。');saveEditorDraft();
+        }else{
+          if(!['image/png','image/jpeg','image/webp'].includes(file.type))throw new Error('圖片格式僅支援 PNG、JPG 或 WebP。');
+          if(draftVideoPreviewUrl){URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl='';}
+          draftVideoFile=null;draftVideoPath='';
+          const preview=$('characterVideoPreview');preview.removeAttribute('src');preview.classList.add('hidden');
+          $('imagePreview').classList.remove('hidden');
+          toast('正在壓縮角色圖片，請稍候…');
+          const compressed=await compressUploadImage(file,{maxEdge:1600,targetBytes:500*1024});
+          if(requestId!==characterImageCompressionRequest)return;
+          draftImage=compressed.dataUrl;$('imagePreview').src=draftImage;$('imagePreview').classList.remove('hidden');
+          toast('角色頭像已自動壓縮。');saveEditorDraft();
+        }
+      }catch(error){if(requestId!==characterImageCompressionRequest)return;target.value='';throw error;}
+      finally{if(requestId===characterImageCompressionRequest)isCompressingCharacterImage=false;}
     }
     if (target.id==='profileImage') {
       if (!target.files?.[0]) return;
@@ -8499,6 +8695,9 @@ function openInsufficientFundsDialog(mode) {
   `);
 }
 document.addEventListener('click',async event=>{
+  const nsfwButton=event.target.closest('[data-action="nsfw-focus"],[data-action="dialog-close"]');
+  if(nsfwButton?.dataset.action==='nsfw-focus'){$('modal')?.close();focusNsfwCheckbox();return;}
+  if(nsfwButton?.dataset.action==='dialog-close'){$('modal')?.close();return;}
   const button=event.target.closest('[data-action="wallet-dialog-close"],[data-action="wallet-cost-details"],[data-action="wallet-confirm-diamonds"],[data-action="wallet-watch-ad"],[data-action="wallet-open-shop"]');
   if(!button)return;
   if(button.dataset.action==='wallet-dialog-close') {
