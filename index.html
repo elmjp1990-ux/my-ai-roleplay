@@ -4172,7 +4172,7 @@ function groupRenderSteps() {
 function groupRenderScenes() {
   const g=groupPrototype;
   const scene=g.draft.scenes[0]||{name:'初始相遇',description:''};
-  return '<label class="group-field"><span>初始場景名稱</span><input id="groupSceneName0" maxlength="80" value="'+e(scene.name||'')+'" placeholder="例如：深夜花店、博物館特展之夜"></label><div class="group-field"><span>初始開場情境（最多 3000 字）</span><div class="group-scene-input-wrap"><textarea id="groupSceneDesc0" maxlength="3000" data-count-for="groupSceneDesc0" placeholder="描寫時間、地點、角色如何相遇，以及故事此刻正在發生什麼。">'+e(scene.description||'')+'</textarea></div><small class="group-scene-help char-counter" data-count-for="groupSceneDesc0">0/3000</small></div>';
+  return '<div class="group-field"><span>初始開場情境</span><div class="group-scene-input-wrap"><textarea id="groupSceneDesc0" maxlength="3000" data-count-for="groupSceneDesc0" placeholder="描寫時間、地點、角色如何相遇，以及故事此刻正在發生什麼。">'+e(scene.description||'')+'</textarea><button type="button" class="group-inspiration" data-action="group-inspiration">✨ AI 靈感</button></div><small class="group-scene-help char-counter" data-count-for="groupSceneDesc0">'+Array.from(scene.description||'').length+'/3000</small></div>';
 }
 function groupRenderCharacterResults() {
   const all=groupAvailableCharacters();
@@ -4822,11 +4822,11 @@ function renderGroupPrototype() {
       '<div class="group-panel" style="padding:12px;margin-bottom:16px"><div class="row" style="gap:8px;align-items:center">'+avatarPieces+'</div><p class="muted small" style="margin:8px 0 0">群組頭像依照已選角色組合顯示，現階段不可自行更換。</p></div>'+
       '<label class="group-field"><span>群組名稱（最多 25 字）</span><input id="groupNameInput" maxlength="25" value="'+e(nameValue)+'" placeholder="輸入群組名稱"></label>'+
       '<label class="group-field"><span>玩家角色名稱（提供給 AI）</span><input id="groupPlayerName" maxlength="80" value="'+e(g.draft.playerName||state.account?.nickname||"玩家")+'" placeholder="你的角色名稱"></label>'+
-      '<label class="group-field"><span>玩家角色與人設</span><textarea id="groupPlayerPersona" maxlength="3000" placeholder="描述你在這個故事中的身分、個性、背景與說話方式。">'+e(g.draft.playerPersona||state.account?.bio||'')+'</textarea></label>'+
+      '<label class="group-field"><span>玩家角色與人設</span><select id="groupPersonaPreset"><option value="">選擇 USER 人設管理中的人設（可再自行編輯）</option>'+((Array.isArray(currentUser()?.personas)?currentUser().personas:[]).map(p=>'<option value="'+e(p.id)+'" '+((g.draft.personaPresetId===p.id)?'selected':'')+'>'+e(p.name)+(p.isDefault?'（預設）':'')+'</option>').join(''))+'</select><textarea id="groupPlayerPersona" maxlength="3000" placeholder="描述你在這個故事中的身分、個性、背景與說話方式。">'+e(g.draft.playerPersona||state.account?.bio||'')+'</textarea><small class="muted">可選擇已保存的人設，套用後仍可在此編輯；不會修改原本人設。</small></label>'+
       '<div class="group-field"><span>選擇哪位角色的世界觀作為整體背景？</span><div class="group-character-grid">'+worldChoices+'</div></div>'+
       '<div class="group-field"><span>背景參考</span><div class="group-alert" id="groupWorldReference">'+e((members.find(c=>c.id===worldId)?.worldBackground||members.find(c=>c.id===worldId)?.world||members.find(c=>c.id===worldId)?.intro)||'所選角色目前沒有可用的公開介紹；可先繼續建立，後續再完善世界觀資料。')+'</div></div>'+
       groupRenderScenes()+
-      '<div class="group-field"><span>確認群組成員（返回上一步才能增減）</span><div class="group-character-grid">'+members.map(c=>'<div class="group-character-option"><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt=""><strong>'+e(c.name)+'</strong></div>').join('')+'</div></div>';
+      '<div class="group-field"><span>確認群組成員（點選頭像可查看角色卡）</span><div class="group-character-grid">'+members.map(c=>'<button type="button" class="group-character-option group-member-avatar-link" data-action="group-member-detail" data-id="'+e(c.id)+'" style="text-align:left;color:inherit;cursor:pointer"><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt=""><strong>'+e(c.name)+'</strong></button>').join('')+'</div></div>';
   }
   const topNext='';
   $('view').innerHTML='<div class="group-wizard"><div class="row between wrap"><div><h1>建立群組聊天</h1><p class="muted">選擇角色後設定群組檔案；目前為測試模式，不呼叫 AI、不扣款。</p></div>'+topNext+'</div>'+groupRenderSteps()+'<section class="group-panel">'+body+'<div id="groupFormError" class="error" role="alert" aria-live="polite">'+e(g.formError)+'</div><div class="group-actions"><button data-action="group-back" '+(g.step===1||g.loading?'disabled':'')+'>上一步</button><button class="primary" data-action="group-next" '+(g.loading?'disabled':'')+'>'+(g.loading?'正在建立…':g.step===2?'建立群組':'下一步')+'</button></div></section></div>';
@@ -4856,7 +4856,7 @@ function groupReadStep() {
     if(!g.draft.playerName||g.draft.playerName.length>80) return '請填寫 1–80 字的玩家角色名稱。';
     if(g.draft.playerPersona.length>3000) return '玩家人設不可超過 3000 字。';
     if(!worldCharacter) return '請選擇一位角色作為整體世界觀背景。';
-    if(g.draft.scenes[0].name.length>80||g.draft.scenes[0].description.length>1000) return '初始場景名稱最多 80 字，開場內容最多 1000 字。';
+    if(g.draft.scenes[0].description.length>3000) return '初始開場情境最多 3000 字。';
   }
   return '';
 }
