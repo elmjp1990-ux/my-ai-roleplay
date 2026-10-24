@@ -4254,7 +4254,7 @@ function renderGroupConversation() {
         <form class="composer" data-form="group-message">
 ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
             <details class="suggestions-panel" open>
-              <summary>建議回覆 <span class="suggestions-count">滑動或點選燈號可切換</span></summary>
+              <summary>建議回覆 <span class="suggestions-count" data-collapsed="點擊可展開" data-expanded="滑動或點選燈號可切換">滑動或點選燈號可切換</span></summary>
               <div class="suggestion-options" aria-label="選擇建議回覆">
                 <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="0" aria-label="第 1 則建議" aria-pressed="true"></button>
                 <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="1" aria-label="第 2 則建議" aria-pressed="false"></button>
@@ -4819,7 +4819,7 @@ function renderConversation() {
         <form class="composer" data-form="message">
           ${s.suggestions ? `<div class="suggestions">
             <details class="suggestions-panel" open>
-              <summary>建議回覆 <span class="suggestions-count">滑動或點選燈號可切換</span></summary>
+              <summary>建議回覆 <span class="suggestions-count" data-collapsed="點擊可展開" data-expanded="滑動或點選燈號可切換">滑動或點選燈號可切換</span></summary>
               <div class="suggestion-options" aria-label="選擇建議回覆">
                 <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="0" aria-label="第 1 則建議" aria-pressed="true"></button>
                 <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="1" aria-label="第 2 則建議" aria-pressed="false"></button>
@@ -5797,6 +5797,15 @@ function renderArchive(sessionId,tab) {
       <button class="primary" data-action="resume-archive" data-id="${e(sessionId)}">繼續聊天</button>
     </div>`);
 }
+
+/* Keep the suggestion hint in sync with the native details open/closed state. */
+document.addEventListener('toggle', event => {
+  const panel = event.target;
+  if (!(panel instanceof HTMLDetailsElement) || !panel.classList.contains('suggestions-panel')) return;
+  const hint = panel.querySelector('.suggestions-count');
+  if (!hint) return;
+  hint.textContent = panel.open ? (hint.dataset.expanded || '滑動或點選燈號可切換') : (hint.dataset.collapsed || '點擊可展開');
+}, true);
 
 /* UI-1024: robust horizontal swipe navigation for single/group suggested replies.
    Touch devices use touch events (with vertical scrolling preserved); mouse uses pointer events.
