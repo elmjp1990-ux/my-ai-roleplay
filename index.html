@@ -369,8 +369,6 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .card:hover .card-chat,.card:focus-within .card-chat{background:linear-gradient(135deg,#e7e9ef55,#8d95a744);border-color:#ffffff80}
 .card-chat:hover{background:linear-gradient(135deg,#e7e9ef65,#8d95a755);border-color:#ffffff90}
 .nsfw-card-badge{position:absolute;z-index:5;top:10px;left:10px;display:inline-flex;align-items:center;gap:5px;padding:6px 9px;border:1px solid #c8a96b99;border-radius:999px;background:linear-gradient(135deg,#211a2bef,#30223bef);color:#f1d8a4;font-size:10px;font-weight:800;letter-spacing:.09em;box-shadow:0 4px 14px #080b1266;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
-.card-chat.nsfw-chat-cta{background:linear-gradient(135deg,#44334f,#282033);border-color:#bca2cf88;color:#f7edf9;box-shadow:0 8px 22px #080b1270,inset 0 1px #ffffff22}
-.card:hover .card-chat.nsfw-chat-cta,.card:focus-within .card-chat.nsfw-chat-cta,.card-chat.nsfw-chat-cta:hover{background:linear-gradient(135deg,#554060,#34263f);border-color:#d0b2e4aa}
 .card-body { padding:13px; }
 .card-body h3 { margin:9px 0 6px; }
 .card-intro {
@@ -3021,16 +3019,16 @@ function card(c,owner = false) {
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
           <span>${e(initialTurnCount)}</span>
         </span>`}
-        ${c.isNSFW === true ? '<span class="nsfw-card-badge" aria-label="成人敏感內容，限 18 歲以上">18+ · NSFW</span>' : ''}
         <button class="heart ${favorite ? 'on' : ''}" data-action="favorite"
                 data-id="${e(c.id)}" aria-label="切換喜愛角色"
                 aria-pressed="${favorite}">♥</button>
-        <button class="card-chat ${c.isNSFW === true ? 'nsfw-chat-cta' : ''}" data-action="start-chat" data-id="${e(c.id)}">開始聊天</button>
+        <button class="card-chat" data-action="start-chat" data-id="${e(c.id)}">開始聊天</button>
       </div>
       <div class="card-body">
         <h3>${e(c.name)}</h3>
         <p class="card-intro">${e(replaceRoleplayVariables(c.intro, currentUser()?.nickname || '你', c.name))}</p>
         <div class="card-tags">${(c.tags || []).slice(0,5).map(tagButton).join('')}</div>
+         ${c.isNSFW === true ? '<div class="nsfw-card-badge" aria-label="成人敏感內容，限 18 歲以上">18+ NSFW</div>' : ''}
         ${owner ? `
           <div class="owner-actions">
             <button data-action="visibility" data-id="${e(c.id)}" data-value="public"
@@ -3129,6 +3127,7 @@ ${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline
             · ${e(c.age || '未設定')} 歲 · ${e(c.race || '未設定種族')}</p>
           <div><h3>角色介紹</h3><div class="prose">${e(replaceRoleplayVariables(c.intro, currentUser()?.nickname || '你', c.name))}</div></div>
           <div class="row wrap">${(c.tags || []).map(tagButton).join('')}</div>
+           ${c.isNSFW === true ? '<div class="nsfw-card-badge nsfw-detail-badge" aria-label="成人敏感內容，限 18 歲以上">18+ NSFW</div>' : ''}
           <div><h3>開場白</h3><div class="prose muted">${e(replaceRoleplayVariables(c.opening, currentUser()?.nickname || '你', c.name))}</div></div>
           ${offline
             ? '<div class="character-status-label"><span class="character-status-dot" style="position:static;background:#8993a4"></span>離線／已下架</div>'
