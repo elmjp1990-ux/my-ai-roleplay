@@ -3577,7 +3577,7 @@ async function renderFollowedAuthors() {
         ${latest.length ? `<div class="grid">${latest.map(character => card(character)).join('')}</div>` : '<div class="empty">目前沒有公開角色。</div>'}
       </section>`;
     }).join('');
-    $('view').innerHTML = `<div class="stack"><button type="button" class="ghost followed-authors-back" data-action="back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><div class="row between"><h1 style="margin:0">喜愛作者</h1><span class="small muted">${authors.length} 位作者</span></div>
+    $('view').innerHTML = `<div class="stack"><div class="followed-authors-title-row"><button type="button" class="ghost followed-authors-back" data-action="back" aria-label="返回上一頁" title="返回上一頁">${ICON.back}</button><div class="row between"><h1 style="margin:0">喜愛作者</h1><span class="small muted">${authors.length} 位作者</span></div></div>
       ${html || '<div class="empty">你還沒有追蹤任何作者。到作者頁點擊「追蹤」，就會在這裡看到作者與最新公開角色。</div>'}
     </div>`;
     persist();
