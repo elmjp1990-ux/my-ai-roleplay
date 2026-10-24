@@ -3513,7 +3513,7 @@ function renderFavorites() {
 async function renderFollowedAuthors() {
   const user = currentUser();
   if (!user) return;
-  $('view').innerHTML = '<div class="stack"><button type="button" class="ghost followed-authors-back" data-action="nav" data-page="profile">← 返回 MY</button><h1>喜愛作者</h1><div class="empty">正在載入追蹤作者…</div></div>';
+  $('view').innerHTML = '<div class="stack"><button type="button" class="ghost followed-authors-back" data-action="back" aria-label="返回上一頁" title="返回上一頁">${ICON.back}</button><h1>喜愛作者</h1><div class="empty">正在載入追蹤作者…</div></div>';
 
   try {
     let authors = [];
@@ -3577,13 +3577,13 @@ async function renderFollowedAuthors() {
         ${latest.length ? `<div class="grid">${latest.map(character => card(character)).join('')}</div>` : '<div class="empty">目前沒有公開角色。</div>'}
       </section>`;
     }).join('');
-    $('view').innerHTML = `<div class="stack"><button type="button" class="ghost followed-authors-back" data-action="nav" data-page="profile">← 返回 MY</button><div class="row between"><h1 style="margin:0">喜愛作者</h1><span class="small muted">${authors.length} 位作者</span></div>
+    $('view').innerHTML = `<div class="stack"><button type="button" class="ghost followed-authors-back" data-action="back" aria-label="返回上一頁" title="返回上一頁">${ICON.back}</button><div class="row between"><h1 style="margin:0">喜愛作者</h1><span class="small muted">${authors.length} 位作者</span></div>
       ${html || '<div class="empty">你還沒有追蹤任何作者。到作者頁點擊「追蹤」，就會在這裡看到作者與最新公開角色。</div>'}
     </div>`;
     persist();
   } catch (error) {
     console.error('喜愛作者載入失敗：', error);
-    $('view').innerHTML = '<div class="stack"><button type="button" class="ghost followed-authors-back" data-action="nav" data-page="profile">← 返回 MY</button><h1>喜愛作者</h1><div class="empty">讀取失敗，請重新整理後再試。</div></div>';
+    $('view').innerHTML = '<div class="stack"><button type="button" class="ghost followed-authors-back" data-action="back" aria-label="返回上一頁" title="返回上一頁">${ICON.back}</button><h1>喜愛作者</h1><div class="empty">讀取失敗，請重新整理後再試。</div></div>';
     toast(error.message || '讀取喜愛作者失敗。');
   }
 }
@@ -4822,7 +4822,7 @@ function renderGroupPrototype() {
       '<div class="group-panel" style="padding:12px;margin-bottom:16px"><div class="row" style="gap:8px;align-items:center">'+avatarPieces+'</div><p class="muted small" style="margin:8px 0 0">群組頭像依照已選角色組合顯示，現階段不可自行更換。</p></div>'+
       '<label class="group-field"><span>群組名稱（最多 25 字）</span><input id="groupNameInput" maxlength="25" value="'+e(nameValue)+'" placeholder="輸入群組名稱"></label>'+
       '<label class="group-field"><span>玩家角色名稱（提供給 AI）</span><input id="groupPlayerName" maxlength="80" value="'+e(g.draft.playerName||state.account?.nickname||"玩家")+'" placeholder="你的角色名稱"></label>'+
-      '<label class="group-field"><span>玩家角色與人設</span><select id="groupPersonaPreset"><option value="">選擇 USER 人設管理中的人設（可再自行編輯）</option>'+((Array.isArray(currentUser()?.personas)?currentUser().personas:[]).map(p=>'<option value="'+e(p.id)+'" '+((g.draft.personaPresetId===p.id)?'selected':'')+'>'+e(p.name)+(p.isDefault?'（預設）':'')+'</option>').join(''))+'</select><textarea id="groupPlayerPersona" maxlength="3000" placeholder="描述你在這個故事中的身分、個性、背景與說話方式。">'+e(g.draft.playerPersona||state.account?.bio||'')+'</textarea><small class="muted">可選擇已保存的人設，套用後仍可在此編輯；不會修改原本人設。</small></label>'+
+      group persona select
       '<div class="group-field"><span>選擇哪位角色的世界觀作為整體背景？</span><div class="group-character-grid">'+worldChoices+'</div></div>'+
       '<div class="group-field"><span>背景參考</span><div class="group-alert" id="groupWorldReference">'+e((members.find(c=>c.id===worldId)?.worldBackground||members.find(c=>c.id===worldId)?.world||members.find(c=>c.id===worldId)?.intro)||'所選角色目前沒有可用的公開介紹；可先繼續建立，後續再完善世界觀資料。')+'</div></div>'+
       groupRenderScenes()+
@@ -5309,6 +5309,8 @@ function renderMessages(scroll = true) {
     </article>`;
   }).join('');
   $('messages').scrollTop = scroll ? $('messages').scrollHeight : oldScroll;
+  const sendButton=$('view')?.querySelector('.chat-main .composer-send');
+  if(sendButton){const sending=!!s?.pendingTurn;sendButton.innerHTML=sending?'<span aria-hidden="true">■</span>':ICON.send;sendButton.setAttribute('aria-label',sending?'訊息處理中':'送出或接續回應');sendButton.title=sending?'訊息處理中':'送出';sendButton.classList.toggle('is-sending',sending);}
 }
 function memorySize(list) {
   return list.reduce((total,m) => total+countChars(m.text),0);
@@ -6454,7 +6456,7 @@ document.addEventListener('click',async event => {
       case 'group-member-detail': {
         const characterId=key;
         const group=groupPrototype.active;
-        const member=group?.members?.find(item=>String(item.characterId||item.id||'')===characterId);
+        const member=group?.members?.find(item=>String(item.characterId||item.id||'')===characterId) || groupSelectedCharacters().find(item=>String(item.id)===characterId);
         if(!isUuid(characterId)||!member){toast('找不到這個群組成員的既有角色資料。');break;}
         const client=window.mySupabase;
         let publicCharacter=false;
@@ -8778,10 +8780,23 @@ document.addEventListener('submit',function(event){
 
 <style id="poyozz-ui-172-send-state">
 .composer-send[disabled]{opacity:1;cursor:progress;background:var(--panel2);color:var(--text);border-color:var(--border)}
-.composer-send[disabled] span[aria-hidden="true"]{font-size:17px;line-height:1}
+.composer-send[disabled] span[aria-hidden="true"],.composer-send.is-sending span[aria-hidden="true"]{font-size:17px;line-height:1}
 .followed-authors-back{align-self:flex-start;color:var(--muted);border:1px solid var(--border);background:var(--panel)}
 .followed-authors-back:hover{color:var(--text);background:var(--panel2)}
+@media(max-width:767px){body.group-chat-page .sidebar{display:none!important}body.group-chat-page .app{margin-left:0!important}body.group-chat-page .chat-layout{display:block;height:100dvh}body.group-chat-page .chat-layout.hide-list .chat-list{display:none!important}body.group-chat-page .chat-main{height:100dvh;border:0;border-radius:0}body.group-chat-page .chat-heading{padding:6px 8px}body.group-chat-page .messages{padding:14px 10px}body.group-chat-page .composer{padding:5px 8px calc(5px + env(safe-area-inset-bottom))}}
 </style>
 
+
+<script id="poyozz-group-persona-preset">
+document.addEventListener('change',function(event){
+  const select=event.target;
+  if(!(select instanceof HTMLSelectElement)||select.id!=='groupPersonaPreset')return;
+  const persona=(Array.isArray(currentUser()?.personas)?currentUser().personas:[]).find(item=>String(item.id)===String(select.value));
+  const textarea=document.getElementById('groupPlayerPersona');
+  if(!textarea)return;
+  if(persona){textarea.value=String(persona.text||'');groupPrototype.draft.personaPresetId=persona.id;groupPrototype.draft.playerPersona=textarea.value;}
+  else {groupPrototype.draft.personaPresetId='';}
+});
+</script>
 </body>
 </html>
