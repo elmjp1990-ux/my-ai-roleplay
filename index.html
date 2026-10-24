@@ -3939,7 +3939,7 @@ function groupRenderSteps() {
 function groupRenderScenes() {
   const g=groupPrototype;
   const scene=g.draft.scenes[0]||{name:'初始相遇',description:''};
-  return '<label class="group-field"><span>初始場景名稱</span><input id="groupSceneName0" maxlength="80" value="'+e(scene.name||'')+'" placeholder="例如：深夜花店、博物館特展之夜"></label><div class="group-field"><span>初始開場情境（最多 3000 字）</span><div class="group-scene-input-wrap"><textarea id="groupSceneDesc0" maxlength="3000" data-count-for="groupSceneDesc0" placeholder="描寫時間、地點、角色如何相遇，以及故事此刻正在發生什麼。">'+e(scene.description||'')+'</textarea></div><small class="group-scene-help char-counter" data-count-for="groupSceneDesc0">0/3000</small></div>';
+  return '<label class="group-field"><span>初始場景名稱</span><input id="groupSceneName0" maxlength="80" value="'+e(scene.name||'')+'" placeholder="例如：深夜花店、博物館特展之夜"></label><div class="group-field"><span>初始開場情境（最多 3000 字）</span><div class="group-scene-input-wrap"><textarea id="groupSceneDesc0" maxlength="3000" data-count-for="groupSceneDesc0" placeholder="描寫時間、地點、角色如何相遇，以及故事此刻正在發生什麼。">'+e(scene.description||'')+'</textarea><button type="button" class="group-inspiration" data-action="group-inspiration">✨ AI 靈感</button></div><small class="group-scene-help char-counter" data-count-for="groupSceneDesc0">0/3000</small></div>';
 }
 function groupRenderCharacterResults() {
   const all=groupAvailableCharacters();
@@ -4819,7 +4819,7 @@ function renderConversation() {
         <form class="composer" data-form="message">
           ${s.suggestions ? `<div class="suggestions">
             <details class="suggestions-panel" open>
-              <summary>建議回覆 <span class="suggestions-count">選擇燈號切換</span></summary>
+              <summary>建議回覆 <span class="suggestions-count">滑動或點選燈號可切換</span></summary>
               <div class="suggestion-options" aria-label="選擇建議回覆">
                 <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="0" aria-label="第 1 則建議" aria-pressed="true"></button>
                 <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="1" aria-label="第 2 則建議" aria-pressed="false"></button>
