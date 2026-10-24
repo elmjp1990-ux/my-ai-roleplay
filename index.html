@@ -4828,7 +4828,7 @@ function renderGroupPrototype() {
       groupRenderScenes()+
       '<div class="group-field"><span>確認群組成員</span><div class="group-member-confirm-row">'+members.map(c=>'<button type="button" class="group-member-confirm-avatar" data-action="group-member-detail" data-id="'+e(c.id)+'" aria-label="查看 '+e(c.name)+' 的角色卡" title="'+e(c.name)+'"><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt=""></button>').join('')+'</div></div>';
   }
-  const topNext='<button type="button" class="ghost" data-action="group-back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button>';
+  const topNext='<button type="button" class="ghost" data-action="back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button>';
   $('view').innerHTML='<div class="group-wizard"><div class="row between wrap"><div class="group-wizard-title"><div class="row" style="align-items:center;gap:10px">'+topNext+'<h1 style="margin:0">建立群組聊天</h1></div><p class="muted">選擇角色後設定群組檔案</p></div></div>'+groupRenderSteps()+'<section class="group-panel">'+body+'<div id="groupFormError" class="error" role="alert" aria-live="polite">'+e(g.formError)+'</div><div class="group-actions"><button data-action="group-back" '+(g.step===1||g.loading?'disabled':'')+'>上一步</button><button class="primary" data-action="group-next" '+(g.loading?'disabled':'')+'>'+(g.loading?'正在建立…':g.step===2?'建立群組':'下一步')+'</button></div></section></div>';
 }
 function groupReadStep() {
