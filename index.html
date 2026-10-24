@@ -679,7 +679,7 @@ body.group-chat-page:has(.group-wizard) #view {
 .suggestion-options { display:flex; align-items:center; gap:5px; padding:0 8px 5px; }
 .suggestion-light { width:10px; height:10px; min-width:10px; padding:0; border:0; border-radius:50%; background:var(--border); box-shadow:inset 0 0 0 1px var(--muted); }
 .suggestion-light[aria-pressed="true"] { background:#34d399; box-shadow:0 0 6px #34d399aa; }
-.suggestion-card { display:none; width:100%; min-width:0; max-height:120px; overflow:hidden; padding:6px 9px; border:1px solid var(--border); border-radius:8px; background:var(--card); color:var(--text); text-align:left; font:inherit; white-space:normal; line-height:1.35; }
+.suggestion-card { touch-action:pan-y; -webkit-user-select:none; user-select:none; display:none; width:100%; min-width:0; max-height:120px; overflow:hidden; padding:6px 9px; border:1px solid var(--border); border-radius:8px; background:var(--card); color:var(--text); text-align:left; font:inherit; white-space:normal; line-height:1.35; }
 .suggestion-card.active { display:block; }
 .suggestion-card:active { transform:scale(.995); }
 .suggestion-card-title { display:block; margin-bottom:3px; font-size:12px; font-weight:700; }
@@ -935,6 +935,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 .group-chat-entry{width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer;border:0;background:transparent;}
 .group-chat-entry .select-chat{display:block;min-width:0;flex:1;}
 .group-chat-entry:focus-visible{outline:2px solid var(--accent,#7c6cf2);outline-offset:2px;}
+.inline-help{display:inline-flex;position:relative;vertical-align:middle;margin-left:5px;font-size:12px}.inline-help summary{display:inline-grid;place-items:center;width:17px;height:17px;border:1px solid currentColor;border-radius:50%;cursor:pointer;list-style:none}.inline-help summary::-webkit-details-marker{display:none}.inline-help>span{position:absolute;z-index:30;left:22px;top:-6px;width:min(260px,70vw);padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--panel);box-shadow:0 8px 24px #0003;font-weight:400;line-height:1.5}.char-counter{display:block;font-variant-numeric:tabular-nums}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -2818,6 +2819,7 @@ function render() {
     case 'album':renderChatAlbumPage();break;
   }
   if (route.overlay) renderModal(route.overlay);
+  updateCharacterCounters($('view'));
 }
 
 /* Explore */
@@ -3511,11 +3513,11 @@ function renderEditor() {
         </div>
         <label class="field"><span>種族</span><input name="race" maxlength="50" value="${e(c.race || '')}"></label>
         <label class="field"><span>公開介紹 *</span><textarea name="intro" required maxlength="2000">${e(c.intro || '')}</textarea>
-          <small>最多2000字。</small></label>
-        <label class="field"><span>開場白 *</span><textarea name="opening" required maxlength="3000">${e(c.opening || '')}</textarea>
-          <small>最多3000字；用 *動作* 表示場景描述。</small></label>
+          <small class="char-counter" data-count-for="intro">0/2000</small></label>
+        <label class="field"><span>開場白 * <details class="inline-help"><summary aria-label="開場白填寫說明" title="開場白填寫說明">?</summary><span>用 *動作* 表示場景描述；用 {USER} 帶入玩家名稱、{CHAR} 帶入角色名稱。</span></details></span><textarea name="opening" required maxlength="3000">${e(c.opening || '')}</textarea>
+          <small class="char-counter" data-count-for="opening">0/3000</small></label>
         <label class="field"><span>私密資訊</span><textarea name="privateInfo" maxlength="10000">${e(c.privateInfo || '')}</textarea>
-          <small>最多10000字，不顯示在公開介紹；勿填真實機密。</small></label>
+          <small class="char-counter" data-count-for="privateInfo">0/10000，不會顯示在公開介紹，請勿填寫真實機密</small></label>
         <label class="field"><span>對話風格</span><textarea name="style" maxlength="1000">${e(c.style || '')}</textarea></label>
         <section class="memory-item stack" style="gap:10px"><strong>角色手機設定</strong>
           <label class="field"><span>AI 手機通知揭露指示（每行一則）</span><textarea name="phoneNotices" maxlength="1200" placeholder="💬心裡話 | 每回合揭露一則簡短心裡話\n🔎線索 | 當劇情出現新線索時，揭露線索通知">${e(savedDraft?.phoneNotices ?? (Array.isArray(c.phoneSettings?.noticePrompts) ? c.phoneSettings.noticePrompts.join('\n') : Array.isArray(c.phoneSettings?.notices) ? c.phoneSettings.notices.join('\n') : ''))}</textarea><small>在這裡填寫每回合對話需要揭露的狀態。每行描述一種 AI 可揭露的通知條件／內容，不是固定顯示文字；最多 8 則。</small></label></section>
@@ -3545,7 +3547,8 @@ function renderAI() {
       <label class="field"><span>角色名稱 *</span><input name="name" required>
         <small>${NAME_HELP}</small></label>
       <label class="field"><span>故事大綱 *</span>
-        <textarea name="outline" required maxlength="10000" placeholder="描寫背景、人物與故事走向…"></textarea>
+        <textarea name="outline" required maxlength="3000" placeholder="描寫背景、人物與故事走向…"></textarea>
+        <small class="char-counter" data-count-for="outline">0/3000</small>
       </label>
       <button type="button" data-action="tags" data-mode="character">添加標籤</button>
       <div id="formTags" class="row wrap" style="margin-top:10px">${draftTags.map(draftTagButton).join('')}</div>
@@ -3936,7 +3939,7 @@ function groupRenderSteps() {
 function groupRenderScenes() {
   const g=groupPrototype;
   const scene=g.draft.scenes[0]||{name:'初始相遇',description:''};
-  return '<label class="group-field"><span>初始場景名稱</span><input id="groupSceneName0" maxlength="80" value="'+e(scene.name||'')+'" placeholder="例如：深夜花店、博物館特展之夜"></label><div class="group-field"><span>初始開場情境（最多 1000 字）</span><div class="group-scene-input-wrap"><textarea id="groupSceneDesc0" maxlength="1000" placeholder="描寫時間、地點、角色如何相遇，以及故事此刻正在發生什麼。">'+e(scene.description||'')+'</textarea><button type="button" class="group-inspiration" data-action="group-inspiration">✨ AI 靈感</button></div><small class="group-scene-help">AI 尚未串接，點擊後會填入測試用 Mock 範例文字，可再自由修改；不呼叫 AI、不扣款。</small></div>';
+  return '<label class="group-field"><span>初始場景名稱</span><input id="groupSceneName0" maxlength="80" value="'+e(scene.name||'')+'" placeholder="例如：深夜花店、博物館特展之夜"></label><div class="group-field"><span>初始開場情境（最多 3000 字）</span><div class="group-scene-input-wrap"><textarea id="groupSceneDesc0" maxlength="3000" data-count-for="groupSceneDesc0" placeholder="描寫時間、地點、角色如何相遇，以及故事此刻正在發生什麼。">'+e(scene.description||'')+'</textarea><button type="button" class="group-inspiration" data-action="group-inspiration">✨ AI 靈感</button></div><small class="group-scene-help char-counter" data-count-for="groupSceneDesc0">0/3000</small></div>';
 }
 function groupRenderCharacterResults() {
   const all=groupAvailableCharacters();
@@ -4251,7 +4254,7 @@ function renderGroupConversation() {
         <form class="composer" data-form="group-message">
 ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
             <details class="suggestions-panel" open>
-              <summary>建議回覆 <span class="suggestions-count">點選建議帶入輸入框</span></summary>
+              <summary>建議回覆 <span class="suggestions-count" data-collapsed="點擊可展開" data-expanded="滑動或點選燈號可切換">滑動或點選燈號可切換</span></summary>
               <div class="suggestion-options" aria-label="選擇建議回覆">
                 <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="0" aria-label="第 1 則建議" aria-pressed="true"></button>
                 <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="1" aria-label="第 2 則建議" aria-pressed="false"></button>
@@ -4816,7 +4819,7 @@ function renderConversation() {
         <form class="composer" data-form="message">
           ${s.suggestions ? `<div class="suggestions">
             <details class="suggestions-panel" open>
-              <summary>建議回覆 <span class="suggestions-count">選擇燈號切換</span></summary>
+              <summary>建議回覆 <span class="suggestions-count" data-collapsed="點擊可展開" data-expanded="滑動或點選燈號可切換">滑動或點選燈號可切換</span></summary>
               <div class="suggestion-options" aria-label="選擇建議回覆">
                 <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="0" aria-label="第 1 則建議" aria-pressed="true"></button>
                 <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="1" aria-label="第 2 則建議" aria-pressed="false"></button>
@@ -5480,7 +5483,7 @@ function renderModal(o) {
       showDialog('版面顏色',`<form data-form="theme-setting" class="stack"><label class="row" style="justify-content:flex-start;gap:10px;padding:12px;border:1px solid var(--border);border-radius:12px;cursor:pointer"><input name="theme" type="radio" value="night" style="width:18px;height:18px;flex:0 0 18px" ${state.theme !== 'day' ? 'checked' : ''}><span><strong>黑夜</strong><small class="muted" style="display:block">深色背景，適合夜間使用</small></span></label><label class="row" style="justify-content:flex-start;gap:10px;padding:12px;border:1px solid var(--border);border-radius:12px;cursor:pointer"><input name="theme" type="radio" value="day" style="width:18px;height:18px;flex:0 0 18px" ${state.theme === 'day' ? 'checked' : ''}><span><strong>白天</strong><small class="muted" style="display:block">明亮背景，適合日間使用</small></span></label><p class="small muted">選擇後會套用至整個網站。</p><button class="primary">儲存版面</button></form>`);
       break;
     case 'birthdate':
-      showDialog('出生日期',`<form data-form="birthdate"><label class="field"><span>出生日期（年月日）</span><input name="birthdate" type="date" max="${new Date().toISOString().slice(0,10)}" value="${e(u.birthdate || '')}"></label><p class="small muted">目前先儲存在此瀏覽器的帳號設定中。</p><button class="primary">儲存日期</button></form>`);
+      showDialog('出生日期',`<form data-form="birthdate"><label class="field"><span>出生日期（年月日）</span><input name="birthdate" type="date" max="${new Date().toISOString().slice(0,10)}" value="${e(u.birthdate || '')}" ${u.birthdate ? 'disabled' : ''}></label><p class="small muted">儲存後不可以修改生日，請確認好再儲存。若填寫錯誤，請聯絡客服協助處理。</p><button class="primary" ${u.birthdate ? 'disabled' : ''}>儲存日期</button></form>`);
       break;
     case 'personas': {
       const personas = Array.isArray(u.personas) ? u.personas : [];
@@ -5725,7 +5728,7 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
         <form data-form="bug">
           <label class="field"><span>問題說明 *</span><textarea name="text" required maxlength="3000"></textarea></label>
           <label class="field"><span>截圖，非必填</span><input name="image" type="file" accept="image/png,image/jpeg,image/webp"></label>
-          <p class="small muted">驗證碼服務與回報API尚未開放。</p>
+          <p class="small muted">請描述問題並附上必要截圖，送出前請勿包含密碼或其他機密資料。</p>
           <button class="primary">檢查表單</button>
         </form>`);
       break;
@@ -5795,6 +5798,82 @@ function renderArchive(sessionId,tab) {
     </div>`);
 }
 
+/* Keep the suggestion hint in sync with the native details open/closed state. */
+document.addEventListener('toggle', event => {
+  const panel = event.target;
+  if (!(panel instanceof HTMLDetailsElement) || !panel.classList.contains('suggestions-panel')) return;
+  const hint = panel.querySelector('.suggestions-count');
+  if (!hint) return;
+  hint.textContent = panel.open ? (hint.dataset.expanded || '滑動或點選燈號可切換') : (hint.dataset.collapsed || '點擊可展開');
+}, true);
+
+/* UI-1024: robust horizontal swipe navigation for single/group suggested replies.
+   Touch devices use touch events (with vertical scrolling preserved); mouse uses pointer events.
+   Delegation keeps the behavior alive across chat rerenders. */
+(function installSuggestionSwipe(){
+  let gesture = null;
+  let suppressClickUntil = 0;
+  let lastSwipeAt = 0;
+  const findCard = target => target instanceof Element ? target.closest('.suggestion-card') : null;
+  const begin = (panel, x, y, kind, id) => {
+    if (!panel || !panel.open) return;
+    gesture = { panel, startX:x, startY:y, kind, id };
+  };
+  const finish = (x, y, kind, id, event) => {
+    if (!gesture || gesture.kind !== kind || (id != null && gesture.id !== id)) return;
+    const current = gesture;
+    gesture = null;
+    const dx = x - current.startX;
+    const dy = y - current.startY;
+    if (Math.abs(dx) < 32 || Math.abs(dx) < Math.abs(dy) * 1.15) return;
+    const cards = Array.from(current.panel.querySelectorAll('.suggestion-card'));
+    if (cards.length < 2) return;
+    const activeIndex = cards.findIndex(card => card.classList.contains('active'));
+    if (activeIndex < 0) return;
+    const nextIndex = Math.max(0, Math.min(cards.length - 1, activeIndex + (dx < 0 ? 1 : -1)));
+    if (nextIndex === activeIndex) return;
+    current.panel.querySelectorAll('.suggestion-card').forEach((card, index) => card.classList.toggle('active', index === nextIndex));
+    current.panel.querySelectorAll('.suggestion-light').forEach((light, index) => light.setAttribute('aria-pressed', String(index === nextIndex)));
+    lastSwipeAt = Date.now();
+    suppressClickUntil = lastSwipeAt + 500;
+    if (event && event.cancelable) event.preventDefault();
+  };
+  document.addEventListener('pointerdown', event => {
+    if (event.pointerType !== 'mouse' || event.button !== 0) return;
+    const card = findCard(event.target);
+    begin(card?.closest('.suggestions-panel'), event.clientX, event.clientY, 'mouse', event.pointerId);
+  }, {passive:true});
+  document.addEventListener('pointerup', event => {
+    if (event.pointerType !== 'mouse') return;
+    finish(event.clientX, event.clientY, 'mouse', event.pointerId, event);
+  }, {passive:false});
+  document.addEventListener('pointercancel', event => {
+    if (gesture?.kind === 'mouse' && gesture.id === event.pointerId) gesture = null;
+  }, {passive:true});
+  document.addEventListener('touchstart', event => {
+    if (event.touches.length !== 1) { gesture = null; return; }
+    const card = findCard(event.target);
+    begin(card?.closest('.suggestions-panel'), event.touches[0].clientX, event.touches[0].clientY, 'touch', 0);
+  }, {passive:true});
+  document.addEventListener('touchend', event => {
+    if (!gesture || gesture.kind !== 'touch' || !event.changedTouches.length) return;
+    const touch = event.changedTouches[0];
+    finish(touch.clientX, touch.clientY, 'touch', 0, event);
+  }, {passive:false});
+  document.addEventListener('touchcancel', () => {
+    if (gesture?.kind === 'touch') gesture = null;
+  }, {passive:true});
+  document.addEventListener('click', event => {
+    if (Date.now() > suppressClickUntil) return;
+    const target = findCard(event.target);
+    if (!target) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    suppressClickUntil = 0;
+  }, true);
+})();
+ 
 /* GROUP-01-OPEN: capture group-open clicks before other delegated handlers.
    This makes group navigation independent of nested list markup or another handler
    stopping propagation. The normal bubble handler is skipped to prevent double-open. */
@@ -5908,6 +5987,20 @@ function refreshExploreTagPicker() {
   count.textContent='['+chosen.length+']';
   selectedArea.innerHTML=chosen.map(item=>`<button type="button" class="tag-picker-chip selected" data-action="toggle-explore-tag" data-tag="${e(item.value)}" aria-label="取消選擇 ${e(item.value)}">${e(item.value)} ×</button>`).join('') || '<span class="small muted">尚未選擇標籤</span>';
 }
+function updateCharacterCounters(root=document) {
+  root.querySelectorAll('.char-counter[data-count-for]').forEach(counter => {
+    const name=counter.dataset.countFor;
+    const field=name==='groupSceneDesc0' ? root.querySelector('#groupSceneDesc0') : root.querySelector('[name="'+name+'"]');
+    if(!field) return;
+    const max=field.maxLength > 0 ? field.maxLength : 3000;
+    counter.textContent=field.value.length+'/'+max+(name==='privateInfo'?'，不會顯示在公開介紹，請勿填寫真實機密':'');
+  });
+}
+document.addEventListener('input', event => {
+  const field=event.target;
+  if(field.matches('textarea[data-count-for]')) updateCharacterCounters(field.closest('form, .group-field') || document);
+  else if(field.matches('form[data-form="character"] textarea, form[data-form="ai"] textarea')) updateCharacterCounters(field.closest('form'));
+});
 document.addEventListener('input', event => {
   const input=event.target;
   if(input instanceof HTMLInputElement && input.name==='exploreTagSearch' && input.closest('.explore-tag-picker')) refreshExploreTagPicker();
@@ -7164,6 +7257,7 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         const value=String(f.get('birthdate') || '');
         if(value && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value > new Date().toISOString().slice(0,10))) return toast('請選擇有效的出生日期。');
         const previousBirthdate=state.account.birthdate || '';
+        if(previousBirthdate && value !== previousBirthdate) return toast('生日儲存後無法自行修改，請聯絡客服協助處理。');
         state.account.birthdate=value;
         persist();
         try {
