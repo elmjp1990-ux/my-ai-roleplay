@@ -7498,8 +7498,17 @@ document.addEventListener('submit',async event => {
   if (form.dataset.submitting === 'true') return;
   form.dataset.submitting = 'true';
   const submitButton = event.submitter || form.querySelector('button[type="submit"], button:not([type])');
-  const originalButtonText = submitButton?.textContent || '';
-  if (submitButton) { submitButton.disabled = true; submitButton.textContent = '儲存中…'; }
+  const originalButtonHTML = submitButton?.innerHTML || '';
+  const originalButtonAriaLabel = submitButton?.getAttribute('aria-label');
+  const originalButtonTitle = submitButton?.getAttribute('title');
+  if (submitButton) {
+    submitButton.disabled = true;
+    if (submitButton.classList.contains('composer-send')) {
+      submitButton.innerHTML = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>';
+      submitButton.setAttribute('aria-label','處理中');
+      submitButton.title = '處理中';
+    } else submitButton.textContent = '儲存中…';
+  }
   const f=new FormData(form);
   if (event.submitter?.name) f.set(event.submitter.name, event.submitter.value);
   const type=form.dataset.form;
@@ -8090,7 +8099,12 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
     }
   } finally {
     form.dataset.submitting = 'false';
-    if (submitButton?.isConnected) { submitButton.disabled = false; submitButton.textContent = originalButtonText; }
+    if (submitButton?.isConnected) {
+      submitButton.disabled = false;
+      submitButton.innerHTML = originalButtonHTML;
+      if (originalButtonAriaLabel === null) submitButton.removeAttribute('aria-label'); else submitButton.setAttribute('aria-label',originalButtonAriaLabel);
+      if (originalButtonTitle === null) submitButton.removeAttribute('title'); else submitButton.setAttribute('title',originalButtonTitle);
+    }
   }
 });
 
