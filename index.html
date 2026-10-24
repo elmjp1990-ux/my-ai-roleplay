@@ -281,7 +281,10 @@ body.collapsed .sidebar-heading .logo-button { display:none; }
 body.collapsed .sidebar-heading { justify-content:center; }
 body.collapsed .nav-label { display:none; }
 body.collapsed .nav-btn { justify-content:center; padding-inline:6px; }
-body.collapsed .sidebar-footer .logo-img { width:45px; height:22px; }
+.sidebar-iconmark { display:none; width:34px; height:34px; object-fit:contain; }
+body.collapsed .sidebar-footer-logo { display:flex; align-items:center; justify-content:center; width:44px; height:44px; padding:4px; }
+body.collapsed .sidebar-footer .sidebar-wordmark { display:none; }
+body.collapsed .sidebar-footer .sidebar-iconmark { display:block; }
 header {
   height:64px;
   padding:0 22px;
@@ -960,8 +963,9 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   </div>
   <nav id="desktopNav"></nav>
   <div class="sidebar-footer">
-    <button class="ghost" data-action="home" aria-label="首頁">
-      <img class="logo-img" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-2" alt="PersonaX">
+    <button class="ghost sidebar-footer-logo" data-action="home" aria-label="首頁">
+      <img class="logo-img sidebar-wordmark" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-2" alt="PersonaX">
+      <img class="sidebar-iconmark" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBICON.png?v=20261024-1" alt="PersonaX">
     </button>
   </div>
 </aside>
