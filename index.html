@@ -161,6 +161,7 @@ body.day .tag { color:#4f46b8; }
 .followed-author-more{flex:0 0 auto;padding:6px 10px;font-size:11px;letter-spacing:.08em;border-radius:9px}
 
 .check { display:flex; align-items:flex-start; gap:9px; line-height:1.7; }
+.nsfw-attention{outline:2px solid #f59e0b;outline-offset:5px;border-radius:8px;background:#f59e0b12;}
 .check input { margin-top:5px; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 .form-width { max-width:820px; }
@@ -1287,7 +1288,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     try {
       const { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible')
+        .select('id, author_id, name, gender, age, avatar_url, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible')
         .eq('visibility', 'public')
         .is('deleted_at', null)
         .order('first_published_at', { ascending: false, nullsFirst: false });
@@ -1339,6 +1340,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
           privateInfo: '', style: row.style || '',
           phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : {},
           nsfwWorkplaceWarning:row.nsfw_workplace_warning === true,
+          isNSFW:row.is_nsfw === true,
           tags: Array.isArray(row.tags) ? row.tags : [],
           authorId: row.author_id, owner: state.account?.uid === row.author_id,
           chats: '0', users: null,
@@ -1376,7 +1378,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       // 這可修復舊版匯入只存 localStorage 的資料；不會上傳其他帳號的本機角色。
       let { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+        .select('id, author_id, name, gender, age, avatar_url, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
         .eq('author_id', user.id)
         .order('created_at', { ascending: false });
       if (error) throw new Error('讀取雲端角色失敗：' + error.message);
@@ -1533,7 +1535,7 @@ const ids = (rows || []).map(row => row.id);
     // 先讀取既有上架紀錄，避免 upsert 把首次公開時間或資格重設。
     const { data: existingCharacter, error: existingCharacterError } = await client
       .from('characters')
-      .select('visibility, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, deleted_at')
+      .select('visibility, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, is_nsfw, deleted_at')
       .eq('id', character.id)
       .eq('author_id', expectedUserId)
       .maybeSingle();
@@ -1571,6 +1573,7 @@ const ids = (rows || []).map(row => row.id);
       style: character.style || '',
       phone_settings:character.phoneSettings && typeof character.phoneSettings==='object' ? {noticePrompts:(Array.isArray(character.phoneSettings.noticePrompts)?character.phoneSettings.noticePrompts:Array.isArray(character.phoneSettings.notices)?character.phoneSettings.notices:[]).slice(0,8).map(x=>String(x).slice(0,150))} : {},
       nsfw_workplace_warning: character.nsfwWorkplaceWarning === true,
+      is_nsfw: character.isNSFW === true,
       tags: Array.isArray(character.tags) ? character.tags : []
     };
 
@@ -3450,6 +3453,7 @@ function saveEditorDraft() {
     phoneNotices:String(values.get('phoneNotices') || ''),
     visibility:String(values.get('visibility') || 'private'),
     rightsConfirmed:values.get('rightsConfirmed') === 'on',
+    isNSFW:values.get('isNSFW') === 'on',
     tags:[...draftTags],
     image:draftImage,
     savedAt:Date.now()
@@ -3499,6 +3503,7 @@ function renderEditor() {
     $('view').innerHTML = '<div class="empty">無法修改此角色。</div>';
     return;
   }
+  if(savedDraft&&typeof savedDraft.isNSFW==='boolean')c.isNSFW=savedDraft.isNSFW;
   $('view').innerHTML = `
     <div class="stack">${creationTabs()}
       <form class="panel form-width" data-form="character">
@@ -3511,8 +3516,8 @@ function renderEditor() {
              class="${draftImage ? '' : 'hidden'}"
              alt="頭像預覽" style="width:120px;height:150px;object-fit:cover;border-radius:13px;margin-bottom:18px">
         <label class="field"><span>角色名字 *</span>
-          <input name="name" required value="${e(c.name || '')}">
-          <small>角色名字至少3字。${NAME_HELP}</small>
+          <input name="name" required maxlength="25" value="${e(c.name || '')}">
+          <small>最多 25 字，可用中文、英文、數字、空格及 -：()_，支援對應全型符號。建議使用清楚好辨識的角色名稱，避免填入聯絡方式或宣傳資訊。</small>
         </label>
         <div class="two-col">
           <label class="field"><span>性別 *</span><select name="gender">
@@ -3541,6 +3546,9 @@ function renderEditor() {
         </div>
         <label class="check"><input name="rightsConfirmed" type="checkbox" required ${c.rightsConfirmed === true ? 'checked' : ''}>
           <span>我確認角色沒有侵犯智慧財產權、形象或其他任何權利。 <span aria-hidden="true" style="color:#ef4444;font-weight:800">*</span></span></label>
+        <label class="check" style="margin-top:12px"><input name="isNSFW" type="checkbox" ${c.isNSFW === true ? 'checked' : ''}>
+          <span>此角色含成人／敏感內容（NSFW，僅限 18 歲以上使用者）</span></label>
+        <small class="muted" style="display:block;margin:6px 0 12px 27px;line-height:1.7">若角色內容包含成人或露骨性描寫，請務必標示 NSFW。系統會檢查公開介紹、開場白、私密資訊及對話風格；偵測到限制詞但尚未勾選時，會提醒你確認分類。</small>
         <label class="check" style="margin-top:12px"><input name="nsfwWorkplaceWarning" type="checkbox" ${c.nsfwWorkplaceWarning === true ? 'checked' : ''}>
           <span>此角色為 NSFW，工作場所不宜</span></label>
         <div class="row" style="margin-top:22px">
@@ -3549,6 +3557,10 @@ function renderEditor() {
         </div>
       </form>
     </div>`;
+  if(c.aiGeneratedDraft)void (async()=>{
+    const matches=findNsfwTerms(c,await loadNsfwTerms());
+    if(matches.length&&!c.isNSFW)showDialog('AI 草稿需要確認 NSFW 分級','<p>這份 AI 私密草稿包含可能屬於成人／敏感內容的限制詞：</p><p><strong>'+e(matches.slice(0,8).join('、'))+'</strong></p><p>請審閱內容；若確實屬於成人／敏感內容，請勾選 NSFW 分級後再儲存。</p><div class="row" style="justify-content:flex-end"><button type="button" data-action="nsfw-focus">前往勾選 NSFW</button><button type="button" data-action="dialog-close">稍後確認</button></div>');
+  })();
 }
 function renderAI() {
   $('view').innerHTML = `<div class="stack">${creationTabs()}
@@ -6025,7 +6037,8 @@ function updateCharacterCounters(root=document) {
     const field=name==='groupSceneDesc0' ? root.querySelector('#groupSceneDesc0') : root.querySelector('[name="'+name+'"]');
     if(!field) return;
     const max=field.maxLength > 0 ? field.maxLength : 3000;
-    counter.textContent=field.value.length+'/'+max+(name==='privateInfo'?'，不會顯示在公開介紹，請勿填寫真實機密':'');
+    const actualCount=typeof Intl!=='undefined'&&Intl.Segmenter?[...new Intl.Segmenter('zh-Hant',{granularity:'grapheme'}).segment(field.value)].length:Array.from(field.value).length;
+    counter.textContent=actualCount+'/'+max+(name==='privateInfo'?'，不會顯示在公開介紹，請勿填寫真實機密':'');
   });
 }
 document.addEventListener('input', event => {
@@ -7171,6 +7184,29 @@ document.addEventListener('click',async event => {
 });
 
 /* Form submissions */
+const DEFAULT_NSFW_TERMS=['18禁','成人內容','色情','情色','露骨性','性描寫','性器官','性交','做愛','口交','肛交','自慰','手淫','高潮','裸露','裸體','乳房','陰莖','陰道','性奴','性侵','強姦','亂倫','NSFW'];
+let cachedNsfwTerms=null;
+async function loadNsfwTerms(){
+  if(cachedNsfwTerms)return cachedNsfwTerms;
+  const client=window.mySupabase;
+  if(!client)return DEFAULT_NSFW_TERMS;
+  const {data,error}=await client.from('content_restriction_terms').select('term').eq('is_active',true);
+  if(error){console.warn('限制詞清單載入失敗，使用內建提醒詞。',error.message);return DEFAULT_NSFW_TERMS;}
+  cachedNsfwTerms=(data||[]).map(row=>String(row.term||'').trim()).filter(Boolean);
+  return cachedNsfwTerms.length?cachedNsfwTerms:DEFAULT_NSFW_TERMS;
+}
+function findNsfwTerms(character,terms){
+  const text=[character.name,character.intro,character.opening,character.privateInfo,character.style].filter(Boolean).join('\n').normalize('NFKC').toLocaleLowerCase('zh-Hant');
+  return terms.filter(term=>text.includes(String(term).normalize('NFKC').toLocaleLowerCase('zh-Hant')));
+}
+function focusNsfwCheckbox(){
+  const input=$('view')?.querySelector('input[name="isNSFW"]');
+  if(!input)return;
+  input.scrollIntoView({behavior:'smooth',block:'center'});input.focus({preventScroll:true});
+  input.closest('label')?.classList.add('nsfw-attention');
+  setTimeout(()=>input.closest('label')?.classList.remove('nsfw-attention'),2200);
+}
+
 document.addEventListener('submit',async event => {
   const form=event.target.closest('[data-form]');
   if (!form) return;
@@ -7206,7 +7242,13 @@ document.addEventListener('submit',async event => {
         if (!draftImage) return toast('請上傳角色頭像。');
         const intro=String(f.get('intro')).trim();
         const opening=String(f.get('opening')).trim();
-        if (!intro || !opening) return toast('介紹與開場白不能留空。');
+        if (!intro || !opening) return toast('公開介紹與開場白不能留空。');
+        const nsfwCandidate={name,intro,opening,privateInfo:String(f.get('privateInfo')||''),style:String(f.get('style')||'')};
+        const matchedTerms=findNsfwTerms(nsfwCandidate,await loadNsfwTerms());
+        if(matchedTerms.length&&f.get('isNSFW')!=='on'){
+          showDialog('請確認角色的 NSFW 分級','<p>系統在角色內容中偵測到可能屬於成人／敏感內容的限制詞：</p><p><strong>'+e(matchedTerms.slice(0,8).join('、'))+'</strong></p><p>若內容確實涉及成人或露骨描寫，請勾選「此角色含成人／敏感內容（NSFW，僅限 18 歲以上使用者）」。若為一般語境或誤判，請修改內容後再儲存。</p><div class="row" style="justify-content:flex-end;margin-top:14px"><button type="button" data-action="nsfw-focus">返回勾選 NSFW</button><button type="button" data-action="dialog-close">我先修改內容</button></div>');
+          return;
+        }
         const old=state.characters.find(c=>c.id===route.id);
         if (old && !owned(old)) return;
         try { draftTags=validateCharacterTags(draftTags); }
@@ -7219,6 +7261,7 @@ document.addEventListener('submit',async event => {
           style:String(f.get('style')).trim(),
           phoneSettings:{noticePrompts:String(f.get('phoneNotices')||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,8).map(x=>x.slice(0,150))},
           visibility:String(f.get('visibility')),image:draftImage,
+          isNSFW:f.get('isNSFW') === 'on',
           rightsConfirmed:f.get('rightsConfirmed') === 'on',
           nsfwWorkplaceWarning:f.get('nsfwWorkplaceWarning') === 'on',
           tags:[...draftTags],authorId:user.uid,owner:true,
@@ -7256,7 +7299,7 @@ document.addEventListener('submit',async event => {
         catch (error) { return toast(error.message); }
         if (!confirm('AI尚未串接，這次只建立可編輯草稿，不生成圖片、不扣鑽石。繼續嗎？')) return;
         state.characters.unshift({
-          id:id(),name,gender:'ambiguous',age:'',race:'',
+          id:id(),name,gender:'ambiguous',age:'',race:'',aiGeneratedDraft:true,isNSFW:false,
           intro:outline.slice(0,2000),
           opening:'**新的故事開始了。**\n「你好。」',
           privateInfo:outline,style:'',tags:[...draftTags],
@@ -8373,6 +8416,9 @@ function openInsufficientFundsDialog(mode) {
   `);
 }
 document.addEventListener('click',async event=>{
+  const nsfwButton=event.target.closest('[data-action="nsfw-focus"],[data-action="dialog-close"]');
+  if(nsfwButton?.dataset.action==='nsfw-focus'){$('modal')?.close();focusNsfwCheckbox();return;}
+  if(nsfwButton?.dataset.action==='dialog-close'){$('modal')?.close();return;}
   const button=event.target.closest('[data-action="wallet-dialog-close"],[data-action="wallet-cost-details"],[data-action="wallet-confirm-diamonds"],[data-action="wallet-watch-ad"],[data-action="wallet-open-shop"]');
   if(!button)return;
   if(button.dataset.action==='wallet-dialog-close') {
