@@ -368,6 +368,9 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .card-chat{position:absolute;z-index:4;left:10px;right:10px;bottom:10px;min-height:40px;border-color:#ffffff55;background:linear-gradient(135deg,#e7e9ef38,#8d95a733);color:#f7f8fc;font-size:12px;letter-spacing:.08em;box-shadow:0 8px 22px #080b1260,inset 0 1px #ffffff28;backdrop-filter:blur(18px) saturate(120%);-webkit-backdrop-filter:blur(18px) saturate(120%);opacity:1}
 .card:hover .card-chat,.card:focus-within .card-chat{background:linear-gradient(135deg,#e7e9ef55,#8d95a744);border-color:#ffffff80}
 .card-chat:hover{background:linear-gradient(135deg,#e7e9ef65,#8d95a755);border-color:#ffffff90}
+.nsfw-card-badge{position:absolute;z-index:5;top:10px;left:10px;display:inline-flex;align-items:center;gap:5px;padding:6px 9px;border:1px solid #c8a96b99;border-radius:999px;background:linear-gradient(135deg,#211a2bef,#30223bef);color:#f1d8a4;font-size:10px;font-weight:800;letter-spacing:.09em;box-shadow:0 4px 14px #080b1266;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.card-chat.nsfw-chat-cta{background:linear-gradient(135deg,#44334f,#282033);border-color:#bca2cf88;color:#f7edf9;box-shadow:0 8px 22px #080b1270,inset 0 1px #ffffff22}
+.card:hover .card-chat.nsfw-chat-cta,.card:focus-within .card-chat.nsfw-chat-cta,.card-chat.nsfw-chat-cta:hover{background:linear-gradient(135deg,#554060,#34263f);border-color:#d0b2e4aa}
 .card-body { padding:13px; }
 .card-body h3 { margin:9px 0 6px; }
 .card-intro {
@@ -1550,6 +1553,20 @@ async function saveSupabaseCharacter(character, expectedUserId) {
     if (!client || !expectedUserId) throw new Error('請先使用 Google 帳號登入，再儲存角色。');
     character.tags = validateCharacterTags(Array.isArray(character.tags) ? character.tags : []);
 
+    // 先用登入者專屬 RPC 取得生日，避免未成年作者勾選 NSFW 後才收到泛用的 RLS 寫入錯誤。
+    // 資料庫 INSERT／UPDATE 年齡政策仍是最終安全防線。
+    if (character.isNSFW === true) {
+      const { data: privateProfile, error: privateProfileError } = await client.rpc('get_my_private_profile_data');
+      if (privateProfileError) throw new Error('讀取年齡資格失敗，請重新登入後再試。');
+      const birthdate = String(privateProfile?.birthdate || '');
+      const today = new Date();
+      const cutoff = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
+      const cutoffDate = cutoff.getFullYear() + '-' + String(cutoff.getMonth()+1).padStart(2,'0') + '-' + String(cutoff.getDate()).padStart(2,'0');
+      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(birthdate) || birthdate > cutoffDate) {
+        throw new Error('[年齡未達許可] 此帳號未滿 18 歲或尚未完成生日驗證，無法建立或修改 NSFW 角色。');
+      }
+    }
+
     const { data: authResult, error: authError } = await client.auth.getUser();
     if (authError || authResult?.user?.id !== expectedUserId) {
       throw new Error('登入狀態驗證失敗，請重新登入後再儲存角色。');
@@ -1821,7 +1838,12 @@ function currentUserCanViewNsfw() {
   return birthdate <= cutoffDate;
 }
 function canViewCharacterNsfw(character) {
-  return character?.isNSFW !== true || currentUserCanViewNsfw();
+  if (character?.isNSFW !== true) return true;
+  // 作者可以在自己的介面辨識／管理自己建立的 NSFW 角色；其他人的公開 NSFW 內容，
+  // 以 Supabase RLS 已完成的伺服器端成年資格判定為準。
+  if (currentUser()?.uid && currentUser().uid === character.authorId) return true;
+  if (character?.cloudPublic === true) return true;
+  return currentUserCanViewNsfw();
 }
 function availableExploreTags() {
   const tags = new Set();
@@ -2999,10 +3021,11 @@ function card(c,owner = false) {
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
           <span>${e(initialTurnCount)}</span>
         </span>`}
+        ${c.isNSFW === true ? '<span class="nsfw-card-badge" aria-label="成人敏感內容，限 18 歲以上">18+ · NSFW</span>' : ''}
         <button class="heart ${favorite ? 'on' : ''}" data-action="favorite"
                 data-id="${e(c.id)}" aria-label="切換喜愛角色"
                 aria-pressed="${favorite}">♥</button>
-        <button class="card-chat" data-action="start-chat" data-id="${e(c.id)}">開始聊天</button>
+        <button class="card-chat ${c.isNSFW === true ? 'nsfw-chat-cta' : ''}" data-action="start-chat" data-id="${e(c.id)}">開始聊天</button>
       </div>
       <div class="card-body">
         <h3>${e(c.name)}</h3>
