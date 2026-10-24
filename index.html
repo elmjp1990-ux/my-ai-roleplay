@@ -6234,8 +6234,7 @@ document.addEventListener('click',async event => {
               const {data:row,error}=await client.from('characters')
                 .select('id,visibility,review_status,deleted_at,latest_eligible')
                 .eq('id',characterId).maybeSingle();
-              publicCharacter=!error&&!!row&&row.visibility==='public'&&!row.deleted_at&&
-                (!row.review_status||row.review_status==='approved');
+              publicCharacter=!error&&!!row&&row.visibility==='public'&&!row.deleted_at;
             }
           }catch(error){console.warn('確認群組角色公開狀態失敗，改顯示既有快照。',error);}
         }
