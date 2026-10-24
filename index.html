@@ -433,6 +433,10 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .card-tags .tag{padding:4px 7px;font-size:10px}
 
 /* Chat */
+/* 單人對話使用完整視窗高度，不顯示全站標頭（頁名／測試環境／錢包／帳號）。 */
+body.conversation .app > header { display:none !important; }
+body.conversation main { max-width:none; height:100dvh; padding:0; }
+body.conversation .chat-layout { height:100dvh; }
 body.chat-page main { max-width:none; padding:12px; }
 body.group-chat-page .app > header,body.group-chat-page .mobile-nav { display:none !important; }
 body.group-chat-page .sidebar { display:flex; }
