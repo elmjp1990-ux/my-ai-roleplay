@@ -975,29 +975,18 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   border-color:#7668d966;
   box-shadow:0 12px 32px #00000032,0 0 0 1px #8b7cff12;
 }
-.chat-cta {
-  border-color:#8b7cff66;
-  background:linear-gradient(135deg,#a99bff,#8b7cff);
-  color:#17142a;
-  box-shadow:0 4px 16px #8b7cff26,inset 0 1px #ffffff70;
+.chat-cta,.card-chat {
+  border:1px solid #6256a8;
+  background:linear-gradient(135deg,#30294f 0%,#24243f 58%,#1d263c 100%);
+  color:#f4f3ff;
+  box-shadow:0 5px 16px #05071155,inset 0 1px #ffffff12;
 }
-.chat-cta:hover {
-  background:linear-gradient(135deg,#c0b7ff,#a99bff);
-  border-color:#c0b7ff;
-}
-.card-chat {
-  border-color:#c7bfff65;
-  background:linear-gradient(135deg,#a99bff45,#8b7cff35);
-  color:#fbfaff;
-  box-shadow:0 8px 22px #080b1260,inset 0 1px #ffffff30;
-}
+.chat-cta:hover,.card-chat:hover,
 .card:hover .card-chat,.card:focus-within .card-chat {
-  background:linear-gradient(135deg,#b9afff65,#8b7cff55);
-  border-color:#d4ceff9c;
-}
-.card-chat:hover {
-  background:linear-gradient(135deg,#c7bfff78,#a99bff65);
-  border-color:#e0dcffb0;
+  border-color:#8b7cff;
+  background:linear-gradient(135deg,#403563 0%,#2d2c4b 58%,#26334c 100%);
+  color:#ffffff;
+  box-shadow:0 7px 20px #05071170,inset 0 1px #ffffff18;
 }
 .heart.on { color:var(--px-accent-pink); }
 :where(button,a,input,textarea,select):focus-visible {
