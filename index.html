@@ -4727,6 +4727,7 @@ function renderGroupChatOverlay(kind) {
   if(kind==='settings'||kind==='settings-background'||kind==='delete-confirm'){renderChatSettingsOverlay(panel,true,kind);return;}
   if(kind==='group-info'){
     const group=groupPrototype.active,sceneLabel=id=>group.scenes.find(x=>x.id===id)?.name||'共用場景';
+    const initialScene=(group.scenes||[]).find(x=>Number(x.position||1)===1)||(group.scenes||[])[0];
     const members=group.members.map(m=>{
       const avatar=String(m.avatar_url||m.image||'').trim();
       const image=/^https?:\/\//i.test(avatar)
@@ -4740,7 +4741,7 @@ function renderGroupChatOverlay(kind) {
         '<p class="small muted" style="margin:4px 0 0">'+e(sceneLabel(m.sceneId))+'</p></div></article>';
     }).join('');
     const scenes=(group.scenes||[]).map(x=>'<article class="memory-item"><strong>'+e(x.name||'未命名場景')+'</strong><p style="white-space:pre-wrap">'+e(x.description||'尚未填寫場景描述。')+'</p></article>').join('');
-    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="群組資訊"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h2>群組資訊</h2></div><p><strong>群組名稱：</strong>'+e(group.name||'')+'</p><p><strong>世界背景</strong></p><article class="memory-item" style="white-space:pre-wrap">'+e(group.world||'尚未設定')+'</article><h3>參與角色（'+group.members.length+'/3）</h3>'+members+'<h3>場景設定</h3>'+scenes+'</section>');
+    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="群組資訊"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h2>群組資訊</h2></div><p><strong>群組名稱：</strong>'+e(group.name||'')+'</p><p><strong>初始開場情境</strong></p><article class="memory-item" style="white-space:pre-wrap">'+e(initialScene?.description||'尚未設定初始開場情境')+'</article><h3>參與角色（'+group.members.length+'/3）</h3>'+members+'<h3>場景設定</h3>'+scenes+'</section>');
     return;
   }
   if(kind==='diary'){
@@ -6511,18 +6512,23 @@ document.addEventListener('click',async event => {
         const group=groupPrototype.active;
         if(!group) break;
         const sceneLabel=sceneId=>group.scenes.find(scene=>scene.id===sceneId)?.name||'共用場景';
+        const initialScene=(group.scenes||[]).find(scene=>Number(scene.position||1)===1)||(group.scenes||[])[0];
         const memberRows=group.members.map(member=>{
           const avatar=String(member.avatar_url||'');
           const image=/^https?:\/\//i.test(avatar)
             ? '<img class="avatar" src="'+e(avatar)+'" alt="">'
             : '<span class="avatar avatar-fallback">'+e(String(member.name||'角').slice(0,1))+'</span>';
-          return '<div class="row" style="gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)">'+image+
-            '<div class="grow" style="min-width:0"><strong>'+e(member.name||'角色')+'</strong><div class="small muted">'+e(sceneLabel(member.sceneId))+'</div></div></div>';
+          const characterId=String(member.characterId||member.id||'');
+          const canLink=isUuid(characterId)&&!characterId.startsWith('seed-');
+          const portrait=canLink?'<button type="button" class="ghost group-member-avatar-link" style="padding:0;border-radius:50%" data-action="group-member-detail" data-id="'+e(characterId)+'" aria-label="查看角色 '+e(member.name||'角色')+' 的角色卡">'+image+'</button>':image;
+          const memberName=canLink?'<button type="button" class="ghost" style="padding:0;text-align:left;font-weight:700" data-action="group-member-detail" data-id="'+e(characterId)+'">'+e(member.name||'角色')+'</button>':'<strong>'+e(member.name||'角色')+'</strong>';
+          return '<div class="row" style="gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)">'+portrait+
+            '<div class="grow" style="min-width:0">'+memberName+'<div class="small muted">'+e(sceneLabel(member.sceneId))+'</div></div></div>';
         }).join('');
         const scenes=(group.scenes||[]).map(scene=>'<div class="group-panel" style="padding:10px;margin:8px 0"><strong>'+e(scene.name||'未命名場景')+'</strong>'+
           (scene.description?'<p style="white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0 0">'+e(scene.description)+'</p>':'<p class="small muted" style="margin:6px 0 0">尚未填寫場景描述。</p>')+'</div>').join('');
         showDialog('群組資訊','<div class="stack"><p><strong>群組名稱：</strong>'+e(group.name||'')+'</p>'+
-          '<p><strong>世界背景：</strong></p><div class="group-panel" style="padding:10px;white-space:pre-wrap;overflow-wrap:anywhere">'+e(group.world||'尚未設定')+'</div>'+
+          '<p><strong>初始開場情境：</strong></p><div class="group-panel" style="padding:10px;white-space:pre-wrap;overflow-wrap:anywhere">'+e(initialScene?.description||'尚未設定初始開場情境')+'</div>'+
           '<div><strong>參與角色（'+group.members.length+'/3）</strong>'+memberRows+'</div>'+
           '<div><strong>場景設定</strong>'+scenes+'</div>'+
           '<div><strong>玩家角色</strong><p style="margin:6px 0"><strong>'+e(group.playerName||'玩家')+'</strong></p><div class="group-panel" style="padding:10px;white-space:pre-wrap;overflow-wrap:anywhere">'+e(group.playerPersona||'尚未設定玩家人設。')+'</div></div>'+
