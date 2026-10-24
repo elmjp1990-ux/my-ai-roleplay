@@ -245,6 +245,9 @@ body.day .tag { color:#4f46b8; }
 
 /* Logo / navigation */
 .logo-img { width:132px; height:29px; object-fit:contain; }
+.group-member-avatar-link{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;padding:0;border:0;border-radius:50%;background:transparent;line-height:0}
+.group-member-avatar-link:hover{filter:brightness(1.12)}
+.group-member-avatar-link:focus-visible{outline:2px solid #a5b4fc;outline-offset:3px}
 .sidebar {
   position:fixed;
   inset:0 auto 0 0;
@@ -951,14 +954,14 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 <aside class="sidebar">
   <div class="sidebar-heading">
     <button class="ghost logo-button" data-action="home" aria-label="首頁">
-      <img class="logo-img" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%2240%22 viewBox=%220 0 180 40%22%3E%3Cpath fill=%22%23a5b4fc%22 d=%22M18 4 23 15 34 20 23 25 18 36 13 25 2 20 13 15Z%22/%3E%3Ctext x=%2243%22 y=%2228%22 fill=%22%23a5b4fc%22 font-family=%22Arial,sans-serif%22 font-size=%2225%22 font-weight=%22800%22%3EPersonaX%3C/text%3E%3C/svg%3E" alt="PersonaX">
+      <img class="logo-img" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png" alt="PersonaX">
     </button>
     <button class="ghost" data-action="collapse" aria-label="收合或展開網站選單">☰</button>
   </div>
   <nav id="desktopNav"></nav>
   <div class="sidebar-footer">
     <button class="ghost" data-action="home" aria-label="首頁">
-      <img class="logo-img" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%2240%22 viewBox=%220 0 180 40%22%3E%3Cpath fill=%22%23a5b4fc%22 d=%22M18 4 23 15 34 20 23 25 18 36 13 25 2 20 13 15Z%22/%3E%3Ctext x=%2243%22 y=%2228%22 fill=%22%23a5b4fc%22 font-family=%22Arial,sans-serif%22 font-size=%2225%22 font-weight=%22800%22%3EPersonaX%3C/text%3E%3C/svg%3E" alt="PersonaX">
+      <img class="logo-img" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png" alt="PersonaX">
     </button>
   </div>
 </aside>
@@ -967,7 +970,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   <header>
     <div class="row">
       <button class="ghost mobile-logo" data-action="home" aria-label="首頁">
-        <img class="logo-img" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%2240%22 viewBox=%220 0 180 40%22%3E%3Cpath fill=%22%23a5b4fc%22 d=%22M18 4 23 15 34 20 23 25 18 36 13 25 2 20 13 15Z%22/%3E%3Ctext x=%2243%22 y=%2228%22 fill=%22%23a5b4fc%22 font-family=%22Arial,sans-serif%22 font-size=%2225%22 font-weight=%22800%22%3EPersonaX%3C/text%3E%3C/svg%3E" alt="PersonaX">
+        <img class="logo-img" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png" alt="PersonaX">
       </button>
       <strong class="desktop-title" id="pageTitle"></strong>
     </div>
@@ -4198,10 +4201,15 @@ function renderGroupConversation() {
   if(!group) return;
   const avatarURL=value=>{const url=String(value||'').trim();return (/^https?:\/\//i.test(url)||/^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(url))?url:'';};
   const memberAvatars=group.members.map(m=>{
-    const avatar=avatarURL(m.avatar_url);
-    return '<span class="character-avatar-status" title="'+e(m.name||'角色')+'">'+
+    const avatar=avatarURL(m.avatar_url||m.image||m.characterSnapshot?.avatar_url||m.characterSnapshot?.image);
+    const characterId=String(m.characterId||m.id||'');
+    const canLink=isUuid(characterId)&&!characterId.startsWith('seed-');
+    const portrait='<span class="character-avatar-status" title="'+e(m.name||'角色')+'">'+
       (avatar?'<img class="avatar" src="'+e(avatar)+'" alt="">':'<span class="group-list-avatar">'+e(String(m.name||'角').trim().slice(0,1)||'角')+'</span>')+
       '</span>';
+    return canLink
+      ? '<button type="button" class="group-member-avatar-link" data-action="group-member-detail" data-id="'+e(characterId)+'" aria-label="查看角色 '+e(m.name||'角色')+' 的角色卡" title="查看 '+e(m.name||'角色')+' 的角色卡">'+portrait+'</button>'
+      : portrait;
   }).join('');
   const roleplayRoles=group.members.map(member=>({
     id:member.characterId || member.id,
