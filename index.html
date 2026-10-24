@@ -935,6 +935,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 .group-chat-entry{width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer;border:0;background:transparent;}
 .group-chat-entry .select-chat{display:block;min-width:0;flex:1;}
 .group-chat-entry:focus-visible{outline:2px solid var(--accent,#7c6cf2);outline-offset:2px;}
+.inline-help{display:inline-flex;position:relative;vertical-align:middle;margin-left:5px;font-size:12px}.inline-help summary{display:inline-grid;place-items:center;width:17px;height:17px;border:1px solid currentColor;border-radius:50%;cursor:pointer;list-style:none}.inline-help summary::-webkit-details-marker{display:none}.inline-help>span{position:absolute;z-index:30;left:22px;top:-6px;width:min(260px,70vw);padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--panel);box-shadow:0 8px 24px #0003;font-weight:400;line-height:1.5}.char-counter{display:block;font-variant-numeric:tabular-nums}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -5911,7 +5912,7 @@ function refreshExploreTagPicker() {
   selectedArea.innerHTML=chosen.map(item=>`<button type="button" class="tag-picker-chip selected" data-action="toggle-explore-tag" data-tag="${e(item.value)}" aria-label="取消選擇 ${e(item.value)}">${e(item.value)} ×</button>`).join('') || '<span class="small muted">尚未選擇標籤</span>';
 }
 function updateCharacterCounters(root=document) {
-  root.querySelectorAll('[data-count-for]').forEach(counter => {
+  root.querySelectorAll('.char-counter[data-count-for]').forEach(counter => {
     const name=counter.dataset.countFor;
     const field=name==='groupSceneDesc0' ? root.querySelector('#groupSceneDesc0') : root.querySelector('[name="'+name+'"]');
     if(!field) return;
