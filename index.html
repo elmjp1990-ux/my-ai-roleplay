@@ -4851,7 +4851,7 @@ function groupReadStep() {
     g.draft.worldCharacterId=$('view').querySelector('input[name="groupWorldCharacter"]:checked')?.value||members[0]?.id||'';
     const worldCharacter=members.find(c=>c.id===g.draft.worldCharacterId);
     g.draft.world=String(worldCharacter?.worldBackground||worldCharacter?.world||worldCharacter?.intro||'').slice(0,10000);
-    g.draft.scenes=[{name:$('groupSceneName0')?.value.trim()||'',description:$('groupSceneDesc0')?.value||''}];
+    g.draft.scenes=[{name:$('groupSceneName0')?.value.trim()||'初始相遇',description:$('groupSceneDesc0')?.value||''}];
     if(!g.draft.name||g.draft.name.length>25) return '群組名稱需為 1–25 字。';
     if(!g.draft.playerName||g.draft.playerName.length>80) return '請填寫 1–80 字的玩家角色名稱。';
     if(g.draft.playerPersona.length>3000) return '玩家人設不可超過 3000 字。';
