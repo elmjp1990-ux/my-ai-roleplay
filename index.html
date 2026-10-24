@@ -1812,10 +1812,22 @@ const countChars = value => [...String(value)].length;
 const timeText = value => new Date(value).toLocaleString('zh-TW');
 const clone = value => JSON.parse(JSON.stringify(value));
 
+function currentUserCanViewNsfw() {
+  const birthdate = String(state.account?.birthdate || '');
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(birthdate)) return false;
+  const today = new Date();
+  const cutoff = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
+  const cutoffDate = cutoff.getFullYear() + '-' + String(cutoff.getMonth()+1).padStart(2,'0') + '-' + String(cutoff.getDate()).padStart(2,'0');
+  return birthdate <= cutoffDate;
+}
+function canViewCharacterNsfw(character) {
+  return character?.isNSFW !== true || currentUserCanViewNsfw();
+}
 function availableExploreTags() {
   const tags = new Set();
   for (const character of (state.characters || [])) {
-    if (character.visibility !== 'public' || character.deletedAt ||
+    if (!canViewCharacterNsfw(character) ||
+        character.visibility !== 'public' || character.deletedAt ||
         character.cloudPublic === false || character.localOnly === true ||
         String(character.id || '').startsWith('seed-')) continue;
     for (const rawTag of (Array.isArray(character.tags) ? character.tags : [])) {
@@ -2937,6 +2949,7 @@ setInterval(() => {
 function exploreList() {
   // 探索頁只顯示正式雲端公開角色；內建 seed 展示資料與未同步的本機測試角色不在公開版面出現。
   let list = state.characters.filter(c =>
+    canViewCharacterNsfw(c) &&
     c.visibility === 'public' &&
     !String(c.id).startsWith('seed-') &&
     c.cloudPublic !== false &&
@@ -3051,7 +3064,7 @@ function renderGrid() {
 
 /* Detail, author and comments */
 function accessible(c) {
-  return !!c && !c.deletedAt && (c.visibility === 'public' ||
+  return !!c && canViewCharacterNsfw(c) && !c.deletedAt && (c.visibility === 'public' ||
     currentUser()?.uid === c.authorId);
 }
 function characterIsOffline(c) {
