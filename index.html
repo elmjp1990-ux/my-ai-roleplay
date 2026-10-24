@@ -4534,7 +4534,7 @@ function renderGroupStatusShell({title,message,error=false,groupId=''}) {
     : '';
   $('view').innerHTML='<div class="chat-layout '+(hideList?'hide-list':'')+'">'+chatListHTML()+
     '<section class="panel chat-main"><div class="chat-heading"><div class="row between">'+
-    '<div class="row grow" style="gap:8px;min-width:0">'+chatSidebarToggleButton('group-return-list')+'+
+    '<div class="row grow" style="gap:8px;min-width:0">'+chatSidebarToggleButton('group-return-list')+
     '<div class="grow" style="min-width:0"><div class="chat-name ellipsis">'+e(title||'群組聊天')+'</div><div class="small muted">群組對話</div></div></div></div></div>'+
     '<div class="messages"><div class="'+(error?'group-alert':'empty')+'" role="'+(error?'alert':'status')+'" aria-live="polite">'+safeMessage+'</div>'+
     (actions?'<div class="row wrap" style="padding:12px">'+actions+'</div>':'')+'</div>'+
