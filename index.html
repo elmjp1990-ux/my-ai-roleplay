@@ -4822,7 +4822,7 @@ function renderGroupPrototype() {
       '<div class="group-panel" style="padding:12px;margin-bottom:16px"><div class="row" style="gap:8px;align-items:center">'+avatarPieces+'</div><p class="muted small" style="margin:8px 0 0">群組頭像依照已選角色組合顯示，現階段不可自行更換。</p></div>'+
       '<label class="group-field"><span>群組名稱（最多 25 字）</span><input id="groupNameInput" maxlength="25" value="'+e(nameValue)+'" placeholder="輸入群組名稱"></label>'+
       '<label class="group-field"><span>玩家角色名稱（提供給 AI）</span><input id="groupPlayerName" maxlength="80" value="'+e(g.draft.playerName||state.account?.nickname||"玩家")+'" placeholder="你的角色名稱"></label>'+
-      '<label class="group-field"><span>玩家角色與人設</span><select id="groupPersonaPreset"><option value="">選擇 USER 人設管理中的人設（可再自行編輯）</option>'+((Array.isArray(currentUser()?.personas)?currentUser().personas:[]).map(p=>'<option value="'+e(p.id)+'" '+((g.draft.personaPresetId===p.id)?'selected':'')+'>'+e(p.name)+(p.isDefault?'（預設）':'')+'</option>').join(''))+'</select><textarea id="groupPlayerPersona" maxlength="3000" placeholder="描述你在這個故事中的身分、個性、背景與說話方式。">'+e(g.draft.playerPersona||state.account?.bio||'')+'</textarea><small class="muted">可選擇已保存的人設，套用後仍可在此編輯；不會修改原本人設。</small></label>'+
+      '<div class="group-field"><span>玩家角色與人設</span><button type="button" data-action="group-persona-choose" style="width:100%;text-align:left;margin-bottom:8px">'+e(g.draft.personaPresetName||'從聊天室「人設管理」選擇人設')+'</button><textarea id="groupPlayerPersona" maxlength="3000" placeholder="描述你在這個故事中的身分、個性、背景與說話方式。">'+e(g.draft.playerPersona||state.account?.bio||'')+'</textarea><small class="muted">選擇後會帶入人設內容，仍可在此編輯；不會修改原本人設。</small></div>'+
       '<div class="group-field"><span>選擇哪位角色的世界觀作為整體背景？</span><div class="group-character-grid">'+worldChoices+'</div></div>'+
       '<div class="group-field"><span>背景參考</span><div class="group-alert" id="groupWorldReference">'+e((members.find(c=>c.id===worldId)?.worldBackground||members.find(c=>c.id===worldId)?.world||members.find(c=>c.id===worldId)?.intro)||'所選角色目前沒有可用的公開介紹；可先繼續建立，後續再完善世界觀資料。')+'</div></div>'+
       groupRenderScenes()+
@@ -5870,6 +5870,11 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
     case 'persona-picker': {
       const personas=Array.isArray(currentUser()?.personas)?currentUser().personas:[];
       showDialog('選擇其他人設',`<div class="stack"><p class="small muted">選擇後會帶入目前聊天的人設編輯框，按「儲存」才會套用到這個聊天，不會修改其他聊天。</p><button type="button" data-action="personas">人設管理／新增人設</button><div class="ledger-scroll" style="max-height:min(50dvh,420px)">${personas.slice().sort((a,b)=>Number(!!b.isDefault)-Number(!!a.isDefault)).map(p=>`<button type="button" data-action="persona-select" data-id="${e(p.id)}" style="display:block;width:100%;text-align:left;margin:6px 0;padding:12px;border:${p.isDefault?'1px dashed var(--primary)':'1px solid var(--border)'};border-radius:10px"><strong>${e(p.name)}</strong>${p.isDefault?'<span class="small" style="display:block;color:var(--primary)">預設人設</span>':''}<span class="small muted" style="display:block;white-space:pre-wrap;margin-top:5px">${e(p.text)}</span></button>`).join('')||'<div class="empty">目前沒有儲存的人設，請先新增。</div>'}</div></div>`);
+      break;
+    }
+    case 'group-persona-picker': {
+      const personas=Array.isArray(currentUser()?.personas)?currentUser().personas:[];
+      showDialog('選擇群組人設',`<div class="stack"><p class="small muted">選擇後會帶入群組建立表單，仍可編輯，不會修改原本人設。</p><button type="button" data-action="personas">人設管理／新增人設</button><div class="ledger-scroll" style="max-height:min(50dvh,420px)">${personas.slice().sort((a,b)=>Number(!!b.isDefault)-Number(!!a.isDefault)).map(p=>`<button type="button" data-action="group-persona-select" data-id="${e(p.id)}" style="display:block;width:100%;text-align:left;margin:6px 0;padding:12px;border:${p.isDefault?'1px dashed var(--primary)':'1px solid var(--border)'};border-radius:10px"><strong>${e(p.name)}</strong>${p.isDefault?'<span class="small" style="display:block;color:var(--primary)">預設人設</span>':''}<span class="small muted" style="display:block;white-space:pre-wrap;margin-top:5px">${e(p.text)}</span></button>`).join('')||'<div class="empty">目前沒有儲存的人設，請先新增。</div>'}</div></div>`);
       break;
     }
     case 'persona':
@@ -7302,6 +7307,16 @@ document.addEventListener('click',async event => {
       case 'birthdate':openModal('birthdate');break;
       case 'persona-edit':openModal('personas',{editId:key});break;
       case 'persona-choose':openModal('persona-picker');break;
+      case 'group-persona-choose':openModal('group-persona-picker');break;
+      case 'group-persona-select': {
+        const selected=(Array.isArray(currentUser()?.personas)?currentUser().personas:[]).find(item=>String(item.id)===String(key));
+        if(!selected){toast('找不到這組人設，請重新整理。');break;}
+        groupPrototype.draft.personaPresetId=selected.id;
+        groupPrototype.draft.personaPresetName=selected.name;
+        groupPrototype.draft.playerPersona=String(selected.text||'');
+        const nextRoute={...route};delete nextRoute.overlay;go(nextRoute,true);render();
+        break;
+      }
       case 'persona-select': {
         const selected=(Array.isArray(currentUser()?.personas)?currentUser().personas:[]).find(item=>item.id===key);
         if(!selected) { toast('找不到這組人設，請重新整理。'); break; }
@@ -7587,19 +7602,19 @@ document.addEventListener('submit',async event => {
         } else {
           try { draftTags=validateCharacterTags(chosen); }
           catch (error) { return toast(error.message); }
-          if (route.page==='editor') {
-            const live=$('view').querySelector('form[data-form="character"]');
-            if (live) {
-              const values=new FormData(live);
-              draftCharacter={
-                ...(draftCharacter || {}),
-                ...Object.fromEntries(values),
-                image:draftImage,tags:draftTags
-              };
-            }
+          const live=$('view').querySelector('form[data-form="character"]');
+          if (live) {
+            const values=new FormData(live);
+            draftCharacter={
+              ...(draftCharacter || {}),
+              ...Object.fromEntries(values),
+              image:draftImage,tags:[...draftTags]
+            };
           }
         }
-        back();break;
+        // Close picker deterministically so the old draft cannot overwrite selected tags.
+        { const returnRoute={...route}; delete returnRoute.overlay; go(returnRoute,true); render(); }
+        break;
       }
       case 'delete-character': {
         if (String(f.get('confirm'))!=='Delete') return toast('請輸入「Delete」。');
@@ -8076,7 +8091,18 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
     }
   } finally {
     form.dataset.submitting = 'false';
-    if (submitButton?.isConnected) { submitButton.disabled = false; submitButton.textContent = originalButtonText; }
+    if (submitButton?.isConnected) {
+      submitButton.disabled = false;
+      if (type === 'message' && submitButton.classList.contains('composer-send')) {
+        // SVG icons have no textContent; restore the actual send icon explicitly.
+        submitButton.innerHTML = ICON.send;
+        submitButton.setAttribute('aria-label','送出或接續回應');
+        submitButton.title = '送出';
+        submitButton.classList.remove('is-sending');
+      } else {
+        submitButton.textContent = originalButtonText;
+      }
+    }
   }
 });
 
@@ -8789,15 +8815,7 @@ document.addEventListener('submit',function(event){
 
 
 <script id="poyozz-group-persona-preset">
-document.addEventListener('change',function(event){
-  const select=event.target;
-  if(!(select instanceof HTMLSelectElement)||select.id!=='groupPersonaPreset')return;
-  const persona=(Array.isArray(currentUser()?.personas)?currentUser().personas:[]).find(item=>String(item.id)===String(select.value));
-  const textarea=document.getElementById('groupPlayerPersona');
-  if(!textarea)return;
-  if(persona){textarea.value=String(persona.text||'');groupPrototype.draft.personaPresetId=persona.id;groupPrototype.draft.playerPersona=textarea.value;}
-  else {groupPrototype.draft.personaPresetId='';}
-});
+// Group persona selection uses the same saved-persona list as the chat's persona management UI.
 </script>
 </body>
 </html>
