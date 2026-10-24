@@ -996,6 +996,85 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 @media (prefers-reduced-motion: reduce) {
   .card { transition:none; }
 }
+
+/* POYOZZ premium immersive system: carry the approved palette across all screens. */
+:root {
+  --px-surface-raised:#1a2235;
+  --px-surface-hover:#202a41;
+  --px-button-start:#30294f;
+  --px-button-end:#24243f;
+  --px-button-hover-start:#403563;
+  --px-button-hover-end:#26334c;
+}
+.primary {
+  color:#f4f3ff;
+  border:1px solid #6256a8;
+  background:linear-gradient(135deg,var(--px-button-start),var(--px-button-end));
+  box-shadow:0 4px 14px #05071135,inset 0 1px #ffffff10;
+}
+.primary:hover:not(:disabled) {
+  background:linear-gradient(135deg,var(--px-button-hover-start),var(--px-button-hover-end));
+  border-color:#8b7cff;
+  filter:none;
+}
+button:not(.ghost):not(.primary):not(.danger):not(.card-chat):not(.chat-cta):hover:not(:disabled) {
+  background-color:var(--px-surface-hover);
+  border-color:#465071;
+}
+.panel,.suggestions-panel {
+  background:linear-gradient(180deg,#151c2d 0%,#111827 100%);
+  border-color:var(--border);
+  box-shadow:0 8px 26px #00000018;
+}
+.tabs .tab[aria-selected="true"],.tabs .tab.active,
+.nav-btn.active,.nav-btn[aria-current="page"] {
+  color:#e4dfff;
+  background:linear-gradient(135deg,#30294f88,#24243f88);
+  border-color:#6256a8;
+}
+.tab:hover,.nav-btn:hover {
+  color:var(--text);
+  background-color:#202a41;
+}
+.chat-list,.chat-list-head,.chat-overlay {
+  background-color:var(--panel);
+}
+.chat-brand-mark,.group-list-avatar,.group-avatar-fallback {
+  background:linear-gradient(135deg,#6256a8,#30294f);
+  color:#f4f3ff;
+  box-shadow:0 4px 14px #080b1260;
+}
+.chat-list-icon,.chat-top-action,.composer-icon-button {
+  background:linear-gradient(145deg,#1b2440,#151c2d);
+  border-color:#303b54;
+}
+.chat-list-icon:hover,.chat-top-action:hover,.composer-icon-button:hover {
+  background:linear-gradient(145deg,#30294f,#202a41);
+  border-color:#6256a8;
+}
+input:focus,textarea:focus,select:focus {
+  border-color:#7668d9;
+  box-shadow:0 0 0 3px #8b7cff18;
+}
+:where(button,a,input,textarea,select):focus-visible {
+  outline-color:#a99bff;
+}
+.modal-heading,.modal-content {
+  color:var(--text);
+}
+body:not(.day) .modal,body:not(.day) dialog {
+  background:var(--panel);
+  color:var(--text);
+  border-color:var(--border);
+}
+body:not(.day) .chat-entry:hover,body:not(.day) .chat-entry.active {
+  background:#202a41;
+  border-color:#35415d;
+}
+body:not(.day) .chat-entry.active {
+  box-shadow:inset 3px 0 #8b7cff;
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
