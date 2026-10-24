@@ -1530,6 +1530,18 @@ async function hydrateCharacterVideo(video){
   video.dataset.videoHydrated='true';
   const {data,error}=await window.mySupabase.storage.from('character-avatar-videos').createSignedUrl(path,300);
   if(error||!data?.signedUrl||!video.isConnected){video.dataset.videoHydrated='false';console.warn('角色影片載入失敗',error);return;}
+  video.controls=false;
+  video.removeAttribute('controls');
+  video.muted=true;
+  video.defaultMuted=true;
+  video.volume=0;
+  // 卡片影片固定靜音，不提供播放控制或解除靜音入口。
+  if(video.dataset.muteLock!=='true'){
+    video.dataset.muteLock='true';
+    video.addEventListener('volumechange',()=>{
+      if(!video.muted||video.volume!==0){video.muted=true;video.volume=0;}
+    });
+  }
   video.src=data.signedUrl;video.load();
   if(video.hasAttribute('autoplay'))video.play().catch(()=>{});
 }
@@ -7222,7 +7234,7 @@ document.addEventListener('click',async event => {
 });
 
 /* Form submissions */
-const DEFAULT_NSFW_TERMS=['18禁','成人內容','色情','情色','露骨性','性描寫','性器官','性交','做愛','口交','肛交','自慰','手淫','高潮','裸露','裸體','乳房','陰莖','陰道','性奴','性侵','強姦','亂倫','NSFW'];
+const DEFAULT_NSFW_TERMS=['18禁','成人','成人內容','成人向','成人情節','性愛','性行為','性暗示','性幻想','性器','性器官','性描寫','露骨','露骨性','情色','色情','色情內容','性交','做愛','約炮','口交','肛交','自慰','手淫','高潮','裸露','裸身','裸體','全裸','露點','乳房','乳頭','陰莖','陰道','性奴','性侵','強姦','亂倫','猥褻','淫亂','NSFW'];
 let cachedNsfwTerms=null;
 async function loadNsfwTerms(){
   if(cachedNsfwTerms)return cachedNsfwTerms;
@@ -7243,8 +7255,11 @@ async function loadNsfwTerms(){
   return cachedNsfwTerms;
 }
 function findNsfwTerms(character,terms){
-  const text=[character.name,character.intro,character.opening,character.privateInfo,character.style].filter(Boolean).join('\n').normalize('NFKC').toLocaleLowerCase('zh-Hant');
-  return terms.filter(term=>text.includes(String(term).normalize('NFKC').toLocaleLowerCase('zh-Hant')));
+  const normalize=value=>String(value||'').normalize('NFKC').toLocaleLowerCase('zh-Hant');
+  // 移除中英文字間常見空白與標點的影響，避免「成 人」「性-描寫」等寫法繞過基本字串偵測。
+  const text=normalize([character.name,character.intro,character.opening,character.privateInfo,character.style].filter(Boolean).join('\n'))
+    .replace(/[\s\p{P}\p{S}]+/gu,'');
+  return [...new Set(terms.map(normalize).filter(Boolean))].filter(term=>text.includes(term.replace(/[\s\p{P}\p{S}]+/gu,'')));
 }
 function focusNsfwCheckbox(){
   const input=$('view')?.querySelector('input[name="isNSFW"]');
