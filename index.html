@@ -7610,6 +7610,8 @@ document.addEventListener('submit',async event => {
               ...Object.fromEntries(values),
               image:draftImage,tags:[...draftTags]
             };
+            // Persist the selected tags before renderEditor merges the saved draft back in.
+            saveEditorDraft();
           }
         }
         // Close picker deterministically so the old draft cannot overwrite selected tags.
