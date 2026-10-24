@@ -434,8 +434,11 @@ main { max-width:1500px; margin:auto; padding:25px; }
 
 /* Chat */
 body.chat-page main { max-width:none; padding:12px; }
-body.group-chat-page .sidebar,body.group-chat-page .app > header,body.group-chat-page .mobile-nav { display:none !important; }
-body.group-chat-page .app { margin-left:0; }
+body.group-chat-page .app > header,body.group-chat-page .mobile-nav { display:none !important; }
+body.group-chat-page .sidebar { display:flex; }
+body.group-chat-page .app { margin-left:var(--sidebar); }
+body.group-chat-page:has(.group-wizard) .sidebar { display:none !important; }
+body.group-chat-page:has(.group-wizard) .app { margin-left:0; }
 body.group-chat-page main { max-width:none; height:100dvh; min-height:0; padding:0; overflow:hidden; }
 body.group-chat-page .chat-layout { height:100dvh; }
 body.group-chat-page .chat-main { height:100%; border:0; border-radius:0; }
