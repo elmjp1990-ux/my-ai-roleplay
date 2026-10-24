@@ -1527,21 +1527,21 @@ const ids = (rows || []).map(row => row.id);
 async function hydrateCharacterVideo(video){
   const path=video?.dataset?.characterVideo;
   if(!path||!window.mySupabase||video.dataset.videoHydrated==='true')return;
-  video.dataset.videoHydrated='true';
-  const {data,error}=await window.mySupabase.storage.from('character-avatar-videos').createSignedUrl(path,300);
-  if(error||!data?.signedUrl||!video.isConnected){video.dataset.videoHydrated='false';console.warn('角色影片載入失敗',error);return;}
+  // 所有角色影片（卡片與詳情頁）都固定靜音，並移除原生控制列。
   video.controls=false;
   video.removeAttribute('controls');
   video.muted=true;
   video.defaultMuted=true;
   video.volume=0;
-  // 卡片影片固定靜音，不提供播放控制或解除靜音入口。
   if(video.dataset.muteLock!=='true'){
     video.dataset.muteLock='true';
     video.addEventListener('volumechange',()=>{
       if(!video.muted||video.volume!==0){video.muted=true;video.volume=0;}
     });
   }
+  video.dataset.videoHydrated='true';
+  const {data,error}=await window.mySupabase.storage.from('character-avatar-videos').createSignedUrl(path,300);
+  if(error||!data?.signedUrl||!video.isConnected){video.dataset.videoHydrated='false';console.warn('角色影片載入失敗',error);return;}
   video.src=data.signedUrl;video.load();
   if(video.hasAttribute('autoplay'))video.play().catch(()=>{});
 }
@@ -3078,7 +3078,7 @@ function renderDetail() {
       ${offline ? '<div class="character-status-banner">● 此角色目前離線或已下架。你仍可查看這段既有聊天所保留的角色簡介與開場白，但不能開啟新對話。</div>' : ''}
       <div class="detail-layout">
         <div class="detail-portrait">
-${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline-image' : ''}" data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline controls aria-label="${e(c.name)} 的角色影片"></video>` : `<img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" alt="${e(c.name)}">`}
+${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline-image' : ''}" data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline aria-label="${e(c.name)} 的角色影片"></video>` : `<img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" alt="${e(c.name)}">`}
           <div class="detail-portrait-meta">
             <h1>${e(c.name)}</h1>
             <button class="author-link" data-action="author" data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>
@@ -7349,7 +7349,7 @@ document.addEventListener('submit',async event => {
         const nsfwCandidate={name,intro,opening,privateInfo:String(f.get('privateInfo')||''),style:String(f.get('style')||'')};
         const matchedTerms=findNsfwTerms(nsfwCandidate,await loadNsfwTerms());
         if(matchedTerms.length&&f.get('isNSFW')!=='on'){
-          showDialog('請確認角色的 NSFW 分級','<p>系統在角色內容中偵測到可能屬於成人／敏感內容的限制詞：</p><p><strong>'+e(matchedTerms.slice(0,8).join('、'))+'</strong></p><p>若內容確實涉及成人或露骨描寫，請勾選「此角色含成人／敏感內容（NSFW，僅限 18 歲以上使用者）」。若為一般語境或誤判，請修改內容後再儲存。</p><div class="row" style="justify-content:flex-end;margin-top:14px"><button type="button" data-action="nsfw-focus">返回勾選 NSFW</button><button type="button" data-action="dialog-close">我先修改內容</button></div>');
+          showDialog('請確認角色的 NSFW 分級','<p>系統在角色內容中偵測到可能屬於成人／敏感內容</p><p>若內容確實涉及成人或露骨描寫，請勾選「此角色含成人／敏感內容（NSFW，僅限 18 歲以上使用者）」。若為一般語境或誤判，請修改內容後再儲存。</p><div class="row" style="justify-content:flex-end;margin-top:14px"><button type="button" data-action="nsfw-focus">返回勾選 NSFW</button><button type="button" data-action="dialog-close">我先修改內容</button></div>');
           return;
         }
         const old=state.characters.find(c=>c.id===route.id);
