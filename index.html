@@ -4497,7 +4497,18 @@ function renderGroupChatOverlay(kind) {
   if(kind==='settings'||kind==='settings-background'||kind==='delete-confirm'){renderChatSettingsOverlay(panel,true,kind);return;}
   if(kind==='group-info'){
     const group=groupPrototype.active,sceneLabel=id=>group.scenes.find(x=>x.id===id)?.name||'共用場景';
-    const members=group.members.map(m=>'<article class="memory-item"><strong>'+e(m.name||'角色')+'</strong><p class="small muted">'+e(sceneLabel(m.sceneId))+'</p></article>').join('');
+    const members=group.members.map(m=>{
+      const avatar=String(m.avatar_url||m.image||'').trim();
+      const image=/^https?:\\/\\//i.test(avatar)
+        ? '<img class="avatar" style="width:44px;height:44px" src="'+e(avatar)+'" alt="">'
+        : '<span class="avatar avatar-fallback" style="width:44px;height:44px">'+e(String(m.name||'角').trim().slice(0,1)||'角')+'</span>';
+      const characterId=String(m.characterId||m.id||'');
+      const canLink=isUuid(characterId)&&!String(characterId).startsWith('seed-');
+      return '<article class="memory-item" style="display:flex;align-items:center;gap:12px">'+
+        (canLink?'<button type="button" class="ghost" style="padding:0;border-radius:50%" data-action="group-member-detail" data-id="'+e(characterId)+'" aria-label="查看角色 '+e(m.name||'角色')+' 的公開角色卡">'+image+'</button>':image)+
+        '<div class="grow" style="min-width:0">'+(canLink?'<button type="button" class="ghost" style="padding:0;text-align:left;font-weight:700" data-action="group-member-detail" data-id="'+e(characterId)+'">'+e(m.name||'角色')+'</button>':'<strong>'+e(m.name||'角色')+'</strong>')+
+        '<p class="small muted" style="margin:4px 0 0">'+e(sceneLabel(m.sceneId))+'</p></div></article>';
+    }).join('');
     const scenes=(group.scenes||[]).map(x=>'<article class="memory-item"><strong>'+e(x.name||'未命名場景')+'</strong><p style="white-space:pre-wrap">'+e(x.description||'尚未填寫場景描述。')+'</p></article>').join('');
     panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="群組資訊"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h2>群組資訊</h2></div><p><strong>群組名稱：</strong>'+e(group.name||'')+'</p><p><strong>世界背景</strong></p><article class="memory-item" style="white-space:pre-wrap">'+e(group.world||'尚未設定')+'</article><h3>參與角色（'+group.members.length+'/3）</h3>'+members+'<h3>場景設定</h3>'+scenes+'</section>');
     return;
@@ -6209,6 +6220,29 @@ document.addEventListener('click',async event => {
         break;
       }
       case 'group-return-list':hideList=false;groupPrototype.active=null;go({page:'chat'});break;
+      case 'group-member-detail': {
+        const characterId=key;
+        const client=window.mySupabase;
+        if(!isUuid(characterId)||!client){toast('目前無法確認角色的公開狀態，請稍後再試。');break;}
+        const {data:{user},error:authError}=await client.auth.getUser();
+        if(authError||!user||user.id!==currentUser()?.uid){toast('登入狀態已失效，請重新登入。');break;}
+        const {data:row,error}=await client.from('characters')
+          .select('id,visibility,review_status,deleted_at,latest_eligible')
+          .eq('id',characterId).maybeSingle();
+        if(error||!row||row.visibility!=='public'||row.deleted_at||
+           (row.review_status&&row.review_status!=='approved')||row.latest_eligible===false){
+          toast('此角色目前為私密、已刪除或未公開，無法開啟角色卡。');
+          break;
+        }
+        await loadPublicSupabaseCharacters();
+        const character=state.characters.find(item=>String(item.id)===characterId);
+        if(!character||!accessible(character)||character.visibility!=='public'){
+          toast('目前無法確認此角色可公開瀏覽，已阻止開啟。');
+          break;
+        }
+        visit('detail',characterId);
+        break;
+      }
       case 'group-info': {
         const group=groupPrototype.active;
         if(!group) break;
