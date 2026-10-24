@@ -2013,7 +2013,7 @@ const currentSession = () => state.sessions[route.id] || null;
 const currentCharacter = () => state.characters.find(c => c.id === route.id);
 function sessionCharacter(s) {
   if (!s) return null;
-  const found = state.characters.find(c => c.id === s.characterId);
+  const found = s.forceCloudSnapshot ? null : state.characters.find(c => c.id === s.characterId);
   if (found) return found;
   const snap = s.cloudCharacterSnapshot;
   if (!snap || snap.id !== s.characterId) return null;
@@ -6222,25 +6222,59 @@ document.addEventListener('click',async event => {
       case 'group-return-list':hideList=false;groupPrototype.active=null;go({page:'chat'});break;
       case 'group-member-detail': {
         const characterId=key;
+        const group=groupPrototype.active;
+        const member=group?.members?.find(item=>String(item.characterId||item.id||'')===characterId);
+        if(!isUuid(characterId)||!member){toast('找不到這個群組成員的既有角色資料。');break;}
         const client=window.mySupabase;
-        if(!isUuid(characterId)||!client){toast('目前無法確認角色的公開狀態，請稍後再試。');break;}
-        const {data:{user},error:authError}=await client.auth.getUser();
-        if(authError||!user||user.id!==currentUser()?.uid){toast('登入狀態已失效，請重新登入。');break;}
-        const {data:row,error}=await client.from('characters')
-          .select('id,visibility,review_status,deleted_at,latest_eligible')
-          .eq('id',characterId).maybeSingle();
-        if(error||!row||row.visibility!=='public'||row.deleted_at||
-           (row.review_status&&row.review_status!=='approved')||row.latest_eligible===false){
-          toast('此角色目前為私密、已刪除或未公開，無法開啟角色卡。');
-          break;
+        let publicCharacter=false;
+        if(client&&currentUser()?.uid){
+          try{
+            const {data:{user},error:authError}=await client.auth.getUser();
+            if(!authError&&user&&user.id===currentUser().uid){
+              const {data:row,error}=await client.from('characters')
+                .select('id,visibility,review_status,deleted_at,latest_eligible')
+                .eq('id',characterId).maybeSingle();
+              publicCharacter=!error&&!!row&&row.visibility==='public'&&!row.deleted_at&&
+                (!row.review_status||row.review_status==='approved')&&row.latest_eligible!==false;
+            }
+          }catch(error){console.warn('確認群組角色公開狀態失敗，改顯示既有快照。',error);}
         }
-        await loadPublicSupabaseCharacters();
-        const character=state.characters.find(item=>String(item.id)===characterId);
-        if(!character||!accessible(character)||character.visibility!=='public'){
-          toast('目前無法確認此角色可公開瀏覽，已阻止開啟。');
-          break;
+        if(publicCharacter){
+          await loadPublicSupabaseCharacters();
+          const character=state.characters.find(item=>String(item.id)===characterId);
+          if(character&&accessible(character)&&character.visibility==='public'){
+            visit('detail',characterId);
+            break;
+          }
         }
-        visit('detail',characterId);
+        // 角色私密、刪除或目前無法公開讀取時，僅顯示群組建立時保存的角色快照。
+        // 僅白名單欄位可進入既有單人離線角色卡呈現，避免攜帶隱藏設定。
+        const source=member.characterSnapshot&&typeof member.characterSnapshot==='object'
+          ? member.characterSnapshot : member;
+        const snapshot={
+          id:characterId,
+          name:String(source.name||member.name||'角色'),
+          image:String(source.image||source.avatar_url||member.avatar_url||''),
+          avatar_url:String(source.avatar_url||member.avatar_url||''),
+          gender:String(source.gender||'ambiguous'),
+          age:source.age??'',
+          intro:String(source.intro||''),
+          opening:String(source.opening||''),
+          race:String(source.race||''),
+          style:String(source.style||''),
+          tags:Array.isArray(source.tags)?source.tags:[],
+          authorId:String(source.authorId||source.author_id||''),
+          visibility:'private',
+          deletedAt:source.deletedAt||source.deleted_at||'offline',
+          firstPublishedAt:source.firstPublishedAt||source.first_published_at||null
+        };
+        const snapshotSessionId='group-offline-snapshot-'+characterId;
+        state.sessions[snapshotSessionId]={
+          id:snapshotSessionId,characterId,characterName:snapshot.name,
+          cloudCharacterSnapshot:snapshot,forceCloudSnapshot:true,
+          messages:[],memories:[],album:[],startedAt:Date.now()
+        };
+        go({page:'session-detail',id:snapshotSessionId});
         break;
       }
       case 'group-info': {
