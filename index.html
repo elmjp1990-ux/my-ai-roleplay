@@ -7483,7 +7483,7 @@ document.addEventListener('submit',async event => {
   form.dataset.submitting = 'true';
   const submitButton = event.submitter || form.querySelector('button[type="submit"], button:not([type])');
   const originalButtonText = submitButton?.textContent || '';
-  if (submitButton) { submitButton.disabled = true; submitButton.textContent = '儲存中…'; }
+  if (submitButton) { submitButton.disabled = true; submitButton.innerHTML = '<span aria-hidden="true">■</span>'; submitButton.setAttribute('aria-label','儲存中'); submitButton.title='儲存中'; }
   const f=new FormData(form);
   if (event.submitter?.name) f.set(event.submitter.name, event.submitter.value);
   const type=form.dataset.form;
