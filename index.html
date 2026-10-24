@@ -10,19 +10,22 @@
 <style>
 :root {
   color-scheme: dark;
-  --bg:#080b12;
-  --panel:#101725;
-  --panel2:#172033;
-  --text:#eef2ff;
-  --muted:#95a3b9;
-  --border:#293348;
-  --primary:#6366f1;
-  --soft:#6366f124;
-  --input:#0b1220;
-  --header:#0b1120ef;
-  --bubble:#1b263b;
-  --shade:#080d17d9;
+  /* POYOZZ premium immersive palette preview */
+  --bg:#090c14;
+  --panel:#151c2d;
+  --panel2:#1b2440;
+  --text:#f4f3ff;
+  --muted:#a4adc2;
+  --border:#2a3349;
+  --primary:#8b7cff;
+  --soft:#272347;
+  --input:#101726;
+  --header:#101726ed;
+  --bubble:#20243b;
+  --shade:#090c14e8;
   --sidebar:232px;
+  --px-primary-hover:#a99bff;
+  --px-accent-pink:#e9b7e8;
 }
 body.day {
   color-scheme:light;
@@ -949,6 +952,61 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 .group-chat-entry .select-chat{display:block;min-width:0;flex:1;}
 .group-chat-entry:focus-visible{outline:2px solid var(--accent,#7c6cf2);outline-offset:2px;}
 .inline-help{display:inline-flex;position:relative;vertical-align:middle;margin-left:5px;font-size:12px}.inline-help summary{display:inline-grid;place-items:center;width:17px;height:17px;border:1px solid currentColor;border-radius:50%;cursor:pointer;list-style:none}.inline-help summary::-webkit-details-marker{display:none}.inline-help>span{position:absolute;z-index:30;left:22px;top:-6px;width:min(260px,70vw);padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--panel);box-shadow:0 8px 24px #0003;font-weight:400;line-height:1.5}.char-counter{display:block;font-variant-numeric:tabular-nums}
+
+/* POYOZZ premium immersive explore-page preview: color-only refinement */
+.hero {
+  color:var(--text);
+  background:
+    radial-gradient(circle at 84% 16%,#a99bff2b,transparent 34%),
+    radial-gradient(circle at 72% 100%,#e9b7e80d,transparent 42%),
+    linear-gradient(115deg,#101726 0%,#171b35 54%,#211936 100%);
+  border-color:#8b7cff45;
+  box-shadow:inset 0 1px 0 #ffffff08;
+}
+.hero p { color:#c6c9dc; }
+.hero-dot.active { background:var(--px-primary-hover); box-shadow:0 0 12px #a99bff65; }
+.card {
+  border-color:var(--border);
+  background:linear-gradient(180deg,#171e30 0%,#131a29 100%);
+  box-shadow:0 8px 28px #00000020;
+  transition:border-color .2s ease,box-shadow .2s ease,transform .2s ease;
+}
+.card:hover,.card:focus-within {
+  border-color:#7668d966;
+  box-shadow:0 12px 32px #00000032,0 0 0 1px #8b7cff12;
+}
+.chat-cta {
+  border-color:#8b7cff66;
+  background:linear-gradient(135deg,#a99bff,#8b7cff);
+  color:#17142a;
+  box-shadow:0 4px 16px #8b7cff26,inset 0 1px #ffffff70;
+}
+.chat-cta:hover {
+  background:linear-gradient(135deg,#c0b7ff,#a99bff);
+  border-color:#c0b7ff;
+}
+.card-chat {
+  border-color:#c7bfff65;
+  background:linear-gradient(135deg,#a99bff45,#8b7cff35);
+  color:#fbfaff;
+  box-shadow:0 8px 22px #080b1260,inset 0 1px #ffffff30;
+}
+.card:hover .card-chat,.card:focus-within .card-chat {
+  background:linear-gradient(135deg,#b9afff65,#8b7cff55);
+  border-color:#d4ceff9c;
+}
+.card-chat:hover {
+  background:linear-gradient(135deg,#c7bfff78,#a99bff65);
+  border-color:#e0dcffb0;
+}
+.heart.on { color:var(--px-accent-pink); }
+:where(button,a,input,textarea,select):focus-visible {
+  outline:2px solid var(--px-primary-hover);
+  outline-offset:2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card { transition:none; }
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
