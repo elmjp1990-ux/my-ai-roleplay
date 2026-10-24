@@ -5269,7 +5269,7 @@ function renderMessages(scroll = true) {
   const c = sessionCharacter(s);
   if (!s || !c) return;
   const oldScroll = $('messages').scrollTop;
-  $('messages').innerHTML = s.messages.map(m => {
+  $('messages').innerHTML = s.messages.filter(m => !(m.role === 'user' && String(m.text||'').trim() === GROUP_CONTINUE_SENTINEL)).map(m => {
     const user = m.role === 'user';
     const roles = [{id:c.id,name:c.name,image:c.image || c.avatar_url}];
     // Role prefixes can appear in AI replies as well as player-authored text.
@@ -5311,7 +5311,7 @@ function renderMessages(scroll = true) {
   }).join('');
   $('messages').scrollTop = scroll ? $('messages').scrollHeight : oldScroll;
   const sendButton=$('view')?.querySelector('.chat-main .composer-send');
-  if(sendButton){const sending=!!s?.pendingTurn;sendButton.innerHTML=sending?'<span aria-hidden="true">■</span>':ICON.send;sendButton.setAttribute('aria-label',sending?'訊息處理中':'送出或接續回應');sendButton.title=sending?'訊息處理中':'送出';sendButton.classList.toggle('is-sending',sending);}
+  if(sendButton){const sending=!!s?.pendingTurn;sendButton.disabled=sending;sendButton.innerHTML=sending?'<span aria-hidden="true">■</span>':ICON.send;sendButton.setAttribute('aria-label',sending?'訊息處理中':'送出或接續回應');sendButton.title=sending?'訊息處理中':'送出';sendButton.classList.toggle('is-sending',sending);}
 }
 function memorySize(list) {
   return list.reduce((total,m) => total+countChars(m.text),0);
