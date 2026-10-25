@@ -95,6 +95,10 @@ svg { pointer-events:none; }
 }
 .hidden { display:none!important; }
 .primary { background:var(--primary); color:white; border-color:transparent; }
+/* Shared deep POYOZZ action style for persona-picker Apply buttons. */
+.persona-picker-apply { width:100%; min-height:44px; color:#f7f8ff; font-weight:650; letter-spacing:.04em; background:linear-gradient(135deg,#303d68 0%,#29284f 52%,#3b2d59 100%); border:1px solid #7180b8; box-shadow:0 7px 18px #05091455,inset 0 1px #ffffff22; }
+.persona-picker-apply:hover:not(:disabled) { background:linear-gradient(135deg,#3a4b7e 0%,#353363 52%,#4a376c 100%); border-color:#9ba9e4; filter:none; }
+.persona-picker-apply:disabled { background:linear-gradient(135deg,#20283c,#24243b); color:#8790a8; border-color:#343d54; box-shadow:none; opacity:1; }
 .danger { color:#e65a76; border-color:#e65a7650; }
 .ghost { background:transparent; border-color:transparent; }
 .row { display:flex; align-items:center; gap:10px; }
@@ -5872,13 +5876,13 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
     case 'persona-picker': {
       const personas=Array.isArray(currentUser()?.personas)?currentUser().personas:[];
       const selectedId=personaPickerSelection;
-      showDialog('選擇其他人設',`<div class="stack"><p class="small muted">點選人設後會以藍框標示；按底部「套用」後會帶入上方編輯框，你仍可修改、預覽並儲存。此操作不會修改其他聊天。</p><button type="button" data-action="personas">人設管理／新增人設</button><div class="ledger-scroll" style="max-height:min(50dvh,420px)">${personas.slice().sort((a,b)=>Number(!!b.isDefault)-Number(!!a.isDefault)).map(p=>`<button type="button" data-action="persona-picker-select" data-id="${e(p.id)}" aria-pressed="${String(selectedId)===String(p.id)}" style="display:block;width:100%;text-align:left;margin:6px 0;padding:12px;border:${String(selectedId)===String(p.id)?'2px solid var(--primary)':'1px solid var(--border)'};border-radius:10px;background:${String(selectedId)===String(p.id)?'var(--soft)':'var(--panel)'}"><strong>${e(p.name)}</strong>${p.isDefault?'<span class="small" style="display:block;color:var(--primary)">預設人設</span>':''}<span class="small muted" style="display:block;white-space:pre-wrap;margin-top:5px">${e(p.text)}</span></button>`).join('')||'<div class="empty">目前沒有儲存的人設，請先新增。</div>'}</div><button type="button" class="primary" data-action="persona-picker-apply" ${selectedId==null?'disabled':''}>套用</button></div>`);
+      showDialog('選擇其他人設',`<div class="stack"><p class="small muted">點選人設後會以藍框標示；按底部「套用」後會帶入上方編輯框，你仍可修改、預覽並儲存。此操作不會修改其他聊天。</p><button type="button" data-action="personas">人設管理／新增人設</button><div class="ledger-scroll" style="max-height:min(50dvh,420px)">${personas.slice().sort((a,b)=>Number(!!b.isDefault)-Number(!!a.isDefault)).map(p=>`<button type="button" data-action="persona-picker-select" data-id="${e(p.id)}" aria-pressed="${String(selectedId)===String(p.id)}" style="display:block;width:100%;text-align:left;margin:6px 0;padding:12px;border:${String(selectedId)===String(p.id)?'2px solid var(--primary)':'1px solid var(--border)'};border-radius:10px;background:${String(selectedId)===String(p.id)?'var(--soft)':'var(--panel)'}"><strong>${e(p.name)}</strong>${p.isDefault?'<span class="small" style="display:block;color:var(--primary)">預設人設</span>':''}<span class="small muted" style="display:block;white-space:pre-wrap;margin-top:5px">${e(p.text)}</span></button>`).join('')||'<div class="empty">目前沒有儲存的人設，請先新增。</div>'}</div><button type="button" class="persona-picker-apply" data-action="persona-picker-apply" ${selectedId==null?'disabled':''}>套用</button></div>`);
       break;
     }
     case 'group-persona-picker': {
       const personas=Array.isArray(currentUser()?.personas)?currentUser().personas:[];
       const selectedId=groupPersonaPickerSelection;
-      showDialog('選擇群組人設',`<div class="stack"><p class="small muted">點選人設後會以藍框標示；按底部「套用」後會帶入群組建立表單，你仍可修改內容。預設人設僅顯示標籤，不會固定藍框。</p><button type="button" data-action="personas">人設管理／新增人設</button><div class="ledger-scroll" style="max-height:min(50dvh,420px)">${personas.slice().sort((a,b)=>Number(!!b.isDefault)-Number(!!a.isDefault)).map(p=>`<button type="button" data-action="group-persona-picker-select" data-id="${e(p.id)}" aria-pressed="${String(selectedId)===String(p.id)}" style="display:block;width:100%;text-align:left;margin:6px 0;padding:12px;border:${String(selectedId)===String(p.id)?'2px solid var(--primary)':'1px solid var(--border)'};border-radius:10px;background:${String(selectedId)===String(p.id)?'var(--soft)':'var(--panel)'}"><strong>${e(p.name)}</strong>${p.isDefault?'<span class="small" style="display:block;color:var(--primary)">預設人設</span>':''}<span class="small muted" style="display:block;white-space:pre-wrap;margin-top:5px">${e(p.text)}</span></button>`).join('')||'<div class="empty">目前沒有儲存的人設，請先新增。</div>'}</div><button type="button" class="primary" data-action="group-persona-picker-apply" ${selectedId==null?'disabled':''}>套用</button></div>`);
+      showDialog('選擇群組人設',`<div class="stack"><p class="small muted">點選人設後會以藍框標示；按底部「套用」後會帶入群組建立表單，你仍可修改內容。預設人設僅顯示標籤，不會固定藍框。</p><button type="button" data-action="personas">人設管理／新增人設</button><div class="ledger-scroll" style="max-height:min(50dvh,420px)">${personas.slice().sort((a,b)=>Number(!!b.isDefault)-Number(!!a.isDefault)).map(p=>`<button type="button" data-action="group-persona-picker-select" data-id="${e(p.id)}" aria-pressed="${String(selectedId)===String(p.id)}" style="display:block;width:100%;text-align:left;margin:6px 0;padding:12px;border:${String(selectedId)===String(p.id)?'2px solid var(--primary)':'1px solid var(--border)'};border-radius:10px;background:${String(selectedId)===String(p.id)?'var(--soft)':'var(--panel)'}"><strong>${e(p.name)}</strong>${p.isDefault?'<span class="small" style="display:block;color:var(--primary)">預設人設</span>':''}<span class="small muted" style="display:block;white-space:pre-wrap;margin-top:5px">${e(p.text)}</span></button>`).join('')||'<div class="empty">目前沒有儲存的人設，請先新增。</div>'}</div><button type="button" class="persona-picker-apply" data-action="group-persona-picker-apply" ${selectedId==null?'disabled':''}>套用</button></div>`);
       break;
     }
     case 'group-persona-settings': {
@@ -7322,7 +7326,11 @@ document.addEventListener('click',async event => {
       case 'persona-choose':personaPickerSelection=null;openModal('persona-picker');break;
       case 'group-persona-choose':groupPersonaPickerSelection=null;openModal('group-persona-picker');break;
       case 'persona-picker-select': {
-        personaPickerSelection=key;openModal('persona-picker');break;
+        if (!key) { toast('找不到這組人設，請重新整理後再試。'); break; }
+        personaPickerSelection=key;
+        // Refresh the active picker so the selected card gets its blue frame and Apply is enabled.
+        render();
+        break;
       }
       case 'group-persona-picker-select': {
         if (!key) { toast('找不到這組人設，請重新整理後再試。'); break; }
