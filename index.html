@@ -5880,7 +5880,9 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
     case 'group-persona-settings': {
       const group=groupPrototype.active;
       if(!group||route.page!=='group') { toast('請先開啟要管理的群組。'); break; }
-      showDialog('群組人設管理',`<form data-form="group-persona-settings" class="stack"><label class="field"><span>玩家角色名稱</span><input name="playerName" maxlength="80" required value="${e(group.playerName||'玩家')}"></label><label class="field"><span>這個群組使用的人設</span><textarea name="playerPersona" maxlength="3000">${e(group.playerPersona||'')}</textarea><small>最多 3000 字。這裡只會更新目前群組，不會修改原本人設。</small></label><div class="row wrap"><button type="button" data-action="group-persona-choose">從已儲存的人設套用</button><button type="submit" class="primary">儲存並套用</button></div></form>`);
+      const personaDraft=Object.prototype.hasOwnProperty.call(o,'draftPlayerPersona')?String(o.draftPlayerPersona||''):(group.playerPersona||'');
+      const selectedPersonaName=String(o.selectedPersonaName||'');
+      showDialog('群組人設管理',`<form data-form="group-persona-settings" class="stack"><label class="field"><span>玩家角色名稱</span><input name="playerName" maxlength="80" required value="${e(group.playerName||'玩家')}"></label><label class="field"><span>這個群組使用的人設</span><textarea name="playerPersona" maxlength="3000">${e(personaDraft)}</textarea><small>最多 3000 字。這裡只會更新目前群組，不會修改原本人設。</small>${selectedPersonaName?'<p class="small" style="color:var(--primary)">已選擇「'+e(selectedPersonaName)+'」，請按「儲存並套用」確認保存。</p>':''}</label><div class="row wrap"><button type="button" data-action="group-persona-choose">從已儲存的人設套用</button><button type="submit" class="primary">儲存並套用</button></div></form>`);
       break;
     }
     case 'persona':
@@ -7319,14 +7321,11 @@ document.addEventListener('click',async event => {
         const selected=(Array.isArray(currentUser()?.personas)?currentUser().personas:[]).find(item=>String(item.id)===String(key));
         if(!selected){toast('找不到這組人設，請重新整理。');break;}
         if(route.page==='group'&&groupPrototype.active){
-          const group=groupPrototype.active;const user=currentUser();
-          if(!user?.uid||!window.mySupabase){toast('請先登入後再套用群組人設。');break;}
-          const {data:{user:authUser},error:authError}=await window.mySupabase.auth.getUser();
-          if(authError||authUser?.id!==user.uid){toast('登入狀態驗證失敗，請重新登入。');break;}
           const personaText=String(selected.text||'');
-          const {data:updated,error:updateError}=await window.mySupabase.from('chat_groups').update({player_persona:personaText,updated_at:new Date().toISOString()}).eq('id',group.id).eq('owner_id',authUser.id).select('id,player_persona').maybeSingle();
-          if(updateError||!updated||updated.player_persona!==personaText){toast('人設套用失敗，群組原設定未變更。');break;}
-          group.playerPersona=personaText;toast('已將「'+selected.name+'」套用到目前群組。');back();render();break;
+          // Keep the chosen preset in the group settings form first; the explicit
+          // Save & Apply action performs the database write and read-back verification.
+          openModal('group-persona-settings',{draftPlayerPersona:personaText,selectedPersonaName:selected.name});
+          break;
         }
         groupPrototype.draft.personaPresetId=selected.id;
         groupPrototype.draft.personaPresetName=selected.name;
