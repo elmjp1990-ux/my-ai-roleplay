@@ -5903,7 +5903,7 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
         showDialog('人設管理',`
           <form data-form="persona" class="stack">
             ${!hasCustomPersona && !Object.prototype.hasOwnProperty.call(o,'draftPersona') && defaultPersona ? `<p class="small" style="color:var(--primary)">目前使用預設人設：${e(defaultPersona.name)}</p>` : ''}
-            <label class="field"><span>目前使用的人設</span><textarea name="persona" maxlength="1000">${e(initialPersona)}</textarea><small>最多 1000 字；只會更新目前聊天，不會修改已儲存的人設或其他聊天。</small>${o.selectedPersonaName?'<p class="small" style="color:var(--primary)">已選擇「'+e(o.selectedPersonaName)+'」，請按「儲存並套用」確認。</p>':''}</label>
+            <label class="field"><span>目前使用的人設</span><textarea name="persona" maxlength="3000">${e(initialPersona)}</textarea><small>最多 3000 字；只會更新目前聊天，不會修改已儲存的人設或其他聊天。</small>${o.selectedPersonaName?'<p class="small" style="color:var(--primary)">已選擇「'+e(o.selectedPersonaName)+'」，請按「儲存並套用」確認。</p>':''}</label>
             <div class="row wrap"><button type="button" data-action="persona-choose">從已儲存的人設套用</button><button type="submit" class="primary">儲存並套用</button></div>
           </form>`);
       }
