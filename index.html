@@ -6342,57 +6342,6 @@ document.addEventListener('change', event => {
   refreshCustomTagPicker();
 });
 
-/* GROUP PERSONA PICKER INTERACTION FIX
-   Capture selection/apply clicks before other delegated UI handlers so the selected
-   preset state always refreshes, enabling the Apply button and moving the blue frame. */
-document.addEventListener('click', event => {
-  const target = event.target instanceof Element ? event.target.closest('[data-action]') : null;
-  if (!target) return;
-  const action = target.dataset.action;
-  if (!['group-persona-picker-select','group-persona-picker-apply'].includes(action)) return;
-  if (target.disabled) return;
-  event.preventDefault();
-  event.stopPropagation();
-  event.stopImmediatePropagation();
-  if (state.account?.accountDeletionPending) {
-    toast('此帳號正在等待刪除，目前不能使用 PersonaX 功能。你可以取消刪除申請以恢復帳號。');
-    return;
-  }
-  if (action === 'group-persona-picker-select') {
-    const id = target.dataset.id;
-    const personas = Array.isArray(currentUser()?.personas) ? currentUser().personas : [];
-    if (!id || !personas.some(item => String(item.id) === String(id))) {
-      toast('找不到這組人設，請重新整理後再試。');
-      return;
-    }
-    groupPersonaPickerSelection = id;
-    openModal('group-persona-picker');
-    return;
-  }
-  const personas = Array.isArray(currentUser()?.personas) ? currentUser().personas : [];
-  const selected = personas.find(item => String(item.id) === String(groupPersonaPickerSelection));
-  if (!selected) {
-    toast('請先選擇一組人設。');
-    openModal('group-persona-picker');
-    return;
-  }
-  groupPersonaPickerSelection = null;
-  if (route.page === 'group' && groupPrototype.active) {
-    openModal('group-persona-settings', {
-      draftPlayerPersona: String(selected.text || ''),
-      selectedPersonaName: selected.name
-    });
-  } else {
-    groupPrototype.draft.personaPresetId = selected.id;
-    groupPrototype.draft.personaPresetName = selected.name;
-    groupPrototype.draft.playerPersona = String(selected.text || '');
-    const nextRoute = {...route};
-    delete nextRoute.overlay;
-    go(nextRoute, true);
-    render();
-  }
-}, true);
-
 /* Delegated click actions */
 document.addEventListener('click',async event => {
   const button = event.target.closest('[data-action]');
@@ -7376,7 +7325,12 @@ document.addEventListener('click',async event => {
         personaPickerSelection=key;openModal('persona-picker');break;
       }
       case 'group-persona-picker-select': {
-        groupPersonaPickerSelection=key;openModal('group-persona-picker');break;
+        if (!key) { toast('找不到這組人設，請重新整理後再試。'); break; }
+        groupPersonaPickerSelection=key;
+        // The picker overlay is already active. openModal() would not change the route,
+        // so render directly to refresh the blue selection frame and enable Apply.
+        render();
+        break;
       }
       case 'persona-picker-apply': {
         const selected=(Array.isArray(currentUser()?.personas)?currentUser().personas:[]).find(item=>String(item.id)===String(personaPickerSelection));
