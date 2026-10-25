@@ -5874,13 +5874,13 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
       break;
     }
     case 'persona-picker': {
-      const personas=Array.isArray(currentUser()?.personas)?currentUser().personas:[];
+      const personas=Array.isArray(state.account?.personas)?state.account.personas:(Array.isArray(currentUser()?.personas)?currentUser().personas:[]);
       const selectedId=personaPickerSelection;
       showDialog('人設管理',`<div class="stack"><p class="small muted">選擇要套用的人設，按「套用」後會帶入目前人設欄位；你仍可修改並儲存。此操作只會影響目前聊天。</p><button type="button" data-action="personas">人設管理／新增人設</button><div class="ledger-scroll" style="max-height:min(50dvh,420px)">${personas.slice().sort((a,b)=>Number(!!b.isDefault)-Number(!!a.isDefault)).map(p=>`<button type="button" data-action="persona-picker-select" data-id="${e(p.id)}" aria-pressed="${String(selectedId)===String(p.id)}" style="display:block;width:100%;text-align:left;margin:6px 0;padding:12px;border:${String(selectedId)===String(p.id)?'2px solid var(--primary)':'1px solid var(--border)'};border-radius:10px;background:${String(selectedId)===String(p.id)?'var(--soft)':'var(--panel)'}"><strong>${e(p.name)}</strong>${p.isDefault?'<span class="small" style="display:block;color:var(--primary)">預設人設</span>':''}<span class="small muted" style="display:block;white-space:pre-wrap;margin-top:5px">${e(p.text)}</span></button>`).join('')||'<div class="empty">目前沒有儲存的人設，請先新增。</div>'}</div><button type="button" class="persona-picker-apply" data-action="persona-picker-apply" ${selectedId==null?'disabled':''}>套用</button></div>`);
       break;
     }
     case 'group-persona-picker': {
-      const personas=Array.isArray(currentUser()?.personas)?currentUser().personas:[];
+      const personas=Array.isArray(state.account?.personas)?state.account.personas:(Array.isArray(currentUser()?.personas)?currentUser().personas:[]);
       const selectedId=groupPersonaPickerSelection;
       showDialog('人設管理',`<div class="stack"><p class="small muted">選擇要套用的人設，按「套用」後會帶入目前人設欄位；你仍可修改內容。預設人設僅顯示標籤，不會固定藍框。</p><button type="button" data-action="personas">人設管理／新增人設</button><div class="ledger-scroll" style="max-height:min(50dvh,420px)">${personas.slice().sort((a,b)=>Number(!!b.isDefault)-Number(!!a.isDefault)).map(p=>`<button type="button" data-action="group-persona-picker-select" data-id="${e(p.id)}" aria-pressed="${String(selectedId)===String(p.id)}" style="display:block;width:100%;text-align:left;margin:6px 0;padding:12px;border:${String(selectedId)===String(p.id)?'2px solid var(--primary)':'1px solid var(--border)'};border-radius:10px;background:${String(selectedId)===String(p.id)?'var(--soft)':'var(--panel)'}"><strong>${e(p.name)}</strong>${p.isDefault?'<span class="small" style="display:block;color:var(--primary)">預設人設</span>':''}<span class="small muted" style="display:block;white-space:pre-wrap;margin-top:5px">${e(p.text)}</span></button>`).join('')||'<div class="empty">目前沒有儲存的人設，請先新增。</div>'}</div><button type="button" class="persona-picker-apply" data-action="group-persona-picker-apply" ${selectedId==null?'disabled':''}>套用</button></div>`);
       break;
@@ -7341,12 +7341,18 @@ document.addEventListener('click',async event => {
         break;
       }
       case 'persona-picker-apply': {
-        const selected=(Array.isArray(currentUser()?.personas)?currentUser().personas:[]).find(item=>String(item.id)===String(personaPickerSelection));
-        if(!selected){toast('請先選擇一組人設。');break;}
-        personaPickerSelection=null;openModal('persona',{draftPersona:selected.text,selectedPersonaName:selected.name});break;
+        const presets=Array.isArray(state.account?.personas)?state.account.personas:(Array.isArray(currentUser()?.personas)?currentUser().personas:[]);
+        const selected=presets.find(item=>String(item.id)===String(personaPickerSelection));
+        if(!selected){toast('找不到已選的人設，請重新選擇。');break;}
+        // Match group behavior: return to the single-chat editor with the chosen text prefilled;
+        // do not clear the selected draft until the editor has been opened.
+        openModal('persona',{draftPersona:String(selected.text||''),selectedPersonaName:String(selected.name||'')});
+        personaPickerSelection=null;
+        break;
       }
       case 'group-persona-picker-apply': {
-        const selected=(Array.isArray(currentUser()?.personas)?currentUser().personas:[]).find(item=>String(item.id)===String(groupPersonaPickerSelection));
+        const presets=Array.isArray(state.account?.personas)?state.account.personas:(Array.isArray(currentUser()?.personas)?currentUser().personas:[]);
+        const selected=presets.find(item=>String(item.id)===String(groupPersonaPickerSelection));
         if(!selected){toast('請先選擇一組人設。');break;}
         groupPersonaPickerSelection=null;
         if(route.page==='group'&&groupPrototype.active) openModal('group-persona-settings',{draftPlayerPersona:String(selected.text||''),selectedPersonaName:selected.name});
