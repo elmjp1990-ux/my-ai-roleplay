@@ -5900,10 +5900,12 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
         // 未手動儲存的聊天永遠跟隨目前預設人設；手動儲存的聊天保留自己的內容。
         const hasCustomPersona=s.personaCustom === true || (s.personaCustom !== false && !!s.persona);
         const initialPersona=Object.prototype.hasOwnProperty.call(o,'draftPersona') ? String(o.draftPersona || '') : (hasCustomPersona ? (s.persona || '') : (defaultPersona?.text || ''));
+        const initialPlayerName=String(s.playerName||currentUser()?.nickname||'玩家');
         showDialog('人設管理',`
           <form data-form="persona" class="stack">
             ${!hasCustomPersona && !Object.prototype.hasOwnProperty.call(o,'draftPersona') && defaultPersona ? `<p class="small" style="color:var(--primary)">目前使用預設人設：${e(defaultPersona.name)}</p>` : ''}
-            <label class="field"><span>目前使用的人設</span><textarea name="persona" maxlength="3000">${e(initialPersona)}</textarea><small>最多 3000 字；只會更新目前聊天，不會修改已儲存的人設或其他聊天。</small>${o.selectedPersonaName?'<p class="small" style="color:var(--primary)">已選擇「'+e(o.selectedPersonaName)+'」，請按「儲存並套用」確認。</p>':''}</label>
+            <label class="field"><span>玩家角色名稱</span><input name="playerName" maxlength="80" required value="${e(initialPlayerName)}"></label>
+            <label class="field"><span>目前使用的人設</span><textarea name="persona" maxlength="3000">${e(initialPersona)}</textarea><small>最多 3000 字。這裡只會更新目前聊天，不會修改原本人設。</small>${o.selectedPersonaName?'<p class="small" style="color:var(--primary)">已選擇「'+e(o.selectedPersonaName)+'」，請按「儲存並套用」確認。</p>':''}</label>
             <div class="row wrap"><button type="button" data-action="persona-choose">從已儲存的人設套用</button><button type="submit" class="primary">儲存並套用</button></div>
           </form>`);
       }
@@ -7939,11 +7941,16 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
       }
       case 'persona': {
         if (!s) return;
+        const playerName=String(f.get('playerName')||'').trim();
+        if (!playerName||playerName.length>80) return toast('玩家角色名稱需為 1–80 字。');
+        const previousPlayerName=s.playerName;
         const previousPersona=s.persona || '';
         const previousPersonaCustom=s.personaCustom === true;
+        s.playerName=playerName;
         s.persona=String(f.get('persona'));
         s.personaCustom=true;
         if (!persist()) {
+          s.playerName=previousPlayerName;
           s.persona=previousPersona;
           s.personaCustom=previousPersonaCustom;
           break;
@@ -7951,14 +7958,15 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         if (s.cloudOwned && currentUser()?.uid===s.cloudOwnerUid) {
           const synced=await saveChatSessionSafely(s);
           if (!synced) {
+            s.playerName=previousPlayerName;
             s.persona=previousPersona;
             s.personaCustom=previousPersonaCustom;
             persist();render();
-            toast('專屬人設同步失敗，已還原原設定。');
+            toast('人設同步失敗，已還原原設定。');
             break;
           }
         }
-        toast('儲存成功');
+        toast('已儲存並套用到目前聊天。');
         if (Object.prototype.hasOwnProperty.call(o,'draftPersona')) { const cleanRoute={...route}; delete cleanRoute.overlay; go(cleanRoute,true); }
         else back();
         break;
