@@ -4594,7 +4594,7 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
     return;
   }
   if(kind==='settings'){
-    const items=[...(isGroup?[['group-info','群組資訊','群組成員、世界背景與場景']]:[]),['diary','甜蜜日記','回憶摘要與長期保存'],['background','聊天背景','無背景、角色圖片或回憶相片'],['persona','人設管理','管理目前聊天使用的人設'],...(!isGroup?[['manage-conversation','管理對話','開始新對話或切換舊的回憶']]:[]),['delete','刪除對話','刪除這段對話與回憶']];
+    const items=[...(isGroup?[['group-info','群組資訊','群組成員、世界背景與場景']]:[]),['diary','甜蜜日記','回憶摘要與長期保存'],['background','聊天背景','無背景、角色圖片或回憶相片'],[isGroup?'group-persona':'persona','人設管理',isGroup?'管理並套用這個群組的玩家人設':'管理目前聊天使用的人設'],...(!isGroup?[['manage-conversation','管理對話','開始新對話或切換舊的回憶']]:[]),['delete','刪除對話','刪除這段對話與回憶']];
     panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="聊天功能選單"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-close" aria-label="返回聊天" title="返回聊天">'+ICON.back+'</button><h2>聊天功能</h2></div><div class="stack chat-settings-options">'+items.map(([action,title,desc])=>'<button type="button" class="profile-setting" data-action="chat-settings-option" data-option="'+e(action)+'"><span><strong>'+e(title)+'</strong><small>'+e(desc)+'</small></span><span>›</span></button>').join('')+'</div></section>');
     return;
   }
@@ -5877,6 +5877,12 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
       showDialog('選擇群組人設',`<div class="stack"><p class="small muted">選擇後會帶入群組建立表單，仍可編輯，不會修改原本人設。</p><button type="button" data-action="personas">人設管理／新增人設</button><div class="ledger-scroll" style="max-height:min(50dvh,420px)">${personas.slice().sort((a,b)=>Number(!!b.isDefault)-Number(!!a.isDefault)).map(p=>`<button type="button" data-action="group-persona-select" data-id="${e(p.id)}" style="display:block;width:100%;text-align:left;margin:6px 0;padding:12px;border:${p.isDefault?'1px dashed var(--primary)':'1px solid var(--border)'};border-radius:10px"><strong>${e(p.name)}</strong>${p.isDefault?'<span class="small" style="display:block;color:var(--primary)">預設人設</span>':''}<span class="small muted" style="display:block;white-space:pre-wrap;margin-top:5px">${e(p.text)}</span></button>`).join('')||'<div class="empty">目前沒有儲存的人設，請先新增。</div>'}</div></div>`);
       break;
     }
+    case 'group-persona-settings': {
+      const group=groupPrototype.active;
+      if(!group||route.page!=='group') { toast('請先開啟要管理的群組。'); break; }
+      showDialog('群組人設管理',`<form data-form="group-persona-settings" class="stack"><label class="field"><span>玩家角色名稱</span><input name="playerName" maxlength="80" required value="${e(group.playerName||'玩家')}"></label><label class="field"><span>這個群組使用的人設</span><textarea name="playerPersona" maxlength="3000">${e(group.playerPersona||'')}</textarea><small>最多 3000 字。這裡只會更新目前群組，不會修改原本人設。</small></label><div class="row wrap"><button type="button" data-action="group-persona-choose">從已儲存的人設套用</button><button type="submit" class="primary">儲存並套用</button></div></form>`);
+      break;
+    }
     case 'persona':
       if (!s) return;
       {
@@ -6372,6 +6378,7 @@ document.addEventListener('click',async event => {
         if(option==='diary'){const next={...route,chatOverlay:'diary'};delete next.overlay;go(next);break;}
         if(option==='group-info'){const next={...route,chatOverlay:'group-info'};delete next.overlay;go(next);break;}
         if(option==='persona'){openModal('personas');break;}
+        if(option==='group-persona'){openModal('group-persona-settings');break;}
         if(option==='manage-conversation'){const next={...route,chatOverlay:'manage-conversation'};delete next.overlay;go(next);break;}
         if(option==='delete'){const next={...route,chatOverlay:'delete-confirm'};delete next.overlay;go(next);break;}
         break;
@@ -7311,6 +7318,16 @@ document.addEventListener('click',async event => {
       case 'group-persona-select': {
         const selected=(Array.isArray(currentUser()?.personas)?currentUser().personas:[]).find(item=>String(item.id)===String(key));
         if(!selected){toast('找不到這組人設，請重新整理。');break;}
+        if(route.page==='group'&&groupPrototype.active){
+          const group=groupPrototype.active;const user=currentUser();
+          if(!user?.uid||!window.mySupabase){toast('請先登入後再套用群組人設。');break;}
+          const {data:{user:authUser},error:authError}=await window.mySupabase.auth.getUser();
+          if(authError||authUser?.id!==user.uid){toast('登入狀態驗證失敗，請重新登入。');break;}
+          const personaText=String(selected.text||'');
+          const {data:updated,error:updateError}=await window.mySupabase.from('chat_groups').update({player_persona:personaText,updated_at:new Date().toISOString()}).eq('id',group.id).eq('owner_id',authUser.id).select('id,player_persona').maybeSingle();
+          if(updateError||!updated||updated.player_persona!==personaText){toast('人設套用失敗，群組原設定未變更。');break;}
+          group.playerPersona=personaText;toast('已將「'+selected.name+'」套用到目前群組。');back();render();break;
+        }
         groupPrototype.draft.personaPresetId=selected.id;
         groupPrototype.draft.personaPresetName=selected.name;
         groupPrototype.draft.playerPersona=String(selected.text||'');
@@ -7862,6 +7879,23 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         persist();
         renderMessages();
         await runPendingChatTurn(s);
+        break;
+      }
+      case 'group-persona-settings': {
+        const group=groupPrototype.active;
+        const user=currentUser();
+        const playerName=String(f.get('playerName')||'').trim();
+        const playerPersona=String(f.get('playerPersona')||'');
+        if(!group||route.page!=='group'||!user?.uid||!window.mySupabase) return toast('群組或登入狀態已失效，請重新開啟後再試。');
+        if(!playerName||playerName.length>80) return toast('玩家角色名稱需為 1–80 字。');
+        if(playerPersona.length>3000) return toast('玩家人設不可超過 3000 字。');
+        const {data:{user:authUser},error:authError}=await window.mySupabase.auth.getUser();
+        if(authError||authUser?.id!==user.uid) return toast('登入狀態驗證失敗，請重新登入。');
+        const {data:updated,error:updateError}=await window.mySupabase.from('chat_groups').update({player_name:playerName,player_persona:playerPersona,updated_at:new Date().toISOString()}).eq('id',group.id).eq('owner_id',authUser.id).select('id,player_name,player_persona').maybeSingle();
+        if(updateError||!updated||updated.player_name!==playerName||updated.player_persona!==playerPersona) return toast('群組人設未能保存，原設定未變更；請稍後重試。');
+        group.playerName=updated.player_name||'';group.playerPersona=updated.player_persona||'';
+        toast('已儲存並套用到目前群組。');
+        back();render();
         break;
       }
       case 'persona': {
