@@ -4728,8 +4728,8 @@ function renderGroupChatOverlay(kind) {
   if(kind==='group-info'){
     const group=groupPrototype.active,sceneLabel=id=>group.scenes.find(x=>x.id===id)?.name||'共用場景';
     const members=group.members.map(m=>{
-      const avatar=String(m.avatar_url||m.image||'').trim();
-      const image=/^https?:\/\//i.test(avatar)
+      const avatar=safeImage(m.avatar_url||m.image);
+      const image=avatar
         ? '<img class="avatar" style="width:44px;height:44px" src="'+e(avatar)+'" alt="">'
         : '<span class="avatar avatar-fallback" style="width:44px;height:44px">'+e(String(m.name||'角').trim().slice(0,1)||'角')+'</span>';
       const characterId=String(m.characterId||m.id||'');
@@ -4887,8 +4887,8 @@ async function groupCreateMock() {
     if(error) throw error;
     const {data:updated,error:updateError}=await window.mySupabase.from('chat_groups')
       .update({player_name:g.draft.playerName,player_persona:g.draft.playerPersona,world_character_id:g.draft.worldCharacterId,updated_at:new Date().toISOString()})
-      .eq('id',groupId).eq('owner_id',user.id).select('id').maybeSingle();
-    if(updateError||!updated) throw new Error('群組已建立，但玩家人設與世界觀選擇未能保存。請重新開啟群組並確認資料。');
+      .eq('id',groupId).eq('owner_id',user.id).select('id,player_name,player_persona,world_character_id').maybeSingle();
+    if(updateError||!updated||updated.player_name!==g.draft.playerName||updated.player_persona!==g.draft.playerPersona||updated.world_character_id!==g.draft.worldCharacterId) throw new Error('群組已建立，但雲端未能確認玩家人設與世界觀選擇完整保存。請重新開啟群組確認，勿重複建立。');
     g.loading=false;
     await groupOpen(groupId);
   } catch(error) {
@@ -6520,8 +6520,8 @@ document.addEventListener('click',async event => {
         if(!group) break;
         const sceneLabel=sceneId=>group.scenes.find(scene=>scene.id===sceneId)?.name||'共用場景';
         const memberRows=group.members.map(member=>{
-          const avatar=String(member.avatar_url||'');
-          const image=/^https?:\/\//i.test(avatar)
+          const avatar=safeImage(member.avatar_url||member.image||member.character_snapshot?.avatar_url||member.character_snapshot?.image);
+          const image=avatar
             ? '<img class="avatar" src="'+e(avatar)+'" alt="">'
             : '<span class="avatar avatar-fallback">'+e(String(member.name||'角').slice(0,1))+'</span>';
           return '<div class="row" style="gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><button type="button" class="group-member-avatar-link" data-action="group-member-detail" data-id="'+e(member.characterId||member.id||'')+'" aria-label="查看'+e(member.name||'角色')+'角色卡">'+image+'</button>'+
