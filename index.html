@@ -6387,7 +6387,7 @@ document.addEventListener('click',async event => {
         if(option==='background'){chatBackgroundDraft=null;const next={...route,chatOverlay:'settings-background'};delete next.overlay;go(next);break;}
         if(option==='diary'){const next={...route,chatOverlay:'diary'};delete next.overlay;go(next);break;}
         if(option==='group-info'){const next={...route,chatOverlay:'group-info'};delete next.overlay;go(next);break;}
-        if(option==='persona'){personaPickerSelection=null;openModal('persona-picker');break;}
+        if(option==='persona'){personaPickerSelection=null;openModal('persona');break;}
         if(option==='group-persona'){openModal('group-persona-settings');break;}
         if(option==='manage-conversation'){const next={...route,chatOverlay:'manage-conversation'};delete next.overlay;go(next);break;}
         if(option==='delete'){const next={...route,chatOverlay:'delete-confirm'};delete next.overlay;go(next);break;}
