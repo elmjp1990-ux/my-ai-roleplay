@@ -5903,7 +5903,6 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
         const initialPlayerName=String(s.playerName||currentUser()?.nickname||'玩家');
         showDialog('人設管理',`
           <form data-form="persona" class="stack">
-            ${!hasCustomPersona && !Object.prototype.hasOwnProperty.call(o,'draftPersona') && defaultPersona ? `<p class="small" style="color:var(--primary)">目前使用預設人設：${e(defaultPersona.name)}</p>` : ''}
             <label class="field"><span>玩家角色名稱</span><input name="playerName" maxlength="80" required value="${e(initialPlayerName)}"></label>
             <label class="field"><span>目前使用的人設</span><textarea name="persona" maxlength="3000">${e(initialPersona)}</textarea><small>最多 3000 字。這裡只會更新目前聊天，不會修改原本人設。</small>${o.selectedPersonaName?'<p class="small" style="color:var(--primary)">已選擇「'+e(o.selectedPersonaName)+'」，請按「儲存並套用」確認。</p>':''}</label>
             <div class="row wrap"><button type="button" data-action="persona-choose">從已儲存的人設套用</button><button type="submit" class="primary">儲存並套用</button></div>
