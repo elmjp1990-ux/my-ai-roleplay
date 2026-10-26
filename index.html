@@ -4445,7 +4445,7 @@ async function groupOpen(groupId) {
     void groupLoadList(true);
   } catch(error) {
     if(requestId!==g.openRequestId) return;
-    g.loading=false;g.active=null;g.openError=groupFriendlyError(error)||'開啟群組失敗。';g.failedGroupId=groupId;
+    g.loading=false;g.active=null;g.messagesLoading=false;g.openError=groupFriendlyError(error)||'開啟群組失敗。';g.failedGroupId=groupId;
     console.error('PersonaX 群組載入失敗：',error);
     render();
   }
