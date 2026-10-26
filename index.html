@@ -1414,9 +1414,11 @@ body:not(.day) .chat-entry.active {
 
   // 探索頁公開角色獨立於登入帳號載入，訪客也能看見。
   // 每次登入／登出都以雲端公開清單為準，避免沿用前一個帳號的過期本機資料。
+  let publicCharactersLoading = false;
   async function loadPublicSupabaseCharacters() {
     const client = window.mySupabase;
-    if (!client) return;
+    if (!client || publicCharactersLoading) return;
+    publicCharactersLoading = true;
     try {
       const { data: rows, error } = await client
         .from('characters')
@@ -1425,6 +1427,32 @@ body:not(.day) .chat-entry.active {
         .is('deleted_at', null)
         .order('first_published_at', { ascending: false, nullsFirst: false });
       if (error) throw new Error(error.message);
+
+      // 首屏只等待角色主資料：作者資料、故事開場等次要資料尚未完成時，
+      // 先把角色卡顯示出來，避免登入按鈕可用但首頁卡片仍空白。
+      const primaryCharacters = (rows || []).map(row => ({
+        id:row.id, name:row.name || '未命名角色', gender:row.gender || 'ambiguous',
+        age:row.age == null ? '' : String(row.age), image:row.avatar_url || '',
+        avatarVideoPath:row.avatar_video_path || '', visibility:'public', reviewStatus:row.review_status,
+        intro:row.intro || '', opening:'', race:row.race || '', privateInfo:'', style:row.style || '',
+        phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : {},
+        nsfwWorkplaceWarning:row.nsfw_workplace_warning === true, isNSFW:row.is_nsfw === true,
+        tags:Array.isArray(row.tags) ? row.tags : [], authorId:row.author_id,
+        owner:state.account?.uid === row.author_id,
+        chats:characterTurnCountCache.has(row.id) ? String(characterTurnCountCache.get(row.id)) : '0',
+        users:null, createdAt:row.created_at ? new Date(row.created_at).getTime() : 0,
+        firstPublishedAt:row.first_published_at ? new Date(row.first_published_at).getTime() : null,
+        latestEligible:row.latest_eligible !== false, rightsConfirmed:false, cloudPublic:true
+      }));
+      const primaryIds = new Set(primaryCharacters.map(character => character.id));
+      const primaryUid = state.account?.uid || null;
+      const primaryKeepLocal = state.characters.filter(character =>
+        String(character.id).startsWith('seed-') ||
+        (!!primaryUid && character.authorId === primaryUid && !character.deletedAt)
+      );
+      state.characters = [...primaryCharacters, ...primaryKeepLocal.filter(character => !primaryIds.has(character.id))];
+      persist();
+      render();
 
       const ids = (rows || []).map(row => row.id);
       const authorIds = [...new Set((rows || []).map(row => row.author_id).filter(Boolean))];
@@ -1491,9 +1519,11 @@ body:not(.day) .chat-entry.active {
         (!!currentUid && character.authorId === currentUid && !character.deletedAt)
       );
       state.characters = [...publicCharacters, ...keepLocal.filter(character => !publicIds.has(character.id))];
+      publicCharactersLoading = false;
       persist();
       render();
     } catch (error) {
+      publicCharactersLoading = false;
       console.error('公開角色載入失敗：', error);
       if (state.account?.uid) toast('公開角色載入失敗：' + error.message);
     }
@@ -3034,6 +3064,14 @@ function render() {
     case 'album':renderChatAlbumPage();break;
   }
   if (route.overlay) renderModal(route.overlay);
+  else {
+    // 原生 dialog 由 history/back 關閉時，也要同步關掉實體視窗；否則遮罩會攔住下一次點擊。
+    const modal = $('modal');
+    if (modal?.open) {
+      modal.close();
+      modal.innerHTML = '';
+    }
+  }
   updateCharacterCounters($('view'));
   // 公開卡片影片需取得私有儲存桶的短效簽名 URL，並在畫面渲染後啟動靜音循環播放。
   $('view')?.querySelectorAll('.card-image video[data-character-video]').forEach(video=>void hydrateCharacterVideo(video));
@@ -3118,7 +3156,11 @@ function exploreList() {
   } else if (filter === 'favorites') {
     list = list.filter(c => state.favorites.includes(c.id));
   } else if (filter === 'popular') {
-    list.sort((a,b) => Number(b.chats || 0)-Number(a.chats || 0));
+    // 以後端 RPC 的實際對話回合數為準；同數量時以最近上架者優先，避免刷新後順序抖動。
+    const turnCount = character => characterTurnCountCache.get(character.id) ?? Number(character.chats || 0);
+    list.sort((a,b) => turnCount(b)-turnCount(a) ||
+      Number(b.firstPublishedAt || b.createdAt || 0)-Number(a.firstPublishedAt || a.createdAt || 0) ||
+      String(a.id).localeCompare(String(b.id)));
   } else if (['male','female'].includes(filter)) {
     list = list.filter(c => c.gender === filter);
   } else {
@@ -3330,6 +3372,10 @@ async function loadCharacterTurnCounts(characterIds, forceRefresh = false) {
       if (returnedIds.has(id)) continue;
       characterTurnCountCache.delete(id);
       updateCharacterTurnCountElements(id,null);
+    }
+    // 取得完整統計後重排熱門清單；若 RPC 因權限而省略角色，避免無限重載。
+    if (filter === 'popular' && route.page === 'home' && requestedIds.every(id => characterTurnCountCache.has(id))) {
+      renderGrid();
     }
   })();
   ids.forEach(id => characterTurnCountRequests.set(id,request));
@@ -4342,15 +4388,14 @@ async function groupOpen(groupId) {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('請重新登入後再開啟群組。');
     g.ownerUid=user.id;
-    const [groupRes,sceneRes,memberRes,messageRes,photoRes]=await groupWithTimeout(Promise.all([
+    const [groupRes,sceneRes,memberRes,messageRes]=await groupWithTimeout(Promise.all([
       window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,background_mode,background_memory_photo_id,created_at,updated_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position'),
-      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:true}).order('sequence_no',{ascending:true}),
-      window.mySupabase.from('chat_memory_photos').select('id,owner_id,chat_type,group_id,storage_path,caption,created_at,expires_at').eq('chat_type','group').eq('group_id',groupId).eq('owner_id',user.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false})
+      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:true}).order('sequence_no',{ascending:true})
     ]),15000,'群組資料讀取逾時，請檢查網路後重試。')
     if(requestId!==g.openRequestId) return;
-    const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error||photoRes.error;
+    const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error;
     if(error) throw error;
     if(user.id!==currentUser()?.uid) throw new Error('帳號已切換，已停止顯示先前帳號的群組。');
     const group=groupRes.data, scenes=sceneRes.data||[], memberRows=memberRes.data||[];
@@ -4364,7 +4409,7 @@ async function groupOpen(groupId) {
     }
     const members=memberRows.map(m=>{const snapshot=m.character_snapshot||{};const characterId=m.character_id||null;const snapshotId=snapshot.id||characterId||null;const displayId=characterId||snapshotId||m.id;return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,avatar_url:avatarById[characterId]||snapshot.avatar_url||snapshot.image||'',position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};});
     groupExpandedMemberId=null;
-    const memoryPhotos=await Promise.all((photoRes.data||[]).map(async photo=>{const {data:signed,error:signedError}=await window.mySupabase.storage.from('personax-memory-photos').createSignedUrl(photo.storage_path,3600);if(signedError)console.warn('群組背景相片簽名網址失敗',signedError.message);return {...photo,image_url:!signedError&&signed?.signedUrl?signed.signedUrl:''};}));
+    // 群組相簿及簽名網址不阻擋聊天首屏；開啟背景設定時再載入，避免多一輪儲存桶請求。
     const messages=(messageRes.data||[]).map(m=>{
       const speakerSnapshot=m.speaker_snapshot||{};
       const member=members.find(x=>x.characterId===m.character_id)||members.find(x=>x.characterSnapshotId===speakerSnapshot.id||x.id===speakerSnapshot.id);
@@ -4373,20 +4418,50 @@ async function groupOpen(groupId) {
       const speaker=type==='user'?'你':type==='system'?'系統':(speakerSnapshot.name||member?.name||'角色')+(scene?' · '+scene.name:'');
       return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user' && m.content===GROUP_CONTINUE_SENTINEL ? '' : m.content,createdAt:m.created_at};
     });
-    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,memoryPhotos,scenes,members};
+    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,memoryPhotos:[],scenes,members};
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;
-    try { await syncGroupDiaryCloud(group.id); }
-    catch(syncError) { console.error('群組甜蜜日記雲端同步載入失敗：',syncError);toast('群組日記雲端同步暫時失敗，已保留本機資料；請檢查網路後重試。'); }
-    if(requestId!==g.openRequestId)return;
     ensureGroupDiaryMemories();g.formError='';
     g.loading=false;g.openError='';g.failedGroupId=null;g.groupsLoaded=false;
     render();
+    // 日記同步與相簿簽名網址改在首屏之後背景載入，不延遲聊天輸入框。
+    void syncGroupDiaryCloud(group.id).then(()=>{
+      if(requestId!==g.openRequestId||g.active?.id!==group.id)return;
+      ensureGroupDiaryMemories();
+      if(route.page==='group'&&route.chatOverlay==='diary')renderGroupConversation();
+    }).catch(syncError=>{
+      console.error('群組甜蜜日記雲端同步載入失敗：',syncError);
+      if(route.page==='group'&&g.active?.id===group.id)toast('群組日記雲端同步暫時失敗，已保留本機資料；請檢查網路後重試。');
+    });
+    void loadGroupBackgroundPhotos(group.id,user.id,requestId);
     void groupLoadList(true);
   } catch(error) {
     if(requestId!==g.openRequestId) return;
     g.loading=false;g.active=null;g.openError=groupFriendlyError(error)||'開啟群組失敗。';g.failedGroupId=groupId;
     console.error('PersonaX 群組載入失敗：',error);
     render();
+  }
+}
+async function loadGroupBackgroundPhotos(groupId,userId,requestId) {
+  const client=window.mySupabase;
+  if(!client||!userId)return;
+  try {
+    const {data,error}=await client.from('chat_memory_photos')
+      .select('id,owner_id,chat_type,group_id,storage_path,caption,created_at,expires_at')
+      .eq('owner_id',userId).eq('chat_type','group').eq('group_id',groupId)
+      .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString())
+      .order('created_at',{ascending:false});
+    if(error)throw error;
+    const photos=await Promise.all((data||[]).map(async photo=>{
+      const {data:signed,error:signedError}=await client.storage.from('personax-memory-photos').createSignedUrl(photo.storage_path,3600);
+      if(signedError)console.warn('群組背景相片簽名網址失敗',signedError.message);
+      return {...photo,image_url:!signedError&&signed?.signedUrl?signed.signedUrl:''};
+    }));
+    if(requestId!==groupPrototype.openRequestId||groupPrototype.active?.id!==groupId||currentUser()?.uid!==userId)return;
+    groupPrototype.active.memoryPhotos=photos;
+    applyGroupChatBackground();
+    if(route.page==='group'&&route.chatOverlay==='settings-background')renderGroupConversation();
+  } catch(error) {
+    console.warn('背景載入群組相簿失敗：',error?.message||error);
   }
 }
 async function openGroupBackgroundSettings() {
