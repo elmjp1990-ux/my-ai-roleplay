@@ -4331,6 +4331,8 @@ async function groupLoadList(force=false) {
         }
         for(const row of memberRows||[]) {
           (g.groupMembers[row.group_id] ||= []).push({
+            id:row.character_id||row.character_snapshot?.id||row.group_id,
+            characterId:row.character_id||null,
             name:row.character_snapshot?.name||'角色',
             avatar_url:avatars[row.character_id]||row.character_snapshot?.avatar_url||'',
             character_snapshot:row.character_snapshot||{}
