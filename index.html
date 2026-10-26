@@ -5031,6 +5031,7 @@ async function groupSendMock() {
   const content=typedContent || GROUP_CONTINUE_SENTINEL;
   const g=groupPrototype;
   if(g.sending) return;
+  if(g.loading||g.messagesLoading){toast('群組資料仍在載入，請稍候再送出。');return;}
   if(!walletPreflight('group')) return;
   if(!window.mySupabase) { g.formError='Supabase 用戶端尚未載入。';render();return; }
   if(!isContinueRequest) {
