@@ -4389,14 +4389,13 @@ async function groupOpen(groupId) {
     const user=session?.user;
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('請重新登入後再開啟群組。');
     g.ownerUid=user.id;
-    const [groupRes,sceneRes,memberRes,messageRes]=await groupWithTimeout(Promise.all([
+    const [groupRes,sceneRes,memberRes]=await groupWithTimeout(Promise.all([
       window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,background_mode,background_memory_photo_id,created_at,updated_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
-      window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position'),
-      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:true}).order('sequence_no',{ascending:true})
-    ]),15000,'群組資料讀取逾時，請檢查網路後重試。')
+      window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position')
+    ]),15000,'群組基本資料讀取逾時，請檢查網路後重試。')
     if(requestId!==g.openRequestId) return;
-    const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error;
+    const error=groupRes.error||sceneRes.error||memberRes.error;
     if(error) throw error;
     if(user.id!==currentUser()?.uid) throw new Error('帳號已切換，已停止顯示先前帳號的群組。');
     const group=groupRes.data, scenes=sceneRes.data||[], memberRows=memberRes.data||[];
@@ -4407,19 +4406,13 @@ async function groupOpen(groupId) {
     const members=memberRows.map(m=>{const snapshot=m.character_snapshot||{};const characterId=m.character_id||null;const snapshotId=snapshot.id||characterId||null;const displayId=characterId||snapshotId||m.id;return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,avatar_url:snapshot.avatar_url||snapshot.image||'',position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};});
     groupExpandedMemberId=null;
     // 群組相簿及簽名網址不阻擋聊天首屏；開啟背景設定時再載入，避免多一輪儲存桶請求。
-    const messages=(messageRes.data||[]).map(m=>{
-      const speakerSnapshot=m.speaker_snapshot||{};
-      const member=members.find(x=>x.characterId===m.character_id)||members.find(x=>x.characterSnapshotId===speakerSnapshot.id||x.id===speakerSnapshot.id);
-      const scene=scenes.find(x=>x.id===m.scene_id);
-      const type=m.speaker_type==='user'?'user':m.speaker_type==='system'?'system':'character';
-      const speaker=type==='user'?'你':type==='system'?'系統':(speakerSnapshot.name||member?.name||'角色')+(scene?' · '+scene.name:'');
-      return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user' && m.content===GROUP_CONTINUE_SENTINEL ? '' : m.content,createdAt:m.created_at};
-    });
     g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,memoryPhotos:[],scenes,members};
-    g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;
+    g.messages=[];g.turn=0;g.messagesLoading=true;
     ensureGroupDiaryMemories();g.formError='';
     g.loading=false;g.openError='';g.failedGroupId=null;g.groupsLoaded=false;
     render();
+    // 聊天主介面先顯示，完整歷史訊息在背景載入；載入期間暫停送出避免與歷史狀態競爭。
+    void loadGroupMessages(group.id,user.id,requestId);
     // 角色頭像查詢也移到首屏之後；聊天先使用角色快照頭像，再補上最新公開頭像。
     if(characterIds.length) void window.mySupabase.from('characters').select('id,avatar_url').in('id',characterIds).then(avatarRes=>{
       if(avatarRes.error||requestId!==g.openRequestId||g.active?.id!==group.id)return;
@@ -4444,6 +4437,33 @@ async function groupOpen(groupId) {
     g.loading=false;g.active=null;g.openError=groupFriendlyError(error)||'開啟群組失敗。';g.failedGroupId=groupId;
     console.error('PersonaX 群組載入失敗：',error);
     render();
+  }
+}
+async function loadGroupMessages(groupId,userId,requestId) {
+  const g=groupPrototype,client=window.mySupabase;
+  try {
+    const {data,error}=await groupWithTimeout(client.from('chat_group_messages')
+      .select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at')
+      .eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:true}).order('sequence_no',{ascending:true}),
+      20000,'群組歷史訊息載入逾時，請重新載入群組。');
+    if(error)throw error;
+    if(requestId!==g.openRequestId||g.active?.id!==groupId||currentUser()?.uid!==userId)return;
+    const members=g.active.members||[],scenes=g.active.scenes||[];
+    g.messages=(data||[]).map(m=>{
+      const speakerSnapshot=m.speaker_snapshot||{};
+      const member=members.find(x=>x.characterId===m.character_id)||members.find(x=>x.characterSnapshotId===speakerSnapshot.id||x.id===speakerSnapshot.id);
+      const scene=scenes.find(x=>x.id===m.scene_id);
+      const type=m.speaker_type==='user'?'user':m.speaker_type==='system'?'system':'character';
+      const speaker=type==='user'?'你':type==='system'?'系統':(speakerSnapshot.name||member?.name||'角色')+(scene?' · '+scene.name:'');
+      return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user'&&m.content===GROUP_CONTINUE_SENTINEL?'':m.content,createdAt:m.created_at};
+    });
+    g.turn=g.messages.filter(m=>m.type==='user').length;g.messagesLoading=false;
+    if(route.page==='group'&&route.id===groupId)renderGroupConversation();
+  } catch(error) {
+    if(requestId!==g.openRequestId||g.active?.id!==groupId)return;
+    g.messagesLoading=false;g.formError=groupFriendlyError(error)||'群組歷史訊息載入失敗。';
+    console.error('群組歷史訊息載入失敗：',error);
+    if(route.page==='group'&&route.id===groupId)renderGroupConversation();
   }
 }
 async function loadGroupBackgroundPhotos(groupId,userId,requestId) {
@@ -4552,7 +4572,7 @@ function renderGroupConversation() {
       ? '<button class="message-more" data-action="group-message-menu" data-id="'+e(m.id)+'" aria-label="訊息操作">⋯</button>' : '';
     return '<div class="message '+(isUser?'user':'')+(hasSpeaker?' roleplay-prefixed-message':'')+'" data-message="'+e(m.id)+'">'+avatarHTML+
       '<div class="message-content">'+bodyHTML+'</div>'+editButton+'</div>';
-  }).join('') || '<div class="empty">這段群組對話還沒有訊息，輸入第一句話開始故事。</div>';
+  }).join('') || (g.messagesLoading ? '<div class="empty">正在載入歷史訊息…</div>' : '<div class="empty">這段群組對話還沒有訊息，輸入第一句話開始故事。</div>');
   const sceneNames=(group.scenes||[]).map(x=>x.name).filter(Boolean).join('、');
   const initialScene=(group.scenes||[]).find(x=>Number(x.position||1)===1)||(group.scenes||[])[0];
   $('view').innerHTML=`
@@ -4602,7 +4622,7 @@ ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
             </details>
           </div>` : ''}
           <div class="composer-input-row">
-            <textarea id="groupMessageInput" name="text" maxlength="1000" rows="1" placeholder="留空發送，角色會繼續說下去" aria-label="輸入群組訊息" ${g.sending?'disabled':''}>${e(g.pendingRequest?.groupId===group.id && g.pendingRequest.content!==GROUP_CONTINUE_SENTINEL?g.pendingRequest.content:'')}</textarea>
+            <textarea id="groupMessageInput" name="text" maxlength="1000" rows="1" placeholder="留空發送，角色會繼續說下去" aria-label="輸入群組訊息" ${(g.sending||g.messagesLoading)?'disabled':''}>${e(g.pendingRequest?.groupId===group.id && g.pendingRequest.content!==GROUP_CONTINUE_SENTINEL?g.pendingRequest.content:'')}</textarea>
           </div>
           <div class="composer-bottom-row">
             <div class="composer-bottom-left">
@@ -4616,7 +4636,7 @@ ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
             </div>
             <div class="composer-bottom-right">
               <button type="button" class="composer-cost wallet-cost-button" data-action="wallet-cost-details" aria-label="查看本次預計扣款與持有資源" title="查看本次預計扣款與持有資源">${walletCostPreviewHTML(Math.max(1,(group.members||[]).length)*3)}</button>
-              <button class="primary composer-send" type="button" data-action="group-send" aria-label="${g.sending?'停止生成':'送出群組訊息'}" title="${g.sending?'停止生成':'送出訊息'}" ${g.sending?'disabled':''}>${g.sending?'<span aria-hidden="true">■</span>':ICON.send}</button>
+              <button class="primary composer-send" type="button" data-action="group-send" aria-label="${g.sending?'停止生成':g.messagesLoading?'正在載入歷史訊息':'送出群組訊息'}" title="${g.sending?'停止生成':g.messagesLoading?'正在載入歷史訊息':'送出訊息'}" ${(g.sending||g.messagesLoading)?'disabled':''}>${g.sending?'<span aria-hidden="true">■</span>':ICON.send}</button>
             </div>
           </div>
           <div class="small muted" role="status" aria-live="polite">${e(g.formError||'')}</div>
