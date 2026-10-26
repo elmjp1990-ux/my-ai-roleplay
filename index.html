@@ -4383,7 +4383,16 @@ async function groupOpen(groupId) {
   // Keep the group ID in the URL so rerenders, auth refreshes, and post-send reloads
   // can recover the same group instead of silently falling back to the creation wizard.
   const requestId=g.openRequestId=(g.openRequestId||0)+1;
-  g.loading=true;g.formError='';g.openError='';g.failedGroupId=groupId;g.active=null;
+  // Show an account-scoped cached group snapshot immediately while authoritative rows load.
+  const cachedGroup=(g.ownerUid===currentUser()?.uid&&g.groupsLoaded)?g.groups.find(item=>item.id===groupId):null;
+  const cachedMembers=(g.ownerUid===currentUser()?.uid&&g.groupsLoaded)?(g.groupMembers[groupId]||[]):[];
+  g.formError='';g.openError='';g.failedGroupId=groupId;
+  if(cachedGroup&&cachedMembers.length){
+    g.active={id:cachedGroup.id,name:cachedGroup.name||'群組聊天',world:'',mode:cachedGroup.scene_mode||'shared',playerName:'',playerPersona:'',worldCharacterId:'',backgroundMode:'avatar',backgroundMemoryPhotoId:null,memoryPhotos:[],scenes:[],members:cachedMembers.map(member=>({...member,...(member.character_snapshot||{}),id:member.characterId||member.id,characterId:member.characterId||null,avatar_url:member.avatar_url||member.character_snapshot?.avatar_url||''}))};
+    g.messages=[];g.turn=0;g.messagesLoading=true;g.loading=false;
+  } else {
+    g.loading=true;g.active=null;g.messagesLoading=true;
+  }
   if(route.page!=='group'||route.id!==groupId||route.overlay) go({page:'group',id:groupId});
   else render();
   try {
