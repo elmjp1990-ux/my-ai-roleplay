@@ -2942,7 +2942,7 @@ function showDialog(title,content) {
   modal.innerHTML = `
     <div class="row between modal-heading">
       <h2>${e(title)}</h2>
-      <button class="ghost" data-action="${walletDialog ? 'wallet-dialog-close' : pendingDeletionDialog ? 'pending-switch-account' : deleteConfirmDialog ? 'delete-dialog-back' : 'back'}"
+      <button class="ghost" data-action="${walletDialog ? 'wallet-dialog-close' : pendingDeletionDialog ? 'pending-switch-account' : deleteConfirmDialog ? 'delete-dialog-back' : 'dialog-close'}"
               aria-label="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}"
               title="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}">✕</button>
     </div>${content}`;
@@ -4385,7 +4385,8 @@ async function groupOpen(groupId) {
   if(route.page!=='group'||route.id!==groupId||route.overlay) go({page:'group',id:groupId});
   else render();
   try {
-    const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
+    const {data:{session},error:authError}=await window.mySupabase.auth.getSession();
+    const user=session?.user;
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('請重新登入後再開啟群組。');
     g.ownerUid=user.id;
     const [groupRes,sceneRes,memberRes,messageRes]=await groupWithTimeout(Promise.all([
@@ -4401,13 +4402,9 @@ async function groupOpen(groupId) {
     const group=groupRes.data, scenes=sceneRes.data||[], memberRows=memberRes.data||[];
     if(!group) throw new Error('找不到這個群組，或目前帳號沒有存取權限。');
     if(memberRows.length<1||memberRows.length>3) throw new Error('群組成員資料不完整，請重新整理或重新建立群組。');
-    let avatarById={};
+    // 先使用成員快照頭像，避免額外角色查詢阻擋聊天室首屏。
     const characterIds=memberRows.map(m=>m.character_id).filter(isUuid);
-    if(characterIds.length) {
-      const avatarRes=await window.mySupabase.from('characters').select('id,avatar_url').in('id',characterIds);
-      if(!avatarRes.error) avatarById=Object.fromEntries((avatarRes.data||[]).map(x=>[x.id,x.avatar_url||'']));
-    }
-    const members=memberRows.map(m=>{const snapshot=m.character_snapshot||{};const characterId=m.character_id||null;const snapshotId=snapshot.id||characterId||null;const displayId=characterId||snapshotId||m.id;return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,avatar_url:avatarById[characterId]||snapshot.avatar_url||snapshot.image||'',position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};});
+    const members=memberRows.map(m=>{const snapshot=m.character_snapshot||{};const characterId=m.character_id||null;const snapshotId=snapshot.id||characterId||null;const displayId=characterId||snapshotId||m.id;return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,avatar_url:snapshot.avatar_url||snapshot.image||'',position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};});
     groupExpandedMemberId=null;
     // 群組相簿及簽名網址不阻擋聊天首屏；開啟背景設定時再載入，避免多一輪儲存桶請求。
     const messages=(messageRes.data||[]).map(m=>{
@@ -4423,6 +4420,14 @@ async function groupOpen(groupId) {
     ensureGroupDiaryMemories();g.formError='';
     g.loading=false;g.openError='';g.failedGroupId=null;g.groupsLoaded=false;
     render();
+    // 角色頭像查詢也移到首屏之後；聊天先使用角色快照頭像，再補上最新公開頭像。
+    if(characterIds.length) void window.mySupabase.from('characters').select('id,avatar_url').in('id',characterIds).then(avatarRes=>{
+      if(avatarRes.error||requestId!==g.openRequestId||g.active?.id!==group.id)return;
+      const avatarById=Object.fromEntries((avatarRes.data||[]).map(x=>[x.id,x.avatar_url||'']));
+      let changed=false;
+      for(const member of g.active.members){const nextAvatar=avatarById[member.characterId];if(nextAvatar&&nextAvatar!==member.avatar_url){member.avatar_url=nextAvatar;changed=true;}}
+      if(changed&&route.page==='group'&&route.id===group.id)renderGroupConversation();
+    }).catch(error=>console.warn('群組角色頭像背景補載失敗',error?.message||error));
     // 日記同步與相簿簽名網址改在首屏之後背景載入，不延遲聊天輸入框。
     void syncGroupDiaryCloud(group.id).then(()=>{
       if(requestId!==g.openRequestId||g.active?.id!==group.id)return;
@@ -6672,6 +6677,16 @@ document.addEventListener('click',async event => {
       case 'delete-dialog-back': {
         $('modal')?.close();
         if (route.page === 'conversation' || route.page === 'group') go({page:'chat'});
+        break;
+      }
+      case 'dialog-close': {
+        const modal=$('modal');
+        if(modal?.open) modal.close();
+        if(route.overlay) {
+          const next={...route};
+          delete next.overlay;
+          go(next,true);
+        } else if(modal) modal.innerHTML='';
         break;
       }
       case 'back':back();break;
