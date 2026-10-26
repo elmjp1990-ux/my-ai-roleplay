@@ -6699,6 +6699,18 @@ document.addEventListener('click',async event => {
         if (route.page === 'conversation' || route.page === 'group') go({page:'chat'});
         break;
       }
+      case 'session-menu-close': {
+        // Close the one-shot session menu synchronously; do not rely on history/back.
+        const modal=$('modal');
+        if(modal?.open) modal.close();
+        if(modal) modal.innerHTML='';
+        const next={...route};
+        delete next.overlay;
+        route=next;
+        history.replaceState({...history.state,personax:true,route:next},'',routeURL(next));
+        render();
+        break;
+      }
       case 'dialog-close': {
         const modal=$('modal');
         if(modal?.open) modal.close();
