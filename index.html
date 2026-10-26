@@ -2942,7 +2942,7 @@ function showDialog(title,content) {
   modal.innerHTML = `
     <div class="row between modal-heading">
       <h2>${e(title)}</h2>
-      <button class="ghost" data-action="${walletDialog ? 'wallet-dialog-close' : pendingDeletionDialog ? 'pending-switch-account' : deleteConfirmDialog ? 'delete-dialog-back' : 'dialog-close'}"
+      <button class="ghost" data-action="${walletDialog ? 'wallet-dialog-close' : pendingDeletionDialog ? 'pending-switch-account' : deleteConfirmDialog ? 'delete-dialog-back' : route?.overlay?.name === 'session-menu' ? 'session-menu-close' : 'dialog-close'}"
               aria-label="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}"
               title="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}">✕</button>
     </div>${content}`;
