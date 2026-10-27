@@ -9171,10 +9171,12 @@ function renderCityMapMVP(){
   // This map stays empty until a trusted schedule/presence source supplies characters.
   // Each entry must contain only public, undeleted, modern-city-compatible characters
   // whose current schedule places them at that location.
+  // Temporary visual-test mode: highlight every marked building so outline placement can be reviewed before live character presence is connected.
+  const CITY_MAP_HIGHLIGHT_ALL_FOR_PREVIEW=true;
   let cityPresenceByPlace={};
   const renderCityPresence=()=>{
     document.querySelectorAll('.city-building-hit').forEach(el=>{
-      const available=Array.isArray(cityPresenceByPlace[el.dataset.place])&&cityPresenceByPlace[el.dataset.place].length>0;
+      const available=CITY_MAP_HIGHLIGHT_ALL_FOR_PREVIEW || (Array.isArray(cityPresenceByPlace[el.dataset.place])&&cityPresenceByPlace[el.dataset.place].length>0);
       el.classList.toggle('is-available',available);
       el.setAttribute('aria-disabled',String(!available));
       el.setAttribute('tabindex',available?'0':'-1');
@@ -9185,7 +9187,7 @@ function renderCityMapMVP(){
     renderCityPresence();
   };
   renderCityPresence();
-  stage.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;if(a==='city-zoom-in'){zoomBy(1.18);return;}if(a==='city-zoom-out'){zoomBy(.85);return;}if(a==='city-close'){$('cityMapPeople').hidden=true;return;}if(a==='city-landmark'){const place=b.dataset.place;const people=cityPresenceByPlace[place];if(!Array.isArray(people)||!people.length)return;$('cityMapPlaceTitle').textContent=cityPlaceNames[place]||'地標';$('cityMapPresenceList').innerHTML=people.map(person=>'<p>'+escapeHTML(String(person.name||'角色'))+(person.activity?' · '+escapeHTML(String(person.activity)):'')+'</p>').join('');$('cityMapPeople').hidden=false;return;}if(a==='city-traditional'){go({page:'home'});return;}});
+  stage.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;if(a==='city-zoom-in'){zoomBy(1.18);return;}if(a==='city-zoom-out'){zoomBy(.85);return;}if(a==='city-close'){$('cityMapPeople').hidden=true;return;}if(a==='city-landmark'){const place=b.dataset.place;const people=cityPresenceByPlace[place];$('cityMapPlaceTitle').textContent=cityPlaceNames[place]||'地標';$('cityMapPresenceList').innerHTML=Array.isArray(people)&&people.length?people.map(person=>'<p>'+escapeHTML(String(person.name||'角色'))+(person.activity?' · '+escapeHTML(String(person.activity)):'')+'</p>').join(''):'<p>測試模式：此建築已開啟高亮，角色名單尚未串接。</p>';$('cityMapPeople').hidden=false;return;}if(a==='city-traditional'){go({page:'home'});return;}});
   window.addEventListener('resize',()=>{sizeWorld();clamp();},{passive:true});
 }
 </script>
