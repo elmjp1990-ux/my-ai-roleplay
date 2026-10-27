@@ -1157,8 +1157,39 @@ body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
 .city-map-info p{color:rgba(255,255,255,.91)}
 .city-map-empty{background:rgba(66,72,83,.58)!important;color:rgba(255,255,255,.96)!important}
 .city-map-logo{display:none!important}
-/* City map is immersive: hide the legacy five-item site navigation row. */
-.city-map-bottom{display:none!important}
+/* City map navigation stays available, styled as a translucent in-world glass dock. */
+.city-map-bottom{
+ display:flex!important;
+ background:rgba(20,27,43,.48)!important;
+ -webkit-backdrop-filter:blur(18px) saturate(135%)!important;
+ backdrop-filter:blur(18px) saturate(135%)!important;
+ border-top:1px solid rgba(255,255,255,.22)!important;
+ box-shadow:0 -8px 28px rgba(7,13,27,.18),inset 0 1px 0 rgba(255,255,255,.08)!important;
+ padding-bottom:env(safe-area-inset-bottom)!important;
+}
+.city-map-bottom button{
+ background:transparent!important;
+ border:1px solid transparent!important;
+ color:rgba(255,255,255,.9)!important;
+ text-shadow:0 1px 8px rgba(5,10,24,.55)!important;
+ transition:background .18s ease,border-color .18s ease,color .18s ease!important;
+}
+.city-map-bottom button:hover,
+.city-map-bottom button:focus-visible{
+ background:rgba(255,255,255,.12)!important;
+ border-color:rgba(255,255,255,.18)!important;
+ color:#fff!important;
+}
+.city-map-bottom button.active{
+ background:linear-gradient(135deg,rgba(183,157,255,.25),rgba(255,178,210,.18))!important;
+ border-color:rgba(225,210,255,.32)!important;
+ color:#fff!important;
+ box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 2px 12px rgba(18,12,42,.12)!important;
+}
+@media(max-width:480px){
+ .city-map-bottom{background:rgba(20,27,43,.58)!important}
+ .city-map-bottom button{min-width:0;padding-inline:4px!important}
+}
 @media(max-width:380px){.city-map-title img{width:clamp(78px,24vw,96px);max-height:24px}}
 </style>
 
