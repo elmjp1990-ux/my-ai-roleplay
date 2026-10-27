@@ -1084,6 +1084,50 @@ body:not(.day) .chat-entry.active {
 
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style id="poyozz-city-map-mvp">
+body.city-map-mode .app{margin-left:0!important}
+body.city-map-mode .sidebar,body.city-map-mode header{display:none!important}
+body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
+.city-map-stage{position:relative;height:100dvh;min-height:560px;overflow:hidden;background:#b9d9c5;isolation:isolate;touch-action:none;user-select:none}
+.city-map-world{position:absolute;inset:-18%;width:136%;height:136%;transform-origin:center;will-change:transform;background:linear-gradient(0deg,#a9d2b5,#c6e2c9 55%,#b4d9c5);overflow:hidden}
+.city-map-world:before{content:"";position:absolute;inset:0;background-image:linear-gradient(90deg,#ffffff18 1px,transparent 1px),linear-gradient(#ffffff18 1px,transparent 1px);background-size:42px 42px;opacity:.4}
+.city-map-river{position:absolute;left:-5%;top:28%;width:112%;height:18%;background:#8fc8df;border:12px solid #d6e6d7;border-radius:50%;transform:rotate(-12deg);box-shadow:0 0 0 8px #b4d8bf}
+.city-map-road{position:absolute;background:#f3e8cf;border:5px solid #fff8e8;border-radius:30px;box-shadow:0 2px 0 #8ba994}
+.city-map-road.r1{left:-8%;top:50%;width:120%;height:8%;transform:rotate(15deg)}
+.city-map-road.r2{left:44%;top:-10%;width:7%;height:120%;transform:rotate(8deg)}
+.city-map-road.r3{left:8%;top:20%;width:75%;height:6%;transform:rotate(-20deg)}
+.city-map-block{position:absolute;border:3px solid #fff9e8;border-radius:13px;box-shadow:0 7px 0 #6d99815c,inset 0 -5px #0000000d}
+.city-map-block.cafe{left:18%;top:34%;width:17%;height:15%;background:#e8ad98}
+.city-map-block.school{left:57%;top:15%;width:22%;height:17%;background:#f2d28c}
+.city-map-block.park{left:59%;top:56%;width:25%;height:24%;background:#75b78b;border-radius:25px}
+.city-map-block.shop{left:12%;top:63%;width:20%;height:14%;background:#d9a8d5}
+.city-map-block.home{left:70%;top:38%;width:15%;height:13%;background:#e4b8a0}
+.city-map-landmark{position:absolute;z-index:2;display:flex;flex-direction:column;align-items:center;gap:3px;transform:translate(-50%,-50%);border:2px solid #fff;background:#19233be8;color:#fff;border-radius:13px;padding:8px 9px;min-width:68px;box-shadow:0 5px 14px #203a3340;font-size:11px;font-weight:700;touch-action:manipulation}
+.city-map-landmark span{font-size:22px;line-height:1}
+.city-map-landmark:focus-visible{outline:3px solid #8b7cff;outline-offset:3px}
+.city-map-ui{position:absolute;z-index:5;inset:0;pointer-events:none;transition:opacity .18s ease}
+.city-map-ui>*{pointer-events:auto}
+.city-map-logo{position:absolute;top:calc(env(safe-area-inset-top) + 12px);left:14px;width:105px;padding:8px 11px;border:1px solid #ffffff90;border-radius:14px;background:#101726d9;color:#fff;font-weight:800;letter-spacing:.12em}
+.city-map-info{position:absolute;left:12px;top:calc(env(safe-area-inset-top) + 60px);width:min(52vw,230px);max-height:30vh;overflow:auto;padding:11px;border:1px solid #ffffffa8;border-radius:15px;background:#101726e8;color:#f4f3ff;box-shadow:0 12px 32px #172a2d30;backdrop-filter:blur(12px);font-size:11px;line-height:1.45}
+.city-map-info h2{font-size:15px;margin:0 0 4px}
+.city-map-info p{font-size:10px;line-height:1.45;margin:6px 0}
+.city-map-weather{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:#e8e9ff;font-size:10px}
+.city-map-traditional{width:100%;margin-top:7px;padding:7px 6px;font-size:10px;border-radius:9px;background:linear-gradient(135deg,#6658c9,#8b7cff);color:white;border:1px solid #c3baff}
+.city-map-zoom{position:absolute;right:12px;bottom:calc(90px + env(safe-area-inset-bottom));display:grid;gap:7px}
+.city-map-zoom button{width:42px;height:42px;padding:0;font-size:22px;background:#101726e8;color:white;border-color:#ffffff70}
+.city-map-bottom{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 8px);left:10px;right:10px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;padding:6px;border:1px solid #ffffff70;border-radius:16px;background:#101726e8}
+.city-map-bottom button{padding:9px 2px;font-size:10px;border-radius:10px;color:#f4f3ff}
+.city-map-bottom button.active{background:#6558be}
+.city-map-people{position:absolute;z-index:4;left:50%;top:48%;transform:translate(-50%,-50%);width:min(84vw,380px);max-height:62vh;overflow:auto;padding:16px;border:1px solid var(--border);border-radius:18px;background:#111827f5;color:#f4f3ff;box-shadow:0 20px 55px #0005}
+.city-map-people[hidden]{display:none}
+.city-map-people button[data-action="city-close"]{float:right}
+.city-map-empty{position:absolute;left:50%;bottom:calc(70px + env(safe-area-inset-bottom));transform:translateX(-50%);padding:6px 10px;border-radius:99px;background:#101726a8;color:#fff;font-size:10px;white-space:nowrap}
+.city-map-mode-immersive .city-map-ui{opacity:0;visibility:hidden;pointer-events:none}
+.city-map-mode-immersive .city-map-zoom{opacity:0;pointer-events:none}
+@media(min-width:768px){.city-map-stage{height:calc(100dvh - 0px)}.city-map-info{left:24px;top:80px;width:230px}.city-map-logo{left:24px}.city-map-bottom{left:50%;right:auto;transform:translateX(-50%);width:min(560px,70vw)}}
+@media(max-width:380px){.city-map-info{width:54vw;padding:8px}.city-map-info h2{font-size:13px}.city-map-info p{font-size:9px}.city-map-traditional{padding:6px 3px;font-size:9px}.city-map-bottom button{font-size:9px}}
+</style>
 </head>
 
 <body>
@@ -2184,7 +2228,7 @@ let pendingDeletionWalletSyncUid =
   state.account?.accountDeletionPending && state.account?.uid
     ? state.account.uid
     : null;
-let route = {page:'home'};
+let route = {page:'citymap'};
 const GROUP_CONTINUE_SENTINEL = '（請接續目前的故事。）';
 let personaPickerSelection = null;
 let groupPersonaPickerSelection = null;
@@ -2985,7 +3029,7 @@ function renderShell() {
 
 function render() {
   if ($('modal').open) $('modal').close();
-  const allowed = ['home','detail','session-detail','author','chat','conversation','group','create',
+  const allowed = ['citymap','home','detail','session-detail','author','chat','conversation','group','create',
     'editor','ai','notifications','favorites','followed-authors','shop','profile','album'];
   if (!allowed.includes(route.page)) route = {page:'home'};
 
@@ -3016,7 +3060,8 @@ function render() {
   }
   renderShell();
   switch(route.page) {
-    case 'home':renderHome();break;
+    case 'citymap':renderCityMapMVP();break;
+    case 'home':document.body.classList.remove('city-map-mode','city-map-mode-immersive');renderHome();break;
     case 'detail':renderDetail();break;
     case 'session-detail':renderDetail();break;
     case 'author':renderAuthor();break;
@@ -8904,6 +8949,56 @@ document.addEventListener('submit',function(event){
 
 <script id="poyozz-group-persona-preset">
 // Group persona selection uses the same saved-persona list as the chat's persona management UI.
+</script>
+
+<script id="poyozz-city-map-mvp-script">
+function renderCityMapMVP(){
+  document.body.classList.add('city-map-mode');
+  const view=$('view');
+  view.innerHTML=`
+    <section class="city-map-stage" id="cityMapStage" aria-label="POYOZZ 城市地圖">
+      <div class="city-map-world" id="cityMapWorld" aria-label="可拖曳地圖">
+        <div class="city-map-river"></div>
+        <div class="city-map-road r1"></div><div class="city-map-road r2"></div><div class="city-map-road r3"></div>
+        <div class="city-map-block cafe"></div><div class="city-map-block school"></div><div class="city-map-block park"></div><div class="city-map-block shop"></div><div class="city-map-block home"></div>
+        <button class="city-map-landmark" style="left:26%;top:40%" data-action="city-landmark" data-place="cafe"><span>☕</span>星光咖啡</button>
+        <button class="city-map-landmark" style="left:67%;top:23%" data-action="city-landmark" data-place="school"><span>🏫</span>晴日學園</button>
+        <button class="city-map-landmark" style="left:70%;top:67%" data-action="city-landmark" data-place="park"><span>🌳</span>中央公園</button>
+        <button class="city-map-landmark" style="left:23%;top:69%" data-action="city-landmark" data-place="shop"><span>🛍️</span>街角商店</button>
+        <button class="city-map-landmark" style="left:78%;top:44%" data-action="city-landmark" data-place="home"><span>🏠</span>住宅區</button>
+      </div>
+      <div class="city-map-ui" id="cityMapUI">
+        <div class="city-map-logo">POYOZZ</div>
+        <aside class="city-map-info">
+          <h2>POYOZZ 城市</h2>
+          <div id="cityMapDate">台灣時間</div>
+          <div class="city-map-weather"><span>🌤️</span><span id="cityMapWeather">天氣資料待串接</span><span id="cityMapTemp">溫度待串接</span></div>
+          <p>這座城市充滿各種可能，也許今天你會在某個角落遇見特別的那個人。</p>
+          <button class="city-map-traditional" data-action="city-traditional">⌖ 傳統探索模式</button>
+        </aside>
+        <div class="city-map-zoom"><button type="button" data-action="city-zoom-in" aria-label="放大地圖">＋</button><button type="button" data-action="city-zoom-out" aria-label="縮小地圖">−</button></div>
+        <div class="city-map-bottom">
+          <button data-action="city-traditional">✧<br>探索</button><button data-action="nav" data-page="create">✎<br>創建</button><button data-action="nav" data-page="chat">☏<br>聊天</button><button data-action="nav" data-page="shop">◇<br>商店</button><button data-action="nav" data-page="profile">♡<br>我的</button>
+        </div>
+      </div>
+      <div class="city-map-empty">拖曳探索 · 雙指縮放 · 雙擊空白處沉浸</div>
+      <section class="city-map-people" id="cityMapPeople" hidden><button type="button" data-action="city-close">關閉</button><h3 id="cityMapPlaceTitle">地標</h3><p>目前尚未連接角色出沒資料。前端 MVP 使用示意地標，不會產生虛構的即時角色名單。</p><p class="small muted">下一階段接入符合現代城鎮設定、公開且未刪除的角色。</p></section>
+    </section>`;
+  document.body.classList.remove('city-map-mode-immersive');
+  const stage=$('cityMapStage'),world=$('cityMapWorld');
+  let scale=1,tx=0,ty=0,pointers=new Map(),start=null,lastTap=0,lastTapX=0,lastTapY=0,moved=false;
+  const apply=()=>{world.style.transform='translate('+tx+'px,'+ty+'px) scale('+scale+')';};
+  const clamp=()=>{scale=Math.max(.72,Math.min(2.25,scale));tx=Math.max(-stage.clientWidth*.45,Math.min(stage.clientWidth*.45,tx));ty=Math.max(-stage.clientHeight*.45,Math.min(stage.clientHeight*.45,ty));apply();};
+  const zoomBy=f=>{scale*=f;clamp();};
+  stage.addEventListener('pointerdown',e=>{if(e.target.closest('button,.city-map-info,.city-map-zoom,.city-map-bottom,.city-map-people'))return;stage.setPointerCapture?.(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=false;if(pointers.size===1)start={x:e.clientX,y:e.clientY,tx,ty,time:Date.now()};else if(pointers.size===2){const a=[...pointers.values()];start={distance:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),scale,kind:'pinch'};}});
+  stage.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2&&start?.kind==='pinch'){const a=[...pointers.values()];const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);scale=start.scale*d/Math.max(1,start.distance);clamp();moved=true;}else if(pointers.size===1&&start&&!start.kind){const dx=e.clientX-start.x,dy=e.clientY-start.y;if(Math.abs(dx)+Math.abs(dy)>5)moved=true;tx=start.tx+dx;ty=start.ty+dy;apply();}});
+  const endPointer=e=>{pointers.delete(e.pointerId);if(pointers.size===0){if(start&&!moved&&Date.now()-start.time<280){const now=Date.now(),dx=e.clientX-lastTapX,dy=e.clientY-lastTapY;if(now-lastTap<320&&Math.hypot(dx,dy)<24){document.body.classList.toggle('city-map-mode-immersive');lastTap=0;}else{lastTap=now;lastTapX=e.clientX;lastTapY=e.clientY;}}start=null;}else if(pointers.size===1){const p=[...pointers.values()][0];start={x:p.x,y:p.y,tx,ty,time:Date.now()};}};
+  stage.addEventListener('pointerup',endPointer);stage.addEventListener('pointercancel',endPointer);stage.addEventListener('dblclick',e=>e.preventDefault());stage.addEventListener('contextmenu',e=>e.preventDefault());
+  const taipeiTime=()=>{const d=new Date();$('cityMapDate').textContent=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);const hour=Number(new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',hour:'2-digit',hour12:false}).format(d));stage.style.background=hour>=6&&hour<18?'#b9d9c5':'#18253e';world.style.filter=hour>=6&&hour<18?'none':'brightness(.58) saturate(.8)';};
+  taipeiTime();
+  stage.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;if(a==='city-zoom-in'){zoomBy(1.18);return;}if(a==='city-zoom-out'){zoomBy(.85);return;}if(a==='city-close'){$('cityMapPeople').hidden=true;return;}if(a==='city-landmark'){const names={cafe:'星光咖啡',school:'晴日學園',park:'中央公園',shop:'街角商店',home:'住宅區'};$('cityMapPlaceTitle').textContent=names[b.dataset.place]||'地標';$('cityMapPeople').hidden=false;return;}if(a==='city-traditional'){go({page:'home'});return;}});
+  window.addEventListener('resize',clamp,{passive:true});
+}
 </script>
 </body>
 </html>
