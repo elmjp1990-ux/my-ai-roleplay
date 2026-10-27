@@ -1090,7 +1090,7 @@ body.city-map-mode .app{margin-left:0!important}
 body.city-map-mode .sidebar,body.city-map-mode header{display:none!important}
 body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
 .city-map-stage{position:fixed;inset:0;width:100vw;height:100dvh;min-height:560px;overflow:hidden;background:#b9d9c5;isolation:isolate;touch-action:none;user-select:none;z-index:1}
-.city-map-world{position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:center;will-change:transform;background-image:url('https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp');background-position:center;background-size:cover;background-repeat:no-repeat;overflow:hidden}
+.city-map-world{position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:center;will-change:transform;background-image:url('https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp');background-position:center;background-size:100% 100%;background-repeat:no-repeat;overflow:visible}
 .city-map-world:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#18253e12,transparent 30%,#18253e18);pointer-events:none}
 .city-map-river{display:none!important;position:absolute;left:-5%;top:28%;width:112%;height:18%;background:#8fc8df;border:12px solid #d6e6d7;border-radius:50%;transform:rotate(-12deg);box-shadow:0 0 0 8px #b4d8bf}
 .city-map-road{display:none!important;position:absolute;background:#f3e8cf;border:5px solid #fff8e8;border-radius:30px;box-shadow:0 2px 0 #8ba994}
@@ -8986,7 +8986,10 @@ function renderCityMapMVP(){
     </section>`;
   document.body.classList.remove('city-map-mode-immersive');
   const stage=$('cityMapStage'),world=$('cityMapWorld');
+  const mapAspect=2752/1536;
   let scale=1,tx=0,ty=0,pointers=new Map(),start=null,lastTap=0,lastTapX=0,lastTapY=0,moved=false;
+  const sizeWorld=()=>{const sw=stage.clientWidth,sh=stage.clientHeight;const w=Math.max(sw,sh*mapAspect),h=w/mapAspect;world.style.width=w+'px';world.style.height=h+'px';world.style.left=((sw-w)/2)+'px';world.style.top=((sh-h)/2)+'px';world.style.backgroundSize='100% 100%';};
+  sizeWorld();
   const apply=()=>{world.style.transform='translate('+tx+'px,'+ty+'px) scale('+scale+')';};
   const clamp=()=>{scale=Math.max(1,Math.min(2.25,scale));const maxX=Math.max(0,(world.offsetWidth*scale-stage.clientWidth)/2);const maxY=Math.max(0,(world.offsetHeight*scale-stage.clientHeight)/2);tx=Math.max(-maxX,Math.min(maxX,tx));ty=Math.max(-maxY,Math.min(maxY,ty));apply();};
   const zoomBy=f=>{scale*=f;clamp();};
@@ -8997,7 +9000,7 @@ function renderCityMapMVP(){
   const taipeiTime=()=>{const d=new Date();$('cityMapDate').textContent=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);const hour=Number(new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',hour:'2-digit',hour12:false}).format(d));const mapImage=hour>=6&&hour<18?'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp':'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Add_nighttime_lighting_to_buildings_2K_20261027142959%20(1).webp';stage.style.backgroundColor=hour>=6&&hour<18?'#b9d9c5':'#18253e';stage.style.backgroundImage='none';world.style.backgroundImage='url("'+mapImage+'")';world.style.filter='none';};
   taipeiTime();
   stage.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;if(a==='city-zoom-in'){zoomBy(1.18);return;}if(a==='city-zoom-out'){zoomBy(.85);return;}if(a==='city-close'){$('cityMapPeople').hidden=true;return;}if(a==='city-landmark'){const names={cafe:'星光咖啡',school:'晴日學園',park:'中央公園',shop:'街角商店',home:'住宅區'};$('cityMapPlaceTitle').textContent=names[b.dataset.place]||'地標';$('cityMapPeople').hidden=false;return;}if(a==='city-traditional'){go({page:'home'});return;}});
-  window.addEventListener('resize',clamp,{passive:true});
+  window.addEventListener('resize',()=>{sizeWorld();clamp();},{passive:true});
 }
 </script>
 </body>
