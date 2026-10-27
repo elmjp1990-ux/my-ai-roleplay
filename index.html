@@ -1145,6 +1145,15 @@ body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
  -webkit-backdrop-filter:blur(16px) saturate(125%)!important;
 }
 .city-map-landmark{font-weight:650;border-width:1px!important}
+/* Presence-based building interaction: no generic rectangular marker buttons. */
+.city-building-layer{position:absolute;inset:0;width:100%;height:100%;z-index:3;overflow:visible}
+.city-building-hit{fill:rgba(255,255,255,0);stroke:rgba(255,255,255,0);stroke-width:3;vector-effect:non-scaling-stroke;pointer-events:all;cursor:default;transition:fill .2s ease,stroke .2s ease,filter .2s ease}
+.city-building-hit.is-available{fill:rgba(255,255,255,.035);stroke:rgba(255,255,255,.96);stroke-width:3.2;filter:drop-shadow(0 0 4px rgba(255,255,255,.9)) drop-shadow(0 0 10px rgba(255,255,255,.42));cursor:pointer;animation:city-building-breathe 2.8s ease-in-out infinite}
+.city-building-hit.is-available:focus-visible{stroke:#fff;stroke-width:5;outline:none}
+@keyframes city-building-breathe{0%,100%{fill:rgba(255,255,255,.025);filter:drop-shadow(0 0 3px rgba(255,255,255,.8))}50%{fill:rgba(255,255,255,.12);filter:drop-shadow(0 0 7px rgba(255,255,255,1)) drop-shadow(0 0 14px rgba(255,255,255,.55))}}
+.city-building-hit:not(.is-available){pointer-events:all}
+@media(prefers-reduced-motion:reduce){.city-building-hit{animation:none!important;transition:none!important}}
+
 .city-map-landmark:active,.city-map-zoom button:active,.city-map-bottom button:active{background:rgba(45,51,62,.88)!important}
 .city-map-traditional,.city-map-bottom button,.city-map-zoom button,.city-map-people button{
  background:rgba(82,88,99,.66)!important;
@@ -9091,11 +9100,15 @@ function renderCityMapMVP(){
         <div class="city-map-river"></div>
         <div class="city-map-road r1"></div><div class="city-map-road r2"></div><div class="city-map-road r3"></div>
         <div class="city-map-block cafe"></div><div class="city-map-block school"></div><div class="city-map-block park"></div><div class="city-map-block shop"></div><div class="city-map-block home"></div>
-        <button class="city-map-landmark" style="left:26%;top:40%" data-action="city-landmark" data-place="cafe"><span>☕</span>星光咖啡</button>
-        <button class="city-map-landmark" style="left:67%;top:23%" data-action="city-landmark" data-place="school"><span>🏫</span>晴日學園</button>
-        <button class="city-map-landmark" style="left:70%;top:67%" data-action="city-landmark" data-place="park"><span>🌳</span>中央公園</button>
-        <button class="city-map-landmark" style="left:23%;top:69%" data-action="city-landmark" data-place="shop"><span>🛍️</span>街角商店</button>
-        <button class="city-map-landmark" style="left:78%;top:44%" data-action="city-landmark" data-place="home"><span>🏠</span>住宅區</button>
+        <svg class="city-building-layer" id="cityBuildingLayer" viewBox="0 0 1662 932" preserveAspectRatio="none" aria-label="可遇見角色的建築位置">
+          <polygon class="city-building-hit" data-action="city-landmark" data-place="airport" tabindex="0" role="button" aria-label="機場" points="112,95 202,107 258,173 193,188 151,148"/>
+          <polygon class="city-building-hit" data-action="city-landmark" data-place="commercial" tabindex="0" role="button" aria-label="商業大樓" points="1250,52 1300,70 1320,122 1295,153 1260,127 1238,90"/>
+          <polygon class="city-building-hit" data-action="city-landmark" data-place="school" tabindex="0" role="button" aria-label="學校" points="1010,259 1040,271 1050,311 1027,332 1007,307"/>
+          <polygon class="city-building-hit" data-action="city-landmark" data-place="apartment" tabindex="0" role="button" aria-label="公寓住宅" points="637,395 690,410 718,449 685,482 642,460 620,427"/>
+          <polygon class="city-building-hit" data-action="city-landmark" data-place="bookstore" tabindex="0" role="button" aria-label="書店" points="440,683 479,686 503,719 485,747 450,731 430,706"/>
+          <polygon class="city-building-hit" data-action="city-landmark" data-place="park" tabindex="0" role="button" aria-label="中央公園" points="687,724 754,713 788,742 775,782 733,803 696,778 674,748"/>
+          <polygon class="city-building-hit" data-action="city-landmark" data-place="market" tabindex="0" role="button" aria-label="商店街" points="583,589 624,597 643,627 626,652 592,641 574,615"/>
+        </svg>
       </div>
       <div class="city-map-ui" id="cityMapUI">
         <aside class="city-map-info">
@@ -9111,7 +9124,7 @@ function renderCityMapMVP(){
         </div>
       </div>
       <div class="city-map-empty">拖曳探索 · 雙指縮放 · 雙擊空白處沉浸</div>
-      <section class="city-map-people" id="cityMapPeople" hidden><button type="button" data-action="city-close">關閉</button><h3 id="cityMapPlaceTitle">地標</h3><p>目前尚未連接角色出沒資料。前端 MVP 使用示意地標，不會產生虛構的即時角色名單。</p><p class="small muted">下一階段接入符合現代城鎮設定、公開且未刪除的角色。</p></section>
+      <section class="city-map-people" id="cityMapPeople" hidden><button type="button" data-action="city-close">關閉</button><h3 id="cityMapPlaceTitle">地標</h3><div id="cityMapPresenceList"><p>這個地點目前沒有可遇見的角色。</p></div></section>
     </section>`;
   document.body.classList.remove('city-map-mode-immersive');
   const stage=$('cityMapStage'),world=$('cityMapWorld');
@@ -9154,7 +9167,25 @@ function renderCityMapMVP(){
   const cityMapClock=setInterval(taipeiTime,30000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)taipeiTime();});
 
-  stage.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;if(a==='city-zoom-in'){zoomBy(1.18);return;}if(a==='city-zoom-out'){zoomBy(.85);return;}if(a==='city-close'){$('cityMapPeople').hidden=true;return;}if(a==='city-landmark'){const names={cafe:'星光咖啡',school:'晴日學園',park:'中央公園',shop:'街角商店',home:'住宅區'};$('cityMapPlaceTitle').textContent=names[b.dataset.place]||'地標';$('cityMapPeople').hidden=false;return;}if(a==='city-traditional'){go({page:'home'});return;}});
+  const cityPlaceNames={airport:'機場',commercial:'商業大樓',school:'學校',apartment:'公寓住宅',bookstore:'書店',park:'中央公園',market:'商店街'};
+  // This map stays empty until a trusted schedule/presence source supplies characters.
+  // Each entry must contain only public, undeleted, modern-city-compatible characters
+  // whose current schedule places them at that location.
+  let cityPresenceByPlace={};
+  const renderCityPresence=()=>{
+    document.querySelectorAll('.city-building-hit').forEach(el=>{
+      const available=Array.isArray(cityPresenceByPlace[el.dataset.place])&&cityPresenceByPlace[el.dataset.place].length>0;
+      el.classList.toggle('is-available',available);
+      el.setAttribute('aria-disabled',String(!available));
+      el.setAttribute('tabindex',available?'0':'-1');
+    });
+  };
+  window.updateCityMapPresence=(presence)=>{
+    cityPresenceByPlace=presence&&typeof presence==='object'?presence:{};
+    renderCityPresence();
+  };
+  renderCityPresence();
+  stage.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;if(a==='city-zoom-in'){zoomBy(1.18);return;}if(a==='city-zoom-out'){zoomBy(.85);return;}if(a==='city-close'){$('cityMapPeople').hidden=true;return;}if(a==='city-landmark'){const place=b.dataset.place;const people=cityPresenceByPlace[place];if(!Array.isArray(people)||!people.length)return;$('cityMapPlaceTitle').textContent=cityPlaceNames[place]||'地標';$('cityMapPresenceList').innerHTML=people.map(person=>'<p>'+escapeHTML(String(person.name||'角色'))+(person.activity?' · '+escapeHTML(String(person.activity)):'')+'</p>').join('');$('cityMapPeople').hidden=false;return;}if(a==='city-traditional'){go({page:'home'});return;}});
   window.addEventListener('resize',()=>{sizeWorld();clamp();},{passive:true});
 }
 </script>
