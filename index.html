@@ -2864,7 +2864,7 @@ function parseRoute() {
   try { identifier = key ? decodeURIComponent(key) : undefined; }
   catch (_) { identifier = undefined; }
   return {
-    page:p === 'character' ? 'detail' : (p || 'home'),
+    page:p === 'character' ? 'detail' : (p || 'citymap'),
     ...(identifier ? {id:identifier} : {}),
     ...(query ? {tag:new URLSearchParams(query).get('tag')} : {})
   };
