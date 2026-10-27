@@ -9100,14 +9100,9 @@ function renderCityMapMVP(){
         <div class="city-map-river"></div>
         <div class="city-map-road r1"></div><div class="city-map-road r2"></div><div class="city-map-road r3"></div>
         <div class="city-map-block cafe"></div><div class="city-map-block school"></div><div class="city-map-block park"></div><div class="city-map-block shop"></div><div class="city-map-block home"></div>
-        <svg class="city-building-layer" id="cityBuildingLayer" viewBox="0 0 1662 932" preserveAspectRatio="none" aria-label="可遇見角色的建築位置">
-          <polygon class="city-building-hit" data-action="city-landmark" data-place="airport" tabindex="0" role="button" aria-label="機場" points="112,95 202,107 258,173 193,188 151,148"/>
-          <polygon class="city-building-hit" data-action="city-landmark" data-place="commercial" tabindex="0" role="button" aria-label="商業大樓" points="1250,52 1300,70 1320,122 1295,153 1260,127 1238,90"/>
-          <polygon class="city-building-hit" data-action="city-landmark" data-place="school" tabindex="0" role="button" aria-label="學校" points="1010,259 1040,271 1050,311 1027,332 1007,307"/>
-          <polygon class="city-building-hit" data-action="city-landmark" data-place="apartment" tabindex="0" role="button" aria-label="公寓住宅" points="637,395 690,410 718,449 685,482 642,460 620,427"/>
-          <polygon class="city-building-hit" data-action="city-landmark" data-place="bookstore" tabindex="0" role="button" aria-label="書店" points="440,683 479,686 503,719 485,747 450,731 430,706"/>
-          <polygon class="city-building-hit" data-action="city-landmark" data-place="park" tabindex="0" role="button" aria-label="中央公園" points="687,724 754,713 788,742 775,782 733,803 696,778 674,748"/>
-          <polygon class="city-building-hit" data-action="city-landmark" data-place="market" tabindex="0" role="button" aria-label="商店街" points="583,589 624,597 643,627 626,652 592,641 574,615"/>
+        <svg class="city-building-layer" id="cityBuildingLayer" viewBox="0 0 1662 932" preserveAspectRatio="none" aria-label="單棟建築輪廓高亮測試">
+          <!-- Prototype 1: trace the roof outline of one red-brick bookstore building from the supplied city map. -->
+          <path class="city-building-hit" data-action="city-landmark" data-place="bookstore" tabindex="0" role="button" aria-label="書店建築輪廓測試" d="M 473 694 L 495 679 L 523 688 L 506 704 L 482 700 Z"/>
         </svg>
       </div>
       <div class="city-map-ui" id="cityMapUI">
