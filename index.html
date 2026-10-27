@@ -1259,14 +1259,14 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 <body>
 <aside class="sidebar">
   <div class="sidebar-heading">
-    <button class="ghost logo-button" data-action="home" aria-label="首頁">
+    <button class="ghost logo-button" data-action="city-home" aria-label="城市地圖首頁">
       <img class="logo-img" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="PersonaX">
     </button>
     <button class="ghost" data-action="collapse" aria-label="收合或展開網站選單">☰</button>
   </div>
   <nav id="desktopNav"></nav>
   <div class="sidebar-footer">
-    <button class="ghost sidebar-footer-logo" data-action="home" aria-label="首頁">
+    <button class="ghost sidebar-footer-logo" data-action="city-home" aria-label="城市地圖首頁">
       <img class="logo-img sidebar-wordmark" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="PersonaX">
       <img class="sidebar-iconmark" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBICON.png?v=20261024-1" alt="PersonaX">
     </button>
@@ -1276,7 +1276,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 <div class="app">
   <header>
     <div class="row">
-      <button class="ghost mobile-logo" data-action="home" aria-label="首頁">
+      <button class="ghost mobile-logo" data-action="city-home" aria-label="城市地圖首頁">
         <img class="logo-img" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="PersonaX">
       </button>
       <strong class="desktop-title" id="pageTitle"></strong>
@@ -2171,6 +2171,7 @@ const svg = (paths, extra = '') =>
 
 const ICON = {
   home:svg('<circle cx="11" cy="11" r="7"></circle><path d="m16 16 5 5"></path>'),
+  citymap:svg('<path d="M3 10.5 12 3l9 7.5"></path><path d="M5.5 9.5V21h13V9.5M9 21v-7h6v7"></path>'),
   chat:svg('<path d="M21 11a9 9 0 0 1-9 9H4l-2 2V11a9 9 0 0 1 19 0Z"></path>','chat-nav-icon'),
   create:svg('<circle cx="9" cy="7" r="4"></circle><path d="M2 21v-2a7 7 0 0 1 12-5M18 13v8M14 17h8"></path>'),
   shop:svg('<path d="M3 9h18l-1.5 12h-15L3 9Z"></path><path d="M8 9V6a4 4 0 0 1 8 0v3"></path>'),
@@ -3096,7 +3097,7 @@ function requireLogin(next) {
 }
 function visit(page,idValue) {
   const next = {page,...(idValue ? {id:idValue} : {})};
-  if (!['home','detail','author'].includes(page) && !currentUser()) {
+  if (!['citymap','home','detail','author'].includes(page) && !currentUser()) {
     openModal('login',{next});
     return;
   }
@@ -6763,6 +6764,7 @@ document.addEventListener('click',async event => {
       case 'group-toggle-member':groupExpandedMemberId=groupExpandedMemberId===key?null:key;render();break;
       case 'group-restart':groupRestart();break;
       case 'nav':visit(button.dataset.page);break;
+      case 'city-home':go({page:'citymap'});break;
       case 'create-visibility':
         createVisibilityFilter = ['all','public','private'].includes(button.dataset.value) ? button.dataset.value : 'all';
         renderCreate();
@@ -9097,7 +9099,7 @@ function renderCityMapMVP(){
       </div>
       <div class="city-map-ui" id="cityMapUI">
         <aside class="city-map-info">
-          <h2 class="city-map-title"><img src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="POYOZZ"> <span>城市</span></h2>
+          <h2 class="city-map-title"><button type="button" class="ghost" data-action="city-home" aria-label="返回城市地圖首頁" style="padding:0;border:0;background:transparent"><img src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="POYOZZ"></button> <span>城市</span></h2>
           <div id="cityMapDate">台灣時間</div>
           <div class="city-map-weather"><span>🌤️</span><span id="cityMapWeather">天氣資料待串接</span><span id="cityMapTemp">溫度待串接</span></div>
           <p>這座城市充滿各種可能，也許今天你會在某個角落遇見特別的那個人。</p>
