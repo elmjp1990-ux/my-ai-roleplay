@@ -8997,8 +8997,34 @@ function renderCityMapMVP(){
   stage.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2&&start?.kind==='pinch'){const a=[...pointers.values()];const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);scale=start.scale*d/Math.max(1,start.distance);clamp();moved=true;}else if(pointers.size===1&&start&&!start.kind){const dx=e.clientX-start.x,dy=e.clientY-start.y;if(Math.abs(dx)+Math.abs(dy)>5)moved=true;tx=start.tx+dx;ty=start.ty+dy;clamp();}});
   const endPointer=e=>{pointers.delete(e.pointerId);if(pointers.size===0){if(start&&!moved&&Date.now()-start.time<280){const now=Date.now(),dx=e.clientX-lastTapX,dy=e.clientY-lastTapY;if(now-lastTap<320&&Math.hypot(dx,dy)<24){document.body.classList.toggle('city-map-mode-immersive');lastTap=0;}else{lastTap=now;lastTapX=e.clientX;lastTapY=e.clientY;}}start=null;}else if(pointers.size===1){const p=[...pointers.values()][0];start={x:p.x,y:p.y,tx,ty,time:Date.now()};}};
   stage.addEventListener('pointerup',endPointer);stage.addEventListener('pointercancel',endPointer);stage.addEventListener('dblclick',e=>e.preventDefault());stage.addEventListener('contextmenu',e=>e.preventDefault());
-  const taipeiTime=()=>{const d=new Date();$('cityMapDate').textContent=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);const hour=Number(new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',hour:'2-digit',hour12:false}).format(d));const mapImage=hour>=6&&hour<18?'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp':'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Add_nighttime_lighting_to_buildings_2K_20261027142959%20(1).webp';stage.style.backgroundColor=hour>=6&&hour<18?'#b9d9c5':'#18253e';stage.style.backgroundImage='none';world.style.backgroundImage='url("'+mapImage+'")';world.style.filter='none';};
+  // 2025 Taipei solar-time reference profile. Calculate the 2025 reference day locally;
+  // no sunrise/sunset API or daily network request is needed.
+  const taipeiSunTimes2025=(month,day)=>{
+    const date=new Date(Date.UTC(2025,month-1,day));
+    const n=Math.floor((date-Date.UTC(2025,0,0))/86400000);
+    const lat=25.033,lon=121.5654,zenith=90.833;
+    const decl=0.006918-0.399912*Math.cos(2*Math.PI*n/365)+0.070257*Math.sin(2*Math.PI*n/365)-0.006758*Math.cos(4*Math.PI*n/365)+0.000907*Math.sin(4*Math.PI*n/365)-0.002697*Math.cos(6*Math.PI*n/365)+0.00148*Math.sin(6*Math.PI*n/365);
+    const cosH=(Math.cos(zenith*Math.PI/180)-Math.sin(lat*Math.PI/180)*Math.sin(decl))/(Math.cos(lat*Math.PI/180)*Math.cos(decl));
+    const ha=Math.acos(Math.max(-1,Math.min(1,cosH)))*180/Math.PI;
+    const solarNoon=12-lon/15+8;
+    return {sunrise:solarNoon-ha/15,sunset:solarNoon+ha/15};
+  };
+  const taipeiTime=()=>{
+    const d=new Date();
+    const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d);
+    const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));
+    const month=Number(p.month),day=Number(p.day),minuteOfDay=Number(p.hour)*60+Number(p.minute);
+    const sun=taipeiSunTimes2025(month,day);
+    const sunrise=Math.round(sun.sunrise*60),sunset=Math.round(sun.sunset*60);
+    const isDay=minuteOfDay>=sunrise&&minuteOfDay<sunset;
+    $('cityMapDate').textContent=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);
+    const mapImage=isDay?'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp':'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Add_nighttime_lighting_to_buildings_2K_20261027142959%20(1).webp';
+    stage.style.backgroundColor=isDay?'#b9d9c5':'#18253e';stage.style.backgroundImage='none';world.style.backgroundImage='url("'+mapImage+'")';world.style.filter='none';
+  };
   taipeiTime();
+  const cityMapClock=setInterval(taipeiTime,30000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)taipeiTime();});
+
   stage.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;if(a==='city-zoom-in'){zoomBy(1.18);return;}if(a==='city-zoom-out'){zoomBy(.85);return;}if(a==='city-close'){$('cityMapPeople').hidden=true;return;}if(a==='city-landmark'){const names={cafe:'星光咖啡',school:'晴日學園',park:'中央公園',shop:'街角商店',home:'住宅區'};$('cityMapPlaceTitle').textContent=names[b.dataset.place]||'地標';$('cityMapPeople').hidden=false;return;}if(a==='city-traditional'){go({page:'home'});return;}});
   window.addEventListener('resize',()=>{sizeWorld();clamp();},{passive:true});
 }
