@@ -1145,14 +1145,16 @@ body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
  -webkit-backdrop-filter:blur(16px) saturate(125%)!important;
 }
 .city-map-landmark{font-weight:650;border-width:1px!important}
-/* Presence-based building interaction: no generic rectangular marker buttons. */
-.city-building-layer{position:absolute;inset:0;width:100%;height:100%;z-index:3;overflow:visible}
-.city-building-hit{fill:rgba(255,255,255,0);stroke:rgba(255,255,255,0);stroke-width:3;vector-effect:non-scaling-stroke;pointer-events:all;cursor:default;transition:fill .2s ease,stroke .2s ease,filter .2s ease}
-.city-building-hit.is-available{fill:rgba(255,255,255,.035);stroke:rgba(255,255,255,.96);stroke-width:3.2;filter:drop-shadow(0 0 4px rgba(255,255,255,.9)) drop-shadow(0 0 10px rgba(255,255,255,.42));cursor:pointer;animation:city-building-breathe 2.8s ease-in-out infinite}
-.city-building-hit.is-available:focus-visible{stroke:#fff;stroke-width:5;outline:none}
-@keyframes city-building-breathe{0%,100%{fill:rgba(255,255,255,.025);filter:drop-shadow(0 0 3px rgba(255,255,255,.8))}50%{fill:rgba(255,255,255,.12);filter:drop-shadow(0 0 7px rgba(255,255,255,1)) drop-shadow(0 0 14px rgba(255,255,255,.55))}}
-.city-building-hit:not(.is-available){pointer-events:all}
-@media(prefers-reduced-motion:reduce){.city-building-hit{animation:none!important;transition:none!important}}
+/* POYOZZ city markers: matching translucent glass treatment for every location. */
+.city-building-layer{position:absolute;inset:0;width:100%;height:100%;z-index:3;overflow:visible;pointer-events:none}
+.city-place-marker{pointer-events:all;cursor:pointer;transform-box:fill-box;transform-origin:center;animation:city-marker-float 3.1s ease-in-out infinite;outline:none}
+.city-place-marker:nth-of-type(even){animation-delay:-1.45s}
+.city-marker-glass{fill:rgba(78,83,98,.58);stroke:rgba(244,241,255,.78);stroke-width:1.5;vector-effect:non-scaling-stroke;filter:drop-shadow(0 3px 5px rgba(13,17,27,.28)) drop-shadow(0 0 5px rgba(226,222,246,.2));backdrop-filter:blur(8px)}
+.city-marker-glyph{fill:rgba(250,248,255,.96);font-size:17px;font-weight:600;text-anchor:middle;dominant-baseline:middle;pointer-events:none;paint-order:stroke;stroke:rgba(255,255,255,.12);stroke-width:.5}
+.city-place-marker:hover .city-marker-glass,.city-place-marker:focus-visible .city-marker-glass{fill:rgba(108,103,132,.78);stroke:rgba(255,255,255,.98);stroke-width:2;filter:drop-shadow(0 3px 6px rgba(13,17,27,.3)) drop-shadow(0 0 8px rgba(231,225,255,.45))}
+.city-place-marker:focus-visible{outline:none}
+@keyframes city-marker-float{0%,100%{translate:0 0}50%{translate:0 -5px}}
+@media(prefers-reduced-motion:reduce){.city-place-marker{animation:none!important;transition:none!important}}
 
 .city-map-landmark:active,.city-map-zoom button:active,.city-map-bottom button:active{background:rgba(45,51,62,.88)!important}
 .city-map-traditional,.city-map-bottom button,.city-map-zoom button,.city-map-people button{
@@ -9100,9 +9102,15 @@ function renderCityMapMVP(){
         <div class="city-map-river"></div>
         <div class="city-map-road r1"></div><div class="city-map-road r2"></div><div class="city-map-road r3"></div>
         <div class="city-map-block cafe"></div><div class="city-map-block school"></div><div class="city-map-block park"></div><div class="city-map-block shop"></div><div class="city-map-block home"></div>
-        <svg class="city-building-layer" id="cityBuildingLayer" viewBox="0 0 1662 932" preserveAspectRatio="none" aria-label="單棟建築輪廓高亮測試">
-          <!-- Prototype 1: trace the roof outline of one red-brick bookstore building from the supplied city map. -->
-          <path class="city-building-hit" data-action="city-landmark" data-place="bookstore" tabindex="0" role="button" aria-label="書店建築輪廓測試" d="M 485 670 L 524 654 L 557 673 L 523 697 L 484 680 Z"/>
+        <svg class="city-building-layer" id="cityBuildingLayer" viewBox="0 0 1662 932" preserveAspectRatio="none" aria-label="城市地點玻璃圓形圖標">
+          <!-- Uniform glass markers: roof-level anchors are visual prototypes and can be fine-tuned after preview. -->
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="airport" transform="translate(285 132)" tabindex="0" role="button" aria-label="機場"><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph" y="1">✦</text></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="commercial" transform="translate(1285 238)" tabindex="0" role="button" aria-label="商業大樓"><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph" y="1">✦</text></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="school" transform="translate(746 422)" tabindex="0" role="button" aria-label="學校"><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph" y="1">✦</text></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="apartment" transform="translate(415 653)" tabindex="0" role="button" aria-label="公寓住宅"><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph" y="1">✦</text></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="bookstore" transform="translate(585 683)" tabindex="0" role="button" aria-label="書店"><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph" y="1">✦</text></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="park" transform="translate(1010 566)" tabindex="0" role="button" aria-label="中央公園"><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph" y="1">✦</text></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="market" transform="translate(1360 650)" tabindex="0" role="button" aria-label="商店街"><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph" y="1">✦</text></g>
         </svg>
       </div>
       <div class="city-map-ui" id="cityMapUI">
@@ -9166,11 +9174,11 @@ function renderCityMapMVP(){
   // This map stays empty until a trusted schedule/presence source supplies characters.
   // Each entry must contain only public, undeleted, modern-city-compatible characters
   // whose current schedule places them at that location.
-  // Temporary visual-test mode: highlight every marked building so outline placement can be reviewed before live character presence is connected.
+  // Temporary preview: show the same glass marker on every planned location until live schedule presence is connected.
   const CITY_MAP_HIGHLIGHT_ALL_FOR_PREVIEW=true;
   let cityPresenceByPlace={};
   const renderCityPresence=()=>{
-    document.querySelectorAll('.city-building-hit').forEach(el=>{
+    document.querySelectorAll('.city-place-marker').forEach(el=>{
       const available=CITY_MAP_HIGHLIGHT_ALL_FOR_PREVIEW || (Array.isArray(cityPresenceByPlace[el.dataset.place])&&cityPresenceByPlace[el.dataset.place].length>0);
       el.classList.toggle('is-available',available);
       el.setAttribute('aria-disabled',String(!available));
