@@ -1128,6 +1128,38 @@ body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
 @media(min-width:768px){.city-map-stage{height:calc(100dvh - 0px)}.city-map-info{left:24px;top:80px;width:230px}.city-map-logo{left:24px}.city-map-bottom{left:50%;right:auto;transform:translateX(-50%);width:min(560px,70vw)}}
 @media(max-width:380px){.city-map-info{width:54vw;padding:8px}.city-map-info h2{font-size:13px}.city-map-info p{font-size:9px}.city-map-traditional{padding:6px 3px;font-size:9px}.city-map-bottom button{font-size:9px}}
 </style>
+
+<style id="poyozz-city-map-glass-polish">
+/* POYOZZ city map: logo lockup and refined translucent neutral controls */
+.city-map-title{display:flex;align-items:center;gap:7px;font-size:15px!important;letter-spacing:.01em}
+.city-map-title img{display:block;width:clamp(88px,11vw,112px);height:auto;max-height:27px;object-fit:contain;object-position:left center}
+.city-map-title span{font-weight:650;white-space:nowrap}
+.city-map-info{background:rgba(70,76,87,.68)!important;border-color:rgba(255,255,255,.38)!important;color:#fff!important;box-shadow:0 12px 32px rgba(20,25,35,.18)!important;backdrop-filter:blur(18px) saturate(125%)!important;-webkit-backdrop-filter:blur(18px) saturate(125%)!important}
+.city-map-weather{color:rgba(255,255,255,.9)!important}
+.city-map-landmark,.city-map-zoom button,.city-map-bottom,.city-map-empty,.city-map-people{
+ background:rgba(66,72,83,.70)!important;
+ border-color:rgba(255,255,255,.38)!important;
+ color:#fff!important;
+ box-shadow:0 8px 24px rgba(18,24,35,.18)!important;
+ backdrop-filter:blur(16px) saturate(125%)!important;
+ -webkit-backdrop-filter:blur(16px) saturate(125%)!important;
+}
+.city-map-landmark{font-weight:650;border-width:1px!important}
+.city-map-landmark:active,.city-map-zoom button:active,.city-map-bottom button:active{background:rgba(45,51,62,.88)!important}
+.city-map-traditional,.city-map-bottom button,.city-map-zoom button,.city-map-people button{
+ background:rgba(82,88,99,.66)!important;
+ border:1px solid rgba(255,255,255,.42)!important;
+ color:#fff!important;
+ box-shadow:0 3px 12px rgba(18,24,35,.12)!important;
+}
+.city-map-traditional:hover,.city-map-bottom button:hover,.city-map-zoom button:hover,.city-map-people button:hover{background:rgba(55,61,72,.82)!important}
+.city-map-bottom button.active{background:rgba(104,108,121,.88)!important}
+.city-map-info p{color:rgba(255,255,255,.91)}
+.city-map-empty{background:rgba(66,72,83,.58)!important;color:rgba(255,255,255,.96)!important}
+.city-map-logo{display:none!important}
+@media(max-width:380px){.city-map-title img{width:clamp(78px,24vw,96px);max-height:24px}}
+</style>
+
 </head>
 
 <body>
@@ -8968,9 +9000,8 @@ function renderCityMapMVP(){
         <button class="city-map-landmark" style="left:78%;top:44%" data-action="city-landmark" data-place="home"><span>🏠</span>住宅區</button>
       </div>
       <div class="city-map-ui" id="cityMapUI">
-        <div class="city-map-logo">POYOZZ</div>
         <aside class="city-map-info">
-          <h2>POYOZZ 城市</h2>
+          <h2 class="city-map-title"><img src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="POYOZZ"> <span>城市</span></h2>
           <div id="cityMapDate">台灣時間</div>
           <div class="city-map-weather"><span>🌤️</span><span id="cityMapWeather">天氣資料待串接</span><span id="cityMapTemp">溫度待串接</span></div>
           <p>這座城市充滿各種可能，也許今天你會在某個角落遇見特別的那個人。</p>
@@ -9013,7 +9044,7 @@ function renderCityMapMVP(){
     const d=new Date();
     const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d);
     const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));
-    const month=Number(p.month),day=Number(p.day),minuteOfDay=Number(p.hour)*60+Number(p.minute);
+    const month=Number(p.month),day=Number(p.day),minuteOfDay=(Number(p.hour)%24)*60+Number(p.minute);
     const sun=taipeiSunTimes2025(month,day);
     const sunrise=Math.round(sun.sunrise*60),sunset=Math.round(sun.sunset*60);
     const isDay=minuteOfDay>=sunrise&&minuteOfDay<sunset;
