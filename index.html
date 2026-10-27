@@ -3033,7 +3033,7 @@ function render() {
     'editor','ai','notifications','favorites','followed-authors','shop','profile','album'];
   if (!allowed.includes(route.page)) route = {page:'home'};
 
-  if (!['home','detail','author'].includes(route.page) && !currentUser()) {
+  if (!['citymap','home','detail','author'].includes(route.page) && !currentUser()) {
     route = {page:'home',overlay:{name:'login'}};
   }
   // 若狀態同步尚未完成，先移除可能殘留的待刪除視窗，避免舊餘額先出現。
