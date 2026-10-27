@@ -1205,6 +1205,55 @@ body.city-map-mode .city-map-bottom{position:absolute;left:0;right:0;bottom:0;wi
  body.city-map-mode .city-map-bottom{left:50%;right:auto;bottom:12px;width:min(560px,70vw);border-radius:16px!important;padding:6px!important;transform:translateX(-50%)}
 }
 </style>
+
+<style id="poyozz-city-map-mobile-nav-glass">
+/* The visible five-button bar is the legacy #mobileNav outside #view, not .city-map-bottom. */
+body.city-map-mode #mobileNav.mobile-nav{
+  display:grid!important;
+  position:fixed!important;
+  z-index:50!important;
+  left:0!important;right:0!important;bottom:0!important;
+  border:0!important;
+  border-top:1px solid rgba(255,255,255,.24)!important;
+  border-radius:18px 18px 0 0!important;
+  background:rgba(20,27,43,.22)!important;
+  box-shadow:0 -8px 28px rgba(7,13,27,.14),inset 0 1px 0 rgba(255,255,255,.08)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(135%)!important;
+  backdrop-filter:blur(18px) saturate(135%)!important;
+  padding:7px 3px calc(7px + env(safe-area-inset-bottom))!important;
+}
+body.city-map-mode #mobileNav.mobile-nav .nav-btn{
+  min-width:0!important;
+  background:transparent!important;
+  border:1px solid transparent!important;
+  border-radius:10px!important;
+  color:rgba(255,255,255,.88)!important;
+  text-shadow:0 1px 8px rgba(5,10,24,.55)!important;
+  box-shadow:none!important;
+}
+body.city-map-mode #mobileNav.mobile-nav .nav-btn svg{
+  filter:drop-shadow(0 1px 5px rgba(5,10,24,.42));
+}
+body.city-map-mode #mobileNav.mobile-nav .nav-btn.active,
+body.city-map-mode #mobileNav.mobile-nav .nav-btn[aria-current="page"]{
+  background:linear-gradient(135deg,rgba(183,157,255,.24),rgba(255,178,210,.17))!important;
+  border-color:rgba(225,210,255,.3)!important;
+  color:#fff!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;
+}
+body.city-map-mode #mobileNav.mobile-nav .nav-btn:hover,
+body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
+  background:rgba(255,255,255,.12)!important;
+  border-color:rgba(255,255,255,.18)!important;
+  color:#fff!important;
+}
+/* Avoid a second set of five navigation actions underneath the legacy mobile bar. */
+@media(max-width:767px){body.city-map-mode .city-map-bottom{display:none!important}}
+@media(min-width:768px){
+  body.city-map-mode #mobileNav.mobile-nav{display:none!important}
+}
+</style>
+
 </head>
 
 <body>
@@ -3135,6 +3184,8 @@ function render() {
       }
     };
   }
+  // City-map-only visual treatment must not leak into traditional pages.
+  if (route.page !== 'citymap') document.body.classList.remove('city-map-mode','city-map-mode-immersive');
   renderShell();
   switch(route.page) {
     case 'citymap':renderCityMapMVP();break;
