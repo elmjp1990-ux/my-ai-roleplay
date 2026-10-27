@@ -1248,7 +1248,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
   color:#fff!important;
 }
 /* Avoid a second set of five navigation actions underneath the legacy mobile bar. */
-body.city-map-mode .city-map-bottom{display:none!important}
+@media(max-width:767px){body.city-map-mode .city-map-bottom{display:none!important}}
 @media(min-width:768px){
   body.city-map-mode #mobileNav.mobile-nav{display:none!important}
 }
