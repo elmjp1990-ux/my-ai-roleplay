@@ -1205,6 +1205,69 @@ body.city-map-mode .city-map-bottom{position:absolute;left:0;right:0;bottom:0;wi
  body.city-map-mode .city-map-bottom{left:50%;right:auto;bottom:12px;width:min(560px,70vw);border-radius:16px!important;padding:6px!important;transform:translateX(-50%)}
 }
 </style>
+
+<style id="poyozz-city-map-container-glass-fix">
+/* Keep the city map as the full-screen canvas; the map artwork may extend beyond the viewport
+   so users can pan vertically without the legacy navigation becoming a solid block. */
+html:has(body.city-map-mode), body.city-map-mode {
+  width:100%; height:100%; min-height:0; margin:0; overflow:hidden;
+}
+body.city-map-mode .app,
+body.city-map-mode main,
+body.city-map-mode #view {
+  width:100%; max-width:none; height:100%; min-height:0; margin:0; padding:0;
+}
+body.city-map-mode .city-map-stage {
+  position:fixed; inset:0; width:100%; height:100dvh; min-height:0;
+  overflow:hidden; isolation:isolate; background:#b9d9c5;
+}
+body.city-map-mode .city-map-world {
+  position:absolute; z-index:0; transform-origin:center center;
+  will-change:transform; overflow:visible;
+}
+body.city-map-mode .city-map-ui {
+  position:absolute; z-index:10; inset:0; overflow:visible; pointer-events:none;
+}
+body.city-map-mode .city-map-ui > * { pointer-events:auto; }
+/* Five legacy navigation actions remain fully usable, but read as glass over the map. */
+body.city-map-mode .city-map-bottom {
+  position:absolute!important; z-index:20!important;
+  left:0!important; right:0!important; bottom:0!important; width:100%!important;
+  min-height:68px; display:grid!important;
+  grid-template-columns:repeat(5,minmax(0,1fr))!important; gap:5px!important;
+  box-sizing:border-box; border:1px solid rgba(255,255,255,.22)!important;
+  border-bottom:0!important; border-radius:18px 18px 0 0!important;
+  padding:8px 8px calc(8px + env(safe-area-inset-bottom))!important;
+  background:rgba(20,27,43,.22)!important;
+  box-shadow:0 -8px 28px rgba(7,13,27,.12),inset 0 1px 0 rgba(255,255,255,.08)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(135%)!important;
+  backdrop-filter:blur(18px) saturate(135%)!important;
+}
+body.city-map-mode .city-map-bottom button {
+  min-width:0; padding:9px 2px!important; border:1px solid transparent!important;
+  border-radius:10px!important; background:rgba(255,255,255,.025)!important;
+  color:rgba(255,255,255,.94)!important;
+  text-shadow:0 1px 8px rgba(5,10,24,.55);
+  box-shadow:none!important;
+}
+body.city-map-mode .city-map-bottom button:hover,
+body.city-map-mode .city-map-bottom button:focus-visible {
+  background:rgba(255,255,255,.12)!important;
+  border-color:rgba(255,255,255,.2)!important;
+}
+body.city-map-mode .city-map-bottom button.active {
+  background:rgba(183,157,255,.2)!important;
+  border-color:rgba(225,210,255,.3)!important;
+}
+@media(min-width:768px) {
+  body.city-map-mode .city-map-bottom {
+    left:50%!important; right:auto!important; bottom:12px!important;
+    width:min(560px,70vw)!important; border:1px solid rgba(255,255,255,.22)!important;
+    border-radius:16px!important; padding:6px!important; transform:translateX(-50%);
+  }
+}
+</style>
+
 </head>
 
 <body>
