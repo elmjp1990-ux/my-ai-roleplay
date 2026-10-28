@@ -8784,6 +8784,82 @@ document.addEventListener('error',event => {
   if (event.target instanceof HTMLImageElement) event.target.style.opacity='.15';
 },true);
 
+function renderCityMapMVP(){
+  document.body.classList.add('city-map-mode');
+  const view=$('view');
+  view.innerHTML=`
+    <section class="city-map-stage" id="cityMapStage" aria-label="POYOZZ 城市地圖">
+      <div class="city-map-world" id="cityMapWorld" aria-label="可拖曳地圖">
+        <div class="city-map-river"></div>
+        <div class="city-map-road r1"></div><div class="city-map-road r2"></div><div class="city-map-road r3"></div>
+        <div class="city-map-block cafe"></div><div class="city-map-block school"></div><div class="city-map-block park"></div><div class="city-map-block shop"></div><div class="city-map-block home"></div>
+        <button class="city-map-landmark" style="left:26%;top:40%" data-action="city-landmark" data-place="cafe"><span>☕</span>星光咖啡</button>
+        <button class="city-map-landmark" style="left:67%;top:23%" data-action="city-landmark" data-place="school"><span>🏫</span>晴日學園</button>
+        <button class="city-map-landmark" style="left:70%;top:67%" data-action="city-landmark" data-place="park"><span>🌳</span>中央公園</button>
+        <button class="city-map-landmark" style="left:23%;top:69%" data-action="city-landmark" data-place="shop"><span>🛍️</span>街角商店</button>
+        <button class="city-map-landmark" style="left:78%;top:44%" data-action="city-landmark" data-place="home"><span>🏠</span>住宅區</button>
+      </div>
+      <div class="city-map-ui" id="cityMapUI">
+        <aside class="city-map-info">
+          <h2 class="city-map-title"><img src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="POYOZZ"> <span>城市</span></h2>
+          <div id="cityMapDate">台灣時間</div>
+          <div class="city-map-weather"><span>🌤️</span><span id="cityMapWeather">天氣資料待串接</span><span id="cityMapTemp">溫度待串接</span></div>
+          <p>這座城市充滿各種可能，也許今天你會在某個角落遇見特別的那個人。</p>
+          <button class="city-map-traditional" data-action="city-traditional">⌖ 傳統探索模式</button>
+        </aside>
+        <div class="city-map-zoom"><button type="button" data-action="city-zoom-in" aria-label="放大地圖">＋</button><button type="button" data-action="city-zoom-out" aria-label="縮小地圖">−</button></div>
+        <div class="city-map-bottom">
+          <button data-action="city-traditional">✧<br>探索</button><button data-action="nav" data-page="create">✎<br>創建</button><button data-action="nav" data-page="chat">☏<br>聊天</button><button data-action="nav" data-page="shop">◇<br>商店</button><button data-action="nav" data-page="profile">♡<br>我的</button>
+        </div>
+      </div>
+      <div class="city-map-empty">拖曳探索 · 雙指縮放 · 雙擊空白處沉浸</div>
+      <section class="city-map-people" id="cityMapPeople" hidden><button type="button" data-action="city-close">關閉</button><h3 id="cityMapPlaceTitle">地標</h3><p>目前尚未連接角色出沒資料。前端 MVP 使用示意地標，不會產生虛構的即時角色名單。</p><p class="small muted">下一階段接入符合現代城鎮設定、公開且未刪除的角色。</p></section>
+    </section>`;
+  document.body.classList.remove('city-map-mode-immersive');
+  const stage=$('cityMapStage'),world=$('cityMapWorld');
+  const mapAspect=2752/1536;
+  let scale=1,tx=0,ty=0,pointers=new Map(),start=null,lastTap=0,lastTapX=0,lastTapY=0,moved=false;
+  const sizeWorld=()=>{const sw=stage.clientWidth,sh=stage.clientHeight;const nav=$('cityMapUI')?.querySelector('.city-map-bottom');const navExtra=Math.max(76,(nav?.offsetHeight||68)+12);const h=Math.max(sh+navExtra,sw/mapAspect);const w=h*mapAspect;world.style.width=w+'px';world.style.height=h+'px';world.style.left=((sw-w)/2)+'px';world.style.top=((sh-h)/2)+'px';world.style.backgroundSize='100% 100%';};
+  sizeWorld();
+  const apply=()=>{world.style.transform='translate('+tx+'px,'+ty+'px) scale('+scale+')';};
+  const clamp=()=>{scale=Math.max(1,Math.min(2.25,scale));const maxX=Math.max(0,(world.offsetWidth*scale-stage.clientWidth)/2);const maxY=Math.max(0,(world.offsetHeight*scale-stage.clientHeight)/2);tx=Math.max(-maxX,Math.min(maxX,tx));ty=Math.max(-maxY,Math.min(maxY,ty));apply();};
+  const zoomBy=f=>{scale*=f;clamp();};
+  stage.addEventListener('pointerdown',e=>{if(e.target.closest('button,.city-map-info,.city-map-zoom,.city-map-bottom,.city-map-people'))return;stage.setPointerCapture?.(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=false;if(pointers.size===1)start={x:e.clientX,y:e.clientY,tx,ty,time:Date.now()};else if(pointers.size===2){const a=[...pointers.values()];start={distance:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),scale,kind:'pinch'};}});
+  stage.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2&&start?.kind==='pinch'){const a=[...pointers.values()];const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);scale=start.scale*d/Math.max(1,start.distance);clamp();moved=true;}else if(pointers.size===1&&start&&!start.kind){const dx=e.clientX-start.x,dy=e.clientY-start.y;if(Math.abs(dx)+Math.abs(dy)>5)moved=true;tx=start.tx+dx;ty=start.ty+dy;clamp();}});
+  const endPointer=e=>{pointers.delete(e.pointerId);if(pointers.size===0){if(start&&!moved&&Date.now()-start.time<280){const now=Date.now(),dx=e.clientX-lastTapX,dy=e.clientY-lastTapY;if(now-lastTap<320&&Math.hypot(dx,dy)<24){document.body.classList.toggle('city-map-mode-immersive');lastTap=0;}else{lastTap=now;lastTapX=e.clientX;lastTapY=e.clientY;}}start=null;}else if(pointers.size===1){const p=[...pointers.values()][0];start={x:p.x,y:p.y,tx,ty,time:Date.now()};}};
+  stage.addEventListener('pointerup',endPointer);stage.addEventListener('pointercancel',endPointer);stage.addEventListener('dblclick',e=>e.preventDefault());stage.addEventListener('contextmenu',e=>e.preventDefault());
+  // 2025 Taipei solar-time reference profile. Calculate the 2025 reference day locally;
+  // no sunrise/sunset API or daily network request is needed.
+  const taipeiSunTimes2025=(month,day)=>{
+    const date=new Date(Date.UTC(2025,month-1,day));
+    const n=Math.floor((date-Date.UTC(2025,0,0))/86400000);
+    const lat=25.033,lon=121.5654,zenith=90.833;
+    const decl=0.006918-0.399912*Math.cos(2*Math.PI*n/365)+0.070257*Math.sin(2*Math.PI*n/365)-0.006758*Math.cos(4*Math.PI*n/365)+0.000907*Math.sin(4*Math.PI*n/365)-0.002697*Math.cos(6*Math.PI*n/365)+0.00148*Math.sin(6*Math.PI*n/365);
+    const cosH=(Math.cos(zenith*Math.PI/180)-Math.sin(lat*Math.PI/180)*Math.sin(decl))/(Math.cos(lat*Math.PI/180)*Math.cos(decl));
+    const ha=Math.acos(Math.max(-1,Math.min(1,cosH)))*180/Math.PI;
+    const solarNoon=12-lon/15+8;
+    return {sunrise:solarNoon-ha/15,sunset:solarNoon+ha/15};
+  };
+  const taipeiTime=()=>{
+    const d=new Date();
+    const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d);
+    const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));
+    const month=Number(p.month),day=Number(p.day),minuteOfDay=(Number(p.hour)%24)*60+Number(p.minute);
+    const sun=taipeiSunTimes2025(month,day);
+    const sunrise=Math.round(sun.sunrise*60),sunset=Math.round(sun.sunset*60);
+    const isDay=minuteOfDay>=sunrise&&minuteOfDay<sunset;
+    $('cityMapDate').textContent=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);
+    const mapImage=isDay?'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp':'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Add_nighttime_lighting_to_buildings_2K_20261027142959%20(1).webp';
+    stage.style.backgroundColor=isDay?'#b9d9c5':'#18253e';stage.style.backgroundImage='none';world.style.backgroundImage='url("'+mapImage+'")';world.style.filter='none';
+  };
+  taipeiTime();
+  const cityMapClock=setInterval(taipeiTime,30000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)taipeiTime();});
+
+  stage.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;if(a==='city-zoom-in'){zoomBy(1.18);return;}if(a==='city-zoom-out'){zoomBy(.85);return;}if(a==='city-close'){$('cityMapPeople').hidden=true;return;}if(a==='city-landmark'){const names={cafe:'星光咖啡',school:'晴日學園',park:'中央公園',shop:'街角商店',home:'住宅區'};$('cityMapPlaceTitle').textContent=names[b.dataset.place]||'地標';$('cityMapPeople').hidden=false;return;}if(a==='city-traditional'){go({page:'home'});return;}});
+  window.addEventListener('resize',()=>{sizeWorld();clamp();},{passive:true});
+}
+
 /* Initialization */
 route=parseRoute();
 history.replaceState({personax:true,depth:0,route},'',routeURL(route));
@@ -9286,81 +9362,7 @@ document.addEventListener('submit',function(event){
 </script>
 
 <script id="poyozz-city-map-mvp-script">
-function renderCityMapMVP(){
-  document.body.classList.add('city-map-mode');
-  const view=$('view');
-  view.innerHTML=`
-    <section class="city-map-stage" id="cityMapStage" aria-label="POYOZZ 城市地圖">
-      <div class="city-map-world" id="cityMapWorld" aria-label="可拖曳地圖">
-        <div class="city-map-river"></div>
-        <div class="city-map-road r1"></div><div class="city-map-road r2"></div><div class="city-map-road r3"></div>
-        <div class="city-map-block cafe"></div><div class="city-map-block school"></div><div class="city-map-block park"></div><div class="city-map-block shop"></div><div class="city-map-block home"></div>
-        <button class="city-map-landmark" style="left:26%;top:40%" data-action="city-landmark" data-place="cafe"><span>☕</span>星光咖啡</button>
-        <button class="city-map-landmark" style="left:67%;top:23%" data-action="city-landmark" data-place="school"><span>🏫</span>晴日學園</button>
-        <button class="city-map-landmark" style="left:70%;top:67%" data-action="city-landmark" data-place="park"><span>🌳</span>中央公園</button>
-        <button class="city-map-landmark" style="left:23%;top:69%" data-action="city-landmark" data-place="shop"><span>🛍️</span>街角商店</button>
-        <button class="city-map-landmark" style="left:78%;top:44%" data-action="city-landmark" data-place="home"><span>🏠</span>住宅區</button>
-      </div>
-      <div class="city-map-ui" id="cityMapUI">
-        <aside class="city-map-info">
-          <h2 class="city-map-title"><img src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="POYOZZ"> <span>城市</span></h2>
-          <div id="cityMapDate">台灣時間</div>
-          <div class="city-map-weather"><span>🌤️</span><span id="cityMapWeather">天氣資料待串接</span><span id="cityMapTemp">溫度待串接</span></div>
-          <p>這座城市充滿各種可能，也許今天你會在某個角落遇見特別的那個人。</p>
-          <button class="city-map-traditional" data-action="city-traditional">⌖ 傳統探索模式</button>
-        </aside>
-        <div class="city-map-zoom"><button type="button" data-action="city-zoom-in" aria-label="放大地圖">＋</button><button type="button" data-action="city-zoom-out" aria-label="縮小地圖">−</button></div>
-        <div class="city-map-bottom">
-          <button data-action="city-traditional">✧<br>探索</button><button data-action="nav" data-page="create">✎<br>創建</button><button data-action="nav" data-page="chat">☏<br>聊天</button><button data-action="nav" data-page="shop">◇<br>商店</button><button data-action="nav" data-page="profile">♡<br>我的</button>
-        </div>
-      </div>
-      <div class="city-map-empty">拖曳探索 · 雙指縮放 · 雙擊空白處沉浸</div>
-      <section class="city-map-people" id="cityMapPeople" hidden><button type="button" data-action="city-close">關閉</button><h3 id="cityMapPlaceTitle">地標</h3><p>目前尚未連接角色出沒資料。前端 MVP 使用示意地標，不會產生虛構的即時角色名單。</p><p class="small muted">下一階段接入符合現代城鎮設定、公開且未刪除的角色。</p></section>
-    </section>`;
-  document.body.classList.remove('city-map-mode-immersive');
-  const stage=$('cityMapStage'),world=$('cityMapWorld');
-  const mapAspect=2752/1536;
-  let scale=1,tx=0,ty=0,pointers=new Map(),start=null,lastTap=0,lastTapX=0,lastTapY=0,moved=false;
-  const sizeWorld=()=>{const sw=stage.clientWidth,sh=stage.clientHeight;const nav=$('cityMapUI')?.querySelector('.city-map-bottom');const navExtra=Math.max(76,(nav?.offsetHeight||68)+12);const h=Math.max(sh+navExtra,sw/mapAspect);const w=h*mapAspect;world.style.width=w+'px';world.style.height=h+'px';world.style.left=((sw-w)/2)+'px';world.style.top=((sh-h)/2)+'px';world.style.backgroundSize='100% 100%';};
-  sizeWorld();
-  const apply=()=>{world.style.transform='translate('+tx+'px,'+ty+'px) scale('+scale+')';};
-  const clamp=()=>{scale=Math.max(1,Math.min(2.25,scale));const maxX=Math.max(0,(world.offsetWidth*scale-stage.clientWidth)/2);const maxY=Math.max(0,(world.offsetHeight*scale-stage.clientHeight)/2);tx=Math.max(-maxX,Math.min(maxX,tx));ty=Math.max(-maxY,Math.min(maxY,ty));apply();};
-  const zoomBy=f=>{scale*=f;clamp();};
-  stage.addEventListener('pointerdown',e=>{if(e.target.closest('button,.city-map-info,.city-map-zoom,.city-map-bottom,.city-map-people'))return;stage.setPointerCapture?.(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=false;if(pointers.size===1)start={x:e.clientX,y:e.clientY,tx,ty,time:Date.now()};else if(pointers.size===2){const a=[...pointers.values()];start={distance:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),scale,kind:'pinch'};}});
-  stage.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2&&start?.kind==='pinch'){const a=[...pointers.values()];const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);scale=start.scale*d/Math.max(1,start.distance);clamp();moved=true;}else if(pointers.size===1&&start&&!start.kind){const dx=e.clientX-start.x,dy=e.clientY-start.y;if(Math.abs(dx)+Math.abs(dy)>5)moved=true;tx=start.tx+dx;ty=start.ty+dy;clamp();}});
-  const endPointer=e=>{pointers.delete(e.pointerId);if(pointers.size===0){if(start&&!moved&&Date.now()-start.time<280){const now=Date.now(),dx=e.clientX-lastTapX,dy=e.clientY-lastTapY;if(now-lastTap<320&&Math.hypot(dx,dy)<24){document.body.classList.toggle('city-map-mode-immersive');lastTap=0;}else{lastTap=now;lastTapX=e.clientX;lastTapY=e.clientY;}}start=null;}else if(pointers.size===1){const p=[...pointers.values()][0];start={x:p.x,y:p.y,tx,ty,time:Date.now()};}};
-  stage.addEventListener('pointerup',endPointer);stage.addEventListener('pointercancel',endPointer);stage.addEventListener('dblclick',e=>e.preventDefault());stage.addEventListener('contextmenu',e=>e.preventDefault());
-  // 2025 Taipei solar-time reference profile. Calculate the 2025 reference day locally;
-  // no sunrise/sunset API or daily network request is needed.
-  const taipeiSunTimes2025=(month,day)=>{
-    const date=new Date(Date.UTC(2025,month-1,day));
-    const n=Math.floor((date-Date.UTC(2025,0,0))/86400000);
-    const lat=25.033,lon=121.5654,zenith=90.833;
-    const decl=0.006918-0.399912*Math.cos(2*Math.PI*n/365)+0.070257*Math.sin(2*Math.PI*n/365)-0.006758*Math.cos(4*Math.PI*n/365)+0.000907*Math.sin(4*Math.PI*n/365)-0.002697*Math.cos(6*Math.PI*n/365)+0.00148*Math.sin(6*Math.PI*n/365);
-    const cosH=(Math.cos(zenith*Math.PI/180)-Math.sin(lat*Math.PI/180)*Math.sin(decl))/(Math.cos(lat*Math.PI/180)*Math.cos(decl));
-    const ha=Math.acos(Math.max(-1,Math.min(1,cosH)))*180/Math.PI;
-    const solarNoon=12-lon/15+8;
-    return {sunrise:solarNoon-ha/15,sunset:solarNoon+ha/15};
-  };
-  const taipeiTime=()=>{
-    const d=new Date();
-    const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d);
-    const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));
-    const month=Number(p.month),day=Number(p.day),minuteOfDay=(Number(p.hour)%24)*60+Number(p.minute);
-    const sun=taipeiSunTimes2025(month,day);
-    const sunrise=Math.round(sun.sunrise*60),sunset=Math.round(sun.sunset*60);
-    const isDay=minuteOfDay>=sunrise&&minuteOfDay<sunset;
-    $('cityMapDate').textContent=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);
-    const mapImage=isDay?'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp':'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Add_nighttime_lighting_to_buildings_2K_20261027142959%20(1).webp';
-    stage.style.backgroundColor=isDay?'#b9d9c5':'#18253e';stage.style.backgroundImage='none';world.style.backgroundImage='url("'+mapImage+'")';world.style.filter='none';
-  };
-  taipeiTime();
-  const cityMapClock=setInterval(taipeiTime,30000);
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)taipeiTime();});
 
-  stage.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;if(a==='city-zoom-in'){zoomBy(1.18);return;}if(a==='city-zoom-out'){zoomBy(.85);return;}if(a==='city-close'){$('cityMapPeople').hidden=true;return;}if(a==='city-landmark'){const names={cafe:'星光咖啡',school:'晴日學園',park:'中央公園',shop:'街角商店',home:'住宅區'};$('cityMapPlaceTitle').textContent=names[b.dataset.place]||'地標';$('cityMapPeople').hidden=false;return;}if(a==='city-traditional'){go({page:'home'});return;}});
-  window.addEventListener('resize',()=>{sizeWorld();clamp();},{passive:true});
-}
 
 /* POYOZZ Encounter scene presentation. Uses the shared chat composer, wallet,
    suggested replies, swipe controls, persistence and pending-turn handler. */
