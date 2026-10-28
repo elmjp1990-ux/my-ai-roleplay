@@ -4229,6 +4229,58 @@ function newArchiveName(character,session) {
   }
   return uniqueSessionName(characterName+'_'+date,session.id);
 }
+// Create a dedicated Encounter session through the trusted Edge Function.
+// Do not use the generic chat_sessions INSERT path: it intentionally creates Story Mode.
+async function createEncounterSession(character) {
+  if (!character?.id || !isUuid(character.id)) {
+    throw new Error('找不到有效的角色資料，無法開始相遇模式。');
+  }
+  if (!window.mySupabase?.auth || !window.mySupabase?.functions) {
+    throw new Error('相遇模式服務尚未準備好，請稍後再試。');
+  }
+  const { data: authData, error: authError } = await window.mySupabase.auth.getUser();
+  if (authError || !authData?.user?.id) {
+    throw new Error('請先登入，再開始相遇模式。');
+  }
+
+  const sessionId = id();
+  const { data, error } = await window.mySupabase.functions.invoke('encounter-session', {
+    body: { characterId: character.id, sessionId }
+  });
+  if (error || !data?.session?.id || data.session.id !== sessionId ||
+      data.session.user_id !== authData.user.id ||
+      data.session.character_id !== character.id ||
+      data.session.chat_mode !== 'encounter') {
+    console.error('相遇聊天室建立失敗：', error || data);
+    throw new Error(data?.error === 'character_unavailable_for_encounter'
+      ? '此角色目前無法進入相遇模式。'
+      : '相遇聊天室建立失敗，請稍後再試。');
+  }
+
+  const session = {
+    id: sessionId,
+    characterId: character.id,
+    name: '',
+    archived: false,
+    hidden: false,
+    pinned: false,
+    startedAt: Date.now(),
+    persona: '',
+    suggestions: false,
+    background: 'avatar',
+    encounterMode: true,
+    messages: [],
+    memories: [],
+    album: [],
+    cloudOwned: true,
+    cloudOwnerUid: authData.user.id,
+    cloudCharacterSnapshot: data.session.character_snapshot || {}
+  };
+  state.sessions[sessionId] = session;
+  persist();
+  return session;
+}
+
 function startChat(characterId) {
   const c = state.characters.find(c => c.id === characterId);
   if (!accessible(c)) return toast('此角色已被作者調整為私密或刪除狀態，不支持開啟新對話');
