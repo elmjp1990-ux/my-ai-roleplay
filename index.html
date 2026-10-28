@@ -8928,10 +8928,21 @@ function renderCityMapMVP(){
     locationModal.hidden=false;
     document.body.classList.add('city-location-active');
   };
-  // Use one delegated click handler on the stage so every landmark follows the same path.
-  // This avoids per-marker listeners being skipped when SVG hit targets differ.
+  // Bind activation directly to each SVG marker. Some mobile SVG click paths do not
+  // reliably reach the stage-level delegated handler, so each landmark owns its click.
   stage.querySelectorAll('[data-action="city-landmark"]').forEach(marker=>{
-    marker.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();openCityLocation(marker);}});
+    marker.addEventListener('click',event=>{
+      event.preventDefault();
+      event.stopPropagation();
+      openCityLocation(marker);
+    });
+    marker.addEventListener('keydown',event=>{
+      if(event.key==='Enter'||event.key===' '){
+        event.preventDefault();
+        event.stopPropagation();
+        openCityLocation(marker);
+      }
+    });
   });
   locationModal?.addEventListener('click',event=>{
     const close=event.target.closest('[data-action="city-close"]');
