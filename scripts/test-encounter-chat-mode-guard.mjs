@@ -30,4 +30,31 @@ assert.match(guardMigration, /NEW\.chat_mode IS DISTINCT FROM OLD\.chat_mode/);
 assert.match(guardMigration, /BEFORE INSERT OR UPDATE OF chat_mode ON public\.chat_sessions/);
 assert.match(guardMigration, /REVOKE ALL ON FUNCTION public\.enforce_trusted_chat_mode\(\) FROM PUBLIC, anon, authenticated/);
 
+
+const encounterSession = fs.readFileSync(
+  "supabase/functions/encounter-session/index.ts",
+  "utf8",
+);
+const accessMigration = fs.readFileSync(
+  "supabase/migrations/20261028180000_encounter_session_access_check.sql",
+  "utf8",
+);
+
+// Session creation must authenticate the caller and derive identity from the JWT.
+assert.match(encounterSession, /auth\.getUser\(\)/);
+assert.match(encounterSession, /rpc\(["']account_is_active["']\)/);
+assert.match(encounterSession, /rpc\(\s*["']can_open_encounter_session["']/);
+assert.match(encounterSession, /SUPABASE_SERVICE_ROLE_KEY/);
+assert.match(encounterSession, /chat_mode:\s*["']encounter["']/);
+assert.match(encounterSession, /user_id:\s*user\.id/);
+assert.match(encounterSession, /character_snapshot:\s*snapshot/);
+assert.match(encounterSession, /snapshot\s*=\s*\{/);
+assert.doesNotMatch(encounterSession, /body\.characterSnapshot|body\.userId|body\.chatMode/);
+assert.match(encounterSession, /session_id_conflict/);
+assert.match(accessMigration, /SECURITY DEFINER/);
+assert.match(accessMigration, /SET search_path = ['"]{2}/);
+assert.match(accessMigration, /private\.current_user_is_adult\(\)/);
+assert.match(accessMigration, /REVOKE ALL ON FUNCTION public\.can_open_encounter_session\(uuid\) FROM PUBLIC, anon/);
+assert.match(accessMigration, /GRANT EXECUTE ON FUNCTION public\.can_open_encounter_session\(uuid\) TO authenticated/);
+
 console.log("Encounter chat-mode security guard tests passed.");
