@@ -1889,6 +1889,30 @@ async function saveEncounterSchedules(characterId, userId, rows) {
   if (error) throw new Error('角色已儲存，但相遇日程寫入失敗：' + error.message);
 }
 
+async function loadEncounterSchedulesIntoEditor(characterId) {
+  const client = window.mySupabase;
+  const field = document.querySelector('form[data-form="character"] textarea[name="encounterSchedules"]');
+  const user = currentUser();
+  if (!client || !user?.uid || !characterId || !field || field.value.trim()) return;
+  const { data, error } = await client.from('character_schedules')
+    .select('weekday, start_time, end_time, location_key, activity')
+    .eq('character_id', characterId)
+    .order('weekday', { ascending: true, nullsFirst: true })
+    .order('start_time', { ascending: true });
+  if (error) {
+    console.warn('讀取作者自己的相遇日程失敗：', error.message);
+    return;
+  }
+  if (!field.isConnected || field.value.trim()) return;
+  field.value = (data || []).map(row => [
+    row.weekday == null ? '*' : row.weekday,
+    String(row.start_time || '').slice(0,5),
+    String(row.end_time || '').slice(0,5),
+    row.location_key,
+    row.activity
+  ].join('|')).join('\\n');
+}
+
 async function saveSupabaseCharacter(character, expectedUserId) {
     const client = window.mySupabase;
     if (!client || !expectedUserId) throw new Error('請先使用 Google 帳號登入，再儲存角色。');
@@ -4012,6 +4036,7 @@ function renderEditor() {
         </div>
       </form>
     </div>`;
+  if (route.id && !savedDraft?.encounterSchedules) void loadEncounterSchedulesIntoEditor(route.id);
   if(draftVideoPath){const preview=$('characterVideoPreview');void window.mySupabase?.storage.from('character-avatar-videos').createSignedUrl(draftVideoPath,300).then(({data,error})=>{if(!error&&data?.signedUrl&&preview?.isConnected){preview.src=data.signedUrl;preview.classList.remove('hidden');}});}
   void isNsfwTermsAdmin().then(isAdmin=>{const button=$('view')?.querySelector('[data-action="nsfw-term-manager"]');if(button&&isAdmin)button.hidden=false;});
   if(c.aiGeneratedDraft)void (async()=>{
@@ -7862,13 +7887,18 @@ document.addEventListener('submit',async event => {
         };
 
         if(draftVideoFile)c.avatarVideoPath=await uploadCharacterAvatarVideo(draftVideoFile,user.uid,c.id);
+        // 先驗證日程格式，避免角色資料已寫入後才發現日程格式錯誤。
+        const scheduleText = String(f.get('encounterSchedules') || '').trim();
+        let scheduleRows = [];
+        if (scheduleText) {
+          try { scheduleRows = parseEncounterScheduleText(scheduleText); }
+          catch (scheduleError) { return toast(scheduleError.message); }
+        }
         // 先寫入雲端；只有角色資料成功後才更新本機畫面狀態。
         const saveResult = await saveSupabaseCharacter(c, user.uid);
         // 日程僅透過作者自己的登入 session 寫入；RLS 會再次驗證角色所有權。
         // 空白代表保留既有日程，避免編輯角色其他欄位時意外清空。
-        const scheduleText = String(f.get('encounterSchedules') || '').trim();
         if (scheduleText) {
-          const scheduleRows = parseEncounterScheduleText(scheduleText);
           await saveEncounterSchedules(c.id, user.uid, scheduleRows);
           c.encounterSchedules = scheduleText;
         } else if (old?.encounterSchedules) {
