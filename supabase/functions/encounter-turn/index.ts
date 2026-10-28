@@ -90,7 +90,7 @@ Deno.serve(async (request) => {
   const persistInteraction = async (assistantContent: string) => {
     const userText = String(userMessage.content || "").trim().slice(0, 900);
     const assistantText = String(assistantContent || "").trim().slice(0, 900);
-    const summary = ("你：" + userText + "\\n角色：" + assistantText).slice(0, 1900);
+    const summary = ("你：" + userText + "\n角色：" + assistantText).slice(0, 1900);
     return await admin.rpc("record_encounter_turn_interaction", {
       p_turn_id: turnId,
       p_user_id: user.id,
