@@ -87,6 +87,24 @@ Deno.serve(async (request) => {
   if (charge.status === "refunded") return json({ error: "turn_already_refunded" }, 409);
 
   const demoReply = "**你抬起頭，認真地看向眼前的人。**\n「我在這裡，你想先聊些什麼？」";
+  const persistInteraction = async (assistantContent: string) => {
+    const userText = String(userMessage.content || "").trim().slice(0, 900);
+    const assistantText = String(assistantContent || "").trim().slice(0, 900);
+    const summary = ("你：" + userText + "\\n角色：" + assistantText).slice(0, 1900);
+    return await admin.rpc("record_encounter_turn_interaction", {
+      p_turn_id: turnId,
+      p_user_id: user.id,
+      p_character_id: session.character_id,
+      p_affinity_delta: 1,
+      p_event_type: "conversation_turn",
+      p_summary: summary || "完成一次相遇對話",
+      p_metadata: {
+        session_id: sessionId,
+        user_message_id: userMessageId,
+        assistant_message_id: assistantMessageId,
+      },
+    });
+  };
   if (charge.status === "settled") {
     const { data: saved, error: savedError } = await admin.from("chat_messages")
       .select("id,content,role").eq("id", assistantMessageId).eq("session_id", sessionId)
@@ -94,7 +112,18 @@ Deno.serve(async (request) => {
     if (savedError || !saved || !String(saved.content || "").trim()) {
       return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
     }
-    return json({ status: "settled", assistantMessage: saved, idempotent: true });
+    const { data: interaction, error: interactionError } = await persistInteraction(saved.content);
+    if (interactionError) {
+      return json({ status: "needs_reconciliation", error: "encounter_interaction_persistence_failed", retryAllowed: true }, 503);
+    }
+    const interactionRow = Array.isArray(interaction) ? interaction[0] : interaction;
+    if (!interactionRow || !interactionRow.diary_id) {
+      return json({ status: "needs_reconciliation", error: "encounter_interaction_receipt_missing", retryAllowed: true }, 503);
+    }
+    return json({
+      status: "settled", assistantMessage: saved, idempotent: true,
+      encounter: { affinity: interactionRow.affinity, relationshipStage: interactionRow.relationship_stage, diaryId: interactionRow.diary_id, interactionIdempotent: interactionRow.idempotent },
+    });
   }
   if (charge.status !== "reserved" && charge.status !== "needs_reconciliation") {
     return json({ error: "turn_not_processable" }, 409);
@@ -125,9 +154,18 @@ Deno.serve(async (request) => {
   const { data: settled, error: settleError } = await admin.rpc("settle_chat_turn", {
     p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
   });
-  if (settleError) return json({ status: "needs_reconciliation", replySaved: true, retryAllowed: false }, 503);
+  if (settleError) return json({ status: "needs_reconciliation", replySaved: true, retryAllowed: true }, 503);
+  const { data: interaction, error: interactionError } = await persistInteraction(reply.content);
+  if (interactionError) {
+    return json({ status: "needs_reconciliation", error: "encounter_interaction_persistence_failed", retryAllowed: true }, 503);
+  }
+  const interactionRow = Array.isArray(interaction) ? interaction[0] : interaction;
+  if (!interactionRow || !interactionRow.diary_id) {
+    return json({ status: "needs_reconciliation", error: "encounter_interaction_receipt_missing", retryAllowed: true }, 503);
+  }
   return json({
     status: settled, assistantMessage: reply,
     billing: { cost: 2, silver_reserved: charge.silver_reserved, diamonds_reserved: charge.diamonds_reserved },
+    encounter: { affinity: interactionRow.affinity, relationshipStage: interactionRow.relationship_stage, diaryId: interactionRow.diary_id, interactionIdempotent: interactionRow.idempotent },
   });
 });
