@@ -5,6 +5,7 @@ on:
     paths:
       - "index.html"
       - "scripts/test-encounter-schedule-parser.mjs"
+      - "scripts/test-encounter-chat-mode-guard.mjs"
       - ".github/workflows/group-background-syntax.yml"
       - "supabase/migrations/**"
   push:
@@ -48,3 +49,5 @@ jobs:
           NODE
       - name: Test Encounter schedule parser
         run: node scripts/test-encounter-schedule-parser.mjs
+      - name: Test Encounter chat-mode security guard
+        run: node scripts/test-encounter-chat-mode-guard.mjs
