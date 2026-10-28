@@ -8984,7 +8984,7 @@ function renderCityMapMVP(){
             : '<span class="city-location-avatar-fallback">'+escapeHTML(characterName.slice(0,1))+'</span>';
           return '<button type="button" class="city-location-avatar city-location-person" data-action="city-person" data-person-index="'+index+'" aria-label="與 '+escapeHTML(characterName)+' 相遇">'+portrait+'<span class="city-location-person-name">'+escapeHTML(characterName)+'</span><span class="city-location-person-activity">'+escapeHTML(String(person.cityActivity||''))+'</span></button>';
         }).join('')
-      : '<p class="city-location-empty">目前沒有角色排定在這個地點。角色日程符合台灣時間時，才會顯示在這裡。';
+      : '<p class="city-location-empty">目前沒有角色排定在這個地點。角色日程符合台灣時間時，才會顯示在這裡。</p>';
     $('cityMapPresenceList').innerHTML='<div class="city-location-scene-icon" aria-hidden="true">'+scene.icon+'</div><h3>'+escapeHTML(scene.heading)+'</h3><p>'+escapeHTML(scene.description)+'</p><div class="city-location-event"><span class="city-location-event-label">'+escapeHTML(scene.eventLabel)+'</span><strong>'+escapeHTML(scene.eventTitle)+'</strong><p>'+escapeHTML(scene.eventDescription)+'</p></div>';
     locationModal.hidden=false;
     document.body.classList.add('city-location-active');
