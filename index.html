@@ -1854,6 +1854,41 @@ function normalizePersonalityProfile(value) {
   return Object.fromEntries(Object.entries(limits).map(([key,max])=>[key,String(source[key]??'').trim().slice(0,max)]));
 }
 
+function parseEncounterScheduleText(raw) {
+  const rows = [];
+  for (const [index, line] of String(raw || '').split(/\\r?\\n/).entries()) {
+    const text = line.trim();
+    if (!text) continue;
+    const parts = text.split('|').map(value => value.trim());
+    if (parts.length !== 5) throw new Error('相遇日程第 ' + (index + 1) + ' 行格式錯誤，請使用「星期|開始|結束|地點代碼|活動」。');
+    const [dayRaw, start, end, locationKey, activity] = parts;
+    const weekday = dayRaw === '*' ? null : Number(dayRaw);
+    if (weekday !== null && (!Number.isInteger(weekday) || weekday < 0 || weekday > 6)) throw new Error('相遇日程第 ' + (index + 1) + ' 行的星期必須是 0 到 6，或 *。');
+    if (!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(start) || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(end) || start === end) throw new Error('相遇日程第 ' + (index + 1) + ' 行的時間格式錯誤，或開始與結束時間相同。');
+    if (!/^[a-zA-Z0-9_-]{1,80}$/.test(locationKey)) throw new Error('相遇日程第 ' + (index + 1) + ' 行的地點代碼只能使用英文、數字、底線或連字號。');
+    if (!activity || activity.length > 300) throw new Error('相遇日程第 ' + (index + 1) + ' 行的活動不可空白且最多 300 字。');
+    rows.push({ weekday, day_type: 'any', start_time: start, end_time: end, location_key: locationKey, activity, priority: 0, is_active: true });
+  }
+  if (rows.length > 50) throw new Error('每個角色最多設定 50 個日程時段。');
+  return rows;
+}
+
+async function saveEncounterSchedules(characterId, userId, rows) {
+  const client = window.mySupabase;
+  if (!client || !characterId || !userId) throw new Error('無法確認相遇日程的雲端連線或角色所有權。');
+  const { data: existing, error: readError } = await client.from('character_schedules')
+    .select('weekday, day_type, start_time, end_time, location_key, activity')
+    .eq('character_id', characterId);
+  if (readError) throw new Error('讀取既有相遇日程失敗：' + readError.message);
+  const normalizeTime = value => String(value || '').slice(0, 5);
+  const keyOf = row => [row.weekday == null ? '*' : row.weekday, normalizeTime(row.start_time), normalizeTime(row.end_time), row.location_key, row.activity].join('|');
+  const known = new Set((existing || []).map(keyOf));
+  const missing = rows.filter(row => !known.has(keyOf(row)));
+  if (!missing.length) return;
+  const { error } = await client.from('character_schedules').insert(missing.map(row => ({ ...row, character_id: characterId })));
+  if (error) throw new Error('角色已儲存，但相遇日程寫入失敗：' + error.message);
+}
+
 async function saveSupabaseCharacter(character, expectedUserId) {
     const client = window.mySupabase;
     if (!client || !expectedUserId) throw new Error('請先使用 Google 帳號登入，再儲存角色。');
@@ -3949,6 +3984,11 @@ function renderEditor() {
           </div>
           <label class="field"><span>互動界線</span><textarea name="personalityBoundaries" maxlength="500" placeholder="角色不接受的互動、需要尊重的界線">${e(c.personalityProfile?.boundaries || '')}</textarea></label>
           <label class="field"><span>關係發展節奏</span><textarea name="personalityRelationshipPacing" maxlength="300" placeholder="例如：慢熱、需要信任累積，不會初次見面就深情告白">${e(c.personalityProfile?.relationshipPacing || '')}</textarea></label>
+        </section>
+        <section class="memory-item stack" style="gap:10px">
+          <strong>相遇模式｜角色日程（測試版）</strong>
+          <small>每行一個時段，格式：星期(0=日、1=一…6=六，*代表每天)|開始時間|結束時間|地點代碼|角色活動。例：1|09:00|12:00|cafe|在咖啡廳工作。此設定目前只有作者可讀，尚未開放玩家端查詢。</small>
+          <label class="field"><span>日程時段</span><textarea name="encounterSchedules" maxlength="5000" placeholder="1|09:00|12:00|cafe|在咖啡廳工作\n*|18:00|20:00|park|傍晚散步">${e(savedDraft?.encounterSchedules ?? c.encounterSchedules ?? '')}</textarea></label>
         </section>
         <section class="memory-item stack" style="gap:10px"><strong>角色手機設定</strong>
           <label class="field"><span>AI 手機通知揭露指示（每行一則）</span><textarea name="phoneNotices" maxlength="1200" placeholder="💬心裡話 | 每回合揭露一則簡短心裡話\n🔎線索 | 當劇情出現新線索時，揭露線索通知">${e(savedDraft?.phoneNotices ?? (Array.isArray(c.phoneSettings?.noticePrompts) ? c.phoneSettings.noticePrompts.join('\n') : Array.isArray(c.phoneSettings?.notices) ? c.phoneSettings.notices.join('\n') : ''))}</textarea><small>在這裡填寫每回合對話需要揭露的狀態。每行描述一種 AI 可揭露的通知條件／內容，不是固定顯示文字；最多 8 則。</small></label></section>
@@ -7824,6 +7864,16 @@ document.addEventListener('submit',async event => {
         if(draftVideoFile)c.avatarVideoPath=await uploadCharacterAvatarVideo(draftVideoFile,user.uid,c.id);
         // 先寫入雲端；只有角色資料成功後才更新本機畫面狀態。
         const saveResult = await saveSupabaseCharacter(c, user.uid);
+        // 日程僅透過作者自己的登入 session 寫入；RLS 會再次驗證角色所有權。
+        // 空白代表保留既有日程，避免編輯角色其他欄位時意外清空。
+        const scheduleText = String(f.get('encounterSchedules') || '').trim();
+        if (scheduleText) {
+          const scheduleRows = parseEncounterScheduleText(scheduleText);
+          await saveEncounterSchedules(c.id, user.uid, scheduleRows);
+          c.encounterSchedules = scheduleText;
+        } else if (old?.encounterSchedules) {
+          c.encounterSchedules = old.encounterSchedules;
+        }
         // 以資料庫確認的公開狀態為準，避免非同步雲端角色載入替換 state.characters
         // 後，indexOf(old) 回傳 -1，導致本機仍保留「私密」狀態而隱藏評論區。
         c.visibility = saveResult.visibility;
