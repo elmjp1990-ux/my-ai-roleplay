@@ -8898,20 +8898,33 @@ function renderCityMapMVP(){
   const locationModal=$('cityMapPeople');
   if(locationModal && locationModal.parentElement!==document.body) document.body.appendChild(locationModal);
   const cityPlaceNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園'};
+  // These are authored scene descriptions, not live opening hours, character presence, or dynamically generated events.
+  const cityVenueScenes={
+    airport:{icon:'✈️',heading:'城市的起點與交會處',description:'航班資訊在大廳螢幕上流動，旅人拖著行李匆匆經過。候機座位、接機大廳與深夜航班，總有新的相遇可能。',eventLabel:'場景亮點',eventTitle:'抵達大廳的偶遇',eventDescription:'適合安排接機、送別、轉機途中或旅程開始前的故事。'},
+    commercial:{icon:'🏢',heading:'玻璃帷幕下的繁忙日常',description:'電梯穿梭於不同樓層，會議室、辦公座位與窗邊休息區構成城市工作的節奏。白天忙碌，傍晚後則逐漸安靜。',eventLabel:'場景亮點',eventTitle:'下班後的窗邊時光',eventDescription:'適合商業談判、同事互動、秘密會面或忙碌一天後的短暫休息。'},
+    'night-bar':{icon:'🍸',heading:'霓虹燈下的微醺夜色',description:'低亮度燈光映著吧台酒杯，音樂與交談聲交錯。角落座位保留一點私密感，適合卸下白天的面具。',eventLabel:'場景亮點',eventTitle:'吧台邊的陌生人',eventDescription:'適合深夜談心、偶然搭話、重逢或帶著秘密的夜間故事。'},
+    'live-house':{icon:'🎸',heading:'讓音樂填滿整個夜晚',description:'舞台燈光、音箱震動與觀眾的歡呼交織成現場氛圍。演出前後的走廊與吧台，也可能發生比舞台更難忘的對話。',eventLabel:'場景亮點',eventTitle:'演出開始前',eventDescription:'適合樂團演出、後台相遇、樂迷交流或散場後的續攤情節。'},
+    apartment:{icon:'🏠',heading:'308 公寓的日常與秘密',description:'熟悉的電梯聲、走廊燈光與各自緊閉的房門，讓這裡既有生活感，也保留鄰居之間尚未說出口的故事。',eventLabel:'場景亮點',eventTitle:'走廊裡的偶然碰面',eventDescription:'適合鄰居日常、借物、深夜返家或逐漸熟悉彼此的生活故事。'},
+    'department-store':{icon:'🛍️',heading:'從精品櫥窗到美食樓層',description:'明亮的中庭連接各式品牌櫃位、服飾樓層與餐飲空間。人潮來去，購物、約會與臨時起意的行程都能在這裡展開。',eventLabel:'場景亮點',eventTitle:'中庭的週末人潮',eventDescription:'適合約會逛街、挑選禮物、偶遇熟人或在美食樓層稍作停留。'},
+    bookstore:{icon:'📚',heading:'在書頁之間慢下腳步',description:'木質書架與紙張氣味讓時間放慢。新書展示區、靠窗閱讀座位與安靜的書架轉角，各自藏著不同的相遇方式。',eventLabel:'場景亮點',eventTitle:'同一本書的選擇',eventDescription:'適合交換閱讀心得、尋找某本書、安靜陪伴或從共同興趣開始的故事。'},
+    cafe:{icon:'☕',heading:'在城市裡，找個地方歇歇腳',description:'咖啡香從吧台飄向窗邊座位，甜點櫃裡擺著當季蛋糕。這裡適合短暫休息、工作、約會，也適合和某個人慢慢聊起近況。',eventLabel:'場景亮點',eventTitle:'今日甜點的話題',eventDescription:'甜點櫃可作為聊天與約會的情境；實際品項、庫存與活動尚未連接動態資料。'},
+    park:{icon:'🌳',heading:'城市裡的一片綠意',description:'步道穿過樹蔭與草地，長椅、噴水池和開闊的天空讓人暫時遠離喧鬧。清晨散步、午後閒聊或傍晚慢跑，都有不同的城市風景。',eventLabel:'場景亮點',eventTitle:'樹蔭下的片刻寧靜',eventDescription:'適合散步、慢跑、野餐、偶遇或在戶外談一場不急著結束的對話。'}
+  };
   // Character presence is intentionally not fabricated. Connect the trusted schedule source before populating this list.
   const cityPresenceByPlace={};
   const openCityLocation=(marker)=>{
     const place=marker.dataset.place;
     const people=cityPresenceByPlace[place];
     const name=cityPlaceNames[place]||'地點';
+    const scene=cityVenueScenes[place]||{icon:'📍',heading:name+'・場景資訊',description:'這個地點的場景介紹將在設定完成後補上。',eventLabel:'場景亮點',eventTitle:'探索這個地點',eventDescription:'目前沒有額外的場景設定。'};
     $('cityMapPlaceTitle').textContent=name;
-    $('cityMapOpenStatus').textContent='營業狀態待串接';
+    $('cityMapOpenStatus').textContent='場地狀態待串接';
     $('cityMapPeopleCount').textContent=Array.isArray(people)&&people.length?people.length+' 位角色':'角色名單待串接';
     const strip=$('cityMapAvatarStrip');
     strip.innerHTML=Array.isArray(people)&&people.length
       ? people.map((person,index)=>'<button type="button" class="city-location-avatar" data-action="city-person" data-person-index="'+index+'" aria-label="查看角色 '+escapeHTML(String(person.name||'角色'))+'"><span class="city-location-avatar-fallback">'+escapeHTML(String(person.name||'角').slice(0,1))+'</span></button>').join('')
       : '<p class="city-location-empty">角色出沒資料完成串接後，會在這裡顯示目前可遇見的角色。</p>';
-    $('cityMapPresenceList').innerHTML='<div class="city-location-scene-icon" aria-hidden="true">'+(place==='cafe'?'☕':place==='night-bar'?'🍸':place==='live-house'?'♫':'✧')+'</div><h3>'+escapeHTML(name)+'・場景資訊</h3><p>地點介紹、環境特色與當日活動將在資料串接後顯示。</p><div class="city-location-event"><span class="city-location-event-label">場景活動</span><strong>活動資料待串接</strong><p>目前不顯示虛構的即時角色名單或活動。</p></div>';
+    $('cityMapPresenceList').innerHTML='<div class="city-location-scene-icon" aria-hidden="true">'+scene.icon+'</div><h3>'+escapeHTML(scene.heading)+'</h3><p>'+escapeHTML(scene.description)+'</p><div class="city-location-event"><span class="city-location-event-label">'+escapeHTML(scene.eventLabel)+' · 固定場景設定</span><strong>'+escapeHTML(scene.eventTitle)+'</strong><p>'+escapeHTML(scene.eventDescription)+'</p></div>';
     locationModal.hidden=false;
     document.body.classList.add('city-location-active');
   };
