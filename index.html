@@ -9211,7 +9211,40 @@ function renderCityMapMVP(){
     renderCityPresence();
   };
   renderCityPresence();
-  stage.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;if(a==='city-zoom-in'){zoomBy(1.18);return;}if(a==='city-zoom-out'){zoomBy(.85);return;}if(a==='city-close'){e.preventDefault();e.stopPropagation();const modal=$('cityMapPeople');if(b.classList.contains('city-location-backdrop'))return;if(Date.now()-Number(modal.dataset.openedAt||0)<600)return;modal.hidden=true;document.body.classList.remove('city-location-active');return;}if(a==='city-landmark'){e.stopPropagation();const place=b.dataset.place;const people=cityPresenceByPlace[place];const names=cityPlaceNames[place]||'地點';$('cityMapPlaceTitle').textContent=names;$('cityMapOpenStatus').textContent='營業狀態待串接';$('cityMapVenueHeading').textContent=names+'・今日場地資訊';$('cityMapVenueDescription').textContent='場地介紹與即時資訊尚待串接。這裡將顯示環境特色、營業時間及當日活動。';const strip=$('cityMapAvatarStrip');$('cityMapPeopleCount').textContent=Array.isArray(people)&&people.length?people.length+' 位角色':'名單尚未串接';strip.innerHTML=Array.isArray(people)&&people.length?people.map((person,index)=>'<button type="button" class="city-location-avatar" data-action="city-person" data-person-index="'+index+'" aria-label="查看角色 '+escapeHTML(String(person.name||'角色'))+'"><span class="city-location-avatar-fallback">'+escapeHTML(String(person.name||'角').slice(0,1))+'</span></button>').join(''):'<p class="city-location-empty">角色名單串接後，會在這裡顯示可左右滑動的圓形頭像。</p>';$('cityMapPresenceList').innerHTML='<div class="city-location-scene-icon" aria-hidden="true">'+(place==='cafe'?'☕':place==='night-bar'?'🍸':place==='live-house'?'♫':'✧')+'</div><h3 id="cityMapVenueHeading">'+escapeHTML(names)+'・今日場地資訊</h3><p id="cityMapVenueDescription">場地介紹與即時資訊尚待串接。這裡將顯示環境特色、營業時間及當日活動。</p><div class="city-location-event"><span class="city-location-event-label">本日活動 · 示意內容</span><strong>草莓塔限量上市</strong><p>活動資料與顯示機率尚未串接；目前僅為介面示意。</p></div>';$('cityMapPeople').hidden=false;$('cityMapPeople').dataset.openedAt=String(Date.now());document.body.classList.add('city-location-active');return;}if(a==='city-person'){return;}if(a==='city-traditional'){go({page:'home'});return;}});
+  // Keep the modal outside the transformed map stage so map gestures and delegated stage clicks cannot dismiss it.
+  const locationModal=$('cityMapPeople');
+  if(locationModal && locationModal.parentElement!==document.body) document.body.appendChild(locationModal);
+  const openCityLocation=(marker)=>{
+    const place=marker.dataset.place;
+    const people=cityPresenceByPlace[place];
+    const names=cityPlaceNames[place]||'地點';
+    $('cityMapPlaceTitle').textContent=names;
+    $('cityMapOpenStatus').textContent='營業狀態待串接';
+    $('cityMapPeopleCount').textContent=Array.isArray(people)&&people.length?people.length+' 位角色':'名單尚未串接';
+    const strip=$('cityMapAvatarStrip');
+    strip.innerHTML=Array.isArray(people)&&people.length
+      ? people.map((person,index)=>'<button type="button" class="city-location-avatar" data-action="city-person" data-person-index="'+index+'" aria-label="查看角色 '+escapeHTML(String(person.name||'角色'))+'"><span class="city-location-avatar-fallback">'+escapeHTML(String(person.name||'角').slice(0,1))+'</span></button>').join('')
+      : '<p class="city-location-empty">角色名單串接後，會在這裡顯示可左右滑動的圓形頭像。</p>';
+    $('cityMapPresenceList').innerHTML='<div class="city-location-scene-icon" aria-hidden="true">'+(place==='cafe'?'☕':place==='night-bar'?'🍸':place==='live-house'?'♫':'✧')+'</div><h3>'+escapeHTML(names)+'・今日場地資訊</h3><p>場地介紹與即時資訊尚待串接。這裡將顯示環境特色、營業時間及當日活動。</p><div class="city-location-event"><span class="city-location-event-label">本日活動 · 示意內容</span><strong>草莓塔限量上市</strong><p>活動資料與顯示機率尚未串接；目前僅為介面示意。</p></div>';
+    locationModal.hidden=false;
+    document.body.classList.add('city-location-active');
+  };
+  stage.querySelectorAll('[data-action="city-landmark"]').forEach(marker=>{
+    marker.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();openCityLocation(marker);});
+    marker.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();openCityLocation(marker);}});
+  });
+  locationModal?.addEventListener('click',event=>{
+    const close=event.target.closest('[data-action="city-close"]');
+    if(close){event.preventDefault();event.stopPropagation();locationModal.hidden=true;document.body.classList.remove('city-location-active');}
+    else event.stopPropagation();
+  });
+  stage.addEventListener('click',event=>{
+    const button=event.target.closest('[data-action]');
+    if(!button)return;
+    if(button.dataset.action==='city-zoom-in'){event.preventDefault();event.stopPropagation();zoomBy(1.18);return;}
+    if(button.dataset.action==='city-zoom-out'){event.preventDefault();event.stopPropagation();zoomBy(.85);return;}
+    if(button.dataset.action==='city-traditional'){event.preventDefault();event.stopPropagation();go({page:'home'});}
+  });
   window.addEventListener('resize',()=>{sizeWorld();clamp();},{passive:true});
 }
 </script>
