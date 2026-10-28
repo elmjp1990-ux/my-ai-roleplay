@@ -6,6 +6,7 @@ on:
       - "index.html"
       - "scripts/test-encounter-schedule-parser.mjs"
       - "scripts/test-encounter-chat-mode-guard.mjs"
+      - "supabase/functions/encounter-session/**"
       - ".github/workflows/group-background-syntax.yml"
       - "supabase/migrations/**"
   push:
