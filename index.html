@@ -4008,7 +4008,7 @@ function renderEditor() {
         <section class="memory-item stack" style="gap:10px">
           <strong>相遇模式｜角色日程（測試版）</strong>
           <small>每行一個時段，格式：星期(0=日、1=一…6=六，*代表每天)|開始時間|結束時間|地點代碼|角色活動。例：1|09:00|12:00|cafe|在咖啡廳工作。此設定目前只有作者可讀，尚未開放玩家端查詢。</small>
-          <label class="field"><span>日程時段</span><textarea name="encounterSchedules" maxlength="5000" placeholder="1|09:00|12:00|cafe|在咖啡廳工作\n*|18:00|20:00|park|傍晚散步">${e(savedDraft?.encounterSchedules ?? c.encounterSchedules ?? '')}</textarea></label>
+          <label class="field"><span>日程時段</span><textarea name="encounterSchedules" maxlength="20000" placeholder="1|09:00|12:00|cafe|在咖啡廳工作\n*|18:00|20:00|park|傍晚散步">${e(savedDraft?.encounterSchedules ?? c.encounterSchedules ?? '')}</textarea></label>
           <label class="check"><input type="checkbox" name="clearEncounterSchedules" value="yes"><span>明確清空這個角色的所有日程（需勾選，避免誤刪）</span></label>
         </section>
         <section class="memory-item stack" style="gap:10px"><strong>角色手機設定</strong>
