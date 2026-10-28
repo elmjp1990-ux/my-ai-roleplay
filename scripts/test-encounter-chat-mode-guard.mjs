@@ -64,4 +64,5 @@ assert.match(frontend, /functions\.invoke\(["']encounter-session["']/);
 assert.match(frontend, /data\.session\.chat_mode !== ["']encounter["']/);
 assert.match(frontend, /encounterMode:\s*true/);
 assert.match(frontend, /messages:\s*\[\]/);
-\nconsole.log("Encounter chat-mode security guard tests passed.");
+
+console.log("Encounter chat-mode security guard tests passed.");
