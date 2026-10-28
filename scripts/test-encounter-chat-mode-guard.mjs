@@ -63,6 +63,11 @@ assert.match(frontend, /async function createEncounterSession\(character\)/);
 assert.match(frontend, /functions\.invoke\(["']encounter-session["']/);
 assert.match(frontend, /data\.session\.chat_mode !== ["']encounter["']/);
 assert.match(frontend, /encounterMode:\s*true/);
+assert.match(frontend, /suggestions:\s*true,[\s\S]{0,100}background:\s*['"]avatar['"]/);
+assert.match(frontend, /installSuggestionSwipe/);
+assert.match(frontend, /滑動或點選燈號可切換/);
+assert.match(frontend, /data-action="suggestion-select"/);
+assert.match(frontend, /data-action="suggestion"/);
 assert.match(frontend, /messages:\s*\[\]/);
 
 console.log("Encounter chat-mode security guard tests passed.");
