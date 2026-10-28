@@ -9369,7 +9369,9 @@ function renderCityMapMVP(){
   style.textContent=`
     .encounter-start-button{background:linear-gradient(135deg,#7969a8,#b17f9d)!important;color:#fff!important;border:1px solid #d8c8ef!important}
     .chat-main.encounter-scene{position:relative;isolation:isolate;overflow:hidden;background:#171522!important}
-    .chat-main.encounter-scene:before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(14,12,25,.26),rgba(14,12,25,.84)),var(--encounter-scene-photo,none) center/cover no-repeat;filter:saturate(.82)}
+    .chat-main.encounter-scene:before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(14,12,25,.30),rgba(14,12,25,.70) 52%,rgba(14,12,25,.94)),var(--encounter-scene-photo,none) center/cover no-repeat;filter:saturate(.82);transform:scale(1.025)}
+    .encounter-character-sprite{position:absolute;z-index:0;pointer-events:none;right:clamp(0px,3vw,28px);bottom:clamp(100px,15vh,170px);width:min(76%,440px);height:68%;object-fit:contain;object-position:center bottom;filter:drop-shadow(0 12px 24px rgba(0,0,0,.25));opacity:.96}
+    .encounter-scene .chat-heading,.encounter-scene .messages,.encounter-scene .composer{position:relative;z-index:1}
     .encounter-scene .chat-heading{background:rgba(20,18,31,.58)!important;backdrop-filter:blur(14px);color:#fff;border-bottom:1px solid #ffffff22}
     .encounter-scene .chat-name,.encounter-scene .character-status-label{color:#fff}
     .encounter-scene .messages{background:transparent!important;overscroll-behavior:contain}
@@ -9396,7 +9398,17 @@ function renderCityMapMVP(){
     if(!panel)return;
     panel.classList.add('encounter-scene');
     const character=sessionCharacter(session);
-    panel.style.setProperty('--encounter-scene-photo','url('+JSON.stringify(safeImage(character?.image||character?.avatar_url))+')');
+    const characterImage=safeImage(character?.image||character?.avatar_url);
+    panel.style.setProperty('--encounter-scene-photo','url('+JSON.stringify(characterImage)+')');
+    if(characterImage && !panel.querySelector('.encounter-character-sprite')){
+      const sprite=document.createElement('img');
+      sprite.className='encounter-character-sprite';
+      sprite.src=characterImage;
+      sprite.alt='';
+      sprite.setAttribute('aria-hidden','true');
+      sprite.loading='eager';
+      panel.insertBefore(sprite,panel.firstChild);
+    }
     const title=panel.querySelector('.chat-heading');
     if(title){
       let tag=title.querySelector('.encounter-scene-label');
