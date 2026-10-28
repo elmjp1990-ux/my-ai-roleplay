@@ -72,13 +72,23 @@ Deno.serve(async (request) => {
 
   const { data: session, error: sessionError } = await admin
     .from("chat_sessions")
-    .select("id,user_id,deleted_at,character_id,character_snapshot")
+    .select("id,user_id,deleted_at,character_id,character_snapshot,chat_mode")
     .eq("id", sessionId)
     .eq("user_id", user.id)
     .is("deleted_at", null)
     .maybeSingle();
   if (sessionError) return json({ error: "session_lookup_failed" }, 503);
   if (!session) return json({ error: "chat_session_not_owned_or_active" }, 403);
+
+  // Encounter sessions must be handled by the dedicated Encounter turn flow.
+  // Never silently process them as ordinary story chats or let this generic
+  // billing endpoint create Encounter affinity/diary events.
+  if (session.chat_mode === "encounter") {
+    return json({ error: "encounter_turn_handler_required", retryAllowed: false }, 409);
+  }
+  if (session.chat_mode !== "story") {
+    return json({ error: "chat_mode_invalid", retryAllowed: false }, 409);
+  }
 
   // Validate the session's role identity before reserving or settling any charge.
   // Existing chats with retired characters remain usable; this only rejects
