@@ -8970,12 +8970,21 @@ function renderCityMapMVP(){
     const name=cityPlaceNames[place]||'地點';
     const scene=cityVenueScenes[place]||{icon:'📍',heading:name+'・場景資訊',description:'這個地點的場景介紹將在設定完成後補上。',eventLabel:'場景亮點',eventTitle:'探索這個地點',eventDescription:'目前沒有額外的場景設定。'};
     $('cityMapPlaceTitle').textContent=name;
-    $('cityMapOpenStatus').textContent='場景介紹';
-    $('cityMapPeopleCount').textContent=people.length?people.length+' 位角色正在此處':'目前沒有符合時段的角色';
+    $('cityMapOpenStatus').textContent='地點場景可探索';
+    $('cityMapPeopleCount').textContent=people.length?people.length+' 位角色符合目前時段':'目前沒有符合時段的角色';
+    const statusNote=locationModal.querySelector('.city-location-status-note');
+    if(statusNote)statusNote.textContent='營業時間尚未串接';
     const strip=$('cityMapAvatarStrip');
     strip.innerHTML=people.length
-      ? people.map((person,index)=>'<button type="button" class="city-location-avatar city-location-person" data-action="city-person" data-person-index="'+index+'" aria-label="與 '+escapeHTML(String(person.name||'角色'))+' 相遇"><span class="city-location-avatar-fallback">'+escapeHTML(String(person.name||'角').slice(0,1))+'</span><span class="city-location-person-name">'+escapeHTML(String(person.name||'角色'))+'</span></button>').join('')
-      : '<p class="city-location-empty">目前沒有角色排定在這個地點。角色日程符合台灣時間時，才會顯示在這裡。</p>';
+      ? people.map((person,index)=>{
+          const characterName=String(person.name||'角色');
+          const image=safeImage(person.image||person.avatar_url||person.avatar);
+          const portrait=image
+            ? '<img class="city-location-person-image" src="'+escapeHTML(image)+'" alt="" loading="lazy" referrerpolicy="no-referrer">'
+            : '<span class="city-location-avatar-fallback">'+escapeHTML(characterName.slice(0,1))+'</span>';
+          return '<button type="button" class="city-location-avatar city-location-person" data-action="city-person" data-person-index="'+index+'" aria-label="與 '+escapeHTML(characterName)+' 相遇">'+portrait+'<span class="city-location-person-name">'+escapeHTML(characterName)+'</span><span class="city-location-person-activity">'+escapeHTML(String(person.cityActivity||''))+'</span></button>';
+        }).join('')
+      : '<p class="city-location-empty">目前沒有角色排定在這個地點。角色日程符合台灣時間時，才會顯示在這裡。';
     $('cityMapPresenceList').innerHTML='<div class="city-location-scene-icon" aria-hidden="true">'+scene.icon+'</div><h3>'+escapeHTML(scene.heading)+'</h3><p>'+escapeHTML(scene.description)+'</p><div class="city-location-event"><span class="city-location-event-label">'+escapeHTML(scene.eventLabel)+'</span><strong>'+escapeHTML(scene.eventTitle)+'</strong><p>'+escapeHTML(scene.eventDescription)+'</p></div>';
     locationModal.hidden=false;
     document.body.classList.add('city-location-active');
@@ -9636,8 +9645,10 @@ document.addEventListener('submit',function(event){
 .city-location-event p{margin:5px 0 0;color:#c3c0d2;font-size:11px;line-height:1.65}
 .city-location-empty{margin:0;padding:14px 12px;width:100%;border:1px dashed rgba(235,225,255,.22);border-radius:14px;color:#d2cfe0;font-size:12px;line-height:1.7;text-align:center}
 .city-location-person{display:flex;flex-direction:column;align-items:center;gap:6px;flex:0 0 72px;min-width:72px;padding:4px 3px 8px;border:0;background:transparent;color:#fff;cursor:pointer}
-.city-location-person .city-location-avatar-fallback{display:grid;place-items:center;width:54px;height:54px;border-radius:50%;border:1px solid rgba(239,221,255,.55);background:linear-gradient(145deg,rgba(232,184,222,.28),rgba(139,124,255,.24));box-shadow:0 5px 18px rgba(0,0,0,.15);font-size:20px}
+.city-location-person .city-location-avatar-fallback,.city-location-person-image{display:grid;place-items:center;width:54px;height:54px;flex:0 0 54px;border-radius:50%;border:1px solid rgba(239,221,255,.55);background:linear-gradient(145deg,rgba(232,184,222,.28),rgba(139,124,255,.24));box-shadow:0 5px 18px rgba(0,0,0,.15);font-size:20px}
+.city-location-person-image{display:block;object-fit:cover;object-position:center 25%}
 .city-location-person-name{max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#f3efff}
+.city-location-person-activity{max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px;color:#c9c1e2}
 .city-location-person:disabled{opacity:.6}
 @media(max-width:600px){.city-location-modal{padding:14px}.city-location-glass{padding:18px;border-radius:23px;max-height:calc(100dvh - 28px)}.city-location-header h2{font-size:22px}.city-location-rule{margin:14px 0}}
 @media(prefers-reduced-motion:no-preference){.city-location-glass{animation:city-location-enter .22s ease-out both}@keyframes city-location-enter{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}}
