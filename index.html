@@ -1856,7 +1856,7 @@ function normalizePersonalityProfile(value) {
 
 function parseEncounterScheduleText(raw) {
   const rows = [];
-  for (const [index, line] of String(raw || '').split(/\\r?\\n/).entries()) {
+  for (const [index, line] of String(raw || '').split(/\r?\n/).entries()) {
     const text = line.trim();
     if (!text) continue;
     const parts = text.split('|').map(value => value.trim());
@@ -1864,7 +1864,7 @@ function parseEncounterScheduleText(raw) {
     const [dayRaw, start, end, locationKey, activity] = parts;
     const weekday = dayRaw === '*' ? null : Number(dayRaw);
     if (weekday !== null && (!Number.isInteger(weekday) || weekday < 0 || weekday > 6)) throw new Error('相遇日程第 ' + (index + 1) + ' 行的星期必須是 0 到 6，或 *。');
-    if (!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(start) || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(end) || start === end) throw new Error('相遇日程第 ' + (index + 1) + ' 行的時間格式錯誤，或開始與結束時間相同。');
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(end) || start === end) throw new Error('相遇日程第 ' + (index + 1) + ' 行的時間格式錯誤，或開始與結束時間相同。');
     if (!/^[a-zA-Z0-9_-]{1,80}$/.test(locationKey)) throw new Error('相遇日程第 ' + (index + 1) + ' 行的地點代碼只能使用英文、數字、底線或連字號。');
     if (!activity || activity.length > 300) throw new Error('相遇日程第 ' + (index + 1) + ' 行的活動不可空白且最多 300 字。');
     rows.push({ weekday, day_type: 'any', start_time: start, end_time: end, location_key: locationKey, activity, priority: 0, is_active: true });
@@ -1906,7 +1906,7 @@ async function loadEncounterSchedulesIntoEditor(characterId) {
     String(row.end_time || '').slice(0,5),
     row.location_key,
     row.activity
-  ].join('|')).join('\\n');
+  ].join('|')).join('\n');
 }
 
 async function saveSupabaseCharacter(character, expectedUserId) {
@@ -1923,7 +1923,7 @@ async function saveSupabaseCharacter(character, expectedUserId) {
       const today = new Date();
       const cutoff = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
       const cutoffDate = cutoff.getFullYear() + '-' + String(cutoff.getMonth()+1).padStart(2,'0') + '-' + String(cutoff.getDate()).padStart(2,'0');
-      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(birthdate) || birthdate > cutoffDate) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(birthdate) || birthdate > cutoffDate) {
         throw new Error('[年齡未達許可] 此帳號未滿 18 歲或尚未完成生日驗證，無法建立或修改 NSFW 角色。');
       }
     }
@@ -2193,7 +2193,7 @@ const clone = value => JSON.parse(JSON.stringify(value));
 
 function currentUserCanViewNsfw() {
   const birthdate = String(state.account?.birthdate || '');
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(birthdate)) return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(birthdate)) return false;
   const today = new Date();
   const cutoff = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
   const cutoffDate = cutoff.getFullYear() + '-' + String(cutoff.getMonth()+1).padStart(2,'0') + '-' + String(cutoff.getDate()).padStart(2,'0');
