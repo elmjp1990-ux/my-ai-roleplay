@@ -1365,7 +1365,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       state.account = null;
       persist();
       void loadPublicSupabaseCharacters();
-      render();
+      if (route?.page !== 'citymap') render();
       return;
     }
 
@@ -1439,7 +1439,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       delete cleanRoute.overlay;
       go(cleanRoute, true);
     } else {
-      render();
+      if (route?.page !== 'citymap') render();
     }
   }
 
@@ -1489,7 +1489,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 
         state.signedIn = true;
         persist();
-        render();
+        if (route?.page !== 'citymap') render();
         if (!state.account.accountDeletionModalDismissed &&
             route?.overlay?.name !== 'account-deletion-pending') {
           openModal('account-deletion-pending', {
@@ -1581,7 +1581,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       };
       state.signedIn = true;
       persist();
-      render();
+      if (route?.page !== 'citymap') render();
     } catch (error) {
       console.error('PersonaX 資料庫同步失敗（階段：' + syncStage + '）：', error);
       // 取消申請後的刷新由呼叫端顯示專屬訊息；一般登入流程仍使用原本提示。
@@ -1674,7 +1674,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       );
       state.characters = [...publicCharacters, ...keepLocal.filter(character => !publicIds.has(character.id))];
       persist();
-      render();
+      if (route?.page !== 'citymap') render();
     } catch (error) {
       console.error('公開角色載入失敗：', error);
       if (state.account?.uid) toast('公開角色載入失敗：' + error.message);
