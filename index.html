@@ -9104,15 +9104,15 @@ function renderCityMapMVP(){
         <div class="city-map-block cafe"></div><div class="city-map-block school"></div><div class="city-map-block park"></div><div class="city-map-block shop"></div><div class="city-map-block home"></div>
         <svg class="city-building-layer" id="cityBuildingLayer" viewBox="0 0 1662 932" preserveAspectRatio="none" aria-label="城市地點玻璃圓形圖標">
           <!-- Marker anchors follow the user's annotated city-map reference; icons are specific to each place type. -->
-          <g class="city-place-marker is-available" data-action="city-landmark" data-place="airport" transform="translate(220 140)" tabindex="0" role="button" aria-label="機場"><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M 0 -11 L 2 -3 L 11 2 L 11 4 L 2 2 L 1 8 L 4 11 L 4 13 L 0 11 L -4 13 L -4 11 L -1 8 L -2 2 L -11 4 L -11 2 L -2 -3 Z"/></g>
-          <g class="city-place-marker is-available" data-action="city-landmark" data-place="commercial" transform="translate(1305 94)" tabindex="0" role="button" aria-label="商業大樓"><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M -8 10 V -10 H 1 V 10 M 1 -3 H 8 V 10 M -5 -6 H -3 M -5 -1 H -3 M -5 4 H -3 M 4 0 H 6 M 4 5 H 6 M -2 10 V 6 H 0 V 10"/></g>
-          <g class="city-place-marker is-available" data-action="city-landmark" data-place="night-bar" transform="translate(632 294)" tabindex="0" role="button" aria-label="夜間酒吧"><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M -10 -9 H 10 L 3 0 V 6 H 7 V 10 H -7 V 6 H -3 V 0 Z M -5 -5 L -2 -2 M 2 -5 L 5 -2"/></g>
-          <g class="city-place-marker is-available" data-action="city-landmark" data-place="live-house" transform="translate(868 416)" tabindex="0" role="button" aria-label="Live House 音樂酒吧"><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M 2 -10 V 5 A 4 4 0 1 1 -1 1 V -6 L 9 -9 V 2 A 4 4 0 1 1 6 -2 V -7 Z"/></g>
-          <g class="city-place-marker is-available" data-action="city-landmark" data-place="apartment" transform="translate(666 440)" tabindex="0" role="button" aria-label="308公寓"><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M -8 10 V -10 H 8 V 10 M -4 -6 H -2 M 3 -6 H 5 M -4 -1 H -2 M 3 -1 H 5 M -4 4 H -2 M 3 4 H 5 M -2 10 V 7 H 2 V 10"/></g>
-          <g class="city-place-marker is-available" data-action="city-landmark" data-place="department-store" transform="translate(1020 300)" tabindex="0" role="button" aria-label="百貨公司"><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M -9 -3 H 9 L 7 10 H -7 Z M -6 -3 V -6 Q -6 -10 0 -10 Q 6 -10 6 -6 V -3 M -9 -3 L -11 1 M 9 -3 L 11 1"/></g>
-          <g class="city-place-marker is-available" data-action="city-landmark" data-place="bookstore" transform="translate(480 733)" tabindex="0" role="button" aria-label="書店"><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M -10 -7 Q -4 -9 0 -5 Q 4 -9 10 -7 V 8 Q 4 6 0 10 Q -4 6 -10 8 Z M 0 -5 V 10 M -7 -4 Q -4 -5 -2 -3 M 2 -3 Q 5 -5 7 -4"/></g>
-          <g class="city-place-marker is-available" data-action="city-landmark" data-place="cafe" transform="translate(645 624)" tabindex="0" role="button" aria-label="咖啡廳"><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M -8 -4 H 6 V 5 Q 6 10 0 10 H -2 Q -8 10 -8 5 Z M 6 -2 H 9 Q 12 -2 11 2 Q 10 5 6 4 M -5 -8 Q -8 -11 -5 -13 M 0 -8 Q -3 -11 0 -13 M 4 -8 Q 1 -11 4 -13"/></g>
-          <g class="city-place-marker is-available" data-action="city-landmark" data-place="park" transform="translate(750 766)" tabindex="0" role="button" aria-label="中央公園"><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M 0 -11 L -7 -2 H -3 L -8 4 H -2 V 10 H 2 V 4 H 8 L 3 -2 H 7 Z"/></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="airport" transform="translate(220 140)" tabindex="0" role="button" aria-label="機場"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M 0 -11 L 2 -3 L 11 2 L 11 4 L 2 2 L 1 8 L 4 11 L 4 13 L 0 11 L -4 13 L -4 11 L -1 8 L -2 2 L -11 4 L -11 2 L -2 -3 Z"/></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="commercial" transform="translate(1305 94)" tabindex="0" role="button" aria-label="商業大樓"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M -8 10 V -10 H 1 V 10 M 1 -3 H 8 V 10 M -5 -6 H -3 M -5 -1 H -3 M -5 4 H -3 M 4 0 H 6 M 4 5 H 6 M -2 10 V 6 H 0 V 10"/></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="night-bar" transform="translate(632 294)" tabindex="0" role="button" aria-label="夜間酒吧"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M -10 -9 H 10 L 3 0 V 6 H 7 V 10 H -7 V 6 H -3 V 0 Z M -5 -5 L -2 -2 M 2 -5 L 5 -2"/></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="live-house" transform="translate(868 416)" tabindex="0" role="button" aria-label="Live House 音樂酒吧"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M 2 -10 V 5 A 4 4 0 1 1 -1 1 V -6 L 9 -9 V 2 A 4 4 0 1 1 6 -2 V -7 Z"/></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="apartment" transform="translate(666 440)" tabindex="0" role="button" aria-label="308公寓"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M -8 10 V -10 H 8 V 10 M -4 -6 H -2 M 3 -6 H 5 M -4 -1 H -2 M 3 -1 H 5 M -4 4 H -2 M 3 4 H 5 M -2 10 V 7 H 2 V 10"/></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="department-store" transform="translate(1020 300)" tabindex="0" role="button" aria-label="百貨公司"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M -9 -3 H 9 L 7 10 H -7 Z M -6 -3 V -6 Q -6 -10 0 -10 Q 6 -10 6 -6 V -3 M -9 -3 L -11 1 M 9 -3 L 11 1"/></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="bookstore" transform="translate(480 733)" tabindex="0" role="button" aria-label="書店"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M -10 -7 Q -4 -9 0 -5 Q 4 -9 10 -7 V 8 Q 4 6 0 10 Q -4 6 -10 8 Z M 0 -5 V 10 M -7 -4 Q -4 -5 -2 -3 M 2 -3 Q 5 -5 7 -4"/></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="cafe" transform="translate(645 624)" tabindex="0" role="button" aria-label="咖啡廳"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M -8 -4 H 6 V 5 Q 6 10 0 10 H -2 Q -8 10 -8 5 Z M 6 -2 H 9 Q 12 -2 11 2 Q 10 5 6 4 M -5 -8 Q -8 -11 -5 -13 M 0 -8 Q -3 -11 0 -13 M 4 -8 Q 1 -11 4 -13"/></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="park" transform="translate(750 766)" tabindex="0" role="button" aria-label="中央公園"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M 0 -11 L -7 -2 H -3 L -8 4 H -2 V 10 H 2 V 4 H 8 L 3 -2 H 7 Z"/></g>
         </svg>
       </div>
       <div class="city-map-ui" id="cityMapUI">
@@ -9129,7 +9129,26 @@ function renderCityMapMVP(){
         </div>
       </div>
       <div class="city-map-empty">拖曳探索 · 雙指縮放 · 雙擊空白處沉浸</div>
-      <section class="city-map-people" id="cityMapPeople" hidden><button type="button" data-action="city-close">關閉</button><h3 id="cityMapPlaceTitle">地標</h3><div id="cityMapPresenceList"><p>這個地點目前沒有可遇見的角色。</p></div></section>
+      <section class="city-location-modal" id="cityMapPeople" hidden aria-modal="true" role="dialog" aria-labelledby="cityMapPlaceTitle">
+      <button class="city-location-backdrop" type="button" data-action="city-close" aria-label="關閉地點資訊"></button>
+      <div class="city-location-glass">
+        <header class="city-location-header">
+          <div><div class="city-location-eyebrow">POYOZZ CITY · LOCATION</div><h2 id="cityMapPlaceTitle">咖啡廳</h2></div>
+          <button type="button" class="city-location-close" data-action="city-close" aria-label="關閉">×</button>
+        </header>
+        <div class="city-location-open"><span class="city-location-status-dot"></span><span id="cityMapOpenStatus">營業狀態待串接</span><span class="city-location-status-note">示意介面</span></div>
+        <div class="city-location-rule"></div>
+        <div class="city-location-section-title">當前角色 <span id="cityMapPeopleCount">名單尚未串接</span></div>
+        <div class="city-location-avatar-strip" id="cityMapAvatarStrip" aria-label="目前在場角色"><p class="city-location-empty">角色名單串接後，會在這裡顯示可左右滑動的圓形頭像。</p></div>
+        <div class="city-location-rule"></div>
+        <div class="city-location-detail" id="cityMapPresenceList">
+          <div class="city-location-scene-icon" aria-hidden="true">☕</div>
+          <h3 id="cityMapVenueHeading">在城市裡，找個地方歇歇腳</h3>
+          <p id="cityMapVenueDescription">地點介紹、環境特色與當日活動將會在這裡出現。</p>
+          <div class="city-location-event"><span class="city-location-event-label">本日活動 · 示意內容</span><strong>草莓塔限量上市</strong><p>活動資料與顯示機率尚未串接；目前僅為介面示意。</p></div>
+        </div>
+      </div>
+    </section>
     </section>`;
   document.body.classList.remove('city-map-mode-immersive');
   const stage=$('cityMapStage'),world=$('cityMapWorld');
@@ -9140,9 +9159,9 @@ function renderCityMapMVP(){
   const apply=()=>{world.style.transform='translate('+tx+'px,'+ty+'px) scale('+scale+')';};
   const clamp=()=>{scale=Math.max(1,Math.min(2.25,scale));const maxX=Math.max(0,(world.offsetWidth*scale-stage.clientWidth)/2);const maxY=Math.max(0,(world.offsetHeight*scale-stage.clientHeight)/2);tx=Math.max(-maxX,Math.min(maxX,tx));ty=Math.max(-maxY,Math.min(maxY,ty));apply();};
   const zoomBy=f=>{scale*=f;clamp();};
-  stage.addEventListener('pointerdown',e=>{if(e.target.closest('button,.city-map-info,.city-map-zoom,.city-map-bottom,.city-map-people'))return;stage.setPointerCapture?.(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=false;if(pointers.size===1)start={x:e.clientX,y:e.clientY,tx,ty,time:Date.now()};else if(pointers.size===2){const a=[...pointers.values()];start={distance:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),scale,kind:'pinch'};}});
+  stage.addEventListener('pointerdown',e=>{if(e.target.closest('button,[data-action="city-landmark"],.city-place-marker,.city-map-info,.city-map-zoom,.city-map-bottom,.city-map-people'))return;stage.setPointerCapture?.(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=false;if(pointers.size===1)start={x:e.clientX,y:e.clientY,tx,ty,time:Date.now()};else if(pointers.size===2){const a=[...pointers.values()];start={distance:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),scale,kind:'pinch'};}});
   stage.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2&&start?.kind==='pinch'){const a=[...pointers.values()];const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);scale=start.scale*d/Math.max(1,start.distance);clamp();moved=true;}else if(pointers.size===1&&start&&!start.kind){const dx=e.clientX-start.x,dy=e.clientY-start.y;if(Math.abs(dx)+Math.abs(dy)>5)moved=true;tx=start.tx+dx;ty=start.ty+dy;clamp();}});
-  const endPointer=e=>{pointers.delete(e.pointerId);if(pointers.size===0){if(start&&!moved&&Date.now()-start.time<280){const now=Date.now(),dx=e.clientX-lastTapX,dy=e.clientY-lastTapY;if(now-lastTap<320&&Math.hypot(dx,dy)<24){document.body.classList.toggle('city-map-mode-immersive');lastTap=0;}else{lastTap=now;lastTapX=e.clientX;lastTapY=e.clientY;}}start=null;}else if(pointers.size===1){const p=[...pointers.values()][0];start={x:p.x,y:p.y,tx,ty,time:Date.now()};}};
+  const endPointer=e=>{if(!pointers.has(e.pointerId))return;pointers.delete(e.pointerId);if(pointers.size===0){if(start&&!moved&&Date.now()-start.time<280){const now=Date.now(),dx=e.clientX-lastTapX,dy=e.clientY-lastTapY;if(now-lastTap<320&&Math.hypot(dx,dy)<24){document.body.classList.toggle('city-map-mode-immersive');lastTap=0;}else{lastTap=now;lastTapX=e.clientX;lastTapY=e.clientY;}}start=null;}else if(pointers.size===1){const p=[...pointers.values()][0];start={x:p.x,y:p.y,tx,ty,time:Date.now()};}};
   stage.addEventListener('pointerup',endPointer);stage.addEventListener('pointercancel',endPointer);stage.addEventListener('dblclick',e=>e.preventDefault());stage.addEventListener('contextmenu',e=>e.preventDefault());
   // 2025 Taipei solar-time reference profile. Calculate the 2025 reference day locally;
   // no sunrise/sunset API or daily network request is needed.
@@ -9192,9 +9211,74 @@ function renderCityMapMVP(){
     renderCityPresence();
   };
   renderCityPresence();
-  stage.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;if(a==='city-zoom-in'){zoomBy(1.18);return;}if(a==='city-zoom-out'){zoomBy(.85);return;}if(a==='city-close'){$('cityMapPeople').hidden=true;return;}if(a==='city-landmark'){const place=b.dataset.place;const people=cityPresenceByPlace[place];$('cityMapPlaceTitle').textContent=cityPlaceNames[place]||'地標';$('cityMapPresenceList').innerHTML=Array.isArray(people)&&people.length?people.map(person=>'<p>'+escapeHTML(String(person.name||'角色'))+(person.activity?' · '+escapeHTML(String(person.activity)):'')+'</p>').join(''):'<p>測試模式：此建築已開啟高亮，角色名單尚未串接。</p>';$('cityMapPeople').hidden=false;return;}if(a==='city-traditional'){go({page:'home'});return;}});
+  // Keep the modal outside the transformed map stage so map gestures and delegated stage clicks cannot dismiss it.
+  const locationModal=$('cityMapPeople');
+  if(locationModal && locationModal.parentElement!==document.body) document.body.appendChild(locationModal);
+  const openCityLocation=(marker)=>{
+    const place=marker.dataset.place;
+    const people=cityPresenceByPlace[place];
+    const names=cityPlaceNames[place]||'地點';
+    $('cityMapPlaceTitle').textContent=names;
+    $('cityMapOpenStatus').textContent='營業狀態待串接';
+    $('cityMapPeopleCount').textContent=Array.isArray(people)&&people.length?people.length+' 位角色':'名單尚未串接';
+    const strip=$('cityMapAvatarStrip');
+    strip.innerHTML=Array.isArray(people)&&people.length
+      ? people.map((person,index)=>'<button type="button" class="city-location-avatar" data-action="city-person" data-person-index="'+index+'" aria-label="查看角色 '+escapeHTML(String(person.name||'角色'))+'"><span class="city-location-avatar-fallback">'+escapeHTML(String(person.name||'角').slice(0,1))+'</span></button>').join('')
+      : '<p class="city-location-empty">角色名單串接後，會在這裡顯示可左右滑動的圓形頭像。</p>';
+    $('cityMapPresenceList').innerHTML='<div class="city-location-scene-icon" aria-hidden="true">'+(place==='cafe'?'☕':place==='night-bar'?'🍸':place==='live-house'?'♫':'✧')+'</div><h3>'+escapeHTML(names)+'・今日場地資訊</h3><p>場地介紹與即時資訊尚待串接。這裡將顯示環境特色、營業時間及當日活動。</p><div class="city-location-event"><span class="city-location-event-label">本日活動 · 示意內容</span><strong>草莓塔限量上市</strong><p>活動資料與顯示機率尚未串接；目前僅為介面示意。</p></div>';
+    locationModal.hidden=false;
+    document.body.classList.add('city-location-active');
+  };
+  stage.querySelectorAll('[data-action="city-landmark"]').forEach(marker=>{
+    marker.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();openCityLocation(marker);});
+    marker.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();openCityLocation(marker);}});
+  });
+  locationModal?.addEventListener('click',event=>{
+    const close=event.target.closest('[data-action="city-close"]');
+    if(close){event.preventDefault();event.stopPropagation();locationModal.hidden=true;document.body.classList.remove('city-location-active');}
+    else event.stopPropagation();
+  });
+  stage.addEventListener('click',event=>{
+    const button=event.target.closest('[data-action]');
+    if(!button)return;
+    if(button.dataset.action==='city-zoom-in'){event.preventDefault();event.stopPropagation();zoomBy(1.18);return;}
+    if(button.dataset.action==='city-zoom-out'){event.preventDefault();event.stopPropagation();zoomBy(.85);return;}
+    if(button.dataset.action==='city-traditional'){event.preventDefault();event.stopPropagation();go({page:'home'});}
+  });
   window.addEventListener('resize',()=>{sizeWorld();clamp();},{passive:true});
 }
 </script>
+
+<style id="poyozz-city-location-panel">
+.city-location-modal[hidden]{display:none!important}
+.city-location-modal{position:fixed;inset:0;z-index:120;display:grid;place-items:center;padding:22px;isolation:isolate}
+.city-location-backdrop{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:0;padding:0;background:rgba(5,8,18,.52);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+.city-location-glass{position:relative;z-index:1;width:min(540px,100%);max-height:min(760px,calc(100dvh - 36px));overflow:auto;overscroll-behavior:contain;border:1px solid rgba(255,255,255,.48);border-radius:26px;padding:22px;background:linear-gradient(135deg,rgba(151,157,173,.43),rgba(105,113,132,.34) 48%,rgba(180,157,193,.30));color:#fff;box-shadow:0 28px 90px rgba(0,0,0,.24),inset 0 1px rgba(255,255,255,.42),inset 0 -1px rgba(255,255,255,.10),0 0 42px rgba(216,203,255,.16);backdrop-filter:blur(32px) saturate(165%);-webkit-backdrop-filter:blur(32px) saturate(165%)}
+.city-location-header{position:static;height:auto;padding:0;display:flex;align-items:center;justify-content:space-between;gap:14px;background:transparent;border:0;backdrop-filter:none}
+.city-location-eyebrow{font-size:9px;letter-spacing:.2em;color:#c5b9ee;margin-bottom:7px}
+.city-location-header h2{font-size:25px;letter-spacing:.02em;margin:0;font-weight:650}
+.city-location-close{width:38px;height:38px;padding:0;display:grid;place-items:center;border-radius:50%;font-size:26px;line-height:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff}
+.city-location-open{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:#e5e2f5}
+.city-location-status-dot{width:8px;height:8px;flex:0 0 8px;border-radius:50%;background:#9da3b5;box-shadow:0 0 12px #9da3b555}
+.city-location-status-note{margin-left:auto;color:#c2bad7;font-size:10px}
+.city-location-rule{height:1px;margin:17px 0;background:linear-gradient(90deg,transparent,rgba(231,226,255,.24) 12%,rgba(231,226,255,.24) 88%,transparent)}
+.city-location-section-title{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;font-weight:650}
+.city-location-section-title span{font-size:10px;color:#c4bddb;font-weight:400}
+.city-location-avatar-strip{display:flex;gap:12px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;padding:13px 2px 5px;min-height:70px;scrollbar-width:thin;scrollbar-color:rgba(221,212,255,.35) transparent}
+.city-location-avatar{flex:0 0 52px;width:52px;height:52px;padding:3px;border-radius:50%;border:1px solid rgba(238,232,255,.38);background:linear-gradient(140deg,rgba(233,183,232,.25),rgba(139,124,255,.2));box-shadow:inset 0 1px rgba(255,255,255,.18);scroll-snap-align:start}
+.city-location-avatar-fallback{display:grid;place-items:center;width:100%;height:100%;border-radius:50%;background:linear-gradient(145deg,#625b83,#34334f);color:#f5eaff;font-size:17px}
+.city-location-empty{margin:0;align-self:center;color:#c4c2d3;font-size:11px;line-height:1.7}
+.city-location-detail{color:#e7e5f3;font-size:13px;line-height:1.75}
+.city-location-scene-icon{width:54px;height:54px;margin:0 auto 12px;display:grid;place-items:center;border-radius:18px;border:1px solid rgba(240,233,255,.18);background:linear-gradient(145deg,rgba(231,183,232,.14),rgba(139,124,255,.12));font-size:25px;color:#f5e6ff}
+.city-location-detail h3{text-align:center;font-size:16px;margin:0 0 6px}
+.city-location-detail>p{text-align:center;margin:0;color:#c9c7d9;font-size:12px}
+.city-location-event{margin-top:17px;padding:14px 15px;border:1px solid rgba(239,221,255,.15);border-radius:16px;background:linear-gradient(130deg,rgba(232,184,222,.09),rgba(164,151,255,.08));}
+.city-location-event-label{display:block;margin-bottom:5px;color:#c8b8f4;font-size:10px;letter-spacing:.08em}
+.city-location-event strong{font-size:14px;font-weight:650}
+.city-location-event p{margin:5px 0 0;color:#c3c0d2;font-size:11px;line-height:1.65}
+@media(max-width:600px){.city-location-modal{padding:14px}.city-location-glass{padding:18px;border-radius:23px;max-height:calc(100dvh - 28px)}.city-location-header h2{font-size:22px}.city-location-rule{margin:14px 0}}
+@media(prefers-reduced-motion:no-preference){.city-location-glass{animation:city-location-enter .22s ease-out both}@keyframes city-location-enter{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}}
+</style>
+
 </body>
 </html>
