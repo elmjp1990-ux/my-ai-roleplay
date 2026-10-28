@@ -96,6 +96,12 @@ assert.match(frontend, /installSuggestionSwipe/);
 assert.match(frontend, /滑動或點選燈號可切換/);
 assert.match(frontend, /data-action="suggestion-select"/);
 assert.match(frontend, /data-action="suggestion"/);
+assert.match(frontend, /data-action="start-encounter"/);
+assert.match(frontend, /case ['"]start-encounter['"]/);
+assert.match(frontend, /installEncounterScenePresentation/);
+assert.match(frontend, /chat-main\.encounter-scene/);
+assert.match(frontend, /const endpointName = s\.encounterMode \? ['"]encounter-turn['"] : ['"]chat-turn['"]/);
+
 assert.match(frontend, /messages:\s*\[\]/);
 
 console.log("Encounter chat-mode security guard tests passed.");
