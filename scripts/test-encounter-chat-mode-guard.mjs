@@ -70,6 +70,20 @@ assert.match(encounterTurn, /rpc\(["']settle_chat_turn["']/);
 assert.match(encounterTurn, /status: "insufficient_funds"/);
 assert.match(encounterTurn, /billing: \{ cost: 2/);
 assert.match(encounterTurn, /assistant_message_id_collision/);
+assert.match(encounterTurn, /record_encounter_turn_interaction/);
+assert.match(encounterTurn, /persistInteraction/);
+assert.match(encounterTurn, /encounter_interaction_persistence_failed/);
+assert.match(encounterTurn, /p_affinity_delta:\s*1/);
+assert.match(encounterTurn, /interactionIdempotent:\s*interactionRow\.idempotent/);
+const interactionMigration = fs.readFileSync(
+  "supabase/migrations/20261028190000_idempotent_encounter_turn_interaction.sql",
+  "utf8",
+);
+assert.match(interactionMigration, /turn_id uuid PRIMARY KEY/);
+assert.match(interactionMigration, /ON CONFLICT \(turn_id\) DO NOTHING/);
+assert.match(interactionMigration, /Turn ID reused with different owner or character/);
+assert.match(interactionMigration, /REVOKE ALL ON FUNCTION public\.record_encounter_turn_interaction/);
+assert.match(interactionMigration, /GRANT EXECUTE ON FUNCTION public\.record_encounter_turn_interaction[^;]*TO service_role/s);
 assert.doesNotMatch(encounterTurn, /encounter_turn_handler_required/);
 
 const frontend = fs.readFileSync("index.html", "utf8");
