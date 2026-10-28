@@ -8924,24 +8924,84 @@ function renderCityMapMVP(){
     cafe:{icon:'☕',heading:'在城市裡，找個地方歇歇腳',description:'咖啡香從吧台飄向窗邊座位，甜點櫃裡擺著當季蛋糕。這裡適合短暫休息、工作、約會，也適合和某個人慢慢聊起近況。',eventLabel:'場景亮點',eventTitle:'今日甜點的話題',eventDescription:'甜點櫃可作為聊天與約會的情境；實際品項、庫存與活動尚未連接動態資料。'},
     park:{icon:'🌳',heading:'城市裡的一片綠意',description:'步道穿過樹蔭與草地，長椅、噴水池和開闊的天空讓人暫時遠離喧鬧。清晨散步、午後閒聊或傍晚慢跑，都有不同的城市風景。',eventLabel:'場景亮點',eventTitle:'樹蔭下的片刻寧靜',eventDescription:'適合散步、慢跑、野餐、偶遇或在戶外談一場不急著結束的對話。'}
   };
-  // Character presence is intentionally not fabricated. Connect the trusted schedule source before populating this list.
+  // Use only published characters whose own schedule data is already available to this client.
+  // Never invent a character or query private schedule rows from the browser.
+  const cityPlaceAliases={airport:['airport'],commercial:['commercial','office'], 'night-bar':['night-bar','bar'], 'live-house':['live-house','livehouse'], apartment:['apartment'], 'department-store':['department-store','department_store'], bookstore:['bookstore','book-store'], cafe:['cafe','coffee-shop'], park:['park']};
+  const getTaipeiClock=()=>{
+    const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
+    const values=Object.fromEntries(parts.map(part=>[part.type,part.value]));
+    return {weekday:{Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[values.weekday],minutes:Number(values.hour)*60+Number(values.minute)};
+  };
+  const getCityPresence=(place)=>{
+    const clock=getTaipeiClock();
+    const aliases=cityPlaceAliases[place]||[place];
+    return (Array.isArray(state.characters)?state.characters:[]).filter(character=>{
+      if(!accessible(character)) return false;
+      const raw=String(character.encounterSchedules||'').trim();
+      if(!raw) return false;
+      return raw.split(/\r?\n/).some(line=>{
+        const parts=line.trim().split('|').map(value=>value.trim());
+        if(parts.length!==5) return false;
+        const [day,start,end,key,activity]=parts;
+        if(!aliases.includes(key)||!activity) return false;
+        if(day!=='*'&&Number(day)!==clock.weekday) return false;
+        if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(start)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(end)) return false;
+        const now=clock.minutes,from=Number(start.slice(0,2))*60+Number(start.slice(3)),to=Number(end.slice(0,2))*60+Number(end.slice(3));
+        return from<to?now>=from&&now<to:(now>=from||now<to);
+      });
+    }).map(character=>{
+      const raw=String(character.encounterSchedules||'');
+      const line=raw.split(/\r?\n/).find(item=>{
+        const parts=item.trim().split('|').map(value=>value.trim());
+        if(parts.length!==5||!(cityPlaceAliases[place]||[place]).includes(parts[3])||!parts[4]) return false;
+        if(parts[0]!=='*'&&Number(parts[0])!==clock.weekday) return false;
+        const from=Number(parts[1]?.slice(0,2))*60+Number(parts[1]?.slice(3)),to=Number(parts[2]?.slice(0,2))*60+Number(parts[2]?.slice(3));
+        return Number.isFinite(from)&&Number.isFinite(to)&&(from<to?clock.minutes>=from&&clock.minutes<to:(clock.minutes>=from||clock.minutes<to));
+      });
+      const parts=String(line||'').trim().split('|').map(value=>value.trim());
+      return {...character,cityActivity:parts[4]||''};
+    });
+  };
   const cityPresenceByPlace={};
   const openCityLocation=(marker)=>{
     const place=marker.dataset.place;
-    const people=cityPresenceByPlace[place];
+    const people=getCityPresence(place);
+    cityPresenceByPlace[place]=people;
     const name=cityPlaceNames[place]||'地點';
     const scene=cityVenueScenes[place]||{icon:'📍',heading:name+'・場景資訊',description:'這個地點的場景介紹將在設定完成後補上。',eventLabel:'場景亮點',eventTitle:'探索這個地點',eventDescription:'目前沒有額外的場景設定。'};
     $('cityMapPlaceTitle').textContent=name;
-    $('cityMapOpenStatus').textContent='場地狀態待串接';
-    $('cityMapPeopleCount').textContent=Array.isArray(people)&&people.length?people.length+' 位角色':'角色名單待串接';
+    $('cityMapOpenStatus').textContent='場景介紹';
+    $('cityMapPeopleCount').textContent=people.length?people.length+' 位角色正在此處':'目前沒有符合時段的角色';
     const strip=$('cityMapAvatarStrip');
-    strip.innerHTML=Array.isArray(people)&&people.length
-      ? people.map((person,index)=>'<button type="button" class="city-location-avatar" data-action="city-person" data-person-index="'+index+'" aria-label="查看角色 '+escapeHTML(String(person.name||'角色'))+'"><span class="city-location-avatar-fallback">'+escapeHTML(String(person.name||'角').slice(0,1))+'</span></button>').join('')
-      : '<p class="city-location-empty">角色出沒資料完成串接後，會在這裡顯示目前可遇見的角色。</p>';
-    $('cityMapPresenceList').innerHTML='<div class="city-location-scene-icon" aria-hidden="true">'+scene.icon+'</div><h3>'+escapeHTML(scene.heading)+'</h3><p>'+escapeHTML(scene.description)+'</p><div class="city-location-event"><span class="city-location-event-label">'+escapeHTML(scene.eventLabel)+' · 固定場景設定</span><strong>'+escapeHTML(scene.eventTitle)+'</strong><p>'+escapeHTML(scene.eventDescription)+'</p></div>';
+    strip.innerHTML=people.length
+      ? people.map((person,index)=>'<button type="button" class="city-location-avatar city-location-person" data-action="city-person" data-person-index="'+index+'" aria-label="與 '+escapeHTML(String(person.name||'角色'))+' 相遇"><span class="city-location-avatar-fallback">'+escapeHTML(String(person.name||'角').slice(0,1))+'</span><span class="city-location-person-name">'+escapeHTML(String(person.name||'角色'))+'</span></button>').join('')
+      : '<p class="city-location-empty">目前沒有角色排定在這個地點。角色日程符合台灣時間時，才會顯示在這裡。</p>';
+    $('cityMapPresenceList').innerHTML='<div class="city-location-scene-icon" aria-hidden="true">'+scene.icon+'</div><h3>'+escapeHTML(scene.heading)+'</h3><p>'+escapeHTML(scene.description)+'</p><div class="city-location-event"><span class="city-location-event-label">'+escapeHTML(scene.eventLabel)+'</span><strong>'+escapeHTML(scene.eventTitle)+'</strong><p>'+escapeHTML(scene.eventDescription)+'</p></div>';
     locationModal.hidden=false;
     document.body.classList.add('city-location-active');
   };
+  locationModal?.addEventListener('click',async event=>{
+    const personButton=event.target.closest('[data-action="city-person"]');
+    if(!personButton)return;
+    event.preventDefault();
+    event.stopPropagation();
+    const place=$('cityMapPlaceTitle')?.textContent;
+    const placeKey=Object.keys(cityPlaceNames).find(key=>cityPlaceNames[key]===place);
+    const person=cityPresenceByPlace[placeKey]?.[Number(personButton.dataset.personIndex)];
+    if(!person||!accessible(person)){toast('此角色目前無法開始相遇模式。');return;}
+    if(!requireLogin({page:'citymap',id:person.id}))return;
+    personButton.disabled=true;
+    try{
+      const encounterSession=await createEncounterSession(person);
+      locationModal.hidden=true;
+      document.body.classList.remove('city-location-active');
+      go({page:'conversation',id:encounterSession.id});
+      toast('已進入相遇模式；每次送出訊息依既有規則扣款。');
+    }catch(error){
+      console.error('從城市地點開始相遇失敗：',error);
+      toast(error?.message||'相遇模式暫時無法使用，請稍後再試。');
+    }finally{personButton.disabled=false;}
+  });
   // Bind activation directly to each SVG marker. Some mobile SVG click paths do not
   // reliably reach the stage-level delegated handler, so each landmark owns its click.
   stage.querySelectorAll('[data-action="city-landmark"]').forEach(marker=>{
@@ -9574,6 +9634,11 @@ document.addEventListener('submit',function(event){
 .city-location-event-label{display:block;margin-bottom:5px;color:#c8b8f4;font-size:10px;letter-spacing:.08em}
 .city-location-event strong{font-size:14px;font-weight:650}
 .city-location-event p{margin:5px 0 0;color:#c3c0d2;font-size:11px;line-height:1.65}
+.city-location-empty{margin:0;padding:14px 12px;width:100%;border:1px dashed rgba(235,225,255,.22);border-radius:14px;color:#d2cfe0;font-size:12px;line-height:1.7;text-align:center}
+.city-location-person{display:flex;flex-direction:column;align-items:center;gap:6px;flex:0 0 72px;min-width:72px;padding:4px 3px 8px;border:0;background:transparent;color:#fff;cursor:pointer}
+.city-location-person .city-location-avatar-fallback{display:grid;place-items:center;width:54px;height:54px;border-radius:50%;border:1px solid rgba(239,221,255,.55);background:linear-gradient(145deg,rgba(232,184,222,.28),rgba(139,124,255,.24));box-shadow:0 5px 18px rgba(0,0,0,.15);font-size:20px}
+.city-location-person-name{max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#f3efff}
+.city-location-person:disabled{opacity:.6}
 @media(max-width:600px){.city-location-modal{padding:14px}.city-location-glass{padding:18px;border-radius:23px;max-height:calc(100dvh - 28px)}.city-location-header h2{font-size:22px}.city-location-rule{margin:14px 0}}
 @media(prefers-reduced-motion:no-preference){.city-location-glass{animation:city-location-enter .22s ease-out both}@keyframes city-location-enter{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}}
 </style>
