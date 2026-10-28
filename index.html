@@ -8840,16 +8840,16 @@ function renderCityMapMVP(){
           <div><div class="city-location-eyebrow">POYOZZ CITY · LOCATION</div><h2 id="cityMapPlaceTitle">咖啡廳</h2></div>
           <button type="button" class="city-location-close" data-action="city-close" aria-label="關閉">×</button>
         </header>
-        <div class="city-location-open"><span class="city-location-status-dot"></span><span id="cityMapOpenStatus">營業狀態待串接</span><span class="city-location-status-note">示意介面</span></div>
+        <div class="city-location-open"><span class="city-location-status-dot"></span><span id="cityMapOpenStatus">地點場景資訊</span><span class="city-location-status-note">營業時間未提供</span></div>
         <div class="city-location-rule"></div>
-        <div class="city-location-section-title">當前角色 <span id="cityMapPeopleCount">名單尚未串接</span></div>
-        <div class="city-location-avatar-strip" id="cityMapAvatarStrip" aria-label="目前在場角色"><p class="city-location-empty">角色名單串接後，會在這裡顯示可左右滑動的圓形頭像。</p></div>
+        <div class="city-location-section-title">當前角色 <span id="cityMapPeopleCount">依公開角色排程顯示</span></div>
+        <div class="city-location-avatar-strip" id="cityMapAvatarStrip" aria-label="目前在場角色"><p class="city-location-empty">目前尚無符合此地點與台灣時間的公開角色排程。</p></div>
         <div class="city-location-rule"></div>
         <div class="city-location-detail" id="cityMapPresenceList">
-          <div class="city-location-scene-icon" aria-hidden="true">📍</div>
-          <h3 id="cityMapVenueHeading">選擇地點以查看專屬場景</h3>
-          <p id="cityMapVenueDescription">每個地點都有獨立的場景介紹與故事亮點。</p>
-          <div class="city-location-event"><span class="city-location-event-label">場景亮點</span><strong>等待選擇地點</strong><p>選擇地圖上的地點後，這裡會顯示對應的場景內容。</p></div>
+          <div class="city-location-scene-icon" aria-hidden="true">📚</div>
+          <h3 id="cityMapVenueHeading">在書頁之間慢下腳步</h3>
+          <p id="cityMapVenueDescription">木質書架與紙張氣味讓時間放慢。新書展示區、靠窗閱讀座位與安靜的書架轉角，各自藏著不同的相遇方式。</p>
+          <div class="city-location-event"><span class="city-location-event-label">場景亮點</span><strong>同一本書的選擇</strong><p>適合交換閱讀心得、尋找某本書、安靜陪伴或從共同興趣開始的故事。</p></div>
         </div>
       </div>
     </section>
@@ -8965,16 +8965,21 @@ function renderCityMapMVP(){
   };
   const cityPresenceByPlace={};
   const openCityLocation=(marker)=>{
-    const place=marker.dataset.place;
-    const people=getCityPresence(place);
-    cityPresenceByPlace[place]=people;
+    const place=marker?.dataset?.place;
+    if(!place||!locationModal)return;
     const name=cityPlaceNames[place]||'地點';
-    const scene=cityVenueScenes[place]||{icon:'📍',heading:name+'・場景資訊',description:'這個地點的場景介紹將在設定完成後補上。',eventLabel:'場景亮點',eventTitle:'探索這個地點',eventDescription:'目前沒有額外的場景設定。'};
+    const scene=cityVenueScenes[place]||{icon:'📍',heading:name+'・場景資訊',description:'這個地點目前沒有額外的場景設定。',eventLabel:'場景亮點',eventTitle:'探索這個地點',eventDescription:'可在這裡展開角色互動與城市故事。'};
+    // Render the place-specific scene before reading optional schedule data so a
+    // missing/malformed schedule can never leave the generic placeholder visible.
     $('cityMapPlaceTitle').textContent=name;
     $('cityMapOpenStatus').textContent='地點場景可探索';
-    $('cityMapPeopleCount').textContent=people.length?people.length+' 位角色符合目前時段':'目前沒有符合時段的角色';
     const statusNote=locationModal.querySelector('.city-location-status-note');
-    if(statusNote)statusNote.textContent='營業時間尚未串接';
+    if(statusNote)statusNote.textContent='營業時間未提供';
+    $('cityMapPresenceList').innerHTML='<div class="city-location-scene-icon" aria-hidden="true">'+scene.icon+'</div><h3>'+escapeHTML(scene.heading)+'</h3><p>'+escapeHTML(scene.description)+'</p><div class="city-location-event"><span class="city-location-event-label">'+escapeHTML(scene.eventLabel)+'</span><strong>'+escapeHTML(scene.eventTitle)+'</strong><p>'+escapeHTML(scene.eventDescription)+'</p></div>';
+    let people=[];
+    try{people=getCityPresence(place);if(!Array.isArray(people))people=[];}catch(error){console.error('讀取城市角色排程失敗：',error);}
+    cityPresenceByPlace[place]=people;
+    $('cityMapPeopleCount').textContent=people.length?people.length+' 位角色符合目前時段':'目前沒有符合時段的角色';
     const strip=$('cityMapAvatarStrip');
     strip.innerHTML=people.length
       ? people.map((person,index)=>{
