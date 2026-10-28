@@ -58,6 +58,20 @@ assert.match(accessMigration, /REVOKE ALL ON FUNCTION public\.can_open_encounter
 assert.match(accessMigration, /GRANT EXECUTE ON FUNCTION public\.can_open_encounter_session\(uuid\) TO authenticated/);
 
 
+const encounterTurn = fs.readFileSync("supabase/functions/encounter-turn/index.ts", "utf8");
+
+// Encounter turn endpoint is separate, authenticated, eligibility-gated, and mode-specific.
+assert.match(encounterTurn, /auth\.getUser\(\)/);
+assert.match(encounterTurn, /rpc\(["']account_is_active["']\)/);
+assert.match(encounterTurn, /session\.chat_mode !== ["']encounter["']/);
+assert.match(encounterTurn, /rpc\(["']can_open_encounter_session["']/);
+assert.match(encounterTurn, /rpc\(["']reserve_chat_turn["']/);
+assert.match(encounterTurn, /rpc\(["']settle_chat_turn["']/);
+assert.match(encounterTurn, /status: "insufficient_funds"/);
+assert.match(encounterTurn, /billing: \{ cost: 2/);
+assert.match(encounterTurn, /assistant_message_id_collision/);
+assert.doesNotMatch(encounterTurn, /encounter_turn_handler_required/);
+
 const frontend = fs.readFileSync("index.html", "utf8");
 assert.match(frontend, /async function createEncounterSession\(character\)/);
 assert.match(frontend, /functions\.invoke\(["']encounter-session["']/);
