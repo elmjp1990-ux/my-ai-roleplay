@@ -57,4 +57,11 @@ assert.match(accessMigration, /private\.current_user_is_adult\(\)/);
 assert.match(accessMigration, /REVOKE ALL ON FUNCTION public\.can_open_encounter_session\(uuid\) FROM PUBLIC, anon/);
 assert.match(accessMigration, /GRANT EXECUTE ON FUNCTION public\.can_open_encounter_session\(uuid\) TO authenticated/);
 
-console.log("Encounter chat-mode security guard tests passed.");
+
+const frontend = fs.readFileSync("index.html", "utf8");
+assert.match(frontend, /async function createEncounterSession\(character\)/);
+assert.match(frontend, /functions\.invoke\(["']encounter-session["']/);
+assert.match(frontend, /data\.session\.chat_mode !== ["']encounter["']/);
+assert.match(frontend, /encounterMode:\s*true/);
+assert.match(frontend, /messages:\s*\[\]/);
+\nconsole.log("Encounter chat-mode security guard tests passed.");
