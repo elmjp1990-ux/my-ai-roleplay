@@ -7886,7 +7886,7 @@ document.addEventListener('submit',async event => {
         if(draftVideoFile)c.avatarVideoPath=await uploadCharacterAvatarVideo(draftVideoFile,user.uid,c.id);
         // 先驗證日程格式，避免角色資料已寫入後才發現日程格式錯誤。
         const scheduleText = String(f.get('encounterSchedules') || '').trim();
-        const clearSchedules = f.elements.clearEncounterSchedules?.checked === true;
+        const clearSchedules = form.querySelector('input[name="clearEncounterSchedules"]')?.checked === true;
         let scheduleRows = [];
         if (scheduleText) {
           try { scheduleRows = parseEncounterScheduleText(scheduleText); }
