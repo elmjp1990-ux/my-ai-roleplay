@@ -8862,7 +8862,7 @@ function renderCityMapMVP(){
   const apply=()=>{world.style.transform='translate('+tx+'px,'+ty+'px) scale('+scale+')';};
   const clamp=()=>{scale=Math.max(1,Math.min(2.25,scale));const maxX=Math.max(0,(world.offsetWidth*scale-stage.clientWidth)/2);const maxY=Math.max(0,(world.offsetHeight*scale-stage.clientHeight)/2);tx=Math.max(-maxX,Math.min(maxX,tx));ty=Math.max(-maxY,Math.min(maxY,ty));apply();};
   const zoomBy=f=>{scale*=f;clamp();};
-  stage.addEventListener('pointerdown',e=>{if(e.target.closest('button,.city-map-info,.city-map-zoom,.city-map-bottom,.city-map-people'))return;stage.setPointerCapture?.(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=false;if(pointers.size===1)start={x:e.clientX,y:e.clientY,tx,ty,time:Date.now()};else if(pointers.size===2){const a=[...pointers.values()];start={distance:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),scale,kind:'pinch'};}});
+  stage.addEventListener('pointerdown',e=>{if(e.target.closest('button,.city-map-info,.city-map-zoom,.city-map-bottom,.city-map-people,[data-action="city-landmark"]'))return;stage.setPointerCapture?.(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=false;if(pointers.size===1)start={x:e.clientX,y:e.clientY,tx,ty,time:Date.now()};else if(pointers.size===2){const a=[...pointers.values()];start={distance:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),scale,kind:'pinch'};}});
   stage.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2&&start?.kind==='pinch'){const a=[...pointers.values()];const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);scale=start.scale*d/Math.max(1,start.distance);clamp();moved=true;}else if(pointers.size===1&&start&&!start.kind){const dx=e.clientX-start.x,dy=e.clientY-start.y;if(Math.abs(dx)+Math.abs(dy)>5)moved=true;tx=start.tx+dx;ty=start.ty+dy;clamp();}});
   const endPointer=e=>{pointers.delete(e.pointerId);if(pointers.size===0){if(start&&!moved&&Date.now()-start.time<280){const now=Date.now(),dx=e.clientX-lastTapX,dy=e.clientY-lastTapY;if(now-lastTap<320&&Math.hypot(dx,dy)<24){document.body.classList.toggle('city-map-mode-immersive');lastTap=0;}else{lastTap=now;lastTapX=e.clientX;lastTapY=e.clientY;}}start=null;}else if(pointers.size===1){const p=[...pointers.values()][0];start={x:p.x,y:p.y,tx,ty,time:Date.now()};}};
   stage.addEventListener('pointerup',endPointer);stage.addEventListener('pointercancel',endPointer);stage.addEventListener('dblclick',e=>e.preventDefault());stage.addEventListener('contextmenu',e=>e.preventDefault());
@@ -8939,7 +8939,7 @@ function renderCityMapMVP(){
     else event.stopPropagation();
   });
   stage.addEventListener('click',event=>{
-    const button=event.target.closest('[data-action]');
+    const button=event.target instanceof Element ? event.target.closest('[data-action]') : null;
     if(!button)return;
     if(button.dataset.action==='city-landmark'){event.preventDefault();event.stopPropagation();openCityLocation(button);return;}
     if(button.dataset.action==='city-zoom-in'){event.preventDefault();event.stopPropagation();zoomBy(1.18);return;}
