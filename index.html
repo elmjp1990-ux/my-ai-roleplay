@@ -3409,6 +3409,7 @@ function card(c,owner = false) {
                 data-id="${e(c.id)}" aria-label="切換喜愛角色"
                 aria-pressed="${favorite}">♥</button>
         <button class="card-chat" data-action="start-chat" data-id="${e(c.id)}">開始聊天</button>
+        <button class="card-chat encounter-start-button" data-action="start-encounter" data-id="${e(c.id)}">相遇模式</button>
       </div>
       <div class="card-body">
         <h3>${e(c.name)}</h3>
@@ -6995,6 +6996,20 @@ document.addEventListener('click',async event => {
       }
       case 'author':visit('author',key);break;
       case 'start-chat':startChat(key);break;
+      case 'start-encounter': {
+        const character = state.characters.find(item => item.id === key);
+        if (!character || !accessible(character)) { toast('此角色目前無法開始相遇模式。'); break; }
+        if (!requireLogin({page:route.page,id:key})) break;
+        try {
+          const encounterSession = await createEncounterSession(character);
+          go({page:'conversation',id:encounterSession.id});
+          toast('已進入相遇模式；每次送出訊息會消耗 2 銀幣或依既有規則使用鑽石。');
+        } catch (error) {
+          console.error('建立相遇模式失敗：',error);
+          toast(error?.message || '相遇模式暫時無法使用，請稍後再試。');
+        }
+        break;
+      }
       case 'test-purchase-200': {
         if (!requireLogin({page:route.page,id:route.id})) break;
         if (window.mySupabase && state.account?.uid && state.account.uid !== 'demo-local-account') {
@@ -9335,6 +9350,55 @@ function renderCityMapMVP(){
   stage.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;if(a==='city-zoom-in'){zoomBy(1.18);return;}if(a==='city-zoom-out'){zoomBy(.85);return;}if(a==='city-close'){$('cityMapPeople').hidden=true;return;}if(a==='city-landmark'){const names={cafe:'星光咖啡',school:'晴日學園',park:'中央公園',shop:'街角商店',home:'住宅區'};$('cityMapPlaceTitle').textContent=names[b.dataset.place]||'地標';$('cityMapPeople').hidden=false;return;}if(a==='city-traditional'){go({page:'home'});return;}});
   window.addEventListener('resize',()=>{sizeWorld();clamp();},{passive:true});
 }
+
+/* POYOZZ Encounter scene presentation. Uses the shared chat composer, wallet,
+   suggested replies, swipe controls, persistence and pending-turn handler. */
+(function installEncounterScenePresentation(){
+  const style=document.createElement('style');
+  style.textContent=`
+    .encounter-start-button{background:linear-gradient(135deg,#7969a8,#b17f9d)!important;color:#fff!important;border:1px solid #d8c8ef!important}
+    .chat-main.encounter-scene{position:relative;isolation:isolate;overflow:hidden;background:#171522!important}
+    .chat-main.encounter-scene:before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(14,12,25,.26),rgba(14,12,25,.84)),var(--encounter-scene-photo,none) center/cover no-repeat;filter:saturate(.82)}
+    .encounter-scene .chat-heading{background:rgba(20,18,31,.58)!important;backdrop-filter:blur(14px);color:#fff;border-bottom:1px solid #ffffff22}
+    .encounter-scene .chat-name,.encounter-scene .character-status-label{color:#fff}
+    .encounter-scene .messages{background:transparent!important;overscroll-behavior:contain}
+    .encounter-scene .message-row{max-width:min(92%,760px)}
+    .encounter-scene .message-bubble{backdrop-filter:blur(10px);background:rgba(32,28,44,.76)!important;border:1px solid #ffffff26!important;color:#fff!important}
+    .encounter-scene .composer{background:rgba(22,19,34,.82)!important;border:1px solid #ffffff25;border-radius:18px 18px 0 0;padding:10px;backdrop-filter:blur(16px);padding-bottom:max(10px,env(safe-area-inset-bottom))}
+    .encounter-scene .suggestions-panel>summary{color:#f1e9ff}
+    .encounter-scene .suggestion-card{background:rgba(255,255,255,.10);border-color:#ffffff38;color:#fff}
+    .encounter-scene .suggestion-card-action{color:#e1d9ee}
+    .encounter-scene #messageInput{background:rgba(255,255,255,.10);color:#fff;border-color:#ffffff35}
+    .encounter-scene #messageInput::placeholder{color:#d4cbdc}
+    .encounter-scene .composer-icon-button,.encounter-scene .composer-cost{color:#fff}
+    .encounter-scene .chat-layout{height:100%;min-height:0}
+    .encounter-scene .chat-main{min-height:0}
+    @media(max-width:767px){.chat-main.encounter-scene{height:calc(100dvh - var(--mobile-nav-height,0px));min-height:0}.encounter-scene .messages{min-height:0}.encounter-scene .composer{position:sticky;bottom:0}.encounter-scene .chat-heading{padding-top:max(8px,env(safe-area-inset-top))}}
+  `;
+  document.head.appendChild(style);
+  const baseRenderConversation=renderConversation;
+  renderConversation=function(){
+    baseRenderConversation.apply(this,arguments);
+    const session=currentSession();
+    if(!session?.encounterMode)return;
+    const panel=$('view').querySelector('.chat-main');
+    if(!panel)return;
+    panel.classList.add('encounter-scene');
+    const character=sessionCharacter(session);
+    panel.style.setProperty('--encounter-scene-photo','url('+JSON.stringify(safeImage(character?.image||character?.avatar_url))+')');
+    const title=panel.querySelector('.chat-heading');
+    if(title){
+      let tag=title.querySelector('.encounter-scene-label');
+      if(!tag){tag=document.createElement('div');tag.className='encounter-scene-label';tag.textContent='✦ 相遇模式';tag.style.cssText='font-size:11px;letter-spacing:.12em;color:#e5d5ff;padding:3px 12px 7px';title.appendChild(tag);}
+    }
+    const composer=panel.querySelector('.composer');
+    if(composer){
+      const input=composer.querySelector('#messageInput');
+      if(input){input.placeholder='說點什麼，或留空讓角色繼續…';input.setAttribute('aria-label','相遇模式對話');}
+    }
+  };
+})();
+
 </script>
 </body>
 </html>
