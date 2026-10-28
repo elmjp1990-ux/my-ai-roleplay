@@ -100,6 +100,8 @@ assert.match(frontend, /data-action="start-encounter"/);
 assert.match(frontend, /case ['"]start-encounter['"]/);
 assert.match(frontend, /installEncounterScenePresentation/);
 assert.match(frontend, /chat-main\.encounter-scene/);
+assert.match(frontend, /encounter-character-sprite/);
+assert.match(frontend, /panel\.insertBefore\(sprite,panel\.firstChild\)/);
 assert.match(frontend, /const endpointName = s\.encounterMode \? ['"]encounter-turn['"] : ['"]chat-turn['"]/);
 
 assert.match(frontend, /messages:\s*\[\]/);
