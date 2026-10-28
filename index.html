@@ -1876,17 +1876,13 @@ function parseEncounterScheduleText(raw) {
 async function saveEncounterSchedules(characterId, userId, rows) {
   const client = window.mySupabase;
   if (!client || !characterId || !userId) throw new Error('無法確認相遇日程的雲端連線或角色所有權。');
-  const { data: existing, error: readError } = await client.from('character_schedules')
-    .select('weekday, day_type, start_time, end_time, location_key, activity')
-    .eq('character_id', characterId);
-  if (readError) throw new Error('讀取既有相遇日程失敗：' + readError.message);
-  const normalizeTime = value => String(value || '').slice(0, 5);
-  const keyOf = row => [row.weekday == null ? '*' : row.weekday, normalizeTime(row.start_time), normalizeTime(row.end_time), row.location_key, row.activity].join('|');
-  const known = new Set((existing || []).map(keyOf));
-  const missing = rows.filter(row => !known.has(keyOf(row)));
-  if (!missing.length) return;
-  const { error } = await client.from('character_schedules').insert(missing.map(row => ({ ...row, character_id: characterId })));
-  if (error) throw new Error('角色已儲存，但相遇日程寫入失敗：' + error.message);
+  // 使用資料庫交易函式一次同步整份清單；函式會以 auth.uid() 再驗證作者權限。
+  const { data, error } = await client.rpc('save_character_schedules', {
+    p_character_id: characterId,
+    p_schedules: rows
+  });
+  if (error) throw new Error('角色已儲存，但相遇日程同步失敗：' + error.message);
+  return data;
 }
 
 async function loadEncounterSchedulesIntoEditor(characterId) {
@@ -4013,6 +4009,7 @@ function renderEditor() {
           <strong>相遇模式｜角色日程（測試版）</strong>
           <small>每行一個時段，格式：星期(0=日、1=一…6=六，*代表每天)|開始時間|結束時間|地點代碼|角色活動。例：1|09:00|12:00|cafe|在咖啡廳工作。此設定目前只有作者可讀，尚未開放玩家端查詢。</small>
           <label class="field"><span>日程時段</span><textarea name="encounterSchedules" maxlength="5000" placeholder="1|09:00|12:00|cafe|在咖啡廳工作\n*|18:00|20:00|park|傍晚散步">${e(savedDraft?.encounterSchedules ?? c.encounterSchedules ?? '')}</textarea></label>
+          <label class="check"><input type="checkbox" name="clearEncounterSchedules" value="yes"><span>明確清空這個角色的所有日程（需勾選，避免誤刪）</span></label>
         </section>
         <section class="memory-item stack" style="gap:10px"><strong>角色手機設定</strong>
           <label class="field"><span>AI 手機通知揭露指示（每行一則）</span><textarea name="phoneNotices" maxlength="1200" placeholder="💬心裡話 | 每回合揭露一則簡短心裡話\n🔎線索 | 當劇情出現新線索時，揭露線索通知">${e(savedDraft?.phoneNotices ?? (Array.isArray(c.phoneSettings?.noticePrompts) ? c.phoneSettings.noticePrompts.join('\n') : Array.isArray(c.phoneSettings?.notices) ? c.phoneSettings.notices.join('\n') : ''))}</textarea><small>在這裡填寫每回合對話需要揭露的狀態。每行描述一種 AI 可揭露的通知條件／內容，不是固定顯示文字；最多 8 則。</small></label></section>
@@ -7889,16 +7886,17 @@ document.addEventListener('submit',async event => {
         if(draftVideoFile)c.avatarVideoPath=await uploadCharacterAvatarVideo(draftVideoFile,user.uid,c.id);
         // 先驗證日程格式，避免角色資料已寫入後才發現日程格式錯誤。
         const scheduleText = String(f.get('encounterSchedules') || '').trim();
+        const clearSchedules = f.elements.clearEncounterSchedules?.checked === true;
         let scheduleRows = [];
         if (scheduleText) {
           try { scheduleRows = parseEncounterScheduleText(scheduleText); }
           catch (scheduleError) { return toast(scheduleError.message); }
         }
+        if (clearSchedules && scheduleText) return toast('若要清空日程，請先清空文字欄位；若要保留或更新日程，請取消勾選清空選項。');
         // 先寫入雲端；只有角色資料成功後才更新本機畫面狀態。
         const saveResult = await saveSupabaseCharacter(c, user.uid);
-        // 日程僅透過作者自己的登入 session 寫入；RLS 會再次驗證角色所有權。
-        // 空白代表保留既有日程，避免編輯角色其他欄位時意外清空。
-        if (scheduleText) {
+        // 使用後端交易函式同步整份清單，支援新增、修改、刪除且不會留下半套資料。
+        if (scheduleText || clearSchedules) {
           await saveEncounterSchedules(c.id, user.uid, scheduleRows);
           c.encounterSchedules = scheduleText;
         } else if (old?.encounterSchedules) {
