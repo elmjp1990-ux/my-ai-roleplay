@@ -8845,10 +8845,10 @@ function renderCityMapMVP(){
         <div class="city-location-avatar-strip" id="cityMapAvatarStrip" aria-label="目前在場角色"><p class="city-location-empty">角色名單串接後，會在這裡顯示可左右滑動的圓形頭像。</p></div>
         <div class="city-location-rule"></div>
         <div class="city-location-detail" id="cityMapPresenceList">
-          <div class="city-location-scene-icon" aria-hidden="true">☕</div>
-          <h3 id="cityMapVenueHeading">在城市裡，找個地方歇歇腳</h3>
-          <p id="cityMapVenueDescription">地點介紹、環境特色與當日活動將會在這裡出現。</p>
-          <div class="city-location-event"><span class="city-location-event-label">本日活動 · 示意內容</span><strong>草莓塔限量上市</strong><p>活動資料與顯示機率尚未串接；目前僅為介面示意。</p></div>
+          <div class="city-location-scene-icon" aria-hidden="true">📍</div>
+          <h3 id="cityMapVenueHeading">選擇地點以查看專屬場景</h3>
+          <p id="cityMapVenueDescription">每個地點都有獨立的場景介紹與故事亮點。</p>
+          <div class="city-location-event"><span class="city-location-event-label">場景亮點</span><strong>等待選擇地點</strong><p>選擇地圖上的地點後，這裡會顯示對應的場景內容。</p></div>
         </div>
       </div>
     </section>
@@ -8928,8 +8928,9 @@ function renderCityMapMVP(){
     locationModal.hidden=false;
     document.body.classList.add('city-location-active');
   };
+  // Use one delegated click handler on the stage so every landmark follows the same path.
+  // This avoids per-marker listeners being skipped when SVG hit targets differ.
   stage.querySelectorAll('[data-action="city-landmark"]').forEach(marker=>{
-    marker.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();openCityLocation(marker);});
     marker.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();openCityLocation(marker);}});
   });
   locationModal?.addEventListener('click',event=>{
@@ -8940,6 +8941,7 @@ function renderCityMapMVP(){
   stage.addEventListener('click',event=>{
     const button=event.target.closest('[data-action]');
     if(!button)return;
+    if(button.dataset.action==='city-landmark'){event.preventDefault();event.stopPropagation();openCityLocation(button);return;}
     if(button.dataset.action==='city-zoom-in'){event.preventDefault();event.stopPropagation();zoomBy(1.18);return;}
     if(button.dataset.action==='city-zoom-out'){event.preventDefault();event.stopPropagation();zoomBy(.85);return;}
     if(button.dataset.action==='city-traditional'){event.preventDefault();event.stopPropagation();go({page:'home'});}
