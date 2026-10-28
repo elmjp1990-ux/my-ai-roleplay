@@ -2904,6 +2904,17 @@ async function runPendingChatTurn(s) {
     return;
   }
 
+  if (result?.error === 'user_message_already_charged') {
+    // A durable user message is globally limited to one wallet charge, even if a caller
+    // tries a different turn ID. Stop this pending attempt without creating another charge.
+    delete s.pendingTurn;
+    persist();
+    await clearCloudPendingTurn(s);
+    renderMessages();
+    toast('這則訊息已進入過扣款流程，為避免重複扣款已停止重送。請確認原回合狀態後再繼續。');
+    return;
+  }
+
   if (
     result?.error === 'user_message_not_found' ||
     result?.error === 'chat_session_not_owned_or_active' ||
