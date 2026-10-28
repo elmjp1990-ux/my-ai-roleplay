@@ -8846,10 +8846,10 @@ function renderCityMapMVP(){
         <div class="city-location-avatar-strip" id="cityMapAvatarStrip" aria-label="目前在場角色"><p class="city-location-empty">目前尚無符合此地點與台灣時間的公開角色排程。</p></div>
         <div class="city-location-rule"></div>
         <div class="city-location-detail" id="cityMapPresenceList">
-          <div class="city-location-scene-icon" aria-hidden="true">📚</div>
-          <h3 id="cityMapVenueHeading">在書頁之間慢下腳步</h3>
-          <p id="cityMapVenueDescription">木質書架與紙張氣味讓時間放慢。新書展示區、靠窗閱讀座位與安靜的書架轉角，各自藏著不同的相遇方式。</p>
-          <div class="city-location-event"><span class="city-location-event-label">場景亮點</span><strong>同一本書的選擇</strong><p>適合交換閱讀心得、尋找某本書、安靜陪伴或從共同興趣開始的故事。</p></div>
+          <div class="city-location-scene-icon" aria-hidden="true">📍</div>
+          <h3 id="cityMapVenueHeading">選擇地點以查看場景</h3>
+          <p id="cityMapVenueDescription">點選地圖上的地點後，這裡會顯示對應的場景介紹。</p>
+          <div class="city-location-event"><span class="city-location-event-label">場景亮點</span><strong>等待選擇地點</strong><p>每個地點都有自己的場景與故事亮點。</p></div>
         </div>
       </div>
     </section>
@@ -8872,7 +8872,9 @@ function renderCityMapMVP(){
       const r=node.getBoundingClientRect();
       return e.clientX>=r.left-8&&e.clientX<=r.right+8&&e.clientY>=r.top-8&&e.clientY<=r.bottom+8;
     });
-    if(marker){e.preventDefault();e.stopPropagation();return;}
+    // Keep marker taps out of map-drag handling without cancelling the browser's synthesized click.
+    // Calling preventDefault() on pointerdown can suppress click on mobile browsers, leaving the static modal content unchanged.
+    if(marker){e.stopPropagation();return;}
     if(e.target instanceof Element&&e.target.closest('button,.city-map-info,.city-map-zoom,.city-map-bottom,.city-map-people'))return;
     stage.setPointerCapture?.(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=false;
     if(pointers.size===1)start={x:e.clientX,y:e.clientY,tx,ty,time:Date.now()};
