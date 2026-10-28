@@ -35,7 +35,7 @@ const formatCharacterPersonality = (value: unknown): string => {
     .map(([label, key, limit]) => [label, str(profile[key]).slice(0, limit)] as const)
     .filter(([, value]) => Boolean(value))
     .map(([label, value]) => `${label}：${value}`)
-    .join("\\n")
+    .join("\n")
     .slice(0, 4000);
 };
 
@@ -69,7 +69,9 @@ export function buildPromptVariableValues(input: PromptContextInput): PromptVari
   const memory = Array.isArray(memorySource) ? capMemory(memorySource.map(v => typeof v === "string" ? v : str(obj(v).summary ?? obj(v).content ?? obj(v).text)).filter(Boolean).join("\n")) : capMemory(memorySource);
   const values: PromptVariableValues = {
     USER: str(group.player_name ?? group.playerName ?? profile.nickname ?? profile.handle), CHAR: str(character.name),
-    USER_DESC: playerPersona, CHAR_DESC: str(character.intro ?? character.description),\n    CHAR_STYLE: str(character.style).slice(0, 1000),\n    CHAR_PERSONALITY: formatCharacterPersonality(character.personality_profile ?? character.personalityProfile),
+    USER_DESC: playerPersona, CHAR_DESC: str(character.intro ?? character.description),
+    CHAR_STYLE: str(character.style).slice(0, 1000),
+    CHAR_PERSONALITY: formatCharacterPersonality(character.personality_profile ?? character.personalityProfile),
     USER_GENDER: str(profile.gender), USER_PRONOUN: str(profile.pronoun),
     WORLD: world, SETTING: str(session.setting ?? character.setting ?? world),
     SCENE: str(session.scene ?? group.scene ?? group.initial_scene),
