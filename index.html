@@ -2822,7 +2822,8 @@ async function runPendingChatTurn(s) {
   let result = null;
   let invokeError = null;
   try {
-    const response = await client.functions.invoke('chat-turn', {
+    const endpointName = s.encounterMode ? 'encounter-turn' : 'chat-turn';
+    const response = await client.functions.invoke(endpointName, {
       body: {
         turnId: turn.turnId,
         sessionId: s.id,
@@ -2884,6 +2885,22 @@ async function runPendingChatTurn(s) {
     renderMessages();
     await clearCloudPendingTurn(s);
     toast('聊天角色資料不一致，本回合尚未扣款。請重新整理聊天；若持續發生，請先不要重送並回報問題。');
+    return;
+  }
+
+  if (
+    result?.error === 'encounter_character_unavailable' ||
+    result?.error === 'encounter_session_required'
+  ) {
+    // These Encounter guards run before reservation; remove the unsent turn and allow a clean retry.
+    s.messages = s.messages.filter(message => message.id !== turn.userMessageId && message.id !== turn.assistantMessageId);
+    delete s.pendingTurn;
+    persist();
+    await clearCloudPendingTurn(s);
+    renderMessages();
+    toast(result.error === 'encounter_character_unavailable'
+      ? '此角色目前不符合相遇模式使用條件，本回合尚未扣款。'
+      : '相遇聊天室模式驗證失敗，本回合尚未扣款。');
     return;
   }
 
