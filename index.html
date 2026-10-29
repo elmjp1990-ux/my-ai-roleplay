@@ -9971,6 +9971,29 @@ document.addEventListener('submit',function(event){
  .city-character-page-button{width:29px!important;height:29px!important;min-width:29px!important;min-height:29px!important}
 }
 
+
+/* 2026-10-29 screenshot corrections: remove arrow discs and make true book-edge tabs */
+#cityCharacterCard{position:relative!important;overflow:visible!important;margin-right:34px!important;border:1px solid rgba(255,255,255,.24)!important;border-radius:20px!important}
+#cityCharacterCard .city-character-card-head{position:relative!important;padding-right:42px!important}
+#cityCharacterCard .city-character-card-close{position:absolute!important;right:7px!important;top:7px!important;z-index:4!important}
+#cityCharacterCard .city-character-bookmarks{position:absolute!important;top:52px!important;right:-35px!important;z-index:5!important;display:flex!important;flex-direction:column!important;gap:0!important;width:34px!important}
+#cityCharacterCard .city-character-bookmark{position:relative!important;box-sizing:border-box!important;width:34px!important;min-width:34px!important;min-height:70px!important;margin:0!important;padding:8px 5px!important;border-radius:0!important;border:1px solid rgba(255,255,255,.32)!important;border-left:0!important;border-right:1px solid rgba(255,255,255,.32)!important;background:linear-gradient(90deg,rgba(34,40,58,.98),rgba(79,87,113,.96))!important;box-shadow:3px 2px 5px rgba(0,0,0,.18),inset 0 1px rgba(255,255,255,.12)!important}
+#cityCharacterCard .city-character-bookmark:first-child{border-radius:0 8px 0 0!important}
+#cityCharacterCard .city-character-bookmark:last-child{border-radius:0 0 8px 0!important}
+#cityCharacterCard .city-character-bookmark.active{background:linear-gradient(90deg,rgba(88,97,128,.99),rgba(132,140,170,.99))!important;border-color:rgba(255,255,255,.48)!important}
+#cityCharacterCard .city-character-card-footer .city-character-page-button{appearance:none!important;-webkit-appearance:none!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;width:24px!important;height:32px!important;min-width:24px!important;min-height:32px!important;padding:0!important;margin:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;outline-offset:2px!important;color:rgba(255,255,255,.98)!important;font-size:29px!important;font-family:Arial,sans-serif!important;font-weight:400!important;line-height:1!important;text-shadow:0 2px 3px rgba(0,0,0,.72)!important}
+#cityCharacterCard .city-character-card-footer .city-character-page-button::before,#cityCharacterCard .city-character-card-footer .city-character-page-button::after{content:none!important;display:none!important}
+#cityCharacterCard .city-character-card-footer{display:flex!important;align-items:center!important;justify-content:center!important;gap:10px!important}
+#cityCharacterCard .city-character-page-dots{display:flex!important;align-items:center!important;justify-content:center!important;gap:5px!important;line-height:1!important}
+#cityCharacterCard .city-character-portrait-video{display:block!important;width:100%!important;max-width:100%!important;height:118px!important;flex:0 0 118px!important;object-fit:cover!important;background:#171b27!important;border-radius:12px!important}
+@media(max-width:600px){
+ #cityCharacterCard{margin-right:29px!important}
+ #cityCharacterCard .city-character-bookmarks{right:-30px!important;width:29px!important}
+ #cityCharacterCard .city-character-bookmark{width:29px!important;min-width:29px!important;min-height:64px!important;padding:7px 4px!important;font-size:10px!important}
+ #cityCharacterCard .city-character-card-head{padding-right:40px!important}
+ #cityCharacterCard .city-character-card-footer .city-character-page-button{width:22px!important;min-width:22px!important;font-size:27px!important}
+}
+
 </style>
 </body>
 </html>
