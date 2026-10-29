@@ -9043,9 +9043,6 @@ function renderCityMapMVP(){
     // Render the place-specific scene before reading optional schedule data so a
     // missing/malformed schedule can never leave the generic placeholder visible.
     $('cityMapPlaceTitle').textContent=name;
-    $('cityMapOpenStatus').textContent='場景開放中';
-    const statusNote=locationModal.querySelector('.city-location-status-note');
-    if(statusNote)statusNote.textContent='城市探索地點';
     const placeIcon=$('cityMapPlaceIcon');
     if(placeIcon)placeIcon.textContent=scene.icon;
     $('cityMapPresenceList').innerHTML='<h3>'+escapeHTML(scene.heading)+'</h3><p>'+escapeHTML(scene.description)+'</p><div class="city-location-news"><span class="city-location-event-label">最新消息</span><div class="city-location-news-items">'+eventMarkup+'</div></div>';
@@ -9802,6 +9799,7 @@ document.addEventListener('submit',function(event){
 .city-location-avatar{flex:0 0 52px;width:52px;height:52px;padding:0;border-radius:50%;border:0;background:transparent;box-shadow:none;scroll-snap-align:start}
 .city-location-avatar-fallback{display:grid;place-items:center;width:100%;height:100%;border-radius:50%;background:linear-gradient(145deg,#625b83,#34334f);color:#f5eaff;font-size:17px}
 .city-location-empty{margin:0;align-self:center;color:#c4c2d3;font-size:11px;line-height:1.7}
+.city-location-detail[hidden]{display:none!important}
 .city-location-detail{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;color:#e7e5f3;font-size:13px;line-height:1.75;padding-right:2px}
 .city-location-detail h3{text-align:left;font-size:13px;line-height:1.5;margin:0 0 7px;font-weight:650}
 .city-location-detail>p{text-align:left;margin:0;color:#c9c7d9;font-size:12px;line-height:1.75}
