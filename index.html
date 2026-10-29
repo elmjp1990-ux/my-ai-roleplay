@@ -9973,7 +9973,7 @@ document.addEventListener('submit',function(event){
     if(messages){
       const latestReply=[...(session.messages||[])].reverse().find(m=>m.role!=='user'&&String(m.text||m.content||'').trim());
       const raw=String(latestReply?.text||latestReply?.content||'').trim();
-      const beats=raw ? raw.split(/\\n\\s*\\n|(?<=[。！？!?])\\s+(?=[*「“"'])/u).map(x=>x.trim().replace(/^\\*+|\\*+$/g,'')).filter(Boolean) : [];
+      const beats=raw ? raw.split(/\n\s*\n|(?<=[。！？!?])\s+(?=[*「“"'])/u).map(x=>x.trim().replace(/^\*+|\*+$/g,'')).filter(Boolean) : [];
       const beatKey=String(latestReply?.id||'')+':'+beats.length;
       if(session.encounterBeatKey!==beatKey){session.encounterBeatKey=beatKey;session.encounterBeatIndex=0;}
       const idx=Math.min(Number(session.encounterBeatIndex)||0,Math.max(0,beats.length-1));
