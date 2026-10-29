@@ -56,6 +56,11 @@ assert.match(accessMigration, /SET search_path = ['"]{2}/);
 assert.match(accessMigration, /private\.current_user_is_adult\(\)/);
 assert.match(accessMigration, /REVOKE ALL ON FUNCTION public\.can_open_encounter_session\(uuid\) FROM PUBLIC, anon/);
 assert.match(accessMigration, /GRANT EXECUTE ON FUNCTION public\.can_open_encounter_session\(uuid\) TO authenticated/);
+const encounterSessionFunction = fs.readFileSync(
+  "supabase/functions/encounter-session/index.ts",
+  "utf8",
+);
+assert.doesNotMatch(encounterSessionFunction, /\.eq\(["']latest_eligible["'],\s*true\)/);
 const encounterEligibilityMigration = fs.readFileSync(
   "supabase/migrations/20261029034207_allow_all_eligible_encounter_sessions.sql",
   "utf8",
