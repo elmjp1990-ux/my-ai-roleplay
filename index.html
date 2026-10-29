@@ -9016,6 +9016,19 @@ function renderCityMapMVP(){
     const name=cityPlaceNames[place]||'地點';
     const scene=cityVenueScenes[place];
     if(!scene){console.error('城市地標缺少專屬場景設定：',place);toast('這個地點的場景資料尚未完成，請稍後再試。');return;}
+    // Fictional in-world city notices are intentionally sampled on each opening;
+    // they are not claims about real stock, purchases, or live advertising inventory.
+    const promotions={
+      cafe:[{title:'新口味草莓塔限量登場',description:'甜點櫃今天多了一款草莓塔，適合當作開啟話題的小驚喜。'}],
+      bookstore:[{title:'本週選書角',description:'書店把幾本值得慢慢讀的作品放到靠窗展示架。'}],
+      park:[{title:'午後野餐時光',description:'草地一角很適合停下腳步，享受一段悠閒的午後。'}],
+      'department-store':[{title:'週末櫥窗新展示',description:'中庭附近換上了新的季節主題佈置。'}]
+    };
+    const promotionList=promotions[place]||[];
+    const promotion=promotionList.length&&Math.random()<0.3?promotionList[Math.floor(Math.random()*promotionList.length)]:null;
+    const eventLabel=promotion?'城市小消息':scene.eventLabel;
+    const eventTitle=promotion?promotion.title:scene.eventTitle;
+    const eventDescription=promotion?promotion.description:scene.eventDescription;
     // Each landmark must resolve to its own authored scene. Never silently fall back
     // to a generic pin/location panel when an ID is missing or mismatched.
     locationModal.dataset.scene=place;
@@ -9024,6 +9037,8 @@ function renderCityMapMVP(){
     locationModal.dataset.side=markerRect.left+markerRect.width/2>window.innerWidth/2?'right':'left';
     const characterCard=$('cityCharacterCard');
     if(characterCard)characterCard.hidden=true;
+    const venueInfo=$('cityMapPresenceList');
+    if(venueInfo)venueInfo.hidden=false;
     locationModal.dataset.selectedPersonIndex='';
     // Render the place-specific scene before reading optional schedule data so a
     // missing/malformed schedule can never leave the generic placeholder visible.
@@ -9033,7 +9048,7 @@ function renderCityMapMVP(){
     if(statusNote)statusNote.textContent='城市探索地點';
     const statusDot=locationModal.querySelector('.city-location-status-dot');
     if(statusDot)statusDot.style.background='#4ade80';
-    $('cityMapPresenceList').innerHTML='<div class="city-location-scene-icon" aria-hidden="true">'+scene.icon+'</div><h3>'+escapeHTML(scene.heading)+'</h3><p>'+escapeHTML(scene.description)+'</p><div class="city-location-event"><span class="city-location-event-label">'+escapeHTML(scene.eventLabel)+'</span><strong>'+escapeHTML(scene.eventTitle)+'</strong><p>'+escapeHTML(scene.eventDescription)+'</p></div>';
+    $('cityMapPresenceList').innerHTML='<div class="city-location-scene-icon" aria-hidden="true">'+scene.icon+'</div><h3>'+escapeHTML(scene.heading)+'</h3><p>'+escapeHTML(scene.description)+'</p><div class="city-location-event"><span class="city-location-event-label">'+escapeHTML(eventLabel)+'</span><strong>'+escapeHTML(eventTitle)+'</strong><p>'+escapeHTML(eventDescription)+'</p></div>';
     let people=[];
     try{
       // Load persisted public schedules before filtering this location. The resolver enforces
@@ -9065,6 +9080,8 @@ function renderCityMapMVP(){
     const card=$('cityCharacterCard'),body=$('cityCharacterCardBody');
     if(!card||!body||!person)return;
     card.hidden=false;
+    const venueInfo=$('cityMapPresenceList');
+    if(venueInfo)venueInfo.hidden=true;
     card.dataset.page=String(page);
     locationModal.dataset.selectedPersonIndex=String((cityPresenceByPlace[locationModal.dataset.place]||[]).findIndex(item=>item.id===person.id));
     const image=safeImage(person.image||person.avatar_url||person.avatar);
@@ -9099,6 +9116,7 @@ function renderCityMapMVP(){
     const cardAction=event.target.closest('[data-action^="city-character-"]')?.dataset.action;
     if(cardAction==='city-character-close'){
       const card=$('cityCharacterCard');if(card)card.hidden=true;
+      const venueInfo=$('cityMapPresenceList');if(venueInfo)venueInfo.hidden=false;
       locationModal.dataset.selectedPersonIndex='';
       return;
     }
