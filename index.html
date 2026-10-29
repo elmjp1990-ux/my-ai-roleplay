@@ -9998,6 +9998,32 @@ document.addEventListener('submit',function(event){
     }
     return beats;
   };
+  // Re-apply the visual-novel beat after BOTH full conversation renders and message-only renders.
+  // The base chat renderer can replace #messages after renderConversation finishes; this hook prevents it
+  // from restoring ordinary chat bubbles and silently cancelling progressive dialogue.
+  const applyEncounterDialogue=(panel,session)=>{
+    const messages=panel?.querySelector('.messages');
+    if(!messages)return;
+    const allMessages=Array.isArray(session?.messages)?session.messages:[];
+    const latestReply=[...allMessages].reverse().find(m=>m&&m.role!=='user'&&String(m.text??m.content??'').trim());
+    const raw=String(latestReply?.text??latestReply?.content??'').trim();
+    const beats=raw?splitEncounterBeats(raw):[];
+    const beatKey=String(latestReply?.id||latestReply?.createdAt||latestReply?.timestamp||raw.slice(0,48))+':'+raw.length+':'+beats.length;
+    if(session.encounterBeatKey!==beatKey){session.encounterBeatKey=beatKey;session.encounterBeatIndex=0;}
+    const idx=Math.min(Math.max(0,Number(session.encounterBeatIndex)||0),Math.max(0,beats.length-1));
+    messages.innerHTML=beats.length
+      ? '<button type="button" class="encounter-dialogue-beat" data-action="encounter-next-beat" aria-label="點擊繼續劇情"><span class="encounter-dialogue-text">'+e(beats[idx])+'</span><span class="encounter-dialogue-hint">'+(idx<beats.length-1?'點擊繼續　⌄':'劇情已讀完')+'</span></button>'
+      : '<div class="encounter-dialogue-empty" aria-hidden="true"></div>';
+    messages.classList.toggle('encounter-dialogue-ready',beats.length>0);
+    const composer=panel.querySelector('.composer');
+    if(composer){
+      const suggestions=composer.querySelector('.suggestions');
+      if(suggestions)suggestions.hidden=beats.length>0&&idx<beats.length-1;
+      composer.classList.toggle('encounter-awaiting-beat',beats.length>0&&idx<beats.length-1);
+    }
+    messages.dataset.encounterBeatKey=beatKey;
+    messages.dataset.encounterBeatIndex=String(idx);
+  };
   const installEncounterRenderWrapper=()=>{
   const baseRenderConversation=renderConversation;
   if(typeof baseRenderConversation!=='function'||baseRenderConversation.__encounterWrapped)return;
@@ -10010,8 +10036,8 @@ document.addEventListener('submit',function(event){
     if(!panel)return;
     panel.classList.add('encounter-scene');
     const character=sessionCharacter(session);
-    const sceneImage=safeImage(character?.encounterSceneImage||character?.sceneImage||character?.backgroundImage||session?.encounterSceneImage||'');
-    const defaultSceneImage='https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/feat/encounter-mode-core-schema/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp';
+    const sceneImage=safeImage(character?.encounterSceneImage||session?.encounterSceneImage||character?.sceneImage||'');
+    const defaultSceneImage='https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp';
     panel.style.setProperty('--encounter-scene-photo','url('+JSON.stringify(sceneImage||defaultSceneImage)+')');
     panel.dataset.encounterPlace=session.encounterPlace||'';
     // Only use a dedicated transparent half-body asset here. The ordinary character-card
@@ -10048,30 +10074,24 @@ document.addEventListener('submit',function(event){
       const input=composer.querySelector('#messageInput');
       if(input){input.placeholder='說點什麼，或留空讓角色繼續…';input.setAttribute('aria-label','相遇模式對話');}
     }
-    // Visual-novel presentation: one reusable dialogue box, one beat per click.
-    const messages=panel.querySelector('.messages');
-    if(messages){
-      const latestReply=[...(session.messages||[])].reverse().find(m=>m.role!=='user'&&String(m.text||m.content||'').trim());
-      const raw=String(latestReply?.text||latestReply?.content||'').trim();
-      const beats=raw ? splitEncounterBeats(raw) : [];
-      const beatKey=String(latestReply?.id||latestReply?.createdAt||latestReply?.timestamp||raw.slice(0,48))+':'+raw.length+':'+beats.length;
-      if(session.encounterBeatKey!==beatKey){session.encounterBeatKey=beatKey;session.encounterBeatIndex=0;}
-      const idx=Math.min(Number(session.encounterBeatIndex)||0,Math.max(0,beats.length-1));
-      messages.innerHTML=beats.length
-        ? '<button type="button" class="encounter-dialogue-beat" data-action="encounter-next-beat" aria-label="點擊繼續劇情"><span class="encounter-dialogue-text">'+e(beats[idx])+'</span><span class="encounter-dialogue-hint">'+(idx<beats.length-1?'點擊繼續　⌄':'劇情已讀完')+'</span></button>'
-        : '';
-      messages.classList.toggle('encounter-dialogue-ready',beats.length>0);
-      if(composer){
-        const suggestions=composer.querySelector('.suggestions');
-        if(suggestions)suggestions.hidden=beats.length>0&&idx<beats.length-1;
-        composer.classList.toggle('encounter-awaiting-beat',beats.length>0&&idx<beats.length-1);
-      }
-      messages.dataset.encounterBeatKey=beatKey;
-      messages.dataset.encounterBeatIndex=String(idx);
-    }
+    applyEncounterDialogue(panel,session);
   };
   wrappedRenderConversation.__encounterWrapped=true;
   renderConversation=wrappedRenderConversation;
+  // Normal send/streaming paths call renderMessages independently. Wrap that path too,
+  // so the standard renderer cannot overwrite the progressive dialogue box after each update.
+  const baseRenderMessages=renderMessages;
+  if(typeof baseRenderMessages==='function'&&!baseRenderMessages.__encounterWrapped){
+    const wrappedRenderMessages=function(){
+      baseRenderMessages.apply(this,arguments);
+      const session=currentSession();
+      if(!session?.encounterMode)return;
+      const panel=$('view')?.querySelector('.chat-main');
+      if(panel){panel.classList.add('encounter-scene');applyEncounterDialogue(panel,session);}
+    };
+    wrappedRenderMessages.__encounterWrapped=true;
+    renderMessages=wrappedRenderMessages;
+  }
   };
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installEncounterRenderWrapper,{once:true});
   else installEncounterRenderWrapper();
@@ -10273,5 +10293,32 @@ document.addEventListener('submit',function(event){
 }
 
 </style>
+
+<style id="encounter-mode-render-conflict-fix">
+/* Final encounter overrides intentionally come after all legacy chat styles. */
+body.encounter-mode-active .chat-main.encounter-scene,
+body.encounter-mode-active .chat-main.encounter-scene:before{background-color:transparent!important}
+body.encounter-mode-active .chat-main.encounter-scene:before{
+  background-image:linear-gradient(180deg,rgba(10,9,17,.08),rgba(10,9,17,.06) 42%,rgba(10,9,17,.20) 72%,rgba(10,9,17,.30) 100%),var(--encounter-scene-photo,none),radial-gradient(ellipse at 70% 22%,#6a5a65 0%,#322b36 48%,#17141b 100%)!important;
+  background-position:center,center,center!important;background-size:cover,cover,cover!important;background-repeat:no-repeat!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .composer{
+  background:linear-gradient(180deg,rgba(17,14,24,.04),rgba(17,14,24,.20) 24%,rgba(17,14,24,.48) 100%)!important;
+  backdrop-filter:blur(5px)!important;-webkit-backdrop-filter:blur(5px)!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .chat-heading .character-avatar-status,
+body.encounter-mode-active .chat-main.encounter-scene .chat-heading button[data-action="session-detail"],
+body.encounter-mode-active .chat-main.encounter-scene .messages .message>img.avatar,
+body.encounter-mode-active .chat-main.encounter-scene .messages .message .avatar,
+body.encounter-mode-active .chat-main.encounter-scene .messages .roleplay-segments .avatar{display:none!important}
+body.encounter-mode-active .chat-main.encounter-scene .chat-heading .row.grow{gap:8px!important}
+body.encounter-mode-active .chat-main.encounter-scene .messages{overflow-y:auto!important;overscroll-behavior:contain!important}
+body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-beat{position:relative;z-index:2;cursor:pointer}
+body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-empty{display:none!important}
+@media(max-width:767px){
+  body.encounter-mode-active .chat-main.encounter-scene .composer{background:linear-gradient(180deg,rgba(17,14,24,.02),rgba(17,14,24,.18) 22%,rgba(17,14,24,.42) 100%)!important}
+}
+</style>
+
 </body>
 </html>
