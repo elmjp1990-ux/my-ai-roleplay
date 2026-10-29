@@ -86,7 +86,6 @@ Deno.serve(async (request: Request) => {
     .eq("id", characterId)
     .eq("visibility", "public")
     .eq("review_status", "approved")
-    .eq("latest_eligible", true)
     .eq("rights_confirmed", true)
     .is("deleted_at", null)
     .maybeSingle();
