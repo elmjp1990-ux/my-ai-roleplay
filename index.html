@@ -9098,13 +9098,18 @@ function renderCityMapMVP(){
     locationModal.dataset.cardMode=mode;
     locationModal.dataset.selectedPersonIndex=String((cityPresenceByPlace[locationModal.dataset.place]||[]).findIndex(item=>item.id===person.id));
     const image=safeImage(person.image||person.avatar_url||person.avatar);
+    // City character records store uploaded videos as a private Storage path, not a public URL.
+    // Reuse the shared signed-URL hydrator and autoplay muted to satisfy browser autoplay policies.
+    const videoPath=String(person.avatarVideoPath||person.avatar_video_path||person.characterVideoPath||'').trim();
     const videoRaw=String(person.videoUrl||person.video_url||person.introVideoUrl||person.intro_video_url||'').trim();
     const videoUrl=/^https:\/\//i.test(videoRaw)?videoRaw:'';
-    const portrait=videoUrl
-      ? '<video class="city-character-portrait city-character-portrait-video" src="'+escapeHTML(videoUrl)+'" poster="'+escapeHTML(image||'')+'" controls playsinline preload="metadata" aria-label="'+escapeHTML(person.name||'角色')+'角色展示影片"></video>'
-      : image
-        ? '<img class="city-character-portrait" src="'+escapeHTML(image)+'" alt="'+escapeHTML(person.name||'角色')+'" loading="eager" referrerpolicy="no-referrer">'
-        : '<div class="city-character-portrait city-character-portrait-fallback">'+escapeHTML(String(person.name||'角').slice(0,1))+'</div>';
+    const portrait=videoPath
+      ? '<video class="city-character-portrait city-character-portrait-video" data-character-video="'+escapeHTML(videoPath)+'" autoplay muted loop playsinline preload="metadata" poster="'+escapeHTML(image||'')+'" aria-label="'+escapeHTML(person.name||'角色')+'角色展示影片"></video>'
+      : videoUrl
+        ? '<video class="city-character-portrait city-character-portrait-video" src="'+escapeHTML(videoUrl)+'" autoplay muted loop playsinline preload="metadata" poster="'+escapeHTML(image||'')+'" aria-label="'+escapeHTML(person.name||'角色')+'角色展示影片"></video>'
+        : image
+          ? '<img class="city-character-portrait" src="'+escapeHTML(image)+'" alt="'+escapeHTML(person.name||'角色')+'" loading="eager" referrerpolicy="no-referrer">'
+          : '<div class="city-character-portrait city-character-portrait-fallback">'+escapeHTML(String(person.name||'角').slice(0,1))+'</div>';
     const name=escapeHTML(person.name||'未命名角色');
     const gender=escapeHTML(person.gender||'未設定');
     const age=escapeHTML(person.age?String(person.age)+' 歲':'未設定');
@@ -9139,6 +9144,18 @@ function renderCityMapMVP(){
       $('cityCharacterPageLabel').textContent='角色介紹 · 02 / 02';
     }
     body.innerHTML=left+copy+bookmarks;
+    const characterVideo=body.querySelector('video.city-character-portrait-video[data-character-video]');
+    if(characterVideo)void hydrateCharacterVideo(characterVideo);
+    else{
+      const directVideo=body.querySelector('video.city-character-portrait-video');
+      if(directVideo){
+        directVideo.muted=true;
+        directVideo.defaultMuted=true;
+        const playWhenReady=()=>directVideo.play().catch(()=>{});
+        directVideo.addEventListener('loadedmetadata',playWhenReady,{once:true});
+        if(directVideo.readyState>=1)playWhenReady();
+      }
+    }
     const dots=card.querySelectorAll('.city-character-page-dots i');
     dots.forEach((dot,index)=>dot.classList.toggle('active',mode==='status'&&index===page));
     const pageButtons=card.querySelectorAll('.city-character-page-button');
