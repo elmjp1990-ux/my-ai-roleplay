@@ -9918,7 +9918,7 @@ document.addEventListener('submit',function(event){
     .encounter-scene .message-name{display:none}
     .encounter-scene .bubble,.encounter-scene .narration{color:#fff!important;text-shadow:0 2px 8px #000b;font-size:clamp(14px,3.7vw,18px);line-height:1.6}
     .encounter-scene .message-more{color:#fff;background:#17141b66}
-    .encounter-character-sprite.encounter-card-portrait-fallback{object-fit:contain;object-position:center bottom;filter:drop-shadow(0 10px 22px rgba(0,0,0,.22))}
+    .encounter-character-sprite.encounter-card-portrait-fallback{object-fit:contain;object-position:center bottom;filter:drop-shadow(0 10px 22px rgba(0,0,0,.22))}.encounter-character-sprite.encounter-auto-bg-fallback{mix-blend-mode:multiply}
     .encounter-character-sprite{position:absolute;z-index:1;pointer-events:none;right:0;bottom:clamp(340px,43dvh,430px);width:min(88%,520px);height:58dvh;object-fit:contain;object-position:center bottom;filter:drop-shadow(0 12px 24px rgba(0,0,0,.28));opacity:.98}
     .encounter-scene .composer{position:absolute!important;z-index:3;left:0;right:0;bottom:0;max-height:56dvh;overflow-y:auto;background:linear-gradient(180deg,rgba(17,14,24,.12),rgba(17,14,24,.92) 18%)!important;border:0!important;border-radius:24px 24px 0 0!important;padding:12px 14px calc(12px + env(safe-area-inset-bottom))!important;backdrop-filter:blur(12px)}
     .encounter-scene .suggestions{margin:0 0 8px!important}
@@ -10110,10 +10110,9 @@ document.addEventListener('submit',function(event){
     const defaultSceneImage='https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp';
     panel.style.setProperty('--encounter-scene-photo','url('+JSON.stringify(sceneImage||defaultSceneImage)+')');
     panel.dataset.encounterPlace=session.encounterPlace||'';
-    // Prefer a dedicated encounter sprite, but allow the character-card image as a
-    // testing fallback so creators can verify scale/placement before preparing a transparent PNG.
-    // A card image with a white/baked-in background will keep that background until replaced
-    // with a transparent half-body asset.
+    // Prefer a dedicated sprite. When only a character-card image exists, try to
+    // remove edge-connected near-white background pixels in-browser so the card's
+    // baked-in white canvas does not cover the encounter scene.
     const dedicatedSprite=safeImage(character?.encounterPortraitImage||character?.halfBodyImage||character?.transparentPortrait||character?.encounterSprite||'');
     const cardPortrait=safeImage(character?.image||character?.avatar_url||character?.avatarUrl||'');
     const halfBodyImage=dedicatedSprite||cardPortrait;
@@ -10129,8 +10128,59 @@ document.addEventListener('submit',function(event){
         existingSprite.loading='eager';
         panel.insertBefore(existingSprite,panel.firstChild);
       }
-      if(existingSprite.getAttribute('src')!==halfBodyImage)existingSprite.src=halfBodyImage;
       existingSprite.classList.toggle('encounter-card-portrait-fallback',!dedicatedSprite);
+      if(existingSprite.dataset.encounterSource!==halfBodyImage){
+        existingSprite.dataset.encounterSource=halfBodyImage;
+        existingSprite.dataset.encounterProcessed='';
+        existingSprite.classList.remove('encounter-auto-bg-fallback');
+        if(!dedicatedSprite){
+          existingSprite.crossOrigin='anonymous';
+          existingSprite.onload=()=>{
+            if(existingSprite.dataset.encounterSource!==halfBodyImage||existingSprite.dataset.encounterProcessed===halfBodyImage)return;
+            try{
+              const sourceImage=existingSprite;
+              const canvas=document.createElement('canvas');
+              canvas.width=sourceImage.naturalWidth;
+              canvas.height=sourceImage.naturalHeight;
+              const ctx=canvas.getContext('2d',{willReadFrequently:true});
+              ctx.drawImage(sourceImage,0,0);
+              const frame=ctx.getImageData(0,0,canvas.width,canvas.height);
+              const pixels=frame.data,w=canvas.width,h=canvas.height,total=w*h;
+              const visited=new Uint8Array(total);
+              const stack=new Int32Array(total);
+              let top=0;
+              const nearWhite=(i)=>{
+                const p=i*4,red=pixels[p],green=pixels[p+1],blue=pixels[p+2];
+                return red>=218&&green>=218&&blue>=218&&Math.max(red,green,blue)-Math.min(red,green,blue)<= thirty;
+              };
+              const thirty=34;
+              const push=(i)=>{if(i>=0&&i<total&&!visited[i]&&nearWhite(i)){visited[i]=1;stack[top++]=i;}};
+              for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
+              for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
+              while(top){
+                const i=stack[--top];
+                const p=i*4;
+                pixels[p+3]=0;
+                const x=i%w,y=(i/w)|0;
+                if(x>0)push(i-1);
+                if(x<w-1)push(i+1);
+                if(y>0)push(i-w);
+                if(y<h-1)push(i+w);
+              }
+              ctx.putImageData(frame,0,0);
+              const transparentImage=canvas.toDataURL('image/png');
+              existingSprite.dataset.encounterProcessed=halfBodyImage;
+              existingSprite.onload=null;
+              existingSprite.src=transparentImage;
+            }catch(error){
+              // If the image host disallows canvas access, use a visual blend fallback.
+              existingSprite.dataset.encounterProcessed=halfBodyImage;
+              existingSprite.classList.add('encounter-auto-bg-fallback');
+            }
+          };
+        }
+        existingSprite.src=halfBodyImage;
+      }
     }else{
       if(existingSprite)existingSprite.remove();
       if(!missingArt){
