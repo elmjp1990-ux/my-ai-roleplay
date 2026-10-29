@@ -9170,16 +9170,15 @@ function renderCityMapMVP(){
       const index=Number(locationModal.dataset.selectedPersonIndex);
       const person=cityPresenceByPlace[locationModal.dataset.place]?.[index];
       if(!person||!accessible(person)){toast('此角色目前無法開啟故事模式。');return;}
-      // Keep the scene open while the visitor signs in; return to the map rather than
-      // routing to the generic character detail page. Once signed in, close the scene
-      // overlay before routing to conversation so it cannot cover the chat screen.
+      // Story mode is an entry to the normal character introduction page, not an
+      // immediate chat. Preserve the intended destination through sign-in.
       if(!currentUser()){
-        openModal('login',{next:{page:'citymap'}});
+        requireLogin({page:'detail',id:person.id});
         return;
       }
       locationModal.hidden=true;
       document.body.classList.remove('city-location-active');
-      startChat(person.id);
+      go({page:'detail',id:person.id});
       return;
     }
     if(cardAction==='city-character-prev'||cardAction==='city-character-next'){
