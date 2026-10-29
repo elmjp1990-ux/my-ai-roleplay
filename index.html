@@ -9922,10 +9922,17 @@ document.addEventListener('submit',function(event){
       .encounter-scene .chat-heading{padding-top:calc(8px + env(safe-area-inset-top))!important}
     }
 
-    /* Encounter full-screen + readable story/suggestion pass (2026-10-29).
-       Fixed viewport removes the legacy sidebar/page gutters from the scene. */
+    /* Encounter fullscreen v2: detach the scene from legacy app/sidebar layout. */
+    html:has(body.encounter-mode-active),body.encounter-mode-active{width:100%!important;height:100%!important;min-height:100%!important;overflow:hidden!important}
+    body.encounter-mode-active .sidebar,
+    body.encounter-mode-active #mobileNav,
+    body.encounter-mode-active .app>header{display:none!important}
+    body.encounter-mode-active .app{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;min-height:100dvh!important;margin:0!important;padding:0!important;overflow:hidden!important;transform:none!important}
+    body.encounter-mode-active #view{position:fixed!important;inset:0!important;z-index:100!important;width:100vw!important;height:100dvh!important;min-height:100dvh!important;max-width:none!important;margin:0!important;padding:0!important;overflow:hidden!important}
+    body.encounter-mode-active .chat-layout{position:fixed!important;inset:0!important;display:block!important;width:100vw!important;height:100dvh!important;min-height:100dvh!important;margin:0!important;padding:0!important;overflow:hidden!important}
     body:has(.chat-main.encounter-scene){overflow:hidden!important}
-    .chat-main.encounter-scene{position:fixed!important;inset:0!important;z-index:110!important;width:100vw!important;height:100dvh!important;min-height:100dvh!important;margin:0!important;border:0!important;border-radius:0!important}
+    .chat-main.encounter-scene{position:fixed!important;inset:0!important;z-index:110!important;display:block!important;width:100vw!important;height:100dvh!important;min-height:100dvh!important;max-width:none!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;overflow:hidden!important;isolation:isolate!important;background:#17141b!important}
+    .chat-main.encounter-scene:before{position:absolute!important;inset:0!important;z-index:0!important;background-image:linear-gradient(180deg,rgba(10,9,17,.10),rgba(10,9,17,.12) 34%,rgba(10,9,17,.40) 66%,rgba(10,9,17,.92) 100%),var(--encounter-scene-photo,none),radial-gradient(ellipse at 70% 22%,#6a5a65 0%,#322b36 48%,#17141b 100%)!important;background-position:center,center,center!important;background-size:cover,cover,cover!important;background-repeat:no-repeat!important;transform:none!important;filter:none!important;content:""!important;pointer-events:none!important}
     .encounter-scene .chat-layout{position:absolute!important;inset:0!important;width:100%!important;height:100dvh!important;min-height:0!important;margin:0!important;padding:0!important}
     .encounter-scene .chat-main{position:absolute!important;inset:0!important;width:100%!important;height:100dvh!important;min-height:0!important;margin:0!important;border-radius:0!important}
     .encounter-scene .messages{bottom:clamp(265px,34dvh,360px)!important;max-height:clamp(110px,31dvh,330px)!important;overflow-y:auto!important;overscroll-behavior:contain!important;scrollbar-width:thin;scrollbar-color:rgba(230,225,245,.45) transparent}
@@ -9958,25 +9965,38 @@ document.addEventListener('submit',function(event){
   `;;
   document.head.appendChild(style);
   const splitEncounterBeats=(value)=>{
-    const source=String(value||'').replace(/\r\n?/g,'\n').trim();
+    const source=String(value||'').replace(/\r\n?/g,'\n').replace(/[ \t]+\n/g,'\n').trim();
     if(!source)return [];
-    const paragraphs=source.split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
+    const paragraphs=source.split(/\n+/).map(x=>x.trim()).filter(Boolean);
     const beats=[];
-    for(const paragraph of paragraphs){
-      let start=0;
-      for(let i=0;i<paragraph.length;i++){
-        if(!/[。！？!?]/u.test(paragraph[i]))continue;
-        let end=i+1;
-        while(end<paragraph.length&&/[」』”’"）)】]/u.test(paragraph[end]))end++;
-        const next=paragraph.slice(start,end).trim();
-        if(next)beats.push(next);
-        start=end;
-        i=end-1;
+    const pushSentence=(text)=>{
+      const cleaned=String(text||'').replace(/^\s*[-*•]+\s*/,'').replace(/^\*+|\*+$/g,'').trim();
+      if(!cleaned)return;
+      // Long, unpunctuated prose is broken into readable visual-novel beats too.
+      if(cleaned.length>58){
+        const clauses=cleaned.split(/(?<=[，,、；;：:])/u).map(x=>x.trim()).filter(Boolean);
+        if(clauses.length>1){
+          let chunk='';
+          for(const clause of clauses){
+            if(chunk&&chunk.length+clause.length>48){beats.push(chunk);chunk=clause;}
+            else chunk+=clause;
+          }
+          if(chunk)pushSentence(chunk);
+          return;
+        }
+        for(let i=0;i<cleaned.length;i+=48)beats.push(cleaned.slice(i,i+48));
+        return;
       }
-      const rest=paragraph.slice(start).trim();
-      if(rest)beats.push(rest);
+      beats.push(cleaned);
+    };
+    for(const paragraph of paragraphs){
+      const sentences=paragraph.match(/[^。！？!?；;]+[。！？!?；;」』”’"）)】]*/gu)||[paragraph];
+      for(const sentence of sentences){
+        const part=sentence.trim();
+        if(part)pushSentence(part);
+      }
     }
-    return beats.map(x=>x.replace(/^\*+|\*+$/g,'').trim()).filter(Boolean);
+    return beats;
   };
   const installEncounterRenderWrapper=()=>{
   const baseRenderConversation=renderConversation;
@@ -9984,13 +10004,14 @@ document.addEventListener('submit',function(event){
   const wrappedRenderConversation=function(){
     baseRenderConversation.apply(this,arguments);
     const session=currentSession();
+    document.body.classList.toggle('encounter-mode-active',!!session?.encounterMode);
     if(!session?.encounterMode)return;
     const panel=$('view').querySelector('.chat-main');
     if(!panel)return;
     panel.classList.add('encounter-scene');
     const character=sessionCharacter(session);
     const sceneImage=safeImage(character?.encounterSceneImage||character?.sceneImage||character?.backgroundImage||session?.encounterSceneImage||'');
-    const defaultSceneImage='/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp';
+    const defaultSceneImage='https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/feat/encounter-mode-core-schema/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp';
     panel.style.setProperty('--encounter-scene-photo','url('+JSON.stringify(sceneImage||defaultSceneImage)+')');
     panel.dataset.encounterPlace=session.encounterPlace||'';
     // Only use a dedicated transparent half-body asset here. The ordinary character-card
@@ -10033,7 +10054,7 @@ document.addEventListener('submit',function(event){
       const latestReply=[...(session.messages||[])].reverse().find(m=>m.role!=='user'&&String(m.text||m.content||'').trim());
       const raw=String(latestReply?.text||latestReply?.content||'').trim();
       const beats=raw ? splitEncounterBeats(raw) : [];
-      const beatKey=String(latestReply?.id||'')+':'+beats.length;
+      const beatKey=String(latestReply?.id||latestReply?.createdAt||latestReply?.timestamp||raw.slice(0,48))+':'+raw.length+':'+beats.length;
       if(session.encounterBeatKey!==beatKey){session.encounterBeatKey=beatKey;session.encounterBeatIndex=0;}
       const idx=Math.min(Number(session.encounterBeatIndex)||0,Math.max(0,beats.length-1));
       messages.innerHTML=beats.length
