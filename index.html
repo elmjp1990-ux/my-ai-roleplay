@@ -8939,6 +8939,36 @@ function renderCityMapMVP(){
     const values=Object.fromEntries(parts.map(part=>[part.type,part.value]));
     return {weekday:{Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[values.weekday],minutes:Number(values.hour)*60+Number(values.minute)};
   };
+  // Public schedules live in character_schedules, not in the character row.
+  // Hydrate them only through the guarded RPC; never grant browser clients direct table access.
+  const cityScheduleCache=new Map();
+  const hydrateCitySchedule=async(character)=>{
+    if(!character?.id||character.visibility!=='public'||character.deletedAt)return;
+    if(cityScheduleCache.has(character.id)){
+      character.encounterSchedules=await cityScheduleCache.get(character.id);
+      return;
+    }
+    const pending=(async()=>{
+      try{
+        const client=window.mySupabase;
+        if(!client)return '';
+        const {data,error}=await client.rpc('get_encounter_character_schedule',{p_character_id:character.id});
+        if(error)throw error;
+        return (data||[]).map(row=>[
+          row.weekday==null?'*':row.weekday,
+          String(row.start_time||'').slice(0,5),
+          String(row.end_time||'').slice(0,5),
+          row.location_key,
+          row.activity
+        ].join('|')).join('\\n');
+      }catch(error){
+        console.warn('城市角色日程載入失敗：',character.id,error?.message||error);
+        return '';
+      }
+    })();
+    cityScheduleCache.set(character.id,pending);
+    character.encounterSchedules=await pending;
+  };
   const getCityPresence=(place)=>{
     const clock=getTaipeiClock();
     const aliases=cityPlaceAliases[place]||[place];
@@ -8970,7 +9000,7 @@ function renderCityMapMVP(){
     });
   };
   const cityPresenceByPlace={};
-  const openCityLocation=(marker)=>{
+  const openCityLocation=async(marker)=>{
     const place=marker?.dataset?.place;
     if(!place||!locationModal)return;
     const name=cityPlaceNames[place]||'地點';
@@ -8988,7 +9018,15 @@ function renderCityMapMVP(){
     if(statusNote)statusNote.textContent='營業時間未提供';
     $('cityMapPresenceList').innerHTML='<div class="city-location-scene-icon" aria-hidden="true">'+scene.icon+'</div><h3>'+escapeHTML(scene.heading)+'</h3><p>'+escapeHTML(scene.description)+'</p><div class="city-location-event"><span class="city-location-event-label">'+escapeHTML(scene.eventLabel)+'</span><strong>'+escapeHTML(scene.eventTitle)+'</strong><p>'+escapeHTML(scene.eventDescription)+'</p></div>';
     let people=[];
-    try{people=getCityPresence(place);if(!Array.isArray(people))people=[];}catch(error){console.error('讀取城市角色排程失敗：',error);}
+    try{
+      // Load persisted public schedules before filtering this location. The resolver enforces
+      // publication, review, rights and NSFW eligibility; character coordinates/UI stay untouched.
+      await Promise.all((Array.isArray(state.characters)?state.characters:[])
+        .filter(character=>character?.visibility==='public'&&!character.deletedAt)
+        .map(hydrateCitySchedule));
+      people=getCityPresence(place);
+      if(!Array.isArray(people))people=[];
+    }catch(error){console.error('讀取城市角色排程失敗：',error);}
     cityPresenceByPlace[place]=people;
     $('cityMapPeopleCount').textContent=people.length?people.length+' 位角色符合目前時段':'目前沒有符合時段的角色';
     const strip=$('cityMapAvatarStrip');
