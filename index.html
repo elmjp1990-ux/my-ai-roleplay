@@ -4271,7 +4271,8 @@ function newArchiveName(character,session) {
 }
 // Create a dedicated Encounter session through the trusted Edge Function.
 // Do not use the generic chat_sessions INSERT path: it intentionally creates Story Mode.
-async function createEncounterSession(character, encounterPlace = null) {
+async function createEncounterSession(character) {
+  const encounterPlace = arguments.length > 1 ? arguments[1] : null;
   if (!character?.id || !isUuid(character.id)) {
     throw new Error('找不到有效的角色資料，無法開始相遇模式。');
   }
