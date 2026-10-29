@@ -2536,6 +2536,8 @@ function chatSessionData(s) {
     : s.initialOpeningMessage;
   return {
     name:s.name || '', archived:!!s.archived, hidden:!!s.hidden,
+    // Keep the mode marker in session_data as a recovery source if a legacy sync row lacks chat_mode.
+    encounterMode:s.encounterMode === true,
     encounterPlace:typeof s.encounterPlace === 'string' ? s.encounterPlace : null,
     openingMessage:initialOpening && String(initialOpening.text || '').trim()
       ? {text:String(initialOpening.text),at:Number(initialOpening.at) || Date.now()}
@@ -2766,7 +2768,7 @@ async function loadCloudChatSessions(user) {
         ...(existing || {}), id:row.id, characterId:row.character_id,
         characterName:row.character_name || snapshot.name || '角色',
         name:data.name || '', archived:data.archived === true || row.status === 'archived',
-        encounterMode:row.chat_mode === 'encounter',
+        encounterMode:row.chat_mode === 'encounter' || data.encounterMode === true || data.encounter?.mode === 'encounter',
         encounterPlace:typeof data.encounterPlace === 'string' ? data.encounterPlace : (existing?.encounterPlace || null),
         hidden:data.hidden === true, pinned:data.pinned === true,
         startedAt:Number(data.startedAt) || (row.created_at ? new Date(row.created_at).getTime() : Date.now()),
@@ -10001,7 +10003,7 @@ document.addEventListener('submit',function(event){
     const key=messages.dataset.encounterBeatKey||'';
     const latestReply=[...(session.messages||[])].reverse().find(m=>m.role!=='user'&&String(m.text||m.content||'').trim());
     const raw=String(latestReply?.text||latestReply?.content||'').trim();
-    const beats=raw.split(/\\n\\s*\\n|(?<=[。！？!?])\\s+(?=[*「“"'])/u).map(x=>x.trim().replace(/^\\*+|\\*+$/g,'')).filter(Boolean);
+    const beats=raw.split(/\n\s*\n|(?<=[。！？!?])\s+(?=[*「“"'])/u).map(x=>x.trim().replace(/^\*+|\*+$/g,'')).filter(Boolean);
     if(session.encounterBeatKey!==key){session.encounterBeatKey=key;session.encounterBeatIndex=0;}
     if((session.encounterBeatIndex||0)<beats.length-1){session.encounterBeatIndex=(session.encounterBeatIndex||0)+1;persist();renderConversation();}
   });
