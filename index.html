@@ -9923,8 +9923,10 @@ document.addEventListener('submit',function(event){
     }
   `;;
   document.head.appendChild(style);
+  const installEncounterRenderWrapper=()=>{
   const baseRenderConversation=renderConversation;
-  renderConversation=function(){
+  if(typeof baseRenderConversation!=='function'||baseRenderConversation.__encounterWrapped)return;
+  const wrappedRenderConversation=function(){
     baseRenderConversation.apply(this,arguments);
     const session=currentSession();
     if(!session?.encounterMode)return;
@@ -9992,6 +9994,11 @@ document.addEventListener('submit',function(event){
       messages.dataset.encounterBeatIndex=String(idx);
     }
   };
+  wrappedRenderConversation.__encounterWrapped=true;
+  renderConversation=wrappedRenderConversation;
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installEncounterRenderWrapper,{once:true});
+  else installEncounterRenderWrapper();
   document.addEventListener('click',event=>{
     const target=event.target.closest('[data-action="encounter-next-beat"]');
     if(!target)return;
