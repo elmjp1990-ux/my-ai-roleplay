@@ -8855,6 +8855,16 @@ function renderCityMapMVP(){
           <p id="cityMapVenueDescription">點選地圖上的地點後，這裡會顯示對應的場景介紹。</p>
           <div class="city-location-event"><span class="city-location-event-label">場景亮點</span><strong>等待選擇地點</strong><p>每個地點都有自己的場景與故事亮點。</p></div>
         </div>
+        <section class="city-character-card" id="cityCharacterCard" hidden aria-live="polite">
+          <div class="city-character-card-head"><span class="city-character-page-label" id="cityCharacterPageLabel">角色狀態 · 01 / 02</span><button type="button" class="city-character-card-close" data-action="city-character-close" aria-label="返回場地資訊">×</button></div>
+          <div class="city-character-card-body" id="cityCharacterCardBody"></div>
+          <div class="city-character-card-footer">
+            <button type="button" class="city-character-page-button" data-action="city-character-prev" aria-label="上一頁">‹</button>
+            <span class="city-character-page-dots"><i class="active"></i><i></i></span>
+            <button type="button" class="city-character-page-button" data-action="city-character-next" aria-label="下一頁">›</button>
+          </div>
+          <button type="button" class="city-character-meet primary" data-action="city-character-meet">與他相遇</button>
+        </section>
       </div>
     </section>
     </section>`;
@@ -8996,7 +9006,7 @@ function renderCityMapMVP(){
         return Number.isFinite(from)&&Number.isFinite(to)&&(from<to?clock.minutes>=from&&clock.minutes<to:(clock.minutes>=from||clock.minutes<to));
       });
       const parts=String(line||'').trim().split('|').map(value=>value.trim());
-      return {...character,cityActivity:parts[4]||''};
+      return {...character,cityStartTime:parts[1]||'',cityEndTime:parts[2]||'',cityActivity:parts[4]||''};
     });
   };
   const cityPresenceByPlace={};
@@ -9010,12 +9020,19 @@ function renderCityMapMVP(){
     // to a generic pin/location panel when an ID is missing or mismatched.
     locationModal.dataset.scene=place;
     locationModal.dataset.place=place;
+    const markerRect=marker.getBoundingClientRect();
+    locationModal.dataset.side=markerRect.left+markerRect.width/2>window.innerWidth/2?'right':'left';
+    const characterCard=$('cityCharacterCard');
+    if(characterCard)characterCard.hidden=true;
+    locationModal.dataset.selectedPersonIndex='';
     // Render the place-specific scene before reading optional schedule data so a
     // missing/malformed schedule can never leave the generic placeholder visible.
     $('cityMapPlaceTitle').textContent=name;
-    $('cityMapOpenStatus').textContent='地點場景可探索';
+    $('cityMapOpenStatus').textContent='場景開放中';
     const statusNote=locationModal.querySelector('.city-location-status-note');
-    if(statusNote)statusNote.textContent='營業時間未提供';
+    if(statusNote)statusNote.textContent='城市探索地點';
+    const statusDot=locationModal.querySelector('.city-location-status-dot');
+    if(statusDot)statusDot.style.background='#4ade80';
     $('cityMapPresenceList').innerHTML='<div class="city-location-scene-icon" aria-hidden="true">'+scene.icon+'</div><h3>'+escapeHTML(scene.heading)+'</h3><p>'+escapeHTML(scene.description)+'</p><div class="city-location-event"><span class="city-location-event-label">'+escapeHTML(scene.eventLabel)+'</span><strong>'+escapeHTML(scene.eventTitle)+'</strong><p>'+escapeHTML(scene.eventDescription)+'</p></div>';
     let people=[];
     try{
@@ -9037,35 +9054,96 @@ function renderCityMapMVP(){
           const portrait=image
             ? '<img class="city-location-person-image" src="'+escapeHTML(image)+'" alt="" loading="lazy" referrerpolicy="no-referrer">'
             : '<span class="city-location-avatar-fallback">'+escapeHTML(characterName.slice(0,1))+'</span>';
-          return '<button type="button" class="city-location-avatar city-location-person" data-action="city-person" data-person-index="'+index+'" aria-label="與 '+escapeHTML(characterName)+' 相遇">'+portrait+'<span class="city-location-person-name">'+escapeHTML(characterName)+'</span><span class="city-location-person-activity">'+escapeHTML(String(person.cityActivity||''))+'</span></button>';
+          return '<button type="button" class="city-location-avatar city-location-person" data-action="city-person" data-person-index="'+index+'" aria-label="查看 '+escapeHTML(characterName)+' 的角色資訊">'+portrait+'<span class="city-location-person-name">'+escapeHTML(characterName)+'</span></button>';
         }).join('')
       : '<p class="city-location-empty">目前沒有角色排定在這個地點。角色日程符合台灣時間時，才會顯示在這裡。</p>';
     $('cityMapPresenceList').innerHTML='<div class="city-location-scene-icon" aria-hidden="true">'+scene.icon+'</div><h3>'+escapeHTML(scene.heading)+'</h3><p>'+escapeHTML(scene.description)+'</p><div class="city-location-event"><span class="city-location-event-label">'+escapeHTML(scene.eventLabel)+'</span><strong>'+escapeHTML(scene.eventTitle)+'</strong><p>'+escapeHTML(scene.eventDescription)+'</p></div>';
     locationModal.hidden=false;
     document.body.classList.add('city-location-active');
   };
+  const renderCityCharacterCard=(person,page=0)=>{
+    const card=$('cityCharacterCard'),body=$('cityCharacterCardBody');
+    if(!card||!body||!person)return;
+    card.hidden=false;
+    card.dataset.page=String(page);
+    locationModal.dataset.selectedPersonIndex=String((cityPresenceByPlace[locationModal.dataset.place]||[]).findIndex(item=>item.id===person.id));
+    const image=safeImage(person.image||person.avatar_url||person.avatar);
+    const portrait=image
+      ? '<img class="city-character-portrait" src="'+escapeHTML(image)+'" alt="'+escapeHTML(person.name||'角色')+'" loading="eager" referrerpolicy="no-referrer">'
+      : '<div class="city-character-portrait city-character-portrait-fallback">'+escapeHTML(String(person.name||'角').slice(0,1))+'</div>';
+    const name=escapeHTML(person.name||'未命名角色');
+    const gender=escapeHTML(person.gender||'未設定');
+    const age=escapeHTML(person.age?String(person.age)+' 歲':'未設定');
+    const activity=escapeHTML(person.cityActivity||'在這個場景中度過自己的時間');
+    const timeRange=person.cityStartTime&&person.cityEndTime?escapeHTML(person.cityStartTime+'–'+person.cityEndTime):'時間未設定';
+    const placeName=escapeHTML(cityPlaceNames[locationModal.dataset.place]||'城市地點');
+    const intro=String(person.intro||person.description||person.personalityProfile?.summary||'這位角色尚未填寫公開介紹。');
+    $('cityCharacterPageLabel').textContent=page===0?'角色狀態 · 01 / 02':'角色介紹 · 02 / 02';
+    const dots=card.querySelectorAll('.city-character-page-dots i');
+    dots.forEach((dot,index)=>dot.classList.toggle('active',index===page));
+    if(page===0){
+      body.innerHTML=portrait+'<div class="city-character-copy"><h3>'+name+'</h3><div class="city-character-meta"><span>'+gender+'</span><span>'+age+'</span></div><p><strong>當前行程</strong><br>'+timeRange+'<br>'+placeName+'</p><p><strong>心情</strong><br>'+escapeHTML(person.cityMood||person.mood||'平靜')+'</p><p><strong>現在狀態</strong><br>'+activity+'</p></div>';
+    }else{
+      body.innerHTML=portrait+'<div class="city-character-copy"><h3>'+name+'｜角色介紹</h3><p>'+escapeHTML(intro)+'</p></div>';
+    }
+  };
   locationModal?.addEventListener('click',async event=>{
     const personButton=event.target.closest('[data-action="city-person"]');
-    if(!personButton)return;
-    event.preventDefault();
-    event.stopPropagation();
-    const place=$('cityMapPlaceTitle')?.textContent;
-    const placeKey=Object.keys(cityPlaceNames).find(key=>cityPlaceNames[key]===place);
-    const person=cityPresenceByPlace[placeKey]?.[Number(personButton.dataset.personIndex)];
-    if(!person||!accessible(person)){toast('此角色目前無法開始相遇模式。');return;}
-    if(!requireLogin({page:'citymap',id:person.id}))return;
-    personButton.disabled=true;
-    try{
-      const encounterSession=await createEncounterSession(person,placeKey);
-      locationModal.hidden=true;
-      document.body.classList.remove('city-location-active');
-      go({page:'conversation',id:encounterSession.id});
-      toast('已進入相遇模式；每次送出訊息依既有規則扣款。');
-    }catch(error){
-      console.error('從城市地點開始相遇失敗：',error);
-      toast(error?.message||'相遇模式暫時無法使用，請稍後再試。');
-    }finally{personButton.disabled=false;}
+    if(personButton){
+      event.preventDefault();event.stopPropagation();
+      const person=cityPresenceByPlace[locationModal.dataset.place]?.[Number(personButton.dataset.personIndex)];
+      if(!person||!accessible(person)){toast('此角色目前無法查看。');return;}
+      renderCityCharacterCard(person,0);
+      return;
+    }
+    const cardAction=event.target.closest('[data-action^="city-character-"]')?.dataset.action;
+    if(cardAction==='city-character-close'){
+      const card=$('cityCharacterCard');if(card)card.hidden=true;
+      locationModal.dataset.selectedPersonIndex='';
+      return;
+    }
+    if(cardAction==='city-character-prev'||cardAction==='city-character-next'){
+      const index=Number(locationModal.dataset.selectedPersonIndex);
+      const person=cityPresenceByPlace[locationModal.dataset.place]?.[index];
+      if(person)renderCityCharacterCard(person,cardAction==='city-character-next'?1:0);
+      return;
+    }
+    if(cardAction==='city-character-meet'){
+      const index=Number(locationModal.dataset.selectedPersonIndex);
+      const placeKey=locationModal.dataset.place;
+      const person=cityPresenceByPlace[placeKey]?.[index];
+      if(!person||!accessible(person)){toast('此角色目前無法開始相遇模式。');return;}
+      if(!requireLogin({page:'citymap',id:person.id}))return;
+      const meetButton=event.target.closest('[data-action="city-character-meet"]');
+      if(meetButton)meetButton.disabled=true;
+      try{
+        const encounterSession=await createEncounterSession(person,placeKey);
+        locationModal.hidden=true;
+        document.body.classList.remove('city-location-active');
+        go({page:'conversation',id:encounterSession.id});
+        toast('已進入相遇模式；每次送出訊息依既有規則扣款。');
+      }catch(error){
+        console.error('從城市地點開始相遇失敗：',error);
+        toast(error?.message||'相遇模式暫時無法使用，請稍後再試。');
+      }finally{if(meetButton)meetButton.disabled=false;}
+    }
   });
+  $('cityMapAvatarStrip')?.addEventListener('error',event=>{
+    const image=event.target;
+    if(!(image instanceof HTMLImageElement)||!image.classList.contains('city-location-person-image'))return;
+    const fallback=document.createElement('span');
+    fallback.className='city-location-avatar-fallback';
+    fallback.textContent=image.alt?.slice(0,1)||'角';
+    image.replaceWith(fallback);
+  },true);
+  $('cityCharacterCardBody')?.addEventListener('error',event=>{
+    const image=event.target;
+    if(!(image instanceof HTMLImageElement)||!image.classList.contains('city-character-portrait'))return;
+    const fallback=document.createElement('div');
+    fallback.className='city-character-portrait city-character-portrait-fallback';
+    fallback.textContent=image.alt?.slice(0,1)||'角';
+    image.replaceWith(fallback);
+  },true);
   // Bind activation directly to each SVG marker. Some mobile SVG click paths do not
   // reliably reach the stage-level delegated handler, so each landmark owns its click.
   stage.querySelectorAll('[data-action="city-landmark"]').forEach(marker=>{
@@ -9675,7 +9753,8 @@ document.addEventListener('submit',function(event){
 </script>
 <style id="poyozz-city-location-panel">
 .city-location-modal[hidden]{display:none!important}
-.city-location-modal{position:fixed;inset:0;z-index:120;display:grid;place-items:center;padding:22px;isolation:isolate}
+.city-location-modal{position:fixed;inset:0;z-index:120;display:grid;align-items:stretch;justify-items:start;padding:0;isolation:isolate;pointer-events:auto}
+.city-location-modal[data-side="right"]{justify-items:end}
 /* Keep every landmark on the same neutral translucent-gray glass system as the bottom dock.
    Scene identity comes from its title, copy, schedule and scene content—not tinted modal skins. */
 .city-location-modal[data-scene] .city-location-glass{
@@ -9687,7 +9766,10 @@ document.addEventListener('submit',function(event){
  -webkit-backdrop-filter:blur(24px) saturate(120%);
 }
 .city-location-backdrop{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:0;padding:0;background:rgba(5,8,18,.52);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
-.city-location-glass{position:relative;z-index:1;width:min(540px,100%);max-height:min(760px,calc(100dvh - 36px));overflow:auto;overscroll-behavior:contain;border:1px solid rgba(255,255,255,.48);border-radius:26px;padding:22px;background:linear-gradient(135deg,rgba(151,157,173,.43),rgba(105,113,132,.34) 48%,rgba(180,157,193,.30));color:#fff;box-shadow:0 28px 90px rgba(0,0,0,.24),inset 0 1px rgba(255,255,255,.42),inset 0 -1px rgba(255,255,255,.10),0 0 42px rgba(216,203,255,.16);backdrop-filter:blur(32px) saturate(165%);-webkit-backdrop-filter:blur(32px) saturate(165%)}
+.city-location-glass{position:relative;z-index:1;width:min(410px,calc(100vw - 20px));height:100%;max-height:100dvh;overflow:auto;overscroll-behavior:contain;border:1px solid rgba(255,255,255,.30);border-radius:0 26px 26px 0;padding:22px 20px calc(24px + env(safe-area-inset-bottom));background:linear-gradient(135deg,rgba(231,233,239,.24),rgba(141,149,167,.22) 52%,rgba(205,209,218,.20));color:#f7f8fc;box-shadow:0 18px 52px rgba(8,11,18,.22),inset 0 1px rgba(255,255,255,.22);backdrop-filter:blur(24px) saturate(120%);-webkit-backdrop-filter:blur(24px) saturate(120%);animation:city-location-slide-left .24s ease-out both}
+.city-location-modal[data-side="right"] .city-location-glass{border-radius:26px 0 0 26px;animation-name:city-location-slide-right}
+@keyframes city-location-slide-left{from{opacity:.6;transform:translateX(-28px)}to{opacity:1;transform:translateX(0)}}
+@keyframes city-location-slide-right{from{opacity:.6;transform:translateX(28px)}to{opacity:1;transform:translateX(0)}}
 .city-location-header{position:static;height:auto;padding:0;display:flex;align-items:center;justify-content:space-between;gap:14px;background:transparent;border:0;backdrop-filter:none}
 .city-location-eyebrow{font-size:9px;letter-spacing:.2em;color:#c5b9ee;margin-bottom:7px}
 .city-location-header h2{font-size:25px;letter-spacing:.02em;margin:0;font-weight:650}
@@ -9712,12 +9794,32 @@ document.addEventListener('submit',function(event){
 .city-location-event p{margin:5px 0 0;color:#c3c0d2;font-size:11px;line-height:1.65}
 .city-location-empty{margin:0;padding:14px 12px;width:100%;border:1px dashed rgba(235,225,255,.22);border-radius:14px;color:#d2cfe0;font-size:12px;line-height:1.7;text-align:center}
 .city-location-person{display:flex;flex-direction:column;align-items:center;gap:6px;flex:0 0 72px;min-width:72px;padding:4px 3px 8px;border:0;background:transparent;color:#fff;cursor:pointer}
-.city-location-person .city-location-avatar-fallback,.city-location-person-image{display:grid;place-items:center;width:54px;height:54px;flex:0 0 54px;border-radius:50%;border:1px solid rgba(239,221,255,.55);background:linear-gradient(145deg,rgba(232,184,222,.28),rgba(139,124,255,.24));box-shadow:0 5px 18px rgba(0,0,0,.15);font-size:20px}
-.city-location-person-image{display:block;object-fit:cover;object-position:center 25%}
+.city-location-person .city-location-avatar-fallback,.city-location-person-image{display:grid;place-items:center;width:54px;height:54px;flex:0 0 54px;border-radius:50%;border:1px solid rgba(239,221,255,.48);background:rgba(235,235,244,.08);box-shadow:none;filter:none;font-size:20px;overflow:hidden}
+.city-location-person-image{display:block;object-fit:cover;object-position:center 25%;outline:none;clip-path:circle(50% at 50% 50%);-webkit-mask-image:radial-gradient(circle,#000 99%,transparent 100%)}
 .city-location-person-name{max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#f3efff}
 .city-location-person-activity{max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px;color:#c9c1e2}
 .city-location-person:disabled{opacity:.6}
-@media(max-width:600px){.city-location-modal{padding:14px}.city-location-glass{padding:18px;border-radius:23px;max-height:calc(100dvh - 28px)}.city-location-header h2{font-size:22px}.city-location-rule{margin:14px 0}}
+@media(max-width:600px){.city-location-glass{width:min(390px,calc(100vw - 18px));padding:18px 16px calc(20px + env(safe-area-inset-bottom))}.city-location-header h2{font-size:22px}.city-location-rule{margin:14px 0}}
+.city-character-card[hidden]{display:none!important}
+.city-character-card{margin-top:8px;padding:14px;border:1px solid rgba(255,255,255,.2);border-radius:18px;background:linear-gradient(145deg,rgba(240,241,246,.13),rgba(122,130,149,.13));box-shadow:inset 0 1px rgba(255,255,255,.12)}
+.city-character-card-head,.city-character-card-footer{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.city-character-page-label{font-size:10px;letter-spacing:.12em;color:#d3cde5}
+.city-character-card-close{width:30px;height:30px;padding:0;border-radius:50%;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.18)}
+.city-character-card-body{display:grid;grid-template-columns:118px minmax(0,1fr);gap:14px;margin:12px 0}
+.city-character-portrait{width:118px;height:164px;object-fit:cover;object-position:center top;border-radius:12px;border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.06);box-shadow:none;display:block}
+.city-character-portrait-fallback{display:grid;place-items:center;color:#eee;font-size:30px}
+.city-character-copy{min-width:0;color:#f4f2fa;font-size:12px;line-height:1.7;overflow-wrap:anywhere}
+.city-character-copy h3{margin:0 0 9px;font-size:17px;line-height:1.35;overflow-wrap:anywhere}
+.city-character-meta{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:9px}
+.city-character-meta span{padding:3px 7px;border:1px solid rgba(255,255,255,.2);border-radius:999px;background:rgba(255,255,255,.07);font-size:10px}
+.city-character-copy p{margin:6px 0;font-size:11px;line-height:1.65;color:#e1deec;overflow-wrap:anywhere}
+.city-character-copy strong{color:#fff;font-weight:650}
+.city-character-card-footer{justify-content:center;margin:7px 0 12px}
+.city-character-page-button{width:30px;height:30px;padding:0;border-radius:50%;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.18);font-size:23px;line-height:1}
+.city-character-page-dots{display:flex;gap:5px}
+.city-character-page-dots i{width:5px;height:5px;border-radius:50%;background:#ffffff55}
+.city-character-page-dots i.active{background:#fff}
+.city-character-meet{width:100%;min-height:42px;background:linear-gradient(135deg,rgba(220,222,233,.34),rgba(136,145,166,.3));border:1px solid rgba(255,255,255,.3);color:#fff}
 @media(prefers-reduced-motion:no-preference){.city-location-glass{animation:city-location-enter .22s ease-out both}@keyframes city-location-enter{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}}
 </style>
 </body>
