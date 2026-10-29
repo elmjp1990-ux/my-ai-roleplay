@@ -9771,8 +9771,7 @@ document.addEventListener('submit',function(event){
 </script>
 <style id="poyozz-city-location-panel">
 .city-location-modal[hidden]{display:none!important}
-.city-location-modal{position:fixed;inset:0;z-index:120;display:grid;align-items:stretch;justify-items:start;padding:0;isolation:isolate;pointer-events:auto}
-.city-location-modal[data-side="right"]{justify-items:end}
+.city-location-modal{position:fixed;inset:0;z-index:120;display:grid;place-items:center;padding:22px;isolation:isolate;pointer-events:auto}
 /* Keep every landmark on the same neutral translucent-gray glass system as the bottom dock.
    Scene identity comes from its title, copy, schedule and scene content—not tinted modal skins. */
 .city-location-modal[data-scene] .city-location-glass{
@@ -9784,10 +9783,7 @@ document.addEventListener('submit',function(event){
  -webkit-backdrop-filter:blur(24px) saturate(120%);
 }
 .city-location-backdrop{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:0;padding:0;background:rgba(5,8,18,.52);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
-.city-location-glass{position:relative;z-index:1;width:min(410px,calc(100vw - 20px));height:100%;max-height:100dvh;overflow:auto;overscroll-behavior:contain;border:1px solid rgba(255,255,255,.30);border-radius:0 26px 26px 0;padding:22px 20px calc(24px + env(safe-area-inset-bottom));background:linear-gradient(135deg,rgba(231,233,239,.24),rgba(141,149,167,.22) 52%,rgba(205,209,218,.20));color:#f7f8fc;box-shadow:0 18px 52px rgba(8,11,18,.22),inset 0 1px rgba(255,255,255,.22);backdrop-filter:blur(24px) saturate(120%);-webkit-backdrop-filter:blur(24px) saturate(120%);animation:city-location-slide-left .24s ease-out both}
-.city-location-modal[data-side="right"] .city-location-glass{border-radius:26px 0 0 26px;animation-name:city-location-slide-right}
-@keyframes city-location-slide-left{from{opacity:.6;transform:translateX(-28px)}to{opacity:1;transform:translateX(0)}}
-@keyframes city-location-slide-right{from{opacity:.6;transform:translateX(28px)}to{opacity:1;transform:translateX(0)}}
+.city-location-glass{position:relative;z-index:1;width:min(540px,100%);height:auto;max-height:min(760px,calc(100dvh - 36px));overflow:auto;overscroll-behavior:contain;border:1px solid rgba(255,255,255,.30);border-radius:26px;padding:22px;background:linear-gradient(135deg,rgba(231,233,239,.24),rgba(141,149,167,.22) 52%,rgba(205,209,218,.20));color:#f7f8fc;box-shadow:0 18px 52px rgba(8,11,18,.22),inset 0 1px rgba(255,255,255,.22);backdrop-filter:blur(24px) saturate(120%);-webkit-backdrop-filter:blur(24px) saturate(120%)}
 .city-location-header{position:static;height:auto;padding:0;display:flex;align-items:center;justify-content:space-between;gap:14px;background:transparent;border:0;backdrop-filter:none}
 .city-location-eyebrow{font-size:9px;letter-spacing:.2em;color:#c5b9ee;margin-bottom:7px}
 .city-location-header h2{font-size:25px;letter-spacing:.02em;margin:0;font-weight:650}
@@ -9817,7 +9813,7 @@ document.addEventListener('submit',function(event){
 .city-location-person-name{max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#f3efff}
 .city-location-person-activity{max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px;color:#c9c1e2}
 .city-location-person:disabled{opacity:.6}
-@media(max-width:600px){.city-location-glass{width:min(390px,calc(100vw - 18px));padding:18px 16px calc(20px + env(safe-area-inset-bottom))}.city-location-header h2{font-size:22px}.city-location-rule{margin:14px 0}}
+@media(max-width:600px){.city-location-modal{padding:14px}.city-location-glass{width:100%;height:auto;max-height:calc(100dvh - 28px);padding:18px;border-radius:23px}.city-location-header h2{font-size:22px}.city-location-rule{margin:14px 0}}
 .city-character-card[hidden]{display:none!important}
 .city-character-card{margin-top:8px;padding:14px;border:1px solid rgba(255,255,255,.2);border-radius:18px;background:linear-gradient(145deg,rgba(240,241,246,.13),rgba(122,130,149,.13));box-shadow:inset 0 1px rgba(255,255,255,.12)}
 .city-character-card-head,.city-character-card-footer{display:flex;align-items:center;justify-content:space-between;gap:10px}
