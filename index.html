@@ -8840,10 +8840,10 @@ function renderCityMapMVP(){
       <section class="city-location-modal" id="cityMapPeople" hidden aria-modal="true" role="dialog" aria-labelledby="cityMapPlaceTitle">
       <button class="city-location-backdrop" type="button" data-action="city-close" aria-label="關閉地點資訊"></button>
       <div class="city-location-glass">
-        <header class="city-location-header">
+        <div class="city-location-header" role="group" aria-label="場景標題列">
           <div class="city-location-title-row"><span class="city-location-scene-icon city-location-title-icon" id="cityMapPlaceIcon" aria-hidden="true">☕</span><h2 id="cityMapPlaceTitle">咖啡廳</h2><span class="city-location-open-inline"><i></i><span>營業中</span></span></div>
-          <button type="button" class="city-location-close" data-action="city-close" aria-label="關閉">×</button>
-        </header>
+          <button type="button" class="city-location-close" data-action="city-close" aria-label="關閉場景視窗">×</button>
+        </div>
         <div class="city-location-rule"></div>
         <div class="city-location-section-title">當前角色 <span id="cityMapPeopleCount">依公開角色排程顯示</span></div>
         <div class="city-location-avatar-strip" id="cityMapAvatarStrip" aria-label="目前在場角色"><p class="city-location-empty">目前尚無符合此地點與台灣時間的公開角色排程。</p></div>
@@ -8862,7 +8862,6 @@ function renderCityMapMVP(){
             <span class="city-character-page-dots"><i class="active"></i><i></i></span>
             <button type="button" class="city-character-page-button" data-action="city-character-next" aria-label="下一頁">›</button>
           </div>
-          <button type="button" class="city-character-meet primary" data-action="city-character-meet">與他相遇</button>
         </section>
       </div>
     </section>
@@ -9015,41 +9014,41 @@ function renderCityMapMVP(){
     const name=cityPlaceNames[place]||'地點';
     const scene=cityVenueScenes[place];
     if(!scene){console.error('城市地標缺少專屬場景設定：',place);toast('這個地點的場景資料尚未完成，請稍後再試。');return;}
-    // Fictional in-world city notices are intentionally sampled on each opening;
-    // they are not claims about real stock, purchases, or live advertising inventory.
-    const venueNews={
-      bookstore:['📣 本週暢銷書排行已經更新。','📣 本週六下午兩點將舉辦作家簽售會。'],
-      cafe:['📣 本日限定甜點已上架，適合搭配店內手沖咖啡。','📣 本週末推出季節限定飲品，店內座位照常開放。'],
-      park:['📣 本週末草地旁將舉辦小型手作市集。','📣 傍晚時段適合散步，中央步道照明已開啟。'],
-      'department-store':['📣 本週末中庭將舉辦季節主題展。','📣 美食樓層本週新增多家期間限定餐飲櫃位。'],
-      airport:['📣 大廳服務櫃檯今日提供旅遊諮詢。','📣 候機區新增安靜休息座位指引。'],
-      commercial:['📣 本週共享會議室開放預約。','📣 一樓大廳本週推出午間快閃展。'],
-      'night-bar':['📣 今晚有現場 DJ 音樂時段。','📣 本週末吧台區安排主題音樂夜。'],
-      'live-house':['📣 本週演出時刻表已更新。','📣 週六晚間將舉辦新團專場演出。'],
-      apartment:['📣 公寓公共交誼區本週進行佈置更新。','📣 本週六下午將舉辦住戶交換市集。']
+    const venueNotices={
+      bookstore:{label:'最新消息',items:['本週暢銷書排行已經更新。','本週六下午兩點將舉辦作家簽售會。']},
+      cafe:{label:'最新消息',items:['本日限定甜點已上架，適合搭配店內手沖咖啡。','本週末推出季節限定飲品。']},
+      park:{label:'最新消息',items:['本週末草地旁將舉辦小型手作市集。','傍晚時段適合散步，中央步道照明已開啟。']},
+      'department-store':{label:'最新消息',items:['10 樓櫃位調整中，造成不便敬請見諒。','地下美食街有多樣美食，用餐期間歡迎前往用餐。','本週末中庭將舉辦季節主題展。']},
+      airport:{label:'最新消息',items:['大廳服務櫃檯今日提供旅遊諮詢。','候機區新增安靜休息座位指引。']},
+      commercial:{label:'管理室公告',items:['如有裝潢需求，請向管理處提出申請。','各辦公室包裹請寄件人填寫好收件單位。','廁所內的公用物品請愛惜使用。']},
+      'night-bar':{label:'最新消息',items:['今晚有現場 DJ 音樂時段。','本週末吧台區安排主題音樂夜。']},
+      'live-house':{label:'最新消息',items:['本週演出時刻表已更新。','週六晚間將舉辦新團專場演出。']},
+      apartment:{label:'管委會公告',items:['公寓公共交誼區本週進行佈置更新。','公共區域請保持整潔，訪客請由住戶陪同進出。','本週六下午將舉辦住戶交換市集。']}
     };
-    const eventItems=venueNews[place]||['📣 這個場景有新的城市消息。'];
-    const eventMarkup=eventItems.map(item=>'<p>'+escapeHTML(item)+'</p>').join('');
-    // Each landmark must resolve to its own authored scene. Never silently fall back
-    // to a generic pin/location panel when an ID is missing or mismatched.
+    const notice=venueNotices[place]||{label:'最新消息',items:['這個場景有新的城市消息。']};
+    const eventMarkup=notice.items.slice(0,3).map(item=>'<p>📣 '+escapeHTML(item)+'</p>').join('');
+    const flightMarkup=place==='airport'
+      ? '<div class="city-location-news city-flight-section"><span class="city-location-event-label">今日航班</span><p class="small">模擬航班時刻表</p><table class="city-flight-table"><thead><tr><th>時間</th><th>航班</th><th>目的地</th><th>狀態</th></tr></thead><tbody><tr><td>09:20</td><td>PZ102</td><td>東京</td><td>準時</td></tr><tr><td>13:45</td><td>PZ238</td><td>首爾</td><td>登機中</td></tr><tr><td>18:10</td><td>PZ516</td><td>台北</td><td>預計抵達</td></tr></tbody></table><p class="city-flight-note">以上為虛構示意資料，非真實航班資訊。</p></div>'
+      : '';
     locationModal.dataset.scene=place;
     locationModal.dataset.place=place;
-    locationModal.dataset.side='center';
+    locationModal.dataset.selectedPersonIndex='';
+    locationModal.dataset.cardMode='status';
     const characterCard=$('cityCharacterCard');
     if(characterCard)characterCard.hidden=true;
     const venueInfo=$('cityMapPresenceList');
     if(venueInfo)venueInfo.hidden=false;
-    locationModal.dataset.selectedPersonIndex='';
-    // Render the place-specific scene before reading optional schedule data so a
-    // missing/malformed schedule can never leave the generic placeholder visible.
-    $('cityMapPlaceTitle').textContent=name;
+    const title=$('cityMapPlaceTitle');
+    if(title){title.textContent=name;title.style.display='block';title.style.visibility='visible';}
     const placeIcon=$('cityMapPlaceIcon');
     if(placeIcon)placeIcon.textContent=scene.icon;
-    $('cityMapPresenceList').innerHTML='<h3>'+escapeHTML(scene.heading)+'</h3><p>'+escapeHTML(scene.description)+'</p><div class="city-location-news"><span class="city-location-event-label">最新消息</span><div class="city-location-news-items">'+eventMarkup+'</div></div>';
+    const renderVenue=()=>{
+      const target=$('cityMapPresenceList');
+      if(target)target.innerHTML='<h3 id="cityMapVenueHeading">'+escapeHTML(scene.heading)+'</h3><p id="cityMapVenueDescription">'+escapeHTML(scene.description)+'</p><div class="city-location-news"><span class="city-location-event-label">'+escapeHTML(notice.label)+'</span><div class="city-location-news-items">'+eventMarkup+'</div></div>'+flightMarkup;
+    };
+    renderVenue();
     let people=[];
     try{
-      // Load persisted public schedules before filtering this location. The resolver enforces
-      // publication, review, rights and NSFW eligibility; character coordinates/UI stay untouched.
       await Promise.all((Array.isArray(state.characters)?state.characters:[])
         .filter(character=>character?.visibility==='public'&&!character.deletedAt)
         .map(hydrateCitySchedule));
@@ -9069,17 +9068,19 @@ function renderCityMapMVP(){
           return '<button type="button" class="city-location-avatar city-location-person" data-action="city-person" data-person-index="'+index+'" aria-label="查看 '+escapeHTML(characterName)+' 的角色資訊">'+portrait+'<span class="city-location-person-name">'+escapeHTML(characterName)+'</span></button>';
         }).join('')
       : '<p class="city-location-empty">目前沒有角色排定在這個地點。角色日程符合台灣時間時，才會顯示在這裡。</p>';
-    $('cityMapPresenceList').innerHTML='<h3>'+escapeHTML(scene.heading)+'</h3><p>'+escapeHTML(scene.description)+'</p><div class="city-location-news"><span class="city-location-event-label">最新消息</span><div class="city-location-news-items">'+eventMarkup+'</div></div>';
+    renderVenue();
     locationModal.hidden=false;
     document.body.classList.add('city-location-active');
   };
-  const renderCityCharacterCard=(person,page=0)=>{
+  const renderCityCharacterCard=(person,page=0,mode='status')=>{
     const card=$('cityCharacterCard'),body=$('cityCharacterCardBody');
     if(!card||!body||!person)return;
     card.hidden=false;
     const venueInfo=$('cityMapPresenceList');
     if(venueInfo)venueInfo.hidden=true;
     card.dataset.page=String(page);
+    card.dataset.mode=mode;
+    locationModal.dataset.cardMode=mode;
     locationModal.dataset.selectedPersonIndex=String((cityPresenceByPlace[locationModal.dataset.place]||[]).findIndex(item=>item.id===person.id));
     const image=safeImage(person.image||person.avatar_url||person.avatar);
     const portrait=image
@@ -9090,16 +9091,39 @@ function renderCityMapMVP(){
     const age=escapeHTML(person.age?String(person.age)+' 歲':'未設定');
     const activity=escapeHTML(person.cityActivity||'在這個場景中度過自己的時間');
     const timeRange=person.cityStartTime&&person.cityEndTime?escapeHTML(person.cityStartTime+'–'+person.cityEndTime):'時間未設定';
-    const placeName=escapeHTML(cityPlaceNames[locationModal.dataset.place]||'城市地點');
+    const placeKey=locationModal.dataset.place;
+    const placeName=escapeHTML(cityPlaceNames[placeKey]||'城市地點');
     const intro=String(person.intro||person.description||person.personalityProfile?.summary||'這位角色尚未填寫公開介紹。');
-    $('cityCharacterPageLabel').textContent=page===0?'角色狀態 · 01 / 02':'角色介紹 · 02 / 02';
-    const dots=card.querySelectorAll('.city-character-page-dots i');
-    dots.forEach((dot,index)=>dot.classList.toggle('active',index===page));
-    if(page===0){
-      body.innerHTML=portrait+'<div class="city-character-copy"><h3>'+name+'</h3><div class="city-character-meta"><span>'+gender+'</span><span>'+age+'</span></div><p><strong>當前行程</strong><br>'+timeRange+'<br>'+placeName+'</p><p><strong>心情</strong><br>'+escapeHTML(person.cityMood||person.mood||'平靜')+'</p><p><strong>現在狀態</strong><br>'+activity+'</p></div>';
+    const sessions=Object.values(state.sessions||{}).filter(session=>session?.encounterMode&&session.characterId===person.id&&!session.archived)
+      .sort((a,b)=>(Number(b.startedAt)||0)-(Number(a.startedAt)||0));
+    const bookmarks='<div class="city-character-bookmarks" aria-label="角色功能"><button type="button" class="city-character-bookmark '+(mode==='history'?'active':'')+'" data-action="city-character-history" aria-label="相遇紀錄">相遇紀錄</button><button type="button" class="city-character-bookmark '+(mode==='story'?'active':'')+'" data-action="city-character-story" aria-label="故事模式">故事模式</button></div>';
+    const left='<div class="city-character-photo-column">'+portrait+'<button type="button" class="city-character-meet primary" data-action="city-character-meet">與他相遇</button></div>';
+    let copy='';
+    if(mode==='history'){
+      const records=sessions.length?sessions.map(session=>{
+        const when=new Date(Number(session.startedAt)||Date.now()).toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'});
+        const venue=cityPlaceNames[session.encounterPlace]||'城市相遇';
+        const lastUser=(session.messages||[]).filter(message=>message.role==='user').at(-1)?.content;
+        const summary=lastUser?'對話片段：'+String(lastUser).slice(0,90):'兩人在'+venue+'相遇，故事仍待續。';
+        return '<article class="city-encounter-history-item"><strong>'+escapeHTML(when)+' · '+escapeHTML(venue)+'</strong><p>'+escapeHTML(summary)+'</p></article>';
+      }).join(''):'<p>目前還沒有已保存的相遇紀錄。完成「與他相遇」對話後，紀錄會顯示在這裡。</p>';
+      copy='<div class="city-character-copy"><h3>'+name+'｜過往相遇</h3><div class="city-encounter-history-list">'+records+'</div></div>';
+      $('cityCharacterPageLabel').textContent='相遇紀錄';
+    }else if(mode==='story'){
+      copy='<div class="city-character-copy"><h3>'+name+'｜故事模式</h3><div class="city-character-meta"><span>'+gender+'</span><span>'+age+'</span></div><p>'+escapeHTML(intro)+'</p><p class="muted">故事模式會沿用傳統角色聊天，不會建立城市相遇場景。</p><button type="button" class="city-character-story-cta primary" data-action="city-character-open-story">開啟故事模式對話</button></div>';
+      $('cityCharacterPageLabel').textContent='故事模式';
+    }else if(page===0){
+      copy='<div class="city-character-copy"><h3>'+name+'</h3><div class="city-character-meta"><span>'+gender+'</span><span>'+age+'</span></div><p><strong>當前行程</strong><br>'+timeRange+'<br>'+placeName+'</p><p><strong>心情</strong><br>'+escapeHTML(person.cityMood||person.mood||'平靜')+'</p><p><strong>現在狀態</strong><br>'+activity+'</p></div>';
+      $('cityCharacterPageLabel').textContent='角色狀態 · 01 / 02';
     }else{
-      body.innerHTML=portrait+'<div class="city-character-copy"><h3>'+name+'｜角色介紹</h3><p>'+escapeHTML(intro)+'</p></div>';
+      copy='<div class="city-character-copy"><h3>'+name+'｜角色介紹</h3><p>'+escapeHTML(intro)+'</p></div>';
+      $('cityCharacterPageLabel').textContent='角色介紹 · 02 / 02';
     }
+    body.innerHTML=left+copy+bookmarks;
+    const dots=card.querySelectorAll('.city-character-page-dots i');
+    dots.forEach((dot,index)=>dot.classList.toggle('active',mode==='status'&&index===page));
+    const pageButtons=card.querySelectorAll('.city-character-page-button');
+    pageButtons.forEach(button=>button.disabled=mode!=='status');
   };
   locationModal?.addEventListener('click',async event=>{
     const personButton=event.target.closest('[data-action="city-person"]');
@@ -9117,10 +9141,23 @@ function renderCityMapMVP(){
       locationModal.dataset.selectedPersonIndex='';
       return;
     }
+    if(cardAction==='city-character-history'||cardAction==='city-character-story'){
+      const index=Number(locationModal.dataset.selectedPersonIndex);
+      const person=cityPresenceByPlace[locationModal.dataset.place]?.[index];
+      if(person)renderCityCharacterCard(person,0,cardAction==='city-character-history'?'history':'story');
+      return;
+    }
+    if(cardAction==='city-character-open-story'){
+      const index=Number(locationModal.dataset.selectedPersonIndex);
+      const person=cityPresenceByPlace[locationModal.dataset.place]?.[index];
+      if(!person||!accessible(person)){toast('此角色目前無法開啟故事模式。');return;}
+      startChat(person.id);
+      return;
+    }
     if(cardAction==='city-character-prev'||cardAction==='city-character-next'){
       const index=Number(locationModal.dataset.selectedPersonIndex);
       const person=cityPresenceByPlace[locationModal.dataset.place]?.[index];
-      if(person)renderCityCharacterCard(person,cardAction==='city-character-next'?1:0);
+      if(person)renderCityCharacterCard(person,cardAction==='city-character-next'?1:0,'status');
       return;
     }
     if(cardAction==='city-character-meet'){
@@ -9783,6 +9820,33 @@ document.addEventListener('submit',function(event){
 .city-character-copy{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-right:3px}
 .city-character-portrait{flex:0 0 118px}
 .city-location-header{position:static;height:auto;min-height:40px;padding:0;display:flex;align-items:center;justify-content:space-between;gap:12px;background:transparent;border:0;backdrop-filter:none}
+.city-location-header{flex:0 0 auto;width:100%;position:relative;z-index:2;visibility:visible}
+.city-location-title-row{flex:1 1 auto;min-width:0;flex-wrap:nowrap;overflow:visible}
+.city-location-title-row h2{display:block!important;visibility:visible!important;opacity:1!important;color:#fff!important;min-width:0;overflow-wrap:anywhere}
+.city-location-title-icon{display:grid;place-items:center;flex:0 0 32px}
+.city-location-close{flex:0 0 38px;position:relative;z-index:3}
+.city-character-card-body{display:grid;grid-template-columns:104px minmax(0,1fr) 34px;gap:10px;align-items:stretch;min-height:0}
+.city-character-layout{display:contents}
+.city-character-photo-column{display:flex;flex-direction:column;gap:9px;min-width:0}
+.city-character-photo-column .city-character-portrait{width:100%;height:136px;min-height:0;flex:0 0 136px;border:0;border-radius:13px;object-fit:cover;background:transparent}
+.city-character-meet{width:100%;padding:9px 5px;font-size:11px;line-height:1.35;white-space:normal;border-radius:10px;min-height:42px}
+.city-character-copy{min-width:0;overflow-y:auto;overscroll-behavior:contain;padding:0 3px 0 0}
+.city-character-bookmarks{display:flex;flex-direction:column;gap:7px;align-items:stretch;justify-content:flex-start}
+.city-character-bookmark{width:34px;min-height:84px;padding:7px 4px;display:flex;align-items:center;justify-content:center;white-space:pre-line;writing-mode:vertical-rl;text-orientation:upright;letter-spacing:.1em;font-size:11px;line-height:1.15;border-radius:10px;background:rgba(24,29,42,.26);border:1px solid rgba(255,255,255,.24);color:#fff}
+.city-character-bookmark.active{background:rgba(245,246,250,.24);border-color:rgba(255,255,255,.58);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.city-character-card-footer{flex:0 0 auto;margin-top:8px;justify-content:center}
+.city-character-page-button{width:34px;height:30px;padding:0;display:grid;place-items:center}
+.city-character-page-dots{min-width:30px;text-align:center}
+.city-character-story-cta{margin-top:10px;width:100%;font-size:12px}
+.city-encounter-history-list{display:grid;gap:9px}
+.city-encounter-history-item{padding:10px;border:1px solid rgba(255,255,255,.17);border-radius:11px;background:rgba(18,22,32,.18)}
+.city-encounter-history-item strong{display:block;font-size:11px;margin-bottom:4px}
+.city-encounter-history-item p{margin:0;font-size:11px;line-height:1.6}
+.city-flight-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:9px}
+.city-flight-table th,.city-flight-table td{padding:7px 5px;text-align:left;border-bottom:1px solid rgba(255,255,255,.18);white-space:nowrap}
+.city-flight-note{font-size:10px!important;opacity:.8;margin-top:7px!important}
+@media(max-width:600px){.city-location-title-row{gap:7px}.city-location-title-row h2{font-size:18px;white-space:nowrap}.city-location-open-inline{font-size:10px;gap:4px}.city-location-close{width:34px;height:34px;flex-basis:34px}.city-character-card-body{grid-template-columns:88px minmax(0,1fr) 31px;gap:7px}.city-character-photo-column .city-character-portrait{height:118px;flex-basis:118px}.city-character-meet{font-size:10px;padding:8px 3px}.city-character-bookmark{width:31px;min-height:76px;font-size:10px}.city-flight-table th,.city-flight-table td{padding:6px 3px;font-size:10px}}
+
 .city-location-title-row{display:flex;align-items:center;gap:9px;min-width:0;flex-wrap:wrap}
 .city-location-title-row h2{font-size:21px;letter-spacing:.02em;margin:0;font-weight:650}
 .city-location-title-icon{width:32px;height:32px;flex:0 0 32px;margin:0;border-radius:10px;font-size:17px}
