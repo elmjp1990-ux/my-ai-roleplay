@@ -9638,16 +9638,16 @@ document.addEventListener('submit',function(event){
 <style id="poyozz-city-location-panel">
 .city-location-modal[hidden]{display:none!important}
 .city-location-modal{position:fixed;inset:0;z-index:120;display:grid;place-items:center;padding:22px;isolation:isolate}
-/* Distinct scene atmosphere per landmark; data-scene is assigned from the stable place ID. */
-.city-location-modal[data-scene="airport"] .city-location-glass{background:linear-gradient(135deg,rgba(54,104,139,.88),rgba(95,130,160,.72),rgba(202,218,226,.48))}
-.city-location-modal[data-scene="commercial"] .city-location-glass{background:linear-gradient(135deg,rgba(37,57,83,.92),rgba(72,94,121,.78),rgba(145,162,184,.48))}
-.city-location-modal[data-scene="night-bar"] .city-location-glass{background:linear-gradient(135deg,rgba(64,36,91,.94),rgba(119,53,104,.78),rgba(34,37,66,.78))}
-.city-location-modal[data-scene="live-house"] .city-location-glass{background:linear-gradient(135deg,rgba(91,34,65,.94),rgba(142,54,78,.82),rgba(50,39,78,.78))}
-.city-location-modal[data-scene="apartment"] .city-location-glass{background:linear-gradient(135deg,rgba(87,75,69,.92),rgba(130,111,96,.76),rgba(195,171,146,.48))}
-.city-location-modal[data-scene="department-store"] .city-location-glass{background:linear-gradient(135deg,rgba(109,72,93,.92),rgba(157,108,133,.76),rgba(222,190,198,.48))}
-.city-location-modal[data-scene="bookstore"] .city-location-glass{background:linear-gradient(135deg,rgba(67,75,59,.94),rgba(113,125,91,.78),rgba(191,178,137,.48))}
-.city-location-modal[data-scene="cafe"] .city-location-glass{background:linear-gradient(135deg,rgba(111,74,58,.92),rgba(162,117,89,.76),rgba(231,198,159,.50))}
-.city-location-modal[data-scene="park"] .city-location-glass{background:linear-gradient(135deg,rgba(37,91,72,.92),rgba(75,132,103,.76),rgba(182,210,163,.48))}
+/* Keep every landmark on the same neutral translucent-gray glass system as the bottom dock.
+   Scene identity comes from its title, copy, schedule and scene content—not tinted modal skins. */
+.city-location-modal[data-scene] .city-location-glass{
+ background:linear-gradient(135deg,rgba(231,233,239,.24),rgba(141,149,167,.22) 52%,rgba(205,209,218,.20))!important;
+ border:1px solid rgba(255,255,255,.28);
+ box-shadow:0 18px 52px rgba(8,11,18,.22),inset 0 1px rgba(255,255,255,.22);
+ color:#f7f8fc;
+ backdrop-filter:blur(24px) saturate(120%);
+ -webkit-backdrop-filter:blur(24px) saturate(120%);
+}
 .city-location-backdrop{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:0;padding:0;background:rgba(5,8,18,.52);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
 .city-location-glass{position:relative;z-index:1;width:min(540px,100%);max-height:min(760px,calc(100dvh - 36px));overflow:auto;overscroll-behavior:contain;border:1px solid rgba(255,255,255,.48);border-radius:26px;padding:22px;background:linear-gradient(135deg,rgba(151,157,173,.43),rgba(105,113,132,.34) 48%,rgba(180,157,193,.30));color:#fff;box-shadow:0 28px 90px rgba(0,0,0,.24),inset 0 1px rgba(255,255,255,.42),inset 0 -1px rgba(255,255,255,.10),0 0 42px rgba(216,203,255,.16);backdrop-filter:blur(32px) saturate(165%);-webkit-backdrop-filter:blur(32px) saturate(165%)}
 .city-location-header{position:static;height:auto;padding:0;display:flex;align-items:center;justify-content:space-between;gap:14px;background:transparent;border:0;backdrop-filter:none}
