@@ -9967,7 +9967,7 @@ document.addEventListener('submit',function(event){
       for(let i=0;i<paragraph.length;i++){
         if(!/[。！？!?]/u.test(paragraph[i]))continue;
         let end=i+1;
-        while(end<paragraph.length&&/[」』”’\"）)】]/u.test(paragraph[end]))end++;
+        while(end<paragraph.length&&/[」』”’"）)】]/u.test(paragraph[end]))end++;
         const next=paragraph.slice(start,end).trim();
         if(next)beats.push(next);
         start=end;
