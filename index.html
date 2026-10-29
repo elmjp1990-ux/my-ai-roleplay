@@ -2478,6 +2478,7 @@ let banner = 0;
 let draftCharacter = null;
 let draftTags = [];
 let draftImage = '';
+let draftIllustrations = [];
 let draftVideoFile = null;
 let draftVideoPath = '';
 let draftVideoPreviewUrl = '';
@@ -3987,6 +3988,7 @@ function saveEditorDraft() {
     tags:[...draftTags],
     image:draftImage,
     avatarVideoPath:draftVideoPath,
+    illustrations:draftIllustrations.slice(0,4),
     savedAt:Date.now()
   };
   const serialized = JSON.stringify(draft);
@@ -3997,6 +3999,7 @@ function saveEditorDraft() {
     // If the image exceeds storage quota, preserve all text fields and tags.
     try {
       delete draft.image;
+      delete draft.illustrations;
       const textOnly = JSON.stringify(draft);
       localStorage.setItem(key, textOnly);
       try { sessionStorage.setItem(key, textOnly); } catch (_) {}
@@ -4013,10 +4016,20 @@ function startEditor(c = null) {
   draftCharacter = c ? clone(c) : null;
   draftTags = [...(c?.tags || [])];
   draftImage = c?.image || '';
+  draftIllustrations = [];
   draftVideoFile = null;
   draftVideoPath = c?.avatarVideoPath || '';
   if(draftVideoPreviewUrl){URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl='';}
   visit('editor',c?.id);
+}
+function renderCharacterIllustrationGallery(items = [], selectedImage = '') {
+  if (!Array.isArray(items) || !items.length) return '<p class="small muted">尚未加入立繪測試圖片。</p>';
+  return '<div class="character-illustration-grid">' + items.slice(0,4).map((src,index) =>
+    '<button type="button" class="character-illustration-option' + (src === selectedImage ? ' is-selected' : '') + '" data-character-illustration-index="' + index + '">' +
+      '<img src="' + e(safeImage(src)) + '" alt="立繪測試圖片 ' + (index+1) + '">' +
+      '<span>' + (src === selectedImage ? '目前主圖' : '設為主圖') + '</span>' +
+    '</button>'
+  ).join('') + '</div>';
 }
 function renderEditor() {
   const savedDraft = readEditorDraft();
@@ -4025,6 +4038,7 @@ function renderEditor() {
   if (savedDraft) {
     draftTags = Array.isArray(savedDraft.tags) ? [...savedDraft.tags] : draftTags;
     draftImage = savedDraft.image || draftImage || '';
+    draftIllustrations = Array.isArray(savedDraft.illustrations) ? savedDraft.illustrations.slice(0,4) : draftIllustrations;
     draftVideoPath = savedDraft.avatarVideoPath || draftVideoPath || '';
   }
   if (!draftCharacter && route.id) {
@@ -4051,6 +4065,11 @@ function renderEditor() {
         <img id="imagePreview" ${draftImage ? `src="${e(safeImage(draftImage))}"` : ''}
              class="${draftImage && !draftVideoPath ? '' : 'hidden'}"
              alt="角色頭像或影片封面預覽" style="width:120px;height:150px;object-fit:cover;border-radius:13px;margin-bottom:10px">
+        <label class="field"><span>立繪測試圖片（可一次選擇多張）</span>
+          <input id="characterIllustrations" type="file" accept="image/png,image/jpeg,image/webp" multiple>
+          <small>最多 4 張 PNG、JPG 或 WebP，每張上限 15 MB。圖片只用於目前編輯器的立繪比較；點選縮圖可將該張設為角色主圖，再儲存角色測試。此測試欄不會把多張圖公開給其他使用者。</small>
+        </label>
+        <div id="characterIllustrationGallery" class="character-illustration-gallery">${renderCharacterIllustrationGallery(draftIllustrations, draftImage)}</div>
         <video id="characterVideoPreview" class="${draftVideoPath ? '' : 'hidden'}" controls muted playsinline style="width:180px;max-height:240px;object-fit:contain;border-radius:13px;margin-bottom:18px;background:#000"></video>
         <label class="field"><span>角色名字 *</span>
           <input name="name" required maxlength="25" value="${e(c.name || '')}">
@@ -8702,6 +8721,24 @@ document.addEventListener('keydown',event => {
   if(event.target.id==='groupMessageInput') void groupSendMock();
   else event.target.form?.requestSubmit();
 });
+document.addEventListener('click',function(event){
+  const option=event.target.closest('[data-character-illustration-index]');
+  if(!option)return;
+  const index=Number(option.dataset.characterIllustrationIndex);
+  if(!Number.isInteger(index)||!draftIllustrations[index])return;
+  draftImage=draftIllustrations[index];
+  draftVideoFile=null;
+  draftVideoPath='';
+  if(draftVideoPreviewUrl){URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl='';}
+  const imagePreview=$('imagePreview');
+  if(imagePreview){imagePreview.src=draftImage;imagePreview.classList.remove('hidden');}
+  const videoPreview=$('characterVideoPreview');
+  if(videoPreview){videoPreview.removeAttribute('src');videoPreview.classList.add('hidden');}
+  const gallery=$('characterIllustrationGallery');
+  if(gallery)gallery.innerHTML=renderCharacterIllustrationGallery(draftIllustrations,draftImage);
+  saveEditorDraft();
+  toast('已切換角色主圖；儲存角色後即可測試這張立繪。');
+});
 document.addEventListener('change',async event => {
   const target=event.target;
   if (target.closest('form[data-form="character"]')) saveEditorDraft();
@@ -8742,6 +8779,27 @@ document.addEventListener('change',async event => {
         }
       }catch(error){if(requestId!==characterImageCompressionRequest)return;target.value='';throw error;}
       finally{if(requestId===characterImageCompressionRequest)isCompressingCharacterImage=false;}
+    }
+    if(target.id==='characterIllustrations'){
+      const files=Array.from(target.files||[]);
+      if(!files.length)return;
+      if(files.length>4){target.value='';throw new Error('立繪測試最多一次選擇 4 張圖片。');}
+      const supported=['image/png','image/jpeg','image/webp'];
+      for(const file of files){
+        if(file.size>15*1024*1024)throw new Error('每張立繪測試圖片不可超過 15 MB。');
+        if(!supported.includes(file.type))throw new Error('立繪測試圖片僅支援 PNG、JPG 或 WebP。');
+      }
+      toast('正在處理立繪測試圖片…');
+      const next=[];
+      for(const file of files){
+        const compressed=await compressUploadImage(file,{maxEdge:1600,targetBytes:350*1024});
+        next.push(compressed.dataUrl);
+      }
+      draftIllustrations=next;
+      const gallery=$('characterIllustrationGallery');
+      if(gallery)gallery.innerHTML=renderCharacterIllustrationGallery(draftIllustrations,draftImage);
+      saveEditorDraft();
+      toast('已載入 '+next.length+' 張立繪，點選縮圖即可切換角色主圖。');
     }
     if (target.id==='profileImage') {
       if (!target.files?.[0]) return;
@@ -9816,6 +9874,15 @@ document.addEventListener('submit',function(event){
 </script>
 
 
+<style id="character-illustration-upload-test">
+.character-illustration-gallery{margin:8px 0 16px}
+.character-illustration-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.character-illustration-option{display:flex;flex-direction:column;gap:6px;min-width:0;padding:7px;border:1px solid var(--border);border-radius:12px;background:var(--panel);color:var(--text);cursor:pointer}
+.character-illustration-option img{display:block;width:100%;aspect-ratio:3/4;object-fit:contain;border-radius:7px;background:rgba(0,0,0,.04)}
+.character-illustration-option span{font-size:12px;text-align:center}
+.character-illustration-option.is-selected{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 22%,transparent)}
+@media(max-width:520px){.character-illustration-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
 <style id="poyozz-ui-172-send-state">
 .composer-send[disabled]{opacity:1;cursor:progress;background:var(--panel2);color:var(--text);border-color:var(--border)}
 .composer-send[disabled] span[aria-hidden="true"],.composer-send.is-sending span[aria-hidden="true"]{font-size:17px;line-height:1}
