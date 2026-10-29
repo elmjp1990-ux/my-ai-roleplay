@@ -8841,10 +8841,9 @@ function renderCityMapMVP(){
       <button class="city-location-backdrop" type="button" data-action="city-close" aria-label="關閉地點資訊"></button>
       <div class="city-location-glass">
         <header class="city-location-header">
-          <div><div class="city-location-eyebrow">POYOZZ CITY · LOCATION</div><h2 id="cityMapPlaceTitle">咖啡廳</h2></div>
+          <div class="city-location-title-row"><span class="city-location-scene-icon city-location-title-icon" id="cityMapPlaceIcon" aria-hidden="true">☕</span><h2 id="cityMapPlaceTitle">咖啡廳</h2><span class="city-location-open-inline"><i></i><span>營業中</span></span></div>
           <button type="button" class="city-location-close" data-action="city-close" aria-label="關閉">×</button>
         </header>
-        <div class="city-location-open"><span class="city-location-status-dot"></span><span id="cityMapOpenStatus">地點場景資訊</span><span class="city-location-status-note">營業時間未提供</span></div>
         <div class="city-location-rule"></div>
         <div class="city-location-section-title">當前角色 <span id="cityMapPeopleCount">依公開角色排程顯示</span></div>
         <div class="city-location-avatar-strip" id="cityMapAvatarStrip" aria-label="目前在場角色"><p class="city-location-empty">目前尚無符合此地點與台灣時間的公開角色排程。</p></div>
@@ -8853,7 +8852,7 @@ function renderCityMapMVP(){
           <div class="city-location-scene-icon" aria-hidden="true">📍</div>
           <h3 id="cityMapVenueHeading">選擇地點以查看場景</h3>
           <p id="cityMapVenueDescription">點選地圖上的地點後，這裡會顯示對應的場景介紹。</p>
-          <div class="city-location-event"><span class="city-location-event-label">場景亮點</span><strong>等待選擇地點</strong><p>每個地點都有自己的場景與故事亮點。</p></div>
+          <div class="city-location-news" id="cityMapVenueNews"><span class="city-location-event-label">最新消息</span><div class="city-location-news-items"><p>📣 查看這個場景的最新消息。</p></div></div>
         </div>
         <section class="city-character-card" id="cityCharacterCard" hidden aria-live="polite">
           <div class="city-character-card-head"><span class="city-character-page-label" id="cityCharacterPageLabel">角色狀態 · 01 / 02</span><button type="button" class="city-character-card-close" data-action="city-character-close" aria-label="返回場地資訊">×</button></div>
@@ -9018,23 +9017,24 @@ function renderCityMapMVP(){
     if(!scene){console.error('城市地標缺少專屬場景設定：',place);toast('這個地點的場景資料尚未完成，請稍後再試。');return;}
     // Fictional in-world city notices are intentionally sampled on each opening;
     // they are not claims about real stock, purchases, or live advertising inventory.
-    const promotions={
-      cafe:[{title:'新口味草莓塔限量登場',description:'甜點櫃今天多了一款草莓塔，適合當作開啟話題的小驚喜。'}],
-      bookstore:[{title:'本週選書角',description:'書店把幾本值得慢慢讀的作品放到靠窗展示架。'}],
-      park:[{title:'午後野餐時光',description:'草地一角很適合停下腳步，享受一段悠閒的午後。'}],
-      'department-store':[{title:'週末櫥窗新展示',description:'中庭附近換上了新的季節主題佈置。'}]
+    const venueNews={
+      bookstore:['📣 本週暢銷書排行已經更新。','📣 本週六下午兩點將舉辦作家簽售會。'],
+      cafe:['📣 本日限定甜點已上架，適合搭配店內手沖咖啡。','📣 本週末推出季節限定飲品，店內座位照常開放。'],
+      park:['📣 本週末草地旁將舉辦小型手作市集。','📣 傍晚時段適合散步，中央步道照明已開啟。'],
+      'department-store':['📣 本週末中庭將舉辦季節主題展。','📣 美食樓層本週新增多家期間限定餐飲櫃位。'],
+      airport:['📣 大廳服務櫃檯今日提供旅遊諮詢。','📣 候機區新增安靜休息座位指引。'],
+      commercial:['📣 本週共享會議室開放預約。','📣 一樓大廳本週推出午間快閃展。'],
+      'night-bar':['📣 今晚有現場 DJ 音樂時段。','📣 本週末吧台區安排主題音樂夜。'],
+      'live-house':['📣 本週演出時刻表已更新。','📣 週六晚間將舉辦新團專場演出。'],
+      apartment:['📣 公寓公共交誼區本週進行佈置更新。','📣 本週六下午將舉辦住戶交換市集。']
     };
-    const promotionList=promotions[place]||[];
-    const promotion=promotionList.length&&Math.random()<0.3?promotionList[Math.floor(Math.random()*promotionList.length)]:null;
-    const eventLabel=promotion?'城市小消息':scene.eventLabel;
-    const eventTitle=promotion?promotion.title:scene.eventTitle;
-    const eventDescription=promotion?promotion.description:scene.eventDescription;
+    const eventItems=venueNews[place]||['📣 這個場景有新的城市消息。'];
+    const eventMarkup=eventItems.map(item=>'<p>'+escapeHTML(item)+'</p>').join('');
     // Each landmark must resolve to its own authored scene. Never silently fall back
     // to a generic pin/location panel when an ID is missing or mismatched.
     locationModal.dataset.scene=place;
     locationModal.dataset.place=place;
-    const markerRect=marker.getBoundingClientRect();
-    locationModal.dataset.side=markerRect.left+markerRect.width/2>window.innerWidth/2?'right':'left';
+    locationModal.dataset.side='center';
     const characterCard=$('cityCharacterCard');
     if(characterCard)characterCard.hidden=true;
     const venueInfo=$('cityMapPresenceList');
@@ -9046,9 +9046,9 @@ function renderCityMapMVP(){
     $('cityMapOpenStatus').textContent='場景開放中';
     const statusNote=locationModal.querySelector('.city-location-status-note');
     if(statusNote)statusNote.textContent='城市探索地點';
-    const statusDot=locationModal.querySelector('.city-location-status-dot');
-    if(statusDot)statusDot.style.background='#4ade80';
-    $('cityMapPresenceList').innerHTML='<div class="city-location-scene-icon" aria-hidden="true">'+scene.icon+'</div><h3>'+escapeHTML(scene.heading)+'</h3><p>'+escapeHTML(scene.description)+'</p><div class="city-location-event"><span class="city-location-event-label">'+escapeHTML(eventLabel)+'</span><strong>'+escapeHTML(eventTitle)+'</strong><p>'+escapeHTML(eventDescription)+'</p></div>';
+    const placeIcon=$('cityMapPlaceIcon');
+    if(placeIcon)placeIcon.textContent=scene.icon;
+    $('cityMapPresenceList').innerHTML='<h3>'+escapeHTML(scene.heading)+'</h3><p>'+escapeHTML(scene.description)+'</p><div class="city-location-news"><span class="city-location-event-label">最新消息</span><div class="city-location-news-items">'+eventMarkup+'</div></div>';
     let people=[];
     try{
       // Load persisted public schedules before filtering this location. The resolver enforces
@@ -9072,7 +9072,7 @@ function renderCityMapMVP(){
           return '<button type="button" class="city-location-avatar city-location-person" data-action="city-person" data-person-index="'+index+'" aria-label="查看 '+escapeHTML(characterName)+' 的角色資訊">'+portrait+'<span class="city-location-person-name">'+escapeHTML(characterName)+'</span></button>';
         }).join('')
       : '<p class="city-location-empty">目前沒有角色排定在這個地點。角色日程符合台灣時間時，才會顯示在這裡。</p>';
-    $('cityMapPresenceList').innerHTML='<div class="city-location-scene-icon" aria-hidden="true">'+scene.icon+'</div><h3>'+escapeHTML(scene.heading)+'</h3><p>'+escapeHTML(scene.description)+'</p><div class="city-location-event"><span class="city-location-event-label">'+escapeHTML(scene.eventLabel)+'</span><strong>'+escapeHTML(scene.eventTitle)+'</strong><p>'+escapeHTML(scene.eventDescription)+'</p></div>';
+    $('cityMapPresenceList').innerHTML='<h3>'+escapeHTML(scene.heading)+'</h3><p>'+escapeHTML(scene.description)+'</p><div class="city-location-news"><span class="city-location-event-label">最新消息</span><div class="city-location-news-items">'+eventMarkup+'</div></div>';
     locationModal.hidden=false;
     document.body.classList.add('city-location-active');
   };
@@ -9185,15 +9185,9 @@ function renderCityMapMVP(){
   });
   stage.addEventListener('click',event=>{
     const button=event.target instanceof Element ? event.target.closest('[data-action]') : null;
-    // If SVG hit-testing is suppressed by another global rule, resolve the click
-    // by its coordinates at click-time. Opening now (not pointerdown) avoids the
-    // touch-generated click accidentally activating the modal backdrop.
-    const landmark=(button?.dataset.action==='city-landmark')?button:
-      [...stage.querySelectorAll('[data-action="city-landmark"]')].find(node=>{
-        const r=node.getBoundingClientRect();
-        return event.clientX>=r.left-8&&event.clientX<=r.right+8&&event.clientY>=r.top-8&&event.clientY<=r.bottom+8;
-      });
-    if(landmark){event.preventDefault();event.stopPropagation();openCityLocation(landmark);return;}
+    // Landmark SVG groups have their own activation listener above. Never resolve
+    // nearby coordinates here: that duplicated async open and caused a first-tap flash.
+    if(button?.dataset.action==='city-landmark')return;
     if(!button)return;
     if(button.dataset.action==='city-zoom-in'){event.preventDefault();event.stopPropagation();zoomBy(1.18);return;}
     if(button.dataset.action==='city-zoom-out'){event.preventDefault();event.stopPropagation();zoomBy(.85);return;}
@@ -9783,37 +9777,48 @@ document.addEventListener('submit',function(event){
  -webkit-backdrop-filter:blur(24px) saturate(120%);
 }
 .city-location-backdrop{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:0;padding:0;background:rgba(5,8,18,.52);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
-.city-location-glass{position:relative;z-index:1;width:min(540px,100%);height:auto;max-height:min(760px,calc(100dvh - 36px));overflow:auto;overscroll-behavior:contain;border:1px solid rgba(255,255,255,.30);border-radius:26px;padding:22px;background:linear-gradient(135deg,rgba(231,233,239,.24),rgba(141,149,167,.22) 52%,rgba(205,209,218,.20));color:#f7f8fc;box-shadow:0 18px 52px rgba(8,11,18,.22),inset 0 1px rgba(255,255,255,.22);backdrop-filter:blur(24px) saturate(120%);-webkit-backdrop-filter:blur(24px) saturate(120%)}
-.city-location-header{position:static;height:auto;padding:0;display:flex;align-items:center;justify-content:space-between;gap:14px;background:transparent;border:0;backdrop-filter:none}
-.city-location-eyebrow{font-size:9px;letter-spacing:.2em;color:#c5b9ee;margin-bottom:7px}
-.city-location-header h2{font-size:25px;letter-spacing:.02em;margin:0;font-weight:650}
+.city-location-glass{position:relative;z-index:1;display:flex;flex-direction:column;width:min(540px,100%);height:min(660px,calc(100dvh - 36px));min-height:420px;overflow:hidden;overscroll-behavior:contain;border:1px solid rgba(255,255,255,.30);border-radius:26px;padding:20px 22px;background:linear-gradient(135deg,rgba(231,233,239,.24),rgba(141,149,167,.22) 52%,rgba(205,209,218,.20));color:#f7f8fc;box-shadow:0 18px 52px rgba(8,11,18,.22),inset 0 1px rgba(255,255,255,.22);backdrop-filter:blur(24px) saturate(120%);-webkit-backdrop-filter:blur(24px) saturate(120%)}
+.city-location-glass>.city-location-rule{flex:0 0 1px}
+.city-location-avatar-strip{flex:0 0 auto}
+.city-character-card{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:hidden}
+.city-character-card[hidden]{display:none!important}
+.city-character-card-body{flex:1 1 auto;min-height:0;overflow:hidden}
+.city-character-copy{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-right:3px}
+.city-character-portrait{flex:0 0 118px}
+.city-location-header{position:static;height:auto;min-height:40px;padding:0;display:flex;align-items:center;justify-content:space-between;gap:12px;background:transparent;border:0;backdrop-filter:none}
+.city-location-title-row{display:flex;align-items:center;gap:9px;min-width:0;flex-wrap:wrap}
+.city-location-title-row h2{font-size:21px;letter-spacing:.02em;margin:0;font-weight:650}
+.city-location-title-icon{width:32px;height:32px;flex:0 0 32px;margin:0;border-radius:10px;font-size:17px}
+.city-location-open-inline{display:inline-flex;align-items:center;gap:6px;margin-left:2px;color:#e5f9eb;font-size:11px;white-space:nowrap}
+.city-location-open-inline i{display:block;width:7px;height:7px;border-radius:50%;background:#4ade80;box-shadow:0 0 8px #4ade8070}
 .city-location-close{width:38px;height:38px;padding:0;display:grid;place-items:center;border-radius:50%;font-size:26px;line-height:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff}
 .city-location-open{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:#e5e2f5}
 .city-location-status-dot{width:8px;height:8px;flex:0 0 8px;border-radius:50%;background:#9da3b5;box-shadow:0 0 12px #9da3b555}
 .city-location-status-note{margin-left:auto;color:#c2bad7;font-size:10px}
-.city-location-rule{height:1px;margin:17px 0;background:linear-gradient(90deg,transparent,rgba(231,226,255,.24) 12%,rgba(231,226,255,.24) 88%,transparent)}
+.city-location-rule{height:1px;flex:0 0 1px;margin:14px 0;background:linear-gradient(90deg,transparent,rgba(231,226,255,.24) 12%,rgba(231,226,255,.24) 88%,transparent)}
 .city-location-section-title{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;font-weight:650}
 .city-location-section-title span{font-size:10px;color:#c4bddb;font-weight:400}
 .city-location-avatar-strip{display:flex;gap:12px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;padding:13px 2px 5px;min-height:70px;scrollbar-width:thin;scrollbar-color:rgba(221,212,255,.35) transparent}
-.city-location-avatar{flex:0 0 52px;width:52px;height:52px;padding:3px;border-radius:50%;border:1px solid rgba(238,232,255,.38);background:linear-gradient(140deg,rgba(233,183,232,.25),rgba(139,124,255,.2));box-shadow:inset 0 1px rgba(255,255,255,.18);scroll-snap-align:start}
+.city-location-avatar{flex:0 0 52px;width:52px;height:52px;padding:0;border-radius:50%;border:0;background:transparent;box-shadow:none;scroll-snap-align:start}
 .city-location-avatar-fallback{display:grid;place-items:center;width:100%;height:100%;border-radius:50%;background:linear-gradient(145deg,#625b83,#34334f);color:#f5eaff;font-size:17px}
 .city-location-empty{margin:0;align-self:center;color:#c4c2d3;font-size:11px;line-height:1.7}
-.city-location-detail{color:#e7e5f3;font-size:13px;line-height:1.75}
-.city-location-scene-icon{width:54px;height:54px;margin:0 auto 12px;display:grid;place-items:center;border-radius:18px;border:1px solid rgba(240,233,255,.18);background:linear-gradient(145deg,rgba(231,183,232,.14),rgba(139,124,255,.12));font-size:25px;color:#f5e6ff}
-.city-location-detail h3{text-align:center;font-size:16px;margin:0 0 6px}
-.city-location-detail>p{text-align:center;margin:0;color:#c9c7d9;font-size:12px}
-.city-location-event{margin-top:17px;padding:14px 15px;border:1px solid rgba(239,221,255,.15);border-radius:16px;background:linear-gradient(130deg,rgba(232,184,222,.09),rgba(164,151,255,.08));}
-.city-location-event-label{display:block;margin-bottom:5px;color:#c8b8f4;font-size:10px;letter-spacing:.08em}
-.city-location-event strong{font-size:14px;font-weight:650}
-.city-location-event p{margin:5px 0 0;color:#c3c0d2;font-size:11px;line-height:1.65}
+.city-location-detail{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;color:#e7e5f3;font-size:13px;line-height:1.75;padding-right:2px}
+.city-location-detail h3{text-align:left;font-size:13px;line-height:1.5;margin:0 0 7px;font-weight:650}
+.city-location-detail>p{text-align:left;margin:0;color:#c9c7d9;font-size:12px;line-height:1.75}
+.city-location-news{margin-top:15px;padding:0 1px 2px}
+.city-location-event-label{display:block;margin-bottom:7px;color:#d0c5ee;font-size:11px;letter-spacing:.04em;font-weight:650}
+.city-location-news-items{display:grid;gap:7px}
+.city-location-news-items p{margin:0;color:#e5e1ef;font-size:11px;line-height:1.65;overflow-wrap:anywhere}
 .city-location-empty{margin:0;padding:14px 12px;width:100%;border:1px dashed rgba(235,225,255,.22);border-radius:14px;color:#d2cfe0;font-size:12px;line-height:1.7;text-align:center}
-.city-location-person{display:flex;flex-direction:column;align-items:center;gap:6px;flex:0 0 72px;min-width:72px;padding:4px 3px 8px;border:0;background:transparent;color:#fff;cursor:pointer}
-.city-location-person .city-location-avatar-fallback,.city-location-person-image{display:grid;place-items:center;width:54px;height:54px;flex:0 0 54px;border-radius:50%;border:1px solid rgba(239,221,255,.48);background:rgba(235,235,244,.08);box-shadow:none;filter:none;font-size:20px;overflow:hidden}
-.city-location-person-image{display:block;object-fit:cover;object-position:center 25%;outline:none;clip-path:circle(50% at 50% 50%);-webkit-mask-image:radial-gradient(circle,#000 99%,transparent 100%)}
+.city-location-empty{margin:0;padding:14px 12px;width:100%;border:1px dashed rgba(235,225,255,.22);border-radius:14px;color:#d2cfe0;font-size:12px;line-height:1.7;text-align:center}
+.city-location-person{display:flex;flex-direction:column;align-items:center;gap:6px;flex:0 0 72px;min-width:72px;padding:4px 3px 8px;border:0!important;border-radius:0;background:transparent!important;box-shadow:none!important;color:#fff;cursor:pointer;outline:none}
+.city-location-person:hover,.city-location-person:focus,.city-location-person:focus-visible{background:transparent!important;box-shadow:none!important;outline:none}
+.city-location-person .city-location-avatar-fallback,.city-location-person-image{display:grid;place-items:center;width:54px;height:54px;flex:0 0 54px;border-radius:50%;border:0!important;background:transparent!important;box-shadow:none!important;filter:none;font-size:20px;overflow:hidden}
+.city-location-person-image{display:block;object-fit:cover;object-position:center 25%;outline:none!important;clip-path:circle(50% at 50% 50%);-webkit-mask-image:none}
 .city-location-person-name{max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#f3efff}
 .city-location-person-activity{max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px;color:#c9c1e2}
 .city-location-person:disabled{opacity:.6}
-@media(max-width:600px){.city-location-modal{padding:14px}.city-location-glass{width:100%;height:auto;max-height:calc(100dvh - 28px);padding:18px;border-radius:23px}.city-location-header h2{font-size:22px}.city-location-rule{margin:14px 0}}
+@media(max-width:600px){.city-location-modal{padding:14px}.city-location-glass{width:100%;height:calc(100dvh - 28px);min-height:0;max-height:calc(100dvh - 28px);padding:17px 18px;border-radius:23px}.city-location-title-row h2{font-size:20px}.city-location-rule{margin:12px 0}.city-character-card-body{grid-template-columns:104px minmax(0,1fr);gap:10px}.city-character-portrait{width:104px;height:150px;flex-basis:104px}}
 .city-character-card[hidden]{display:none!important}
 .city-character-card{margin-top:8px;padding:14px;border:1px solid rgba(255,255,255,.2);border-radius:18px;background:linear-gradient(145deg,rgba(240,241,246,.13),rgba(122,130,149,.13));box-shadow:inset 0 1px rgba(255,255,255,.12)}
 .city-character-card-head,.city-character-card-footer{display:flex;align-items:center;justify-content:space-between;gap:10px}
