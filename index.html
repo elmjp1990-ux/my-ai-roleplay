@@ -2520,6 +2520,7 @@ function chatSessionData(s) {
     : s.initialOpeningMessage;
   return {
     name:s.name || '', archived:!!s.archived, hidden:!!s.hidden,
+    encounterPlace:typeof s.encounterPlace === 'string' ? s.encounterPlace : null,
     openingMessage:initialOpening && String(initialOpening.text || '').trim()
       ? {text:String(initialOpening.text),at:Number(initialOpening.at) || Date.now()}
       : null,
@@ -2661,11 +2662,14 @@ async function saveChatSessionToCloud(s, options = {}) {
 async function loadCloudChatSessions(user) {
   const client = window.mySupabase;
   if (!client || !user?.id) return;
+  // A session-list request can finish after a newer Encounter session was created.
+  // Only treat absent rows as deleted when the cached session predates this sync.
+  const syncStartedAt = Date.now();
   try {
     const { data: authResult, error: authError } = await client.auth.getUser();
     if (authError || authResult?.user?.id !== user.id) return;
     const { data: rows, error } = await client.from('chat_sessions')
-      .select('id,user_id,character_id,character_name,status,created_at,updated_at,character_snapshot,session_data')
+      .select('id,user_id,character_id,character_name,status,chat_mode,created_at,updated_at,character_snapshot,session_data')
       .eq('user_id', user.id).is('deleted_at', null).order('updated_at', { ascending:false });
     if (error) throw new Error(error.message);
     if (state.account?.uid !== user.id) return;
@@ -2674,7 +2678,7 @@ async function loadCloudChatSessions(user) {
     let changed = false;
     // 雲端清單不再包含的本帳號聊天，可能已被軟刪除；清掉過期本機副本，避免刷新後復活。
     for (const [sessionId, cached] of Object.entries(state.sessions || {})) {
-      if (cached?.cloudOwned && cached.cloudOwnerUid === user.id && !activeSessionIds.has(sessionId)) {
+      if (cached?.cloudOwned && cached.cloudOwnerUid === user.id && !activeSessionIds.has(sessionId) && Number(cached.startedAt || 0) < syncStartedAt) {
         delete state.sessions[sessionId];
         changed = true;
       }
@@ -2746,6 +2750,8 @@ async function loadCloudChatSessions(user) {
         ...(existing || {}), id:row.id, characterId:row.character_id,
         characterName:row.character_name || snapshot.name || '角色',
         name:data.name || '', archived:data.archived === true || row.status === 'archived',
+        encounterMode:row.chat_mode === 'encounter',
+        encounterPlace:typeof data.encounterPlace === 'string' ? data.encounterPlace : (existing?.encounterPlace || null),
         hidden:data.hidden === true, pinned:data.pinned === true,
         startedAt:Number(data.startedAt) || (row.created_at ? new Date(row.created_at).getTime() : Date.now()),
         archivedAt:data.archivedAt || null, persona:data.persona || '',
