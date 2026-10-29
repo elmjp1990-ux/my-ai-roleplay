@@ -8960,7 +8960,7 @@ function renderCityMapMVP(){
           String(row.end_time||'').slice(0,5),
           row.location_key,
           row.activity
-        ].join('|')).join('\\n');
+        ].join('|')).join('\n');
       }catch(error){
         console.warn('城市角色日程載入失敗：',character.id,error?.message||error);
         return '';
