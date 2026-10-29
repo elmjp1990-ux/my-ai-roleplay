@@ -9918,6 +9918,7 @@ document.addEventListener('submit',function(event){
     .encounter-scene .message-name{display:none}
     .encounter-scene .bubble,.encounter-scene .narration{color:#fff!important;text-shadow:0 2px 8px #000b;font-size:clamp(14px,3.7vw,18px);line-height:1.6}
     .encounter-scene .message-more{color:#fff;background:#17141b66}
+    .encounter-character-sprite.encounter-card-portrait-fallback{object-fit:contain;object-position:center bottom;filter:drop-shadow(0 10px 22px rgba(0,0,0,.22))}
     .encounter-character-sprite{position:absolute;z-index:1;pointer-events:none;right:0;bottom:clamp(340px,43dvh,430px);width:min(88%,520px);height:58dvh;object-fit:contain;object-position:center bottom;filter:drop-shadow(0 12px 24px rgba(0,0,0,.28));opacity:.98}
     .encounter-scene .composer{position:absolute!important;z-index:3;left:0;right:0;bottom:0;max-height:56dvh;overflow-y:auto;background:linear-gradient(180deg,rgba(17,14,24,.12),rgba(17,14,24,.92) 18%)!important;border:0!important;border-radius:24px 24px 0 0!important;padding:12px 14px calc(12px + env(safe-area-inset-bottom))!important;backdrop-filter:blur(12px)}
     .encounter-scene .suggestions{margin:0 0 8px!important}
@@ -10109,24 +10110,36 @@ document.addEventListener('submit',function(event){
     const defaultSceneImage='https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp';
     panel.style.setProperty('--encounter-scene-photo','url('+JSON.stringify(sceneImage||defaultSceneImage)+')');
     panel.dataset.encounterPlace=session.encounterPlace||'';
-    // Only use a dedicated transparent half-body asset here. The ordinary character-card
-    // portrait often has its own baked-in background and must never be enlarged as the sprite.
-    const halfBodyImage=safeImage(character?.encounterPortraitImage||character?.halfBodyImage||character?.transparentPortrait||character?.encounterSprite||'');
-    const existingSprite=panel.querySelector('.encounter-character-sprite');
-    if(halfBodyImage && !existingSprite){
-      const sprite=document.createElement('img');
-      sprite.className='encounter-character-sprite';
-      sprite.src=halfBodyImage;
-      sprite.alt='';
-      sprite.setAttribute('aria-hidden','true');
-      sprite.loading='eager';
-      panel.insertBefore(sprite,panel.firstChild);
-    }else if(!halfBodyImage && !panel.querySelector('.encounter-missing-art')){
-      const artNote=document.createElement('div');
-      artNote.className='encounter-missing-art';
-      artNote.textContent='角色半立繪素材待補';
-      artNote.setAttribute('aria-hidden','true');
-      panel.insertBefore(artNote,panel.firstChild);
+    // Prefer a dedicated encounter sprite, but allow the character-card image as a
+    // testing fallback so creators can verify scale/placement before preparing a transparent PNG.
+    // A card image with a white/baked-in background will keep that background until replaced
+    // with a transparent half-body asset.
+    const dedicatedSprite=safeImage(character?.encounterPortraitImage||character?.halfBodyImage||character?.transparentPortrait||character?.encounterSprite||'');
+    const cardPortrait=safeImage(character?.image||character?.avatar_url||character?.avatarUrl||'');
+    const halfBodyImage=dedicatedSprite||cardPortrait;
+    let existingSprite=panel.querySelector('.encounter-character-sprite');
+    const missingArt=panel.querySelector('.encounter-missing-art');
+    if(halfBodyImage){
+      if(missingArt)missingArt.remove();
+      if(!existingSprite){
+        existingSprite=document.createElement('img');
+        existingSprite.className='encounter-character-sprite';
+        existingSprite.alt='';
+        existingSprite.setAttribute('aria-hidden','true');
+        existingSprite.loading='eager';
+        panel.insertBefore(existingSprite,panel.firstChild);
+      }
+      if(existingSprite.getAttribute('src')!==halfBodyImage)existingSprite.src=halfBodyImage;
+      existingSprite.classList.toggle('encounter-card-portrait-fallback',!dedicatedSprite);
+    }else{
+      if(existingSprite)existingSprite.remove();
+      if(!missingArt){
+        const artNote=document.createElement('div');
+        artNote.className='encounter-missing-art';
+        artNote.textContent='角色半立繪素材待補';
+        artNote.setAttribute('aria-hidden','true');
+        panel.insertBefore(artNote,panel.firstChild);
+      }
     }
     const title=panel.querySelector('.chat-heading');
     if(title){
