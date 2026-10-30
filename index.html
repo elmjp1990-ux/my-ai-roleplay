@@ -2573,8 +2573,11 @@ async function saveChatSessionToCloud(s, options = {}) {
   const localUser = currentUser();
   if (!client || !localUser?.uid || !s) return false;
   if (!isUuid(s.characterId) || !isUuid(s.id)) return false;
-  // 空白聊天只存在本機；玩家真正送出訊息後才建立雲端聊天紀錄。
-  if (!(s.messages || []).some(message => message.role === 'user' && String(message.text || '').trim())) return false;
+  // 一般故事模式的空白聊天仍只存在本機；相遇模式由 encounter-session
+  // 預先建立了雲端 session，因此即使尚未送出第一句，也必須允許保存玩家人設等 session_data。
+  const hasUserMessage = (s.messages || []).some(message => message.role === 'user' && String(message.text || '').trim());
+  const canSaveEncounterMetadata = s.encounterMode === true && s.cloudOwned === true && s.cloudOwnerUid === localUser.uid;
+  if (!hasUserMessage && !canSaveEncounterMetadata) return false;
   const { data: authResult, error: authError } = await client.auth.getUser();
   if (authError || authResult?.user?.id !== localUser.uid) {
     throw new Error('登入狀態驗證失敗，聊天尚未同步。');
@@ -5019,11 +5022,27 @@ async function loadEncounterMemoryList(panel,session){
       if(!groups.has(groupKey))groups.set(groupKey,{sessionId,rows:[],latestAt:row.occurred_at});
       groups.get(groupKey).rows.push(row);
     }
+    // 地點是在建立相遇 session 時寫入 session_data.encounterPlace；
+    // 從本人擁有的 encounter chat_sessions 讀回，避免依摘要文字猜測地點。
+    const sessionIds=[...new Set([...groups.values()].map(group=>group.sessionId).filter(Boolean))];
+    const sessionPlaces=new Map();
+    if(sessionIds.length){
+      const {data:sessionRows,error:sessionRowsError}=await client.from('chat_sessions')
+        .select('id,session_data').eq('user_id',uid).eq('chat_mode','encounter').in('id',sessionIds);
+      if(sessionRowsError){console.warn('讀取相遇地點失敗：',sessionRowsError.message);}
+      else for(const sessionRow of sessionRows||[]){
+        const sessionData=sessionRow.session_data&&typeof sessionRow.session_data==='object'?sessionRow.session_data:{};
+        sessionPlaces.set(sessionRow.id,typeof sessionData.encounterPlace==='string'?sessionData.encounterPlace:'');
+      }
+    }
+    const placeNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308 公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園'};
     const cards=[...groups.values()].sort((a,b)=>new Date(b.latestAt||0)-new Date(a.latestAt||0)).map(group=>{
       const newest=group.rows[0];
       const date=new Date(newest.occurred_at||Date.now()).toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
       const preview=String(newest.summary||'這次相遇留下了一段回憶。').slice(0,180);
-      return '<button type="button" class="archive-card encounter-memory-card" data-action="encounter-memory-open" data-id="'+e(group.sessionId||'')+'" data-memory-id="'+e(newest.id)+'"><span class="row between" style="gap:8px"><strong>相遇 · '+e(date)+'</strong><span class="small muted">'+group.rows.length+' 則紀錄</span></span><p class="encounter-memory-excerpt">'+e(preview)+(String(newest.summary||'').length>180?'…':'')+'</p><span class="small muted">點擊查看完整對話　›</span></button>';
+      const rawPlace=group.sessionId?sessionPlaces.get(group.sessionId):'';
+      const place=rawPlace?(placeNames[rawPlace]||rawPlace):'地點資料未保存';
+      return '<button type="button" class="archive-card encounter-memory-card" data-action="encounter-memory-open" data-id="'+e(group.sessionId||'')+'" data-memory-id="'+e(newest.id)+'" data-place="'+e(place)+'"><span class="row between" style="gap:8px"><strong>相遇 · '+e(date)+'</strong><span class="small muted">'+group.rows.length+' 則紀錄</span></span><span class="small muted encounter-memory-place">📍 '+e(place)+'</span><p class="encounter-memory-excerpt">'+e(preview)+(String(newest.summary||'').length>180?'…':'')+'</p><span class="small muted">點擊查看完整對話　›</span></button>';
     }).join('');
     if(!list.isConnected)return;
     list.innerHTML=cards||'<div class="empty"><strong>你們的相遇，正等待被收藏</strong><p>完成相遇對話後，系統會自動保存回憶摘要。每段相遇都會獨立整理，不會混入故事模式。</p></div>';
@@ -5074,7 +5093,8 @@ async function openEncounterMemoryDetail(button){
       body=(diaries||[]).map(row=>'<article class="encounter-memory-message"><div class="small muted">'+e(new Date(row.occurred_at||Date.now()).toLocaleString('zh-TW'))+'</div><p>'+e(row.summary||'')+'</p></article>').join('');
     }
     if(!body)body='<p class="muted">目前沒有可顯示的詳細對話內容。</p>';
-    showDialog('相遇回憶','<div class="encounter-memory-detail">'+body+'</div>');
+    const placeLabel=String(button.dataset.place||'地點資料未保存');
+    showDialog('相遇回憶','<div class="small muted encounter-memory-detail-place">📍 相遇地點：'+e(placeLabel)+'</div><div class="encounter-memory-detail">'+body+'</div>');
   }catch(error){
     console.error('讀取相遇回憶詳細內容失敗：',error);
     toast(error?.message||'相遇回憶詳細內容載入失敗，請稍後重試。');
@@ -10393,6 +10413,8 @@ document.addEventListener('submit',function(event){
 .encounter-memory-card{display:block;width:100%;text-align:left;color:inherit;cursor:pointer;transition:border-color .18s ease,background .18s ease}
 .encounter-memory-card:hover,.encounter-memory-card:focus-visible{border-color:rgba(205,184,255,.65);background:rgba(110,96,145,.24);outline:none}
 .encounter-memory-excerpt{margin:8px 0!important;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--muted);line-height:1.65}
+.encounter-memory-place{display:block;margin-top:6px;color:var(--primary);letter-spacing:.02em}
+.encounter-memory-detail-place{margin:0 0 10px;padding:9px 11px;border:1px solid var(--border);border-radius:10px;background:var(--soft)}
 .encounter-memory-detail{max-height:min(68dvh,620px);overflow:auto;overscroll-behavior:contain;display:grid;gap:10px}
 .encounter-memory-message{padding:11px 12px;border:1px solid var(--border);border-radius:12px;background:var(--panel)}
 .encounter-memory-message p{margin:7px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75}
