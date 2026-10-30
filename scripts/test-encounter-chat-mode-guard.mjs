@@ -55,6 +55,12 @@ assert.doesNotMatch(encounterTurn, /record_encounter_turn_interaction/);
 assert.doesNotMatch(encounterTurn, /p_affinity_delta:\s*1/);
 assert.match(encounterTurn, /affinityPendingUntilSceneEnd/);
 assert.match(encounterTurn, /assistant_message_id_collision/);
+assert.match(encounterTurn, /encounter_session_lifecycle/);
+assert.match(encounterTurn, /encounter_scene_expired_or_inactive/);
+assert.ok(
+  encounterTurn.indexOf("encounter_session_lifecycle") < encounterTurn.indexOf("reserve_chat_turn"),
+  "Encounter lifecycle expiry must be checked before reserving/charging a turn",
+);
 
 const interactionMigration = fs.readFileSync(
   "supabase/migrations/20261029210000_validate_settled_encounter_interaction.sql",
