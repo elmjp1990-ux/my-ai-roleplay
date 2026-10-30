@@ -84,6 +84,26 @@ assert.match(preExpiryTurnMigration, /Encounter has pending pre-expiry turns/);
 assert.match(preExpiryTurnMigration, /l\.status NOT IN \('active','paused','ready_to_settle'\)/);
 assert.match(preExpiryTurnMigration, /FOR UPDATE/);
 
+const pauseResumeMigration = fs.readFileSync(
+  "supabase/migrations/20261031190000_encounter_session_pause_resume.sql",
+  "utf8",
+);
+const pauseResumeEndpoint = fs.readFileSync(
+  "supabase/functions/encounter-session-state/index.ts",
+  "utf8",
+);
+assert.match(pauseResumeMigration, /FUNCTION public\\.set_encounter_session_lifecycle_state/);
+assert.match(pauseResumeMigration, /FOR UPDATE/);
+assert.match(pauseResumeMigration, /p_action='pause'/);
+assert.match(pauseResumeMigration, /p_action='resume'/);
+assert.match(pauseResumeMigration, /l\\.scheduled_end_at <= clock_timestamp\\(\\)/);
+assert.match(pauseResumeMigration, /TO service_role/);
+assert.match(pauseResumeEndpoint, /auth\\.getUser\\(\\)/);
+assert.match(pauseResumeEndpoint, /account_is_active/);
+assert.match(pauseResumeEndpoint, /set_encounter_session_lifecycle_state/);
+assert.match(pauseResumeEndpoint, /encounter_scene_expired_or_closed/);
+assert.match(pauseResumeEndpoint, /p_user_id: user\\.id/);
+
 
 const interactionMigration = fs.readFileSync(
   "supabase/migrations/20261029210000_validate_settled_encounter_interaction.sql",
