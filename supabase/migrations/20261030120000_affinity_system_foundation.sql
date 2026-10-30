@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS public.story_relationship_states (
       'hostile', 'dislike', 'wary',
       'first_meeting', 'acquaintance', 'close', 'intimate', 'special'
     )),
-  source_encounter_session_id uuid,
+  source_encounter_session_id uuid REFERENCES public.encounter_session_lifecycle(session_id) ON DELETE SET NULL,
   origin_affinity integer NOT NULL DEFAULT 0 CHECK (origin_affinity BETWEEN -100 AND 100),
   origin_relationship_stage text NOT NULL DEFAULT 'first_meeting'
     CHECK (origin_relationship_stage IN (
@@ -144,9 +144,7 @@ CREATE TABLE IF NOT EXISTS public.story_relationship_states (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT story_relationship_origin_check CHECK (
-    (origin_mode = 'encounter_snapshot'
-      AND source_encounter_session_id IS NOT NULL
-      AND snapshot_at IS NOT NULL)
+    (origin_mode = 'encounter_snapshot' AND snapshot_at IS NOT NULL)
     OR
     (origin_mode = 'fresh_story'
       AND source_encounter_session_id IS NULL
@@ -329,7 +327,7 @@ DECLARE
   v_source_character uuid;
   v_source_status text;
 BEGIN
-  IF NEW.origin_mode = 'encounter_snapshot' THEN
+  IF NEW.origin_mode = 'encounter_snapshot' AND NEW.source_encounter_session_id IS NOT NULL THEN
     SELECT l.user_id, l.character_id, l.status
       INTO v_source_user, v_source_character, v_source_status
     FROM public.encounter_session_lifecycle AS l
@@ -341,6 +339,9 @@ BEGIN
        OR v_source_status <> 'settled' THEN
       RAISE EXCEPTION 'Encounter snapshot source is invalid or not settled' USING ERRCODE = '23514';
     END IF;
+  ELSIF NEW.origin_mode = 'encounter_snapshot'
+        AND (TG_OP = 'INSERT' OR OLD.source_encounter_session_id IS NOT NULL) THEN
+    RAISE EXCEPTION 'Encounter snapshot source is required at creation' USING ERRCODE = '23514';
   END IF;
   RETURN NEW;
 END;
