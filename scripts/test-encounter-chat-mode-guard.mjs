@@ -96,9 +96,9 @@ assert.match(pauseResumeMigration, /FUNCTION public\.set_encounter_session_lifec
 assert.match(pauseResumeMigration, /FOR UPDATE/);
 assert.match(pauseResumeMigration, /p_action='pause'/);
 assert.match(pauseResumeMigration, /p_action NOT IN \(['"]pause['"],['"]resume['"]\)/);
-assert.match(pauseResumeMigration, /l\.scheduled_end_at <= clock_timestamp\\(\\)/);
+assert.match(pauseResumeMigration, /scheduled_end_at <= clock_timestamp/);
 assert.match(pauseResumeMigration, /TO service_role/);
-assert.match(pauseResumeEndpoint, /auth\.getUser\\(\\)/);
+assert.match(pauseResumeEndpoint, /auth.getUser/);
 assert.match(pauseResumeEndpoint, /account_is_active/);
 assert.match(pauseResumeEndpoint, /set_encounter_session_lifecycle_state/);
 assert.match(pauseResumeEndpoint, /encounter_scene_expired_or_closed/);
