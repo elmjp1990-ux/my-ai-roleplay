@@ -5074,7 +5074,7 @@ async function loadEncounterMemoryList(panel,session){
       if(!group.sessionId)continue;
       const sessionData=sessionMetadataById.get(group.sessionId);
       if(!sessionData)continue;
-      const isNewEncounter=typeof sessionData.encounterDay==='string' || sessionData.encounterMode===true;
+      const isNewEncounter=typeof sessionData.encounterDay==='string';
       if(isNewEncounter && sessionData.archived!==true)groups.delete(groupKey);
     }
     const placeNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308 公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園'};
