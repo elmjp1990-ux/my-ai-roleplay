@@ -82,4 +82,26 @@ assert.match(frontend, /route\.page === 'citymap' \? 'home'/);
 assert.match(frontend, /\['citymap','探索'\]/);
 assert.match(frontend, /ICON\[page === 'citymap' \? 'home' : page\]/);
 assert.match(frontend, /case 'home':go\(\{page:'citymap'\}\);break;/);
-console.log("Encounter chat-mode security guard tests passed.");
+
+const affinityMigration = fs.readFileSync(
+  "supabase/migrations/20261030120000_affinity_system_foundation.sql",
+  "utf8",
+);
+assert.match(affinityMigration, /CHECK \(affinity BETWEEN -100 AND 100\)/);
+assert.match(affinityMigration, /ON DELETE SET NULL/);
+assert.match(affinityMigration, /REVOKE ALL ON TABLE public\.story_relationship_states FROM PUBLIC, anon, authenticated/);
+assert.match(affinityMigration, /REVOKE ALL ON TABLE public\.encounter_session_turns FROM PUBLIC, anon, authenticated/);
+assert.match(affinityMigration, /validate_affinity_session_link/);
+assert.match(affinityMigration, /Affinity session owner mismatch/);
+assert.match(affinityMigration, /Encounter lifecycle requires an Encounter session/);
+assert.match(affinityMigration, /Story relationship requires a Story session/);
+assert.match(affinityMigration, /validate_encounter_turn_evidence/);
+assert.match(affinityMigration, /Encounter user message does not belong to the session/);
+assert.match(affinityMigration, /Encounter assistant message does not belong to the session/);
+assert.match(affinityMigration, /Encounter turn charge does not match session owner/);
+assert.match(affinityMigration, /validate_story_relationship_origin/);
+assert.match(affinityMigration, /Encounter snapshot source is invalid or not settled/);
+assert.match(affinityMigration, /source_encounter_session_id uuid REFERENCES public\.encounter_session_lifecycle\(session_id\) ON DELETE SET NULL/);
+assert.match(affinityMigration, /A carried-over Story must reference a settled Encounter/);
+
+console.log("Encounter chat-mode and affinity schema guard tests passed.");
