@@ -15,6 +15,7 @@ assert.match(guardMigration, /SECURITY DEFINER/);
 assert.match(guardMigration, /SET search_path = ['"]{2}/);
 assert.match(guardMigration, /NEW\.chat_mode IS DISTINCT FROM OLD\.chat_mode/);
 
+const frontend = fs.readFileSync("index.html", "utf8");
 const encounterSession = fs.readFileSync("supabase/functions/encounter-session/index.ts", "utf8");
 assert.match(frontend, /locationKey: encounterPlace/);
 assert.match(frontend, /請從城市地圖的有效地標進入相遇/);
@@ -55,7 +56,6 @@ assert.match(interactionMigration, /m\.role = ['"]assistant['"]/);
 assert.match(interactionMigration, /REVOKE ALL ON FUNCTION public\.record_encounter_turn_interaction/);
 assert.match(interactionMigration, /GRANT EXECUTE ON FUNCTION public\.record_encounter_turn_interaction[^;]*TO service_role/s);
 
-const frontend = fs.readFileSync("index.html", "utf8");
 assert.match(frontend, /async function createEncounterSession\(character\)/);
 assert.match(frontend, /functions\.invoke\(["']encounter-session["']/);
 assert.match(frontend, /const endpointName = s\.encounterMode \? ["']encounter-turn["'] : ["']chat-turn["']/);
