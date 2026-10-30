@@ -94,10 +94,11 @@ CREATE TABLE IF NOT EXISTS public.encounter_session_turns (
   affinity_delta integer CHECK (
     affinity_delta IS NULL OR affinity_delta BETWEEN -100 AND 100
   ),
-  evaluation jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (
-    jsonb_typeof(evaluation) = 'object'
-    AND pg_column_size(evaluation) <= 8000
-  ),
+  evaluation jsonb NOT NULL DEFAULT '{}'::jsonb
+    CONSTRAINT encounter_session_turns_evaluation_json_check CHECK (
+      jsonb_typeof(evaluation) = 'object'
+      AND pg_column_size(evaluation) <= 8000
+    ),
   created_at timestamptz NOT NULL DEFAULT now(),
   evaluated_at timestamptz,
   CONSTRAINT encounter_session_turns_unique_number UNIQUE (session_id, turn_number),
