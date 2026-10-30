@@ -34,8 +34,10 @@ Deno.serve(async (request: Request) => {
 
   const characterId = body.characterId;
   const sessionId = body.sessionId;
-  if (!isUuid(characterId) || !isUuid(sessionId)) {
-    return json({ error: "invalid_identifiers" }, 400);
+  const locationKey = body.locationKey;
+  if (!isUuid(characterId) || !isUuid(sessionId) ||
+      typeof locationKey !== "string" || !/^[a-zA-Z0-9_-]{1,80}$/.test(locationKey)) {
+    return json({ error: "invalid_identifiers_or_location" }, 400);
   }
 
   const userClient = createClient(url, anonKey, {
@@ -77,6 +79,15 @@ Deno.serve(async (request: Request) => {
       existing.chat_mode !== "encounter" ||
       existing.deleted_at !== null
     ) return json({ error: "session_id_conflict" }, 409);
+    const { data: lifecycle, error: lifecycleError } = await admin
+      .from("encounter_session_lifecycle")
+      .select("location_key")
+      .eq("session_id", sessionId)
+      .maybeSingle();
+    if (lifecycleError) return json({ error: "encounter_lifecycle_lookup_failed" }, 503);
+    if (!lifecycle || lifecycle.location_key !== locationKey) {
+      return json({ error: "encounter_session_incomplete_or_location_conflict" }, 409);
+    }
     return json({ session: existing, idempotent: true });
   }
 
@@ -112,34 +123,98 @@ Deno.serve(async (request: Request) => {
     deletedAt: character.deleted_at,
   };
 
-  const { data: session, error: insertError } = await admin
-    .from("chat_sessions")
-    .insert({
-      id: sessionId,
-      user_id: user.id,
-      character_id: character.id,
-      character_name: character.name,
-      status: "active",
-      character_snapshot: snapshot,
-      session_data: { encounter: { affinity: 0, relationshipStage: "first_meeting" } },
-      chat_mode: "encounter",
-    })
-    .select("id,user_id,character_id,character_name,character_snapshot,session_data,chat_mode,created_at,updated_at")
-    .single();
+  // Resolve the character's active schedule on the server using Taiwan local time.
+  // The client can request a location, but cannot supply or override schedule data.
+  const { data: schedules, error: scheduleError } = await admin
+    .from("character_schedules")
+    .select("id,weekday,day_type,start_time,end_time,location_key,activity,priority,is_active")
+    .eq("character_id", characterId)
+    .eq("is_active", true)
+    .eq("location_key", locationKey);
+  if (scheduleError) return json({ error: "encounter_schedule_lookup_failed" }, 503);
+  const now = new Date();
+  const taiwanParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(now);
+  const part = (type: string) => taiwanParts.find(item => item.type === type)?.value || "";
+  const localDate = `${part("year")}-${part("month")}-${part("day")}`;
+  const localMinute = Number(part("hour")) * 60 + Number(part("minute"));
+  const localWeekday = new Date(`${localDate}T12:00:00+08:00`).getUTCDay();
+  const dateAtOffset = (date: string, offset: number) => {
+    const value = new Date(`${date}T12:00:00+08:00`);
+    value.setUTCDate(value.getUTCDate() + offset);
+    return value.toISOString().slice(0, 10);
+  };
+  const weekdayFor = (date: string) => new Date(`${date}T12:00:00+08:00`).getUTCDay();
+  const minutes = (time: string) => {
+    const match = /^(\\d{2}):(\\d{2})(?::\\d{2})?$/.exec(time);
+    return match ? Number(match[1]) * 60 + Number(match[2]) : NaN;
+  };
+  const matches: Array<{ row: Record<string, unknown>; startDate: string; endDate: string; start: number; end: number }> = [];
+  for (const row of (schedules || []) as Array<Record<string, unknown>>) {
+    const start = minutes(String(row.start_time || ""));
+    const end = minutes(String(row.end_time || ""));
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start === end) continue;
+    for (const dayOffset of [-1, 0]) {
+      const scheduleDate = dateAtOffset(localDate, dayOffset);
+      const scheduleWeekday = weekdayFor(scheduleDate);
+      if (row.weekday !== null && row.weekday !== undefined && Number(row.weekday) !== scheduleWeekday) continue;
+      const weekend = scheduleWeekday === 0 || scheduleWeekday === 6;
+      if (row.day_type === "weekday" && weekend) continue;
+      if (row.day_type === "weekend" && !weekend) continue;
+      const overnight = end < start;
+      const startDate = scheduleDate;
+      const endDate = overnight ? dateAtOffset(scheduleDate, 1) : scheduleDate;
+      const currentAbsolute = dayOffset === -1 ? 1440 + localMinute : localMinute;
+      const startAbsolute = dayOffset === -1 ? start : start;
+      const endAbsolute = dayOffset === -1 ? (overnight ? 1440 + end : end) : (overnight ? 1440 + end : end);
+      const inWindow = dayOffset === -1
+        ? overnight && localMinute < end
+        : (overnight ? localMinute >= start : localMinute >= start && localMinute < end);
+      if (!inWindow) continue;
+      matches.push({ row, startDate, endDate, start, end });
+    }
+  }
+  matches.sort((a, b) =>
+    Number(b.row.priority || 0) - Number(a.row.priority || 0) ||
+    Number(b.row.weekday !== null) - Number(a.row.weekday !== null) ||
+    String(a.row.id).localeCompare(String(b.row.id))
+  );
+  const selected = matches[0];
+  if (!selected) return json({ error: "character_not_at_this_location_now" }, 409);
+  const timeText = (value: number) => `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}:00`;
+  const scheduledStartAt = new Date(`${selected.startDate}T${timeText(selected.start)}+08:00`).toISOString();
+  const scheduledEndAt = new Date(`${selected.endDate}T${timeText(selected.end)}+08:00`).toISOString();
+  const scheduleSnapshot = {
+    schedule_id: selected.row.id,
+    weekday: selected.row.weekday,
+    day_type: selected.row.day_type,
+    start_time: selected.row.start_time,
+    end_time: selected.row.end_time,
+    location_key: locationKey,
+    activity: selected.row.activity,
+    priority: selected.row.priority,
+    timezone: "Asia/Taipei",
+    verified_at: now.toISOString(),
+  };
 
-  if (insertError) {
-    // A concurrent retry may have inserted the same session after our first read.
-    const { data: retrySession } = await admin
-      .from("chat_sessions")
-      .select("id,user_id,character_id,character_name,character_snapshot,session_data,chat_mode,deleted_at")
-      .eq("id", sessionId)
-      .maybeSingle();
-    if (
-      retrySession?.user_id === user.id &&
-      retrySession?.character_id === characterId &&
-      retrySession?.chat_mode === "encounter" &&
-      retrySession?.deleted_at === null
-    ) return json({ session: retrySession, idempotent: true });
+  const { data: session, error: insertError } = await admin.rpc(
+    "create_encounter_session_with_lifecycle",
+    {
+      p_session_id: sessionId,
+      p_user_id: user.id,
+      p_character_id: character.id,
+      p_character_name: character.name,
+      p_character_snapshot: snapshot,
+      p_schedule_snapshot: scheduleSnapshot,
+      p_location_key: locationKey,
+      p_scheduled_start_at: scheduledStartAt,
+      p_scheduled_end_at: scheduledEndAt,
+    },
+  );
+  if (insertError || !session?.id || session.id !== sessionId) {
+    console.error("Encounter session creation failed:", insertError?.message || "invalid_rpc_result");
     return json({ error: "encounter_session_create_failed" }, 503);
   }
 
