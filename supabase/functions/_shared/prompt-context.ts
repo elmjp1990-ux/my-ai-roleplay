@@ -19,6 +19,26 @@ const obj = (value: unknown): Row => value && typeof value === "object" && !Arra
 const snapshotOf = (member: Row): Row => obj(member.character_snapshot ?? member.characterSnapshot ?? member);
 const playerMessage = (m: MessageRow): boolean => m.role === "user" || m.speaker_type === "player";
 
+const formatCharacterPersonality = (value: unknown): string => {
+  const profile = obj(value);
+  const fields: Array<[string, string, number]> = [
+    ["核心性格", "coreTraits", 500],
+    ["價值觀與動機", "values", 500],
+    ["說話方式", "speechStyle", 500],
+    ["行為準則", "behaviorRules", 700],
+    ["喜好", "likes", 300],
+    ["雷點", "dislikes", 300],
+    ["互動界線", "boundaries", 500],
+    ["關係發展節奏", "relationshipPacing", 300],
+  ];
+  return fields
+    .map(([label, key, limit]) => [label, str(profile[key]).slice(0, limit)] as const)
+    .filter(([, value]) => Boolean(value))
+    .map(([label, value]) => `${label}：${value}`)
+    .join("\n")
+    .slice(0, 4000);
+};
+
 export function buildPromptVariableValues(input: PromptContextInput): PromptVariableValues {
   const profile = obj(input.profile);
   const character = Object.keys(obj(input.character)).length ? obj(input.character) : obj(input.characterSnapshot);
@@ -50,6 +70,8 @@ export function buildPromptVariableValues(input: PromptContextInput): PromptVari
   const values: PromptVariableValues = {
     USER: str(group.player_name ?? group.playerName ?? profile.nickname ?? profile.handle), CHAR: str(character.name),
     USER_DESC: playerPersona, CHAR_DESC: str(character.intro ?? character.description),
+    CHAR_STYLE: str(character.style).slice(0, 1000),
+    CHAR_PERSONALITY: formatCharacterPersonality(character.personality_profile ?? character.personalityProfile),
     USER_GENDER: str(profile.gender), USER_PRONOUN: str(profile.pronoun),
     WORLD: world, SETTING: str(session.setting ?? character.setting ?? world),
     SCENE: str(session.scene ?? group.scene ?? group.initial_scene),

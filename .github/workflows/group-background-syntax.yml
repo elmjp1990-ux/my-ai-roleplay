@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "index.html"
+      - "scripts/test-encounter-schedule-parser.mjs"
+      - "scripts/test-encounter-chat-mode-guard.mjs"
+      - "supabase/functions/encounter-session/**"
       - ".github/workflows/group-background-syntax.yml"
       - "supabase/migrations/**"
   push:
@@ -45,3 +48,7 @@ jobs:
           }
           console.log('Parsed ' + blocks.length + ' inline JavaScript blocks.');
           NODE
+      - name: Test Encounter schedule parser
+        run: node scripts/test-encounter-schedule-parser.mjs
+      - name: Test Encounter chat-mode security guard
+        run: node scripts/test-encounter-chat-mode-guard.mjs

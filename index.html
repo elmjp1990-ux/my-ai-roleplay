@@ -1082,6 +1082,20 @@ body:not(.day) .chat-entry.active {
   box-shadow:inset 3px 0 #8b7cff;
 }
 
+
+/* Character card v2: video-ready portrait, edge tabs, typography-only pagination */
+.city-character-portrait-video{display:block;object-fit:cover;object-position:center top;background:rgba(8,12,24,.55)}
+.city-character-bookmarks{top:54px!important;right:-1px!important;gap:0!important;width:34px!important}
+.city-character-bookmark{width:34px!important;min-width:34px!important;min-height:68px!important;padding:8px 5px!important;border-radius:0!important;border:1px solid rgba(255,255,255,.26)!important;border-right:0!important;border-left:1px solid rgba(255,255,255,.26)!important;background:linear-gradient(90deg,rgba(43,49,68,.9),rgba(67,74,98,.95))!important;box-shadow:inset 0 1px rgba(255,255,255,.1),-3px 2px 8px rgba(8,12,25,.12)!important}
+.city-character-bookmark:first-child{border-radius:8px 0 0 0!important}
+.city-character-bookmark:last-child{border-radius:0 0 0 8px!important}
+.city-character-bookmark.active{background:linear-gradient(90deg,rgba(103,111,143,.98),rgba(126,134,164,.98))!important;border-color:rgba(255,255,255,.44)!important}
+.city-character-page-button{border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;color:rgba(255,255,255,.94)!important;font-size:0!important}
+.city-character-page-button:before{width:9px!important;height:9px!important;border-width:0 0 2px 2px!important;filter:drop-shadow(0 2px 2px rgba(0,0,0,.55))!important}
+.city-character-page-button[data-action="city-character-next"]:before{border-width:2px 2px 0 0!important}
+.city-character-card-footer{gap:10px!important}
+@media(max-width:600px){.city-character-bookmarks{top:49px!important;right:-1px!important;width:29px!important}.city-character-bookmark{width:29px!important;min-width:29px!important;min-height:64px!important;padding:7px 4px!important;font-size:10px!important}.city-character-page-button:before{width:8px!important;height:8px!important}}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -1103,6 +1117,17 @@ body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
 .city-map-block.park{left:59%;top:56%;width:25%;height:24%;background:#75b78b;border-radius:25px}
 .city-map-block.shop{left:12%;top:63%;width:20%;height:14%;background:#d9a8d5}
 .city-map-block.home{left:70%;top:38%;width:15%;height:13%;background:#e4b8a0}
+/* Restored original 9 POYOZZ city landmark anchors from feat/poyozz-city-location-panel-v2. */
+.city-building-layer{position:absolute;inset:0;width:100%;height:100%;z-index:3;overflow:visible;pointer-events:auto!important}
+.city-place-marker{pointer-events:all!important;cursor:pointer;transform-box:fill-box;transform-origin:center;animation:city-marker-float 3.1s ease-in-out infinite;outline:none}
+.city-place-marker:nth-of-type(even){animation-delay:-1.45s}
+.city-marker-glass{fill:rgba(78,83,98,.58);stroke:rgba(244,241,255,.78);stroke-width:1.5;vector-effect:non-scaling-stroke;filter:drop-shadow(0 3px 5px rgba(13,17,27,.28)) drop-shadow(0 0 5px rgba(226,222,246,.2));backdrop-filter:blur(8px)}
+.city-marker-glyph{fill:none;stroke:rgba(250,248,255,.96);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none}
+.city-place-marker:hover .city-marker-glass,.city-place-marker:focus-visible .city-marker-glass{fill:rgba(108,103,132,.78);stroke:rgba(255,255,255,.98);stroke-width:2;filter:drop-shadow(0 3px 6px rgba(13,17,27,.3)) drop-shadow(0 0 8px rgba(231,225,255,.45))}
+.city-place-marker:focus-visible{outline:none}
+@keyframes city-marker-float{0%,100%{translate:0 0}50%{translate:0 -5px}}
+@media(prefers-reduced-motion:reduce){.city-place-marker{animation:none!important;transition:none!important}}
+
 .city-map-landmark{position:absolute;z-index:2;display:flex;flex-direction:column;align-items:center;gap:3px;transform:translate(-50%,-50%);border:2px solid #fff;background:#19233be8;color:#fff;border-radius:13px;padding:8px 9px;min-width:68px;box-shadow:0 5px 14px #203a3340;font-size:11px;font-weight:700;touch-action:manipulation}
 .city-map-landmark span{font-size:22px;line-height:1}
 .city-map-landmark:focus-visible{outline:3px solid #8b7cff;outline-offset:3px}
@@ -1254,6 +1279,22 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 }
 </style>
 
+<style id="poyozz-encounter-visual-novel">
+.chat-main.encounter-scene{isolation:isolate!important;background:transparent!important}
+.chat-main.encounter-scene:before{position:absolute!important;inset:-1px!important;z-index:0!important}
+.chat-main.encounter-scene>.chat-heading{position:absolute!important;inset:0 0 auto 0!important;background:rgba(13,14,20,.30)!important;border:0!important;box-shadow:none!important;backdrop-filter:blur(16px)!important;-webkit-backdrop-filter:blur(16px)!important}
+.chat-main.encounter-scene .composer{background:linear-gradient(180deg,rgba(18,19,27,.10),rgba(18,19,27,.42))!important;border-top:1px solid rgba(255,255,255,.14)!important;border-radius:0!important;backdrop-filter:blur(18px)!important;-webkit-backdrop-filter:blur(18px)!important}
+.chat-main.encounter-scene .messages{bottom:clamp(245px,31dvh,310px)!important;max-height:30dvh!important;overflow:visible!important;padding:12px 16px!important}
+.chat-main.encounter-scene .encounter-dialogue-beat{display:flex;width:100%;min-height:78px;flex-direction:column;justify-content:space-between;gap:12px;text-align:left;padding:13px 15px;border-radius:15px;border:1px solid rgba(255,255,255,.22);background:rgba(22,23,31,.40);color:#fff;box-shadow:0 10px 26px rgba(0,0,0,.16),inset 0 1px rgba(255,255,255,.10);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);cursor:pointer}
+.chat-main.encounter-scene .encounter-dialogue-text{font-size:clamp(13px,3.5vw,16px);line-height:1.55;text-shadow:0 1px 5px #0009}
+.chat-main.encounter-scene .encounter-dialogue-hint{align-self:flex-end;font-size:10px;letter-spacing:.04em;color:rgba(255,255,255,.72)}
+.chat-main.encounter-scene .composer .suggestions[hidden]{display:none!important}
+.chat-main.encounter-scene .suggestion-card{display:none!important}
+.chat-main.encounter-scene .suggestion-card.active{display:block!important;max-width:100%!important;width:100%!important;max-height:58px!important;padding:6px 9px!important;background:rgba(225,228,237,.12)!important;border-color:rgba(255,255,255,.20)!important;backdrop-filter:blur(16px)!important}
+.chat-main.encounter-scene .suggestion-options{justify-content:center!important}
+.chat-main.encounter-scene .composer-input-row{margin-top:4px!important}
+.chat-main.encounter-scene #messageInput{background:rgba(225,228,237,.12)!important;border-color:rgba(255,255,255,.20)!important;backdrop-filter:blur(16px)!important}
+</style>
 </head>
 
 <body>
@@ -1297,14 +1338,8 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
   const SUPABASE_URL = 'https://ouyewoagbmtqehbofrje.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_MyTDqAKNTkK4zo7eap8gZA_ZGozHRMd';
 
-  // 若 Supabase CDN 未載入，避免初始化錯誤中止首頁主程式。
-  // 雲端登入與資料操作會暫不可用，但首頁 UI 仍應正常啟動。
   if (!window.mySupabase) {
-    if (window.supabase && typeof window.supabase.createClient === 'function') {
-      window.mySupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    } else {
-      console.error('Supabase JS SDK 載入失敗：請檢查 CDN 連線。首頁 UI 將繼續載入。');
-    }
+    window.mySupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
 
   /*
@@ -1360,7 +1395,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       state.account = null;
       persist();
       void loadPublicSupabaseCharacters();
-      render();
+      if (route?.page !== 'citymap') render();
       return;
     }
 
@@ -1434,7 +1469,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       delete cleanRoute.overlay;
       go(cleanRoute, true);
     } else {
-      render();
+      if (route?.page !== 'citymap') render();
     }
   }
 
@@ -1484,7 +1519,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 
         state.signedIn = true;
         persist();
-        render();
+        if (route?.page !== 'citymap') render();
         if (!state.account.accountDeletionModalDismissed &&
             route?.overlay?.name !== 'account-deletion-pending') {
           openModal('account-deletion-pending', {
@@ -1575,7 +1610,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       };
       state.signedIn = true;
       persist();
-      render();
+      if (route?.page !== 'citymap') render();
     } catch (error) {
       console.error('PersonaX 資料庫同步失敗（階段：' + syncStage + '）：', error);
       // 取消申請後的刷新由呼叫端顯示專屬訊息；一般登入流程仍使用原本提示。
@@ -1595,7 +1630,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     try {
       const { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible')
+        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, personality_profile, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible')
         .eq('visibility', 'public')
         .is('deleted_at', null)
         .order('first_published_at', { ascending: false, nullsFirst: false });
@@ -1645,6 +1680,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
           reviewStatus: row.review_status, intro: row.intro || '',
           opening: story?.opening_message || '', race: row.race || '',
           privateInfo: '', style: row.style || '',
+          personalityProfile: normalizePersonalityProfile(row.personality_profile),
           phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : {},
           nsfwWorkplaceWarning:row.nsfw_workplace_warning === true,
           isNSFW:row.is_nsfw === true,
@@ -1667,7 +1703,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       );
       state.characters = [...publicCharacters, ...keepLocal.filter(character => !publicIds.has(character.id))];
       persist();
-      render();
+      if (route?.page !== 'citymap') render();
     } catch (error) {
       console.error('公開角色載入失敗：', error);
       if (state.account?.uid) toast('公開角色載入失敗：' + error.message);
@@ -1685,7 +1721,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       // 這可修復舊版匯入只存 localStorage 的資料；不會上傳其他帳號的本機角色。
       let { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, personality_profile, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
         .eq('author_id', user.id)
         .order('created_at', { ascending: false });
       if (error) throw new Error('讀取雲端角色失敗：' + error.message);
@@ -1711,7 +1747,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       if (migratedCount > 0) {
         const refreshed = await client
           .from('characters')
-          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, personality_profile, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
           .eq('author_id', user.id)
           .order('created_at', { ascending: false });
         if (refreshed.error) throw new Error('角色補傳後重新讀取失敗：' + refreshed.error.message);
@@ -1785,6 +1821,7 @@ const ids = (rows || []).map(row => row.id);
           race: row.race ?? local.race ?? '',
           privateInfo: privateInfoById.get(row.id) ?? local.privateInfo ?? '',
           style: row.style ?? local.style ?? '',
+          personalityProfile: normalizePersonalityProfile(row.personality_profile ?? local.personalityProfile),
           phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : (local.phoneSettings || {}),
           nsfwWorkplaceWarning:row.nsfw_workplace_warning === true,
           tags: Array.isArray(row.tags) ? row.tags : (local.tags || []),
@@ -1851,6 +1888,67 @@ async function hydrateCharacterVideo(video){
   video.src=data.signedUrl;video.load();
   if(video.hasAttribute('autoplay'))video.play().catch(()=>{});
 }
+function normalizePersonalityProfile(value) {
+  const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
+  const limits={coreTraits:500,values:500,speechStyle:500,behaviorRules:700,likes:300,dislikes:300,boundaries:500,relationshipPacing:300};
+  return Object.fromEntries(Object.entries(limits).map(([key,max])=>[key,String(source[key]??'').trim().slice(0,max)]));
+}
+
+function parseEncounterScheduleText(raw) {
+  const rows = [];
+  for (const [index, line] of String(raw || '').split(/\r?\n/).entries()) {
+    const text = line.trim();
+    if (!text) continue;
+    const parts = text.split('|').map(value => value.trim());
+    if (parts.length !== 5) throw new Error('相遇日程第 ' + (index + 1) + ' 行格式錯誤，請使用「星期|開始|結束|地點代碼|活動」。');
+    const [dayRaw, start, end, locationKey, activity] = parts;
+    const weekday = dayRaw === '*' ? null : Number(dayRaw);
+    if (weekday !== null && (!Number.isInteger(weekday) || weekday < 0 || weekday > 6)) throw new Error('相遇日程第 ' + (index + 1) + ' 行的星期必須是 0 到 6，或 *。');
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(end) || start === end) throw new Error('相遇日程第 ' + (index + 1) + ' 行的時間格式錯誤，或開始與結束時間相同。');
+    if (!/^[a-zA-Z0-9_-]{1,80}$/.test(locationKey)) throw new Error('相遇日程第 ' + (index + 1) + ' 行的地點代碼只能使用英文、數字、底線或連字號。');
+    if (!activity || activity.length > 300) throw new Error('相遇日程第 ' + (index + 1) + ' 行的活動不可空白且最多 300 字。');
+    rows.push({ weekday, day_type: 'any', start_time: start, end_time: end, location_key: locationKey, activity, priority: 0, is_active: true });
+  }
+  if (rows.length > 50) throw new Error('每個角色最多設定 50 個日程時段。');
+  return rows;
+}
+
+async function saveEncounterSchedules(characterId, userId, rows) {
+  const client = window.mySupabase;
+  if (!client || !characterId || !userId) throw new Error('無法確認相遇日程的雲端連線或角色所有權。');
+  // 使用資料庫交易函式一次同步整份清單；函式會以 auth.uid() 再驗證作者權限。
+  const { data, error } = await client.rpc('save_character_schedules', {
+    p_character_id: characterId,
+    p_schedules: rows
+  });
+  if (error) throw new Error('角色已儲存，但相遇日程同步失敗：' + error.message);
+  return data;
+}
+
+async function loadEncounterSchedulesIntoEditor(characterId) {
+  const client = window.mySupabase;
+  const field = document.querySelector('form[data-form="character"] textarea[name="encounterSchedules"]');
+  const user = currentUser();
+  if (!client || !user?.uid || !characterId || !field || field.value.trim()) return;
+  const { data, error } = await client.from('character_schedules')
+    .select('weekday, start_time, end_time, location_key, activity')
+    .eq('character_id', characterId)
+    .order('weekday', { ascending: true, nullsFirst: true })
+    .order('start_time', { ascending: true });
+  if (error) {
+    console.warn('讀取作者自己的相遇日程失敗：', error.message);
+    return;
+  }
+  if (!field.isConnected || field.value.trim()) return;
+  field.value = (data || []).map(row => [
+    row.weekday == null ? '*' : row.weekday,
+    String(row.start_time || '').slice(0,5),
+    String(row.end_time || '').slice(0,5),
+    row.location_key,
+    row.activity
+  ].join('|')).join('\n');
+}
+
 async function saveSupabaseCharacter(character, expectedUserId) {
     const client = window.mySupabase;
     if (!client || !expectedUserId) throw new Error('請先使用 Google 帳號登入，再儲存角色。');
@@ -1865,7 +1963,7 @@ async function saveSupabaseCharacter(character, expectedUserId) {
       const today = new Date();
       const cutoff = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
       const cutoffDate = cutoff.getFullYear() + '-' + String(cutoff.getMonth()+1).padStart(2,'0') + '-' + String(cutoff.getDate()).padStart(2,'0');
-      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(birthdate) || birthdate > cutoffDate) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(birthdate) || birthdate > cutoffDate) {
         throw new Error('[年齡未達許可] 此帳號未滿 18 歲或尚未完成生日驗證，無法建立或修改 NSFW 角色。');
       }
     }
@@ -1926,6 +2024,7 @@ async function saveSupabaseCharacter(character, expectedUserId) {
       intro: character.intro || '',
       race: character.race || '',
       style: character.style || '',
+      personality_profile: normalizePersonalityProfile(character.personalityProfile),
       phone_settings:character.phoneSettings && typeof character.phoneSettings==='object' ? {noticePrompts:(Array.isArray(character.phoneSettings.noticePrompts)?character.phoneSettings.noticePrompts:Array.isArray(character.phoneSettings.notices)?character.phoneSettings.notices:[]).slice(0,8).map(x=>String(x).slice(0,150))} : {},
       nsfw_workplace_warning: character.nsfwWorkplaceWarning === true,
       is_nsfw: character.isNSFW === true,
@@ -2134,7 +2233,7 @@ const clone = value => JSON.parse(JSON.stringify(value));
 
 function currentUserCanViewNsfw() {
   const birthdate = String(state.account?.birthdate || '');
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(birthdate)) return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(birthdate)) return false;
   const today = new Date();
   const cutoff = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
   const cutoffDate = cutoff.getFullYear() + '-' + String(cutoff.getMonth()+1).padStart(2,'0') + '-' + String(cutoff.getDate()).padStart(2,'0');
@@ -2378,6 +2477,7 @@ let banner = 0;
 let draftCharacter = null;
 let draftTags = [];
 let draftImage = '';
+let draftIllustrations = [];
 let draftVideoFile = null;
 let draftVideoPath = '';
 let draftVideoPreviewUrl = '';
@@ -2436,6 +2536,9 @@ function chatSessionData(s) {
     : s.initialOpeningMessage;
   return {
     name:s.name || '', archived:!!s.archived, hidden:!!s.hidden,
+    // Keep the mode marker in session_data as a recovery source if a legacy sync row lacks chat_mode.
+    encounterMode:s.encounterMode === true,
+    encounterPlace:typeof s.encounterPlace === 'string' ? s.encounterPlace : null,
     openingMessage:initialOpening && String(initialOpening.text || '').trim()
       ? {text:String(initialOpening.text),at:Number(initialOpening.at) || Date.now()}
       : null,
@@ -2577,11 +2680,14 @@ async function saveChatSessionToCloud(s, options = {}) {
 async function loadCloudChatSessions(user) {
   const client = window.mySupabase;
   if (!client || !user?.id) return;
+  // A session-list request can finish after a newer Encounter session was created.
+  // Only treat absent rows as deleted when the cached session predates this sync.
+  const syncStartedAt = Date.now();
   try {
     const { data: authResult, error: authError } = await client.auth.getUser();
     if (authError || authResult?.user?.id !== user.id) return;
     const { data: rows, error } = await client.from('chat_sessions')
-      .select('id,user_id,character_id,character_name,status,created_at,updated_at,character_snapshot,session_data')
+      .select('id,user_id,character_id,character_name,status,chat_mode,created_at,updated_at,character_snapshot,session_data')
       .eq('user_id', user.id).is('deleted_at', null).order('updated_at', { ascending:false });
     if (error) throw new Error(error.message);
     if (state.account?.uid !== user.id) return;
@@ -2590,7 +2696,7 @@ async function loadCloudChatSessions(user) {
     let changed = false;
     // 雲端清單不再包含的本帳號聊天，可能已被軟刪除；清掉過期本機副本，避免刷新後復活。
     for (const [sessionId, cached] of Object.entries(state.sessions || {})) {
-      if (cached?.cloudOwned && cached.cloudOwnerUid === user.id && !activeSessionIds.has(sessionId)) {
+      if (cached?.cloudOwned && cached.cloudOwnerUid === user.id && !activeSessionIds.has(sessionId) && Number(cached.startedAt || 0) < syncStartedAt) {
         delete state.sessions[sessionId];
         changed = true;
       }
@@ -2662,6 +2768,8 @@ async function loadCloudChatSessions(user) {
         ...(existing || {}), id:row.id, characterId:row.character_id,
         characterName:row.character_name || snapshot.name || '角色',
         name:data.name || '', archived:data.archived === true || row.status === 'archived',
+        encounterMode:row.chat_mode === 'encounter' || data.encounterMode === true || data.encounter?.mode === 'encounter',
+        encounterPlace:typeof data.encounterPlace === 'string' ? data.encounterPlace : (existing?.encounterPlace || null),
         hidden:data.hidden === true, pinned:data.pinned === true,
         startedAt:Number(data.startedAt) || (row.created_at ? new Date(row.created_at).getTime() : Date.now()),
         archivedAt:data.archivedAt || null, persona:data.persona || '',
@@ -2763,7 +2871,8 @@ async function runPendingChatTurn(s) {
   let result = null;
   let invokeError = null;
   try {
-    const response = await client.functions.invoke('chat-turn', {
+    const endpointName = s.encounterMode ? 'encounter-turn' : 'chat-turn';
+    const response = await client.functions.invoke(endpointName, {
       body: {
         turnId: turn.turnId,
         sessionId: s.id,
@@ -2825,6 +2934,33 @@ async function runPendingChatTurn(s) {
     renderMessages();
     await clearCloudPendingTurn(s);
     toast('聊天角色資料不一致，本回合尚未扣款。請重新整理聊天；若持續發生，請先不要重送並回報問題。');
+    return;
+  }
+
+  if (
+    result?.error === 'encounter_character_unavailable' ||
+    result?.error === 'encounter_session_required'
+  ) {
+    // These Encounter guards run before reservation; remove the unsent turn and allow a clean retry.
+    s.messages = s.messages.filter(message => message.id !== turn.userMessageId && message.id !== turn.assistantMessageId);
+    delete s.pendingTurn;
+    persist();
+    await clearCloudPendingTurn(s);
+    renderMessages();
+    toast(result.error === 'encounter_character_unavailable'
+      ? '此角色目前不符合相遇模式使用條件，本回合尚未扣款。'
+      : '相遇聊天室模式驗證失敗，本回合尚未扣款。');
+    return;
+  }
+
+  if (result?.error === 'user_message_already_charged') {
+    // A durable user message is globally limited to one wallet charge, even if a caller
+    // tries a different turn ID. Stop this pending attempt without creating another charge.
+    delete s.pendingTurn;
+    persist();
+    await clearCloudPendingTurn(s);
+    renderMessages();
+    toast('這則訊息已進入過扣款流程，為避免重複扣款已停止重送。請確認原回合狀態後再繼續。');
     return;
   }
 
@@ -3333,6 +3469,7 @@ function card(c,owner = false) {
                 data-id="${e(c.id)}" aria-label="切換喜愛角色"
                 aria-pressed="${favorite}">♥</button>
         <button class="card-chat" data-action="start-chat" data-id="${e(c.id)}">開始聊天</button>
+        <button class="card-chat encounter-start-button" data-action="start-encounter" data-id="${e(c.id)}">相遇模式</button>
       </div>
       <div class="card-body">
         <h3>${e(c.name)}</h3>
@@ -3837,6 +3974,12 @@ function saveEditorDraft() {
     opening:String(values.get('opening') || ''),
     privateInfo:String(values.get('privateInfo') || ''),
     style:String(values.get('style') || ''),
+    personalityProfile:normalizePersonalityProfile({
+      coreTraits:values.get('personalityCoreTraits'), values:values.get('personalityValues'),
+      speechStyle:values.get('personalitySpeechStyle'), behaviorRules:values.get('personalityBehaviorRules'),
+      likes:values.get('personalityLikes'), dislikes:values.get('personalityDislikes'),
+      boundaries:values.get('personalityBoundaries'), relationshipPacing:values.get('personalityRelationshipPacing')
+    }),
     phoneNotices:String(values.get('phoneNotices') || ''),
     visibility:String(values.get('visibility') || 'private'),
     rightsConfirmed:values.get('rightsConfirmed') === 'on',
@@ -3844,6 +3987,7 @@ function saveEditorDraft() {
     tags:[...draftTags],
     image:draftImage,
     avatarVideoPath:draftVideoPath,
+    illustrations:draftIllustrations.slice(0,4),
     savedAt:Date.now()
   };
   const serialized = JSON.stringify(draft);
@@ -3854,6 +3998,7 @@ function saveEditorDraft() {
     // If the image exceeds storage quota, preserve all text fields and tags.
     try {
       delete draft.image;
+      delete draft.illustrations;
       const textOnly = JSON.stringify(draft);
       localStorage.setItem(key, textOnly);
       try { sessionStorage.setItem(key, textOnly); } catch (_) {}
@@ -3870,10 +4015,20 @@ function startEditor(c = null) {
   draftCharacter = c ? clone(c) : null;
   draftTags = [...(c?.tags || [])];
   draftImage = c?.image || '';
+  draftIllustrations = [];
   draftVideoFile = null;
   draftVideoPath = c?.avatarVideoPath || '';
   if(draftVideoPreviewUrl){URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl='';}
   visit('editor',c?.id);
+}
+function renderCharacterIllustrationGallery(items = [], selectedImage = '') {
+  if (!Array.isArray(items) || !items.length) return '<p class="small muted">尚未加入立繪測試圖片。</p>';
+  return '<div class="character-illustration-grid">' + items.slice(0,4).map((src,index) =>
+    '<button type="button" class="character-illustration-option' + (src === selectedImage ? ' is-selected' : '') + '" data-character-illustration-index="' + index + '">' +
+      '<img src="' + e(safeImage(src)) + '" alt="立繪測試圖片 ' + (index+1) + '">' +
+      '<span>' + (src === selectedImage ? '目前主圖' : '設為主圖') + '</span>' +
+    '</button>'
+  ).join('') + '</div>';
 }
 function renderEditor() {
   const savedDraft = readEditorDraft();
@@ -3882,6 +4037,7 @@ function renderEditor() {
   if (savedDraft) {
     draftTags = Array.isArray(savedDraft.tags) ? [...savedDraft.tags] : draftTags;
     draftImage = savedDraft.image || draftImage || '';
+    draftIllustrations = Array.isArray(savedDraft.illustrations) ? savedDraft.illustrations.slice(0,4) : draftIllustrations;
     draftVideoPath = savedDraft.avatarVideoPath || draftVideoPath || '';
   }
   if (!draftCharacter && route.id) {
@@ -3908,6 +4064,11 @@ function renderEditor() {
         <img id="imagePreview" ${draftImage ? `src="${e(safeImage(draftImage))}"` : ''}
              class="${draftImage && !draftVideoPath ? '' : 'hidden'}"
              alt="角色頭像或影片封面預覽" style="width:120px;height:150px;object-fit:cover;border-radius:13px;margin-bottom:10px">
+        <label class="field"><span>立繪測試圖片（可一次選擇多張）</span>
+          <input id="characterIllustrations" type="file" accept="image/png,image/jpeg,image/webp" multiple>
+          <small>最多 4 張 PNG、JPG 或 WebP，每張上限 15 MB。圖片只用於目前編輯器的立繪比較；點選縮圖可將該張設為角色主圖，再儲存角色測試。此測試欄不會把多張圖公開給其他使用者。</small>
+        </label>
+        <div id="characterIllustrationGallery" class="character-illustration-gallery">${renderCharacterIllustrationGallery(draftIllustrations, draftImage)}</div>
         <video id="characterVideoPreview" class="${draftVideoPath ? '' : 'hidden'}" controls muted playsinline style="width:180px;max-height:240px;object-fit:contain;border-radius:13px;margin-bottom:18px;background:#000"></video>
         <label class="field"><span>角色名字 *</span>
           <input name="name" required maxlength="25" value="${e(c.name || '')}">
@@ -3927,7 +4088,25 @@ function renderEditor() {
           <small class="char-counter" data-count-for="opening">0/3000</small></label>
         <label class="field"><span>私密資訊</span><textarea name="privateInfo" maxlength="10000">${e(c.privateInfo || '')}</textarea>
           <small class="char-counter" data-count-for="privateInfo">0/10000，不會顯示在公開介紹，請勿填寫真實機密</small></label>
-        <label class="field"><span>對話風格</span><textarea name="style" maxlength="1000">${e(c.style || '')}</textarea></label>
+        <label class="field"><span>對話風格（舊欄位，保留相容）</span><textarea name="style" maxlength="1000">${e(c.style || '')}</textarea><small>可補充整體文風；下方人格欄位會更明確描述角色的行為與反應。</small></label>
+        <section class="memory-item stack" style="gap:12px"><strong>角色人格設定</strong><small>由創作者設定角色的核心人格，玩家不能直接改寫。請填寫可觀察、可扮演的特徵；作者私密設定仍請放在上方「私密資訊」。</small>
+          <label class="field"><span>核心性格</span><textarea name="personalityCoreTraits" maxlength="500" placeholder="例如：外冷內熱、觀察敏銳、不輕易示弱">${e(c.personalityProfile?.coreTraits || '')}</textarea></label>
+          <label class="field"><span>價值觀與行動動機</span><textarea name="personalityValues" maxlength="500" placeholder="例如：重視承諾、把家人安全放在第一位">${e(c.personalityProfile?.values || '')}</textarea></label>
+          <label class="field"><span>說話方式</span><textarea name="personalitySpeechStyle" maxlength="500" placeholder="例如：句子簡短、少用表情符號、緊張時會轉移話題">${e(c.personalityProfile?.speechStyle || '')}</textarea></label>
+          <label class="field"><span>行為準則與反應習慣</span><textarea name="personalityBehaviorRules" maxlength="700" placeholder="例如：生氣時先沉默，不會突然無理由改變立場">${e(c.personalityProfile?.behaviorRules || '')}</textarea></label>
+          <div class="two-col">
+            <label class="field"><span>角色喜好</span><textarea name="personalityLikes" maxlength="300" placeholder="喜歡的事物、活動或相處方式">${e(c.personalityProfile?.likes || '')}</textarea></label>
+            <label class="field"><span>角色雷點</span><textarea name="personalityDislikes" maxlength="300" placeholder="討厭的事物或容易觸發的反應">${e(c.personalityProfile?.dislikes || '')}</textarea></label>
+          </div>
+          <label class="field"><span>互動界線</span><textarea name="personalityBoundaries" maxlength="500" placeholder="角色不接受的互動、需要尊重的界線">${e(c.personalityProfile?.boundaries || '')}</textarea></label>
+          <label class="field"><span>關係發展節奏</span><textarea name="personalityRelationshipPacing" maxlength="300" placeholder="例如：慢熱、需要信任累積，不會初次見面就深情告白">${e(c.personalityProfile?.relationshipPacing || '')}</textarea></label>
+        </section>
+        <section class="memory-item stack" style="gap:10px">
+          <strong>相遇模式｜角色日程（測試版）</strong>
+          <small>每行一個時段，格式：星期(0=日、1=一…6=六，*代表每天)|開始時間|結束時間|地點代碼|角色活動。例：1|09:00|12:00|cafe|在咖啡廳工作。此設定目前只有作者可讀，尚未開放玩家端查詢。</small>
+          <label class="field"><span>日程時段</span><textarea name="encounterSchedules" maxlength="20000" placeholder="1|09:00|12:00|cafe|在咖啡廳工作\n*|18:00|20:00|park|傍晚散步">${e(savedDraft?.encounterSchedules ?? c.encounterSchedules ?? '')}</textarea></label>
+          <label class="check"><input type="checkbox" name="clearEncounterSchedules" value="yes"><span>明確清空這個角色的所有日程（需勾選，避免誤刪）</span></label>
+        </section>
         <section class="memory-item stack" style="gap:10px"><strong>角色手機設定</strong>
           <label class="field"><span>AI 手機通知揭露指示（每行一則）</span><textarea name="phoneNotices" maxlength="1200" placeholder="💬心裡話 | 每回合揭露一則簡短心裡話\n🔎線索 | 當劇情出現新線索時，揭露線索通知">${e(savedDraft?.phoneNotices ?? (Array.isArray(c.phoneSettings?.noticePrompts) ? c.phoneSettings.noticePrompts.join('\n') : Array.isArray(c.phoneSettings?.notices) ? c.phoneSettings.notices.join('\n') : ''))}</textarea><small>在這裡填寫每回合對話需要揭露的狀態。每行描述一種 AI 可揭露的通知條件／內容，不是固定顯示文字；最多 8 則。</small></label></section>
         <label class="field"><span>權限</span><select name="visibility">
@@ -3950,6 +4129,7 @@ function renderEditor() {
         </div>
       </form>
     </div>`;
+  if (route.id && !savedDraft?.encounterSchedules) void loadEncounterSchedulesIntoEditor(route.id);
   if(draftVideoPath){const preview=$('characterVideoPreview');void window.mySupabase?.storage.from('character-avatar-videos').createSignedUrl(draftVideoPath,300).then(({data,error})=>{if(!error&&data?.signedUrl&&preview?.isConnected){preview.src=data.signedUrl;preview.classList.remove('hidden');}});}
   void isNsfwTermsAdmin().then(isAdmin=>{const button=$('view')?.querySelector('[data-action="nsfw-term-manager"]');if(button&&isAdmin)button.hidden=false;});
   if(c.aiGeneratedDraft)void (async()=>{
@@ -4145,6 +4325,60 @@ function newArchiveName(character,session) {
   }
   return uniqueSessionName(characterName+'_'+date,session.id);
 }
+// Create a dedicated Encounter session through the trusted Edge Function.
+// Do not use the generic chat_sessions INSERT path: it intentionally creates Story Mode.
+async function createEncounterSession(character) {
+  const encounterPlace = arguments.length > 1 ? arguments[1] : null;
+  if (!character?.id || !isUuid(character.id)) {
+    throw new Error('找不到有效的角色資料，無法開始相遇模式。');
+  }
+  if (!window.mySupabase?.auth || !window.mySupabase?.functions) {
+    throw new Error('相遇模式服務尚未準備好，請稍後再試。');
+  }
+  const { data: authData, error: authError } = await window.mySupabase.auth.getUser();
+  if (authError || !authData?.user?.id) {
+    throw new Error('請先登入，再開始相遇模式。');
+  }
+
+  const sessionId = id();
+  const { data, error } = await window.mySupabase.functions.invoke('encounter-session', {
+    body: { characterId: character.id, sessionId }
+  });
+  if (error || !data?.session?.id || data.session.id !== sessionId ||
+      data.session.user_id !== authData.user.id ||
+      data.session.character_id !== character.id ||
+      data.session.chat_mode !== 'encounter') {
+    console.error('相遇聊天室建立失敗：', error || data);
+    throw new Error(data?.error === 'character_unavailable_for_encounter'
+      ? '此角色目前無法進入相遇模式。'
+      : '相遇聊天室建立失敗，請稍後再試。');
+  }
+
+  const session = {
+    id: sessionId,
+    characterId: character.id,
+    name: '',
+    archived: false,
+    hidden: false,
+    pinned: false,
+    startedAt: Date.now(),
+    persona: '',
+    suggestions: true,
+    background: 'avatar',
+    encounterMode: true,
+    encounterPlace: typeof encounterPlace === 'string' ? encounterPlace : null,
+    messages: [],
+    memories: [],
+    album: [],
+    cloudOwned: true,
+    cloudOwnerUid: authData.user.id,
+    cloudCharacterSnapshot: data.session.character_snapshot || {}
+  };
+  state.sessions[sessionId] = session;
+  persist();
+  return session;
+}
+
 function startChat(characterId) {
   const c = state.characters.find(c => c.id === characterId);
   if (!accessible(c)) return toast('此角色已被作者調整為私密或刪除狀態，不支持開啟新對話');
@@ -4769,16 +5003,21 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
   }
   if(kind==='manage-conversation'){
     if(ctx.isGroup)return;
-    const archives=Object.values(state.sessions).filter(item=>item.characterId===ctx.session.characterId&&item.archived).sort((a,b)=>(b.archivedAt||0)-(a.archivedAt||0));
+    const isEncounter=!!ctx.session.encounterMode;
+    const archives=Object.values(state.sessions).filter(item=>item.characterId===ctx.session.characterId&&item.archived&&(!isEncounter||item.encounterMode)).sort((a,b)=>(b.archivedAt||0)-(a.archivedAt||0));
     const archiveCards=archives.map(item=>{
-      const messageCount=item.messages.filter(message=>message.role==='user'&&String(message.text||'').trim()).length;
+      const messageCount=(item.messages||[]).filter(message=>message.role==='user'&&String(message.text||message.content||'').trim()).length;
+      if(isEncounter)return '<article class="archive-card"><strong>'+e(item.name||'相遇紀錄')+'</strong><p class="small muted" style="margin:8px 0">'+e(timeText(item.archivedAt||item.startedAt))+'<br>對話 '+messageCount+' 則</p><p>'+e(item.encounterSummary||'本次相遇的摘要尚未整理。')+'</p><div class="row wrap"><button data-action="view-archive" data-id="'+e(item.id)+'">查看對話紀錄</button></div></article>';
       return '<article class="archive-card"><strong>'+e(item.name||sessionTitle(item))+'</strong><p class="small muted" style="margin:8px 0">'+e(timeText(item.archivedAt||item.startedAt))+'<br>玩家訊息 '+messageCount+' 筆 · 日記 '+item.memories.length+' 筆 · 相片 '+item.album.length+' 張</p><div class="row wrap"><button data-action="view-archive" data-id="'+e(item.id)+'">查看回憶</button><button data-action="resume-archive" data-id="'+e(item.id)+'">繼續聊天</button><button data-action="rename-archive" data-id="'+e(item.id)+'">編輯檔名</button></div></article>';
     }).join('');
-    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="管理對話"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回聊天功能" title="返回聊天功能">'+ICON.back+'</button><h2>管理對話</h2></div><p class="small muted">開始新對話後，舊劇情會封存於下方；切換歷史時，當前對話會先封存。同一角色只會在聊天列表保留一個目前對話。</p><div class="stack"><button type="button" class="primary" data-action="new-conversation" data-id="'+e(ctx.id)+'">開始新對話</button></div><h3 style="margin:18px 0 8px">舊的回憶</h3><div class="stack">'+(archiveCards||'<div class="empty">尚無封存對話；開始新對話後，舊劇情會顯示在這裡。</div>')+'</div></section>');
+    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="'+(isEncounter?'相遇紀錄':'管理對話')+'"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回聊天功能" title="返回聊天功能">'+ICON.back+'</button><h2>'+(isEncounter?'相遇紀錄':'管理對話')+'</h2></div><p class="small muted">'+(isEncounter?'同一角色過往的相遇會依結束時間由新到舊排列。點選紀錄可查看當次對話。':'開始新對話後，舊劇情會封存於下方；切換歷史時，當前對話會先封存。')+'</p>'+(isEncounter?'':'<div class="stack"><button type="button" class="primary" data-action="new-conversation" data-id="'+e(ctx.id)+'">開始新對話</button></div>')+'<h3 style="margin:18px 0 8px">'+(isEncounter?'過往相遇':'舊的回憶')+'</h3><div class="stack">'+(archiveCards||'<div class="empty">'+(isEncounter?'尚無已結束的相遇紀錄。':'尚無封存對話；開始新對話後，舊劇情會顯示在這裡。')+'</div>')+'</div></section>');
     return;
   }
   if(kind==='settings'){
-    const items=[...(isGroup?[['group-info','群組資訊','群組成員、世界背景與場景']]:[]),['diary','甜蜜日記','回憶摘要與長期保存'],['background','聊天背景','無背景、角色圖片或回憶相片'],[isGroup?'group-persona':'persona','人設管理',isGroup?'管理並套用這個群組的玩家人設':'管理目前聊天使用的人設'],...(!isGroup?[['manage-conversation','管理對話','開始新對話或切換舊的回憶']]:[]),['delete','刪除對話','刪除這段對話與回憶']];
+    const encounterMode=!isGroup&&!!ctx.session.encounterMode;
+    const items=encounterMode
+      ?[['encounter-record','相遇紀錄','查看這個角色過往的相遇，依時間由新到舊'],['persona','人設管理','設定此角色所有相遇共用的人設'],['encounter-dialogues','對話紀錄','查看本次相遇的對話紀錄'],['encounter-end','結束相遇','結束本次相遇，期待下次與您相遇']]
+      :[...(isGroup?[['group-info','群組資訊','群組成員、世界背景與場景']]:[]),['diary','甜蜜日記','回憶摘要與長期保存'],['background','聊天背景','無背景、角色圖片或回憶相片'],[isGroup?'group-persona':'persona','人設管理',isGroup?'管理並套用這個群組的玩家人設':'管理目前聊天使用的人設'],...(!isGroup?[['manage-conversation','管理對話','開始新對話或切換舊的回憶']]:[]),['delete','刪除對話','刪除這段對話與回憶']];
     panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="聊天功能選單"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-close" aria-label="返回聊天" title="返回聊天">'+ICON.back+'</button><h2>聊天功能</h2></div><div class="stack chat-settings-options">'+items.map(([action,title,desc])=>'<button type="button" class="profile-setting" data-action="chat-settings-option" data-option="'+e(action)+'"><span><strong>'+e(title)+'</strong><small>'+e(desc)+'</small></span><span>›</span></button>').join('')+'</div></section>');
     return;
   }
@@ -6562,14 +6801,34 @@ document.addEventListener('click',async event => {
       case 'chat-settings-menu': { const next={...route,chatOverlay:'settings'};delete next.overlay;go(next);break; }
       case 'chat-settings-option': {
         const option=button.dataset.option;
+        if(option==='encounter-record'||option==='encounter-dialogues'){const next={...route,chatOverlay:'manage-conversation'};delete next.overlay;go(next);break;}
         if(option==='background'){chatBackgroundDraft=null;const next={...route,chatOverlay:'settings-background'};delete next.overlay;go(next);break;}
         if(option==='diary'){const next={...route,chatOverlay:'diary'};delete next.overlay;go(next);break;}
         if(option==='group-info'){const next={...route,chatOverlay:'group-info'};delete next.overlay;go(next);break;}
         if(option==='persona'){personaPickerSelection=null;openModal('persona');break;}
         if(option==='group-persona'){openModal('group-persona-settings');break;}
         if(option==='manage-conversation'){const next={...route,chatOverlay:'manage-conversation'};delete next.overlay;go(next);break;}
+        if(option==='encounter-end'){const session=currentSession();if(session?.encounterMode)showDialog('結束相遇','<p>結束本次相遇，期待下次與您相遇。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">再聊一下</button><button type="button" class="primary" data-action="encounter-end-confirm" data-id="'+e(session.id)+'">結束相遇</button></div>');break;}
         if(option==='delete'){const next={...route,chatOverlay:'delete-confirm'};delete next.overlay;go(next);break;}
         break;
+      }
+      case 'encounter-temporary-leave': {
+        const session=state.sessions[key];if(!session?.encounterMode)break;
+        captureDraft();persist();$('modal')?.close();hideList=false;go({page:'citymap'});break;
+      }
+      case 'encounter-end-confirm': {
+        const session=state.sessions[key]||currentSession();if(!session?.encounterMode)break;
+        const messages=session.messages||[];
+        const lastCharacter=messages.filter(m=>m.role!=='user'&&String(m.text||m.content||'').trim()).slice(-1)[0];
+        const lastUser=messages.filter(m=>m.role==='user'&&String(m.text||m.content||'').trim()).slice(-1)[0];
+        const summaryParts=[];
+        if(lastUser)summaryParts.push('你說：「'+String(lastUser.text||lastUser.content).trim().slice(0,70)+'」。');
+        if(lastCharacter)summaryParts.push((sessionCharacter(session)?.name||'角色')+'回應：「'+String(lastCharacter.text||lastCharacter.content).trim().slice(0,90)+'」。');
+        session.encounterSummary=summaryParts.join(' ').slice(0,360)||'這次相遇留下了一段尚待整理的回憶。';
+        session.encounterEndedAt=Date.now();session.archived=true;session.archivedAt=session.encounterEndedAt;
+        session.name='相遇紀錄 · '+timeText(session.encounterEndedAt);
+        persist();$('modal')?.close();hideList=false;go({page:'citymap'});
+        toast('本次相遇已結束並保存紀錄。');break;
       }
       case 'chat-settings-back': {
         const next={...route,chatOverlay:'settings'};delete next.overlay;
@@ -6842,6 +7101,20 @@ document.addEventListener('click',async event => {
       }
       case 'author':visit('author',key);break;
       case 'start-chat':startChat(key);break;
+      case 'start-encounter': {
+        const character = state.characters.find(item => item.id === key);
+        if (!character || !accessible(character)) { toast('此角色目前無法開始相遇模式。'); break; }
+        if (!requireLogin({page:route.page,id:key})) break;
+        try {
+          const encounterSession = await createEncounterSession(character);
+          go({page:'conversation',id:encounterSession.id});
+          toast('已進入相遇模式；每次送出訊息會消耗 2 銀幣或依既有規則使用鑽石。');
+        } catch (error) {
+          console.error('建立相遇模式失敗：',error);
+          toast(error?.message || '相遇模式暫時無法使用，請稍後再試。');
+        }
+        break;
+      }
       case 'test-purchase-200': {
         if (!requireLogin({page:route.page,id:route.id})) break;
         if (window.mySupabase && state.account?.uid && state.account.uid !== 'demo-local-account') {
@@ -7056,13 +7329,19 @@ document.addEventListener('click',async event => {
         }
         render();break;
       }
-      case 'chat-back':
-        // 聊天標題列的返回鍵固定回到角色聊天選擇／聊天列表，不使用 history.back，
-        // 避免上一個歷史狀態是甜蜜日記或聊天設定時又跳回覆蓋面板。
-        captureDraft();
-        hideList=false;
-        go({page:'chat'});
-        break;
+      case 'chat-back': {
+        const encounterSession=currentSession();
+        if(encounterSession?.encounterMode){
+          showDialog('離開相遇',
+            '<div class="stack" style="gap:10px">'+
+            '<button type="button" class="profile-setting" data-action="encounter-temporary-leave" data-id="'+e(encounterSession.id)+'"><span><strong>暫時離開</strong><small>暫時離開若到了角色離開當前場景的時間，也會自動結束相遇哦</small></span><span>›</span></button>'+
+            '<button type="button" class="profile-setting" data-action="encounter-end-confirm" data-id="'+e(encounterSession.id)+'"><span><strong>結束相遇</strong><small>結束本次相遇，期待下次與您相遇</small></span><span>›</span></button>'+
+            '</div>');
+          break;
+        }
+        // 聊天標題列的返回鍵固定回到聊天列表，不使用 history.back。
+        captureDraft();hideList=false;go({page:'chat'});break;
+      }
       case 'chat-overlay': {
         const next={...route,chatOverlay:button.dataset.kind};
         delete next.overlay;
@@ -7782,6 +8061,12 @@ document.addEventListener('submit',async event => {
           race:String(f.get('race')).trim(),intro,opening,
           privateInfo:String(f.get('privateInfo')).trim(),
           style:String(f.get('style')).trim(),
+          personalityProfile:normalizePersonalityProfile({
+            coreTraits:f.get('personalityCoreTraits'), values:f.get('personalityValues'),
+            speechStyle:f.get('personalitySpeechStyle'), behaviorRules:f.get('personalityBehaviorRules'),
+            likes:f.get('personalityLikes'), dislikes:f.get('personalityDislikes'),
+            boundaries:f.get('personalityBoundaries'), relationshipPacing:f.get('personalityRelationshipPacing')
+          }),
           phoneSettings:{noticePrompts:String(f.get('phoneNotices')||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,8).map(x=>x.slice(0,150))},
           visibility:String(f.get('visibility')),image:draftImage,
           avatarVideoPath:draftVideoPath || '',
@@ -7794,8 +8079,24 @@ document.addEventListener('submit',async event => {
         };
 
         if(draftVideoFile)c.avatarVideoPath=await uploadCharacterAvatarVideo(draftVideoFile,user.uid,c.id);
+        // 先驗證日程格式，避免角色資料已寫入後才發現日程格式錯誤。
+        const scheduleText = String(f.get('encounterSchedules') || '').trim();
+        const clearSchedules = form.querySelector('input[name="clearEncounterSchedules"]')?.checked === true;
+        let scheduleRows = [];
+        if (scheduleText) {
+          try { scheduleRows = parseEncounterScheduleText(scheduleText); }
+          catch (scheduleError) { return toast(scheduleError.message); }
+        }
+        if (clearSchedules && scheduleText) return toast('若要清空日程，請先清空文字欄位；若要保留或更新日程，請取消勾選清空選項。');
         // 先寫入雲端；只有角色資料成功後才更新本機畫面狀態。
         const saveResult = await saveSupabaseCharacter(c, user.uid);
+        // 使用後端交易函式同步整份清單，支援新增、修改、刪除且不會留下半套資料。
+        if (scheduleText || clearSchedules) {
+          await saveEncounterSchedules(c.id, user.uid, scheduleRows);
+          c.encounterSchedules = scheduleText;
+        } else if (old?.encounterSchedules) {
+          c.encounterSchedules = old.encounterSchedules;
+        }
         // 以資料庫確認的公開狀態為準，避免非同步雲端角色載入替換 state.characters
         // 後，indexOf(old) 回傳 -1，導致本機仍保留「私密」狀態而隱藏評論區。
         c.visibility = saveResult.visibility;
@@ -8419,6 +8720,24 @@ document.addEventListener('keydown',event => {
   if(event.target.id==='groupMessageInput') void groupSendMock();
   else event.target.form?.requestSubmit();
 });
+document.addEventListener('click',function(event){
+  const option=event.target.closest('[data-character-illustration-index]');
+  if(!option)return;
+  const index=Number(option.dataset.characterIllustrationIndex);
+  if(!Number.isInteger(index)||!draftIllustrations[index])return;
+  draftImage=draftIllustrations[index];
+  draftVideoFile=null;
+  draftVideoPath='';
+  if(draftVideoPreviewUrl){URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl='';}
+  const imagePreview=$('imagePreview');
+  if(imagePreview){imagePreview.src=draftImage;imagePreview.classList.remove('hidden');}
+  const videoPreview=$('characterVideoPreview');
+  if(videoPreview){videoPreview.removeAttribute('src');videoPreview.classList.add('hidden');}
+  const gallery=$('characterIllustrationGallery');
+  if(gallery)gallery.innerHTML=renderCharacterIllustrationGallery(draftIllustrations,draftImage);
+  saveEditorDraft();
+  toast('已切換角色主圖；儲存角色後即可測試這張立繪。');
+});
 document.addEventListener('change',async event => {
   const target=event.target;
   if (target.closest('form[data-form="character"]')) saveEditorDraft();
@@ -8459,6 +8778,27 @@ document.addEventListener('change',async event => {
         }
       }catch(error){if(requestId!==characterImageCompressionRequest)return;target.value='';throw error;}
       finally{if(requestId===characterImageCompressionRequest)isCompressingCharacterImage=false;}
+    }
+    if(target.id==='characterIllustrations'){
+      const files=Array.from(target.files||[]);
+      if(!files.length)return;
+      if(files.length>4){target.value='';throw new Error('立繪測試最多一次選擇 4 張圖片。');}
+      const supported=['image/png','image/jpeg','image/webp'];
+      for(const file of files){
+        if(file.size>15*1024*1024)throw new Error('每張立繪測試圖片不可超過 15 MB。');
+        if(!supported.includes(file.type))throw new Error('立繪測試圖片僅支援 PNG、JPG 或 WebP。');
+      }
+      toast('正在處理立繪測試圖片…');
+      const next=[];
+      for(const file of files){
+        const compressed=await compressUploadImage(file,{maxEdge:1600,targetBytes:350*1024});
+        next.push(compressed.dataUrl);
+      }
+      draftIllustrations=next;
+      const gallery=$('characterIllustrationGallery');
+      if(gallery)gallery.innerHTML=renderCharacterIllustrationGallery(draftIllustrations,draftImage);
+      saveEditorDraft();
+      toast('已載入 '+next.length+' 張立繪，點選縮圖即可切換角色主圖。');
     }
     if (target.id==='profileImage') {
       if (!target.files?.[0]) return;
@@ -8582,6 +8922,468 @@ async function importCharacter(file) {
 document.addEventListener('error',event => {
   if (event.target instanceof HTMLImageElement) event.target.style.opacity='.15';
 },true);
+
+function renderCityMapMVP(){
+  // A previous city-map render moves its dialog to <body>. Remove stale dialogs first;
+  // otherwise duplicate IDs make later landmark clicks update an old, detached-from-view panel.
+  document.querySelectorAll('#cityMapPeople').forEach(modal=>modal.remove());
+  document.body.classList.remove('city-location-active');
+  document.body.classList.add('city-map-mode');
+  const view=$('view');
+  view.innerHTML=`
+    <section class="city-map-stage" id="cityMapStage" aria-label="POYOZZ 城市地圖">
+      <div class="city-map-world" id="cityMapWorld" aria-label="可拖曳地圖">
+        <div class="city-map-river"></div>
+        <div class="city-map-road r1"></div><div class="city-map-road r2"></div><div class="city-map-road r3"></div>
+        <div class="city-map-block cafe"></div><div class="city-map-block school"></div><div class="city-map-block park"></div><div class="city-map-block shop"></div><div class="city-map-block home"></div>
+        <svg class="city-building-layer" id="cityBuildingLayer" viewBox="0 0 1662 932" preserveAspectRatio="none" aria-label="城市地點玻璃圓形圖標">
+          <!-- Marker anchors follow the user's annotated city-map reference; icons are specific to each place type. -->
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="airport" transform="translate(220 140)" tabindex="0" role="button" aria-label="機場"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M 0 -11 L 2 -3 L 11 2 L 11 4 L 2 2 L 1 8 L 4 11 L 4 13 L 0 11 L -4 13 L -4 11 L -1 8 L -2 2 L -11 4 L -11 2 L -2 -3 Z"/></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="commercial" transform="translate(1305 94)" tabindex="0" role="button" aria-label="商業大樓"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M -8 10 V -10 H 1 V 10 M 1 -3 H 8 V 10 M -5 -6 H -3 M -5 -1 H -3 M -5 4 H -3 M 4 0 H 6 M 4 5 H 6 M -2 10 V 6 H 0 V 10"/></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="night-bar" transform="translate(632 294)" tabindex="0" role="button" aria-label="夜間酒吧"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M -10 -9 H 10 L 3 0 V 6 H 7 V 10 H -7 V 6 H -3 V 0 Z M -5 -5 L -2 -2 M 2 -5 L 5 -2"/></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="live-house" transform="translate(868 416)" tabindex="0" role="button" aria-label="Live House 音樂酒吧"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M 2 -10 V 5 A 4 4 0 1 1 -1 1 V -6 L 9 -9 V 2 A 4 4 0 1 1 6 -2 V -7 Z"/></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="apartment" transform="translate(666 440)" tabindex="0" role="button" aria-label="308公寓"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M -8 10 V -10 H 8 V 10 M -4 -6 H -2 M 3 -6 H 5 M -4 -1 H -2 M 3 -1 H 5 M -4 4 H -2 M 3 4 H 5 M -2 10 V 7 H 2 V 10"/></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="department-store" transform="translate(1020 300)" tabindex="0" role="button" aria-label="百貨公司"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M -9 -3 H 9 L 7 10 H -7 Z M -6 -3 V -6 Q -6 -10 0 -10 Q 6 -10 6 -6 V -3 M -9 -3 L -11 1 M 9 -3 L 11 1"/></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="bookstore" transform="translate(480 733)" tabindex="0" role="button" aria-label="書店"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M -10 -7 Q -4 -9 0 -5 Q 4 -9 10 -7 V 8 Q 4 6 0 10 Q -4 6 -10 8 Z M 0 -5 V 10 M -7 -4 Q -4 -5 -2 -3 M 2 -3 Q 5 -5 7 -4"/></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="cafe" transform="translate(645 624)" tabindex="0" role="button" aria-label="咖啡廳"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M -8 -4 H 6 V 5 Q 6 10 0 10 H -2 Q -8 10 -8 5 Z M 6 -2 H 9 Q 12 -2 11 2 Q 10 5 6 4 M -5 -8 Q -8 -11 -5 -13 M 0 -8 Q -3 -11 0 -13 M 4 -8 Q 1 -11 4 -13"/></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="park" transform="translate(750 766)" tabindex="0" role="button" aria-label="中央公園"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><path class="city-marker-glyph" d="M 0 -11 L -7 -2 H -3 L -8 4 H -2 V 10 H 2 V 4 H 8 L 3 -2 H 7 Z"/></g>
+        </svg>
+
+      </div>
+      <div class="city-map-ui" id="cityMapUI">
+        <aside class="city-map-info">
+          <h2 class="city-map-title"><img src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="POYOZZ"> <span>城市</span></h2>
+          <div id="cityMapDate">台灣時間</div>
+          <div class="city-map-weather"><span>🌤️</span><span id="cityMapWeather">天氣資料待串接</span><span id="cityMapTemp">溫度待串接</span></div>
+          <p>這座城市充滿各種可能，也許今天你會在某個角落遇見特別的那個人。</p>
+          <button class="city-map-traditional" data-action="city-traditional">⌖ 傳統探索模式</button>
+        </aside>
+        <div class="city-map-zoom"><button type="button" data-action="city-zoom-in" aria-label="放大地圖">＋</button><button type="button" data-action="city-zoom-out" aria-label="縮小地圖">−</button></div>
+        <div class="city-map-bottom">
+          <button data-action="city-traditional">✧<br>探索</button><button data-action="nav" data-page="create">✎<br>創建</button><button data-action="nav" data-page="chat">☏<br>聊天</button><button data-action="nav" data-page="shop">◇<br>商店</button><button data-action="nav" data-page="profile">♡<br>我的</button>
+        </div>
+      </div>
+      <div class="city-map-empty">拖曳探索 · 雙指縮放 · 雙擊空白處沉浸</div>
+      <section class="city-location-modal" id="cityMapPeople" hidden aria-modal="true" role="dialog" aria-labelledby="cityMapPlaceTitle">
+      <button class="city-location-backdrop" type="button" data-action="city-close" aria-label="關閉地點資訊"></button>
+      <div class="city-location-glass">
+        <div class="city-location-header" role="group" aria-label="場景標題列">
+          <div class="city-location-title-row"><span class="city-location-scene-icon city-location-title-icon" id="cityMapPlaceIcon" aria-hidden="true">☕</span><h2 id="cityMapPlaceTitle">咖啡廳</h2><span class="city-location-open-inline"><i></i><span>營業中</span></span></div>
+          <button type="button" class="city-location-close" data-action="city-close" aria-label="關閉場景視窗">×</button>
+        </div>
+        <div class="city-location-rule"></div>
+        <div class="city-location-section-title">當前角色 <span id="cityMapPeopleCount">依公開角色排程顯示</span></div>
+        <div class="city-location-avatar-strip" id="cityMapAvatarStrip" aria-label="目前在場角色"><p class="city-location-empty">目前尚無符合此地點與台灣時間的公開角色排程。</p></div>
+        <div class="city-location-rule"></div>
+        <div class="city-location-detail" id="cityMapPresenceList">
+          <div class="city-location-scene-icon" aria-hidden="true">📍</div>
+          <h3 id="cityMapVenueHeading">選擇地點以查看場景</h3>
+          <p id="cityMapVenueDescription">點選地圖上的地點後，這裡會顯示對應的場景介紹。</p>
+          <div class="city-location-news" id="cityMapVenueNews"><span class="city-location-event-label">最新消息</span><div class="city-location-news-items"><p>📣 查看這個場景的最新消息。</p></div></div>
+        </div>
+        <section class="city-character-card" id="cityCharacterCard" hidden aria-live="polite">
+          <div class="city-character-card-head"><span class="city-character-page-label" id="cityCharacterPageLabel">角色狀態 · 01 / 02</span><button type="button" class="city-character-card-close" data-action="city-character-close" aria-label="返回場地資訊">×</button></div>
+          <div class="city-character-card-body" id="cityCharacterCardBody"></div>
+          <div class="city-character-card-footer">
+            <button type="button" class="city-character-page-button" data-action="city-character-prev" aria-label="上一頁">‹</button>
+            <span class="city-character-page-dots"><i class="active"></i><i></i></span>
+            <button type="button" class="city-character-page-button" data-action="city-character-next" aria-label="下一頁">›</button>
+          </div>
+        </section>
+      </div>
+    </section>
+    </section>`;
+  document.body.classList.remove('city-map-mode-immersive');
+  const stage=$('cityMapStage'),world=$('cityMapWorld');
+  const mapAspect=2752/1536;
+  let scale=1,tx=0,ty=0,pointers=new Map(),start=null,lastTap=0,lastTapX=0,lastTapY=0,moved=false;
+  const sizeWorld=()=>{const sw=stage.clientWidth,sh=stage.clientHeight;const nav=$('cityMapUI')?.querySelector('.city-map-bottom');const navExtra=Math.max(76,(nav?.offsetHeight||68)+12);const h=Math.max(sh+navExtra,sw/mapAspect);const w=h*mapAspect;world.style.width=w+'px';world.style.height=h+'px';world.style.left=((sw-w)/2)+'px';world.style.top=((sh-h)/2)+'px';world.style.backgroundSize='100% 100%';};
+  sizeWorld();
+  const apply=()=>{world.style.transform='translate('+tx+'px,'+ty+'px) scale('+scale+')';};
+  const clamp=()=>{scale=Math.max(1,Math.min(2.25,scale));const maxX=Math.max(0,(world.offsetWidth*scale-stage.clientWidth)/2);const maxY=Math.max(0,(world.offsetHeight*scale-stage.clientHeight)/2);tx=Math.max(-maxX,Math.min(maxX,tx));ty=Math.max(-maxY,Math.min(maxY,ty));apply();};
+  const zoomBy=f=>{scale*=f;clamp();};
+  stage.addEventListener('pointerdown',e=>{
+    const direct=e.target instanceof Element?e.target.closest('[data-action="city-landmark"]'):null;
+    // Detect marker taps here only to keep them out of map-drag handling.
+    // Do NOT open the modal on pointerdown: on touch devices the synthesized click
+    // may then land on the newly displayed backdrop and immediately close it.
+    const marker=direct||[...stage.querySelectorAll('[data-action="city-landmark"]')].find(node=>{
+      const r=node.getBoundingClientRect();
+      return e.clientX>=r.left-8&&e.clientX<=r.right+8&&e.clientY>=r.top-8&&e.clientY<=r.bottom+8;
+    });
+    // Keep marker taps out of map-drag handling without cancelling the browser's synthesized click.
+    // Calling preventDefault() on pointerdown can suppress click on mobile browsers, leaving the static modal content unchanged.
+    if(marker){e.stopPropagation();return;}
+    if(e.target instanceof Element&&e.target.closest('button,.city-map-info,.city-map-zoom,.city-map-bottom,.city-map-people'))return;
+    stage.setPointerCapture?.(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=false;
+    if(pointers.size===1)start={x:e.clientX,y:e.clientY,tx,ty,time:Date.now()};
+    else if(pointers.size===2){const a=[...pointers.values()];start={distance:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),scale,kind:'pinch'};}
+  });
+  stage.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2&&start?.kind==='pinch'){const a=[...pointers.values()];const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);scale=start.scale*d/Math.max(1,start.distance);clamp();moved=true;}else if(pointers.size===1&&start&&!start.kind){const dx=e.clientX-start.x,dy=e.clientY-start.y;if(Math.abs(dx)+Math.abs(dy)>5)moved=true;tx=start.tx+dx;ty=start.ty+dy;clamp();}});
+  const endPointer=e=>{pointers.delete(e.pointerId);if(pointers.size===0){if(start&&!moved&&Date.now()-start.time<280){const now=Date.now(),dx=e.clientX-lastTapX,dy=e.clientY-lastTapY;if(now-lastTap<320&&Math.hypot(dx,dy)<24){document.body.classList.toggle('city-map-mode-immersive');lastTap=0;}else{lastTap=now;lastTapX=e.clientX;lastTapY=e.clientY;}}start=null;}else if(pointers.size===1){const p=[...pointers.values()][0];start={x:p.x,y:p.y,tx,ty,time:Date.now()};}};
+  stage.addEventListener('pointerup',endPointer);stage.addEventListener('pointercancel',endPointer);stage.addEventListener('dblclick',e=>e.preventDefault());stage.addEventListener('contextmenu',e=>e.preventDefault());
+  // 2025 Taipei solar-time reference profile. Calculate the 2025 reference day locally;
+  // no sunrise/sunset API or daily network request is needed.
+  const taipeiSunTimes2025=(month,day)=>{
+    const date=new Date(Date.UTC(2025,month-1,day));
+    const n=Math.floor((date-Date.UTC(2025,0,0))/86400000);
+    const lat=25.033,lon=121.5654,zenith=90.833;
+    const decl=0.006918-0.399912*Math.cos(2*Math.PI*n/365)+0.070257*Math.sin(2*Math.PI*n/365)-0.006758*Math.cos(4*Math.PI*n/365)+0.000907*Math.sin(4*Math.PI*n/365)-0.002697*Math.cos(6*Math.PI*n/365)+0.00148*Math.sin(6*Math.PI*n/365);
+    const cosH=(Math.cos(zenith*Math.PI/180)-Math.sin(lat*Math.PI/180)*Math.sin(decl))/(Math.cos(lat*Math.PI/180)*Math.cos(decl));
+    const ha=Math.acos(Math.max(-1,Math.min(1,cosH)))*180/Math.PI;
+    const solarNoon=12-lon/15+8;
+    return {sunrise:solarNoon-ha/15,sunset:solarNoon+ha/15};
+  };
+  const taipeiTime=()=>{
+    const d=new Date();
+    const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d);
+    const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));
+    const month=Number(p.month),day=Number(p.day),minuteOfDay=(Number(p.hour)%24)*60+Number(p.minute);
+    const sun=taipeiSunTimes2025(month,day);
+    const sunrise=Math.round(sun.sunrise*60),sunset=Math.round(sun.sunset*60);
+    const isDay=minuteOfDay>=sunrise&&minuteOfDay<sunset;
+    $('cityMapDate').textContent=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);
+    const mapImage=isDay?'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp':'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Add_nighttime_lighting_to_buildings_2K_20261027142959%20(1).webp';
+    stage.style.backgroundColor=isDay?'#b9d9c5':'#18253e';stage.style.backgroundImage='none';world.style.backgroundImage='url("'+mapImage+'")';world.style.filter='none';
+  };
+  taipeiTime();
+  const cityMapClock=setInterval(taipeiTime,30000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)taipeiTime();});
+
+  // Keep the location dialog outside the transformed map stage to isolate it from map gestures.
+  const locationModal=$('cityMapPeople');
+  if(locationModal && locationModal.parentElement!==document.body) document.body.appendChild(locationModal);
+  const cityPlaceNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園'};
+  // These are authored scene descriptions, not live opening hours, character presence, or dynamically generated events.
+  const cityVenueScenes={
+    airport:{icon:'✈️',heading:'城市的起點與交會處',description:'航班資訊在大廳螢幕上流動，旅人拖著行李匆匆經過。候機座位、接機大廳與深夜航班，總有新的相遇可能。',eventLabel:'場景亮點',eventTitle:'抵達大廳的偶遇',eventDescription:'適合安排接機、送別、轉機途中或旅程開始前的故事。'},
+    commercial:{icon:'🏢',heading:'玻璃帷幕下的繁忙日常',description:'電梯穿梭於不同樓層，會議室、辦公座位與窗邊休息區構成城市工作的節奏。白天忙碌，傍晚後則逐漸安靜。',eventLabel:'場景亮點',eventTitle:'下班後的窗邊時光',eventDescription:'適合商業談判、同事互動、秘密會面或忙碌一天後的短暫休息。'},
+    'night-bar':{icon:'🍸',heading:'霓虹燈下的微醺夜色',description:'低亮度燈光映著吧台酒杯，音樂與交談聲交錯。角落座位保留一點私密感，適合卸下白天的面具。',eventLabel:'場景亮點',eventTitle:'吧台邊的陌生人',eventDescription:'適合深夜談心、偶然搭話、重逢或帶著秘密的夜間故事。'},
+    'live-house':{icon:'🎸',heading:'讓音樂填滿整個夜晚',description:'舞台燈光、音箱震動與觀眾的歡呼交織成現場氛圍。演出前後的走廊與吧台，也可能發生比舞台更難忘的對話。',eventLabel:'場景亮點',eventTitle:'演出開始前',eventDescription:'適合樂團演出、後台相遇、樂迷交流或散場後的續攤情節。'},
+    apartment:{icon:'🏠',heading:'308 公寓的日常與秘密',description:'熟悉的電梯聲、走廊燈光與各自緊閉的房門，讓這裡既有生活感，也保留鄰居之間尚未說出口的故事。',eventLabel:'場景亮點',eventTitle:'走廊裡的偶然碰面',eventDescription:'適合鄰居日常、借物、深夜返家或逐漸熟悉彼此的生活故事。'},
+    'department-store':{icon:'🛍️',heading:'從精品櫥窗到美食樓層',description:'明亮的中庭連接各式品牌櫃位、服飾樓層與餐飲空間。人潮來去，購物、約會與臨時起意的行程都能在這裡展開。',eventLabel:'場景亮點',eventTitle:'中庭的週末人潮',eventDescription:'適合約會逛街、挑選禮物、偶遇熟人或在美食樓層稍作停留。'},
+    bookstore:{icon:'📚',heading:'在書頁之間慢下腳步',description:'木質書架與紙張氣味讓時間放慢。新書展示區、靠窗閱讀座位與安靜的書架轉角，各自藏著不同的相遇方式。',eventLabel:'場景亮點',eventTitle:'同一本書的選擇',eventDescription:'適合交換閱讀心得、尋找某本書、安靜陪伴或從共同興趣開始的故事。'},
+    cafe:{icon:'☕',heading:'在城市裡，找個地方歇歇腳',description:'咖啡香從吧台飄向窗邊座位，甜點櫃裡擺著當季蛋糕。這裡適合短暫休息、工作、約會，也適合和某個人慢慢聊起近況。',eventLabel:'場景亮點',eventTitle:'今日甜點的話題',eventDescription:'甜點櫃可作為聊天與約會的情境；實際品項、庫存與活動尚未連接動態資料。'},
+    park:{icon:'🌳',heading:'城市裡的一片綠意',description:'步道穿過樹蔭與草地，長椅、噴水池和開闊的天空讓人暫時遠離喧鬧。清晨散步、午後閒聊或傍晚慢跑，都有不同的城市風景。',eventLabel:'場景亮點',eventTitle:'樹蔭下的片刻寧靜',eventDescription:'適合散步、慢跑、野餐、偶遇或在戶外談一場不急著結束的對話。'}
+  };
+  // Use only published characters whose own schedule data is already available to this client.
+  // Never invent a character or query private schedule rows from the browser.
+  const cityPlaceAliases={airport:['airport'],commercial:['commercial','office'], 'night-bar':['night-bar','bar'], 'live-house':['live-house','livehouse'], apartment:['apartment'], 'department-store':['department-store','department_store'], bookstore:['bookstore','book-store'], cafe:['cafe','coffee-shop'], park:['park']};
+  const getTaipeiClock=()=>{
+    const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
+    const values=Object.fromEntries(parts.map(part=>[part.type,part.value]));
+    return {weekday:{Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[values.weekday],minutes:Number(values.hour)*60+Number(values.minute)};
+  };
+  // Public schedules live in character_schedules, not in the character row.
+  // Hydrate them only through the guarded RPC; never grant browser clients direct table access.
+  const cityScheduleCache=new Map();
+  const hydrateCitySchedule=async(character)=>{
+    if(!character?.id||character.visibility!=='public'||character.deletedAt)return;
+    if(cityScheduleCache.has(character.id)){
+      character.encounterSchedules=await cityScheduleCache.get(character.id);
+      return;
+    }
+    const pending=(async()=>{
+      try{
+        const client=window.mySupabase;
+        if(!client)return '';
+        const {data,error}=await client.rpc('get_encounter_character_schedule',{p_character_id:character.id});
+        if(error)throw error;
+        return (data||[]).map(row=>[
+          row.weekday==null?'*':row.weekday,
+          String(row.start_time||'').slice(0,5),
+          String(row.end_time||'').slice(0,5),
+          row.location_key,
+          row.activity
+        ].join('|')).join('\n');
+      }catch(error){
+        console.warn('城市角色日程載入失敗：',character.id,error?.message||error);
+        return '';
+      }
+    })();
+    cityScheduleCache.set(character.id,pending);
+    character.encounterSchedules=await pending;
+  };
+  const getCityPresence=(place)=>{
+    const clock=getTaipeiClock();
+    const aliases=cityPlaceAliases[place]||[place];
+    return (Array.isArray(state.characters)?state.characters:[]).filter(character=>{
+      if(!accessible(character)) return false;
+      const raw=String(character.encounterSchedules||'').trim();
+      if(!raw) return false;
+      return raw.split(/\r?\n/).some(line=>{
+        const parts=line.trim().split('|').map(value=>value.trim());
+        if(parts.length!==5) return false;
+        const [day,start,end,key,activity]=parts;
+        if(!aliases.includes(key)||!activity) return false;
+        if(day!=='*'&&Number(day)!==clock.weekday) return false;
+        if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(start)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(end)) return false;
+        const now=clock.minutes,from=Number(start.slice(0,2))*60+Number(start.slice(3)),to=Number(end.slice(0,2))*60+Number(end.slice(3));
+        return from<to?now>=from&&now<to:(now>=from||now<to);
+      });
+    }).map(character=>{
+      const raw=String(character.encounterSchedules||'');
+      const line=raw.split(/\r?\n/).find(item=>{
+        const parts=item.trim().split('|').map(value=>value.trim());
+        if(parts.length!==5||!(cityPlaceAliases[place]||[place]).includes(parts[3])||!parts[4]) return false;
+        if(parts[0]!=='*'&&Number(parts[0])!==clock.weekday) return false;
+        const from=Number(parts[1]?.slice(0,2))*60+Number(parts[1]?.slice(3)),to=Number(parts[2]?.slice(0,2))*60+Number(parts[2]?.slice(3));
+        return Number.isFinite(from)&&Number.isFinite(to)&&(from<to?clock.minutes>=from&&clock.minutes<to:(clock.minutes>=from||clock.minutes<to));
+      });
+      const parts=String(line||'').trim().split('|').map(value=>value.trim());
+      return {...character,cityStartTime:parts[1]||'',cityEndTime:parts[2]||'',cityActivity:parts[4]||''};
+    });
+  };
+  const cityPresenceByPlace={};
+  const openCityLocation=async(marker)=>{
+    const place=marker?.dataset?.place;
+    if(!place||!locationModal)return;
+    const name=cityPlaceNames[place]||'地點';
+    const scene=cityVenueScenes[place];
+    if(!scene){console.error('城市地標缺少專屬場景設定：',place);toast('這個地點的場景資料尚未完成，請稍後再試。');return;}
+    const venueNotices={
+      bookstore:{label:'最新消息',items:['本週暢銷書排行已經更新。','本週六下午兩點將舉辦作家簽售會。']},
+      cafe:{label:'最新消息',items:['本日限定甜點已上架，適合搭配店內手沖咖啡。','本週末推出季節限定飲品。']},
+      park:{label:'最新消息',items:['本週末草地旁將舉辦小型手作市集。','傍晚時段適合散步，中央步道照明已開啟。']},
+      'department-store':{label:'最新消息',items:['10 樓櫃位調整中，造成不便敬請見諒。','地下美食街有多樣美食，用餐期間歡迎前往用餐。','本週末中庭將舉辦季節主題展。']},
+      airport:{label:'最新消息',items:['大廳服務櫃檯今日提供旅遊諮詢。','候機區新增安靜休息座位指引。']},
+      commercial:{label:'管理室公告',items:['如有裝潢需求，請向管理處提出申請。','各辦公室包裹請寄件人填寫好收件單位。','廁所內的公用物品請愛惜使用。']},
+      'night-bar':{label:'最新消息',items:['今晚有現場 DJ 音樂時段。','本週末吧台區安排主題音樂夜。']},
+      'live-house':{label:'最新消息',items:['本週演出時刻表已更新。','週六晚間將舉辦新團專場演出。']},
+      apartment:{label:'管委會公告',items:['公寓公共交誼區本週進行佈置更新。','公共區域請保持整潔，訪客請由住戶陪同進出。','本週六下午將舉辦住戶交換市集。']}
+    };
+    const notice=venueNotices[place]||{label:'最新消息',items:['這個場景有新的城市消息。']};
+    const eventMarkup=notice.items.slice(0,3).map(item=>'<p>📣 '+escapeHTML(item)+'</p>').join('');
+    const flightMarkup=place==='airport'
+      ? '<div class="city-location-news city-flight-section"><span class="city-location-event-label">今日航班</span><p class="small">模擬航班時刻表</p><table class="city-flight-table"><thead><tr><th>時間</th><th>航班</th><th>目的地</th><th>狀態</th></tr></thead><tbody><tr><td>09:20</td><td>PZ102</td><td>東京</td><td>準時</td></tr><tr><td>13:45</td><td>PZ238</td><td>首爾</td><td>登機中</td></tr><tr><td>18:10</td><td>PZ516</td><td>台北</td><td>預計抵達</td></tr></tbody></table><p class="city-flight-note">以上為虛構示意資料，非真實航班資訊。</p></div>'
+      : '';
+    locationModal.dataset.scene=place;
+    locationModal.dataset.place=place;
+    locationModal.dataset.selectedPersonIndex='';
+    locationModal.dataset.cardMode='status';
+    const characterCard=$('cityCharacterCard');
+    if(characterCard)characterCard.hidden=true;
+    const venueInfo=$('cityMapPresenceList');
+    if(venueInfo)venueInfo.hidden=false;
+    const title=$('cityMapPlaceTitle');
+    if(title){title.textContent=name;title.style.display='block';title.style.visibility='visible';}
+    const placeIcon=$('cityMapPlaceIcon');
+    if(placeIcon)placeIcon.textContent=scene.icon;
+    const renderVenue=()=>{
+      const target=$('cityMapPresenceList');
+      if(target)target.innerHTML='<h3 id="cityMapVenueHeading">'+escapeHTML(scene.heading)+'</h3><p id="cityMapVenueDescription">'+escapeHTML(scene.description)+'</p><div class="city-location-news"><span class="city-location-event-label">'+escapeHTML(notice.label)+'</span><div class="city-location-news-items">'+eventMarkup+'</div></div>'+flightMarkup;
+    };
+    renderVenue();
+    let people=[];
+    try{
+      await Promise.all((Array.isArray(state.characters)?state.characters:[])
+        .filter(character=>character?.visibility==='public'&&!character.deletedAt)
+        .map(hydrateCitySchedule));
+      people=getCityPresence(place);
+      if(!Array.isArray(people))people=[];
+    }catch(error){console.error('讀取城市角色排程失敗：',error);}
+    cityPresenceByPlace[place]=people;
+    $('cityMapPeopleCount').textContent=people.length?people.length+' 位角色符合目前時段':'目前沒有符合時段的角色';
+    const strip=$('cityMapAvatarStrip');
+    strip.innerHTML=people.length
+      ? people.map((person,index)=>{
+          const characterName=String(person.name||'角色');
+          const image=safeImage(person.image||person.avatar_url||person.avatar);
+          const portrait=image
+            ? '<img class="city-location-person-image" src="'+escapeHTML(image)+'" alt="" loading="lazy" referrerpolicy="no-referrer">'
+            : '<span class="city-location-avatar-fallback">'+escapeHTML(characterName.slice(0,1))+'</span>';
+          return '<button type="button" class="city-location-avatar city-location-person" data-action="city-person" data-person-index="'+index+'" aria-label="查看 '+escapeHTML(characterName)+' 的角色資訊">'+portrait+'<span class="city-location-person-name">'+escapeHTML(characterName)+'</span></button>';
+        }).join('')
+      : '<p class="city-location-empty">目前沒有角色排定在這個地點。角色日程符合台灣時間時，才會顯示在這裡。</p>';
+    renderVenue();
+    locationModal.hidden=false;
+    document.body.classList.add('city-location-active');
+  };
+  const renderCityCharacterCard=(person,page=0,mode='status')=>{
+    const card=$('cityCharacterCard'),body=$('cityCharacterCardBody');
+    if(!card||!body||!person)return;
+    card.hidden=false;
+    const venueInfo=$('cityMapPresenceList');
+    if(venueInfo)venueInfo.hidden=true;
+    card.dataset.page=String(page);
+    card.dataset.mode=mode;
+    locationModal.dataset.cardMode=mode;
+    locationModal.dataset.selectedPersonIndex=String((cityPresenceByPlace[locationModal.dataset.place]||[]).findIndex(item=>item.id===person.id));
+    const image=safeImage(person.image||person.avatar_url||person.avatar);
+    // Uploaded character videos are private Storage objects, so hydrate their signed URL.
+    const videoPath=String(person.avatarVideoPath||person.avatar_video_path||person.characterVideoPath||'').trim();
+    const videoRaw=String(person.videoUrl||person.video_url||person.introVideoUrl||person.intro_video_url||'').trim();
+    const videoUrl=/^https:\/\//i.test(videoRaw)?videoRaw:'';
+    const portrait=videoPath
+      ? '<video class="city-character-portrait city-character-portrait-video" data-character-video="'+escapeHTML(videoPath)+'" autoplay muted loop playsinline preload="metadata" poster="'+escapeHTML(image||'')+'" aria-label="'+escapeHTML(person.name||'角色')+'角色展示影片"></video>'
+      : videoUrl
+        ? '<video class="city-character-portrait city-character-portrait-video" src="'+escapeHTML(videoUrl)+'" autoplay muted loop playsinline preload="metadata" poster="'+escapeHTML(image||'')+'" aria-label="'+escapeHTML(person.name||'角色')+'角色展示影片"></video>'
+        : image
+          ? '<img class="city-character-portrait" src="'+escapeHTML(image)+'" alt="'+escapeHTML(person.name||'角色')+'" loading="eager" referrerpolicy="no-referrer">'
+          : '<div class="city-character-portrait city-character-portrait-fallback">'+escapeHTML(String(person.name||'角').slice(0,1))+'</div>';
+    const name=escapeHTML(person.name||'未命名角色');
+    const gender=escapeHTML(person.gender||'未設定');
+    const age=escapeHTML(person.age?String(person.age)+' 歲':'未設定');
+    const activity=escapeHTML(person.cityActivity||'在這個場景中度過自己的時間');
+    const timeRange=person.cityStartTime&&person.cityEndTime?escapeHTML(person.cityStartTime+'–'+person.cityEndTime):'時間未設定';
+    const placeKey=locationModal.dataset.place;
+    const placeName=escapeHTML(cityPlaceNames[placeKey]||'城市地點');
+    const intro=String(person.intro||person.description||person.personalityProfile?.summary||'這位角色尚未填寫公開介紹。');
+    const sessions=Object.values(state.sessions||{}).filter(session=>session?.encounterMode&&session.characterId===person.id&&!session.archived)
+      .sort((a,b)=>(Number(b.startedAt)||0)-(Number(a.startedAt)||0));
+    const bookmarks='<div class="city-character-bookmarks" aria-label="角色功能"><button type="button" class="city-character-bookmark '+(mode==='status'?'active':'')+'" data-action="city-character-status" aria-label="角色資料">角色資料</button><button type="button" class="city-character-bookmark '+(mode==='history'?'active':'')+'" data-action="city-character-history" aria-label="相遇紀錄">相遇紀錄</button><button type="button" class="city-character-bookmark" data-action="city-character-story" aria-label="故事模式">故事模式</button></div>';
+    const left='<div class="city-character-photo-column">'+portrait+'<button type="button" class="city-character-meet primary" data-action="city-character-meet">與他相遇</button></div>';
+    let copy='';
+    if(mode==='history'){
+      const records=sessions.length?sessions.map(session=>{
+        const when=new Date(Number(session.startedAt)||Date.now()).toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'});
+        const venue=cityPlaceNames[session.encounterPlace]||'城市相遇';
+        const lastUser=(session.messages||[]).filter(message=>message.role==='user').at(-1)?.content;
+        const summary=lastUser?'對話片段：'+String(lastUser).slice(0,90):'兩人在'+venue+'相遇，故事仍待續。';
+        return '<article class="city-encounter-history-item"><strong>'+escapeHTML(when)+' · '+escapeHTML(venue)+'</strong><p>'+escapeHTML(summary)+'</p></article>';
+      }).join(''):'<p>目前還沒有已保存的相遇紀錄。完成「與他相遇」對話後，紀錄會顯示在這裡。</p>';
+      copy='<div class="city-character-copy"><h3>'+name+'｜過往相遇</h3><div class="city-encounter-history-list">'+records+'</div></div>';
+      $('cityCharacterPageLabel').textContent='相遇紀錄';
+    }else if(mode==='story'){
+      copy='<div class="city-character-copy"><h3>'+name+'｜故事模式</h3><p>正在開啟傳統角色聊天……</p></div>';
+      $('cityCharacterPageLabel').textContent='故事模式';
+    }else if(page===0){
+      copy='<div class="city-character-copy"><h3>'+name+'</h3><div class="city-character-meta"><span>'+gender+'</span><span>'+age+'</span></div><p><strong>當前行程</strong><br>'+timeRange+'<br>'+placeName+'</p><p><strong>心情</strong><br>'+escapeHTML(person.cityMood||person.mood||'平靜')+'</p><p><strong>現在狀態</strong><br>'+activity+'</p></div>';
+      $('cityCharacterPageLabel').textContent='角色狀態 · 01 / 02';
+    }else{
+      copy='<div class="city-character-copy"><h3>'+name+'｜角色介紹</h3><p>'+escapeHTML(intro)+'</p></div>';
+      $('cityCharacterPageLabel').textContent='角色介紹 · 02 / 02';
+    }
+    body.innerHTML=left+copy+bookmarks;
+    const characterVideo=body.querySelector('video.city-character-portrait-video[data-character-video]');
+    if(characterVideo)void hydrateCharacterVideo(characterVideo);
+    else{
+      const directVideo=body.querySelector('video.city-character-portrait-video');
+      if(directVideo){
+        directVideo.muted=true;
+        directVideo.defaultMuted=true;
+        const playWhenReady=()=>directVideo.play().catch(()=>{});
+        directVideo.addEventListener('loadedmetadata',playWhenReady,{once:true});
+        if(directVideo.readyState>=1)playWhenReady();
+      }
+    }
+    const dots=card.querySelectorAll('.city-character-page-dots i');
+    dots.forEach((dot,index)=>dot.classList.toggle('active',mode==='status'&&index===page));
+    const pageButtons=card.querySelectorAll('.city-character-page-button');
+    pageButtons.forEach(button=>button.disabled=mode!=='status');
+  };
+  locationModal?.addEventListener('click',async event=>{
+    const personButton=event.target.closest('[data-action="city-person"]');
+    if(personButton){
+      event.preventDefault();event.stopPropagation();
+      const person=cityPresenceByPlace[locationModal.dataset.place]?.[Number(personButton.dataset.personIndex)];
+      if(!person||!accessible(person)){toast('此角色目前無法查看。');return;}
+      renderCityCharacterCard(person,0);
+      return;
+    }
+    const cardAction=event.target.closest('[data-action^="city-character-"]')?.dataset.action;
+    if(cardAction==='city-character-close'){
+      const card=$('cityCharacterCard');if(card)card.hidden=true;
+      const venueInfo=$('cityMapPresenceList');if(venueInfo)venueInfo.hidden=false;
+      locationModal.dataset.selectedPersonIndex='';
+      return;
+    }
+    if(cardAction==='city-character-status'||cardAction==='city-character-history'){
+      const index=Number(locationModal.dataset.selectedPersonIndex);
+      const person=cityPresenceByPlace[locationModal.dataset.place]?.[index];
+      if(person)renderCityCharacterCard(person,0,cardAction==='city-character-history'?'history':'status');
+      return;
+    }
+    if(cardAction==='city-character-story'){
+      const index=Number(locationModal.dataset.selectedPersonIndex);
+      const person=cityPresenceByPlace[locationModal.dataset.place]?.[index];
+      if(!person||!accessible(person)){toast('此角色目前無法開啟故事模式。');return;}
+      // Story mode is an entry to the normal character introduction page, not an
+      // immediate chat. Preserve the intended destination through sign-in.
+      if(!currentUser()){
+        requireLogin({page:'detail',id:person.id});
+        return;
+      }
+      locationModal.hidden=true;
+      document.body.classList.remove('city-location-active');
+      go({page:'detail',id:person.id});
+      return;
+    }
+    if(cardAction==='city-character-prev'||cardAction==='city-character-next'){
+      const index=Number(locationModal.dataset.selectedPersonIndex);
+      const person=cityPresenceByPlace[locationModal.dataset.place]?.[index];
+      if(person)renderCityCharacterCard(person,cardAction==='city-character-next'?1:0,'status');
+      return;
+    }
+    if(cardAction==='city-character-meet'){
+      const index=Number(locationModal.dataset.selectedPersonIndex);
+      const placeKey=locationModal.dataset.place;
+      const person=cityPresenceByPlace[placeKey]?.[index];
+      if(!person||!accessible(person)){toast('此角色目前無法開始相遇模式。');return;}
+      if(!requireLogin({page:'citymap',id:person.id}))return;
+      const meetButton=event.target.closest('[data-action="city-character-meet"]');
+      if(meetButton)meetButton.disabled=true;
+      try{
+        const encounterSession=await createEncounterSession(person,placeKey);
+        locationModal.hidden=true;
+        document.body.classList.remove('city-location-active');
+        go({page:'conversation',id:encounterSession.id});
+        toast('已進入相遇模式；每次送出訊息依既有規則扣款。');
+      }catch(error){
+        console.error('從城市地點開始相遇失敗：',error);
+        toast(error?.message||'相遇模式暫時無法使用，請稍後再試。');
+      }finally{if(meetButton)meetButton.disabled=false;}
+    }
+  });
+  $('cityMapAvatarStrip')?.addEventListener('error',event=>{
+    const image=event.target;
+    if(!(image instanceof HTMLImageElement)||!image.classList.contains('city-location-person-image'))return;
+    const fallback=document.createElement('span');
+    fallback.className='city-location-avatar-fallback';
+    fallback.textContent=image.alt?.slice(0,1)||'角';
+    image.replaceWith(fallback);
+  },true);
+  $('cityCharacterCardBody')?.addEventListener('error',event=>{
+    const image=event.target;
+    if(!(image instanceof HTMLImageElement)||!image.classList.contains('city-character-portrait'))return;
+    const fallback=document.createElement('div');
+    fallback.className='city-character-portrait city-character-portrait-fallback';
+    fallback.textContent=image.alt?.slice(0,1)||'角';
+    image.replaceWith(fallback);
+  },true);
+  // Bind activation directly to each SVG marker. Some mobile SVG click paths do not
+  // reliably reach the stage-level delegated handler, so each landmark owns its click.
+  stage.querySelectorAll('[data-action="city-landmark"]').forEach(marker=>{
+    marker.addEventListener('click',event=>{
+      event.preventDefault();
+      event.stopPropagation();
+      openCityLocation(marker);
+    });
+    marker.addEventListener('keydown',event=>{
+      if(event.key==='Enter'||event.key===' '){
+        event.preventDefault();
+        event.stopPropagation();
+        openCityLocation(marker);
+      }
+    });
+  });
+  locationModal?.addEventListener('click',event=>{
+    const close=event.target.closest('[data-action="city-close"]');
+    if(close){event.preventDefault();event.stopPropagation();locationModal.hidden=true;document.body.classList.remove('city-location-active');}
+    else event.stopPropagation();
+  });
+  stage.addEventListener('click',event=>{
+    const button=event.target instanceof Element ? event.target.closest('[data-action]') : null;
+    // Landmark SVG groups have their own activation listener above. Never resolve
+    // nearby coordinates here: that duplicated async open and caused a first-tap flash.
+    if(button?.dataset.action==='city-landmark')return;
+    if(!button)return;
+    if(button.dataset.action==='city-zoom-in'){event.preventDefault();event.stopPropagation();zoomBy(1.18);return;}
+    if(button.dataset.action==='city-zoom-out'){event.preventDefault();event.stopPropagation();zoomBy(.85);return;}
+    if(button.dataset.action==='city-traditional'){event.preventDefault();event.stopPropagation();go({page:'home'});}
+  });
+  window.addEventListener('resize',()=>{sizeWorld();clamp();},{passive:true});
+}
 
 /* Initialization */
 route=parseRoute();
@@ -9071,6 +9873,15 @@ document.addEventListener('submit',function(event){
 </script>
 
 
+<style id="character-illustration-upload-test">
+.character-illustration-gallery{margin:8px 0 16px}
+.character-illustration-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.character-illustration-option{display:flex;flex-direction:column;gap:6px;min-width:0;padding:7px;border:1px solid var(--border);border-radius:12px;background:var(--panel);color:var(--text);cursor:pointer}
+.character-illustration-option img{display:block;width:100%;aspect-ratio:3/4;object-fit:contain;border-radius:7px;background:rgba(0,0,0,.04)}
+.character-illustration-option span{font-size:12px;text-align:center}
+.character-illustration-option.is-selected{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 22%,transparent)}
+@media(max-width:520px){.character-illustration-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
 <style id="poyozz-ui-172-send-state">
 .composer-send[disabled]{opacity:1;cursor:progress;background:var(--panel2);color:var(--text);border-color:var(--border)}
 .composer-send[disabled] span[aria-hidden="true"],.composer-send.is-sending span[aria-hidden="true"]{font-size:17px;line-height:1}
@@ -9085,81 +9896,619 @@ document.addEventListener('submit',function(event){
 </script>
 
 <script id="poyozz-city-map-mvp-script">
-function renderCityMapMVP(){
-  document.body.classList.add('city-map-mode');
-  const view=$('view');
-  view.innerHTML=`
-    <section class="city-map-stage" id="cityMapStage" aria-label="POYOZZ 城市地圖">
-      <div class="city-map-world" id="cityMapWorld" aria-label="可拖曳地圖">
-        <div class="city-map-river"></div>
-        <div class="city-map-road r1"></div><div class="city-map-road r2"></div><div class="city-map-road r3"></div>
-        <div class="city-map-block cafe"></div><div class="city-map-block school"></div><div class="city-map-block park"></div><div class="city-map-block shop"></div><div class="city-map-block home"></div>
-        <button class="city-map-landmark" style="left:26%;top:40%" data-action="city-landmark" data-place="cafe"><span>☕</span>星光咖啡</button>
-        <button class="city-map-landmark" style="left:67%;top:23%" data-action="city-landmark" data-place="school"><span>🏫</span>晴日學園</button>
-        <button class="city-map-landmark" style="left:70%;top:67%" data-action="city-landmark" data-place="park"><span>🌳</span>中央公園</button>
-        <button class="city-map-landmark" style="left:23%;top:69%" data-action="city-landmark" data-place="shop"><span>🛍️</span>街角商店</button>
-        <button class="city-map-landmark" style="left:78%;top:44%" data-action="city-landmark" data-place="home"><span>🏠</span>住宅區</button>
-      </div>
-      <div class="city-map-ui" id="cityMapUI">
-        <aside class="city-map-info">
-          <h2 class="city-map-title"><img src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="POYOZZ"> <span>城市</span></h2>
-          <div id="cityMapDate">台灣時間</div>
-          <div class="city-map-weather"><span>🌤️</span><span id="cityMapWeather">天氣資料待串接</span><span id="cityMapTemp">溫度待串接</span></div>
-          <p>這座城市充滿各種可能，也許今天你會在某個角落遇見特別的那個人。</p>
-          <button class="city-map-traditional" data-action="city-traditional">⌖ 傳統探索模式</button>
-        </aside>
-        <div class="city-map-zoom"><button type="button" data-action="city-zoom-in" aria-label="放大地圖">＋</button><button type="button" data-action="city-zoom-out" aria-label="縮小地圖">−</button></div>
-        <div class="city-map-bottom">
-          <button data-action="city-traditional">✧<br>探索</button><button data-action="nav" data-page="create">✎<br>創建</button><button data-action="nav" data-page="chat">☏<br>聊天</button><button data-action="nav" data-page="shop">◇<br>商店</button><button data-action="nav" data-page="profile">♡<br>我的</button>
-        </div>
-      </div>
-      <div class="city-map-empty">拖曳探索 · 雙指縮放 · 雙擊空白處沉浸</div>
-      <section class="city-map-people" id="cityMapPeople" hidden><button type="button" data-action="city-close">關閉</button><h3 id="cityMapPlaceTitle">地標</h3><p>目前尚未連接角色出沒資料。前端 MVP 使用示意地標，不會產生虛構的即時角色名單。</p><p class="small muted">下一階段接入符合現代城鎮設定、公開且未刪除的角色。</p></section>
-    </section>`;
-  document.body.classList.remove('city-map-mode-immersive');
-  const stage=$('cityMapStage'),world=$('cityMapWorld');
-  const mapAspect=2752/1536;
-  let scale=1,tx=0,ty=0,pointers=new Map(),start=null,lastTap=0,lastTapX=0,lastTapY=0,moved=false;
-  const sizeWorld=()=>{const sw=stage.clientWidth,sh=stage.clientHeight;const nav=$('cityMapUI')?.querySelector('.city-map-bottom');const navExtra=Math.max(76,(nav?.offsetHeight||68)+12);const h=Math.max(sh+navExtra,sw/mapAspect);const w=h*mapAspect;world.style.width=w+'px';world.style.height=h+'px';world.style.left=((sw-w)/2)+'px';world.style.top=((sh-h)/2)+'px';world.style.backgroundSize='100% 100%';};
-  sizeWorld();
-  const apply=()=>{world.style.transform='translate('+tx+'px,'+ty+'px) scale('+scale+')';};
-  const clamp=()=>{scale=Math.max(1,Math.min(2.25,scale));const maxX=Math.max(0,(world.offsetWidth*scale-stage.clientWidth)/2);const maxY=Math.max(0,(world.offsetHeight*scale-stage.clientHeight)/2);tx=Math.max(-maxX,Math.min(maxX,tx));ty=Math.max(-maxY,Math.min(maxY,ty));apply();};
-  const zoomBy=f=>{scale*=f;clamp();};
-  stage.addEventListener('pointerdown',e=>{if(e.target.closest('button,.city-map-info,.city-map-zoom,.city-map-bottom,.city-map-people'))return;stage.setPointerCapture?.(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=false;if(pointers.size===1)start={x:e.clientX,y:e.clientY,tx,ty,time:Date.now()};else if(pointers.size===2){const a=[...pointers.values()];start={distance:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),scale,kind:'pinch'};}});
-  stage.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2&&start?.kind==='pinch'){const a=[...pointers.values()];const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);scale=start.scale*d/Math.max(1,start.distance);clamp();moved=true;}else if(pointers.size===1&&start&&!start.kind){const dx=e.clientX-start.x,dy=e.clientY-start.y;if(Math.abs(dx)+Math.abs(dy)>5)moved=true;tx=start.tx+dx;ty=start.ty+dy;clamp();}});
-  const endPointer=e=>{pointers.delete(e.pointerId);if(pointers.size===0){if(start&&!moved&&Date.now()-start.time<280){const now=Date.now(),dx=e.clientX-lastTapX,dy=e.clientY-lastTapY;if(now-lastTap<320&&Math.hypot(dx,dy)<24){document.body.classList.toggle('city-map-mode-immersive');lastTap=0;}else{lastTap=now;lastTapX=e.clientX;lastTapY=e.clientY;}}start=null;}else if(pointers.size===1){const p=[...pointers.values()][0];start={x:p.x,y:p.y,tx,ty,time:Date.now()};}};
-  stage.addEventListener('pointerup',endPointer);stage.addEventListener('pointercancel',endPointer);stage.addEventListener('dblclick',e=>e.preventDefault());stage.addEventListener('contextmenu',e=>e.preventDefault());
-  // 2025 Taipei solar-time reference profile. Calculate the 2025 reference day locally;
-  // no sunrise/sunset API or daily network request is needed.
-  const taipeiSunTimes2025=(month,day)=>{
-    const date=new Date(Date.UTC(2025,month-1,day));
-    const n=Math.floor((date-Date.UTC(2025,0,0))/86400000);
-    const lat=25.033,lon=121.5654,zenith=90.833;
-    const decl=0.006918-0.399912*Math.cos(2*Math.PI*n/365)+0.070257*Math.sin(2*Math.PI*n/365)-0.006758*Math.cos(4*Math.PI*n/365)+0.000907*Math.sin(4*Math.PI*n/365)-0.002697*Math.cos(6*Math.PI*n/365)+0.00148*Math.sin(6*Math.PI*n/365);
-    const cosH=(Math.cos(zenith*Math.PI/180)-Math.sin(lat*Math.PI/180)*Math.sin(decl))/(Math.cos(lat*Math.PI/180)*Math.cos(decl));
-    const ha=Math.acos(Math.max(-1,Math.min(1,cosH)))*180/Math.PI;
-    const solarNoon=12-lon/15+8;
-    return {sunrise:solarNoon-ha/15,sunset:solarNoon+ha/15};
-  };
-  const taipeiTime=()=>{
-    const d=new Date();
-    const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d);
-    const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));
-    const month=Number(p.month),day=Number(p.day),minuteOfDay=(Number(p.hour)%24)*60+Number(p.minute);
-    const sun=taipeiSunTimes2025(month,day);
-    const sunrise=Math.round(sun.sunrise*60),sunset=Math.round(sun.sunset*60);
-    const isDay=minuteOfDay>=sunrise&&minuteOfDay<sunset;
-    $('cityMapDate').textContent=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);
-    const mapImage=isDay?'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp':'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Add_nighttime_lighting_to_buildings_2K_20261027142959%20(1).webp';
-    stage.style.backgroundColor=isDay?'#b9d9c5':'#18253e';stage.style.backgroundImage='none';world.style.backgroundImage='url("'+mapImage+'")';world.style.filter='none';
-  };
-  taipeiTime();
-  const cityMapClock=setInterval(taipeiTime,30000);
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)taipeiTime();});
 
-  stage.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;if(a==='city-zoom-in'){zoomBy(1.18);return;}if(a==='city-zoom-out'){zoomBy(.85);return;}if(a==='city-close'){$('cityMapPeople').hidden=true;return;}if(a==='city-landmark'){const names={cafe:'星光咖啡',school:'晴日學園',park:'中央公園',shop:'街角商店',home:'住宅區'};$('cityMapPlaceTitle').textContent=names[b.dataset.place]||'地標';$('cityMapPeople').hidden=false;return;}if(a==='city-traditional'){go({page:'home'});return;}});
-  window.addEventListener('resize',()=>{sizeWorld();clamp();},{passive:true});
-}
+
+/* POYOZZ Encounter scene presentation. Uses the shared chat composer, wallet,
+   suggested replies, swipe controls, persistence and pending-turn handler. */
+(function installEncounterScenePresentation(){
+  const style=document.createElement('style');
+  style.textContent=`
+    .encounter-start-button{background:linear-gradient(135deg,#7969a8,#b17f9d)!important;color:#fff!important;border:1px solid #d8c8ef!important}
+    .chat-main.encounter-scene{position:relative;isolation:isolate;overflow:hidden;height:100dvh!important;min-height:0!important;border:0!important;border-radius:0!important;background:#15141b!important}
+    .chat-main.encounter-scene:before{content:"";position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,rgba(10,9,17,.26),rgba(10,9,17,.08) 34%,rgba(10,9,17,.36) 57%,rgba(10,9,17,.88) 100%),var(--encounter-scene-photo,none) center/cover no-repeat,radial-gradient(ellipse at 70% 22%,#6a5a65 0%,#322b36 48%,#17141b 100%);filter:saturate(.9);transform:scale(1.025);pointer-events:none}
+    .encounter-scene .chat-layout{height:100dvh!important;min-height:0!important}
+    .encounter-scene .chat-heading{position:absolute!important;z-index:4;left:0;right:0;top:0;background:linear-gradient(180deg,rgba(10,9,17,.72),rgba(10,9,17,.18))!important;backdrop-filter:blur(8px);color:#fff;border:0!important;padding:calc(10px + env(safe-area-inset-top)) 10px 18px!important}
+    .encounter-scene .chat-heading .chat-name,.encounter-scene .chat-heading .character-status-label{color:#fff}
+    .encounter-scene .chat-heading .row.between>.row:last-child button:not([data-action="chat-settings-menu"]){display:none!important}
+    .encounter-scene .chat-heading .character-status-dot{box-shadow:0 0 8px #22c55e55}
+    .encounter-scene .messages{position:absolute!important;z-index:2;left:0;right:0;bottom:clamp(390px,48dvh,470px);height:auto;max-height:22dvh;min-height:0!important;overflow-y:auto;background:transparent!important;padding:12px 22px!important;overscroll-behavior:contain}
+    .encounter-scene .message{max-width:100%;background:transparent!important;align-items:flex-start}
+    .encounter-scene .message-content{max-width:100%;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important;color:#fff!important}
+    .encounter-scene .message-name{display:none}
+    .encounter-scene .bubble,.encounter-scene .narration{color:#fff!important;text-shadow:0 2px 8px #000b;font-size:clamp(14px,3.7vw,18px);line-height:1.6}
+    .encounter-scene .message-more{color:#fff;background:#17141b66}
+    .encounter-character-sprite.encounter-card-portrait-fallback{object-fit:contain;object-position:center bottom;filter:drop-shadow(0 10px 22px rgba(0,0,0,.22))}.encounter-character-sprite.encounter-auto-bg-fallback{mix-blend-mode:multiply}
+    .encounter-character-sprite{position:absolute;z-index:1;pointer-events:none;right:-2%;bottom:0;width:min(108%,680px);height:78dvh;object-fit:contain;object-position:center bottom;filter:drop-shadow(0 12px 24px rgba(0,0,0,.28));opacity:.98}
+    .encounter-scene .composer{position:absolute!important;z-index:3;left:0;right:0;bottom:0;max-height:56dvh;overflow-y:auto;background:linear-gradient(180deg,rgba(17,14,24,.12),rgba(17,14,24,.92) 18%)!important;border:0!important;border-radius:24px 24px 0 0!important;padding:12px 14px calc(12px + env(safe-area-inset-bottom))!important;backdrop-filter:blur(12px)}
+    .encounter-scene .suggestions{margin:0 0 8px!important}
+    .encounter-scene .suggestions-panel{border:0!important;background:transparent!important;overflow:visible!important}
+    .encounter-scene .suggestions-panel>summary{display:flex;align-items:center;justify-content:space-between;color:#fff!important;font-size:13px;padding:4px 2px 8px!important;list-style:none}
+    .encounter-scene .suggestions-panel>summary::-webkit-details-marker{display:none}
+    .encounter-scene .suggestions-panel>summary:after{display:none}
+    .encounter-scene .suggestions-count{color:#d4cedd!important;font-size:11px}
+    .encounter-scene .suggestion-options{display:flex!important;padding:0 2px 7px!important;gap:7px}
+    .encounter-scene .suggestion-light{width:9px;height:9px;min-width:9px;background:#ffffff22;box-shadow:inset 0 0 0 1px #e7e0f0}
+    .encounter-scene .suggestion-light[aria-pressed="true"]{background:#bda5f4;box-shadow:0 0 8px #bda5f488}
+    .encounter-scene .suggestion-card,.encounter-scene .suggestion-card.active{display:block!important;width:100%;max-height:82px;overflow:auto;margin:0 0 7px;padding:9px 11px!important;border:1px solid #ffffff35!important;border-radius:13px!important;background:rgba(244,239,249,.13)!important;color:#fff!important;text-align:left;backdrop-filter:blur(14px)}
+    .encounter-scene .suggestion-card-title{font-size:12px;color:#fff;margin-bottom:3px}
+    .encounter-scene .suggestion-card-action,.encounter-scene .suggestion-card-dialogue{display:inline!important;font-size:12px;line-height:1.45;color:#f5f0fa!important;overflow:visible;-webkit-line-clamp:unset}
+    .encounter-scene .suggestion-card-dialogue{margin-left:3px}
+    .encounter-scene .suggestion-card:not(.active){opacity:.92}
+    .encounter-scene .composer-input-row{margin-top:7px}
+    .encounter-scene #messageInput{min-height:48px;max-height:100px;background:rgba(255,255,255,.13)!important;color:#fff!important;border:1px solid #ffffff40!important;border-radius:15px!important;padding:12px!important}
+    .encounter-scene #messageInput::placeholder{color:#e0d9e7!important}
+    .encounter-scene .composer-bottom-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:8px}
+    .encounter-scene .composer-icon-button{background:rgba(255,255,255,.1)!important;border:1px solid #ffffff32!important;color:#fff!important}
+    .encounter-scene .composer-cost{color:#fff!important;background:rgba(255,255,255,.08)!important;border-color:#ffffff30!important}
+    .encounter-scene .composer-send{border-radius:50%!important;min-width:48px;min-height:48px}
+    .encounter-scene .chat-tools{background:rgba(25,21,34,.94);padding:7px;border-radius:12px}
+    .encounter-scene .chat-tools button{color:#fff}
+    .encounter-scene .chat-layout{display:block!important}
+    .encounter-scene .chat-list{display:none!important}
+    .encounter-scene .chat-main{width:100%!important}
+    /* Latest encounter UI refinement: extend the dim scene through the entire viewport,
+       keep the original identity row, and use compact horizontal glass suggestions. */
+    .chat-main.encounter-scene{background:#17171b!important}
+    .encounter-scene .chat-heading{padding:calc(9px + env(safe-area-inset-top)) 12px 12px!important;background:rgba(18,19,23,.42)!important;backdrop-filter:blur(18px) saturate(115%)}
+    .encounter-scene .chat-heading>.row.between{align-items:center}
+    .encounter-scene .chat-heading .row.grow{align-items:center;gap:7px!important;flex-wrap:wrap}
+    .encounter-scene .chat-heading .chat-name{font-size:14px;max-width:38vw}
+    .encounter-scene .chat-heading .encounter-scene-label{display:inline-flex!important;align-items:center;margin:0!important;padding:3px 7px!important;border-radius:999px;background:rgba(225,226,232,.13);border:1px solid rgba(255,255,255,.18);color:#f1f1f4!important;font-size:10px!important;letter-spacing:.04em!important;white-space:nowrap}
+    .encounter-scene .messages{bottom:clamp(220px,30dvh,300px)!important;max-height:35dvh!important;padding:10px 16px!important}
+    .encounter-scene .message.user{display:none!important}
+    .encounter-scene .message:not(.user) .message-content{padding:9px 12px!important;border:1px solid rgba(255,255,255,.18)!important;border-radius:15px!important;background:rgba(27,28,33,.28)!important;backdrop-filter:blur(9px);text-shadow:0 1px 6px #0009}
+    .encounter-scene .encounter-character-sprite{bottom:0!important;height:78dvh!important;width:min(108%,680px)!important;right:-2%!important}
+    .encounter-scene .composer{max-height:44dvh!important;padding:8px 12px calc(8px + env(safe-area-inset-bottom))!important;background:linear-gradient(180deg,rgba(24,25,30,.12),rgba(22,23,28,.60) 20%,rgba(22,23,28,.78))!important;border-top:1px solid rgba(255,255,255,.13)!important;backdrop-filter:blur(18px) saturate(110%)}
+    .encounter-scene .suggestions{margin:0 0 5px!important}
+    .encounter-scene .suggestions-panel>summary{font-size:11px;padding:2px 2px 5px!important}
+    .encounter-scene .suggestion-options{padding:0 2px 5px!important;gap:9px}
+    .encounter-scene .suggestion-light{width:7px;height:7px;min-width:7px}
+    .encounter-scene .suggestion-cards,.encounter-scene .suggestions-panel{min-width:0}
+    .encounter-scene .suggestion-card,.encounter-scene .suggestion-card.active{display:block!important;width:100%!important;max-width:100%!important;max-height:54px!important;min-height:0!important;overflow:hidden!important;white-space:normal;margin:0 0 2px!important;padding:6px 9px!important;border-radius:10px!important;background:rgba(226,228,233,.16)!important;border:1px solid rgba(255,255,255,.23)!important;box-shadow:inset 0 1px rgba(255,255,255,.12);backdrop-filter:blur(16px)}
+    .encounter-scene .suggestions-panel .suggestion-card{display:none!important}
+    .encounter-scene .suggestions-panel .suggestion-card.active{display:block!important}
+    .encounter-scene .suggestion-card-title{font-size:10px!important;margin-bottom:1px!important}
+    .encounter-scene .suggestion-card-action,.encounter-scene .suggestion-card-dialogue{font-size:11px!important;line-height:1.3!important;display:-webkit-box!important;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+    .encounter-scene .suggestion-card-dialogue{margin-left:2px}
+    .encounter-scene .composer-input-row{margin-top:4px!important}
+    .encounter-scene #messageInput{min-height:38px!important;max-height:76px!important;padding:8px 10px!important;border-radius:12px!important;font-size:13px!important;background:rgba(235,236,240,.13)!important;border-color:rgba(255,255,255,.23)!important;backdrop-filter:blur(16px)}
+    .encounter-scene .composer-bottom-row{padding-top:5px!important}
+    .encounter-scene .composer-send{min-width:40px!important;min-height:40px!important}
+    .encounter-scene .chat-tools{background:rgba(28,29,34,.58)!important;border:1px solid rgba(255,255,255,.15);backdrop-filter:blur(18px)}
+    .encounter-scene .chat-settings-overlay{background:linear-gradient(135deg,rgba(225,227,232,.20),rgba(108,112,122,.22))!important;border:1px solid rgba(255,255,255,.25)!important;box-shadow:0 18px 50px #0005,inset 0 1px #ffffff25!important;backdrop-filter:blur(24px)!important;color:#f7f7fa!important}
+    .encounter-scene .chat-settings-overlay .profile-setting{background:rgba(35,36,41,.28)!important;border:1px solid rgba(255,255,255,.18)!important;color:#f7f7fa!important}
+    .encounter-scene .chat-settings-overlay .profile-setting small{color:#d5d6dc!important}
+    .encounter-scene .encounter-missing-art{position:absolute;z-index:1;right:16px;bottom:clamp(390px,49dvh,480px);max-width:45%;padding:8px 10px;border-radius:12px;background:#17141b66;color:#ffffffa8;font-size:10px;pointer-events:none}
+    @media(max-width:767px){
+      .chat-main.encounter-scene{height:100dvh!important;min-height:0}
+      .encounter-scene .messages{bottom:clamp(390px,48dvh,460px);max-height:19dvh;padding:8px 20px!important}
+      .encounter-character-sprite{right:-2%!important;bottom:0!important;width:min(108%,680px)!important;height:78dvh!important}
+      .encounter-scene .composer{max-height:57dvh;padding:10px 12px calc(10px + env(safe-area-inset-bottom))!important}
+      .encounter-scene .suggestion-card,.encounter-scene .suggestion-card.active{max-height:72px;padding:7px 9px!important;margin-bottom:5px}
+      .encounter-scene .suggestion-card-action,.encounter-scene .suggestion-card-dialogue{font-size:11px}
+      .encounter-scene .chat-heading{padding-top:calc(8px + env(safe-area-inset-top))!important}
+    }
+
+    /* Encounter fullscreen v2: detach the scene from legacy app/sidebar layout. */
+    html:has(body.encounter-mode-active),body.encounter-mode-active{width:100%!important;height:100%!important;min-height:100%!important;overflow:hidden!important}
+    body.encounter-mode-active .sidebar,
+    body.encounter-mode-active #mobileNav,
+    body.encounter-mode-active .app>header{display:none!important}
+    body.encounter-mode-active .app{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;min-height:100dvh!important;margin:0!important;padding:0!important;overflow:hidden!important;transform:none!important}
+    body.encounter-mode-active #view{position:fixed!important;inset:0!important;z-index:100!important;width:100vw!important;height:100dvh!important;min-height:100dvh!important;max-width:none!important;margin:0!important;padding:0!important;overflow:hidden!important}
+    body.encounter-mode-active .chat-layout{position:fixed!important;inset:0!important;display:block!important;width:100vw!important;height:100dvh!important;min-height:100dvh!important;margin:0!important;padding:0!important;overflow:hidden!important}
+    body:has(.chat-main.encounter-scene){overflow:hidden!important}
+    .chat-main.encounter-scene{position:fixed!important;inset:0!important;z-index:110!important;display:block!important;width:100vw!important;height:100dvh!important;min-height:100dvh!important;max-width:none!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;overflow:hidden!important;isolation:isolate!important;background:#17141b!important}
+    .chat-main.encounter-scene:before{position:absolute!important;inset:0!important;z-index:0!important;background-image:linear-gradient(180deg,rgba(10,9,17,.10),rgba(10,9,17,.12) 34%,rgba(10,9,17,.40) 66%,rgba(10,9,17,.92) 100%),var(--encounter-scene-photo,none),radial-gradient(ellipse at 70% 22%,#6a5a65 0%,#322b36 48%,#17141b 100%)!important;background-position:center,center,center!important;background-size:cover,cover,cover!important;background-repeat:no-repeat!important;transform:none!important;filter:none!important;content:""!important;pointer-events:none!important}
+    .encounter-scene .chat-layout{position:absolute!important;inset:0!important;width:100%!important;height:100dvh!important;min-height:0!important;margin:0!important;padding:0!important}
+    .encounter-scene .chat-main{position:absolute!important;inset:0!important;width:100%!important;height:100dvh!important;min-height:0!important;margin:0!important;border-radius:0!important}
+    .encounter-scene .messages{bottom:clamp(265px,34dvh,360px)!important;max-height:clamp(110px,31dvh,330px)!important;overflow-y:auto!important;overscroll-behavior:contain!important;scrollbar-width:thin;scrollbar-color:rgba(230,225,245,.45) transparent}
+    .encounter-scene .encounter-dialogue-beat{display:flex!important;flex-direction:column!important;gap:10px!important;width:100%!important;max-width:100%!important;min-height:74px!important;padding:14px 16px!important;border:1px solid rgba(255,255,255,.2)!important;border-radius:17px!important;background:linear-gradient(135deg,rgba(22,22,30,.58),rgba(22,22,30,.34))!important;color:#fff!important;text-align:left!important;white-space:pre-wrap!important;backdrop-filter:blur(14px)!important;box-shadow:0 10px 28px rgba(0,0,0,.12),inset 0 1px rgba(255,255,255,.1)!important}
+    .encounter-scene .encounter-dialogue-text{font-size:clamp(15px,3.8vw,19px)!important;line-height:1.85!important;overflow-wrap:anywhere!important}
+    .encounter-scene .encounter-dialogue-hint{align-self:flex-end!important;color:#e0d6f4!important;font-size:11px!important;letter-spacing:.04em!important}
+    .encounter-scene .composer{max-height:50dvh!important;overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain!important;touch-action:pan-y!important;padding:9px 12px calc(9px + env(safe-area-inset-bottom))!important;scrollbar-width:thin!important;scrollbar-color:rgba(230,225,245,.35) transparent!important}
+    .encounter-scene .suggestions{display:block!important;min-height:0!important;margin:0 0 5px!important}
+    .encounter-scene .suggestions-panel{display:block!important;max-height:none!important;min-height:0!important;overflow:visible!important}
+    .encounter-scene .suggestions-panel>summary{position:relative!important;z-index:2!important;background:rgba(25,24,32,.42)!important;border-radius:8px!important}
+    .encounter-scene .suggestion-cards{display:block!important;max-height:none!important;overflow:visible!important;touch-action:pan-y!important;padding:2px 3px 8px!important}
+    .encounter-scene .suggestions-panel .suggestion-card{display:none!important}
+    .encounter-scene .suggestions-panel .suggestion-card.active{display:block!important;width:100%!important;max-width:100%!important;max-height:clamp(90px,19dvh,190px)!important;min-height:54px!important;height:auto!important;overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain!important;touch-action:pan-y!important;white-space:normal!important;margin:0!important;padding:10px 12px!important;border-radius:12px!important;background:rgba(226,228,239,.15)!important;border:1px solid rgba(255,255,255,.25)!important;color:#fff!important;text-align:left!important;box-shadow:inset 0 1px rgba(255,255,255,.12)!important;backdrop-filter:blur(14px)!important;scrollbar-width:thin!important;scrollbar-color:rgba(230,225,245,.45) transparent!important}
+    .encounter-scene .suggestion-card-title{font-size:11px!important;line-height:1.5!important;white-space:normal!important;overflow-wrap:anywhere!important}
+    .encounter-scene .suggestion-card-action,.encounter-scene .suggestion-card-dialogue{display:inline!important;font-size:12px!important;line-height:1.65!important;white-space:normal!important;overflow:visible!important;-webkit-line-clamp:unset!important;-webkit-box-orient:initial!important;overflow-wrap:anywhere!important}
+    .encounter-scene .suggestion-card-dialogue{margin-left:3px!important}
+    .encounter-scene .suggestion-card.active{border-color:rgba(205,184,255,.72)!important;background:rgba(143,120,190,.27)!important}
+    .encounter-scene .composer-input-row{flex:0 0 auto!important}
+    @media(max-width:767px){
+      .encounter-scene .chat-heading{left:0!important;right:0!important;padding-top:calc(8px + env(safe-area-inset-top))!important}
+      .encounter-scene .messages{bottom:clamp(300px,39dvh,390px)!important;max-height:clamp(100px,27dvh,240px)!important;padding:8px 14px!important}
+      .encounter-character-sprite{right:-2%!important;bottom:0!important;width:min(108%,680px)!important;height:78dvh!important;max-height:none!important}
+      .encounter-scene .composer{max-height:54dvh!important;overflow-y:auto!important;overflow-x:hidden!important;padding:7px 10px calc(7px + env(safe-area-inset-bottom))!important}
+      .encounter-scene .suggestions-panel{max-height:clamp(112px,26dvh,235px)!important}
+      .encounter-scene .suggestion-cards{max-height:clamp(90px,22dvh,190px)!important}
+      .encounter-scene .suggestions-panel .suggestion-card,.encounter-scene .suggestions-panel .suggestion-card.active{padding:9px 10px!important}
+      .encounter-scene .suggestion-card-action,.encounter-scene .suggestion-card-dialogue{font-size:12px!important;line-height:1.6!important}
+      .encounter-scene .composer-bottom-row{padding-top:4px!important}
+    }
+  `;;
+  document.head.appendChild(style);
+  const splitEncounterBeats=(value)=>{
+    const source=String(value||'').replace(/\r\n?/g,'\n').replace(/[ \t]+\n/g,'\n').trim();
+    if(!source)return [];
+    const paragraphs=source.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+    const beats=[];
+    const pushSentence=(text)=>{
+      const cleaned=String(text||'').replace(/^\s*[-*•]+\s*/,'').replace(/^\*+|\*+$/g,'').trim();
+      if(!cleaned)return;
+      // Long, unpunctuated prose is broken into readable visual-novel beats too.
+      if(cleaned.length>58){
+        const clauses=cleaned.split(/(?<=[，,、；;：:])/u).map(x=>x.trim()).filter(Boolean);
+        if(clauses.length>1){
+          let chunk='';
+          for(const clause of clauses){
+            if(chunk&&chunk.length+clause.length>48){beats.push(chunk);chunk=clause;}
+            else chunk+=clause;
+          }
+          if(chunk)pushSentence(chunk);
+          return;
+        }
+        for(let i=0;i<cleaned.length;i+=48)beats.push(cleaned.slice(i,i+48));
+        return;
+      }
+      beats.push(cleaned);
+    };
+    for(const paragraph of paragraphs){
+      const sentences=paragraph.match(/[^。！？!?；;]+[。！？!?；;」』”’"）)】]*/gu)||[paragraph];
+      for(const sentence of sentences){
+        const part=sentence.trim();
+        if(part)pushSentence(part);
+      }
+    }
+    return beats;
+  };
+  // Re-apply the visual-novel beat after BOTH full conversation renders and message-only renders.
+  // The base chat renderer can replace #messages after renderConversation finishes; this hook prevents it
+  // from restoring ordinary chat bubbles and silently cancelling progressive dialogue.
+  const applyEncounterDialogue=(panel,session)=>{
+    const messages=panel?.querySelector('.messages');
+    if(!messages)return;
+    const allMessages=Array.isArray(session?.messages)?session.messages:[];
+    const latestReply=[...allMessages].reverse().find(m=>m&&m.role!=='user'&&String(m.text??m.content??'').trim());
+    const raw=String(latestReply?.text??latestReply?.content??'').trim();
+    const beats=raw?splitEncounterBeats(raw):[];
+    const beatKey=String(latestReply?.id||latestReply?.createdAt||latestReply?.timestamp||raw.slice(0,48))+':'+raw.length+':'+beats.length;
+    if(session.encounterBeatKey!==beatKey){session.encounterBeatKey=beatKey;session.encounterBeatIndex=0;}
+    const idx=Math.min(Math.max(0,Number(session.encounterBeatIndex)||0),Math.max(0,beats.length-1));
+    const speakerCharacter=sessionCharacter(session);
+    const speakerName=String(speakerCharacter?.name||speakerCharacter?.display_name||speakerCharacter?.character_name||'角色').trim();
+    messages.innerHTML=beats.length
+      ? '<button type="button" class="encounter-dialogue-beat" data-action="encounter-next-beat" aria-label="點擊繼續劇情"><span class="encounter-speaker-label">'+e(speakerName)+'</span><span class="encounter-dialogue-text">'+e(beats[idx])+'</span><span class="encounter-dialogue-hint">'+(idx<beats.length-1?'點擊繼續　⌄':'劇情已讀完')+'</span></button>'
+      : '<div class="encounter-dialogue-empty" aria-hidden="true"></div>';
+    messages.classList.toggle('encounter-dialogue-ready',beats.length>0);
+    const composer=panel.querySelector('.composer');
+    if(composer){
+      const suggestions=composer.querySelector('.suggestions');
+      if(suggestions)suggestions.hidden=beats.length>0&&idx<beats.length-1;
+      composer.classList.toggle('encounter-awaiting-beat',beats.length>0&&idx<beats.length-1);
+    }
+    messages.dataset.encounterBeatKey=beatKey;
+    messages.dataset.encounterBeatIndex=String(idx);
+  };
+  const installEncounterRenderWrapper=()=>{
+  const baseRenderConversation=renderConversation;
+  if(typeof baseRenderConversation!=='function'||baseRenderConversation.__encounterWrapped)return;
+  const wrappedRenderConversation=function(){
+    baseRenderConversation.apply(this,arguments);
+    const session=currentSession();
+    document.body.classList.toggle('encounter-mode-active',!!session?.encounterMode);
+    if(!session?.encounterMode)return;
+    const panel=$('view').querySelector('.chat-main');
+    if(!panel)return;
+    panel.classList.add('encounter-scene');
+    const character=sessionCharacter(session);
+    const sceneImage=safeImage(character?.encounterSceneImage||session?.encounterSceneImage||character?.sceneImage||'');
+    const defaultSceneImage='https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp';
+    panel.style.setProperty('--encounter-scene-photo','url('+JSON.stringify(sceneImage||defaultSceneImage)+')');
+    panel.dataset.encounterPlace=session.encounterPlace||'';
+    // Prefer a dedicated sprite. When only a character-card image exists, try to
+    // remove edge-connected near-white background pixels in-browser so the card's
+    // baked-in white canvas does not cover the encounter scene.
+    const dedicatedSprite=safeImage(character?.encounterPortraitImage||character?.halfBodyImage||character?.transparentPortrait||character?.encounterSprite||'');
+    const cardPortrait=safeImage(character?.image||character?.avatar_url||character?.avatarUrl||'');
+    const halfBodyImage=dedicatedSprite||cardPortrait;
+    let existingSprite=panel.querySelector('.encounter-character-sprite');
+    const missingArt=panel.querySelector('.encounter-missing-art');
+    if(halfBodyImage){
+      if(missingArt)missingArt.remove();
+      if(!existingSprite){
+        existingSprite=document.createElement('img');
+        existingSprite.className='encounter-character-sprite';
+        existingSprite.alt='';
+        existingSprite.setAttribute('aria-hidden','true');
+        existingSprite.loading='eager';
+        panel.insertBefore(existingSprite,panel.firstChild);
+      }
+      existingSprite.classList.toggle('encounter-card-portrait-fallback',!dedicatedSprite);
+      if(existingSprite.dataset.encounterSource!==halfBodyImage){
+        existingSprite.dataset.encounterSource=halfBodyImage;
+        existingSprite.dataset.encounterProcessed='';
+        existingSprite.classList.remove('encounter-auto-bg-fallback');
+        if(!dedicatedSprite){
+          existingSprite.crossOrigin='anonymous';
+          existingSprite.onload=()=>{
+            if(existingSprite.dataset.encounterSource!==halfBodyImage||existingSprite.dataset.encounterProcessed===halfBodyImage)return;
+            try{
+              const sourceImage=existingSprite;
+              const canvas=document.createElement('canvas');
+              canvas.width=sourceImage.naturalWidth;
+              canvas.height=sourceImage.naturalHeight;
+              const ctx=canvas.getContext('2d',{willReadFrequently:true});
+              ctx.drawImage(sourceImage,0,0);
+              const frame=ctx.getImageData(0,0,canvas.width,canvas.height);
+              const pixels=frame.data,w=canvas.width,h=canvas.height,total=w*h;
+              const visited=new Uint8Array(total);
+              const stack=new Int32Array(total);
+              let top=0;
+              const nearWhite=(i)=>{
+                const p=i*4,red=pixels[p],green=pixels[p+1],blue=pixels[p+2];
+                return red>=218&&green>=218&&blue>=218&&Math.max(red,green,blue)-Math.min(red,green,blue)<= thirty;
+              };
+              const thirty=34;
+              const push=(i)=>{if(i>=0&&i<total&&!visited[i]&&nearWhite(i)){visited[i]=1;stack[top++]=i;}};
+              for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
+              for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
+              while(top){
+                const i=stack[--top];
+                const p=i*4;
+                pixels[p+3]=0;
+                const x=i%w,y=(i/w)|0;
+                if(x>0)push(i-1);
+                if(x<w-1)push(i+1);
+                if(y>0)push(i-w);
+                if(y<h-1)push(i+w);
+              }
+              ctx.putImageData(frame,0,0);
+              const transparentImage=canvas.toDataURL('image/png');
+              existingSprite.dataset.encounterProcessed=halfBodyImage;
+              existingSprite.onload=null;
+              existingSprite.src=transparentImage;
+            }catch(error){
+              // If the image host disallows canvas access, use a visual blend fallback.
+              existingSprite.dataset.encounterProcessed=halfBodyImage;
+              existingSprite.classList.add('encounter-auto-bg-fallback');
+            }
+          };
+        }
+        existingSprite.src=halfBodyImage;
+      }
+    }else{
+      if(existingSprite)existingSprite.remove();
+      if(!missingArt){
+        const artNote=document.createElement('div');
+        artNote.className='encounter-missing-art';
+        artNote.textContent='角色半立繪素材待補';
+        artNote.setAttribute('aria-hidden','true');
+        panel.insertBefore(artNote,panel.firstChild);
+      }
+    }
+    const title=panel.querySelector('.chat-heading');
+    if(title){
+      let tag=title.querySelector('.encounter-scene-label');
+      if(!tag){
+        tag=document.createElement('span');tag.className='encounter-scene-label';tag.textContent='✦ 相遇模式';
+        const identityRow=title.querySelector('.row.grow');
+        tag.style.cssText='font-size:10px;letter-spacing:.04em;color:#f1f1f4;padding:3px 7px;border-radius:999px;background:rgba(225,226,232,.13);border:1px solid rgba(255,255,255,.18);white-space:nowrap';
+        if(identityRow)identityRow.appendChild(tag);else title.appendChild(tag);
+      }
+    }
+    const composer=panel.querySelector('.composer');
+    if(composer){
+      const input=composer.querySelector('#messageInput');
+      if(input){input.placeholder='說點什麼，或留空讓角色繼續…';input.setAttribute('aria-label','相遇模式對話');}
+    }
+    applyEncounterDialogue(panel,session);
+  };
+  wrappedRenderConversation.__encounterWrapped=true;
+  renderConversation=wrappedRenderConversation;
+  // Normal send/streaming paths call renderMessages independently. Wrap that path too,
+  // so the standard renderer cannot overwrite the progressive dialogue box after each update.
+  const baseRenderMessages=renderMessages;
+  if(typeof baseRenderMessages==='function'&&!baseRenderMessages.__encounterWrapped){
+    const wrappedRenderMessages=function(){
+      baseRenderMessages.apply(this,arguments);
+      const session=currentSession();
+      if(!session?.encounterMode)return;
+      const panel=$('view')?.querySelector('.chat-main');
+      if(panel){panel.classList.add('encounter-scene');applyEncounterDialogue(panel,session);}
+    };
+    wrappedRenderMessages.__encounterWrapped=true;
+    renderMessages=wrappedRenderMessages;
+  }
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installEncounterRenderWrapper,{once:true});
+  else installEncounterRenderWrapper();
+  document.addEventListener('click',event=>{
+    const target=event.target.closest('[data-action="encounter-next-beat"]');
+    if(!target)return;
+    const session=currentSession();
+    if(!session?.encounterMode)return;
+    const panel=target.closest('.chat-main');
+    const messages=panel?.querySelector('.messages');
+    if(!messages)return;
+    const key=messages.dataset.encounterBeatKey||'';
+    const latestReply=[...(session.messages||[])].reverse().find(m=>m.role!=='user'&&String(m.text||m.content||'').trim());
+    const raw=String(latestReply?.text||latestReply?.content||'').trim();
+    const beats=splitEncounterBeats(raw);
+    if(session.encounterBeatKey!==key){session.encounterBeatKey=key;session.encounterBeatIndex=0;}
+    if((session.encounterBeatIndex||0)<beats.length-1){session.encounterBeatIndex=(session.encounterBeatIndex||0)+1;persist();renderConversation();}
+  });
+})();
+
 </script>
+<style id="poyozz-city-location-panel">
+.city-location-modal[hidden]{display:none!important}
+.city-location-modal{position:fixed;inset:0;z-index:120;display:grid;place-items:center;padding:22px;isolation:isolate;pointer-events:auto}
+/* Keep every landmark on the same neutral translucent-gray glass system as the bottom dock.
+   Scene identity comes from its title, copy, schedule and scene content—not tinted modal skins. */
+.city-location-modal[data-scene] .city-location-glass{
+ background:linear-gradient(135deg,rgba(231,233,239,.24),rgba(141,149,167,.22) 52%,rgba(205,209,218,.20))!important;
+ border:1px solid rgba(255,255,255,.28);
+ box-shadow:0 18px 52px rgba(8,11,18,.22),inset 0 1px rgba(255,255,255,.22);
+ color:#f7f8fc;
+ backdrop-filter:blur(24px) saturate(120%);
+ -webkit-backdrop-filter:blur(24px) saturate(120%);
+}
+.city-location-backdrop{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:0;padding:0;background:rgba(5,8,18,.52);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+.city-location-glass{position:relative;z-index:1;display:flex;flex-direction:column;width:min(540px,100%);height:min(660px,calc(100dvh - 36px));min-height:420px;overflow:hidden;overscroll-behavior:contain;border:1px solid rgba(255,255,255,.30);border-radius:26px;padding:20px 22px;background:linear-gradient(135deg,rgba(231,233,239,.24),rgba(141,149,167,.22) 52%,rgba(205,209,218,.20));color:#f7f8fc;box-shadow:0 18px 52px rgba(8,11,18,.22),inset 0 1px rgba(255,255,255,.22);backdrop-filter:blur(24px) saturate(120%);-webkit-backdrop-filter:blur(24px) saturate(120%)}
+.city-location-glass>.city-location-rule{flex:0 0 1px}
+.city-location-avatar-strip{flex:0 0 auto}
+.city-character-card{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:hidden}
+.city-character-card[hidden]{display:none!important}
+.city-character-card-body{flex:1 1 auto;min-height:0;overflow:hidden}
+.city-character-copy{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-right:3px}
+.city-character-portrait{flex:0 0 118px}
+.city-location-header{position:static;height:auto;min-height:40px;padding:0;display:flex;align-items:center;justify-content:space-between;gap:12px;background:transparent;border:0;backdrop-filter:none}
+.city-location-header{flex:0 0 auto;width:100%;position:relative;z-index:2;visibility:visible}
+.city-location-title-row{flex:1 1 auto;min-width:0;flex-wrap:nowrap;overflow:visible}
+.city-location-title-row h2{display:block!important;visibility:visible!important;opacity:1!important;color:#fff!important;min-width:0;overflow-wrap:anywhere}
+.city-location-title-icon{display:grid;place-items:center;flex:0 0 32px}
+.city-location-close{flex:0 0 38px;position:relative;z-index:3}
+.city-character-card-body{display:grid;grid-template-columns:104px minmax(0,1fr) 34px;gap:10px;align-items:stretch;min-height:0}
+.city-character-layout{display:contents}
+.city-character-photo-column{display:flex;flex-direction:column;gap:9px;min-width:0}
+.city-character-photo-column .city-character-portrait{width:100%;height:136px;min-height:0;flex:0 0 136px;border:0;border-radius:13px;object-fit:cover;background:transparent}
+.city-character-meet{width:100%;padding:9px 5px;font-size:11px;line-height:1.35;white-space:normal;border-radius:10px;min-height:42px}
+.city-character-copy{min-width:0;overflow-y:auto;overscroll-behavior:contain;padding:0 3px 0 0}
+.city-character-bookmarks{display:flex;flex-direction:column;gap:7px;align-items:stretch;justify-content:flex-start}
+.city-character-bookmark{width:34px;min-height:84px;padding:7px 4px;display:flex;align-items:center;justify-content:center;white-space:pre-line;writing-mode:vertical-rl;text-orientation:upright;letter-spacing:.1em;font-size:11px;line-height:1.15;border-radius:10px;background:rgba(24,29,42,.26);border:1px solid rgba(255,255,255,.24);color:#fff}
+.city-character-bookmark.active{background:rgba(245,246,250,.24);border-color:rgba(255,255,255,.58);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.city-character-card-footer{flex:0 0 auto;margin-top:8px;justify-content:center}
+.city-character-page-button{width:34px;height:30px;padding:0;display:grid;place-items:center}
+.city-character-page-dots{min-width:30px;text-align:center}
+.city-character-story-cta{margin-top:10px;width:100%;font-size:12px}
+.city-encounter-history-list{display:grid;gap:9px}
+.city-encounter-history-item{padding:10px;border:1px solid rgba(255,255,255,.17);border-radius:11px;background:rgba(18,22,32,.18)}
+.city-encounter-history-item strong{display:block;font-size:11px;margin-bottom:4px}
+.city-encounter-history-item p{margin:0;font-size:11px;line-height:1.6}
+.city-flight-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:9px}
+.city-flight-table th,.city-flight-table td{padding:7px 5px;text-align:left;border-bottom:1px solid rgba(255,255,255,.18);white-space:nowrap}
+.city-flight-note{font-size:10px!important;opacity:.8;margin-top:7px!important}
+@media(max-width:600px){.city-location-title-row{gap:7px}.city-location-title-row h2{font-size:18px;white-space:nowrap}.city-location-open-inline{font-size:10px;gap:4px}.city-location-close{width:34px;height:34px;flex-basis:34px}.city-character-card-body{grid-template-columns:88px minmax(0,1fr) 31px;gap:7px}.city-character-photo-column .city-character-portrait{height:118px;flex-basis:118px}.city-character-meet{font-size:10px;padding:8px 3px}.city-character-bookmark{width:31px;min-height:76px;font-size:10px}.city-flight-table th,.city-flight-table td{padding:6px 3px;font-size:10px}}
+
+.city-location-title-row{display:flex;align-items:center;gap:9px;min-width:0;flex-wrap:wrap}
+.city-location-title-row h2{font-size:21px;letter-spacing:.02em;margin:0;font-weight:650}
+.city-location-title-icon{width:32px;height:32px;flex:0 0 32px;margin:0;border-radius:10px;font-size:17px}
+.city-location-open-inline{display:inline-flex;align-items:center;gap:6px;margin-left:2px;color:#e5f9eb;font-size:11px;white-space:nowrap}
+.city-location-open-inline i{display:block;width:7px;height:7px;border-radius:50%;background:#4ade80;box-shadow:0 0 8px #4ade8070}
+.city-location-close{width:38px;height:38px;padding:0;display:grid;place-items:center;border-radius:50%;font-size:26px;line-height:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff}
+.city-location-open{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:#e5e2f5}
+.city-location-status-dot{width:8px;height:8px;flex:0 0 8px;border-radius:50%;background:#9da3b5;box-shadow:0 0 12px #9da3b555}
+.city-location-status-note{margin-left:auto;color:#c2bad7;font-size:10px}
+.city-location-rule{height:1px;flex:0 0 1px;margin:14px 0;background:linear-gradient(90deg,transparent,rgba(231,226,255,.24) 12%,rgba(231,226,255,.24) 88%,transparent)}
+.city-location-section-title{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;font-weight:650}
+.city-location-section-title span{font-size:10px;color:#c4bddb;font-weight:400}
+.city-location-avatar-strip{display:flex;gap:12px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;padding:13px 2px 5px;min-height:70px;scrollbar-width:thin;scrollbar-color:rgba(221,212,255,.35) transparent}
+.city-location-avatar{flex:0 0 52px;width:52px;height:52px;padding:0;border-radius:50%;border:0;background:transparent;box-shadow:none;scroll-snap-align:start}
+.city-location-avatar-fallback{display:grid;place-items:center;width:100%;height:100%;border-radius:50%;background:linear-gradient(145deg,#625b83,#34334f);color:#f5eaff;font-size:17px}
+.city-location-empty{margin:0;align-self:center;color:#c4c2d3;font-size:11px;line-height:1.7}
+.city-location-detail[hidden]{display:none!important}
+.city-location-detail{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;color:#e7e5f3;font-size:13px;line-height:1.75;padding-right:2px}
+.city-location-detail h3{text-align:left;font-size:13px;line-height:1.5;margin:0 0 7px;font-weight:650}
+.city-location-detail>p{text-align:left;margin:0;color:#c9c7d9;font-size:12px;line-height:1.75}
+.city-location-news{margin-top:15px;padding:0 1px 2px}
+.city-location-event-label{display:block;margin-bottom:7px;color:#d0c5ee;font-size:11px;letter-spacing:.04em;font-weight:650}
+.city-location-news-items{display:grid;gap:7px}
+.city-location-news-items p{margin:0;color:#e5e1ef;font-size:11px;line-height:1.65;overflow-wrap:anywhere}
+.city-location-empty{margin:0;padding:14px 12px;width:100%;border:1px dashed rgba(235,225,255,.22);border-radius:14px;color:#d2cfe0;font-size:12px;line-height:1.7;text-align:center}
+.city-location-empty{margin:0;padding:14px 12px;width:100%;border:1px dashed rgba(235,225,255,.22);border-radius:14px;color:#d2cfe0;font-size:12px;line-height:1.7;text-align:center}
+.city-location-person{display:flex;flex-direction:column;align-items:center;gap:6px;flex:0 0 72px;min-width:72px;padding:4px 3px 8px;border:0!important;border-radius:0;background:transparent!important;box-shadow:none!important;color:#fff;cursor:pointer;outline:none}
+.city-location-person:hover,.city-location-person:focus,.city-location-person:focus-visible{background:transparent!important;box-shadow:none!important;outline:none}
+.city-location-person .city-location-avatar-fallback,.city-location-person-image{display:grid;place-items:center;width:54px;height:54px;flex:0 0 54px;border-radius:50%;border:0!important;background:transparent!important;box-shadow:none!important;filter:none;font-size:20px;overflow:hidden}
+.city-location-person-image{display:block;object-fit:cover;object-position:center 25%;outline:none!important;clip-path:circle(50% at 50% 50%);-webkit-mask-image:none}
+.city-location-person-name{max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#f3efff}
+.city-location-person-activity{max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px;color:#c9c1e2}
+.city-location-person:disabled{opacity:.6}
+@media(max-width:600px){.city-location-modal{padding:14px}.city-location-glass{width:100%;height:calc(100dvh - 28px);min-height:0;max-height:calc(100dvh - 28px);padding:17px 18px;border-radius:23px}.city-location-title-row h2{font-size:20px}.city-location-rule{margin:12px 0}.city-character-card-body{grid-template-columns:104px minmax(0,1fr);gap:10px}.city-character-portrait{width:104px;height:150px;flex-basis:104px}}
+.city-character-card[hidden]{display:none!important}
+.city-character-card{margin-top:8px;padding:14px;border:1px solid rgba(255,255,255,.2);border-radius:18px;background:linear-gradient(145deg,rgba(240,241,246,.13),rgba(122,130,149,.13));box-shadow:inset 0 1px rgba(255,255,255,.12)}
+.city-character-card-head,.city-character-card-footer{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.city-character-page-label{font-size:10px;letter-spacing:.12em;color:#d3cde5}
+.city-character-card-close{width:30px;height:30px;padding:0;border-radius:50%;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.18)}
+.city-character-card-body{display:grid;grid-template-columns:118px minmax(0,1fr);gap:14px;margin:12px 0}
+.city-character-portrait{width:118px;height:164px;object-fit:cover;object-position:center top;border-radius:12px;border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.06);box-shadow:none;display:block}
+.city-character-portrait-fallback{display:grid;place-items:center;color:#eee;font-size:30px}
+.city-character-copy{min-width:0;color:#f4f2fa;font-size:12px;line-height:1.7;overflow-wrap:anywhere}
+.city-character-copy h3{margin:0 0 9px;font-size:17px;line-height:1.35;overflow-wrap:anywhere}
+.city-character-meta{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:9px}
+.city-character-meta span{padding:3px 7px;border:1px solid rgba(255,255,255,.2);border-radius:999px;background:rgba(255,255,255,.07);font-size:10px}
+.city-character-copy p{margin:6px 0;font-size:11px;line-height:1.65;color:#e1deec;overflow-wrap:anywhere}
+.city-character-copy strong{color:#fff;font-weight:650}
+.city-character-card-footer{justify-content:center;margin:7px 0 12px}
+.city-character-page-button{width:30px;height:30px;padding:0;border-radius:50%;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.18);font-size:23px;line-height:1}
+.city-character-page-dots{display:flex;gap:5px}
+.city-character-page-dots i{width:5px;height:5px;border-radius:50%;background:#ffffff55}
+.city-character-page-dots i.active{background:#fff}
+.city-character-meet{width:100%;min-height:42px;background:linear-gradient(135deg,rgba(220,222,233,.34),rgba(136,145,166,.3));border:1px solid rgba(255,255,255,.3);color:#fff}
+@media(prefers-reduced-motion:no-preference){.city-location-modal[data-side="left"] .city-location-glass{animation:city-location-slide-left .24s ease-out both}.city-location-modal[data-side="right"] .city-location-glass{animation:city-location-slide-right .24s ease-out both}}
+@media(prefers-reduced-motion:no-preference){.city-location-glass{animation:city-location-enter .22s ease-out both}@keyframes city-location-enter{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}}
+
+/* Premium alignment pass: scene header, close controls, pagination and right-side bookmark rail */
+.city-location-header{display:flex!important;align-items:center!important;justify-content:space-between!important;min-height:44px!important;gap:12px!important;padding:0 1px!important}
+.city-location-title-row{display:flex!important;align-items:center!important;align-self:center!important;gap:10px!important;flex-wrap:nowrap!important;min-width:0!important}
+.city-location-title-icon{display:grid!important;place-items:center!important;width:34px!important;height:34px!important;flex:0 0 34px!important;line-height:1!important;font-size:18px!important;border-radius:11px!important;background:rgba(255,255,255,.12)!important;border:1px solid rgba(255,255,255,.17)!important;box-shadow:inset 0 1px rgba(255,255,255,.14)!important}
+.city-location-title-row h2{display:block!important;align-self:center!important;margin:0!important;padding:0!important;line-height:1.2!important;font-size:clamp(16px,2vw,20px)!important;font-weight:650!important;letter-spacing:.015em!important;white-space:normal!important;overflow-wrap:anywhere!important}
+.city-location-open-inline{display:inline-flex!important;align-items:center!important;align-self:center!important;gap:6px!important;line-height:1!important;white-space:nowrap!important}
+.city-location-close,.city-character-card-close{position:relative!important;display:grid!important;place-items:center!important;align-self:center!important;flex:0 0 36px!important;width:36px!important;height:36px!important;min-width:36px!important;min-height:36px!important;padding:0!important;margin:0!important;border:1px solid rgba(255,255,255,.26)!important;border-radius:50%!important;background:linear-gradient(145deg,rgba(255,255,255,.20),rgba(255,255,255,.07))!important;color:transparent!important;font-size:0!important;line-height:0!important;box-shadow:0 4px 14px rgba(8,12,25,.16),inset 0 1px rgba(255,255,255,.2)!important;backdrop-filter:blur(12px)!important;-webkit-backdrop-filter:blur(12px)!important;cursor:pointer!important;transition:transform .18s ease,background .18s ease,border-color .18s ease!important}
+.city-location-close:before,.city-location-close:after,.city-character-card-close:before,.city-character-card-close:after{content:""!important;position:absolute!important;left:50%!important;top:50%!important;width:13px!important;height:1.5px!important;border-radius:2px!important;background:rgba(255,255,255,.94)!important;transform-origin:center!important}
+.city-location-close:before,.city-character-card-close:before{transform:translate(-50%,-50%) rotate(45deg)!important}
+.city-location-close:after,.city-character-card-close:after{transform:translate(-50%,-50%) rotate(-45deg)!important}
+.city-location-close:hover,.city-character-card-close:hover{transform:scale(1.04)!important;background:linear-gradient(145deg,rgba(255,255,255,.27),rgba(255,255,255,.12))!important;border-color:rgba(255,255,255,.45)!important}
+.city-location-close:focus-visible,.city-character-card-close:focus-visible,.city-character-page-button:focus-visible,.city-character-bookmark:focus-visible{outline:2px solid rgba(255,255,255,.85)!important;outline-offset:3px!important}
+.city-character-card{position:relative!important;overflow:visible!important;padding:14px 15px 12px!important;margin-right:0!important}
+.city-character-card-head{display:flex!important;align-items:center!important;justify-content:space-between!important;min-height:34px!important;gap:10px!important}
+.city-character-card-close{flex-basis:32px!important;width:32px!important;height:32px!important;min-width:32px!important;min-height:32px!important}
+.city-character-card-body{display:grid!important;grid-template-columns:104px minmax(0,1fr)!important;gap:12px!important;align-items:start!important;min-height:0!important;overflow:hidden!important;margin:10px 0 0!important;padding-right:0!important}
+.city-character-photo-column{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:9px!important;min-width:0!important}
+.city-character-photo-column .city-character-portrait{width:100%!important;height:136px!important;min-height:0!important;flex:0 0 136px!important;object-fit:cover!important;object-position:center top!important;border:0!important;box-shadow:none!important}
+.city-character-meet{display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;min-height:40px!important;line-height:1.35!important}
+.city-character-copy{min-width:0!important;min-height:0!important;max-height:100%!important;overflow-y:auto!important;overscroll-behavior:contain!important}
+.city-character-bookmarks{position:absolute!important;z-index:5!important;top:18px!important;right:-15px!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:7px!important;width:30px!important;overflow:visible!important}
+.city-character-bookmark{display:flex!important;align-items:center!important;justify-content:center!important;width:30px!important;min-width:30px!important;min-height:78px!important;height:auto!important;padding:9px 5px!important;writing-mode:vertical-rl!important;text-orientation:upright!important;white-space:normal!important;letter-spacing:.08em!important;font-size:11px!important;line-height:1.15!important;border-radius:0 9px 9px 0!important;border:1px solid rgba(255,255,255,.3)!important;border-left:0!important;background:linear-gradient(100deg,rgba(44,51,72,.84),rgba(75,83,108,.91))!important;color:#fff!important;box-shadow:3px 4px 10px rgba(8,12,25,.18)!important}
+.city-character-bookmark.active{background:linear-gradient(100deg,rgba(93,101,130,.96),rgba(116,124,153,.98))!important;border-color:rgba(255,255,255,.48)!important;box-shadow:3px 4px 12px rgba(8,12,25,.22),inset 0 1px rgba(255,255,255,.15)!important}
+.city-character-card-footer{display:flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;min-height:42px!important;margin:10px 0 0!important;padding:0!important}
+.city-character-page-button{position:relative!important;display:grid!important;place-items:center!important;align-self:center!important;width:30px!important;height:30px!important;min-width:30px!important;min-height:30px!important;padding:0!important;margin:0!important;border:1px solid rgba(255,255,255,.25)!important;border-radius:50%!important;background:linear-gradient(145deg,rgba(255,255,255,.17),rgba(255,255,255,.06))!important;color:transparent!important;font-size:0!important;line-height:0!important;box-shadow:inset 0 1px rgba(255,255,255,.12),0 3px 9px rgba(8,12,25,.13)!important}
+.city-character-page-button:before{content:""!important;display:block!important;width:7px!important;height:7px!important;border-top:1.7px solid rgba(255,255,255,.95)!important;border-right:1.7px solid rgba(255,255,255,.95)!important}
+.city-character-page-button[data-action="city-character-prev"]:before{transform:translateX(1px) rotate(-135deg)!important}
+.city-character-page-button[data-action="city-character-next"]:before{transform:translateX(-1px) rotate(45deg)!important}
+.city-character-page-button:disabled{opacity:.38!important;cursor:default!important}
+.city-character-page-dots{display:flex!important;align-items:center!important;justify-content:center!important;gap:5px!important;min-width:24px!important;height:30px!important}
+.city-character-page-dots i{display:block!important;width:5px!important;height:5px!important;border-radius:50%!important;background:rgba(255,255,255,.38)!important}
+.city-character-page-dots i.active{width:7px!important;height:7px!important;background:rgba(255,255,255,.95)!important;box-shadow:0 0 0 3px rgba(255,255,255,.1)!important}
+@media(max-width:600px){
+ .city-location-header{min-height:40px!important;gap:8px!important}
+ .city-location-title-row{gap:7px!important}
+ .city-location-title-icon{width:30px!important;height:30px!important;flex-basis:30px!important;border-radius:9px!important}
+ .city-location-title-row h2{font-size:16px!important}
+ .city-location-open-inline{font-size:10px!important;gap:4px!important}
+ .city-location-close{width:32px!important;height:32px!important;min-width:32px!important;min-height:32px!important;flex-basis:32px!important}
+ .city-character-card{padding:11px 11px 9px!important}
+ .city-character-card-body{grid-template-columns:88px minmax(0,1fr)!important;gap:9px!important}
+ .city-character-photo-column .city-character-portrait{height:118px!important;flex-basis:118px!important}
+ .city-character-bookmarks{top:14px!important;right:-13px!important;width:27px!important;gap:6px!important}
+ .city-character-bookmark{width:27px!important;min-width:27px!important;min-height:72px!important;padding:7px 4px!important;font-size:10px!important}
+ .city-character-card-footer{min-height:38px!important;margin-top:8px!important}
+ .city-character-page-button{width:29px!important;height:29px!important;min-width:29px!important;min-height:29px!important}
+}
+
+
+/* 2026-10-29 screenshot corrections: remove arrow discs and make true book-edge tabs */
+#cityCharacterCard{position:relative!important;overflow:visible!important;margin-right:34px!important;border:1px solid rgba(255,255,255,.24)!important;border-radius:20px!important}
+#cityCharacterCard .city-character-card-head{position:relative!important;padding-right:42px!important}
+#cityCharacterCard .city-character-card-close{position:absolute!important;right:7px!important;top:7px!important;z-index:4!important}
+#cityCharacterCard .city-character-bookmarks{position:absolute!important;top:52px!important;right:-35px!important;z-index:5!important;display:flex!important;flex-direction:column!important;gap:0!important;width:34px!important}
+#cityCharacterCard .city-character-bookmark{position:relative!important;box-sizing:border-box!important;width:34px!important;min-width:34px!important;min-height:70px!important;margin:0!important;padding:8px 5px!important;border-radius:0!important;border:1px solid rgba(235,220,239,.56)!important;border-left:0!important;border-right:1px solid rgba(235,220,239,.56)!important;background:linear-gradient(100deg,rgba(142,130,161,.82),rgba(184,169,194,.94))!important;color:#fffaff!important;text-shadow:0 1px 2px rgba(53,38,63,.24)!important;box-shadow:3px 2px 7px rgba(14,12,24,.13),inset 0 1px rgba(255,255,255,.3)!important;transition:background .18s ease,color .18s ease,transform .18s ease!important}
+#cityCharacterCard .city-character-bookmark:first-child{border-radius:0 8px 0 0!important}
+#cityCharacterCard .city-character-bookmark:last-child{border-radius:0 0 8px 0!important}
+#cityCharacterCard .city-character-bookmark:hover{background:linear-gradient(100deg,rgba(169,153,186,.96),rgba(206,188,211,.98))!important}
+#cityCharacterCard .city-character-bookmark.active{background:linear-gradient(100deg,rgba(241,229,240,.98),rgba(255,245,233,.99))!important;color:#55445f!important;text-shadow:none!important;border-color:rgba(255,255,255,.88)!important;box-shadow:3px 2px 8px rgba(14,12,24,.12),inset 0 1px rgba(255,255,255,.92)!important}
+#cityCharacterCard .city-character-card-footer .city-character-page-button{appearance:none!important;-webkit-appearance:none!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;width:24px!important;height:32px!important;min-width:24px!important;min-height:32px!important;padding:0!important;margin:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;outline-offset:2px!important;color:rgba(255,255,255,.98)!important;font-size:29px!important;font-family:Arial,sans-serif!important;font-weight:400!important;line-height:1!important;text-shadow:0 2px 3px rgba(0,0,0,.72)!important}
+#cityCharacterCard .city-character-card-footer .city-character-page-button::before,#cityCharacterCard .city-character-card-footer .city-character-page-button::after{content:none!important;display:none!important}
+#cityCharacterCard .city-character-card-footer{display:flex!important;align-items:center!important;justify-content:center!important;gap:10px!important}
+#cityCharacterCard .city-character-page-dots{display:flex!important;align-items:center!important;justify-content:center!important;gap:5px!important;line-height:1!important}
+#cityCharacterCard .city-character-portrait-video{display:block!important;width:100%!important;max-width:100%!important;height:118px!important;flex:0 0 118px!important;object-fit:cover!important;background:#171b27!important;border-radius:12px!important}
+@media(max-width:600px){
+ #cityCharacterCard{margin-right:29px!important}
+ #cityCharacterCard .city-character-bookmarks{right:-30px!important;width:29px!important}
+ #cityCharacterCard .city-character-bookmark{width:29px!important;min-width:29px!important;min-height:64px!important;padding:7px 4px!important;font-size:10px!important}
+ #cityCharacterCard .city-character-card-head{padding-right:40px!important}
+ #cityCharacterCard .city-character-card-footer .city-character-page-button{width:22px!important;min-width:22px!important;font-size:27px!important}
+}
+
+</style>
+
+<style id="encounter-mode-render-conflict-fix">
+/* Final encounter overrides intentionally come after all legacy chat styles. */
+body.encounter-mode-active .chat-main.encounter-scene,
+body.encounter-mode-active .chat-main.encounter-scene:before{background-color:transparent!important}
+body.encounter-mode-active .chat-main.encounter-scene:before{
+  background-image:linear-gradient(180deg,rgba(10,9,17,.08),rgba(10,9,17,.06) 42%,rgba(10,9,17,.20) 72%,rgba(10,9,17,.30) 100%),var(--encounter-scene-photo,none),radial-gradient(ellipse at 70% 22%,#6a5a65 0%,#322b36 48%,#17141b 100%)!important;
+  background-position:center,center,center!important;background-size:cover,cover,cover!important;background-repeat:no-repeat!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .composer{
+  background:linear-gradient(180deg,rgba(17,14,24,.04),rgba(17,14,24,.20) 24%,rgba(17,14,24,.48) 100%)!important;
+  backdrop-filter:blur(5px)!important;-webkit-backdrop-filter:blur(5px)!important;
+}
+/* Keep the character avatar in the heading as specified; remove only duplicate message/speaker avatars. */
+body.encounter-mode-active .chat-main.encounter-scene .messages .message>img.avatar,
+body.encounter-mode-active .chat-main.encounter-scene .messages .message .avatar,
+body.encounter-mode-active .chat-main.encounter-scene .messages .roleplay-segments .avatar{display:none!important}
+body.encounter-mode-active .chat-main.encounter-scene .chat-heading .row.grow{gap:8px!important}
+body.encounter-mode-active .chat-main.encounter-scene .messages{overflow-y:auto!important;overscroll-behavior:contain!important}
+body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-beat{position:relative;z-index:2;cursor:pointer}
+body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-empty{display:none!important}
+@media(max-width:767px){
+  body.encounter-mode-active .chat-main.encounter-scene .composer{background:linear-gradient(180deg,rgba(17,14,24,.02),rgba(17,14,24,.18) 22%,rgba(17,14,24,.42) 100%)!important}
+}
+
+/* Encounter visual-novel polish: soft glass gradients, restrained nameplate and lighter dialogue surfaces. */
+body.encounter-mode-active .chat-main.encounter-scene .chat-heading{
+  background:linear-gradient(110deg,rgba(25,22,35,.30) 0%,rgba(45,38,55,.18) 52%,rgba(25,22,35,.10) 100%)!important;
+  border-color:rgba(255,255,255,.12)!important;
+  box-shadow:0 8px 28px rgba(8,6,14,.08)!important;
+  backdrop-filter:blur(12px)!important;-webkit-backdrop-filter:blur(12px)!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .chat-heading .row.grow{
+  max-width:calc(100% - 12px)!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .messages .encounter-dialogue-beat{
+  display:flex!important;flex-direction:column!important;align-items:stretch!important;
+  width:min(100%,760px)!important;margin:0 auto!important;text-align:left!important;
+  gap:9px!important;padding:17px 19px 12px!important;
+  color:rgba(255,250,247,.96)!important;
+  background:linear-gradient(135deg,rgba(35,29,43,.54) 0%,rgba(61,48,66,.43) 48%,rgba(31,28,42,.48) 100%)!important;
+  border:1px solid rgba(255,237,242,.22)!important;border-radius:17px!important;
+  box-shadow:0 10px 32px rgba(10,7,16,.12),inset 0 1px 0 rgba(255,255,255,.10)!important;
+  backdrop-filter:blur(15px)!important;-webkit-backdrop-filter:blur(15px)!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .encounter-speaker-label{
+  align-self:flex-start!important;display:inline-flex!important;max-width:72%!important;
+  padding:4px 12px!important;margin:0 0 1px!important;border-radius:5px 11px 11px 5px!important;
+  font-size:12px!important;font-weight:650!important;letter-spacing:.08em!important;
+  color:rgba(255,239,224,.98)!important;
+  background:linear-gradient(100deg,rgba(205,164,177,.32),rgba(167,150,196,.20) 60%,rgba(255,255,255,.08))!important;
+  border-left:2px solid rgba(244,204,218,.72)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-text{
+  display:block!important;font-size:15px!important;line-height:1.9!important;
+  font-weight:450!important;white-space:pre-wrap!important;text-shadow:0 1px 8px rgba(0,0,0,.16)!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-hint{
+  align-self:flex-end!important;padding:3px 8px!important;border-radius:999px!important;
+  color:rgba(255,255,255,.58)!important;background:rgba(255,255,255,.045)!important;
+  font-size:10px!important;letter-spacing:.05em!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .suggestions-panel,
+body.encounter-mode-active .chat-main.encounter-scene .suggestion-cards,
+body.encounter-mode-active .chat-main.encounter-scene .suggestions-panel .suggestion-card,
+body.encounter-mode-active .chat-main.encounter-scene .suggestions-panel .suggestion-card.active{
+  background:linear-gradient(135deg,rgba(38,32,47,.30),rgba(72,57,77,.22) 52%,rgba(36,31,46,.26))!important;
+  border-color:rgba(255,255,255,.13)!important;
+  box-shadow:0 6px 22px rgba(8,6,14,.07),inset 0 1px 0 rgba(255,255,255,.07)!important;
+  backdrop-filter:blur(13px)!important;-webkit-backdrop-filter:blur(13px)!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .suggestion-card-action,
+body.encounter-mode-active .chat-main.encounter-scene .suggestion-card-dialogue{
+  background:transparent!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .composer{
+  background:linear-gradient(180deg,rgba(24,20,31,.015),rgba(36,29,43,.13) 42%,rgba(26,22,34,.30) 100%)!important;
+}
+@media(max-width:767px){
+  body.encounter-mode-active .chat-main.encounter-scene .messages .encounter-dialogue-beat{padding:14px 15px 10px!important;gap:7px!important}
+  body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-text{font-size:14px!important;line-height:1.85!important}
+  body.encounter-mode-active .chat-main.encounter-scene .encounter-speaker-label{font-size:11px!important;padding:4px 10px!important}
+}
+</style>
+
 </body>
 </html>

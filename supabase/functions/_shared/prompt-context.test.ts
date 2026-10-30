@@ -58,3 +58,36 @@ Deno.test("caps memory at 3000 characters and excludes current message from hist
   assertEquals(values.CHAT_HISTORY.includes("current question"), false);
   assertEquals(values.CHAT_HISTORY.includes("old answer"), true);
 });
+
+Deno.test("formats structured creator personality without exposing private info", () => {
+  const values = buildPromptVariableValues({
+    character: {
+      name: "Mira",
+      style: "Warm, descriptive prose",
+      intro: "A florist",
+      personality_profile: {
+        coreTraits: "Observant and guarded",
+        values: "Keeps promises",
+        speechStyle: "Short sentences",
+        behaviorRules: "Pauses when upset",
+        likes: "Rainy afternoons",
+        dislikes: "Broken promises",
+        boundaries: "Respect personal space",
+        relationshipPacing: "Slow burn",
+        private_info: "THIS MUST NOT APPEAR",
+      },
+    },
+  });
+  assertEquals(values.CHAR_STYLE, "Warm, descriptive prose");
+  assertEquals(values.CHAR_PERSONALITY.includes("核心性格：Observant and guarded"), true);
+  assertEquals(values.CHAR_PERSONALITY.includes("關係發展節奏：Slow burn"), true);
+  assertEquals(values.CHAR_PERSONALITY.includes("THIS MUST NOT APPEAR"), false);
+  assertEquals(values.CHAR_PERSONALITY.length <= 4000, true);
+});
+
+Deno.test("empty or malformed character personality safely falls back to empty context", () => {
+  const empty = buildPromptVariableValues({ character: { personality_profile: null } });
+  const malformed = buildPromptVariableValues({ character: { personality_profile: ["not", "an", "object"] } });
+  assertEquals(empty.CHAR_PERSONALITY, "");
+  assertEquals(malformed.CHAR_PERSONALITY, "");
+});
