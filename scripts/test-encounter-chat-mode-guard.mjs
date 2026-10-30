@@ -78,4 +78,6 @@ assert.match(frontend, /return c && !s\.encounterMode && !s\.archived && hasUser
 assert.match(frontend, /if \(!item \|\| item\.hidden \|\| item\.encounterMode === true\) return false;/);
 assert.match(frontend, /item\.id !== s\.id && item\.characterId === c\.id && !item\.archived && item\.encounterMode !== true/);
 assert.match(frontend, /candidate\.id!==item\.id&&candidate\.characterId===item\.characterId&&!candidate\.archived&&candidate\.encounterMode!==true/);
+assert.match(frontend, /route\.page === 'citymap' \? 'home'/);
+assert.match(frontend, /\['citymap','探索'\]/);
 console.log("Encounter chat-mode security guard tests passed.");
