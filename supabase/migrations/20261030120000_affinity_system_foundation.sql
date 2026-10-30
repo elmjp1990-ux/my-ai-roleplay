@@ -340,7 +340,7 @@ BEGIN
       RAISE EXCEPTION 'Encounter snapshot source is invalid or not settled' USING ERRCODE = '23514';
     END IF;
   ELSIF NEW.origin_mode = 'encounter_snapshot'
-        AND (TG_OP = 'INSERT' OR OLD.source_encounter_session_id IS NOT NULL) THEN
+        AND (TG_OP = 'INSERT' OR OLD.source_encounter_session_id IS NULL) THEN
     RAISE EXCEPTION 'Encounter snapshot source is required at creation' USING ERRCODE = '23514';
   END IF;
   RETURN NEW;
