@@ -62,7 +62,7 @@ Deno.serve(async (request) => {
     .eq("session_id", sessionId)
     .maybeSingle();
   if (lifecycleError) return json({ error: "encounter_lifecycle_lookup_failed", retryAllowed: true }, 503);
-  if (!lifecycle || !["active", "paused"].includes(lifecycle.status) ||
+  if (!lifecycle || lifecycle.status !== "active" ||
       !lifecycle.scheduled_end_at || new Date(lifecycle.scheduled_end_at).getTime() <= Date.now()) {
     return json({ error: "encounter_scene_expired_or_inactive", retryAllowed: false }, 409);
   }
@@ -85,12 +85,12 @@ Deno.serve(async (request) => {
   if (messageError) return json({ error: "user_message_lookup_failed" }, 503);
   if (!userMessage || !String(userMessage.content || "").trim()) return json({ error: "user_message_not_found" }, 400);
 
-  const { data: reservation, error: reserveError } = await admin.rpc("reserve_chat_turn", {
+  const { data: reservation, error: reserveError } = await admin.rpc("reserve_encounter_chat_turn", {
     p_user_id: user.id, p_turn_id: turnId, p_session_id: sessionId,
     p_user_message_id: userMessageId, p_assistant_message_id: assistantMessageId,
   });
   if (reserveError?.code === "23505" || String(reserveError?.message || "").includes("chat_turn_charges_user_message_id_uidx")) return json({ error: "user_message_already_charged", retryAllowed: false }, 409);
-  if (reserveError) return json({ error: "reservation_failed" }, 503);
+  if (reserveError?.code === "23514" || String(reserveError?.message || "").includes("encounter_scene_expired_or_inactive")) return json({ error: "encounter_scene_expired_or_inactive", retryAllowed: false }, 409);\n  if (reserveError) return json({ error: "reservation_failed" }, 503);
   const charge = Array.isArray(reservation) ? reservation[0] : reservation;
   if (!charge) return json({ error: "reservation_state_missing" }, 503);
   if (charge.status === "insufficient_funds") return json({
