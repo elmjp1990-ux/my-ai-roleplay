@@ -29,12 +29,16 @@ assert.match(encounterSession, /locationKey/);
 assert.match(encounterSession, /Asia.Taipei/);
 assert.match(encounterSession, /character_schedules/);
 assert.match(encounterSession, /character_not_at_this_location_now/);
-assert.match(encounterSession, /row\.day_type !== ["']any["']/);
-assert.match(encounterSession, /row\.day_type === ["']weekday["']/);
-assert.match(encounterSession, /row\.day_type === ["']weekend["']/);
-assert.match(encounterSession, /const overnight = end < start/);
-assert.match(encounterSession, /dayOffset === -1/);
-assert.match(encounterSession, /priority/);
+const encounterSchedule = fs.readFileSync("supabase/functions/_shared/encounter-schedule.mjs", "utf8");
+assert.match(encounterSchedule, /Asia\/Taipei/);
+assert.match(encounterSchedule, /const dayType = row\.day_type/);
+assert.match(encounterSchedule, /dayType === ["']weekday["']/);
+assert.match(encounterSchedule, /dayType === ["']weekend["']/);
+assert.match(encounterSchedule, /const overnight = end < start/);
+assert.match(encounterSchedule, /dayOffset === -1/);
+assert.match(encounterSchedule, /priority/);
+assert.match(encounterSchedule, /weekdaySpecific/);
+assert.match(encounterSchedule, /\(\\d\{2\}\)/);
 
 assert.match(encounterSession, /create_encounter_session_with_lifecycle/);
 
