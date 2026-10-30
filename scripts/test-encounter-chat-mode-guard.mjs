@@ -24,7 +24,7 @@ assert.match(encounterSession, /rpc\(["']account_is_active["']\)/);
 assert.match(encounterSession, /can_open_encounter_session/);
 assert.match(encounterSession, /session_id_conflict/);
 assert.match(encounterSession, /locationKey/);
-assert.match(encounterSession, /Asia\\/Taipei/);
+assert.match(encounterSession, /Asia.Taipei/);
 assert.match(encounterSession, /character_schedules/);
 assert.match(encounterSession, /character_not_at_this_location_now/);
 assert.match(encounterSession, /create_encounter_session_with_lifecycle/);
