@@ -3224,13 +3224,15 @@ function showDialog(title,content) {
   const pendingDeletionDialog = route?.overlay?.name === 'account-deletion-pending' && title === '帳號正在等待刪除';
   const deleteConfirmDialog = title === '刪除';
   const encounterLeaveDialog = title === '離開相遇';
+  const encounterMemoryDialog = title === '相遇回憶';
   const walletDialog = title === '我的資源' || title === '銀幣或鑽石不足' || title === '廣告功能尚未串接';
   modal.dataset.walletDialog = walletDialog ? 'true' : 'false';
   modal.dataset.encounterLeaveDialog = encounterLeaveDialog ? 'true' : 'false';
+  modal.dataset.encounterMemoryDialog = encounterMemoryDialog ? 'true' : 'false';
   modal.innerHTML = `
     <div class="row between modal-heading">
       <h2>${e(title)}</h2>
-      <button class="ghost" data-action="${walletDialog ? 'wallet-dialog-close' : encounterLeaveDialog ? 'encounter-dialog-dismiss' : pendingDeletionDialog ? 'pending-switch-account' : deleteConfirmDialog ? 'delete-dialog-back' : 'back'}"
+      <button class="ghost" data-action="${walletDialog ? 'wallet-dialog-close' : encounterLeaveDialog ? 'encounter-dialog-dismiss' : encounterMemoryDialog ? 'encounter-memory-detail-dismiss' : pendingDeletionDialog ? 'pending-switch-account' : deleteConfirmDialog ? 'delete-dialog-back' : 'back'}"
               aria-label="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}"
               title="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}">✕</button>
     </div>${content}`;
@@ -6988,6 +6990,7 @@ document.addEventListener('click',async event => {
       }
       case 'encounter-memory-open': { await openEncounterMemoryDetail(button);break; }
       case 'encounter-dialog-dismiss': { $('modal')?.close(); break; }
+      case 'encounter-memory-detail-dismiss': { $('modal')?.close(); break; }
       case 'encounter-temporary-leave': {
         const session=state.sessions[key];if(!session?.encounterMode)break;
         captureDraft();
