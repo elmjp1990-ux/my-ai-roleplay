@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS public.encounter_session_turns (
   evaluation_status text NOT NULL DEFAULT 'pending'
     CHECK (evaluation_status IN ('pending', 'evaluated', 'skipped', 'failed')),
   affinity_delta integer CHECK (
-    affinity_delta IS NULL OR affinity_delta BETWEEN -10 AND 10
+    affinity_delta IS NULL OR affinity_delta BETWEEN -100 AND 100
   ),
   evaluation jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (
     jsonb_typeof(evaluation) = 'object'
