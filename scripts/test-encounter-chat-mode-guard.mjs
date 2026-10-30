@@ -143,6 +143,14 @@ assert.match(evidenceMigration, /REVOKE ALL ON FUNCTION public\.record_encounter
 assert.match(evidenceMigration, /GRANT EXECUTE ON FUNCTION public\.record_encounter_session_turn_evidence[^;]*TO service_role/s);
 
 
+
+const expiredTurnMigration = fs.readFileSync(
+  "supabase/migrations/20261031160000_block_expired_encounter_turns.sql",
+  "utf8",
+);
+assert.match(expiredTurnMigration, /l\.scheduled_end_at <= now\(\)/);
+assert.match(expiredTurnMigration, /Invalid or expired Encounter lifecycle/);
+
 const settlementMigration = fs.readFileSync(
   "supabase/migrations/20261031150000_encounter_scene_settlement.sql",
   "utf8",
