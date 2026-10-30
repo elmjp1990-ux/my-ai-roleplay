@@ -36,7 +36,7 @@ ALTER TABLE public.encounter_turn_interaction_receipts
 CREATE TABLE IF NOT EXISTS public.encounter_session_lifecycle (
   session_id uuid PRIMARY KEY REFERENCES public.chat_sessions(id) ON DELETE CASCADE,
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  character_id uuid NOT NULL REFERENCES public.characters(id) ON DELETE CASCADE,
+  character_id uuid REFERENCES public.characters(id) ON DELETE SET NULL,
   location_key text NOT NULL CHECK (char_length(location_key) BETWEEN 1 AND 80),
   schedule_snapshot jsonb NOT NULL CHECK (
     jsonb_typeof(schedule_snapshot) = 'object'
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS public.encounter_session_turns (
   turn_id uuid PRIMARY KEY REFERENCES public.chat_turn_charges(turn_id) ON DELETE CASCADE,
   session_id uuid NOT NULL REFERENCES public.chat_sessions(id) ON DELETE CASCADE,
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  character_id uuid NOT NULL REFERENCES public.characters(id) ON DELETE CASCADE,
+  character_id uuid REFERENCES public.characters(id) ON DELETE SET NULL,
   user_message_id uuid NOT NULL REFERENCES public.chat_messages(id) ON DELETE CASCADE,
   assistant_message_id uuid NOT NULL REFERENCES public.chat_messages(id) ON DELETE CASCADE,
   turn_number integer NOT NULL CHECK (turn_number > 0),
@@ -117,7 +117,7 @@ CREATE INDEX IF NOT EXISTS encounter_session_turns_session_order_idx
 CREATE TABLE IF NOT EXISTS public.story_relationship_states (
   session_id uuid PRIMARY KEY REFERENCES public.chat_sessions(id) ON DELETE CASCADE,
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  character_id uuid NOT NULL REFERENCES public.characters(id) ON DELETE CASCADE,
+  character_id uuid REFERENCES public.characters(id) ON DELETE SET NULL,
   origin_mode text NOT NULL
     CHECK (origin_mode IN ('encounter_snapshot', 'fresh_story')),
   affinity integer NOT NULL DEFAULT 0 CHECK (affinity BETWEEN -100 AND 100),
@@ -166,7 +166,7 @@ CREATE TABLE IF NOT EXISTS public.story_relationship_batches (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id uuid NOT NULL REFERENCES public.chat_sessions(id) ON DELETE CASCADE,
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  character_id uuid NOT NULL REFERENCES public.characters(id) ON DELETE CASCADE,
+  character_id uuid REFERENCES public.characters(id) ON DELETE SET NULL,
   batch_number integer NOT NULL CHECK (batch_number > 0),
   first_turn_number integer NOT NULL CHECK (first_turn_number > 0),
   last_turn_number integer NOT NULL CHECK (last_turn_number >= first_turn_number),
@@ -204,35 +204,15 @@ REVOKE ALL ON TABLE public.encounter_session_turns FROM PUBLIC, anon, authentica
 REVOKE ALL ON TABLE public.story_relationship_states FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.story_relationship_batches FROM PUBLIC, anon, authenticated;
 
-GRANT SELECT ON TABLE public.encounter_session_lifecycle TO authenticated;
-GRANT SELECT ON TABLE public.encounter_session_turns TO authenticated;
-GRANT SELECT ON TABLE public.story_relationship_states TO authenticated;
-GRANT SELECT ON TABLE public.story_relationship_batches TO authenticated;
-
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.encounter_session_lifecycle TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.encounter_session_turns TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.story_relationship_states TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.story_relationship_batches TO service_role;
 
-DROP POLICY IF EXISTS encounter_session_lifecycle_select_own ON public.encounter_session_lifecycle;
-CREATE POLICY encounter_session_lifecycle_select_own
-  ON public.encounter_session_lifecycle FOR SELECT TO authenticated
-  USING (user_id = (SELECT auth.uid()));
-
-DROP POLICY IF EXISTS encounter_session_turns_select_own ON public.encounter_session_turns;
-CREATE POLICY encounter_session_turns_select_own
-  ON public.encounter_session_turns FOR SELECT TO authenticated
-  USING (user_id = (SELECT auth.uid()));
-
-DROP POLICY IF EXISTS story_relationship_states_select_own ON public.story_relationship_states;
-CREATE POLICY story_relationship_states_select_own
-  ON public.story_relationship_states FOR SELECT TO authenticated
-  USING (user_id = (SELECT auth.uid()));
-
-DROP POLICY IF EXISTS story_relationship_batches_select_own ON public.story_relationship_batches;
-CREATE POLICY story_relationship_batches_select_own
-  ON public.story_relationship_batches FOR SELECT TO authenticated
-  USING (user_id = (SELECT auth.uid()));
+-- No authenticated direct reads: raw affinity values, settlement deltas and evaluator
+-- payloads are internal state. A narrowly scoped owner-checked presentation RPC
+-- will be added with the runtime/UI integration; service_role remains the only
+-- application role allowed to read or mutate these tables.
 
 COMMENT ON TABLE public.story_relationship_batches IS
   'One idempotent five-player-turn Story batch per chat session. A completed batch contains both the memory summary and affinity evaluation result.';
