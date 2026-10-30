@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { resolveEncounterSchedule } from "../_shared/encounter-schedule.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -123,8 +124,7 @@ Deno.serve(async (request: Request) => {
     deletedAt: character.deleted_at,
   };
 
-  // Resolve the character's active schedule on the server using Taiwan local time.
-  // The client can request a location, but cannot supply or override schedule data.
+  // Resolve the active schedule on the server using Taiwan local time.
   const { data: schedules, error: scheduleError } = await admin
     .from("character_schedules")
     .select("id,weekday,day_type,start_time,end_time,location_key,activity,priority,is_active")
@@ -132,70 +132,10 @@ Deno.serve(async (request: Request) => {
     .eq("is_active", true)
     .eq("location_key", locationKey);
   if (scheduleError) return json({ error: "encounter_schedule_lookup_failed" }, 503);
-  const now = new Date();
-  const taiwanParts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-  }).formatToParts(now);
-  const part = (type: string) => taiwanParts.find(item => item.type === type)?.value || "";
-  const localDate = `${part("year")}-${part("month")}-${part("day")}`;
-  const localMinute = Number(part("hour")) * 60 + Number(part("minute"));
-  const dateAtOffset = (date: string, offset: number) => {
-    const value = new Date(`${date}T12:00:00+08:00`);
-    value.setUTCDate(value.getUTCDate() + offset);
-    return value.toISOString().slice(0, 10);
-  };
-  const weekdayFor = (date: string) => new Date(`${date}T12:00:00+08:00`).getUTCDay();
-  const minutes = (time: string) => {
-    const match = /^(\\d{2}):(\\d{2})(?::\\d{2})?$/.exec(time);
-    return match ? Number(match[1]) * 60 + Number(match[2]) : NaN;
-  };
-  const matches: Array<{ row: Record<string, unknown>; startDate: string; endDate: string; start: number; end: number }> = [];
-  for (const row of (schedules || []) as Array<Record<string, unknown>>) {
-    const start = minutes(String(row.start_time || ""));
-    const end = minutes(String(row.end_time || ""));
-    if (!Number.isFinite(start) || !Number.isFinite(end) || start === end) continue;
-    for (const dayOffset of [-1, 0]) {
-      const scheduleDate = dateAtOffset(localDate, dayOffset);
-      const scheduleWeekday = weekdayFor(scheduleDate);
-      if (row.weekday !== null && row.weekday !== undefined && Number(row.weekday) !== scheduleWeekday) continue;
-      const weekend = scheduleWeekday === 0 || scheduleWeekday === 6;
-      if (row.day_type === "weekday" && weekend) continue;
-      if (row.day_type === "weekend" && !weekend) continue;
-      if (row.day_type !== "any" && row.day_type !== "weekday" && row.day_type !== "weekend") continue;
-      const overnight = end < start;
-      const startDate = scheduleDate;
-      const endDate = overnight ? dateAtOffset(scheduleDate, 1) : scheduleDate;
-      const inWindow = dayOffset === -1
-        ? overnight && localMinute < end
-        : (overnight ? localMinute >= start : localMinute >= start && localMinute < end);
-      if (!inWindow) continue;
-      matches.push({ row, startDate, endDate, start, end });
-    }
-  }
-  matches.sort((a, b) =>
-    Number(b.row.priority || 0) - Number(a.row.priority || 0) ||
-    Number(b.row.weekday !== null && b.row.weekday !== undefined) -
-      Number(a.row.weekday !== null && a.row.weekday !== undefined) ||
-    String(a.row.id).localeCompare(String(b.row.id))
-  );
-  const selected = matches[0];
-  if (!selected) return json({ error: "character_not_at_this_location_now" }, 409);
-  const timeText = (value: number) => `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}:00`;
-  const scheduledStartAt = new Date(`${selected.startDate}T${timeText(selected.start)}+08:00`).toISOString();
-  const scheduledEndAt = new Date(`${selected.endDate}T${timeText(selected.end)}+08:00`).toISOString();
-  const scheduleSnapshot = {
-    schedule_id: selected.row.id,
-    weekday: selected.row.weekday,
-    day_type: selected.row.day_type,
-    start_time: selected.row.start_time,
-    end_time: selected.row.end_time,
-    location_key: locationKey,
-    activity: selected.row.activity,
-    priority: selected.row.priority,
-    timezone: "Asia/Taipei",
-    verified_at: now.toISOString(),
-  };
+  const scheduleResolution = resolveEncounterSchedule(schedules || [], locationKey, new Date());
+  if (!scheduleResolution) return json({ error: "character_not_at_this_location_now" }, 409);
+  const { scheduleSnapshot, scheduledStartAt, scheduledEndAt } = scheduleResolution;
+
 
   const { data: session, error: insertError } = await admin.rpc(
     "create_encounter_session_with_lifecycle",
