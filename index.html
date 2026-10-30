@@ -4421,7 +4421,7 @@ function startChat(characterId) {
   if (!accessible(c)) return toast('此角色已被作者調整為私密或刪除狀態，不支持開啟新對話');
   if (!requireLogin({page:'detail',id:characterId})) return;
   const sessions = Object.values(state.sessions).filter(item =>
-    item.characterId === c.id && !item.archived
+    item.characterId === c.id && !item.archived && item.encounterMode !== true
   ).sort((a,b) =>
     Number(hasUserMessage(b))-Number(hasUserMessage(a)) ||
     (b.messages?.at(-1)?.at || b.startedAt || 0)-(a.messages?.at(-1)?.at || a.startedAt || 0)
@@ -4435,7 +4435,7 @@ function visibleSessions() {
   const q = chatSearch.trim().toLowerCase();
   return Object.values(state.sessions).filter(s => {
     const c = sessionCharacter(s);
-    return c && !s.archived && hasUserMessage(s) &&
+    return c && !s.encounterMode && !s.archived && hasUserMessage(s) &&
       (!q || (s.name || c.name).toLowerCase().includes(q));
   }).sort((a,b) =>
     Number(b.pinned)-Number(a.pinned) ||
@@ -5925,7 +5925,7 @@ function addMemory(s,text) {
 function archiveSearchResults(query) {
   const q=String(query||'').trim().toLocaleLowerCase();
   const items=Object.values(state.sessions||{}).filter(item => {
-    if (!item || item.hidden) return false;
+    if (!item || item.hidden || item.encounterMode === true) return false;
     const character=sessionCharacter(item);
     return !q || [item.name,character?.name].filter(Boolean).join(' ').toLocaleLowerCase().includes(q);
   }).sort((a,b)=>(b.startedAt||0)-(a.startedAt||0));
@@ -7775,7 +7775,7 @@ document.addEventListener('click',async event => {
         s.name=uniqueSessionName(s.name || newArchiveName(c,s),s.id);
         s.archived=true;
         const existing=Object.values(state.sessions).filter(item =>
-          item.id !== s.id && item.characterId === c.id && !item.archived
+          item.id !== s.id && item.characterId === c.id && !item.archived && item.encounterMode !== true
         ).sort((a,b) =>
           Number(hasUserMessage(b))-Number(hasUserMessage(a)) ||
           (b.messages?.at(-1)?.at || b.startedAt || 0)-(a.messages?.at(-1)?.at || a.startedAt || 0)
@@ -7808,7 +7808,7 @@ document.addEventListener('click',async event => {
         if (!item || !canAccessSessionCharacter(item,sessionCharacter(item))) break;
         if (!confirm('恢復這段回憶？目前進行中的對話會先封存，這段歷史將接替聊天列表中的角色項目。')) break;
         const snapshot=clone(state);
-        const active=Object.values(state.sessions).filter(candidate=>candidate.id!==item.id&&candidate.characterId===item.characterId&&!candidate.archived)
+        const active=Object.values(state.sessions).filter(candidate=>candidate.id!==item.id&&candidate.characterId===item.characterId&&!candidate.archived&&candidate.encounterMode!==true)
           .sort((a,b)=>(b.messages?.at(-1)?.at||b.startedAt||0)-(a.messages?.at(-1)?.at||a.startedAt||0))[0];
         if(active) {
           active.archivedAt=Date.now();
