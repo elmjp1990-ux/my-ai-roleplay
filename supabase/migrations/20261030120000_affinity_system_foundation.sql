@@ -456,3 +456,71 @@ REVOKE ALL ON FUNCTION public.create_story_session_with_relationship(
 GRANT EXECUTE ON FUNCTION public.create_story_session_with_relationship(
   uuid, uuid, uuid, text, jsonb, text, uuid, integer, text, jsonb
 ) TO service_role;
+
+
+-- Atomically create an Encounter session together with the server-verified schedule window.
+-- The Edge Function resolves the schedule using Asia/Taipei time; only service_role can call this RPC.
+CREATE OR REPLACE FUNCTION public.create_encounter_session_with_lifecycle(
+  p_session_id uuid,
+  p_user_id uuid,
+  p_character_id uuid,
+  p_character_name text,
+  p_character_snapshot jsonb,
+  p_schedule_snapshot jsonb,
+  p_location_key text,
+  p_scheduled_start_at timestamptz,
+  p_scheduled_end_at timestamptz
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_session jsonb;
+BEGIN
+  IF p_session_id IS NULL OR p_user_id IS NULL OR p_character_id IS NULL
+     OR p_location_key IS NULL OR char_length(p_location_key) NOT BETWEEN 1 AND 80
+     OR jsonb_typeof(COALESCE(p_character_snapshot, '{}'::jsonb)) <> 'object'
+     OR jsonb_typeof(COALESCE(p_schedule_snapshot, '{}'::jsonb)) <> 'object'
+     OR pg_column_size(COALESCE(p_schedule_snapshot, '{}'::jsonb)) > 8000
+     OR p_scheduled_start_at IS NULL OR p_scheduled_end_at IS NULL
+     OR p_scheduled_end_at <= p_scheduled_start_at THEN
+    RAISE EXCEPTION 'Invalid Encounter session lifecycle input' USING ERRCODE = '22023';
+  END IF;
+
+  INSERT INTO public.chat_sessions (
+    id, user_id, character_id, character_name, status,
+    character_snapshot, session_data, chat_mode
+  ) VALUES (
+    p_session_id, p_user_id, p_character_id, p_character_name, 'active',
+    COALESCE(p_character_snapshot, '{}'::jsonb),
+    jsonb_build_object('encounter', jsonb_build_object('affinity', 0, 'relationshipStage', 'first_meeting')),
+    'encounter'
+  );
+
+  INSERT INTO public.encounter_session_lifecycle (
+    session_id, user_id, character_id, location_key, schedule_snapshot,
+    scheduled_start_at, scheduled_end_at, timezone, status
+  ) VALUES (
+    p_session_id, p_user_id, p_character_id, p_location_key, p_schedule_snapshot,
+    p_scheduled_start_at, p_scheduled_end_at, 'Asia/Taipei', 'active'
+  );
+
+  SELECT jsonb_build_object(
+    'id', s.id, 'user_id', s.user_id, 'character_id', s.character_id,
+    'character_name', s.character_name, 'status', s.status,
+    'character_snapshot', s.character_snapshot, 'session_data', s.session_data,
+    'chat_mode', s.chat_mode, 'created_at', s.created_at, 'updated_at', s.updated_at
+  ) INTO v_session
+  FROM public.chat_sessions AS s WHERE s.id = p_session_id;
+  RETURN v_session;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.create_encounter_session_with_lifecycle(
+  uuid, uuid, uuid, text, jsonb, jsonb, text, timestamptz, timestamptz
+) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.create_encounter_session_with_lifecycle(
+  uuid, uuid, uuid, text, jsonb, jsonb, text, timestamptz, timestamptz
+) TO service_role;
