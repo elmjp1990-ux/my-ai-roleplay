@@ -3336,6 +3336,9 @@ function render() {
   }
   // City-map-only visual treatment must not leak into traditional pages.
   if (route.page !== 'citymap') document.body.classList.remove('city-map-mode','city-map-mode-immersive');
+  // Encounter fullscreen scroll locks must be released when leaving the Encounter conversation.
+  // renderConversation() will re-enable the class only for an active Encounter session.
+  if (route.page !== 'conversation') document.body.classList.remove('encounter-mode-active');
   renderShell();
   switch(route.page) {
     case 'citymap':renderCityMapMVP();break;
