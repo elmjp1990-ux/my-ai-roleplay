@@ -140,7 +140,6 @@ Deno.serve(async (request: Request) => {
   const part = (type: string) => taiwanParts.find(item => item.type === type)?.value || "";
   const localDate = `${part("year")}-${part("month")}-${part("day")}`;
   const localMinute = Number(part("hour")) * 60 + Number(part("minute"));
-  const localWeekday = new Date(`${localDate}T12:00:00+08:00`).getUTCDay();
   const dateAtOffset = (date: string, offset: number) => {
     const value = new Date(`${date}T12:00:00+08:00`);
     value.setUTCDate(value.getUTCDate() + offset);
@@ -163,12 +162,10 @@ Deno.serve(async (request: Request) => {
       const weekend = scheduleWeekday === 0 || scheduleWeekday === 6;
       if (row.day_type === "weekday" && weekend) continue;
       if (row.day_type === "weekend" && !weekend) continue;
+      if (row.day_type !== "any" && row.day_type !== "weekday" && row.day_type !== "weekend") continue;
       const overnight = end < start;
       const startDate = scheduleDate;
       const endDate = overnight ? dateAtOffset(scheduleDate, 1) : scheduleDate;
-      const currentAbsolute = dayOffset === -1 ? 1440 + localMinute : localMinute;
-      const startAbsolute = dayOffset === -1 ? start : start;
-      const endAbsolute = dayOffset === -1 ? (overnight ? 1440 + end : end) : (overnight ? 1440 + end : end);
       const inWindow = dayOffset === -1
         ? overnight && localMinute < end
         : (overnight ? localMinute >= start : localMinute >= start && localMinute < end);
@@ -178,7 +175,8 @@ Deno.serve(async (request: Request) => {
   }
   matches.sort((a, b) =>
     Number(b.row.priority || 0) - Number(a.row.priority || 0) ||
-    Number(b.row.weekday !== null) - Number(a.row.weekday !== null) ||
+    Number(b.row.weekday !== null && b.row.weekday !== undefined) -
+      Number(a.row.weekday !== null && a.row.weekday !== undefined) ||
     String(a.row.id).localeCompare(String(b.row.id))
   );
   const selected = matches[0];
