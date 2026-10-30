@@ -80,4 +80,5 @@ assert.match(frontend, /item\.id !== s\.id && item\.characterId === c\.id && !it
 assert.match(frontend, /candidate\.id!==item\.id&&candidate\.characterId===item\.characterId&&!candidate\.archived&&candidate\.encounterMode!==true/);
 assert.match(frontend, /route\.page === 'citymap' \? 'home'/);
 assert.match(frontend, /\['citymap','探索'\]/);
+assert.match(frontend, /ICON\[page === 'citymap' \? 'home' : page\]/);
 console.log("Encounter chat-mode security guard tests passed.");
