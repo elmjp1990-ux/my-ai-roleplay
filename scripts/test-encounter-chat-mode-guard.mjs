@@ -142,6 +142,21 @@ assert.match(evidenceMigration, /turn_count=n/);
 assert.match(evidenceMigration, /REVOKE ALL ON FUNCTION public\.record_encounter_session_turn_evidence/);
 assert.match(evidenceMigration, /GRANT EXECUTE ON FUNCTION public\.record_encounter_session_turn_evidence[^;]*TO service_role/s);
 
+
+const settlementMigration = fs.readFileSync(
+  "supabase/migrations/20261031150000_encounter_scene_settlement.sql",
+  "utf8",
+);
+assert.match(settlementMigration, /l\.scheduled_end_at > now\(\)/);
+assert.match(settlementMigration, /l\.status NOT IN \(['"]active['"],['"]paused['"],['"]ready_to_settle['"]\)/);
+assert.match(settlementMigration, /FOR UPDATE/);
+assert.match(settlementMigration, /l\.status='settled'/);
+assert.match(settlementMigration, /idempotent',true/);
+assert.match(settlementMigration, /greatest\(-100,least\(100,v_current\+p_affinity_delta\)\)/);
+assert.match(settlementMigration, /encounter_session_turns t WHERE t\.session_id=p_session_id/);
+assert.match(settlementMigration, /REVOKE ALL ON FUNCTION public\.settle_encounter_session/);
+assert.match(settlementMigration, /GRANT EXECUTE ON FUNCTION public\.settle_encounter_session[^;]*TO service_role/s);
+
 const schedule = (overrides = {}) => ({
   id: "schedule-1", weekday: null, day_type: "any",
   start_time: "09:00:00", end_time: "18:00:00",
