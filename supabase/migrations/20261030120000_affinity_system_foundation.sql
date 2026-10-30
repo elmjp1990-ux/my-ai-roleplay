@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS public.story_relationship_states (
       'hostile', 'dislike', 'wary',
       'first_meeting', 'acquaintance', 'close', 'intimate', 'special'
     )),
-  source_encounter_session_id uuid REFERENCES public.chat_sessions(id) ON DELETE SET NULL,
+  source_encounter_session_id uuid,
   origin_affinity integer NOT NULL DEFAULT 0 CHECK (origin_affinity BETWEEN -100 AND 100),
   origin_relationship_stage text NOT NULL DEFAULT 'first_meeting'
     CHECK (origin_relationship_stage IN (
