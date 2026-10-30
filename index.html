@@ -3255,19 +3255,20 @@ function visit(page,idValue) {
 
 function renderShell() {
   const navPage = route.page === 'conversation' ? 'chat'
+    : route.page === 'citymap' ? 'home'
     : ['editor','ai'].includes(route.page) ? 'create'
     : ['detail','session-detail'].includes(route.page) ? 'home'
     : route.page === 'group' ? 'chat' : route.page;
   // 五大主入口固定順序：探索、創建、聊天、商店、我的。
   // 通知、收藏、群組仍保留既有次級頁面路徑，不再占用主導覽位置。
   const labels = [
-    ['home','探索'],['create','創建'],['chat','聊天'],
+    ['citymap','探索'],['create','創建'],['chat','聊天'],
     ['shop','商店'],['profile','我的']
   ];
   const html = labels.map(([page,label]) => `
     <button class="nav-btn ${navPage === page ? 'active' : ''}"
             data-action="nav" data-page="${page}">
-      ${ICON[page]}<span class="nav-label">${label}</span>
+      ${ICON[page === 'citymap' ? 'home' : page]}<span class="nav-label">${label}</span>
     </button>`).join('');
   $('desktopNav').innerHTML = html;
   $('mobileNav').innerHTML = html;
@@ -3304,6 +3305,10 @@ function renderShell() {
 }
 
 function render() {
+  // Encounter fullscreen scroll locking must follow the active route, not a stale
+  // session left in memory after navigating back to the city or traditional pages.
+  const encounterRouteActive = route.page === 'conversation' && !!currentSession()?.encounterMode;
+  document.body.classList.toggle('encounter-mode-active', encounterRouteActive);
   if ($('modal').open) $('modal').close();
   const allowed = ['citymap','home','detail','session-detail','author','chat','conversation','group','create',
     'editor','ai','notifications','favorites','followed-authors','shop','profile','album'];
@@ -4417,7 +4422,7 @@ function startChat(characterId) {
   if (!accessible(c)) return toast('此角色已被作者調整為私密或刪除狀態，不支持開啟新對話');
   if (!requireLogin({page:'detail',id:characterId})) return;
   const sessions = Object.values(state.sessions).filter(item =>
-    item.characterId === c.id && !item.archived
+    item.characterId === c.id && !item.archived && item.encounterMode !== true
   ).sort((a,b) =>
     Number(hasUserMessage(b))-Number(hasUserMessage(a)) ||
     (b.messages?.at(-1)?.at || b.startedAt || 0)-(a.messages?.at(-1)?.at || a.startedAt || 0)
@@ -4431,7 +4436,7 @@ function visibleSessions() {
   const q = chatSearch.trim().toLowerCase();
   return Object.values(state.sessions).filter(s => {
     const c = sessionCharacter(s);
-    return c && !s.archived && hasUserMessage(s) &&
+    return c && !s.encounterMode && !s.archived && hasUserMessage(s) &&
       (!q || (s.name || c.name).toLowerCase().includes(q));
   }).sort((a,b) =>
     Number(b.pinned)-Number(a.pinned) ||
@@ -5921,7 +5926,7 @@ function addMemory(s,text) {
 function archiveSearchResults(query) {
   const q=String(query||'').trim().toLocaleLowerCase();
   const items=Object.values(state.sessions||{}).filter(item => {
-    if (!item || item.hidden) return false;
+    if (!item || item.hidden || item.encounterMode === true) return false;
     const character=sessionCharacter(item);
     return !q || [item.name,character?.name].filter(Boolean).join(' ').toLocaleLowerCase().includes(q);
   }).sort((a,b)=>(b.startedAt||0)-(a.startedAt||0));
@@ -6961,7 +6966,7 @@ document.addEventListener('click',async event => {
 
   try {
     switch(action) {
-      case 'home':go({page:'home'});break;
+      case 'home':go({page:'citymap'});break;
       case 'phone-open':renderPhoneModal();break;
       case 'phone-close':document.querySelector('.phone-modal-backdrop')?.remove();break;
       case 'group-next':groupNext();break;
@@ -7771,7 +7776,7 @@ document.addEventListener('click',async event => {
         s.name=uniqueSessionName(s.name || newArchiveName(c,s),s.id);
         s.archived=true;
         const existing=Object.values(state.sessions).filter(item =>
-          item.id !== s.id && item.characterId === c.id && !item.archived
+          item.id !== s.id && item.characterId === c.id && !item.archived && item.encounterMode !== true
         ).sort((a,b) =>
           Number(hasUserMessage(b))-Number(hasUserMessage(a)) ||
           (b.messages?.at(-1)?.at || b.startedAt || 0)-(a.messages?.at(-1)?.at || a.startedAt || 0)
@@ -7804,7 +7809,7 @@ document.addEventListener('click',async event => {
         if (!item || !canAccessSessionCharacter(item,sessionCharacter(item))) break;
         if (!confirm('恢復這段回憶？目前進行中的對話會先封存，這段歷史將接替聊天列表中的角色項目。')) break;
         const snapshot=clone(state);
-        const active=Object.values(state.sessions).filter(candidate=>candidate.id!==item.id&&candidate.characterId===item.characterId&&!candidate.archived)
+        const active=Object.values(state.sessions).filter(candidate=>candidate.id!==item.id&&candidate.characterId===item.characterId&&!candidate.archived&&candidate.encounterMode!==true)
           .sort((a,b)=>(b.messages?.at(-1)?.at||b.startedAt||0)-(a.messages?.at(-1)?.at||a.startedAt||0))[0];
         if(active) {
           active.archivedAt=Date.now();
@@ -10190,7 +10195,7 @@ document.addEventListener('submit',function(event){
     body.encounter-mode-active .app{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;min-height:100dvh!important;margin:0!important;padding:0!important;overflow:hidden!important;transform:none!important}
     body.encounter-mode-active #view{position:fixed!important;inset:0!important;z-index:100!important;width:100vw!important;height:100dvh!important;min-height:100dvh!important;max-width:none!important;margin:0!important;padding:0!important;overflow:hidden!important}
     body.encounter-mode-active .chat-layout{position:fixed!important;inset:0!important;display:block!important;width:100vw!important;height:100dvh!important;min-height:100dvh!important;margin:0!important;padding:0!important;overflow:hidden!important}
-    body:has(.chat-main.encounter-scene){overflow:hidden!important}
+    body.encounter-mode-active:has(.chat-main.encounter-scene){overflow:hidden!important}
     .chat-main.encounter-scene{position:fixed!important;inset:0!important;z-index:110!important;display:block!important;width:100vw!important;height:100dvh!important;min-height:100dvh!important;max-width:none!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;overflow:hidden!important;isolation:isolate!important;background:#17141b!important}
     .chat-main.encounter-scene:before{position:absolute!important;inset:0!important;z-index:0!important;background-image:linear-gradient(180deg,rgba(10,9,17,.10),rgba(10,9,17,.12) 34%,rgba(10,9,17,.40) 66%,rgba(10,9,17,.92) 100%),var(--encounter-scene-photo,none),radial-gradient(ellipse at 70% 22%,#6a5a65 0%,#322b36 48%,#17141b 100%)!important;background-position:center,center,center!important;background-size:cover,cover,cover!important;background-repeat:no-repeat!important;transform:none!important;filter:none!important;content:""!important;pointer-events:none!important}
     .encounter-scene .chat-layout{position:absolute!important;inset:0!important;width:100%!important;height:100dvh!important;min-height:0!important;margin:0!important;padding:0!important}
