@@ -28,6 +28,13 @@ assert.match(encounterSession, /locationKey/);
 assert.match(encounterSession, /Asia.Taipei/);
 assert.match(encounterSession, /character_schedules/);
 assert.match(encounterSession, /character_not_at_this_location_now/);
+assert.match(encounterSession, /row\.day_type !== ["']any["']/);
+assert.match(encounterSession, /row\.day_type === ["']weekday["']/);
+assert.match(encounterSession, /row\.day_type === ["']weekend["']/);
+assert.match(encounterSession, /const overnight = end < start/);
+assert.match(encounterSession, /dayOffset === -1/);
+assert.match(encounterSession, /priority/);
+
 assert.match(encounterSession, /create_encounter_session_with_lifecycle/);
 
 assert.match(accessMigration, /private\.current_user_is_adult\(\)/);
