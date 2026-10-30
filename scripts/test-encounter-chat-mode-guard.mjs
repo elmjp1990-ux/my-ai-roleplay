@@ -74,6 +74,16 @@ assert.match(atomicReservationMigration, /public\.reserve_chat_turn\(/);
 assert.match(atomicReservationMigration, /TO service_role/);
 assert.match(atomicReservationMigration, /clock_timestamp\(\)/);
 
+const preExpiryTurnMigration = fs.readFileSync(
+  "supabase/migrations/20261031180000_allow_preexpiry_reserved_turn_completion.sql",
+  "utf8",
+);
+assert.match(preExpiryTurnMigration, /c\.reserved_at <= l\.scheduled_end_at/);
+assert.match(preExpiryTurnMigration, /c\.status IN \('reserved','needs_reconciliation'\)/);
+assert.match(preExpiryTurnMigration, /Encounter has pending pre-expiry turns/);
+assert.match(preExpiryTurnMigration, /l\.status NOT IN \('active','paused','ready_to_settle'\)/);
+assert.match(preExpiryTurnMigration, /FOR UPDATE/);
+
 
 const interactionMigration = fs.readFileSync(
   "supabase/migrations/20261029210000_validate_settled_encounter_interaction.sql",
