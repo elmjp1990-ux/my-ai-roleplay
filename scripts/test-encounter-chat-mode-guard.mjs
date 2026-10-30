@@ -16,11 +16,19 @@ assert.match(guardMigration, /SET search_path = ['"]{2}/);
 assert.match(guardMigration, /NEW\.chat_mode IS DISTINCT FROM OLD\.chat_mode/);
 
 const encounterSession = fs.readFileSync("supabase/functions/encounter-session/index.ts", "utf8");
+assert.match(frontend, /locationKey: encounterPlace/);
+assert.match(frontend, /請從城市地圖的有效地標進入相遇/);
 const accessMigration = fs.readFileSync("supabase/migrations/20261028180000_encounter_session_access_check.sql", "utf8");
 assert.match(encounterSession, /auth\.getUser\(\)/);
 assert.match(encounterSession, /rpc\(["']account_is_active["']\)/);
 assert.match(encounterSession, /can_open_encounter_session/);
 assert.match(encounterSession, /session_id_conflict/);
+assert.match(encounterSession, /locationKey/);
+assert.match(encounterSession, /Asia\\/Taipei/);
+assert.match(encounterSession, /character_schedules/);
+assert.match(encounterSession, /character_not_at_this_location_now/);
+assert.match(encounterSession, /create_encounter_session_with_lifecycle/);
+
 assert.match(accessMigration, /private\.current_user_is_adult\(\)/);
 assert.doesNotMatch(encounterSession, /\.eq\(["']latest_eligible["'],\s*true\)/);
 
@@ -88,7 +96,7 @@ const affinityMigration = fs.readFileSync(
   "utf8",
 );
 assert.match(affinityMigration, /CHECK \(affinity BETWEEN -100 AND 100\)/);
-assert.equal((affinityMigration.match(/AS \$\$/g) || []).length, 4);
+assert.equal((affinityMigration.match(/AS \$\$/g) || []).length, 5);
 assert.equal((affinityMigration.match(/^\$\$;$/gm) || []).length, 4);
 assert.match(affinityMigration, /ON DELETE SET NULL/);
 assert.match(affinityMigration, /REVOKE ALL ON TABLE public\.story_relationship_states FROM PUBLIC, anon, authenticated/);
@@ -120,4 +128,8 @@ assert.match(storySession, /create_story_session_with_relationship/);
 assert.match(storySession, /session_id_conflict/);
 assert.match(affinityMigration, /FUNCTION public\.create_story_session_with_relationship/);
 assert.match(affinityMigration, /GRANT EXECUTE ON FUNCTION public\.create_story_session_with_relationship/);
+assert.match(affinityMigration, /FUNCTION public\.create_encounter_session_with_lifecycle/);
+assert.match(affinityMigration, /INSERT INTO public\.encounter_session_lifecycle/);
+assert.match(affinityMigration, /GRANT EXECUTE ON FUNCTION public\.create_encounter_session_with_lifecycle/);
+
 assert.match(affinityMigration, /INSERT INTO public\.story_relationship_states/);
