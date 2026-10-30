@@ -5105,7 +5105,7 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
   if(kind==='settings'){
     const encounterMode=!isGroup&&!!ctx.session.encounterMode;
     const items=encounterMode
-      ?[['encounter-record','相遇紀錄','查看這個角色過往的相遇，依時間由新到舊'],['persona','人設管理','設定此角色所有相遇共用的人設'],['encounter-dialogues','對話紀錄','查看本次相遇的對話紀錄'],['encounter-end','結束相遇','結束本次相遇，期待下次與您相遇']]
+      ?[['encounter-record','相遇回憶','查看這個角色過往的相遇摘要，點選即可閱讀完整內容'],['persona','人設管理','設定此角色所有相遇共用的人設'],['encounter-dialogues','本次對話','查看目前這次相遇的完整對話'],['encounter-end','結束相遇','結束本次相遇，期待下次與您相遇']]
       :[...(isGroup?[['group-info','群組資訊','群組成員、世界背景與場景']]:[]),['diary','甜蜜日記','回憶摘要與長期保存'],['background','聊天背景','無背景、角色圖片或回憶相片'],[isGroup?'group-persona':'persona','人設管理',isGroup?'管理並套用這個群組的玩家人設':'管理目前聊天使用的人設'],...(!isGroup?[['manage-conversation','管理對話','開始新對話或切換舊的回憶']]:[]),['delete','刪除對話','刪除這段對話與回憶']];
     panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="聊天功能選單"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-close" aria-label="返回聊天" title="返回聊天">'+ICON.back+'</button><h2>聊天功能</h2></div><div class="stack chat-settings-options">'+items.map(([action,title,desc])=>'<button type="button" class="profile-setting" data-action="chat-settings-option" data-option="'+e(action)+'"><span><strong>'+e(title)+'</strong><small>'+e(desc)+'</small></span><span>›</span></button>').join('')+'</div></section>');
     return;
