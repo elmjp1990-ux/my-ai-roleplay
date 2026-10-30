@@ -16,7 +16,6 @@ DECLARE
   l public.encounter_session_lifecycle%ROWTYPE;
   v_current integer := 0;
   v_final integer := 0;
-  v_stage text;
   v_state_id uuid;
   v_result jsonb;
 BEGIN
@@ -44,6 +43,10 @@ BEGIN
     RETURN jsonb_build_object('settled',true,'idempotent',true,'result',l.settlement_result);
   END IF;
 
+  IF l.character_id IS NULL THEN
+    RAISE EXCEPTION 'Encounter character is no longer available for relationship settlement' USING ERRCODE='23514';
+  END IF;
+
   IF l.status NOT IN ('active','paused','ready_to_settle') THEN
     RAISE EXCEPTION 'Encounter lifecycle is not settleable' USING ERRCODE='23514';
   END IF;
@@ -60,8 +63,8 @@ BEGIN
   VALUES(l.user_id,l.character_id,0,'first_meeting',now(),now())
   ON CONFLICT (user_id,character_id) DO NOTHING;
 
-  SELECT s.id,s.affinity,s.relationship_stage
-    INTO v_state_id,v_current,v_stage
+  SELECT s.id,s.affinity
+    INTO v_state_id,v_current
   FROM public.encounter_character_state s
   WHERE s.user_id=l.user_id AND s.character_id=l.character_id
   FOR UPDATE;
