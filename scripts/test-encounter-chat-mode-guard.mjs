@@ -89,7 +89,7 @@ const affinityMigration = fs.readFileSync(
 );
 assert.match(affinityMigration, /CHECK \(affinity BETWEEN -100 AND 100\)/);
 assert.equal((affinityMigration.match(/AS \$\$/g) || []).length, 4);
-assert.equal((affinityMigration.match(/^\$\$;$/gm) || []).length, 3);
+assert.equal((affinityMigration.match(/^\$\$;$/gm) || []).length, 4);
 assert.match(affinityMigration, /ON DELETE SET NULL/);
 assert.match(affinityMigration, /REVOKE ALL ON TABLE public\.story_relationship_states FROM PUBLIC, anon, authenticated/);
 assert.match(affinityMigration, /REVOKE ALL ON TABLE public\.encounter_session_turns FROM PUBLIC, anon, authenticated/);
