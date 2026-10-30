@@ -48,7 +48,7 @@ assert.doesNotMatch(encounterSession, /\.eq\(["']latest_eligible["'],\s*true\)/)
 const encounterTurn = fs.readFileSync("supabase/functions/encounter-turn/index.ts", "utf8");
 assert.match(encounterTurn, /auth\.getUser\(\)/);
 assert.match(encounterTurn, /session\.chat_mode !== ["']encounter["']/);
-assert.match(encounterTurn, /reserve_chat_turn/);
+assert.match(encounterTurn, /reserve_encounter_chat_turn/);
 assert.match(encounterTurn, /settle_chat_turn/);
 assert.match(encounterTurn, /record_encounter_session_turn_evidence/);
 assert.doesNotMatch(encounterTurn, /record_encounter_turn_interaction/);
@@ -58,9 +58,22 @@ assert.match(encounterTurn, /assistant_message_id_collision/);
 assert.match(encounterTurn, /encounter_session_lifecycle/);
 assert.match(encounterTurn, /encounter_scene_expired_or_inactive/);
 assert.ok(
-  encounterTurn.indexOf("encounter_session_lifecycle") < encounterTurn.indexOf("reserve_chat_turn"),
+  encounterTurn.indexOf("encounter_session_lifecycle") < encounterTurn.indexOf("reserve_encounter_chat_turn"),
   "Encounter lifecycle expiry must be checked before reserving/charging a turn",
 );
+
+const atomicReservationMigration = fs.readFileSync(
+  "supabase/migrations/20261031170000_atomic_encounter_turn_reservation.sql",
+  "utf8",
+);
+assert.match(atomicReservationMigration, /FUNCTION public\.reserve_encounter_chat_turn/);
+assert.match(atomicReservationMigration, /FOR UPDATE/);
+assert.match(atomicReservationMigration, /l\.status <> 'active'/);
+assert.match(atomicReservationMigration, /l\.scheduled_end_at <= clock_timestamp\(\)/);
+assert.match(atomicReservationMigration, /public\.reserve_chat_turn\(/);
+assert.match(atomicReservationMigration, /TO service_role/);
+assert.match(atomicReservationMigration, /clock_timestamp\(\)/);
+
 
 const interactionMigration = fs.readFileSync(
   "supabase/migrations/20261029210000_validate_settled_encounter_interaction.sql",
