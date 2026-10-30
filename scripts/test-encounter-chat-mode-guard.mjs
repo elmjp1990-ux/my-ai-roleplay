@@ -50,7 +50,10 @@ assert.match(encounterTurn, /auth\.getUser\(\)/);
 assert.match(encounterTurn, /session\.chat_mode !== ["']encounter["']/);
 assert.match(encounterTurn, /reserve_chat_turn/);
 assert.match(encounterTurn, /settle_chat_turn/);
-assert.match(encounterTurn, /record_encounter_turn_interaction/);
+assert.match(encounterTurn, /record_encounter_session_turn_evidence/);
+assert.doesNotMatch(encounterTurn, /record_encounter_turn_interaction/);
+assert.doesNotMatch(encounterTurn, /p_affinity_delta:\s*1/);
+assert.match(encounterTurn, /affinityPendingUntilSceneEnd/);
 assert.match(encounterTurn, /assistant_message_id_collision/);
 
 const interactionMigration = fs.readFileSync(
@@ -126,6 +129,18 @@ assert.match(affinityMigration, /Encounter snapshot source is invalid or not set
 assert.match(affinityMigration, /source_encounter_session_id uuid REFERENCES public\.encounter_session_lifecycle\(session_id\) ON DELETE SET NULL/);
 assert.match(affinityMigration, /A carried-over Story must reference a settled Encounter/);
 
+
+
+const evidenceMigration = fs.readFileSync("supabase/migrations/20261031120000_encounter_turn_evidence_writer.sql", "utf8");
+assert.match(evidenceMigration, /c\.status <> ['"]settled['"]/);
+assert.match(evidenceMigration, /c\.session_id IS DISTINCT FROM p_session_id/);
+assert.match(evidenceMigration, /c\.user_id IS DISTINCT FROM p_user_id/);
+assert.match(evidenceMigration, /um\.session_id IS DISTINCT FROM p_session_id/);
+assert.match(evidenceMigration, /am\.session_id IS DISTINCT FROM p_session_id/);
+assert.match(evidenceMigration, /FOR UPDATE/);
+assert.match(evidenceMigration, /turn_count=n/);
+assert.match(evidenceMigration, /REVOKE ALL ON FUNCTION public\.record_encounter_session_turn_evidence/);
+assert.match(evidenceMigration, /GRANT EXECUTE ON FUNCTION public\.record_encounter_session_turn_evidence[^;]*TO service_role/s);
 
 const schedule = (overrides = {}) => ({
   id: "schedule-1", weekday: null, day_type: "any",
