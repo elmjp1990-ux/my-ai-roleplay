@@ -377,3 +377,82 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.story_relationship_batches 
 
 COMMENT ON TABLE public.story_relationship_batches IS
   'One idempotent five-player-turn Story batch per chat session. A completed batch contains both the memory summary and affinity evaluation result.';
+
+-- Atomically create a Story chat session and its isolated relationship state.
+-- Only the trusted story-session Edge Function (service_role) may invoke this.
+CREATE OR REPLACE FUNCTION public.create_story_session_with_relationship(
+  p_session_id uuid,
+  p_user_id uuid,
+  p_character_id uuid,
+  p_character_name text,
+  p_character_snapshot jsonb,
+  p_origin_mode text,
+  p_source_encounter_session_id uuid,
+  p_affinity integer,
+  p_relationship_stage text,
+  p_imported_memories jsonb
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_session jsonb;
+BEGIN
+  IF p_origin_mode NOT IN ('fresh_story', 'encounter_snapshot') THEN
+    RAISE EXCEPTION 'Invalid Story relationship origin' USING ERRCODE = '22023';
+  END IF;
+  IF p_affinity IS NULL OR p_affinity < -100 OR p_affinity > 100 THEN
+    RAISE EXCEPTION 'Story affinity is outside the allowed range' USING ERRCODE = '22023';
+  END IF;
+  IF jsonb_typeof(COALESCE(p_imported_memories, '[]'::jsonb)) <> 'array' THEN
+    RAISE EXCEPTION 'Imported memories must be an array' USING ERRCODE = '22023';
+  END IF;
+  IF pg_column_size(COALESCE(p_imported_memories, '[]'::jsonb)) > 20000 THEN
+    RAISE EXCEPTION 'Imported memories are too large' USING ERRCODE = '22023';
+  END IF;
+
+  INSERT INTO public.chat_sessions (
+    id, user_id, character_id, character_name, status,
+    character_snapshot, session_data, chat_mode
+  ) VALUES (
+    p_session_id, p_user_id, p_character_id, p_character_name, 'active',
+    COALESCE(p_character_snapshot, '{}'::jsonb), '{}'::jsonb, 'story'
+  );
+
+  INSERT INTO public.story_relationship_states (
+    session_id, user_id, character_id, origin_mode,
+    affinity, relationship_stage, source_encounter_session_id,
+    origin_affinity, origin_relationship_stage, imported_memories, snapshot_at
+  ) VALUES (
+    p_session_id, p_user_id, p_character_id, p_origin_mode,
+    p_affinity, p_relationship_stage, p_source_encounter_session_id,
+    p_affinity, p_relationship_stage, COALESCE(p_imported_memories, '[]'::jsonb),
+    CASE WHEN p_origin_mode = 'encounter_snapshot' THEN now() ELSE NULL END
+  );
+
+  SELECT jsonb_build_object(
+    'id', s.id,
+    'user_id', s.user_id,
+    'character_id', s.character_id,
+    'character_name', s.character_name,
+    'status', s.status,
+    'character_snapshot', s.character_snapshot,
+    'chat_mode', s.chat_mode,
+    'created_at', s.created_at,
+    'updated_at', s.updated_at
+  ) INTO v_session
+  FROM public.chat_sessions AS s
+  WHERE s.id = p_session_id;
+
+  RETURN v_session;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.create_story_session_with_relationship(
+  uuid, uuid, uuid, text, jsonb, text, uuid, integer, text, jsonb
+) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.create_story_session_with_relationship(
+  uuid, uuid, uuid, text, jsonb, text, uuid, integer, text, jsonb
+) TO service_role;
