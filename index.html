@@ -6890,7 +6890,8 @@ document.addEventListener('click',async event => {
       case 'chat-settings-menu': { const next={...route,chatOverlay:'settings'};delete next.overlay;go(next);break; }
       case 'chat-settings-option': {
         const option=button.dataset.option;
-        if(option==='encounter-record'||option==='encounter-dialogues'){const next={...route,chatOverlay:'manage-conversation'};delete next.overlay;go(next);break;}
+        if(option==='encounter-record'){const next={...route,chatOverlay:'manage-conversation'};delete next.overlay;go(next);break;}
+        if(option==='encounter-dialogues'){const next={...route,chatOverlay:'encounter-dialogues'};delete next.overlay;go(next);break;}
         if(option==='background'){chatBackgroundDraft=null;const next={...route,chatOverlay:'settings-background'};delete next.overlay;go(next);break;}
         if(option==='diary'){const next={...route,chatOverlay:'diary'};delete next.overlay;go(next);break;}
         if(option==='group-info'){const next={...route,chatOverlay:'group-info'};delete next.overlay;go(next);break;}
