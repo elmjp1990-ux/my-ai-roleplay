@@ -3304,6 +3304,10 @@ function renderShell() {
 }
 
 function render() {
+  // Encounter fullscreen scroll locking must follow the active route, not a stale
+  // session left in memory after navigating back to the city or traditional pages.
+  const encounterRouteActive = route.page === 'conversation' && !!currentSession()?.encounterMode;
+  document.body.classList.toggle('encounter-mode-active', encounterRouteActive);
   if ($('modal').open) $('modal').close();
   const allowed = ['citymap','home','detail','session-detail','author','chat','conversation','group','create',
     'editor','ai','notifications','favorites','followed-authors','shop','profile','album'];
@@ -10190,7 +10194,7 @@ document.addEventListener('submit',function(event){
     body.encounter-mode-active .app{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;min-height:100dvh!important;margin:0!important;padding:0!important;overflow:hidden!important;transform:none!important}
     body.encounter-mode-active #view{position:fixed!important;inset:0!important;z-index:100!important;width:100vw!important;height:100dvh!important;min-height:100dvh!important;max-width:none!important;margin:0!important;padding:0!important;overflow:hidden!important}
     body.encounter-mode-active .chat-layout{position:fixed!important;inset:0!important;display:block!important;width:100vw!important;height:100dvh!important;min-height:100dvh!important;margin:0!important;padding:0!important;overflow:hidden!important}
-    body:has(.chat-main.encounter-scene){overflow:hidden!important}
+    body.encounter-mode-active:has(.chat-main.encounter-scene){overflow:hidden!important}
     .chat-main.encounter-scene{position:fixed!important;inset:0!important;z-index:110!important;display:block!important;width:100vw!important;height:100dvh!important;min-height:100dvh!important;max-width:none!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;overflow:hidden!important;isolation:isolate!important;background:#17141b!important}
     .chat-main.encounter-scene:before{position:absolute!important;inset:0!important;z-index:0!important;background-image:linear-gradient(180deg,rgba(10,9,17,.10),rgba(10,9,17,.12) 34%,rgba(10,9,17,.40) 66%,rgba(10,9,17,.92) 100%),var(--encounter-scene-photo,none),radial-gradient(ellipse at 70% 22%,#6a5a65 0%,#322b36 48%,#17141b 100%)!important;background-position:center,center,center!important;background-size:cover,cover,cover!important;background-repeat:no-repeat!important;transform:none!important;filter:none!important;content:""!important;pointer-events:none!important}
     .encounter-scene .chat-layout{position:absolute!important;inset:0!important;width:100%!important;height:100dvh!important;min-height:0!important;margin:0!important;padding:0!important}
