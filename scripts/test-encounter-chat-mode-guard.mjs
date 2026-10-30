@@ -73,4 +73,9 @@ assert.match(frontend, /if\(isNewEncounter && sessionData\.archived!==true\)grou
 assert.match(frontend, /encounter-dialog-dismiss/);
 assert.match(frontend, /saved!==true\)throw new Error\('雲端未確認儲存結果。'\)/);
 assert.match(frontend, /\.eq\(["']chat_mode["'],["']encounter["']\)/);
+assert.match(frontend, /item\.characterId === c\.id && !item\.archived && item\.encounterMode !== true/);
+assert.match(frontend, /return c && !s\.encounterMode && !s\.archived && hasUserMessage\(s\) &&/);
+assert.match(frontend, /if \(!item \|\| item\.hidden \|\| item\.encounterMode === true\) return false;/);
+assert.match(frontend, /item\.id !== s\.id && item\.characterId === c\.id && !item\.archived && item\.encounterMode !== true/);
+assert.match(frontend, /candidate\.id!==item\.id&&candidate\.characterId===item\.characterId&&!candidate\.archived&&candidate\.encounterMode!==true/);
 console.log("Encounter chat-mode security guard tests passed.");
