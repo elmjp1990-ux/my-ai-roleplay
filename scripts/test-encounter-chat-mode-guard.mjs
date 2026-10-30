@@ -81,4 +81,5 @@ assert.match(frontend, /candidate\.id!==item\.id&&candidate\.characterId===item\
 assert.match(frontend, /route\.page === 'citymap' \? 'home'/);
 assert.match(frontend, /\['citymap','探索'\]/);
 assert.match(frontend, /ICON\[page === 'citymap' \? 'home' : page\]/);
+assert.match(frontend, /case 'home':go\(\{page:'citymap'\}\);break;/);
 console.log("Encounter chat-mode security guard tests passed.");
