@@ -200,7 +200,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_user_id uuid;
   v_character_id uuid;
@@ -240,7 +240,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.validate_affinity_session_link() FROM PUBLIC, anon, authenticated;
 
@@ -274,7 +274,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_user_message_session uuid;
   v_user_message_role text;
@@ -304,7 +304,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.validate_encounter_turn_evidence() FROM PUBLIC, anon, authenticated;
 
@@ -321,7 +321,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_source_user uuid;
   v_source_character uuid;
@@ -345,7 +345,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.validate_story_relationship_origin() FROM PUBLIC, anon, authenticated;
 
