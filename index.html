@@ -2539,6 +2539,7 @@ function chatSessionData(s) {
     // Keep the mode marker in session_data as a recovery source if a legacy sync row lacks chat_mode.
     encounterMode:s.encounterMode === true,
     encounterPlace:typeof s.encounterPlace === 'string' ? s.encounterPlace : null,
+    encounterDay:s.encounterDay || (s.startedAt ? new Date(s.startedAt).toLocaleDateString('en-CA') : null),
     openingMessage:initialOpening && String(initialOpening.text || '').trim()
       ? {text:String(initialOpening.text),at:Number(initialOpening.at) || Date.now()}
       : null,
@@ -2573,8 +2574,11 @@ async function saveChatSessionToCloud(s, options = {}) {
   const localUser = currentUser();
   if (!client || !localUser?.uid || !s) return false;
   if (!isUuid(s.characterId) || !isUuid(s.id)) return false;
-  // 空白聊天只存在本機；玩家真正送出訊息後才建立雲端聊天紀錄。
-  if (!(s.messages || []).some(message => message.role === 'user' && String(message.text || '').trim())) return false;
+  // 一般故事模式的空白聊天仍只存在本機；相遇模式由 encounter-session
+  // 預先建立了雲端 session，因此即使尚未送出第一句，也必須允許保存玩家人設等 session_data。
+  const hasUserMessage = (s.messages || []).some(message => message.role === 'user' && String(message.text || '').trim());
+  const canSaveEncounterMetadata = s.encounterMode === true && s.cloudOwned === true && s.cloudOwnerUid === localUser.uid;
+  if (!hasUserMessage && !canSaveEncounterMetadata) return false;
   const { data: authResult, error: authError } = await client.auth.getUser();
   if (authError || authResult?.user?.id !== localUser.uid) {
     throw new Error('登入狀態驗證失敗，聊天尚未同步。');
@@ -2770,6 +2774,7 @@ async function loadCloudChatSessions(user) {
         name:data.name || '', archived:data.archived === true || row.status === 'archived',
         encounterMode:row.chat_mode === 'encounter' || data.encounterMode === true || data.encounter?.mode === 'encounter',
         encounterPlace:typeof data.encounterPlace === 'string' ? data.encounterPlace : (existing?.encounterPlace || null),
+        encounterDay:typeof data.encounterDay === 'string' ? data.encounterDay : (existing?.encounterDay || (Number(data.startedAt) ? new Date(Number(data.startedAt)).toLocaleDateString('en-CA') : null)),
         hidden:data.hidden === true, pinned:data.pinned === true,
         startedAt:Number(data.startedAt) || (row.created_at ? new Date(row.created_at).getTime() : Date.now()),
         archivedAt:data.archivedAt || null, persona:data.persona || '',
@@ -3175,7 +3180,7 @@ window.addEventListener('popstate',event => {
   render();
 });
 $('modal').addEventListener('cancel',event => {
-  if ($('modal').dataset.walletDialog === 'true') {
+  if ($('modal').dataset.walletDialog === 'true' || $('modal').dataset.encounterLeaveDialog === 'true') {
     event.preventDefault();
     $('modal').close();
     return;
@@ -3188,7 +3193,7 @@ $('modal').addEventListener('click',event => {
   const r = $('modal').getBoundingClientRect();
   if (event.clientX < r.left || event.clientX > r.right ||
       event.clientY < r.top || event.clientY > r.bottom) {
-    if ($('modal').dataset.walletDialog === 'true') $('modal').close();
+    if ($('modal').dataset.walletDialog === 'true' || $('modal').dataset.encounterLeaveDialog === 'true') $('modal').close();
     else dismissPendingDeletionModal();
   }
 });
@@ -3218,12 +3223,16 @@ function showDialog(title,content) {
   modal.style.overflowY='';
   const pendingDeletionDialog = route?.overlay?.name === 'account-deletion-pending' && title === '帳號正在等待刪除';
   const deleteConfirmDialog = title === '刪除';
+  const encounterLeaveDialog = title === '離開相遇';
+  const encounterMemoryDialog = title === '相遇回憶';
   const walletDialog = title === '我的資源' || title === '銀幣或鑽石不足' || title === '廣告功能尚未串接';
   modal.dataset.walletDialog = walletDialog ? 'true' : 'false';
+  modal.dataset.encounterLeaveDialog = encounterLeaveDialog ? 'true' : 'false';
+  modal.dataset.encounterMemoryDialog = encounterMemoryDialog ? 'true' : 'false';
   modal.innerHTML = `
     <div class="row between modal-heading">
       <h2>${e(title)}</h2>
-      <button class="ghost" data-action="${walletDialog ? 'wallet-dialog-close' : pendingDeletionDialog ? 'pending-switch-account' : deleteConfirmDialog ? 'delete-dialog-back' : 'back'}"
+      <button class="ghost" data-action="${walletDialog ? 'wallet-dialog-close' : encounterLeaveDialog ? 'encounter-dialog-dismiss' : encounterMemoryDialog ? 'encounter-memory-detail-dismiss' : pendingDeletionDialog ? 'pending-switch-account' : deleteConfirmDialog ? 'delete-dialog-back' : 'back'}"
               aria-label="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}"
               title="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}">✕</button>
     </div>${content}`;
@@ -4367,6 +4376,7 @@ async function createEncounterSession(character) {
     background: 'avatar',
     encounterMode: true,
     encounterPlace: typeof encounterPlace === 'string' ? encounterPlace : null,
+    encounterDay: new Date().toLocaleDateString('en-CA'),
     messages: [],
     memories: [],
     album: [],
@@ -4377,6 +4387,29 @@ async function createEncounterSession(character) {
   state.sessions[sessionId] = session;
   persist();
   return session;
+}
+
+// 暫時離開後，只有同一位角色、同一地標、同一個台灣本地日期的未結束相遇可續談。
+function findResumableEncounterSession(characterId, placeKey) {
+  const uid=currentUser()?.uid;
+  if(!uid)return null;
+  const today=new Date().toLocaleDateString('en-CA');
+  return Object.values(state.sessions).filter(item=>
+    item.encounterMode===true && item.archived!==true &&
+    item.characterId===characterId && item.encounterPlace===placeKey &&
+    item.cloudOwned===true && item.cloudOwnerUid===uid &&
+    (item.encounterDay || (item.startedAt?new Date(item.startedAt).toLocaleDateString('en-CA'):''))===today
+  ).sort((a,b)=>(b.messages?.at(-1)?.at||b.startedAt||0)-(a.messages?.at(-1)?.at||a.startedAt||0))[0]||null;
+}
+
+function showEncounterLeaveDialog(session) {
+  if(!session?.encounterMode)return;
+  showDialog('離開相遇',
+    '<p class="small muted">你想暫時離開，還是結束這次相遇？</p>'+ 
+    '<div class="stack" style="gap:10px;margin-top:14px">'+
+    '<button type="button" class="profile-setting" data-action="encounter-temporary-leave" data-id="'+e(session.id)+'"><span><strong>暫時離開</strong><small>這次對話會保留；今天同一地標仍能遇見他時，可以接著聊。</small></span><span>›</span></button>'+
+    '<button type="button" class="profile-setting" data-action="encounter-end-confirm" data-id="'+e(session.id)+'"><span><strong>結束相遇</strong><small>將這次相遇整理並保存到相遇回憶，之後不再接續本次對話。</small></span><span>›</span></button>'+
+    '</div>');
 }
 
 function startChat(characterId) {
@@ -4995,6 +5028,135 @@ function setChatOverlayRoute(next){
   render();
   window.scrollTo(0,0);
 }
+async function loadEncounterMemoryList(panel,session){
+  const list=panel.querySelector('#encounterMemoryList');
+  if(!list||!session?.encounterMode)return;
+  const client=window.mySupabase;
+  const uid=currentUser()?.uid;
+  if(!client||!uid){list.innerHTML='<div class="empty">請先登入，才能查看你的相遇回憶。</div>';return;}
+  try{
+    const {data:{user},error:authError}=await client.auth.getUser();
+    if(authError||!user||user.id!==uid||session.cloudOwnerUid!==uid){
+      throw new Error('登入狀態已失效，請重新登入後查看相遇回憶。');
+    }
+    const {data:rows,error}=await client.from('encounter_diary')
+      .select('id,event_type,summary,occurred_at,metadata')
+      .eq('user_id',uid).eq('character_id',session.characterId)
+      .order('occurred_at',{ascending:false}).limit(200);
+    if(error)throw error;
+    const groups=new Map();
+    for(const row of rows||[]){
+      const rawSessionId=row.metadata&&typeof row.metadata==='object'?row.metadata.session_id:null;
+      const sessionId=isUuid(rawSessionId)?rawSessionId:null;
+      const groupKey=sessionId||('diary:'+row.id);
+      if(!groups.has(groupKey))groups.set(groupKey,{sessionId,rows:[],latestAt:row.occurred_at});
+      groups.get(groupKey).rows.push(row);
+    }
+    // 地點是在建立相遇 session 時寫入 session_data.encounterPlace；
+    // 從本人擁有的 encounter chat_sessions 讀回，避免依摘要文字猜測地點。
+    const sessionIds=[...new Set([...groups.values()].map(group=>group.sessionId).filter(Boolean))];
+    const sessionPlaces=new Map();
+    const sessionMetadataById=new Map();
+    if(sessionIds.length){
+      // 舊版相遇 session 可能沒有 chat_mode 欄位；以本人 session ID 查詢，
+      // 並同時讀取 session_data 的新舊欄位，避免把舊回憶整批排除。
+      const {data:sessionRows,error:sessionRowsError}=await client.from('chat_sessions')
+        .select('id,chat_mode,session_data').eq('user_id',uid).eq('chat_mode','encounter').in('id',sessionIds);
+      if(sessionRowsError){console.warn('讀取相遇地點／狀態失敗：',sessionRowsError.message);}
+      else for(const sessionRow of sessionRows||[]){
+        const sessionData=sessionRow.session_data&&typeof sessionRow.session_data==='object'?sessionRow.session_data:{};
+        sessionMetadataById.set(sessionRow.id,sessionData);
+        sessionPlaces.set(sessionRow.id,typeof sessionData.encounterPlace==='string'?sessionData.encounterPlace:'');
+      }
+      // Legacy rows may predate the chat_mode column; only recover them through
+      // the owner's explicit Encounter marker stored in session_data.
+      const missingLegacyIds=sessionIds.filter(id=>!sessionMetadataById.has(id));
+      if(missingLegacyIds.length){
+        const {data:legacyRows,error:legacyRowsError}=await client.from('chat_sessions')
+          .select('id,session_data').eq('user_id',uid).eq('session_data->>encounterMode','true').in('id',missingLegacyIds);
+        if(legacyRowsError){console.warn('讀取舊版相遇回憶狀態失敗：',legacyRowsError.message);}
+        else for(const sessionRow of legacyRows||[]){
+          const sessionData=sessionRow.session_data&&typeof sessionRow.session_data==='object'?sessionRow.session_data:{};
+          sessionMetadataById.set(sessionRow.id,sessionData);
+          sessionPlaces.set(sessionRow.id,typeof sessionData.encounterPlace==='string'?sessionData.encounterPlace:'');
+        }
+      }
+    }
+    // 新版 session 會有 encounterDay：只有明確結束的才顯示；
+    // 舊版 session 沒有 encounterDay，保留既有回憶，不因缺少 archived 標記而消失。
+    // 找不到對應 session 的舊 diary 資料也保留，避免誤隱藏歷史紀錄。
+    for(const [groupKey,group] of groups){
+      if(!group.sessionId)continue;
+      const sessionData=sessionMetadataById.get(group.sessionId);
+      if(!sessionData)continue;
+      const isNewEncounter=typeof sessionData.encounterDay==='string';
+      if(isNewEncounter && sessionData.archived!==true)groups.delete(groupKey);
+    }
+    const placeNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308 公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園'};
+    const cards=[...groups.values()].sort((a,b)=>new Date(b.latestAt||0)-new Date(a.latestAt||0)).map(group=>{
+      const newest=group.rows[0];
+      const date=new Date(newest.occurred_at||Date.now()).toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+      const preview=String(newest.summary||'這次相遇留下了一段回憶。').slice(0,180);
+      const rawPlace=group.sessionId?sessionPlaces.get(group.sessionId):'';
+      const place=rawPlace?(placeNames[rawPlace]||rawPlace):'地點資料未保存';
+      return '<button type="button" class="archive-card encounter-memory-card" data-action="encounter-memory-open" data-id="'+e(group.sessionId||'')+'" data-memory-id="'+e(newest.id)+'" data-place="'+e(place)+'"><span class="row between" style="gap:8px"><strong>相遇 · '+e(date)+'</strong><span class="small muted">'+group.rows.length+' 則紀錄</span></span><span class="small muted encounter-memory-place">📍 '+e(place)+'</span><p class="encounter-memory-excerpt">'+e(preview)+(String(newest.summary||'').length>180?'…':'')+'</p><span class="small muted">點擊查看完整對話　›</span></button>';
+    }).join('');
+    if(!list.isConnected)return;
+    list.innerHTML=cards||'<div class="empty"><strong>你們的相遇，正等待被收藏</strong><p>完成相遇對話後，系統會自動保存回憶摘要。每段相遇都會獨立整理，不會混入故事模式。</p></div>';
+  }catch(error){
+    console.error('載入相遇回憶失敗：',error);
+    if(list.isConnected)list.innerHTML='<div class="empty">'+e(error?.message||'相遇回憶載入失敗，請稍後重試。')+'</div>';
+  }
+}
+async function openEncounterMemoryDetail(button){
+  const session=currentSession();
+  const client=window.mySupabase,uid=currentUser()?.uid;
+  if(!session?.encounterMode||!client||!uid){toast('請從相遇模式登入後查看回憶。');return;}
+  const sessionId=button.dataset.id;
+  const memoryId=button.dataset.memoryId;
+  try{
+    const {data:{user},error:authError}=await client.auth.getUser();
+    if(authError||!user||user.id!==uid||session.cloudOwnerUid!==uid)throw new Error('登入狀態已失效，請重新登入。');
+    let messages=[];
+    if(isUuid(sessionId)){
+      const {data:ownedSession,error:sessionError}=await client.from('chat_sessions')
+        .select('id,user_id,character_id,chat_mode').eq('id',sessionId)
+        .eq('user_id',uid).eq('character_id',session.characterId)
+        .eq('chat_mode','encounter').maybeSingle();
+      if(sessionError)throw sessionError;
+      if(ownedSession){
+        const {data:messageRows,error:messageError}=await client.from('chat_messages')
+          .select('id,role,content,created_at').eq('session_id',sessionId)
+          .is('deleted_at',null).order('created_at',{ascending:true}).limit(500);
+        if(messageError)throw messageError;
+        messages=messageRows||[];
+      }
+    }
+    let body='';
+    if(messages.length){
+      const characterName=sessionCharacter(session)?.name||'角色';
+      body=messages.map(message=>{
+        const speaker=message.role==='user'?'你':characterName;
+        const stamp=message.created_at?new Date(message.created_at).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+        return '<article class="encounter-memory-message"><div class="row between"><strong>'+e(speaker)+'</strong><span class="small muted">'+e(stamp)+'</span></div><p>'+e(message.content||'')+'</p></article>';
+      }).join('');
+    }else{
+      let query=client.from('encounter_diary').select('summary,occurred_at')
+        .eq('user_id',uid).eq('character_id',session.characterId).order('occurred_at',{ascending:true});
+      if(isUuid(sessionId))query=query.eq('metadata->>session_id',sessionId);
+      else if(isUuid(memoryId))query=query.eq('id',memoryId);
+      const {data:diaries,error:diaryError}=await query;
+      if(diaryError)throw diaryError;
+      body=(diaries||[]).map(row=>'<article class="encounter-memory-message"><div class="small muted">'+e(new Date(row.occurred_at||Date.now()).toLocaleString('zh-TW'))+'</div><p>'+e(row.summary||'')+'</p></article>').join('');
+    }
+    if(!body)body='<p class="muted">目前沒有可顯示的詳細對話內容。</p>';
+    const placeLabel=String(button.dataset.place||'地點資料未保存');
+    showDialog('相遇回憶','<div class="small muted encounter-memory-detail-place">📍 相遇地點：'+e(placeLabel)+'</div><div class="encounter-memory-detail">'+body+'</div>');
+  }catch(error){
+    console.error('讀取相遇回憶詳細內容失敗：',error);
+    toast(error?.message||'相遇回憶詳細內容載入失敗，請稍後重試。');
+  }
+}
 function renderChatSettingsOverlay(panel,isGroup,kind){
   const ctx=chatSettingsContext(isGroup);if(!ctx||!panel)return;
   if(kind==='delete-confirm'){
@@ -5004,19 +5166,23 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
   if(kind==='manage-conversation'){
     if(ctx.isGroup)return;
     const isEncounter=!!ctx.session.encounterMode;
-    const archives=Object.values(state.sessions).filter(item=>item.characterId===ctx.session.characterId&&item.archived&&(!isEncounter||item.encounterMode)).sort((a,b)=>(b.archivedAt||0)-(a.archivedAt||0));
+    if(isEncounter){
+      panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="相遇回憶"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回聊天功能" title="返回聊天功能">'+ICON.back+'</button><h2>相遇回憶</h2></div><p class="small muted">這裡收藏你與 '+e(sessionCharacter(ctx.session)?.name||'角色')+' 的過往相遇。每段相遇依時間整理，點選摘要即可閱讀完整對話；內容只屬於你，不會與故事模式記憶混合。</p><div id="encounterMemoryList" class="stack encounter-memory-list"><div class="empty">正在整理你們的相遇回憶…</div></div></section>');
+      void loadEncounterMemoryList(panel,ctx.session);
+      return;
+    }
+    const archives=Object.values(state.sessions).filter(item=>item.characterId===ctx.session.characterId&&item.archived&&!item.encounterMode).sort((a,b)=>(b.archivedAt||0)-(a.archivedAt||0));
     const archiveCards=archives.map(item=>{
       const messageCount=(item.messages||[]).filter(message=>message.role==='user'&&String(message.text||message.content||'').trim()).length;
-      if(isEncounter)return '<article class="archive-card"><strong>'+e(item.name||'相遇紀錄')+'</strong><p class="small muted" style="margin:8px 0">'+e(timeText(item.archivedAt||item.startedAt))+'<br>對話 '+messageCount+' 則</p><p>'+e(item.encounterSummary||'本次相遇的摘要尚未整理。')+'</p><div class="row wrap"><button data-action="view-archive" data-id="'+e(item.id)+'">查看對話紀錄</button></div></article>';
       return '<article class="archive-card"><strong>'+e(item.name||sessionTitle(item))+'</strong><p class="small muted" style="margin:8px 0">'+e(timeText(item.archivedAt||item.startedAt))+'<br>玩家訊息 '+messageCount+' 筆 · 日記 '+item.memories.length+' 筆 · 相片 '+item.album.length+' 張</p><div class="row wrap"><button data-action="view-archive" data-id="'+e(item.id)+'">查看回憶</button><button data-action="resume-archive" data-id="'+e(item.id)+'">繼續聊天</button><button data-action="rename-archive" data-id="'+e(item.id)+'">編輯檔名</button></div></article>';
     }).join('');
-    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="'+(isEncounter?'相遇紀錄':'管理對話')+'"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回聊天功能" title="返回聊天功能">'+ICON.back+'</button><h2>'+(isEncounter?'相遇紀錄':'管理對話')+'</h2></div><p class="small muted">'+(isEncounter?'同一角色過往的相遇會依結束時間由新到舊排列。點選紀錄可查看當次對話。':'開始新對話後，舊劇情會封存於下方；切換歷史時，當前對話會先封存。')+'</p>'+(isEncounter?'':'<div class="stack"><button type="button" class="primary" data-action="new-conversation" data-id="'+e(ctx.id)+'">開始新對話</button></div>')+'<h3 style="margin:18px 0 8px">'+(isEncounter?'過往相遇':'舊的回憶')+'</h3><div class="stack">'+(archiveCards||'<div class="empty">'+(isEncounter?'尚無已結束的相遇紀錄。':'尚無封存對話；開始新對話後，舊劇情會顯示在這裡。')+'</div>')+'</div></section>');
+    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="管理對話"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回聊天功能" title="返回聊天功能">'+ICON.back+'</button><h2>管理對話</h2></div><p class="small muted">開始新對話後，舊劇情會封存於下方；切換歷史時，當前對話會先封存。</p><div class="stack"><button type="button" class="primary" data-action="new-conversation" data-id="'+e(ctx.id)+'">開始新對話</button></div><h3 style="margin:18px 0 8px">舊的回憶</h3><div class="stack">'+(archiveCards||'<div class="empty">尚無封存對話；開始新對話後，舊劇情會顯示在這裡。</div>')+'</div></section>');
     return;
   }
   if(kind==='settings'){
     const encounterMode=!isGroup&&!!ctx.session.encounterMode;
     const items=encounterMode
-      ?[['encounter-record','相遇紀錄','查看這個角色過往的相遇，依時間由新到舊'],['persona','人設管理','設定此角色所有相遇共用的人設'],['encounter-dialogues','對話紀錄','查看本次相遇的對話紀錄'],['encounter-end','結束相遇','結束本次相遇，期待下次與您相遇']]
+      ?[['encounter-record','相遇回憶','查看這個角色過往的相遇摘要，點選即可閱讀完整內容'],['persona','人設管理','設定此角色所有相遇共用的人設'],['encounter-dialogues','本次對話','查看目前這次相遇的完整對話'],['encounter-end','結束相遇','結束本次相遇，期待下次與您相遇']]
       :[...(isGroup?[['group-info','群組資訊','群組成員、世界背景與場景']]:[]),['diary','甜蜜日記','回憶摘要與長期保存'],['background','聊天背景','無背景、角色圖片或回憶相片'],[isGroup?'group-persona':'persona','人設管理',isGroup?'管理並套用這個群組的玩家人設':'管理目前聊天使用的人設'],...(!isGroup?[['manage-conversation','管理對話','開始新對話或切換舊的回憶']]:[]),['delete','刪除對話','刪除這段對話與回憶']];
     panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="聊天功能選單"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-close" aria-label="返回聊天" title="返回聊天">'+ICON.back+'</button><h2>聊天功能</h2></div><div class="stack chat-settings-options">'+items.map(([action,title,desc])=>'<button type="button" class="profile-setting" data-action="chat-settings-option" data-option="'+e(action)+'"><span><strong>'+e(title)+'</strong><small>'+e(desc)+'</small></span><span>›</span></button>').join('')+'</div></section>');
     return;
@@ -5826,6 +5992,15 @@ function renderChatOverlay(kind) {
   const panel = $('view').querySelector('.chat-main');
   if (!s || !panel) return;
   if(kind==='settings'||kind==='settings-background'||kind==='delete-confirm'||kind==='manage-conversation'){renderChatSettingsOverlay(panel,false,kind);return;}
+  if(kind==='encounter-dialogues'&&s.encounterMode){
+    const characterName=sessionCharacter(s)?.name||'角色';
+    const rows=(s.messages||[]).filter(message=>String(message.text||message.content||'').trim()).map(message=>{
+      const speaker=message.role==='user'?'你':characterName;
+      return '<article class="encounter-memory-message"><div class="row between"><strong>'+e(speaker)+'</strong><span class="small muted">'+e(timeText(message.at||message.created_at||0))+'</span></div><p>'+e(message.text||message.content||'')+'</p></article>';
+    }).join('');
+    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="本次對話紀錄"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回聊天功能" title="返回聊天功能">'+ICON.back+'</button><h2>本次對話</h2></div><p class="small muted">只顯示目前這次相遇的對話，不會混入其他相遇或故事模式。</p><div class="encounter-memory-detail">'+(rows||'<div class="empty">這次相遇還沒有對話內容。</div>')+'</div></section>');
+    return;
+  }
   const photos = s.album.filter(p => safeImage(p.url));
   const canTestCloudData = CHAT_DATA_TEST_MODE && s.cloudOwned &&
     currentUser()?.uid === s.cloudOwnerUid && hasUserMessage(s);
@@ -6801,7 +6976,8 @@ document.addEventListener('click',async event => {
       case 'chat-settings-menu': { const next={...route,chatOverlay:'settings'};delete next.overlay;go(next);break; }
       case 'chat-settings-option': {
         const option=button.dataset.option;
-        if(option==='encounter-record'||option==='encounter-dialogues'){const next={...route,chatOverlay:'manage-conversation'};delete next.overlay;go(next);break;}
+        if(option==='encounter-record'){const next={...route,chatOverlay:'manage-conversation'};delete next.overlay;go(next);break;}
+        if(option==='encounter-dialogues'){const next={...route,chatOverlay:'encounter-dialogues'};delete next.overlay;go(next);break;}
         if(option==='background'){chatBackgroundDraft=null;const next={...route,chatOverlay:'settings-background'};delete next.overlay;go(next);break;}
         if(option==='diary'){const next={...route,chatOverlay:'diary'};delete next.overlay;go(next);break;}
         if(option==='group-info'){const next={...route,chatOverlay:'group-info'};delete next.overlay;go(next);break;}
@@ -6812,9 +6988,16 @@ document.addEventListener('click',async event => {
         if(option==='delete'){const next={...route,chatOverlay:'delete-confirm'};delete next.overlay;go(next);break;}
         break;
       }
+      case 'encounter-memory-open': { await openEncounterMemoryDetail(button);break; }
+      case 'encounter-dialog-dismiss': { $('modal')?.close(); break; }
+      case 'encounter-memory-detail-dismiss': { $('modal')?.close(); break; }
       case 'encounter-temporary-leave': {
         const session=state.sessions[key];if(!session?.encounterMode)break;
-        captureDraft();persist();$('modal')?.close();hideList=false;go({page:'citymap'});break;
+        captureDraft();
+        session.archived=false;session.archivedAt=null;session.encounterTemporarilyLeftAt=Date.now();
+        if(!persist())break;
+        try{const saved=await saveChatSessionSafely(session);if(saved!==true)throw new Error('雲端未確認儲存結果。');}catch(error){console.error('暫時離開同步失敗：',error);toast('暫時離開已保留在此裝置，但雲端同步失敗，請稍後重試。');break;}
+        $('modal')?.close();hideList=false;go({page:'citymap'});break;
       }
       case 'encounter-end-confirm': {
         const session=state.sessions[key]||currentSession();if(!session?.encounterMode)break;
@@ -6826,9 +7009,16 @@ document.addEventListener('click',async event => {
         if(lastCharacter)summaryParts.push((sessionCharacter(session)?.name||'角色')+'回應：「'+String(lastCharacter.text||lastCharacter.content).trim().slice(0,90)+'」。');
         session.encounterSummary=summaryParts.join(' ').slice(0,360)||'這次相遇留下了一段尚待整理的回憶。';
         session.encounterEndedAt=Date.now();session.archived=true;session.archivedAt=session.encounterEndedAt;
+        session.encounterTemporarilyLeftAt=null;
         session.name='相遇紀錄 · '+timeText(session.encounterEndedAt);
-        persist();$('modal')?.close();hideList=false;go({page:'citymap'});
-        toast('本次相遇已結束並保存紀錄。');break;
+        if(!persist())break;
+        try{const saved=await saveChatSessionSafely(session);if(saved!==true)throw new Error('雲端未確認儲存結果。');}catch(error){
+          console.error('結束相遇同步失敗：',error);
+          session.archived=false;session.archivedAt=null;session.encounterEndedAt=null;persist();
+          toast('相遇回憶尚未成功保存到雲端，請稍後再試。');break;
+        }
+        $('modal')?.close();hideList=false;go({page:'citymap'});
+        toast('本次相遇已結束並保存到相遇回憶。');break;
       }
       case 'chat-settings-back': {
         const next={...route,chatOverlay:'settings'};delete next.overlay;
@@ -6899,6 +7089,8 @@ document.addEventListener('click',async event => {
         const next={...route,chatOverlay:'album'};delete next.overlay;go(next);break;
       }
       case 'chat-sidebar-toggle': {
+        const activeEncounter=currentSession();
+        if(activeEncounter?.encounterMode===true){showEncounterLeaveDialog(activeEncounter);break;}
         if(window.matchMedia && window.matchMedia('(max-width: 767px)').matches) {
           if(button.dataset.mobileAction==='group-return-list') { hideList=false;groupPrototype.active=null;go({page:'chat'}); }
           else { captureDraft();hideList=false;go({page:'chat'}); }
@@ -7036,7 +7228,11 @@ document.addEventListener('click',async event => {
         if (route.page === 'conversation' || route.page === 'group') go({page:'chat'});
         break;
       }
-      case 'back':back();break;
+      case 'back': {
+        const activeEncounter=currentSession();
+        if(route.page==='conversation'&&activeEncounter?.encounterMode===true&&!route.overlay){showEncounterLeaveDialog(activeEncounter);break;}
+        back();break;
+      }
       case 'collapse':document.body.classList.toggle('collapsed');break;
       case 'environment':openModal('environment');break;
       case 'login':openModal('login');break;
@@ -7331,14 +7527,7 @@ document.addEventListener('click',async event => {
       }
       case 'chat-back': {
         const encounterSession=currentSession();
-        if(encounterSession?.encounterMode){
-          showDialog('離開相遇',
-            '<div class="stack" style="gap:10px">'+
-            '<button type="button" class="profile-setting" data-action="encounter-temporary-leave" data-id="'+e(encounterSession.id)+'"><span><strong>暫時離開</strong><small>暫時離開若到了角色離開當前場景的時間，也會自動結束相遇哦</small></span><span>›</span></button>'+
-            '<button type="button" class="profile-setting" data-action="encounter-end-confirm" data-id="'+e(encounterSession.id)+'"><span><strong>結束相遇</strong><small>結束本次相遇，期待下次與您相遇</small></span><span>›</span></button>'+
-            '</div>');
-          break;
-        }
+        if(encounterSession?.encounterMode){showEncounterLeaveDialog(encounterSession);break;}
         // 聊天標題列的返回鍵固定回到聊天列表，不使用 history.back。
         captureDraft();hideList=false;go({page:'chat'});break;
       }
@@ -9324,11 +9513,15 @@ function renderCityMapMVP(){
       const meetButton=event.target.closest('[data-action="city-character-meet"]');
       if(meetButton)meetButton.disabled=true;
       try{
-        const encounterSession=await createEncounterSession(person,placeKey);
+        // 同一個角色今天仍在同一地標出現時，優先接回暫時離開的相遇 session。
+        const resumedSession=findResumableEncounterSession(person.id,placeKey);
+        const encounterSession=resumedSession||await createEncounterSession(person,placeKey);
+        encounterSession.hidden=false;
+        persist();
         locationModal.hidden=true;
         document.body.classList.remove('city-location-active');
         go({page:'conversation',id:encounterSession.id});
-        toast('已進入相遇模式；每次送出訊息依既有規則扣款。');
+        toast(resumedSession?'已接續你們這次的相遇。':'已進入相遇模式；每次送出訊息依既有規則扣款。');
       }catch(error){
         console.error('從城市地點開始相遇失敗：',error);
         toast(error?.message||'相遇模式暫時無法使用，請稍後再試。');
@@ -10289,6 +10482,17 @@ document.addEventListener('submit',function(event){
 .city-encounter-history-item{padding:10px;border:1px solid rgba(255,255,255,.17);border-radius:11px;background:rgba(18,22,32,.18)}
 .city-encounter-history-item strong{display:block;font-size:11px;margin-bottom:4px}
 .city-encounter-history-item p{margin:0;font-size:11px;line-height:1.6}
+.encounter-memory-list{gap:10px}
+.encounter-memory-card{display:block;width:100%;text-align:left;color:inherit;cursor:pointer;transition:border-color .18s ease,background .18s ease}
+.encounter-memory-card:hover,.encounter-memory-card:focus-visible{border-color:rgba(205,184,255,.65);background:rgba(110,96,145,.24);outline:none}
+.encounter-memory-excerpt{margin:8px 0!important;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--muted);line-height:1.65}
+.encounter-memory-place{display:block;margin-top:6px;color:var(--primary);letter-spacing:.02em}
+.encounter-leave-dialog-copy{line-height:1.7;color:var(--muted)}
+.encounter-memory-detail-place{margin:0 0 10px;padding:9px 11px;border:1px solid var(--border);border-radius:10px;background:var(--soft)}
+.encounter-memory-detail{max-height:min(68dvh,620px);overflow:auto;overscroll-behavior:contain;display:grid;gap:10px}
+.encounter-memory-message{padding:11px 12px;border:1px solid var(--border);border-radius:12px;background:var(--panel)}
+.encounter-memory-message p{margin:7px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75}
+
 .city-flight-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:9px}
 .city-flight-table th,.city-flight-table td{padding:7px 5px;text-align:left;border-bottom:1px solid rgba(255,255,255,.18);white-space:nowrap}
 .city-flight-note{font-size:10px!important;opacity:.8;margin-top:7px!important}
