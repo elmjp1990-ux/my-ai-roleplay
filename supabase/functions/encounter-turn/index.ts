@@ -88,22 +88,15 @@ Deno.serve(async (request) => {
   if (charge.status === "refunded") return json({ error: "turn_already_refunded" }, 409);
 
   const demoReply = "**你抬起頭，認真地看向眼前的人。**\n「我在這裡，你想先聊些什麼？」";
-  const persistInteraction = async (assistantContent: string) => {
-    const userText = String(userMessage.content || "").trim().slice(0, 900);
-    const assistantText = String(assistantContent || "").trim().slice(0, 900);
-    const summary = ("你：" + userText + "\n角色：" + assistantText).slice(0, 1900);
-    return await admin.rpc("record_encounter_turn_interaction", {
+  const persistEvidence = async () => {
+    return await admin.rpc("record_encounter_session_turn_evidence", {
       p_turn_id: turnId,
+      p_session_id: sessionId,
       p_user_id: user.id,
       p_character_id: session.character_id,
-      p_affinity_delta: 1,
-      p_event_type: "conversation_turn",
-      p_summary: summary || "完成一次相遇對話",
-      p_metadata: {
-        session_id: sessionId,
-        user_message_id: userMessageId,
-        assistant_message_id: assistantMessageId,
-      },
+      p_user_message_id: userMessageId,
+      p_assistant_message_id: assistantMessageId,
+      p_evaluation: { source: "encounter_turn_handler", evaluator: "pending" },
     });
   };
   if (charge.status === "settled") {
