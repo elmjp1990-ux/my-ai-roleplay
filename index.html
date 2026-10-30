@@ -4368,7 +4368,11 @@ async function createEncounterSession(character) {
     console.error('相遇聊天室建立失敗：', error || data);
     throw new Error(data?.error === 'character_unavailable_for_encounter'
       ? '此角色目前無法進入相遇模式。'
-      : '相遇聊天室建立失敗，請稍後再試。');
+      : data?.error === 'character_not_at_this_location_now'
+        ? '角色目前不在這個地標，請選擇角色實際出現的地點。'
+        : data?.error === 'invalid_identifiers_or_location'
+          ? '請從城市地圖的有效地標進入相遇。'
+          : '相遇聊天室建立失敗，請稍後再試。');
   }
 
   const session = {
@@ -7309,14 +7313,10 @@ document.addEventListener('click',async event => {
         const character = state.characters.find(item => item.id === key);
         if (!character || !accessible(character)) { toast('此角色目前無法開始相遇模式。'); break; }
         if (!requireLogin({page:route.page,id:key})) break;
-        try {
-          const encounterSession = await createEncounterSession(character);
-          go({page:'conversation',id:encounterSession.id});
-          toast('已進入相遇模式；每次送出訊息會消耗 2 銀幣或依既有規則使用鑽石。');
-        } catch (error) {
-          console.error('建立相遇模式失敗：',error);
-          toast(error?.message || '相遇模式暫時無法使用，請稍後再試。');
-        }
+        // Encounter must begin from a real city landmark so the backend can
+        // verify the character's active schedule and snapshot its end time.
+        go({page:'citymap'});
+        toast('請在城市地圖選擇角色目前所在的地標，再開始相遇。');
         break;
       }
       case 'test-purchase-200': {
