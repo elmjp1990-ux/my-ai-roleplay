@@ -3180,7 +3180,7 @@ window.addEventListener('popstate',event => {
   render();
 });
 $('modal').addEventListener('cancel',event => {
-  if ($('modal').dataset.walletDialog === 'true') {
+  if ($('modal').dataset.walletDialog === 'true' || $('modal').dataset.encounterLeaveDialog === 'true') {
     event.preventDefault();
     $('modal').close();
     return;
@@ -3193,7 +3193,7 @@ $('modal').addEventListener('click',event => {
   const r = $('modal').getBoundingClientRect();
   if (event.clientX < r.left || event.clientX > r.right ||
       event.clientY < r.top || event.clientY > r.bottom) {
-    if ($('modal').dataset.walletDialog === 'true') $('modal').close();
+    if ($('modal').dataset.walletDialog === 'true' || $('modal').dataset.encounterLeaveDialog === 'true') $('modal').close();
     else dismissPendingDeletionModal();
   }
 });
@@ -3223,12 +3223,14 @@ function showDialog(title,content) {
   modal.style.overflowY='';
   const pendingDeletionDialog = route?.overlay?.name === 'account-deletion-pending' && title === '帳號正在等待刪除';
   const deleteConfirmDialog = title === '刪除';
+  const encounterLeaveDialog = title === '離開相遇';
   const walletDialog = title === '我的資源' || title === '銀幣或鑽石不足' || title === '廣告功能尚未串接';
   modal.dataset.walletDialog = walletDialog ? 'true' : 'false';
+  modal.dataset.encounterLeaveDialog = encounterLeaveDialog ? 'true' : 'false';
   modal.innerHTML = `
     <div class="row between modal-heading">
       <h2>${e(title)}</h2>
-      <button class="ghost" data-action="${walletDialog ? 'wallet-dialog-close' : pendingDeletionDialog ? 'pending-switch-account' : deleteConfirmDialog ? 'delete-dialog-back' : 'back'}"
+      <button class="ghost" data-action="${walletDialog ? 'wallet-dialog-close' : encounterLeaveDialog ? 'encounter-dialog-dismiss' : pendingDeletionDialog ? 'pending-switch-account' : deleteConfirmDialog ? 'delete-dialog-back' : 'back'}"
               aria-label="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}"
               title="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}">✕</button>
     </div>${content}`;
@@ -6962,12 +6964,13 @@ document.addEventListener('click',async event => {
         break;
       }
       case 'encounter-memory-open': { await openEncounterMemoryDetail(button);break; }
+      case 'encounter-dialog-dismiss': { $('modal')?.close(); break; }
       case 'encounter-temporary-leave': {
         const session=state.sessions[key];if(!session?.encounterMode)break;
         captureDraft();
         session.archived=false;session.archivedAt=null;session.encounterTemporarilyLeftAt=Date.now();
         if(!persist())break;
-        try{await saveChatSessionSafely(session);}catch(error){console.error('暫時離開同步失敗：',error);toast('暫時離開已保留在此裝置，但雲端同步失敗，請保持此頁並重試。');break;}
+        try{const saved=await saveChatSessionSafely(session);if(saved!==true)throw new Error('雲端未確認儲存結果。');}catch(error){console.error('暫時離開同步失敗：',error);toast('暫時離開已保留在此裝置，但雲端同步失敗，請稍後重試。');break;}
         $('modal')?.close();hideList=false;go({page:'citymap'});break;
       }
       case 'encounter-end-confirm': {
@@ -6983,7 +6986,7 @@ document.addEventListener('click',async event => {
         session.encounterTemporarilyLeftAt=null;
         session.name='相遇紀錄 · '+timeText(session.encounterEndedAt);
         if(!persist())break;
-        try{await saveChatSessionSafely(session);}catch(error){
+        try{const saved=await saveChatSessionSafely(session);if(saved!==true)throw new Error('雲端未確認儲存結果。');}catch(error){
           console.error('結束相遇同步失敗：',error);
           session.archived=false;session.archivedAt=null;session.encounterEndedAt=null;persist();
           toast('相遇回憶尚未成功保存到雲端，請稍後再試。');break;
