@@ -5054,19 +5054,29 @@ async function loadEncounterMemoryList(panel,session){
     // 從本人擁有的 encounter chat_sessions 讀回，避免依摘要文字猜測地點。
     const sessionIds=[...new Set([...groups.values()].map(group=>group.sessionId).filter(Boolean))];
     const sessionPlaces=new Map();
-    const endedSessionIds=new Set();
+    const sessionMetadataById=new Map();
     if(sessionIds.length){
+      // 舊版相遇 session 可能沒有 chat_mode 欄位；以本人 session ID 查詢，
+      // 並同時讀取 session_data 的新舊欄位，避免把舊回憶整批排除。
       const {data:sessionRows,error:sessionRowsError}=await client.from('chat_sessions')
-        .select('id,session_data').eq('user_id',uid).eq('chat_mode','encounter').in('id',sessionIds);
-      if(sessionRowsError){console.warn('讀取相遇地點／結束狀態失敗：',sessionRowsError.message);}
+        .select('id,chat_mode,session_data').eq('user_id',uid).in('id',sessionIds);
+      if(sessionRowsError){console.warn('讀取相遇地點／狀態失敗：',sessionRowsError.message);}
       else for(const sessionRow of sessionRows||[]){
         const sessionData=sessionRow.session_data&&typeof sessionRow.session_data==='object'?sessionRow.session_data:{};
+        sessionMetadataById.set(sessionRow.id,sessionData);
         sessionPlaces.set(sessionRow.id,typeof sessionData.encounterPlace==='string'?sessionData.encounterPlace:'');
-        if(sessionData.archived===true)endedSessionIds.add(sessionRow.id);
       }
     }
-    // Diary 會逐回合記錄，但只有使用者明確「結束相遇」後才列入相遇回憶。
-    for(const [groupKey,group] of groups){if(group.sessionId&&!endedSessionIds.has(group.sessionId))groups.delete(groupKey);}
+    // 新版 session 會有 encounterDay：只有明確結束的才顯示；
+    // 舊版 session 沒有 encounterDay，保留既有回憶，不因缺少 archived 標記而消失。
+    // 找不到對應 session 的舊 diary 資料也保留，避免誤隱藏歷史紀錄。
+    for(const [groupKey,group] of groups){
+      if(!group.sessionId)continue;
+      const sessionData=sessionMetadataById.get(group.sessionId);
+      if(!sessionData)continue;
+      const isNewEncounter=typeof sessionData.encounterDay==='string' || sessionData.encounterMode===true;
+      if(isNewEncounter && sessionData.archived!==true)groups.delete(groupKey);
+    }
     const placeNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308 公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園'};
     const cards=[...groups.values()].sort((a,b)=>new Date(b.latestAt||0)-new Date(a.latestAt||0)).map(group=>{
       const newest=group.rows[0];
