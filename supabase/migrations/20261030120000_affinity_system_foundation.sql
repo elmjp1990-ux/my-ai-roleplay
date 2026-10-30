@@ -194,6 +194,166 @@ CREATE INDEX IF NOT EXISTS story_relationship_batches_pending_idx
   ON public.story_relationship_batches (status, created_at)
   WHERE status IN ('pending', 'failed');
 
+
+-- Enforce session ownership and mode consistency inside the database.
+-- These checks remain authoritative even when trusted service-role handlers write rows.
+CREATE OR REPLACE FUNCTION public.validate_affinity_session_link()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+DECLARE
+  v_user_id uuid;
+  v_character_id uuid;
+  v_chat_mode text;
+BEGIN
+  SELECT s.user_id, s.character_id, s.chat_mode
+    INTO v_user_id, v_character_id, v_chat_mode
+  FROM public.chat_sessions AS s
+  WHERE s.id = NEW.session_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Affinity session does not exist' USING ERRCODE = '23503';
+  END IF;
+
+  IF v_user_id IS DISTINCT FROM NEW.user_id THEN
+    RAISE EXCEPTION 'Affinity session owner mismatch' USING ERRCODE = '23514';
+  END IF;
+
+  IF NEW.character_id IS NOT NULL
+     AND v_character_id IS DISTINCT FROM NEW.character_id THEN
+    RAISE EXCEPTION 'Affinity session character mismatch' USING ERRCODE = '23514';
+  END IF;
+
+  IF TG_TABLE_NAME = 'encounter_session_lifecycle'
+     AND v_chat_mode <> 'encounter' THEN
+    RAISE EXCEPTION 'Encounter lifecycle requires an Encounter session' USING ERRCODE = '23514';
+  ELSIF TG_TABLE_NAME = 'story_relationship_states'
+     AND v_chat_mode <> 'story' THEN
+    RAISE EXCEPTION 'Story relationship requires a Story session' USING ERRCODE = '23514';
+  ELSIF TG_TABLE_NAME = 'story_relationship_batches'
+     AND v_chat_mode <> 'story' THEN
+    RAISE EXCEPTION 'Story batch requires a Story session' USING ERRCODE = '23514';
+  ELSIF TG_TABLE_NAME = 'encounter_session_turns'
+     AND v_chat_mode <> 'encounter' THEN
+    RAISE EXCEPTION 'Encounter turn requires an Encounter session' USING ERRCODE = '23514';
+  END IF;
+
+  RETURN NEW;
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.validate_affinity_session_link() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS validate_encounter_lifecycle_session_link ON public.encounter_session_lifecycle;
+CREATE TRIGGER validate_encounter_lifecycle_session_link
+  BEFORE INSERT OR UPDATE OF session_id, user_id, character_id
+  ON public.encounter_session_lifecycle
+  FOR EACH ROW EXECUTE FUNCTION public.validate_affinity_session_link();
+
+DROP TRIGGER IF EXISTS validate_encounter_turn_session_link ON public.encounter_session_turns;
+CREATE TRIGGER validate_encounter_turn_session_link
+  BEFORE INSERT OR UPDATE OF session_id, user_id, character_id
+  ON public.encounter_session_turns
+  FOR EACH ROW EXECUTE FUNCTION public.validate_affinity_session_link();
+
+DROP TRIGGER IF EXISTS validate_story_relationship_session_link ON public.story_relationship_states;
+CREATE TRIGGER validate_story_relationship_session_link
+  BEFORE INSERT OR UPDATE OF session_id, user_id, character_id
+  ON public.story_relationship_states
+  FOR EACH ROW EXECUTE FUNCTION public.validate_affinity_session_link();
+
+DROP TRIGGER IF EXISTS validate_story_batch_session_link ON public.story_relationship_batches;
+CREATE TRIGGER validate_story_batch_session_link
+  BEFORE INSERT OR UPDATE OF session_id, user_id, character_id
+  ON public.story_relationship_batches
+  FOR EACH ROW EXECUTE FUNCTION public.validate_affinity_session_link();
+
+-- Encounter turn messages and charge must belong to the same session and roles.
+CREATE OR REPLACE FUNCTION public.validate_encounter_turn_evidence()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+DECLARE
+  v_user_message_session uuid;
+  v_user_message_role text;
+  v_assistant_message_session uuid;
+  v_assistant_message_role text;
+  v_charge_session uuid;
+  v_charge_user uuid;
+BEGIN
+  SELECT m.session_id, m.role INTO v_user_message_session, v_user_message_role
+  FROM public.chat_messages AS m WHERE m.id = NEW.user_message_id;
+
+  SELECT m.session_id, m.role INTO v_assistant_message_session, v_assistant_message_role
+  FROM public.chat_messages AS m WHERE m.id = NEW.assistant_message_id;
+
+  SELECT c.session_id, c.user_id INTO v_charge_session, v_charge_user
+  FROM public.chat_turn_charges AS c WHERE c.turn_id = NEW.turn_id;
+
+  IF v_user_message_session IS DISTINCT FROM NEW.session_id OR v_user_message_role <> 'user' THEN
+    RAISE EXCEPTION 'Encounter user message does not belong to the session' USING ERRCODE = '23514';
+  END IF;
+  IF v_assistant_message_session IS DISTINCT FROM NEW.session_id OR v_assistant_message_role <> 'assistant' THEN
+    RAISE EXCEPTION 'Encounter assistant message does not belong to the session' USING ERRCODE = '23514';
+  END IF;
+  IF v_charge_session IS DISTINCT FROM NEW.session_id OR v_charge_user IS DISTINCT FROM NEW.user_id THEN
+    RAISE EXCEPTION 'Encounter turn charge does not match session owner' USING ERRCODE = '23514';
+  END IF;
+
+  RETURN NEW;
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.validate_encounter_turn_evidence() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS validate_encounter_turn_evidence ON public.encounter_session_turns;
+CREATE TRIGGER validate_encounter_turn_evidence
+  BEFORE INSERT OR UPDATE OF turn_id, session_id, user_id, user_message_id, assistant_message_id
+  ON public.encounter_session_turns
+  FOR EACH ROW EXECUTE FUNCTION public.validate_encounter_turn_evidence();
+
+-- A carried-over Story must reference a settled Encounter owned by the same player
+-- and tied to the same character. The copied affinity/memory remain independent.
+CREATE OR REPLACE FUNCTION public.validate_story_relationship_origin()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+DECLARE
+  v_source_user uuid;
+  v_source_character uuid;
+  v_source_status text;
+BEGIN
+  IF NEW.origin_mode = 'encounter_snapshot' THEN
+    SELECT l.user_id, l.character_id, l.status
+      INTO v_source_user, v_source_character, v_source_status
+    FROM public.encounter_session_lifecycle AS l
+    WHERE l.session_id = NEW.source_encounter_session_id;
+
+    IF NOT FOUND
+       OR v_source_user IS DISTINCT FROM NEW.user_id
+       OR (NEW.character_id IS NOT NULL AND v_source_character IS DISTINCT FROM NEW.character_id)
+       OR v_source_status <> 'settled' THEN
+      RAISE EXCEPTION 'Encounter snapshot source is invalid or not settled' USING ERRCODE = '23514';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.validate_story_relationship_origin() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS validate_story_relationship_origin ON public.story_relationship_states;
+CREATE TRIGGER validate_story_relationship_origin
+  BEFORE INSERT OR UPDATE OF origin_mode, source_encounter_session_id, user_id, character_id
+  ON public.story_relationship_states
+  FOR EACH ROW EXECUTE FUNCTION public.validate_story_relationship_origin();
+
 ALTER TABLE public.encounter_session_lifecycle ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.encounter_session_turns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.story_relationship_states ENABLE ROW LEVEL SECURITY;
