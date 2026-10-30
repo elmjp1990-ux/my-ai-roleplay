@@ -3268,7 +3268,7 @@ function renderShell() {
   const html = labels.map(([page,label]) => `
     <button class="nav-btn ${navPage === page ? 'active' : ''}"
             data-action="nav" data-page="${page}">
-      ${ICON[page]}<span class="nav-label">${label}</span>
+      ${ICON[page === 'citymap' ? 'home' : page]}<span class="nav-label">${label}</span>
     </button>`).join('');
   $('desktopNav').innerHTML = html;
   $('mobileNav').innerHTML = html;
