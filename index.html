@@ -3255,13 +3255,14 @@ function visit(page,idValue) {
 
 function renderShell() {
   const navPage = route.page === 'conversation' ? 'chat'
+    : route.page === 'citymap' ? 'home'
     : ['editor','ai'].includes(route.page) ? 'create'
     : ['detail','session-detail'].includes(route.page) ? 'home'
     : route.page === 'group' ? 'chat' : route.page;
   // 五大主入口固定順序：探索、創建、聊天、商店、我的。
   // 通知、收藏、群組仍保留既有次級頁面路徑，不再占用主導覽位置。
   const labels = [
-    ['home','探索'],['create','創建'],['chat','聊天'],
+    ['citymap','探索'],['create','創建'],['chat','聊天'],
     ['shop','商店'],['profile','我的']
   ];
   const html = labels.map(([page,label]) => `
