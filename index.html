@@ -4355,8 +4355,11 @@ async function createEncounterSession(character) {
   }
 
   const sessionId = id();
+  if (typeof encounterPlace !== 'string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(encounterPlace)) {
+    throw new Error('請從城市地圖的有效地標進入相遇，才能確認角色目前是否在場。');
+  }
   const { data, error } = await window.mySupabase.functions.invoke('encounter-session', {
-    body: { characterId: character.id, sessionId }
+    body: { characterId: character.id, sessionId, locationKey: encounterPlace }
   });
   if (error || !data?.session?.id || data.session.id !== sessionId ||
       data.session.user_id !== authData.user.id ||
