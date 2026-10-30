@@ -5915,6 +5915,15 @@ function renderChatOverlay(kind) {
   const panel = $('view').querySelector('.chat-main');
   if (!s || !panel) return;
   if(kind==='settings'||kind==='settings-background'||kind==='delete-confirm'||kind==='manage-conversation'){renderChatSettingsOverlay(panel,false,kind);return;}
+  if(kind==='encounter-dialogues'&&s.encounterMode){
+    const characterName=sessionCharacter(s)?.name||'角色';
+    const rows=(s.messages||[]).filter(message=>String(message.text||message.content||'').trim()).map(message=>{
+      const speaker=message.role==='user'?'你':characterName;
+      return '<article class="encounter-memory-message"><div class="row between"><strong>'+e(speaker)+'</strong><span class="small muted">'+e(timeText(message.at||message.created_at||0))+'</span></div><p>'+e(message.text||message.content||'')+'</p></article>';
+    }).join('');
+    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="本次對話紀錄"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回聊天功能" title="返回聊天功能">'+ICON.back+'</button><h2>本次對話</h2></div><p class="small muted">只顯示目前這次相遇的對話，不會混入其他相遇或故事模式。</p><div class="encounter-memory-detail">'+(rows||'<div class="empty">這次相遇還沒有對話內容。</div>')+'</div></section>');
+    return;
+  }
   const photos = s.album.filter(p => safeImage(p.url));
   const canTestCloudData = CHAT_DATA_TEST_MODE && s.cloudOwned &&
     currentUser()?.uid === s.cloudOwnerUid && hasUserMessage(s);
