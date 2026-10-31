@@ -242,6 +242,12 @@ body.day .tag { color:#4f46b8; }
   display:inline-block;
   flex:0 0 auto;
 }
+.story-relationship-chip{display:inline-flex;align-items:center;gap:9px;max-width:calc(100% - 48px);margin:5px 0 0 46px;padding:5px 10px;border:1px solid #756bb5;border-radius:999px;background:linear-gradient(100deg,#292744,#302640);color:#e5ddff;font-size:11px;line-height:1.2}
+.story-relationship-meter{display:inline-block;width:58px;height:4px;overflow:hidden;border-radius:999px;background:#ffffff28}
+.story-relationship-meter i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#9c8cff,#e9b7e8)}
+body.day .story-relationship-chip{background:linear-gradient(100deg,#efedff,#f8edf7);color:#50466f;border-color:#c9bde9}
+body.day .story-relationship-meter{background:#8a7ca833}
+
 .character-status-banner {
   border:1px solid var(--border);
   border-radius:12px;
@@ -2538,6 +2544,7 @@ function chatSessionData(s) {
     name:s.name || '', archived:!!s.archived, hidden:!!s.hidden,
     // Keep the mode marker in session_data as a recovery source if a legacy sync row lacks chat_mode.
     encounterMode:s.encounterMode === true,
+    storyMode:s.storyMode === true,
     encounterPlace:typeof s.encounterPlace === 'string' ? s.encounterPlace : null,
     encounterDay:s.encounterDay || (s.startedAt ? new Date(s.startedAt).toLocaleDateString('en-CA') : null),
     openingMessage:initialOpening && String(initialOpening.text || '').trim()
@@ -2775,6 +2782,7 @@ async function loadCloudChatSessions(user) {
         characterName:row.character_name || snapshot.name || '角色',
         name:data.name || '', archived:data.archived === true || row.status === 'archived',
         encounterMode:row.chat_mode === 'encounter' || data.encounterMode === true || data.encounter?.mode === 'encounter',
+        storyMode:data.storyMode === true,
         encounterPlace:typeof data.encounterPlace === 'string' ? data.encounterPlace : (existing?.encounterPlace || null),
         encounterDay:typeof data.encounterDay === 'string' ? data.encounterDay : (existing?.encounterDay || (Number(data.startedAt) ? new Date(Number(data.startedAt)).toLocaleDateString('en-CA') : null)),
         hidden:data.hidden === true, pinned:data.pinned === true,
@@ -5760,6 +5768,39 @@ function chatSidebarToggleButton(mobileAction) {
   const icon=isMobile?ICON.back:(hideList?ICON.forward:ICON.back);
   return `<button class="ghost" data-action="chat-sidebar-toggle" data-mobile-action="${mobileAction}" aria-label="${label}" title="${label}" aria-expanded="${hideList?'false':'true'}">${icon}</button>`;
 }
+async function loadStoryRelationshipState(session) {
+  if (!session?.storyMode || !isUuid(session.id) || !window.mySupabase) return;
+  const target = document.getElementById('storyRelationshipLabel');
+  if (!target) return;
+  const labels = {
+    hostile:'敵對',dislike:'反感',wary:'戒備',first_meeting:'初次見面',
+    acquaintance:'熟識',close:'親近',intimate:'親密',special:'特殊羈絆'
+  };
+  try {
+    const { data, error } = await window.mySupabase.rpc('get_story_relationship_state', {
+      p_session_id: session.id
+    });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) { target.remove(); return; }
+    const affinity = Number(row.affinity);
+    const label = labels[row.relationship_stage];
+    if (!Number.isInteger(affinity) || affinity < -100 || affinity > 100 || !label) {
+      target.textContent = '關係資料待確認';
+      return;
+    }
+    session.storyAffinity = affinity;
+    session.storyRelationshipStage = row.relationship_stage;
+    persist();
+    const progress = Math.round((affinity + 100) / 2);
+    target.innerHTML = '<span>關係 · '+e(label)+'</span><span class="story-relationship-meter" aria-hidden="true"><i style="width:'+progress+'%"></i></span>';
+    target.setAttribute('aria-label','關係階段 '+label+'，好感度進度 '+progress+'%');
+  } catch (error) {
+    console.warn('Story 關係狀態載入失敗：',error?.message||error);
+    target.textContent = '關係資料暫時無法載入';
+  }
+}
+
 function renderConversation() {
   const s = currentSession();
   const c = sessionCharacter(s);
@@ -5795,6 +5836,7 @@ function renderConversation() {
               <button class="ghost" data-action="chat-settings-menu" aria-label="聊天功能選單" title="聊天功能選單">${ICON.menu}</button>
             </div>
           </div>
+          ${s.storyMode ? '<div class="story-relationship-chip" id="storyRelationshipLabel" role="status">關係載入中</div>' : ''}
         </div>
         <div class="messages" id="messages"></div>
         <form class="composer" data-form="message">
@@ -5846,6 +5888,7 @@ function renderConversation() {
   panel.style.setProperty('--chat-photo',
     s.background === 'none' ? 'none' : `url(${JSON.stringify(safeImage(c.image))})`);
   renderMessages();
+  if (s.storyMode) void loadStoryRelationshipState(s);
 
   if (route.chatOverlay) renderChatOverlay(route.chatOverlay);
 }
