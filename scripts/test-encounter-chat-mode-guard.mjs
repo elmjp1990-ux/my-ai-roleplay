@@ -343,6 +343,25 @@ assert.match(storySession, /result\.final_affinity/);
 assert.match(storySession, /story_session_incomplete/);
 assert.match(storySession, /create_story_session_with_relationship/);
 assert.match(storySession, /session_id_conflict/);
+
+assert.match(storySession, /relationshipState/);
+assert.match(storySession, /relationship: relationshipState/);
+assert.match(frontend, /async function openNewStoryDialog\(characterId\)/);
+assert.match(frontend, /get_latest_settled_encounter_session/);
+assert.match(frontend, /data-action="start-new-story"/);
+assert.match(frontend, /data-action="story-start-mode"/);
+assert.match(frontend, /async function createStorySession\(characterId, originMode/);
+assert.match(frontend, /functions\.invoke\('story-session'/);
+assert.match(frontend, /storyRelationshipStage/);
+const latestStorySourceMigration = fs.readFileSync(
+  "supabase/migrations/20261031260000_latest_settled_encounter_for_story.sql",
+  "utf8",
+);
+assert.match(latestStorySourceMigration, /auth\.uid\(\)/);
+assert.match(latestStorySourceMigration, /lifecycle\.user_id=v_user_id/);
+assert.match(latestStorySourceMigration, /lifecycle\.character_id=p_character_id/);
+assert.match(latestStorySourceMigration, /lifecycle\.status='settled'/);
+assert.match(latestStorySourceMigration, /GRANT EXECUTE ON FUNCTION public\.get_latest_settled_encounter_session\(uuid\) TO authenticated/);
 assert.match(affinityMigration, /FUNCTION public\.create_story_session_with_relationship/);
 assert.match(affinityMigration, /GRANT EXECUTE ON FUNCTION public\.create_story_session_with_relationship/);
 assert.match(affinityMigration, /FUNCTION public\.create_encounter_session_with_lifecycle/);
