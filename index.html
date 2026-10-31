@@ -1875,7 +1875,7 @@ async function loadCharacterIllustrationAssets(characterIds) {
   const result=new Map();
   if(!client||!ids.length)return result;
   const {data:rows,error}=await client.from('character_illustrations')
-    .select('id, character_id, storage_path, asset_type, sort_order')
+    .select('id, character_id, storage_path, asset_type, sort_order, display_name')
     .in('character_id',ids)
     .order('sort_order',{ascending:true});
   if(error)throw new Error('讀取角色立繪資料失敗：'+error.message);
@@ -1883,7 +1883,7 @@ async function loadCharacterIllustrationAssets(characterIds) {
     const {data,error:signedError}=await client.storage.from('character-illustrations').createSignedUrl(row.storage_path,3600);
     if(signedError||!data?.signedUrl)continue;
     const list=result.get(row.character_id)||{primary:null,gallery:[]};
-    const asset={id:row.id,path:row.storage_path,src:data.signedUrl,sortOrder:row.sort_order};
+    const asset={id:row.id,path:row.storage_path,src:data.signedUrl,sortOrder:row.sort_order,name:row.display_name||''};
     if(row.asset_type==='primary')list.primary=asset;
     else list.gallery.push(asset);
     result.set(row.character_id,list);
@@ -1908,7 +1908,7 @@ async function syncCharacterIllustrations(character,userId) {
   const client=window.mySupabase;
   if(!client||!userId||!character?.id)throw new Error('無法確認角色立繪同步權限。');
   const {data:existing,error:readError}=await client.from('character_illustrations')
-    .select('id, storage_path, asset_type, sort_order')
+    .select('id, storage_path, asset_type, sort_order, display_name')
     .eq('character_id',character.id).eq('author_id',userId);
   if(readError)throw new Error('讀取既有立繪失敗：'+readError.message);
   const oldPrimary=(existing||[]).find(row=>row.asset_type==='primary')||null;
@@ -1929,7 +1929,7 @@ async function syncCharacterIllustrations(character,userId) {
     const nextGallery=[];
     for(const item of draftIllustrations){
       if(item&&typeof item==='object'&&item.id&&item.path){
-        nextGallery.push({...item});
+        nextGallery.push({...item,name:String(item.name||'').trim().slice(0,40)});
         continue;
       }
       const src=typeof item==='string'?item:item?.src;
@@ -1940,7 +1940,7 @@ async function syncCharacterIllustrations(character,userId) {
       const path=await uploadCharacterIllustrationDataUrl(src,userId,character.id);
       uploaded.push(path);
       const {data,error}=await client.from('character_illustrations')
-        .insert({character_id:character.id,author_id:userId,storage_path:path,asset_type:'gallery',sort_order:freeSlot})
+        .insert({character_id:character.id,author_id:userId,storage_path:path,asset_type:'gallery',sort_order:freeSlot,display_name:String(item?.name||'').trim().slice(0,40)})
         .select('id').single();
       if(error)throw new Error('儲存附加立繪資料失敗：'+error.message);
       insertedGallery.push(data.id);
@@ -1956,7 +1956,7 @@ async function syncCharacterIllustrations(character,userId) {
   if(nextPrimaryPath){
     if(oldPrimary){
       const {error}=await client.from('character_illustrations')
-        .update({storage_path:nextPrimaryPath,sort_order:0,updated_at:new Date().toISOString()})
+        .update({storage_path:nextPrimaryPath,sort_order:0,display_name:String(character.primaryIllustrationName||'').trim().slice(0,40),updated_at:new Date().toISOString()})
         .eq('id',oldPrimary.id).eq('author_id',userId);
       if(error){
         if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
@@ -1965,7 +1965,7 @@ async function syncCharacterIllustrations(character,userId) {
       }
     }else{
       const {error}=await client.from('character_illustrations')
-        .insert({character_id:character.id,author_id:userId,storage_path:nextPrimaryPath,asset_type:'primary',sort_order:0});
+        .insert({character_id:character.id,author_id:userId,storage_path:nextPrimaryPath,asset_type:'primary',sort_order:0,display_name:String(character.primaryIllustrationName||'').trim().slice(0,40)});
       if(error){
         if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
         if(uploaded.length)await client.storage.from('character-illustrations').remove(uploaded);
@@ -2042,7 +2042,7 @@ async function hydrateCharacterVideo(video){
 function normalizePersonalityProfile(value) {
   const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
   const limits={coreTraits:500,values:500,speechStyle:500,behaviorRules:700,likes:300,dislikes:300,boundaries:500,relationshipPacing:300};
-  return Object.fromEntries(Object.entries(limits).map(([key,max])=>[key,String(source[key]??'').trim().slice(0,max)]));
+  return {...Object.fromEntries(Object.entries(limits).map(([key,max])=>[key,String(source[key]??'').trim().slice(0,max)])),primaryIllustrationName:String(source.primaryIllustrationName??'').trim().slice(0,40)};
 }
 
 function parseEncounterScheduleText(raw) {
@@ -4189,6 +4189,7 @@ function saveEditorDraft() {
     privateInfo:String(values.get('privateInfo') || ''),
     style:String(values.get('style') || ''),
     personalityProfile:normalizePersonalityProfile({
+      primaryIllustrationName:values.get('primaryIllustrationName'),
       coreTraits:values.get('personalityCoreTraits'), values:values.get('personalityValues'),
       speechStyle:values.get('personalitySpeechStyle'), behaviorRules:values.get('personalityBehaviorRules'),
       likes:values.get('personalityLikes'), dislikes:values.get('personalityDislikes'),
@@ -4201,7 +4202,7 @@ function saveEditorDraft() {
     tags:[...draftTags],
     image:draftImage,
     avatarVideoPath:draftVideoPath,
-    illustrations:draftIllustrations.slice(0,5),
+    illustrations:draftIllustrations.slice(0,5).map((item,index)=>({...((typeof item==='object'&&item)?item:{src:item}),name:String(form.querySelector('[data-illustration-name="'+index+'"]')?.value||'').slice(0,40)})),
     primaryIllustrationPath:draftPrimaryIllustrationPath,
     savedAt:Date.now()
   };
@@ -4269,7 +4270,7 @@ function renderCharacterIllustrationGallery(items = []) {
     const src = typeof item === 'string' ? item : item?.src || '';
     return '<div class="character-illustration-option">' +
       '<img src="' + e(safeImage(src)) + '" alt="附加立繪 ' + (index+1) + '">' +
-      '<span>立繪 ' + (index+1) + '</span>' +
+      '<label class="field"><span>立繪名稱</span><input data-illustration-name="' + index + '" maxlength="40" placeholder="例如：開心、緊張" value="' + e(typeof item==='object'?(item.name||''):'') + '"></label>' +
       '<button type="button" class="small" data-action="remove-character-illustration" data-index="' + index + '" aria-label="移除第 ' + (index+1) + ' 張立繪">移除</button>' +
     '</div>';
   }).join('') + '</div>';
@@ -4319,34 +4320,29 @@ function renderEditor() {
           <small class="char-counter" data-count-for="intro">0/2000</small></label>
         <label class="field"><span>開場白 * <details class="inline-help"><summary aria-label="開場白填寫說明" title="開場白填寫說明">?</summary><span>用 *動作* 表示場景描述；用 {USER} 帶入玩家名稱、{CHAR} 帶入角色名稱。</span></details></span><textarea name="opening" required maxlength="3000">${e(c.opening || '')}</textarea>
           <small class="char-counter" data-count-for="opening">0/3000</small></label>
-        <label class="field"><span>私密資訊</span><textarea name="privateInfo" maxlength="10000">${e(c.privateInfo || '')}</textarea>
-          <small class="char-counter" data-count-for="privateInfo">0/10000，不會顯示在公開介紹，請勿填寫真實機密</small></label>
-        <label class="field"><span>對話風格（舊欄位，保留相容）</span><textarea name="style" maxlength="1000">${e(c.style || '')}</textarea><small>可補充整體文風；下方人格欄位會更明確描述角色的行為與反應。</small></label>
-        <section class="memory-item stack" style="gap:12px"><strong>角色人格設定</strong><small>由創作者設定角色的核心人格，玩家不能直接改寫。請填寫可觀察、可扮演的特徵；作者私密設定仍請放在上方「私密資訊」。</small>
+        <details class="memory-item" style="margin:14px 0"><summary>作者私密資訊與舊版對話風格（相容保留）</summary><label class="field"><span>私密資訊</span><textarea name="privateInfo" maxlength="10000">${e(c.privateInfo || '')}</textarea><small class="char-counter" data-count-for="privateInfo">0/10000，不會顯示在公開介紹，請勿填寫真實機密</small></label><label class="field"><span>對話風格（舊欄位，保留相容）</span><textarea name="style" maxlength="1000">${e(c.style || '')}</textarea><small>可補充整體文風；新的人格欄位會更明確描述角色的行為與反應。</small></label></details>
+        <section class="memory-item stack" style="gap:12px"><strong>7. 角色人格設定</strong><small>由創作者設定角色的核心人格，玩家不能直接改寫。請填寫可觀察、可扮演的特徵；作者私密設定仍請放在上方「私密資訊」。</small>
           <label class="field"><span>核心性格</span><textarea name="personalityCoreTraits" maxlength="500" placeholder="例如：外冷內熱、觀察敏銳、不輕易示弱">${e(c.personalityProfile?.coreTraits || '')}</textarea></label>
           <label class="field"><span>價值觀與行動動機</span><textarea name="personalityValues" maxlength="500" placeholder="例如：重視承諾、把家人安全放在第一位">${e(c.personalityProfile?.values || '')}</textarea></label>
           <label class="field"><span>說話方式</span><textarea name="personalitySpeechStyle" maxlength="500" placeholder="例如：句子簡短、少用表情符號、緊張時會轉移話題">${e(c.personalityProfile?.speechStyle || '')}</textarea></label>
           <label class="field"><span>行為準則與反應習慣</span><textarea name="personalityBehaviorRules" maxlength="700" placeholder="例如：生氣時先沉默，不會突然無理由改變立場">${e(c.personalityProfile?.behaviorRules || '')}</textarea></label>
-          <div class="two-col">
-            <label class="field"><span>角色喜好</span><textarea name="personalityLikes" maxlength="300" placeholder="喜歡的事物、活動或相處方式">${e(c.personalityProfile?.likes || '')}</textarea></label>
-            <label class="field"><span>角色雷點</span><textarea name="personalityDislikes" maxlength="300" placeholder="討厭的事物或容易觸發的反應">${e(c.personalityProfile?.dislikes || '')}</textarea></label>
-          </div>
           <label class="field"><span>互動界線</span><textarea name="personalityBoundaries" maxlength="500" placeholder="角色不接受的互動、需要尊重的界線">${e(c.personalityProfile?.boundaries || '')}</textarea></label>
           <label class="field"><span>關係發展節奏</span><textarea name="personalityRelationshipPacing" maxlength="300" placeholder="例如：慢熱、需要信任累積，不會初次見面就深情告白">${e(c.personalityProfile?.relationshipPacing || '')}</textarea></label>
         </section>
+        <section class="memory-item stack" style="gap:12px"><strong>8. 角色人格愛好</strong><small>描述角色喜歡與不喜歡的事物、活動及相處方式。</small><div class="two-col"><label class="field"><span>喜歡</span><textarea name="personalityLikes" maxlength="300" placeholder="喜歡的事物、活動或相處方式">${e(c.personalityProfile?.likes || '')}</textarea></label><label class="field"><span>不喜歡／雷點</span><textarea name="personalityDislikes" maxlength="300" placeholder="討厭的事物或容易觸發的反應">${e(c.personalityProfile?.dislikes || '')}</textarea></label></div></section>
         <section class="memory-item stack" style="gap:10px">
-          <strong>相遇模式｜角色日程（測試版）</strong>
+          <strong>9. 角色日程</strong>
           <small>每行一個時段，格式：星期(0=日、1=一…6=六，*代表每天)|開始時間|結束時間|地點代碼|角色活動。例：1|09:00|12:00|cafe|在咖啡廳工作。此設定目前只有作者可讀，尚未開放玩家端查詢。</small>
           <label class="field"><span>日程時段</span><textarea name="encounterSchedules" maxlength="20000" placeholder="1|09:00|12:00|cafe|在咖啡廳工作\n*|18:00|20:00|park|傍晚散步">${e(savedDraft?.encounterSchedules ?? c.encounterSchedules ?? '')}</textarea></label>
           <label class="check"><input type="checkbox" name="clearEncounterSchedules" value="yes"><span>明確清空這個角色的所有日程（需勾選，避免誤刪）</span></label>
         </section>
-        <section class="memory-item stack" style="gap:10px"><strong>角色手機設定</strong>
+        <section class="memory-item stack" style="gap:10px"><strong>10. 角色手機設定</strong>
           <label class="field"><span>AI 手機通知揭露指示（每行一則）</span><textarea name="phoneNotices" maxlength="1200" placeholder="💬心裡話 | 每回合揭露一則簡短心裡話\n🔎線索 | 當劇情出現新線索時，揭露線索通知">${e(savedDraft?.phoneNotices ?? (Array.isArray(c.phoneSettings?.noticePrompts) ? c.phoneSettings.noticePrompts.join('\n') : Array.isArray(c.phoneSettings?.notices) ? c.phoneSettings.notices.join('\n') : ''))}</textarea><small>在這裡填寫每回合對話需要揭露的狀態。每行描述一種 AI 可揭露的通知條件／內容，不是固定顯示文字；最多 8 則。</small></label></section>
         <section class="memory-item stack" style="gap:12px">
-          <strong>11. 主要角色立繪</strong>
+          <strong>11. 上傳主要角色圖</strong>
           <label class="field"><span>角色主圖 *</span>
-            <input id="characterImage" type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime">
-            <small>支援透明 PNG／WebP 與 JPG，圖片上限 15 MB；也可上傳 10 秒內、15 MB 以下的 MP4、WebM 或 MOV 影片。透明背景會保留，不會與場景背景合併。請確認你擁有素材使用權。</small>
+            <input id="characterImage" type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime"><input name="primaryIllustrationName" maxlength="40" placeholder="名稱，例如：主要角色" value="${e(c.personalityProfile?.primaryIllustrationName||'主要角色')}">
+            <small>支援透明 PNG／WebP 與 JPG；也可上傳 10 秒內、15 MB 以下的 MP4、WebM 或 MOV 影片。若上傳影片，會自動使用影片封面作為主要角色圖。請確認你擁有素材使用權。</small>
           </label>
           <img id="imagePreview" ${draftImage ? `src="${e(safeImage(draftImage))}"` : ''}
                class="${draftImage && !draftVideoPath ? '' : 'hidden'}"
@@ -4354,10 +4350,10 @@ function renderEditor() {
           <video id="characterVideoPreview" class="${draftVideoPath ? '' : 'hidden'}" controls muted playsinline style="width:180px;max-height:240px;object-fit:contain;border-radius:13px;margin-bottom:18px;background:#000"></video>
         </section>
         <section class="memory-item stack" style="gap:12px">
-          <strong>12. 其他角色立繪</strong>
+          <strong>12. 立繪角色圖（最多 5 張）</strong>
           <label class="field"><span>附加立繪（最多 5 張）</span>
             <input id="characterIllustrations" type="file" accept="image/png,image/jpeg,image/webp" multiple>
-            <small>可上傳最多 5 張 PNG、JPG 或 WebP，每張上限 10 MB。支援透明背景；這些圖片會獨立保存，不會覆蓋主要角色立繪。</small>
+            <small>每張立繪可填寫名稱，例如「開心」「緊張」。AI 會依照對話情境判斷是否使用合適的表情圖。建議使用白底或透明背景 PNG；最多 5 張，每張上限 10 MB。</small>
           </label>
           <div id="characterIllustrationGallery" class="character-illustration-gallery">${renderCharacterIllustrationGallery(draftIllustrations, draftImage)}</div>
         </section>
