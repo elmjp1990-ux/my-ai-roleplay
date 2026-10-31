@@ -23,4 +23,12 @@ assert.match(html, /await saveEncounterScheduleDescription\(c\.id, user\.uid, sc
 assert.doesNotMatch(html, /save_character_schedules/);
 assert.doesNotMatch(html, /saveEncounterSchedules\(/);
 
-console.log("Author natural-language schedule description contract tests passed.");
+
+ // Private Storage images must refresh expired signed URLs without exposing object paths.
+assert.match(html, /async function refreshCharacterIllustrationSignedUrl\(storagePath\)/);
+assert.match(html, /createSignedUrl\(storagePath,3600\)/);
+assert.match(html, /data-character-illustration-path/);
+assert.match(html, /document\.addEventListener\('error',[\s\S]*refreshCharacterIllustrationSignedUrl/);
+assert.match(html, /document\.addEventListener\('load'/);
+
+console.log("Author schedule and illustration signed-URL refresh contract tests passed.");
