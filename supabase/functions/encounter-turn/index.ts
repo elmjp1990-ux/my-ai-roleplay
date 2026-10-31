@@ -54,19 +54,8 @@ Deno.serve(async (request) => {
   if (session.chat_mode !== "encounter") return json({ error: "encounter_session_required", retryAllowed: false }, 409);
   if (!isUuid(session.character_id)) return json({ error: "chat_session_character_id_invalid", retryAllowed: false }, 409);
 
-  // Check the server-authoritative scene window before any turn reservation.
-  // The evidence RPC repeats this gate after generation to close the normal expiry path.
-  const { data: lifecycle, error: lifecycleError } = await admin
-    .from("encounter_session_lifecycle")
-    .select("status,scheduled_end_at")
-    .eq("session_id", sessionId)
-    .maybeSingle();
-  if (lifecycleError) return json({ error: "encounter_lifecycle_lookup_failed", retryAllowed: true }, 503);
-  if (!lifecycle || lifecycle.status !== "active" ||
-      !lifecycle.scheduled_end_at || new Date(lifecycle.scheduled_end_at).getTime() <= Date.now()) {
-    return json({ error: "encounter_scene_expired_or_inactive", retryAllowed: false }, 409);
-  }
-
+  // The reservation RPC is the authoritative lifecycle gate. It also permits
+  // idempotent recovery of an already-reserved pre-expiry turn after scene end.
   const { data: canOpen, error: eligibilityError } = await userClient.rpc("can_open_encounter_session", {
     p_character_id: session.character_id,
   });
