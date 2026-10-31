@@ -121,6 +121,27 @@ assert.match(storyBatchSourcesMigration, /charge\.session_id=NEW\.session_id/);
 assert.match(storyBatchSourcesMigration, /charge\.user_id=NEW\.user_id/);
 assert.match(storyBatchSourcesMigration, /charge\.status='settled'/);
 
+const evaluationDispatchMigration = fs.readFileSync(
+  "supabase/migrations/20261031240000_encounter_evaluation_dispatch_queue.sql",
+  "utf8",
+);
+assert.match(evaluationDispatchMigration, /FUNCTION public\.enqueue_due_encounter_evaluations/);
+assert.match(evaluationDispatchMigration, /FUNCTION public\.claim_encounter_evaluation_jobs/);
+assert.match(evaluationDispatchMigration, /FUNCTION public\.fail_encounter_evaluation_job/);
+assert.match(evaluationDispatchMigration, /FOR UPDATE SKIP LOCKED/);
+assert.match(evaluationDispatchMigration, /Encounter evaluation job session link is invalid/);
+assert.match(evaluationDispatchMigration, /cron\.schedule/);
+assert.match(evaluationDispatchMigration, /status='ready_to_settle'/);
+assert.match(evaluationDispatchMigration, /status IN \('created','reserved','needs_reconciliation'\)/);
+
+const evaluationRetryMigration = fs.readFileSync(
+  "supabase/migrations/20261031250000_bound_encounter_evaluation_retries.sql",
+  "utf8",
+);
+assert.match(evaluationRetryMigration, /attempt_count < 5/);
+assert.match(evaluationRetryMigration, /interval '5 minutes'/);
+assert.match(evaluationRetryMigration, /interval '10 minutes'/);
+
 const pauseResumeMigration = fs.readFileSync(
   "supabase/migrations/20261031190000_encounter_session_pause_resume.sql",
   "utf8",
