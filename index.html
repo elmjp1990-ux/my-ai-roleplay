@@ -4354,7 +4354,6 @@ function renderEditor() {
           <strong>9. 角色日程</strong>
           <small>簡單描述角色平日、假日的生活作息、常去的地點，以及通常會進行的活動。可以自由描述，不需要填寫固定格式或精確時段。</small>
           <label class="field"><span>生活作息與日常活動</span><textarea name="encounterScheduleDescription" maxlength="20000" placeholder="例如：平日早上通常在公司上班，中午會到附近餐廳用餐。晚上偶爾去咖啡廳看書。週末比較自由，有時會到公園散步，或和朋友去酒吧。">${e(savedDraft?.encounterScheduleDescription ?? c.encounterScheduleDescription ?? '')}</textarea>
-            <small>可直接用自然語言描述；不需要輸入星期代碼、時間格式或地點代碼。這份描述僅作者可查看。</small>
           </label>
         </section>
         <section class="memory-item stack" style="gap:12px">
@@ -4374,12 +4373,12 @@ function renderEditor() {
           </label>
           <img id="imagePreview" ${draftImage ? `src="${e(safeImage(draftImage))}"` : ''}
                class="${draftImage && !draftVideoPath ? '' : 'hidden'}"
-               alt="主要角色立繪預覽" style="width:160px;max-height:240px;object-fit:contain;object-position:center;border-radius:13px;margin-bottom:10px;background:rgba(120,110,140,.08)">
+               alt="主要角色圖預覽" style="width:160px;max-height:240px;object-fit:contain;object-position:center;border-radius:13px;margin-bottom:10px;background:rgba(120,110,140,.08)">
           <video id="characterVideoPreview" class="${draftVideoPath ? '' : 'hidden'}" controls muted playsinline style="width:180px;max-height:240px;object-fit:contain;border-radius:13px;margin-bottom:18px;background:#000"></video>
         </section>
         <section class="memory-item stack" style="gap:12px">
-          <strong>立繪角色圖（最多 5 張）</strong>
-          <label class="field"><span>附加立繪（最多 5 張）</span>
+          <strong>相遇模式立繪（最多 5 張）</strong>
+          <label class="field"><span>場景立繪（最多 5 張）</span>
             <input id="characterIllustrations" type="file" accept="image/png,image/jpeg,image/webp" multiple>
             <small>每張立繪可填寫名稱，例如「開心」「緊張」。AI 會依照對話情境判斷是否使用合適的表情圖。建議使用白底或透明背景 PNG；最多 5 張，每張上限 10 MB。</small>
           </label>
@@ -10842,12 +10841,11 @@ document.addEventListener('submit',function(event){
     const defaultSceneImage='https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp';
     panel.style.setProperty('--encounter-scene-photo','url('+JSON.stringify(sceneImage||defaultSceneImage)+')');
     panel.dataset.encounterPlace=session.encounterPlace||'';
-    // Prefer a dedicated sprite. When only a character-card image exists, try to
-    // remove edge-connected near-white background pixels in-browser so the card's
-    // baked-in white canvas does not cover the encounter scene.
+    // Encounter scenes use dedicated encounter art or the author's scene-illustration gallery.
+    // The character-card primary image is intentionally never reused as a scene sprite.
     const dedicatedSprite=safeImage(character?.encounterPortraitImage||character?.halfBodyImage||character?.transparentPortrait||character?.encounterSprite||'');
-    const cardPortrait=safeImage(character?.image||character?.avatar_url||character?.avatarUrl||'');
-    const halfBodyImage=dedicatedSprite||cardPortrait;
+    const sceneIllustration=safeImage(character?.galleryIllustrations?.[0]?.src||'');
+    const halfBodyImage=dedicatedSprite||sceneIllustration;
     let existingSprite=panel.querySelector('.encounter-character-sprite');
     const missingArt=panel.querySelector('.encounter-missing-art');
     if(halfBodyImage){
