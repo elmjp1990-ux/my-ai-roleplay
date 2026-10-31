@@ -1922,6 +1922,72 @@ if(!window.__characterIllustrationRefreshHandlerInstalled){
   },true);
 }
 
+async function enqueueCharacterIllustrationCleanup(storagePath,userId) {
+  const client=window.mySupabase;
+  if(!client||!userId||typeof storagePath!=='string')throw new Error('無法建立角色立繪清理紀錄。');
+  const parts=storagePath.split('/');
+  if(parts.length!==3||parts[0]!==userId||!/[0-9a-f-]{36}/i.test(parts[1])||!/[0-9a-f-]{36}\\.(jpg|jpeg|png|webp)$/i.test(parts[2])) {
+    throw new Error('角色立繪清理路徑驗證失敗。');
+  }
+  const {data,error}=await client.from('character_illustration_cleanup_jobs')
+    .upsert({author_id:userId,storage_path:storagePath},{onConflict:'author_id,storage_path'})
+    .select('id,attempts').single();
+  if(error||!data?.id)throw new Error('建立角色立繪清理紀錄失敗：'+(error?.message||'missing_job'));
+  return data;
+}
+async function cancelCharacterIllustrationCleanupJob(jobId,userId) {
+  if(!jobId)return;
+  const client=window.mySupabase;
+  const {error}=await client.from('character_illustration_cleanup_jobs').delete()
+    .eq('id',jobId).eq('author_id',userId);
+  if(error)console.warn('取消暫存的立繪清理工作失敗：',error.message);
+}
+async function processCharacterIllustrationCleanupJob(job,userId) {
+  const client=window.mySupabase;
+  const {error:storageError}=await client.storage.from('character-illustrations').remove([job.storage_path]);
+  if(storageError) {
+    const {error:updateError}=await client.from('character_illustration_cleanup_jobs')
+      .update({attempts:Number(job.attempts||0)+1,last_error:String(storageError.message||'Storage remove failed').slice(0,500),updated_at:new Date().toISOString()})
+      .eq('id',job.id).eq('author_id',userId);
+    if(updateError)console.warn('立繪清理失敗紀錄更新失敗：',updateError.message);
+    console.warn('角色立繪檔案清理待重試：',storageError.message);
+    return false;
+  }
+  const {error:deleteError}=await client.from('character_illustration_cleanup_jobs').delete()
+    .eq('id',job.id).eq('author_id',userId);
+  if(deleteError) {
+    console.warn('已移除立繪檔案，但清理工作紀錄刪除失敗，將於下次重試：',deleteError.message);
+    return false;
+  }
+  return true;
+}
+async function cleanupCharacterIllustrationUploads(paths,userId) {
+  for(const storagePath of paths||[]) {
+    try {
+      const job=await enqueueCharacterIllustrationCleanup(storagePath,userId);
+      await processCharacterIllustrationCleanupJob(job,userId);
+    } catch(error) {
+      console.warn('新上傳立繪回滾清理未能排入重試佇列：',error?.message||error);
+    }
+  }
+}
+async function retryCharacterIllustrationCleanup(userId) {
+  const client=window.mySupabase;
+  if(!client||!userId)return {processed:0,failed:0};
+  const {data:jobs,error}=await client.from('character_illustration_cleanup_jobs')
+    .select('id,storage_path,attempts').eq('author_id',userId).order('created_at',{ascending:true}).limit(50);
+  if(error) {
+    console.warn('讀取待重試的角色立繪清理工作失敗：',error.message);
+    return {processed:0,failed:0};
+  }
+  let processed=0,failed=0;
+  for(const job of jobs||[]) {
+    const ok=await processCharacterIllustrationCleanupJob(job,userId);
+    if(ok)processed++;else failed++;
+  }
+  return {processed,failed};
+}
+
 async function uploadCharacterIllustrationDataUrl(dataUrl,userId,characterId) {
   const client=window.mySupabase;
   if(!client||!userId||!characterId)throw new Error('無法確認角色立繪的雲端上傳權限。');
@@ -1949,6 +2015,7 @@ async function syncCharacterIllustrations(character,userId) {
   const insertedGallery=[];
   let nextPrimaryPath=draftPrimaryIllustrationPath||'';
   const nextGallery=[];
+  await retryCharacterIllustrationCleanup(userId);
   try{
     if(!character.avatarVideoPath&&/^data:image\//i.test(String(draftImage||''))){
       nextPrimaryPath=await uploadCharacterIllustrationDataUrl(draftImage,userId,character.id);
@@ -1980,7 +2047,7 @@ async function syncCharacterIllustrations(character,userId) {
     }
   }catch(error){
     if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
-    if(uploaded.length)await client.storage.from('character-illustrations').remove(uploaded);
+    if(uploaded.length)await cleanupCharacterIllustrationUploads(uploaded,userId);
     throw error;
   }
 
@@ -1993,7 +2060,7 @@ async function syncCharacterIllustrations(character,userId) {
       .eq('id',item.id).eq('author_id',userId);
     if(error){
       if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
-      if(uploaded.length)await client.storage.from('character-illustrations').remove(uploaded);
+      if(uploaded.length)await cleanupCharacterIllustrationUploads(uploaded,userId);
       throw new Error('更新立繪名稱失敗：'+error.message);
     }
   }
@@ -2001,45 +2068,72 @@ async function syncCharacterIllustrations(character,userId) {
   // Only replace the primary row after every new gallery asset has uploaded successfully.
   if(nextPrimaryPath){
     if(oldPrimary){
+      let oldPrimaryCleanupJob;
+      if(oldPrimary.storage_path!==nextPrimaryPath){
+        try{oldPrimaryCleanupJob=await enqueueCharacterIllustrationCleanup(oldPrimary.storage_path,userId);}
+        catch(error){
+          if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
+          if(uploaded.length)await cleanupCharacterIllustrationUploads(uploaded,userId);
+          throw new Error('無法建立舊主要角色圖的清理紀錄：'+error.message);
+        }
+      }
       const {error}=await client.from('character_illustrations')
         .update({storage_path:nextPrimaryPath,sort_order:0,display_name:String(character.primaryIllustrationName||'').trim().slice(0,40),updated_at:new Date().toISOString()})
         .eq('id',oldPrimary.id).eq('author_id',userId);
       if(error){
+        if(oldPrimaryCleanupJob)await cancelCharacterIllustrationCleanupJob(oldPrimaryCleanupJob.id,userId);
         if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
-        if(uploaded.length)await client.storage.from('character-illustrations').remove(uploaded);
+        if(uploaded.length)await cleanupCharacterIllustrationUploads(uploaded,userId);
         throw new Error('更新主要角色立繪資料失敗：'+error.message);
       }
+      if(oldPrimaryCleanupJob)await processCharacterIllustrationCleanupJob(oldPrimaryCleanupJob,userId);
     }else{
       const {error}=await client.from('character_illustrations')
         .insert({character_id:character.id,author_id:userId,storage_path:nextPrimaryPath,asset_type:'primary',sort_order:0,display_name:String(character.primaryIllustrationName||'').trim().slice(0,40)});
       if(error){
         if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
-        if(uploaded.length)await client.storage.from('character-illustrations').remove(uploaded);
+        if(uploaded.length)await cleanupCharacterIllustrationUploads(uploaded,userId);
         throw new Error('建立主要角色立繪資料失敗：'+error.message);
       }
     }
   }else if(oldPrimary){
+    let oldPrimaryCleanupJob;
+    try{oldPrimaryCleanupJob=await enqueueCharacterIllustrationCleanup(oldPrimary.storage_path,userId);}
+    catch(error){
+      if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
+      if(uploaded.length)await cleanupCharacterIllustrationUploads(uploaded,userId);
+      throw new Error('無法建立舊主要角色圖的清理紀錄：'+error.message);
+    }
     const {error}=await client.from('character_illustrations').delete().eq('id',oldPrimary.id).eq('author_id',userId);
     if(error){
+      await cancelCharacterIllustrationCleanupJob(oldPrimaryCleanupJob.id,userId);
       if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
-      if(uploaded.length)await client.storage.from('character-illustrations').remove(uploaded);
+      if(uploaded.length)await cleanupCharacterIllustrationUploads(uploaded,userId);
       throw new Error('移除舊主要立繪資料失敗：'+error.message);
     }
+    await processCharacterIllustrationCleanupJob(oldPrimaryCleanupJob,userId);
   }
 
   const keepIds=new Set(nextGallery.filter(item=>item.id).map(item=>item.id));
   const obsolete=oldGallery.filter(row=>!keepIds.has(row.id));
   if(obsolete.length){
-    const {error}=await client.from('character_illustrations').delete().in('id',obsolete.map(row=>row.id)).eq('author_id',userId);
-    if(error)console.warn('舊附加立繪 metadata 清理待重試：',error.message);
-    else{
-      const {error:storageError}=await client.storage.from('character-illustrations').remove(obsolete.map(row=>row.storage_path));
-      if(storageError)console.warn('舊附加立繪檔案清理待重試：',storageError.message);
+    const cleanupJobs=[];
+    try{
+      for(const row of obsolete)cleanupJobs.push(await enqueueCharacterIllustrationCleanup(row.storage_path,userId));
+    }catch(error){
+      for(const job of cleanupJobs)await cancelCharacterIllustrationCleanupJob(job.id,userId);
+      console.warn('舊附加立繪尚未移除：清理紀錄建立失敗，保留原始資料以避免孤兒檔案。',error.message);
+      toast('部分舊立繪尚未完成移除，系統會保留原始檔案並於下次重試。');
     }
-  }
-  if(oldPrimary&&oldPrimary.storage_path!==nextPrimaryPath){
-    const {error:storageError}=await client.storage.from('character-illustrations').remove([oldPrimary.storage_path]);
-    if(storageError)console.warn('舊主要立繪檔案清理待重試：',storageError.message);
+    if(cleanupJobs.length===obsolete.length){
+      const {error}=await client.from('character_illustrations').delete().in('id',obsolete.map(row=>row.id)).eq('author_id',userId);
+      if(error){
+        for(const job of cleanupJobs)await cancelCharacterIllustrationCleanupJob(job.id,userId);
+        console.warn('舊附加立繪 metadata 清理失敗：',error.message);
+      }else{
+        for(const job of cleanupJobs)await processCharacterIllustrationCleanupJob(job,userId);
+      }
+    }
   }
   if(!character.avatarVideoPath&&nextPrimaryPath){
     const {error:avatarClearError}=await client.from('characters').update({avatar_url:null}).eq('id',character.id).eq('author_id',userId);
