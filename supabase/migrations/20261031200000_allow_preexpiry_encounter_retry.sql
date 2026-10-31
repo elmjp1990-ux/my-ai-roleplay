@@ -41,9 +41,9 @@ BEGIN
 
   -- Existing reservations are recoverable after expiry only when the original
   -- reservation was created before the scene end and every identifier matches.
-  SELECT * INTO c
-  FROM public.chat_turn_charges
-  WHERE turn_id=p_turn_id
+  SELECT charge.* INTO c
+  FROM public.chat_turn_charges AS charge
+  WHERE charge.turn_id=p_turn_id
   FOR UPDATE;
   v_existing := FOUND;
 
