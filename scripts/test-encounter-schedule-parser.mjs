@@ -34,6 +34,10 @@ assert.match(html, /document\.addEventListener\('load'/);
 assert.match(html, /image: publicIllustrations\.get\(row\.id\)\?\.primary\?\.src \|\| row\.avatar_url/);
 assert.match(html, /image: ownerIllustrations\.get\(row\.id\)\?\.primary\?\.src \|\| row\.avatar_url/);
 
+// Gallery sync must keep nextGallery in function scope for post-upload persistence and cleanup.
+assert.match(html, /async function syncCharacterIllustrations\([\s\S]*?let nextPrimaryPath=draftPrimaryIllustrationPath\|\|\x27\x27;\s*const nextGallery=\[\];\s*try\{/);
+assert.doesNotMatch(html, /const usedSlots=new Set\([\s\S]*?\n\s*const nextGallery=\[\];/);
+
 // The card primary image is not reused as encounter-scene art.
 assert.match(html, /const sceneIllustration=safeImage\(character\?\.galleryIllustrations\?\.\[0\]\?\.src\|\|\x27\x27\)/);
 assert.match(html, /const halfBodyImage=dedicatedSprite\|\|sceneIllustration/);
