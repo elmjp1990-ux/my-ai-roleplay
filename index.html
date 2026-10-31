@@ -4204,10 +4204,9 @@ function saveEditorDraft() {
     style:String(values.get('style') || ''),
     personalityProfile:normalizePersonalityProfile({
       primaryIllustrationName:values.get('primaryIllustrationName'),
-      coreTraits:values.get('personalityCoreTraits'), values:values.get('personalityValues'),
-      speechStyle:values.get('personalitySpeechStyle'), behaviorRules:values.get('personalityBehaviorRules'),
+      coreTraits:values.get('personalityDescription'), values:'', speechStyle:'', behaviorRules:'',
       likes:values.get('personalityLikes'), dislikes:values.get('personalityDislikes'),
-      boundaries:values.get('personalityBoundaries'), relationshipPacing:values.get('personalityRelationshipPacing')
+      boundaries:'', relationshipPacing:''
     }),
     phoneNotices:String(values.get('phoneNotices') || ''),
     visibility:String(values.get('visibility') || 'private'),
@@ -4334,13 +4333,9 @@ function renderEditor() {
           <small class="char-counter" data-count-for="intro">0/2000</small></label>
         <label class="field"><span>開場白 * <details class="inline-help"><summary aria-label="開場白填寫說明" title="開場白填寫說明">?</summary><span>用 *動作* 表示場景描述；用 {USER} 帶入玩家名稱、{CHAR} 帶入角色名稱。</span></details></span><textarea name="opening" required maxlength="3000">${e(c.opening || '')}</textarea>
           <small class="char-counter" data-count-for="opening">0/3000</small></label>
-        <section class="memory-item stack" style="gap:12px"><strong>7. 角色人格設定</strong><small>由創作者設定角色的核心人格，玩家不能直接改寫。請填寫可觀察、可扮演的特徵；作者私密設定請填寫在第 11 項「私密設定」。</small>
-          <label class="field"><span>核心性格</span><textarea name="personalityCoreTraits" maxlength="500" placeholder="例如：外冷內熱、觀察敏銳、不輕易示弱">${e(c.personalityProfile?.coreTraits || '')}</textarea></label>
-          <label class="field"><span>價值觀與行動動機</span><textarea name="personalityValues" maxlength="500" placeholder="例如：重視承諾、把家人安全放在第一位">${e(c.personalityProfile?.values || '')}</textarea></label>
-          <label class="field"><span>說話方式</span><textarea name="personalitySpeechStyle" maxlength="500" placeholder="例如：句子簡短、少用表情符號、緊張時會轉移話題">${e(c.personalityProfile?.speechStyle || '')}</textarea></label>
-          <label class="field"><span>行為準則與反應習慣</span><textarea name="personalityBehaviorRules" maxlength="700" placeholder="例如：生氣時先沉默，不會突然無理由改變立場">${e(c.personalityProfile?.behaviorRules || '')}</textarea></label>
-          <label class="field"><span>互動界線</span><textarea name="personalityBoundaries" maxlength="500" placeholder="角色不接受的互動、需要尊重的界線">${e(c.personalityProfile?.boundaries || '')}</textarea></label>
-          <label class="field"><span>關係發展節奏</span><textarea name="personalityRelationshipPacing" maxlength="300" placeholder="例如：慢熱、需要信任累積，不會初次見面就深情告白">${e(c.personalityProfile?.relationshipPacing || '')}</textarea></label>
+        <section class="memory-item stack" style="gap:12px"><strong>7. 角色人格設定</strong>
+          <small>詳細描述角色的核心性格、價值觀與行動動機、說話方式、行為準則與反應習慣等內容；填寫越詳細，角色人格就越完整。</small>
+          <label class="field"><span>角色人格設定</span><textarea name="personalityDescription" maxlength="3000" placeholder="例如：描述角色的核心性格、重視的價值、做決定的動機、說話語氣、行為準則，以及面對不同情境時的反應習慣。">${e([c.personalityProfile?.coreTraits,c.personalityProfile?.values,c.personalityProfile?.speechStyle,c.personalityProfile?.behaviorRules,c.personalityProfile?.boundaries,c.personalityProfile?.relationshipPacing].filter(Boolean).join('\n'))}</textarea></label>
         </section>
         <section class="memory-item stack" style="gap:12px"><strong>8. 角色人格愛好</strong><small>描述角色喜歡與不喜歡的事物、活動及相處方式。</small><div class="two-col"><label class="field"><span>喜歡</span><textarea name="personalityLikes" maxlength="300" placeholder="喜歡的事物、活動或相處方式">${e(c.personalityProfile?.likes || '')}</textarea></label><label class="field"><span>不喜歡／雷點</span><textarea name="personalityDislikes" maxlength="300" placeholder="討厭的事物或容易觸發的反應">${e(c.personalityProfile?.dislikes || '')}</textarea></label></div></section>
         <section class="memory-item stack" style="gap:10px">
@@ -4351,12 +4346,7 @@ function renderEditor() {
         </section>
         <section class="memory-item stack" style="gap:10px"><strong>10. 角色手機設定</strong>
           <label class="field"><span>AI 手機通知揭露指示（每行一則）</span><textarea name="phoneNotices" maxlength="1200" placeholder="💬心裡話 | 每回合揭露一則簡短心裡話\n🔎線索 | 當劇情出現新線索時，揭露線索通知">${e(savedDraft?.phoneNotices ?? (Array.isArray(c.phoneSettings?.noticePrompts) ? c.phoneSettings.noticePrompts.join('\n') : Array.isArray(c.phoneSettings?.notices) ? c.phoneSettings.notices.join('\n') : ''))}</textarea><small>在這裡填寫每回合對話需要揭露的狀態。每行描述一種 AI 可揭露的通知條件／內容，不是固定顯示文字；最多 8 則。</small></label></section>
-        <section class="memory-item stack" style="gap:12px">
-          <strong>11. 私密設定</strong>
-          <label class="field"><span>作者私密資訊</span><textarea name="privateInfo" maxlength="10000">${e(c.privateInfo || '')}</textarea>
-            <small class="char-counter" data-count-for="privateInfo">0/10000；僅作者可查看，不會顯示在公開介紹或提供給一般玩家。</small>
-          </label>
-        </section>
+        <input type="hidden" name="privateInfo" value="${e(c.privateInfo || '')}">
         <section class="memory-item stack" style="gap:12px">
           <strong>12. 上傳主要角色圖</strong>
           <label class="field"><span>角色主圖 *</span>
@@ -4376,7 +4366,6 @@ function renderEditor() {
           </label>
           <div id="characterIllustrationGallery" class="character-illustration-gallery">${renderCharacterIllustrationGallery(draftIllustrations, draftImage)}</div>
         </section>
-        <details class="memory-item" style="margin:14px 0"><summary>舊版對話風格（相容保留）</summary><label class="field"><span>對話風格（舊欄位，保留相容）</span><textarea name="style" maxlength="1000">${e(c.style || '')}</textarea><small>此欄位僅為舊角色資料相容保留；新角色建議使用上方第 7 項的人格設定。</small></label></details>
         <label class="field"><span>權限</span><select name="visibility">
           <option value="private" ${c.visibility !== 'public' ? 'selected' : ''}>私密</option>
           <option value="public" ${c.visibility === 'public' ? 'selected' : ''}>公開</option>
@@ -8726,10 +8715,9 @@ document.addEventListener('submit',async event => {
           privateInfo:String(f.get('privateInfo')).trim(),
           style:String(f.get('style')).trim(),
           personalityProfile:normalizePersonalityProfile({
-            coreTraits:f.get('personalityCoreTraits'), values:f.get('personalityValues'),
-            speechStyle:f.get('personalitySpeechStyle'), behaviorRules:f.get('personalityBehaviorRules'),
+            coreTraits:f.get('personalityDescription'), values:'', speechStyle:'', behaviorRules:'',
             likes:f.get('personalityLikes'), dislikes:f.get('personalityDislikes'),
-            boundaries:f.get('personalityBoundaries'), relationshipPacing:f.get('personalityRelationshipPacing')
+            boundaries:'', relationshipPacing:''
           }),
           phoneSettings:{noticePrompts:String(f.get('phoneNotices')||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,8).map(x=>x.slice(0,150))},
           visibility:String(f.get('visibility')),image:draftImage,
