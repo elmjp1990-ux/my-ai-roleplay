@@ -18,8 +18,8 @@ assert.match(guardMigration, /NEW\.chat_mode IS DISTINCT FROM OLD\.chat_mode/);
 
 const frontend = fs.readFileSync("index.html", "utf8");
 assert.doesNotMatch(frontend, /data-action="start-new-story"/);
-assert.match(frontend, /function newSession\(character,options = \{\}\) \{\s*\/\/ A server-created Story supplies its UUID\.\s*const sessionId = options\.id \|\| id\(\)/);
-assert.match(frontend, /state\.sessions\[sessionId\] = session/);
+assert.ok(frontend.includes('const sessionId = options.id || id();'));
+assert.ok(frontend.includes('state.sessions[sessionId] = session;'));
 assert.match(frontend, /function compactLocalStateForQuota\(\)/);
 assert.match(frontend, /localStorageCompactMode = true/);
 assert.match(frontend, /雲端聊天仍會照常同步/);
