@@ -163,6 +163,13 @@ assert.match(pauseResumeEndpoint, /set_encounter_session_lifecycle_state/);
 assert.match(pauseResumeEndpoint, /encounter_scene_expired_or_closed/);
 assert.match(pauseResumeEndpoint, /p_user_id: user\.id/);
 
+assert.match(frontend, /async function setEncounterLifecycleState\(sessionId, action\)/);
+assert.match(frontend, /functions\.invoke\(['"]encounter-session-state['"]/);
+assert.match(frontend, /setEncounterLifecycleState\(session\.id,'pause'\)/);
+assert.match(frontend, /setEncounterLifecycleState\(resumedSession\.id,'resume'\)/);
+assert.match(frontend, /const saved=await saveChatSessionSafely\(encounterSession\)/);
+assert.match(frontend, /encounter_scene_expired_or_closed/);
+
 
 const interactionMigration = fs.readFileSync(
   "supabase/migrations/20261029210000_validate_settled_encounter_interaction.sql",
