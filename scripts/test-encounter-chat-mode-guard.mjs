@@ -17,6 +17,15 @@ assert.match(guardMigration, /SET search_path = ['"]{2}/);
 assert.match(guardMigration, /NEW\.chat_mode IS DISTINCT FROM OLD\.chat_mode/);
 
 const frontend = fs.readFileSync("index.html", "utf8");
+assert.doesNotMatch(frontend, /data-action="start-new-story"/);
+assert.match(frontend, /async function startChat\(characterId\)/);
+assert.match(frontend, /\.eq\('user_id', userId\)\.eq\('character_id', characterId\)/);
+assert.match(frontend, /get_latest_settled_encounter_session/);
+assert.match(frontend, /代入相遇好感度/);
+assert.match(frontend, /開啟全新故事/);
+assert.match(frontend, /await openNewStoryDialog\(characterId, latestEncounter\)/);
+assert.match(frontend, /await createStorySession\(characterId, 'fresh_story', null\)/);
+assert.match(frontend, /if \(!saved\) throw new Error\('新故事已建立/);
 const encounterSession = fs.readFileSync("supabase/functions/encounter-session/index.ts", "utf8");
 assert.match(frontend, /locationKey: encounterPlace/);
 assert.match(frontend, /請從城市地圖的有效地標進入相遇/);
