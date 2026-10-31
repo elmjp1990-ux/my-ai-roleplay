@@ -2529,7 +2529,7 @@ function compactLocalStateForQuota() {
   const characters = (state.characters || []).map(character => {
     const cloudBacked = isUuid(character.id) &&
       (character.cloudSnapshotOnly === true || character.owner !== true);
-    if (cloudBacked && typeof character.image === 'string' && /^data:image\\//i.test(character.image)) {
+    if (cloudBacked && typeof character.image === 'string' && /^data:image\//i.test(character.image)) {
       return {...character, image:''};
     }
     return character;
@@ -2537,7 +2537,7 @@ function compactLocalStateForQuota() {
   const sessions = Object.fromEntries(Object.entries(state.sessions || {}).map(([key, session]) => {
     if (!session?.cloudOwned || !session.cloudCharacterSnapshot) return [key, session];
     const snapshot = session.cloudCharacterSnapshot;
-    const compactSnapshot = typeof snapshot.image === 'string' && /^data:image\\//i.test(snapshot.image)
+    const compactSnapshot = typeof snapshot.image === 'string' && /^data:image\//i.test(snapshot.image)
       ? {...snapshot, image:''}
       : snapshot;
     return [key, compactSnapshot === snapshot ? session : {...session, cloudCharacterSnapshot:compactSnapshot}];
