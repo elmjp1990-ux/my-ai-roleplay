@@ -407,7 +407,7 @@ assert.match(frontend, /storyRelationshipLabel/);
 assert.match(frontend, /story-relationship-meter/);
 assert.match(frontend, /get_latest_settled_encounter_affinity/);
 assert.match(frontend, /city-character-affinity/);
-assert.match(frontend, /尚未建立關係/);
+assert.match(frontend, /你們還不認識/);
 assert.match(frontend, /登入後查看與角色的好感度/);
 assert.match(frontend, /loadCityCharacterAffinity\(person.id\)/);
 assert.match(frontend, /city-character-affinity-meter/);
