@@ -4463,7 +4463,7 @@ function showEncounterLeaveDialog(session) {
 
 async function openNewStoryDialog(characterId, latest = null) {
   const character = state.characters.find(item => item.id === characterId);
-  if (!accessible(character) || !latest?.session_id) return toast('目前沒有可承接的相遇紀錄。');
+  if (!accessible(character)) return toast('此角色目前無法開啟新故事。');
   const stageLabels = {
     hostile:'敵對',dislike:'反感',wary:'戒備',first_meeting:'初次見面',
     acquaintance:'熟識',close:'親近',intimate:'親密',special:'特殊羈絆'
@@ -4471,7 +4471,9 @@ async function openNewStoryDialog(characterId, latest = null) {
   showDialog('選擇故事開始方式',
     '<p class="small muted">你曾與這個角色相遇。可以延續當時累積的關係，或重新展開一段故事；兩者都會建立獨立聊天室，不會覆蓋相遇紀錄。</p>'+
     '<div class="stack" style="gap:10px;margin-top:14px">'+
-    '<button type="button" class="profile-setting" data-action="story-start-mode" data-id="'+e(characterId)+'" data-value="encounter_snapshot" data-source-encounter-session-id="'+e(latest.session_id)+'"><span><strong>代入相遇好感度</strong><small>承接最近一次相遇：'+e(stageLabels[latest.relationship_stage]||'相遇回憶')+'，並帶入已保存的關係記憶。</small></span><span>›</span></button>'+
+    (latest?.session_id
+      ? '<button type="button" class="profile-setting" data-action="story-start-mode" data-id="'+e(characterId)+'" data-value="encounter_snapshot" data-source-encounter-session-id="'+e(latest.session_id)+'"><span><strong>代入相遇好感度</strong><small>承接最近一次相遇：'+e(stageLabels[latest.relationship_stage]||'相遇回憶')+'，並帶入已保存的關係記憶。</small></span><span>›</span></button>'
+      : '<div class="profile-setting" aria-disabled="true" style="opacity:.55;cursor:not-allowed"><span><strong>代入相遇好感度</strong><small>目前沒有已結算的相遇紀錄，暫時無法代入。</small></span><span>—</span></div>')+
     '<button type="button" class="profile-setting" data-action="story-start-mode" data-id="'+e(characterId)+'" data-value="fresh_story"><span><strong>開啟全新故事</strong><small>從初次見面開始，好感度為 0。</small></span><span>›</span></button>'+
     '</div>');
 }
@@ -4590,11 +4592,7 @@ async function startChat(characterId) {
     );
     if (encounterError) throw encounterError;
     const latestEncounter = Array.isArray(encounterRows) ? encounterRows[0] : encounterRows;
-    if (latestEncounter?.session_id) {
-      await openNewStoryDialog(characterId, latestEncounter);
-      return;
-    }
-    await createStorySession(characterId, 'fresh_story', null);
+    await openNewStoryDialog(characterId, latestEncounter || null);
   } catch (error) {
     console.error('開始聊天前檢查既有紀錄失敗：', error);
     toast(error?.message || '無法確認既有聊天紀錄，請稍後重試。');
