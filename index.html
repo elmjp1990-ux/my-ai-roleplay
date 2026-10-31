@@ -1676,13 +1676,17 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
         if (!latestStory.has(story.character_id)) latestStory.set(story.character_id, story);
       }
 
+      const publicIllustrations = await loadCharacterIllustrationAssets((rows || []).map(row=>row.id));
       const publicCharacters = (rows || []).map(row => {
         const story = latestStory.get(row.id);
         return {
           id: row.id, name: row.name || '未命名角色',
           gender: row.gender || 'ambiguous',
           age: row.age == null ? '' : String(row.age),
-          image: row.avatar_url || '', avatarVideoPath:row.avatar_video_path || '', visibility: 'public',
+          image: row.avatar_url || publicIllustrations.get(row.id)?.primary?.src || '',
+          primaryIllustrationPath:publicIllustrations.get(row.id)?.primary?.path || '',
+          galleryIllustrations:publicIllustrations.get(row.id)?.gallery || [],
+          avatarVideoPath:row.avatar_video_path || '', visibility: 'public',
           reviewStatus: row.review_status, intro: row.intro || '',
           opening: story?.opening_message || '', race: row.race || '',
           privateInfo: '', style: row.style || '',
@@ -1810,6 +1814,7 @@ const ids = (rows || []).map(row => row.id);
       }
       if (state.account?.uid !== user.id) return;
       const localOwnedForMerge = state.characters.filter(c => c.authorId === user.id);
+      const ownerIllustrations = await loadCharacterIllustrationAssets(ids);
       const cloudCharacters = (rows || []).filter(row => !row.deleted_at).map(row => {
         const local = localOwnedForMerge.find(c => c.id === row.id) || {};
         const story = latestStory.get(row.id);
@@ -1819,7 +1824,9 @@ const ids = (rows || []).map(row => row.id);
           name: row.name || local.name || '未命名角色',
           gender: row.gender || local.gender || 'ambiguous',
           age: row.age == null ? (local.age || '') : String(row.age),
-          image: row.avatar_url || local.image || '',
+          image: row.avatar_url || ownerIllustrations.get(row.id)?.primary?.src || local.image || '',
+          primaryIllustrationPath:ownerIllustrations.get(row.id)?.primary?.path || local.primaryIllustrationPath || '',
+          galleryIllustrations:ownerIllustrations.get(row.id)?.gallery || local.galleryIllustrations || [],
           avatarVideoPath:row.avatar_video_path || local.avatarVideoPath || '',
           visibility: row.visibility || 'private',
           intro: row.intro ?? local.intro ?? '',
@@ -1961,6 +1968,10 @@ async function syncCharacterIllustrations(character,userId) {
     if(oldPrimary&&oldPrimary.storage_path!==nextPrimaryPath){
       const {error:storageError}=await client.storage.from('character-illustrations').remove([oldPrimary.storage_path]);
       if(storageError)console.warn('舊主要立繪檔案清理待重試：',storageError.message);
+    }
+    if(!character.avatarVideoPath&&nextPrimaryPath){
+      const {error:avatarClearError}=await client.from('characters').update({avatar_url:null}).eq('id',character.id).eq('author_id',userId);
+      if(avatarClearError)throw new Error('立繪已上傳，但清除舊的內嵌圖片失敗：'+avatarClearError.message);
     }
     draftPrimaryIllustrationPath=nextPrimaryPath;
     draftIllustrations=nextGallery;
@@ -8700,7 +8711,9 @@ document.addEventListener('submit',async event => {
         }
         if (clearSchedules && scheduleText) return toast('若要清空日程，請先清空文字欄位；若要保留或更新日程，請取消勾選清空選項。');
         // 先寫入雲端；只有角色資料成功後才更新本機畫面狀態。
+        c.primaryIllustrationPath=draftPrimaryIllustrationPath || '';
         const saveResult = await saveSupabaseCharacter(c, user.uid);
+        await syncCharacterIllustrations(c,user.uid);
         // 使用後端交易函式同步整份清單，支援新增、修改、刪除且不會留下半套資料。
         if (scheduleText || clearSchedules) {
           await saveEncounterSchedules(c.id, user.uid, scheduleRows);
