@@ -371,6 +371,19 @@ assert.match(latestStorySourceMigration, /lifecycle\.user_id=v_user_id/);
 assert.match(latestStorySourceMigration, /lifecycle\.character_id=p_character_id/);
 assert.match(latestStorySourceMigration, /lifecycle\.status='settled'/);
 assert.match(latestStorySourceMigration, /GRANT EXECUTE ON FUNCTION public\.get_latest_settled_encounter_session\(uuid\) TO authenticated/);
+
+const storyRelationshipReadMigration = fs.readFileSync(
+  "supabase/migrations/20261031270000_story_relationship_state_read_rpc.sql",
+  "utf8",
+);
+assert.match(storyRelationshipReadMigration, /auth\.uid\(\)/);
+assert.match(storyRelationshipReadMigration, /state\.user_id=v_user_id/);
+assert.match(storyRelationshipReadMigration, /session\.chat_mode='story'/);
+assert.match(storyRelationshipReadMigration, /GRANT EXECUTE ON FUNCTION public\.get_story_relationship_state\(uuid\) TO authenticated/);
+assert.match(frontend, /async function loadStoryRelationshipState\(session\)/);
+assert.match(frontend, /get_story_relationship_state/);
+assert.match(frontend, /storyRelationshipLabel/);
+assert.match(frontend, /story-relationship-meter/);
 assert.match(affinityMigration, /FUNCTION public\.create_story_session_with_relationship/);
 assert.match(affinityMigration, /GRANT EXECUTE ON FUNCTION public\.create_story_session_with_relationship/);
 assert.match(affinityMigration, /FUNCTION public\.create_encounter_session_with_lifecycle/);
