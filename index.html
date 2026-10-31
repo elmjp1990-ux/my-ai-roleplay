@@ -9570,7 +9570,8 @@ function renderCityMapMVP(){
             await setEncounterLifecycleState(resumedSession.id,'resume');
             resumedSession.encounterTemporarilyLeftAt=null;
             encounterSession=resumedSession;
-            await saveChatSessionSafely(encounterSession);
+            const saved=await saveChatSessionSafely(encounterSession);
+            if(saved!==true)throw new Error('接續相遇狀態尚未同步保存。');
           }catch(error){
             if(error?.code!=='encounter_scene_expired_or_closed')throw error;
             // The authoritative scene clock has ended; archive the stale local resume candidate
