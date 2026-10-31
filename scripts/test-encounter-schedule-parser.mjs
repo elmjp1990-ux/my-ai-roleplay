@@ -39,6 +39,19 @@ assert.match(html, /image: ownerIllustrations\.get\(row\.id\)\?\.primary\?\.src 
 assert.match(html, /async function syncCharacterIllustrations\([\s\S]*?let nextPrimaryPath=draftPrimaryIllustrationPath\|\|\x27\x27;\s*const nextGallery=\[\];\s*await retryCharacterIllustrationCleanup\(userId\);\s*try\{/);
 assert.doesNotMatch(html, /const usedSlots=new Set\([\s\S]*?\n\s*const nextGallery=\[\];/);
 
+// Editing an existing character must finish illustration hydration before save.
+// A failed load blocks save so an empty draft cannot be mistaken for intentional image removal.
+assert.match(html, /let editorIllustrationHydration = \{characterId:null,status:'idle',promise:null,error:null\}/);
+assert.match(html, /editorIllustrationHydration=\{characterId,status:'loading',promise:null,error:null\}/);
+assert.match(html, /await hydration\.promise/);
+assert.match(html, /editorIllustrationHydration\.status!=='loaded'/);
+assert.match(html, /為避免誤刪既有圖片，本次未儲存/);
+assert.match(html, /if\(!client\|\|!uid\|\|!characterId\|\|!owned\(state\.characters\.find\(item=>item\.id===characterId\)\)\)throw new Error/);
+
+// An unchanged primary image reuses its existing Storage path instead of uploading a duplicate.
+assert.match(html, /if\(!character\.avatarVideoPath&&\/\^data:image\\\/\//);
+assert.match(html, /\(!oldPrimary\|\|draftPrimaryIllustrationPath!==oldPrimary\.storage_path\)/);
+
 // Failed Storage deletions are durably queued, owner-scoped, and retried on asset loads/saves.
 assert.ok(html.includes("async function enqueueCharacterIllustrationCleanup(storagePath,userId)"));
 assert.ok(html.includes("async function processCharacterIllustrationCleanupJob(job,userId)"));
