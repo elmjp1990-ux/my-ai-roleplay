@@ -1890,6 +1890,38 @@ async function loadCharacterIllustrationAssets(characterIds) {
   }
   return result;
 }
+async function refreshCharacterIllustrationSignedUrl(storagePath) {
+  const client=window.mySupabase;
+  if(!client||typeof storagePath!=='string'||!storagePath)return null;
+  const {data,error}=await client.storage.from('character-illustrations').createSignedUrl(storagePath,3600);
+  if(error||!data?.signedUrl)throw new Error('角色立繪簽名網址更新失敗：'+(error?.message||'missing_signed_url'));
+  return data.signedUrl;
+}
+if(!window.__characterIllustrationRefreshHandlerInstalled){
+  window.__characterIllustrationRefreshHandlerInstalled=true;
+  document.addEventListener('error',event=>{
+    const image=event.target;
+    if(!(image instanceof HTMLImageElement)||!image.dataset.characterIllustrationPath)return;
+    if(image.dataset.refreshingSignedUrl==='true'||image.dataset.signedUrlRefreshAttempted==='true')return;
+    image.dataset.refreshingSignedUrl='true';
+    image.dataset.signedUrlRefreshAttempted='true';
+    refreshCharacterIllustrationSignedUrl(image.dataset.characterIllustrationPath).then(url=>{
+      if(image.isConnected&&url)image.src=url;
+    }).catch(error=>{
+      console.warn('角色立繪網址更新失敗：',error?.message||error);
+      image.dataset.signedUrlRefreshAttempted='false';
+    }).finally(()=>{
+      image.dataset.refreshingSignedUrl='false';
+    });
+  },true);
+  document.addEventListener('load',event=>{
+    const image=event.target;
+    if(image instanceof HTMLImageElement&&image.dataset.characterIllustrationPath){
+      image.dataset.signedUrlRefreshAttempted='false';
+    }
+  },true);
+}
+
 async function uploadCharacterIllustrationDataUrl(dataUrl,userId,characterId) {
   const client=window.mySupabase;
   if(!client||!userId||!characterId)throw new Error('無法確認角色立繪的雲端上傳權限。');
@@ -3667,7 +3699,7 @@ function card(c,owner = false) {
       <div class="card-image">
         <button class="image-button" data-action="detail" data-id="${e(c.id)}"
                 aria-label="查看${e(c.name)}">
-          ${c.avatarVideoPath ? `<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" muted autoplay loop playsinline preload="metadata" aria-label="${e(c.name)}影片預覽"></video>` : `<img src="${e(safeImage(c.image))}" alt="${e(c.name)}" loading="lazy">`}
+          ${c.avatarVideoPath ? `<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" muted autoplay loop playsinline preload="metadata" aria-label="${e(c.name)}影片預覽"></video>` : `<img src="${e(safeImage(c.image))}" ${c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath)+'"' : ''} alt="${e(c.name)}" loading="lazy">`}
         </button>
         ${c.deletedAt ? '' : `<span class="card-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(initialTurnCount)}" title="對話回合數">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
@@ -3767,7 +3799,7 @@ function renderDetail() {
       ${offline ? '<div class="character-status-banner">● 此角色目前離線或已下架。你仍可查看這段既有聊天所保留的角色簡介與開場白，但不能開啟新對話。</div>' : ''}
       <div class="detail-layout">
         <div class="detail-portrait">
-${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline-image' : ''}" data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline aria-label="${e(c.name)} 的角色影片"></video>` : `<img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" alt="${e(c.name)}">`}
+${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline-image' : ''}" data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline aria-label="${e(c.name)} 的角色影片"></video>` : `<img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" ${c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath)+'"' : ''} alt="${e(c.name)}">`}
           <div class="detail-portrait-meta">
             <h1>${e(c.name)}</h1>
             <button class="author-link" data-action="author" data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>
@@ -4243,7 +4275,7 @@ async function hydrateCharacterIllustrationsIntoEditor(characterId) {
       draftPrimaryIllustrationPath=current.primary.path;
       draftImage=current.primary.src;
       const preview=$('imagePreview');
-      if(preview){preview.src=current.primary.src;preview.classList.remove('hidden');}
+      if(preview){preview.src=current.primary.src;preview.dataset.characterIllustrationPath=current.primary.path;preview.classList.remove('hidden');}
     }
     if(!draftIllustrations.length&&current.gallery.length){
       draftIllustrations=current.gallery.slice(0,5);
@@ -4262,7 +4294,7 @@ function renderCharacterIllustrationGallery(items = []) {
   return '<div class="character-illustration-grid">' + items.slice(0,5).map((item,index) => {
     const src = typeof item === 'string' ? item : item?.src || '';
     return '<div class="character-illustration-option">' +
-      '<img src="' + e(safeImage(src)) + '" alt="附加立繪 ' + (index+1) + '">' +
+      '<img src="' + e(safeImage(src)) + '"' + (item&&item.path?' data-character-illustration-path="'+e(item.path)+'"':'') + ' alt="附加立繪 ' + (index+1) + '">' +
       '<label class="field"><span>立繪名稱</span><input data-illustration-name="' + index + '" maxlength="40" placeholder="例如：開心、緊張" value="' + e(typeof item==='object'?(item.name||''):'') + '"></label>' +
       '<button type="button" class="small" data-action="remove-character-illustration" data-index="' + index + '" aria-label="移除第 ' + (index+1) + ' 張立繪">移除</button>' +
     '</div>';
