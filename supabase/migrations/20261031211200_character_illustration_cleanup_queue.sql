@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS public.character_illustration_cleanup_jobs (
     CHECK (
       storage_path ~ (
         '^' || author_id::text ||
-        '/[0-9a-fA-F-]{36}/[0-9a-fA-F-]{36}\\.(jpg|jpeg|png|webp)$'
+        '/[0-9a-fA-F-]{36}/[0-9a-fA-F-]{36}\.(jpg|jpeg|png|webp)$'
       )
     )
 );
