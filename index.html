@@ -9539,34 +9539,38 @@ function renderCityMapMVP(){
     return {weekday:{Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[values.weekday],minutes:Number(values.hour)*60+Number(values.minute)};
   };
   // Public schedules live in character_schedules, not in the character row.
-  // Hydrate them only through the guarded RPC; never grant browser clients direct table access.
-  const cityScheduleCache=new Map();
+  // Always re-check through the server RPC when opening a city location. A cached
+  // public schedule can outlive a public -> private change, so never reuse it.
   const hydrateCitySchedule=async(character)=>{
-    if(!character?.id||character.visibility!=='public'||character.deletedAt)return;
-    if(cityScheduleCache.has(character.id)){
-      character.encounterSchedules=await cityScheduleCache.get(character.id);
-      return;
+    if(!character?.id)return '';
+    if(character.visibility!=='public'||character.deletedAt){
+      character.encounterSchedules='';
+      return '';
     }
-    const pending=(async()=>{
-      try{
-        const client=window.mySupabase;
-        if(!client)return '';
-        const {data,error}=await client.rpc('get_encounter_character_schedule',{p_character_id:character.id});
-        if(error)throw error;
-        return (data||[]).map(row=>[
-          row.weekday==null?'*':row.weekday,
-          String(row.start_time||'').slice(0,5),
-          String(row.end_time||'').slice(0,5),
-          row.location_key,
-          row.activity
-        ].join('|')).join('\n');
-      }catch(error){
-        console.warn('城市角色日程載入失敗：',character.id,error?.message||error);
-        return '';
-      }
-    })();
-    cityScheduleCache.set(character.id,pending);
-    character.encounterSchedules=await pending;
+    try{
+      const client=window.mySupabase;
+      if(!client)throw new Error('城市日程雲端連線不可用');
+      const {data,error}=await client.rpc('get_encounter_character_schedule',{p_character_id:character.id});
+      if(error)throw error;
+      // The RPC independently enforces public/approved/not-deleted/rights-confirmed.
+      // An empty result is authoritative; do not fall back to local author-only schedules.
+      character.encounterSchedules=(data||[]).map(row=>[
+        row.weekday==null?'*':row.weekday,
+        String(row.start_time||'').slice(0,5),
+        String(row.end_time||'').slice(0,5),
+        row.location_key,
+        row.activity
+      ].join('|')).join('\n');
+      return character.encounterSchedules;
+    }catch(error){
+      character.encounterSchedules='';
+      console.warn('城市角色日程載入失敗：',character.id,error?.message||error);
+      return '';
+    }
+  };
+  const isCurrentCityCharacterEligible=(person)=>{
+    const live=(Array.isArray(state.characters)?state.characters:[]).find(item=>item?.id===person?.id);
+    return !!live&&live.visibility==='public'&&!live.deletedAt&&live.cloudPublic!==false&&live.localOnly!==true&&!String(live.id||'').startsWith('seed-')&&accessible(live);
   };
   const getCityPresence=(place)=>{
     const clock=getTaipeiClock();
@@ -9745,8 +9749,13 @@ function renderCityMapMVP(){
     if(personButton){
       event.preventDefault();event.stopPropagation();
       const person=cityPresenceByPlace[locationModal.dataset.place]?.[Number(personButton.dataset.personIndex)];
-      if(!person||!accessible(person)){toast('此角色目前無法查看。');return;}
-      renderCityCharacterCard(person,0);
+      if(!person||!isCurrentCityCharacterEligible(person)){
+        toast('此角色已不在公開城市行程中。');
+        await openCityLocation({dataset:{place:locationModal.dataset.place}});
+        return;
+      }
+      const live=state.characters.find(item=>item.id===person.id);
+      renderCityCharacterCard(live,0);
       return;
     }
     const cardAction=event.target.closest('[data-action^="city-character-"]')?.dataset.action;
@@ -9765,7 +9774,7 @@ function renderCityMapMVP(){
     if(cardAction==='city-character-story'){
       const index=Number(locationModal.dataset.selectedPersonIndex);
       const person=cityPresenceByPlace[locationModal.dataset.place]?.[index];
-      if(!person||!accessible(person)){toast('此角色目前無法開啟故事模式。');return;}
+      if(!person||!isCurrentCityCharacterEligible(person)){toast('此角色已不在公開城市行程中。');await openCityLocation({dataset:{place:locationModal.dataset.place}});return;}
       // Story mode is an entry to the normal character introduction page, not an
       // immediate chat. Preserve the intended destination through sign-in.
       if(!currentUser()){
@@ -9787,7 +9796,7 @@ function renderCityMapMVP(){
       const index=Number(locationModal.dataset.selectedPersonIndex);
       const placeKey=locationModal.dataset.place;
       const person=cityPresenceByPlace[placeKey]?.[index];
-      if(!person||!accessible(person)){toast('此角色目前無法開始相遇模式。');return;}
+      if(!person||!isCurrentCityCharacterEligible(person)){toast('此角色已不在公開城市行程中。');await openCityLocation({dataset:{place:placeKey}});return;}
       if(!requireLogin({page:'citymap',id:person.id}))return;
       const meetButton=event.target.closest('[data-action="city-character-meet"]');
       if(meetButton)meetButton.disabled=true;
