@@ -92,6 +92,16 @@ assert.match(preExpiryRetryMigration, /l\.status <> 'active'/);
 assert.match(preExpiryRetryMigration, /l\.scheduled_end_at <= clock_timestamp\(\)/);
 assert.match(preExpiryRetryMigration, /public\.reserve_chat_turn\(/);
 
+const retryChargeLookupMigration = fs.readFileSync(
+  "supabase/migrations/20261031210000_fix_encounter_retry_charge_lookup.sql",
+  "utf8",
+);
+assert.match(retryChargeLookupMigration, /charge\.turn_id=p_turn_id/);
+assert.match(retryChargeLookupMigration, /c\.status IN \('reserved','needs_reconciliation','settled','refunded'\)/);
+assert.match(retryChargeLookupMigration, /c\.reserved_at <= l\.scheduled_end_at/);
+assert.match(retryChargeLookupMigration, /l\.scheduled_end_at <= clock_timestamp\(\)/);
+assert.match(retryChargeLookupMigration, /turn_id_reuse_conflict/);
+
 const pauseResumeMigration = fs.readFileSync(
   "supabase/migrations/20261031190000_encounter_session_pause_resume.sql",
   "utf8",
