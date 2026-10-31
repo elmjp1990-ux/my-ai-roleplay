@@ -9671,6 +9671,44 @@ function renderCityMapMVP(){
     locationModal.hidden=false;
     document.body.classList.add('city-location-active');
   };
+  const loadCityCharacterAffinity=async(characterId)=>{
+    const target=$('cityCharacterAffinity');
+    if(!target||target.dataset.characterId!==String(characterId))return;
+    if(!currentUser()){
+      target.textContent='登入後查看與角色的好感度';
+      return;
+    }
+    target.textContent='正在讀取好感度…';
+    try{
+      const client=window.mySupabase;
+      if(!client)throw new Error('關係資料服務尚未連線');
+      const {data,error}=await client.rpc('get_latest_settled_encounter_affinity',{p_character_id:characterId});
+      if(error)throw error;
+      const row=Array.isArray(data)?data[0]:data;
+      const liveTarget=$('cityCharacterAffinity');
+      if(!liveTarget||liveTarget.dataset.characterId!==String(characterId))return;
+      if(!row){
+        liveTarget.innerHTML='<span class="city-character-affinity-empty">尚未建立關係</span>';
+        liveTarget.setAttribute('aria-label','尚未有已結算的相遇好感度');
+        return;
+      }
+      const affinity=Number(row.affinity);
+      const labels={hostile:'敵對',dislike:'反感',wary:'戒備',first_meeting:'初次見面',acquaintance:'熟識',close:'親近',intimate:'親密',special:'特殊羈絆'};
+      const stage=labels[row.relationship_stage];
+      if(!Number.isInteger(affinity)||affinity < -100||affinity > 100||!stage)throw new Error('好感度資料格式不正確');
+      const progress=Math.round((affinity+100)/2);
+      const score=affinity>0?'+'+affinity:String(affinity);
+      liveTarget.innerHTML='<div class="city-character-affinity-heading"><span>好感度</span><strong>'+score+'</strong><em>'+stage+'</em></div><div class="city-character-affinity-meter" role="img" aria-label="好感度進度 '+progress+'%"><i style="width:'+progress+'%"></i></div>';
+      liveTarget.setAttribute('aria-label','好感度 '+score+'，關係階段 '+stage);
+    }catch(error){
+      console.warn('城市角色好感度載入失敗：',error?.message||error);
+      const liveTarget=$('cityCharacterAffinity');
+      if(liveTarget&&liveTarget.dataset.characterId===String(characterId)){
+        liveTarget.textContent='好感度暫時無法載入';
+        liveTarget.setAttribute('aria-label','好感度暫時無法載入');
+      }
+    }
+  };
   const renderCityCharacterCard=(person,page=0,mode='status')=>{
     const card=$('cityCharacterCard'),body=$('cityCharacterCardBody');
     if(!card||!body||!person)return;
@@ -9704,7 +9742,8 @@ function renderCityMapMVP(){
     const sessions=Object.values(state.sessions||{}).filter(session=>session?.encounterMode&&session.characterId===person.id&&!session.archived)
       .sort((a,b)=>(Number(b.startedAt)||0)-(Number(a.startedAt)||0));
     const bookmarks='<div class="city-character-bookmarks" aria-label="角色功能"><button type="button" class="city-character-bookmark '+(mode==='status'?'active':'')+'" data-action="city-character-status" aria-label="角色資料">角色資料</button><button type="button" class="city-character-bookmark '+(mode==='history'?'active':'')+'" data-action="city-character-history" aria-label="相遇紀錄">相遇紀錄</button><button type="button" class="city-character-bookmark" data-action="city-character-story" aria-label="故事模式">故事模式</button></div>';
-    const left='<div class="city-character-photo-column">'+portrait+'<button type="button" class="city-character-meet primary" data-action="city-character-meet">與他相遇</button></div>';
+    const affinityMarkup=mode==='status'&&page===0?'<div class="city-character-affinity" id="cityCharacterAffinity" data-character-id="'+escapeHTML(person.id)+'">正在讀取好感度…</div>':'';
+    const left='<div class="city-character-photo-column">'+portrait+affinityMarkup+'<button type="button" class="city-character-meet primary" data-action="city-character-meet">與他相遇</button></div>';
     let copy='';
     if(mode==='history'){
       const records=sessions.length?sessions.map(session=>{
@@ -9727,6 +9766,7 @@ function renderCityMapMVP(){
       $('cityCharacterPageLabel').textContent='角色介紹 · 02 / 02';
     }
     body.innerHTML=left+copy+bookmarks;
+    if(mode==='status'&&page===0)void loadCityCharacterAffinity(person.id);
     const characterVideo=body.querySelector('video.city-character-portrait-video[data-character-video]');
     if(characterVideo)void hydrateCharacterVideo(characterVideo);
     else{
@@ -10776,6 +10816,14 @@ document.addEventListener('submit',function(event){
 .city-character-card-body{display:grid;grid-template-columns:104px minmax(0,1fr) 34px;gap:10px;align-items:stretch;min-height:0}
 .city-character-layout{display:contents}
 .city-character-photo-column{display:flex;flex-direction:column;gap:9px;min-width:0}
+.city-character-affinity{width:100%;padding:7px 8px;border:1px solid rgba(255,255,255,.2);border-radius:10px;background:linear-gradient(135deg,rgba(25,29,43,.54),rgba(72,61,76,.34));color:rgba(255,255,255,.92);font-size:10px;line-height:1.35;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);min-height:35px;display:flex;flex-direction:column;justify-content:center;gap:5px}
+.city-character-affinity-heading{display:flex;align-items:center;gap:5px;white-space:nowrap}
+.city-character-affinity-heading span{opacity:.78}
+.city-character-affinity-heading strong{font-size:13px;font-weight:700;letter-spacing:.02em}
+.city-character-affinity-heading em{margin-left:auto;font-style:normal;color:#f3d9c4}
+.city-character-affinity-meter{height:4px;border-radius:99px;background:rgba(255,255,255,.17);overflow:hidden}
+.city-character-affinity-meter i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#a99acb,#f1c6b0);box-shadow:0 0 8px rgba(226,190,205,.35)}
+.city-character-affinity-empty{opacity:.78;text-align:center}
 .city-character-photo-column .city-character-portrait{width:100%;height:136px;min-height:0;flex:0 0 136px;border:0;border-radius:13px;object-fit:cover;background:transparent}
 .city-character-meet{width:100%;padding:9px 5px;font-size:11px;line-height:1.35;white-space:normal;border-radius:10px;min-height:42px}
 .city-character-copy{min-width:0;overflow-y:auto;overscroll-behavior:contain;padding:0 3px 0 0}
