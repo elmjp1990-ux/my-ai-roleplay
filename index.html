@@ -1874,6 +1874,8 @@ async function loadCharacterIllustrationAssets(characterIds) {
   const ids=[...new Set((characterIds||[]).filter(Boolean))];
   const result=new Map();
   if(!client||!ids.length)return result;
+  const cleanupUserId=state.account?.uid;
+  if(cleanupUserId)await retryCharacterIllustrationCleanup(cleanupUserId);
   const {data:rows,error}=await client.from('character_illustrations')
     .select('id, character_id, storage_path, asset_type, sort_order, display_name')
     .in('character_id',ids)
