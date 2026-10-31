@@ -1942,21 +1942,20 @@ async function syncCharacterIllustrations(character,userId) {
       if(item&&typeof item==='object'&&item.id&&item.path){
         keepIds.add(item.id);
         nextGallery.push({...item,sortOrder:index});
-        if(item.sortOrder!==index){
-          const {error}=await client.from('character_illustrations').update({sort_order:index,updated_at:new Date().toISOString()}).eq('id',item.id).eq('author_id',userId);
-          if(error)throw new Error('更新附加立繪排序失敗：'+error.message);
-        }
         continue;
       }
       const src=typeof item==='string'?item:item?.src;
       if(!/^data:image\//i.test(String(src||'')))continue;
+      const usedSlots=new Set([...oldGallery.filter(row=>keepIds.has(row.id)).map(row=>Number(row.sort_order)),...nextGallery.map(item=>Number(item.sortOrder))]);
+      const freeSlot=[1,2,3,4,5].find(slot=>!usedSlots.has(slot));
+      if(!freeSlot)throw new Error('其他角色立繪最多保留 5 張。');
       const path=await uploadCharacterIllustrationDataUrl(src,userId,character.id);
       uploaded.push(path);
-      const {data,error}=await client.from('character_illustrations').insert({character_id:character.id,author_id:userId,storage_path:path,asset_type:'gallery',sort_order:index}).select('id').single();
+      const {data,error}=await client.from('character_illustrations').insert({character_id:character.id,author_id:userId,storage_path:path,asset_type:'gallery',sort_order:freeSlot}).select('id').single();
       if(error)throw new Error('儲存附加立繪資料失敗：'+error.message);
       inserted.push(data.id);
       keepIds.add(data.id);
-      nextGallery.push({id:data.id,path,src,sortOrder:index});
+      nextGallery.push({id:data.id,path,src,sortOrder:freeSlot});
     }
     const obsolete=oldGallery.filter(row=>!keepIds.has(row.id));
     if(obsolete.length){
