@@ -2574,11 +2574,13 @@ async function saveChatSessionToCloud(s, options = {}) {
   const localUser = currentUser();
   if (!client || !localUser?.uid || !s) return false;
   if (!isUuid(s.characterId) || !isUuid(s.id)) return false;
-  // 一般故事模式的空白聊天仍只存在本機；相遇模式由 encounter-session
-  // 預先建立了雲端 session，因此即使尚未送出第一句，也必須允許保存玩家人設等 session_data。
+  // Generic blank chats remain local. Encounter and Story sessions are pre-created
+  // by trusted Edge Functions, so their opening message and session metadata must sync
+  // even before the player sends the first user message.
   const hasUserMessage = (s.messages || []).some(message => message.role === 'user' && String(message.text || '').trim());
-  const canSaveEncounterMetadata = s.encounterMode === true && s.cloudOwned === true && s.cloudOwnerUid === localUser.uid;
-  if (!hasUserMessage && !canSaveEncounterMetadata) return false;
+  const canSavePrecreatedSession = s.cloudOwned === true && s.cloudOwnerUid === localUser.uid &&
+    (s.encounterMode === true || s.storyMode === true);
+  if (!hasUserMessage && !canSavePrecreatedSession) return false;
   const { data: authResult, error: authError } = await client.auth.getUser();
   if (authError || authResult?.user?.id !== localUser.uid) {
     throw new Error('登入狀態驗證失敗，聊天尚未同步。');
