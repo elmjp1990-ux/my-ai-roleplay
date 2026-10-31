@@ -1926,7 +1926,7 @@ async function enqueueCharacterIllustrationCleanup(storagePath,userId) {
   const client=window.mySupabase;
   if(!client||!userId||typeof storagePath!=='string')throw new Error('無法建立角色立繪清理紀錄。');
   const parts=storagePath.split('/');
-  if(parts.length!==3||parts[0]!==userId||!/[0-9a-f-]{36}/i.test(parts[1])||!/[0-9a-f-]{36}\\.(jpg|jpeg|png|webp)$/i.test(parts[2])) {
+  if(parts.length!==3||parts[0]!==userId||!/[0-9a-f-]{36}/i.test(parts[1])||!/[0-9a-f-]{36}\.(jpg|jpeg|png|webp)$/i.test(parts[2])) {
     throw new Error('角色立繪清理路徑驗證失敗。');
   }
   const {data,error}=await client.from('character_illustration_cleanup_jobs')
