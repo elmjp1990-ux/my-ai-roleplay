@@ -353,6 +353,14 @@ assert.match(frontend, /data-action="story-start-mode"/);
 assert.match(frontend, /async function createStorySession\(characterId, originMode/);
 assert.match(frontend, /functions\.invoke\('story-session'/);
 assert.match(frontend, /storyRelationshipStage/);
+
+assert.match(frontend, /canSavePrecreatedSession/);
+assert.match(frontend, /s\.storyMode === true/);
+assert.match(frontend, /開啟新故事/);
+assert.ok(
+  storySession.indexOf("A retry may only retrieve") < storySession.indexOf("character_can_start_chat"),
+  "Idempotent Story session recovery must be checked before new-character access eligibility",
+);
 const latestStorySourceMigration = fs.readFileSync(
   "supabase/migrations/20261031260000_latest_settled_encounter_for_story.sql",
   "utf8",
