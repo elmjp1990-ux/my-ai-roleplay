@@ -3604,7 +3604,6 @@ ${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline
             ? '<div class="character-status-label"><span class="character-status-dot" style="position:static;background:#8993a4"></span>離線／已下架</div>'
             : `<div class="row wrap">
                 <button class="chat-cta" data-action="start-chat" data-id="${e(c.id)}">開始聊天</button>
-                <button data-action="start-new-story" data-id="${e(c.id)}">開啟新故事</button>
                 <button data-action="share" data-kind="detail" data-id="${e(c.id)}">↗ 分享</button>
                 <button data-action="favorite" data-id="${e(c.id)}">${state.favorites.includes(c.id) ? '♥ 已喜愛' : '♡ 喜愛'}</button>
                 <button data-action="report" data-kind="角色" data-id="${e(c.id)}">⚑ 檢舉</button>
@@ -4462,38 +4461,18 @@ function showEncounterLeaveDialog(session) {
     '</div>');
 }
 
-async function openNewStoryDialog(characterId) {
+async function openNewStoryDialog(characterId, latest = null) {
   const character = state.characters.find(item => item.id === characterId);
-  if (!accessible(character)) return toast('此角色目前無法開啟新故事。');
-  if (!requireLogin({page:'detail',id:characterId})) return;
-  const client = window.mySupabase;
-  if (!client) return toast('新故事服務尚未準備好，請稍後再試。');
-
-  let latest = null;
-  let lookupFailed = false;
-  try {
-    const { data, error } = await client.rpc('get_latest_settled_encounter_session', {
-      p_character_id: characterId
-    });
-    if (error) throw error;
-    latest = Array.isArray(data) ? data[0] : data;
-  } catch (error) {
-    lookupFailed = true;
-    console.warn('載入可承接的相遇紀錄失敗：',error);
-  }
-
+  if (!accessible(character) || !latest?.session_id) return toast('目前沒有可承接的相遇紀錄。');
   const stageLabels = {
     hostile:'敵對',dislike:'反感',wary:'戒備',first_meeting:'初次見面',
     acquaintance:'熟識',close:'親近',intimate:'親密',special:'特殊羈絆'
   };
-  const carryOption = latest?.session_id
-    ? '<button type="button" class="profile-setting" data-action="story-start-mode" data-id="'+e(characterId)+'" data-value="encounter_snapshot" data-source-encounter-session-id="'+e(latest.session_id)+'"><span><strong>承接最近一次相遇</strong><small>保留你們已結算的關係：'+e(stageLabels[latest.relationship_stage]||'相遇回憶')+'；開啟一段獨立的新故事。</small></span><span>›</span></button>'
-    : '<div class="small muted">'+(lookupFailed?'目前無法載入相遇紀錄，你仍可選擇全新開始。':'目前還沒有已結算的相遇紀錄，這次會從初次見面開始。')+'</div>';
-  showDialog('開啟新故事',
-    '<p class="small muted">這會建立獨立的新故事，不會覆蓋你與角色原本的聊天室。</p>'+
+  showDialog('選擇故事開始方式',
+    '<p class="small muted">你曾與這個角色相遇。可以延續當時累積的關係，或重新展開一段故事；兩者都會建立獨立聊天室，不會覆蓋相遇紀錄。</p>'+
     '<div class="stack" style="gap:10px;margin-top:14px">'+
-    '<button type="button" class="profile-setting" data-action="story-start-mode" data-id="'+e(characterId)+'" data-value="fresh_story"><span><strong>全新開始</strong><small>從初次見面開始，關係值為 0。</small></span><span>›</span></button>'+
-    carryOption+
+    '<button type="button" class="profile-setting" data-action="story-start-mode" data-id="'+e(characterId)+'" data-value="encounter_snapshot" data-source-encounter-session-id="'+e(latest.session_id)+'"><span><strong>代入相遇好感度</strong><small>承接最近一次相遇：'+e(stageLabels[latest.relationship_stage]||'相遇回憶')+'，並帶入已保存的關係記憶。</small></span><span>›</span></button>'+
+    '<button type="button" class="profile-setting" data-action="story-start-mode" data-id="'+e(characterId)+'" data-value="fresh_story"><span><strong>開啟全新故事</strong><small>從初次見面開始，好感度為 0。</small></span><span>›</span></button>'+
     '</div>');
 }
 
@@ -4550,26 +4529,76 @@ async function createStorySession(characterId, originMode, sourceEncounterSessio
   persist();
   // The Edge Function has already created the trusted Story row. This sync stores
   // the local opening message and UI metadata; the database row remains authoritative.
-  await saveChatSessionSafely(session);
+  const saved = await saveChatSessionSafely(session);
+  if (!saved) throw new Error('新故事已建立，但聊天室資料同步未完成；請勿重複建立，重新整理後再從「開始聊天」進入。');
   $('modal')?.close();
   go({page:'conversation',id:session.id});
   toast(originMode==='encounter_snapshot'?'已承接上次相遇，並建立獨立的新故事。':'已建立全新故事；原本聊天室不會被覆蓋。');
 }
 
-function startChat(characterId) {
-  const c = state.characters.find(c => c.id === characterId);
-  if (!accessible(c)) return toast('此角色已被作者調整為私密或刪除狀態，不支持開啟新對話');
+async function startChat(characterId) {
+  const character = state.characters.find(item => item.id === characterId);
+  if (!accessible(character)) return toast('此角色已被作者調整為私密或刪除狀態，不支持開啟新對話');
   if (!requireLogin({page:'detail',id:characterId})) return;
-  const sessions = Object.values(state.sessions).filter(item =>
-    item.characterId === c.id && !item.archived && item.encounterMode !== true
-  ).sort((a,b) =>
-    Number(hasUserMessage(b))-Number(hasUserMessage(a)) ||
-    (b.messages?.at(-1)?.at || b.startedAt || 0)-(a.messages?.at(-1)?.at || a.startedAt || 0)
-  );
-  let s = sessions[0] || newSession(c);
-  s.hidden = false;
-  persist();
-  go({page:'conversation',id:s.id});
+
+  const client = window.mySupabase;
+  const { data: authData, error: authError } = await client?.auth?.getUser?.() || {};
+  const userId = authData?.user?.id || currentUser()?.uid;
+  if (!client || !userId) return toast('登入狀態尚未確認，請重新登入後再試。');
+
+  try {
+    // Always inspect the owner's cloud history before deciding to create a new Story.
+    const { data: rows, error: sessionsError } = await client.from('chat_sessions')
+      .select('id,chat_mode,status,created_at,updated_at')
+      .eq('user_id', userId).eq('character_id', characterId)
+      .is('deleted_at', null).neq('chat_mode', 'encounter')
+      .order('updated_at', { ascending:false });
+    if (sessionsError) throw sessionsError;
+
+    const candidateIds = (rows || []).filter(row => row.id && row.status !== 'archived').map(row => row.id);
+    let chattedIds = new Set();
+    if (candidateIds.length) {
+      const { data: messages, error: messagesError } = await client.from('chat_messages')
+        .select('session_id,content').in('session_id', candidateIds)
+        .eq('role', 'user').is('deleted_at', null);
+      if (messagesError) throw messagesError;
+      chattedIds = new Set((messages || [])
+        .filter(message => String(message.content || '').trim())
+        .map(message => message.session_id));
+    }
+
+    const existingRow = (rows || []).find(row => chattedIds.has(row.id));
+    if (existingRow) {
+      // Hydrate the exact cloud session before navigating; never create a duplicate
+      // just because this browser has not loaded the chat list yet.
+      await loadCloudChatSessions({ id:userId });
+      const existing = state.sessions[existingRow.id];
+      if (!existing) throw new Error('找到既有聊天室，但載入聊天內容失敗。請重新整理後再試。');
+      existing.hidden = false;
+      existing.archived = false;
+      existing.archivedAt = null;
+      persist();
+      await saveChatSessionSafely(existing);
+      go({page:'conversation',id:existing.id});
+      return;
+    }
+
+    // No ordinary Story chat exists. A settled Encounter offers carry-over;
+    // otherwise create a fresh Story directly.
+    const { data: encounterRows, error: encounterError } = await client.rpc(
+      'get_latest_settled_encounter_session', { p_character_id:characterId }
+    );
+    if (encounterError) throw encounterError;
+    const latestEncounter = Array.isArray(encounterRows) ? encounterRows[0] : encounterRows;
+    if (latestEncounter?.session_id) {
+      await openNewStoryDialog(characterId, latestEncounter);
+      return;
+    }
+    await createStorySession(characterId, 'fresh_story', null);
+  } catch (error) {
+    console.error('開始聊天前檢查既有紀錄失敗：', error);
+    toast(error?.message || '無法確認既有聊天紀錄，請稍後重試。');
+  }
 }
 function visibleSessions() {
   const q = chatSearch.trim().toLowerCase();
