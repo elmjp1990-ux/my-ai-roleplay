@@ -4375,7 +4375,7 @@ function startEditor(c = null) {
 async function hydrateCharacterIllustrationsIntoEditor(characterId) {
   const client=window.mySupabase;
   const uid=currentUser()?.uid;
-  if(!client||!uid||!characterId||!owned(state.characters.find(item=>item.id===characterId)))return;
+  if(!client||!uid||!characterId||!owned(state.characters.find(item=>item.id===characterId)))throw new Error('無法確認角色立繪載入權限，請重新登入後再試。');
   const assets=await loadCharacterIllustrationAssets([characterId]);
     if(route.page!=='editor'||route.id!==characterId)return;
     const current=assets.get(characterId)||{primary:null,gallery:[]};
