@@ -2519,12 +2519,56 @@ function canAccessSessionCharacter(s,c) {
 }
 const isMobile = () => matchMedia('(max-width:767px)').matches;
 
+let localStorageCompactMode = false;
+let localStorageQuotaWarningShown = false;
+
+function compactLocalStateForQuota() {
+  // Cloud-owned chats and cloud-backed character images have durable server
+  // copies. Keep their text and relationship data locally, but avoid storing
+  // duplicate embedded image payloads in localStorage.
+  const characters = (state.characters || []).map(character => {
+    const cloudBacked = isUuid(character.id) &&
+      (character.cloudSnapshotOnly === true || character.owner !== true);
+    if (cloudBacked && typeof character.image === 'string' && /^data:image\\//i.test(character.image)) {
+      return {...character, image:''};
+    }
+    return character;
+  });
+  const sessions = Object.fromEntries(Object.entries(state.sessions || {}).map(([key, session]) => {
+    if (!session?.cloudOwned || !session.cloudCharacterSnapshot) return [key, session];
+    const snapshot = session.cloudCharacterSnapshot;
+    const compactSnapshot = typeof snapshot.image === 'string' && /^data:image\\//i.test(snapshot.image)
+      ? {...snapshot, image:''}
+      : snapshot;
+    return [key, compactSnapshot === snapshot ? session : {...session, cloudCharacterSnapshot:compactSnapshot}];
+  }));
+  return {...state, characters, sessions};
+}
+
 function persist() {
   try {
-    localStorage.setItem(STORE_KEY,JSON.stringify(state));
+    const snapshot = localStorageCompactMode ? compactLocalStateForQuota() : state;
+    localStorage.setItem(STORE_KEY,JSON.stringify(snapshot));
     return true;
   } catch (error) {
-    toast('儲存失敗，請檢查瀏覽器儲存空間或縮小圖片。');
+    const quotaExceeded = error?.name === 'QuotaExceededError' ||
+      error?.code === 22 || error?.code === 1014;
+    if (quotaExceeded && !localStorageCompactMode) {
+      try {
+        const compact = compactLocalStateForQuota();
+        localStorage.setItem(STORE_KEY,JSON.stringify(compact));
+        localStorageCompactMode = true;
+        console.warn('本機儲存空間不足：已改用精簡快取，保留聊天文字與雲端資料，僅省略雲端已有的重複內嵌圖片。');
+        return true;
+      } catch (compactError) {
+        console.warn('精簡本機快取仍無法保存：',compactError);
+      }
+    }
+    console.warn('本機儲存失敗：',error);
+    if (!localStorageQuotaWarningShown) {
+      localStorageQuotaWarningShown = true;
+      toast('瀏覽器本機快取空間不足；雲端聊天仍會照常同步，但部分離線快取可能無法保存。');
+    }
     return false;
   }
 }
@@ -4301,7 +4345,10 @@ async function compressUploadImage(file, options = {}) {
 
 /* Chat sessions: character identity stays separate from conversation identity. */
 function newSession(character,options = {}) {
-  const sessionId = id();
+  // A server-created Story supplies its UUID. Use that exact ID as both the
+  // object ID and state.sessions key; generating a second key makes the first
+  // conversation render as missing until the next cloud hydration finishes.
+  const sessionId = options.id || id();
   const session = {
     id:sessionId,characterId:character.id,name:'',
     archived:false,hidden:false,pinned:false,
