@@ -356,7 +356,7 @@ assert.match(storySession, /session_id_conflict/);
 
 assert.match(storySession, /relationshipState/);
 assert.match(storySession, /relationship: relationshipState/);
-assert.match(frontend, /async function openNewStoryDialog\(characterId\)/);
+assert.match(frontend, /async function openNewStoryDialog\(characterId, latest = null\)/);
 assert.match(frontend, /get_latest_settled_encounter_session/);
 assert.match(frontend, /data-action="start-new-story"/);
 assert.match(frontend, /data-action="story-start-mode"/);
