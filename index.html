@@ -4470,10 +4470,9 @@ async function compressUploadImage(file, options = {}) {
     const targetBytes=Number(options.targetBytes)||500*1024;
     const maxEdge=Number(options.maxEdge)||1600;
     let scale=Math.min(1,maxEdge/Math.max(image.naturalWidth,image.naturalHeight));
-    const formats=[
-      {type:'image/webp',qualities:[0.84,0.76,0.68,0.60,0.52]},
-      {type:'image/jpeg',qualities:[0.82,0.72,0.62,0.52]}
-    ];
+    const formats=options.preserveAlpha
+      ?[{type:'image/webp',qualities:[0.86,0.78,0.70,0.62,0.54]},{type:'image/png',qualities:[1]}]
+      :[{type:'image/webp',qualities:[0.84,0.76,0.68,0.60,0.52]},{type:'image/jpeg',qualities:[0.82,0.72,0.62,0.52]}];
     let bestBlob=null,bestWidth=0,bestHeight=0;
     while(scale>=0.35) {
       const width=Math.max(1,Math.round(image.naturalWidth*scale));
@@ -9415,7 +9414,7 @@ document.addEventListener('change',async event => {
           const preview=$('characterVideoPreview');preview.removeAttribute('src');preview.classList.add('hidden');
           $('imagePreview').classList.remove('hidden');
           toast('正在壓縮角色圖片，請稍候…');
-          const compressed=await compressUploadImage(file,{maxEdge:1600,targetBytes:500*1024});
+          const compressed=await compressUploadImage(file,{maxEdge:1600,targetBytes:500*1024,preserveAlpha:true});
           if(requestId!==characterImageCompressionRequest)return;
           draftImage=compressed.dataUrl;$('imagePreview').src=draftImage;$('imagePreview').classList.remove('hidden');
           toast('角色頭像已自動壓縮。');saveEditorDraft();
@@ -9434,7 +9433,7 @@ document.addEventListener('change',async event => {
       }
       toast('正在處理附加立繪…');
       for(const file of files){
-        const compressed=await compressUploadImage(file,{maxEdge:1800,targetBytes:700*1024});
+        const compressed=await compressUploadImage(file,{maxEdge:1800,targetBytes:700*1024,preserveAlpha:true});
         draftIllustrations.push({src:compressed.dataUrl,path:'',id:'',sortOrder:draftIllustrations.length});
       }
       const gallery=$('characterIllustrationGallery');
