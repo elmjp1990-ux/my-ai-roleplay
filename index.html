@@ -2030,7 +2030,7 @@ async function syncCharacterIllustrations(character,userId) {
   const nextGallery=[];
   await retryCharacterIllustrationCleanup(userId);
   try{
-    if(!character.avatarVideoPath&&/^data:image\//i.test(String(draftImage||''))){
+    if(!character.avatarVideoPath&&/^data:image\//i.test(String(draftImage||''))&&(!oldPrimary||draftPrimaryIllustrationPath!==oldPrimary.storage_path)){
       nextPrimaryPath=await uploadCharacterIllustrationDataUrl(draftImage,userId,character.id);
       uploaded.push(nextPrimaryPath);
     }
@@ -2763,6 +2763,7 @@ let draftTags = [];
 let draftImage = '';
 let draftIllustrations = [];
 let draftPrimaryIllustrationPath = '';
+let editorIllustrationHydration = {characterId:null,status:'idle',promise:null,error:null};
 let draftVideoFile = null;
 let draftVideoPath = '';
 let draftVideoPreviewUrl = '';
@@ -4365,6 +4366,7 @@ function startEditor(c = null) {
   draftImage = c?.image || '';
   draftIllustrations = [];
   draftPrimaryIllustrationPath = '';
+  editorIllustrationHydration = {characterId:c?.id||null,status:'idle',promise:null,error:null};
   draftVideoFile = null;
   draftVideoPath = c?.avatarVideoPath || '';
   if(draftVideoPreviewUrl){URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl='';}
@@ -4374,8 +4376,7 @@ async function hydrateCharacterIllustrationsIntoEditor(characterId) {
   const client=window.mySupabase;
   const uid=currentUser()?.uid;
   if(!client||!uid||!characterId||!owned(state.characters.find(item=>item.id===characterId)))return;
-  try{
-    const assets=await loadCharacterIllustrationAssets([characterId]);
+  const assets=await loadCharacterIllustrationAssets([characterId]);
     if(route.page!=='editor'||route.id!==characterId)return;
     const current=assets.get(characterId)||{primary:null,gallery:[]};
     if(current.primary&&!/^data:image\//i.test(String(draftImage||''))){
@@ -4393,8 +4394,7 @@ async function hydrateCharacterIllustrationsIntoEditor(characterId) {
     }
     const gallery=$('characterIllustrationGallery');
     if(gallery)gallery.innerHTML=renderCharacterIllustrationGallery(draftIllustrations);
-    saveEditorDraft();
-  }catch(error){console.warn('角色立繪載入失敗：',error);toast('角色立繪載入失敗：'+error.message);}
+  saveEditorDraft();
 }
 function renderCharacterIllustrationGallery(items = []) {
   if (!Array.isArray(items) || !items.length) return '<p class="small muted">尚未加入其他立繪。</p>';
@@ -4512,7 +4512,19 @@ function renderEditor() {
       </form>
     </div>`;
   if (route.id && !savedDraft?.encounterScheduleDescription) void loadEncounterScheduleDescriptionIntoEditor(route.id);
-  if (route.id) void hydrateCharacterIllustrationsIntoEditor(route.id);
+  if (route.id && (editorIllustrationHydration.characterId!==route.id || editorIllustrationHydration.status==='idle')) {
+    const characterId=route.id;
+    editorIllustrationHydration={characterId,status:'loading',promise:null,error:null};
+    const promise=hydrateCharacterIllustrationsIntoEditor(characterId);
+    editorIllustrationHydration.promise=promise;
+    promise.then(()=>{
+      if(editorIllustrationHydration.characterId===characterId)editorIllustrationHydration.status='loaded';
+    }).catch(error=>{
+      if(editorIllustrationHydration.characterId===characterId){editorIllustrationHydration.status='error';editorIllustrationHydration.error=error;}
+      console.warn('角色立繪載入失敗：',error);
+      toast('角色立繪載入失敗：'+error.message);
+    });
+  }
   if(draftVideoPath){const preview=$('characterVideoPreview');void window.mySupabase?.storage.from('character-avatar-videos').createSignedUrl(draftVideoPath,300).then(({data,error})=>{if(!error&&data?.signedUrl&&preview?.isConnected){preview.src=data.signedUrl;preview.classList.remove('hidden');}});}
   void isNsfwTermsAdmin().then(isAdmin=>{const button=$('view')?.querySelector('[data-action="nsfw-term-manager"]');if(button&&isAdmin)button.hidden=false;});
   if(c.aiGeneratedDraft)void (async()=>{
@@ -8814,6 +8826,18 @@ document.addEventListener('submit',async event => {
     switch(type) {
       case 'character': {
         const user = currentUser();
+        if(route.id){
+          const hydration=editorIllustrationHydration;
+          if(hydration.characterId!==route.id || hydration.status==='idle'){
+            toast('角色立繪尚未載入完成，請重新開啟編輯頁面後再儲存。');
+            return;
+          }
+          if(hydration.status==='loading' && hydration.promise) await hydration.promise;
+          if(editorIllustrationHydration.characterId!==route.id || editorIllustrationHydration.status!=='loaded'){
+            toast('角色立繪載入失敗，為避免誤刪既有圖片，本次未儲存。請重新載入編輯頁面再試一次。');
+            return;
+          }
+        }
         if (!user?.uid || !window.mySupabase) {
           return toast('請先使用 Google 帳號登入，角色才會保存到雲端。');
         }
