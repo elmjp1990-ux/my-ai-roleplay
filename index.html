@@ -4252,9 +4252,13 @@ async function hydrateCharacterIllustrationsIntoEditor(characterId) {
     }
     if(!draftIllustrations.length&&current.gallery.length){
       draftIllustrations=current.gallery.slice(0,5);
-      const gallery=$('characterIllustrationGallery');
-      if(gallery)gallery.innerHTML=renderCharacterIllustrationGallery(draftIllustrations);
+    }else if(draftIllustrations.length&&current.gallery.length){
+      const refreshed=new Map(current.gallery.map(item=>[item.id,item]));
+      draftIllustrations=draftIllustrations.map(item=>item&&typeof item==='object'&&item.id&&refreshed.has(item.id)
+        ?{...item,...refreshed.get(item.id)}:item);
     }
+    const gallery=$('characterIllustrationGallery');
+    if(gallery)gallery.innerHTML=renderCharacterIllustrationGallery(draftIllustrations);
     saveEditorDraft();
   }catch(error){console.warn('角色立繪載入失敗：',error);toast('角色立繪載入失敗：'+error.message);}
 }
