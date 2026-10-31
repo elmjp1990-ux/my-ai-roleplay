@@ -153,17 +153,17 @@ create policy "Character illustration owner upload"
   to authenticated
   with check (
     bucket_id = 'character-illustrations'
-    and name ~* (
+    and objects.name ~* (
       '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/' ||
       '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/' ||
       '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|jpeg|png|webp)$'
     )
-    and split_part(name, '/', 1) = (select auth.uid())::text
+    and split_part(objects.name, '/', 1) = (select auth.uid())::text
     and public.account_is_active()
     and exists (
       select 1
       from public.characters c
-      where c.id::text = split_part(name, '/', 2)
+      where c.id::text = split_part(objects.name, '/', 2)
         and c.author_id = (select auth.uid())
         and c.deleted_at is null
         and (
@@ -179,26 +179,26 @@ create policy "Character illustration owner update"
   to authenticated
   using (
     bucket_id = 'character-illustrations'
-    and split_part(name, '/', 1) = (select auth.uid())::text
+    and split_part(objects.name, '/', 1) = (select auth.uid())::text
     and exists (
       select 1
       from public.characters c
-      where c.id::text = split_part(name, '/', 2)
+      where c.id::text = split_part(objects.name, '/', 2)
         and c.author_id = (select auth.uid())
     )
   )
   with check (
     bucket_id = 'character-illustrations'
-    and name ~* (
+    and objects.name ~* (
       '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/' ||
       '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/' ||
       '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|jpeg|png|webp)$'
     )
-    and split_part(name, '/', 1) = (select auth.uid())::text
+    and split_part(objects.name, '/', 1) = (select auth.uid())::text
     and exists (
       select 1
       from public.characters c
-      where c.id::text = split_part(name, '/', 2)
+      where c.id::text = split_part(objects.name, '/', 2)
         and c.author_id = (select auth.uid())
     )
   );
@@ -209,11 +209,11 @@ create policy "Character illustration owner delete"
   to authenticated
   using (
     bucket_id = 'character-illustrations'
-    and split_part(name, '/', 1) = (select auth.uid())::text
+    and split_part(objects.name, '/', 1) = (select auth.uid())::text
     and exists (
       select 1
       from public.characters c
-      where c.id::text = split_part(name, '/', 2)
+      where c.id::text = split_part(objects.name, '/', 2)
         and c.author_id = (select auth.uid())
     )
   );
@@ -226,11 +226,11 @@ create policy "Character illustrations visible to eligible viewers"
     bucket_id = 'character-illustrations'
     and (
       (
-        split_part(name, '/', 1) = (select auth.uid())::text
+        split_part(objects.name, '/', 1) = (select auth.uid())::text
         and exists (
           select 1
           from public.characters c
-          where c.id::text = split_part(name, '/', 2)
+          where c.id::text = split_part(objects.name, '/', 2)
             and c.author_id = (select auth.uid())
         )
       )
