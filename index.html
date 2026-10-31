@@ -1999,6 +1999,7 @@ async function syncCharacterIllustrations(character,userId) {
     const {error:avatarClearError}=await client.from('characters').update({avatar_url:null}).eq('id',character.id).eq('author_id',userId);
     if(avatarClearError)console.warn('舊的內嵌圖片欄位尚未清除：',avatarClearError.message);
   }
+  nextGallery.sort((left,right)=>Number(left.sortOrder||0)-Number(right.sortOrder||0));
   draftPrimaryIllustrationPath=nextPrimaryPath;
   draftIllustrations=nextGallery;
   character.primaryIllustrationPath=nextPrimaryPath;
