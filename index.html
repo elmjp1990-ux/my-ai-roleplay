@@ -3594,6 +3594,7 @@ ${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline
             ? '<div class="character-status-label"><span class="character-status-dot" style="position:static;background:#8993a4"></span>離線／已下架</div>'
             : `<div class="row wrap">
                 <button class="chat-cta" data-action="start-chat" data-id="${e(c.id)}">開始聊天</button>
+                <button data-action="start-new-story" data-id="${e(c.id)}">開啟新故事</button>
                 <button data-action="share" data-kind="detail" data-id="${e(c.id)}">↗ 分享</button>
                 <button data-action="favorite" data-id="${e(c.id)}">${state.favorites.includes(c.id) ? '♥ 已喜愛' : '♡ 喜愛'}</button>
                 <button data-action="report" data-kind="角色" data-id="${e(c.id)}">⚑ 檢舉</button>
@@ -4449,6 +4450,100 @@ function showEncounterLeaveDialog(session) {
     '<button type="button" class="profile-setting" data-action="encounter-temporary-leave" data-id="'+e(session.id)+'"><span><strong>暫時離開</strong><small>這次對話會保留；今天同一地標仍能遇見他時，可以接著聊。</small></span><span>›</span></button>'+
     '<button type="button" class="profile-setting" data-action="encounter-end-confirm" data-id="'+e(session.id)+'"><span><strong>結束相遇</strong><small>將這次相遇整理並保存到相遇回憶，之後不再接續本次對話。</small></span><span>›</span></button>'+
     '</div>');
+}
+
+async function openNewStoryDialog(characterId) {
+  const character = state.characters.find(item => item.id === characterId);
+  if (!accessible(character)) return toast('此角色目前無法開啟新故事。');
+  if (!requireLogin({page:'detail',id:characterId})) return;
+  const client = window.mySupabase;
+  if (!client) return toast('新故事服務尚未準備好，請稍後再試。');
+
+  let latest = null;
+  let lookupFailed = false;
+  try {
+    const { data, error } = await client.rpc('get_latest_settled_encounter_session', {
+      p_character_id: characterId
+    });
+    if (error) throw error;
+    latest = Array.isArray(data) ? data[0] : data;
+  } catch (error) {
+    lookupFailed = true;
+    console.warn('載入可承接的相遇紀錄失敗：',error);
+  }
+
+  const stageLabels = {
+    hostile:'敵對',dislike:'反感',wary:'戒備',first_meeting:'初次見面',
+    acquaintance:'熟識',close:'親近',intimate:'親密',special:'特殊羈絆'
+  };
+  const carryOption = latest?.session_id
+    ? '<button type="button" class="profile-setting" data-action="story-start-mode" data-id="'+e(characterId)+'" data-value="encounter_snapshot" data-source-encounter-session-id="'+e(latest.session_id)+'"><span><strong>承接最近一次相遇</strong><small>保留你們已結算的關係：'+e(stageLabels[latest.relationship_stage]||'相遇回憶')+'；開啟一段獨立的新故事。</small></span><span>›</span></button>'
+    : '<div class="small muted">'+(lookupFailed?'目前無法載入相遇紀錄，你仍可選擇全新開始。':'目前還沒有已結算的相遇紀錄，這次會從初次見面開始。')+'</div>';
+  showDialog('開啟新故事',
+    '<p class="small muted">這會建立獨立的新故事，不會覆蓋你與角色原本的聊天室。</p>'+
+    '<div class="stack" style="gap:10px;margin-top:14px">'+
+    '<button type="button" class="profile-setting" data-action="story-start-mode" data-id="'+e(characterId)+'" data-value="fresh_story"><span><strong>全新開始</strong><small>從初次見面開始，關係值為 0。</small></span><span>›</span></button>'+
+    carryOption+
+    '</div>');
+}
+
+async function createStorySession(characterId, originMode, sourceEncounterSessionId = null) {
+  const character = state.characters.find(item => item.id === characterId);
+  if (!accessible(character)) throw new Error('此角色目前無法開啟新故事。');
+  const client = window.mySupabase;
+  if (!client?.auth || !client?.functions) throw new Error('新故事服務尚未準備好，請稍後再試。');
+  const { data: authData, error: authError } = await client.auth.getUser();
+  if (authError || !authData?.user?.id) throw new Error('請先登入，再開啟新故事。');
+
+  const sessionId = id();
+  const { data, error } = await client.functions.invoke('story-session', {
+    body: {
+      characterId,
+      sessionId,
+      originMode,
+      sourceEncounterSessionId
+    }
+  });
+  let payload = data;
+  if (error && error.context && typeof error.context.json === 'function') {
+    try { payload = await error.context.json(); } catch (_) {}
+  }
+  if (
+    error || !payload?.session?.id || payload.session.id !== sessionId ||
+    payload.session.user_id !== authData.user.id ||
+    payload.session.character_id !== characterId ||
+    payload.session.chat_mode !== 'story' ||
+    !payload.relationship?.relationship_stage
+  ) {
+    const code = payload?.error || '';
+    throw new Error(code === 'encounter_not_settled'
+      ? '這段相遇尚未完成結算，暫時無法承接。'
+      : code === 'character_unavailable_for_story'
+        ? '此角色目前無法開啟新故事。'
+        : '新故事建立失敗，請稍後再試。');
+  }
+
+  const relationship = payload.relationship;
+  const session = newSession(character, {
+    id:sessionId,
+    cloudOwned:true,
+    cloudOwnerUid:authData.user.id,
+    cloudCharacterSnapshot:payload.session.character_snapshot || {},
+    storyMode:true,
+    storyOriginMode:relationship.origin_mode,
+    storySourceEncounterSessionId:relationship.source_encounter_session_id || null,
+    storyAffinity:Number(relationship.affinity || 0),
+    storyRelationshipStage:relationship.relationship_stage,
+    storyImportedMemories:Array.isArray(relationship.imported_memories) ? relationship.imported_memories : []
+  });
+  session.hidden=false;
+  persist();
+  // The Edge Function has already created the trusted Story row. This sync stores
+  // the local opening message and UI metadata; the database row remains authoritative.
+  await saveChatSessionSafely(session);
+  $('modal')?.close();
+  go({page:'conversation',id:session.id});
+  toast(originMode==='encounter_snapshot'?'已承接上次相遇，並建立獨立的新故事。':'已建立全新故事；原本聊天室不會被覆蓋。');
 }
 
 function startChat(characterId) {
@@ -7350,6 +7445,18 @@ document.addEventListener('click',async event => {
       }
       case 'author':visit('author',key);break;
       case 'start-chat':startChat(key);break;
+      case 'start-new-story': { await openNewStoryDialog(key); break; }
+      case 'story-start-mode': {
+        const characterId=key;
+        const mode=button.dataset.value;
+        const sourceId=button.dataset.sourceEncounterSessionId||null;
+        if(!['fresh_story','encounter_snapshot'].includes(mode))break;
+        if(mode==='encounter_snapshot'&&!isUuid(sourceId)){toast('找不到可承接的相遇紀錄。');break;}
+        $('modal')?.close();
+        try{await createStorySession(characterId,mode,sourceId);}
+        catch(error){console.error('建立新故事失敗：',error);toast(error?.message||'新故事建立失敗，請稍後再試。');}
+        break;
+      }
       case 'start-encounter': {
         const character = state.characters.find(item => item.id === key);
         if (!character || !accessible(character)) { toast('此角色目前無法開始相遇模式。'); break; }
