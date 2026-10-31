@@ -64,14 +64,6 @@ Deno.serve(async (request: Request) => {
   const { data: active, error: activeError } = await userClient.rpc("account_is_active");
   if (activeError || active !== true) return json({ error: "account_not_active" }, 403);
 
-  // Run the existing role-access check under the caller JWT, not service_role.
-  const { data: canStart, error: accessError } = await userClient.rpc(
-    "character_can_start_chat",
-    { p_character_id: characterId },
-  );
-  if (accessError) return json({ error: "character_access_check_failed" }, 503);
-  if (canStart !== true) return json({ error: "character_unavailable_for_story" }, 403);
-
   // A retry may only retrieve the exact Story session created for this owner/character.
   const { data: existing, error: existingError } = await admin
     .from("chat_sessions")
@@ -103,6 +95,14 @@ Deno.serve(async (request: Request) => {
     if (stateError || !relationshipState) return json({ error: "relationship_state_lookup_failed" }, 503);
     return json({ session: existing, relationship: relationshipState, idempotent: true });
   }
+
+  // Run the existing role-access check under the caller JWT, not service_role.
+  const { data: canStart, error: accessError } = await userClient.rpc(
+    "character_can_start_chat",
+    { p_character_id: characterId },
+  );
+  if (accessError) return json({ error: "character_access_check_failed" }, 503);
+  if (canStart !== true) return json({ error: "character_unavailable_for_story" }, 403);
 
   const { data: character, error: characterError } = await admin
     .from("characters")
