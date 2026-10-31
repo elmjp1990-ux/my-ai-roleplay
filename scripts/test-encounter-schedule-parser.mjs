@@ -30,5 +30,7 @@ assert.match(html, /createSignedUrl\(storagePath,3600\)/);
 assert.match(html, /data-character-illustration-path/);
 assert.match(html, /document\.addEventListener\('error',[\s\S]*refreshCharacterIllustrationSignedUrl/);
 assert.match(html, /document\.addEventListener\('load'/);
+assert.match(html, /image: publicIllustrations\.get\(row\.id\)\?\.primary\?\.src \|\| row\.avatar_url/);
+assert.match(html, /image: ownerIllustrations\.get\(row\.id\)\?\.primary\?\.src \|\| row\.avatar_url/);
 
 console.log("Author schedule and illustration signed-URL refresh contract tests passed.");
