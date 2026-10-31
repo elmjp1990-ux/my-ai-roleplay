@@ -1948,6 +1948,7 @@ async function syncCharacterIllustrations(character,userId) {
   const uploaded=[];
   const insertedGallery=[];
   let nextPrimaryPath=draftPrimaryIllustrationPath||'';
+  const nextGallery=[];
   try{
     if(!character.avatarVideoPath&&/^data:image\//i.test(String(draftImage||''))){
       nextPrimaryPath=await uploadCharacterIllustrationDataUrl(draftImage,userId,character.id);
@@ -1958,7 +1959,6 @@ async function syncCharacterIllustrations(character,userId) {
       .filter(item=>item&&typeof item==='object'&&item.id&&item.path)
       .map(item=>item.id));
     const usedSlots=new Set(oldGallery.filter(row=>desiredExistingIds.has(row.id)).map(row=>Number(row.sort_order)));
-    const nextGallery=[];
     for(const item of draftIllustrations){
       if(item&&typeof item==='object'&&item.id&&item.path){
         nextGallery.push({...item,name:String(item.name||'').trim().slice(0,40)});
