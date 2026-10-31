@@ -4555,7 +4555,7 @@ async function startChat(characterId) {
       .order('updated_at', { ascending:false });
     if (sessionsError) throw sessionsError;
 
-    const candidateIds = (rows || []).filter(row => row.id && row.status !== 'archived').map(row => row.id);
+    const candidateIds = (rows || []).filter(row => row.id).map(row => row.id);
     let chattedIds = new Set();
     if (candidateIds.length) {
       const { data: messages, error: messagesError } = await client.from('chat_messages')
