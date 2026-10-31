@@ -227,6 +227,8 @@ CREATE TRIGGER mark_encounter_evaluation_job_completed
   AFTER UPDATE OF status ON public.encounter_session_lifecycle
   FOR EACH ROW EXECUTE FUNCTION public.mark_encounter_evaluation_job_completed();
 
+CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA pg_catalog;
+
 -- One-minute dispatcher: only enqueue eligible scenes; AI evaluation is a separate trusted worker.
 DO $$
 DECLARE
