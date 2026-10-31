@@ -2,36 +2,75 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const html = fs.readFileSync("index.html", "utf8");
-const start = html.indexOf("function parseEncounterScheduleText(raw) {");
-const end = html.indexOf("\nasync function saveEncounterSchedules", start);
-assert.ok(start >= 0 && end > start, "Encounter schedule parser must exist in index.html");
+const cleanupMigration = fs.readFileSync("supabase/migrations/20261031211200_character_illustration_cleanup_queue.sql", "utf8");
 
-const parserSource = html.slice(start, end);
-const parseEncounterScheduleText = new Function(
-  parserSource + "\nreturn parseEncounterScheduleText;"
-)();
+// The author-facing field must accept ordinary prose, not a pipe-delimited schema.
+assert.match(html, /name="encounterScheduleDescription"/);
+assert.match(html, /簡單描述角色平日、假日的生活作息/);
+assert.match(html, /不需要填寫固定格式或精確時段/);
+assert.doesNotMatch(html, /可直接用自然語言描述；不需要輸入星期代碼、時間格式或地點代碼。這份描述僅作者可查看。/);
+assert.doesNotMatch(html, /name="clearEncounterSchedules"/);
+assert.doesNotMatch(html, /function parseEncounterScheduleText\(raw\)/);
+assert.doesNotMatch(html, /星期\(0=日、1=一/);
 
-const validTwoRows = "1|09:00|12:00|cafe|在咖啡廳工作\n*|18:00|20:00|park|傍晚散步";
-assert.equal(parseEncounterScheduleText(validTwoRows).length, 2);
-assert.equal(parseEncounterScheduleText(validTwoRows.replaceAll("\n", "\r\n")).length, 2);
-assert.deepEqual(parseEncounterScheduleText(""), []);
+// Save/load must use the separate author-only description table.
+assert.match(html, /async function saveEncounterScheduleDescription\(/);
+assert.match(html, /async function loadEncounterScheduleDescriptionIntoEditor\(/);
+assert.match(html, /from\('character_schedule_descriptions'\)/);
+assert.match(html, /author_id: userId/);
+assert.match(html, /\.eq\('author_id', user\.uid\)/);
+assert.match(html, /await saveEncounterScheduleDescription\(c\.id, user\.uid, scheduleDescription\)/);
 
-const fiftyRows = Array.from(
-  { length: 50 },
-  (_, i) => `1|09:${String(i % 60).padStart(2, "0")}|10:${String(i % 60).padStart(2, "0")}|cafe|工作`,
-).join("\n");
-assert.equal(parseEncounterScheduleText(fiftyRows).length, 50);
-assert.throws(() => parseEncounterScheduleText(fiftyRows + "\n2|10:00|11:00|park|散步"), /最多設定 50/);
+// Existing structured city schedules must not be overwritten with raw prose.
+assert.doesNotMatch(html, /save_character_schedules/);
+assert.doesNotMatch(html, /saveEncounterSchedules\(/);
 
-for (const [name, row, expectedError] of [
-  ["bad time", "1|25:00|12:00|cafe|工作", /時間格式錯誤/],
-  ["bad weekday", "7|09:00|12:00|cafe|工作", /星期必須是 0 到 6/],
-  ["bad location", "1|09:00|12:00|咖啡廳|工作", /地點代碼只能使用英文/],
-  ["empty activity", "1|09:00|12:00|cafe|", /活動不可空白/],
-  ["same start/end", "1|09:00|09:00|cafe|工作", /時間格式錯誤/],
-  ["wrong column count", "1|09:00|cafe|工作", /格式錯誤/],
-]) {
-  assert.throws(() => parseEncounterScheduleText(row), expectedError, name);
-}
 
-console.log("Encounter schedule parser tests passed.");
+ // Private Storage images must refresh expired signed URLs without exposing object paths.
+assert.match(html, /async function refreshCharacterIllustrationSignedUrl\(storagePath\)/);
+assert.match(html, /createSignedUrl\(storagePath,3600\)/);
+assert.match(html, /data-character-illustration-path/);
+assert.match(html, /document\.addEventListener\('error',[\s\S]*refreshCharacterIllustrationSignedUrl/);
+assert.match(html, /document\.addEventListener\('load'/);
+assert.match(html, /image: publicIllustrations\.get\(row\.id\)\?\.primary\?\.src \|\| row\.avatar_url/);
+assert.match(html, /image: ownerIllustrations\.get\(row\.id\)\?\.primary\?\.src \|\| row\.avatar_url/);
+
+// Gallery sync must keep nextGallery in function scope for post-upload persistence and cleanup.
+assert.match(html, /async function syncCharacterIllustrations\([\s\S]*?let nextPrimaryPath=draftPrimaryIllustrationPath\|\|\x27\x27;\s*const nextGallery=\[\];\s*await retryCharacterIllustrationCleanup\(userId\);\s*try\{/);
+assert.doesNotMatch(html, /const usedSlots=new Set\([\s\S]*?\n\s*const nextGallery=\[\];/);
+
+// Editing an existing character must finish illustration hydration before save.
+// A failed load blocks save so an empty draft cannot be mistaken for intentional image removal.
+assert.match(html, /let editorIllustrationHydration = \{characterId:null,status:'idle',promise:null,error:null\}/);
+assert.match(html, /editorIllustrationHydration=\{characterId,status:'loading',promise:null,error:null\}/);
+assert.match(html, /await hydration\.promise/);
+assert.match(html, /editorIllustrationHydration\.status!=='loaded'/);
+assert.match(html, /為避免誤刪既有圖片，本次未儲存/);
+assert.match(html, /if\(!client\|\|!uid\|\|!characterId\|\|!owned\(state\.characters\.find\(item=>item\.id===characterId\)\)\)throw new Error/);
+
+// An unchanged primary image reuses its existing Storage path instead of uploading a duplicate.
+assert.match(html, /if\(!character\.avatarVideoPath&&\/\^data:image\\\/\//);
+assert.match(html, /\(!oldPrimary\|\|draftPrimaryIllustrationPath!==oldPrimary\.storage_path\)/);
+
+// Failed Storage deletions are durably queued, owner-scoped, and retried on asset loads/saves.
+assert.ok(html.includes("async function enqueueCharacterIllustrationCleanup(storagePath,userId)"));
+assert.ok(html.includes("async function processCharacterIllustrationCleanupJob(job,userId)"));
+assert.ok(html.includes("此檔案仍被角色立繪資料引用"));
+assert.ok(html.includes(".eq('storage_path',job.storage_path).limit(1)"));
+assert.ok(html.includes("uuidPattern.test(parts[1])"));
+assert.ok(html.includes("async function retryCharacterIllustrationCleanup(userId)"));
+assert.ok(html.includes("from('character_illustration_cleanup_jobs')"));
+assert.ok(html.includes("await retryCharacterIllustrationCleanup(userId)"));
+assert.match(cleanupMigration, /ENABLE ROW LEVEL SECURITY/);
+assert.match(cleanupMigration, /GRANT SELECT, INSERT, UPDATE, DELETE/);
+assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_jobs_select_own[\s\S]*?auth\.uid\(\)/);
+assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_jobs_insert_own[\s\S]*?auth\.uid\(\)/);
+
+// The card primary image is not reused as encounter-scene art.
+assert.match(html, /const sceneIllustration=safeImage\(character\?\.galleryIllustrations\?\.\[0\]\?\.src\|\|\x27\x27\)/);
+assert.match(html, /const halfBodyImage=dedicatedSprite\|\|sceneIllustration/);
+assert.doesNotMatch(html, /const cardPortrait=safeImage\(character\?\.image/);
+assert.match(html, /相遇模式立繪（最多 5 張）/);
+assert.match(html, /主要角色圖預覽/);
+
+console.log("Author schedule and illustration signed-URL refresh contract tests passed.");

@@ -1676,13 +1676,17 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
         if (!latestStory.has(story.character_id)) latestStory.set(story.character_id, story);
       }
 
+      const publicIllustrations = await loadCharacterIllustrationAssets((rows || []).map(row=>row.id));
       const publicCharacters = (rows || []).map(row => {
         const story = latestStory.get(row.id);
         return {
           id: row.id, name: row.name || '未命名角色',
           gender: row.gender || 'ambiguous',
           age: row.age == null ? '' : String(row.age),
-          image: row.avatar_url || '', avatarVideoPath:row.avatar_video_path || '', visibility: 'public',
+          image: publicIllustrations.get(row.id)?.primary?.src || row.avatar_url || '',
+          primaryIllustrationPath:publicIllustrations.get(row.id)?.primary?.path || '',
+          galleryIllustrations:publicIllustrations.get(row.id)?.gallery || [],
+          avatarVideoPath:row.avatar_video_path || '', visibility: 'public',
           reviewStatus: row.review_status, intro: row.intro || '',
           opening: story?.opening_message || '', race: row.race || '',
           privateInfo: '', style: row.style || '',
@@ -1810,6 +1814,7 @@ const ids = (rows || []).map(row => row.id);
       }
       if (state.account?.uid !== user.id) return;
       const localOwnedForMerge = state.characters.filter(c => c.authorId === user.id);
+      const ownerIllustrations = await loadCharacterIllustrationAssets(ids);
       const cloudCharacters = (rows || []).filter(row => !row.deleted_at).map(row => {
         const local = localOwnedForMerge.find(c => c.id === row.id) || {};
         const story = latestStory.get(row.id);
@@ -1819,7 +1824,9 @@ const ids = (rows || []).map(row => row.id);
           name: row.name || local.name || '未命名角色',
           gender: row.gender || local.gender || 'ambiguous',
           age: row.age == null ? (local.age || '') : String(row.age),
-          image: row.avatar_url || local.image || '',
+          image: ownerIllustrations.get(row.id)?.primary?.src || row.avatar_url || local.image || '',
+          primaryIllustrationPath:ownerIllustrations.get(row.id)?.primary?.path || local.primaryIllustrationPath || '',
+          galleryIllustrations:ownerIllustrations.get(row.id)?.gallery || local.galleryIllustrations || [],
           avatarVideoPath:row.avatar_video_path || local.avatarVideoPath || '',
           visibility: row.visibility || 'private',
           intro: row.intro ?? local.intro ?? '',
@@ -1862,6 +1869,297 @@ const ids = (rows || []).map(row => row.id);
     }
   }
 
+async function loadCharacterIllustrationAssets(characterIds) {
+  const client=window.mySupabase;
+  const ids=[...new Set((characterIds||[]).filter(Boolean))];
+  const result=new Map();
+  if(!client||!ids.length)return result;
+  const cleanupUserId=state.account?.uid;
+  if(cleanupUserId)await retryCharacterIllustrationCleanup(cleanupUserId);
+  const {data:rows,error}=await client.from('character_illustrations')
+    .select('id, character_id, storage_path, asset_type, sort_order, display_name')
+    .in('character_id',ids)
+    .order('sort_order',{ascending:true});
+  if(error)throw new Error('讀取角色立繪資料失敗：'+error.message);
+  for(const row of rows||[]){
+    const {data,error:signedError}=await client.storage.from('character-illustrations').createSignedUrl(row.storage_path,3600);
+    if(signedError||!data?.signedUrl)continue;
+    const list=result.get(row.character_id)||{primary:null,gallery:[]};
+    const asset={id:row.id,path:row.storage_path,src:data.signedUrl,sortOrder:row.sort_order,name:row.display_name||''};
+    if(row.asset_type==='primary')list.primary=asset;
+    else list.gallery.push(asset);
+    result.set(row.character_id,list);
+  }
+  return result;
+}
+async function refreshCharacterIllustrationSignedUrl(storagePath) {
+  const client=window.mySupabase;
+  if(!client||typeof storagePath!=='string'||!storagePath)return null;
+  const {data,error}=await client.storage.from('character-illustrations').createSignedUrl(storagePath,3600);
+  if(error||!data?.signedUrl)throw new Error('角色立繪簽名網址更新失敗：'+(error?.message||'missing_signed_url'));
+  return data.signedUrl;
+}
+if(!window.__characterIllustrationRefreshHandlerInstalled){
+  window.__characterIllustrationRefreshHandlerInstalled=true;
+  document.addEventListener('error',event=>{
+    const image=event.target;
+    if(!(image instanceof HTMLImageElement)||!image.dataset.characterIllustrationPath)return;
+    if(image.dataset.refreshingSignedUrl==='true'||image.dataset.signedUrlRefreshAttempted==='true')return;
+    image.dataset.refreshingSignedUrl='true';
+    image.dataset.signedUrlRefreshAttempted='true';
+    refreshCharacterIllustrationSignedUrl(image.dataset.characterIllustrationPath).then(url=>{
+      if(image.isConnected&&url)image.src=url;
+    }).catch(error=>{
+      console.warn('角色立繪網址更新失敗：',error?.message||error);
+      image.dataset.signedUrlRefreshAttempted='false';
+    }).finally(()=>{
+      image.dataset.refreshingSignedUrl='false';
+    });
+  },true);
+  document.addEventListener('load',event=>{
+    const image=event.target;
+    if(image instanceof HTMLImageElement&&image.dataset.characterIllustrationPath){
+      image.dataset.signedUrlRefreshAttempted='false';
+    }
+  },true);
+}
+
+async function enqueueCharacterIllustrationCleanup(storagePath,userId) {
+  const client=window.mySupabase;
+  if(!client||!userId||typeof storagePath!=='string')throw new Error('無法建立角色立繪清理紀錄。');
+  const parts=storagePath.split('/');
+  const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if(parts.length!==3||parts[0]!==userId||!uuidPattern.test(parts[1])||!uuidPattern.test(parts[2].replace(/\.(jpg|jpeg|png|webp)$/i,''))) {
+    throw new Error('角色立繪清理路徑驗證失敗。');
+  }
+  const {data,error}=await client.from('character_illustration_cleanup_jobs')
+    .upsert({author_id:userId,storage_path:storagePath},{onConflict:'author_id,storage_path'})
+    .select('id,attempts').single();
+  if(error||!data?.id)throw new Error('建立角色立繪清理紀錄失敗：'+(error?.message||'missing_job'));
+  return data;
+}
+async function cancelCharacterIllustrationCleanupJob(jobId,userId) {
+  if(!jobId)return;
+  const client=window.mySupabase;
+  const {error}=await client.from('character_illustration_cleanup_jobs').delete()
+    .eq('id',jobId).eq('author_id',userId);
+  if(error)console.warn('取消暫存的立繪清理工作失敗：',error.message);
+}
+async function processCharacterIllustrationCleanupJob(job,userId) {
+  const client=window.mySupabase;
+  const {data:references,error:referenceError}=await client.from('character_illustrations')
+    .select('id').eq('author_id',userId).eq('storage_path',job.storage_path).limit(1);
+  if(referenceError||references?.length) {
+    const reason=referenceError?.message||'此檔案仍被角色立繪資料引用';
+    const {error:updateError}=await client.from('character_illustration_cleanup_jobs')
+      .update({attempts:Number(job.attempts||0)+1,last_error:String(reason).slice(0,500),updated_at:new Date().toISOString()})
+      .eq('id',job.id).eq('author_id',userId);
+    if(updateError)console.warn('立繪清理保護紀錄更新失敗：',updateError.message);
+    return false;
+  }
+  const {error:storageError}=await client.storage.from('character-illustrations').remove([job.storage_path]);
+  if(storageError) {
+    const {error:updateError}=await client.from('character_illustration_cleanup_jobs')
+      .update({attempts:Number(job.attempts||0)+1,last_error:String(storageError.message||'Storage remove failed').slice(0,500),updated_at:new Date().toISOString()})
+      .eq('id',job.id).eq('author_id',userId);
+    if(updateError)console.warn('立繪清理失敗紀錄更新失敗：',updateError.message);
+    console.warn('角色立繪檔案清理待重試：',storageError.message);
+    return false;
+  }
+  const {error:deleteError}=await client.from('character_illustration_cleanup_jobs').delete()
+    .eq('id',job.id).eq('author_id',userId);
+  if(deleteError) {
+    console.warn('已移除立繪檔案，但清理工作紀錄刪除失敗，將於下次重試：',deleteError.message);
+    return false;
+  }
+  return true;
+}
+async function cleanupCharacterIllustrationUploads(paths,userId) {
+  for(const storagePath of paths||[]) {
+    try {
+      const job=await enqueueCharacterIllustrationCleanup(storagePath,userId);
+      await processCharacterIllustrationCleanupJob(job,userId);
+    } catch(error) {
+      console.warn('新上傳立繪回滾清理未能排入重試佇列：',error?.message||error);
+    }
+  }
+}
+async function retryCharacterIllustrationCleanup(userId) {
+  const client=window.mySupabase;
+  if(!client||!userId)return {processed:0,failed:0};
+  const {data:jobs,error}=await client.from('character_illustration_cleanup_jobs')
+    .select('id,storage_path,attempts').eq('author_id',userId).order('created_at',{ascending:true}).limit(50);
+  if(error) {
+    console.warn('讀取待重試的角色立繪清理工作失敗：',error.message);
+    return {processed:0,failed:0};
+  }
+  let processed=0,failed=0;
+  for(const job of jobs||[]) {
+    const ok=await processCharacterIllustrationCleanupJob(job,userId);
+    if(ok)processed++;else failed++;
+  }
+  return {processed,failed};
+}
+
+async function uploadCharacterIllustrationDataUrl(dataUrl,userId,characterId) {
+  const client=window.mySupabase;
+  if(!client||!userId||!characterId)throw new Error('無法確認角色立繪的雲端上傳權限。');
+  if(typeof dataUrl!=='string'||!/^data:image\/(png|jpeg|webp);base64,/i.test(dataUrl))throw new Error('角色立繪資料格式不正確，請重新選圖。');
+  const response=await fetch(dataUrl);
+  const blob=await response.blob();
+  if(!['image/png','image/jpeg','image/webp'].includes(blob.type))throw new Error('角色立繪只支援 PNG、JPG 或 WebP。');
+  if(blob.size>10*1024*1024)throw new Error('壓縮後的角色立繪不可超過 10 MB。');
+  const ext=({'image/png':'png','image/jpeg':'jpg','image/webp':'webp'})[blob.type];
+  const path=userId+'/'+characterId+'/'+id()+'.'+ext;
+  const {error}=await client.storage.from('character-illustrations').upload(path,blob,{upsert:false,contentType:blob.type,cacheControl:'3600'});
+  if(error)throw new Error('角色立繪上傳失敗：'+error.message);
+  return path;
+}
+async function syncCharacterIllustrations(character,userId) {
+  const client=window.mySupabase;
+  if(!client||!userId||!character?.id)throw new Error('無法確認角色立繪同步權限。');
+  const {data:existing,error:readError}=await client.from('character_illustrations')
+    .select('id, storage_path, asset_type, sort_order, display_name')
+    .eq('character_id',character.id).eq('author_id',userId);
+  if(readError)throw new Error('讀取既有立繪失敗：'+readError.message);
+  const oldPrimary=(existing||[]).find(row=>row.asset_type==='primary')||null;
+  const oldGallery=(existing||[]).filter(row=>row.asset_type==='gallery');
+  const uploaded=[];
+  const insertedGallery=[];
+  let nextPrimaryPath=draftPrimaryIllustrationPath||'';
+  const nextGallery=[];
+  await retryCharacterIllustrationCleanup(userId);
+  try{
+    if(!character.avatarVideoPath&&/^data:image\//i.test(String(draftImage||''))&&(!oldPrimary||draftPrimaryIllustrationPath!==oldPrimary.storage_path)){
+      nextPrimaryPath=await uploadCharacterIllustrationDataUrl(draftImage,userId,character.id);
+      uploaded.push(nextPrimaryPath);
+    }
+    if(character.avatarVideoPath)nextPrimaryPath='';
+    const desiredExistingIds=new Set(draftIllustrations
+      .filter(item=>item&&typeof item==='object'&&item.id&&item.path)
+      .map(item=>item.id));
+    const usedSlots=new Set(oldGallery.filter(row=>desiredExistingIds.has(row.id)).map(row=>Number(row.sort_order)));
+    for(const item of draftIllustrations){
+      if(item&&typeof item==='object'&&item.id&&item.path){
+        nextGallery.push({...item,name:String(item.name||'').trim().slice(0,40)});
+        continue;
+      }
+      const src=typeof item==='string'?item:item?.src;
+      if(!/^data:image\//i.test(String(src||'')))continue;
+      const freeSlot=[1,2,3,4,5].find(slot=>!usedSlots.has(slot));
+      if(!freeSlot)throw new Error('其他角色立繪最多保留 5 張。');
+      usedSlots.add(freeSlot);
+      const path=await uploadCharacterIllustrationDataUrl(src,userId,character.id);
+      uploaded.push(path);
+      const {data,error}=await client.from('character_illustrations')
+        .insert({character_id:character.id,author_id:userId,storage_path:path,asset_type:'gallery',sort_order:freeSlot,display_name:String(item?.name||'').trim().slice(0,40)})
+        .select('id').single();
+      if(error)throw new Error('儲存附加立繪資料失敗：'+error.message);
+      insertedGallery.push(data.id);
+      nextGallery.push({id:data.id,path,src,sortOrder:freeSlot,name:String(item?.name||'').trim().slice(0,40)});
+    }
+  }catch(error){
+    if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
+    if(uploaded.length)await cleanupCharacterIllustrationUploads(uploaded,userId);
+    throw error;
+  }
+
+  // Persist labels for retained gallery assets as well as newly inserted ones.
+  // Scope every update by both asset ID and author UID.
+  for(const item of nextGallery){
+    if(!item?.id)continue;
+    const {error}=await client.from('character_illustrations')
+      .update({display_name:String(item.name||'').trim().slice(0,40),updated_at:new Date().toISOString()})
+      .eq('id',item.id).eq('author_id',userId);
+    if(error){
+      if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
+      if(uploaded.length)await cleanupCharacterIllustrationUploads(uploaded,userId);
+      throw new Error('更新立繪名稱失敗：'+error.message);
+    }
+  }
+
+  // Only replace the primary row after every new gallery asset has uploaded successfully.
+  if(nextPrimaryPath){
+    if(oldPrimary){
+      let oldPrimaryCleanupJob;
+      if(oldPrimary.storage_path!==nextPrimaryPath){
+        try{oldPrimaryCleanupJob=await enqueueCharacterIllustrationCleanup(oldPrimary.storage_path,userId);}
+        catch(error){
+          if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
+          if(uploaded.length)await cleanupCharacterIllustrationUploads(uploaded,userId);
+          throw new Error('無法建立舊主要角色圖的清理紀錄：'+error.message);
+        }
+      }
+      const {error}=await client.from('character_illustrations')
+        .update({storage_path:nextPrimaryPath,sort_order:0,display_name:String(character.primaryIllustrationName||'').trim().slice(0,40),updated_at:new Date().toISOString()})
+        .eq('id',oldPrimary.id).eq('author_id',userId);
+      if(error){
+        if(oldPrimaryCleanupJob)await cancelCharacterIllustrationCleanupJob(oldPrimaryCleanupJob.id,userId);
+        if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
+        if(uploaded.length)await cleanupCharacterIllustrationUploads(uploaded,userId);
+        throw new Error('更新主要角色立繪資料失敗：'+error.message);
+      }
+      if(oldPrimaryCleanupJob)await processCharacterIllustrationCleanupJob(oldPrimaryCleanupJob,userId);
+    }else{
+      const {error}=await client.from('character_illustrations')
+        .insert({character_id:character.id,author_id:userId,storage_path:nextPrimaryPath,asset_type:'primary',sort_order:0,display_name:String(character.primaryIllustrationName||'').trim().slice(0,40)});
+      if(error){
+        if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
+        if(uploaded.length)await cleanupCharacterIllustrationUploads(uploaded,userId);
+        throw new Error('建立主要角色立繪資料失敗：'+error.message);
+      }
+    }
+  }else if(oldPrimary){
+    let oldPrimaryCleanupJob;
+    try{oldPrimaryCleanupJob=await enqueueCharacterIllustrationCleanup(oldPrimary.storage_path,userId);}
+    catch(error){
+      if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
+      if(uploaded.length)await cleanupCharacterIllustrationUploads(uploaded,userId);
+      throw new Error('無法建立舊主要角色圖的清理紀錄：'+error.message);
+    }
+    const {error}=await client.from('character_illustrations').delete().eq('id',oldPrimary.id).eq('author_id',userId);
+    if(error){
+      await cancelCharacterIllustrationCleanupJob(oldPrimaryCleanupJob.id,userId);
+      if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
+      if(uploaded.length)await cleanupCharacterIllustrationUploads(uploaded,userId);
+      throw new Error('移除舊主要立繪資料失敗：'+error.message);
+    }
+    await processCharacterIllustrationCleanupJob(oldPrimaryCleanupJob,userId);
+  }
+
+  const keepIds=new Set(nextGallery.filter(item=>item.id).map(item=>item.id));
+  const obsolete=oldGallery.filter(row=>!keepIds.has(row.id));
+  if(obsolete.length){
+    const cleanupJobs=[];
+    try{
+      for(const row of obsolete)cleanupJobs.push(await enqueueCharacterIllustrationCleanup(row.storage_path,userId));
+    }catch(error){
+      for(const job of cleanupJobs)await cancelCharacterIllustrationCleanupJob(job.id,userId);
+      console.warn('舊附加立繪尚未移除：清理紀錄建立失敗，保留原始資料以避免孤兒檔案。',error.message);
+      toast('部分舊立繪尚未完成移除，系統會保留原始檔案並於下次重試。');
+    }
+    if(cleanupJobs.length===obsolete.length){
+      const {error}=await client.from('character_illustrations').delete().in('id',obsolete.map(row=>row.id)).eq('author_id',userId);
+      if(error){
+        for(const job of cleanupJobs)await cancelCharacterIllustrationCleanupJob(job.id,userId);
+        console.warn('舊附加立繪 metadata 清理失敗：',error.message);
+      }else{
+        for(const job of cleanupJobs)await processCharacterIllustrationCleanupJob(job,userId);
+      }
+    }
+  }
+  if(!character.avatarVideoPath&&nextPrimaryPath){
+    const {error:avatarClearError}=await client.from('characters').update({avatar_url:null}).eq('id',character.id).eq('author_id',userId);
+    if(avatarClearError)console.warn('舊的內嵌圖片欄位尚未清除：',avatarClearError.message);
+  }
+  nextGallery.sort((left,right)=>Number(left.sortOrder||0)-Number(right.sortOrder||0));
+  draftPrimaryIllustrationPath=nextPrimaryPath;
+  draftIllustrations=nextGallery;
+  character.primaryIllustrationPath=nextPrimaryPath;
+  character.galleryIllustrations=nextGallery.map(item=>({id:item.id,path:item.path,sortOrder:item.sortOrder,name:item.name||''}));
+  return {primaryPath:nextPrimaryPath,gallery:nextGallery};
+}
+
   async function uploadCharacterAvatarVideo(file,userId,characterId){
   const client=window.mySupabase;
   if(!client||!userId||!characterId)throw new Error('請先登入再上傳角色影片。');
@@ -1897,62 +2195,42 @@ async function hydrateCharacterVideo(video){
 function normalizePersonalityProfile(value) {
   const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
   const limits={coreTraits:500,values:500,speechStyle:500,behaviorRules:700,likes:300,dislikes:300,boundaries:500,relationshipPacing:300};
-  return Object.fromEntries(Object.entries(limits).map(([key,max])=>[key,String(source[key]??'').trim().slice(0,max)]));
+  return {...Object.fromEntries(Object.entries(limits).map(([key,max])=>[key,String(source[key]??'').trim().slice(0,max)])),primaryIllustrationName:String(source.primaryIllustrationName??'').trim().slice(0,40)};
 }
 
-function parseEncounterScheduleText(raw) {
-  const rows = [];
-  for (const [index, line] of String(raw || '').split(/\r?\n/).entries()) {
-    const text = line.trim();
-    if (!text) continue;
-    const parts = text.split('|').map(value => value.trim());
-    if (parts.length !== 5) throw new Error('相遇日程第 ' + (index + 1) + ' 行格式錯誤，請使用「星期|開始|結束|地點代碼|活動」。');
-    const [dayRaw, start, end, locationKey, activity] = parts;
-    const weekday = dayRaw === '*' ? null : Number(dayRaw);
-    if (weekday !== null && (!Number.isInteger(weekday) || weekday < 0 || weekday > 6)) throw new Error('相遇日程第 ' + (index + 1) + ' 行的星期必須是 0 到 6，或 *。');
-    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(end) || start === end) throw new Error('相遇日程第 ' + (index + 1) + ' 行的時間格式錯誤，或開始與結束時間相同。');
-    if (!/^[a-zA-Z0-9_-]{1,80}$/.test(locationKey)) throw new Error('相遇日程第 ' + (index + 1) + ' 行的地點代碼只能使用英文、數字、底線或連字號。');
-    if (!activity || activity.length > 300) throw new Error('相遇日程第 ' + (index + 1) + ' 行的活動不可空白且最多 300 字。');
-    rows.push({ weekday, day_type: 'any', start_time: start, end_time: end, location_key: locationKey, activity, priority: 0, is_active: true });
-  }
-  if (rows.length > 50) throw new Error('每個角色最多設定 50 個日程時段。');
-  return rows;
-}
-
-async function saveEncounterSchedules(characterId, userId, rows) {
+async function saveEncounterScheduleDescription(characterId, userId, description) {
   const client = window.mySupabase;
-  if (!client || !characterId || !userId) throw new Error('無法確認相遇日程的雲端連線或角色所有權。');
-  // 使用資料庫交易函式一次同步整份清單；函式會以 auth.uid() 再驗證作者權限。
-  const { data, error } = await client.rpc('save_character_schedules', {
-    p_character_id: characterId,
-    p_schedules: rows
-  });
-  if (error) throw new Error('角色已儲存，但相遇日程同步失敗：' + error.message);
-  return data;
-}
-
-async function loadEncounterSchedulesIntoEditor(characterId) {
-  const client = window.mySupabase;
-  const field = document.querySelector('form[data-form="character"] textarea[name="encounterSchedules"]');
-  const user = currentUser();
-  if (!client || !user?.uid || !characterId || !field || field.value.trim()) return;
-  const { data, error } = await client.from('character_schedules')
-    .select('weekday, start_time, end_time, location_key, activity')
-    .eq('character_id', characterId)
-    .order('weekday', { ascending: true, nullsFirst: true })
-    .order('start_time', { ascending: true });
-  if (error) {
-    console.warn('讀取作者自己的相遇日程失敗：', error.message);
+  if (!client || !characterId || !userId) throw new Error('無法確認角色日程的雲端連線或角色所有權。');
+  const text = String(description || '').trim();
+  if (text.length > 20000) throw new Error('角色日程描述最多 20,000 字。');
+  if (!text) {
+    const { error } = await client.from('character_schedule_descriptions')
+      .delete().eq('character_id', characterId).eq('author_id', userId);
+    if (error) throw new Error('清除角色日程描述失敗：' + error.message);
     return;
   }
-  if (!field.isConnected || field.value.trim()) return;
-  field.value = (data || []).map(row => [
-    row.weekday == null ? '*' : row.weekday,
-    String(row.start_time || '').slice(0,5),
-    String(row.end_time || '').slice(0,5),
-    row.location_key,
-    row.activity
-  ].join('|')).join('\n');
+  const { error } = await client.from('character_schedule_descriptions').upsert({
+    character_id: characterId, author_id: userId, description: text,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'character_id' });
+  if (error) throw new Error('角色已儲存，但日程描述同步失敗：' + error.message);
+}
+
+async function loadEncounterScheduleDescriptionIntoEditor(characterId) {
+  const client = window.mySupabase;
+  const field = document.querySelector('form[data-form="character"] textarea[name="encounterScheduleDescription"]');
+  const user = currentUser();
+  if (!client || !user?.uid || !characterId || !field || field.value.trim()) return;
+  const { data, error } = await client.from('character_schedule_descriptions')
+    .select('description')
+    .eq('character_id', characterId)
+    .eq('author_id', user.uid)
+    .maybeSingle();
+  if (error) {
+    console.warn('讀取作者自己的角色日程描述失敗：', error.message);
+    return;
+  }
+  if (field.isConnected && !field.value.trim()) field.value = data?.description || '';
 }
 
 async function saveSupabaseCharacter(character, expectedUserId) {
@@ -2020,7 +2298,7 @@ async function saveSupabaseCharacter(character, expectedUserId) {
       title: null,
       gender: character.gender || null,
       age,
-      avatar_url: character.image || null,
+      avatar_url: character.primaryIllustrationPath ? null : (character.image || null),
       avatar_video_path: character.avatarVideoPath || null,
       visibility: nextVisibility,
       review_status: nextVisibility === 'public' ? 'approved' : 'draft',
@@ -2484,6 +2762,8 @@ let draftCharacter = null;
 let draftTags = [];
 let draftImage = '';
 let draftIllustrations = [];
+let draftPrimaryIllustrationPath = '';
+let editorIllustrationHydration = {characterId:null,status:'idle',promise:null,error:null};
 let draftVideoFile = null;
 let draftVideoPath = '';
 let draftVideoPreviewUrl = '';
@@ -3527,7 +3807,7 @@ function card(c,owner = false) {
       <div class="card-image">
         <button class="image-button" data-action="detail" data-id="${e(c.id)}"
                 aria-label="查看${e(c.name)}">
-          ${c.avatarVideoPath ? `<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" muted autoplay loop playsinline preload="metadata" aria-label="${e(c.name)}影片預覽"></video>` : `<img src="${e(safeImage(c.image))}" alt="${e(c.name)}" loading="lazy">`}
+          ${c.avatarVideoPath ? `<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" muted autoplay loop playsinline preload="metadata" aria-label="${e(c.name)}影片預覽"></video>` : `<img src="${e(safeImage(c.image))}" ${c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath)+'"' : ''} alt="${e(c.name)}" loading="lazy">`}
         </button>
         ${c.deletedAt ? '' : `<span class="card-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(initialTurnCount)}" title="對話回合數">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
@@ -3627,7 +3907,7 @@ function renderDetail() {
       ${offline ? '<div class="character-status-banner">● 此角色目前離線或已下架。你仍可查看這段既有聊天所保留的角色簡介與開場白，但不能開啟新對話。</div>' : ''}
       <div class="detail-layout">
         <div class="detail-portrait">
-${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline-image' : ''}" data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline aria-label="${e(c.name)} 的角色影片"></video>` : `<img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" alt="${e(c.name)}">`}
+${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline-image' : ''}" data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline aria-label="${e(c.name)} 的角色影片"></video>` : `<img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" ${c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath)+'"' : ''} alt="${e(c.name)}">`}
           <div class="detail-portrait-meta">
             <h1>${e(c.name)}</h1>
             <button class="author-link" data-action="author" data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>
@@ -4043,10 +4323,10 @@ function saveEditorDraft() {
     privateInfo:String(values.get('privateInfo') || ''),
     style:String(values.get('style') || ''),
     personalityProfile:normalizePersonalityProfile({
-      coreTraits:values.get('personalityCoreTraits'), values:values.get('personalityValues'),
-      speechStyle:values.get('personalitySpeechStyle'), behaviorRules:values.get('personalityBehaviorRules'),
+      primaryIllustrationName:values.get('primaryIllustrationName'),
+      coreTraits:values.get('personalityDescription'), values:'', speechStyle:'', behaviorRules:'',
       likes:values.get('personalityLikes'), dislikes:values.get('personalityDislikes'),
-      boundaries:values.get('personalityBoundaries'), relationshipPacing:values.get('personalityRelationshipPacing')
+      boundaries:'', relationshipPacing:''
     }),
     phoneNotices:String(values.get('phoneNotices') || ''),
     visibility:String(values.get('visibility') || 'private'),
@@ -4055,7 +4335,8 @@ function saveEditorDraft() {
     tags:[...draftTags],
     image:draftImage,
     avatarVideoPath:draftVideoPath,
-    illustrations:draftIllustrations.slice(0,4),
+    illustrations:draftIllustrations.slice(0,5).map((item,index)=>({...((typeof item==='object'&&item)?item:{src:item}),name:String(form.querySelector('[data-illustration-name="'+index+'"]')?.value||'').slice(0,40)})),
+    primaryIllustrationPath:draftPrimaryIllustrationPath,
     savedAt:Date.now()
   };
   const serialized = JSON.stringify(draft);
@@ -4084,20 +4365,49 @@ function startEditor(c = null) {
   draftTags = [...(c?.tags || [])];
   draftImage = c?.image || '';
   draftIllustrations = [];
+  draftPrimaryIllustrationPath = '';
+  editorIllustrationHydration = {characterId:c?.id||null,status:'idle',promise:null,error:null};
   draftVideoFile = null;
   draftVideoPath = c?.avatarVideoPath || '';
   if(draftVideoPreviewUrl){URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl='';}
   visit('editor',c?.id);
 }
-function renderCharacterIllustrationGallery(items = [], selectedImage = '') {
-  if (!Array.isArray(items) || !items.length) return '<p class="small muted">尚未加入立繪測試圖片。</p>';
-  return '<div class="character-illustration-grid">' + items.slice(0,4).map((src,index) =>
-    '<button type="button" class="character-illustration-option' + (src === selectedImage ? ' is-selected' : '') + '" data-character-illustration-index="' + index + '">' +
-      '<img src="' + e(safeImage(src)) + '" alt="立繪測試圖片 ' + (index+1) + '">' +
-      '<span>' + (src === selectedImage ? '目前主圖' : '設為主圖') + '</span>' +
-    '</button>'
-  ).join('') + '</div>';
+async function hydrateCharacterIllustrationsIntoEditor(characterId) {
+  const client=window.mySupabase;
+  const uid=currentUser()?.uid;
+  if(!client||!uid||!characterId||!owned(state.characters.find(item=>item.id===characterId)))throw new Error('無法確認角色立繪載入權限，請重新登入後再試。');
+  const assets=await loadCharacterIllustrationAssets([characterId]);
+    if(route.page!=='editor'||route.id!==characterId)return;
+    const current=assets.get(characterId)||{primary:null,gallery:[]};
+    if(current.primary&&!/^data:image\//i.test(String(draftImage||''))){
+      draftPrimaryIllustrationPath=current.primary.path;
+      draftImage=current.primary.src;
+      const preview=$('imagePreview');
+      if(preview){preview.src=current.primary.src;preview.dataset.characterIllustrationPath=current.primary.path;preview.classList.remove('hidden');}
+    }
+    if(!draftIllustrations.length&&current.gallery.length){
+      draftIllustrations=current.gallery.slice(0,5);
+    }else if(draftIllustrations.length&&current.gallery.length){
+      const refreshed=new Map(current.gallery.map(item=>[item.id,item]));
+      draftIllustrations=draftIllustrations.map(item=>item&&typeof item==='object'&&item.id&&refreshed.has(item.id)
+        ?{...item,...refreshed.get(item.id)}:item);
+    }
+    const gallery=$('characterIllustrationGallery');
+    if(gallery)gallery.innerHTML=renderCharacterIllustrationGallery(draftIllustrations);
+  saveEditorDraft();
 }
+function renderCharacterIllustrationGallery(items = []) {
+  if (!Array.isArray(items) || !items.length) return '<p class="small muted">尚未加入其他立繪。</p>';
+  return '<div class="character-illustration-grid">' + items.slice(0,5).map((item,index) => {
+    const src = typeof item === 'string' ? item : item?.src || '';
+    return '<div class="character-illustration-option">' +
+      '<img src="' + e(safeImage(src)) + '"' + (item&&item.path?' data-character-illustration-path="'+e(item.path)+'"':'') + ' alt="附加立繪 ' + (index+1) + '">' +
+      '<label class="field"><span>立繪名稱</span><input data-illustration-name="' + index + '" maxlength="40" placeholder="例如：開心、緊張" value="' + e(typeof item==='object'?(item.name||''):'') + '"></label>' +
+      '<button type="button" class="small" data-action="remove-character-illustration" data-index="' + index + '" aria-label="移除第 ' + (index+1) + ' 張立繪">移除</button>' +
+    '</div>';
+  }).join('') + '</div>';
+}
+
 function renderEditor() {
   const savedDraft = readEditorDraft();
   const original = draftCharacter || state.characters.find(c => c.id === route.id) || {};
@@ -4105,7 +4415,8 @@ function renderEditor() {
   if (savedDraft) {
     draftTags = Array.isArray(savedDraft.tags) ? [...savedDraft.tags] : draftTags;
     draftImage = savedDraft.image || draftImage || '';
-    draftIllustrations = Array.isArray(savedDraft.illustrations) ? savedDraft.illustrations.slice(0,4) : draftIllustrations;
+    draftIllustrations = Array.isArray(savedDraft.illustrations) ? savedDraft.illustrations.slice(0,5) : draftIllustrations;
+    draftPrimaryIllustrationPath = savedDraft.primaryIllustrationPath || draftPrimaryIllustrationPath || '';
     draftVideoPath = savedDraft.avatarVideoPath || draftVideoPath || '';
   }
   if (!draftCharacter && route.id) {
@@ -4125,19 +4436,6 @@ function renderEditor() {
     <div class="stack">${creationTabs()}
       <form class="panel form-width" data-form="character">
         <h2>${route.id ? '修改角色' : '建立新角色'}</h2>
-        <label class="field"><span>角色頭像 *</span>
-          <input id="characterImage" type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime">
-          <small>支援 PNG、JPG、WebP，圖片上限 15 MB；也可上傳 10 秒內、15 MB 以下的 MP4、WebM 或 MOV 影片。圖片會自動壓縮；影片會擷取封面，並在角色介紹頁播放。請確認你擁有素材使用權。</small>
-        </label>
-        <img id="imagePreview" ${draftImage ? `src="${e(safeImage(draftImage))}"` : ''}
-             class="${draftImage && !draftVideoPath ? '' : 'hidden'}"
-             alt="角色頭像或影片封面預覽" style="width:120px;height:150px;object-fit:cover;border-radius:13px;margin-bottom:10px">
-        <label class="field"><span>立繪測試圖片（可一次選擇多張）</span>
-          <input id="characterIllustrations" type="file" accept="image/png,image/jpeg,image/webp" multiple>
-          <small>最多 4 張 PNG、JPG 或 WebP，每張上限 15 MB。圖片只用於目前編輯器的立繪比較；點選縮圖可將該張設為角色主圖，再儲存角色測試。此測試欄不會把多張圖公開給其他使用者。</small>
-        </label>
-        <div id="characterIllustrationGallery" class="character-illustration-gallery">${renderCharacterIllustrationGallery(draftIllustrations, draftImage)}</div>
-        <video id="characterVideoPreview" class="${draftVideoPath ? '' : 'hidden'}" controls muted playsinline style="width:180px;max-height:240px;object-fit:contain;border-radius:13px;margin-bottom:18px;background:#000"></video>
         <label class="field"><span>角色名字 *</span>
           <input name="name" required maxlength="25" value="${e(c.name || '')}">
           <small>最多 25 字，可用中文、英文、數字、空格及 -：()_，支援對應全型符號。建議使用清楚好辨識的角色名稱，避免填入聯絡方式或宣傳資訊。</small>
@@ -4154,29 +4452,45 @@ function renderEditor() {
           <small class="char-counter" data-count-for="intro">0/2000</small></label>
         <label class="field"><span>開場白 * <details class="inline-help"><summary aria-label="開場白填寫說明" title="開場白填寫說明">?</summary><span>用 *動作* 表示場景描述；用 {USER} 帶入玩家名稱、{CHAR} 帶入角色名稱。</span></details></span><textarea name="opening" required maxlength="3000">${e(c.opening || '')}</textarea>
           <small class="char-counter" data-count-for="opening">0/3000</small></label>
-        <label class="field"><span>私密資訊</span><textarea name="privateInfo" maxlength="10000">${e(c.privateInfo || '')}</textarea>
-          <small class="char-counter" data-count-for="privateInfo">0/10000，不會顯示在公開介紹，請勿填寫真實機密</small></label>
-        <label class="field"><span>對話風格（舊欄位，保留相容）</span><textarea name="style" maxlength="1000">${e(c.style || '')}</textarea><small>可補充整體文風；下方人格欄位會更明確描述角色的行為與反應。</small></label>
-        <section class="memory-item stack" style="gap:12px"><strong>角色人格設定</strong><small>由創作者設定角色的核心人格，玩家不能直接改寫。請填寫可觀察、可扮演的特徵；作者私密設定仍請放在上方「私密資訊」。</small>
-          <label class="field"><span>核心性格</span><textarea name="personalityCoreTraits" maxlength="500" placeholder="例如：外冷內熱、觀察敏銳、不輕易示弱">${e(c.personalityProfile?.coreTraits || '')}</textarea></label>
-          <label class="field"><span>價值觀與行動動機</span><textarea name="personalityValues" maxlength="500" placeholder="例如：重視承諾、把家人安全放在第一位">${e(c.personalityProfile?.values || '')}</textarea></label>
-          <label class="field"><span>說話方式</span><textarea name="personalitySpeechStyle" maxlength="500" placeholder="例如：句子簡短、少用表情符號、緊張時會轉移話題">${e(c.personalityProfile?.speechStyle || '')}</textarea></label>
-          <label class="field"><span>行為準則與反應習慣</span><textarea name="personalityBehaviorRules" maxlength="700" placeholder="例如：生氣時先沉默，不會突然無理由改變立場">${e(c.personalityProfile?.behaviorRules || '')}</textarea></label>
-          <div class="two-col">
-            <label class="field"><span>角色喜好</span><textarea name="personalityLikes" maxlength="300" placeholder="喜歡的事物、活動或相處方式">${e(c.personalityProfile?.likes || '')}</textarea></label>
-            <label class="field"><span>角色雷點</span><textarea name="personalityDislikes" maxlength="300" placeholder="討厭的事物或容易觸發的反應">${e(c.personalityProfile?.dislikes || '')}</textarea></label>
-          </div>
-          <label class="field"><span>互動界線</span><textarea name="personalityBoundaries" maxlength="500" placeholder="角色不接受的互動、需要尊重的界線">${e(c.personalityProfile?.boundaries || '')}</textarea></label>
-          <label class="field"><span>關係發展節奏</span><textarea name="personalityRelationshipPacing" maxlength="300" placeholder="例如：慢熱、需要信任累積，不會初次見面就深情告白">${e(c.personalityProfile?.relationshipPacing || '')}</textarea></label>
+        <section class="memory-item stack" style="gap:12px"><strong>7. 角色人格設定</strong>
+          <small>詳細描述角色的核心性格、價值觀與行動動機、說話方式、行為準則與反應習慣等內容；填寫越詳細，角色人格就越完整。</small>
+          <label class="field"><span>角色人格設定</span><textarea name="personalityDescription" maxlength="3000" placeholder="例如：描述角色的核心性格、重視的價值、做決定的動機、說話語氣、行為準則，以及面對不同情境時的反應習慣。">${e([c.personalityProfile?.coreTraits,c.personalityProfile?.values,c.personalityProfile?.speechStyle,c.personalityProfile?.behaviorRules,c.personalityProfile?.boundaries,c.personalityProfile?.relationshipPacing].filter(Boolean).join('\n'))}</textarea></label>
         </section>
+        <section class="memory-item stack" style="gap:12px"><strong>8. 角色人格愛好</strong><small>描述角色喜歡與不喜歡的事物、活動及相處方式。</small><div class="two-col"><label class="field"><span>喜歡</span><textarea name="personalityLikes" maxlength="300" placeholder="喜歡的事物、活動或相處方式">${e(c.personalityProfile?.likes || '')}</textarea></label><label class="field"><span>不喜歡／雷點</span><textarea name="personalityDislikes" maxlength="300" placeholder="討厭的事物或容易觸發的反應">${e(c.personalityProfile?.dislikes || '')}</textarea></label></div></section>
         <section class="memory-item stack" style="gap:10px">
-          <strong>相遇模式｜角色日程（測試版）</strong>
-          <small>每行一個時段，格式：星期(0=日、1=一…6=六，*代表每天)|開始時間|結束時間|地點代碼|角色活動。例：1|09:00|12:00|cafe|在咖啡廳工作。此設定目前只有作者可讀，尚未開放玩家端查詢。</small>
-          <label class="field"><span>日程時段</span><textarea name="encounterSchedules" maxlength="20000" placeholder="1|09:00|12:00|cafe|在咖啡廳工作\n*|18:00|20:00|park|傍晚散步">${e(savedDraft?.encounterSchedules ?? c.encounterSchedules ?? '')}</textarea></label>
-          <label class="check"><input type="checkbox" name="clearEncounterSchedules" value="yes"><span>明確清空這個角色的所有日程（需勾選，避免誤刪）</span></label>
+          <strong>9. 角色日程</strong>
+          <small>簡單描述角色平日、假日的生活作息、常去的地點，以及通常會進行的活動。可以自由描述，不需要填寫固定格式或精確時段。</small>
+          <label class="field"><span>生活作息與日常活動</span><textarea name="encounterScheduleDescription" maxlength="20000" placeholder="例如：平日早上通常在公司上班，中午會到附近餐廳用餐。晚上偶爾去咖啡廳看書。週末比較自由，有時會到公園散步，或和朋友去酒吧。">${e(savedDraft?.encounterScheduleDescription ?? c.encounterScheduleDescription ?? '')}</textarea>
+          </label>
         </section>
-        <section class="memory-item stack" style="gap:10px"><strong>角色手機設定</strong>
-          <label class="field"><span>AI 手機通知揭露指示（每行一則）</span><textarea name="phoneNotices" maxlength="1200" placeholder="💬心裡話 | 每回合揭露一則簡短心裡話\n🔎線索 | 當劇情出現新線索時，揭露線索通知">${e(savedDraft?.phoneNotices ?? (Array.isArray(c.phoneSettings?.noticePrompts) ? c.phoneSettings.noticePrompts.join('\n') : Array.isArray(c.phoneSettings?.notices) ? c.phoneSettings.notices.join('\n') : ''))}</textarea><small>在這裡填寫每回合對話需要揭露的狀態。每行描述一種 AI 可揭露的通知條件／內容，不是固定顯示文字；最多 8 則。</small></label></section>
+        <section class="memory-item stack" style="gap:12px">
+          <strong>10. 角色私密設定</strong>
+          <small>描寫角色私下的隱藏劇情、秘密、未公開背景或只有作者需要掌握的設定；此內容僅作者可查看，不會公開給一般玩家。</small>
+          <label class="field"><span>私密設定</span><textarea name="privateInfo" maxlength="10000" placeholder="描寫角色私下的隱藏劇情與秘密…">${e(c.privateInfo || '')}</textarea>
+            <small class="char-counter" data-count-for="privateInfo">0/10000；僅作者可查看。</small>
+          </label>
+        </section>
+        <section class="memory-item stack" style="gap:10px"><strong>11. 角色手機設定</strong>
+          <label class="field"><span>手機通知揭露指示（每行 1 則，最多 8 則）</span><textarea name="phoneNotices" maxlength="1200" placeholder="💬心裡話 | 每回合揭露一則簡短心裡話\n🔎線索 | 當劇情出現新線索時，揭露線索通知">${e(savedDraft?.phoneNotices ?? (Array.isArray(c.phoneSettings?.noticePrompts) ? c.phoneSettings.noticePrompts.join('\n') : Array.isArray(c.phoneSettings?.notices) ? c.phoneSettings.notices.join('\n') : ''))}</textarea><small>每行填寫一則 AI 手機通知的揭露指示，最多 8 則。</small></label></section>
+        <section class="memory-item stack" style="gap:12px">
+          <strong>上傳主要角色圖</strong>
+          <label class="field"><span>角色主圖 *</span>
+            <input id="characterImage" type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime"><input name="primaryIllustrationName" maxlength="40" placeholder="名稱，例如：主要角色" value="${e(c.personalityProfile?.primaryIllustrationName||'主要角色')}">
+            <small>支援透明 PNG／WebP 與 JPG；也可上傳 10 秒內、15 MB 以下的 MP4、WebM 或 MOV 影片。若上傳影片，會自動使用影片封面作為主要角色圖。請確認你擁有素材使用權。</small>
+          </label>
+          <img id="imagePreview" ${draftImage ? `src="${e(safeImage(draftImage))}"` : ''}
+               class="${draftImage && !draftVideoPath ? '' : 'hidden'}"
+               alt="主要角色圖預覽" style="width:160px;max-height:240px;object-fit:contain;object-position:center;border-radius:13px;margin-bottom:10px;background:rgba(120,110,140,.08)">
+          <video id="characterVideoPreview" class="${draftVideoPath ? '' : 'hidden'}" controls muted playsinline style="width:180px;max-height:240px;object-fit:contain;border-radius:13px;margin-bottom:18px;background:#000"></video>
+        </section>
+        <section class="memory-item stack" style="gap:12px">
+          <strong>相遇模式立繪（最多 5 張）</strong>
+          <label class="field"><span>場景立繪（最多 5 張）</span>
+            <input id="characterIllustrations" type="file" accept="image/png,image/jpeg,image/webp" multiple>
+            <small>每張立繪可填寫名稱，例如「開心」「緊張」。AI 會依照對話情境判斷是否使用合適的表情圖。建議使用白底或透明背景 PNG；最多 5 張，每張上限 10 MB。</small>
+          </label>
+          <div id="characterIllustrationGallery" class="character-illustration-gallery">${renderCharacterIllustrationGallery(draftIllustrations, draftImage)}</div>
+        </section>
         <label class="field"><span>權限</span><select name="visibility">
           <option value="private" ${c.visibility !== 'public' ? 'selected' : ''}>私密</option>
           <option value="public" ${c.visibility === 'public' ? 'selected' : ''}>公開</option>
@@ -4197,7 +4511,20 @@ function renderEditor() {
         </div>
       </form>
     </div>`;
-  if (route.id && !savedDraft?.encounterSchedules) void loadEncounterSchedulesIntoEditor(route.id);
+  if (route.id && !savedDraft?.encounterScheduleDescription) void loadEncounterScheduleDescriptionIntoEditor(route.id);
+  if (route.id && (editorIllustrationHydration.characterId!==route.id || editorIllustrationHydration.status==='idle')) {
+    const characterId=route.id;
+    editorIllustrationHydration={characterId,status:'loading',promise:null,error:null};
+    const promise=hydrateCharacterIllustrationsIntoEditor(characterId);
+    editorIllustrationHydration.promise=promise;
+    promise.then(()=>{
+      if(editorIllustrationHydration.characterId===characterId)editorIllustrationHydration.status='loaded';
+    }).catch(error=>{
+      if(editorIllustrationHydration.characterId===characterId){editorIllustrationHydration.status='error';editorIllustrationHydration.error=error;}
+      console.warn('角色立繪載入失敗：',error);
+      toast('角色立繪載入失敗：'+error.message);
+    });
+  }
   if(draftVideoPath){const preview=$('characterVideoPreview');void window.mySupabase?.storage.from('character-avatar-videos').createSignedUrl(draftVideoPath,300).then(({data,error})=>{if(!error&&data?.signedUrl&&preview?.isConnected){preview.src=data.signedUrl;preview.classList.remove('hidden');}});}
   void isNsfwTermsAdmin().then(isAdmin=>{const button=$('view')?.querySelector('[data-action="nsfw-term-manager"]');if(button&&isAdmin)button.hidden=false;});
   if(c.aiGeneratedDraft)void (async()=>{
@@ -4286,10 +4613,9 @@ async function compressUploadImage(file, options = {}) {
     const targetBytes=Number(options.targetBytes)||500*1024;
     const maxEdge=Number(options.maxEdge)||1600;
     let scale=Math.min(1,maxEdge/Math.max(image.naturalWidth,image.naturalHeight));
-    const formats=[
-      {type:'image/webp',qualities:[0.84,0.76,0.68,0.60,0.52]},
-      {type:'image/jpeg',qualities:[0.82,0.72,0.62,0.52]}
-    ];
+    const formats=options.preserveAlpha
+      ?[{type:'image/webp',qualities:[0.86,0.78,0.70,0.62,0.54]},{type:'image/png',qualities:[1]}]
+      :[{type:'image/webp',qualities:[0.84,0.76,0.68,0.60,0.52]},{type:'image/jpeg',qualities:[0.82,0.72,0.62,0.52]}];
     let bestBlob=null,bestWidth=0,bestHeight=0;
     while(scale>=0.35) {
       const width=Math.max(1,Math.round(image.naturalWidth*scale));
@@ -8500,6 +8826,18 @@ document.addEventListener('submit',async event => {
     switch(type) {
       case 'character': {
         const user = currentUser();
+        if(route.id){
+          const hydration=editorIllustrationHydration;
+          if(hydration.characterId!==route.id || hydration.status==='idle'){
+            toast('角色立繪尚未載入完成，請重新開啟編輯頁面後再儲存。');
+            return;
+          }
+          if(hydration.status==='loading' && hydration.promise) await hydration.promise;
+          if(editorIllustrationHydration.characterId!==route.id || editorIllustrationHydration.status!=='loaded'){
+            toast('角色立繪載入失敗，為避免誤刪既有圖片，本次未儲存。請重新載入編輯頁面再試一次。');
+            return;
+          }
+        }
         if (!user?.uid || !window.mySupabase) {
           return toast('請先使用 Google 帳號登入，角色才會保存到雲端。');
         }
@@ -8526,10 +8864,9 @@ document.addEventListener('submit',async event => {
           privateInfo:String(f.get('privateInfo')).trim(),
           style:String(f.get('style')).trim(),
           personalityProfile:normalizePersonalityProfile({
-            coreTraits:f.get('personalityCoreTraits'), values:f.get('personalityValues'),
-            speechStyle:f.get('personalitySpeechStyle'), behaviorRules:f.get('personalityBehaviorRules'),
+            coreTraits:f.get('personalityDescription'), values:'', speechStyle:'', behaviorRules:'',
             likes:f.get('personalityLikes'), dislikes:f.get('personalityDislikes'),
-            boundaries:f.get('personalityBoundaries'), relationshipPacing:f.get('personalityRelationshipPacing')
+            boundaries:'', relationshipPacing:''
           }),
           phoneSettings:{noticePrompts:String(f.get('phoneNotices')||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,8).map(x=>x.slice(0,150))},
           visibility:String(f.get('visibility')),image:draftImage,
@@ -8543,24 +8880,16 @@ document.addEventListener('submit',async event => {
         };
 
         if(draftVideoFile)c.avatarVideoPath=await uploadCharacterAvatarVideo(draftVideoFile,user.uid,c.id);
-        // 先驗證日程格式，避免角色資料已寫入後才發現日程格式錯誤。
-        const scheduleText = String(f.get('encounterSchedules') || '').trim();
-        const clearSchedules = form.querySelector('input[name="clearEncounterSchedules"]')?.checked === true;
-        let scheduleRows = [];
-        if (scheduleText) {
-          try { scheduleRows = parseEncounterScheduleText(scheduleText); }
-          catch (scheduleError) { return toast(scheduleError.message); }
-        }
-        if (clearSchedules && scheduleText) return toast('若要清空日程，請先清空文字欄位；若要保留或更新日程，請取消勾選清空選項。');
+        // 自然語言日程只做長度與登入者檢查，不要求作者提供任何機器格式。
+        const scheduleDescription = String(f.get('encounterScheduleDescription') || '').trim();
+        if (scheduleDescription.length > 20000) return toast('角色日程描述最多 20,000 字。');
         // 先寫入雲端；只有角色資料成功後才更新本機畫面狀態。
+        c.primaryIllustrationPath=draftPrimaryIllustrationPath || '';
         const saveResult = await saveSupabaseCharacter(c, user.uid);
-        // 使用後端交易函式同步整份清單，支援新增、修改、刪除且不會留下半套資料。
-        if (scheduleText || clearSchedules) {
-          await saveEncounterSchedules(c.id, user.uid, scheduleRows);
-          c.encounterSchedules = scheduleText;
-        } else if (old?.encounterSchedules) {
-          c.encounterSchedules = old.encounterSchedules;
-        }
+        await syncCharacterIllustrations(c,user.uid);
+        // 日程原文存入獨立作者專用資料表，不會混入公開角色資料或公開日程解析器。
+        await saveEncounterScheduleDescription(c.id, user.uid, scheduleDescription);
+        c.encounterScheduleDescription = scheduleDescription;
         // 以資料庫確認的公開狀態為準，避免非同步雲端角色載入替換 state.characters
         // 後，indexOf(old) 回傳 -1，導致本機仍保留「私密」狀態而隱藏評論區。
         c.visibility = saveResult.visibility;
@@ -9185,23 +9514,17 @@ document.addEventListener('keydown',event => {
   else event.target.form?.requestSubmit();
 });
 document.addEventListener('click',function(event){
-  const option=event.target.closest('[data-character-illustration-index]');
-  if(!option)return;
-  const index=Number(option.dataset.characterIllustrationIndex);
-  if(!Number.isInteger(index)||!draftIllustrations[index])return;
-  draftImage=draftIllustrations[index];
-  draftVideoFile=null;
-  draftVideoPath='';
-  if(draftVideoPreviewUrl){URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl='';}
-  const imagePreview=$('imagePreview');
-  if(imagePreview){imagePreview.src=draftImage;imagePreview.classList.remove('hidden');}
-  const videoPreview=$('characterVideoPreview');
-  if(videoPreview){videoPreview.removeAttribute('src');videoPreview.classList.add('hidden');}
+  const remove=event.target.closest('[data-action="remove-character-illustration"]');
+  if(!remove)return;
+  const index=Number(remove.dataset.index);
+  if(!Number.isInteger(index)||index<0||index>=draftIllustrations.length)return;
+  draftIllustrations.splice(index,1);
   const gallery=$('characterIllustrationGallery');
-  if(gallery)gallery.innerHTML=renderCharacterIllustrationGallery(draftIllustrations,draftImage);
+  if(gallery)gallery.innerHTML=renderCharacterIllustrationGallery(draftIllustrations);
   saveEditorDraft();
-  toast('已切換角色主圖；儲存角色後即可測試這張立繪。');
+  toast('已移除這張附加立繪；儲存角色後會同步更新雲端。');
 });
+
 document.addEventListener('change',async event => {
   const target=event.target;
   if (target.closest('form[data-form="character"]')) saveEditorDraft();
@@ -9223,7 +9546,7 @@ document.addEventListener('change',async event => {
           if(requestId!==characterImageCompressionRequest){URL.revokeObjectURL(url);return;}
           const canvas=document.createElement('canvas');canvas.width=Math.min(1200,meta.width);canvas.height=Math.max(1,Math.round(canvas.width*meta.height/meta.width));
           const ctx=canvas.getContext('2d');if(!ctx)throw new Error('無法產生影片封面。');ctx.drawImage(frame,0,0,canvas.width,canvas.height);
-          draftImage=canvas.toDataURL('image/jpeg',.82);draftVideoFile=file;draftVideoPath='';
+          draftImage=canvas.toDataURL('image/jpeg',.82);draftVideoFile=file;draftVideoPath='';draftPrimaryIllustrationPath='';
           if(draftVideoPreviewUrl)URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl=url;
           $('imagePreview').src=draftImage;$('imagePreview').classList.add('hidden');
           const preview=$('characterVideoPreview');preview.src=url;preview.classList.remove('hidden');
@@ -9231,11 +9554,11 @@ document.addEventListener('change',async event => {
         }else{
           if(!['image/png','image/jpeg','image/webp'].includes(file.type))throw new Error('圖片格式僅支援 PNG、JPG 或 WebP。');
           if(draftVideoPreviewUrl){URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl='';}
-          draftVideoFile=null;draftVideoPath='';
+          draftVideoFile=null;draftVideoPath='';draftPrimaryIllustrationPath='';
           const preview=$('characterVideoPreview');preview.removeAttribute('src');preview.classList.add('hidden');
           $('imagePreview').classList.remove('hidden');
           toast('正在壓縮角色圖片，請稍候…');
-          const compressed=await compressUploadImage(file,{maxEdge:1600,targetBytes:500*1024});
+          const compressed=await compressUploadImage(file,{maxEdge:1600,targetBytes:500*1024,preserveAlpha:true});
           if(requestId!==characterImageCompressionRequest)return;
           draftImage=compressed.dataUrl;$('imagePreview').src=draftImage;$('imagePreview').classList.remove('hidden');
           toast('角色頭像已自動壓縮。');saveEditorDraft();
@@ -9246,23 +9569,22 @@ document.addEventListener('change',async event => {
     if(target.id==='characterIllustrations'){
       const files=Array.from(target.files||[]);
       if(!files.length)return;
-      if(files.length>4){target.value='';throw new Error('立繪測試最多一次選擇 4 張圖片。');}
+      if(draftIllustrations.length+files.length>5){target.value='';throw new Error('其他角色立繪最多保留 5 張。');}
       const supported=['image/png','image/jpeg','image/webp'];
       for(const file of files){
-        if(file.size>15*1024*1024)throw new Error('每張立繪測試圖片不可超過 15 MB。');
-        if(!supported.includes(file.type))throw new Error('立繪測試圖片僅支援 PNG、JPG 或 WebP。');
+        if(file.size>10*1024*1024)throw new Error('每張附加立繪不可超過 10 MB。');
+        if(!supported.includes(file.type))throw new Error('附加立繪僅支援 PNG、JPG 或 WebP。');
       }
-      toast('正在處理立繪測試圖片…');
-      const next=[];
+      toast('正在處理附加立繪…');
       for(const file of files){
-        const compressed=await compressUploadImage(file,{maxEdge:1600,targetBytes:350*1024});
-        next.push(compressed.dataUrl);
+        const compressed=await compressUploadImage(file,{maxEdge:1800,targetBytes:700*1024,preserveAlpha:true});
+        draftIllustrations.push({src:compressed.dataUrl,path:'',id:'',sortOrder:draftIllustrations.length});
       }
-      draftIllustrations=next;
       const gallery=$('characterIllustrationGallery');
-      if(gallery)gallery.innerHTML=renderCharacterIllustrationGallery(draftIllustrations,draftImage);
+      if(gallery)gallery.innerHTML=renderCharacterIllustrationGallery(draftIllustrations);
       saveEditorDraft();
-      toast('已載入 '+next.length+' 張立繪，點選縮圖即可切換角色主圖。');
+      target.value='';
+      toast('已加入附加立繪預覽；儲存角色後會上傳至雲端。');
     }
     if (target.id==='profileImage') {
       if (!target.files?.[0]) return;
@@ -10650,12 +10972,11 @@ document.addEventListener('submit',function(event){
     const defaultSceneImage='https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp';
     panel.style.setProperty('--encounter-scene-photo','url('+JSON.stringify(sceneImage||defaultSceneImage)+')');
     panel.dataset.encounterPlace=session.encounterPlace||'';
-    // Prefer a dedicated sprite. When only a character-card image exists, try to
-    // remove edge-connected near-white background pixels in-browser so the card's
-    // baked-in white canvas does not cover the encounter scene.
+    // Encounter scenes use dedicated encounter art or the author's scene-illustration gallery.
+    // The character-card primary image is intentionally never reused as a scene sprite.
     const dedicatedSprite=safeImage(character?.encounterPortraitImage||character?.halfBodyImage||character?.transparentPortrait||character?.encounterSprite||'');
-    const cardPortrait=safeImage(character?.image||character?.avatar_url||character?.avatarUrl||'');
-    const halfBodyImage=dedicatedSprite||cardPortrait;
+    const sceneIllustration=safeImage(character?.galleryIllustrations?.[0]?.src||'');
+    const halfBodyImage=dedicatedSprite||sceneIllustration;
     let existingSprite=panel.querySelector('.encounter-character-sprite');
     const missingArt=panel.querySelector('.encounter-missing-art');
     if(halfBodyImage){
