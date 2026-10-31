@@ -36,7 +36,7 @@ assert.match(html, /image: publicIllustrations\.get\(row\.id\)\?\.primary\?\.src
 assert.match(html, /image: ownerIllustrations\.get\(row\.id\)\?\.primary\?\.src \|\| row\.avatar_url/);
 
 // Gallery sync must keep nextGallery in function scope for post-upload persistence and cleanup.
-assert.match(html, /async function syncCharacterIllustrations\([\s\S]*?let nextPrimaryPath=draftPrimaryIllustrationPath\|\|\x27\x27;\s*const nextGallery=\[\];\s*try\{/);
+assert.match(html, /async function syncCharacterIllustrations\([\s\S]*?let nextPrimaryPath=draftPrimaryIllustrationPath\|\|\x27\x27;\s*const nextGallery=\[\];\s*await retryCharacterIllustrationCleanup\(userId\);\s*try\{/);
 assert.doesNotMatch(html, /const usedSlots=new Set\([\s\S]*?\n\s*const nextGallery=\[\];/);
 
 // Failed Storage deletions are durably queued, owner-scoped, and retried on asset loads/saves.
