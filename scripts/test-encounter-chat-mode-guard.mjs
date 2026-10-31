@@ -131,6 +131,7 @@ assert.match(evaluationDispatchMigration, /FUNCTION public\.fail_encounter_evalu
 assert.match(evaluationDispatchMigration, /FOR UPDATE SKIP LOCKED/);
 assert.match(evaluationDispatchMigration, /Encounter evaluation job session link is invalid/);
 assert.match(evaluationDispatchMigration, /cron\.schedule/);
+assert.match(evaluationDispatchMigration, /CREATE EXTENSION IF NOT EXISTS pg_cron/);
 assert.match(evaluationDispatchMigration, /status='ready_to_settle'/);
 assert.match(evaluationDispatchMigration, /status IN \('created','reserved','needs_reconciliation'\)/);
 
