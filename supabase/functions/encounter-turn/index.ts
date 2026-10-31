@@ -90,7 +90,8 @@ Deno.serve(async (request) => {
     p_user_message_id: userMessageId, p_assistant_message_id: assistantMessageId,
   });
   if (reserveError?.code === "23505" || String(reserveError?.message || "").includes("chat_turn_charges_user_message_id_uidx")) return json({ error: "user_message_already_charged", retryAllowed: false }, 409);
-  if (reserveError?.code === "23514" || String(reserveError?.message || "").includes("encounter_scene_expired_or_inactive")) return json({ error: "encounter_scene_expired_or_inactive", retryAllowed: false }, 409);\n  if (reserveError) return json({ error: "reservation_failed" }, 503);
+  if (reserveError?.code === "23514" || String(reserveError?.message || "").includes("encounter_scene_expired_or_inactive")) return json({ error: "encounter_scene_expired_or_inactive", retryAllowed: false }, 409);
+  if (reserveError) return json({ error: "reservation_failed" }, 503);
   const charge = Array.isArray(reservation) ? reservation[0] : reservation;
   if (!charge) return json({ error: "reservation_state_missing" }, 503);
   if (charge.status === "insufficient_funds") return json({
