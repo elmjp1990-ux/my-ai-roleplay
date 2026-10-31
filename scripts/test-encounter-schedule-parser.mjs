@@ -7,6 +7,7 @@ const html = fs.readFileSync("index.html", "utf8");
 assert.match(html, /name="encounterScheduleDescription"/);
 assert.match(html, /簡單描述角色平日、假日的生活作息/);
 assert.match(html, /不需要填寫固定格式或精確時段/);
+assert.doesNotMatch(html, /可直接用自然語言描述；不需要輸入星期代碼、時間格式或地點代碼。這份描述僅作者可查看。/);
 assert.doesNotMatch(html, /name="clearEncounterSchedules"/);
 assert.doesNotMatch(html, /function parseEncounterScheduleText\(raw\)/);
 assert.doesNotMatch(html, /星期\(0=日、1=一/);
@@ -32,5 +33,12 @@ assert.match(html, /document\.addEventListener\('error',[\s\S]*refreshCharacterI
 assert.match(html, /document\.addEventListener\('load'/);
 assert.match(html, /image: publicIllustrations\.get\(row\.id\)\?\.primary\?\.src \|\| row\.avatar_url/);
 assert.match(html, /image: ownerIllustrations\.get\(row\.id\)\?\.primary\?\.src \|\| row\.avatar_url/);
+
+// The card primary image is not reused as encounter-scene art.
+assert.match(html, /const sceneIllustration=safeImage\(character\?\.galleryIllustrations\?\.\[0\]\?\.src\|\|\x27\x27\)/);
+assert.match(html, /const halfBodyImage=dedicatedSprite\|\|sceneIllustration/);
+assert.doesNotMatch(html, /const cardPortrait=safeImage\(character\?\.image/);
+assert.match(html, /相遇模式立繪（最多 5 張）/);
+assert.match(html, /主要角色圖預覽/);
 
 console.log("Author schedule and illustration signed-URL refresh contract tests passed.");
