@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { resolveEncounterSchedule } from "../_shared/encounter-schedule.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,8 +35,10 @@ Deno.serve(async (request: Request) => {
 
   const characterId = body.characterId;
   const sessionId = body.sessionId;
-  if (!isUuid(characterId) || !isUuid(sessionId)) {
-    return json({ error: "invalid_identifiers" }, 400);
+  const locationKey = body.locationKey;
+  if (!isUuid(characterId) || !isUuid(sessionId) ||
+      typeof locationKey !== "string" || !/^[a-zA-Z0-9_-]{1,80}$/.test(locationKey)) {
+    return json({ error: "invalid_identifiers_or_location" }, 400);
   }
 
   const userClient = createClient(url, anonKey, {
@@ -77,6 +80,15 @@ Deno.serve(async (request: Request) => {
       existing.chat_mode !== "encounter" ||
       existing.deleted_at !== null
     ) return json({ error: "session_id_conflict" }, 409);
+    const { data: lifecycle, error: lifecycleError } = await admin
+      .from("encounter_session_lifecycle")
+      .select("location_key")
+      .eq("session_id", sessionId)
+      .maybeSingle();
+    if (lifecycleError) return json({ error: "encounter_lifecycle_lookup_failed" }, 503);
+    if (!lifecycle || lifecycle.location_key !== locationKey) {
+      return json({ error: "encounter_session_incomplete_or_location_conflict" }, 409);
+    }
     return json({ session: existing, idempotent: true });
   }
 
@@ -112,34 +124,35 @@ Deno.serve(async (request: Request) => {
     deletedAt: character.deleted_at,
   };
 
-  const { data: session, error: insertError } = await admin
-    .from("chat_sessions")
-    .insert({
-      id: sessionId,
-      user_id: user.id,
-      character_id: character.id,
-      character_name: character.name,
-      status: "active",
-      character_snapshot: snapshot,
-      session_data: { encounter: { affinity: 0, relationshipStage: "first_meeting" } },
-      chat_mode: "encounter",
-    })
-    .select("id,user_id,character_id,character_name,character_snapshot,session_data,chat_mode,created_at,updated_at")
-    .single();
+  // Resolve the active schedule on the server using Taiwan local time.
+  const { data: schedules, error: scheduleError } = await admin
+    .from("character_schedules")
+    .select("id,weekday,day_type,start_time,end_time,location_key,activity,priority,is_active")
+    .eq("character_id", characterId)
+    .eq("is_active", true)
+    .eq("location_key", locationKey);
+  if (scheduleError) return json({ error: "encounter_schedule_lookup_failed" }, 503);
+  const scheduleResolution = resolveEncounterSchedule(schedules || [], locationKey, new Date());
+  if (!scheduleResolution) return json({ error: "character_not_at_this_location_now" }, 409);
+  const { scheduleSnapshot, scheduledStartAt, scheduledEndAt } = scheduleResolution;
 
-  if (insertError) {
-    // A concurrent retry may have inserted the same session after our first read.
-    const { data: retrySession } = await admin
-      .from("chat_sessions")
-      .select("id,user_id,character_id,character_name,character_snapshot,session_data,chat_mode,deleted_at")
-      .eq("id", sessionId)
-      .maybeSingle();
-    if (
-      retrySession?.user_id === user.id &&
-      retrySession?.character_id === characterId &&
-      retrySession?.chat_mode === "encounter" &&
-      retrySession?.deleted_at === null
-    ) return json({ session: retrySession, idempotent: true });
+
+  const { data: session, error: insertError } = await admin.rpc(
+    "create_encounter_session_with_lifecycle",
+    {
+      p_session_id: sessionId,
+      p_user_id: user.id,
+      p_character_id: character.id,
+      p_character_name: character.name,
+      p_character_snapshot: snapshot,
+      p_schedule_snapshot: scheduleSnapshot,
+      p_location_key: locationKey,
+      p_scheduled_start_at: scheduledStartAt,
+      p_scheduled_end_at: scheduledEndAt,
+    },
+  );
+  if (insertError || !session?.id || session.id !== sessionId) {
+    console.error("Encounter session creation failed:", insertError?.message || "invalid_rpc_result");
     return json({ error: "encounter_session_create_failed" }, 503);
   }
 
