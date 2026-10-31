@@ -102,6 +102,15 @@ assert.match(retryChargeLookupMigration, /c\.reserved_at <= l\.scheduled_end_at/
 assert.match(retryChargeLookupMigration, /l\.scheduled_end_at <= clock_timestamp\(\)/);
 assert.match(retryChargeLookupMigration, /turn_id_reuse_conflict/);
 
+const retryLifecycleMigration = fs.readFileSync(
+  "supabase/migrations/20261031220000_restrict_encounter_retry_lifecycle_states.sql",
+  "utf8",
+);
+assert.match(retryLifecycleMigration, /l\.status NOT IN \('active','paused','ready_to_settle'\)/);
+assert.match(retryLifecycleMigration, /c\.reserved_at <= l\.scheduled_end_at/);
+assert.match(retryLifecycleMigration, /l\.scheduled_end_at <= clock_timestamp\(\)/);
+assert.match(retryLifecycleMigration, /turn_id_reuse_conflict/);
+
 const pauseResumeMigration = fs.readFileSync(
   "supabase/migrations/20261031190000_encounter_session_pause_resume.sql",
   "utf8",
