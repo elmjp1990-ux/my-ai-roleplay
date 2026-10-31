@@ -192,8 +192,9 @@ assert.match(frontend, /const endpointName = s\.encounterMode \? ["']encounter-t
 assert.match(frontend, /async function loadEncounterMemoryList\(panel,session\)/);
 assert.match(frontend, /sessionData\.encounterPlace/);
 assert.match(frontend, /相遇地點：/);
-assert.match(frontend, /canSaveEncounterMetadata = s\.encounterMode === true && s\.cloudOwned === true/);
-assert.match(frontend, /if \(!hasUserMessage && !canSaveEncounterMetadata\) return false;/);
+assert.match(frontend, /canSavePrecreatedSession = s\.cloudOwned === true/);
+assert.match(frontend, /s\.encounterMode === true \|\| s\.storyMode === true/);
+assert.match(frontend, /if \(!hasUserMessage && !canSavePrecreatedSession\) return false;/);
 assert.match(frontend, /from\(["']encounter_diary["']\)/);
 assert.match(frontend, /async function openEncounterMemoryDetail\(button\)/);
 assert.match(frontend, /data-action="encounter-memory-open"/);
