@@ -94,7 +94,14 @@ Deno.serve(async (request: Request) => {
       .maybeSingle();
     if (relationshipError) return json({ error: "relationship_state_lookup_failed" }, 503);
     if (!relationship) return json({ error: "story_session_incomplete" }, 409);
-    return json({ session: existing, idempotent: true });
+    const { data: relationshipState, error: stateError } = await admin
+      .from("story_relationship_states")
+      .select("affinity,relationship_stage,origin_mode,source_encounter_session_id,imported_memories,updated_at")
+      .eq("session_id", sessionId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (stateError || !relationshipState) return json({ error: "relationship_state_lookup_failed" }, 503);
+    return json({ session: existing, relationship: relationshipState, idempotent: true });
   }
 
   const { data: character, error: characterError } = await admin
@@ -186,5 +193,13 @@ Deno.serve(async (request: Request) => {
     return json({ error: "story_session_create_failed" }, 503);
   }
 
-  return json({ session, idempotent: false }, 201);
+  const { data: relationshipState, error: stateError } = await admin
+    .from("story_relationship_states")
+    .select("affinity,relationship_stage,origin_mode,source_encounter_session_id,imported_memories,updated_at")
+    .eq("session_id", sessionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (stateError || !relationshipState) return json({ error: "relationship_state_lookup_failed" }, 503);
+
+  return json({ session, relationship: relationshipState, idempotent: false }, 201);
 });
