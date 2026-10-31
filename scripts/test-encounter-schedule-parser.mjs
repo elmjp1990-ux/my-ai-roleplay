@@ -42,6 +42,9 @@ assert.doesNotMatch(html, /const usedSlots=new Set\([\s\S]*?\n\s*const nextGalle
 // Failed Storage deletions are durably queued, owner-scoped, and retried on asset loads/saves.
 assert.ok(html.includes("async function enqueueCharacterIllustrationCleanup(storagePath,userId)"));
 assert.ok(html.includes("async function processCharacterIllustrationCleanupJob(job,userId)"));
+assert.ok(html.includes("此檔案仍被角色立繪資料引用"));
+assert.ok(html.includes(".eq('storage_path',job.storage_path).limit(1)"));
+assert.ok(html.includes("uuidPattern.test(parts[1])"));
 assert.ok(html.includes("async function retryCharacterIllustrationCleanup(userId)"));
 assert.ok(html.includes("from('character_illustration_cleanup_jobs')"));
 assert.ok(html.includes("await retryCharacterIllustrationCleanup(userId)"));
