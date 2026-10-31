@@ -1928,7 +1928,8 @@ async function enqueueCharacterIllustrationCleanup(storagePath,userId) {
   const client=window.mySupabase;
   if(!client||!userId||typeof storagePath!=='string')throw new Error('無法建立角色立繪清理紀錄。');
   const parts=storagePath.split('/');
-  if(parts.length!==3||parts[0]!==userId||!/[0-9a-f-]{36}/i.test(parts[1])||!/[0-9a-f-]{36}\.(jpg|jpeg|png|webp)$/i.test(parts[2])) {
+  const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if(parts.length!==3||parts[0]!==userId||!uuidPattern.test(parts[1])||!uuidPattern.test(parts[2].replace(/\.(jpg|jpeg|png|webp)$/i,''))) {
     throw new Error('角色立繪清理路徑驗證失敗。');
   }
   const {data,error}=await client.from('character_illustration_cleanup_jobs')
@@ -1946,6 +1947,16 @@ async function cancelCharacterIllustrationCleanupJob(jobId,userId) {
 }
 async function processCharacterIllustrationCleanupJob(job,userId) {
   const client=window.mySupabase;
+  const {data:references,error:referenceError}=await client.from('character_illustrations')
+    .select('id').eq('author_id',userId).eq('storage_path',job.storage_path).limit(1);
+  if(referenceError||references?.length) {
+    const reason=referenceError?.message||'此檔案仍被角色立繪資料引用';
+    const {error:updateError}=await client.from('character_illustration_cleanup_jobs')
+      .update({attempts:Number(job.attempts||0)+1,last_error:String(reason).slice(0,500),updated_at:new Date().toISOString()})
+      .eq('id',job.id).eq('author_id',userId);
+    if(updateError)console.warn('立繪清理保護紀錄更新失敗：',updateError.message);
+    return false;
+  }
   const {error:storageError}=await client.storage.from('character-illustrations').remove([job.storage_path]);
   if(storageError) {
     const {error:updateError}=await client.from('character_illustration_cleanup_jobs')
