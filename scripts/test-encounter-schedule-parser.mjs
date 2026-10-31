@@ -40,15 +40,15 @@ assert.match(html, /async function syncCharacterIllustrations\([\s\S]*?let nextP
 assert.doesNotMatch(html, /const usedSlots=new Set\([\s\S]*?\n\s*const nextGallery=\[\];/);
 
 // Failed Storage deletions are durably queued, owner-scoped, and retried on asset loads/saves.
-assert.match(html, /async function enqueueCharacterIllustrationCleanup\\(storagePath,userId\\)/);
-assert.match(html, /async function processCharacterIllustrationCleanupJob\\(job,userId\\)/);
-assert.match(html, /async function retryCharacterIllustrationCleanup\\(userId\\)/);
-assert.match(html, /from\\('character_illustration_cleanup_jobs'\\)/);
-assert.match(html, /await retryCharacterIllustrationCleanup\\(userId\\)/);
+assert.ok(html.includes("async function enqueueCharacterIllustrationCleanup(storagePath,userId)"));
+assert.ok(html.includes("async function processCharacterIllustrationCleanupJob(job,userId)"));
+assert.ok(html.includes("async function retryCharacterIllustrationCleanup(userId)"));
+assert.ok(html.includes("from('character_illustration_cleanup_jobs')"));
+assert.ok(html.includes("await retryCharacterIllustrationCleanup(userId)"));
 assert.match(cleanupMigration, /ENABLE ROW LEVEL SECURITY/);
 assert.match(cleanupMigration, /GRANT SELECT, INSERT, UPDATE, DELETE/);
-assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_jobs_select_own[\\s\\S]*?auth\\.uid\\(\\)/);
-assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_jobs_insert_own[\\s\\S]*?auth\\.uid\\(\\)/);
+assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_jobs_select_own[\s\S]*?auth\.uid\(\)/);
+assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_jobs_insert_own[\s\S]*?auth\.uid\(\)/);
 
 // The card primary image is not reused as encounter-scene art.
 assert.match(html, /const sceneIllustration=safeImage\(character\?\.galleryIllustrations\?\.\[0\]\?\.src\|\|\x27\x27\)/);
