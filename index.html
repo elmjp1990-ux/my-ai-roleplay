@@ -9688,8 +9688,8 @@ function renderCityMapMVP(){
       const liveTarget=$('cityCharacterAffinity');
       if(!liveTarget||liveTarget.dataset.characterId!==String(characterId))return;
       if(!row){
-        liveTarget.innerHTML='<span class="city-character-affinity-empty">尚未建立關係</span>';
-        liveTarget.setAttribute('aria-label','尚未有已結算的相遇好感度');
+        liveTarget.innerHTML='<span class="city-character-affinity-empty">你們還不認識</span>';
+        liveTarget.setAttribute('aria-label','你們還不認識（尚無已結算的相遇紀錄）');
         return;
       }
       const affinity=Number(row.affinity);
