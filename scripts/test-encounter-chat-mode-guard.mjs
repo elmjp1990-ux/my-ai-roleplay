@@ -358,7 +358,7 @@ assert.match(storySession, /relationshipState/);
 assert.match(storySession, /relationship: relationshipState/);
 assert.match(frontend, /async function openNewStoryDialog\(characterId, latest = null\)/);
 assert.match(frontend, /get_latest_settled_encounter_session/);
-assert.match(frontend, /data-action="start-new-story"/);
+assert.doesNotMatch(frontend, /data-action="start-new-story"/);
 assert.match(frontend, /data-action="story-start-mode"/);
 assert.match(frontend, /async function createStorySession\(characterId, originMode/);
 assert.match(frontend, /functions\.invoke\('story-session'/);
