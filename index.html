@@ -1944,12 +1944,26 @@ async function syncCharacterIllustrations(character,userId) {
         .select('id').single();
       if(error)throw new Error('儲存附加立繪資料失敗：'+error.message);
       insertedGallery.push(data.id);
-      nextGallery.push({id:data.id,path,src,sortOrder:freeSlot});
+      nextGallery.push({id:data.id,path,src,sortOrder:freeSlot,name:String(item?.name||'').trim().slice(0,40)});
     }
   }catch(error){
     if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
     if(uploaded.length)await client.storage.from('character-illustrations').remove(uploaded);
     throw error;
+  }
+
+  // Persist labels for retained gallery assets as well as newly inserted ones.
+  // Scope every update by both asset ID and author UID.
+  for(const item of nextGallery){
+    if(!item?.id)continue;
+    const {error}=await client.from('character_illustrations')
+      .update({display_name:String(item.name||'').trim().slice(0,40),updated_at:new Date().toISOString()})
+      .eq('id',item.id).eq('author_id',userId);
+    if(error){
+      if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
+      if(uploaded.length)await client.storage.from('character-illustrations').remove(uploaded);
+      throw new Error('更新立繪名稱失敗：'+error.message);
+    }
   }
 
   // Only replace the primary row after every new gallery asset has uploaded successfully.
@@ -2003,7 +2017,7 @@ async function syncCharacterIllustrations(character,userId) {
   draftPrimaryIllustrationPath=nextPrimaryPath;
   draftIllustrations=nextGallery;
   character.primaryIllustrationPath=nextPrimaryPath;
-  character.galleryIllustrations=nextGallery.map(item=>({id:item.id,path:item.path,sortOrder:item.sortOrder}));
+  character.galleryIllustrations=nextGallery.map(item=>({id:item.id,path:item.path,sortOrder:item.sortOrder,name:item.name||''}));
   return {primaryPath:nextPrimaryPath,gallery:nextGallery};
 }
 
