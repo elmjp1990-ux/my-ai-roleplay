@@ -2484,6 +2484,7 @@ let draftCharacter = null;
 let draftTags = [];
 let draftImage = '';
 let draftIllustrations = [];
+let draftPrimaryIllustrationPath = '';
 let draftVideoFile = null;
 let draftVideoPath = '';
 let draftVideoPreviewUrl = '';
@@ -4055,7 +4056,8 @@ function saveEditorDraft() {
     tags:[...draftTags],
     image:draftImage,
     avatarVideoPath:draftVideoPath,
-    illustrations:draftIllustrations.slice(0,4),
+    illustrations:draftIllustrations.slice(0,5),
+    primaryIllustrationPath:draftPrimaryIllustrationPath,
     savedAt:Date.now()
   };
   const serialized = JSON.stringify(draft);
@@ -4084,20 +4086,24 @@ function startEditor(c = null) {
   draftTags = [...(c?.tags || [])];
   draftImage = c?.image || '';
   draftIllustrations = [];
+  draftPrimaryIllustrationPath = '';
   draftVideoFile = null;
   draftVideoPath = c?.avatarVideoPath || '';
   if(draftVideoPreviewUrl){URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl='';}
   visit('editor',c?.id);
 }
-function renderCharacterIllustrationGallery(items = [], selectedImage = '') {
-  if (!Array.isArray(items) || !items.length) return '<p class="small muted">尚未加入立繪測試圖片。</p>';
-  return '<div class="character-illustration-grid">' + items.slice(0,4).map((src,index) =>
-    '<button type="button" class="character-illustration-option' + (src === selectedImage ? ' is-selected' : '') + '" data-character-illustration-index="' + index + '">' +
-      '<img src="' + e(safeImage(src)) + '" alt="立繪測試圖片 ' + (index+1) + '">' +
-      '<span>' + (src === selectedImage ? '目前主圖' : '設為主圖') + '</span>' +
-    '</button>'
-  ).join('') + '</div>';
+function renderCharacterIllustrationGallery(items = []) {
+  if (!Array.isArray(items) || !items.length) return '<p class="small muted">尚未加入其他立繪。</p>';
+  return '<div class="character-illustration-grid">' + items.slice(0,5).map((item,index) => {
+    const src = typeof item === 'string' ? item : item?.src || '';
+    return '<div class="character-illustration-option">' +
+      '<img src="' + e(safeImage(src)) + '" alt="附加立繪 ' + (index+1) + '">' +
+      '<span>立繪 ' + (index+1) + '</span>' +
+      '<button type="button" class="small" data-action="remove-character-illustration" data-index="' + index + '" aria-label="移除第 ' + (index+1) + ' 張立繪">移除</button>' +
+    '</div>';
+  }).join('') + '</div>';
 }
+
 function renderEditor() {
   const savedDraft = readEditorDraft();
   const original = draftCharacter || state.characters.find(c => c.id === route.id) || {};
@@ -4105,7 +4111,8 @@ function renderEditor() {
   if (savedDraft) {
     draftTags = Array.isArray(savedDraft.tags) ? [...savedDraft.tags] : draftTags;
     draftImage = savedDraft.image || draftImage || '';
-    draftIllustrations = Array.isArray(savedDraft.illustrations) ? savedDraft.illustrations.slice(0,4) : draftIllustrations;
+    draftIllustrations = Array.isArray(savedDraft.illustrations) ? savedDraft.illustrations.slice(0,5) : draftIllustrations;
+    draftPrimaryIllustrationPath = savedDraft.primaryIllustrationPath || draftPrimaryIllustrationPath || '';
     draftVideoPath = savedDraft.avatarVideoPath || draftVideoPath || '';
   }
   if (!draftCharacter && route.id) {
@@ -9191,23 +9198,17 @@ document.addEventListener('keydown',event => {
   else event.target.form?.requestSubmit();
 });
 document.addEventListener('click',function(event){
-  const option=event.target.closest('[data-character-illustration-index]');
-  if(!option)return;
-  const index=Number(option.dataset.characterIllustrationIndex);
-  if(!Number.isInteger(index)||!draftIllustrations[index])return;
-  draftImage=draftIllustrations[index];
-  draftVideoFile=null;
-  draftVideoPath='';
-  if(draftVideoPreviewUrl){URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl='';}
-  const imagePreview=$('imagePreview');
-  if(imagePreview){imagePreview.src=draftImage;imagePreview.classList.remove('hidden');}
-  const videoPreview=$('characterVideoPreview');
-  if(videoPreview){videoPreview.removeAttribute('src');videoPreview.classList.add('hidden');}
+  const remove=event.target.closest('[data-action="remove-character-illustration"]');
+  if(!remove)return;
+  const index=Number(remove.dataset.index);
+  if(!Number.isInteger(index)||index<0||index>=draftIllustrations.length)return;
+  draftIllustrations.splice(index,1);
   const gallery=$('characterIllustrationGallery');
-  if(gallery)gallery.innerHTML=renderCharacterIllustrationGallery(draftIllustrations,draftImage);
+  if(gallery)gallery.innerHTML=renderCharacterIllustrationGallery(draftIllustrations);
   saveEditorDraft();
-  toast('已切換角色主圖；儲存角色後即可測試這張立繪。');
+  toast('已移除這張附加立繪；儲存角色後會同步更新雲端。');
 });
+
 document.addEventListener('change',async event => {
   const target=event.target;
   if (target.closest('form[data-form="character"]')) saveEditorDraft();
@@ -9229,7 +9230,7 @@ document.addEventListener('change',async event => {
           if(requestId!==characterImageCompressionRequest){URL.revokeObjectURL(url);return;}
           const canvas=document.createElement('canvas');canvas.width=Math.min(1200,meta.width);canvas.height=Math.max(1,Math.round(canvas.width*meta.height/meta.width));
           const ctx=canvas.getContext('2d');if(!ctx)throw new Error('無法產生影片封面。');ctx.drawImage(frame,0,0,canvas.width,canvas.height);
-          draftImage=canvas.toDataURL('image/jpeg',.82);draftVideoFile=file;draftVideoPath='';
+          draftImage=canvas.toDataURL('image/jpeg',.82);draftVideoFile=file;draftVideoPath='';draftPrimaryIllustrationPath='';
           if(draftVideoPreviewUrl)URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl=url;
           $('imagePreview').src=draftImage;$('imagePreview').classList.add('hidden');
           const preview=$('characterVideoPreview');preview.src=url;preview.classList.remove('hidden');
@@ -9237,7 +9238,7 @@ document.addEventListener('change',async event => {
         }else{
           if(!['image/png','image/jpeg','image/webp'].includes(file.type))throw new Error('圖片格式僅支援 PNG、JPG 或 WebP。');
           if(draftVideoPreviewUrl){URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl='';}
-          draftVideoFile=null;draftVideoPath='';
+          draftVideoFile=null;draftVideoPath='';draftPrimaryIllustrationPath='';
           const preview=$('characterVideoPreview');preview.removeAttribute('src');preview.classList.add('hidden');
           $('imagePreview').classList.remove('hidden');
           toast('正在壓縮角色圖片，請稍候…');
@@ -9252,23 +9253,22 @@ document.addEventListener('change',async event => {
     if(target.id==='characterIllustrations'){
       const files=Array.from(target.files||[]);
       if(!files.length)return;
-      if(files.length>4){target.value='';throw new Error('立繪測試最多一次選擇 4 張圖片。');}
+      if(draftIllustrations.length+files.length>5){target.value='';throw new Error('其他角色立繪最多保留 5 張。');}
       const supported=['image/png','image/jpeg','image/webp'];
       for(const file of files){
-        if(file.size>15*1024*1024)throw new Error('每張立繪測試圖片不可超過 15 MB。');
-        if(!supported.includes(file.type))throw new Error('立繪測試圖片僅支援 PNG、JPG 或 WebP。');
+        if(file.size>10*1024*1024)throw new Error('每張附加立繪不可超過 10 MB。');
+        if(!supported.includes(file.type))throw new Error('附加立繪僅支援 PNG、JPG 或 WebP。');
       }
-      toast('正在處理立繪測試圖片…');
-      const next=[];
+      toast('正在處理附加立繪…');
       for(const file of files){
-        const compressed=await compressUploadImage(file,{maxEdge:1600,targetBytes:350*1024});
-        next.push(compressed.dataUrl);
+        const compressed=await compressUploadImage(file,{maxEdge:1800,targetBytes:700*1024});
+        draftIllustrations.push({src:compressed.dataUrl,path:'',id:'',sortOrder:draftIllustrations.length});
       }
-      draftIllustrations=next;
       const gallery=$('characterIllustrationGallery');
-      if(gallery)gallery.innerHTML=renderCharacterIllustrationGallery(draftIllustrations,draftImage);
+      if(gallery)gallery.innerHTML=renderCharacterIllustrationGallery(draftIllustrations);
       saveEditorDraft();
-      toast('已載入 '+next.length+' 張立繪，點選縮圖即可切換角色主圖。');
+      target.value='';
+      toast('已加入附加立繪預覽；儲存角色後會上傳至雲端。');
     }
     if (target.id==='profileImage') {
       if (!target.files?.[0]) return;
