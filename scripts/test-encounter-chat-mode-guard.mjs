@@ -55,12 +55,9 @@ assert.doesNotMatch(encounterTurn, /record_encounter_turn_interaction/);
 assert.doesNotMatch(encounterTurn, /p_affinity_delta:\s*1/);
 assert.match(encounterTurn, /affinityPendingUntilSceneEnd/);
 assert.match(encounterTurn, /assistant_message_id_collision/);
-assert.match(encounterTurn, /encounter_session_lifecycle/);
-assert.match(encounterTurn, /encounter_scene_expired_or_inactive/);
-assert.ok(
-  encounterTurn.indexOf("encounter_session_lifecycle") < encounterTurn.indexOf("reserve_encounter_chat_turn"),
-  "Encounter lifecycle expiry must be checked before reserving/charging a turn",
-);
+assert.match(encounterTurn, /reserve_encounter_chat_turn/);
+assert.doesNotMatch(encounterTurn, /from\(["']encounter_session_lifecycle["']\)/);
+assert.match(encounterTurn, /idempotent recovery of an already-reserved pre-expiry turn/);
 
 const atomicReservationMigration = fs.readFileSync(
   "supabase/migrations/20261031170000_atomic_encounter_turn_reservation.sql",
@@ -83,6 +80,17 @@ assert.match(preExpiryTurnMigration, /c\.status IN \('reserved','needs_reconcili
 assert.match(preExpiryTurnMigration, /Encounter has pending pre-expiry turns/);
 assert.match(preExpiryTurnMigration, /l\.status NOT IN \('active','paused','ready_to_settle'\)/);
 assert.match(preExpiryTurnMigration, /FOR UPDATE/);
+
+const preExpiryRetryMigration = fs.readFileSync(
+  "supabase/migrations/20261031200000_allow_preexpiry_encounter_retry.sql",
+  "utf8",
+);
+assert.match(preExpiryRetryMigration, /c\.status IN \('reserved','needs_reconciliation','settled','refunded'\)/);
+assert.match(preExpiryRetryMigration, /c\.reserved_at <= l\.scheduled_end_at/);
+assert.match(preExpiryRetryMigration, /c\.status='insufficient_funds'/);
+assert.match(preExpiryRetryMigration, /l\.status <> 'active'/);
+assert.match(preExpiryRetryMigration, /l\.scheduled_end_at <= clock_timestamp\(\)/);
+assert.match(preExpiryRetryMigration, /public\.reserve_chat_turn\(/);
 
 const pauseResumeMigration = fs.readFileSync(
   "supabase/migrations/20261031190000_encounter_session_pause_resume.sql",
