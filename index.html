@@ -4312,25 +4312,6 @@ function renderEditor() {
         <label class="field"><span>種族</span><input name="race" maxlength="50" value="${e(c.race || '')}"></label>
         <label class="field"><span>公開介紹 *</span><textarea name="intro" required maxlength="2000">${e(c.intro || '')}</textarea>
           <small class="char-counter" data-count-for="intro">0/2000</small></label>
-        <section class="memory-item stack" style="gap:12px">
-          <strong>11. 主要角色立繪</strong>
-          <label class="field"><span>角色主圖 *</span>
-            <input id="characterImage" type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime">
-            <small>支援透明 PNG／WebP 與 JPG，圖片上限 15 MB；也可上傳 10 秒內、15 MB 以下的 MP4、WebM 或 MOV 影片。透明背景會保留，不會與場景背景合併。請確認你擁有素材使用權。</small>
-          </label>
-          <img id="imagePreview" ${draftImage ? `src="${e(safeImage(draftImage))}"` : ''}
-               class="${draftImage && !draftVideoPath ? '' : 'hidden'}"
-               alt="主要角色立繪預覽" style="width:160px;max-height:240px;object-fit:contain;object-position:center;border-radius:13px;margin-bottom:10px;background:rgba(120,110,140,.08)">
-          <video id="characterVideoPreview" class="${draftVideoPath ? '' : 'hidden'}" controls muted playsinline style="width:180px;max-height:240px;object-fit:contain;border-radius:13px;margin-bottom:18px;background:#000"></video>
-        </section>
-        <section class="memory-item stack" style="gap:12px">
-          <strong>12. 其他角色立繪</strong>
-          <label class="field"><span>附加立繪（最多 5 張）</span>
-            <input id="characterIllustrations" type="file" accept="image/png,image/jpeg,image/webp" multiple>
-            <small>可上傳最多 5 張 PNG、JPG 或 WebP，每張上限 10 MB。支援透明背景；這些圖片會獨立保存，不會覆蓋主要角色立繪。</small>
-          </label>
-          <div id="characterIllustrationGallery" class="character-illustration-gallery">${renderCharacterIllustrationGallery(draftIllustrations, draftImage)}</div>
-        </section>
         <label class="field"><span>開場白 * <details class="inline-help"><summary aria-label="開場白填寫說明" title="開場白填寫說明">?</summary><span>用 *動作* 表示場景描述；用 {USER} 帶入玩家名稱、{CHAR} 帶入角色名稱。</span></details></span><textarea name="opening" required maxlength="3000">${e(c.opening || '')}</textarea>
           <small class="char-counter" data-count-for="opening">0/3000</small></label>
         <label class="field"><span>私密資訊</span><textarea name="privateInfo" maxlength="10000">${e(c.privateInfo || '')}</textarea>
@@ -4356,6 +4337,25 @@ function renderEditor() {
         </section>
         <section class="memory-item stack" style="gap:10px"><strong>角色手機設定</strong>
           <label class="field"><span>AI 手機通知揭露指示（每行一則）</span><textarea name="phoneNotices" maxlength="1200" placeholder="💬心裡話 | 每回合揭露一則簡短心裡話\n🔎線索 | 當劇情出現新線索時，揭露線索通知">${e(savedDraft?.phoneNotices ?? (Array.isArray(c.phoneSettings?.noticePrompts) ? c.phoneSettings.noticePrompts.join('\n') : Array.isArray(c.phoneSettings?.notices) ? c.phoneSettings.notices.join('\n') : ''))}</textarea><small>在這裡填寫每回合對話需要揭露的狀態。每行描述一種 AI 可揭露的通知條件／內容，不是固定顯示文字；最多 8 則。</small></label></section>
+        <section class="memory-item stack" style="gap:12px">
+          <strong>11. 主要角色立繪</strong>
+          <label class="field"><span>角色主圖 *</span>
+            <input id="characterImage" type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime">
+            <small>支援透明 PNG／WebP 與 JPG，圖片上限 15 MB；也可上傳 10 秒內、15 MB 以下的 MP4、WebM 或 MOV 影片。透明背景會保留，不會與場景背景合併。請確認你擁有素材使用權。</small>
+          </label>
+          <img id="imagePreview" ${draftImage ? `src="${e(safeImage(draftImage))}"` : ''}
+               class="${draftImage && !draftVideoPath ? '' : 'hidden'}"
+               alt="主要角色立繪預覽" style="width:160px;max-height:240px;object-fit:contain;object-position:center;border-radius:13px;margin-bottom:10px;background:rgba(120,110,140,.08)">
+          <video id="characterVideoPreview" class="${draftVideoPath ? '' : 'hidden'}" controls muted playsinline style="width:180px;max-height:240px;object-fit:contain;border-radius:13px;margin-bottom:18px;background:#000"></video>
+        </section>
+        <section class="memory-item stack" style="gap:12px">
+          <strong>12. 其他角色立繪</strong>
+          <label class="field"><span>附加立繪（最多 5 張）</span>
+            <input id="characterIllustrations" type="file" accept="image/png,image/jpeg,image/webp" multiple>
+            <small>可上傳最多 5 張 PNG、JPG 或 WebP，每張上限 10 MB。支援透明背景；這些圖片會獨立保存，不會覆蓋主要角色立繪。</small>
+          </label>
+          <div id="characterIllustrationGallery" class="character-illustration-gallery">${renderCharacterIllustrationGallery(draftIllustrations, draftImage)}</div>
+        </section>
         <label class="field"><span>權限</span><select name="visibility">
           <option value="private" ${c.visibility !== 'public' ? 'selected' : ''}>私密</option>
           <option value="public" ${c.visibility === 'public' ? 'selected' : ''}>公開</option>
