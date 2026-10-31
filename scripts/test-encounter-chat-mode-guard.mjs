@@ -111,6 +111,16 @@ assert.match(retryLifecycleMigration, /c\.reserved_at <= l\.scheduled_end_at/);
 assert.match(retryLifecycleMigration, /l\.scheduled_end_at <= clock_timestamp\(\)/);
 assert.match(retryLifecycleMigration, /turn_id_reuse_conflict/);
 
+const storyBatchSourcesMigration = fs.readFileSync(
+  "supabase/migrations/20261031230000_validate_story_batch_turn_sources.sql",
+  "utf8",
+);
+assert.match(storyBatchSourcesMigration, /cardinality\(NEW\.source_turn_ids\) <> v_expected_count/);
+assert.match(storyBatchSourcesMigration, /count\(DISTINCT source_id\)/);
+assert.match(storyBatchSourcesMigration, /charge\.session_id=NEW\.session_id/);
+assert.match(storyBatchSourcesMigration, /charge\.user_id=NEW\.user_id/);
+assert.match(storyBatchSourcesMigration, /charge\.status='settled'/);
+
 const pauseResumeMigration = fs.readFileSync(
   "supabase/migrations/20261031190000_encounter_session_pause_resume.sql",
   "utf8",
