@@ -23,6 +23,8 @@ assert.ok(frontend.includes('state.sessions[sessionId] = session;'));
 assert.match(frontend, /function compactLocalStateForQuota\(\)/);
 assert.match(frontend, /localStorageCompactMode = true/);
 assert.match(frontend, /雲端聊天仍會照常同步/);
+assert.match(frontend, /character\\?\\.visibility!==['\"]public['\"]\\|\\|character\\.deletedAt\\|\\|!accessible\\(character\\)/);
+assert.match(frontend, /Author access to a private character is for management only/);
 assert.match(frontend, /async function startChat\(characterId\)/);
 assert.match(frontend, /\.eq\('user_id', userId\)\.eq\('character_id', characterId\)/);
 assert.match(frontend, /get_latest_settled_encounter_session/);
