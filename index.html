@@ -1862,6 +1862,117 @@ const ids = (rows || []).map(row => row.id);
     }
   }
 
+async function loadCharacterIllustrationAssets(characterIds) {
+  const client=window.mySupabase;
+  const ids=[...new Set((characterIds||[]).filter(Boolean))];
+  const result=new Map();
+  if(!client||!ids.length)return result;
+  const {data:rows,error}=await client.from('character_illustrations')
+    .select('id, character_id, storage_path, asset_type, sort_order')
+    .in('character_id',ids)
+    .order('sort_order',{ascending:true});
+  if(error)throw new Error('讀取角色立繪資料失敗：'+error.message);
+  for(const row of rows||[]){
+    const {data,error:signedError}=await client.storage.from('character-illustrations').createSignedUrl(row.storage_path,3600);
+    if(signedError||!data?.signedUrl)continue;
+    const list=result.get(row.character_id)||{primary:null,gallery:[]};
+    const asset={id:row.id,path:row.storage_path,src:data.signedUrl,sortOrder:row.sort_order};
+    if(row.asset_type==='primary')list.primary=asset;
+    else list.gallery.push(asset);
+    result.set(row.character_id,list);
+  }
+  return result;
+}
+async function uploadCharacterIllustrationDataUrl(dataUrl,userId,characterId) {
+  const client=window.mySupabase;
+  if(!client||!userId||!characterId)throw new Error('無法確認角色立繪的雲端上傳權限。');
+  if(typeof dataUrl!=='string'||!/^data:image\/(png|jpeg|webp);base64,/i.test(dataUrl))throw new Error('角色立繪資料格式不正確，請重新選圖。');
+  const response=await fetch(dataUrl);
+  const blob=await response.blob();
+  if(!['image/png','image/jpeg','image/webp'].includes(blob.type))throw new Error('角色立繪只支援 PNG、JPG 或 WebP。');
+  if(blob.size>10*1024*1024)throw new Error('壓縮後的角色立繪不可超過 10 MB。');
+  const ext=({'image/png':'png','image/jpeg':'jpg','image/webp':'webp'})[blob.type];
+  const path=userId+'/'+characterId+'/'+id()+'.'+ext;
+  const {error}=await client.storage.from('character-illustrations').upload(path,blob,{upsert:false,contentType:blob.type,cacheControl:'3600'});
+  if(error)throw new Error('角色立繪上傳失敗：'+error.message);
+  return path;
+}
+async function syncCharacterIllustrations(character,userId) {
+  const client=window.mySupabase;
+  if(!client||!userId||!character?.id)throw new Error('無法確認角色立繪同步權限。');
+  const {data:existing,error:readError}=await client.from('character_illustrations')
+    .select('id, storage_path, asset_type, sort_order')
+    .eq('character_id',character.id).eq('author_id',userId);
+  if(readError)throw new Error('讀取既有立繪失敗：'+readError.message);
+  const oldPrimary=(existing||[]).find(row=>row.asset_type==='primary')||null;
+  const oldGallery=(existing||[]).filter(row=>row.asset_type==='gallery');
+  const uploaded=[];
+  const inserted=[];
+  try{
+    let nextPrimaryPath=draftPrimaryIllustrationPath||'';
+    if(!character.avatarVideoPath&&/^data:image\//i.test(String(draftImage||''))){
+      nextPrimaryPath=await uploadCharacterIllustrationDataUrl(draftImage,userId,character.id);
+      uploaded.push(nextPrimaryPath);
+    }
+    if(character.avatarVideoPath)nextPrimaryPath='';
+    if(nextPrimaryPath){
+      if(oldPrimary){
+        const {error}=await client.from('character_illustrations').update({storage_path:nextPrimaryPath,sort_order:0,updated_at:new Date().toISOString()}).eq('id',oldPrimary.id).eq('author_id',userId);
+        if(error)throw new Error('更新主要角色立繪資料失敗：'+error.message);
+      }else{
+        const {data,error}=await client.from('character_illustrations').insert({character_id:character.id,author_id:userId,storage_path:nextPrimaryPath,asset_type:'primary',sort_order:0}).select('id').single();
+        if(error)throw new Error('建立主要角色立繪資料失敗：'+error.message);
+        inserted.push(data.id);
+      }
+    }else if(oldPrimary){
+      const {error}=await client.from('character_illustrations').delete().eq('id',oldPrimary.id).eq('author_id',userId);
+      if(error)throw new Error('移除舊主要立繪資料失敗：'+error.message);
+    }
+    const keepIds=new Set();
+    const nextGallery=[];
+    for(let index=0;index<draftIllustrations.length;index++){
+      const item=draftIllustrations[index];
+      if(item&&typeof item==='object'&&item.id&&item.path){
+        keepIds.add(item.id);
+        nextGallery.push({...item,sortOrder:index});
+        if(item.sortOrder!==index){
+          const {error}=await client.from('character_illustrations').update({sort_order:index,updated_at:new Date().toISOString()}).eq('id',item.id).eq('author_id',userId);
+          if(error)throw new Error('更新附加立繪排序失敗：'+error.message);
+        }
+        continue;
+      }
+      const src=typeof item==='string'?item:item?.src;
+      if(!/^data:image\//i.test(String(src||'')))continue;
+      const path=await uploadCharacterIllustrationDataUrl(src,userId,character.id);
+      uploaded.push(path);
+      const {data,error}=await client.from('character_illustrations').insert({character_id:character.id,author_id:userId,storage_path:path,asset_type:'gallery',sort_order:index}).select('id').single();
+      if(error)throw new Error('儲存附加立繪資料失敗：'+error.message);
+      inserted.push(data.id);
+      keepIds.add(data.id);
+      nextGallery.push({id:data.id,path,src,sortOrder:index});
+    }
+    const obsolete=oldGallery.filter(row=>!keepIds.has(row.id));
+    if(obsolete.length){
+      const {error}=await client.from('character_illustrations').delete().in('id',obsolete.map(row=>row.id)).eq('author_id',userId);
+      if(error)throw new Error('移除已刪除的附加立繪資料失敗：'+error.message);
+      const {error:storageError}=await client.storage.from('character-illustrations').remove(obsolete.map(row=>row.storage_path));
+      if(storageError)console.warn('舊附加立繪檔案清理待重試：',storageError.message);
+    }
+    if(oldPrimary&&oldPrimary.storage_path!==nextPrimaryPath){
+      const {error:storageError}=await client.storage.from('character-illustrations').remove([oldPrimary.storage_path]);
+      if(storageError)console.warn('舊主要立繪檔案清理待重試：',storageError.message);
+    }
+    draftPrimaryIllustrationPath=nextPrimaryPath;
+    draftIllustrations=nextGallery;
+    character.primaryIllustrationPath=nextPrimaryPath;
+    character.galleryIllustrations=nextGallery.map(item=>({id:item.id,path:item.path,sortOrder:item.sortOrder}));
+    return {primaryPath:nextPrimaryPath,gallery:nextGallery};
+  }catch(error){
+    if(inserted.length)await client.from('character_illustrations').delete().in('id',inserted).eq('author_id',userId);
+    if(uploaded.length)await client.storage.from('character-illustrations').remove(uploaded);
+    throw error;
+  }
+}
   async function uploadCharacterAvatarVideo(file,userId,characterId){
   const client=window.mySupabase;
   if(!client||!userId||!characterId)throw new Error('請先登入再上傳角色影片。');
@@ -2020,7 +2131,7 @@ async function saveSupabaseCharacter(character, expectedUserId) {
       title: null,
       gender: character.gender || null,
       age,
-      avatar_url: character.image || null,
+      avatar_url: character.primaryIllustrationPath ? null : (character.image || null),
       avatar_video_path: character.avatarVideoPath || null,
       visibility: nextVisibility,
       review_status: nextVisibility === 'public' ? 'approved' : 'draft',
@@ -4092,6 +4203,28 @@ function startEditor(c = null) {
   if(draftVideoPreviewUrl){URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl='';}
   visit('editor',c?.id);
 }
+async function hydrateCharacterIllustrationsIntoEditor(characterId) {
+  const client=window.mySupabase;
+  const uid=currentUser()?.uid;
+  if(!client||!uid||!characterId||!owned(state.characters.find(item=>item.id===characterId)))return;
+  try{
+    const assets=await loadCharacterIllustrationAssets([characterId]);
+    if(route.page!=='editor'||route.id!==characterId)return;
+    const current=assets.get(characterId)||{primary:null,gallery:[]};
+    if(current.primary&&!/^data:image\//i.test(String(draftImage||''))){
+      draftPrimaryIllustrationPath=current.primary.path;
+      draftImage=current.primary.src;
+      const preview=$('imagePreview');
+      if(preview){preview.src=current.primary.src;preview.classList.remove('hidden');}
+    }
+    if(!draftIllustrations.length&&current.gallery.length){
+      draftIllustrations=current.gallery.slice(0,5);
+      const gallery=$('characterIllustrationGallery');
+      if(gallery)gallery.innerHTML=renderCharacterIllustrationGallery(draftIllustrations);
+    }
+    saveEditorDraft();
+  }catch(error){console.warn('角色立繪載入失敗：',error);toast('角色立繪載入失敗：'+error.message);}
+}
 function renderCharacterIllustrationGallery(items = []) {
   if (!Array.isArray(items) || !items.length) return '<p class="small muted">尚未加入其他立繪。</p>';
   return '<div class="character-illustration-grid">' + items.slice(0,5).map((item,index) => {
@@ -4211,6 +4344,7 @@ function renderEditor() {
       </form>
     </div>`;
   if (route.id && !savedDraft?.encounterSchedules) void loadEncounterSchedulesIntoEditor(route.id);
+  if (route.id) void hydrateCharacterIllustrationsIntoEditor(route.id);
   if(draftVideoPath){const preview=$('characterVideoPreview');void window.mySupabase?.storage.from('character-avatar-videos').createSignedUrl(draftVideoPath,300).then(({data,error})=>{if(!error&&data?.signedUrl&&preview?.isConnected){preview.src=data.signedUrl;preview.classList.remove('hidden');}});}
   void isNsfwTermsAdmin().then(isAdmin=>{const button=$('view')?.querySelector('[data-action="nsfw-term-manager"]');if(button&&isAdmin)button.hidden=false;});
   if(c.aiGeneratedDraft)void (async()=>{
