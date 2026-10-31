@@ -4344,11 +4344,17 @@ function renderEditor() {
           <label class="field"><span>日程時段</span><textarea name="encounterSchedules" maxlength="20000" placeholder="1|09:00|12:00|cafe|在咖啡廳工作\n*|18:00|20:00|park|傍晚散步">${e(savedDraft?.encounterSchedules ?? c.encounterSchedules ?? '')}</textarea></label>
           <label class="check"><input type="checkbox" name="clearEncounterSchedules" value="yes"><span>明確清空這個角色的所有日程（需勾選，避免誤刪）</span></label>
         </section>
-        <section class="memory-item stack" style="gap:10px"><strong>10. 角色手機設定</strong>
-          <label class="field"><span>AI 手機通知揭露指示（每行一則）</span><textarea name="phoneNotices" maxlength="1200" placeholder="💬心裡話 | 每回合揭露一則簡短心裡話\n🔎線索 | 當劇情出現新線索時，揭露線索通知">${e(savedDraft?.phoneNotices ?? (Array.isArray(c.phoneSettings?.noticePrompts) ? c.phoneSettings.noticePrompts.join('\n') : Array.isArray(c.phoneSettings?.notices) ? c.phoneSettings.notices.join('\n') : ''))}</textarea><small>在這裡填寫每回合對話需要揭露的狀態。每行描述一種 AI 可揭露的通知條件／內容，不是固定顯示文字；最多 8 則。</small></label></section>
-        <input type="hidden" name="privateInfo" value="${e(c.privateInfo || '')}">
         <section class="memory-item stack" style="gap:12px">
-          <strong>12. 上傳主要角色圖</strong>
+          <strong>10. 角色私密設定</strong>
+          <small>描寫角色私下的隱藏劇情、秘密、未公開背景或只有作者需要掌握的設定；此內容僅作者可查看，不會公開給一般玩家。</small>
+          <label class="field"><span>私密設定</span><textarea name="privateInfo" maxlength="10000" placeholder="描寫角色私下的隱藏劇情與秘密…">${e(c.privateInfo || '')}</textarea>
+            <small class="char-counter" data-count-for="privateInfo">0/10000；僅作者可查看。</small>
+          </label>
+        </section>
+        <section class="memory-item stack" style="gap:10px"><strong>11. 角色手機設定</strong>
+          <label class="field"><span>手機通知揭露指示（每行 1 則，最多 8 則）</span><textarea name="phoneNotices" maxlength="1200" placeholder="💬心裡話 | 每回合揭露一則簡短心裡話\n🔎線索 | 當劇情出現新線索時，揭露線索通知">${e(savedDraft?.phoneNotices ?? (Array.isArray(c.phoneSettings?.noticePrompts) ? c.phoneSettings.noticePrompts.join('\n') : Array.isArray(c.phoneSettings?.notices) ? c.phoneSettings.notices.join('\n') : ''))}</textarea><small>每行填寫一則 AI 手機通知的揭露指示，最多 8 則。</small></label></section>
+        <section class="memory-item stack" style="gap:12px">
+          <strong>上傳主要角色圖</strong>
           <label class="field"><span>角色主圖 *</span>
             <input id="characterImage" type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime"><input name="primaryIllustrationName" maxlength="40" placeholder="名稱，例如：主要角色" value="${e(c.personalityProfile?.primaryIllustrationName||'主要角色')}">
             <small>支援透明 PNG／WebP 與 JPG；也可上傳 10 秒內、15 MB 以下的 MP4、WebM 或 MOV 影片。若上傳影片，會自動使用影片封面作為主要角色圖。請確認你擁有素材使用權。</small>
@@ -4359,7 +4365,7 @@ function renderEditor() {
           <video id="characterVideoPreview" class="${draftVideoPath ? '' : 'hidden'}" controls muted playsinline style="width:180px;max-height:240px;object-fit:contain;border-radius:13px;margin-bottom:18px;background:#000"></video>
         </section>
         <section class="memory-item stack" style="gap:12px">
-          <strong>13. 立繪角色圖（最多 5 張）</strong>
+          <strong>立繪角色圖（最多 5 張）</strong>
           <label class="field"><span>附加立繪（最多 5 張）</span>
             <input id="characterIllustrations" type="file" accept="image/png,image/jpeg,image/webp" multiple>
             <small>每張立繪可填寫名稱，例如「開心」「緊張」。AI 會依照對話情境判斷是否使用合適的表情圖。建議使用白底或透明背景 PNG；最多 5 張，每張上限 10 MB。</small>
