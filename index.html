@@ -4334,7 +4334,6 @@ function renderEditor() {
           <small class="char-counter" data-count-for="intro">0/2000</small></label>
         <label class="field"><span>開場白 * <details class="inline-help"><summary aria-label="開場白填寫說明" title="開場白填寫說明">?</summary><span>用 *動作* 表示場景描述；用 {USER} 帶入玩家名稱、{CHAR} 帶入角色名稱。</span></details></span><textarea name="opening" required maxlength="3000">${e(c.opening || '')}</textarea>
           <small class="char-counter" data-count-for="opening">0/3000</small></label>
-        <details class="memory-item" style="margin:14px 0"><summary>舊版對話風格（相容保留）</summary><label class="field"><span>對話風格（舊欄位，保留相容）</span><textarea name="style" maxlength="1000">${e(c.style || '')}</textarea><small>可補充整體文風；新的人格欄位會更明確描述角色的行為與反應。</small></label></details>
         <section class="memory-item stack" style="gap:12px"><strong>7. 角色人格設定</strong><small>由創作者設定角色的核心人格，玩家不能直接改寫。請填寫可觀察、可扮演的特徵；作者私密設定請填寫在第 11 項「私密設定」。</small>
           <label class="field"><span>核心性格</span><textarea name="personalityCoreTraits" maxlength="500" placeholder="例如：外冷內熱、觀察敏銳、不輕易示弱">${e(c.personalityProfile?.coreTraits || '')}</textarea></label>
           <label class="field"><span>價值觀與行動動機</span><textarea name="personalityValues" maxlength="500" placeholder="例如：重視承諾、把家人安全放在第一位">${e(c.personalityProfile?.values || '')}</textarea></label>
@@ -4377,6 +4376,7 @@ function renderEditor() {
           </label>
           <div id="characterIllustrationGallery" class="character-illustration-gallery">${renderCharacterIllustrationGallery(draftIllustrations, draftImage)}</div>
         </section>
+        <details class="memory-item" style="margin:14px 0"><summary>舊版對話風格（相容保留）</summary><label class="field"><span>對話風格（舊欄位，保留相容）</span><textarea name="style" maxlength="1000">${e(c.style || '')}</textarea><small>此欄位僅為舊角色資料相容保留；新角色建議使用上方第 7 項的人格設定。</small></label></details>
         <label class="field"><span>權限</span><select name="visibility">
           <option value="private" ${c.visibility !== 'public' ? 'selected' : ''}>私密</option>
           <option value="public" ${c.visibility === 'public' ? 'selected' : ''}>公開</option>
