@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const html = fs.readFileSync("index.html", "utf8");
+const cleanupMigration = fs.readFileSync("supabase/migrations/20261031211200_character_illustration_cleanup_queue.sql", "utf8");
 
 // The author-facing field must accept ordinary prose, not a pipe-delimited schema.
 assert.match(html, /name="encounterScheduleDescription"/);
@@ -37,6 +38,17 @@ assert.match(html, /image: ownerIllustrations\.get\(row\.id\)\?\.primary\?\.src 
 // Gallery sync must keep nextGallery in function scope for post-upload persistence and cleanup.
 assert.match(html, /async function syncCharacterIllustrations\([\s\S]*?let nextPrimaryPath=draftPrimaryIllustrationPath\|\|\x27\x27;\s*const nextGallery=\[\];\s*try\{/);
 assert.doesNotMatch(html, /const usedSlots=new Set\([\s\S]*?\n\s*const nextGallery=\[\];/);
+
+// Failed Storage deletions are durably queued, owner-scoped, and retried on asset loads/saves.
+assert.match(html, /async function enqueueCharacterIllustrationCleanup\\(storagePath,userId\\)/);
+assert.match(html, /async function processCharacterIllustrationCleanupJob\\(job,userId\\)/);
+assert.match(html, /async function retryCharacterIllustrationCleanup\\(userId\\)/);
+assert.match(html, /from\\('character_illustration_cleanup_jobs'\\)/);
+assert.match(html, /await retryCharacterIllustrationCleanup\\(userId\\)/);
+assert.match(cleanupMigration, /ENABLE ROW LEVEL SECURITY/);
+assert.match(cleanupMigration, /GRANT SELECT, INSERT, UPDATE, DELETE/);
+assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_jobs_select_own[\\s\\S]*?auth\\.uid\\(\\)/);
+assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_jobs_insert_own[\\s\\S]*?auth\\.uid\\(\\)/);
 
 // The card primary image is not reused as encounter-scene art.
 assert.match(html, /const sceneIllustration=safeImage\(character\?\.galleryIllustrations\?\.\[0\]\?\.src\|\|\x27\x27\)/);
