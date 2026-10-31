@@ -24,7 +24,7 @@ assert.match(frontend, /get_latest_settled_encounter_session/);
 assert.match(frontend, /代入相遇好感度/);
 assert.match(frontend, /開啟全新故事/);
 assert.match(frontend, /await openNewStoryDialog\(characterId, latestEncounter\)/);
-assert.match(frontend, /await createStorySession\(characterId, 'fresh_story', null\)/);
+assert.match(frontend, /目前沒有已結算的相遇紀錄，暫時無法代入/);
 assert.match(frontend, /if \(!saved\) throw new Error\('新故事已建立/);
 const encounterSession = fs.readFileSync("supabase/functions/encounter-session/index.ts", "utf8");
 assert.match(frontend, /locationKey: encounterPlace/);
