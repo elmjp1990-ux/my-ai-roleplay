@@ -4414,6 +4414,33 @@ function findResumableEncounterSession(characterId, placeKey) {
   ).sort((a,b)=>(b.messages?.at(-1)?.at||b.startedAt||0)-(a.messages?.at(-1)?.at||a.startedAt||0))[0]||null;
 }
 
+async function setEncounterLifecycleState(sessionId, action) {
+  if (!isUuid(sessionId) || !['pause','resume'].includes(action)) {
+    throw new Error('相遇狀態資料無效，請重新整理後再試。');
+  }
+  const client = window.mySupabase;
+  if (!client?.functions) throw new Error('相遇同步服務尚未準備好，請稍後再試。');
+  const { data, error } = await client.functions.invoke('encounter-session-state', {
+    body: { sessionId, action }
+  });
+  let payload = data;
+  if (error && error.context && typeof error.context.json === 'function') {
+    try { payload = await error.context.json(); } catch (_) {}
+  }
+  if (error || !payload?.encounter) {
+    const code = payload?.error || '';
+    const message = code === 'encounter_scene_expired_or_closed'
+      ? '這次相遇的場景時間已結束，無法再暫停或接續。'
+      : code === 'encounter_session_not_found'
+        ? '找不到這次相遇紀錄，請重新整理城市地圖。'
+        : '相遇狀態同步失敗，請稍後再試。';
+    const failure = new Error(message);
+    failure.code = code;
+    throw failure;
+  }
+  return payload.encounter;
+}
+
 function showEncounterLeaveDialog(session) {
   if(!session?.encounterMode)return;
   showDialog('離開相遇',
@@ -7006,9 +7033,23 @@ document.addEventListener('click',async event => {
       case 'encounter-temporary-leave': {
         const session=state.sessions[key];if(!session?.encounterMode)break;
         captureDraft();
-        session.archived=false;session.archivedAt=null;session.encounterTemporarilyLeftAt=Date.now();
-        if(!persist())break;
-        try{const saved=await saveChatSessionSafely(session);if(saved!==true)throw new Error('雲端未確認儲存結果。');}catch(error){console.error('暫時離開同步失敗：',error);toast('暫時離開已保留在此裝置，但雲端同步失敗，請稍後重試。');break;}
+        const previous={archived:session.archived,archivedAt:session.archivedAt,temporarilyLeftAt:session.encounterTemporarilyLeftAt};
+        try{
+          await setEncounterLifecycleState(session.id,'pause');
+          session.archived=false;session.archivedAt=null;session.encounterTemporarilyLeftAt=Date.now();
+          if(!persist())throw new Error('本機聊天狀態無法保存。');
+          const saved=await saveChatSessionSafely(session);
+          if(saved!==true)throw new Error('雲端聊天狀態未確認保存。');
+        }catch(error){
+          session.archived=previous.archived;session.archivedAt=previous.archivedAt;session.encounterTemporarilyLeftAt=previous.temporarilyLeftAt;
+          persist();
+          if(error?.code!=='encounter_scene_expired_or_closed'){
+            try{await setEncounterLifecycleState(session.id,'resume');}catch(rollbackError){console.warn('相遇 pause rollback 失敗：',rollbackError);}
+          }
+          console.error('暫時離開同步失敗：',error);
+          toast(error?.message||'暫時離開失敗，請稍後再試。');
+          break;
+        }
         $('modal')?.close();hideList=false;go({page:'citymap'});break;
       }
       case 'encounter-end-confirm': {
@@ -9523,13 +9564,32 @@ function renderCityMapMVP(){
       try{
         // 同一個角色今天仍在同一地標出現時，優先接回暫時離開的相遇 session。
         const resumedSession=findResumableEncounterSession(person.id,placeKey);
-        const encounterSession=resumedSession||await createEncounterSession(person,placeKey);
+        let encounterSession=null;
+        if(resumedSession){
+          try{
+            await setEncounterLifecycleState(resumedSession.id,'resume');
+            resumedSession.encounterTemporarilyLeftAt=null;
+            encounterSession=resumedSession;
+            await saveChatSessionSafely(encounterSession);
+          }catch(error){
+            if(error?.code!=='encounter_scene_expired_or_closed')throw error;
+            // The authoritative scene clock has ended; archive the stale local resume candidate
+            // and ask the backend to create a new session only if the character is still present.
+            resumedSession.archived=true;
+            resumedSession.archivedAt=Date.now();
+            resumedSession.encounterTemporarilyLeftAt=null;
+            persist();
+            encounterSession=await createEncounterSession(person,placeKey);
+          }
+        }else{
+          encounterSession=await createEncounterSession(person,placeKey);
+        }
         encounterSession.hidden=false;
         persist();
         locationModal.hidden=true;
         document.body.classList.remove('city-location-active');
         go({page:'conversation',id:encounterSession.id});
-        toast(resumedSession?'已接續你們這次的相遇。':'已進入相遇模式；每次送出訊息依既有規則扣款。');
+        toast(resumedSession && encounterSession.id===resumedSession.id?'已接續你們這次的相遇。':'已進入相遇模式；每次送出訊息依既有規則扣款。');
       }catch(error){
         console.error('從城市地點開始相遇失敗：',error);
         toast(error?.message||'相遇模式暫時無法使用，請稍後再試。');
