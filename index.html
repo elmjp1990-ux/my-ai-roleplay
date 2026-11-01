@@ -6236,6 +6236,92 @@ async function groupRefreshList() { groupPrototype.groupsLoaded=false;await grou
     else if (sessionsChanged || deletedGroupIds.size) render();
     refreshChatEntryList();
   });
+
+let lastDeletedChatReconcileAt = 0;
+async function reconcileDeletedCloudChatParents() {
+  const uid = currentUser()?.uid;
+  const client = window.mySupabase;
+  if (!uid || !client || Date.now() - lastDeletedChatReconcileAt < 15000) return;
+  lastDeletedChatReconcileAt = Date.now();
+  try {
+    const sessionIds = [...new Set(Object.values(state.sessions || {})
+      .filter(session => session?.cloudOwned && session.cloudOwnerUid === uid)
+      .map(session => session.id).filter(isUuid))];
+    let activeSessionIds = new Set();
+    for (let i = 0; i < sessionIds.length; i += 100) {
+      const batch = sessionIds.slice(i, i + 100);
+      const {data, error} = await client.from('chat_sessions')
+        .select('id').eq('user_id', uid).in('id', batch).is('deleted_at', null);
+      if (error) throw error;
+      for (const row of data || []) activeSessionIds.add(row.id);
+    }
+
+    let sessionsChanged = false;
+    for (const sessionId of sessionIds) {
+      if (!activeSessionIds.has(sessionId)) {
+        delete state.sessions[sessionId];
+        sessionsChanged = true;
+      }
+    }
+    if (sessionsChanged) {
+      persist();
+      cacheSessionsForUser(uid);
+    }
+
+    const groupIds = [...new Set([
+      ...(groupPrototype.groups || []).map(group => group.id),
+      groupPrototype.active?.id,
+      route.page === 'group' ? route.id : null
+    ].filter(isUuid))];
+    let activeGroupIds = new Set();
+    for (let i = 0; i < groupIds.length; i += 100) {
+      const batch = groupIds.slice(i, i + 100);
+      const {data, error} = await client.from('chat_groups')
+        .select('id').in('id', batch);
+      if (error) throw error;
+      for (const row of data || []) activeGroupIds.add(row.id);
+    }
+
+    const removedGroupIds = groupIds.filter(groupId => !activeGroupIds.has(groupId));
+    if (removedGroupIds.length) {
+      const removed = new Set(removedGroupIds);
+      groupPrototype.groups = (groupPrototype.groups || []).filter(group => !removed.has(group.id));
+      for (const groupId of removedGroupIds) {
+        clearGroupDiaryLocalData(groupId, uid);
+        delete groupPrototype.groupPreviews[groupId];
+        delete groupPrototype.groupMembers[groupId];
+      }
+      if (groupPrototype.active?.id && removed.has(groupPrototype.active.id)) {
+        groupPrototype.active = null;
+        groupPrototype.messages = [];
+        groupPrototype.pendingRequest = null;
+        groupPrototype.loading = false;
+      }
+    }
+
+    if (route.page === 'conversation' && route.id && !state.sessions[route.id]) {
+      go({page:'chat'});
+      return;
+    }
+    if (route.page === 'group' && route.id && !activeGroupIds.has(route.id)) {
+      go({page:'chat'});
+      return;
+    }
+    if (sessionsChanged || removedGroupIds.length) {
+      render();
+      refreshChatEntryList();
+    }
+  } catch (error) {
+    console.warn('跨裝置聊天室刪除狀態核對失敗：', error?.message || error);
+  }
+}
+
+// No polling: reconcile only when a previously backgrounded tab becomes visible/focused.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') void reconcileDeletedCloudChatParents();
+});
+window.addEventListener('focus', () => void reconcileDeletedCloudChatParents());
+
 async function groupRename(groupId) {
   const g=groupPrototype;
   const target=g.groups.find(x=>x.id===groupId);
