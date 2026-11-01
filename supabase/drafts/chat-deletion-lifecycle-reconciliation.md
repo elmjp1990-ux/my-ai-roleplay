@@ -152,3 +152,27 @@ Requirements:
 - This PR branch is based on latest `main`.
 - No database mutation, migration application, worker deployment, cron setup, or production change is authorized by this draft.
 - Do not merge as a completed deletion implementation. This document records the verified design and blocks unsafe partial rollout.
+
+
+## 8. Full migration inventory comparison — 2026-11-01
+
+A fresh comparison was made between the test project's migration history and the recursive Git tree at the PR #199 merge base (0a951f290d6594a520afb4ab0dc3177a8ab16a24).
+
+- Test Supabase migration history: **141 entries**.
+- GitHub main migration directory: **96 SQL files**.
+- Same migration names in both inventories: **82**.
+- Of those shared names, **67 have different version/timestamp prefixes** between the live DB and repository.
+- Live DB-only names: **57**.
+- Repository-only names: **14**.
+- The two chat deletion migrations (20261022094147_delete_chat_group_with_related_data, 20261022094349_delete_chat_session_content) are among the live DB-only entries.
+- GitHub commit-history lookup for the two exact missing migration paths returned no commits. PR #133's changed-file list remains only index.html; its description/comments mention the RPCs but do not provide the applied SQL source.
+
+This is broader than two missing files. The repository migration directory and the test database history are not a one-to-one migration chain. A migration cannot safely be selected or applied based on filename/timestamp assumptions.
+
+### Reconciliation decision
+
+- Keep PR #200 Draft and keep all lifecycle SQL non-executable until a canonical baseline is established.
+- Do not rename repository migration files to match the live history, invent missing historical SQL, or manually insert rows into supabase_migrations.schema_migrations.
+- Next evidence-gathering step: capture a read-only schema inventory from the test project (tables/columns, constraints, indexes, triggers, policies, functions, grants, Storage bucket/policies) and compare it with the repository's migration replay state or a clean disposable project built from main.
+- If a clean replay cannot be produced, create a separately reviewed baseline/reconciliation plan from an authoritative schema snapshot, with explicit object-by-object provenance and drift disposition. Do not treat pg_get_functiondef alone as a complete historical migration source because it omits surrounding grants, policies, triggers, dependencies, and data transformations.
+- Only after baseline sign-off should the implementation branch add the first executable lifecycle migration. No test DB DDL/DML, migration application, worker deployment, or cron was performed in this inventory pass.
