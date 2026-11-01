@@ -195,3 +195,16 @@ Function-source inspection found another race boundary:
 - append_chat_group_mock_turn does lock the parent group row, but only checks archived_at IS NULL; add deleted_at IS NULL under the same lock after the group lifecycle marker exists.
 
 This inspection reinforces the required common lock order: parent session/group first, then turn/charge, then wallet; all writers must use the same order to avoid delete-vs-send races and deadlocks. No schema or data was modified.
+
+
+## 10. RPC grants and Security Advisor review — 2026-11-01
+
+Read-only review of function ACL/security settings and Supabase Security Advisor:
+
+- The two current chat deletion RPCs, group append RPC, and individual memory-photo soft-delete RPC are SECURITY DEFINER with an empty search_path and owner postgres. EXECUTE is granted to authenticated and service_role, not anon. Authenticated access is expected only if each function verifies auth.uid() against the owning session/group/photo and enforces lifecycle state internally; frontend visibility is not an authorization boundary.
+- reserve_chat_turn, settle_chat_turn, refund_chat_turn, and assistant guards are SECURITY DEFINER with empty search_path; their ACL is postgres/service_role only. Preserve this server-side billing boundary while fixing parent-first locks and lifecycle gates.
+- Security Advisor reports 14 RLS-enabled tables with no policies, including chat_group_turn_charges, chat_turn_events, encounter_session_lifecycle, encounter_session_turns, encounter_turn_interaction_receipts, story_relationship_batches and story_relationship_states. This may be intentional for service-role/RPC-only access. Do not add broad owner policies merely to silence the lint; inventory table grants and actual call paths first.
+- Advisor also reports four SECURITY DEFINER functions executable by anon: get_character_comments_safe, get_character_turn_counts, get_encounter_character_schedule, get_public_character_turn_count. These are adjacent character-data risks, not direct deletion functions; assess separately and do not silently broaden this PR.
+- Advisor reports leaked-password protection disabled at the Auth project setting level; track separately from chat lifecycle SQL.
+
+No grants, RLS policies, Auth settings, or database objects were changed in this review.
