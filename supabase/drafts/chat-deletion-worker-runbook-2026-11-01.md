@@ -4,7 +4,7 @@ Date: 2026-11-01
 PR: #200  
 Function: `purge-chat-deletions`  
 Project: `ouyewoagbmtqehbofrje`  
-Status: deployed to the test project; not invoked and not scheduled.
+Status: version 2 deployed to the test project; one authenticated empty-queue invocation succeeded; not scheduled.
 
 ## Purpose
 
@@ -23,9 +23,9 @@ Process the shared 30-day deletion queues for single and group chats. The worker
 
 ## Invocation
 
-The Edge Function has JWT verification enabled and additionally requires the JWT role claim `service_role`.
+The Edge Function uses Supabase's official `@supabase/server` wrapper with `auth: 'secret:default'`. Platform `verify_jwt` is disabled for this function only; the wrapper validates the named Secret Key on the `apikey` header before the handler runs. The handler uses `ctx.supabaseAdmin` only after successful secret-key validation.
 
-Send a POST request to the deployed function URL using the service-role key as the Bearer token. Never put the service-role key in browser code, a public repository, or a user-facing client.
+The test project's `default` Secret Key is stored in Vault under `chat_deletion_worker_service_role_key`. The function source and `supabase/config.toml` are tracked in PR #200. Never place the key in browser code, a public repository, or a user-facing client.
 
 The function processes at most:
 - 10 due relational chat deletion jobs per invocation.
@@ -36,15 +36,23 @@ The response contains counts only; it does not return chat IDs or object paths.
 ## Current deployment controls
 
 - Function is deployed only to the test Supabase project.
+- `pg_net` 0.20.4 is enabled in the `extensions` schema; `pg_cron` 1.6.4 remains enabled.
+- One manual `pg_net` POST invocation using the Vault secret returned HTTP 200 with all chat/Storage counts equal to zero. No persistent jobs were present or modified.
 - No pg_cron, external cron, Vercel Cron, or other schedule has been created.
-- The worker has not been invoked against persistent jobs.
 - The SQL claim/purge/retry RPCs have been exercised inside rollback-only test transactions.
 - Actual Storage API deletion with a disposable object remains an outstanding end-to-end test.
 
 ## Before enabling any schedule
 
-1. Run a disposable Storage upload/remove test in the test bucket and verify retry behavior.
-2. Run a real due-job test using a dedicated test fixture, verify content purge and ledger preservation, then confirm Storage queue completion.
+1. Create a dedicated disposable single-chat fixture and a disposable object in `personax-memory-photos`; verify relational purge, Storage API removal, idempotency, and retry behavior.
+2. Run the equivalent group-chat fixture and verify charge/ledger tombstones remain intact.
 3. Verify dead-letter monitoring and a documented manual recovery procedure.
 4. Verify account deletion does not cascade-delete pending chat deletion jobs or Storage jobs.
 5. Obtain explicit approval before creating any cron schedule; production scheduling requires separate approval.
+
+## Authentication and pg_net security notes
+
+- Supabase's current service-to-service pattern accepts a Secret Key in `apikey` and validates it with `withSupabase({ auth: 'secret:<name>' })`; this replaces the legacy JWT role-claim parser.
+- `pg_net` stores request headers in `net.http_request_queue` until dispatch. Supabase documents that any direct database login role can read those headers. The test project currently has only Supabase-managed login roles (no custom application login role); do not add custom direct-login roles while this scheduling pattern is in use.
+- The request queue is not exposed through the Data API by default. Do not expose the `net` schema or add it to API-exposed schemas.
+- Schedule remains intentionally absent until disposable single/group relational + Storage E2E and account-deletion interaction tests pass, and the user explicitly approves scheduling.
