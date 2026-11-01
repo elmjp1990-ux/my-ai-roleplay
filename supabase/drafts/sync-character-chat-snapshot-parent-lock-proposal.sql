@@ -74,7 +74,7 @@ BEGIN
 
   -- Group parent locks are deterministic and acquired before child updates.
   FOR v_parent_id IN
-    SELECT DISTINCT g.id
+    SELECT g.id
     FROM public.chat_groups g
     WHERE g.deleted_at IS NULL
       AND (
