@@ -64,6 +64,20 @@ BEGIN
     RAISE EXCEPTION 'archive_table_has_direct_role_grants';
   END IF;
 
+  IF EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_class c
+    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind IN ('r', 'p')
+      AND (
+        pg_catalog.has_table_privilege('anon', c.oid, 'TRUNCATE')
+        OR pg_catalog.has_table_privilege('authenticated', c.oid, 'TRUNCATE')
+      )
+  ) THEN
+    RAISE EXCEPTION 'client_role_truncate_privilege_remains';
+  END IF;
+
   IF v_helper IS NULL THEN
     RAISE EXCEPTION 'snapshot_helper_missing';
   END IF;
