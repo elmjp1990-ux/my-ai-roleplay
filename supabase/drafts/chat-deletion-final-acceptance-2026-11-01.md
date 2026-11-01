@@ -66,3 +66,25 @@ Before treating this as launch-ready:
 3. Keep account deletion (PR #201) separate; resolve group-charge archival, orphan chat content, and bucket-specific asset sweep rules before implementing it.
 
 This document records the current evidence and limitations; it does not approve merge, scheduling, or production rollout.
+
+
+## 2026-11-01 — deterministic Worker adapter tests added
+
+Commits:
+- `9d509f1925459b19807c5c3408dbce7861085e08` — extracted the chat Storage deletion adapter into `supabase/functions/_shared/chat-deletion-worker.ts`.
+- `820d839c106dbbcc2cc91939c434f9e2bbd7c1c5` — added deterministic adapter tests.
+- `b653b74173f87385560fadeef6a6085dffe5accb` — wired the deployed Worker entrypoint to the tested adapter.
+- `a8280befa6dbfb5b7f183a33552c0df5d8aa650f` — added a focused Deno 2 GitHub Actions workflow.
+
+The adapter tests cover:
+1. Successful Storage removal is counted only after the queue-mark RPC returns `true`.
+2. Simulated Storage HTTP 5xx returns an error and is routed to the queue failure marker.
+3. Simulated network failure is routed to the queue failure marker.
+4. A false or errored queue-mark RPC is never counted as completed.
+5. Non-chat buckets and empty object paths are rejected without calling Storage.
+
+**Evidence classification:** these are deterministic Worker/queue adapter tests with fake Storage and RPC adapters. They are not a live Storage HTTP fault-injection test and do not prove a real Supabase Storage 5xx response. The existing DB retry/backoff/dead-letter rollback tests remain separate evidence.
+
+**CI status:** workflow was added to run `deno test --no-check supabase/functions/_shared/chat-deletion-worker.test.ts`; GitHub Actions result must be checked before marking the tests as passed. No local Deno executable is available in the current execution environment.
+
+No database DDL, migration history, Storage schema, Storage objects, queue rows, cron jobs, Vault values, or production resources were changed by these commits. PR #200 remains Draft and unmerged. PR #201 remains paused.
