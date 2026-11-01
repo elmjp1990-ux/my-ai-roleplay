@@ -137,9 +137,9 @@ jobs:
             docker ps --format '{{.Names}}'
             exit 1
           fi
-          docker exec -i "${db_containers[0]}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \\
+          docker exec -i "${db_containers[0]}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
             < supabase/drafts/chat-deletion-turn-stats-structural-verification.sql
-          docker exec -i "${db_containers[0]}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \\
+          docker exec -i "${db_containers[0]}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
             < supabase/drafts/encounter-lifecycle-trigger-attachment-audit.sql
 
       - name: Stop and discard local database
