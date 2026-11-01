@@ -1,9 +1,22 @@
 # POYOZZ chat deletion lifecycle — reconciliation and implementation plan
 
-Status: Draft / design gate only  
+Status: implementation in progress; PR #200 remains Draft  
 Base: `main` at `0a951f290d6594a520afb4ab0dc3177a8ab16a24` (PR #199 merged)  
 Test Supabase project: `ouyewoagbmtqehbofrje`  
-Policy: user-requested chat deletion is immediate soft-delete; permanent relational and Storage cleanup only after 30 days.
+Policy: user-requested chat deletion is immediate soft-delete; chat content and chat-memory Storage cleanup only after 30 days.
+
+## Current implementation status — 2026-11-01 (supersedes historical baseline below)
+
+- Six initial migrations plus purge-worker, tombstone-marker and wallet-label migrations have been applied to the existing test project. Migration filenames are aligned to the versions recorded by Supabase.
+- Single/group delete RPCs now soft-delete and enqueue the shared 30-day queue; they do not clear content at request time.
+- Deleted-parent RLS guards and parent-first writer locks are active for session/group/message/version/generation/photo access, turn reservations, group append, assistant writes, encounter evidence/interaction, story validation and encounter evaluation enqueue/claim.
+- Direct group DELETE is revoked. Broad owner-folder chat-memory Storage policies were removed and replaced with active-parent owner/type/path policies.
+- Frontend no longer calls Storage.remove during whole-chat deletion; new chat-memory signed URLs last 300 seconds.
+- Day-30 purge RPCs now blank content and remove chat-only children while retaining minimal session/group/message/turn tombstones so billing FKs remain valid. Charge/refund/wallet/turn evidence and global encounter affinity remain.
+- The service-role `purge-chat-deletions` Edge Function is deployed to the test project with JWT verification and service-role claim check. It has not been invoked; no cron has been created.
+- Rollback-only tests cover soft-delete idempotency, RLS hiding, writer rejection, 30-day due-job claim/purge, financial evidence preservation, Storage queue retention/retry, and wallet character-label display. All test transactions rolled back.
+
+Historical findings in section 2 describe the pre-change baseline and should be read as such. The current test database is the implementation reference; migration replay from a clean DB remains unverified due historical drift.
 
 > This file is intentionally under `supabase/drafts/`. It is not an executable migration. Do not apply it, schedule a worker, or deploy a cleanup function from this document.
 
@@ -18,7 +31,7 @@ Policy: user-requested chat deletion is immediate soft-delete; permanent relatio
 - Character assets (character portrait, encounter illustrations, avatar videos) are not chat assets and must never be deleted by chat cleanup.
 - Existing one-year memory-photo expiry remains distinct from chat deletion. Explicit single-photo deletion can hide the photo immediately and queue its object for cleanup without deleting the chat.
 
-## 2. Confirmed live test-database findings (read-only inspection, 2026-11-01)
+## 2. Historical pre-change live test-database findings (2026-11-01)
 
 ### RPCs
 
@@ -61,11 +74,11 @@ The current GitHub `main` tree does not contain:
 
 Both versions are present in the test Supabase migration history and their functions are live. A direct fetch of both paths from `main` returns 404. Therefore the live test DB contains applied migration history/function state that is not reproducible from the current GitHub main tree.
 
-Do not add a new lifecycle migration on top of this unresolved drift. First recover the exact source SQL for those two applied migrations from the authoritative migration artifact/history, or create a reviewed baseline reconciliation migration that faithfully captures the live state. Do not guess or recreate historical files from function names alone.
+The historical drift remains a clean-room replay blocker, but the user explicitly approved reusing the existing test database without creating a paid branch. PR #200 has therefore applied new, additive migrations to the current test project only. The new migration versions are recorded in the live history and corresponding files use the exact recorded version prefixes.
 
-Other migration names/timestamps also differ between the live database and repository history. Reconcile the full version/name inventory before any migration is applied.
+Do not reset the current test DB, manually edit remote `schema_migrations`, or claim that the repository can replay from an empty database. Production has not been touched.
 
-## 4. Target implementation architecture
+## 4. Target architecture and current implementation notes
 
 ### 4.1 Parent lifecycle
 
@@ -95,7 +108,7 @@ Requirements:
 
 ### 4.3 Financial preservation and relational purge
 
-- Before enabling hard purge, remove chat-parent cascade paths from financial audit records or archive the complete financial/audit payload into a separately retained immutable model with verified counts and idempotent retry.
+- Current first-pass implementation does not hard-delete the session/group/message/turn IDs referenced by financial audit rows. It blanks content and keeps minimal tombstones, preserving existing FKs. Any future hard-delete redesign must first decouple/archive those references and be separately reviewed.
 - Do not cascade-delete charge rows or their audit events when deleting session/group/turn/message rows.
 - Explicitly handle `ai_generation_records` content according to a field-level retention decision; preserve billing/usage evidence while minimizing or redacting prompt/raw model content where policy requires. Do not silently blank content at deletion request time.
 - Purge child rows in FK-safe order only after 30 days and after storage paths have been queued.
