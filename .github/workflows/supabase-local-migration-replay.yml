@@ -43,18 +43,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          encounter_draft="supabase/drafts/encounter-session-delete-lifecycle-guards.sql"
           diary_draft="supabase/drafts/encounter-diary-chat-deletion-lifecycle-guard.sql"
           truncate_draft="supabase/drafts/revoke-public-truncate-privileges-proposal.sql"
           stats_draft="supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql"
+          encounter_migration="supabase/migrations/99999999999996_encounter_session_delete_lifecycle_ci.sql"
           diary_migration="supabase/migrations/99999999999997_encounter_diary_chat_lifecycle_guard_ci.sql"
           truncate_migration="supabase/migrations/99999999999998_revoke_public_truncate_ci.sql"
           stats_migration="supabase/migrations/99999999999999_chat_deletion_cumulative_turn_statistics_ci.sql"
+          test -f "$encounter_draft"
           test -f "$diary_draft"
           test -f "$truncate_draft"
           test -f "$stats_draft"
+          test ! -e "$encounter_migration"
           test ! -e "$diary_migration"
           test ! -e "$truncate_migration"
           test ! -e "$stats_migration"
+          cp "$encounter_draft" "$encounter_migration"
           cp "$diary_draft" "$diary_migration"
           cp "$truncate_draft" "$truncate_migration"
           cp "$stats_draft" "$stats_migration"
