@@ -212,6 +212,46 @@ BEGIN
     RAISE EXCEPTION 'encounter_diary_missing_restrictive_active_session_guard';
   END IF;
 
+  FOREACH v_proc IN ARRAY ARRAY[
+    pg_catalog.to_regprocedure('public.get_latest_settled_encounter_session(uuid)')::oid,
+    pg_catalog.to_regprocedure('public.get_latest_settled_encounter_affinity(uuid)')::oid,
+    pg_catalog.to_regprocedure('public.set_encounter_session_lifecycle_state(uuid,uuid,text)')::oid,
+    pg_catalog.to_regprocedure('public.settle_encounter_session(uuid,integer,text,jsonb,jsonb)')::oid,
+    pg_catalog.to_regprocedure('public.validate_affinity_session_link()')::oid,
+    pg_catalog.to_regprocedure('public.validate_encounter_evaluation_job_link()')::oid
+  ] LOOP
+    IF v_proc IS NULL THEN
+      RAISE EXCEPTION 'encounter_delete_lifecycle_function_missing';
+    END IF;
+    v_def := pg_catalog.pg_get_functiondef(v_proc);
+    IF pg_catalog.strpos(v_def, 'chat_sessions') = 0
+       OR pg_catalog.strpos(v_def, 'deleted_at IS NULL') = 0
+       OR pg_catalog.strpos(v_def, 'FOR UPDATE') = 0 THEN
+      RAISE EXCEPTION 'encounter_delete_lifecycle_parent_lock_or_filter_missing: %', v_proc::regprocedure;
+    END IF;
+  END LOOP;
+
+  FOREACH v_proc IN ARRAY ARRAY[
+    pg_catalog.to_regprocedure('public.get_latest_settled_encounter_session(uuid)')::oid,
+    pg_catalog.to_regprocedure('public.get_latest_settled_encounter_affinity(uuid)')::oid
+  ] LOOP
+    IF NOT pg_catalog.has_function_privilege('authenticated', v_proc, 'EXECUTE')
+       OR pg_catalog.has_function_privilege('anon', v_proc, 'EXECUTE') THEN
+      RAISE EXCEPTION 'latest_encounter_read_rpc_acl_mismatch: %', v_proc::regprocedure;
+    END IF;
+  END LOOP;
+
+  FOREACH v_proc IN ARRAY ARRAY[
+    pg_catalog.to_regprocedure('public.set_encounter_session_lifecycle_state(uuid,uuid,text)')::oid,
+    pg_catalog.to_regprocedure('public.settle_encounter_session(uuid,integer,text,jsonb,jsonb)')::oid
+  ] LOOP
+    IF NOT pg_catalog.has_function_privilege('service_role', v_proc, 'EXECUTE')
+       OR pg_catalog.has_function_privilege('authenticated', v_proc, 'EXECUTE')
+       OR pg_catalog.has_function_privilege('anon', v_proc, 'EXECUTE') THEN
+      RAISE EXCEPTION 'encounter_lifecycle_writer_rpc_acl_mismatch: %', v_proc::regprocedure;
+    END IF;
+  END LOOP;
+
   RAISE NOTICE 'chat deletion cumulative turn-stat structural assertions passed';
 END;
 $verify$;
