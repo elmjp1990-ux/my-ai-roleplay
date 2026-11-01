@@ -5874,7 +5874,10 @@ async function syncGroupDiaryCloud(groupId) {
   const local=readGroupDiaryLocalRecord(groupId);
   const {data:cloud,error}=await client.from('chat_group_diary')
     .select('group_id,owner_id,memories,updated_at').eq('group_id',groupId).maybeSingle();
-  if(error)throw error;
+  if(error) {
+    if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return [];}
+    throw error;
+  }
   if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return [];}
   if(cloud) {
     const cloudUpdatedAt=Date.parse(cloud.updated_at)||0;
@@ -5899,7 +5902,10 @@ async function saveGroupDiaryCloudNow(groupId,memories,updatedAt,uid=currentUser
   const {error}=await client.from('chat_group_diary').upsert({
     group_id:groupId,owner_id:uid,memories,updated_at:new Date(Math.max(Number(updatedAt)||Date.now(),Date.now())).toISOString()
   },{onConflict:'group_id'});
-  if(error)throw error;
+  if(error) {
+    if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return;}
+    throw error;
+  }
   if(readDeletedChatTombstones(uid).groups[groupId]) clearGroupDiaryLocalData(groupId,uid);
 }
 function queueGroupDiaryCloudSave(groupId) {
@@ -5919,6 +5925,10 @@ function queueGroupDiaryCloudSave(groupId) {
       if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return;}
       writeGroupDiaryLocalRecord(groupId,local.memories,Date.now());
     }).catch(error=>{
+      if(readDeletedChatTombstones(currentUser()?.uid).groups[groupId]) {
+        clearGroupDiaryLocalData(groupId,currentUser()?.uid);
+        return;
+      }
       console.error('群組甜蜜日記雲端同步失敗：',error);
       toast('日記已保存在此裝置，但雲端同步失敗；請確認網路後重新開啟群組重試。');
     });
