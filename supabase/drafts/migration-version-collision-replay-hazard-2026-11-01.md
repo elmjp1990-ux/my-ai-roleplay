@@ -136,3 +136,29 @@ The docs confirm the ordered pending-migration model, but this investigation has
 This repository's current `supabase/config.toml` contains only `project_id` and the worker function's `verify_jwt` setting; it does not supply a preconfigured local stack override. The current execution environment has no Supabase CLI or Docker executable, so no local replay was attempted.
 
 No hosted `db push`, `db reset`, or `migration repair` was run.
+
+
+## 2026-11-01 addendum — legacy deleted sessions and cumulative turn-stat loss
+
+A new read-only audit found four `chat_sessions` rows with `deleted_at IS NOT NULL` but no matching `chat_deletion_jobs` row. All four were deleted on 2026-10-15 to 2026-10-16 and still retain transcript rows. Across those four sessions there are 14 undeleted assistant messages (3 + 4 + 3 + 4) and 24 total message rows. They are legacy soft-deleted sessions predating the current shared queue lifecycle.
+
+Additional checks:
+- No deleted `chat_groups` without a queue job were found.
+- The four legacy sessions currently have zero `chat_memory_photos` metadata rows.
+- The only current deletion queue row is one completed synthetic tombstone; there are no non-completed jobs.
+- No completed deletion job has residual transcript rows.
+- The four legacy sessions are still within their original 30-day retention windows as of 2026-11-01; their deadlines fall on 2026-11-14 to 2026-11-15. No worker or cron was run.
+
+This finding means the migration reconciliation must do more than add a new stats table. It must:
+1. Snapshot the 14 assistant turns into a durable per-character aggregate before transcript purge.
+2. Create the missing `single_session` deletion jobs using each session's original `deleted_at` and `purge_after = deleted_at + interval '30 days'`.
+3. Enqueue any matching `chat_memory_photos` Storage paths after owner/path validation (none were found for these four sessions).
+4. Validate that an existing queue job, if present, matches the parent owner and original deletion timestamp; validate that an existing Storage path is not attached to another deletion job.
+
+A new comprehensive draft was added:
+- `supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql`
+- Commit `fe33550b85ab88d824fb0d9b2d942894db906d5a`, subsequently hardened with queue/path conflict checks in commit `f450ea1a674ae1eed4fb8d5edded10522d8f1acd`.
+
+The proposal creates a service-only aggregate table with no transcript content, snapshots single/group character turns inside the player deletion transaction, repeats the snapshot idempotently before purge, backfills legacy deleted parents/jobs, and updates both count RPCs to combine active message counts with archived aggregates while excluding soft-deleted group parents. The earlier standalone parent-group filter draft is now explicitly marked superseded because it did not preserve cumulative counts through purge.
+
+The proposal remains draft-only and has not been applied or tested. No hosted DDL/DML, queue creation, Storage operation, or cron invocation occurred. Migration history collision and lack of local Docker/Supabase CLI replay remain blockers.
