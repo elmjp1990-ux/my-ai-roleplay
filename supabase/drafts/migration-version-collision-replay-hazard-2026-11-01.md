@@ -122,3 +122,17 @@ Updated replay assessment:
 5. Preserve the parent-group filter as a separate additive change and test it against both RPCs, including NSFW and solo deletion cases.
 
 This correction supersedes the earlier wording in this document that implied no later repository migration could restore the solo filters. No database changes were made.
+
+
+## Supabase CLI workflow evidence checked
+
+The current Supabase documentation states that timestamped migration files are applied in order, `db push` applies migrations absent from the remote history table, and local clean replay requires the Supabase CLI plus a Docker-compatible runtime:
+
+- https://supabase.com/docs/guides/local-development/cli-workflows
+- https://supabase.com/docs/reference/cli/global-flags
+
+The docs confirm the ordered pending-migration model, but this investigation has not inspected the exact CLI version/source used by this project or run the two pending migrations locally. It therefore does not claim whether the whole pending set is one atomic transaction or whether requests can observe the interval between migration files. The exact migration runner version and transaction boundary must be confirmed in a reproducible local run before assessing exposure of the intermediate state.
+
+This repository's current `supabase/config.toml` contains only `project_id` and the worker function's `verify_jwt` setting; it does not supply a preconfigured local stack override. The current execution environment has no Supabase CLI or Docker executable, so no local replay was attempted.
+
+No hosted `db push`, `db reset`, or `migration repair` was run.
