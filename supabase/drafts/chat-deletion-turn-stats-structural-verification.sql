@@ -232,7 +232,8 @@ BEGIN
     pg_catalog.to_regprocedure('public.set_encounter_session_lifecycle_state(uuid,uuid,text)')::oid,
     pg_catalog.to_regprocedure('public.settle_encounter_session(uuid,integer,text,jsonb,jsonb)')::oid,
     pg_catalog.to_regprocedure('public.validate_affinity_session_link()')::oid,
-    pg_catalog.to_regprocedure('public.validate_encounter_evaluation_job_link()')::oid
+    pg_catalog.to_regprocedure('public.validate_encounter_evaluation_job_link()')::oid,
+    pg_catalog.to_regprocedure('public.validate_story_relationship_origin()')::oid
   ] LOOP
     IF v_proc IS NULL THEN
       RAISE EXCEPTION 'encounter_delete_lifecycle_function_missing';
@@ -255,6 +256,16 @@ BEGIN
       RAISE EXCEPTION 'encounter_lifecycle_writer_rpc_acl_mismatch: %', v_proc::regprocedure;
     END IF;
   END LOOP;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_trigger AS tr
+    WHERE tr.tgrelid = pg_catalog.to_regclass('public.story_relationship_states')
+      AND tr.tgname = 'validate_story_relationship_origin'
+      AND NOT tr.tgisinternal
+  ) THEN
+    RAISE EXCEPTION 'story_relationship_origin_trigger_missing';
+  END IF;
 
   RAISE NOTICE 'chat deletion cumulative turn-stat structural assertions passed';
 END;
