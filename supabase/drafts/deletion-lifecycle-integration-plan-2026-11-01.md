@@ -85,3 +85,12 @@ This is recorded for Phase 3; do not silently expand PR #200 into account deleti
 - Billing ledger and required audit evidence are not deleted as a side effect of chat or character deletion.
 - Account deletion is the only phase that removes the account identity; it must archive and verify required evidence before irreversible cleanup.
 - Every implementation, test, repair, blocker and policy decision is recorded in Notion P23-03 and the relevant PR.
+
+
+## 2026-11-01｜帳號待刪除鎖定與前端流程查核
+
+- 前端 `index.html` 已串接 `get_account_deletion_status()`、`request_account_deletion()`、`cancel_account_deletion()`：申請前要求輸入 DELETE 並再次確認；申請後顯示後端期限及取消入口；登入時重新向 DB 查狀態，待刪除帳號只讀取既有錢包，不初始化／補發餘額。這證明申請與取消 UI/RPC 有串接，但不代表實際到期 worker 存在。
+- 前端在待刪除期間設有大部分互動攔截；後端 `account_is_active()` 以是否存在 account_deletion_requests 作為狀態依據。資料庫 ACL 確認 request/cancel/status 僅 authenticated 可執行，archive/prepare/finalize/work-items/failure RPC 僅 service_role 可執行，anon 無執行權。
+- 查核 `account_is_active()` 的 public/private 函式呼叫，目前只出現在少數 RPC（群聊 append、wallet ensure、profile save、角色刪除、相簿照片刪除、角色快照同步等）；並非所有 Edge Function/service-role 寫入都會自動受 RLS 保護。帳號 worker 與所有 service-role 路徑必須自行驗證刪除狀態及 owner。
+- 公開 schema RLS policy 查核：多數角色、聊天室、群聊、訊息、profile 寫入政策已套用 account_is_active()；但 Storage 的 `Character video owner upload` 與 `Character video owner update` policy 目前只有 bucket + owner folder 條件，未檢查 account_is_active()。待刪除帳號可能仍能直接透過 Storage API 上傳／更新角色影片，需補後端政策 gate 並做拒絕測試。
+- 本輪未修改任何 RLS policy、未呼叫刪除 RPC、未建立帳號刪除 worker／Cron。新增待辦：修補角色影片 Storage INSERT/UPDATE pending-deletion gate；並逐一驗證 Edge Function service-role 寫入路徑不受前端 UI gate 取代。
