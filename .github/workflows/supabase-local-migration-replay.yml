@@ -43,11 +43,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          draft="supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql"
-          temporary_migration="supabase/migrations/99999999999999_chat_deletion_cumulative_turn_statistics_ci.sql"
-          test -f "$draft"
-          test ! -e "$temporary_migration"
-          cp "$draft" "$temporary_migration"
+          stats_draft="supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql"
+          truncate_draft="supabase/drafts/revoke-public-truncate-privileges-proposal.sql"
+          stats_migration="supabase/migrations/99999999999999_chat_deletion_cumulative_turn_statistics_ci.sql"
+          truncate_migration="supabase/migrations/99999999999998_revoke_public_truncate_ci.sql"
+          test -f "$stats_draft"
+          test -f "$truncate_draft"
+          test ! -e "$stats_migration"
+          test ! -e "$truncate_migration"
+          cp "$truncate_draft" "$truncate_migration"
+          cp "$stats_draft" "$stats_migration"
           # Explicitly local: no link, no access token, no remote DB password.
           supabase db reset --local --no-seed
           supabase migration list --local
