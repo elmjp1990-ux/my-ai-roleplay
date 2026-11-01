@@ -30,6 +30,8 @@ Git history shows the earliest repository migration commit:
 
 The repository's migration directory has no base-schema migration or schema dump that creates `public.characters` / `public.profiles`. The group core migration therefore depends on a schema created before the checked-in migration chain, likely through an earlier manual/bootstrap process. The exact original SQL source has not been recovered.
 
+Earlier project conversations from 2026-10-14 and 2026-10-15 also confirm that `public.characters` and `public.profiles` already existed and that their live column inventories were inspected (including character identity/visibility/deletion fields and profile identity/display fields). Those conversations did not contain the original `CREATE TABLE` statements, complete defaults/constraints/indexes, or a schema/bootstrap file. The column inventory is evidence of shape only and is not sufficient to recreate a safe baseline.
+
 ## Consequence
 
 The current GitHub migration chain is not reproducible from an empty database. Do not:
