@@ -12,7 +12,7 @@
 --   * Keep only aggregate counts and minimal tombstone linkage, never message text.
 --   * Backfill legacy deleted sessions which predate chat_deletion_jobs.
 --
--- The snapshot is written in the same transaction as the player delete RPC,
+-- The snapshot stores only source tombstone IDs, character IDs and counts; it does not retain player IDs or transcript content. The snapshot is written in the same transaction as the player delete RPC,
 -- after the parent row has been locked and before deleted_at is set. All writer
 -- paths must continue to lock the same parent row, so no post-snapshot writes
 -- can slip in. The purge worker repeats the snapshot idempotently as a safety
@@ -22,8 +22,7 @@ CREATE TABLE IF NOT EXISTS public.chat_deletion_character_turn_stats (
   resource_type text NOT NULL
     CHECK (resource_type IN ('single_session', 'group')),
   resource_id uuid NOT NULL,
-  owner_id uuid NOT NULL,
-  character_id uuid NOT NULL,
+  character_id uuid NOT NULL,  -- no player/account identifier is retained in the aggregate
   turn_count bigint NOT NULL CHECK (turn_count > 0),
   created_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),
   CONSTRAINT chat_deletion_character_turn_stats_resource_character_key
@@ -55,12 +54,11 @@ AS $function$
 BEGIN
   IF p_resource_type = 'single_session' THEN
     INSERT INTO public.chat_deletion_character_turn_stats (
-      resource_type, resource_id, owner_id, character_id, turn_count
+      resource_type, resource_id, character_id, turn_count
     )
     SELECT
       'single_session',
       s.id,
-      s.user_id,
       s.character_id,
       pg_catalog.count(m.id)::bigint
     FROM public.chat_sessions AS s
@@ -77,12 +75,11 @@ BEGIN
 
   ELSIF p_resource_type = 'group' THEN
     INSERT INTO public.chat_deletion_character_turn_stats (
-      resource_type, resource_id, owner_id, character_id, turn_count
+      resource_type, resource_id, character_id, turn_count
     )
     SELECT
       'group',
       g.id,
-      g.owner_id,
       gm.character_id,
       pg_catalog.count(gm.id)::bigint
     FROM public.chat_groups AS g
@@ -109,12 +106,11 @@ REVOKE ALL ON FUNCTION private.snapshot_chat_deletion_character_turn_stats(text,
 -- Backfill any already soft-deleted parents before the new count RPCs start
 -- including archived statistics. Idempotent by the resource/character key.
 INSERT INTO public.chat_deletion_character_turn_stats (
-  resource_type, resource_id, owner_id, character_id, turn_count
+  resource_type, resource_id, character_id, turn_count
 )
 SELECT
   'single_session',
   s.id,
-  s.user_id,
   s.character_id,
   pg_catalog.count(m.id)::bigint
 FROM public.chat_sessions AS s
@@ -129,12 +125,11 @@ HAVING pg_catalog.count(m.id) > 0
 ON CONFLICT (resource_type, resource_id, character_id) DO NOTHING;
 
 INSERT INTO public.chat_deletion_character_turn_stats (
-  resource_type, resource_id, owner_id, character_id, turn_count
+  resource_type, resource_id, character_id, turn_count
 )
 SELECT
   'group',
   g.id,
-  g.owner_id,
   gm.character_id,
   pg_catalog.count(gm.id)::bigint
 FROM public.chat_groups AS g
