@@ -27,6 +27,12 @@ Repository file `supabase/migrations/20261015_character_soft_delete.sql` is an A
 
 Therefore the local clean replay error is consistent with a missing pre-existing baseline: the live database had base schema created before the first tracked migration, likely through an earlier manual SQL / Dashboard operation or an untracked initial setup script. The exact source is not yet recovered.
 
+## GitHub history cross-check
+
+The earliest matching repository commit found for the character persistence flow is `79760d81e2d72b73808ac8807c7ec0b75bb61ecf` (2026-10-14, "Connect character editor to Supabase"). Its application diff already upserts rows into `public.characters` and `public.profiles`, but contains no CREATE TABLE SQL. This supports that the application was connected to pre-existing tables by that point; it does not reveal who/what originally created them.
+
+Commit: https://github.com/elmjp1990-ux/my-ai-roleplay/commit/79760d81e2d72b73808ac8807c7ec0b75bb61ecf
+
 ## User-provided history
 
 The user recalls creating a batch of public sample characters before using ChatGPT for coding, then later asking for those sample character records to be deleted.
