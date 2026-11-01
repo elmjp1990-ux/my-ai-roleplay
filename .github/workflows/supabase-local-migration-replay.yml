@@ -1,0 +1,45 @@
+name: Supabase local migration replay (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-migration-replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out PR branch
+        uses: actions/checkout@v4
+
+      - name: Install pinned Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.84.2
+
+      - name: Verify isolated local-only environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase --version
+          test -f supabase/config.toml
+          # This workflow intentionally has no Supabase access token or DB password.
+          # Never link this runner to a hosted project.
+          if [[ -n "${SUPABASE_ACCESS_TOKEN:-}" || -n "${SUPABASE_DB_PASSWORD:-}" ]]; then
+            echo "Hosted Supabase credentials must not be present in this workflow."
+            exit 1
+          fi
+
+      - name: Replay repository migrations on disposable local Postgres
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase db start
+          supabase migration list --local
+
+      - name: Stop and discard local database
+        if: always()
+        shell: bash
+        run: supabase stop --no-backup
