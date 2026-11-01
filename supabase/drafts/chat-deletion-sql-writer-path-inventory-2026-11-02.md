@@ -63,3 +63,16 @@ A targeted pass over the historical group-chat and character snapshot migrations
 ### Coverage status
 
 The PR branch tree contains 107 migration files. This round inspected a targeted subset of historical group, character snapshot, encounter writer, and chat-deletion migrations; it did not fetch/review every one of the 107 migration bodies. Therefore the repository-wide writer inventory remains partial. Do not mark 5A fully complete.
+
+## Encounter evaluation queue: deleted-session re-enqueue risk
+
+Review of `20261031240000_encounter_evaluation_dispatch_queue.sql`, its bounded-retry replacement `20261031250000_bound_encounter_evaluation_retries.sql`, and the latest chat purge RPC found:
+
+- `enqueue_due_encounter_evaluations()` locks/updates `encounter_session_lifecycle` and can enqueue a job based on lifecycle status/time, but does not join/check `chat_sessions.deleted_at` and does not lock the chat session parent first.
+- `claim_encounter_evaluation_jobs()` also selects ready lifecycle/job rows without checking `chat_sessions.deleted_at`; it claims only the job row.
+- Chat purge deletes `encounter_session_evaluation_jobs` and clears lifecycle payload fields, but does not transition the lifecycle status out of `active/paused/ready_to_settle`. The lifecycle row survives because it is the queue FK parent.
+- Therefore, after chat purge deletes an evaluation job, the existing minute dispatcher can potentially enqueue it again from the surviving due lifecycle row. This is a real static lifecycle integration risk; no runtime race has yet been executed.
+- Added draft-only proposal `supabase/drafts/encounter-evaluation-deletion-gate-proposal.sql` (commit `016e20389900443fdc34ffcee573e795d14832a6`). It joins/checks the chat parent, uses parent-first locking before lifecycle/job locks, and prevents enqueue/claim for deleted sessions. It preserves the existing service_role-only function ACL and does not add a chat-deletion Cron.
+- Claim-time filtering is not enough by itself: the evaluator's final settlement RPC must also recheck and lock the chat session parent, because deletion can happen after a job is claimed. That path remains a required audit/test.
+
+Required tests: purge-then-dispatch no re-enqueue; dispatcher-first vs delete-first lock ordering; claim skips deleted sessions; settlement rejects deleted sessions under parent lock; active-session retry/lease remains bounded.
