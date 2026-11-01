@@ -247,11 +247,11 @@ BEGIN
   END LOOP;
 
   IF pg_catalog.strpos(
-       pg_catalog.pg_get_functiondef(pg_catalog.to_regprocedure('public.set_encounter_session_lifecycle_state(uuid,uuid,text)')),
+       pg_catalog.pg_get_functiondef(pg_catalog.to_regprocedure('public.set_encounter_session_lifecycle_state(uuid,uuid,text)')::oid),
        'p_action IS NULL'
      ) = 0
      OR pg_catalog.strpos(
-       pg_catalog.pg_get_functiondef(pg_catalog.to_regprocedure('public.settle_encounter_session(uuid,integer,text,jsonb,jsonb)')),
+       pg_catalog.pg_get_functiondef(pg_catalog.to_regprocedure('public.settle_encounter_session(uuid,integer,text,jsonb,jsonb)')::oid),
        'p_relationship_stage IS NULL'
      ) = 0 THEN
     RAISE EXCEPTION 'encounter_lifecycle_null_argument_guard_missing';
