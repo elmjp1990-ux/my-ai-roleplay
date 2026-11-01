@@ -47,7 +47,7 @@ jobs:
             storyEdge.includes('encounter_source_session_lookup_failed'),
             'Story carry-over Edge Function must verify an active source session'
           );
-          const scripts = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)]
+          const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)]
             .map(match => match[1]).filter(source => source.trim());
           assert.ok(scripts.length > 0, 'No inline JavaScript script blocks found');
           scripts.forEach((source, index) => {
