@@ -76,3 +76,29 @@ Review of `20261031240000_encounter_evaluation_dispatch_queue.sql`, its bounded-
 - Claim-time filtering is not enough by itself: the evaluator's final settlement RPC must also recheck and lock the chat session parent, because deletion can happen after a job is claimed. That path remains a required audit/test.
 
 Required tests: purge-then-dispatch no re-enqueue; dispatcher-first vs delete-first lock ordering; claim skips deleted sessions; settlement rejects deleted sessions under parent lock; active-session retry/lease remains bounded.
+
+
+## Seventh-round extension: Encounter settlement vs deletion (2026-11-02)
+
+A cross-check of the queue-gate proposal against the existing draft `encounter-session-delete-lifecycle-guards.sql` found:
+
+- The existing draft replacement for `settle_encounter_session(...)` already locks `chat_sessions` first with `deleted_at IS NULL`, then locks `encounter_session_lifecycle`, and only then updates `encounter_character_state` and lifecycle settlement fields. This is the correct serialization shape against chat deletion **if this draft is included and its ACL is preserved**.
+- The settlement replacement is currently draft-only; it is not in the PR's changed migration list and has not been applied. It must not be described as an active protection.
+- The queue-gate proposal separately fixes dispatcher and claimer parent locking. Both are required: queue filtering prevents deleted work from being enqueued/claimed, while settlement parent locking prevents an already-claimed worker from committing affinity after deletion wins the parent lock.
+- The settlement draft shown in this file does not itself include explicit GRANT/REVOKE statements for `settle_encounter_session`. Before promotion, fetch the live function ACL and preserve its exact intended caller boundary. Do not assume that SECURITY DEFINER alone makes it service-only.
+- The settlement RPC returns idempotently for an already-settled lifecycle only after the parent lock/check, which is desirable: a deleted parent cannot use the idempotent branch to reveal or mutate settlement state.
+- The inspected settlement body checks pending pre-expiry reserved/reconciliation charges and evidence-count equality before applying affinity. It does not settle while there is incomplete turn evidence.
+
+### Remaining evaluator integration evidence gap
+
+The PR-changed Edge Function set contains the deletion worker and story-session function; it does not contain a dedicated Encounter evaluator file. This bounded pass has not yet established the deployed evaluator's exact function name, RPC call order, or failure/retry behavior. Trace the deployed evaluator entry point and confirm it calls `settle_encounter_session` only after a successful claim, and that failures use the bounded `fail_encounter_evaluation_job` path. Do not infer this from the queue SQL alone.
+
+### Required combined race matrix
+
+1. Evaluator claims first, then delete acquires `chat_sessions`: settlement must block, observe `deleted_at`, and reject without affinity/lifecycle mutation.
+2. Settlement acquires `chat_sessions` first: deletion must wait; settlement may complete, then deletion proceeds and hides/purges the chat on its schedule.
+3. Dispatcher claims/queues before delete: delete must remove the job; worker settlement must still reject if delete wins parent lock.
+4. Delete/purge completes before dispatcher: no job may be recreated from surviving lifecycle rows.
+5. Verify function ACL for settlement, enqueue, claim, and fail RPCs; verify evaluator service identity; verify retry count/lease is bounded.
+
+Coverage remains partial; no runtime lock-race fixture or deployed evaluator trace has been completed in this round.
