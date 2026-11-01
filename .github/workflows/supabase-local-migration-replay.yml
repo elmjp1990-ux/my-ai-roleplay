@@ -1,0 +1,76 @@
+name: Supabase local migration replay (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-migration-replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out selected branch
+        uses: actions/checkout@v4
+
+      - name: Install pinned Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.84.2
+
+      - name: Verify isolated local-only environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase --version
+          test -f supabase/config.toml
+          # This workflow intentionally has no Supabase access token or DB password.
+          # Never link this runner to a hosted project.
+          if [[ -n "${SUPABASE_ACCESS_TOKEN:-}" || -n "${SUPABASE_DB_PASSWORD:-}" ]]; then
+            echo "Hosted Supabase credentials must not be present in this workflow."
+            exit 1
+          fi
+
+      - name: Start disposable local Supabase database
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase db start
+          supabase migration list --local
+
+      - name: Apply security drafts on the disposable local database
+        shell: bash
+        run: |
+          set -euo pipefail
+          stats_draft="supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql"
+          truncate_draft="supabase/drafts/revoke-public-truncate-privileges-proposal.sql"
+          stats_migration="supabase/migrations/99999999999999_chat_deletion_cumulative_turn_statistics_ci.sql"
+          truncate_migration="supabase/migrations/99999999999998_revoke_public_truncate_ci.sql"
+          test -f "$stats_draft"
+          test -f "$truncate_draft"
+          test ! -e "$stats_migration"
+          test ! -e "$truncate_migration"
+          cp "$truncate_draft" "$truncate_migration"
+          cp "$stats_draft" "$stats_migration"
+          # Explicitly local: no link, no access token, no remote DB password.
+          supabase db reset --local --no-seed
+          supabase migration list --local
+
+      - name: Verify archived-turn schema, RPC guards and ACLs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t db_containers < <(docker ps --format '{{.Names}}' | grep '^supabase_db_' || true)
+          if [[ "${#db_containers[@]}" -ne 1 ]]; then
+            echo "Expected exactly one disposable Supabase database container; found ${#db_containers[@]}."
+            docker ps --format '{{.Names}}'
+            exit 1
+          fi
+          docker exec -i "${db_containers[0]}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < supabase/drafts/chat-deletion-turn-stats-structural-verification.sql
+
+      - name: Stop and discard local database
+        if: always()
+        shell: bash
+        run: supabase stop --no-backup
