@@ -65,4 +65,30 @@ No approach is selected or applied in this note. Do not mutate the existing migr
 4. Once a reproducible local Supabase CLI/Docker workflow exists, run clean replay and regression tests on a disposable local database; stop on first error.
 5. Build the final additive migration from the current live definitions with only the parent-group deleted filter delta, then test active/deleted groups, deleted individual group messages, solo session/message deletion, NSFW/owner visibility, grants, owner, SECURITY DEFINER and search_path.
 
+## 2026-11-01 addendum — current NSFW count gate has no matching migration source
+
+A second read-only scan searched every recorded migration statement for either count RPC name:
+- public.get_character_turn_counts(uuid[])
+- public.get_public_character_turn_count(uuid)
+
+Only four migration versions contain either function:
+- 20261021023530 / include_group_turns_in_character_counts
+- 20261022173642 / secure_character_turn_count_visibility
+- 20261022185425 / exclude_deleted_group_messages_from_turn_counts
+- 20261023095003 / exclude_deleted_chat_from_character_turn_counts
+
+No later recorded migration statement updates either count RPC. In particular:
+- 20261024073819 / character_nsfw_terms_and_age_gate adds NSFW schema/helper/policies but does not replace either count RPC.
+- 20261024075220 / move_adult_check_to_private_schema moves the helper and updates character/video policies but does not replace either count RPC.
+- 20261024083626 / enforce_nsfw_age_gate_for_character_reads updates character RLS policies but does not replace either count RPC.
+
+The current live count RPC definitions nevertheless contain c.is_nsfw / private.current_user_is_adult() predicates. Therefore this part of the live function state is not represented in the recorded migration statements examined. It is an unexplained live-schema drift / missing migration provenance; do not assert that it is covered by the recorded NSFW policy migrations. It may have been applied out-of-band or its source migration may be missing from the ledger/repository. The exact origin is unknown.
+
+Consequences:
+- A clean migration replay from repository history cannot be assumed to reproduce the current live NSFW count gate.
+- The repo-only 20261023120000 migration can overwrite deleted solo filters; no later recorded migration restores those two count functions.
+- The final additive migration must preserve both current live functions in full, including NSFW and solo deletion predicates, and must be accompanied by a reviewed baseline/provenance decision. Do not rely on replaying only the historical files.
+
+This addendum is based on a read-only scan of all schema_migrations.statements containing either function name and a separate read of the current live function definitions. No DDL/DML or migration application was performed.
+
 PR #200 remains Draft/unmerged. No hosted migration was applied. No cron was enabled. PR #201 remains paused.
