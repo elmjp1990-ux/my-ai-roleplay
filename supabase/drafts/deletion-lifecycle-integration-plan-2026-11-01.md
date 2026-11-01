@@ -32,12 +32,13 @@ All phases use the existing Supabase test project. Do not create paid branches/p
 
 ### Additional account-deletion gap found during chat queue integration audit (2026-11-01)
 
-- `prepare_account_deletion(uuid)` archives single-chat `chat_turn_charges` and `chat_turn_events`, then deletes `ai_generation_records`, `chat_message_versions`, `chat_turn_charges`, `wallet_transactions`, and legacy `conversations`.
-- `archive_account_deletion_data(uuid)` archives AI generation records and wallet transactions; the prepare step adds single-chat charge/event archives. Neither function currently archives `chat_group_turn_charges`.
-- The prepare function does not explicitly delete `chat_sessions`, `chat_groups`, `chat_messages`, `chat_group_messages`, or `chat_group_turns`.
-- Current FK inventory shows `chat_sessions.user_id` and `chat_groups.owner_id` have no FK to `profiles` or `auth.users`; deleting Auth/profile therefore does not automatically remove these chat parent rows. This can leave orphaned chat content after account deletion unless the account workflow explicitly handles it.
-- `chat_group_turn_charges` is FK-cascaded by `chat_groups` and `chat_group_turns`, but is not included in the current account archive. If a later account cleanup removes groups/turns, group billing evidence could be lost.
-- The new `chat_deletion_jobs` and `chat_storage_deletion_jobs` are not referenced by the current account deletion functions; their owner/resource columns have no FK to account/chat parents, so pending cleanup work survives current account/profile parent deletion paths. Preserve this invariant in future changes.
+- prepare_account_deletion(uuid) archives single-chat chat_turn_charges and chat_turn_events, then deletes ai_generation_records, chat_message_versions, chat_turn_charges, wallet_transactions, and legacy conversations.
+- archive_account_deletion_data(uuid) archives AI generation records and wallet transactions; the prepare step adds single-chat charge/event archives. Neither function currently archives chat_group_turn_charges.
+- The prepare function does not explicitly delete chat_sessions, chat_groups, chat_messages, chat_group_messages, or chat_group_turns.
+- Current FK inventory shows chat_sessions.user_id and chat_groups.owner_id have no FK to profiles or auth.users; deleting Auth/profile therefore does not automatically remove these chat parent rows. This can leave orphaned chat content after account deletion unless the account workflow explicitly handles it.
+- chat_group_turn_charges is FK-cascaded by chat_groups and chat_group_turns, but is not included in the current account archive. If a later account cleanup removes groups/turns, group billing evidence could be lost.
+- The new chat_deletion_jobs and chat_storage_deletion_jobs are not referenced by the current account deletion functions; their owner/resource columns have no FK to account/chat parents, so pending cleanup work survives current account/profile parent deletion paths. Preserve this invariant in future changes.
+- Follow-up FK inspection confirms group messages, members, scenes, diary, group photos, turns and group charges cascade from group/turn parents; single messages, single charges, encounter lifecycle/turns and story relationship rows cascade from session parents. This makes archive-before-parent-delete ordering mandatory.
 
 This is recorded for Phase 3; do not silently expand PR #200 into account deletion. The account phase must first add group-charge archive coverage, explicit chat content cleanup, and a verified rule for pending 30-day chat jobs.
 
@@ -56,17 +57,21 @@ This is recorded for Phase 3; do not silently expand PR #200 into account deleti
 
 - request_account_deletion(), cancel_account_deletion(), get_account_deletion_status(), get_account_deletion_work_items(), archive_account_deletion_data(), prepare_account_deletion(), finalize_account_deletion(), and failure recording RPCs exist.
 - Account deletion requests use account_deletion_settings.grace_period. Current test-project setting is 5 minutes; this is a test configuration and must not be copied into production. The repository includes a migration restoring a 30-day default for future requests, but the live request RPC reads the settings row.
-- prepare_account_deletion verifies archived payloads for AI generation records, wallet transactions, chat turn charges, and chat turn events before deleting source rows. It then deletes AI generation records, relevant message versions, chat charges, wallet transactions, and legacy conversations; later profile/Auth cleanup is expected in the remaining deletion path.
+- prepare_account_deletion verifies archived payloads for AI generation records, wallet transactions, single-chat turn charges, and single-chat turn events before deleting source rows. It does not currently archive group turn charges.
+- prepare_account_deletion deletes AI generation records, relevant message versions, single-chat charge rows, wallet transactions, and legacy conversations. It does not explicitly delete chat_sessions, chat_groups, chat_messages, chat_group_messages, or chat_group_turns.
 - finalize_account_deletion only marks a batch completed after the Auth user is absent.
 - Archive batch/item tables exist and currently contain no batches/items in the test project.
 - Current project has only one active pg_cron job, for encounter-evaluation dispatch. No account-deletion worker Edge Function or account-deletion cron invocation was found in the project inventory during this audit.
+- Storage object ownership is not enforced by an FK to auth.users. Character illustration paths use {author_id}/{character_id}/{asset_uuid}.{ext}; avatar-video objects use the author folder; chat-memory objects use {owner_id}/single|group/{chat_id}/{asset_uuid}.{ext}. Cleanup must validate each bucket's own path contract and ownership, not issue a broad owner-prefix delete.
+- Character illustrations and avatar videos are character assets, not chat assets. Account deletion must coordinate their cleanup with character ownership and historical-chat display rules, while chat purge remains restricted to personax-memory-photos.
 
 ### Remaining implementation/verification
 
-- Trace the full worker path from due request → archive → prepare → profile/storage cleanup → Auth Admin deletion → finalize; identify exactly which step invokes each RPC.
+- Trace the full worker path from due request → archive → prepare → chat/character asset queues → profile cleanup → Auth Admin deletion → finalize; identify exactly which step invokes each RPC.
 - Implement/verify a scheduled service-role worker with leases, bounded retries, idempotency and dead-letter handling; do not rely on an RPC merely existing.
+- Add archive coverage for chat_group_turn_charges, verify exact payload/count parity, and only then allow group/turn cleanup.
 - Verify cancel-vs-worker race and account lock/freeze behavior across all write paths.
-- Coordinate account deletion with chat deletion jobs and character asset cleanup jobs; preserve job rows independently of the account/profile being deleted.
+- Coordinate account deletion with pending chat deletion jobs and character asset cleanup jobs; preserve job rows independently of the account/profile being deleted and explicitly decide whether 30-day chat retention remains in force for account deletion.
 - Define and test archive retention/access/deletion policy for financial and security evidence; do not invent legal retention periods.
 - Remove account-owned Storage objects across approved buckets without touching other users' assets.
 - Verify Auth user deletion, profile cascades, and retry safety end-to-end using a dedicated disposable test account only.
