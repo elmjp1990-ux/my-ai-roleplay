@@ -52,6 +52,19 @@ jobs:
           supabase db reset --local --no-seed
           supabase migration list --local
 
+      - name: Verify archived-turn schema, RPC guards and ACLs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t db_containers < <(docker ps --format '{{.Names}}' | grep '^supabase_db_' || true)
+          if [[ "${#db_containers[@]}" -ne 1 ]]; then
+            echo "Expected exactly one disposable Supabase database container; found ${#db_containers[@]}."
+            docker ps --format '{{.Names}}'
+            exit 1
+          fi
+          docker exec -i "${db_containers[0]}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < supabase/drafts/chat-deletion-turn-stats-structural-verification.sql
+
       - name: Stop and discard local database
         if: always()
         shell: bash
