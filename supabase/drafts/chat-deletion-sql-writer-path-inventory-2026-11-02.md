@@ -47,3 +47,19 @@ The proposal locks active single-session parents, then active group parents in d
 7. Complete browser multi-tab/device and real Storage failure/retry E2E.
 
 No cron, deployment, merge, or hosted DDL is authorized by this document.
+
+## Fifth-round extension: historical migrations and character lifecycle writers
+
+A targeted pass over the historical group-chat and character snapshot migrations found:
+
+- `create_chat_group(...)` creates a new group/scenes/member snapshots atomically. It is a creation path, not a writer into an already deleted parent; its member-limit trigger locks the parent group before member insert/update.
+- Historical definitions of `append_chat_group_mock_turn(...)` existed in 2026-10-15 migrations and were later replaced by billing and parent-first guard migrations. Do not assess only the earliest definition; the effective latest definition is in `20261101053732_chat_writer_parent_first_guards.sql`.
+- `soft_delete_character(...)` in `20261022175412_sync_group_character_snapshots_on_delete_and_update.sql` is a second SECURITY DEFINER snapshot writer. It originally updates all chat sessions, group members, and group messages by character ID without locking chat parents or excluding deleted parents. Fixing only `sync_character_chat_snapshot` would leave this sibling bypass.
+- The parent-lock proposal was expanded to replace both `soft_delete_character` and `sync_character_chat_snapshot`. Both paths now lock active single-chat parents and active group parents in deterministic order before child snapshot updates; deleted parents are skipped. Draft-only commit `e76edc374d872765fbea51d1fa938df4b860480c`.
+- Encounter writer paths `reserve_encounter_chat_turn` and `record_encounter_session_turn_evidence` in `20261101054027_encounter_chat_deletion_gates.sql` both lock `chat_sessions` parent first and reject deleted parents before lifecycle/charge/evidence writes.
+- Encounter interaction writer `record_encounter_turn_interaction` also reads the matching charge, then locks the session parent before locking charge and inserting receipt/affinity/diary evidence; it rejects deleted sessions.
+- Encounter evaluation queue functions write evaluation jobs/lifecycle state, not chat transcript rows; their session-deletion interaction still needs explicit coverage in the dedicated queue/worker audit.
+
+### Coverage status
+
+The PR branch tree contains 107 migration files. This round inspected a targeted subset of historical group, character snapshot, encounter writer, and chat-deletion migrations; it did not fetch/review every one of the 107 migration bodies. Therefore the repository-wide writer inventory remains partial. Do not mark 5A fully complete.
