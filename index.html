@@ -2947,6 +2947,8 @@ async function saveChatSessionToCloud(s, options = {}) {
   const localUser = currentUser();
   if (!client || !localUser?.uid || !s) return false;
   if (!isUuid(s.characterId) || !isUuid(s.id)) return false;
+  if (s.cloudOwned && s.cloudOwnerUid === localUser.uid &&
+      readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
   // Generic blank chats remain local. Encounter and Story sessions are pre-created
   // by trusted Edge Functions, so their opening message and session metadata must sync
   // even before the player sends the first user message.
@@ -2963,6 +2965,7 @@ async function saveChatSessionToCloud(s, options = {}) {
     const currentRow = await client.from('chat_sessions').select('character_snapshot')
       .eq('id',s.id).eq('user_id',localUser.uid).maybeSingle();
     if (currentRow.error) throw new Error('讀取既有聊天快照失敗：'+currentRow.error.message);
+    if (readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
     if (currentRow.data?.character_snapshot) s.cloudCharacterSnapshot = currentRow.data.character_snapshot;
   }
   const priorSnapshot = s.cloudCharacterSnapshot && typeof s.cloudCharacterSnapshot === 'object'
@@ -3037,6 +3040,7 @@ async function saveChatSessionToCloud(s, options = {}) {
   if (!sessionWrite.data?.id) {
     throw new Error('資料庫未確認聊天基本資料已寫入；本次不會標記同步成功。');
   }
+  if (readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
   s.cloudOwned = true;
   s.cloudOwnerUid = localUser.uid;
   s.cloudCharacterSnapshot = snapshot;
@@ -3047,12 +3051,14 @@ async function saveChatSessionToCloud(s, options = {}) {
     content:String(m.text ?? ''), created_at:new Date(Number(m.at) || Date.now()).toISOString()
   }));
   if (messages.length) {
+    if (readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
     const { data: savedMessages, error: messageError } = await client.from('chat_messages')
       .upsert(messages,{onConflict:'id'}).select('id');
     if (messageError) throw new Error('聊天訊息同步失敗：'+messageError.message);
     if (!Array.isArray(savedMessages) || savedMessages.length !== messages.length) {
       throw new Error('資料庫回報的已儲存訊息數量不符；請重新整理確認，勿視為同步完成。');
     }
+    if (readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
   }
   return true;
 }
@@ -3230,6 +3236,9 @@ async function loadCloudChatSessions(user) {
 
 async function saveChatSessionSafely(s) {
   try {
+    const uid=currentUser()?.uid;
+    if (s?.cloudOwned && uid && s.cloudOwnerUid===uid &&
+        readDeletedChatTombstones(uid).sessions[s.id]) return false;
     const saved = await saveChatSessionToCloud(s);
     return saved;
   } catch (error) {
