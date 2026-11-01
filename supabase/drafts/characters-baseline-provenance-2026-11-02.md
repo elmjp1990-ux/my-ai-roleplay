@@ -60,3 +60,17 @@ That history may explain deletion of example rows, but it does not imply the `pu
 - Live migration `20261015065943 / isolate_character_private_info` begins by creating `character_private_info` referencing `characters`; it does not create `characters`.
 - Live test database table listing confirms `public.characters` and its current columns/FK dependencies.
 - Repository file `supabase/migrations/20261015_character_soft_delete.sql` alters an already-existing table.
+
+
+## Additional catalog fingerprint captured read-only
+
+For future baseline comparison, the live test project reports:
+
+- Both `characters` and `profiles` are owned by `postgres`, RLS enabled, FORCE RLS disabled.
+- `characters` primary key `id`; FK `author_id → profiles(id) ON DELETE CASCADE`; checks for owner-scoped avatar video path, JSON object `phone_settings`, and bounded JSON object `personality_profile`.
+- `characters` indexes: primary key, `idx_characters_author_id`, and partial `characters_active_public_idx` on visibility/review status/first published time where not deleted.
+- `profiles` primary key `id`; unique `handle`; FK `id → auth.users(id) ON DELETE CASCADE`; `persona_presets` JSON array check.
+- Character policies currently include owner create/update/delete, visibility + age-gated select, account-active restriction, and restrictive soft-delete visibility. Profiles policies include owner read/update/insert and public six-column read.
+- Character triggers currently include `characters_prevent_soft_delete_restore` and `guard_pending_account_character_write` (BEFORE INSERT/UPDATE/DELETE).
+
+This is a current-state fingerprint only, not a claim about the original base schema. Full current column list and constraints are available from the live catalog; future reconstruction must compare every object and dependency rather than copying only this summary.
