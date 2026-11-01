@@ -71,3 +71,19 @@ The repository migration chain cannot be assumed replayable until these duplicat
 6. Close RLS and Storage policy bypasses; test all authenticated/anon paths.
 7. Add worker-only purge path after 30 days with idempotency, retry/backoff and dead-letter.
 8. Test race conditions, rollback, storage failure, signed URL behavior, and exclusion of character assets.
+
+
+## Table grants and RLS no-policy interpretation — 2026-11-01
+
+A follow-up `has_table_privilege` check clarified the Security Advisor findings:
+
+- The 14 RLS-enabled/no-policy tables do **not** grant anon or authenticated direct table privileges. The chat/encounter ledger tables grant direct CRUD to `service_role` only; several account-deletion archive/settings tables have no direct grants even to service_role and are presumably accessed through tightly scoped SECURITY DEFINER routines. Do not add authenticated policies to these tables just to clear the advisor notice.
+- `chat_groups` does grant authenticated SELECT/UPDATE/DELETE, and the existing owner DELETE policy matches. This is a confirmed direct client DELETE path that bypasses the intended lifecycle RPC unless removed/replaced.
+- `chat_sessions` also grants authenticated DELETE, but the inspected policies contain no DELETE policy; with RLS enabled, the grant alone does not make deletion possible. Keep this distinction in the regression test.
+- `chat_group_diary` grants authenticated DELETE and has no explicit lifecycle check in its owner policy; this needs to be closed on soft delete.
+- `chat_messages` grants authenticated INSERT/UPDATE but not DELETE. The policies do not consistently check parent deleted_at, so freeze UPDATE after delete and keep inserts gated.
+- `chat_group_memory_photos` grants anon and authenticated CRUD at the SQL privilege layer, but its listed policies target authenticated and owner/group; test anon role explicitly and review the RLS configuration before changing grants. Authenticated broad owner policy still needs parent lifecycle gating.
+- `ai_generation_records` has authenticated SELECT, no direct client write/delete; service_role can delete. Its SELECT policy checks owner/account-active but not parent session deleted_at, so generation records may remain visible through the client during the 30-day retention window unless the policy is updated.
+- `chat_turn_charges` permits authenticated SELECT; its policy checks user/account-active but not parent session deleted_at. Decide whether users should see billing status after chat deletion; preserve ledger/audit data, but expose only the minimum permitted metadata.
+
+Regression tests must assert both SQL table grants and RLS behavior; neither layer alone describes effective access.
