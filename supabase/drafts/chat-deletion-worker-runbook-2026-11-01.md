@@ -44,11 +44,10 @@ The response contains counts only; it does not return chat IDs or object paths.
 
 ## Before enabling any schedule
 
-1. Run true two-transaction concurrency tests for delete-vs-reserve, delete-vs-message insert, and delete-vs-encounter evidence.
-2. Verify Storage API failure/retry/dead-letter behavior and object-not-found idempotency against a real failed request.
-3. Verify account deletion does not cascade-delete pending chat deletion jobs or Storage jobs.
-4. Verify financial evidence retention with a fixture that includes valid charge/turn rows; the latest disposable E2E intentionally created no financial rows.
-5. Obtain explicit approval before creating any cron schedule; production scheduling requires separate approval.
+1. Verify Storage API failure/retry/dead-letter behavior and object-not-found idempotency against a real failed request.
+2. Verify account deletion with a disposable synthetic Auth user inside a rollback-safe transaction; structural FK review indicates the durable jobs are independent of user/chat parents, but the actual cascade transaction has not yet been run.
+3. Verify financial evidence retention with a fixture that includes valid charge/turn rows; the latest disposable content E2E intentionally created no financial rows.
+4. Obtain explicit approval before creating any cron schedule; production scheduling requires separate approval.
 
 ## Authentication and pg_net security notes
 
@@ -66,3 +65,20 @@ The stable worker source was temporarily extended with a secret-authenticated te
 - Both fixture sets were cleaned after verification. Final checks: no test sessions/groups, no sentinel content, no deletion queue rows, no `_worker-e2e` photo metadata or Storage objects, and no pending pg_net requests.
 - The E2E fixtures did not create financial charge rows; financial evidence retention remains supported by earlier rollback-only SQL tests and still needs a dedicated fixture containing valid charge/turn rows.
 - No existing user chat or character asset was touched. No chat-deletion Cron schedule was created.
+## Concurrency and account-deletion FK review — 2026-11-01
+
+### True two-transaction race tests (passed)
+
+- Delete-vs-message insert: transaction A locked the session parent, paused, then called the authenticated soft-delete RPC. Transaction B attempted a new user-message insert while A held the lock. After A committed the delete marker, B was rejected by `guard_chat_turn_assistant_insert` with `chat_session_not_found_or_deleted`; the contender message row was not inserted.
+- Delete-vs-reserve: transaction A locked and soft-deleted a separate synthetic session. Transaction B called `reserve_chat_turn` as the service role while A held the lock. After A committed, B was rejected with `chat_session_not_owned_or_active`; no charge row or wallet transaction was created.
+- Delete-vs-encounter evidence: a synthetic Encounter session was provisioned with a valid active lifecycle, user/assistant messages, and a settled synthetic charge. Transaction A locked and soft-deleted the parent. Transaction B called `record_encounter_session_turn_evidence` while A held the lock; after A committed, B was rejected with `Encounter chat is deleted or not owned`; no encounter evidence row was created.
+- All synthetic sessions, messages, lifecycle rows, charges, deletion jobs and test markers were cleaned. Final check: zero concurrency fixtures, zero synthetic charge rows, zero evidence rows, and both deletion queues empty.
+
+### Account-deletion cascade structural review (not yet full transaction E2E)
+
+- `chat_deletion_jobs` intentionally has no FK to `auth.users`, `chat_sessions`, or `chat_groups`; owner/resource IDs are immutable snapshots. Therefore account deletion of a user/chat parent does not directly cascade-delete the relational deletion job.
+- `chat_storage_deletion_jobs` has one FK to `chat_deletion_jobs.id` with `ON DELETE CASCADE`, and no FK to `auth.users`, session, or group. It survives user/chat parent deletion as long as the relational job row is retained.
+- `chat_sessions.user_id`, `chat_groups.owner_id`, and chat-memory photo owner/session/group references do cascade from Auth/chat parents. The purge worker's orphan-parent handling and independent queue are intended to finish Storage cleanup after these parents are gone.
+- `prepare_account_deletion` archives `chat_turn_charges` and `chat_turn_events` before deleting source rows; it also archives AI generation and wallet transactions through the account archive path. `finalize_account_deletion` only marks completion after the Auth user no longer exists.
+- A real synthetic Auth-user deletion inside a rollback-safe transaction has not yet been executed. Do not delete any existing test account to simulate it; use a dedicated disposable Auth fixture or transaction-safe harness.
+- The account deletion worker/Storage-prefix cleanup must be audited separately to ensure it does not delete chat deletion queue rows or sweep character illustration/video assets.
