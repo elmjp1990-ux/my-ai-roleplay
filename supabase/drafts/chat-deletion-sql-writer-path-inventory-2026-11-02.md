@@ -102,3 +102,37 @@ The PR-changed Edge Function set contains the deletion worker and story-session 
 5. Verify function ACL for settlement, enqueue, claim, and fail RPCs; verify evaluator service identity; verify retry count/lease is bounded.
 
 Coverage remains partial; no runtime lock-race fixture or deployed evaluator trace has been completed in this round.
+
+
+## Eighth-round extension: actual Encounter evaluator and queue ACL trace (2026-11-02)
+
+Inspected the branch's complete `supabase/functions/` top-level directory and the concrete Encounter Edge Function entrypoints:
+
+- Present: `encounter-session/index.ts` (create/reuse session), `encounter-session-state/index.ts` (pause/resume RPC), and `encounter-turn/index.ts` (demo reply, charge reservation/settlement, evidence persistence).
+- Not present in the enumerated Edge Function directories: a dedicated Encounter evaluation worker/evaluator that claims `claim_encounter_evaluation_jobs`, obtains an AI evaluation, and calls `settle_encounter_session`.
+- `encounter-turn` explicitly says demo response only; no real AI provider is connected. It records evidence with evaluator marker `pending` and returns `affinityPendingUntilSceneEnd: true`. This is not the whole-session evaluator and does not invoke `settle_encounter_session`.
+- Consequently, the earlier evaluator claim/settle race is a future integration requirement, not a verified currently-running Edge Function path. The SQL queue schema and RPCs are scaffolding awaiting a trusted evaluator.
+
+### Queue RPC ACL and retry facts from migrations
+
+- `enqueue_due_encounter_evaluations(integer)`: explicitly REVOKE EXECUTE from PUBLIC/anon/authenticated and GRANT only to service_role.
+- `claim_encounter_evaluation_jobs(integer)`: same service_role-only EXECUTE ACL.
+- `fail_encounter_evaluation_job(uuid,text)`: same service_role-only EXECUTE ACL.
+- Queue table: RLS enabled; table privileges revoked from PUBLIC/anon/authenticated; service_role CRUD granted.
+- Retry bound: maximum 5 attempts; 10-minute processing lease; failed retry backoff 5 minutes. The dispatcher migration's first definition was later replaced by the bounded retry migration.
+- The inspected migrations do not show an evaluator identity because no evaluator entrypoint was found in the function directory.
+
+### Existing Encounter cron distinction
+
+- `20261031240000_encounter_evaluation_dispatch_queue.sql` contains a pg_cron schedule named `poyozz-encounter-evaluation-dispatch` running every minute and calling `enqueue_due_encounter_evaluations(50)`.
+- This is an Encounter evaluation *dispatcher* cron, not a chat-deletion purge cron. The user restriction against creating a chat-deletion cron remains respected; this audit did not create or modify any cron.
+- This migration is in the repository branch. Static source inspection does not establish whether it has been applied to the test database; do not claim live cron state without a read-only catalog check.
+
+### Corrected implementation sequencing
+
+1. Treat the Encounter queue as currently incomplete scaffolding unless a deployed evaluator is found outside the enumerated repo Edge Functions.
+2. Before implementing an evaluator, land/test the deleted-parent gate for enqueue/claim and the parent-first settlement replacement as a coordinated set; preserve the service_role-only ACLs for queue RPCs and inspect the live settlement ACL separately.
+3. The future evaluator must use service_role, claim bounded batches, enforce the 5-attempt/10-minute lease/5-minute backoff, and call settlement only with trusted model output; settlement must independently lock/check the chat session parent.
+4. Add tests for deleted-session dispatch/claim, job deletion/purge no-reenqueue, bounded retries, evaluator failure, and both lock acquisition orders.
+
+This is static branch inventory only. It does not prove the test project's cron state, deployed Edge Function inventory, live function ACLs, or runtime behavior.
