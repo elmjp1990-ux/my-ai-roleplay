@@ -126,7 +126,7 @@ DECLARE
   v_status text;
 BEGIN
   IF p_session_id IS NULL OR p_user_id IS NULL
-     OR p_action NOT IN ('pause','resume') THEN
+     OR p_action IS NULL OR p_action NOT IN ('pause','resume') THEN
     RAISE EXCEPTION 'Invalid Encounter lifecycle state request' USING ERRCODE='22023';
   END IF;
 
@@ -205,6 +205,7 @@ DECLARE
 BEGIN
   IF p_session_id IS NULL OR p_affinity_delta IS NULL
      OR p_affinity_delta NOT BETWEEN -100 AND 100
+     OR p_relationship_stage IS NULL
      OR p_relationship_stage NOT IN ('hostile','dislike','wary','first_meeting','acquaintance','close','intimate','special')
      OR jsonb_typeof(COALESCE(p_memories,'[]'::jsonb)) <> 'array'
      OR pg_column_size(COALESCE(p_memories,'[]'::jsonb)) > 20000
