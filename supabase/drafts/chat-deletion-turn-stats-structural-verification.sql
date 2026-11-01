@@ -11,6 +11,7 @@ DECLARE
   v_proc oid;
   v_def text;
   v_owner text;
+  v_security_definer boolean;
   v_search_path text;
 BEGIN
   IF v_table IS NULL THEN
@@ -83,20 +84,19 @@ BEGIN
     SELECT pg_catalog.pg_get_userbyid(p.proowner), p.prosecdef,
            (SELECT option_value FROM pg_catalog.pg_options_to_table(p.proconfig)
             WHERE option_name = 'search_path')
-      INTO v_owner, v_search_path
+      INTO v_owner, v_security_definer, v_search_path
     FROM pg_catalog.pg_proc p
     WHERE p.oid = v_proc;
 
-    IF v_owner <> 'postgres' OR NOT (
-      SELECT p.prosecdef FROM pg_catalog.pg_proc p WHERE p.oid = v_proc
-    ) OR v_search_path IS DISTINCT FROM '""' THEN
+    IF v_owner <> 'postgres' OR NOT v_security_definer
+       OR v_search_path IS DISTINCT FROM '""' THEN
       RAISE EXCEPTION 'rpc_security_definer_owner_or_search_path_mismatch: %', v_proc::regprocedure;
     END IF;
   END LOOP;
 
   v_proc := pg_catalog.to_regprocedure('public.delete_chat_session_content(uuid)');
   v_def := pg_catalog.pg_get_functiondef(v_proc);
-  IF pg_catalog.position('snapshot_chat_deletion_character_turn_stats' IN v_def) = 0
+  IF pg_catalog.strpos(v_def, 'snapshot_chat_deletion_character_turn_stats') = 0
      OR NOT pg_catalog.has_function_privilege('authenticated', v_proc, 'EXECUTE')
      OR NOT pg_catalog.has_function_privilege('service_role', v_proc, 'EXECUTE')
      OR pg_catalog.has_function_privilege('anon', v_proc, 'EXECUTE') THEN
@@ -105,7 +105,7 @@ BEGIN
 
   v_proc := pg_catalog.to_regprocedure('public.delete_chat_group_with_related_data(uuid)');
   v_def := pg_catalog.pg_get_functiondef(v_proc);
-  IF pg_catalog.position('snapshot_chat_deletion_character_turn_stats' IN v_def) = 0
+  IF pg_catalog.strpos(v_def, 'snapshot_chat_deletion_character_turn_stats') = 0
      OR NOT pg_catalog.has_function_privilege('authenticated', v_proc, 'EXECUTE')
      OR NOT pg_catalog.has_function_privilege('service_role', v_proc, 'EXECUTE')
      OR pg_catalog.has_function_privilege('anon', v_proc, 'EXECUTE') THEN
@@ -114,7 +114,7 @@ BEGIN
 
   v_proc := pg_catalog.to_regprocedure('public.purge_chat_deletion_job(uuid)');
   v_def := pg_catalog.pg_get_functiondef(v_proc);
-  IF pg_catalog.position('snapshot_chat_deletion_character_turn_stats' IN v_def) = 0
+  IF pg_catalog.strpos(v_def, 'snapshot_chat_deletion_character_turn_stats') = 0
      OR NOT pg_catalog.has_function_privilege('service_role', v_proc, 'EXECUTE')
      OR pg_catalog.has_function_privilege('authenticated', v_proc, 'EXECUTE')
      OR pg_catalog.has_function_privilege('anon', v_proc, 'EXECUTE') THEN
@@ -123,19 +123,19 @@ BEGIN
 
   v_proc := pg_catalog.to_regprocedure('public.get_character_turn_counts(uuid[])');
   v_def := pg_catalog.pg_get_functiondef(v_proc);
-  IF pg_catalog.position('chat_deletion_character_turn_stats' IN v_def) = 0
-     OR pg_catalog.position('g.deleted_at IS NULL' IN v_def) = 0
-     OR pg_catalog.position('private.current_user_is_adult' IN v_def) = 0
-     OR pg_catalog.position('s.deleted_at IS NULL' IN v_def) = 0 THEN
+  IF pg_catalog.strpos(v_def, 'chat_deletion_character_turn_stats') = 0
+     OR pg_catalog.strpos(v_def, 'g.deleted_at IS NULL') = 0
+     OR pg_catalog.strpos(v_def, 'private.current_user_is_adult') = 0
+     OR pg_catalog.strpos(v_def, 's.deleted_at IS NULL') = 0 THEN
     RAISE EXCEPTION 'bulk_count_rpc_missing_archive_or_existing_guards';
   END IF;
 
   v_proc := pg_catalog.to_regprocedure('public.get_public_character_turn_count(uuid)');
   v_def := pg_catalog.pg_get_functiondef(v_proc);
-  IF pg_catalog.position('chat_deletion_character_turn_stats' IN v_def) = 0
-     OR pg_catalog.position('g.deleted_at IS NULL' IN v_def) = 0
-     OR pg_catalog.position('private.current_user_is_adult' IN v_def) = 0
-     OR pg_catalog.position('s.deleted_at IS NULL' IN v_def) = 0 THEN
+  IF pg_catalog.strpos(v_def, 'chat_deletion_character_turn_stats') = 0
+     OR pg_catalog.strpos(v_def, 'g.deleted_at IS NULL') = 0
+     OR pg_catalog.strpos(v_def, 'private.current_user_is_adult') = 0
+     OR pg_catalog.strpos(v_def, 's.deleted_at IS NULL') = 0 THEN
     RAISE EXCEPTION 'public_count_rpc_missing_archive_or_existing_guards';
   END IF;
 
