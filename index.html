@@ -5353,7 +5353,7 @@ async function groupOpen(groupId) {
     }
     const members=memberRows.map(m=>{const snapshot=m.character_snapshot||{};const characterId=m.character_id||null;const snapshotId=snapshot.id||characterId||null;const displayId=characterId||snapshotId||m.id;return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,avatar_url:avatarById[characterId]||snapshot.avatar_url||snapshot.image||'',position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};});
     groupExpandedMemberId=null;
-    const memoryPhotos=await Promise.all((photoRes.data||[]).map(async photo=>{const {data:signed,error:signedError}=await window.mySupabase.storage.from('personax-memory-photos').createSignedUrl(photo.storage_path,3600);if(signedError)console.warn('群組背景相片簽名網址失敗',signedError.message);return {...photo,image_url:!signedError&&signed?.signedUrl?signed.signedUrl:''};}));
+    const memoryPhotos=await Promise.all((photoRes.data||[]).map(async photo=>{const {data:signed,error:signedError}=await window.mySupabase.storage.from('personax-memory-photos').createSignedUrl(photo.storage_path,300);if(signedError)console.warn('群組背景相片簽名網址失敗',signedError.message);return {...photo,image_url:!signedError&&signed?.signedUrl?signed.signedUrl:''};}));
     const messages=(messageRes.data||[]).map(m=>{
       const speakerSnapshot=m.speaker_snapshot||{};
       const member=members.find(x=>x.characterId===m.character_id)||members.find(x=>x.characterSnapshotId===speakerSnapshot.id||x.id===speakerSnapshot.id);
@@ -5391,7 +5391,7 @@ async function openGroupBackgroundSettings() {
       .order('created_at',{ascending:false});
     if(error)throw error;
     group.memoryPhotos=await Promise.all((data||[]).map(async photo=>{
-      const {data:signed,error:signedError}=await client.storage.from('personax-memory-photos').createSignedUrl(photo.storage_path,3600);
+      const {data:signed,error:signedError}=await client.storage.from('personax-memory-photos').createSignedUrl(photo.storage_path,300);
       if(signedError)console.warn('群組背景相片簽名網址失敗',signedError.message);
       return {...photo,image_url:!signedError&&signed?.signedUrl?signed.signedUrl:''};
     }));
@@ -5748,7 +5748,7 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
         if(!ctx.session.cloudOwned||ctx.session.cloudOwnerUid!==uid)throw new Error('請先使用目前帳號擁有的雲端聊天。');
         const {data,error}=await client.from('chat_memory_photos').select('id,caption,storage_path,created_at').eq('owner_id',uid).eq('chat_type','single').eq('session_id',ctx.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false});
         if(error)throw error;
-        rows=await Promise.all((data||[]).map(async p=>{const {data:signed,error:signedError}=await client.storage.from('personax-memory-photos').createSignedUrl(p.storage_path,3600);return !signedError&&signed?.signedUrl?{id:p.id,caption:p.caption||'',url:signed.signedUrl}:null;}));
+        rows=await Promise.all((data||[]).map(async p=>{const {data:signed,error:signedError}=await client.storage.from('personax-memory-photos').createSignedUrl(p.storage_path,300);return !signedError&&signed?.signedUrl?{id:p.id,caption:p.caption||'',url:signed.signedUrl}:null;}));
         rows=rows.filter(Boolean);
       }
       if(chatBackgroundDraft?.key!==ctx.key)return;draft.photos=rows;draft.loaded=true;draft.loading=false;
@@ -10284,7 +10284,7 @@ if (window.__pendingSupabaseUser) {
         .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false});
       if(error)throw error;
       const cards=await Promise.all((data||[]).map(async photo=>{
-        const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,3600);
+        const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,300);
         const imageUrl=!signedError&&signed?.signedUrl?signed.signedUrl:'';
         if(!imageUrl)console.warn('相簿簽名網址取得失敗',signedError?.message);
         urlCache.set(photo.id,{url:imageUrl,photo});
@@ -10370,7 +10370,7 @@ if (window.__pendingSupabaseUser) {
         .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).maybeSingle();
       if(error)throw error;
       if(!photo){session.background='none';persist();panel.style.setProperty('--chat-photo','none');return;}
-      const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,3600);
+      const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,300);
       if(signedError||!signed?.signedUrl)throw signedError||new Error('無法取得背景圖片。');
       if(currentSession()?.id===session.id)panel.style.setProperty('--chat-photo','url('+JSON.stringify(signed.signedUrl)+')');
     }catch(err){console.error('讀取單聊相簿背景失敗',err);panel.style.setProperty('--chat-photo','none');}
@@ -10393,7 +10393,7 @@ if (window.__pendingSupabaseUser) {
         if(cleared&&groupPrototype.active?.id===group.id){group.backgroundMode='none';group.backgroundMemoryPhotoId=null;}
         return;
       }
-      const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,3600);
+      const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,300);
       if(signedError||!signed?.signedUrl)throw signedError||new Error('無法取得群組背景圖片。');
       if(groupPrototype.active?.id===group.id)panel.style.setProperty('--chat-photo','url('+JSON.stringify(signed.signedUrl)+')');
     }catch(err){console.error('讀取群組相簿背景失敗',err);panel.style.setProperty('--chat-photo','none');}
@@ -10448,7 +10448,7 @@ if (window.__pendingSupabaseUser) {
     const panel=$('view').querySelector('.chat-main');if(panel)void applySingleMemoryPhotoBackground(currentSession(),panel);
   }
   async function downloadCompressedMemoryPhoto(cached){
-    try{const client=window.mySupabase;let url=cached.url;let response=await fetch(url);if(!response.ok){const {data,error}=await client.storage.from(BUCKET).createSignedUrl(cached.photo.storage_path,3600);if(error||!data?.signedUrl)throw error||new Error('下載連結失效。');url=data.signedUrl;response=await fetch(url);}if(!response.ok)throw new Error('下載連結已失效，請重新開啟相簿後再試。');const blob=await response.blob(),objectUrl=URL.createObjectURL(blob);const a=document.createElement('a');a.href=objectUrl;a.download=(cached.photo.caption||'personax-memory')+'.webp';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),1500);}catch(error){toast('下載失敗：'+(error.message||'請重新開啟相簿後再試。'));}
+    try{const client=window.mySupabase;let url=cached.url;let response=await fetch(url);if(!response.ok){const {data,error}=await client.storage.from(BUCKET).createSignedUrl(cached.photo.storage_path,300);if(error||!data?.signedUrl)throw error||new Error('下載連結失效。');url=data.signedUrl;response=await fetch(url);}if(!response.ok)throw new Error('下載連結已失效，請重新開啟相簿後再試。');const blob=await response.blob(),objectUrl=URL.createObjectURL(blob);const a=document.createElement('a');a.href=objectUrl;a.download=(cached.photo.caption||'personax-memory')+'.webp';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),1500);}catch(error){toast('下載失敗：'+(error.message||'請重新開啟相簿後再試。'));}
   }
   document.addEventListener('change',event=>{
     const input=event.target;
