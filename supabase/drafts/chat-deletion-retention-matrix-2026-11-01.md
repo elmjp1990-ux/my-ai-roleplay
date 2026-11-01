@@ -3,13 +3,28 @@
 Date: 2026-11-01  
 PR: #200 — `security/chat-deletion-lifecycle-reconciliation`  
 Environment evidence: read-only catalog inspection of test project `ouyewoagbmtqehbofrje`.  
-Status: design only; no executable migration and no database changes.
+Status: retention policy draft; executable migrations have been applied to the existing test database. This document remains non-executable.
+
+## Implementation decision — tombstone-based content purge (2026-11-01)
+
+This section supersedes the earlier FK-decoupling / hard-delete proposal in sections 2–4 for the first implementation.
+
+- Day 0: mark the parent deleted, immediately hide it through RLS and enqueue the shared 30-day relational and Storage jobs.
+- Day 30: clear chat content and chat-specific metadata, but retain minimal parent/message/turn tombstones. This avoids deleting rows still referenced by billing and AI-generation FKs.
+- Single chat: keep `chat_sessions` and `chat_messages` IDs; clear `chat_sessions.session_data` and `character_snapshot`; set message `content=''` and `deleted_at`; delete `chat_message_versions`; clear `ai_generation_records.original_content`.
+- Group chat: keep `chat_groups` and `chat_group_turns` IDs; replace group name with `已刪除對話`, clear world/player text; delete group messages, diary, scenes, members and photo metadata; set each group turn's request text to the neutral tombstone marker `[purged]`.
+- Preserve `chat_turn_charges`, `chat_group_turn_charges`, `chat_turn_events`, `wallet_transactions`, and their reference IDs. No financial FK decoupling is required for this first-pass tombstone strategy.
+- Preserve `chat_sessions.character_name` so the user's own wallet history can still show the character label; `get_my_wallet_transaction_character_names()` no longer filters deleted sessions.
+- Clear encounter evaluation/schedule payloads and story summaries/imported memories belonging to the deleted session; delete encounter diary entries tied to that session and null the matching receipt diary IDs. Preserve global `encounter_character_state` affinity and interaction receipts.
+- Storage objects remain in `chat_storage_deletion_jobs` until the service-role worker removes them. The queue survives parent/account cascades because it has no parent/user FK.
+
+The earlier reference snapshot/backfill sections describe a possible future hard-delete design, not the current implementation. Do not apply FK changes unless a separate reviewed decision replaces this tombstone strategy.
 
 ## 1. Governing rule
 
 A user deleting a single chat or group chat starts one common 30-day deletion lifecycle. The 30-day period applies to chat content and chat-linked personal media. It does **not** automatically erase wallet/accounting evidence needed to explain charges, refunds, idempotency, or wallet history. The group model is one player with multiple AI characters, not a multi-user group.
 
-At day 30, content eligible for purge is erased. Minimal financial audit evidence remains detached from chat parent/message foreign keys. Any retention period beyond the chat deletion window for financial/accounting records must follow the platform's separately approved retention policy; this document does not invent a statutory duration.
+At day 30, content eligible for purge is erased. Financial audit evidence remains attached to minimal tombstone parent/message/turn rows; those IDs are not hard-deleted by the chat purge. Any retention period beyond the chat deletion window for financial/accounting records must follow the platform's separately approved retention policy; this document does not invent a statutory duration.
 
 ## 2. Field-level retention matrix
 
@@ -28,7 +43,7 @@ At day 30, content eligible for purge is erased. Minimal financial audit evidenc
 | Chat memory photo rows + Storage objects | Photo rows reference chat parent; storage path can outlive parent | Hide immediately; enqueue exact bucket/path in durable storage job | Delete only `personax-memory-photos` objects; never delete character illustrations/videos |
 | Character assets | Separate character illustration/video buckets | Not part of chat deletion | Never purge from chat deletion worker |
 
-## 3. Reference snapshot requirements
+## 3. Earlier hard-delete reference snapshot alternative (not current implementation)
 
 Before changing any financial/generation FK, introduce immutable non-FK references sufficient for audit and idempotency:
 
@@ -39,7 +54,7 @@ Before changing any financial/generation FK, introduce immutable non-FK referenc
 
 Do not assume UUID references alone are enough for wallet display. `get_my_wallet_transaction_character_names()` currently joins wallet reference_id → chat_turn_charges → chat_sessions and filters deleted sessions. Preserve a safe character display snapshot or update this read path so wallet history remains understandable after chat parent purge, without restoring access to deleted chat content.
 
-## 4. Migration / backfill gates
+## 4. Migration / backfill gates for any future hard-delete redesign
 
 1. Confirm disposable baseline can replay without touching the current test DB migration history.
 2. Inventory every SQL function and application consumer for affected columns, including wallet history, charge reserve/settle/refund, assistant guards, group append, encounter evidence/evaluation, story relationship validation, and account-deletion archive routines.
@@ -53,12 +68,12 @@ Do not assume UUID references alone are enough for wallet display. `get_my_walle
 
 - Exact retention period for wallet/accounting evidence after chat deletion.
 - Which AI generation metadata fields are necessary after raw `original_content` is cleared.
-- Whether encounter affinity/diary summaries are considered chat content or a separately retained relationship record.
+- Current first-pass decision: preserve global encounter affinity; delete session-linked encounter diary content and clear session evaluation payloads. Revisit only if product requirements change.
 - Whether wallet character-name display snapshots should be stored at charge creation or materialized during FK decoupling.
 
 ## 6. Explicit non-goals
 
 - No changes to wallet pricing, silver/diamond order, charge amounts, refunds, or signup bonuses.
 - No deletion of character illustration or avatar-video assets.
-- No production schema changes, cron, or worker deployment.
+- No production schema changes or cron. A service-role Edge Function is deployed to the test project but has not been invoked or scheduled.
 - No executable migration in this document.
