@@ -136,3 +136,37 @@ Inspected the branch's complete `supabase/functions/` top-level directory and th
 4. Add tests for deleted-session dispatch/claim, job deletion/purge no-reenqueue, bounded retries, evaluator failure, and both lock acquisition orders.
 
 This is static branch inventory only. It does not prove the test project's cron state, deployed Edge Function inventory, live function ACLs, or runtime behavior.
+
+
+## Ninth-round extension: live test Supabase comparison (read-only, 2026-11-02)
+
+This round queried the configured test project `ouyewoagbmtqehbofrje` using read-only catalog inspection and the Supabase project Edge Function/migration listings. No SQL writes, migration apply, deployment, or cron changes were performed.
+
+### Live project state observed
+
+- Applied migration history includes the Encounter queue migrations (`20261031011426`, `20261031011509`) and chat deletion lifecycle migrations through `20261101110211`. This establishes the project has recorded those migration versions; it does not establish every runtime behavior is correct.
+- Active Edge Functions listed by the project include `encounter-session`, `encounter-turn`, `encounter-session-state`, `story-session`, and `purge-chat-deletions`; no Encounter evaluator/worker slug is deployed in the returned function list.
+- Live cron catalog previously returned one active job: `poyozz-encounter-evaluation-dispatch`, every minute, DB user postgres. It calls the enqueue dispatcher. No chat-deletion purge cron appeared in that catalog result. This is the live Encounter dispatcher only; do not confuse it with deletion purge scheduling.
+- Live `enqueue_due_encounter_evaluations(integer)` and `claim_encounter_evaluation_jobs(integer)` definitions already contain the deleted-parent gate and parent-first lock: select `chat_sessions` where `deleted_at IS NULL`, lock parent rows first with `FOR UPDATE ... SKIP LOCKED`, then lock lifecycle/job rows. This is stronger than the older migration source initially inspected and appears to be the later draft/proposal implementation already applied in the test DB.
+- Live ACL inspection for enqueue/claim/fail showed owner postgres and EXECUTE granted to postgres and service_role only; no PUBLIC, anon, or authenticated EXECUTE.
+- Live evaluation job table has RLS enabled and grants only to postgres and service_role; no anon/authenticated grants were observed.
+
+### Critical live mismatch: settlement does not yet lock/check chat_sessions
+
+The live `public.settle_encounter_session(uuid,integer,text,jsonb,jsonb)` definition was fetched read-only. It is SECURITY DEFINER, owned by postgres, and its body begins by locking `encounter_session_lifecycle` directly:
+
+- It does **not** first lock `chat_sessions`.
+- It does **not** check `chat_sessions.deleted_at IS NULL`.
+- It returns the idempotent settled result before any deleted-parent check (because there is no parent check).
+- It can proceed to update `encounter_character_state` affinity and lifecycle settlement after chat deletion if a valid call reaches it.
+- Live ACL is restricted to postgres and service_role (no PUBLIC/anon/authenticated), which is good caller restriction but does not solve the deleted-parent lifecycle gap.
+
+This is now a **confirmed live test-project static code finding**, not merely a draft concern. It is not a runtime-exploited finding: no race fixture or mutation was run. The existing draft replacement in `encounter-session-delete-lifecycle-guards.sql` contains the intended parent-first lock/check, but that replacement is not the live definition.
+
+### Safe next action
+
+- Do not execute the settlement replacement directly yet. First compare its exact signature/ACL with the live function and ensure it locks `chat_sessions` first, checks owner-independent deleted state, then locks lifecycle, and preserves idempotence only after the parent gate.
+- Build a rollback-safe transaction test fixture in a disposable local database for both lock orders and for a deleted parent; verify no affinity/lifecycle writes occur when deleted.
+- Only after tests pass, add a reviewed migration to PR #200; do not apply it to the hosted test project as part of this audit.
+
+Coverage note: this read-only live comparison does not replace a full inventory of every writer/trigger/service-role path or deployed runtime test.
