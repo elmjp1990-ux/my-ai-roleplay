@@ -6990,7 +6990,7 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
     case 'session-menu': {
       const selected=state.sessions[o.id]||s;
       if(!selected)return;
-      showDialog('刪除',`<p>刪除這段對話與回憶</p><p class="small muted">刪除後會立即從列表隱藏並停止存取，聊天內容將於 30 天後永久清除。此操作無法復原。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="remove-session" data-id="${e(selected.id)}">確認刪除</button></div>`);
+      showDialog('刪除',`<p>此操作無法復原，確認要刪除聊天室嗎？如果有回憶相簿也會一併刪除哦。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="remove-session" data-id="${e(selected.id)}">確認刪除</button></div>`);
       break;
     }
     case 'chat-settings': {
@@ -8153,13 +8153,13 @@ document.addEventListener('click',async event => {
       case 'group-entry-menu': {
         const group=(groupPrototype.groups||[]).find(item=>item.id===key);
         if(!group) { toast('找不到這個群組，請重新載入清單。'); break; }
-        showDialog('刪除', '<p>刪除這段對話與回憶</p><p class="small muted">刪除後會立即從列表隱藏並停止存取，聊天內容將於 30 天後永久清除。此操作無法復原。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="group-delete" data-id="'+e(group.id)+'">確認刪除</button></div>');
+        showDialog('刪除', '<p>此操作無法復原，確認要刪除聊天室嗎？如果有回憶相簿也會一併刪除哦。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="group-delete" data-id="'+e(group.id)+'">確認刪除</button></div>');
         break;
       }
       case 'group-delete-confirm': {
         const group=(groupPrototype.groups||[]).find(item=>item.id===key);
         if(!group) { toast('找不到這個群組，請重新載入清單。'); break; }
-        showDialog('刪除', '<p>刪除這段對話與回憶</p><p class="small muted">刪除後會立即從列表隱藏並停止存取，聊天內容將於 30 天後永久清除。此操作無法復原。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="group-delete" data-id="'+e(group.id)+'">確認刪除</button></div>');
+        showDialog('刪除', '<p>此操作無法復原，確認要刪除聊天室嗎？如果有回憶相簿也會一併刪除哦。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="group-delete" data-id="'+e(group.id)+'">確認刪除</button></div>');
         break;
       }
       case 'group-delete': {
@@ -8182,7 +8182,7 @@ document.addEventListener('click',async event => {
       case 'remove-session-confirm': {
         const item=state.sessions[key];
         if(!item)break;
-        showDialog('刪除','<p>刪除這段對話與回憶</p><p class="small muted">刪除後會立即從列表隱藏並停止存取，聊天內容將於 30 天後永久清除。此操作無法復原。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="delete-dialog-back">取消</button><button type="button" class="danger" data-action="remove-session" data-id="'+e(item.id)+'">確認刪除</button></div>');
+        showDialog('刪除','<p>此操作無法復原，確認要刪除聊天室嗎？如果有回憶相簿也會一併刪除哦。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="delete-dialog-back">取消</button><button type="button" class="danger" data-action="remove-session" data-id="'+e(item.id)+'">確認刪除</button></div>');
         break;
       }
       case 'remove-session': {
