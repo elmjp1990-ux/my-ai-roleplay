@@ -1,0 +1,71 @@
+# POYOZZ deletion lifecycle integration plan — 2026-11-01
+
+Status: cross-feature dependency note. Chat deletion remains the active implementation priority. Character deletion and account deletion are subsequent phases; this document does not change database state.
+
+## Product-level sequence
+
+1. Complete and verify chat deletion for both single and group chats.
+2. Complete character deletion without destroying player-owned historical chats or financial evidence.
+3. Complete account deletion, coordinating pending chat and character cleanup jobs and preserving only approved audit/archive records.
+
+All phases use the existing Supabase test project. Do not create paid branches/projects, reset the test DB, edit remote migration history, or touch production without explicit authorization.
+
+## Phase 1 — chat deletion (current PR #200)
+
+- One lifecycle contract for single sessions and groups; group has one player and multiple AI characters.
+- User-facing deletion immediately hides and freezes the conversation.
+- Keep chat content for 30 days, then purge chat text, versions, chat-only memory images and raw generation content according to the approved retention matrix.
+- Preserve wallet transactions, charge/refund evidence, idempotency metadata and required audit records.
+- Character avatars, illustrations and videos are not chat-memory assets and must never enter the chat cleanup allowlist.
+- The durable chat deletion job must not have a cascading FK to chat_sessions, chat_groups, profiles, or auth.users; retain immutable owner/resource IDs so later account cleanup cannot erase the queue.
+- Account deletion must coordinate with any queued chat purge and may not silently bypass the 30-day chat retention contract or erase the durable queue.
+
+## Phase 2 — character deletion (existing soft-delete foundation)
+
+### Existing observed behavior
+
+- soft_delete_character(uuid) is SECURITY DEFINER, owner-checked, locks the character row, and idempotently sets visibility=private, review_status=draft, deleted_at, and deletion_reason=author_deleted.
+- It makes character stories private and updates snapshots in chat_sessions, chat_group_members, and chat_group_messages.
+- Existing player chat history is retained; deleted characters must not be offered for new chats.
+- Restore is blocked by prevent_character_soft_delete_restore.
+- character_illustrations stores separate illustration asset paths; character avatar video paths are stored separately and use the private character-avatar-videos bucket.
+
+### Remaining implementation/verification
+
+- Confirm all public discovery, encounter schedule, profile/story, search, and direct RPC paths reject deleted characters.
+- Confirm the existing chat snapshot remains readable to the player without re-exposing the deleted character publicly.
+- Inventory every character asset path (main avatar, illustration gallery, avatar video) and its storage bucket/policy.
+- Add owner-verified durable cleanup for character assets with retry/dead-letter behavior; never use the chat-memory bucket or chat cleanup worker for these assets.
+- Decide and test the historical-chat rendering policy before deleting assets referenced by snapshots (e.g. preserve a safe display snapshot/thumbnail or intentionally remove asset access without leaking private files).
+- Ensure character deletion does not delete player chats, messages, chat charges, wallet transactions, or group speaker snapshots.
+
+## Phase 3 — account deletion (existing request/archive foundation)
+
+### Existing observed behavior in current test project
+
+- request_account_deletion(), cancel_account_deletion(), get_account_deletion_status(), get_account_deletion_work_items(), archive_account_deletion_data(), prepare_account_deletion(), finalize_account_deletion(), and failure recording RPCs exist.
+- Account deletion requests use account_deletion_settings.grace_period. Current test-project setting is 5 minutes; this is a test configuration and must not be copied into production. The repository includes a migration restoring a 30-day default for future requests, but the live request RPC reads the settings row.
+- prepare_account_deletion verifies archived payloads for AI generation records, wallet transactions, chat turn charges, and chat turn events before deleting source rows. It then deletes AI generation records, relevant message versions, chat charges, wallet transactions, and legacy conversations; later profile/Auth cleanup is expected in the remaining deletion path.
+- finalize_account_deletion only marks a batch completed after the Auth user is absent.
+- Archive batch/item tables exist and currently contain no batches/items in the test project.
+- Current project has only one active pg_cron job, for encounter-evaluation dispatch. No account-deletion worker Edge Function or account-deletion cron invocation was found in the project inventory during this audit.
+
+### Remaining implementation/verification
+
+- Trace the full worker path from due request → archive → prepare → profile/storage cleanup → Auth Admin deletion → finalize; identify exactly which step invokes each RPC.
+- Implement/verify a scheduled service-role worker with leases, bounded retries, idempotency and dead-letter handling; do not rely on an RPC merely existing.
+- Verify cancel-vs-worker race and account lock/freeze behavior across all write paths.
+- Coordinate account deletion with chat deletion jobs and character asset cleanup jobs; preserve job rows independently of the account/profile being deleted.
+- Define and test archive retention/access/deletion policy for financial and security evidence; do not invent legal retention periods.
+- Remove account-owned Storage objects across approved buckets without touching other users' assets.
+- Verify Auth user deletion, profile cascades, and retry safety end-to-end using a dedicated disposable test account only.
+
+## Shared invariants
+
+- No direct client DELETE may bypass a lifecycle RPC.
+- Parent-first locking and explicit lifecycle gates prevent writes racing with deletion.
+- Queues store immutable resource/owner references and survive parent/profile/Auth deletion.
+- Each queue has a strict bucket allowlist and validates owner/resource path before deletion.
+- Billing ledger and required audit evidence are not deleted as a side effect of chat or character deletion.
+- Account deletion is the only phase that removes the account identity; it must archive and verify required evidence before irreversible cleanup.
+- Every implementation, test, repair, blocker and policy decision is recorded in Notion P23-03 and the relevant PR.
