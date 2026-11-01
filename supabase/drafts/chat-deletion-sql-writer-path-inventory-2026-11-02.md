@@ -184,3 +184,22 @@ Added `supabase/drafts/settle-encounter-session-parent-lock-live-reconciliation.
 - Includes required local rollback fixture scenarios: delete-first, settlement-first, already-settled-but-deleted, and wrong chat mode.
 
 No SQL was executed against local or hosted databases in this round. No concurrency behavior is claimed as tested. The new file is a proposal only and is not a migration. Before promotion, validate owner/ACL after CREATE OR REPLACE and execute the concurrency fixtures in a disposable local database. The existing broad draft `encounter-session-delete-lifecycle-guards.sql` remains a separate proposal and should be reconciled to avoid duplicate/conflicting function definitions when preparing a migration.
+
+
+## 第十一輪（2026-11-02）：Settlement 草案去重與本機測試環境確認
+
+### 草案整併
+- `encounter-session-delete-lifecycle-guards.sql` 原本也定義 `public.settle_encounter_session(uuid, integer, text, jsonb, jsonb)`，與專項檔案重複。
+- 已移除廣義 lifecycle 草案中的第二份函式定義，改為明確指向唯一 canonical 草案：`settle-encounter-session-parent-lock-live-reconciliation.sql`。
+- 唯一 settlement 定義保留 parent-first `chat_sessions` lock、`chat_mode='encounter'`、`deleted_at IS NULL`，且在 lifecycle lock 與 settled idempotent return 之前完成 gate；保留 live observed EXECUTE audience（postgres/service_role only）。
+- 這是 draft 去重，尚未將任何 SQL 移入 migration，也未執行 SQL。
+
+### 本機測試能力
+- 目前執行環境未找到 `supabase` CLI、`docker` 或 `psql` 可執行檔；因此不能聲稱已建立 disposable local DB 或執行交易競態測試。
+- 不改用 hosted test DB 代替本機測試；不套用 migration、不修改遠端資料、不部署、不建立 chat deletion Cron。
+
+### 下一個驗收門檻
+1. 準備可重現的 disposable PostgreSQL/Supabase local stack（含必要 migrations/extensions），再執行 rollback-safe fixtures。
+2. 驗證 delete-first、settlement-first、already-settled-but-deleted、wrong chat_mode 四種情境。
+3. 再確認 broad lifecycle draft 其他函式的實際 trigger attachment、ACL 與呼叫路徑，避免只驗證函式本體。
+4. 所有交易測試通過後，才整理成單一 migration 並送 PR review。
