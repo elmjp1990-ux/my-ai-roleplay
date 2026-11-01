@@ -246,6 +246,17 @@ BEGIN
     END IF;
   END LOOP;
 
+  IF pg_catalog.strpos(
+       pg_catalog.pg_get_functiondef(pg_catalog.to_regprocedure('public.set_encounter_session_lifecycle_state(uuid,uuid,text)')),
+       'p_action IS NULL'
+     ) = 0
+     OR pg_catalog.strpos(
+       pg_catalog.pg_get_functiondef(pg_catalog.to_regprocedure('public.settle_encounter_session(uuid,integer,text,jsonb,jsonb)')),
+       'p_relationship_stage IS NULL'
+     ) = 0 THEN
+    RAISE EXCEPTION 'encounter_lifecycle_null_argument_guard_missing';
+  END IF;
+
   FOREACH v_proc IN ARRAY ARRAY[
     pg_catalog.to_regprocedure('public.set_encounter_session_lifecycle_state(uuid,uuid,text)')::oid,
     pg_catalog.to_regprocedure('public.settle_encounter_session(uuid,integer,text,jsonb,jsonb)')::oid
