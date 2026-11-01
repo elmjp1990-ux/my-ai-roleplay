@@ -57,15 +57,15 @@ export default {
 
     for (const job of (chatJobs ?? []) as Job[]) {
       summary.chat_claimed += 1;
-      const { error } = await supabase.rpc("purge_chat_deletion_job", {
+      const { data: purged, error } = await supabase.rpc("purge_chat_deletion_job", {
         p_job_id: job.job_id,
       });
 
-      if (error) {
+      if (error || purged !== true) {
         summary.chat_failed += 1;
         await supabase.rpc("mark_chat_deletion_job_failed", {
           p_job_id: job.job_id,
-          p_error_code: safeErrorCode(error.code, "purge_failed"),
+          p_error_code: safeErrorCode(error?.code, purged === false ? "purge_not_completed" : "purge_failed"),
         });
       } else {
         summary.chat_purged += 1;
@@ -102,7 +102,7 @@ export default {
         .from(ALLOWED_BUCKET)
         .remove([job.object_path]);
 
-      const { error: markError } = await supabase.rpc(
+      const { data: marked, error: markError } = await supabase.rpc(
         "mark_chat_storage_deletion_job",
         {
           p_job_id: job.job_id,
@@ -113,7 +113,7 @@ export default {
         },
       );
 
-      if (error || markError) {
+      if (error || markError || marked !== true) {
         summary.storage_failed += 1;
       } else {
         summary.storage_deleted += 1;
