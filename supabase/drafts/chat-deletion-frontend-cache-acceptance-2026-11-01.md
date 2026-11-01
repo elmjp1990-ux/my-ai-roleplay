@@ -1,4 +1,4 @@
-# Chat deletion frontend cache acceptance — PR #200
+# Chat deletion lifecycle acceptance — PR #200
 
 ## Scope
 
