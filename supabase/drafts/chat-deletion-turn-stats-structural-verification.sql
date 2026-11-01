@@ -50,19 +50,33 @@ BEGIN
      OR pg_catalog.has_table_privilege('anon', v_table, 'INSERT')
      OR pg_catalog.has_table_privilege('anon', v_table, 'UPDATE')
      OR pg_catalog.has_table_privilege('anon', v_table, 'DELETE')
+     OR pg_catalog.has_table_privilege('anon', v_table, 'TRUNCATE')
      OR pg_catalog.has_table_privilege('authenticated', v_table, 'SELECT')
      OR pg_catalog.has_table_privilege('authenticated', v_table, 'INSERT')
      OR pg_catalog.has_table_privilege('authenticated', v_table, 'UPDATE')
      OR pg_catalog.has_table_privilege('authenticated', v_table, 'DELETE')
+     OR pg_catalog.has_table_privilege('authenticated', v_table, 'TRUNCATE')
      OR pg_catalog.has_table_privilege('service_role', v_table, 'SELECT')
      OR pg_catalog.has_table_privilege('service_role', v_table, 'INSERT')
      OR pg_catalog.has_table_privilege('service_role', v_table, 'UPDATE')
-     OR pg_catalog.has_table_privilege('service_role', v_table, 'DELETE') THEN
+     OR pg_catalog.has_table_privilege('service_role', v_table, 'DELETE')
+     OR pg_catalog.has_table_privilege('service_role', v_table, 'TRUNCATE') THEN
     RAISE EXCEPTION 'archive_table_has_direct_role_grants';
   END IF;
 
   IF v_helper IS NULL THEN
     RAISE EXCEPTION 'snapshot_helper_missing';
+  END IF;
+
+  SELECT pg_catalog.pg_get_userbyid(p.proowner), p.prosecdef,
+         (SELECT option_value FROM pg_catalog.pg_options_to_table(p.proconfig)
+          WHERE option_name = 'search_path')
+    INTO v_owner, v_security_definer, v_search_path
+  FROM pg_catalog.pg_proc p
+  WHERE p.oid = v_helper;
+  IF v_owner <> 'postgres' OR NOT v_security_definer
+     OR v_search_path IS DISTINCT FROM '""' THEN
+    RAISE EXCEPTION 'snapshot_helper_security_definer_owner_or_search_path_mismatch';
   END IF;
 
   IF pg_catalog.has_function_privilege('anon', v_helper, 'EXECUTE')
@@ -91,6 +105,18 @@ BEGIN
     IF v_owner <> 'postgres' OR NOT v_security_definer
        OR v_search_path IS DISTINCT FROM '""' THEN
       RAISE EXCEPTION 'rpc_security_definer_owner_or_search_path_mismatch: %', v_proc::regprocedure;
+    END IF;
+    IF EXISTS (
+      SELECT 1
+      FROM pg_catalog.pg_proc p
+      CROSS JOIN LATERAL pg_catalog.aclexplode(
+        COALESCE(p.proacl, pg_catalog.acldefault('f', p.proowner))
+      ) AS acl
+      WHERE p.oid = v_proc
+        AND acl.grantee = 0
+        AND acl.privilege_type = 'EXECUTE'
+    ) THEN
+      RAISE EXCEPTION 'rpc_public_execute_not_revoked: %', v_proc::regprocedure;
     END IF;
   END LOOP;
 
@@ -126,7 +152,10 @@ BEGIN
   IF pg_catalog.strpos(v_def, 'chat_deletion_character_turn_stats') = 0
      OR pg_catalog.strpos(v_def, 'g.deleted_at IS NULL') = 0
      OR pg_catalog.strpos(v_def, 'private.current_user_is_adult') = 0
-     OR pg_catalog.strpos(v_def, 's.deleted_at IS NULL') = 0 THEN
+     OR pg_catalog.strpos(v_def, 's.deleted_at IS NULL') = 0
+     OR NOT pg_catalog.has_function_privilege('anon', v_proc, 'EXECUTE')
+     OR NOT pg_catalog.has_function_privilege('authenticated', v_proc, 'EXECUTE')
+     OR NOT pg_catalog.has_function_privilege('service_role', v_proc, 'EXECUTE') THEN
     RAISE EXCEPTION 'bulk_count_rpc_missing_archive_or_existing_guards';
   END IF;
 
@@ -135,7 +164,10 @@ BEGIN
   IF pg_catalog.strpos(v_def, 'chat_deletion_character_turn_stats') = 0
      OR pg_catalog.strpos(v_def, 'g.deleted_at IS NULL') = 0
      OR pg_catalog.strpos(v_def, 'private.current_user_is_adult') = 0
-     OR pg_catalog.strpos(v_def, 's.deleted_at IS NULL') = 0 THEN
+     OR pg_catalog.strpos(v_def, 's.deleted_at IS NULL') = 0
+     OR NOT pg_catalog.has_function_privilege('anon', v_proc, 'EXECUTE')
+     OR NOT pg_catalog.has_function_privilege('authenticated', v_proc, 'EXECUTE')
+     OR NOT pg_catalog.has_function_privilege('service_role', v_proc, 'EXECUTE') THEN
     RAISE EXCEPTION 'public_count_rpc_missing_archive_or_existing_guards';
   END IF;
 
