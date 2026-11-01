@@ -178,6 +178,49 @@ FROM public.chat_groups AS g
 WHERE g.deleted_at IS NOT NULL
 ON CONFLICT (resource_type, resource_id) DO NOTHING;
 
+-- Fail closed if an existing resource job conflicts with the legacy parent.
+DO $block$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM public.chat_sessions AS s
+    JOIN public.chat_deletion_jobs AS j
+      ON j.resource_type = 'single_session' AND j.resource_id = s.id
+    WHERE s.deleted_at IS NOT NULL
+      AND (j.owner_id IS DISTINCT FROM s.user_id OR j.deleted_at IS DISTINCT FROM s.deleted_at)
+  ) OR EXISTS (
+    SELECT 1
+    FROM public.chat_groups AS g
+    JOIN public.chat_deletion_jobs AS j
+      ON j.resource_type = 'group' AND j.resource_id = g.id
+    WHERE g.deleted_at IS NOT NULL
+      AND (j.owner_id IS DISTINCT FROM g.owner_id OR j.deleted_at IS DISTINCT FROM g.deleted_at)
+  ) THEN
+    RAISE EXCEPTION 'chat_deletion_job_conflict';
+  END IF;
+END;
+$block$;
+
+-- Fail closed if a Storage path is already assigned to a different deletion job.
+DO $block$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM public.chat_memory_photos AS p
+    JOIN public.chat_deletion_jobs AS j
+      ON ((p.chat_type = 'single' AND j.resource_type = 'single_session' AND j.resource_id = p.session_id)
+       OR (p.chat_type = 'group' AND j.resource_type = 'group' AND j.resource_id = p.group_id))
+    JOIN public.chat_storage_deletion_jobs AS sj
+      ON sj.bucket_id = 'personax-memory-photos'
+     AND sj.object_path = p.storage_path
+    WHERE sj.owner_id IS DISTINCT FROM j.owner_id
+       OR sj.deletion_job_id IS DISTINCT FROM j.id
+  ) THEN
+    RAISE EXCEPTION 'chat_storage_deletion_job_conflict';
+  END IF;
+END;
+$block$;
+
 -- Fail closed if any legacy photo path violates the existing owner-prefix rule.
 DO $block$
 BEGIN
