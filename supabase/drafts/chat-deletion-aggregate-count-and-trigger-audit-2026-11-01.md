@@ -12,23 +12,23 @@ Scope: read-only catalog/function/policy review. No DDL or data changes.
 - Although some permissive owner SELECT/UPDATE policies do not themselves repeat deleted_at, the corresponding restrictive lifecycle policies also apply to authenticated access and block access when the parent group is deleted.
 - chat_sessions and chat_messages have corresponding restrictive parent lifecycle guards. The existing message insert policy also checks the parent session is not deleted.
 
-## Finding A — character turn-count functions include deleted group conversations
+## Finding A — historical group-turn aggregate interpretation corrected (not a defect)
 
 Two live SECURITY DEFINER functions are executable by anon and authenticated:
 - public.get_public_character_turn_count(uuid)
 - public.get_character_turn_counts(uuid[])
 
-Both functions filter deleted single sessions and deleted individual group messages, but their group-count CTE/subquery reads public.chat_group_messages without joining public.chat_groups and checking chat_groups.deleted_at IS NULL.
+The earlier audit noticed that their group-count paths read character messages without joining chat_groups.deleted_at. It incorrectly labeled this as a defect because deleted-group turns remained counted during the 30-day grace period. That conclusion is withdrawn: the product requirement is that every successfully completed AI character reply in a group contributes to that character's cumulative total, and deleting the group must not erase that historical contribution.
 
-Because chat deletion intentionally retains group messages during the 30-day backend grace period while the parent group is immediately hidden, these functions can continue counting character messages from a deleted group during that grace period. This is a stale aggregate/metadata issue; this audit did not find evidence that it exposes message content or restores deleted chat access.
+The correct implementation must switch the source of the contribution, not remove it:
+- Active single/group parents contribute from their live valid assistant/character message rows.
+- A deleted single/group parent contributes from one immutable per-character aggregate snapshot captured in the delete transaction.
+- After day-30 transcript purge, the same archived aggregate remains in both owner-visible and public count paths, subject to the existing character visibility, ownership, NSFW and deleted-character gates.
+- A deleted parent must not be counted from both live rows and its archive snapshot.
 
-Suggested function correction (not applied):
-- Join chat_group_messages gm to chat_groups g on g.id = gm.group_id.
-- Add g.deleted_at IS NULL to the group-count predicates in both functions.
-- Preserve gm.deleted_at IS NULL and existing character visibility / NSFW / ownership predicates.
-- Add regression coverage proving active group turns still count and soft-deleted group turns no longer count, for both anonymous public count and author count paths.
+The historical migration file 20261023095003_exclude_deleted_chat_from_character_turn_counts.sql is retained as migration provenance and must not be rewritten as historical SQL. The cumulative snapshot proposal supersedes its counting behavior when safely implemented. Its test requirements must prove that deleting a group does not reduce any participating character's total, that counts remain after purge, and that retries never duplicate the archived contribution.
 
-No function was altered in the database or repository during this audit because the supported migration creation/reconciliation workflow remains blocked by the project's migration-history drift and the current environment has no local Supabase CLI/Docker.
+No database function or hosted schema was changed during this audit. The cumulative snapshot proposal remains draft-only pending migration-baseline/replay resolution and transactional fixture tests.
 
 ## Finding B — two trigger validators lack an explicit deleted-parent predicate
 
