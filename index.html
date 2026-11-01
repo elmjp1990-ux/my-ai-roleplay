@@ -3242,6 +3242,9 @@ async function saveChatSessionSafely(s) {
     const saved = await saveChatSessionToCloud(s);
     return saved;
   } catch (error) {
+    const uid=currentUser()?.uid;
+    if (s?.cloudOwned && uid && s.cloudOwnerUid===uid &&
+        readDeletedChatTombstones(uid).sessions[s.id]) return false;
     console.error('PersonaX 聊天同步失敗：',error);
     toast(error.message || '聊天已保存在本機，但雲端同步失敗。');
     return false;
