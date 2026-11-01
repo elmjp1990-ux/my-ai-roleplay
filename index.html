@@ -5841,6 +5841,16 @@ function loadGroupDiaryMemories(groupId=groupPrototype.active?.id) {
 const groupDiaryCloudReady=new Map();
 const groupDiaryCloudSaveTimers=new Map();
 const groupDiaryCloudSaveChains=new Map();
+function clearGroupDiaryLocalData(groupId,uid=currentUser()?.uid) {
+  if(!groupId||!uid)return;
+  try { localStorage.removeItem('personax-group-diary-v1:'+uid+':'+groupId); }
+  catch(error) { console.warn('群組日記本機快取清除失敗：',error); }
+  groupDiaryCloudReady.delete(groupId);
+  const timer=groupDiaryCloudSaveTimers.get(groupId);
+  if(timer)clearTimeout(timer);
+  groupDiaryCloudSaveTimers.delete(groupId);
+  groupDiaryCloudSaveChains.delete(groupId);
+}
 async function syncGroupDiaryCloud(groupId) {
   const client=window.mySupabase,uid=currentUser()?.uid;
   if(!client||!groupId||!uid)throw new Error('登入後才能同步群組甜蜜日記。');
@@ -6211,6 +6221,7 @@ async function groupRefreshList() { groupPrototype.groupsLoaded=false;await grou
     const deletedGroupIds = new Set(Object.keys(tombstones.groups));
     groupPrototype.groups = (groupPrototype.groups || []).filter(group => !deletedGroupIds.has(group.id));
     for (const groupId of deletedGroupIds) {
+      clearGroupDiaryLocalData(groupId,uid);
       delete groupPrototype.groupPreviews[groupId];
       delete groupPrototype.groupMembers[groupId];
       if (groupPrototype.active?.id === groupId && groupPrototype.ownerUid === uid) {
@@ -8275,6 +8286,7 @@ document.addEventListener('click',async event => {
           const {error:deleteError}=await client.rpc('delete_chat_group_with_related_data',{p_group_id:groupId});
           if(deleteError) throw new Error('群組與關聯資料刪除失敗：'+deleteError.message);
           markDeletedChatTombstone(uid,'groups',groupId);
+          clearGroupDiaryLocalData(groupId,uid);
           g.groups=(g.groups||[]).filter(item=>item.id!==groupId);
           delete g.groupPreviews[groupId];
           delete g.groupMembers[groupId];
