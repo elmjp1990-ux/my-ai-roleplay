@@ -32,6 +32,53 @@ jobs:
             exit 1
           fi
 
+      - name: Verify frontend JavaScript and deletion tombstones
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const assert = require('node:assert/strict');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const scripts = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)]
+            .map(match => match[1]).filter(source => source.trim());
+          assert.ok(scripts.length > 0, 'No inline JavaScript script blocks found');
+          scripts.forEach((source, index) => {
+            try { new Function(source); }
+            catch (error) { throw new Error('Inline script ' + (index + 1) + ' failed syntax parsing: ' + error.message); }
+          });
+
+          const start = html.indexOf('  function readDeletedChatTombstones(uid) {');
+          const end = html.indexOf('  function cacheSessionsForUser(uid) {', start);
+          assert.ok(start >= 0 && end > start, 'Deletion tombstone helper block missing');
+          const helperSource = html.slice(start, end);
+          const values = new Map();
+          const localStorage = {
+            getItem: key => values.has(key) ? values.get(key) : null,
+            setItem: (key, value) => values.set(key, String(value)),
+          };
+          const isUuid = value =>
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+          const helpers = new Function(
+            'localStorage', 'isUuid', 'USER_DELETED_CHAT_TOMBSTONES_KEY_PREFIX',
+            helperSource + '; return {readDeletedChatTombstones,markDeletedChatTombstone,filterDeletedChatSessions};'
+          )(localStorage, isUuid, 'test-tombstones:');
+
+          const uid = '11111111-1111-4111-8111-111111111111';
+          const sessionId = '22222222-2222-4222-8222-222222222222';
+          const groupId = '33333333-3333-4333-8333-333333333333';
+          assert.equal(helpers.markDeletedChatTombstone(uid, 'sessions', sessionId), true);
+          assert.equal(helpers.markDeletedChatTombstone(uid, 'groups', groupId), true);
+          const filtered = helpers.filterDeletedChatSessions(uid, {
+            [sessionId]: { id: sessionId },
+            keep: { id: 'keep' },
+          });
+          assert.equal(filtered[sessionId], undefined, 'Deleted session must be filtered');
+          assert.ok(filtered.keep, 'Unrelated session must remain');
+          assert.ok(helpers.readDeletedChatTombstones(uid).groups[groupId], 'Group tombstone must persist');
+          console.log('Frontend syntax and deletion tombstone checks passed (' + scripts.length + ' inline scripts).');
+          NODE
+
       - name: Start disposable local Supabase database
         shell: bash
         run: |
