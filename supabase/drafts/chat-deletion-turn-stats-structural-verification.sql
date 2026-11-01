@@ -214,7 +214,21 @@ BEGIN
 
   FOREACH v_proc IN ARRAY ARRAY[
     pg_catalog.to_regprocedure('public.get_latest_settled_encounter_session(uuid)')::oid,
-    pg_catalog.to_regprocedure('public.get_latest_settled_encounter_affinity(uuid)')::oid,
+    pg_catalog.to_regprocedure('public.get_latest_settled_encounter_affinity(uuid)')::oid
+  ] LOOP
+    IF v_proc IS NULL THEN
+      RAISE EXCEPTION 'latest_encounter_read_rpc_missing';
+    END IF;
+    v_def := pg_catalog.pg_get_functiondef(v_proc);
+    IF pg_catalog.strpos(v_def, 'chat_sessions') = 0
+       OR pg_catalog.strpos(v_def, 'deleted_at IS NULL') = 0
+       OR NOT pg_catalog.has_function_privilege('authenticated', v_proc, 'EXECUTE')
+       OR pg_catalog.has_function_privilege('anon', v_proc, 'EXECUTE') THEN
+      RAISE EXCEPTION 'latest_encounter_read_rpc_missing_parent_filter_or_acl: %', v_proc::regprocedure;
+    END IF;
+  END LOOP;
+
+  FOREACH v_proc IN ARRAY ARRAY[
     pg_catalog.to_regprocedure('public.set_encounter_session_lifecycle_state(uuid,uuid,text)')::oid,
     pg_catalog.to_regprocedure('public.settle_encounter_session(uuid,integer,text,jsonb,jsonb)')::oid,
     pg_catalog.to_regprocedure('public.validate_affinity_session_link()')::oid,
@@ -228,16 +242,6 @@ BEGIN
        OR pg_catalog.strpos(v_def, 'deleted_at IS NULL') = 0
        OR pg_catalog.strpos(v_def, 'FOR UPDATE') = 0 THEN
       RAISE EXCEPTION 'encounter_delete_lifecycle_parent_lock_or_filter_missing: %', v_proc::regprocedure;
-    END IF;
-  END LOOP;
-
-  FOREACH v_proc IN ARRAY ARRAY[
-    pg_catalog.to_regprocedure('public.get_latest_settled_encounter_session(uuid)')::oid,
-    pg_catalog.to_regprocedure('public.get_latest_settled_encounter_affinity(uuid)')::oid
-  ] LOOP
-    IF NOT pg_catalog.has_function_privilege('authenticated', v_proc, 'EXECUTE')
-       OR pg_catalog.has_function_privilege('anon', v_proc, 'EXECUTE') THEN
-      RAISE EXCEPTION 'latest_encounter_read_rpc_acl_mismatch: %', v_proc::regprocedure;
     END IF;
   END LOOP;
 
