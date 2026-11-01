@@ -203,3 +203,17 @@ No SQL was executed against local or hosted databases in this round. No concurre
 2. 驗證 delete-first、settlement-first、already-settled-but-deleted、wrong chat_mode 四種情境。
 3. 再確認 broad lifecycle draft 其他函式的實際 trigger attachment、ACL 與呼叫路徑，避免只驗證函式本體。
 4. 所有交易測試通過後，才整理成單一 migration 並送 PR review。
+
+
+## 第十二輪（2026-11-02）：Trigger attachment / ACL 只讀驗收查詢
+
+- 新增 `supabase/drafts/encounter-lifecycle-trigger-attachment-audit.sql`，僅包含 PostgreSQL catalog SELECT，沒有 DDL/DML。
+- 查詢會列出 lifecycle、Encounter turns、evaluation jobs、Story relationship tables 的非內建 triggers、啟用狀態、trigger definition、實際綁定函式及函式安全設定。
+- 另外檢查 `validate_affinity_session_link()` 與 `validate_encounter_evaluation_job_link()` 是否真的有 trigger attachment，避免只建立/替換函式卻沒有掛載而形成假防護。
+- 第三段列出 pause/resume、settlement 與 validator 的 owner、SECURITY DEFINER、search_path 設定及完整 EXECUTE ACL（含 PUBLIC）。
+- 這是待執行的只讀驗收腳本；目前環境沒有 Supabase CLI、Docker、psql，因此尚未執行，也沒有任何 live catalog 結果。不得將其描述為 trigger/ACL 已驗收。
+
+### 下一步
+1. 在 disposable local DB 套用完整 migration replay 後執行此 catalog audit。
+2. 將實際 trigger attachment 與 ACL 結果逐一對照廣義 lifecycle draft 及專項 settlement draft。
+3. 再執行四項交易競態測試；全部通過後才考慮整理正式 migration。
