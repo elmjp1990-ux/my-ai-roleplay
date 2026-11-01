@@ -4,7 +4,7 @@
 
 DO $verify$
 DECLARE
-  v_table oid := pg_catalog.to_regclass('public.chat_deletion_character_turn_stats');
+  v_table oid := pg_catalog.to_regclass('public.chat_deletion_character_turn_stats')::oid;
   v_helper oid := pg_catalog.to_regprocedure(
     'private.snapshot_chat_deletion_character_turn_stats(text,uuid,uuid)'
   );
@@ -79,6 +79,19 @@ BEGIN
     RAISE EXCEPTION 'snapshot_helper_security_definer_owner_or_search_path_mismatch';
   END IF;
 
+  IF EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_proc p
+    CROSS JOIN LATERAL pg_catalog.aclexplode(
+      COALESCE(p.proacl, pg_catalog.acldefault('f', p.proowner))
+    ) AS acl
+    WHERE p.oid = v_helper
+      AND acl.grantee = 0
+      AND acl.privilege_type = 'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'snapshot_helper_public_execute_not_revoked';
+  END IF;
+
   IF pg_catalog.has_function_privilege('anon', v_helper, 'EXECUTE')
      OR pg_catalog.has_function_privilege('authenticated', v_helper, 'EXECUTE')
      OR pg_catalog.has_function_privilege('service_role', v_helper, 'EXECUTE') THEN
@@ -86,11 +99,11 @@ BEGIN
   END IF;
 
   FOREACH v_proc IN ARRAY ARRAY[
-    pg_catalog.to_regprocedure('public.delete_chat_session_content(uuid)'),
-    pg_catalog.to_regprocedure('public.delete_chat_group_with_related_data(uuid)'),
-    pg_catalog.to_regprocedure('public.purge_chat_deletion_job(uuid)'),
-    pg_catalog.to_regprocedure('public.get_character_turn_counts(uuid[])'),
-    pg_catalog.to_regprocedure('public.get_public_character_turn_count(uuid)')
+    pg_catalog.to_regprocedure('public.delete_chat_session_content(uuid)')::oid,
+    pg_catalog.to_regprocedure('public.delete_chat_group_with_related_data(uuid)')::oid,
+    pg_catalog.to_regprocedure('public.purge_chat_deletion_job(uuid)')::oid,
+    pg_catalog.to_regprocedure('public.get_character_turn_counts(uuid[])')::oid,
+    pg_catalog.to_regprocedure('public.get_public_character_turn_count(uuid)')::oid
   ] LOOP
     IF v_proc IS NULL THEN
       RAISE EXCEPTION 'required_rpc_missing';
@@ -159,7 +172,7 @@ BEGIN
     RAISE EXCEPTION 'bulk_count_rpc_missing_archive_or_existing_guards';
   END IF;
 
-  v_proc := pg_catalog.to_regprocedure('public.get_public_character_turn_count(uuid)');
+  v_proc := pg_catalog.to_regprocedure('public.get_public_character_turn_count(uuid)')::oid;
   v_def := pg_catalog.pg_get_functiondef(v_proc);
   IF pg_catalog.strpos(v_def, 'chat_deletion_character_turn_stats') = 0
      OR pg_catalog.strpos(v_def, 'g.deleted_at IS NULL') = 0
