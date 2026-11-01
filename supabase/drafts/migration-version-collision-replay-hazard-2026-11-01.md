@@ -98,3 +98,27 @@ PR #200 remains Draft/unmerged. No hosted migration was applied. No cron was ena
 The connected Supabase integration currently lists exactly one accessible project: `ouyewoagbmtqehbofrje` (ACTIVE_HEALTHY, ap-northeast-1). This matches the project treated as the test database in this work. No second Supabase project is currently visible through this connection.
 
 This is not proof that no other unlinked Supabase organization/project or external environment exists. Therefore version 20261023120000 is confirmed absent only from the one accessible test project's migration ledger; do not generalize that absence to every environment without checking those environments separately.
+
+
+## 2026-11-01 correction: later pending source migration changes the replay conclusion
+
+A follow-up check found an important later source migration that was not accounted for in the earlier replay-risk wording:
+
+- `supabase/migrations/20261024180000_fix_nsfw_public_rpc_age_gate.sql` exists on the repository default branch.
+- It replaces both count RPCs after the repo-only `20261023120000` version in timestamp order.
+- Its source definitions include the NSFW/adult gate and the deleted single-session/message filters that are absent from `20261023120000`.
+- The test DB ledger contains the earlier NSFW helper/policy versions `20261024073819`, `20261024075220`, and `20261024083626`, but has neither `20261023120000` nor `20261024180000`.
+
+Therefore the previous statement that applying `20261023120000` would necessarily leave a persistent solo-filter regression after a complete repository replay was too strong. If a version-ordered replay applies both missing files successfully, `20261024180000` subsequently restores the NSFW and solo deleted-session/message predicates. The earlier file is still stale and unsafe to treat as a standalone fix; it can create an intermediate state before the later migration executes. Whether that intermediate state is externally observable depends on the migration runner's transaction boundaries and deployment process; this has not been tested here.
+
+The expected final definitions after applying both pending migrations would still lack the parent-group deleted filter, because `20261024180000` does not join `chat_groups` or test `g.deleted_at IS NULL`. The additive parent-group correction remains necessary.
+
+Updated replay assessment:
+
+1. Do not describe the old migration as causing a proven permanent regression after the *full* pending chain; describe it as a stale intermediate replacement superseded by the later NSFW migration.
+2. Do not run hosted `db push`, reset, repair, or manual history edits. The full replay order and transaction behavior must first be reproduced locally.
+3. The missing ledger entry for `20261024180000` remains a separate history discrepancy: live function clauses match the migration's behavior, but its version is absent from the accessible test ledger.
+4. The only accessible Supabase project remains the test project; other unlinked environments have not been checked.
+5. Preserve the parent-group filter as a separate additive change and test it against both RPCs, including NSFW and solo deletion cases.
+
+This correction supersedes the earlier wording in this document that implied no later repository migration could restore the solo filters. No database changes were made.
