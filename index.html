@@ -5859,12 +5859,14 @@ function clearGroupDiaryLocalData(groupId,uid=currentUser()?.uid) {
 async function syncGroupDiaryCloud(groupId) {
   const client=window.mySupabase,uid=currentUser()?.uid;
   if(!client||!groupId||!uid)throw new Error('登入後才能同步群組甜蜜日記。');
+  if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return [];}
   const {data:{user},error:authError}=await client.auth.getUser();
   if(authError||!user||user.id!==uid)throw new Error('登入狀態已失效，請重新登入後同步日記。');
   const local=readGroupDiaryLocalRecord(groupId);
   const {data:cloud,error}=await client.from('chat_group_diary')
     .select('group_id,owner_id,memories,updated_at').eq('group_id',groupId).maybeSingle();
   if(error)throw error;
+  if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return [];}
   if(cloud) {
     const cloudUpdatedAt=Date.parse(cloud.updated_at)||0;
     // Preserve a newer local edit (for example, one made while temporarily offline);
@@ -5884,10 +5886,12 @@ async function syncGroupDiaryCloud(groupId) {
 async function saveGroupDiaryCloudNow(groupId,memories,updatedAt,uid=currentUser()?.uid) {
   const client=window.mySupabase;
   if(!client||!uid)throw new Error('登入後才能同步群組甜蜜日記。');
+  if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return;}
   const {error}=await client.from('chat_group_diary').upsert({
     group_id:groupId,owner_id:uid,memories,updated_at:new Date(Math.max(Number(updatedAt)||Date.now(),Date.now())).toISOString()
   },{onConflict:'group_id'});
   if(error)throw error;
+  if(readDeletedChatTombstones(uid).groups[groupId]) clearGroupDiaryLocalData(groupId,uid);
 }
 function queueGroupDiaryCloudSave(groupId) {
   const oldTimer=groupDiaryCloudSaveTimers.get(groupId);
@@ -5898,9 +5902,12 @@ function queueGroupDiaryCloudSave(groupId) {
     const next=previous.catch(()=>{}).then(async()=>{
       const uid=currentUser()?.uid;
       if(!uid||!window.mySupabase)throw new Error('登入後才能同步群組甜蜜日記。');
+      if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return;}
       if(!groupDiaryCloudReady.get(groupId))await syncGroupDiaryCloud(groupId);
+      if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return;}
       const local=readGroupDiaryLocalRecord(groupId);
       await saveGroupDiaryCloudNow(groupId,local.memories,local.updatedAt,uid);
+      if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return;}
       writeGroupDiaryLocalRecord(groupId,local.memories,Date.now());
     }).catch(error=>{
       console.error('群組甜蜜日記雲端同步失敗：',error);
@@ -5912,6 +5919,7 @@ function queueGroupDiaryCloudSave(groupId) {
 }
 function saveGroupDiaryMemories(memories,groupId=groupPrototype.active?.id) {
   if(!groupId)return false;
+  if(readDeletedChatTombstones(currentUser()?.uid).groups[groupId]) {clearGroupDiaryLocalData(groupId);return false;}
   try {
     writeGroupDiaryLocalRecord(groupId,memories,Date.now());
     queueGroupDiaryCloudSave(groupId);
