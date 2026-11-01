@@ -176,3 +176,22 @@ This is broader than two missing files. The repository migration directory and t
 - Next evidence-gathering step: capture a read-only schema inventory from the test project (tables/columns, constraints, indexes, triggers, policies, functions, grants, Storage bucket/policies) and compare it with the repository's migration replay state or a clean disposable project built from main.
 - If a clean replay cannot be produced, create a separately reviewed baseline/reconciliation plan from an authoritative schema snapshot, with explicit object-by-object provenance and drift disposition. Do not treat pg_get_functiondef alone as a complete historical migration source because it omits surrounding grants, policies, triggers, dependencies, and data transformations.
 - Only after baseline sign-off should the implementation branch add the first executable lifecycle migration. No test DB DDL/DML, migration application, worker deployment, or cron was performed in this inventory pass.
+
+
+## 9. Additional live schema and billing-function inspection — 2026-11-01
+
+Read-only catalog inspection of the test project returned 45 public base tables, 270 constraints, 132 indexes, 23 non-internal public triggers, 84 public RLS policies, 72 functions across public/private, and 13 Storage policies. The chat table column inventory confirms:
+
+- chat_sessions already has deleted_at.
+- chat_groups currently has archived_at but **no deleted_at** column.
+- chat_turn_charges stores session_id, user_message_id, expected_assistant_message_id and assistant_message_id as UUID references; chat_group_turn_charges stores group_id and group_turn_id.
+- ai_generation_records has non-null session/message IDs and non-null original_content; chat_message_versions has a non-null message_id.
+- The three relevant private Storage buckets are personax-memory-photos, character-illustrations and character-avatar-videos. Only the first is eligible for chat-memory cleanup; the latter two are character assets and must remain excluded.
+
+Function-source inspection found another race boundary:
+
+- reserve_chat_turn checks chat_sessions.deleted_at before inserting/locking the charge row, but it does **not** lock the parent chat_sessions row. A concurrent delete can therefore race the initial active check and reservation. It must adopt parent-first session FOR UPDATE, recheck deleted_at while holding that lock, and only then create/lock the charge and wallet rows.
+- settle_chat_turn and refund_chat_turn lock the charge row but do not lock/check the parent session. They need a narrowly defined post-delete rule: allow only settlement/refund/reconciliation of a turn that was already reserved before deletion, while preventing any new reservation or assistant content. This must not become a general write bypass.
+- append_chat_group_mock_turn does lock the parent group row, but only checks archived_at IS NULL; add deleted_at IS NULL under the same lock after the group lifecycle marker exists.
+
+This inspection reinforces the required common lock order: parent session/group first, then turn/charge, then wallet; all writers must use the same order to avoid delete-vs-send races and deadlocks. No schema or data was modified.
