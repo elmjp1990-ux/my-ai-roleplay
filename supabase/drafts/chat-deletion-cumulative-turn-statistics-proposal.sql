@@ -97,6 +97,54 @@ BEGIN
   ELSE
     RAISE EXCEPTION 'unsupported_chat_resource_type' USING ERRCODE = '22023';
   END IF;
+
+  -- Fail closed if a pre-existing aggregate is incomplete or stale. ON CONFLICT
+  -- DO NOTHING is safe only when the first snapshot is complete and immutable.
+  IF p_resource_type = 'single_session' AND EXISTS (
+    SELECT 1
+    FROM public.chat_sessions AS s
+    CROSS JOIN LATERAL (
+      SELECT pg_catalog.count(m.id)::bigint AS expected_count
+      FROM public.chat_messages AS m
+      WHERE m.session_id = s.id
+        AND m.role = 'assistant'
+        AND m.deleted_at IS NULL
+    ) AS expected
+    LEFT JOIN public.chat_deletion_character_turn_stats AS archived
+      ON archived.resource_type = 'single_session'
+     AND archived.resource_id = s.id
+     AND archived.character_id = s.character_id
+    WHERE s.id = p_resource_id
+      AND s.user_id = p_owner_id
+      AND (
+        (expected.expected_count > 0 AND archived.character_id IS NULL)
+        OR pg_catalog.coalesce(archived.turn_count, 0) <> expected.expected_count
+      )
+  ) THEN
+    RAISE EXCEPTION 'chat_deletion_turn_snapshot_incomplete' USING ERRCODE = '23514';
+  ELSIF p_resource_type = 'group' AND EXISTS (
+    WITH expected AS (
+      SELECT gm.character_id, pg_catalog.count(gm.id)::bigint AS turn_count
+      FROM public.chat_group_messages AS gm
+      WHERE gm.group_id = p_resource_id
+        AND gm.speaker_type = 'character'
+        AND gm.deleted_at IS NULL
+        AND gm.character_id IS NOT NULL
+      GROUP BY gm.character_id
+    ), archived AS (
+      SELECT s.character_id, s.turn_count
+      FROM public.chat_deletion_character_turn_stats AS s
+      WHERE s.resource_type = 'group'
+        AND s.resource_id = p_resource_id
+    )
+    SELECT 1
+    FROM expected
+    FULL OUTER JOIN archived USING (character_id)
+    WHERE pg_catalog.coalesce(expected.turn_count, 0)
+       <> pg_catalog.coalesce(archived.turn_count, 0)
+  ) THEN
+    RAISE EXCEPTION 'chat_deletion_turn_snapshot_incomplete' USING ERRCODE = '23514';
+  END IF;
 END;
 $function$;
 
