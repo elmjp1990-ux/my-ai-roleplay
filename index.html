@@ -1353,6 +1353,44 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
    * 不直接改 DOM，也絕對不刪除 #modal。
    */
   const USER_SESSIONS_KEY_PREFIX = 'personax-chat-sessions-v1:';
+  const USER_DELETED_CHAT_TOMBSTONES_KEY_PREFIX = 'personax-deleted-chat-tombstones-v1:';
+
+  // Local tombstones prevent a stale in-flight cloud sync or another tab from
+  // rehydrating a chat after the server has accepted its deletion.
+  function readDeletedChatTombstones(uid) {
+    if (!uid) return {sessions:{},groups:{}};
+    try {
+      const value = JSON.parse(localStorage.getItem(USER_DELETED_CHAT_TOMBSTONES_KEY_PREFIX + uid) || '{}');
+      const clean = {sessions:{},groups:{}};
+      for (const kind of ['sessions','groups']) {
+        const source = value?.[kind] && typeof value[kind] === 'object' ? value[kind] : {};
+        for (const [id, at] of Object.entries(source)) {
+          if (isUuid(id) && Number.isFinite(Number(at)) && Number(at) > 0) clean[kind][id] = Number(at);
+        }
+      }
+      return clean;
+    } catch (_) {
+      return {sessions:{},groups:{}};
+    }
+  }
+
+  function markDeletedChatTombstone(uid, kind, resourceId) {
+    if (!uid || !['sessions','groups'].includes(kind) || !isUuid(resourceId)) return false;
+    try {
+      const tombstones = readDeletedChatTombstones(uid);
+      tombstones[kind][resourceId] = Date.now();
+      localStorage.setItem(USER_DELETED_CHAT_TOMBSTONES_KEY_PREFIX + uid, JSON.stringify(tombstones));
+      return true;
+    } catch (error) {
+      console.warn('刪除聊天室的本機同步標記保存失敗：', error);
+      return false;
+    }
+  }
+
+  function filterDeletedChatSessions(uid, sessions) {
+    const deleted = readDeletedChatTombstones(uid).sessions;
+    return Object.fromEntries(Object.entries(sessions || {}).filter(([id]) => !deleted[id]));
+  }
 
   function cacheSessionsForUser(uid) {
     if (!uid || typeof state === 'undefined') return;
@@ -1367,7 +1405,9 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     if (!uid) return {};
     try {
       const saved = JSON.parse(localStorage.getItem(USER_SESSIONS_KEY_PREFIX + uid) || '{}');
-      return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {};
+      return saved && typeof saved === 'object' && !Array.isArray(saved)
+        ? filterDeletedChatSessions(uid, saved)
+        : {};
     } catch (_) {
       return {};
     }
@@ -2705,7 +2745,9 @@ function load() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORE_KEY));
     if (saved?.version === 3 && Array.isArray(saved.characters) && saved.sessions) {
-      return {...freshState(),...saved};
+      const restored = {...freshState(),...saved};
+      if (restored.account?.uid) restored.sessions = filterDeletedChatSessions(restored.account.uid, restored.sessions);
+      return restored;
     }
     return migrateOld(JSON.parse(localStorage.getItem(OLD_KEY)));
   } catch (error) {
@@ -3028,7 +3070,9 @@ async function loadCloudChatSessions(user) {
       .eq('user_id', user.id).is('deleted_at', null).order('updated_at', { ascending:false });
     if (error) throw new Error(error.message);
     if (state.account?.uid !== user.id) return;
-    const sessions = rows || [];
+    let sessions = (rows || []).filter(row =>
+      !readDeletedChatTombstones(user.id).sessions[row.id]
+    );
     const activeSessionIds = new Set(sessions.map(row => row.id));
     let changed = false;
     // 雲端清單不再包含的本帳號聊天，可能已被軟刪除；清掉過期本機副本，避免刷新後復活。
@@ -3076,6 +3120,21 @@ async function loadCloudChatSessions(user) {
           };
         }
       }
+    }
+
+    // Re-read tombstones after all awaited profile/message requests. A stale
+    // response that began before deletion must never repopulate the local cache.
+    const latestDeletedSessions = readDeletedChatTombstones(user.id).sessions;
+    const beforeFilterCount = sessions.length;
+    sessions = sessions.filter(row => !latestDeletedSessions[row.id]);
+    if (sessions.length !== beforeFilterCount) {
+      for (const [sessionId, cached] of Object.entries(state.sessions || {})) {
+        if (latestDeletedSessions[sessionId] && cached?.cloudOwned && cached.cloudOwnerUid === user.id) {
+          delete state.sessions[sessionId];
+        }
+      }
+      persist();
+      cacheSessionsForUser(user.id);
     }
 
     const bySession = new Map();
@@ -5257,7 +5316,8 @@ async function groupLoadList(force=false) {
       .is('archived_at',null).order('updated_at',{ascending:false});
     if(error) throw error;
     if(user.id!==currentUser()?.uid) { groupResetForAccount(currentUser()?.uid||null); return; }
-    g.ownerUid=user.id;g.groups=data||[];g.groupPreviews={};g.groupMembers={};
+    const deletedGroupIds = readDeletedChatTombstones(user.id).groups;
+    g.ownerUid=user.id;g.groups=(data||[]).filter(group=>!deletedGroupIds[group.id]);g.groupPreviews={};g.groupMembers={};
     if(g.groups.length) {
       try {
         const groupIdsForMembers=g.groups.map(group=>group.id);
@@ -5301,6 +5361,13 @@ async function groupLoadList(force=false) {
       }
     }
     if(user.id!==currentUser()?.uid) { groupResetForAccount(currentUser()?.uid||null); return; }
+    // A group may have been deleted while member/preview requests were in flight.
+    const latestDeletedGroups = readDeletedChatTombstones(user.id).groups;
+    const retainedGroups = g.groups.filter(group=>!latestDeletedGroups[group.id]);
+    const retainedIds = new Set(retainedGroups.map(group=>group.id));
+    g.groups = retainedGroups;
+    for (const groupId of Object.keys(g.groupPreviews)) if (!retainedIds.has(groupId)) delete g.groupPreviews[groupId];
+    for (const groupId of Object.keys(g.groupMembers)) if (!retainedIds.has(groupId)) delete g.groupMembers[groupId];
     g.groupsLoaded=true;g.loadingGroups=false;g.loadError='';
   } catch(error) {
     g.groupsLoaded=true;g.loadingGroups=false;g.loadError=groupFriendlyError(error)||'讀取群組清單失敗。';
@@ -6122,6 +6189,42 @@ async function groupSendMock() {
   }
 }
 async function groupRefreshList() { groupPrototype.groupsLoaded=false;await groupLoadList(true);if(route.page==='group'&&!groupPrototype.active)render(); }
+
+  // Broadcast successful cloud-chat deletions to other tabs on this origin.
+  // Server RLS remains authoritative; this only clears already-cached UI copies.
+  window.addEventListener('storage', event => {
+    const uid = currentUser()?.uid;
+    if (!uid || event.key !== USER_DELETED_CHAT_TOMBSTONES_KEY_PREFIX + uid) return;
+    const tombstones = readDeletedChatTombstones(uid);
+    let sessionsChanged = false;
+    for (const sessionId of Object.keys(tombstones.sessions)) {
+      const cached = state.sessions?.[sessionId];
+      if (cached?.cloudOwned && cached.cloudOwnerUid === uid) {
+        delete state.sessions[sessionId];
+        sessionsChanged = true;
+      }
+    }
+    if (sessionsChanged) {
+      persist();
+      cacheSessionsForUser(uid);
+    }
+    const deletedGroupIds = new Set(Object.keys(tombstones.groups));
+    groupPrototype.groups = (groupPrototype.groups || []).filter(group => !deletedGroupIds.has(group.id));
+    for (const groupId of deletedGroupIds) {
+      delete groupPrototype.groupPreviews[groupId];
+      delete groupPrototype.groupMembers[groupId];
+      if (groupPrototype.active?.id === groupId && groupPrototype.ownerUid === uid) {
+        groupPrototype.active = null;
+        groupPrototype.messages = [];
+        groupPrototype.pendingRequest = null;
+        groupPrototype.loading = false;
+      }
+    }
+    if (route.page === 'conversation' && tombstones.sessions[route.id]) go({page:'chat'});
+    else if (route.page === 'group' && deletedGroupIds.has(route.id)) go({page:'chat'});
+    else if (sessionsChanged || deletedGroupIds.size) render();
+    refreshChatEntryList();
+  });
 async function groupRename(groupId) {
   const g=groupPrototype;
   const target=g.groups.find(x=>x.id===groupId);
@@ -8171,7 +8274,11 @@ document.addEventListener('click',async event => {
           if(authError||user?.id!==uid) throw new Error('登入狀態已失效，請重新登入。');
           const {error:deleteError}=await client.rpc('delete_chat_group_with_related_data',{p_group_id:groupId});
           if(deleteError) throw new Error('群組與關聯資料刪除失敗：'+deleteError.message);
-                    if(g.active?.id===groupId) { g.active=null;g.messages=[];g.pendingRequest=null;g.loading=false; }
+          markDeletedChatTombstone(uid,'groups',groupId);
+          g.groups=(g.groups||[]).filter(item=>item.id!==groupId);
+          delete g.groupPreviews[groupId];
+          delete g.groupMembers[groupId];
+          if(g.active?.id===groupId) { g.active=null;g.messages=[];g.pendingRequest=null;g.loading=false; }
           $('modal')?.close();
           await groupRefreshList();
           if(route.page==='group'&&route.id===groupId) go({page:'chat'});
@@ -8193,10 +8300,12 @@ document.addEventListener('click',async event => {
           const client=window.mySupabase;
           const {error:deleteError}=await client.rpc('delete_chat_session_content',{p_session_id:key});
           if(deleteError) throw new Error('對話與回憶刪除失敗：'+deleteError.message);
-                  }
+          markDeletedChatTombstone(uid,'sessions',key);
+        }
         // 本機介面立即移除；雲端只標記刪除並排入 30 天清除佇列，期間不直接刪除 Storage 檔案。
         delete state.sessions[key];
         persist();
+        if(uid) cacheSessionsForUser(uid);
         toast('對話已隱藏，聊天內容與回憶將於 30 天後永久清除。');
         if (route.id === key) go({page:'chat'});
         else closeModal();
