@@ -21,10 +21,10 @@ Current live protections:
 - Deleted single chat sessions and messages excluded.
 - Deleted individual group messages excluded.
 
-Confirmed remaining gap:
+Historical observation (not a product defect):
 - Both group aggregates read chat_group_messages without joining chat_groups.
-- Neither filters chat_groups.deleted_at IS NULL.
-- The 30-day soft-delete parent remains present with its child messages, so FK cascade does not solve this aggregate leak.
+- This means historical turns from a soft-deleted group remain included during the 30-day grace period. That behavior matches the user's requirement that deleting a chat must not erase character cumulative turns.
+- The earlier audit incorrectly called this a gap. That conclusion is withdrawn. The correct future design must archive each deleted parent's per-character contribution, then switch from live rows to the immutable archive so transcript purge cannot erase counts and the live/archive sources are never double-counted.
 
 ## Recovered migration provenance
 
@@ -47,30 +47,26 @@ Timestamp mismatch still present:
 - The repository file 20261023120000 is a separate repo-only version; do not assume it is the exact source corresponding to the live 20261022185425 row.
 - The first live source 20261022173642 is present in the repository under the same timestamp/name.
 
-## Safe correction proposal — NOT APPLIED
+## Correct archive/snapshot proposal — NOT APPLIED
 
-For both current live functions, preserve the complete current live definitions and all existing visibility/ownership/NSFW/deleted-session/deleted-message predicates. Change only the group aggregate:
-```sql
-FROM public.chat_group_messages AS gm
-JOIN public.chat_groups AS g
-  ON g.id = gm.group_id
-WHERE gm.character_id = ...
-  AND gm.speaker_type = 'character'
-  AND gm.deleted_at IS NULL
-  AND g.deleted_at IS NULL
-```
+Do not apply the earlier proposed filter `g.deleted_at IS NULL` as a standalone change to the count RPCs: doing so would erase the deleted group's historical contribution from the character's cumulative total.
 
-For get_character_turn_counts, retain its JOIN to allowed characters. For get_public_character_turn_count, retain public visibility and NSFW adult gate. Do not replace either function with a historical migration body.
+The cumulative snapshot proposal supersedes the old filter-only proposal. Its correct source split is:
+- Active parents: count valid live single/group character replies.
+- Deleted parents: count one immutable aggregate snapshot per character and parent.
+- After day-30 transcript purge: retain the same aggregate snapshot.
+- Never sum a deleted parent's live child rows and its archive simultaneously.
 
 Regression tests required:
-1. Active group with character messages contributes to the count for an eligible public character.
-2. Soft-deleted group with undeleted child messages contributes zero.
-3. Soft-deleted individual group message in an active group contributes zero.
-4. Active single chat counts remain unchanged.
-5. Soft-deleted single chat/session remains excluded.
-6. Author count remains owner-scoped and public count retains NSFW/adult restrictions.
-7. RPC EXECUTE grants remain anon, authenticated, service_role; PUBLIC remains revoked (owner retains inherent owner rights).
-8. Owner remains postgres, SECURITY DEFINER remains enabled, search_path remains empty.
+1. Active group: each character's successfully completed replies contribute to that character.
+2. Delete a group: each participating character's total is unchanged; the deleted group's contribution moves to its per-character archive.
+3. Owner-visible and public aggregate RPCs include archived contribution during grace period and after transcript purge, subject to existing character visibility/NSFW/deleted-character gates.
+4. Deleted individual group messages are not included in the snapshot.
+5. Repeated delete RPC / worker retry does not duplicate archived counts.
+6. Active single chat counts remain unchanged; deleted single chat uses one archive snapshot.
+7. Failed delete rolls back both snapshot and job/parent changes.
+8. Concurrent parent-first writer/delete locking prevents post-snapshot replies.
+9. RPC grants, owner=postgres, SECURITY DEFINER, search_path='' and character visibility restrictions remain unchanged.
 
 ## Migration workflow decision
 
@@ -83,3 +79,8 @@ Next safe action:
 - Apply only after an approved, reproducible migration workflow is available; verify function definitions, grants, owner, security_definer, search_path, and count behavior in the test DB.
 
 PR #200 remains Draft/unmerged. No deletion cron is enabled. PR #201 remains paused.
+
+
+## 2026-11-02 requirement correction
+
+The previous heading and statements calling the deleted-group count behavior a confirmed gap are superseded. The product requirement is that group role replies remain in each character's cumulative total after chat deletion and after the 30-day transcript purge. Use `supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql` as the sole current proposal; do not use the narrower filter-only proposal.
