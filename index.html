@@ -6277,6 +6277,7 @@ async function reconcileDeletedCloudChatParents() {
       if (error) throw error;
       for (const row of data || []) activeSessionIds.add(row.id);
     }
+    if (currentUser()?.uid !== uid) return;
 
     let sessionsChanged = false;
     for (const sessionId of sessionIds) {
@@ -6303,6 +6304,7 @@ async function reconcileDeletedCloudChatParents() {
       if (error) throw error;
       for (const row of data || []) activeGroupIds.add(row.id);
     }
+    if (currentUser()?.uid !== uid) return;
 
     const removedGroupIds = groupIds.filter(groupId => !activeGroupIds.has(groupId));
     if (removedGroupIds.length) {
