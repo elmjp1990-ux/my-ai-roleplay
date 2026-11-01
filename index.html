@@ -3216,7 +3216,12 @@ async function loadCloudChatSessions(user) {
       }
       changed = true;
     }
-    if (changed) { persist(); render(); }
+    if (changed) persist();
+    if (route.page === 'conversation' && route.id && !state.sessions[route.id]) {
+      go({page:'chat'});
+      return;
+    }
+    if (changed) render();
   } catch (error) {
     console.error('雲端聊天載入失敗：', error);
     if (state.account?.uid === user.id) toast('雲端聊天載入失敗：' + error.message);
