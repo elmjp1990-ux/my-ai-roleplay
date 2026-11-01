@@ -88,3 +88,18 @@ The adapter tests cover:
 **CI status:** workflow was added to run `deno test --no-check supabase/functions/_shared/chat-deletion-worker.test.ts`; GitHub Actions result must be checked before marking the tests as passed. No local Deno executable is available in the current execution environment.
 
 No database DDL, migration history, Storage schema, Storage objects, queue rows, cron jobs, Vault values, or production resources were changed by these commits. PR #200 remains Draft and unmerged. PR #201 remains paused.
+
+
+## CI result — deterministic Worker adapter tests PASS
+
+GitHub Actions run:
+- Workflow: Chat deletion worker tests
+- Run ID: 41304264047
+- Job: chat-deletion-worker (124841331656)
+- Result: completed / success
+- Test output: 5 passed, 0 failed
+- Merge ref tested: c4ebaeb495dac4373d38eaaf9ccfd9726d6cd4b5 (PR #200 merge ref containing adapter workflow commit a8280befa6dbfb5b7f183a33552c0df5d8aa650f).
+
+The five cases all passed: successful removal + successful queue mark, simulated Storage 5xx, simulated network failure, false/error queue mark, and bucket/path rejection.
+
+The latest documentation-only head commit 792c75b75f8b39c132949ff121160bc054bbd9f5 also has Vercel status success. This CI result validates the deterministic adapter logic only; it does not close the live Supabase Storage HTTP error → deployed Worker retry E2E gap, nor migration replayability/TRUNCATE-grant blockers.
