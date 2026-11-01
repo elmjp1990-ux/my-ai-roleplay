@@ -118,7 +118,7 @@ BEGIN
       AND s.user_id = p_owner_id
       AND (
         (expected.expected_count > 0 AND archived.character_id IS NULL)
-        OR pg_catalog.coalesce(archived.turn_count, 0) <> expected.expected_count
+        OR COALESCE(archived.turn_count, 0) <> expected.expected_count
       )
   ) THEN
     RAISE EXCEPTION 'chat_deletion_turn_snapshot_incomplete' USING ERRCODE = '23514';
@@ -140,8 +140,8 @@ BEGIN
     SELECT 1
     FROM expected
     FULL OUTER JOIN archived USING (character_id)
-    WHERE pg_catalog.coalesce(expected.turn_count, 0)
-       <> pg_catalog.coalesce(archived.turn_count, 0)
+    WHERE COALESCE(expected.turn_count, 0)
+       <> COALESCE(archived.turn_count, 0)
   ) THEN
     RAISE EXCEPTION 'chat_deletion_turn_snapshot_incomplete' USING ERRCODE = '23514';
   END IF;
