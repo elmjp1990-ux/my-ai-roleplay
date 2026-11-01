@@ -39,7 +39,7 @@ jobs:
           supabase db start
           supabase migration list --local
 
-      - name: Apply the cumulative-turn draft on the disposable local database
+      - name: Apply security drafts on the disposable local database
         shell: bash
         run: |
           set -euo pipefail
