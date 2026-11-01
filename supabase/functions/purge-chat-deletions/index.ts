@@ -1,4 +1,5 @@
 import { withSupabase } from "npm:@supabase/server@1";
+import { processStorageDeletionJobs } from "../_shared/chat-deletion-worker.ts";
 
 type Job = {
   job_id: string;
@@ -85,40 +86,29 @@ export default {
       }, { status: 500 });
     }
 
-    for (const job of (storageJobs ?? []) as Job[]) {
-      summary.storage_claimed += 1;
-
-      if (job.bucket_id !== ALLOWED_BUCKET || !job.object_path) {
-        summary.storage_failed += 1;
-        await supabase.rpc("mark_chat_storage_deletion_job", {
-          p_job_id: job.job_id,
-          p_success: false,
-          p_error_code: "storage_path_not_allowed",
-        });
-        continue;
-      }
-
-      const { error } = await supabase.storage
-        .from(ALLOWED_BUCKET)
-        .remove([job.object_path]);
-
-      const { data: marked, error: markError } = await supabase.rpc(
-        "mark_chat_storage_deletion_job",
-        {
-          p_job_id: job.job_id,
-          p_success: !error,
-          p_error_code: error
-            ? safeErrorCode(error.name || "storage_delete_failed", "storage_delete_failed")
-            : null,
+    const storageSummary = await processStorageDeletionJobs(
+      (storageJobs ?? []) as Job[],
+      {
+        removeObject: async (bucketId, objectPath) => {
+          const { error } = await supabase.storage.from(bucketId).remove([objectPath]);
+          return { error };
         },
-      );
-
-      if (error || markError || marked !== true) {
-        summary.storage_failed += 1;
-      } else {
-        summary.storage_deleted += 1;
-      }
-    }
+        markJob: async (jobId, success, errorCode) => {
+          const { data, error } = await supabase.rpc(
+            "mark_chat_storage_deletion_job",
+            {
+              p_job_id: jobId,
+              p_success: success,
+              p_error_code: errorCode,
+            },
+          );
+          return { data, error };
+        },
+      },
+    );
+    summary.storage_claimed = storageSummary.storage_claimed;
+    summary.storage_deleted = storageSummary.storage_deleted;
+    summary.storage_failed = storageSummary.storage_failed;
 
     return Response.json({ ok: true, summary });
   }),
