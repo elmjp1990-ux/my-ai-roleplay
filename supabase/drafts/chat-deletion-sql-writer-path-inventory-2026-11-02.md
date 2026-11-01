@@ -170,3 +170,17 @@ This is now a **confirmed live test-project static code finding**, not merely a 
 - Only after tests pass, add a reviewed migration to PR #200; do not apply it to the hosted test project as part of this audit.
 
 Coverage note: this read-only live comparison does not replace a full inventory of every writer/trigger/service-role path or deployed runtime test.
+
+
+## Tenth-round focused settlement remediation draft (2026-11-02)
+
+Added `supabase/drafts/settle-encounter-session-parent-lock-live-reconciliation.sql` as a focused, draft-only replacement for the live settlement RPC.
+
+- Keeps the exact live identity signature: `settle_encounter_session(uuid, integer, text, jsonb, jsonb)`.
+- Preserves SECURITY DEFINER and `search_path TO ''`.
+- Adds a first lock on `chat_sessions` with `chat_mode='encounter'` and `deleted_at IS NULL`; failure raises before lifecycle lookup and before already-settled idempotent return.
+- Then locks lifecycle, retains pending pre-expiry charge and evidence-count guards, and updates relationship state only after the parent gate.
+- Explicitly revokes EXECUTE from PUBLIC/anon/authenticated and grants service_role, matching the live observed execution audience; postgres remains function owner.
+- Includes required local rollback fixture scenarios: delete-first, settlement-first, already-settled-but-deleted, and wrong chat mode.
+
+No SQL was executed against local or hosted databases in this round. No concurrency behavior is claimed as tested. The new file is a proposal only and is not a migration. Before promotion, validate owner/ACL after CREATE OR REPLACE and execute the concurrency fixtures in a disposable local database. The existing broad draft `encounter-session-delete-lifecycle-guards.sql` remains a separate proposal and should be reconciled to avoid duplicate/conflicting function definitions when preparing a migration.
