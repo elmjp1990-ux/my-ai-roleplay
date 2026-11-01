@@ -74,3 +74,68 @@ For future baseline comparison, the live test project reports:
 - Character triggers currently include `characters_prevent_soft_delete_restore` and `guard_pending_account_character_write` (BEFORE INSERT/UPDATE/DELETE).
 
 This is a current-state fingerprint only, not a claim about the original base schema. Full current column list and constraints are available from the live catalog; future reconstruction must compare every object and dependency rather than copying only this summary.
+
+
+## Detailed read-only catalog capture — 2026-11-02 follow-up
+
+The following was captured directly from the connected test project's PostgreSQL catalogs. This is current live state only; it is not original migration provenance.
+
+### Column-level evidence
+
+public.characters columns in ordinal order (ordinal gaps are retained; do not infer missing historical columns):
+- id uuid NOT NULL DEFAULT gen_random_uuid()
+- author_id uuid NOT NULL
+- name text NOT NULL
+- title text NULL
+- gender text NULL
+- age integer NULL
+- avatar_url text NULL
+- visibility text NULL DEFAULT 'public'
+- review_status text NULL DEFAULT 'approved'
+- created_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+- intro text NULL
+- race text NULL
+- style text NULL
+- tags jsonb NOT NULL DEFAULT '[]'::jsonb
+- first_published_at timestamptz NULL
+- latest_eligible boolean NOT NULL DEFAULT true
+- rights_confirmed boolean NOT NULL DEFAULT false
+- deleted_at timestamptz NULL
+- deletion_reason text NULL
+- phone_settings jsonb NOT NULL DEFAULT '{}'::jsonb
+- nsfw_workplace_warning boolean NOT NULL DEFAULT false
+- is_nsfw boolean NOT NULL DEFAULT false
+- avatar_video_path text NULL
+- personality_profile jsonb NOT NULL DEFAULT '{}'::jsonb
+
+public.profiles:
+- id uuid NOT NULL (no column default observed)
+- handle text NOT NULL
+- nickname text NOT NULL
+- avatar_url text NULL
+- bio text NULL
+- status text NULL DEFAULT 'active'
+- created_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+- persona_presets jsonb NOT NULL DEFAULT '[]'::jsonb
+- birthdate date NULL
+- follower_count integer NOT NULL DEFAULT 0
+
+### Constraints and indexes
+
+- characters: PK id; FK author_id → profiles(id) ON DELETE CASCADE; check avatar_video_path is NULL or owner-scoped path; personality_profile must be JSON object and <= 12000 bytes; phone_settings must be JSON object.
+- characters indexes: PK; idx_characters_author_id(author_id); partial characters_active_public_idx(visibility, review_status, first_published_at DESC) WHERE deleted_at IS NULL.
+- profiles: PK id; unique handle; FK id → auth.users(id) ON DELETE CASCADE; persona_presets must be JSON array and <= 30 entries.
+- Extension dependencies, grants, sequences, object owners and referenced function definitions still need separate capture.
+
+### Current RLS policy evidence
+
+- characters: account_must_be_active ALL; owner DELETE/INSERT/UPDATE; SELECT allows owner or public non-deleted character subject to NSFW age gate.
+- profiles: account_must_be_active ALL; public read policy profiles_public_read_six_columns; owner-only UPDATE/INSERT/SELECT policies.
+- RLS is enabled on both tables; FORCE RLS is disabled.
+- Trigger evidence: characters has BEFORE UPDATE characters_prevent_soft_delete_restore; and BEFORE INSERT/UPDATE/DELETE guard_pending_account_character_write. No public.profiles trigger was returned by information_schema.triggers.
+
+### Verification boundaries and next step
+
+- Successful read-only catalog queries returned columns, policies, indexes, constraints and triggers. An initial combined catalog query failed due to an OID-array cast; a revised query succeeded. No data rows were read.
+- This evidence narrows reconstruction work but does not yet make a safe baseline. Exact grants/ACLs, function definitions and dependencies, enum/domain/extension dependencies, table owner/replica identity, and all foreign keys referencing these tables remain to be captured. We must reconcile live catalog state with later migrations to avoid duplicating columns or policies.
+- Do not generate or apply baseline SQL until this dependency and migration-delta review is complete.
