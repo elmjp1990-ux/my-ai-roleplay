@@ -1,3 +1,94 @@
+-- The same post-delete freeze must cover character soft deletion itself.
+-- The existing soft_delete_character() also rewrites snapshots, so fixing only
+-- sync_character_chat_snapshot() would leave a second SECURITY DEFINER bypass.
+CREATE OR REPLACE FUNCTION public.soft_delete_character(p_character_id uuid)
+RETURNS timestamptz
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_author_id uuid;
+  v_first_published_at timestamptz;
+  v_deleted_at timestamptz;
+  v_parent_id uuid;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'authentication_required' USING ERRCODE = '42501';
+  END IF;
+  IF NOT public.account_is_active() THEN
+    RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT c.author_id, c.first_published_at, c.deleted_at
+    INTO v_author_id, v_first_published_at, v_deleted_at
+  FROM public.characters c
+  WHERE c.id = p_character_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN RAISE EXCEPTION 'Character not found.'; END IF;
+  IF v_author_id IS DISTINCT FROM auth.uid() THEN
+    RAISE EXCEPTION 'Not allowed to delete this character.' USING ERRCODE = '42501';
+  END IF;
+  IF v_deleted_at IS NOT NULL THEN RETURN v_deleted_at; END IF;
+
+  -- Acquire active chat parents before changing any child snapshot. A deleted
+  -- parent is intentionally immutable and remains represented by its archive.
+  FOR v_parent_id IN
+    SELECT cs.id FROM public.chat_sessions cs
+    WHERE cs.character_id = p_character_id AND cs.deleted_at IS NULL
+    ORDER BY cs.id FOR UPDATE
+  LOOP NULL; END LOOP;
+
+  FOR v_parent_id IN
+    SELECT g.id FROM public.chat_groups g
+    WHERE g.deleted_at IS NULL
+      AND (
+        EXISTS (SELECT 1 FROM public.chat_group_members gm
+                WHERE gm.group_id = g.id AND gm.character_id = p_character_id)
+        OR EXISTS (SELECT 1 FROM public.chat_group_messages msg
+                   WHERE msg.group_id = g.id AND msg.character_id = p_character_id)
+      )
+    ORDER BY g.id FOR UPDATE
+  LOOP NULL; END LOOP;
+
+  v_deleted_at := pg_catalog.clock_timestamp();
+  UPDATE public.characters
+  SET visibility = 'private', review_status = 'draft',
+      deleted_at = v_deleted_at, deletion_reason = 'author_deleted'
+  WHERE id = p_character_id;
+
+  UPDATE public.character_stories
+  SET visibility = 'private'
+  WHERE character_id = p_character_id;
+
+  UPDATE public.chat_sessions cs
+  SET character_snapshot = COALESCE(cs.character_snapshot, '{}'::jsonb) ||
+      jsonb_build_object('authorId', v_author_id, 'visibility', 'private',
+        'firstPublishedAt', v_first_published_at, 'deletedAt', v_deleted_at),
+      updated_at = pg_catalog.now()
+  WHERE cs.character_id = p_character_id AND cs.deleted_at IS NULL;
+
+  UPDATE public.chat_group_members gm
+  SET character_snapshot = COALESCE(gm.character_snapshot, '{}'::jsonb) ||
+      jsonb_build_object('authorId', v_author_id, 'visibility', 'private',
+        'firstPublishedAt', v_first_published_at, 'deletedAt', v_deleted_at)
+  WHERE gm.character_id = p_character_id
+    AND EXISTS (SELECT 1 FROM public.chat_groups g
+                WHERE g.id = gm.group_id AND g.deleted_at IS NULL);
+
+  UPDATE public.chat_group_messages gm
+  SET speaker_snapshot = COALESCE(gm.speaker_snapshot, '{}'::jsonb) ||
+      jsonb_build_object('authorId', v_author_id, 'visibility', 'private',
+        'firstPublishedAt', v_first_published_at, 'deletedAt', v_deleted_at)
+  WHERE gm.character_id = p_character_id
+    AND EXISTS (SELECT 1 FROM public.chat_groups g
+                WHERE g.id = gm.group_id AND g.deleted_at IS NULL);
+
+  RETURN v_deleted_at;
+END;
+$function$;
+
 -- DRAFT ONLY — PR #200 follow-up for sync_character_chat_snapshot.
 -- Do not move into migrations or apply to hosted DB until local replay and
 -- authenticated race fixtures pass.
