@@ -45,9 +45,8 @@ The response contains counts only; it does not return chat IDs or object paths.
 ## Before enabling any schedule
 
 1. Verify Storage API failure/retry/dead-letter behavior and object-not-found idempotency against a real failed request.
-2. Verify account deletion with a disposable synthetic Auth user inside a rollback-safe transaction; structural FK review indicates the durable jobs are independent of user/chat parents, but the actual cascade transaction has not yet been run.
-3. Verify financial evidence retention with a fixture that includes valid charge/turn rows; the latest disposable content E2E intentionally created no financial rows.
-4. Obtain explicit approval before creating any cron schedule; production scheduling requires separate approval.
+2. Audit the deployed account-deletion worker and any Storage-prefix cleanup; ensure it preserves pending chat/storage queue rows and does not sweep character illustration/video assets.
+3. Obtain explicit approval before creating any cron schedule; production scheduling requires separate approval.
 
 ## Authentication and pg_net security notes
 
@@ -80,5 +79,11 @@ The stable worker source was temporarily extended with a secret-authenticated te
 - `chat_storage_deletion_jobs` has one FK to `chat_deletion_jobs.id` with `ON DELETE CASCADE`, and no FK to `auth.users`, session, or group. It survives user/chat parent deletion as long as the relational job row is retained.
 - `chat_sessions.user_id`, `chat_groups.owner_id`, and chat-memory photo owner/session/group references do cascade from Auth/chat parents. The purge worker's orphan-parent handling and independent queue are intended to finish Storage cleanup after these parents are gone.
 - `prepare_account_deletion` archives `chat_turn_charges` and `chat_turn_events` before deleting source rows; it also archives AI generation and wallet transactions through the account archive path. `finalize_account_deletion` only marks completion after the Auth user no longer exists.
-- A real synthetic Auth-user deletion inside a rollback-safe transaction has not yet been executed. Do not delete any existing test account to simulate it; use a dedicated disposable Auth fixture or transaction-safe harness.
+- A rollback-safe transaction probe inserted a synthetic Auth user, profile, single/group parent rows and two relational + two Storage queue rows, then deleted the Auth user. Before forced rollback, the observed state was: Auth user/profile/session/group parents = 0; relational deletion jobs = 2; Storage deletion jobs = 2. The exception rolled the entire probe back; a follow-up query confirmed zero synthetic Auth user/profile/jobs persisted. This proves parent cascades leave the durable queues intact in the tested schema.
 - The account deletion worker/Storage-prefix cleanup must be audited separately to ensure it does not delete chat deletion queue rows or sweep character illustration/video assets.
+## Charge-bearing purge and Auth cascade rollback probes — 2026-11-01
+
+- Charge-bearing purge probe (explicit rollback): created a synthetic single session with one user and one assistant message, a valid settled `chat_turn_charges` row, one `chat_turn_events` row, and a matching `wallet_transactions` row. Marked the session due, claimed the job, and called the actual `purge_chat_deletion_job` RPC. Before forced rollback, verification returned: job `completed`; session snapshot/data empty; both message rows retained with empty content; settled charge row preserved; turn event preserved; wallet transaction preserved. The custom exception rolled the transaction back, and a follow-up query confirmed zero fixture/session/charge/event/wallet/job rows persisted.
+- Auth cascade probe (explicit rollback): inserted a synthetic Auth user (trigger-created profile), session, group, two relational deletion jobs and two Storage jobs; deleted the Auth user. Before forced rollback, Auth user/profile/session/group parent counts were zero while both relational jobs and both Storage jobs remained. The custom exception rolled the transaction back; follow-up query confirmed zero synthetic rows persisted.
+- These probes close the charge-bearing purge and Auth-parent cascade database checks without deleting an existing test account or leaving test data.
+- Remaining gates: actual Storage API failure/retry/dead-letter and missing-object idempotency; review any account-deletion Storage sweep worker (none is deployed as a Supabase Edge Function in this project) to ensure it cannot sweep character assets or pending chat queues. No recurring chat purge schedule exists.
