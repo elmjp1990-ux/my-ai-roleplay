@@ -79,3 +79,15 @@ That SQL remains draft-only. It has not been applied or executed against fixture
 5. Keep PR #200 Draft/unmerged, no deletion cron, and PR #201 paused.
 
 No database schema/data, migration history, Storage object, cron, or production environment was changed during this investigation.
+
+
+## 2026-11-01 follow-up: live definition cross-check
+
+The three live function definitions were retrieved read-only and compared with the source migration `20261024180000_fix_nsfw_public_rpc_age_gate.sql`.
+
+- `get_character_comments_safe`: the function body matches the migration source after whitespace normalization. The live formatting is more compact, but the NSFW gate and whisper-thread redaction clauses are present.
+- `get_character_turn_counts` and `get_public_character_turn_count`: the source and live bodies are not byte/whitespace-normalized identical because the live definitions use compact formatting and omit optional `AS` alias keywords. A clause-by-clause review confirms both live functions retain the source migration's NSFW/adult predicate, public visibility/owner gate as applicable, deleted solo session/message exclusions, and deleted individual group-message exclusion. This is a semantic review, not a PostgreSQL parser/AST equivalence proof.
+- All three live functions are postgres-owned SECURITY DEFINER with `search_path = ''`. The count functions still lack a join to `public.chat_groups` and do not test `g.deleted_at IS NULL`; therefore deleted parent groups can still contribute undeleted child messages to counts.
+- The live ledger has nearby NSFW helper/policy migrations `20261024073819`, `20261024075220`, and `20261024083626`, but the migration source `20261024180000` is absent. The nearby version scan ends at `20261024083626`; the missing source migration is later in the same date's sequence.
+
+This narrows the discrepancy: the live RPC behavior contains the NSFW migration's key clauses, but the matching migration version is not recorded. It does not prove how those clauses reached the database. The parent-group exclusion is a separate, still-open correctness defect and should be fixed additively while preserving every existing live predicate.
