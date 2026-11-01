@@ -3,7 +3,7 @@
 Date: 2026-11-01
 Project: `ouyewoagbmtqehbofrje` (test only)
 Discovery context: read-only Phase A/B catalog and privilege inventory during PR #200.
-Severity: high-priority privilege-hardening issue; exploitability through the ordinary PostgREST surface is not established by this inspection.
+Severity: high-priority privilege-hardening issue; no direct exploit path through the ordinary Data API was established.
 Status: confirmed excessive database grants; remediation not yet applied.
 
 ## Finding
@@ -23,9 +23,16 @@ A read-only catalog query of table ACLs and `has_table_privilege` found explicit
 
 The affected tables are owned by `postgres`; their current ACL strings explicitly include `anon=arwdDxtm/postgres` and/or `authenticated=arwdDxtm/postgres`. These are not merely inferred from RLS policy membership.
 
-### Important qualification
+## Exploitability qualification
 
-This confirms excessive SQL-level table privileges. It does not, by itself, prove that a user can execute arbitrary SQL or issue TRUNCATE through the normal Supabase Data API; ordinary PostgREST does not expose a generic TRUNCATE operation. No exploit was attempted and no table was modified. However, these grants violate least privilege and would be dangerous if an execution path ever exposed them (for example, a privileged SQL/RPC path that allowed user-controlled statements).
+The inspection confirms excessive SQL-level table privileges, but **does not establish that an ordinary app user can execute TRUNCATE through the Supabase Data API**:
+
+- Supabase `anon` and `authenticated` roles have `rolcanlogin=false`; they cannot log in directly to PostgreSQL.
+- Ordinary PostgREST does not expose a generic TRUNCATE operation.
+- A read-only scan of user-callable function bodies that contain `TRUNCATE` or dynamic `EXECUTE` found no direct `TRUNCATE` command in an app-callable SECURITY DEFINER function. Returned dynamic-SQL helpers were platform extension/realtime/storage functions marked SECURITY INVOKER. This was a targeted scan, not a full transitive call-graph proof.
+- No exploit was attempted and no table was modified.
+
+Therefore this is a confirmed least-privilege defect and a dangerous latent capability if an execution path later exposes it, **not a confirmed remotely exploitable data-wipe vulnerability from the current ordinary REST surface**.
 
 ## Related default-privilege finding
 
@@ -42,22 +49,22 @@ The catalog also shows a separate `supabase_admin` default ACL for `public` tabl
 
 ## Proposed minimal remediation
 
-Add a new reviewed migration that revokes only the dangerous table-level TRUNCATE privilege from client roles across the public schema:
+Add a new reviewed migration that revokes only the table-level TRUNCATE privilege from client roles across the public schema:
 
 ```sql
 REVOKE TRUNCATE ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
 ```
 
-This leaves the existing SELECT/INSERT/UPDATE/DELETE grants and RLS policies unchanged, and does not revoke privileges from `service_role` or `postgres`. Existing postgres default privileges already revoke all table privileges from anon/authenticated for future public-schema tables created by postgres.
+This leaves existing SELECT/INSERT/UPDATE/DELETE grants and RLS policies unchanged, and does not revoke privileges from `service_role` or `postgres`. Existing postgres default privileges already revoke all table privileges from anon/authenticated for future public-schema tables created by postgres.
 
-Do not apply this remediation until the migration file has been created through the supported local migration workflow, reviewed, and matched to the remote migration operation. The current environment has no local Supabase CLI or Docker executable available to perform the required `supabase migration new` workflow; therefore this inspection did not execute the REVOKE.
+Do not apply this remediation until the migration file has been created through the supported local migration workflow, reviewed, and matched to the remote migration operation. The current execution environment has no local Supabase CLI or Docker executable available to perform the required `supabase migration new` workflow; therefore this inspection did not execute the REVOKE.
 
 ## Required verification after a reviewed migration is applied to the test project
 
 1. For every public table, `has_table_privilege('anon', table_oid, 'TRUNCATE')` and `has_table_privilege('authenticated', table_oid, 'TRUNCATE')` must both be false.
 2. `service_role` and `postgres` retain expected administrative privileges.
 3. RLS policy behavior and intended authenticated SELECT/INSERT/UPDATE flows remain unchanged.
-4. Confirm no application RPC depends on client-role TRUNCATE (none identified by this catalog inspection).
+4. Confirm no application RPC depends on client-role TRUNCATE (none identified by this targeted catalog inspection).
 5. Re-run the privilege query and record the exact migration version plus before/after counts.
 
 ## Safety
