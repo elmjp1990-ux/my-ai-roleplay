@@ -641,8 +641,11 @@ END;
 $function$;
 
 -- Current live count RPC definitions plus:
---   1) exclude messages under soft-deleted group parents,
---   2) add the immutable per-character archive aggregate.
+--   1) read live messages only from active parents,
+--   2) add immutable per-character snapshots for deleted parents.
+-- IMPORTANT: deleting a chat must NOT reduce a character's historical total.
+-- A deleted group's contribution moves from live child messages to this archive;
+-- after day-30 transcript purge the same archived contribution remains counted.
 CREATE OR REPLACE FUNCTION public.get_character_turn_counts(p_character_ids uuid[])
 RETURNS TABLE(character_id uuid, turn_count bigint)
 LANGUAGE sql
@@ -772,11 +775,16 @@ GRANT EXECUTE ON FUNCTION public.get_public_character_turn_count(uuid) TO anon, 
 -- A. Active single session: assistant message count is unchanged.
 -- B. Deleted single session: count is represented by exactly one archive snapshot.
 -- C. Active group: each character's assistant messages remain counted.
--- D. Deleted parent group: raw child messages are excluded and archive counts
---    preserve each character's pre-delete total.
+-- D. Deleted parent group: raw child messages are excluded from the live path,
+--    but each character's pre-delete contribution remains in the aggregate via
+--    exactly one archive row; deletion must not reduce the historical total.
+-- D1. Verify both owner-visible and public aggregate RPCs still include the
+--     deleted group's archived contribution during the 30-day grace period and
+--     after transcript purge.
 -- E. Deleted individual group message is not included in the snapshot.
 -- F. Repeated delete RPC / worker retry does not duplicate archived counts.
--- G. Worker purge after 30 days removes transcript rows but archived counts remain.
+-- G. Worker purge after 30 days removes transcript rows but archived counts remain;
+--    re-running the worker cannot duplicate or erase the archived contribution.
 -- H. Failed deletion RPC rolls back both snapshot and job/parent changes.
 -- I. Concurrent writer vs delete: parent lock serializes; no message can be
 --    inserted after the snapshot and before deleted_at is committed.
