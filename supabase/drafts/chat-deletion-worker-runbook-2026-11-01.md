@@ -4,7 +4,7 @@ Date: 2026-11-01
 PR: #200  
 Function: `purge-chat-deletions`  
 Project: `ouyewoagbmtqehbofrje`  
-Status: stable worker source deployed ACTIVE as version 8 to the test project; valid/invalid key authentication and full disposable single/group content + Storage purge E2E passed; not scheduled.
+Status: worker source deployed ACTIVE as version 9 to the test project. Version 9 adds explicit boolean-result checks for relational purge and Storage job completion. Earlier valid/invalid key authentication, disposable single/group content + Storage purge E2E, and missing-object idempotency passed; v9 source is verified deployed but has not yet had a fresh Dashboard invocation. Not scheduled.
 
 ## Purpose
 
@@ -37,16 +37,16 @@ The response contains counts only; it does not return chat IDs or object paths.
 
 - Function is deployed only to the test Supabase project.
 - `pg_net` 0.20.4 is enabled in the `extensions` schema; `pg_cron` 1.6.4 remains enabled.
-- One manual `pg_net` POST invocation using the Vault secret returned HTTP 200 with all chat/Storage counts equal to zero. No persistent jobs were present or modified.
+- Historical manual `pg_net` POST invocation using the Vault secret returned HTTP 200 with empty queues; this was not a recurring schedule. The latest live invocation was performed through Supabase Dashboard Test (not SQL/pg_net) on 2026-11-01 and returned `chat_claimed=1, chat_purged=1, chat_failed=0, storage_claimed=2, storage_deleted=2, storage_failed=0`. It confirmed one synthetic relational job purge and two Storage jobs completed; one missing legal object path was treated as idempotent success. A traversal-shaped path also completed without Storage API error and is not failure-test evidence.
 - No pg_cron, external cron, Vercel Cron, or other schedule has been created.
 - The SQL claim/purge/retry RPCs have been exercised inside rollback-only test transactions and the real Worker has completed disposable single-chat and group-chat due-job fixtures.
 - Actual Storage API upload/remove was verified for both single and group fixture objects; both objects were confirmed missing after the worker ran.
 
 ## Before enabling any schedule
 
-1. Verify Storage API failure/retry/dead-letter behavior and object-not-found idempotency against a real failed request.
-2. Audit the deployed account-deletion worker and any Storage-prefix cleanup; ensure it preserves pending chat/storage queue rows and does not sweep character illustration/video assets.
-3. Obtain explicit approval before creating any cron schedule; production scheduling requires separate approval.
+1. Missing-object idempotency has now been confirmed through the live Dashboard invocation. DB retry/backoff/dead-letter behavior passed rollback-only tests, and Worker source routes Storage remove errors to the retry RPC. A real Storage API failure response flowing through the live Worker remains unverified: Supabase exposes no supported fault-injection parameter, and modifying `storage` schema is prohibited. Treat this as an external validation limitation, not a pass.
+2. No account-deletion Edge Function or account-wide Storage sweep is currently deployed in this test project. The account-deletion workflow still has separate blockers (including group-charge archive and orphan chat-content coordination) tracked for PR #201; do not treat that workflow as complete.
+3. Obtain explicit approval before creating any chat purge cron schedule; production scheduling requires separate approval.
 
 ## Authentication and pg_net security notes
 
@@ -94,3 +94,13 @@ The stable worker source was temporarily extended with a secret-authenticated te
 - `storage.objects` has a FK only to `storage.buckets`; there is no owner_id FK to `auth.users`. Therefore Auth user cascade does not automatically delete Storage object blobs/metadata.
 - Existing private buckets are `personax-memory-photos`, `character-illustrations`, and `character-avatar-videos`, all with MIME restrictions. A future account-deletion worker must enumerate/delete only the target account's objects with bucket-specific ownership checks, coordinate with pending chat Storage jobs, and explicitly preserve or transfer character assets according to the separate character-deletion policy.
 - No Storage sweep code was changed in this PR. The account-wide Storage cleanup remains a separate required implementation before account deletion can be marked complete.
+
+## Final acceptance update — 2026-11-01
+
+- Worker v9 is ACTIVE in the test project and its deployed source matches the PR branch. It now requires the boolean return from both `purge_chat_deletion_job` and `mark_chat_storage_deletion_job` to be exactly `true` before incrementing the corresponding success counter. This prevents a stale/lost lease (RPC returns false without transport error) from being reported as a successful completion.
+- The v9 deployment was source-verified; a fresh Dashboard invocation after this v9 deployment has not yet been performed. Earlier Dashboard invocation and real disposable single/group + PNG E2E were against the prior function source. The v9 change only tightens result accounting, but must not be described as a new E2E run.
+- Current queue readback: one completed synthetic parent tombstone remains; no Storage child rows and no Storage queue jobs. No chat deletion Cron exists; the only active Cron is the pre-existing `poyozz-encounter-evaluation-dispatch`.
+- One synthetic parent tombstone ID `46d4c421-d490-4357-9e2b-7bf7802d19e7` is completed, has no error/next retry, and has zero Storage children. Direct SQL cleanup was blocked by the pre-existing `storage.protect_delete()` platform guard; no bypass was attempted. Keep as documented harmless test residue pending supported cleanup.
+- The test DB migration history is materially drifted from repository history (141 historical live entries before this PR's 10 migrations, 96 repository SQL files, many shared names with version-prefix mismatches and duplicate repository prefixes). Do not assume a fresh replay or repair remote history by hand. Migration replay needs a separately reviewed disposable-environment plan before launch.
+- Current PR head after v9 source correction: `0ee2899db4f6629f48b906b55ade41c1b15f505a`. Vercel preview deployment completed; the `inline-javascript-syntax` GitHub Actions check passed. PR remains Draft.
+- No new cron, no production changes, no account deletion, no real chat/object deletion during this final pass.
