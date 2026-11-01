@@ -136,6 +136,20 @@ Deno.serve(async (request: Request) => {
   let relationshipStage = "first_meeting";
   let importedMemories: unknown[] = [];
   if (originMode === "encounter_snapshot") {
+    // Do not trust a client-supplied source session ID. Check the active parent
+    // before reading its settlement payload; the DB trigger rechecks under lock
+    // when the new Story relationship row is inserted.
+    const { data: sourceSession, error: sourceSessionError } = await admin
+      .from("chat_sessions")
+      .select("id")
+      .eq("id", sourceEncounterSessionId)
+      .eq("user_id", user.id)
+      .eq("character_id", characterId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (sourceSessionError) return json({ error: "encounter_source_session_lookup_failed" }, 503);
+    if (!sourceSession) return json({ error: "encounter_not_settled" }, 409);
+
     // Only a server-settled lifecycle result is eligible for carry-over.
     const { data: source, error: sourceError } = await admin
       .from("encounter_session_lifecycle")
