@@ -198,6 +198,20 @@ BEGIN
     RAISE EXCEPTION 'public_count_rpc_missing_archive_or_existing_guards';
   END IF;
 
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_policy p
+    WHERE p.polrelid = pg_catalog.to_regclass('public.encounter_diary')
+      AND p.polname = 'encounter_diary_active_session_lifecycle_guard'
+      AND NOT p.polpermissive
+      AND p.polcmd IN ('r', '*')
+      AND pg_catalog.strpos(pg_catalog.pg_get_expr(p.polqual, p.polrelid), 'session_id') > 0
+      AND pg_catalog.strpos(pg_catalog.pg_get_expr(p.polqual, p.polrelid), 'deleted_at') > 0
+      AND pg_catalog.strpos(pg_catalog.pg_get_expr(p.polqual, p.polrelid), 'auth.uid') > 0
+  ) THEN
+    RAISE EXCEPTION 'encounter_diary_missing_restrictive_active_session_guard';
+  END IF;
+
   RAISE NOTICE 'chat deletion cumulative turn-stat structural assertions passed';
 END;
 $verify$;
