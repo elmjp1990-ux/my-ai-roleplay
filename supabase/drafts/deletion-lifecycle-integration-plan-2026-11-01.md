@@ -30,6 +30,17 @@ All phases use the existing Supabase test project. Do not create paid branches/p
 - Restore is blocked by prevent_character_soft_delete_restore.
 - character_illustrations stores separate illustration asset paths; character avatar video paths are stored separately and use the private character-avatar-videos bucket.
 
+### Additional account-deletion gap found during chat queue integration audit (2026-11-01)
+
+- `prepare_account_deletion(uuid)` archives single-chat `chat_turn_charges` and `chat_turn_events`, then deletes `ai_generation_records`, `chat_message_versions`, `chat_turn_charges`, `wallet_transactions`, and legacy `conversations`.
+- `archive_account_deletion_data(uuid)` archives AI generation records and wallet transactions; the prepare step adds single-chat charge/event archives. Neither function currently archives `chat_group_turn_charges`.
+- The prepare function does not explicitly delete `chat_sessions`, `chat_groups`, `chat_messages`, `chat_group_messages`, or `chat_group_turns`.
+- Current FK inventory shows `chat_sessions.user_id` and `chat_groups.owner_id` have no FK to `profiles` or `auth.users`; deleting Auth/profile therefore does not automatically remove these chat parent rows. This can leave orphaned chat content after account deletion unless the account workflow explicitly handles it.
+- `chat_group_turn_charges` is FK-cascaded by `chat_groups` and `chat_group_turns`, but is not included in the current account archive. If a later account cleanup removes groups/turns, group billing evidence could be lost.
+- The new `chat_deletion_jobs` and `chat_storage_deletion_jobs` are not referenced by the current account deletion functions; their owner/resource columns have no FK to account/chat parents, so pending cleanup work survives current account/profile parent deletion paths. Preserve this invariant in future changes.
+
+This is recorded for Phase 3; do not silently expand PR #200 into account deletion. The account phase must first add group-charge archive coverage, explicit chat content cleanup, and a verified rule for pending 30-day chat jobs.
+
 ### Remaining implementation/verification
 
 - Confirm all public discovery, encounter schedule, profile/story, search, and direct RPC paths reject deleted characters.
