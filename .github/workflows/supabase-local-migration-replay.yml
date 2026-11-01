@@ -47,7 +47,7 @@ jobs:
             storyEdge.includes('encounter_source_session_lookup_failed'),
             'Story carry-over Edge Function must verify an active source session'
           );
-          const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)]
+          const scripts = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)]
             .map(match => match[1]).filter(source => source.trim());
           assert.ok(scripts.length > 0, 'No inline JavaScript script blocks found');
           scripts.forEach((source, index) => {
@@ -97,22 +97,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          settlement_draft="supabase/drafts/settle-encounter-session-parent-lock-live-reconciliation.sql"
           encounter_draft="supabase/drafts/encounter-session-delete-lifecycle-guards.sql"
           diary_draft="supabase/drafts/encounter-diary-chat-deletion-lifecycle-guard.sql"
           truncate_draft="supabase/drafts/revoke-public-truncate-privileges-proposal.sql"
           stats_draft="supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql"
+          settlement_migration="supabase/migrations/99999999999995_settle_encounter_session_parent_lock_ci.sql"
           encounter_migration="supabase/migrations/99999999999996_encounter_session_delete_lifecycle_ci.sql"
           diary_migration="supabase/migrations/99999999999997_encounter_diary_chat_lifecycle_guard_ci.sql"
           truncate_migration="supabase/migrations/99999999999998_revoke_public_truncate_ci.sql"
           stats_migration="supabase/migrations/99999999999999_chat_deletion_cumulative_turn_statistics_ci.sql"
+          test -f "$settlement_draft"
           test -f "$encounter_draft"
           test -f "$diary_draft"
           test -f "$truncate_draft"
           test -f "$stats_draft"
+          test ! -e "$settlement_migration"
           test ! -e "$encounter_migration"
           test ! -e "$diary_migration"
           test ! -e "$truncate_migration"
           test ! -e "$stats_migration"
+          # Apply the single canonical settlement definition before broader guards.
+          cp "$settlement_draft" "$settlement_migration"
           cp "$encounter_draft" "$encounter_migration"
           cp "$diary_draft" "$diary_migration"
           cp "$truncate_draft" "$truncate_migration"
@@ -121,7 +127,7 @@ jobs:
           supabase db reset --local --no-seed
           supabase migration list --local
 
-      - name: Verify archived-turn schema, RPC guards and ACLs
+      - name: Verify archived-turn schema, RPC guards, trigger attachments and ACLs
         shell: bash
         run: |
           set -euo pipefail
@@ -131,8 +137,10 @@ jobs:
             docker ps --format '{{.Names}}'
             exit 1
           fi
-          docker exec -i "${db_containers[0]}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+          docker exec -i "${db_containers[0]}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \\
             < supabase/drafts/chat-deletion-turn-stats-structural-verification.sql
+          docker exec -i "${db_containers[0]}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \\
+            < supabase/drafts/encounter-lifecycle-trigger-attachment-audit.sql
 
       - name: Stop and discard local database
         if: always()
