@@ -35,7 +35,7 @@ This checklist covers local browser state only. Backend RLS/RPC/worker acceptanc
 11. **Latest-settled read RPCs:** After deleting a settled encounter session, both `get_latest_settled_encounter_session` and `get_latest_settled_encounter_affinity` return no row for that session.
 12. **Story carry-over endpoint:** Calling `story-session` with a deleted `sourceEncounterSessionId` returns 409 and does not create a Story session or relationship state. Race the endpoint against deletion; the database trigger remains the final parent-lock guard.
 13. **Settlement race:** Race `settle_encounter_session` against `delete_chat_session_content`. If settlement gets the parent lock first, it completes before deletion; if deletion commits first, settlement rejects. No settlement/affinity write may commit after deletion.
-14. **Pause/resume after deletion:** `set_encounter_session_lifecycle_state` rejects pause/resume when the parent session is deleted.
+14. **Pause/resume after deletion:** `set_encounter_session_lifecycle_state` rejects pause/resume when the parent session is deleted. It also rejects a NULL/unknown action rather than treating NULL as resume.
 15. **Session-link trigger guards:** Inserts or updates to encounter lifecycle, encounter turns, evaluation jobs, and story relationship link rows referencing a deleted session are rejected under parent-first locking.
 16. **Financial state remains:** The deletion guards do not remove settled charges/refunds, wallet transactions, or global per-user/per-character affinity state unless a separate product requirement explicitly changes that behavior.
 
