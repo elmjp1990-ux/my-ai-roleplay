@@ -13,8 +13,9 @@
 --   * retains only aggregate counts and minimal tombstone linkage,
 --   * snapshots again idempotently before purge as a safety net,
 --   * backfills legacy deleted parents and missing deletion queue jobs,
---   * excludes deleted parent groups from live message aggregates,
---   * adds archived counts to both public/owner count RPCs.
+--   * reads live message aggregates only from active parents,
+--   * preserves each deleted parent's historical contribution in its per-character archive,
+--   * adds archived counts to both public/owner count RPCs (including after purge).
 --
 -- It remains draft-only pending migration-history reconciliation and exact
 -- local Supabase CLI replay. No hosted DDL/DML has been applied.
