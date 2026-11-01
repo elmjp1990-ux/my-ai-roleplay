@@ -1,6 +1,21 @@
 # POYOZZ unified chat deletion data model and state machine — 2026-11-01
 
-Status: proposed design only; not an executable migration. No database objects or data were changed.
+Status: implementation reference; additive/function migrations are applied to the existing test project. This file is a design document, not executable SQL.
+
+## Implementation status — 2026-11-01
+
+The shared lifecycle is now implemented in the test database:
+- `chat_groups.deleted_at`, `chat_deletion_jobs`, and `chat_storage_deletion_jobs` exist.
+- Single/group delete RPCs atomically set the deleted marker and enqueue durable work without clearing content at request time.
+- Deleted-parent restrictive RLS and parent-first writer gates cover single/group messages, reservations, encounter evidence/affinity, story validators, and evaluation workers.
+- Broad owner-folder policies for `personax-memory-photos` were replaced with active-parent owner/type/path policies.
+- Day-30 SQL claim/purge/retry RPCs are implemented. The purge uses minimal tombstones rather than hard-deleting charge/message parent IDs.
+- `purge-chat-deletions` Edge Function is deployed to the test project with JWT verification and an additional service-role check. It has not been invoked and no cron exists.
+- Functional and purge tests have been run inside rollback-only transactions. Actual Storage API deletion with a disposable object remains pending.
+
+### Current retention choice
+
+Keep `chat_sessions`, `chat_groups`, `chat_messages`, and `chat_group_turns` as minimal tombstones to preserve charge and audit FK references. Clear user-authored/AI content and delete chat-only child rows/versions/photos. Preserve charge/refund/wallet/turn audit rows and global encounter affinity. Do not implement financial FK decoupling or hard-delete parent rows in this phase.
 
 ## Product contract
 
@@ -37,7 +52,7 @@ chat_deletion_jobs (
 )
 ```
 
-No FK to chat parent is intentional: the queue must survive deletion of the parent row. No user-facing table grants or RLS policies; only a tightly scoped service-role worker may read/update jobs. User deletion/archive is a separate lifecycle and must not cascade away a pending chat purge job.
+No FK to chat parent is intentional: the queue must survive later character/account deletion of the parent row. No user-facing table grants or RLS policies; only a tightly scoped service-role worker may read/update jobs. User deletion/archive is a separate lifecycle and must not cascade away a pending chat purge job.
 
 ## Durable Storage cleanup queue
 
@@ -116,7 +131,7 @@ Do not implement the FK changes until uniqueness/index dependencies, RPC referen
 - Service-role only; no client-callable purge RPC.
 - Claim due jobs using row locks and `SKIP LOCKED`; set a lease so crashed workers can be recovered.
 - Idempotently remove Storage objects using the durable Storage queue; retries use bounded exponential backoff and dead-letter after a configured maximum, with monitoring/alerting.
-- Relational purge order follows the verified FK graph: remove chat-only children and versions; detach retained financial/operational evidence; remove messages/turns/scenes/diaries/photos; delete the parent last.
+- Relational purge uses an explicit allowlist: delete chat-only children and versions; blank message/turn content while retaining referenced IDs; clear AI raw content and snapshots; preserve financial charge/refund/wallet/turn audit rows and parent tombstones.
 - The relational purge may proceed even if Storage removal is failing because the object path is already durable in the separate queue. The Storage queue remains until success/dead-letter.
 - Every operation is repeat-safe. A retry after partial success must not double-refund, double-charge, or delete unrelated assets.
 - Never log message text, prompts, image URLs with signed tokens, or raw storage object contents in error fields.
@@ -133,7 +148,7 @@ Do not implement the FK changes until uniqueness/index dependencies, RPC referen
 - AI generation raw content is removed according to the approved retention policy.
 - Storage failure retries without losing object paths; dead-letter is observable and recoverable.
 - Only `personax-memory-photos` objects are eligible; character illustrations/videos and character snapshots survive.
-- Worker is not scheduled in production until rollback-only tests, test DB verification and explicit approval pass.
+- Worker is not scheduled anywhere until Storage API end-to-end tests, test DB verification and explicit approval pass.
 
 ## Open decisions / blockers
 
@@ -141,4 +156,4 @@ Do not implement the FK changes until uniqueness/index dependencies, RPC referen
 2. Confirm whether AI generation metadata (excluding raw content) must be retained and for how long.
 3. Inspect all downstream consumers before nullable FK/backfill changes.
 4. Determine Storage signed URL lifetime and refresh paths so deleted chats cannot reissue access during the 30-day backend buffer.
-5. Only after the above, convert this proposal into executable migrations and tests.
+5. The test migrations are now applied; do not create a cron until the remaining Storage API, true concurrency, and account-deletion interaction tests pass.
