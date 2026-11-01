@@ -92,3 +92,9 @@ Consequences:
 This addendum is based on a read-only scan of all schema_migrations.statements containing either function name and a separate read of the current live function definitions. No DDL/DML or migration application was performed.
 
 PR #200 remains Draft/unmerged. No hosted migration was applied. No cron was enabled. PR #201 remains paused.
+
+## Connected Supabase environment scope
+
+The connected Supabase integration currently lists exactly one accessible project: `ouyewoagbmtqehbofrje` (ACTIVE_HEALTHY, ap-northeast-1). This matches the project treated as the test database in this work. No second Supabase project is currently visible through this connection.
+
+This is not proof that no other unlinked Supabase organization/project or external environment exists. Therefore version 20261023120000 is confirmed absent only from the one accessible test project's migration ledger; do not generalize that absence to every environment without checking those environments separately.
