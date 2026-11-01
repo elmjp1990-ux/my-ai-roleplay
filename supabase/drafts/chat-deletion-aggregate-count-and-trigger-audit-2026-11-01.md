@@ -58,3 +58,20 @@ Therefore this is currently a defense-in-depth hardening item for trusted backen
 6. Do not modify hosted migration history, use db reset/db push/migration repair, or apply ad hoc DDL to work around the current migration drift.
 
 This is a read-only audit record, not a claim that either finding has been fixed.
+
+
+## Follow-up — service-role lifecycle call graph narrows Finding B
+
+A second read-only pass checked trigger attachment points and the service-role functions that create or enqueue the affected rows.
+
+- The two trigger validators are attached to encounter lifecycle/evaluation and story/encounter relationship tables.
+- Those tables' direct INSERT/UPDATE privileges are service_role-only; anon/authenticated have no direct write grants.
+- enqueue_due_encounter_evaluations filters parent sessions with deleted_at IS NULL before inserting evaluation jobs.
+- claim_encounter_evaluation_jobs also filters deleted sessions before claiming.
+- record_encounter_session_turn_evidence and record_encounter_turn_interaction explicitly lock/check the parent session with deleted_at IS NULL.
+- create_encounter_session_with_lifecycle creates a brand-new chat_sessions parent and then its lifecycle row in the same transaction; it is not reusing a deleted parent.
+- create_story_session_with_relationship creates a new story parent. Its story relationship origin trigger validates the source encounter session is not deleted when origin_mode is encounter_snapshot.
+
+Therefore Finding B is narrowed: the trigger validators themselves lack a repeated deleted_at predicate, but the reviewed service-role call paths either create a fresh parent or apply an active-parent guard. No client-side bypass or current service-role bypass was demonstrated in this targeted pass. Keep an explicit deleted-parent guard on validators as optional defense-in-depth hardening, but do not label it a confirmed exploitable defect. Preserve the existing ability to settle/refund already-reserved charges and write necessary financial audit records.
+
+Finding A (public/author character turn-count aggregates missing the deleted group parent join) remains the confirmed functional issue requiring a reviewed migration.
