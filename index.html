@@ -5353,7 +5353,7 @@ async function groupOpen(groupId) {
     }
     const members=memberRows.map(m=>{const snapshot=m.character_snapshot||{};const characterId=m.character_id||null;const snapshotId=snapshot.id||characterId||null;const displayId=characterId||snapshotId||m.id;return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,avatar_url:avatarById[characterId]||snapshot.avatar_url||snapshot.image||'',position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};});
     groupExpandedMemberId=null;
-    const memoryPhotos=await Promise.all((photoRes.data||[]).map(async photo=>{const {data:signed,error:signedError}=await window.mySupabase.storage.from('personax-memory-photos').createSignedUrl(photo.storage_path,3600);if(signedError)console.warn('群組背景相片簽名網址失敗',signedError.message);return {...photo,image_url:!signedError&&signed?.signedUrl?signed.signedUrl:''};}));
+    const memoryPhotos=await Promise.all((photoRes.data||[]).map(async photo=>{const {data:signed,error:signedError}=await window.mySupabase.storage.from('personax-memory-photos').createSignedUrl(photo.storage_path,300);if(signedError)console.warn('群組背景相片簽名網址失敗',signedError.message);return {...photo,image_url:!signedError&&signed?.signedUrl?signed.signedUrl:''};}));
     const messages=(messageRes.data||[]).map(m=>{
       const speakerSnapshot=m.speaker_snapshot||{};
       const member=members.find(x=>x.characterId===m.character_id)||members.find(x=>x.characterSnapshotId===speakerSnapshot.id||x.id===speakerSnapshot.id);
@@ -5391,7 +5391,7 @@ async function openGroupBackgroundSettings() {
       .order('created_at',{ascending:false});
     if(error)throw error;
     group.memoryPhotos=await Promise.all((data||[]).map(async photo=>{
-      const {data:signed,error:signedError}=await client.storage.from('personax-memory-photos').createSignedUrl(photo.storage_path,3600);
+      const {data:signed,error:signedError}=await client.storage.from('personax-memory-photos').createSignedUrl(photo.storage_path,300);
       if(signedError)console.warn('群組背景相片簽名網址失敗',signedError.message);
       return {...photo,image_url:!signedError&&signed?.signedUrl?signed.signedUrl:''};
     }));
@@ -5748,7 +5748,7 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
         if(!ctx.session.cloudOwned||ctx.session.cloudOwnerUid!==uid)throw new Error('請先使用目前帳號擁有的雲端聊天。');
         const {data,error}=await client.from('chat_memory_photos').select('id,caption,storage_path,created_at').eq('owner_id',uid).eq('chat_type','single').eq('session_id',ctx.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false});
         if(error)throw error;
-        rows=await Promise.all((data||[]).map(async p=>{const {data:signed,error:signedError}=await client.storage.from('personax-memory-photos').createSignedUrl(p.storage_path,3600);return !signedError&&signed?.signedUrl?{id:p.id,caption:p.caption||'',url:signed.signedUrl}:null;}));
+        rows=await Promise.all((data||[]).map(async p=>{const {data:signed,error:signedError}=await client.storage.from('personax-memory-photos').createSignedUrl(p.storage_path,300);return !signedError&&signed?.signedUrl?{id:p.id,caption:p.caption||'',url:signed.signedUrl}:null;}));
         rows=rows.filter(Boolean);
       }
       if(chatBackgroundDraft?.key!==ctx.key)return;draft.photos=rows;draft.loaded=true;draft.loading=false;
@@ -6990,7 +6990,7 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
     case 'session-menu': {
       const selected=state.sessions[o.id]||s;
       if(!selected)return;
-      showDialog('刪除',`<p>刪除這段對話與回憶</p><p class="small muted">確定要刪除嗎？此操作無法復原。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="remove-session" data-id="${e(selected.id)}">確認刪除</button></div>`);
+      showDialog('刪除',`<p>此操作無法復原，確認要刪除聊天室嗎？如果有回憶相簿也會一併刪除哦。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="remove-session" data-id="${e(selected.id)}">確認刪除</button></div>`);
       break;
     }
     case 'chat-settings': {
@@ -8153,13 +8153,13 @@ document.addEventListener('click',async event => {
       case 'group-entry-menu': {
         const group=(groupPrototype.groups||[]).find(item=>item.id===key);
         if(!group) { toast('找不到這個群組，請重新載入清單。'); break; }
-        showDialog('刪除', '<p>刪除這段對話與回憶</p><p class="small muted">確定要刪除嗎？此操作無法復原。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="group-delete" data-id="'+e(group.id)+'">確認刪除</button></div>');
+        showDialog('刪除', '<p>此操作無法復原，確認要刪除聊天室嗎？如果有回憶相簿也會一併刪除哦。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="group-delete" data-id="'+e(group.id)+'">確認刪除</button></div>');
         break;
       }
       case 'group-delete-confirm': {
         const group=(groupPrototype.groups||[]).find(item=>item.id===key);
         if(!group) { toast('找不到這個群組，請重新載入清單。'); break; }
-        showDialog('刪除', '<p>刪除這段對話與回憶</p><p class="small muted">確定要刪除嗎？此操作無法復原。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="group-delete" data-id="'+e(group.id)+'">確認刪除</button></div>');
+        showDialog('刪除', '<p>此操作無法復原，確認要刪除聊天室嗎？如果有回憶相簿也會一併刪除哦。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="group-delete" data-id="'+e(group.id)+'">確認刪除</button></div>');
         break;
       }
       case 'group-delete': {
@@ -8169,29 +8169,20 @@ document.addEventListener('click',async event => {
         try {
           const {data:{user},error:authError}=await client.auth.getUser();
           if(authError||user?.id!==uid) throw new Error('登入狀態已失效，請重新登入。');
-          const {data:removedPaths,error:deleteError}=await client.rpc('delete_chat_group_with_related_data',{p_group_id:groupId});
+          const {error:deleteError}=await client.rpc('delete_chat_group_with_related_data',{p_group_id:groupId});
           if(deleteError) throw new Error('群組與關聯資料刪除失敗：'+deleteError.message);
-          const storagePaths=(removedPaths||[]).map(item=>item.storage_path).filter(Boolean);
-          let storageCleanupFailed=false;
-          if(storagePaths.length) {
-            const {error:storageError}=await client.storage.from('personax-memory-photos').remove(storagePaths);
-            if(storageError) {
-              storageCleanupFailed=true;
-              console.error('群組資料已刪除，但部分相片儲存檔清理失敗',storageError.message);
-            }
-          }
-          if(g.active?.id===groupId) { g.active=null;g.messages=[];g.pendingRequest=null;g.loading=false; }
+                    if(g.active?.id===groupId) { g.active=null;g.messages=[];g.pendingRequest=null;g.loading=false; }
           $('modal')?.close();
           await groupRefreshList();
           if(route.page==='group'&&route.id===groupId) go({page:'chat'});
-          toast(storageCleanupFailed?'群組與資料庫關聯內容已刪除，但部分相片檔案清理失敗，需後續補清。':'群組、訊息、日記、相簿紀錄與關聯資料已刪除。');
+          toast('群組對話已隱藏，聊天內容與回憶將於 30 天後永久清除。');
         } catch(error) { toast(error?.message||'群組刪除失敗，請稍後重試。'); }
         break;
       }
       case 'remove-session-confirm': {
         const item=state.sessions[key];
         if(!item)break;
-        showDialog('刪除','<p>刪除這段對話與回憶</p><p class="small muted">確定要刪除嗎？此操作無法復原。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="delete-dialog-back">取消</button><button type="button" class="danger" data-action="remove-session" data-id="'+e(item.id)+'">確認刪除</button></div>');
+        showDialog('刪除','<p>此操作無法復原，確認要刪除聊天室嗎？如果有回憶相簿也會一併刪除哦。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="delete-dialog-back">取消</button><button type="button" class="danger" data-action="remove-session" data-id="'+e(item.id)+'">確認刪除</button></div>');
         break;
       }
       case 'remove-session': {
@@ -8200,20 +8191,13 @@ document.addEventListener('click',async event => {
         const uid=currentUser()?.uid;
         if (item.cloudOwned && uid && item.cloudOwnerUid === uid && window.mySupabase) {
           const client=window.mySupabase;
-          const {data:removedPaths,error:deleteError}=await client.rpc('delete_chat_session_content',{p_session_id:key});
+          const {error:deleteError}=await client.rpc('delete_chat_session_content',{p_session_id:key});
           if(deleteError) throw new Error('對話與回憶刪除失敗：'+deleteError.message);
-          const paths=(removedPaths||[]).map(photo=>photo.storage_path).filter(Boolean);
-          if(paths.length) {
-            const {error:storageError}=await client.storage.from('personax-memory-photos').remove(paths);
-            if(storageError) {
-              console.error('對話內容已刪除，但部分相片檔案清理失敗',storageError.message);
-              toast('對話文字、日記與相簿紀錄已刪除；部分相片檔案清理失敗，需後續補清。');
-            }
-          }
-        }
-        // 本機介面移除；雲端 chat_sessions.deleted_at 保留軟刪除記錄與完整內容。
+                  }
+        // 本機介面立即移除；雲端只標記刪除並排入 30 天清除佇列，期間不直接刪除 Storage 檔案。
         delete state.sessions[key];
         persist();
+        toast('對話已隱藏，聊天內容與回憶將於 30 天後永久清除。');
         if (route.id === key) go({page:'chat'});
         else closeModal();
         break;
@@ -10300,7 +10284,7 @@ if (window.__pendingSupabaseUser) {
         .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false});
       if(error)throw error;
       const cards=await Promise.all((data||[]).map(async photo=>{
-        const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,3600);
+        const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,300);
         const imageUrl=!signedError&&signed?.signedUrl?signed.signedUrl:'';
         if(!imageUrl)console.warn('相簿簽名網址取得失敗',signedError?.message);
         urlCache.set(photo.id,{url:imageUrl,photo});
@@ -10386,7 +10370,7 @@ if (window.__pendingSupabaseUser) {
         .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).maybeSingle();
       if(error)throw error;
       if(!photo){session.background='none';persist();panel.style.setProperty('--chat-photo','none');return;}
-      const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,3600);
+      const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,300);
       if(signedError||!signed?.signedUrl)throw signedError||new Error('無法取得背景圖片。');
       if(currentSession()?.id===session.id)panel.style.setProperty('--chat-photo','url('+JSON.stringify(signed.signedUrl)+')');
     }catch(err){console.error('讀取單聊相簿背景失敗',err);panel.style.setProperty('--chat-photo','none');}
@@ -10409,7 +10393,7 @@ if (window.__pendingSupabaseUser) {
         if(cleared&&groupPrototype.active?.id===group.id){group.backgroundMode='none';group.backgroundMemoryPhotoId=null;}
         return;
       }
-      const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,3600);
+      const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,300);
       if(signedError||!signed?.signedUrl)throw signedError||new Error('無法取得群組背景圖片。');
       if(groupPrototype.active?.id===group.id)panel.style.setProperty('--chat-photo','url('+JSON.stringify(signed.signedUrl)+')');
     }catch(err){console.error('讀取群組相簿背景失敗',err);panel.style.setProperty('--chat-photo','none');}
@@ -10464,7 +10448,7 @@ if (window.__pendingSupabaseUser) {
     const panel=$('view').querySelector('.chat-main');if(panel)void applySingleMemoryPhotoBackground(currentSession(),panel);
   }
   async function downloadCompressedMemoryPhoto(cached){
-    try{const client=window.mySupabase;let url=cached.url;let response=await fetch(url);if(!response.ok){const {data,error}=await client.storage.from(BUCKET).createSignedUrl(cached.photo.storage_path,3600);if(error||!data?.signedUrl)throw error||new Error('下載連結失效。');url=data.signedUrl;response=await fetch(url);}if(!response.ok)throw new Error('下載連結已失效，請重新開啟相簿後再試。');const blob=await response.blob(),objectUrl=URL.createObjectURL(blob);const a=document.createElement('a');a.href=objectUrl;a.download=(cached.photo.caption||'personax-memory')+'.webp';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),1500);}catch(error){toast('下載失敗：'+(error.message||'請重新開啟相簿後再試。'));}
+    try{const client=window.mySupabase;let url=cached.url;let response=await fetch(url);if(!response.ok){const {data,error}=await client.storage.from(BUCKET).createSignedUrl(cached.photo.storage_path,300);if(error||!data?.signedUrl)throw error||new Error('下載連結失效。');url=data.signedUrl;response=await fetch(url);}if(!response.ok)throw new Error('下載連結已失效，請重新開啟相簿後再試。');const blob=await response.blob(),objectUrl=URL.createObjectURL(blob);const a=document.createElement('a');a.href=objectUrl;a.download=(cached.photo.caption||'personax-memory')+'.webp';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),1500);}catch(error){toast('下載失敗：'+(error.message||'請重新開啟相簿後再試。'));}
   }
   document.addEventListener('change',event=>{
     const input=event.target;

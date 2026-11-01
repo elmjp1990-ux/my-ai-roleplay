@@ -1,0 +1,20 @@
+-- SUPERSEDED DRAFT — do not promote this file independently.
+--
+-- The original proposal only added the deleted-parent-group filter. Further
+-- review on 2026-11-01 established that the product requirement also needs
+-- cumulative per-character turn counts to survive 30-day transcript purge.
+-- This file does not archive those counts and would therefore be incomplete.
+--
+-- Use the comprehensive proposal instead:
+-- supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql
+--
+-- That proposal:
+--   * snapshots single/group per-character assistant-turn counts at deletion,
+--   * retains only aggregate counts and minimal tombstone linkage,
+--   * snapshots again idempotently before purge as a safety net,
+--   * backfills legacy deleted parents and missing deletion queue jobs,
+--   * excludes deleted parent groups from live message aggregates,
+--   * adds archived counts to both public/owner count RPCs.
+--
+-- It remains draft-only pending migration-history reconciliation and exact
+-- local Supabase CLI replay. No hosted DDL/DML has been applied.
