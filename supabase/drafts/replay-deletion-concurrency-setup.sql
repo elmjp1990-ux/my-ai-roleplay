@@ -1,0 +1,59 @@
+-- DRAFT ONLY — disposable PostgreSQL concurrency-test setup.
+-- Applied only after the rollback verification in the CI-owned ephemeral database.
+-- The database is discarded when the workflow job ends; never run on hosted Supabase.
+\set ON_ERROR_STOP on
+
+CREATE SCHEMA IF NOT EXISTS storage;
+CREATE TABLE IF NOT EXISTS storage.objects (bucket_id text NOT NULL, name text NOT NULL);
+
+\i supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql
+\i supabase/drafts/seed-character-deletion-legacy-fixtures.sql
+\i supabase/drafts/character-history-aware-deletion.sql
+\i supabase/drafts/account-deletion-character-preservation-draft.sql
+\i supabase/drafts/account-is-active-auth-user-existence-guard.sql
+\i supabase/drafts/account-archived-character-session-insert-guard.sql
+\i supabase/drafts/account-deletion-character-child-write-freeze.sql
+\i supabase/drafts/character-deletion-existing-chat-continuation.sql
+\i supabase/drafts/prepare-account-deletion-character-preservation-integration.sql
+
+INSERT INTO auth.users (id) VALUES
+  ('10000000-0000-4000-8000-000000000030'),
+  ('10000000-0000-4000-8000-000000000031')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.profiles (id, handle, nickname) VALUES
+  ('10000000-0000-4000-8000-000000000030', 'pr200-race-author', 'Race Test Author'),
+  ('10000000-0000-4000-8000-000000000031', 'pr200-race-player', 'Race Test Player')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.characters (id, author_id, name, visibility, review_status, rights_confirmed)
+VALUES
+  ('20000000-0000-4000-8000-000000000030', '10000000-0000-4000-8000-000000000030', 'Delete race character', 'public', 'approved', true),
+  ('20000000-0000-4000-8000-000000000031', '10000000-0000-4000-8000-000000000030', 'Archive race character', 'public', 'approved', true),
+  ('20000000-0000-4000-8000-000000000032', '10000000-0000-4000-8000-000000000030', 'Asset race draft', 'private', 'draft', true),
+  ('20000000-0000-4000-8000-000000000033', '10000000-0000-4000-8000-000000000030', 'Asset race target', 'public', 'approved', true);
+
+INSERT INTO public.character_schedules (
+  id, character_id, weekday, day_type, start_time, end_time, location_key, activity
+) VALUES (
+  '40000000-0000-4000-8000-000000000031',
+  '20000000-0000-4000-8000-000000000031',
+  1, 'any', '09:00', '10:00', 'cafe', 'Initial schedule activity'
+);
+
+INSERT INTO public.character_private_info (character_id, author_id, private_info)
+VALUES (
+  '20000000-0000-4000-8000-000000000031',
+  '10000000-0000-4000-8000-000000000030',
+  'Concurrency fixture private info'
+);
+
+INSERT INTO public.character_illustrations (
+  id, character_id, author_id, storage_path, asset_type, sort_order
+) VALUES (
+  '30000000-0000-4000-8000-000000000032',
+  '20000000-0000-4000-8000-000000000032',
+  '10000000-0000-4000-8000-000000000030',
+  '10000000-0000-4000-8000-000000000030/20000000-0000-4000-8000-000000000032/30000000-0000-4000-8000-000000000032.jpg',
+  'primary', 0
+);
