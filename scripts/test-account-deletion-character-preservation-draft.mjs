@@ -102,17 +102,21 @@ const memoryPhotoDraft = fs.readFileSync(
   "supabase/drafts/chat-archive-memory-photo-read-access.sql",
   "utf8",
 );
-const tablePhotoSelect = memoryPhotoDraft.match(/CREATE POLICY memory_photos_select_owner[\\s\\S]*?\\);/i)?.[0];
-assert.ok(tablePhotoSelect, "memory photo table SELECT policy must be replaced");
+const tablePhotoStart = memoryPhotoDraft.indexOf("CREATE POLICY memory_photos_select_owner");
+const storagePhotoDrop = memoryPhotoDraft.indexOf("DROP POLICY IF EXISTS memory_photo_objects_select_owner");
+const tablePhotoSelect = memoryPhotoDraft.slice(tablePhotoStart, storagePhotoDrop);
+assert.ok(tablePhotoStart >= 0 && storagePhotoDrop > tablePhotoStart, "memory photo table SELECT policy must be replaced");
 assert.match(tablePhotoSelect, /owner_id = [(]SELECT auth[.]uid[(][)][)]/);
 assert.match(tablePhotoSelect, /g[.]deleted_at IS NULL/);
 assert.doesNotMatch(tablePhotoSelect, /g[.]archived_at/);
-const storagePhotoSelect = memoryPhotoDraft.match(/CREATE POLICY memory_photo_objects_select_owner[\\s\\S]*?\\);/i)?.[0];
-assert.ok(storagePhotoSelect, "memory photo Storage SELECT policy must be replaced");
+const storagePhotoStart = memoryPhotoDraft.indexOf("CREATE POLICY memory_photo_objects_select_owner");
+const noWriteChanges = memoryPhotoDraft.indexOf("-- No INSERT, UPDATE, DELETE", storagePhotoStart);
+const storagePhotoSelect = memoryPhotoDraft.slice(storagePhotoStart, noWriteChanges);
+assert.ok(storagePhotoStart >= 0 && noWriteChanges > storagePhotoStart, "memory photo Storage SELECT policy must be replaced");
 assert.match(storagePhotoSelect, /p[.]storage_path = objects[.]name/);
 assert.match(storagePhotoSelect, /g[.]deleted_at IS NULL/);
 assert.doesNotMatch(storagePhotoSelect, /g[.]archived_at/);
-assert.doesNotMatch(memoryPhotoDraft, /CREATE POLICY[\\s\\S]*?FOR (?:INSERT|UPDATE|DELETE)/i);
+assert.doesNotMatch(memoryPhotoDraft, /FOR INSERT|FOR UPDATE|FOR DELETE/i);
 
 const migrationsDir = "supabase/migrations";
 const activeSql = fs.readdirSync(migrationsDir)
