@@ -246,3 +246,26 @@ This is a material implementation gap, not a confirmed runtime failure. Do not c
 ### Safety boundary
 
 Only Edge Function inventory, repository tree, and SELECT from cron.job were inspected. No account data was read, no worker was invoked, no function was deployed, no cron job was created/modified, and no Auth user was deleted.
+
+## Account-deletion worker implementation draft — 2026-11-02
+
+### Added to PR branch (not deployed)
+
+- `supabase/functions/_shared/account-deletion-worker.ts`: dependency-injected processor for archive → prepare → Auth Admin delete → finalize; sanitizes failure codes; marks a batch failure when a batch ID is known; only treats an Auth deletion error as idempotent success when a separate Auth lookup positively confirms the user is absent.
+- `supabase/functions/_shared/account-deletion-worker.test.ts`: deterministic tests for success ordering, archive fail-closed behavior, Auth deletion failure, already-deleted Auth retry, and finalize false.
+- `supabase/functions/account-deletion-worker/index.ts`: POST-only service-secret-authenticated Edge Function; does not accept target user IDs from request input; reads due work exclusively from service-only get_account_deletion_work_items(); limits each run to 10 items; calls the existing restricted RPCs and Supabase Auth Admin.
+- `.github/workflows/account-deletion-worker-tests.yml`: isolated Deno test workflow.
+- `supabase/config.toml`: function config uses verify_jwt=false only because the handler uses `withSupabase({ auth: "secret:default" })` to validate the named Supabase Secret Key before handler execution.
+
+### Implementation boundaries / not yet accepted
+
+- This is PR-only source code. The function has NOT been deployed; no cron schedule has been created.
+- CI run has not yet been observed. The deterministic test file has been reviewed statically only; no claim that tests pass.
+- The worker is intentionally separate from purge-chat-deletions.
+- Existing SQL work-item function does not claim/lease rows. Archive and prepare RPCs lock the exact deletion request and reuse the same batch; Auth delete is retried idempotently by checking Auth user absence before finalize. A dedicated lease/claim mechanism may still be desirable if operational concurrency or worker overlap testing exposes contention.
+- Before deployment, add an end-to-end disposable local Supabase test covering due request, archive verification, prepare cleanup, Auth Admin deletion, finalize, transient failure between each stage, and repeated invocation.
+- Do not schedule until secret provisioning, deployed function behavior, failure recovery, and E2E tests are reviewed. Do not use real user accounts.
+
+### Current status
+
+Implementation draft exists on PR #200 branch only. PR remains Draft/unmerged. No live DB mutation, no account deletion invocation, no Edge Function deployment, and no schedule change occurred.
