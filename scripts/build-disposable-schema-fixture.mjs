@@ -163,7 +163,8 @@ export function buildDisposableSchemaSql(structure, routinesSnapshot, security, 
 
   for (const routine of routines) {
     if (!routine.definition) throw new Error(`Missing definition for routine ${routine.schema}.${routine.name}`);
-    lines.push(routine.definition.trim());
+    const routineDefinition = routine.definition.trim();
+    lines.push(routineDefinition.endsWith(";") ? routineDefinition : `${routineDefinition};`);
     const kind = routine.kind === "p" ? "PROCEDURE" : "FUNCTION";
     const signature = `${quoteIdent(routine.schema)}.${quoteIdent(routine.name)}(${routine.identity_arguments})`;
     if (routine.owner) lines.push(`ALTER ${kind} ${signature} OWNER TO ${quoteIdent(routine.owner)};`);
