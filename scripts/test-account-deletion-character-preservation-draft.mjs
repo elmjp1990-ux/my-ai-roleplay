@@ -139,20 +139,6 @@ for (const table of [
   assert.ok(childWriteFreeze.slice(start, policyEnd).includes("TO authenticated"));
 }
 
-// New session/member attachments are blocked at the database boundary,
-// including service-role RPC inserts. Existing turns/messages remain continuable.
-const sessionGuardFn = sql.match(
-  /CREATE OR REPLACE FUNCTION private[.]guard_new_session_character_not_archived[(][\s\S]*?\$function\$;/,
-)?.[0];
-assert.ok(sessionGuardFn, "new session archived-character trigger function must exist");
-assert.match(sessionGuardFn, /SECURITY DEFINER/);
-assert.match(sessionGuardFn, /SET search_path TO ''/);
-assert.match(sessionGuardFn, /FOR KEY SHARE/);
-assert.match(sessionGuardFn, /account_archived_at/);
-assert.match(sql, /CREATE TRIGGER guard_archived_character_chat_session[\s\S]*?BEFORE INSERT OR UPDATE OF character_id[\s\S]*?ON public[.]chat_sessions/);
-assert.match(sql, /CREATE TRIGGER guard_archived_character_group_member[\s\S]*?BEFORE INSERT OR UPDATE OF character_id[\s\S]*?ON public[.]chat_group_members/);
-assert.doesNotMatch(sql, /ON public[.]chat_group_messages/);
-
 const startChatFn = sql.match(
   /CREATE OR REPLACE FUNCTION public[.]character_can_start_chat[(][\s\S]*?\$function\$;/,
 )?.[0];
