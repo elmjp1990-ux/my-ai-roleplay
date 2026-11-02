@@ -1,6 +1,16 @@
 name: Supabase local migration replay (manual)
 
 on:
+  push:
+    branches:
+      - security/chat-deletion-lifecycle-reconciliation
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/drafts/**"
+      - "supabase/functions/**"
+      - "index.html"
+      - "supabase/config.toml"
+      - ".github/workflows/supabase-local-migration-replay.yml"
   workflow_dispatch:
 
 permissions:
