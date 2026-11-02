@@ -181,7 +181,7 @@ INSERT INTO public.character_illustrations (
 ) VALUES (
   '30000000-0000-4000-8000-000000000036',
   '20000000-0000-4000-8000-000000000032',
-  '$asset_author', '$asset_path_a', 'primary', 0
+  '$asset_author', '$asset_path_a', 'gallery', 1
 );
 SELECT pg_sleep(2);
 COMMIT;
