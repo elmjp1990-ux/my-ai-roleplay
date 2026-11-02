@@ -7,6 +7,7 @@ CREATE SCHEMA IF NOT EXISTS storage;
 CREATE TABLE IF NOT EXISTS storage.objects (bucket_id text NOT NULL, name text NOT NULL);
 
 \i supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql
+\i supabase/drafts/chat-deletion-direct-parent-delete-privilege-guard.sql
 \i supabase/drafts/seed-character-deletion-legacy-fixtures.sql
 \i supabase/drafts/character-history-aware-deletion.sql
 \i supabase/drafts/account-deletion-character-preservation-draft.sql
