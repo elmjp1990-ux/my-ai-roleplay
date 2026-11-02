@@ -151,3 +151,20 @@ Deno.test("resumes Auth deletion directly when deleting batch still has an Auth 
     ["finalize", "batch-1"],
   ]);
 });
+
+Deno.test("continues processing later items when failure reporting throws", async () => {
+  const calls: unknown[][] = [];
+  const deps = successfulDeps(calls);
+  deps.archive = async (id) => {
+    calls.push(["archive", id]);
+    return { data: null, error: new Error("archive_unavailable") };
+  };
+  deps.markFailure = async (id, code) => {
+    calls.push(["markFailure", id, code]);
+    throw new Error("failure_rpc_unavailable");
+  };
+  const second = { ...item, target_user_id: "user-2" };
+  const summary = await processAccountDeletionWorkItems([item, second], deps);
+  assertEquals(summary, { claimed: 2, completed: 0, failed: 2, skipped: 0 });
+  assertEquals(calls.filter(([name]) => name === "archive").length, 2);
+});
