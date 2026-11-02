@@ -68,12 +68,12 @@ BEGIN
     RETURN v_turn_id;
   END IF;
 
-  -- Only non-deleted characters are active speakers and billable members.
+  -- Existing group membership is a durable conversation snapshot.
+  -- A character deletion hides the character from public discovery/new chats,
+  -- but MUST NOT remove its speaking turn or billing from an existing group.
   SELECT count(*)::integer INTO v_member_count
   FROM public.chat_group_members m
-  JOIN public.characters c ON c.id = m.character_id
-  WHERE m.group_id = p_group_id
-    AND c.deleted_at IS NULL;
+  WHERE m.group_id = p_group_id;
   IF v_member_count NOT BETWEEN 1 AND 3 THEN
     RAISE EXCEPTION 'group_has_no_active_characters' USING ERRCODE = '23514';
   END IF;
@@ -125,9 +125,6 @@ BEGIN
     v_character_id,v_scene_id,v_character_snapshot,
     v_character_name,v_style,v_scene_name
   FROM public.chat_group_members m
-  JOIN public.characters c
-    ON c.id = m.character_id
-   AND c.deleted_at IS NULL
   LEFT JOIN public.chat_group_scenes s
     ON s.id=m.scene_id AND s.group_id=m.group_id
   WHERE m.group_id=p_group_id
