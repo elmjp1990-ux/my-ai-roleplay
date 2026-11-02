@@ -17,21 +17,32 @@ SET search_path TO ''
 AS $function$
 DECLARE
   v_character_id uuid;
+  v_character_unavailable boolean;
 BEGIN
   v_character_id := NULLIF(COALESCE(
     pg_catalog.to_jsonb(NEW) ->> 'character_id',
     pg_catalog.to_jsonb(NEW) ->> 'world_character_id'
   ), '')::uuid;
 
-  IF v_character_id IS NOT NULL
-     AND EXISTS (
-       SELECT 1
-       FROM public.characters AS c
-       WHERE c.id = v_character_id
-         AND c.account_archived_at IS NOT NULL
-     ) THEN
-    RAISE EXCEPTION 'character_account_archived'
-      USING ERRCODE = '42501';
+  IF v_character_id IS NOT NULL THEN
+    -- Serialize new-entry creation with soft_delete_character()'s FOR UPDATE
+    -- lock. If the insert wins, deletion waits and its history check sees the
+    -- committed parent. If deletion wins, this insert waits and then fails.
+    SELECT (c.deleted_at IS NOT NULL OR c.account_archived_at IS NOT NULL)
+      INTO v_character_unavailable
+    FROM public.characters AS c
+    WHERE c.id = v_character_id
+    FOR KEY SHARE;
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'character_not_available'
+        USING ERRCODE = '42501';
+    END IF;
+
+    IF v_character_unavailable IS TRUE THEN
+      RAISE EXCEPTION 'character_not_available'
+        USING ERRCODE = '42501';
+    END IF;
   END IF;
 
   RETURN NEW;
