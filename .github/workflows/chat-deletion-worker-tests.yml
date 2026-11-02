@@ -6,6 +6,8 @@ on:
       - "supabase/functions/_shared/chat-deletion-worker.ts"
       - "supabase/functions/_shared/chat-deletion-worker.test.ts"
       - "supabase/functions/purge-chat-deletions/index.ts"
+      - "supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql"
+      - "scripts/test-chat-deletion-turn-stats-draft.mjs"
       - ".github/workflows/chat-deletion-worker-tests.yml"
   push:
     branches:
@@ -27,3 +29,5 @@ jobs:
           deno-version: v2.x
       - name: Run deterministic worker adapter tests
         run: deno test --no-check supabase/functions/_shared/chat-deletion-worker.test.ts
+      - name: Run cumulative turn-stat draft regression guard
+        run: node scripts/test-chat-deletion-turn-stats-draft.mjs
