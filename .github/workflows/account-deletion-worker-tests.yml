@@ -37,6 +37,7 @@ on:
       - "supabase/drafts/verify-deletion-draft-replay.sql"
       - "supabase/drafts/seed-character-deletion-legacy-fixtures.sql"
       - "supabase/drafts/test-character-deletion-behavior.sql"
+      - "supabase/drafts/test-account-deletion-character-preservation-behavior.sql"
       - "supabase/drafts/replay-and-test-character-deletion.sql"
       - "supabase/drafts/verify-deletion-draft-rollback.sql"
       - "supabase/drafts/current-state-schema-catalog-manifest-2026-11-02.md"
