@@ -150,3 +150,18 @@ PostgreSQL fencing cannot make an external Auth HTTP request atomic with a datab
 5. Archive batch uniqueness must be established in the new protocol without retroactively assuming existing data already satisfies it. The migration must first detect and safely handle any duplicate active exact-request batches.
 
 This refinement is still a design/audit note only. No lease table, RPC, migration, hosted DDL/DML, account-deletion execution, Auth user creation/deletion, deployment, or Cron change was performed.
+
+
+## Round 35 — repository caller inventory follow-up
+
+A recursive Git tree at the current branch head was inspected (180 tracked files; tree response was not truncated). The following tracked application entry points were fetched and searched for all seven account-deletion RPC names:
+
+- `index.html`: direct client calls only to `request_account_deletion()` and `cancel_account_deletion()`.
+- `supabase/functions/account-deletion-worker/index.ts`: direct service-role calls to `get_account_deletion_work_items()`, `archive_account_deletion_data()`, `prepare_account_deletion()`, `finalize_account_deletion()`, and `record_account_deletion_failure()`.
+- Other tracked Edge Function entrypoints inspected: `chat-turn`, `encounter-session`, `encounter-session-state`, `encounter-turn`, `expire-memory-album-photos`, `purge-chat-deletions`, and `story-session`; no direct calls to these account-deletion RPCs were found.
+- The live definition of `prepare_account_deletion()` internally invokes `archive_account_deletion_data()` when no batch exists. This internal call must be redesigned together with the worker-facing archive/prepare API; it cannot remain an unfenced bypass.
+- GitHub code search returned `incomplete_results=true`; therefore this is a tracked application-entrypoint inventory, not proof that no external SQL Editor/manual/admin caller exists. The live ACL inventory remains the authority for callable roles.
+
+Implementation consequence: keep the two player-facing RPCs (`request_account_deletion`, `cancel_account_deletion`) authenticated and separate from the service-only worker RPC set. The cancellation function must lock the request then lease; worker claim/archive/prepare/failure/finalize use the same canonical request → lease → batch lock order where those rows exist. Refactor prepare's internal archive invocation so both operations validate the same lease within the same transaction rather than exposing an unleased nested path.
+
+This is still pre-implementation documentation. No RPC signature, migration, worker code, hosted schema or data was changed.
