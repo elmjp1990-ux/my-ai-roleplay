@@ -17,6 +17,8 @@ on:
       - "supabase/functions/_shared/chat-deletion-worker.ts"
       - "supabase/functions/_shared/chat-deletion-worker.test.ts"
       - "supabase/functions/purge-chat-deletions/index.ts"
+      - "supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql"
+      - "scripts/test-chat-deletion-turn-stats-draft.mjs"
       - ".github/workflows/chat-deletion-worker-tests.yml"
 
 jobs:
