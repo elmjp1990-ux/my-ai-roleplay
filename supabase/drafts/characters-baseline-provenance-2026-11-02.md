@@ -294,3 +294,58 @@ The initial worker implementation ignored `work_status` / `batch_id` and always 
 
 - New CI run: GitHub Actions run 41365781489; status was in progress at documentation time. Do not claim pass until completed.
 - This is a static/unit-test correction only. No Auth user was deleted, no worker deployed, no cron created, and no hosted DB mutation occurred.
+
+## Stale JWT access after Auth deletion — critical RLS guard gap — 2026-11-02
+
+### Verified live behavior
+
+Supabase documents that deleting an Auth user removes refresh sessions / prevents new token minting, but an already-issued access JWT remains valid until its exp claim. Sensitive operations must check the session_id against auth.sessions or otherwise check the current Auth user record.
+
+The connected database's current `public.account_is_active()` definition is:
+- auth.uid() IS NOT NULL
+- AND NOT EXISTS a row in public.account_deletion_requests for auth.uid()
+- It does NOT check that auth.uid() still exists in auth.users.
+
+The FK `account_deletion_requests.user_id → auth.users(id)` is ON DELETE CASCADE. Therefore, after Auth Admin deletes the user, the deletion request row disappears. An already-issued JWT can still carry auth.uid(); the current function then evaluates true, even though the Auth user no longer exists.
+
+### RLS scope confirmed
+
+The function is used by RESTRICTIVE policies (not merely permissive) on:
+- characters
+- character_stories
+- conversations
+- messages
+- profiles
+- chat_groups, chat_group_scenes, chat_group_members, chat_group_turns, chat_group_messages
+
+Because these policies are RESTRICTIVE, the current account_is_active() result is a real guard on those tables. The missing auth.users existence check means that guard can reopen after request cascade for an outstanding JWT.
+
+The function is SECURITY DEFINER, owned by postgres, search_path empty; current EXECUTE ACL is postgres, authenticated, service_role. A draft preserves this execution model while explicitly revoking PUBLIC/anon.
+
+### Draft correction (not applied)
+
+Added `supabase/drafts/account-is-active-auth-user-existence-guard.sql`:
+- Require auth.uid() IS NOT NULL.
+- Require an auth.users row matching auth.uid().
+- Require no pending account_deletion_requests row.
+- Preserve SECURITY DEFINER and empty search_path.
+- Preserve authenticated/service_role execution; revoke PUBLIC/anon.
+
+This draft is NOT a migration and has NOT been applied to the connected hosted project.
+
+### Migration provenance gap
+
+The live `supabase_migrations.schema_migrations` table lists version `20261017010847` / name `account_deletion_worker`, but the corresponding SQL migration file is absent from the current PR branch tree. This is a migration-source drift/provenance issue and must be reconciled before local replay. Do not invent the missing original migration or edit applied history.
+
+### Required tests before applying
+
+1. Valid existing Auth user, no deletion request → account_is_active() true.
+2. Existing Auth user with pending request → false.
+3. Deleted Auth user represented by a still-valid JWT claim and no request row → false.
+4. Verify restrictive policies deny SELECT/INSERT/UPDATE/DELETE as appropriate for deleted JWT on the guarded tables.
+5. Verify anon remains denied where it was previously denied and public read policies remain unchanged.
+6. Verify service_role worker RPC execution remains intact.
+
+### Safety
+
+All findings came from SELECT-only function/policy/FK/catalog inspection and official Supabase documentation. No application rows were read; no function invoked; no DDL/DML, migration, deployment, cron, or Auth deletion occurred.
