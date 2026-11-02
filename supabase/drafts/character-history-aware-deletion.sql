@@ -10,6 +10,7 @@
 --     hard-delete the character row in the same transaction.
 --   * Account deletion is separate and MUST preserve characters and assets.
 --   * Storage objects are never deleted by this SQL function.
+--   * Requires chat_deletion_character_history from the cumulative chat-deletion draft.
 
 CREATE TABLE IF NOT EXISTS public.character_asset_cleanup_jobs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -50,6 +51,8 @@ AS $function$
                WHERE gm.character_id = p_character_id)
     OR EXISTS (SELECT 1 FROM public.chat_group_messages gm
                WHERE gm.character_id = p_character_id)
+    OR EXISTS (SELECT 1 FROM public.chat_deletion_character_history h
+               WHERE h.character_id = p_character_id)
     OR EXISTS (SELECT 1 FROM public.chat_groups g
                WHERE g.world_character_id = p_character_id)
     OR EXISTS (
