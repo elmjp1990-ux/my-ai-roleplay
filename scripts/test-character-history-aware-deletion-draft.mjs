@@ -80,7 +80,7 @@ assert.match(sql, /PERFORM 1[\s\S]*FROM public\.chat_sessions AS session_parent[
 assert.match(sql, /PERFORM 1[\s\S]*FROM public\.chat_groups g[\s\S]*g\.deleted_at IS NULL[\s\S]*ORDER BY g\.id[\s\S]*FOR UPDATE/);
 assert.match(continuation, /JOIN public\.characters c ON c\.id = m\.character_id[\s\S]*c\.deleted_at IS NULL/);
 assert.match(continuation, /v_cost := v_member_count \* 3/);
-assert.match(continuation, /group_has_no_active_characters/);
+assert.match(continuation, /group_has_no_members/);
 assert.match(behavior, /reserve_chat_turn\([\s\S]*v_chat_session[\s\S]*v_chat_assistant_message/);
 assert.match(behavior, /existing_single_chat_assistant_reply_rejected_after_character_delete/);
 assert.match(behavior, /append_chat_group_mock_turn\([\s\S]*v_group/);
