@@ -58,6 +58,56 @@ assert.match(integration, /^-- DRAFT ONLY — NOT AN ACTIVE MIGRATION\./);
 assert.match(integration, /CREATE OR REPLACE FUNCTION public[.]prepare_account_deletion[(]p_user_id uuid[)]/);
 assert.match(integration, /SET search_path TO ''/);
 
+// Account deletion also cascades through auth.users -> chat_sessions/chat_groups.
+// The turn-statistics draft must snapshot every owned parent before prepare can
+// permit Auth deletion, while skipping already-purged parents only with tombstone proof.
+const accountChatSnapshot = cumulativeDeletionDraft.match(
+  /CREATE OR REPLACE FUNCTION private[.]snapshot_account_chat_character_history[(]p_user_id uuid[)][\\s\\S]*?\\$function\\$;/,
+)?.[0];
+assert.ok(accountChatSnapshot, "account deletion character-history snapshot helper must exist");
+assert.match(accountChatSnapshot, /SECURITY DEFINER/);
+assert.match(accountChatSnapshot, /SET search_path TO ''/);
+assert.match(accountChatSnapshot, /FROM public[.]chat_sessions AS s[\\s\\S]*?FOR UPDATE/);
+assert.match(accountChatSnapshot, /FROM public[.]chat_groups AS g[\\s\\S]*?FOR UPDATE/);
+assert.match(accountChatSnapshot, /snapshot_chat_deletion_character_turn_stats/);
+assert.match(accountChatSnapshot, /status = 'completed'[\\s\\S]*?chat_deletion_character_history/);
+assert.doesNotMatch(accountChatSnapshot, /request_content|message content/i);
+assert.equal(
+  (integration.match(/PERFORM private[.]snapshot_account_chat_character_history[(]p_user_id[)][;]/g) || []).length,
+  1,
+  "account chat history must be snapshotted exactly once before batch handling",
+);
+assert.ok(
+  integration.indexOf("PERFORM private.snapshot_account_chat_character_history(p_user_id);") <
+    integration.indexOf("-- Lock/reuse this exact request's batch"),
+  "account chat history snapshot must precede batch handling and Auth deletion",
+);
+
+// Group charges are FK-cascaded by both group and Auth deletion. Preserve the
+// complete financial charge row and only minimal group-turn idempotency metadata.
+assert.match(integration, /'chat_group_turn_charges'/);
+assert.match(integration, /'chat_group_turns'/);
+assert.match(integration, /ALTER TABLE public[.]account_deletion_archive_items[\\s\\S]*?CHECK [(]source_table IN/);
+assert.match(integration, /pg_catalog[.]to_jsonb[(]gc[)]/);
+assert.match(integration, /'request_key', gt[.]request_key/);
+assert.match(integration, /'completed_at', gt[.]completed_at/);
+assert.doesNotMatch(integration, /jsonb_build_object[\\s\\S]{0,250}request_content/);
+assert.match(integration, /v_group_charge_source <> v_group_charge_archived/);
+assert.match(integration, /v_group_turn_source <> v_group_turn_archived/);
+assert.match(integration, /chat_group_turn_charges[\\s\\S]*?payload IS DISTINCT FROM pg_catalog[.]to_jsonb[(]gc[)]/);
+assert.match(integration, /chat_group_turns[\\s\\S]*?payload IS DISTINCT FROM pg_catalog[.]jsonb_build_object/);
+
+// The live account_is_active() still trusts auth.uid() plus absence of a pending
+// request. Its replacement draft must additionally verify the Auth row, so a
+// stale JWT cannot authorize work after Auth Admin deletion.
+const activeGuard = fs.readFileSync(
+  "supabase/drafts/account-is-active-auth-user-existence-guard.sql",
+  "utf8",
+);
+assert.match(activeGuard, /^-- DRAFT ONLY/);
+assert.match(activeGuard, /EXISTS [(][\\s\\S]*?FROM auth[.]users AS u[\\s\\S]*?u[.]id = auth[.]uid[(][)]/);
+assert.match(activeGuard, /NOT EXISTS [(][\\s\\S]*?account_deletion_requests/);
+
 // The existing deleting retry must not require a profile that may already be gone.
 // A legacy deleting batch is healed only if still-owned character rows exist.
 const deletingBranch = integration.match(/IF FOUND AND v_status = 'deleting' THEN[\s\S]*?RETURN QUERY SELECT v_batch_id, p_user_id, 'deleting'::text;/)?.[0];
