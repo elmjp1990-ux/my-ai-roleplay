@@ -59,7 +59,11 @@ STABLE
 SECURITY DEFINER
 SET search_path TO ''
 AS $function$
+  -- Existing-session access requires a live, active account. Pair this with
+  -- account_is_active()'s auth.users existence guard so an unexpired JWT from
+  -- a deleted account cannot continue reading retained character assets.
   SELECT auth.uid() IS NOT NULL
+    AND public.account_is_active() IS TRUE
     AND p_character_id IS NOT NULL
     AND (
       EXISTS (
