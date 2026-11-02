@@ -144,6 +144,16 @@ const characterDeletionDraft = fs.readFileSync(
   "supabase/drafts/character-history-aware-deletion.sql",
   "utf8",
 );
+const cumulativeDeletionDraft = fs.readFileSync(
+  "supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql",
+  "utf8",
+);
+assert.match(cumulativeDeletionDraft, /CREATE TABLE IF NOT EXISTS public[.]chat_deletion_character_history/);
+assert.match(cumulativeDeletionDraft, /INSERT INTO public[.]chat_deletion_character_history/);
+assert.match(cumulativeDeletionDraft, /FROM public[.]chat_group_members/);
+assert.match(cumulativeDeletionDraft, /FROM public[.]chat_group_messages/);
+assert.match(cumulativeDeletionDraft, /FROM public[.]chat_deletion_character_turn_stats/);
+assert.match(characterDeletionDraft, /public[.]chat_deletion_character_history/);
 assert.ok(characterDeletionDraft.startsWith("-- DRAFT ONLY — NOT AN ACTIVE MIGRATION."));
 assert.match(characterDeletionDraft, /CREATE TABLE IF NOT EXISTS public[.]character_asset_cleanup_jobs/);
 assert.match(characterDeletionDraft, /ENABLE ROW LEVEL SECURITY/);
@@ -151,6 +161,7 @@ assert.match(characterDeletionDraft, /REVOKE ALL ON public[.]character_asset_cle
 assert.match(characterDeletionDraft, /CREATE OR REPLACE FUNCTION private[.]character_has_history[(]p_character_id uuid[)]/);
 for (const table of [
   "chat_sessions", "chat_group_members", "chat_group_messages", "chat_groups",
+  "chat_deletion_character_history",
   "conversations", "encounter_character_state", "encounter_diary",
   "encounter_turn_interaction_receipts", "encounter_session_lifecycle",
   "encounter_session_turns", "encounter_session_evaluation_jobs",
