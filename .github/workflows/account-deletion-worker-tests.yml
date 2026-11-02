@@ -9,6 +9,7 @@ on:
       - "supabase/functions/account-deletion-worker/index.ts"
       - "supabase/drafts/account-deletion-character-preservation-draft.sql"
       - "supabase/drafts/prepare-account-deletion-character-preservation-integration.sql"
+      - "supabase/drafts/chat-archive-memory-photo-read-access.sql"
       - "scripts/test-account-deletion-character-preservation-draft.mjs"
       - ".github/workflows/account-deletion-worker-tests.yml"
   push:
@@ -21,6 +22,7 @@ on:
       - "supabase/functions/account-deletion-worker/index.ts"
       - "supabase/drafts/account-deletion-character-preservation-draft.sql"
       - "supabase/drafts/prepare-account-deletion-character-preservation-integration.sql"
+      - "supabase/drafts/chat-archive-memory-photo-read-access.sql"
       - "scripts/test-account-deletion-character-preservation-draft.mjs"
       - ".github/workflows/account-deletion-worker-tests.yml"
 
