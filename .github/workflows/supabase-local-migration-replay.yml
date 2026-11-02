@@ -100,7 +100,7 @@ jobs:
           cd "$local_project"
           supabase db start
           DB_URL="$(supabase status --output env | sed -n 's/^DB_URL=//p' | sed 's/^"//;s/"$//')"
-          if [[ -z "$DATABASE_URL" ]]; then
+          if [[ -z "$DB_URL" ]]; then
             echo "Could not resolve the isolated local Supabase DB_URL."
             exit 1
           fi
