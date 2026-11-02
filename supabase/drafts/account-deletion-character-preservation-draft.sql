@@ -143,7 +143,7 @@ CREATE POLICY "Existing session owners can read archived character assets"
   FOR SELECT TO authenticated
   USING (private.can_read_character_asset(bucket_id, name));
 
--- Explicitly exclude account-archived characters from caller-side new-session
+-- 5) Explicitly exclude account-archived characters from caller-side new-session
 -- eligibility helpers as well as the INSERT triggers below.
 CREATE OR REPLACE FUNCTION public.character_can_start_chat(p_character_id uuid)
 RETURNS boolean
@@ -259,7 +259,7 @@ CREATE TRIGGER guard_archived_character_group_member
 -- Existing group messages are intentionally not blocked: they belong to an
 -- already-authorized group conversation and must remain continuable.
 
--- 6) Service-only account archive helper.
+-- 7) Service-only account archive helper.
 -- The helper is called internally by the SECURITY DEFINER prepare RPC; do not
 -- broaden schema USAGE on the private schema just for this internal call.
 
@@ -439,7 +439,7 @@ REVOKE ALL ON FUNCTION private.archive_account_characters(uuid)
 GRANT EXECUTE ON FUNCTION private.archive_account_characters(uuid)
   TO service_role;
 
--- 6) Transactional integration with the live prepare_account_deletion(uuid).
+-- 8) Transactional integration with the live prepare_account_deletion(uuid).
 -- The complete replacement function, copied from the current test-DB definition
 -- and amended with safe retry handling, lives in:
 --   supabase/drafts/prepare-account-deletion-character-preservation-integration.sql
