@@ -6,6 +6,31 @@ tmpdir="$(mktemp -d)"
 cleanup() { rm -rf "$tmpdir"; }
 trap cleanup EXIT
 
+wait_for_activity() {
+  local app="$1"
+  local query="$2"
+  for _ in $(seq 1 40); do
+    if [[ "$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = '$app' AND state = 'active' AND query LIKE '%$query%')")" == "t" ]]; then
+      return 0
+    fi
+    sleep 0.1
+  done
+  echo "ERROR: timed out waiting for PostgreSQL session $app to reach $query"
+  return 1
+}
+
+wait_for_lock() {
+  local app="$1"
+  for _ in $(seq 1 40); do
+    if [[ "$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = '$app' AND state = 'active' AND wait_event_type = 'Lock')")" == "t" ]]; then
+      return 0
+    fi
+    sleep 0.1
+  done
+  echo "ERROR: timed out waiting for PostgreSQL session $app to wait on a row lock"
+  return 1
+}
+
 author="10000000-0000-4000-8000-000000000030"
 player="10000000-0000-4000-8000-000000000031"
 delete_character="20000000-0000-4000-8000-000000000030"
@@ -41,9 +66,9 @@ INSERT INTO public.chat_sessions (
 COMMIT;
 SQL
 
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/delete-owner.sql" >"$tmpdir/delete-owner.log" 2>&1 &
+PGAPPNAME=pr200-delete-owner psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/delete-owner.sql" >"$tmpdir/delete-owner.log" 2>&1 &
 delete_pid=$!
-sleep 0.4
+wait_for_activity "pr200-delete-owner" "pg_sleep(2)"
 if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/new-session.sql" >"$tmpdir/new-session.log" 2>&1; then
   echo "ERROR: new session insert unexpectedly succeeded while character deletion won the lock"
   cat "$tmpdir/new-session.log"
@@ -92,11 +117,12 @@ SELECT batch_status FROM public.prepare_account_deletion('$author');
 COMMIT;
 SQL
 
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/child-writer.sql" >"$tmpdir/child-writer.log" 2>&1 &
+PGAPPNAME=pr200-child-writer psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/child-writer.sql" >"$tmpdir/child-writer.log" 2>&1 &
 child_pid=$!
-sleep 0.4
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/account-archive.sql" >"$tmpdir/account-archive.log" 2>&1 &
+wait_for_activity "pr200-child-writer" "pg_sleep(2)"
+PGAPPNAME=pr200-account-archive psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/account-archive.sql" >"$tmpdir/account-archive.log" 2>&1 &
 archive_pid=$!
+wait_for_lock "pr200-account-archive"
 wait "$child_pid"
 wait "$archive_pid"
 
