@@ -24,6 +24,16 @@ BEGIN
     pg_catalog.to_jsonb(NEW) ->> 'world_character_id'
   ), '')::uuid;
 
+  -- Legacy conversations reference character_stories rather than characters.
+  -- Lock the owning character too, or a conversation INSERT could race a
+  -- hard-delete and then be cascaded away through story_id.
+  IF v_character_id IS NULL THEN
+    SELECT cs.character_id
+      INTO v_character_id
+    FROM public.character_stories AS cs
+    WHERE cs.id = NULLIF(pg_catalog.to_jsonb(NEW) ->> 'story_id', '')::uuid;
+  END IF;
+
   IF v_character_id IS NOT NULL THEN
     -- Serialize new-entry creation with soft_delete_character()'s FOR UPDATE
     -- lock. If the insert wins, deletion waits and its history check sees the
@@ -89,6 +99,19 @@ CREATE TRIGGER reject_archived_character_new_story
   BEFORE INSERT OR UPDATE OF character_id ON public.story_relationship_states
   FOR EACH ROW
   EXECUTE FUNCTION private.reject_account_archived_character_entry();
+
+-- Legacy conversations have no direct character_id FK: they point to a story,
+-- which then cascades from characters. Guard story_id writes explicitly so
+-- history-aware hard deletion cannot race and cascade away a newly inserted chat.
+DROP TRIGGER IF EXISTS reject_archived_character_legacy_conversation
+  ON public.conversations;
+CREATE TRIGGER reject_archived_character_legacy_conversation
+  BEFORE INSERT OR UPDATE OF story_id ON public.conversations
+  FOR EACH ROW
+  EXECUTE FUNCTION private.reject_account_archived_character_entry();
+
+-- Existing legacy messages are continuation writes and are deliberately not
+-- guarded. Only creating/reassigning the conversation parent is blocked.
 
 -- Regression requirements for disposable PostgreSQL:
 -- 1. Account archive marker set: INSERT chat_sessions for that character fails.
