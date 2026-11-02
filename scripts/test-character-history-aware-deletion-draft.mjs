@@ -2,6 +2,7 @@ import fs from "node:fs";
 import assert from "node:assert/strict";
 
 const sql = fs.readFileSync("supabase/drafts/character-history-aware-deletion.sql", "utf8");
+const chatParentGuard = fs.readFileSync("supabase/drafts/chat-deletion-direct-parent-delete-privilege-guard.sql", "utf8");
 const worker = fs.readFileSync("supabase/functions/_shared/character-asset-cleanup-worker.ts", "utf8");
 const edge = fs.readFileSync("supabase/functions/purge-character-assets/index.ts", "utf8");
 const continuation = fs.readFileSync("supabase/drafts/character-deletion-existing-chat-continuation.sql", "utf8");
@@ -90,6 +91,10 @@ assert.match(behavior, /reserve_chat_turn\([\s\S]*v_chat_session[\s\S]*v_chat_as
 assert.match(behavior, /existing_single_chat_assistant_reply_rejected_after_character_delete/);
 assert.match(behavior, /non_author_character_delete_must_be_rejected_without_mutation/);
 assert.match(sql, /v_author_id IS DISTINCT FROM auth\.uid\(\)[\s\S]*Not allowed to delete this character/);
+assert.match(sql, /REVOKE DELETE ON TABLE public\.characters FROM PUBLIC, anon, authenticated, service_role/);
+assert.match(chatParentGuard, /REVOKE DELETE ON TABLE public\.chat_sessions[\s\S]*FROM PUBLIC, anon, authenticated, service_role/);
+assert.match(chatParentGuard, /REVOKE DELETE ON TABLE public\.chat_groups[\s\S]*FROM PUBLIC, anon, authenticated, service_role/);
+
 
 assert.match(behavior, /append_chat_group_mock_turn\([\s\S]*v_group/);
 assert.match(behavior, /deleted_group_character_must_continue_speaking/);
