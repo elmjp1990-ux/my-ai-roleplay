@@ -144,10 +144,12 @@ SELECT jsonb_pretty(jsonb_build_object(
     SELECT COALESCE(jsonb_agg(jsonb_build_object(
       'schema', n.nspname, 'name', c.relname, 'owner', pg_catalog.pg_get_userbyid(c.relowner),
       'sequence_type', pg_catalog.format_type(s.seqtypid, NULL),
-      'start', s.seqstart, 'increment', s.seqincrement, 'min', s.seqmin,
-      'max', s.seqmax, 'cache', s.seqcache, 'cycle', s.seqcycle,
-      'owned_by', (SELECT jsonb_build_object('table', d.refobjid::regclass::text, 'column', a.attname)
+      'start', s.seqstart::text, 'increment', s.seqincrement::text, 'min', s.seqmin::text,
+      'max', s.seqmax::text, 'cache', s.seqcache::text, 'cycle', s.seqcycle,
+      'owned_by', (SELECT jsonb_build_object('table', rn.nspname || '.' || rt.relname, 'column', a.attname, 'dependency_type', d.deptype)
         FROM pg_catalog.pg_depend d
+        JOIN pg_catalog.pg_class rt ON rt.oid = d.refobjid
+        JOIN pg_catalog.pg_namespace rn ON rn.oid = rt.relnamespace
         JOIN pg_catalog.pg_attribute a ON a.attrelid = d.refobjid AND a.attnum = d.refobjsubid
         WHERE d.classid = 'pg_catalog.pg_class'::regclass AND d.objid = c.oid
           AND d.refclassid = 'pg_catalog.pg_class'::regclass AND d.deptype IN ('a', 'i')
