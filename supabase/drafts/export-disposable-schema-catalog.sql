@@ -66,6 +66,33 @@ SELECT jsonb_pretty(jsonb_build_object(
     JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace
     WHERE n.nspname IN ('public', 'private')
   ),
+  'relation_privileges', (
+    SELECT COALESCE(jsonb_agg(jsonb_build_object(
+      'relation', n.nspname || '.' || c.relname,
+      'grantee', CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE gr.rolname END,
+      'privilege', x.privilege_type, 'grantable', x.is_grantable
+    ) ORDER BY n.nspname, c.relname, x.grantee, x.privilege_type), '[]'::jsonb)
+    FROM pg_catalog.pg_class c
+    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+    CROSS JOIN LATERAL pg_catalog.aclexplode(COALESCE(c.relacl,
+      pg_catalog.acldefault(CASE WHEN c.relkind = 'S' THEN 'S' ELSE 'r' END, c.relowner))) x
+    LEFT JOIN pg_catalog.pg_roles gr ON gr.oid = x.grantee
+    WHERE n.nspname IN ('public', 'private') AND c.relkind IN ('r', 'p', 'v', 'm', 'S', 'f')
+  ),
+  'column_acl', (
+    SELECT COALESCE(jsonb_agg(jsonb_build_object(
+      'table', n.nspname || '.' || c.relname, 'column', a.attname,
+      'grantee', CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE gr.rolname END,
+      'privilege', x.privilege_type, 'grantable', x.is_grantable
+    ) ORDER BY n.nspname, c.relname, a.attnum, x.grantee, x.privilege_type), '[]'::jsonb)
+    FROM pg_catalog.pg_attribute a
+    JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
+    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+    CROSS JOIN LATERAL pg_catalog.aclexplode(a.attacl) x
+    LEFT JOIN pg_catalog.pg_roles gr ON gr.oid = x.grantee
+    WHERE n.nspname IN ('public', 'private') AND a.attnum > 0 AND NOT a.attisdropped
+      AND a.attacl IS NOT NULL
+  ),
   'policies', (
     SELECT COALESCE(jsonb_agg(jsonb_build_object(
       'table', schemaname || '.' || tablename, 'name', policyname,
@@ -92,6 +119,12 @@ SELECT jsonb_pretty(jsonb_build_object(
       'security_definer', p.prosecdef, 'volatility', p.provolatile,
       'strict', p.proisstrict, 'returns_set', p.proretset,
       'config', p.proconfig, 'acl', p.proacl::text,
+      'privileges', (SELECT COALESCE(jsonb_agg(jsonb_build_object(
+        'grantee', CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE gr.rolname END,
+        'privilege', x.privilege_type, 'grantable', x.is_grantable
+      ) ORDER BY x.grantee, x.privilege_type), '[]'::jsonb)
+      FROM pg_catalog.aclexplode(COALESCE(p.proacl, pg_catalog.acldefault('f', p.proowner))) x
+      LEFT JOIN pg_catalog.pg_roles gr ON gr.oid = x.grantee),
       'definition', pg_catalog.pg_get_functiondef(p.oid)
     ) ORDER BY n.nspname, p.proname, pg_catalog.pg_get_function_identity_arguments(p.oid)), '[]'::jsonb)
     FROM pg_catalog.pg_proc p
