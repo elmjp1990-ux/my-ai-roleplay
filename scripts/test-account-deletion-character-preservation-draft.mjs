@@ -57,6 +57,7 @@ const integration = fs.readFileSync(integrationPath, "utf8");
 assert.match(integration, /^-- DRAFT ONLY — NOT AN ACTIVE MIGRATION\./);
 assert.match(integration, /CREATE OR REPLACE FUNCTION public[.]prepare_account_deletion[(]p_user_id uuid[)]/);
 assert.match(integration, /SET search_path TO ''/);
+assert.match(integration.trimEnd(), /\\$function\\$;$/);
 
 // Account deletion also cascades through auth.users -> chat_sessions/chat_groups.
 // The turn-statistics draft must snapshot every owned parent before prepare can
