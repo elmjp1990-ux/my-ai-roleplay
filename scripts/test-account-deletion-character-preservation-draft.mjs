@@ -171,6 +171,23 @@ assert.match(characterDeletionDraft, /CREATE OR REPLACE FUNCTION public[.]claim_
 assert.match(characterDeletionDraft, /CREATE OR REPLACE FUNCTION public[.]finish_character_asset_cleanup_job/);
 assert.match(characterDeletionDraft, /auth[.]jwt[(][)] ->> 'role'/);
 assert.match(characterDeletionDraft, /TO service_role/);
+assert.match(characterDeletionDraft, /dead_letter/);
+assert.match(characterDeletionDraft, /claimed_at < pg_catalog[.]statement_timestamp[(][)] - interval '15 minutes'/);
+const assetWorker = fs.readFileSync("supabase/functions/purge-character-assets/index.ts", "utf8");
+const assetProcessor = fs.readFileSync("supabase/functions/_shared/character-asset-cleanup-worker.ts", "utf8");
+assert.match(assetWorker, /withSupabase[(][{] auth: "secret:default" [}]/);
+assert.match(assetWorker, /claim_character_asset_cleanup_jobs/);
+assert.match(assetWorker, /finish_character_asset_cleanup_job/);
+assert.match(assetWorker, /character_illustrations/);
+assert.match(assetWorker, /avatar_video_path/);
+assert.match(assetProcessor, /isSafeCharacterAssetJob/);
+assert.match(assetProcessor, /asset_still_referenced/);
+assert.match(assetProcessor, /unsafe_asset_path/);
+assert.match(assetProcessor, /markJob[(]job[.]id, "failed"/);
+const assetWorkerTests = fs.readFileSync("supabase/functions/_shared/character-asset-cleanup-worker.test.ts", "utf8");
+assert.match(assetWorkerTests, /skips assets still referenced/);
+assert.match(assetWorkerTests, /Storage errors for retry/);
+assert.match(assetWorkerTests, /owner\/character scoped asset paths/);
 assert.doesNotMatch(characterDeletionDraft, /DELETE FROM storage[.]objects/);
 assert.ok(!characterDeletionDraft.includes("DELETE FROM storage.objects"));
 
