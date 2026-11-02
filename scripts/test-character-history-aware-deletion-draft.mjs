@@ -75,7 +75,7 @@ assert.match(historyFn, /JOIN public\.character_stories cs ON cs\.id = cv\.story
 
 
 
-assert.match(sql, /PERFORM 1[\s\S]*FROM public\.chat_sessions cs[\s\S]*cs\.deleted_at IS NULL[\s\S]*ORDER BY cs\.id[\s\S]*FOR UPDATE/);
+assert.match(sql, /PERFORM 1[\s\S]*FROM public\.chat_sessions AS session_parent[\s\S]*session_parent\.deleted_at IS NULL[\s\S]*ORDER BY session_parent\.id[\s\S]*FOR UPDATE/);
 assert.match(sql, /PERFORM 1[\s\S]*FROM public\.chat_groups g[\s\S]*g\.deleted_at IS NULL[\s\S]*ORDER BY g\.id[\s\S]*FOR UPDATE/);
 assert.match(continuation, /JOIN public\.characters c ON c\.id = m\.character_id[\s\S]*c\.deleted_at IS NULL/);
 assert.match(continuation, /v_cost := v_member_count \* 3/);
