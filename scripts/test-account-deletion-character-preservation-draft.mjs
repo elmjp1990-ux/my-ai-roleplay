@@ -77,6 +77,17 @@ assert.doesNotMatch(archiveFn, /DELETE FROM public[.]characters/);
 assert.doesNotMatch(archiveFn, /DELETE FROM storage[.]objects/);
 assert.match(sql, /GRANT EXECUTE ON FUNCTION private[.]archive_account_characters[(]uuid[)][\s\S]*?TO service_role/);
 
+const behavior = fs.readFileSync(
+  "supabase/drafts/test-account-deletion-character-preservation-behavior.sql",
+  "utf8",
+);
+assert.match(behavior, /public[.]prepare_account_deletion[(]v_author[)]/);
+assert.match(behavior, /account_deletion_must_preserve_character_and_original_public_state/);
+assert.match(behavior, /account_deletion_must_preserve_character_children_and_media/);
+assert.match(behavior, /account_deletion_must_preserve_other_players_existing_chats/);
+assert.match(behavior, /character_snapshot->>'characterStatus' = 'offline'/);
+assert.match(behavior, /speaker_snapshot->>'creatorDisplayName'/);
+
 const integrationPath = "supabase/drafts/prepare-account-deletion-character-preservation-integration.sql";
 const integration = fs.readFileSync(integrationPath, "utf8");
 assert.match(integration, /^-- DRAFT ONLY — NOT AN ACTIVE MIGRATION\./);
