@@ -13,6 +13,12 @@ DECLARE
   v_encounter_draft uuid := '20000000-0000-4000-8000-000000000010';
   v_encounter_state uuid := '80000000-0000-4000-8000-000000000001';
   v_encounter_diary uuid := '80000000-0000-4000-8000-000000000002';
+  v_encounter_session uuid := '50000000-0000-4000-8000-000000000003';
+  v_encounter_user_message uuid := '60000000-0000-4000-8000-000000000004';
+  v_encounter_assistant_message uuid := '60000000-0000-4000-8000-000000000005';
+  v_encounter_turn uuid := '70000000-0000-4000-8000-000000000004';
+  v_encounter_turn_status text;
+  v_encounter_evidence jsonb;
   v_chat_session uuid := '50000000-0000-4000-8000-000000000002';
   v_chat_user_message uuid := '60000000-0000-4000-8000-000000000002';
   v_chat_assistant_message uuid := '60000000-0000-4000-8000-000000000003';
@@ -250,6 +256,18 @@ BEGIN
   VALUES (v_encounter_state, v_user, v_encounter_draft, 12, 'acquaintance');
   INSERT INTO public.encounter_diary (id, user_id, character_id, event_type, summary)
   VALUES (v_encounter_diary, v_user, v_encounter_draft, 'interaction', 'Existing encounter memory');
+  -- Create the Encounter session while the character is still active. The
+  -- player will continue this same session only after the author archives it.
+  INSERT INTO public.chat_sessions (id, user_id, character_id, character_name, chat_mode)
+  VALUES (v_encounter_session, v_user, v_encounter_draft, 'Private draft with encounter history', 'encounter');
+  INSERT INTO public.encounter_session_lifecycle (
+    session_id, user_id, character_id, location_key, schedule_snapshot,
+    scheduled_start_at, scheduled_end_at, status
+  ) VALUES (
+    v_encounter_session, v_user, v_encounter_draft, 'cafe',
+    jsonb_build_object('location_key', 'cafe'),
+    now() - interval '1 hour', now() + interval '1 hour', 'active'
+  );
   v_deleted_at := public.soft_delete_character(v_encounter_draft);
   IF NOT EXISTS (
     SELECT 1 FROM public.characters WHERE id = v_encounter_draft AND deleted_at = v_deleted_at
@@ -265,6 +283,54 @@ BEGIN
       AND summary = 'Existing encounter memory'
   ) THEN
     RAISE EXCEPTION 'encounter_relationship_or_diary_history_was_lost';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.chat_sessions
+    WHERE id = v_encounter_session
+      AND deleted_at IS NULL
+      AND character_snapshot ? 'deletedAt'
+  ) THEN
+    RAISE EXCEPTION 'existing_encounter_session_snapshot_not_preserved';
+  END IF;
+
+  -- Existing Encounter session can still reserve a turn and persist its AI
+  -- reply/evidence after character deletion. No new session is created here.
+  INSERT INTO public.chat_messages (id, session_id, role, content)
+  VALUES (v_encounter_user_message, v_encounter_session, 'user', 'I am continuing our encounter');
+  SELECT r.status INTO v_encounter_turn_status
+  FROM public.reserve_encounter_chat_turn(
+    v_user, v_encounter_turn, v_encounter_session,
+    v_encounter_user_message, v_encounter_assistant_message
+  ) AS r;
+  IF v_encounter_turn_status IS DISTINCT FROM 'reserved' THEN
+    RAISE EXCEPTION 'existing_encounter_turn_reservation_failed_after_character_delete';
+  END IF;
+  INSERT INTO public.chat_messages (id, session_id, role, content)
+  VALUES (
+    v_encounter_assistant_message, v_encounter_session, 'assistant',
+    'I remember our meeting. Let us continue.'
+  );
+  IF public.settle_chat_turn(v_user, v_encounter_turn, v_encounter_assistant_message)
+     IS DISTINCT FROM 'settled' THEN
+    RAISE EXCEPTION 'existing_encounter_turn_settlement_failed_after_character_delete';
+  END IF;
+  v_encounter_evidence := public.record_encounter_session_turn_evidence(
+    v_encounter_turn, v_encounter_session, v_user, v_encounter_draft,
+    v_encounter_user_message, v_encounter_assistant_message,
+    jsonb_build_object('source', 'pr200_disposable_continuation_test')
+  );
+  IF v_encounter_evidence->>'status' IS DISTINCT FROM 'pending'
+     OR NOT EXISTS (
+       SELECT 1 FROM public.encounter_session_turns
+       WHERE turn_id = v_encounter_turn
+         AND session_id = v_encounter_session
+         AND turn_number = 1
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM public.encounter_session_lifecycle
+       WHERE session_id = v_encounter_session AND turn_count = 1
+     ) THEN
+    RAISE EXCEPTION 'existing_encounter_evidence_not_persisted_after_character_delete';
   END IF;
 
   -- Deletion RPC is idempotent: retries return the original deletion timestamp.
