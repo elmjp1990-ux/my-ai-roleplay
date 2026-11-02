@@ -61,6 +61,21 @@ export async function processAccountDeletionWorkItems(
         continue;
       }
 
+      // If Auth deletion committed but the worker crashed before finalize, the
+      // request row may already have cascaded away. The SQL work-items RPC returns
+      // the still-deleting batch specifically for this recovery case.
+      if (item.work_status === "deleting" && batchId) {
+        const authUserAbsent = await deps.isAuthUserAbsent(item.target_user_id);
+        if (authUserAbsent) {
+          const recovered = await deps.finalize(batchId);
+          if (recovered.error || recovered.data !== true) {
+            throw recovered.error ?? new Error("recovery_finalize_not_confirmed");
+          }
+          summary.completed += 1;
+          continue;
+        }
+      }
+
       const archived = await deps.archive(item.target_user_id);
       if (archived.error || !archived.data?.[0]?.batch_id) {
         throw archived.error ?? new Error("archive_batch_missing");
