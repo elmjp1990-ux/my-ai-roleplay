@@ -140,8 +140,8 @@ CREATE POLICY "Existing session owners can read archived character assets"
   USING (private.can_read_character_asset(bucket_id, name));
 
 -- 5) Service-only account archive helper.
--- service_role currently lacks USAGE on private; grant it before invoking this helper.
-GRANT USAGE ON SCHEMA private TO service_role;
+-- The helper is called internally by the SECURITY DEFINER prepare RPC; do not
+-- broaden schema USAGE on the private schema just for this internal call.
 
 -- Call from the final prepare_account_deletion() transaction only after the
 -- request is due and account writes are frozen, but BEFORE deleting auth.users.
@@ -304,31 +304,20 @@ REVOKE ALL ON FUNCTION private.archive_account_characters(uuid)
 GRANT EXECUTE ON FUNCTION private.archive_account_characters(uuid)
   TO service_role;
 
--- 6) Required follow-up integration (not included here):
--- Live test-DB review on 2026-11-02 confirmed prepare_account_deletion(uuid)
--- currently does NOT call this helper. It archives billing evidence, then removes
--- the account's own legacy conversations; Auth/profile deletion can still cascade
--- through characters unless this helper is integrated first.
+-- 6) Transactional integration with the live prepare_account_deletion(uuid).
+-- The complete replacement function, copied from the current test-DB definition
+-- and amended with safe retry handling, lives in:
+--   supabase/drafts/prepare-account-deletion-character-preservation-integration.sql
 --
--- Add the following call inside the final prepare_account_deletion(p_user_id)
--- function, immediately after locking/validating the due account_deletion_requests
--- row and before the existing-batch lookup (including the early "deleting" retry
--- return). This placement is deliberate: the helper is idempotent, and every retry
--- must detach character ownership before any path can continue toward Auth deletion.
+-- It deliberately does NOT call the helper before looking up the existing batch:
+-- a retry after Auth deletion must not require the now-deleted profile row.
+-- Instead it:
+--   - returns immediately for an already-deleting batch, unless legacy owned
+--     character rows still exist (then it archives those rows before returning);
+--   - calls the helper for existing archived/archiving batches; and
+--   - calls the helper for a new batch before any irreversible cleanup.
+-- All helper calls execute inside the same prepare_account_deletion transaction.
+-- The worker's deleting-recovery branch then performs only Auth/finalize steps.
 --
---   PERFORM private.archive_account_characters(p_user_id);
---
--- The call must execute in the SAME PostgreSQL transaction as the rest of
--- prepare_account_deletion. If later archive verification or cleanup fails, all
--- character detachment/snapshot changes must roll back with the transaction.
--- Do not put this call only in the worker's separate archive callback.
---
--- - Add account_archived_at IS NULL to every new-session gate:
---   character_can_start_chat, can_open_encounter_session, create_chat_group,
---   encounter-session, story-session, and any direct session INSERT/RPC.
--- - Update frontend snapshot sync so explicit canonical authorId:null is preserved
---   (do not use canonical.authorId || oldSnapshot.authorId).
--- - Render creatorDisplayName/creatorHandleSnapshot as plain text when authorId is null.
--- - Keep existing chat-turn / encounter-turn paths free of current public-eligibility checks.
--- - Re-check grants, function owner, private schema usage, and all RLS policies.
--- - Test on disposable local DB before any hosted migration is considered.
+-- Do not move either SQL file into active migrations until schema provenance,
+-- disposable PostgreSQL replay, RLS/Storage tests and end-to-end deletion tests pass.
