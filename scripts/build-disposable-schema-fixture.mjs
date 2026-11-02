@@ -245,6 +245,10 @@ export function buildDisposableSchemaSql(structure, routinesSnapshot, security, 
   lines.push("");
 
   for (const defaults of security.default_privileges ?? []) {
+    // Supabase platform-owned defaults (supabase_admin, supabase_auth_admin)
+    // belong to the local platform and cannot be replayed by the app DB role.
+    // Recreate only application-owned postgres defaults from public/storage.
+    if (defaults.owner !== "postgres") continue;
     const owner = quoteIdent(defaults.owner);
     const schema = defaults.schema ? ` IN SCHEMA ${quoteIdent(defaults.schema)}` : "";
     const objectType = ({ r: "TABLES", S: "SEQUENCES", f: "FUNCTIONS", T: "TYPES" })[defaults.object_type];
