@@ -1,65 +1,63 @@
-# Account deletion Storage-sweep audit — 2026-11-02
+# Account deletion — retained character ownership and asset lifecycle — 2026-11-02
 
 Repository: `elmjp1990-ux/my-ai-roleplay`
 PR: #200 — Draft / unmerged
-Environment: connected Supabase test project; catalog/function definitions read only.
-Scope: account deletion worker, chat Storage queue, character illustration/video asset lifecycle.
+Environment: connected Supabase test project; schema/function inspections are read-only.
 No DDL/DML, Auth mutation, Storage mutation, deployment, or Cron change was performed.
 
-## Confirmed current behavior
+## User-approved product policy
 
-### Account deletion worker
+When an account deletion grace period expires:
 
-The current `account-deletion-worker` Edge Function orchestrates only:
-- `get_account_deletion_work_items()`
-- `archive_account_deletion_data()`
-- `prepare_account_deletion()`
-- Auth Admin user lookup/delete
-- `finalize_account_deletion()`
-- `record_account_deletion_failure()`
+1. **Do not delete the author's character content.** Keep the character records, character settings, illustration files, avatar videos, and creator attribution.
+2. **Detach the author from the public profile route.** The author attribution may still be displayed as historical creator information, but it must not be clickable and must not navigate to a live author profile page.
+3. **Move all characters owned by that account into a private/archived state.** They must disappear from public discovery, city/map encounter discovery, recommendations, and every entry point that creates a new conversation.
+4. **Allow existing conversations to continue.** A player who already has a conversation with that character may continue that same conversation. The character must not be selectable to start a new single chat, new group chat, new encounter/story session, or a duplicate conversation.
+5. Preserve existing conversation history and references to the character; do not cascade-delete the character or its media as part of account deletion.
+6. This policy is distinct from chat-memory photo retention. Existing chat deletion's 30-day Storage lifecycle remains unchanged.
 
-It does not enumerate, queue, or remove Storage objects.
+This supersedes the earlier open question about deleting character Storage assets after the grace period: **character illustrations and avatar videos are retained with their character records; they are not queued for account-deletion deletion.**
 
-### Chat-memory objects
+## Important schema consequence
 
-- Private bucket: `personax-memory-photos`.
-- `chat_deletion_jobs` has no FK to chat parents or Auth users, so its retention job can survive account/profile/Auth cascade.
-- `chat_storage_deletion_jobs.deletion_job_id` references `chat_deletion_jobs(id) ON DELETE CASCADE`.
-- The storage claim RPC only claims storage jobs after their parent chat-deletion job is completed and its 30-day `purge_after` is due.
-- Chat deletion RPCs snapshot chat-memory object paths into that queue before marking the parent deleted.
-- The account deletion prepare function does not explicitly delete either queue. Auth cascades can remove the chat parent and `chat_memory_photos` metadata, but the independent chat-deletion job remains available to gate the later Storage cleanup.
+The live test schema currently has:
+- `characters.author_id → profiles(id) ON DELETE CASCADE`
+- `character_illustrations.author_id → profiles(id) ON DELETE CASCADE`
+- `character_illustrations.character_id → characters(id) ON DELETE CASCADE`
+- `profiles.id` is the profile identity, and the inspected schema links profile deletion to Auth deletion through the account data model.
 
-This is consistent with preserving the chat's 30-day retention policy even if the account is deleted earlier, provided the queue and worker remain operational.
+Therefore, simply deleting the Auth user using the existing cascade path would destroy the character and illustration metadata even if Storage objects were left untouched. Leaving Storage objects behind is not sufficient.
 
-### Character assets
+The account-deletion implementation must be redesigned so character records and attribution survive without retaining a login-capable Auth account or a navigable public author profile. Do not weaken RLS or leave a deleted Auth identity active merely to preserve attribution.
 
-The test project has private buckets:
-- `character-illustrations`
-- `character-avatar-videos`
+## Required architecture work before implementation
 
-The relational structure confirms:
-- `characters.author_id` references `profiles(id) ON DELETE CASCADE`.
-- `character_illustrations.author_id` references `profiles(id) ON DELETE CASCADE`.
-- `character_illustrations.character_id` references `characters(id) ON DELETE CASCADE`.
-- `characters.avatar_video_path` stores the avatar-video object path.
-- `character_illustration_cleanup_jobs` is an owner-scoped queue used by browser code for failed-upload/temporary illustration cleanup. It is not an account-deletion worker queue and no database trigger was found on `characters` or `character_illustrations` to enqueue account-deletion cleanup.
+1. Introduce a durable, non-login creator-attribution identity (or equivalent immutable snapshot) that is not FK-cascaded from `auth.users` or `profiles`. It must preserve the agreed author attribution while exposing no live author-page link.
+2. Repoint/decouple character ownership and illustration ownership from the deletable Auth profile. Preserve a stable creator reference for historical attribution, but distinguish it from an active account owner.
+3. Define a strict account-deleted character state, e.g. `visibility='private'` plus an explicit account-deleted/archived state. Existing private/deleted status semantics must not be conflated if they produce different access rules.
+4. Make all public discovery and new-conversation entry points reject archived characters, including direct RPC/Edge Function paths. Frontend hiding alone is not sufficient.
+5. Add a narrow authorization path for existing conversation participants to continue their existing conversation with an archived character. It must validate the existing conversation/character relationship server-side and must not allow creating a new conversation or reusing an old conversation ID to bypass the restriction.
+6. Preserve character rows, `character_illustrations` rows, `avatar_video_path`, and both private Storage buckets. Ensure existing signed-URL refresh and media access still work for permitted existing conversations; do not make assets public.
+7. Account deletion worker must snapshot/transform ownership and archive profile attribution before Auth deletion, under the same fenced transaction/lease protocol. The process must be idempotent and recoverable if it crashes before or after Auth deletion.
+8. Retain the independent chat-memory photo deletion queue and its 30-day `purge_after` gate. Account deletion must not bypass or reset it.
+9. Test with multiple characters and multiple existing conversations; verify discovery/new-chat denial, existing-chat continuation, creator label display without link, image/video access, RLS isolation, stale JWT denial, and Auth deletion recovery.
 
-When Auth/profile cascade removes a user's character and illustration rows, Storage objects do not automatically disappear. The current account-deletion worker does not sweep either character bucket. This creates a likely orphaned-private-object gap for account deletion.
+## Acceptance criteria
 
-## Required design before implementation
-
-1. Decide and document the retention point for character assets on account deletion (remove at the end of the account grace period, or retain for a separate period). Do not infer this from chat's 30-day policy.
-2. Before relational/Auth deletion removes the source rows, snapshot only that user's character asset paths into a durable account-deletion Storage queue linked to the archive batch, not by FK to `auth.users`, `profiles`, or `characters`.
-3. Include both `characters.avatar_video_path` and every `character_illustrations.storage_path` row owned by the target author.
-4. Validate bucket allowlist and exact object path shape: owner UUID / character UUID / asset UUID + allowed extension. Never use a broad owner-folder recursive delete.
-5. Keep chat-memory objects out of this character-asset queue. Their independent 30-day chat-deletion job controls their timing.
-6. Make claim/mark/retry/dead-letter operations service-role-only, idempotent, bounded, and durable after Auth deletion. Do not depend on a browser session or the current owner remaining authenticated.
-7. Recheck that the object path is not referenced by another live row before removal; treat missing objects as idempotent success only after a confirmed Storage response.
-8. Add tests for Auth cascade, multiple characters, primary/gallery/video assets, duplicate paths, foreign-owner path rejection, retryable Storage errors, dead-letter, and chat-memory retention separation.
+- [ ] Auth account is deleted after the configured grace period.
+- [ ] Character records and all associated illustration/video Storage objects remain.
+- [ ] Historical creator attribution remains visible, but author handle/avatar attribution is not a link to a live author page.
+- [ ] Characters are absent from all public lists, map locations, recommendations, and new-chat creation paths.
+- [ ] Existing authorized conversations can continue.
+- [ ] No new single/group chat, encounter, or story session can be created for an archived character.
+- [ ] A stale JWT or deleted account cannot use author-management APIs or mutate retained characters.
+- [ ] Chat-memory photo retention continues on its separate 30-day schedule.
+- [ ] Local migration replay, independent-session concurrency tests, and all CI checks pass before merge.
 
 ## Status / release gate
 
-- Finding: character illustration/video Storage cleanup is not currently integrated into account deletion.
-- Chat-memory Storage retention has a separate durable queue and 30-day gate; do not bypass it during account deletion.
-- No implementation or policy change made in this audit.
-- The account-deletion Storage sweep remains a merge blocker until retention semantics, queue design, tests, and recovery behavior are approved.
+- User-approved policy recorded; implementation is not yet done.
+- Previous proposed character-asset Storage sweep is no longer the correct solution. Preserve those objects and their metadata instead.
+- The current profile/character cascade is incompatible with this policy and is a critical blocker for account deletion.
+- PR #200 must remain Draft/unmerged until schema, RLS, frontend, RPC/Edge Function guards, recovery tests, and migration provenance are resolved.
+- No database or hosted data changes were made in this update.
