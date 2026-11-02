@@ -18,7 +18,10 @@ AS $function$
 DECLARE
   v_character_id uuid;
 BEGIN
-  v_character_id := NULLIF(pg_catalog.to_jsonb(NEW) ->> 'character_id', '')::uuid;
+  v_character_id := NULLIF(COALESCE(
+    pg_catalog.to_jsonb(NEW) ->> 'character_id',
+    pg_catalog.to_jsonb(NEW) ->> 'world_character_id'
+  ), '')::uuid;
 
   IF v_character_id IS NOT NULL
      AND EXISTS (
@@ -44,28 +47,35 @@ REVOKE ALL ON FUNCTION private.reject_account_archived_character_entry()
 DROP TRIGGER IF EXISTS reject_archived_character_new_chat
   ON public.chat_sessions;
 CREATE TRIGGER reject_archived_character_new_chat
-  BEFORE INSERT ON public.chat_sessions
+  BEFORE INSERT OR UPDATE OF character_id ON public.chat_sessions
+  FOR EACH ROW
+  EXECUTE FUNCTION private.reject_account_archived_character_entry();
+
+DROP TRIGGER IF EXISTS reject_archived_character_new_world_group
+  ON public.chat_groups;
+CREATE TRIGGER reject_archived_character_new_world_group
+  BEFORE INSERT OR UPDATE OF world_character_id ON public.chat_groups
   FOR EACH ROW
   EXECUTE FUNCTION private.reject_account_archived_character_entry();
 
 DROP TRIGGER IF EXISTS reject_archived_character_new_group_member
   ON public.chat_group_members;
 CREATE TRIGGER reject_archived_character_new_group_member
-  BEFORE INSERT ON public.chat_group_members
+  BEFORE INSERT OR UPDATE OF character_id ON public.chat_group_members
   FOR EACH ROW
   EXECUTE FUNCTION private.reject_account_archived_character_entry();
 
 DROP TRIGGER IF EXISTS reject_archived_character_new_encounter
   ON public.encounter_session_lifecycle;
 CREATE TRIGGER reject_archived_character_new_encounter
-  BEFORE INSERT ON public.encounter_session_lifecycle
+  BEFORE INSERT OR UPDATE OF character_id ON public.encounter_session_lifecycle
   FOR EACH ROW
   EXECUTE FUNCTION private.reject_account_archived_character_entry();
 
 DROP TRIGGER IF EXISTS reject_archived_character_new_story
   ON public.story_relationship_states;
 CREATE TRIGGER reject_archived_character_new_story
-  BEFORE INSERT ON public.story_relationship_states
+  BEFORE INSERT OR UPDATE OF character_id ON public.story_relationship_states
   FOR EACH ROW
   EXECUTE FUNCTION private.reject_account_archived_character_entry();
 
