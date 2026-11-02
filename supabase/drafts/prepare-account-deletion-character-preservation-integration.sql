@@ -433,5 +433,4 @@ BEGIN
 
   RETURN QUERY SELECT v_batch_id, p_user_id, 'deleting'::text;
 END;
-$function$
-
+$function$;
