@@ -16,7 +16,8 @@ assert.match(sql, /ci\.storage_path IS NULL[\s\S]*ci\.storage_path !~/);
 // Only an actual INSERT creates the immutable private-draft origin record.
 // This avoids BEFORE INSERT upsert triggers marking an existing legacy row.
 assert.match(sql, /CREATE TABLE IF NOT EXISTS private\.character_private_draft_origins/);
-assert.match(sql, /AFTER INSERT ON public\.characters[\s\S]*EXECUTE FUNCTION private\.record_character_private_draft_origin\(\)/);\nassert.doesNotMatch(sql, /BEFORE INSERT ON public\.characters[\s\S]*record_character_private_draft_origin/);
+assert.match(sql, /AFTER INSERT ON public\.characters[\s\S]*EXECUTE FUNCTION private\.record_character_private_draft_origin\(\)/);
+assert.doesNotMatch(sql, /BEFORE INSERT ON public\.characters[\s\S]*record_character_private_draft_origin/);
 assert.match(sql, /REVOKE ALL ON private\.character_private_draft_origins FROM PUBLIC, anon, authenticated, service_role/);
 assert.match(sql, /UPDATE public\.characters[\s\S]*WHERE visibility = 'public'[\s\S]*first_published_at IS NULL/);
 assert.match(sql, /OLD\.visibility = 'public' OR NEW\.visibility = 'public'[\s\S]*NEW\.first_published_at := pg_catalog\.statement_timestamp\(\)/);
