@@ -7,6 +7,7 @@ const edge = fs.readFileSync("supabase/functions/purge-character-assets/index.ts
 const continuation = fs.readFileSync("supabase/drafts/character-deletion-existing-chat-continuation.sql", "utf8");
 const behavior = fs.readFileSync("supabase/drafts/test-character-deletion-behavior.sql", "utf8");
 const replay = fs.readFileSync("supabase/drafts/replay-and-test-character-deletion.sql", "utf8");
+const encounterTurnEdge = fs.readFileSync("supabase/functions/encounter-turn/index.ts", "utf8");
 
 assert.match(sql, /CREATE OR REPLACE FUNCTION private\.lock_character_asset_path\(/);
 assert.match(sql, /pg_advisory_xact_lock\([\s\S]*hashtextextended\(p_bucket_id\s*\|\|\s*':'\s*\|\|\s*p_object_path/);
@@ -85,6 +86,13 @@ assert.match(behavior, /existing_single_chat_assistant_reply_rejected_after_char
 assert.match(behavior, /append_chat_group_mock_turn\([\s\S]*v_group/);
 assert.match(behavior, /deleted_group_character_must_not_speak_again/);
 assert.match(behavior, /group_turn_must_charge_only_remaining_active_character/);
+assert.match(behavior, /reserve_encounter_chat_turn\\([\\s\\S]*v_encounter_session[\\s\\S]*v_encounter_assistant_message/);
+assert.match(behavior, /record_encounter_session_turn_evidence\\([\\s\\S]*v_encounter_turn/);
+assert.match(behavior, /existing_encounter_evidence_not_persisted_after_character_delete/);
+assert.doesNotMatch(encounterTurnEdge, /can_open_encounter_session/);
+assert.match(encounterTurnEdge, /reserve_encounter_chat_turn/);
+assert.match(encounterTurnEdge, /session\\.user_id/);
+
 assert.match(replay, /character-deletion-existing-chat-continuation\.sql/);
 
 console.log("Character asset cleanup path-lock and reference guards passed.");
