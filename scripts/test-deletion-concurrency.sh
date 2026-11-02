@@ -229,10 +229,10 @@ COMMIT;
 SQL
 cat > "$tmpdir/asset-reattach-after-delete.sql" <<SQL
 BEGIN;
-SET LOCAL ROLE authenticated;
+SET LOCAL ROLE service_role;
 SELECT set_config('request.jwt.claim.sub', '$asset_author', true);
-SELECT set_config('request.jwt.claim.role', 'authenticated', true);
-SELECT set_config('request.jwt.claims', '{"sub":"$asset_author","role":"authenticated"}', true);
+SELECT set_config('request.jwt.claim.role', 'service_role', true);
+SELECT set_config('request.jwt.claims', '{"sub":"$asset_author","role":"service_role"}', true);
 INSERT INTO public.character_illustrations (
   id, character_id, author_id, storage_path, asset_type, sort_order
 ) VALUES (
