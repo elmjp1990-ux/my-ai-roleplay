@@ -383,6 +383,16 @@ assert.match(characterDeletionDraft, /s[.]character_id = p_character_id/);
 assert.doesNotMatch(characterDeletionDraft, /s[.]deleted_at IS NULL/);
 assert.match(characterDeletionDraft, /v_first_published_at IS NULL[\s\S]*?v_visibility = 'private'[\s\S]*?v_review_status = 'draft'[\s\S]*?NOT v_has_history/);
 assert.doesNotMatch(characterDeletionDraft, /v_review_status <> 'approved'/);
+const publicationGuard = characterDeletionDraft.match(
+  /CREATE OR REPLACE FUNCTION private[.]preserve_character_first_publication_timestamp[(][\\s\\S]*?\\$function\\$;/,
+)?.[0];
+assert.ok(publicationGuard, "immutable first-publication timestamp guard must exist");
+assert.match(publicationGuard, /OLD[.]first_published_at IS NOT NULL/);
+assert.match(publicationGuard, /NEW[.]first_published_at IS DISTINCT FROM OLD[.]first_published_at/);
+assert.match(publicationGuard, /NEW[.]visibility = 'public'/);
+assert.match(characterDeletionDraft, /BEFORE INSERT OR UPDATE OF first_published_at, visibility ON public[.]characters/);
+assert.match(characterDeletionDraft, /character_first_publication_is_immutable/);
+assert.match(characterDeletionDraft, /first transition to visibility='public' stamps first_published_at/);
 assert.match(characterDeletionDraft, /DELETE FROM public[.]characters WHERE id = p_character_id/);
 assert.ok(characterDeletionDraft.includes("SET visibility = 'private',"));
 assert.ok(characterDeletionDraft.includes("deletion_reason = 'author_deleted'"));
