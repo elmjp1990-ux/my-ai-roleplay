@@ -144,7 +144,7 @@ const characterDeletionDraft = fs.readFileSync(
   "supabase/drafts/character-history-aware-deletion.sql",
   "utf8",
 );
-assert.match(characterDeletionDraft, /^-- DRAFT ONLY — NOT AN ACTIVE MIGRATION\\./);
+assert.ok(characterDeletionDraft.startsWith("-- DRAFT ONLY — NOT AN ACTIVE MIGRATION."));
 assert.match(characterDeletionDraft, /CREATE TABLE IF NOT EXISTS public[.]character_asset_cleanup_jobs/);
 assert.match(characterDeletionDraft, /ENABLE ROW LEVEL SECURITY/);
 assert.match(characterDeletionDraft, /REVOKE ALL ON public[.]character_asset_cleanup_jobs FROM PUBLIC, anon, authenticated/);
@@ -162,16 +162,16 @@ assert.match(characterDeletionDraft, /s[.]character_id = p_character_id/);
 assert.doesNotMatch(characterDeletionDraft, /s[.]deleted_at IS NULL/);
 assert.match(characterDeletionDraft, /v_first_published_at IS NULL AND NOT v_has_history/);
 assert.match(characterDeletionDraft, /DELETE FROM public[.]characters WHERE id = p_character_id/);
-assert.match(characterDeletionDraft, /SET visibility = 'private'[\\s\\S]*?deletion_reason = 'author_deleted'/);
+assert.match(characterDeletionDraft, /SET visibility = 'private'[\\s\S]*?deletion_reason = 'author_deleted'/);
 assert.match(characterDeletionDraft, /character-avatar-videos/);
 assert.match(characterDeletionDraft, /character-illustrations/);
-assert.match(characterDeletionDraft, /auth[.]uid[(][)]::text \\|\\| '\/' \\|\\| p_character_id::text/);
+assert.ok(characterDeletionDraft.includes("auth.uid()::text || '/' || p_character_id::text"));
 assert.match(characterDeletionDraft, /CREATE OR REPLACE FUNCTION public[.]claim_character_asset_cleanup_jobs/);
 assert.match(characterDeletionDraft, /CREATE OR REPLACE FUNCTION public[.]finish_character_asset_cleanup_job/);
 assert.match(characterDeletionDraft, /auth[.]jwt[(][)] ->> 'role'/);
 assert.match(characterDeletionDraft, /TO service_role/);
 assert.doesNotMatch(characterDeletionDraft, /DELETE FROM storage[.]objects/);
-assert.doesNotMatch(characterDeletionDraft, /DELETE FROM public[.]characters[\\s\\S]*?account_archived_at/);
+assert.doesNotMatch(characterDeletionDraft, /DELETE FROM public[.]characters[\s\S]*?account_archived_at/);
 
 console.log("Account and character deletion draft guards: passed (static only; no SQL execution).");
 
