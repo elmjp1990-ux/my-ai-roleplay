@@ -10,6 +10,9 @@ DECLARE
   v_asset_draft uuid := '20000000-0000-4000-8000-000000000007';
   v_group_draft uuid := '20000000-0000-4000-8000-000000000008';
   v_group_other_draft uuid := '20000000-0000-4000-8000-000000000009';
+  v_encounter_draft uuid := '20000000-0000-4000-8000-000000000010';
+  v_encounter_state uuid := '80000000-0000-4000-8000-000000000001';
+  v_encounter_diary uuid := '80000000-0000-4000-8000-000000000002';
   v_group uuid := '50000000-0000-4000-8000-000000000001';
   v_group_turn uuid := '60000000-0000-4000-8000-000000000001';
   v_asset_file uuid := '30000000-0000-4000-8000-000000000001';
@@ -165,6 +168,36 @@ BEGIN
     WHERE id = v_group_other_draft AND deleted_at IS NULL
   ) THEN
     RAISE EXCEPTION 'other_group_character_was_affected_by_single_character_delete';
+  END IF;
+
+  -- Encounter relationship and diary rows are player history and must survive character deletion.
+  INSERT INTO public.characters (id, author_id, name, visibility, review_status)
+  VALUES (v_encounter_draft, v_user, 'Private draft with encounter history', 'private', 'draft');
+  INSERT INTO public.encounter_character_state (id, user_id, character_id, affinity, relationship_stage)
+  VALUES (v_encounter_state, v_user, v_encounter_draft, 12, 'acquaintance');
+  INSERT INTO public.encounter_diary (id, user_id, character_id, event_type, summary)
+  VALUES (v_encounter_diary, v_user, v_encounter_draft, 'interaction', 'Existing encounter memory');
+  v_deleted_at := public.soft_delete_character(v_encounter_draft);
+  IF NOT EXISTS (
+    SELECT 1 FROM public.characters WHERE id = v_encounter_draft AND deleted_at = v_deleted_at
+  ) THEN
+    RAISE EXCEPTION 'character_with_encounter_history_must_soft_delete';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.encounter_character_state
+    WHERE id = v_encounter_state AND character_id = v_encounter_draft AND affinity = 12
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.encounter_diary
+    WHERE id = v_encounter_diary AND character_id = v_encounter_draft
+      AND summary = 'Existing encounter memory'
+  ) THEN
+    RAISE EXCEPTION 'encounter_relationship_or_diary_history_was_lost';
+  END IF;
+
+  -- Deletion RPC is idempotent: retries return the original deletion timestamp.
+  IF public.soft_delete_character(v_group_draft) IS DISTINCT FROM v_deleted_at
+     AND NOT EXISTS (SELECT 1 FROM public.characters WHERE id = v_group_draft AND deleted_at IS NOT NULL) THEN
+    RAISE EXCEPTION 'duplicate_character_delete_did_not_remain_idempotent';
   END IF;
 
   -- A truly unused new draft queues both exact asset paths before hard deletion.
