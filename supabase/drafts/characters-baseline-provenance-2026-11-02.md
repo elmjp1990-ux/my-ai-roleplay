@@ -440,3 +440,38 @@ Next trusted sources: original SQL Editor history, a user-held SQL export, or an
 1. 繼續追查剩餘 52 個 remote migration 名稱的原始來源，優先找出基礎表之前的 bootstrap SQL。
 2. 對五個恢復檔案逐項核對目前後續 migration 是否有重複定義或行為衝突。
 3. 完成完整 migration manifest、時間戳衝突與依賴順序檢查後，再做 disposable-only replay 設計。
+
+
+## 2026-11-02｜Round 73：擴大 Git 歷史與 Supabase catalog 證據
+
+### Git 歷史追查結果
+
+- 搜尋目前可見的 209 個 repository branches（分三頁），包含 `v1-backup`、`main`、security/account-deletion 分支及 bootstrap workflow 分支；沒有發現可直接採信的 schema dump 檔案。
+- 檢查最早的角色雲端寫入程式 commit `79760d81e2d72b73808ac8807c7ec0b75bb61ecf`（2026-10-14）。它已對 `public.characters`、`public.profiles` 執行 upsert，但 diff 沒有 CREATE TABLE SQL，表示應用程式連線時兩表已存在；仍不能推定建表來源。
+- 檢查最早的聊天雲端保存 commit `460adf7dfdd284b5f8e51ebedc8d0a7548c6ee2d`。它新增的是前端 chat_sessions / chat_messages persistence，沒有建立 profiles 或 characters。
+- 針對 `CREATE TABLE public.profiles`、`CREATE TABLE public.characters` 等字串進行 GitHub code search，未回傳結果；該搜尋索引並非完整，因此只能記為「未找到」，不能證明所有 Git 歷史或私人 SQL Editor 記錄均不存在。
+- 另以 commit search 檢查 migration 名稱，確認部分歷史 SQL 原始內容可在早期 commit diff 找到（如 wallet charging / transaction function / idempotency / conflict-target），但它們不是 profiles / characters bootstrap DDL，也不能補上基礎 schema 缺口。
+
+### 本輪 Supabase read-only catalog evidence
+
+使用 Supabase verbose table inventory 重新確認（未讀取任何資料列內容）：
+
+- `public.profiles`：10 欄，PK `id`，unique `handle`，FK `id → auth.users(id)`；RLS enabled；4 rows。
+- `public.characters`：24 欄，PK `id`，FK `author_id → profiles(id)`；RLS enabled；11 rows。
+- characters 目前欄位包括 `id, author_id, name, title, gender, age, avatar_url, visibility, review_status, created_at, intro, race, style, tags, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason, phone_settings, nsfw_workplace_warning, is_nsfw, avatar_video_path, personality_profile`。
+- profiles 目前欄位包括 `id, handle, nickname, avatar_url, bio, status, created_at, persona_presets, birthdate, follower_count`。
+- list_tables 也確認 characters 的直接 FK dependents 包含 chat_sessions、chat_groups、chat_group_members/messages、character_stories、character_private_info、illustrations、schedules、comments、encounter 與 story relationship records。這些依賴再次說明不能在 hosted project drop/recreate 核心表。
+- Supabase extension inventory 顯示目前啟用的相關 extensions 包含 `pg_cron`、`pg_net`、`pgcrypto`、`uuid-ossp`、`pg_stat_statements`、`vector`、`pg_graphql` 等；但 inventory 不能證明 profiles/characters 原始建表時的 extension 依賴與安裝順序。
+
+### 本輪結論與界線
+
+- 沒有找到 profiles / characters 的原始 CREATE TABLE SQL 或可信 schema-only dump。
+- live inventory 仍只能作為現況比對證據，不足以單獨生成可安全 replay 的完整 baseline；尤其 ACL/default privileges、完整函式定義、trigger function、所有 indexes/policies、extension dependencies 與精確 FK action 仍須逐項捕捉。
+- 本輪只有 GitHub 讀取與 Supabase inventory/extension listing；沒有執行 SQL、DDL/DML、migration、RPC、reset、db push、部署或排程。
+- 不新增 synthetic baseline，不變更 hosted migration ledger；PR #200 維持 Draft/unmerged。
+
+### 下一步
+
+1. 優先從 Supabase Dashboard SQL Editor 歷史或使用者保存的 schema-only export 取得真正的基礎表來源。
+2. 若無法取得，需先明確批准建立「synthetic disposable-local-only baseline」，並以完整 catalog dump（非 list_tables 摘要）做來源註記與差異審查。
+3. 取得完整 schema source 後，才恢復 local PostgreSQL migration replay；在此之前不將 CI 靜態測試稱為 SQL integration pass。
