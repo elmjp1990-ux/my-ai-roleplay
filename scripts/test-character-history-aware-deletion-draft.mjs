@@ -94,6 +94,8 @@ assert.match(sql, /v_author_id IS DISTINCT FROM auth\.uid\(\)[\s\S]*Not allowed 
 assert.match(behavior, /append_chat_group_mock_turn\([\s\S]*v_group/);
 assert.match(behavior, /deleted_group_character_must_continue_speaking/);
 assert.match(behavior, /deleted_group_character_must_remain_billable/);
+assert.ok(behavior.trimEnd().endsWith("$;"), "character deletion behavior DML must close its DO block");
+
 assert.match(behavior, /reserve_encounter_chat_turn\([\s\S]*v_encounter_session[\s\S]*v_encounter_assistant_message/);
 assert.match(behavior, /record_encounter_session_turn_evidence\([\s\S]*v_encounter_turn/);
 assert.match(behavior, /existing_encounter_evidence_not_persisted_after_character_delete/);
