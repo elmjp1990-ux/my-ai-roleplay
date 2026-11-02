@@ -131,6 +131,7 @@ GRANT EXECUTE ON FUNCTION private.can_read_character_asset(text, text)
 -- and could remove a still-live asset. This caller-bound RPC is fail-closed:
 -- inactive/deleted/revoked sessions and any remaining reference all return false.
 CREATE OR REPLACE FUNCTION public.can_process_character_illustration_cleanup(
+  p_job_id uuid,
   p_user_id uuid,
   p_storage_path text
 )
@@ -148,6 +149,18 @@ BEGIN
   END IF;
 
   IF NOT public.account_is_active() THEN
+    RETURN false;
+  END IF;
+
+  -- The job must still exist. Account archival/cancellation removes it, so an
+  -- already-running browser task cannot act on a stale job held in memory.
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.character_illustration_cleanup_jobs AS j
+    WHERE j.id = p_job_id
+      AND j.author_id = p_user_id
+      AND j.storage_path = p_storage_path
+  ) THEN
     RETURN false;
   END IF;
 
@@ -486,9 +499,9 @@ GRANT EXECUTE ON FUNCTION private.archive_account_characters(uuid)
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.can_process_character_illustration_cleanup(uuid, text)
+REVOKE ALL ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
   FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.can_process_character_illustration_cleanup(uuid, text)
+GRANT EXECUTE ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
   TO authenticated;
 
 -- Existing public/author policies remain. These additional SELECT policies are
