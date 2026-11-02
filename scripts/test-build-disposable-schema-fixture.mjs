@@ -27,6 +27,10 @@ assert.match(sql, /ALTER TABLE "public"\."characters" ENABLE ROW LEVEL SECURITY/
 assert.match(sql, /ALTER SCHEMA "private" OWNER TO/);
 assert.match(sql, /GRANT EXECUTE ON FUNCTION/);
 assert.match(sql, /ALTER DEFAULT PRIVILEGES/);
+assert.doesNotMatch(sql, /ALTER DEFAULT PRIVILEGES FOR ROLE "supabase_admin"/);
+assert.doesNotMatch(sql, /ALTER DEFAULT PRIVILEGES FOR ROLE "supabase_auth_admin"/);
+assert.match(sql, /ALTER DEFAULT PRIVILEGES FOR ROLE "postgres"/);
+
 assert.match(sql, /SET check_function_bodies = off/);
 assert.match(sql, /SET check_function_bodies = on/);
 assert.equal((sql.match(/CREATE TABLE IF NOT EXISTS /g) ?? []).length, 47);
