@@ -113,6 +113,59 @@ assert.match(activeGuard, /^-- DRAFT ONLY/);
 assert.match(activeGuard, /EXISTS [(][\s\S]*?FROM auth[.]users AS u[\s\S]*?u[.]id = auth[.]uid[(][)]/);
 assert.match(activeGuard, /NOT EXISTS [(][\s\S]*?account_deletion_requests/);
 
+// Existing-session media reads must use the same live-account gate; the
+// Auth-user-existence guard above makes this stale-JWT safe.
+assert.match(existingSessionFn, /public[.]account_is_active[(][)] IS TRUE/);
+
+// Retained character child tables get restrictive pending-deletion gates.
+const childWriteFreeze = fs.readFileSync(
+  "supabase/drafts/account-deletion-character-child-write-freeze.sql",
+  "utf8",
+);
+assert.match(childWriteFreeze, /^-- DRAFT ONLY — NOT AN ACTIVE MIGRATION[.]/);
+for (const table of [
+  "character_private_info",
+  "character_schedules",
+  "character_schedule_descriptions",
+  "character_illustrations",
+]) {
+  const start = childWriteFreeze.indexOf("CREATE POLICY account_must_be_active");
+  const tableStart = childWriteFreeze.indexOf("ON public." + table, start);
+  const policyEnd = childWriteFreeze.indexOf("WITH CHECK (public.account_is_active())", tableStart);
+  assert.ok(start >= 0 && tableStart > start && policyEnd > tableStart,
+    table + " must have an account-active restrictive policy");
+  assert.ok(childWriteFreeze.slice(start, policyEnd).includes("AS RESTRICTIVE"));
+  assert.ok(childWriteFreeze.slice(start, policyEnd).includes("FOR ALL"));
+  assert.ok(childWriteFreeze.slice(start, policyEnd).includes("TO authenticated"));
+}
+
+// New session/member attachments are blocked at the database boundary,
+// including service-role RPC inserts. Existing turns/messages remain continuable.
+const sessionGuardFn = sql.match(
+  /CREATE OR REPLACE FUNCTION private[.]guard_new_session_character_not_archived[(][\s\S]*?\$function\$;/,
+)?.[0];
+assert.ok(sessionGuardFn, "new session archived-character trigger function must exist");
+assert.match(sessionGuardFn, /SECURITY DEFINER/);
+assert.match(sessionGuardFn, /SET search_path TO ''/);
+assert.match(sessionGuardFn, /FOR KEY SHARE/);
+assert.match(sessionGuardFn, /account_archived_at/);
+assert.match(sql, /CREATE TRIGGER guard_archived_character_chat_session[\s\S]*?BEFORE INSERT OR UPDATE OF character_id[\s\S]*?ON public[.]chat_sessions/);
+assert.match(sql, /CREATE TRIGGER guard_archived_character_group_member[\s\S]*?BEFORE INSERT OR UPDATE OF character_id[\s\S]*?ON public[.]chat_group_members/);
+assert.doesNotMatch(sql, /ON public[.]chat_group_messages/);
+
+const startChatFn = sql.match(
+  /CREATE OR REPLACE FUNCTION public[.]character_can_start_chat[(][\s\S]*?\$function\$;/,
+)?.[0];
+assert.ok(startChatFn, "single/story new-session eligibility helper must exist");
+assert.match(startChatFn, /account_archived_at IS NULL/);
+const encounterEligibilityFn = sql.match(
+  /CREATE OR REPLACE FUNCTION public[.]can_open_encounter_session[(][\s\S]*?\$function\$;/,
+)?.[0];
+assert.ok(encounterEligibilityFn, "encounter new-session eligibility helper must exist");
+assert.match(encounterEligibilityFn, /account_archived_at IS NULL/);
+assert.match(archiveFn, /FOR UPDATE OF cs/);
+assert.match(archiveFn, /FOR UPDATE OF st/);
+
 const archivedEntryGuard = fs.readFileSync(
   "supabase/drafts/account-archived-character-session-insert-guard.sql",
   "utf8",
