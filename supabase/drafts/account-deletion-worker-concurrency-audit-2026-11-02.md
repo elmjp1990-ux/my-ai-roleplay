@@ -102,3 +102,10 @@ Commits: 60e339fed954533b6ea95fd8652504576682c99b (worker), 380ab0567c700feac602
 - Commits: worker `48a07804c85ec4852c2282aa7068ecd60eb10999`; handler `d4686645b7c1a4122bce7abbea46072183931a4c`; test `1b2af4648407d58eafe597fb436282fbea808364`.
 - CI runs for worker and handler commits were observed in progress at audit time; test commit was just pushed and requires its own run/result. Do not call this verified until all latest runs complete successfully.
 - No hosted RPC/DDL/DML, Auth user creation/deletion, deployment, or cron change. PR #200 remains Draft/unmerged. Atomic lease/fencing remains a separate blocking item.
+
+
+### Round 31 CI follow-up
+
+- Initial CI exposed incomplete test expectation updates after adding `failureReportFailed`: type-check/tests failed, and the two new tests initially expected zero report failures despite intentionally failing report calls.
+- Updated all exact summary assertions and the two-item case to expect two failed reports. Commit `d3571af91b2e7cf8c7a4e9fee8dc41fa8218767b`.
+- Prior failing runs: `41392075705`, `41392081220`, `41392091899`; failure causes inspected from job logs. Awaiting the new commit's workflow result before declaring the round green.
