@@ -165,9 +165,9 @@ child_value="$(psql "$DATABASE_URL" -Atqc "SELECT activity FROM public.character
 echo "ok: account archival serializes against in-flight child write and blocks later writes"
 
 
-# Race 3: a live illustration reference wins the advisory path lock first.
-# Character deletion must wait, enqueue the path after the reattachment commits,
-# and leave the new reference intact for the worker's reference-check to skip.
+# Race 3: an in-flight illustration reference write wins the advisory path lock.
+# It targets the same character being hard-deleted; deletion must wait, then
+# enqueue the path only after the new illustration row is committed and cascaded.
 asset_author="10000000-0000-4000-8000-000000000032"
 asset_path_a="$asset_author/20000000-0000-4000-8000-000000000032/30000000-0000-4000-8000-000000000032.jpg"
 cat > "$tmpdir/asset-reattach-first.sql" <<SQL
@@ -179,8 +179,8 @@ SELECT set_config('request.jwt.claims', '{"sub":"$asset_author","role":"service_
 INSERT INTO public.character_illustrations (
   id, character_id, author_id, storage_path, asset_type, sort_order
 ) VALUES (
-  '30000000-0000-4000-8000-000000000033',
-  '20000000-0000-4000-8000-000000000033',
+  '30000000-0000-4000-8000-000000000036',
+  '20000000-0000-4000-8000-000000000032',
   '$asset_author', '$asset_path_a', 'primary', 0
 );
 SELECT pg_sleep(2);
@@ -206,12 +206,12 @@ wait "$reattach_pid"
 wait "$asset_delete_pid"
 asset_a_queued="$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM public.character_asset_cleanup_jobs WHERE bucket_id='character-illustrations' AND object_path='$asset_path_a')")"
 asset_a_referenced="$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM public.character_illustrations WHERE storage_path='$asset_path_a')")"
-[[ "$asset_a_queued" == "t" && "$asset_a_referenced" == "t" ]] || {
+[[ "$asset_a_queued" == "t" && "$asset_a_referenced" == "f" ]] || {
   echo "ERROR: reattachment-first race did not preserve the live reference and enqueue cleanup"
   cat "$tmpdir/asset-reattach-first.log" "$tmpdir/asset-delete-after.log"
   exit 1
 }
-echo "ok: asset reattachment wins path lock; cleanup sees a still-referenced object"
+echo "ok: in-flight illustration write wins path lock; deletion waits then queues cascaded asset"
 
 # Race 4: deletion owns the path lock first. A later attempt to attach that path
 # must wait until the cleanup row is committed, then fail in the BEFORE trigger.
@@ -236,8 +236,8 @@ SELECT set_config('request.jwt.claims', '{"sub":"$asset_author","role":"service_
 INSERT INTO public.character_illustrations (
   id, character_id, author_id, storage_path, asset_type, sort_order
 ) VALUES (
-  '30000000-0000-4000-8000-000000000035',
-  '20000000-0000-4000-8000-000000000035',
+  '30000000-0000-4000-8000-000000000037',
+  '20000000-0000-4000-8000-000000000034',
   '$asset_author', '$asset_path_b', 'primary', 0
 );
 COMMIT;
