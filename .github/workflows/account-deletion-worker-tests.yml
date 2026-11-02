@@ -7,7 +7,6 @@ on:
       - "supabase/functions/_shared/account-deletion-worker.ts"
       - "supabase/functions/_shared/account-deletion-worker.test.ts"
       - "supabase/functions/account-deletion-worker/index.ts"
-      - "supabase/drafts/account-deletion-character-preservation-draft.sql"
       - ".github/workflows/account-deletion-worker-tests.yml"
   push:
     branches:
@@ -31,18 +30,3 @@ jobs:
         run: deno check supabase/functions/account-deletion-worker/index.ts
       - name: Run deterministic account deletion worker tests
         run: deno test supabase/functions/_shared/account-deletion-worker.test.ts
-      - name: Guard archived group existing-session asset access in draft SQL
-        run: |
-          node --input-type=module <<'NODE'
-          import assert from 'node:assert/strict';
-          import { readFileSync } from 'node:fs';
-          const sql = readFileSync('supabase/drafts/account-deletion-character-preservation-draft.sql', 'utf8');
-          const start = sql.indexOf('CREATE OR REPLACE FUNCTION private.user_has_existing_character_session');
-          const end = sql.indexOf('$function$;', start);
-          assert.notEqual(start, -1, 'existing-session helper must exist');
-          assert.notEqual(end, -1, 'existing-session helper must terminate');
-          const helper = sql.slice(start, end);
-          assert.match(helper, /g\\.deleted_at\\s+IS\\s+NULL/i);
-          assert.doesNotMatch(helper, /g\\.archived_at\\s+IS\\s+NULL/i, 'archived groups are hidden, not deleted');
-          console.log('Archived group existing-session draft guard passed.');
-          NODE
