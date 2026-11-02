@@ -46,7 +46,15 @@ assert.match(archiveFn, /SET search_path TO ''/);
 for (const table of ["chat_sessions", "chat_group_members", "chat_group_messages", "character_private_info", "character_illustrations", "character_schedule_descriptions", "characters"]) {
   assert.match(archiveFn, new RegExp("UPDATE public[.]" + table));
 }
-assert.match(archiveFn, /visibility = 'private'/);
+// Account deletion preserves each work's original visibility/review state.
+assert.doesNotMatch(archiveFn, /visibility\\s*=\\s*'private'/);
+assert.match(archiveFn, /c[.]visibility AS current_visibility/);
+assert.match(archiveFn, /'visibility', owned[.]current_visibility/);
+assert.match(archiveFn, /'creatorDisplayName'/);
+assert.match(archiveFn, /'creatorProfileAvailable', false/);
+assert.match(archiveFn, /'characterStatus', 'offline'/);
+assert.match(archiveFn, /'isOnline', false/);
+assert.doesNotMatch(sql, /creator_handle_snapshot|creatorHandleSnapshot/);
 assert.match(archiveFn, /author_id = NULL/);
 assert.match(archiveFn, /DELETE FROM public[.]character_illustration_cleanup_jobs/);
 assert.doesNotMatch(archiveFn, /DELETE FROM public[.]characters/);
