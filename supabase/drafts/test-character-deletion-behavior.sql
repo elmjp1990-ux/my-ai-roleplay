@@ -114,9 +114,12 @@ BEGIN
     v_non_author_rejected := true;
   END;
   PERFORM pg_catalog.set_config('request.jwt.claim.sub', v_user::text, true);
-  IF NOT v_non_author_rejected OR EXISTS (
+  IF NOT v_non_author_rejected OR NOT EXISTS (
     SELECT 1 FROM public.characters
-    WHERE id = v_chat_draft AND deleted_at IS NOT NULL
+    WHERE id = v_chat_draft AND deleted_at IS NULL
+  ) OR EXISTS (
+    SELECT 1 FROM public.character_asset_cleanup_jobs
+    WHERE character_id = v_chat_draft
   ) THEN
     RAISE EXCEPTION 'non_author_character_delete_must_be_rejected_without_mutation';
   END IF;
