@@ -33,8 +33,8 @@ assert.match(assetFn, /SET search_path TO ''/);
 assert.match(assetFn, /ci[.]storage_path = p_object_name/);
 assert.match(assetFn, /c[.]avatar_video_path = p_object_name/);
 assert.match(assetFn, /ELSE false/);
-assert.match(sql, /CREATE POLICY "Existing session owners can read archived character assets"[\\s\\S]*?FOR SELECT TO authenticated/);
-assert.match(sql, /CREATE POLICY "Existing session owners can read character illustration metadata"[\\s\\S]*?FOR SELECT TO authenticated/);
+assert.match(sql, /CREATE POLICY "Existing session owners can read archived character assets"[\s\S]*?FOR SELECT TO authenticated/);
+assert.match(sql, /CREATE POLICY "Existing session owners can read character illustration metadata"[\s\S]*?FOR SELECT TO authenticated/);
 
 const archiveFn = sql.match(/CREATE OR REPLACE FUNCTION private[.]archive_account_characters[(][\s\S]*?\$function\$;/)?.[0];
 assert.ok(archiveFn, "account archive helper must exist");
