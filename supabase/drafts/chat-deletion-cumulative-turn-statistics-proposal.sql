@@ -930,17 +930,19 @@ AS $function$
     SELECT c.id AS character_id
     FROM public.characters AS c
     JOIN requested AS r ON r.character_id = c.id
-    WHERE c.deleted_at IS NULL
-      AND (
-        c.author_id = (SELECT auth.uid())
-        OR (
-          c.visibility = 'public'
-          AND (
-            c.is_nsfw IS NOT TRUE
-            OR ((SELECT auth.uid()) IS NOT NULL AND private.current_user_is_adult())
-          )
+    WHERE (
+      -- Owners retain access to their own statistics even after soft-deleting
+      -- a character. Public callers must never see deleted-character counts.
+      c.author_id = (SELECT auth.uid())
+      OR (
+        c.deleted_at IS NULL
+        AND c.visibility = 'public'
+        AND (
+          c.is_nsfw IS NOT TRUE
+          OR ((SELECT auth.uid()) IS NOT NULL AND private.current_user_is_adult())
         )
       )
+    )
   ),
   solo_counts AS (
     SELECT s.character_id, pg_catalog.count(m.id)::bigint AS turn_count
