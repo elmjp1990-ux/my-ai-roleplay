@@ -52,17 +52,56 @@ assert.doesNotMatch(archiveFn, /DELETE FROM public[.]characters/);
 assert.doesNotMatch(archiveFn, /DELETE FROM storage[.]objects/);
 assert.match(sql, /GRANT EXECUTE ON FUNCTION private[.]archive_account_characters[(]uuid[)][\s\S]*?TO service_role/);
 
+const integrationPath = "supabase/drafts/prepare-account-deletion-character-preservation-integration.sql";
+const integration = fs.readFileSync(integrationPath, "utf8");
+assert.match(integration, /^-- DRAFT ONLY — NOT AN ACTIVE MIGRATION\./);
+assert.match(integration, /CREATE OR REPLACE FUNCTION public[.]prepare_account_deletion[(]p_user_id uuid[)]/);
+assert.match(integration, /SET search_path TO ''/);
+
+// The existing deleting retry must not require a profile that may already be gone.
+// A legacy deleting batch is healed only if still-owned character rows exist.
+const deletingBranch = integration.match(/IF FOUND AND v_status = 'deleting' THEN[\\s\\S]*?RETURN QUERY SELECT v_batch_id, p_user_id, 'deleting'::text;/)?.[0];
+assert.ok(deletingBranch, "deleting retry branch must exist");
+assert.match(deletingBranch, /IF EXISTS [(][\\s\\S]*?c[.]author_id = p_user_id[\\s\\S]*?PERFORM private[.]archive_account_characters[(]p_user_id[)][;]/);
+assert.ok(deletingBranch.indexOf("PERFORM private.archive_account_characters") < deletingBranch.indexOf("RETURN QUERY"));
+assert.match(deletingBranch, /RETURN QUERY SELECT v_batch_id, p_user_id, 'deleting'::text/);
+
+// Both non-terminal paths archive characters before billing cleanup/deleting state.
+const existingBatchBranch = integration.match(/ELSIF FOUND THEN[\\s\\S]*?ELSE[\\s\\S]*?SELECT a[.]batch_id INTO v_batch_id/)?.[0];
+assert.ok(existingBatchBranch, "existing batch branch must exist");
+assert.match(existingBatchBranch, /PERFORM private[.]archive_account_characters[(]p_user_id[)][;]/);
+const newBatchBranch = integration.match(/ELSE[\\s\\S]*?PERFORM private[.]archive_account_characters[(]p_user_id[)][;][\\s\\S]*?SELECT a[.]batch_id INTO v_batch_id/)?.[0];
+assert.ok(newBatchBranch, "new batch branch must archive characters before archive batch creation");
+assert.equal((integration.match(/PERFORM private[.]archive_account_characters[(]p_user_id[)][;]/g) || []).length, 3);
+
+// Ensure the exact existing prepare flow still preserves financial/audit verification,
+// removes only the deleting player's legacy conversations, and doesn't remove other
+// players' chat_message_versions when they were merely edited by this account.
+for (const pattern of [
+  /chat_turn_charges/,
+  /chat_turn_events/,
+  /payload IS DISTINCT FROM pg[.]catalog[.]to_jsonb/,
+  /DELETE FROM public[.]chat_turn_charges/,
+  /DELETE FROM public[.]wallet_transactions/,
+  /DELETE FROM public[.]conversations WHERE user_id = p_user_id/,
+  /UPDATE public[.]chat_message_versions AS v[\\s\\S]*?SET edited_by = NULL/,
+]) assert.match(integration, pattern);
+
+// The worker's deleting recovery path must resume Auth/finalize only. It must not
+// re-run archive/prepare after the request/profile may have disappeared.
+const worker = fs.readFileSync("supabase/functions/_shared/account-deletion-worker.ts", "utf8");
+const recoveryBranch = worker.match(/if [(]item[.]work_status === "deleting" && batchId[)][\\s\\S]*?continue;/)?.[0];
+assert.ok(recoveryBranch, "worker deleting recovery branch must exist");
+assert.match(recoveryBranch, /deps[.]deleteAuthUser/);
+assert.match(recoveryBranch, /deps[.]finalize/);
+assert.doesNotMatch(recoveryBranch, /deps[.]archive|deps[.]prepare/);
+
 const migrationsDir = "supabase/migrations";
 const activeSql = fs.readdirSync(migrationsDir)
   .filter((name) => name.endsWith(".sql"))
   .map((name) => fs.readFileSync(path.join(migrationsDir, name), "utf8"))
-  .join("\n");
-assert.doesNotMatch(activeSql, /archive_account_characters/);
-assert.match(sql, /Required follow-up integration/);
-assert.match(sql, /PERFORM private[.]archive_account_characters[(]p_user_id[)][;]/);
-assert.match(sql, /PERFORM private[.]archive_account_characters[(]p_user_id[)][;]/);
-assert.match(sql, /before the existing-batch lookup/);
-assert.match(sql, /SAME PostgreSQL transaction/);
-assert.match(sql, /Do not put this call only in the worker's separate archive callback/);
+  .join("\\n");
+assert.doesNotMatch(activeSql, /archive_account_characters|account_archived_at/);
+assert.doesNotMatch(activeSql, /prepare_account_deletion[(]p_user_id uuid[)]/);
 
-console.log("Account deletion character-preservation draft guard: passed (static only; no SQL execution).");
+console.log("Account deletion character-preservation and retry-integration draft guard: passed (static only; no SQL execution).");
