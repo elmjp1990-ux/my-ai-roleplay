@@ -139,3 +139,40 @@ public.profiles:
 - Successful read-only catalog queries returned columns, policies, indexes, constraints and triggers. An initial combined catalog query failed due to an OID-array cast; a revised query succeeded. No data rows were read.
 - This evidence narrows reconstruction work but does not yet make a safe baseline. Exact grants/ACLs, function definitions and dependencies, enum/domain/extension dependencies, table owner/replica identity, and all foreign keys referencing these tables remain to be captured. We must reconcile live catalog state with later migrations to avoid duplicating columns or policies.
 - Do not generate or apply baseline SQL until this dependency and migration-delta review is complete.
+
+## Account-deletion FK dependency and cleanup reconciliation — 2026-11-02
+
+### Live FK dependents of public.characters
+
+Current catalog lists these references:
+- CASCADE: character_comments.character_id; character_illustrations.character_id; character_private_info.character_id; character_schedule_descriptions.character_id; character_schedules.character_id; character_stories.character_id; encounter_character_state.character_id; encounter_diary.character_id; encounter_turn_interaction_receipts.character_id.
+- SET NULL: chat_group_members.character_id; chat_group_messages.character_id; chat_groups.world_character_id; chat_sessions.character_id; encounter_session_evaluation_jobs.character_id; encounter_session_lifecycle.character_id; encounter_session_turns.character_id; story_relationship_batches.character_id; story_relationship_states.character_id.
+This is a mixed retention model: character-owned auxiliary records cascade, while chat/encounter snapshots and relationship/audit records can survive with a nullable character reference.
+
+### Live FK dependents of public.profiles
+
+- CASCADE: author_follows.author_id; character_illustrations.author_id; character_private_info.author_id; characters.author_id; conversations.user_id; wallet_accounts.user_id; wallet_transactions.user_id.
+- No ON DELETE action (default NO ACTION / RESTRICT): ai_generation_records.user_id and chat_message_versions.edited_by.
+- Other dependent references observed: chat_message_versions.message_id → chat_messages(id); ai_generation_records.session_id → chat_sessions(id); ai_generation_records.user_message_id / assistant_message_id → chat_messages(id).
+
+### Reconciliation with the actual account-deletion routine
+
+The two non-cascading profile references are not automatically safe merely because the archive function exists. The current live prepare_account_deletion(p_user_id) definition explicitly handles both before profile deletion:
+1. Deletes that account's ai_generation_records after archive verification.
+2. Deletes version rows for messages belonging to the account being deleted.
+3. For version rows on another user's messages, sets edited_by = NULL so another user's edit history is retained without retaining the deleted account's profile reference.
+4. Deletes that account's chat_turn_charges, wallet transactions, and conversations before returning the batch as deleting.
+
+The live archive_account_deletion_data(p_user_id) archives ai_generation_records and wallet_transactions as JSON payloads and verifies source counts and exact payload equality before marking the batch archived. The current prepare_account_deletion also verifies billing/audit snapshots before entering the irreversible phase. finalize_account_deletion(p_batch_id) only marks a batch completed after confirming the Auth user no longer exists.
+
+### Risk / acceptance interpretation
+
+- The RESTRICT references are intentional/manual-cleanup dependencies in the current function, not proof that account deletion necessarily fails.
+- They are high-risk regression points: if a future code path deletes profiles / auth.users without calling the guarded preparation routine, FK deletion should fail closed rather than silently lose audit data.
+- chat_message_versions.edited_by is nullable, and the current routine anonymizes the editor reference only for messages owned by other users.
+- ai_generation_records.user_id is NOT NULL, so the current routine must delete these rows after verified archival; a nullable/set-null conversion would be a policy change and is not proposed here.
+- The account_deletion_requests catalog query returned columns but no RLS policies in pg_policies. This needs separate ACL/function-privilege review; absence of a policy row alone does not establish exposure or access.
+
+### Scope and safety
+
+All evidence above came from SELECT-only catalog reads and function-definition inspection. No application rows were selected. No functions were invoked. No DDL/DML, migration, deployment, or hosted-data mutation occurred.
