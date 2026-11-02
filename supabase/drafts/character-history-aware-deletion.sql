@@ -268,7 +268,7 @@ CREATE TRIGGER preserve_character_first_publication_timestamp
   FOR EACH ROW
   EXECUTE FUNCTION private.preserve_character_first_publication_timestamp();
 
-REVOKE DELETE ON TABLE public.characters FROM PUBLIC, anon, authenticated;
+REVOKE DELETE ON TABLE public.characters FROM PUBLIC, anon, authenticated, service_role;
 
 -- Legacy conversations cascade from character_stories. Prevent an author from
 -- deleting a story template that still anchors another player's legacy transcript.
