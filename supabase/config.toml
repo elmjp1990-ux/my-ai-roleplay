@@ -3,3 +3,7 @@ project_id = "ouyewoagbmtqehbofrje"
 [functions.purge-chat-deletions]
 # The handler validates the named Supabase Secret Key via @supabase/server.
 verify_jwt = false
+
+[functions.account-deletion-worker]
+# The handler validates the named Supabase Secret Key via @supabase/server.
+verify_jwt = false
