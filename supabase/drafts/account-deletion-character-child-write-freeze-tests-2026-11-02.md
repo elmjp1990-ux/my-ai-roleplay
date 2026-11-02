@@ -70,3 +70,24 @@ A restrictive policy only blocks statements whose policy snapshot sees the pendi
 - No public/anon privileges are broadened.
 - Concurrency tests show no post-archive child writes.
 - Test output is recorded with synthetic fixture IDs and SQLSTATE/results.
+
+
+## Archived-character attachment trigger tests
+
+The character-preservation draft also adds `private.guard_new_session_character_not_archived()` to:
+
+- `chat_sessions` BEFORE INSERT OR UPDATE OF `character_id`
+- `chat_group_members` BEFORE INSERT OR UPDATE OF `character_id`
+
+Required tests on a disposable local stack:
+
+1. Direct authenticated single-chat INSERT for an archived character is rejected.
+2. Encounter and Story service-role RPC INSERTs for an archived character are rejected by the same database trigger, even if an Edge pre-check is accidentally omitted.
+3. Group creation/member INSERT for an archived character is rejected.
+4. Reassigning an existing session or group member to an archived character is rejected.
+5. Existing single/group session continuation remains allowed because it does not insert or reassign the character reference.
+6. Existing group messages for an already-authorized group remain allowed; do not add a blanket trigger to `chat_group_messages`.
+7. Concurrency: if a new session obtains the character `FOR KEY SHARE` lock first, archival waits and the newly created session is treated as pre-existing; if archival obtains `FOR UPDATE` first, the new session waits and then fails after seeing `account_archived_at`.
+8. A failed archival transaction rolls back the marker and does not permanently block new sessions.
+
+The trigger is a defense-in-depth gate, not a replacement for caller authentication, account-active checks, RLS, or the explicit new-session eligibility functions.
