@@ -139,6 +139,9 @@ CREATE POLICY "Existing session owners can read archived character assets"
   USING (private.can_read_character_asset(bucket_id, name));
 
 -- 5) Service-only account archive helper.
+-- service_role currently lacks USAGE on private; grant it before invoking this helper.
+GRANT USAGE ON SCHEMA private TO service_role;
+
 -- Call from the final prepare_account_deletion() transaction only after the
 -- request is due and account writes are frozen, but BEFORE deleting auth.users.
 -- It preserves all characters (including private/unpublished) and all child rows.
