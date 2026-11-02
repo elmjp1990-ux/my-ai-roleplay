@@ -54,7 +54,7 @@ for (const table of [
 ]) {
   assert.ok(!historyFn.includes(`FROM public.${table}`), `Do not classify draft metadata ${table} as player history`);
 }
-assert.match(historyFn, /JOIN public\\.character_stories cs ON cs\\.id = cv\\.story_id/,
+assert.match(historyFn, /JOIN public\.character_stories cs ON cs\.id = cv\.story_id/,
   "Legacy conversations must preserve the linked character story");
 
 
