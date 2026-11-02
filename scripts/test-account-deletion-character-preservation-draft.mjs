@@ -113,6 +113,31 @@ assert.match(activeGuard, /^-- DRAFT ONLY/);
 assert.match(activeGuard, /EXISTS [(][\s\S]*?FROM auth[.]users AS u[\s\S]*?u[.]id = auth[.]uid[(][)]/);
 assert.match(activeGuard, /NOT EXISTS [(][\s\S]*?account_deletion_requests/);
 
+const archivedEntryGuard = fs.readFileSync(
+  "supabase/drafts/account-archived-character-session-insert-guard.sql",
+  "utf8",
+);
+assert.match(archivedEntryGuard, /^-- DRAFT ONLY/);
+const archivedEntryFn = archivedEntryGuard.match(
+  /CREATE OR REPLACE FUNCTION private[.]reject_account_archived_character_entry[(][\s\S]*?\$function\$;/,
+)?.[0];
+assert.ok(archivedEntryFn, "database-level archived-character insert guard must exist");
+assert.match(archivedEntryFn, /SECURITY DEFINER/);
+assert.match(archivedEntryFn, /SET search_path TO ''/);
+assert.match(archivedEntryFn, /account_archived_at IS NOT NULL/);
+for (const table of [
+  "chat_sessions", "chat_group_members",
+  "encounter_session_lifecycle", "story_relationship_states",
+]) {
+  assert.match(
+    archivedEntryGuard,
+    new RegExp("BEFORE INSERT ON public[.]" + table),
+  );
+}
+assert.doesNotMatch(archivedEntryGuard, /BEFORE INSERT ON public[.]chat_messages/);
+assert.doesNotMatch(archivedEntryGuard, /BEFORE INSERT ON public[.]chat_group_messages/);
+assert.match(archivedEntryGuard, /REVOKE ALL ON FUNCTION private[.]reject_account_archived_character_entry[(][)][\s\S]*?FROM PUBLIC, anon, authenticated, service_role/);
+
 // The existing deleting retry must not require a profile that may already be gone.
 // A legacy deleting batch is healed only if still-owned character rows exist.
 const deletingBranch = integration.match(/IF FOUND AND v_status = 'deleting' THEN[\s\S]*?RETURN QUERY SELECT v_batch_id, p_user_id, 'deleting'::text;/)?.[0];
