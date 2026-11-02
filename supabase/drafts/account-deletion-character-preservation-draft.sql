@@ -160,7 +160,8 @@ DECLARE
   v_archived_at timestamptz := pg_catalog.statement_timestamp();
   v_character_count integer := 0;
 BEGIN
-  IF auth.role() IS DISTINCT FROM 'service_role' THEN
+  -- Trust the signed JWT role claim; auth.role() is deprecated by Supabase.
+  IF (auth.jwt() ->> 'role') IS DISTINCT FROM 'service_role' THEN
     RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
   END IF;
   IF p_user_id IS NULL THEN
