@@ -441,10 +441,10 @@ BEGIN
   -- Snapshot writes follow the same parent-first order as chat writers.
   -- Existing sessions/groups stay active; only their character snapshot changes.
   PERFORM 1
-  FROM public.chat_sessions cs
-  WHERE cs.character_id = p_character_id
-    AND cs.deleted_at IS NULL
-  ORDER BY cs.id
+  FROM public.chat_sessions AS session_parent
+  WHERE session_parent.character_id = p_character_id
+    AND session_parent.deleted_at IS NULL
+  ORDER BY session_parent.id
   FOR UPDATE;
 
   PERFORM 1
