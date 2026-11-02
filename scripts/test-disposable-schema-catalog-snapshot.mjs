@@ -30,7 +30,7 @@ assert.equal(security.default_privileges.length, 6);
 assert.ok(structure.relations.filter((r) => r.schema === "public" && r.kind === "r").every((r) => r.rls_enabled === true));
 assert.ok(manifest.includes("DISPOSABLE ONLY"));
 assert.ok(manifest.includes("No application table rows"));
-assert.ok(manifest.includes("not a historical migration"));
+assert.match(manifest, /not a historical migration/i);
 
 for (const snapshot of [structure, routines, security]) {
   for (const forbidden of ["application_rows", "chat_transcripts", "wallet_balances", "storage_objects"]) {
