@@ -401,3 +401,15 @@ Do not reconstruct `characters` / `profiles` from the compact table inventory an
 - 沒有執行 hosted DDL/DML、帳號刪除 RPC、Auth user 建立/刪除、Worker deployment 或 cron。
 - PR #200 維持 Draft/unmerged。
 - 下一個可靠來源需由原始專案 SQL Editor 歷史、使用者保存的 SQL 匯出，或由有權限的資料庫管理流程產生 schema-only dump（排除所有應用資料列）提供。取得後才進行逐項 schema 對照。
+
+
+## Round 28 - repository backup and bootstrap search (2026-11-02)
+
+- Searched repository branches including v1-backup, chore/bootstrap-local-migration-replay-workflow, and the current PR branch.
+- Checked conventional schema/bootstrap paths (supabase/schema.sql, supabase/seed.sql, supabase/config.toml, the missing account-deletion migration path, root schema.sql, and database/schema.sql). No trusted schema dump or original migration source was found.
+- Expanded commit searches for character/profile migrations, schema snapshots, initial schema, and database bootstrap. No verifiable foundational CREATE TABLE source was returned. This is a bounded search result, not proof that private SQL Editor history or every unindexed source is absent.
+- Reviewed available Supabase connector capabilities: table inventory, migration metadata, catalog SQL, and generated TypeScript types are available; a dedicated schema-only dump/export action is not exposed. Generated types cannot reconstruct constraints, indexes, triggers, policies, grants, functions, or exact creation order.
+
+Conclusion: the original public.characters / public.profiles DDL and missing account-deletion migration remain unrecovered. No synthetic baseline or migration was created. No local/hosted reset, hosted DDL/DML, deletion RPC, Auth user creation/deletion, worker deployment, or cron operation occurred. PR #200 remains Draft/unmerged.
+
+Next trusted sources: original SQL Editor history, a user-held SQL export, or an authorized schema-only dump that excludes application rows. Compare it against live catalog only after provenance is established.
