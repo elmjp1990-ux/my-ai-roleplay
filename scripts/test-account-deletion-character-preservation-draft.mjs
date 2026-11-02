@@ -118,6 +118,20 @@ assert.match(storagePhotoSelect, /g[.]deleted_at IS NULL/);
 assert.doesNotMatch(storagePhotoSelect, /g[.]archived_at/);
 assert.doesNotMatch(memoryPhotoDraft, /FOR INSERT|FOR UPDATE|FOR DELETE/i);
 
+// The 30-day purge worker is deployed but has no visible scheduler. Keep the
+// proposed five-minute cron in a draft until the worker and deployment are accepted.
+const purgeCronDraft = fs.readFileSync("supabase/drafts/chat-deletion-purge-cron.sql", "utf8");
+assert.match(purgeCronDraft, /^-- DRAFT ONLY — NOT AN ACTIVE MIGRATION\./);
+assert.match(purgeCronDraft, /cron[.]schedule[(]/);
+assert.match(purgeCronDraft, /'poyozz-chat-deletion-purge'/);
+assert.match(purgeCronDraft, /'\\*\\/5 \\* \\* \\* \\*'/);
+assert.match(purgeCronDraft, /chat_deletion_worker_service_role_key/);
+assert.match(purgeCronDraft, /decrypted_secret LIKE 'sb_secret_%'/);
+assert.match(purgeCronDraft, /functions[.]v1[.]purge-chat-deletions/);
+assert.match(purgeCronDraft, /WHERE EXISTS/);
+assert.match(purgeCronDraft, /chat_storage_deletion_jobs/);
+assert.doesNotMatch(purgeCronDraft, /sb_secret_[A-Za-z0-9_-]{20,}/);
+
 const migrationsDir = "supabase/migrations";
 const activeSql = fs.readdirSync(migrationsDir)
   .filter((name) => name.endsWith(".sql"))
