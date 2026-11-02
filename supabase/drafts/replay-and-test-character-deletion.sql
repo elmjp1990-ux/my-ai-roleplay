@@ -8,11 +8,17 @@ BEGIN;
 \i supabase/drafts/seed-character-deletion-legacy-fixtures.sql
 \echo 'Applying character history-aware deletion draft'
 \i supabase/drafts/character-history-aware-deletion.sql
+\echo 'Applying account deletion character preservation and safe Auth detachment draft'
+\i supabase/drafts/account-deletion-character-preservation-draft.sql
+\echo 'Applying complete prepare_account_deletion integration draft'
+\i supabase/drafts/prepare-account-deletion-character-preservation-integration.sql
 \echo 'Applying existing-chat continuation writer draft (single/group deletion behavior remains isolated to disposable replay)'
 \i supabase/drafts/character-deletion-existing-chat-continuation.sql
 \echo 'Verifying draft tables, triggers, RLS and ACLs before behavior tests'
 \i supabase/drafts/verify-deletion-draft-replay.sql
 \echo 'Running hard-delete, soft-delete, single/group continuation, history, publication and asset path behavior tests'
 \i supabase/drafts/test-character-deletion-behavior.sql
+\echo 'Running account deletion character/media/chat preservation integration behavior tests'
+\i supabase/drafts/test-account-deletion-character-preservation-behavior.sql
 \echo 'All disposable character deletion behavior assertions passed; rolling back all draft DDL and test rows'
 ROLLBACK;
