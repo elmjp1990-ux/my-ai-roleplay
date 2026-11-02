@@ -91,3 +91,23 @@ Required tests on a disposable local stack:
 8. A failed archival transaction rolls back the marker and does not permanently block new sessions.
 
 The trigger is a defense-in-depth gate, not a replacement for caller authentication, account-active checks, RLS, or the explicit new-session eligibility functions.
+
+
+## Product acceptance: creator account deleted, work retained
+
+This is distinct from author deleting an individual character.
+
+For every character owned by a deleted account:
+
+1. Preserve its pre-deletion `visibility` and `review_status`; do not force public works to private.
+2. A previously public/approved work remains in public discovery and its character card remains visible.
+3. Preserve the creator's display name as plain text (profile nickname; fallback `原作者` only if no display name was saved).
+4. Creator name must not be a link, must not open a profile page, and must not expose follow/message/author actions. Do not preserve a handle snapshot solely to construct an author interface.
+5. Display the character as `offline` / `isOnline=false` in character cards, encounter/map availability and existing conversation headers.
+6. The work is not available for a new single chat, group membership, encounter session, or story session.
+7. A player who already has a single/group conversation can continue that exact conversation; do not block continuation messages or delete its history.
+8. An unpublished/private work remains private; account deletion must not publish it.
+9. A previously public work must not disappear merely because `author_id` is detached from the deleted profile. Public list queries must use the retained character row and must not require an active profile join.
+10. No author profile route, clickable avatar, or author ownership controls may be rendered for an archived creator.
+
+The SQL draft writes `creatorDisplayName`, `creatorProfileAvailable=false`, `characterStatus='offline'`, `isOnline=false`, and the original visibility into existing session/group snapshots. The canonical character row retains `creator_display_name`, its original visibility/review state, and `account_archived_at`. UI rendering and public discovery query compatibility still require code-level implementation/review and browser acceptance; these SQL snapshot fields alone do not implement the UI.
