@@ -78,3 +78,27 @@ The design still needs local replay, full RLS composition tests, media signed-UR
 - Do not enable or deploy the account-deletion worker.
 - Do not move draft SQL into active migrations until a trusted local baseline exists and all tests pass.
 - PR #200 remains Draft/unmerged.
+
+
+## Round 79 follow-up — shared archived-entry guard consolidation
+
+A further branch review found that the repository already contains the more complete draft `account-archived-character-session-insert-guard.sql`. It covers:
+- `chat_sessions.character_id`
+- `chat_groups.world_character_id`
+- `chat_group_members.character_id`
+- `encounter_session_lifecycle.character_id`
+- `story_relationship_states.character_id`
+- legacy `conversations.story_id`
+
+It resolves the story_id through `character_stories`, checks both `deleted_at` and `account_archived_at`, and takes `FOR KEY SHARE` on the character row to serialize new-entry creation against character archival/hard deletion. It deliberately does not attach to continuation tables such as `chat_messages` or `chat_group_messages`.
+
+To avoid duplicate BEFORE triggers and conflicting implementations, the temporary duplicate trigger block was removed from `account-deletion-character-preservation-draft.sql`. That file retains only the explicit `account_archived_at IS NULL` checks in `character_can_start_chat()` and `can_open_encounter_session()`; the shared guard draft remains the single database trigger source.
+
+The static account-deletion test script now checks:
+- active-account requirement in existing-session media helper;
+- restrictive child-table policies;
+- explicit archived-state checks in caller-side eligibility functions;
+- row locks for retained schedule/story child rows;
+- the shared archived-entry trigger coverage and no triggers on continuation message tables.
+
+The CI workflow now runs when the child-table policy SQL or its test plan changes. This remains static verification only; PostgreSQL trigger execution and concurrency tests are still pending local replay.
