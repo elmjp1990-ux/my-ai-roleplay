@@ -216,13 +216,14 @@ echo "ok: in-flight illustration write wins path lock; deletion waits then queue
 # Race 4: deletion owns the path lock first. A later attempt to attach that path
 # must wait until the cleanup row is committed, then fail in the BEFORE trigger.
 asset_path_b="$asset_author/20000000-0000-4000-8000-000000000034/30000000-0000-4000-8000-000000000034.jpg"
+asset_video_path_b="$asset_author/20000000-0000-4000-8000-000000000034/avatar.mp4"
 cat > "$tmpdir/asset-delete-first.sql" <<SQL
 BEGIN;
 SET LOCAL ROLE service_role;
 SELECT set_config('request.jwt.claim.sub', '$asset_author', true);
 SELECT set_config('request.jwt.claim.role', 'service_role', true);
 SELECT set_config('request.jwt.claims', '{"sub":"$asset_author","role":"service_role"}', true);
-SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('character-illustrations:' || '$asset_path_b', 0));
+SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('character-avatar-videos:' || '$asset_video_path_b', 0));
 SELECT pg_sleep(2);
 SELECT public.soft_delete_character('20000000-0000-4000-8000-000000000034');
 COMMIT;
@@ -233,12 +234,12 @@ SET LOCAL ROLE service_role;
 SELECT set_config('request.jwt.claim.sub', '$asset_author', true);
 SELECT set_config('request.jwt.claim.role', 'service_role', true);
 SELECT set_config('request.jwt.claims', '{"sub":"$asset_author","role":"service_role"}', true);
-INSERT INTO public.character_illustrations (
-  id, character_id, author_id, storage_path, asset_type, sort_order
+INSERT INTO public.characters (
+  id, author_id, name, visibility, review_status, rights_confirmed, avatar_video_path
 ) VALUES (
-  '30000000-0000-4000-8000-000000000037',
   '20000000-0000-4000-8000-000000000034',
-  '$asset_author', '$asset_path_b', 'primary', 0
+  '$asset_author', 'Attempted recreated character', 'private', 'draft', true,
+  '$asset_video_path_b'
 );
 COMMIT;
 SQL
@@ -259,9 +260,10 @@ if ! grep -q "character_asset_path_cleanup_already_queued" "$tmpdir/asset-reatta
   cat "$tmpdir/asset-reattach-after-delete.log"
   exit 1
 fi
-asset_b_queued="$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM public.character_asset_cleanup_jobs WHERE bucket_id='character-illustrations' AND object_path='$asset_path_b')")"
-asset_b_referenced="$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM public.character_illustrations WHERE storage_path='$asset_path_b')")"
-[[ "$asset_b_queued" == "t" && "$asset_b_referenced" == "f" ]] || {
+asset_b_queued="$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM public.character_asset_cleanup_jobs WHERE bucket_id='character-avatar-videos' AND object_path='$asset_video_path_b')")"
+asset_b_illustration_queued="$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM public.character_asset_cleanup_jobs WHERE bucket_id='character-illustrations' AND object_path='$asset_path_b')")"
+asset_b_referenced="$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM public.characters WHERE id='20000000-0000-4000-8000-000000000034')")"
+[[ "$asset_b_queued" == "t" && "$asset_b_illustration_queued" == "t" && "$asset_b_referenced" == "f" ]] || {
   echo "ERROR: delete-first race left an invalid queued/referenced path state"
   exit 1
 }
