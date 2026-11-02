@@ -109,3 +109,12 @@ Commits: 60e339fed954533b6ea95fd8652504576682c99b (worker), 380ab0567c700feac602
 - Initial CI exposed incomplete test expectation updates after adding `failureReportFailed`: type-check/tests failed, and the two new tests initially expected zero report failures despite intentionally failing report calls.
 - Updated all exact summary assertions and the two-item case to expect two failed reports. Commit `d3571af91b2e7cf8c7a4e9fee8dc41fa8218767b`.
 - Prior failing runs: `41392075705`, `41392081220`, `41392091899`; failure causes inspected from job logs. Awaiting the new commit's workflow result before declaring the round green.
+
+
+## Round 32 - make worker CI reproducible (2026-11-02)
+
+- The corrected test commit `d3571af91b2e7cf8c7a4e9fee8dc41fa8218767b` did not have an associated workflow run in the branch Actions history. A commit-level check query for the then-current PR head also returned no check runs, so the latest correction could not be called verified.
+- Added `workflow_dispatch` to `.github/workflows/account-deletion-worker-tests.yml` so the same deterministic Deno type-check/test suite can be run on demand in future. The workflow-file change itself triggered a push run on the branch.
+- Workflow change commit `f37a35aa03d0af4741634b93626fdb03029f43a0`; run `41392406296` was queued at the time of this note. Await completion and inspect job logs before acceptance.
+- This change only adds a manual CI trigger; it does not invoke any Supabase function, RPC, database mutation, Auth operation, deployment, or cron.
+- PR #200 remains Draft/unmerged. Atomic lease/fencing remains unimplemented; no claim of concurrency safety is made.
