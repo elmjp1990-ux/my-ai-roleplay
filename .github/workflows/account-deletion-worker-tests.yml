@@ -24,7 +24,8 @@ on:
       - "supabase/drafts/chat-archive-memory-photo-read-access.sql"
       - "supabase/drafts/chat-deletion-purge-cron.sql"
       - "scripts/test-account-deletion-character-preservation-draft.mjs"
-      - "scripts/test-character-history-aware-deletion-draft.mjs"\n      - "supabase/drafts/character-history-fk-classification-2026-11-02.md"
+      - "scripts/test-character-history-aware-deletion-draft.mjs"
+      - "supabase/drafts/character-history-fk-classification-2026-11-02.md"
       - ".github/workflows/account-deletion-worker-tests.yml"
   push:
     branches:
