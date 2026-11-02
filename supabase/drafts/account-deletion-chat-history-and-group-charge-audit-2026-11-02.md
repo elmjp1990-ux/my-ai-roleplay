@@ -86,3 +86,15 @@ Static guard and worker checks completed successfully on code head `e9a8d4683a3d
 - Group background UI syntax check #849: **success**.
 
 These are static/worker-unit checks only. They do not execute the draft SQL, prove PostgreSQL syntax/replay, or replace stale-JWT/Auth cascade integration tests. The audit document was committed separately after the tested code head; no code changed in that documentation-only commit.
+
+
+## Follow-up SQL draft syntax guard — 2026-11-02
+
+A review of the complete prepare-function draft found its final `$function$` delimiter lacked the required statement-terminating semicolon. Corrected the draft and added a static assertion that the file ends with `$function$;`.
+
+Latest code head: `45d63a4bfe00928ab593f8378c420b1560d4d34d`.
+- Account deletion worker tests #158: **success**.
+- Chat deletion worker tests #125: **success**.
+- Group background UI syntax check #853: **success**.
+
+The semicolon guard is static only; PostgreSQL parsing/replay remains outstanding.
