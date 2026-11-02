@@ -182,6 +182,29 @@ BEGIN
        '^' || p_user_id::text ||
        '/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}' ||
        '/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](jpg|jpeg|png|webp)
+       '/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{3}-[0-9a-f]{12}[.](jpg|jpeg|png|webp)$'
+     ) THEN
+    RETURN false;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.character_illustrations AS ci
+    WHERE ci.storage_path = p_storage_path
+  ) OR EXISTS (
+    SELECT 1 FROM public.characters AS c
+    WHERE c.avatar_video_path = p_storage_path
+  ) THEN
+    RETURN false;
+  END IF;
+
+  RETURN true;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
+  FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
+  TO authenticated;
 -- authenticated-only and do not allow upload, update, or delete.
 DROP POLICY IF EXISTS "Existing session owners can read character illustration metadata"
   ON public.character_illustrations;
