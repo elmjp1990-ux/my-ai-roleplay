@@ -349,3 +349,17 @@ The live `supabase_migrations.schema_migrations` table lists version `2026101701
 ### Safety
 
 All findings came from SELECT-only function/policy/FK/catalog inspection and official Supabase documentation. No application rows were read; no function invoked; no DDL/DML, migration, deployment, cron, or Auth deletion occurred.
+
+## Follow-up: source provenance and stale-JWT test plan — 2026-11-02
+
+Further verification:
+- GitHub commits API queried for exact path `supabase/migrations/20261017010847_account_deletion_worker.sql`; no commits returned.
+- Recursive PR branch tree confirms no account-deletion migration source, only the current worker Edge Function/tests and later account-deletion guard migrations.
+- Live migration history records only version/name metadata; it does not provide the SQL body.
+- Live `account_is_active()` definition reconfirmed unchanged: non-null auth.uid() AND no account_deletion_requests row; no auth.users existence predicate.
+- Live request FK reconfirmed ON DELETE CASCADE.
+- Live account deletion schema reconfirmed: request scheduled_for default currently five minutes (test configuration), not 30 days. Existing settings/defaults need a separate policy review before any production launch; no changes made.
+
+Added `supabase/drafts/account-is-active-auth-user-existence-guard-tests-2026-11-02.md` with local-only test fixtures and function + RESTRICTIVE RLS integration matrix. The stale JWT test must use a real locally issued, still-unexpired JWT captured before local Auth Admin deletion, not just a fabricated subject claim.
+
+No hosted DB changes. No function execution. No user deletion. No deployment or cron changes.
