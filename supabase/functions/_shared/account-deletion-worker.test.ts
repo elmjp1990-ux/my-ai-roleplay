@@ -57,7 +57,7 @@ function successfulDeps(calls: unknown[][] = []): AccountDeletionWorkerDeps {
 Deno.test("runs archive, prepare, Auth deletion, and finalize in order", async () => {
   const calls: unknown[][] = [];
   const summary = await processAccountDeletionWorkItems([item], successfulDeps(calls));
-  assertEquals(summary, { claimed: 1, completed: 1, failed: 0, skipped: 0 });
+  assertEquals(summary, { claimed: 1, completed: 1, failed: 0, skipped: 0, failureReportFailed: 0 });
   assertEquals(calls, [
     ["archive", "user-1"],
     ["prepare", "user-1"],
@@ -93,7 +93,7 @@ Deno.test("finalizes idempotently when Auth user was already deleted", async () 
   deps.deleteAuthUser = async () => ({ error: { code: "user_not_found" } });
   deps.isAuthUserAbsent = async () => true;
   const summary = await processAccountDeletionWorkItems([item], deps);
-  assertEquals(summary, { claimed: 1, completed: 1, failed: 0, skipped: 0 });
+  assertEquals(summary, { claimed: 1, completed: 1, failed: 0, skipped: 0, failureReportFailed: 0 });
   assertEquals(calls.some(([name]) => name === "finalize"), true);
 });
 
@@ -120,7 +120,7 @@ Deno.test("recovers a deleting batch after Auth deletion removed the request row
     work_status: "deleting",
   };
   const summary = await processAccountDeletionWorkItems([interruptedItem], deps);
-  assertEquals(summary, { claimed: 1, completed: 1, failed: 0, skipped: 0 });
+  assertEquals(summary, { claimed: 1, completed: 1, failed: 0, skipped: 0, failureReportFailed: 0 });
   assertEquals(calls, [
     ["isAuthUserAbsent", "user-1"],
     ["finalize", "batch-1"],
@@ -144,7 +144,7 @@ Deno.test("resumes Auth deletion directly when deleting batch still has an Auth 
     work_status: "deleting",
   };
   const summary = await processAccountDeletionWorkItems([interruptedItem], deps);
-  assertEquals(summary, { claimed: 1, completed: 1, failed: 0, skipped: 0 });
+  assertEquals(summary, { claimed: 1, completed: 1, failed: 0, skipped: 0, failureReportFailed: 0 });
   assertEquals(calls, [
     ["isAuthUserAbsent", "user-1"],
     ["deleteAuthUser", "user-1"],
@@ -165,6 +165,19 @@ Deno.test("continues processing later items when failure reporting throws", asyn
   };
   const second = { ...item, target_user_id: "user-2" };
   const summary = await processAccountDeletionWorkItems([item, second], deps);
-  assertEquals(summary, { claimed: 2, completed: 0, failed: 2, skipped: 0 });
+  assertEquals(summary, { claimed: 2, completed: 0, failed: 2, skipped: 0, failureReportFailed: 2 });
   assertEquals(calls.filter(([name]) => name === "archive").length, 2);
 });
+
+Deno.test("counts resolved RPC errors from failure reporting", async () => {
+  const deps = successfulDeps();
+  deps.archive = async () => ({ data: null, error: new Error("archive_unavailable") });
+  deps.markFailure = async () => ({
+    data: null,
+    error: { code: "failure_rpc_unavailable" },
+  });
+  const summary = await processAccountDeletionWorkItems([item], deps);
+  assertEquals(summary.failed, 1);
+  assertEquals(summary.failureReportFailed, 1);
+});
+
