@@ -61,6 +61,11 @@ assert.match(sql, /auth[.]users AS u/);
 assert.match(sql, /ci[.]storage_path = p_storage_path/);
 assert.match(sql, /c[.]avatar_video_path = p_storage_path/);
 assert.match(sql, /NOT public[.]account_is_active[(][)]/);
+assert.match(sql, /auth[.]uid[(][)] IS DISTINCT FROM p_user_id/);
+assert.match(sql, /auth[.]jwt[(][)] ->> 'session_id'/);
+assert.match(sql, /p_storage_path !~ [(]/);
+assert.match(sql, /REVOKE ALL ON FUNCTION public[.]can_process_character_illustration_cleanup[(]uuid, text[)]/);
+assert.match(sql, /GRANT EXECUTE ON FUNCTION public[.]can_process_character_illustration_cleanup[(]uuid, text[)][\\s\\S]*?TO authenticated/);
 assert.match(archiveFn, /author_id = NULL/);
 assert.match(archiveFn, /DELETE FROM public[.]character_illustration_cleanup_jobs/);
 assert.doesNotMatch(archiveFn, /DELETE FROM public[.]characters/);
@@ -431,12 +436,20 @@ const indexHtml = fs.readFileSync("index.html", "utf8");
 assert.ok(indexHtml.includes("最後確認：刪除角色？公開列表會隱藏；若已有聊天、相遇或故事紀錄，系統會保留既有紀錄並封存角色。"));
 assert.ok(indexHtml.includes("角色已刪除；有歷史紀錄的角色會保留既有內容"));
 assert.ok(!indexHtml.includes("角色軟刪除失敗："));
-const illustrationCleanupProcessor = indexHtml.match(
-  /async function processCharacterIllustrationCleanupJob[(]job,userId[)][\\s\\S]*?\\n}/,
-)?.[0];
-assert.ok(illustrationCleanupProcessor, "legacy illustration cleanup processor must exist");
-assert.match(illustrationCleanupProcessor, /rpc[(]'can_process_character_illustration_cleanup'/);
-assert.doesNotMatch(illustrationCleanupProcessor, /eq[(]'author_id',userId[)]/);
+const illustrationCleanupStart = indexHtml.indexOf(
+  "async function processCharacterIllustrationCleanupJob(job,userId) {",
+);
+const illustrationCleanupEnd = indexHtml.indexOf(
+  "\\nasync function cleanupCharacterIllustrationUploads",
+  illustrationCleanupStart,
+);
+assert.ok(illustrationCleanupStart >= 0 && illustrationCleanupEnd > illustrationCleanupStart);
+const illustrationCleanupProcessor = indexHtml.slice(
+  illustrationCleanupStart,
+  illustrationCleanupEnd,
+);
+assert.ok(illustrationCleanupProcessor.includes("can_process_character_illustration_cleanup"));
+assert.ok(!illustrationCleanupProcessor.includes(".eq('author_id',userId)"));
 
 const assetWorkerTests = fs.readFileSync("supabase/functions/_shared/character-asset-cleanup-worker.test.ts", "utf8");
 assert.match(assetWorkerTests, /skips assets still referenced/);
