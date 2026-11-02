@@ -11,7 +11,15 @@ BEGIN;
 \i supabase/drafts/character-history-aware-deletion.sql
 \echo 'Bootstrapping disposable Storage metadata schema for RLS policy replay'
 CREATE SCHEMA IF NOT EXISTS storage;
-CREATE TABLE IF NOT EXISTS storage.objects (bucket_id text NOT NULL, name text NOT NULL);
+DO $storage_stub$
+BEGIN
+  -- Supabase Local already owns storage.objects; do not attempt CREATE on its
+  -- protected storage schema. Plain disposable PostgreSQL needs only this stub.
+  IF pg_catalog.to_regclass('storage.objects') IS NULL THEN
+    CREATE TABLE storage.objects (bucket_id text NOT NULL, name text NOT NULL);
+  END IF;
+END;
+$storage_stub$;
 \echo 'Applying account deletion character preservation and safe Auth detachment draft'
 \i supabase/drafts/account-deletion-character-preservation-draft.sql
 \echo 'Applying stale-JWT Auth-user existence guard'
