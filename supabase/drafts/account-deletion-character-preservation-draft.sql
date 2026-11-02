@@ -305,8 +305,24 @@ GRANT EXECUTE ON FUNCTION private.archive_account_characters(uuid)
   TO service_role;
 
 -- 6) Required follow-up integration (not included here):
--- - Call private.archive_account_characters(p_user_id) inside the final
---   prepare_account_deletion() transaction before Auth deletion.
+-- Live test-DB review on 2026-11-02 confirmed prepare_account_deletion(uuid)
+-- currently does NOT call this helper. It archives billing evidence, then removes
+-- the account's own legacy conversations; Auth/profile deletion can still cascade
+-- through characters unless this helper is integrated first.
+--
+-- Add the following call inside the final prepare_account_deletion(p_user_id)
+-- function, immediately after locking/validating the due account_deletion_requests
+-- row and before the existing-batch lookup (including the early "deleting" retry
+-- return). This placement is deliberate: the helper is idempotent, and every retry
+-- must detach character ownership before any path can continue toward Auth deletion.
+--
+--   PERFORM private.archive_account_characters(p_user_id);
+--
+-- The call must execute in the SAME PostgreSQL transaction as the rest of
+-- prepare_account_deletion. If later archive verification or cleanup fails, all
+-- character detachment/snapshot changes must roll back with the transaction.
+-- Do not put this call only in the worker's separate archive callback.
+--
 -- - Add account_archived_at IS NULL to every new-session gate:
 --   character_can_start_chat, can_open_encounter_session, create_chat_group,
 --   encounter-session, story-session, and any direct session INSERT/RPC.
