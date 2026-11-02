@@ -18,6 +18,8 @@ assert.equal(structure.constraints.length, 288);
 assert.equal(structure.indexes.length, 140);
 assert.equal(structure.views.length, 1);
 assert.equal(structure.sequences.length, 2);
+assert.ok(structure.sequences.every((s) => typeof s.start === "string" && typeof s.max === "string"));
+assert.ok(structure.sequences.some((s) => s.owned_by?.dependency_type === "i"), "Identity-owned sequences must be distinguished from serial sequences");
 assert.equal(structure.extensions.length, 7);
 assert.equal(routines.routines.length, 77);
 assert.ok(routines.routines.every((r) => typeof r.definition === "string" && r.definition.startsWith("CREATE OR REPLACE")));
