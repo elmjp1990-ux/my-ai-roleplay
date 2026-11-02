@@ -1,4 +1,4 @@
-name: Supabase local migration replay (manual)
+name: Supabase local synthetic schema replay (manual)
 
 on:
   push:
@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 jobs:
-  local-migration-replay:
+  local-synthetic-schema-replay:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -100,57 +100,38 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Start the local platform only. This workflow never links a hosted project.
           supabase db start
-          supabase migration list --local
 
-      - name: Apply security drafts on the disposable local database
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Load synthetic current-state schema and replay deletion security drafts
         shell: bash
         run: |
           set -euo pipefail
-          settlement_draft="supabase/drafts/settle-encounter-session-parent-lock-live-reconciliation.sql"
-          encounter_draft="supabase/drafts/encounter-session-delete-lifecycle-guards.sql"
-          diary_draft="supabase/drafts/encounter-diary-chat-deletion-lifecycle-guard.sql"
-          truncate_draft="supabase/drafts/revoke-public-truncate-privileges-proposal.sql"
-          stats_draft="supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql"
-          settlement_migration="supabase/migrations/99999999999995_settle_encounter_session_parent_lock_ci.sql"
-          encounter_migration="supabase/migrations/99999999999996_encounter_session_delete_lifecycle_ci.sql"
-          diary_migration="supabase/migrations/99999999999997_encounter_diary_chat_lifecycle_guard_ci.sql"
-          truncate_migration="supabase/migrations/99999999999998_revoke_public_truncate_ci.sql"
-          stats_migration="supabase/migrations/99999999999999_chat_deletion_cumulative_turn_statistics_ci.sql"
-          test -f "$settlement_draft"
-          test -f "$encounter_draft"
-          test -f "$diary_draft"
-          test -f "$truncate_draft"
-          test -f "$stats_draft"
-          test ! -e "$settlement_migration"
-          test ! -e "$encounter_migration"
-          test ! -e "$diary_migration"
-          test ! -e "$truncate_migration"
-          test ! -e "$stats_migration"
-          # Apply the single canonical settlement definition before broader guards.
-          cp "$settlement_draft" "$settlement_migration"
-          cp "$encounter_draft" "$encounter_migration"
-          cp "$diary_draft" "$diary_migration"
-          cp "$truncate_draft" "$truncate_migration"
-          cp "$stats_draft" "$stats_migration"
-          # Explicitly local: no link, no access token, no remote DB password.
-          supabase db reset --local --no-seed
-          supabase migration list --local
-
-      - name: Verify archived-turn schema, RPC guards, trigger attachments and ACLs
-        shell: bash
-        run: |
-          set -euo pipefail
-          mapfile -t db_containers < <(docker ps --format '{{.Names}}' | grep '^supabase_db_' || true)
-          if [[ "${#db_containers[@]}" -ne 1 ]]; then
-            echo "Expected exactly one disposable Supabase database container; found ${#db_containers[@]}."
-            docker ps --format '{{.Names}}'
+          node scripts/build-disposable-schema-fixture.mjs > "$RUNNER_TEMP/current-state-schema.sql"
+          DB_URL="$(supabase status --output env | sed -n 's/^DB_URL=//p' | sed 's/^"//;s/"$//')"
+          if [[ -z "$DB_URL" ]]; then
+            echo "Could not resolve the disposable local Supabase DB_URL."
             exit 1
           fi
-          docker exec -i "${db_containers[0]}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
-            < supabase/drafts/chat-deletion-turn-stats-structural-verification.sql
-          docker exec -i "${db_containers[0]}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
-            < supabase/drafts/encounter-lifecycle-trigger-attachment-audit.sql
+          echo "DATABASE_URL=$DB_URL" >> "$GITHUB_ENV"
+
+          # Synthetic current-state baseline is intentional: the original pre-ledger
+          # profiles/characters foundation is unavailable. Do not replay old migrations.
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-current-state-schema-fixture.sql
+
+          # Encounter/chat structural audits and character/account DML all run inside
+          # disposable transactions and are rolled back.
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-local-security-drafts.sql
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-and-test-character-deletion.sql
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-deletion-draft-rollback.sql
+
+          # True independent-connection races use only this disposable local database.
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-deletion-concurrency-setup.sql
+          DATABASE_URL="$DB_URL" bash scripts/test-deletion-concurrency.sh
 
       - name: Stop and discard local database
         if: always()
