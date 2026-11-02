@@ -172,10 +172,10 @@ asset_author="10000000-0000-4000-8000-000000000032"
 asset_path_a="$asset_author/20000000-0000-4000-8000-000000000032/30000000-0000-4000-8000-000000000032.jpg"
 cat > "$tmpdir/asset-reattach-first.sql" <<SQL
 BEGIN;
-SET LOCAL ROLE authenticated;
+SET LOCAL ROLE service_role;
 SELECT set_config('request.jwt.claim.sub', '$asset_author', true);
-SELECT set_config('request.jwt.claim.role', 'authenticated', true);
-SELECT set_config('request.jwt.claims', '{"sub":"$asset_author","role":"authenticated"}', true);
+SELECT set_config('request.jwt.claim.role', 'service_role', true);
+SELECT set_config('request.jwt.claims', '{"sub":"$asset_author","role":"service_role"}', true);
 INSERT INTO public.character_illustrations (
   id, character_id, author_id, storage_path, asset_type, sort_order
 ) VALUES (
@@ -218,10 +218,10 @@ echo "ok: asset reattachment wins path lock; cleanup sees a still-referenced obj
 asset_path_b="$asset_author/20000000-0000-4000-8000-000000000034/30000000-0000-4000-8000-000000000034.jpg"
 cat > "$tmpdir/asset-delete-first.sql" <<SQL
 BEGIN;
-SET LOCAL ROLE authenticated;
+SET LOCAL ROLE service_role;
 SELECT set_config('request.jwt.claim.sub', '$asset_author', true);
-SELECT set_config('request.jwt.claim.role', 'authenticated', true);
-SELECT set_config('request.jwt.claims', '{"sub":"$asset_author","role":"authenticated"}', true);
+SELECT set_config('request.jwt.claim.role', 'service_role', true);
+SELECT set_config('request.jwt.claims', '{"sub":"$asset_author","role":"service_role"}', true);
 SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('character-illustrations:' || '$asset_path_b', 0));
 SELECT pg_sleep(2);
 SELECT public.soft_delete_character('20000000-0000-4000-8000-000000000034');
