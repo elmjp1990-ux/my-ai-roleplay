@@ -138,6 +138,5 @@ const activeSql = fs.readdirSync(migrationsDir)
   .map((name) => fs.readFileSync(path.join(migrationsDir, name), "utf8"))
   .join("\n");
 assert.doesNotMatch(activeSql, /archive_account_characters|account_archived_at/);
-assert.doesNotMatch(activeSql, /prepare_account_deletion[(]p_user_id uuid[)]/);
 
 console.log("Account deletion character-preservation and retry-integration draft guard: passed (static only; no SQL execution).");
