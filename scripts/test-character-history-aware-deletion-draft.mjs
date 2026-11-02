@@ -4,6 +4,9 @@ import assert from "node:assert/strict";
 const sql = fs.readFileSync("supabase/drafts/character-history-aware-deletion.sql", "utf8");
 const worker = fs.readFileSync("supabase/functions/_shared/character-asset-cleanup-worker.ts", "utf8");
 const edge = fs.readFileSync("supabase/functions/purge-character-assets/index.ts", "utf8");
+const continuation = fs.readFileSync("supabase/drafts/character-deletion-existing-chat-continuation.sql", "utf8");
+const behavior = fs.readFileSync("supabase/drafts/test-character-deletion-behavior.sql", "utf8");
+const replay = fs.readFileSync("supabase/drafts/replay-and-test-character-deletion.sql", "utf8");
 
 assert.match(sql, /CREATE OR REPLACE FUNCTION private\.lock_character_asset_path\(/);
 assert.match(sql, /pg_advisory_xact_lock\([\s\S]*hashtextextended\(p_bucket_id\s*\|\|\s*':'\s*\|\|\s*p_object_path/);
@@ -70,5 +73,18 @@ for (const table of [
 assert.match(historyFn, /JOIN public\.character_stories cs ON cs\.id = cv\.story_id/,
   "Legacy conversations must preserve the linked character story");
 
+
+
+assert.match(sql, /PERFORM 1[\\s\\S]*FROM public\\.chat_sessions cs[\\s\\S]*cs\\.deleted_at IS NULL[\\s\\S]*ORDER BY cs\\.id[\\s\\S]*FOR UPDATE/);
+assert.match(sql, /PERFORM 1[\\s\\S]*FROM public\\.chat_groups g[\\s\\S]*g\\.deleted_at IS NULL[\\s\\S]*ORDER BY g\\.id[\\s\\S]*FOR UPDATE/);
+assert.match(continuation, /JOIN public\\.characters c ON c\\.id = m\\.character_id[\\s\\S]*c\\.deleted_at IS NULL/);
+assert.match(continuation, /v_cost := v_member_count \\* 3/);
+assert.match(continuation, /group_has_no_active_characters/);
+assert.match(behavior, /reserve_chat_turn\\([\\s\\S]*v_chat_session[\\s\\S]*v_chat_assistant_message/);
+assert.match(behavior, /existing_single_chat_assistant_reply_rejected_after_character_delete/);
+assert.match(behavior, /append_chat_group_mock_turn\\([\\s\\S]*v_group/);
+assert.match(behavior, /deleted_group_character_must_not_speak_again/);
+assert.match(behavior, /group_turn_must_charge_only_remaining_active_character/);
+assert.match(replay, /character-deletion-existing-chat-continuation\\.sql/);
 
 console.log("Character asset cleanup path-lock and reference guards passed.");
