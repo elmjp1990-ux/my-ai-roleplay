@@ -29,7 +29,8 @@ assert.ok(
   "Storage removal must happen only after a successful reference check",
 );
 assert.match(edge, /character-avatar-videos/);
-assert.match(edge, /character-illustrations/);\n
+assert.match(edge, /character-illustrations/);
+
 const historyStart = sql.indexOf("CREATE OR REPLACE FUNCTION private.character_has_history(");
 const publicationStart = sql.indexOf("CREATE OR REPLACE FUNCTION private.preserve_character_first_publication_timestamp(", historyStart);
 assert.ok(historyStart >= 0 && publicationStart > historyStart);
