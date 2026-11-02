@@ -169,7 +169,7 @@ echo "ok: account archival serializes against in-flight child write and blocks l
 # It targets the same character being hard-deleted; deletion must wait, then
 # enqueue the path only after the new illustration row is committed and cascaded.
 asset_author="10000000-0000-4000-8000-000000000032"
-asset_path_a="$asset_author/20000000-0000-4000-8000-000000000032/race-extra.jpg"
+asset_path_a="$asset_author/20000000-0000-4000-8000-000000000032/30000000-0000-4000-8000-000000000038.jpg"
 cat > "$tmpdir/asset-reattach-first.sql" <<SQL
 BEGIN;
 SET LOCAL ROLE service_role;
