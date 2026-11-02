@@ -256,7 +256,8 @@ BEGIN
     SELECT c.id,
       COALESCE(NULLIF(c.creator_display_name, ''),
                NULLIF(v_nickname, ''),
-               '已停用作者') AS creator_name,
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
     FROM public.characters AS c
     WHERE c.author_id = p_user_id
   )
@@ -266,7 +267,10 @@ BEGIN
       jsonb_build_object(
         'authorId', NULL,
         'creatorDisplayName', owned.creator_name,
-        'visibility', 'private',
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
         'accountArchivedAt', v_archived_at
       ),
       updated_at = v_archived_at
@@ -278,7 +282,8 @@ BEGIN
     SELECT c.id,
       COALESCE(NULLIF(c.creator_display_name, ''),
                NULLIF(v_nickname, ''),
-               '已停用作者') AS creator_name,
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
     FROM public.characters AS c
     WHERE c.author_id = p_user_id
   )
@@ -288,7 +293,10 @@ BEGIN
       jsonb_build_object(
         'authorId', NULL,
         'creatorDisplayName', owned.creator_name,
-        'visibility', 'private',
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
         'accountArchivedAt', v_archived_at
       )
   FROM owned
@@ -299,7 +307,8 @@ BEGIN
     SELECT c.id,
       COALESCE(NULLIF(c.creator_display_name, ''),
                NULLIF(v_nickname, ''),
-               '已停用作者') AS creator_name,
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
     FROM public.characters AS c
     WHERE c.author_id = p_user_id
   )
@@ -309,7 +318,10 @@ BEGIN
       jsonb_build_object(
         'authorId', NULL,
         'creatorDisplayName', owned.creator_name,
-        'visibility', 'private',
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
         'accountArchivedAt', v_archived_at
       )
   FROM owned
@@ -339,7 +351,7 @@ BEGIN
   SET creator_display_name =
         COALESCE(NULLIF(c.creator_display_name, ''),
                  NULLIF(v_nickname, ''),
-                   '已停用作者'),
+                   '原作者'),
       -- Preserve the existing public/private visibility and review state.
       -- Account deletion marks the character offline; it does not delist the work.
       account_archived_at = COALESCE(c.account_archived_at, v_archived_at),
