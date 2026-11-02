@@ -84,6 +84,13 @@ BEGIN
 
   PERFORM pg_catalog.set_config('request.jwt.claim.sub', v_author::text, true);
   PERFORM pg_catalog.set_config('request.jwt.claim.role', 'service_role', true);
+  -- Supabase auth.jwt() reads the complete claims JSON, not the legacy
+  -- request.jwt.claim.role setting used by auth.role().
+  PERFORM pg_catalog.set_config(
+    'request.jwt.claims',
+    pg_catalog.jsonb_build_object('sub', v_author::text, 'role', 'service_role')::text,
+    true
+  );
 
   SELECT p.batch_id, p.batch_status INTO v_batch, v_status
   FROM public.prepare_account_deletion(v_author) AS p;
