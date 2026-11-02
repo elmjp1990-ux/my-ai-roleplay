@@ -9,7 +9,6 @@
 -- 1) Durable, non-clickable creator attribution and explicit account archive marker.
 ALTER TABLE public.characters
   ADD COLUMN IF NOT EXISTS creator_display_name text,
-  ADD COLUMN IF NOT EXISTS creator_handle_snapshot text,
   ADD COLUMN IF NOT EXISTS account_archived_at timestamptz;
 
 COMMENT ON COLUMN public.characters.creator_display_name IS
