@@ -124,7 +124,7 @@ const purgeCronDraft = fs.readFileSync("supabase/drafts/chat-deletion-purge-cron
 assert.match(purgeCronDraft, /^-- DRAFT ONLY — NOT AN ACTIVE MIGRATION\./);
 assert.match(purgeCronDraft, /cron[.]schedule[(]/);
 assert.match(purgeCronDraft, /'poyozz-chat-deletion-purge'/);
-assert.match(purgeCronDraft, /'\\*\\/5 \\* \\* \\* \\*'/);
+assert.ok(purgeCronDraft.includes("'*/5 * * * *'"));
 assert.match(purgeCronDraft, /chat_deletion_worker_service_role_key/);
 assert.match(purgeCronDraft, /decrypted_secret LIKE 'sb_secret_%'/);
 assert.match(purgeCronDraft, /functions[.]v1[.]purge-chat-deletions/);
