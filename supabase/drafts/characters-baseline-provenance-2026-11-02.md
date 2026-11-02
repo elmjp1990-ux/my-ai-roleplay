@@ -203,3 +203,46 @@ All inspected account deletion RPCs are SECURITY DEFINER and set search_path to 
 - Table ACL relacl and function proacl were inspected, but default privileges, inherited grants, schema USAGE grants, and any edge-function / worker invocation authentication have not yet been fully audited.
 - Need trace the actual worker/Edge Function or external invocation path that obtains get_account_deletion_work_items(), calls prepare_account_deletion(), deletes auth.users, then calls finalize_account_deletion(). The SQL function definitions alone do not prove that the deployed worker authenticates correctly or handles partial failures safely.
 - No account deletion RPC was invoked. All evidence came from read-only catalog queries and pg_get_functiondef.
+
+## Account-deletion worker / scheduler execution-path audit — 2026-11-02
+
+### Deployed Edge Functions inventory
+
+The connected Supabase project currently lists these active Edge Functions:
+- chat-turn
+- expire-memory-album-photos
+- encounter-session
+- encounter-turn
+- story-session
+- encounter-session-state
+- purge-chat-deletions
+
+There is no account-deletion worker Edge Function in the deployed function inventory. The repository tree at the audited PR head likewise contains no account-deletion worker function; the only deletion worker function is purge-chat-deletions.
+
+### Important separation: chat deletion worker is not account deletion worker
+
+The deployed purge-chat-deletions handler claims chat deletion jobs and chat Storage deletion jobs, then calls purge_chat_deletion_job / mark_chat_deletion_job_failed and the corresponding storage RPCs. It does not call:
+- get_account_deletion_work_items()
+- archive_account_deletion_data()
+- prepare_account_deletion()
+- Auth Admin deleteUser
+- finalize_account_deletion()
+
+It must not be treated as proof that account deletion is automated.
+
+### Scheduler evidence
+
+A read-only query of cron.job returned exactly one active job:
+- jobid 1, every minute: SELECT public.enqueue_due_encounter_evaluations(50);
+
+No scheduled account-deletion worker invocation was present in cron.job. The repository migration enabling pg_net explicitly says the schedule for the chat-deletion Edge Function is intentionally deferred until end-to-end worker tests pass. This is separate from account deletion.
+
+### Current conclusion
+
+The database has account-deletion request/archive/prepare/finalize RPCs and permissions, but the connected project's deployed Edge Function inventory and active pg_cron schedule do not show an account-deletion worker or an automatic Auth user deletion path. Therefore, end-to-end automatic account deletion after the 30-day grace period is NOT verified and appears not yet implemented/deployed.
+
+This is a material implementation gap, not a confirmed runtime failure. Do not create a cron schedule or worker as part of this audit. The next implementation step should be a separate account-deletion worker design and test suite, with strict service-only authentication, idempotent batch claims, archive verification, Auth Admin deletion, finalize, retry/failure states, and a dry-run/test-user gate. Keep it separate from purge-chat-deletions.
+
+### Safety boundary
+
+Only Edge Function inventory, repository tree, and SELECT from cron.job were inspected. No account data was read, no worker was invoked, no function was deployed, no cron job was created/modified, and no Auth user was deleted.
