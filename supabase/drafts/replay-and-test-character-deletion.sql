@@ -8,6 +8,9 @@ BEGIN;
 \i supabase/drafts/seed-character-deletion-legacy-fixtures.sql
 \echo 'Applying character history-aware deletion draft'
 \i supabase/drafts/character-history-aware-deletion.sql
+\echo 'Bootstrapping disposable Storage metadata schema for RLS policy replay'
+CREATE SCHEMA IF NOT EXISTS storage;
+CREATE TABLE IF NOT EXISTS storage.objects (bucket_id text NOT NULL, name text NOT NULL);
 \echo 'Applying account deletion character preservation and safe Auth detachment draft'
 \i supabase/drafts/account-deletion-character-preservation-draft.sql
 \echo 'Applying complete prepare_account_deletion integration draft'
