@@ -15,6 +15,23 @@
 -- This is a complete replacement of the current live function definition, not
 -- a partial snippet. Re-diff against pg_get_functiondef() immediately before use.
 
+-- Group chat charges are independent financial/idempotency evidence. The
+-- group parent and auth user both cascade to these rows, so archive them first.
+-- Group turn request_content is transcript content: retain only the minimal
+-- idempotency metadata, never the player's message text.
+ALTER TABLE public.account_deletion_archive_items
+  DROP CONSTRAINT IF EXISTS account_deletion_archive_items_source_table_check;
+ALTER TABLE public.account_deletion_archive_items
+  ADD CONSTRAINT account_deletion_archive_items_source_table_check
+  CHECK (source_table IN (
+    'ai_generation_records',
+    'wallet_transactions',
+    'chat_turn_charges',
+    'chat_turn_events',
+    'chat_group_turn_charges',
+    'chat_group_turns'
+  ));
+
 CREATE OR REPLACE FUNCTION public.prepare_account_deletion(p_user_id uuid)
  RETURNS TABLE(batch_id uuid, target_user_id uuid, batch_status text)
  LANGUAGE plpgsql
@@ -34,6 +51,10 @@ DECLARE
   v_charge_archived bigint;
   v_event_source bigint;
   v_event_archived bigint;
+  v_group_charge_source bigint;
+  v_group_charge_archived bigint;
+  v_group_turn_source bigint;
+  v_group_turn_archived bigint;
 BEGIN
   IF p_user_id IS NULL THEN
     RAISE EXCEPTION '目標帳號不可為空';
@@ -106,6 +127,32 @@ BEGIN
     ON CONFLICT ON CONSTRAINT account_deletion_archive_item_batch_id_source_table_source__key
     DO NOTHING;
 
+    INSERT INTO public.account_deletion_archive_items
+      (batch_id, source_table, source_record_id, payload)
+    SELECT v_batch_id, 'chat_group_turn_charges', gc.id::text, pg_catalog.to_jsonb(gc)
+    FROM public.chat_group_turn_charges AS gc
+    WHERE gc.user_id = p_user_id
+    ON CONFLICT ON CONSTRAINT account_deletion_archive_item_batch_id_source_table_source__key
+    DO NOTHING;
+
+    -- Exclude request_content and user_id: this preserves retry/idempotency
+    -- metadata without retaining the group player's transcript text.
+    INSERT INTO public.account_deletion_archive_items
+      (batch_id, source_table, source_record_id, payload)
+    SELECT v_batch_id, 'chat_group_turns', gt.id::text,
+      pg_catalog.jsonb_build_object(
+        'id', gt.id,
+        'group_id', gt.group_id,
+        'request_key', gt.request_key,
+        'status', gt.status,
+        'created_at', gt.created_at,
+        'completed_at', gt.completed_at
+      )
+    FROM public.chat_group_turns AS gt
+    WHERE gt.user_id = p_user_id
+    ON CONFLICT ON CONSTRAINT account_deletion_archive_item_batch_id_source_table_source__key
+    DO NOTHING;
+
     -- A failed or interrupted archive can be retried only if every remaining source row
     -- is exactly represented in the existing archive. Any mismatch fails closed.
     SELECT count(*) INTO v_ai_source
@@ -128,9 +175,21 @@ BEGIN
     SELECT count(*) INTO v_event_archived
     FROM public.account_deletion_archive_items AS i
     WHERE i.batch_id = v_batch_id AND i.source_table = 'chat_turn_events';
+    SELECT count(*) INTO v_group_charge_source
+    FROM public.chat_group_turn_charges AS gc WHERE gc.user_id = p_user_id;
+    SELECT count(*) INTO v_group_charge_archived
+    FROM public.account_deletion_archive_items AS i
+    WHERE i.batch_id = v_batch_id AND i.source_table = 'chat_group_turn_charges';
+    SELECT count(*) INTO v_group_turn_source
+    FROM public.chat_group_turns AS gt WHERE gt.user_id = p_user_id;
+    SELECT count(*) INTO v_group_turn_archived
+    FROM public.account_deletion_archive_items AS i
+    WHERE i.batch_id = v_batch_id AND i.source_table = 'chat_group_turns';
 
     IF v_ai_source <> v_ai_archived OR v_wallet_source <> v_wallet_archived
        OR v_charge_source <> v_charge_archived OR v_event_source <> v_event_archived
+       OR v_group_charge_source <> v_group_charge_archived
+       OR v_group_turn_source <> v_group_turn_archived
        OR EXISTS (
          SELECT 1 FROM public.ai_generation_records AS a
          LEFT JOIN public.account_deletion_archive_items AS i
@@ -166,6 +225,31 @@ BEGIN
           AND i.source_record_id = e.event_id::text
          WHERE e.user_id = p_user_id
            AND (i.id IS NULL OR i.payload IS DISTINCT FROM pg_catalog.to_jsonb(e))
+       )
+       OR EXISTS (
+         SELECT 1 FROM public.chat_group_turn_charges AS gc
+         LEFT JOIN public.account_deletion_archive_items AS i
+           ON i.batch_id = v_batch_id
+          AND i.source_table = 'chat_group_turn_charges'
+          AND i.source_record_id = gc.id::text
+         WHERE gc.user_id = p_user_id
+           AND (i.id IS NULL OR i.payload IS DISTINCT FROM pg_catalog.to_jsonb(gc))
+       )
+       OR EXISTS (
+         SELECT 1 FROM public.chat_group_turns AS gt
+         LEFT JOIN public.account_deletion_archive_items AS i
+           ON i.batch_id = v_batch_id
+          AND i.source_table = 'chat_group_turns'
+          AND i.source_record_id = gt.id::text
+         WHERE gt.user_id = p_user_id
+           AND (i.id IS NULL OR i.payload IS DISTINCT FROM pg_catalog.jsonb_build_object(
+             'id', gt.id,
+             'group_id', gt.group_id,
+             'request_key', gt.request_key,
+             'status', gt.status,
+             'created_at', gt.created_at,
+             'completed_at', gt.completed_at
+           ))
        ) THEN
       RAISE EXCEPTION '既有封存批次與來源資料不一致，已停止刪除以避免資料遺失';
     END IF;
@@ -203,6 +287,32 @@ BEGIN
     ON CONFLICT ON CONSTRAINT account_deletion_archive_item_batch_id_source_table_source__key
     DO NOTHING;
 
+    INSERT INTO public.account_deletion_archive_items
+      (batch_id, source_table, source_record_id, payload)
+    SELECT v_batch_id, 'chat_group_turn_charges', gc.id::text, pg_catalog.to_jsonb(gc)
+    FROM public.chat_group_turn_charges AS gc
+    WHERE gc.user_id = p_user_id
+    ON CONFLICT ON CONSTRAINT account_deletion_archive_item_batch_id_source_table_source__key
+    DO NOTHING;
+
+    -- Exclude request_content and user_id: this preserves retry/idempotency
+    -- metadata without retaining the group player's transcript text.
+    INSERT INTO public.account_deletion_archive_items
+      (batch_id, source_table, source_record_id, payload)
+    SELECT v_batch_id, 'chat_group_turns', gt.id::text,
+      pg_catalog.jsonb_build_object(
+        'id', gt.id,
+        'group_id', gt.group_id,
+        'request_key', gt.request_key,
+        'status', gt.status,
+        'created_at', gt.created_at,
+        'completed_at', gt.completed_at
+      )
+    FROM public.chat_group_turns AS gt
+    WHERE gt.user_id = p_user_id
+    ON CONFLICT ON CONSTRAINT account_deletion_archive_item_batch_id_source_table_source__key
+    DO NOTHING;
+
     v_status := 'archived';
   END IF;
 
@@ -217,8 +327,20 @@ BEGIN
   SELECT count(*) INTO v_event_archived
   FROM public.account_deletion_archive_items AS i
   WHERE i.batch_id = v_batch_id AND i.source_table = 'chat_turn_events';
+  SELECT count(*) INTO v_group_charge_source
+  FROM public.chat_group_turn_charges AS gc WHERE gc.user_id = p_user_id;
+  SELECT count(*) INTO v_group_charge_archived
+  FROM public.account_deletion_archive_items AS i
+  WHERE i.batch_id = v_batch_id AND i.source_table = 'chat_group_turn_charges';
+  SELECT count(*) INTO v_group_turn_source
+  FROM public.chat_group_turns AS gt WHERE gt.user_id = p_user_id;
+  SELECT count(*) INTO v_group_turn_archived
+  FROM public.account_deletion_archive_items AS i
+  WHERE i.batch_id = v_batch_id AND i.source_table = 'chat_group_turns';
 
   IF v_charge_source <> v_charge_archived OR v_event_source <> v_event_archived
+     OR v_group_charge_source <> v_group_charge_archived
+     OR v_group_turn_source <> v_group_turn_archived
      OR EXISTS (
        SELECT 1 FROM public.chat_turn_charges AS c
        LEFT JOIN public.account_deletion_archive_items AS i
@@ -236,6 +358,31 @@ BEGIN
         AND i.source_record_id = e.event_id::text
        WHERE e.user_id = p_user_id
          AND (i.id IS NULL OR i.payload IS DISTINCT FROM pg_catalog.to_jsonb(e))
+     )
+     OR EXISTS (
+       SELECT 1 FROM public.chat_group_turn_charges AS gc
+       LEFT JOIN public.account_deletion_archive_items AS i
+         ON i.batch_id = v_batch_id
+        AND i.source_table = 'chat_group_turn_charges'
+        AND i.source_record_id = gc.id::text
+       WHERE gc.user_id = p_user_id
+         AND (i.id IS NULL OR i.payload IS DISTINCT FROM pg_catalog.to_jsonb(gc))
+     )
+     OR EXISTS (
+       SELECT 1 FROM public.chat_group_turns AS gt
+       LEFT JOIN public.account_deletion_archive_items AS i
+         ON i.batch_id = v_batch_id
+        AND i.source_table = 'chat_group_turns'
+        AND i.source_record_id = gt.id::text
+       WHERE gt.user_id = p_user_id
+         AND (i.id IS NULL OR i.payload IS DISTINCT FROM pg_catalog.jsonb_build_object(
+           'id', gt.id,
+           'group_id', gt.group_id,
+           'request_key', gt.request_key,
+           'status', gt.status,
+           'created_at', gt.created_at,
+           'completed_at', gt.completed_at
+         ))
      ) THEN
     RAISE EXCEPTION '聊天扣款／事件紀錄封存核對失敗，已停止刪除';
   END IF;
