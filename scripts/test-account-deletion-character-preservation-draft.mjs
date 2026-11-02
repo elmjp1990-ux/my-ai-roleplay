@@ -64,8 +64,8 @@ assert.match(sql, /NOT public[.]account_is_active[(][)]/);
 assert.match(sql, /auth[.]uid[(][)] IS DISTINCT FROM p_user_id/);
 assert.match(sql, /auth[.]jwt[(][)] ->> 'session_id'/);
 assert.match(sql, /p_storage_path !~ [(]/);
-assert.match(sql, /REVOKE ALL ON FUNCTION public[.]can_process_character_illustration_cleanup[(]uuid, text[)]/);
-assert.ok(sql.includes("GRANT EXECUTE ON FUNCTION public.can_process_character_illustration_cleanup(uuid, text)"));
+assert.match(sql, /REVOKE ALL ON FUNCTION public[.]can_process_character_illustration_cleanup[(]uuid, uuid, text[)]/);
+assert.ok(sql.includes("GRANT EXECUTE ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)"));
 assert.ok(sql.includes("TO authenticated"));
 assert.match(archiveFn, /author_id = NULL/);
 assert.match(archiveFn, /DELETE FROM public[.]character_illustration_cleanup_jobs/);
@@ -450,6 +450,7 @@ const illustrationCleanupProcessor = indexHtml.slice(
   illustrationCleanupEnd,
 );
 assert.ok(illustrationCleanupProcessor.includes("can_process_character_illustration_cleanup"));
+assert.ok(illustrationCleanupProcessor.includes("p_job_id:job.id"));
 assert.ok(!illustrationCleanupProcessor.includes("from('character_illustrations')"));
 
 const assetWorkerTests = fs.readFileSync("supabase/functions/_shared/character-asset-cleanup-worker.test.ts", "utf8");
