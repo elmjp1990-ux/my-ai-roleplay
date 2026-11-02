@@ -76,9 +76,9 @@ export function buildDisposableSchemaSql(structure, routinesSnapshot, security, 
     "",
   ];
 
+  lines.push("-- Source extension inventory (platform-provided; no extension is installed by this fixture):");
   for (const ext of structure.extensions ?? []) {
-    if (!ext.name || !ext.schema) continue;
-    lines.push(`CREATE EXTENSION IF NOT EXISTS ${quoteIdent(ext.name)} WITH SCHEMA ${quoteIdent(ext.schema)};`);
+    lines.push(`-- ${ext.name} ${ext.version} (${ext.schema})`);
   }
   lines.push("");
 
