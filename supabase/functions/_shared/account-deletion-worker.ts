@@ -23,6 +23,7 @@ export type AccountDeletionWorkerSummary = {
   completed: number;
   failed: number;
   skipped: number;
+  failureReportFailed: number;
 };
 
 function safeCode(value: unknown, fallback: string): string {
@@ -48,6 +49,7 @@ export async function processAccountDeletionWorkItems(
     completed: 0,
     failed: 0,
     skipped: 0,
+    failureReportFailed: 0,
   };
 
   for (const item of items) {
@@ -129,9 +131,16 @@ export async function processAccountDeletionWorkItems(
         // remains authoritative; a transient reporting error is surfaced by
         // logs/metrics at the caller and the next item can still be processed.
         try {
-          await deps.markFailure(batchId, safeCode(error, "account_deletion_worker_failed"));
+          const report = await deps.markFailure(
+            batchId,
+            safeCode(error, "account_deletion_worker_failed"),
+          );
+          if (report.error || report.data !== true) {
+            summary.failureReportFailed += 1;
+          }
         } catch {
           // Preserve the original processing failure and continue with later work.
+          summary.failureReportFailed += 1;
         }
       }
     }
