@@ -25,7 +25,7 @@ A fresh read-only `list_migrations` returned 152 records. The latest 11 entries 
 - `20261101101343 enable_pg_net_for_chat_deletion_worker`
 - `20261101110211 account_deletion_character_video_storage_gates`
 
-The ten PR #200 chat-deletion migration versions (20261101052444 through 20261101101343) are already present in the connected test project's migration ledger. Do not try to re-apply them to that project. The last account-deletion character/video storage gate (20261101110211) is in the remote ledger but has no matching SQL file in the current branch; its source remains a provenance gap.
+The ten PR #200 chat-deletion migration versions (20261101052444 through 20261101101343) are already present in the connected test project's migration ledger. Do not try to re-apply them to that project. The account-deletion character/video storage gate (20261101110211) was initially missing from the repository but has now been restored from the ledger's single stored SQL statement; see migration-source-recovery-from-ledger-2026-11-03.md.
 
 The repository still contains five timestamp-collision values:
 - 20261015151500 (two files)
@@ -80,3 +80,8 @@ The first isolated Supabase CLI run successfully started and discarded its tempo
 ## Second local replay retry: keep Supabase platform-owned default ACLs native
 
 The attempted local-only membership grant was rejected because Supabase reserves those platform-role memberships. The synthetic fixture generator now restores only `postgres`-owned application defaults and deliberately leaves `supabase_admin` / `supabase_auth_admin` defaults to Supabase Local itself. Static tests assert that platform-owned default ACL statements are not emitted. One more isolated local run is triggered by this document update; no hosted credentials are used.
+
+
+## Migration source recovery update
+
+As of 2026-11-03, 12 missing migration SQL statement bodies have been restored from the connected test project's read-only `schema_migrations.statements` ledger (including the 20261101110211 character-video Storage gate). The remote-only source gap for that migration is closed at the statement-body level; original comments/formatting are not guaranteed. Five duplicate timestamp values, five legacy filenames, and the pre-ledger profiles/characters foundation remain unresolved.
