@@ -65,15 +65,24 @@ export async function processAccountDeletionWorkItems(
       // request row may already have cascaded away. The SQL work-items RPC returns
       // the still-deleting batch specifically for this recovery case.
       if (item.work_status === "deleting" && batchId) {
+        // prepare_account_deletion() commits the deleting status and relational
+        // cleanup atomically. The request row may therefore be gone while the
+        // Auth user still exists. Do not call archive/prepare again: both require
+        // the due request row. Resume only the remaining Auth + finalize steps.
         const authUserAbsent = await deps.isAuthUserAbsent(item.target_user_id);
-        if (authUserAbsent) {
-          const recovered = await deps.finalize(batchId);
-          if (recovered.error || recovered.data !== true) {
-            throw recovered.error ?? new Error("recovery_finalize_not_confirmed");
+        if (!authUserAbsent) {
+          const deletion = await deps.deleteAuthUser(item.target_user_id);
+          if (deletion.error) {
+            const absentAfterError = await deps.isAuthUserAbsent(item.target_user_id);
+            if (!absentAfterError) throw deletion.error;
           }
-          summary.completed += 1;
-          continue;
         }
+        const recovered = await deps.finalize(batchId);
+        if (recovered.error || recovered.data !== true) {
+          throw recovered.error ?? new Error("recovery_finalize_not_confirmed");
+        }
+        summary.completed += 1;
+        continue;
       }
 
       const archived = await deps.archive(item.target_user_id);
