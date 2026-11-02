@@ -52,6 +52,11 @@ VALUES (
   'Concurrency fixture private info'
 );
 
+UPDATE public.characters
+SET avatar_video_path =
+  '10000000-0000-4000-8000-000000000032/20000000-0000-4000-8000-000000000034/avatar.mp4'
+WHERE id = '20000000-0000-4000-8000-000000000034';
+
 INSERT INTO public.character_illustrations (
   id, character_id, author_id, storage_path, asset_type, sort_order
 ) VALUES (
