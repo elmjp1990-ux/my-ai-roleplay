@@ -49,3 +49,35 @@ Before enabling any schedule:
 - No hosted schema/data/settings were modified.
 - No Edge Function was deployed and no cron schedule was created.
 - PR #200 remains Draft/unmerged.
+
+
+## Round 29 - deleting-batch recovery defect found and corrected (2026-11-02)
+
+### Live SQL control-flow confirmation (read-only)
+
+- get_account_deletion_work_items() returns a second class of work items: batches in deleting state for which the exact account_deletion_requests row no longer exists.
+- prepare_account_deletion() marks the batch deleting and performs relational cleanup in the same PostgreSQL transaction. Once that transaction commits, the worker must not restart archive/prepare as though it still has a due request row.
+- archive_account_deletion_data() explicitly requires an existing due account_deletion_requests row and raises when it is absent.
+- finalize_account_deletion() independently locks the batch, requires deleting status, and verifies the Auth user is absent before marking completed.
+
+### Defect in the previous Edge Worker
+
+For a work item with work_status=deleting and a batch_id, the worker checked whether the Auth user was absent. If the user still existed, it fell through to archive_account_deletion_data(), which cannot succeed for the request-row-missing recovery result. This stranded the exact crash-recovery case where prepare had committed but Auth deletion had not yet happened.
+
+### Correction committed to PR branch
+
+- When work_status=deleting and batch_id is present, the worker now treats relational preparation as already committed.
+- If Auth user is absent, it finalizes directly.
+- If Auth user still exists, it calls Auth Admin deleteUser directly; if that returns an error, it independently checks Auth absence and fails closed unless absence is confirmed.
+- It then calls finalize, which independently verifies Auth absence and deleting batch state.
+- It no longer re-enters archive/prepare for a deleting batch.
+- Updated regression test asserts exact call order: Auth lookup -> Auth delete -> finalize, with no archive/prepare calls.
+
+Commits: 60e339fed954533b6ea95fd8652504576682c99b (worker), 380ab0567c700feac602c815a053324ca0708f32 (test).
+
+### Verification status and boundaries
+
+- Previous CI run 41365781489 passed Deno type-check and 7 tests, but it predates this correction.
+- No workflow run is yet associated with the new test commit at the time of this note; the correction is NOT yet CI-verified.
+- No hosted function invoked, no account deletion RPC invoked, no Auth user created/deleted, no hosted DDL/DML, no deployment, and no cron change.
+- The separate atomic lease/fencing design remains unimplemented; concurrency safety is still an outstanding gate.
