@@ -13,6 +13,8 @@ DECLARE
   v_schedule uuid := '40000000-0000-4000-8000-000000000020';
   v_batch uuid;
   v_status text;
+  v_new_session uuid := '50000000-0000-4000-8000-000000000022';
+  v_new_session_rejected boolean := false;
   v_storage_path text := '10000000-0000-4000-8000-000000000020/20000000-0000-4000-8000-000000000020/30000000-0000-4000-8000-000000000020.jpg';
 BEGIN
   INSERT INTO auth.users (id) VALUES (v_author) ON CONFLICT (id) DO NOTHING;
@@ -162,5 +164,62 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'account_deletion_batch_state_mismatch';
   END IF;
+
+  -- Existing player can still access the archived character through the old
+  -- session, but cannot create a new session for the account-archived work.
+  PERFORM pg_catalog.set_config('request.jwt.claim.sub', v_player::text, true);
+  PERFORM pg_catalog.set_config('request.jwt.claim.role', 'authenticated', true);
+  PERFORM pg_catalog.set_config(
+    'request.jwt.claims',
+    pg_catalog.jsonb_build_object('sub', v_player::text, 'role', 'authenticated')::text,
+    true
+  );
+  IF public.character_can_start_chat(v_character) IS DISTINCT FROM false
+     OR public.can_open_encounter_session(v_character) IS DISTINCT FROM false
+     OR private.user_has_existing_character_session(v_character) IS DISTINCT FROM true
+     OR private.can_read_character_asset('character-illustrations', v_storage_path) IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'archived_character_must_block_new_entry_but_preserve_existing_player_access';
+  END IF;
+
+  BEGIN
+    INSERT INTO public.chat_sessions (
+      id, user_id, character_id, character_name, chat_mode
+    ) VALUES (
+      v_new_session, v_player, v_character, 'Account archived character', 'story'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_new_session_rejected := true;
+  END;
+  IF NOT v_new_session_rejected OR EXISTS (
+    SELECT 1 FROM public.chat_sessions WHERE id = v_new_session
+  ) THEN
+    RAISE EXCEPTION 'account_archived_character_new_session_must_be_rejected';
+  END IF;
+
+  -- Simulate Auth Admin deletion while the old JWT is still present. The stale
+  -- author token must no longer read retained media; the unrelated player token
+  -- must continue to read the same existing session and media.
+  DELETE FROM auth.users WHERE id = v_author;
+  PERFORM pg_catalog.set_config('request.jwt.claim.sub', v_author::text, true);
+  PERFORM pg_catalog.set_config('request.jwt.claims',
+    pg_catalog.jsonb_build_object('sub', v_author::text, 'role', 'authenticated')::text, true);
+  IF public.account_is_active() IS DISTINCT FROM false
+     OR private.user_has_existing_character_session(v_character) IS DISTINCT FROM false
+     OR private.can_read_character_asset('character-illustrations', v_storage_path) IS DISTINCT FROM false THEN
+    RAISE EXCEPTION 'deleted_auth_user_stale_jwt_must_lose_retained_character_access';
+  END IF;
+
+  PERFORM pg_catalog.set_config('request.jwt.claim.sub', v_player::text, true);
+  PERFORM pg_catalog.set_config('request.jwt.claims',
+    pg_catalog.jsonb_build_object('sub', v_player::text, 'role', 'authenticated')::text, true);
+  IF public.account_is_active() IS DISTINCT FROM true
+     OR private.user_has_existing_character_session(v_character) IS DISTINCT FROM true
+     OR private.can_read_character_asset('character-illustrations', v_storage_path) IS DISTINCT FROM true
+     OR NOT EXISTS (
+       SELECT 1 FROM public.chat_sessions
+       WHERE id = v_session AND deleted_at IS NULL AND character_id = v_character
+     ) THEN
+    RAISE EXCEPTION 'other_player_existing_chat_and_media_access_must_survive_author_auth_deletion';
+  END IF;
 END;
-$$;
+$;
