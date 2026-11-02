@@ -8,6 +8,10 @@ DECLARE
   v_chat_draft uuid := '20000000-0000-4000-8000-000000000005';
   v_story_draft uuid := '20000000-0000-4000-8000-000000000006';
   v_asset_draft uuid := '20000000-0000-4000-8000-000000000007';
+  v_group_draft uuid := '20000000-0000-4000-8000-000000000008';
+  v_group_other_draft uuid := '20000000-0000-4000-8000-000000000009';
+  v_group uuid := '50000000-0000-4000-8000-000000000001';
+  v_group_turn uuid := '60000000-0000-4000-8000-000000000001';
   v_asset_file uuid := '30000000-0000-4000-8000-000000000001';
   v_story uuid := '40000000-0000-4000-8000-000000000001';
   v_deleted_at timestamptz;
@@ -106,6 +110,62 @@ BEGIN
     RAISE EXCEPTION 'expected_story_history_delete_rejection';
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
+
+  -- A group is one player with multiple AI characters. Deleting one character
+  -- must preserve the group, its transcript, its speaker snapshot, and other members.
+  INSERT INTO public.characters (id, author_id, name, visibility, review_status)
+  VALUES
+    (v_group_draft, v_user, 'Private draft in existing group', 'private', 'draft'),
+    (v_group_other_draft, v_user, 'Other AI in same group', 'private', 'draft');
+  INSERT INTO public.chat_groups (id, owner_id, name, scene_mode, world_character_id, player_name)
+  VALUES (v_group, v_user, 'PR200 group history fixture', 'shared', v_group_draft, 'Test player');
+  INSERT INTO public.chat_group_members (group_id, character_id, position, character_snapshot)
+  VALUES
+    (v_group, v_group_draft, 1, jsonb_build_object('id', v_group_draft, 'name', 'Private draft in existing group')),
+    (v_group, v_group_other_draft, 2, jsonb_build_object('id', v_group_other_draft, 'name', 'Other AI in same group'));
+  INSERT INTO public.chat_group_turns (id, group_id, user_id, request_key, request_content)
+  VALUES (v_group_turn, v_group, v_user, '70000000-0000-4000-8000-000000000001', 'Hello group');
+  INSERT INTO public.chat_group_messages (group_id, turn_id, sequence_no, speaker_type, character_id, content, speaker_snapshot)
+  VALUES (v_group, v_group_turn, 1, 'character', v_group_draft, 'Existing group reply', jsonb_build_object('id', v_group_draft, 'name', 'Private draft in existing group'));
+
+  v_deleted_at := public.soft_delete_character(v_group_draft);
+  IF NOT EXISTS (
+    SELECT 1 FROM public.characters
+    WHERE id = v_group_draft AND deleted_at = v_deleted_at AND visibility = 'private'
+  ) THEN
+    RAISE EXCEPTION 'character_with_group_history_must_soft_delete';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.chat_groups
+    WHERE id = v_group AND deleted_at IS NULL AND world_character_id = v_group_draft
+  ) THEN
+    RAISE EXCEPTION 'existing_group_or_world_character_reference_was_lost';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.chat_group_members
+    WHERE group_id = v_group AND character_id = v_group_draft
+      AND character_snapshot ? 'deletedAt'
+  ) THEN
+    RAISE EXCEPTION 'existing_group_member_snapshot_not_preserved';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.chat_group_messages
+    WHERE group_id = v_group AND character_id = v_group_draft
+      AND speaker_snapshot ? 'deletedAt'
+      AND content = 'Existing group reply'
+  ) THEN
+    RAISE EXCEPTION 'existing_group_message_or_speaker_snapshot_not_preserved';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.chat_group_members
+    WHERE group_id = v_group AND character_id = v_group_other_draft
+      AND character_snapshot->>'name' = 'Other AI in same group'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.characters
+    WHERE id = v_group_other_draft AND deleted_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'other_group_character_was_affected_by_single_character_delete';
+  END IF;
 
   -- A truly unused new draft queues both exact asset paths before hard deletion.
   v_avatar_path := v_user::text || '/' || v_asset_draft::text || '/avatar.mp4';
