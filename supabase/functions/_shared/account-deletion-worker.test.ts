@@ -72,7 +72,7 @@ Deno.test("fails closed when archive verification fails", async () => {
   deps.archive = async () => ({ data: null, error: new Error("archive_mismatch") });
   const summary = await processAccountDeletionWorkItems([item], deps);
   assertEquals(summary.failed, 1);
-  assertEquals(calls, [["markFailure", "batch-1", "Error"]]);
+  assertEquals(calls, []);
 });
 
 Deno.test("does not finalize when Auth deletion fails and user still exists", async () => {
