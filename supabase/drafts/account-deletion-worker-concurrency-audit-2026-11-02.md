@@ -91,3 +91,14 @@ Commits: 60e339fed954533b6ea95fd8652504576682c99b (worker), 380ab0567c700feac602
 - Commits: worker `74e43af63a6fe762aeb9d17886b5f128bded19a6`; test `cc1ecbcac6d6658161baf869ca1c6fb2c28c7f9b`.
 - No workflow run is currently associated with the latest test commit; not CI-verified yet. No hosted RPC/DDL/DML, Auth user creation/deletion, deployment, or cron change.
 - Important: swallowing failure-reporting errors prevents batch starvation but makes observability/alerting essential. The handler should emit structured logs/metrics for failed markFailure calls; this is a follow-up check before considering production readiness.
+
+
+## Round 31 - make failure-reporting failures observable (2026-11-02)
+
+- Follow-up review found the Round 30 guard was incomplete: `markFailure()` returns an RPC result object, so a resolved `{ error }` did not throw and was silently ignored.
+- Worker summary now includes `failureReportFailed`. Both thrown errors and resolved RPC errors / non-true results increment it, while the item remains failed and later items continue.
+- Edge Function emits a structured, redacted `console.error` event when failure reporting is incomplete (counts only; no user IDs, batch IDs, or raw provider errors). HTTP success now requires both zero processing failures and zero failure-reporting failures; otherwise returns 207.
+- Added regression coverage for resolved RPC error. Existing thrown-error/two-item regression remains.
+- Commits: worker `48a07804c85ec4852c2282aa7068ecd60eb10999`; handler `d4686645b7c1a4122bce7abbea46072183931a4c`; test `1b2af4648407d58eafe597fb436282fbea808364`.
+- CI runs for worker and handler commits were observed in progress at audit time; test commit was just pushed and requires its own run/result. Do not call this verified until all latest runs complete successfully.
+- No hosted RPC/DDL/DML, Auth user creation/deletion, deployment, or cron change. PR #200 remains Draft/unmerged. Atomic lease/fencing remains a separate blocking item.
