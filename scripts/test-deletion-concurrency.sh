@@ -222,7 +222,7 @@ SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub', '$asset_author', true);
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
 SELECT set_config('request.jwt.claims', '{"sub":"$asset_author","role":"authenticated"}', true);
-SELECT private.lock_character_asset_path('character-illustrations', '$asset_path_b');
+SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('character-illustrations:' || '$asset_path_b', 0));
 SELECT pg_sleep(2);
 SELECT public.soft_delete_character('20000000-0000-4000-8000-000000000034');
 COMMIT;
@@ -246,7 +246,10 @@ SQL
 PGAPPNAME=pr200-asset-delete-first psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/asset-delete-first.sql" >"$tmpdir/asset-delete-first.log" 2>&1 &
 asset_delete_first_pid=$!
 wait_for_activity "pr200-asset-delete-first" "pg_sleep(2)"
-if PGAPPNAME=pr200-asset-reattach-after psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/asset-reattach-after-delete.sql" >"$tmpdir/asset-reattach-after-delete.log" 2>&1; then
+PGAPPNAME=pr200-asset-reattach-after psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/asset-reattach-after-delete.sql" >"$tmpdir/asset-reattach-after-delete.log" 2>&1 &
+reattach_after_pid=$!
+wait_for_lock "pr200-asset-reattach-after"
+if wait "$reattach_after_pid"; then
   echo "ERROR: reattachment unexpectedly succeeded after cleanup path was queued"
   exit 1
 fi
