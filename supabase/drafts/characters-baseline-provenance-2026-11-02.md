@@ -475,3 +475,76 @@ Next trusted sources: original SQL Editor history, a user-held SQL export, or an
 1. 優先從 Supabase Dashboard SQL Editor 歷史或使用者保存的 schema-only export 取得真正的基礎表來源。
 2. 若無法取得，需先明確批准建立「synthetic disposable-local-only baseline」，並以完整 catalog dump（非 list_tables 摘要）做來源註記與差異審查。
 3. 取得完整 schema source 後，才恢復 local PostgreSQL migration replay；在此之前不將 CI 靜態測試稱為 SQL integration pass。
+
+
+## 2026-11-02｜Round 74：profiles / characters 完整 catalog 深查（read-only）
+
+### 已查詢的 PostgreSQL catalog 項目
+
+本輪對 hosted 測試 DB 只執行 SELECT catalog queries，取得：
+
+- 欄位型別、NOT NULL、DEFAULT、identity/generated metadata。
+- PK、unique、FK、check constraints 及 validation 狀態。
+- indexes 的完整 `pg_get_indexdef`。
+- RLS enabled/forced 狀態、policy command/roles/USING/WITH CHECK。
+- 非內部 triggers、trigger definitions 與 trigger function source。
+- relation ACL、column-level grants、object owner。
+- default privileges（依建立者、schema、object type）。
+- profiles / characters 的 inbound foreign keys、ON DELETE / ON UPDATE 行為。
+- 相依 public views。
+
+### 核心表定義摘要
+
+**profiles**
+- 10 欄；owner `postgres`；RLS enabled，FORCE RLS 未啟用。
+- PK `id`；unique `handle`；FK `id → auth.users(id) ON DELETE CASCADE`。
+- Check：`persona_presets` 必須為 JSON array，長度最多 30。
+- Index：`profiles_pkey`、`profiles_handle_key`。
+- RLS policies：active-account gate、public six-column read、owner update、owner insert、owner-only private read。
+- Column-level SELECT grants：anon/authenticated 僅六個公開欄位（id、handle、nickname、avatar_url、bio、follower_count）；service_role 有完整必要欄位存取。
+- 沒有找到 profiles 自身的非內部 trigger。
+- public view `public_profiles` 只投影上述六個公開欄位；baseline 必須同時重建 view 的 security option / grants，而非只建表。
+
+**characters**
+- 24 欄；owner `postgres`；RLS enabled，FORCE RLS 未啟用。
+- PK `id`；FK `author_id → profiles(id) ON DELETE CASCADE`。
+- Checks：avatar_video_path 必須符合 author/character path；personality_profile 必須為 object 且不超過 12,000 bytes；phone_settings 必須為 object。
+- Index：`characters_pkey`、`idx_characters_author_id`、`characters_active_public_idx`（partial index）。
+- RLS policies：active-account gate、作者 insert/update/delete、public+not-deleted+age-gated reads、作者可讀自己的角色。
+- Triggers：禁止 soft-deleted character 恢復；pending account deletion 時阻擋角色 insert/update/delete。兩個 trigger function source 已讀取並保留作為 schema evidence。
+
+### 高影響 FK 行為（必須在 baseline / deletion tests 重現）
+
+- `characters.author_id → profiles.id ON DELETE CASCADE`。
+- `profiles.id → auth.users.id ON DELETE CASCADE`。
+- 因此若直接刪 auth.users，會沿 FK chain cascade 到 profiles，再 cascade 到 characters。帳號刪除流程必須在刪除 auth user 前完成既定角色保留／解除擁有者關聯策略；不能把「只刪 auth.users」視為保留角色。
+- characters 的歷史型子表（comments、illustrations、private_info、schedule、stories、部分 encounter records）多數為 ON DELETE CASCADE；聊天／群聊／部分 encounter/story relationship references 多數為 ON DELETE SET NULL。角色永久硬刪測試必須驗證 tombstone 先保存，且所有 cascade/set-null 結果符合政策。
+- profiles 還有多個 user-owned data FK；帳號刪除保留策略須完整盤點，不可僅以 characters 一張表代表全部。
+
+### 權限與 default privileges 的重要發現
+
+- `profiles` relation ACL 沒有直接授予 anon/authenticated table-level privileges；公開六欄是 column-level SELECT grants。
+- `characters` relation ACL 目前對 anon/authenticated 有 table-level DML grants，但實際列存取仍受 RLS policies 限制。此差異必須在 baseline 中明確保留或由安全審核決定是否調整，不可因為兩表都開 RLS 就假設 ACL 相同。
+- `pg_default_acl` 顯示 postgres 建立的 public objects 已限制 anon/authenticated；但 `supabase_admin` 建立 public tables/functions/sequences 的 default ACL 仍包含 anon/authenticated。未來若 migration 以 supabase_admin 建立物件，仍可能繼承較寬權限。此為需獨立安全審核的風險，不在本輪修改。
+- profiles / characters 本身沒有 serial/identity-owned sequence。
+
+### 尚未完成的 catalog 項目
+
+- 完整所有 referenced function / RPC 定義及 EXECUTE ACL。
+- 所有 FK dependency 的遞迴圖與 policies on referenced tables。
+- 所有 schema-level USAGE/CREATE ACL、view security_invoker option、所有 default ACL creator/schema 組合的完整核對。
+- extensions 的實際 object dependencies 與安裝版本順序。
+- 完整 schema-only export 仍需由可信 dump 取得；MCP catalog 查詢結果只作為逐項核對材料。
+
+### 安全界線與結論
+
+- 本輪所有 Supabase 操作均為 SELECT catalog query / migration inventory；沒有讀取聊天內容、沒有查閱使用者資料列、沒有 DDL/DML、沒有執行 migration、RPC、reset、db push 或 worker。
+- 目前取得的證據足以大幅補足 baseline 的現況定義，但仍不足以宣稱找回原始 CREATE TABLE。
+- 不建立 synthetic baseline、不修改 hosted migration ledger；PR #200 維持 Draft/unmerged。
+- account deletion worker、chat purge worker、character asset cleanup worker 均不因本輪查核而啟用。
+
+### 下一步
+
+1. 以本輪 catalog evidence 補齊 dependency map，優先分析 profiles → characters 的 CASCADE 與帳號刪除 worker 的角色保留策略。
+2. 核對 supabase_admin default ACL 與各 migration 執行角色，確認未來新物件是否有權限擴張風險。
+3. 取得可信 schema-only dump 或明確批准 disposable-local-only baseline 後，再進行完整 PostgreSQL replay。
