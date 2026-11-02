@@ -438,6 +438,27 @@ BEGIN
   SET visibility = 'private'
   WHERE character_id = p_character_id;
 
+  -- Snapshot writes follow the same parent-first order as chat writers.
+  -- Existing sessions/groups stay active; only their character snapshot changes.
+  PERFORM 1
+  FROM public.chat_sessions cs
+  WHERE cs.character_id = p_character_id
+    AND cs.deleted_at IS NULL
+  ORDER BY cs.id
+  FOR UPDATE;
+
+  PERFORM 1
+  FROM public.chat_groups g
+  WHERE g.deleted_at IS NULL
+    AND EXISTS (
+      SELECT 1
+      FROM public.chat_group_members gm
+      WHERE gm.group_id = g.id
+        AND gm.character_id = p_character_id
+    )
+  ORDER BY g.id
+  FOR UPDATE;
+
   UPDATE public.chat_sessions cs
   SET character_snapshot = COALESCE(cs.character_snapshot, '{}'::jsonb) ||
     jsonb_build_object(
@@ -447,7 +468,8 @@ BEGIN
       'deletedAt', v_deleted_at
     ),
     updated_at = v_deleted_at
-  WHERE cs.character_id = p_character_id;
+  WHERE cs.character_id = p_character_id
+    AND cs.deleted_at IS NULL;
 
   UPDATE public.chat_group_members gm
   SET character_snapshot = COALESCE(gm.character_snapshot, '{}'::jsonb) ||
@@ -457,7 +479,11 @@ BEGIN
       'firstPublishedAt', v_first_published_at,
       'deletedAt', v_deleted_at
     )
-  WHERE gm.character_id = p_character_id;
+  WHERE gm.character_id = p_character_id
+    AND EXISTS (
+      SELECT 1 FROM public.chat_groups g
+      WHERE g.id = gm.group_id AND g.deleted_at IS NULL
+    );
 
   UPDATE public.chat_group_messages gm
   SET speaker_snapshot = COALESCE(gm.speaker_snapshot, '{}'::jsonb) ||
@@ -467,7 +493,11 @@ BEGIN
       'firstPublishedAt', v_first_published_at,
       'deletedAt', v_deleted_at
     )
-  WHERE gm.character_id = p_character_id;
+  WHERE gm.character_id = p_character_id
+    AND EXISTS (
+      SELECT 1 FROM public.chat_groups g
+      WHERE g.id = gm.group_id AND g.deleted_at IS NULL
+    );
 
   RETURN v_deleted_at;
 END;
