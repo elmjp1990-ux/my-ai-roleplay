@@ -594,3 +594,32 @@ Remote migration ledger 有以下早期記錄，但目前 repo 找不到相同 S
 1. 追查缺少的三個早期 migration source 與 `archive_account_deletion_data` 定義。
 2. 以角色保留需求設計 owner identity / orphan ownership 模型，列出 RLS、Storage、角色編輯、公開歸屬、chat history 的完整影響。
 3. 在 disposable PostgreSQL 驗證 auth.users deletion cascade 前後的 profiles/characters 數量與 owner identity 行為；未通過前 worker 維持 disabled。
+
+
+## 2026-11-02｜Round 76：早期 account-deletion migration source 再追查
+
+### 本輪查核
+
+- 以 GitHub commit search 搜尋 `archive_account_deletion_data`、`account_deletion_archive_batches`、`prepare_account_deletion`、`20261015083242` 等關鍵字，沒有找到可定位原始 SQL 的 commit。
+- 針對六個相關歷史分支逐一嘗試取得三個缺失 migration：
+  - `fix/account-deletion-deadline-config`
+  - `fix/account-deletion-ready`
+  - `fix/account-deletion-repair`
+  - `fix/account-deletion-worker`
+  - `security/account-deletion-storage-gates`
+  - `security-restore-account-deletion-grace-period`
+- 三個檔案在上述六個分支均不存在：
+  - `20261015083242_make_account_deletion_archive_idempotent.sql`
+  - `20261015083812_harden_handle_new_user_trigger.sql`
+  - `20261015084226_allow_safe_recovery_before_deletion_processing.sql`
+- 因此目前不只是 PR 分支缺檔；已檢查的相關 account-deletion branches 也沒有可直接恢復的相同路徑檔案。這不排除其他未索引來源、Supabase Dashboard SQL Editor history 或本機備份仍有原始 SQL。
+
+### 結論
+
+- `archive_account_deletion_data` 的原始定義仍未找到；現有 worker migration 對其呼叫不能代替函式定義。
+- account deletion source reconciliation 仍受阻；不可根據目前不完整 SQL 推測其所有副作用或聲稱可 replay。
+- 建議下一個有效來源改為 Supabase SQL Editor 歷史／schema-only export／本機原始備份，而非重複搜尋已檢查過的分支路徑。
+
+### 安全界線
+
+本輪僅 GitHub 搜尋與 fetch；沒有 Supabase 寫入、SQL mutation、migration、Auth 操作、worker 執行或部署。
