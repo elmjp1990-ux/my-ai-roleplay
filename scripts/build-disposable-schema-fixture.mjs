@@ -129,13 +129,17 @@ export function buildDisposableSchemaSql(structure, routinesSnapshot, security, 
     lines.push("");
   }
 
-  for (const [tableName, constraintsForTable] of constraintsByTable) {
-    for (const constraint of constraintsForTable) {
-      let definition = constraint.definition;
-      if (!constraint.validated) definition += " NOT VALID";
-      lines.push(`ALTER TABLE ${qualified(tableName)} ADD CONSTRAINT ${quoteIdent(constraint.name)} ${definition};`);
-    }
-  }
+  const allConstraints = [...constraintsByTable.entries()].flatMap(([tableName, items]) =>
+    items.map((constraint) => ({ tableName, constraint })),
+  );
+  const emitConstraint = ({ tableName, constraint }) => {
+    let definition = constraint.definition;
+    if (!constraint.validated) definition += " NOT VALID";
+    lines.push(`ALTER TABLE ${qualified(tableName)} ADD CONSTRAINT ${quoteIdent(constraint.name)} ${definition};`);
+  };
+  // Referenced PK/UNIQUE constraints and standalone unique indexes must exist
+  // before foreign keys are added, regardless of table-name sort order.
+  for (const item of allConstraints.filter((x) => x.constraint.type !== "f")) emitConstraint(item);
   lines.push("");
 
   for (const index of structure.indexes ?? []) {
@@ -144,6 +148,8 @@ export function buildDisposableSchemaSql(structure, routinesSnapshot, security, 
   }
   lines.push("");
 
+  for (const item of allConstraints.filter((x) => x.constraint.type === "f")) emitConstraint(item);
+  lines.push("");
   for (const seq of sequences) {
     if (seq.owned_by?.dependency_type === "i") continue; // identity sequence owner follows its table.
     if (seq.owner) {
