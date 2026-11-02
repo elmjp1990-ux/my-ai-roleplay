@@ -1,11 +1,6 @@
 name: Supabase local synthetic schema replay (manual)
 
 on:
-  push:
-    branches:
-      - security/chat-deletion-lifecycle-reconciliation
-    paths:
-      - "supabase/drafts/replay-and-test-character-deletion.sql"
   workflow_dispatch:
 
 permissions:
