@@ -98,3 +98,55 @@ Use a disposable local Supabase stack and synthetic Auth users only.
 ## Safety
 
 This file is a design proposal, not an implementation or migration. No hosted DDL/DML, account-deletion RPC, Auth user creation/deletion, Edge Function deployment, or Cron change was performed. PR #200 remains Draft/unmerged.
+
+
+## Round 34 — live schema invariants and lease protocol refinement
+
+Read-only inspection of connected test project `ouyewoagbmtqehbofrje` confirmed the following implementation constraints:
+
+- `account_deletion_requests` has `user_id` as its primary key and a cascading FK to `auth.users(id)`. It stores only `requested_at` and `scheduled_for`; there is no stable request UUID.
+- `account_deletion_archive_batches` has a UUID primary key, nullable `target_user_id`, `requested_at`, and `scheduled_for`; it has no FK to Auth and no unique constraint on the exact request identity. Do not assume a uniqueness guarantee that is not present.
+- `account_deletion_archive_items.batch_id` references the archive batch with NO ACTION; archive rows are not automatically removed by deleting the Auth user.
+- No lease-control table exists in the inspected public schema.
+- Existing worker RPCs are SECURITY DEFINER, owned by postgres, use an empty search_path, and have service_role-only execute ACLs, except user-facing request/cancel RPCs which also grant authenticated. New lease RPCs must preserve the service-only boundary.
+- Test database currently stores the five-minute grace period in `account_deletion_settings`; the request table's default is also five minutes. The setting table remains authoritative; lease work must not change either grace-period policy.
+
+### Refined row identity and lock order
+
+Because there is no request UUID, use the tuple `(target_user_id, requested_at, scheduled_for)` as the exact logical request identity. A lease row keyed by `target_user_id` can be reused only after verifying the prior tuple is terminal/cancelled and the prior batch is not active; every new request identity must rotate token and increment generation. Do not permit a previous lease to be silently rebound while it is active.
+
+All operations that need both rows must take locks in one consistent order:
+
+1. Lock the exact `account_deletion_requests` row (when it still exists).
+2. Lock or create the durable lease row for that target user.
+3. Lock the associated archive batch (when one exists).
+
+Claim and cancellation must use the same order. If claim wins, it creates/renews the lease while holding the request lock; cancellation then sees an active, unexpired claim and must refuse. If cancellation wins, it deletes the exact request under lock; claim subsequently sees no eligible request and cannot create a lease. Once prepare commits and the request disappears, recovery must start from the retained lease + deleting batch, not attempt to reacquire a request lock.
+
+### Fencing requirements by existing RPC
+
+- Claim replaces the current read-only `get_account_deletion_work_items()` behavior: atomically select and lease a bounded set; return token and generation only to service_role. The Edge Function must never call the old unclaimed listing path for work.
+- Archive must require request identity + token + generation and attach the resulting `batch_id` to the lease in the same transaction. It must reject a mismatched or expired lease before creating or changing archive state.
+- Prepare must validate the same lease inside its transaction before snapshot verification and destructive relational cleanup. It must retain the lease row while deleting the request/profile/Auth-dependent data.
+- Failure recording must validate token + generation + expiry and exact batch association. A stale worker must not update `last_error` or `attempt_count`.
+- Finalize must validate token + generation + expiry and batch association in the same transaction that checks Auth absence and marks completed; it then marks the lease terminal without deleting the durable audit row.
+- Renew must be conditional on current token + generation and must not resurrect an expired lease. Reclaim creates a new token and increments generation.
+- Cancellation must reject an active lease even if the archive batch has not yet been created. A lease that has expired and has no batch may be cancelled under the same row-lock order; if policy instead requires cancellation to be permanently blocked once any claim occurred, preserve a durable claimed marker and test it explicitly.
+
+### External Auth call boundary
+
+PostgreSQL fencing cannot make an external Auth HTTP request atomic with a database transaction. Therefore:
+- Renew and validate immediately before calling Auth Admin; set a bounded HTTP timeout shorter than the lease's remaining time.
+- A stale worker can never finalize or write failure metadata after reclaim because every database mutation is fenced.
+- Two Auth delete calls may overlap only in a pathological pause/network-delay case; deletion of the same Auth user must be treated as an idempotent external side effect. A new owner must independently check Auth state before deciding whether to call delete and before finalize.
+- Do not claim that a lease can cancel an already in-flight Auth HTTP request. The safety guarantee is fenced database state plus reconciliation of Auth absence, not distributed transaction semantics.
+
+### Open gates before implementation
+
+1. Baseline migration provenance is still unresolved. The clean local replay workflow fails before reaching the draft SQL because foundational `public.characters` and `public.profiles` creation migrations are absent. No guessed baseline or hosted migration-history mutation is allowed.
+2. The complete set of all callers to the seven existing RPCs must be inventoried before signature changes; current Edge Function caller is confirmed, but frontend/admin/manual callers still need repository-wide search.
+3. The SQL concurrency test harness must prove simultaneous claim/cancel/renew/reclaim behavior using independent database sessions, not only sequential unit tests.
+4. Lease TTL must be selected from measured local worker phase durations and Auth HTTP timeout; do not hardcode an arbitrary TTL in the migration.
+5. Archive batch uniqueness must be established in the new protocol without retroactively assuming existing data already satisfies it. The migration must first detect and safely handle any duplicate active exact-request batches.
+
+This refinement is still a design/audit note only. No lease table, RPC, migration, hosted DDL/DML, account-deletion execution, Auth user creation/deletion, deployment, or Cron change was performed.
