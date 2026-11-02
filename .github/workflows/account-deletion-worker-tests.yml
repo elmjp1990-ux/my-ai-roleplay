@@ -5,6 +5,11 @@ on:
   pull_request:
     paths:
       - "supabase/functions/_shared/account-deletion-worker.ts"
+      - "supabase/functions/_shared/character-asset-cleanup-worker.ts"
+      - "supabase/functions/_shared/character-asset-cleanup-worker.test.ts"
+      - "supabase/functions/purge-character-assets/index.ts"
+      - "supabase/drafts/character-history-aware-deletion.sql"
+      - "supabase/config.toml"
       - "supabase/functions/_shared/account-deletion-worker.test.ts"
       - "supabase/functions/account-deletion-worker/index.ts"
       - "supabase/drafts/account-deletion-character-preservation-draft.sql"
@@ -19,6 +24,11 @@ on:
       - "security/chat-deletion-lifecycle-reconciliation"
     paths:
       - "supabase/functions/_shared/account-deletion-worker.ts"
+      - "supabase/functions/_shared/character-asset-cleanup-worker.ts"
+      - "supabase/functions/_shared/character-asset-cleanup-worker.test.ts"
+      - "supabase/functions/purge-character-assets/index.ts"
+      - "supabase/drafts/character-history-aware-deletion.sql"
+      - "supabase/config.toml"
       - "supabase/functions/_shared/account-deletion-worker.test.ts"
       - "supabase/functions/account-deletion-worker/index.ts"
       - "supabase/drafts/account-deletion-character-preservation-draft.sql"
@@ -40,5 +50,9 @@ jobs:
         run: deno check supabase/functions/account-deletion-worker/index.ts
       - name: Run deterministic account deletion worker tests
         run: deno test supabase/functions/_shared/account-deletion-worker.test.ts
+      - name: Type-check character asset cleanup Edge Function
+        run: deno check supabase/functions/purge-character-assets/index.ts
+      - name: Run deterministic character asset cleanup tests
+        run: deno test supabase/functions/_shared/character-asset-cleanup-worker.test.ts
       - name: Check account deletion character-preservation draft invariants
         run: node scripts/test-account-deletion-character-preservation-draft.mjs
