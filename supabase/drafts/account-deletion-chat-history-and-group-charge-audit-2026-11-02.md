@@ -98,3 +98,34 @@ Latest code head: `45d63a4bfe00928ab593f8378c420b1560d4d34d`.
 - Group background UI syntax check #853: **success**.
 
 The semicolon guard is static only; PostgreSQL parsing/replay remains outstanding.
+
+
+## Round 78 — database-level archived-character entrypoint guard
+
+### Read-only entrypoint audit
+
+Inspected live function definitions and grants:
+- `character_can_start_chat(uuid)` and `can_open_encounter_session(uuid)` are SECURITY DEFINER eligibility RPCs callable by authenticated/service_role; neither knows about the proposed `account_archived_at` column yet.
+- `create_chat_group(...)` is SECURITY DEFINER and authenticated-callable. It checks public visibility and deleted_at, but has no explicit account archive marker check.
+- `create_encounter_session_with_lifecycle(...)` and `create_story_session_with_relationship(...)` are service_role-only. Their function bodies accept user/character IDs and insert sessions without independently checking account archive state; Edge Functions currently perform caller authentication, account_is_active, and caller-JWT eligibility checks before invoking them.
+- Current archive helper sets visibility private and clears author_id, so existing gates currently reject new session creation. The missing marker checks are a defense-in-depth gap if visibility or author state is ever changed later.
+
+### Draft correction made
+
+Added `account-archived-character-session-insert-guard.sql`:
+- A private SECURITY DEFINER trigger function with empty search_path reads `character_id` (or `world_character_id`) from NEW and rejects any reference whose character has non-null `account_archived_at`.
+- BEFORE INSERT OR UPDATE OF character_id guards on `chat_sessions`, `chat_group_members`, `encounter_session_lifecycle`, and `story_relationship_states`.
+- BEFORE INSERT OR UPDATE OF world_character_id guard on `chat_groups`.
+- Direct EXECUTE is revoked from PUBLIC, anon, authenticated, and service_role.
+- No trigger is attached to `chat_messages` or `chat_group_messages`; existing authorized single/group chats can continue after account archival.
+
+Static guard and workflow were extended for these invariants.
+
+### CI
+
+Latest code/test head `aa632a8cd9869dc47c7ccc95a2324eb9d4ebf963`:
+- Account deletion worker tests #168: **success**.
+- Chat deletion worker tests #131: **success**.
+- Group background UI syntax check #859: **success**.
+
+This remains static/worker CI only. The new trigger SQL has not been parsed or executed by PostgreSQL. It depends on the draft `account_archived_at` column and must be replayed together with the ownership/schema changes on a disposable local database.
