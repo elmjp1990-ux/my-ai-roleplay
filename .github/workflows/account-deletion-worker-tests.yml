@@ -1,0 +1,29 @@
+name: Account deletion worker tests
+
+on:
+  pull_request:
+    paths:
+      - "supabase/functions/_shared/account-deletion-worker.ts"
+      - "supabase/functions/_shared/account-deletion-worker.test.ts"
+      - "supabase/functions/account-deletion-worker/index.ts"
+      - ".github/workflows/account-deletion-worker-tests.yml"
+  push:
+    branches:
+      - main
+      - "security/chat-deletion-lifecycle-reconciliation"
+    paths:
+      - "supabase/functions/_shared/account-deletion-worker.ts"
+      - "supabase/functions/_shared/account-deletion-worker.test.ts"
+      - "supabase/functions/account-deletion-worker/index.ts"
+      - ".github/workflows/account-deletion-worker-tests.yml"
+
+jobs:
+  account-deletion-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Run deterministic account deletion worker tests
+        run: deno test --no-check supabase/functions/_shared/account-deletion-worker.test.ts
