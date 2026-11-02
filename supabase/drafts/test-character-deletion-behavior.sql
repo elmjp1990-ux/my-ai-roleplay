@@ -13,6 +13,12 @@ DECLARE
   v_encounter_draft uuid := '20000000-0000-4000-8000-000000000010';
   v_encounter_state uuid := '80000000-0000-4000-8000-000000000001';
   v_encounter_diary uuid := '80000000-0000-4000-8000-000000000002';
+  v_chat_session uuid := '50000000-0000-4000-8000-000000000002';
+  v_chat_user_message uuid := '60000000-0000-4000-8000-000000000002';
+  v_chat_assistant_message uuid := '60000000-0000-4000-8000-000000000003';
+  v_chat_turn uuid := '70000000-0000-4000-8000-000000000002';
+  v_group_continue_turn uuid;
+  v_chat_turn_status text;
   v_group uuid := '50000000-0000-4000-8000-000000000001';
   v_group_turn uuid := '60000000-0000-4000-8000-000000000001';
   v_asset_file uuid := '30000000-0000-4000-8000-000000000001';
@@ -85,14 +91,43 @@ BEGIN
   -- A new private draft with a single-chat session is preserved and the transcript link remains intact.
   INSERT INTO public.characters (id, author_id, name, visibility, review_status)
   VALUES (v_chat_draft, v_user, 'Private draft with chat history', 'private', 'draft');
-  INSERT INTO public.chat_sessions (user_id, character_id, character_name)
-  VALUES (v_user, v_chat_draft, 'Private draft with chat history');
+  INSERT INTO public.chat_sessions (id, user_id, character_id, character_name, chat_mode)
+  VALUES (v_chat_session, v_user, v_chat_draft, 'Private draft with chat history', 'story');
   v_deleted_at := public.soft_delete_character(v_chat_draft);
   IF NOT EXISTS (SELECT 1 FROM public.characters WHERE id = v_chat_draft AND deleted_at = v_deleted_at) THEN
     RAISE EXCEPTION 'character_with_chat_history_must_soft_delete';
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM public.chat_sessions WHERE character_id = v_chat_draft AND character_snapshot ? 'deletedAt') THEN
+  IF NOT EXISTS (SELECT 1 FROM public.chat_sessions WHERE id = v_chat_session AND deleted_at IS NULL AND character_snapshot ? 'deletedAt') THEN
     RAISE EXCEPTION 'existing_chat_session_snapshot_not_preserved';
+  END IF;
+  IF public.character_can_start_chat(v_chat_draft) IS DISTINCT FROM false THEN
+    RAISE EXCEPTION 'archived_character_must_not_start_a_new_chat';
+  END IF;
+
+  -- Existing single-chat sessions remain writable after character archive:
+  -- reserve a normal paid turn, then persist its assistant reply through the
+  -- same trigger-guarded writer path used by the chat-turn Edge Function.
+  PERFORM public.ensure_wallet_account();
+  INSERT INTO public.chat_messages (id, session_id, role, content)
+  VALUES (v_chat_user_message, v_chat_session, 'user', 'I am continuing our old conversation');
+  SELECT r.status INTO v_chat_turn_status
+  FROM public.reserve_chat_turn(
+    v_user, v_chat_turn, v_chat_session, v_chat_user_message, v_chat_assistant_message
+  ) AS r;
+  IF v_chat_turn_status IS DISTINCT FROM 'reserved' THEN
+    RAISE EXCEPTION 'existing_single_chat_turn_reservation_failed_after_character_delete';
+  END IF;
+  INSERT INTO public.chat_messages (id, session_id, role, content)
+  VALUES (v_chat_assistant_message, v_chat_session, 'assistant', 'I am still here; let us continue.');
+  IF NOT EXISTS (
+    SELECT 1 FROM public.chat_messages
+    WHERE id = v_chat_assistant_message
+      AND session_id = v_chat_session
+      AND role = 'assistant'
+      AND content = 'I am still here; let us continue.'
+      AND deleted_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'existing_single_chat_assistant_reply_rejected_after_character_delete';
   END IF;
 
   -- A legacy conversation referencing a story template is player history, even if the draft was never public.
@@ -170,6 +205,42 @@ BEGIN
     WHERE id = v_group_other_draft AND deleted_at IS NULL
   ) THEN
     RAISE EXCEPTION 'other_group_character_was_affected_by_single_character_delete';
+  END IF;
+
+  -- Existing group remains usable. The deleted member stays in history but is
+  -- offline: only the remaining active AI speaks and is charged (3 silver).
+  v_group_continue_turn := public.append_chat_group_mock_turn(
+    v_group,
+    '70000000-0000-4000-8000-000000000003',
+    'Continue the existing group after one character was deleted'
+  );
+  IF NOT EXISTS (
+    SELECT 1 FROM public.chat_group_messages
+    WHERE group_id = v_group
+      AND turn_id = v_group_continue_turn
+      AND speaker_type = 'character'
+      AND character_id = v_group_other_draft
+  ) THEN
+    RAISE EXCEPTION 'remaining_active_group_character_did_not_reply';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.chat_group_messages
+    WHERE group_id = v_group
+      AND turn_id = v_group_continue_turn
+      AND speaker_type = 'character'
+      AND character_id = v_group_draft
+  ) THEN
+    RAISE EXCEPTION 'deleted_group_character_must_not_speak_again';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.chat_group_turn_charges
+    WHERE group_id = v_group
+      AND group_turn_id = v_group_continue_turn
+      AND member_count = 1
+      AND cost = 3
+      AND status = 'settled'
+  ) THEN
+    RAISE EXCEPTION 'group_turn_must_charge_only_remaining_active_character';
   END IF;
 
   -- Encounter relationship and diary rows are player history and must survive character deletion.
