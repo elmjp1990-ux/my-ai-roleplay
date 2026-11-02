@@ -81,3 +81,13 @@ Commits: 60e339fed954533b6ea95fd8652504576682c99b (worker), 380ab0567c700feac602
 - No workflow run is yet associated with the new test commit at the time of this note; the correction is NOT yet CI-verified.
 - No hosted function invoked, no account deletion RPC invoked, no Auth user created/deleted, no hosted DDL/DML, no deployment, and no cron change.
 - The separate atomic lease/fencing design remains unimplemented; concurrency safety is still an outstanding gate.
+
+
+## Round 30 - isolate failure-reporting errors (2026-11-02)
+
+- Further reviewed the worker's per-item catch path. A rejected `markFailure()` promise previously escaped the catch block and could abort processing the remaining work items in the same invocation.
+- Wrapped failure telemetry recording in a narrow try/catch so a transient reporting RPC failure does not terminate the batch loop. The original processing failure remains counted; the worker proceeds to later items. This does not claim that the failure was durably recorded.
+- Added a regression test with two items where archive fails and failure reporting throws; asserts both items are attempted and both count as failed.
+- Commits: worker `74e43af63a6fe762aeb9d17886b5f128bded19a6`; test `cc1ecbcac6d6658161baf869ca1c6fb2c28c7f9b`.
+- No workflow run is currently associated with the latest test commit; not CI-verified yet. No hosted RPC/DDL/DML, Auth user creation/deletion, deployment, or cron change.
+- Important: swallowing failure-reporting errors prevents batch starvation but makes observability/alerting essential. The handler should emit structured logs/metrics for failed markFailure calls; this is a follow-up check before considering production readiness.
