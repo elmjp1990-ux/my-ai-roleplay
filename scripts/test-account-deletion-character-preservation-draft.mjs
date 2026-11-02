@@ -61,7 +61,11 @@ assert.match(integration, /SET search_path TO ''/);
 // Account deletion also cascades through auth.users -> chat_sessions/chat_groups.
 // The turn-statistics draft must snapshot every owned parent before prepare can
 // permit Auth deletion, while skipping already-purged parents only with tombstone proof.
-const accountChatSnapshot = cumulativeDeletionDraft.match(
+const accountHistoryDraft = fs.readFileSync(
+  "supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql",
+  "utf8",
+);
+const accountChatSnapshot = accountHistoryDraft.match(
   /CREATE OR REPLACE FUNCTION private[.]snapshot_account_chat_character_history[(]p_user_id uuid[)][\s\S]*?\\$function\\$;/,
 )?.[0];
 assert.ok(accountChatSnapshot, "account deletion character-history snapshot helper must exist");
