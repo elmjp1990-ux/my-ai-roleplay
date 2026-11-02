@@ -155,10 +155,7 @@ Deno.test("resumes Auth deletion directly when deleting batch still has an Auth 
 Deno.test("continues processing later items when failure reporting throws", async () => {
   const calls: unknown[][] = [];
   const deps = successfulDeps(calls);
-  deps.archive = async (id) => {
-    calls.push(["archive", id]);
-    return { data: null, error: new Error("archive_unavailable") };
-  };
+  deps.prepare = async () => ({ data: null, error: new Error("prepare_unavailable") });
   deps.markFailure = async (id, code) => {
     calls.push(["markFailure", id, code]);
     throw new Error("failure_rpc_unavailable");
@@ -171,7 +168,7 @@ Deno.test("continues processing later items when failure reporting throws", asyn
 
 Deno.test("counts resolved RPC errors from failure reporting", async () => {
   const deps = successfulDeps();
-  deps.archive = async () => ({ data: null, error: new Error("archive_unavailable") });
+  deps.prepare = async () => ({ data: null, error: new Error("prepare_unavailable") });
   deps.markFailure = async () => ({
     data: null,
     error: { code: "failure_rpc_unavailable" },
