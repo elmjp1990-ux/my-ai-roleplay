@@ -9,8 +9,8 @@ assert.match(sql, /^-- DRAFT ONLY — NOT AN ACTIVE MIGRATION\./);
 assert.match(sql, /Do not execute this file against the hosted Supabase project/);
 
 for (const table of ["characters", "character_private_info", "character_illustrations", "character_schedule_descriptions"]) {
-  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\\s\\S]*?ALTER COLUMN author_id DROP NOT NULL"));
-  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\\s\\S]*?ON DELETE SET NULL"));
+  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\s\S]*?ALTER COLUMN author_id DROP NOT NULL"));
+  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\s\S]*?ON DELETE SET NULL"));
 }
 assert.match(sql, /character_schedule_descriptions[\s\S]*?REFERENCES auth[.]users[(]id[)] ON DELETE SET NULL/);
 assert.match(sql, /creator_display_name/);
@@ -160,7 +160,7 @@ for (const table of [
 }
 assert.match(characterDeletionDraft, /s[.]character_id = p_character_id/);
 assert.doesNotMatch(characterDeletionDraft, /s[.]deleted_at IS NULL/);
-assert.match(characterDeletionDraft, /v_first_published_at IS NULL[\\s\\S]*?v_visibility = 'private'[\\s\\S]*?v_review_status IS NOT NULL[\\s\\S]*?v_review_status <> 'approved'[\\s\\S]*?NOT v_has_history/);
+assert.match(characterDeletionDraft, /v_first_published_at IS NULL[\s\S]*?v_visibility = 'private'[\s\S]*?v_review_status IS NOT NULL[\s\S]*?v_review_status <> 'approved'[\s\S]*?NOT v_has_history/);
 assert.match(characterDeletionDraft, /DELETE FROM public[.]characters WHERE id = p_character_id/);
 assert.ok(characterDeletionDraft.includes("SET visibility = 'private',"));
 assert.ok(characterDeletionDraft.includes("deletion_reason = 'author_deleted'"));
