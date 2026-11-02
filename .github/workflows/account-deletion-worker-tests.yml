@@ -24,6 +24,7 @@ on:
       - "supabase/drafts/chat-archive-memory-photo-read-access.sql"
       - "supabase/drafts/chat-deletion-purge-cron.sql"
       - "scripts/test-account-deletion-character-preservation-draft.mjs"
+      - "scripts/test-character-history-aware-deletion-draft.mjs"
       - ".github/workflows/account-deletion-worker-tests.yml"
   push:
     branches:
@@ -49,6 +50,7 @@ on:
       - "supabase/drafts/chat-archive-memory-photo-read-access.sql"
       - "supabase/drafts/chat-deletion-purge-cron.sql"
       - "scripts/test-account-deletion-character-preservation-draft.mjs"
+      - "scripts/test-character-history-aware-deletion-draft.mjs"
       - ".github/workflows/account-deletion-worker-tests.yml"
 
 jobs:
@@ -69,3 +71,5 @@ jobs:
         run: deno test supabase/functions/_shared/character-asset-cleanup-worker.test.ts
       - name: Check account deletion character-preservation draft invariants
         run: node scripts/test-account-deletion-character-preservation-draft.mjs
+      - name: Check character asset cleanup path-lock invariants
+        run: node scripts/test-character-history-aware-deletion-draft.mjs
