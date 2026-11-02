@@ -50,16 +50,16 @@ The current Edge entrypoints perform caller authentication and an `account_is_ac
 
 The two encounter/story creation RPCs are executable only by postgres/service_role in the inspected ACL; authenticated clients do not have direct EXECUTE. Preserve this boundary. Continue to verify the Edge Function binds the target user to the verified `auth.getUser()` result, never to untrusted request input.
 
-After character archival, the current proposed `visibility='private'` plus `author_id=NULL` causes the existing caller-side character start checks to reject new sessions. Still add/verify an explicit `account_archived_at IS NULL` predicate at all trusted creation/discovery boundaries so the new lifecycle state is explicit and cannot be bypassed by future visibility logic changes.
+After account archival, preserve the character's existing `visibility` and `review_status`; do NOT force a previously public/approved work to private. `author_id` is detached, while `account_archived_at` is the explicit offline/new-session-denial marker. Existing eligibility helpers must require `account_archived_at IS NULL`, and the shared archived-entry trigger must guard every new session/member attachment. Public discovery must continue to show previously public/approved works and must not require a live `profiles` join; however, all new-chat/encounter/story entry points remain disabled.
 
 ## 4. Attribution minimization decision
 
-The preservation draft currently stores both `creator_display_name` and `creator_handle_snapshot`. The approved requirement is historical creator attribution displayed as plain, non-clickable text; a retained handle is not necessary to satisfy that minimum and may preserve more identifying information than needed.
+The confirmed product rule is: a deleted creator's works remain visible with the creator name, but no author profile interface is available. The preservation draft now stores only `creator_display_name` (profile nickname; fallback `原作者` if no nickname exists). It does not retain a handle snapshot.
 
-Before migration finalization:
-- Prefer only the minimum agreed display label unless there is an explicit product requirement for the historical handle.
-- Never use the snapshot to build a profile URL or grant author-management privileges.
-- Do not retain email, birthdate, profile bio, or avatar merely for attribution.
+- Render creator name as plain, non-clickable text only.
+- Do not show author avatar/profile link/follow/message/management actions.
+- Do not retain email, birthdate, profile bio, avatar, or handle solely for attribution.
+- The character must visibly be offline (`characterStatus='offline'`, `isOnline=false`) while existing conversations remain usable.
 
 ## 5. Confirmed safe scope of current draft
 
@@ -102,3 +102,29 @@ The static account-deletion test script now checks:
 - the shared archived-entry trigger coverage and no triggers on continuation message tables.
 
 The CI workflow now runs when the child-table policy SQL or its test plan changes. This remains static verification only; PostgreSQL trigger execution and concurrency tests are still pending local replay.
+
+
+## Round 80 — product clarification: account deletion retains works, author name, and offline state
+
+The user explicitly confirmed:
+
+> 帳號刪除，如果是作者他的作品還是要顯示作者名稱，只是沒有作者介面，然後顯示角色離線（不可開新的聊天室）
+
+This is now the governing acceptance rule:
+- A previously public/approved character remains publicly discoverable; account deletion is not character deletion and must not set `visibility='private'`.
+- A previously private/unpublished character stays private.
+- Store only the creator's display name as plain text; do not retain a clickable handle/profile reference.
+- Hide all author profile/avatar/follow/message/management affordances for the deleted creator.
+- Character status is offline; no new single chat, group membership, encounter, or story session.
+- Existing single/group conversations continue with the same transcript and character identity.
+- Public discovery queries must not require an active `profiles` row or non-null `author_id` for a previously public character.
+- The SQL draft snapshots `creatorDisplayName`, `creatorProfileAvailable=false`, `characterStatus='offline'`, `isOnline=false`, and the original visibility for existing chat/session snapshots. UI/query implementation remains to be audited and accepted separately.
+
+The draft SQL now:
+- removed `creator_handle_snapshot` and `creatorHandleSnapshot`;
+- no longer changes `characters.visibility`;
+- preserves the original visibility in chat/group snapshots;
+- retains the creator nickname as plain text and sets offline metadata;
+- keeps `account_archived_at` as the server-side no-new-session gate.
+
+No hosted schema/data was changed. The draft is not replayed; UI and public discovery behavior are not yet verified.
