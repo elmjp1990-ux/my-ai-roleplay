@@ -83,13 +83,14 @@ No hosted DDL/DML, migration, Auth/Storage mutation, deployment, Cron activation
 While reviewing the character hard-delete eligibility rule, a separate fail-closed gap was found: a legacy character could have been public before the publication timestamp trigger existed, yet still have `first_published_at IS NULL`. If it later became private/draft, the old condition could not prove that it had never been published.
 
 The draft SQL now:
-- Adds `characters.private_draft_origin_at`, set only by a BEFORE INSERT trigger when a new row is inserted as `visibility='private'`, `review_status='draft'`, and `first_published_at IS NULL`.
-- Ignores caller-supplied marker values on INSERT and rejects any later UPDATE that changes the marker.
-- Backfills currently public legacy rows with a non-NULL `first_published_at` at rollout time.
-- Stamps a legacy row if an update observes that its OLD or NEW visibility is public while its publication marker is still NULL.
-- Requires `private_draft_origin_at IS NOT NULL` in addition to the existing private/draft/no-history conditions before hard-delete.
+- Creates `private.character_private_draft_origins`, a private RLS-enabled marker table with no direct grants to `PUBLIC`, `anon`, `authenticated`, or `service_role`.
+- Uses an **AFTER INSERT** trigger to record only genuinely inserted rows whose state is `visibility='private'`, `review_status='draft'`, and `first_published_at IS NULL`.
+- Uses AFTER INSERT intentionally: PostgreSQL also runs BEFORE INSERT triggers for `INSERT ... ON CONFLICT DO UPDATE`; a BEFORE INSERT marker could therefore misclassify an existing legacy row during an upsert.
+- Does not backfill the origin marker for any existing row. The marker is created only on a real insert after this guard is installed.
+- Backfills currently public legacy rows with a non-NULL `first_published_at` at rollout time and stamps any missed legacy public row when a later update transitions it to private.
+- Requires both `private.character_private_draft_origins` evidence and the existing private/draft/no-history conditions before hard-delete.
 - Leaves pre-existing private rows with no verifiable origin marker ineligible for hard-delete; they take the existing soft-delete/archive path.
 
-This is intentionally conservative: it may soft-delete an old never-used private draft, but it will not hard-delete an old character whose publication history cannot be proven.
+This is intentionally conservative: it may soft-delete an old never-used private draft, but it will not hard-delete an old character whose publication history cannot be proven. The private marker is FK-cascaded only when the character is hard-deleted.
 
-Regression assertions were added to `scripts/test-character-history-aware-deletion-draft.mjs`. Static CI is still required; this does not replace PostgreSQL replay or multi-connection tests.
+Regression assertions were added to `scripts/test-character-history-aware-deletion-draft.mjs`, including a guard that the marker uses AFTER INSERT rather than BEFORE INSERT. Static CI is still required; this does not replace PostgreSQL replay or multi-connection tests.
