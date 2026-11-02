@@ -25,7 +25,7 @@ BEGIN
     SELECT 1
     FROM vault.decrypted_secrets
     WHERE name = 'chat_deletion_worker_service_role_key'
-      AND decrypted_secret LIKE 'sb_secret_%'
+      AND left(decrypted_secret, 10) = 'sb_secret_'
   ) THEN
     RAISE EXCEPTION 'chat_deletion_worker_secret_missing_or_wrong_type';
   END IF;
