@@ -25,6 +25,8 @@ DECLARE
   v_chat_turn uuid := '70000000-0000-4000-8000-000000000002';
   v_group_continue_turn uuid;
   v_group_deleted_character_turn uuid;
+  v_diamonds_before integer;
+  v_diamonds_after integer;
   v_chat_turn_status text;
   v_non_author_rejected boolean := false;
   v_group uuid := '50000000-0000-4000-8000-000000000001';
@@ -265,6 +267,15 @@ BEGIN
     RAISE EXCEPTION 'group_turn_must_charge_all_existing_characters';
   END IF;
 
+  -- Force the wallet to the diamond-fallback case for the deleted character's turn.
+  -- The normal group tariff remains 3 units per original member, including deleted members.
+  UPDATE public.wallet_accounts
+  SET silver_coins = 0, diamonds = 20
+  WHERE user_id = v_user;
+  SELECT diamonds INTO v_diamonds_before
+  FROM public.wallet_accounts
+  WHERE user_id = v_user;
+
   -- The next round-robin slot is the deleted character; it must still reply.
   v_group_deleted_character_turn := public.append_chat_group_mock_turn(
     v_group,
@@ -286,9 +297,17 @@ BEGIN
       AND group_turn_id = v_group_deleted_character_turn
       AND member_count = 2
       AND cost = 6
+      AND silver_charged = 0
+      AND diamonds_charged = 6
       AND status = 'settled'
   ) THEN
-    RAISE EXCEPTION 'deleted_group_character_must_remain_billable';
+    RAISE EXCEPTION 'deleted_group_character_must_remain_billable_in_diamonds';
+  END IF;
+  SELECT diamonds INTO v_diamonds_after
+  FROM public.wallet_accounts
+  WHERE user_id = v_user;
+  IF v_diamonds_before IS NULL OR v_diamonds_after <> v_diamonds_before - 6 THEN
+    RAISE EXCEPTION 'deleted_group_character_turn_must_deduct_six_diamonds';
   END IF;
 
   -- Encounter relationship and diary rows are player history and must survive character deletion.
