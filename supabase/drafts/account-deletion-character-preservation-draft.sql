@@ -152,8 +152,6 @@ BEGIN
     RETURN false;
   END IF;
 
-  -- The job must still exist. Account archival/cancellation removes it, so an
-  -- already-running browser task cannot act on a stale job held in memory.
   IF NOT EXISTS (
     SELECT 1
     FROM public.character_illustration_cleanup_jobs AS j
@@ -181,8 +179,7 @@ BEGIN
      OR p_storage_path !~ (
        '^' || p_user_id::text ||
        '/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}' ||
-       '/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](jpg|jpeg|png|webp)
-       '/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{3}-[0-9a-f]{12}[.](jpg|jpeg|png|webp)$'
+       '/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](jpg|jpeg|png|webp)$'
      ) THEN
     RETURN false;
   END IF;
@@ -205,6 +202,8 @@ REVOKE ALL ON FUNCTION public.can_process_character_illustration_cleanup(uuid, u
   FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
   TO authenticated;
+
+-- Existing public/author policies remain. These additional SELECT policies are
 -- authenticated-only and do not allow upload, update, or delete.
 DROP POLICY IF EXISTS "Existing session owners can read character illustration metadata"
   ON public.character_illustrations;
