@@ -1988,7 +1988,7 @@ async function cancelCharacterIllustrationCleanupJob(jobId,userId) {
 async function processCharacterIllustrationCleanupJob(job,userId) {
   const client=window.mySupabase;
   const {data:canRemove,error:referenceError}=await client.rpc('can_process_character_illustration_cleanup',{
-    p_user_id:userId,p_storage_path:job.storage_path
+    p_job_id:job.id,p_user_id:userId,p_storage_path:job.storage_path
   });
   if(referenceError||canRemove!==true) {
     const reason=referenceError?.message||'帳號狀態或角色素材引用尚未允許清理';
