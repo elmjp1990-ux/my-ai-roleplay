@@ -11,7 +11,8 @@ assert.match(sql, /CREATE TRIGGER prevent_reuse_queued_character_avatar_video[\s
 assert.match(sql, /CREATE TRIGGER prevent_reuse_queued_character_illustration[\s\S]*ON public\.character_illustrations[\s\S]*EXECUTE FUNCTION private\.prevent_reuse_queued_character_asset\(\)/);
 assert.match(sql, /character_asset_path_cleanup_already_queued/);
 assert.match(sql, /ORDER BY 1, 2[\s\S]*LOOP[\s\S]*private\.lock_character_asset_path\(v_asset\.bucket_id, v_asset\.object_path\)/);
-assert.match(sql, /ci\.storage_path IS NULL[\s\S]*ci\.storage_path !~/);\n
+assert.match(sql, /ci\.storage_path IS NULL[\s\S]*ci\.storage_path !~/);
+
 // Hard-delete must require a server-stamped marker that only new private drafts receive.
 assert.match(sql, /ADD COLUMN IF NOT EXISTS private_draft_origin_at timestamptz/);
 assert.match(sql, /UPDATE public\.characters[\s\S]*WHERE visibility = 'public'[\s\S]*first_published_at IS NULL/);
