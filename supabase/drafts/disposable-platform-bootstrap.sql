@@ -1,0 +1,45 @@
+-- Minimal platform compatibility bootstrap for disposable PostgreSQL fixture tests.
+-- This is NOT a Supabase Auth database and contains no user records.
+-- It provides only the roles/schema/function surface referenced by the app schema snapshot.
+
+DO $$ BEGIN
+  CREATE ROLE anon NOLOGIN;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE ROLE authenticated NOLOGIN;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE ROLE service_role NOLOGIN BYPASSRLS;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE ROLE supabase_admin NOLOGIN SUPERUSER;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE SCHEMA IF NOT EXISTS auth AUTHORIZATION postgres;
+CREATE TABLE IF NOT EXISTS auth.users (id uuid PRIMARY KEY);
+
+CREATE OR REPLACE FUNCTION auth.uid()
+RETURNS uuid
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT NULLIF(pg_catalog.current_setting('request.jwt.claim.sub', true), '')::uuid
+$$;
+
+CREATE OR REPLACE FUNCTION auth.role()
+RETURNS text
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT COALESCE(
+    NULLIF(pg_catalog.current_setting('request.jwt.claim.role', true), ''),
+    NULLIF(pg_catalog.current_setting('role', true), ''),
+    current_user
+  )
+$$;
+
+GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION auth.role() TO anon, authenticated, service_role;
+GRANT ALL ON SCHEMA public TO supabase_admin;
+GRANT ALL ON SCHEMA auth TO supabase_admin;
