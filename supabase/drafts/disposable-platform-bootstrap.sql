@@ -38,8 +38,21 @@ AS $$
   )
 $$;
 
+
+CREATE OR REPLACE FUNCTION auth.jwt()
+RETURNS jsonb
+LANGUAGE sql
+STABLE
+AS $
+  SELECT COALESCE(
+    NULLIF(pg_catalog.current_setting('request.jwt.claims', true), '')::jsonb,
+    '{}'::jsonb
+  )
+$;
+
 GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION auth.role() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION auth.jwt() TO anon, authenticated, service_role;
 GRANT ALL ON SCHEMA public TO supabase_admin;
 GRANT ALL ON SCHEMA auth TO supabase_admin;
