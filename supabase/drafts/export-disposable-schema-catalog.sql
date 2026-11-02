@@ -75,7 +75,7 @@ SELECT jsonb_pretty(jsonb_build_object(
     FROM pg_catalog.pg_class c
     JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
     CROSS JOIN LATERAL pg_catalog.aclexplode(COALESCE(c.relacl,
-      pg_catalog.acldefault(CASE WHEN c.relkind = 'S' THEN 'S' ELSE 'r' END, c.relowner))) x
+      pg_catalog.acldefault((CASE WHEN c.relkind = 'S' THEN 'S' ELSE 'r' END)::"char", c.relowner))) x
     LEFT JOIN pg_catalog.pg_roles gr ON gr.oid = x.grantee
     WHERE n.nspname IN ('public', 'private') AND c.relkind IN ('r', 'p', 'v', 'm', 'S', 'f')
   ),
