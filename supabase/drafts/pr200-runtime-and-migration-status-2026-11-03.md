@@ -75,3 +75,8 @@ On 2026-11-03, a single push-triggered run of the manual synthetic Supabase work
 ## One-time local replay retry after default-ACL role membership fix
 
 The first isolated Supabase CLI run successfully started and discarded its temporary local project, but schema loading stopped at an `ALTER DEFAULT PRIVILEGES` statement owned by Supabase platform roles. No DDL beyond the disposable local container was persisted. The workflow now grants local `postgres` membership in `supabase_admin` and `supabase_auth_admin` inside that disposable instance only, so the schema-only fixture can faithfully restore the recorded default ACLs. One more local-only run is triggered by this document update; the push trigger will be removed afterward.
+
+
+## Second local replay retry: keep Supabase platform-owned default ACLs native
+
+The attempted local-only membership grant was rejected because Supabase reserves those platform-role memberships. The synthetic fixture generator now restores only `postgres`-owned application defaults and deliberately leaves `supabase_admin` / `supabase_auth_admin` defaults to Supabase Local itself. Static tests assert that platform-owned default ACL statements are not emitted. One more isolated local run is triggered by this document update; no hosted credentials are used.
