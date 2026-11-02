@@ -14,6 +14,7 @@ assert.equal(structure.relations.filter((r) => r.schema === "public" && r.kind =
 assert.equal(structure.relations.filter((r) => r.schema === "public" && r.kind === "v").length, 1);
 assert.equal(structure.relations.filter((r) => r.schema === "public" && r.kind === "S").length, 2);
 assert.equal(structure.columns.length, 416);
+assert.equal(structure.columns.filter((c) => c.table === "public_profiles").length, 6);
 assert.equal(structure.constraints.length, 288);
 assert.equal(structure.indexes.length, 140);
 assert.equal(structure.views.length, 1);
