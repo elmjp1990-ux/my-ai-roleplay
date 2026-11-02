@@ -188,6 +188,21 @@ BEGIN
   WHERE c.author_id = p_user_id
   FOR UPDATE;
 
+  -- Lock child rows whose data is retained but not otherwise updated below.
+  -- This serializes in-flight owner writes against the archival transaction;
+  -- after commit, the parent author_id is NULL and the owner RLS predicates fail.
+  PERFORM 1
+  FROM public.character_schedules AS cs
+  JOIN public.characters AS c ON c.id = cs.character_id
+  WHERE c.author_id = p_user_id
+  FOR UPDATE OF cs;
+
+  PERFORM 1
+  FROM public.character_stories AS st
+  JOIN public.characters AS c ON c.id = st.character_id
+  WHERE c.author_id = p_user_id
+  FOR UPDATE OF st;
+
   -- Preserve creator attribution in every existing single-chat snapshot.
   WITH owned AS (
     SELECT c.id,
