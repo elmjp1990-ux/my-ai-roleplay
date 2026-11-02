@@ -118,7 +118,7 @@ BEGIN
     (v_group_draft, v_user, 'Private draft in existing group', 'private', 'draft'),
     (v_group_other_draft, v_user, 'Other AI in same group', 'private', 'draft');
   INSERT INTO public.chat_groups (id, owner_id, name, scene_mode, world_character_id, player_name)
-  VALUES (v_group, v_user, 'PR200 group history fixture', 'shared', v_group_draft, 'Test player');
+  VALUES (v_group, v_user, 'PR200 group test', 'shared', v_group_draft, 'Test player');
   INSERT INTO public.chat_group_members (group_id, character_id, position, character_snapshot)
   VALUES
     (v_group, v_group_draft, 1, jsonb_build_object('id', v_group_draft, 'name', 'Private draft in existing group')),
