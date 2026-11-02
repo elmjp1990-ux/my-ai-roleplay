@@ -129,12 +129,11 @@ BEGIN
   v_has_history := private.character_has_history(p_character_id);
 
   -- Fail closed on any publication evidence. first_published_at is the durable
-  -- marker, while current public/approved state is an additional guard against
-  -- legacy rows or incomplete historical backfills.
+  -- marker, while the exact draft state is required. Unknown, NULL, pending,
+  -- rejected, approved, or future review states fail closed to soft-delete.
   IF v_first_published_at IS NULL
      AND v_visibility = 'private'
-     AND v_review_status IS NOT NULL
-     AND v_review_status <> 'approved'
+     AND v_review_status = 'draft'
      AND NOT v_has_history THEN
     -- Storage paths must be exact author/character/object paths. Unknown URL,
     -- base64, legacy or malformed formats fail closed and are not queued.
