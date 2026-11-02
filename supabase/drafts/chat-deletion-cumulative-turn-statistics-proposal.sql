@@ -32,6 +32,30 @@ CREATE TABLE IF NOT EXISTS public.chat_deletion_character_turn_stats (
 CREATE INDEX IF NOT EXISTS chat_deletion_character_turn_stats_character_idx
   ON public.chat_deletion_character_turn_stats (character_id);
 
+-- Independent character-use tombstones: unlike turn-count aggregates, these rows
+-- record every character attached to a deleted chat, including members who never
+-- produced an assistant reply. They deliberately have NO FK to chat parents or
+-- characters, so the link survives day-30 purge and a later character hard-delete.
+CREATE TABLE IF NOT EXISTS public.chat_deletion_character_history (
+  resource_type text NOT NULL
+    CHECK (resource_type IN ('single_session', 'group')),
+  resource_id uuid NOT NULL,
+  character_id uuid NOT NULL,
+  captured_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),
+  CONSTRAINT chat_deletion_character_history_resource_character_key
+    UNIQUE (resource_type, resource_id, character_id)
+);
+
+CREATE INDEX IF NOT EXISTS chat_deletion_character_history_character_idx
+  ON public.chat_deletion_character_history (character_id);
+
+ALTER TABLE public.chat_deletion_character_history ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.chat_deletion_character_history
+  FROM PUBLIC, anon, authenticated, service_role;
+
+COMMENT ON TABLE public.chat_deletion_character_history IS
+  'Minimal immutable character-use tombstones retained after chat purge; stores no player ID or transcript content and has no FK to parents or characters.';
+
 ALTER TABLE public.chat_deletion_character_turn_stats ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.chat_deletion_character_turn_stats
   FROM PUBLIC, anon, authenticated, service_role;
@@ -53,6 +77,16 @@ SET search_path TO ''
 AS $function$
 BEGIN
   IF p_resource_type = 'single_session' THEN
+    INSERT INTO public.chat_deletion_character_history (
+      resource_type, resource_id, character_id
+    )
+    SELECT 'single_session', s.id, s.character_id
+    FROM public.chat_sessions AS s
+    WHERE s.id = p_resource_id
+      AND s.user_id = p_owner_id
+      AND s.character_id IS NOT NULL
+    ON CONFLICT (resource_type, resource_id, character_id) DO NOTHING;
+
     INSERT INTO public.chat_deletion_character_turn_stats (
       resource_type, resource_id, character_id, turn_count
     )
@@ -74,6 +108,28 @@ BEGIN
     ON CONFLICT (resource_type, resource_id, character_id) DO NOTHING;
 
   ELSIF p_resource_type = 'group' THEN
+    INSERT INTO public.chat_deletion_character_history (
+      resource_type, resource_id, character_id
+    )
+    SELECT 'group', p_resource_id, source.character_id
+    FROM (
+      SELECT gm.character_id
+      FROM public.chat_group_members AS gm
+      JOIN public.chat_groups AS g ON g.id = gm.group_id
+      WHERE g.id = p_resource_id AND g.owner_id = p_owner_id
+      UNION
+      SELECT gm.character_id
+      FROM public.chat_group_messages AS gm
+      JOIN public.chat_groups AS g ON g.id = gm.group_id
+      WHERE g.id = p_resource_id AND g.owner_id = p_owner_id
+      UNION
+      SELECT g.world_character_id AS character_id
+      FROM public.chat_groups AS g
+      WHERE g.id = p_resource_id AND g.owner_id = p_owner_id
+    ) AS source
+    WHERE source.character_id IS NOT NULL
+    ON CONFLICT (resource_type, resource_id, character_id) DO NOTHING;
+
     INSERT INTO public.chat_deletion_character_turn_stats (
       resource_type, resource_id, character_id, turn_count
     )
@@ -189,6 +245,42 @@ JOIN public.chat_group_messages AS gm
 WHERE g.deleted_at IS NOT NULL
 GROUP BY g.id, g.owner_id, gm.character_id
 HAVING pg_catalog.count(gm.id) > 0
+ON CONFLICT (resource_type, resource_id, character_id) DO NOTHING;
+
+-- Backfill immutable character-use tombstones for existing deleted parents
+-- before day-30 purge removes group membership/message rows. Existing turn
+-- aggregates are also a source for groups whose member rows were already purged.
+INSERT INTO public.chat_deletion_character_history (
+  resource_type, resource_id, character_id
+)
+SELECT 'single_session', s.id, s.character_id
+FROM public.chat_sessions AS s
+WHERE s.deleted_at IS NOT NULL
+  AND s.character_id IS NOT NULL
+ON CONFLICT (resource_type, resource_id, character_id) DO NOTHING;
+
+INSERT INTO public.chat_deletion_character_history (
+  resource_type, resource_id, character_id
+)
+SELECT 'group', g.id, source.character_id
+FROM public.chat_groups AS g
+CROSS JOIN LATERAL (
+  SELECT gm.character_id
+  FROM public.chat_group_members AS gm
+  WHERE gm.group_id = g.id
+  UNION
+  SELECT gm.character_id
+  FROM public.chat_group_messages AS gm
+  WHERE gm.group_id = g.id
+  UNION
+  SELECT g.world_character_id AS character_id
+  UNION
+  SELECT st.character_id
+  FROM public.chat_deletion_character_turn_stats AS st
+  WHERE st.resource_type = 'group' AND st.resource_id = g.id
+) AS source
+WHERE g.deleted_at IS NOT NULL
+  AND source.character_id IS NOT NULL
 ON CONFLICT (resource_type, resource_id, character_id) DO NOTHING;
 
 -- Legacy deleted sessions without a queue job must join the same 30-day
