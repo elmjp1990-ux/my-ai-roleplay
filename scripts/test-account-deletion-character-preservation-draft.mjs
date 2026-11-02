@@ -153,6 +153,41 @@ assert.match(cumulativeDeletionDraft, /INSERT INTO public[.]chat_deletion_charac
 assert.match(cumulativeDeletionDraft, /FROM public[.]chat_group_members/);
 assert.match(cumulativeDeletionDraft, /FROM public[.]chat_group_messages/);
 assert.match(cumulativeDeletionDraft, /FROM public[.]chat_deletion_character_turn_stats/);
+const historyTombstone = cumulativeDeletionDraft.match(
+  /CREATE TABLE IF NOT EXISTS public[.]chat_deletion_character_history[(][\s\S]*?\);/,
+)?.[0];
+assert.ok(historyTombstone, "persistent character-use tombstone table must exist");
+assert.doesNotMatch(historyTombstone, /REFERENCES/);
+
+const singleDeleteFn = cumulativeDeletionDraft.match(
+  /CREATE OR REPLACE FUNCTION public[.]delete_chat_session_content[(]p_session_id uuid[)][\s\S]*?\$function\$;/,
+)?.[0];
+assert.ok(singleDeleteFn, "single chat deletion RPC must exist");
+assert.ok(
+  singleDeleteFn.indexOf("PERFORM private.snapshot_chat_deletion_character_turn_stats") <
+    singleDeleteFn.indexOf("UPDATE public.chat_sessions"),
+  "single chat character history must be snapshotted before marking deleted",
+);
+
+const groupDeleteFn = cumulativeDeletionDraft.match(
+  /CREATE OR REPLACE FUNCTION public[.]delete_chat_group_with_related_data[(]p_group_id uuid[)][\s\S]*?\$function\$;/,
+)?.[0];
+assert.ok(groupDeleteFn, "group chat deletion RPC must exist");
+assert.ok(
+  groupDeleteFn.indexOf("PERFORM private.snapshot_chat_deletion_character_turn_stats") <
+    groupDeleteFn.indexOf("UPDATE public.chat_groups"),
+  "group character history must be snapshotted before marking deleted",
+);
+
+const purgeFn = cumulativeDeletionDraft.match(
+  /CREATE OR REPLACE FUNCTION public[.]purge_chat_deletion_job[(]p_job_id uuid[)][\s\S]*?\$function\$;/,
+)?.[0];
+assert.ok(purgeFn, "chat purge RPC must exist");
+assert.ok(
+  purgeFn.indexOf("PERFORM private.snapshot_chat_deletion_character_turn_stats") <
+    purgeFn.indexOf("DELETE FROM public.chat_group_members"),
+  "group character history must be snapshotted before member rows are purged",
+);
 assert.match(characterDeletionDraft, /public[.]chat_deletion_character_history/);
 assert.ok(characterDeletionDraft.startsWith("-- DRAFT ONLY — NOT AN ACTIVE MIGRATION."));
 assert.match(characterDeletionDraft, /CREATE TABLE IF NOT EXISTS public[.]character_asset_cleanup_jobs/);
