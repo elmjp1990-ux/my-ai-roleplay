@@ -18,6 +18,7 @@ DECLARE
   v_asset_file uuid := '30000000-0000-4000-8000-000000000001';
   v_story uuid := '40000000-0000-4000-8000-000000000001';
   v_deleted_at timestamptz;
+  v_group_deleted_at timestamptz;
   v_first_published_at timestamptz;
   v_avatar_path text;
   v_illustration_path text;
@@ -132,6 +133,7 @@ BEGIN
   VALUES (v_group, v_group_turn, 1, 'character', v_group_draft, 'Existing group reply', jsonb_build_object('id', v_group_draft, 'name', 'Private draft in existing group'));
 
   v_deleted_at := public.soft_delete_character(v_group_draft);
+  v_group_deleted_at := v_deleted_at;
   IF NOT EXISTS (
     SELECT 1 FROM public.characters
     WHERE id = v_group_draft AND deleted_at = v_deleted_at AND visibility = 'private'
@@ -195,9 +197,8 @@ BEGIN
   END IF;
 
   -- Deletion RPC is idempotent: retries return the original deletion timestamp.
-  IF public.soft_delete_character(v_group_draft) IS DISTINCT FROM v_deleted_at
-     AND NOT EXISTS (SELECT 1 FROM public.characters WHERE id = v_group_draft AND deleted_at IS NOT NULL) THEN
-    RAISE EXCEPTION 'duplicate_character_delete_did_not_remain_idempotent';
+  IF public.soft_delete_character(v_group_draft) IS DISTINCT FROM v_group_deleted_at THEN
+    RAISE EXCEPTION 'duplicate_character_delete_did_not_return_original_timestamp';
   END IF;
 
   -- A truly unused new draft queues both exact asset paths before hard deletion.
