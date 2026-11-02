@@ -85,6 +85,53 @@ $function$;
 REVOKE ALL ON FUNCTION private.character_has_history(uuid)
   FROM PUBLIC, anon, authenticated, service_role;
 
+-- first_published_at is the durable evidence that a character was ever public.
+-- The live author UPDATE policy does not restrict this column, so without this
+-- trigger an author could clear the marker and make a previously published,
+-- currently-private character eligible for hard deletion.
+CREATE OR REPLACE FUNCTION private.preserve_character_first_publication_timestamp()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    IF OLD.first_published_at IS NOT NULL
+       AND NEW.first_published_at IS DISTINCT FROM OLD.first_published_at THEN
+      RAISE EXCEPTION 'character_first_publication_is_immutable'
+        USING ERRCODE = '42501';
+    END IF;
+  END IF;
+
+  -- Any public visibility is publication evidence, regardless of review-state
+  -- label. A future/private draft may remain NULL and retain the safe-delete path.
+  IF NEW.first_published_at IS NULL AND NEW.visibility = 'public' THEN
+    NEW.first_published_at := pg_catalog.statement_timestamp();
+  END IF;
+
+  RETURN NEW;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.preserve_character_first_publication_timestamp()
+  FROM PUBLIC, anon, authenticated, service_role;
+
+DROP TRIGGER IF EXISTS preserve_character_first_publication_timestamp
+  ON public.characters;
+CREATE TRIGGER preserve_character_first_publication_timestamp
+  BEFORE INSERT OR UPDATE OF first_published_at, visibility
+  ON public.characters
+  FOR EACH ROW
+  EXECUTE FUNCTION private.preserve_character_first_publication_timestamp();
+
+-- Disposable PostgreSQL acceptance:
+-- 1. First transition to visibility='public' stamps first_published_at.
+-- 2. A later visibility='private' update retains the timestamp.
+-- 3. Attempting to clear/change a non-NULL timestamp fails.
+-- 4. A never-public private draft keeps first_published_at NULL.
+-- 5. The history-aware hard-delete branch cannot be reached by clearing the marker.
+
 CREATE OR REPLACE FUNCTION public.soft_delete_character(p_character_id uuid)
 RETURNS timestamptz
 LANGUAGE plpgsql
