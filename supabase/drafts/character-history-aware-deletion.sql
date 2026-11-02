@@ -176,6 +176,19 @@ REVOKE ALL ON FUNCTION private.character_has_history(uuid)
 -- The live author UPDATE policy does not restrict this column, so without this
 -- trigger an author could clear the marker and make a previously published,
 -- currently-private character eligible for hard deletion.
+ALTER TABLE public.characters
+  ADD COLUMN IF NOT EXISTS private_draft_origin_at timestamptz;
+
+COMMENT ON COLUMN public.characters.private_draft_origin_at IS
+  'Server-stamped evidence that this row was inserted as a private draft after the history-aware deletion guard was installed. NULL for legacy rows; never client-writable.';
+
+-- Existing rows that are public at rollout are publication evidence. Legacy private
+-- rows remain ineligible for hard-delete because their prior visibility cannot be proven.
+UPDATE public.characters
+SET first_published_at = pg_catalog.statement_timestamp()
+WHERE visibility = 'public'
+  AND first_published_at IS NULL;
+
 CREATE OR REPLACE FUNCTION private.preserve_character_first_publication_timestamp()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -183,16 +196,46 @@ SECURITY DEFINER
 SET search_path TO ''
 AS $function$
 BEGIN
-  IF TG_OP = 'UPDATE' THEN
-    IF OLD.first_published_at IS NOT NULL
-       AND NEW.first_published_at IS DISTINCT FROM OLD.first_published_at THEN
-      RAISE EXCEPTION 'character_first_publication_is_immutable'
-        USING ERRCODE = '42501';
+  IF TG_OP = 'INSERT' THEN
+    -- Only a newly inserted private draft receives a hard-delete eligibility marker.
+    -- Caller-supplied marker values are ignored; legacy rows are never backfilled.
+    IF NEW.visibility = 'private'
+       AND NEW.review_status = 'draft'
+       AND NEW.first_published_at IS NULL THEN
+      NEW.private_draft_origin_at := pg_catalog.statement_timestamp();
+    ELSE
+      NEW.private_draft_origin_at := NULL;
     END IF;
+
+    IF NEW.visibility = 'public' AND NEW.first_published_at IS NULL THEN
+      NEW.first_published_at := pg_catalog.statement_timestamp();
+    END IF;
+    RETURN NEW;
   END IF;
 
-  -- Any public visibility is publication evidence, regardless of review-state
-  -- label. A future/private draft may remain NULL and retain the safe-delete path.
+  -- The eligibility marker is immutable and cannot be set later by an author.
+  IF NEW.private_draft_origin_at IS DISTINCT FROM OLD.private_draft_origin_at THEN
+    RAISE EXCEPTION 'character_private_draft_origin_is_immutable'
+      USING ERRCODE = '42501';
+  END IF;
+
+  IF OLD.first_published_at IS NOT NULL
+     AND NEW.first_published_at IS DISTINCT FROM OLD.first_published_at THEN
+    RAISE EXCEPTION 'character_first_publication_is_immutable'
+      USING ERRCODE = '42501';
+  END IF;
+
+  -- A legacy row that was public before this trigger was installed must be
+  -- stamped before it can transition to private, even if its old marker was NULL.
+  IF OLD.first_published_at IS NULL
+     AND (OLD.visibility = 'public' OR NEW.visibility = 'public') THEN
+    NEW.first_published_at := pg_catalog.statement_timestamp();
+  ELSIF OLD.first_published_at IS NULL
+        AND NEW.first_published_at IS NOT NULL THEN
+    RAISE EXCEPTION 'character_first_publication_marker_is_server_managed'
+      USING ERRCODE = '42501';
+  END IF;
+
   IF NEW.first_published_at IS NULL AND NEW.visibility = 'public' THEN
     NEW.first_published_at := pg_catalog.statement_timestamp();
   END IF;
@@ -207,13 +250,11 @@ REVOKE ALL ON FUNCTION private.preserve_character_first_publication_timestamp()
 DROP TRIGGER IF EXISTS preserve_character_first_publication_timestamp
   ON public.characters;
 CREATE TRIGGER preserve_character_first_publication_timestamp
-  BEFORE INSERT OR UPDATE OF first_published_at, visibility
+  BEFORE INSERT OR UPDATE OF first_published_at, visibility, private_draft_origin_at
   ON public.characters
   FOR EACH ROW
   EXECUTE FUNCTION private.preserve_character_first_publication_timestamp();
 
--- Direct table DELETE would bypass history checks and Storage queue creation.
--- The SECURITY DEFINER soft_delete_character() RPC remains the only client path.
 REVOKE DELETE ON TABLE public.characters FROM PUBLIC, anon, authenticated;
 
 -- Legacy conversations cascade from character_stories. Prevent an author from
@@ -266,6 +307,7 @@ AS $function$
 DECLARE
   v_author_id uuid;
   v_first_published_at timestamptz;
+  v_private_draft_origin_at timestamptz;
   v_visibility text;
   v_review_status text;
   v_deleted_at timestamptz;
@@ -280,10 +322,10 @@ BEGIN
     RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';
   END IF;
 
-  SELECT c.author_id, c.first_published_at, c.visibility, c.review_status,
-         c.deleted_at, c.avatar_video_path
-    INTO v_author_id, v_first_published_at, v_visibility, v_review_status,
-         v_deleted_at, v_avatar_video_path
+  SELECT c.author_id, c.first_published_at, c.private_draft_origin_at,
+         c.visibility, c.review_status, c.deleted_at, c.avatar_video_path
+    INTO v_author_id, v_first_published_at, v_private_draft_origin_at,
+         v_visibility, v_review_status, v_deleted_at, v_avatar_video_path
   FROM public.characters c
   WHERE c.id = p_character_id
   FOR UPDATE;
@@ -305,6 +347,7 @@ BEGIN
   -- marker, while the exact draft state is required. Unknown, NULL, pending,
   -- rejected, approved, or future review states fail closed to soft-delete.
   IF v_first_published_at IS NULL
+     AND v_private_draft_origin_at IS NOT NULL
      AND v_visibility = 'private'
      AND v_review_status = 'draft'
      AND NOT v_has_history THEN
