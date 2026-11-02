@@ -13,8 +13,7 @@ ALTER TABLE public.characters
 
 COMMENT ON COLUMN public.characters.creator_display_name IS
   'Plain-text historical creator attribution; not a profile link.';
-COMMENT ON COLUMN public.characters.creator_handle_snapshot IS
-  'Plain-text historical creator handle; not a profile link.';
+-- Creator attribution is stored as plain text only; never as a profile link.
 COMMENT ON COLUMN public.characters.account_archived_at IS
   'Set when the creator account is deleted; blocks all new sessions while preserving existing sessions.';
 
@@ -210,7 +209,6 @@ SET search_path TO ''
 AS $function$
 DECLARE
   v_nickname text;
-  v_handle text;
   v_archived_at timestamptz := pg_catalog.statement_timestamp();
   v_character_count integer := 0;
 BEGIN
@@ -222,8 +220,8 @@ BEGIN
     RAISE EXCEPTION 'target_user_required' USING ERRCODE = '22023';
   END IF;
 
-  SELECT p.nickname, p.handle
-    INTO v_nickname, v_handle
+  SELECT p.nickname
+    INTO v_nickname
   FROM public.profiles AS p
   WHERE p.id = p_user_id
   FOR UPDATE;
@@ -258,10 +256,7 @@ BEGIN
     SELECT c.id,
       COALESCE(NULLIF(c.creator_display_name, ''),
                NULLIF(v_nickname, ''),
-               NULLIF(v_handle, ''),
                '已停用作者') AS creator_name,
-      COALESCE(NULLIF(c.creator_handle_snapshot, ''),
-               NULLIF(v_handle, '')) AS creator_handle
     FROM public.characters AS c
     WHERE c.author_id = p_user_id
   )
@@ -271,7 +266,6 @@ BEGIN
       jsonb_build_object(
         'authorId', NULL,
         'creatorDisplayName', owned.creator_name,
-        'creatorHandleSnapshot', owned.creator_handle,
         'visibility', 'private',
         'accountArchivedAt', v_archived_at
       ),
@@ -284,10 +278,7 @@ BEGIN
     SELECT c.id,
       COALESCE(NULLIF(c.creator_display_name, ''),
                NULLIF(v_nickname, ''),
-               NULLIF(v_handle, ''),
                '已停用作者') AS creator_name,
-      COALESCE(NULLIF(c.creator_handle_snapshot, ''),
-               NULLIF(v_handle, '')) AS creator_handle
     FROM public.characters AS c
     WHERE c.author_id = p_user_id
   )
@@ -297,7 +288,6 @@ BEGIN
       jsonb_build_object(
         'authorId', NULL,
         'creatorDisplayName', owned.creator_name,
-        'creatorHandleSnapshot', owned.creator_handle,
         'visibility', 'private',
         'accountArchivedAt', v_archived_at
       )
@@ -309,10 +299,7 @@ BEGIN
     SELECT c.id,
       COALESCE(NULLIF(c.creator_display_name, ''),
                NULLIF(v_nickname, ''),
-               NULLIF(v_handle, ''),
                '已停用作者') AS creator_name,
-      COALESCE(NULLIF(c.creator_handle_snapshot, ''),
-               NULLIF(v_handle, '')) AS creator_handle
     FROM public.characters AS c
     WHERE c.author_id = p_user_id
   )
@@ -322,7 +309,6 @@ BEGIN
       jsonb_build_object(
         'authorId', NULL,
         'creatorDisplayName', owned.creator_name,
-        'creatorHandleSnapshot', owned.creator_handle,
         'visibility', 'private',
         'accountArchivedAt', v_archived_at
       )
@@ -353,12 +339,9 @@ BEGIN
   SET creator_display_name =
         COALESCE(NULLIF(c.creator_display_name, ''),
                  NULLIF(v_nickname, ''),
-                 NULLIF(v_handle, ''),
-                 '已停用作者'),
-      creator_handle_snapshot =
-        COALESCE(NULLIF(c.creator_handle_snapshot, ''),
-                 NULLIF(v_handle, '')),
-      visibility = 'private',
+                   '已停用作者'),
+      -- Preserve the existing public/private visibility and review state.
+      -- Account deletion marks the character offline; it does not delist the work.
       account_archived_at = COALESCE(c.account_archived_at, v_archived_at),
       author_id = NULL
   WHERE c.author_id = p_user_id;
