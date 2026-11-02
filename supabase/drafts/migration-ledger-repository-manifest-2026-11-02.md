@@ -217,3 +217,30 @@ Method: read-only migration ledger listing + recursive Git tree comparison. No m
 ## Next step
 
 Build a per-migration provenance matrix for the 57 remote names without local counterparts, the 68 same-name/version-drift pairs, and 14 repository-only names. Use Git commit history and available SQL sources to distinguish renamed files from missing/manual migrations before changing migration files.
+
+
+## Cross-branch source recovery (selected branch scan)
+
+A follow-up read-only scan examined 38 selected repository branches with migration-heavy or security-related names, including account-deletion, group-chat, wallet, encounter, privacy, and RLS branches. This is a bounded scan, not every branch/history object.
+
+### Candidate source files recovered outside the current PR branch
+
+| Remote ledger version/name | Candidate branch | Candidate file | Git blob SHA | Assessment |
+|---|---|---|---|---|
+| `20261017010838 / preserve_group_history_on_character_delete` | `fix/account-deletion-ready` | `20261017010838_preserve_group_history_on_character_delete.sql` | `628b6a6ecf56962b64bdc1764d04b81d8687c4c0` | Exact version + name candidate |
+| `20261017010841 / account_deletion_grace_period_config` | `fix/account-deletion-ready` | `20261017010841_account_deletion_grace_period_config.sql` | `664c30ff901817050cacb86f67bc0a84986f9dac` | Exact version + name candidate |
+| `20261017010847 / account_deletion_worker` | `fix/account-deletion-ready` | `20261017010847_account_deletion_worker.sql` | `1e329c68a40f5ada56bf7dd47f9b64bf45a77367` | Exact version + name candidate |
+| `20261017035145 / guard_group_mock_turn_during_deletion` | `fix/account-deletion-ready` | `20261017035145_guard_group_mock_turn_during_deletion.sql` | `730e8d037d79f6718728ef8dc77bd90372477a7c` | Exact version + name candidate |
+| `20261017040730 / guard_snapshot_sync_during_deletion` | `fix/account-deletion-ready` | `20261017040730_guard_snapshot_sync_during_deletion.sql` | `25f46d7163589c9d4c97caf155e43ebf05a85d08` | Exact version + name candidate |
+| `20261018015631 / guard_character_rpcs_during_deletion` | `fix/account-deletion-ready` | `20261017043000_guard_character_rpcs_during_deletion.sql` | `94ade7da6a2fa3adcf89217c2fc44176e58dfcb7` | Same-name candidate; version differs and requires SQL/commit provenance comparison |
+
+Additional older variants:
+- `fix/account-deletion-worker` contains same-name `account_deletion_grace_period_config`, `account_deletion_worker`, and `preserve_group_history_on_character_delete` files under earlier versions (`20261015110000`, `20261015120000`, `20261017110000`). Prefer neither automatically; compare to the exact remote version candidate and commit history.
+- `fix/account-deletion-deadline-config` also contains an earlier `account_deletion_grace_period_config` version.
+
+### Interpretation
+
+- The five exact version + name candidates above are useful source-recovery evidence, but their SQL still must be reviewed for content, dependencies, and consistency with current code before copying into the PR branch.
+- The sixth candidate is a same-name/different-version variant and must not be relabeled as the remote source without proving the SQL matches.
+- 51 of the 57 remote-only migration names were not found in this selected branch scan. This does not prove they are absent from all Git history or private/manual SQL sources.
+- Do not copy these historical files into the active migration directory or replay them until the complete order, dependencies, duplicate timestamps, and current architecture have been reconciled.
