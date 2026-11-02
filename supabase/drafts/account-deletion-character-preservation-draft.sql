@@ -500,7 +500,7 @@ END;
 $function$;
 
 REVOKE ALL ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
-  FROM PUBLIC, anon;
+  FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
   TO authenticated;
 
