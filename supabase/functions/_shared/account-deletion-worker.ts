@@ -125,7 +125,14 @@ export async function processAccountDeletionWorkItems(
     } catch (error) {
       summary.failed += 1;
       if (batchId) {
-        await deps.markFailure(batchId, safeCode(error, "account_deletion_worker_failed"));
+        // Failure telemetry must never abort the batch loop. The database RPC
+        // remains authoritative; a transient reporting error is surfaced by
+        // logs/metrics at the caller and the next item can still be processed.
+        try {
+          await deps.markFailure(batchId, safeCode(error, "account_deletion_worker_failed"));
+        } catch {
+          // Preserve the original processing failure and continue with later work.
+        }
       }
     }
   }
