@@ -86,12 +86,25 @@ jobs:
           console.log('Frontend syntax and deletion tombstone checks passed (' + scripts.length + ' inline scripts).');
           NODE
 
-      - name: Start disposable local Supabase database
+      - name: Start isolated local Supabase database without repository migrations
         shell: bash
         run: |
           set -euo pipefail
-          # Start the local platform only. This workflow never links a hosted project.
+          # Use a temporary project directory with an empty migrations folder.
+          # Supabase CLI startup otherwise auto-applies this repo's incomplete
+          # pre-ledger history before the synthetic current-state schema is loaded.
+          local_project="$RUNNER_TEMP/poyozz-local-synthetic"
+          mkdir -p "$local_project/supabase/migrations"
+          sed 's/^project_id = .*/project_id = "poyozz-local-synthetic"/' \
+            supabase/config.toml > "$local_project/supabase/config.toml"
+          cd "$local_project"
           supabase db start
+          DB_URL="$(supabase status --output env | sed -n 's/^DB_URL=//p' | sed 's/^"//;s/"$//')"
+          if [[ -z "$DB_URL" ]]; then
+            echo "Could not resolve the isolated local Supabase DB_URL."
+            exit 1
+          fi
+          echo "DATABASE_URL=$DB_URL" >> "$GITHUB_ENV"
 
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
@@ -101,13 +114,6 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/build-disposable-schema-fixture.mjs > "$RUNNER_TEMP/current-state-schema.sql"
-          DB_URL="$(supabase status --output env | sed -n 's/^DB_URL=//p' | sed 's/^"//;s/"$//')"
-          if [[ -z "$DB_URL" ]]; then
-            echo "Could not resolve the disposable local Supabase DB_URL."
-            exit 1
-          fi
-          echo "DATABASE_URL=$DB_URL" >> "$GITHUB_ENV"
-
           # Synthetic current-state baseline is intentional: the original pre-ledger
           # profiles/characters foundation is unavailable. Do not replay old migrations.
           psql "$DB_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
@@ -126,4 +132,6 @@ jobs:
       - name: Stop and discard local database
         if: always()
         shell: bash
-        run: supabase stop --no-backup
+        run: |
+          cd "$RUNNER_TEMP/poyozz-local-synthetic"
+          supabase stop --no-backup
