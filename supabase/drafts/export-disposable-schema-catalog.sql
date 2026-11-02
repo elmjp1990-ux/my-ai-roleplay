@@ -19,7 +19,7 @@ SELECT jsonb_pretty(jsonb_build_object(
       'owner', pg_catalog.pg_get_userbyid(c.relowner), 'acl', c.relacl::text,
       'rls_enabled', c.relrowsecurity, 'force_rls', c.relforcerowsecurity,
       'replica_identity', c.relreplident, 'persistence', c.relpersistence,
-      'comment', pg_catalog.obj_description(c.oid, 'pg_class')
+      'options', c.reloptions, 'comment', pg_catalog.obj_description(c.oid, 'pg_class')
     ) ORDER BY n.nspname, c.relname), '[]'::jsonb)
     FROM pg_catalog.pg_class c
     JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
@@ -112,7 +112,13 @@ SELECT jsonb_pretty(jsonb_build_object(
       'schema', n.nspname, 'name', c.relname, 'owner', pg_catalog.pg_get_userbyid(c.relowner),
       'sequence_type', pg_catalog.format_type(s.seqtypid, NULL),
       'start', s.seqstart, 'increment', s.seqincrement, 'min', s.seqmin,
-      'max', s.seqmax, 'cache', s.seqcache, 'cycle', s.seqcycle
+      'max', s.seqmax, 'cache', s.seqcache, 'cycle', s.seqcycle,
+      'owned_by', (SELECT jsonb_build_object('table', d.refobjid::regclass::text, 'column', a.attname)
+        FROM pg_catalog.pg_depend d
+        JOIN pg_catalog.pg_attribute a ON a.attrelid = d.refobjid AND a.attnum = d.refobjsubid
+        WHERE d.classid = 'pg_catalog.pg_class'::regclass AND d.objid = c.oid
+          AND d.refclassid = 'pg_catalog.pg_class'::regclass AND d.deptype IN ('a', 'i')
+        LIMIT 1)
     ) ORDER BY n.nspname, c.relname), '[]'::jsonb)
     FROM pg_catalog.pg_sequence s
     JOIN pg_catalog.pg_class c ON c.oid = s.seqrelid
@@ -162,14 +168,38 @@ SELECT jsonb_pretty(jsonb_build_object(
   'schema_privileges', (
     SELECT COALESCE(jsonb_agg(jsonb_build_object(
       'schema', n.nspname, 'owner', pg_catalog.pg_get_userbyid(n.nspowner),
-      'acl', n.nspacl::text
+      'acl', n.nspacl::text,
+      'privileges', (SELECT COALESCE(jsonb_agg(jsonb_build_object(
+        'grantee', CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE gr.rolname END,
+        'privilege', x.privilege_type, 'grantable', x.is_grantable
+      ) ORDER BY x.grantee, x.privilege_type), '[]'::jsonb)
+      FROM pg_catalog.aclexplode(COALESCE(n.nspacl, pg_catalog.acldefault('n', n.nspowner))) x
+      LEFT JOIN pg_catalog.pg_roles gr ON gr.oid = x.grantee)
     ) ORDER BY n.nspname), '[]'::jsonb)
     FROM pg_catalog.pg_namespace n WHERE n.nspname IN ('public', 'private')
+  ),
+  'sequence_privileges', (
+    SELECT COALESCE(jsonb_agg(jsonb_build_object(
+      'schema', n.nspname, 'sequence', c.relname,
+      'grantee', CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE gr.rolname END,
+      'privilege', x.privilege_type, 'grantable', x.is_grantable
+    ) ORDER BY n.nspname, c.relname, x.grantee, x.privilege_type), '[]'::jsonb)
+    FROM pg_catalog.pg_class c
+    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+    CROSS JOIN LATERAL pg_catalog.aclexplode(COALESCE(c.relacl, pg_catalog.acldefault('S', c.relowner))) x
+    LEFT JOIN pg_catalog.pg_roles gr ON gr.oid = x.grantee
+    WHERE n.nspname IN ('public', 'private') AND c.relkind = 'S'
   ),
   'default_privileges', (
     SELECT COALESCE(jsonb_agg(jsonb_build_object(
       'schema', n.nspname, 'owner', pg_catalog.pg_get_userbyid(d.defaclrole),
-      'object_type', d.defaclobjtype, 'acl', d.defaclacl::text
+      'object_type', d.defaclobjtype, 'acl', d.defaclacl::text,
+      'privileges', (SELECT COALESCE(jsonb_agg(jsonb_build_object(
+        'grantee', CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE gr.rolname END,
+        'privilege', x.privilege_type, 'grantable', x.is_grantable
+      ) ORDER BY x.grantee, x.privilege_type), '[]'::jsonb)
+      FROM pg_catalog.aclexplode(d.defaclacl) x
+      LEFT JOIN pg_catalog.pg_roles gr ON gr.oid = x.grantee)
     ) ORDER BY n.nspname, d.defaclobjtype), '[]'::jsonb)
     FROM pg_catalog.pg_default_acl d
     LEFT JOIN pg_catalog.pg_namespace n ON n.oid = d.defaclnamespace
