@@ -10,6 +10,7 @@ on:
       - "supabase/functions/purge-character-assets/index.ts"
       - "supabase/drafts/character-history-aware-deletion.sql"
       - "supabase/config.toml"
+      - "index.html"
       - "supabase/functions/_shared/account-deletion-worker.test.ts"
       - "supabase/functions/account-deletion-worker/index.ts"
       - "supabase/drafts/account-deletion-character-preservation-draft.sql"
