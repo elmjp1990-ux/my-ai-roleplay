@@ -424,8 +424,9 @@ BEGIN
   EXCEPTION WHEN check_violation THEN NULL;
   END;
 
-  IF has_table_privilege('authenticated', 'public.characters', 'DELETE') THEN
-    RAISE EXCEPTION 'authenticated_must_not_directly_delete_characters';
+  IF has_table_privilege('authenticated', 'public.characters', 'DELETE')
+     OR has_table_privilege('service_role', 'public.characters', 'DELETE') THEN
+    RAISE EXCEPTION 'client_and_service_role_must_not_directly_delete_characters';
   END IF;
 
   -- Final privilege matrix: character deletion is an authenticated RPC;
