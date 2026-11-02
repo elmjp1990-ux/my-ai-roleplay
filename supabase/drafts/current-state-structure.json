@@ -6,7 +6,7 @@
     ],
     "purpose": "current-state schema-only disposable fixture; not historical migration provenance",
     "database": "postgres",
-    "captured_at": "2026-11-02T14:40:45.558798+00:00",
+    "captured_at": "2026-11-02T14:41:08.003641+00:00",
     "server_version": "17.11"
   },
   "relations": [
