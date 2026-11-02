@@ -126,7 +126,7 @@ assert.match(purgeCronDraft, /cron[.]schedule[(]/);
 assert.match(purgeCronDraft, /'poyozz-chat-deletion-purge'/);
 assert.ok(purgeCronDraft.includes("'*/5 * * * *'"));
 assert.match(purgeCronDraft, /chat_deletion_worker_service_role_key/);
-assert.match(purgeCronDraft, /left(decrypted_secret, 10) = 'sb_secret_'/);
+assert.ok(purgeCronDraft.includes("left(decrypted_secret, 10) = 'sb_secret_'"));
 assert.match(purgeCronDraft, /functions[.]v1[.]purge-chat-deletions/);
 assert.match(purgeCronDraft, /WHERE EXISTS/);
 assert.match(purgeCronDraft, /chat_storage_deletion_jobs/);
