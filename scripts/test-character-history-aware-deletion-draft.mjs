@@ -91,7 +91,7 @@ assert.match(behavior, /record_encounter_session_turn_evidence\([\s\S]*v_encount
 assert.match(behavior, /existing_encounter_evidence_not_persisted_after_character_delete/);
 assert.doesNotMatch(encounterTurnEdge, /can_open_encounter_session/);
 assert.match(encounterTurnEdge, /reserve_encounter_chat_turn/);
-assert.match(encounterTurnEdge, /session\.user_id/);
+assert.match(encounterTurnEdge, /eq\("user_id", user\.id\)/);
 
 assert.match(replay, /character-deletion-existing-chat-continuation\.sql/);
 
