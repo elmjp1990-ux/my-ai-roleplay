@@ -6,6 +6,12 @@ import {
 
 const MAX_BATCH = 10;
 
+// Fail-closed release gate: account deletion must not execute until durable
+// character retention, ownership detachment, Storage access, and local E2E
+// acceptance are implemented and explicitly reviewed. Do not flip this in
+// isolation; remove only in the separately approved enablement change.
+const ACCOUNT_DELETION_EXECUTION_ENABLED = false;
+
 function errorCode(error: unknown, fallback: string): string {
   if (error && typeof error === "object" && "code" in error) {
     const code = (error as { code?: unknown }).code;
@@ -26,6 +32,16 @@ export default {
   fetch: withSupabase({ auth: "secret:default" }, async (request, ctx) => {
     if (request.method !== "POST") {
       return Response.json({ error: "method_not_allowed" }, { status: 405 });
+    }
+
+    // This endpoint is intentionally inert until the account-deletion
+    // retention and authorization release gates are independently accepted.
+    // Return before claiming work or invoking any destructive RPC/Auth action.
+    if (!ACCOUNT_DELETION_EXECUTION_ENABLED) {
+      return Response.json({
+        error: "account_deletion_worker_disabled",
+        reason: "retention_and_authorization_release_gates_pending",
+      }, { status: 503 });
     }
 
     // The named Supabase Secret Key is validated by @supabase/server before
