@@ -28,6 +28,7 @@ DECLARE
   v_diamonds_before integer;
   v_diamonds_after integer;
   v_chat_turn_status text;
+  v_chat_settled_status text;
   v_non_author_rejected boolean := false;
   v_group uuid := '50000000-0000-4000-8000-000000000001';
   v_group_turn uuid := '60000000-0000-4000-8000-000000000001';
@@ -161,6 +162,22 @@ BEGIN
       AND deleted_at IS NULL
   ) THEN
     RAISE EXCEPTION 'existing_single_chat_assistant_reply_rejected_after_character_delete';
+  END IF;
+
+  -- A durable reply must settle the normal 2-unit turn charge after the author
+  -- has deleted the character; character retirement must not cancel old chats.
+  v_chat_settled_status := public.settle_chat_turn(
+    v_user, v_chat_turn, v_chat_assistant_message
+  );
+  IF v_chat_settled_status IS DISTINCT FROM 'settled'
+     OR NOT EXISTS (
+       SELECT 1 FROM public.chat_turn_charges
+       WHERE turn_id = v_chat_turn
+         AND session_id = v_chat_session
+         AND status = 'settled'
+         AND assistant_message_id = v_chat_assistant_message
+     ) THEN
+    RAISE EXCEPTION 'existing_single_chat_turn_must_settle_after_character_delete';
   END IF;
 
   -- A legacy conversation referencing a story template is player history, even if the draft was never public.
