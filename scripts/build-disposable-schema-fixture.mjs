@@ -10,6 +10,11 @@ function quoteRole(value) {
   return String(value).toUpperCase() === "PUBLIC" ? "PUBLIC" : quoteIdent(value);
 }
 
+function normalizeRelationName(value) {
+  const name = String(value);
+  return name.includes(".") ? name : `public.${name}`;
+}
+
 function qualified(value) {
   const parts = String(value).split(".");
   const schema = parts.length === 1 ? "public" : parts[0];
@@ -46,8 +51,8 @@ export function buildDisposableSchemaSql(structure, routinesSnapshot, security, 
   const relations = structure.relations ?? [];
   const tables = relations.filter((r) => ["r", "p", "f"].includes(r.kind));
   const sequences = structure.sequences ?? [];
-  const columnsByTable = grouped(structure.columns ?? [], (c) => c.table);
-  const constraintsByTable = grouped(structure.constraints ?? [], (c) => c.table);
+  const columnsByTable = grouped(structure.columns ?? [], (c) => normalizeRelationName(c.table));
+  const constraintsByTable = grouped(structure.constraints ?? [], (c) => normalizeRelationName(c.table));
   const constraintIndexNames = new Set(
     (structure.constraints ?? []).filter((c) => ["p", "u"].includes(c.type)).map((c) => c.name),
   );
