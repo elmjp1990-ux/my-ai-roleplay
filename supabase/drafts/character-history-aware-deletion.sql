@@ -356,6 +356,7 @@ BEGIN
       SELECT 1 FROM public.character_illustrations ci
       WHERE ci.character_id = p_character_id
         AND (ci.author_id IS DISTINCT FROM auth.uid()
+             OR ci.storage_path IS NULL
              OR ci.storage_path !~ (
                '^' || auth.uid()::text || '/' || p_character_id::text || '/[^/]+$'
              ))
