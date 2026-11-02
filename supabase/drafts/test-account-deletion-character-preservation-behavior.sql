@@ -222,4 +222,4 @@ BEGIN
     RAISE EXCEPTION 'other_player_existing_chat_and_media_access_must_survive_author_auth_deletion';
   END IF;
 END;
-$;
+$$;
