@@ -80,7 +80,7 @@ assert.equal((integration.match(/PERFORM private[.]archive_account_characters[(]
 for (const pattern of [
   /chat_turn_charges/,
   /chat_turn_events/,
-  /payload IS DISTINCT FROM pg[.]catalog[.]to_jsonb/,
+  /payload IS DISTINCT FROM pg_catalog[.]to_jsonb/,
   /DELETE FROM public[.]chat_turn_charges/,
   /DELETE FROM public[.]wallet_transactions/,
   /DELETE FROM public[.]conversations WHERE user_id = p_user_id/,
