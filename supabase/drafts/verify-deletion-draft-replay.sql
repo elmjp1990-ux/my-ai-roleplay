@@ -10,6 +10,24 @@ BEGIN
   IF has_function_privilege('anon','public.soft_delete_character(uuid)','EXECUTE') THEN RAISE EXCEPTION 'anon must not execute soft_delete_character'; END IF;
   IF NOT has_function_privilege('service_role','public.claim_character_asset_cleanup_jobs(integer)','EXECUTE') THEN RAISE EXCEPTION 'service_role must execute cleanup claim RPC'; END IF;
   IF has_function_privilege('authenticated','public.claim_character_asset_cleanup_jobs(integer)','EXECUTE') THEN RAISE EXCEPTION 'authenticated must not execute cleanup claim RPC'; END IF;
+  IF NOT has_function_privilege('authenticated','public.delete_chat_session_content(uuid)','EXECUTE')
+     OR has_function_privilege('anon','public.delete_chat_session_content(uuid)','EXECUTE') THEN
+    RAISE EXCEPTION 'single_chat_delete_rpc_acl_mismatch';
+  END IF;
+  IF NOT has_function_privilege('authenticated','public.delete_chat_group_with_related_data(uuid)','EXECUTE')
+     OR has_function_privilege('anon','public.delete_chat_group_with_related_data(uuid)','EXECUTE') THEN
+    RAISE EXCEPTION 'group_chat_delete_rpc_acl_mismatch';
+  END IF;
+  IF NOT has_function_privilege('service_role','public.purge_chat_deletion_job(uuid)','EXECUTE')
+     OR has_function_privilege('authenticated','public.purge_chat_deletion_job(uuid)','EXECUTE')
+     OR has_function_privilege('anon','public.purge_chat_deletion_job(uuid)','EXECUTE') THEN
+    RAISE EXCEPTION 'chat_purge_rpc_must_be_service_only';
+  END IF;
+  IF NOT has_function_privilege('service_role','public.finish_character_asset_cleanup_job(uuid,text,text)','EXECUTE')
+     OR has_function_privilege('authenticated','public.finish_character_asset_cleanup_job(uuid,text,text)','EXECUTE')
+     OR has_function_privilege('anon','public.finish_character_asset_cleanup_job(uuid,text,text)','EXECUTE') THEN
+    RAISE EXCEPTION 'asset_cleanup_finalize_rpc_must_be_service_only';
+  END IF;
   IF has_table_privilege('anon','private.character_private_draft_origins','SELECT') THEN RAISE EXCEPTION 'anon must not read private draft origin markers'; END IF;
   IF has_table_privilege('authenticated','private.character_private_draft_origins','SELECT') THEN RAISE EXCEPTION 'authenticated must not read private draft origin markers'; END IF;
   IF has_table_privilege('service_role','private.character_private_draft_origins','SELECT') THEN RAISE EXCEPTION 'service_role must not directly read private draft origin markers'; END IF;
