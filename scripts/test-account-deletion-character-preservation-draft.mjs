@@ -55,6 +55,12 @@ assert.match(archiveFn, /'creatorProfileAvailable', false/);
 assert.match(archiveFn, /'characterStatus', 'offline'/);
 assert.match(archiveFn, /'isOnline', false/);
 assert.doesNotMatch(sql, /creator_handle_snapshot|creatorHandleSnapshot/);
+assert.match(sql, /CREATE OR REPLACE FUNCTION public[.]can_process_character_illustration_cleanup/);
+assert.match(sql, /auth[.]sessions AS s/);
+assert.match(sql, /auth[.]users AS u/);
+assert.match(sql, /ci[.]storage_path = p_storage_path/);
+assert.match(sql, /c[.]avatar_video_path = p_storage_path/);
+assert.match(sql, /NOT public[.]account_is_active[(][)]/);
 assert.match(archiveFn, /author_id = NULL/);
 assert.match(archiveFn, /DELETE FROM public[.]character_illustration_cleanup_jobs/);
 assert.doesNotMatch(archiveFn, /DELETE FROM public[.]characters/);
@@ -425,6 +431,13 @@ const indexHtml = fs.readFileSync("index.html", "utf8");
 assert.ok(indexHtml.includes("最後確認：刪除角色？公開列表會隱藏；若已有聊天、相遇或故事紀錄，系統會保留既有紀錄並封存角色。"));
 assert.ok(indexHtml.includes("角色已刪除；有歷史紀錄的角色會保留既有內容"));
 assert.ok(!indexHtml.includes("角色軟刪除失敗："));
+const illustrationCleanupProcessor = indexHtml.match(
+  /async function processCharacterIllustrationCleanupJob[(]job,userId[)][\\s\\S]*?\\n}/,
+)?.[0];
+assert.ok(illustrationCleanupProcessor, "legacy illustration cleanup processor must exist");
+assert.match(illustrationCleanupProcessor, /rpc[(]'can_process_character_illustration_cleanup'/);
+assert.doesNotMatch(illustrationCleanupProcessor, /eq[(]'author_id',userId[)]/);
+
 const assetWorkerTests = fs.readFileSync("supabase/functions/_shared/character-asset-cleanup-worker.test.ts", "utf8");
 assert.match(assetWorkerTests, /skips assets still referenced/);
 assert.match(assetWorkerTests, /Storage errors for retry/);
