@@ -7,6 +7,8 @@ on:
       - "supabase/functions/_shared/account-deletion-worker.ts"
       - "supabase/functions/_shared/account-deletion-worker.test.ts"
       - "supabase/functions/account-deletion-worker/index.ts"
+      - "supabase/drafts/account-deletion-character-preservation-draft.sql"
+      - "scripts/test-account-deletion-character-preservation-draft.mjs"
       - ".github/workflows/account-deletion-worker-tests.yml"
   push:
     branches:
@@ -16,6 +18,8 @@ on:
       - "supabase/functions/_shared/account-deletion-worker.ts"
       - "supabase/functions/_shared/account-deletion-worker.test.ts"
       - "supabase/functions/account-deletion-worker/index.ts"
+      - "supabase/drafts/account-deletion-character-preservation-draft.sql"
+      - "scripts/test-account-deletion-character-preservation-draft.mjs"
       - ".github/workflows/account-deletion-worker-tests.yml"
 
 jobs:
@@ -30,3 +34,5 @@ jobs:
         run: deno check supabase/functions/account-deletion-worker/index.ts
       - name: Run deterministic account deletion worker tests
         run: deno test supabase/functions/_shared/account-deletion-worker.test.ts
+      - name: Check account deletion character-preservation draft invariants
+        run: node scripts/test-account-deletion-character-preservation-draft.mjs
