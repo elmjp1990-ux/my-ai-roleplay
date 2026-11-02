@@ -44,6 +44,8 @@ on:
       - "scripts/test-disposable-schema-catalog-snapshot.mjs"
       - "scripts/build-disposable-schema-fixture.mjs"
       - "scripts/test-build-disposable-schema-fixture.mjs"
+      - "supabase/drafts/replay-deletion-concurrency-setup.sql"
+      - "scripts/test-deletion-concurrency.sh"
       - ".github/workflows/account-deletion-worker-tests.yml"
   push:
     branches:
@@ -88,6 +90,8 @@ on:
       - "scripts/test-disposable-schema-catalog-snapshot.mjs"
       - "scripts/build-disposable-schema-fixture.mjs"
       - "scripts/test-build-disposable-schema-fixture.mjs"
+      - "supabase/drafts/replay-deletion-concurrency-setup.sql"
+      - "scripts/test-deletion-concurrency.sh"
       - ".github/workflows/account-deletion-worker-tests.yml"
 
 jobs:
@@ -149,3 +153,7 @@ jobs:
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-and-test-character-deletion.sql
       - name: Verify all deletion draft DDL and synthetic rows were rolled back
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-deletion-draft-rollback.sql
+      - name: Replay deletion drafts for two-session concurrency tests
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-deletion-concurrency-setup.sql
+          bash scripts/test-deletion-concurrency.sh
