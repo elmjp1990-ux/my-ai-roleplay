@@ -60,5 +60,9 @@ const activeSql = fs.readdirSync(migrationsDir)
 assert.doesNotMatch(activeSql, /archive_account_characters/);
 assert.match(sql, /Required follow-up integration/);
 assert.match(sql, /Call private[.]archive_account_characters[(]p_user_id[)] inside the final/);
+assert.match(sql, /PERFORM private[.]archive_account_characters[(]p_user_id[)][;]/);
+assert.match(sql, /before the existing-batch lookup/);
+assert.match(sql, /SAME PostgreSQL transaction/);
+assert.match(sql, /Do not put this call only in the worker's separate archive callback/);
 
 console.log("Account deletion character-preservation draft guard: passed (static only; no SQL execution).");
