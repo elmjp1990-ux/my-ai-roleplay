@@ -78,7 +78,9 @@ assert.match(encounterTurn, /affinityPendingUntilSceneEnd/);
 assert.match(encounterTurn, /assistant_message_id_collision/);
 assert.match(encounterTurn, /reserve_encounter_chat_turn/);
 assert.doesNotMatch(encounterTurn, /from\(["']encounter_session_lifecycle["']\)/);
-assert.match(encounterTurn, /idempotent recovery of an already-reserved pre-expiry turn/);
+assert.match(encounterTurn, /Retry recovery: reuse only the exact expected deterministic reply/);
+assert.match(encounterTurn, /charge\.status !== "reserved" && charge\.status !== "needs_reconciliation"/);
+assert.match(encounterTurn, /existing && String\(existing\.content \|\| ""\)\.trim\(\) !== demoReply/);
 
 const atomicReservationMigration = fs.readFileSync(
   "supabase/migrations/20261031170000_atomic_encounter_turn_reservation.sql",
