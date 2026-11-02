@@ -6,7 +6,7 @@
     ],
     "purpose": "current-state schema-only disposable fixture; not historical migration provenance",
     "database": "postgres",
-    "captured_at": "2026-11-02T14:37:16.919759+00:00",
+    "captured_at": "2026-11-02T14:40:45.558798+00:00",
     "server_version": "17.11"
   },
   "relations": [
@@ -9658,35 +9658,37 @@
   ],
   "sequences": [
     {
-      "max": 9223372036854776000,
-      "min": 1,
+      "max": "9223372036854775807",
+      "min": "1",
       "name": "chat_turn_events_event_id_seq",
-      "cache": 1,
+      "cache": "1",
       "cycle": false,
       "owner": "postgres",
-      "start": 1,
+      "start": "1",
       "schema": "public",
       "owned_by": {
-        "table": "chat_turn_events",
-        "column": "event_id"
+        "table": "public.chat_turn_events",
+        "column": "event_id",
+        "dependency_type": "i"
       },
-      "increment": 1,
+      "increment": "1",
       "sequence_type": "bigint"
     },
     {
-      "max": 2147483647,
-      "min": 1,
+      "max": "2147483647",
+      "min": "1",
       "name": "messages_sequence_order_seq",
-      "cache": 1,
+      "cache": "1",
       "cycle": false,
       "owner": "postgres",
-      "start": 1,
+      "start": "1",
       "schema": "public",
       "owned_by": {
-        "table": "messages",
-        "column": "sequence_order"
+        "table": "public.messages",
+        "column": "sequence_order",
+        "dependency_type": "a"
       },
-      "increment": 1,
+      "increment": "1",
       "sequence_type": "integer"
     }
   ],
