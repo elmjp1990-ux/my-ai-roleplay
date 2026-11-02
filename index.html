@@ -2828,7 +2828,11 @@ function sessionCharacter(s) {
   const snap = s.cloudCharacterSnapshot;
   if (!snap || snap.id !== s.characterId) return null;
   return {...snap, id:s.characterId, name:snap.name || s.characterName || '角色',
-    visibility:snap.visibility || 'private', reviewStatus:'draft', authorId:snap.authorId || '',
+    visibility:snap.visibility || 'private', reviewStatus:'draft',
+    authorId:Object.prototype.hasOwnProperty.call(snap,'authorId') ? snap.authorId : '',
+    creatorDisplayName:snap.creatorDisplayName || '',
+    creatorHandleSnapshot:snap.creatorHandleSnapshot || '',
+    accountArchivedAt:snap.accountArchivedAt || null,
     firstPublishedAt:snap.firstPublishedAt || null, deletedAt:snap.deletedAt || null,
     owner:false, cloudSnapshotOnly:true};
 }
@@ -2991,7 +2995,12 @@ async function saveChatSessionToCloud(s, options = {}) {
     style:character?.style ?? priorSnapshot.style ?? '',
     phoneSettings:character?.phoneSettings ?? priorSnapshot.phoneSettings ?? {},
     tags:Array.isArray(character?.tags) ? character.tags : (Array.isArray(priorSnapshot.tags) ? priorSnapshot.tags : []),
-    authorId:character?.authorId || priorSnapshot.authorId || '',
+    authorId:Object.prototype.hasOwnProperty.call(priorSnapshot,'authorId')
+      ? priorSnapshot.authorId
+      : (character?.authorId ?? ''),
+    creatorDisplayName:priorSnapshot.creatorDisplayName ?? character?.creatorDisplayName ?? '',
+    creatorHandleSnapshot:priorSnapshot.creatorHandleSnapshot ?? character?.creatorHandleSnapshot ?? '',
+    accountArchivedAt:priorSnapshot.accountArchivedAt ?? character?.accountArchivedAt ?? null,
     visibility:priorSnapshot.visibility || character?.visibility || 'private',
     firstPublishedAt:priorSnapshot.firstPublishedAt || character?.firstPublishedAt || null,
     deletedAt:priorSnapshot.deletedAt || character?.deletedAt || null
@@ -3011,7 +3020,10 @@ async function saveChatSessionToCloud(s, options = {}) {
       const { privateInfo: _legacyExistingPrivateInfo, ...safeExistingSnapshot } = existingSnapshot || {};
       s.cloudCharacterSnapshot = existingSnapshot ? safeExistingSnapshot : snapshot;
       const canonical = s.cloudCharacterSnapshot;
-      snapshot.authorId = canonical.authorId || snapshot.authorId;
+      if (Object.prototype.hasOwnProperty.call(canonical,'authorId')) snapshot.authorId = canonical.authorId;
+      snapshot.creatorDisplayName = canonical.creatorDisplayName ?? snapshot.creatorDisplayName;
+      snapshot.creatorHandleSnapshot = canonical.creatorHandleSnapshot ?? snapshot.creatorHandleSnapshot;
+      snapshot.accountArchivedAt = canonical.accountArchivedAt ?? snapshot.accountArchivedAt;
       snapshot.visibility = canonical.visibility || snapshot.visibility;
       snapshot.firstPublishedAt = canonical.firstPublishedAt || snapshot.firstPublishedAt;
       snapshot.deletedAt = canonical.deletedAt || snapshot.deletedAt;
@@ -3209,15 +3221,25 @@ async function loadCloudChatSessions(user) {
         const existingCharacterIndex = state.characters.findIndex(character => character.id === row.character_id);
         if (existingCharacterIndex >= 0) {
           const existingCharacter = state.characters[existingCharacterIndex];
-          // 既有本機角色資料若缺作者 ID，以雲端聊天快照補齊，不覆蓋已存在的作者 ID。
-          if (!existingCharacter.authorId && snapshot.authorId) {
+          // 雲端快照是既有聊天的權威來源；明確的 authorId:null 必須清除本機舊作者 ID。
+          if (Object.prototype.hasOwnProperty.call(snapshot,'authorId')) {
             state.characters[existingCharacterIndex] = {
-              ...existingCharacter, authorId:snapshot.authorId
+              ...existingCharacter,
+              authorId:snapshot.authorId,
+              creatorDisplayName:snapshot.creatorDisplayName ?? existingCharacter.creatorDisplayName ?? '',
+              creatorHandleSnapshot:snapshot.creatorHandleSnapshot ?? existingCharacter.creatorHandleSnapshot ?? '',
+              accountArchivedAt:snapshot.accountArchivedAt ?? existingCharacter.accountArchivedAt ?? null,
+              visibility:snapshot.visibility ?? existingCharacter.visibility
             };
           }
         } else {
           state.characters.push({...snapshot, id:row.character_id, name:snapshot.name || row.character_name || '角色',
-            visibility:'private', reviewStatus:'draft', authorId:snapshot.authorId || '', owner:false, cloudSnapshotOnly:true});
+            visibility:'private', reviewStatus:'draft',
+            authorId:Object.prototype.hasOwnProperty.call(snapshot,'authorId') ? snapshot.authorId : null,
+            creatorDisplayName:snapshot.creatorDisplayName || '',
+            creatorHandleSnapshot:snapshot.creatorHandleSnapshot || '',
+            accountArchivedAt:snapshot.accountArchivedAt || null,
+            owner:false, cloudSnapshotOnly:true});
         }
       }
       changed = true;
@@ -3974,9 +3996,11 @@ function renderDetail() {
   const offline = characterIsOffline(c);
   // 作者正在查看自己建立的角色時，以已登入帳號的真實會員資料為後備，
   // 避免私密角色因 profiles RLS 或作者快取未載入而顯示「故事創作者」。
-  const a = (c.owner || state.account?.uid === c.authorId)
+  const a = c.authorId ? ((c.owner || state.account?.uid === c.authorId)
     ? author(state.account?.uid || c.authorId)
-    : author(c.authorId);
+    : author(c.authorId)) : null;
+  const creatorAttribution = c.creatorDisplayName ||
+    (c.creatorHandleSnapshot ? '@'+String(c.creatorHandleSnapshot).replace(/^@/,'') : '原作者');
   $('view').innerHTML = `
     <div class="stack">
       <button class="ghost" data-action="back">← 返回上一頁</button>
@@ -3986,7 +4010,7 @@ function renderDetail() {
 ${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline-image' : ''}" data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline aria-label="${e(c.name)} 的角色影片"></video>` : `<img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" ${c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath)+'"' : ''} alt="${e(c.name)}">`}
           <div class="detail-portrait-meta">
             <h1>${e(c.name)}</h1>
-            <button class="author-link" data-action="author" data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>
+            ${c.authorId ? `<button class="author-link" data-action="author" data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>` : `<span class="small muted">BY ${e(creatorAttribution)}</span>`}
             ${c.deletedAt ? '' : `<div class="detail-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(c.chats || 0)}" title="對話回合數">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
               <span>${e(c.chats || 0)}</span>
