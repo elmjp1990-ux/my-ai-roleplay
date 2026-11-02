@@ -195,13 +195,13 @@ assert.match(archivedEntryGuard, /REVOKE ALL ON FUNCTION private[.]reject_accoun
 
 // Character hard-delete draft: never-published + zero-history is the only
 // destructive exception. Unknown review states must remain soft-delete only.
-const characterDeletionDraft = fs.readFileSync(
+const characterHardDeleteDraft = fs.readFileSync(
   "supabase/drafts/character-history-aware-deletion.sql",
   "utf8",
 );
-assert.match(characterDeletionDraft, /^-- DRAFT ONLY — NOT AN ACTIVE MIGRATION\./);
-assert.match(characterDeletionDraft, /v_first_published_at IS NULL[\s\S]*?v_visibility = 'private'[\s\S]*?v_review_status = 'draft'[\s\S]*?NOT v_has_history/);
-assert.doesNotMatch(characterDeletionDraft, /v_review_status <> 'approved'/);
+assert.match(characterHardDeleteDraft, /^-- DRAFT ONLY — NOT AN ACTIVE MIGRATION\./);
+assert.match(characterHardDeleteDraft, /v_first_published_at IS NULL[\s\S]*?v_visibility = 'private'[\s\S]*?v_review_status = 'draft'[\s\S]*?NOT v_has_history/);
+assert.doesNotMatch(characterHardDeleteDraft, /v_review_status <> 'approved'/);
 for (const pattern of [
   /public[.]chat_sessions/,
   /public[.]chat_group_members/,
@@ -218,11 +218,11 @@ for (const pattern of [
   /public[.]story_relationship_batches/,
   /public[.]story_relationship_states/,
   /public[.]character_comments/,
-]) assert.match(characterDeletionDraft, pattern);
-assert.match(characterDeletionDraft, /character-avatar-videos/);
-assert.match(characterDeletionDraft, /character-illustrations/);
-assert.match(characterDeletionDraft, /CREATE TABLE IF NOT EXISTS public[.]character_asset_cleanup_jobs/);
-assert.doesNotMatch(characterDeletionDraft, /DELETE FROM storage[.]objects/);
+]) assert.match(characterHardDeleteDraft, pattern);
+assert.match(characterHardDeleteDraft, /character-avatar-videos/);
+assert.match(characterHardDeleteDraft, /character-illustrations/);
+assert.match(characterHardDeleteDraft, /CREATE TABLE IF NOT EXISTS public[.]character_asset_cleanup_jobs/);
+assert.doesNotMatch(characterHardDeleteDraft, /DELETE FROM storage[.]objects/);
 
 // The existing deleting retry must not require a profile that may already be gone.
 // A legacy deleting batch is healed only if still-owned character rows exist.
@@ -372,7 +372,8 @@ for (const table of [
 }
 assert.match(characterDeletionDraft, /s[.]character_id = p_character_id/);
 assert.doesNotMatch(characterDeletionDraft, /s[.]deleted_at IS NULL/);
-assert.match(characterDeletionDraft, /v_first_published_at IS NULL[\s\S]*?v_visibility = 'private'[\s\S]*?v_review_status IS NOT NULL[\s\S]*?v_review_status <> 'approved'[\s\S]*?NOT v_has_history/);
+assert.match(characterDeletionDraft, /v_first_published_at IS NULL[\\s\\S]*?v_visibility = 'private'[\\s\\S]*?v_review_status = 'draft'[\\s\\S]*?NOT v_has_history/);
+assert.doesNotMatch(characterDeletionDraft, /v_review_status <> 'approved'/);
 assert.match(characterDeletionDraft, /DELETE FROM public[.]characters WHERE id = p_character_id/);
 assert.ok(characterDeletionDraft.includes("SET visibility = 'private',"));
 assert.ok(characterDeletionDraft.includes("deletion_reason = 'author_deleted'"));
