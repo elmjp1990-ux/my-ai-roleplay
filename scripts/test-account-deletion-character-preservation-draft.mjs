@@ -450,7 +450,7 @@ const illustrationCleanupProcessor = indexHtml.slice(
   illustrationCleanupEnd,
 );
 assert.ok(illustrationCleanupProcessor.includes("can_process_character_illustration_cleanup"));
-assert.ok(!illustrationCleanupProcessor.includes(".eq('author_id',userId)"));
+assert.ok(!illustrationCleanupProcessor.includes("from('character_illustrations')"));
 
 const assetWorkerTests = fs.readFileSync("supabase/functions/_shared/character-asset-cleanup-worker.test.ts", "utf8");
 assert.match(assetWorkerTests, /skips assets still referenced/);
