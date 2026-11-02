@@ -80,3 +80,18 @@ Do not call this fixed until:
 4. Existing active-user and public-read behavior is unchanged.
 5. Function ACL/security attributes match the expected matrix.
 6. CI runs these tests on PR updates.
+
+
+## Retained character media regression
+
+After applying both account activity and character-preservation drafts locally:
+
+- An active player with an existing single-chat session can read only the linked illustration/video objects.
+- An active player with an existing group session can read only assets linked to that group's existing character members.
+- A player with no prior session cannot read the archived character's private assets.
+- A deleted account with a still-valid captured JWT cannot read media through `private.user_has_existing_character_session` or `private.can_read_character_asset`.
+- A pending-deletion account is denied by the same helper.
+- A live unrelated account cannot enumerate arbitrary owner-prefixed folders or read another character's assets.
+- Public/eligible character media reads remain unchanged for non-archived characters.
+
+The character-preservation draft now explicitly calls `public.account_is_active() IS TRUE` inside `private.user_has_existing_character_session`. This must be tested together with the Auth-user-existence guard; applying only one half leaves the stale-JWT risk unresolved.
