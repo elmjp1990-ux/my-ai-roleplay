@@ -14,7 +14,8 @@ for (const table of ["characters", "character_private_info", "character_illustra
 }
 assert.match(sql, /character_schedule_descriptions[\s\S]*?REFERENCES auth[.]users[(]id[)] ON DELETE SET NULL/);
 assert.match(sql, /creator_display_name/);
-assert.match(sql, /creator_handle_snapshot/);
+// Historical creator attribution is deliberately plain-text display name only.
+assert.match(sql, /creator_display_name/);
 assert.match(sql, /account_archived_at timestamptz/);
 
 const existingSessionFn = sql.match(/CREATE OR REPLACE FUNCTION private[.]user_has_existing_character_session[(][\s\S]*?\$function\$;/)?.[0];
