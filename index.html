@@ -1987,10 +1987,11 @@ async function cancelCharacterIllustrationCleanupJob(jobId,userId) {
 }
 async function processCharacterIllustrationCleanupJob(job,userId) {
   const client=window.mySupabase;
-  const {data:references,error:referenceError}=await client.from('character_illustrations')
-    .select('id').eq('author_id',userId).eq('storage_path',job.storage_path).limit(1);
-  if(referenceError||references?.length) {
-    const reason=referenceError?.message||'此檔案仍被角色立繪資料引用';
+  const {data:canRemove,error:referenceError}=await client.rpc('can_process_character_illustration_cleanup',{
+    p_user_id:userId,p_storage_path:job.storage_path
+  });
+  if(referenceError||canRemove!==true) {
+    const reason=referenceError?.message||'帳號狀態或角色素材引用尚未允許清理';
     const {error:updateError}=await client.from('character_illustration_cleanup_jobs')
       .update({attempts:Number(job.attempts||0)+1,last_error:String(reason).slice(0,500),updated_at:new Date().toISOString()})
       .eq('id',job.id).eq('author_id',userId);
