@@ -231,7 +231,6 @@ BEGIN
   IF (auth.jwt() ->> 'role') IS DISTINCT FROM 'service_role' THEN
     RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
   END IF;
-  RETURN QUERY
   UPDATE public.character_asset_cleanup_jobs j
   SET status = 'dead_letter',
       claimed_at = NULL,
@@ -241,6 +240,7 @@ BEGIN
     AND j.claimed_at < pg_catalog.statement_timestamp() - interval '15 minutes'
     AND j.attempts >= 8;
 
+  RETURN QUERY
   WITH due AS (
     SELECT j.id
     FROM public.character_asset_cleanup_jobs j
@@ -287,7 +287,7 @@ BEGIN
       available_at = CASE WHEN p_status = 'failed'
         THEN pg_catalog.statement_timestamp() + pg_catalog.make_interval(mins => LEAST(60, (2 ^ LEAST(j.attempts, 6))::integer))
         ELSE j.available_at END,
-      completed_at = CASE WHEN p_status IN ('completed', 'skipped', 'dead_letter') THEN pg_catalog.statement_timestamp() ELSE NULL END,
+      completed_at = CASE WHEN p_status IN ('completed', 'skipped') THEN pg_catalog.statement_timestamp() ELSE NULL END,
       claimed_at = NULL,
       updated_at = pg_catalog.statement_timestamp()
   WHERE j.id = p_job_id AND j.status = 'processing';
@@ -297,13 +297,13 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION private.claim_character_asset_cleanup_jobs(integer)
+REVOKE ALL ON FUNCTION public.claim_character_asset_cleanup_jobs(integer)
   FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION private.finish_character_asset_cleanup_job(uuid, text, text)
+REVOKE ALL ON FUNCTION public.finish_character_asset_cleanup_job(uuid, text, text)
   FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION private.claim_character_asset_cleanup_jobs(integer)
+GRANT EXECUTE ON FUNCTION public.claim_character_asset_cleanup_jobs(integer)
   TO service_role;
-GRANT EXECUTE ON FUNCTION private.finish_character_asset_cleanup_job(uuid, text, text)
+GRANT EXECUTE ON FUNCTION public.finish_character_asset_cleanup_job(uuid, text, text)
   TO service_role;
 
 -- Not yet included: Storage worker deployment/scheduler. Pending jobs intentionally
