@@ -276,8 +276,18 @@ BEGIN
   VALUES (v_encounter_diary, v_user, v_encounter_draft, 'interaction', 'Existing encounter memory');
   -- Create the Encounter session while the character is still active. The
   -- player will continue this same session only after the author archives it.
+  -- chat_mode is server-managed; use the trusted server role for this fixture,
+  -- then restore the simulated player role before exercising the player writer.
+  PERFORM pg_catalog.set_config('request.jwt.claim.role', 'service_role', true);
   INSERT INTO public.chat_sessions (id, user_id, character_id, character_name, chat_mode)
   VALUES (v_encounter_session, v_user, v_encounter_draft, 'Private draft with encounter history', 'encounter');
+  PERFORM pg_catalog.set_config('request.jwt.claim.role', 'authenticated', true);
+  IF NOT EXISTS (
+    SELECT 1 FROM public.chat_sessions
+    WHERE id = v_encounter_session AND chat_mode = 'encounter'
+  ) THEN
+    RAISE EXCEPTION 'encounter_fixture_must_use_server_managed_encounter_mode';
+  END IF;
   INSERT INTO public.encounter_session_lifecycle (
     session_id, user_id, character_id, location_key, schedule_snapshot,
     scheduled_start_at, scheduled_end_at, status
