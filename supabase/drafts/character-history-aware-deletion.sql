@@ -91,6 +91,8 @@ AS $function$
 DECLARE
   v_author_id uuid;
   v_first_published_at timestamptz;
+  v_visibility text;
+  v_review_status text;
   v_deleted_at timestamptz;
   v_avatar_video_path text;
   v_has_history boolean;
@@ -102,8 +104,10 @@ BEGIN
     RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';
   END IF;
 
-  SELECT c.author_id, c.first_published_at, c.deleted_at, c.avatar_video_path
-    INTO v_author_id, v_first_published_at, v_deleted_at, v_avatar_video_path
+  SELECT c.author_id, c.first_published_at, c.visibility, c.review_status,
+         c.deleted_at, c.avatar_video_path
+    INTO v_author_id, v_first_published_at, v_visibility, v_review_status,
+         v_deleted_at, v_avatar_video_path
   FROM public.characters c
   WHERE c.id = p_character_id
   FOR UPDATE;
@@ -121,9 +125,14 @@ BEGIN
   v_deleted_at := pg_catalog.statement_timestamp();
   v_has_history := private.character_has_history(p_character_id);
 
-  -- Only a never-published character with no trace of player activity can be
-  -- physically removed. first_published_at is a permanent publication marker.
-  IF v_first_published_at IS NULL AND NOT v_has_history THEN
+  -- Fail closed on any publication evidence. first_published_at is the durable
+  -- marker, while current public/approved state is an additional guard against
+  -- legacy rows or incomplete historical backfills.
+  IF v_first_published_at IS NULL
+     AND v_visibility = 'private'
+     AND v_review_status IS NOT NULL
+     AND v_review_status <> 'approved'
+     AND NOT v_has_history THEN
     -- Storage paths must be exact author/character/object paths. Unknown URL,
     -- base64, legacy or malformed formats fail closed and are not queued.
     IF v_avatar_video_path IS NOT NULL THEN
