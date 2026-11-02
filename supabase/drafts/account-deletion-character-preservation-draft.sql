@@ -76,7 +76,8 @@ AS $function$
           ON g.id = gm.group_id
         WHERE gm.character_id = p_character_id
           AND g.owner_id = auth.uid()
-          AND g.archived_at IS NULL
+          -- archived_at only hides a group from the active list; it is not deletion.
+          -- An archived group remains an existing conversation and retains access.
           AND g.deleted_at IS NULL
       )
     );
@@ -88,7 +89,7 @@ GRANT EXECUTE ON FUNCTION private.user_has_existing_character_session(uuid)
   TO authenticated;
 
 -- 4) Storage policy helper: exact path must be referenced by the character row
--- or illustration metadata, and the caller must own an existing live chat/group.
+-- or illustration metadata, and the caller must own an existing undeleted chat/group.
 CREATE OR REPLACE FUNCTION private.can_read_character_asset(
   p_bucket_id text,
   p_object_name text
