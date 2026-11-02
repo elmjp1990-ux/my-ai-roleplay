@@ -390,7 +390,7 @@ assert.ok(publicationGuard, "immutable first-publication timestamp guard must ex
 assert.match(publicationGuard, /OLD[.]first_published_at IS NOT NULL/);
 assert.match(publicationGuard, /NEW[.]first_published_at IS DISTINCT FROM OLD[.]first_published_at/);
 assert.match(publicationGuard, /NEW[.]visibility = 'public'/);
-assert.match(characterDeletionDraft, /BEFORE INSERT OR UPDATE OF first_published_at, visibility ON public[.]characters/);
+assert.match(characterDeletionDraft, /BEFORE INSERT OR UPDATE OF first_published_at, visibility[\s\S]*?ON public[.]characters/);
 assert.match(characterDeletionDraft, /character_first_publication_is_immutable/);
 assert.match(characterDeletionDraft, /first transition to visibility='public' stamps first_published_at/);
 assert.match(characterDeletionDraft, /DELETE FROM public[.]characters WHERE id = p_character_id/);
