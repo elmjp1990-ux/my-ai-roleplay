@@ -143,7 +143,58 @@ CREATE POLICY "Existing session owners can read archived character assets"
   FOR SELECT TO authenticated
   USING (private.can_read_character_asset(bucket_id, name));
 
--- 5) Database-level gate for every NEW character session/member attachment.
+-- Explicitly exclude account-archived characters from caller-side new-session
+-- eligibility helpers as well as the INSERT triggers below.
+CREATE OR REPLACE FUNCTION public.character_can_start_chat(p_character_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.characters AS c
+    WHERE c.id = p_character_id
+      AND c.account_archived_at IS NULL
+      AND c.deleted_at IS NULL
+      AND (
+        c.author_id = (SELECT auth.uid())
+        OR (c.visibility = 'public' AND c.review_status = 'approved')
+      )
+  );
+$function$;
+
+CREATE OR REPLACE FUNCTION public.can_open_encounter_session(p_character_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.characters AS c
+    WHERE c.id = p_character_id
+      AND c.account_archived_at IS NULL
+      AND c.visibility = 'public'
+      AND c.deleted_at IS NULL
+      AND c.review_status = 'approved'
+      AND c.rights_confirmed IS TRUE
+      AND (
+        c.is_nsfw IS NOT TRUE
+        OR (
+          auth.uid() IS NOT NULL
+          AND private.current_user_is_adult()
+        )
+      )
+  );
+$function$;
+
+-- CREATE OR REPLACE preserves the currently audited function ownership and
+-- EXECUTE ACLs; verify both again after local replay.
+
+-- 6) Database-level gate for every NEW character session/member attachment.
 -- This closes the direct single-chat insert path as well as trusted
 -- Encounter/Story service-role RPC paths. Existing sessions are unaffected:
 -- continuing a chat does not INSERT or reassign character_id.
