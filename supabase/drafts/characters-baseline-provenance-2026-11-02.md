@@ -176,3 +176,30 @@ The live archive_account_deletion_data(p_user_id) archives ai_generation_records
 ### Scope and safety
 
 All evidence above came from SELECT-only catalog reads and function-definition inspection. No application rows were selected. No functions were invoked. No DDL/DML, migration, deployment, or hosted-data mutation occurred.
+
+## Account deletion control-plane ACL / RLS review — 2026-11-02
+
+### Tables
+
+- account_deletion_requests: RLS enabled, FORCE RLS disabled; owner postgres; table ACL grants postgres and service_role. No direct anon/authenticated table grants were present in relacl. pg_policies returned no policies for this table.
+- account_deletion_archive_batches: RLS enabled, FORCE RLS disabled; owner postgres; ACL only postgres. No policies returned.
+- account_deletion_archive_items: RLS enabled, FORCE RLS disabled; owner postgres; ACL only postgres. No policies returned.
+- This is a locked-down control-plane pattern: client access is through narrowly scoped SECURITY DEFINER RPCs; service_role owns worker access; archive payload tables are not directly granted to client roles. Continue verifying default privileges and any inherited role grants before final sign-off.
+
+### RPC EXECUTE ACL and function properties
+
+All inspected account deletion RPCs are SECURITY DEFINER and set search_path to empty:
+- authenticated + service_role + postgres: request_account_deletion(), cancel_account_deletion(), get_account_deletion_status().
+- service_role + postgres only: archive_account_deletion_data(uuid), prepare_account_deletion(uuid), finalize_account_deletion(uuid), record_account_deletion_failure(uuid,text), get_account_deletion_work_items().
+- This keeps irreversible archive/preparation/finalization/worker queue functions unavailable to authenticated clients by direct EXECUTE grant.
+- request_account_deletion() derives target identity from auth.uid(), checks configured grace period, and inserts only the caller's request.
+- cancel_account_deletion() derives auth.uid(), locks that caller's request, and blocks cancellation after an exact request has entered an archive/deletion batch.
+- get_account_deletion_status() filters by auth.uid().
+- get_account_deletion_work_items() is service_role-only and returns due work plus interrupted deleting batches.
+- record_account_deletion_failure() and finalize_account_deletion() are service_role-only. finalize requires batch status deleting and verifies the Auth user no longer exists.
+
+### Remaining review gaps
+
+- Table ACL relacl and function proacl were inspected, but default privileges, inherited grants, schema USAGE grants, and any edge-function / worker invocation authentication have not yet been fully audited.
+- Need trace the actual worker/Edge Function or external invocation path that obtains get_account_deletion_work_items(), calls prepare_account_deletion(), deletes auth.users, then calls finalize_account_deletion(). The SQL function definitions alone do not prove that the deployed worker authenticates correctly or handles partial failures safely.
+- No account deletion RPC was invoked. All evidence came from read-only catalog queries and pg_get_functiondef.
