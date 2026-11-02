@@ -25,5 +25,7 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - name: Type-check account deletion Edge Function
+        run: deno check supabase/functions/account-deletion-worker/index.ts
       - name: Run deterministic account deletion worker tests
-        run: deno test --no-check supabase/functions/_shared/account-deletion-worker.test.ts
+        run: deno test supabase/functions/_shared/account-deletion-worker.test.ts
