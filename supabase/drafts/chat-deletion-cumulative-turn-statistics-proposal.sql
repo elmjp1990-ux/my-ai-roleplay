@@ -207,6 +207,136 @@ $function$;
 REVOKE ALL ON FUNCTION private.snapshot_chat_deletion_character_turn_stats(text, uuid, uuid)
   FROM PUBLIC, anon, authenticated, service_role;
 
+-- Account deletion bypasses the ordinary single/group chat soft-delete RPCs:
+-- Auth FK cascades remove chat_sessions and chat_groups directly. Capture the
+-- same minimal character-use tombstones and assistant-turn aggregates before
+-- prepare_account_deletion permits Auth deletion. No transcript text or player
+-- identifier is written to these aggregate tables.
+CREATE OR REPLACE FUNCTION private.snapshot_account_chat_character_history(
+  p_user_id uuid
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_session record;
+  v_group record;
+BEGIN
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'account_chat_history_owner_required' USING ERRCODE = '22023';
+  END IF;
+
+  -- Match the parent-first writer-lock protocol used by chat deletion. Stable
+  -- ordering prevents two maintenance paths from acquiring these locks in
+  -- inconsistent order.
+  PERFORM 1
+  FROM public.chat_sessions AS s
+  WHERE s.user_id = p_user_id
+  ORDER BY s.id
+  FOR UPDATE;
+
+  PERFORM 1
+  FROM public.chat_groups AS g
+  WHERE g.owner_id = p_user_id
+  ORDER BY g.id
+  FOR UPDATE;
+
+  FOR v_session IN
+    SELECT s.id, s.character_id
+    FROM public.chat_sessions AS s
+    WHERE s.user_id = p_user_id
+    ORDER BY s.id
+  LOOP
+    IF EXISTS (
+      SELECT 1
+      FROM public.chat_deletion_jobs AS j
+      WHERE j.resource_type = 'single_session'
+        AND j.resource_id = v_session.id
+        AND j.status = 'completed'
+    ) THEN
+      -- A completed 30-day purge has already removed/blanked transcript rows.
+      -- Never recompute from the now-empty transcript; require its tombstone.
+      IF v_session.character_id IS NOT NULL
+         AND NOT EXISTS (
+           SELECT 1
+           FROM public.chat_deletion_character_history AS h
+           WHERE h.resource_type = 'single_session'
+             AND h.resource_id = v_session.id
+             AND h.character_id = v_session.character_id
+         ) THEN
+        RAISE EXCEPTION 'account_chat_history_tombstone_missing'
+          USING ERRCODE = '23514';
+      END IF;
+    ELSE
+      PERFORM private.snapshot_chat_deletion_character_turn_stats(
+        'single_session', v_session.id, p_user_id
+      );
+    END IF;
+  END LOOP;
+
+  FOR v_group IN
+    SELECT g.id, g.world_character_id
+    FROM public.chat_groups AS g
+    WHERE g.owner_id = p_user_id
+    ORDER BY g.id
+  LOOP
+    IF EXISTS (
+      SELECT 1
+      FROM public.chat_deletion_jobs AS j
+      WHERE j.resource_type = 'group'
+        AND j.resource_id = v_group.id
+        AND j.status = 'completed'
+    ) THEN
+      -- Group purge removes member/message rows. The durable history table is
+      -- then the only authoritative record of members that never replied.
+      IF NOT EXISTS (
+        SELECT 1
+        FROM public.chat_deletion_character_history AS h
+        WHERE h.resource_type = 'group'
+          AND h.resource_id = v_group.id
+      ) THEN
+        RAISE EXCEPTION 'account_group_history_tombstone_missing'
+          USING ERRCODE = '23514';
+      END IF;
+      IF v_group.world_character_id IS NOT NULL
+         AND NOT EXISTS (
+           SELECT 1
+           FROM public.chat_deletion_character_history AS h
+           WHERE h.resource_type = 'group'
+             AND h.resource_id = v_group.id
+             AND h.character_id = v_group.world_character_id
+         ) THEN
+        RAISE EXCEPTION 'account_group_world_character_tombstone_missing'
+          USING ERRCODE = '23514';
+      END IF;
+      IF EXISTS (
+        SELECT 1
+        FROM public.chat_deletion_character_turn_stats AS st
+        LEFT JOIN public.chat_deletion_character_history AS h
+          ON h.resource_type = st.resource_type
+         AND h.resource_id = st.resource_id
+         AND h.character_id = st.character_id
+        WHERE st.resource_type = 'group'
+          AND st.resource_id = v_group.id
+          AND h.character_id IS NULL
+      ) THEN
+        RAISE EXCEPTION 'account_group_turn_stats_tombstone_mismatch'
+          USING ERRCODE = '23514';
+      END IF;
+    ELSE
+      PERFORM private.snapshot_chat_deletion_character_turn_stats(
+        'group', v_group.id, p_user_id
+      );
+    END IF;
+  END LOOP;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.snapshot_account_chat_character_history(uuid)
+  FROM PUBLIC, anon, authenticated, service_role;
+
 -- Backfill any already soft-deleted parents before the new count RPCs start
 -- including archived statistics. Idempotent by the resource/character key.
 INSERT INTO public.chat_deletion_character_turn_stats (
