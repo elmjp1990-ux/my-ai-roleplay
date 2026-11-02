@@ -2,19 +2,19 @@
 
 Repository: `elmjp1990-ux/my-ai-roleplay`  
 Branch: `security/chat-deletion-lifecycle-reconciliation`  
-Compared branch head: `941f1e1059fbf533c5857aa77bad270c5442dda6`  
+Compared branch head: `eaa13723d1ebf69b56ec85fa5bdf2b286bbeb983` (after exact-source restoration)  
 Supabase test project: `ouyewoagbmtqehbofrje`  
 Method: read-only migration ledger listing + recursive Git tree comparison. No migration SQL was executed.
 
 ## Summary
 
 - Remote ledger records: **152**
-- Repository migration SQL files: **107** (102 timestamp-prefixed, 5 legacy)
-- Exact remote version + name match: **27**
+- Repository migration SQL files: **112** (107 timestamp-prefixed, 5 legacy)
+- Exact remote version + name match: **32**
 - Remote records whose name exists in repo but version differs: **68**
-- Remote migration names with no matching repository filename: **57**
+- Remote migration names with no matching repository filename: **52**
 - Repository migration files whose names are absent from remote ledger: **14**
-- Unique timestamp versions in repo: **96**
+- Unique timestamp versions in repo: **101**
 - Duplicate timestamp collisions: **5 version values**
 
 **Important correction to version-only interpretation:** 104 remote versions have no exact same-version file, but **68** of those migration names do exist in the repository under a different timestamp. These are filename/version drift, not proof that all 104 SQL sources are missing. Only **57** remote migration names have no matching local filename at all. The exact source content and commit provenance still need verification.
@@ -55,11 +55,11 @@ Method: read-only migration ledger listing + recursive Git tree comparison. No m
 | 20261016112636 | restrict_private_character_reads | — | NO NAME MATCH |
 | 20261016112651 | restrict_story_reads_to_public_characters | — | NO NAME MATCH |
 | 20261016140139 | limit_chat_group_name_to_25_chars | — | NO NAME MATCH |
-| 20261017010838 | preserve_group_history_on_character_delete | — | NO NAME MATCH |
-| 20261017010841 | account_deletion_grace_period_config | — | NO NAME MATCH |
-| 20261017010847 | account_deletion_worker | — | NO NAME MATCH |
-| 20261017035145 | guard_group_mock_turn_during_deletion | — | NO NAME MATCH |
-| 20261017040730 | guard_snapshot_sync_during_deletion | — | NO NAME MATCH |
+| 20261017010838 | preserve_group_history_on_character_delete | `supabase/migrations/20261017010838_preserve_group_history_on_character_delete.sql` | EXACT (restored from exact-version source branch; blob verified) |
+| 20261017010841 | account_deletion_grace_period_config | `supabase/migrations/20261017010841_account_deletion_grace_period_config.sql` | EXACT (restored from exact-version source branch; blob verified) |
+| 20261017010847 | account_deletion_worker | `supabase/migrations/20261017010847_account_deletion_worker.sql` | EXACT (restored from exact-version source branch; blob verified) |
+| 20261017035145 | guard_group_mock_turn_during_deletion | `supabase/migrations/20261017035145_guard_group_mock_turn_during_deletion.sql` | EXACT (restored from exact-version source branch; blob verified) |
+| 20261017040730 | guard_snapshot_sync_during_deletion | `supabase/migrations/20261017040730_guard_snapshot_sync_during_deletion.sql` | EXACT (restored from exact-version source branch; blob verified) |
 | 20261017100648 | chat_turn_existing_retry_recovery_order | — | NO NAME MATCH |
 | 20261018005752 | persist_group_speaker_snapshot | `supabase/migrations/20261018005752_persist_group_speaker_snapshot.sql` (v=20261018005752) | EXACT |
 | 20261018005846 | allow_snapshotted_group_speaker_without_character_fk | `supabase/migrations/20261018005846_allow_snapshotted_group_speaker_without_character_fk.sql` (v=20261018005846) | EXACT |
@@ -266,4 +266,18 @@ The branch-specific GitHub commit history was checked for the five recovered fil
 - `guard_group_mock_turn_during_deletion` protects a legacy mock group-turn RPC with account-active, owner, and idempotency checks; confirm whether any live frontend path still uses it before treating it as part of the new canonical chat model.
 - `guard_snapshot_sync_during_deletion` requires the authenticated character author and blocks pending deletion, but updates snapshots for every `chat_sessions` row for that character. Integrate only after verifying the new existing-session snapshot/continuation rules; it is not a replacement for durable ownership detachment.
 
-These recovered files are retained as historical source evidence only. No file was copied into `supabase/migrations/`, and no hosted or local migration was executed.
+## Round 71 — exact-version migration source restoration
+
+The five exact-version candidates listed above were restored into the current PR branch's `supabase/migrations/` directory from `fix/account-deletion-ready`. Each restored file's Git blob SHA was re-fetched on both branches and matched byte-for-byte:
+
+- `20261017010838_preserve_group_history_on_character_delete.sql` — `628b6a6ecf56962b64bdc1764d04b81d8687c4c0`
+- `20261017010841_account_deletion_grace_period_config.sql` — `664c30ff901817050cacb86f67bc0a84986f9dac`
+- `20261017010847_account_deletion_worker.sql` — `1e329c68a40f5ada56bf7dd47f9b64bf45a77367`
+- `20261017035145_guard_group_mock_turn_during_deletion.sql` — `730e8d037d79f6718728ef8dc77bd90372477a7c`
+- `20261017040730_guard_snapshot_sync_during_deletion.sql` — `25f46d7163589c9d4c97caf155e43ebf05a85d08`
+
+The five records now count as exact version + name source matches. Updated counts above reflect 112 repository SQL files, 32 exact matches, and 52 remote names still without a matching repository filename. This is source restoration only: no local/hosted migration was executed and no remote ledger was changed.
+
+**Important:** the restored account-deletion worker migration is historical SQL, not approval to run its deletion flow. Its `prepare_account_deletion()` still relies on existing cascade behavior and does not preserve/detach all character data required by the current account-deletion policy. Keep the worker disabled and review later migrations/guard proposals before any replay. The five files also do not restore the missing `profiles` / `characters` foundational CREATE TABLE baseline.
+
+
