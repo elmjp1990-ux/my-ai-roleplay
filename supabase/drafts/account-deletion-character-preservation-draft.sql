@@ -182,6 +182,2589 @@ BEGIN
        '^' || p_user_id::text ||
        '/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}' ||
        '/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](jpg|jpeg|png|webp)
+CREATE POLICY "Existing session owners can read character illustration metadata"
+  ON public.character_illustrations
+  FOR SELECT TO authenticated
+  USING (private.user_has_existing_character_session(character_id));
+
+DROP POLICY IF EXISTS "Existing session owners can read archived character assets"
+  ON storage.objects;
+CREATE POLICY "Existing session owners can read archived character assets"
+  ON storage.objects
+  FOR SELECT TO authenticated
+  USING (private.can_read_character_asset(bucket_id, name));
+
+-- 5) Explicitly exclude account-archived characters from caller-side new-session
+-- eligibility helpers as well as the INSERT triggers below.
+CREATE OR REPLACE FUNCTION public.character_can_start_chat(p_character_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.characters AS c
+    WHERE c.id = p_character_id
+      AND c.account_archived_at IS NULL
+      AND c.deleted_at IS NULL
+      AND (
+        c.author_id = (SELECT auth.uid())
+        OR (c.visibility = 'public' AND c.review_status = 'approved')
+      )
+  );
+$function$;
+
+CREATE OR REPLACE FUNCTION public.can_open_encounter_session(p_character_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.characters AS c
+    WHERE c.id = p_character_id
+      AND c.account_archived_at IS NULL
+      AND c.visibility = 'public'
+      AND c.deleted_at IS NULL
+      AND c.review_status = 'approved'
+      AND c.rights_confirmed IS TRUE
+      AND (
+        c.is_nsfw IS NOT TRUE
+        OR (
+          auth.uid() IS NOT NULL
+          AND private.current_user_is_adult()
+        )
+      )
+  );
+$function$;
+
+-- City/map schedule discovery must also hide account-archived characters,
+-- while public character discovery itself continues to return public works.
+CREATE OR REPLACE FUNCTION public.get_encounter_character_schedule(p_character_id uuid)
+RETURNS TABLE(
+  weekday smallint,
+  day_type text,
+  start_time time without time zone,
+  end_time time without time zone,
+  location_key text,
+  activity text,
+  priority smallint
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT
+    s.weekday, s.day_type, s.start_time, s.end_time,
+    s.location_key, s.activity, s.priority
+  FROM public.characters AS c
+  JOIN public.character_schedules AS s ON s.character_id = c.id
+  WHERE c.id = p_character_id
+    AND c.account_archived_at IS NULL
+    AND c.visibility = 'public'
+    AND c.deleted_at IS NULL
+    AND c.review_status = 'approved'
+    AND c.rights_confirmed IS TRUE
+    AND s.is_active IS TRUE
+    AND (
+      c.is_nsfw IS NOT TRUE
+      OR (
+        (SELECT auth.uid()) IS NOT NULL
+        AND private.current_user_is_adult()
+      )
+    )
+  ORDER BY s.priority DESC, s.weekday NULLS FIRST, s.start_time;
+$function$;
+
+-- CREATE OR REPLACE preserves the currently audited function ownership and
+-- EXECUTE ACLs; verify both again after local replay.
+
+-- 6) Service-only account archive helper.
+-- The helper is called internally by the SECURITY DEFINER prepare RPC; do not
+-- broaden schema USAGE on the private schema just for this internal call.
+
+-- Call from the final prepare_account_deletion() transaction only after the
+-- request is due and account writes are frozen, but BEFORE deleting auth.users.
+-- It preserves all characters (including private/unpublished) and all child rows.
+CREATE OR REPLACE FUNCTION private.archive_account_characters(
+  p_user_id uuid
+)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_nickname text;
+  v_archived_at timestamptz := pg_catalog.statement_timestamp();
+  v_character_count integer := 0;
+BEGIN
+  -- Trust the signed JWT role claim; auth.role() is deprecated by Supabase.
+  IF (auth.jwt() ->> 'role') IS DISTINCT FROM 'service_role' THEN
+    RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
+  END IF;
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'target_user_required' USING ERRCODE = '22023';
+  END IF;
+
+  SELECT p.nickname
+    INTO v_nickname
+  FROM public.profiles AS p
+  WHERE p.id = p_user_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'profile_not_found_before_character_archive' USING ERRCODE = 'P0002';
+  END IF;
+
+  -- Lock all characters first; no publication-state filter by design.
+  PERFORM 1
+  FROM public.characters AS c
+  WHERE c.author_id = p_user_id
+  FOR UPDATE;
+
+  -- Lock child rows whose data is retained but not otherwise updated below.
+  -- This serializes in-flight owner writes against the archival transaction;
+  -- after commit, the parent author_id is NULL and the owner RLS predicates fail.
+  PERFORM 1
+  FROM public.character_schedules AS cs
+  JOIN public.characters AS c ON c.id = cs.character_id
+  WHERE c.author_id = p_user_id
+  FOR UPDATE OF cs;
+
+  PERFORM 1
+  FROM public.character_stories AS st
+  JOIN public.characters AS c ON c.id = st.character_id
+  WHERE c.author_id = p_user_id
+  FOR UPDATE OF st;
+
+  -- Preserve creator attribution in every existing single-chat snapshot.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_sessions AS s
+  SET character_snapshot =
+      COALESCE(s.character_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      ),
+      updated_at = v_archived_at
+  FROM owned
+  WHERE s.character_id = owned.id;
+
+  -- Preserve creator attribution in group member snapshots.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_group_members AS gm
+  SET character_snapshot =
+      COALESCE(gm.character_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      )
+  FROM owned
+  WHERE gm.character_id = owned.id;
+
+  -- Preserve creator attribution in group speaker snapshots.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_group_messages AS gm
+  SET speaker_snapshot =
+      COALESCE(gm.speaker_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      )
+  FROM owned
+  WHERE gm.character_id = owned.id
+    AND gm.speaker_type = 'character';
+
+  -- Detach author IDs from character-owned children before profile/Auth deletion.
+  UPDATE public.character_private_info
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  UPDATE public.character_illustrations
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  UPDATE public.character_schedule_descriptions
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  -- Cancel pending cleanup queue records only. Never delete Storage objects here.
+  DELETE FROM public.character_illustration_cleanup_jobs
+  WHERE author_id = p_user_id;
+
+  -- Archive every character row and detach its active owner. Do not set deleted_at:
+  -- this is account archival, not character-content deletion.
+  UPDATE public.characters AS c
+  SET creator_display_name =
+        COALESCE(NULLIF(c.creator_display_name, ''),
+                 NULLIF(v_nickname, ''),
+                   '原作者'),
+      -- Preserve the existing public/private visibility and review state.
+      -- Account deletion marks the character offline; it does not delist the work.
+      account_archived_at = COALESCE(c.account_archived_at, v_archived_at),
+      author_id = NULL
+  WHERE c.author_id = p_user_id;
+
+  GET DIAGNOSTICS v_character_count = ROW_COUNT;
+  RETURN v_character_count;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.archive_account_characters(uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private.archive_account_characters(uuid)
+  TO service_role;
+
+-- 7) Transactional integration with the live prepare_account_deletion(uuid).
+-- The complete replacement function, copied from the current test-DB definition
+-- and amended with safe retry handling, lives in:
+--   supabase/drafts/prepare-account-deletion-character-preservation-integration.sql
+--
+-- It deliberately does NOT call the helper before looking up the existing batch:
+-- a retry after Auth deletion must not require the now-deleted profile row.
+-- Instead it:
+--   - returns immediately for an already-deleting batch, unless legacy owned
+--     character rows still exist (then it archives those rows before returning);
+--   - calls the helper for existing archived/archiving batches; and
+--   - calls the helper for a new batch before any irreversible cleanup.
+-- All helper calls execute inside the same prepare_account_deletion transaction.
+-- The worker's deleting-recovery branch then performs only Auth/finalize steps.
+--
+-- Do not move either SQL file into active migrations until schema provenance,
+-- disposable PostgreSQL replay, RLS/Storage tests and end-to-end deletion tests pass.
+
+     ) THEN
+    RETURN false;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.character_illustrations AS ci
+    WHERE ci.storage_path = p_storage_path
+  ) OR EXISTS (
+    SELECT 1 FROM public.characters AS c
+    WHERE c.avatar_video_path = p_storage_path
+  ) THEN
+    RETURN false;
+  END IF;
+
+  RETURN true;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
+  FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
+  TO authenticated;
+
+-- Existing public/author policies remain. These additional SELECT policies are
+-- authenticated-only and do not allow upload, update, or delete.
+DROP POLICY IF EXISTS "Existing session owners can read character illustration metadata"
+  ON public.character_illustrations;
+CREATE POLICY "Existing session owners can read character illustration metadata"
+  ON public.character_illustrations
+  FOR SELECT TO authenticated
+  USING (private.user_has_existing_character_session(character_id));
+
+DROP POLICY IF EXISTS "Existing session owners can read archived character assets"
+  ON storage.objects;
+CREATE POLICY "Existing session owners can read archived character assets"
+  ON storage.objects
+  FOR SELECT TO authenticated
+  USING (private.can_read_character_asset(bucket_id, name));
+
+-- 5) Explicitly exclude account-archived characters from caller-side new-session
+-- eligibility helpers as well as the INSERT triggers below.
+CREATE OR REPLACE FUNCTION public.character_can_start_chat(p_character_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.characters AS c
+    WHERE c.id = p_character_id
+      AND c.account_archived_at IS NULL
+      AND c.deleted_at IS NULL
+      AND (
+        c.author_id = (SELECT auth.uid())
+        OR (c.visibility = 'public' AND c.review_status = 'approved')
+      )
+  );
+$function$;
+
+CREATE OR REPLACE FUNCTION public.can_open_encounter_session(p_character_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.characters AS c
+    WHERE c.id = p_character_id
+      AND c.account_archived_at IS NULL
+      AND c.visibility = 'public'
+      AND c.deleted_at IS NULL
+      AND c.review_status = 'approved'
+      AND c.rights_confirmed IS TRUE
+      AND (
+        c.is_nsfw IS NOT TRUE
+        OR (
+          auth.uid() IS NOT NULL
+          AND private.current_user_is_adult()
+        )
+      )
+  );
+$function$;
+
+-- City/map schedule discovery must also hide account-archived characters,
+-- while public character discovery itself continues to return public works.
+CREATE OR REPLACE FUNCTION public.get_encounter_character_schedule(p_character_id uuid)
+RETURNS TABLE(
+  weekday smallint,
+  day_type text,
+  start_time time without time zone,
+  end_time time without time zone,
+  location_key text,
+  activity text,
+  priority smallint
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT
+    s.weekday, s.day_type, s.start_time, s.end_time,
+    s.location_key, s.activity, s.priority
+  FROM public.characters AS c
+  JOIN public.character_schedules AS s ON s.character_id = c.id
+  WHERE c.id = p_character_id
+    AND c.account_archived_at IS NULL
+    AND c.visibility = 'public'
+    AND c.deleted_at IS NULL
+    AND c.review_status = 'approved'
+    AND c.rights_confirmed IS TRUE
+    AND s.is_active IS TRUE
+    AND (
+      c.is_nsfw IS NOT TRUE
+      OR (
+        (SELECT auth.uid()) IS NOT NULL
+        AND private.current_user_is_adult()
+      )
+    )
+  ORDER BY s.priority DESC, s.weekday NULLS FIRST, s.start_time;
+$function$;
+
+-- CREATE OR REPLACE preserves the currently audited function ownership and
+-- EXECUTE ACLs; verify both again after local replay.
+
+-- 6) Service-only account archive helper.
+-- The helper is called internally by the SECURITY DEFINER prepare RPC; do not
+-- broaden schema USAGE on the private schema just for this internal call.
+
+-- Call from the final prepare_account_deletion() transaction only after the
+-- request is due and account writes are frozen, but BEFORE deleting auth.users.
+-- It preserves all characters (including private/unpublished) and all child rows.
+CREATE OR REPLACE FUNCTION private.archive_account_characters(
+  p_user_id uuid
+)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_nickname text;
+  v_archived_at timestamptz := pg_catalog.statement_timestamp();
+  v_character_count integer := 0;
+BEGIN
+  -- Trust the signed JWT role claim; auth.role() is deprecated by Supabase.
+  IF (auth.jwt() ->> 'role') IS DISTINCT FROM 'service_role' THEN
+    RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
+  END IF;
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'target_user_required' USING ERRCODE = '22023';
+  END IF;
+
+  SELECT p.nickname
+    INTO v_nickname
+  FROM public.profiles AS p
+  WHERE p.id = p_user_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'profile_not_found_before_character_archive' USING ERRCODE = 'P0002';
+  END IF;
+
+  -- Lock all characters first; no publication-state filter by design.
+  PERFORM 1
+  FROM public.characters AS c
+  WHERE c.author_id = p_user_id
+  FOR UPDATE;
+
+  -- Lock child rows whose data is retained but not otherwise updated below.
+  -- This serializes in-flight owner writes against the archival transaction;
+  -- after commit, the parent author_id is NULL and the owner RLS predicates fail.
+  PERFORM 1
+  FROM public.character_schedules AS cs
+  JOIN public.characters AS c ON c.id = cs.character_id
+  WHERE c.author_id = p_user_id
+  FOR UPDATE OF cs;
+
+  PERFORM 1
+  FROM public.character_stories AS st
+  JOIN public.characters AS c ON c.id = st.character_id
+  WHERE c.author_id = p_user_id
+  FOR UPDATE OF st;
+
+  -- Preserve creator attribution in every existing single-chat snapshot.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_sessions AS s
+  SET character_snapshot =
+      COALESCE(s.character_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      ),
+      updated_at = v_archived_at
+  FROM owned
+  WHERE s.character_id = owned.id;
+
+  -- Preserve creator attribution in group member snapshots.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_group_members AS gm
+  SET character_snapshot =
+      COALESCE(gm.character_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      )
+  FROM owned
+  WHERE gm.character_id = owned.id;
+
+  -- Preserve creator attribution in group speaker snapshots.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_group_messages AS gm
+  SET speaker_snapshot =
+      COALESCE(gm.speaker_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      )
+  FROM owned
+  WHERE gm.character_id = owned.id
+    AND gm.speaker_type = 'character';
+
+  -- Detach author IDs from character-owned children before profile/Auth deletion.
+  UPDATE public.character_private_info
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  UPDATE public.character_illustrations
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  UPDATE public.character_schedule_descriptions
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  -- Cancel pending cleanup queue records only. Never delete Storage objects here.
+  DELETE FROM public.character_illustration_cleanup_jobs
+  WHERE author_id = p_user_id;
+
+  -- Archive every character row and detach its active owner. Do not set deleted_at:
+  -- this is account archival, not character-content deletion.
+  UPDATE public.characters AS c
+  SET creator_display_name =
+        COALESCE(NULLIF(c.creator_display_name, ''),
+                 NULLIF(v_nickname, ''),
+                   '原作者'),
+      -- Preserve the existing public/private visibility and review state.
+      -- Account deletion marks the character offline; it does not delist the work.
+      account_archived_at = COALESCE(c.account_archived_at, v_archived_at),
+      author_id = NULL
+  WHERE c.author_id = p_user_id;
+
+  GET DIAGNOSTICS v_character_count = ROW_COUNT;
+  RETURN v_character_count;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.archive_account_characters(uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private.archive_account_characters(uuid)
+  TO service_role;
+
+-- 7) Transactional integration with the live prepare_account_deletion(uuid).
+-- The complete replacement function, copied from the current test-DB definition
+-- and amended with safe retry handling, lives in:
+--   supabase/drafts/prepare-account-deletion-character-preservation-integration.sql
+--
+-- It deliberately does NOT call the helper before looking up the existing batch:
+-- a retry after Auth deletion must not require the now-deleted profile row.
+-- Instead it:
+--   - returns immediately for an already-deleting batch, unless legacy owned
+--     character rows still exist (then it archives those rows before returning);
+--   - calls the helper for existing archived/archiving batches; and
+--   - calls the helper for a new batch before any irreversible cleanup.
+-- All helper calls execute inside the same prepare_account_deletion transaction.
+-- The worker's deleting-recovery branch then performs only Auth/finalize steps.
+--
+-- Do not move either SQL file into active migrations until schema provenance,
+-- disposable PostgreSQL replay, RLS/Storage tests and end-to-end deletion tests pass.
+
+     ) THEN
+    RETURN false;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.character_illustrations AS ci
+    WHERE ci.storage_path = p_storage_path
+  ) OR EXISTS (
+    SELECT 1 FROM public.characters AS c
+    WHERE c.avatar_video_path = p_storage_path
+  ) THEN
+    RETURN false;
+  END IF;
+
+  RETURN true;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
+  FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
+  TO authenticated;
+
+-- Existing public/author policies remain. These additional SELECT policies are
+-- authenticated-only and do not allow upload, update, or delete.
+DROP POLICY IF EXISTS "Existing session owners can read character illustration metadata"
+  ON public.character_illustrations;
+CREATE POLICY "Existing session owners can read character illustration metadata"
+  ON public.character_illustrations
+  FOR SELECT TO authenticated
+  USING (private.user_has_existing_character_session(character_id));
+
+DROP POLICY IF EXISTS "Existing session owners can read archived character assets"
+  ON storage.objects;
+CREATE POLICY "Existing session owners can read archived character assets"
+  ON storage.objects
+  FOR SELECT TO authenticated
+  USING (private.can_read_character_asset(bucket_id, name));
+
+-- 5) Explicitly exclude account-archived characters from caller-side new-session
+-- eligibility helpers as well as the INSERT triggers below.
+CREATE OR REPLACE FUNCTION public.character_can_start_chat(p_character_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.characters AS c
+    WHERE c.id = p_character_id
+      AND c.account_archived_at IS NULL
+      AND c.deleted_at IS NULL
+      AND (
+        c.author_id = (SELECT auth.uid())
+        OR (c.visibility = 'public' AND c.review_status = 'approved')
+      )
+  );
+$function$;
+
+CREATE OR REPLACE FUNCTION public.can_open_encounter_session(p_character_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.characters AS c
+    WHERE c.id = p_character_id
+      AND c.account_archived_at IS NULL
+      AND c.visibility = 'public'
+      AND c.deleted_at IS NULL
+      AND c.review_status = 'approved'
+      AND c.rights_confirmed IS TRUE
+      AND (
+        c.is_nsfw IS NOT TRUE
+        OR (
+          auth.uid() IS NOT NULL
+          AND private.current_user_is_adult()
+        )
+      )
+  );
+$function$;
+
+-- City/map schedule discovery must also hide account-archived characters,
+-- while public character discovery itself continues to return public works.
+CREATE OR REPLACE FUNCTION public.get_encounter_character_schedule(p_character_id uuid)
+RETURNS TABLE(
+  weekday smallint,
+  day_type text,
+  start_time time without time zone,
+  end_time time without time zone,
+  location_key text,
+  activity text,
+  priority smallint
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT
+    s.weekday, s.day_type, s.start_time, s.end_time,
+    s.location_key, s.activity, s.priority
+  FROM public.characters AS c
+  JOIN public.character_schedules AS s ON s.character_id = c.id
+  WHERE c.id = p_character_id
+    AND c.account_archived_at IS NULL
+    AND c.visibility = 'public'
+    AND c.deleted_at IS NULL
+    AND c.review_status = 'approved'
+    AND c.rights_confirmed IS TRUE
+    AND s.is_active IS TRUE
+    AND (
+      c.is_nsfw IS NOT TRUE
+      OR (
+        (SELECT auth.uid()) IS NOT NULL
+        AND private.current_user_is_adult()
+      )
+    )
+  ORDER BY s.priority DESC, s.weekday NULLS FIRST, s.start_time;
+$function$;
+
+-- CREATE OR REPLACE preserves the currently audited function ownership and
+-- EXECUTE ACLs; verify both again after local replay.
+
+-- 6) Service-only account archive helper.
+-- The helper is called internally by the SECURITY DEFINER prepare RPC; do not
+-- broaden schema USAGE on the private schema just for this internal call.
+
+-- Call from the final prepare_account_deletion() transaction only after the
+-- request is due and account writes are frozen, but BEFORE deleting auth.users.
+-- It preserves all characters (including private/unpublished) and all child rows.
+CREATE OR REPLACE FUNCTION private.archive_account_characters(
+  p_user_id uuid
+)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_nickname text;
+  v_archived_at timestamptz := pg_catalog.statement_timestamp();
+  v_character_count integer := 0;
+BEGIN
+  -- Trust the signed JWT role claim; auth.role() is deprecated by Supabase.
+  IF (auth.jwt() ->> 'role') IS DISTINCT FROM 'service_role' THEN
+    RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
+  END IF;
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'target_user_required' USING ERRCODE = '22023';
+  END IF;
+
+  SELECT p.nickname
+    INTO v_nickname
+  FROM public.profiles AS p
+  WHERE p.id = p_user_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'profile_not_found_before_character_archive' USING ERRCODE = 'P0002';
+  END IF;
+
+  -- Lock all characters first; no publication-state filter by design.
+  PERFORM 1
+  FROM public.characters AS c
+  WHERE c.author_id = p_user_id
+  FOR UPDATE;
+
+  -- Lock child rows whose data is retained but not otherwise updated below.
+  -- This serializes in-flight owner writes against the archival transaction;
+  -- after commit, the parent author_id is NULL and the owner RLS predicates fail.
+  PERFORM 1
+  FROM public.character_schedules AS cs
+  JOIN public.characters AS c ON c.id = cs.character_id
+  WHERE c.author_id = p_user_id
+  FOR UPDATE OF cs;
+
+  PERFORM 1
+  FROM public.character_stories AS st
+  JOIN public.characters AS c ON c.id = st.character_id
+  WHERE c.author_id = p_user_id
+  FOR UPDATE OF st;
+
+  -- Preserve creator attribution in every existing single-chat snapshot.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_sessions AS s
+  SET character_snapshot =
+      COALESCE(s.character_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      ),
+      updated_at = v_archived_at
+  FROM owned
+  WHERE s.character_id = owned.id;
+
+  -- Preserve creator attribution in group member snapshots.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_group_members AS gm
+  SET character_snapshot =
+      COALESCE(gm.character_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      )
+  FROM owned
+  WHERE gm.character_id = owned.id;
+
+  -- Preserve creator attribution in group speaker snapshots.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_group_messages AS gm
+  SET speaker_snapshot =
+      COALESCE(gm.speaker_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      )
+  FROM owned
+  WHERE gm.character_id = owned.id
+    AND gm.speaker_type = 'character';
+
+  -- Detach author IDs from character-owned children before profile/Auth deletion.
+  UPDATE public.character_private_info
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  UPDATE public.character_illustrations
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  UPDATE public.character_schedule_descriptions
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  -- Cancel pending cleanup queue records only. Never delete Storage objects here.
+  DELETE FROM public.character_illustration_cleanup_jobs
+  WHERE author_id = p_user_id;
+
+  -- Archive every character row and detach its active owner. Do not set deleted_at:
+  -- this is account archival, not character-content deletion.
+  UPDATE public.characters AS c
+  SET creator_display_name =
+        COALESCE(NULLIF(c.creator_display_name, ''),
+                 NULLIF(v_nickname, ''),
+                   '原作者'),
+      -- Preserve the existing public/private visibility and review state.
+      -- Account deletion marks the character offline; it does not delist the work.
+      account_archived_at = COALESCE(c.account_archived_at, v_archived_at),
+      author_id = NULL
+  WHERE c.author_id = p_user_id;
+
+  GET DIAGNOSTICS v_character_count = ROW_COUNT;
+  RETURN v_character_count;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.archive_account_characters(uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private.archive_account_characters(uuid)
+  TO service_role;
+
+-- 7) Transactional integration with the live prepare_account_deletion(uuid).
+-- The complete replacement function, copied from the current test-DB definition
+-- and amended with safe retry handling, lives in:
+--   supabase/drafts/prepare-account-deletion-character-preservation-integration.sql
+--
+-- It deliberately does NOT call the helper before looking up the existing batch:
+-- a retry after Auth deletion must not require the now-deleted profile row.
+-- Instead it:
+--   - returns immediately for an already-deleting batch, unless legacy owned
+--     character rows still exist (then it archives those rows before returning);
+--   - calls the helper for existing archived/archiving batches; and
+--   - calls the helper for a new batch before any irreversible cleanup.
+-- All helper calls execute inside the same prepare_account_deletion transaction.
+-- The worker's deleting-recovery branch then performs only Auth/finalize steps.
+--
+-- Do not move either SQL file into active migrations until schema provenance,
+-- disposable PostgreSQL replay, RLS/Storage tests and end-to-end deletion tests pass.
+
+     ) THEN
+    RETURN false;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.character_illustrations AS ci
+    WHERE ci.storage_path = p_storage_path
+  ) OR EXISTS (
+    SELECT 1 FROM public.characters AS c
+    WHERE c.avatar_video_path = p_storage_path
+  ) THEN
+    RETURN false;
+  END IF;
+
+  RETURN true;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
+  FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
+  TO authenticated;
+
+-- Existing public/author policies remain. These additional SELECT policies are
+-- authenticated-only and do not allow upload, update, or delete.
+DROP POLICY IF EXISTS "Existing session owners can read character illustration metadata"
+  ON public.character_illustrations;
+CREATE POLICY "Existing session owners can read character illustration metadata"
+  ON public.character_illustrations
+  FOR SELECT TO authenticated
+  USING (private.user_has_existing_character_session(character_id));
+
+DROP POLICY IF EXISTS "Existing session owners can read archived character assets"
+  ON storage.objects;
+CREATE POLICY "Existing session owners can read archived character assets"
+  ON storage.objects
+  FOR SELECT TO authenticated
+  USING (private.can_read_character_asset(bucket_id, name));
+
+-- 5) Explicitly exclude account-archived characters from caller-side new-session
+-- eligibility helpers as well as the INSERT triggers below.
+CREATE OR REPLACE FUNCTION public.character_can_start_chat(p_character_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.characters AS c
+    WHERE c.id = p_character_id
+      AND c.account_archived_at IS NULL
+      AND c.deleted_at IS NULL
+      AND (
+        c.author_id = (SELECT auth.uid())
+        OR (c.visibility = 'public' AND c.review_status = 'approved')
+      )
+  );
+$function$;
+
+CREATE OR REPLACE FUNCTION public.can_open_encounter_session(p_character_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.characters AS c
+    WHERE c.id = p_character_id
+      AND c.account_archived_at IS NULL
+      AND c.visibility = 'public'
+      AND c.deleted_at IS NULL
+      AND c.review_status = 'approved'
+      AND c.rights_confirmed IS TRUE
+      AND (
+        c.is_nsfw IS NOT TRUE
+        OR (
+          auth.uid() IS NOT NULL
+          AND private.current_user_is_adult()
+        )
+      )
+  );
+$function$;
+
+-- City/map schedule discovery must also hide account-archived characters,
+-- while public character discovery itself continues to return public works.
+CREATE OR REPLACE FUNCTION public.get_encounter_character_schedule(p_character_id uuid)
+RETURNS TABLE(
+  weekday smallint,
+  day_type text,
+  start_time time without time zone,
+  end_time time without time zone,
+  location_key text,
+  activity text,
+  priority smallint
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT
+    s.weekday, s.day_type, s.start_time, s.end_time,
+    s.location_key, s.activity, s.priority
+  FROM public.characters AS c
+  JOIN public.character_schedules AS s ON s.character_id = c.id
+  WHERE c.id = p_character_id
+    AND c.account_archived_at IS NULL
+    AND c.visibility = 'public'
+    AND c.deleted_at IS NULL
+    AND c.review_status = 'approved'
+    AND c.rights_confirmed IS TRUE
+    AND s.is_active IS TRUE
+    AND (
+      c.is_nsfw IS NOT TRUE
+      OR (
+        (SELECT auth.uid()) IS NOT NULL
+        AND private.current_user_is_adult()
+      )
+    )
+  ORDER BY s.priority DESC, s.weekday NULLS FIRST, s.start_time;
+$function$;
+
+-- CREATE OR REPLACE preserves the currently audited function ownership and
+-- EXECUTE ACLs; verify both again after local replay.
+
+-- 6) Service-only account archive helper.
+-- The helper is called internally by the SECURITY DEFINER prepare RPC; do not
+-- broaden schema USAGE on the private schema just for this internal call.
+
+-- Call from the final prepare_account_deletion() transaction only after the
+-- request is due and account writes are frozen, but BEFORE deleting auth.users.
+-- It preserves all characters (including private/unpublished) and all child rows.
+CREATE OR REPLACE FUNCTION private.archive_account_characters(
+  p_user_id uuid
+)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_nickname text;
+  v_archived_at timestamptz := pg_catalog.statement_timestamp();
+  v_character_count integer := 0;
+BEGIN
+  -- Trust the signed JWT role claim; auth.role() is deprecated by Supabase.
+  IF (auth.jwt() ->> 'role') IS DISTINCT FROM 'service_role' THEN
+    RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
+  END IF;
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'target_user_required' USING ERRCODE = '22023';
+  END IF;
+
+  SELECT p.nickname
+    INTO v_nickname
+  FROM public.profiles AS p
+  WHERE p.id = p_user_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'profile_not_found_before_character_archive' USING ERRCODE = 'P0002';
+  END IF;
+
+  -- Lock all characters first; no publication-state filter by design.
+  PERFORM 1
+  FROM public.characters AS c
+  WHERE c.author_id = p_user_id
+  FOR UPDATE;
+
+  -- Lock child rows whose data is retained but not otherwise updated below.
+  -- This serializes in-flight owner writes against the archival transaction;
+  -- after commit, the parent author_id is NULL and the owner RLS predicates fail.
+  PERFORM 1
+  FROM public.character_schedules AS cs
+  JOIN public.characters AS c ON c.id = cs.character_id
+  WHERE c.author_id = p_user_id
+  FOR UPDATE OF cs;
+
+  PERFORM 1
+  FROM public.character_stories AS st
+  JOIN public.characters AS c ON c.id = st.character_id
+  WHERE c.author_id = p_user_id
+  FOR UPDATE OF st;
+
+  -- Preserve creator attribution in every existing single-chat snapshot.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_sessions AS s
+  SET character_snapshot =
+      COALESCE(s.character_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      ),
+      updated_at = v_archived_at
+  FROM owned
+  WHERE s.character_id = owned.id;
+
+  -- Preserve creator attribution in group member snapshots.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_group_members AS gm
+  SET character_snapshot =
+      COALESCE(gm.character_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      )
+  FROM owned
+  WHERE gm.character_id = owned.id;
+
+  -- Preserve creator attribution in group speaker snapshots.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_group_messages AS gm
+  SET speaker_snapshot =
+      COALESCE(gm.speaker_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      )
+  FROM owned
+  WHERE gm.character_id = owned.id
+    AND gm.speaker_type = 'character';
+
+  -- Detach author IDs from character-owned children before profile/Auth deletion.
+  UPDATE public.character_private_info
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  UPDATE public.character_illustrations
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  UPDATE public.character_schedule_descriptions
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  -- Cancel pending cleanup queue records only. Never delete Storage objects here.
+  DELETE FROM public.character_illustration_cleanup_jobs
+  WHERE author_id = p_user_id;
+
+  -- Archive every character row and detach its active owner. Do not set deleted_at:
+  -- this is account archival, not character-content deletion.
+  UPDATE public.characters AS c
+  SET creator_display_name =
+        COALESCE(NULLIF(c.creator_display_name, ''),
+                 NULLIF(v_nickname, ''),
+                   '原作者'),
+      -- Preserve the existing public/private visibility and review state.
+      -- Account deletion marks the character offline; it does not delist the work.
+      account_archived_at = COALESCE(c.account_archived_at, v_archived_at),
+      author_id = NULL
+  WHERE c.author_id = p_user_id;
+
+  GET DIAGNOSTICS v_character_count = ROW_COUNT;
+  RETURN v_character_count;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.archive_account_characters(uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private.archive_account_characters(uuid)
+  TO service_role;
+
+-- 7) Transactional integration with the live prepare_account_deletion(uuid).
+-- The complete replacement function, copied from the current test-DB definition
+-- and amended with safe retry handling, lives in:
+--   supabase/drafts/prepare-account-deletion-character-preservation-integration.sql
+--
+-- It deliberately does NOT call the helper before looking up the existing batch:
+-- a retry after Auth deletion must not require the now-deleted profile row.
+-- Instead it:
+--   - returns immediately for an already-deleting batch, unless legacy owned
+--     character rows still exist (then it archives those rows before returning);
+--   - calls the helper for existing archived/archiving batches; and
+--   - calls the helper for a new batch before any irreversible cleanup.
+-- All helper calls execute inside the same prepare_account_deletion transaction.
+-- The worker's deleting-recovery branch then performs only Auth/finalize steps.
+--
+-- Do not move either SQL file into active migrations until schema provenance,
+-- disposable PostgreSQL replay, RLS/Storage tests and end-to-end deletion tests pass.
+
+     ) THEN
+    RETURN false;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.character_illustrations AS ci
+    WHERE ci.storage_path = p_storage_path
+  ) OR EXISTS (
+    SELECT 1 FROM public.characters AS c
+    WHERE c.avatar_video_path = p_storage_path
+  ) THEN
+    RETURN false;
+  END IF;
+
+  RETURN true;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
+  FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
+  TO authenticated;
+
+-- Existing public/author policies remain. These additional SELECT policies are
+-- authenticated-only and do not allow upload, update, or delete.
+DROP POLICY IF EXISTS "Existing session owners can read character illustration metadata"
+  ON public.character_illustrations;
+CREATE POLICY "Existing session owners can read character illustration metadata"
+  ON public.character_illustrations
+  FOR SELECT TO authenticated
+  USING (private.user_has_existing_character_session(character_id));
+
+DROP POLICY IF EXISTS "Existing session owners can read archived character assets"
+  ON storage.objects;
+CREATE POLICY "Existing session owners can read archived character assets"
+  ON storage.objects
+  FOR SELECT TO authenticated
+  USING (private.can_read_character_asset(bucket_id, name));
+
+-- 5) Explicitly exclude account-archived characters from caller-side new-session
+-- eligibility helpers as well as the INSERT triggers below.
+CREATE OR REPLACE FUNCTION public.character_can_start_chat(p_character_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.characters AS c
+    WHERE c.id = p_character_id
+      AND c.account_archived_at IS NULL
+      AND c.deleted_at IS NULL
+      AND (
+        c.author_id = (SELECT auth.uid())
+        OR (c.visibility = 'public' AND c.review_status = 'approved')
+      )
+  );
+$function$;
+
+CREATE OR REPLACE FUNCTION public.can_open_encounter_session(p_character_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.characters AS c
+    WHERE c.id = p_character_id
+      AND c.account_archived_at IS NULL
+      AND c.visibility = 'public'
+      AND c.deleted_at IS NULL
+      AND c.review_status = 'approved'
+      AND c.rights_confirmed IS TRUE
+      AND (
+        c.is_nsfw IS NOT TRUE
+        OR (
+          auth.uid() IS NOT NULL
+          AND private.current_user_is_adult()
+        )
+      )
+  );
+$function$;
+
+-- City/map schedule discovery must also hide account-archived characters,
+-- while public character discovery itself continues to return public works.
+CREATE OR REPLACE FUNCTION public.get_encounter_character_schedule(p_character_id uuid)
+RETURNS TABLE(
+  weekday smallint,
+  day_type text,
+  start_time time without time zone,
+  end_time time without time zone,
+  location_key text,
+  activity text,
+  priority smallint
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT
+    s.weekday, s.day_type, s.start_time, s.end_time,
+    s.location_key, s.activity, s.priority
+  FROM public.characters AS c
+  JOIN public.character_schedules AS s ON s.character_id = c.id
+  WHERE c.id = p_character_id
+    AND c.account_archived_at IS NULL
+    AND c.visibility = 'public'
+    AND c.deleted_at IS NULL
+    AND c.review_status = 'approved'
+    AND c.rights_confirmed IS TRUE
+    AND s.is_active IS TRUE
+    AND (
+      c.is_nsfw IS NOT TRUE
+      OR (
+        (SELECT auth.uid()) IS NOT NULL
+        AND private.current_user_is_adult()
+      )
+    )
+  ORDER BY s.priority DESC, s.weekday NULLS FIRST, s.start_time;
+$function$;
+
+-- CREATE OR REPLACE preserves the currently audited function ownership and
+-- EXECUTE ACLs; verify both again after local replay.
+
+-- 6) Service-only account archive helper.
+-- The helper is called internally by the SECURITY DEFINER prepare RPC; do not
+-- broaden schema USAGE on the private schema just for this internal call.
+
+-- Call from the final prepare_account_deletion() transaction only after the
+-- request is due and account writes are frozen, but BEFORE deleting auth.users.
+-- It preserves all characters (including private/unpublished) and all child rows.
+CREATE OR REPLACE FUNCTION private.archive_account_characters(
+  p_user_id uuid
+)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_nickname text;
+  v_archived_at timestamptz := pg_catalog.statement_timestamp();
+  v_character_count integer := 0;
+BEGIN
+  -- Trust the signed JWT role claim; auth.role() is deprecated by Supabase.
+  IF (auth.jwt() ->> 'role') IS DISTINCT FROM 'service_role' THEN
+    RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
+  END IF;
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'target_user_required' USING ERRCODE = '22023';
+  END IF;
+
+  SELECT p.nickname
+    INTO v_nickname
+  FROM public.profiles AS p
+  WHERE p.id = p_user_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'profile_not_found_before_character_archive' USING ERRCODE = 'P0002';
+  END IF;
+
+  -- Lock all characters first; no publication-state filter by design.
+  PERFORM 1
+  FROM public.characters AS c
+  WHERE c.author_id = p_user_id
+  FOR UPDATE;
+
+  -- Lock child rows whose data is retained but not otherwise updated below.
+  -- This serializes in-flight owner writes against the archival transaction;
+  -- after commit, the parent author_id is NULL and the owner RLS predicates fail.
+  PERFORM 1
+  FROM public.character_schedules AS cs
+  JOIN public.characters AS c ON c.id = cs.character_id
+  WHERE c.author_id = p_user_id
+  FOR UPDATE OF cs;
+
+  PERFORM 1
+  FROM public.character_stories AS st
+  JOIN public.characters AS c ON c.id = st.character_id
+  WHERE c.author_id = p_user_id
+  FOR UPDATE OF st;
+
+  -- Preserve creator attribution in every existing single-chat snapshot.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_sessions AS s
+  SET character_snapshot =
+      COALESCE(s.character_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      ),
+      updated_at = v_archived_at
+  FROM owned
+  WHERE s.character_id = owned.id;
+
+  -- Preserve creator attribution in group member snapshots.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_group_members AS gm
+  SET character_snapshot =
+      COALESCE(gm.character_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      )
+  FROM owned
+  WHERE gm.character_id = owned.id;
+
+  -- Preserve creator attribution in group speaker snapshots.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_group_messages AS gm
+  SET speaker_snapshot =
+      COALESCE(gm.speaker_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      )
+  FROM owned
+  WHERE gm.character_id = owned.id
+    AND gm.speaker_type = 'character';
+
+  -- Detach author IDs from character-owned children before profile/Auth deletion.
+  UPDATE public.character_private_info
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  UPDATE public.character_illustrations
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  UPDATE public.character_schedule_descriptions
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  -- Cancel pending cleanup queue records only. Never delete Storage objects here.
+  DELETE FROM public.character_illustration_cleanup_jobs
+  WHERE author_id = p_user_id;
+
+  -- Archive every character row and detach its active owner. Do not set deleted_at:
+  -- this is account archival, not character-content deletion.
+  UPDATE public.characters AS c
+  SET creator_display_name =
+        COALESCE(NULLIF(c.creator_display_name, ''),
+                 NULLIF(v_nickname, ''),
+                   '原作者'),
+      -- Preserve the existing public/private visibility and review state.
+      -- Account deletion marks the character offline; it does not delist the work.
+      account_archived_at = COALESCE(c.account_archived_at, v_archived_at),
+      author_id = NULL
+  WHERE c.author_id = p_user_id;
+
+  GET DIAGNOSTICS v_character_count = ROW_COUNT;
+  RETURN v_character_count;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.archive_account_characters(uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private.archive_account_characters(uuid)
+  TO service_role;
+
+-- 7) Transactional integration with the live prepare_account_deletion(uuid).
+-- The complete replacement function, copied from the current test-DB definition
+-- and amended with safe retry handling, lives in:
+--   supabase/drafts/prepare-account-deletion-character-preservation-integration.sql
+--
+-- It deliberately does NOT call the helper before looking up the existing batch:
+-- a retry after Auth deletion must not require the now-deleted profile row.
+-- Instead it:
+--   - returns immediately for an already-deleting batch, unless legacy owned
+--     character rows still exist (then it archives those rows before returning);
+--   - calls the helper for existing archived/archiving batches; and
+--   - calls the helper for a new batch before any irreversible cleanup.
+-- All helper calls execute inside the same prepare_account_deletion transaction.
+-- The worker's deleting-recovery branch then performs only Auth/finalize steps.
+--
+-- Do not move either SQL file into active migrations until schema provenance,
+-- disposable PostgreSQL replay, RLS/Storage tests and end-to-end deletion tests pass.
+
+     ) THEN
+    RETURN false;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.character_illustrations AS ci
+    WHERE ci.storage_path = p_storage_path
+  ) OR EXISTS (
+    SELECT 1 FROM public.characters AS c
+    WHERE c.avatar_video_path = p_storage_path
+  ) THEN
+    RETURN false;
+  END IF;
+
+  RETURN true;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
+  FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
+  TO authenticated;
+
+-- Existing public/author policies remain. These additional SELECT policies are
+-- authenticated-only and do not allow upload, update, or delete.
+DROP POLICY IF EXISTS "Existing session owners can read character illustration metadata"
+  ON public.character_illustrations;
+CREATE POLICY "Existing session owners can read character illustration metadata"
+  ON public.character_illustrations
+  FOR SELECT TO authenticated
+  USING (private.user_has_existing_character_session(character_id));
+
+DROP POLICY IF EXISTS "Existing session owners can read archived character assets"
+  ON storage.objects;
+CREATE POLICY "Existing session owners can read archived character assets"
+  ON storage.objects
+  FOR SELECT TO authenticated
+  USING (private.can_read_character_asset(bucket_id, name));
+
+-- 5) Explicitly exclude account-archived characters from caller-side new-session
+-- eligibility helpers as well as the INSERT triggers below.
+CREATE OR REPLACE FUNCTION public.character_can_start_chat(p_character_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.characters AS c
+    WHERE c.id = p_character_id
+      AND c.account_archived_at IS NULL
+      AND c.deleted_at IS NULL
+      AND (
+        c.author_id = (SELECT auth.uid())
+        OR (c.visibility = 'public' AND c.review_status = 'approved')
+      )
+  );
+$function$;
+
+CREATE OR REPLACE FUNCTION public.can_open_encounter_session(p_character_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.characters AS c
+    WHERE c.id = p_character_id
+      AND c.account_archived_at IS NULL
+      AND c.visibility = 'public'
+      AND c.deleted_at IS NULL
+      AND c.review_status = 'approved'
+      AND c.rights_confirmed IS TRUE
+      AND (
+        c.is_nsfw IS NOT TRUE
+        OR (
+          auth.uid() IS NOT NULL
+          AND private.current_user_is_adult()
+        )
+      )
+  );
+$function$;
+
+-- City/map schedule discovery must also hide account-archived characters,
+-- while public character discovery itself continues to return public works.
+CREATE OR REPLACE FUNCTION public.get_encounter_character_schedule(p_character_id uuid)
+RETURNS TABLE(
+  weekday smallint,
+  day_type text,
+  start_time time without time zone,
+  end_time time without time zone,
+  location_key text,
+  activity text,
+  priority smallint
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT
+    s.weekday, s.day_type, s.start_time, s.end_time,
+    s.location_key, s.activity, s.priority
+  FROM public.characters AS c
+  JOIN public.character_schedules AS s ON s.character_id = c.id
+  WHERE c.id = p_character_id
+    AND c.account_archived_at IS NULL
+    AND c.visibility = 'public'
+    AND c.deleted_at IS NULL
+    AND c.review_status = 'approved'
+    AND c.rights_confirmed IS TRUE
+    AND s.is_active IS TRUE
+    AND (
+      c.is_nsfw IS NOT TRUE
+      OR (
+        (SELECT auth.uid()) IS NOT NULL
+        AND private.current_user_is_adult()
+      )
+    )
+  ORDER BY s.priority DESC, s.weekday NULLS FIRST, s.start_time;
+$function$;
+
+-- CREATE OR REPLACE preserves the currently audited function ownership and
+-- EXECUTE ACLs; verify both again after local replay.
+
+-- 6) Service-only account archive helper.
+-- The helper is called internally by the SECURITY DEFINER prepare RPC; do not
+-- broaden schema USAGE on the private schema just for this internal call.
+
+-- Call from the final prepare_account_deletion() transaction only after the
+-- request is due and account writes are frozen, but BEFORE deleting auth.users.
+-- It preserves all characters (including private/unpublished) and all child rows.
+CREATE OR REPLACE FUNCTION private.archive_account_characters(
+  p_user_id uuid
+)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_nickname text;
+  v_archived_at timestamptz := pg_catalog.statement_timestamp();
+  v_character_count integer := 0;
+BEGIN
+  -- Trust the signed JWT role claim; auth.role() is deprecated by Supabase.
+  IF (auth.jwt() ->> 'role') IS DISTINCT FROM 'service_role' THEN
+    RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
+  END IF;
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'target_user_required' USING ERRCODE = '22023';
+  END IF;
+
+  SELECT p.nickname
+    INTO v_nickname
+  FROM public.profiles AS p
+  WHERE p.id = p_user_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'profile_not_found_before_character_archive' USING ERRCODE = 'P0002';
+  END IF;
+
+  -- Lock all characters first; no publication-state filter by design.
+  PERFORM 1
+  FROM public.characters AS c
+  WHERE c.author_id = p_user_id
+  FOR UPDATE;
+
+  -- Lock child rows whose data is retained but not otherwise updated below.
+  -- This serializes in-flight owner writes against the archival transaction;
+  -- after commit, the parent author_id is NULL and the owner RLS predicates fail.
+  PERFORM 1
+  FROM public.character_schedules AS cs
+  JOIN public.characters AS c ON c.id = cs.character_id
+  WHERE c.author_id = p_user_id
+  FOR UPDATE OF cs;
+
+  PERFORM 1
+  FROM public.character_stories AS st
+  JOIN public.characters AS c ON c.id = st.character_id
+  WHERE c.author_id = p_user_id
+  FOR UPDATE OF st;
+
+  -- Preserve creator attribution in every existing single-chat snapshot.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_sessions AS s
+  SET character_snapshot =
+      COALESCE(s.character_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      ),
+      updated_at = v_archived_at
+  FROM owned
+  WHERE s.character_id = owned.id;
+
+  -- Preserve creator attribution in group member snapshots.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_group_members AS gm
+  SET character_snapshot =
+      COALESCE(gm.character_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      )
+  FROM owned
+  WHERE gm.character_id = owned.id;
+
+  -- Preserve creator attribution in group speaker snapshots.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_group_messages AS gm
+  SET speaker_snapshot =
+      COALESCE(gm.speaker_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      )
+  FROM owned
+  WHERE gm.character_id = owned.id
+    AND gm.speaker_type = 'character';
+
+  -- Detach author IDs from character-owned children before profile/Auth deletion.
+  UPDATE public.character_private_info
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  UPDATE public.character_illustrations
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  UPDATE public.character_schedule_descriptions
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  -- Cancel pending cleanup queue records only. Never delete Storage objects here.
+  DELETE FROM public.character_illustration_cleanup_jobs
+  WHERE author_id = p_user_id;
+
+  -- Archive every character row and detach its active owner. Do not set deleted_at:
+  -- this is account archival, not character-content deletion.
+  UPDATE public.characters AS c
+  SET creator_display_name =
+        COALESCE(NULLIF(c.creator_display_name, ''),
+                 NULLIF(v_nickname, ''),
+                   '原作者'),
+      -- Preserve the existing public/private visibility and review state.
+      -- Account deletion marks the character offline; it does not delist the work.
+      account_archived_at = COALESCE(c.account_archived_at, v_archived_at),
+      author_id = NULL
+  WHERE c.author_id = p_user_id;
+
+  GET DIAGNOSTICS v_character_count = ROW_COUNT;
+  RETURN v_character_count;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.archive_account_characters(uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private.archive_account_characters(uuid)
+  TO service_role;
+
+-- 7) Transactional integration with the live prepare_account_deletion(uuid).
+-- The complete replacement function, copied from the current test-DB definition
+-- and amended with safe retry handling, lives in:
+--   supabase/drafts/prepare-account-deletion-character-preservation-integration.sql
+--
+-- It deliberately does NOT call the helper before looking up the existing batch:
+-- a retry after Auth deletion must not require the now-deleted profile row.
+-- Instead it:
+--   - returns immediately for an already-deleting batch, unless legacy owned
+--     character rows still exist (then it archives those rows before returning);
+--   - calls the helper for existing archived/archiving batches; and
+--   - calls the helper for a new batch before any irreversible cleanup.
+-- All helper calls execute inside the same prepare_account_deletion transaction.
+-- The worker's deleting-recovery branch then performs only Auth/finalize steps.
+--
+-- Do not move either SQL file into active migrations until schema provenance,
+-- disposable PostgreSQL replay, RLS/Storage tests and end-to-end deletion tests pass.
+
+     ) THEN
+    RETURN false;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.character_illustrations AS ci
+    WHERE ci.storage_path = p_storage_path
+  ) OR EXISTS (
+    SELECT 1 FROM public.characters AS c
+    WHERE c.avatar_video_path = p_storage_path
+  ) THEN
+    RETURN false;
+  END IF;
+
+  RETURN true;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
+  FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
+  TO authenticated;
+
+-- Existing public/author policies remain. These additional SELECT policies are
+-- authenticated-only and do not allow upload, update, or delete.
+DROP POLICY IF EXISTS "Existing session owners can read character illustration metadata"
+  ON public.character_illustrations;
+CREATE POLICY "Existing session owners can read character illustration metadata"
+  ON public.character_illustrations
+  FOR SELECT TO authenticated
+  USING (private.user_has_existing_character_session(character_id));
+
+DROP POLICY IF EXISTS "Existing session owners can read archived character assets"
+  ON storage.objects;
+CREATE POLICY "Existing session owners can read archived character assets"
+  ON storage.objects
+  FOR SELECT TO authenticated
+  USING (private.can_read_character_asset(bucket_id, name));
+
+-- 5) Explicitly exclude account-archived characters from caller-side new-session
+-- eligibility helpers as well as the INSERT triggers below.
+CREATE OR REPLACE FUNCTION public.character_can_start_chat(p_character_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.characters AS c
+    WHERE c.id = p_character_id
+      AND c.account_archived_at IS NULL
+      AND c.deleted_at IS NULL
+      AND (
+        c.author_id = (SELECT auth.uid())
+        OR (c.visibility = 'public' AND c.review_status = 'approved')
+      )
+  );
+$function$;
+
+CREATE OR REPLACE FUNCTION public.can_open_encounter_session(p_character_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.characters AS c
+    WHERE c.id = p_character_id
+      AND c.account_archived_at IS NULL
+      AND c.visibility = 'public'
+      AND c.deleted_at IS NULL
+      AND c.review_status = 'approved'
+      AND c.rights_confirmed IS TRUE
+      AND (
+        c.is_nsfw IS NOT TRUE
+        OR (
+          auth.uid() IS NOT NULL
+          AND private.current_user_is_adult()
+        )
+      )
+  );
+$function$;
+
+-- City/map schedule discovery must also hide account-archived characters,
+-- while public character discovery itself continues to return public works.
+CREATE OR REPLACE FUNCTION public.get_encounter_character_schedule(p_character_id uuid)
+RETURNS TABLE(
+  weekday smallint,
+  day_type text,
+  start_time time without time zone,
+  end_time time without time zone,
+  location_key text,
+  activity text,
+  priority smallint
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT
+    s.weekday, s.day_type, s.start_time, s.end_time,
+    s.location_key, s.activity, s.priority
+  FROM public.characters AS c
+  JOIN public.character_schedules AS s ON s.character_id = c.id
+  WHERE c.id = p_character_id
+    AND c.account_archived_at IS NULL
+    AND c.visibility = 'public'
+    AND c.deleted_at IS NULL
+    AND c.review_status = 'approved'
+    AND c.rights_confirmed IS TRUE
+    AND s.is_active IS TRUE
+    AND (
+      c.is_nsfw IS NOT TRUE
+      OR (
+        (SELECT auth.uid()) IS NOT NULL
+        AND private.current_user_is_adult()
+      )
+    )
+  ORDER BY s.priority DESC, s.weekday NULLS FIRST, s.start_time;
+$function$;
+
+-- CREATE OR REPLACE preserves the currently audited function ownership and
+-- EXECUTE ACLs; verify both again after local replay.
+
+-- 6) Service-only account archive helper.
+-- The helper is called internally by the SECURITY DEFINER prepare RPC; do not
+-- broaden schema USAGE on the private schema just for this internal call.
+
+-- Call from the final prepare_account_deletion() transaction only after the
+-- request is due and account writes are frozen, but BEFORE deleting auth.users.
+-- It preserves all characters (including private/unpublished) and all child rows.
+CREATE OR REPLACE FUNCTION private.archive_account_characters(
+  p_user_id uuid
+)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_nickname text;
+  v_archived_at timestamptz := pg_catalog.statement_timestamp();
+  v_character_count integer := 0;
+BEGIN
+  -- Trust the signed JWT role claim; auth.role() is deprecated by Supabase.
+  IF (auth.jwt() ->> 'role') IS DISTINCT FROM 'service_role' THEN
+    RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
+  END IF;
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'target_user_required' USING ERRCODE = '22023';
+  END IF;
+
+  SELECT p.nickname
+    INTO v_nickname
+  FROM public.profiles AS p
+  WHERE p.id = p_user_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'profile_not_found_before_character_archive' USING ERRCODE = 'P0002';
+  END IF;
+
+  -- Lock all characters first; no publication-state filter by design.
+  PERFORM 1
+  FROM public.characters AS c
+  WHERE c.author_id = p_user_id
+  FOR UPDATE;
+
+  -- Lock child rows whose data is retained but not otherwise updated below.
+  -- This serializes in-flight owner writes against the archival transaction;
+  -- after commit, the parent author_id is NULL and the owner RLS predicates fail.
+  PERFORM 1
+  FROM public.character_schedules AS cs
+  JOIN public.characters AS c ON c.id = cs.character_id
+  WHERE c.author_id = p_user_id
+  FOR UPDATE OF cs;
+
+  PERFORM 1
+  FROM public.character_stories AS st
+  JOIN public.characters AS c ON c.id = st.character_id
+  WHERE c.author_id = p_user_id
+  FOR UPDATE OF st;
+
+  -- Preserve creator attribution in every existing single-chat snapshot.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_sessions AS s
+  SET character_snapshot =
+      COALESCE(s.character_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      ),
+      updated_at = v_archived_at
+  FROM owned
+  WHERE s.character_id = owned.id;
+
+  -- Preserve creator attribution in group member snapshots.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_group_members AS gm
+  SET character_snapshot =
+      COALESCE(gm.character_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      )
+  FROM owned
+  WHERE gm.character_id = owned.id;
+
+  -- Preserve creator attribution in group speaker snapshots.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_group_messages AS gm
+  SET speaker_snapshot =
+      COALESCE(gm.speaker_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      )
+  FROM owned
+  WHERE gm.character_id = owned.id
+    AND gm.speaker_type = 'character';
+
+  -- Detach author IDs from character-owned children before profile/Auth deletion.
+  UPDATE public.character_private_info
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  UPDATE public.character_illustrations
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  UPDATE public.character_schedule_descriptions
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  -- Cancel pending cleanup queue records only. Never delete Storage objects here.
+  DELETE FROM public.character_illustration_cleanup_jobs
+  WHERE author_id = p_user_id;
+
+  -- Archive every character row and detach its active owner. Do not set deleted_at:
+  -- this is account archival, not character-content deletion.
+  UPDATE public.characters AS c
+  SET creator_display_name =
+        COALESCE(NULLIF(c.creator_display_name, ''),
+                 NULLIF(v_nickname, ''),
+                   '原作者'),
+      -- Preserve the existing public/private visibility and review state.
+      -- Account deletion marks the character offline; it does not delist the work.
+      account_archived_at = COALESCE(c.account_archived_at, v_archived_at),
+      author_id = NULL
+  WHERE c.author_id = p_user_id;
+
+  GET DIAGNOSTICS v_character_count = ROW_COUNT;
+  RETURN v_character_count;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.archive_account_characters(uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private.archive_account_characters(uuid)
+  TO service_role;
+
+-- 7) Transactional integration with the live prepare_account_deletion(uuid).
+-- The complete replacement function, copied from the current test-DB definition
+-- and amended with safe retry handling, lives in:
+--   supabase/drafts/prepare-account-deletion-character-preservation-integration.sql
+--
+-- It deliberately does NOT call the helper before looking up the existing batch:
+-- a retry after Auth deletion must not require the now-deleted profile row.
+-- Instead it:
+--   - returns immediately for an already-deleting batch, unless legacy owned
+--     character rows still exist (then it archives those rows before returning);
+--   - calls the helper for existing archived/archiving batches; and
+--   - calls the helper for a new batch before any irreversible cleanup.
+-- All helper calls execute inside the same prepare_account_deletion transaction.
+-- The worker's deleting-recovery branch then performs only Auth/finalize steps.
+--
+-- Do not move either SQL file into active migrations until schema provenance,
+-- disposable PostgreSQL replay, RLS/Storage tests and end-to-end deletion tests pass.
+
+     ) THEN
+    RETURN false;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.character_illustrations AS ci
+    WHERE ci.storage_path = p_storage_path
+  ) OR EXISTS (
+    SELECT 1 FROM public.characters AS c
+    WHERE c.avatar_video_path = p_storage_path
+  ) THEN
+    RETURN false;
+  END IF;
+
+  RETURN true;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
+  FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
+  TO authenticated;
+
+-- Existing public/author policies remain. These additional SELECT policies are
+-- authenticated-only and do not allow upload, update, or delete.
+DROP POLICY IF EXISTS "Existing session owners can read character illustration metadata"
+  ON public.character_illustrations;
+CREATE POLICY "Existing session owners can read character illustration metadata"
+  ON public.character_illustrations
+  FOR SELECT TO authenticated
+  USING (private.user_has_existing_character_session(character_id));
+
+DROP POLICY IF EXISTS "Existing session owners can read archived character assets"
+  ON storage.objects;
+CREATE POLICY "Existing session owners can read archived character assets"
+  ON storage.objects
+  FOR SELECT TO authenticated
+  USING (private.can_read_character_asset(bucket_id, name));
+
+-- 5) Explicitly exclude account-archived characters from caller-side new-session
+-- eligibility helpers as well as the INSERT triggers below.
+CREATE OR REPLACE FUNCTION public.character_can_start_chat(p_character_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.characters AS c
+    WHERE c.id = p_character_id
+      AND c.account_archived_at IS NULL
+      AND c.deleted_at IS NULL
+      AND (
+        c.author_id = (SELECT auth.uid())
+        OR (c.visibility = 'public' AND c.review_status = 'approved')
+      )
+  );
+$function$;
+
+CREATE OR REPLACE FUNCTION public.can_open_encounter_session(p_character_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.characters AS c
+    WHERE c.id = p_character_id
+      AND c.account_archived_at IS NULL
+      AND c.visibility = 'public'
+      AND c.deleted_at IS NULL
+      AND c.review_status = 'approved'
+      AND c.rights_confirmed IS TRUE
+      AND (
+        c.is_nsfw IS NOT TRUE
+        OR (
+          auth.uid() IS NOT NULL
+          AND private.current_user_is_adult()
+        )
+      )
+  );
+$function$;
+
+-- City/map schedule discovery must also hide account-archived characters,
+-- while public character discovery itself continues to return public works.
+CREATE OR REPLACE FUNCTION public.get_encounter_character_schedule(p_character_id uuid)
+RETURNS TABLE(
+  weekday smallint,
+  day_type text,
+  start_time time without time zone,
+  end_time time without time zone,
+  location_key text,
+  activity text,
+  priority smallint
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT
+    s.weekday, s.day_type, s.start_time, s.end_time,
+    s.location_key, s.activity, s.priority
+  FROM public.characters AS c
+  JOIN public.character_schedules AS s ON s.character_id = c.id
+  WHERE c.id = p_character_id
+    AND c.account_archived_at IS NULL
+    AND c.visibility = 'public'
+    AND c.deleted_at IS NULL
+    AND c.review_status = 'approved'
+    AND c.rights_confirmed IS TRUE
+    AND s.is_active IS TRUE
+    AND (
+      c.is_nsfw IS NOT TRUE
+      OR (
+        (SELECT auth.uid()) IS NOT NULL
+        AND private.current_user_is_adult()
+      )
+    )
+  ORDER BY s.priority DESC, s.weekday NULLS FIRST, s.start_time;
+$function$;
+
+-- CREATE OR REPLACE preserves the currently audited function ownership and
+-- EXECUTE ACLs; verify both again after local replay.
+
+-- 6) Service-only account archive helper.
+-- The helper is called internally by the SECURITY DEFINER prepare RPC; do not
+-- broaden schema USAGE on the private schema just for this internal call.
+
+-- Call from the final prepare_account_deletion() transaction only after the
+-- request is due and account writes are frozen, but BEFORE deleting auth.users.
+-- It preserves all characters (including private/unpublished) and all child rows.
+CREATE OR REPLACE FUNCTION private.archive_account_characters(
+  p_user_id uuid
+)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_nickname text;
+  v_archived_at timestamptz := pg_catalog.statement_timestamp();
+  v_character_count integer := 0;
+BEGIN
+  -- Trust the signed JWT role claim; auth.role() is deprecated by Supabase.
+  IF (auth.jwt() ->> 'role') IS DISTINCT FROM 'service_role' THEN
+    RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
+  END IF;
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'target_user_required' USING ERRCODE = '22023';
+  END IF;
+
+  SELECT p.nickname
+    INTO v_nickname
+  FROM public.profiles AS p
+  WHERE p.id = p_user_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'profile_not_found_before_character_archive' USING ERRCODE = 'P0002';
+  END IF;
+
+  -- Lock all characters first; no publication-state filter by design.
+  PERFORM 1
+  FROM public.characters AS c
+  WHERE c.author_id = p_user_id
+  FOR UPDATE;
+
+  -- Lock child rows whose data is retained but not otherwise updated below.
+  -- This serializes in-flight owner writes against the archival transaction;
+  -- after commit, the parent author_id is NULL and the owner RLS predicates fail.
+  PERFORM 1
+  FROM public.character_schedules AS cs
+  JOIN public.characters AS c ON c.id = cs.character_id
+  WHERE c.author_id = p_user_id
+  FOR UPDATE OF cs;
+
+  PERFORM 1
+  FROM public.character_stories AS st
+  JOIN public.characters AS c ON c.id = st.character_id
+  WHERE c.author_id = p_user_id
+  FOR UPDATE OF st;
+
+  -- Preserve creator attribution in every existing single-chat snapshot.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_sessions AS s
+  SET character_snapshot =
+      COALESCE(s.character_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      ),
+      updated_at = v_archived_at
+  FROM owned
+  WHERE s.character_id = owned.id;
+
+  -- Preserve creator attribution in group member snapshots.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_group_members AS gm
+  SET character_snapshot =
+      COALESCE(gm.character_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      )
+  FROM owned
+  WHERE gm.character_id = owned.id;
+
+  -- Preserve creator attribution in group speaker snapshots.
+  WITH owned AS (
+    SELECT c.id,
+      COALESCE(NULLIF(c.creator_display_name, ''),
+               NULLIF(v_nickname, ''),
+               '原作者') AS creator_name,
+      c.visibility AS current_visibility
+    FROM public.characters AS c
+    WHERE c.author_id = p_user_id
+  )
+  UPDATE public.chat_group_messages AS gm
+  SET speaker_snapshot =
+      COALESCE(gm.speaker_snapshot, '{}'::jsonb) ||
+      jsonb_build_object(
+        'authorId', NULL,
+        'creatorDisplayName', owned.creator_name,
+        'creatorProfileAvailable', false,
+        'characterStatus', 'offline',
+        'isOnline', false,
+        'visibility', owned.current_visibility,
+        'accountArchivedAt', v_archived_at
+      )
+  FROM owned
+  WHERE gm.character_id = owned.id
+    AND gm.speaker_type = 'character';
+
+  -- Detach author IDs from character-owned children before profile/Auth deletion.
+  UPDATE public.character_private_info
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  UPDATE public.character_illustrations
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  UPDATE public.character_schedule_descriptions
+  SET author_id = NULL
+  WHERE author_id = p_user_id;
+
+  -- Cancel pending cleanup queue records only. Never delete Storage objects here.
+  DELETE FROM public.character_illustration_cleanup_jobs
+  WHERE author_id = p_user_id;
+
+  -- Archive every character row and detach its active owner. Do not set deleted_at:
+  -- this is account archival, not character-content deletion.
+  UPDATE public.characters AS c
+  SET creator_display_name =
+        COALESCE(NULLIF(c.creator_display_name, ''),
+                 NULLIF(v_nickname, ''),
+                   '原作者'),
+      -- Preserve the existing public/private visibility and review state.
+      -- Account deletion marks the character offline; it does not delist the work.
+      account_archived_at = COALESCE(c.account_archived_at, v_archived_at),
+      author_id = NULL
+  WHERE c.author_id = p_user_id;
+
+  GET DIAGNOSTICS v_character_count = ROW_COUNT;
+  RETURN v_character_count;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.archive_account_characters(uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private.archive_account_characters(uuid)
+  TO service_role;
+
+-- 7) Transactional integration with the live prepare_account_deletion(uuid).
+-- The complete replacement function, copied from the current test-DB definition
+-- and amended with safe retry handling, lives in:
+--   supabase/drafts/prepare-account-deletion-character-preservation-integration.sql
+--
+-- It deliberately does NOT call the helper before looking up the existing batch:
+-- a retry after Auth deletion must not require the now-deleted profile row.
+-- Instead it:
+--   - returns immediately for an already-deleting batch, unless legacy owned
+--     character rows still exist (then it archives those rows before returning);
+--   - calls the helper for existing archived/archiving batches; and
+--   - calls the helper for a new batch before any irreversible cleanup.
+-- All helper calls execute inside the same prepare_account_deletion transaction.
+-- The worker's deleting-recovery branch then performs only Auth/finalize steps.
+--
+-- Do not move either SQL file into active migrations until schema provenance,
+-- disposable PostgreSQL replay, RLS/Storage tests and end-to-end deletion tests pass.
+
+     ) THEN
+    RETURN false;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.character_illustrations AS ci
+    WHERE ci.storage_path = p_storage_path
+  ) OR EXISTS (
+    SELECT 1 FROM public.characters AS c
+    WHERE c.avatar_video_path = p_storage_path
+  ) THEN
+    RETURN false;
+  END IF;
+
+  RETURN true;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
+  FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.can_process_character_illustration_cleanup(uuid, uuid, text)
+  TO authenticated;
+
+-- Existing public/author policies remain. These additional SELECT policies are
+-- authenticated-only and do not allow upload, update, or delete.
+DROP POLICY IF EXISTS "Existing session owners can read character illustration metadata"
   ON public.character_illustrations;
 CREATE POLICY "Existing session owners can read character illustration metadata"
   ON public.character_illustrations
