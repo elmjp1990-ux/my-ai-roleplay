@@ -154,7 +154,7 @@ assert.match(cumulativeDeletionDraft, /FROM public[.]chat_group_members/);
 assert.match(cumulativeDeletionDraft, /FROM public[.]chat_group_messages/);
 assert.match(cumulativeDeletionDraft, /FROM public[.]chat_deletion_character_turn_stats/);
 const historyTombstone = cumulativeDeletionDraft.match(
-  /CREATE TABLE IF NOT EXISTS public[.]chat_deletion_character_history[(][\s\S]*?\);/,
+  /CREATE TABLE IF NOT EXISTS public[.]chat_deletion_character_history\s*[(][\s\S]*?\);/,
 )?.[0];
 assert.ok(historyTombstone, "persistent character-use tombstone table must exist");
 assert.doesNotMatch(historyTombstone, /REFERENCES/);
