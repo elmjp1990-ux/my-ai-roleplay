@@ -1,6 +1,11 @@
 name: Supabase local synthetic schema replay (manual)
 
 on:
+  push:
+    branches:
+      - security/chat-deletion-lifecycle-reconciliation
+    paths:
+      - "supabase/drafts/replay-deletion-concurrency-setup.sql"
   workflow_dispatch:
 
 permissions:
