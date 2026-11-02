@@ -17,7 +17,7 @@ assert.match(sql, /creator_display_name/);
 assert.match(sql, /creator_handle_snapshot/);
 assert.match(sql, /account_archived_at timestamptz/);
 
-const existingSessionFn = sql.match(/CREATE OR REPLACE FUNCTION private[.]user_has_existing_character_session[(][\\s\\S]*?\$function\$;/)?.[0];
+const existingSessionFn = sql.match(/CREATE OR REPLACE FUNCTION private[.]user_has_existing_character_session[(][\s\S]*?\$function\$;/)?.[0];
 assert.ok(existingSessionFn, "existing-session helper must exist");
 assert.match(existingSessionFn, /SET search_path TO ''/);
 assert.match(existingSessionFn, /auth[.]uid[(][)]/);
@@ -27,16 +27,16 @@ assert.match(existingSessionFn, /g[.]deleted_at IS NULL/);
 assert.doesNotMatch(existingSessionFn, /g[.]archived_at IS NULL/);
 assert.match(existingSessionFn, /s[.]deleted_at IS NULL/);
 
-const assetFn = sql.match(/CREATE OR REPLACE FUNCTION private[.]can_read_character_asset[(][\\s\\S]*?\$function\$;/)?.[0];
+const assetFn = sql.match(/CREATE OR REPLACE FUNCTION private[.]can_read_character_asset[(][\s\S]*?\$function\$;/)?.[0];
 assert.ok(assetFn, "exact-path media helper must exist");
 assert.match(assetFn, /SET search_path TO ''/);
 assert.match(assetFn, /ci[.]storage_path = p_object_name/);
 assert.match(assetFn, /c[.]avatar_video_path = p_object_name/);
 assert.match(assetFn, /ELSE false/);
-assert.match(sql, /CREATE POLICY "Existing session owners can read archived character assets"[\\s\\S]*?FOR SELECT TO authenticated/);
-assert.match(sql, /CREATE POLICY "Existing session owners can read character illustration metadata"[\\s\\S]*?FOR SELECT TO authenticated/);
+assert.match(sql, /CREATE POLICY "Existing session owners can read archived character assets"[\s\S]*?FOR SELECT TO authenticated/);
+assert.match(sql, /CREATE POLICY "Existing session owners can read character illustration metadata"[\s\S]*?FOR SELECT TO authenticated/);
 
-const archiveFn = sql.match(/CREATE OR REPLACE FUNCTION private[.]archive_account_characters[(][\\s\\S]*?\$function\$;/)?.[0];
+const archiveFn = sql.match(/CREATE OR REPLACE FUNCTION private[.]archive_account_characters[(][\s\S]*?\$function\$;/)?.[0];
 assert.ok(archiveFn, "account archive helper must exist");
 assert.match(archiveFn, /auth[.]jwt[(][)] ->> 'role'/);
 assert.match(archiveFn, /IS DISTINCT FROM 'service_role'/);
@@ -50,7 +50,7 @@ assert.match(archiveFn, /author_id = NULL/);
 assert.match(archiveFn, /DELETE FROM public[.]character_illustration_cleanup_jobs/);
 assert.doesNotMatch(archiveFn, /DELETE FROM public[.]characters/);
 assert.doesNotMatch(archiveFn, /DELETE FROM storage[.]objects/);
-assert.match(sql, /GRANT EXECUTE ON FUNCTION private[.]archive_account_characters[(]uuid[)][\\s\\S]*?TO service_role/);
+assert.match(sql, /GRANT EXECUTE ON FUNCTION private[.]archive_account_characters[(]uuid[)][\s\S]*?TO service_role/);
 
 const integrationPath = "supabase/drafts/prepare-account-deletion-character-preservation-integration.sql";
 const integration = fs.readFileSync(integrationPath, "utf8");
@@ -60,17 +60,17 @@ assert.match(integration, /SET search_path TO ''/);
 
 // The existing deleting retry must not require a profile that may already be gone.
 // A legacy deleting batch is healed only if still-owned character rows exist.
-const deletingBranch = integration.match(/IF FOUND AND v_status = 'deleting' THEN[\\s\\S]*?RETURN QUERY SELECT v_batch_id, p_user_id, 'deleting'::text;/)?.[0];
+const deletingBranch = integration.match(/IF FOUND AND v_status = 'deleting' THEN[\s\S]*?RETURN QUERY SELECT v_batch_id, p_user_id, 'deleting'::text;/)?.[0];
 assert.ok(deletingBranch, "deleting retry branch must exist");
-assert.match(deletingBranch, /IF EXISTS [(][\\s\\S]*?c[.]author_id = p_user_id[\\s\\S]*?PERFORM private[.]archive_account_characters[(]p_user_id[)][;]/);
+assert.match(deletingBranch, /IF EXISTS [(][\s\S]*?c[.]author_id = p_user_id[\s\S]*?PERFORM private[.]archive_account_characters[(]p_user_id[)][;]/);
 assert.ok(deletingBranch.indexOf("PERFORM private.archive_account_characters") < deletingBranch.indexOf("RETURN QUERY"));
 assert.match(deletingBranch, /RETURN QUERY SELECT v_batch_id, p_user_id, 'deleting'::text/);
 
 // Both non-terminal paths archive characters before billing cleanup/deleting state.
-const existingBatchBranch = integration.match(/ELSIF FOUND THEN[\\s\\S]*?ELSE[\\s\\S]*?SELECT a[.]batch_id INTO v_batch_id/)?.[0];
+const existingBatchBranch = integration.match(/ELSIF FOUND THEN[\s\S]*?ELSE[\s\S]*?SELECT a[.]batch_id INTO v_batch_id/)?.[0];
 assert.ok(existingBatchBranch, "existing batch branch must exist");
 assert.match(existingBatchBranch, /PERFORM private[.]archive_account_characters[(]p_user_id[)][;]/);
-const newBatchBranch = integration.match(/ELSE[\\s\\S]*?PERFORM private[.]archive_account_characters[(]p_user_id[)][;][\\s\\S]*?SELECT a[.]batch_id INTO v_batch_id/)?.[0];
+const newBatchBranch = integration.match(/ELSE[\s\S]*?PERFORM private[.]archive_account_characters[(]p_user_id[)][;][\s\S]*?SELECT a[.]batch_id INTO v_batch_id/)?.[0];
 assert.ok(newBatchBranch, "new batch branch must archive characters before archive batch creation");
 assert.equal((integration.match(/PERFORM private[.]archive_account_characters[(]p_user_id[)][;]/g) || []).length, 3);
 
@@ -84,13 +84,13 @@ for (const pattern of [
   /DELETE FROM public[.]chat_turn_charges/,
   /DELETE FROM public[.]wallet_transactions/,
   /DELETE FROM public[.]conversations WHERE user_id = p_user_id/,
-  /UPDATE public[.]chat_message_versions AS v[\\s\\S]*?SET edited_by = NULL/,
+  /UPDATE public[.]chat_message_versions AS v[\s\S]*?SET edited_by = NULL/,
 ]) assert.match(integration, pattern);
 
 // The worker's deleting recovery path must resume Auth/finalize only. It must not
 // re-run archive/prepare after the request/profile may have disappeared.
 const worker = fs.readFileSync("supabase/functions/_shared/account-deletion-worker.ts", "utf8");
-const recoveryBranch = worker.match(/if [(]item[.]work_status === "deleting" && batchId[)][\\s\\S]*?continue;/)?.[0];
+const recoveryBranch = worker.match(/if [(]item[.]work_status === "deleting" && batchId[)][\s\S]*?continue;/)?.[0];
 assert.ok(recoveryBranch, "worker deleting recovery branch must exist");
 assert.match(recoveryBranch, /deps[.]deleteAuthUser/);
 assert.match(recoveryBranch, /deps[.]finalize/);
@@ -160,7 +160,7 @@ for (const table of [
 }
 assert.match(characterDeletionDraft, /s[.]character_id = p_character_id/);
 assert.doesNotMatch(characterDeletionDraft, /s[.]deleted_at IS NULL/);
-assert.match(characterDeletionDraft, /v_first_published_at IS NULL[\\s\\S]*?v_visibility = 'private'[\\s\\S]*?v_review_status IS NOT NULL[\\s\\S]*?v_review_status <> 'approved'[\\s\\S]*?NOT v_has_history/);
+assert.match(characterDeletionDraft, /v_first_published_at IS NULL[\s\S]*?v_visibility = 'private'[\s\S]*?v_review_status IS NOT NULL[\s\S]*?v_review_status <> 'approved'[\s\S]*?NOT v_has_history/);
 assert.match(characterDeletionDraft, /DELETE FROM public[.]characters WHERE id = p_character_id/);
 assert.ok(characterDeletionDraft.includes("SET visibility = 'private',"));
 assert.ok(characterDeletionDraft.includes("deletion_reason = 'author_deleted'"));
