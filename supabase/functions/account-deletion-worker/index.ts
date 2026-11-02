@@ -87,9 +87,17 @@ export default {
       },
     });
 
+    if (summary.failureReportFailed > 0) {
+      // Do not log user IDs, batch IDs, or raw provider errors.
+      console.error("account_deletion_worker_failure_reporting_incomplete", {
+        failureReportFailed: summary.failureReportFailed,
+        failed: summary.failed,
+      });
+    }
+
     return Response.json({
-      ok: summary.failed === 0,
+      ok: summary.failed === 0 && summary.failureReportFailed === 0,
       summary,
-    }, { status: summary.failed === 0 ? 200 : 207 });
+    }, { status: summary.failed === 0 && summary.failureReportFailed === 0 ? 200 : 207 });
   }),
 };
