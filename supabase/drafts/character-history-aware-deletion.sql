@@ -459,8 +459,8 @@ BEGIN
   ORDER BY g.id
   FOR UPDATE;
 
-  UPDATE public.chat_sessions cs
-  SET character_snapshot = COALESCE(cs.character_snapshot, '{}'::jsonb) ||
+  UPDATE public.chat_sessions AS parent_session
+  SET character_snapshot = COALESCE(parent_session.character_snapshot, '{}'::jsonb) ||
     jsonb_build_object(
       'authorId', v_author_id,
       'visibility', 'private',
@@ -468,8 +468,8 @@ BEGIN
       'deletedAt', v_deleted_at
     ),
     updated_at = v_deleted_at
-  WHERE cs.character_id = p_character_id
-    AND cs.deleted_at IS NULL;
+  WHERE parent_session.character_id = p_character_id
+    AND parent_session.deleted_at IS NULL;
 
   UPDATE public.chat_group_members gm
   SET character_snapshot = COALESCE(gm.character_snapshot, '{}'::jsonb) ||
