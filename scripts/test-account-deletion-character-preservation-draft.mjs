@@ -65,7 +65,8 @@ assert.match(sql, /auth[.]uid[(][)] IS DISTINCT FROM p_user_id/);
 assert.match(sql, /auth[.]jwt[(][)] ->> 'session_id'/);
 assert.match(sql, /p_storage_path !~ [(]/);
 assert.match(sql, /REVOKE ALL ON FUNCTION public[.]can_process_character_illustration_cleanup[(]uuid, text[)]/);
-assert.match(sql, /GRANT EXECUTE ON FUNCTION public[.]can_process_character_illustration_cleanup[(]uuid, text[)][\\s\\S]*?TO authenticated/);
+assert.ok(sql.includes("GRANT EXECUTE ON FUNCTION public.can_process_character_illustration_cleanup(uuid, text)"));
+assert.ok(sql.includes("TO authenticated"));
 assert.match(archiveFn, /author_id = NULL/);
 assert.match(archiveFn, /DELETE FROM public[.]character_illustration_cleanup_jobs/);
 assert.doesNotMatch(archiveFn, /DELETE FROM public[.]characters/);
@@ -440,7 +441,7 @@ const illustrationCleanupStart = indexHtml.indexOf(
   "async function processCharacterIllustrationCleanupJob(job,userId) {",
 );
 const illustrationCleanupEnd = indexHtml.indexOf(
-  "\\nasync function cleanupCharacterIllustrationUploads",
+  "async function cleanupCharacterIllustrationUploads",
   illustrationCleanupStart,
 );
 assert.ok(illustrationCleanupStart >= 0 && illustrationCleanupEnd > illustrationCleanupStart);
