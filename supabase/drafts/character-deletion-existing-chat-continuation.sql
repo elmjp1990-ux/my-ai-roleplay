@@ -1,7 +1,7 @@
 -- Draft-only replacement for the existing group writer.
--- Archived character members remain in the transcript/snapshot, but are offline:
--- they are excluded from speaker rotation and from per-turn character billing.
--- A group with no remaining active characters cannot accept a new turn.
+-- Existing group membership is a durable conversation snapshot. Character deletion
+-- hides a character from public discovery/new chats, but never removes its speaking
+-- turn or billing from a group that already exists.
 
 CREATE OR REPLACE FUNCTION public.append_chat_group_mock_turn(
   p_group_id uuid,
