@@ -37,6 +37,93 @@ CREATE INDEX IF NOT EXISTS character_asset_cleanup_jobs_due_idx
   ON public.character_asset_cleanup_jobs (available_at, created_at)
   WHERE status IN ('pending', 'failed');
 
+-- Serialize reference creation against cleanup enqueue/removal. A reference writer
+-- and the deletion transaction take the same transaction-scoped advisory lock
+-- for the exact bucket/path. Once a cleanup job exists, that path can never be
+-- reattached to a character or illustration.
+CREATE OR REPLACE FUNCTION private.lock_character_asset_path(
+  p_bucket_id text,
+  p_object_path text
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+BEGIN
+  IF p_bucket_id NOT IN ('character-illustrations', 'character-avatar-videos')
+     OR p_object_path IS NULL OR p_object_path = '' THEN
+    RAISE EXCEPTION 'invalid_character_asset_reference'
+      USING ERRCODE = '22023';
+  END IF;
+  PERFORM pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(p_bucket_id || ':' || p_object_path, 0)
+  );
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.lock_character_asset_path(text, text)
+  FROM PUBLIC, anon, authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION private.prevent_reuse_queued_character_asset()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_bucket_id text;
+  v_object_path text;
+BEGIN
+  IF TG_TABLE_NAME = 'characters' THEN
+    v_bucket_id := 'character-avatar-videos';
+    v_object_path := NEW.avatar_video_path;
+  ELSIF TG_TABLE_NAME = 'character_illustrations' THEN
+    v_bucket_id := 'character-illustrations';
+    v_object_path := NEW.storage_path;
+  ELSE
+    RAISE EXCEPTION 'unsupported_character_asset_reference_table';
+  END IF;
+
+  IF v_object_path IS NULL OR v_object_path = '' THEN
+    RETURN NEW;
+  END IF;
+
+  PERFORM private.lock_character_asset_path(v_bucket_id, v_object_path);
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.character_asset_cleanup_jobs AS j
+    WHERE j.bucket_id = v_bucket_id
+      AND j.object_path = v_object_path
+  ) THEN
+    RAISE EXCEPTION 'character_asset_path_cleanup_already_queued'
+      USING ERRCODE = '23514';
+  END IF;
+
+  RETURN NEW;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.prevent_reuse_queued_character_asset()
+  FROM PUBLIC, anon, authenticated, service_role;
+
+DROP TRIGGER IF EXISTS prevent_reuse_queued_character_avatar_video
+  ON public.characters;
+CREATE TRIGGER prevent_reuse_queued_character_avatar_video
+  BEFORE INSERT OR UPDATE OF avatar_video_path
+  ON public.characters
+  FOR EACH ROW
+  EXECUTE FUNCTION private.prevent_reuse_queued_character_asset();
+
+DROP TRIGGER IF EXISTS prevent_reuse_queued_character_illustration
+  ON public.character_illustrations;
+CREATE TRIGGER prevent_reuse_queued_character_illustration
+  BEFORE INSERT OR UPDATE OF storage_path
+  ON public.character_illustrations
+  FOR EACH ROW
+  EXECUTE FUNCTION private.prevent_reuse_queued_character_asset();
+
 CREATE OR REPLACE FUNCTION private.character_has_history(p_character_id uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -184,6 +271,7 @@ DECLARE
   v_deleted_at timestamptz;
   v_avatar_video_path text;
   v_has_history boolean;
+  v_asset record;
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'authentication_required' USING ERRCODE = '42501';
@@ -234,6 +322,23 @@ BEGIN
       VALUES ('character-avatar-videos', v_avatar_video_path, auth.uid(), p_character_id)
       ON CONFLICT (bucket_id, object_path) DO NOTHING;
     END IF;
+
+    -- Acquire the same advisory locks as reference-write triggers in stable
+    -- order before queueing any object. This closes the check/remove race where
+    -- another character could adopt the path after the worker's reference check.
+    FOR v_asset IN
+      SELECT 'character-avatar-videos'::text AS bucket_id,
+             v_avatar_video_path AS object_path
+      WHERE v_avatar_video_path IS NOT NULL
+      UNION ALL
+      SELECT 'character-illustrations'::text, ci.storage_path
+      FROM public.character_illustrations AS ci
+      WHERE ci.character_id = p_character_id
+        AND ci.author_id = auth.uid()
+      ORDER BY 1, 2
+    LOOP
+      PERFORM private.lock_character_asset_path(v_asset.bucket_id, v_asset.object_path);
+    END LOOP;
 
     INSERT INTO public.character_asset_cleanup_jobs
       (bucket_id, object_path, owner_id, character_id)
