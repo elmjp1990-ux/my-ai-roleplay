@@ -9,8 +9,8 @@ assert.match(sql, /^-- DRAFT ONLY — NOT AN ACTIVE MIGRATION\./);
 assert.match(sql, /Do not execute this file against the hosted Supabase project/);
 
 for (const table of ["characters", "character_private_info", "character_illustrations", "character_schedule_descriptions"]) {
-  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\s\S]*?ALTER COLUMN author_id DROP NOT NULL"));
-  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\s\S]*?ON DELETE SET NULL"));
+  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\\s\\S]*?ALTER COLUMN author_id DROP NOT NULL"));
+  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\\s\\S]*?ON DELETE SET NULL"));
 }
 assert.match(sql, /character_schedule_descriptions[\s\S]*?REFERENCES auth[.]users[(]id[)] ON DELETE SET NULL/);
 assert.match(sql, /creator_display_name/);
@@ -33,8 +33,8 @@ assert.match(assetFn, /SET search_path TO ''/);
 assert.match(assetFn, /ci[.]storage_path = p_object_name/);
 assert.match(assetFn, /c[.]avatar_video_path = p_object_name/);
 assert.match(assetFn, /ELSE false/);
-assert.match(sql, /CREATE POLICY "Existing session owners can read archived character assets"[\s\S]*?FOR SELECT TO authenticated/);
-assert.match(sql, /CREATE POLICY "Existing session owners can read character illustration metadata"[\s\S]*?FOR SELECT TO authenticated/);
+assert.match(sql, /CREATE POLICY "Existing session owners can read archived character assets"[\\s\\S]*?FOR SELECT TO authenticated/);
+assert.match(sql, /CREATE POLICY "Existing session owners can read character illustration metadata"[\\s\\S]*?FOR SELECT TO authenticated/);
 
 const archiveFn = sql.match(/CREATE OR REPLACE FUNCTION private[.]archive_account_characters[(][\s\S]*?\$function\$;/)?.[0];
 assert.ok(archiveFn, "account archive helper must exist");
