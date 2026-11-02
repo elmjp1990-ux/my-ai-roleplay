@@ -432,5 +432,14 @@ assert.match(assetWorkerTests, /owner\/character scoped asset paths/);
 assert.doesNotMatch(characterDeletionDraft, /DELETE FROM storage[.]objects/);
 assert.ok(!characterDeletionDraft.includes("DELETE FROM storage.objects"));
 
+const chatParentDeleteGuard = fs.readFileSync(
+  "supabase/drafts/chat-deletion-direct-parent-delete-privilege-guard.sql",
+  "utf8",
+);
+assert.match(chatParentDeleteGuard, /^-- DRAFT ONLY — NOT AN ACTIVE MIGRATION\\./);
+assert.match(chatParentDeleteGuard, /REVOKE DELETE ON TABLE public[.]chat_sessions[\\s\\S]*?FROM PUBLIC, anon, authenticated/);
+assert.match(chatParentDeleteGuard, /delete_chat_session_content[(][)]/);
+assert.doesNotMatch(chatParentDeleteGuard, /GRANT DELETE ON TABLE public[.]chat_sessions/);
+
 console.log("Account and character deletion draft guards: passed (static only; no SQL execution).");
 
