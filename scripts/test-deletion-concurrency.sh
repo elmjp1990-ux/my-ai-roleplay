@@ -111,14 +111,15 @@ child_value="$(psql "$DATABASE_URL" -Atqc "SELECT activity FROM public.character
 # Once the account deletion request is committed, later author writes must be
 # blocked by the restrictive account_is_active RLS policy.
 cat > "$tmpdir/post-archive-write.sql" <<SQL
-DO \$\$
+BEGIN;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '$author', true);
+SELECT set_config('request.jwt.claim.role', 'authenticated', true);
+SELECT set_config('request.jwt.claims', '{"sub":"$author","role":"authenticated"}', true);
+DO \\$\\$
 DECLARE
   v_updated integer;
 BEGIN
-  PERFORM set_config('request.jwt.claim.sub', '$author', true);
-  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
-  PERFORM set_config('request.jwt.claims', '{"sub":"$author","role":"authenticated"}', true);
-  SET LOCAL ROLE authenticated;
   UPDATE public.character_schedules
   SET activity = 'MUST NOT OVERWRITE ARCHIVED CHILD'
   WHERE id = '$schedule_id';
@@ -127,7 +128,7 @@ BEGIN
     RAISE EXCEPTION 'post_archive_child_write_must_be_rejected';
   END IF;
 END;
-\$\$;
+\\$\\$;
 SQL
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/post-archive-write.sql" >/dev/null
 child_value="$(psql "$DATABASE_URL" -Atqc "SELECT activity FROM public.character_schedules WHERE id = '$schedule_id'")"
