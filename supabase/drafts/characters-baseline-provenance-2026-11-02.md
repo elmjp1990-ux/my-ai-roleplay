@@ -413,3 +413,30 @@ Do not reconstruct `characters` / `profiles` from the compact table inventory an
 Conclusion: the original public.characters / public.profiles DDL and missing account-deletion migration remain unrecovered. No synthetic baseline or migration was created. No local/hosted reset, hosted DDL/DML, deletion RPC, Auth user creation/deletion, worker deployment, or cron operation occurred. PR #200 remains Draft/unmerged.
 
 Next trusted sources: original SQL Editor history, a user-held SQL export, or an authorized schema-only dump that excludes application rows. Compare it against live catalog only after provenance is established.
+
+
+## 2026-11-02｜Round 71：找回五個已套用 migration 的原始 SQL
+
+從舊分支 `fix/account-deletion-ready` 找回五個與 Supabase migration ledger 版本及名稱完全一致的 SQL，並恢復到目前 PR #200 分支 `supabase/migrations/`。逐一重新讀取兩分支檔案後，Git blob SHA 完全一致：
+
+- `20261017010838_preserve_group_history_on_character_delete.sql` — `628b6a6ecf56962b64bdc1764d04b81d8687c4c0`
+- `20261017010841_account_deletion_grace_period_config.sql` — `664c30ff901817050cacb86f67bc0a84986f9dac`
+- `20261017010847_account_deletion_worker.sql` — `1e329c68a40f5ada56bf7dd47f9b64bf45a77367`
+- `20261017035145_guard_group_mock_turn_during_deletion.sql` — `730e8d037d79f6718728ef8dc77bd90372477a7c`
+- `20261017040730_guard_snapshot_sync_during_deletion.sql` — `25f46d7163589c9d4c97caf155e43ebf05a85d08`
+
+這修復了五個「migration ledger 有紀錄、目前 PR 分支卻缺少對應 SQL」的來源缺口。Migration manifest 已同步調整：repo SQL files 112、exact version+name matches 32、仍無同名來源的 remote migration 52。
+
+### 安全界線
+
+- 這是原始檔案恢復，不是執行 migration。
+- 沒有修改 Supabase hosted migration ledger，沒有執行 hosted DDL/DML、reset、db push 或 migration replay。
+- 特別注意：`20261017010847_account_deletion_worker.sql` 是歷史版本，其 `prepare_account_deletion()` 仍依賴既有 cascade 行為，沒有滿足目前帳號刪除時保留角色及其子資料的要求；恢復原始檔不代表批准執行或啟用 worker。
+- `profiles` / `characters` 最初的 CREATE TABLE baseline 仍未找回；五個 migration 不會解決這個基礎表缺口。
+- PR #200 維持 Draft/unmerged；帳號刪除 worker維持 disabled，沒有部署或排程。
+
+### 下一步
+
+1. 繼續追查剩餘 52 個 remote migration 名稱的原始來源，優先找出基礎表之前的 bootstrap SQL。
+2. 對五個恢復檔案逐項核對目前後續 migration 是否有重複定義或行為衝突。
+3. 完成完整 migration manifest、時間戳衝突與依賴順序檢查後，再做 disposable-only replay 設計。
