@@ -15,6 +15,9 @@ assert.doesNotMatch(sql, /CREATE SEQUENCE IF NOT EXISTS "public"\."chat_turn_eve
 assert.match(sql, /MAXVALUE 2147483647/);
 assert.match(sql, /CREATE TABLE IF NOT EXISTS "public"\."characters"/);
 assert.match(sql, /ALTER TABLE "public"\."characters" ADD CONSTRAINT/);
+const chatMessagePk = sql.indexOf('ADD CONSTRAINT "chat_messages_pkey" PRIMARY KEY');
+const assistantMessageFk = sql.indexOf('ADD CONSTRAINT "ai_generation_records_assistant_message_id_fkey" FOREIGN KEY');
+assert.ok(chatMessagePk >= 0 && assistantMessageFk > chatMessagePk, "referenced primary keys must be created before foreign keys");
 assert.match(sql, /CREATE OR REPLACE FUNCTION public\.account_is_active\(\)/);
 assert.match(sql, /CREATE TRIGGER/);
 assert.match(sql, /CREATE POLICY/);
