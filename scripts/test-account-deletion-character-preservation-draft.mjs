@@ -125,7 +125,11 @@ assert.ok(archivedEntryFn, "database-level archived-character insert guard must 
 assert.match(archivedEntryFn, /SECURITY DEFINER/);
 assert.match(archivedEntryFn, /SET search_path TO ''/);
 assert.match(archivedEntryFn, /account_archived_at IS NOT NULL/);
+assert.match(archivedEntryFn, /deleted_at IS NOT NULL/);
+assert.match(archivedEntryFn, /FOR KEY SHARE/);
+assert.match(archivedEntryFn, /character_not_available/);
 assert.match(archivedEntryFn, /world_character_id/);
+assert.match(archivedEntryFn, /Serialize new-entry creation with/);
 for (const [table, column] of [
   ["chat_sessions", "character_id"],
   ["chat_groups", "world_character_id"],
