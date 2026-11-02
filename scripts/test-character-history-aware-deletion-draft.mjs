@@ -29,6 +29,33 @@ assert.ok(
   "Storage removal must happen only after a successful reference check",
 );
 assert.match(edge, /character-avatar-videos/);
-assert.match(edge, /character-illustrations/);
+assert.match(edge, /character-illustrations/);\n
+const historyStart = sql.indexOf("CREATE OR REPLACE FUNCTION private.character_has_history(");
+const publicationStart = sql.indexOf("CREATE OR REPLACE FUNCTION private.preserve_character_first_publication_timestamp(", historyStart);
+assert.ok(historyStart >= 0 && publicationStart > historyStart);
+const historyFn = sql.slice(historyStart, publicationStart);
+// Every current FK-backed player-history source must block the never-published
+// hard-delete path. Names come from the accompanying read-only live catalog inventory.
+for (const table of [
+  "chat_sessions", "chat_group_members", "chat_group_messages", "chat_groups",
+  "conversations", "encounter_character_state", "encounter_diary",
+  "encounter_turn_interaction_receipts", "encounter_session_lifecycle",
+  "encounter_session_turns", "encounter_session_evaluation_jobs",
+  "story_relationship_batches", "story_relationship_states", "character_comments",
+  "chat_deletion_character_history",
+]) {
+  assert.ok(historyFn.includes(`FROM public.${table}`), `Character history guard must include ${table}`);
+}
+// Creator-authored draft metadata may cascade with a never-used draft. Story templates
+// are separately protected when a legacy conversation references them.
+for (const table of [
+  "character_private_info", "character_schedule_descriptions",
+  "character_schedules", "character_illustrations",
+]) {
+  assert.ok(!historyFn.includes(`FROM public.${table}`), `Do not classify draft metadata ${table} as player history`);
+}
+assert.match(historyFn, /JOIN public\\.character_stories cs ON cs\\.id = cv\\.story_id/,
+  "Legacy conversations must preserve the linked character story");
+
 
 console.log("Character asset cleanup path-lock and reference guards passed.");
