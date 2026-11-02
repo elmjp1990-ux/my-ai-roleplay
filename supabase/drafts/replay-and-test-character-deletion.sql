@@ -13,6 +13,10 @@ CREATE SCHEMA IF NOT EXISTS storage;
 CREATE TABLE IF NOT EXISTS storage.objects (bucket_id text NOT NULL, name text NOT NULL);
 \echo 'Applying account deletion character preservation and safe Auth detachment draft'
 \i supabase/drafts/account-deletion-character-preservation-draft.sql
+\echo 'Applying stale-JWT Auth-user existence guard'
+\i supabase/drafts/account-is-active-auth-user-existence-guard.sql
+\echo 'Applying database guard against new sessions for archived characters'
+\i supabase/drafts/account-archived-character-session-insert-guard.sql
 \echo 'Applying complete prepare_account_deletion integration draft'
 \i supabase/drafts/prepare-account-deletion-character-preservation-integration.sql
 \echo 'Applying existing-chat continuation writer draft (single/group deletion behavior remains isolated to disposable replay)'
