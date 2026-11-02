@@ -363,3 +363,20 @@ Further verification:
 Added `supabase/drafts/account-is-active-auth-user-existence-guard-tests-2026-11-02.md` with local-only test fixtures and function + RESTRICTIVE RLS integration matrix. The stale JWT test must use a real locally issued, still-unexpired JWT captured before local Auth Admin deletion, not just a fabricated subject claim.
 
 No hosted DB changes. No function execution. No user deletion. No deployment or cron changes.
+
+
+## 2026-11-02 follow-up: repository and hosted schema-source recheck
+
+A fresh recursive Git tree read at PR head `dd31b44124328ac9004f2ac5de38fbb10f30c4ff` confirms:
+- The tracked migration directory begins with migrations that assume the foundational application tables already exist; no foundational `CREATE TABLE public.characters` / `public.profiles` migration is present in the branch tree.
+- GitHub code-search requests for the exact table creation statements returned zero results (search endpoint marked results incomplete, so this is not proof that no historical source exists anywhere).
+- The live Supabase migration ledger still starts at `20261015065943` and contains the previously identified migration history, but the missing original SQL body is not included in the ledger response.
+- Verbose table inventory confirms that live `public.characters` and `public.profiles` have evolved columns, keys and references. This inventory is not a complete schema dump: it does not reconstruct all historical constraints, indexes, triggers, policies, grants, functions, extension dependencies, or exact creation order. It must not be used as a fabricated baseline migration.
+
+## Local replay workflow review
+
+The manual workflow starts a disposable local stack and then runs `supabase db reset --local --no-seed`. Because migration replay begins before the later CI-only draft migrations are copied into the migrations directory, the missing foundational schema prevents a valid clean replay before the workflow can reach the new account-deletion lease tests. This is a baseline blocker, not a reason to alter the connected hosted test database.
+
+## Decision
+
+Do not reconstruct `characters` / `profiles` from the compact table inventory and do not run the current workflow as if it were a valid end-to-end database test. The safe next source is a trusted schema-only dump or the original project bootstrap SQL from its true provenance. Once obtained, compare it against the live catalog and the migration sequence, then mark any local-only reconstruction as explicitly synthetic and separately reviewed. No application rows were queried by this follow-up, and no hosted writes were performed.
