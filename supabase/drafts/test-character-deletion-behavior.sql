@@ -427,5 +427,38 @@ BEGIN
   IF has_table_privilege('authenticated', 'public.characters', 'DELETE') THEN
     RAISE EXCEPTION 'authenticated_must_not_directly_delete_characters';
   END IF;
+
+  -- Final privilege matrix: character deletion is an authenticated RPC;
+  -- asset queue claim/finalize and chat/account purge are service-only.
+  IF NOT has_function_privilege('authenticated', 'public.soft_delete_character(uuid)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.soft_delete_character(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'soft_delete_character_execute_acl_mismatch';
+  END IF;
+  IF NOT has_function_privilege('service_role', 'public.claim_character_asset_cleanup_jobs(integer)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.claim_character_asset_cleanup_jobs(integer)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.claim_character_asset_cleanup_jobs(integer)', 'EXECUTE')
+     OR NOT has_function_privilege('service_role', 'public.finish_character_asset_cleanup_job(uuid,text,text)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.finish_character_asset_cleanup_job(uuid,text,text)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.finish_character_asset_cleanup_job(uuid,text,text)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'asset_cleanup_rpc_execute_acl_mismatch';
+  END IF;
+  IF has_table_privilege('authenticated', 'public.character_asset_cleanup_jobs', 'SELECT')
+     OR has_table_privilege('authenticated', 'public.character_asset_cleanup_jobs', 'INSERT')
+     OR has_table_privilege('authenticated', 'public.character_asset_cleanup_jobs', 'UPDATE')
+     OR has_table_privilege('anon', 'public.character_asset_cleanup_jobs', 'SELECT')
+     OR NOT has_table_privilege('service_role', 'public.character_asset_cleanup_jobs', 'SELECT')
+     OR NOT has_table_privilege('service_role', 'public.character_asset_cleanup_jobs', 'INSERT')
+     OR NOT has_table_privilege('service_role', 'public.character_asset_cleanup_jobs', 'UPDATE') THEN
+    RAISE EXCEPTION 'asset_cleanup_queue_table_privilege_mismatch';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_class c
+    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relname = 'character_asset_cleanup_jobs'
+      AND c.relrowsecurity IS TRUE
+  ) THEN
+    RAISE EXCEPTION 'asset_cleanup_queue_rls_must_be_enabled';
+  END IF;
 END;
-$$;
+$;
