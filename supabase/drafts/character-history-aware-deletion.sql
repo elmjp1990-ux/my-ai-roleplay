@@ -32,7 +32,6 @@ CREATE TABLE IF NOT EXISTS public.character_asset_cleanup_jobs (
 ALTER TABLE public.character_asset_cleanup_jobs ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.character_asset_cleanup_jobs FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.character_asset_cleanup_jobs TO service_role;
-GRANT USAGE, SELECT ON SEQUENCE public.character_asset_cleanup_jobs_id_seq TO service_role;
 CREATE INDEX IF NOT EXISTS character_asset_cleanup_jobs_due_idx
   ON public.character_asset_cleanup_jobs (available_at, created_at)
   WHERE status IN ('pending', 'failed');
@@ -222,7 +221,7 @@ GRANT EXECUTE ON FUNCTION public.soft_delete_character(uuid) TO authenticated;
 -- Service-only claim/finalize endpoints for a future Edge worker.
 -- The worker must verify that the path is not referenced by another live character
 -- or illustration before Storage.remove(); bucket IDs are allowlisted above.
-CREATE OR REPLACE FUNCTION private.claim_character_asset_cleanup_jobs(p_limit integer DEFAULT 50)
+CREATE OR REPLACE FUNCTION public.claim_character_asset_cleanup_jobs(p_limit integer DEFAULT 50)
 RETURNS TABLE(id uuid, bucket_id text, object_path text, owner_id uuid, character_id uuid)
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -254,7 +253,7 @@ BEGIN
 END;
 $function$;
 
-CREATE OR REPLACE FUNCTION private.finish_character_asset_cleanup_job(
+CREATE OR REPLACE FUNCTION public.finish_character_asset_cleanup_job(
   p_job_id uuid,
   p_status text,
   p_error text DEFAULT NULL
@@ -275,7 +274,7 @@ BEGIN
   SET status = p_status,
       last_error = CASE WHEN p_status = 'failed' THEN left(COALESCE(p_error, 'unknown'), 1000) ELSE NULL END,
       available_at = CASE WHEN p_status = 'failed'
-        THEN pg_catalog.statement_timestamp() + pg_catalog.make_interval(mins => LEAST(60, 2 ^ LEAST(j.attempts, 6)))
+        THEN pg_catalog.statement_timestamp() + pg_catalog.make_interval(mins => LEAST(60, (2 ^ LEAST(j.attempts, 6))::integer))
         ELSE j.available_at END,
       completed_at = CASE WHEN p_status IN ('completed', 'skipped') THEN pg_catalog.statement_timestamp() ELSE NULL END,
       claimed_at = NULL,
