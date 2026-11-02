@@ -16,7 +16,7 @@ SELECT jsonb_pretty(jsonb_build_object(
   'relations', (
     SELECT COALESCE(jsonb_agg(jsonb_build_object(
       'schema', n.nspname, 'name', c.relname, 'kind', c.relkind,
-      'owner', pg_catalog.pg_get_userbyid(c.relowner),
+      'owner', pg_catalog.pg_get_userbyid(c.relowner), 'acl', c.relacl::text,
       'rls_enabled', c.relrowsecurity, 'force_rls', c.relforcerowsecurity,
       'replica_identity', c.relreplident, 'persistence', c.relpersistence,
       'comment', pg_catalog.obj_description(c.oid, 'pg_class')
@@ -158,6 +158,13 @@ SELECT jsonb_pretty(jsonb_build_object(
       'privilege', privilege_type, 'grantable', is_grantable
     ) ORDER BY routine_schema, routine_name, grantee, privilege_type), '[]'::jsonb)
     FROM information_schema.routine_privileges WHERE routine_schema IN ('public', 'private')
+  ),
+  'schema_privileges', (
+    SELECT COALESCE(jsonb_agg(jsonb_build_object(
+      'schema', n.nspname, 'owner', pg_catalog.pg_get_userbyid(n.nspowner),
+      'acl', n.nspacl::text
+    ) ORDER BY n.nspname), '[]'::jsonb)
+    FROM pg_catalog.pg_namespace n WHERE n.nspname IN ('public', 'private')
   ),
   'default_privileges', (
     SELECT COALESCE(jsonb_agg(jsonb_build_object(
