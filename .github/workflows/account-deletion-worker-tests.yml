@@ -33,6 +33,8 @@ on:
       - "supabase/drafts/current-state-effective-grants.json"
       - "supabase/drafts/current-state-schema-catalog-manifest-2026-11-02.md"
       - "scripts/test-disposable-schema-catalog-snapshot.mjs"
+      - "scripts/build-disposable-schema-fixture.mjs"
+      - "scripts/test-build-disposable-schema-fixture.mjs"
       - ".github/workflows/account-deletion-worker-tests.yml"
   push:
     branches:
@@ -67,6 +69,8 @@ on:
       - "supabase/drafts/current-state-effective-grants.json"
       - "supabase/drafts/current-state-schema-catalog-manifest-2026-11-02.md"
       - "scripts/test-disposable-schema-catalog-snapshot.mjs"
+      - "scripts/build-disposable-schema-fixture.mjs"
+      - "scripts/test-build-disposable-schema-fixture.mjs"
       - ".github/workflows/account-deletion-worker-tests.yml"
 
 jobs:
@@ -91,3 +95,5 @@ jobs:
         run: node scripts/test-character-history-aware-deletion-draft.mjs
       - name: Validate disposable schema-only catalog snapshot
         run: node scripts/test-disposable-schema-catalog-snapshot.mjs
+      - name: Validate disposable schema fixture generation
+        run: node scripts/test-build-disposable-schema-fixture.mjs
