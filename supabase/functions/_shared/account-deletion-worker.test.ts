@@ -127,12 +127,16 @@ Deno.test("recovers a deleting batch after Auth deletion removed the request row
   ]);
 });
 
-Deno.test("does not finalize a deleting batch while Auth user still exists", async () => {
+Deno.test("resumes Auth deletion directly when deleting batch still has an Auth user", async () => {
   const calls: unknown[][] = [];
   const deps = successfulDeps(calls);
   deps.isAuthUserAbsent = async (id) => {
     calls.push(["isAuthUserAbsent", id]);
     return false;
+  };
+  deps.deleteAuthUser = async (id) => {
+    calls.push(["deleteAuthUser", id]);
+    return { error: null };
   };
   const interruptedItem = {
     ...item,
@@ -140,9 +144,10 @@ Deno.test("does not finalize a deleting batch while Auth user still exists", asy
     work_status: "deleting",
   };
   const summary = await processAccountDeletionWorkItems([interruptedItem], deps);
-  assertEquals(summary.completed, 1);
-  assertEquals(calls.slice(0, 2), [
+  assertEquals(summary, { claimed: 1, completed: 1, failed: 0, skipped: 0 });
+  assertEquals(calls, [
     ["isAuthUserAbsent", "user-1"],
-    ["archive", "user-1"],
+    ["deleteAuthUser", "user-1"],
+    ["finalize", "batch-1"],
   ]);
 });
