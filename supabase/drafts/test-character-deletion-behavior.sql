@@ -26,6 +26,7 @@ DECLARE
   v_group_continue_turn uuid;
   v_group_deleted_character_turn uuid;
   v_chat_turn_status text;
+  v_non_author_rejected boolean := false;
   v_group uuid := '50000000-0000-4000-8000-000000000001';
   v_group_turn uuid := '60000000-0000-4000-8000-000000000001';
   v_asset_file uuid := '30000000-0000-4000-8000-000000000001';
@@ -100,6 +101,26 @@ BEGIN
   VALUES (v_chat_draft, v_user, 'Private draft with chat history', 'private', 'draft');
   INSERT INTO public.chat_sessions (id, user_id, character_id, character_name, chat_mode)
   VALUES (v_chat_session, v_user, v_chat_draft, 'Private draft with chat history', 'story');
+  -- Only the character author may invoke the SECURITY DEFINER delete RPC.
+  -- Simulate a different authenticated player and verify the denial is atomic.
+  PERFORM pg_catalog.set_config(
+    'request.jwt.claim.sub',
+    '10000000-0000-4000-8000-000000000099',
+    true
+  );
+  BEGIN
+    PERFORM public.soft_delete_character(v_chat_draft);
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_non_author_rejected := true;
+  END;
+  PERFORM pg_catalog.set_config('request.jwt.claim.sub', v_user::text, true);
+  IF NOT v_non_author_rejected OR EXISTS (
+    SELECT 1 FROM public.characters
+    WHERE id = v_chat_draft AND deleted_at IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION 'non_author_character_delete_must_be_rejected_without_mutation';
+  END IF;
+
   v_deleted_at := public.soft_delete_character(v_chat_draft);
   IF NOT EXISTS (SELECT 1 FROM public.characters WHERE id = v_chat_draft AND deleted_at = v_deleted_at) THEN
     RAISE EXCEPTION 'character_with_chat_history_must_soft_delete';
