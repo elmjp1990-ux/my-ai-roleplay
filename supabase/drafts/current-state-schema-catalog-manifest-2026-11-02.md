@@ -18,7 +18,9 @@ No application table rows, profile contents, character contents, chat contents, 
 | Catalog category | Count |
 |---|---:|
 | Relations (47 public tables + view + sequences + private objects) | 50 |
-| Columns | 416 |
+| Table columns | 410 |
+| View columns | 6 |
+| All relation columns | 416 |
 | Constraints | 288 |
 | Indexes | 140 |
 | RLS policies | 95 |
