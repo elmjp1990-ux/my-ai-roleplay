@@ -85,6 +85,11 @@ assert.match(behavior, /public[.]prepare_account_deletion[(]v_author[)]/);
 assert.match(behavior, /account_deletion_must_preserve_character_and_original_public_state/);
 assert.match(behavior, /account_deletion_must_preserve_character_children_and_media/);
 assert.match(behavior, /account_deletion_must_preserve_other_players_existing_chats/);
+assert.match(behavior, /account_archived_character_new_session_must_be_rejected/);
+assert.match(behavior, /deleted_auth_user_stale_jwt_must_lose_retained_character_access/);
+assert.match(behavior, /other_player_existing_chat_and_media_access_must_survive_author_auth_deletion/);
+assert.match(behavior, /private\\.can_read_character_asset/);
+
 assert.match(behavior, /character_snapshot->>'characterStatus' = 'offline'/);
 assert.match(behavior, /speaker_snapshot->>'creatorDisplayName'/);
 
