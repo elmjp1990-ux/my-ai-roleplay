@@ -194,72 +194,7 @@ $function$;
 -- CREATE OR REPLACE preserves the currently audited function ownership and
 -- EXECUTE ACLs; verify both again after local replay.
 
--- 6) Database-level gate for every NEW character session/member attachment.
--- This closes the direct single-chat insert path as well as trusted
--- Encounter/Story service-role RPC paths. Existing sessions are unaffected:
--- continuing a chat does not INSERT or reassign character_id.
---
--- FOR KEY SHARE serializes session creation against archive_account_characters(),
--- which locks the character FOR UPDATE before setting account_archived_at.
-CREATE OR REPLACE FUNCTION private.guard_new_session_character_not_archived()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO ''
-AS $function$
-DECLARE
-  v_account_archived_at timestamptz;
-BEGIN
-  IF TG_OP = 'UPDATE'
-     AND NEW.character_id IS NOT DISTINCT FROM OLD.character_id THEN
-    RETURN NEW;
-  END IF;
-
-  IF NEW.character_id IS NULL THEN
-    RETURN NEW;
-  END IF;
-
-  SELECT c.account_archived_at
-    INTO v_account_archived_at
-  FROM public.characters AS c
-  WHERE c.id = NEW.character_id
-  FOR KEY SHARE;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'character_not_found' USING ERRCODE = '23503';
-  END IF;
-
-  IF v_account_archived_at IS NOT NULL THEN
-    RAISE EXCEPTION 'character_account_archived' USING ERRCODE = '42501';
-  END IF;
-
-  RETURN NEW;
-END;
-$function$;
-
-REVOKE ALL ON FUNCTION private.guard_new_session_character_not_archived()
-  FROM PUBLIC, anon, authenticated;
-
-DROP TRIGGER IF EXISTS guard_archived_character_chat_session
-  ON public.chat_sessions;
-CREATE TRIGGER guard_archived_character_chat_session
-  BEFORE INSERT OR UPDATE OF character_id
-  ON public.chat_sessions
-  FOR EACH ROW
-  EXECUTE FUNCTION private.guard_new_session_character_not_archived();
-
-DROP TRIGGER IF EXISTS guard_archived_character_group_member
-  ON public.chat_group_members;
-CREATE TRIGGER guard_archived_character_group_member
-  BEFORE INSERT OR UPDATE OF character_id
-  ON public.chat_group_members
-  FOR EACH ROW
-  EXECUTE FUNCTION private.guard_new_session_character_not_archived();
-
--- Existing group messages are intentionally not blocked: they belong to an
--- already-authorized group conversation and must remain continuable.
-
--- 7) Service-only account archive helper.
+-- 6) Service-only account archive helper.
 -- The helper is called internally by the SECURITY DEFINER prepare RPC; do not
 -- broaden schema USAGE on the private schema just for this internal call.
 
@@ -439,7 +374,7 @@ REVOKE ALL ON FUNCTION private.archive_account_characters(uuid)
 GRANT EXECUTE ON FUNCTION private.archive_account_characters(uuid)
   TO service_role;
 
--- 8) Transactional integration with the live prepare_account_deletion(uuid).
+-- 7) Transactional integration with the live prepare_account_deletion(uuid).
 -- The complete replacement function, copied from the current test-DB definition
 -- and amended with safe retry handling, lives in:
 --   supabase/drafts/prepare-account-deletion-character-preservation-integration.sql
