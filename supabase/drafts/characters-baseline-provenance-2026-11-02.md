@@ -380,3 +380,24 @@ The manual workflow starts a disposable local stack and then runs `supabase db r
 ## Decision
 
 Do not reconstruct `characters` / `profiles` from the compact table inventory and do not run the current workflow as if it were a valid end-to-end database test. The safe next source is a trusted schema-only dump or the original project bootstrap SQL from its true provenance. Once obtained, compare it against the live catalog and the migration sequence, then mark any local-only reconstruction as explicitly synthetic and separately reviewed. No application rows were queried by this follow-up, and no hosted writes were performed.
+
+
+## 2026-11-02｜第二十八輪：擴大搜尋備份分支與 bootstrap 歷史
+
+### 本輪查核
+
+- GitHub branch search 找到舊分支 v1-backup，並另外檢查 chore/bootstrap-local-migration-replay-workflow 與目前 PR 分支。
+- 在上述分支檢查常見 schema / bootstrap 位置：supabase/schema.sql、supabase/seed.sql、supabase/config.toml、supabase/migrations/20261017010847_account_deletion_worker.sql、根目錄 schema.sql、database/schema.sql 等；沒有找到可直接採信的 schema dump 或缺失 migration 原始檔。
+- GitHub commit search 以 characters migration、profiles migration、schema snapshot、initial schema、database bootstrap 等詞擴大查找；結果仍未提供可驗證的 foundational CREATE TABLE source。搜尋結果只能說明目前查詢未找到，不能證明私人 SQL Editor / Dashboard 歷史或所有未索引來源不存在。
+- 檢查可用 Supabase connector 能力：目前有 table inventory、migration metadata、catalog SQL、TypeScript types 等讀取能力，但沒有提供 schema-only pg_dump / migration source export 的專用動作。TypeScript types 也不足以重建 constraints、indexes、triggers、policies、grants 與 functions，因此不以它替代 schema dump。
+
+### 結論
+
+目前仍沒有可信來源可還原最初 public.characters / public.profiles 建表 SQL，也沒有找到缺失的 20261017010847_account_deletion_worker.sql。不能僅憑備份分支名稱或目前 live catalog 推定存在完整備份。
+
+### 安全界線與下一步
+
+- 沒有建立 synthetic baseline、沒有新增 migration、沒有 reset local stack 或 hosted DB。
+- 沒有執行 hosted DDL/DML、帳號刪除 RPC、Auth user 建立/刪除、Worker deployment 或 cron。
+- PR #200 維持 Draft/unmerged。
+- 下一個可靠來源需由原始專案 SQL Editor 歷史、使用者保存的 SQL 匯出，或由有權限的資料庫管理流程產生 schema-only dump（排除所有應用資料列）提供。取得後才進行逐項 schema 對照。
