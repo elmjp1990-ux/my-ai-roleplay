@@ -76,3 +76,13 @@ Updated `.github/workflows/account-deletion-worker-tests.yml` to run when the ch
 4. account_is_active() must be integrated and tested against a stale JWT after Auth deletion.
 5. Full schema baseline, migration provenance, clean-room replay, and Storage E2E remain outstanding.
 6. Account-deletion worker remains hard-disabled; PR #200 remains Draft/unmerged.
+
+
+## CI confirmation — 2026-11-02
+
+Static guard and worker checks completed successfully on code head `e9a8d4683a3d5690a73f8e3325fd02f10da97626`:
+- Account deletion worker tests #151: **success** (includes account/character draft invariants).
+- Chat deletion worker tests #121: **success**.
+- Group background UI syntax check #849: **success**.
+
+These are static/worker-unit checks only. They do not execute the draft SQL, prove PostgreSQL syntax/replay, or replace stale-JWT/Auth cascade integration tests. The audit document was committed separately after the tested code head; no code changed in that documentation-only commit.
