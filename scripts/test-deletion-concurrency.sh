@@ -116,7 +116,7 @@ SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub', '$author', true);
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
 SELECT set_config('request.jwt.claims', '{"sub":"$author","role":"authenticated"}', true);
-DO \\$\\$
+DO \$\$
 DECLARE
   v_updated integer;
 BEGIN
@@ -128,7 +128,7 @@ BEGIN
     RAISE EXCEPTION 'post_archive_child_write_must_be_rejected';
   END IF;
 END;
-\\$\\$;
+\$\$;
 SQL
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/post-archive-write.sql" >/dev/null
 child_value="$(psql "$DATABASE_URL" -Atqc "SELECT activity FROM public.character_schedules WHERE id = '$schedule_id'")"
