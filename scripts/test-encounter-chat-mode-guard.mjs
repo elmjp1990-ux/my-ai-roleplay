@@ -25,6 +25,17 @@ assert.match(frontend, /localStorageCompactMode = true/);
 assert.match(frontend, /雲端聊天仍會照常同步/);
 assert.match(frontend, /character\\?\\.visibility!==['\"]public['\"]\\|\\|character\\.deletedAt\\|\\|!accessible\\(character\\)/);
 assert.match(frontend, /Author access to a private character is for management only/);
+
+assert.ok(frontend.includes("Object.prototype.hasOwnProperty.call(priorSnapshot,'authorId')"));
+assert.ok(frontend.includes("Object.prototype.hasOwnProperty.call(canonical,'authorId')"));
+assert.ok(frontend.includes("Object.prototype.hasOwnProperty.call(snap,'authorId')"));
+assert.ok(frontend.includes("creatorDisplayName:priorSnapshot.creatorDisplayName ?? character?.creatorDisplayName ?? ''"));
+assert.ok(frontend.includes("creatorHandleSnapshot:priorSnapshot.creatorHandleSnapshot ?? character?.creatorHandleSnapshot ?? ''"));
+assert.ok(frontend.includes("authorId:snapshot.authorId"));
+assert.ok(frontend.includes("creatorDisplayName:snapshot.creatorDisplayName ?? existingCharacter.creatorDisplayName ?? ''"));
+assert.ok(frontend.includes("BY ${e(creatorAttribution)}"));
+assert.ok(frontend.includes("c.authorId ? `<button class=\"author-link\""));
+
 assert.doesNotMatch(frontend, /const cityScheduleCache=new Map\(\)/);
 assert.match(frontend, /Always re-check through the server RPC when opening a city location/);
 assert.match(frontend, /character.encounterSchedules='';/);
