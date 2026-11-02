@@ -24,6 +24,7 @@ DECLARE
   v_chat_assistant_message uuid := '60000000-0000-4000-8000-000000000003';
   v_chat_turn uuid := '70000000-0000-4000-8000-000000000002';
   v_group_continue_turn uuid;
+  v_group_deleted_character_turn uuid;
   v_chat_turn_status text;
   v_group uuid := '50000000-0000-4000-8000-000000000001';
   v_group_turn uuid := '60000000-0000-4000-8000-000000000001';
@@ -213,8 +214,8 @@ BEGIN
     RAISE EXCEPTION 'other_group_character_was_affected_by_single_character_delete';
   END IF;
 
-  -- Existing group remains usable. The deleted member stays in history but is
-  -- offline: only the remaining active AI speaks and is charged (3 silver).
+  -- Existing group membership remains durable after character deletion.
+  -- Both characters continue taking turns and both remain billable (3 silver each).
   v_group_continue_turn := public.append_chat_group_mock_turn(
     v_group,
     '70000000-0000-4000-8000-000000000003',
@@ -227,26 +228,43 @@ BEGIN
       AND speaker_type = 'character'
       AND character_id = v_group_other_draft
   ) THEN
-    RAISE EXCEPTION 'remaining_active_group_character_did_not_reply';
-  END IF;
-  IF EXISTS (
-    SELECT 1 FROM public.chat_group_messages
-    WHERE group_id = v_group
-      AND turn_id = v_group_continue_turn
-      AND speaker_type = 'character'
-      AND character_id = v_group_draft
-  ) THEN
-    RAISE EXCEPTION 'deleted_group_character_must_not_speak_again';
+    RAISE EXCEPTION 'remaining_group_character_did_not_reply';
   END IF;
   IF NOT EXISTS (
     SELECT 1 FROM public.chat_group_turn_charges
     WHERE group_id = v_group
       AND group_turn_id = v_group_continue_turn
-      AND member_count = 1
-      AND cost = 3
+      AND member_count = 2
+      AND cost = 6
       AND status = 'settled'
   ) THEN
-    RAISE EXCEPTION 'group_turn_must_charge_only_remaining_active_character';
+    RAISE EXCEPTION 'group_turn_must_charge_all_existing_characters';
+  END IF;
+
+  -- The next round-robin slot is the deleted character; it must still reply.
+  v_group_deleted_character_turn := public.append_chat_group_mock_turn(
+    v_group,
+    '70000000-0000-4000-8000-000000000004',
+    'The deleted character should still answer in the existing group'
+  );
+  IF NOT EXISTS (
+    SELECT 1 FROM public.chat_group_messages
+    WHERE group_id = v_group
+      AND turn_id = v_group_deleted_character_turn
+      AND speaker_type = 'character'
+      AND character_id = v_group_draft
+  ) THEN
+    RAISE EXCEPTION 'deleted_group_character_must_continue_speaking';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.chat_group_turn_charges
+    WHERE group_id = v_group
+      AND group_turn_id = v_group_deleted_character_turn
+      AND member_count = 2
+      AND cost = 6
+      AND status = 'settled'
+  ) THEN
+    RAISE EXCEPTION 'deleted_group_character_must_remain_billable';
   END IF;
 
   -- Encounter relationship and diary rows are player history and must survive character deletion.
