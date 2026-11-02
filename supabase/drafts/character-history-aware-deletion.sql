@@ -374,10 +374,6 @@ BEGIN
         RAISE EXCEPTION 'character_asset_path_not_owned_or_invalid'
           USING ERRCODE = '22023';
       END IF;
-      INSERT INTO public.character_asset_cleanup_jobs
-        (bucket_id, object_path, owner_id, character_id)
-      VALUES ('character-avatar-videos', v_avatar_video_path, auth.uid(), p_character_id)
-      ON CONFLICT (bucket_id, object_path) DO NOTHING;
     END IF;
 
     -- Acquire the same advisory locks as reference-write triggers in stable
@@ -396,6 +392,17 @@ BEGIN
     LOOP
       PERFORM private.lock_character_asset_path(v_asset.bucket_id, v_asset.object_path);
     END LOOP;
+
+    -- Queue both asset types only after all exact-path advisory locks are held.
+    -- The reference-write trigger takes the same lock before checking the queue,
+    -- so a concurrent reattachment either commits first (worker later skips the
+    -- still-referenced object) or waits and is rejected after this job is visible.
+    IF v_avatar_video_path IS NOT NULL THEN
+      INSERT INTO public.character_asset_cleanup_jobs
+        (bucket_id, object_path, owner_id, character_id)
+      VALUES ('character-avatar-videos', v_avatar_video_path, auth.uid(), p_character_id)
+      ON CONFLICT (bucket_id, object_path) DO NOTHING;
+    END IF;
 
     INSERT INTO public.character_asset_cleanup_jobs
       (bucket_id, object_path, owner_id, character_id)
