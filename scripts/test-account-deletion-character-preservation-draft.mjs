@@ -125,17 +125,21 @@ assert.ok(archivedEntryFn, "database-level archived-character insert guard must 
 assert.match(archivedEntryFn, /SECURITY DEFINER/);
 assert.match(archivedEntryFn, /SET search_path TO ''/);
 assert.match(archivedEntryFn, /account_archived_at IS NOT NULL/);
-for (const table of [
-  "chat_sessions", "chat_group_members",
-  "encounter_session_lifecycle", "story_relationship_states",
+assert.match(archivedEntryFn, /world_character_id/);
+for (const [table, column] of [
+  ["chat_sessions", "character_id"],
+  ["chat_groups", "world_character_id"],
+  ["chat_group_members", "character_id"],
+  ["encounter_session_lifecycle", "character_id"],
+  ["story_relationship_states", "character_id"],
 ]) {
   assert.match(
     archivedEntryGuard,
-    new RegExp("BEFORE INSERT ON public[.]" + table),
+    new RegExp("BEFORE INSERT OR UPDATE OF " + column + " ON public[.]" + table),
   );
 }
-assert.doesNotMatch(archivedEntryGuard, /BEFORE INSERT ON public[.]chat_messages/);
-assert.doesNotMatch(archivedEntryGuard, /BEFORE INSERT ON public[.]chat_group_messages/);
+assert.doesNotMatch(archivedEntryGuard, /ON public[.]chat_messages/);
+assert.doesNotMatch(archivedEntryGuard, /ON public[.]chat_group_messages/);
 assert.match(archivedEntryGuard, /REVOKE ALL ON FUNCTION private[.]reject_account_archived_character_entry[(][)][\s\S]*?FROM PUBLIC, anon, authenticated, service_role/);
 
 // The existing deleting retry must not require a profile that may already be gone.
