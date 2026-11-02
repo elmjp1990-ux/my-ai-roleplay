@@ -35,3 +35,20 @@ Important provenance limitation: the ledger stores executable statements, not ne
 - All seven versions/names were present in the 152-row live migration ledger at time of inspection.
 - The restored SQL files were committed to PR #200. GitHub CI and disposable schema replay are being re-run after the restorations.
 - No hosted database, Auth, Storage, Edge Function, or Cron state was modified.
+
+
+## Additional chat access / billing source recovery
+
+A second read-only pass recovered five more migration statement bodies relevant to the old-chat continuation and billing path:
+
+| Migration | Restored file | Why it matters |
+|---|---|---|
+| `20261015130752 chat_session_character_access` | `supabase/migrations/20261015130752_chat_session_character_access.sql` | New chat INSERT is restricted to eligible characters; existing chat sessions are explicitly unaffected |
+| `20261015133300 chat_turn_transaction_functions` | `supabase/migrations/20261015133300_chat_turn_transaction_functions.sql` | Original reserve/settle/refund transaction RPCs and assistant insert guard |
+| `20261015134109 chat_turn_ledger_idempotency` | `supabase/migrations/20261015134109_chat_turn_ledger_idempotency.sql` | Wallet transaction idempotency unique index for chat turn charge/refund |
+| `20261015145637 fix_reserve_chat_turn_conflict_target` | `supabase/migrations/20261015145637_fix_reserve_chat_turn_conflict_target.sql` | Correct primary-key conflict target in reserve RPC |
+| `20261017100648 chat_turn_existing_retry_recovery_order` | `supabase/migrations/20261017100648_chat_turn_existing_retry_recovery_order.sql` | Lock/recover stable existing turn before validating user message visibility; supports idempotent retry |
+
+All five versions/names exist in the connected test project's ledger and each has one stored SQL statement. These are historical sources only; later migrations may replace their function bodies. They are not being applied to the hosted test project.
+
+Total migration SQL statement bodies recovered in this note: **12** (seven deletion/account/storage items plus five chat-access/billing items). The remaining timestamp collisions, legacy filenames, and pre-ledger foundation gap remain unchanged.
