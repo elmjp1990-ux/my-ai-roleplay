@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.character_asset_cleanup_jobs (
   owner_id uuid NOT NULL,
   character_id uuid NOT NULL,
   status text NOT NULL DEFAULT 'pending'
-    CHECK (status IN ('pending', 'processing', 'completed', 'skipped', 'failed')),
+    CHECK (status IN ('pending', 'processing', 'completed', 'skipped', 'failed', 'dead_letter')),
   attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
   available_at timestamptz NOT NULL DEFAULT now(),
   claimed_at timestamptz,
@@ -232,11 +232,22 @@ BEGIN
     RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
   END IF;
   RETURN QUERY
+  UPDATE public.character_asset_cleanup_jobs j
+  SET status = 'dead_letter',
+      claimed_at = NULL,
+      last_error = COALESCE(j.last_error, 'lease_expired_after_max_attempts'),
+      updated_at = pg_catalog.statement_timestamp()
+  WHERE j.status = 'processing'
+    AND j.claimed_at < pg_catalog.statement_timestamp() - interval '15 minutes'
+    AND j.attempts >= 8;
+
   WITH due AS (
     SELECT j.id
     FROM public.character_asset_cleanup_jobs j
-    WHERE j.status IN ('pending', 'failed')
-      AND j.available_at <= pg_catalog.statement_timestamp()
+    WHERE (
+        (j.status IN ('pending', 'failed') AND j.available_at <= pg_catalog.statement_timestamp())
+        OR (j.status = 'processing' AND j.claimed_at < pg_catalog.statement_timestamp() - interval '15 minutes')
+      )
       AND j.attempts < 8
     ORDER BY j.created_at
     FOR UPDATE SKIP LOCKED
@@ -267,16 +278,16 @@ BEGIN
   IF (auth.jwt() ->> 'role') IS DISTINCT FROM 'service_role' THEN
     RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
   END IF;
-  IF p_status NOT IN ('completed', 'skipped', 'failed') THEN
+  IF p_status NOT IN ('completed', 'skipped', 'failed', 'dead_letter') THEN
     RAISE EXCEPTION 'invalid_cleanup_status' USING ERRCODE = '22023';
   END IF;
   UPDATE public.character_asset_cleanup_jobs j
-  SET status = p_status,
-      last_error = CASE WHEN p_status = 'failed' THEN left(COALESCE(p_error, 'unknown'), 1000) ELSE NULL END,
+  SET status = CASE WHEN p_status = 'failed' AND j.attempts >= 8 THEN 'dead_letter' ELSE p_status END,
+      last_error = CASE WHEN p_status IN ('failed', 'dead_letter') THEN left(COALESCE(p_error, 'unknown'), 1000) ELSE NULL END,
       available_at = CASE WHEN p_status = 'failed'
         THEN pg_catalog.statement_timestamp() + pg_catalog.make_interval(mins => LEAST(60, (2 ^ LEAST(j.attempts, 6))::integer))
         ELSE j.available_at END,
-      completed_at = CASE WHEN p_status IN ('completed', 'skipped') THEN pg_catalog.statement_timestamp() ELSE NULL END,
+      completed_at = CASE WHEN p_status IN ('completed', 'skipped', 'dead_letter') THEN pg_catalog.statement_timestamp() ELSE NULL END,
       claimed_at = NULL,
       updated_at = pg_catalog.statement_timestamp()
   WHERE j.id = p_job_id AND j.status = 'processing';
