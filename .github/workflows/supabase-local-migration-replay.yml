@@ -119,6 +119,10 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/build-disposable-schema-fixture.mjs > "$RUNNER_TEMP/current-state-schema.sql"
+          # The live snapshot includes default ACLs owned by Supabase platform roles.
+          # In this disposable local instance only, grant postgres membership so it
+          # can reproduce those ALTER DEFAULT PRIVILEGES statements.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'GRANT supabase_admin, supabase_auth_admin TO postgres;'
           # Synthetic current-state baseline is intentional: the original pre-ledger
           # profiles/characters foundation is unavailable. Do not replay old migrations.
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
