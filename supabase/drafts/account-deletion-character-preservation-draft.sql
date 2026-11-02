@@ -189,6 +189,45 @@ AS $function$
   );
 $function$;
 
+-- City/map schedule discovery must also hide account-archived characters,
+-- while public character discovery itself continues to return public works.
+CREATE OR REPLACE FUNCTION public.get_encounter_character_schedule(p_character_id uuid)
+RETURNS TABLE(
+  weekday smallint,
+  day_type text,
+  start_time time without time zone,
+  end_time time without time zone,
+  location_key text,
+  activity text,
+  priority smallint
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT
+    s.weekday, s.day_type, s.start_time, s.end_time,
+    s.location_key, s.activity, s.priority
+  FROM public.characters AS c
+  JOIN public.character_schedules AS s ON s.character_id = c.id
+  WHERE c.id = p_character_id
+    AND c.account_archived_at IS NULL
+    AND c.visibility = 'public'
+    AND c.deleted_at IS NULL
+    AND c.review_status = 'approved'
+    AND c.rights_confirmed IS TRUE
+    AND s.is_active IS TRUE
+    AND (
+      c.is_nsfw IS NOT TRUE
+      OR (
+        (SELECT auth.uid()) IS NOT NULL
+        AND private.current_user_is_adult()
+      )
+    )
+  ORDER BY s.priority DESC, s.weekday NULLS FIRST, s.start_time;
+$function$;
+
 -- CREATE OR REPLACE preserves the currently audited function ownership and
 -- EXECUTE ACLs; verify both again after local replay.
 
