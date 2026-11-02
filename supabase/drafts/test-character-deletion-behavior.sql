@@ -461,4 +461,4 @@ BEGIN
     RAISE EXCEPTION 'asset_cleanup_queue_rls_must_be_enabled';
   END IF;
 END;
-$;
+$$;
