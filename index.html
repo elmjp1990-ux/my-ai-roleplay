@@ -9211,13 +9211,13 @@ document.addEventListener('submit',async event => {
         const c=state.characters.find(c=>c.id===o.id);
         const user=currentUser();
         if (!owned(c) || !user?.uid || !window.mySupabase) return toast('請登入後再刪除角色。');
-        if (!confirm('最後確認：將角色下架？公開列表會隱藏，既有聊天保留，新對話將被禁止。')) return;
+        if (!confirm('最後確認：刪除角色？公開列表會隱藏；若已有聊天、相遇或故事紀錄，系統會保留既有紀錄並封存角色。')) return;
         const { data: authResult, error: authError } = await window.mySupabase.auth.getUser();
         if (authError || authResult?.user?.id !== user.uid) throw new Error('登入狀態驗證失敗，請重新登入。');
         const { data: deletedAt, error: deleteError } = await window.mySupabase
           .rpc('soft_delete_character',{p_character_id:c.id});
-        if (deleteError) throw new Error('角色軟刪除失敗：'+deleteError.message);
-        if (!deletedAt) throw new Error('資料庫未確認角色下架成功，請重新整理後再試。');
+        if (deleteError) throw new Error('角色刪除失敗：'+deleteError.message);
+        if (!deletedAt) throw new Error('資料庫未確認角色刪除成功，請重新整理後再試。');
         c.visibility='private';c.deletedAt=deletedAt;c.deletionReason='author_deleted';
         for (const session of Object.values(state.sessions)) {
           if (session.characterId===c.id) {
@@ -9237,7 +9237,7 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         state.favorites=state.favorites.filter(v=>v!==c.id);
         delete state.comments[c.id];
         persist();go({page:'create'},true);
-        toast('角色已下架；既有聊天保留，不能再開啟新對話。');
+        toast('角色已刪除；有歷史紀錄的角色會保留既有內容，且不能再開啟新對話。');
         break;
       }
       case 'profile': {
