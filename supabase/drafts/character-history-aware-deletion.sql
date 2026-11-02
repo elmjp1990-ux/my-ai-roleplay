@@ -3,6 +3,8 @@
 -- Do not execute against the hosted test project. Replay only on a disposable
 -- PostgreSQL database after the full migration ledger has been reconciled.
 --
+CREATE SCHEMA IF NOT EXISTS private;
+
 -- Policy:
 --   * Any publication OR any single/group/legacy/encounter/story/comment record
 --     => soft-delete only; all existing player history remains.
