@@ -2995,11 +2995,11 @@ async function saveChatSessionToCloud(s, options = {}) {
     style:character?.style ?? priorSnapshot.style ?? '',
     phoneSettings:character?.phoneSettings ?? priorSnapshot.phoneSettings ?? {},
     tags:Array.isArray(character?.tags) ? character.tags : (Array.isArray(priorSnapshot.tags) ? priorSnapshot.tags : []),
-    authorId:Object.prototype.hasOwnProperty.call(priorSnapshot,'authorId')
+    authorId:Object.prototype.hasOwnProperty.call(priorSnapshot,'authorId') && priorSnapshot.authorId !== ''
       ? priorSnapshot.authorId
       : (character?.authorId ?? ''),
-    creatorDisplayName:priorSnapshot.creatorDisplayName ?? character?.creatorDisplayName ?? '',
-    creatorHandleSnapshot:priorSnapshot.creatorHandleSnapshot ?? character?.creatorHandleSnapshot ?? '',
+    creatorDisplayName:priorSnapshot.creatorDisplayName || character?.creatorDisplayName || '',
+    creatorHandleSnapshot:priorSnapshot.creatorHandleSnapshot || character?.creatorHandleSnapshot || '',
     accountArchivedAt:priorSnapshot.accountArchivedAt ?? character?.accountArchivedAt ?? null,
     visibility:priorSnapshot.visibility || character?.visibility || 'private',
     firstPublishedAt:priorSnapshot.firstPublishedAt || character?.firstPublishedAt || null,
@@ -3020,9 +3020,9 @@ async function saveChatSessionToCloud(s, options = {}) {
       const { privateInfo: _legacyExistingPrivateInfo, ...safeExistingSnapshot } = existingSnapshot || {};
       s.cloudCharacterSnapshot = existingSnapshot ? safeExistingSnapshot : snapshot;
       const canonical = s.cloudCharacterSnapshot;
-      if (Object.prototype.hasOwnProperty.call(canonical,'authorId')) snapshot.authorId = canonical.authorId;
-      snapshot.creatorDisplayName = canonical.creatorDisplayName ?? snapshot.creatorDisplayName;
-      snapshot.creatorHandleSnapshot = canonical.creatorHandleSnapshot ?? snapshot.creatorHandleSnapshot;
+      if (Object.prototype.hasOwnProperty.call(canonical,'authorId') && canonical.authorId !== '') snapshot.authorId = canonical.authorId;
+      snapshot.creatorDisplayName = canonical.creatorDisplayName || snapshot.creatorDisplayName;
+      snapshot.creatorHandleSnapshot = canonical.creatorHandleSnapshot || snapshot.creatorHandleSnapshot;
       snapshot.accountArchivedAt = canonical.accountArchivedAt ?? snapshot.accountArchivedAt;
       snapshot.visibility = canonical.visibility || snapshot.visibility;
       snapshot.firstPublishedAt = canonical.firstPublishedAt || snapshot.firstPublishedAt;
@@ -3222,7 +3222,8 @@ async function loadCloudChatSessions(user) {
         if (existingCharacterIndex >= 0) {
           const existingCharacter = state.characters[existingCharacterIndex];
           // 雲端快照是既有聊天的權威來源；明確的 authorId:null 必須清除本機舊作者 ID。
-          if (Object.prototype.hasOwnProperty.call(snapshot,'authorId')) {
+          if (Object.prototype.hasOwnProperty.call(snapshot,'authorId') &&
+              (snapshot.authorId === null || isUuid(snapshot.authorId))) {
             state.characters[existingCharacterIndex] = {
               ...existingCharacter,
               authorId:snapshot.authorId,
@@ -3235,7 +3236,7 @@ async function loadCloudChatSessions(user) {
         } else {
           state.characters.push({...snapshot, id:row.character_id, name:snapshot.name || row.character_name || '角色',
             visibility:'private', reviewStatus:'draft',
-            authorId:Object.prototype.hasOwnProperty.call(snapshot,'authorId') ? snapshot.authorId : null,
+            authorId:Object.prototype.hasOwnProperty.call(snapshot,'authorId') && snapshot.authorId !== '' ? snapshot.authorId : null,
             creatorDisplayName:snapshot.creatorDisplayName || '',
             creatorHandleSnapshot:snapshot.creatorHandleSnapshot || '',
             accountArchivedAt:snapshot.accountArchivedAt || null,
