@@ -4,7 +4,15 @@
 \set ON_ERROR_STOP on
 
 CREATE SCHEMA IF NOT EXISTS storage;
-CREATE TABLE IF NOT EXISTS storage.objects (bucket_id text NOT NULL, name text NOT NULL);
+DO $storage_stub$
+BEGIN
+  -- Reuse Supabase Local's protected storage.objects; create only the stub
+  -- required by plain disposable PostgreSQL when the relation is absent.
+  IF pg_catalog.to_regclass('storage.objects') IS NULL THEN
+    CREATE TABLE storage.objects (bucket_id text NOT NULL, name text NOT NULL);
+  END IF;
+END;
+$storage_stub$;
 
 \i supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql
 \i supabase/drafts/chat-deletion-direct-parent-delete-privilege-guard.sql
