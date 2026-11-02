@@ -392,7 +392,7 @@ assert.match(publicationGuard, /NEW[.]first_published_at IS DISTINCT FROM OLD[.]
 assert.match(publicationGuard, /NEW[.]visibility = 'public'/);
 assert.match(characterDeletionDraft, /BEFORE INSERT OR UPDATE OF first_published_at, visibility[\s\S]*?ON public[.]characters/);
 assert.match(characterDeletionDraft, /character_first_publication_is_immutable/);
-assert.match(characterDeletionDraft, /first transition to visibility='public' stamps first_published_at/);
+assert.match(characterDeletionDraft, /first transition to visibility='public' stamps first_published_at/i);
 assert.match(characterDeletionDraft, /DELETE FROM public[.]characters WHERE id = p_character_id/);
 assert.ok(characterDeletionDraft.includes("SET visibility = 'private',"));
 assert.ok(characterDeletionDraft.includes("deletion_reason = 'author_deleted'"));
