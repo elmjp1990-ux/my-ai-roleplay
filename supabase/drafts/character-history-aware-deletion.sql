@@ -125,12 +125,50 @@ CREATE TRIGGER preserve_character_first_publication_timestamp
   FOR EACH ROW
   EXECUTE FUNCTION private.preserve_character_first_publication_timestamp();
 
+-- Direct table DELETE would bypass history checks and Storage queue creation.
+-- The SECURITY DEFINER soft_delete_character() RPC remains the only client path.
+REVOKE DELETE ON TABLE public.characters FROM PUBLIC, anon, authenticated;
+
+-- Legacy conversations cascade from character_stories. Prevent an author from
+-- deleting a story template that still anchors another player's legacy transcript.
+CREATE OR REPLACE FUNCTION private.prevent_character_story_delete_with_conversations()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM public.conversations AS cv
+    WHERE cv.story_id = OLD.id
+  ) THEN
+    RAISE EXCEPTION 'character_story_has_chat_history'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN OLD;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.prevent_character_story_delete_with_conversations()
+  FROM PUBLIC, anon, authenticated, service_role;
+
+DROP TRIGGER IF EXISTS prevent_character_story_delete_with_conversations
+  ON public.character_stories;
+CREATE TRIGGER prevent_character_story_delete_with_conversations
+  BEFORE DELETE ON public.character_stories
+  FOR EACH ROW
+  EXECUTE FUNCTION private.prevent_character_story_delete_with_conversations();
+
 -- Disposable PostgreSQL acceptance:
 -- 1. First transition to visibility='public' stamps first_published_at.
 -- 2. A later visibility='private' update retains the timestamp.
 -- 3. Attempting to clear/change a non-NULL timestamp fails.
 -- 4. A never-public private draft keeps first_published_at NULL.
--- 5. The history-aware hard-delete branch cannot be reached by clearing the marker.
+-- 5. Direct DELETE from characters is denied to anon/authenticated.
+-- 6. Deleting a story with a legacy conversation is rejected; unused story
+--    templates may still be deleted.
+-- 7. The history-aware hard-delete branch cannot be reached by clearing the marker.
 
 CREATE OR REPLACE FUNCTION public.soft_delete_character(p_character_id uuid)
 RETURNS timestamptz
