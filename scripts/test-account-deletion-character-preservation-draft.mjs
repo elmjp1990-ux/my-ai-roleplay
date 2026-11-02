@@ -393,6 +393,15 @@ assert.match(publicationGuard, /NEW[.]visibility = 'public'/);
 assert.match(characterDeletionDraft, /BEFORE INSERT OR UPDATE OF first_published_at, visibility[\s\S]*?ON public[.]characters/);
 assert.match(characterDeletionDraft, /character_first_publication_is_immutable/);
 assert.match(characterDeletionDraft, /first transition to visibility='public' stamps first_published_at/i);
+assert.match(characterDeletionDraft, /REVOKE DELETE ON TABLE public[.]characters FROM PUBLIC, anon, authenticated/);
+const storyDeleteGuard = characterDeletionDraft.match(
+  /CREATE OR REPLACE FUNCTION private[.]prevent_character_story_delete_with_conversations[(][\\s\\S]*?\\$function\\$;/,
+)?.[0];
+assert.ok(storyDeleteGuard, "legacy story delete history guard must exist");
+assert.match(storyDeleteGuard, /FROM public[.]conversations AS cv/);
+assert.match(storyDeleteGuard, /cv[.]story_id = OLD[.]id/);
+assert.match(storyDeleteGuard, /character_story_has_chat_history/);
+assert.match(characterDeletionDraft, /BEFORE DELETE ON public[.]character_stories/);
 assert.match(characterDeletionDraft, /DELETE FROM public[.]characters WHERE id = p_character_id/);
 assert.ok(characterDeletionDraft.includes("SET visibility = 'private',"));
 assert.ok(characterDeletionDraft.includes("deletion_reason = 'author_deleted'"));
