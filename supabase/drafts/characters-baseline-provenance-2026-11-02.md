@@ -269,3 +269,28 @@ Only Edge Function inventory, repository tree, and SELECT from cron.job were ins
 ### Current status
 
 Implementation draft exists on PR #200 branch only. PR remains Draft/unmerged. No live DB mutation, no account deletion invocation, no Edge Function deployment, and no schedule change occurred.
+
+## Account-deletion post-Auth crash recovery fix — 2026-11-02
+
+### Defect found during end-to-end control-flow review
+
+The SQL work-item function deliberately includes a second result set for batches still in `deleting` when the corresponding account_deletion_requests row no longer exists. This is the recovery path after Auth Admin deletion cascades away the request row but the worker crashes before finalize.
+
+The initial worker implementation ignored `work_status` / `batch_id` and always called archive_account_deletion_data() first. That RPC requires a due request row, so it would fail on precisely this post-Auth/pre-finalize recovery case. The existing 5 unit tests did not cover it.
+
+### Fix
+
+- For a work item with `work_status = deleting` and a non-null `batch_id`, the worker first checks Auth Admin for the target user.
+- If Auth confirms the user is absent, the worker calls finalize(batch_id) directly. The finalize RPC independently verifies Auth absence and batch status before completion.
+- If the Auth user still exists, the worker follows the normal archive → prepare → Auth delete → finalize path.
+- Any lookup error is fail-closed by the outer error handler; no finalize is attempted unless absence is positively confirmed.
+
+### Added regression tests
+
+- Auth user absent + deleting batch: only Auth lookup and finalize are called; no request-dependent archive/prepare call.
+- Auth user still exists + deleting batch: normal retry path continues; no premature finalize.
+
+### Verification
+
+- New CI run: GitHub Actions run 41365781489; status was in progress at documentation time. Do not claim pass until completed.
+- This is a static/unit-test correction only. No Auth user was deleted, no worker deployed, no cron created, and no hosted DB mutation occurred.
