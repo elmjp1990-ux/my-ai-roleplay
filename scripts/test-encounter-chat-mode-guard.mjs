@@ -30,8 +30,8 @@ assert.ok(frontend.includes("Object.prototype.hasOwnProperty.call(priorSnapshot,
 assert.ok(frontend.includes("snapshot.authorId === null || isUuid(snapshot.authorId)"));
 assert.ok(frontend.includes("Object.prototype.hasOwnProperty.call(canonical,'authorId') && canonical.authorId !== ''"));
 assert.ok(frontend.includes("Object.prototype.hasOwnProperty.call(snap,'authorId') ? snap.authorId : ''"));
-assert.ok(frontend.includes("creatorDisplayName:priorSnapshot.creatorDisplayName ?? character?.creatorDisplayName ?? ''"));
-assert.ok(frontend.includes("creatorHandleSnapshot:priorSnapshot.creatorHandleSnapshot ?? character?.creatorHandleSnapshot ?? ''"));
+assert.ok(frontend.includes("creatorDisplayName:priorSnapshot.creatorDisplayName || character?.creatorDisplayName || ''"));
+assert.ok(frontend.includes("creatorHandleSnapshot:priorSnapshot.creatorHandleSnapshot || character?.creatorHandleSnapshot || ''"));
 assert.ok(frontend.includes("authorId:snapshot.authorId"));
 assert.ok(frontend.includes("creatorDisplayName:snapshot.creatorDisplayName ?? existingCharacter.creatorDisplayName ?? ''"));
 assert.ok(frontend.includes("BY ${e(creatorAttribution)}"));
