@@ -244,3 +244,26 @@ Additional older variants:
 - The sixth candidate is a same-name/different-version variant and must not be relabeled as the remote source without proving the SQL matches.
 - 51 of the 57 remote-only migration names were not found in this selected branch scan. This does not prove they are absent from all Git history or private/manual SQL sources.
 - Do not copy these historical files into the active migration directory or replay them until the complete order, dependencies, duplicate timestamps, and current architecture have been reconciled.
+
+
+## Source commit provenance and safety review
+
+The branch-specific GitHub commit history was checked for the five recovered files. These are source additions/filename-alignment commits, not proof that the current active branch should replay them unchanged.
+
+| File | Source commit | Commit message / date | Evidence |
+|---|---|---|---|
+| `20261017010838_preserve_group_history_on_character_delete.sql` | `7a993d0af80d34d194228823cbbb3ea5493ca157` | `chore: align migration filename with applied test migration version` — 2026-10-17 01:10:53Z | Commit adds 86-line migration |
+| `20261017010841_account_deletion_grace_period_config.sql` | `d7768435c9e7b2552816a2282efee26367c4430e` | `chore: align migration filename with applied test migration version` — 2026-10-17 01:10:58Z | Commit adds 50-line migration |
+| `20261017010847_account_deletion_worker.sql` | `e8ecf796c105db3aac9e79beb6b2d369236b766e` | `chore: align migration filename with applied test migration version` — 2026-10-17 01:11:03Z | Commit adds 395-line migration; later comment-only rollout wording change in `af34cf3bed63182adf1cfe9c82b792d3c5d6421b` |
+| `20261017035145_guard_group_mock_turn_during_deletion.sql` | `a855de8680542ea18da8c79122f076b0b1f85df2` | `Align group-turn guard migration filename with test DB history` — 2026-10-17 05:37:58Z | Commit adds 121-line migration |
+| `20261017040730_guard_snapshot_sync_during_deletion.sql` | `81fe5d5ba749a7d19169c6eee6cec251a09d4356` | `Align snapshot-sync guard migration filename with test DB history` — 2026-10-17 05:38:01Z | Commit adds 54-line migration |
+
+### Safety findings from recovered SQL
+
+- **Account deletion worker migration is not safe as the final implementation under the current user-approved requirements.** Its `prepare_account_deletion(p_user_id)` archives selected financial/chat evidence, then deletes `ai_generation_records`, owned message versions, `chat_turn_charges`, `wallet_transactions`, and the account's legacy `conversations`; it relies on profile/character CASCADE relationships for further cleanup. It does not preserve and detach all character rows, private settings, schedules, stories, illustration metadata, avatar video references, and historical creator attribution. Do not re-enable this worker or replay it as the final deletion design.
+- `preserve_group_history_on_character_delete` backfills `speaker_snapshot`, makes group member/message `character_id` nullable, and changes those FKs to `ON DELETE SET NULL`. This preserves group speaker display data but does not by itself satisfy single-chat, encounter/story, media, or durable creator-attribution requirements.
+- `account_deletion_grace_period_config` intentionally does not seed a grace period and makes the request RPC fail closed until the environment has a setting. Keep environment-specific timing out of the migration source.
+- `guard_group_mock_turn_during_deletion` protects a legacy mock group-turn RPC with account-active, owner, and idempotency checks; confirm whether any live frontend path still uses it before treating it as part of the new canonical chat model.
+- `guard_snapshot_sync_during_deletion` requires the authenticated character author and blocks pending deletion, but updates snapshots for every `chat_sessions` row for that character. Integrate only after verifying the new existing-session snapshot/continuation rules; it is not a replacement for durable ownership detachment.
+
+These recovered files are retained as historical source evidence only. No file was copied into `supabase/migrations/`, and no hosted or local migration was executed.
