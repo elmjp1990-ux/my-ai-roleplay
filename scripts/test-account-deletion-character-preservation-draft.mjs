@@ -183,6 +183,13 @@ assert.match(archivedEntryFn, /FOR KEY SHARE/);
 assert.match(archivedEntryFn, /character_not_available/);
 assert.match(archivedEntryFn, /world_character_id/);
 assert.match(archivedEntryFn, /Serialize new-entry creation with/);
+assert.match(archivedEntryFn, /character_stories AS cs/);
+assert.match(archivedEntryFn, /to_jsonb[(]NEW[)] ->> 'story_id'/);
+assert.match(
+  archivedEntryGuard,
+  /BEFORE INSERT OR UPDATE OF story_id ON public[.]conversations/,
+);
+assert.doesNotMatch(archivedEntryGuard, /ON public[.]messages/);
 for (const [table, column] of [
   ["chat_sessions", "character_id"],
   ["chat_groups", "world_character_id"],
@@ -198,6 +205,38 @@ for (const [table, column] of [
 assert.doesNotMatch(archivedEntryGuard, /ON public[.]chat_messages/);
 assert.doesNotMatch(archivedEntryGuard, /ON public[.]chat_group_messages/);
 assert.match(archivedEntryGuard, /REVOKE ALL ON FUNCTION private[.]reject_account_archived_character_entry[(][)][\s\S]*?FROM PUBLIC, anon, authenticated, service_role/);
+
+
+// Character hard-delete draft: never-published + zero-history is the only
+// destructive exception. Unknown review states must remain soft-delete only.
+const characterDeletionDraft = fs.readFileSync(
+  "supabase/drafts/character-history-aware-deletion.sql",
+  "utf8",
+);
+assert.match(characterDeletionDraft, /^-- DRAFT ONLY — NOT AN ACTIVE MIGRATION\./);
+assert.match(characterDeletionDraft, /v_first_published_at IS NULL[\s\S]*?v_visibility = 'private'[\s\S]*?v_review_status = 'draft'[\s\S]*?NOT v_has_history/);
+assert.doesNotMatch(characterDeletionDraft, /v_review_status <> 'approved'/);
+for (const pattern of [
+  /public[.]chat_sessions/,
+  /public[.]chat_group_members/,
+  /public[.]chat_group_messages/,
+  /public[.]chat_deletion_character_history/,
+  /public[.]chat_groups/,
+  /public[.]conversations[\s\S]*?public[.]character_stories/,
+  /public[.]encounter_character_state/,
+  /public[.]encounter_diary/,
+  /public[.]encounter_turn_interaction_receipts/,
+  /public[.]encounter_session_lifecycle/,
+  /public[.]encounter_session_turns/,
+  /public[.]encounter_session_evaluation_jobs/,
+  /public[.]story_relationship_batches/,
+  /public[.]story_relationship_states/,
+  /public[.]character_comments/,
+]) assert.match(characterDeletionDraft, pattern);
+assert.match(characterDeletionDraft, /character-avatar-videos/);
+assert.match(characterDeletionDraft, /character-illustrations/);
+assert.match(characterDeletionDraft, /CREATE TABLE IF NOT EXISTS public[.]character_asset_cleanup_jobs/);
+assert.doesNotMatch(characterDeletionDraft, /DELETE FROM storage[.]objects/);
 
 // The existing deleting retry must not require a profile that may already be gone.
 // A legacy deleting batch is healed only if still-owned character rows exist.
