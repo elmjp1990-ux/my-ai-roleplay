@@ -83,6 +83,9 @@ assert.match(continuation, /SELECT count\(\*\)::integer INTO v_member_count[\s\S
 assert.match(continuation, /SELECT count\(\*\)::integer INTO v_member_count[\s\S]*FROM public\.chat_group_members m[\s\S]*WHERE m\.group_id = p_group_id/);
 assert.match(behavior, /reserve_chat_turn\([\s\S]*v_chat_session[\s\S]*v_chat_assistant_message/);
 assert.match(behavior, /existing_single_chat_assistant_reply_rejected_after_character_delete/);
+assert.match(behavior, /non_author_character_delete_must_be_rejected_without_mutation/);
+assert.match(sql, /v_author_id IS DISTINCT FROM auth\\.uid\\(\\)[\\s\\S]*Not allowed to delete this character/);
+
 assert.match(behavior, /append_chat_group_mock_turn\([\s\S]*v_group/);
 assert.match(behavior, /deleted_group_character_must_continue_speaking/);
 assert.match(behavior, /deleted_group_character_must_remain_billable/);
