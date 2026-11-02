@@ -9,8 +9,8 @@ assert.match(sql, /^-- DRAFT ONLY — NOT AN ACTIVE MIGRATION\./);
 assert.match(sql, /Do not execute this file against the hosted Supabase project/);
 
 for (const table of ["characters", "character_private_info", "character_illustrations", "character_schedule_descriptions"]) {
-  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\\s\\S]*?ALTER COLUMN author_id DROP NOT NULL"));
-  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\\s\\S]*?ON DELETE SET NULL"));
+  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\s\S]*?ALTER COLUMN author_id DROP NOT NULL"));
+  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\s\S]*?ON DELETE SET NULL"));
 }
 assert.match(sql, /character_schedule_descriptions[\s\S]*?REFERENCES auth[.]users[(]id[)] ON DELETE SET NULL/);
 assert.match(sql, /creator_display_name/);
@@ -60,17 +60,17 @@ assert.match(integration, /SET search_path TO ''/);
 
 // The existing deleting retry must not require a profile that may already be gone.
 // A legacy deleting batch is healed only if still-owned character rows exist.
-const deletingBranch = integration.match(/IF FOUND AND v_status = 'deleting' THEN[\\s\\S]*?RETURN QUERY SELECT v_batch_id, p_user_id, 'deleting'::text;/)?.[0];
+const deletingBranch = integration.match(/IF FOUND AND v_status = 'deleting' THEN[\s\S]*?RETURN QUERY SELECT v_batch_id, p_user_id, 'deleting'::text;/)?.[0];
 assert.ok(deletingBranch, "deleting retry branch must exist");
-assert.match(deletingBranch, /IF EXISTS [(][\\s\\S]*?c[.]author_id = p_user_id[\\s\\S]*?PERFORM private[.]archive_account_characters[(]p_user_id[)][;]/);
+assert.match(deletingBranch, /IF EXISTS [(][\s\S]*?c[.]author_id = p_user_id[\s\S]*?PERFORM private[.]archive_account_characters[(]p_user_id[)][;]/);
 assert.ok(deletingBranch.indexOf("PERFORM private.archive_account_characters") < deletingBranch.indexOf("RETURN QUERY"));
 assert.match(deletingBranch, /RETURN QUERY SELECT v_batch_id, p_user_id, 'deleting'::text/);
 
 // Both non-terminal paths archive characters before billing cleanup/deleting state.
-const existingBatchBranch = integration.match(/ELSIF FOUND THEN[\\s\\S]*?ELSE[\\s\\S]*?SELECT a[.]batch_id INTO v_batch_id/)?.[0];
+const existingBatchBranch = integration.match(/ELSIF FOUND THEN[\s\S]*?ELSE[\s\S]*?SELECT a[.]batch_id INTO v_batch_id/)?.[0];
 assert.ok(existingBatchBranch, "existing batch branch must exist");
 assert.match(existingBatchBranch, /PERFORM private[.]archive_account_characters[(]p_user_id[)][;]/);
-const newBatchBranch = integration.match(/ELSE[\\s\\S]*?PERFORM private[.]archive_account_characters[(]p_user_id[)][;][\\s\\S]*?SELECT a[.]batch_id INTO v_batch_id/)?.[0];
+const newBatchBranch = integration.match(/ELSE[\s\S]*?PERFORM private[.]archive_account_characters[(]p_user_id[)][;][\s\S]*?SELECT a[.]batch_id INTO v_batch_id/)?.[0];
 assert.ok(newBatchBranch, "new batch branch must archive characters before archive batch creation");
 assert.equal((integration.match(/PERFORM private[.]archive_account_characters[(]p_user_id[)][;]/g) || []).length, 3);
 
@@ -84,13 +84,13 @@ for (const pattern of [
   /DELETE FROM public[.]chat_turn_charges/,
   /DELETE FROM public[.]wallet_transactions/,
   /DELETE FROM public[.]conversations WHERE user_id = p_user_id/,
-  /UPDATE public[.]chat_message_versions AS v[\\s\\S]*?SET edited_by = NULL/,
+  /UPDATE public[.]chat_message_versions AS v[\s\S]*?SET edited_by = NULL/,
 ]) assert.match(integration, pattern);
 
 // The worker's deleting recovery path must resume Auth/finalize only. It must not
 // re-run archive/prepare after the request/profile may have disappeared.
 const worker = fs.readFileSync("supabase/functions/_shared/account-deletion-worker.ts", "utf8");
-const recoveryBranch = worker.match(/if [(]item[.]work_status === "deleting" && batchId[)][\\s\\S]*?continue;/)?.[0];
+const recoveryBranch = worker.match(/if [(]item[.]work_status === "deleting" && batchId[)][\s\S]*?continue;/)?.[0];
 assert.ok(recoveryBranch, "worker deleting recovery branch must exist");
 assert.match(recoveryBranch, /deps[.]deleteAuthUser/);
 assert.match(recoveryBranch, /deps[.]finalize/);
@@ -100,7 +100,7 @@ const migrationsDir = "supabase/migrations";
 const activeSql = fs.readdirSync(migrationsDir)
   .filter((name) => name.endsWith(".sql"))
   .map((name) => fs.readFileSync(path.join(migrationsDir, name), "utf8"))
-  .join("\\n");
+  .join("\n");
 assert.doesNotMatch(activeSql, /archive_account_characters|account_archived_at/);
 assert.doesNotMatch(activeSql, /prepare_account_deletion[(]p_user_id uuid[)]/);
 
