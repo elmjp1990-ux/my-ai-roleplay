@@ -548,3 +548,49 @@ Next trusted sources: original SQL Editor history, a user-held SQL export, or an
 1. 以本輪 catalog evidence 補齊 dependency map，優先分析 profiles → characters 的 CASCADE 與帳號刪除 worker 的角色保留策略。
 2. 核對 supabase_admin default ACL 與各 migration 執行角色，確認未來新物件是否有權限擴張風險。
 3. 取得可信 schema-only dump 或明確批准 disposable-local-only baseline 後，再進行完整 PostgreSQL replay。
+
+
+## 2026-11-02｜Round 75：帳號刪除 worker 與 FK CASCADE 實作交叉驗證
+
+### 本輪檢查來源
+
+- `supabase/migrations/20261017010847_account_deletion_worker.sql`（從歷史分支恢復、原始 blob SHA `1e329c68a40f5ada56bf7dd47f9b64bf45a77367`）。
+- `supabase/functions/account-deletion-worker/index.ts`（目前 PR 分支）。
+- Supabase catalog Round 74 的 FK 定義。
+
+### 確認的關鍵問題
+
+1. SQL `prepare_account_deletion(p_user_id)` 會封存 AI / wallet / chat billing audit 資料，刪除部分使用者資料，並將 archive batch 標為 `deleting`；但該函式內沒有：
+   - `UPDATE public.characters`；
+   - 解除或轉移 `characters.author_id`；
+   - 保留 / 轉移角色素材 owner path；
+   - 保護 profiles row 不被 auth FK cascade 移除的動作。
+2. Edge worker 在 prepare 完成後會呼叫 `supabase.auth.admin.deleteUser(userId)`。
+3. Live FK 已確認 `profiles.id → auth.users.id ON DELETE CASCADE`，以及 `characters.author_id → profiles.id ON DELETE CASCADE`。
+4. 因此如果未來只移除 worker 的 disabled gate，刪除 Auth user 就會 cascade 刪除 profile，並進一步 cascade 刪除其 characters。這與「帳號刪除保留角色及素材」要求衝突。
+5. 目前 `ACCOUNT_DELETION_EXECUTION_ENABLED = false`，worker 在 claim work / 呼叫 RPC / 刪除 Auth user 前就回 503；因此目前沒有執行此危險路徑。不得只翻轉此常數。
+
+### 另外確認的 migration source 缺口
+
+Remote migration ledger 有以下早期記錄，但目前 repo 找不到相同 SQL 檔案：
+- `20261015083242_make_account_deletion_archive_idempotent`
+- `20261015083812_harden_handle_new_user_trigger`
+- `20261015084226_allow_safe_recovery_before_deletion_processing`
+
+其中 `prepare_account_deletion` 依賴 `archive_account_deletion_data` 等較早函式與資料表定義；缺少原始 migration source 時，不能宣稱已完整理解封存／清理前置行為。上述三個 migration 名稱與版本必須繼續列入 source-reconciliation。
+
+### 設計阻塞（本輪不自行選擇）
+
+帳號刪除保留角色需要先決定持續存在角色的 owner identity 模型。現況 `characters.author_id NOT NULL` 且 FK cascade 到 profiles，不能只把 auth user 刪掉就達成保留。候選方向可能涉及 orphaned/system owner、角色 owner tombstone 或獨立 creator attribution 欄位；每種方案都會影響 RLS、作者管理權、素材 Storage path、公開角色歸屬及既有關聯。未完成完整設計與測試前不得變更 schema。
+
+### 本輪安全界線
+
+- 僅讀取 GitHub source 與 Supabase FK catalog；沒有執行任何 worker、RPC、Auth deletion、SQL mutation、migration、reset、db push、Storage operation 或排程。
+- worker disabled gate 保持 false；PR #200 維持 Draft/unmerged。
+- 不將帳號刪除角色保留問題與「角色本身刪除」的 history-aware soft-delete/hard-delete 規則混為一談。
+
+### 下一步
+
+1. 追查缺少的三個早期 migration source 與 `archive_account_deletion_data` 定義。
+2. 以角色保留需求設計 owner identity / orphan ownership 模型，列出 RLS、Storage、角色編輯、公開歸屬、chat history 的完整影響。
+3. 在 disposable PostgreSQL 驗證 auth.users deletion cascade 前後的 profiles/characters 數量與 owner identity 行為；未通過前 worker 維持 disabled。
