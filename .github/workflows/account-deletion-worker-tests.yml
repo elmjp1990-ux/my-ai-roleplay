@@ -1,6 +1,7 @@
 name: Account deletion worker tests
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - "supabase/functions/_shared/account-deletion-worker.ts"
