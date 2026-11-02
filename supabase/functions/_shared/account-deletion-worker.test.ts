@@ -106,3 +106,43 @@ Deno.test("does not report success when finalize returns false", async () => {
   assertEquals(summary.failed, 1);
   assertEquals(calls.at(-1), ["markFailure", "batch-1", "Error"]);
 });
+
+Deno.test("recovers a deleting batch after Auth deletion removed the request row", async () => {
+  const calls: unknown[][] = [];
+  const deps = successfulDeps(calls);
+  deps.isAuthUserAbsent = async (id) => {
+    calls.push(["isAuthUserAbsent", id]);
+    return true;
+  };
+  const interruptedItem = {
+    ...item,
+    batch_id: "batch-1",
+    work_status: "deleting",
+  };
+  const summary = await processAccountDeletionWorkItems([interruptedItem], deps);
+  assertEquals(summary, { claimed: 1, completed: 1, failed: 0, skipped: 0 });
+  assertEquals(calls, [
+    ["isAuthUserAbsent", "user-1"],
+    ["finalize", "batch-1"],
+  ]);
+});
+
+Deno.test("does not finalize a deleting batch while Auth user still exists", async () => {
+  const calls: unknown[][] = [];
+  const deps = successfulDeps(calls);
+  deps.isAuthUserAbsent = async (id) => {
+    calls.push(["isAuthUserAbsent", id]);
+    return false;
+  };
+  const interruptedItem = {
+    ...item,
+    batch_id: "batch-1",
+    work_status: "deleting",
+  };
+  const summary = await processAccountDeletionWorkItems([interruptedItem], deps);
+  assertEquals(summary.completed, 1);
+  assertEquals(calls.slice(0, 2), [
+    ["isAuthUserAbsent", "user-1"],
+    ["archive", "user-1"],
+  ]);
+});
