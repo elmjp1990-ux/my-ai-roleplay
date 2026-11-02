@@ -50,6 +50,11 @@ BEGIN
     RAISE EXCEPTION '找不到此帳號已到期的刪除申請';
   END IF;
 
+  -- Account deletion bypasses chat soft-delete RPCs; preserve character-use
+  -- tombstones and completed assistant-turn totals before Auth FK cascades.
+  -- This is idempotent and shares this transaction with all later archive steps.
+  PERFORM private.snapshot_account_chat_character_history(p_user_id);
+
   -- Lock/reuse this exact request's batch. Never create a second active batch.
   SELECT b.id, b.status
     INTO v_batch_id, v_status
