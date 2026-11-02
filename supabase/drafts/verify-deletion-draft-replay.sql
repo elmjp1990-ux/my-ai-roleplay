@@ -14,6 +14,12 @@ BEGIN
      OR has_function_privilege('anon','public.delete_chat_session_content(uuid)','EXECUTE') THEN
     RAISE EXCEPTION 'single_chat_delete_rpc_acl_mismatch';
   END IF;
+  IF has_table_privilege('authenticated','public.chat_sessions','DELETE')
+     OR has_table_privilege('service_role','public.chat_sessions','DELETE')
+     OR has_table_privilege('authenticated','public.chat_groups','DELETE')
+     OR has_table_privilege('service_role','public.chat_groups','DELETE') THEN
+    RAISE EXCEPTION 'chat_parent_direct_delete_must_be_revoked_for_client_and_service_roles';
+  END IF;
   IF NOT has_function_privilege('authenticated','public.delete_chat_group_with_related_data(uuid)','EXECUTE')
      OR has_function_privilege('anon','public.delete_chat_group_with_related_data(uuid)','EXECUTE') THEN
     RAISE EXCEPTION 'group_chat_delete_rpc_acl_mismatch';
