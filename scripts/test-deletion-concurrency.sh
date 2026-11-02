@@ -168,19 +168,20 @@ echo "ok: account archival serializes against in-flight child write and blocks l
 # Race 3: a live illustration reference wins the advisory path lock first.
 # Character deletion must wait, enqueue the path after the reattachment commits,
 # and leave the new reference intact for the worker's reference-check to skip.
-asset_path_a="$author/20000000-0000-4000-8000-000000000032/30000000-0000-4000-8000-000000000032.jpg"
+asset_author="10000000-0000-4000-8000-000000000032"
+asset_path_a="$asset_author/20000000-0000-4000-8000-000000000032/30000000-0000-4000-8000-000000000032.jpg"
 cat > "$tmpdir/asset-reattach-first.sql" <<SQL
 BEGIN;
 SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claim.sub', '$author', true);
+SELECT set_config('request.jwt.claim.sub', '$asset_author', true);
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
-SELECT set_config('request.jwt.claims', '{"sub":"$author","role":"authenticated"}', true);
+SELECT set_config('request.jwt.claims', '{"sub":"$asset_author","role":"authenticated"}', true);
 INSERT INTO public.character_illustrations (
   id, character_id, author_id, storage_path, asset_type, sort_order
 ) VALUES (
   '30000000-0000-4000-8000-000000000033',
   '20000000-0000-4000-8000-000000000033',
-  '$author', '$asset_path_a', 'primary', 0
+  '$asset_author', '$asset_path_a', 'primary', 0
 );
 SELECT pg_sleep(2);
 COMMIT;
@@ -188,9 +189,9 @@ SQL
 cat > "$tmpdir/asset-delete-after-reattach.sql" <<SQL
 BEGIN;
 SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claim.sub', '$author', true);
+SELECT set_config('request.jwt.claim.sub', '$asset_author', true);
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
-SELECT set_config('request.jwt.claims', '{"sub":"$author","role":"authenticated"}', true);
+SELECT set_config('request.jwt.claims', '{"sub":"$asset_author","role":"authenticated"}', true);
 SELECT public.soft_delete_character('20000000-0000-4000-8000-000000000032');
 COMMIT;
 SQL
@@ -214,13 +215,13 @@ echo "ok: asset reattachment wins path lock; cleanup sees a still-referenced obj
 
 # Race 4: deletion owns the path lock first. A later attempt to attach that path
 # must wait until the cleanup row is committed, then fail in the BEFORE trigger.
-asset_path_b="$author/20000000-0000-4000-8000-000000000034/30000000-0000-4000-8000-000000000034.jpg"
+asset_path_b="$asset_author/20000000-0000-4000-8000-000000000034/30000000-0000-4000-8000-000000000034.jpg"
 cat > "$tmpdir/asset-delete-first.sql" <<SQL
 BEGIN;
 SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claim.sub', '$author', true);
+SELECT set_config('request.jwt.claim.sub', '$asset_author', true);
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
-SELECT set_config('request.jwt.claims', '{"sub":"$author","role":"authenticated"}', true);
+SELECT set_config('request.jwt.claims', '{"sub":"$asset_author","role":"authenticated"}', true);
 SELECT private.lock_character_asset_path('character-illustrations', '$asset_path_b');
 SELECT pg_sleep(2);
 SELECT public.soft_delete_character('20000000-0000-4000-8000-000000000034');
@@ -229,15 +230,15 @@ SQL
 cat > "$tmpdir/asset-reattach-after-delete.sql" <<SQL
 BEGIN;
 SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claim.sub', '$author', true);
+SELECT set_config('request.jwt.claim.sub', '$asset_author', true);
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
-SELECT set_config('request.jwt.claims', '{"sub":"$author","role":"authenticated"}', true);
+SELECT set_config('request.jwt.claims', '{"sub":"$asset_author","role":"authenticated"}', true);
 INSERT INTO public.character_illustrations (
   id, character_id, author_id, storage_path, asset_type, sort_order
 ) VALUES (
   '30000000-0000-4000-8000-000000000035',
   '20000000-0000-4000-8000-000000000035',
-  '$author', '$asset_path_b', 'primary', 0
+  '$asset_author', '$asset_path_b', 'primary', 0
 );
 COMMIT;
 SQL
