@@ -35,6 +35,13 @@ assert.ok(deleteStart >= 0 && claimStart > deleteStart);
 const deleteFn = sql.slice(deleteStart, claimStart);
 assert.match(deleteFn, /private\.lock_character_asset_path\(/);
 assert.match(deleteFn, /INSERT INTO public\.character_asset_cleanup_jobs/);
+const assetLockLoop = deleteFn.indexOf("FOR v_asset IN");
+const avatarCleanupInsert = deleteFn.indexOf("VALUES ('character-avatar-videos'");
+assert.ok(assetLockLoop >= 0 && avatarCleanupInsert > assetLockLoop,
+  "Avatar-video cleanup jobs must be enqueued only after the shared path locks are held");
+assert.ok(deleteFn.indexOf("INSERT INTO public.character_asset_cleanup_jobs", assetLockLoop) > assetLockLoop,
+  "Illustration cleanup jobs must be enqueued only after the shared path locks are held");
+
 
 assert.match(worker, /await deps\.isReferenced\(job\.bucket_id, job\.object_path\)/);
 assert.match(worker, /if \(reference\.referenced\)/);
