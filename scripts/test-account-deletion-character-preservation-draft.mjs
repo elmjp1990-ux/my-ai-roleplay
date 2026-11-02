@@ -66,7 +66,7 @@ const accountHistoryDraft = fs.readFileSync(
   "utf8",
 );
 const accountChatSnapshot = accountHistoryDraft.match(
-  /CREATE OR REPLACE FUNCTION private[.]snapshot_account_chat_character_history[(]p_user_id uuid[)][\s\S]*?\$function\$;/,
+  /CREATE OR REPLACE FUNCTION private[.]snapshot_account_chat_character_history[(][\s\S]*?p_user_id uuid[\s\S]*?\$function\$;/,
 )?.[0];
 assert.ok(accountChatSnapshot, "account deletion character-history snapshot helper must exist");
 assert.match(accountChatSnapshot, /SECURITY DEFINER/);
