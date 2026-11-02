@@ -65,3 +65,8 @@ The DML test already reserves a normal single-chat turn, persists an assistant r
 - No cron creation/activation.
 - No Vercel plan upgrade or extra paid resource.
 - PR #200 remains Draft and unmerged pending the final migration provenance/replay review and explicit rollout approval.
+
+
+## One-time isolated local replay validation
+
+On 2026-11-03, a single push-triggered run of the manual synthetic Supabase workflow is enabled for this document update only. The workflow uses a temporary Supabase project under the runner's temp directory, an empty migrations directory, and the schema-only synthetic fixture. It contains no hosted Supabase credentials. The push trigger will be removed after the run completes; future runs remain manual-only.
