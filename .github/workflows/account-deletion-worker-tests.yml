@@ -34,6 +34,10 @@ on:
       - "supabase/drafts/disposable-platform-bootstrap.sql"
       - "supabase/drafts/verify-current-state-schema-fixture.sql"
       - "supabase/drafts/verify-deletion-draft-replay.sql"
+      - "supabase/drafts/seed-character-deletion-legacy-fixtures.sql"
+      - "supabase/drafts/test-character-deletion-behavior.sql"
+      - "supabase/drafts/replay-and-test-character-deletion.sql"
+      - "supabase/drafts/verify-deletion-draft-rollback.sql"
       - "supabase/drafts/current-state-schema-catalog-manifest-2026-11-02.md"
       - "scripts/test-disposable-schema-catalog-snapshot.mjs"
       - "scripts/build-disposable-schema-fixture.mjs"
@@ -73,6 +77,10 @@ on:
       - "supabase/drafts/disposable-platform-bootstrap.sql"
       - "supabase/drafts/verify-current-state-schema-fixture.sql"
       - "supabase/drafts/verify-deletion-draft-replay.sql"
+      - "supabase/drafts/seed-character-deletion-legacy-fixtures.sql"
+      - "supabase/drafts/test-character-deletion-behavior.sql"
+      - "supabase/drafts/replay-and-test-character-deletion.sql"
+      - "supabase/drafts/verify-deletion-draft-rollback.sql"
       - "supabase/drafts/current-state-schema-catalog-manifest-2026-11-02.md"
       - "scripts/test-disposable-schema-catalog-snapshot.mjs"
       - "scripts/build-disposable-schema-fixture.mjs"
@@ -134,9 +142,7 @@ jobs:
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
       - name: Verify current-state schema fingerprint and empty tables
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-current-state-schema-fixture.sql
-      - name: Apply chat deletion cumulative draft on disposable PostgreSQL
-        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql
-      - name: Apply character history-aware deletion draft on disposable PostgreSQL
-        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/character-history-aware-deletion.sql
-      - name: Verify deletion draft schema, triggers, RLS and ACLs
-        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-deletion-draft-replay.sql
+      - name: Replay deletion drafts and run hard/soft delete behavior tests in a rollback transaction
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-and-test-character-deletion.sql
+      - name: Verify all deletion draft DDL and synthetic rows were rolled back
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-deletion-draft-rollback.sql
