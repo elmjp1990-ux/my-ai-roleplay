@@ -100,7 +100,7 @@ jobs:
           cd "$local_project"
           supabase db start
           DB_URL="$(supabase status --output env | sed -n 's/^DB_URL=//p' | sed 's/^"//;s/"$//')"
-          if [[ -z "$DB_URL" ]]; then
+          if [[ -z "$DATABASE_URL" ]]; then
             echo "Could not resolve the isolated local Supabase DB_URL."
             exit 1
           fi
@@ -116,18 +116,18 @@ jobs:
           node scripts/build-disposable-schema-fixture.mjs > "$RUNNER_TEMP/current-state-schema.sql"
           # Synthetic current-state baseline is intentional: the original pre-ledger
           # profiles/characters foundation is unavailable. Do not replay old migrations.
-          psql "$DB_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
-          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-current-state-schema-fixture.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-current-state-schema-fixture.sql
 
           # Encounter/chat structural audits and character/account DML all run inside
           # disposable transactions and are rolled back.
-          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-local-security-drafts.sql
-          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-and-test-character-deletion.sql
-          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-deletion-draft-rollback.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-local-security-drafts.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-and-test-character-deletion.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-deletion-draft-rollback.sql
 
           # True independent-connection races use only this disposable local database.
-          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-deletion-concurrency-setup.sql
-          DATABASE_URL="$DB_URL" bash scripts/test-deletion-concurrency.sh
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-deletion-concurrency-setup.sql
+          DATABASE_URL="$DATABASE_URL" bash scripts/test-deletion-concurrency.sh
 
       - name: Stop and discard local database
         if: always()
