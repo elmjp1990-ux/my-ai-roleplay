@@ -19,6 +19,7 @@ assert.match(sql, /CREATE OR REPLACE FUNCTION public\.account_is_active\(\)/);
 assert.match(sql, /CREATE TRIGGER/);
 assert.match(sql, /CREATE POLICY/);
 assert.doesNotMatch(sql, /CREATE EXTENSION/, "the disposable harness uses PostgreSQL core and does not install platform extensions");
+assert.doesNotMatch(sql, /CREATE EXTENSION/, "the disposable harness uses PostgreSQL core and does not install platform extensions");
 assert.match(sql, /ALTER TABLE "public"\."characters" ENABLE ROW LEVEL SECURITY/);
 assert.match(sql, /ALTER SCHEMA "private" OWNER TO/);
 assert.match(sql, /GRANT EXECUTE ON FUNCTION/);
