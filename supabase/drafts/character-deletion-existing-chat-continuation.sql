@@ -75,7 +75,7 @@ BEGIN
   FROM public.chat_group_members m
   WHERE m.group_id = p_group_id;
   IF v_member_count NOT BETWEEN 1 AND 3 THEN
-    RAISE EXCEPTION 'group_has_no_active_characters' USING ERRCODE = '23514';
+    RAISE EXCEPTION 'group_has_no_members' USING ERRCODE = '23514';
   END IF;
 
   v_cost := v_member_count * 3;
