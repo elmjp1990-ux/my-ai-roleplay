@@ -1,0 +1,1323 @@
+{
+  "capture": {
+    "scope": [
+      "public",
+      "private"
+    ],
+    "purpose": "current-state schema-only disposable fixture; not historical migration provenance",
+    "database": "postgres",
+    "captured_at": "2026-11-02T14:31:41.276538+00:00",
+    "server_version": "17.11"
+  },
+  "routines": [
+    {
+      "acl": "{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres}",
+      "kind": "f",
+      "name": "comment_is_whisper_thread",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "private",
+      "strict": false,
+      "language": "sql",
+      "definition": "CREATE OR REPLACE FUNCTION private.comment_is_whisper_thread(p_comment_id uuid)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  with recursive thread as (\n    select c.id, c.parent_id, c.is_whisper, array[c.id]::uuid[] as path\n    from public.character_comments c\n    where c.id = p_comment_id\n    union all\n    select parent.id, parent.parent_id, parent.is_whisper, child.path || parent.id\n    from public.character_comments parent\n    join thread child on child.parent_id = parent.id\n    where not parent.id = any(child.path)\n  )\n  select coalesce(bool_or(thread.is_whisper), false)\n  from thread;\n$function$\n",
+      "volatility": "s",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_comment_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+      "kind": "f",
+      "name": "comment_parent_matches",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "private",
+      "strict": false,
+      "language": "sql",
+      "definition": "CREATE OR REPLACE FUNCTION private.comment_parent_matches(p_parent_id uuid, p_character_id uuid)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  select exists (\n    select 1\n    from public.character_comments parent\n    where parent.id = p_parent_id\n      and parent.character_id = p_character_id\n  );\n$function$\n",
+      "volatility": "s",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_parent_id uuid, p_character_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+      "kind": "f",
+      "name": "comment_reply_allowed",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "private",
+      "strict": false,
+      "language": "sql",
+      "definition": "CREATE OR REPLACE FUNCTION private.comment_reply_allowed(p_parent_id uuid, p_character_id uuid, p_user_id uuid)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  select exists (\n    select 1\n    from public.character_comments parent\n    left join public.characters ch on ch.id = parent.character_id\n    where parent.id = p_parent_id\n      and parent.character_id = p_character_id\n      and (\n        not private.comment_is_whisper_thread(parent.id)\n        or parent.author_id = p_user_id\n        or ch.author_id = p_user_id\n      )\n  );\n$function$\n",
+      "volatility": "s",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_parent_id uuid, p_character_id uuid, p_user_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres}",
+      "kind": "f",
+      "name": "current_user_is_adult",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "private",
+      "strict": false,
+      "language": "sql",
+      "definition": "CREATE OR REPLACE FUNCTION private.current_user_is_adult()\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  SELECT EXISTS (\n    SELECT 1\n    FROM public.profiles AS p\n    WHERE p.id = (SELECT auth.uid())\n      AND p.birthdate IS NOT NULL\n      AND p.birthdate <= (CURRENT_DATE - INTERVAL '18 years')::date\n  );\n$function$\n",
+      "volatility": "s",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "account_is_active",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "sql",
+      "definition": "CREATE OR REPLACE FUNCTION public.account_is_active()\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\r\n  select auth.uid() is not null\r\n     and not exists (\r\n       select 1\r\n       from public.account_deletion_requests r\r\n       where r.user_id = auth.uid()\r\n     );\r\n$function$\n",
+      "volatility": "s",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "append_chat_group_mock_turn",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.append_chat_group_mock_turn(p_group_id uuid, p_request_key uuid, p_content text)\n RETURNS uuid\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_user_id uuid:=auth.uid(); v_turn_id uuid; v_existing_content text; v_member_count integer;\n  v_cost integer; v_silver integer; v_diamonds integer; v_balance_silver integer; v_balance_diamonds integer;\n  v_pick integer; v_character_id uuid; v_scene_id uuid; v_character_name text; v_style text; v_scene_name text; v_character_snapshot jsonb;\nBEGIN\n  IF v_user_id IS NULL THEN RAISE EXCEPTION 'authentication_required' USING ERRCODE='42501'; END IF;\n  IF NOT public.account_is_active() THEN RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE='42501'; END IF;\n  IF p_request_key IS NULL THEN RAISE EXCEPTION 'request_key_required' USING ERRCODE='22023'; END IF;\n  IF p_content IS NULL OR char_length(btrim(p_content)) NOT BETWEEN 1 AND 2000 THEN RAISE EXCEPTION 'invalid_message_content' USING ERRCODE='22023'; END IF;\n  PERFORM 1 FROM public.chat_groups g WHERE g.id=p_group_id AND g.owner_id=v_user_id AND g.archived_at IS NULL AND g.deleted_at IS NULL FOR UPDATE;\n  IF NOT FOUND THEN RAISE EXCEPTION 'group_not_found_or_not_accessible' USING ERRCODE='42501'; END IF;\n  SELECT t.id,t.request_content INTO v_turn_id,v_existing_content FROM public.chat_group_turns t WHERE t.group_id=p_group_id AND t.request_key=p_request_key;\n  IF FOUND THEN\n    IF v_existing_content IS DISTINCT FROM btrim(p_content) THEN RAISE EXCEPTION 'idempotency_key_reused_with_different_content' USING ERRCODE='22023'; END IF;\n    RETURN v_turn_id;\n  END IF;\n  SELECT count(*)::integer INTO v_member_count FROM public.chat_group_members m WHERE m.group_id=p_group_id;\n  IF v_member_count NOT BETWEEN 1 AND 3 THEN RAISE EXCEPTION 'invalid_group_member_count' USING ERRCODE='23514'; END IF;\n  v_cost:=v_member_count*3;\n  PERFORM public.ensure_wallet_account();\n  SELECT w.silver_coins,w.diamonds INTO v_balance_silver,v_balance_diamonds FROM public.wallet_accounts w WHERE w.user_id=v_user_id FOR UPDATE;\n  IF NOT FOUND THEN RAISE EXCEPTION 'wallet_not_initialized' USING ERRCODE='P0001'; END IF;\n  IF COALESCE(v_balance_silver,0)+COALESCE(v_balance_diamonds,0)<v_cost THEN\n    RAISE EXCEPTION 'group_insufficient_funds: required %, available %',v_cost,COALESCE(v_balance_silver,0)+COALESCE(v_balance_diamonds,0) USING ERRCODE='P0001';\n  END IF;\n  v_silver:=LEAST(v_balance_silver,v_cost); v_diamonds:=v_cost-v_silver;\n  UPDATE public.wallet_accounts w SET silver_coins=w.silver_coins-v_silver,diamonds=w.diamonds-v_diamonds,updated_at=now() WHERE w.user_id=v_user_id;\n  SELECT count(*)::integer % v_member_count INTO v_pick FROM public.chat_group_turns t WHERE t.group_id=p_group_id;\n  INSERT INTO public.chat_group_turns(group_id,user_id,request_key,request_content) VALUES(p_group_id,v_user_id,p_request_key,btrim(p_content))\n  ON CONFLICT(group_id,request_key) DO NOTHING RETURNING id INTO v_turn_id;\n  IF v_turn_id IS NULL THEN RAISE EXCEPTION 'group_turn_request_conflict' USING ERRCODE='40001'; END IF;\n  SELECT m.character_id,m.scene_id,m.character_snapshot,COALESCE(m.character_snapshot->>'name','角色'),\n    COALESCE(m.character_snapshot->>'style',m.character_snapshot->>'intro','我會仔細留意目前的情況。'),COALESCE(s.name,'目前場景')\n  INTO v_character_id,v_scene_id,v_character_snapshot,v_character_name,v_style,v_scene_name\n  FROM public.chat_group_members m LEFT JOIN public.chat_group_scenes s ON s.id=m.scene_id AND s.group_id=m.group_id\n  WHERE m.group_id=p_group_id ORDER BY m.position OFFSET v_pick LIMIT 1;\n  IF NOT FOUND THEN RAISE EXCEPTION 'mock_director_no_valid_speaker' USING ERRCODE='23514'; END IF;\n  INSERT INTO public.chat_group_messages(group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,content)\n  VALUES(p_group_id,v_scene_id,v_turn_id,0,'user',NULL,btrim(p_content));\n  INSERT INTO public.chat_group_messages(group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,content,speaker_snapshot)\n  VALUES(p_group_id,v_scene_id,v_turn_id,1,'character',v_character_id,\n    format('聽見你的話，%s 回應：「我明白了。%s 我們可以從「%s」開始，你接下來想怎麼做？」',v_character_name,v_style,v_scene_name),\n    jsonb_build_object('id',COALESCE(v_character_snapshot->>'id',v_character_id::text),'name',v_character_name));\n  INSERT INTO public.chat_group_turn_charges(group_id,group_turn_id,user_id,request_key,member_count,cost,silver_charged,diamonds_charged,status)\n  VALUES(p_group_id,v_turn_id,v_user_id,p_request_key,v_member_count,v_cost,v_silver,v_diamonds,'settled');\n  IF v_silver>0 THEN INSERT INTO public.wallet_transactions(user_id,currency_type,amount,biz_type,reference_id) VALUES(v_user_id,'silver_coins',-v_silver,'group_chat_turn_charge',v_turn_id::text); END IF;\n  IF v_diamonds>0 THEN INSERT INTO public.wallet_transactions(user_id,currency_type,amount,biz_type,reference_id) VALUES(v_user_id,'diamonds',-v_diamonds,'group_chat_turn_charge',v_turn_id::text); END IF;\n  UPDATE public.chat_groups SET updated_at=now() WHERE id=p_group_id;\n  RETURN v_turn_id;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_group_id uuid, p_request_key uuid, p_content text"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "archive_account_deletion_data",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.archive_account_deletion_data(p_user_id uuid)\n RETURNS TABLE(batch_id uuid, target_user_id uuid, ai_source_rows bigint, ai_archived_rows bigint, wallet_source_rows bigint, wallet_archived_rows bigint, batch_status text)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_requested_at timestamptz;\n  v_scheduled_for timestamptz;\n  v_batch_id uuid;\n  v_ai_source bigint;\n  v_ai_archived bigint;\n  v_wallet_source bigint;\n  v_wallet_archived bigint;\n  v_existing_status text;\nBEGIN\n  IF p_user_id IS NULL THEN\n    RAISE EXCEPTION '目標帳號不可為空';\n  END IF;\n\n  SELECT r.requested_at, r.scheduled_for\n    INTO v_requested_at, v_scheduled_for\n  FROM public.account_deletion_requests AS r\n  WHERE r.user_id = p_user_id\n    AND r.scheduled_for <= pg_catalog.statement_timestamp()\n  FOR UPDATE;\n\n  IF NOT FOUND THEN\n    RAISE EXCEPTION '找不到此帳號已到期的刪除申請';\n  END IF;\n\n  -- Reuse a verified archive instead of creating duplicate batches on retries.\n  SELECT b.id, b.status\n    INTO v_batch_id, v_existing_status\n  FROM public.account_deletion_archive_batches AS b\n  WHERE b.target_user_id = p_user_id\n    AND b.requested_at = v_requested_at\n    AND b.scheduled_for = v_scheduled_for\n    AND b.status IN ('archived', 'deleting', 'completed')\n  ORDER BY b.created_at DESC\n  LIMIT 1\n  FOR UPDATE;\n\n  IF FOUND THEN\n    SELECT pg_catalog.count(*) INTO v_ai_archived\n    FROM public.account_deletion_archive_items AS i\n    WHERE i.batch_id = v_batch_id\n      AND i.source_table = 'ai_generation_records';\n\n    SELECT pg_catalog.count(*) INTO v_wallet_archived\n    FROM public.account_deletion_archive_items AS i\n    WHERE i.batch_id = v_batch_id\n      AND i.source_table = 'wallet_transactions';\n\n    SELECT pg_catalog.count(*) INTO v_ai_source\n    FROM public.ai_generation_records AS a\n    WHERE a.user_id = p_user_id;\n\n    SELECT pg_catalog.count(*) INTO v_wallet_source\n    FROM public.wallet_transactions AS w\n    WHERE w.user_id = p_user_id;\n\n    RETURN QUERY SELECT v_batch_id, p_user_id, v_ai_source, v_ai_archived,\n      v_wallet_source, v_wallet_archived, v_existing_status;\n    RETURN;\n  END IF;\n\n  IF EXISTS (\n    SELECT 1\n    FROM public.account_deletion_archive_batches AS b\n    WHERE b.target_user_id = p_user_id\n      AND b.status IN ('pending', 'archiving', 'deleting')\n  ) THEN\n    RAISE EXCEPTION '此帳號已有正在處理的封存／刪除批次';\n  END IF;\n\n  INSERT INTO public.account_deletion_archive_batches (\n    target_user_id, status, requested_at, scheduled_for, started_at,\n    attempt_count, last_error\n  )\n  VALUES (\n    p_user_id, 'archiving', v_requested_at, v_scheduled_for,\n    pg_catalog.statement_timestamp(), 1, NULL\n  )\n  RETURNING id INTO v_batch_id;\n\n  SELECT pg_catalog.count(*) INTO v_ai_source\n  FROM public.ai_generation_records AS a\n  WHERE a.user_id = p_user_id;\n\n  SELECT pg_catalog.count(*) INTO v_wallet_source\n  FROM public.wallet_transactions AS w\n  WHERE w.user_id = p_user_id;\n\n  INSERT INTO public.account_deletion_archive_items AS dst (\n    batch_id, source_table, source_record_id, payload\n  )\n  SELECT v_batch_id, 'ai_generation_records', a.id::text, pg_catalog.to_jsonb(a)\n  FROM public.ai_generation_records AS a\n  WHERE a.user_id = p_user_id\n  ON CONFLICT ON CONSTRAINT account_deletion_archive_item_batch_id_source_table_source__key\n  DO NOTHING;\n\n  INSERT INTO public.account_deletion_archive_items AS dst (\n    batch_id, source_table, source_record_id, payload\n  )\n  SELECT v_batch_id, 'wallet_transactions', w.id::text, pg_catalog.to_jsonb(w)\n  FROM public.wallet_transactions AS w\n  WHERE w.user_id = p_user_id\n  ON CONFLICT ON CONSTRAINT account_deletion_archive_item_batch_id_source_table_source__key\n  DO NOTHING;\n\n  SELECT pg_catalog.count(*) INTO v_ai_archived\n  FROM public.account_deletion_archive_items AS i\n  WHERE i.batch_id = v_batch_id AND i.source_table = 'ai_generation_records';\n\n  SELECT pg_catalog.count(*) INTO v_wallet_archived\n  FROM public.account_deletion_archive_items AS i\n  WHERE i.batch_id = v_batch_id AND i.source_table = 'wallet_transactions';\n\n  IF v_ai_source <> v_ai_archived OR v_wallet_source <> v_wallet_archived THEN\n    RAISE EXCEPTION '封存筆數不一致，已取消本次交易';\n  END IF;\n\n  IF EXISTS (\n    SELECT 1\n    FROM public.ai_generation_records AS a\n    LEFT JOIN public.account_deletion_archive_items AS i\n      ON i.batch_id = v_batch_id\n     AND i.source_table = 'ai_generation_records'\n     AND i.source_record_id = a.id::text\n    WHERE a.user_id = p_user_id\n      AND (i.id IS NULL OR i.payload IS DISTINCT FROM pg_catalog.to_jsonb(a))\n  ) THEN\n    RAISE EXCEPTION 'AI 原始生成紀錄內容核對失敗';\n  END IF;\n\n  IF EXISTS (\n    SELECT 1\n    FROM public.wallet_transactions AS w\n    LEFT JOIN public.account_deletion_archive_items AS i\n      ON i.batch_id = v_batch_id\n     AND i.source_table = 'wallet_transactions'\n     AND i.source_record_id = w.id::text\n    WHERE w.user_id = p_user_id\n      AND (i.id IS NULL OR i.payload IS DISTINCT FROM pg_catalog.to_jsonb(w))\n  ) THEN\n    RAISE EXCEPTION '錢包交易紀錄內容核對失敗';\n  END IF;\n\n  UPDATE public.account_deletion_archive_batches AS b\n  SET status = 'archived',\n      updated_at = pg_catalog.statement_timestamp(),\n      last_error = NULL\n  WHERE b.id = v_batch_id;\n\n  RETURN QUERY SELECT v_batch_id, p_user_id, v_ai_source, v_ai_archived,\n    v_wallet_source, v_wallet_archived, 'archived'::text;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": "p_user_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}",
+      "kind": "f",
+      "name": "can_open_encounter_session",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "sql",
+      "definition": "CREATE OR REPLACE FUNCTION public.can_open_encounter_session(p_character_id uuid)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  SELECT EXISTS (\n    SELECT 1\n    FROM public.characters c\n    WHERE c.id = p_character_id\n      AND c.visibility = 'public'\n      AND c.deleted_at IS NULL\n      AND c.review_status = 'approved'\n      AND c.rights_confirmed IS TRUE\n      AND (\n        c.is_nsfw IS NOT TRUE\n        OR (\n          auth.uid() IS NOT NULL\n          AND private.current_user_is_adult()\n        )\n      )\n  );\n$function$\n",
+      "volatility": "s",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_character_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "cancel_account_deletion",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.cancel_account_deletion()\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_user_id uuid := auth.uid();\n  v_requested_at timestamptz;\n  v_scheduled_for timestamptz;\n  v_now timestamptz := pg_catalog.statement_timestamp();\nBEGIN\n  IF v_user_id IS NULL THEN\n    RAISE EXCEPTION '請先登入';\n  END IF;\n\n  -- Lock the request so recovery cannot race with a worker starting the same request.\n  SELECT r.requested_at, r.scheduled_for\n    INTO v_requested_at, v_scheduled_for\n  FROM public.account_deletion_requests AS r\n  WHERE r.user_id = v_user_id\n  FOR UPDATE;\n\n  IF NOT FOUND THEN\n    RAISE EXCEPTION '找不到待處理的刪除申請';\n  END IF;\n\n  -- Before the deadline, normal cancellation is allowed.\n  -- After the deadline, recovery is allowed only if no archive/deletion batch\n  -- has been created for this exact request. Once processing has started,\n  -- manual recovery is blocked to avoid racing with deletion.\n  IF v_scheduled_for <= v_now AND EXISTS (\n    SELECT 1\n    FROM public.account_deletion_archive_batches AS b\n    WHERE b.target_user_id = v_user_id\n      AND b.requested_at = v_requested_at\n      AND b.scheduled_for = v_scheduled_for\n  ) THEN\n    RAISE EXCEPTION '刪除處理已開始，無法透過此功能復原；請交由管理程序檢查';\n  END IF;\n\n  DELETE FROM public.account_deletion_requests AS r\n  WHERE r.user_id = v_user_id\n    AND r.requested_at = v_requested_at\n    AND r.scheduled_for = v_scheduled_for;\n\n  IF NOT FOUND THEN\n    RAISE EXCEPTION '刪除申請狀態已變更，請重新查詢帳號狀態';\n  END IF;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "character_can_start_chat",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "sql",
+      "definition": "CREATE OR REPLACE FUNCTION public.character_can_start_chat(p_character_id uuid)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  SELECT EXISTS (\n    SELECT 1\n    FROM public.characters c\n    WHERE c.id = p_character_id\n      AND c.deleted_at IS NULL\n      AND (\n        c.author_id = (SELECT auth.uid())\n        OR (c.visibility = 'public' AND c.review_status = 'approved')\n      )\n  );\n$function$\n",
+      "volatility": "s",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_character_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "character_is_not_soft_deleted",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "sql",
+      "definition": "CREATE OR REPLACE FUNCTION public.character_is_not_soft_deleted(p_character_id uuid)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\r\n  SELECT EXISTS (\r\n    SELECT 1\r\n    FROM public.characters c\r\n    WHERE c.id = p_character_id\r\n      AND c.deleted_at IS NULL\r\n  );\r\n$function$\n",
+      "volatility": "s",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_character_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "claim_chat_deletion_jobs",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.claim_chat_deletion_jobs(p_limit integer DEFAULT 10)\n RETURNS TABLE(job_id uuid, resource_type text, resource_id uuid, owner_id uuid, purge_after timestamp with time zone, attempt_count integer)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_limit integer:=LEAST(GREATEST(COALESCE(p_limit,10),1),50);\nBEGIN\n  IF COALESCE(auth.role(),'')<>'service_role' THEN RAISE EXCEPTION 'service_role_required' USING ERRCODE='42501'; END IF;\n  RETURN QUERY\n  WITH candidates AS (\n    SELECT j.id FROM public.chat_deletion_jobs j\n    WHERE j.purge_after<=clock_timestamp() AND j.attempt_count<8\n      AND ((j.status IN ('queued','retry') AND (j.next_attempt_at IS NULL OR j.next_attempt_at<=clock_timestamp()))\n        OR (j.status='processing' AND j.lease_until<=clock_timestamp()))\n    ORDER BY j.purge_after,j.created_at FOR UPDATE SKIP LOCKED LIMIT v_limit\n  )\n  UPDATE public.chat_deletion_jobs j\n  SET status='processing',attempt_count=j.attempt_count+1,next_attempt_at=NULL,\n      lease_until=clock_timestamp()+interval '5 minutes',updated_at=clock_timestamp()\n  FROM candidates c WHERE j.id=c.id\n  RETURNING j.id,j.resource_type,j.resource_id,j.owner_id,j.purge_after,j.attempt_count;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": "p_limit integer"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "claim_chat_storage_deletion_jobs",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.claim_chat_storage_deletion_jobs(p_limit integer DEFAULT 25)\n RETURNS TABLE(job_id uuid, deletion_job_id uuid, bucket_id text, object_path text, resource_type text, resource_id uuid, owner_id uuid, attempt_count integer)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_limit integer:=LEAST(GREATEST(COALESCE(p_limit,25),1),100);\nBEGIN\n  IF COALESCE(auth.role(),'')<>'service_role' THEN RAISE EXCEPTION 'service_role_required' USING ERRCODE='42501'; END IF;\n  RETURN QUERY\n  WITH candidates AS (\n    SELECT sj.id FROM public.chat_storage_deletion_jobs sj\n    JOIN public.chat_deletion_jobs dj ON dj.id=sj.deletion_job_id\n    WHERE dj.status='completed' AND dj.purge_after<=clock_timestamp() AND sj.attempt_count<8\n      AND ((sj.status IN ('queued','retry') AND (sj.next_attempt_at IS NULL OR sj.next_attempt_at<=clock_timestamp()))\n        OR (sj.status='processing' AND sj.lease_until<=clock_timestamp()))\n    ORDER BY sj.created_at FOR UPDATE OF sj SKIP LOCKED LIMIT v_limit\n  )\n  UPDATE public.chat_storage_deletion_jobs sj\n  SET status='processing',attempt_count=sj.attempt_count+1,next_attempt_at=NULL,\n      lease_until=clock_timestamp()+interval '5 minutes',updated_at=clock_timestamp()\n  FROM candidates c WHERE sj.id=c.id\n  RETURNING sj.id,sj.deletion_job_id,sj.bucket_id,sj.object_path,sj.resource_type,sj.resource_id,sj.owner_id,sj.attempt_count;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": "p_limit integer"
+    },
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "claim_daily_checkin",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.claim_daily_checkin()\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare\n  v_user_id uuid := auth.uid();\n  v_today date := (now() at time zone 'Asia/Taipei')::date;\n  v_reward integer;\n  v_enabled boolean;\n  v_balance integer;\n  v_last_day smallint;\n  v_cycle_day smallint := 1;\n  v_existing_day smallint;\nbegin\n  if v_user_id is null then\n    raise exception 'authentication required' using errcode = '42501';\n  end if;\n\n  if exists (select 1 from public.account_deletion_requests adr where adr.user_id = v_user_id) then\n    raise exception 'account deletion pending' using errcode = '42501';\n  end if;\n\n  select wa.silver_coins\n    into v_balance\n  from public.wallet_accounts wa\n  where wa.user_id = v_user_id\n  for update;\n\n  if not found then\n    raise exception 'wallet account not found' using errcode = 'P0002';\n  end if;\n\n  select s.reward_silver, s.enabled\n    into v_reward, v_enabled\n  from public.daily_checkin_settings s\n  where s.id = 1;\n\n  if not found then\n    v_reward := 10;\n    v_enabled := true;\n  end if;\n\n  if not v_enabled then\n    raise exception 'daily check-in is disabled' using errcode = '42501';\n  end if;\n\n  select c.cycle_day into v_existing_day\n  from public.daily_checkins c\n  where c.user_id = v_user_id and c.checkin_date = v_today;\n\n  if found then\n    return jsonb_build_object(\n      'granted', false,\n      'claimed_today', true,\n      'reward', v_reward,\n      'cycle_day', v_existing_day,\n      'silver_balance', v_balance,\n      'today', v_today\n    );\n  end if;\n\n  select c.cycle_day into v_last_day\n  from public.daily_checkins c\n  where c.user_id = v_user_id\n  order by c.checkin_date desc\n  limit 1;\n\n  if v_last_day is not null then\n    v_cycle_day := (v_last_day % 7) + 1;\n  end if;\n\n  insert into public.daily_checkins (user_id, checkin_date, cycle_day, reward_silver)\n  values (v_user_id, v_today, v_cycle_day, v_reward);\n\n  update public.wallet_accounts\n    set silver_coins = silver_coins + v_reward,\n        updated_at = now()\n  where user_id = v_user_id\n  returning silver_coins into v_balance;\n\n  insert into public.wallet_transactions\n    (user_id, currency_type, amount, biz_type, reference_id)\n  values\n    (v_user_id, 'silver_coins', v_reward, 'daily_checkin', 'daily_checkin:' || v_today::text);\n\n  return jsonb_build_object(\n    'granted', true,\n    'claimed_today', true,\n    'reward', v_reward,\n    'cycle_day', v_cycle_day,\n    'silver_balance', v_balance,\n    'today', v_today\n  );\nend;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "claim_encounter_evaluation_jobs",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.claim_encounter_evaluation_jobs(p_limit integer DEFAULT 10)\n RETURNS TABLE(session_id uuid, user_id uuid, character_id uuid, turn_count integer, attempt_count integer)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_limit integer:=LEAST(GREATEST(COALESCE(p_limit,10),1),25);\nBEGIN\n  RETURN QUERY\n  WITH candidate_sessions AS MATERIALIZED (\n    SELECT s.id FROM public.chat_sessions s\n    JOIN public.encounter_session_lifecycle lifecycle ON lifecycle.session_id=s.id\n    JOIN public.encounter_session_evaluation_jobs job ON job.session_id=s.id\n    WHERE s.deleted_at IS NULL AND lifecycle.status='ready_to_settle' AND lifecycle.scheduled_end_at<=clock_timestamp()\n      AND job.attempt_count<5\n      AND (job.status='pending' OR (job.status='failed' AND job.updated_at<=clock_timestamp()-interval '5 minutes') OR (job.status='processing' AND job.claimed_at<clock_timestamp()-interval '10 minutes'))\n      AND NOT EXISTS(SELECT 1 FROM public.chat_turn_charges charge WHERE charge.session_id=job.session_id AND charge.status IN ('created','reserved','needs_reconciliation'))\n      AND (SELECT count(*) FROM public.encounter_session_turns turn WHERE turn.session_id=job.session_id)=lifecycle.turn_count\n    ORDER BY lifecycle.scheduled_end_at,job.session_id FOR UPDATE OF s SKIP LOCKED LIMIT v_limit\n  ),\n  candidates AS MATERIALIZED (\n    SELECT job.session_id FROM public.encounter_session_evaluation_jobs job\n    JOIN candidate_sessions cs ON cs.id=job.session_id ORDER BY job.session_id FOR UPDATE OF job SKIP LOCKED LIMIT v_limit\n  )\n  UPDATE public.encounter_session_evaluation_jobs job\n  SET status='processing',attempt_count=job.attempt_count+1,claimed_at=clock_timestamp(),completed_at=NULL,last_error=NULL,updated_at=clock_timestamp()\n  FROM candidates JOIN public.encounter_session_lifecycle lifecycle ON lifecycle.session_id=candidates.session_id\n  WHERE job.session_id=candidates.session_id\n  RETURNING job.session_id,job.user_id,job.character_id,lifecycle.turn_count,job.attempt_count;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": "p_limit integer"
+    },
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "create_chat_group",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.create_chat_group(p_name text, p_world_background text, p_scene_mode text, p_scenes jsonb, p_members jsonb)\n RETURNS uuid\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_user_id uuid := auth.uid();\n  v_group_id uuid;\n  v_scene jsonb;\n  v_member jsonb;\n  v_character_id uuid;\n  v_scene_id uuid;\n  v_position smallint := 0;\n  v_member_count integer;\n  v_character public.characters%ROWTYPE;\nBEGIN\n  IF v_user_id IS NULL THEN\n    RAISE EXCEPTION 'authentication_required' USING ERRCODE = '42501';\n  END IF;\n  IF EXISTS (SELECT 1 FROM public.account_deletion_requests r WHERE r.user_id = v_user_id) THEN\n    RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';\n  END IF;\n  IF p_name IS NULL OR char_length(btrim(p_name)) NOT BETWEEN 1 AND 80 THEN\n    RAISE EXCEPTION 'invalid_group_name' USING ERRCODE = '22023';\n  END IF;\n  IF p_world_background IS NULL OR char_length(p_world_background) > 10000 THEN\n    RAISE EXCEPTION 'invalid_world_background' USING ERRCODE = '22023';\n  END IF;\n  IF p_scene_mode IS DISTINCT FROM 'shared' THEN\n    RAISE EXCEPTION 'group_scene_mode_must_be_shared' USING ERRCODE = '22023';\n  END IF;\n  IF jsonb_typeof(p_members) IS DISTINCT FROM 'array' THEN\n    RAISE EXCEPTION 'members_must_be_array' USING ERRCODE = '22023';\n  END IF;\n  v_member_count := jsonb_array_length(p_members);\n  IF v_member_count NOT BETWEEN 1 AND 3 THEN\n    RAISE EXCEPTION 'group_requires_one_to_three_characters' USING ERRCODE = '22023';\n  END IF;\n  IF jsonb_typeof(p_scenes) IS DISTINCT FROM 'array' THEN\n    RAISE EXCEPTION 'invalid_scenes' USING ERRCODE = '22023';\n  END IF;\n  IF jsonb_array_length(p_scenes) <> 1 THEN\n    RAISE EXCEPTION 'shared_mode_requires_one_scene' USING ERRCODE = '22023';\n  END IF;\n\n  INSERT INTO public.chat_groups(owner_id, name, world_background, scene_mode)\n  VALUES (v_user_id, btrim(p_name), p_world_background, 'shared')\n  RETURNING id INTO v_group_id;\n\n  v_scene := p_scenes->0;\n  IF jsonb_typeof(v_scene) IS DISTINCT FROM 'object'\n     OR jsonb_typeof(v_scene->'name') IS DISTINCT FROM 'string'\n     OR (v_scene ? 'description' AND jsonb_typeof(v_scene->'description') IS DISTINCT FROM 'string')\n     OR char_length(btrim(COALESCE(v_scene->>'name',''))) NOT BETWEEN 1 AND 80\n     OR char_length(COALESCE(v_scene->>'description','')) > 5000 THEN\n    RAISE EXCEPTION 'invalid_scene_payload' USING ERRCODE = '22023';\n  END IF;\n  INSERT INTO public.chat_group_scenes(group_id, name, description, position)\n  VALUES (v_group_id, btrim(v_scene->>'name'), COALESCE(v_scene->>'description',''), 1)\n  RETURNING id INTO v_scene_id;\n\n  FOR v_member IN SELECT value FROM jsonb_array_elements(p_members)\n  LOOP\n    v_position := v_position + 1;\n    IF jsonb_typeof(v_member) IS DISTINCT FROM 'object'\n       OR jsonb_typeof(v_member->'character_id') IS DISTINCT FROM 'string'\n       OR NULLIF(v_member->>'character_id', '') IS NULL THEN\n      RAISE EXCEPTION 'invalid_member_payload' USING ERRCODE = '22023';\n    END IF;\n    BEGIN\n      v_character_id := (v_member->>'character_id')::uuid;\n    EXCEPTION WHEN invalid_text_representation THEN\n      RAISE EXCEPTION 'invalid_character_id' USING ERRCODE = '22023';\n    END;\n\n    -- A character can join a group whenever it is public and not taken down.\n    -- review_status is intentionally not an access gate: there is no pre-publication review workflow.\n    SELECT c.* INTO v_character\n    FROM public.characters c\n    WHERE c.id = v_character_id\n      AND c.deleted_at IS NULL\n      AND c.visibility = 'public'\n    FOR SHARE;\n    IF NOT FOUND THEN\n      RAISE EXCEPTION 'character_not_public_or_unavailable' USING ERRCODE = '42501';\n    END IF;\n\n    IF EXISTS (\n      SELECT 1 FROM public.chat_group_members m\n      WHERE m.group_id = v_group_id AND m.character_id = v_character_id\n    ) THEN\n      RAISE EXCEPTION 'duplicate_character' USING ERRCODE = '22023';\n    END IF;\n    INSERT INTO public.chat_group_members(group_id, character_id, position, scene_id, character_snapshot)\n    VALUES (\n      v_group_id, v_character_id, v_position, v_scene_id,\n      jsonb_build_object(\n        'id', v_character.id, 'name', v_character.name, 'gender', v_character.gender,\n        'age', v_character.age, 'intro', v_character.intro,\n        'opening', COALESCE((\n          SELECT cs.opening_message FROM public.character_stories cs\n          WHERE cs.character_id = v_character.id\n            AND cs.visibility = 'public'\n          ORDER BY cs.created_at ASC LIMIT 1\n        ), ''),\n        'race', v_character.race, 'style', v_character.style, 'tags', v_character.tags\n      )\n    );\n  END LOOP;\n  RETURN v_group_id;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_name text, p_world_background text, p_scene_mode text, p_scenes jsonb, p_members jsonb"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "create_encounter_session_with_lifecycle",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.create_encounter_session_with_lifecycle(p_session_id uuid, p_user_id uuid, p_character_id uuid, p_character_name text, p_character_snapshot jsonb, p_schedule_snapshot jsonb, p_location_key text, p_scheduled_start_at timestamp with time zone, p_scheduled_end_at timestamp with time zone)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_session jsonb;\nBEGIN\n  IF p_session_id IS NULL OR p_user_id IS NULL OR p_character_id IS NULL\n     OR p_location_key IS NULL OR char_length(p_location_key) NOT BETWEEN 1 AND 80\n     OR jsonb_typeof(COALESCE(p_character_snapshot, '{}'::jsonb)) <> 'object'\n     OR jsonb_typeof(COALESCE(p_schedule_snapshot, '{}'::jsonb)) <> 'object'\n     OR pg_column_size(COALESCE(p_schedule_snapshot, '{}'::jsonb)) > 8000\n     OR p_scheduled_start_at IS NULL OR p_scheduled_end_at IS NULL\n     OR p_scheduled_end_at <= p_scheduled_start_at THEN\n    RAISE EXCEPTION 'Invalid Encounter session lifecycle input' USING ERRCODE = '22023';\n  END IF;\n\n  INSERT INTO public.chat_sessions (\n    id, user_id, character_id, character_name, status,\n    character_snapshot, session_data, chat_mode\n  ) VALUES (\n    p_session_id, p_user_id, p_character_id, p_character_name, 'active',\n    COALESCE(p_character_snapshot, '{}'::jsonb),\n    jsonb_build_object('encounter', jsonb_build_object('affinity', 0, 'relationshipStage', 'first_meeting')),\n    'encounter'\n  );\n\n  INSERT INTO public.encounter_session_lifecycle (\n    session_id, user_id, character_id, location_key, schedule_snapshot,\n    scheduled_start_at, scheduled_end_at, timezone, status\n  ) VALUES (\n    p_session_id, p_user_id, p_character_id, p_location_key, p_schedule_snapshot,\n    p_scheduled_start_at, p_scheduled_end_at, 'Asia/Taipei', 'active'\n  );\n\n  SELECT jsonb_build_object(\n    'id', s.id, 'user_id', s.user_id, 'character_id', s.character_id,\n    'character_name', s.character_name, 'status', s.status,\n    'character_snapshot', s.character_snapshot, 'session_data', s.session_data,\n    'chat_mode', s.chat_mode, 'created_at', s.created_at, 'updated_at', s.updated_at\n  ) INTO v_session\n  FROM public.chat_sessions AS s WHERE s.id = p_session_id;\n  RETURN v_session;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_session_id uuid, p_user_id uuid, p_character_id uuid, p_character_name text, p_character_snapshot jsonb, p_schedule_snapshot jsonb, p_location_key text, p_scheduled_start_at timestamp with time zone, p_scheduled_end_at timestamp with time zone"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "create_story_session_with_relationship",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.create_story_session_with_relationship(p_session_id uuid, p_user_id uuid, p_character_id uuid, p_character_name text, p_character_snapshot jsonb, p_origin_mode text, p_source_encounter_session_id uuid, p_affinity integer, p_relationship_stage text, p_imported_memories jsonb)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_session jsonb;\nBEGIN\n  IF p_origin_mode NOT IN ('fresh_story', 'encounter_snapshot') THEN\n    RAISE EXCEPTION 'Invalid Story relationship origin' USING ERRCODE = '22023';\n  END IF;\n  IF p_affinity IS NULL OR p_affinity < -100 OR p_affinity > 100 THEN\n    RAISE EXCEPTION 'Story affinity is outside the allowed range' USING ERRCODE = '22023';\n  END IF;\n  IF jsonb_typeof(COALESCE(p_imported_memories, '[]'::jsonb)) <> 'array' THEN\n    RAISE EXCEPTION 'Imported memories must be an array' USING ERRCODE = '22023';\n  END IF;\n  IF pg_column_size(COALESCE(p_imported_memories, '[]'::jsonb)) > 20000 THEN\n    RAISE EXCEPTION 'Imported memories are too large' USING ERRCODE = '22023';\n  END IF;\n\n  INSERT INTO public.chat_sessions (\n    id, user_id, character_id, character_name, status,\n    character_snapshot, session_data, chat_mode\n  ) VALUES (\n    p_session_id, p_user_id, p_character_id, p_character_name, 'active',\n    COALESCE(p_character_snapshot, '{}'::jsonb), '{}'::jsonb, 'story'\n  );\n\n  INSERT INTO public.story_relationship_states (\n    session_id, user_id, character_id, origin_mode,\n    affinity, relationship_stage, source_encounter_session_id,\n    origin_affinity, origin_relationship_stage, imported_memories, snapshot_at\n  ) VALUES (\n    p_session_id, p_user_id, p_character_id, p_origin_mode,\n    p_affinity, p_relationship_stage, p_source_encounter_session_id,\n    p_affinity, p_relationship_stage, COALESCE(p_imported_memories, '[]'::jsonb),\n    CASE WHEN p_origin_mode = 'encounter_snapshot' THEN now() ELSE NULL END\n  );\n\n  SELECT jsonb_build_object(\n    'id', s.id,\n    'user_id', s.user_id,\n    'character_id', s.character_id,\n    'character_name', s.character_name,\n    'status', s.status,\n    'character_snapshot', s.character_snapshot,\n    'chat_mode', s.chat_mode,\n    'created_at', s.created_at,\n    'updated_at', s.updated_at\n  ) INTO v_session\n  FROM public.chat_sessions AS s\n  WHERE s.id = p_session_id;\n\n  RETURN v_session;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_session_id uuid, p_user_id uuid, p_character_id uuid, p_character_name text, p_character_snapshot jsonb, p_origin_mode text, p_source_encounter_session_id uuid, p_affinity integer, p_relationship_stage text, p_imported_memories jsonb"
+    },
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "delete_chat_group_with_related_data",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.delete_chat_group_with_related_data(p_group_id uuid)\n RETURNS TABLE(storage_path text)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_user_id uuid := auth.uid();\n  v_owner_id uuid;\n  v_deleted_at timestamptz;\n  v_job_id uuid;\nBEGIN\n  IF v_user_id IS NULL THEN\n    RAISE EXCEPTION 'authentication_required' USING ERRCODE = '42501';\n  END IF;\n\n  IF EXISTS (\n    SELECT 1 FROM public.account_deletion_requests r\n    WHERE r.user_id = v_user_id\n  ) THEN\n    RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';\n  END IF;\n\n  SELECT g.owner_id, g.deleted_at\n    INTO v_owner_id, v_deleted_at\n  FROM public.chat_groups g\n  WHERE g.id = p_group_id\n  FOR UPDATE;\n\n  IF NOT FOUND OR v_owner_id IS DISTINCT FROM v_user_id THEN\n    RAISE EXCEPTION 'group_not_found_or_not_owned' USING ERRCODE = '42501';\n  END IF;\n\n  v_deleted_at := COALESCE(v_deleted_at, pg_catalog.statement_timestamp());\n\n  INSERT INTO public.chat_deletion_jobs (\n    resource_type, resource_id, owner_id, deleted_at, purge_after, status\n  )\n  VALUES (\n    'group', p_group_id, v_user_id, v_deleted_at,\n    v_deleted_at + interval '30 days', 'queued'\n  )\n  ON CONFLICT (resource_type, resource_id) DO NOTHING;\n\n  SELECT j.id\n    INTO v_job_id\n  FROM public.chat_deletion_jobs j\n  WHERE j.resource_type = 'group'\n    AND j.resource_id = p_group_id\n    AND j.owner_id = v_user_id\n    AND j.deleted_at = v_deleted_at\n  FOR UPDATE;\n\n  IF NOT FOUND THEN\n    RAISE EXCEPTION 'chat_deletion_job_conflict' USING ERRCODE = '40001';\n  END IF;\n\n  IF EXISTS (\n    SELECT 1\n    FROM public.chat_memory_photos p\n    WHERE p.group_id = p_group_id\n      AND p.chat_type = 'group'\n      AND p.owner_id = v_user_id\n      AND left(p.storage_path, char_length(v_user_id::text) + 1) <> v_user_id::text || '/'\n  ) THEN\n    RAISE EXCEPTION 'chat_storage_path_owner_mismatch' USING ERRCODE = '42501';\n  END IF;\n\n  INSERT INTO public.chat_storage_deletion_jobs (\n    deletion_job_id, bucket_id, object_path, resource_type, resource_id, owner_id\n  )\n  SELECT\n    v_job_id, 'personax-memory-photos', p.storage_path,\n    'group', p_group_id, v_user_id\n  FROM public.chat_memory_photos p\n  WHERE p.group_id = p_group_id\n    AND p.chat_type = 'group'\n    AND p.owner_id = v_user_id\n  ON CONFLICT (bucket_id, object_path) DO NOTHING;\n\n  IF EXISTS (\n    SELECT 1\n    FROM public.chat_storage_deletion_jobs sj\n    JOIN public.chat_memory_photos p ON p.storage_path = sj.object_path\n    WHERE p.group_id = p_group_id\n      AND p.chat_type = 'group'\n      AND p.owner_id = v_user_id\n      AND (sj.owner_id <> v_user_id OR sj.deletion_job_id <> v_job_id)\n  ) THEN\n    RAISE EXCEPTION 'chat_storage_deletion_job_conflict' USING ERRCODE = '40001';\n  END IF;\n\n  UPDATE public.chat_groups g\n  SET deleted_at = COALESCE(g.deleted_at, v_deleted_at),\n      updated_at = pg_catalog.statement_timestamp()\n  WHERE g.id = p_group_id\n    AND g.owner_id = v_user_id;\n\n  RETURN QUERY SELECT NULL::text WHERE false;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": "p_group_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "delete_chat_session_content",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.delete_chat_session_content(p_session_id uuid)\n RETURNS TABLE(storage_path text)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_user_id uuid := auth.uid();\n  v_owner_id uuid;\n  v_deleted_at timestamptz;\n  v_job_id uuid;\nBEGIN\n  IF v_user_id IS NULL THEN\n    RAISE EXCEPTION 'authentication_required' USING ERRCODE = '42501';\n  END IF;\n\n  IF EXISTS (\n    SELECT 1 FROM public.account_deletion_requests r\n    WHERE r.user_id = v_user_id\n  ) THEN\n    RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';\n  END IF;\n\n  SELECT s.user_id, s.deleted_at\n    INTO v_owner_id, v_deleted_at\n  FROM public.chat_sessions s\n  WHERE s.id = p_session_id\n  FOR UPDATE;\n\n  IF NOT FOUND OR v_owner_id IS DISTINCT FROM v_user_id THEN\n    RAISE EXCEPTION 'session_not_found_or_not_owned' USING ERRCODE = '42501';\n  END IF;\n\n  v_deleted_at := COALESCE(v_deleted_at, pg_catalog.statement_timestamp());\n\n  INSERT INTO public.chat_deletion_jobs (\n    resource_type, resource_id, owner_id, deleted_at, purge_after, status\n  )\n  VALUES (\n    'single_session', p_session_id, v_user_id, v_deleted_at,\n    v_deleted_at + interval '30 days', 'queued'\n  )\n  ON CONFLICT (resource_type, resource_id) DO NOTHING;\n\n  SELECT j.id\n    INTO v_job_id\n  FROM public.chat_deletion_jobs j\n  WHERE j.resource_type = 'single_session'\n    AND j.resource_id = p_session_id\n    AND j.owner_id = v_user_id\n    AND j.deleted_at = v_deleted_at\n  FOR UPDATE;\n\n  IF NOT FOUND THEN\n    RAISE EXCEPTION 'chat_deletion_job_conflict' USING ERRCODE = '40001';\n  END IF;\n\n  IF EXISTS (\n    SELECT 1\n    FROM public.chat_memory_photos p\n    WHERE p.session_id = p_session_id\n      AND p.chat_type = 'single'\n      AND p.owner_id = v_user_id\n      AND left(p.storage_path, char_length(v_user_id::text) + 1) <> v_user_id::text || '/'\n  ) THEN\n    RAISE EXCEPTION 'chat_storage_path_owner_mismatch' USING ERRCODE = '42501';\n  END IF;\n\n  INSERT INTO public.chat_storage_deletion_jobs (\n    deletion_job_id, bucket_id, object_path, resource_type, resource_id, owner_id\n  )\n  SELECT\n    v_job_id, 'personax-memory-photos', p.storage_path,\n    'single_session', p_session_id, v_user_id\n  FROM public.chat_memory_photos p\n  WHERE p.session_id = p_session_id\n    AND p.chat_type = 'single'\n    AND p.owner_id = v_user_id\n  ON CONFLICT (bucket_id, object_path) DO NOTHING;\n\n  IF EXISTS (\n    SELECT 1\n    FROM public.chat_storage_deletion_jobs sj\n    JOIN public.chat_memory_photos p ON p.storage_path = sj.object_path\n    WHERE p.session_id = p_session_id\n      AND p.chat_type = 'single'\n      AND p.owner_id = v_user_id\n      AND (sj.owner_id <> v_user_id OR sj.deletion_job_id <> v_job_id)\n  ) THEN\n    RAISE EXCEPTION 'chat_storage_deletion_job_conflict' USING ERRCODE = '40001';\n  END IF;\n\n  UPDATE public.chat_sessions s\n  SET deleted_at = COALESCE(s.deleted_at, v_deleted_at),\n      updated_at = pg_catalog.statement_timestamp()\n  WHERE s.id = p_session_id\n    AND s.user_id = v_user_id;\n\n  RETURN QUERY SELECT NULL::text WHERE false;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": "p_session_id uuid"
+    },
+    {
+      "acl": "{=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "enforce_chat_group_member_limit",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.enforce_chat_group_member_limit()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_count integer;\nBEGIN\n  PERFORM 1 FROM public.chat_groups WHERE id = NEW.group_id FOR UPDATE;\n  IF NOT FOUND THEN\n    RAISE EXCEPTION 'group_not_found' USING ERRCODE = '23503';\n  END IF;\n\n  SELECT count(*) INTO v_count\n  FROM public.chat_group_members\n  WHERE group_id = NEW.group_id\n    AND id IS DISTINCT FROM NEW.id;\n\n  IF v_count >= 3 THEN\n    RAISE EXCEPTION 'group_character_limit_exceeded' USING ERRCODE = '23514';\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": false,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "enforce_chat_memory_photo_expiry",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.enforce_chat_memory_photo_expiry()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nbegin\n  new.created_at := pg_catalog.now();\n  new.expires_at := new.created_at + interval '1 year';\n  new.status := 'active';\n  new.deletion_attempts := 0;\n  new.last_deletion_error := null;\n  new.deleted_at := null;\n  return new;\nend;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": false,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "enforce_shared_group_scene_mode",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.enforce_shared_group_scene_mode()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nBEGIN\n  IF NEW.scene_mode IS DISTINCT FROM 'shared' THEN\n    RAISE EXCEPTION 'group_scene_mode_must_be_shared' USING ERRCODE = '22023';\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": false,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "enforce_trusted_chat_mode",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.enforce_trusted_chat_mode()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nBEGIN\n  IF COALESCE(auth.role(), '') <> 'service_role' THEN\n    IF TG_OP = 'INSERT' THEN\n      NEW.chat_mode := 'story';\n    ELSIF NEW.chat_mode IS DISTINCT FROM OLD.chat_mode THEN\n      RAISE EXCEPTION 'chat_mode is server-managed'\n        USING ERRCODE = '42501';\n    END IF;\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "enqueue_due_encounter_evaluations",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.enqueue_due_encounter_evaluations(p_limit integer DEFAULT 50)\n RETURNS integer\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE l public.encounter_session_lifecycle%ROWTYPE; v_enqueued integer:=0; v_rows integer:=0; v_limit integer:=LEAST(GREATEST(COALESCE(p_limit,50),1),100); v_session_id uuid;\nBEGIN\n  FOR v_session_id IN\n    SELECT s.id FROM public.chat_sessions s JOIN public.encounter_session_lifecycle lifecycle ON lifecycle.session_id=s.id\n    WHERE s.deleted_at IS NULL AND lifecycle.status IN ('active','paused','ready_to_settle') AND lifecycle.character_id IS NOT NULL AND lifecycle.scheduled_end_at<=clock_timestamp()\n    ORDER BY lifecycle.scheduled_end_at,lifecycle.session_id FOR UPDATE OF s SKIP LOCKED LIMIT v_limit\n  LOOP\n    SELECT lifecycle.* INTO l FROM public.encounter_session_lifecycle lifecycle WHERE lifecycle.session_id=v_session_id FOR UPDATE;\n    IF NOT FOUND THEN CONTINUE; END IF;\n    IF EXISTS(SELECT 1 FROM public.chat_turn_charges charge WHERE charge.session_id=l.session_id AND charge.status IN ('created','reserved','needs_reconciliation')) THEN CONTINUE; END IF;\n    IF (SELECT count(*) FROM public.encounter_session_turns turn WHERE turn.session_id=l.session_id)<>l.turn_count THEN CONTINUE; END IF;\n    UPDATE public.encounter_session_lifecycle SET status='ready_to_settle',updated_at=clock_timestamp() WHERE session_id=l.session_id AND status IN ('active','paused','ready_to_settle');\n    INSERT INTO public.encounter_session_evaluation_jobs(session_id,user_id,character_id,status) VALUES(l.session_id,l.user_id,l.character_id,'pending')\n    ON CONFLICT(session_id) DO UPDATE SET status='pending',claimed_at=NULL,completed_at=NULL,last_error=NULL,updated_at=clock_timestamp()\n    WHERE public.encounter_session_evaluation_jobs.status='failed' AND public.encounter_session_evaluation_jobs.attempt_count<5 AND public.encounter_session_evaluation_jobs.updated_at<=clock_timestamp()-interval '5 minutes';\n    GET DIAGNOSTICS v_rows=ROW_COUNT; v_enqueued:=v_enqueued+v_rows;\n  END LOOP;\n  RETURN v_enqueued;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_limit integer"
+    },
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "ensure_wallet_account",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.ensure_wallet_account()\n RETURNS TABLE(diamonds integer, silver_coins integer)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\r\ndeclare\r\n  v_user_id uuid;\r\n  v_rows integer;\r\nbegin\r\n  v_user_id := auth.uid();\r\n  if v_user_id is null then\r\n    raise exception '請先登入';\r\n  end if;\r\n  if not public.account_is_active() then\r\n    raise exception '帳號正在等待刪除，請先取消刪除申請';\r\n  end if;\r\n\r\n  insert into public.wallet_accounts (\r\n    user_id, diamonds, silver_coins, updated_at\r\n  )\r\n  values (v_user_id, 0, 100, now())\r\n  on conflict (user_id) do nothing;\r\n  get diagnostics v_rows = row_count;\r\n  if v_rows > 0 then\r\n    insert into public.wallet_transactions (\r\n      user_id, currency_type, amount, biz_type, reference_id\r\n    )\r\n    values (\r\n      v_user_id, 'silver_coins', 100, 'signup_bonus', 'initial_wallet_grant'\r\n    );\r\n  end if;\r\n\r\n  return query\r\n  select wa.diamonds, wa.silver_coins\r\n  from public.wallet_accounts as wa\r\n  where wa.user_id = v_user_id;\r\nend;\r\n$function$\n",
+      "volatility": "v",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "fail_encounter_evaluation_job",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.fail_encounter_evaluation_job(p_session_id uuid, p_error text)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_updated integer;\nBEGIN\n  IF p_session_id IS NULL THEN\n    RAISE EXCEPTION 'Invalid evaluation job session' USING ERRCODE='22023';\n  END IF;\n\n  UPDATE public.encounter_session_evaluation_jobs\n  SET status='failed',claimed_at=NULL,last_error=left(COALESCE(p_error,'evaluation_failed'),500),\n      updated_at=clock_timestamp()\n  WHERE session_id=p_session_id AND status='processing';\n\n  GET DIAGNOSTICS v_updated = ROW_COUNT;\n  RETURN v_updated=1;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_session_id uuid, p_error text"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "finalize_account_deletion",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.finalize_account_deletion(p_batch_id uuid)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_status text;\n  v_user_id uuid;\nBEGIN\n  IF p_batch_id IS NULL THEN\n    RAISE EXCEPTION '封存批次不可為空';\n  END IF;\n\n  SELECT b.status, b.target_user_id\n    INTO v_status, v_user_id\n  FROM public.account_deletion_archive_batches AS b\n  WHERE b.id = p_batch_id\n  FOR UPDATE;\n\n  IF NOT FOUND THEN\n    RAISE EXCEPTION '找不到封存批次';\n  END IF;\n\n  IF v_status = 'completed' THEN\n    RETURN true;\n  END IF;\n\n  IF v_status <> 'deleting' THEN\n    RAISE EXCEPTION '批次尚未進入 deleting 狀態';\n  END IF;\n\n  IF EXISTS (SELECT 1 FROM auth.users AS u WHERE u.id = v_user_id) THEN\n    RAISE EXCEPTION 'Auth 帳號仍存在，不能標記刪除完成';\n  END IF;\n\n  UPDATE public.account_deletion_archive_batches\n  SET status = 'completed',\n      completed_at = pg_catalog.statement_timestamp(),\n      updated_at = pg_catalog.statement_timestamp(),\n      last_error = NULL\n  WHERE id = p_batch_id;\n\n  RETURN true;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_batch_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "get_account_deletion_status",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "sql",
+      "definition": "CREATE OR REPLACE FUNCTION public.get_account_deletion_status()\n RETURNS TABLE(is_pending boolean, requested_at timestamp with time zone, scheduled_for timestamp with time zone)\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\r\n  select\r\n    exists (\r\n      select 1 from public.account_deletion_requests r\r\n      where r.user_id = auth.uid()\r\n    ) as is_pending,\r\n    (select r.requested_at from public.account_deletion_requests r\r\n      where r.user_id = auth.uid()) as requested_at,\r\n    (select r.scheduled_for from public.account_deletion_requests r\r\n      where r.user_id = auth.uid()) as scheduled_for;\r\n$function$\n",
+      "volatility": "s",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "get_account_deletion_work_items",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "sql",
+      "definition": "CREATE OR REPLACE FUNCTION public.get_account_deletion_work_items()\n RETURNS TABLE(target_user_id uuid, batch_id uuid, scheduled_for timestamp with time zone, work_status text)\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  SELECT q.user_id, b.id, q.scheduled_for, COALESCE(b.status, 'due')::text\n  FROM public.account_deletion_requests AS q\n  LEFT JOIN LATERAL (\n    SELECT ab.id, ab.status\n    FROM public.account_deletion_archive_batches AS ab\n    WHERE ab.target_user_id = q.user_id\n      AND ab.requested_at = q.requested_at\n      AND ab.scheduled_for = q.scheduled_for\n      AND ab.status NOT IN ('completed', 'cancelled')\n    ORDER BY ab.created_at DESC\n    LIMIT 1\n  ) AS b ON true\n  WHERE q.scheduled_for <= pg_catalog.statement_timestamp()\n    AND NOT EXISTS (\n      SELECT 1\n      FROM public.account_deletion_archive_batches AS completed_batch\n      WHERE completed_batch.target_user_id = q.user_id\n        AND completed_batch.requested_at = q.requested_at\n        AND completed_batch.scheduled_for = q.scheduled_for\n        AND completed_batch.status = 'completed'\n    )\n\n  UNION ALL\n\n  SELECT b.target_user_id, b.id, b.scheduled_for, b.status\n  FROM public.account_deletion_archive_batches AS b\n  WHERE b.status = 'deleting'\n    AND b.target_user_id IS NOT NULL\n    AND NOT EXISTS (\n      SELECT 1 FROM public.account_deletion_requests AS q\n      WHERE q.user_id = b.target_user_id\n        AND q.requested_at = b.requested_at\n        AND q.scheduled_for = b.scheduled_for\n    );\n$function$\n",
+      "volatility": "v",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "get_character_comments_safe",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "sql",
+      "definition": "CREATE OR REPLACE FUNCTION public.get_character_comments_safe(p_character_id uuid)\n RETURNS TABLE(id uuid, character_id uuid, author_id uuid, content text, parent_id uuid, is_whisper boolean, is_deleted boolean, created_at timestamp with time zone, updated_at timestamp with time zone, is_redacted boolean)\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  WITH me AS (SELECT auth.uid() AS uid),\n  ch AS (\n    SELECT c.id, c.author_id AS character_author_id\n    FROM public.characters c\n    WHERE c.id = p_character_id\n      AND (\n        c.author_id = (SELECT auth.uid())\n        OR (\n          c.visibility = 'public' AND c.deleted_at IS NULL\n          AND (c.is_nsfw IS NOT TRUE OR ((SELECT auth.uid()) IS NOT NULL AND private.current_user_is_adult()))\n        )\n      )\n  )\n  SELECT cm.id, cm.character_id, cm.author_id,\n    CASE\n      WHEN cm.is_deleted THEN '該筆評論已被刪除'\n      WHEN private.comment_is_whisper_thread(cm.id)\n       AND cm.author_id IS DISTINCT FROM me.uid\n       AND ch.character_author_id IS DISTINCT FROM me.uid\n       AND COALESCE(parent.author_id, cm.author_id) IS DISTINCT FROM me.uid\n        THEN '這是一則悄悄話留言'\n      ELSE cm.content\n    END,\n    cm.parent_id, cm.is_whisper, cm.is_deleted, cm.created_at, cm.updated_at,\n    (NOT cm.is_deleted AND private.comment_is_whisper_thread(cm.id)\n      AND cm.author_id IS DISTINCT FROM me.uid\n      AND ch.character_author_id IS DISTINCT FROM me.uid\n      AND COALESCE(parent.author_id, cm.author_id) IS DISTINCT FROM me.uid) AS is_redacted\n  FROM public.character_comments cm\n  JOIN ch ON ch.id = cm.character_id\n  CROSS JOIN me\n  LEFT JOIN public.character_comments parent ON parent.id = cm.parent_id\n  WHERE cm.character_id = p_character_id\n  ORDER BY cm.created_at ASC;\n$function$\n",
+      "volatility": "s",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": "p_character_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "get_character_turn_counts",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "sql",
+      "definition": "CREATE OR REPLACE FUNCTION public.get_character_turn_counts(p_character_ids uuid[])\n RETURNS TABLE(character_id uuid, turn_count bigint)\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  WITH requested AS (\n    SELECT DISTINCT unnest(COALESCE(p_character_ids, ARRAY[]::uuid[])) AS character_id\n  ),\n  allowed AS (\n    SELECT c.id AS character_id\n    FROM public.characters c JOIN requested r ON r.character_id = c.id\n    WHERE c.deleted_at IS NULL\n      AND (\n        c.author_id = (SELECT auth.uid())\n        OR (c.visibility = 'public' AND (\n          c.is_nsfw IS NOT TRUE OR ((SELECT auth.uid()) IS NOT NULL AND private.current_user_is_adult())\n        ))\n      )\n  ),\n  solo_counts AS (\n    SELECT s.character_id, count(m.id)::bigint AS turn_count\n    FROM public.chat_sessions s\n    LEFT JOIN public.chat_messages m ON m.session_id=s.id AND m.role='assistant' AND m.deleted_at IS NULL\n    JOIN allowed a ON a.character_id=s.character_id\n    WHERE s.deleted_at IS NULL GROUP BY s.character_id\n  ),\n  group_counts AS (\n    SELECT gm.character_id,count(gm.id)::bigint AS turn_count\n    FROM public.chat_group_messages gm JOIN allowed a ON a.character_id=gm.character_id\n    WHERE gm.speaker_type='character' AND gm.deleted_at IS NULL GROUP BY gm.character_id\n  )\n  SELECT a.character_id,COALESCE(sc.turn_count,0)+COALESCE(gc.turn_count,0) AS turn_count\n  FROM allowed a LEFT JOIN solo_counts sc ON sc.character_id=a.character_id\n  LEFT JOIN group_counts gc ON gc.character_id=a.character_id;\n$function$\n",
+      "volatility": "s",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": "p_character_ids uuid[]"
+    },
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "get_daily_checkin_status",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.get_daily_checkin_status()\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare\n  v_user_id uuid := auth.uid();\n  v_today date := (now() at time zone 'Asia/Taipei')::date;\n  v_reward integer;\n  v_enabled boolean;\n  v_today_day smallint;\n  v_last_day smallint;\n  v_claimed_today boolean := false;\n  v_next_day smallint := 1;\n  v_last_date date;\nbegin\n  if v_user_id is null then\n    raise exception 'authentication required' using errcode = '42501';\n  end if;\n\n  if exists (select 1 from public.account_deletion_requests adr where adr.user_id = v_user_id) then\n    raise exception 'account deletion pending' using errcode = '42501';\n  end if;\n\n  select s.reward_silver, s.enabled\n    into v_reward, v_enabled\n  from public.daily_checkin_settings s\n  where s.id = 1;\n\n  if not found then\n    v_reward := 10;\n    v_enabled := true;\n  end if;\n\n  select c.cycle_day into v_today_day\n  from public.daily_checkins c\n  where c.user_id = v_user_id and c.checkin_date = v_today;\n\n  v_claimed_today := found;\n\n  select c.cycle_day, c.checkin_date\n    into v_last_day, v_last_date\n  from public.daily_checkins c\n  where c.user_id = v_user_id\n  order by c.checkin_date desc\n  limit 1;\n\n  if v_claimed_today then\n    v_next_day := v_today_day;\n  elsif v_last_day is not null then\n    v_next_day := (v_last_day % 7) + 1;\n  end if;\n\n  return jsonb_build_object(\n    'reward', v_reward,\n    'enabled', v_enabled,\n    'claimed_today', v_claimed_today,\n    'cycle_day', v_next_day,\n    'last_checkin_date', v_last_date,\n    'today', v_today\n  );\nend;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres,anon=X/postgres,authenticated=X/postgres}",
+      "kind": "f",
+      "name": "get_encounter_character_schedule",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "sql",
+      "definition": "CREATE OR REPLACE FUNCTION public.get_encounter_character_schedule(p_character_id uuid)\n RETURNS TABLE(weekday smallint, day_type text, start_time time without time zone, end_time time without time zone, location_key text, activity text, priority smallint)\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  SELECT\n    s.weekday, s.day_type, s.start_time, s.end_time,\n    s.location_key, s.activity, s.priority\n  FROM public.characters c\n  JOIN public.character_schedules s ON s.character_id = c.id\n  WHERE c.id = p_character_id\n    AND c.visibility = 'public'\n    AND c.deleted_at IS NULL\n    AND c.review_status = 'approved'\n    AND c.rights_confirmed IS TRUE\n    AND s.is_active IS TRUE\n    AND (\n      c.is_nsfw IS NOT TRUE\n      OR (\n        (SELECT auth.uid()) IS NOT NULL\n        AND private.current_user_is_adult()\n      )\n    )\n  ORDER BY s.priority DESC, s.weekday NULLS FIRST, s.start_time;\n$function$\n",
+      "volatility": "s",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": "p_character_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}",
+      "kind": "f",
+      "name": "get_latest_settled_encounter_affinity",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.get_latest_settled_encounter_affinity(p_character_id uuid)\n RETURNS TABLE(session_id uuid, settled_at timestamp with time zone, affinity integer, relationship_stage text)\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_user_id uuid := auth.uid();\nBEGIN\n  IF p_character_id IS NULL THEN\n    RAISE EXCEPTION 'Character ID is required' USING ERRCODE='22023';\n  END IF;\n  IF v_user_id IS NULL THEN\n    RAISE EXCEPTION 'Authentication required' USING ERRCODE='42501';\n  END IF;\n\n  RETURN QUERY\n  SELECT lifecycle.session_id,\n         lifecycle.settled_at,\n         (lifecycle.settlement_result->>'final_affinity')::integer,\n         lifecycle.settlement_result->>'relationship_stage'\n  FROM public.encounter_session_lifecycle AS lifecycle\n  WHERE lifecycle.user_id=v_user_id\n    AND lifecycle.character_id=p_character_id\n    AND lifecycle.status='settled'\n    AND lifecycle.settled_at IS NOT NULL\n    AND jsonb_typeof(lifecycle.settlement_result)='object'\n    AND (lifecycle.settlement_result->>'final_affinity') ~ '^-?[0-9]{1,3}$'\n    AND (lifecycle.settlement_result->>'final_affinity')::integer BETWEEN -100 AND 100\n    AND lifecycle.settlement_result->>'relationship_stage' IN (\n      'hostile','dislike','wary','first_meeting',\n      'acquaintance','close','intimate','special'\n    )\n  ORDER BY lifecycle.settled_at DESC,lifecycle.session_id\n  LIMIT 1;\nEND;\n$function$\n",
+      "volatility": "s",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": "p_character_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}",
+      "kind": "f",
+      "name": "get_latest_settled_encounter_session",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.get_latest_settled_encounter_session(p_character_id uuid)\n RETURNS TABLE(session_id uuid, settled_at timestamp with time zone, relationship_stage text)\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_user_id uuid := auth.uid();\nBEGIN\n  IF p_character_id IS NULL THEN\n    RAISE EXCEPTION 'Character ID is required' USING ERRCODE='22023';\n  END IF;\n  IF v_user_id IS NULL THEN\n    RAISE EXCEPTION 'Authentication required' USING ERRCODE='42501';\n  END IF;\n\n  RETURN QUERY\n  SELECT lifecycle.session_id,\n         lifecycle.settled_at,\n         lifecycle.settlement_result->>'relationship_stage'\n  FROM public.encounter_session_lifecycle AS lifecycle\n  WHERE lifecycle.user_id=v_user_id\n    AND lifecycle.character_id=p_character_id\n    AND lifecycle.status='settled'\n    AND lifecycle.settled_at IS NOT NULL\n    AND jsonb_typeof(lifecycle.settlement_result)='object'\n    AND (lifecycle.settlement_result->>'final_affinity') ~ '^-?[0-9]{1,3}$'\n    AND (lifecycle.settlement_result->>'final_affinity')::integer BETWEEN -100 AND 100\n    AND lifecycle.settlement_result->>'relationship_stage' IN (\n      'hostile','dislike','wary','first_meeting',\n      'acquaintance','close','intimate','special'\n    )\n  ORDER BY lifecycle.settled_at DESC,lifecycle.session_id\n  LIMIT 1;\nEND;\n$function$\n",
+      "volatility": "s",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": "p_character_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}",
+      "kind": "f",
+      "name": "get_my_private_profile_data",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "sql",
+      "definition": "CREATE OR REPLACE FUNCTION public.get_my_private_profile_data()\n RETURNS jsonb\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  select jsonb_build_object(\n    'birthdate', p.birthdate,\n    'persona_presets', p.persona_presets\n  )\n  from public.profiles as p\n  where p.id = auth.uid();\n$function$\n",
+      "volatility": "s",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "get_my_wallet_transaction_character_names",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "sql",
+      "definition": "CREATE OR REPLACE FUNCTION public.get_my_wallet_transaction_character_names()\n RETURNS TABLE(reference_id text, character_name text)\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  SELECT wt.reference_id,COALESCE(cs.character_name,cs.character_snapshot->>'name','未知角色') AS character_name\n  FROM public.wallet_transactions wt\n  JOIN public.chat_turn_charges c ON c.turn_id::text=wt.reference_id\n  JOIN public.chat_sessions cs ON cs.id=c.session_id\n  WHERE wt.user_id=auth.uid()\n    AND wt.biz_type IN ('chat_turn_charge','chat_turn_refund')\n    AND cs.user_id=auth.uid();\n$function$\n",
+      "volatility": "s",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "get_public_character_turn_count",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "sql",
+      "definition": "CREATE OR REPLACE FUNCTION public.get_public_character_turn_count(p_character_id uuid)\n RETURNS bigint\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  SELECT\n    (SELECT count(m.id)::bigint FROM public.chat_sessions s\n      LEFT JOIN public.chat_messages m ON m.session_id=s.id AND m.role='assistant' AND m.deleted_at IS NULL\n      WHERE s.character_id=c.id AND s.deleted_at IS NULL)\n    +\n    (SELECT count(gm.id)::bigint FROM public.chat_group_messages gm\n      WHERE gm.character_id=c.id AND gm.speaker_type='character' AND gm.deleted_at IS NULL)\n  FROM public.characters c\n  WHERE c.id=p_character_id AND c.visibility='public' AND c.deleted_at IS NULL\n    AND (c.is_nsfw IS NOT TRUE OR ((SELECT auth.uid()) IS NOT NULL AND private.current_user_is_adult()));\n$function$\n",
+      "volatility": "s",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_character_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}",
+      "kind": "f",
+      "name": "get_story_relationship_state",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.get_story_relationship_state(p_session_id uuid)\n RETURNS TABLE(affinity integer, relationship_stage text, origin_mode text, updated_at timestamp with time zone)\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_user_id uuid := auth.uid();\nBEGIN\n  IF p_session_id IS NULL THEN\n    RAISE EXCEPTION 'Story session ID is required' USING ERRCODE='22023';\n  END IF;\n  IF v_user_id IS NULL THEN\n    RAISE EXCEPTION 'Authentication required' USING ERRCODE='42501';\n  END IF;\n\n  RETURN QUERY\n  SELECT state.affinity,state.relationship_stage,state.origin_mode,state.updated_at\n  FROM public.story_relationship_states AS state\n  JOIN public.chat_sessions AS session\n    ON session.id=state.session_id\n  WHERE state.session_id=p_session_id\n    AND state.user_id=v_user_id\n    AND session.user_id=v_user_id\n    AND session.chat_mode='story'\n    AND session.deleted_at IS NULL;\nEND;\n$function$\n",
+      "volatility": "s",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": "p_session_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "guard_chat_turn_assistant_insert",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.guard_chat_turn_assistant_insert()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_charge public.chat_turn_charges%rowtype;\nBEGIN\n  PERFORM 1 FROM public.chat_sessions s WHERE s.id=NEW.session_id AND s.deleted_at IS NULL FOR UPDATE;\n  IF NOT FOUND THEN RAISE EXCEPTION 'chat_session_not_found_or_deleted'; END IF;\n  SELECT c.* INTO v_charge FROM public.chat_turn_charges c WHERE c.expected_assistant_message_id=NEW.id FOR UPDATE;\n  IF FOUND THEN\n    IF NEW.role IS DISTINCT FROM 'assistant' THEN RAISE EXCEPTION 'expected_assistant_message_id_role_conflict'; END IF;\n    IF NEW.session_id IS DISTINCT FROM v_charge.session_id THEN RAISE EXCEPTION 'expected_assistant_message_session_conflict'; END IF;\n    IF v_charge.status IS DISTINCT FROM 'reserved' AND v_charge.status IS DISTINCT FROM 'needs_reconciliation' THEN RAISE EXCEPTION 'assistant_insert_requires_unresolved_charge'; END IF;\n    IF char_length(btrim(coalesce(NEW.content,'')))=0 THEN RAISE EXCEPTION 'assistant_reply_content_required'; END IF;\n    RETURN NEW;\n  END IF;\n  IF NEW.role='assistant' THEN RAISE EXCEPTION 'assistant_reply_requires_chat_turn'; END IF;\n  RETURN NEW;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "guard_chat_turn_assistant_update",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.guard_chat_turn_assistant_update()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_locked_charge public.chat_turn_charges%rowtype; v_old_charge public.chat_turn_charges%rowtype;\n  v_new_charge public.chat_turn_charges%rowtype; v_has_old_charge boolean:=false;\n  v_has_new_charge boolean:=false; v_content_changed boolean; v_deleted_changed boolean;\nBEGIN\n  IF auth.role()='service_role' AND current_setting('app.chat_purge_worker',true)='on' THEN\n    IF NEW.id IS DISTINCT FROM OLD.id OR NEW.session_id IS DISTINCT FROM OLD.session_id OR NEW.role IS DISTINCT FROM OLD.role THEN\n      RAISE EXCEPTION 'chat_purge_worker_identity_change_forbidden';\n    END IF;\n    RETURN NEW;\n  END IF;\n  PERFORM 1 FROM public.chat_sessions s WHERE s.id=OLD.session_id AND s.deleted_at IS NULL FOR UPDATE;\n  IF NOT FOUND THEN RAISE EXCEPTION 'chat_session_not_found_or_deleted'; END IF;\n  IF NEW.role IS DISTINCT FROM OLD.role THEN RAISE EXCEPTION 'chat_message_role_is_immutable'; END IF;\n  IF NEW.id IS DISTINCT FROM OLD.id OR NEW.session_id IS DISTINCT FROM OLD.session_id THEN\n    IF OLD.role='assistant' THEN RAISE EXCEPTION 'assistant_message_identity_is_immutable';\n    ELSE RAISE EXCEPTION 'user_message_identity_is_immutable'; END IF;\n  END IF;\n  IF OLD.role<>'assistant' THEN RETURN NEW; END IF;\n  v_content_changed:=NEW.content IS DISTINCT FROM OLD.content;\n  v_deleted_changed:=NEW.deleted_at IS DISTINCT FROM OLD.deleted_at;\n  FOR v_locked_charge IN SELECT c.* FROM public.chat_turn_charges c\n    WHERE c.expected_assistant_message_id=OLD.id OR c.expected_assistant_message_id=NEW.id\n    ORDER BY c.expected_assistant_message_id FOR UPDATE\n  LOOP\n    IF v_locked_charge.expected_assistant_message_id=OLD.id THEN v_old_charge:=v_locked_charge;v_has_old_charge:=true;END IF;\n    IF v_locked_charge.expected_assistant_message_id=NEW.id THEN v_new_charge:=v_locked_charge;v_has_new_charge:=true;END IF;\n  END LOOP;\n  IF v_has_old_charge AND v_has_new_charge AND v_old_charge.turn_id IS DISTINCT FROM v_new_charge.turn_id THEN RAISE EXCEPTION 'assistant_message_turn_id_conflict';END IF;\n  IF v_has_old_charge AND OLD.id IS DISTINCT FROM v_old_charge.expected_assistant_message_id THEN RAISE EXCEPTION 'assistant_message_turn_id_conflict';END IF;\n  IF v_deleted_changed THEN\n    IF v_content_changed THEN RAISE EXCEPTION 'assistant_reply_edit_and_delete_must_be_separate';END IF;\n    IF v_has_old_charge AND v_old_charge.status IS DISTINCT FROM 'settled' THEN RAISE EXCEPTION 'chat_turn_reply_delete_requires_settled_charge';END IF;\n    RETURN NEW;\n  END IF;\n  IF v_content_changed AND v_has_old_charge AND v_old_charge.status IS DISTINCT FROM 'settled' THEN RAISE EXCEPTION 'assistant_reply_edit_requires_settled_charge';END IF;\n  RETURN NEW;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres}",
+      "kind": "f",
+      "name": "guard_pending_account_character_write",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.guard_pending_account_character_write()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_owner_id uuid;\nBEGIN\n  IF TG_OP = 'DELETE' THEN\n    v_owner_id := OLD.author_id;\n  ELSE\n    v_owner_id := NEW.author_id;\n  END IF;\n\n  IF auth.uid() IS NOT NULL\n     AND auth.uid() = v_owner_id\n     AND EXISTS (\n       SELECT 1 FROM public.account_deletion_requests AS r\n       WHERE r.user_id = v_owner_id\n     ) THEN\n    RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';\n  END IF;\n\n  IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;\n  RETURN NEW;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres}",
+      "kind": "f",
+      "name": "guard_pending_account_chat_session_update",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.guard_pending_account_chat_session_update()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nBEGIN\n  IF auth.uid() IS NOT NULL\n     AND auth.uid() = OLD.user_id\n     AND EXISTS (\n       SELECT 1 FROM public.account_deletion_requests AS r\n       WHERE r.user_id = OLD.user_id\n     ) THEN\n    RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "guard_pending_account_group_activity",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.guard_pending_account_group_activity()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_user_id uuid;\nBEGIN\n  IF TG_TABLE_NAME = 'chat_groups' THEN\n    v_user_id := NEW.owner_id;\n  ELSIF TG_TABLE_NAME = 'chat_group_turns' THEN\n    v_user_id := NEW.user_id;\n  ELSE\n    RAISE EXCEPTION 'unsupported_group_activity_table';\n  END IF;\n\n  IF v_user_id IS NULL THEN\n    RAISE EXCEPTION 'group_activity_user_required' USING ERRCODE = '42501';\n  END IF;\n\n  IF EXISTS (\n    SELECT 1\n    FROM public.account_deletion_requests AS r\n    WHERE r.user_id = v_user_id\n  ) THEN\n    RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';\n  END IF;\n\n  RETURN NEW;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "handle_new_user",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.handle_new_user()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\r\nbegin\r\n  insert into public.profiles (id, handle, nickname, avatar_url)\r\n  values (\r\n    new.id,\r\n    coalesce(new.raw_user_meta_data->>'handle', 'user_' || substr(new.id::text, 1, 8)),\r\n    coalesce(new.raw_user_meta_data->>'name', '新玩家'),\r\n    new.raw_user_meta_data->>'avatar_url'\r\n  );\r\n  return new;\r\nend;\r\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "mark_chat_deletion_job_failed",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.mark_chat_deletion_job_failed(p_job_id uuid, p_error_code text DEFAULT 'purge_failed'::text)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nBEGIN\n  IF COALESCE(auth.role(),'')<>'service_role' THEN RAISE EXCEPTION 'service_role_required' USING ERRCODE='42501'; END IF;\n  UPDATE public.chat_deletion_jobs j\n  SET status=CASE WHEN j.attempt_count>=8 THEN 'dead_letter' ELSE 'retry' END,\n      next_attempt_at=CASE WHEN j.attempt_count>=8 THEN NULL ELSE clock_timestamp()+make_interval(mins=>LEAST(60,power(2,LEAST(j.attempt_count,6))::integer)) END,\n      lease_until=NULL,\n      last_error_code=COALESCE(NULLIF(left(regexp_replace(COALESCE(p_error_code,'purge_failed'),'[^a-zA-Z0-9:_-]','','g'),100),''),'purge_failed'),\n      updated_at=clock_timestamp()\n  WHERE j.id=p_job_id AND j.status='processing';\n  RETURN FOUND;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_job_id uuid, p_error_code text"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "mark_chat_storage_deletion_job",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.mark_chat_storage_deletion_job(p_job_id uuid, p_success boolean, p_error_code text DEFAULT NULL::text)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nBEGIN\n  IF COALESCE(auth.role(),'')<>'service_role' THEN RAISE EXCEPTION 'service_role_required' USING ERRCODE='42501'; END IF;\n  IF p_success IS TRUE THEN\n    UPDATE public.chat_storage_deletion_jobs SET status='completed',next_attempt_at=NULL,lease_until=NULL,last_error_code=NULL,updated_at=clock_timestamp()\n    WHERE id=p_job_id AND status='processing';\n  ELSE\n    UPDATE public.chat_storage_deletion_jobs sj\n    SET status=CASE WHEN sj.attempt_count>=8 THEN 'dead_letter' ELSE 'retry' END,\n        next_attempt_at=CASE WHEN sj.attempt_count>=8 THEN NULL ELSE clock_timestamp()+make_interval(mins=>LEAST(60,power(2,LEAST(sj.attempt_count,6))::integer)) END,\n        lease_until=NULL,\n        last_error_code=COALESCE(NULLIF(left(regexp_replace(COALESCE(p_error_code,'storage_delete_failed'),'[^a-zA-Z0-9:_-]','','g'),100),''),'storage_delete_failed'),\n        updated_at=clock_timestamp()\n    WHERE sj.id=p_job_id AND sj.status='processing';\n  END IF;\n  RETURN FOUND;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_job_id uuid, p_success boolean, p_error_code text"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "mark_encounter_evaluation_job_completed",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.mark_encounter_evaluation_job_completed()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nBEGIN\n  IF NEW.status='settled' AND OLD.status IS DISTINCT FROM 'settled' THEN\n    UPDATE public.encounter_session_evaluation_jobs\n    SET status='completed',completed_at=clock_timestamp(),claimed_at=NULL,\n        last_error=NULL,updated_at=clock_timestamp()\n    WHERE session_id=NEW.session_id;\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "prepare_account_deletion",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.prepare_account_deletion(p_user_id uuid)\n RETURNS TABLE(batch_id uuid, target_user_id uuid, batch_status text)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_requested_at timestamptz;\n  v_scheduled_for timestamptz;\n  v_batch_id uuid;\n  v_status text;\n  v_ai_source bigint;\n  v_ai_archived bigint;\n  v_wallet_source bigint;\n  v_wallet_archived bigint;\n  v_charge_source bigint;\n  v_charge_archived bigint;\n  v_event_source bigint;\n  v_event_archived bigint;\nBEGIN\n  IF p_user_id IS NULL THEN\n    RAISE EXCEPTION '目標帳號不可為空';\n  END IF;\n\n  SELECT r.requested_at, r.scheduled_for\n    INTO v_requested_at, v_scheduled_for\n  FROM public.account_deletion_requests AS r\n  WHERE r.user_id = p_user_id\n    AND r.scheduled_for <= pg_catalog.statement_timestamp()\n  FOR UPDATE;\n\n  IF NOT FOUND THEN\n    RAISE EXCEPTION '找不到此帳號已到期的刪除申請';\n  END IF;\n\n  -- Lock/reuse this exact request's batch. Never create a second active batch.\n  SELECT b.id, b.status\n    INTO v_batch_id, v_status\n  FROM public.account_deletion_archive_batches AS b\n  WHERE b.target_user_id = p_user_id\n    AND b.requested_at = v_requested_at\n    AND b.scheduled_for = v_scheduled_for\n    AND b.status NOT IN ('completed', 'cancelled')\n  ORDER BY b.created_at DESC\n  LIMIT 1\n  FOR UPDATE;\n\n  IF FOUND AND v_status = 'deleting' THEN\n    -- The status change and relational cleanup commit in one PostgreSQL transaction.\n    -- Therefore a committed deleting batch means cleanup already completed; do not\n    -- compare now-empty source tables with their preserved archive row counts.\n    RETURN QUERY SELECT v_batch_id, p_user_id, 'deleting'::text;\n    RETURN;\n  ELSIF FOUND THEN\n    -- Backfill billing/audit snapshots for older batches created before these source\n    -- tables were added to the archive. ON CONFLICT preserves any prior payload so the\n    -- exact-payload checks below still fail closed on a conflicting existing snapshot.\n    INSERT INTO public.account_deletion_archive_items\n      (batch_id, source_table, source_record_id, payload)\n    SELECT v_batch_id, 'chat_turn_charges', c.turn_id::text, pg_catalog.to_jsonb(c)\n    FROM public.chat_turn_charges AS c\n    WHERE c.user_id = p_user_id\n    ON CONFLICT ON CONSTRAINT account_deletion_archive_item_batch_id_source_table_source__key\n    DO NOTHING;\n\n    INSERT INTO public.account_deletion_archive_items\n      (batch_id, source_table, source_record_id, payload)\n    SELECT v_batch_id, 'chat_turn_events', e.event_id::text, pg_catalog.to_jsonb(e)\n    FROM public.chat_turn_events AS e\n    WHERE e.user_id = p_user_id\n    ON CONFLICT ON CONSTRAINT account_deletion_archive_item_batch_id_source_table_source__key\n    DO NOTHING;\n\n    -- A failed or interrupted archive can be retried only if every remaining source row\n    -- is exactly represented in the existing archive. Any mismatch fails closed.\n    SELECT count(*) INTO v_ai_source\n    FROM public.ai_generation_records AS a WHERE a.user_id = p_user_id;\n    SELECT count(*) INTO v_wallet_source\n    FROM public.wallet_transactions AS w WHERE w.user_id = p_user_id;\n    SELECT count(*) INTO v_ai_archived\n    FROM public.account_deletion_archive_items AS i\n    WHERE i.batch_id = v_batch_id AND i.source_table = 'ai_generation_records';\n    SELECT count(*) INTO v_wallet_archived\n    FROM public.account_deletion_archive_items AS i\n    WHERE i.batch_id = v_batch_id AND i.source_table = 'wallet_transactions';\n    SELECT count(*) INTO v_charge_source\n    FROM public.chat_turn_charges AS c WHERE c.user_id = p_user_id;\n    SELECT count(*) INTO v_charge_archived\n    FROM public.account_deletion_archive_items AS i\n    WHERE i.batch_id = v_batch_id AND i.source_table = 'chat_turn_charges';\n    SELECT count(*) INTO v_event_source\n    FROM public.chat_turn_events AS e WHERE e.user_id = p_user_id;\n    SELECT count(*) INTO v_event_archived\n    FROM public.account_deletion_archive_items AS i\n    WHERE i.batch_id = v_batch_id AND i.source_table = 'chat_turn_events';\n\n    IF v_ai_source <> v_ai_archived OR v_wallet_source <> v_wallet_archived\n       OR v_charge_source <> v_charge_archived OR v_event_source <> v_event_archived\n       OR EXISTS (\n         SELECT 1 FROM public.ai_generation_records AS a\n         LEFT JOIN public.account_deletion_archive_items AS i\n           ON i.batch_id = v_batch_id\n          AND i.source_table = 'ai_generation_records'\n          AND i.source_record_id = a.id::text\n         WHERE a.user_id = p_user_id\n           AND (i.id IS NULL OR i.payload IS DISTINCT FROM pg_catalog.to_jsonb(a))\n       )\n       OR EXISTS (\n         SELECT 1 FROM public.wallet_transactions AS w\n         LEFT JOIN public.account_deletion_archive_items AS i\n           ON i.batch_id = v_batch_id\n          AND i.source_table = 'wallet_transactions'\n          AND i.source_record_id = w.id::text\n         WHERE w.user_id = p_user_id\n           AND (i.id IS NULL OR i.payload IS DISTINCT FROM pg_catalog.to_jsonb(w))\n       )\n       OR EXISTS (\n         SELECT 1 FROM public.chat_turn_charges AS c\n         LEFT JOIN public.account_deletion_archive_items AS i\n           ON i.batch_id = v_batch_id\n          AND i.source_table = 'chat_turn_charges'\n          AND i.source_record_id = c.turn_id::text\n         WHERE c.user_id = p_user_id\n           AND (i.id IS NULL OR i.payload IS DISTINCT FROM pg_catalog.to_jsonb(c))\n       )\n       OR EXISTS (\n         SELECT 1 FROM public.chat_turn_events AS e\n         LEFT JOIN public.account_deletion_archive_items AS i\n           ON i.batch_id = v_batch_id\n          AND i.source_table = 'chat_turn_events'\n          AND i.source_record_id = e.event_id::text\n         WHERE e.user_id = p_user_id\n           AND (i.id IS NULL OR i.payload IS DISTINCT FROM pg_catalog.to_jsonb(e))\n       ) THEN\n      RAISE EXCEPTION '既有封存批次與來源資料不一致，已停止刪除以避免資料遺失';\n    END IF;\n\n    UPDATE public.account_deletion_archive_batches AS b\n    SET status = 'archived',\n        attempt_count = b.attempt_count + 1,\n        started_at = pg_catalog.statement_timestamp(),\n        updated_at = pg_catalog.statement_timestamp(),\n        last_error = NULL\n    WHERE b.id = v_batch_id;\n  ELSE\n    SELECT a.batch_id INTO v_batch_id\n    FROM public.archive_account_deletion_data(p_user_id) AS a\n    LIMIT 1;\n\n    -- Preserve billing/audit rows as well as the original AI and wallet archive payloads.\n    INSERT INTO public.account_deletion_archive_items\n      (batch_id, source_table, source_record_id, payload)\n    SELECT v_batch_id, 'chat_turn_charges', c.turn_id::text, pg_catalog.to_jsonb(c)\n    FROM public.chat_turn_charges AS c\n    WHERE c.user_id = p_user_id\n    ON CONFLICT ON CONSTRAINT account_deletion_archive_item_batch_id_source_table_source__key\n    DO NOTHING;\n\n    INSERT INTO public.account_deletion_archive_items\n      (batch_id, source_table, source_record_id, payload)\n    SELECT v_batch_id, 'chat_turn_events', e.event_id::text, pg_catalog.to_jsonb(e)\n    FROM public.chat_turn_events AS e\n    WHERE e.user_id = p_user_id\n    ON CONFLICT ON CONSTRAINT account_deletion_archive_item_batch_id_source_table_source__key\n    DO NOTHING;\n\n    v_status := 'archived';\n  END IF;\n\n  -- Verify billing/audit archive rows too before any irreversible deletion.\n  SELECT count(*) INTO v_charge_source\n  FROM public.chat_turn_charges AS c WHERE c.user_id = p_user_id;\n  SELECT count(*) INTO v_charge_archived\n  FROM public.account_deletion_archive_items AS i\n  WHERE i.batch_id = v_batch_id AND i.source_table = 'chat_turn_charges';\n  SELECT count(*) INTO v_event_source\n  FROM public.chat_turn_events AS e WHERE e.user_id = p_user_id;\n  SELECT count(*) INTO v_event_archived\n  FROM public.account_deletion_archive_items AS i\n  WHERE i.batch_id = v_batch_id AND i.source_table = 'chat_turn_events';\n\n  IF v_charge_source <> v_charge_archived OR v_event_source <> v_event_archived\n     OR EXISTS (\n       SELECT 1 FROM public.chat_turn_charges AS c\n       LEFT JOIN public.account_deletion_archive_items AS i\n         ON i.batch_id = v_batch_id\n        AND i.source_table = 'chat_turn_charges'\n        AND i.source_record_id = c.turn_id::text\n       WHERE c.user_id = p_user_id\n         AND (i.id IS NULL OR i.payload IS DISTINCT FROM pg_catalog.to_jsonb(c))\n     )\n     OR EXISTS (\n       SELECT 1 FROM public.chat_turn_events AS e\n       LEFT JOIN public.account_deletion_archive_items AS i\n         ON i.batch_id = v_batch_id\n        AND i.source_table = 'chat_turn_events'\n        AND i.source_record_id = e.event_id::text\n       WHERE e.user_id = p_user_id\n         AND (i.id IS NULL OR i.payload IS DISTINCT FROM pg_catalog.to_jsonb(e))\n     ) THEN\n    RAISE EXCEPTION '聊天扣款／事件紀錄封存核對失敗，已停止刪除';\n  END IF;\n\n  -- Archive verified: mark the irreversible phase before deleting source rows.\n  UPDATE public.account_deletion_archive_batches AS b\n  SET status = 'deleting',\n      attempt_count = CASE WHEN b.attempt_count = 0 THEN 1 ELSE b.attempt_count END,\n      started_at = COALESCE(b.started_at, pg_catalog.statement_timestamp()),\n      updated_at = pg_catalog.statement_timestamp(),\n      last_error = NULL\n  WHERE b.id = v_batch_id;\n\n  -- Remove non-cascading references before chat/profile/Auth deletion.\n  DELETE FROM public.ai_generation_records WHERE user_id = p_user_id;\n\n  -- Delete version history only for messages owned by the account being deleted.\n  -- If this user edited another player's message, preserve that player's version rows\n  -- and anonymize the editor reference instead of deleting someone else's history.\n  DELETE FROM public.chat_message_versions AS v\n  WHERE v.message_id IN (\n    SELECT m.id\n    FROM public.chat_messages AS m\n    JOIN public.chat_sessions AS s ON s.id = m.session_id\n    WHERE s.user_id = p_user_id\n  );\n\n  UPDATE public.chat_message_versions AS v\n  SET edited_by = NULL\n  WHERE v.edited_by = p_user_id\n    AND NOT EXISTS (\n      SELECT 1\n      FROM public.chat_messages AS m\n      JOIN public.chat_sessions AS s ON s.id = m.session_id\n      WHERE m.id = v.message_id\n        AND s.user_id = p_user_id\n    );\n\n  -- user_message_id uses ON DELETE RESTRICT, so charges must be removed before messages.\n  DELETE FROM public.chat_turn_charges WHERE user_id = p_user_id;\n\n  DELETE FROM public.wallet_transactions WHERE user_id = p_user_id;\n\n  -- Old conversation schema and role/chat data are owned by the profile; their declared\n  -- CASCADE relationships remove stories, private info, conversations/messages and sessions.\n  -- Explicitly remove conversations first so the cleanup is clear and retry-safe.\n  DELETE FROM public.conversations WHERE user_id = p_user_id;\n\n  RETURN QUERY SELECT v_batch_id, p_user_id, 'deleting'::text;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": "p_user_id uuid"
+    },
+    {
+      "acl": "{=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "prevent_character_soft_delete_restore",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.prevent_character_soft_delete_restore()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\r\nBEGIN\r\n  IF OLD.deleted_at IS NOT NULL AND NEW.deleted_at IS NULL THEN\r\n    RAISE EXCEPTION 'A soft-deleted character cannot be restored; create a new character instead.';\r\n  END IF;\r\n  RETURN NEW;\r\nEND;\r\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": false,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "purge_chat_deletion_job",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.purge_chat_deletion_job(p_job_id uuid)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_job public.chat_deletion_jobs%ROWTYPE; v_owner_id uuid; v_parent_deleted_at timestamptz; v_parent_found boolean:=false;\nBEGIN\n  IF COALESCE(auth.role(),'')<>'service_role' THEN RAISE EXCEPTION 'service_role_required' USING ERRCODE='42501'; END IF;\n  IF p_job_id IS NULL THEN RAISE EXCEPTION 'job_id_required' USING ERRCODE='22023'; END IF;\n  SELECT * INTO v_job FROM public.chat_deletion_jobs WHERE id=p_job_id;\n  IF NOT FOUND THEN RAISE EXCEPTION 'chat_deletion_job_not_found'; END IF;\n  IF v_job.status='completed' THEN RETURN true; END IF;\n  IF v_job.purge_after>clock_timestamp() THEN RAISE EXCEPTION 'chat_deletion_not_due'; END IF;\n  IF v_job.resource_type='single_session' THEN\n    SELECT s.user_id,s.deleted_at INTO v_owner_id,v_parent_deleted_at FROM public.chat_sessions s WHERE s.id=v_job.resource_id FOR UPDATE;\n    v_parent_found:=FOUND;\n  ELSIF v_job.resource_type='group' THEN\n    SELECT g.owner_id,g.deleted_at INTO v_owner_id,v_parent_deleted_at FROM public.chat_groups g WHERE g.id=v_job.resource_id FOR UPDATE;\n    v_parent_found:=FOUND;\n  ELSE RAISE EXCEPTION 'unsupported_chat_resource_type'; END IF;\n  SELECT * INTO v_job FROM public.chat_deletion_jobs WHERE id=p_job_id FOR UPDATE;\n  IF NOT FOUND THEN RAISE EXCEPTION 'chat_deletion_job_not_found'; END IF;\n  IF v_job.status='completed' THEN RETURN true; END IF;\n  IF v_job.status<>'processing' OR v_job.lease_until IS NULL OR v_job.lease_until<=clock_timestamp() THEN RAISE EXCEPTION 'chat_deletion_job_lease_not_owned'; END IF;\n  IF v_parent_found THEN\n    IF v_owner_id IS DISTINCT FROM v_job.owner_id OR v_parent_deleted_at IS DISTINCT FROM v_job.deleted_at THEN RAISE EXCEPTION 'chat_deletion_parent_mismatch'; END IF;\n    PERFORM set_config('app.chat_purge_worker','on',true);\n    IF v_job.resource_type='single_session' THEN\n      DELETE FROM public.chat_message_versions v WHERE v.message_id IN (SELECT m.id FROM public.chat_messages m WHERE m.session_id=v_job.resource_id);\n      UPDATE public.chat_messages m SET content='',deleted_at=COALESCE(m.deleted_at,v_job.deleted_at) WHERE m.session_id=v_job.resource_id;\n      UPDATE public.ai_generation_records SET original_content='' WHERE session_id=v_job.resource_id AND user_id=v_job.owner_id;\n      UPDATE public.encounter_session_turns SET evaluation='{}'::jsonb WHERE session_id=v_job.resource_id;\n      UPDATE public.encounter_session_lifecycle SET schedule_snapshot='{}'::jsonb,settlement_result='{}'::jsonb,updated_at=clock_timestamp() WHERE session_id=v_job.resource_id;\n      DELETE FROM public.encounter_session_evaluation_jobs WHERE session_id=v_job.resource_id;\n      UPDATE public.encounter_turn_interaction_receipts r SET diary_id=NULL FROM public.chat_turn_charges c WHERE c.turn_id=r.turn_id AND c.session_id=v_job.resource_id AND r.diary_id IS NOT NULL;\n      DELETE FROM public.encounter_diary d WHERE d.user_id=v_job.owner_id AND d.metadata->>'session_id'=v_job.resource_id::text;\n      UPDATE public.story_relationship_batches SET summary=NULL,evaluation='{}'::jsonb WHERE session_id=v_job.resource_id;\n      UPDATE public.story_relationship_states SET imported_memories='[]'::jsonb,updated_at=clock_timestamp() WHERE session_id=v_job.resource_id;\n      DELETE FROM public.chat_memory_photos WHERE session_id=v_job.resource_id AND owner_id=v_job.owner_id;\n      UPDATE public.chat_sessions SET session_data='{}'::jsonb,character_snapshot='{}'::jsonb,updated_at=clock_timestamp() WHERE id=v_job.resource_id AND user_id=v_job.owner_id;\n    ELSE\n      UPDATE public.chat_groups SET background_mode='none',background_memory_photo_id=NULL,name='已刪除對話',world_background='',player_name='',player_persona='',world_character_id=NULL,pinned=false,updated_at=clock_timestamp()\n      WHERE id=v_job.resource_id AND owner_id=v_job.owner_id;\n      DELETE FROM public.chat_group_messages WHERE group_id=v_job.resource_id;\n      DELETE FROM public.chat_group_diary WHERE group_id=v_job.resource_id AND owner_id=v_job.owner_id;\n      DELETE FROM public.chat_group_memory_photos WHERE group_id=v_job.resource_id AND owner_id=v_job.owner_id;\n      DELETE FROM public.chat_memory_photos WHERE group_id=v_job.resource_id AND owner_id=v_job.owner_id;\n      DELETE FROM public.chat_group_members WHERE group_id=v_job.resource_id;\n      DELETE FROM public.chat_group_scenes WHERE group_id=v_job.resource_id;\n      UPDATE public.chat_group_turns SET request_content='[purged]' WHERE group_id=v_job.resource_id;\n    END IF;\n  END IF;\n  UPDATE public.chat_deletion_jobs SET status='completed',next_attempt_at=NULL,lease_until=NULL,last_error_code=NULL,updated_at=clock_timestamp() WHERE id=p_job_id;\n  RETURN true;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_job_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "record_account_deletion_failure",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.record_account_deletion_failure(p_batch_id uuid, p_error_code text)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nBEGIN\n  IF p_batch_id IS NULL THEN\n    RETURN false;\n  END IF;\n\n  UPDATE public.account_deletion_archive_batches\n  SET last_error = left(COALESCE(NULLIF(p_error_code, ''), 'worker_error'), 300),\n      updated_at = pg_catalog.statement_timestamp(),\n      attempt_count = attempt_count + 1\n  WHERE id = p_batch_id\n    AND status IN ('archived', 'deleting', 'failed');\n\n  RETURN FOUND;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_batch_id uuid, p_error_code text"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "record_encounter_interaction",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.record_encounter_interaction(p_user_id uuid, p_character_id uuid, p_affinity_delta integer, p_event_type text, p_summary text, p_metadata jsonb DEFAULT '{}'::jsonb, p_occurred_at timestamp with time zone DEFAULT now())\n RETURNS TABLE(affinity integer, relationship_stage text, diary_id uuid)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_affinity integer;\n  v_stage text;\n  v_diary_id uuid;\n  v_occurred_at timestamptz := COALESCE(p_occurred_at, now());\nBEGIN\n  IF COALESCE(auth.role(), '') <> 'service_role' THEN\n    RAISE EXCEPTION 'Trusted backend required' USING ERRCODE = '42501';\n  END IF;\n  IF p_user_id IS NULL OR p_character_id IS NULL THEN\n    RAISE EXCEPTION 'User and character are required' USING ERRCODE = '22023';\n  END IF;\n  IF p_affinity_delta IS NULL OR p_affinity_delta < -10 OR p_affinity_delta > 10 THEN\n    RAISE EXCEPTION 'Affinity delta must be between -10 and 10' USING ERRCODE = '22023';\n  END IF;\n  IF COALESCE(char_length(btrim(p_event_type)), 0) NOT BETWEEN 1 AND 60 THEN\n    RAISE EXCEPTION 'Invalid event type' USING ERRCODE = '22023';\n  END IF;\n  IF COALESCE(char_length(btrim(p_summary)), 0) NOT BETWEEN 1 AND 2000 THEN\n    RAISE EXCEPTION 'Invalid diary summary' USING ERRCODE = '22023';\n  END IF;\n  IF p_metadata IS NULL OR jsonb_typeof(p_metadata) <> 'object'\n     OR pg_column_size(p_metadata) > 4000 THEN\n    RAISE EXCEPTION 'Invalid diary metadata' USING ERRCODE = '22023';\n  END IF;\n  IF NOT EXISTS (SELECT 1 FROM auth.users u WHERE u.id = p_user_id) THEN\n    RAISE EXCEPTION 'User not found' USING ERRCODE = '22023';\n  END IF;\n  IF NOT EXISTS (\n    SELECT 1 FROM public.characters c\n    WHERE c.id = p_character_id AND c.deleted_at IS NULL\n  ) THEN\n    RAISE EXCEPTION 'Character not found or deleted' USING ERRCODE = '22023';\n  END IF;\n\n  INSERT INTO public.encounter_character_state AS current_state (\n    user_id, character_id, affinity, relationship_stage,\n    first_met_at, last_interaction_at, updated_at\n  )\n  VALUES (\n    p_user_id, p_character_id, GREATEST(0, LEAST(100, p_affinity_delta)),\n    'first_meeting', v_occurred_at, v_occurred_at, now()\n  )\n  ON CONFLICT (user_id, character_id) DO UPDATE\n  SET affinity = GREATEST(0, LEAST(100, current_state.affinity + p_affinity_delta)),\n      last_interaction_at = GREATEST(current_state.last_interaction_at, EXCLUDED.last_interaction_at),\n      updated_at = now()\n  RETURNING current_state.affinity INTO v_affinity;\n\n  v_stage := CASE\n    WHEN v_affinity >= 80 THEN 'special'\n    WHEN v_affinity >= 50 THEN 'intimate'\n    WHEN v_affinity >= 20 THEN 'close'\n    WHEN v_affinity >= 1 THEN 'acquaintance'\n    ELSE 'first_meeting'\n  END;\n\n  UPDATE public.encounter_character_state s\n  SET relationship_stage = v_stage,\n      first_met_at = COALESCE(s.first_met_at, v_occurred_at),\n      updated_at = now()\n  WHERE s.user_id = p_user_id AND s.character_id = p_character_id;\n\n  INSERT INTO public.encounter_diary (\n    user_id, character_id, event_type, summary, occurred_at, metadata\n  )\n  VALUES (\n    p_user_id, p_character_id, btrim(p_event_type), btrim(p_summary), v_occurred_at, p_metadata\n  )\n  RETURNING id INTO v_diary_id;\n\n  RETURN QUERY SELECT v_affinity, v_stage, v_diary_id;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": "p_user_id uuid, p_character_id uuid, p_affinity_delta integer, p_event_type text, p_summary text, p_metadata jsonb, p_occurred_at timestamp with time zone"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "record_encounter_session_turn_evidence",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.record_encounter_session_turn_evidence(p_turn_id uuid, p_session_id uuid, p_user_id uuid, p_character_id uuid, p_user_message_id uuid, p_assistant_message_id uuid, p_evaluation jsonb DEFAULT '{}'::jsonb)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE l public.encounter_session_lifecycle%ROWTYPE; c public.chat_turn_charges%ROWTYPE; um public.chat_messages%ROWTYPE; am public.chat_messages%ROWTYPE; oldrow public.encounter_session_turns%ROWTYPE; n integer;\nBEGIN\n  IF p_turn_id IS NULL OR p_session_id IS NULL OR p_user_id IS NULL OR p_character_id IS NULL OR p_user_message_id IS NULL OR p_assistant_message_id IS NULL OR jsonb_typeof(COALESCE(p_evaluation,'{}'::jsonb))<>'object' OR pg_column_size(COALESCE(p_evaluation,'{}'::jsonb))>8000 THEN RAISE EXCEPTION 'Invalid evidence input' USING ERRCODE='22023'; END IF;\n  PERFORM 1 FROM public.chat_sessions s WHERE s.id=p_session_id AND s.user_id=p_user_id AND s.character_id=p_character_id AND s.chat_mode='encounter' AND s.deleted_at IS NULL FOR UPDATE;\n  IF NOT FOUND THEN RAISE EXCEPTION 'Encounter chat is deleted or not owned' USING ERRCODE='23514'; END IF;\n  SELECT * INTO l FROM public.encounter_session_lifecycle WHERE session_id=p_session_id FOR UPDATE;\n  IF NOT FOUND OR l.user_id IS DISTINCT FROM p_user_id OR l.character_id IS DISTINCT FROM p_character_id OR l.status NOT IN ('active','paused','ready_to_settle') THEN RAISE EXCEPTION 'Invalid Encounter lifecycle' USING ERRCODE='23514'; END IF;\n  SELECT * INTO c FROM public.chat_turn_charges WHERE turn_id=p_turn_id FOR SHARE;\n  IF NOT FOUND OR c.session_id IS DISTINCT FROM p_session_id OR c.user_id IS DISTINCT FROM p_user_id OR c.status<>'settled' OR c.user_message_id IS DISTINCT FROM p_user_message_id OR c.assistant_message_id IS DISTINCT FROM p_assistant_message_id OR c.expected_assistant_message_id IS DISTINCT FROM p_assistant_message_id OR c.reserved_at IS NULL OR c.reserved_at>l.scheduled_end_at THEN RAISE EXCEPTION 'Charge evidence mismatch, unsettled, or reserved after scene end' USING ERRCODE='23514'; END IF;\n  SELECT * INTO um FROM public.chat_messages WHERE id=p_user_message_id FOR SHARE;\n  IF NOT FOUND OR um.session_id IS DISTINCT FROM p_session_id OR um.role<>'user' OR um.deleted_at IS NOT NULL OR length(btrim(um.content))=0 THEN RAISE EXCEPTION 'Invalid user message evidence' USING ERRCODE='23514'; END IF;\n  SELECT * INTO am FROM public.chat_messages WHERE id=p_assistant_message_id FOR SHARE;\n  IF NOT FOUND OR am.session_id IS DISTINCT FROM p_session_id OR am.role<>'assistant' OR am.deleted_at IS NOT NULL OR length(btrim(am.content))=0 THEN RAISE EXCEPTION 'Invalid assistant message evidence' USING ERRCODE='23514'; END IF;\n  SELECT * INTO oldrow FROM public.encounter_session_turns WHERE turn_id=p_turn_id;\n  IF FOUND THEN\n    IF oldrow.session_id IS DISTINCT FROM p_session_id OR oldrow.user_id IS DISTINCT FROM p_user_id OR oldrow.character_id IS DISTINCT FROM p_character_id OR oldrow.user_message_id IS DISTINCT FROM p_user_message_id OR oldrow.assistant_message_id IS DISTINCT FROM p_assistant_message_id THEN RAISE EXCEPTION 'Evidence idempotency collision' USING ERRCODE='23505'; END IF;\n    RETURN jsonb_build_object('turn_id',oldrow.turn_id,'turn_number',oldrow.turn_number,'status',oldrow.evaluation_status,'idempotent',true);\n  END IF;\n  n:=l.turn_count+1;\n  INSERT INTO public.encounter_session_turns(turn_id,session_id,user_id,character_id,user_message_id,assistant_message_id,turn_number,evaluation_status,evaluation)\n  VALUES(p_turn_id,p_session_id,p_user_id,p_character_id,p_user_message_id,p_assistant_message_id,n,'pending',COALESCE(p_evaluation,'{}'::jsonb));\n  UPDATE public.encounter_session_lifecycle SET turn_count=n,updated_at=clock_timestamp() WHERE session_id=p_session_id;\n  RETURN jsonb_build_object('turn_id',p_turn_id,'turn_number',n,'status','pending','idempotent',false);\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_turn_id uuid, p_session_id uuid, p_user_id uuid, p_character_id uuid, p_user_message_id uuid, p_assistant_message_id uuid, p_evaluation jsonb"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "record_encounter_turn_interaction",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.record_encounter_turn_interaction(p_turn_id uuid, p_user_id uuid, p_character_id uuid, p_affinity_delta integer, p_event_type text, p_summary text, p_metadata jsonb DEFAULT '{}'::jsonb, p_occurred_at timestamp with time zone DEFAULT now())\n RETURNS TABLE(affinity integer, relationship_stage text, diary_id uuid, idempotent boolean)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_inserted integer; v_affinity integer; v_stage text; v_diary_id uuid; v_receipt public.encounter_turn_interaction_receipts%ROWTYPE; v_charge public.chat_turn_charges%ROWTYPE; v_session public.chat_sessions%ROWTYPE; v_session_id uuid; v_occurred_at timestamptz:=COALESCE(p_occurred_at,now());\nBEGIN\n  IF COALESCE(auth.role(),'')<>'service_role' THEN RAISE EXCEPTION 'Trusted backend required' USING ERRCODE='42501'; END IF;\n  IF p_turn_id IS NULL OR p_user_id IS NULL OR p_character_id IS NULL THEN RAISE EXCEPTION 'Turn, user and character are required' USING ERRCODE='22023'; END IF;\n  IF p_affinity_delta IS NULL OR p_affinity_delta < -10 OR p_affinity_delta > 10 THEN RAISE EXCEPTION 'Affinity delta must be between -10 and 10' USING ERRCODE='22023'; END IF;\n  IF COALESCE(char_length(btrim(p_event_type)),0) NOT BETWEEN 1 AND 60 OR COALESCE(char_length(btrim(p_summary)),0) NOT BETWEEN 1 AND 2000 THEN RAISE EXCEPTION 'Invalid event type or diary summary' USING ERRCODE='22023'; END IF;\n  IF p_metadata IS NULL OR jsonb_typeof(p_metadata)<>'object' OR pg_column_size(p_metadata)>4000 THEN RAISE EXCEPTION 'Invalid diary metadata' USING ERRCODE='22023'; END IF;\n  IF NOT EXISTS(SELECT 1 FROM auth.users u WHERE u.id=p_user_id) THEN RAISE EXCEPTION 'User not found' USING ERRCODE='22023'; END IF;\n  IF NOT EXISTS(SELECT 1 FROM public.characters c WHERE c.id=p_character_id AND c.deleted_at IS NULL) THEN RAISE EXCEPTION 'Character not found or deleted' USING ERRCODE='22023'; END IF;\n  SELECT c.session_id INTO v_session_id FROM public.chat_turn_charges c WHERE c.turn_id=p_turn_id AND c.user_id=p_user_id;\n  IF NOT FOUND THEN RAISE EXCEPTION 'Encounter interaction requires matching settled chat turn' USING ERRCODE='23514'; END IF;\n  SELECT s.* INTO v_session FROM public.chat_sessions s WHERE s.id=v_session_id AND s.user_id=p_user_id AND s.character_id=p_character_id AND s.chat_mode='encounter' AND s.deleted_at IS NULL FOR UPDATE;\n  IF NOT FOUND THEN RAISE EXCEPTION 'Encounter session ownership or lifecycle mismatch' USING ERRCODE='23514'; END IF;\n  SELECT c.* INTO v_charge FROM public.chat_turn_charges c WHERE c.turn_id=p_turn_id FOR UPDATE;\n  IF NOT FOUND OR v_charge.session_id IS DISTINCT FROM v_session.id OR v_charge.user_id IS DISTINCT FROM p_user_id OR v_charge.status IS DISTINCT FROM 'settled' OR v_charge.assistant_message_id IS DISTINCT FROM v_charge.expected_assistant_message_id OR p_metadata->>'session_id' IS DISTINCT FROM v_charge.session_id::text OR p_metadata->>'user_message_id' IS DISTINCT FROM v_charge.user_message_id::text OR p_metadata->>'assistant_message_id' IS DISTINCT FROM v_charge.expected_assistant_message_id::text THEN RAISE EXCEPTION 'Encounter interaction requires matching settled chat turn' USING ERRCODE='23514'; END IF;\n  IF NOT EXISTS(SELECT 1 FROM public.chat_messages m WHERE m.id=v_charge.user_message_id AND m.session_id=v_charge.session_id AND m.role='user' AND m.deleted_at IS NULL AND length(btrim(m.content))>0) OR NOT EXISTS(SELECT 1 FROM public.chat_messages m WHERE m.id=v_charge.expected_assistant_message_id AND m.session_id=v_charge.session_id AND m.role='assistant' AND m.deleted_at IS NULL AND length(btrim(m.content))>0) THEN RAISE EXCEPTION 'Encounter interaction requires durable user and assistant messages' USING ERRCODE='23514'; END IF;\n  INSERT INTO public.encounter_turn_interaction_receipts(turn_id,user_id,character_id) VALUES(p_turn_id,p_user_id,p_character_id) ON CONFLICT(turn_id) DO NOTHING;\n  GET DIAGNOSTICS v_inserted=ROW_COUNT;\n  IF v_inserted=0 THEN\n    SELECT * INTO v_receipt FROM public.encounter_turn_interaction_receipts r WHERE r.turn_id=p_turn_id FOR UPDATE;\n    IF v_receipt.user_id<>p_user_id OR v_receipt.character_id<>p_character_id THEN RAISE EXCEPTION 'Turn ID reused with different owner or character' USING ERRCODE='23505'; END IF;\n    IF v_receipt.diary_id IS NULL OR v_receipt.affinity IS NULL OR v_receipt.relationship_stage IS NULL THEN RAISE EXCEPTION 'Interaction receipt incomplete' USING ERRCODE='55000'; END IF;\n    RETURN QUERY SELECT v_receipt.affinity,v_receipt.relationship_stage,v_receipt.diary_id,true; RETURN;\n  END IF;\n  INSERT INTO public.encounter_character_state AS current_state(user_id,character_id,affinity,relationship_stage,first_met_at,last_interaction_at,updated_at)\n  VALUES(p_user_id,p_character_id,GREATEST(0,LEAST(100,p_affinity_delta)),'first_meeting',v_occurred_at,v_occurred_at,now())\n  ON CONFLICT(user_id,character_id) DO UPDATE\n  SET affinity=GREATEST(0,LEAST(100,current_state.affinity+p_affinity_delta)),last_interaction_at=GREATEST(current_state.last_interaction_at,EXCLUDED.last_interaction_at),updated_at=now()\n  RETURNING current_state.affinity INTO v_affinity;\n  v_stage:=CASE WHEN v_affinity>=80 THEN 'special' WHEN v_affinity>=50 THEN 'intimate' WHEN v_affinity>=20 THEN 'close' WHEN v_affinity>=1 THEN 'acquaintance' ELSE 'first_meeting' END;\n  UPDATE public.encounter_character_state s SET relationship_stage=v_stage,first_met_at=COALESCE(s.first_met_at,v_occurred_at),updated_at=now() WHERE s.user_id=p_user_id AND s.character_id=p_character_id;\n  INSERT INTO public.encounter_diary(user_id,character_id,event_type,summary,occurred_at,metadata) VALUES(p_user_id,p_character_id,btrim(p_event_type),btrim(p_summary),v_occurred_at,p_metadata) RETURNING id INTO v_diary_id;\n  UPDATE public.encounter_turn_interaction_receipts r SET affinity=v_affinity,relationship_stage=v_stage,diary_id=v_diary_id WHERE r.turn_id=p_turn_id;\n  RETURN QUERY SELECT v_affinity,v_stage,v_diary_id,false;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": "p_turn_id uuid, p_user_id uuid, p_character_id uuid, p_affinity_delta integer, p_event_type text, p_summary text, p_metadata jsonb, p_occurred_at timestamp with time zone"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "refund_chat_turn",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.refund_chat_turn(p_user_id uuid, p_turn_id uuid, p_assistant_message_id uuid, p_failure_code text)\n RETURNS TABLE(status text, balance_silver integer, balance_diamonds integer)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare\n  v_charge public.chat_turn_charges%rowtype;\n  v_wallet public.wallet_accounts%rowtype;\nbegin\n  select c.* into v_charge\n  from public.chat_turn_charges c\n  where c.turn_id = p_turn_id\n  for update;\n\n  if not found or v_charge.user_id <> p_user_id then\n    raise exception 'turn_not_found';\n  end if;\n  if v_charge.expected_assistant_message_id is distinct from p_assistant_message_id then\n    raise exception 'turn_assistant_id_conflict';\n  end if;\n\n  if v_charge.status = 'refunded' then\n    select w.silver_coins, w.diamonds\n      into v_wallet.silver_coins, v_wallet.diamonds\n    from public.wallet_accounts w\n    where w.user_id = p_user_id;\n    return query select 'refunded'::text, v_wallet.silver_coins, v_wallet.diamonds;\n    return;\n  end if;\n\n  if v_charge.status = 'settled' then\n    raise exception 'settled_turn_cannot_be_refunded';\n  end if;\n  if v_charge.status not in ('reserved', 'needs_reconciliation') then\n    raise exception 'turn_not_refundable';\n  end if;\n\n  -- Fail closed: any row occupying the expected assistant ID blocks refund,\n  -- including soft-deleted/empty rows or role/session integrity conflicts.\n  if p_assistant_message_id is not null and exists (\n    select 1 from public.chat_messages m where m.id = p_assistant_message_id\n  ) then\n    raise exception 'reply_already_persisted_or_integrity_conflict';\n  end if;\n\n  select w.* into v_wallet\n  from public.wallet_accounts w\n  where w.user_id = p_user_id\n  for update;\n  if not found then\n    raise exception 'wallet_not_initialized';\n  end if;\n\n  update public.wallet_accounts w\n  set silver_coins = w.silver_coins + v_charge.silver_reserved,\n      diamonds = w.diamonds + v_charge.diamonds_reserved,\n      updated_at = now()\n  where w.user_id = p_user_id;\n\n  if v_charge.silver_reserved > 0 then\n    insert into public.wallet_transactions(user_id, currency_type, amount, biz_type, reference_id)\n    values (p_user_id, 'silver_coins', v_charge.silver_reserved, 'chat_turn_refund', p_turn_id::text);\n  end if;\n  if v_charge.diamonds_reserved > 0 then\n    insert into public.wallet_transactions(user_id, currency_type, amount, biz_type, reference_id)\n    values (p_user_id, 'diamonds', v_charge.diamonds_reserved, 'chat_turn_refund', p_turn_id::text);\n  end if;\n\n  update public.chat_turn_charges c\n  set status = 'refunded',\n      failure_code = left(coalesce(p_failure_code, 'confirmed_failure'), 80),\n      refunded_at = now(),\n      updated_at = now()\n  where c.turn_id = p_turn_id;\n\n  insert into public.chat_turn_events(turn_id, user_id, event_type, stage, error_code)\n  values (p_turn_id, p_user_id, 'refunded', 'recovery',\n          left(coalesce(p_failure_code, 'confirmed_failure'), 80));\n\n  select w.silver_coins, w.diamonds\n    into v_wallet.silver_coins, v_wallet.diamonds\n  from public.wallet_accounts w\n  where w.user_id = p_user_id;\n\n  return query select 'refunded'::text, v_wallet.silver_coins, v_wallet.diamonds;\nend;\n$function$\n",
+      "volatility": "v",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": "p_user_id uuid, p_turn_id uuid, p_assistant_message_id uuid, p_failure_code text"
+    },
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "request_account_deletion",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.request_account_deletion()\n RETURNS TABLE(requested_at timestamp with time zone, scheduled_for timestamp with time zone)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_user_id uuid := auth.uid();\n  v_grace_period interval;\nBEGIN\n  IF v_user_id IS NULL THEN\n    RAISE EXCEPTION '請先登入';\n  END IF;\n\n  SELECT s.grace_period\n    INTO v_grace_period\n  FROM public.account_deletion_settings AS s\n  WHERE s.singleton = true;\n\n  IF NOT FOUND OR v_grace_period IS NULL THEN\n    RAISE EXCEPTION '帳號刪除期限尚未完成環境設定，請聯絡管理員';\n  END IF;\n\n  INSERT INTO public.account_deletion_requests (user_id, scheduled_for)\n  VALUES (v_user_id, pg_catalog.statement_timestamp() + v_grace_period)\n  ON CONFLICT (user_id) DO NOTHING;\n\n  RETURN QUERY\n  SELECT r.requested_at, r.scheduled_for\n  FROM public.account_deletion_requests AS r\n  WHERE r.user_id = v_user_id;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "reserve_chat_turn",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.reserve_chat_turn(p_user_id uuid, p_turn_id uuid, p_session_id uuid, p_user_message_id uuid, p_assistant_message_id uuid)\n RETURNS TABLE(turn_id uuid, status text, silver_reserved integer, diamonds_reserved integer, balance_silver integer, balance_diamonds integer)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_charge public.chat_turn_charges%rowtype; v_wallet public.wallet_accounts%rowtype; v_silver integer; v_diamonds integer;\nBEGIN\n  IF p_user_id IS NULL OR p_turn_id IS NULL OR p_session_id IS NULL OR p_user_message_id IS NULL OR p_assistant_message_id IS NULL THEN RAISE EXCEPTION 'invalid_turn_request'; END IF;\n  IF EXISTS (SELECT 1 FROM public.account_deletion_requests r WHERE r.user_id=p_user_id) THEN RAISE EXCEPTION 'account_not_active'; END IF;\n  PERFORM 1 FROM public.chat_sessions s WHERE s.id=p_session_id AND s.user_id=p_user_id AND s.deleted_at IS NULL FOR UPDATE;\n  IF NOT FOUND THEN RAISE EXCEPTION 'chat_session_not_owned_or_active'; END IF;\n  INSERT INTO public.chat_turn_charges(turn_id,user_id,session_id,user_message_id,expected_assistant_message_id,cost,status)\n  VALUES(p_turn_id,p_user_id,p_session_id,p_user_message_id,p_assistant_message_id,2,'created')\n  ON CONFLICT ON CONSTRAINT chat_turn_charges_pkey DO NOTHING;\n  SELECT c.* INTO v_charge FROM public.chat_turn_charges c WHERE c.turn_id=p_turn_id FOR UPDATE;\n  IF NOT FOUND THEN RAISE EXCEPTION 'turn_not_found'; END IF;\n  IF v_charge.user_id<>p_user_id OR v_charge.session_id<>p_session_id OR v_charge.user_message_id<>p_user_message_id OR v_charge.expected_assistant_message_id<>p_assistant_message_id THEN RAISE EXCEPTION 'turn_id_reuse_conflict'; END IF;\n  IF v_charge.status<>'created' THEN\n    SELECT w.silver_coins,w.diamonds INTO v_silver,v_diamonds FROM public.wallet_accounts w WHERE w.user_id=p_user_id;\n    RETURN QUERY SELECT v_charge.turn_id,v_charge.status,v_charge.silver_reserved,v_charge.diamonds_reserved,v_silver,v_diamonds; RETURN;\n  END IF;\n  IF NOT EXISTS(SELECT 1 FROM public.chat_messages m WHERE m.id=p_user_message_id AND m.session_id=p_session_id AND m.role='user' AND m.deleted_at IS NULL) THEN RAISE EXCEPTION 'user_message_not_found'; END IF;\n  SELECT w.* INTO v_wallet FROM public.wallet_accounts w WHERE w.user_id=p_user_id FOR UPDATE;\n  IF NOT FOUND THEN RAISE EXCEPTION 'wallet_not_initialized'; END IF;\n  IF v_wallet.silver_coins+v_wallet.diamonds<2 THEN\n    UPDATE public.chat_turn_charges c SET status='insufficient_funds',updated_at=now() WHERE c.turn_id=p_turn_id;\n    INSERT INTO public.chat_turn_events(turn_id,user_id,event_type,stage,error_code) VALUES(p_turn_id,p_user_id,'insufficient_balance','reservation','insufficient_funds');\n    RETURN QUERY SELECT p_turn_id,'insufficient_funds'::text,0,0,v_wallet.silver_coins,v_wallet.diamonds; RETURN;\n  END IF;\n  v_silver:=least(v_wallet.silver_coins,2); v_diamonds:=2-v_silver;\n  UPDATE public.wallet_accounts w SET silver_coins=w.silver_coins-v_silver,diamonds=w.diamonds-v_diamonds,updated_at=now() WHERE w.user_id=p_user_id;\n  IF v_silver>0 THEN INSERT INTO public.wallet_transactions(user_id,currency_type,amount,biz_type,reference_id) VALUES(p_user_id,'silver_coins',-v_silver,'chat_turn_charge',p_turn_id::text); END IF;\n  IF v_diamonds>0 THEN INSERT INTO public.wallet_transactions(user_id,currency_type,amount,biz_type,reference_id) VALUES(p_user_id,'diamonds',-v_diamonds,'chat_turn_charge',p_turn_id::text); END IF;\n  UPDATE public.chat_turn_charges c SET status='reserved',silver_reserved=v_silver,diamonds_reserved=v_diamonds,reserved_at=now(),updated_at=now() WHERE c.turn_id=p_turn_id;\n  INSERT INTO public.chat_turn_events(turn_id,user_id,event_type,stage) VALUES(p_turn_id,p_user_id,'reserved','reservation');\n  SELECT w.silver_coins,w.diamonds INTO v_silver,v_diamonds FROM public.wallet_accounts w WHERE w.user_id=p_user_id;\n  RETURN QUERY SELECT p_turn_id,'reserved'::text,\n    (SELECT c.silver_reserved FROM public.chat_turn_charges c WHERE c.turn_id=p_turn_id),\n    (SELECT c.diamonds_reserved FROM public.chat_turn_charges c WHERE c.turn_id=p_turn_id),v_silver,v_diamonds;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": "p_user_id uuid, p_turn_id uuid, p_session_id uuid, p_user_message_id uuid, p_assistant_message_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "reserve_encounter_chat_turn",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.reserve_encounter_chat_turn(p_user_id uuid, p_turn_id uuid, p_session_id uuid, p_user_message_id uuid, p_assistant_message_id uuid)\n RETURNS TABLE(turn_id uuid, status text, silver_reserved integer, diamonds_reserved integer, balance_silver integer, balance_diamonds integer)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE l public.encounter_session_lifecycle%ROWTYPE; c public.chat_turn_charges%ROWTYPE; v_existing boolean:=false;\nBEGIN\n  IF p_user_id IS NULL OR p_turn_id IS NULL OR p_session_id IS NULL OR p_user_message_id IS NULL OR p_assistant_message_id IS NULL THEN RAISE EXCEPTION 'invalid_turn_request'; END IF;\n  PERFORM 1 FROM public.chat_sessions s WHERE s.id=p_session_id AND s.user_id=p_user_id AND s.chat_mode='encounter' AND s.deleted_at IS NULL FOR UPDATE;\n  IF NOT FOUND THEN RAISE EXCEPTION 'encounter_chat_not_found_or_deleted' USING ERRCODE='23514'; END IF;\n  SELECT * INTO l FROM public.encounter_session_lifecycle WHERE session_id=p_session_id FOR UPDATE;\n  IF NOT FOUND OR l.user_id IS DISTINCT FROM p_user_id OR l.status NOT IN ('active','paused','ready_to_settle') THEN RAISE EXCEPTION 'encounter_scene_expired_or_inactive' USING ERRCODE='23514'; END IF;\n  SELECT charge.* INTO c FROM public.chat_turn_charges charge WHERE charge.turn_id=p_turn_id FOR UPDATE;\n  v_existing:=FOUND;\n  IF v_existing THEN\n    IF c.user_id IS DISTINCT FROM p_user_id OR c.session_id IS DISTINCT FROM p_session_id OR c.user_message_id IS DISTINCT FROM p_user_message_id OR c.expected_assistant_message_id IS DISTINCT FROM p_assistant_message_id THEN RAISE EXCEPTION 'turn_id_reuse_conflict' USING ERRCODE='23505'; END IF;\n    IF c.status='insufficient_funds' THEN RETURN QUERY SELECT r.turn_id,r.status,r.silver_reserved,r.diamonds_reserved,r.balance_silver,r.balance_diamonds FROM public.reserve_chat_turn(p_user_id,p_turn_id,p_session_id,p_user_message_id,p_assistant_message_id) r; RETURN; END IF;\n    IF c.status IN ('reserved','needs_reconciliation','settled','refunded') AND c.reserved_at IS NOT NULL AND c.reserved_at<=l.scheduled_end_at THEN\n      RETURN QUERY SELECT r.turn_id,r.status,r.silver_reserved,r.diamonds_reserved,r.balance_silver,r.balance_diamonds FROM public.reserve_chat_turn(p_user_id,p_turn_id,p_session_id,p_user_message_id,p_assistant_message_id) r; RETURN;\n    END IF;\n  END IF;\n  IF l.status<>'active' OR l.scheduled_end_at<=clock_timestamp() THEN RAISE EXCEPTION 'encounter_scene_expired_or_inactive' USING ERRCODE='23514'; END IF;\n  RETURN QUERY SELECT r.turn_id,r.status,r.silver_reserved,r.diamonds_reserved,r.balance_silver,r.balance_diamonds FROM public.reserve_chat_turn(p_user_id,p_turn_id,p_session_id,p_user_message_id,p_assistant_message_id) r;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": "p_user_id uuid, p_turn_id uuid, p_session_id uuid, p_user_message_id uuid, p_assistant_message_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}",
+      "kind": "f",
+      "name": "save_character_schedules",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.save_character_schedules(p_character_id uuid, p_schedules jsonb)\n RETURNS integer\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_uid uuid := auth.uid();\n  v_count integer;\nBEGIN\n  IF v_uid IS NULL THEN\n    RAISE EXCEPTION 'Authentication required' USING ERRCODE = '42501';\n  END IF;\n\n  IF p_character_id IS NULL OR NOT EXISTS (\n    SELECT 1\n    FROM public.characters c\n    WHERE c.id = p_character_id\n      AND c.author_id = v_uid\n      AND c.deleted_at IS NULL\n  ) THEN\n    RAISE EXCEPTION 'Character not found or not owned by caller' USING ERRCODE = '42501';\n  END IF;\n\n  IF p_schedules IS NULL OR jsonb_typeof(p_schedules) <> 'array' THEN\n    RAISE EXCEPTION 'Schedules must be a JSON array' USING ERRCODE = '22023';\n  END IF;\n\n  v_count := jsonb_array_length(p_schedules);\n  IF v_count > 50 THEN\n    RAISE EXCEPTION 'At most 50 schedule rows are allowed' USING ERRCODE = '22023';\n  END IF;\n\n  IF EXISTS (\n    SELECT 1\n    FROM jsonb_array_elements(p_schedules) AS e(value)\n    WHERE jsonb_typeof(e.value) <> 'object'\n      OR (e.value ? 'weekday' AND e.value->'weekday' <> 'null'::jsonb\n          AND (jsonb_typeof(e.value->'weekday') <> 'number'\n               OR (e.value->>'weekday') !~ '^[0-6]$'))\n      OR COALESCE(e.value->>'day_type', 'any') NOT IN ('any', 'weekday', 'weekend')\n      OR COALESCE(e.value->>'start_time', '') !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'\n      OR COALESCE(e.value->>'end_time', '') !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'\n      OR COALESCE(e.value->>'start_time', '') = COALESCE(e.value->>'end_time', '')\n      OR COALESCE(e.value->>'location_key', '') !~ '^[A-Za-z0-9_-]{1,80}$'\n      OR char_length(COALESCE(e.value->>'activity', '')) NOT BETWEEN 1 AND 300\n  ) THEN\n    RAISE EXCEPTION 'One or more schedule rows are invalid' USING ERRCODE = '22023';\n  END IF;\n\n  -- Transactional replacement: any insertion error rolls the deletion back as well.\n  DELETE FROM public.character_schedules\n  WHERE character_id = p_character_id;\n\n  INSERT INTO public.character_schedules (\n    character_id, weekday, day_type, start_time, end_time,\n    location_key, activity, priority, is_active\n  )\n  SELECT\n    p_character_id,\n    x.weekday,\n    COALESCE(x.day_type, 'any'),\n    x.start_time::time,\n    x.end_time::time,\n    x.location_key,\n    x.activity,\n    0,\n    true\n  FROM jsonb_to_recordset(p_schedules) AS x(\n    weekday smallint,\n    day_type text,\n    start_time text,\n    end_time text,\n    location_key text,\n    activity text\n  );\n\n  RETURN v_count;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_character_id uuid, p_schedules jsonb"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "save_chat_message_version",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.save_chat_message_version()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nBEGIN\n  IF auth.role()='service_role' AND current_setting('app.chat_purge_worker',true)='on' THEN RETURN NEW; END IF;\n  IF OLD.content IS DISTINCT FROM NEW.content THEN\n    INSERT INTO public.chat_message_versions(message_id,content,edited_by) VALUES(OLD.id,OLD.content,auth.uid());\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "save_my_profile",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.save_my_profile(p_handle text, p_nickname text, p_avatar_url text DEFAULT NULL::text, p_bio text DEFAULT ''::text, p_birthdate date DEFAULT NULL::date, p_persona_presets jsonb DEFAULT '[]'::jsonb)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_user_id uuid := auth.uid();\n  v_result jsonb;\nBEGIN\n  IF v_user_id IS NULL THEN\n    RAISE EXCEPTION 'Authentication required';\n  END IF;\n\n  IF NOT public.account_is_active() THEN\n    RAISE EXCEPTION 'Account is not active';\n  END IF;\n\n  IF NULLIF(btrim(p_handle), '') IS NULL THEN\n    RAISE EXCEPTION 'Handle is required';\n  END IF;\n\n  IF NULLIF(btrim(p_nickname), '') IS NULL THEN\n    RAISE EXCEPTION 'Nickname is required';\n  END IF;\n\n  IF p_persona_presets IS NULL OR jsonb_typeof(p_persona_presets) <> 'array' THEN\n    RAISE EXCEPTION 'Persona presets must be a JSON array';\n  END IF;\n\n  INSERT INTO public.profiles (\n    id, handle, nickname, avatar_url, bio, birthdate, persona_presets\n  )\n  VALUES (\n    v_user_id, btrim(p_handle), btrim(p_nickname), p_avatar_url,\n    COALESCE(p_bio, ''), p_birthdate, p_persona_presets\n  )\n  ON CONFLICT (id) DO UPDATE SET\n    handle = EXCLUDED.handle,\n    nickname = EXCLUDED.nickname,\n    avatar_url = EXCLUDED.avatar_url,\n    bio = EXCLUDED.bio,\n    birthdate = EXCLUDED.birthdate,\n    persona_presets = EXCLUDED.persona_presets\n  RETURNING jsonb_build_object(\n    'id', id, 'handle', handle, 'nickname', nickname,\n    'avatar_url', avatar_url, 'bio', bio, 'follower_count', follower_count\n  ) INTO v_result;\n\n  RETURN v_result;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_handle text, p_nickname text, p_avatar_url text, p_bio text, p_birthdate date, p_persona_presets jsonb"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "set_encounter_session_lifecycle_state",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.set_encounter_session_lifecycle_state(p_session_id uuid, p_user_id uuid, p_action text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  l public.encounter_session_lifecycle%ROWTYPE;\n  v_status text;\nBEGIN\n  IF p_session_id IS NULL OR p_user_id IS NULL\n     OR p_action NOT IN ('pause','resume') THEN\n    RAISE EXCEPTION 'Invalid Encounter lifecycle state request' USING ERRCODE='22023';\n  END IF;\n\n  SELECT * INTO l FROM public.encounter_session_lifecycle\n  WHERE session_id=p_session_id FOR UPDATE;\n\n  IF NOT FOUND OR l.user_id IS DISTINCT FROM p_user_id THEN\n    RAISE EXCEPTION 'Encounter session not found' USING ERRCODE='P0002';\n  END IF;\n  IF l.character_id IS NULL THEN\n    RAISE EXCEPTION 'Encounter character is unavailable' USING ERRCODE='23514';\n  END IF;\n  IF l.status='settled' OR l.status='cancelled'\n     OR l.scheduled_end_at <= clock_timestamp() THEN\n    RAISE EXCEPTION 'Encounter scene expired or closed' USING ERRCODE='23514';\n  END IF;\n\n  IF p_action='pause' THEN\n    IF l.status='paused' THEN\n      RETURN jsonb_build_object('session_id',p_session_id,'status','paused','idempotent',true);\n    END IF;\n    IF l.status <> 'active' THEN\n      RAISE EXCEPTION 'Encounter session cannot be paused from current state' USING ERRCODE='23514';\n    END IF;\n    v_status := 'paused';\n  ELSE\n    IF l.status='active' THEN\n      RETURN jsonb_build_object('session_id',p_session_id,'status','active','idempotent',true);\n    END IF;\n    IF l.status <> 'paused' THEN\n      RAISE EXCEPTION 'Encounter session cannot be resumed from current state' USING ERRCODE='23514';\n    END IF;\n    v_status := 'active';\n  END IF;\n\n  UPDATE public.encounter_session_lifecycle\n  SET status=v_status,updated_at=clock_timestamp()\n  WHERE session_id=p_session_id;\n\n  RETURN jsonb_build_object('session_id',p_session_id,'status',v_status,'idempotent',false);\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_session_id uuid, p_user_id uuid, p_action text"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "settle_chat_turn",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.settle_chat_turn(p_user_id uuid, p_turn_id uuid, p_assistant_message_id uuid)\n RETURNS text\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare v_charge public.chat_turn_charges%rowtype;\nbegin\n  select c.* into v_charge from public.chat_turn_charges c where c.turn_id=p_turn_id for update;\n  if not found or v_charge.user_id <> p_user_id then raise exception 'turn_not_found'; end if;\n  if v_charge.expected_assistant_message_id is distinct from p_assistant_message_id then raise exception 'turn_assistant_id_conflict'; end if;\n  if v_charge.status = 'settled' then\n    if v_charge.assistant_message_id is distinct from p_assistant_message_id then raise exception 'settled_turn_reply_id_conflict'; end if;\n    return 'settled';\n  end if;\n  if v_charge.status not in ('reserved','needs_reconciliation') then raise exception 'turn_not_settleable'; end if;\n  if not exists (select 1 from public.chat_messages m where m.id=p_assistant_message_id and m.session_id=v_charge.session_id and m.role='assistant' and m.deleted_at is null and length(btrim(m.content)) > 0) then\n    raise exception 'durable_assistant_reply_not_found';\n  end if;\n  update public.chat_turn_charges c set status='settled', assistant_message_id=p_assistant_message_id, settled_at=now(), updated_at=now() where c.turn_id=p_turn_id;\n  insert into public.chat_turn_events(turn_id,user_id,event_type,stage) values (p_turn_id,p_user_id,'settled','persistence');\n  return 'settled';\nend;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_user_id uuid, p_turn_id uuid, p_assistant_message_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "settle_encounter_session",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.settle_encounter_session(p_session_id uuid, p_affinity_delta integer, p_relationship_stage text, p_memories jsonb DEFAULT '[]'::jsonb, p_evaluation jsonb DEFAULT '{}'::jsonb)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  l public.encounter_session_lifecycle%ROWTYPE;\n  v_current integer := 0;\n  v_final integer := 0;\n  v_state_id uuid;\n  v_result jsonb;\nBEGIN\n  IF p_session_id IS NULL OR p_affinity_delta IS NULL\n     OR p_affinity_delta NOT BETWEEN -100 AND 100\n     OR p_relationship_stage NOT IN ('hostile','dislike','wary','first_meeting','acquaintance','close','intimate','special')\n     OR jsonb_typeof(COALESCE(p_memories,'[]'::jsonb)) <> 'array'\n     OR pg_column_size(COALESCE(p_memories,'[]'::jsonb)) > 20000\n     OR jsonb_typeof(COALESCE(p_evaluation,'{}'::jsonb)) <> 'object'\n     OR pg_column_size(COALESCE(p_evaluation,'{}'::jsonb)) > 12000 THEN\n    RAISE EXCEPTION 'Invalid Encounter settlement payload' USING ERRCODE='22023';\n  END IF;\n\n  SELECT * INTO l FROM public.encounter_session_lifecycle\n  WHERE session_id=p_session_id FOR UPDATE;\n  IF NOT FOUND THEN RAISE EXCEPTION 'Encounter lifecycle not found' USING ERRCODE='P0002'; END IF;\n  IF l.status='settled' THEN\n    RETURN jsonb_build_object('settled',true,'idempotent',true,'result',l.settlement_result);\n  END IF;\n  IF l.character_id IS NULL THEN\n    RAISE EXCEPTION 'Encounter character is no longer available for relationship settlement' USING ERRCODE='23514';\n  END IF;\n  IF l.status NOT IN ('active','paused','ready_to_settle')\n     OR l.scheduled_end_at > clock_timestamp() THEN\n    RAISE EXCEPTION 'Encounter scene has not reached scheduled end or is not settleable' USING ERRCODE='23514';\n  END IF;\n\n  -- A turn reserved before expiry may still be generating/persisting its reply.\n  -- Do not settle until every such reservation is settled or refunded.\n  IF EXISTS (\n    SELECT 1 FROM public.chat_turn_charges c\n    WHERE c.session_id=p_session_id\n      AND c.reserved_at IS NOT NULL\n      AND c.reserved_at <= l.scheduled_end_at\n      AND c.status IN ('reserved','needs_reconciliation')\n  ) THEN\n    RAISE EXCEPTION 'Encounter has pending pre-expiry turns' USING ERRCODE='23514';\n  END IF;\n\n  IF (SELECT count(*) FROM public.encounter_session_turns t WHERE t.session_id=p_session_id) <> l.turn_count THEN\n    RAISE EXCEPTION 'Encounter turn evidence is incomplete' USING ERRCODE='23514';\n  END IF;\n\n  INSERT INTO public.encounter_character_state(user_id,character_id,affinity,relationship_stage,first_met_at,last_interaction_at)\n  VALUES(l.user_id,l.character_id,0,'first_meeting',clock_timestamp(),clock_timestamp())\n  ON CONFLICT (user_id,character_id) DO NOTHING;\n  SELECT s.id,s.affinity INTO v_state_id,v_current\n  FROM public.encounter_character_state s\n  WHERE s.user_id=l.user_id AND s.character_id=l.character_id FOR UPDATE;\n\n  v_final := greatest(-100,least(100,v_current+p_affinity_delta));\n  UPDATE public.encounter_character_state\n  SET affinity=v_final,relationship_stage=p_relationship_stage,\n      last_interaction_at=clock_timestamp(),updated_at=clock_timestamp()\n  WHERE id=v_state_id;\n\n  v_result := jsonb_build_object(\n    'final_affinity',v_final,'affinity_delta',v_final-v_current,\n    'relationship_stage',p_relationship_stage,'memories',COALESCE(p_memories,'[]'::jsonb),\n    'evaluation',COALESCE(p_evaluation,'{}'::jsonb),'turn_count',l.turn_count,\n    'source_session_id',p_session_id\n  );\n  UPDATE public.encounter_session_lifecycle\n  SET status='settled',settlement_delta=v_final-v_current,\n      settlement_result=v_result,settled_at=clock_timestamp(),updated_at=clock_timestamp()\n  WHERE session_id=p_session_id;\n  RETURN jsonb_build_object('settled',true,'idempotent',false,'result',v_result);\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_session_id uuid, p_affinity_delta integer, p_relationship_stage text, p_memories jsonb, p_evaluation jsonb"
+    },
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "soft_delete_character",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.soft_delete_character(p_character_id uuid)\n RETURNS timestamp with time zone\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_author_id uuid;\n  v_first_published_at timestamptz;\n  v_deleted_at timestamptz;\nBEGIN\n  IF auth.uid() IS NULL THEN\n    RAISE EXCEPTION 'authentication_required' USING ERRCODE = '42501';\n  END IF;\n  IF NOT public.account_is_active() THEN\n    RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';\n  END IF;\n\n  SELECT c.author_id, c.first_published_at, c.deleted_at\n    INTO v_author_id, v_first_published_at, v_deleted_at\n  FROM public.characters c\n  WHERE c.id = p_character_id\n  FOR UPDATE;\n\n  IF NOT FOUND THEN\n    RAISE EXCEPTION 'Character not found.';\n  END IF;\n  IF v_author_id IS DISTINCT FROM auth.uid() THEN\n    RAISE EXCEPTION 'Not allowed to delete this character.' USING ERRCODE = '42501';\n  END IF;\n  IF v_deleted_at IS NOT NULL THEN\n    RETURN v_deleted_at;\n  END IF;\n\n  v_deleted_at := now();\n\n  UPDATE public.characters\n  SET visibility = 'private',\n      review_status = 'draft',\n      deleted_at = v_deleted_at,\n      deletion_reason = 'author_deleted'\n  WHERE id = p_character_id;\n\n  UPDATE public.character_stories\n  SET visibility = 'private'\n  WHERE character_id = p_character_id;\n\n  UPDATE public.chat_sessions cs\n  SET character_snapshot = COALESCE(cs.character_snapshot, '{}'::jsonb) ||\n    jsonb_build_object(\n      'authorId', v_author_id,\n      'visibility', 'private',\n      'firstPublishedAt', v_first_published_at,\n      'deletedAt', v_deleted_at\n    ),\n    updated_at = now()\n  WHERE cs.character_id = p_character_id;\n\n  UPDATE public.chat_group_members gm\n  SET character_snapshot = COALESCE(gm.character_snapshot, '{}'::jsonb) ||\n    jsonb_build_object(\n      'authorId', v_author_id,\n      'visibility', 'private',\n      'firstPublishedAt', v_first_published_at,\n      'deletedAt', v_deleted_at\n    )\n  WHERE gm.character_id = p_character_id;\n\n  UPDATE public.chat_group_messages gm\n  SET speaker_snapshot = COALESCE(gm.speaker_snapshot, '{}'::jsonb) ||\n    jsonb_build_object(\n      'authorId', v_author_id,\n      'visibility', 'private',\n      'firstPublishedAt', v_first_published_at,\n      'deletedAt', v_deleted_at\n    )\n  WHERE gm.character_id = p_character_id;\n\n  RETURN v_deleted_at;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_character_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "soft_delete_chat_memory_photo",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.soft_delete_chat_memory_photo(p_photo_id uuid)\n RETURNS TABLE(storage_path text, chat_type text, session_id uuid, group_id uuid)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_uid uuid := auth.uid();\nBEGIN\n  IF v_uid IS NULL THEN\n    RAISE EXCEPTION 'authentication required' USING ERRCODE = '42501';\n  END IF;\n\n  IF NOT public.account_is_active() THEN\n    RAISE EXCEPTION 'account deletion pending' USING ERRCODE = '42501';\n  END IF;\n\n  RETURN QUERY\n  UPDATE public.chat_memory_photos AS p\n     SET status = 'deleting',\n         deleted_at = pg_catalog.now()\n   WHERE p.id = p_photo_id\n     AND p.owner_id = v_uid\n     AND p.deleted_at IS NULL\n  RETURNING p.storage_path, p.chat_type, p.session_id, p.group_id;\n\n  IF NOT FOUND THEN\n    RAISE EXCEPTION 'photo not found or not owned by current user' USING ERRCODE = '42501';\n  END IF;\n\n  UPDATE public.chat_groups AS g\n     SET background_mode = 'none',\n         background_memory_photo_id = NULL,\n         updated_at = pg_catalog.now()\n   WHERE g.background_memory_photo_id = p_photo_id\n     AND g.owner_id = v_uid;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": true,
+      "security_definer": true,
+      "identity_arguments": "p_photo_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "sync_author_follower_count",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.sync_author_follower_count()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nbegin\n  if tg_op = 'INSERT' then\n    update public.profiles\n       set follower_count = follower_count + 1\n     where id = new.author_id;\n    return new;\n  elsif tg_op = 'DELETE' then\n    update public.profiles\n       set follower_count = greatest(follower_count - 1, 0)\n     where id = old.author_id;\n    return old;\n  end if;\n  return null;\nend;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "sync_character_chat_snapshot",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.sync_character_chat_snapshot(p_character_id uuid)\n RETURNS integer\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_author_id uuid;\n  v_visibility text;\n  v_first_published_at timestamptz;\n  v_deleted_at timestamptz;\n  v_count integer := 0;\n  v_rows integer := 0;\nBEGIN\n  IF auth.uid() IS NULL THEN\n    RAISE EXCEPTION 'authentication_required' USING ERRCODE = '42501';\n  END IF;\n  IF NOT public.account_is_active() THEN\n    RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';\n  END IF;\n\n  SELECT c.author_id, c.visibility, c.first_published_at, c.deleted_at\n    INTO v_author_id, v_visibility, v_first_published_at, v_deleted_at\n  FROM public.characters c\n  WHERE c.id = p_character_id;\n\n  IF NOT FOUND THEN\n    RAISE EXCEPTION 'Character not found.';\n  END IF;\n  IF v_author_id IS DISTINCT FROM auth.uid() THEN\n    RAISE EXCEPTION 'Not allowed to update this character snapshot.' USING ERRCODE = '42501';\n  END IF;\n\n  UPDATE public.chat_sessions cs\n  SET character_snapshot = COALESCE(cs.character_snapshot, '{}'::jsonb) ||\n    jsonb_build_object(\n      'authorId', v_author_id,\n      'visibility', v_visibility,\n      'firstPublishedAt', v_first_published_at,\n      'deletedAt', v_deleted_at\n    ),\n    updated_at = now()\n  WHERE cs.character_id = p_character_id;\n  GET DIAGNOSTICS v_rows = ROW_COUNT;\n  v_count := v_count + v_rows;\n\n  UPDATE public.chat_group_members gm\n  SET character_snapshot = COALESCE(gm.character_snapshot, '{}'::jsonb) ||\n    jsonb_build_object(\n      'authorId', v_author_id,\n      'visibility', v_visibility,\n      'firstPublishedAt', v_first_published_at,\n      'deletedAt', v_deleted_at\n    )\n  WHERE gm.character_id = p_character_id;\n  GET DIAGNOSTICS v_rows = ROW_COUNT;\n  v_count := v_count + v_rows;\n\n  UPDATE public.chat_group_messages gm\n  SET speaker_snapshot = COALESCE(gm.speaker_snapshot, '{}'::jsonb) ||\n    jsonb_build_object(\n      'authorId', v_author_id,\n      'visibility', v_visibility,\n      'firstPublishedAt', v_first_published_at,\n      'deletedAt', v_deleted_at\n    )\n  WHERE gm.character_id = p_character_id;\n  GET DIAGNOSTICS v_rows = ROW_COUNT;\n  v_count := v_count + v_rows;\n\n  RETURN v_count;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": "p_character_id uuid"
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "test_grant_diamonds_200",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.test_grant_diamonds_200()\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare\n  v_user_id uuid := auth.uid();\n  v_balance integer;\nbegin\n  if v_user_id is null then\n    raise exception 'authentication required' using errcode = '42501';\n  end if;\n\n  if exists (\n    select 1\n    from public.account_deletion_requests adr\n    where adr.user_id = v_user_id\n  ) then\n    raise exception 'account deletion pending' using errcode = '42501';\n  end if;\n\n  select wa.diamonds\n    into v_balance\n  from public.wallet_accounts wa\n  where wa.user_id = v_user_id\n  for update;\n\n  if not found then\n    raise exception 'wallet account not found' using errcode = 'P0002';\n  end if;\n\n  if exists (\n    select 1\n    from public.wallet_transactions wt\n    where wt.user_id = v_user_id\n      and wt.currency_type = 'diamonds'\n      and wt.biz_type = 'test_purchase_200'\n      and wt.reference_id = 'test_purchase_200_once'\n  ) then\n    return jsonb_build_object('diamonds', v_balance, 'granted', false);\n  end if;\n\n  update public.wallet_accounts\n    set diamonds = diamonds + 200,\n        updated_at = now()\n  where user_id = v_user_id\n  returning diamonds into v_balance;\n\n  insert into public.wallet_transactions\n    (user_id, currency_type, amount, biz_type, reference_id)\n  values\n    (v_user_id, 'diamonds', 200, 'test_purchase_200', 'test_purchase_200_once');\n\n  return jsonb_build_object('diamonds', v_balance, 'granted', true);\nend;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "validate_affinity_session_link",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.validate_affinity_session_link()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_user_id uuid;\n  v_character_id uuid;\n  v_chat_mode text;\nBEGIN\n  SELECT s.user_id, s.character_id, s.chat_mode\n    INTO v_user_id, v_character_id, v_chat_mode\n  FROM public.chat_sessions AS s\n  WHERE s.id = NEW.session_id;\n\n  IF NOT FOUND THEN\n    RAISE EXCEPTION 'Affinity session does not exist' USING ERRCODE = '23503';\n  END IF;\n\n  IF v_user_id IS DISTINCT FROM NEW.user_id THEN\n    RAISE EXCEPTION 'Affinity session owner mismatch' USING ERRCODE = '23514';\n  END IF;\n\n  IF NEW.character_id IS NOT NULL\n     AND v_character_id IS DISTINCT FROM NEW.character_id THEN\n    RAISE EXCEPTION 'Affinity session character mismatch' USING ERRCODE = '23514';\n  END IF;\n\n  IF TG_TABLE_NAME = 'encounter_session_lifecycle'\n     AND v_chat_mode <> 'encounter' THEN\n    RAISE EXCEPTION 'Encounter lifecycle requires an Encounter session' USING ERRCODE = '23514';\n  ELSIF TG_TABLE_NAME = 'story_relationship_states'\n     AND v_chat_mode <> 'story' THEN\n    RAISE EXCEPTION 'Story relationship requires a Story session' USING ERRCODE = '23514';\n  ELSIF TG_TABLE_NAME = 'story_relationship_batches'\n     AND v_chat_mode <> 'story' THEN\n    RAISE EXCEPTION 'Story batch requires a Story session' USING ERRCODE = '23514';\n  ELSIF TG_TABLE_NAME = 'encounter_session_turns'\n     AND v_chat_mode <> 'encounter' THEN\n    RAISE EXCEPTION 'Encounter turn requires an Encounter session' USING ERRCODE = '23514';\n  END IF;\n\n  RETURN NEW;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "validate_chat_group_background_photo",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.validate_chat_group_background_photo()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nBEGIN\n  IF NEW.background_mode NOT IN ('avatar','none','memory') THEN\n    RAISE EXCEPTION 'invalid_group_background_mode';\n  END IF;\n\n  IF NEW.background_mode = 'memory' THEN\n    IF NEW.background_memory_photo_id IS NULL OR NOT EXISTS (\n      SELECT 1\n      FROM public.chat_memory_photos AS photo\n      WHERE photo.id = NEW.background_memory_photo_id\n        AND photo.chat_type = 'group'\n        AND photo.group_id = NEW.id\n        AND photo.owner_id = NEW.owner_id\n        AND photo.status = 'active'\n        AND photo.deleted_at IS NULL\n        AND photo.expires_at > pg_catalog.now()\n    ) THEN\n      RAISE EXCEPTION 'group_background_photo_not_owned_or_active';\n    END IF;\n  ELSE\n    NEW.background_memory_photo_id := NULL;\n  END IF;\n\n  RETURN NEW;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": false,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "validate_encounter_evaluation_job_link",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.validate_encounter_evaluation_job_link()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_user_id uuid;\n  v_character_id uuid;\n  v_chat_mode text;\nBEGIN\n  SELECT s.user_id,s.character_id,s.chat_mode\n  INTO v_user_id,v_character_id,v_chat_mode\n  FROM public.chat_sessions AS s\n  WHERE s.id=NEW.session_id;\n\n  IF NOT FOUND OR v_user_id IS DISTINCT FROM NEW.user_id\n     OR v_chat_mode <> 'encounter'\n     OR (NEW.character_id IS NOT NULL AND v_character_id IS DISTINCT FROM NEW.character_id) THEN\n    RAISE EXCEPTION 'Encounter evaluation job session link is invalid' USING ERRCODE='23514';\n  END IF;\n\n  RETURN NEW;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "validate_encounter_turn_evidence",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.validate_encounter_turn_evidence()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_user_message_session uuid; v_user_message_role text; v_assistant_message_session uuid; v_assistant_message_role text; v_charge_session uuid; v_charge_user uuid;\nBEGIN\n  PERFORM 1 FROM public.chat_sessions s WHERE s.id=NEW.session_id AND s.user_id=NEW.user_id AND s.deleted_at IS NULL FOR UPDATE;\n  IF NOT FOUND THEN RAISE EXCEPTION 'Encounter evidence parent session is deleted or inaccessible' USING ERRCODE='23514'; END IF;\n  SELECT m.session_id,m.role INTO v_user_message_session,v_user_message_role FROM public.chat_messages m WHERE m.id=NEW.user_message_id;\n  SELECT m.session_id,m.role INTO v_assistant_message_session,v_assistant_message_role FROM public.chat_messages m WHERE m.id=NEW.assistant_message_id;\n  SELECT c.session_id,c.user_id INTO v_charge_session,v_charge_user FROM public.chat_turn_charges c WHERE c.turn_id=NEW.turn_id;\n  IF v_user_message_session IS DISTINCT FROM NEW.session_id OR v_user_message_role<>'user' THEN RAISE EXCEPTION 'Encounter user message does not belong to the session' USING ERRCODE='23514'; END IF;\n  IF v_assistant_message_session IS DISTINCT FROM NEW.session_id OR v_assistant_message_role<>'assistant' THEN RAISE EXCEPTION 'Encounter assistant message does not belong to the session' USING ERRCODE='23514'; END IF;\n  IF v_charge_session IS DISTINCT FROM NEW.session_id OR v_charge_user IS DISTINCT FROM NEW.user_id THEN RAISE EXCEPTION 'Encounter turn charge does not match session owner' USING ERRCODE='23514'; END IF;\n  RETURN NEW;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "validate_story_relationship_batch_sources",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.validate_story_relationship_batch_sources()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_expected_count integer; v_distinct_count integer; v_valid_count integer;\nBEGIN\n  PERFORM 1 FROM public.chat_sessions s WHERE s.id=NEW.session_id AND s.user_id=NEW.user_id AND s.chat_mode='story' AND s.deleted_at IS NULL FOR UPDATE;\n  IF NOT FOUND THEN RAISE EXCEPTION 'Story session is deleted or inaccessible' USING ERRCODE='23514'; END IF;\n  v_expected_count:=NEW.last_turn_number-NEW.first_turn_number+1;\n  IF NEW.first_turn_number<1 OR NEW.last_turn_number<NEW.first_turn_number OR v_expected_count NOT BETWEEN 1 AND 5 OR cardinality(NEW.source_turn_ids)<>v_expected_count THEN RAISE EXCEPTION 'Story batch turn range does not match source turn count' USING ERRCODE='23514'; END IF;\n  SELECT count(DISTINCT source_id) INTO v_distinct_count FROM unnest(NEW.source_turn_ids) AS source(source_id);\n  IF v_distinct_count<>cardinality(NEW.source_turn_ids) THEN RAISE EXCEPTION 'Story batch source turn IDs must be unique' USING ERRCODE='23514'; END IF;\n  SELECT count(*) INTO v_valid_count FROM unnest(NEW.source_turn_ids) AS source(source_id) JOIN public.chat_turn_charges charge ON charge.turn_id=source.source_id WHERE charge.session_id=NEW.session_id AND charge.user_id=NEW.user_id AND charge.status='settled';\n  IF v_valid_count<>cardinality(NEW.source_turn_ids) THEN RAISE EXCEPTION 'Story batch sources must be settled turns from the same session and owner' USING ERRCODE='23514'; END IF;\n  RETURN NEW;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "kind": "f",
+      "name": "validate_story_relationship_origin",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "schema": "public",
+      "strict": false,
+      "language": "plpgsql",
+      "definition": "CREATE OR REPLACE FUNCTION public.validate_story_relationship_origin()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_source_user uuid; v_source_character uuid; v_source_status text;\nBEGIN\n  PERFORM 1 FROM public.chat_sessions s WHERE s.id=NEW.session_id AND s.user_id=NEW.user_id AND s.deleted_at IS NULL FOR UPDATE;\n  IF NOT FOUND THEN RAISE EXCEPTION 'Story session is deleted or inaccessible' USING ERRCODE='23514'; END IF;\n  IF NEW.origin_mode='encounter_snapshot' AND NEW.source_encounter_session_id IS NOT NULL THEN\n    PERFORM 1 FROM public.chat_sessions s WHERE s.id=NEW.source_encounter_session_id AND s.user_id=NEW.user_id AND s.deleted_at IS NULL FOR UPDATE;\n    IF NOT FOUND THEN RAISE EXCEPTION 'Encounter snapshot source session is deleted' USING ERRCODE='23514'; END IF;\n    SELECT l.user_id,l.character_id,l.status INTO v_source_user,v_source_character,v_source_status FROM public.encounter_session_lifecycle l WHERE l.session_id=NEW.source_encounter_session_id;\n    IF NOT FOUND OR v_source_user IS DISTINCT FROM NEW.user_id OR (NEW.character_id IS NOT NULL AND v_source_character IS DISTINCT FROM NEW.character_id) OR v_source_status<>'settled' THEN RAISE EXCEPTION 'Encounter snapshot source is invalid or not settled' USING ERRCODE='23514'; END IF;\n  ELSIF NEW.origin_mode='encounter_snapshot' AND (TG_OP='INSERT' OR OLD.source_encounter_session_id IS NULL) THEN\n    RAISE EXCEPTION 'Encounter snapshot source is required at creation' USING ERRCODE='23514';\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n",
+      "volatility": "v",
+      "returns_set": false,
+      "security_definer": true,
+      "identity_arguments": ""
+    }
+  ]
+}
