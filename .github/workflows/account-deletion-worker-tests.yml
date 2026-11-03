@@ -30,6 +30,8 @@ on:
       - "supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql"
       - "supabase/drafts/account-is-active-auth-user-existence-guard.sql"
       - "supabase/migrations/20261103090100_account_is_active_auth_user_existence_guard.sql"
+      - "supabase/migrations/20261103115931_poyozz_account_deletion_preservation_atomic_lease.sql"
+      - "supabase/drafts/replay-account-deletion-release-migration.sql"
       - "supabase/drafts/chat-deletion-purge-cron.sql"
       - "scripts/test-account-deletion-character-preservation-draft.mjs"
       - "scripts/test-character-history-aware-deletion-draft.mjs"
@@ -169,6 +171,8 @@ jobs:
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
       - name: Verify current-state schema fingerprint and empty tables
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-current-state-schema-fixture.sql
+      - name: Replay generated PR #200 migration and behavior/security checks in rollback
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-account-deletion-release-migration.sql
       - name: Replay deletion drafts and run hard/soft delete behavior tests in a rollback transaction
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-and-test-character-deletion.sql
 
