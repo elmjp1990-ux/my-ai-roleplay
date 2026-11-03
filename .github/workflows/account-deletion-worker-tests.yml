@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - "supabase/functions/_shared/account-deletion-worker.ts"
+      - "supabase/functions/_shared/account-deletion-auth-fetch.ts"
       - "supabase/functions/_shared/character-asset-cleanup-worker.ts"
       - "supabase/functions/_shared/character-asset-cleanup-worker.test.ts"
       - "supabase/functions/purge-character-assets/index.ts"
