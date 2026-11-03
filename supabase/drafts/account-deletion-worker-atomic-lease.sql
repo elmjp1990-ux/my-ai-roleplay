@@ -153,13 +153,14 @@ BEGIN
     LIMIT 1
     FOR UPDATE;
 
-    IF v_batch_id IS NOT NULL THEN
-      UPDATE public.account_deletion_work_leases AS l
-      SET batch_id = v_batch_id, updated_at = v_now
-      WHERE l.target_user_id = v_request.user_id
-        AND l.lease_token = v_lease.lease_token
-        AND l.lease_generation = v_lease.lease_generation;
-    END IF;
+    UPDATE public.account_deletion_work_leases AS l
+    SET batch_id = COALESCE(v_batch_id, l.batch_id),
+        lease_expires_at = pg_catalog.clock_timestamp() + interval '10 minutes',
+        updated_at = pg_catalog.clock_timestamp()
+    WHERE l.target_user_id = v_request.user_id
+      AND l.lease_token = v_lease.lease_token
+      AND l.lease_generation = v_lease.lease_generation
+    RETURNING l.* INTO v_lease;
 
     target_user_id := v_request.user_id;
     batch_id := v_batch_id;
@@ -286,7 +287,7 @@ SET search_path TO ''
 AS $function$
 BEGIN
   UPDATE public.account_deletion_work_leases AS l
-  SET lease_expires_at = pg_catalog.statement_timestamp() + interval '10 minutes',
+  SET lease_expires_at = pg_catalog.clock_timestamp() + interval '10 minutes',
       updated_at = pg_catalog.statement_timestamp()
   WHERE l.target_user_id = p_user_id
     AND l.lease_token = p_lease_token
@@ -332,7 +333,7 @@ BEGIN
        OR v_lease.lease_token IS DISTINCT FROM p_lease_token
        OR v_lease.lease_generation IS DISTINCT FROM p_lease_generation
        OR v_lease.lease_status <> 'claimed'
-       OR v_lease.lease_expires_at <= pg_catalog.statement_timestamp() THEN
+       OR v_lease.lease_expires_at <= pg_catalog.clock_timestamp() THEN
       RAISE EXCEPTION 'account_deletion_lease_lost' USING ERRCODE = '55000';
     END IF;
 
@@ -373,7 +374,7 @@ BEGIN
   IF NOT FOUND OR v_lease.lease_token IS DISTINCT FROM p_lease_token
      OR v_lease.lease_generation IS DISTINCT FROM p_lease_generation
      OR v_lease.lease_status <> 'claimed'
-     OR v_lease.lease_expires_at <= pg_catalog.statement_timestamp()
+     OR v_lease.lease_expires_at <= pg_catalog.clock_timestamp()
      OR v_lease.batch_id IS NULL THEN
     RAISE EXCEPTION 'account_deletion_lease_lost' USING ERRCODE = '55000';
   END IF;
@@ -416,7 +417,7 @@ BEGIN
   IF NOT FOUND OR v_lease.lease_token IS DISTINCT FROM p_lease_token
      OR v_lease.lease_generation IS DISTINCT FROM p_lease_generation
      OR v_lease.lease_status <> 'claimed'
-     OR v_lease.lease_expires_at <= pg_catalog.statement_timestamp()
+     OR v_lease.lease_expires_at <= pg_catalog.clock_timestamp()
      OR v_lease.batch_id IS DISTINCT FROM p_batch_id THEN
     RAISE EXCEPTION 'account_deletion_lease_lost' USING ERRCODE = '55000';
   END IF;
@@ -469,7 +470,7 @@ BEGIN
   IF NOT FOUND OR v_lease.lease_token IS DISTINCT FROM p_lease_token
      OR v_lease.lease_generation IS DISTINCT FROM p_lease_generation
      OR v_lease.lease_status <> 'claimed'
-     OR v_lease.lease_expires_at <= pg_catalog.statement_timestamp()
+     OR v_lease.lease_expires_at <= pg_catalog.clock_timestamp()
      OR v_lease.batch_id IS DISTINCT FROM p_batch_id THEN
     RETURN false;
   END IF;
@@ -523,7 +524,6 @@ DECLARE
   v_user_id uuid := auth.uid();
   v_requested_at timestamptz;
   v_scheduled_for timestamptz;
-  v_now timestamptz := pg_catalog.statement_timestamp();
   v_lease public.account_deletion_work_leases%ROWTYPE;
   v_batch_id uuid;
 BEGIN
@@ -546,7 +546,7 @@ BEGIN
   FOR UPDATE;
 
   IF FOUND AND v_lease.lease_status = 'claimed'
-     AND (v_lease.lease_expires_at > v_now OR v_lease.batch_id IS NOT NULL) THEN
+     AND (v_lease.lease_expires_at > pg_catalog.clock_timestamp() OR v_lease.batch_id IS NOT NULL) THEN
     RAISE EXCEPTION '刪除處理已由背景工作領取，無法取消';
   END IF;
 
@@ -574,8 +574,8 @@ BEGIN
   IF v_lease.target_user_id IS NOT NULL THEN
     UPDATE public.account_deletion_work_leases AS l
     SET lease_status = 'cancelled',
-        lease_expires_at = v_now,
-        updated_at = v_now,
+        lease_expires_at = pg_catalog.clock_timestamp(),
+        updated_at = pg_catalog.clock_timestamp(),
         last_error = NULL
     WHERE l.target_user_id = v_user_id
       AND l.requested_at = v_requested_at
