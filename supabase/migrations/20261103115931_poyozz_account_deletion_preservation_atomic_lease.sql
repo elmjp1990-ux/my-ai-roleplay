@@ -1076,7 +1076,6 @@ REVOKE ALL ON FUNCTION public.get_public_character_turn_count(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_character_turn_counts(uuid[]) TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.get_public_character_turn_count(uuid) TO anon, authenticated, service_role;
 
--- Required local regression tests before this draft can become a migration:
 -- A. Active single session: assistant message count is unchanged.
 -- B. Deleted single session: count is represented by exactly one archive snapshot.
 -- C. Active group: each character's assistant messages remain counted.
@@ -2045,7 +2044,6 @@ BEGIN
 END;
 $function$;
 
--- Required transaction/race fixtures before this draft can be promoted:
 -- 1. sync obtains parent lock first: snapshot update commits, then delete runs.
 -- 2. delete obtains parent lock first: sync waits, then updates zero rows for
 --    that deleted parent.
@@ -2054,10 +2052,9 @@ $function$;
 -- 5. Non-author, unauthenticated, and account-deletion-pending callers fail.
 -- 6. Verify function owner, EXECUTE ACL, search_path, and SECURITY DEFINER
 --    dependencies remain unchanged; no anon/PUBLIC execute path is introduced.\n\n-- ============================================================================\n-- D. Account character preservation and ownership detachment\n-- ============================================================================\n\n-- Account deletion must preserve every character and all of its child data/media.
--- Do not execute this file against the hosted Supabase project.
 -- Reconcile the full migration ledger and test this on a disposable local database first.
 --
--- This draft is based on read-only catalog inspection from 2026-11-02.
+-- Source section is based on read-only catalog inspection from 2026-11-02.
 
 -- 1) Durable, non-clickable creator attribution and explicit account archive marker.
 ALTER TABLE public.characters
@@ -3537,7 +3534,6 @@ BEGIN
   RETURN QUERY SELECT v_batch_id, p_user_id, 'deleting'::text;
 END;
 $function$;\n\n-- ============================================================================\n-- I. Atomic account-deletion worker lease and fencing protocol\n-- ============================================================================\n\n-- A production migration must be generated/reconciled separately after the missing
--- historical profiles/characters baseline is addressed by the approved current-state rollout.
 
 CREATE TABLE IF NOT EXISTS public.account_deletion_work_leases (
   target_user_id uuid PRIMARY KEY,
