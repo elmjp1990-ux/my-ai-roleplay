@@ -4,7 +4,7 @@
 BEGIN;
 \echo 'Applying cumulative chat deletion character-history snapshot draft'
 \i supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql
-\i supabase/migrations/20261103040547_poyozz_chat_deletion_privilege_hardening.sql
+\i supabase/migrations/20261103195621_poyozz_chat_deletion_privilege_hardening.sql
 \echo 'Seeding legacy character rows before the publication/origin triggers exist'
 \i supabase/drafts/seed-character-deletion-legacy-fixtures.sql
 \echo 'Applying character history-aware deletion draft'
@@ -24,7 +24,7 @@ $storage_stub$;
 \echo 'Applying account deletion character preservation and safe Auth detachment draft'
 \i supabase/drafts/account-deletion-character-preservation-draft.sql
 \echo 'Applying stale-JWT Auth-user existence guard'
-\i supabase/migrations/20261103090100_account_is_active_auth_user_existence_guard.sql
+\i supabase/migrations/20261104200000_account_is_active_auth_user_existence_guard.sql
 \echo 'Applying database guard against new sessions for archived characters'
 \i supabase/drafts/account-archived-character-session-insert-guard.sql
 \echo 'Applying complete prepare_account_deletion integration draft'
