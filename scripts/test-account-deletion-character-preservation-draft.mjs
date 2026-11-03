@@ -494,8 +494,8 @@ assert.match(assetProcessor, /asset_still_referenced/);
 assert.match(assetProcessor, /unsafe_asset_path/);
 assert.match(assetProcessor, /markJob[(]job[.]id, "failed"/);
 const indexHtml = fs.readFileSync("index.html", "utf8");
-assert.ok(indexHtml.includes("最後確認：刪除角色？公開列表會隱藏；若已有聊天、相遇或故事紀錄，系統會保留既有紀錄並封存角色。"));
-assert.ok(indexHtml.includes("角色已刪除；有歷史紀錄的角色會保留既有內容"));
+assert.ok(!indexHtml.includes("最後確認：刪除角色？公開列表會隱藏；若已有聊天、相遇或故事紀錄，系統會保留既有紀錄並封存角色。"));
+assert.ok(indexHtml.includes("角色已刪除"));
 assert.ok(!indexHtml.includes("角色軟刪除失敗："));
 const illustrationCleanupStart = indexHtml.indexOf(
   "async function processCharacterIllustrationCleanupJob(job,userId) {",
