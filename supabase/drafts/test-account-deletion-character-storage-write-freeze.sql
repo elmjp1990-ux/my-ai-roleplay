@@ -25,23 +25,21 @@ BEGIN
     ('character-avatar-videos', 'character-avatar-videos', false)
   ON CONFLICT (id) DO NOTHING;
 
-  INSERT INTO storage.objects (
-    id, bucket_id, name, owner, owner_id, metadata
-  ) VALUES
+  INSERT INTO storage.objects (bucket_id, name) VALUES
     (
-      '30000000-0000-4000-8000-000000000040',
       'character-illustrations',
-      '10000000-0000-4000-8000-000000000040/20000000-0000-4000-8000-000000000040/30000000-0000-4000-8000-000000000040.jpg',
-      v_author, v_author::text, '{"mimetype":"image/jpeg","size":12}'::jsonb
+      '10000000-0000-4000-8000-000000000040/20000000-0000-4000-8000-000000000040/30000000-0000-4000-8000-000000000040.jpg'
     ),
     (
-      '40000000-0000-4000-8000-000000000040',
       'character-avatar-videos',
-      '10000000-0000-4000-8000-000000000040/40000000-0000-4000-8000-000000000040.mp4',
-      v_author, v_author::text, '{"mimetype":"video/mp4","size":12}'::jsonb
+      '10000000-0000-4000-8000-000000000040/40000000-0000-4000-8000-000000000040.mp4'
     );
 END;
 $fixture$;
+
+-- The disposable Storage shim grants SELECT only by default. Grant mutations
+-- here so this test isolates row-policy behavior, not platform table grants.
+GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated;
 
 SELECT pg_catalog.set_config('request.jwt.claim.sub',
   '10000000-0000-4000-8000-000000000040', true);
@@ -49,16 +47,22 @@ SELECT pg_catalog.set_config('request.jwt.claim.role', 'authenticated', true);
 SELECT pg_catalog.set_config('request.jwt.claims',
   '{"sub":"10000000-0000-4000-8000-000000000040","role":"authenticated"}', true);
 
--- While active, owner update remains available.
+-- While active, owner update remains available for both asset types.
 SET LOCAL ROLE authenticated;
 DO $active_owner$
 DECLARE v_rows integer;
 BEGIN
-  UPDATE storage.objects
-  SET metadata = metadata || '{"active_update":true}'::jsonb
-  WHERE id = '30000000-0000-4000-8000-000000000040';
+  UPDATE storage.objects SET name = name
+  WHERE bucket_id = 'character-illustrations'
+    AND name = '10000000-0000-4000-8000-000000000040/20000000-0000-4000-8000-000000000040/30000000-0000-4000-8000-000000000040.jpg';
   GET DIAGNOSTICS v_rows = ROW_COUNT;
   IF v_rows <> 1 THEN RAISE EXCEPTION 'active_owner_must_retain_illustration_storage_update'; END IF;
+
+  UPDATE storage.objects SET name = name
+  WHERE bucket_id = 'character-avatar-videos'
+    AND name = '10000000-0000-4000-8000-000000000040/40000000-0000-4000-8000-000000000040.mp4';
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  IF v_rows <> 1 THEN RAISE EXCEPTION 'active_owner_must_retain_video_storage_update'; END IF;
 END;
 $active_owner$;
 RESET ROLE;
@@ -74,25 +78,27 @@ SET LOCAL ROLE authenticated;
 DO $pending_owner$
 DECLARE v_rows integer;
 BEGIN
-  UPDATE storage.objects
-  SET metadata = metadata || '{"pending_update":true}'::jsonb
-  WHERE id = '30000000-0000-4000-8000-000000000040';
+  UPDATE storage.objects SET name = name
+  WHERE bucket_id = 'character-illustrations'
+    AND name = '10000000-0000-4000-8000-000000000040/20000000-0000-4000-8000-000000000040/30000000-0000-4000-8000-000000000040.jpg';
   GET DIAGNOSTICS v_rows = ROW_COUNT;
   IF v_rows <> 0 THEN RAISE EXCEPTION 'pending_owner_illustration_storage_update_not_blocked'; END IF;
 
   DELETE FROM storage.objects
-  WHERE id = '30000000-0000-4000-8000-000000000040';
+  WHERE bucket_id = 'character-illustrations'
+    AND name = '10000000-0000-4000-8000-000000000040/20000000-0000-4000-8000-000000000040/30000000-0000-4000-8000-000000000040.jpg';
   GET DIAGNOSTICS v_rows = ROW_COUNT;
   IF v_rows <> 0 THEN RAISE EXCEPTION 'pending_owner_illustration_storage_delete_not_blocked'; END IF;
 
-  UPDATE storage.objects
-  SET metadata = metadata || '{"pending_update":true}'::jsonb
-  WHERE id = '40000000-0000-4000-8000-000000000040';
+  UPDATE storage.objects SET name = name
+  WHERE bucket_id = 'character-avatar-videos'
+    AND name = '10000000-0000-4000-8000-000000000040/40000000-0000-4000-8000-000000000040.mp4';
   GET DIAGNOSTICS v_rows = ROW_COUNT;
   IF v_rows <> 0 THEN RAISE EXCEPTION 'pending_owner_video_storage_update_not_blocked'; END IF;
 
   DELETE FROM storage.objects
-  WHERE id = '40000000-0000-4000-8000-000000000040';
+  WHERE bucket_id = 'character-avatar-videos'
+    AND name = '10000000-0000-4000-8000-000000000040/40000000-0000-4000-8000-000000000040.mp4';
   GET DIAGNOSTICS v_rows = ROW_COUNT;
   IF v_rows <> 0 THEN RAISE EXCEPTION 'pending_owner_video_storage_delete_not_blocked'; END IF;
 END;
@@ -112,12 +118,14 @@ BEGIN
   END IF;
 
   DELETE FROM storage.objects
-  WHERE id = '40000000-0000-4000-8000-000000000040';
+  WHERE bucket_id = 'character-avatar-videos'
+    AND name = '10000000-0000-4000-8000-000000000040/40000000-0000-4000-8000-000000000040.mp4';
   GET DIAGNOSTICS v_rows = ROW_COUNT;
   IF v_rows <> 0 THEN RAISE EXCEPTION 'stale_jwt_video_storage_delete_not_blocked'; END IF;
 
   DELETE FROM storage.objects
-  WHERE id = '30000000-0000-4000-8000-000000000040';
+  WHERE bucket_id = 'character-illustrations'
+    AND name = '10000000-0000-4000-8000-000000000040/20000000-0000-4000-8000-000000000040/30000000-0000-4000-8000-000000000040.jpg';
   GET DIAGNOSTICS v_rows = ROW_COUNT;
   IF v_rows <> 0 THEN RAISE EXCEPTION 'stale_jwt_illustration_storage_delete_not_blocked'; END IF;
 END;
