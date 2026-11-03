@@ -1546,6 +1546,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
         state.account = {
           ...state.account,
           accountDeletionPending: true,
+          deletionRequestedAt: deletionStatus.requested_at || state.account.deletionRequestedAt || null,
           deletionScheduledFor: deletionStatus.scheduled_for
         };
         if (!pendingWalletError && pendingWallet) {
@@ -1569,6 +1570,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
         if (!state.account.accountDeletionModalDismissed &&
             route?.overlay?.name !== 'account-deletion-pending') {
           openModal('account-deletion-pending', {
+            requestedAt: deletionStatus.requested_at || state.account.deletionRequestedAt,
             scheduledFor: deletionStatus.scheduled_for
           });
         }
@@ -3787,6 +3789,7 @@ function render() {
       ...route,
       overlay: {
         name: 'account-deletion-pending',
+        requestedAt: state.account.deletionRequestedAt,
         scheduledFor: state.account.deletionScheduledFor
       }
     };
@@ -8136,6 +8139,7 @@ document.addEventListener('click',async event => {
       }
       case 'pending-show-deletion-modal': {
         openModal('account-deletion-pending', {
+          requestedAt: state.account?.deletionRequestedAt,
           scheduledFor: state.account?.deletionScheduledFor
         });
         break;
@@ -9371,6 +9375,7 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         const { error } = await window.mySupabase.rpc('cancel_account_deletion');
         if (error) throw new Error('取消刪除失敗：' + error.message);
         delete state.account.accountDeletionPending;
+        delete state.account.deletionRequestedAt;
         delete state.account.deletionScheduledFor;
         delete state.account.accountDeletionModalDismissed;
         persist();
