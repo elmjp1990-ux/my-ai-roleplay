@@ -15,19 +15,18 @@ const supabase = createClient(apiUrl, serviceKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 const bucketId = "personax-memory-photos";
-const ownerId = crypto.randomUUID();
-const sessionId = crypto.randomUUID();
-const photoId = crypto.randomUUID();
-const parentJobId = crypto.randomUUID();
+// This path is seeded by the disposable SQL fixture through the exact
+// private.enqueue_account_chat_memory_photo_cleanup() helper used by
+// prepare_account_deletion(); the Storage API test consumes that same queue row.
+const ownerId = "10000000-0000-4000-8000-000000000031";
+const sessionId = "50000000-0000-4000-8000-000000000031";
+const photoId = "c0000000-0000-4000-8000-000000000031";
 const objectPath = `${ownerId}/single/${sessionId}/${photoId}.jpg`;
-const now = Date.now();
-const deletedAt = new Date(now - 31 * 24 * 60 * 60 * 1000).toISOString();
-const purgeAfter = new Date(Date.parse(deletedAt) + 30 * 24 * 60 * 60 * 1000)
-  .toISOString();
+const parentJobId = "account-photo-helper-fixture";
 
 let fakeServer: Deno.HttpServer | null = null;
 let bucketCreated = false;
-let parentJobCreated = false;
+let parentJobId: string | null = null;
 
 try {
   const bucket = await supabase.storage.createBucket(bucketId, { public: false });
@@ -43,27 +42,21 @@ try {
   );
   if (upload.error) throw upload.error;
 
-  const parent = await supabase.from("chat_deletion_jobs").insert({
-    id: parentJobId,
-    resource_type: "single_session",
-    resource_id: sessionId,
-    owner_id: ownerId,
-    deleted_at: deletedAt,
-    purge_after: purgeAfter,
-    status: "completed",
-  });
+  const parent = await supabase.from("chat_deletion_jobs")
+    .select("id")
+    .eq("resource_type", "single_session")
+    .eq("resource_id", sessionId)
+    .eq("owner_id", ownerId)
+    .single();
   if (parent.error) throw parent.error;
-  parentJobCreated = true;
+  parentJobId = parent.data.id;
 
-  const child = await supabase.from("chat_storage_deletion_jobs").insert({
-    deletion_job_id: parentJobId,
-    bucket_id: bucketId,
-    object_path: objectPath,
-    resource_type: "single_session",
-    resource_id: sessionId,
-    owner_id: ownerId,
-    status: "queued",
-  }).select("id").single();
+  const child = await supabase.from("chat_storage_deletion_jobs")
+    .select("id")
+    .eq("deletion_job_id", parentJobId)
+    .eq("bucket_id", bucketId)
+    .eq("object_path", objectPath)
+    .single();
   if (child.error) throw child.error;
 
   const firstClaim = await supabase.rpc("claim_chat_storage_deletion_jobs", {
@@ -173,9 +166,14 @@ try {
   console.log("Local Storage API 503 -> durable retry -> successful object deletion passed.");
 } finally {
   if (fakeServer) await fakeServer.shutdown();
-  if (parentJobCreated) {
+  if (parentJobId) {
+    await supabase.from("chat_storage_deletion_jobs").delete().eq("deletion_job_id", parentJobId);
     await supabase.from("chat_deletion_jobs").delete().eq("id", parentJobId);
   }
+  await supabase.from("chat_memory_photos").delete().eq("id", photoId);
+  await supabase.from("chat_sessions").delete().eq("id", sessionId);
+  await supabase.from("profiles").delete().eq("id", ownerId);
+  await supabase.auth.admin.deleteUser(ownerId);
   if (bucketCreated) {
     await supabase.storage.deleteBucket(bucketId);
   }
