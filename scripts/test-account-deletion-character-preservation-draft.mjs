@@ -584,3 +584,16 @@ assert.doesNotMatch(accountPhotoQueueFn, /chat_group_memory_photos|image_url/,
 
 console.log("Account and character deletion draft guards: passed (static only; no SQL execution).");
 
+// The stale-JWT guard is now a uniquely versioned incremental migration and is replayed in disposable CI.
+
+const activeGuardMigration = fs.readFileSync(
+  "supabase/migrations/20261103090100_account_is_active_auth_user_existence_guard.sql",
+  "utf8",
+);
+assert.match(activeGuardMigration, /CREATE OR REPLACE FUNCTION public[.]account_is_active[(][)]/);
+assert.match(activeGuardMigration, /SECURITY DEFINER/);
+assert.match(activeGuardMigration, /SET search_path TO ''/);
+assert.match(activeGuardMigration, /FROM auth[.]users AS u[\\s\\S]*?u[.]id = auth[.]uid[(][)]/);
+assert.match(activeGuardMigration, /NOT EXISTS [(][\\s\\S]*?account_deletion_requests/);
+assert.match(activeGuardMigration, /REVOKE ALL ON FUNCTION public[.]account_is_active[(][)] FROM PUBLIC, anon/);
+assert.match(activeGuardMigration, /GRANT EXECUTE ON FUNCTION public[.]account_is_active[(][)] TO authenticated, service_role/);
