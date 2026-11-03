@@ -649,9 +649,29 @@ if ! grep -q "character_asset_path_cleanup_already_queued" "$tmpdir/asset-reatta
   cat "$tmpdir/asset-reattach-after-delete.log"
   exit 1
 fi
-asset_b_queued="$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM public.character_asset_cleanup_jobs WHERE bucket_id='character-avatar-videos' AND object_path='$asset_video_path_b')")"
-asset_b_illustration_queued="$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM public.character_asset_cleanup_jobs WHERE bucket_id='character-illustrations' AND object_path='$asset_path_b')")"
-asset_b_referenced="$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM public.characters WHERE id='20000000-0000-4000-8000-000000000034')")"
+asset_b_queued="$(psql "$DATABASE_URL" -Atq <<SQL
+SELECT EXISTS (
+  SELECT 1 FROM public.character_asset_cleanup_jobs
+  WHERE bucket_id = 'character-avatar-videos'
+    AND object_path = '$asset_video_path_b'
+);
+SQL
+)"
+asset_b_illustration_queued="$(psql "$DATABASE_URL" -Atq <<SQL
+SELECT EXISTS (
+  SELECT 1 FROM public.character_asset_cleanup_jobs
+  WHERE bucket_id = 'character-illustrations'
+    AND object_path = '$asset_path_b'
+);
+SQL
+)"
+asset_b_referenced="$(psql "$DATABASE_URL" -Atq <<SQL
+SELECT EXISTS (
+  SELECT 1 FROM public.characters
+  WHERE id = '20000000-0000-4000-8000-000000000034'
+);
+SQL
+)"
 [[ "$asset_b_queued" == "t" && "$asset_b_illustration_queued" == "t" && "$asset_b_referenced" == "f" ]] || {
   echo "ERROR: delete-first race left an invalid queued/referenced path state"
   exit 1
