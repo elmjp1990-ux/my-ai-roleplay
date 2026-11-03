@@ -115,6 +115,38 @@ Deno.test("finalizes idempotently when Auth user was already deleted", async () 
   assertEquals(calls.some(([name]) => name === "finalize"), true);
 });
 
+Deno.test("does not delete Auth user when the Auth lookup is unavailable", async () => {
+  const calls: unknown[][] = [];
+  const deps = successfulDeps(calls);
+  deps.isAuthUserAbsent = async () => {
+    calls.push(["isAuthUserAbsent"]);
+    throw new Error("auth_lookup_unavailable");
+  };
+  const summary = await processAccountDeletionWorkItems([item], deps);
+  assertEquals(summary.failed, 1);
+  assertEquals(calls.some(([name]) => name === "deleteAuthUser"), false);
+  assertEquals(calls.some(([name]) => name === "finalize"), false);
+});
+
+Deno.test("renews the lease before idempotently finalizing an already-completed batch", async () => {
+  const calls: unknown[][] = [];
+  const deps = successfulDeps(calls);
+  deps.prepare = async (id, token, generation) => {
+    calls.push(["prepare", id, token, generation]);
+    return {
+      data: [{ batch_id: "batch-1", target_user_id: id, batch_status: "completed" }],
+      error: null,
+    };
+  };
+  const summary = await processAccountDeletionWorkItems([item], deps);
+  assertEquals(summary.completed, 1);
+  assertEquals(calls, [
+    ["prepare", "user-1", "lease-token-1", 1],
+    ["renew", "user-1", "lease-token-1", 1],
+    ["finalize", "user-1", "batch-1", "lease-token-1", 1],
+  ]);
+});
+
 Deno.test("does not report success when fenced finalize returns false", async () => {
   const calls: unknown[][] = [];
   const deps = successfulDeps(calls);
