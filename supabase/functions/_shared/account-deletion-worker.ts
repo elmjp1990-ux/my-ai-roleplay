@@ -101,6 +101,7 @@ export async function processAccountDeletionWorkItems(
       batchId = prepared.data[0].batch_id;
       if (prepared.data[0].batch_status !== "deleting") {
         if (prepared.data[0].batch_status === "completed") {
+          await renewOrThrow(item.target_user_id, item.lease_token, item.lease_generation, deps);
           const completed = await deps.finalize(
             item.target_user_id,
             batchId,
