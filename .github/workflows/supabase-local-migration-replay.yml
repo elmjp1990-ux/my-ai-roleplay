@@ -142,6 +142,9 @@ jobs:
           # profiles/characters foundation is unavailable. Do not replay old migrations.
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-current-state-schema-fixture.sql
+          # Exercise the CLI-generated incremental migration itself, not only
+          # its source drafts. The script rolls back all DDL and synthetic rows.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-account-deletion-release-migration.sql
 
           # Encounter/chat structural audits and character/account DML all run inside
           # disposable transactions and are rolled back.
