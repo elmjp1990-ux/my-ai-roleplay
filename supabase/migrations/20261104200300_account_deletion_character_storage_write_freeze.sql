@@ -60,6 +60,6 @@ FOR DELETE
 TO authenticated
 USING (
   bucket_id = 'character-avatar-videos'
-  AND (storage.foldername(name))[1] = (SELECT auth.uid())::text
+  AND split_part(name, '/', 1) = (SELECT auth.uid())::text
   AND public.account_is_active()
 );
