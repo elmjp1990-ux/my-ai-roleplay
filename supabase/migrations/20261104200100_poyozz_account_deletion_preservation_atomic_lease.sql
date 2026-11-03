@@ -10,7 +10,6 @@
 -- version 20261103195621. This migration follows that actual hosted execution order.
 -- Validated against the disposable current-state schema fixture only; do not apply
 -- to hosted Supabase without explicit approval.
--- to hosted Supabase without explicit approval.
 
 
 -- ============================================================================
