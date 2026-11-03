@@ -419,7 +419,7 @@ assert.match(purgeCronDraft, /chat_storage_deletion_jobs/);
 assert.doesNotMatch(purgeCronDraft, /sb_secret_[A-Za-z0-9_-]{20,}/);
 
 const migrationsDir = "supabase/migrations";
-const releaseMigrationName = "20261103115931_poyozz_account_deletion_preservation_atomic_lease.sql";
+const releaseMigrationName = "20261104200100_poyozz_account_deletion_preservation_atomic_lease.sql";
 const historicalSql = fs.readdirSync(migrationsDir)
   .filter((name) => name.endsWith(".sql") && name !== releaseMigrationName)
   .map((name) => fs.readFileSync(path.join(migrationsDir, name), "utf8"))
@@ -577,7 +577,7 @@ assert.ok(chatParentDeleteGuard.includes("delete_chat_session_content()"));
 assert.ok(!chatParentDeleteGuard.includes("GRANT DELETE ON TABLE public.chat_sessions"));
 
 const finalPrivilegeMigration = fs.readFileSync(
-  "supabase/migrations/20261103040547_poyozz_chat_deletion_privilege_hardening.sql",
+  "supabase/migrations/20261103195621_poyozz_chat_deletion_privilege_hardening.sql",
   "utf8",
 );
 assert.ok(finalPrivilegeMigration.startsWith("-- PR #200: final least-privilege hardening for chat deletion lifecycle."));
@@ -588,7 +588,7 @@ const deletionReplay = fs.readFileSync(
   "supabase/drafts/replay-and-test-character-deletion.sql",
   "utf8",
 );
-assert.ok(deletionReplay.includes("supabase/migrations/20261103040547_poyozz_chat_deletion_privilege_hardening.sql"));
+assert.ok(deletionReplay.includes("supabase/migrations/20261103195621_poyozz_chat_deletion_privilege_hardening.sql"));
 
 
 // Ordinary single/group chat deletion has a backend-only 30-day retention window.
@@ -633,7 +633,7 @@ console.log("Account and character deletion draft guards: passed (static only; n
 // The stale-JWT guard is now a uniquely versioned incremental migration and is replayed in disposable CI.
 
 const activeGuardMigration = fs.readFileSync(
-  "supabase/migrations/20261103090100_account_is_active_auth_user_existence_guard.sql",
+  "supabase/migrations/20261104200000_account_is_active_auth_user_existence_guard.sql",
   "utf8",
 );
 assert.match(activeGuardMigration, /CREATE OR REPLACE FUNCTION public[.]account_is_active[(][)]/);
