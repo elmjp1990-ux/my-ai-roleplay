@@ -9,17 +9,6 @@ on:
       - "scripts/build-disposable-schema-fixture.mjs"
       - "supabase/drafts/verify-current-state-schema-fixture.sql"
       - ".github/workflows/chat-storage-api-retry-e2e.yml"
-  push:
-    branches:
-      - main
-      - "security/chat-deletion-lifecycle-reconciliation"
-    paths:
-      - "scripts/test-chat-storage-api-retry-e2e.ts"
-      - "supabase/functions/_shared/chat-deletion-worker.ts"
-      - "supabase/migrations/20261103040547_poyozz_chat_deletion_privilege_hardening.sql"
-      - "scripts/build-disposable-schema-fixture.mjs"
-      - "supabase/drafts/verify-current-state-schema-fixture.sql"
-      - ".github/workflows/chat-storage-api-retry-e2e.yml"
 
 permissions:
   contents: read
