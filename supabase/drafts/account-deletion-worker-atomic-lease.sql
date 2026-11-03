@@ -147,11 +147,11 @@ BEGIN
       UPDATE public.account_deletion_work_leases AS l
       SET lease_token = pg_catalog.gen_random_uuid(),
           lease_generation = l.lease_generation + 1,
-          lease_expires_at = v_now + interval '10 minutes',
+          lease_expires_at = pg_catalog.clock_timestamp() + interval '10 minutes',
           lease_status = 'claimed',
           batch_id = COALESCE(v_batch_id, l.batch_id),
-          claimed_at = v_now,
-          updated_at = v_now,
+          claimed_at = pg_catalog.clock_timestamp(),
+          updated_at = pg_catalog.clock_timestamp(),
           last_error = NULL
       WHERE l.target_user_id = v_request.user_id
       RETURNING l.* INTO v_lease;
@@ -282,11 +282,11 @@ BEGIN
       UPDATE public.account_deletion_work_leases AS l
       SET lease_token = pg_catalog.gen_random_uuid(),
           lease_generation = l.lease_generation + 1,
-          lease_expires_at = v_now + interval '10 minutes',
+          lease_expires_at = pg_catalog.clock_timestamp() + interval '10 minutes',
           lease_status = 'claimed',
           batch_id = v_batch.id,
-          claimed_at = v_now,
-          updated_at = v_now,
+          claimed_at = pg_catalog.clock_timestamp(),
+          updated_at = pg_catalog.clock_timestamp(),
           last_error = NULL
       WHERE l.target_user_id = v_batch.target_user_id
       RETURNING l.* INTO v_lease;
