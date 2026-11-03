@@ -55,3 +55,19 @@ The live test project's current table ACL inspection found:
 ## Status
 
 PR #200 remains Draft / unmerged. The current code-validation HEAD and disposable synthetic replay evidence are recorded separately in `pr200-runtime-and-migration-status-2026-11-03.md`. This audit is read-only and does not authorize rollout.
+
+
+## Exact migration source reconciliation — 2026-11-03
+
+The `supabase_migrations.schema_migrations` ledger includes `version`, `name`, and `statements text[]`; for all 28 PR migration versions, `array_length(statements, 1) = 1` and `statements[1]` contains the full applied SQL source. This enabled direct source reconciliation rather than version-only checking.
+
+Initial comparison found 9 byte-identical files and 19 files with textual differences. A token-aware comparison that removes SQL comments/whitespace, normalizes unquoted token case, and preserves quoted string literals showed:
+- 15 differences were comments/formatting only.
+- 4 remaining files differed only by: one error-message string wording; four optional `AS` table-alias keywords; splitting an equivalent Storage path regex string into adjacent concatenated literals; and two unused local variable declarations in the purge worker migration.
+- No changed predicates, grants, RLS policy conditions, trigger behavior, queue constraints, retention intervals, or function control flow were identified in the differences.
+
+To prevent future replay drift, the 19 non-identical repository migration files were restored byte-for-byte from their already-applied test-project ledger `statements[1]` sources. The 9 already-identical files were left unchanged. A second direct comparison now confirms **28/28 exact source matches** after normalizing CRLF to LF. This was a Git branch file restoration only; no hosted migration was applied, repaired, reset, or re-recorded.
+
+Restored migration source commit: `68e3ed291d3079efebc7a2a128c9df6827f254b4`.
+
+The separate fresh incremental migration requirement remains: do not edit/replay historical migrations. The direct parent DELETE ACL guard must be carried in a new uniquely versioned migration before any hosted rollout. Original `profiles`/`characters` baseline provenance remains unresolved but is not a blocker for disposable current-state fixture validation, per the agreed project decision.
