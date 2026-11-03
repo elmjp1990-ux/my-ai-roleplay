@@ -499,10 +499,8 @@ BEGIN
   WHERE l.target_user_id = v_user_id
   FOR UPDATE;
 
-  IF FOUND AND v_lease.requested_at = v_requested_at
-     AND v_lease.scheduled_for = v_scheduled_for
-     AND v_lease.lease_status = 'claimed'
-     AND v_lease.lease_expires_at > v_now THEN
+  IF FOUND AND v_lease.lease_status = 'claimed'
+     AND (v_lease.lease_expires_at > v_now OR v_lease.batch_id IS NOT NULL) THEN
     RAISE EXCEPTION '刪除處理已由背景工作領取，無法取消';
   END IF;
 
