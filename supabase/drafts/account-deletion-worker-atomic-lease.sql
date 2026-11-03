@@ -60,8 +60,8 @@ BEGIN
     FROM public.account_deletion_requests AS q
     WHERE q.scheduled_for <= v_now
     ORDER BY q.scheduled_for, q.user_id
-    FOR UPDATE SKIP LOCKED
     LIMIT p_limit
+    FOR UPDATE SKIP LOCKED
   LOOP
     SELECT pg_catalog.count(*)::integer
       INTO v_active_count
@@ -75,23 +75,13 @@ BEGIN
       RAISE EXCEPTION 'duplicate_active_account_deletion_batches';
     END IF;
 
-    SELECT b.id INTO v_batch_id
-    FROM public.account_deletion_archive_batches AS b
-    WHERE b.target_user_id = v_request.user_id
-      AND b.requested_at = v_request.requested_at
-      AND b.scheduled_for = v_request.scheduled_for
-      AND b.status NOT IN ('completed', 'cancelled')
-    ORDER BY b.created_at DESC
-    LIMIT 1
-    FOR UPDATE;
-
     INSERT INTO public.account_deletion_work_leases (
       target_user_id, requested_at, scheduled_for, lease_token,
       lease_generation, lease_expires_at, lease_status, batch_id
     ) VALUES (
       v_request.user_id, v_request.requested_at, v_request.scheduled_for,
       pg_catalog.gen_random_uuid(), 1, v_now + interval '10 minutes',
-      'claimed', v_batch_id
+      'claimed', NULL
     )
     ON CONFLICT (target_user_id) DO NOTHING;
 
@@ -137,6 +127,25 @@ BEGIN
       RETURNING l.* INTO v_lease;
     END IF;
 
+    -- The request lock and lease lock are held before taking the batch lock.
+    SELECT b.id INTO v_batch_id
+    FROM public.account_deletion_archive_batches AS b
+    WHERE b.target_user_id = v_request.user_id
+      AND b.requested_at = v_request.requested_at
+      AND b.scheduled_for = v_request.scheduled_for
+      AND b.status NOT IN ('completed', 'cancelled')
+    ORDER BY b.created_at DESC
+    LIMIT 1
+    FOR UPDATE;
+
+    IF v_batch_id IS NOT NULL THEN
+      UPDATE public.account_deletion_work_leases AS l
+      SET batch_id = v_batch_id, updated_at = v_now
+      WHERE l.target_user_id = v_request.user_id
+        AND l.lease_token = v_lease.lease_token
+        AND l.lease_generation = v_lease.lease_generation;
+    END IF;
+
     target_user_id := v_request.user_id;
     batch_id := v_batch_id;
     scheduled_for := v_request.scheduled_for;
@@ -163,7 +172,6 @@ BEGIN
             AND q.scheduled_for = b.scheduled_for
         )
       ORDER BY b.updated_at, b.id
-      FOR UPDATE SKIP LOCKED
       LIMIT (p_limit - v_claimed)
     LOOP
       INSERT INTO public.account_deletion_work_leases (
@@ -179,14 +187,27 @@ BEGIN
       SELECT l.* INTO v_lease
       FROM public.account_deletion_work_leases AS l
       WHERE l.target_user_id = v_batch.target_user_id
-      FOR UPDATE;
+      FOR UPDATE SKIP LOCKED;
 
+      IF NOT FOUND THEN
+        CONTINUE;
+      END IF;
       IF v_lease.requested_at IS DISTINCT FROM v_batch.requested_at
          OR v_lease.scheduled_for IS DISTINCT FROM v_batch.scheduled_for THEN
         CONTINUE;
       END IF;
       IF v_lease.lease_status = 'completed'
          OR (v_lease.lease_status = 'claimed' AND v_lease.lease_expires_at > v_now) THEN
+        CONTINUE;
+      END IF;
+
+      -- Recovery lock order is lease -> batch because the request row no longer exists.
+      PERFORM 1
+      FROM public.account_deletion_archive_batches AS b
+      WHERE b.id = v_batch.id
+        AND b.status = 'deleting'
+      FOR UPDATE SKIP LOCKED;
+      IF NOT FOUND THEN
         CONTINUE;
       END IF;
 
@@ -419,7 +440,7 @@ BEGIN
   UPDATE public.account_deletion_work_leases AS l
   SET attempt_count = l.attempt_count + 1,
       last_error = pg_catalog.left(
-        pg_catalog.coalesce(pg_catalog.nullif(p_error_code, ''), 'worker_error'), 300
+        coalesce(nullif(p_error_code, ''), 'worker_error'), 300
       ),
       updated_at = pg_catalog.statement_timestamp()
   WHERE l.target_user_id = p_user_id
@@ -429,7 +450,7 @@ BEGIN
   IF p_batch_id IS NOT NULL THEN
     UPDATE public.account_deletion_archive_batches AS b
     SET last_error = pg_catalog.left(
-          pg_catalog.coalesce(pg_catalog.nullif(p_error_code, ''), 'worker_error'), 300
+          coalesce(nullif(p_error_code, ''), 'worker_error'), 300
         ),
         updated_at = pg_catalog.statement_timestamp(),
         attempt_count = b.attempt_count + 1
