@@ -374,7 +374,7 @@ SQL
 # Sync wins: the snapshot update commits before deletion can acquire the parent.
 cat > "$tmpdir/snapshot-sync-wins.sql" <<SQL
 BEGIN;
-SET LOCAL ROLE authenticated;
+SET LOCAL ROLE service_role;
 SELECT set_config('request.jwt.claim.sub', '$author', true);
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
 SELECT set_config('request.jwt.claims', '{"sub":"$author","role":"authenticated"}', true);
