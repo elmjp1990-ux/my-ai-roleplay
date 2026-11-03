@@ -28,6 +28,9 @@ DECLARE
   v_author_photo uuid := 'c0000000-0000-4000-8000-000000000023';
   v_author_photo_path text := '10000000-0000-4000-8000-000000000020/50000000-0000-4000-8000-000000000023/account-delete-photo.jpg';
   v_active_author_session uuid := '50000000-0000-4000-8000-000000000026';
+  v_retention_session uuid := '50000000-0000-4000-8000-000000000027';
+  v_retention_job uuid;
+  v_retention_claimed boolean := false;
   v_active_solo_photo uuid := 'c0000000-0000-4000-8000-000000000026';
   v_active_group_photo uuid := 'c0000000-0000-4000-8000-000000000024';
   v_active_solo_path text := '10000000-0000-4000-8000-000000000020/50000000-0000-4000-8000-000000000026/account-active-solo.jpg';
@@ -187,6 +190,15 @@ BEGIN
     id, user_id, character_id, character_name, chat_mode
   ) VALUES (
     v_active_author_session, v_author, v_character, 'Account archived character', 'story'
+  );
+
+  -- Separate pre-existing player conversation used to verify the exact 29/30-day
+  -- retention boundary without altering the other pending deletion fixtures.
+  INSERT INTO public.chat_sessions (
+    id, user_id, character_id, character_name, chat_mode, deleted_at
+  ) VALUES (
+    v_retention_session, v_player, v_character, 'Retention boundary fixture',
+    'story', now() - interval '29 days'
   );
   INSERT INTO public.chat_memory_photos (
     id, owner_id, chat_type, session_id, storage_path, caption
@@ -469,6 +481,63 @@ BEGIN
       AND status = 'queued'
   ) THEN
     RAISE EXCEPTION 'account_auth_cascade_must_preserve_pending_and_account_photo_storage_jobs';
+  END IF;
+
+
+  -- Explicit 29/30-day boundary regression: a job at day 29 must not be claimed;
+  -- moving the same exact job to day 30 must make it claimable and purgeable.
+  INSERT INTO public.chat_deletion_jobs (
+    resource_type, resource_id, owner_id, deleted_at, purge_after
+  ) VALUES (
+    'single_session', v_retention_session, v_player,
+    now() - interval '29 days', now() + interval '1 day'
+  ) RETURNING id INTO v_retention_job;
+
+  PERFORM pg_catalog.set_config('request.jwt.claim.sub', '', true);
+  PERFORM pg_catalog.set_config('request.jwt.claim.role', 'service_role', true);
+  PERFORM pg_catalog.set_config(
+    'request.jwt.claims',
+    pg_catalog.jsonb_build_object('role', 'service_role')::text,
+    true
+  );
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.claim_chat_deletion_jobs(50) AS claimed
+    WHERE claimed.job_id = v_retention_job
+  ) INTO v_retention_claimed;
+  IF v_retention_claimed
+     OR NOT EXISTS (
+       SELECT 1 FROM public.chat_deletion_jobs
+       WHERE id = v_retention_job AND status = 'queued'
+         AND purge_after > clock_timestamp()
+     ) THEN
+    RAISE EXCEPTION 'chat_retention_day_29_must_not_be_claimed';
+  END IF;
+
+  UPDATE public.chat_sessions
+  SET deleted_at = now() - interval '30 days'
+  WHERE id = v_retention_session AND user_id = v_player;
+  UPDATE public.chat_deletion_jobs
+  SET deleted_at = now() - interval '30 days',
+      purge_after = (now() - interval '30 days') + interval '30 days'
+  WHERE id = v_retention_job;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.claim_chat_deletion_jobs(50) AS claimed
+    WHERE claimed.job_id = v_retention_job
+  ) INTO v_retention_claimed;
+  IF NOT v_retention_claimed THEN
+    RAISE EXCEPTION 'chat_retention_day_30_must_be_claimed';
+  END IF;
+
+  IF public.purge_chat_deletion_job(v_retention_job) IS DISTINCT FROM true
+     OR NOT EXISTS (
+       SELECT 1 FROM public.chat_deletion_jobs
+       WHERE id = v_retention_job AND status = 'completed'
+     ) THEN
+    RAISE EXCEPTION 'chat_retention_day_30_must_be_purgeable';
   END IF;
 
   IF EXISTS (
