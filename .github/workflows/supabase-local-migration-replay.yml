@@ -22,22 +22,6 @@ jobs:
         with:
           version: 2.84.2
 
-      - name: Generate release migration filename with Supabase CLI (no apply)
-        shell: bash
-        run: |
-          set -euo pipefail
-          migration_project="$RUNNER_TEMP/poyozz-migration-name"
-          mkdir -p "$migration_project/supabase/migrations"
-          sed 's/^project_id = .*/project_id = "poyozz-migration-name"/' \
-            supabase/config.toml > "$migration_project/supabase/config.toml"
-          cd "$migration_project"
-          supabase migration new poyozz_chat_deletion_privilege_hardening
-          generated="$(find supabase/migrations -maxdepth 1 -type f \
-            -name '*_poyozz_chat_deletion_privilege_hardening.sql' -printf '%f')"
-          test -n "$generated"
-          echo "Generated migration filename (not applied): $generated"
-          printf 'Generated migration filename (not applied): %s\n' "$generated" >> "$GITHUB_STEP_SUMMARY"
-
       - name: Verify isolated local-only environment
         shell: bash
         run: |
