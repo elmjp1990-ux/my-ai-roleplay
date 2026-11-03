@@ -81,13 +81,34 @@ $precheck$;
 -- While active, owner update remains available for both asset types.
 SET LOCAL ROLE authenticated;
 DO $active_owner$
-DECLARE v_rows integer;
+DECLARE
+  v_rows integer;
+  v_path text := '10000000-0000-4000-8000-000000000040/20000000-0000-4000-8000-000000000040/30000000-0000-4000-8000-000000000040.jpg';
+  v_matches boolean;
 BEGIN
+  IF NOT has_table_privilege(current_user, 'storage.objects', 'UPDATE') THEN
+    RAISE EXCEPTION 'authenticated_storage_update_grant_missing';
+  END IF;
+  v_matches := split_part(v_path, '/', 1) = auth.uid()::text
+    AND public.account_is_active()
+    AND EXISTS (
+      SELECT 1 FROM public.characters c
+      WHERE c.id::text = split_part(v_path, '/', 2)
+        AND c.author_id = auth.uid()
+    );
+  IF NOT v_matches THEN
+    RAISE EXCEPTION 'active_owner_storage_update_predicate_false: uid %, active %, path %, character_exists %',
+      auth.uid(), public.account_is_active(),
+      split_part(v_path, '/', 1) = auth.uid()::text,
+      EXISTS (SELECT 1 FROM public.characters c
+        WHERE c.id::text = split_part(v_path, '/', 2) AND c.author_id = auth.uid());
+  END IF;
+
   UPDATE storage.objects SET name = name
   WHERE bucket_id = 'character-illustrations'
-    AND name = '10000000-0000-4000-8000-000000000040/20000000-0000-4000-8000-000000000040/30000000-0000-4000-8000-000000000040.jpg';
+    AND name = v_path;
   GET DIAGNOSTICS v_rows = ROW_COUNT;
-  IF v_rows <> 1 THEN RAISE EXCEPTION 'active_owner_must_retain_illustration_storage_update'; END IF;
+  IF v_rows <> 1 THEN RAISE EXCEPTION 'active_owner_must_retain_illustration_storage_update: rowcount %', v_rows; END IF;
 
   UPDATE storage.objects SET name = name
   WHERE bucket_id = 'character-avatar-videos'
