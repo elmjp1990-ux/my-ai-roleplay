@@ -2,6 +2,9 @@ name: Supabase local synthetic schema replay (manual)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - security/chat-deletion-lifecycle-reconciliation
 
 permissions:
   contents: read
