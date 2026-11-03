@@ -88,3 +88,24 @@ A read-only Supabase Security Advisor snapshot returned:
 - Auth Leaked Password Protection is disabled. This is a separate pre-launch Auth configuration hardening item and was not changed.
 
 This advisor snapshot is a read-only point-in-time classification, not a full transitive audit of every app RPC. No hosted DDL, ACL, Auth setting, Storage mutation, worker deployment, or Cron activation occurred.
+
+
+## 2026-11-03 addendum — account worker lease migration review
+
+The account deletion worker's atomic lease implementation is now in `supabase/drafts/account-deletion-worker-atomic-lease.sql`, with effective-privilege assertions in `test-account-deletion-worker-lease-security.sql`. Do not move it to active migrations until the complete account-preservation/prepare integration draft chain is reconciled.
+
+Verified in disposable PostgreSQL:
+- lease table RLS enabled and no direct table privileges for service_role/authenticated/anon;
+- fenced worker RPCs callable by service_role only;
+- old unleased work-list/archive/prepare/finalize/failure RPCs are no longer service_role-callable;
+- cancellation remains authenticated-only;
+- all new SECURITY DEFINER RPCs have empty search_path;
+- 14 independent-session/concurrency scenarios pass, including claim/cancel in both directions, lease expiry while a renewal is blocked on a row lock, stale token fencing, request-row cascade recovery, and existing character/asset deletion races.
+
+Worker implementation now bounds Auth Admin user lookup/delete HTTP calls to 60 seconds using a dedicated fetch wrapper; non-Auth requests are unchanged. Lease duration is currently 10 minutes but provisional until actual worker phase timing is measured.
+
+Migration status:
+- This remains a DRAFT SQL implementation, not a generated migration file.
+- The old foundational profiles/characters migration provenance remains unresolved; per the agreed route, do not recover or fabricate old migrations, do not replay the historical chain, and do not modify migration history.
+- The eventual new incremental migration must be generated with Supabase CLI, combine the reviewed account-preservation + child-write freeze + archived-character session guard + complete prepare integration + lease SQL in dependency order, then be diffed against the connected test project's schema and migration ledger.
+- No hosted DDL/DML, Auth/Storage mutation, Worker deployment, Vault secret, or Cron change has occurred. Worker source remains disabled; PR #200 remains Draft/unmerged.
