@@ -44,6 +44,8 @@ DECLARE
   v_turn_count_after bigint;
   v_storage_path text := '10000000-0000-4000-8000-000000000020/20000000-0000-4000-8000-000000000020/30000000-0000-4000-8000-000000000020.jpg';
   v_due_job record;
+  v_prepare_started_at timestamptz;
+  v_prepare_elapsed_ms numeric;
 BEGIN
   INSERT INTO auth.users (id) VALUES (v_author) ON CONFLICT (id) DO NOTHING;
   INSERT INTO public.profiles (id, handle, nickname)
@@ -233,8 +235,11 @@ BEGIN
     true
   );
 
+  v_prepare_started_at := pg_catalog.clock_timestamp();
   SELECT p.batch_id, p.batch_status INTO v_batch, v_status
   FROM public.prepare_account_deletion(v_author) AS p;
+  v_prepare_elapsed_ms := extract(epoch FROM (pg_catalog.clock_timestamp() - v_prepare_started_at)) * 1000;
+  RAISE NOTICE 'pr200_account_prepare_elapsed_ms=%', round(v_prepare_elapsed_ms, 2);
 
   IF v_batch IS NULL OR v_status IS DISTINCT FROM 'deleting' THEN
     RAISE EXCEPTION 'account_deletion_prepare_did_not_reach_deleting_state';
