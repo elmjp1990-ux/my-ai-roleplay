@@ -39,7 +39,7 @@ BEGIN
     FROM public.chat_storage_deletion_jobs AS sj
     JOIN public.chat_deletion_jobs AS j ON j.id = sj.deletion_job_id
     WHERE sj.bucket_id = 'personax-memory-photos'
-      AND sj.object_path = v_owner::text || '/' || v_session::text || '/' || v_photo::text || '.jpg'
+      AND sj.object_path = v_owner::text || '/single/' || v_session::text || '/' || v_photo::text || '.jpg'
       AND sj.owner_id = v_owner
       AND sj.status = 'queued'
       AND j.resource_type = 'single_session'
