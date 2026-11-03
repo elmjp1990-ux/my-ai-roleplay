@@ -15,6 +15,13 @@ DECLARE
   v_status text;
   v_new_session uuid := '50000000-0000-4000-8000-000000000022';
   v_new_session_rejected boolean := false;
+  v_author_session uuid := '50000000-0000-4000-8000-000000000023';
+  v_author_message uuid := '60000000-0000-4000-8000-000000000023';
+  v_author_group uuid := '50000000-0000-4000-8000-000000000024';
+  v_author_group_turn uuid := '70000000-0000-4000-8000-000000000024';
+  v_author_group_message uuid := '60000000-0000-4000-8000-000000000024';
+  v_turn_count_before bigint;
+  v_turn_count_after bigint;
   v_storage_path text := '10000000-0000-4000-8000-000000000020/20000000-0000-4000-8000-000000000020/30000000-0000-4000-8000-000000000020.jpg';
 BEGIN
   INSERT INTO auth.users (id) VALUES (v_author) ON CONFLICT (id) DO NOTHING;
@@ -79,6 +86,44 @@ BEGIN
     'Existing character reply', jsonb_build_object('name', 'Account archived character')
   );
 
+  -- Account deletion cascades the author's own chat parents. Seed one solo and
+  -- one group reply so the pre-cascade aggregate snapshot is behavior-tested.
+  INSERT INTO public.chat_sessions (
+    id, user_id, character_id, character_name, chat_mode
+  ) VALUES (
+    v_author_session, v_author, v_character, 'Account archived character', 'story'
+  );
+  INSERT INTO public.chat_messages (id, session_id, role, content)
+  VALUES (v_author_message, v_author_session, 'assistant', 'Author-owned solo reply');
+
+  INSERT INTO public.chat_groups (
+    id, owner_id, name, scene_mode, world_character_id
+  ) VALUES (
+    v_author_group, v_author, 'Author-owned group before account deletion', 'shared', v_character
+  );
+  INSERT INTO public.chat_group_members (
+    id, group_id, character_id, position, character_snapshot
+  ) VALUES (
+    '80000000-0000-4000-8000-000000000024',
+    v_author_group, v_character, 1, jsonb_build_object('name', 'Account archived character')
+  );
+  INSERT INTO public.chat_group_turns (
+    id, group_id, user_id, request_key, request_content, status
+  ) VALUES (
+    v_author_group_turn, v_author_group, v_author,
+    '90000000-0000-4000-8000-000000000024',
+    'Author-owned group turn', 'completed'
+  );
+  INSERT INTO public.chat_group_messages (
+    id, group_id, turn_id, sequence_no, speaker_type, character_id, content, speaker_snapshot
+  ) VALUES (
+    v_author_group_message, v_author_group, v_author_group_turn, 1, 'character', v_character,
+    'Author-owned group reply', jsonb_build_object('name', 'Account archived character')
+  );
+
+  SELECT public.get_public_character_turn_count(v_character)
+  INTO v_turn_count_before;
+
   INSERT INTO public.account_deletion_requests (user_id, requested_at, scheduled_for)
   VALUES (v_author, now() - interval '1 hour', now() - interval '1 minute')
   ON CONFLICT (user_id) DO UPDATE
@@ -99,6 +144,28 @@ BEGIN
 
   IF v_batch IS NULL OR v_status IS DISTINCT FROM 'deleting' THEN
     RAISE EXCEPTION 'account_deletion_prepare_did_not_reach_deleting_state';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.chat_deletion_character_turn_stats
+    WHERE resource_type = 'single_session'
+      AND resource_id = v_author_session
+      AND character_id = v_character
+      AND turn_count = 1
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.chat_deletion_character_turn_stats
+    WHERE resource_type = 'group'
+      AND resource_id = v_author_group
+      AND character_id = v_character
+      AND turn_count = 1
+  ) THEN
+    RAISE EXCEPTION 'account_deletion_must_snapshot_solo_and_group_character_turn_counts';
+  END IF;
+
+  SELECT public.get_public_character_turn_count(v_character)
+  INTO v_turn_count_after;
+  IF v_turn_count_after IS DISTINCT FROM v_turn_count_before THEN
+    RAISE EXCEPTION 'account_deletion_must_preserve_public_character_cumulative_turn_count';
   END IF;
 
   IF NOT EXISTS (
