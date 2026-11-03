@@ -22,6 +22,25 @@ jobs:
         with:
           version: 2.84.2
 
+      - name: Discover pinned CLI migration command and generate isolated migration name
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase migration --help
+          supabase migration new --help
+          migration_project="$RUNNER_TEMP/poyozz-migration-name-only"
+          mkdir -p "$migration_project/supabase/migrations"
+          printf '[project]\\nid = "poyozz-migration-name-only"\\n' > "$migration_project/supabase/config.toml"
+          cd "$migration_project"
+          supabase migration new poyozz_account_deletion_preservation_atomic_lease
+          generated="$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print -quit)"
+          if [[ -z "$generated" ]]; then
+            echo "Supabase CLI did not generate a migration file."
+            exit 1
+          fi
+          echo "CLI_GENERATED_MIGRATION_PATH=$generated"
+          echo "CLI_GENERATED_MIGRATION_FILENAME=$(basename "$generated")"
+
       - name: Verify isolated local-only environment
         shell: bash
         run: |
