@@ -14,11 +14,26 @@ BEGIN
      OR has_function_privilege('anon','public.delete_chat_session_content(uuid)','EXECUTE') THEN
     RAISE EXCEPTION 'single_chat_delete_rpc_acl_mismatch';
   END IF;
-  IF has_table_privilege('authenticated','public.chat_sessions','DELETE')
+  IF has_table_privilege('anon','public.chat_sessions','DELETE')
+     OR has_table_privilege('authenticated','public.chat_sessions','DELETE')
      OR has_table_privilege('service_role','public.chat_sessions','DELETE')
+     OR has_table_privilege('anon','public.chat_groups','DELETE')
      OR has_table_privilege('authenticated','public.chat_groups','DELETE')
      OR has_table_privilege('service_role','public.chat_groups','DELETE') THEN
     RAISE EXCEPTION 'chat_parent_direct_delete_must_be_revoked_for_client_and_service_roles';
+  END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_class AS c
+    JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind IN ('r', 'p')
+      AND (
+        has_table_privilege('anon', c.oid, 'TRUNCATE')
+        OR has_table_privilege('authenticated', c.oid, 'TRUNCATE')
+      )
+  ) THEN
+    RAISE EXCEPTION 'client_roles_must_not_retain_public_table_truncate';
   END IF;
   IF NOT has_function_privilege('authenticated','public.delete_chat_group_with_related_data(uuid)','EXECUTE')
      OR has_function_privilege('anon','public.delete_chat_group_with_related_data(uuid)','EXECUTE') THEN
