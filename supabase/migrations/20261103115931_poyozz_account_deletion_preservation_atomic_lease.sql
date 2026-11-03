@@ -7,7 +7,12 @@
 -- This migration assumes those prerequisites and was validated against the disposable
 -- current-state schema fixture; do not apply to hosted Supabase without explicit approval.
 
-\n-- ============================================================================\n-- A. Cumulative chat-deletion turn statistics and durable character-use history\n-- ============================================================================\n\n-- Reviewed against read-only live test-project definitions on 2026-11-01.
+
+-- ============================================================================
+-- A. Cumulative chat-deletion turn statistics and durable character-use history
+-- ============================================================================
+
+-- Reviewed against read-only live test-project definitions on 2026-11-01.
 --   1) migration provenance/version collision is reconciled,
 --   2) exact local Supabase CLI replay succeeds,
 --   3) disposable fixture tests below pass.
@@ -1097,7 +1102,13 @@ GRANT EXECUTE ON FUNCTION public.get_public_character_turn_count(uuid) TO anon, 
 -- K. Four legacy deleted sessions without jobs are queued at original
 --    deleted_at + 30 days; no chat photo objects are touched by this SQL.
 -- L. No role except postgres-owned SECURITY DEFINER code can directly read or
---    write the aggregate table.\n\n-- ============================================================================\n-- B. History-aware character deletion and private asset cleanup queue\n-- ============================================================================\n\n-- History-aware character deletion and private Storage cleanup queue.
+--    write the aggregate table.
+
+-- ============================================================================
+-- B. History-aware character deletion and private asset cleanup queue
+-- ============================================================================
+
+-- History-aware character deletion and private Storage cleanup queue.
 -- PostgreSQL database after the full migration ledger has been reconciled.
 --
 CREATE SCHEMA IF NOT EXISTS private;
@@ -1700,7 +1711,13 @@ GRANT EXECUTE ON FUNCTION public.finish_character_asset_cleanup_job(uuid, text, 
   TO service_role;
 
 -- Not yet included: Storage worker deployment/scheduler. Pending jobs intentionally
--- retain their objects until an audited Edge worker with reference checks is ready.\n\n-- ============================================================================\n-- C. Parent-first character snapshot synchronization\n-- ============================================================================\n\n-- The same post-delete freeze must cover character soft deletion itself.
+-- retain their objects until an audited Edge worker with reference checks is ready.
+
+-- ============================================================================
+-- C. Parent-first character snapshot synchronization
+-- ============================================================================
+
+-- The same post-delete freeze must cover character soft deletion itself.
 -- The existing soft_delete_character() also rewrites snapshots, so fixing only
 -- sync_character_chat_snapshot() would leave a second SECURITY DEFINER bypass.
 -- Merge the history-aware hard-delete path with parent locking for both
@@ -2051,7 +2068,13 @@ $function$;
 -- 4. Active parent members/messages still receive the current character fields.
 -- 5. Non-author, unauthenticated, and account-deletion-pending callers fail.
 -- 6. Verify function owner, EXECUTE ACL, search_path, and SECURITY DEFINER
---    dependencies remain unchanged; no anon/PUBLIC execute path is introduced.\n\n-- ============================================================================\n-- D. Account character preservation and ownership detachment\n-- ============================================================================\n\n-- Account deletion must preserve every character and all of its child data/media.
+--    dependencies remain unchanged; no anon/PUBLIC execute path is introduced.
+
+-- ============================================================================
+-- D. Account character preservation and ownership detachment
+-- ============================================================================
+
+-- Account deletion must preserve every character and all of its child data/media.
 -- Reconcile the full migration ledger and test this on a disposable local database first.
 --
 -- Source section is based on read-only catalog inspection from 2026-11-02.
@@ -2556,7 +2579,13 @@ GRANT EXECUTE ON FUNCTION private.archive_account_characters(uuid)
 -- All helper calls execute inside the same prepare_account_deletion transaction.
 -- The worker's deleting-recovery branch then performs only Auth/finalize steps.
 --
--- disposable PostgreSQL replay, RLS/Storage tests and end-to-end deletion tests pass.\n\n-- ============================================================================\n-- E. Database guard against new sessions for account-archived characters\n-- ============================================================================\n\n-- Defense-in-depth for account-archived characters.
+-- disposable PostgreSQL replay, RLS/Storage tests and end-to-end deletion tests pass.
+
+-- ============================================================================
+-- E. Database guard against new sessions for account-archived characters
+-- ============================================================================
+
+-- Defense-in-depth for account-archived characters.
 -- Requires public.characters.account_archived_at from
 -- account-deletion-character-preservation-draft.sql.
 -- PostgreSQL replay are complete.
@@ -2678,7 +2707,13 @@ CREATE TRIGGER reject_archived_character_legacy_conversation
 --    for their already-authorized, non-deleted parent; no trigger is attached to
 --    these continuation tables.
 -- 6. Non-archived characters preserve existing creation behavior.
--- 7. A failure in any parent/child insert transaction rolls back all rows.\n\n-- ============================================================================\n-- F. Freeze author-managed character child writes during pending deletion\n-- ============================================================================\n\n-- Consistent pending-account-deletion RLS freeze for author-managed character data.
+-- 7. A failure in any parent/child insert transaction rolls back all rows.
+
+-- ============================================================================
+-- F. Freeze author-managed character child writes during pending deletion
+-- ============================================================================
+
+-- Consistent pending-account-deletion RLS freeze for author-managed character data.
 --
 -- Existing owner policies remain the permissive ownership/visibility checks.
 -- These additional RESTRICTIVE policies are AND gates for authenticated users:
@@ -2743,7 +2778,13 @@ CREATE POLICY account_must_be_active
 
 -- No policy is added to character_comments or character_comment_likes here:
 -- those are player-authored social records, not author-owned character settings.
--- Their deletion/anonymization policy is separate from character retention.\n\n-- ============================================================================\n-- G. Preserve existing group chat continuation after character deletion\n-- ============================================================================\n\n-- Existing group membership is a durable conversation snapshot. Character deletion
+-- Their deletion/anonymization policy is separate from character retention.
+
+-- ============================================================================
+-- G. Preserve existing group chat continuation after character deletion
+-- ============================================================================
+
+-- Existing group membership is a durable conversation snapshot. Character deletion
 -- hides a character from public discovery/new chats, but never removes its speaking
 -- turn or billing from a group that already exists.
 
@@ -2921,7 +2962,13 @@ BEGIN
 END;
 $function$;
 
--- CREATE OR REPLACE preserves the existing function ACL. Do not widen it here.\n\n-- ============================================================================\n-- H. Integrate character preservation and photo retention into account prepare\n-- ============================================================================\n\n-- Exact prepare_account_deletion(uuid) replacement based on the live test DB
+-- CREATE OR REPLACE preserves the existing function ACL. Do not widen it here.
+
+-- ============================================================================
+-- H. Integrate character preservation and photo retention into account prepare
+-- ============================================================================
+
+-- Exact prepare_account_deletion(uuid) replacement based on the live test DB
 -- pg_get_functiondef() inspected 2026-11-02, with character-preservation calls.
 -- account-deletion-character-preservation-draft.sql to be reviewed and replayed
 -- on a disposable local database first.
@@ -3533,7 +3580,13 @@ BEGIN
 
   RETURN QUERY SELECT v_batch_id, p_user_id, 'deleting'::text;
 END;
-$function$;\n\n-- ============================================================================\n-- I. Atomic account-deletion worker lease and fencing protocol\n-- ============================================================================\n\n-- A production migration must be generated/reconciled separately after the missing
+$function$;
+
+-- ============================================================================
+-- I. Atomic account-deletion worker lease and fencing protocol
+-- ============================================================================
+
+-- A production migration must be generated/reconciled separately after the missing
 
 CREATE TABLE IF NOT EXISTS public.account_deletion_work_leases (
   target_user_id uuid PRIMARY KEY,
@@ -4168,4 +4221,4 @@ GRANT EXECUTE ON FUNCTION public.record_account_deletion_failure_leased(uuid, uu
 
 -- Keep the player-facing cancellation RPC authenticated-only.
 REVOKE ALL ON FUNCTION public.cancel_account_deletion() FROM PUBLIC, anon, service_role;
-GRANT EXECUTE ON FUNCTION public.cancel_account_deletion() TO authenticated;\n
+GRANT EXECUTE ON FUNCTION public.cancel_account_deletion() TO authenticated;
