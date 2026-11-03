@@ -33,6 +33,10 @@ BEGIN
   INSERT INTO storage.objects (bucket_id, name)
   VALUES ('personax-memory-photos', v_archived_path),
          ('personax-memory-photos', v_deleted_path);
+  RAISE NOTICE 'storage_objects_seeded=%', (
+    SELECT pg_catalog.count(*) FROM storage.objects
+    WHERE name IN (v_archived_path, v_deleted_path)
+  );
 
   GRANT USAGE ON SCHEMA storage TO authenticated;
   ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
@@ -67,6 +71,41 @@ BEGIN
     RAISE EXCEPTION 'archived_group_photo_metadata_must_remain_readable_and_deleted_group_hidden: %', v_photo_count;
   END IF;
 
+  RAISE NOTICE 'storage_policy_inputs=%', pg_catalog.jsonb_build_object(
+    'auth_uid', auth.uid(),
+    'archived_path_matches', v_archived_path ~* (
+      '^' || auth.uid()::text ||
+      '/(single|group)/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/' ||
+      '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](jpg|jpeg|png|webp)
+  IF v_object_count <> 1 THEN
+    RAISE EXCEPTION 'archived_group_storage_object_must_remain_readable_and_deleted_group_hidden: %', v_object_count;
+  END IF;
+END;
+$photo_assert$;
+
+RESET ROLE;
+
+    ),
+    'archived_photo_visible', EXISTS (
+      SELECT 1 FROM public.chat_memory_photos p
+      WHERE p.storage_path = v_archived_path
+        AND p.owner_id = auth.uid()
+        AND p.deleted_at IS NULL
+        AND p.chat_type = 'group'
+        AND EXISTS (
+          SELECT 1 FROM public.chat_groups g
+          WHERE g.id = p.group_id
+            AND g.owner_id = auth.uid()
+            AND g.deleted_at IS NULL
+        )
+    ),
+    'archived_group_visible', EXISTS (
+      SELECT 1 FROM public.chat_groups g
+      WHERE g.id = v_archived_group
+        AND g.owner_id = auth.uid()
+        AND g.deleted_at IS NULL
+    )
+  );
   SELECT pg_catalog.count(*)::integer INTO v_object_count
   FROM storage.objects
   WHERE name IN (v_archived_path, v_deleted_path);
