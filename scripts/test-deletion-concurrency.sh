@@ -673,8 +673,8 @@ VALUES
   ('$sync_group_second', '$player', 'Snapshot Delete Group', 'shared');
 INSERT INTO public.chat_group_members (id, group_id, character_id, position, character_snapshot)
 VALUES
-  ('$sync_member_first', '$sync_group_first', '$archive_character', 0, '{"marker":"group-sync-first"}'::jsonb),
-  ('$sync_member_second', '$sync_group_second', '$archive_character', 0, '{"marker":"group-delete-first"}'::jsonb);
+  ('$sync_member_first', '$sync_group_first', '$archive_character', 1, '{"marker":"group-sync-first"}'::jsonb),
+  ('$sync_member_second', '$sync_group_second', '$archive_character', 1, '{"marker":"group-delete-first"}'::jsonb);
 SQL
 
 cat > "$tmpdir/group-snapshot-sync-wins.sql" <<SQL
