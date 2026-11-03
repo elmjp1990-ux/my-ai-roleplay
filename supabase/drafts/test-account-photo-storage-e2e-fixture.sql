@@ -6,7 +6,7 @@ DECLARE
   v_owner uuid := '10000000-0000-4000-8000-000000000031';
   v_session uuid := '50000000-0000-4000-8000-000000000031';
   v_photo uuid := 'c0000000-0000-4000-8000-000000000031';
-  v_requested_at timestamptz := pg_catalog.statement_timestamp();
+  v_requested_at timestamptz := pg_catalog.statement_timestamp() - interval '31 days';
   v_queued integer;
 BEGIN
   INSERT INTO auth.users (id) VALUES (v_owner)
