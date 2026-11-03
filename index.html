@@ -7167,7 +7167,6 @@ function renderModal(o) {
     case 'delete-character':
       showDialog('刪除角色',`
         <form data-form="delete-character">
-          <p class="muted">角色會從公開列表下架，不再接受新對話；已開始的聊天與必要角色快照會保留。</p>
           <label class="field"><span>請輸入「Delete」確認</span>
             <input name="confirm" required autocomplete="off"></label>
           <button class="danger">確認刪除角色（下架）</button>
@@ -9210,7 +9209,6 @@ document.addEventListener('submit',async event => {
         const c=state.characters.find(c=>c.id===o.id);
         const user=currentUser();
         if (!owned(c) || !user?.uid || !window.mySupabase) return toast('請登入後再刪除角色。');
-        if (!confirm('最後確認：刪除角色？公開列表會隱藏；若已有聊天、相遇或故事紀錄，系統會保留既有紀錄並封存角色。')) return;
         const { data: authResult, error: authError } = await window.mySupabase.auth.getUser();
         if (authError || authResult?.user?.id !== user.uid) throw new Error('登入狀態驗證失敗，請重新登入。');
         const { data: deletedAt, error: deleteError } = await window.mySupabase
@@ -9236,7 +9234,7 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         state.favorites=state.favorites.filter(v=>v!==c.id);
         delete state.comments[c.id];
         persist();go({page:'create'},true);
-        toast('角色已刪除；有歷史紀錄的角色會保留既有內容，且不能再開啟新對話。');
+        toast('角色已刪除');
         break;
       }
       case 'profile': {
