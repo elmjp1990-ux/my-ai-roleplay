@@ -114,7 +114,14 @@ stale_failure="$(psql "$DATABASE_URL" -Atqc "SELECT public.record_account_deleti
   echo "ERROR: stale worker was able to renew or write failure metadata"
   exit 1
 }
+wrong_batch_failure="$(psql "$DATABASE_URL" -Atqc "SELECT public.record_account_deletion_failure_leased('$lease_author', 'ffffffff-ffff-4fff-8fff-ffffffffffff', '$new_token', $new_generation, 'wrong_batch')")"
+current_failure="$(psql "$DATABASE_URL" -Atqc "SELECT public.record_account_deletion_failure_leased('$lease_author', NULL, '$new_token', $new_generation, 'current_owner')")"
+[[ "$wrong_batch_failure" == "f" && "$current_failure" == "t" ]] || {
+  echo "ERROR: failure reporting did not enforce the exact lease-to-batch association"
+  exit 1
+}
 echo "ok: expired lease is reclaimed with a new fencing generation; stale owner is rejected"
+echo "ok: failure reporting requires the exact batch association"
 
 # The same stale generation must also be rejected by the destructive prepare
 # and finalize wrappers, not only by renew/failure telemetry.
@@ -522,4 +529,4 @@ asset_b_referenced="$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM p
 }
 echo "ok: deletion wins path lock; queued asset path cannot be reattached"
 
-echo "Deletion concurrency tests: 12 passed, 0 failed"
+echo "Deletion concurrency tests: 13 passed, 0 failed"
