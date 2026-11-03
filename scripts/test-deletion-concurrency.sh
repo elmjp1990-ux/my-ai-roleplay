@@ -448,7 +448,18 @@ snapshot_sync_loses_pid=$!
 wait_for_lock "pr200-snapshot-sync-loses"
 wait "$snapshot_delete_wins_pid"
 wait "$snapshot_sync_loses_pid"
-sync_loses_result="$(grep -E '^[0-9]+
+sync_loses_result="$(grep -E '^[0-9]+' "$tmpdir/snapshot-sync-loses.log" | tail -n 1)"
+sync_loses_snapshot="$(psql "$DATABASE_URL" -Atqc "SELECT character_snapshot->>'marker' FROM public.chat_sessions WHERE id='$sync_session_second'")"
+[[ "$sync_loses_result" == "0" && "$sync_loses_snapshot" == "delete-first" ]] || {
+  echo "ERROR: snapshot sync changed the deleted parent's frozen character snapshot"
+  cat "$tmpdir/snapshot-delete-wins.log" "$tmpdir/snapshot-sync-loses.log"
+  exit 1
+}
+echo "ok: chat deletion wins the parent lock and freezes the snapshot"
+
+# An authenticated child-row update starts before the deletion request
+# is committed and holds the schedule row. prepare_account_deletion must wait,
+# then archive the character without losing the already-committed child write.
 cat > "$tmpdir/child-writer.sql" <<SQL
 BEGIN;
 SET LOCAL ROLE authenticated;
