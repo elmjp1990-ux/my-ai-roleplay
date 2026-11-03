@@ -1,0 +1,100 @@
+name: Chat Storage API retry E2E (local only)
+
+on:
+  pull_request:
+    paths:
+      - "scripts/test-chat-storage-api-retry-e2e.ts"
+      - "supabase/functions/_shared/chat-deletion-worker.ts"
+      - "supabase/migrations/20261103040547_poyozz_chat_deletion_privilege_hardening.sql"
+      - "scripts/build-disposable-schema-fixture.mjs"
+      - "supabase/drafts/verify-current-state-schema-fixture.sql"
+      - ".github/workflows/chat-storage-api-retry-e2e.yml"
+  push:
+    branches:
+      - main
+      - "security/chat-deletion-lifecycle-reconciliation"
+    paths:
+      - "scripts/test-chat-storage-api-retry-e2e.ts"
+      - "supabase/functions/_shared/chat-deletion-worker.ts"
+      - "supabase/migrations/20261103040547_poyozz_chat_deletion_privilege_hardening.sql"
+      - "scripts/build-disposable-schema-fixture.mjs"
+      - "supabase/drafts/verify-current-state-schema-fixture.sql"
+      - ".github/workflows/chat-storage-api-retry-e2e.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  local-storage-api-retry:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.84.2
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Verify isolated local-only environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase --version
+          deno --version
+          test -f supabase/config.toml
+          # This job intentionally has no hosted credentials or project link.
+          if [[ -n "${SUPABASE_ACCESS_TOKEN:-}" || -n "${SUPABASE_DB_PASSWORD:-}" ]]; then
+            echo "Hosted Supabase credentials must not be present."
+            exit 1
+          fi
+
+      - name: Start full isolated Supabase stack with empty migration history
+        shell: bash
+        run: |
+          set -euo pipefail
+          local_project="$RUNNER_TEMP/poyozz-storage-api-e2e"
+          mkdir -p "$local_project/supabase/migrations"
+          sed 's/^project_id = .*/project_id = "poyozz-storage-api-e2e"/' \
+            supabase/config.toml > "$local_project/supabase/config.toml"
+          cd "$local_project"
+          supabase start
+          env_output="$(supabase status --output env)"
+          get_env() {
+            printf '%s\n' "$env_output" | sed -n "s/^$1=//p" | sed 's/^"//;s/"$//'
+          }
+          db_url="$(get_env DB_URL)"
+          api_url="$(get_env API_URL)"
+          service_role_key="$(get_env SERVICE_ROLE_KEY)"
+          if [[ -z "$db_url" || -z "$api_url" || -z "$service_role_key" ]]; then
+            echo "Local Supabase DB_URL/API_URL/SERVICE_ROLE_KEY was not returned."
+            exit 1
+          fi
+          printf 'DATABASE_URL=%s\n' "$db_url" >> "$GITHUB_ENV"
+          printf 'API_URL=%s\n' "$api_url" >> "$GITHUB_ENV"
+          printf 'SERVICE_ROLE_KEY=%s\n' "$service_role_key" >> "$GITHUB_ENV"
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Load synthetic current-state schema and final ACL migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/build-disposable-schema-fixture.mjs > "$RUNNER_TEMP/current-state-schema.sql"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-current-state-schema-fixture.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261103040547_poyozz_chat_deletion_privilege_hardening.sql
+
+      - name: Exercise real Supabase Storage client against HTTP 503 and retry
+        run: deno run --allow-net --allow-env scripts/test-chat-storage-api-retry-e2e.ts
+
+      - name: Stop and discard local Supabase stack
+        if: always()
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/poyozz-storage-api-e2e"
+          supabase stop --no-backup
