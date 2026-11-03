@@ -51,7 +51,11 @@ BEGIN
     SELECT p.id, p.owner_id, p.chat_type, p.session_id, p.group_id, p.storage_path
     FROM public.chat_memory_photos AS p
     WHERE p.owner_id = p_user_id
-    ORDER BY p.chat_type, COALESCE(p.session_id, p.group_id), p.id
+    -- Match snapshot_account_chat_character_history(): lock all solo parents
+    -- first (stable ID order), then all group parents, preventing inverse-order
+    -- deadlocks when account preparation and other lifecycle writers overlap.
+    ORDER BY CASE WHEN p.chat_type = 'single' THEN 0 ELSE 1 END,
+      COALESCE(p.session_id, p.group_id), p.id
   LOOP
     IF v_photo.storage_path !~ ('^' || p_user_id::text || '/')
        OR char_length(v_photo.storage_path) > 1024 THEN
@@ -104,6 +108,31 @@ BEGIN
     -- is independently fixed at 30 days even when a test environment uses a shorter
     -- account grace period; cancellation before prepare creates no cleanup jobs.
     v_deleted_at := COALESCE(v_parent_deleted_at, p_requested_at);
+
+    -- An account-prepare photo job can outlive a failed/interrupted Auth cascade.
+    -- Mark the owned parent with the exact same retention timestamp so the normal
+    -- day-30 purge RPC can still validate and purge it if the parent remains present.
+    -- The account worker uses a service-role JWT without an end-user sub claim; this
+    -- is an internal lifecycle transition, not a user-authored chat update.
+    IF v_resource_type = 'single_session' THEN
+      UPDATE public.chat_sessions AS s
+      SET deleted_at = COALESCE(s.deleted_at, v_deleted_at),
+          updated_at = pg_catalog.statement_timestamp()
+      WHERE s.id = v_resource_id
+        AND s.user_id = p_user_id
+        AND s.deleted_at IS NOT DISTINCT FROM v_parent_deleted_at;
+    ELSE
+      UPDATE public.chat_groups AS g
+      SET deleted_at = COALESCE(g.deleted_at, v_deleted_at),
+          updated_at = pg_catalog.statement_timestamp()
+      WHERE g.id = v_resource_id
+        AND g.owner_id = p_user_id
+        AND g.deleted_at IS NOT DISTINCT FROM v_parent_deleted_at;
+    END IF;
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'account_chat_photo_parent_changed_during_queueing';
+    END IF;
 
     INSERT INTO public.chat_deletion_jobs (
       resource_type, resource_id, owner_id, deleted_at, purge_after
