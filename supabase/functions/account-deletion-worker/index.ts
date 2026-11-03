@@ -89,7 +89,9 @@ export default {
         const code = "code" in lookupError
           ? (lookupError as { code?: unknown }).code
           : undefined;
-        return status === 404 || code === "user_not_found";
+        if (status === 404 || code === "user_not_found") return true;
+        // An unavailable Auth lookup is not proof that the user is absent.
+        throw lookupError;
       },
       finalize: async (userId, batchId, token, generation) => {
         const result = await supabase.rpc("finalize_account_deletion_leased", {
