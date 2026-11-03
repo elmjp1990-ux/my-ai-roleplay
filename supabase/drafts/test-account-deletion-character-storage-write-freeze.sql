@@ -1,7 +1,7 @@
 -- Effective Storage RLS behavior for character asset preservation.
 -- Executed only inside replay-account-deletion-release-migration.sql's outer
 -- disposable transaction. Fixtures are rolled back by that outer transaction.
-\\set ON_ERROR_STOP on
+\set ON_ERROR_STOP on
 
 DO $fixture$
 DECLARE
