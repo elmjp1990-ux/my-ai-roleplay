@@ -184,6 +184,82 @@ request_exists="$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM publi
 }
 echo "ok: cancellation and claim serialize; expired unstarted request is cancellable"
 
+# True claim-vs-cancel race, claim wins: cancellation must wait for the request
+# lock, then observe the active lease and refuse without deleting the request.
+claim_race_author="10000000-0000-4000-8000-000000000035"
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "INSERT INTO public.account_deletion_requests (user_id, requested_at, scheduled_for) VALUES ('$claim_race_author', now() - interval '1 hour', now() - interval '1 minute')" >/dev/null
+cat > "$tmpdir/claim-wins.sql" <<SQL
+BEGIN;
+DO \$\$
+DECLARE v_count integer;
+BEGIN
+  SELECT count(*)::integer INTO v_count FROM public.claim_account_deletion_work_items(1);
+  IF v_count <> 1 THEN RAISE EXCEPTION 'claim_wins_race_must_claim'; END IF;
+END;
+\$\$;
+SELECT pg_sleep(2);
+COMMIT;
+SQL
+cat > "$tmpdir/cancel-loses.sql" <<SQL
+BEGIN;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '$claim_race_author', true);
+SELECT set_config('request.jwt.claim.role', 'authenticated', true);
+SELECT set_config('request.jwt.claims', '{"sub":"$claim_race_author","role":"authenticated"}', true);
+SELECT public.cancel_account_deletion();
+COMMIT;
+SQL
+PGAPPNAME=pr200-claim-wins-race psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/claim-wins.sql" >"$tmpdir/claim-wins.log" 2>&1 &
+claim_wins_pid=$!
+wait_for_activity "pr200-claim-wins-race" "pg_sleep(2)"
+PGAPPNAME=pr200-cancel-loses-race psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/cancel-loses.sql" >"$tmpdir/cancel-loses.log" 2>&1 &
+cancel_loses_pid=$!
+wait_for_lock "pr200-cancel-loses-race"
+wait "$claim_wins_pid"
+if wait "$cancel_loses_pid"; then
+  echo "ERROR: cancellation won after worker claim had already locked the request"
+  exit 1
+fi
+if ! grep -q "刪除處理已由背景工作領取" "$tmpdir/cancel-loses.log"; then
+  echo "ERROR: claim-wins cancellation race failed for an unexpected reason"
+  cat "$tmpdir/cancel-loses.log"
+  exit 1
+fi
+claim_race_request="$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM public.account_deletion_requests WHERE user_id='$claim_race_author')")"
+[[ "$claim_race_request" == "t" ]] || {
+  echo "ERROR: claim-wins race removed the pending account deletion request"
+  exit 1
+}
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "DELETE FROM public.account_deletion_requests WHERE user_id='$claim_race_author'; DELETE FROM public.account_deletion_work_leases WHERE target_user_id='$claim_race_author'" >/dev/null
+echo "ok: simultaneous claim-vs-cancel race is serialized when claim wins"
+
+# True claim-vs-cancel race, cancellation wins: claim must skip the request
+# while cancellation owns its row lock, then find no request after commit.
+cancel_race_author="10000000-0000-4000-8000-000000000036"
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "INSERT INTO public.account_deletion_requests (user_id, requested_at, scheduled_for) VALUES ('$cancel_race_author', now() - interval '1 hour', now() - interval '1 minute')" >/dev/null
+cat > "$tmpdir/cancel-wins.sql" <<SQL
+BEGIN;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '$cancel_race_author', true);
+SELECT set_config('request.jwt.claim.role', 'authenticated', true);
+SELECT set_config('request.jwt.claims', '{"sub":"$cancel_race_author","role":"authenticated"}', true);
+SELECT public.cancel_account_deletion();
+SELECT pg_sleep(2);
+COMMIT;
+SQL
+PGAPPNAME=pr200-cancel-wins-race psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/cancel-wins.sql" >"$tmpdir/cancel-wins.log" 2>&1 &
+cancel_wins_pid=$!
+wait_for_activity "pr200-cancel-wins-race" "pg_sleep(2)"
+claim_during_cancel="$(psql "$DATABASE_URL" -Atqc "SELECT count(*) FROM public.claim_account_deletion_work_items(1)")"
+wait "$cancel_wins_pid"
+claim_after_cancel="$(psql "$DATABASE_URL" -Atqc "SELECT count(*) FROM public.claim_account_deletion_work_items(1)")"
+cancel_race_request="$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM public.account_deletion_requests WHERE user_id='$cancel_race_author')")"
+[[ "$claim_during_cancel" == "0" && "$claim_after_cancel" == "0" && "$cancel_race_request" == "f" ]] || {
+  echo "ERROR: cancellation-wins race allowed a worker to claim the request"
+  exit 1
+}
+echo "ok: simultaneous claim-vs-cancel race is serialized when cancellation wins"
+
 
 # Race 1: character deletion takes the parent FOR UPDATE lock first. The new
 # session trigger must wait on FOR KEY SHARE, then observe deleted_at and reject.
@@ -421,4 +497,4 @@ asset_b_referenced="$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM p
 }
 echo "ok: deletion wins path lock; queued asset path cannot be reattached"
 
-echo "Deletion concurrency tests: 9 passed, 0 failed"
+echo "Deletion concurrency tests: 11 passed, 0 failed"
