@@ -89,6 +89,14 @@ solo_sync_state="$(tr -d '\r\n' < "$tmpdir/solo-sync-state.txt")"
   exit 1
 }
 echo "ok: solo snapshot sync wins the parent lock before chat deletion"
+# Sync updates all active sessions for the character; restore the second fixture
+# so the independent delete-wins race starts from its original marker.
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
+UPDATE public.chat_sessions
+SET character_snapshot = '{"marker":"solo-delete-first"}'::jsonb
+WHERE id = '$solo_delete_first';
+SQL
+
 
 # Delete wins: the author's sync RPC must wait, then exclude the soft-deleted
 # parent so the original snapshot remains frozen.
@@ -192,6 +200,14 @@ group_sync_state="$(tr -d '\r\n' < "$tmpdir/group-sync-state.txt")"
   exit 1
 }
 echo "ok: group snapshot sync wins the parent lock before group deletion"
+# Sync updates every active group containing this character; restore the
+# second member's marker before the independent delete-wins race.
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
+UPDATE public.chat_group_members
+SET character_snapshot = '{"marker":"group-delete-first"}'::jsonb
+WHERE id = '$member_delete_first';
+SQL
+
 
 # Delete wins for a group: sync must re-check group.deleted_at after acquiring
 # the parent lock and leave the member snapshot byte-for-byte unchanged.
