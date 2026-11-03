@@ -20,6 +20,12 @@ BEGIN
   VALUES (v_owner, 'pr200-archived-photo-reader', 'Archived Photo Reader')
   ON CONFLICT (id) DO NOTHING;
 
+  -- Supabase Local enforces storage.objects.bucket_id -> storage.buckets.id.
+  -- Seed only the private test bucket required by this rollback-only fixture.
+  INSERT INTO storage.buckets (id, name, public)
+  VALUES ('personax-memory-photos', 'personax-memory-photos', false)
+  ON CONFLICT (id) DO NOTHING;
+
   INSERT INTO public.chat_groups (
     id, owner_id, name, scene_mode, archived_at, deleted_at
   ) VALUES
