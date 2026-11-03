@@ -1,6 +1,6 @@
 -- DRAFT ONLY — behavior test for archived-group memory photo reads.
 -- Run inside replay-local-security-drafts.sql's disposable transaction, then rollback.
-DO $photo_fixture$
+DO $photo_seed$
 DECLARE
   v_owner uuid := '90000000-0000-4000-8000-000000000001';
   v_archived_group uuid := '60000000-0000-4000-8000-000000000001';
@@ -9,8 +9,6 @@ DECLARE
   v_deleted_photo uuid := '70000000-0000-4000-8000-000000000002';
   v_archived_path text;
   v_deleted_path text;
-  v_photo_count integer;
-  v_object_count integer;
 BEGIN
   v_archived_path := v_owner::text || '/group/' || v_archived_group::text || '/' || v_archived_photo::text || '.jpg';
   v_deleted_path := v_owner::text || '/group/' || v_deleted_group::text || '/' || v_deleted_photo::text || '.jpg';
@@ -38,14 +36,29 @@ BEGIN
 
   ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
   GRANT SELECT ON storage.objects TO authenticated;
-  PERFORM pg_catalog.set_config('request.jwt.claim.sub', v_owner::text, true);
-  PERFORM pg_catalog.set_config('request.jwt.claim.role', 'authenticated', true);
-  PERFORM pg_catalog.set_config(
-    'request.jwt.claims',
-    pg_catalog.jsonb_build_object('sub', v_owner::text, 'role', 'authenticated')::text,
-    true
-  );
+END;
+$photo_seed$;
 
+SET LOCAL ROLE authenticated;
+SELECT pg_catalog.set_config('request.jwt.claim.sub', '90000000-0000-4000-8000-000000000001', true);
+SELECT pg_catalog.set_config('request.jwt.claim.role', 'authenticated', true);
+SELECT pg_catalog.set_config(
+  'request.jwt.claims',
+  '{"sub":"90000000-0000-4000-8000-000000000001","role":"authenticated"}',
+  true
+);
+
+DO $photo_assert$
+DECLARE
+  v_archived_photo uuid := '70000000-0000-4000-8000-000000000001';
+  v_deleted_photo uuid := '70000000-0000-4000-8000-000000000002';
+  v_archived_group uuid := '60000000-0000-4000-8000-000000000001';
+  v_deleted_group uuid := '60000000-0000-4000-8000-000000000002';
+  v_archived_path text := '90000000-0000-4000-8000-000000000001/group/60000000-0000-4000-8000-000000000001/70000000-0000-4000-8000-000000000001.jpg';
+  v_deleted_path text := '90000000-0000-4000-8000-000000000001/group/60000000-0000-4000-8000-000000000002/70000000-0000-4000-8000-000000000002.jpg';
+  v_photo_count integer;
+  v_object_count integer;
+BEGIN
   SELECT pg_catalog.count(*)::integer INTO v_photo_count
   FROM public.chat_memory_photos
   WHERE id IN (v_archived_photo, v_deleted_photo);
@@ -60,4 +73,6 @@ BEGIN
     RAISE EXCEPTION 'archived_group_storage_object_must_remain_readable_and_deleted_group_hidden: %', v_object_count;
   END IF;
 END;
-$photo_fixture$;
+$photo_assert$;
+
+RESET ROLE;
