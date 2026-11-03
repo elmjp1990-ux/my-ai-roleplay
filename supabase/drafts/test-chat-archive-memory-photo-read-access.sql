@@ -43,7 +43,17 @@ BEGIN
          ('personax-memory-photos', v_deleted_path);
 
   GRANT USAGE ON SCHEMA storage TO authenticated;
-  ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+  -- Supabase Local's platform-owned storage.objects already has RLS enabled.
+  -- Enable it only for the plain PostgreSQL stub when it is not already active.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_class AS relation
+    JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'storage'
+      AND relation.relname = 'objects'
+      AND relation.relrowsecurity
+  ) THEN
+    ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+  END IF;
   GRANT SELECT ON storage.objects TO authenticated;
 END;
 $photo_seed$;
