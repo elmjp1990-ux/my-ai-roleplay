@@ -1,3 +1,4 @@
+import { createAuthAdminTimeoutFetch } from "../_shared/account-deletion-auth-fetch.ts";
 import { withSupabase } from "npm:@supabase/server@1";
 import {
   processAccountDeletionWorkItems,
@@ -28,7 +29,17 @@ function errorCode(error: unknown, fallback: string): string {
 }
 
 export default {
-  fetch: withSupabase({ auth: "secret:default" }, async (request, ctx) => {
+  fetch: withSupabase({
+    auth: "secret:default",
+    // supabase-js routes Auth Admin through this fetch implementation.
+    // Only /auth/v1/admin/users/* requests receive the 60-second abort bound;
+    // database RPC requests keep the normal transport behavior.
+    supabaseOptions: {
+      global: {
+        fetch: createAuthAdminTimeoutFetch(fetch, 60_000),
+      },
+    },
+  }, async (request, ctx) => {
     if (request.method !== "POST") {
       return Response.json({ error: "method_not_allowed" }, { status: 405 });
     }
