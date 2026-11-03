@@ -25,6 +25,7 @@ $storage_stub$;
 \i supabase/drafts/character-deletion-existing-chat-continuation.sql
 \i supabase/drafts/prepare-account-deletion-character-preservation-integration.sql
 \i supabase/drafts/account-deletion-worker-atomic-lease.sql
+\i supabase/drafts/test-account-deletion-worker-lease-security.sql
 
 INSERT INTO auth.users (id) VALUES
   ('10000000-0000-4000-8000-000000000030'),
