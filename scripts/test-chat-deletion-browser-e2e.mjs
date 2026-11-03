@@ -331,10 +331,10 @@ try {
     };
   }, { apiUrl, anonKey, accessToken });
 
-  const deviceBefore = await devicePage.evaluate((uid) => ({
+  const deviceBefore = await devicePage.evaluate(({ uid, tombstonePrefix }) => ({
     restored: Object.keys(window.__restoreSessionsForUser(uid)),
-    tombstones: localStorage.getItem("personax-deleted-chat-tombstones-v1:" + uid),
-  }), userId);
+    tombstones: localStorage.getItem(tombstonePrefix + uid),
+  }), { uid: userId, tombstonePrefix });
   assert.deepEqual(deviceBefore.restored, [sessionId], "Separate device should demonstrate stale local cache before backend reconciliation");
   assert.equal(deviceBefore.tombstones, null, "Separate device must not share another device's localStorage tombstone");
 
