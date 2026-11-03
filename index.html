@@ -3479,11 +3479,23 @@ async function runPendingChatTurn(s) {
 
 function toast(text) {
   clearTimeout(toastTimer);
-  const notice = $('toast');
+  let notice = $('toast');
   const modal = $('modal');
+  // showDialog() replaces modal.innerHTML; if the toast was previously moved
+  // into the dialog, that replacement can detach #toast from the document.
+  // Recreate it before checking its parent or displaying the notification.
+  if (!notice) {
+    notice = document.createElement('div');
+    notice.id = 'toast';
+    notice.className = 'hidden';
+    notice.setAttribute('role', 'status');
+  }
   // Native dialog occupies the browser top layer, so place notifications inside it when open.
-  if (modal?.open && notice.parentElement !== modal) modal.appendChild(notice);
-  else if (!modal?.open && notice.parentElement !== document.body) document.body.appendChild(notice);
+  if (modal?.open) {
+    if (notice.parentElement !== modal) modal.appendChild(notice);
+  } else if (notice.parentElement !== document.body) {
+    document.body.appendChild(notice);
+  }
   notice.textContent = text;
   notice.classList.remove('hidden');
   toastTimer = setTimeout(() => notice.classList.add('hidden'),3500);
@@ -9347,7 +9359,7 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
       case 'delete-account': {
         if (String(f.get('confirm')).trim() !== 'DELETE') return toast('請輸入「DELETE」。');
         if (!state.account?.uid || !window.mySupabase) return toast('請先使用 Google 帳號登入。');
-        if (!confirm('您確定要刪除帳號嗎？提出申請後，帳號將會暫時無法使用；您仍可在截止期限前取消申請。')) return;
+        if (!confirm('確定提出帳號刪除申請？申請後會暫停使用功能，您隨時可以在期限內恢復。')) return;
         const { data: authData, error: authError } = await window.mySupabase.auth.getUser();
         if (authError || authData?.user?.id !== state.account.uid) {
           return toast('登入狀態驗證失敗，請重新登入後再試。');
