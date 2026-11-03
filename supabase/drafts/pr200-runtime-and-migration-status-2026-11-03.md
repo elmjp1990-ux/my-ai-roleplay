@@ -142,3 +142,14 @@ The account workflow path filter now includes `test-account-deletion-character-p
 - Source restoration commit: `68e3ed291d3079efebc7a2a128c9df6827f254b4`; subsequent documentation commit records this audit.
 - CI on source-restoration HEAD `68e3ed291d3079efebc7a2a128c9df6827f254b4`: Account deletion worker success; Chat deletion worker success; Group background UI syntax success. Local synthetic Supabase replay is running; previous code HEAD `eb8a2d8` local synthetic Supabase replay completed successfully.
 - Release migration still required: carry the direct parent DELETE privilege revocation draft into a new uniquely versioned incremental migration. Do not modify or reapply historical migrations. PR remains Draft/unmerged; no hosted mutation, worker deployment, or Cron activation.
+
+
+## Relational chat purge batch isolation and final ACL draft — 2026-11-03
+
+- Added `supabase/functions/_shared/chat-deletion-job-worker.ts`; `purge-chat-deletions/index.ts` now delegates relational chat purge processing to it. A thrown `purge_chat_deletion_job` RPC or thrown `mark_chat_deletion_job_failed` RPC no longer aborts later jobs. If failure reporting is unreachable, the lease expires and the durable queue retries.
+- Added three deterministic regression tests for returned RPC errors/false results, thrown purge RPC, and thrown failure-marker RPC. Chat worker CI on code HEAD `d6a1dc1285761e1f578237bd8b96de88b5aa849a`: **10 passed / 0 failed** (storage adapter tests + chat purge adapter tests); cumulative turn-stat regression guard passed.
+- Added consolidated draft `supabase/drafts/pr200-final-privilege-hardening.sql`: client TRUNCATE revoke across public plus direct DELETE revoke for chat_sessions/chat_groups from PUBLIC/anon/authenticated/service_role. The replay harness applies it and verifies no client TRUNCATE across public tables and no direct parent DELETE for anon/authenticated/service_role.
+- Account worker + disposable schema behavior/rollback/two-session concurrency on code HEAD `d6a1dc1285761e1f578237bd8b96de88b5aa849a`: success. Local synthetic Supabase replay on the same HEAD: success. Group UI syntax: success.
+- Read-only advisor classification: 16 no-policy RLS tables have no anon/authenticated table privileges; 27 authenticated + 4 anon executable SECURITY DEFINER functions all use empty search_path; the four anon-callable functions were checked for public-data filters. Leaked-password protection remains disabled as a separate pre-launch Auth setting.
+- Current workflow now invokes `supabase migration new poyozz_chat_deletion_privilege_hardening` in a temporary isolated folder to generate a release migration filename; it does not apply or link to hosted Supabase. The filename output is pending workflow log retrieval.
+- No hosted ACL/DDL/Auth/Storage mutation, worker deployment, or Cron activation. PR remains Draft/unmerged.
