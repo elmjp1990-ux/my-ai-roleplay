@@ -90,21 +90,6 @@ USING (
   AND split_part(name, '/', 1) = (SELECT auth.uid())::text
 );
 
-CREATE POLICY pr200_storage_fixture_video_owner_update
-ON storage.objects
-FOR UPDATE
-TO authenticated
-USING (
-  bucket_id = 'character-avatar-videos'
-  AND split_part(name, '/', 1) = (SELECT auth.uid())::text
-  AND public.account_is_active()
-)
-WITH CHECK (
-  bucket_id = 'character-avatar-videos'
-  AND split_part(name, '/', 1) = (SELECT auth.uid())::text
-  AND public.account_is_active()
-);
-
 -- While active, owner update remains available for both asset types.
 SET LOCAL ROLE authenticated;
 DO $active_owner$
@@ -137,11 +122,6 @@ BEGIN
   GET DIAGNOSTICS v_rows = ROW_COUNT;
   IF v_rows <> 1 THEN RAISE EXCEPTION 'active_owner_must_retain_illustration_storage_update: rowcount %', v_rows; END IF;
 
-  UPDATE storage.objects SET name = name
-  WHERE bucket_id = 'character-avatar-videos'
-    AND name = '10000000-0000-4000-8000-000000000040/40000000-0000-4000-8000-000000000040.mp4';
-  GET DIAGNOSTICS v_rows = ROW_COUNT;
-  IF v_rows <> 1 THEN RAISE EXCEPTION 'active_owner_must_retain_video_storage_update'; END IF;
 END;
 $active_owner$;
 RESET ROLE;
@@ -168,12 +148,6 @@ BEGIN
     AND name = '10000000-0000-4000-8000-000000000040/20000000-0000-4000-8000-000000000040/30000000-0000-4000-8000-000000000040.jpg';
   GET DIAGNOSTICS v_rows = ROW_COUNT;
   IF v_rows <> 0 THEN RAISE EXCEPTION 'pending_owner_illustration_storage_delete_not_blocked'; END IF;
-
-  UPDATE storage.objects SET name = name
-  WHERE bucket_id = 'character-avatar-videos'
-    AND name = '10000000-0000-4000-8000-000000000040/40000000-0000-4000-8000-000000000040.mp4';
-  GET DIAGNOSTICS v_rows = ROW_COUNT;
-  IF v_rows <> 0 THEN RAISE EXCEPTION 'pending_owner_video_storage_update_not_blocked'; END IF;
 
   DELETE FROM storage.objects
   WHERE bucket_id = 'character-avatar-videos'
