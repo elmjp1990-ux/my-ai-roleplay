@@ -83,23 +83,38 @@ BEGIN
       RAISE EXCEPTION 'duplicate_active_account_deletion_batches';
     END IF;
 
-    INSERT INTO public.account_deletion_work_leases (
-      target_user_id, requested_at, scheduled_for, lease_token,
-      lease_generation, lease_expires_at, lease_status, batch_id
-    ) VALUES (
-      v_request.user_id, v_request.requested_at, v_request.scheduled_for,
-      pg_catalog.gen_random_uuid(), 0, v_now,
-      'cancelled', NULL
-    )
-    ON CONFLICT ON CONSTRAINT account_deletion_work_leases_pkey DO NOTHING;
-
+    -- Prefer a non-blocking lease lock before attempting first-row insertion.
     SELECT l.* INTO v_lease
     FROM public.account_deletion_work_leases AS l
     WHERE l.target_user_id = v_request.user_id
     FOR UPDATE SKIP LOCKED;
 
     IF NOT FOUND THEN
-      CONTINUE;
+      IF EXISTS (
+        SELECT 1 FROM public.account_deletion_work_leases AS existing_lease
+        WHERE existing_lease.target_user_id = v_request.user_id
+      ) THEN
+        CONTINUE;
+      END IF;
+
+      INSERT INTO public.account_deletion_work_leases (
+        target_user_id, requested_at, scheduled_for, lease_token,
+        lease_generation, lease_expires_at, lease_status, batch_id
+      ) VALUES (
+        v_request.user_id, v_request.requested_at, v_request.scheduled_for,
+        pg_catalog.gen_random_uuid(), 0, v_now,
+        'cancelled', NULL
+      )
+      ON CONFLICT ON CONSTRAINT account_deletion_work_leases_pkey DO NOTHING;
+
+      SELECT l.* INTO v_lease
+      FROM public.account_deletion_work_leases AS l
+      WHERE l.target_user_id = v_request.user_id
+      FOR UPDATE SKIP LOCKED;
+
+      IF NOT FOUND THEN
+        CONTINUE;
+      END IF;
     END IF;
     IF v_lease.lease_status = 'completed' AND v_active_count > 0 THEN
       RAISE EXCEPTION 'completed_account_deletion_lease_has_active_batch';
@@ -210,23 +225,38 @@ BEGIN
         RAISE EXCEPTION 'duplicate_deleting_account_batches';
       END IF;
 
-      INSERT INTO public.account_deletion_work_leases (
-        target_user_id, requested_at, scheduled_for, lease_token,
-        lease_generation, lease_expires_at, lease_status, batch_id
-      ) VALUES (
-        v_batch.target_user_id, v_batch.requested_at, v_batch.scheduled_for,
-        pg_catalog.gen_random_uuid(), 0, v_now,
-        'cancelled', v_batch.id
-      )
-      ON CONFLICT ON CONSTRAINT account_deletion_work_leases_pkey DO NOTHING;
-
+      -- Recovery locks the lease first; an already locked row is skipped.
       SELECT l.* INTO v_lease
       FROM public.account_deletion_work_leases AS l
       WHERE l.target_user_id = v_batch.target_user_id
       FOR UPDATE SKIP LOCKED;
 
       IF NOT FOUND THEN
-        CONTINUE;
+        IF EXISTS (
+          SELECT 1 FROM public.account_deletion_work_leases AS existing_lease
+          WHERE existing_lease.target_user_id = v_batch.target_user_id
+        ) THEN
+          CONTINUE;
+        END IF;
+
+        INSERT INTO public.account_deletion_work_leases (
+          target_user_id, requested_at, scheduled_for, lease_token,
+          lease_generation, lease_expires_at, lease_status, batch_id
+        ) VALUES (
+          v_batch.target_user_id, v_batch.requested_at, v_batch.scheduled_for,
+          pg_catalog.gen_random_uuid(), 0, v_now,
+          'cancelled', v_batch.id
+        )
+        ON CONFLICT ON CONSTRAINT account_deletion_work_leases_pkey DO NOTHING;
+
+        SELECT l.* INTO v_lease
+        FROM public.account_deletion_work_leases AS l
+        WHERE l.target_user_id = v_batch.target_user_id
+        FOR UPDATE SKIP LOCKED;
+
+        IF NOT FOUND THEN
+          CONTINUE;
+        END IF;
       END IF;
       IF v_lease.requested_at IS DISTINCT FROM v_batch.requested_at
          OR v_lease.scheduled_for IS DISTINCT FROM v_batch.scheduled_for THEN
