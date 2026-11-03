@@ -116,6 +116,35 @@ stale_failure="$(psql "$DATABASE_URL" -Atqc "SELECT public.record_account_deleti
 }
 echo "ok: expired lease is reclaimed with a new fencing generation; stale owner is rejected"
 
+# The same stale generation must also be rejected by the destructive prepare
+# and finalize wrappers, not only by renew/failure telemetry.
+cat > "$tmpdir/stale-fenced-rpcs.sql" <<SQL
+DO \$\$
+BEGIN
+  BEGIN
+    PERFORM * FROM public.prepare_account_deletion_leased(
+      '$lease_author', '$old_token'::uuid, $old_generation::bigint
+    );
+    RAISE EXCEPTION 'stale_prepare_unexpectedly_succeeded';
+  EXCEPTION WHEN SQLSTATE '55000' THEN
+    NULL;
+  END;
+
+  BEGIN
+    PERFORM public.finalize_account_deletion_leased(
+      '$lease_author', 'ffffffff-ffff-4fff-8fff-ffffffffffff'::uuid,
+      '$old_token'::uuid, $old_generation::bigint
+    );
+    RAISE EXCEPTION 'stale_finalize_unexpectedly_succeeded';
+  EXCEPTION WHEN SQLSTATE '55000' THEN
+    NULL;
+  END;
+END;
+\$\$;
+SQL
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/stale-fenced-rpcs.sql" >/dev/null
+echo "ok: stale generation cannot prepare or finalize an account deletion"
+
 # An active lease blocks player cancellation. Once the lease expires and no
 # archive batch exists, cancellation can win and leaves the durable lease cancelled.
 cat > "$tmpdir/active-lease-cancel.sql" <<SQL
