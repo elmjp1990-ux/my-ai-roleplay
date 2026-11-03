@@ -31,6 +31,7 @@ DECLARE
   v_retention_session uuid := '50000000-0000-4000-8000-000000000027';
   v_retention_job uuid;
   v_retention_claimed boolean := false;
+  v_retention_purged boolean := false;
   v_active_solo_photo uuid := 'c0000000-0000-4000-8000-000000000026';
   v_active_group_photo uuid := 'c0000000-0000-4000-8000-000000000024';
   v_active_solo_path text := '10000000-0000-4000-8000-000000000020/50000000-0000-4000-8000-000000000026/account-active-solo.jpg';
@@ -532,12 +533,16 @@ BEGIN
     RAISE EXCEPTION 'chat_retention_day_30_must_be_claimed';
   END IF;
 
-  IF public.purge_chat_deletion_job(v_retention_job) IS DISTINCT FROM true
-     OR NOT EXISTS (
-       SELECT 1 FROM public.chat_deletion_jobs
-       WHERE id = v_retention_job AND status = 'completed'
-     ) THEN
-    RAISE EXCEPTION 'chat_retention_day_30_must_be_purgeable';
+  SELECT public.purge_chat_deletion_job(v_retention_job)
+  INTO v_retention_purged;
+  IF v_retention_purged IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'chat_retention_day_30_purge_rpc_returned_false';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.chat_deletion_jobs
+    WHERE id = v_retention_job AND status = 'completed'
+  ) THEN
+    RAISE EXCEPTION 'chat_retention_day_30_job_not_completed';
   END IF;
 
   IF EXISTS (
