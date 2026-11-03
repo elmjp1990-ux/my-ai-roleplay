@@ -196,3 +196,27 @@ Still open:
 5. Complete account-wide Storage sweep / legacy photo classification and final rollout audit.
 
 No hosted DDL/DML, Auth/Storage mutation, Edge Function deployment, Vault secret, or Cron change occurred. PR #200 remains Draft / unmerged.
+
+
+## Round 38 — 12-scenario two-session acceptance passed (2026-11-03)
+
+Latest implementation code HEAD: `f67befe2cfddb7fb134d09f34dd34fa62b7cb6bd`.
+
+Account deletion worker Run #654 (`41618839849`) passed both jobs:
+- account-worker: Deno type-check, 12 deterministic worker tests, character cleanup tests, structural lease/ACL/kill-switch assertions.
+- disposable-schema-replay: current-state fixture replay, deletion behavior/rollback, and the expanded independent-session concurrency suite all success.
+
+The concurrency script explicitly reports `Deletion concurrency tests: 12 passed, 0 failed`, including:
+1. Exactly one worker claims one due request under concurrent invocation.
+2. An older active lease does not starve another due account.
+3. Expired lease is reclaimed with new token and generation; old renew/failure calls return false.
+4. Old generation cannot invoke fenced prepare or finalize.
+5. Active lease prevents cancellation; expired unstarted request remains cancellable.
+6. Claim-wins concurrent claim/cancel race: cancellation waits, then refuses.
+7. Cancel-wins concurrent claim/cancel race: claim skips the locked request and cannot claim after cancellation commits.
+8. Committed deleting batch is recovered after request-row cascade using a new lease; fenced prepare returns the same batch and does not create a duplicate.
+9–12. Existing character deletion/new-session, account archive/child-write, asset reattach-first and delete-first path-lock races remain green.
+
+Same code HEAD Chat deletion worker Run #415 and Group UI Run #1138 also succeeded. Chat Storage API retry E2E Run #57 is still in progress and must finish before the complete same-HEAD CI set is called green.
+
+This closes the previously identified missing atomic-claim/fencing test gate at the disposable implementation level. It does NOT authorize hosted deployment: 10-minute TTL remains provisional pending runtime/HTTP timeout measurements; final Auth external-side-effect timeout/reconciliation review, CLI-generated incremental migration, storage sweep/release audit, and explicit deployment/Cron approval remain open. Worker remains source-disabled and PR #200 remains Draft/unmerged.
