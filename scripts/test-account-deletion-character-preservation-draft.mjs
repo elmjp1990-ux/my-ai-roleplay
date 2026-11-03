@@ -142,6 +142,17 @@ assert.match(accountPhotoQueueFn, /p[.]owner_id = p_user_id/);
 assert.match(accountPhotoQueueFn, /personax-memory-photos/);
 assert.match(accountPhotoQueueFn, /ON CONFLICT [(]bucket_id, object_path[)] DO NOTHING/);
 assert.match(accountPhotoQueueFn, /account_chat_photo_storage_job_conflict/);
+assert.ok(
+  accountPhotoQueueFn.indexOf("FROM public.chat_sessions AS s") <
+    accountPhotoQueueFn.indexOf("FROM public.chat_memory_photos AS p\\n    WHERE p.id = v_photo.id"),
+  "account photo cleanup must lock the parent chat before locking photo metadata",
+);
+assert.doesNotMatch(
+  accountPhotoQueueFn.match(/SELECT p[.]id, p[.]owner_id[\\s\\S]*?LOOP/)?.[0] || "",
+  /FOR UPDATE/,
+  "initial photo scan must not take photo locks before parent locks",
+);
+
 assert.match(integration, /PERFORM private[.]enqueue_account_chat_memory_photo_cleanup[(][\s\S]*?p_user_id, v_requested_at, v_scheduled_for/);
 assert.ok(
   integration.indexOf("PERFORM private.enqueue_account_chat_memory_photo_cleanup(") <
