@@ -36,7 +36,7 @@ jobs:
             -name '*_poyozz_chat_deletion_privilege_hardening.sql' -printf '%f')"
           test -n "$generated"
           echo "Generated migration filename (not applied): $generated"
-          echo "Generated migration filename (not applied): `$generated`" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Generated migration filename (not applied): %s\n' "$generated" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Verify isolated local-only environment
         shell: bash
