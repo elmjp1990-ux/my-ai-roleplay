@@ -526,5 +526,43 @@ assert.ok(chatParentDeleteGuard.includes("FROM PUBLIC, anon, authenticated"));
 assert.ok(chatParentDeleteGuard.includes("delete_chat_session_content()"));
 assert.ok(!chatParentDeleteGuard.includes("GRANT DELETE ON TABLE public.chat_sessions"));
 
+
+// Ordinary single/group chat deletion has a backend-only 30-day retention window.
+// There is deliberately no player-facing restore/undo/reopen path.
+const chatIndex = fs.readFileSync("index.html", "utf8");
+const tombstoneHelpers = chatIndex.slice(
+  chatIndex.indexOf("  function readDeletedChatTombstones(uid) {"),
+  chatIndex.indexOf("  function cacheSessionsForUser(uid) {"),
+);
+assert.ok(tombstoneHelpers.includes("filterDeletedChatSessions(uid, saved)"),
+  "cached single chats must be filtered by permanent local deletion tombstones");
+const groupLoaderStart = chatIndex.indexOf("async function groupLoadList(force=false) {");
+const groupLoaderEnd = chatIndex.indexOf("function groupRenderList()", groupLoaderStart);
+const groupLoader = chatIndex.slice(groupLoaderStart, groupLoaderEnd);
+assert.ok(groupLoader.includes("readDeletedChatTombstones(user.id).groups"),
+  "group list hydration must filter deleted group tombstones");
+assert.ok(groupLoader.includes("latestDeletedGroups"),
+  "group list hydration must recheck tombstones after awaited member/preview reads");
+const singleDeleteStart = chatIndex.indexOf("case 'remove-session':");
+const singleDeleteEnd = chatIndex.indexOf("case 'chat-settings':", singleDeleteStart);
+const singleDelete = chatIndex.slice(singleDeleteStart, singleDeleteEnd);
+assert.ok(singleDelete.includes("delete_chat_session_content"),
+  "single chat deletion must call the server lifecycle RPC");
+assert.ok(singleDelete.includes("markDeletedChatTombstone(uid,'sessions',key)"),
+  "single chat deletion must persist a no-restore UI tombstone");
+const groupDeleteStart = chatIndex.indexOf("case 'group-delete':");
+const groupDeleteEnd = chatIndex.indexOf("case 'remove-session-confirm':", groupDeleteStart);
+const groupDelete = chatIndex.slice(groupDeleteStart, groupDeleteEnd);
+assert.ok(groupDelete.includes("delete_chat_group_with_related_data"),
+  "group chat deletion must call the shared server lifecycle RPC");
+assert.ok(groupDelete.includes("markDeletedChatTombstone(uid,'groups',groupId)"),
+  "group chat deletion must persist a no-restore UI tombstone");
+assert.doesNotMatch(chatIndex, /data-action=["'](?:restore-chat|undo-chat-delete|reopen-deleted-chat)["']/i,
+  "deleted chats must not expose player-facing restore/undo/reopen actions");
+assert.doesNotMatch(chatIndex, /rpc\(["'](?:restore_chat|undelete_chat|undo_chat_deletion)["']/i,
+  "frontend must not call a chat restore RPC");
+assert.doesNotMatch(accountPhotoQueueFn, /chat_group_memory_photos|image_url/,
+  "legacy group photo URLs must never be passed into the Storage object cleanup queue");
+
 console.log("Account and character deletion draft guards: passed (static only; no SQL execution).");
 
