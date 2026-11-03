@@ -58,6 +58,26 @@ SELECT pg_catalog.set_config('request.jwt.claim.role', 'authenticated', true);
 SELECT pg_catalog.set_config('request.jwt.claims',
   '{"sub":"10000000-0000-4000-8000-000000000040","role":"authenticated"}', true);
 
+-- Assert the test identity, account state, and character ownership fixture
+-- before attributing any denied Storage update to the policy under test.
+DO $precheck$
+BEGIN
+  IF auth.uid() IS DISTINCT FROM '10000000-0000-4000-8000-000000000040'::uuid THEN
+    RAISE EXCEPTION 'storage_fixture_jwt_subject_not_set';
+  END IF;
+  IF public.account_is_active() IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'storage_fixture_account_must_be_active_before_request';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.characters
+    WHERE id = '20000000-0000-4000-8000-000000000040'
+      AND author_id = auth.uid()
+  ) THEN
+    RAISE EXCEPTION 'storage_fixture_character_not_visible_to_owner';
+  END IF;
+END;
+$precheck$;
+
 -- While active, owner update remains available for both asset types.
 SET LOCAL ROLE authenticated;
 DO $active_owner$
