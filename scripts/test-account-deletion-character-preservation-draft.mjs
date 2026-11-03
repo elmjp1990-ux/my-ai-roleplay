@@ -339,6 +339,7 @@ for (const pattern of [
 const worker = fs.readFileSync("supabase/functions/_shared/account-deletion-worker.ts", "utf8");
 const handler = fs.readFileSync("supabase/functions/account-deletion-worker/index.ts", "utf8");
 const leaseSql = fs.readFileSync("supabase/drafts/account-deletion-worker-atomic-lease.sql", "utf8");
+const authTimeoutFetch = fs.readFileSync("supabase/functions/_shared/account-deletion-auth-fetch.ts", "utf8");
 assert.match(worker, /deps\.prepare[\s\S]*?lease_generation/);
 assert.match(worker, /renewOrThrow/);
 assert.match(worker, /deps\.finalize[\s\S]*?lease_generation/);
@@ -350,6 +351,11 @@ assert.match(handler, /finalize_account_deletion_leased/);
 assert.match(handler, /record_account_deletion_failure_leased/);
 assert.match(handler, /ACCOUNT_DELETION_EXECUTION_ENABLED = false/);
 assert.match(handler, /MAX_BATCH = 1/);
+assert.match(handler, /createAuthAdminTimeoutFetch\(fetch, 60_000\)/);
+assert.match(handler, /supabaseOptions:[\s\S]*?global:[\s\S]*?fetch:/);
+assert.match(authTimeoutFetch, /AbortSignal\.timeout\(timeoutMs\)/);
+assert.match(authTimeoutFetch, /AbortSignal\.any\(\[requestSignal, timeoutSignal\]\)/);
+assert.match(authTimeoutFetch, /auth\/v1\/admin\/users/);
 assert.doesNotMatch(handler, /get_account_deletion_work_items|archive_account_deletion_data|rpc\(["']prepare_account_deletion["']|rpc\(["']finalize_account_deletion["']|rpc\(["']record_account_deletion_failure["']/);
 for (const rpc of [
   "claim_account_deletion_work_items",
