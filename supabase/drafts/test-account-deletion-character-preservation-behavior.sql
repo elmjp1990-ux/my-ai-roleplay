@@ -289,6 +289,16 @@ BEGIN
   -- author token must no longer read retained media; the unrelated player token
   -- must continue to read the same existing session and media.
   DELETE FROM auth.users WHERE id = v_author;
+
+  -- Once Auth FK cascades remove the author's own active chat parents, their
+  -- saved aggregates become authoritative. The public count must still equal
+  -- the pre-deletion value (and must not have double-counted them pre-cascade).
+  SELECT public.get_public_character_turn_count(v_character)
+  INTO v_turn_count_after;
+  IF v_turn_count_after IS DISTINCT FROM v_turn_count_before THEN
+    RAISE EXCEPTION 'account_auth_cascade_must_activate_snapshots_without_changing_character_turn_count';
+  END IF;
+
   PERFORM pg_catalog.set_config('request.jwt.claim.sub', v_author::text, true);
   PERFORM pg_catalog.set_config('request.jwt.claims',
     pg_catalog.jsonb_build_object('sub', v_author::text, 'role', 'authenticated')::text, true);
