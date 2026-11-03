@@ -16,7 +16,10 @@ DECLARE
   v_new_session uuid := '50000000-0000-4000-8000-000000000022';
   v_new_session_rejected boolean := false;
   v_author_session uuid := '50000000-0000-4000-8000-000000000023';
+  v_author_user_message uuid := '60000000-0000-4000-8000-000000000025';
   v_author_message uuid := '60000000-0000-4000-8000-000000000023';
+  v_author_turn uuid := '70000000-0000-4000-8000-000000000025';
+  v_author_reservation_status text;
   v_author_group uuid := '50000000-0000-4000-8000-000000000024';
   v_author_group_turn uuid := '70000000-0000-4000-8000-000000000024';
   v_author_group_message uuid := '60000000-0000-4000-8000-000000000024';
@@ -93,8 +96,27 @@ BEGIN
   ) VALUES (
     v_author_session, v_author, v_character, 'Account archived character', 'story'
   );
+  PERFORM pg_catalog.set_config('request.jwt.claim.sub', v_author::text, true);
+  PERFORM pg_catalog.set_config('request.jwt.claim.role', 'authenticated', true);
+  PERFORM pg_catalog.set_config(
+    'request.jwt.claims',
+    pg_catalog.jsonb_build_object('sub', v_author::text, 'role', 'authenticated')::text,
+    true
+  );
+  PERFORM public.ensure_wallet_account();
+  INSERT INTO public.chat_messages (id, session_id, role, content)
+  VALUES (v_author_user_message, v_author_session, 'user', 'Count this author-owned solo turn');
+  SELECT r.status INTO v_author_reservation_status
+  FROM public.reserve_chat_turn(
+    v_author, v_author_turn, v_author_session,
+    v_author_user_message, v_author_message
+  ) AS r;
+  IF v_author_reservation_status IS DISTINCT FROM 'reserved' THEN
+    RAISE EXCEPTION 'account_deletion_solo_turn_fixture_reservation_failed';
+  END IF;
   INSERT INTO public.chat_messages (id, session_id, role, content)
   VALUES (v_author_message, v_author_session, 'assistant', 'Author-owned solo reply');
+  PERFORM public.settle_chat_turn(v_author, v_author_turn, v_author_message);
 
   INSERT INTO public.chat_groups (
     id, owner_id, name, scene_mode, world_character_id
