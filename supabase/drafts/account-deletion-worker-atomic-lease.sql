@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS public.account_deletion_work_leases (
   requested_at timestamptz NOT NULL,
   scheduled_for timestamptz NOT NULL,
   lease_token uuid NOT NULL,
-  lease_generation bigint NOT NULL DEFAULT 1 CHECK (lease_generation > 0),
+  lease_generation bigint NOT NULL DEFAULT 0 CHECK (lease_generation >= 0),
   lease_expires_at timestamptz NOT NULL,
   lease_status text NOT NULL CHECK (lease_status IN ('claimed', 'completed', 'cancelled')),
   batch_id uuid,
@@ -81,8 +81,8 @@ BEGIN
       lease_generation, lease_expires_at, lease_status, batch_id
     ) VALUES (
       v_request.user_id, v_request.requested_at, v_request.scheduled_for,
-      pg_catalog.gen_random_uuid(), 1, v_now + interval '10 minutes',
-      'claimed', NULL
+      pg_catalog.gen_random_uuid(), 0, v_now,
+      'cancelled', NULL
     )
     ON CONFLICT (target_user_id) DO NOTHING;
 
@@ -183,8 +183,8 @@ BEGIN
         lease_generation, lease_expires_at, lease_status, batch_id
       ) VALUES (
         v_batch.target_user_id, v_batch.requested_at, v_batch.scheduled_for,
-        pg_catalog.gen_random_uuid(), 1, v_now + interval '10 minutes',
-        'claimed', v_batch.id
+        pg_catalog.gen_random_uuid(), 0, v_now,
+        'cancelled', v_batch.id
       )
       ON CONFLICT (target_user_id) DO NOTHING;
 
