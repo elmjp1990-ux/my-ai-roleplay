@@ -41,7 +41,7 @@ DECLARE
   v_queued integer := 0;
 BEGIN
   IF p_user_id IS NULL OR p_requested_at IS NULL OR p_scheduled_for IS NULL
-     OR p_scheduled_for <> p_requested_at + interval '30 days' THEN
+     OR p_scheduled_for <= p_requested_at THEN
     RAISE EXCEPTION 'account_chat_photo_retention_window_mismatch';
   END IF;
 
@@ -82,8 +82,9 @@ BEGIN
     END IF;
 
     -- Existing soft-deleted chats keep their original deletion clock. Active
-    -- account-owned chats receive the account request timestamp, so their photo
-    -- cleanup becomes due exactly when the 30-day account recovery window ends.
+    -- account-owned chats receive the account request timestamp. Photo retention
+    -- is independently fixed at 30 days even when a test environment uses a shorter
+    -- account grace period; cancellation before prepare creates no cleanup jobs.
     v_deleted_at := COALESCE(v_parent_deleted_at, p_requested_at);
 
     INSERT INTO public.chat_deletion_jobs (
