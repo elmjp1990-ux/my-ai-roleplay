@@ -63,6 +63,7 @@ BEGIN
     LIMIT p_limit
     FOR UPDATE SKIP LOCKED
   LOOP
+    v_batch_id := NULL;
     SELECT pg_catalog.count(*)::integer
       INTO v_active_count
     FROM public.account_deletion_archive_batches AS b
@@ -88,8 +89,11 @@ BEGIN
     SELECT l.* INTO v_lease
     FROM public.account_deletion_work_leases AS l
     WHERE l.target_user_id = v_request.user_id
-    FOR UPDATE;
+    FOR UPDATE SKIP LOCKED;
 
+    IF NOT FOUND THEN
+      CONTINUE;
+    END IF;
     IF v_lease.requested_at IS DISTINCT FROM v_request.requested_at
        OR v_lease.scheduled_for IS DISTINCT FROM v_request.scheduled_for THEN
       IF v_lease.lease_status <> 'cancelled' THEN
