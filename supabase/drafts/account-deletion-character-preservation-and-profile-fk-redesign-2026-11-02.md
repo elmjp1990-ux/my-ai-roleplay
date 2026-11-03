@@ -52,7 +52,7 @@ Introduce a durable creator-attribution identity independent of Auth/profile:
 - One durable attribution row per original creator identity, with immutable display label snapshot and created timestamp.
 - `characters.creator_attribution_id` references that durable row.
 - A nullable active-owner reference (for editing/admin authorization) is separate from historical creator attribution.
-- Before Auth deletion, snapshot creator display label from profiles, set active owner to NULL, set a dedicated account-archived marker/state, and remove the character from all discovery/new-session paths.
+- Before Auth deletion, snapshot creator display label from profiles, set active owner to NULL, and set a dedicated account-archived/offline marker. Preserve the character's original visibility and review state: public/approved works remain publicly discoverable, while private/unpublished works remain private. Block new chat/encounter/story entry independently of discovery visibility.
 - The historical creator label is plain non-navigable text; it must not resolve to a profile page.
 - Never reuse `author_id` as historical attribution after the account is deleted.
 
@@ -99,7 +99,7 @@ The repo's migration history lacks a recovered foundational CREATE TABLE baselin
 - Account deletion preserves every character row and every child row (including never-published characters).
 - Creator attribution survives Auth/profile deletion and is non-navigable.
 - Active owner is null and no owner-only editing path remains.
-- All discovery and new session entry points reject account-archived characters.
+- Public discovery preserves the original visibility/review state; private/unpublished characters remain private. All new session entry points reject account-archived characters.
 - Existing single, group, encounter, and story sessions continue for their original player owners.
 - Existing players can read exact character media objects but cannot enumerate or read unrelated assets.
 - Retry after prepare but before Auth deletion is idempotent; retry after Auth deletion but before finalize completes.
