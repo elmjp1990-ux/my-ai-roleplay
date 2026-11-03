@@ -126,6 +126,8 @@ echo "ok: failure reporting requires the exact batch association"
 # Expiry must be checked after acquiring the lease row lock, not against the
 # SQL statement start time. A renew request begins before expiry but waits until
 # another session has expired the lease; it must return false after waking.
+prior_lease_token="$new_token"
+prior_lease_generation="$new_generation"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "UPDATE public.account_deletion_work_leases SET lease_expires_at=clock_timestamp()+interval '1 second' WHERE target_user_id='$lease_author'" >/dev/null
 cat > "$tmpdir/lease-expire-while-locked.sql" <<SQL
 BEGIN;
@@ -155,7 +157,7 @@ renew_after_locked_expiry="$(tr -d '\r\n' < "$tmpdir/lease-expiry-renew-result.l
 reclaimed_after_locked_expiry="$(psql "$DATABASE_URL" -Atqc "SELECT lease_token::text || '|' || lease_generation::text FROM public.claim_account_deletion_work_items(1)")"
 new_token="${reclaimed_after_locked_expiry%%|*}"
 new_generation="${reclaimed_after_locked_expiry##*|}"
-[[ -n "$new_token" && "$new_generation" == "$((new_generation - 1 + 1))" ]] || {
+[[ -n "$new_token" && "$new_token" != "$prior_lease_token" && "$new_generation" == "$((prior_lease_generation + 1))" ]] || {
   echo "ERROR: expired lease after lock wait was not reclaimable"
   exit 1
 }
