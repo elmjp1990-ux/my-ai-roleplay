@@ -4,7 +4,7 @@
 BEGIN;
 \echo 'Applying cumulative chat deletion character-history snapshot draft'
 \i supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql
-\i supabase/drafts/pr200-final-privilege-hardening.sql
+\i supabase/migrations/20261103040547_poyozz_chat_deletion_privilege_hardening.sql
 \echo 'Seeding legacy character rows before the publication/origin triggers exist'
 \i supabase/drafts/seed-character-deletion-legacy-fixtures.sql
 \echo 'Applying character history-aware deletion draft'
