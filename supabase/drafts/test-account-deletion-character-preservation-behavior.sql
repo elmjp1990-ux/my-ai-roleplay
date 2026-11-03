@@ -27,6 +27,13 @@ DECLARE
   v_author_storage_job uuid;
   v_author_photo uuid := 'c0000000-0000-4000-8000-000000000023';
   v_author_photo_path text := '10000000-0000-4000-8000-000000000020/50000000-0000-4000-8000-000000000023/account-delete-photo.jpg';
+  v_active_author_session uuid := '50000000-0000-4000-8000-000000000026';
+  v_active_solo_photo uuid := 'c0000000-0000-4000-8000-000000000026';
+  v_active_group_photo uuid := 'c0000000-0000-4000-8000-000000000024';
+  v_active_solo_path text := '10000000-0000-4000-8000-000000000020/50000000-0000-4000-8000-000000000026/account-active-solo.jpg';
+  v_active_group_path text := '10000000-0000-4000-8000-000000000020/50000000-0000-4000-8000-000000000024/account-active-group.jpg';
+  v_account_requested_at timestamptz := now() - interval '31 days';
+  v_account_scheduled_for timestamptz := now() - interval '30 days';
   v_turn_count_before bigint;
   v_turn_count_after bigint;
   v_storage_path text := '10000000-0000-4000-8000-000000000020/20000000-0000-4000-8000-000000000020/30000000-0000-4000-8000-000000000020.jpg';
@@ -171,11 +178,31 @@ BEGIN
     'Author-owned group reply', jsonb_build_object('name', 'Account archived character')
   );
 
+  -- Active solo/group photos must not be queued while the account is still
+  -- recoverable. They are captured only by prepare_account_deletion at day 30.
+  INSERT INTO public.chat_sessions (
+    id, user_id, character_id, character_name, chat_mode
+  ) VALUES (
+    v_active_author_session, v_author, v_character, 'Account archived character', 'story'
+  );
+  INSERT INTO public.chat_memory_photos (
+    id, owner_id, chat_type, session_id, storage_path, caption
+  ) VALUES (
+    v_active_solo_photo, v_author, 'single', v_active_author_session,
+    v_active_solo_path, 'active solo photo during account recovery'
+  );
+  INSERT INTO public.chat_memory_photos (
+    id, owner_id, chat_type, group_id, storage_path, caption
+  ) VALUES (
+    v_active_group_photo, v_author, 'group', v_author_group,
+    v_active_group_path, 'active group photo during account recovery'
+  );
+
   SELECT public.get_public_character_turn_count(v_character)
   INTO v_turn_count_before;
 
   INSERT INTO public.account_deletion_requests (user_id, requested_at, scheduled_for)
-  VALUES (v_author, now() - interval '1 hour', now() - interval '1 minute')
+  VALUES (v_author, v_account_requested_at, v_account_scheduled_for)
   ON CONFLICT (user_id) DO UPDATE
     SET requested_at = EXCLUDED.requested_at, scheduled_for = EXCLUDED.scheduled_for;
 
@@ -194,6 +221,44 @@ BEGIN
 
   IF v_batch IS NULL OR v_status IS DISTINCT FROM 'deleting' THEN
     RAISE EXCEPTION 'account_deletion_prepare_did_not_reach_deleting_state';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.chat_deletion_jobs
+    WHERE resource_type = 'single_session'
+      AND resource_id = v_active_author_session
+      AND owner_id = v_author
+      AND deleted_at = v_account_requested_at
+      AND purge_after = v_account_scheduled_for
+      AND purge_after = deleted_at + interval '30 days'
+      AND status = 'queued'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.chat_deletion_jobs
+    WHERE resource_type = 'group'
+      AND resource_id = v_author_group
+      AND owner_id = v_author
+      AND deleted_at = v_account_requested_at
+      AND purge_after = v_account_scheduled_for
+      AND purge_after = deleted_at + interval '30 days'
+      AND status = 'queued'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.chat_storage_deletion_jobs
+    WHERE bucket_id = 'personax-memory-photos'
+      AND object_path = v_active_solo_path
+      AND owner_id = v_author
+      AND resource_type = 'single_session'
+      AND resource_id = v_active_author_session
+      AND status = 'queued'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.chat_storage_deletion_jobs
+    WHERE bucket_id = 'personax-memory-photos'
+      AND object_path = v_active_group_path
+      AND owner_id = v_author
+      AND resource_type = 'group'
+      AND resource_id = v_author_group
+      AND status = 'queued'
+  ) THEN
+    RAISE EXCEPTION 'account_deletion_must_queue_active_solo_and_group_photos_for_30_day_recovery_window';
   END IF;
 
   IF NOT EXISTS (
@@ -334,8 +399,31 @@ BEGIN
       AND status = 'queued'
   ) OR EXISTS (
     SELECT 1 FROM public.chat_memory_photos WHERE id = v_author_photo
+  ) OR EXISTS (
+    SELECT 1 FROM public.chat_memory_photos
+    WHERE id IN (v_active_solo_photo, v_active_group_photo)
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.chat_deletion_jobs
+    WHERE resource_id = v_active_author_session
+      AND resource_type = 'single_session'
+      AND owner_id = v_author
+      AND purge_after = v_account_scheduled_for
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.chat_deletion_jobs
+    WHERE resource_id = v_author_group
+      AND resource_type = 'group'
+      AND owner_id = v_author
+      AND purge_after = v_account_scheduled_for
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.chat_storage_deletion_jobs
+    WHERE object_path = v_active_solo_path
+      AND status = 'queued'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.chat_storage_deletion_jobs
+    WHERE object_path = v_active_group_path
+      AND status = 'queued'
   ) THEN
-    RAISE EXCEPTION 'account_auth_cascade_must_preserve_pending_chat_storage_jobs';
+    RAISE EXCEPTION 'account_auth_cascade_must_preserve_pending_and_account_photo_storage_jobs';
   END IF;
 
   IF EXISTS (
