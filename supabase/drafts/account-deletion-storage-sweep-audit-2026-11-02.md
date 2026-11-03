@@ -69,3 +69,21 @@ Existing pending chat deletion jobs remain independent: their parent job has no 
 ## Explicit safety boundary
 
 Do not use the character asset cleanup worker for account deletion. Do not delete character illustration/video objects. Do not remove existing chat deletion jobs or their Storage child jobs as part of account deletion. The user has explicitly chosen 30-day retention for account-owned chat-memory photos; keep that clock independent from the environment-specific account grace period. No hosted DDL/DML, Storage mutation, worker deployment, or Cron activation without explicit approval.
+
+
+## Legacy group-photo URL classification — 2026-11-03
+
+A read-only aggregate query against the connected test project inspected public.chat_group_memory_photos without returning any URL values:
+
+- Total legacy rows: 1.
+- Empty URL rows: 0.
+- Absolute URLs: 1.
+- Relative/object-path values: 0.
+- Supabase Storage object URLs: 0.
+- URLs identifying the personax-memory-photos bucket: 0.
+
+The one legacy value is therefore not a provable object path in the current chat-memory bucket. It is deliberately excluded from automatic Storage cleanup. Do not parse arbitrary external URLs, infer a bucket, or pass image_url to Storage.remove. Its relational metadata can be removed by the normal 30-day group purge; the external URL is not treated as a managed Storage object.
+
+A static regression guard was added to scripts/test-account-deletion-character-preservation-draft.mjs to ensure the account photo queue helper never reads chat_group_memory_photos or image_url. The same guard now checks that single/group frontend deletion calls the lifecycle RPCs, persists tombstones, filters stale cached chats/groups, and exposes no player-facing restore/undo/reopen action or restore RPC call.
+
+This is a classification of the current test-project row only; it does not establish that every historical deployment used the same URL format. If future evidence identifies a managed Storage object, add a separate exact-bucket + exact-owner-path migration/queue design rather than widening the existing cleanup helper.
