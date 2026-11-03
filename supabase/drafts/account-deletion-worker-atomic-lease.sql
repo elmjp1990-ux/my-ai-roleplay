@@ -59,10 +59,17 @@ BEGIN
     SELECT q.user_id, q.requested_at, q.scheduled_for
     FROM public.account_deletion_requests AS q
     WHERE q.scheduled_for <= v_now
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.account_deletion_work_leases AS active_lease
+        WHERE active_lease.target_user_id = q.user_id
+          AND active_lease.lease_status = 'claimed'
+          AND active_lease.lease_expires_at > v_now
+      )
     ORDER BY q.scheduled_for, q.user_id
-    LIMIT p_limit
     FOR UPDATE SKIP LOCKED
   LOOP
+    EXIT WHEN v_claimed >= p_limit;
     v_batch_id := NULL;
     SELECT pg_catalog.count(*)::integer
       INTO v_active_count
@@ -159,6 +166,7 @@ BEGIN
     lease_expires_at := v_lease.lease_expires_at;
     RETURN NEXT;
     v_claimed := v_claimed + 1;
+    EXIT WHEN v_claimed >= p_limit;
   END LOOP;
 
   -- Recover committed deleting batches whose request row was removed by prepare.
@@ -175,9 +183,16 @@ BEGIN
             AND q.requested_at = b.requested_at
             AND q.scheduled_for = b.scheduled_for
         )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM public.account_deletion_work_leases AS active_lease
+          WHERE active_lease.target_user_id = b.target_user_id
+            AND active_lease.lease_status = 'claimed'
+            AND active_lease.lease_expires_at > v_now
+        )
       ORDER BY b.updated_at, b.id
-      LIMIT (p_limit - v_claimed)
     LOOP
+      EXIT WHEN v_claimed >= p_limit;
       INSERT INTO public.account_deletion_work_leases (
         target_user_id, requested_at, scheduled_for, lease_token,
         lease_generation, lease_expires_at, lease_status, batch_id
