@@ -49,6 +49,7 @@ on:
       - "scripts/build-disposable-schema-fixture.mjs"
       - "scripts/test-build-disposable-schema-fixture.mjs"
       - "supabase/drafts/account-deletion-worker-atomic-lease.sql"
+      - "supabase/drafts/test-account-deletion-worker-lease-security.sql"
       - "supabase/drafts/replay-deletion-concurrency-setup.sql"
       - "scripts/test-deletion-concurrency.sh"
       - ".github/workflows/account-deletion-worker-tests.yml"
