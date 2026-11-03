@@ -55,6 +55,7 @@ on:
       - "supabase/drafts/test-account-deletion-worker-lease-security.sql"
       - "supabase/drafts/replay-deletion-concurrency-setup.sql"
       - "scripts/test-deletion-concurrency.sh"
+      - "scripts/test-character-chat-snapshot-races.sh"
       - ".github/workflows/account-deletion-worker-tests.yml"
   push:
     branches:
@@ -179,3 +180,4 @@ jobs:
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-deletion-concurrency-setup.sql
           bash scripts/test-deletion-concurrency.sh
+          bash scripts/test-character-chat-snapshot-races.sh
