@@ -32,11 +32,14 @@ DECLARE
   v_active_group_photo uuid := 'c0000000-0000-4000-8000-000000000024';
   v_active_solo_path text := '10000000-0000-4000-8000-000000000020/50000000-0000-4000-8000-000000000026/account-active-solo.jpg';
   v_active_group_path text := '10000000-0000-4000-8000-000000000020/50000000-0000-4000-8000-000000000024/account-active-group.jpg';
-  v_account_requested_at timestamptz := now() - interval '1 hour';
-  v_account_scheduled_for timestamptz := now() - interval '1 minute';
+  -- Make the independent 30-day photo retention deadline due so the test can
+  -- execute the real purge RPC while the parent rows still exist.
+  v_account_requested_at timestamptz := now() - interval '31 days';
+  v_account_scheduled_for timestamptz := now() - interval '30 days';
   v_turn_count_before bigint;
   v_turn_count_after bigint;
   v_storage_path text := '10000000-0000-4000-8000-000000000020/20000000-0000-4000-8000-000000000020/30000000-0000-4000-8000-000000000020.jpg';
+  v_due_job record;
 BEGIN
   INSERT INTO auth.users (id) VALUES (v_author) ON CONFLICT (id) DO NOTHING;
   INSERT INTO public.profiles (id, handle, nickname)
@@ -270,6 +273,37 @@ BEGIN
       AND status = 'queued'
   ) THEN
     RAISE EXCEPTION 'account_deletion_must_queue_active_solo_and_group_photos_for_30_day_recovery_window';
+  END IF;
+
+  -- Exercise the real day-30 purge while the Auth cascade has not yet removed
+  -- the parents. The account-photo helper must have marked each parent with
+  -- exactly the queue's deleted_at timestamp, or purge_chat_deletion_job()
+  -- would fail its parent/job consistency check and retry forever.
+  FOR v_due_job IN
+    SELECT claimed.job_id
+    FROM public.claim_chat_deletion_jobs(10) AS claimed
+    WHERE claimed.resource_id IN (v_active_author_session, v_author_group)
+  LOOP
+    PERFORM public.purge_chat_deletion_job(v_due_job.job_id);
+  END LOOP;
+
+  IF EXISTS (
+    SELECT 1 FROM public.chat_deletion_jobs
+    WHERE resource_id IN (v_active_author_session, v_author_group)
+      AND status IS DISTINCT FROM 'completed'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.chat_sessions
+    WHERE id = v_active_author_session
+      AND deleted_at = v_account_requested_at
+      AND session_data = '{}'::jsonb
+      AND character_snapshot = '{}'::jsonb
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.chat_groups
+    WHERE id = v_author_group
+      AND deleted_at = v_account_requested_at
+      AND name = '已刪除對話'
+  ) THEN
+    RAISE EXCEPTION 'account_photo_parent_must_be_purgeable_before_auth_cascade';
   END IF;
 
   IF NOT EXISTS (
