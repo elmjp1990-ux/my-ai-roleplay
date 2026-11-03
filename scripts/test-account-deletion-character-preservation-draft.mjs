@@ -530,11 +530,11 @@ assert.ok(!chatParentDeleteGuard.includes("GRANT DELETE ON TABLE public.chat_ses
 // Ordinary single/group chat deletion has a backend-only 30-day retention window.
 // There is deliberately no player-facing restore/undo/reopen path.
 const chatIndex = fs.readFileSync("index.html", "utf8");
-const tombstoneHelpers = chatIndex.slice(
-  chatIndex.indexOf("  function readDeletedChatTombstones(uid) {"),
-  chatIndex.indexOf("  function cacheSessionsForUser(uid) {"),
-);
-assert.ok(tombstoneHelpers.includes("filterDeletedChatSessions(uid, saved)"),
+const restoreSessionsStart = chatIndex.indexOf("  function restoreSessionsForUser(uid) {");
+const isolateSessionsStart = chatIndex.indexOf("  function isolateSessionsForUser(nextUid) {", restoreSessionsStart);
+const restoreSessionsSource = chatIndex.slice(restoreSessionsStart, isolateSessionsStart);
+assert.ok(restoreSessionsStart >= 0 && isolateSessionsStart > restoreSessionsStart);
+assert.ok(restoreSessionsSource.includes("filterDeletedChatSessions(uid, saved)"),
   "cached single chats must be filtered by permanent local deletion tombstones");
 const groupLoaderStart = chatIndex.indexOf("async function groupLoadList(force=false) {");
 const groupLoaderEnd = chatIndex.indexOf("function groupRenderList()", groupLoaderStart);
