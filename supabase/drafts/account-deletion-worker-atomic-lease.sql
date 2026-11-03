@@ -470,8 +470,21 @@ BEGIN
      OR v_lease.lease_generation IS DISTINCT FROM p_lease_generation
      OR v_lease.lease_status <> 'claimed'
      OR v_lease.lease_expires_at <= pg_catalog.statement_timestamp()
-     OR (p_batch_id IS NOT NULL AND v_lease.batch_id IS DISTINCT FROM p_batch_id) THEN
+     OR v_lease.batch_id IS DISTINCT FROM p_batch_id THEN
     RETURN false;
+  END IF;
+
+  -- Lock and validate the associated batch before writing either failure record.
+  IF p_batch_id IS NOT NULL THEN
+    PERFORM 1
+    FROM public.account_deletion_archive_batches AS b
+    WHERE b.id = p_batch_id
+      AND b.target_user_id = p_user_id
+      AND b.status IN ('archived', 'deleting', 'failed')
+    FOR UPDATE;
+    IF NOT FOUND THEN
+      RETURN false;
+    END IF;
   END IF;
 
   UPDATE public.account_deletion_work_leases AS l
