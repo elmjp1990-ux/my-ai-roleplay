@@ -530,19 +530,19 @@ assert.ok(chatParentDeleteGuard.includes("FROM PUBLIC, anon, authenticated"));
 assert.ok(chatParentDeleteGuard.includes("delete_chat_session_content()"));
 assert.ok(!chatParentDeleteGuard.includes("GRANT DELETE ON TABLE public.chat_sessions"));
 
-const finalPrivilegeDraft = fs.readFileSync(
-  "supabase/drafts/pr200-final-privilege-hardening.sql",
+const finalPrivilegeMigration = fs.readFileSync(
+  "supabase/migrations/20261103040547_poyozz_chat_deletion_privilege_hardening.sql",
   "utf8",
 );
-assert.ok(finalPrivilegeDraft.startsWith("-- DRAFT ONLY — NOT AN ACTIVE MIGRATION."));
-assert.ok(finalPrivilegeDraft.includes("REVOKE TRUNCATE ON ALL TABLES IN SCHEMA public"));
-assert.ok(finalPrivilegeDraft.includes("REVOKE DELETE ON TABLE public.chat_sessions"));
-assert.ok(finalPrivilegeDraft.includes("REVOKE DELETE ON TABLE public.chat_groups"));
+assert.ok(finalPrivilegeMigration.startsWith("-- PR #200: final least-privilege hardening for chat deletion lifecycle."));
+assert.ok(finalPrivilegeMigration.includes("REVOKE TRUNCATE ON ALL TABLES IN SCHEMA public"));
+assert.ok(finalPrivilegeMigration.includes("REVOKE DELETE ON TABLE public.chat_sessions"));
+assert.ok(finalPrivilegeMigration.includes("REVOKE DELETE ON TABLE public.chat_groups"));
 const deletionReplay = fs.readFileSync(
   "supabase/drafts/replay-and-test-character-deletion.sql",
   "utf8",
 );
-assert.ok(deletionReplay.includes("supabase/drafts/pr200-final-privilege-hardening.sql"));
+assert.ok(deletionReplay.includes("supabase/migrations/20261103040547_poyozz_chat_deletion_privilege_hardening.sql"));
 
 
 // Ordinary single/group chat deletion has a backend-only 30-day retention window.
