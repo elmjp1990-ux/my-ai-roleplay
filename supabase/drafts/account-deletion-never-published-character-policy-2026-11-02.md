@@ -1,43 +1,51 @@
-# Account deletion: never-published character disposition (2026-11-02)
+# Account deletion vs character deletion — publication history boundary (updated 2026-11-03)
 
-## User-confirmed policy refinement
+## Critical distinction
 
-Account deletion must distinguish characters that have never been publicly published from characters with any public publication history.
+The `first_published_at` hard-delete rule applies only when the user explicitly deletes an individual character. It does **not** authorize account deletion to hard-delete the author's never-published drafts.
 
-### Never published
+The user-confirmed account-deletion policy is to preserve the author's characters and their associated data/media. Account deletion and explicit character deletion are separate product actions and must not share the same deletion branch.
 
-When the account deletion grace period expires and the account deletion is processed:
-- If `characters.first_published_at IS NULL`, the character is an unpublished draft and must be permanently deleted as part of account deletion.
-- Delete its character-owned relational data, including private info, schedules, schedule descriptions, stories, and illustration metadata.
-- Delete its character illustration and avatar-video Storage objects as part of the same lifecycle, with retryable cleanup and verification. Do not leave orphaned private media.
-- This is not a 30-day chat-memory photo retention item. The separate chat-memory photo queue remains unchanged.
-- No retained creator-attribution record is needed solely for a never-published draft unless a separate legal/audit requirement is identified.
+## Explicit character deletion (character owner chooses Delete)
 
-### Published at least once
+Use `first_published_at` plus complete history checks:
 
-If `characters.first_published_at IS NOT NULL`, retain the character and its creative assets:
-- Preserve character data, settings, illustration rows, illustration objects, and avatar-video objects.
-- Preserve historical creator attribution as non-navigable text; do not link to the deleted author's profile.
-- Move the character to a distinct account-archived state, excluded from discovery, map encounters, recommendations, and every new-chat entry point.
-- Allow only already-existing authorized conversations to continue; prohibit new single/group/encounter/story sessions.
+- If the character has ever been published, or has any solo/group/encounter/story/comment history, soft-delete and preserve existing conversation history.
+- Only if it has never been published and has absolutely no history may the character be hard-deleted after all exact-path illustration/video assets have been durably queued, path reattachment is locked, and Storage cleanup is verified.
+- The hard-delete worker is `purge-character-assets`; it is only for this explicit character-deletion path.
+
+## Account deletion (owner deletes their account)
+
+Preserve **all** authored characters, including never-published/private drafts:
+
+- Preserve the character row, private settings, schedules, schedule descriptions, stories, illustration metadata, illustration objects and avatar-video objects.
+- Preserve the original visibility and review state. A public/approved character remains public/discoverable; a private/unpublished character remains private.
+- Store the approved historical creator display name as plain, non-navigable text. Do not retain a live author profile, handle link, avatar/profile route or author-management capability.
+- Character status becomes offline. No new solo chat, group membership, encounter or story session may be created.
+- Other players' already-existing authorized conversations continue; their character can still reply and normal billing applies.
+- Never enqueue any account-owned character asset into `character_asset_cleanup_jobs`; never invoke `purge-character-assets` as part of account deletion.
 
 ## Classification rule
 
-Use the durable publication-history field `first_published_at`, not current `visibility`:
-- A character that is currently private but was public previously is still in the published-at-least-once category and must be retained/archived.
-- A character with no publication timestamp is in the never-published category, subject to verifying that all publishing paths reliably set `first_published_at`.
+`first_published_at` remains a durable publication-history signal for **explicit character deletion only**. It is not an account-deletion filter.
 
-Before implementation, audit every publication transition to confirm `first_published_at` is immutable once set and cannot be bypassed by direct RPC/API writes. If historical data has missing timestamps, do not silently classify it as never published; fail closed into retention/manual review until publication history can be established.
+For explicit character deletion:
+- A currently-private character with non-null `first_published_at` is still previously published and must be soft-deleted.
+- A null `first_published_at` is necessary but not sufficient for hard deletion; all history tables and tombstones must also be empty.
+- Missing/ambiguous publication evidence fails closed to retention/manual review.
 
-## Implementation gates
+For account deletion:
+- Do not classify a never-published draft as disposable.
+- Preserve it and its media; its existing private visibility means it remains absent from public discovery.
 
-- Verify `first_published_at` semantics and every publish/unpublish path.
-- Add a deterministic classification test for null/non-null timestamps, including currently-private previously-published characters.
-- For never-published drafts, delete relational children in FK-safe order and enqueue private Storage object deletion durably before deleting metadata; retries must be idempotent and must not cross owner/character boundaries.
-- For published characters, transform ownership/creator attribution and archive state before profile/Auth deletion; preserve media privately.
-- Preserve the existing independent 30-day chat-memory photo cleanup queue.
-- Keep PR #200 Draft/unmerged until schema provenance, RLS, cleanup retries, tests, and migration replay are verified.
+## Implementation / test gates
+
+- Test explicit character deletion separately: never-published/no-history hard-delete with asset queue; previously-published or any-history soft-delete.
+- Test account deletion separately: public, private, previously published, and never-published characters all survive with original visibility/review state and all child/media references intact.
+- Verify account deletion never writes to `character_asset_cleanup_jobs`.
+- Verify offline state, no-new-entry guards, and existing-session continuation.
+- Keep the account deletion worker disabled until full SQL, RLS, Storage and recovery gates pass.
 
 ## Safety status
 
-Policy/design documentation only. No hosted database writes, Storage deletion, Auth deletion, deployment, or cron changes were performed.
+Design clarification only. No hosted database writes, Storage deletion, Auth deletion, deployment, or Cron changes were performed.
