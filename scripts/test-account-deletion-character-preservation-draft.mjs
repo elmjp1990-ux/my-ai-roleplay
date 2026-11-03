@@ -334,14 +334,33 @@ for (const pattern of [
   /UPDATE public[.]chat_message_versions AS v[\s\S]*?SET edited_by = NULL/,
 ]) assert.match(integration, pattern);
 
-// The worker's deleting recovery path must resume Auth/finalize only. It must not
-// re-run archive/prepare after the request/profile may have disappeared.
+// The worker must use only the atomic claim and lease-fenced RPC path.
+// It must never call the old unclaimed listing/archive/prepare/finalize/failure RPCs.
 const worker = fs.readFileSync("supabase/functions/_shared/account-deletion-worker.ts", "utf8");
-const recoveryBranch = worker.match(/if [(]item[.]work_status === "deleting" && batchId[)][\s\S]*?continue;/)?.[0];
-assert.ok(recoveryBranch, "worker deleting recovery branch must exist");
-assert.match(recoveryBranch, /deps[.]deleteAuthUser/);
-assert.match(recoveryBranch, /deps[.]finalize/);
-assert.doesNotMatch(recoveryBranch, /deps[.]archive|deps[.]prepare/);
+const handler = fs.readFileSync("supabase/functions/account-deletion-worker/index.ts", "utf8");
+const leaseSql = fs.readFileSync("supabase/drafts/account-deletion-worker-atomic-lease.sql", "utf8");
+assert.match(worker, /deps\.prepare[\s\S]*?lease_generation/);
+assert.match(worker, /renewOrThrow/);
+assert.match(worker, /deps\.finalize[\s\S]*?lease_generation/);
+assert.match(worker, /deps\.markFailure[\s\S]*?lease_generation/);
+assert.match(handler, /claim_account_deletion_work_items/);
+assert.match(handler, /prepare_account_deletion_leased/);
+assert.match(handler, /renew_account_deletion_lease/);
+assert.match(handler, /finalize_account_deletion_leased/);
+assert.match(handler, /record_account_deletion_failure_leased/);
+assert.doesNotMatch(handler, /get_account_deletion_work_items|archive_account_deletion_data|rpc\(["']prepare_account_deletion["']|rpc\(["']finalize_account_deletion["']|rpc\(["']record_account_deletion_failure["']/);
+for (const rpc of [
+  "claim_account_deletion_work_items",
+  "renew_account_deletion_lease",
+  "prepare_account_deletion_leased",
+  "finalize_account_deletion_leased",
+  "record_account_deletion_failure_leased",
+]) assert.match(leaseSql, new RegExp("CREATE OR REPLACE FUNCTION public\\." + rpc + "\\("));
+assert.match(leaseSql, /FOR UPDATE SKIP LOCKED/);
+assert.match(leaseSql, /lease_generation = l\.lease_generation \+ 1/);
+assert.match(leaseSql, /p_lease_token/);
+assert.match(leaseSql, /REVOKE ALL ON FUNCTION public\.prepare_account_deletion\(uuid\) FROM PUBLIC, anon, authenticated, service_role/);
+assert.match(leaseSql, /GRANT EXECUTE ON FUNCTION public\.prepare_account_deletion_leased/);
 
 // Manually archived groups keep their existing memory-photo reads. Only deleted_at
 // removes access; this draft does not widen upload/update/delete privileges.
