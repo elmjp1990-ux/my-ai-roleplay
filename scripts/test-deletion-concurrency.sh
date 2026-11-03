@@ -74,6 +74,27 @@ second_claim_after_commit="$(psql "$DATABASE_URL" -Atqc "SELECT count(*) FROM pu
 }
 echo "ok: exactly one concurrent worker claims a due account deletion request"
 
+# An active lease for the oldest request must not starve a different due account.
+fair_author="10000000-0000-4000-8000-000000000034"
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "INSERT INTO public.account_deletion_requests (user_id, requested_at, scheduled_for) VALUES ('$fair_author', now() - interval '1 hour', now() - interval '1 minute')" >/dev/null
+fair_claim="$(psql "$DATABASE_URL" -Atqc "SELECT target_user_id::text FROM public.claim_account_deletion_work_items(1)")"
+[[ "$fair_claim" == "$fair_author" ]] || {
+  echo "ERROR: an active lease on an earlier request starved another due request"
+  exit 1
+}
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "UPDATE public.account_deletion_work_leases SET lease_expires_at=now()-interval '1 second' WHERE target_user_id='$fair_author'" >/dev/null
+cat > "$tmpdir/fair-request-cancel.sql" <<SQL
+BEGIN;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '$fair_author', true);
+SELECT set_config('request.jwt.claim.role', 'authenticated', true);
+SELECT set_config('request.jwt.claims', '{"sub":"$fair_author","role":"authenticated"}', true);
+SELECT public.cancel_account_deletion();
+COMMIT;
+SQL
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/fair-request-cancel.sql" >/dev/null
+echo "ok: active older leases do not starve other due account requests"
+
 # Expired lease reclaim must rotate both token and generation. The previous
 # owner must be unable to renew or write failure metadata after reclaim.
 old_lease="$(psql "$DATABASE_URL" -Atqc "SELECT lease_token::text || '|' || lease_generation::text FROM public.account_deletion_work_leases WHERE target_user_id='$lease_author'")"
