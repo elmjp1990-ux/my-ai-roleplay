@@ -137,6 +137,10 @@ const accountPhotoQueueFn = integration.match(
 assert.ok(accountPhotoQueueFn, "account deletion must persist chat-memory photo cleanup work");
 assert.match(accountPhotoQueueFn, /p_scheduled_for <= p_requested_at/);
 assert.match(accountPhotoQueueFn, /v_deleted_at \+ interval '30 days'/);
+assert.match(accountPhotoQueueFn, /ORDER BY CASE WHEN p[.]chat_type = 'single' THEN 0 ELSE 1 END/);
+assert.match(accountPhotoQueueFn, /UPDATE public[.]chat_sessions AS s[\\s\\S]*?SET deleted_at = COALESCE[(]s[.]deleted_at, v_deleted_at[)]/);
+assert.match(accountPhotoQueueFn, /UPDATE public[.]chat_groups AS g[\\s\\S]*?SET deleted_at = COALESCE[(]g[.]deleted_at, v_deleted_at[)]/);
+assert.match(accountPhotoQueueFn, /account_chat_photo_parent_changed_during_queueing/);
 assert.match(accountPhotoQueueFn, /FROM public[.]chat_memory_photos AS p/);
 assert.match(accountPhotoQueueFn, /p[.]owner_id = p_user_id/);
 assert.match(accountPhotoQueueFn, /personax-memory-photos/);
