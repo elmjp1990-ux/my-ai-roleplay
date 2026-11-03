@@ -153,3 +153,28 @@ The account workflow path filter now includes `test-account-deletion-character-p
 - Read-only advisor classification: 16 no-policy RLS tables have no anon/authenticated table privileges; 27 authenticated + 4 anon executable SECURITY DEFINER functions all use empty search_path; the four anon-callable functions were checked for public-data filters. Leaked-password protection remains disabled as a separate pre-launch Auth setting.
 - Current workflow now invokes `supabase migration new poyozz_chat_deletion_privilege_hardening` in a temporary isolated folder to generate a release migration filename; it does not apply or link to hosted Supabase. The filename output is pending workflow log retrieval.
 - No hosted ACL/DDL/Auth/Storage mutation, worker deployment, or Cron activation. PR remains Draft/unmerged.
+
+
+## Latest full validation after lease fencing and snapshot race suite — 2026-11-03
+
+Latest validated code HEAD: `1fedc372e837b2a0f150f11221e92334bc06e770`.
+
+Same-HEAD workflows all completed successfully:
+- Account deletion worker Run #722 (`41631045494`): account-worker + disposable-schema-replay success. The replay ran the 14-case canonical lease/deletion suite (14 passed / 0 failed) and the separately maintained solo/group snapshot race suite (4 passed / 0 failed).
+- Chat deletion worker Run #483 (`41631045495`): success.
+- Group background UI Run #1206 (`41631045487`): success.
+- Chat Storage API retry E2E Run #125 (`41631045488`): success. Local Storage API 503 -> durable retry -> successful object deletion; Auth Admin deletion -> stale JWT rejected by account_is_active; browser multi-tab storage-event and cross-device backend-RLS reconciliation passed.
+
+The former duplicated/truncated concurrency script was replaced with the last complete 14-case canonical script. Solo and group character-snapshot parent-lock races are now in a separate 4-case script. Both scripts are called by the disposable workflow; no case was removed to obtain green CI.
+
+## Remaining release gates (not covered by the green disposable CI)
+
+1. The lease SQL remains a draft, not a generated active migration. Produce a fresh uniquely-versioned incremental migration using the pinned Supabase CLI, bundling only the reviewed lease/prepare changes and their prerequisite account-preservation SQL. Do not edit or replay historical migrations; the missing original profiles/characters foundation remains intentionally non-blocking for synthetic current-state fixture tests.
+2. Review the complete final incremental migration ACL/RLS/ownership/SECURITY DEFINER set and compare the generated migration against the connected test project's current schema/ledger. Existing migration source reconciliation found 28/28 historical PR migration files byte-matched to the test ledger after CRLF normalization; this does not mean the new lease draft is already installed.
+3. Ten-minute lease TTL remains provisional. Auth Admin HTTP requests now have a 60-second abort timeout, but the complete worker phase duration still needs a bounded acceptance measurement before any Cron activation.
+4. The test project's five-minute grace setting is for synthetic acceptance only; production must use the separately agreed 30-day account grace period. A real hosted synthetic-account end-to-end deletion acceptance has not yet been run with the new worker because the Edge Function is not deployed and no account-deletion Cron is enabled.
+5. Account worker source is still fail-closed (`ACCOUNT_DELETION_EXECUTION_ENABLED = false`, returns 503 before claim/RPC/Auth work). No account-worker Edge Function deployment, Vault secret, or Cron schedule exists/was activated. Existing chat purge worker is a separate path.
+6. The account-photo helper queues account-owned solo/group chat-memory photo paths with the independent `requested_at + 30 days` retention clock and preserves character illustration/video objects. The single legacy group-photo URL remains excluded because it is an external URL, not a proven Storage object path.
+7. Explicit user approval is still required before hosted migration application, synthetic Auth user deletion, Edge Function deployment, secret creation, or Cron activation.
+
+No hosted database/Auth/Storage mutation, deployment, Vault secret, or Cron change occurred during this validation. PR #200 remains Draft / unmerged; no merge approval has been given.
