@@ -143,3 +143,13 @@ New final cases:
 Existing exact-one-claim, fairness, expiry/reclaim, stale renew/failure/prepare/finalize rejection, cancellation guard, character session guard, child-write, and asset-path race cases all remain green. This resolves the earlier unimplemented atomic lease/fencing blocker for disposable acceptance.
 
 Remaining outside this concurrency gate: measure and finalize lease TTL; bound/review external Auth Admin HTTP side-effect behavior; produce CLI-generated incremental migration and review ACL/RLS; complete Storage/release audit. No hosted database/Auth/Storage mutation, deployment, Vault secret, or Cron change. PR #200 remains Draft/unmerged.
+
+
+## Round 41 — lease-expiry lock-wait regression and Auth HTTP timeout passed (2026-11-03)
+
+- Lease expiry predicates in renew/prepare/finalize/failure/cancel now use `clock_timestamp()` after row-lock acquisition. A new independent-session test starts renew before expiry, holds the lease row lock past expiry in another session, then confirms renew returns false rather than resurrecting the expired lease.
+- Auth Admin user lookup/delete requests are now bounded to 60 seconds via a dedicated fetch wrapper; non-Auth requests are unchanged. The wrapper composes the caller's abort signal with the timeout.
+- Failure metadata requires exact lease-to-batch association and locks/verifies the batch before writing.
+- Account worker Run #673 on HEAD `401ee12`: worker + disposable replay both success; 14 concurrency scenarios passed, 0 failed, including request-cascade recovery and both simultaneous claim/cancel race directions. Effective function ACL and lease-table privilege/RLS assertions also passed.
+- Chat worker #434 and Group UI #1157 passed. Chat Storage API retry E2E #76 remains in progress at local Supabase startup.
+- This is still a disposable implementation acceptance, not a hosted rollout. Ten-minute lease TTL remains provisional; no hosted mutations, deployment, Vault secret, or Cron change.
