@@ -32,8 +32,8 @@ DECLARE
   v_active_group_photo uuid := 'c0000000-0000-4000-8000-000000000024';
   v_active_solo_path text := '10000000-0000-4000-8000-000000000020/50000000-0000-4000-8000-000000000026/account-active-solo.jpg';
   v_active_group_path text := '10000000-0000-4000-8000-000000000020/50000000-0000-4000-8000-000000000024/account-active-group.jpg';
-  v_account_requested_at timestamptz := now() - interval '31 days';
-  v_account_scheduled_for timestamptz := now() - interval '30 days';
+  v_account_requested_at timestamptz := now() - interval '1 hour';
+  v_account_scheduled_for timestamptz := now() - interval '1 minute';
   v_turn_count_before bigint;
   v_turn_count_after bigint;
   v_storage_path text := '10000000-0000-4000-8000-000000000020/20000000-0000-4000-8000-000000000020/30000000-0000-4000-8000-000000000020.jpg';
@@ -229,7 +229,7 @@ BEGIN
       AND resource_id = v_active_author_session
       AND owner_id = v_author
       AND deleted_at = v_account_requested_at
-      AND purge_after = v_account_scheduled_for
+      AND purge_after = v_account_requested_at + interval '30 days'
       AND purge_after = deleted_at + interval '30 days'
       AND status = 'queued'
   ) OR NOT EXISTS (
@@ -238,7 +238,7 @@ BEGIN
       AND resource_id = v_author_group
       AND owner_id = v_author
       AND deleted_at = v_account_requested_at
-      AND purge_after = v_account_scheduled_for
+      AND purge_after = v_account_requested_at + interval '30 days'
       AND purge_after = deleted_at + interval '30 days'
       AND status = 'queued'
   ) OR NOT EXISTS (
@@ -407,13 +407,13 @@ BEGIN
     WHERE resource_id = v_active_author_session
       AND resource_type = 'single_session'
       AND owner_id = v_author
-      AND purge_after = v_account_scheduled_for
+      AND purge_after = v_account_requested_at + interval '30 days'
   ) OR NOT EXISTS (
     SELECT 1 FROM public.chat_deletion_jobs
     WHERE resource_id = v_author_group
       AND resource_type = 'group'
       AND owner_id = v_author
-      AND purge_after = v_account_scheduled_for
+      AND purge_after = v_account_requested_at + interval '30 days'
   ) OR NOT EXISTS (
     SELECT 1 FROM public.chat_storage_deletion_jobs
     WHERE object_path = v_active_solo_path
