@@ -1,12 +1,2065 @@
--- Generated migration using Supabase CLI v2.84.2:
+-- Generated with Supabase CLI v2.84.2 as:
 -- 20261103115931_poyozz_account_deletion_preservation_atomic_lease.sql
--- Fresh incremental migration; do not edit or replay historical migrations.
--- Prerequisites already present in the test-project ledger:
+-- Fresh incremental migration. Historical migration files and ledger are not rewritten.
+-- Prerequisite migrations already present in the current test-project ledger:
 --   20261103040547_poyozz_chat_deletion_privilege_hardening.sql
 --   20261103090100_account_is_active_auth_user_existence_guard.sql
--- Apply only after the disposable current-state replay and security checks pass.
+-- This migration assumes those prerequisites and was validated against the disposable
+-- current-state schema fixture; do not apply to hosted Supabase without explicit approval.
 
-\n-- ============================================================================\n-- 1. Preserve authored characters, detach ownership, and archive account data\n-- ============================================================================\n\n-- 1) Durable, non-clickable creator attribution and explicit account archive marker.
+\n-- ============================================================================\n-- A. Cumulative chat-deletion turn statistics and durable character-use history\n-- ============================================================================\n\n-- Reviewed against read-only live test-project definitions on 2026-11-01.
+--   1) migration provenance/version collision is reconciled,
+--   2) exact local Supabase CLI replay succeeds,
+--   3) disposable fixture tests below pass.
+--
+-- Purpose:
+--   * Preserve per-character cumulative assistant-turn counts when a single or
+--     group chat is soft-deleted and later purged.
+--   * Exclude deleted parent groups from live-message counts.
+--   * Keep only aggregate counts and minimal tombstone linkage, never message text.
+--   * Backfill legacy deleted sessions which predate chat_deletion_jobs.
+--
+-- The snapshot stores only source tombstone IDs, character IDs and counts; it does not retain player IDs or transcript content. The snapshot is written in the same transaction as the player delete RPC,
+-- after the parent row has been locked and before deleted_at is set. All writer
+-- paths must continue to lock the same parent row, so no post-snapshot writes
+-- can slip in. The purge worker repeats the snapshot idempotently as a safety
+-- net for older queued jobs.
+
+CREATE TABLE IF NOT EXISTS public.chat_deletion_character_turn_stats (
+  resource_type text NOT NULL
+    CHECK (resource_type IN ('single_session', 'group')),
+  resource_id uuid NOT NULL,
+  character_id uuid NOT NULL,  -- no player/account identifier is retained in the aggregate
+  turn_count bigint NOT NULL CHECK (turn_count > 0),
+  created_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),
+  CONSTRAINT chat_deletion_character_turn_stats_resource_character_key
+    UNIQUE (resource_type, resource_id, character_id)
+);
+
+CREATE INDEX IF NOT EXISTS chat_deletion_character_turn_stats_character_idx
+  ON public.chat_deletion_character_turn_stats (character_id);
+
+-- Independent character-use tombstones: unlike turn-count aggregates, these rows
+-- record every character attached to a deleted chat, including members who never
+-- produced an assistant reply. They deliberately have NO FK to chat parents or
+-- characters, so the link survives day-30 purge and a later character hard-delete.
+CREATE TABLE IF NOT EXISTS public.chat_deletion_character_history (
+  resource_type text NOT NULL
+    CHECK (resource_type IN ('single_session', 'group')),
+  resource_id uuid NOT NULL,
+  character_id uuid NOT NULL,
+  captured_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),
+  CONSTRAINT chat_deletion_character_history_resource_character_key
+    UNIQUE (resource_type, resource_id, character_id)
+);
+
+CREATE INDEX IF NOT EXISTS chat_deletion_character_history_character_idx
+  ON public.chat_deletion_character_history (character_id);
+
+ALTER TABLE public.chat_deletion_character_history ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.chat_deletion_character_history
+  FROM PUBLIC, anon, authenticated, service_role;
+
+COMMENT ON TABLE public.chat_deletion_character_history IS
+  'Minimal immutable character-use tombstones retained after chat purge; stores no player ID or transcript content and has no FK to parents or characters.';
+
+ALTER TABLE public.chat_deletion_character_turn_stats ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.chat_deletion_character_turn_stats
+  FROM PUBLIC, anon, authenticated, service_role;
+
+COMMENT ON TABLE public.chat_deletion_character_turn_stats IS
+  'Minimal per-character aggregate counts retained after chat deletion; contains no transcript or message content. Service access is through postgres-owned SECURITY DEFINER functions only.';
+
+-- Internal helper. No client-facing EXECUTE grant. It is invoked by existing
+-- postgres-owned SECURITY DEFINER deletion functions and the purge worker.
+CREATE OR REPLACE FUNCTION private.snapshot_chat_deletion_character_turn_stats(
+  p_resource_type text,
+  p_resource_id uuid,
+  p_owner_id uuid
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+BEGIN
+  IF p_resource_type = 'single_session' THEN
+    INSERT INTO public.chat_deletion_character_history (
+      resource_type, resource_id, character_id
+    )
+    SELECT 'single_session', s.id, s.character_id
+    FROM public.chat_sessions AS s
+    WHERE s.id = p_resource_id
+      AND s.user_id = p_owner_id
+      AND s.character_id IS NOT NULL
+    ON CONFLICT (resource_type, resource_id, character_id) DO NOTHING;
+
+    INSERT INTO public.chat_deletion_character_turn_stats (
+      resource_type, resource_id, character_id, turn_count
+    )
+    SELECT
+      'single_session',
+      s.id,
+      s.character_id,
+      pg_catalog.count(m.id)::bigint
+    FROM public.chat_sessions AS s
+    LEFT JOIN public.chat_messages AS m
+      ON m.session_id = s.id
+     AND m.role = 'assistant'
+     AND m.deleted_at IS NULL
+    WHERE s.id = p_resource_id
+      AND s.user_id = p_owner_id
+      AND s.character_id IS NOT NULL
+    GROUP BY s.id, s.user_id, s.character_id
+    HAVING pg_catalog.count(m.id) > 0
+    ON CONFLICT (resource_type, resource_id, character_id) DO NOTHING;
+
+  ELSIF p_resource_type = 'group' THEN
+    INSERT INTO public.chat_deletion_character_history (
+      resource_type, resource_id, character_id
+    )
+    SELECT 'group', p_resource_id, source.character_id
+    FROM (
+      SELECT gm.character_id
+      FROM public.chat_group_members AS gm
+      JOIN public.chat_groups AS g ON g.id = gm.group_id
+      WHERE g.id = p_resource_id AND g.owner_id = p_owner_id
+      UNION
+      SELECT gm.character_id
+      FROM public.chat_group_messages AS gm
+      JOIN public.chat_groups AS g ON g.id = gm.group_id
+      WHERE g.id = p_resource_id AND g.owner_id = p_owner_id
+      UNION
+      SELECT g.world_character_id AS character_id
+      FROM public.chat_groups AS g
+      WHERE g.id = p_resource_id AND g.owner_id = p_owner_id
+    ) AS source
+    WHERE source.character_id IS NOT NULL
+    ON CONFLICT (resource_type, resource_id, character_id) DO NOTHING;
+
+    INSERT INTO public.chat_deletion_character_turn_stats (
+      resource_type, resource_id, character_id, turn_count
+    )
+    SELECT
+      'group',
+      g.id,
+      gm.character_id,
+      pg_catalog.count(gm.id)::bigint
+    FROM public.chat_groups AS g
+    JOIN public.chat_group_messages AS gm
+      ON gm.group_id = g.id
+     AND gm.speaker_type = 'character'
+     AND gm.deleted_at IS NULL
+     AND gm.character_id IS NOT NULL
+    WHERE g.id = p_resource_id
+      AND g.owner_id = p_owner_id
+    GROUP BY g.id, g.owner_id, gm.character_id
+    HAVING pg_catalog.count(gm.id) > 0
+    ON CONFLICT (resource_type, resource_id, character_id) DO NOTHING;
+
+  ELSE
+    RAISE EXCEPTION 'unsupported_chat_resource_type' USING ERRCODE = '22023';
+  END IF;
+
+  -- Fail closed if a pre-existing aggregate is incomplete or stale. ON CONFLICT
+  -- DO NOTHING is safe only when the first snapshot is complete and immutable.
+  IF p_resource_type = 'single_session' AND EXISTS (
+    SELECT 1
+    FROM public.chat_sessions AS s
+    CROSS JOIN LATERAL (
+      SELECT pg_catalog.count(m.id)::bigint AS expected_count
+      FROM public.chat_messages AS m
+      WHERE m.session_id = s.id
+        AND m.role = 'assistant'
+        AND m.deleted_at IS NULL
+    ) AS expected
+    LEFT JOIN public.chat_deletion_character_turn_stats AS archived
+      ON archived.resource_type = 'single_session'
+     AND archived.resource_id = s.id
+     AND archived.character_id = s.character_id
+    WHERE s.id = p_resource_id
+      AND s.user_id = p_owner_id
+      AND (
+        (expected.expected_count > 0 AND archived.character_id IS NULL)
+        OR COALESCE(archived.turn_count, 0) <> expected.expected_count
+      )
+  ) THEN
+    RAISE EXCEPTION 'chat_deletion_turn_snapshot_incomplete' USING ERRCODE = '23514';
+  ELSIF p_resource_type = 'group' AND EXISTS (
+    WITH expected AS (
+      SELECT gm.character_id, pg_catalog.count(gm.id)::bigint AS turn_count
+      FROM public.chat_group_messages AS gm
+      WHERE gm.group_id = p_resource_id
+        AND gm.speaker_type = 'character'
+        AND gm.deleted_at IS NULL
+        AND gm.character_id IS NOT NULL
+      GROUP BY gm.character_id
+    ), archived AS (
+      SELECT s.character_id, s.turn_count
+      FROM public.chat_deletion_character_turn_stats AS s
+      WHERE s.resource_type = 'group'
+        AND s.resource_id = p_resource_id
+    )
+    SELECT 1
+    FROM expected
+    FULL OUTER JOIN archived USING (character_id)
+    WHERE COALESCE(expected.turn_count, 0)
+       <> COALESCE(archived.turn_count, 0)
+  ) THEN
+    RAISE EXCEPTION 'chat_deletion_turn_snapshot_incomplete' USING ERRCODE = '23514';
+  END IF;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.snapshot_chat_deletion_character_turn_stats(text, uuid, uuid)
+  FROM PUBLIC, anon, authenticated, service_role;
+
+-- Account deletion bypasses the ordinary single/group chat soft-delete RPCs:
+-- Auth FK cascades remove chat_sessions and chat_groups directly. Capture the
+-- same minimal character-use tombstones and assistant-turn aggregates before
+-- prepare_account_deletion permits Auth deletion. No transcript text or player
+-- identifier is written to these aggregate tables.
+CREATE OR REPLACE FUNCTION private.snapshot_account_chat_character_history(
+  p_user_id uuid
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_session record;
+  v_group record;
+BEGIN
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'account_chat_history_owner_required' USING ERRCODE = '22023';
+  END IF;
+
+  -- Match the parent-first writer-lock protocol used by chat deletion. Stable
+  -- ordering prevents two maintenance paths from acquiring these locks in
+  -- inconsistent order.
+  PERFORM 1
+  FROM public.chat_sessions AS s
+  WHERE s.user_id = p_user_id
+  ORDER BY s.id
+  FOR UPDATE;
+
+  PERFORM 1
+  FROM public.chat_groups AS g
+  WHERE g.owner_id = p_user_id
+  ORDER BY g.id
+  FOR UPDATE;
+
+  FOR v_session IN
+    SELECT s.id, s.character_id
+    FROM public.chat_sessions AS s
+    WHERE s.user_id = p_user_id
+    ORDER BY s.id
+  LOOP
+    IF EXISTS (
+      SELECT 1
+      FROM public.chat_deletion_jobs AS j
+      WHERE j.resource_type = 'single_session'
+        AND j.resource_id = v_session.id
+        AND j.status = 'completed'
+    ) THEN
+      -- A completed 30-day purge has already removed/blanked transcript rows.
+      -- Never recompute from the now-empty transcript; require its tombstone.
+      IF v_session.character_id IS NOT NULL
+         AND NOT EXISTS (
+           SELECT 1
+           FROM public.chat_deletion_character_history AS h
+           WHERE h.resource_type = 'single_session'
+             AND h.resource_id = v_session.id
+             AND h.character_id = v_session.character_id
+         ) THEN
+        RAISE EXCEPTION 'account_chat_history_tombstone_missing'
+          USING ERRCODE = '23514';
+      END IF;
+    ELSE
+      PERFORM private.snapshot_chat_deletion_character_turn_stats(
+        'single_session', v_session.id, p_user_id
+      );
+    END IF;
+  END LOOP;
+
+  FOR v_group IN
+    SELECT g.id, g.world_character_id
+    FROM public.chat_groups AS g
+    WHERE g.owner_id = p_user_id
+    ORDER BY g.id
+  LOOP
+    IF EXISTS (
+      SELECT 1
+      FROM public.chat_deletion_jobs AS j
+      WHERE j.resource_type = 'group'
+        AND j.resource_id = v_group.id
+        AND j.status = 'completed'
+    ) THEN
+      -- Group purge removes member/message rows. The durable history table is
+      -- then the only authoritative record of members that never replied.
+      IF NOT EXISTS (
+        SELECT 1
+        FROM public.chat_deletion_character_history AS h
+        WHERE h.resource_type = 'group'
+          AND h.resource_id = v_group.id
+      ) THEN
+        RAISE EXCEPTION 'account_group_history_tombstone_missing'
+          USING ERRCODE = '23514';
+      END IF;
+      IF v_group.world_character_id IS NOT NULL
+         AND NOT EXISTS (
+           SELECT 1
+           FROM public.chat_deletion_character_history AS h
+           WHERE h.resource_type = 'group'
+             AND h.resource_id = v_group.id
+             AND h.character_id = v_group.world_character_id
+         ) THEN
+        RAISE EXCEPTION 'account_group_world_character_tombstone_missing'
+          USING ERRCODE = '23514';
+      END IF;
+      IF EXISTS (
+        SELECT 1
+        FROM public.chat_deletion_character_turn_stats AS st
+        LEFT JOIN public.chat_deletion_character_history AS h
+          ON h.resource_type = st.resource_type
+         AND h.resource_id = st.resource_id
+         AND h.character_id = st.character_id
+        WHERE st.resource_type = 'group'
+          AND st.resource_id = v_group.id
+          AND h.character_id IS NULL
+      ) THEN
+        RAISE EXCEPTION 'account_group_turn_stats_tombstone_mismatch'
+          USING ERRCODE = '23514';
+      END IF;
+    ELSE
+      PERFORM private.snapshot_chat_deletion_character_turn_stats(
+        'group', v_group.id, p_user_id
+      );
+    END IF;
+  END LOOP;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.snapshot_account_chat_character_history(uuid)
+  FROM PUBLIC, anon, authenticated, service_role;
+
+-- Backfill any already soft-deleted parents before the new count RPCs start
+-- including archived statistics. Idempotent by the resource/character key.
+INSERT INTO public.chat_deletion_character_turn_stats (
+  resource_type, resource_id, character_id, turn_count
+)
+SELECT
+  'single_session',
+  s.id,
+  s.character_id,
+  pg_catalog.count(m.id)::bigint
+FROM public.chat_sessions AS s
+JOIN public.chat_messages AS m
+  ON m.session_id = s.id
+ AND m.role = 'assistant'
+ AND m.deleted_at IS NULL
+WHERE s.deleted_at IS NOT NULL
+  AND s.character_id IS NOT NULL
+GROUP BY s.id, s.user_id, s.character_id
+HAVING pg_catalog.count(m.id) > 0
+ON CONFLICT (resource_type, resource_id, character_id) DO NOTHING;
+
+INSERT INTO public.chat_deletion_character_turn_stats (
+  resource_type, resource_id, character_id, turn_count
+)
+SELECT
+  'group',
+  g.id,
+  gm.character_id,
+  pg_catalog.count(gm.id)::bigint
+FROM public.chat_groups AS g
+JOIN public.chat_group_messages AS gm
+  ON gm.group_id = g.id
+ AND gm.speaker_type = 'character'
+ AND gm.deleted_at IS NULL
+ AND gm.character_id IS NOT NULL
+WHERE g.deleted_at IS NOT NULL
+GROUP BY g.id, g.owner_id, gm.character_id
+HAVING pg_catalog.count(gm.id) > 0
+ON CONFLICT (resource_type, resource_id, character_id) DO NOTHING;
+
+-- Backfill immutable character-use tombstones for existing deleted parents
+-- before day-30 purge removes group membership/message rows. Existing turn
+-- aggregates are also a source for groups whose member rows were already purged.
+INSERT INTO public.chat_deletion_character_history (
+  resource_type, resource_id, character_id
+)
+SELECT 'single_session', s.id, s.character_id
+FROM public.chat_sessions AS s
+WHERE s.deleted_at IS NOT NULL
+  AND s.character_id IS NOT NULL
+ON CONFLICT (resource_type, resource_id, character_id) DO NOTHING;
+
+INSERT INTO public.chat_deletion_character_history (
+  resource_type, resource_id, character_id
+)
+SELECT 'group', g.id, source.character_id
+FROM public.chat_groups AS g
+CROSS JOIN LATERAL (
+  SELECT gm.character_id
+  FROM public.chat_group_members AS gm
+  WHERE gm.group_id = g.id
+  UNION
+  SELECT gm.character_id
+  FROM public.chat_group_messages AS gm
+  WHERE gm.group_id = g.id
+  UNION
+  SELECT g.world_character_id AS character_id
+  UNION
+  SELECT st.character_id
+  FROM public.chat_deletion_character_turn_stats AS st
+  WHERE st.resource_type = 'group' AND st.resource_id = g.id
+) AS source
+WHERE g.deleted_at IS NOT NULL
+  AND source.character_id IS NOT NULL
+ON CONFLICT (resource_type, resource_id, character_id) DO NOTHING;
+
+-- Legacy deleted sessions without a queue job must join the same 30-day
+-- lifecycle. The 30-day deadline is based on their original deleted_at.
+INSERT INTO public.chat_deletion_jobs (
+  resource_type, resource_id, owner_id, deleted_at, purge_after, status
+)
+SELECT
+  'single_session',
+  s.id,
+  s.user_id,
+  s.deleted_at,
+  s.deleted_at + interval '30 days',
+  'queued'
+FROM public.chat_sessions AS s
+WHERE s.deleted_at IS NOT NULL
+ON CONFLICT (resource_type, resource_id) DO NOTHING;
+
+INSERT INTO public.chat_deletion_jobs (
+  resource_type, resource_id, owner_id, deleted_at, purge_after, status
+)
+SELECT
+  'group',
+  g.id,
+  g.owner_id,
+  g.deleted_at,
+  g.deleted_at + interval '30 days',
+  'queued'
+FROM public.chat_groups AS g
+WHERE g.deleted_at IS NOT NULL
+ON CONFLICT (resource_type, resource_id) DO NOTHING;
+
+-- Fail closed if an existing resource job conflicts with the legacy parent.
+DO $block$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM public.chat_sessions AS s
+    JOIN public.chat_deletion_jobs AS j
+      ON j.resource_type = 'single_session' AND j.resource_id = s.id
+    WHERE s.deleted_at IS NOT NULL
+      AND (j.owner_id IS DISTINCT FROM s.user_id OR j.deleted_at IS DISTINCT FROM s.deleted_at)
+  ) OR EXISTS (
+    SELECT 1
+    FROM public.chat_groups AS g
+    JOIN public.chat_deletion_jobs AS j
+      ON j.resource_type = 'group' AND j.resource_id = g.id
+    WHERE g.deleted_at IS NOT NULL
+      AND (j.owner_id IS DISTINCT FROM g.owner_id OR j.deleted_at IS DISTINCT FROM g.deleted_at)
+  ) THEN
+    RAISE EXCEPTION 'chat_deletion_job_conflict';
+  END IF;
+END;
+$block$;
+
+-- Fail closed if a Storage path is already assigned to a different deletion job.
+DO $block$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM public.chat_memory_photos AS p
+    JOIN public.chat_deletion_jobs AS j
+      ON ((p.chat_type = 'single' AND j.resource_type = 'single_session' AND j.resource_id = p.session_id)
+       OR (p.chat_type = 'group' AND j.resource_type = 'group' AND j.resource_id = p.group_id))
+    JOIN public.chat_storage_deletion_jobs AS sj
+      ON sj.bucket_id = 'personax-memory-photos'
+     AND sj.object_path = p.storage_path
+    WHERE sj.owner_id IS DISTINCT FROM j.owner_id
+       OR sj.deletion_job_id IS DISTINCT FROM j.id
+  ) THEN
+    RAISE EXCEPTION 'chat_storage_deletion_job_conflict';
+  END IF;
+END;
+$block$;
+
+-- Fail closed if any legacy photo path violates the existing owner-prefix rule.
+DO $block$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM public.chat_memory_photos AS p
+    JOIN public.chat_deletion_jobs AS j
+      ON j.resource_type = 'single_session'
+     AND j.resource_id = p.session_id
+    WHERE p.chat_type = 'single'
+      AND (p.owner_id IS DISTINCT FROM j.owner_id
+        OR pg_catalog.left(p.storage_path, pg_catalog.char_length(j.owner_id::text) + 1)
+           <> j.owner_id::text || '/')
+  ) OR EXISTS (
+    SELECT 1
+    FROM public.chat_memory_photos AS p
+    JOIN public.chat_deletion_jobs AS j
+      ON j.resource_type = 'group'
+     AND j.resource_id = p.group_id
+    WHERE p.chat_type = 'group'
+      AND (p.owner_id IS DISTINCT FROM j.owner_id
+        OR pg_catalog.left(p.storage_path, pg_catalog.char_length(j.owner_id::text) + 1)
+           <> j.owner_id::text || '/')
+  ) THEN
+    RAISE EXCEPTION 'chat_storage_path_owner_mismatch';
+  END IF;
+END;
+$block$;
+
+INSERT INTO public.chat_storage_deletion_jobs (
+  deletion_job_id, bucket_id, object_path, resource_type, resource_id, owner_id
+)
+SELECT
+  j.id,
+  'personax-memory-photos',
+  p.storage_path,
+  'single_session',
+  p.session_id,
+  p.owner_id
+FROM public.chat_memory_photos AS p
+JOIN public.chat_deletion_jobs AS j
+  ON j.resource_type = 'single_session'
+ AND j.resource_id = p.session_id
+WHERE p.chat_type = 'single'
+ON CONFLICT (bucket_id, object_path) DO NOTHING;
+
+INSERT INTO public.chat_storage_deletion_jobs (
+  deletion_job_id, bucket_id, object_path, resource_type, resource_id, owner_id
+)
+SELECT
+  j.id,
+  'personax-memory-photos',
+  p.storage_path,
+  'group',
+  p.group_id,
+  p.owner_id
+FROM public.chat_memory_photos AS p
+JOIN public.chat_deletion_jobs AS j
+  ON j.resource_type = 'group'
+ AND j.resource_id = p.group_id
+WHERE p.chat_type = 'group'
+ON CONFLICT (bucket_id, object_path) DO NOTHING;
+
+-- Existing player deletion RPCs, with only the snapshot call added.
+CREATE OR REPLACE FUNCTION public.delete_chat_session_content(p_session_id uuid)
+RETURNS TABLE(storage_path text)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_owner_id uuid;
+  v_deleted_at timestamptz;
+  v_job_id uuid;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'authentication_required' USING ERRCODE = '42501';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.account_deletion_requests r
+    WHERE r.user_id = v_user_id
+  ) THEN
+    RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT s.user_id, s.deleted_at
+    INTO v_owner_id, v_deleted_at
+  FROM public.chat_sessions s
+  WHERE s.id = p_session_id
+  FOR UPDATE;
+
+  IF NOT FOUND OR v_owner_id IS DISTINCT FROM v_user_id THEN
+    RAISE EXCEPTION 'session_not_found_or_not_owned' USING ERRCODE = '42501';
+  END IF;
+
+  v_deleted_at := COALESCE(v_deleted_at, pg_catalog.statement_timestamp());
+
+  INSERT INTO public.chat_deletion_jobs (
+    resource_type, resource_id, owner_id, deleted_at, purge_after, status
+  )
+  VALUES (
+    'single_session', p_session_id, v_user_id, v_deleted_at,
+    v_deleted_at + interval '30 days', 'queued'
+  )
+  ON CONFLICT (resource_type, resource_id) DO NOTHING;
+
+  SELECT j.id
+    INTO v_job_id
+  FROM public.chat_deletion_jobs j
+  WHERE j.resource_type = 'single_session'
+    AND j.resource_id = p_session_id
+    AND j.owner_id = v_user_id
+    AND j.deleted_at = v_deleted_at
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'chat_deletion_job_conflict' USING ERRCODE = '40001';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.chat_memory_photos p
+    WHERE p.session_id = p_session_id
+      AND p.chat_type = 'single'
+      AND p.owner_id = v_user_id
+      AND pg_catalog.left(p.storage_path, pg_catalog.char_length(v_user_id::text) + 1) <> v_user_id::text || '/'
+  ) THEN
+    RAISE EXCEPTION 'chat_storage_path_owner_mismatch' USING ERRCODE = '42501';
+  END IF;
+
+  INSERT INTO public.chat_storage_deletion_jobs (
+    deletion_job_id, bucket_id, object_path, resource_type, resource_id, owner_id
+  )
+  SELECT
+    v_job_id, 'personax-memory-photos', p.storage_path,
+    'single_session', p_session_id, v_user_id
+  FROM public.chat_memory_photos p
+  WHERE p.session_id = p_session_id
+    AND p.chat_type = 'single'
+    AND p.owner_id = v_user_id
+  ON CONFLICT (bucket_id, object_path) DO NOTHING;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.chat_storage_deletion_jobs sj
+    JOIN public.chat_memory_photos p ON p.storage_path = sj.object_path
+    WHERE p.session_id = p_session_id
+      AND p.chat_type = 'single'
+      AND p.owner_id = v_user_id
+      AND (sj.owner_id <> v_user_id OR sj.deletion_job_id <> v_job_id)
+  ) THEN
+    RAISE EXCEPTION 'chat_storage_deletion_job_conflict' USING ERRCODE = '40001';
+  END IF;
+
+  PERFORM private.snapshot_chat_deletion_character_turn_stats(
+    'single_session', p_session_id, v_user_id
+  );
+
+  UPDATE public.chat_sessions s
+  SET deleted_at = COALESCE(s.deleted_at, v_deleted_at),
+      updated_at = pg_catalog.statement_timestamp()
+  WHERE s.id = p_session_id
+    AND s.user_id = v_user_id;
+
+  RETURN QUERY SELECT NULL::text WHERE false;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.delete_chat_group_with_related_data(p_group_id uuid)
+RETURNS TABLE(storage_path text)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_owner_id uuid;
+  v_deleted_at timestamptz;
+  v_job_id uuid;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'authentication_required' USING ERRCODE = '42501';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.account_deletion_requests r
+    WHERE r.user_id = v_user_id
+  ) THEN
+    RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT g.owner_id, g.deleted_at
+    INTO v_owner_id, v_deleted_at
+  FROM public.chat_groups g
+  WHERE g.id = p_group_id
+  FOR UPDATE;
+
+  IF NOT FOUND OR v_owner_id IS DISTINCT FROM v_user_id THEN
+    RAISE EXCEPTION 'group_not_found_or_not_owned' USING ERRCODE = '42501';
+  END IF;
+
+  v_deleted_at := COALESCE(v_deleted_at, pg_catalog.statement_timestamp());
+
+  INSERT INTO public.chat_deletion_jobs (
+    resource_type, resource_id, owner_id, deleted_at, purge_after, status
+  )
+  VALUES (
+    'group', p_group_id, v_user_id, v_deleted_at,
+    v_deleted_at + interval '30 days', 'queued'
+  )
+  ON CONFLICT (resource_type, resource_id) DO NOTHING;
+
+  SELECT j.id
+    INTO v_job_id
+  FROM public.chat_deletion_jobs j
+  WHERE j.resource_type = 'group'
+    AND j.resource_id = p_group_id
+    AND j.owner_id = v_user_id
+    AND j.deleted_at = v_deleted_at
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'chat_deletion_job_conflict' USING ERRCODE = '40001';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.chat_memory_photos p
+    WHERE p.group_id = p_group_id
+      AND p.chat_type = 'group'
+      AND p.owner_id = v_user_id
+      AND pg_catalog.left(p.storage_path, pg_catalog.char_length(v_user_id::text) + 1) <> v_user_id::text || '/'
+  ) THEN
+    RAISE EXCEPTION 'chat_storage_path_owner_mismatch' USING ERRCODE = '42501';
+  END IF;
+
+  INSERT INTO public.chat_storage_deletion_jobs (
+    deletion_job_id, bucket_id, object_path, resource_type, resource_id, owner_id
+  )
+  SELECT
+    v_job_id, 'personax-memory-photos', p.storage_path,
+    'group', p_group_id, v_user_id
+  FROM public.chat_memory_photos p
+  WHERE p.group_id = p_group_id
+    AND p.chat_type = 'group'
+    AND p.owner_id = v_user_id
+  ON CONFLICT (bucket_id, object_path) DO NOTHING;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.chat_storage_deletion_jobs sj
+    JOIN public.chat_memory_photos p ON p.storage_path = sj.object_path
+    WHERE p.group_id = p_group_id
+      AND p.chat_type = 'group'
+      AND p.owner_id = v_user_id
+      AND (sj.owner_id <> v_user_id OR sj.deletion_job_id <> v_job_id)
+  ) THEN
+    RAISE EXCEPTION 'chat_storage_deletion_job_conflict' USING ERRCODE = '40001';
+  END IF;
+
+  PERFORM private.snapshot_chat_deletion_character_turn_stats(
+    'group', p_group_id, v_user_id
+  );
+
+  UPDATE public.chat_groups g
+  SET deleted_at = COALESCE(g.deleted_at, v_deleted_at),
+      updated_at = pg_catalog.statement_timestamp()
+  WHERE g.id = p_group_id
+    AND g.owner_id = v_user_id;
+
+  RETURN QUERY SELECT NULL::text WHERE false;
+END;
+$function$;
+
+-- Purge worker: add an idempotent last-chance snapshot before content is erased.
+CREATE OR REPLACE FUNCTION public.purge_chat_deletion_job(p_job_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_job public.chat_deletion_jobs%ROWTYPE;
+  v_owner_id uuid;
+  v_parent_deleted_at timestamptz;
+  v_parent_found boolean := false;
+BEGIN
+  IF COALESCE(auth.role(), '') <> 'service_role' THEN
+    RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
+  END IF;
+  IF p_job_id IS NULL THEN
+    RAISE EXCEPTION 'job_id_required' USING ERRCODE = '22023';
+  END IF;
+
+  SELECT * INTO v_job FROM public.chat_deletion_jobs WHERE id = p_job_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'chat_deletion_job_not_found'; END IF;
+  IF v_job.status = 'completed' THEN RETURN true; END IF;
+  IF v_job.purge_after > pg_catalog.clock_timestamp() THEN
+    RAISE EXCEPTION 'chat_deletion_not_due';
+  END IF;
+
+  IF v_job.resource_type = 'single_session' THEN
+    SELECT s.user_id, s.deleted_at
+      INTO v_owner_id, v_parent_deleted_at
+    FROM public.chat_sessions s
+    WHERE s.id = v_job.resource_id
+    FOR UPDATE;
+    v_parent_found := FOUND;
+  ELSIF v_job.resource_type = 'group' THEN
+    SELECT g.owner_id, g.deleted_at
+      INTO v_owner_id, v_parent_deleted_at
+    FROM public.chat_groups g
+    WHERE g.id = v_job.resource_id
+    FOR UPDATE;
+    v_parent_found := FOUND;
+  ELSE
+    RAISE EXCEPTION 'unsupported_chat_resource_type';
+  END IF;
+
+  SELECT * INTO v_job FROM public.chat_deletion_jobs WHERE id = p_job_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'chat_deletion_job_not_found'; END IF;
+  IF v_job.status = 'completed' THEN RETURN true; END IF;
+  IF v_job.status <> 'processing'
+     OR v_job.lease_until IS NULL
+     OR v_job.lease_until <= pg_catalog.clock_timestamp() THEN
+    RAISE EXCEPTION 'chat_deletion_job_lease_not_owned';
+  END IF;
+
+  IF v_parent_found THEN
+    IF v_owner_id IS DISTINCT FROM v_job.owner_id
+       OR v_parent_deleted_at IS DISTINCT FROM v_job.deleted_at THEN
+      RAISE EXCEPTION 'chat_deletion_parent_mismatch';
+    END IF;
+
+    PERFORM private.snapshot_chat_deletion_character_turn_stats(
+      v_job.resource_type, v_job.resource_id, v_job.owner_id
+    );
+
+    PERFORM pg_catalog.set_config('app.chat_purge_worker', 'on', true);
+
+    IF v_job.resource_type = 'single_session' THEN
+      DELETE FROM public.chat_message_versions v
+      WHERE v.message_id IN (
+        SELECT m.id FROM public.chat_messages m WHERE m.session_id = v_job.resource_id
+      );
+      UPDATE public.chat_messages m
+      SET content = '', deleted_at = COALESCE(m.deleted_at, v_job.deleted_at)
+      WHERE m.session_id = v_job.resource_id;
+      UPDATE public.ai_generation_records
+      SET original_content = ''
+      WHERE session_id = v_job.resource_id AND user_id = v_job.owner_id;
+      UPDATE public.encounter_session_turns
+      SET evaluation = '{}'::jsonb
+      WHERE session_id = v_job.resource_id;
+      UPDATE public.encounter_session_lifecycle
+      SET schedule_snapshot = '{}'::jsonb,
+          settlement_result = '{}'::jsonb,
+          updated_at = pg_catalog.clock_timestamp()
+      WHERE session_id = v_job.resource_id;
+      DELETE FROM public.encounter_session_evaluation_jobs
+      WHERE session_id = v_job.resource_id;
+      UPDATE public.encounter_turn_interaction_receipts r
+      SET diary_id = NULL
+      FROM public.chat_turn_charges c
+      WHERE c.turn_id = r.turn_id
+        AND c.session_id = v_job.resource_id
+        AND r.diary_id IS NOT NULL;
+      DELETE FROM public.encounter_diary d
+      WHERE d.user_id = v_job.owner_id
+        AND d.metadata->>'session_id' = v_job.resource_id::text;
+      UPDATE public.story_relationship_batches
+      SET summary = NULL, evaluation = '{}'::jsonb
+      WHERE session_id = v_job.resource_id;
+      UPDATE public.story_relationship_states
+      SET imported_memories = '[]'::jsonb, updated_at = pg_catalog.clock_timestamp()
+      WHERE session_id = v_job.resource_id;
+      DELETE FROM public.chat_memory_photos
+      WHERE session_id = v_job.resource_id AND owner_id = v_job.owner_id;
+      UPDATE public.chat_sessions
+      SET session_data = '{}'::jsonb,
+          character_snapshot = '{}'::jsonb,
+          updated_at = pg_catalog.clock_timestamp()
+      WHERE id = v_job.resource_id AND user_id = v_job.owner_id;
+    ELSE
+      UPDATE public.chat_groups
+      SET background_mode = 'none',
+          background_memory_photo_id = NULL,
+          name = '已刪除對話',
+          world_background = '',
+          player_name = '',
+          player_persona = '',
+          world_character_id = NULL,
+          pinned = false,
+          updated_at = pg_catalog.clock_timestamp()
+      WHERE id = v_job.resource_id AND owner_id = v_job.owner_id;
+      DELETE FROM public.chat_group_messages WHERE group_id = v_job.resource_id;
+      DELETE FROM public.chat_group_diary
+      WHERE group_id = v_job.resource_id AND owner_id = v_job.owner_id;
+      DELETE FROM public.chat_group_memory_photos
+      WHERE group_id = v_job.resource_id AND owner_id = v_job.owner_id;
+      DELETE FROM public.chat_memory_photos
+      WHERE group_id = v_job.resource_id AND owner_id = v_job.owner_id;
+      DELETE FROM public.chat_group_members WHERE group_id = v_job.resource_id;
+      DELETE FROM public.chat_group_scenes WHERE group_id = v_job.resource_id;
+      UPDATE public.chat_group_turns
+      SET request_content = '[purged]'
+      WHERE group_id = v_job.resource_id;
+    END IF;
+  END IF;
+
+  UPDATE public.chat_deletion_jobs
+  SET status = 'completed',
+      next_attempt_at = NULL,
+      lease_until = NULL,
+      last_error_code = NULL,
+      updated_at = pg_catalog.clock_timestamp()
+  WHERE id = p_job_id;
+
+  RETURN true;
+END;
+$function$;
+
+-- Current live count RPC definitions plus:
+--   1) read live messages only from active parents,
+--   2) add immutable per-character snapshots for deleted parents.
+-- IMPORTANT: deleting a chat must NOT reduce a character's historical total.
+-- A deleted group's contribution moves from live child messages to this archive;
+-- after day-30 transcript purge the same archived contribution remains counted.
+CREATE OR REPLACE FUNCTION public.get_character_turn_counts(p_character_ids uuid[])
+RETURNS TABLE(character_id uuid, turn_count bigint)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  WITH requested AS (
+    SELECT DISTINCT unnest(COALESCE(p_character_ids, ARRAY[]::uuid[])) AS character_id
+  ),
+  allowed AS (
+    SELECT c.id AS character_id
+    FROM public.characters AS c
+    JOIN requested AS r ON r.character_id = c.id
+    WHERE (
+      -- Owners retain access to their own statistics even after soft-deleting
+      -- a character. Public callers must never see deleted-character counts.
+      c.author_id = (SELECT auth.uid())
+      OR (
+        c.deleted_at IS NULL
+        AND c.visibility = 'public'
+        AND (
+          c.is_nsfw IS NOT TRUE
+          OR ((SELECT auth.uid()) IS NOT NULL AND private.current_user_is_adult())
+        )
+      )
+    )
+  ),
+  solo_counts AS (
+    SELECT s.character_id, pg_catalog.count(m.id)::bigint AS turn_count
+    FROM public.chat_sessions AS s
+    LEFT JOIN public.chat_messages AS m
+      ON m.session_id = s.id
+     AND m.role = 'assistant'
+     AND m.deleted_at IS NULL
+    JOIN allowed AS a ON a.character_id = s.character_id
+    WHERE s.deleted_at IS NULL
+    GROUP BY s.character_id
+  ),
+  group_counts AS (
+    SELECT gm.character_id, pg_catalog.count(gm.id)::bigint AS turn_count
+    FROM public.chat_group_messages AS gm
+    JOIN public.chat_groups AS g
+      ON g.id = gm.group_id
+     AND g.deleted_at IS NULL
+    JOIN allowed AS a ON a.character_id = gm.character_id
+    WHERE gm.speaker_type = 'character'
+      AND gm.deleted_at IS NULL
+    GROUP BY gm.character_id
+  ),
+  archived_counts AS (
+    SELECT st.character_id, pg_catalog.sum(st.turn_count)::bigint AS turn_count
+    FROM public.chat_deletion_character_turn_stats AS st
+    JOIN allowed AS a ON a.character_id = st.character_id
+    WHERE (
+      -- During account deletion, snapshots are committed before Auth FK
+      -- cascades remove the author's own active chat parents. Until that
+      -- cascade occurs, the live parent/message path remains authoritative;
+      -- count the snapshot only after the parent is soft-deleted or absent.
+      (st.resource_type = 'single_session' AND NOT EXISTS (
+        SELECT 1 FROM public.chat_sessions AS s
+        WHERE s.id = st.resource_id AND s.deleted_at IS NULL
+      ))
+      OR
+      (st.resource_type = 'group' AND NOT EXISTS (
+        SELECT 1 FROM public.chat_groups AS g
+        WHERE g.id = st.resource_id AND g.deleted_at IS NULL
+      ))
+    )
+    GROUP BY st.character_id
+  )
+  SELECT
+    a.character_id,
+    COALESCE(sc.turn_count, 0)
+      + COALESCE(gc.turn_count, 0)
+      + COALESCE(ac.turn_count, 0) AS turn_count
+  FROM allowed AS a
+  LEFT JOIN solo_counts AS sc ON sc.character_id = a.character_id
+  LEFT JOIN group_counts AS gc ON gc.character_id = a.character_id
+  LEFT JOIN archived_counts AS ac ON ac.character_id = a.character_id;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.get_public_character_turn_count(p_character_id uuid)
+RETURNS bigint
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT
+    (
+      SELECT pg_catalog.count(m.id)::bigint
+      FROM public.chat_sessions AS s
+      LEFT JOIN public.chat_messages AS m
+        ON m.session_id = s.id
+       AND m.role = 'assistant'
+       AND m.deleted_at IS NULL
+      WHERE s.character_id = c.id
+        AND s.deleted_at IS NULL
+    )
+    +
+    (
+      SELECT pg_catalog.count(gm.id)::bigint
+      FROM public.chat_group_messages AS gm
+      JOIN public.chat_groups AS g
+        ON g.id = gm.group_id
+       AND g.deleted_at IS NULL
+      WHERE gm.character_id = c.id
+        AND gm.speaker_type = 'character'
+        AND gm.deleted_at IS NULL
+    )
+    +
+    (
+      SELECT COALESCE(pg_catalog.sum(st.turn_count), 0)::bigint
+      FROM public.chat_deletion_character_turn_stats AS st
+      WHERE st.character_id = c.id
+        AND (
+          (st.resource_type = 'single_session' AND NOT EXISTS (
+            SELECT 1 FROM public.chat_sessions AS s
+            WHERE s.id = st.resource_id AND s.deleted_at IS NULL
+          ))
+          OR
+          (st.resource_type = 'group' AND NOT EXISTS (
+            SELECT 1 FROM public.chat_groups AS g
+            WHERE g.id = st.resource_id AND g.deleted_at IS NULL
+          ))
+        )
+    )
+  FROM public.characters AS c
+  WHERE c.id = p_character_id
+    AND c.visibility = 'public'
+    AND c.deleted_at IS NULL
+    AND (
+      c.is_nsfw IS NOT TRUE
+      OR ((SELECT auth.uid()) IS NOT NULL AND private.current_user_is_adult())
+    );
+$function$;
+
+-- Preserve the current intended grants. Functions are created by postgres in
+-- the migration context; verify owner/search_path/ACL after local replay.
+REVOKE ALL ON FUNCTION public.delete_chat_session_content(uuid) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.delete_chat_group_with_related_data(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.delete_chat_session_content(uuid) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.delete_chat_group_with_related_data(uuid) TO authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.purge_chat_deletion_job(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.purge_chat_deletion_job(uuid) TO service_role;
+
+REVOKE ALL ON FUNCTION public.get_character_turn_counts(uuid[]) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_public_character_turn_count(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_character_turn_counts(uuid[]) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.get_public_character_turn_count(uuid) TO anon, authenticated, service_role;
+
+-- Required local regression tests before this draft can become a migration:
+-- A. Active single session: assistant message count is unchanged.
+-- B. Deleted single session: count is represented by exactly one archive snapshot.
+-- C. Active group: each character's assistant messages remain counted.
+-- D. Deleted parent group: raw child messages are excluded from the live path,
+--    but each character's pre-delete contribution remains in the aggregate via
+--    exactly one archive row; deletion must not reduce the historical total.
+-- D1. Verify both owner-visible and public aggregate RPCs still include the
+--     deleted group's archived contribution during the 30-day grace period and
+--     after transcript purge.
+-- E. Deleted individual group message is not included in the snapshot.
+-- F. Repeated delete RPC / worker retry does not duplicate archived counts.
+-- G. Worker purge after 30 days removes transcript rows but archived counts remain;
+--    re-running the worker cannot duplicate or erase the archived contribution.
+-- H. Failed deletion RPC rolls back both snapshot and job/parent changes.
+-- I. Concurrent writer vs delete: parent lock serializes; no message can be
+--    inserted after the snapshot and before deleted_at is committed.
+-- J. NSFW adult gate, owner-private access, deleted-character exclusion, grants,
+--    owner=postgres, SECURITY DEFINER and search_path='' are unchanged.
+-- K. Four legacy deleted sessions without jobs are queued at original
+--    deleted_at + 30 days; no chat photo objects are touched by this SQL.
+-- L. No role except postgres-owned SECURITY DEFINER code can directly read or
+--    write the aggregate table.\n\n-- ============================================================================\n-- B. History-aware character deletion and private asset cleanup queue\n-- ============================================================================\n\n-- History-aware character deletion and private Storage cleanup queue.
+-- PostgreSQL database after the full migration ledger has been reconciled.
+--
+CREATE SCHEMA IF NOT EXISTS private;
+
+-- Policy:
+--   * Any publication OR any single/group/legacy/encounter/story/comment record
+--     => soft-delete only; all existing player history remains.
+--   * Never published AND absolutely no history => enqueue private assets and
+--     hard-delete the character row in the same transaction.
+--   * Account deletion is separate and MUST preserve characters and assets.
+--   * Storage objects are never deleted by this SQL function.
+--   * Requires chat_deletion_character_history from the cumulative chat-deletion draft.
+
+CREATE TABLE IF NOT EXISTS public.character_asset_cleanup_jobs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  bucket_id text NOT NULL CHECK (bucket_id IN ('character-illustrations', 'character-avatar-videos')),
+  object_path text NOT NULL,
+  owner_id uuid NOT NULL,
+  character_id uuid NOT NULL,
+  status text NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'processing', 'completed', 'skipped', 'failed', 'dead_letter')),
+  attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  available_at timestamptz NOT NULL DEFAULT now(),
+  claimed_at timestamptz,
+  completed_at timestamptz,
+  last_error text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (bucket_id, object_path)
+);
+
+ALTER TABLE public.character_asset_cleanup_jobs ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.character_asset_cleanup_jobs FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.character_asset_cleanup_jobs TO service_role;
+CREATE INDEX IF NOT EXISTS character_asset_cleanup_jobs_due_idx
+  ON public.character_asset_cleanup_jobs (available_at, created_at)
+  WHERE status IN ('pending', 'failed');
+
+-- Serialize reference creation against cleanup enqueue/removal. A reference writer
+-- and the deletion transaction take the same transaction-scoped advisory lock
+-- for the exact bucket/path. Once a cleanup job exists, that path can never be
+-- reattached to a character or illustration.
+CREATE OR REPLACE FUNCTION private.lock_character_asset_path(
+  p_bucket_id text,
+  p_object_path text
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+BEGIN
+  IF p_bucket_id NOT IN ('character-illustrations', 'character-avatar-videos')
+     OR p_object_path IS NULL OR p_object_path = '' THEN
+    RAISE EXCEPTION 'invalid_character_asset_reference'
+      USING ERRCODE = '22023';
+  END IF;
+  PERFORM pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(p_bucket_id || ':' || p_object_path, 0)
+  );
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.lock_character_asset_path(text, text)
+  FROM PUBLIC, anon, authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION private.prevent_reuse_queued_character_asset()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_bucket_id text;
+  v_object_path text;
+BEGIN
+  IF TG_TABLE_NAME = 'characters' THEN
+    v_bucket_id := 'character-avatar-videos';
+    v_object_path := NEW.avatar_video_path;
+  ELSIF TG_TABLE_NAME = 'character_illustrations' THEN
+    v_bucket_id := 'character-illustrations';
+    v_object_path := NEW.storage_path;
+  ELSE
+    RAISE EXCEPTION 'unsupported_character_asset_reference_table';
+  END IF;
+
+  IF v_object_path IS NULL OR v_object_path = '' THEN
+    RETURN NEW;
+  END IF;
+
+  PERFORM private.lock_character_asset_path(v_bucket_id, v_object_path);
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.character_asset_cleanup_jobs AS j
+    WHERE j.bucket_id = v_bucket_id
+      AND j.object_path = v_object_path
+  ) THEN
+    RAISE EXCEPTION 'character_asset_path_cleanup_already_queued'
+      USING ERRCODE = '23514';
+  END IF;
+
+  RETURN NEW;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.prevent_reuse_queued_character_asset()
+  FROM PUBLIC, anon, authenticated, service_role;
+
+DROP TRIGGER IF EXISTS prevent_reuse_queued_character_avatar_video
+  ON public.characters;
+CREATE TRIGGER prevent_reuse_queued_character_avatar_video
+  BEFORE INSERT OR UPDATE OF avatar_video_path
+  ON public.characters
+  FOR EACH ROW
+  EXECUTE FUNCTION private.prevent_reuse_queued_character_asset();
+
+DROP TRIGGER IF EXISTS prevent_reuse_queued_character_illustration
+  ON public.character_illustrations;
+CREATE TRIGGER prevent_reuse_queued_character_illustration
+  BEFORE INSERT OR UPDATE OF storage_path
+  ON public.character_illustrations
+  FOR EACH ROW
+  EXECUTE FUNCTION private.prevent_reuse_queued_character_asset();
+
+CREATE OR REPLACE FUNCTION private.character_has_history(p_character_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+  SELECT
+    EXISTS (SELECT 1 FROM public.chat_sessions s
+            WHERE s.character_id = p_character_id)
+    OR EXISTS (SELECT 1 FROM public.chat_group_members gm
+               WHERE gm.character_id = p_character_id)
+    OR EXISTS (SELECT 1 FROM public.chat_group_messages gm
+               WHERE gm.character_id = p_character_id)
+    OR EXISTS (SELECT 1 FROM public.chat_deletion_character_history h
+               WHERE h.character_id = p_character_id)
+    OR EXISTS (SELECT 1 FROM public.chat_groups g
+               WHERE g.world_character_id = p_character_id)
+    OR EXISTS (
+      SELECT 1 FROM public.conversations cv
+      JOIN public.character_stories cs ON cs.id = cv.story_id
+      WHERE cs.character_id = p_character_id
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.encounter_character_state e
+      WHERE e.character_id = p_character_id
+    )
+    OR EXISTS (SELECT 1 FROM public.encounter_diary e
+               WHERE e.character_id = p_character_id)
+    OR EXISTS (SELECT 1 FROM public.encounter_turn_interaction_receipts e
+               WHERE e.character_id = p_character_id)
+    OR EXISTS (SELECT 1 FROM public.encounter_session_lifecycle e
+               WHERE e.character_id = p_character_id)
+    OR EXISTS (SELECT 1 FROM public.encounter_session_turns e
+               WHERE e.character_id = p_character_id)
+    OR EXISTS (SELECT 1 FROM public.encounter_session_evaluation_jobs e
+               WHERE e.character_id = p_character_id)
+    OR EXISTS (SELECT 1 FROM public.story_relationship_batches e
+               WHERE e.character_id = p_character_id)
+    OR EXISTS (SELECT 1 FROM public.story_relationship_states e
+               WHERE e.character_id = p_character_id)
+    OR EXISTS (SELECT 1 FROM public.character_comments c
+               WHERE c.character_id = p_character_id);
+$function$;
+
+REVOKE ALL ON FUNCTION private.character_has_history(uuid)
+  FROM PUBLIC, anon, authenticated, service_role;
+
+-- first_published_at is the durable evidence that a character was ever public.
+-- The live author UPDATE policy does not restrict this column, so without this
+-- trigger an author could clear the marker and make a previously published,
+-- currently-private character eligible for hard deletion.
+-- This private marker table is populated only by an AFTER INSERT trigger. That is
+-- deliberate: BEFORE INSERT also runs for INSERT ... ON CONFLICT DO UPDATE and could
+-- accidentally mark an existing legacy character as a newly-created private draft.
+CREATE TABLE IF NOT EXISTS private.character_private_draft_origins (
+  character_id uuid PRIMARY KEY
+    REFERENCES public.characters(id) ON DELETE CASCADE,
+  recorded_at timestamptz NOT NULL DEFAULT pg_catalog.statement_timestamp()
+);
+
+ALTER TABLE private.character_private_draft_origins ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON private.character_private_draft_origins FROM PUBLIC, anon, authenticated, service_role;
+
+-- Existing rows that are public at rollout are publication evidence. Legacy private
+-- rows remain ineligible for hard-delete because their prior visibility cannot be proven.
+UPDATE public.characters
+SET first_published_at = pg_catalog.statement_timestamp()
+WHERE visibility = 'public'
+  AND first_published_at IS NULL;
+
+CREATE OR REPLACE FUNCTION private.record_character_private_draft_origin()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+BEGIN
+  IF NEW.visibility = 'private'
+     AND NEW.review_status = 'draft'
+     AND NEW.first_published_at IS NULL THEN
+    INSERT INTO private.character_private_draft_origins (character_id)
+    VALUES (NEW.id)
+    ON CONFLICT (character_id) DO NOTHING;
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.record_character_private_draft_origin()
+  FROM PUBLIC, anon, authenticated, service_role;
+
+DROP TRIGGER IF EXISTS record_character_private_draft_origin
+  ON public.characters;
+CREATE TRIGGER record_character_private_draft_origin
+  AFTER INSERT ON public.characters
+  FOR EACH ROW
+  EXECUTE FUNCTION private.record_character_private_draft_origin();
+
+CREATE OR REPLACE FUNCTION private.preserve_character_first_publication_timestamp()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+BEGIN
+  IF TG_OP = 'UPDATE' AND OLD.first_published_at IS NOT NULL
+     AND NEW.first_published_at IS DISTINCT FROM OLD.first_published_at THEN
+    RAISE EXCEPTION 'character_first_publication_is_immutable'
+      USING ERRCODE = '42501';
+  END IF;
+
+  -- Existing public rows are backfilled above. This additional OLD-state check
+  -- protects any legacy public row missed by a partial/older rollout before it
+  -- transitions to private. Caller-supplied publication timestamps are replaced.
+  IF TG_OP = 'UPDATE' AND OLD.first_published_at IS NULL
+     AND (OLD.visibility = 'public' OR NEW.visibility = 'public') THEN
+    NEW.first_published_at := pg_catalog.statement_timestamp();
+  ELSIF TG_OP = 'UPDATE' AND OLD.first_published_at IS NULL
+        AND NEW.first_published_at IS NOT NULL THEN
+    RAISE EXCEPTION 'character_first_publication_marker_is_server_managed'
+      USING ERRCODE = '42501';
+  END IF;
+
+  IF NEW.visibility = 'public' AND NEW.first_published_at IS NULL THEN
+    NEW.first_published_at := pg_catalog.statement_timestamp();
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.preserve_character_first_publication_timestamp()
+  FROM PUBLIC, anon, authenticated, service_role;
+
+DROP TRIGGER IF EXISTS preserve_character_first_publication_timestamp
+  ON public.characters;
+CREATE TRIGGER preserve_character_first_publication_timestamp
+  BEFORE INSERT OR UPDATE OF first_published_at, visibility
+  ON public.characters
+  FOR EACH ROW
+  EXECUTE FUNCTION private.preserve_character_first_publication_timestamp();
+
+REVOKE DELETE ON TABLE public.characters FROM PUBLIC, anon, authenticated, service_role;
+
+-- Legacy conversations cascade from character_stories. Prevent an author from
+-- deleting a story template that still anchors another player's legacy transcript.
+CREATE OR REPLACE FUNCTION private.prevent_character_story_delete_with_conversations()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM public.conversations AS cv
+    WHERE cv.story_id = OLD.id
+  ) THEN
+    RAISE EXCEPTION 'character_story_has_chat_history'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN OLD;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.prevent_character_story_delete_with_conversations()
+  FROM PUBLIC, anon, authenticated, service_role;
+
+DROP TRIGGER IF EXISTS prevent_character_story_delete_with_conversations
+  ON public.character_stories;
+CREATE TRIGGER prevent_character_story_delete_with_conversations
+  BEFORE DELETE ON public.character_stories
+  FOR EACH ROW
+  EXECUTE FUNCTION private.prevent_character_story_delete_with_conversations();
+
+-- Disposable PostgreSQL acceptance:
+-- 1. First transition to visibility='public' stamps first_published_at.
+-- 2. A later visibility='private' update retains the timestamp.
+-- 3. Attempting to clear/change a non-NULL timestamp fails.
+-- 4. A never-public private draft keeps first_published_at NULL.
+-- 5. Direct DELETE from characters is denied to anon/authenticated.
+-- 6. Deleting a story with a legacy conversation is rejected; unused story
+--    templates may still be deleted.
+-- 7. The history-aware hard-delete branch cannot be reached by clearing the marker.
+
+CREATE OR REPLACE FUNCTION public.soft_delete_character(p_character_id uuid)
+RETURNS timestamptz
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_author_id uuid;
+  v_first_published_at timestamptz;
+  v_private_draft_origin boolean;
+  v_visibility text;
+  v_review_status text;
+  v_deleted_at timestamptz;
+  v_avatar_video_path text;
+  v_has_history boolean;
+  v_asset record;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'authentication_required' USING ERRCODE = '42501';
+  END IF;
+  IF NOT public.account_is_active() THEN
+    RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT c.author_id, c.first_published_at,
+         EXISTS (SELECT 1 FROM private.character_private_draft_origins d WHERE d.character_id = c.id),
+         c.visibility, c.review_status, c.deleted_at, c.avatar_video_path
+    INTO v_author_id, v_first_published_at, v_private_draft_origin,
+         v_visibility, v_review_status, v_deleted_at, v_avatar_video_path
+  FROM public.characters c
+  WHERE c.id = p_character_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Character not found.';
+  END IF;
+  IF v_author_id IS DISTINCT FROM auth.uid() THEN
+    RAISE EXCEPTION 'Not allowed to delete this character.' USING ERRCODE = '42501';
+  END IF;
+  IF v_deleted_at IS NOT NULL THEN
+    RETURN v_deleted_at;
+  END IF;
+
+  v_deleted_at := pg_catalog.statement_timestamp();
+  v_has_history := private.character_has_history(p_character_id);
+
+  -- Fail closed on any publication evidence. first_published_at is the durable
+  -- marker, while the exact draft state is required. Unknown, NULL, pending,
+  -- rejected, approved, or future review states fail closed to soft-delete.
+  IF v_first_published_at IS NULL
+     AND v_private_draft_origin
+     AND v_visibility = 'private'
+     AND v_review_status = 'draft'
+     AND NOT v_has_history THEN
+    -- Storage paths must be exact author/character/object paths. Unknown URL,
+    -- base64, legacy or malformed formats fail closed and are not queued.
+    IF v_avatar_video_path IS NOT NULL THEN
+      IF v_avatar_video_path !~ (
+        '^' || auth.uid()::text || '/' || p_character_id::text || '/[^/]+$'
+      ) THEN
+        RAISE EXCEPTION 'character_asset_path_not_owned_or_invalid'
+          USING ERRCODE = '22023';
+      END IF;
+    END IF;
+
+    -- Acquire the same advisory locks as reference-write triggers in stable
+    -- order before queueing any object. This closes the check/remove race where
+    -- another character could adopt the path after the worker's reference check.
+    FOR v_asset IN
+      SELECT 'character-avatar-videos'::text AS bucket_id,
+             v_avatar_video_path AS object_path
+      WHERE v_avatar_video_path IS NOT NULL
+      UNION ALL
+      SELECT 'character-illustrations'::text, ci.storage_path
+      FROM public.character_illustrations AS ci
+      WHERE ci.character_id = p_character_id
+        AND ci.author_id = auth.uid()
+      ORDER BY 1, 2
+    LOOP
+      PERFORM private.lock_character_asset_path(v_asset.bucket_id, v_asset.object_path);
+    END LOOP;
+
+    -- Queue both asset types only after all exact-path advisory locks are held.
+    -- The reference-write trigger takes the same lock before checking the queue,
+    -- so a concurrent reattachment either commits first (worker later skips the
+    -- still-referenced object) or waits and is rejected after this job is visible.
+    IF v_avatar_video_path IS NOT NULL THEN
+      INSERT INTO public.character_asset_cleanup_jobs
+        (bucket_id, object_path, owner_id, character_id)
+      VALUES ('character-avatar-videos', v_avatar_video_path, auth.uid(), p_character_id)
+      ON CONFLICT (bucket_id, object_path) DO NOTHING;
+    END IF;
+
+    INSERT INTO public.character_asset_cleanup_jobs
+      (bucket_id, object_path, owner_id, character_id)
+    SELECT 'character-illustrations', ci.storage_path, auth.uid(), p_character_id
+    FROM public.character_illustrations ci
+    WHERE ci.character_id = p_character_id
+      AND ci.author_id = auth.uid()
+      AND ci.storage_path ~ (
+        '^' || auth.uid()::text || '/' || p_character_id::text || '/[^/]+$'
+      )
+    ON CONFLICT (bucket_id, object_path) DO NOTHING;
+
+    -- An unexpected illustration path must not be silently orphaned.
+    IF EXISTS (
+      SELECT 1 FROM public.character_illustrations ci
+      WHERE ci.character_id = p_character_id
+        AND (ci.author_id IS DISTINCT FROM auth.uid()
+             OR ci.storage_path IS NULL
+             OR ci.storage_path !~ (
+               '^' || auth.uid()::text || '/' || p_character_id::text || '/[^/]+$'
+             ))
+    ) THEN
+      RAISE EXCEPTION 'character_illustration_path_not_owned_or_invalid'
+        USING ERRCODE = '22023';
+    END IF;
+
+    DELETE FROM public.characters WHERE id = p_character_id;
+    RETURN v_deleted_at;
+  END IF;
+
+  -- Any published or historically used character is archived, never cascaded.
+  UPDATE public.characters
+  SET visibility = 'private',
+      review_status = 'draft',
+      deleted_at = v_deleted_at,
+      deletion_reason = 'author_deleted'
+  WHERE id = p_character_id;
+
+  UPDATE public.character_stories
+  SET visibility = 'private'
+  WHERE character_id = p_character_id;
+
+  -- Snapshot writes follow the same parent-first order as chat writers.
+  -- Existing sessions/groups stay active; only their character snapshot changes.
+  PERFORM 1
+  FROM public.chat_sessions AS session_parent
+  WHERE session_parent.character_id = p_character_id
+    AND session_parent.deleted_at IS NULL
+  ORDER BY session_parent.id
+  FOR UPDATE;
+
+  PERFORM 1
+  FROM public.chat_groups g
+  WHERE g.deleted_at IS NULL
+    AND EXISTS (
+      SELECT 1
+      FROM public.chat_group_members gm
+      WHERE gm.group_id = g.id
+        AND gm.character_id = p_character_id
+    )
+  ORDER BY g.id
+  FOR UPDATE;
+
+  UPDATE public.chat_sessions AS parent_session
+  SET character_snapshot = COALESCE(parent_session.character_snapshot, '{}'::jsonb) ||
+    jsonb_build_object(
+      'authorId', v_author_id,
+      'visibility', 'private',
+      'firstPublishedAt', v_first_published_at,
+      'deletedAt', v_deleted_at
+    ),
+    updated_at = v_deleted_at
+  WHERE parent_session.character_id = p_character_id
+    AND parent_session.deleted_at IS NULL;
+
+  UPDATE public.chat_group_members gm
+  SET character_snapshot = COALESCE(gm.character_snapshot, '{}'::jsonb) ||
+    jsonb_build_object(
+      'authorId', v_author_id,
+      'visibility', 'private',
+      'firstPublishedAt', v_first_published_at,
+      'deletedAt', v_deleted_at
+    )
+  WHERE gm.character_id = p_character_id
+    AND EXISTS (
+      SELECT 1 FROM public.chat_groups g
+      WHERE g.id = gm.group_id AND g.deleted_at IS NULL
+    );
+
+  UPDATE public.chat_group_messages gm
+  SET speaker_snapshot = COALESCE(gm.speaker_snapshot, '{}'::jsonb) ||
+    jsonb_build_object(
+      'authorId', v_author_id,
+      'visibility', 'private',
+      'firstPublishedAt', v_first_published_at,
+      'deletedAt', v_deleted_at
+    )
+  WHERE gm.character_id = p_character_id
+    AND EXISTS (
+      SELECT 1 FROM public.chat_groups g
+      WHERE g.id = gm.group_id AND g.deleted_at IS NULL
+    );
+
+  RETURN v_deleted_at;
+END;
+$function$;
+
+-- Preserve the existing public RPC call contract, but don't broaden execution.
+REVOKE ALL ON FUNCTION public.soft_delete_character(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.soft_delete_character(uuid) TO authenticated;
+
+-- Service-only claim/finalize endpoints for a future Edge worker.
+-- The worker must verify that the path is not referenced by another live character
+-- or illustration before Storage.remove(); bucket IDs are allowlisted above.
+CREATE OR REPLACE FUNCTION public.claim_character_asset_cleanup_jobs(p_limit integer DEFAULT 50)
+RETURNS TABLE(id uuid, bucket_id text, object_path text, owner_id uuid, character_id uuid)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+BEGIN
+  IF (auth.jwt() ->> 'role') IS DISTINCT FROM 'service_role' THEN
+    RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
+  END IF;
+  UPDATE public.character_asset_cleanup_jobs j
+  SET status = 'dead_letter',
+      claimed_at = NULL,
+      last_error = COALESCE(j.last_error, 'lease_expired_after_max_attempts'),
+      updated_at = pg_catalog.statement_timestamp()
+  WHERE j.status = 'processing'
+    AND j.claimed_at < pg_catalog.statement_timestamp() - interval '15 minutes'
+    AND j.attempts >= 8;
+
+  RETURN QUERY
+  WITH due AS (
+    SELECT j.id
+    FROM public.character_asset_cleanup_jobs j
+    WHERE (
+        (j.status IN ('pending', 'failed') AND j.available_at <= pg_catalog.statement_timestamp())
+        OR (j.status = 'processing' AND j.claimed_at < pg_catalog.statement_timestamp() - interval '15 minutes')
+      )
+      AND j.attempts < 8
+    ORDER BY j.created_at
+    FOR UPDATE SKIP LOCKED
+    LIMIT GREATEST(1, LEAST(COALESCE(p_limit, 50), 100))
+  )
+  UPDATE public.character_asset_cleanup_jobs j
+  SET status = 'processing',
+      attempts = j.attempts + 1,
+      claimed_at = pg_catalog.statement_timestamp(),
+      updated_at = pg_catalog.statement_timestamp()
+  FROM due
+  WHERE j.id = due.id
+  RETURNING j.id, j.bucket_id, j.object_path, j.owner_id, j.character_id;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.finish_character_asset_cleanup_job(
+  p_job_id uuid,
+  p_status text,
+  p_error text DEFAULT NULL
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+BEGIN
+  IF (auth.jwt() ->> 'role') IS DISTINCT FROM 'service_role' THEN
+    RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
+  END IF;
+  IF p_status NOT IN ('completed', 'skipped', 'failed', 'dead_letter') THEN
+    RAISE EXCEPTION 'invalid_cleanup_status' USING ERRCODE = '22023';
+  END IF;
+  UPDATE public.character_asset_cleanup_jobs j
+  SET status = CASE WHEN p_status = 'failed' AND j.attempts >= 8 THEN 'dead_letter' ELSE p_status END,
+      last_error = CASE WHEN p_status IN ('failed', 'dead_letter') THEN left(COALESCE(p_error, 'unknown'), 1000) ELSE NULL END,
+      available_at = CASE WHEN p_status = 'failed'
+        THEN pg_catalog.statement_timestamp() + pg_catalog.make_interval(mins => LEAST(60, (2 ^ LEAST(j.attempts, 6))::integer))
+        ELSE j.available_at END,
+      completed_at = CASE WHEN p_status IN ('completed', 'skipped') THEN pg_catalog.statement_timestamp() ELSE NULL END,
+      claimed_at = NULL,
+      updated_at = pg_catalog.statement_timestamp()
+  WHERE j.id = p_job_id AND j.status = 'processing';
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'cleanup_job_not_claimed' USING ERRCODE = 'P0002';
+  END IF;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.claim_character_asset_cleanup_jobs(integer)
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.finish_character_asset_cleanup_job(uuid, text, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_character_asset_cleanup_jobs(integer)
+  TO service_role;
+GRANT EXECUTE ON FUNCTION public.finish_character_asset_cleanup_job(uuid, text, text)
+  TO service_role;
+
+-- Not yet included: Storage worker deployment/scheduler. Pending jobs intentionally
+-- retain their objects until an audited Edge worker with reference checks is ready.\n\n-- ============================================================================\n-- C. Parent-first character snapshot synchronization\n-- ============================================================================\n\n-- The same post-delete freeze must cover character soft deletion itself.
+-- The existing soft_delete_character() also rewrites snapshots, so fixing only
+-- sync_character_chat_snapshot() would leave a second SECURITY DEFINER bypass.
+-- Merge the history-aware hard-delete path with parent locking for both
+-- member and message references. The character row is locked first, followed
+-- by active chat parents, matching sync_character_chat_snapshot's lock order.
+CREATE OR REPLACE FUNCTION public.soft_delete_character(p_character_id uuid)
+RETURNS timestamptz
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_author_id uuid;
+  v_first_published_at timestamptz;
+  v_private_draft_origin boolean;
+  v_visibility text;
+  v_review_status text;
+  v_deleted_at timestamptz;
+  v_avatar_video_path text;
+  v_has_history boolean;
+  v_asset record;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'authentication_required' USING ERRCODE = '42501';
+  END IF;
+  IF NOT public.account_is_active() THEN
+    RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT c.author_id, c.first_published_at,
+         EXISTS (SELECT 1 FROM private.character_private_draft_origins d WHERE d.character_id = c.id),
+         c.visibility, c.review_status, c.deleted_at, c.avatar_video_path
+    INTO v_author_id, v_first_published_at, v_private_draft_origin,
+         v_visibility, v_review_status, v_deleted_at, v_avatar_video_path
+  FROM public.characters c
+  WHERE c.id = p_character_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Character not found.';
+  END IF;
+  IF v_author_id IS DISTINCT FROM auth.uid() THEN
+    RAISE EXCEPTION 'Not allowed to delete this character.' USING ERRCODE = '42501';
+  END IF;
+  IF v_deleted_at IS NOT NULL THEN
+    RETURN v_deleted_at;
+  END IF;
+
+  v_deleted_at := pg_catalog.statement_timestamp();
+  v_has_history := private.character_has_history(p_character_id);
+
+  -- Fail closed on any publication evidence. first_published_at is the durable
+  -- marker, while the exact draft state is required. Unknown, NULL, pending,
+  -- rejected, approved, or future review states fail closed to soft-delete.
+  IF v_first_published_at IS NULL
+     AND v_private_draft_origin
+     AND v_visibility = 'private'
+     AND v_review_status = 'draft'
+     AND NOT v_has_history THEN
+    -- Storage paths must be exact author/character/object paths. Unknown URL,
+    -- base64, legacy or malformed formats fail closed and are not queued.
+    IF v_avatar_video_path IS NOT NULL THEN
+      IF v_avatar_video_path !~ (
+        '^' || auth.uid()::text || '/' || p_character_id::text || '/[^/]+$'
+      ) THEN
+        RAISE EXCEPTION 'character_asset_path_not_owned_or_invalid'
+          USING ERRCODE = '22023';
+      END IF;
+    END IF;
+
+    -- Acquire the same advisory locks as reference-write triggers in stable
+    -- order before queueing any object. This closes the check/remove race where
+    -- another character could adopt the path after the worker's reference check.
+    FOR v_asset IN
+      SELECT 'character-avatar-videos'::text AS bucket_id,
+             v_avatar_video_path AS object_path
+      WHERE v_avatar_video_path IS NOT NULL
+      UNION ALL
+      SELECT 'character-illustrations'::text, ci.storage_path
+      FROM public.character_illustrations AS ci
+      WHERE ci.character_id = p_character_id
+        AND ci.author_id = auth.uid()
+      ORDER BY 1, 2
+    LOOP
+      PERFORM private.lock_character_asset_path(v_asset.bucket_id, v_asset.object_path);
+    END LOOP;
+
+    -- Queue both asset types only after all exact-path advisory locks are held.
+    -- The reference-write trigger takes the same lock before checking the queue,
+    -- so a concurrent reattachment either commits first (worker later skips the
+    -- still-referenced object) or waits and is rejected after this job is visible.
+    IF v_avatar_video_path IS NOT NULL THEN
+      INSERT INTO public.character_asset_cleanup_jobs
+        (bucket_id, object_path, owner_id, character_id)
+      VALUES ('character-avatar-videos', v_avatar_video_path, auth.uid(), p_character_id)
+      ON CONFLICT (bucket_id, object_path) DO NOTHING;
+    END IF;
+
+    INSERT INTO public.character_asset_cleanup_jobs
+      (bucket_id, object_path, owner_id, character_id)
+    SELECT 'character-illustrations', ci.storage_path, auth.uid(), p_character_id
+    FROM public.character_illustrations ci
+    WHERE ci.character_id = p_character_id
+      AND ci.author_id = auth.uid()
+      AND ci.storage_path ~ (
+        '^' || auth.uid()::text || '/' || p_character_id::text || '/[^/]+$'
+      )
+    ON CONFLICT (bucket_id, object_path) DO NOTHING;
+
+    -- An unexpected illustration path must not be silently orphaned.
+    IF EXISTS (
+      SELECT 1 FROM public.character_illustrations ci
+      WHERE ci.character_id = p_character_id
+        AND (ci.author_id IS DISTINCT FROM auth.uid()
+             OR ci.storage_path IS NULL
+             OR ci.storage_path !~ (
+               '^' || auth.uid()::text || '/' || p_character_id::text || '/[^/]+$'
+             ))
+    ) THEN
+      RAISE EXCEPTION 'character_illustration_path_not_owned_or_invalid'
+        USING ERRCODE = '22023';
+    END IF;
+
+    DELETE FROM public.characters WHERE id = p_character_id;
+    RETURN v_deleted_at;
+  END IF;
+
+  -- Any published or historically used character is archived, never cascaded.
+  UPDATE public.characters
+  SET visibility = 'private',
+      review_status = 'draft',
+      deleted_at = v_deleted_at,
+      deletion_reason = 'author_deleted'
+  WHERE id = p_character_id;
+
+  UPDATE public.character_stories
+  SET visibility = 'private'
+  WHERE character_id = p_character_id;
+
+  -- Snapshot writes follow the same parent-first order as chat writers.
+  -- Existing sessions/groups stay active; only their character snapshot changes.
+  PERFORM 1
+  FROM public.chat_sessions AS session_parent
+  WHERE session_parent.character_id = p_character_id
+    AND session_parent.deleted_at IS NULL
+  ORDER BY session_parent.id
+  FOR UPDATE;
+
+  PERFORM 1
+  FROM public.chat_groups g
+  WHERE g.deleted_at IS NULL
+    AND (
+      EXISTS (
+        SELECT 1
+        FROM public.chat_group_members gm
+        WHERE gm.group_id = g.id
+          AND gm.character_id = p_character_id
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM public.chat_group_messages msg
+        WHERE msg.group_id = g.id
+          AND msg.character_id = p_character_id
+      )
+    )
+  ORDER BY g.id
+  FOR UPDATE;
+
+  UPDATE public.chat_sessions AS parent_session
+  SET character_snapshot = COALESCE(parent_session.character_snapshot, '{}'::jsonb) ||
+    jsonb_build_object(
+      'authorId', v_author_id,
+      'visibility', 'private',
+      'firstPublishedAt', v_first_published_at,
+      'deletedAt', v_deleted_at
+    ),
+    updated_at = v_deleted_at
+  WHERE parent_session.character_id = p_character_id
+    AND parent_session.deleted_at IS NULL;
+
+  UPDATE public.chat_group_members gm
+  SET character_snapshot = COALESCE(gm.character_snapshot, '{}'::jsonb) ||
+    jsonb_build_object(
+      'authorId', v_author_id,
+      'visibility', 'private',
+      'firstPublishedAt', v_first_published_at,
+      'deletedAt', v_deleted_at
+    )
+  WHERE gm.character_id = p_character_id
+    AND EXISTS (
+      SELECT 1 FROM public.chat_groups g
+      WHERE g.id = gm.group_id AND g.deleted_at IS NULL
+    );
+
+  UPDATE public.chat_group_messages gm
+  SET speaker_snapshot = COALESCE(gm.speaker_snapshot, '{}'::jsonb) ||
+    jsonb_build_object(
+      'authorId', v_author_id,
+      'visibility', 'private',
+      'firstPublishedAt', v_first_published_at,
+      'deletedAt', v_deleted_at
+    )
+  WHERE gm.character_id = p_character_id
+    AND EXISTS (
+      SELECT 1 FROM public.chat_groups g
+      WHERE g.id = gm.group_id AND g.deleted_at IS NULL
+    );
+
+  RETURN v_deleted_at;
+END;
+$function$;
+
+-- authenticated race fixtures pass.
+--
+-- Defect confirmed in live test DB on 2026-11-02:
+-- The current SECURITY DEFINER function updates chat_group_members and
+-- chat_group_messages by character_id without locking the parent chat_groups
+-- row and without excluding deleted groups. This permits metadata mutation
+-- after chat deletion even though authenticated RLS blocks ordinary writes.
+--
+-- Lock the character row first (same order as soft_delete_character), then
+-- lock active parents in deterministic order before updating their snapshots.
+-- Deletion RPCs use the same parent-first lock, so a concurrent sync either
+-- commits before deletion or waits and observes deleted_at after deletion.
+
+CREATE OR REPLACE FUNCTION public.sync_character_chat_snapshot(p_character_id uuid)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_author_id uuid;
+  v_visibility text;
+  v_first_published_at timestamptz;
+  v_deleted_at timestamptz;
+  v_parent_id uuid;
+  v_count integer := 0;
+  v_rows integer := 0;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'authentication_required' USING ERRCODE = '42501';
+  END IF;
+  IF NOT public.account_is_active() THEN
+    RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT c.author_id, c.visibility, c.first_published_at, c.deleted_at
+    INTO v_author_id, v_visibility, v_first_published_at, v_deleted_at
+  FROM public.characters c
+  WHERE c.id = p_character_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Character not found.';
+  END IF;
+  IF v_author_id IS DISTINCT FROM auth.uid() THEN
+    RAISE EXCEPTION 'Not allowed to update this character snapshot.' USING ERRCODE = '42501';
+  END IF;
+
+  -- Single-chat parent locks first. A deleted session is intentionally frozen.
+  FOR v_parent_id IN
+    SELECT cs.id
+    FROM public.chat_sessions cs
+    WHERE cs.character_id = p_character_id
+      AND cs.deleted_at IS NULL
+    ORDER BY cs.id
+    FOR UPDATE
+  LOOP
+    NULL;
+  END LOOP;
+
+  UPDATE public.chat_sessions cs
+  SET character_snapshot = COALESCE(cs.character_snapshot, '{}'::jsonb) ||
+    jsonb_build_object(
+      'authorId', v_author_id,
+      'visibility', v_visibility,
+      'firstPublishedAt', v_first_published_at,
+      'deletedAt', v_deleted_at
+    ),
+    updated_at = pg_catalog.now()
+  WHERE cs.character_id = p_character_id
+    AND cs.deleted_at IS NULL;
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  v_count := v_count + v_rows;
+
+  -- Group parent locks are deterministic and acquired before child updates.
+  FOR v_parent_id IN
+    SELECT g.id
+    FROM public.chat_groups g
+    WHERE g.deleted_at IS NULL
+      AND (
+        EXISTS (
+          SELECT 1 FROM public.chat_group_members gm
+          WHERE gm.group_id = g.id AND gm.character_id = p_character_id
+        )
+        OR EXISTS (
+          SELECT 1 FROM public.chat_group_messages msg
+          WHERE msg.group_id = g.id AND msg.character_id = p_character_id
+        )
+      )
+    ORDER BY g.id
+    FOR UPDATE OF g
+  LOOP
+    NULL;
+  END LOOP;
+
+  UPDATE public.chat_group_members gm
+  SET character_snapshot = COALESCE(gm.character_snapshot, '{}'::jsonb) ||
+    jsonb_build_object(
+      'authorId', v_author_id,
+      'visibility', v_visibility,
+      'firstPublishedAt', v_first_published_at,
+      'deletedAt', v_deleted_at
+    )
+  WHERE gm.character_id = p_character_id
+    AND EXISTS (
+      SELECT 1 FROM public.chat_groups g
+      WHERE g.id = gm.group_id AND g.deleted_at IS NULL
+    );
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  v_count := v_count + v_rows;
+
+  UPDATE public.chat_group_messages gm
+  SET speaker_snapshot = COALESCE(gm.speaker_snapshot, '{}'::jsonb) ||
+    jsonb_build_object(
+      'authorId', v_author_id,
+      'visibility', v_visibility,
+      'firstPublishedAt', v_first_published_at,
+      'deletedAt', v_deleted_at
+    )
+  WHERE gm.character_id = p_character_id
+    AND EXISTS (
+      SELECT 1 FROM public.chat_groups g
+      WHERE g.id = gm.group_id AND g.deleted_at IS NULL
+    );
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  v_count := v_count + v_rows;
+
+  RETURN v_count;
+END;
+$function$;
+
+-- Required transaction/race fixtures before this draft can be promoted:
+-- 1. sync obtains parent lock first: snapshot update commits, then delete runs.
+-- 2. delete obtains parent lock first: sync waits, then updates zero rows for
+--    that deleted parent.
+-- 3. Deleted parent members/messages remain byte-for-byte unchanged after sync.
+-- 4. Active parent members/messages still receive the current character fields.
+-- 5. Non-author, unauthenticated, and account-deletion-pending callers fail.
+-- 6. Verify function owner, EXECUTE ACL, search_path, and SECURITY DEFINER
+--    dependencies remain unchanged; no anon/PUBLIC execute path is introduced.\n\n-- ============================================================================\n-- D. Account character preservation and ownership detachment\n-- ============================================================================\n\n-- Account deletion must preserve every character and all of its child data/media.
+-- Do not execute this file against the hosted Supabase project.
+-- Reconcile the full migration ledger and test this on a disposable local database first.
+--
+-- This draft is based on read-only catalog inspection from 2026-11-02.
+
+-- 1) Durable, non-clickable creator attribution and explicit account archive marker.
 ALTER TABLE public.characters
   ADD COLUMN IF NOT EXISTS creator_display_name text,
   ADD COLUMN IF NOT EXISTS account_archived_at timestamptz;
@@ -506,8 +2559,12 @@ GRANT EXECUTE ON FUNCTION private.archive_account_characters(uuid)
 -- All helper calls execute inside the same prepare_account_deletion transaction.
 -- The worker's deleting-recovery branch then performs only Auth/finalize steps.
 --
--- Do not move either SQL file into active migrations until schema provenance,
--- disposable PostgreSQL replay, RLS/Storage tests and end-to-end deletion tests pass.\n\n-- ============================================================================\n-- 2. Reject new entries for account-archived characters\n-- ============================================================================\n\n-- Edge Functions already perform caller-JWT eligibility checks, but trusted
+-- disposable PostgreSQL replay, RLS/Storage tests and end-to-end deletion tests pass.\n\n-- ============================================================================\n-- E. Database guard against new sessions for account-archived characters\n-- ============================================================================\n\n-- Defense-in-depth for account-archived characters.
+-- Requires public.characters.account_archived_at from
+-- account-deletion-character-preservation-draft.sql.
+-- PostgreSQL replay are complete.
+
+-- Edge Functions already perform caller-JWT eligibility checks, but trusted
 -- service-role creation RPCs are privileged entrypoints. Enforce the archive
 -- state again at the database INSERT boundary so a future Edge/RPC regression
 -- cannot create a new conversation for an account-archived character.
@@ -624,7 +2681,9 @@ CREATE TRIGGER reject_archived_character_legacy_conversation
 --    for their already-authorized, non-deleted parent; no trigger is attached to
 --    these continuation tables.
 -- 6. Non-archived characters preserve existing creation behavior.
--- 7. A failure in any parent/child insert transaction rolls back all rows.\n\n-- ============================================================================\n-- 3. Freeze author-managed child writes while account deletion is pending\n-- ============================================================================\n\n-- Existing owner policies remain the permissive ownership/visibility checks.
+-- 7. A failure in any parent/child insert transaction rolls back all rows.\n\n-- ============================================================================\n-- F. Freeze author-managed character child writes during pending deletion\n-- ============================================================================\n\n-- Consistent pending-account-deletion RLS freeze for author-managed character data.
+--
+-- Existing owner policies remain the permissive ownership/visibility checks.
 -- These additional RESTRICTIVE policies are AND gates for authenticated users:
 -- a pending-deletion account cannot read or mutate these owner-managed rows.
 -- Public/anon reads are not changed because these policies target authenticated.
@@ -687,7 +2746,189 @@ CREATE POLICY account_must_be_active
 
 -- No policy is added to character_comments or character_comment_likes here:
 -- those are player-authored social records, not author-owned character settings.
--- Their deletion/anonymization policy is separate from character retention.\n\n-- ============================================================================\n-- 4. Integrate character preservation and chat-memory photo retention into prepare_account_deletion\n-- ============================================================================\n\n--
+-- Their deletion/anonymization policy is separate from character retention.\n\n-- ============================================================================\n-- G. Preserve existing group chat continuation after character deletion\n-- ============================================================================\n\n-- Existing group membership is a durable conversation snapshot. Character deletion
+-- hides a character from public discovery/new chats, but never removes its speaking
+-- turn or billing from a group that already exists.
+
+CREATE OR REPLACE FUNCTION public.append_chat_group_mock_turn(
+  p_group_id uuid,
+  p_request_key uuid,
+  p_content text
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_turn_id uuid;
+  v_existing_content text;
+  v_member_count integer;
+  v_cost integer;
+  v_silver integer;
+  v_diamonds integer;
+  v_balance_silver integer;
+  v_balance_diamonds integer;
+  v_pick integer;
+  v_character_id uuid;
+  v_scene_id uuid;
+  v_character_name text;
+  v_style text;
+  v_scene_name text;
+  v_character_snapshot jsonb;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'authentication_required' USING ERRCODE = '42501';
+  END IF;
+  IF NOT public.account_is_active() THEN
+    RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';
+  END IF;
+  IF p_request_key IS NULL THEN
+    RAISE EXCEPTION 'request_key_required' USING ERRCODE = '22023';
+  END IF;
+  IF p_content IS NULL OR char_length(btrim(p_content)) NOT BETWEEN 1 AND 2000 THEN
+    RAISE EXCEPTION 'invalid_message_content' USING ERRCODE = '22023';
+  END IF;
+
+  -- Serialize against group deletion before touching wallet/turn/message rows.
+  PERFORM 1
+  FROM public.chat_groups g
+  WHERE g.id = p_group_id
+    AND g.owner_id = v_user_id
+    AND g.archived_at IS NULL
+    AND g.deleted_at IS NULL
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'group_not_found_or_not_accessible' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT t.id, t.request_content
+    INTO v_turn_id, v_existing_content
+  FROM public.chat_group_turns t
+  WHERE t.group_id = p_group_id
+    AND t.request_key = p_request_key;
+  IF FOUND THEN
+    IF v_existing_content IS DISTINCT FROM btrim(p_content) THEN
+      RAISE EXCEPTION 'idempotency_key_reused_with_different_content' USING ERRCODE = '22023';
+    END IF;
+    RETURN v_turn_id;
+  END IF;
+
+  -- Existing group membership is a durable conversation snapshot.
+  -- A character deletion hides the character from public discovery/new chats,
+  -- but MUST NOT remove its speaking turn or billing from an existing group.
+  SELECT count(*)::integer INTO v_member_count
+  FROM public.chat_group_members m
+  WHERE m.group_id = p_group_id;
+  IF v_member_count NOT BETWEEN 1 AND 3 THEN
+    RAISE EXCEPTION 'group_has_no_members' USING ERRCODE = '23514';
+  END IF;
+
+  v_cost := v_member_count * 3;
+  PERFORM public.ensure_wallet_account();
+
+  SELECT w.silver_coins, w.diamonds
+    INTO v_balance_silver, v_balance_diamonds
+  FROM public.wallet_accounts w
+  WHERE w.user_id = v_user_id
+  FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'wallet_not_initialized'; END IF;
+
+  IF COALESCE(v_balance_silver, 0) + COALESCE(v_balance_diamonds, 0) < v_cost THEN
+    RAISE EXCEPTION 'group_insufficient_funds: required %, available %',
+      v_cost, COALESCE(v_balance_silver, 0) + COALESCE(v_balance_diamonds, 0)
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  v_silver := LEAST(v_balance_silver, v_cost);
+  v_diamonds := v_cost - v_silver;
+
+  UPDATE public.wallet_accounts w
+  SET silver_coins=w.silver_coins-v_silver,
+      diamonds=w.diamonds-v_diamonds,
+      updated_at=now()
+  WHERE w.user_id=v_user_id;
+
+  SELECT count(*)::integer % v_member_count INTO v_pick
+  FROM public.chat_group_turns t
+  WHERE t.group_id=p_group_id;
+
+  INSERT INTO public.chat_group_turns(group_id,user_id,request_key,request_content)
+  VALUES (p_group_id,v_user_id,p_request_key,btrim(p_content))
+  ON CONFLICT (group_id,request_key) DO NOTHING
+  RETURNING id INTO v_turn_id;
+
+  IF v_turn_id IS NULL THEN
+    RAISE EXCEPTION 'group_turn_request_conflict' USING ERRCODE = '40001';
+  END IF;
+
+  SELECT
+    m.character_id,m.scene_id,m.character_snapshot,
+    COALESCE(m.character_snapshot->>'name','角色'),
+    COALESCE(m.character_snapshot->>'style',m.character_snapshot->>'intro','我會仔細留意目前的情況。'),
+    COALESCE(s.name,'目前場景')
+  INTO
+    v_character_id,v_scene_id,v_character_snapshot,
+    v_character_name,v_style,v_scene_name
+  FROM public.chat_group_members m
+  LEFT JOIN public.chat_group_scenes s
+    ON s.id=m.scene_id AND s.group_id=m.group_id
+  WHERE m.group_id=p_group_id
+  ORDER BY m.position
+  OFFSET v_pick
+  LIMIT 1;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'group_active_speaker_not_found' USING ERRCODE = '23514';
+  END IF;
+
+  INSERT INTO public.chat_group_messages(
+    group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,content
+  )
+  VALUES (p_group_id,v_scene_id,v_turn_id,0,'user',NULL,btrim(p_content));
+
+  INSERT INTO public.chat_group_messages(
+    group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,content,speaker_snapshot
+  )
+  VALUES (
+    p_group_id,v_scene_id,v_turn_id,1,'character',v_character_id,
+    format('聽見你的話，%s 回應：「我明白了。%s 我們可以從「%s」開始，你接下來想怎麼做？」',
+      v_character_name,v_style,v_scene_name),
+    jsonb_build_object(
+      'id',COALESCE(v_character_snapshot->>'id',v_character_id::text),
+      'name',v_character_name
+    )
+  );
+
+  INSERT INTO public.chat_group_turn_charges(
+    group_id,group_turn_id,user_id,request_key,
+    member_count,cost,silver_charged,diamonds_charged,status
+  )
+  VALUES (
+    p_group_id,v_turn_id,v_user_id,p_request_key,
+    v_member_count,v_cost,v_silver,v_diamonds,'settled'
+  );
+
+  IF v_silver > 0 THEN
+    INSERT INTO public.wallet_transactions(user_id,currency_type,amount,biz_type,reference_id)
+    VALUES (v_user_id,'silver_coins',-v_silver,'group_chat_turn_charge',v_turn_id::text);
+  END IF;
+  IF v_diamonds > 0 THEN
+    INSERT INTO public.wallet_transactions(user_id,currency_type,amount,biz_type,reference_id)
+    VALUES (v_user_id,'diamonds',-v_diamonds,'group_chat_turn_charge',v_turn_id::text);
+  END IF;
+
+  UPDATE public.chat_groups SET updated_at=now() WHERE id=p_group_id;
+  RETURN v_turn_id;
+END;
+$function$;
+
+-- CREATE OR REPLACE preserves the existing function ACL. Do not widen it here.\n\n-- ============================================================================\n-- H. Integrate character preservation and photo retention into account prepare\n-- ============================================================================\n\n-- Exact prepare_account_deletion(uuid) replacement based on the live test DB
+-- pg_get_functiondef() inspected 2026-11-02, with character-preservation calls.
+-- account-deletion-character-preservation-draft.sql to be reviewed and replayed
+-- on a disposable local database first.
+--
 -- Retry safety:
 --   1. An already-deleting batch returns without requiring the profile row.
 --   2. If legacy deleting batches still have author-owned characters, archive them
@@ -1295,7 +3536,8 @@ BEGIN
 
   RETURN QUERY SELECT v_batch_id, p_user_id, 'deleting'::text;
 END;
-$function$;\n\n-- ============================================================================\n-- 5. Atomic account-deletion worker lease and fencing protocol\n-- ============================================================================\n\n-- historical profiles/characters baseline is addressed by the approved current-state rollout.
+$function$;\n\n-- ============================================================================\n-- I. Atomic account-deletion worker lease and fencing protocol\n-- ============================================================================\n\n-- A production migration must be generated/reconciled separately after the missing
+-- historical profiles/characters baseline is addressed by the approved current-state rollout.
 
 CREATE TABLE IF NOT EXISTS public.account_deletion_work_leases (
   target_user_id uuid PRIMARY KEY,
