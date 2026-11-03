@@ -84,7 +84,7 @@ BEGIN
       pg_catalog.gen_random_uuid(), 0, v_now,
       'cancelled', NULL
     )
-    ON CONFLICT (target_user_id) DO NOTHING;
+    ON CONFLICT ON CONSTRAINT account_deletion_work_leases_pkey DO NOTHING;
 
     SELECT l.* INTO v_lease
     FROM public.account_deletion_work_leases AS l
@@ -186,7 +186,7 @@ BEGIN
         pg_catalog.gen_random_uuid(), 0, v_now,
         'cancelled', v_batch.id
       )
-      ON CONFLICT (target_user_id) DO NOTHING;
+      ON CONFLICT ON CONSTRAINT account_deletion_work_leases_pkey DO NOTHING;
 
       SELECT l.* INTO v_lease
       FROM public.account_deletion_work_leases AS l
