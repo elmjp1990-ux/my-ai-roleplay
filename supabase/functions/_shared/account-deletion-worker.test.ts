@@ -261,9 +261,9 @@ Deno.test("does not apply Auth Admin timeout to PostgREST or unrelated requests"
 
 Deno.test("combines an existing request abort signal with the Auth Admin timeout", async () => {
   const controller = new AbortController();
-  let receivedSignal: AbortSignal | null = null;
+  const receivedSignals: AbortSignal[] = [];
   const boundedFetch = createAuthAdminTimeoutFetch(async (_input, init) => {
-    receivedSignal = init?.signal ?? null;
+    if (init?.signal) receivedSignals.push(init.signal);
     return new Response("ok", { status: 200 });
   }, 60_000);
 
