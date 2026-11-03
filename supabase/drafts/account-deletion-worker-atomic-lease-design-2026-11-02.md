@@ -220,3 +220,17 @@ The concurrency script explicitly reports `Deletion concurrency tests: 12 passed
 Same code HEAD Chat deletion worker Run #415 and Group UI Run #1138 also succeeded. Chat Storage API retry E2E Run #57 is still in progress and must finish before the complete same-HEAD CI set is called green.
 
 This closes the previously identified missing atomic-claim/fencing test gate at the disposable implementation level. It does NOT authorize hosted deployment: 10-minute TTL remains provisional pending runtime/HTTP timeout measurements; final Auth external-side-effect timeout/reconciliation review, CLI-generated incremental migration, storage sweep/release audit, and explicit deployment/Cron approval remain open. Worker remains source-disabled and PR #200 remains Draft/unmerged.
+
+
+## Round 40 — wall-clock fencing and bounded Auth Admin HTTP added (2026-11-03)
+
+- Lease expiry checks now use `clock_timestamp()` after acquiring the relevant row locks, rather than `statement_timestamp()`. This prevents a renew/prepare/finalize/failure operation that started before expiry but waited on a row lock until after expiry from being accepted using its stale statement-start timestamp.
+- Claim now locks an existing lease with `FOR UPDATE SKIP LOCKED` before attempting first-time insertion, avoiding waiting behind a lease row already locked by another invocation. A first-row insert race remains serialized by the primary key and then rechecked under lock.
+- Failure reporting requires the exact `p_batch_id IS NOT DISTINCT FROM lease.batch_id`; if a batch is supplied, it is locked and verified before either failure record is updated.
+- Recovery rejects mismatched lease/request identity and a completed lease that still has a deleting batch; it does not silently skip these inconsistent states.
+- Added `account-deletion-auth-fetch.ts`: Auth Admin user lookup/delete HTTP requests have a 60-second AbortSignal timeout, while unrelated PostgREST/Storage requests retain the caller's fetch. Worker uses this fetch wrapper; unit tests verify timeout, caller abort composition, and that unrelated paths are not changed.
+- Added an independent-session regression where a renew statement starts before expiry, blocks behind a row lock, then wakes after another session has expired the lease. Renew must return false; the lease is then reclaimed with a new token/generation.
+- Account worker Run #673 (`41620209355`) on HEAD `401ee12`: account-worker job and disposable-schema-replay job both success. Disposable logs explicitly report `Deletion concurrency tests: 14 passed, 0 failed`, including the lock-wait expiry regression, request-cascade recovery, two directions of claim/cancel races, and effective SQL ACL/RLS checks.
+- Chat deletion worker Run #434 (`41620209357`) success; Group UI Run #1157 (`41620209362`) success. Chat Storage API retry E2E Run #76 (`41620209358`) still starting its isolated local Supabase stack at note time; await completion for same-HEAD full CI.
+
+The 10-minute lease remains provisional pending actual phase-duration telemetry; Auth Admin HTTP is now bounded at 60 seconds, below the lease duration. No hosted database/Auth/Storage mutation, worker deployment, Vault secret, or Cron change. PR #200 remains Draft/unmerged.
