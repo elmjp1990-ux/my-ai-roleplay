@@ -131,6 +131,27 @@ assert.ok(
   "account chat history snapshot must precede batch handling and Auth deletion",
 );
 
+const accountPhotoQueueFn = integration.match(
+  /CREATE OR REPLACE FUNCTION private[.]enqueue_account_chat_memory_photo_cleanup[(][\\s\\S]*?\\$function\\$;/,
+)?.[0];
+assert.ok(accountPhotoQueueFn, "account deletion must persist chat-memory photo cleanup work");
+assert.match(accountPhotoQueueFn, /p_scheduled_for <> p_requested_at \\+ interval '30 days'/);
+assert.match(accountPhotoQueueFn, /FROM public[.]chat_memory_photos AS p/);
+assert.match(accountPhotoQueueFn, /p[.]owner_id = p_user_id/);
+assert.match(accountPhotoQueueFn, /personax-memory-photos/);
+assert.match(accountPhotoQueueFn, /ON CONFLICT [(]bucket_id, object_path[)] DO NOTHING/);
+assert.match(accountPhotoQueueFn, /account_chat_photo_storage_job_conflict/);
+assert.match(integration, /PERFORM private[.]enqueue_account_chat_memory_photo_cleanup[(][\\s\\S]*?p_user_id, v_requested_at, v_scheduled_for/);
+assert.ok(
+  integration.indexOf("PERFORM private.enqueue_account_chat_memory_photo_cleanup(") <
+    integration.indexOf("-- Lock/reuse this exact request's batch"),
+  "photo cleanup must be enqueued in the same locked prepare transaction",
+);
+assert.match(behavior, /account_deletion_must_queue_active_solo_and_group_photos_for_30_day_recovery_window/);
+assert.match(behavior, /account_auth_cascade_must_preserve_pending_and_account_photo_storage_jobs/);
+assert.match(behavior, /v_account_scheduled_for/);
+
+
 // Group charges are FK-cascaded by both group and Auth deletion. Preserve the
 // complete financial charge row and only minimal group-turn idempotency metadata.
 assert.match(integration, /'chat_group_turn_charges'/);
