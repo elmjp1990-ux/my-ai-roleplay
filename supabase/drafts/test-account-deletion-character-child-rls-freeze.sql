@@ -1,9 +1,7 @@
 -- DRAFT ONLY — disposable PostgreSQL behavior test, executed inside the
 -- PR #200 replay transaction. This verifies effective RLS as authenticated,
--- not merely policy catalog entries. All fixture changes are rolled back.
+-- not merely policy catalog entries. The outer replay transaction rolls back.
 \set ON_ERROR_STOP on
-
-BEGIN;
 
 DO $fixture$
 DECLARE
@@ -208,4 +206,3 @@ END;
 $stale_jwt$;
 
 RESET ROLE;
-ROLLBACK;
