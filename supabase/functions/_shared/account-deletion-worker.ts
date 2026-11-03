@@ -3,19 +3,27 @@ export type AccountDeletionWorkItem = {
   batch_id: string | null;
   scheduled_for: string;
   work_status: string;
+  lease_token: string;
+  lease_generation: number;
+  lease_expires_at: string;
 };
 
 type RpcResult<T> = { data: T | null; error: unknown | null };
-type ArchiveRow = { batch_id: string; target_user_id: string; batch_status: string };
 type PreparedRow = { batch_id: string; target_user_id: string; batch_status: string };
 
 export type AccountDeletionWorkerDeps = {
-  archive: (userId: string) => Promise<RpcResult<ArchiveRow[]>>;
-  prepare: (userId: string) => Promise<RpcResult<PreparedRow[]>>;
+  prepare: (userId: string, token: string, generation: number) => Promise<RpcResult<PreparedRow[]>>;
+  renew: (userId: string, token: string, generation: number) => Promise<RpcResult<boolean>>;
   deleteAuthUser: (userId: string) => Promise<{ error: unknown | null }>;
   isAuthUserAbsent: (userId: string) => Promise<boolean>;
-  finalize: (batchId: string) => Promise<RpcResult<boolean>>;
-  markFailure: (batchId: string, code: string) => Promise<RpcResult<boolean>>;
+  finalize: (userId: string, batchId: string, token: string, generation: number) => Promise<RpcResult<boolean>>;
+  markFailure: (
+    userId: string,
+    batchId: string | null,
+    token: string,
+    generation: number,
+    code: string,
+  ) => Promise<RpcResult<boolean>>;
 };
 
 export type AccountDeletionWorkerSummary = {
@@ -40,6 +48,18 @@ function safeCode(value: unknown, fallback: string): string {
   return fallback;
 }
 
+async function renewOrThrow(
+  userId: string,
+  token: string,
+  generation: number,
+  deps: AccountDeletionWorkerDeps,
+): Promise<void> {
+  const result = await deps.renew(userId, token, generation);
+  if (result.error || result.data !== true) {
+    throw result.error ?? new Error("account_deletion_lease_lost");
+  }
+}
+
 export async function processAccountDeletionWorkItems(
   items: AccountDeletionWorkItem[],
   deps: AccountDeletionWorkerDeps,
@@ -57,91 +77,87 @@ export async function processAccountDeletionWorkItems(
     let batchId = item.batch_id;
 
     try {
-      if (!item.target_user_id || !item.scheduled_for) {
+      if (
+        !item.target_user_id || !item.scheduled_for || !item.lease_token ||
+        !Number.isSafeInteger(item.lease_generation) || item.lease_generation < 1
+      ) {
         summary.skipped += 1;
         summary.failed += 1;
         continue;
       }
 
-      // If Auth deletion committed but the worker crashed before finalize, the
-      // request row may already have cascaded away. The SQL work-items RPC returns
-      // the still-deleting batch specifically for this recovery case.
-      if (item.work_status === "deleting" && batchId) {
-        // prepare_account_deletion() commits the deleting status and relational
-        // cleanup atomically. The request row may therefore be gone while the
-        // Auth user still exists. Do not call archive/prepare again: both require
-        // the due request row. Resume only the remaining Auth + finalize steps.
-        const authUserAbsent = await deps.isAuthUserAbsent(item.target_user_id);
-        if (!authUserAbsent) {
-          const deletion = await deps.deleteAuthUser(item.target_user_id);
-          if (deletion.error) {
-            const absentAfterError = await deps.isAuthUserAbsent(item.target_user_id);
-            if (!absentAfterError) throw deletion.error;
-          }
-        }
-        const recovered = await deps.finalize(batchId);
-        if (recovered.error || recovered.data !== true) {
-          throw recovered.error ?? new Error("recovery_finalize_not_confirmed");
-        }
-        summary.completed += 1;
-        continue;
-      }
-
-      const archived = await deps.archive(item.target_user_id);
-      if (archived.error || !archived.data?.[0]?.batch_id) {
-        throw archived.error ?? new Error("archive_batch_missing");
-      }
-      batchId = archived.data[0].batch_id;
-      const archiveStatus = archived.data[0].batch_status;
-      if (!["archived", "deleting", "completed"].includes(archiveStatus)) {
-        throw new Error("archive_status_not_ready");
-      }
-
-      if (archiveStatus === "completed") {
-        summary.skipped += 1;
-        continue;
-      }
-
-      const prepared = await deps.prepare(item.target_user_id);
+      // The fenced prepare RPC either performs the complete verified archive +
+      // relational preparation, or resumes an already-deleting batch whose
+      // request row has been cascaded away. It validates token + generation in
+      // the same database transaction as the state mutation.
+      const prepared = await deps.prepare(
+        item.target_user_id,
+        item.lease_token,
+        item.lease_generation,
+      );
       if (prepared.error || !prepared.data?.[0]?.batch_id) {
         throw prepared.error ?? new Error("prepared_batch_missing");
       }
       batchId = prepared.data[0].batch_id;
       if (prepared.data[0].batch_status !== "deleting") {
+        if (prepared.data[0].batch_status === "completed") {
+          const completed = await deps.finalize(
+            item.target_user_id,
+            batchId,
+            item.lease_token,
+            item.lease_generation,
+          );
+          if (completed.error || completed.data !== true) {
+            throw completed.error ?? new Error("completed_batch_finalize_not_confirmed");
+          }
+          summary.completed += 1;
+          continue;
+        }
         throw new Error("batch_not_in_deleting_state");
       }
 
-      const deletion = await deps.deleteAuthUser(item.target_user_id);
-      if (deletion.error) {
-        // A retry may arrive after Auth deletion succeeded but before finalize committed.
-        // Treat only a positively verified missing Auth user as idempotent success.
-        const absent = await deps.isAuthUserAbsent(item.target_user_id);
-        if (!absent) throw deletion.error;
+      // Renew after the potentially long SQL preparation and immediately before
+      // external Auth Admin work. A stale invocation cannot proceed after reclaim.
+      await renewOrThrow(item.target_user_id, item.lease_token, item.lease_generation, deps);
+      const authUserAbsent = await deps.isAuthUserAbsent(item.target_user_id);
+      if (!authUserAbsent) {
+        // Renew again after the lookup, immediately before the external side effect.
+        await renewOrThrow(item.target_user_id, item.lease_token, item.lease_generation, deps);
+        const deletion = await deps.deleteAuthUser(item.target_user_id);
+        if (deletion.error) {
+          const absentAfterError = await deps.isAuthUserAbsent(item.target_user_id);
+          if (!absentAfterError) throw deletion.error;
+        }
       }
 
-      const finalized = await deps.finalize(batchId);
+      // If the Auth call outlived the lease, this renewal fails. A later owner
+      // will reconcile Auth absence and finalize; this invocation cannot write.
+      await renewOrThrow(item.target_user_id, item.lease_token, item.lease_generation, deps);
+      const finalized = await deps.finalize(
+        item.target_user_id,
+        batchId,
+        item.lease_token,
+        item.lease_generation,
+      );
       if (finalized.error || finalized.data !== true) {
         throw finalized.error ?? new Error("finalize_not_confirmed");
       }
       summary.completed += 1;
     } catch (error) {
       summary.failed += 1;
-      if (batchId) {
-        // Failure telemetry must never abort the batch loop. The database RPC
-        // remains authoritative; a transient reporting error is surfaced by
-        // logs/metrics at the caller and the next item can still be processed.
-        try {
-          const report = await deps.markFailure(
-            batchId,
-            safeCode(error, "account_deletion_worker_failed"),
-          );
-          if (report.error || report.data !== true) {
-            summary.failureReportFailed += 1;
-          }
-        } catch {
-          // Preserve the original processing failure and continue with later work.
+      try {
+        const report = await deps.markFailure(
+          item.target_user_id,
+          batchId,
+          item.lease_token,
+          item.lease_generation,
+          safeCode(error, "account_deletion_worker_failed"),
+        );
+        if (report.error || report.data !== true) {
           summary.failureReportFailed += 1;
         }
+      } catch {
+        summary.failureReportFailed += 1;
       }
     }
   }
