@@ -1,6 +1,9 @@
 -- The same post-delete freeze must cover character soft deletion itself.
 -- The existing soft_delete_character() also rewrites snapshots, so fixing only
 -- sync_character_chat_snapshot() would leave a second SECURITY DEFINER bypass.
+-- Merge the history-aware hard-delete path with parent locking for both
+-- member and message references. The character row is locked first, followed
+-- by active chat parents, matching sync_character_chat_snapshot's lock order.
 CREATE OR REPLACE FUNCTION public.soft_delete_character(p_character_id uuid)
 RETURNS timestamptz
 LANGUAGE plpgsql
@@ -10,8 +13,13 @@ AS $function$
 DECLARE
   v_author_id uuid;
   v_first_published_at timestamptz;
+  v_private_draft_origin boolean;
+  v_visibility text;
+  v_review_status text;
   v_deleted_at timestamptz;
-  v_parent_id uuid;
+  v_avatar_video_path text;
+  v_has_history boolean;
+  v_asset record;
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'authentication_required' USING ERRCODE = '42501';
@@ -20,70 +28,184 @@ BEGIN
     RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';
   END IF;
 
-  SELECT c.author_id, c.first_published_at, c.deleted_at
-    INTO v_author_id, v_first_published_at, v_deleted_at
+  SELECT c.author_id, c.first_published_at,
+         EXISTS (SELECT 1 FROM private.character_private_draft_origins d WHERE d.character_id = c.id),
+         c.visibility, c.review_status, c.deleted_at, c.avatar_video_path
+    INTO v_author_id, v_first_published_at, v_private_draft_origin,
+         v_visibility, v_review_status, v_deleted_at, v_avatar_video_path
   FROM public.characters c
   WHERE c.id = p_character_id
   FOR UPDATE;
 
-  IF NOT FOUND THEN RAISE EXCEPTION 'Character not found.'; END IF;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Character not found.';
+  END IF;
   IF v_author_id IS DISTINCT FROM auth.uid() THEN
     RAISE EXCEPTION 'Not allowed to delete this character.' USING ERRCODE = '42501';
   END IF;
-  IF v_deleted_at IS NOT NULL THEN RETURN v_deleted_at; END IF;
+  IF v_deleted_at IS NOT NULL THEN
+    RETURN v_deleted_at;
+  END IF;
 
-  -- Acquire active chat parents before changing any child snapshot. A deleted
-  -- parent is intentionally immutable and remains represented by its archive.
-  FOR v_parent_id IN
-    SELECT cs.id FROM public.chat_sessions cs
-    WHERE cs.character_id = p_character_id AND cs.deleted_at IS NULL
-    ORDER BY cs.id FOR UPDATE
-  LOOP NULL; END LOOP;
+  v_deleted_at := pg_catalog.statement_timestamp();
+  v_has_history := private.character_has_history(p_character_id);
 
-  FOR v_parent_id IN
-    SELECT g.id FROM public.chat_groups g
-    WHERE g.deleted_at IS NULL
-      AND (
-        EXISTS (SELECT 1 FROM public.chat_group_members gm
-                WHERE gm.group_id = g.id AND gm.character_id = p_character_id)
-        OR EXISTS (SELECT 1 FROM public.chat_group_messages msg
-                   WHERE msg.group_id = g.id AND msg.character_id = p_character_id)
+  -- Fail closed on any publication evidence. first_published_at is the durable
+  -- marker, while the exact draft state is required. Unknown, NULL, pending,
+  -- rejected, approved, or future review states fail closed to soft-delete.
+  IF v_first_published_at IS NULL
+     AND v_private_draft_origin
+     AND v_visibility = 'private'
+     AND v_review_status = 'draft'
+     AND NOT v_has_history THEN
+    -- Storage paths must be exact author/character/object paths. Unknown URL,
+    -- base64, legacy or malformed formats fail closed and are not queued.
+    IF v_avatar_video_path IS NOT NULL THEN
+      IF v_avatar_video_path !~ (
+        '^' || auth.uid()::text || '/' || p_character_id::text || '/[^/]+$'
+      ) THEN
+        RAISE EXCEPTION 'character_asset_path_not_owned_or_invalid'
+          USING ERRCODE = '22023';
+      END IF;
+    END IF;
+
+    -- Acquire the same advisory locks as reference-write triggers in stable
+    -- order before queueing any object. This closes the check/remove race where
+    -- another character could adopt the path after the worker's reference check.
+    FOR v_asset IN
+      SELECT 'character-avatar-videos'::text AS bucket_id,
+             v_avatar_video_path AS object_path
+      WHERE v_avatar_video_path IS NOT NULL
+      UNION ALL
+      SELECT 'character-illustrations'::text, ci.storage_path
+      FROM public.character_illustrations AS ci
+      WHERE ci.character_id = p_character_id
+        AND ci.author_id = auth.uid()
+      ORDER BY 1, 2
+    LOOP
+      PERFORM private.lock_character_asset_path(v_asset.bucket_id, v_asset.object_path);
+    END LOOP;
+
+    -- Queue both asset types only after all exact-path advisory locks are held.
+    -- The reference-write trigger takes the same lock before checking the queue,
+    -- so a concurrent reattachment either commits first (worker later skips the
+    -- still-referenced object) or waits and is rejected after this job is visible.
+    IF v_avatar_video_path IS NOT NULL THEN
+      INSERT INTO public.character_asset_cleanup_jobs
+        (bucket_id, object_path, owner_id, character_id)
+      VALUES ('character-avatar-videos', v_avatar_video_path, auth.uid(), p_character_id)
+      ON CONFLICT (bucket_id, object_path) DO NOTHING;
+    END IF;
+
+    INSERT INTO public.character_asset_cleanup_jobs
+      (bucket_id, object_path, owner_id, character_id)
+    SELECT 'character-illustrations', ci.storage_path, auth.uid(), p_character_id
+    FROM public.character_illustrations ci
+    WHERE ci.character_id = p_character_id
+      AND ci.author_id = auth.uid()
+      AND ci.storage_path ~ (
+        '^' || auth.uid()::text || '/' || p_character_id::text || '/[^/]+$'
       )
-    ORDER BY g.id FOR UPDATE
-  LOOP NULL; END LOOP;
+    ON CONFLICT (bucket_id, object_path) DO NOTHING;
 
-  v_deleted_at := pg_catalog.clock_timestamp();
+    -- An unexpected illustration path must not be silently orphaned.
+    IF EXISTS (
+      SELECT 1 FROM public.character_illustrations ci
+      WHERE ci.character_id = p_character_id
+        AND (ci.author_id IS DISTINCT FROM auth.uid()
+             OR ci.storage_path IS NULL
+             OR ci.storage_path !~ (
+               '^' || auth.uid()::text || '/' || p_character_id::text || '/[^/]+$'
+             ))
+    ) THEN
+      RAISE EXCEPTION 'character_illustration_path_not_owned_or_invalid'
+        USING ERRCODE = '22023';
+    END IF;
+
+    DELETE FROM public.characters WHERE id = p_character_id;
+    RETURN v_deleted_at;
+  END IF;
+
+  -- Any published or historically used character is archived, never cascaded.
   UPDATE public.characters
-  SET visibility = 'private', review_status = 'draft',
-      deleted_at = v_deleted_at, deletion_reason = 'author_deleted'
+  SET visibility = 'private',
+      review_status = 'draft',
+      deleted_at = v_deleted_at,
+      deletion_reason = 'author_deleted'
   WHERE id = p_character_id;
 
   UPDATE public.character_stories
   SET visibility = 'private'
   WHERE character_id = p_character_id;
 
-  UPDATE public.chat_sessions cs
-  SET character_snapshot = COALESCE(cs.character_snapshot, '{}'::jsonb) ||
-      jsonb_build_object('authorId', v_author_id, 'visibility', 'private',
-        'firstPublishedAt', v_first_published_at, 'deletedAt', v_deleted_at),
-      updated_at = pg_catalog.now()
-  WHERE cs.character_id = p_character_id AND cs.deleted_at IS NULL;
+  -- Snapshot writes follow the same parent-first order as chat writers.
+  -- Existing sessions/groups stay active; only their character snapshot changes.
+  PERFORM 1
+  FROM public.chat_sessions AS session_parent
+  WHERE session_parent.character_id = p_character_id
+    AND session_parent.deleted_at IS NULL
+  ORDER BY session_parent.id
+  FOR UPDATE;
+
+  PERFORM 1
+  FROM public.chat_groups g
+  WHERE g.deleted_at IS NULL
+    AND (
+      EXISTS (
+        SELECT 1
+        FROM public.chat_group_members gm
+        WHERE gm.group_id = g.id
+          AND gm.character_id = p_character_id
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM public.chat_group_messages msg
+        WHERE msg.group_id = g.id
+          AND msg.character_id = p_character_id
+      )
+    )
+  ORDER BY g.id
+  FOR UPDATE;
+
+  UPDATE public.chat_sessions AS parent_session
+  SET character_snapshot = COALESCE(parent_session.character_snapshot, '{}'::jsonb) ||
+    jsonb_build_object(
+      'authorId', v_author_id,
+      'visibility', 'private',
+      'firstPublishedAt', v_first_published_at,
+      'deletedAt', v_deleted_at
+    ),
+    updated_at = v_deleted_at
+  WHERE parent_session.character_id = p_character_id
+    AND parent_session.deleted_at IS NULL;
 
   UPDATE public.chat_group_members gm
   SET character_snapshot = COALESCE(gm.character_snapshot, '{}'::jsonb) ||
-      jsonb_build_object('authorId', v_author_id, 'visibility', 'private',
-        'firstPublishedAt', v_first_published_at, 'deletedAt', v_deleted_at)
+    jsonb_build_object(
+      'authorId', v_author_id,
+      'visibility', 'private',
+      'firstPublishedAt', v_first_published_at,
+      'deletedAt', v_deleted_at
+    )
   WHERE gm.character_id = p_character_id
-    AND EXISTS (SELECT 1 FROM public.chat_groups g
-                WHERE g.id = gm.group_id AND g.deleted_at IS NULL);
+    AND EXISTS (
+      SELECT 1 FROM public.chat_groups g
+      WHERE g.id = gm.group_id AND g.deleted_at IS NULL
+    );
 
   UPDATE public.chat_group_messages gm
   SET speaker_snapshot = COALESCE(gm.speaker_snapshot, '{}'::jsonb) ||
-      jsonb_build_object('authorId', v_author_id, 'visibility', 'private',
-        'firstPublishedAt', v_first_published_at, 'deletedAt', v_deleted_at)
+    jsonb_build_object(
+      'authorId', v_author_id,
+      'visibility', 'private',
+      'firstPublishedAt', v_first_published_at,
+      'deletedAt', v_deleted_at
+    )
   WHERE gm.character_id = p_character_id
-    AND EXISTS (SELECT 1 FROM public.chat_groups g
-                WHERE g.id = gm.group_id AND g.deleted_at IS NULL);
+    AND EXISTS (
+      SELECT 1 FROM public.chat_groups g
+      WHERE g.id = gm.group_id AND g.deleted_at IS NULL
+    );
 
   RETURN v_deleted_at;
 END;
@@ -128,7 +250,8 @@ BEGIN
   SELECT c.author_id, c.visibility, c.first_published_at, c.deleted_at
     INTO v_author_id, v_visibility, v_first_published_at, v_deleted_at
   FROM public.characters c
-  WHERE c.id = p_character_id;
+  WHERE c.id = p_character_id
+  FOR UPDATE;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Character not found.';
