@@ -221,7 +221,8 @@ $function$;
 -- row and without excluding deleted groups. This permits metadata mutation
 -- after chat deletion even though authenticated RLS blocks ordinary writes.
 --
--- Lock parents first, in deterministic order, then update only active parents.
+-- Lock the character row first (same order as soft_delete_character), then
+-- lock active parents in deterministic order before updating their snapshots.
 -- Deletion RPCs use the same parent-first lock, so a concurrent sync either
 -- commits before deletion or waits and observes deleted_at after deletion.
 
