@@ -85,3 +85,16 @@ The attempted local-only membership grant was rejected because Supabase reserves
 ## Migration source recovery update
 
 As of 2026-11-03, 12 missing migration SQL statement bodies have been restored from the connected test project's read-only `schema_migrations.statements` ledger (including the 20261101110211 character-video Storage gate). The remote-only source gap for that migration is closed at the statement-body level; original comments/formatting are not guaranteed. Five duplicate timestamp values, five legacy filenames, and the pre-ledger profiles/characters foundation remain unresolved.
+
+
+## Storage worker thrown-error isolation — 2026-11-03
+
+A source review found that the deterministic adapter tests modeled Supabase Storage/network failures only as returned error objects. The adapter did not catch a rejected Promise from Storage.remove or from the queue-mark RPC, so a thrown exception could abort the remaining batch and leave later jobs unprocessed until another worker invocation.
+
+The shared worker now isolates each job:
+- A thrown Storage/network error is normalized to a bounded error code and sent to the durable queue failure marker.
+- A thrown queue-mark RPC is counted as a failed item; the lease/retry mechanism remains responsible for recovery if the marker itself is unreachable.
+- Invalid bucket/path jobs also cannot abort the remaining batch if their failure marker throws.
+- Later jobs continue processing after either failure class.
+
+New deterministic tests cover thrown Storage/network and queue-RPC exceptions with a second job proving batch continuation. This is adapter-level behavior, not a live Storage API failure injection test. Deno type-check, deterministic tests, and same-SHA disposable schema replay must pass before treating the change as validated. No hosted Storage operation, worker deployment, or Cron activation was performed.
