@@ -90,6 +90,24 @@ BEGIN
         AND p.tablename = 'objects'
         AND p.policyname = 'memory_photo_objects_select_owner'
     ),
+    'all_policies', (
+      SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
+        'name', p.policyname, 'permissive', p.permissive,
+        'roles', p.roles, 'command', p.cmd, 'qual', p.qual
+      )) FROM pg_catalog.pg_policies p
+      WHERE p.schemaname = 'storage' AND p.tablename = 'objects'
+    ),
+    'rls_enabled', (
+      SELECT c.relrowsecurity FROM pg_catalog.pg_class c
+      JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'storage' AND c.relname = 'objects'
+    ),
+    'rls_forced', (
+      SELECT c.relforcerowsecurity FROM pg_catalog.pg_class c
+      JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'storage' AND c.relname = 'objects'
+    ),
+    'select_privilege', pg_catalog.has_table_privilege(current_user, 'storage.objects', 'SELECT'),
     'archived_path_matches', v_archived_path ~* (
       '^' || auth.uid()::text ||
       '/(single|group)/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/' ||
