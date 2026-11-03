@@ -970,6 +970,21 @@ AS $function$
     SELECT st.character_id, pg_catalog.sum(st.turn_count)::bigint AS turn_count
     FROM public.chat_deletion_character_turn_stats AS st
     JOIN allowed AS a ON a.character_id = st.character_id
+    WHERE (
+      -- During account deletion, snapshots are committed before Auth FK
+      -- cascades remove the author's own active chat parents. Until that
+      -- cascade occurs, the live parent/message path remains authoritative;
+      -- count the snapshot only after the parent is soft-deleted or absent.
+      (st.resource_type = 'single_session' AND NOT EXISTS (
+        SELECT 1 FROM public.chat_sessions AS s
+        WHERE s.id = st.resource_id AND s.deleted_at IS NULL
+      ))
+      OR
+      (st.resource_type = 'group' AND NOT EXISTS (
+        SELECT 1 FROM public.chat_groups AS g
+        WHERE g.id = st.resource_id AND g.deleted_at IS NULL
+      ))
+    )
     GROUP BY st.character_id
   )
   SELECT
@@ -1017,6 +1032,17 @@ AS $function$
       SELECT COALESCE(pg_catalog.sum(st.turn_count), 0)::bigint
       FROM public.chat_deletion_character_turn_stats AS st
       WHERE st.character_id = c.id
+        AND (
+          (st.resource_type = 'single_session' AND NOT EXISTS (
+            SELECT 1 FROM public.chat_sessions AS s
+            WHERE s.id = st.resource_id AND s.deleted_at IS NULL
+          ))
+          OR
+          (st.resource_type = 'group' AND NOT EXISTS (
+            SELECT 1 FROM public.chat_groups AS g
+            WHERE g.id = st.resource_id AND g.deleted_at IS NULL
+          ))
+        )
     )
   FROM public.characters AS c
   WHERE c.id = p_character_id
