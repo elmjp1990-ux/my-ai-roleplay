@@ -32,6 +32,7 @@ on:
       - "supabase/migrations/20261104200000_account_is_active_auth_user_existence_guard.sql"
       - "supabase/migrations/20261104200100_poyozz_account_deletion_preservation_atomic_lease.sql"
       - "supabase/drafts/replay-account-deletion-release-migration.sql"
+      - "supabase/drafts/test-account-deletion-character-child-rls-freeze.sql"
       - "supabase/migrations/20261104200100_poyozz_account_deletion_preservation_atomic_lease.sql"
       - "supabase/drafts/replay-account-deletion-release-migration.sql"
       - "supabase/drafts/chat-deletion-purge-cron.sql"
