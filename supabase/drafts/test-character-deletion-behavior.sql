@@ -114,6 +114,33 @@ BEGIN
     'comments', (SELECT count(*) FROM public.character_comments WHERE character_id = v_new_draft)
   );
   v_deleted_at := public.soft_delete_character(v_new_draft);
+  RAISE NOTICE 'new_draft_delete_result=%', pg_catalog.jsonb_build_object(
+    'returned_deleted_at', v_deleted_at,
+    'remaining_deleted_at', (SELECT deleted_at FROM public.characters WHERE id = v_new_draft),
+    'remaining_row', EXISTS (SELECT 1 FROM public.characters WHERE id = v_new_draft),
+    'function_owner', (
+      SELECT pg_catalog.pg_get_userbyid(p.proowner)
+      FROM pg_catalog.pg_proc p
+      WHERE p.oid = 'public.soft_delete_character(uuid)'::regprocedure
+    ),
+    'function_security_definer', (
+      SELECT p.prosecdef FROM pg_catalog.pg_proc p
+      WHERE p.oid = 'public.soft_delete_character(uuid)'::regprocedure
+    ),
+    'postgres_delete_privilege', pg_catalog.has_table_privilege('postgres', 'public.characters', 'DELETE'),
+    'character_triggers', (
+      SELECT pg_catalog.coalesce(
+        pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
+          'name', t.tgname,
+          'definition', pg_catalog.pg_get_triggerdef(t.oid)
+        )), '[]'::jsonb
+      )
+      FROM pg_catalog.pg_trigger t
+      JOIN pg_catalog.pg_class r ON r.oid = t.tgrelid
+      JOIN pg_catalog.pg_namespace n ON n.oid = r.relnamespace
+      WHERE n.nspname = 'public' AND r.relname = 'characters' AND NOT t.tgisinternal
+    )
+  );
   IF EXISTS (SELECT 1 FROM public.characters WHERE id = v_new_draft) THEN
     RAISE EXCEPTION 'unused_new_private_draft_should_hard_delete';
   END IF;
