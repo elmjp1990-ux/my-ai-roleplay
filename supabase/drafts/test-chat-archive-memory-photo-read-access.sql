@@ -40,6 +40,10 @@ BEGIN
     SELECT pg_catalog.count(*) FROM storage.objects
     WHERE name IN (v_archived_path, v_deleted_path)
   );
+  RAISE NOTICE 'storage_seed_rows=%', (
+    SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object('bucket_id', bucket_id, 'name', name))
+    FROM storage.objects WHERE name IN (v_archived_path, v_deleted_path)
+  );
 
   GRANT USAGE ON SCHEMA storage TO authenticated;
   ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
@@ -76,6 +80,16 @@ BEGIN
 
   RAISE NOTICE 'storage_policy_inputs=%', pg_catalog.jsonb_build_object(
     'auth_uid', auth.uid(),
+    'auth_role', auth.role(),
+    'current_user', current_user,
+    'owner_prefix_matches', pg_catalog.split_part(v_archived_path, '/', 1) = auth.uid()::text,
+    'bucket_id_literal_matches', 'personax-memory-photos' = 'personax-memory-photos',
+    'policy_qual', (
+      SELECT p.qual FROM pg_catalog.pg_policies p
+      WHERE p.schemaname = 'storage'
+        AND p.tablename = 'objects'
+        AND p.policyname = 'memory_photo_objects_select_owner'
+    ),
     'archived_path_matches', v_archived_path ~* (
       '^' || auth.uid()::text ||
       '/(single|group)/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/' ||
