@@ -26,7 +26,7 @@ BEGIN
     id, owner_id, chat_type, session_id, storage_path, caption
   ) VALUES (
     v_photo, v_owner, 'single', v_session,
-    v_owner::text || '/' || v_session::text || '/' || v_photo::text || '.jpg',
+    v_owner::text || '/single/' || v_session::text || '/' || v_photo::text || '.jpg',
     'synthetic account deletion photo Storage E2E'
   );
 
