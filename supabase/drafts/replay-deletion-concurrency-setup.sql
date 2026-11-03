@@ -14,18 +14,11 @@ BEGIN
 END;
 $storage_stub$;
 
-\i supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql
-\i supabase/drafts/chat-deletion-direct-parent-delete-privilege-guard.sql
+-- The two prerequisite incremental migrations (chat privilege hardening and
+-- account_is_active) are already present in the current-state schema fixture.
+-- Seed legacy rows before the migration installs first-publication origin triggers.
 \i supabase/drafts/seed-character-deletion-legacy-fixtures.sql
-\i supabase/drafts/character-history-aware-deletion.sql
-\i supabase/drafts/sync-character-chat-snapshot-parent-lock-proposal.sql
-\i supabase/drafts/account-deletion-character-preservation-draft.sql
-\i supabase/drafts/account-is-active-auth-user-existence-guard.sql
-\i supabase/drafts/account-archived-character-session-insert-guard.sql
-\i supabase/drafts/account-deletion-character-child-write-freeze.sql
-\i supabase/drafts/character-deletion-existing-chat-continuation.sql
-\i supabase/drafts/prepare-account-deletion-character-preservation-integration.sql
-\i supabase/drafts/account-deletion-worker-atomic-lease.sql
+\i supabase/migrations/20261103115931_poyozz_account_deletion_preservation_atomic_lease.sql
 \i supabase/drafts/test-account-deletion-worker-lease-security.sql
 
 INSERT INTO auth.users (id) VALUES
