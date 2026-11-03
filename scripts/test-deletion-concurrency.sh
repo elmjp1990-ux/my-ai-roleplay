@@ -392,6 +392,31 @@ child_value="$(psql "$DATABASE_URL" -Atqc "SELECT activity FROM public.character
 }
 echo "ok: account archival serializes against in-flight child write and blocks later writes"
 
+# Recovery after the irreversible prepare transaction: simulate the request row
+# being removed by Auth cascade, expire the old lease, then reclaim the retained
+# deleting batch without re-running archive or creating a duplicate batch.
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "DELETE FROM public.account_deletion_requests WHERE user_id='$author'; UPDATE public.account_deletion_work_leases SET lease_expires_at=now()-interval '1 second' WHERE target_user_id='$author'" >/dev/null
+recovery_item="$(psql "$DATABASE_URL" -Atqc "SELECT target_user_id::text || '|' || batch_id::text || '|' || lease_token::text || '|' || lease_generation::text || '|' || work_status FROM public.claim_account_deletion_work_items(1)")"
+recovery_user="${recovery_item%%|*}"
+recovery_rest="${recovery_item#*|}"
+recovery_batch="${recovery_rest%%|*}"
+recovery_rest="${recovery_rest#*|}"
+recovery_token="${recovery_rest%%|*}"
+recovery_rest="${recovery_rest#*|}"
+recovery_generation="${recovery_rest%%|*}"
+recovery_status="${recovery_rest##*|}"
+[[ "$recovery_user" == "$author" && "$recovery_batch" != "" && "$recovery_token" != "" && "$recovery_status" == "deleting" ]] || {
+  echo "ERROR: deleting batch was not recovered after request row disappeared"
+  exit 1
+}
+recovered_prepare="$(psql "$DATABASE_URL" -Atqc "SELECT batch_status FROM public.prepare_account_deletion_leased('$author', '$recovery_token', $recovery_generation)")"
+recovered_batch_count="$(psql "$DATABASE_URL" -Atqc "SELECT count(*) FROM public.account_deletion_archive_batches WHERE target_user_id='$author' AND status='deleting'")"
+[[ "$recovered_prepare" == "deleting" && "$recovered_batch_count" == "1" ]] || {
+  echo "ERROR: recovery re-entered archive or failed to resume the existing deleting batch"
+  exit 1
+}
+echo "ok: deleting batch recovers with a new lease after request row cascade"
+
 
 # Race 3: an in-flight illustration reference write wins the advisory path lock.
 # It targets the same character being hard-deleted; deletion must wait, then
@@ -497,4 +522,4 @@ asset_b_referenced="$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM p
 }
 echo "ok: deletion wins path lock; queued asset path cannot be reattached"
 
-echo "Deletion concurrency tests: 11 passed, 0 failed"
+echo "Deletion concurrency tests: 12 passed, 0 failed"
