@@ -8443,7 +8443,6 @@ document.addEventListener('click',async event => {
           $('modal')?.close();
           await groupRefreshList();
           if(route.page==='group'&&route.id===groupId) go({page:'chat'});
-          toast('群組對話已隱藏，聊天內容與回憶將於 30 天後永久清除。');
         } catch(error) { toast(error?.message||'群組刪除失敗，請稍後重試。'); }
         break;
       }
@@ -8467,7 +8466,6 @@ document.addEventListener('click',async event => {
         delete state.sessions[key];
         persist();
         if(uid) cacheSessionsForUser(uid);
-        toast('對話已隱藏，聊天內容與回憶將於 30 天後永久清除。');
         if (route.id === key) go({page:'chat'});
         else closeModal();
         break;
