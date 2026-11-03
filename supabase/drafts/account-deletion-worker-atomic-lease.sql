@@ -115,11 +115,11 @@ BEGIN
           scheduled_for = v_request.scheduled_for,
           lease_token = pg_catalog.gen_random_uuid(),
           lease_generation = l.lease_generation + 1,
-          lease_expires_at = v_now + interval '10 minutes',
+          lease_expires_at = pg_catalog.clock_timestamp() + interval '10 minutes',
           lease_status = 'claimed',
           batch_id = v_batch_id,
-          claimed_at = v_now,
-          updated_at = v_now,
+          claimed_at = pg_catalog.clock_timestamp(),
+          updated_at = pg_catalog.clock_timestamp(),
           attempt_count = 0,
           last_error = NULL
       WHERE l.target_user_id = v_request.user_id
@@ -293,7 +293,7 @@ BEGIN
     AND l.lease_token = p_lease_token
     AND l.lease_generation = p_lease_generation
     AND l.lease_status = 'claimed'
-    AND l.lease_expires_at > pg_catalog.statement_timestamp();
+    AND l.lease_expires_at > pg_catalog.clock_timestamp();
   RETURN FOUND;
 END;
 $function$;
@@ -437,7 +437,7 @@ BEGIN
 
   UPDATE public.account_deletion_work_leases AS l
   SET lease_status = 'completed',
-      lease_expires_at = pg_catalog.statement_timestamp(),
+      lease_expires_at = pg_catalog.clock_timestamp(),
       updated_at = pg_catalog.statement_timestamp(),
       last_error = NULL
   WHERE l.target_user_id = p_user_id
