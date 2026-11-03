@@ -3850,7 +3850,7 @@ function renderHome() {
       ${state.account?.accountDeletionPending ? `
         <section class="card" style="border:1px solid #d97706;padding:14px;margin-bottom:14px">
           <strong>帳號正在等待刪除</strong>
-          <p class="muted small" style="margin:6px 0 10px">此帳號目前無法使用 PersonaX 功能。若要保留帳號與錢包餘額，請在後端設定的期限內取消刪除申請。</p>
+          <p class="muted small" style="margin:6px 0 10px">此帳號目前暫停使用功能。若要保留帳號與錢包餘額，請在後端設定的期限內取消刪除申請。</p>
           <button class="primary" data-action="pending-show-deletion-modal">查看狀態／取消刪除</button>
         </section>` : ''}
       <section class="hero" id="hero"></section>
@@ -7242,7 +7242,7 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
         o.scheduledFor || state.account?.deletionScheduledFor
       );
       showDialog('帳號正在等待刪除',`
-        <p>您已提出帳號刪除申請。在接下來的 ${e(duration)}內，您的帳號將暫時無法使用 PersonaX 功能。若您改變主意，只需在 ${e(scheduled)} 前使用原本的 Google 帳號重新登入，即可取消申請並恢復帳號。</p>
+        <p>您已提出帳號刪除申請。在接下來的 ${e(duration)}內，您的帳號將暫停使用功能。若您改變主意，只需在 ${e(scheduled)} 前使用原本的 Google 帳號重新登入，即可取消申請並恢復帳號。</p>
         <p class="muted">待刪除期間內，帳號資料、角色、聊天紀錄、交易紀錄及錢包餘額不會因提出申請而立即刪除或變更。</p>
         <form data-form="cancel-account-deletion">
           <button class="primary">取消刪除，恢復帳號</button>
@@ -7655,7 +7655,7 @@ document.addEventListener('click', async event => {
   const id = target.dataset.id || '';
   try {
     if (state.account?.accountDeletionPending) {
-      toast('此帳號正在等待刪除，目前不能使用 PersonaX 功能。你可以取消刪除申請以恢復帳號。');
+      toast('此帳號正在等待刪除，目前暫停使用功能。你可以取消刪除申請以恢復帳號。');
       return;
     }
     if (action === 'group-message-menu') {
@@ -7832,7 +7832,7 @@ document.addEventListener('click',async event => {
 
   if (state.account?.accountDeletionPending &&
       !['home','pending-dismiss-deletion-modal','pending-show-deletion-modal','cancel-account-deletion','logout','pending-switch-account'].includes(action)) {
-    toast('此帳號正在等待刪除，目前不能使用 PersonaX 功能。你可以取消刪除申請以恢復帳號。');
+    toast('此帳號正在等待刪除，目前暫停使用功能。你可以取消刪除申請以恢復帳號。');
     return;
   }
 
