@@ -7,6 +7,12 @@ BEGIN;
 -- Seed legacy rows before the migration installs first-publication origin triggers.
 \i supabase/drafts/seed-character-deletion-legacy-fixtures.sql
 
+\echo 'Applying PR #200 prerequisite migration: privilege hardening'
+\i supabase/migrations/20261103040547_poyozz_chat_deletion_privilege_hardening.sql
+
+\echo 'Applying PR #200 prerequisite migration: account auth-user existence guard'
+\i supabase/migrations/20261103090100_account_is_active_auth_user_existence_guard.sql
+
 \echo 'Applying CLI-generated character/account deletion and atomic lease migration'
 \i supabase/migrations/20261103115931_poyozz_account_deletion_preservation_atomic_lease.sql
 
