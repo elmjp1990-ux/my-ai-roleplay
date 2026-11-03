@@ -23,6 +23,10 @@ DECLARE
   v_author_group uuid := '50000000-0000-4000-8000-000000000024';
   v_author_group_turn uuid := '70000000-0000-4000-8000-000000000024';
   v_author_group_message uuid := '60000000-0000-4000-8000-000000000024';
+  v_author_chat_delete_job uuid := 'a0000000-0000-4000-8000-000000000023';
+  v_author_storage_job uuid := 'b0000000-0000-4000-8000-000000000023';
+  v_author_photo uuid := 'c0000000-0000-4000-8000-000000000023';
+  v_author_photo_path text := '10000000-0000-4000-8000-000000000020/50000000-0000-4000-8000-000000000023/account-delete-photo.jpg';
   v_turn_count_before bigint;
   v_turn_count_after bigint;
   v_storage_path text := '10000000-0000-4000-8000-000000000020/20000000-0000-4000-8000-000000000020/30000000-0000-4000-8000-000000000020.jpg';
@@ -117,6 +121,32 @@ BEGIN
   INSERT INTO public.chat_messages (id, session_id, role, content)
   VALUES (v_author_message, v_author_session, 'assistant', 'Author-owned solo reply');
   PERFORM public.settle_chat_turn(v_author, v_author_turn, v_author_message);
+
+  -- Model a chat deletion already pending when account deletion starts. Its
+  -- durable parent/storage jobs must survive the later Auth FK cascade, while
+  -- the photo metadata itself may cascade with the session.
+  UPDATE public.chat_sessions
+  SET deleted_at = pg_catalog.statement_timestamp()
+  WHERE id = v_author_session;
+  INSERT INTO public.chat_deletion_jobs (
+    id, resource_type, resource_id, owner_id, deleted_at, purge_after, status
+  ) VALUES (
+    v_author_chat_delete_job, 'single_session', v_author_session, v_author,
+    pg_catalog.statement_timestamp(),
+    pg_catalog.statement_timestamp() + interval '30 days', 'queued'
+  );
+  INSERT INTO public.chat_storage_deletion_jobs (
+    id, deletion_job_id, bucket_id, object_path, resource_type, resource_id, owner_id, status
+  ) VALUES (
+    v_author_storage_job, v_author_chat_delete_job, 'personax-memory-photos',
+    v_author_photo_path, 'single_session', v_author_session, v_author, 'queued'
+  );
+  INSERT INTO public.chat_memory_photos (
+    id, owner_id, chat_type, session_id, storage_path, caption
+  ) VALUES (
+    v_author_photo, v_author, 'single', v_author_session, v_author_photo_path,
+    'pending account deletion photo'
+  );
 
   INSERT INTO public.chat_groups (
     id, owner_id, name, scene_mode, world_character_id
@@ -289,6 +319,33 @@ BEGIN
   -- author token must no longer read retained media; the unrelated player token
   -- must continue to read the same existing session and media.
   DELETE FROM auth.users WHERE id = v_author;
+
+  -- Existing pending deletion jobs are independent of Auth ownership. The
+  -- photo metadata cascades with its chat session, but the durable Storage job
+  -- must remain available to the chat purge worker.
+  IF NOT EXISTS (
+    SELECT 1 FROM public.chat_deletion_jobs
+    WHERE id = v_author_chat_delete_job AND status = 'queued'
+      AND purge_after = deleted_at + interval '30 days'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.chat_storage_deletion_jobs
+    WHERE id = v_author_storage_job
+      AND deletion_job_id = v_author_chat_delete_job
+      AND bucket_id = 'personax-memory-photos'
+      AND object_path = v_author_photo_path
+      AND status = 'queued'
+  ) OR EXISTS (
+    SELECT 1 FROM public.chat_memory_photos WHERE id = v_author_photo
+  ) THEN
+    RAISE EXCEPTION 'account_auth_cascade_must_preserve_pending_chat_storage_jobs';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.character_asset_cleanup_jobs
+    WHERE character_id = v_character
+  ) THEN
+    RAISE EXCEPTION 'account_deletion_must_not_queue_retained_character_assets';
+  END IF;
 
   -- Once Auth FK cascades remove the author's own active chat parents, their
   -- saved aggregates become authoritative. The public count must still equal
