@@ -28,6 +28,9 @@ BEGIN;
 \echo 'Run account-deletion schedule read/write freeze behavior'
 \i supabase/drafts/test-account-deletion-character-schedule-write-freeze.sql
 
+\echo 'Run account-deletion character child-table RLS freeze behavior'
+\i supabase/drafts/test-account-deletion-character-child-rls-freeze.sql
+
 \echo 'Run history-aware character deletion behavior against generated migration'
 \i supabase/drafts/test-character-deletion-behavior.sql
 
