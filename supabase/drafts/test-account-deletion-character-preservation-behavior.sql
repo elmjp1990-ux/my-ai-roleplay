@@ -121,7 +121,7 @@ BEGIN
   INSERT INTO public.chat_groups (
     id, owner_id, name, scene_mode, world_character_id
   ) VALUES (
-    v_author_group, v_author, 'Author-owned group before account deletion', 'shared', v_character
+    v_author_group, v_author, 'Author delete group', 'shared', v_character
   );
   INSERT INTO public.chat_group_members (
     id, group_id, character_id, position, character_snapshot
