@@ -35,7 +35,9 @@ INSERT INTO auth.users (id) VALUES
   ('10000000-0000-4000-8000-000000000033'),
   ('10000000-0000-4000-8000-000000000034'),
   ('10000000-0000-4000-8000-000000000035'),
-  ('10000000-0000-4000-8000-000000000036')
+  ('10000000-0000-4000-8000-000000000036'),
+  ('10000000-0000-4000-8000-000000000038'),
+  ('10000000-0000-4000-8000-000000000039')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.profiles (id, handle, nickname) VALUES
@@ -45,7 +47,9 @@ INSERT INTO public.profiles (id, handle, nickname) VALUES
   ('10000000-0000-4000-8000-000000000033', 'pr200-lease-author', 'Lease Test Author'),
   ('10000000-0000-4000-8000-000000000034', 'pr200-lease-author-2', 'Lease Test Author 2'),
   ('10000000-0000-4000-8000-000000000035', 'pr200-lease-race-claim', 'Lease Claim Race'),
-  ('10000000-0000-4000-8000-000000000036', 'pr200-lease-race-cancel', 'Lease Cancel Race')
+  ('10000000-0000-4000-8000-000000000036', 'pr200-lease-race-cancel', 'Lease Cancel Race'),
+  ('10000000-0000-4000-8000-000000000038', 'pr200-snapshot-author-a', 'Snapshot Author A'),
+  ('10000000-0000-4000-8000-000000000039', 'pr200-snapshot-author-b', 'Snapshot Author B')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.characters (id, author_id, name, visibility, review_status, rights_confirmed)
@@ -55,7 +59,16 @@ VALUES
   ('20000000-0000-4000-8000-000000000032', '10000000-0000-4000-8000-000000000032', 'Asset race draft A', 'private', 'draft', true),
   ('20000000-0000-4000-8000-000000000033', '10000000-0000-4000-8000-000000000032', 'Asset race target A', 'public', 'approved', true),
   ('20000000-0000-4000-8000-000000000034', '10000000-0000-4000-8000-000000000032', 'Asset race draft B', 'private', 'draft', true),
-  ('20000000-0000-4000-8000-000000000035', '10000000-0000-4000-8000-000000000032', 'Asset race target B', 'public', 'approved', true);
+  ('20000000-0000-4000-8000-000000000035', '10000000-0000-4000-8000-000000000032', 'Asset race target B', 'public', 'approved', true),
+  ('20000000-0000-4000-8000-000000000038', '10000000-0000-4000-8000-000000000038', 'Snapshot race character A', 'public', 'approved', true),
+  ('20000000-0000-4000-8000-000000000039', '10000000-0000-4000-8000-000000000039', 'Snapshot race character B', 'public', 'approved', true);
+
+UPDATE public.characters
+SET first_published_at = pg_catalog.statement_timestamp()
+WHERE id IN (
+  '20000000-0000-4000-8000-000000000038',
+  '20000000-0000-4000-8000-000000000039'
+);
 
 INSERT INTO public.character_schedules (
   id, character_id, weekday, day_type, start_time, end_time, location_key, activity
