@@ -24,17 +24,20 @@ $storage_stub$;
 \i supabase/drafts/account-deletion-character-child-write-freeze.sql
 \i supabase/drafts/character-deletion-existing-chat-continuation.sql
 \i supabase/drafts/prepare-account-deletion-character-preservation-integration.sql
+\i supabase/drafts/account-deletion-worker-atomic-lease.sql
 
 INSERT INTO auth.users (id) VALUES
   ('10000000-0000-4000-8000-000000000030'),
   ('10000000-0000-4000-8000-000000000031'),
-  ('10000000-0000-4000-8000-000000000032')
+  ('10000000-0000-4000-8000-000000000032'),
+  ('10000000-0000-4000-8000-000000000033')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.profiles (id, handle, nickname) VALUES
   ('10000000-0000-4000-8000-000000000030', 'pr200-race-author', 'Race Test Author'),
   ('10000000-0000-4000-8000-000000000031', 'pr200-race-player', 'Race Test Player'),
-  ('10000000-0000-4000-8000-000000000032', 'pr200-asset-author', 'Asset Test Author')
+  ('10000000-0000-4000-8000-000000000032', 'pr200-asset-author', 'Asset Test Author'),
+  ('10000000-0000-4000-8000-000000000033', 'pr200-lease-author', 'Lease Test Author')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.characters (id, author_id, name, visibility, review_status, rights_confirmed)
