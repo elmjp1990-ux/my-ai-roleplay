@@ -57,7 +57,7 @@ CREATE POLICY memory_photo_objects_select_owner
     AND EXISTS (
       SELECT 1
       FROM public.chat_memory_photos AS p
-      WHERE p.storage_path = objects.name
+      WHERE p.storage_path = name
         AND p.owner_id = (SELECT auth.uid())
         AND p.deleted_at IS NULL
         AND (
