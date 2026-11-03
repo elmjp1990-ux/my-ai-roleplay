@@ -53,7 +53,6 @@ on:
   push:
     branches:
       - main
-      - "security/chat-deletion-lifecycle-reconciliation"
     paths:
       - "supabase/functions/_shared/account-deletion-worker.ts"
       - "supabase/functions/_shared/character-asset-cleanup-worker.ts"
