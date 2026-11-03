@@ -67,6 +67,55 @@ Deno.test("does not count completion when queue mark returns false or errors", a
   assertEquals(rpcError.storage_failed, 1);
 });
 
+Deno.test("continues the batch when Storage removal throws", async () => {
+  const marked: unknown[][] = [];
+  let removeCalls = 0;
+  const summary = await processStorageDeletionJobs([
+    { ...job, job_id: "network-throw" },
+    { ...job, job_id: "later-job", object_path: "owner/session/later.png" },
+  ], {
+    removeObject: async (_bucket, path) => {
+      removeCalls += 1;
+      if (path.endsWith("photo.png")) {
+        const error = new Error("network unavailable");
+        error.name = "FetchError";
+        throw error;
+      }
+      return { error: null };
+    },
+    markJob: async (...args) => {
+      marked.push(args);
+      return { data: true, error: null };
+    },
+  });
+  assertEquals(removeCalls, 2);
+  assertEquals(marked, [
+    ["network-throw", false, "FetchError"],
+    ["later-job", true, null],
+  ]);
+  assertEquals(summary, { storage_claimed: 2, storage_deleted: 1, storage_failed: 1 });
+});
+
+Deno.test("continues the batch when a queue mark RPC throws", async () => {
+  const removed: string[] = [];
+  let markCalls = 0;
+  const summary = await processStorageDeletionJobs([
+    { ...job, job_id: "mark-throw" },
+    { ...job, job_id: "later-job", object_path: "owner/session/later.png" },
+  ], {
+    removeObject: async (_bucket, path) => {
+      removed.push(path);
+      return { error: null };
+    },
+    markJob: async () => {
+      markCalls += 1;
+      if (markCalls === 1) throw new Error("queue RPC unavailable");
+      return { data: true, error: null };
+    },
+  });
+  assertEquals(removed.length, 2);
+  assertEquals(summary, { storage_claimed: 2, storage_deleted: 1, storage_failed: 1 });
+});
 Deno.test("rejects non-chat buckets and empty paths without calling Storage", async () => {
   let removeCalls = 0;
   const marked: unknown[][] = [];
