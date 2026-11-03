@@ -14,7 +14,6 @@ on:
   push:
     branches:
       - main
-      - "security/chat-deletion-lifecycle-reconciliation"
     paths:
       - "supabase/functions/_shared/chat-deletion-worker.ts"
       - "supabase/functions/_shared/chat-deletion-job-worker.ts"
