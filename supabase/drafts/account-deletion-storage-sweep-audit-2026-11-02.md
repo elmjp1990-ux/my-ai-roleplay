@@ -87,3 +87,14 @@ The one legacy value is therefore not a provable object path in the current chat
 A static regression guard was added to scripts/test-account-deletion-character-preservation-draft.mjs to ensure the account photo queue helper never reads chat_group_memory_photos or image_url. The same guard now checks that single/group frontend deletion calls the lifecycle RPCs, persists tombstones, filters stale cached chats/groups, and exposes no player-facing restore/undo/reopen action or restore RPC call.
 
 This is a classification of the current test-project row only; it does not establish that every historical deployment used the same URL format. If future evidence identifies a managed Storage object, add a separate exact-bucket + exact-owner-path migration/queue design rather than widening the existing cleanup helper.
+
+
+## Account-photo queue parent timestamp reconciliation — 2026-11-03
+
+A follow-up review found an interrupted-account-deletion edge case: account prepare could enqueue a chat-photo cleanup job with `deleted_at = requested_at` while leaving the still-existing `chat_sessions` / `chat_groups` parent `deleted_at` as NULL. If the Auth cascade had not completed by the time the 30-day job was claimed, `purge_chat_deletion_job()` would correctly reject the mismatched parent/job timestamps and retry until dead-letter.
+
+The draft helper now, under the already-acquired parent lock and after revalidating the photo row, soft-deletes the exact owned parent using the same `v_deleted_at` timestamp used by the queue. Existing soft-deleted parents keep their original timestamp. It also processes solo parents first in stable ID order, then group parents, matching `snapshot_account_chat_character_history()` lock order and avoiding an inverse-order lock pattern.
+
+The disposable behavior test now uses an expired 31-day request / 30-day account grace fixture, asserts both parent timestamps equal the queued `requested_at`, invokes the real `claim_chat_deletion_jobs()` and `purge_chat_deletion_job()` while both parent rows still exist, and verifies the jobs complete before the later Auth cascade. The service-role test claim intentionally has no end-user `sub`, matching the account worker's internal service context and allowing the existing owner-update guard to distinguish it from a browser user's update.
+
+The account workflow path filter was also corrected to trigger when `test-account-deletion-character-preservation-behavior.sql` changes. A pre-existing `new RegExp()` string-escape defect in the static test harness was corrected so whitespace-crossing assertions work as intended. Await same-HEAD disposable schema replay and local synthetic replay before accepting this fix. No hosted mutation or worker deployment was performed.
