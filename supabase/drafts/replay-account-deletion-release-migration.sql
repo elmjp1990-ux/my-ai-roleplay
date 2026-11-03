@@ -18,6 +18,8 @@ BEGIN;
 
 \echo 'Applying account-deletion schedule write-freeze migration'
 \i supabase/migrations/20261104200200_account_deletion_character_schedule_write_freeze.sql
+\echo 'Applying account-deletion character Storage write-freeze migration'
+\i supabase/migrations/20261104200300_account_deletion_character_storage_write_freeze.sql
 
 \echo 'Verify migration structure, RLS, grants, SECURITY DEFINER and search_path'
 \i supabase/drafts/verify-deletion-draft-replay.sql
@@ -30,6 +32,8 @@ BEGIN;
 
 \echo 'Run account-deletion character child-table RLS freeze behavior'
 \i supabase/drafts/test-account-deletion-character-child-rls-freeze.sql
+\echo 'Run account-deletion character Storage write-freeze behavior'
+\i supabase/drafts/test-account-deletion-character-storage-write-freeze.sql
 
 \echo 'Run history-aware character deletion behavior against generated migration'
 \i supabase/drafts/test-character-deletion-behavior.sql
