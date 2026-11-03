@@ -129,7 +129,7 @@ BEGIN
     ),
     'postgres_delete_privilege', pg_catalog.has_table_privilege('postgres', 'public.characters', 'DELETE'),
     'character_triggers', (
-      SELECT pg_catalog.coalesce(
+      SELECT COALESCE(
         pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
           'name', t.tgname,
           'definition', pg_catalog.pg_get_triggerdef(t.oid)
