@@ -421,4 +421,4 @@ asset_b_referenced="$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM p
 }
 echo "ok: deletion wins path lock; queued asset path cannot be reattached"
 
-echo "Deletion concurrency tests: 4 passed, 0 failed"
+echo "Deletion concurrency tests: 9 passed, 0 failed"
