@@ -7,7 +7,7 @@ Read-only inspection of the connected test Supabase project and the current acco
 This document refines the user-approved account deletion policy:
 - Retain character records, character settings, illustration rows, illustration objects, and avatar-video objects.
 - Retain historical creator attribution, but render it as plain, non-navigable text (never a link to an author page).
-- After the account deletion grace period, archive the account's characters from discovery, city encounters, recommendations, and every new-chat entry point.
+- Preserve each character's original visibility and review state. Previously public/approved works remain publicly discoverable; private/unpublished works remain private. All account-owned characters become offline and cannot start a new chat, encounter or story session.
 - Existing authorized conversations may continue; no new single/group/encounter/story conversation may be created for those characters.
 - Chat-memory photo cleanup remains its separate 30-day queue.
 
@@ -107,11 +107,11 @@ Existing session reads/turns must not accidentally reuse a generic `character_ca
 
 ## Required implementation/test gates before worker activation
 
-- Recover/verify the trusted baseline migration provenance before authoring deployable migrations.
+- Use the agreed disposable current-state schema fixture for draft validation; recovering the original pre-ledger profiles/characters CREATE TABLE files is not a prerequisite. Before hosted rollout, create fresh uniquely versioned incremental migrations and compare them against the existing test-project schema/ledger.
 - Design and test the durable creator identity and active-owner separation, including profile/Auth deletion recovery.
 - Inventory all direct and indirect single/group/encounter/story creation routes and EXECUTE grants.
 - Verify Edge Functions bind supplied user IDs to the verified JWT user; preferably derive user identity server-side rather than trust request payload.
-- Add explicit archived-state denial to all discovery and new-session creation gates.
+- Preserve public discovery for previously public/approved characters and preserve private state for unpublished/private characters. Add explicit archived-state denial to all new-session creation gates and encounter-start actions.
 - Add exact-existing-session continuation checks for single and group chats.
 - Verify illustration/avatar-video object reads and signed URL refresh for authorized existing chats only.
 - Preserve `personax-memory-photos` and the existing 30-day `chat_deletion_jobs` / `chat_storage_deletion_jobs` workflow unchanged.
@@ -123,3 +123,18 @@ Existing session reads/turns must not accidentally reuse a generic `character_ca
 ## Status
 
 Architecture audit only. No schema, policy, data, Storage, Auth, worker deployment, cron, or hosted migration changes were made. This is not approval to activate account deletion.
+
+
+## Round 80 superseding product clarification — 2026-11-03 reconciliation
+
+Earlier wording in this audit that said account-deleted characters should be removed from all discovery is superseded.
+
+The accepted behavior is:
+- Preserve original `visibility` and `review_status`.
+- Previously public/approved works remain publicly discoverable and retain plain-text historical creator display name.
+- Private/unpublished works remain private.
+- Every account-owned character is offline and cannot start new chat/group membership/encounter/story.
+- Existing player conversations continue and the character still replies with normal billing.
+- Preserve all character settings and media; account deletion never routes character media into the explicit character hard-delete cleanup worker.
+
+This distinction is critical: **public discovery visibility is not the same as permission to create a new conversation**. Keep those checks separate.
