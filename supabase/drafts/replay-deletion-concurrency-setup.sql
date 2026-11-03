@@ -18,7 +18,7 @@ $storage_stub$;
 -- account_is_active) are already present in the current-state schema fixture.
 -- Seed legacy rows before the migration installs first-publication origin triggers.
 \i supabase/drafts/seed-character-deletion-legacy-fixtures.sql
-\i supabase/migrations/20261103115931_poyozz_account_deletion_preservation_atomic_lease.sql
+\i supabase/migrations/20261104200100_poyozz_account_deletion_preservation_atomic_lease.sql
 \i supabase/drafts/test-account-deletion-worker-lease-security.sql
 
 INSERT INTO auth.users (id) VALUES
