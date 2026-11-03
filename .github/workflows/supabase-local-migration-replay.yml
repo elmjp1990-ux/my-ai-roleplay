@@ -33,7 +33,7 @@ jobs:
           cd "$migration_project"
           supabase migration new poyozz_chat_deletion_privilege_hardening
           generated="$(find supabase/migrations -maxdepth 1 -type f \
-            -name '*_poyozz_chat_deletion_privilege_hardening.sql' -printf '%f\\n')"
+            -name '*_poyozz_chat_deletion_privilege_hardening.sql' -printf '%f')"
           test -n "$generated"
           echo "Generated migration filename (not applied): $generated"
           echo "Generated migration filename (not applied): `$generated`" >> "$GITHUB_STEP_SUMMARY"
