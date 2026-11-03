@@ -132,3 +132,13 @@ CI on code-validation HEAD `eb8a2d811208d24881ff3bf3ad4544636989bc9e`:
 - Group UI syntax: success.
 
 The account workflow path filter now includes `test-account-deletion-character-preservation-behavior.sql`; a pre-existing `new RegExp()` string-escape bug in its structural test was fixed so the regex assertions actually span newlines. This is still disposable-only validation, not hosted mutation or live Storage API E2E. No worker deployment or Cron activation.
+
+
+## Exact migration source restoration and validation — 2026-11-03
+
+- The connected test project's `supabase_migrations.schema_migrations` table stores the complete migration source in `statements[1]` (one array element per migration). Compared all 28 PR migration files directly against those stored source strings.
+- 9 were already byte-identical; 19 had textual drift. Token-aware comparison found only comments/formatting, one error message, optional table-alias `AS`, equivalent regex string concatenation, and unused local variable declarations; no changed grant, policy predicate, trigger, retention interval, or control-flow semantics were identified.
+- Restored the 19 non-identical repository migration files exactly from their applied test-ledger source. Rechecked in four batches: **28/28 exact source matches** (CRLF normalized to LF). No hosted migration was applied, repaired, reset, or re-recorded.
+- Source restoration commit: `68e3ed291d3079efebc7a2a128c9df6827f254b4`; subsequent documentation commit records this audit.
+- CI on source-restoration HEAD `68e3ed291d3079efebc7a2a128c9df6827f254b4`: Account deletion worker success; Chat deletion worker success; Group background UI syntax success. Local synthetic Supabase replay is running; previous code HEAD `eb8a2d8` local synthetic Supabase replay completed successfully.
+- Release migration still required: carry the direct parent DELETE privilege revocation draft into a new uniquely versioned incremental migration. Do not modify or reapply historical migrations. PR remains Draft/unmerged; no hosted mutation, worker deployment, or Cron activation.
