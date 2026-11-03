@@ -1,71 +1,71 @@
-CREATE OR REPLACE FUNCTION public.reserve_chat_turn(
+create or replace function public.reserve_chat_turn(
   p_user_id uuid,
   p_turn_id uuid,
   p_session_id uuid,
   p_user_message_id uuid,
   p_assistant_message_id uuid
 )
-RETURNS TABLE(turn_id uuid, status text, silver_reserved integer, diamonds_reserved integer, balance_silver integer, balance_diamonds integer)
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO ''
-AS $function$
-DECLARE
+returns table(turn_id uuid, status text, silver_reserved integer, diamonds_reserved integer, balance_silver integer, balance_diamonds integer)
+language plpgsql
+security definer
+set search_path to ''
+as $function$
+declare
   v_charge public.chat_turn_charges%rowtype;
   v_wallet public.wallet_accounts%rowtype;
   v_silver integer;
   v_diamonds integer;
-BEGIN
-  IF p_user_id IS NULL OR p_turn_id IS NULL OR p_session_id IS NULL OR p_user_message_id IS NULL OR p_assistant_message_id IS NULL THEN
-    RAISE EXCEPTION 'invalid_turn_request';
-  END IF;
-  IF EXISTS (SELECT 1 FROM public.account_deletion_requests r WHERE r.user_id = p_user_id) THEN
-    RAISE EXCEPTION 'account_not_active';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM public.chat_sessions s WHERE s.id = p_session_id AND s.user_id = p_user_id AND s.deleted_at IS NULL) THEN
-    RAISE EXCEPTION 'chat_session_not_owned_or_active';
-  END IF;
+begin
+  if p_user_id is null or p_turn_id is null or p_session_id is null or p_user_message_id is null or p_assistant_message_id is null then
+    raise exception 'invalid_turn_request';
+  end if;
+  if exists (select 1 from public.account_deletion_requests r where r.user_id = p_user_id) then
+    raise exception 'account_not_active';
+  end if;
+  if not exists (select 1 from public.chat_sessions s where s.id = p_session_id and s.user_id = p_user_id and s.deleted_at is null) then
+    raise exception 'chat_session_not_owned_or_active';
+  end if;
 
   -- Find and lock the stable turn before checking message visibility so existing turns can recover idempotently.
-  INSERT INTO public.chat_turn_charges(turn_id,user_id,session_id,user_message_id,expected_assistant_message_id,cost,status)
-  VALUES (p_turn_id,p_user_id,p_session_id,p_user_message_id,p_assistant_message_id,2,'created')
-  ON CONFLICT ON CONSTRAINT chat_turn_charges_pkey DO NOTHING;
+  insert into public.chat_turn_charges(turn_id,user_id,session_id,user_message_id,expected_assistant_message_id,cost,status)
+  values (p_turn_id,p_user_id,p_session_id,p_user_message_id,p_assistant_message_id,2,'created')
+  on conflict on constraint chat_turn_charges_pkey do nothing;
 
-  SELECT c.* INTO v_charge FROM public.chat_turn_charges c WHERE c.turn_id = p_turn_id FOR UPDATE;
-  IF NOT FOUND THEN RAISE EXCEPTION 'turn_not_found'; END IF;
-  IF v_charge.user_id <> p_user_id OR v_charge.session_id <> p_session_id OR v_charge.user_message_id <> p_user_message_id OR v_charge.expected_assistant_message_id <> p_assistant_message_id THEN
-    RAISE EXCEPTION 'turn_id_reuse_conflict';
-  END IF;
+  select c.* into v_charge from public.chat_turn_charges c where c.turn_id = p_turn_id for update;
+  if not found then raise exception 'turn_not_found'; end if;
+  if v_charge.user_id <> p_user_id or v_charge.session_id <> p_session_id or v_charge.user_message_id <> p_user_message_id or v_charge.expected_assistant_message_id <> p_assistant_message_id then
+    raise exception 'turn_id_reuse_conflict';
+  end if;
 
-  IF v_charge.status <> 'created' THEN
-    SELECT w.silver_coins, w.diamonds INTO v_silver, v_diamonds FROM public.wallet_accounts w WHERE w.user_id = p_user_id;
-    RETURN QUERY SELECT v_charge.turn_id, v_charge.status, v_charge.silver_reserved, v_charge.diamonds_reserved, v_silver, v_diamonds;
-    RETURN;
-  END IF;
+  if v_charge.status <> 'created' then
+    select w.silver_coins, w.diamonds into v_silver, v_diamonds from public.wallet_accounts w where w.user_id = p_user_id;
+    return query select v_charge.turn_id, v_charge.status, v_charge.silver_reserved, v_charge.diamonds_reserved, v_silver, v_diamonds;
+    return;
+  end if;
 
   -- New reservations still require a non-deleted user message.
-  IF NOT EXISTS (SELECT 1 FROM public.chat_messages m WHERE m.id = p_user_message_id AND m.session_id = p_session_id AND m.role = 'user' AND m.deleted_at IS NULL) THEN
-    RAISE EXCEPTION 'user_message_not_found';
-  END IF;
+  if not exists (select 1 from public.chat_messages m where m.id = p_user_message_id and m.session_id = p_session_id and m.role = 'user' and m.deleted_at is null) then
+    raise exception 'user_message_not_found';
+  end if;
 
-  SELECT w.* INTO v_wallet FROM public.wallet_accounts w WHERE w.user_id = p_user_id FOR UPDATE;
-  IF NOT FOUND THEN RAISE EXCEPTION 'wallet_not_initialized'; END IF;
-  IF v_wallet.silver_coins + v_wallet.diamonds < 2 THEN
-    UPDATE public.chat_turn_charges c SET status='insufficient_funds', updated_at=now() WHERE c.turn_id=p_turn_id;
-    INSERT INTO public.chat_turn_events(turn_id,user_id,event_type,stage,error_code) VALUES (p_turn_id,p_user_id,'insufficient_balance','reservation','insufficient_funds');
-    RETURN QUERY SELECT p_turn_id, 'insufficient_funds'::text, 0, 0, v_wallet.silver_coins, v_wallet.diamonds;
-    RETURN;
-  END IF;
+  select w.* into v_wallet from public.wallet_accounts w where w.user_id = p_user_id for update;
+  if not found then raise exception 'wallet_not_initialized'; end if;
+  if v_wallet.silver_coins + v_wallet.diamonds < 2 then
+    update public.chat_turn_charges c set status='insufficient_funds', updated_at=now() where c.turn_id=p_turn_id;
+    insert into public.chat_turn_events(turn_id,user_id,event_type,stage,error_code) values (p_turn_id,p_user_id,'insufficient_balance','reservation','insufficient_funds');
+    return query select p_turn_id, 'insufficient_funds'::text, 0, 0, v_wallet.silver_coins, v_wallet.diamonds;
+    return;
+  end if;
   v_silver := least(v_wallet.silver_coins, 2);
   v_diamonds := 2 - v_silver;
-  UPDATE public.wallet_accounts w SET silver_coins=w.silver_coins-v_silver, diamonds=w.diamonds-v_diamonds, updated_at=now() WHERE w.user_id=p_user_id;
-  IF v_silver > 0 THEN INSERT INTO public.wallet_transactions(user_id,currency_type,amount,biz_type,reference_id) VALUES (p_user_id,'silver_coins',-v_silver,'chat_turn_charge',p_turn_id::text); END IF;
-  IF v_diamonds > 0 THEN INSERT INTO public.wallet_transactions(user_id,currency_type,amount,biz_type,reference_id) VALUES (p_user_id,'diamonds',-v_diamonds,'chat_turn_charge',p_turn_id::text); END IF;
-  UPDATE public.chat_turn_charges c SET status='reserved', silver_reserved=v_silver, diamonds_reserved=v_diamonds, reserved_at=now(), updated_at=now() WHERE c.turn_id=p_turn_id;
-  INSERT INTO public.chat_turn_events(turn_id,user_id,event_type,stage) VALUES (p_turn_id,p_user_id,'reserved','reservation');
-  SELECT w.silver_coins, w.diamonds INTO v_silver, v_diamonds FROM public.wallet_accounts w WHERE w.user_id=p_user_id;
-  RETURN QUERY SELECT p_turn_id, 'reserved'::text,
-    (SELECT c.silver_reserved FROM public.chat_turn_charges c WHERE c.turn_id=p_turn_id),
-    (SELECT c.diamonds_reserved FROM public.chat_turn_charges c WHERE c.turn_id=p_turn_id), v_silver, v_diamonds;
-END;
+  update public.wallet_accounts w set silver_coins=w.silver_coins-v_silver, diamonds=w.diamonds-v_diamonds, updated_at=now() where w.user_id=p_user_id;
+  if v_silver > 0 then insert into public.wallet_transactions(user_id,currency_type,amount,biz_type,reference_id) values (p_user_id,'silver_coins',-v_silver,'chat_turn_charge',p_turn_id::text); end if;
+  if v_diamonds > 0 then insert into public.wallet_transactions(user_id,currency_type,amount,biz_type,reference_id) values (p_user_id,'diamonds',-v_diamonds,'chat_turn_charge',p_turn_id::text); end if;
+  update public.chat_turn_charges c set status='reserved', silver_reserved=v_silver, diamonds_reserved=v_diamonds, reserved_at=now(), updated_at=now() where c.turn_id=p_turn_id;
+  insert into public.chat_turn_events(turn_id,user_id,event_type,stage) values (p_turn_id,p_user_id,'reserved','reservation');
+  select w.silver_coins, w.diamonds into v_silver, v_diamonds from public.wallet_accounts w where w.user_id=p_user_id;
+  return query select p_turn_id, 'reserved'::text,
+    (select c.silver_reserved from public.chat_turn_charges c where c.turn_id=p_turn_id),
+    (select c.diamonds_reserved from public.chat_turn_charges c where c.turn_id=p_turn_id), v_silver, v_diamonds;
+end;
 $function$;

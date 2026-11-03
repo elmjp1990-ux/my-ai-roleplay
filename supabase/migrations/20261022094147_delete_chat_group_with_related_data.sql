@@ -1,3 +1,4 @@
+
 CREATE OR REPLACE FUNCTION public.delete_chat_group_with_related_data(p_group_id uuid)
 RETURNS TABLE(storage_path text)
 LANGUAGE plpgsql

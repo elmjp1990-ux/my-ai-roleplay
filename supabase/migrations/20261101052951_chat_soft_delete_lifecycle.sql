@@ -25,7 +25,6 @@ BEGIN
     RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';
   END IF;
 
-  -- Parent-first lock serializes deletion with the new reservation/writer gates.
   SELECT s.user_id, s.deleted_at
     INTO v_owner_id, v_deleted_at
   FROM public.chat_sessions s
@@ -101,7 +100,6 @@ BEGIN
   WHERE s.id = p_session_id
     AND s.user_id = v_user_id;
 
-  -- Preserve all content during the 30-day retention window.
   RETURN QUERY SELECT NULL::text WHERE false;
 END;
 $function$;
@@ -129,7 +127,6 @@ BEGIN
     RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';
   END IF;
 
-  -- Parent-first lock serializes deletion with group-turn writers.
   SELECT g.owner_id, g.deleted_at
     INTO v_owner_id, v_deleted_at
   FROM public.chat_groups g
@@ -205,7 +202,6 @@ BEGIN
   WHERE g.id = p_group_id
     AND g.owner_id = v_user_id;
 
-  -- Preserve all group content and character snapshots during the 30-day window.
   RETURN QUERY SELECT NULL::text WHERE false;
 END;
 $function$;
@@ -215,159 +211,77 @@ REVOKE ALL ON FUNCTION public.delete_chat_group_with_related_data(uuid) FROM PUB
 GRANT EXECUTE ON FUNCTION public.delete_chat_session_content(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.delete_chat_group_with_related_data(uuid) TO authenticated, service_role;
 
--- Restrictive policies add an AND gate to the existing owner/account policies.
--- Deleted parents become invisible and immutable immediately.
 CREATE POLICY chat_sessions_active_lifecycle_guard
-  ON public.chat_sessions AS RESTRICTIVE
-  FOR ALL TO authenticated
-  USING (deleted_at IS NULL)
-  WITH CHECK (deleted_at IS NULL);
+  ON public.chat_sessions AS RESTRICTIVE FOR ALL TO authenticated
+  USING (deleted_at IS NULL) WITH CHECK (deleted_at IS NULL);
 
 CREATE POLICY chat_messages_active_session_lifecycle_guard
-  ON public.chat_messages AS RESTRICTIVE
-  FOR ALL TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public.chat_sessions s
-    WHERE s.id = chat_messages.session_id AND s.deleted_at IS NULL
-  ))
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM public.chat_sessions s
-    WHERE s.id = chat_messages.session_id AND s.deleted_at IS NULL
-  ));
+  ON public.chat_messages AS RESTRICTIVE FOR ALL TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.chat_sessions s WHERE s.id = chat_messages.session_id AND s.deleted_at IS NULL))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.chat_sessions s WHERE s.id = chat_messages.session_id AND s.deleted_at IS NULL));
 
 CREATE POLICY chat_message_versions_active_session_lifecycle_guard
-  ON public.chat_message_versions AS RESTRICTIVE
-  FOR ALL TO authenticated
+  ON public.chat_message_versions AS RESTRICTIVE FOR ALL TO authenticated
   USING (EXISTS (
-    SELECT 1
-    FROM public.chat_messages m
-    JOIN public.chat_sessions s ON s.id = m.session_id
-    WHERE m.id = chat_message_versions.message_id
-      AND s.deleted_at IS NULL
+    SELECT 1 FROM public.chat_messages m JOIN public.chat_sessions s ON s.id = m.session_id
+    WHERE m.id = chat_message_versions.message_id AND s.deleted_at IS NULL
   ))
   WITH CHECK (EXISTS (
-    SELECT 1
-    FROM public.chat_messages m
-    JOIN public.chat_sessions s ON s.id = m.session_id
-    WHERE m.id = chat_message_versions.message_id
-      AND s.deleted_at IS NULL
+    SELECT 1 FROM public.chat_messages m JOIN public.chat_sessions s ON s.id = m.session_id
+    WHERE m.id = chat_message_versions.message_id AND s.deleted_at IS NULL
   ));
 
 CREATE POLICY ai_generation_records_active_session_lifecycle_guard
-  ON public.ai_generation_records AS RESTRICTIVE
-  FOR ALL TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public.chat_sessions s
-    WHERE s.id = ai_generation_records.session_id AND s.deleted_at IS NULL
-  ))
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM public.chat_sessions s
-    WHERE s.id = ai_generation_records.session_id AND s.deleted_at IS NULL
-  ));
+  ON public.ai_generation_records AS RESTRICTIVE FOR ALL TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.chat_sessions s WHERE s.id = ai_generation_records.session_id AND s.deleted_at IS NULL))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.chat_sessions s WHERE s.id = ai_generation_records.session_id AND s.deleted_at IS NULL));
 
 CREATE POLICY chat_groups_active_lifecycle_guard
-  ON public.chat_groups AS RESTRICTIVE
-  FOR ALL TO authenticated
-  USING (deleted_at IS NULL)
-  WITH CHECK (deleted_at IS NULL);
+  ON public.chat_groups AS RESTRICTIVE FOR ALL TO authenticated
+  USING (deleted_at IS NULL) WITH CHECK (deleted_at IS NULL);
 
 DROP POLICY IF EXISTS chat_groups_owner_delete ON public.chat_groups;
 REVOKE DELETE ON TABLE public.chat_groups FROM authenticated, anon;
 
 CREATE POLICY chat_group_members_active_group_lifecycle_guard
-  ON public.chat_group_members AS RESTRICTIVE
-  FOR ALL TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public.chat_groups g
-    WHERE g.id = chat_group_members.group_id AND g.deleted_at IS NULL
-  ))
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM public.chat_groups g
-    WHERE g.id = chat_group_members.group_id AND g.deleted_at IS NULL
-  ));
+  ON public.chat_group_members AS RESTRICTIVE FOR ALL TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.chat_groups g WHERE g.id = chat_group_members.group_id AND g.deleted_at IS NULL))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.chat_groups g WHERE g.id = chat_group_members.group_id AND g.deleted_at IS NULL));
 
 CREATE POLICY chat_group_messages_active_group_lifecycle_guard
-  ON public.chat_group_messages AS RESTRICTIVE
-  FOR ALL TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public.chat_groups g
-    WHERE g.id = chat_group_messages.group_id AND g.deleted_at IS NULL
-  ))
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM public.chat_groups g
-    WHERE g.id = chat_group_messages.group_id AND g.deleted_at IS NULL
-  ));
+  ON public.chat_group_messages AS RESTRICTIVE FOR ALL TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.chat_groups g WHERE g.id = chat_group_messages.group_id AND g.deleted_at IS NULL))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.chat_groups g WHERE g.id = chat_group_messages.group_id AND g.deleted_at IS NULL));
 
 CREATE POLICY chat_group_scenes_active_group_lifecycle_guard
-  ON public.chat_group_scenes AS RESTRICTIVE
-  FOR ALL TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public.chat_groups g
-    WHERE g.id = chat_group_scenes.group_id AND g.deleted_at IS NULL
-  ))
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM public.chat_groups g
-    WHERE g.id = chat_group_scenes.group_id AND g.deleted_at IS NULL
-  ));
+  ON public.chat_group_scenes AS RESTRICTIVE FOR ALL TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.chat_groups g WHERE g.id = chat_group_scenes.group_id AND g.deleted_at IS NULL))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.chat_groups g WHERE g.id = chat_group_scenes.group_id AND g.deleted_at IS NULL));
 
 CREATE POLICY chat_group_turns_active_group_lifecycle_guard
-  ON public.chat_group_turns AS RESTRICTIVE
-  FOR ALL TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public.chat_groups g
-    WHERE g.id = chat_group_turns.group_id AND g.deleted_at IS NULL
-  ))
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM public.chat_groups g
-    WHERE g.id = chat_group_turns.group_id AND g.deleted_at IS NULL
-  ));
+  ON public.chat_group_turns AS RESTRICTIVE FOR ALL TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.chat_groups g WHERE g.id = chat_group_turns.group_id AND g.deleted_at IS NULL))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.chat_groups g WHERE g.id = chat_group_turns.group_id AND g.deleted_at IS NULL));
 
 CREATE POLICY chat_group_diary_active_group_lifecycle_guard
-  ON public.chat_group_diary AS RESTRICTIVE
-  FOR ALL TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public.chat_groups g
-    WHERE g.id = chat_group_diary.group_id AND g.deleted_at IS NULL
-  ))
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM public.chat_groups g
-    WHERE g.id = chat_group_diary.group_id AND g.deleted_at IS NULL
-  ));
+  ON public.chat_group_diary AS RESTRICTIVE FOR ALL TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.chat_groups g WHERE g.id = chat_group_diary.group_id AND g.deleted_at IS NULL))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.chat_groups g WHERE g.id = chat_group_diary.group_id AND g.deleted_at IS NULL));
 
 CREATE POLICY chat_group_memory_photos_active_group_lifecycle_guard
-  ON public.chat_group_memory_photos AS RESTRICTIVE
-  FOR ALL TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public.chat_groups g
-    WHERE g.id = chat_group_memory_photos.group_id AND g.deleted_at IS NULL
-  ))
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM public.chat_groups g
-    WHERE g.id = chat_group_memory_photos.group_id AND g.deleted_at IS NULL
-  ));
+  ON public.chat_group_memory_photos AS RESTRICTIVE FOR ALL TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.chat_groups g WHERE g.id = chat_group_memory_photos.group_id AND g.deleted_at IS NULL))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.chat_groups g WHERE g.id = chat_group_memory_photos.group_id AND g.deleted_at IS NULL));
 
 CREATE POLICY chat_memory_photos_active_parent_lifecycle_guard
-  ON public.chat_memory_photos AS RESTRICTIVE
-  FOR ALL TO authenticated
+  ON public.chat_memory_photos AS RESTRICTIVE FOR ALL TO authenticated
   USING (
-    (chat_type = 'single' AND EXISTS (
-      SELECT 1 FROM public.chat_sessions s
-      WHERE s.id = chat_memory_photos.session_id AND s.deleted_at IS NULL
-    ))
+    (chat_type = 'single' AND EXISTS (SELECT 1 FROM public.chat_sessions s WHERE s.id = chat_memory_photos.session_id AND s.deleted_at IS NULL))
     OR
-    (chat_type = 'group' AND EXISTS (
-      SELECT 1 FROM public.chat_groups g
-      WHERE g.id = chat_memory_photos.group_id AND g.deleted_at IS NULL
-    ))
+    (chat_type = 'group' AND EXISTS (SELECT 1 FROM public.chat_groups g WHERE g.id = chat_memory_photos.group_id AND g.deleted_at IS NULL))
   )
   WITH CHECK (
-    (chat_type = 'single' AND EXISTS (
-      SELECT 1 FROM public.chat_sessions s
-      WHERE s.id = chat_memory_photos.session_id AND s.deleted_at IS NULL
-    ))
+    (chat_type = 'single' AND EXISTS (SELECT 1 FROM public.chat_sessions s WHERE s.id = chat_memory_photos.session_id AND s.deleted_at IS NULL))
     OR
-    (chat_type = 'group' AND EXISTS (
-      SELECT 1 FROM public.chat_groups g
-      WHERE g.id = chat_memory_photos.group_id AND g.deleted_at IS NULL
-    ))
+    (chat_type = 'group' AND EXISTS (SELECT 1 FROM public.chat_groups g WHERE g.id = chat_memory_photos.group_id AND g.deleted_at IS NULL))
   );

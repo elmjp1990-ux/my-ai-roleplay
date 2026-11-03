@@ -1,5 +1,5 @@
 -- Account deletion worker orchestration.
--- This migration was validated against the test database; reconcile remote migration history before applying in another environment.
+-- This migration is intentionally proposed in a PR only; do not apply until migration history is reconciled.
 
 -- The existing archive allow-list covered only AI and wallet rows. Expand it before
 -- archiving chat billing/audit rows, otherwise the new inserts would fail their CHECK.

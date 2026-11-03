@@ -153,7 +153,7 @@ BEGIN
     WHERE w.user_id = p_user_id
       AND (i.id IS NULL OR i.payload IS DISTINCT FROM pg_catalog.to_jsonb(w))
   ) THEN
-    RAISE EXCEPTION '錢包交易紀錄核對失敗';
+    RAISE EXCEPTION '錢包交易紀錄內容核對失敗';
   END IF;
 
   UPDATE public.account_deletion_archive_batches AS b

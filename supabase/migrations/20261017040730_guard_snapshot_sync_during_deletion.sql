@@ -1,5 +1,3 @@
--- Block pending-deletion accounts from mutating other users' chat snapshots.
--- Test environment only; reconcile migration history before applying elsewhere.
 CREATE OR REPLACE FUNCTION public.sync_character_chat_snapshot(p_character_id uuid)
 RETURNS integer
 LANGUAGE plpgsql

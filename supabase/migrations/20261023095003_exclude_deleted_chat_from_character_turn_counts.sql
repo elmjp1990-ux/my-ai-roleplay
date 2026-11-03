@@ -1,6 +1,3 @@
--- Recovered verbatim from the test project's supabase_migrations.schema_migrations
--- row for version 20261023095003. This restores missing source provenance only;
--- it is not a new migration and must not be replayed against the hosted database.
 CREATE OR REPLACE FUNCTION public.get_character_turn_counts(p_character_ids uuid[])
 RETURNS TABLE(character_id uuid, turn_count bigint)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO ''

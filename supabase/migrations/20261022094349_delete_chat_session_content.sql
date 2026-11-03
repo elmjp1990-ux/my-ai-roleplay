@@ -1,3 +1,4 @@
+
 CREATE OR REPLACE FUNCTION public.delete_chat_session_content(p_session_id uuid)
 RETURNS TABLE(storage_path text)
 LANGUAGE plpgsql
