@@ -392,7 +392,7 @@ const storagePhotoStart = memoryPhotoDraft.indexOf("CREATE POLICY memory_photo_o
 const noWriteChanges = memoryPhotoDraft.indexOf("-- No INSERT, UPDATE, DELETE", storagePhotoStart);
 const storagePhotoSelect = memoryPhotoDraft.slice(storagePhotoStart, noWriteChanges);
 assert.ok(storagePhotoStart >= 0 && noWriteChanges > storagePhotoStart, "memory photo Storage SELECT policy must be replaced");
-assert.match(storagePhotoSelect, /p[.]storage_path = objects[.]name/);
+assert.match(storagePhotoSelect, /p[.]storage_path = name/);
 assert.match(storagePhotoSelect, /g[.]deleted_at IS NULL/);
 assert.doesNotMatch(storagePhotoSelect, /g[.]archived_at/);
 assert.doesNotMatch(memoryPhotoDraft, /FOR INSERT|FOR UPDATE|FOR DELETE/i);
