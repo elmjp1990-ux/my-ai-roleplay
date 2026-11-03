@@ -71,3 +71,20 @@ To prevent future replay drift, the 19 non-identical repository migration files 
 Restored migration source commit: `68e3ed291d3079efebc7a2a128c9df6827f254b4`.
 
 The separate fresh incremental migration requirement remains: do not edit/replay historical migrations. The direct parent DELETE ACL guard must be carried in a new uniquely versioned migration before any hosted rollout. Original `profiles`/`characters` baseline provenance remains unresolved but is not a blocker for disposable current-state fixture validation, per the agreed project decision.
+
+
+## Final privilege-hardening draft and advisor classification — 2026-11-03
+
+A consolidated draft now exists at `supabase/drafts/pr200-final-privilege-hardening.sql`. It contains only:
+
+1. `REVOKE TRUNCATE ON ALL TABLES IN SCHEMA public FROM anon, authenticated;`
+2. Revoke direct `DELETE` on `chat_sessions` and `chat_groups` from `PUBLIC`, `anon`, `authenticated`, and `service_role`.
+
+The disposable replay applies this combined draft before behavior tests. `verify-deletion-draft-replay.sql` now asserts that no public table retains client-role TRUNCATE, and that anon/authenticated/service_role cannot directly DELETE either chat parent. The actual authenticated soft-delete RPCs remain executable; final purge RPC remains service_role-only and runs as its postgres-owned SECURITY DEFINER function. CI on the disposable current-state schema passes these assertions and the behavior/concurrency suites. The draft is not applied to the hosted test project.
+
+A read-only Supabase Security Advisor snapshot returned:
+- 16 RLS-enabled tables with no policies. Effective ACL inspection confirmed anon/authenticated have no table privileges on all 16; 12 are service_role-only, while the four account archive/settings tables have no direct service_role table privileges and are accessed through SECURITY DEFINER routines. These are intentionally backend-only tables, not missing client policies.
+- 4 anon-executable SECURITY DEFINER functions and 27 authenticated-executable SECURITY DEFINER functions. All 27 have `search_path = ''`; all 4 anon-callable functions were inspected and filter to public/approved/rights-confirmed data, with NSFW age checks where relevant. The deletion RPCs specifically enforce auth.uid()/owner matching; queue worker RPCs remain service_role-only.
+- Auth Leaked Password Protection is disabled. This is a separate pre-launch Auth configuration hardening item and was not changed.
+
+This advisor snapshot is a read-only point-in-time classification, not a full transitive audit of every app RPC. No hosted DDL, ACL, Auth setting, Storage mutation, worker deployment, or Cron activation occurred.
