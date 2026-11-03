@@ -67,6 +67,7 @@ WHERE name LIKE '90000000-0000-4000-8000-000000000001/group/%';
 SELECT o.name,
   o.bucket_id = 'personax-memory-photos' AS bucket_matches,
   pg_catalog.split_part(o.name, '/', 1) = auth.uid()::text AS owner_matches,
+  pg_catalog.split_part(o.name, '/', 1) = (SELECT auth.uid())::text AS scalar_owner_matches,
   o.name ~* (
     '^' || auth.uid()::text ||
     '/(single|group)/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/' ||
@@ -84,7 +85,28 @@ SELECT o.name,
           AND g.owner_id = auth.uid()
           AND g.deleted_at IS NULL
       )
-  ) AS metadata_matches
+  ) AS metadata_matches,
+  EXISTS (
+    SELECT 1 FROM public.chat_memory_photos p
+    WHERE p.storage_path = o.name
+      AND p.owner_id = (SELECT auth.uid())
+      AND p.deleted_at IS NULL
+      AND (
+        (p.chat_type = 'single' AND EXISTS (
+          SELECT 1 FROM public.chat_sessions s
+          WHERE s.id = p.session_id
+            AND s.user_id = (SELECT auth.uid())
+            AND s.deleted_at IS NULL
+        ))
+        OR
+        (p.chat_type = 'group' AND EXISTS (
+          SELECT 1 FROM public.chat_groups g
+          WHERE g.id = p.group_id
+            AND g.owner_id = (SELECT auth.uid())
+            AND g.deleted_at IS NULL
+        ))
+      )
+  ) AS scalar_policy_metadata_matches
 FROM storage.objects o
 WHERE o.name LIKE '90000000-0000-4000-8000-000000000001/group/%';
 RESET ROLE;
