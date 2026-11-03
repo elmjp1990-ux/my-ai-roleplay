@@ -1,5 +1,7 @@
 -- DRAFT ONLY — behavior test for archived-group memory photo reads.
 -- Run inside replay-local-security-drafts.sql's disposable transaction, then rollback.
+
+-- Seed fixture as the disposable database owner before switching to authenticated.
 DO $photo_seed$
 DECLARE
   v_owner uuid := '90000000-0000-4000-8000-000000000001';
@@ -33,6 +35,7 @@ BEGIN
   INSERT INTO storage.objects (bucket_id, name)
   VALUES ('personax-memory-photos', v_archived_path),
          ('personax-memory-photos', v_deleted_path);
+
   RAISE NOTICE 'storage_objects_seeded=%', (
     SELECT pg_catalog.count(*) FROM storage.objects
     WHERE name IN (v_archived_path, v_deleted_path)
@@ -76,15 +79,7 @@ BEGIN
     'archived_path_matches', v_archived_path ~* (
       '^' || auth.uid()::text ||
       '/(single|group)/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/' ||
-      '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](jpg|jpeg|png|webp)
-  IF v_object_count <> 1 THEN
-    RAISE EXCEPTION 'archived_group_storage_object_must_remain_readable_and_deleted_group_hidden: %', v_object_count;
-  END IF;
-END;
-$photo_assert$;
-
-RESET ROLE;
-
+      '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](jpg|jpeg|png|webp)$'
     ),
     'archived_photo_visible', EXISTS (
       SELECT 1 FROM public.chat_memory_photos p
@@ -106,6 +101,7 @@ RESET ROLE;
         AND g.deleted_at IS NULL
     )
   );
+
   SELECT pg_catalog.count(*)::integer INTO v_object_count
   FROM storage.objects
   WHERE name IN (v_archived_path, v_deleted_path);
