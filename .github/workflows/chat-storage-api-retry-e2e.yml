@@ -62,12 +62,13 @@ jobs:
           service_role_key="$(get_env SERVICE_ROLE_KEY)"
           anon_key="$(get_env ANON_KEY)"
           if [[ -z "$db_url" || -z "$api_url" || -z "$service_role_key" || -z "$anon_key" ]]; then
-            echo "Local Supabase DB_URL/API_URL/SERVICE_ROLE_KEY was not returned."
+            echo "Local Supabase DB_URL/API_URL/SERVICE_ROLE_KEY/ANON_KEY was not returned."
             exit 1
           fi
           printf 'DATABASE_URL=%s\n' "$db_url" >> "$GITHUB_ENV"
           printf 'API_URL=%s\n' "$api_url" >> "$GITHUB_ENV"
           printf 'SERVICE_ROLE_KEY=%s\n' "$service_role_key" >> "$GITHUB_ENV"
+          printf 'ANON_KEY=%s\n' "$anon_key" >> "$GITHUB_ENV"
 
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
