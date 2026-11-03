@@ -419,11 +419,18 @@ assert.match(purgeCronDraft, /chat_storage_deletion_jobs/);
 assert.doesNotMatch(purgeCronDraft, /sb_secret_[A-Za-z0-9_-]{20,}/);
 
 const migrationsDir = "supabase/migrations";
-const activeSql = fs.readdirSync(migrationsDir)
-  .filter((name) => name.endsWith(".sql"))
+const releaseMigrationName = "20261103115931_poyozz_account_deletion_preservation_atomic_lease.sql";
+const historicalSql = fs.readdirSync(migrationsDir)
+  .filter((name) => name.endsWith(".sql") && name !== releaseMigrationName)
   .map((name) => fs.readFileSync(path.join(migrationsDir, name), "utf8"))
   .join("\n");
-assert.doesNotMatch(activeSql, /archive_account_characters|account_archived_at/);
+assert.doesNotMatch(historicalSql, /archive_account_characters|account_archived_at/,
+  "historical migrations remain unchanged; account preservation belongs only in the fresh incremental migration");
+const releaseMigration = fs.readFileSync(path.join(migrationsDir, releaseMigrationName), "utf8");
+assert.match(releaseMigration, /archive_account_characters/);
+assert.match(releaseMigration, /account_archived_at timestamptz/);
+assert.match(releaseMigration, /account_deletion_work_leases/);
+assert.match(releaseMigration, /prepare_account_deletion_leased/);
 
 
 const characterDeletionDraft = fs.readFileSync(
