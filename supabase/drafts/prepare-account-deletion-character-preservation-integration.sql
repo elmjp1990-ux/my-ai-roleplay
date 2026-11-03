@@ -30,6 +30,7 @@ SET search_path TO ''
 AS $function$
 DECLARE
   v_photo record;
+  v_locked_photo public.chat_memory_photos%ROWTYPE;
   v_parent_owner uuid;
   v_parent_deleted_at timestamptz;
   v_resource_type text;
@@ -50,7 +51,6 @@ BEGIN
     FROM public.chat_memory_photos AS p
     WHERE p.owner_id = p_user_id
     ORDER BY p.chat_type, COALESCE(p.session_id, p.group_id), p.id
-    FOR UPDATE
   LOOP
     IF v_photo.storage_path !~ ('^' || p_user_id::text || '/')
        OR char_length(v_photo.storage_path) > 1024 THEN
@@ -79,6 +79,23 @@ BEGIN
 
     IF NOT FOUND OR v_parent_owner IS DISTINCT FROM p_user_id THEN
       RAISE EXCEPTION 'account_chat_photo_parent_owner_mismatch';
+    END IF;
+
+    -- Preserve the common parent-first lock order used by chat writers. The
+    -- initial photo scan is unlocked; re-lock and verify the exact row only
+    -- after its parent has been locked to avoid delete/photo-write deadlocks.
+    SELECT p.* INTO v_locked_photo
+    FROM public.chat_memory_photos AS p
+    WHERE p.id = v_photo.id
+    FOR UPDATE;
+
+    IF NOT FOUND
+       OR v_locked_photo.owner_id IS DISTINCT FROM p_user_id
+       OR v_locked_photo.chat_type IS DISTINCT FROM v_photo.chat_type
+       OR v_locked_photo.session_id IS DISTINCT FROM v_photo.session_id
+       OR v_locked_photo.group_id IS DISTINCT FROM v_photo.group_id
+       OR v_locked_photo.storage_path IS DISTINCT FROM v_photo.storage_path THEN
+      RAISE EXCEPTION 'account_chat_photo_changed_during_queueing';
     END IF;
 
     -- Existing soft-deleted chats keep their original deletion clock. Active
