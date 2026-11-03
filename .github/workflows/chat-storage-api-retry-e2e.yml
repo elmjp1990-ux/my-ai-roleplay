@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "scripts/test-chat-storage-api-retry-e2e.ts"
+      - "scripts/test-account-deletion-stale-jwt-e2e.ts"
+      - "supabase/migrations/20261103090100_account_is_active_auth_user_existence_guard.sql"
       - "scripts/test-chat-deletion-browser-e2e.mjs"
       - "index.html"
       - "supabase/functions/_shared/chat-deletion-worker.ts"
@@ -81,9 +83,13 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-current-state-schema-fixture.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261103040547_poyozz_chat_deletion_privilege_hardening.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261103090100_account_is_active_auth_user_existence_guard.sql
 
       - name: Exercise real Supabase Storage client against HTTP 503 and retry
         run: deno run --allow-net --allow-env scripts/test-chat-storage-api-retry-e2e.ts
+
+      - name: Verify Auth Admin deletion rejects a still-valid pre-deletion JWT
+        run: deno run --allow-net --allow-env scripts/test-account-deletion-stale-jwt-e2e.ts
 
       - name: Install Playwright and Chromium
         run: |
