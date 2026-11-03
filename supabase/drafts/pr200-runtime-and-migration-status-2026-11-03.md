@@ -98,3 +98,16 @@ The shared worker now isolates each job:
 - Later jobs continue processing after either failure class.
 
 New deterministic tests cover thrown Storage/network and queue-RPC exceptions with a second job proving batch continuation. This is adapter-level behavior, not a live Storage API failure injection test. Deno type-check, deterministic tests, and same-SHA disposable schema replay must pass before treating the change as validated. No hosted Storage operation, worker deployment, or Cron activation was performed.
+
+
+## Latest HEAD validation — 2026-11-03
+
+Latest HEAD: `8fffe826077d81908df44acfa0251ea30c245763`.
+
+- Account deletion worker Run `41565273138`: completed / success. Account worker and character asset worker type-checks, deterministic tests, character-preservation structural guards, schema fixture generation, disposable PostgreSQL current-state schema load, deletion draft replay, rollback verification, two-independent-session concurrency replay, and local container stop/discard all passed.
+- Chat deletion worker Run `41565273045`: completed / success; 7 passed / 0 failed. Includes thrown Storage/network failure and thrown queue-mark RPC isolation tests.
+- Group background UI syntax Run `41565273196`: completed / success.
+- The no-restore frontend structural guard and legacy group-photo queue exclusion assertion passed in the account worker workflow.
+- Read-only test-project classification of `chat_group_memory_photos`: one absolute URL row; no relative object paths, no Supabase Storage object URLs, and no `personax-memory-photos` bucket URLs. No URL value was read into the report or passed to Storage cleanup.
+
+This validates the current code and disposable synthetic schema only. It does not constitute historical migration-chain replay, live Storage API failure injection, browser E2E, or hosted rollout. PR #200 remains Draft / unmerged; no worker deployment or Cron activation was performed.
