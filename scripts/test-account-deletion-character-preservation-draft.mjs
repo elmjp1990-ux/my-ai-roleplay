@@ -9,8 +9,8 @@ assert.match(sql, /^-- DRAFT ONLY — NOT AN ACTIVE MIGRATION\./);
 assert.match(sql, /Do not execute this file against the hosted Supabase project/);
 
 for (const table of ["characters", "character_private_info", "character_illustrations", "character_schedule_descriptions"]) {
-  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\\s\\S]*?ALTER COLUMN author_id DROP NOT NULL"));
-  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\\s\\S]*?ON DELETE SET NULL"));
+  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\s\S]*?ALTER COLUMN author_id DROP NOT NULL"));
+  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\s\S]*?ON DELETE SET NULL"));
 }
 assert.match(sql, /character_schedule_descriptions[\s\S]*?REFERENCES auth[.]users[(]id[)] ON DELETE SET NULL/);
 assert.match(sql, /creator_display_name/);
@@ -47,7 +47,7 @@ for (const table of ["chat_sessions", "chat_group_members", "chat_group_messages
   assert.match(archiveFn, new RegExp("UPDATE public[.]" + table));
 }
 // Account deletion preserves each work's original visibility/review state.
-assert.doesNotMatch(archiveFn, /visibility\\s*=\\s*'private'/);
+assert.doesNotMatch(archiveFn, /visibility\s*=\s*'private'/);
 assert.match(archiveFn, /c[.]visibility AS current_visibility/);
 assert.match(archiveFn, /'visibility', owned[.]current_visibility/);
 assert.match(archiveFn, /'creatorDisplayName'/);
@@ -593,7 +593,7 @@ const activeGuardMigration = fs.readFileSync(
 assert.match(activeGuardMigration, /CREATE OR REPLACE FUNCTION public[.]account_is_active[(][)]/);
 assert.match(activeGuardMigration, /SECURITY DEFINER/);
 assert.match(activeGuardMigration, /SET search_path TO ''/);
-assert.match(activeGuardMigration, /FROM auth[.]users AS u[\\s\\S]*?u[.]id = auth[.]uid[(][)]/);
-assert.match(activeGuardMigration, /NOT EXISTS [(][\\s\\S]*?account_deletion_requests/);
+assert.match(activeGuardMigration, /FROM auth[.]users AS u[\s\S]*?u[.]id = auth[.]uid[(][)]/);
+assert.match(activeGuardMigration, /NOT EXISTS [(][\s\S]*?account_deletion_requests/);
 assert.match(activeGuardMigration, /REVOKE ALL ON FUNCTION public[.]account_is_active[(][)] FROM PUBLIC, anon/);
 assert.match(activeGuardMigration, /GRANT EXECUTE ON FUNCTION public[.]account_is_active[(][)] TO authenticated, service_role/);
