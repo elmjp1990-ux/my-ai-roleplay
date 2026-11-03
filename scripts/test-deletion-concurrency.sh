@@ -211,7 +211,7 @@ SELECT set_config('request.jwt.claims', '{"sub":"$author","role":"service_role"}
 INSERT INTO public.account_deletion_requests (user_id, requested_at, scheduled_for)
 VALUES ('$author', now() - interval '1 hour', now() - interval '1 minute');
 SELECT lease_token AS account_lease_token, lease_generation AS account_lease_generation
-FROM public.claim_account_deletion_work_items(1) \\gset
+FROM public.claim_account_deletion_work_items(1) \gset
 SELECT batch_status
 FROM public.prepare_account_deletion_leased(
   '$author', :'account_lease_token'::uuid, :'account_lease_generation'::bigint
