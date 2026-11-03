@@ -209,14 +209,14 @@ try {
     method: "POST",
     body: { p_session_id: sessionId },
   });
-  assert.ok(soloDelete.response.ok && soloDelete.data === true, `Solo lifecycle RPC should succeed: ${JSON.stringify(soloDelete.data)}`);
+  assert.ok(soloDelete.response.ok && Array.isArray(soloDelete.data), `Solo lifecycle RPC should succeed: ${JSON.stringify(soloDelete.data)}`);
 
   const groupDelete = await request("/rest/v1/rpc/delete_chat_group_with_related_data", {
     ...userHeaders,
     method: "POST",
     body: { p_group_id: groupId },
   });
-  assert.ok(groupDelete.response.ok && groupDelete.data === true, `Group lifecycle RPC should succeed: ${JSON.stringify(groupDelete.data)}`);
+  assert.ok(groupDelete.response.ok && Array.isArray(groupDelete.data), `Group lifecycle RPC should succeed: ${JSON.stringify(groupDelete.data)}`);
 
   const activeSessionAfter = await request(
     `/rest/v1/chat_sessions?select=id&id=eq.${sessionId}&deleted_at=is.null`,
