@@ -8,13 +8,13 @@ BEGIN;
 \i supabase/drafts/seed-character-deletion-legacy-fixtures.sql
 
 \echo 'Applying PR #200 prerequisite migration: privilege hardening'
-\i supabase/migrations/20261103040547_poyozz_chat_deletion_privilege_hardening.sql
+\i supabase/migrations/20261103195621_poyozz_chat_deletion_privilege_hardening.sql
 
 \echo 'Applying PR #200 prerequisite migration: account auth-user existence guard'
-\i supabase/migrations/20261103090100_account_is_active_auth_user_existence_guard.sql
+\i supabase/migrations/20261104200000_account_is_active_auth_user_existence_guard.sql
 
 \echo 'Applying CLI-generated character/account deletion and atomic lease migration'
-\i supabase/migrations/20261103115931_poyozz_account_deletion_preservation_atomic_lease.sql
+\i supabase/migrations/20261104200100_poyozz_account_deletion_preservation_atomic_lease.sql
 
 \echo 'Verify migration structure, RLS, grants, SECURITY DEFINER and search_path'
 \i supabase/drafts/verify-deletion-draft-replay.sql
