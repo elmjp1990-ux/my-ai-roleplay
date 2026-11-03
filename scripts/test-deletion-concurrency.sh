@@ -397,7 +397,14 @@ snapshot_sync_pid=$!
 wait_for_activity "pr200-snapshot-sync-wins" "pg_sleep(2)"
 PGAPPNAME=pr200-snapshot-delete-loses psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/snapshot-delete-loses.sql" >"$tmpdir/snapshot-delete-loses.log" 2>&1 &
 snapshot_delete_pid=$!
-wait_for_lock "pr200-snapshot-delete-loses"
+if ! wait_for_lock "pr200-snapshot-delete-loses"; then
+  echo "snapshot-sync-wins log:"
+  cat "$tmpdir/snapshot-sync-wins.log"
+  echo "snapshot-delete-loses log:"
+  cat "$tmpdir/snapshot-delete-loses.log"
+  psql "$DATABASE_URL" -x -c "SELECT application_name, state, wait_event_type, wait_event, query FROM pg_stat_activity WHERE application_name IN ('pr200-snapshot-sync-wins', 'pr200-snapshot-delete-loses')"
+  exit 1
+fi
 wait "$snapshot_sync_pid"
 wait "$snapshot_delete_pid"
 sync_first_state="$(psql "$DATABASE_URL" -Atqc "SELECT deleted_at IS NOT NULL AND character_snapshot->>'visibility'='public' FROM public.chat_sessions WHERE id='$sync_session_first'")"
