@@ -348,6 +348,8 @@ assert.match(handler, /prepare_account_deletion_leased/);
 assert.match(handler, /renew_account_deletion_lease/);
 assert.match(handler, /finalize_account_deletion_leased/);
 assert.match(handler, /record_account_deletion_failure_leased/);
+assert.match(handler, /ACCOUNT_DELETION_EXECUTION_ENABLED = false/);
+assert.match(handler, /MAX_BATCH = 1/);
 assert.doesNotMatch(handler, /get_account_deletion_work_items|archive_account_deletion_data|rpc\(["']prepare_account_deletion["']|rpc\(["']finalize_account_deletion["']|rpc\(["']record_account_deletion_failure["']/);
 for (const rpc of [
   "claim_account_deletion_work_items",
@@ -361,6 +363,11 @@ assert.match(leaseSql, /lease_generation = l\.lease_generation \+ 1/);
 assert.match(leaseSql, /p_lease_token/);
 assert.match(leaseSql, /REVOKE ALL ON FUNCTION public\.prepare_account_deletion\(uuid\) FROM PUBLIC, anon, authenticated, service_role/);
 assert.match(leaseSql, /GRANT EXECUTE ON FUNCTION public\.prepare_account_deletion_leased/);
+assert.match(leaseSql, /ALTER TABLE public[.]account_deletion_work_leases ENABLE ROW LEVEL SECURITY/);
+assert.match(leaseSql, /REVOKE ALL ON TABLE public[.]account_deletion_work_leases FROM PUBLIC, anon, authenticated, service_role/);
+assert.match(leaseSql, /REVOKE ALL ON FUNCTION public[.]get_account_deletion_work_items[(][)] FROM PUBLIC, anon, authenticated, service_role/);
+assert.match(leaseSql, /REVOKE ALL ON FUNCTION public[.]cancel_account_deletion[(][)] FROM PUBLIC, anon, service_role/);
+assert.match(leaseSql, /GRANT EXECUTE ON FUNCTION public[.]cancel_account_deletion[(][)] TO authenticated/);
 
 // Manually archived groups keep their existing memory-photo reads. Only deleted_at
 // removes access; this draft does not widen upload/update/delete privileges.
