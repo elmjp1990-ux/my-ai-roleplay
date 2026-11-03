@@ -37,6 +37,17 @@ BEGIN
 END;
 $fixture$;
 
+-- Match the Storage helper used by the pre-existing video UPDATE policy.
+-- The synthetic platform shim omits this platform-owned helper.
+CREATE OR REPLACE FUNCTION storage.foldername(name text)
+RETURNS text[]
+LANGUAGE sql
+IMMUTABLE
+SET search_path TO ''
+AS $function$
+  SELECT pg_catalog.string_to_array(name, '/');
+$function$;
+
 -- The disposable Storage shim grants SELECT only by default. Grant mutations
 -- here so this test isolates row-policy behavior, not platform table grants.
 GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated;
