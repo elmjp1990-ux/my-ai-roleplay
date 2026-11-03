@@ -499,3 +499,131 @@ BEGIN
   END IF;
 END;
 $$;
+
+
+-- Cumulative turn-count regression: deleting either chat type moves its live
+-- assistant replies into one immutable archive row per resource/character.
+-- The same total must survive duplicate delete calls and day-30 purge retries.
+DO $turn_stats$
+DECLARE
+  v_user uuid := '10000000-0000-4000-8000-000000000001';
+  v_session uuid := '50000000-0000-4000-8000-000000000002';
+  v_single_character uuid := '20000000-0000-4000-8000-000000000005';
+  v_group uuid := '50000000-0000-4000-8000-000000000001';
+  v_group_character uuid := '20000000-0000-4000-8000-000000000008';
+  v_other_character uuid := '20000000-0000-4000-8000-000000000009';
+  v_single_before bigint;
+  v_single_after bigint;
+  v_group_before bigint;
+  v_group_after bigint;
+  v_job uuid;
+BEGIN
+  PERFORM pg_catalog.set_config('request.jwt.claim.sub', v_user::text, true);
+  PERFORM pg_catalog.set_config('request.jwt.claim.role', 'authenticated', true);
+  PERFORM pg_catalog.set_config(
+    'request.jwt.claims',
+    pg_catalog.jsonb_build_object('sub', v_user::text, 'role', 'authenticated')::text,
+    true
+  );
+
+  SELECT turn_count INTO v_single_before
+  FROM public.get_character_turn_counts(ARRAY[v_single_character]::uuid[]);
+  IF COALESCE(v_single_before, 0) < 1 THEN
+    RAISE EXCEPTION 'single_chat_fixture_must_have_assistant_turn';
+  END IF;
+
+  PERFORM public.delete_chat_session_content(v_session);
+  PERFORM public.delete_chat_session_content(v_session);
+
+  IF (SELECT pg_catalog.count(*) FROM public.chat_deletion_character_turn_stats
+      WHERE resource_type = 'single_session' AND resource_id = v_session
+        AND character_id = v_single_character) <> 1 THEN
+    RAISE EXCEPTION 'single_chat_delete_retry_must_create_one_snapshot';
+  END IF;
+  SELECT turn_count INTO v_single_after
+  FROM public.get_character_turn_counts(ARRAY[v_single_character]::uuid[]);
+  IF v_single_after IS DISTINCT FROM v_single_before THEN
+    RAISE EXCEPTION 'single_chat_delete_must_preserve_cumulative_turn_count';
+  END IF;
+
+  SELECT turn_count INTO v_group_before
+  FROM public.get_character_turn_counts(ARRAY[v_group_character]::uuid[]);
+  IF COALESCE(v_group_before, 0) < 1 THEN
+    RAISE EXCEPTION 'group_deleted_character_fixture_must_have_assistant_turn';
+  END IF;
+  PERFORM public.delete_chat_group_with_related_data(v_group);
+  PERFORM public.delete_chat_group_with_related_data(v_group);
+
+  IF (SELECT pg_catalog.count(*) FROM public.chat_deletion_character_turn_stats
+      WHERE resource_type = 'group' AND resource_id = v_group
+        AND character_id = v_group_character) <> 1
+     OR (SELECT pg_catalog.count(*) FROM public.chat_deletion_character_turn_stats
+         WHERE resource_type = 'group' AND resource_id = v_group
+           AND character_id = v_other_character) <> 1 THEN
+    RAISE EXCEPTION 'group_delete_retry_must_create_one_snapshot_per_replying_character';
+  END IF;
+  SELECT turn_count INTO v_group_after
+  FROM public.get_character_turn_counts(ARRAY[v_group_character]::uuid[]);
+  IF v_group_after IS DISTINCT FROM v_group_before THEN
+    RAISE EXCEPTION 'group_delete_must_preserve_cumulative_turn_count';
+  END IF;
+
+  -- Simulate a claimed, due worker lease in the disposable database. No hosted
+  -- worker is invoked; this directly exercises the SQL purge transaction.
+  SELECT id INTO v_job
+  FROM public.chat_deletion_jobs
+  WHERE resource_type = 'single_session' AND resource_id = v_session;
+  UPDATE public.chat_deletion_jobs
+  SET status = 'processing',
+      purge_after = pg_catalog.clock_timestamp() - interval '1 second',
+      lease_until = pg_catalog.clock_timestamp() + interval '5 minutes'
+  WHERE id = v_job;
+
+  PERFORM pg_catalog.set_config('request.jwt.claim.role', 'service_role', true);
+  PERFORM pg_catalog.set_config(
+    'request.jwt.claims',
+    pg_catalog.jsonb_build_object('sub', v_user::text, 'role', 'service_role')::text,
+    true
+  );
+  IF public.purge_chat_deletion_job(v_job) IS DISTINCT FROM true
+     OR public.purge_chat_deletion_job(v_job) IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'single_chat_purge_and_completed_retry_must_succeed';
+  END IF;
+
+  SELECT turn_count INTO v_single_after
+  FROM public.get_character_turn_counts(ARRAY[v_single_character]::uuid[]);
+  IF v_single_after IS DISTINCT FROM v_single_before
+     OR EXISTS (SELECT 1 FROM public.chat_messages WHERE session_id = v_session AND content <> '') THEN
+    RAISE EXCEPTION 'single_chat_purge_must_retain_count_and_erase_transcript';
+  END IF;
+
+  SELECT id INTO v_job
+  FROM public.chat_deletion_jobs
+  WHERE resource_type = 'group' AND resource_id = v_group;
+  UPDATE public.chat_deletion_jobs
+  SET status = 'processing',
+      purge_after = pg_catalog.clock_timestamp() - interval '1 second',
+      lease_until = pg_catalog.clock_timestamp() + interval '5 minutes'
+  WHERE id = v_job;
+  IF public.purge_chat_deletion_job(v_job) IS DISTINCT FROM true
+     OR public.purge_chat_deletion_job(v_job) IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'group_purge_and_completed_retry_must_succeed';
+  END IF;
+
+  SELECT turn_count INTO v_group_after
+  FROM public.get_character_turn_counts(ARRAY[v_group_character]::uuid[]);
+  IF v_group_after IS DISTINCT FROM v_group_before
+     OR EXISTS (SELECT 1 FROM public.chat_group_messages WHERE group_id = v_group) THEN
+    RAISE EXCEPTION 'group_purge_must_retain_count_and_erase_transcript';
+  END IF;
+
+  IF (SELECT pg_catalog.count(*) FROM public.chat_deletion_character_turn_stats
+      WHERE resource_type = 'single_session' AND resource_id = v_session
+        AND character_id = v_single_character) <> 1
+     OR (SELECT pg_catalog.count(*) FROM public.chat_deletion_character_turn_stats
+         WHERE resource_type = 'group' AND resource_id = v_group
+           AND character_id IN (v_group_character, v_other_character)) <> 2 THEN
+    RAISE EXCEPTION 'purge_retry_must_not_duplicate_or_erase_archived_turn_counts';
+  END IF;
+END;
+$turn_stats$;
