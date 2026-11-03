@@ -30,14 +30,16 @@ INSERT INTO auth.users (id) VALUES
   ('10000000-0000-4000-8000-000000000030'),
   ('10000000-0000-4000-8000-000000000031'),
   ('10000000-0000-4000-8000-000000000032'),
-  ('10000000-0000-4000-8000-000000000033')
+  ('10000000-0000-4000-8000-000000000033'),
+  ('10000000-0000-4000-8000-000000000034')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.profiles (id, handle, nickname) VALUES
   ('10000000-0000-4000-8000-000000000030', 'pr200-race-author', 'Race Test Author'),
   ('10000000-0000-4000-8000-000000000031', 'pr200-race-player', 'Race Test Player'),
   ('10000000-0000-4000-8000-000000000032', 'pr200-asset-author', 'Asset Test Author'),
-  ('10000000-0000-4000-8000-000000000033', 'pr200-lease-author', 'Lease Test Author')
+  ('10000000-0000-4000-8000-000000000033', 'pr200-lease-author', 'Lease Test Author'),
+  ('10000000-0000-4000-8000-000000000034', 'pr200-lease-author-2', 'Lease Test Author 2')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.characters (id, author_id, name, visibility, review_status, rights_confirmed)
