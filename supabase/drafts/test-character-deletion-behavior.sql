@@ -91,6 +91,28 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM private.character_private_draft_origins WHERE character_id = v_new_draft) THEN
     RAISE EXCEPTION 'new_private_draft_origin_marker_missing';
   END IF;
+  RAISE NOTICE 'new_draft_state=%', pg_catalog.jsonb_build_object(
+    'first_published_at', (SELECT first_published_at FROM public.characters WHERE id = v_new_draft),
+    'visibility', (SELECT visibility FROM public.characters WHERE id = v_new_draft),
+    'review_status', (SELECT review_status FROM public.characters WHERE id = v_new_draft),
+    'origin_marker', EXISTS (SELECT 1 FROM private.character_private_draft_origins WHERE character_id = v_new_draft),
+    'history', private.character_has_history(v_new_draft),
+    'sessions', (SELECT count(*) FROM public.chat_sessions WHERE character_id = v_new_draft),
+    'group_members', (SELECT count(*) FROM public.chat_group_members WHERE character_id = v_new_draft),
+    'group_messages', (SELECT count(*) FROM public.chat_group_messages WHERE character_id = v_new_draft),
+    'history_rows', (SELECT count(*) FROM public.chat_deletion_character_history WHERE character_id = v_new_draft),
+    'world_groups', (SELECT count(*) FROM public.chat_groups WHERE world_character_id = v_new_draft),
+    'story_rows', (SELECT count(*) FROM public.character_stories WHERE character_id = v_new_draft),
+    'encounter_state', (SELECT count(*) FROM public.encounter_character_state WHERE character_id = v_new_draft),
+    'encounter_diary', (SELECT count(*) FROM public.encounter_diary WHERE character_id = v_new_draft),
+    'encounter_receipts', (SELECT count(*) FROM public.encounter_turn_interaction_receipts WHERE character_id = v_new_draft),
+    'encounter_lifecycle', (SELECT count(*) FROM public.encounter_session_lifecycle WHERE character_id = v_new_draft),
+    'encounter_turns', (SELECT count(*) FROM public.encounter_session_turns WHERE character_id = v_new_draft),
+    'encounter_jobs', (SELECT count(*) FROM public.encounter_session_evaluation_jobs WHERE character_id = v_new_draft),
+    'story_batches', (SELECT count(*) FROM public.story_relationship_batches WHERE character_id = v_new_draft),
+    'story_states', (SELECT count(*) FROM public.story_relationship_states WHERE character_id = v_new_draft),
+    'comments', (SELECT count(*) FROM public.character_comments WHERE character_id = v_new_draft)
+  );
   v_deleted_at := public.soft_delete_character(v_new_draft);
   IF EXISTS (SELECT 1 FROM public.characters WHERE id = v_new_draft) THEN
     RAISE EXCEPTION 'unused_new_private_draft_should_hard_delete';
