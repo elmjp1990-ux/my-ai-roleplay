@@ -173,8 +173,8 @@ BEGIN
   );
 
   SELECT pg_catalog.count(*)::integer INTO v_object_count
-  FROM storage.objects
-  WHERE name IN (v_archived_path, v_deleted_path);
+  FROM storage.objects AS objects
+  WHERE objects.name IN (v_archived_path, v_deleted_path);
   IF v_object_count <> 1 THEN
     RAISE EXCEPTION 'archived_group_storage_object_must_remain_readable_and_deleted_group_hidden: %', v_object_count;
   END IF;
