@@ -1,4 +1,5 @@
 import { withSupabase } from "npm:@supabase/server@1";
+import { processChatDeletionJobs } from "../_shared/chat-deletion-job-worker.ts";
 import { processStorageDeletionJobs } from "../_shared/chat-deletion-worker.ts";
 
 type Job = {
@@ -56,22 +57,27 @@ export default {
       }, { status: 500 });
     }
 
-    for (const job of (chatJobs ?? []) as Job[]) {
-      summary.chat_claimed += 1;
-      const { data: purged, error } = await supabase.rpc("purge_chat_deletion_job", {
-        p_job_id: job.job_id,
-      });
-
-      if (error || purged !== true) {
-        summary.chat_failed += 1;
-        await supabase.rpc("mark_chat_deletion_job_failed", {
-          p_job_id: job.job_id,
-          p_error_code: safeErrorCode(error?.code, purged === false ? "purge_not_completed" : "purge_failed"),
-        });
-      } else {
-        summary.chat_purged += 1;
-      }
-    }
+    const chatSummary = await processChatDeletionJobs(
+      (chatJobs ?? []) as Job[],
+      {
+        purgeJob: async (jobId) => {
+          const { data, error } = await supabase.rpc("purge_chat_deletion_job", {
+            p_job_id: jobId,
+          });
+          return { data, error };
+        },
+        markFailed: async (jobId, errorCode) => {
+          const { data, error } = await supabase.rpc("mark_chat_deletion_job_failed", {
+            p_job_id: jobId,
+            p_error_code: errorCode,
+          });
+          return { data, error };
+        },
+      },
+    );
+    summary.chat_claimed = chatSummary.chat_claimed;
+    summary.chat_purged = chatSummary.chat_purged;
+    summary.chat_failed = chatSummary.chat_failed;
 
     const { data: storageJobs, error: storageClaimError } = await supabase.rpc(
       "claim_chat_storage_deletion_jobs",
