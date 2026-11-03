@@ -111,3 +111,24 @@ Latest HEAD: `8fffe826077d81908df44acfa0251ea30c245763`.
 - Read-only test-project classification of `chat_group_memory_photos`: one absolute URL row; no relative object paths, no Supabase Storage object URLs, and no `personax-memory-photos` bucket URLs. No URL value was read into the report or passed to Storage cleanup.
 
 This validates the current code and disposable synthetic schema only. It does not constitute historical migration-chain replay, live Storage API failure injection, browser E2E, or hosted rollout. PR #200 remains Draft / unmerged; no worker deployment or Cron activation was performed.
+
+
+## Account-photo parent purgeability fix — 2026-11-03
+
+Code-validation HEAD: `eb8a2d811208d24881ff3bf3ad4544636989bc9e` (the current subsequent branch commit only adds audit documentation).
+
+A newly found edge case was fixed in `private.enqueue_account_chat_memory_photo_cleanup()`:
+- Before queueing each account-owned photo path, the helper now marks the exact locked solo/group parent `deleted_at = COALESCE(existing_deleted_at, requested_at)` and updates `updated_at`.
+- The parent timestamp now exactly matches the queue's `deleted_at`, so `purge_chat_deletion_job()` can validate and purge the parent if the Auth cascade is interrupted and the parent still exists at day 30.
+- Already-soft-deleted parents keep their original clock; conflicts fail closed.
+- Parent lock ordering is now solo sessions by ID first, then groups by ID, matching the account character-history snapshot function's parent lock order. The photo row is still locked only after its parent.
+- The disposable behavior fixture now uses a 31-day-old request / 30-day-old scheduled execution, asserts both parent timestamps, and invokes the real claim + purge RPCs while the parents still exist before simulating Auth cascade.
+- The test service-role JWT has no end-user `sub`, matching the worker's internal service context and exercising the existing pending-account update guard correctly.
+
+CI on code-validation HEAD `eb8a2d811208d24881ff3bf3ad4544636989bc9e`:
+- Account worker/type-check/static invariants: success.
+- Disposable current-state schema fixture + draft replay + behavior tests + rollback + two-session concurrency: success.
+- Chat deletion worker: success.
+- Group UI syntax: success.
+
+The account workflow path filter now includes `test-account-deletion-character-preservation-behavior.sql`; a pre-existing `new RegExp()` string-escape bug in its structural test was fixed so the regex assertions actually span newlines. This is still disposable-only validation, not hosted mutation or live Storage API E2E. No worker deployment or Cron activation.
