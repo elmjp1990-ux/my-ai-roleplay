@@ -56,3 +56,23 @@ GRANT EXECUTE ON FUNCTION auth.role() TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION auth.jwt() TO anon, authenticated, service_role;
 GRANT ALL ON SCHEMA public TO supabase_admin;
 GRANT ALL ON SCHEMA auth TO supabase_admin;
+
+-- Minimal Supabase Storage compatibility surface for disposable migration replay.
+-- The app schema snapshot intentionally excludes platform-owned storage tables;
+-- create only the columns and bucket metadata referenced by reviewed policies/tests.
+CREATE SCHEMA IF NOT EXISTS storage AUTHORIZATION postgres;
+CREATE TABLE IF NOT EXISTS storage.buckets (
+  id text PRIMARY KEY,
+  name text NOT NULL,
+  public boolean NOT NULL DEFAULT false
+);
+CREATE TABLE IF NOT EXISTS storage.objects (
+  bucket_id text NOT NULL,
+  name text NOT NULL,
+  PRIMARY KEY (bucket_id, name)
+);
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role;
+GRANT SELECT ON storage.objects TO authenticated, service_role;
+GRANT ALL ON storage.buckets TO postgres, supabase_admin;
+GRANT ALL ON storage.objects TO postgres, supabase_admin;
