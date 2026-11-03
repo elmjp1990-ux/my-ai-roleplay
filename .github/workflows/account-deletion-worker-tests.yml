@@ -48,6 +48,7 @@ on:
       - "scripts/test-disposable-schema-catalog-snapshot.mjs"
       - "scripts/build-disposable-schema-fixture.mjs"
       - "scripts/test-build-disposable-schema-fixture.mjs"
+      - "supabase/drafts/account-deletion-worker-atomic-lease.sql"
       - "supabase/drafts/replay-deletion-concurrency-setup.sql"
       - "scripts/test-deletion-concurrency.sh"
       - ".github/workflows/account-deletion-worker-tests.yml"
