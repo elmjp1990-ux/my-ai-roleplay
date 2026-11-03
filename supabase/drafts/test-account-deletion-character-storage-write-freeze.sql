@@ -78,6 +78,33 @@ BEGIN
 END;
 $precheck$;
 
+-- The disposable Storage shim omits baseline owner SELECT and video UPDATE
+-- policies. Recreate their relevant production semantics only for this rollback
+-- fixture so UPDATE's implicit SELECT checks are evaluated realistically.
+CREATE POLICY pr200_storage_fixture_owner_select
+ON storage.objects
+FOR SELECT
+TO authenticated
+USING (
+  bucket_id IN ('character-illustrations', 'character-avatar-videos')
+  AND split_part(name, '/', 1) = (SELECT auth.uid())::text
+);
+
+CREATE POLICY pr200_storage_fixture_video_owner_update
+ON storage.objects
+FOR UPDATE
+TO authenticated
+USING (
+  bucket_id = 'character-avatar-videos'
+  AND split_part(name, '/', 1) = (SELECT auth.uid())::text
+  AND public.account_is_active()
+)
+WITH CHECK (
+  bucket_id = 'character-avatar-videos'
+  AND split_part(name, '/', 1) = (SELECT auth.uid())::text
+  AND public.account_is_active()
+);
+
 -- While active, owner update remains available for both asset types.
 SET LOCAL ROLE authenticated;
 DO $active_owner$
