@@ -416,7 +416,7 @@ echo "ok: snapshot sync wins the parent lock before chat deletion"
 
 # The previous sync covers every active parent for this character; reset the
 # second fixture so the delete-wins assertion starts from its own untouched marker.
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "UPDATE public.chat_sessions SET character_snapshot='{"marker":"delete-first"}'::jsonb WHERE id='$sync_session_second'" >/dev/null
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "UPDATE public.chat_sessions SET character_snapshot='{\"marker\":\"delete-first\"}'::jsonb WHERE id='$sync_session_second'" >/dev/null
 
 # Delete wins: a waiting sync must re-check deleted_at after acquiring the row
 # lock and leave the deleted parent's snapshot byte-for-byte unchanged.
