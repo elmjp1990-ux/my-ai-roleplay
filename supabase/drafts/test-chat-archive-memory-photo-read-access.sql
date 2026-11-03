@@ -48,9 +48,24 @@ BEGIN
   GRANT USAGE ON SCHEMA storage TO authenticated;
   ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
   GRANT SELECT ON storage.objects TO authenticated;
+  DROP POLICY IF EXISTS test_debug_storage_allow ON storage.objects;
+  CREATE POLICY test_debug_storage_allow
+    ON storage.objects FOR SELECT TO authenticated USING (true);
 END;
 $photo_seed$;
 
+SET LOCAL ROLE authenticated;
+SELECT pg_catalog.set_config('request.jwt.claim.sub', '90000000-0000-4000-8000-000000000001', true);
+SELECT pg_catalog.set_config('request.jwt.claim.role', 'authenticated', true);
+SELECT pg_catalog.set_config(
+  'request.jwt.claims',
+  '{"sub":"90000000-0000-4000-8000-000000000001","role":"authenticated"}',
+  true
+);
+SELECT pg_catalog.count(*) AS debug_allow_policy_rows FROM storage.objects
+WHERE name LIKE '90000000-0000-4000-8000-000000000001/group/%';
+RESET ROLE;
+DROP POLICY test_debug_storage_allow ON storage.objects;
 SET LOCAL ROLE authenticated;
 SELECT pg_catalog.set_config('request.jwt.claim.sub', '90000000-0000-4000-8000-000000000001', true);
 SELECT pg_catalog.set_config('request.jwt.claim.role', 'authenticated', true);
