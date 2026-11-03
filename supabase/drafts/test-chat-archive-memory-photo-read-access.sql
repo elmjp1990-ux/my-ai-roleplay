@@ -34,6 +34,7 @@ BEGIN
   VALUES ('personax-memory-photos', v_archived_path),
          ('personax-memory-photos', v_deleted_path);
 
+  GRANT USAGE ON SCHEMA storage TO authenticated;
   ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
   GRANT SELECT ON storage.objects TO authenticated;
 END;
