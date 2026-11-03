@@ -10,6 +10,14 @@ on:
       - "supabase/functions/_shared/character-asset-cleanup-worker.test.ts"
       - "supabase/functions/purge-character-assets/index.ts"
       - "supabase/drafts/character-history-aware-deletion.sql"
+      - "supabase/drafts/sync-character-chat-snapshot-parent-lock-proposal.sql"
+      - "supabase/drafts/chat-archive-memory-photo-read-access.sql"
+      - "supabase/drafts/test-chat-archive-memory-photo-read-access.sql"
+      - "supabase/drafts/replay-local-security-drafts.sql"
+      - "supabase/drafts/sync-character-chat-snapshot-parent-lock-proposal.sql"
+      - "supabase/drafts/chat-archive-memory-photo-read-access.sql"
+      - "supabase/drafts/test-chat-archive-memory-photo-read-access.sql"
+      - "supabase/drafts/replay-local-security-drafts.sql"
       - "supabase/drafts/character-deletion-existing-chat-continuation.sql"
       - "supabase/drafts/chat-deletion-direct-parent-delete-privilege-guard.sql"
       - "supabase/drafts/pr200-final-privilege-hardening.sql"
@@ -161,6 +169,9 @@ jobs:
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-current-state-schema-fixture.sql
       - name: Replay deletion drafts and run hard/soft delete behavior tests in a rollback transaction
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-and-test-character-deletion.sql
+
+      - name: Replay local security drafts and archived-photo RLS behavior
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-local-security-drafts.sql
       - name: Verify all deletion draft DDL and synthetic rows were rolled back
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-deletion-draft-rollback.sql
       - name: Replay deletion drafts for two-session concurrency tests
