@@ -57,6 +57,20 @@ try {
     .single();
   if (child.error) throw child.error;
 
+  // Complete the due relational parent first. The real Storage claim RPC only
+  // releases photo jobs after the 30-day chat purge has completed.
+  const parentClaim = await supabase.rpc("claim_chat_deletion_jobs", { p_limit: 10 });
+  if (parentClaim.error) throw parentClaim.error;
+  assert(
+    (parentClaim.data ?? []).some((job: { job_id: string }) => job.job_id === parentJobId),
+    "Account photo parent deletion job was not claimed at its 30-day deadline",
+  );
+  const parentPurge = await supabase.rpc("purge_chat_deletion_job", {
+    p_job_id: parentJobId,
+  });
+  if (parentPurge.error) throw parentPurge.error;
+  assert(parentPurge.data === true, "Account photo parent chat purge must complete");
+
   const firstClaim = await supabase.rpc("claim_chat_storage_deletion_jobs", {
     p_limit: 10,
   });
