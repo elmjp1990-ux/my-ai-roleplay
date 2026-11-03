@@ -15,6 +15,130 @@
 -- This is a complete replacement of the current live function definition, not
 -- a partial snippet. Re-diff against pg_get_functiondef() immediately before use.
 
+-- Queue account-owned chat-memory photo paths only when the irreversible account
+-- deletion prepare step begins (after the 30-day recovery window). A cancellation
+-- before this point creates no photo cleanup work. Queue rows survive Auth cascades.
+CREATE OR REPLACE FUNCTION private.enqueue_account_chat_memory_photo_cleanup(
+  p_user_id uuid,
+  p_requested_at timestamptz,
+  p_scheduled_for timestamptz
+)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_photo record;
+  v_parent_owner uuid;
+  v_parent_deleted_at timestamptz;
+  v_resource_type text;
+  v_resource_id uuid;
+  v_deleted_at timestamptz;
+  v_job_id uuid;
+  v_job public.chat_deletion_jobs%ROWTYPE;
+  v_storage_job public.chat_storage_deletion_jobs%ROWTYPE;
+  v_queued integer := 0;
+BEGIN
+  IF p_user_id IS NULL OR p_requested_at IS NULL OR p_scheduled_for IS NULL
+     OR p_scheduled_for <> p_requested_at + interval '30 days' THEN
+    RAISE EXCEPTION 'account_chat_photo_retention_window_mismatch';
+  END IF;
+
+  FOR v_photo IN
+    SELECT p.id, p.owner_id, p.chat_type, p.session_id, p.group_id, p.storage_path
+    FROM public.chat_memory_photos AS p
+    WHERE p.owner_id = p_user_id
+    ORDER BY p.chat_type, COALESCE(p.session_id, p.group_id), p.id
+    FOR UPDATE
+  LOOP
+    IF v_photo.storage_path !~ ('^' || p_user_id::text || '/')
+       OR char_length(v_photo.storage_path) > 1024 THEN
+      RAISE EXCEPTION 'account_chat_photo_storage_path_invalid';
+    END IF;
+
+    IF v_photo.chat_type = 'single' THEN
+      v_resource_type := 'single_session';
+      v_resource_id := v_photo.session_id;
+      SELECT s.user_id, s.deleted_at
+        INTO v_parent_owner, v_parent_deleted_at
+      FROM public.chat_sessions AS s
+      WHERE s.id = v_resource_id
+      FOR UPDATE;
+    ELSIF v_photo.chat_type = 'group' THEN
+      v_resource_type := 'group';
+      v_resource_id := v_photo.group_id;
+      SELECT g.owner_id, g.deleted_at
+        INTO v_parent_owner, v_parent_deleted_at
+      FROM public.chat_groups AS g
+      WHERE g.id = v_resource_id
+      FOR UPDATE;
+    ELSE
+      RAISE EXCEPTION 'account_chat_photo_type_invalid';
+    END IF;
+
+    IF NOT FOUND OR v_parent_owner IS DISTINCT FROM p_user_id THEN
+      RAISE EXCEPTION 'account_chat_photo_parent_owner_mismatch';
+    END IF;
+
+    -- Existing soft-deleted chats keep their original deletion clock. Active
+    -- account-owned chats receive the account request timestamp, so their photo
+    -- cleanup becomes due exactly when the 30-day account recovery window ends.
+    v_deleted_at := COALESCE(v_parent_deleted_at, p_requested_at);
+
+    INSERT INTO public.chat_deletion_jobs (
+      resource_type, resource_id, owner_id, deleted_at, purge_after
+    ) VALUES (
+      v_resource_type, v_resource_id, p_user_id, v_deleted_at,
+      v_deleted_at + interval '30 days'
+    )
+    ON CONFLICT (resource_type, resource_id) DO NOTHING;
+
+    SELECT j.* INTO v_job
+    FROM public.chat_deletion_jobs AS j
+    WHERE j.resource_type = v_resource_type
+      AND j.resource_id = v_resource_id
+    FOR UPDATE;
+
+    IF NOT FOUND OR v_job.owner_id IS DISTINCT FROM p_user_id
+       OR v_job.deleted_at IS DISTINCT FROM v_deleted_at
+       OR v_job.purge_after IS DISTINCT FROM v_deleted_at + interval '30 days' THEN
+      RAISE EXCEPTION 'account_chat_photo_deletion_job_conflict';
+    END IF;
+
+    INSERT INTO public.chat_storage_deletion_jobs (
+      deletion_job_id, bucket_id, object_path, resource_type, resource_id, owner_id
+    ) VALUES (
+      v_job.id, 'personax-memory-photos', v_photo.storage_path,
+      v_resource_type, v_resource_id, p_user_id
+    )
+    ON CONFLICT (bucket_id, object_path) DO NOTHING;
+
+    SELECT sj.* INTO v_storage_job
+    FROM public.chat_storage_deletion_jobs AS sj
+    WHERE sj.bucket_id = 'personax-memory-photos'
+      AND sj.object_path = v_photo.storage_path
+    FOR UPDATE;
+
+    IF NOT FOUND OR v_storage_job.deletion_job_id IS DISTINCT FROM v_job.id
+       OR v_storage_job.resource_type IS DISTINCT FROM v_resource_type
+       OR v_storage_job.resource_id IS DISTINCT FROM v_resource_id
+       OR v_storage_job.owner_id IS DISTINCT FROM p_user_id THEN
+      RAISE EXCEPTION 'account_chat_photo_storage_job_conflict';
+    END IF;
+
+    v_queued := v_queued + 1;
+  END LOOP;
+
+  RETURN v_queued;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.enqueue_account_chat_memory_photo_cleanup(uuid, timestamptz, timestamptz)
+  FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION private.enqueue_account_chat_memory_photo_cleanup(uuid, timestamptz, timestamptz)
+  TO postgres;
+
 -- Group chat charges are independent financial/idempotency evidence. The
 -- group parent and auth user both cascade to these rows, so archive them first.
 -- Group turn request_content is transcript content: retain only the minimal
@@ -70,6 +194,13 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION '找不到此帳號已到期的刪除申請';
   END IF;
+
+  -- Enqueue only after the recovery deadline has elapsed and this exact
+  -- request row is locked. A cancellation that wins before this point leaves
+  -- no photo cleanup jobs behind; queue retention ends at scheduled_for.
+  PERFORM private.enqueue_account_chat_memory_photo_cleanup(
+    p_user_id, v_requested_at, v_scheduled_for
+  );
 
   -- Account deletion bypasses chat soft-delete RPCs; preserve character-use
   -- tombstones and completed assistant-turn totals before Auth FK cascades.
