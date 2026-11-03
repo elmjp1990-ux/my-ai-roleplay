@@ -123,6 +123,45 @@ current_failure="$(psql "$DATABASE_URL" -Atqc "SELECT public.record_account_dele
 echo "ok: expired lease is reclaimed with a new fencing generation; stale owner is rejected"
 echo "ok: failure reporting requires the exact batch association"
 
+# Expiry must be checked after acquiring the lease row lock, not against the
+# SQL statement start time. A renew request begins before expiry but waits until
+# another session has expired the lease; it must return false after waking.
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "UPDATE public.account_deletion_work_leases SET lease_expires_at=clock_timestamp()+interval '1 second' WHERE target_user_id='$lease_author'" >/dev/null
+cat > "$tmpdir/lease-expire-while-locked.sql" <<SQL
+BEGIN;
+SELECT 1 FROM public.account_deletion_work_leases
+WHERE target_user_id='$lease_author'
+FOR UPDATE;
+SELECT pg_sleep(2);
+UPDATE public.account_deletion_work_leases
+SET lease_expires_at=clock_timestamp()-interval '1 second'
+WHERE target_user_id='$lease_author';
+COMMIT;
+SQL
+PGAPPNAME=pr200-lease-expiry-holder psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/lease-expire-while-locked.sql" >"$tmpdir/lease-expiry-holder.log" 2>&1 &
+lease_expiry_holder_pid=$!
+wait_for_activity "pr200-lease-expiry-holder" "pg_sleep(2)"
+PGAPPNAME=pr200-lease-expiry-renewer psql "$DATABASE_URL" -Atqc "SELECT public.renew_account_deletion_lease('$lease_author', '$new_token', $new_generation)" >"$tmpdir/lease-expiry-renew-result.log" 2>&1 &
+lease_expiry_renewer_pid=$!
+wait_for_lock "pr200-lease-expiry-renewer"
+wait "$lease_expiry_holder_pid"
+wait "$lease_expiry_renewer_pid"
+renew_after_locked_expiry="$(tr -d '\r\n' < "$tmpdir/lease-expiry-renew-result.log")"
+[[ "$renew_after_locked_expiry" == "f" ]] || {
+  echo "ERROR: a renew statement that waited past expiry resurrected an expired lease"
+  cat "$tmpdir/lease-expiry-renew-result.log"
+  exit 1
+}
+reclaimed_after_locked_expiry="$(psql "$DATABASE_URL" -Atqc "SELECT lease_token::text || '|' || lease_generation::text FROM public.claim_account_deletion_work_items(1)")"
+new_token="${reclaimed_after_locked_expiry%%|*}"
+new_generation="${reclaimed_after_locked_expiry##*|}"
+[[ -n "$new_token" && "$new_generation" == "$((new_generation - 1 + 1))" ]] || {
+  echo "ERROR: expired lease after lock wait was not reclaimable"
+  exit 1
+}
+echo "ok: renew cannot resurrect a lease that expires while waiting for its row lock"
+
+
 # The same stale generation must also be rejected by the destructive prepare
 # and finalize wrappers, not only by renew/failure telemetry.
 cat > "$tmpdir/stale-fenced-rpcs.sql" <<SQL
@@ -529,4 +568,4 @@ asset_b_referenced="$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM p
 }
 echo "ok: deletion wins path lock; queued asset path cannot be reattached"
 
-echo "Deletion concurrency tests: 13 passed, 0 failed"
+echo "Deletion concurrency tests: 14 passed, 0 failed"
