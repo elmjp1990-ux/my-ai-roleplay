@@ -118,3 +118,15 @@ Commits: 60e339fed954533b6ea95fd8652504576682c99b (worker), 380ab0567c700feac602
 - Workflow change commit `f37a35aa03d0af4741634b93626fdb03029f43a0`; run `41392406296` was queued at the time of this note. Await completion and inspect job logs before acceptance.
 - This change only adds a manual CI trigger; it does not invoke any Supabase function, RPC, database mutation, Auth operation, deployment, or cron.
 - PR #200 remains Draft/unmerged. Atomic lease/fencing remains unimplemented; no claim of concurrency safety is made.
+
+
+## Round 37 — implementation and latest race-test status (2026-11-03)
+
+The atomic lease protocol is no longer design-only: implementation is in `supabase/drafts/account-deletion-worker-atomic-lease.sql`, and the Edge Function now claims one item and uses lease-fenced prepare/renew/finalize/failure RPCs. The file remains a disposable-only draft, not a hosted migration.
+
+- Run #642 / HEAD `7f4f6f1`: disposable replay passed claim exclusivity, fairness, expiry reclaim, stale renew/failure, and cancellation checks.
+- Run #647 / HEAD `9a5130b`: disposable replay passed stale prepare/finalize rejection as well.
+- Run #648 / HEAD `32fe709`: same account-worker and disposable replay jobs passed.
+- HEAD `659e75a` adds two true independent-session claim-vs-cancel races (one where claim wins and cancellation must refuse, and one where cancellation wins and claim must skip). Account worker/static job passed; disposable replay was still running at the time of this note. Do not mark the two new race directions accepted until that exact run finishes successfully.
+
+The 10-minute lease TTL remains provisional pending measured runtime/timeout data. No hosted DDL/DML, Auth/Storage mutation, deployment, Vault secret, or Cron change. Worker source remains disabled; PR #200 remains Draft/unmerged.
