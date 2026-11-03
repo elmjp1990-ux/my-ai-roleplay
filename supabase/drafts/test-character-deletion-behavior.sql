@@ -573,11 +573,18 @@ BEGIN
   SELECT id INTO v_job
   FROM public.chat_deletion_jobs
   WHERE resource_type = 'single_session' AND resource_id = v_session;
-  UPDATE public.chat_deletion_jobs
+  -- Respect the production retention constraint: age the parent and job
+  -- together by 31 days instead of moving purge_after independently.
+  UPDATE public.chat_sessions
+  SET deleted_at = pg_catalog.clock_timestamp() - interval '31 days'
+  WHERE id = v_session;
+  UPDATE public.chat_deletion_jobs AS j
   SET status = 'processing',
-      purge_after = pg_catalog.clock_timestamp() - interval '1 second',
+      deleted_at = s.deleted_at,
+      purge_after = s.deleted_at + interval '30 days',
       lease_until = pg_catalog.clock_timestamp() + interval '5 minutes'
-  WHERE id = v_job;
+  FROM public.chat_sessions AS s
+  WHERE j.id = v_job AND s.id = v_session;
 
   PERFORM pg_catalog.set_config('request.jwt.claim.role', 'service_role', true);
   PERFORM pg_catalog.set_config(
@@ -600,11 +607,16 @@ BEGIN
   SELECT id INTO v_job
   FROM public.chat_deletion_jobs
   WHERE resource_type = 'group' AND resource_id = v_group;
-  UPDATE public.chat_deletion_jobs
+  UPDATE public.chat_groups
+  SET deleted_at = pg_catalog.clock_timestamp() - interval '31 days'
+  WHERE id = v_group;
+  UPDATE public.chat_deletion_jobs AS j
   SET status = 'processing',
-      purge_after = pg_catalog.clock_timestamp() - interval '1 second',
+      deleted_at = g.deleted_at,
+      purge_after = g.deleted_at + interval '30 days',
       lease_until = pg_catalog.clock_timestamp() + interval '5 minutes'
-  WHERE id = v_job;
+  FROM public.chat_groups AS g
+  WHERE j.id = v_job AND g.id = v_group;
   IF public.purge_chat_deletion_job(v_job) IS DISTINCT FROM true
      OR public.purge_chat_deletion_job(v_job) IS DISTINCT FROM true THEN
     RAISE EXCEPTION 'group_purge_and_completed_retry_must_succeed';
