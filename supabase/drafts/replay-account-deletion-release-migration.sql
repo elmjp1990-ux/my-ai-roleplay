@@ -16,11 +16,17 @@ BEGIN;
 \echo 'Applying CLI-generated character/account deletion and atomic lease migration'
 \i supabase/migrations/20261104200100_poyozz_account_deletion_preservation_atomic_lease.sql
 
+\echo 'Applying account-deletion schedule write-freeze migration'
+\i supabase/migrations/20261104200200_account_deletion_character_schedule_write_freeze.sql
+
 \echo 'Verify migration structure, RLS, grants, SECURITY DEFINER and search_path'
 \i supabase/drafts/verify-deletion-draft-replay.sql
 
 \echo 'Verify effective lease table/RPC privileges'
 \i supabase/drafts/test-account-deletion-worker-lease-security.sql
+
+\echo 'Run account-deletion schedule read/write freeze behavior'
+\i supabase/drafts/test-account-deletion-character-schedule-write-freeze.sql
 
 \echo 'Run history-aware character deletion behavior against generated migration'
 \i supabase/drafts/test-character-deletion-behavior.sql
