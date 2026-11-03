@@ -193,6 +193,18 @@ BEGIN
       ORDER BY b.updated_at, b.id
     LOOP
       EXIT WHEN v_claimed >= p_limit;
+
+      SELECT pg_catalog.count(*)::integer
+        INTO v_active_count
+      FROM public.account_deletion_archive_batches AS duplicate_batch
+      WHERE duplicate_batch.target_user_id = v_batch.target_user_id
+        AND duplicate_batch.requested_at = v_batch.requested_at
+        AND duplicate_batch.scheduled_for = v_batch.scheduled_for
+        AND duplicate_batch.status = 'deleting';
+      IF v_active_count > 1 THEN
+        RAISE EXCEPTION 'duplicate_deleting_account_batches';
+      END IF;
+
       INSERT INTO public.account_deletion_work_leases (
         target_user_id, requested_at, scheduled_for, lease_token,
         lease_generation, lease_expires_at, lease_status, batch_id
