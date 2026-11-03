@@ -9,8 +9,8 @@ assert.match(sql, /^-- DRAFT ONLY — NOT AN ACTIVE MIGRATION\./);
 assert.match(sql, /Do not execute this file against the hosted Supabase project/);
 
 for (const table of ["characters", "character_private_info", "character_illustrations", "character_schedule_descriptions"]) {
-  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\\s\\S]*?ALTER COLUMN author_id DROP NOT NULL"));
-  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\\s\\S]*?ON DELETE SET NULL"));
+  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\s\S]*?ALTER COLUMN author_id DROP NOT NULL"));
+  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\s\S]*?ON DELETE SET NULL"));
 }
 assert.match(sql, /character_schedule_descriptions[\s\S]*?REFERENCES auth[.]users[(]id[)] ON DELETE SET NULL/);
 assert.match(sql, /creator_display_name/);
@@ -138,8 +138,8 @@ assert.ok(accountPhotoQueueFn, "account deletion must persist chat-memory photo 
 assert.match(accountPhotoQueueFn, /p_scheduled_for <= p_requested_at/);
 assert.match(accountPhotoQueueFn, /v_deleted_at \+ interval '30 days'/);
 assert.match(accountPhotoQueueFn, /ORDER BY CASE WHEN p[.]chat_type = 'single' THEN 0 ELSE 1 END/);
-assert.match(accountPhotoQueueFn, /UPDATE public[.]chat_sessions AS s[\\s\\S]*?SET deleted_at = COALESCE[(]s[.]deleted_at, v_deleted_at[)]/);
-assert.match(accountPhotoQueueFn, /UPDATE public[.]chat_groups AS g[\\s\\S]*?SET deleted_at = COALESCE[(]g[.]deleted_at, v_deleted_at[)]/);
+assert.match(accountPhotoQueueFn, /UPDATE public[.]chat_sessions AS s[\s\S]*?SET deleted_at = COALESCE[(]s[.]deleted_at, v_deleted_at[)]/);
+assert.match(accountPhotoQueueFn, /UPDATE public[.]chat_groups AS g[\s\S]*?SET deleted_at = COALESCE[(]g[.]deleted_at, v_deleted_at[)]/);
 assert.match(accountPhotoQueueFn, /account_chat_photo_parent_changed_during_queueing/);
 assert.match(accountPhotoQueueFn, /FROM public[.]chat_memory_photos AS p/);
 assert.match(accountPhotoQueueFn, /p[.]owner_id = p_user_id/);
