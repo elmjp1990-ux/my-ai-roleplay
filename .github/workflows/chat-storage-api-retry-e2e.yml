@@ -4,6 +4,13 @@ on:
   pull_request:
     paths:
       - "scripts/test-chat-storage-api-retry-e2e.ts"
+      - "supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql"
+      - "supabase/drafts/seed-character-deletion-legacy-fixtures.sql"
+      - "supabase/drafts/character-history-aware-deletion.sql"
+      - "supabase/drafts/account-deletion-character-preservation-draft.sql"
+      - "supabase/drafts/account-archived-character-session-insert-guard.sql"
+      - "supabase/drafts/prepare-account-deletion-character-preservation-integration.sql"
+      - "supabase/drafts/test-account-photo-storage-e2e-fixture.sql"
       - "scripts/test-account-deletion-stale-jwt-e2e.ts"
       - "supabase/migrations/20261103090100_account_is_active_auth_user_existence_guard.sql"
       - "scripts/test-chat-deletion-browser-e2e.mjs"
@@ -85,7 +92,19 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261103040547_poyozz_chat_deletion_privilege_hardening.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261103090100_account_is_active_auth_user_existence_guard.sql
 
-      - name: Exercise real Supabase Storage client against HTTP 503 and retry
+      - name: Load account deletion photo-queue helper in the disposable local schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/seed-character-deletion-legacy-fixtures.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/character-history-aware-deletion.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/account-deletion-character-preservation-draft.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/account-archived-character-session-insert-guard.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/prepare-account-deletion-character-preservation-integration.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/test-account-photo-storage-e2e-fixture.sql
+
+      - name: Exercise account-prepare photo path through Storage HTTP 503 and retry
         run: deno run --allow-net --allow-env scripts/test-chat-storage-api-retry-e2e.ts
 
       - name: Verify Auth Admin deletion rejects a still-valid pre-deletion JWT
