@@ -392,7 +392,13 @@ BEGIN
       ),
       updated_at = v_archived_at
   FROM owned
-  WHERE s.character_id = owned.id;
+  WHERE s.character_id = owned.id
+    -- The deleting account's own sessions are removed by the later Auth FK
+    -- cascade. They were already snapshotted above for aggregate character
+    -- counts, so do not UPDATE them while account deletion is pending: the
+    -- pending-account guard intentionally rejects writes to those sessions.
+    -- Only other players' retained sessions need the offline/creator snapshot.
+    AND s.user_id <> p_user_id;
 
   -- Preserve creator attribution in group member snapshots.
   WITH owned AS (
