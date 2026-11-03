@@ -23,7 +23,7 @@ $storage_stub$;
 \echo 'Applying account deletion character preservation and safe Auth detachment draft'
 \i supabase/drafts/account-deletion-character-preservation-draft.sql
 \echo 'Applying stale-JWT Auth-user existence guard'
-\i supabase/drafts/account-is-active-auth-user-existence-guard.sql
+\i supabase/migrations/20261103090100_account_is_active_auth_user_existence_guard.sql
 \echo 'Applying database guard against new sessions for archived characters'
 \i supabase/drafts/account-archived-character-session-insert-guard.sql
 \echo 'Applying complete prepare_account_deletion integration draft'
