@@ -1,3 +1,4 @@
+import { createAuthAdminTimeoutFetch } from "./account-deletion-auth-fetch.ts";
 import { assertEquals } from "jsr:@std/assert";
 import {
   processAccountDeletionWorkItems,
@@ -219,4 +220,58 @@ Deno.test("counts resolved RPC errors from fenced failure reporting", async () =
   const summary = await processAccountDeletionWorkItems([item], deps);
   assertEquals(summary.failed, 1);
   assertEquals(summary.failureReportFailed, 1);
+});
+
+
+Deno.test("aborts an Auth Admin request at the configured timeout", async () => {
+  let observedSignal: AbortSignal | null = null;
+  const boundedFetch = createAuthAdminTimeoutFetch(async (_input, init) => {
+    observedSignal = init?.signal ?? null;
+    return await new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => {
+        reject(init?.signal?.reason ?? new Error("aborted"));
+      }, { once: true });
+    });
+  }, 10);
+
+  let rejected = false;
+  try {
+    await boundedFetch("https://project.supabase.co/auth/v1/admin/users/user-1", {
+      method: "DELETE",
+    });
+  } catch {
+    rejected = true;
+  }
+  assertEquals(rejected, true);
+  assertEquals(observedSignal instanceof AbortSignal, true);
+  assertEquals(observedSignal?.aborted, true);
+});
+
+Deno.test("does not apply Auth Admin timeout to PostgREST or unrelated requests", async () => {
+  let receivedSignal: AbortSignal | null = null;
+  const boundedFetch = createAuthAdminTimeoutFetch(async (_input, init) => {
+    receivedSignal = init?.signal ?? null;
+    return new Response("ok", { status: 200 });
+  }, 10);
+
+  const response = await boundedFetch("https://project.supabase.co/rest/v1/profiles");
+  assertEquals(response.status, 200);
+  assertEquals(receivedSignal, null);
+});
+
+Deno.test("combines an existing request abort signal with the Auth Admin timeout", async () => {
+  const controller = new AbortController();
+  let receivedSignal: AbortSignal | null = null;
+  const boundedFetch = createAuthAdminTimeoutFetch(async (_input, init) => {
+    receivedSignal = init?.signal ?? null;
+    return new Response("ok", { status: 200 });
+  }, 60_000);
+
+  await boundedFetch("https://project.supabase.co/auth/v1/admin/users/user-1", {
+    signal: controller.signal,
+  });
+  assertEquals(receivedSignal instanceof AbortSignal, true);
+  assertEquals(receivedSignal === controller.signal, false);
+  controller.abort();
+  assertEquals(receivedSignal?.aborted, true);
 });
