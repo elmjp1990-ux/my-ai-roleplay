@@ -4,8 +4,21 @@
 \set ON_ERROR_STOP on
 BEGIN;
 
+CREATE SCHEMA IF NOT EXISTS storage;
+DO $storage_stub$
+BEGIN
+  IF pg_catalog.to_regclass('storage.objects') IS NULL THEN
+    CREATE TABLE storage.objects (bucket_id text NOT NULL, name text NOT NULL);
+  END IF;
+END;
+$storage_stub$;
+
 \echo 'Applying cumulative chat deletion turn-statistics draft'
 \i supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql
+
+\echo 'Applying archived-group memory-photo read-access correction'
+\i supabase/drafts/chat-archive-memory-photo-read-access.sql
+\i supabase/drafts/test-chat-archive-memory-photo-read-access.sql
 
 \echo 'Applying Encounter settlement parent-first lock reconciliation'
 \i supabase/drafts/settle-encounter-session-parent-lock-live-reconciliation.sql
