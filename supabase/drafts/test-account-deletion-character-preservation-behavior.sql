@@ -206,13 +206,14 @@ BEGIN
   ON CONFLICT (user_id) DO UPDATE
     SET requested_at = EXCLUDED.requested_at, scheduled_for = EXCLUDED.scheduled_for;
 
-  PERFORM pg_catalog.set_config('request.jwt.claim.sub', v_author::text, true);
+  -- The account worker invokes prepare through a service-role JWT without an
+  -- end-user subject. This lets the internal prepare path mark the user's own
+  -- chat parents deleted without impersonating a browser-authenticated update.
+  PERFORM pg_catalog.set_config('request.jwt.claim.sub', '', true);
   PERFORM pg_catalog.set_config('request.jwt.claim.role', 'service_role', true);
-  -- Supabase auth.jwt() reads the complete claims JSON, not the legacy
-  -- request.jwt.claim.role setting used by auth.role().
   PERFORM pg_catalog.set_config(
     'request.jwt.claims',
-    pg_catalog.jsonb_build_object('sub', v_author::text, 'role', 'service_role')::text,
+    pg_catalog.jsonb_build_object('role', 'service_role')::text,
     true
   );
 
@@ -241,6 +242,16 @@ BEGIN
       AND purge_after = v_account_requested_at + interval '30 days'
       AND purge_after = deleted_at + interval '30 days'
       AND status = 'queued'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.chat_sessions
+    WHERE id = v_active_author_session
+      AND user_id = v_author
+      AND deleted_at = v_account_requested_at
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.chat_groups
+    WHERE id = v_author_group
+      AND owner_id = v_author
+      AND deleted_at = v_account_requested_at
   ) OR NOT EXISTS (
     SELECT 1 FROM public.chat_storage_deletion_jobs
     WHERE bucket_id = 'personax-memory-photos'
