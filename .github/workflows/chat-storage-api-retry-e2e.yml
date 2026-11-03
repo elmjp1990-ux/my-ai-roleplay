@@ -12,11 +12,11 @@ on:
       - "supabase/drafts/prepare-account-deletion-character-preservation-integration.sql"
       - "supabase/drafts/test-account-photo-storage-e2e-fixture.sql"
       - "scripts/test-account-deletion-stale-jwt-e2e.ts"
-      - "supabase/migrations/20261103090100_account_is_active_auth_user_existence_guard.sql"
+      - "supabase/migrations/20261104200000_account_is_active_auth_user_existence_guard.sql"
       - "scripts/test-chat-deletion-browser-e2e.mjs"
       - "index.html"
       - "supabase/functions/_shared/chat-deletion-worker.ts"
-      - "supabase/migrations/20261103040547_poyozz_chat_deletion_privilege_hardening.sql"
+      - "supabase/migrations/20261103195621_poyozz_chat_deletion_privilege_hardening.sql"
       - "scripts/build-disposable-schema-fixture.mjs"
       - "supabase/drafts/verify-current-state-schema-fixture.sql"
       - ".github/workflows/chat-storage-api-retry-e2e.yml"
@@ -89,7 +89,7 @@ jobs:
           node scripts/build-disposable-schema-fixture.mjs > "$RUNNER_TEMP/current-state-schema.sql"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-current-state-schema-fixture.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261103040547_poyozz_chat_deletion_privilege_hardening.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261103195621_poyozz_chat_deletion_privilege_hardening.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261103090100_account_is_active_auth_user_existence_guard.sql
 
       - name: Load account deletion photo-queue helper in the disposable local schema
