@@ -9,6 +9,7 @@ BEGIN;
 \i supabase/drafts/seed-character-deletion-legacy-fixtures.sql
 \echo 'Applying character history-aware deletion draft'
 \i supabase/drafts/character-history-aware-deletion.sql
+\i supabase/drafts/sync-character-chat-snapshot-parent-lock-proposal.sql
 \echo 'Bootstrapping disposable Storage metadata schema for RLS policy replay'
 CREATE SCHEMA IF NOT EXISTS storage;
 DO $storage_stub$
