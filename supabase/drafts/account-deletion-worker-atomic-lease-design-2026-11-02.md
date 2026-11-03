@@ -165,3 +165,34 @@ A recursive Git tree at the current branch head was inspected (180 tracked files
 Implementation consequence: keep the two player-facing RPCs (`request_account_deletion`, `cancel_account_deletion`) authenticated and separate from the service-only worker RPC set. The cancellation function must lock the request then lease; worker claim/archive/prepare/failure/finalize use the same canonical request → lease → batch lock order where those rows exist. Refactor prepare's internal archive invocation so both operations validate the same lease within the same transaction rather than exposing an unleased nested path.
 
 This is still pre-implementation documentation. No RPC signature, migration, worker code, hosted schema or data was changed.
+
+
+## Round 36 — first implementation landed in a disposable-only SQL draft
+
+Implementation file: `supabase/drafts/account-deletion-worker-atomic-lease.sql` (DRAFT ONLY; deliberately not in `supabase/migrations/`).
+
+Implemented:
+- Durable `account_deletion_work_leases` table with no Auth/request FK, request identity tuple, random UUID token, monotonic generation, expiry, status, batch association and failure metadata. RLS enabled; all table privileges revoked from PUBLIC/anon/authenticated/service_role.
+- `claim_account_deletion_work_items(1)`: transaction-scoped claim, request → lease → batch lock order for due requests, `FOR UPDATE SKIP LOCKED`, active-lease filtering, expired-lease reclaim, duplicate active-batch fail-closed guard, deleting-batch recovery after request-row cascade, and no starvation behind an earlier active lease.
+- `renew_account_deletion_lease`: renews only the current unexpired token/generation; expired/stale owners cannot resurrect a lease.
+- `prepare_account_deletion_leased`: validates token/generation inside the same transaction as the existing complete prepare routine; supports recovery when the request row is already gone but a deleting batch remains.
+- `finalize_account_deletion_leased` and `record_account_deletion_failure_leased`: fence batch completion and failure telemetry; stale owners cannot mutate either.
+- `cancel_account_deletion()` now follows request → lease → batch lock order. An active lease blocks cancellation; an expired lease without a batch can be cancelled. Claim and cancellation therefore serialize.
+- Old unleased work-list/archive/prepare/finalize/failure RPC execute privileges are revoked from service_role. The Edge Function now uses only claim + lease-fenced RPCs. It claims one account per invocation, renews before Auth Admin calls/finalize, and fails closed on non-404 Auth lookup errors.
+- Ten-minute lease TTL is provisional and must be revisited against measured phase duration / Auth request timeout before any schedule is enabled. Worker remains source-disabled.
+
+Verification:
+- Account worker Run #642 on HEAD `7f4f6f1`: account-worker/static checks and disposable PostgreSQL schema replay passed. Logs confirmed exactly-one concurrent claim, active-lease fairness, expired reclaim/new generation, stale renew/failure rejection, and cancellation behavior.
+- Run #647 on HEAD `9a5130b`: account-worker and disposable-schema-replay both success; additionally confirmed stale generation cannot call prepare or finalize.
+- Run #648 on HEAD `32fe709`: account-worker and disposable-schema-replay both success. This run includes corrected 9-scenario summary text; the new simultaneous claim-vs-cancel race cases are added in later HEAD `659e75a` and await their own run.
+- Latest HEAD `659e75a`: account worker/static job passed; disposable-schema-replay is running. The new two independent-session races test both outcomes: claim wins → cancellation waits then refuses; cancellation wins → claim skips the locked request and cannot claim after commit.
+- Worker deterministic tests cover lease renewal, stale fencing generation propagation, Auth lookup failure fail-closed, recovery after Auth deletion, and failure-report isolation.
+
+Still open:
+1. Latest HEAD's full disposable two-session replay must pass, including both claim/cancel race directions.
+2. Measure actual worker phase times and choose final lease TTL; add bounded Auth Admin HTTP timeout/reconciliation review.
+3. Run Supabase CLI advisors / final routine ACL and RLS review against the disposable schema.
+4. Generate a fresh uniquely-versioned migration via Supabase CLI only after draft acceptance; compare to current test schema/ledger. Do not apply it to hosted DB without separate approval.
+5. Complete account-wide Storage sweep / legacy photo classification and final rollout audit.
+
+No hosted DDL/DML, Auth/Storage mutation, Edge Function deployment, Vault secret, or Cron change occurred. PR #200 remains Draft / unmerged.
