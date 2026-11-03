@@ -530,6 +530,20 @@ assert.ok(chatParentDeleteGuard.includes("FROM PUBLIC, anon, authenticated"));
 assert.ok(chatParentDeleteGuard.includes("delete_chat_session_content()"));
 assert.ok(!chatParentDeleteGuard.includes("GRANT DELETE ON TABLE public.chat_sessions"));
 
+const finalPrivilegeDraft = fs.readFileSync(
+  "supabase/drafts/pr200-final-privilege-hardening.sql",
+  "utf8",
+);
+assert.ok(finalPrivilegeDraft.startsWith("-- DRAFT ONLY — NOT AN ACTIVE MIGRATION."));
+assert.ok(finalPrivilegeDraft.includes("REVOKE TRUNCATE ON ALL TABLES IN SCHEMA public"));
+assert.ok(finalPrivilegeDraft.includes("REVOKE DELETE ON TABLE public.chat_sessions"));
+assert.ok(finalPrivilegeDraft.includes("REVOKE DELETE ON TABLE public.chat_groups"));
+const deletionReplay = fs.readFileSync(
+  "supabase/drafts/replay-and-test-character-deletion.sql",
+  "utf8",
+);
+assert.ok(deletionReplay.includes("supabase/drafts/pr200-final-privilege-hardening.sql"));
+
 
 // Ordinary single/group chat deletion has a backend-only 30-day retention window.
 // There is deliberately no player-facing restore/undo/reopen path.
