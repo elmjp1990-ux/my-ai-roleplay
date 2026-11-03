@@ -54,26 +54,7 @@ BEGIN
 END;
 $photo_seed$;
 
-CREATE OR REPLACE FUNCTION public.test_archived_photo_storage_policy_inputs()
-RETURNS TABLE (
-  object_name text,
-  bucket_matches boolean,
-  owner_matches boolean,
-  path_matches boolean,
-  metadata_matches boolean
-)
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = ''
-AS $fn$
-  SELECT
-    o.name,
-    o.bucket_id = 'personax-memory-photos',
-    pg_catalog.split_part(o.name, '/', 1) = (SELECT auth.uid())::text,
-    o.name ~* (
-      '^' || (SELECT auth.uid())::text ||
-      '/(single|group)/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/' ||
-      '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](jpg|jpeg|png|webp)
+SET LOCAL ROLE authenticated;
 SELECT pg_catalog.set_config('request.jwt.claim.sub', '90000000-0000-4000-8000-000000000001', true);
 SELECT pg_catalog.set_config('request.jwt.claim.role', 'authenticated', true);
 SELECT pg_catalog.set_config(
@@ -83,9 +64,14 @@ SELECT pg_catalog.set_config(
 );
 SELECT pg_catalog.count(*) AS debug_allow_policy_rows FROM storage.objects
 WHERE name LIKE '90000000-0000-4000-8000-000000000001/group/%';
-SELECT * FROM public.test_archived_photo_storage_policy_inputs();
+SELECT o.name,
+  o.bucket_id = 'personax-memory-photos' AS bucket_matches,
+  pg_catalog.split_part(o.name, '/', 1) = auth.uid()::text AS owner_matches,
+  o.name ~* (
+    '^' || auth.uid()::text ||
+    '/(single|group)/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/' ||
+    '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](jpg|jpeg|png|webp)
 RESET ROLE;
-DROP FUNCTION public.test_archived_photo_storage_policy_inputs();
 DROP POLICY test_debug_storage_allow ON storage.objects;
 SET LOCAL ROLE authenticated;
 SELECT pg_catalog.set_config('request.jwt.claim.sub', '90000000-0000-4000-8000-000000000001', true);
@@ -181,45 +167,22 @@ $photo_assert$;
 
 RESET ROLE;
 
-    ),
-    EXISTS (
-      SELECT 1 FROM public.chat_memory_photos p
-      WHERE p.storage_path = o.name
-        AND p.owner_id = (SELECT auth.uid())
-        AND p.deleted_at IS NULL
-        AND (
-          (p.chat_type = 'single' AND EXISTS (
-            SELECT 1 FROM public.chat_sessions s
-            WHERE s.id = p.session_id
-              AND s.user_id = (SELECT auth.uid())
-              AND s.deleted_at IS NULL
-          ))
-          OR
-          (p.chat_type = 'group' AND EXISTS (
-            SELECT 1 FROM public.chat_groups g
-            WHERE g.id = p.group_id
-              AND g.owner_id = (SELECT auth.uid())
-              AND g.deleted_at IS NULL
-          ))
-        )
-    )
-  FROM storage.objects o
-  WHERE o.name IN (
-    '90000000-0000-4000-8000-000000000001/group/60000000-0000-4000-8000-000000000001/70000000-0000-4000-8000-000000000001.jpg',
-    '90000000-0000-4000-8000-000000000001/group/60000000-0000-4000-8000-000000000002/70000000-0000-4000-8000-000000000002.jpg'
-  );
-$fn$;
-
-SET LOCAL ROLE authenticated;
-SELECT pg_catalog.set_config('request.jwt.claim.sub', '90000000-0000-4000-8000-000000000001', true);
-SELECT pg_catalog.set_config('request.jwt.claim.role', 'authenticated', true);
-SELECT pg_catalog.set_config(
-  'request.jwt.claims',
-  '{"sub":"90000000-0000-4000-8000-000000000001","role":"authenticated"}',
-  true
-);
-SELECT pg_catalog.count(*) AS debug_allow_policy_rows FROM storage.objects
-WHERE name LIKE '90000000-0000-4000-8000-000000000001/group/%';
+  ) AS path_matches,
+  EXISTS (
+    SELECT 1 FROM public.chat_memory_photos p
+    WHERE p.storage_path = o.name
+      AND p.owner_id = auth.uid()
+      AND p.deleted_at IS NULL
+      AND p.chat_type = 'group'
+      AND EXISTS (
+        SELECT 1 FROM public.chat_groups g
+        WHERE g.id = p.group_id
+          AND g.owner_id = auth.uid()
+          AND g.deleted_at IS NULL
+      )
+  ) AS metadata_matches
+FROM storage.objects o
+WHERE o.name LIKE '90000000-0000-4000-8000-000000000001/group/%';
 RESET ROLE;
 DROP POLICY test_debug_storage_allow ON storage.objects;
 SET LOCAL ROLE authenticated;
