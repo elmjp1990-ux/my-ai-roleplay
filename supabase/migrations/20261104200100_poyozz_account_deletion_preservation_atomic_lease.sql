@@ -1,13 +1,15 @@
--- Generated with Supabase CLI v2.84.2 as:
+-- Originally generated with Supabase CLI v2.84.2 as:
+-- 20261103115931_poyozz_account_deletion_preservation_atomic_lease.sql
+-- Re-versioned in the repository to follow the already-applied hosted prerequisite:
 -- 20261104200100_poyozz_account_deletion_preservation_atomic_lease.sql
 -- Fresh incremental migration. Historical migration files and ledger are not rewritten.
 -- Required earlier migrations in this PR release set (apply in version order):
 --   20261103195621_poyozz_chat_deletion_privilege_hardening.sql
 --   20261104200000_account_is_active_auth_user_existence_guard.sql
--- Read-only test-project ledger inspection on 2026-11-03 found neither prerequisite
--- applied yet; the ledger already contains the first prerequisite at version 20261103195621; this release preserves that executed order. This migration assumes
--- both PR prerequisites have been applied first.
+-- The connected test project's ledger already contains the first prerequisite at
+-- version 20261103195621. This migration follows that actual hosted execution order.
 -- Validated against the disposable current-state schema fixture only; do not apply
+-- to hosted Supabase without explicit approval.
 -- to hosted Supabase without explicit approval.
 
 
