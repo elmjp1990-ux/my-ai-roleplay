@@ -9,8 +9,8 @@ assert.match(sql, /^-- DRAFT ONLY — NOT AN ACTIVE MIGRATION\./);
 assert.match(sql, /Do not execute this file against the hosted Supabase project/);
 
 for (const table of ["characters", "character_private_info", "character_illustrations", "character_schedule_descriptions"]) {
-  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\\s\\S]*?ALTER COLUMN author_id DROP NOT NULL"));
-  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\\s\\S]*?ON DELETE SET NULL"));
+  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\s\S]*?ALTER COLUMN author_id DROP NOT NULL"));
+  assert.match(sql, new RegExp("ALTER TABLE public[.]" + table + "[\s\S]*?ON DELETE SET NULL"));
 }
 assert.match(sql, /character_schedule_descriptions[\s\S]*?REFERENCES auth[.]users[(]id[)] ON DELETE SET NULL/);
 assert.match(sql, /creator_display_name/);
@@ -132,17 +132,17 @@ assert.ok(
 );
 
 const accountPhotoQueueFn = integration.match(
-  /CREATE OR REPLACE FUNCTION private[.]enqueue_account_chat_memory_photo_cleanup[(][\\s\\S]*?\\$function\\$;/,
+  /CREATE OR REPLACE FUNCTION private[.]enqueue_account_chat_memory_photo_cleanup[(][\s\S]*?\\$function\\$;/,
 )?.[0];
 assert.ok(accountPhotoQueueFn, "account deletion must persist chat-memory photo cleanup work");
 assert.match(accountPhotoQueueFn, /p_scheduled_for <= p_requested_at/);
-assert.match(accountPhotoQueueFn, /v_deleted_at \\+ interval '30 days'/);
+assert.match(accountPhotoQueueFn, /v_deleted_at \+ interval '30 days'/);
 assert.match(accountPhotoQueueFn, /FROM public[.]chat_memory_photos AS p/);
 assert.match(accountPhotoQueueFn, /p[.]owner_id = p_user_id/);
 assert.match(accountPhotoQueueFn, /personax-memory-photos/);
 assert.match(accountPhotoQueueFn, /ON CONFLICT [(]bucket_id, object_path[)] DO NOTHING/);
 assert.match(accountPhotoQueueFn, /account_chat_photo_storage_job_conflict/);
-assert.match(integration, /PERFORM private[.]enqueue_account_chat_memory_photo_cleanup[(][\\s\\S]*?p_user_id, v_requested_at, v_scheduled_for/);
+assert.match(integration, /PERFORM private[.]enqueue_account_chat_memory_photo_cleanup[(][\s\S]*?p_user_id, v_requested_at, v_scheduled_for/);
 assert.ok(
   integration.indexOf("PERFORM private.enqueue_account_chat_memory_photo_cleanup(") <
     integration.indexOf("-- Lock/reuse this exact request's batch"),
