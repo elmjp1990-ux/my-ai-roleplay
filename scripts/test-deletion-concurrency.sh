@@ -407,6 +407,10 @@ sync_first_state="$(psql "$DATABASE_URL" -Atqc "SELECT deleted_at IS NOT NULL AN
 }
 echo "ok: snapshot sync wins the parent lock before chat deletion"
 
+# The previous sync covers every active parent for this character; reset the
+# second fixture so the delete-wins assertion starts from its own untouched marker.
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "UPDATE public.chat_sessions SET character_snapshot='{"marker":"delete-first"}'::jsonb WHERE id='$sync_session_second'" >/dev/null
+
 # Delete wins: a waiting sync must re-check deleted_at after acquiring the row
 # lock and leave the deleted parent's snapshot byte-for-byte unchanged.
 cat > "$tmpdir/snapshot-delete-wins.sql" <<SQL
@@ -707,6 +711,10 @@ group_sync_first_state="$(psql "$DATABASE_URL" -Atqc "SELECT g.deleted_at IS NOT
   exit 1
 }
 echo "ok: group snapshot sync wins the parent lock before group deletion"
+
+# The sync-first call also updates all active groups for this character.
+# Restore the second group's initial marker before its independent delete-wins race.
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "UPDATE public.chat_group_members SET character_snapshot='{"marker":"group-delete-first"}'::jsonb WHERE id='$sync_member_second'" >/dev/null
 
 cat > "$tmpdir/group-snapshot-delete-wins.sql" <<SQL
 BEGIN;
