@@ -4,12 +4,11 @@ import {
   type AccountDeletionWorkItem,
 } from "../_shared/account-deletion-worker.ts";
 
-const MAX_BATCH = 10;
+// Keep one account per invocation while the lease protocol is being measured.
+const MAX_BATCH = 1;
 
-// Fail-closed release gate: account deletion must not execute until durable
-// character retention, ownership detachment, Storage access, and local E2E
-// acceptance are implemented and explicitly reviewed. Do not flip this in
-// isolation; remove only in the separately approved enablement change.
+// Fail-closed release gate: account deletion must not execute until the complete
+// storage sweep, migration rollout, and hosted synthetic acceptance are approved.
 const ACCOUNT_DELETION_EXECUTION_ENABLED = false;
 
 function errorCode(error: unknown, fallback: string): string {
@@ -34,9 +33,7 @@ export default {
       return Response.json({ error: "method_not_allowed" }, { status: 405 });
     }
 
-    // This endpoint is intentionally inert until the account-deletion
-    // retention and authorization release gates are independently accepted.
-    // Return before claiming work or invoking any destructive RPC/Auth action.
+    // This endpoint is inert until all release gates are explicitly accepted.
     if (!ACCOUNT_DELETION_EXECUTION_ENABLED) {
       return Response.json({
         error: "account_deletion_worker_disabled",
@@ -44,32 +41,38 @@ export default {
       }, { status: 503 });
     }
 
-    // The named Supabase Secret Key is validated by @supabase/server before
-    // this handler executes. Never accept a target user ID from request input.
     const supabase = ctx.supabaseAdmin;
     if (!supabase) {
       return Response.json({ error: "worker_admin_context_missing" }, { status: 500 });
     }
 
-    const { data, error } = await supabase.rpc("get_account_deletion_work_items");
+    // The database performs the atomic claim and returns a fresh fencing token.
+    // An invocation that receives no row does not record a failure for that work.
+    const { data, error } = await supabase.rpc("claim_account_deletion_work_items", {
+      p_limit: MAX_BATCH,
+    });
     if (error) {
       return Response.json({
-        error: "account_deletion_work_items_failed",
-        code: errorCode(error, "work_items_failed"),
+        error: "account_deletion_claim_failed",
+        code: errorCode(error, "claim_failed"),
       }, { status: 500 });
     }
 
     const items = ((data ?? []) as AccountDeletionWorkItem[]).slice(0, MAX_BATCH);
     const summary = await processAccountDeletionWorkItems(items, {
-      archive: async (userId) => {
-        const result = await supabase.rpc("archive_account_deletion_data", {
+      prepare: async (userId, token, generation) => {
+        const result = await supabase.rpc("prepare_account_deletion_leased", {
           p_user_id: userId,
+          p_lease_token: token,
+          p_lease_generation: generation,
         });
         return { data: result.data, error: result.error };
       },
-      prepare: async (userId) => {
-        const result = await supabase.rpc("prepare_account_deletion", {
+      renew: async (userId, token, generation) => {
+        const result = await supabase.rpc("renew_account_deletion_lease", {
           p_user_id: userId,
+          p_lease_token: token,
+          p_lease_generation: generation,
         });
         return { data: result.data, error: result.error };
       },
@@ -88,15 +91,21 @@ export default {
           : undefined;
         return status === 404 || code === "user_not_found";
       },
-      finalize: async (batchId) => {
-        const result = await supabase.rpc("finalize_account_deletion", {
+      finalize: async (userId, batchId, token, generation) => {
+        const result = await supabase.rpc("finalize_account_deletion_leased", {
+          p_user_id: userId,
           p_batch_id: batchId,
+          p_lease_token: token,
+          p_lease_generation: generation,
         });
         return { data: result.data, error: result.error };
       },
-      markFailure: async (batchId, code) => {
-        const result = await supabase.rpc("record_account_deletion_failure", {
+      markFailure: async (userId, batchId, token, generation, code) => {
+        const result = await supabase.rpc("record_account_deletion_failure_leased", {
+          p_user_id: userId,
           p_batch_id: batchId,
+          p_lease_token: token,
+          p_lease_generation: generation,
           p_error_code: code,
         });
         return { data: result.data, error: result.error };
@@ -104,7 +113,7 @@ export default {
     });
 
     if (summary.failureReportFailed > 0) {
-      // Do not log user IDs, batch IDs, or raw provider errors.
+      // Do not log user IDs, batch IDs, lease tokens, or raw provider errors.
       console.error("account_deletion_worker_failure_reporting_incomplete", {
         failureReportFailed: summary.failureReportFailed,
         failed: summary.failed,
