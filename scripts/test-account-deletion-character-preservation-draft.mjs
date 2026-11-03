@@ -388,13 +388,20 @@ assert.ok(tablePhotoStart >= 0 && storagePhotoDrop > tablePhotoStart, "memory ph
 assert.match(tablePhotoSelect, /owner_id = [(]SELECT auth[.]uid[(][)][)]/);
 assert.match(tablePhotoSelect, /g[.]deleted_at IS NULL/);
 assert.doesNotMatch(tablePhotoSelect, /g[.]archived_at/);
-const storagePhotoStart = memoryPhotoDraft.indexOf("CREATE POLICY memory_photo_objects_select_owner");
-const noWriteChanges = memoryPhotoDraft.indexOf("-- No INSERT, UPDATE, DELETE", storagePhotoStart);
-const storagePhotoSelect = memoryPhotoDraft.slice(storagePhotoStart, noWriteChanges);
-assert.ok(storagePhotoStart >= 0 && noWriteChanges > storagePhotoStart, "memory photo Storage SELECT policy must be replaced");
-assert.match(storagePhotoSelect, /p[.]storage_path = name/);
-assert.match(storagePhotoSelect, /g[.]deleted_at IS NULL/);
-assert.doesNotMatch(storagePhotoSelect, /g[.]archived_at/);
+const storageHelperStart = memoryPhotoDraft.indexOf("CREATE OR REPLACE FUNCTION private.can_read_chat_memory_photo_object");
+const storagePolicyStart = memoryPhotoDraft.indexOf("CREATE POLICY memory_photo_objects_select_owner");
+const noWriteChanges = memoryPhotoDraft.indexOf("-- No INSERT, UPDATE, DELETE", storagePolicyStart);
+const storagePhotoHelper = memoryPhotoDraft.slice(storageHelperStart, storagePolicyStart);
+const storagePhotoSelect = memoryPhotoDraft.slice(storagePolicyStart, noWriteChanges);
+assert.ok(storageHelperStart >= 0 && storagePolicyStart > storageHelperStart, "memory photo Storage authorization helper must exist");
+assert.match(storagePhotoHelper, /SECURITY DEFINER/);
+assert.match(storagePhotoHelper, /SET search_path = ''/);
+assert.match(storagePhotoHelper, /p[.]storage_path = p_storage_path/);
+assert.match(storagePhotoHelper, /g[.]deleted_at IS NULL/);
+assert.doesNotMatch(storagePhotoHelper, /g[.]archived_at/);
+assert.ok(noWriteChanges > storagePolicyStart, "memory photo Storage SELECT policy must be replaced");
+assert.match(storagePhotoSelect, /private[.]can_read_chat_memory_photo_object[(]name[)]/);
+assert.doesNotMatch(storagePhotoSelect, /FOR INSERT|FOR UPDATE|FOR DELETE/i);
 assert.doesNotMatch(memoryPhotoDraft, /FOR INSERT|FOR UPDATE|FOR DELETE/i);
 
 // The 30-day purge worker is deployed but has no visible scheduler. Keep the
