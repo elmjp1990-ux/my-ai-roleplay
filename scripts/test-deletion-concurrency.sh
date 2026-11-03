@@ -37,6 +37,103 @@ delete_character="20000000-0000-4000-8000-000000000030"
 archive_character="20000000-0000-4000-8000-000000000031"
 schedule_id="40000000-0000-4000-8000-000000000031"
 race_session="50000000-0000-4000-8000-000000000030"
+lease_author="10000000-0000-4000-8000-000000000033"
+
+# Lease race: two independent sessions contend for one due account request.
+# Session A holds its transaction open after claim; session B must skip the
+# locked request, then still see no work after A commits because the lease is active.
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
+INSERT INTO public.account_deletion_requests (user_id, requested_at, scheduled_for)
+VALUES ('$lease_author', now() - interval '1 hour', now() - interval '1 minute');
+SQL
+cat > "$tmpdir/lease-claim-first.sql" <<SQL
+BEGIN;
+DO \$\$
+DECLARE v_count integer;
+BEGIN
+  SELECT count(*)::integer INTO v_count
+  FROM public.claim_account_deletion_work_items(1);
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'first_worker_must_claim_exactly_one_request';
+  END IF;
+END;
+\$\$;
+SELECT pg_sleep(2);
+COMMIT;
+SQL
+PGAPPNAME=pr200-lease-claim-first psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/lease-claim-first.sql" >"$tmpdir/lease-claim-first.log" 2>&1 &
+lease_first_pid=$!
+wait_for_activity "pr200-lease-claim-first" "pg_sleep(2)"
+second_claim_during_lock="$(psql "$DATABASE_URL" -Atqc "SELECT count(*) FROM public.claim_account_deletion_work_items(1)")"
+wait "$lease_first_pid"
+second_claim_after_commit="$(psql "$DATABASE_URL" -Atqc "SELECT count(*) FROM public.claim_account_deletion_work_items(1)")"
+[[ "$second_claim_during_lock" == "0" && "$second_claim_after_commit" == "0" ]] || {
+  echo "ERROR: competing worker obtained duplicate account deletion work"
+  cat "$tmpdir/lease-claim-first.log"
+  exit 1
+}
+echo "ok: exactly one concurrent worker claims a due account deletion request"
+
+# Expired lease reclaim must rotate both token and generation. The previous
+# owner must be unable to renew or write failure metadata after reclaim.
+old_lease="$(psql "$DATABASE_URL" -Atqc "SELECT lease_token::text || '|' || lease_generation::text FROM public.account_deletion_work_leases WHERE target_user_id='$lease_author'")"
+old_token="${old_lease%%|*}"
+old_generation="${old_lease##*|}"
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "UPDATE public.account_deletion_work_leases SET lease_expires_at=now()-interval '1 second' WHERE target_user_id='$lease_author'" >/dev/null
+new_lease="$(psql "$DATABASE_URL" -Atqc "SELECT lease_token::text || '|' || lease_generation::text FROM public.claim_account_deletion_work_items(1)")"
+new_token="${new_lease%%|*}"
+new_generation="${new_lease##*|}"
+[[ -n "$new_token" && "$new_token" != "$old_token" && "$new_generation" == "$((old_generation + 1))" ]] || {
+  echo "ERROR: expired lease reclaim did not rotate token and increment generation"
+  exit 1
+}
+stale_renew="$(psql "$DATABASE_URL" -Atqc "SELECT public.renew_account_deletion_lease('$lease_author', '$old_token', $old_generation)")"
+stale_failure="$(psql "$DATABASE_URL" -Atqc "SELECT public.record_account_deletion_failure_leased('$lease_author', NULL, '$old_token', $old_generation, 'stale_worker')")"
+[[ "$stale_renew" == "f" && "$stale_failure" == "f" ]] || {
+  echo "ERROR: stale worker was able to renew or write failure metadata"
+  exit 1
+}
+echo "ok: expired lease is reclaimed with a new fencing generation; stale owner is rejected"
+
+# An active lease blocks player cancellation. Once the lease expires and no
+# archive batch exists, cancellation can win and leaves the durable lease cancelled.
+cat > "$tmpdir/active-lease-cancel.sql" <<SQL
+BEGIN;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '$lease_author', true);
+SELECT set_config('request.jwt.claim.role', 'authenticated', true);
+SELECT set_config('request.jwt.claims', '{"sub":"$lease_author","role":"authenticated"}', true);
+SELECT public.cancel_account_deletion();
+COMMIT;
+SQL
+if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/active-lease-cancel.sql" >"$tmpdir/active-lease-cancel.log" 2>&1; then
+  echo "ERROR: cancellation unexpectedly succeeded while a worker held an active lease"
+  exit 1
+fi
+if ! grep -q "刪除處理已由背景工作領取" "$tmpdir/active-lease-cancel.log"; then
+  echo "ERROR: active-lease cancellation failed for an unexpected reason"
+  cat "$tmpdir/active-lease-cancel.log"
+  exit 1
+fi
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "UPDATE public.account_deletion_work_leases SET lease_expires_at=now()-interval '1 second' WHERE target_user_id='$lease_author'" >/dev/null
+cat > "$tmpdir/expired-lease-cancel.sql" <<SQL
+BEGIN;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '$lease_author', true);
+SELECT set_config('request.jwt.claim.role', 'authenticated', true);
+SELECT set_config('request.jwt.claims', '{"sub":"$lease_author","role":"authenticated"}', true);
+SELECT public.cancel_account_deletion();
+COMMIT;
+SQL
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmpdir/expired-lease-cancel.sql" >/dev/null
+cancel_state="$(psql "$DATABASE_URL" -Atqc "SELECT lease_status FROM public.account_deletion_work_leases WHERE target_user_id='$lease_author'")"
+request_exists="$(psql "$DATABASE_URL" -Atqc "SELECT EXISTS (SELECT 1 FROM public.account_deletion_requests WHERE user_id='$lease_author')")"
+[[ "$cancel_state" == "cancelled" && "$request_exists" == "f" ]] || {
+  echo "ERROR: expired unstarted request did not cancel cleanly"
+  exit 1
+}
+echo "ok: cancellation and claim serialize; expired unstarted request is cancellable"
+
 
 # Race 1: character deletion takes the parent FOR UPDATE lock first. The new
 # session trigger must wait on FOR KEY SHARE, then observe deleted_at and reject.
@@ -113,7 +210,12 @@ SELECT set_config('request.jwt.claim.role', 'service_role', true);
 SELECT set_config('request.jwt.claims', '{"sub":"$author","role":"service_role"}', true);
 INSERT INTO public.account_deletion_requests (user_id, requested_at, scheduled_for)
 VALUES ('$author', now() - interval '1 hour', now() - interval '1 minute');
-SELECT batch_status FROM public.prepare_account_deletion('$author');
+SELECT lease_token AS account_lease_token, lease_generation AS account_lease_generation
+FROM public.claim_account_deletion_work_items(1) \\gset
+SELECT batch_status
+FROM public.prepare_account_deletion_leased(
+  '$author', :'account_lease_token'::uuid, :'account_lease_generation'::bigint
+);
 COMMIT;
 SQL
 
