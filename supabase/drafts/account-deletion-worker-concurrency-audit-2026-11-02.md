@@ -130,3 +130,16 @@ The atomic lease protocol is no longer design-only: implementation is in `supaba
 - HEAD `659e75a` adds two true independent-session claim-vs-cancel races (one where claim wins and cancellation must refuse, and one where cancellation wins and claim must skip). Account worker/static job passed; disposable replay was still running at the time of this note. Do not mark the two new race directions accepted until that exact run finishes successfully.
 
 The 10-minute lease TTL remains provisional pending measured runtime/timeout data. No hosted DDL/DML, Auth/Storage mutation, deployment, Vault secret, or Cron change. Worker source remains disabled; PR #200 remains Draft/unmerged.
+
+
+## Round 39 — final claim/cancel + cascade-recovery races passed (2026-11-03)
+
+On implementation HEAD `f67befe2cfddb7fb134d09f34dd34fa62b7cb6bd`, Account worker Run #654 (`41618839849`) passed the account-worker job and disposable-schema-replay job. The final independent-session script reported **12 passed / 0 failed**.
+
+New final cases:
+- Both directions of a real simultaneous claim-vs-cancel race were tested with separate PostgreSQL sessions and row-lock observation. Claim wins → cancellation waits and refuses; cancellation wins → claim skips the locked row and cannot claim after commit.
+- After the prepare transaction creates a deleting batch, the fixture simulates request-row removal (the Auth-cascade recovery state), expires the previous lease, reclaims with a new token/generation, and verifies the fenced prepare wrapper resumes the same deleting batch without a duplicate archive batch.
+
+Existing exact-one-claim, fairness, expiry/reclaim, stale renew/failure/prepare/finalize rejection, cancellation guard, character session guard, child-write, and asset-path race cases all remain green. This resolves the earlier unimplemented atomic lease/fencing blocker for disposable acceptance.
+
+Remaining outside this concurrency gate: measure and finalize lease TTL; bound/review external Auth Admin HTTP side-effect behavior; produce CLI-generated incremental migration and review ACL/RLS; complete Storage/release audit. No hosted database/Auth/Storage mutation, deployment, Vault secret, or Cron change. PR #200 remains Draft/unmerged.
