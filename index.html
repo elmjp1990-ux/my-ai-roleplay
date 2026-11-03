@@ -3595,6 +3595,24 @@ function back() {
   if (history.state?.personax && history.state.depth > 0) history.back();
   else go({page:'home'},true);
 }
+function formatAccountDeletionPeriod(requestedAt, scheduledFor) {
+  const start = new Date(requestedAt).getTime();
+  const end = new Date(scheduledFor).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return '後端設定的期限';
+  const minutes = Math.ceil((end - start) / 60000);
+  if (minutes >= 1440 && minutes % 1440 === 0) return `${minutes / 1440} 天`;
+  if (minutes >= 60 && minutes % 60 === 0) return `${minutes / 60} 小時`;
+  return `${minutes} 分鐘`;
+}
+function formatAccountDeletionDeadline(value) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '系統顯示的截止期限';
+  return date.toLocaleString('zh-TW', {
+    timeZone: 'Asia/Taipei',
+    year: 'numeric', month: 'long', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  });
+}
 function openModal(name, data = {}) {
   go({...route,overlay:{name,...data}},!!route.overlay);
 }
@@ -7196,18 +7214,21 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
     case 'delete-account':
       showDialog('申請刪除帳號',`
         <form data-form="delete-account">
-          <p>提出申請後，帳號會進入後端設定的待刪除期。這段期間會暫停使用 PersonaX 功能；你可以使用原本的 Google 帳號登入，並在期限內取消申請。</p>
-          <p class="muted">本階段只會建立刪除申請，不會立即刪除 UID、個人檔案、角色、聊天、交易紀錄或錢包，也不會修改鑽石與銀幣餘額。</p>
+          <p>您確定要刪除帳號嗎？提交申請後，您的帳號將在後端設定的待刪除期間內暫時無法使用 PersonaX 功能。若您改變主意，請在申請成功後顯示的截止日期前，使用原本的 Google 帳號重新登入，即可取消申請並恢復帳號。</p>
           <label class="field"><span>請輸入「DELETE」確認</span>
             <input name="confirm" required autocomplete="off"></label>
-          <button class="danger">申請刪除（期限內可取消）</button>
+          <button class="danger">申請刪除</button>
         </form>`);
       break;
     case 'account-deletion-pending': {
-      const scheduled = o.scheduledFor ? new Date(o.scheduledFor).toLocaleString('zh-TW') : '尚未取得後端設定的期限';
+      const scheduled = formatAccountDeletionDeadline(o.scheduledFor || state.account?.deletionScheduledFor);
+      const duration = formatAccountDeletionPeriod(
+        o.requestedAt || state.account?.deletionRequestedAt,
+        o.scheduledFor || state.account?.deletionScheduledFor
+      );
       showDialog('帳號正在等待刪除',`
-        <p>你的帳號已進入待刪除期。期限內不能使用 PersonaX 功能，但可以取消刪除並保留原本的帳號與錢包餘額。</p>
-        <p><strong>預定刪除時間：</strong>${e(scheduled)}</p>
+        <p>您已提出帳號刪除申請。在接下來的 ${e(duration)}內，您的帳號將暫時無法使用 PersonaX 功能。若您改變主意，只需在 ${e(scheduled)} 前使用原本的 Google 帳號重新登入，即可取消申請並恢復帳號。</p>
+        <p class="muted">待刪除期間內，帳號資料、角色、聊天紀錄、交易紀錄及錢包餘額不會因提出申請而立即刪除或變更。</p>
         <form data-form="cancel-account-deletion">
           <button class="primary">取消刪除，恢復帳號</button>
         </form>
@@ -9322,7 +9343,7 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
       case 'delete-account': {
         if (String(f.get('confirm')).trim() !== 'DELETE') return toast('請輸入「DELETE」。');
         if (!state.account?.uid || !window.mySupabase) return toast('請先使用 Google 帳號登入。');
-        if (!confirm('確定提出帳號刪除申請？申請後會暫停使用功能，並可在後端設定的期限內取消。')) return;
+        if (!confirm('您確定要刪除帳號嗎？提出申請後，帳號將暫時無法使用 PersonaX 功能；您仍可在截止期限前取消申請。')) return;
         const { data: authData, error: authError } = await window.mySupabase.auth.getUser();
         if (authError || authData?.user?.id !== state.account.uid) {
           return toast('登入狀態驗證失敗，請重新登入後再試。');
@@ -9331,9 +9352,13 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         if (error) throw new Error('申請刪除失敗：' + error.message);
         const requestRow = Array.isArray(data) ? data[0] : data;
         state.account.accountDeletionPending = true;
+        state.account.deletionRequestedAt = requestRow?.requested_at || new Date().toISOString();
         state.account.deletionScheduledFor = requestRow?.scheduled_for || null;
         persist();
-        openModal('account-deletion-pending', {scheduledFor: state.account.deletionScheduledFor});
+        openModal('account-deletion-pending', {
+          requestedAt: state.account.deletionRequestedAt,
+          scheduledFor: state.account.deletionScheduledFor
+        });
         toast('已提出刪除申請；目前不會刪除錢包或修改餘額。');
         break;
       }
