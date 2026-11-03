@@ -16,8 +16,9 @@
 -- a partial snippet. Re-diff against pg_get_functiondef() immediately before use.
 
 -- Queue account-owned chat-memory photo paths only when the irreversible account
--- deletion prepare step begins (after the 30-day recovery window). A cancellation
--- before this point creates no photo cleanup work. Queue rows survive Auth cascades.
+-- deletion prepare step begins (after the environment-specific account grace period).
+-- Photos retain their own fixed 30-day clock from requested_at. A cancellation before
+-- prepare creates no photo cleanup work. Queue rows survive Auth cascades.
 CREATE OR REPLACE FUNCTION private.enqueue_account_chat_memory_photo_cleanup(
   p_user_id uuid,
   p_requested_at timestamptz,
