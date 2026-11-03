@@ -132,7 +132,7 @@ assert.ok(
 );
 
 const accountPhotoQueueFn = integration.match(
-  /CREATE OR REPLACE FUNCTION private[.]enqueue_account_chat_memory_photo_cleanup[(][\s\S]*?\\$function\\$;/,
+  /CREATE OR REPLACE FUNCTION private[.]enqueue_account_chat_memory_photo_cleanup[(][\s\S]*?\$function\$;/,
 )?.[0];
 assert.ok(accountPhotoQueueFn, "account deletion must persist chat-memory photo cleanup work");
 assert.match(accountPhotoQueueFn, /p_scheduled_for <= p_requested_at/);
