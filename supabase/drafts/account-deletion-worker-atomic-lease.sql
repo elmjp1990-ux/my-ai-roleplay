@@ -101,10 +101,14 @@ BEGIN
     IF NOT FOUND THEN
       CONTINUE;
     END IF;
+    IF v_lease.lease_status = 'completed' AND v_active_count > 0 THEN
+      RAISE EXCEPTION 'completed_account_deletion_lease_has_active_batch';
+    END IF;
+
     IF v_lease.requested_at IS DISTINCT FROM v_request.requested_at
        OR v_lease.scheduled_for IS DISTINCT FROM v_request.scheduled_for THEN
       IF v_lease.lease_status <> 'cancelled' THEN
-        CONTINUE;
+        RAISE EXCEPTION 'account_deletion_lease_request_identity_mismatch';
       END IF;
       UPDATE public.account_deletion_work_leases AS l
       SET requested_at = v_request.requested_at,
@@ -225,10 +229,12 @@ BEGIN
       END IF;
       IF v_lease.requested_at IS DISTINCT FROM v_batch.requested_at
          OR v_lease.scheduled_for IS DISTINCT FROM v_batch.scheduled_for THEN
-        CONTINUE;
+        RAISE EXCEPTION 'account_deletion_recovery_lease_identity_mismatch';
       END IF;
-      IF v_lease.lease_status = 'completed'
-         OR (v_lease.lease_status = 'claimed' AND v_lease.lease_expires_at > v_now) THEN
+      IF v_lease.lease_status = 'completed' THEN
+        RAISE EXCEPTION 'completed_account_deletion_lease_has_deleting_batch';
+      END IF;
+      IF v_lease.lease_status = 'claimed' AND v_lease.lease_expires_at > v_now THEN
         CONTINUE;
       END IF;
 
