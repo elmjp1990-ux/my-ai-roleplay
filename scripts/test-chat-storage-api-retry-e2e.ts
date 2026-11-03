@@ -22,8 +22,6 @@ const ownerId = "10000000-0000-4000-8000-000000000031";
 const sessionId = "50000000-0000-4000-8000-000000000031";
 const photoId = "c0000000-0000-4000-8000-000000000031";
 const objectPath = `${ownerId}/single/${sessionId}/${photoId}.jpg`;
-const parentJobId = "account-photo-helper-fixture";
-
 let fakeServer: Deno.HttpServer | null = null;
 let bucketCreated = false;
 let parentJobId: string | null = null;
@@ -174,6 +172,7 @@ try {
   await supabase.from("chat_sessions").delete().eq("id", sessionId);
   await supabase.from("profiles").delete().eq("id", ownerId);
   await supabase.auth.admin.deleteUser(ownerId);
+  await supabase.storage.from(bucketId).remove([objectPath]);
   if (bucketCreated) {
     await supabase.storage.deleteBucket(bucketId);
   }
