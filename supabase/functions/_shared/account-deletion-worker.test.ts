@@ -224,9 +224,9 @@ Deno.test("counts resolved RPC errors from fenced failure reporting", async () =
 
 
 Deno.test("aborts an Auth Admin request at the configured timeout", async () => {
-  let observedSignal: AbortSignal | null = null;
+  const observedSignals: AbortSignal[] = [];
   const boundedFetch = createAuthAdminTimeoutFetch(async (_input, init) => {
-    observedSignal = init?.signal ?? null;
+    if (init?.signal) observedSignals.push(init.signal);
     return await new Promise<Response>((_resolve, reject) => {
       init?.signal?.addEventListener("abort", () => {
         reject(init?.signal?.reason ?? new Error("aborted"));
@@ -243,20 +243,20 @@ Deno.test("aborts an Auth Admin request at the configured timeout", async () => 
     rejected = true;
   }
   assertEquals(rejected, true);
-  assertEquals(observedSignal instanceof AbortSignal, true);
-  assertEquals(observedSignal?.aborted, true);
+  assertEquals(observedSignals.length, 1);
+  assertEquals(observedSignals[0].aborted, true);
 });
 
 Deno.test("does not apply Auth Admin timeout to PostgREST or unrelated requests", async () => {
-  let receivedSignal: AbortSignal | null = null;
+  const receivedSignals: AbortSignal[] = [];
   const boundedFetch = createAuthAdminTimeoutFetch(async (_input, init) => {
-    receivedSignal = init?.signal ?? null;
+    if (init?.signal) receivedSignals.push(init.signal);
     return new Response("ok", { status: 200 });
   }, 10);
 
   const response = await boundedFetch("https://project.supabase.co/rest/v1/profiles");
   assertEquals(response.status, 200);
-  assertEquals(receivedSignal, null);
+  assertEquals(receivedSignals.length, 0);
 });
 
 Deno.test("combines an existing request abort signal with the Auth Admin timeout", async () => {
@@ -270,8 +270,8 @@ Deno.test("combines an existing request abort signal with the Auth Admin timeout
   await boundedFetch("https://project.supabase.co/auth/v1/admin/users/user-1", {
     signal: controller.signal,
   });
-  assertEquals(receivedSignal instanceof AbortSignal, true);
-  assertEquals(receivedSignal === controller.signal, false);
+  assertEquals(receivedSignals.length, 1);
+  assertEquals(receivedSignals[0] === controller.signal, false);
   controller.abort();
-  assertEquals(receivedSignal?.aborted, true);
+  assertEquals(receivedSignals[0].aborted, true);
 });
