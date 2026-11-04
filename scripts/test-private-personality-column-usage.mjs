@@ -7,6 +7,10 @@ const phaseOne = fs.readFileSync(
   "supabase/migrations/20261104062017_move_character_personality_profile_to_private_info.sql",
   "utf8",
 );
+const phaseOneAccess = fs.readFileSync(
+  "supabase/migrations/20261104095000_restrict_legacy_personality_profile_select.sql",
+  "utf8",
+);
 
 // The public characters table must never be queried for the author-only profile.
 assert.doesNotMatch(
