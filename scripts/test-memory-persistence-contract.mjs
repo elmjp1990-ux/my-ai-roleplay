@@ -59,7 +59,8 @@ const clearEnd = html.indexOf("async function runPendingChatTurn", clearStart);
 assert.ok(clearStart >= 0 && clearEnd > clearStart);
 const clearWrapper = html.slice(clearStart, clearEnd);
 assert.match(clearWrapper, /saveChatSessionSafely\(latest\)/);
-assert.match(saveWrapper, /snapshot\.cloudUpdatedAt = latest\.cloudUpdatedAt/);
+assert.match(saveWrapper, /rebaseSessionSaveVersion\(snapshot, latest, uid\)/);
+assert.match(memoryCapture, /function rebaseSessionSaveVersion\(snapshot, latest, userId\)/);
 
 
 assert.match(memoryEditor, /memoryMutationTracker\?\.begin\(s\.id,\s*previousMemories\)/);
