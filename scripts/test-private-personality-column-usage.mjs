@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 const frontend = fs.readFileSync("index.html", "utf8");
 const chatTurn = fs.readFileSync("supabase/functions/chat-turn/index.ts", "utf8");
 const phaseOne = fs.readFileSync(
-  "supabase/migrations/20261104090000_move_character_personality_profile_to_private_info.sql",
+  "supabase/migrations/20261104062017_move_character_personality_profile_to_private_info.sql",
   "utf8",
 );
 
