@@ -3316,16 +3316,17 @@ async function clearCloudPendingTurn(s) {
   const user = currentUser();
   const client = window.mySupabase;
   if (!s || !user || !client || !s.cloudOwned || s.cloudOwnerUid !== user.uid) return;
+  const snapshot = clone(state.sessions?.[s.id] || s);
   const clear = async () => {
     const activeUser = currentUser();
-    const latest = state.sessions?.[s.id] || s;
     if (!activeUser || activeUser.uid !== user.uid ||
-        !latest.cloudOwned || latest.cloudOwnerUid !== user.uid ||
+        !snapshot.cloudOwned || snapshot.cloudOwnerUid !== user.uid ||
         readDeletedChatTombstones(user.uid).sessions[s.id]) return;
     const { error } = await client.from('chat_sessions')
-      .update({session_data:chatSessionData(latest),updated_at:new Date().toISOString()})
+      .update({session_data:chatSessionData(snapshot),updated_at:new Date().toISOString()})
       .eq('id',s.id).eq('user_id',user.uid);
     if (error) console.warn('清除雲端待處理回合標記失敗：',error.message);
+    else memoryMutationTracker?.markSaved(s.id,snapshot.memories);
   };
   try {
     if (chatSessionSaveQueue) await chatSessionSaveQueue(user.uid + ':' + s.id, clear);
