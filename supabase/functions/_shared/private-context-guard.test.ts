@@ -13,13 +13,13 @@ Deno.test("collects author-only story notes and personality values without expos
 });
 
 Deno.test("caps prompt text but screens the complete private source", () => {
-  const privateInfo = "前段公開背景。" + "一般劇情描述。".repeat(500) +
-    "只有作者知道的最終秘密是主角其實早已收到那封信。";
+  const secretTail = "只有作者知道的最終秘密是主角其實早已收到那封信而且他決定永遠不說出來。";
+  const privateInfo = "前段公開背景。" + "一般劇情描述。".repeat(1001) + secretTail;
   const prepared = preparePrivateContext(privateInfo, { coreTraits: "冷靜而謹慎" }, 6000);
   assertEquals(prepared.promptText.length, 6000);
   assertEquals(prepared.protectedValues.includes(privateInfo), true);
   assertEquals(findPrivateContextLeak(
-    "他說出了秘密：只有作者知道的最終秘密是主角其實早已收到那封信。",
+    "他說出了秘密：" + secretTail.slice(0, 32),
     prepared.protectedValues,
   ), true);
 });
