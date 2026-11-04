@@ -53,7 +53,7 @@ const clearStart = html.indexOf("async function clearCloudPendingTurn(s) {");
 const clearEnd = html.indexOf("async function runPendingChatTurn", clearStart);
 assert.ok(clearStart >= 0 && clearEnd > clearStart);
 const clearWrapper = html.slice(clearStart, clearEnd);
-assert.match(clearWrapper, /chatSessionSaveQueue\(user\.uid \+ ':' \+ s\.id, clear\)/);
+assert.match(clearWrapper, /saveChatSessionSafely\(latest\)/);
 
 assert.match(memoryEditor, /memoryMutationTracker\?\.begin\(s\.id,\s*previousMemories\)/);
 assert.match(memoryEditor, /memoryMutationTracker\?\.rollback\(s\.id,\s*mutationVersion\)/);
