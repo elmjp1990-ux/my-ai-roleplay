@@ -72,4 +72,11 @@ assert.match(html, /cloudUpdatedAt:row\.updated_at \|\| null/);
 assert.match(saveWrapper, /target\.cloudUpdatedAt = snapshot\.cloudUpdatedAt/);
 assert.match(clearWrapper, /saveChatSessionSafely\(latest\)/);
 
+// Other direct session metadata writes (pin/background) also use the same
+// updated_at compare-and-swap token and refresh the local version on success.
+assert.match(html, /eq\('updated_at',expectedUpdatedAt\)/);
+assert.match(html, /session\.cloudUpdatedAt=saved\.updated_at/);
+assert.match(html, /s\.cloudUpdatedAt=saved\.updated_at/);
+assert.match(html, /item\.cloudUpdatedAt=updatedRow\.updated_at/);
+
 console.log("Memory persistence, per-session serialization, cross-device CAS and rollback contracts passed.");
