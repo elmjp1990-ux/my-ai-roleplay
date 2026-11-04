@@ -3314,6 +3314,15 @@ async function saveChatSessionSafely(s) {
       }
       return saved;
     } catch (error) {
+      // A row update can succeed before a later message upsert fails. Preserve
+      // that confirmed version token so a safe retry does not remain permanently stale.
+      if (snapshot?.cloudUpdatedAt && s?.id && snapshot.cloudOwned && snapshot.cloudOwnerUid === uid) {
+        const target = state.sessions?.[s.id] || s;
+        target.cloudOwned = true;
+        target.cloudOwnerUid = uid;
+        target.cloudUpdatedAt = snapshot.cloudUpdatedAt;
+        target.cloudCharacterSnapshot = snapshot.cloudCharacterSnapshot;
+      }
       if (latest?.cloudOwned && uid && latest.cloudOwnerUid === uid &&
           readDeletedChatTombstones(uid).sessions[latest.id]) return false;
       console.error('PersonaX 聊天同步失敗：',error);
