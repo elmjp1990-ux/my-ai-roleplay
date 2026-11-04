@@ -23,6 +23,8 @@ on:
       - "supabase/functions/_shared/ai-provider-result.ts"
       - "supabase/functions/_shared/ai-provider-result.test.ts"
       - "supabase/functions/_shared/private-context-guard.ts"
+      - "supabase/functions/_shared/ai-gateway-policy.ts"
+      - "supabase/functions/_shared/ai-gateway-policy.test.ts"
       - "supabase/functions/_shared/private-context-guard.test.ts"
       - "supabase/migrations/20261104090000_move_character_personality_profile_to_private_info.sql"
       - "scripts/test-character-personality-private-migration.sql"
