@@ -6820,16 +6820,12 @@ function memorySize(list) {
 }
 function addMemory(s,text) {
   const item = {id:id(),text,important:false,at:Date.now()};
-  const next = [...s.memories,item];
-  while (memorySize(next)>10000) {
-    const i = next.findIndex(m => !m.important);
-    if (i<0 || next[i].id === item.id) {
-      toast('重大記憶占滿容量，本次無法新增日記。');
-      return;
-    }
-    next.splice(i,1);
+  const result = window.POYOZZMemoryCapture?.appendMemoryWithLimit(s.memories,item,10000);
+  if (!result?.added) {
+    toast('重大記憶占滿容量，本次無法新增日記。');
+    return;
   }
-  s.memories = next;
+  s.memories = result.memories;
 }
 function archiveSearchResults(query) {
   const q=String(query||'').trim().toLocaleLowerCase();
