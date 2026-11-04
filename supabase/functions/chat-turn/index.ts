@@ -446,11 +446,8 @@ Deno.serve(async (request) => {
   }
 
   if (providerResult.kind === "provider_error" || providerResult.kind === "empty_output") {
-    const retryable = providerResult.kind === "empty_output" ||
-      (providerResult.kind === "provider_error" && providerResult.retryable);
-    // 429 is an explicit refusal before inference; safely release the claim so
-    // the same turn can retry. For 5xx/timeout/unknown, retain the claim because
-    // provider execution or billing may already have happened.
+    // A 429 or empty response is a confirmed non-generation result; release
+    // the claim so the same stable turn can retry without a second reservation.
     if (providerResponse.httpStatus === 429 || providerResult.kind === "empty_output") {
       await admin.from("chat_turn_charges").update({
         status: "reserved", failure_code: null, updated_at: new Date().toISOString(),
@@ -467,6 +464,39 @@ Deno.serve(async (request) => {
         retryAllowed: true,
       }, 503);
     }
+
+    // Other explicit 4xx responses mean the Gateway rejected the request
+    // before producing a reply. Return the user's exact reservation; do not
+    // label this as a content-policy refusal.
+    if (providerResponse.httpStatus >= 400 && providerResponse.httpStatus < 500) {
+      const { data: refunded, error: refundError } = await admin.rpc("refund_chat_turn", {
+        p_user_id: user.id,
+        p_turn_id: turnId,
+        p_assistant_message_id: assistantMessageId,
+        p_failure_code: "provider_request_rejected",
+      });
+      if (!refundError) {
+        const refundResult = Array.isArray(refunded) ? refunded[0] : refunded;
+        if (refundResult?.status === "refunded") {
+          await admin.from("chat_turn_events").insert({
+            turn_id: turnId, user_id: user.id, event_type: "refunded",
+            stage: "provider_response", error_code: "provider_request_rejected",
+          });
+          return json({
+            status: "provider_error_refunded",
+            error: providerResult.kind === "provider_error" ? providerResult.code : "empty_output",
+            balance: {
+              silver_coins: refundResult.balance_silver,
+              diamonds: refundResult.balance_diamonds,
+            },
+          }, 200);
+        }
+      }
+      return json({ status: "needs_reconciliation", error: "provider_error_refund_unknown", retryAllowed: false }, 503);
+    }
+
+    // A 5xx/timeout/unknown provider outcome may have executed upstream.
+    // Keep the reservation locked until a reliable reconciliation is available.
     await admin.from("chat_turn_events").insert({
       turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
       stage: "provider_response",
