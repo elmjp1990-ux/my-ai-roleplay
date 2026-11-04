@@ -11,31 +11,31 @@ const phaseOne = fs.readFileSync(
 // The public characters table must never be queried for the author-only profile.
 assert.doesNotMatch(
   frontend,
-  /\\.from\\(["']characters["']\\)[\\s\\S]{0,700}?\\.select\\(["'][^"']*personality_profile/i,
+  /\.from\(["']characters["']\)[\s\S]{0,700}?\.select\(["'][^"']*personality_profile/i,
   "frontend must not select personality_profile from public.characters",
 );
 assert.doesNotMatch(
   chatTurn,
-  /from\\(["']characters["']\\)[\\s\\S]{0,300}?select\\(["'][^"']*personality_profile/i,
+  /from\(["']characters["']\)[\s\S]{0,300}?select\(["'][^"']*personality_profile/i,
   "Story AI must not select personality_profile from public.characters",
 );
 
 // The owner-only table remains the only source for author-only personality data.
 assert.match(
   frontend,
-  /\\.from\\(["']character_private_info["']\\)[\\s\\S]{0,300}?\\.select\\(["']character_id, private_info, personality_profile["']\\)/,
+  /\.from\(["']character_private_info["']\)[\s\S]{0,300}?\.select\(["']character_id, private_info, personality_profile["']\)/,
   "frontend must load personality_profile from character_private_info",
 );
 assert.match(
   chatTurn,
-  /from\\(["']character_private_info["']\\)[\\s\\S]{0,300}?select\\(["']private_info,personality_profile["']\\)/,
+  /from\(["']character_private_info["']\)[\s\S]{0,300}?select\(["']private_info,personality_profile["']\)/,
   "Story AI must load personality_profile from character_private_info",
 );
 
 // Phase 1 must remain additive; dropping the public column is a separate post-deploy contract migration.
 assert.doesNotMatch(
   phaseOne,
-  /drop\\s+column\\s+(if\\s+exists\\s+)?personality_profile/i,
+  /drop\s+column\s+(if\s+exists\s+)?personality_profile/i,
   "Phase 1 must not drop the legacy public column",
 );
 
