@@ -1863,7 +1863,7 @@ const ids = (rows || []).map(row => row.id);
       }
       if (state.account?.uid !== user.id) return;
       const localOwnedForMerge = state.characters.filter(c => c.authorId === user.id);
-      const ownerIllustrations = await loadCharacterIllustrationAssets(ids);
+      const ownerIllustrations = await loadCharacterIllustrationAssets(ids,user.id);
       // 立繪查詢期間可能發生登出或切換帳號；舊帳號請求不得覆寫新帳號角色狀態。
       if (state.account?.uid !== user.id) return;
       const cloudCharacters = (rows || []).filter(row => !row.deleted_at).map(row => {
@@ -1936,19 +1936,34 @@ async function getCharacterIllustrationSignedUrl(storagePath) {
   characterIllustrationSignedUrlInflight.set(storagePath,request);
   try{return await request;}finally{characterIllustrationSignedUrlInflight.delete(storagePath);}
 }
-async function loadCharacterIllustrationAssets(characterIds) {
+const characterIllustrationMetadataInflight = new Map();
+async function loadCharacterIllustrationAssets(characterIds, cleanupUserId=null) {
   const client=window.mySupabase;
-  const ids=[...new Set((characterIds||[]).filter(Boolean))];
+  const ids=[...new Set((characterIds||[]).filter(Boolean))].sort();
   const result=new Map();
   if(!client||!ids.length)return result;
-  const cleanupUserId=state.account?.uid;
+  // Cleanup retries are owner-only. Public exploration must never trigger an author cleanup query.
   if(cleanupUserId)await retryCharacterIllustrationCleanup(cleanupUserId);
-  const {data:rows,error}=await client.from('character_illustrations')
-    .select('id, character_id, storage_path, asset_type, sort_order, display_name')
-    .in('character_id',ids)
-    .order('sort_order',{ascending:true});
-  if(error)throw new Error('讀取角色立繪資料失敗：'+error.message);
-  for(const row of rows||[]){
+  // Public and owner loaders can overlap; deduplicate identical metadata reads per auth scope.
+  const scope=cleanupUserId||'public';
+  const key=scope+':'+ids.join(',');
+  let rowsPromise=characterIllustrationMetadataInflight.get(key);
+  if(!rowsPromise){
+    rowsPromise=client.from('character_illustrations')
+      .select('id, character_id, storage_path, asset_type, sort_order, display_name')
+      .in('character_id',ids)
+      .order('sort_order',{ascending:true})
+      .then(({data,error})=>{
+        if(error)throw new Error('讀取角色立繪資料失敗：'+error.message);
+        return data||[];
+      });
+    characterIllustrationMetadataInflight.set(key,rowsPromise);
+  }
+  let rows;
+  try{rows=await rowsPromise;}finally{
+    if(characterIllustrationMetadataInflight.get(key)===rowsPromise)characterIllustrationMetadataInflight.delete(key);
+  }
+  for(const row of rows){
     let signedUrl;
     try{signedUrl=await getCharacterIllustrationSignedUrl(row.storage_path);}catch(_){continue;}
     const list=result.get(row.character_id)||{primary:null,gallery:[]};
