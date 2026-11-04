@@ -26,6 +26,18 @@ Deno.test("blocks a long copied excerpt even when surrounded by roleplay prose",
   ), true);
 });
 
+Deno.test("blocks a long partial excerpt but ignores short shared phrases", () => {
+  const privateSetting = "作者設定中真正不可公開的核心秘密是十年前那場事故其實由家族內部策劃，而且所有證據都被刻意隱藏，這是故事後期才會揭露的真相。";
+  assertEquals(findPrivateContextLeak(
+    "他低聲說道：" + privateSetting.slice(12, 48),
+    [privateSetting],
+  ), true);
+  assertEquals(findPrivateContextLeak(
+    "他喜歡安靜地喝咖啡，偶爾也會看看窗外的雨。",
+    ["角色平常喜歡安靜地喝咖啡，偶爾也會看看窗外的雨，並且習慣在雨天獨自散步。"],
+  ), false);
+});
+
 Deno.test("normalizes whitespace and punctuation before checking", () => {
   assertEquals(findPrivateContextLeak(
     "真正的秘密，是那枚戒指早在十年前就被調包",
