@@ -73,20 +73,40 @@
     };
   }
 
-  function createMutationVersionTracker() {
-    const versions = new WeakMap();
+  function createMemoryMutationTracker() {
+    const states = new Map();
+    const copy = (memories) => Array.isArray(memories)
+      ? memories.map((memory) => memory && typeof memory === "object" ? { ...memory } : memory)
+      : [];
     return {
-      next(target) {
-        if (!target || (typeof target !== "object" && typeof target !== "function")) return 0;
-        const version = (versions.get(target) || 0) + 1;
-        versions.set(target, version);
-        return version;
+      begin(key, currentMemories) {
+        const id = String(key ?? "");
+        let state = states.get(id);
+        if (!state) {
+          state = { version: 0, persisted: copy(currentMemories) };
+          states.set(id, state);
+        }
+        state.version += 1;
+        return state.version;
       },
-      isCurrent(target, version) {
-        return !!target && versions.get(target) === version;
+      markSaved(key, memories) {
+        const id = String(key ?? "");
+        let state = states.get(id);
+        if (!state) {
+          state = { version: 0, persisted: [] };
+          states.set(id, state);
+        }
+        state.persisted = copy(memories);
+      },
+      isCurrent(key, version) {
+        return states.get(String(key ?? ""))?.version === version;
+      },
+      rollback(key, version) {
+        const state = states.get(String(key ?? ""));
+        return state && state.version === version ? copy(state.persisted) : null;
       },
     };
   }
 
-  return { buildPlayerMemoryExcerpt, appendMemoryWithLimit, createSerialQueue, createMutationVersionTracker };
+  return { buildPlayerMemoryExcerpt, appendMemoryWithLimit, createSerialQueue, createMemoryMutationTracker };
 });
