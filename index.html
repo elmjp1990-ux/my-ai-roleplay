@@ -3499,8 +3499,12 @@ async function runPendingChatTurn(s) {
     const playerBatch = users.slice(-5);
     const firstIndex = s.messages.findIndex(message => message.id === playerBatch[0]?.id);
     const lastIndex = s.messages.findIndex(message => message.id === playerBatch[playerBatch.length - 1]?.id);
+    const nextAssistantIndex = lastIndex >= 0
+      ? s.messages.findIndex((message, index) => index > lastIndex && message.role === 'assistant')
+      : -1;
+    const dialogueEnd = nextAssistantIndex >= 0 ? nextAssistantIndex : lastIndex;
     const dialogue = firstIndex >= 0 && lastIndex >= firstIndex
-      ? s.messages.slice(firstIndex, lastIndex + 1)
+      ? s.messages.slice(firstIndex, dialogueEnd + 1)
       : playerBatch;
     const playerText = playerBatch.map((message, index) =>
       '玩家原話 ' + (index + 1) + '：' + [...String(message.text || '').trim()].slice(0, 480).join('')
