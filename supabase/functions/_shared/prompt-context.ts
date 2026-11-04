@@ -44,7 +44,6 @@ const formatCharacterPreferences = (value: unknown, key: "likes" | "dislikes", l
 };
 
 const formatCharacterAppearance = (character: Row): string => [
-  str(character.appearance ?? character.appearance_description ?? character.visual_description),
   str(character.gender) ? `性別：${str(character.gender)}` : "",
   str(character.age) ? `年齡：${str(character.age)}` : "",
   str(character.race) ? `種族：${str(character.race)}` : "",
