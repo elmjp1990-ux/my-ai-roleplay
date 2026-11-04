@@ -1,5 +1,7 @@
 -- Move AI-only creator personality instructions out of publicly readable characters rows.
--- Apply only after the matching frontend/backend code is deployed.
+-- Phase 1 (expand): apply before deploying the matching frontend/backend code.
+-- Keep the legacy public column temporarily for old app versions. Drop it in a
+-- separate contract migration only after the new frontend and Edge Function are deployed.
 begin;
 
 alter table public.character_private_info
@@ -25,9 +27,6 @@ set personality_profile = case
   else public.character_private_info.personality_profile
 end;
 
--- Remove the publicly selectable column after all existing values are preserved
--- in the author-only table governed by its existing owner RLS policy.
-alter table public.characters
-  drop column if exists personality_profile;
-
+-- Phase 2 is intentionally separate: drop the legacy public column only
+-- after the new frontend and Edge Function no longer select it.
 commit;
