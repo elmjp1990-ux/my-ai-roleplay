@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { buildPlayerMemoryExcerpt } = require("../memory-capture.js");
+const { buildPlayerMemoryExcerpt, appendMemoryWithLimit } = require("../memory-capture.js");
 
 function makeConversation(playerCount) {
   const messages = [];
@@ -59,4 +59,37 @@ test("caps assistant context separately and safely handles missing assistant rep
   const withoutAssistant = buildPlayerMemoryExcerpt(playerOnly, "Mira");
   assert.ok(withoutAssistant.includes("【玩家原話優先保存】"));
   assert.equal(withoutAssistant.includes("角色回應脈絡"), false);
+});
+
+
+test("memory capacity evicts oldest ordinary entries before pinned memories", () => {
+  const existing = [
+    { id: "old", text: "O".repeat(4000), important: false },
+    { id: "pinned", text: "P".repeat(4000), important: true },
+    { id: "recent", text: "R".repeat(3000), important: false },
+  ];
+  const result = appendMemoryWithLimit(existing, { id: "new", text: "N".repeat(2000), important: false }, 10000);
+  assert.equal(result.added, true);
+  assert.equal(result.memories.some((item) => item.id === "old"), false);
+  assert.equal(result.memories.some((item) => item.id === "pinned"), true);
+  assert.equal(result.memories.some((item) => item.id === "recent"), true);
+  assert.equal(result.memories.some((item) => item.id === "new"), true);
+  assert.ok(result.memories.reduce((sum, item) => sum + Array.from(item.text).length, 0) <= 10000);
+});
+
+test("does not evict pinned memories or partially mutate history when a new item cannot fit", () => {
+  const existing = [
+    { id: "pinned-a", text: "A".repeat(6000), important: true },
+    { id: "pinned-b", text: "B".repeat(4000), important: true },
+  ];
+  const result = appendMemoryWithLimit(existing, { id: "new", text: "N", important: false }, 10000);
+  assert.equal(result.added, false);
+  assert.deepEqual(result.memories, existing);
+});
+
+test("uses Unicode code points when enforcing memory capacity", () => {
+  const existing = [{ id: "emoji", text: "😀".repeat(6), important: false }];
+  const result = appendMemoryWithLimit(existing, { id: "next", text: "x".repeat(5), important: false }, 10);
+  assert.equal(result.added, false);
+  assert.deepEqual(result.memories, existing);
 });
