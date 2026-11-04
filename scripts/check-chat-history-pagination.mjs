@@ -10,6 +10,7 @@ const between = (start, end) => {
   return html.slice(from, to);
 };
 
+const chatSessionData = between('function chatSessionData(s) {', 'async function saveChatSessionToCloud(s, options = {})');
 const listHydration = between('async function loadCloudChatSessions(user) {', 'async function saveChatSessionSafely(s)');
 const singleSessionLoader = between('async function loadCloudChatSessionMessages(session, options = {}) {', 'async function ensureCompleteCloudChatHistory(session) {');
 const completeHistoryGuard = between('async function ensureCompleteCloudChatHistory(session) {', 'async function loadCloudChatSessions(user) {');
@@ -41,5 +42,7 @@ assert.match(html, /case 'load-older-messages'/, 'older-message action must be w
 assert.match(messageSubmit, /ensureCompleteCloudChatHistory\(s\)/, 'turn submission must restore full history before continuing');
 assert.match(startChat, /\.select\('session_id'\)/, 'start-chat lookup must not download full message content');
 assert.match(html, /lastMessagePreview:/, 'new session saves must persist a lightweight list preview');
+assert.match(chatSessionData, /s\.messagesComplete === false && s\.cloudRoleplayMeta/, 'partial history saves must preserve remote roleplay metadata');
+assert.match(chatSessionData, /s\.messagesComplete === false \? \(s\.lastMessagePreview/, 'partial history saves must preserve the latest remote preview');
 
 console.log('Chat history lazy-pagination regression checks passed.');
