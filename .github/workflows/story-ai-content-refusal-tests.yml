@@ -30,7 +30,6 @@ on:
   push:
     branches:
       - main
-      - feat/story-ai-content-refusal-refund
     paths:
       - "supabase/functions/_shared/ai-provider-result.ts"
       - "supabase/functions/_shared/ai-provider-result.test.ts"
