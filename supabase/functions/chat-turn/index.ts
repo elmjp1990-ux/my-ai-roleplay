@@ -541,12 +541,12 @@ Deno.serve(async (request) => {
       const released = await releaseGenerationClaim(admin, turnId, user.id);
       await admin.from("chat_turn_events").insert({
         turn_id: turnId, user_id: user.id, event_type: "provider_retryable_error",
-        stage: "provider_response", error_code: providerResult.code,
+        stage: "provider_response", error_code: providerResult.kind === "provider_error" ? providerResult.code : "provider_error",
       });
       if (!released) return json({ status: "needs_reconciliation", error: "generation_claim_release_unconfirmed", retryAllowed: false }, 503);
       return json({
         status: "provider_error",
-        error: providerResult.code,
+        error: providerResult.kind === "provider_error" ? providerResult.code : "provider_error",
         retryAllowed: true,
       }, 503);
     }
