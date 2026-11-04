@@ -32,7 +32,8 @@ assert.match(html, /createSignedUrl\(storagePath,3600\)/);
 assert.match(html, /data-character-illustration-path/);
 assert.match(html, /document\.addEventListener\('error',[\s\S]*refreshCharacterIllustrationSignedUrl/);
 assert.match(html, /document\.addEventListener\('load'/);
-assert.match(html, /image: publicIllustrations\.get\(row\.id\)\?\.primary\?\.src \|\| row\.avatar_url/);
+assert.match(html, /image: publicAssets\?\.primary\?\.src \|\| row\.avatar_url \|\| ownerLocal\?\.image/);
+assert.match(html, /galleryIllustrations:publicAssets\?\.gallery\?\.length \? publicAssets\.gallery : \(ownerLocal\?\.galleryIllustrations \|\| \[\]\)/);
 assert.match(html, /image: ownerIllustrations\.get\(row\.id\)\?\.primary\?\.src \|\| row\.avatar_url/);
 
 // Gallery sync must keep nextGallery in function scope for post-upload persistence and cleanup.
