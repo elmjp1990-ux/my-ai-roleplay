@@ -122,6 +122,29 @@ END;
 $active_owner$;
 RESET ROLE;
 
+-- Isolate row-level DELETE policy behavior from Supabase Storage's
+-- protect_delete() platform guard. The guard intentionally rejects direct SQL
+-- DELETE even when RLS would filter the row; production clients must use the
+-- Storage API. Disable only that guard inside this disposable rollback fixture,
+-- then restore it before the fixture transaction ends.
+DO $disable_storage_guard$
+DECLARE
+  v_trigger text;
+BEGIN
+  SELECT tgname INTO v_trigger
+  FROM pg_catalog.pg_trigger
+  WHERE tgrelid = 'storage.objects'::regclass
+    AND tgfoid = 'storage.protect_delete()'::regprocedure
+    AND NOT tgisinternal;
+
+  IF v_trigger IS NULL THEN
+    RAISE EXCEPTION 'storage_protect_delete_trigger_not_found';
+  END IF;
+
+  EXECUTE format('ALTER TABLE storage.objects DISABLE TRIGGER %I', v_trigger);
+END;
+$disable_storage_guard$;
+
 -- A pending account must not mutate/delete either asset via direct Storage RLS.
 INSERT INTO public.account_deletion_requests (user_id, requested_at, scheduled_for)
 VALUES (
@@ -180,3 +203,21 @@ BEGIN
 END;
 $stale_jwt$;
 RESET ROLE;
+
+DO $restore_storage_guard$
+DECLARE
+  v_trigger text;
+BEGIN
+  SELECT tgname INTO v_trigger
+  FROM pg_catalog.pg_trigger
+  WHERE tgrelid = 'storage.objects'::regclass
+    AND tgfoid = 'storage.protect_delete()'::regprocedure
+    AND NOT tgisinternal;
+
+  IF v_trigger IS NULL THEN
+    RAISE EXCEPTION 'storage_protect_delete_trigger_not_found_on_restore';
+  END IF;
+
+  EXECUTE format('ALTER TABLE storage.objects ENABLE TRIGGER %I', v_trigger);
+END;
+$restore_storage_guard$;
