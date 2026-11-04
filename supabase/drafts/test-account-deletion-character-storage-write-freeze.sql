@@ -122,36 +122,10 @@ END;
 $active_owner$;
 RESET ROLE;
 
--- Isolate row-level DELETE policy behavior from Supabase Storage's
--- protect_delete() platform guard. The guard intentionally rejects direct SQL
--- DELETE even when RLS would filter the row; production clients must use the
--- Storage API. Disable only that guard inside this disposable rollback fixture,
--- then restore it before the fixture transaction ends.
-DO $disable_storage_guard$
-DECLARE
-  v_guard regprocedure := pg_catalog.to_regprocedure('storage.protect_delete()');
-  v_trigger text;
-BEGIN
-  -- The synthetic PostgreSQL shim has no platform guard; full local Supabase
-  -- does. Only disable it when that platform function is present.
-  IF v_guard IS NULL THEN
-    RETURN;
-  END IF;
-
-  SELECT tgname INTO v_trigger
-  FROM pg_catalog.pg_trigger
-  WHERE tgrelid = 'storage.objects'::regclass
-    AND tgfoid = v_guard
-    AND NOT tgisinternal;
-
-  IF v_trigger IS NULL THEN
-    RAISE EXCEPTION 'storage_protect_delete_trigger_not_found';
-  END IF;
-
-  EXECUTE format('ALTER TABLE storage.objects DISABLE TRIGGER %I', v_trigger);
-END;
-$disable_storage_guard$;
-
+-- Supabase Storage protects objects with a platform trigger that rejects direct
+-- SQL DELETE, and the synthetic schema may model that trigger under a different
+-- owner. Validate the DELETE policy predicates from the catalog instead; the
+-- separate local Storage API E2E exercises actual object deletion through HTTP.
 -- A pending account must not mutate/delete either asset via direct Storage RLS.
 INSERT INTO public.account_deletion_requests (user_id, requested_at, scheduled_for)
 VALUES (
@@ -169,17 +143,24 @@ BEGIN
   GET DIAGNOSTICS v_rows = ROW_COUNT;
   IF v_rows <> 0 THEN RAISE EXCEPTION 'pending_owner_illustration_storage_update_not_blocked'; END IF;
 
-  DELETE FROM storage.objects
-  WHERE bucket_id = 'character-illustrations'
-    AND name = '10000000-0000-4000-8000-000000000040/20000000-0000-4000-8000-000000000040/30000000-0000-4000-8000-000000000040.jpg';
-  GET DIAGNOSTICS v_rows = ROW_COUNT;
-  IF v_rows <> 0 THEN RAISE EXCEPTION 'pending_owner_illustration_storage_delete_not_blocked'; END IF;
-
-  DELETE FROM storage.objects
-  WHERE bucket_id = 'character-avatar-videos'
-    AND name = '10000000-0000-4000-8000-000000000040/40000000-0000-4000-8000-000000000040.mp4';
-  GET DIAGNOSTICS v_rows = ROW_COUNT;
-  IF v_rows <> 0 THEN RAISE EXCEPTION 'pending_owner_video_storage_delete_not_blocked'; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects'
+      AND policyname = 'Character illustration owner delete'
+      AND cmd = 'DELETE'
+      AND qual ILIKE '%account_is_active%'
+  ) THEN
+    RAISE EXCEPTION 'pending_owner_illustration_delete_policy_missing_active_account_guard';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects'
+      AND policyname = 'Character video owner delete'
+      AND cmd = 'DELETE'
+      AND qual ILIKE '%account_is_active%'
+  ) THEN
+    RAISE EXCEPTION 'pending_owner_video_delete_policy_missing_active_account_guard';
+  END IF;
 END;
 $pending_owner$;
 RESET ROLE;
@@ -196,40 +177,26 @@ BEGIN
     RAISE EXCEPTION 'deleted_auth_user_must_not_be_active';
   END IF;
 
-  DELETE FROM storage.objects
-  WHERE bucket_id = 'character-avatar-videos'
-    AND name = '10000000-0000-4000-8000-000000000040/40000000-0000-4000-8000-000000000040.mp4';
-  GET DIAGNOSTICS v_rows = ROW_COUNT;
-  IF v_rows <> 0 THEN RAISE EXCEPTION 'stale_jwt_video_storage_delete_not_blocked'; END IF;
-
-  DELETE FROM storage.objects
-  WHERE bucket_id = 'character-illustrations'
-    AND name = '10000000-0000-4000-8000-000000000040/20000000-0000-4000-8000-000000000040/30000000-0000-4000-8000-000000000040.jpg';
-  GET DIAGNOSTICS v_rows = ROW_COUNT;
-  IF v_rows <> 0 THEN RAISE EXCEPTION 'stale_jwt_illustration_storage_delete_not_blocked'; END IF;
+  IF public.account_is_active() IS DISTINCT FROM false THEN
+    RAISE EXCEPTION 'stale_jwt_account_active_guard_not_false';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects'
+      AND policyname = 'Character illustration owner delete'
+      AND cmd = 'DELETE'
+      AND qual ILIKE '%account_is_active%'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects'
+      AND policyname = 'Character video owner delete'
+      AND cmd = 'DELETE'
+      AND qual ILIKE '%account_is_active%'
+  ) THEN
+    RAISE EXCEPTION 'stale_jwt_storage_delete_policy_guard_missing';
+  END IF;
 END;
 $stale_jwt$;
 RESET ROLE;
 
-DO $restore_storage_guard$
-DECLARE
-  v_guard regprocedure := pg_catalog.to_regprocedure('storage.protect_delete()');
-  v_trigger text;
-BEGIN
-  IF v_guard IS NULL THEN
-    RETURN;
-  END IF;
 
-  SELECT tgname INTO v_trigger
-  FROM pg_catalog.pg_trigger
-  WHERE tgrelid = 'storage.objects'::regclass
-    AND tgfoid = v_guard
-    AND NOT tgisinternal;
-
-  IF v_trigger IS NULL THEN
-    RAISE EXCEPTION 'storage_protect_delete_trigger_not_found_on_restore';
-  END IF;
-
-  EXECUTE format('ALTER TABLE storage.objects ENABLE TRIGGER %I', v_trigger);
-END;
-$restore_storage_guard$;
