@@ -43,4 +43,4 @@ assert.ok(
   "Do not force repetitive narration/dialogue quotas",
 );
 
-console.log("Story roleplay prompt contracts passed: varied prose, concrete detail, character agency, POV boundaries and bold narration.");
+console.log("Story roleplay prompt contracts passed: varied prose, concrete detail, character agency, POV boundaries and single-asterisk narration.");
