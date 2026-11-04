@@ -33,7 +33,7 @@ export function findPrivateContextLeak(output: unknown, protectedValues: string[
     if (value.length < 12) continue;
     if (normalizedOutput.includes(value)) return true;
     if (value.length >= 48) {
-      for (let index = 0; index <= value.length - 32; index += 8) {
+      for (let index = 0; index <= value.length - 32; index += 4) {
         if (normalizedOutput.includes(value.slice(index, index + 32))) return true;
       }
     }
