@@ -252,4 +252,59 @@ BEGIN
 END
 $test$;
 
+
+-- Stale unknown provider outcome: flag for manual review without refund or retry.
+DO $test$
+DECLARE r record; s integer; d integer; status_value text; attempts integer;
+BEGIN
+  INSERT INTO public.wallet_accounts(user_id,silver_coins,diamonds)
+  VALUES ('10000000-0000-4000-8000-000000000006', 5, 1);
+  INSERT INTO public.chat_sessions(id,user_id)
+  VALUES ('20000000-0000-4000-8000-000000000006','10000000-0000-4000-8000-000000000006');
+  INSERT INTO public.chat_messages(id,session_id,role,content)
+  VALUES ('30000000-0000-4000-8000-000000000006','20000000-0000-4000-8000-000000000006','user','hello');
+  PERFORM * FROM public.reserve_chat_turn(
+    '10000000-0000-4000-8000-000000000006','40000000-0000-4000-8000-000000000006',
+    '20000000-0000-4000-8000-000000000006','30000000-0000-4000-8000-000000000006',
+    '50000000-0000-4000-8000-000000000006');
+  UPDATE public.chat_turn_charges
+  SET status='needs_reconciliation', failure_code='provider_request_outcome_unknown',
+      updated_at=now()-interval '20 minutes'
+  WHERE turn_id='40000000-0000-4000-8000-000000000006';
+
+  SELECT * INTO r FROM public.reconcile_stale_story_chat_turns(10, 10, 30);
+  IF r.processed <> 1 OR r.review_count <> 1 OR r.settled_count <> 0 OR r.failed_count <> 0 THEN
+    RAISE EXCEPTION 'stale_unknown_outcome_not_flagged: %', row_to_json(r);
+  END IF;
+  SELECT status, reconciliation_attempts INTO status_value, attempts
+  FROM public.chat_turn_charges WHERE turn_id='40000000-0000-4000-8000-000000000006';
+  IF status_value <> 'needs_reconciliation' OR attempts <> 1 THEN
+    RAISE EXCEPTION 'unknown_outcome_was_unlocked_or_not_counted';
+  END IF;
+  SELECT silver_coins, diamonds INTO s,d FROM public.wallet_accounts
+  WHERE user_id='10000000-0000-4000-8000-000000000006';
+  IF s <> 3 OR d <> 1 THEN
+    RAISE EXCEPTION 'unknown_outcome_was_refunded_or_balance_changed: %, %',s,d;
+  END IF;
+
+  -- Review throttle: do not emit another review event on every scheduler tick.
+  SELECT * INTO r FROM public.reconcile_stale_story_chat_turns(10, 10, 30);
+  IF r.processed <> 0 THEN RAISE EXCEPTION 'review_throttle_failed: %',row_to_json(r); END IF;
+
+  -- If a late durable reply subsequently appears, a later pass settles, never refunds.
+  INSERT INTO public.chat_messages(id,session_id,role,content)
+  VALUES ('50000000-0000-4000-8000-000000000006','20000000-0000-4000-8000-000000000006','assistant','late durable reply');
+  UPDATE public.chat_turn_charges
+  SET reconciliation_checked_at=now()-interval '31 minutes'
+  WHERE turn_id='40000000-0000-4000-8000-000000000006';
+  SELECT * INTO r FROM public.reconcile_stale_story_chat_turns(10, 10, 30);
+  IF r.processed <> 1 OR r.settled_count <> 1 OR r.review_count <> 0 OR r.failed_count <> 0 THEN
+    RAISE EXCEPTION 'late_durable_reply_not_settled: %',row_to_json(r);
+  END IF;
+  SELECT status INTO status_value FROM public.chat_turn_charges
+  WHERE turn_id='40000000-0000-4000-8000-000000000006';
+  IF status_value <> 'settled' THEN RAISE EXCEPTION 'late_reply_not_settled'; END IF;
+END
+$test$;
+
 ROLLBACK;
