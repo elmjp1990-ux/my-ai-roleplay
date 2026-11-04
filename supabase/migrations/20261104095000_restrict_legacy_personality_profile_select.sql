@@ -3,7 +3,10 @@
 -- but it must not be readable by anon/authenticated while the migration window is open.
 begin;
 
-revoke select on table public.characters from anon, authenticated;
+-- Remove both table-wide and column-specific grants. A prior explicit column
+-- grant survives a table-level REVOKE, so revoke the legacy private column too.
+revoke select on table public.characters from public, anon, authenticated;
+revoke select (personality_profile) on table public.characters from public, anon, authenticated;
 
 grant select (
   id,
@@ -32,6 +35,6 @@ grant select (
 ) on table public.characters to anon, authenticated;
 
 comment on column public.characters.personality_profile is
-  'Legacy compatibility column. SELECT is revoked from anon/authenticated; authoritative author-only data lives in character_private_info.';
+  'Legacy compatibility column. SELECT is revoked from PUBLIC, anon, and authenticated; authoritative author-only data lives in character_private_info.';
 
 commit;
