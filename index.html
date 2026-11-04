@@ -2049,21 +2049,27 @@ async function cleanupCharacterIllustrationUploads(paths,userId) {
     }
   }
 }
-async function retryCharacterIllustrationCleanup(userId) {
+const characterIllustrationCleanupRetryInflight = new Map();
+function retryCharacterIllustrationCleanup(userId) {
   const client=window.mySupabase;
-  if(!client||!userId)return {processed:0,failed:0};
-  const {data:jobs,error}=await client.from('character_illustration_cleanup_jobs')
-    .select('id,storage_path,attempts').eq('author_id',userId).order('created_at',{ascending:true}).limit(50);
-  if(error) {
-    console.warn('讀取待重試的角色立繪清理工作失敗：',error.message);
-    return {processed:0,failed:0};
-  }
-  let processed=0,failed=0;
-  for(const job of jobs||[]) {
-    const ok=await processCharacterIllustrationCleanupJob(job,userId);
-    if(ok)processed++;else failed++;
-  }
-  return {processed,failed};
+  if(!client||!userId)return Promise.resolve({processed:0,failed:0});
+  if(characterIllustrationCleanupRetryInflight.has(userId))return characterIllustrationCleanupRetryInflight.get(userId);
+  const request=(async()=>{
+    const {data:jobs,error}=await client.from('character_illustration_cleanup_jobs')
+      .select('id,storage_path,attempts').eq('author_id',userId).order('created_at',{ascending:true}).limit(50);
+    if(error) {
+      console.warn('讀取待重試的角色立繪清理工作失敗：',error.message);
+      return {processed:0,failed:0};
+    }
+    let processed=0,failed=0;
+    for(const job of jobs||[]) {
+      const ok=await processCharacterIllustrationCleanupJob(job,userId);
+      if(ok)processed++;else failed++;
+    }
+    return {processed,failed};
+  })();
+  characterIllustrationCleanupRetryInflight.set(userId,request);
+  return request.finally(()=>characterIllustrationCleanupRetryInflight.delete(userId));
 }
 
 async function uploadCharacterIllustrationDataUrl(dataUrl,userId,characterId) {
