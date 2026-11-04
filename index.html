@@ -2993,8 +2993,14 @@ async function saveChatSessionToCloud(s, options = {}) {
   if (!character && (!s.cloudOwned || !priorSnapshot.id)) {
     throw new Error('找不到這段聊天所屬的正式角色或既有角色快照。');
   }
-// 舊版快照可能曾含隱藏設定；同步前先剔除，避免再次寫回玩家可讀的 chat_sessions。
-  const { privateInfo: _legacyPrivateInfo, ...safePriorSnapshot } = priorSnapshot;
+// 舊版快照可能曾含隱藏設定；同步前剔除 camelCase／snake_case 欄位，避免寫回玩家可讀的 chat_sessions。
+  const {
+    privateInfo: _legacyPrivateInfo,
+    personalityProfile: _legacyPersonalityProfile,
+    private_info: _legacyPrivateInfoSnakeCase,
+    personality_profile: _legacyPersonalityProfileSnakeCase,
+    ...safePriorSnapshot
+  } = priorSnapshot;
   const snapshot = {
     ...safePriorSnapshot,
     id:s.characterId,
@@ -3033,7 +3039,13 @@ async function saveChatSessionToCloud(s, options = {}) {
       s.cloudUpdatedAt = existing.data.updated_at;
       s.cloudOwned = true;
       s.cloudOwnerUid = localUser.uid;
-      const { privateInfo: _legacyExistingPrivateInfo, ...safeExistingSnapshot } = existingSnapshot || {};
+      const {
+        privateInfo: _legacyExistingPrivateInfo,
+        personalityProfile: _legacyExistingPersonalityProfile,
+        private_info: _legacyExistingPrivateInfoSnakeCase,
+        personality_profile: _legacyExistingPersonalityProfileSnakeCase,
+        ...safeExistingSnapshot
+      } = existingSnapshot || {};
       s.cloudCharacterSnapshot = existingSnapshot ? safeExistingSnapshot : snapshot;
       const canonical = s.cloudCharacterSnapshot;
       if (Object.prototype.hasOwnProperty.call(canonical,'authorId') && canonical.authorId !== '') snapshot.authorId = canonical.authorId;
@@ -3188,7 +3200,15 @@ async function loadCloudChatSessions(user) {
     for (const row of sessions) {
       if (!isUuid(row.id) || !isUuid(row.character_id)) continue;
       const data = row.session_data && typeof row.session_data === 'object' ? row.session_data : {};
-      const snapshot = row.character_snapshot && typeof row.character_snapshot === 'object' ? row.character_snapshot : {};
+      const rawSnapshot = row.character_snapshot && typeof row.character_snapshot === 'object' ? row.character_snapshot : {};
+      // Never hydrate author-only fields from legacy chat snapshots into player-visible client state.
+      const {
+        privateInfo: _legacyPrivateInfo,
+        personalityProfile: _legacyPersonalityProfile,
+        private_info: _legacyPrivateInfoSnakeCase,
+        personality_profile: _legacyPersonalityProfileSnakeCase,
+        ...snapshot
+      } = rawSnapshot;
       // Never hydrate a chat with a snapshot belonging to a different role.
       // The server also rejects this metadata before billing; fail closed in the UI too.
       if (snapshot.id && snapshot.id !== row.character_id) {
