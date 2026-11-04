@@ -3174,6 +3174,9 @@ async function loadCloudChatSessionMessages(session, options = {}) {
 
 async function ensureCompleteCloudChatHistory(session) {
   if (!session?.cloudOwned) return true;
+  const uid=currentUser()?.uid;
+  const pending=uid ? cloudChatMessageLoads.get(uid+':'+session.id) : null;
+  if (pending) await pending;
   if (!session.messagesLoaded) { const loaded = await loadCloudChatSessionMessages(session); if (!loaded || !session.messagesLoaded) return false; }
   let previousCount = -1;
   while (session.messagesHasMore === true) {
