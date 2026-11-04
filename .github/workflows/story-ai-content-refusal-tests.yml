@@ -5,6 +5,10 @@ on:
     paths:
       - "supabase/functions/_shared/ai-provider-result.ts"
       - "supabase/functions/_shared/ai-provider-result.test.ts"
+      - "supabase/functions/chat-turn/index.ts"
+      - "supabase/functions/_shared/prompt-context.ts"
+      - "supabase/functions/_shared/prompt-variables.ts"
+      - "index.html"
       - ".github/workflows/story-ai-content-refusal-tests.yml"
   push:
     branches:
@@ -12,6 +16,10 @@ on:
     paths:
       - "supabase/functions/_shared/ai-provider-result.ts"
       - "supabase/functions/_shared/ai-provider-result.test.ts"
+      - "supabase/functions/chat-turn/index.ts"
+      - "supabase/functions/_shared/prompt-context.ts"
+      - "supabase/functions/_shared/prompt-variables.ts"
+      - "index.html"
       - ".github/workflows/story-ai-content-refusal-tests.yml"
 
 jobs:
