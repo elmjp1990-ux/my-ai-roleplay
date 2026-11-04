@@ -32,6 +32,18 @@ assert.match(
   "Story AI must load personality_profile from character_private_info",
 );
 
+// Legacy chat snapshots must not re-expose author-only private settings to players.
+assert.match(
+  frontend,
+  /personalityProfile:\s*_legacyPersonalityProfile,[\\s\\S]{0,250}personality_profile:\s*_legacyPersonalityProfileSnakeCase,[\\s\\S]{0,120}\.\.\.safePriorSnapshot/,
+  "chat sync must strip camelCase and snake_case private fields before writing snapshots",
+);
+assert.match(
+  frontend,
+  /const rawSnapshot = row\.character_snapshot[\\s\\S]{0,500}personalityProfile:\s*_legacyPersonalityProfile,[\\s\\S]{0,250}\.\.\.snapshot\\s*\\} = rawSnapshot/,
+  "chat hydration must strip legacy private fields before exposing snapshots to client state",
+);
+
 // Phase 1 must remain additive; dropping the public column is a separate post-deploy contract migration.
 assert.doesNotMatch(
   phaseOne,
