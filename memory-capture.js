@@ -55,5 +55,38 @@
     return { added: true, memories: next };
   }
 
-  return { buildPlayerMemoryExcerpt, appendMemoryWithLimit };
+  function createSerialQueue() {
+    const tails = new Map();
+    return async function enqueue(key, operation) {
+      const queueKey = String(key ?? "");
+      const previous = tails.get(queueKey) || Promise.resolve();
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      tails.set(queueKey, gate);
+      await previous;
+      try {
+        return await operation();
+      } finally {
+        release();
+        if (tails.get(queueKey) === gate) tails.delete(queueKey);
+      }
+    };
+  }
+
+  function createMutationVersionTracker() {
+    const versions = new WeakMap();
+    return {
+      next(target) {
+        if (!target || (typeof target !== "object" && typeof target !== "function")) return 0;
+        const version = (versions.get(target) || 0) + 1;
+        versions.set(target, version);
+        return version;
+      },
+      isCurrent(target, version) {
+        return !!target && versions.get(target) === version;
+      },
+    };
+  }
+
+  return { buildPlayerMemoryExcerpt, appendMemoryWithLimit, createSerialQueue, createMutationVersionTracker };
 });
