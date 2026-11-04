@@ -1678,7 +1678,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     try {
       const { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, personality_profile, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible')
+        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible')
         .eq('visibility', 'public')
         .is('deleted_at', null)
         .order('first_published_at', { ascending: false, nullsFirst: false });
@@ -1732,7 +1732,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
           reviewStatus: row.review_status, intro: row.intro || '',
           opening: story?.opening_message || '', race: row.race || '',
           privateInfo: '', style: row.style || '',
-          personalityProfile: normalizePersonalityProfile(row.personality_profile),
+          personalityProfile: normalizePersonalityProfile({}),
           phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : {},
           nsfwWorkplaceWarning:row.nsfw_workplace_warning === true,
           isNSFW:row.is_nsfw === true,
@@ -1773,7 +1773,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       // 這可修復舊版匯入只存 localStorage 的資料；不會上傳其他帳號的本機角色。
       let { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, personality_profile, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
         .eq('author_id', user.id)
         .order('created_at', { ascending: false });
       if (error) throw new Error('讀取雲端角色失敗：' + error.message);
@@ -1799,7 +1799,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       if (migratedCount > 0) {
         const refreshed = await client
           .from('characters')
-          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, personality_profile, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
           .eq('author_id', user.id)
           .order('created_at', { ascending: false });
         if (refreshed.error) throw new Error('角色補傳後重新讀取失敗：' + refreshed.error.message);
@@ -1811,14 +1811,14 @@ const ids = (rows || []).map(row => row.id);
       const privateInfoById = new Map();
       if (ids.length) {
         const privateInfoResult = await client.from('character_private_info')
-          .select('character_id, private_info')
+          .select('character_id, private_info, personality_profile')
           .eq('author_id', user.id)
           .in('character_id', ids);
         if (privateInfoResult.error) {
           throw new Error('讀取角色隱藏設定失敗：' + privateInfoResult.error.message);
         }
         for (const item of privateInfoResult.data || []) {
-          privateInfoById.set(item.character_id, item.private_info || '');
+          privateInfoById.set(item.character_id, { privateInfo: item.private_info || '', personalityProfile: item.personality_profile || {} });
         }
       }
       // 私密角色不會經過公開角色載入器；在作者自己的角色載入流程也補齊作者 profile。
@@ -1874,9 +1874,9 @@ const ids = (rows || []).map(row => row.id);
           intro: row.intro ?? local.intro ?? '',
           opening: story?.opening_message ?? local.opening ?? '',
           race: row.race ?? local.race ?? '',
-          privateInfo: privateInfoById.get(row.id) ?? local.privateInfo ?? '',
+          privateInfo: privateInfoById.get(row.id)?.privateInfo ?? local.privateInfo ?? '',
           style: row.style ?? local.style ?? '',
-          personalityProfile: normalizePersonalityProfile(row.personality_profile ?? local.personalityProfile),
+          personalityProfile: normalizePersonalityProfile(privateInfoById.get(row.id)?.personalityProfile ?? local.personalityProfile),
           phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : (local.phoneSettings || {}),
           nsfwWorkplaceWarning:row.nsfw_workplace_warning === true,
           tags: Array.isArray(row.tags) ? row.tags : (local.tags || []),
@@ -2351,7 +2351,6 @@ async function saveSupabaseCharacter(character, expectedUserId) {
       intro: character.intro || '',
       race: character.race || '',
       style: character.style || '',
-      personality_profile: normalizePersonalityProfile(character.personalityProfile),
       phone_settings:character.phoneSettings && typeof character.phoneSettings==='object' ? {noticePrompts:(Array.isArray(character.phoneSettings.noticePrompts)?character.phoneSettings.noticePrompts:Array.isArray(character.phoneSettings.notices)?character.phoneSettings.notices:[]).slice(0,8).map(x=>String(x).slice(0,150))} : {},
       nsfw_workplace_warning: character.nsfwWorkplaceWarning === true,
       is_nsfw: character.isNSFW === true,
@@ -2370,7 +2369,8 @@ if (characterError) {
       .upsert({
         character_id: character.id,
         author_id: expectedUserId,
-        private_info: String(character.privateInfo || '').slice(0, 10000)
+        private_info: String(character.privateInfo || '').slice(0, 10000),
+        personality_profile: normalizePersonalityProfile(character.personalityProfile)
       }, { onConflict: 'character_id' });
     if (privateInfoError) {
       throw new Error('角色基本資料已寫入，但隱藏設定儲存失敗：' + privateInfoError.message);
