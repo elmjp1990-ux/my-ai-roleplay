@@ -20,6 +20,18 @@ assert.doesNotMatch(
   "Story AI must not select personality_profile from public.characters",
 );
 
+// Avoid wildcard selects: they would silently re-expose the legacy public column.
+assert.doesNotMatch(
+  frontend,
+  /\.from\(["']characters["']\)[\s\S]{0,500}?\.select\(["']\*["']\)/i,
+  "frontend must not wildcard-select public characters rows",
+);
+assert.doesNotMatch(
+  chatTurn,
+  /from\(["']characters["']\)[\s\S]{0,300}?select\(["']\*["']\)/i,
+  "Story AI must not wildcard-select public characters rows",
+);
+
 // The owner-only table remains the only source for author-only personality data.
 assert.match(
   frontend,
