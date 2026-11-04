@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildPromptVariableValues, applyPromptVariables } from "../_shared/prompt-context.ts";
 import { normalizeAiProviderResult } from "../_shared/ai-provider-result.ts";
 import { collectProtectedContext, findPrivateContextLeak } from "../_shared/private-context-guard.ts";
+import { buildGatewayProviderOptions } from "../_shared/ai-gateway-policy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -187,8 +188,8 @@ async function requestStoryGeneration(
         messages,
         temperature: 0.85,
         max_tokens: 1800,
-        // Do not route prompts to providers that may use them for model training.
-        provider: { data_collection: "deny" },
+        // Vercel AI Gateway Chat Completions extension; fail if no compliant provider exists.
+        providerOptions: { gateway: buildGatewayProviderOptions().gateway },
       }),
       signal: controller.signal,
     });
