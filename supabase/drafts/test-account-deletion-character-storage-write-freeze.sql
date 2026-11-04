@@ -42,16 +42,8 @@ BEGIN
 END;
 $fixture$;
 
--- Match the Storage helper used by the pre-existing video UPDATE policy.
--- The synthetic platform shim omits this platform-owned helper.
-CREATE OR REPLACE FUNCTION storage.foldername(name text)
-RETURNS text[]
-LANGUAGE sql
-IMMUTABLE
-SET search_path TO ''
-AS $function$
-  SELECT pg_catalog.string_to_array(name, '/');
-$function$;
+-- Video UPDATE is pre-existing and outside this migration's changed scope;
+-- no synthetic Storage helper is needed by the assertions below.
 
 -- The disposable Storage shim's grants above isolate row-policy behavior,
 -- not platform table grants.
