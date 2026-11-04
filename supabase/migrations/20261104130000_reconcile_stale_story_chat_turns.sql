@@ -73,6 +73,21 @@ begin
         );
         if v_result = 'settled' then
           v_settled := v_settled + 1;
+        else
+          -- Fail closed if the settlement function ever returns an unexpected
+          -- value: throttle repeated scans and require manual review.
+          update public.chat_turn_charges c
+          set reconciliation_checked_at = now(),
+              reconciliation_attempts = c.reconciliation_attempts + 1
+          where c.turn_id = v_charge.turn_id;
+
+          insert into public.chat_turn_events(
+            turn_id, user_id, event_type, stage, error_code
+          ) values (
+            v_charge.turn_id, v_charge.user_id, 'reconciliation_review_required',
+            'stale_provider_outcome', 'unexpected_settlement_result_manual_review'
+          );
+          v_review := v_review + 1;
         end if;
       else
         -- Provider may still have completed upstream. Keep the charge locked:
