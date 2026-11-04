@@ -440,6 +440,33 @@ Deno.serve(async (request) => {
   }
 
   const providerResult = providerResponse.result;
+
+  // Persist only allowlisted diagnostic metadata. Never store provider messages,
+  // prompts, player content, or credentials in operational event logs.
+  if (providerResponse.httpStatus >= 400 || providerResult.kind !== "generated") {
+    const diagnosticCode = providerResult.kind === "provider_error"
+      ? providerResult.code
+      : providerResult.kind === "content_rejected"
+      ? "provider_content_rejected"
+      : providerResult.kind === "empty_output"
+      ? "empty_output"
+      : "provider_response_error";
+    const rawRequestId = providerResponse.requestId;
+    const gatewayRequestId = /^[A-Za-z0-9._:-]{1,128}$/.test(rawRequestId)
+      ? rawRequestId
+      : null;
+    await admin.from("chat_turn_events").insert({
+      turn_id: turnId,
+      user_id: user.id,
+      event_type: "provider_response_diagnostic",
+      stage: "provider_response",
+      error_code: diagnosticCode,
+      retryable: providerResult.kind === "provider_error" ? providerResult.retryable : false,
+      http_status: providerResponse.httpStatus,
+      gateway_request_id: gatewayRequestId,
+    });
+  }
+
   if (providerResult.kind === "generated" && findPrivateContextLeak(providerResult.text, protectedContext, priorAssistantOutputs)) {
     // Never persist or return a response that reproduces author-only source material.
     // Record only a fixed reason code; never log the matched phrase or private text.
