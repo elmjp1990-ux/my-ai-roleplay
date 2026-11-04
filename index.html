@@ -9370,7 +9370,13 @@ document.addEventListener('submit',async event => {
         c.visibility='private';c.deletedAt=deletedAt;c.deletionReason='author_deleted';
         for (const session of Object.values(state.sessions)) {
           if (session.characterId===c.id) {
-const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudCharacterSnapshot || {};
+const {
+              privateInfo: _legacyPrivateInfo,
+              personalityProfile: _legacyPersonalityProfile,
+              private_info: _legacyPrivateInfoSnakeCase,
+              personality_profile: _legacyPersonalityProfileSnakeCase,
+              ...safeCloudSnapshot
+            } = session.cloudCharacterSnapshot || {};
             session.cloudCharacterSnapshot={
               ...safeCloudSnapshot,
               id:c.id,name:c.name,gender:c.gender,age:c.age,image:c.image,intro:c.intro,
