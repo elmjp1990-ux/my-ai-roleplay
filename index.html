@@ -1338,6 +1338,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 <div id="toast" class="hidden" role="status"></div>
 <input id="jsonFile" class="hidden" type="file" accept=".json,application/json">
 
+<script src="./memory-capture.js"></script>
 <script>
 'use strict';
 
@@ -3494,29 +3495,12 @@ async function runPendingChatTurn(s) {
   }
   delete s.pendingTurn;
 
-  const users = s.messages.filter(message => message.role === 'user');
-  if (replyWasAdded && users.length && users.length % 5 === 0) {
-    const playerBatch = users.slice(-5);
-    const firstIndex = s.messages.findIndex(message => message.id === playerBatch[0]?.id);
-    const lastIndex = s.messages.findIndex(message => message.id === playerBatch[playerBatch.length - 1]?.id);
-    const nextAssistantIndex = lastIndex >= 0
-      ? s.messages.findIndex((message, index) => index > lastIndex && message.role === 'assistant')
-      : -1;
-    const dialogueEnd = nextAssistantIndex >= 0 ? nextAssistantIndex : lastIndex;
-    const dialogue = firstIndex >= 0 && lastIndex >= firstIndex
-      ? s.messages.slice(firstIndex, dialogueEnd + 1)
-      : playerBatch;
-    const playerText = playerBatch.map((message, index) =>
-      '玩家原話 ' + (index + 1) + '：' + [...String(message.text || '').trim()].slice(0, 480).join('')
-    ).join('\n');
-    const characterName = sessionCharacter(s)?.name || '角色';
-    const assistantText = dialogue.filter(message => message.role === 'assistant').slice(-5)
-      .map(message => characterName + '回應：' + String(message.text || '').trim()).join('\n');
-    const playerBlock = [...playerText].slice(0, 2500).join('');
-    const assistantBlock = [...assistantText].slice(0, 420).join('');
-    const memoryText = ('【玩家原話優先保存】\n' + playerBlock +
-      (assistantBlock ? '\n\n【角色回應脈絡】\n' + assistantBlock : '')).slice(0, 3000);
-    if (memoryText.trim()) addMemory(s, memoryText);
+  if (replyWasAdded) {
+    const memoryText = window.POYOZZMemoryCapture?.buildPlayerMemoryExcerpt(
+      s.messages,
+      sessionCharacter(s)?.name || '角色',
+    ) || '';
+    if (memoryText) addMemory(s, memoryText);
   }
 
   persist();
