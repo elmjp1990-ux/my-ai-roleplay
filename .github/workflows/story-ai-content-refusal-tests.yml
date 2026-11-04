@@ -7,6 +7,8 @@ on:
       - "supabase/functions/_shared/ai-provider-result.test.ts"
       - "supabase/functions/_shared/private-context-guard.ts"
       - "supabase/functions/_shared/private-context-guard.test.ts"
+      - "supabase/functions/_shared/ai-gateway-policy.ts"
+      - "supabase/functions/_shared/ai-gateway-policy.test.ts"
       - "supabase/functions/chat-turn/index.ts"
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/prompt-variables.ts"
@@ -40,3 +42,5 @@ jobs:
         run: deno test supabase/functions/_shared/ai-provider-result.test.ts
       - name: Run private context output guard tests
         run: deno test supabase/functions/_shared/private-context-guard.test.ts
+      - name: Run AI Gateway privacy policy tests
+        run: deno test supabase/functions/_shared/ai-gateway-policy.test.ts
