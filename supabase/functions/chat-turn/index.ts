@@ -1,4 +1,4 @@
-// POYOZZ single-player Story turn orchestrator: reservation, AI Gateway generation, privacy screening, persistence, and settlement.
+// POYOZZ single-player Story turn orchestrator: reservation, OpenRouter generation, privacy screening, persistence, and settlement.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildPromptVariableValues, applyPromptVariables } from "../_shared/prompt-context.ts";
 import { normalizeAiProviderResult } from "../_shared/ai-provider-result.ts";
