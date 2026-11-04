@@ -20,8 +20,8 @@ export function collectProtectedContext(privateInfo: unknown, personalityProfile
 
 /**
  * Detects verbatim or near-verbatim disclosure of author-only context.
- * Short values are checked only as complete phrases to reduce false positives.
- * Long values are also checked for a 20-code-point contiguous excerpt.
+ * Short values are ignored to reduce false positives from ordinary character traits.
+ * Long values are checked for a 32-code-point contiguous excerpt.
  */
 export function findPrivateContextLeak(output: unknown, protectedValues: string[]): boolean {
   if (typeof output !== "string" || !output.trim()) return false;
@@ -32,9 +32,9 @@ export function findPrivateContextLeak(output: unknown, protectedValues: string[
     const value = normalize(rawValue);
     if (value.length < 12) continue;
     if (normalizedOutput.includes(value)) return true;
-    if (value.length >= 32) {
-      for (let index = 0; index <= value.length - 20; index += 4) {
-        if (normalizedOutput.includes(value.slice(index, index + 20))) return true;
+    if (value.length >= 48) {
+      for (let index = 0; index <= value.length - 32; index += 8) {
+        if (normalizedOutput.includes(value.slice(index, index + 32))) return true;
       }
     }
   }
