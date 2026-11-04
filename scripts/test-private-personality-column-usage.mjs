@@ -76,8 +76,13 @@ assert.doesNotMatch(
 // During the compatibility window, public roles may read only an explicit safe-column allowlist.
 assert.match(
   phaseOneAccess,
-  /revoke\s+select\s+on\s+table\s+public\.characters\s+from\s+anon\s*,\s*authenticated/i,
+  /revoke\s+select\s+on\s+table\s+public\.characters\s+from\s+(?:public\s*,\s*)?anon\s*,\s*authenticated/i,
   "public roles must lose table-level SELECT on characters",
+);
+assert.match(
+  phaseOneAccess,
+  /revoke\s+select\s*\(\s*personality_profile\s*\)\s+on\s+table\s+public\.characters\s+from\s+public\s*,\s*anon\s*,\s*authenticated/i,
+  "legacy column-level SELECT grants must be revoked from PUBLIC and client roles",
 );
 const safeSelectGrant = phaseOneAccess.match(/grant\s+select\s*\(([\s\S]*?)\)\s+on\s+table\s+public\.characters\s+to\s+anon\s*,\s*authenticated/i);
 assert.ok(safeSelectGrant, "approved character columns must be granted explicitly");
