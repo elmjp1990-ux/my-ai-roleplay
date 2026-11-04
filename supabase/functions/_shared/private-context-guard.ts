@@ -44,7 +44,9 @@ export function findPrivateContextLeak(output: unknown, protectedValues: string[
     // Catch common direct transformations used to disguise copied settings.
     const raw = rawValue.normalize("NFKC");
     const encodedForms = [
+      encodeURIComponent(rawValue).toLocaleLowerCase(),
       encodeURIComponent(raw).toLocaleLowerCase(),
+      base64Utf8(rawValue).toLocaleLowerCase(),
       base64Utf8(raw).toLocaleLowerCase(),
       base64Utf8(value).toLocaleLowerCase(),
     ];
