@@ -13,6 +13,8 @@ on:
       - "scripts/test-character-personality-private-migration.sql"
       - "scripts/test-private-personality-column-usage.mjs"
       - "scripts/test-chat-turn-wallet-refund.sql"
+      - "scripts/test-chat-turn-reconciliation-ui.mjs"
+      - "supabase/migrations/20261104073621_add_ai_gateway_response_diagnostics.sql"
       - "memory-capture.js"
       - "scripts/test-memory-capture.cjs"
       - "scripts/test-memory-persistence-contract.mjs"
@@ -101,6 +103,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify author-only personality data never reads from public characters
         run: node scripts/test-private-personality-column-usage.mjs
+      - name: Verify unresolved Story turns are not presented as safe retries
+        run: node scripts/test-chat-turn-reconciliation-ui.mjs
       - name: Verify roleplay prose, character agency and player point-of-view rules
         run: node scripts/test-story-roleplay-prompt.mjs
       - name: Test five-turn player-first memory capture
