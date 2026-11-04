@@ -129,12 +129,19 @@ RESET ROLE;
 -- then restore it before the fixture transaction ends.
 DO $disable_storage_guard$
 DECLARE
+  v_guard regprocedure := pg_catalog.to_regprocedure('storage.protect_delete()');
   v_trigger text;
 BEGIN
+  -- The synthetic PostgreSQL shim has no platform guard; full local Supabase
+  -- does. Only disable it when that platform function is present.
+  IF v_guard IS NULL THEN
+    RETURN;
+  END IF;
+
   SELECT tgname INTO v_trigger
   FROM pg_catalog.pg_trigger
   WHERE tgrelid = 'storage.objects'::regclass
-    AND tgfoid = 'storage.protect_delete()'::regprocedure
+    AND tgfoid = v_guard
     AND NOT tgisinternal;
 
   IF v_trigger IS NULL THEN
@@ -206,12 +213,17 @@ RESET ROLE;
 
 DO $restore_storage_guard$
 DECLARE
+  v_guard regprocedure := pg_catalog.to_regprocedure('storage.protect_delete()');
   v_trigger text;
 BEGIN
+  IF v_guard IS NULL THEN
+    RETURN;
+  END IF;
+
   SELECT tgname INTO v_trigger
   FROM pg_catalog.pg_trigger
   WHERE tgrelid = 'storage.objects'::regclass
-    AND tgfoid = 'storage.protect_delete()'::regprocedure
+    AND tgfoid = v_guard
     AND NOT tgisinternal;
 
   IF v_trigger IS NULL THEN
