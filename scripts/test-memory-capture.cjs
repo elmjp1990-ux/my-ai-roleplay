@@ -27,11 +27,12 @@ test("preserves all five player messages and uses assistant replies only as cont
 
 test("captures the newest five player turns at each five-turn boundary", () => {
   const memory = buildPlayerMemoryExcerpt(makeConversation(10), "Mira");
+  const playerLines = memory.split("\\n").filter((line) => line.startsWith("玩家原話 "));
   for (let index = 6; index <= 10; index += 1) {
-    assert.ok(memory.includes("PLAYER_" + index));
+    assert.ok(playerLines.includes("玩家原話 " + (index - 5) + "：PLAYER_" + index));
   }
   for (let index = 1; index <= 5; index += 1) {
-    assert.equal(memory.includes("PLAYER_" + index), false);
+    assert.equal(playerLines.some((line) => line.endsWith("：PLAYER_" + index)), false);
   }
 });
 
