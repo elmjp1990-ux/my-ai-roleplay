@@ -3130,6 +3130,7 @@ async function loadCloudChatSessionMessages(session, options = {}) {
       if (pageRows.length) session.messagesCursor = pageRows[0].created_at || session.messagesCursor || null;
       session.messagesHasMore = hasMore;
       session.messagesLoaded = true;
+      session.messagesLoading = false;
       session.messagesComplete = !hasMore;
       const latest = mapped.at(-1);
       if (!older && latest) { session.lastMessagePreview = String(latest.text || '').slice(0,180); session.lastMessageAt = latest.at; }
@@ -9514,6 +9515,10 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         // Reuse the same turn IDs after an ambiguous response; never create a new
         // charge attempt until the prior turn has an authoritative outcome.
         if (s.pendingTurn) {
+          if (!(await ensureCompleteCloudChatHistory(s))) {
+            toast('完整聊天紀錄尚未載入完成，為避免遺漏劇情記憶，本次暫不繼續送出。請稍後重試。');
+            break;
+          }
           await runPendingChatTurn(s);
           break;
         }
@@ -9555,6 +9560,10 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
           break;
         }
 
+        if (!(await ensureCompleteCloudChatHistory(s))) {
+          toast('完整聊天紀錄尚未載入完成，為避免遺漏劇情記憶，本次暫不送出。請稍後重試。');
+          break;
+        }
         if (!walletPreflight('single')) break;
         const previousMessages = s.messages.slice();
         const previousMemories = (s.memories || []).map(memory => ({...memory}));
