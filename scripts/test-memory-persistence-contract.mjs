@@ -37,7 +37,7 @@ const memoryEditor = html.slice(memoryEditorStart, memoryEditorEnd);
 assert.match(memoryEditor, /if \(!m \|\| m\.important\) return/);
 assert.match(memoryEditor, /s\.memories\s*=\s*s\.memories\.filter/);
 assert.match(memoryEditor, /await saveChatSessionSafely\(s\)/);
-assert.match(memoryEditor, /s\.memories\s*=\s*previousMemories/);
+assert.match(memoryEditor, /s\.memories\s*=\s*memoryMutationTracker\?\.rollback\(s\.id,mutationVersion\)\s*\|\|\s*previousMemories/);
 
 // Cloud writes and pending-turn metadata updates share one per-owner/session queue
 // and capture immutable snapshots so out-of-order requests cannot overwrite newer state.
