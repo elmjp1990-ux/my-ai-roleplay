@@ -3295,11 +3295,8 @@ async function saveChatSessionSafely(s) {
       if (requestedUid && uid !== requestedUid) return false;
       // The queue may have waited behind an earlier successful save. Rebase only
       // the version token, not the call-time content snapshot, onto that saved row.
-      if (latest?.cloudOwned && uid && latest.cloudOwnerUid === uid) {
-        snapshot.cloudOwned = true;
-        snapshot.cloudOwnerUid = uid;
-        if (latest.cloudUpdatedAt) snapshot.cloudUpdatedAt = latest.cloudUpdatedAt;
-        if (latest.cloudCharacterSnapshot) snapshot.cloudCharacterSnapshot = latest.cloudCharacterSnapshot;
+      if (snapshot) {
+        Object.assign(snapshot, window.POYOZZMemoryCapture.rebaseSessionSaveVersion(snapshot, latest, uid));
       }
       if (latest?.cloudOwned && uid && latest.cloudOwnerUid === uid &&
           readDeletedChatTombstones(uid).sessions[latest.id]) return false;
