@@ -3277,9 +3277,9 @@ async function loadCloudChatSessions(user) {
           (Array.isArray(existing?.messages) && existing.messages.length > 1),
         messagesHasMore:existing?.messagesHasMore === true,
         messagesCursor:existing?.messagesCursor || null,
-        messagesComplete:existing?.messagesComplete === true ||
-          (Array.isArray(existing?.messages) && existing.messages.some(message=>message.role === 'user')) ||
-          (Array.isArray(existing?.messages) && existing.messages.length > 1),
+        messagesComplete:typeof existing?.messagesComplete === 'boolean'
+          ? existing.messagesComplete
+          : (Array.isArray(existing?.messages) && (existing.messages.some(message=>message.role === 'user') || existing.messages.length > 1)),
         pendingTurn:data.pendingTurn &&
           isUuid(data.pendingTurn.turnId) &&
           isUuid(data.pendingTurn.userMessageId) &&
@@ -5153,12 +5153,10 @@ async function startChat(characterId) {
     let chattedIds = new Set();
     if (candidateIds.length) {
       const { data: messages, error: messagesError } = await client.from('chat_messages')
-        .select('session_id,content').in('session_id', candidateIds)
-        .eq('role', 'user').is('deleted_at', null);
+        .select('session_id').in('session_id', candidateIds)
+        .eq('role', 'user').neq('content','').is('deleted_at', null);
       if (messagesError) throw messagesError;
-      chattedIds = new Set((messages || [])
-        .filter(message => String(message.content || '').trim())
-        .map(message => message.session_id));
+      chattedIds = new Set((messages || []).map(message => message.session_id));
     }
 
     const existingRow = (rows || []).find(row => chattedIds.has(row.id));
