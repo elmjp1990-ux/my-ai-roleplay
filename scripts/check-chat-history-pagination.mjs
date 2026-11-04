@@ -38,6 +38,7 @@ assert.match(singleSessionLoader, /currentUser\(\)\?\.uid !== uid/, 'account swi
 assert.match(singleSessionLoader, /new Map\(existing\.map\(message => \[message\.id, message\]\)\)/, 'pagination must deduplicate message IDs');
 
 assert.match(completeHistoryGuard, /while \(session\.messagesHasMore === true\)/, 'full context must be recoverable page by page');
+assert.match(completeHistoryGuard, /if \(pending\) await pending/, 'turn submission must wait for in-flight first-page hydration');
 assert.match(renderConversation, /loadCloudChatSessionMessages\(s,\{refresh:true\}\)/, 'conversation opening must refresh the selected session only');
 assert.match(renderMessages, /load-older-messages/, 'older-message control must be rendered');
 assert.match(html, /case 'load-older-messages'/, 'older-message action must be wired');
