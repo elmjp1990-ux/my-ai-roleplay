@@ -1,0 +1,43 @@
+(function (root, factory) {
+  const api = factory();
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  root.POYOZZMemoryCapture = api;
+})(globalThis, function () {
+  const takeCodePoints = (value, limit) => Array.from(String(value ?? "")).slice(0, limit).join("");
+
+  /**
+   * Build one deterministic five-player-turn memory excerpt.
+   * Player-authored text is the primary record; assistant text is only context.
+   * Called only after a newly persisted assistant reply has been added.
+   */
+  function buildPlayerMemoryExcerpt(messages, characterName = "角色") {
+    const rows = Array.isArray(messages) ? messages : [];
+    const users = rows.filter((message) => message && message.role === "user");
+    if (!users.length || users.length % 5 !== 0) return "";
+
+    const playerBatch = users.slice(-5);
+    const firstIndex = rows.findIndex((message) => message?.id === playerBatch[0]?.id);
+    const lastIndex = rows.findIndex((message) => message?.id === playerBatch[playerBatch.length - 1]?.id);
+    const nextAssistantIndex = lastIndex >= 0
+      ? rows.findIndex((message, index) => index > lastIndex && message?.role === "assistant")
+      : -1;
+    const dialogueEnd = nextAssistantIndex >= 0 ? nextAssistantIndex : lastIndex;
+    const dialogue = firstIndex >= 0 && lastIndex >= firstIndex
+      ? rows.slice(firstIndex, dialogueEnd + 1)
+      : playerBatch;
+
+    const playerText = playerBatch.map((message, index) =>
+      "玩家原話 " + (index + 1) + "：" + takeCodePoints(String(message.text || "").trim(), 480)
+    ).join("\n");
+    const name = String(characterName || "角色").trim() || "角色";
+    const assistantText = dialogue.filter((message) => message?.role === "assistant").slice(-5)
+      .map((message) => name + "回應：" + String(message.text || "").trim()).join("\n");
+    const playerBlock = takeCodePoints(playerText, 2500);
+    const assistantBlock = takeCodePoints(assistantText, 420);
+    const memoryText = "【玩家原話優先保存】\n" + playerBlock +
+      (assistantBlock ? "\n\n【角色回應脈絡】\n" + assistantBlock : "");
+    return takeCodePoints(memoryText, 3000).trim();
+  }
+
+  return { buildPlayerMemoryExcerpt };
+});
