@@ -3328,26 +3328,10 @@ async function refreshWalletBalance() {
 
 async function clearCloudPendingTurn(s) {
   const user = currentUser();
-  const client = window.mySupabase;
-  if (!s || !user || !client || !s.cloudOwned || s.cloudOwnerUid !== user.uid) return;
-  const snapshot = clone(state.sessions?.[s.id] || s);
-  const clear = async () => {
-    const activeUser = currentUser();
-    if (!activeUser || activeUser.uid !== user.uid ||
-        !snapshot.cloudOwned || snapshot.cloudOwnerUid !== user.uid ||
-        readDeletedChatTombstones(user.uid).sessions[s.id]) return;
-    const { error } = await client.from('chat_sessions')
-      .update({session_data:chatSessionData(snapshot),updated_at:new Date().toISOString()})
-      .eq('id',s.id).eq('user_id',user.uid);
-    if (error) console.warn('清除雲端待處理回合標記失敗：',error.message);
-    else memoryMutationTracker?.markSaved(s.id,snapshot.memories);
-  };
-  try {
-    if (chatSessionSaveQueue) await chatSessionSaveQueue(user.uid + ':' + s.id, clear);
-    else await clear();
-  } catch (error) {
-    console.warn('清除雲端待處理回合標記失敗：',error?.message || error);
-  }
+  if (!s || !user || !s.cloudOwned || s.cloudOwnerUid !== user.uid) return;
+  const latest = state.sessions?.[s.id] || s;
+  const saved = await saveChatSessionSafely(latest);
+  if (!saved) console.warn('清除雲端待處理回合標記失敗：同步未獲資料庫確認。');
 }
 
 async function runPendingChatTurn(s) {
