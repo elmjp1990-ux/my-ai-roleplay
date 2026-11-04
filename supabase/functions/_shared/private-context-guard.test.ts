@@ -45,6 +45,17 @@ Deno.test("normalizes whitespace and punctuation before checking", () => {
   ), true);
 });
 
+Deno.test("blocks URL-encoded and Base64 copies of long private settings", () => {
+  const secret = "作者私密設定中真正不能公開的劇情真相是十年前那場事故由家族內部策劃，所有證據都被刻意隱藏。";
+  const bytes = new TextEncoder().encode(secret);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  const base64 = btoa(binary);
+
+  assertEquals(findPrivateContextLeak("這是編碼內容：" + base64, [secret]), true);
+  assertEquals(findPrivateContextLeak("這是網址編碼：" + encodeURIComponent(secret), [secret]), true);
+});
+
 Deno.test("does not block unrelated roleplay output or short common values", () => {
   assertEquals(findPrivateContextLeak(
     "他微微一笑，替你拉開椅子，問你今天過得如何。",
