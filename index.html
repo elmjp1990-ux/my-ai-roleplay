@@ -3079,6 +3079,90 @@ async function saveChatSessionToCloud(s, options = {}) {
   }
   return true;
 }
+const CHAT_HISTORY_PAGE_SIZE = 50;
+const cloudChatMessageLoads = new Map();
+
+async function loadCloudChatSessionMessages(session, options = {}) {
+  const client = window.mySupabase;
+  const uid = currentUser()?.uid;
+  if (!client || !uid || !session?.cloudOwned || session.cloudOwnerUid !== uid ||
+      !isUuid(session.id) || readDeletedChatTombstones(uid).sessions[session.id]) return false;
+  const older = options.older === true;
+  if (older && (!session.messagesHasMore || !session.messagesCursor)) return true;
+  const loadKey = uid + ':' + session.id;
+  const inFlight = cloudChatMessageLoads.get(loadKey);
+  if (inFlight) { await inFlight; return true; }
+  const promise = (async () => {
+    const messagesElement = route.page === 'conversation' && route.id === session.id ? $('messages') : null;
+    const previousHeight = messagesElement?.scrollHeight || 0;
+    const previousTop = messagesElement?.scrollTop || 0;
+    session.messagesLoading = true;
+    if (messagesElement && !session.messagesLoaded) {
+      messagesElement.innerHTML = '<div class="empty chat-history-loading" role="status">正在載入最近的聊天紀錄…</div>';
+    }
+    try {
+      if (currentUser()?.uid !== uid || readDeletedChatTombstones(uid).sessions[session.id]) return false;
+      let query = client.from('chat_messages').select('id,session_id,role,content,created_at')
+        .eq('session_id', session.id).is('deleted_at', null)
+        .order('created_at', {ascending:false}).limit(CHAT_HISTORY_PAGE_SIZE + 1);
+      if (older) query = query.lt('created_at', session.messagesCursor);
+      const {data,error} = await query;
+      if (error) throw new Error(error.message);
+      if (currentUser()?.uid !== uid || session.cloudOwnerUid !== uid ||
+          readDeletedChatTombstones(uid).sessions[session.id]) return false;
+      const fetched = Array.isArray(data) ? data : [];
+      const hasMore = fetched.length > CHAT_HISTORY_PAGE_SIZE;
+      const pageRows = fetched.slice(0, CHAT_HISTORY_PAGE_SIZE).reverse();
+      const roleplayMeta = session.cloudRoleplayMeta && typeof session.cloudRoleplayMeta === 'object' ? session.cloudRoleplayMeta : {};
+      const mapped = pageRows.map(row => {
+        const message = {id:row.id,role:row.role === 'user' ? 'user' : 'assistant',text:row.content || '',at:row.created_at ? new Date(row.created_at).getTime() : Date.now()};
+        const metadata = roleplayMeta[message.id];
+        if (metadata && typeof metadata === 'object') Object.assign(message, metadata);
+        return message;
+      });
+      const existing = Array.isArray(session.messages) ? session.messages : [];
+      const byId = new Map(existing.map(message => [message.id, message]));
+      for (const message of mapped) byId.set(message.id, {...byId.get(message.id), ...message});
+      const opening = session.initialOpeningMessage && String(session.initialOpeningMessage.text || '').trim()
+        ? {id:'opening-'+session.id,role:'assistant',text:String(session.initialOpeningMessage.text),at:Number(session.initialOpeningMessage.at) || Date.now()} : null;
+      if (opening && ![...byId.values()].some(message => message.role === 'assistant' && String(message.text || '') === opening.text)) byId.set(opening.id, opening);
+      session.messages = [...byId.values()].sort((a,b)=>(Number(a.at)||0)-(Number(b.at)||0));
+      if (pageRows.length) session.messagesCursor = pageRows[0].created_at || session.messagesCursor || null;
+      session.messagesHasMore = hasMore;
+      session.messagesLoaded = true;
+      session.messagesComplete = !hasMore;
+      const latest = mapped.at(-1);
+      if (!older && latest) { session.lastMessagePreview = String(latest.text || '').slice(0,180); session.lastMessageAt = latest.at; }
+      persist();
+      if (messagesElement && messagesElement.isConnected) {
+        renderMessages(false);
+        if (older) { const updated = $('messages'); if (updated) updated.scrollTop = previousTop + Math.max(0, updated.scrollHeight - previousHeight); }
+      } else if (route.page === 'chat') refreshChatEntryList();
+      return true;
+    } catch (error) {
+      console.error('單一聊天室訊息載入失敗：', error);
+      if (route.page === 'conversation' && route.id === session.id) { const target = $('messages'); if (target) target.innerHTML = '<div class="empty">聊天紀錄載入失敗，請重新進入聊天室重試。</div>'; }
+      return false;
+    } finally { session.messagesLoading = false; }
+  })();
+  cloudChatMessageLoads.set(loadKey, promise);
+  try { return await promise; }
+  finally { if (cloudChatMessageLoads.get(loadKey) === promise) cloudChatMessageLoads.delete(loadKey); }
+}
+
+async function ensureCompleteCloudChatHistory(session) {
+  if (!session?.cloudOwned) return true;
+  if (!session.messagesLoaded) { const loaded = await loadCloudChatSessionMessages(session); if (!loaded || !session.messagesLoaded) return false; }
+  let previousCount = -1;
+  while (session.messagesHasMore === true) {
+    const count = (session.messages || []).length;
+    if (count === previousCount) return false;
+    previousCount = count;
+    if (!(await loadCloudChatSessionMessages(session, {older:true}))) return false;
+  }
+  session.messagesComplete = true;
+  return true;
+}
 async function loadCloudChatSessions(user) {
   const client = window.mySupabase;
   if (!client || !user?.id) return;
