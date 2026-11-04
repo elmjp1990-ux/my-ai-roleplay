@@ -73,4 +73,15 @@ assert.doesNotMatch(html, /const cardPortrait=safeImage\(character\?\.image/);
 assert.match(html, /相遇模式立繪（最多 5 張）/);
 assert.match(html, /主要角色圖預覽/);
 
+// Lazy video observer must dispatch to each observed element, not capture the first card's loader.
+assert.match(html, /const characterVideoLoaders = new WeakMap\(\)/);
+assert.match(html, /characterVideoLoaders\.set\(video,load\)/);
+assert.match(html, /characterVideoLoaders\.get\(target\)/);
+assert.match(html, /if\(target\.dataset\.videoHydrated==='true'\)target\.play\(\)\.catch/);
+
+// Illustration metadata reads are single-flight and author cleanup is never implicit for public loads.
+assert.match(html, /const characterIllustrationMetadataInflight = new Map\(\)/);
+assert.match(html, /async function loadCharacterIllustrationAssets\(characterIds, cleanupUserId=null\)/);
+assert.match(html, /if\(cleanupUserId\)await retryCharacterIllustrationCleanup\(cleanupUserId\)/);
+
 console.log("Author schedule and illustration signed-URL refresh contract tests passed.");
