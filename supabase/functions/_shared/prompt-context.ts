@@ -76,7 +76,16 @@ export function buildPromptVariableValues(input: PromptContextInput): PromptVari
   const defaultPersona = personaPresets.find(p => p.isDefault === true);
   const playerPersona = str(session.persona) || str(group.player_persona ?? group.playerPersona) || str(defaultPersona?.text);
   const memorySource = session.memories ?? session.memory;
-  const memory = Array.isArray(memorySource) ? capMemory(memorySource.map(v => typeof v === "string" ? v : str(obj(v).summary ?? obj(v).content ?? obj(v).text)).filter(Boolean).join("\n")) : capMemory(memorySource);
+  const memory = Array.isArray(memorySource)
+    ? capMemory(memorySource.map((value, index) => {
+        if (typeof value === "string") return { text: value, important: false, at: index };
+        const item = obj(value);
+        return { text: str(item.text ?? item.summary ?? item.content), important: item.important === true, at: Number(item.at) || index };
+      }).filter(item => item.text)
+        .sort((a, b) => Number(b.important) - Number(a.important) || b.at - a.at)
+        .map(item => (item.important ? "【重大記憶】" : "【回憶摘錄】") + "\n" + item.text)
+        .join("\n\n"))
+    : capMemory(memorySource);
   const values: PromptVariableValues = {
     USER: str(group.player_name ?? group.playerName ?? profile.nickname ?? profile.handle), CHAR: str(character.name),
     USER_DESC: playerPersona, CHAR_DESC: str(character.intro ?? character.description),
