@@ -120,6 +120,7 @@ async function buildStoryMessages(
     "公開介紹：{CHAR_DESC}",
     "演繹風格：{CHAR_STYLE}",
     "個性與行為準則：{CHAR_PERSONALITY}",
+    "角色開場白：" + asString(snapshot.opening),
     "開場情境：{SCENE}",
     "世界觀：{WORLD}",
     "目前關係：{RELATIONSHIP}",
@@ -250,7 +251,7 @@ Deno.serve(async (request) => {
 
   const { data: session, error: sessionError } = await admin
     .from("chat_sessions")
-    .select("id,user_id,deleted_at,character_id,character_snapshot,chat_mode")
+    .select("id,user_id,deleted_at,character_id,character_snapshot,session_data,chat_mode")
     .eq("id", sessionId)
     .eq("user_id", user.id)
     .is("deleted_at", null)
