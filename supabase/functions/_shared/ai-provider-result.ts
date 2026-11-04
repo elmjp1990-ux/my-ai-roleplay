@@ -119,7 +119,9 @@ export function normalizeAiProviderResult(value: unknown): AiProviderResult {
     const status = Number(response.status);
     const code = normalizedCode(error.code || error.type || response.status || "provider_error");
     const retryable = status === 408 || status === 409 || status === 429 || status >= 500 ||
-      code.includes("timeout") || code.includes("rate_limit") || code.includes("temporar");
+      code.includes("timeout") || code.includes("rate_limit") || code.includes("temporar") ||
+      code.includes("server_error") || code.includes("service_unavailable") ||
+      code.includes("internal_error");
     return { kind: "provider_error", retryable, code: code.slice(0, 80) };
   }
 
