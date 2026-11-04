@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { buildPlayerMemoryExcerpt, appendMemoryWithLimit, createSerialQueue, createMemoryMutationTracker, nextSessionUpdatedAt } = require("../memory-capture.js");
+const { buildPlayerMemoryExcerpt, appendMemoryWithLimit, createSerialQueue, createMemoryMutationTracker, nextSessionUpdatedAt, rebaseSessionSaveVersion } = require("../memory-capture.js");
 
 function makeConversation(playerCount) {
   const messages = [];
@@ -143,4 +143,34 @@ test("chat session version timestamps always advance beyond the prior server ver
   assert.equal(nextSessionUpdatedAt(previous, Date.parse(previous) - 5000), "2026-11-04T03:52:10.124Z");
   assert.equal(nextSessionUpdatedAt(previous, Date.parse(previous) + 5000), "2026-11-04T03:52:15.123Z");
   assert.throws(() => nextSessionUpdatedAt(null), /valid previous chat-session version/);
+});
+
+
+test("queued session saves rebase only the cloud version token onto the last confirmed row", async () => {
+  const enqueue = createSerialQueue();
+  const latest = {
+    cloudOwned: true,
+    cloudOwnerUid: "user-a",
+    cloudUpdatedAt: "v1",
+    cloudCharacterSnapshot: { id: "character-a", name: "Mira" },
+  };
+  const firstSnapshot = { id: "session-a", messages: ["first"], cloudUpdatedAt: "v1" };
+  const secondSnapshot = { id: "session-a", messages: ["second"], cloudUpdatedAt: "v1" };
+  let releaseFirst;
+  const firstGate = new Promise((resolve) => { releaseFirst = resolve; });
+  const first = enqueue("user-a:session-a", async () => {
+    await firstGate;
+    latest.cloudUpdatedAt = "v2";
+    return true;
+  });
+  const second = enqueue("user-a:session-a", async () => {
+    const rebased = rebaseSessionSaveVersion(secondSnapshot, latest, "user-a");
+    assert.equal(rebased.cloudUpdatedAt, "v2");
+    assert.deepEqual(rebased.messages, ["second"]);
+    assert.equal(rebased.cloudCharacterSnapshot.name, "Mira");
+    assert.equal(rebaseSessionSaveVersion(secondSnapshot, latest, "user-b").cloudUpdatedAt, "v1");
+    return true;
+  });
+  releaseFirst();
+  await Promise.all([first, second]);
 });
