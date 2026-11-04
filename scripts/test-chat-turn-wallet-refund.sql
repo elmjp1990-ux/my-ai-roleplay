@@ -57,6 +57,7 @@ CREATE TABLE public.chat_messages (
 CREATE TABLE public.account_deletion_requests (user_id uuid PRIMARY KEY);
 
 \ir ../supabase/migrations/20261015133300_chat_turn_transaction_functions.sql
+\ir ../supabase/migrations/20261104120000_fix_reserve_chat_turn_conflict_ambiguity.sql
 \ir ../supabase/migrations/20261015134109_chat_turn_ledger_idempotency.sql
 
 -- Silver-only: exact original currency is restored; duplicate refund is idempotent.
