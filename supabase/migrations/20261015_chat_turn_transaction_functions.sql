@@ -24,7 +24,7 @@ begin
   end if;
   insert into public.chat_turn_charges(turn_id,user_id,session_id,user_message_id,expected_assistant_message_id,cost,status)
   values (p_turn_id,p_user_id,p_session_id,p_user_message_id,p_assistant_message_id,2,'created')
-  on conflict do nothing;
+  on conflict (turn_id) do nothing;
   select c.* into v_charge from public.chat_turn_charges c where c.turn_id = p_turn_id for update;
   if v_charge.user_id <> p_user_id or v_charge.session_id <> p_session_id or v_charge.user_message_id <> p_user_message_id or v_charge.expected_assistant_message_id <> p_assistant_message_id then
     raise exception 'turn_id_reuse_conflict';
