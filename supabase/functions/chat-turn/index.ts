@@ -32,7 +32,7 @@ const asString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
 async function buildStoryMessages(
-  admin: ReturnType<typeof createClient>,
+  admin: any,
   session: DbRow,
   userId: string,
   userMessageId: string,
