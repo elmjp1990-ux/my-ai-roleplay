@@ -30,13 +30,15 @@ assert.match(listHydration, /cloudRoleplayMeta:roleplayMeta/, 'roleplay display 
 assert.match(singleSessionLoader, /\.eq\('session_id', session\.id\)/, 'message query must be scoped to one session');
 assert.match(singleSessionLoader, /\.limit\(CHAT_HISTORY_PAGE_SIZE \+ 1\)/, 'message query must have a bounded page size');
 assert.match(singleSessionLoader, /query\.lt\('created_at', session\.messagesCursor\)/, 'older messages must use cursor pagination');
+assert.match(singleSessionLoader, /previousComplete \|\| !session\.messagesHasMore/, 'refreshing a cached complete history must not mark it partial');
+assert.match(singleSessionLoader, /renderMessages\(older \|\| wasLoaded \? false : true\)/, 'first page must scroll to newest messages while refreshes preserve scroll');
 assert.match(singleSessionLoader, /readDeletedChatTombstones\(uid\)\.sessions\[session\.id\]/, 'deleted-session tombstones must be checked');
 assert.match(singleSessionLoader, /session\.cloudOwnerUid !== uid/, 'session owner must be checked before loading');
 assert.match(singleSessionLoader, /currentUser\(\)\?\.uid !== uid/, 'account switches must invalidate stale message reads');
 assert.match(singleSessionLoader, /new Map\(existing\.map\(message => \[message\.id, message\]\)\)/, 'pagination must deduplicate message IDs');
 
 assert.match(completeHistoryGuard, /while \(session\.messagesHasMore === true\)/, 'full context must be recoverable page by page');
-assert.match(renderConversation, /loadCloudChatSessionMessages\(s\)/, 'conversation opening must trigger lazy first-page hydration');
+assert.match(renderConversation, /loadCloudChatSessionMessages\(s,\{refresh:true\}\)/, 'conversation opening must refresh the selected session only');
 assert.match(renderMessages, /load-older-messages/, 'older-message control must be rendered');
 assert.match(html, /case 'load-older-messages'/, 'older-message action must be wired');
 assert.match(messageSubmit, /ensureCompleteCloudChatHistory\(s\)/, 'turn submission must restore full history before continuing');
