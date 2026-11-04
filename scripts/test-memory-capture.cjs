@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { buildPlayerMemoryExcerpt, appendMemoryWithLimit } = require("../memory-capture.js");
+const { buildPlayerMemoryExcerpt, appendMemoryWithLimit, createSerialQueue, createMutationVersionTracker } = require("../memory-capture.js");
 
 function makeConversation(playerCount) {
   const messages = [];
@@ -92,4 +92,45 @@ test("uses Unicode code points when enforcing memory capacity", () => {
   const result = appendMemoryWithLimit(existing, { id: "next", text: "x".repeat(5), important: false }, 10);
   assert.equal(result.added, false);
   assert.deepEqual(result.memories, existing);
+});
+
+
+test("serializes writes for one session while allowing independent sessions to progress", async () => {
+  const enqueue = createSerialQueue();
+  const order = [];
+  let releaseFirst;
+  const firstGate = new Promise((resolve) => { releaseFirst = resolve; });
+  const first = enqueue("user-a:session-1", async () => {
+    order.push("first-start");
+    await firstGate;
+    order.push("first-end");
+  });
+  const second = enqueue("user-a:session-1", async () => {
+    order.push("second");
+  });
+  const independent = enqueue("user-a:session-2", async () => {
+    order.push("independent");
+  });
+  await Promise.resolve();
+  assert.deepEqual(order, ["first-start", "independent"]);
+  releaseFirst();
+  await Promise.all([first, second, independent]);
+  assert.deepEqual(order, ["first-start", "independent", "first-end", "second"]);
+});
+
+test("a failed save does not block later queued saves", async () => {
+  const enqueue = createSerialQueue();
+  const failed = enqueue("session", async () => { throw new Error("write failed"); });
+  const later = enqueue("session", async () => "saved");
+  await assert.rejects(failed, /write failed/);
+  assert.equal(await later, "saved");
+});
+
+test("only the newest mutation version may roll back local memory state", () => {
+  const tracker = createMutationVersionTracker();
+  const session = { id: "session" };
+  const first = tracker.next(session);
+  const second = tracker.next(session);
+  assert.equal(tracker.isCurrent(session, first), false);
+  assert.equal(tracker.isCurrent(session, second), true);
 });
