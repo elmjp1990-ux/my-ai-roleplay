@@ -15,7 +15,7 @@ const requiredRules = [
   ["permit disagreement and boundaries", "允許角色有不同意見、遲疑、拒絕"],
   ["separate spoken dialogue from private thoughts", "只供 AI 理解劇情的內心話"],
   ["do not let characters read the player's mind", "不得讓角色直接引用、回應、猜中或表現得像讀心"],
-  ["narration and actions use bold markdown", "一律使用 **雙星號** 包住"],
+  ["narration and actions use the UI single-asterisk syntax", "一律使用 *單星號* 包住"],
 ];
 for (const [label, phrase] of requiredRules) {
   assert.ok(prompt.includes(phrase), `Missing roleplay prompt rule: ${label}`);
@@ -27,7 +27,16 @@ assert.ok(
 );
 assert.ok(
   prompt.includes("角色實際說出口的話直接寫"),
-  "Spoken dialogue must remain visually distinct from bold narration",
+  "Spoken dialogue must remain visually distinct from narration",
+);
+assert.ok(
+  prompt.includes("星號只決定畫面呈現，不代表角色能得知其中資訊"),
+  "Asterisks control presentation, not character knowledge",
+);
+const uiSource = readFileSync("index.html", "utf8");
+assert.ok(
+  uiSource.includes("Legacy single-asterisk *...* narration remains supported"),
+  "The chat UI must preserve single-asterisk narration rendering",
 );
 assert.ok(
   !prompt.includes("每次至少包含兩段動作／背景描寫與兩處角色對話"),
