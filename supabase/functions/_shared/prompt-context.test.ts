@@ -110,3 +110,15 @@ Deno.test("important memories and recent entries are retained before older ordin
   assertEquals(values.MEMORY.length <= 3000, true);
   assertEquals(values.MEMORY.indexOf("重大記憶") < values.MEMORY.indexOf("回憶摘錄"), true);
 });
+
+
+Deno.test("keeps an explicit current player correction alongside older memory for prompt priority rules", () => {
+  const values = buildPromptVariableValues({
+    sessionData: { memories: [{ text: "舊記憶：玩家住在台北", important: true, at: 1 }] },
+    messages: [{ id: "u-correction", role: "user", content: "更正：我已搬到台中，之後請以台中為準。" }],
+    currentUserMessageId: "u-correction",
+  });
+  assertEquals(values.MEMORY.includes("玩家住在台北"), true);
+  assertEquals(values.USER_MESSAGE, "更正：我已搬到台中，之後請以台中為準。");
+  assertEquals(values.CHAT_HISTORY.includes("更正：我已搬到台中"), false);
+});
