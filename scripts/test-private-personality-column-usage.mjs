@@ -44,6 +44,12 @@ assert.match(
   "chat hydration must strip legacy private fields before exposing snapshots to client state",
 );
 
+assert.match(
+  frontend,
+  /personalityProfile:\s*_legacyPersonalityProfile,[\s\S]{0,250}personality_profile:\s*_legacyPersonalityProfileSnakeCase,[\s\S]{0,150}\.\.\.safeCloudSnapshot/,
+  "character deletion must strip legacy private fields from the cloud snapshot too",
+);
+
 // Phase 1 must remain additive; dropping the public column is a separate post-deploy contract migration.
 assert.doesNotMatch(
   phaseOne,
