@@ -223,6 +223,15 @@ BEGIN
   END IF;
   INSERT INTO public.chat_messages(id,session_id,role,content)
   VALUES ('50000000-0000-4000-8000-000000000005','20000000-0000-4000-8000-000000000005','assistant','late reply');
+  BEGIN
+    PERFORM * FROM public.refund_chat_turn(
+      '10000000-0000-4000-8000-000000000005','40000000-0000-4000-8000-000000000005',
+      '50000000-0000-4000-8000-000000000005','must_not_refund_persisted_reply');
+    RAISE EXCEPTION 'persisted_reply_was_refunded_before_settlement';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM = 'persisted_reply_was_refunded_before_settlement' THEN RAISE; END IF;
+    IF SQLERRM <> 'reply_already_persisted' THEN RAISE; END IF;
+  END;
   IF public.settle_chat_turn(
     '10000000-0000-4000-8000-000000000005','40000000-0000-4000-8000-000000000005',
     '50000000-0000-4000-8000-000000000005') <> 'settled' THEN
