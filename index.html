@@ -3261,21 +3261,30 @@ async function loadCloudChatSessions(user) {
   }
 }
 
+const chatSessionSaveQueue = window.POYOZZMemoryCapture?.createSerialQueue();
+const memoryMutationTracker = window.POYOZZMemoryCapture?.createMutationVersionTracker();
+
 async function saveChatSessionSafely(s) {
-  try {
-    const uid=currentUser()?.uid;
-    if (s?.cloudOwned && uid && s.cloudOwnerUid===uid &&
-        readDeletedChatTombstones(uid).sessions[s.id]) return false;
-    const saved = await saveChatSessionToCloud(s);
-    return saved;
-  } catch (error) {
-    const uid=currentUser()?.uid;
-    if (s?.cloudOwned && uid && s.cloudOwnerUid===uid &&
-        readDeletedChatTombstones(uid).sessions[s.id]) return false;
-    console.error('PersonaX 聊天同步失敗：',error);
-    toast(error.message || '聊天已保存在本機，但雲端同步失敗。');
-    return false;
-  }
+  const requestedUid = currentUser()?.uid;
+  const key = requestedUid && s?.id ? requestedUid + ':' + s.id : '';
+  const performSave = async () => {
+    const uid = currentUser()?.uid;
+    const latest = s?.id && state.sessions?.[s.id] ? state.sessions[s.id] : s;
+    try {
+      if (requestedUid && uid !== requestedUid) return false;
+      if (latest?.cloudOwned && uid && latest.cloudOwnerUid === uid &&
+          readDeletedChatTombstones(uid).sessions[latest.id]) return false;
+      return await saveChatSessionToCloud(latest);
+    } catch (error) {
+      if (latest?.cloudOwned && uid && latest.cloudOwnerUid === uid &&
+          readDeletedChatTombstones(uid).sessions[latest.id]) return false;
+      console.error('PersonaX 聊天同步失敗：',error);
+      toast(error.message || '聊天已保存在本機，但雲端同步失敗。');
+      return false;
+    }
+  };
+  if (!key || !chatSessionSaveQueue) return performSave();
+  return chatSessionSaveQueue(key, performSave);
 }
 
 async function refreshWalletBalance() {
