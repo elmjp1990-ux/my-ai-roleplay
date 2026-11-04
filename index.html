@@ -1672,7 +1672,14 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 
   // 探索頁公開角色獨立於登入帳號載入，訪客也能看見。
   // 每次登入／登出都以雲端公開清單為準，避免沿用前一個帳號的過期本機資料。
-  async function loadPublicSupabaseCharacters() {
+  let publicCharactersLoadPromise = null;
+  function loadPublicSupabaseCharacters() {
+    if (publicCharactersLoadPromise) return publicCharactersLoadPromise;
+    publicCharactersLoadPromise = loadPublicSupabaseCharactersImpl()
+      .finally(() => { publicCharactersLoadPromise = null; });
+    return publicCharactersLoadPromise;
+  }
+  async function loadPublicSupabaseCharactersImpl() {
     const client = window.mySupabase;
     if (!client) return;
     try {
@@ -2569,8 +2576,13 @@ if (characterError) {
       if (!window.mySupabase?.auth) return;
       window.mySupabase.auth.onAuthStateChange((event, session) => {
         if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') return;
-        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        if (event === 'SIGNED_IN') {
+          const nextUid = session?.user?.id || null;
+          if (nextUid && state?.signedIn && state.account?.uid === nextUid) return;
           syncSupabaseUser(session?.user || null);
+        } else if (event === 'SIGNED_OUT') {
+          if (!state?.signedIn && !state?.account) return;
+          syncSupabaseUser(null);
         }
       });
 
@@ -2579,7 +2591,9 @@ if (characterError) {
         console.error('Supabase Session 讀取失敗：', error);
         return;
       }
-      syncSupabaseUser(data?.session?.user || null);
+      const sessionUser = data?.session?.user || null;
+      if (sessionUser && state?.signedIn && state.account?.uid === sessionUser.id) return;
+      syncSupabaseUser(sessionUser);
     } catch (error) {
       console.error('Supabase Auth 初始化失敗：', error);
     }
