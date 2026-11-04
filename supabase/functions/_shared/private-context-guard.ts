@@ -23,18 +23,42 @@ export function collectProtectedContext(privateInfo: unknown, personalityProfile
  * Short values are ignored to reduce false positives from ordinary character traits.
  * Long values are checked for a 32-code-point contiguous excerpt.
  */
+const base64Utf8 = (value: string): string => {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+};
+
 export function findPrivateContextLeak(output: unknown, protectedValues: string[]): boolean {
   if (typeof output !== "string" || !output.trim()) return false;
   const normalizedOutput = normalize(output);
+  const rawOutput = output.normalize("NFKC").toLocaleLowerCase();
   if (!normalizedOutput) return false;
 
   for (const rawValue of protectedValues) {
     const value = normalize(rawValue);
     if (value.length < 12) continue;
     if (normalizedOutput.includes(value)) return true;
+
+    // Catch common direct transformations used to disguise copied settings.
+    const raw = rawValue.normalize("NFKC");
+    const encodedForms = [
+      encodeURIComponent(raw).toLocaleLowerCase(),
+      base64Utf8(raw).toLocaleLowerCase(),
+      base64Utf8(value).toLocaleLowerCase(),
+    ];
+    if (encodedForms.some((encoded) => encoded.length >= 24 && rawOutput.includes(encoded))) {
+      return true;
+    }
+
+    // Also check encoded long excerpts, not only the full setting.
     if (value.length >= 48) {
       for (let index = 0; index <= value.length - 32; index += 4) {
-        if (normalizedOutput.includes(value.slice(index, index + 32))) return true;
+        const excerpt = value.slice(index, index + 32);
+        if (normalizedOutput.includes(excerpt)) return true;
+        const encodedExcerpt = base64Utf8(excerpt).toLocaleLowerCase();
+        if (rawOutput.includes(encodedExcerpt)) return true;
       }
     }
   }
