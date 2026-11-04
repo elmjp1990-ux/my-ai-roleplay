@@ -80,7 +80,7 @@ BEGIN
     RAISE EXCEPTION 'service_role must retain table-level SELECT';
   END IF;
 END;
-$;
+$$;
 
 DO $$
 BEGIN
