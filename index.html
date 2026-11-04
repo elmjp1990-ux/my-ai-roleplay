@@ -3262,11 +3262,12 @@ async function loadCloudChatSessions(user) {
 }
 
 const chatSessionSaveQueue = window.POYOZZMemoryCapture?.createSerialQueue();
-const memoryMutationTracker = window.POYOZZMemoryCapture?.createMutationVersionTracker();
+const memoryMutationTracker = window.POYOZZMemoryCapture?.createMemoryMutationTracker();
 
 async function saveChatSessionSafely(s) {
   const requestedUid = currentUser()?.uid;
   const key = requestedUid && s?.id ? requestedUid + ':' + s.id : '';
+  const snapshot = s ? clone(s) : s;
   const performSave = async () => {
     const uid = currentUser()?.uid;
     const latest = s?.id && state.sessions?.[s.id] ? state.sessions[s.id] : s;
@@ -3274,7 +3275,15 @@ async function saveChatSessionSafely(s) {
       if (requestedUid && uid !== requestedUid) return false;
       if (latest?.cloudOwned && uid && latest.cloudOwnerUid === uid &&
           readDeletedChatTombstones(uid).sessions[latest.id]) return false;
-      return await saveChatSessionToCloud(latest);
+      const saved = await saveChatSessionToCloud(snapshot);
+      if (saved && s?.id) {
+        const target = state.sessions?.[s.id] || s;
+        target.cloudOwned = snapshot.cloudOwned;
+        target.cloudOwnerUid = snapshot.cloudOwnerUid;
+        target.cloudCharacterSnapshot = snapshot.cloudCharacterSnapshot;
+        memoryMutationTracker?.markSaved(s.id, snapshot.memories);
+      }
+      return saved;
     } catch (error) {
       if (latest?.cloudOwned && uid && latest.cloudOwnerUid === uid &&
           readDeletedChatTombstones(uid).sessions[latest.id]) return false;
