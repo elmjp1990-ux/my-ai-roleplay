@@ -3,6 +3,11 @@
 -- disposable transaction. Fixtures are rolled back by that outer transaction.
 \set ON_ERROR_STOP on
 
+-- The synthetic Storage schema requires USAGE before fixture INSERTs.
+-- This grant is confined to the outer disposable rollback transaction.
+GRANT USAGE ON SCHEMA storage TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated;
+
 DO $fixture$
 DECLARE
   v_author uuid := '10000000-0000-4000-8000-000000000040';
@@ -48,10 +53,8 @@ AS $function$
   SELECT pg_catalog.string_to_array(name, '/');
 $function$;
 
--- The disposable Storage shim grants SELECT only by default. Grant mutations
--- here so this test isolates row-policy behavior, not platform table grants.
-GRANT USAGE ON SCHEMA storage TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated;
+-- The disposable Storage shim's grants above isolate row-policy behavior,
+-- not platform table grants.
 
 SELECT pg_catalog.set_config('request.jwt.claim.sub',
   '10000000-0000-4000-8000-000000000040', true);
