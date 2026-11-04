@@ -39,5 +39,21 @@
     return takeCodePoints(memoryText, 3000).trim();
   }
 
-  return { buildPlayerMemoryExcerpt };
+  function appendMemoryWithLimit(existing, item, maxLength = 10000) {
+    const current = Array.isArray(existing) ? existing : [];
+    const next = [...current, item];
+    const size = (items) => items.reduce((total, memory) =>
+      total + Array.from(String(memory?.text ?? "")).length, 0);
+    const limit = Math.max(0, Number(maxLength) || 0);
+    while (size(next) > limit) {
+      const index = next.findIndex((memory) => !memory?.important);
+      if (index < 0 || next[index]?.id === item?.id) {
+        return { added: false, memories: current };
+      }
+      next.splice(index, 1);
+    }
+    return { added: true, memories: next };
+  }
+
+  return { buildPlayerMemoryExcerpt, appendMemoryWithLimit };
 });
