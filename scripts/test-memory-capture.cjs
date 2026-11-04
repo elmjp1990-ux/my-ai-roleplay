@@ -88,7 +88,7 @@ test("does not evict pinned memories or partially mutate history when a new item
 });
 
 test("uses Unicode code points when enforcing memory capacity", () => {
-  const existing = [{ id: "emoji", text: "😀".repeat(6), important: false }];
+  const existing = [{ id: "emoji", text: "😀".repeat(6), important: true }];
   const result = appendMemoryWithLimit(existing, { id: "next", text: "x".repeat(5), important: false }, 10);
   assert.equal(result.added, false);
   assert.deepEqual(result.memories, existing);
