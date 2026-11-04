@@ -3503,7 +3503,7 @@ async function runPendingChatTurn(s) {
       ? s.messages.slice(firstIndex, lastIndex + 1)
       : playerBatch;
     const playerText = playerBatch.map((message, index) =>
-      '玩家原話 ' + (index + 1) + '：' + String(message.text || '').trim()
+      '玩家原話 ' + (index + 1) + '：' + [...String(message.text || '').trim()].slice(0, 480).join('')
     ).join('\n');
     const characterName = sessionCharacter(s)?.name || '角色';
     const assistantText = dialogue.filter(message => message.role === 'assistant').slice(-5)
