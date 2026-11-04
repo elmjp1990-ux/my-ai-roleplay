@@ -59,6 +59,8 @@ CREATE TABLE public.account_deletion_requests (user_id uuid PRIMARY KEY);
 \ir ../supabase/migrations/20261015133300_chat_turn_transaction_functions.sql
 \ir ../supabase/migrations/20261015145637_fix_reserve_chat_turn_conflict_target.sql
 \ir ../supabase/migrations/20261015134109_chat_turn_ledger_idempotency.sql
+DO $roles$ DECLARE r text; BEGIN FOREACH r IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname=r) THEN EXECUTE format('CREATE ROLE %I',r); END IF; END LOOP; END $roles$;
+\ir ../supabase/migrations/20261104130000_reconcile_stale_story_chat_turns.sql
 
 -- Silver-only: exact original currency is restored; duplicate refund is idempotent.
 DO $test$
