@@ -3483,7 +3483,8 @@ async function runPendingChatTurn(s) {
     return;
   }
 
-  if (!s.messages.some(message => message.id === reply.id)) {
+  const replyWasAdded = !s.messages.some(message => message.id === reply.id);
+  if (replyWasAdded) {
     s.messages.push({
       id:reply.id,
       role:'assistant',
@@ -3494,9 +3495,24 @@ async function runPendingChatTurn(s) {
   delete s.pendingTurn;
 
   const users = s.messages.filter(message => message.role === 'user');
-  if (users.length && users.length % 5 === 0) {
-    const snippets = users.slice(-5).map(message => [...message.text].slice(0,7).join('')).join('、');
-    addMemory(s,[...('本輪對話摘錄：'+snippets+'。')].slice(0,50).join(''));
+  if (replyWasAdded && users.length && users.length % 5 === 0) {
+    const playerBatch = users.slice(-5);
+    const firstIndex = s.messages.findIndex(message => message.id === playerBatch[0]?.id);
+    const lastIndex = s.messages.findIndex(message => message.id === playerBatch[playerBatch.length - 1]?.id);
+    const dialogue = firstIndex >= 0 && lastIndex >= firstIndex
+      ? s.messages.slice(firstIndex, lastIndex + 1)
+      : playerBatch;
+    const playerText = playerBatch.map((message, index) =>
+      '玩家原話 ' + (index + 1) + '：' + String(message.text || '').trim()
+    ).join('\n');
+    const characterName = sessionCharacter(s)?.name || '角色';
+    const assistantText = dialogue.filter(message => message.role === 'assistant').slice(-5)
+      .map(message => characterName + '回應：' + String(message.text || '').trim()).join('\n');
+    const playerBlock = [...playerText].slice(0, 2500).join('');
+    const assistantBlock = [...assistantText].slice(0, 420).join('');
+    const memoryText = ('【玩家原話優先保存】\n' + playerBlock +
+      (assistantBlock ? '\n\n【角色回應脈絡】\n' + assistantBlock : '')).slice(0, 3000);
+    if (memoryText.trim()) addMemory(s, memoryText);
   }
 
   persist();
@@ -6936,8 +6952,8 @@ function renderChatOverlay(kind) {
     ? `<label class="field"><span>搜尋過往聊天記錄</span><input id="archiveSearchInput" type="search" placeholder="輸入聊天名稱或角色名稱…" autocomplete="off"></label>
       <div id="archiveSearchResults">${archiveSearchResults('')}</div>`
     : kind === 'diary'
-      ? '<section class="diary-summary"><div class="diary-summary-head"><div><p class="small muted diary-eyebrow">SWEET DIARY · LONG-TERM MEMORY</p><h3>把重要的瞬間，好好收藏</h3><p class="small muted">每 5 次玩家發言會建立一則日記摘錄；目前是測試文字，AI 摘要待串接。</p></div><div class="diary-count"><strong>'+memorySize(s.memories).toLocaleString()+'</strong><span>/ 10,000 字</span></div></div><div class="diary-meter"><span style="width:'+Math.min(100,memorySize(s.memories)/10000*100)+'%"></span></div><p class="small muted diary-hint">勾選「重大記憶」即可珍藏這段回憶；取消勾選後，就能再次編輯。</p></section>' +
-        ((s.memories||[]).map(m => '<article class="memory-item diary-memory-card '+(m.important?'is-important':'')+'"><div class="diary-memory-head"><label class="diary-check"><input type="checkbox" data-memory="'+e(m.id)+'" '+(m.important?'checked':'')+'><span class="diary-heart">'+(m.important?'♥':'♡')+'</span><span>'+(m.important?'重大記憶':'設為重大記憶')+'</span></label><span class="diary-memory-date">'+e(timeText(m.at))+'</span></div><p class="prose diary-memory-text">'+e(m.text)+'</p>'+(m.important?'<p class="small diary-lock-note">♥ 已珍藏，不會被自動清除</p>':'<button type="button" class="diary-edit-button" data-action="edit-memory" data-id="'+e(m.id)+'">編輯這則回憶</button>')+'</article>').join('') || '<div class="empty diary-empty"><strong>你們的故事，正等待被收藏</strong><p>當聊天累積到第 5 次玩家發言，系統會建立一則日記摘錄。測試模式可使用上方按鈕先驗收勾選與編輯功能。</p></div>')
+      ? '<section class="diary-summary"><div class="diary-summary-head"><div><p class="small muted diary-eyebrow">SWEET DIARY · LONG-TERM MEMORY</p><h3>把重要的瞬間，好好收藏</h3><p class="small muted">每 5 次玩家發言建立一則回憶摘錄，優先保留玩家原話與相關對話脈絡；重大記憶會優先保留。</p></div><div class="diary-count"><strong>'+memorySize(s.memories).toLocaleString()+'</strong><span>/ 10,000 字</span></div></div><div class="diary-meter"><span style="width:'+Math.min(100,memorySize(s.memories)/10000*100)+'%"></span></div><p class="small muted diary-hint">勾選「重大記憶」即可珍藏這段回憶；取消勾選後，就能再次編輯。</p></section>' +
+        ((s.memories||[]).map(m => '<article class="memory-item diary-memory-card '+(m.important?'is-important':'')+'"><div class="diary-memory-head"><label class="diary-check"><input type="checkbox" data-memory="'+e(m.id)+'" '+(m.important?'checked':'')+'><span class="diary-heart">'+(m.important?'♥':'♡')+'</span><span>'+(m.important?'重大記憶':'設為重大記憶')+'</span></label><span class="diary-memory-date">'+e(timeText(m.at))+'</span></div><p class="prose diary-memory-text">'+e(m.text)+'</p>'+(m.important?'<p class="small diary-lock-note">♥ 已珍藏，不會被自動清除</p>':'<button type="button" class="diary-edit-button" data-action="edit-memory" data-id="'+e(m.id)+'">編輯這則回憶</button>')+'</article>').join('') || '<div class="empty diary-empty"><strong>你們的故事，正等待被收藏</strong><p>當聊天累積到第 5 次玩家發言，系統會保存玩家原話與相關角色回應；你也可以將重要內容標記為重大記憶。</p></div>')
 
     : `${testControls}<div class="album-grid">${photos.map(p => `
         <button class="photo-button" data-action="photo" data-id="${e(p.id)}">
