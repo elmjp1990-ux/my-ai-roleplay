@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert";
-import { collectProtectedContext, findPrivateContextLeak } from "./private-context-guard.ts";
+import { collectProtectedContext, findPrivateContextLeak, preparePrivateContext } from "./private-context-guard.ts";
 
 Deno.test("collects author-only story notes and personality values without exposing keys", () => {
   const values = collectProtectedContext("隱藏結局：他其實早已知道真相。", {
@@ -10,6 +10,18 @@ Deno.test("collects author-only story notes and personality values without expos
   assertEquals(values.includes("隱藏結局：他其實早已知道真相。"), true);
   assertEquals(values.includes("表面冷淡，實際非常重視承諾。"), true);
   assertEquals(values.includes("雨天"), true);
+});
+
+Deno.test("caps prompt text but screens the complete private source", () => {
+  const privateInfo = "前段公開背景。" + "一般劇情描述。".repeat(500) +
+    "只有作者知道的最終秘密是主角其實早已收到那封信。";
+  const prepared = preparePrivateContext(privateInfo, { coreTraits: "冷靜而謹慎" }, 6000);
+  assertEquals(prepared.promptText.length, 6000);
+  assertEquals(prepared.protectedValues.includes(privateInfo), true);
+  assertEquals(findPrivateContextLeak(
+    "他說出了秘密：只有作者知道的最終秘密是主角其實早已收到那封信。",
+    prepared.protectedValues,
+  ), true);
 });
 
 Deno.test("blocks exact private setting disclosure", () => {
