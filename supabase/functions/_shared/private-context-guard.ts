@@ -46,10 +46,17 @@ const base64Utf8 = (value: string): string => {
   return btoa(binary);
 };
 
-export function findPrivateContextLeak(output: unknown, protectedValues: string[]): boolean {
+export function findPrivateContextLeak(
+  output: unknown,
+  protectedValues: string[],
+  priorOutputs: string[] = [],
+): boolean {
   if (typeof output !== "string" || !output.trim()) return false;
-  const normalizedOutput = normalize(output);
-  const rawOutput = output.normalize("NFKC").toLocaleLowerCase();
+  // Check a short rolling window of earlier assistant turns together with the
+  // current response, so a secret cannot be disclosed as individually small fragments.
+  const combinedOutput = [...priorOutputs, output].filter((part) => typeof part === "string").join("\n");
+  const normalizedOutput = normalize(combinedOutput);
+  const rawOutput = combinedOutput.normalize("NFKC").toLocaleLowerCase();
   if (!normalizedOutput) return false;
 
   for (const rawValue of protectedValues) {
