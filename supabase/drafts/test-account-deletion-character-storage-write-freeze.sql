@@ -50,6 +50,7 @@ $function$;
 
 -- The disposable Storage shim grants SELECT only by default. Grant mutations
 -- here so this test isolates row-policy behavior, not platform table grants.
+GRANT USAGE ON SCHEMA storage TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated;
 
 SELECT pg_catalog.set_config('request.jwt.claim.sub',
