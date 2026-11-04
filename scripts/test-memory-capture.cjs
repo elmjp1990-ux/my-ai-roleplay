@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { buildPlayerMemoryExcerpt, appendMemoryWithLimit, createSerialQueue, createMemoryMutationTracker } = require("../memory-capture.js");
+const { buildPlayerMemoryExcerpt, appendMemoryWithLimit, createSerialQueue, createMemoryMutationTracker, nextSessionUpdatedAt } = require("../memory-capture.js");
 
 function makeConversation(playerCount) {
   const messages = [];
@@ -135,4 +135,12 @@ test("only the newest mutation may roll back, using the last confirmed persisted
   assert.deepEqual(tracker.rollback("session", second), [{ id: "old", text: "persisted", important: false }]);
   tracker.markSaved("session", [{ id: "old", text: "first edit", important: false }]);
   assert.deepEqual(tracker.rollback("session", second), [{ id: "old", text: "first edit", important: false }]);
+});
+
+test("chat session version timestamps always advance beyond the prior server version", () => {
+  const previous = "2026-11-04T03:52:10.123456+00:00";
+  assert.equal(nextSessionUpdatedAt(previous, Date.parse(previous)), "2026-11-04T03:52:10.124Z");
+  assert.equal(nextSessionUpdatedAt(previous, Date.parse(previous) - 5000), "2026-11-04T03:52:10.124Z");
+  assert.equal(nextSessionUpdatedAt(previous, Date.parse(previous) + 5000), "2026-11-04T03:52:15.123Z");
+  assert.throws(() => nextSessionUpdatedAt(null), /valid previous chat-session version/);
 });
