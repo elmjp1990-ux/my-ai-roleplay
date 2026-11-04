@@ -55,8 +55,8 @@ assert.ok(clearStart >= 0 && clearEnd > clearStart);
 const clearWrapper = html.slice(clearStart, clearEnd);
 assert.match(clearWrapper, /chatSessionSaveQueue\(user\.uid \+ ':' \+ s\.id, clear\)/);
 
-assert.match(memoryEditor, /memoryMutationTracker\?\.begin\(s\.id, previousMemories\)/);
-assert.match(memoryEditor, /memoryMutationTracker\?\.rollback\(s\.id, mutationVersion\)/);
-assert.match(pinHandler, /memoryMutationTracker\?\.begin\(session\.id, session\.memories\)/);
-assert.match(pinHandler, /memoryMutationTracker\?\.rollback\(session\.id, mutationVersion\)/);
+assert.match(memoryEditor, /memoryMutationTracker\?\.begin\(s\.id,\s*previousMemories\)/);
+assert.match(memoryEditor, /memoryMutationTracker\?\.rollback\(s\.id,\s*mutationVersion\)/);
+assert.match(pinHandler, /memoryMutationTracker\?\.begin\(session\.id,\s*session\.memories\)/);
+assert.match(pinHandler, /memoryMutationTracker\?\.rollback\(session\.id,\s*mutationVersion\)/);
 console.log("Memory persistence, queue ordering, pin/edit/delete rollback and correction-priority contracts passed.");
