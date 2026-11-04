@@ -38,7 +38,7 @@ async function buildStoryMessages(
   userId: string,
   userMessageId: string,
   currentUserMessage: DbRow,
-): Promise<{ messages: Array<{ role: "system" | "user" | "assistant"; content: string }>; protectedContext: string[] }> {
+): Promise<{ messages: Array<{ role: "system" | "user" | "assistant"; content: string }>; protectedContext: string[]; priorAssistantOutputs: string[] }> {
   const characterId = String(session.character_id);
   const [characterResult, profileResult, historyResult] = await Promise.all([
     admin.from("characters")
@@ -165,6 +165,8 @@ async function buildStoryMessages(
   return {
     messages: [{ role: "system", content: system }, ...messages],
     protectedContext: preparePrivateContext(privateInfo, personalityProfile).protectedValues,
+    priorAssistantOutputs: historyRows.filter((row: DbRow) => row.role === "assistant")
+      .slice(-5).map((row: DbRow) => asString(row.content)).filter(Boolean),
   };
 }
 
@@ -401,10 +403,12 @@ Deno.serve(async (request) => {
 
   let messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
   let protectedContext: string[] = [];
+  let priorAssistantOutputs: string[] = [];
   try {
     const storyContext = await buildStoryMessages(admin, session, user.id, userMessageId, userMessage);
     messages = storyContext.messages;
     protectedContext = storyContext.protectedContext;
+    priorAssistantOutputs = storyContext.priorAssistantOutputs;
   } catch (error) {
     const code = String(error instanceof Error ? error.message : "story_context_failed").slice(0, 80);
     await admin.from("chat_turn_charges").update({
@@ -433,7 +437,7 @@ Deno.serve(async (request) => {
   }
 
   const providerResult = providerResponse.result;
-  if (providerResult.kind === "generated" && findPrivateContextLeak(providerResult.text, protectedContext)) {
+  if (providerResult.kind === "generated" && findPrivateContextLeak(providerResult.text, protectedContext, priorAssistantOutputs)) {
     // Never persist or return a response that reproduces author-only source material.
     // Record only a fixed reason code; never log the matched phrase or private text.
     await admin.from("chat_turn_events").insert({
