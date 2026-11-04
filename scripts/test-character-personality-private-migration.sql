@@ -1,20 +1,20 @@
 \set ON_ERROR_STOP on
 
-DO $
+DO $$
 BEGIN
   CREATE ROLE anon;
 EXCEPTION WHEN duplicate_object THEN NULL;
-END $;
-DO $
+END $$;
+DO $$
 BEGIN
   CREATE ROLE authenticated;
 EXCEPTION WHEN duplicate_object THEN NULL;
-END $;
-DO $
+END $$;
+DO $$
 BEGIN
   CREATE ROLE service_role;
 EXCEPTION WHEN duplicate_object THEN NULL;
-END $;
+END $$;
 
 -- This script runs only against the disposable PostgreSQL service in GitHub Actions.
 CREATE TABLE public.characters (
@@ -60,7 +60,7 @@ INSERT INTO public.characters (id, author_id, personality_profile) VALUES
 \i supabase/migrations/20261104062017_move_character_personality_profile_to_private_info.sql
 \i supabase/migrations/20261104095000_restrict_legacy_personality_profile_select.sql
 
-DO $
+DO $$
 BEGIN
   IF has_table_privilege('anon', 'public.characters', 'SELECT') THEN
     RAISE EXCEPTION 'anon must not retain table-level SELECT on public.characters';
