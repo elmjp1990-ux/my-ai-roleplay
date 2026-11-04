@@ -2928,16 +2928,24 @@ function chatSessionData(s) {
     startedAt:s.startedAt || Date.now(), archivedAt:s.archivedAt || null,
     memories:Array.isArray(s.memories) ? s.memories : [],
     album:Array.isArray(s.album) ? s.album : [],
-    roleplayMeta:Object.fromEntries((s.messages || [])
-      .filter(message => message.role === 'user' &&
-        (Array.isArray(message.displaySegments) || message.aiTargetId || message.commandType))
-      .map(message => [message.id, {
-        displaySegments:message.displaySegments || null,
-        aiTargetId:message.aiTargetId || null,
-        commandType:message.commandType || null
-      }])),
-    lastMessagePreview:(()=>{const last=[...(s.messages || [])].reverse().find(message=>String(message.text || '').trim());return last ? String(last.text || '').slice(0,180) : String(s.lastMessagePreview || '').slice(0,180);})(),
-    lastMessageAt:(()=>{const last=[...(s.messages || [])].reverse().find(message=>String(message.text || '').trim());return Number(last?.at) || Number(s.lastMessageAt) || null;})(),
+    roleplayMeta:s.messagesComplete === false && s.cloudRoleplayMeta && typeof s.cloudRoleplayMeta === 'object'
+      ? s.cloudRoleplayMeta
+      : Object.fromEntries((s.messages || [])
+          .filter(message => message.role === 'user' &&
+            (Array.isArray(message.displaySegments) || message.aiTargetId || message.commandType))
+          .map(message => [message.id, {
+            displaySegments:message.displaySegments || null,
+            aiTargetId:message.aiTargetId || null,
+            commandType:message.commandType || null
+          }])),
+    lastMessagePreview:(()=>{
+      const last=[...(s.messages || [])].reverse().find(message=>String(message.text || '').trim());
+      return String(s.messagesComplete === false ? (s.lastMessagePreview || last?.text || '') : (last?.text || s.lastMessagePreview || '')).slice(0,180);
+    })(),
+    lastMessageAt:(()=>{
+      const last=[...(s.messages || [])].reverse().find(message=>String(message.text || '').trim());
+      return s.messagesComplete === false ? (Number(s.lastMessageAt) || Number(last?.at) || null) : (Number(last?.at) || Number(s.lastMessageAt) || null);
+    })(),
     pendingTurn:s.pendingTurn &&
       isUuid(s.pendingTurn.turnId) &&
       isUuid(s.pendingTurn.userMessageId) &&
