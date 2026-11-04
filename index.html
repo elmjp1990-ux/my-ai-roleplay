@@ -1911,6 +1911,22 @@ const ids = (rows || []).map(row => row.id);
     }
   }
 
+const characterIllustrationSignedUrlCache = new Map();
+const characterIllustrationSignedUrlInflight = new Map();
+async function getCharacterIllustrationSignedUrl(storagePath) {
+  const now=Date.now();
+  const cached=characterIllustrationSignedUrlCache.get(storagePath);
+  if(cached&&cached.expiresAt>now+60000)return cached.url;
+  if(characterIllustrationSignedUrlInflight.has(storagePath))return characterIllustrationSignedUrlInflight.get(storagePath);
+  const request=(async()=>{
+    const {data,error}=await window.mySupabase.storage.from('character-illustrations').createSignedUrl(storagePath,3600);
+    if(error||!data?.signedUrl)throw new Error(error?.message||'無法取得角色立繪網址');
+    characterIllustrationSignedUrlCache.set(storagePath,{url:data.signedUrl,expiresAt:Date.now()+3300000});
+    return data.signedUrl;
+  })();
+  characterIllustrationSignedUrlInflight.set(storagePath,request);
+  try{return await request;}finally{characterIllustrationSignedUrlInflight.delete(storagePath);}
+}
 async function loadCharacterIllustrationAssets(characterIds) {
   const client=window.mySupabase;
   const ids=[...new Set((characterIds||[]).filter(Boolean))];
@@ -1924,10 +1940,10 @@ async function loadCharacterIllustrationAssets(characterIds) {
     .order('sort_order',{ascending:true});
   if(error)throw new Error('讀取角色立繪資料失敗：'+error.message);
   for(const row of rows||[]){
-    const {data,error:signedError}=await client.storage.from('character-illustrations').createSignedUrl(row.storage_path,3600);
-    if(signedError||!data?.signedUrl)continue;
+    let signedUrl;
+    try{signedUrl=await getCharacterIllustrationSignedUrl(row.storage_path);}catch(_){continue;}
     const list=result.get(row.character_id)||{primary:null,gallery:[]};
-    const asset={id:row.id,path:row.storage_path,src:data.signedUrl,sortOrder:row.sort_order,name:row.display_name||''};
+    const asset={id:row.id,path:row.storage_path,src:signedUrl,sortOrder:row.sort_order,name:row.display_name||''};
     if(row.asset_type==='primary')list.primary=asset;
     else list.gallery.push(asset);
     result.set(row.character_id,list);
@@ -1937,9 +1953,8 @@ async function loadCharacterIllustrationAssets(characterIds) {
 async function refreshCharacterIllustrationSignedUrl(storagePath) {
   const client=window.mySupabase;
   if(!client||typeof storagePath!=='string'||!storagePath)return null;
-  const {data,error}=await client.storage.from('character-illustrations').createSignedUrl(storagePath,3600);
-  if(error||!data?.signedUrl)throw new Error('角色立繪簽名網址更新失敗：'+(error?.message||'missing_signed_url'));
-  return data.signedUrl;
+  try{return await getCharacterIllustrationSignedUrl(storagePath);}
+  catch(error){throw new Error('角色立繪簽名網址更新失敗：'+(error?.message||'missing_signed_url'));}
 }
 if(!window.__characterIllustrationRefreshHandlerInstalled){
   window.__characterIllustrationRefreshHandlerInstalled=true;
@@ -2547,23 +2562,24 @@ if (characterError) {
     }
   }
 
-  // Google OAuth 回站後恢復 Session。
+  // Auth listener 先註冊，避免 getSession() 期間漏掉登入／登出事件。
+  // INITIAL_SESSION 由下方 getSession() 單一處理；TOKEN_REFRESHED 不重載整批資料。
   window.addEventListener('load', async () => {
     try {
-      const { data, error } = await window.mySupabase.auth.getSession();
+      if (!window.mySupabase?.auth) return;
+      window.mySupabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') return;
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+          syncSupabaseUser(session?.user || null);
+        }
+      });
 
+      const { data, error } = await window.mySupabase.auth.getSession();
       if (error) {
         console.error('Supabase Session 讀取失敗：', error);
         return;
       }
-
       syncSupabaseUser(data?.session?.user || null);
-      void loadPublicSupabaseCharacters();
-
-      window.mySupabase.auth.onAuthStateChange((event, session) => {
-        // INITIAL_SESSION / SIGNED_IN / TOKEN_REFRESHED 等狀態都統一交給同一入口。
-        syncSupabaseUser(session?.user || null);
-      });
     } catch (error) {
       console.error('Supabase Auth 初始化失敗：', error);
     }
