@@ -18,6 +18,7 @@ on:
       - "scripts/test-chat-turn-wallet-refund.sql"
       - "scripts/test-chat-turn-reconciliation-ui.mjs"
       - "supabase/migrations/20261104073621_add_ai_gateway_response_diagnostics.sql"
+      - "supabase/migrations/20261104130000_reconcile_stale_story_chat_turns.sql"
       - "memory-capture.js"
       - "scripts/test-memory-capture.cjs"
       - "scripts/test-memory-persistence-contract.mjs"
