@@ -8020,11 +8020,13 @@ document.addEventListener('click',async event => {
                 const {data:photo,error:photoError}=await client.from('chat_memory_photos').select('id').eq('id',photoId).eq('owner_id',user.id).eq('chat_type','single').eq('session_id',session.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).maybeSingle();
                 if(photoError||!photo)throw photoError||new Error('這張回憶相片已刪除或到期，請重新選擇。');
               }
-              const {data:row,error:readError}=await client.from('chat_sessions').select('session_data').eq('id',session.id).eq('user_id',user.id).maybeSingle();
+              const {data:row,error:readError}=await client.from('chat_sessions').select('session_data,updated_at').eq('id',session.id).eq('user_id',user.id).maybeSingle();
               if(readError||!row)throw readError||new Error('讀取聊天設定失敗。');
+              const expectedUpdatedAt=session.cloudUpdatedAt||row.updated_at;
               const nextData={...(row.session_data||{}),background:nextBackground};
-              const {data:saved,error:saveError}=await client.from('chat_sessions').update({session_data:nextData,updated_at:new Date().toISOString()}).eq('id',session.id).eq('user_id',user.id).select('id').maybeSingle();
-              if(saveError||!saved)throw saveError||new Error('資料庫未確認背景設定已儲存。');
+              const {data:saved,error:saveError}=await client.from('chat_sessions').update({session_data:nextData,updated_at:new Date().toISOString()}).eq('id',session.id).eq('user_id',user.id).eq('updated_at',expectedUpdatedAt).select('id,updated_at').maybeSingle();
+              if(saveError||!saved)throw saveError||new Error('聊天已在其他分頁或裝置更新，請重新載入後再設定背景。');
+              session.cloudUpdatedAt=saved.updated_at||session.cloudUpdatedAt;
             }
             const previous=session.background;session.background=nextBackground;
             if(!persist()){session.background=previous;throw new Error('本機設定保存失敗。');}
@@ -8466,19 +8468,21 @@ document.addEventListener('click',async event => {
             }
             // 置頂只需更新 session_data.pinned；不要重傳訊息，避免無關的訊息同步失敗阻擋置頂。
             const {data:cloudRow,error:readError}=await client.from('chat_sessions')
-              .select('session_data').eq('id',item.id).eq('user_id',uid).maybeSingle();
+              .select('session_data,updated_at').eq('id',item.id).eq('user_id',uid).maybeSingle();
             if (readError) throw new Error(readError.message);
             if (!cloudRow) throw new Error('找不到這筆雲端聊天紀錄。');
             const currentData=cloudRow.session_data && typeof cloudRow.session_data==='object'
               ? cloudRow.session_data : {};
+            const expectedUpdatedAt=item.cloudUpdatedAt||cloudRow.updated_at;
             const {data:updatedRow,error:updateError}=await client.from('chat_sessions')
               .update({
                 session_data:{...currentData,pinned:!!item.pinned},
                 updated_at:new Date().toISOString()
               })
-              .eq('id',item.id).eq('user_id',uid).select('id').maybeSingle();
+              .eq('id',item.id).eq('user_id',uid).eq('updated_at',expectedUpdatedAt).select('id,updated_at').maybeSingle();
             if (updateError) throw new Error(updateError.message);
-            if (!updatedRow?.id) throw new Error('雲端未確認置頂設定已儲存。');
+            if (!updatedRow?.id) throw new Error('聊天已在其他分頁或裝置更新，請重新載入後再設定置頂。');
+            item.cloudUpdatedAt=updatedRow.updated_at||item.cloudUpdatedAt;
           } catch (error) {
             console.error('PersonaX 單人聊天置頂同步失敗：',error);
             item.pinned=previousPinned;
@@ -9963,11 +9967,13 @@ document.addEventListener('change',async event => {
           if(!client||!uid||!s.cloudOwned||s.cloudOwnerUid!==uid)throw new Error('請先使用目前帳號擁有的已同步聊天。');
           const {data:photo,error:photoError}=await client.from('chat_memory_photos').select('id').eq('id',photoId).eq('owner_id',uid).eq('chat_type','single').eq('session_id',s.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).maybeSingle();
           if(photoError||!photo)throw photoError||new Error('找不到這張有效的回憶相片。');
-          const {data:row,error:readError}=await client.from('chat_sessions').select('session_data').eq('id',s.id).eq('user_id',uid).maybeSingle();
+          const {data:row,error:readError}=await client.from('chat_sessions').select('session_data,updated_at').eq('id',s.id).eq('user_id',uid).maybeSingle();
           if(readError||!row)throw readError||new Error('讀取聊天設定失敗。');
+          const expectedUpdatedAt=s.cloudUpdatedAt||row.updated_at;
           const nextData={...(row.session_data||{}),background:target.value};
-          const {data:saved,error:saveError}=await client.from('chat_sessions').update({session_data:nextData,updated_at:new Date().toISOString()}).eq('id',s.id).eq('user_id',uid).select('id').maybeSingle();
-          if(saveError||!saved)throw saveError||new Error('資料庫未確認背景設定已儲存。');
+          const {data:saved,error:saveError}=await client.from('chat_sessions').update({session_data:nextData,updated_at:new Date().toISOString()}).eq('id',s.id).eq('user_id',uid).eq('updated_at',expectedUpdatedAt).select('id,updated_at').maybeSingle();
+          if(saveError||!saved)throw saveError||new Error('聊天已在其他分頁或裝置更新，請重新載入後再設定背景。');
+          s.cloudUpdatedAt=saved.updated_at||s.cloudUpdatedAt;
           s.background=target.value;persist();const panel=$('view').querySelector('.chat-main');if(panel)void window.applySingleMemoryPhotoBackground?.(s,panel);toast('已更新聊天背景。');
         } catch(err) {s.background=previousBackground;target.value=previousBackground;console.error('回憶相片背景設定失敗',err);toast('背景設定失敗：'+(err.message||'請稍後再試。')); }
       } else if (s && ['avatar','none'].includes(target.value)) {
