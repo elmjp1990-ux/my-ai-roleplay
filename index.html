@@ -3526,6 +3526,19 @@ async function runPendingChatTurn(s) {
     return;
   }
 
+  if (result?.status === 'needs_reconciliation') {
+    // The provider may have completed even though the response or persistence acknowledgement was lost.
+    // Keep the stable pending turn and never imply that retrying can safely generate a second reply.
+    persist();
+    showDialog('回覆狀態確認中', `
+      <div class="stack">
+        <p>這次請求的處理結果尚未確認，角色可能已完成生成，但系統還沒有取得可核對的回覆紀錄。</p>
+        <p>為避免重複生成或重複扣款，請先不要再次送出相同訊息。本回合會保留待確認狀態；若重新整理後仍持續顯示，請聯絡客服並提供聊天回合資訊。</p>
+        <div class="row end"><button class="primary" data-action="back">知道了</button></div>
+      </div>`);
+    return;
+  }
+
   if (result?.status !== 'settled' || invokeError) {
     // Keep stable IDs locally. The next send action retries the same logical turn;
     // it must not append another user message or create another charge.
