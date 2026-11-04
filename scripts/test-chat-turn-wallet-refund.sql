@@ -61,6 +61,46 @@ CREATE TABLE public.account_deletion_requests (user_id uuid PRIMARY KEY);
 \ir ../supabase/migrations/20261015134109_chat_turn_ledger_idempotency.sql
 DO $roles$ DECLARE r text; BEGIN FOREACH r IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname=r) THEN EXECUTE format('CREATE ROLE %I',r); END IF; END LOOP; END $roles$;
 \ir ../supabase/migrations/20261104130000_reconcile_stale_story_chat_turns.sql
+\\ir ../supabase/migrations/20261104140000_restrict_chat_turn_rpc_execution.sql
+
+-- All wallet transaction RPCs are backend-only. Client roles must not be able
+-- to invoke SECURITY DEFINER functions that accept an explicit p_user_id.
+DO $wallet_acl$
+BEGIN
+  IF has_function_privilege('anon',
+      'public.reserve_chat_turn(uuid,uuid,uuid,uuid,uuid)', 'EXECUTE')
+     OR has_function_privilege('authenticated',
+      'public.reserve_chat_turn(uuid,uuid,uuid,uuid,uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'client_can_execute_reserve_chat_turn';
+  END IF;
+  IF has_function_privilege('anon',
+      'public.settle_chat_turn(uuid,uuid,uuid)', 'EXECUTE')
+     OR has_function_privilege('authenticated',
+      'public.settle_chat_turn(uuid,uuid,uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'client_can_execute_settle_chat_turn';
+  END IF;
+  IF has_function_privilege('anon',
+      'public.refund_chat_turn(uuid,uuid,uuid,text)', 'EXECUTE')
+     OR has_function_privilege('authenticated',
+      'public.refund_chat_turn(uuid,uuid,uuid,text)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'client_can_execute_refund_chat_turn';
+  END IF;
+  IF NOT has_function_privilege('service_role',
+      'public.reserve_chat_turn(uuid,uuid,uuid,uuid,uuid)', 'EXECUTE')
+     OR NOT has_function_privilege('service_role',
+      'public.settle_chat_turn(uuid,uuid,uuid)', 'EXECUTE')
+     OR NOT has_function_privilege('service_role',
+      'public.refund_chat_turn(uuid,uuid,uuid,text)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'service_role_wallet_rpc_execution_missing';
+  END IF;
+  IF has_function_privilege('anon',
+      'public.guard_chat_turn_assistant_insert()', 'EXECUTE')
+     OR has_function_privilege('authenticated',
+      'public.guard_chat_turn_assistant_insert()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'client_can_execute_chat_turn_trigger_function';
+  END IF;
+END
+$wallet_acl$;
 
 -- The recovery RPC must remain service-role-only; ordinary client roles cannot invoke it.
 DO $acl$
