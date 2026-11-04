@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildPromptVariableValues, applyPromptVariables } from "../_shared/prompt-context.ts";
 import { normalizeAiProviderResult } from "../_shared/ai-provider-result.ts";
 import { findPrivateContextLeak, preparePrivateContext } from "../_shared/private-context-guard.ts";
-import { buildGatewayProviderOptions } from "../_shared/ai-gateway-policy.ts";
+import { buildOpenRouterProviderOptions } from "../_shared/openrouter-provider-policy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,8 +22,8 @@ const isUuid = (value: unknown): value is string =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
 
-const AI_GATEWAY_URL = "https://ai-gateway.vercel.sh/v1/chat/completions";
-const DEFAULT_AI_GATEWAY_MODEL = "deepseek/deepseek-v4.1-flash-1017";
+const OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions";
+const DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-v4.1-flash-1017";
 const GENERATION_TIMEOUT_MS = 55_000;
 
 type DbRow = Record<string, unknown>;
@@ -177,23 +177,25 @@ async function requestStoryGeneration(
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
   apiKey: string,
   model: string,
-): Promise<{ result: ReturnType<typeof normalizeAiProviderResult>; httpStatus: number; requestId: string }> {
+): Promise<{ result: ReturnType<typeof normalizeAiProviderResult>; httpStatus: number; requestId: string; provider: string }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), GENERATION_TIMEOUT_MS);
   try {
-    const response = await fetch(AI_GATEWAY_URL, {
+    const response = await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, {
       method: "POST",
       headers: {
         "Authorization": "Bearer " + apiKey,
         "Content-Type": "application/json",
+        "X-OpenRouter-Title": "POYOZZ",
       },
       body: JSON.stringify({
         model,
         messages,
         temperature: 0.85,
         max_tokens: 1800,
-        // Vercel AI Gateway Chat Completions extension; fail if no compliant provider exists.
-        providerOptions: { gateway: buildGatewayProviderOptions().gateway },
+        // Only approved non-training providers may receive player content.
+        // No fallback is allowed: unavailable compliant providers fail closed.
+        provider: buildOpenRouterProviderOptions(),
       }),
       signal: controller.signal,
     });
@@ -211,6 +213,7 @@ async function requestStoryGeneration(
       result: normalizeAiProviderResult(payload),
       httpStatus: response.status,
       requestId: response.headers.get("x-request-id") || asString(payload.id),
+      provider: asString(payload.provider),
     };
   } finally {
     clearTimeout(timeout);
@@ -375,9 +378,9 @@ Deno.serve(async (request) => {
   }
   if (charge.status !== "reserved") return json({ error: "turn_not_processable" }, 409);
 
-  const gatewayKey = Deno.env.get("AI_GATEWAY_API_KEY");
-  if (!gatewayKey) return json({ error: "ai_gateway_not_configured", retryAllowed: true }, 503);
-  const model = Deno.env.get("AI_GATEWAY_MODEL") || DEFAULT_AI_GATEWAY_MODEL;
+  const openRouterKey = Deno.env.get("OPENROUTER_API_KEY");
+  if (!openRouterKey) return json({ error: "openrouter_not_configured", retryAllowed: true }, 503);
+  const model = Deno.env.get("OPENROUTER_MODEL") || DEFAULT_OPENROUTER_MODEL;
 
   // Atomically claim the reserved turn before calling the external provider.
   // A duplicate concurrent request sees needs_reconciliation and cannot make
@@ -427,7 +430,7 @@ Deno.serve(async (request) => {
 
   let providerResponse: Awaited<ReturnType<typeof requestStoryGeneration>>;
   try {
-    providerResponse = await requestStoryGeneration(messages, gatewayKey, model);
+    providerResponse = await requestStoryGeneration(messages, openRouterKey, model);
   } catch (error) {
     const code = error instanceof Error && error.name === "AbortError"
       ? "provider_request_timeout"
@@ -661,7 +664,7 @@ Deno.serve(async (request) => {
     status: settled,
     assistantMessage: { id: assistantMessageId, content: providerResult.text, role: "assistant" },
     billing: { cost: 2, silver_reserved: charge.silver_reserved, diamonds_reserved: charge.diamonds_reserved },
-    provider: { gateway: "vercel-ai-gateway", model },
+    provider: { gateway: "openrouter", model, upstream: providerResponse.provider || null },
   });
 
 });
