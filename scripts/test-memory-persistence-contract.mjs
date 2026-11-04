@@ -4,6 +4,9 @@ import assert from "node:assert/strict";
 const html = readFileSync("index.html", "utf8");
 const promptContext = readFileSync("supabase/functions/_shared/prompt-context.ts", "utf8");
 const chatTurn = readFileSync("supabase/functions/chat-turn/index.ts", "utf8");
+const storySession = readFileSync("supabase/functions/story-session/index.ts", "utf8");
+const encounterSession = readFileSync("supabase/functions/encounter-session/index.ts", "utf8");
+const memoryCapture = readFileSync("memory-capture.js", "utf8");
 
 // Memory must be persisted with the session metadata and hydrated on cloud reload.
 assert.match(html, /memories:\s*Array\.isArray\(s\.memories\)\s*\?\s*s\.memories\s*:\s*\[\]/);
@@ -54,6 +57,17 @@ const clearEnd = html.indexOf("async function runPendingChatTurn", clearStart);
 assert.ok(clearStart >= 0 && clearEnd > clearStart);
 const clearWrapper = html.slice(clearStart, clearEnd);
 assert.match(clearWrapper, /saveChatSessionSafely\(latest\)/);
+assert.match(saveWrapper, /snapshot\.cloudUpdatedAt = latest\.cloudUpdatedAt/);
+assert.match(cloudSave, /if \(!s\.cloudUpdatedAt \|\| !Number\.isFinite\(Date\.parse\(s\.cloudUpdatedAt\)\)\)/);
+assert.match(cloudSave, /currentRow\.data\.updated_at !== expectedUpdatedAt/);
+assert.doesNotMatch(cloudSave, /s\.cloudUpdatedAt \|\| currentRow\.data\.updated_at/);
+assert.match(cloudSave, /select\('id,character_snapshot,updated_at'\)/);
+assert.match(cloudSave, /expectedUpdatedAt = existing\.data\.updated_at/);
+assert.match(memoryCapture, /function nextSessionUpdatedAt\(previous, now = Date\.now\(\)\)/);
+assert.match(memoryCapture, /Math\.max\(clockMs, previousMs \+ 1\)/);
+assert.match(storySession, /character_snapshot,chat_mode,deleted_at,updated_at/);
+assert.match(encounterSession, /character_snapshot,session_data,chat_mode,deleted_at,updated_at/);
+
 
 assert.match(memoryEditor, /memoryMutationTracker\?\.begin\(s\.id,\s*previousMemories\)/);
 assert.match(memoryEditor, /memoryMutationTracker\?\.rollback\(s\.id,\s*mutationVersion\)/);
@@ -75,6 +89,10 @@ assert.match(clearWrapper, /saveChatSessionSafely\(latest\)/);
 // Other direct session metadata writes (pin/background) also use the same
 // updated_at compare-and-swap token and refresh the local version on success.
 assert.match(html, /eq\('updated_at',expectedUpdatedAt\)/);
+assert.doesNotMatch(html, /cloudUpdatedAt\|\|row\.updated_at/);
+assert.match(html, /nextSessionUpdatedAt\(expectedUpdatedAt\)/);
+assert.match(html, /row\.updated_at!==expectedUpdatedAt/);
+
 assert.match(html, /session\.cloudUpdatedAt=saved\.updated_at/);
 assert.match(html, /s\.cloudUpdatedAt=saved\.updated_at/);
 assert.match(html, /item\.cloudUpdatedAt=updatedRow\.updated_at/);
