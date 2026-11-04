@@ -62,6 +62,24 @@ CREATE TABLE public.account_deletion_requests (user_id uuid PRIMARY KEY);
 DO $roles$ DECLARE r text; BEGIN FOREACH r IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname=r) THEN EXECUTE format('CREATE ROLE %I',r); END IF; END LOOP; END $roles$;
 \ir ../supabase/migrations/20261104130000_reconcile_stale_story_chat_turns.sql
 
+-- The recovery RPC must remain service-role-only; ordinary client roles cannot invoke it.
+DO $acl$
+BEGIN
+  IF has_function_privilege('anon',
+      'public.reconcile_stale_story_chat_turns(integer,integer,integer)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'anon_can_execute_stale_reconciliation';
+  END IF;
+  IF has_function_privilege('authenticated',
+      'public.reconcile_stale_story_chat_turns(integer,integer,integer)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'authenticated_can_execute_stale_reconciliation';
+  END IF;
+  IF NOT has_function_privilege('service_role',
+      'public.reconcile_stale_story_chat_turns(integer,integer,integer)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'service_role_cannot_execute_stale_reconciliation';
+  END IF;
+END
+$acl$;
+
 -- Silver-only: exact original currency is restored; duplicate refund is idempotent.
 DO $test$
 DECLARE r record; n integer; s integer; d integer;
