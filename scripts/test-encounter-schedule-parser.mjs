@@ -84,4 +84,9 @@ assert.ok(html.includes("const characterIllustrationMetadataInflight = new Map()
 assert.ok(html.includes("async function loadCharacterIllustrationAssets(characterIds, cleanupUserId=null)"));
 assert.ok(html.includes("if(cleanupUserId)await retryCharacterIllustrationCleanup(cleanupUserId)"));
 
-// Character hydration only fetches story fields consumed by the UI; avoid downloading unused story descriptions/titles.\nassert.equal((html.match(/\\.from\\('character_stories'\\)\\s*\\.select\\('character_id, opening_message, visibility, created_at'\\)/g)||[]).length,2);\nassert.doesNotMatch(html, /\\.from\\('character_stories'\\)\\s*\\.select\\('id, character_id, story_name, description, opening_message, visibility, created_at'\\)/);\n\nconsole.log("Author schedule and illustration signed-URL refresh contract tests passed.");
+// Character hydration only fetches story fields consumed by the UI; avoid downloading unused story descriptions/titles.
+const minimalStorySelect = ".select('character_id, opening_message, visibility, created_at')";
+assert.equal(html.split(minimalStorySelect).length - 1, 2);
+assert.ok(!html.includes(".select('id, character_id, story_name, description, opening_message, visibility, created_at')"));
+
+console.log("Author schedule and illustration signed-URL refresh contract tests passed.");
