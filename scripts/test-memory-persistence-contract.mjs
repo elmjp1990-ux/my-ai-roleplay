@@ -21,6 +21,9 @@ assert.match(promptContext, /USER_MESSAGE:\s*str\(current\?\.content\)/);
 // The roleplay system instruction explicitly says a current player correction
 // overrides conflicting stale memory.
 assert.match(chatTurn, /新訊息若與舊記憶衝突，先以玩家當下明確更正為準/);
+assert.match(chatTurn, /priorAssistantOutputs: historyRows\.filter/);
+assert.match(chatTurn, /findPrivateContextLeak\(providerResult\.text, protectedContext, priorAssistantOutputs\)/);
+
 
 // Pin/unpin must persist and roll back local state if cloud sync fails.
 const pinHandlerStart = html.indexOf("if (target.dataset.memory) {");
