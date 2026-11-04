@@ -59,4 +59,17 @@ assert.match(memoryEditor, /memoryMutationTracker\?\.begin\(s\.id,\s*previousMem
 assert.match(memoryEditor, /memoryMutationTracker\?\.rollback\(s\.id,\s*mutationVersion\)/);
 assert.match(pinHandler, /memoryMutationTracker\?\.begin\(session\.id,\s*session\.memories\)/);
 assert.match(pinHandler, /memoryMutationTracker\?\.rollback\(session\.id,\s*mutationVersion\)/);
-console.log("Memory persistence, queue ordering, pin/edit/delete rollback and correction-priority contracts passed.");
+// Cross-tab/device writes use the existing updated_at field as a compare-and-swap token.
+const cloudSaveStart = html.indexOf("async function saveChatSessionToCloud(s, options = {})");
+const cloudSaveEnd = html.indexOf("async function loadCloudChatSessions", cloudSaveStart);
+assert.ok(cloudSaveStart >= 0 && cloudSaveEnd > cloudSaveStart);
+const cloudSave = html.slice(cloudSaveStart, cloudSaveEnd);
+assert.match(cloudSave, /select\('character_snapshot,updated_at'\)/);
+assert.match(cloudSave, /eq\('updated_at', expectedUpdatedAt\)/);
+assert.match(cloudSave, /s\.cloudUpdatedAt = sessionWrite\.data\.updated_at/);
+assert.match(cloudSave, /此聊天已在其他分頁或裝置更新/);
+assert.match(html, /cloudUpdatedAt:row\.updated_at \|\| null/);
+assert.match(saveWrapper, /target\.cloudUpdatedAt = snapshot\.cloudUpdatedAt/);
+assert.match(clearWrapper, /saveChatSessionSafely\(latest\)/);
+
+console.log("Memory persistence, per-session serialization, cross-device CAS and rollback contracts passed.");
