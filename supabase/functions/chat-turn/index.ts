@@ -4,6 +4,7 @@ import { buildPromptVariableValues, applyPromptVariables } from "../_shared/prom
 import { normalizeAiProviderResult } from "../_shared/ai-provider-result.ts";
 import { findPrivateContextLeak, preparePrivateContext } from "../_shared/private-context-guard.ts";
 import { buildOpenRouterProviderOptions } from "../_shared/openrouter-provider-policy.ts";
+import { releaseGenerationClaim } from "../_shared/chat-turn-claim.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -400,10 +401,8 @@ Deno.serve(async (request) => {
     turn_id: turnId, user_id: user.id, event_type: "generation_started", stage: "provider_request",
   });
   if (startedEventError) {
-    await admin.from("chat_turn_charges").update({
-      status: "reserved", failure_code: null, updated_at: new Date().toISOString(),
-    }).eq("turn_id", turnId).eq("user_id", user.id).eq("status", "needs_reconciliation")
-      .eq("failure_code", "provider_generation_in_progress");
+    const released = await releaseGenerationClaim(admin, turnId, user.id);
+    if (!released) return json({ status: "needs_reconciliation", error: "generation_claim_release_unconfirmed", retryAllowed: false }, 503);
     return json({ error: "generation_event_write_failed", retryAllowed: true }, 503);
   }
 
@@ -417,14 +416,12 @@ Deno.serve(async (request) => {
     priorAssistantOutputs = storyContext.priorAssistantOutputs;
   } catch (error) {
     const code = String(error instanceof Error ? error.message : "story_context_failed").slice(0, 80);
-    await admin.from("chat_turn_charges").update({
-      status: "reserved", failure_code: null, updated_at: new Date().toISOString(),
-    }).eq("turn_id", turnId).eq("user_id", user.id).eq("status", "needs_reconciliation")
-      .eq("failure_code", "provider_generation_in_progress");
+    const released = await releaseGenerationClaim(admin, turnId, user.id);
     await admin.from("chat_turn_events").insert({
       turn_id: turnId, user_id: user.id, event_type: "generation_context_failed",
       stage: "context", error_code: code,
     });
+    if (!released) return json({ status: "needs_reconciliation", error: "generation_claim_release_unconfirmed", retryAllowed: false }, 503);
     return json({ error: "story_context_unavailable", retryAllowed: true }, 503);
   }
 
@@ -538,15 +535,13 @@ Deno.serve(async (request) => {
     // A 429 or empty response is a confirmed non-generation result; release
     // the claim so the same stable turn can retry without a second reservation.
     if (providerResponse.httpStatus === 429 || providerResult.kind === "empty_output") {
-      await admin.from("chat_turn_charges").update({
-        status: "reserved", failure_code: null, updated_at: new Date().toISOString(),
-      }).eq("turn_id", turnId).eq("user_id", user.id).eq("status", "needs_reconciliation")
-        .eq("failure_code", "provider_generation_in_progress");
+      const released = await releaseGenerationClaim(admin, turnId, user.id);
       await admin.from("chat_turn_events").insert({
         turn_id: turnId, user_id: user.id, event_type: "provider_retryable_error",
         stage: "provider_response",
         error_code: providerResult.kind === "empty_output" ? "empty_output" : providerResult.code,
       });
+      if (!released) return json({ status: "needs_reconciliation", error: "generation_claim_release_unconfirmed", retryAllowed: false }, 503);
       return json({
         status: "provider_error",
         error: providerResult.kind === "empty_output" ? "empty_output" : providerResult.code,
