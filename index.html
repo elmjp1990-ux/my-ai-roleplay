@@ -5263,7 +5263,7 @@ async function toggleGroupPin(groupId) {
 function chatEntries() {
   const q=chatSearch.trim().toLocaleLowerCase();
   const items=visibleSessions().map(s=>({
-    kind:'session',value:s,sortAt:Number(s.messages?.at(-1)?.at||s.startedAt||0),pinned:!!s.pinned
+    kind:'session',value:s,sortAt:Number(s.messages?.at(-1)?.at||s.lastMessageAt||s.startedAt||0),pinned:!!s.pinned
   }));
   const groupPinned=readGroupPins();
   const groupItems=(groupPrototype.groups||[]).filter(group=>{
@@ -5314,6 +5314,7 @@ function chatEntries() {
     const c=sessionCharacter(s);
     if(!c) return '';
     const last=s.messages?.at(-1);
+    const lastPreview=last?.text||s.lastMessagePreview||(!s.messagesLoaded?'點擊載入最近訊息':'');
     return `<div class="chat-entry ${route.page==='conversation'&&route.id===s.id?'active':''}">
       <button class="pin ${s.pinned?'on':''}" data-action="pin"
               data-id="${e(s.id)}" aria-label="切換置頂">${ICON.pin}</button>
@@ -5326,8 +5327,8 @@ function chatEntries() {
       </button>
       <button class="select-chat" data-action="select-chat" data-id="${e(s.id)}">
         <div class="row between"><strong class="ellipsis">${e(s.name||c.name)}</strong>
-          <span class="small muted">${chatListDate(last?.at||s.startedAt)}</span></div>
-        <div class="ellipsis small muted">${e(last?.text||'')}</div>
+          <span class="small muted">${chatListDate(last?.at||s.lastMessageAt||s.startedAt)}</span></div>
+        <div class="ellipsis small muted">${e(lastPreview)}</div>
       </button>
       <button class="entry-menu" data-action="session-menu" data-id="${e(s.id)}" aria-label="刪除這段對話與回憶" title="刪除這段對話與回憶">⋯</button>
     </div>`;
@@ -6667,6 +6668,7 @@ function renderConversation() {
   panel.style.setProperty('--chat-photo',
     s.background === 'none' ? 'none' : `url(${JSON.stringify(safeImage(c.image))})`);
   renderMessages();
+  if (s.cloudOwned && !s.messagesLoaded) void loadCloudChatSessionMessages(s);
   if (s.storyMode) void loadStoryRelationshipState(s);
 
   if (route.chatOverlay) renderChatOverlay(route.chatOverlay);
