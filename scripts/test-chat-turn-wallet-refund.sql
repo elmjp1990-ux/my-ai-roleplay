@@ -175,7 +175,7 @@ BEGIN
 END
 $test$;
 
--- Confirmed retry (e.g. 429/empty output): release the claim, retry the same turn,
+-- Confirmed HTTP 429 retry: release the claim, retry the same turn,
 -- and eventually settle exactly one original reservation.
 DO $test$
 DECLARE r record; s integer; d integer; n integer;
