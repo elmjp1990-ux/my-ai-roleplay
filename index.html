@@ -8470,6 +8470,12 @@ document.addEventListener('click',async event => {
         go({page:'conversation',id:key});
         break;
       }
+      case 'load-older-messages': {
+        const item=state.sessions[key] || currentSession();
+        if (!item || item.id!==key || item.messagesLoading) break;
+        await loadCloudChatSessionMessages(item,{older:true});
+        break;
+      }
       case 'group-pin': {
         toggleGroupPin(key);
         break;
