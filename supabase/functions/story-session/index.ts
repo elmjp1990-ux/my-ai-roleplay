@@ -67,7 +67,7 @@ Deno.serve(async (request: Request) => {
   // A retry may only retrieve the exact Story session created for this owner/character.
   const { data: existing, error: existingError } = await admin
     .from("chat_sessions")
-    .select("id,user_id,character_id,character_name,character_snapshot,chat_mode,deleted_at")
+    .select("id,user_id,character_id,character_name,character_snapshot,chat_mode,deleted_at,updated_at")
     .eq("id", sessionId)
     .maybeSingle();
   if (existingError) return json({ error: "session_lookup_failed" }, 503);
