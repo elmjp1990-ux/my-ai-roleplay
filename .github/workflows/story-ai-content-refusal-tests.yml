@@ -13,6 +13,8 @@ on:
       - "scripts/test-character-personality-private-migration.sql"
       - "scripts/test-private-personality-column-usage.mjs"
       - "scripts/test-chat-turn-wallet-refund.sql"
+      - "memory-capture.js"
+      - "scripts/test-memory-capture.cjs"
       - "supabase/functions/chat-turn/index.ts"
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/prompt-variables.ts"
@@ -32,6 +34,8 @@ on:
       - "scripts/test-character-personality-private-migration.sql"
       - "scripts/test-private-personality-column-usage.mjs"
       - "scripts/test-chat-turn-wallet-refund.sql"
+      - "memory-capture.js"
+      - "scripts/test-memory-capture.cjs"
       - "supabase/functions/chat-turn/index.ts"
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/prompt-variables.ts"
@@ -93,6 +97,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify author-only personality data never reads from public characters
         run: node scripts/test-private-personality-column-usage.mjs
+      - name: Test five-turn player-first memory capture
+        run: node --test scripts/test-memory-capture.cjs
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
