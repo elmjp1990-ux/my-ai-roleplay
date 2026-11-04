@@ -60,15 +60,6 @@ assert.ok(clearStart >= 0 && clearEnd > clearStart);
 const clearWrapper = html.slice(clearStart, clearEnd);
 assert.match(clearWrapper, /saveChatSessionSafely\(latest\)/);
 assert.match(saveWrapper, /snapshot\.cloudUpdatedAt = latest\.cloudUpdatedAt/);
-assert.match(cloudSave, /if \(!s\.cloudUpdatedAt \|\| !Number\.isFinite\(Date\.parse\(s\.cloudUpdatedAt\)\)\)/);
-assert.match(cloudSave, /currentRow\.data\.updated_at !== expectedUpdatedAt/);
-assert.doesNotMatch(cloudSave, /s\.cloudUpdatedAt \|\| currentRow\.data\.updated_at/);
-assert.match(cloudSave, /select\('id,character_snapshot,updated_at'\)/);
-assert.match(cloudSave, /expectedUpdatedAt = existing\.data\.updated_at/);
-assert.match(memoryCapture, /function nextSessionUpdatedAt\(previous, now = Date\.now\(\)\)/);
-assert.match(memoryCapture, /Math\.max\(clockMs, previousMs \+ 1\)/);
-assert.match(storySession, /character_snapshot,chat_mode,deleted_at,updated_at/);
-assert.match(encounterSession, /character_snapshot,session_data,chat_mode,deleted_at,updated_at/);
 
 
 assert.match(memoryEditor, /memoryMutationTracker\?\.begin\(s\.id,\s*previousMemories\)/);
@@ -80,6 +71,15 @@ const cloudSaveStart = html.indexOf("async function saveChatSessionToCloud(s, op
 const cloudSaveEnd = html.indexOf("async function loadCloudChatSessions", cloudSaveStart);
 assert.ok(cloudSaveStart >= 0 && cloudSaveEnd > cloudSaveStart);
 const cloudSave = html.slice(cloudSaveStart, cloudSaveEnd);
+assert.match(cloudSave, /if \(!s\.cloudUpdatedAt \|\| !Number\.isFinite\(Date\.parse\(s\.cloudUpdatedAt\)\)\)/);
+assert.match(cloudSave, /currentRow\.data\.updated_at !== expectedUpdatedAt/);
+assert.doesNotMatch(cloudSave, /s\.cloudUpdatedAt \|\| currentRow\.data\.updated_at/);
+assert.match(cloudSave, /select\('id,character_snapshot,updated_at'\)/);
+assert.match(cloudSave, /expectedUpdatedAt = existing\.data\.updated_at/);
+assert.match(memoryCapture, /function nextSessionUpdatedAt\(previous, now = Date\.now\(\)\)/);
+assert.match(memoryCapture, /Math\.max\(clockMs, previousMs \+ 1\)/);
+assert.match(storySession, /character_snapshot,chat_mode,deleted_at,updated_at/);
+assert.match(encounterSession, /character_snapshot,session_data,chat_mode,deleted_at,updated_at/);
 assert.match(cloudSave, /select\('character_snapshot,updated_at'\)/);
 assert.match(cloudSave, /eq\('updated_at', expectedUpdatedAt\)/);
 assert.match(cloudSave, /s\.cloudUpdatedAt = sessionWrite\.data\.updated_at/);
