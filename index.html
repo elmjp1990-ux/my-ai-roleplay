@@ -3104,6 +3104,7 @@ async function loadCloudChatSessionMessages(session, options = {}) {
     const messagesElement = route.page === 'conversation' && route.id === session.id ? $('messages') : null;
     const previousHeight = messagesElement?.scrollHeight || 0;
     const previousTop = messagesElement?.scrollTop || 0;
+    const wasLoaded = session.messagesLoaded === true;
     session.messagesLoading = true;
     if (messagesElement && !session.messagesLoaded) {
       messagesElement.innerHTML = '<div class="empty chat-history-loading" role="status">正在載入最近的聊天紀錄…</div>';
@@ -3155,7 +3156,7 @@ async function loadCloudChatSessionMessages(session, options = {}) {
       if (!older && latest) { session.lastMessagePreview = String(latest.text || '').slice(0,180); session.lastMessageAt = latest.at; }
       persist();
       if (messagesElement && messagesElement.isConnected) {
-        renderMessages(false);
+        renderMessages(older || wasLoaded ? false : true);
         if (older) { const updated = $('messages'); if (updated) updated.scrollTop = previousTop + Math.max(0, updated.scrollHeight - previousHeight); }
         refreshChatEntryList();
       } else if (route.page === 'chat') refreshChatEntryList();
@@ -3250,8 +3251,8 @@ async function loadCloudChatSessions(user) {
     // 作者公開資料不應阻塞聊天室清單與對話首屏；改為背景補齊。
     if (snapshotAuthorIds.length) void loadChatSessionAuthorProfiles(user.id, snapshotAuthorIds);
 
-    // Re-read tombstones after all awaited profile/message requests. A stale
-    // response that began before deletion must never repopulate the local cache.
+    // Re-read tombstones immediately before local hydration. A stale response
+    // that began before deletion must never repopulate the local cache.
     const latestDeletedSessions = readDeletedChatTombstones(user.id).sessions;
     const beforeFilterCount = sessions.length;
     sessions = sessions.filter(row => !latestDeletedSessions[row.id]);
