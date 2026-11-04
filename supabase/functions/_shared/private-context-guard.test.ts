@@ -74,3 +74,17 @@ Deno.test("does not block unrelated roleplay output or short common values", () 
     ["冷淡", "喜歡咖啡"],
   ), false);
 });
+
+
+Deno.test("blocks a private setting stitched across recent assistant turns", () => {
+  const secret = "作者私密劇情的真正關鍵是那場十年前的事故由家族內部策劃，所有證據都被刻意隱藏，直到故事後期才會揭露。";
+  const fragments = [
+    secret.slice(0, 20),
+    secret.slice(20, 40),
+    secret.slice(40, 60),
+  ];
+  for (const fragment of fragments) {
+    assertEquals(findPrivateContextLeak(fragment, [secret]), false);
+  }
+  assertEquals(findPrivateContextLeak(fragments[2], [secret], fragments.slice(0, 2)), true);
+});
