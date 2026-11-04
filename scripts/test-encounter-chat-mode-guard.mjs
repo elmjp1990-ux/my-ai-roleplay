@@ -25,6 +25,18 @@ assert.match(frontend, /localStorageCompactMode = true/);
 assert.match(frontend, /雲端聊天仍會照常同步/);
 assert.match(frontend, /character\\?\\.visibility!==['\"]public['\"]\\|\\|character\\.deletedAt\\|\\|!accessible\\(character\\)/);
 assert.match(frontend, /Author access to a private character is for management only/);
+
+assert.ok(frontend.includes("Object.prototype.hasOwnProperty.call(priorSnapshot,'authorId') && priorSnapshot.authorId !== ''"));
+assert.ok(frontend.includes("snapshot.authorId === null || isUuid(snapshot.authorId)"));
+assert.ok(frontend.includes("Object.prototype.hasOwnProperty.call(canonical,'authorId') && canonical.authorId !== ''"));
+assert.ok(frontend.includes("Object.prototype.hasOwnProperty.call(snap,'authorId') ? snap.authorId : ''"));
+assert.ok(frontend.includes("creatorDisplayName:priorSnapshot.creatorDisplayName || character?.creatorDisplayName || ''"));
+assert.ok(frontend.includes("creatorHandleSnapshot:priorSnapshot.creatorHandleSnapshot || character?.creatorHandleSnapshot || ''"));
+assert.ok(frontend.includes("authorId:snapshot.authorId"));
+assert.ok(frontend.includes("creatorDisplayName:snapshot.creatorDisplayName ?? existingCharacter.creatorDisplayName ?? ''"));
+assert.ok(frontend.includes("BY ${e(creatorAttribution)}"));
+assert.ok(frontend.includes("c.authorId ? `<button class=\"author-link\""));
+
 assert.doesNotMatch(frontend, /const cityScheduleCache=new Map\(\)/);
 assert.match(frontend, /Always re-check through the server RPC when opening a city location/);
 assert.match(frontend, /character.encounterSchedules='';/);
@@ -78,7 +90,9 @@ assert.match(encounterTurn, /affinityPendingUntilSceneEnd/);
 assert.match(encounterTurn, /assistant_message_id_collision/);
 assert.match(encounterTurn, /reserve_encounter_chat_turn/);
 assert.doesNotMatch(encounterTurn, /from\(["']encounter_session_lifecycle["']\)/);
-assert.match(encounterTurn, /idempotent recovery of an already-reserved pre-expiry turn/);
+assert.match(encounterTurn, /Retry recovery: reuse only the exact expected deterministic reply/);
+assert.match(encounterTurn, /charge\.status !== "reserved" && charge\.status !== "needs_reconciliation"/);
+assert.match(encounterTurn, /existing && String\(existing\.content \|\| ""\)\.trim\(\) !== demoReply/);
 
 const atomicReservationMigration = fs.readFileSync(
   "supabase/migrations/20261031170000_atomic_encounter_turn_reservation.sql",

@@ -56,15 +56,6 @@ Deno.serve(async (request: Request) => {
   const { data: active, error: activeError } = await userClient.rpc("account_is_active");
   if (activeError || active !== true) return json({ error: "account_not_active" }, 403);
 
-  // This check runs with the caller's JWT so private.current_user_is_adult()
-  // evaluates the actual caller, not the service-role backend.
-  const { data: canOpen, error: accessError } = await userClient.rpc(
-    "can_open_encounter_session",
-    { p_character_id: characterId },
-  );
-  if (accessError) return json({ error: "encounter_access_check_failed" }, 503);
-  if (canOpen !== true) return json({ error: "character_unavailable_for_encounter" }, 403);
-
   // Retry-safe: return the same session only if it already belongs to this user,
   // is Encounter mode, and targets the same character. Never adopt an ID collision.
   const { data: existing, error: existingError } = await admin
@@ -91,6 +82,18 @@ Deno.serve(async (request: Request) => {
     }
     return json({ session: existing, idempotent: true });
   }
+
+  // New sessions must pass current character eligibility. Existing-session
+  // idempotent recovery is checked first below so a character archived after
+  // session creation cannot break a retry for that same owner's session.
+  // This check runs with the caller's JWT so private.current_user_is_adult()
+  // evaluates the actual caller, not the service-role backend.
+  const { data: canOpen, error: accessError } = await userClient.rpc(
+    "can_open_encounter_session",
+    { p_character_id: characterId },
+  );
+  if (accessError) return json({ error: "encounter_access_check_failed" }, 503);
+  if (canOpen !== true) return json({ error: "character_unavailable_for_encounter" }, 403);
 
   const { data: character, error: characterError } = await admin
     .from("characters")

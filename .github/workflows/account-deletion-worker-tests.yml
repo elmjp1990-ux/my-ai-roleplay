@@ -1,0 +1,194 @@
+name: Account deletion worker tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "supabase/functions/_shared/account-deletion-worker.ts"
+      - "supabase/functions/_shared/account-deletion-auth-fetch.ts"
+      - "supabase/functions/_shared/character-asset-cleanup-worker.ts"
+      - "supabase/functions/_shared/character-asset-cleanup-worker.test.ts"
+      - "supabase/functions/purge-character-assets/index.ts"
+      - "supabase/drafts/character-history-aware-deletion.sql"
+      - "supabase/drafts/sync-character-chat-snapshot-parent-lock-proposal.sql"
+      - "supabase/drafts/chat-archive-memory-photo-read-access.sql"
+      - "supabase/drafts/test-chat-archive-memory-photo-read-access.sql"
+      - "supabase/drafts/replay-local-security-drafts.sql"
+      - "supabase/drafts/character-deletion-existing-chat-continuation.sql"
+      - "supabase/drafts/chat-deletion-direct-parent-delete-privilege-guard.sql"
+      - "supabase/drafts/pr200-final-privilege-hardening.sql"
+      - "supabase/migrations/20261103195621_poyozz_chat_deletion_privilege_hardening.sql"
+      - "supabase/config.toml"
+      - "index.html"
+      - "supabase/functions/_shared/account-deletion-worker.test.ts"
+      - "supabase/functions/account-deletion-worker/index.ts"
+      - "supabase/drafts/account-deletion-character-preservation-draft.sql"
+      - "supabase/drafts/account-deletion-character-child-write-freeze.sql"
+      - "supabase/drafts/account-deletion-character-child-write-freeze-tests-2026-11-02.md"
+      - "supabase/drafts/account-archived-character-session-insert-guard.sql"
+      - "supabase/drafts/prepare-account-deletion-character-preservation-integration.sql"
+      - "supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql"
+      - "supabase/drafts/account-is-active-auth-user-existence-guard.sql"
+      - "supabase/migrations/20261104200000_account_is_active_auth_user_existence_guard.sql"
+      - "supabase/migrations/20261104200100_poyozz_account_deletion_preservation_atomic_lease.sql"
+      - "supabase/migrations/20261104200300_account_deletion_character_storage_write_freeze.sql"
+      - "supabase/drafts/replay-account-deletion-release-migration.sql"
+      - "supabase/drafts/test-account-deletion-character-storage-write-freeze.sql"
+      - "supabase/drafts/test-account-deletion-character-child-rls-freeze.sql"
+      - "supabase/migrations/20261104200100_poyozz_account_deletion_preservation_atomic_lease.sql"
+      - "supabase/drafts/replay-account-deletion-release-migration.sql"
+      - "supabase/drafts/chat-deletion-purge-cron.sql"
+      - "scripts/test-account-deletion-character-preservation-draft.mjs"
+      - "scripts/test-character-history-aware-deletion-draft.mjs"
+      - "supabase/drafts/character-history-fk-classification-2026-11-02.md"
+      - "supabase/drafts/export-disposable-schema-catalog.sql"
+      - "supabase/drafts/current-state-structure.json"
+      - "supabase/drafts/current-state-routines.json"
+      - "supabase/drafts/current-state-security.json"
+      - "supabase/drafts/current-state-effective-grants.json"
+      - "supabase/drafts/disposable-platform-bootstrap.sql"
+      - "supabase/drafts/verify-current-state-schema-fixture.sql"
+      - "supabase/drafts/verify-deletion-draft-replay.sql"
+      - "supabase/drafts/seed-character-deletion-legacy-fixtures.sql"
+      - "supabase/drafts/test-character-deletion-behavior.sql"
+      - "supabase/drafts/test-account-deletion-character-preservation-behavior.sql"
+      - "supabase/drafts/replay-and-test-character-deletion.sql"
+      - "supabase/drafts/verify-deletion-draft-rollback.sql"
+      - "supabase/drafts/current-state-schema-catalog-manifest-2026-11-02.md"
+      - "scripts/test-disposable-schema-catalog-snapshot.mjs"
+      - "scripts/build-disposable-schema-fixture.mjs"
+      - "scripts/test-build-disposable-schema-fixture.mjs"
+      - "supabase/drafts/account-deletion-worker-atomic-lease.sql"
+      - "supabase/drafts/test-account-deletion-worker-lease-security.sql"
+      - "supabase/drafts/replay-deletion-concurrency-setup.sql"
+      - "scripts/test-deletion-concurrency.sh"
+      - "scripts/test-character-chat-snapshot-races.sh"
+      - ".github/workflows/account-deletion-worker-tests.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "supabase/functions/_shared/account-deletion-worker.ts"
+      - "supabase/functions/_shared/character-asset-cleanup-worker.ts"
+      - "supabase/functions/_shared/character-asset-cleanup-worker.test.ts"
+      - "supabase/functions/purge-character-assets/index.ts"
+      - "supabase/drafts/character-history-aware-deletion.sql"
+      - "supabase/drafts/character-deletion-existing-chat-continuation.sql"
+      - "supabase/drafts/chat-deletion-direct-parent-delete-privilege-guard.sql"
+      - "supabase/drafts/pr200-final-privilege-hardening.sql"
+      - "supabase/migrations/20261103195621_poyozz_chat_deletion_privilege_hardening.sql"
+      - "supabase/config.toml"
+      - "supabase/functions/_shared/account-deletion-worker.test.ts"
+      - "supabase/functions/account-deletion-worker/index.ts"
+      - "supabase/drafts/account-deletion-character-preservation-draft.sql"
+      - "supabase/drafts/account-deletion-character-child-write-freeze.sql"
+      - "supabase/drafts/account-deletion-character-child-write-freeze-tests-2026-11-02.md"
+      - "supabase/drafts/account-archived-character-session-insert-guard.sql"
+      - "supabase/drafts/prepare-account-deletion-character-preservation-integration.sql"
+      - "supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql"
+      - "supabase/drafts/account-is-active-auth-user-existence-guard.sql"
+      - "supabase/migrations/20261104200000_account_is_active_auth_user_existence_guard.sql"
+      - "supabase/migrations/20261104200100_poyozz_account_deletion_preservation_atomic_lease.sql"
+      - "supabase/drafts/replay-account-deletion-release-migration.sql"
+      - "supabase/drafts/chat-archive-memory-photo-read-access.sql"
+      - "supabase/drafts/chat-deletion-purge-cron.sql"
+      - "scripts/test-account-deletion-character-preservation-draft.mjs"
+      - "scripts/test-character-history-aware-deletion-draft.mjs"
+      - "supabase/drafts/character-history-fk-classification-2026-11-02.md"
+      - "supabase/drafts/export-disposable-schema-catalog.sql"
+      - "supabase/drafts/current-state-structure.json"
+      - "supabase/drafts/current-state-routines.json"
+      - "supabase/drafts/current-state-security.json"
+      - "supabase/drafts/current-state-effective-grants.json"
+      - "supabase/drafts/disposable-platform-bootstrap.sql"
+      - "supabase/drafts/verify-current-state-schema-fixture.sql"
+      - "supabase/drafts/verify-deletion-draft-replay.sql"
+      - "supabase/drafts/seed-character-deletion-legacy-fixtures.sql"
+      - "supabase/drafts/test-character-deletion-behavior.sql"
+      - "supabase/drafts/test-account-deletion-character-preservation-behavior.sql"
+      - "supabase/drafts/replay-and-test-character-deletion.sql"
+      - "supabase/drafts/verify-deletion-draft-rollback.sql"
+      - "supabase/drafts/current-state-schema-catalog-manifest-2026-11-02.md"
+      - "scripts/test-disposable-schema-catalog-snapshot.mjs"
+      - "scripts/build-disposable-schema-fixture.mjs"
+      - "scripts/test-build-disposable-schema-fixture.mjs"
+      - "supabase/drafts/replay-deletion-concurrency-setup.sql"
+      - "scripts/test-deletion-concurrency.sh"
+      - ".github/workflows/account-deletion-worker-tests.yml"
+      - "supabase/drafts/sync-character-chat-snapshot-parent-lock-proposal.sql"
+      - "supabase/drafts/test-chat-archive-memory-photo-read-access.sql"
+      - "supabase/drafts/replay-local-security-drafts.sql"
+      - "supabase/drafts/account-deletion-worker-atomic-lease.sql"
+      - "supabase/drafts/test-account-deletion-worker-lease-security.sql"
+
+jobs:
+  account-deletion-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check account deletion Edge Function
+        run: deno check supabase/functions/account-deletion-worker/index.ts
+      - name: Run deterministic account deletion worker tests
+        run: deno test supabase/functions/_shared/account-deletion-worker.test.ts
+      - name: Type-check character asset cleanup Edge Function
+        run: deno check supabase/functions/purge-character-assets/index.ts
+      - name: Run deterministic character asset cleanup tests
+        run: deno test supabase/functions/_shared/character-asset-cleanup-worker.test.ts
+      - name: Check account deletion character-preservation draft invariants
+        run: node scripts/test-account-deletion-character-preservation-draft.mjs
+      - name: Check character asset cleanup path-lock invariants
+        run: node scripts/test-character-history-aware-deletion-draft.mjs
+      - name: Validate disposable schema-only catalog snapshot
+        run: node scripts/test-disposable-schema-catalog-snapshot.mjs
+      - name: Validate disposable schema fixture generation
+        run: node scripts/test-build-disposable-schema-fixture.mjs
+
+  disposable-schema-replay:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: poyo_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d poyo_disposable"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/poyo_disposable
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Bootstrap disposable Auth compatibility layer
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/disposable-platform-bootstrap.sql
+      - name: Generate current-state schema fixture
+        run: node scripts/build-disposable-schema-fixture.mjs > "$RUNNER_TEMP/current-state-schema.sql"
+      - name: Replay schema-only fixture in disposable PostgreSQL
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
+      - name: Verify current-state schema fingerprint and empty tables
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-current-state-schema-fixture.sql
+      - name: Replay generated PR #200 migration and behavior/security checks in rollback
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-account-deletion-release-migration.sql
+      - name: Replay deletion drafts and run hard/soft delete behavior tests in a rollback transaction
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-and-test-character-deletion.sql
+
+      - name: Replay local security drafts and archived-photo RLS behavior
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-local-security-drafts.sql
+      - name: Verify all deletion draft DDL and synthetic rows were rolled back
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-deletion-draft-rollback.sql
+      - name: Replay deletion drafts for two-session concurrency tests
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-deletion-concurrency-setup.sql
+          bash scripts/test-deletion-concurrency.sh
+          bash scripts/test-character-chat-snapshot-races.sh

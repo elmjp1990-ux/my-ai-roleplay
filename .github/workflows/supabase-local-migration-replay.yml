@@ -1,23 +1,45 @@
-name: Supabase local migration replay (manual)
+name: Supabase local synthetic schema replay (manual)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - security/chat-deletion-lifecycle-reconciliation
 
 permissions:
   contents: read
 
 jobs:
-  local-migration-replay:
-    runs-on: ubuntu-latest
+  local-synthetic-schema-replay:
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - name: Check out selected branch
-        uses: actions/checkout@v4
+      - name: Check out PR branch
+        uses: actions/checkout@v7.0.1
 
       - name: Install pinned Supabase CLI
         uses: supabase/setup-cli@v3
         with:
           version: 2.84.2
+
+      - name: Discover pinned CLI migration command and generate isolated migration name
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase migration --help
+          supabase migration new --help
+          migration_project="$RUNNER_TEMP/poyozz-migration-name-only"
+          mkdir -p "$migration_project/supabase/migrations"
+          printf '[project]\\nid = "poyozz-migration-name-only"\\n' > "$migration_project/supabase/config.toml"
+          cd "$migration_project"
+          supabase migration new poyozz_account_deletion_preservation_atomic_lease
+          generated="$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print -quit)"
+          if [[ -z "$generated" ]]; then
+            echo "Supabase CLI did not generate a migration file."
+            exit 1
+          fi
+          echo "CLI_GENERATED_MIGRATION_PATH=$generated"
+          echo "CLI_GENERATED_MIGRATION_FILENAME=$(basename "$generated")"
 
       - name: Verify isolated local-only environment
         shell: bash
@@ -32,45 +54,111 @@ jobs:
             exit 1
           fi
 
-      - name: Start disposable local Supabase database
+      - name: Verify frontend JavaScript and deletion tombstones
         shell: bash
         run: |
           set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const assert = require('node:assert/strict');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const storyEdge = fs.readFileSync('supabase/functions/story-session/index.ts', 'utf8');
+          assert.ok(
+            storyEdge.includes('.from("chat_sessions")') &&
+            storyEdge.includes('.is("deleted_at", null)') &&
+            storyEdge.includes('encounter_source_session_lookup_failed'),
+            'Story carry-over Edge Function must verify an active source session'
+          );
+          const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)]
+            .map(match => match[1]).filter(source => source.trim());
+          assert.ok(scripts.length > 0, 'No inline JavaScript script blocks found');
+          scripts.forEach((source, index) => {
+            try { new Function(source); }
+            catch (error) { throw new Error('Inline script ' + (index + 1) + ' failed syntax parsing: ' + error.message); }
+          });
+
+          const start = html.indexOf('  function readDeletedChatTombstones(uid) {');
+          const end = html.indexOf('  function cacheSessionsForUser(uid) {', start);
+          assert.ok(start >= 0 && end > start, 'Deletion tombstone helper block missing');
+          const helperSource = html.slice(start, end);
+          const values = new Map();
+          const localStorage = {
+            getItem: key => values.has(key) ? values.get(key) : null,
+            setItem: (key, value) => values.set(key, String(value)),
+          };
+          const isUuid = value =>
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+          const helpers = new Function(
+            'localStorage', 'isUuid', 'USER_DELETED_CHAT_TOMBSTONES_KEY_PREFIX',
+            helperSource + '; return {readDeletedChatTombstones,markDeletedChatTombstone,filterDeletedChatSessions};'
+          )(localStorage, isUuid, 'test-tombstones:');
+
+          const uid = '11111111-1111-4111-8111-111111111111';
+          const sessionId = '22222222-2222-4222-8222-222222222222';
+          const groupId = '33333333-3333-4333-8333-333333333333';
+          assert.equal(helpers.markDeletedChatTombstone(uid, 'sessions', sessionId), true);
+          assert.equal(helpers.markDeletedChatTombstone(uid, 'groups', groupId), true);
+          const filtered = helpers.filterDeletedChatSessions(uid, {
+            [sessionId]: { id: sessionId },
+            keep: { id: 'keep' },
+          });
+          assert.equal(filtered[sessionId], undefined, 'Deleted session must be filtered');
+          assert.ok(filtered.keep, 'Unrelated session must remain');
+          assert.ok(helpers.readDeletedChatTombstones(uid).groups[groupId], 'Group tombstone must persist');
+          console.log('Frontend syntax and deletion tombstone checks passed (' + scripts.length + ' inline scripts).');
+          NODE
+
+      - name: Start isolated local Supabase database without repository migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Use a temporary project directory with an empty migrations folder.
+          # Supabase CLI startup otherwise auto-applies this repo's incomplete
+          # pre-ledger history before the synthetic current-state schema is loaded.
+          local_project="$RUNNER_TEMP/poyozz-local-synthetic"
+          mkdir -p "$local_project/supabase/migrations"
+          sed 's/^project_id = .*/project_id = "poyozz-local-synthetic"/' \
+            supabase/config.toml > "$local_project/supabase/config.toml"
+          cd "$local_project"
           supabase db start
-          supabase migration list --local
-
-      - name: Apply security drafts on the disposable local database
-        shell: bash
-        run: |
-          set -euo pipefail
-          stats_draft="supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql"
-          truncate_draft="supabase/drafts/revoke-public-truncate-privileges-proposal.sql"
-          stats_migration="supabase/migrations/99999999999999_chat_deletion_cumulative_turn_statistics_ci.sql"
-          truncate_migration="supabase/migrations/99999999999998_revoke_public_truncate_ci.sql"
-          test -f "$stats_draft"
-          test -f "$truncate_draft"
-          test ! -e "$stats_migration"
-          test ! -e "$truncate_migration"
-          cp "$truncate_draft" "$truncate_migration"
-          cp "$stats_draft" "$stats_migration"
-          # Explicitly local: no link, no access token, no remote DB password.
-          supabase db reset --local --no-seed
-          supabase migration list --local
-
-      - name: Verify archived-turn schema, RPC guards and ACLs
-        shell: bash
-        run: |
-          set -euo pipefail
-          mapfile -t db_containers < <(docker ps --format '{{.Names}}' | grep '^supabase_db_' || true)
-          if [[ "${#db_containers[@]}" -ne 1 ]]; then
-            echo "Expected exactly one disposable Supabase database container; found ${#db_containers[@]}."
-            docker ps --format '{{.Names}}'
+          DB_URL="$(supabase status --output env | sed -n 's/^DB_URL=//p' | sed 's/^"//;s/"$//')"
+          if [[ -z "$DB_URL" ]]; then
+            echo "Could not resolve the isolated local Supabase DB_URL."
             exit 1
           fi
-          docker exec -i "${db_containers[0]}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
-            < supabase/drafts/chat-deletion-turn-stats-structural-verification.sql
+          echo "DATABASE_URL=$DB_URL" >> "$GITHUB_ENV"
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Load synthetic current-state schema and replay deletion security drafts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/build-disposable-schema-fixture.mjs > "$RUNNER_TEMP/current-state-schema.sql"
+          # Platform-owned default ACLs are intentionally skipped by the fixture generator;
+          # Supabase Local retains its own defaults for supabase_admin/auth_admin.
+          # Synthetic current-state baseline is intentional: the original pre-ledger
+          # profiles/characters foundation is unavailable. Do not replay old migrations.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-current-state-schema-fixture.sql
+          # Exercise the CLI-generated incremental migration itself, not only
+          # its source drafts. The script rolls back all DDL and synthetic rows.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-account-deletion-release-migration.sql
+
+          # Encounter/chat structural audits and character/account DML all run inside
+          # disposable transactions and are rolled back.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-local-security-drafts.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-and-test-character-deletion.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-deletion-draft-rollback.sql
+
+          # True independent-connection races use only this disposable local database.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-deletion-concurrency-setup.sql
+          DATABASE_URL="$DATABASE_URL" bash scripts/test-deletion-concurrency.sh
 
       - name: Stop and discard local database
         if: always()
         shell: bash
-        run: supabase stop --no-backup
+        run: |
+          cd "$RUNNER_TEMP/poyozz-local-synthetic"
+          supabase stop --no-backup

@@ -1,5 +1,8 @@
 -- Test-only fixtures inserted before the character deletion draft installs its AFTER INSERT origin trigger.
 -- All rows are inside replay-and-test-character-deletion.sql's outer transaction and are rolled back.
+SELECT pg_catalog.set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000001', true);
+SELECT pg_catalog.set_config('request.jwt.claim.role', 'authenticated', true);
+
 INSERT INTO auth.users (id)
 VALUES ('10000000-0000-4000-8000-000000000001')
 ON CONFLICT (id) DO NOTHING;

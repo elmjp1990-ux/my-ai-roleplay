@@ -1,0 +1,4 @@
+-- SUPERSEDED REFERENCE — DO NOT APPLY.
+-- The reviewed privilege changes now live in:
+-- supabase/migrations/20261103040547_poyozz_chat_deletion_privilege_hardening.sql
+-- The disposable replay uses that generated incremental migration directly.

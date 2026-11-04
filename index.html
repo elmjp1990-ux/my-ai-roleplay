@@ -1353,6 +1353,44 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
    * 不直接改 DOM，也絕對不刪除 #modal。
    */
   const USER_SESSIONS_KEY_PREFIX = 'personax-chat-sessions-v1:';
+  const USER_DELETED_CHAT_TOMBSTONES_KEY_PREFIX = 'personax-deleted-chat-tombstones-v1:';
+
+  // Local tombstones prevent a stale in-flight cloud sync or another tab from
+  // rehydrating a chat after the server has accepted its deletion.
+  function readDeletedChatTombstones(uid) {
+    if (!uid) return {sessions:{},groups:{}};
+    try {
+      const value = JSON.parse(localStorage.getItem(USER_DELETED_CHAT_TOMBSTONES_KEY_PREFIX + uid) || '{}');
+      const clean = {sessions:{},groups:{}};
+      for (const kind of ['sessions','groups']) {
+        const source = value?.[kind] && typeof value[kind] === 'object' ? value[kind] : {};
+        for (const [id, at] of Object.entries(source)) {
+          if (isUuid(id) && Number.isFinite(Number(at)) && Number(at) > 0) clean[kind][id] = Number(at);
+        }
+      }
+      return clean;
+    } catch (_) {
+      return {sessions:{},groups:{}};
+    }
+  }
+
+  function markDeletedChatTombstone(uid, kind, resourceId) {
+    if (!uid || !['sessions','groups'].includes(kind) || !isUuid(resourceId)) return false;
+    try {
+      const tombstones = readDeletedChatTombstones(uid);
+      tombstones[kind][resourceId] = Date.now();
+      localStorage.setItem(USER_DELETED_CHAT_TOMBSTONES_KEY_PREFIX + uid, JSON.stringify(tombstones));
+      return true;
+    } catch (error) {
+      console.warn('刪除聊天室的本機同步標記保存失敗：', error);
+      return false;
+    }
+  }
+
+  function filterDeletedChatSessions(uid, sessions) {
+    const deleted = readDeletedChatTombstones(uid).sessions;
+    return Object.fromEntries(Object.entries(sessions || {}).filter(([id]) => !deleted[id]));
+  }
 
   function cacheSessionsForUser(uid) {
     if (!uid || typeof state === 'undefined') return;
@@ -1367,7 +1405,9 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     if (!uid) return {};
     try {
       const saved = JSON.parse(localStorage.getItem(USER_SESSIONS_KEY_PREFIX + uid) || '{}');
-      return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {};
+      return saved && typeof saved === 'object' && !Array.isArray(saved)
+        ? filterDeletedChatSessions(uid, saved)
+        : {};
     } catch (_) {
       return {};
     }
@@ -1506,6 +1546,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
         state.account = {
           ...state.account,
           accountDeletionPending: true,
+          deletionRequestedAt: deletionStatus.requested_at || state.account.deletionRequestedAt || null,
           deletionScheduledFor: deletionStatus.scheduled_for
         };
         if (!pendingWalletError && pendingWallet) {
@@ -1529,6 +1570,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
         if (!state.account.accountDeletionModalDismissed &&
             route?.overlay?.name !== 'account-deletion-pending') {
           openModal('account-deletion-pending', {
+            requestedAt: deletionStatus.requested_at || state.account.deletionRequestedAt,
             scheduledFor: deletionStatus.scheduled_for
           });
         }
@@ -1947,10 +1989,11 @@ async function cancelCharacterIllustrationCleanupJob(jobId,userId) {
 }
 async function processCharacterIllustrationCleanupJob(job,userId) {
   const client=window.mySupabase;
-  const {data:references,error:referenceError}=await client.from('character_illustrations')
-    .select('id').eq('author_id',userId).eq('storage_path',job.storage_path).limit(1);
-  if(referenceError||references?.length) {
-    const reason=referenceError?.message||'此檔案仍被角色立繪資料引用';
+  const {data:canRemove,error:referenceError}=await client.rpc('can_process_character_illustration_cleanup',{
+    p_job_id:job.id,p_user_id:userId,p_storage_path:job.storage_path
+  });
+  if(referenceError||canRemove!==true) {
+    const reason=referenceError?.message||'帳號狀態或角色素材引用尚未允許清理';
     const {error:updateError}=await client.from('character_illustration_cleanup_jobs')
       .update({attempts:Number(job.attempts||0)+1,last_error:String(reason).slice(0,500),updated_at:new Date().toISOString()})
       .eq('id',job.id).eq('author_id',userId);
@@ -2705,7 +2748,9 @@ function load() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORE_KEY));
     if (saved?.version === 3 && Array.isArray(saved.characters) && saved.sessions) {
-      return {...freshState(),...saved};
+      const restored = {...freshState(),...saved};
+      if (restored.account?.uid) restored.sessions = filterDeletedChatSessions(restored.account.uid, restored.sessions);
+      return restored;
     }
     return migrateOld(JSON.parse(localStorage.getItem(OLD_KEY)));
   } catch (error) {
@@ -2786,7 +2831,11 @@ function sessionCharacter(s) {
   const snap = s.cloudCharacterSnapshot;
   if (!snap || snap.id !== s.characterId) return null;
   return {...snap, id:s.characterId, name:snap.name || s.characterName || '角色',
-    visibility:snap.visibility || 'private', reviewStatus:'draft', authorId:snap.authorId || '',
+    visibility:snap.visibility || 'private', reviewStatus:'draft',
+    authorId:Object.prototype.hasOwnProperty.call(snap,'authorId') ? snap.authorId : '',
+    creatorDisplayName:snap.creatorDisplayName || '',
+    creatorHandleSnapshot:snap.creatorHandleSnapshot || '',
+    accountArchivedAt:snap.accountArchivedAt || null,
     firstPublishedAt:snap.firstPublishedAt || null, deletedAt:snap.deletedAt || null,
     owner:false, cloudSnapshotOnly:true};
 }
@@ -2905,6 +2954,8 @@ async function saveChatSessionToCloud(s, options = {}) {
   const localUser = currentUser();
   if (!client || !localUser?.uid || !s) return false;
   if (!isUuid(s.characterId) || !isUuid(s.id)) return false;
+  if (s.cloudOwned && s.cloudOwnerUid === localUser.uid &&
+      readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
   // Generic blank chats remain local. Encounter and Story sessions are pre-created
   // by trusted Edge Functions, so their opening message and session metadata must sync
   // even before the player sends the first user message.
@@ -2921,6 +2972,7 @@ async function saveChatSessionToCloud(s, options = {}) {
     const currentRow = await client.from('chat_sessions').select('character_snapshot')
       .eq('id',s.id).eq('user_id',localUser.uid).maybeSingle();
     if (currentRow.error) throw new Error('讀取既有聊天快照失敗：'+currentRow.error.message);
+    if (readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
     if (currentRow.data?.character_snapshot) s.cloudCharacterSnapshot = currentRow.data.character_snapshot;
   }
   const priorSnapshot = s.cloudCharacterSnapshot && typeof s.cloudCharacterSnapshot === 'object'
@@ -2946,7 +2998,12 @@ async function saveChatSessionToCloud(s, options = {}) {
     style:character?.style ?? priorSnapshot.style ?? '',
     phoneSettings:character?.phoneSettings ?? priorSnapshot.phoneSettings ?? {},
     tags:Array.isArray(character?.tags) ? character.tags : (Array.isArray(priorSnapshot.tags) ? priorSnapshot.tags : []),
-    authorId:character?.authorId || priorSnapshot.authorId || '',
+    authorId:Object.prototype.hasOwnProperty.call(priorSnapshot,'authorId') && priorSnapshot.authorId !== ''
+      ? priorSnapshot.authorId
+      : (character?.authorId ?? ''),
+    creatorDisplayName:priorSnapshot.creatorDisplayName || character?.creatorDisplayName || '',
+    creatorHandleSnapshot:priorSnapshot.creatorHandleSnapshot || character?.creatorHandleSnapshot || '',
+    accountArchivedAt:priorSnapshot.accountArchivedAt ?? character?.accountArchivedAt ?? null,
     visibility:priorSnapshot.visibility || character?.visibility || 'private',
     firstPublishedAt:priorSnapshot.firstPublishedAt || character?.firstPublishedAt || null,
     deletedAt:priorSnapshot.deletedAt || character?.deletedAt || null
@@ -2966,7 +3023,10 @@ async function saveChatSessionToCloud(s, options = {}) {
       const { privateInfo: _legacyExistingPrivateInfo, ...safeExistingSnapshot } = existingSnapshot || {};
       s.cloudCharacterSnapshot = existingSnapshot ? safeExistingSnapshot : snapshot;
       const canonical = s.cloudCharacterSnapshot;
-      snapshot.authorId = canonical.authorId || snapshot.authorId;
+      if (Object.prototype.hasOwnProperty.call(canonical,'authorId') && canonical.authorId !== '') snapshot.authorId = canonical.authorId;
+      snapshot.creatorDisplayName = canonical.creatorDisplayName || snapshot.creatorDisplayName;
+      snapshot.creatorHandleSnapshot = canonical.creatorHandleSnapshot || snapshot.creatorHandleSnapshot;
+      snapshot.accountArchivedAt = canonical.accountArchivedAt ?? snapshot.accountArchivedAt;
       snapshot.visibility = canonical.visibility || snapshot.visibility;
       snapshot.firstPublishedAt = canonical.firstPublishedAt || snapshot.firstPublishedAt;
       snapshot.deletedAt = canonical.deletedAt || snapshot.deletedAt;
@@ -2995,6 +3055,7 @@ async function saveChatSessionToCloud(s, options = {}) {
   if (!sessionWrite.data?.id) {
     throw new Error('資料庫未確認聊天基本資料已寫入；本次不會標記同步成功。');
   }
+  if (readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
   s.cloudOwned = true;
   s.cloudOwnerUid = localUser.uid;
   s.cloudCharacterSnapshot = snapshot;
@@ -3005,12 +3066,14 @@ async function saveChatSessionToCloud(s, options = {}) {
     content:String(m.text ?? ''), created_at:new Date(Number(m.at) || Date.now()).toISOString()
   }));
   if (messages.length) {
+    if (readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
     const { data: savedMessages, error: messageError } = await client.from('chat_messages')
       .upsert(messages,{onConflict:'id'}).select('id');
     if (messageError) throw new Error('聊天訊息同步失敗：'+messageError.message);
     if (!Array.isArray(savedMessages) || savedMessages.length !== messages.length) {
       throw new Error('資料庫回報的已儲存訊息數量不符；請重新整理確認，勿視為同步完成。');
     }
+    if (readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
   }
   return true;
 }
@@ -3028,7 +3091,9 @@ async function loadCloudChatSessions(user) {
       .eq('user_id', user.id).is('deleted_at', null).order('updated_at', { ascending:false });
     if (error) throw new Error(error.message);
     if (state.account?.uid !== user.id) return;
-    const sessions = rows || [];
+    let sessions = (rows || []).filter(row =>
+      !readDeletedChatTombstones(user.id).sessions[row.id]
+    );
     const activeSessionIds = new Set(sessions.map(row => row.id));
     let changed = false;
     // 雲端清單不再包含的本帳號聊天，可能已被軟刪除；清掉過期本機副本，避免刷新後復活。
@@ -3076,6 +3141,21 @@ async function loadCloudChatSessions(user) {
           };
         }
       }
+    }
+
+    // Re-read tombstones after all awaited profile/message requests. A stale
+    // response that began before deletion must never repopulate the local cache.
+    const latestDeletedSessions = readDeletedChatTombstones(user.id).sessions;
+    const beforeFilterCount = sessions.length;
+    sessions = sessions.filter(row => !latestDeletedSessions[row.id]);
+    if (sessions.length !== beforeFilterCount) {
+      for (const [sessionId, cached] of Object.entries(state.sessions || {})) {
+        if (latestDeletedSessions[sessionId] && cached?.cloudOwned && cached.cloudOwnerUid === user.id) {
+          delete state.sessions[sessionId];
+        }
+      }
+      persist();
+      cacheSessionsForUser(user.id);
     }
 
     const bySession = new Map();
@@ -3144,20 +3224,36 @@ async function loadCloudChatSessions(user) {
         const existingCharacterIndex = state.characters.findIndex(character => character.id === row.character_id);
         if (existingCharacterIndex >= 0) {
           const existingCharacter = state.characters[existingCharacterIndex];
-          // 既有本機角色資料若缺作者 ID，以雲端聊天快照補齊，不覆蓋已存在的作者 ID。
-          if (!existingCharacter.authorId && snapshot.authorId) {
+          // 雲端快照是既有聊天的權威來源；明確的 authorId:null 必須清除本機舊作者 ID。
+          if (Object.prototype.hasOwnProperty.call(snapshot,'authorId') &&
+              (snapshot.authorId === null || isUuid(snapshot.authorId))) {
             state.characters[existingCharacterIndex] = {
-              ...existingCharacter, authorId:snapshot.authorId
+              ...existingCharacter,
+              authorId:snapshot.authorId,
+              creatorDisplayName:snapshot.creatorDisplayName ?? existingCharacter.creatorDisplayName ?? '',
+              creatorHandleSnapshot:snapshot.creatorHandleSnapshot ?? existingCharacter.creatorHandleSnapshot ?? '',
+              accountArchivedAt:snapshot.accountArchivedAt ?? existingCharacter.accountArchivedAt ?? null,
+              visibility:snapshot.visibility ?? existingCharacter.visibility
             };
           }
         } else {
           state.characters.push({...snapshot, id:row.character_id, name:snapshot.name || row.character_name || '角色',
-            visibility:'private', reviewStatus:'draft', authorId:snapshot.authorId || '', owner:false, cloudSnapshotOnly:true});
+            visibility:'private', reviewStatus:'draft',
+            authorId:Object.prototype.hasOwnProperty.call(snapshot,'authorId') && snapshot.authorId !== '' ? snapshot.authorId : null,
+            creatorDisplayName:snapshot.creatorDisplayName || '',
+            creatorHandleSnapshot:snapshot.creatorHandleSnapshot || '',
+            accountArchivedAt:snapshot.accountArchivedAt || null,
+            owner:false, cloudSnapshotOnly:true});
         }
       }
       changed = true;
     }
-    if (changed) { persist(); render(); }
+    if (changed) persist();
+    if (route.page === 'conversation' && route.id && !state.sessions[route.id]) {
+      go({page:'chat'});
+      return;
+    }
+    if (changed) render();
   } catch (error) {
     console.error('雲端聊天載入失敗：', error);
     if (state.account?.uid === user.id) toast('雲端聊天載入失敗：' + error.message);
@@ -3166,9 +3262,15 @@ async function loadCloudChatSessions(user) {
 
 async function saveChatSessionSafely(s) {
   try {
+    const uid=currentUser()?.uid;
+    if (s?.cloudOwned && uid && s.cloudOwnerUid===uid &&
+        readDeletedChatTombstones(uid).sessions[s.id]) return false;
     const saved = await saveChatSessionToCloud(s);
     return saved;
   } catch (error) {
+    const uid=currentUser()?.uid;
+    if (s?.cloudOwned && uid && s.cloudOwnerUid===uid &&
+        readDeletedChatTombstones(uid).sessions[s.id]) return false;
     console.error('PersonaX 聊天同步失敗：',error);
     toast(error.message || '聊天已保存在本機，但雲端同步失敗。');
     return false;
@@ -3377,11 +3479,23 @@ async function runPendingChatTurn(s) {
 
 function toast(text) {
   clearTimeout(toastTimer);
-  const notice = $('toast');
+  let notice = $('toast');
   const modal = $('modal');
+  // showDialog() replaces modal.innerHTML; if the toast was previously moved
+  // into the dialog, that replacement can detach #toast from the document.
+  // Recreate it before checking its parent or displaying the notification.
+  if (!notice) {
+    notice = document.createElement('div');
+    notice.id = 'toast';
+    notice.className = 'hidden';
+    notice.setAttribute('role', 'status');
+  }
   // Native dialog occupies the browser top layer, so place notifications inside it when open.
-  if (modal?.open && notice.parentElement !== modal) modal.appendChild(notice);
-  else if (!modal?.open && notice.parentElement !== document.body) document.body.appendChild(notice);
+  if (modal?.open) {
+    if (notice.parentElement !== modal) modal.appendChild(notice);
+  } else if (notice.parentElement !== document.body) {
+    document.body.appendChild(notice);
+  }
   notice.textContent = text;
   notice.classList.remove('hidden');
   toastTimer = setTimeout(() => notice.classList.add('hidden'),3500);
@@ -3494,6 +3608,24 @@ function go(next, replace = false) {
 function back() {
   if (history.state?.personax && history.state.depth > 0) history.back();
   else go({page:'home'},true);
+}
+function formatAccountDeletionPeriod(requestedAt, scheduledFor) {
+  const start = new Date(requestedAt).getTime();
+  const end = new Date(scheduledFor).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return '後端設定的期限';
+  const minutes = Math.ceil((end - start) / 60000);
+  if (minutes >= 1440 && minutes % 1440 === 0) return `${minutes / 1440} 天`;
+  if (minutes >= 60 && minutes % 60 === 0) return `${minutes / 60} 小時`;
+  return `${minutes} 分鐘`;
+}
+function formatAccountDeletionDeadline(value) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '系統顯示的截止期限';
+  return date.toLocaleString('zh-TW', {
+    timeZone: 'Asia/Taipei',
+    year: 'numeric', month: 'long', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  });
 }
 function openModal(name, data = {}) {
   go({...route,overlay:{name,...data}},!!route.overlay);
@@ -3669,6 +3801,7 @@ function render() {
       ...route,
       overlay: {
         name: 'account-deletion-pending',
+        requestedAt: state.account.deletionRequestedAt,
         scheduledFor: state.account.deletionScheduledFor
       }
     };
@@ -3717,7 +3850,7 @@ function renderHome() {
       ${state.account?.accountDeletionPending ? `
         <section class="card" style="border:1px solid #d97706;padding:14px;margin-bottom:14px">
           <strong>帳號正在等待刪除</strong>
-          <p class="muted small" style="margin:6px 0 10px">此帳號目前無法使用 PersonaX 功能。若要保留帳號與錢包餘額，請在後端設定的期限內取消刪除申請。</p>
+          <p class="muted small" style="margin:6px 0 10px">此帳號目前暫停使用功能。若要保留帳號與錢包餘額，請在後端設定的期限內取消刪除申請。</p>
           <button class="primary" data-action="pending-show-deletion-modal">查看狀態／取消刪除</button>
         </section>` : ''}
       <section class="hero" id="hero"></section>
@@ -3898,9 +4031,11 @@ function renderDetail() {
   const offline = characterIsOffline(c);
   // 作者正在查看自己建立的角色時，以已登入帳號的真實會員資料為後備，
   // 避免私密角色因 profiles RLS 或作者快取未載入而顯示「故事創作者」。
-  const a = (c.owner || state.account?.uid === c.authorId)
+  const a = c.authorId ? ((c.owner || state.account?.uid === c.authorId)
     ? author(state.account?.uid || c.authorId)
-    : author(c.authorId);
+    : author(c.authorId)) : null;
+  const creatorAttribution = c.creatorDisplayName ||
+    (c.creatorHandleSnapshot ? '@'+String(c.creatorHandleSnapshot).replace(/^@/,'') : '原作者');
   $('view').innerHTML = `
     <div class="stack">
       <button class="ghost" data-action="back">← 返回上一頁</button>
@@ -3910,7 +4045,7 @@ function renderDetail() {
 ${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline-image' : ''}" data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline aria-label="${e(c.name)} 的角色影片"></video>` : `<img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" ${c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath)+'"' : ''} alt="${e(c.name)}">`}
           <div class="detail-portrait-meta">
             <h1>${e(c.name)}</h1>
-            <button class="author-link" data-action="author" data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>
+            ${c.authorId ? `<button class="author-link" data-action="author" data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>` : `<span class="small muted">BY ${e(creatorAttribution)}</span>`}
             ${c.deletedAt ? '' : `<div class="detail-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(c.chats || 0)}" title="對話回合數">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
               <span>${e(c.chats || 0)}</span>
@@ -5257,7 +5392,8 @@ async function groupLoadList(force=false) {
       .is('archived_at',null).order('updated_at',{ascending:false});
     if(error) throw error;
     if(user.id!==currentUser()?.uid) { groupResetForAccount(currentUser()?.uid||null); return; }
-    g.ownerUid=user.id;g.groups=data||[];g.groupPreviews={};g.groupMembers={};
+    const deletedGroupIds = readDeletedChatTombstones(user.id).groups;
+    g.ownerUid=user.id;g.groups=(data||[]).filter(group=>!deletedGroupIds[group.id]);g.groupPreviews={};g.groupMembers={};
     if(g.groups.length) {
       try {
         const groupIdsForMembers=g.groups.map(group=>group.id);
@@ -5301,6 +5437,13 @@ async function groupLoadList(force=false) {
       }
     }
     if(user.id!==currentUser()?.uid) { groupResetForAccount(currentUser()?.uid||null); return; }
+    // A group may have been deleted while member/preview requests were in flight.
+    const latestDeletedGroups = readDeletedChatTombstones(user.id).groups;
+    const retainedGroups = g.groups.filter(group=>!latestDeletedGroups[group.id]);
+    const retainedIds = new Set(retainedGroups.map(group=>group.id));
+    g.groups = retainedGroups;
+    for (const groupId of Object.keys(g.groupPreviews)) if (!retainedIds.has(groupId)) delete g.groupPreviews[groupId];
+    for (const groupId of Object.keys(g.groupMembers)) if (!retainedIds.has(groupId)) delete g.groupMembers[groupId];
     g.groupsLoaded=true;g.loadingGroups=false;g.loadError='';
   } catch(error) {
     g.groupsLoaded=true;g.loadingGroups=false;g.loadError=groupFriendlyError(error)||'讀取群組清單失敗。';
@@ -5353,7 +5496,7 @@ async function groupOpen(groupId) {
     }
     const members=memberRows.map(m=>{const snapshot=m.character_snapshot||{};const characterId=m.character_id||null;const snapshotId=snapshot.id||characterId||null;const displayId=characterId||snapshotId||m.id;return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,avatar_url:avatarById[characterId]||snapshot.avatar_url||snapshot.image||'',position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};});
     groupExpandedMemberId=null;
-    const memoryPhotos=await Promise.all((photoRes.data||[]).map(async photo=>{const {data:signed,error:signedError}=await window.mySupabase.storage.from('personax-memory-photos').createSignedUrl(photo.storage_path,3600);if(signedError)console.warn('群組背景相片簽名網址失敗',signedError.message);return {...photo,image_url:!signedError&&signed?.signedUrl?signed.signedUrl:''};}));
+    const memoryPhotos=await Promise.all((photoRes.data||[]).map(async photo=>{const {data:signed,error:signedError}=await window.mySupabase.storage.from('personax-memory-photos').createSignedUrl(photo.storage_path,300);if(signedError)console.warn('群組背景相片簽名網址失敗',signedError.message);return {...photo,image_url:!signedError&&signed?.signedUrl?signed.signedUrl:''};}));
     const messages=(messageRes.data||[]).map(m=>{
       const speakerSnapshot=m.speaker_snapshot||{};
       const member=members.find(x=>x.characterId===m.character_id)||members.find(x=>x.characterSnapshotId===speakerSnapshot.id||x.id===speakerSnapshot.id);
@@ -5391,7 +5534,7 @@ async function openGroupBackgroundSettings() {
       .order('created_at',{ascending:false});
     if(error)throw error;
     group.memoryPhotos=await Promise.all((data||[]).map(async photo=>{
-      const {data:signed,error:signedError}=await client.storage.from('personax-memory-photos').createSignedUrl(photo.storage_path,3600);
+      const {data:signed,error:signedError}=await client.storage.from('personax-memory-photos').createSignedUrl(photo.storage_path,300);
       if(signedError)console.warn('群組背景相片簽名網址失敗',signedError.message);
       return {...photo,image_url:!signedError&&signed?.signedUrl?signed.signedUrl:''};
     }));
@@ -5748,7 +5891,7 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
         if(!ctx.session.cloudOwned||ctx.session.cloudOwnerUid!==uid)throw new Error('請先使用目前帳號擁有的雲端聊天。');
         const {data,error}=await client.from('chat_memory_photos').select('id,caption,storage_path,created_at').eq('owner_id',uid).eq('chat_type','single').eq('session_id',ctx.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false});
         if(error)throw error;
-        rows=await Promise.all((data||[]).map(async p=>{const {data:signed,error:signedError}=await client.storage.from('personax-memory-photos').createSignedUrl(p.storage_path,3600);return !signedError&&signed?.signedUrl?{id:p.id,caption:p.caption||'',url:signed.signedUrl}:null;}));
+        rows=await Promise.all((data||[]).map(async p=>{const {data:signed,error:signedError}=await client.storage.from('personax-memory-photos').createSignedUrl(p.storage_path,300);return !signedError&&signed?.signedUrl?{id:p.id,caption:p.caption||'',url:signed.signedUrl}:null;}));
         rows=rows.filter(Boolean);
       }
       if(chatBackgroundDraft?.key!==ctx.key)return;draft.photos=rows;draft.loaded=true;draft.loading=false;
@@ -5774,15 +5917,30 @@ function loadGroupDiaryMemories(groupId=groupPrototype.active?.id) {
 const groupDiaryCloudReady=new Map();
 const groupDiaryCloudSaveTimers=new Map();
 const groupDiaryCloudSaveChains=new Map();
+function clearGroupDiaryLocalData(groupId,uid=currentUser()?.uid) {
+  if(!groupId||!uid)return;
+  try { localStorage.removeItem('personax-group-diary-v1:'+uid+':'+groupId); }
+  catch(error) { console.warn('群組日記本機快取清除失敗：',error); }
+  groupDiaryCloudReady.delete(groupId);
+  const timer=groupDiaryCloudSaveTimers.get(groupId);
+  if(timer)clearTimeout(timer);
+  groupDiaryCloudSaveTimers.delete(groupId);
+  groupDiaryCloudSaveChains.delete(groupId);
+}
 async function syncGroupDiaryCloud(groupId) {
   const client=window.mySupabase,uid=currentUser()?.uid;
   if(!client||!groupId||!uid)throw new Error('登入後才能同步群組甜蜜日記。');
+  if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return [];}
   const {data:{user},error:authError}=await client.auth.getUser();
   if(authError||!user||user.id!==uid)throw new Error('登入狀態已失效，請重新登入後同步日記。');
   const local=readGroupDiaryLocalRecord(groupId);
   const {data:cloud,error}=await client.from('chat_group_diary')
     .select('group_id,owner_id,memories,updated_at').eq('group_id',groupId).maybeSingle();
-  if(error)throw error;
+  if(error) {
+    if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return [];}
+    throw error;
+  }
+  if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return [];}
   if(cloud) {
     const cloudUpdatedAt=Date.parse(cloud.updated_at)||0;
     // Preserve a newer local edit (for example, one made while temporarily offline);
@@ -5802,10 +5960,15 @@ async function syncGroupDiaryCloud(groupId) {
 async function saveGroupDiaryCloudNow(groupId,memories,updatedAt,uid=currentUser()?.uid) {
   const client=window.mySupabase;
   if(!client||!uid)throw new Error('登入後才能同步群組甜蜜日記。');
+  if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return;}
   const {error}=await client.from('chat_group_diary').upsert({
     group_id:groupId,owner_id:uid,memories,updated_at:new Date(Math.max(Number(updatedAt)||Date.now(),Date.now())).toISOString()
   },{onConflict:'group_id'});
-  if(error)throw error;
+  if(error) {
+    if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return;}
+    throw error;
+  }
+  if(readDeletedChatTombstones(uid).groups[groupId]) clearGroupDiaryLocalData(groupId,uid);
 }
 function queueGroupDiaryCloudSave(groupId) {
   const oldTimer=groupDiaryCloudSaveTimers.get(groupId);
@@ -5816,11 +5979,18 @@ function queueGroupDiaryCloudSave(groupId) {
     const next=previous.catch(()=>{}).then(async()=>{
       const uid=currentUser()?.uid;
       if(!uid||!window.mySupabase)throw new Error('登入後才能同步群組甜蜜日記。');
+      if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return;}
       if(!groupDiaryCloudReady.get(groupId))await syncGroupDiaryCloud(groupId);
+      if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return;}
       const local=readGroupDiaryLocalRecord(groupId);
       await saveGroupDiaryCloudNow(groupId,local.memories,local.updatedAt,uid);
+      if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return;}
       writeGroupDiaryLocalRecord(groupId,local.memories,Date.now());
     }).catch(error=>{
+      if(readDeletedChatTombstones(currentUser()?.uid).groups[groupId]) {
+        clearGroupDiaryLocalData(groupId,currentUser()?.uid);
+        return;
+      }
       console.error('群組甜蜜日記雲端同步失敗：',error);
       toast('日記已保存在此裝置，但雲端同步失敗；請確認網路後重新開啟群組重試。');
     });
@@ -5830,6 +6000,7 @@ function queueGroupDiaryCloudSave(groupId) {
 }
 function saveGroupDiaryMemories(memories,groupId=groupPrototype.active?.id) {
   if(!groupId)return false;
+  if(readDeletedChatTombstones(currentUser()?.uid).groups[groupId]) {clearGroupDiaryLocalData(groupId);return false;}
   try {
     writeGroupDiaryLocalRecord(groupId,memories,Date.now());
     queueGroupDiaryCloudSave(groupId);
@@ -6122,6 +6293,131 @@ async function groupSendMock() {
   }
 }
 async function groupRefreshList() { groupPrototype.groupsLoaded=false;await groupLoadList(true);if(route.page==='group'&&!groupPrototype.active)render(); }
+
+  // Broadcast successful cloud-chat deletions to other tabs on this origin.
+  // Server RLS remains authoritative; this only clears already-cached UI copies.
+  window.addEventListener('storage', event => {
+    const uid = currentUser()?.uid;
+    if (!uid || event.key !== USER_DELETED_CHAT_TOMBSTONES_KEY_PREFIX + uid) return;
+    const tombstones = readDeletedChatTombstones(uid);
+    let sessionsChanged = false;
+    for (const sessionId of Object.keys(tombstones.sessions)) {
+      const cached = state.sessions?.[sessionId];
+      if (cached?.cloudOwned && cached.cloudOwnerUid === uid) {
+        delete state.sessions[sessionId];
+        sessionsChanged = true;
+      }
+    }
+    if (sessionsChanged) {
+      persist();
+      cacheSessionsForUser(uid);
+    }
+    const deletedGroupIds = new Set(Object.keys(tombstones.groups));
+    groupPrototype.groups = (groupPrototype.groups || []).filter(group => !deletedGroupIds.has(group.id));
+    for (const groupId of deletedGroupIds) {
+      clearGroupDiaryLocalData(groupId,uid);
+      delete groupPrototype.groupPreviews[groupId];
+      delete groupPrototype.groupMembers[groupId];
+      if (groupPrototype.active?.id === groupId && groupPrototype.ownerUid === uid) {
+        groupPrototype.active = null;
+        groupPrototype.messages = [];
+        groupPrototype.pendingRequest = null;
+        groupPrototype.loading = false;
+      }
+    }
+    if (route.page === 'conversation' && tombstones.sessions[route.id]) go({page:'chat'});
+    else if (route.page === 'group' && deletedGroupIds.has(route.id)) go({page:'chat'});
+    else if (sessionsChanged || deletedGroupIds.size) render();
+    refreshChatEntryList();
+  });
+
+let lastDeletedChatReconcileAt = 0;
+async function reconcileDeletedCloudChatParents() {
+  const uid = currentUser()?.uid;
+  const client = window.mySupabase;
+  if (!uid || !client || Date.now() - lastDeletedChatReconcileAt < 15000) return;
+  lastDeletedChatReconcileAt = Date.now();
+  try {
+    const sessionIds = [...new Set(Object.values(state.sessions || {})
+      .filter(session => session?.cloudOwned && session.cloudOwnerUid === uid)
+      .map(session => session.id).filter(isUuid))];
+    let activeSessionIds = new Set();
+    for (let i = 0; i < sessionIds.length; i += 100) {
+      const batch = sessionIds.slice(i, i + 100);
+      const {data, error} = await client.from('chat_sessions')
+        .select('id').eq('user_id', uid).in('id', batch).is('deleted_at', null);
+      if (error) throw error;
+      for (const row of data || []) activeSessionIds.add(row.id);
+    }
+    if (currentUser()?.uid !== uid) return;
+
+    let sessionsChanged = false;
+    for (const sessionId of sessionIds) {
+      if (!activeSessionIds.has(sessionId)) {
+        delete state.sessions[sessionId];
+        sessionsChanged = true;
+      }
+    }
+    if (sessionsChanged) {
+      persist();
+      cacheSessionsForUser(uid);
+    }
+
+    const groupIds = [...new Set([
+      ...(groupPrototype.groups || []).map(group => group.id),
+      groupPrototype.active?.id,
+      route.page === 'group' ? route.id : null
+    ].filter(isUuid))];
+    let activeGroupIds = new Set();
+    for (let i = 0; i < groupIds.length; i += 100) {
+      const batch = groupIds.slice(i, i + 100);
+      const {data, error} = await client.from('chat_groups')
+        .select('id').in('id', batch);
+      if (error) throw error;
+      for (const row of data || []) activeGroupIds.add(row.id);
+    }
+    if (currentUser()?.uid !== uid) return;
+
+    const removedGroupIds = groupIds.filter(groupId => !activeGroupIds.has(groupId));
+    if (removedGroupIds.length) {
+      const removed = new Set(removedGroupIds);
+      groupPrototype.groups = (groupPrototype.groups || []).filter(group => !removed.has(group.id));
+      for (const groupId of removedGroupIds) {
+        clearGroupDiaryLocalData(groupId, uid);
+        delete groupPrototype.groupPreviews[groupId];
+        delete groupPrototype.groupMembers[groupId];
+      }
+      if (groupPrototype.active?.id && removed.has(groupPrototype.active.id)) {
+        groupPrototype.active = null;
+        groupPrototype.messages = [];
+        groupPrototype.pendingRequest = null;
+        groupPrototype.loading = false;
+      }
+    }
+
+    if (route.page === 'conversation' && route.id && !state.sessions[route.id]) {
+      go({page:'chat'});
+      return;
+    }
+    if (route.page === 'group' && isUuid(route.id) && !activeGroupIds.has(route.id)) {
+      go({page:'chat'});
+      return;
+    }
+    if (sessionsChanged || removedGroupIds.length) {
+      render();
+      refreshChatEntryList();
+    }
+  } catch (error) {
+    console.warn('跨裝置聊天室刪除狀態核對失敗：', error?.message || error);
+  }
+}
+
+// No polling: reconcile only when a previously backgrounded tab becomes visible/focused.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') void reconcileDeletedCloudChatParents();
+});
+window.addEventListener('focus', () => void reconcileDeletedCloudChatParents());
+
 async function groupRename(groupId) {
   const g=groupPrototype;
   const target=g.groups.find(x=>x.id===groupId);
@@ -6904,7 +7200,6 @@ function renderModal(o) {
     case 'delete-character':
       showDialog('刪除角色',`
         <form data-form="delete-character">
-          <p class="muted">角色會從公開列表下架，不再接受新對話；已開始的聊天與必要角色快照會保留。</p>
           <label class="field"><span>請輸入「Delete」確認</span>
             <input name="confirm" required autocomplete="off"></label>
           <button class="danger">確認刪除角色（下架）</button>
@@ -6934,18 +7229,21 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
     case 'delete-account':
       showDialog('申請刪除帳號',`
         <form data-form="delete-account">
-          <p>提出申請後，帳號會進入後端設定的待刪除期。這段期間會暫停使用 PersonaX 功能；你可以使用原本的 Google 帳號登入，並在期限內取消申請。</p>
-          <p class="muted">本階段只會建立刪除申請，不會立即刪除 UID、個人檔案、角色、聊天、交易紀錄或錢包，也不會修改鑽石與銀幣餘額。</p>
+          <p>您確定要刪除帳號嗎？提交申請後，在接下來的待刪除期間內，您的帳號將會暫時無法使用。如果您改變主意，只需在截止日期前重新登入，即可隨時恢復帳號。</p>
           <label class="field"><span>請輸入「DELETE」確認</span>
             <input name="confirm" required autocomplete="off"></label>
-          <button class="danger">申請刪除（期限內可取消）</button>
+          <button class="danger">申請刪除</button>
         </form>`);
       break;
     case 'account-deletion-pending': {
-      const scheduled = o.scheduledFor ? new Date(o.scheduledFor).toLocaleString('zh-TW') : '尚未取得後端設定的期限';
+      const scheduled = formatAccountDeletionDeadline(o.scheduledFor || state.account?.deletionScheduledFor);
+      const duration = formatAccountDeletionPeriod(
+        o.requestedAt || state.account?.deletionRequestedAt,
+        o.scheduledFor || state.account?.deletionScheduledFor
+      );
       showDialog('帳號正在等待刪除',`
-        <p>你的帳號已進入待刪除期。期限內不能使用 PersonaX 功能，但可以取消刪除並保留原本的帳號與錢包餘額。</p>
-        <p><strong>預定刪除時間：</strong>${e(scheduled)}</p>
+        <p>您已提出帳號刪除申請。在接下來的 ${e(duration)}內，您的帳號將暫停使用功能。若您改變主意，只需在 ${e(scheduled)} 前使用原本的 Google 帳號重新登入，即可取消申請並恢復帳號。</p>
+        <p class="muted">待刪除期間內，帳號資料、角色、聊天紀錄、交易紀錄及錢包餘額不會因提出申請而立即刪除或變更。</p>
         <form data-form="cancel-account-deletion">
           <button class="primary">取消刪除，恢復帳號</button>
         </form>
@@ -6990,7 +7288,7 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
     case 'session-menu': {
       const selected=state.sessions[o.id]||s;
       if(!selected)return;
-      showDialog('刪除',`<p>刪除這段對話與回憶</p><p class="small muted">確定要刪除嗎？此操作無法復原。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="remove-session" data-id="${e(selected.id)}">確認刪除</button></div>`);
+      showDialog('刪除',`<p>此操作無法復原，確認要刪除聊天室嗎？如果有回憶相簿也會一併刪除哦。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="remove-session" data-id="${e(selected.id)}">確認刪除</button></div>`);
       break;
     }
     case 'chat-settings': {
@@ -7357,7 +7655,7 @@ document.addEventListener('click', async event => {
   const id = target.dataset.id || '';
   try {
     if (state.account?.accountDeletionPending) {
-      toast('此帳號正在等待刪除，目前不能使用 PersonaX 功能。你可以取消刪除申請以恢復帳號。');
+      toast('此帳號正在等待刪除，目前暫停使用功能。你可以取消刪除申請以恢復帳號。');
       return;
     }
     if (action === 'group-message-menu') {
@@ -7534,7 +7832,7 @@ document.addEventListener('click',async event => {
 
   if (state.account?.accountDeletionPending &&
       !['home','pending-dismiss-deletion-modal','pending-show-deletion-modal','cancel-account-deletion','logout','pending-switch-account'].includes(action)) {
-    toast('此帳號正在等待刪除，目前不能使用 PersonaX 功能。你可以取消刪除申請以恢復帳號。');
+    toast('此帳號正在等待刪除，目前暫停使用功能。你可以取消刪除申請以恢復帳號。');
     return;
   }
 
@@ -7853,6 +8151,7 @@ document.addEventListener('click',async event => {
       }
       case 'pending-show-deletion-modal': {
         openModal('account-deletion-pending', {
+          requestedAt: state.account?.deletionRequestedAt,
           scheduledFor: state.account?.deletionScheduledFor
         });
         break;
@@ -8153,13 +8452,13 @@ document.addEventListener('click',async event => {
       case 'group-entry-menu': {
         const group=(groupPrototype.groups||[]).find(item=>item.id===key);
         if(!group) { toast('找不到這個群組，請重新載入清單。'); break; }
-        showDialog('刪除', '<p>刪除這段對話與回憶</p><p class="small muted">確定要刪除嗎？此操作無法復原。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="group-delete" data-id="'+e(group.id)+'">確認刪除</button></div>');
+        showDialog('刪除', '<p>此操作無法復原，確認要刪除聊天室嗎？如果有回憶相簿也會一併刪除哦。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="group-delete" data-id="'+e(group.id)+'">確認刪除</button></div>');
         break;
       }
       case 'group-delete-confirm': {
         const group=(groupPrototype.groups||[]).find(item=>item.id===key);
         if(!group) { toast('找不到這個群組，請重新載入清單。'); break; }
-        showDialog('刪除', '<p>刪除這段對話與回憶</p><p class="small muted">確定要刪除嗎？此操作無法復原。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="group-delete" data-id="'+e(group.id)+'">確認刪除</button></div>');
+        showDialog('刪除', '<p>此操作無法復原，確認要刪除聊天室嗎？如果有回憶相簿也會一併刪除哦。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">取消</button><button type="button" class="danger" data-action="group-delete" data-id="'+e(group.id)+'">確認刪除</button></div>');
         break;
       }
       case 'group-delete': {
@@ -8169,29 +8468,24 @@ document.addEventListener('click',async event => {
         try {
           const {data:{user},error:authError}=await client.auth.getUser();
           if(authError||user?.id!==uid) throw new Error('登入狀態已失效，請重新登入。');
-          const {data:removedPaths,error:deleteError}=await client.rpc('delete_chat_group_with_related_data',{p_group_id:groupId});
+          const {error:deleteError}=await client.rpc('delete_chat_group_with_related_data',{p_group_id:groupId});
           if(deleteError) throw new Error('群組與關聯資料刪除失敗：'+deleteError.message);
-          const storagePaths=(removedPaths||[]).map(item=>item.storage_path).filter(Boolean);
-          let storageCleanupFailed=false;
-          if(storagePaths.length) {
-            const {error:storageError}=await client.storage.from('personax-memory-photos').remove(storagePaths);
-            if(storageError) {
-              storageCleanupFailed=true;
-              console.error('群組資料已刪除，但部分相片儲存檔清理失敗',storageError.message);
-            }
-          }
+          markDeletedChatTombstone(uid,'groups',groupId);
+          clearGroupDiaryLocalData(groupId,uid);
+          g.groups=(g.groups||[]).filter(item=>item.id!==groupId);
+          delete g.groupPreviews[groupId];
+          delete g.groupMembers[groupId];
           if(g.active?.id===groupId) { g.active=null;g.messages=[];g.pendingRequest=null;g.loading=false; }
           $('modal')?.close();
           await groupRefreshList();
           if(route.page==='group'&&route.id===groupId) go({page:'chat'});
-          toast(storageCleanupFailed?'群組與資料庫關聯內容已刪除，但部分相片檔案清理失敗，需後續補清。':'群組、訊息、日記、相簿紀錄與關聯資料已刪除。');
         } catch(error) { toast(error?.message||'群組刪除失敗，請稍後重試。'); }
         break;
       }
       case 'remove-session-confirm': {
         const item=state.sessions[key];
         if(!item)break;
-        showDialog('刪除','<p>刪除這段對話與回憶</p><p class="small muted">確定要刪除嗎？此操作無法復原。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="delete-dialog-back">取消</button><button type="button" class="danger" data-action="remove-session" data-id="'+e(item.id)+'">確認刪除</button></div>');
+        showDialog('刪除','<p>此操作無法復原，確認要刪除聊天室嗎？如果有回憶相簿也會一併刪除哦。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="delete-dialog-back">取消</button><button type="button" class="danger" data-action="remove-session" data-id="'+e(item.id)+'">確認刪除</button></div>');
         break;
       }
       case 'remove-session': {
@@ -8200,20 +8494,14 @@ document.addEventListener('click',async event => {
         const uid=currentUser()?.uid;
         if (item.cloudOwned && uid && item.cloudOwnerUid === uid && window.mySupabase) {
           const client=window.mySupabase;
-          const {data:removedPaths,error:deleteError}=await client.rpc('delete_chat_session_content',{p_session_id:key});
+          const {error:deleteError}=await client.rpc('delete_chat_session_content',{p_session_id:key});
           if(deleteError) throw new Error('對話與回憶刪除失敗：'+deleteError.message);
-          const paths=(removedPaths||[]).map(photo=>photo.storage_path).filter(Boolean);
-          if(paths.length) {
-            const {error:storageError}=await client.storage.from('personax-memory-photos').remove(paths);
-            if(storageError) {
-              console.error('對話內容已刪除，但部分相片檔案清理失敗',storageError.message);
-              toast('對話文字、日記與相簿紀錄已刪除；部分相片檔案清理失敗，需後續補清。');
-            }
-          }
+          markDeletedChatTombstone(uid,'sessions',key);
         }
-        // 本機介面移除；雲端 chat_sessions.deleted_at 保留軟刪除記錄與完整內容。
+        // 本機介面立即移除；雲端只標記刪除並排入 30 天清除佇列，期間不直接刪除 Storage 檔案。
         delete state.sessions[key];
         persist();
+        if(uid) cacheSessionsForUser(uid);
         if (route.id === key) go({page:'chat'});
         else closeModal();
         break;
@@ -8958,13 +9246,12 @@ document.addEventListener('submit',async event => {
         const c=state.characters.find(c=>c.id===o.id);
         const user=currentUser();
         if (!owned(c) || !user?.uid || !window.mySupabase) return toast('請登入後再刪除角色。');
-        if (!confirm('最後確認：將角色下架？公開列表會隱藏，既有聊天保留，新對話將被禁止。')) return;
         const { data: authResult, error: authError } = await window.mySupabase.auth.getUser();
         if (authError || authResult?.user?.id !== user.uid) throw new Error('登入狀態驗證失敗，請重新登入。');
         const { data: deletedAt, error: deleteError } = await window.mySupabase
           .rpc('soft_delete_character',{p_character_id:c.id});
-        if (deleteError) throw new Error('角色軟刪除失敗：'+deleteError.message);
-        if (!deletedAt) throw new Error('資料庫未確認角色下架成功，請重新整理後再試。');
+        if (deleteError) throw new Error('角色刪除失敗：'+deleteError.message);
+        if (!deletedAt) throw new Error('資料庫未確認角色刪除成功，請重新整理後再試。');
         c.visibility='private';c.deletedAt=deletedAt;c.deletionReason='author_deleted';
         for (const session of Object.values(state.sessions)) {
           if (session.characterId===c.id) {
@@ -8984,7 +9271,7 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         state.favorites=state.favorites.filter(v=>v!==c.id);
         delete state.comments[c.id];
         persist();go({page:'create'},true);
-        toast('角色已下架；既有聊天保留，不能再開啟新對話。');
+        toast('角色已刪除');
         break;
       }
       case 'profile': {
@@ -9072,7 +9359,7 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
       case 'delete-account': {
         if (String(f.get('confirm')).trim() !== 'DELETE') return toast('請輸入「DELETE」。');
         if (!state.account?.uid || !window.mySupabase) return toast('請先使用 Google 帳號登入。');
-        if (!confirm('確定提出帳號刪除申請？申請後會暫停使用功能，並可在後端設定的期限內取消。')) return;
+        if (!confirm('確定提出帳號刪除申請？申請後會暫停使用功能，您隨時可以在期限內恢復。')) return;
         const { data: authData, error: authError } = await window.mySupabase.auth.getUser();
         if (authError || authData?.user?.id !== state.account.uid) {
           return toast('登入狀態驗證失敗，請重新登入後再試。');
@@ -9081,9 +9368,13 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         if (error) throw new Error('申請刪除失敗：' + error.message);
         const requestRow = Array.isArray(data) ? data[0] : data;
         state.account.accountDeletionPending = true;
+        state.account.deletionRequestedAt = requestRow?.requested_at || new Date().toISOString();
         state.account.deletionScheduledFor = requestRow?.scheduled_for || null;
         persist();
-        openModal('account-deletion-pending', {scheduledFor: state.account.deletionScheduledFor});
+        openModal('account-deletion-pending', {
+          requestedAt: state.account.deletionRequestedAt,
+          scheduledFor: state.account.deletionScheduledFor
+        });
         toast('已提出刪除申請；目前不會刪除錢包或修改餘額。');
         break;
       }
@@ -9096,6 +9387,7 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         const { error } = await window.mySupabase.rpc('cancel_account_deletion');
         if (error) throw new Error('取消刪除失敗：' + error.message);
         delete state.account.accountDeletionPending;
+        delete state.account.deletionRequestedAt;
         delete state.account.deletionScheduledFor;
         delete state.account.accountDeletionModalDismissed;
         persist();
@@ -10300,7 +10592,7 @@ if (window.__pendingSupabaseUser) {
         .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false});
       if(error)throw error;
       const cards=await Promise.all((data||[]).map(async photo=>{
-        const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,3600);
+        const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,300);
         const imageUrl=!signedError&&signed?.signedUrl?signed.signedUrl:'';
         if(!imageUrl)console.warn('相簿簽名網址取得失敗',signedError?.message);
         urlCache.set(photo.id,{url:imageUrl,photo});
@@ -10386,7 +10678,7 @@ if (window.__pendingSupabaseUser) {
         .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).maybeSingle();
       if(error)throw error;
       if(!photo){session.background='none';persist();panel.style.setProperty('--chat-photo','none');return;}
-      const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,3600);
+      const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,300);
       if(signedError||!signed?.signedUrl)throw signedError||new Error('無法取得背景圖片。');
       if(currentSession()?.id===session.id)panel.style.setProperty('--chat-photo','url('+JSON.stringify(signed.signedUrl)+')');
     }catch(err){console.error('讀取單聊相簿背景失敗',err);panel.style.setProperty('--chat-photo','none');}
@@ -10409,7 +10701,7 @@ if (window.__pendingSupabaseUser) {
         if(cleared&&groupPrototype.active?.id===group.id){group.backgroundMode='none';group.backgroundMemoryPhotoId=null;}
         return;
       }
-      const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,3600);
+      const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,300);
       if(signedError||!signed?.signedUrl)throw signedError||new Error('無法取得群組背景圖片。');
       if(groupPrototype.active?.id===group.id)panel.style.setProperty('--chat-photo','url('+JSON.stringify(signed.signedUrl)+')');
     }catch(err){console.error('讀取群組相簿背景失敗',err);panel.style.setProperty('--chat-photo','none');}
@@ -10464,7 +10756,7 @@ if (window.__pendingSupabaseUser) {
     const panel=$('view').querySelector('.chat-main');if(panel)void applySingleMemoryPhotoBackground(currentSession(),panel);
   }
   async function downloadCompressedMemoryPhoto(cached){
-    try{const client=window.mySupabase;let url=cached.url;let response=await fetch(url);if(!response.ok){const {data,error}=await client.storage.from(BUCKET).createSignedUrl(cached.photo.storage_path,3600);if(error||!data?.signedUrl)throw error||new Error('下載連結失效。');url=data.signedUrl;response=await fetch(url);}if(!response.ok)throw new Error('下載連結已失效，請重新開啟相簿後再試。');const blob=await response.blob(),objectUrl=URL.createObjectURL(blob);const a=document.createElement('a');a.href=objectUrl;a.download=(cached.photo.caption||'personax-memory')+'.webp';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),1500);}catch(error){toast('下載失敗：'+(error.message||'請重新開啟相簿後再試。'));}
+    try{const client=window.mySupabase;let url=cached.url;let response=await fetch(url);if(!response.ok){const {data,error}=await client.storage.from(BUCKET).createSignedUrl(cached.photo.storage_path,300);if(error||!data?.signedUrl)throw error||new Error('下載連結失效。');url=data.signedUrl;response=await fetch(url);}if(!response.ok)throw new Error('下載連結已失效，請重新開啟相簿後再試。');const blob=await response.blob(),objectUrl=URL.createObjectURL(blob);const a=document.createElement('a');a.href=objectUrl;a.download=(cached.photo.caption||'personax-memory')+'.webp';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),1500);}catch(error){toast('下載失敗：'+(error.message||'請重新開啟相簿後再試。'));}
   }
   document.addEventListener('change',event=>{
     const input=event.target;

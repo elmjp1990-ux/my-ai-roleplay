@@ -54,12 +54,12 @@ Deno.serve(async (request) => {
   if (session.chat_mode !== "encounter") return json({ error: "encounter_session_required", retryAllowed: false }, 409);
   if (!isUuid(session.character_id)) return json({ error: "chat_session_character_id_invalid", retryAllowed: false }, 409);
 
-  // The reservation RPC is the authoritative lifecycle gate. It also permits
-  // idempotent recovery of an already-reserved pre-expiry turn after scene end.
-  const { data: canOpen, error: eligibilityError } = await userClient.rpc("can_open_encounter_session", {
-    p_character_id: session.character_id,
-  });
-  if (eligibilityError || canOpen !== true) return json({ error: "encounter_character_unavailable", retryAllowed: false }, 403);
+  // This is an existing, owner-verified Encounter session. Do not re-check
+  // current character discovery/creation eligibility here: a character may
+  // have been made private or archived after this session began, and every
+  // player with an existing session must still be able to continue it.
+  // reserve_encounter_chat_turn below remains authoritative for session
+  // ownership, lifecycle status, scheduled window, and idempotent turn recovery.
 
   const snapshot = session.character_snapshot;
   if (snapshot && typeof snapshot === "object" && !Array.isArray(snapshot) &&

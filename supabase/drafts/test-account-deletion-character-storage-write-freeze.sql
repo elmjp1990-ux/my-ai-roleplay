@@ -1,0 +1,202 @@
+-- Effective Storage RLS behavior for character asset preservation.
+-- Executed only inside replay-account-deletion-release-migration.sql's outer
+-- disposable transaction. Fixtures are rolled back by that outer transaction.
+\set ON_ERROR_STOP on
+
+-- The synthetic Storage schema requires USAGE before fixture INSERTs.
+-- This grant is confined to the outer disposable rollback transaction.
+GRANT USAGE ON SCHEMA storage TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated;
+
+DO $fixture$
+DECLARE
+  v_author uuid := '10000000-0000-4000-8000-000000000040';
+  v_character uuid := '20000000-0000-4000-8000-000000000040';
+BEGIN
+  INSERT INTO auth.users (id) VALUES (v_author) ON CONFLICT (id) DO NOTHING;
+  INSERT INTO public.profiles (id, handle, nickname)
+  VALUES (v_author, 'pr200-storage-freeze-author', 'PR200 Storage Fixture')
+  ON CONFLICT (id) DO NOTHING;
+
+  INSERT INTO public.characters (
+    id, author_id, name, visibility, review_status, rights_confirmed
+  ) VALUES (
+    v_character, v_author, 'PR200 storage freeze fixture', 'public', 'approved', true
+  );
+
+  INSERT INTO storage.buckets (id, name, public)
+  VALUES
+    ('character-illustrations', 'character-illustrations', false),
+    ('character-avatar-videos', 'character-avatar-videos', false)
+  ON CONFLICT (id) DO NOTHING;
+
+  INSERT INTO storage.objects (bucket_id, name) VALUES
+    (
+      'character-illustrations',
+      '10000000-0000-4000-8000-000000000040/20000000-0000-4000-8000-000000000040/30000000-0000-4000-8000-000000000040.jpg'
+    ),
+    (
+      'character-avatar-videos',
+      '10000000-0000-4000-8000-000000000040/40000000-0000-4000-8000-000000000040.mp4'
+    );
+END;
+$fixture$;
+
+-- Video UPDATE is pre-existing and outside this migration's changed scope;
+-- no synthetic Storage helper is needed by the assertions below.
+
+-- The disposable Storage shim's grants above isolate row-policy behavior,
+-- not platform table grants.
+
+SELECT pg_catalog.set_config('request.jwt.claim.sub',
+  '10000000-0000-4000-8000-000000000040', true);
+SELECT pg_catalog.set_config('request.jwt.claim.role', 'authenticated', true);
+SELECT pg_catalog.set_config('request.jwt.claims',
+  '{"sub":"10000000-0000-4000-8000-000000000040","role":"authenticated"}', true);
+
+-- Assert the test identity, account state, and character ownership fixture
+-- before attributing any denied Storage update to the policy under test.
+DO $precheck$
+BEGIN
+  IF auth.uid() IS DISTINCT FROM '10000000-0000-4000-8000-000000000040'::uuid THEN
+    RAISE EXCEPTION 'storage_fixture_jwt_subject_not_set';
+  END IF;
+  IF public.account_is_active() IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'storage_fixture_account_must_be_active_before_request';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.characters
+    WHERE id = '20000000-0000-4000-8000-000000000040'
+      AND author_id = auth.uid()
+  ) THEN
+    RAISE EXCEPTION 'storage_fixture_character_not_visible_to_owner';
+  END IF;
+END;
+$precheck$;
+
+-- The disposable Storage shim omits baseline owner SELECT and video UPDATE
+-- policies. Recreate their relevant production semantics only for this rollback
+-- fixture so UPDATE's implicit SELECT checks are evaluated realistically.
+CREATE POLICY pr200_storage_fixture_owner_select
+ON storage.objects
+FOR SELECT
+TO authenticated
+USING (
+  bucket_id IN ('character-illustrations', 'character-avatar-videos')
+  AND split_part(name, '/', 1) = (SELECT auth.uid())::text
+);
+
+-- While active, owner update remains available for both asset types.
+SET LOCAL ROLE authenticated;
+DO $active_owner$
+DECLARE
+  v_rows integer;
+  v_path text := '10000000-0000-4000-8000-000000000040/20000000-0000-4000-8000-000000000040/30000000-0000-4000-8000-000000000040.jpg';
+  v_matches boolean;
+BEGIN
+  IF NOT has_table_privilege(current_user, 'storage.objects', 'UPDATE') THEN
+    RAISE EXCEPTION 'authenticated_storage_update_grant_missing';
+  END IF;
+  v_matches := split_part(v_path, '/', 1) = auth.uid()::text
+    AND public.account_is_active()
+    AND EXISTS (
+      SELECT 1 FROM public.characters c
+      WHERE c.id::text = split_part(v_path, '/', 2)
+        AND c.author_id = auth.uid()
+    );
+  IF NOT v_matches THEN
+    RAISE EXCEPTION 'active_owner_storage_update_predicate_false: uid %, active %, path %, character_exists %',
+      auth.uid(), public.account_is_active(),
+      split_part(v_path, '/', 1) = auth.uid()::text,
+      EXISTS (SELECT 1 FROM public.characters c
+        WHERE c.id::text = split_part(v_path, '/', 2) AND c.author_id = auth.uid());
+  END IF;
+
+  UPDATE storage.objects SET name = name
+  WHERE bucket_id = 'character-illustrations'
+    AND name = v_path;
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  IF v_rows <> 1 THEN RAISE EXCEPTION 'active_owner_must_retain_illustration_storage_update: rowcount %', v_rows; END IF;
+
+END;
+$active_owner$;
+RESET ROLE;
+
+-- Supabase Storage protects objects with a platform trigger that rejects direct
+-- SQL DELETE, and the synthetic schema may model that trigger under a different
+-- owner. Validate the DELETE policy predicates from the catalog instead; the
+-- separate local Storage API E2E exercises actual object deletion through HTTP.
+-- A pending account must not mutate/delete either asset via direct Storage RLS.
+INSERT INTO public.account_deletion_requests (user_id, requested_at, scheduled_for)
+VALUES (
+  '10000000-0000-4000-8000-000000000040',
+  clock_timestamp(), clock_timestamp() + interval '5 minutes'
+);
+
+SET LOCAL ROLE authenticated;
+DO $pending_owner$
+DECLARE v_rows integer;
+BEGIN
+  UPDATE storage.objects SET name = name
+  WHERE bucket_id = 'character-illustrations'
+    AND name = '10000000-0000-4000-8000-000000000040/20000000-0000-4000-8000-000000000040/30000000-0000-4000-8000-000000000040.jpg';
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  IF v_rows <> 0 THEN RAISE EXCEPTION 'pending_owner_illustration_storage_update_not_blocked'; END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects'
+      AND policyname = 'Character illustration owner delete'
+      AND cmd = 'DELETE'
+      AND qual ILIKE '%account_is_active%'
+  ) THEN
+    RAISE EXCEPTION 'pending_owner_illustration_delete_policy_missing_active_account_guard';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects'
+      AND policyname = 'Character video owner delete'
+      AND cmd = 'DELETE'
+      AND qual ILIKE '%account_is_active%'
+  ) THEN
+    RAISE EXCEPTION 'pending_owner_video_delete_policy_missing_active_account_guard';
+  END IF;
+END;
+$pending_owner$;
+RESET ROLE;
+
+-- A stale JWT must also fail closed after Auth user deletion.
+DELETE FROM auth.users
+WHERE id = '10000000-0000-4000-8000-000000000040';
+
+SET LOCAL ROLE authenticated;
+DO $stale_jwt$
+DECLARE v_rows integer;
+BEGIN
+  IF public.account_is_active() IS DISTINCT FROM false THEN
+    RAISE EXCEPTION 'deleted_auth_user_must_not_be_active';
+  END IF;
+
+  IF public.account_is_active() IS DISTINCT FROM false THEN
+    RAISE EXCEPTION 'stale_jwt_account_active_guard_not_false';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects'
+      AND policyname = 'Character illustration owner delete'
+      AND cmd = 'DELETE'
+      AND qual ILIKE '%account_is_active%'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects'
+      AND policyname = 'Character video owner delete'
+      AND cmd = 'DELETE'
+      AND qual ILIKE '%account_is_active%'
+  ) THEN
+    RAISE EXCEPTION 'stale_jwt_storage_delete_policy_guard_missing';
+  END IF;
+END;
+$stale_jwt$;
+RESET ROLE;
+
+
