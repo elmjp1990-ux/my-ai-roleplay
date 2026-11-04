@@ -1713,7 +1713,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       if (ids.length) {
         const result = await client
           .from('character_stories')
-          .select('id, character_id, story_name, description, opening_message, visibility, created_at')
+          .select('character_id, opening_message, visibility, created_at')
           .in('character_id', ids)
           .eq('visibility', 'public')
           .order('created_at', { ascending: false });
@@ -1851,7 +1851,7 @@ const ids = (rows || []).map(row => row.id);
       if (ids.length) {
         const result = await client
           .from('character_stories')
-          .select('id, character_id, story_name, description, opening_message, visibility, created_at')
+          .select('character_id, opening_message, visibility, created_at')
           .in('character_id', ids)
           .order('created_at', { ascending: false });
         if (result.error) throw new Error('讀取雲端角色故事失敗：' + result.error.message);
