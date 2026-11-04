@@ -96,3 +96,17 @@ Deno.test("empty or malformed character personality safely falls back to empty c
   assertEquals(empty.CHAR_DISLIKES, "");
   assertEquals(malformed.CHAR_PERSONALITY, "");
 });
+
+Deno.test("important memories and recent entries are retained before older ordinary entries", () => {
+  const values = buildPromptVariableValues({
+    sessionData: { memories: [
+      { text: "OLD_ENTRY_".repeat(500), important: false, at: 1 },
+      { text: "PINNED_MEMORY", important: true, at: 2 },
+      { text: "RECENT_MEMORY", important: false, at: 3 },
+    ] },
+  });
+  assertEquals(values.MEMORY.includes("PINNED_MEMORY"), true);
+  assertEquals(values.MEMORY.includes("RECENT_MEMORY"), true);
+  assertEquals(values.MEMORY.length <= 3000, true);
+  assertEquals(values.MEMORY.indexOf("重大記憶") < values.MEMORY.indexOf("回憶摘錄"), true);
+});
