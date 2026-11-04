@@ -61,7 +61,7 @@ CREATE TABLE public.account_deletion_requests (user_id uuid PRIMARY KEY);
 \ir ../supabase/migrations/20261015134109_chat_turn_ledger_idempotency.sql
 DO $roles$ DECLARE r text; BEGIN FOREACH r IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname=r) THEN EXECUTE format('CREATE ROLE %I',r); END IF; END LOOP; END $roles$;
 \ir ../supabase/migrations/20261104130000_reconcile_stale_story_chat_turns.sql
-\\ir ../supabase/migrations/20261104140000_restrict_chat_turn_rpc_execution.sql
+\ir ../supabase/migrations/20261104140000_restrict_chat_turn_rpc_execution.sql
 
 -- All wallet transaction RPCs are backend-only. Client roles must not be able
 -- to invoke SECURITY DEFINER functions that accept an explicit p_user_id.
