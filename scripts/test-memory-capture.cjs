@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { buildPlayerMemoryExcerpt, appendMemoryWithLimit, createSerialQueue, createMutationVersionTracker } = require("../memory-capture.js");
+const { buildPlayerMemoryExcerpt, appendMemoryWithLimit, createSerialQueue, createMemoryMutationTracker } = require("../memory-capture.js");
 
 function makeConversation(playerCount) {
   const messages = [];
@@ -126,11 +126,13 @@ test("a failed save does not block later queued saves", async () => {
   assert.equal(await later, "saved");
 });
 
-test("only the newest mutation version may roll back local memory state", () => {
-  const tracker = createMutationVersionTracker();
-  const session = { id: "session" };
-  const first = tracker.next(session);
-  const second = tracker.next(session);
-  assert.equal(tracker.isCurrent(session, first), false);
-  assert.equal(tracker.isCurrent(session, second), true);
+test("only the newest mutation may roll back, using the last confirmed persisted snapshot", () => {
+  const tracker = createMemoryMutationTracker();
+  const first = tracker.begin("session", [{ id: "old", text: "persisted", important: false }]);
+  const second = tracker.begin("session", [{ id: "old", text: "first edit", important: false }]);
+  assert.equal(tracker.isCurrent("session", first), false);
+  assert.equal(tracker.isCurrent("session", second), true);
+  assert.deepEqual(tracker.rollback("session", second), [{ id: "old", text: "persisted", important: false }]);
+  tracker.markSaved("session", [{ id: "old", text: "first edit", important: false }]);
+  assert.deepEqual(tracker.rollback("session", second), [{ id: "old", text: "first edit", important: false }]);
 });
