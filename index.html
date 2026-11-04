@@ -9645,7 +9645,6 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         const m=s?.memories.find(m=>m.id===o.id);
         if (!m || m.important) return;
         const previousMemories=clone(s.memories);
-        const mutationVersion=memoryMutationTracker?.begin(s.id,s.memories);
         if (!text) {
           if (!confirm('內容為空，確定刪除此記憶？')) return;
           s.memories=s.memories.filter(m=>m.id!==o.id);
@@ -9655,8 +9654,9 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
           }
           m.text=text;
         }
+        const mutationVersion=memoryMutationTracker?.begin(s.id,previousMemories);
         if (!persist()) {
-          s.memories=previousMemories;
+          s.memories=memoryMutationTracker?.rollback(s.id,mutationVersion) || previousMemories;
           return;
         }
         if (s.cloudOwned && currentUser()?.uid===s.cloudOwnerUid) {
@@ -10010,8 +10010,11 @@ document.addEventListener('change',async event => {
         const mutationVersion=memoryMutationTracker?.begin(session.id,session.memories);
         m.important=target.checked;
         if (!persist()) {
-          m.important=previousImportant;
+          const restored = memoryMutationTracker?.rollback(session.id,mutationVersion);
+          if (restored) session.memories=restored;
+          else m.important=previousImportant;
           target.checked=previousImportant;
+          render();
           return;
         }
         render();
