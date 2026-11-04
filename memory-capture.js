@@ -73,6 +73,19 @@
     };
   }
 
+  function rebaseSessionSaveVersion(snapshot, latest, userId) {
+    if (!snapshot || !latest?.cloudOwned || !userId || latest.cloudOwnerUid !== userId) {
+      return snapshot;
+    }
+    return {
+      ...snapshot,
+      cloudOwned: true,
+      cloudOwnerUid: userId,
+      cloudUpdatedAt: latest.cloudUpdatedAt || snapshot.cloudUpdatedAt,
+      cloudCharacterSnapshot: latest.cloudCharacterSnapshot || snapshot.cloudCharacterSnapshot,
+    };
+  }
+
   function nextSessionUpdatedAt(previous, now = Date.now()) {
     const previousMs = Date.parse(previous);
     if (!Number.isFinite(previousMs)) {
@@ -117,5 +130,5 @@
     };
   }
 
-  return { buildPlayerMemoryExcerpt, appendMemoryWithLimit, createSerialQueue, createMemoryMutationTracker, nextSessionUpdatedAt };
+  return { buildPlayerMemoryExcerpt, appendMemoryWithLimit, createSerialQueue, createMemoryMutationTracker, nextSessionUpdatedAt, rebaseSessionSaveVersion };
 });
