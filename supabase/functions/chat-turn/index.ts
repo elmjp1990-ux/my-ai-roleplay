@@ -5,6 +5,7 @@ import { normalizeAiProviderResult } from "../_shared/ai-provider-result.ts";
 import { findPrivateContextLeak, preparePrivateContext } from "../_shared/private-context-guard.ts";
 import { buildOpenRouterProviderOptions } from "../_shared/openrouter-provider-policy.ts";
 import { releaseGenerationClaim } from "../_shared/chat-turn-claim.ts";
+import { classifyProviderFailure } from "../_shared/provider-failure-policy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -532,27 +533,27 @@ Deno.serve(async (request) => {
   }
 
   if (providerResult.kind === "provider_error" || providerResult.kind === "empty_output") {
-    // A 429 or empty response is a confirmed non-generation result; release
-    // the claim so the same stable turn can retry without a second reservation.
-    if (providerResponse.httpStatus === 429 || providerResult.kind === "empty_output") {
+    const failureAction = classifyProviderFailure(providerResult, providerResponse.httpStatus);
+
+    if (failureAction === "retry_same_turn") {
+      // An explicit 429 is treated as a rejected request. Release only the
+      // generation claim; the original reservation remains idempotent.
       const released = await releaseGenerationClaim(admin, turnId, user.id);
       await admin.from("chat_turn_events").insert({
         turn_id: turnId, user_id: user.id, event_type: "provider_retryable_error",
-        stage: "provider_response",
-        error_code: providerResult.kind === "empty_output" ? "empty_output" : providerResult.code,
+        stage: "provider_response", error_code: providerResult.code,
       });
       if (!released) return json({ status: "needs_reconciliation", error: "generation_claim_release_unconfirmed", retryAllowed: false }, 503);
       return json({
         status: "provider_error",
-        error: providerResult.kind === "empty_output" ? "empty_output" : providerResult.code,
+        error: providerResult.code,
         retryAllowed: true,
       }, 503);
     }
 
-    // Other explicit 4xx responses mean the Gateway rejected the request
-    // before producing a reply. Return the user's exact reservation; do not
-    // label this as a content-policy refusal.
-    if (providerResponse.httpStatus >= 400 && providerResponse.httpStatus < 500) {
+    if (failureAction === "refund") {
+      // Only a non-retryable explicit 4xx is treated as a confirmed request
+      // rejection. Timeouts and other ambiguous outcomes must not be refunded.
       const { data: refunded, error: refundError } = await admin.rpc("refund_chat_turn", {
         p_user_id: user.id,
         p_turn_id: turnId,
@@ -579,8 +580,9 @@ Deno.serve(async (request) => {
       return json({ status: "needs_reconciliation", error: "provider_error_refund_unknown", retryAllowed: false }, 503);
     }
 
-    // A 5xx/timeout/unknown provider outcome may have executed upstream.
-    // Keep the reservation locked until a reliable reconciliation is available.
+    // Empty output, timeouts, retryable 4xx/5xx, and unknown outcomes may
+    // still have incurred provider work. Keep the reservation locked and
+    // require reconciliation; never issue a second generation automatically.
     await admin.from("chat_turn_events").insert({
       turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
       stage: "provider_response",
