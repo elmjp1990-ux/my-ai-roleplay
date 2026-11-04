@@ -14,5 +14,6 @@ export function buildOpenRouterProviderOptions() {
   return {
     only: [...APPROVED_OPENROUTER_PROVIDERS],
     allow_fallbacks: false,
+    data_collection: "deny",
   } as const;
 }
