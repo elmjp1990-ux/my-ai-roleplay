@@ -56,3 +56,17 @@ Deno.test("extracts normal Responses API output text", () => {
     output: [{ type: "message", content: [{ type: "output_text", text: "A reply." }] }],
   }), { kind: "generated", text: "A reply." });
 });
+
+Deno.test("classifies a Gateway HTTP 400 with explicit policy code as content rejection", () => {
+  assertEquals(normalizeAiProviderResult({
+    status: 400,
+    error: { type: "content_policy_violation", message: "Request blocked by policy" },
+  }), { kind: "content_rejected", reason: "provider_refusal" });
+});
+
+Deno.test("does not classify generic HTTP 400 as content rejection", () => {
+  assertEquals(normalizeAiProviderResult({
+    status: 400,
+    error: { code: "invalid_request_error", message: "Invalid parameter" },
+  }), { kind: "provider_error", retryable: false, code: "invalid_request_error" });
+});
