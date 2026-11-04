@@ -2214,26 +2214,74 @@ async function syncCharacterIllustrations(character,userId) {
   if(error)throw new Error('角色影片上傳失敗：'+error.message);
   return path;
 }
-async function hydrateCharacterVideo(video){
+// Signed URL 依 storage path 共用快取與進行中的請求，避免同一影片被重複簽名。
+const characterVideoSignedUrlCache = new Map();
+const characterVideoSignedUrlInflight = new Map();
+let characterVideoObserver = null;
+async function getCharacterVideoSignedUrl(path){
+  const now=Date.now();
+  const cached=characterVideoSignedUrlCache.get(path);
+  if(cached&&cached.expiresAt>now+30000)return cached.url;
+  if(characterVideoSignedUrlInflight.has(path))return characterVideoSignedUrlInflight.get(path);
+  const request=(async()=>{
+    const {data,error}=await window.mySupabase.storage.from('character-avatar-videos').createSignedUrl(path,300);
+    if(error||!data?.signedUrl)throw new Error(error?.message||'無法取得角色影片網址');
+    characterVideoSignedUrlCache.set(path,{url:data.signedUrl,expiresAt:Date.now()+270000});
+    return data.signedUrl;
+  })();
+  characterVideoSignedUrlInflight.set(path,request);
+  try{return await request;}finally{characterVideoSignedUrlInflight.delete(path);}
+}
+function hydrateCharacterVideo(video){
   const path=video?.dataset?.characterVideo;
-  if(!path||!window.mySupabase||video.dataset.videoHydrated==='true')return;
-  // 所有角色影片（卡片與詳情頁）都固定靜音，並移除原生控制列。
+  if(!path||!window.mySupabase||video.dataset.videoHydrated==='true'||video.dataset.videoObservePending==='true')return;
+  // 列表中的影片只在接近可視範圍時才取得 Signed URL 並下載。
   video.controls=false;
   video.removeAttribute('controls');
   video.muted=true;
   video.defaultMuted=true;
   video.volume=0;
+  video.preload='none';
+  video.removeAttribute('autoplay');
   if(video.dataset.muteLock!=='true'){
     video.dataset.muteLock='true';
     video.addEventListener('volumechange',()=>{
       if(!video.muted||video.volume!==0){video.muted=true;video.volume=0;}
     });
   }
-  video.dataset.videoHydrated='true';
-  const {data,error}=await window.mySupabase.storage.from('character-avatar-videos').createSignedUrl(path,300);
-  if(error||!data?.signedUrl||!video.isConnected){video.dataset.videoHydrated='false';console.warn('角色影片載入失敗',error);return;}
-  video.src=data.signedUrl;video.load();
-  if(video.hasAttribute('autoplay'))video.play().catch(()=>{});
+  const load=async()=>{
+    if(video.dataset.videoHydrated==='true'||!video.isConnected)return;
+    video.dataset.videoObservePending='false';
+    video.dataset.videoHydrated='loading';
+    try{
+      const signedUrl=await getCharacterVideoSignedUrl(path);
+      if(!video.isConnected)return;
+      video.src=signedUrl;
+      video.preload='metadata';
+      video.load();
+      video.dataset.videoHydrated='true';
+      // 僅在實際可視時嘗試靜音預覽，不會因列表 render 就全部播放。
+      const rect=video.getBoundingClientRect();
+      if(rect.bottom>0&&rect.top<window.innerHeight)video.play().catch(()=>{});
+    }catch(error){
+      video.dataset.videoHydrated='false';
+      console.warn('角色影片載入失敗',error);
+    }
+  };
+  if('IntersectionObserver' in window){
+    if(!characterVideoObserver)characterVideoObserver=new IntersectionObserver(entries=>{
+      for(const entry of entries){
+        if(!entry.isIntersecting)continue;
+        characterVideoObserver.unobserve(entry.target);
+        void load();
+      }
+    },{rootMargin:'120px 0px',threshold:0.01});
+    video.dataset.videoObservePending='true';
+    characterVideoObserver.observe(video);
+  }else{
+    const rect=video.getBoundingClientRect();
+    if(rect.bottom>=0&&rect.top<=window.innerHeight)void load();
+  }
 }
 function normalizePersonalityProfile(value) {
   const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
@@ -3940,7 +3988,7 @@ function card(c,owner = false) {
       <div class="card-image">
         <button class="image-button" data-action="detail" data-id="${e(c.id)}"
                 aria-label="查看${e(c.name)}">
-          ${c.avatarVideoPath ? `<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" muted autoplay loop playsinline preload="metadata" aria-label="${e(c.name)}影片預覽"></video>` : `<img src="${e(safeImage(c.image))}" ${c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath)+'"' : ''} alt="${e(c.name)}" loading="lazy">`}
+          ${c.avatarVideoPath ? `<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" muted loop playsinline preload="none" aria-label="${e(c.name)}影片預覽"></video>` : `<img src="${e(safeImage(c.image))}" ${c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath)+'"' : ''} alt="${e(c.name)}" loading="lazy">`}
         </button>
         ${c.deletedAt ? '' : `<span class="card-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(initialTurnCount)}" title="對話回合數">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
