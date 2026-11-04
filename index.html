@@ -1864,6 +1864,8 @@ const ids = (rows || []).map(row => row.id);
       if (state.account?.uid !== user.id) return;
       const localOwnedForMerge = state.characters.filter(c => c.authorId === user.id);
       const ownerIllustrations = await loadCharacterIllustrationAssets(ids);
+      // 立繪查詢期間可能發生登出或切換帳號；舊帳號請求不得覆寫新帳號角色狀態。
+      if (state.account?.uid !== user.id) return;
       const cloudCharacters = (rows || []).filter(row => !row.deleted_at).map(row => {
         const local = localOwnedForMerge.find(c => c.id === row.id) || {};
         const story = latestStory.get(row.id);
