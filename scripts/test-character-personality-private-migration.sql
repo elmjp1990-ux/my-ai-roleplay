@@ -1,4 +1,4 @@
-\set ON_ERROR_STOP on
+\\set ON_ERROR_STOP on
 
 DO $$
 BEGIN
@@ -45,6 +45,11 @@ CREATE TABLE public.characters (
 );
 GRANT SELECT ON public.characters TO anon, authenticated, service_role;
 
+-- Simulate legacy grants from a previously deployed schema. Column-level
+-- grants are independent of table-level SELECT and must also be removed.
+GRANT SELECT (personality_profile) ON public.characters TO anon, authenticated;
+GRANT SELECT (personality_profile) ON public.characters TO PUBLIC;
+
 -- Deliberately omit personality_profile: the migration must add it.
 CREATE TABLE public.character_private_info (
   character_id uuid PRIMARY KEY,
@@ -57,8 +62,8 @@ INSERT INTO public.characters (id, author_id, personality_profile) VALUES
   ('00000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000001', '{"coreTraits":"initial private profile B"}'),
   ('00000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000001', '{}');
 
-\i supabase/migrations/20261104062017_move_character_personality_profile_to_private_info.sql
-\i supabase/migrations/20261104095000_restrict_legacy_personality_profile_select.sql
+\\i supabase/migrations/20261104062017_move_character_personality_profile_to_private_info.sql
+\\i supabase/migrations/20261104095000_restrict_legacy_personality_profile_select.sql
 
 DO $$
 BEGIN
@@ -133,7 +138,7 @@ UPDATE public.characters
 SET personality_profile = '{"coreTraits":"copy into empty private profile C"}'
 WHERE id = '00000000-0000-4000-8000-000000000003';
 
-\i supabase/migrations/20261104062017_move_character_personality_profile_to_private_info.sql
+\\i supabase/migrations/20261104062017_move_character_personality_profile_to_private_info.sql
 
 DO $$
 BEGIN
