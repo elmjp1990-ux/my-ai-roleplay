@@ -1728,13 +1728,21 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       const publicIllustrations = await loadCharacterIllustrationAssets((rows || []).map(row=>row.id));
       const publicCharacters = (rows || []).map(row => {
         const story = latestStory.get(row.id);
+        // The public and owner hydrators run concurrently. Preserve already-hydrated
+        // owner assets for the current user's own public character if the public
+        // response finishes later and has a narrower RLS-visible asset set.
+        const ownerLocal = state.characters.find(character =>
+          character.id === row.id && character.authorId === row.author_id &&
+          character.authorId === state.account?.uid
+        );
+        const publicAssets = publicIllustrations.get(row.id);
         return {
           id: row.id, name: row.name || '未命名角色',
           gender: row.gender || 'ambiguous',
           age: row.age == null ? '' : String(row.age),
-          image: publicIllustrations.get(row.id)?.primary?.src || row.avatar_url || '',
-          primaryIllustrationPath:publicIllustrations.get(row.id)?.primary?.path || '',
-          galleryIllustrations:publicIllustrations.get(row.id)?.gallery || [],
+          image: publicAssets?.primary?.src || row.avatar_url || ownerLocal?.image || '',
+          primaryIllustrationPath:publicAssets?.primary?.path || ownerLocal?.primaryIllustrationPath || '',
+          galleryIllustrations:publicAssets?.gallery?.length ? publicAssets.gallery : (ownerLocal?.galleryIllustrations || []),
           avatarVideoPath:row.avatar_video_path || '', visibility: 'public',
           reviewStatus: row.review_status, intro: row.intro || '',
           opening: story?.opening_message || '', race: row.race || '',
@@ -1973,6 +1981,41 @@ async function loadCharacterIllustrationAssets(characterIds, cleanupUserId=null)
     result.set(row.character_id,list);
   }
   return result;
+}
+
+// Encounter scenes can be opened before the concurrent public/owner hydration settles.
+// If the gallery is still missing, fetch its metadata on demand instead of permanently
+// showing the "素材待補" fallback. This remains RLS-scoped by the current Supabase user.
+const encounterGalleryIllustrationCache = new Map();
+const encounterGalleryIllustrationInflight = new Map();
+async function hydrateEncounterGalleryIllustration(characterId) {
+  const client=window.mySupabase;
+  if(!client||!characterId)return null;
+  const requestUid=currentUser()?.uid||null;
+  const key=(requestUid||'public')+':'+characterId;
+  if(encounterGalleryIllustrationCache.has(key))return encounterGalleryIllustrationCache.get(key);
+  if(encounterGalleryIllustrationInflight.has(key))return encounterGalleryIllustrationInflight.get(key);
+  const request=(async()=>{
+    const assets=await loadCharacterIllustrationAssets([characterId]);
+    if((currentUser()?.uid||null)!==requestUid)return null;
+    const gallery=assets.get(characterId)?.gallery||[];
+    const first=gallery[0]||null;
+    if(first){
+      const current=state.characters.find(character=>character.id===characterId);
+      if(current)current.galleryIllustrations=gallery;
+      const session=currentSession();
+      if(session?.characterId===characterId&&session.cloudCharacterSnapshot){
+        session.cloudCharacterSnapshot.galleryIllustrations=gallery;
+      }
+      persist();
+    }
+    encounterGalleryIllustrationCache.set(key,first);
+    return first;
+  })();
+  encounterGalleryIllustrationInflight.set(key,request);
+  try{return await request;}finally{
+    if(encounterGalleryIllustrationInflight.get(key)===request)encounterGalleryIllustrationInflight.delete(key);
+  }
 }
 async function refreshCharacterIllustrationSignedUrl(storagePath) {
   const client=window.mySupabase;
@@ -4063,7 +4106,7 @@ function card(c,owner = false) {
       <div class="card-image">
         <button class="image-button" data-action="detail" data-id="${e(c.id)}"
                 aria-label="查看${e(c.name)}">
-          <img src="${e(safeImage(c.image))}" ${c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath)+'"' : ''} alt="${e(c.name)}" loading="lazy">
+          ${c.avatarVideoPath ? `<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline preload="none" aria-label="${e(c.name)}影片預覽"></video>` : `<img src="${e(safeImage(c.image))}" ${c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath)+'"' : ''} alt="${e(c.name)}" loading="lazy">`}
         </button>
         ${c.deletedAt ? '' : `<span class="card-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(initialTurnCount)}" title="對話回合數">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
@@ -11459,12 +11502,39 @@ document.addEventListener('submit',function(event){
       }
     }else{
       if(existingSprite)existingSprite.remove();
-      if(!missingArt){
-        const artNote=document.createElement('div');
+      let artNote=missingArt;
+      if(!artNote){
+        artNote=document.createElement('div');
         artNote.className='encounter-missing-art';
-        artNote.textContent='角色半立繪素材待補';
+        artNote.textContent='正在載入角色立繪…';
         artNote.setAttribute('aria-hidden','true');
         panel.insertBefore(artNote,panel.firstChild);
+      }
+      if(character?.id){
+        const encounterSessionId=session.id;
+        void hydrateEncounterGalleryIllustration(character.id).then(asset=>{
+          if(!panel.isConnected||currentSession()?.id!==encounterSessionId)return;
+          if(asset?.src){
+            if(panel.querySelector('.encounter-character-sprite'))return;
+            const sprite=document.createElement('img');
+            sprite.className='encounter-character-sprite encounter-card-portrait-fallback';
+            sprite.alt='';
+            sprite.setAttribute('aria-hidden','true');
+            sprite.loading='eager';
+            sprite.dataset.encounterSource=asset.src;
+            if(asset.path)sprite.dataset.characterIllustrationPath=asset.path;
+            sprite.src=asset.src;
+            panel.insertBefore(sprite,panel.firstChild);
+            panel.querySelector('.encounter-missing-art')?.remove();
+          }else if(artNote.isConnected){
+            artNote.textContent='角色半立繪素材待補';
+          }
+        }).catch(error=>{
+          if(artNote.isConnected)artNote.textContent='角色立繪暫時無法載入';
+          console.warn('相遇場景立繪延遲載入失敗：',error?.message||error);
+        });
+      }else if(artNote){
+        artNote.textContent='角色半立繪素材待補';
       }
     }
     const title=panel.querySelector('.chat-heading');
