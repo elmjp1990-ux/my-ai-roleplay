@@ -36,7 +36,7 @@ assert.match(html, /image: publicIllustrations\.get\(row\.id\)\?\.primary\?\.src
 assert.match(html, /image: ownerIllustrations\.get\(row\.id\)\?\.primary\?\.src \|\| row\.avatar_url/);
 
 // Gallery sync must keep nextGallery in function scope for post-upload persistence and cleanup.
-assert.match(html, /function retryCharacterIllustrationCleanup\(userId\)\s*\{/);
+assert.ok(html.includes("function retryCharacterIllustrationCleanup(userId) {"));
 assert.doesNotMatch(html, /const usedSlots=new Set\([\s\S]*?\n\s*const nextGallery=\[\];/);
 
 // Editing an existing character must finish illustration hydration before save.
