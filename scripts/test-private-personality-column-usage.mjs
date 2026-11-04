@@ -73,4 +73,18 @@ assert.doesNotMatch(
   "Phase 1 must not drop the legacy public column",
 );
 
+// During the compatibility window, public roles may read only an explicit safe-column allowlist.
+assert.match(
+  phaseOneAccess,
+  /revoke\s+select\s+on\s+table\s+public\.characters\s+from\s+anon\s*,\s*authenticated/i,
+  "public roles must lose table-level SELECT on characters",
+);
+const safeSelectGrant = phaseOneAccess.match(/grant\s+select\s*\(([\s\S]*?)\)\s+on\s+table\s+public\.characters\s+to\s+anon\s*,\s*authenticated/i);
+assert.ok(safeSelectGrant, "approved character columns must be granted explicitly");
+assert.doesNotMatch(
+  safeSelectGrant[1],
+  /personality_profile/i,
+  "legacy personality_profile must not be in the public column allowlist",
+);
+
 console.log("Private personality column usage and two-phase migration contract checks passed.");
