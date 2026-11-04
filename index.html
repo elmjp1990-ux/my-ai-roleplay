@@ -3307,10 +3307,23 @@ async function clearCloudPendingTurn(s) {
   const user = currentUser();
   const client = window.mySupabase;
   if (!s || !user || !client || !s.cloudOwned || s.cloudOwnerUid !== user.uid) return;
-  const { error } = await client.from('chat_sessions')
-    .update({session_data:chatSessionData(s),updated_at:new Date().toISOString()})
-    .eq('id',s.id).eq('user_id',user.uid);
-  if (error) console.warn('清除雲端待處理回合標記失敗：',error.message);
+  const clear = async () => {
+    const activeUser = currentUser();
+    const latest = state.sessions?.[s.id] || s;
+    if (!activeUser || activeUser.uid !== user.uid ||
+        !latest.cloudOwned || latest.cloudOwnerUid !== user.uid ||
+        readDeletedChatTombstones(user.uid).sessions[s.id]) return;
+    const { error } = await client.from('chat_sessions')
+      .update({session_data:chatSessionData(latest),updated_at:new Date().toISOString()})
+      .eq('id',s.id).eq('user_id',user.uid);
+    if (error) console.warn('清除雲端待處理回合標記失敗：',error.message);
+  };
+  try {
+    if (chatSessionSaveQueue) await chatSessionSaveQueue(user.uid + ':' + s.id, clear);
+    else await clear();
+  } catch (error) {
+    console.warn('清除雲端待處理回合標記失敗：',error?.message || error);
+  }
 }
 
 async function runPendingChatTurn(s) {
