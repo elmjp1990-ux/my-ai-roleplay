@@ -9645,6 +9645,7 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         const m=s?.memories.find(m=>m.id===o.id);
         if (!m || m.important) return;
         const previousMemories=clone(s.memories);
+        const mutationVersion=memoryMutationTracker?.begin(s.id,s.memories);
         if (!text) {
           if (!confirm('內容為空，確定刪除此記憶？')) return;
           s.memories=s.memories.filter(m=>m.id!==o.id);
@@ -9661,12 +9662,17 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
         if (s.cloudOwned && currentUser()?.uid===s.cloudOwnerUid) {
           const synced=await saveChatSessionSafely(s);
           if (!synced) {
-            s.memories=previousMemories;
-            persist();
-            render();
-            toast('回憶同步失敗，已還原原內容；請確認網路後再試。');
-            return;
+            const canRollback = !memoryMutationTracker || memoryMutationTracker.isCurrent(s.id,mutationVersion);
+            if (canRollback) {
+              s.memories = memoryMutationTracker?.rollback(s.id,mutationVersion) || previousMemories;
+              persist();
+              render();
+              toast('回憶同步失敗，已還原至最後一次成功同步的內容；請確認網路後再試。');
+              return;
+            }
           }
+        } else {
+          memoryMutationTracker?.markSaved(s.id,s.memories);
         }
         back();break;
       }
