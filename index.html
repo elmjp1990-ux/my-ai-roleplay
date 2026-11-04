@@ -3348,6 +3348,40 @@ async function runPendingChatTurn(s) {
     return;
   }
 
+  if (result?.status === 'content_rejected') {
+    // The backend returns this state only after refund_chat_turn confirms the
+    // exact original silver/diamond reservation has been restored.
+    delete s.pendingTurn;
+    persist();
+    renderMessages();
+    await saveChatSessionSafely(s);
+    await clearCloudPendingTurn(s);
+    await refreshWalletBalance();
+    showDialog('本次生成未完成', `
+      <div class="stack">
+        <p>因內容限制因素，角色暫時無法生成回覆。</p>
+        <p>本次生成失敗，未扣除銀幣或鑽石。請調整輸入內容後再試一次。</p>
+        <div class="row end"><button class="primary" data-action="back">知道了</button></div>
+      </div>`);
+    return;
+  }
+
+  if (result?.status === 'provider_error_refunded') {
+    delete s.pendingTurn;
+    persist();
+    renderMessages();
+    await saveChatSessionSafely(s);
+    await clearCloudPendingTurn(s);
+    await refreshWalletBalance();
+    showDialog('AI 服務暫時無法完成', `
+      <div class="stack">
+        <p>目前 AI 服務無法完成這次生成，本次未扣除銀幣或鑽石。</p>
+        <p>你可以保留並修改原訊息，稍後再試。</p>
+        <div class="row end"><button class="primary" data-action="back">知道了</button></div>
+      </div>`);
+    return;
+  }
+
   if (
     result?.status === 'refunded' ||
     result?.error === 'assistant_persistence_failed' ||
