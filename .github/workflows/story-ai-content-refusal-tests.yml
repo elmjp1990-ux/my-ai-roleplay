@@ -30,6 +30,7 @@ on:
   push:
     branches:
       - main
+      - feat/story-ai-content-refusal-refund
     paths:
       - "supabase/functions/_shared/ai-provider-result.ts"
       - "supabase/functions/_shared/ai-provider-result.test.ts"
@@ -37,6 +38,8 @@ on:
       - "supabase/functions/_shared/openrouter-provider-policy.ts"
       - "supabase/functions/_shared/openrouter-provider-policy.test.ts"
       - "supabase/functions/_shared/private-context-guard.test.ts"
+      - "supabase/functions/_shared/chat-turn-claim.ts"
+      - "supabase/functions/_shared/chat-turn-claim.test.ts"
       - "supabase/migrations/20261104062017_move_character_personality_profile_to_private_info.sql"
       - "supabase/migrations/20261104095000_restrict_legacy_personality_profile_select.sql"
       - "scripts/test-character-personality-private-migration.sql"
@@ -51,6 +54,7 @@ on:
       - "supabase/functions/_shared/prompt-variables.ts"
       - "index.html"
       - ".github/workflows/story-ai-content-refusal-tests.yml"
+  workflow_dispatch:
 
 jobs:
   chat-turn-wallet-refund:
