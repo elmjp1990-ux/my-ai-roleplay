@@ -58,7 +58,7 @@ assert.ok(html.includes("async function processCharacterIllustrationCleanupJob(j
 assert.ok(html.includes("帳號狀態或角色素材引用尚未允許清理"));
 assert.ok(html.includes("can_process_character_illustration_cleanup"));
 assert.ok(html.includes("uuidPattern.test(parts[1])"));
-assert.ok(html.includes("async function retryCharacterIllustrationCleanup(userId)"));
+assert.match(html, /function retryCharacterIllustrationCleanup\\(userId\\)\\s*\\{/);
 assert.ok(html.includes("from('character_illustration_cleanup_jobs')"));
 assert.ok(html.includes("await retryCharacterIllustrationCleanup(userId)"));
 assert.match(cleanupMigration, /ENABLE ROW LEVEL SECURITY/);
