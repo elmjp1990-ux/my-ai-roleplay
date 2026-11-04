@@ -51,7 +51,7 @@ const saveWrapper = html.slice(saveStart, saveEnd);
 assert.match(saveWrapper, /const snapshot = s \? clone\(s\) : s/);
 assert.match(saveWrapper, /chatSessionSaveQueue\(key, performSave\)/);
 assert.match(saveWrapper, /memoryMutationTracker\?\.markSaved\(s\.id, snapshot\.memories\)/);
-assert.match(saveWrapper, /Preserve that confirmed version token/);
+assert.match(saveWrapper, /A row update can succeed before a later message upsert fails/);
 assert.match(saveWrapper, /target\.cloudUpdatedAt = snapshot\.cloudUpdatedAt/);
 
 const clearStart = html.indexOf("async function clearCloudPendingTurn(s) {");
