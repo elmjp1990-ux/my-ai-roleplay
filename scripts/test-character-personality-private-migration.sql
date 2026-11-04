@@ -1,4 +1,4 @@
-\\set ON_ERROR_STOP on
+\set ON_ERROR_STOP on
 
 DO $$
 BEGIN
@@ -62,8 +62,8 @@ INSERT INTO public.characters (id, author_id, personality_profile) VALUES
   ('00000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000001', '{"coreTraits":"initial private profile B"}'),
   ('00000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000001', '{}');
 
-\\i supabase/migrations/20261104062017_move_character_personality_profile_to_private_info.sql
-\\i supabase/migrations/20261104095000_restrict_legacy_personality_profile_select.sql
+\i supabase/migrations/20261104062017_move_character_personality_profile_to_private_info.sql
+\i supabase/migrations/20261104095000_restrict_legacy_personality_profile_select.sql
 
 DO $$
 BEGIN
@@ -138,7 +138,7 @@ UPDATE public.characters
 SET personality_profile = '{"coreTraits":"copy into empty private profile C"}'
 WHERE id = '00000000-0000-4000-8000-000000000003';
 
-\\i supabase/migrations/20261104062017_move_character_personality_profile_to_private_info.sql
+\i supabase/migrations/20261104062017_move_character_personality_profile_to_private_info.sql
 
 DO $$
 BEGIN
