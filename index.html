@@ -2569,13 +2569,16 @@ if (characterError) {
     }
   }
 
-  // Auth listener 先註冊，避免 getSession() 期間漏掉登入／登出事件。
-  // INITIAL_SESSION 由下方 getSession() 單一處理；TOKEN_REFRESHED 不重載整批資料。
+  // 先以 getSession() 完成每次頁面載入的雲端資料初始化，再處理後續登入／登出事件。
+  // 不可用 localStorage 的 signedIn 狀態跳過初始化：該狀態只是快取，不能代表本頁已載入雲端資料。
+  // TOKEN_REFRESHED / USER_UPDATED 不重載整批資料，避免不必要的 PostgREST 請求。
   window.addEventListener('load', async () => {
     try {
       if (!window.mySupabase?.auth) return;
+      let authBootstrapped = false;
       window.mySupabase.auth.onAuthStateChange((event, session) => {
         if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') return;
+        if (!authBootstrapped) return;
         if (event === 'SIGNED_IN') {
           const nextUid = session?.user?.id || null;
           if (nextUid && state?.signedIn && state.account?.uid === nextUid) return;
@@ -2591,9 +2594,9 @@ if (characterError) {
         console.error('Supabase Session 讀取失敗：', error);
         return;
       }
-      const sessionUser = data?.session?.user || null;
-      if (sessionUser && state?.signedIn && state.account?.uid === sessionUser.id) return;
-      syncSupabaseUser(sessionUser);
+      // 無論本機是否保存 signedIn，都必須由當前 Supabase Session 啟動一次雲端 hydration。
+      authBootstrapped = true;
+      syncSupabaseUser(data?.session?.user || null);
     } catch (error) {
       console.error('Supabase Auth 初始化失敗：', error);
     }
