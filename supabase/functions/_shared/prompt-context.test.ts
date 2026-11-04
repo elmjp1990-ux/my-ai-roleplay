@@ -81,6 +81,9 @@ Deno.test("formats structured creator personality without exposing private info"
   assertEquals(values.CHAR_STYLE, "Warm, descriptive prose");
   assertEquals(values.CHAR_PERSONALITY.includes("核心性格：Observant and guarded"), true);
   assertEquals(values.CHAR_PERSONALITY.includes("關係發展節奏：Slow burn"), true);
+  assertEquals(values.CHAR_PERSONALITY.includes("喜好："), false);
+  assertEquals(values.CHAR_LIKES, "喜歡：Rainy afternoons");
+  assertEquals(values.CHAR_DISLIKES, "不喜歡／雷點：Broken promises");
   assertEquals(values.CHAR_PERSONALITY.includes("THIS MUST NOT APPEAR"), false);
   assertEquals(values.CHAR_PERSONALITY.length <= 4000, true);
 });
@@ -89,5 +92,7 @@ Deno.test("empty or malformed character personality safely falls back to empty c
   const empty = buildPromptVariableValues({ character: { personality_profile: null } });
   const malformed = buildPromptVariableValues({ character: { personality_profile: ["not", "an", "object"] } });
   assertEquals(empty.CHAR_PERSONALITY, "");
+  assertEquals(empty.CHAR_LIKES, "");
+  assertEquals(empty.CHAR_DISLIKES, "");
   assertEquals(malformed.CHAR_PERSONALITY, "");
 });
