@@ -24,9 +24,9 @@ const pinHandlerStart = html.indexOf("if (target.dataset.memory) {");
 const pinHandlerEnd = html.indexOf("if (['aiImages','aiImageCount'].includes(target.id))", pinHandlerStart);
 assert.ok(pinHandlerStart >= 0 && pinHandlerEnd > pinHandlerStart);
 const pinHandler = html.slice(pinHandlerStart, pinHandlerEnd);
-assert.match(pinHandler, /m\\.important\\s*=\\s*target\\.checked/);
-assert.match(pinHandler, /await saveChatSessionSafely\\(session\\)/);
-assert.match(pinHandler, /m\\.important\\s*=\\s*previousImportant/);
+assert.match(pinHandler, /m\.important\s*=\s*target\.checked/);
+assert.match(pinHandler, /await saveChatSessionSafely\(session\)/);
+assert.match(pinHandler, /m\.important\s*=\s*previousImportant/);
 
 // Important memories are read-only; ordinary memory edits/deletes are persisted
 // and rolled back locally if cloud sync cannot confirm the write.
@@ -34,9 +34,9 @@ const memoryEditorStart = html.indexOf("case 'memory':");
 const memoryEditorEnd = html.indexOf("case 'message-edit':", memoryEditorStart);
 assert.ok(memoryEditorStart >= 0 && memoryEditorEnd > memoryEditorStart);
 const memoryEditor = html.slice(memoryEditorStart, memoryEditorEnd);
-assert.match(memoryEditor, /if \\(!m \\|\\| m\\.important\\) return/);
-assert.match(memoryEditor, /s\\.memories\\s*=\\s*s\\.memories\\.filter/);
-assert.match(memoryEditor, /await saveChatSessionSafely\\(s\\)/);
-assert.match(memoryEditor, /s\\.memories\\s*=\\s*previousMemories/);
+assert.match(memoryEditor, /if \(!m \|\| m\.important\) return/);
+assert.match(memoryEditor, /s\.memories\s*=\s*s\.memories\.filter/);
+assert.match(memoryEditor, /await saveChatSessionSafely\(s\)/);
+assert.match(memoryEditor, /s\.memories\s*=\s*previousMemories/);
 
 console.log("Memory persistence, hydration, pin/edit/delete rollback, ordering and correction-priority contracts passed.");
