@@ -6,8 +6,6 @@ on:
       - "supabase/functions/_shared/ai-provider-result.ts"
       - "supabase/functions/_shared/ai-provider-result.test.ts"
       - "supabase/functions/_shared/private-context-guard.ts"
-      - "supabase/functions/_shared/private-context-guard.ts"
-      - "supabase/functions/_shared/private-context-guard.test.ts"
       - "supabase/functions/_shared/private-context-guard.test.ts"
       - "supabase/functions/chat-turn/index.ts"
       - "supabase/functions/_shared/prompt-context.ts"
