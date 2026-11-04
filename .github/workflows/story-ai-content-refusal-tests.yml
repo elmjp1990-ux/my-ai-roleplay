@@ -7,8 +7,8 @@ on:
       - "supabase/functions/_shared/ai-provider-result.test.ts"
       - "supabase/functions/_shared/private-context-guard.ts"
       - "supabase/functions/_shared/private-context-guard.test.ts"
-      - "supabase/functions/_shared/ai-gateway-policy.ts"
-      - "supabase/functions/_shared/ai-gateway-policy.test.ts"
+      - "supabase/functions/_shared/openrouter-provider-policy.ts"
+      - "supabase/functions/_shared/openrouter-provider-policy.test.ts"
       - "supabase/migrations/20261104090000_move_character_personality_profile_to_private_info.sql"
       - "scripts/test-character-personality-private-migration.sql"
       - "scripts/test-private-personality-column-usage.mjs"
@@ -29,8 +29,8 @@ on:
       - "supabase/functions/_shared/ai-provider-result.ts"
       - "supabase/functions/_shared/ai-provider-result.test.ts"
       - "supabase/functions/_shared/private-context-guard.ts"
-      - "supabase/functions/_shared/ai-gateway-policy.ts"
-      - "supabase/functions/_shared/ai-gateway-policy.test.ts"
+      - "supabase/functions/_shared/openrouter-provider-policy.ts"
+      - "supabase/functions/_shared/openrouter-provider-policy.test.ts"
       - "supabase/functions/_shared/private-context-guard.test.ts"
       - "supabase/migrations/20261104090000_move_character_personality_profile_to_private_info.sql"
       - "scripts/test-character-personality-private-migration.sql"
@@ -116,5 +116,5 @@ jobs:
         run: deno test supabase/functions/_shared/ai-provider-result.test.ts
       - name: Run private context output guard tests
         run: deno test supabase/functions/_shared/private-context-guard.test.ts
-      - name: Run AI Gateway privacy policy tests
-        run: deno test supabase/functions/_shared/ai-gateway-policy.test.ts
+      - name: Run OpenRouter provider privacy policy tests
+        run: deno test supabase/functions/_shared/openrouter-provider-policy.test.ts
