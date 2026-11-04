@@ -73,6 +73,15 @@
     };
   }
 
+  function nextSessionUpdatedAt(previous, now = Date.now()) {
+    const previousMs = Date.parse(previous);
+    if (!Number.isFinite(previousMs)) {
+      throw new Error("A valid previous chat-session version is required.");
+    }
+    const clockMs = Number.isFinite(now) ? now : Date.now();
+    return new Date(Math.max(clockMs, previousMs + 1)).toISOString();
+  }
+
   function createMemoryMutationTracker() {
     const states = new Map();
     const copy = (memories) => Array.isArray(memories)
@@ -108,5 +117,5 @@
     };
   }
 
-  return { buildPlayerMemoryExcerpt, appendMemoryWithLimit, createSerialQueue, createMemoryMutationTracker };
+  return { buildPlayerMemoryExcerpt, appendMemoryWithLimit, createSerialQueue, createMemoryMutationTracker, nextSessionUpdatedAt };
 });
