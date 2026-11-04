@@ -30,5 +30,7 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - name: Type-check Story chat-turn Edge Function
+        run: deno check supabase/functions/chat-turn/index.ts
       - name: Run provider result normalization tests
-        run: deno test --no-check supabase/functions/_shared/ai-provider-result.test.ts
+        run: deno test supabase/functions/_shared/ai-provider-result.test.ts
