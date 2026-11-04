@@ -11,6 +11,7 @@ on:
       - "supabase/functions/_shared/ai-gateway-policy.test.ts"
       - "supabase/migrations/20261104090000_move_character_personality_profile_to_private_info.sql"
       - "scripts/test-character-personality-private-migration.sql"
+      - "scripts/test-private-personality-column-usage.mjs"
       - "supabase/functions/chat-turn/index.ts"
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/prompt-variables.ts"
@@ -28,6 +29,7 @@ on:
       - "supabase/functions/_shared/private-context-guard.test.ts"
       - "supabase/migrations/20261104090000_move_character_personality_profile_to_private_info.sql"
       - "scripts/test-character-personality-private-migration.sql"
+      - "scripts/test-private-personality-column-usage.mjs"
       - "supabase/functions/chat-turn/index.ts"
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/prompt-variables.ts"
@@ -63,6 +65,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Verify author-only personality data never reads from public characters
+        run: node scripts/test-private-personality-column-usage.mjs
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
