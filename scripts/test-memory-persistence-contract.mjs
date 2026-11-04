@@ -39,4 +39,24 @@ assert.match(memoryEditor, /s\.memories\s*=\s*s\.memories\.filter/);
 assert.match(memoryEditor, /await saveChatSessionSafely\(s\)/);
 assert.match(memoryEditor, /s\.memories\s*=\s*previousMemories/);
 
-console.log("Memory persistence, hydration, pin/edit/delete rollback, ordering and correction-priority contracts passed.");
+// Cloud writes and pending-turn metadata updates share one per-owner/session queue
+// and capture immutable snapshots so out-of-order requests cannot overwrite newer state.
+const saveStart = html.indexOf("async function saveChatSessionSafely(s) {");
+const saveEnd = html.indexOf("async function refreshWalletBalance", saveStart);
+assert.ok(saveStart >= 0 && saveEnd > saveStart);
+const saveWrapper = html.slice(saveStart, saveEnd);
+assert.match(saveWrapper, /const snapshot = s \? clone\(s\) : s/);
+assert.match(saveWrapper, /chatSessionSaveQueue\(key, performSave\)/);
+assert.match(saveWrapper, /memoryMutationTracker\?\.markSaved\(s\.id, snapshot\.memories\)/);
+
+const clearStart = html.indexOf("async function clearCloudPendingTurn(s) {");
+const clearEnd = html.indexOf("async function runPendingChatTurn", clearStart);
+assert.ok(clearStart >= 0 && clearEnd > clearStart);
+const clearWrapper = html.slice(clearStart, clearEnd);
+assert.match(clearWrapper, /chatSessionSaveQueue\(user\.uid \+ ':' \+ s\.id, clear\)/);
+
+assert.match(memoryEditor, /memoryMutationTracker\?\.begin\(s\.id, previousMemories\)/);
+assert.match(memoryEditor, /memoryMutationTracker\?\.rollback\(s\.id, mutationVersion\)/);
+assert.match(pinHandler, /memoryMutationTracker\?\.begin\(session\.id, session\.memories\)/);
+assert.match(pinHandler, /memoryMutationTracker\?\.rollback\(session\.id, mutationVersion\)/);
+console.log("Memory persistence, queue ordering, pin/edit/delete rollback and correction-priority contracts passed.");
