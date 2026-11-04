@@ -6818,7 +6818,12 @@ function renderMessages(scroll = true) {
   const c = sessionCharacter(s);
   if (!s || !c) return;
   const oldScroll = $('messages').scrollTop;
-  $('messages').innerHTML = s.messages.filter(m => !(m.role === 'user' && String(m.text||'').trim() === GROUP_CONTINUE_SENTINEL)).map(m => {
+  const olderControl = s.messagesHasMore
+    ? '<div class="chat-history-pagination"><button type="button" data-action="load-older-messages" data-id="'+e(s.id)+'" '+(s.messagesLoading?'disabled':'')+'>載入更早的聊天紀錄</button></div>'
+    : '';
+  const loadingNotice = s.messagesLoading && !s.messages.length
+    ? '<div class="empty chat-history-loading" role="status">正在載入最近的聊天紀錄…</div>' : '';
+  $('messages').innerHTML = loadingNotice + olderControl + s.messages.filter(m => !(m.role === 'user' && String(m.text||'').trim() === GROUP_CONTINUE_SENTINEL)).map(m => {
     const user = m.role === 'user';
     const roles = [{id:c.id,name:c.name,image:c.image || c.avatar_url}];
     // Role prefixes can appear in AI replies as well as player-authored text.
@@ -6857,7 +6862,8 @@ function renderMessages(scroll = true) {
       <div class="message-content">${contentHTML}</div>
       <button class="message-more" data-action="message-menu" data-id="${e(m.id)}" aria-label="訊息操作">⋯</button>
     </article>`;
-  }).join('');
+  }).join('') + (s.messagesLoading && s.messages.length
+    ? '<div class="small muted chat-history-loading" role="status">正在載入更早的聊天紀錄…</div>' : '');
   $('messages').scrollTop = scroll ? $('messages').scrollHeight : oldScroll;
   const sendButton=$('view')?.querySelector('.chat-main .composer-send');
   if(sendButton){const sending=!!s?.pendingTurn;sendButton.disabled=sending;sendButton.innerHTML=sending?'<span aria-hidden="true">■</span>':ICON.send;sendButton.setAttribute('aria-label',sending?'訊息處理中':'送出或接續回應');sendButton.title=sending?'訊息處理中':'送出';sendButton.classList.toggle('is-sending',sending);}
