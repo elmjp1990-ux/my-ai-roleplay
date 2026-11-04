@@ -41,7 +41,7 @@ async function buildStoryMessages(
   const characterId = String(session.character_id);
   const [characterResult, profileResult, historyResult] = await Promise.all([
     admin.from("characters")
-      .select("id,author_id,name,intro,style,gender,age,race,appearance,appearance_description,visual_description")
+      .select("id,author_id,name,intro,style,gender,age,race")
       .eq("id", characterId)
       .maybeSingle(),
     admin.from("profiles")
@@ -182,7 +182,7 @@ async function requestStoryGeneration(
         model,
         messages,
         temperature: 0.85,
-        max_tokens: 1200,
+        max_tokens: 1800,
         // Do not route prompts to providers that may use them for model training.
         provider: { data_collection: "deny" },
       }),
