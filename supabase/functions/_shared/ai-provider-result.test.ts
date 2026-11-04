@@ -64,6 +64,20 @@ Deno.test("classifies a Gateway HTTP 400 with explicit policy code as content re
   }), { kind: "content_rejected", reason: "provider_refusal" });
 });
 
+Deno.test("keeps Vercel no_providers_available as a generic provider error", () => {
+  assertEquals(normalizeAiProviderResult({
+    status: 400,
+    error: {
+      type: "no_providers_available",
+      code: "no_providers_available",
+    },
+  }), {
+    kind: "provider_error",
+    retryable: false,
+    code: "no_providers_available",
+  });
+});
+
 Deno.test("does not classify generic HTTP 400 as content rejection", () => {
   assertEquals(normalizeAiProviderResult({
     status: 400,
