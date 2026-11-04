@@ -2976,7 +2976,13 @@ async function saveChatSessionToCloud(s, options = {}) {
     if (currentRow.error) throw new Error('讀取既有聊天快照失敗：'+currentRow.error.message);
     if (!currentRow.data?.updated_at) throw new Error('既有聊天已不存在或無法取得版本，已停止同步。');
     if (readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
-    expectedUpdatedAt = s.cloudUpdatedAt || currentRow.data.updated_at;
+    if (!s.cloudUpdatedAt || !Number.isFinite(Date.parse(s.cloudUpdatedAt))) {
+      throw new Error('這段聊天缺少同步版本資訊，為避免舊資料覆蓋雲端內容，請重新載入聊天後再試。');
+    }
+    expectedUpdatedAt = s.cloudUpdatedAt;
+    if (currentRow.data.updated_at !== expectedUpdatedAt) {
+      throw new Error('此聊天已在其他分頁或裝置更新，為避免覆蓋新內容，請重新載入最新聊天後再試。');
+    }
     if (currentRow.data?.character_snapshot) s.cloudCharacterSnapshot = currentRow.data.character_snapshot;
   }
   const priorSnapshot = s.cloudCharacterSnapshot && typeof s.cloudCharacterSnapshot === 'object'
@@ -3014,7 +3020,7 @@ async function saveChatSessionToCloud(s, options = {}) {
   };
   // 若本機未標記 cloudOwned，先確認這個 ID 是否已存在，避免對舊聊天誤做 INSERT。
   if (!s.cloudOwned) {
-    const existing = await client.from('chat_sessions').select('id,character_snapshot')
+    const existing = await client.from('chat_sessions').select('id,character_snapshot,updated_at')
       .eq('id',s.id).eq('user_id',localUser.uid).maybeSingle();
     if (existing.error) throw new Error('檢查既有聊天失敗：'+existing.error.message);
     if (existing.data) {
@@ -3022,6 +3028,9 @@ async function saveChatSessionToCloud(s, options = {}) {
       if (existingSnapshot?.id && existingSnapshot.id !== s.characterId) {
         throw new Error('雲端既有聊天的角色快照與角色 ID 不一致，已停止同步以避免覆寫錯誤角色資料。');
       }
+      if (!existing.data.updated_at) throw new Error('既有聊天缺少同步版本資訊，已停止同步。');
+      expectedUpdatedAt = existing.data.updated_at;
+      s.cloudUpdatedAt = existing.data.updated_at;
       s.cloudOwned = true;
       s.cloudOwnerUid = localUser.uid;
       const { privateInfo: _legacyExistingPrivateInfo, ...safeExistingSnapshot } = existingSnapshot || {};
@@ -3036,11 +3045,9 @@ async function saveChatSessionToCloud(s, options = {}) {
       snapshot.deletedAt = canonical.deletedAt || snapshot.deletedAt;
     }
   }
-  const rowTimestamp = new Date();
-  const expectedTimestamp = Date.parse(expectedUpdatedAt || '');
-  if (Number.isFinite(expectedTimestamp) && rowTimestamp.getTime() <= expectedTimestamp) {
-    rowTimestamp.setTime(expectedTimestamp + 1);
-  }
+  const rowTimestamp = expectedUpdatedAt
+    ? new Date(window.POYOZZMemoryCapture.nextSessionUpdatedAt(expectedUpdatedAt))
+    : new Date();
   const row = {
     id:s.id, user_id:localUser.uid, character_id:s.characterId,
     character_name:snapshot.name,
@@ -3286,6 +3293,14 @@ async function saveChatSessionSafely(s) {
     const latest = s?.id && state.sessions?.[s.id] ? state.sessions[s.id] : s;
     try {
       if (requestedUid && uid !== requestedUid) return false;
+      // The queue may have waited behind an earlier successful save. Rebase only
+      // the version token, not the call-time content snapshot, onto that saved row.
+      if (latest?.cloudOwned && uid && latest.cloudOwnerUid === uid) {
+        snapshot.cloudOwned = true;
+        snapshot.cloudOwnerUid = uid;
+        if (latest.cloudUpdatedAt) snapshot.cloudUpdatedAt = latest.cloudUpdatedAt;
+        if (latest.cloudCharacterSnapshot) snapshot.cloudCharacterSnapshot = latest.cloudCharacterSnapshot;
+      }
       if (latest?.cloudOwned && uid && latest.cloudOwnerUid === uid &&
           readDeletedChatTombstones(uid).sessions[latest.id]) return false;
       const saved = await saveChatSessionToCloud(snapshot);
@@ -4980,7 +4995,8 @@ async function createEncounterSession(character) {
     album: [],
     cloudOwned: true,
     cloudOwnerUid: authData.user.id,
-    cloudCharacterSnapshot: data.session.character_snapshot || {}
+    cloudCharacterSnapshot: data.session.character_snapshot || {},
+    cloudUpdatedAt: data.session.updated_at || null
   };
   state.sessions[sessionId] = session;
   persist();
@@ -5096,6 +5112,7 @@ async function createStorySession(characterId, originMode, sourceEncounterSessio
     cloudOwned:true,
     cloudOwnerUid:authData.user.id,
     cloudCharacterSnapshot:payload.session.character_snapshot || {},
+    cloudUpdatedAt:payload.session.updated_at || null,
     storyMode:true,
     storyOriginMode:relationship.origin_mode,
     storySourceEncounterSessionId:relationship.source_encounter_session_id || null,
@@ -8022,9 +8039,11 @@ document.addEventListener('click',async event => {
               }
               const {data:row,error:readError}=await client.from('chat_sessions').select('session_data,updated_at').eq('id',session.id).eq('user_id',user.id).maybeSingle();
               if(readError||!row)throw readError||new Error('讀取聊天設定失敗。');
-              const expectedUpdatedAt=session.cloudUpdatedAt||row.updated_at;
+              const expectedUpdatedAt=session.cloudUpdatedAt;
+              if(!expectedUpdatedAt||row.updated_at!==expectedUpdatedAt)throw new Error('聊天版本已變更或遺失，請重新載入後再設定背景。');
               const nextData={...(row.session_data||{}),background:nextBackground};
-              const {data:saved,error:saveError}=await client.from('chat_sessions').update({session_data:nextData,updated_at:new Date().toISOString()}).eq('id',session.id).eq('user_id',user.id).eq('updated_at',expectedUpdatedAt).select('id,updated_at').maybeSingle();
+              const nextUpdatedAt=window.POYOZZMemoryCapture.nextSessionUpdatedAt(expectedUpdatedAt);
+              const {data:saved,error:saveError}=await client.from('chat_sessions').update({session_data:nextData,updated_at:nextUpdatedAt}).eq('id',session.id).eq('user_id',user.id).eq('updated_at',expectedUpdatedAt).select('id,updated_at').maybeSingle();
               if(saveError||!saved)throw saveError||new Error('聊天已在其他分頁或裝置更新，請重新載入後再設定背景。');
               session.cloudUpdatedAt=saved.updated_at||session.cloudUpdatedAt;
             }
@@ -8473,11 +8492,13 @@ document.addEventListener('click',async event => {
             if (!cloudRow) throw new Error('找不到這筆雲端聊天紀錄。');
             const currentData=cloudRow.session_data && typeof cloudRow.session_data==='object'
               ? cloudRow.session_data : {};
-            const expectedUpdatedAt=item.cloudUpdatedAt||cloudRow.updated_at;
+            const expectedUpdatedAt=item.cloudUpdatedAt;
+            if(!expectedUpdatedAt||cloudRow.updated_at!==expectedUpdatedAt)throw new Error('聊天版本已變更或遺失，請重新載入後再設定置頂。');
+            const nextUpdatedAt=window.POYOZZMemoryCapture.nextSessionUpdatedAt(expectedUpdatedAt);
             const {data:updatedRow,error:updateError}=await client.from('chat_sessions')
               .update({
                 session_data:{...currentData,pinned:!!item.pinned},
-                updated_at:new Date().toISOString()
+                updated_at:nextUpdatedAt
               })
               .eq('id',item.id).eq('user_id',uid).eq('updated_at',expectedUpdatedAt).select('id,updated_at').maybeSingle();
             if (updateError) throw new Error(updateError.message);
@@ -9969,9 +9990,11 @@ document.addEventListener('change',async event => {
           if(photoError||!photo)throw photoError||new Error('找不到這張有效的回憶相片。');
           const {data:row,error:readError}=await client.from('chat_sessions').select('session_data,updated_at').eq('id',s.id).eq('user_id',uid).maybeSingle();
           if(readError||!row)throw readError||new Error('讀取聊天設定失敗。');
-          const expectedUpdatedAt=s.cloudUpdatedAt||row.updated_at;
+          const expectedUpdatedAt=s.cloudUpdatedAt;
+          if(!expectedUpdatedAt||row.updated_at!==expectedUpdatedAt)throw new Error('聊天版本已變更或遺失，請重新載入後再設定背景。');
           const nextData={...(row.session_data||{}),background:target.value};
-          const {data:saved,error:saveError}=await client.from('chat_sessions').update({session_data:nextData,updated_at:new Date().toISOString()}).eq('id',s.id).eq('user_id',uid).eq('updated_at',expectedUpdatedAt).select('id,updated_at').maybeSingle();
+          const nextUpdatedAt=window.POYOZZMemoryCapture.nextSessionUpdatedAt(expectedUpdatedAt);
+          const {data:saved,error:saveError}=await client.from('chat_sessions').update({session_data:nextData,updated_at:nextUpdatedAt}).eq('id',s.id).eq('user_id',uid).eq('updated_at',expectedUpdatedAt).select('id,updated_at').maybeSingle();
           if(saveError||!saved)throw saveError||new Error('聊天已在其他分頁或裝置更新，請重新載入後再設定背景。');
           s.cloudUpdatedAt=saved.updated_at||s.cloudUpdatedAt;
           s.background=target.value;persist();const panel=$('view').querySelector('.chat-main');if(panel)void window.applySingleMemoryPhotoBackground?.(s,panel);toast('已更新聊天背景。');
