@@ -2936,6 +2936,8 @@ function chatSessionData(s) {
         aiTargetId:message.aiTargetId || null,
         commandType:message.commandType || null
       }])),
+    lastMessagePreview:(()=>{const last=[...(s.messages || [])].reverse().find(message=>String(message.text || '').trim());return last ? String(last.text || '').slice(0,180) : String(s.lastMessagePreview || '').slice(0,180);})(),
+    lastMessageAt:(()=>{const last=[...(s.messages || [])].reverse().find(message=>String(message.text || '').trim());return Number(last?.at) || Number(s.lastMessageAt) || null;})(),
     pendingTurn:s.pendingTurn &&
       isUuid(s.pendingTurn.turnId) &&
       isUuid(s.pendingTurn.userMessageId) &&
