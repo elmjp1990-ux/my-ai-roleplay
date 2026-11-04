@@ -10007,15 +10007,28 @@ document.addEventListener('change',async event => {
       const m=session?.memories.find(m=>m.id===target.dataset.memory);
       if (m) {
         const previousImportant=m.important;
+        const mutationVersion=memoryMutationTracker?.begin(session.id,session.memories);
         m.important=target.checked;
-        persist();render();
+        if (!persist()) {
+          m.important=previousImportant;
+          target.checked=previousImportant;
+          return;
+        }
+        render();
         if (session.cloudOwned && currentUser()?.uid===session.cloudOwnerUid) {
           const synced=await saveChatSessionSafely(session);
           if (!synced) {
-            m.important=previousImportant;
-            persist();render();
-            toast('重大記憶同步失敗，已還原原設定。');
+            const canRollback = !memoryMutationTracker || memoryMutationTracker.isCurrent(session.id,mutationVersion);
+            if (canRollback) {
+              const restored = memoryMutationTracker?.rollback(session.id,mutationVersion);
+              if (restored) session.memories=restored;
+              else m.important=previousImportant;
+              persist();render();
+              toast('重大記憶同步失敗，已還原至最後一次成功同步的設定。');
+            }
           }
+        } else {
+          memoryMutationTracker?.markSaved(session.id,session.memories);
         }
       }
     }
