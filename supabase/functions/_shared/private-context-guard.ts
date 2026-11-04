@@ -19,6 +19,22 @@ export function collectProtectedContext(privateInfo: unknown, personalityProfile
 }
 
 /**
+ * Keep the prompt context bounded while screening against the complete source.
+ * Never truncate author-only source material before building the leak detector.
+ */
+export function preparePrivateContext(
+  privateInfo: unknown,
+  personalityProfile: unknown,
+  promptLimit = 6000,
+): { promptText: string; protectedValues: string[] } {
+  const fullPrivateInfo = typeof privateInfo === "string" ? privateInfo : "";
+  return {
+    promptText: fullPrivateInfo.slice(0, Math.max(0, promptLimit)),
+    protectedValues: collectProtectedContext(fullPrivateInfo, personalityProfile),
+  };
+}
+
+/**
  * Detects verbatim or near-verbatim disclosure of author-only context.
  * Short values are ignored to reduce false positives from ordinary character traits.
  * Long values are checked for a 32-code-point contiguous excerpt.
