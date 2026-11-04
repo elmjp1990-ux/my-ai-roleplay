@@ -11,6 +11,8 @@ on:
       - "supabase/functions/_shared/openrouter-provider-policy.test.ts"
       - "supabase/functions/_shared/chat-turn-claim.ts"
       - "supabase/functions/_shared/chat-turn-claim.test.ts"
+      - "supabase/functions/_shared/provider-failure-policy.ts"
+      - "supabase/functions/_shared/provider-failure-policy.test.ts"
       - "supabase/migrations/20261104062017_move_character_personality_profile_to_private_info.sql"
       - "supabase/migrations/20261104095000_restrict_legacy_personality_profile_select.sql"
       - "scripts/test-character-personality-private-migration.sql"
@@ -126,6 +128,8 @@ jobs:
         run: deno check supabase/functions/chat-turn/index.ts
       - name: Run provider result normalization tests
         run: deno test supabase/functions/_shared/ai-provider-result.test.ts
+      - name: Run provider failure safety policy tests
+        run: deno test supabase/functions/_shared/provider-failure-policy.test.ts
       - name: Run private context output guard tests
         run: deno test supabase/functions/_shared/private-context-guard.test.ts
       - name: Run OpenRouter provider privacy policy tests
