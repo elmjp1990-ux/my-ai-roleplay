@@ -2263,6 +2263,7 @@ async function syncCharacterIllustrations(character,userId) {
 const characterVideoSignedUrlCache = new Map();
 const characterVideoSignedUrlInflight = new Map();
 let characterVideoObserver = null;
+const characterVideoLoaders = new WeakMap();
 async function getCharacterVideoSignedUrl(path){
   const now=Date.now();
   const cached=characterVideoSignedUrlCache.get(path);
@@ -2315,7 +2316,6 @@ function hydrateCharacterVideo(video){
       video.preload='metadata';
       video.load();
       video.dataset.videoHydrated='true';
-      // 僅在接近可視範圍時載入；真正進入畫面才播放。
       const rect=video.getBoundingClientRect();
       if(rect.bottom>0&&rect.top<window.innerHeight)video.play().catch(()=>{});
     }catch(error){
@@ -2323,13 +2323,18 @@ function hydrateCharacterVideo(video){
       console.warn('角色影片載入失敗',error);
     }
   };
+  characterVideoLoaders.set(video,load);
   if('IntersectionObserver' in window){
     if(!characterVideoObserver)characterVideoObserver=new IntersectionObserver(entries=>{
       for(const entry of entries){
         const target=entry.target;
         if(!target?.isConnected)continue;
         if(entry.isIntersecting){
-          void load();
+          if(target.dataset.videoHydrated==='true')target.play().catch(()=>{});
+          else {
+            const loadTarget=characterVideoLoaders.get(target);
+            if(loadTarget)void loadTarget();
+          }
         }else if(target.dataset.videoHydrated==='true'){
           target.pause();
         }
