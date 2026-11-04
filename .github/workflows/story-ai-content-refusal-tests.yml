@@ -15,6 +15,7 @@ on:
       - "scripts/test-chat-turn-wallet-refund.sql"
       - "memory-capture.js"
       - "scripts/test-memory-capture.cjs"
+      - "scripts/test-memory-persistence-contract.mjs"
       - "supabase/functions/chat-turn/index.ts"
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/prompt-variables.ts"
@@ -36,6 +37,7 @@ on:
       - "scripts/test-chat-turn-wallet-refund.sql"
       - "memory-capture.js"
       - "scripts/test-memory-capture.cjs"
+      - "scripts/test-memory-persistence-contract.mjs"
       - "supabase/functions/chat-turn/index.ts"
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/prompt-variables.ts"
@@ -99,6 +101,8 @@ jobs:
         run: node scripts/test-private-personality-column-usage.mjs
       - name: Test five-turn player-first memory capture
         run: node --test scripts/test-memory-capture.cjs
+      - name: Verify memory persistence, reload and correction-priority contracts
+        run: node scripts/test-memory-persistence-contract.mjs
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
