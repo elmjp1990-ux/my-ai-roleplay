@@ -86,6 +86,12 @@ assert.ok(html.includes("const characterVideoLoaders = new WeakMap()"));
 assert.ok(html.includes("characterVideoLoaders.set(video,load)"));
 assert.ok(html.includes("characterVideoLoaders.get(target)"));
 assert.ok(html.includes("if(target.dataset.videoHydrated==='true')target.play().catch"));
+assert.ok(html.includes("function stopCharacterVideo(video) {"));
+assert.ok(html.includes("video.removeAttribute('src');"));
+assert.ok(html.includes("video.load();"));
+assert.ok(html.includes("document.addEventListener('visibilitychange'"));
+assert.ok(html.includes("window.addEventListener('pagehide'"));
+assert.ok(html.includes("}, {rootMargin:'0px',threshold:0.01}"));
 
 // Illustration metadata reads are single-flight and author cleanup is never implicit for public loads.
 assert.ok(html.includes("const characterIllustrationMetadataInflight = new Map()"));
