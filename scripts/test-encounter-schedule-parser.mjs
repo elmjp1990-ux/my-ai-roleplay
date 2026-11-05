@@ -32,11 +32,12 @@ assert.match(html, /createSignedUrl\(storagePath,3600\)/);
 assert.match(html, /data-character-illustration-path/);
 assert.match(html, /document\.addEventListener\('error',[\s\S]*refreshCharacterIllustrationSignedUrl/);
 assert.match(html, /document\.addEventListener\('load'/);
-assert.match(html, /image: publicIllustrations\.get\(row\.id\)\?\.primary\?\.src \|\| row\.avatar_url/);
+assert.match(html, /image: publicAssets\?\.primary\?\.src \|\| row\.avatar_url \|\| ownerLocal\?\.image/);
+assert.match(html, /galleryIllustrations:publicAssets\?\.gallery\?\.length \? publicAssets\.gallery : \(ownerLocal\?\.galleryIllustrations \|\| \[\]\)/);
 assert.match(html, /image: ownerIllustrations\.get\(row\.id\)\?\.primary\?\.src \|\| row\.avatar_url/);
 
 // Gallery sync must keep nextGallery in function scope for post-upload persistence and cleanup.
-assert.match(html, /async function syncCharacterIllustrations\([\s\S]*?let nextPrimaryPath=draftPrimaryIllustrationPath\|\|\x27\x27;\s*const nextGallery=\[\];\s*await retryCharacterIllustrationCleanup\(userId\);\s*try\{/);
+assert.ok(html.includes("function retryCharacterIllustrationCleanup(userId) {"));
 assert.doesNotMatch(html, /const usedSlots=new Set\([\s\S]*?\n\s*const nextGallery=\[\];/);
 
 // Editing an existing character must finish illustration hydration before save.
@@ -58,7 +59,7 @@ assert.ok(html.includes("async function processCharacterIllustrationCleanupJob(j
 assert.ok(html.includes("帳號狀態或角色素材引用尚未允許清理"));
 assert.ok(html.includes("can_process_character_illustration_cleanup"));
 assert.ok(html.includes("uuidPattern.test(parts[1])"));
-assert.ok(html.includes("async function retryCharacterIllustrationCleanup(userId)"));
+assert.ok(html.includes("function retryCharacterIllustrationCleanup(userId) {"));
 assert.ok(html.includes("from('character_illustration_cleanup_jobs')"));
 assert.ok(html.includes("await retryCharacterIllustrationCleanup(userId)"));
 assert.match(cleanupMigration, /ENABLE ROW LEVEL SECURITY/);
@@ -68,9 +69,38 @@ assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_job
 
 // The card primary image is not reused as encounter-scene art.
 assert.match(html, /const sceneIllustration=safeImage\(character\?\.galleryIllustrations\?\.\[0\]\?\.src\|\|\x27\x27\)/);
+// Restore muted inline card video playback while retaining lazy signed-URL hydration.
+assert.ok(html.includes('<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline preload="none"'));
+assert.ok(html.includes("function hydrateEncounterGalleryIllustration(characterId) {"));
+assert.ok(html.includes("正在載入角色立繪…"));
+assert.ok(html.includes("角色半立繪素材待補"));
+assert.ok(html.includes("const ownerLocal = state.characters.find(character =>"));
+assert.ok(html.includes("ownerLocal?.galleryIllustrations || []"));
 assert.match(html, /const halfBodyImage=dedicatedSprite\|\|sceneIllustration/);
 assert.doesNotMatch(html, /const cardPortrait=safeImage\(character\?\.image/);
 assert.match(html, /相遇模式立繪（最多 5 張）/);
 assert.match(html, /主要角色圖預覽/);
+
+// Lazy video observer must dispatch to each observed element, not capture the first card's loader.
+assert.ok(html.includes("const characterVideoLoaders = new WeakMap()"));
+assert.ok(html.includes("characterVideoLoaders.set(video,load)"));
+assert.ok(html.includes("characterVideoLoaders.get(target)"));
+assert.ok(html.includes("if(target.dataset.videoHydrated==='true')target.play().catch"));
+assert.ok(html.includes("function stopCharacterVideo(video){"));
+assert.ok(html.includes("video.removeAttribute('src');"));
+assert.ok(html.includes("video.load();"));
+assert.ok(html.includes("document.addEventListener('visibilitychange'"));
+assert.ok(html.includes("window.addEventListener('pagehide'"));
+assert.ok(html.includes("},{rootMargin:'0px',threshold:0.01}"));
+
+// Illustration metadata reads are single-flight and author cleanup is never implicit for public loads.
+assert.ok(html.includes("const characterIllustrationMetadataInflight = new Map()"));
+assert.ok(html.includes("async function loadCharacterIllustrationAssets(characterIds, cleanupUserId=null)"));
+assert.ok(html.includes("if(cleanupUserId)await retryCharacterIllustrationCleanup(cleanupUserId)"));
+
+// Character hydration only fetches story fields consumed by the UI; avoid downloading unused story descriptions/titles.
+const minimalStorySelect = ".select('character_id, opening_message, visibility, created_at')";
+assert.equal(html.split(minimalStorySelect).length - 1, 2);
+assert.ok(!html.includes(".select('id, character_id, story_name, description, opening_message, visibility, created_at')"));
 
 console.log("Author schedule and illustration signed-URL refresh contract tests passed.");

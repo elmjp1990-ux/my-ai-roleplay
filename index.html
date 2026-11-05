@@ -1673,7 +1673,14 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 
   // 探索頁公開角色獨立於登入帳號載入，訪客也能看見。
   // 每次登入／登出都以雲端公開清單為準，避免沿用前一個帳號的過期本機資料。
-  async function loadPublicSupabaseCharacters() {
+  let publicCharactersLoadPromise = null;
+  function loadPublicSupabaseCharacters() {
+    if (publicCharactersLoadPromise) return publicCharactersLoadPromise;
+    publicCharactersLoadPromise = loadPublicSupabaseCharactersImpl()
+      .finally(() => { publicCharactersLoadPromise = null; });
+    return publicCharactersLoadPromise;
+  }
+  async function loadPublicSupabaseCharactersImpl() {
     const client = window.mySupabase;
     if (!client) return;
     try {
@@ -1707,7 +1714,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       if (ids.length) {
         const result = await client
           .from('character_stories')
-          .select('id, character_id, story_name, description, opening_message, visibility, created_at')
+          .select('character_id, opening_message, visibility, created_at')
           .in('character_id', ids)
           .eq('visibility', 'public')
           .order('created_at', { ascending: false });
@@ -1722,13 +1729,21 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       const publicIllustrations = await loadCharacterIllustrationAssets((rows || []).map(row=>row.id));
       const publicCharacters = (rows || []).map(row => {
         const story = latestStory.get(row.id);
+        // The public and owner hydrators run concurrently. Preserve already-hydrated
+        // owner assets for the current user's own public character if the public
+        // response finishes later and has a narrower RLS-visible asset set.
+        const ownerLocal = state.characters.find(character =>
+          character.id === row.id && character.authorId === row.author_id &&
+          character.authorId === state.account?.uid
+        );
+        const publicAssets = publicIllustrations.get(row.id);
         return {
           id: row.id, name: row.name || '未命名角色',
           gender: row.gender || 'ambiguous',
           age: row.age == null ? '' : String(row.age),
-          image: publicIllustrations.get(row.id)?.primary?.src || row.avatar_url || '',
-          primaryIllustrationPath:publicIllustrations.get(row.id)?.primary?.path || '',
-          galleryIllustrations:publicIllustrations.get(row.id)?.gallery || [],
+          image: publicAssets?.primary?.src || row.avatar_url || ownerLocal?.image || '',
+          primaryIllustrationPath:publicAssets?.primary?.path || ownerLocal?.primaryIllustrationPath || '',
+          galleryIllustrations:publicAssets?.gallery?.length ? publicAssets.gallery : (ownerLocal?.galleryIllustrations || []),
           avatarVideoPath:row.avatar_video_path || '', visibility: 'public',
           reviewStatus: row.review_status, intro: row.intro || '',
           opening: story?.opening_message || '', race: row.race || '',
@@ -1845,7 +1860,7 @@ const ids = (rows || []).map(row => row.id);
       if (ids.length) {
         const result = await client
           .from('character_stories')
-          .select('id, character_id, story_name, description, opening_message, visibility, created_at')
+          .select('character_id, opening_message, visibility, created_at')
           .in('character_id', ids)
           .order('created_at', { ascending: false });
         if (result.error) throw new Error('讀取雲端角色故事失敗：' + result.error.message);
@@ -1857,7 +1872,9 @@ const ids = (rows || []).map(row => row.id);
       }
       if (state.account?.uid !== user.id) return;
       const localOwnedForMerge = state.characters.filter(c => c.authorId === user.id);
-      const ownerIllustrations = await loadCharacterIllustrationAssets(ids);
+      const ownerIllustrations = await loadCharacterIllustrationAssets(ids,user.id);
+      // 立繪查詢期間可能發生登出或切換帳號；舊帳號請求不得覆寫新帳號角色狀態。
+      if (state.account?.uid !== user.id) return;
       const cloudCharacters = (rows || []).filter(row => !row.deleted_at).map(row => {
         const local = localOwnedForMerge.find(c => c.id === row.id) || {};
         const story = latestStory.get(row.id);
@@ -1912,35 +1929,100 @@ const ids = (rows || []).map(row => row.id);
     }
   }
 
-async function loadCharacterIllustrationAssets(characterIds) {
+const characterIllustrationSignedUrlCache = new Map();
+const characterIllustrationSignedUrlInflight = new Map();
+async function getCharacterIllustrationSignedUrl(storagePath) {
+  const now=Date.now();
+  const cached=characterIllustrationSignedUrlCache.get(storagePath);
+  if(cached&&cached.expiresAt>now+60000)return cached.url;
+  if(characterIllustrationSignedUrlInflight.has(storagePath))return characterIllustrationSignedUrlInflight.get(storagePath);
+  const request=(async()=>{
+    const {data,error}=await window.mySupabase.storage.from('character-illustrations').createSignedUrl(storagePath,3600);
+    if(error||!data?.signedUrl)throw new Error(error?.message||'無法取得角色立繪網址');
+    characterIllustrationSignedUrlCache.set(storagePath,{url:data.signedUrl,expiresAt:Date.now()+3300000});
+    return data.signedUrl;
+  })();
+  characterIllustrationSignedUrlInflight.set(storagePath,request);
+  try{return await request;}finally{characterIllustrationSignedUrlInflight.delete(storagePath);}
+}
+const characterIllustrationMetadataInflight = new Map();
+async function loadCharacterIllustrationAssets(characterIds, cleanupUserId=null) {
   const client=window.mySupabase;
-  const ids=[...new Set((characterIds||[]).filter(Boolean))];
+  const ids=[...new Set((characterIds||[]).filter(Boolean))].sort();
   const result=new Map();
   if(!client||!ids.length)return result;
-  const cleanupUserId=state.account?.uid;
+  // Cleanup retries are owner-only. Public exploration must never trigger an author cleanup query.
   if(cleanupUserId)await retryCharacterIllustrationCleanup(cleanupUserId);
-  const {data:rows,error}=await client.from('character_illustrations')
-    .select('id, character_id, storage_path, asset_type, sort_order, display_name')
-    .in('character_id',ids)
-    .order('sort_order',{ascending:true});
-  if(error)throw new Error('讀取角色立繪資料失敗：'+error.message);
-  for(const row of rows||[]){
-    const {data,error:signedError}=await client.storage.from('character-illustrations').createSignedUrl(row.storage_path,3600);
-    if(signedError||!data?.signedUrl)continue;
+  // Public and owner loaders can overlap; deduplicate identical metadata reads per auth scope.
+  const scope=cleanupUserId||'public';
+  const key=scope+':'+ids.join(',');
+  let rowsPromise=characterIllustrationMetadataInflight.get(key);
+  if(!rowsPromise){
+    rowsPromise=client.from('character_illustrations')
+      .select('id, character_id, storage_path, asset_type, sort_order, display_name')
+      .in('character_id',ids)
+      .order('sort_order',{ascending:true})
+      .then(({data,error})=>{
+        if(error)throw new Error('讀取角色立繪資料失敗：'+error.message);
+        return data||[];
+      });
+    characterIllustrationMetadataInflight.set(key,rowsPromise);
+  }
+  let rows;
+  try{rows=await rowsPromise;}finally{
+    if(characterIllustrationMetadataInflight.get(key)===rowsPromise)characterIllustrationMetadataInflight.delete(key);
+  }
+  for(const row of rows){
+    let signedUrl;
+    try{signedUrl=await getCharacterIllustrationSignedUrl(row.storage_path);}catch(_){continue;}
     const list=result.get(row.character_id)||{primary:null,gallery:[]};
-    const asset={id:row.id,path:row.storage_path,src:data.signedUrl,sortOrder:row.sort_order,name:row.display_name||''};
+    const asset={id:row.id,path:row.storage_path,src:signedUrl,sortOrder:row.sort_order,name:row.display_name||''};
     if(row.asset_type==='primary')list.primary=asset;
     else list.gallery.push(asset);
     result.set(row.character_id,list);
   }
   return result;
 }
+
+// Encounter scenes can be opened before the concurrent public/owner hydration settles.
+// If the gallery is still missing, fetch its metadata on demand instead of permanently
+// showing the "素材待補" fallback. This remains RLS-scoped by the current Supabase user.
+const encounterGalleryIllustrationCache = new Map();
+const encounterGalleryIllustrationInflight = new Map();
+async function hydrateEncounterGalleryIllustration(characterId) {
+  const client=window.mySupabase;
+  if(!client||!characterId)return null;
+  const requestUid=currentUser()?.uid||null;
+  const key=(requestUid||'public')+':'+characterId;
+  if(encounterGalleryIllustrationCache.has(key))return encounterGalleryIllustrationCache.get(key);
+  if(encounterGalleryIllustrationInflight.has(key))return encounterGalleryIllustrationInflight.get(key);
+  const request=(async()=>{
+    const assets=await loadCharacterIllustrationAssets([characterId]);
+    if((currentUser()?.uid||null)!==requestUid)return null;
+    const gallery=assets.get(characterId)?.gallery||[];
+    const first=gallery[0]||null;
+    if(first){
+      const current=state.characters.find(character=>character.id===characterId);
+      if(current)current.galleryIllustrations=gallery;
+      const session=currentSession();
+      if(session?.characterId===characterId&&session.cloudCharacterSnapshot){
+        session.cloudCharacterSnapshot.galleryIllustrations=gallery;
+      }
+      persist();
+    }
+    encounterGalleryIllustrationCache.set(key,first);
+    return first;
+  })();
+  encounterGalleryIllustrationInflight.set(key,request);
+  try{return await request;}finally{
+    if(encounterGalleryIllustrationInflight.get(key)===request)encounterGalleryIllustrationInflight.delete(key);
+  }
+}
 async function refreshCharacterIllustrationSignedUrl(storagePath) {
   const client=window.mySupabase;
   if(!client||typeof storagePath!=='string'||!storagePath)return null;
-  const {data,error}=await client.storage.from('character-illustrations').createSignedUrl(storagePath,3600);
-  if(error||!data?.signedUrl)throw new Error('角色立繪簽名網址更新失敗：'+(error?.message||'missing_signed_url'));
-  return data.signedUrl;
+  try{return await getCharacterIllustrationSignedUrl(storagePath);}
+  catch(error){throw new Error('角色立繪簽名網址更新失敗：'+(error?.message||'missing_signed_url'));}
 }
 if(!window.__characterIllustrationRefreshHandlerInstalled){
   window.__characterIllustrationRefreshHandlerInstalled=true;
@@ -2028,21 +2110,27 @@ async function cleanupCharacterIllustrationUploads(paths,userId) {
     }
   }
 }
-async function retryCharacterIllustrationCleanup(userId) {
+const characterIllustrationCleanupRetryInflight = new Map();
+function retryCharacterIllustrationCleanup(userId) {
   const client=window.mySupabase;
-  if(!client||!userId)return {processed:0,failed:0};
-  const {data:jobs,error}=await client.from('character_illustration_cleanup_jobs')
-    .select('id,storage_path,attempts').eq('author_id',userId).order('created_at',{ascending:true}).limit(50);
-  if(error) {
-    console.warn('讀取待重試的角色立繪清理工作失敗：',error.message);
-    return {processed:0,failed:0};
-  }
-  let processed=0,failed=0;
-  for(const job of jobs||[]) {
-    const ok=await processCharacterIllustrationCleanupJob(job,userId);
-    if(ok)processed++;else failed++;
-  }
-  return {processed,failed};
+  if(!client||!userId)return Promise.resolve({processed:0,failed:0});
+  if(characterIllustrationCleanupRetryInflight.has(userId))return characterIllustrationCleanupRetryInflight.get(userId);
+  const request=(async()=>{
+    const {data:jobs,error}=await client.from('character_illustration_cleanup_jobs')
+      .select('id,storage_path,attempts').eq('author_id',userId).order('created_at',{ascending:true}).limit(50);
+    if(error) {
+      console.warn('讀取待重試的角色立繪清理工作失敗：',error.message);
+      return {processed:0,failed:0};
+    }
+    let processed=0,failed=0;
+    for(const job of jobs||[]) {
+      const ok=await processCharacterIllustrationCleanupJob(job,userId);
+      if(ok)processed++;else failed++;
+    }
+    return {processed,failed};
+  })();
+  characterIllustrationCleanupRetryInflight.set(userId,request);
+  return request.finally(()=>characterIllustrationCleanupRetryInflight.delete(userId));
 }
 
 async function uploadCharacterIllustrationDataUrl(dataUrl,userId,characterId) {
@@ -2215,27 +2303,125 @@ async function syncCharacterIllustrations(character,userId) {
   if(error)throw new Error('角色影片上傳失敗：'+error.message);
   return path;
 }
-async function hydrateCharacterVideo(video){
+// Signed URL 依 storage path 共用快取與進行中的請求，避免同一影片被重複簽名。
+const characterVideoSignedUrlCache = new Map();
+const characterVideoSignedUrlInflight = new Map();
+let characterVideoObserver = null;
+const characterVideoLoaders = new WeakMap();
+async function getCharacterVideoSignedUrl(path){
+  const now=Date.now();
+  const cached=characterVideoSignedUrlCache.get(path);
+  if(cached&&cached.expiresAt>now+30000)return cached.url;
+  if(characterVideoSignedUrlInflight.has(path))return characterVideoSignedUrlInflight.get(path);
+  const request=(async()=>{
+    const {data,error}=await window.mySupabase.storage.from('character-avatar-videos').createSignedUrl(path,300);
+    if(error||!data?.signedUrl)throw new Error(error?.message||'無法取得角色影片網址');
+    characterVideoSignedUrlCache.set(path,{url:data.signedUrl,expiresAt:Date.now()+270000});
+    return data.signedUrl;
+  })();
+  characterVideoSignedUrlInflight.set(path,request);
+  try{return await request;}finally{characterVideoSignedUrlInflight.delete(path);}
+}
+function stopCharacterVideo(video){
+  if(!video)return;
+  // pause() alone may leave the media resource attached and buffered. Removing src
+  // and calling load() aborts the resource selection so an offscreen clip stops fetching.
+  video.pause();
+  video.removeAttribute('src');
+  video.preload='none';
+  video.load();
+  video.dataset.videoHydrated='false';
+}
+function hydrateCharacterVideo(video){
   const path=video?.dataset?.characterVideo;
-  if(!path||!window.mySupabase||video.dataset.videoHydrated==='true')return;
-  // 所有角色影片（卡片與詳情頁）都固定靜音，並移除原生控制列。
+  if(!path||!window.mySupabase||video.dataset.videoHydrated==='true'||video.dataset.videoHydrated==='loading'||video.dataset.videoObservePending==='true')return;
+  // 列表中的影片只在實際可視範圍內取得 Signed URL 並下載。
   video.controls=false;
   video.removeAttribute('controls');
   video.muted=true;
   video.defaultMuted=true;
   video.volume=0;
+  video.preload='none';
+  video.removeAttribute('autoplay');
   if(video.dataset.muteLock!=='true'){
     video.dataset.muteLock='true';
     video.addEventListener('volumechange',()=>{
       if(!video.muted||video.volume!==0){video.muted=true;video.volume=0;}
     });
   }
-  video.dataset.videoHydrated='true';
-  const {data,error}=await window.mySupabase.storage.from('character-avatar-videos').createSignedUrl(path,300);
-  if(error||!data?.signedUrl||!video.isConnected){video.dataset.videoHydrated='false';console.warn('角色影片載入失敗',error);return;}
-  video.src=data.signedUrl;video.load();
-  if(video.hasAttribute('autoplay'))video.play().catch(()=>{});
+  if(video.dataset.videoErrorHandler!=='true'){
+    video.dataset.videoErrorHandler='true';
+    video.addEventListener('error',()=>{
+      // 不在錯誤事件中自動重試，避免壞檔或網路錯誤形成請求迴圈。
+      stopCharacterVideo(video);
+    });
+  }
+  const load=async()=>{
+    if(video.dataset.videoHydrated==='true'||video.dataset.videoHydrated==='loading'||!video.isConnected)return;
+    video.dataset.videoObservePending='false';
+    video.dataset.videoHydrated='loading';
+    try{
+      const signedUrl=await getCharacterVideoSignedUrl(path);
+      const rect=video.getBoundingClientRect();
+      const inViewport=rect.bottom>0&&rect.top<window.innerHeight&&rect.right>0&&rect.left<window.innerWidth;
+      // A slow signing request must not attach a media URL after the user has scrolled away
+      // or switched tabs while it was pending.
+      if(!video.isConnected||document.hidden||!inViewport){
+        video.dataset.videoHydrated='false';
+        return;
+      }
+      video.src=signedUrl;
+      video.preload='metadata';
+      video.load();
+      video.dataset.videoHydrated='true';
+      video.play().catch(()=>{});
+    }catch(error){
+      video.dataset.videoHydrated='false';
+      console.warn('角色影片載入失敗',error);
+    }
+  };
+  characterVideoLoaders.set(video,load);
+  if('IntersectionObserver' in window){
+    if(!characterVideoObserver)characterVideoObserver=new IntersectionObserver(entries=>{
+      for(const entry of entries){
+        const target=entry.target;
+        if(!target?.isConnected)continue;
+        if(entry.isIntersecting&&!document.hidden){
+          if(target.dataset.videoHydrated==='true')target.play().catch(()=>{});
+          else {
+            const loadTarget=characterVideoLoaders.get(target);
+            if(loadTarget)void loadTarget();
+          }
+        }else if(target.dataset.videoHydrated==='true'||target.dataset.videoHydrated==='loading'){
+          stopCharacterVideo(target);
+        }
+      }
+    },{rootMargin:'0px',threshold:0.01});
+    video.dataset.videoObservePending='true';
+    characterVideoObserver.observe(video);
+  }else{
+    const rect=video.getBoundingClientRect();
+    if(!document.hidden&&rect.bottom>0&&rect.top<window.innerHeight&&rect.right>0&&rect.left<window.innerWidth)void load();
+  }
 }
+// Stop all character media when the tab is backgrounded. Re-observe on return so
+// only clips actually inside the viewport are fetched and played again.
+document.addEventListener('visibilitychange',()=>{
+  const videos=document.querySelectorAll('video[data-character-video]');
+  if(document.hidden){
+    videos.forEach(stopCharacterVideo);
+  }else{
+    videos.forEach(video=>{
+      if(characterVideoObserver){
+        characterVideoObserver.unobserve(video);
+        characterVideoObserver.observe(video);
+      }
+    });
+  }
+});
+window.addEventListener('pagehide',()=>{
+  document.querySelectorAll('video[data-character-video]').forEach(stopCharacterVideo);
+});
 function normalizePersonalityProfile(value) {
   const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
   const limits={coreTraits:500,values:500,speechStyle:500,behaviorRules:700,likes:300,dislikes:300,boundaries:500,relationshipPacing:300};
@@ -2500,23 +2686,34 @@ if (characterError) {
     }
   }
 
-  // Google OAuth 回站後恢復 Session。
+  // 先以 getSession() 完成每次頁面載入的雲端資料初始化，再處理後續登入／登出事件。
+  // 不可用 localStorage 的 signedIn 狀態跳過初始化：該狀態只是快取，不能代表本頁已載入雲端資料。
+  // TOKEN_REFRESHED / USER_UPDATED 不重載整批資料，避免不必要的 PostgREST 請求。
   window.addEventListener('load', async () => {
     try {
-      const { data, error } = await window.mySupabase.auth.getSession();
+      if (!window.mySupabase?.auth) return;
+      let authBootstrapped = false;
+      window.mySupabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') return;
+        if (!authBootstrapped) return;
+        if (event === 'SIGNED_IN') {
+          const nextUid = session?.user?.id || null;
+          if (nextUid && state?.signedIn && state.account?.uid === nextUid) return;
+          syncSupabaseUser(session?.user || null);
+        } else if (event === 'SIGNED_OUT') {
+          if (!state?.signedIn && !state?.account) return;
+          syncSupabaseUser(null);
+        }
+      });
 
+      const { data, error } = await window.mySupabase.auth.getSession();
       if (error) {
         console.error('Supabase Session 讀取失敗：', error);
         return;
       }
-
+      // 無論本機是否保存 signedIn，都必須由當前 Supabase Session 啟動一次雲端 hydration。
+      authBootstrapped = true;
       syncSupabaseUser(data?.session?.user || null);
-      void loadPublicSupabaseCharacters();
-
-      window.mySupabase.auth.onAuthStateChange((event, session) => {
-        // INITIAL_SESSION / SIGNED_IN / TOKEN_REFRESHED 等狀態都統一交給同一入口。
-        syncSupabaseUser(session?.user || null);
-      });
     } catch (error) {
       console.error('Supabase Auth 初始化失敗：', error);
     }
@@ -4062,7 +4259,7 @@ function card(c,owner = false) {
       <div class="card-image">
         <button class="image-button" data-action="detail" data-id="${e(c.id)}"
                 aria-label="查看${e(c.name)}">
-          ${c.avatarVideoPath ? `<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" muted autoplay loop playsinline preload="metadata" aria-label="${e(c.name)}影片預覽"></video>` : `<img src="${e(safeImage(c.image))}" ${c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath)+'"' : ''} alt="${e(c.name)}" loading="lazy">`}
+          ${c.avatarVideoPath ? `<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline preload="none" aria-label="${e(c.name)}影片預覽"></video>` : `<img src="${e(safeImage(c.image))}" ${c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath)+'"' : ''} alt="${e(c.name)}" loading="lazy">`}
         </button>
         ${c.deletedAt ? '' : `<span class="card-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(initialTurnCount)}" title="對話回合數">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
@@ -11496,12 +11693,39 @@ document.addEventListener('submit',function(event){
       }
     }else{
       if(existingSprite)existingSprite.remove();
-      if(!missingArt){
-        const artNote=document.createElement('div');
+      let artNote=missingArt;
+      if(!artNote){
+        artNote=document.createElement('div');
         artNote.className='encounter-missing-art';
-        artNote.textContent='角色半立繪素材待補';
+        artNote.textContent='正在載入角色立繪…';
         artNote.setAttribute('aria-hidden','true');
         panel.insertBefore(artNote,panel.firstChild);
+      }
+      if(character?.id){
+        const encounterSessionId=session.id;
+        void hydrateEncounterGalleryIllustration(character.id).then(asset=>{
+          if(!panel.isConnected||currentSession()?.id!==encounterSessionId)return;
+          if(asset?.src){
+            if(panel.querySelector('.encounter-character-sprite'))return;
+            const sprite=document.createElement('img');
+            sprite.className='encounter-character-sprite encounter-card-portrait-fallback';
+            sprite.alt='';
+            sprite.setAttribute('aria-hidden','true');
+            sprite.loading='eager';
+            sprite.dataset.encounterSource=asset.src;
+            if(asset.path)sprite.dataset.characterIllustrationPath=asset.path;
+            sprite.src=asset.src;
+            panel.insertBefore(sprite,panel.firstChild);
+            panel.querySelector('.encounter-missing-art')?.remove();
+          }else if(artNote.isConnected){
+            artNote.textContent='角色半立繪素材待補';
+          }
+        }).catch(error=>{
+          if(artNote.isConnected)artNote.textContent='角色立繪暫時無法載入';
+          console.warn('相遇場景立繪延遲載入失敗：',error?.message||error);
+        });
+      }else if(artNote){
+        artNote.textContent='角色半立繪素材待補';
       }
     }
     const title=panel.querySelector('.chat-heading');
