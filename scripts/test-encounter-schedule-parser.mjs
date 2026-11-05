@@ -91,7 +91,7 @@ assert.ok(html.includes("video.removeAttribute('src');"));
 assert.ok(html.includes("video.load();"));
 assert.ok(html.includes("document.addEventListener('visibilitychange'"));
 assert.ok(html.includes("window.addEventListener('pagehide'"));
-assert.ok(html.includes("}, {rootMargin:'0px',threshold:0.01}"));
+assert.ok(html.includes("},{rootMargin:'0px',threshold:0.01}"));
 
 // Illustration metadata reads are single-flight and author cleanup is never implicit for public loads.
 assert.ok(html.includes("const characterIllustrationMetadataInflight = new Map()"));
