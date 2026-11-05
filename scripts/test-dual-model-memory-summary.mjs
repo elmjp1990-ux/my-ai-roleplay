@@ -9,7 +9,7 @@ assert.match(source, /provider: \{ only: \["deepinfra"\], allow_fallbacks: false
 assert.match(source, /processDueStoryMemorySummary\(admin, session, user\.id, openRouterKey\)/);
 assert.match(source, /recordChatModelUsage\(admin/);
 assert.match(source, /storedSummary/);
-assert.match(source, /EdgeRuntime\.waitUntil/);
+assert.match(source, /edgeRuntime\?\.waitUntil/);
 assert.match(summary, /const SUMMARY_MODEL = "openai\/gpt-oss-20b"/);
 assert.match(summary, /const SUMMARY_INTERVAL = 5/);
 assert.match(summary, /generation_type: "memory_summary"/);
