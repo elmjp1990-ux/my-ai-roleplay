@@ -32,8 +32,8 @@ create table if not exists public.ai_model_usage (
     or (summary is not null and processed_at is not null)
   )
 );
-create unique index if not exists ai_model_usage_chat_assistant_unique
-  on public.ai_model_usage (assistant_message_id)
+create index if not exists ai_model_usage_chat_assistant_idx
+  on public.ai_model_usage (assistant_message_id, created_at desc)
   where generation_type = 'chat_response' and assistant_message_id is not null;
 create unique index if not exists ai_model_usage_summary_batch_unique
   on public.ai_model_usage (session_id, batch_number)
