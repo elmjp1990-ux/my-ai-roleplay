@@ -86,7 +86,7 @@ assert.ok(html.includes("const characterVideoLoaders = new WeakMap()"));
 assert.ok(html.includes("characterVideoLoaders.set(video,load)"));
 assert.ok(html.includes("characterVideoLoaders.get(target)"));
 assert.ok(html.includes("if(target.dataset.videoHydrated==='true')target.play().catch"));
-assert.ok(html.includes("function stopCharacterVideo(video) {"));
+assert.ok(html.includes("function stopCharacterVideo(video){"));
 assert.ok(html.includes("video.removeAttribute('src');"));
 assert.ok(html.includes("video.load();"));
 assert.ok(html.includes("document.addEventListener('visibilitychange'"));
