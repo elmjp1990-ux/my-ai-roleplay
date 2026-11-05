@@ -684,12 +684,13 @@ Deno.serve(async (request) => {
   const edgeRuntime = (globalThis as typeof globalThis & {
     EdgeRuntime?: { waitUntil: (task: Promise<unknown>) => void };
   }).EdgeRuntime;
+  const summaryTask = processDueStoryMemorySummary(admin, session, user.id, openRouterKey).catch((error) => {
+    console.error("Story memory summary background task failed:", error instanceof Error ? error.message : "unknown_error");
+  });
   if (edgeRuntime?.waitUntil) {
-    edgeRuntime.waitUntil(
-      processDueStoryMemorySummary(admin, session, user.id, openRouterKey).catch((error) => {
-        console.error("Story memory summary background task failed:", error instanceof Error ? error.message : "unknown_error");
-      }),
-    );
+    edgeRuntime.waitUntil(summaryTask);
+  } else {
+    await summaryTask;
   }
 
   return json({
