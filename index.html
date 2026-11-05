@@ -2321,10 +2321,20 @@ async function getCharacterVideoSignedUrl(path){
   characterVideoSignedUrlInflight.set(path,request);
   try{return await request;}finally{characterVideoSignedUrlInflight.delete(path);}
 }
+function stopCharacterVideo(video){
+  if(!video)return;
+  // pause() alone may leave the media resource attached and buffered. Removing src
+  // and calling load() aborts the resource selection so an offscreen clip stops fetching.
+  video.pause();
+  video.removeAttribute('src');
+  video.preload='none';
+  video.load();
+  video.dataset.videoHydrated='false';
+}
 function hydrateCharacterVideo(video){
   const path=video?.dataset?.characterVideo;
   if(!path||!window.mySupabase||video.dataset.videoHydrated==='true'||video.dataset.videoHydrated==='loading'||video.dataset.videoObservePending==='true')return;
-  // 列表中的影片只在接近可視範圍時才取得 Signed URL 並下載。
+  // 列表中的影片只在實際可視範圍內取得 Signed URL 並下載。
   video.controls=false;
   video.removeAttribute('controls');
   video.muted=true;
@@ -2342,10 +2352,7 @@ function hydrateCharacterVideo(video){
     video.dataset.videoErrorHandler='true';
     video.addEventListener('error',()=>{
       // 不在錯誤事件中自動重試，避免壞檔或網路錯誤形成請求迴圈。
-      video.pause();
-      video.removeAttribute('src');
-      video.preload='none';
-      video.dataset.videoHydrated='false';
+      stopCharacterVideo(video);
     });
   }
   const load=async()=>{
@@ -2354,13 +2361,19 @@ function hydrateCharacterVideo(video){
     video.dataset.videoHydrated='loading';
     try{
       const signedUrl=await getCharacterVideoSignedUrl(path);
-      if(!video.isConnected)return;
+      const rect=video.getBoundingClientRect();
+      const inViewport=rect.bottom>0&&rect.top<window.innerHeight&&rect.right>0&&rect.left<window.innerWidth;
+      // A slow signing request must not attach a media URL after the user has scrolled away
+      // or switched tabs while it was pending.
+      if(!video.isConnected||document.hidden||!inViewport){
+        video.dataset.videoHydrated='false';
+        return;
+      }
       video.src=signedUrl;
       video.preload='metadata';
       video.load();
       video.dataset.videoHydrated='true';
-      const rect=video.getBoundingClientRect();
-      if(rect.bottom>0&&rect.top<window.innerHeight)video.play().catch(()=>{});
+      video.play().catch(()=>{});
     }catch(error){
       video.dataset.videoHydrated='false';
       console.warn('角色影片載入失敗',error);
@@ -2372,24 +2385,42 @@ function hydrateCharacterVideo(video){
       for(const entry of entries){
         const target=entry.target;
         if(!target?.isConnected)continue;
-        if(entry.isIntersecting){
+        if(entry.isIntersecting&&!document.hidden){
           if(target.dataset.videoHydrated==='true')target.play().catch(()=>{});
           else {
             const loadTarget=characterVideoLoaders.get(target);
             if(loadTarget)void loadTarget();
           }
-        }else if(target.dataset.videoHydrated==='true'){
-          target.pause();
+        }else if(target.dataset.videoHydrated==='true'||target.dataset.videoHydrated==='loading'){
+          stopCharacterVideo(target);
         }
       }
-    },{rootMargin:'120px 0px',threshold:0.01});
+    },{rootMargin:'0px',threshold:0.01});
     video.dataset.videoObservePending='true';
     characterVideoObserver.observe(video);
   }else{
     const rect=video.getBoundingClientRect();
-    if(rect.bottom>=0&&rect.top<=window.innerHeight)void load();
+    if(!document.hidden&&rect.bottom>0&&rect.top<window.innerHeight&&rect.right>0&&rect.left<window.innerWidth)void load();
   }
 }
+// Stop all character media when the tab is backgrounded. Re-observe on return so
+// only clips actually inside the viewport are fetched and played again.
+document.addEventListener('visibilitychange',()=>{
+  const videos=document.querySelectorAll('video[data-character-video]');
+  if(document.hidden){
+    videos.forEach(stopCharacterVideo);
+  }else{
+    videos.forEach(video=>{
+      if(characterVideoObserver){
+        characterVideoObserver.unobserve(video);
+        characterVideoObserver.observe(video);
+      }
+    });
+  }
+});
+window.addEventListener('pagehide',()=>{
+  document.querySelectorAll('video[data-character-video]').forEach(stopCharacterVideo);
+});
 function normalizePersonalityProfile(value) {
   const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
   const limits={coreTraits:500,values:500,speechStyle:500,behaviorRules:700,likes:300,dislikes:300,boundaries:500,relationshipPacing:300};
