@@ -636,6 +636,7 @@ Deno.serve(async (request) => {
       .select("id,content").eq("id", assistantMessageId).eq("session_id", sessionId)
       .eq("role", "assistant").is("deleted_at", null).maybeSingle();
     if (verifyError) {
+      await recordUsage(null, "failed");
       await admin.from("chat_turn_events").insert({
         turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
         stage: "assistant_persistence", error_code: "reply_write_outcome_unknown",
@@ -643,6 +644,7 @@ Deno.serve(async (request) => {
       return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
     }
     if (!possibleReply || !String(possibleReply.content || "").trim()) {
+      await recordUsage(null, "failed");
       const { data: refunded, error: refundError } = await admin.rpc("refund_chat_turn", {
         p_user_id: user.id,
         p_turn_id: turnId,
@@ -668,6 +670,7 @@ Deno.serve(async (request) => {
       return json({ status: "needs_reconciliation", error: "assistant_persistence_refund_unknown", retryAllowed: false }, 503);
     }
     if (String(possibleReply.content) !== providerResult.text) {
+      await recordUsage(null, "failed");
       return json({ status: "needs_reconciliation", error: "assistant_message_id_collision", retryAllowed: false }, 409);
     }
   }
