@@ -1,0 +1,31 @@
+name: Story chat OpenRouter preflight contract
+
+on:
+  pull_request:
+    paths:
+      - "supabase/functions/chat-turn/index.ts"
+      - "scripts/test-chat-turn-preflight.mjs"
+      - ".github/workflows/chat-turn-preflight-contract.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "supabase/functions/chat-turn/index.ts"
+      - "scripts/test-chat-turn-preflight.mjs"
+      - ".github/workflows/chat-turn-preflight-contract.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  preflight-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7.0.1
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify missing provider credentials cannot reserve wallet funds
+        run: node scripts/test-chat-turn-preflight.mjs
