@@ -3,9 +3,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildPromptVariableValues, applyPromptVariables } from "../_shared/prompt-context.ts";
 import { normalizeAiProviderResult } from "../_shared/ai-provider-result.ts";
 import { findPrivateContextLeak, preparePrivateContext } from "../_shared/private-context-guard.ts";
-import { buildOpenRouterProviderOptions } from "../_shared/openrouter-provider-policy.ts";
 import { releaseGenerationClaim } from "../_shared/chat-turn-claim.ts";
 import { classifyProviderFailure } from "../_shared/provider-failure-policy.ts";
+import { processDueStoryMemorySummary, recordChatModelUsage } from "../_shared/story-memory-summary.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,7 +25,7 @@ const isUuid = (value: unknown): value is string =>
 
 
 const OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-v4.1-flash-1017";
+const DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-v4-flash-0731";
 const GENERATION_TIMEOUT_MS = 55_000;
 
 type DbRow = Record<string, unknown>;
@@ -42,7 +42,7 @@ async function buildStoryMessages(
   currentUserMessage: DbRow,
 ): Promise<{ messages: Array<{ role: "system" | "user" | "assistant"; content: string }>; protectedContext: string[]; priorAssistantOutputs: string[] }> {
   const characterId = String(session.character_id);
-  const [characterResult, profileResult, historyResult] = await Promise.all([
+  const [characterResult, profileResult, historyResult, summaryResult] = await Promise.all([
     admin.from("characters")
       .select("id,author_id,name,intro,style,gender,age,race")
       .eq("id", characterId)
@@ -57,11 +57,17 @@ async function buildStoryMessages(
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(10),
+    admin.from("ai_model_usage").select("summary")
+      .eq("session_id", String(session.id))
+      .eq("generation_type", "memory_summary")
+      .eq("status", "completed")
+      .order("batch_number", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   if (characterResult.error) throw new Error("story_character_context_unavailable");
   if (profileResult.error) throw new Error("story_player_context_unavailable");
   if (historyResult.error) throw new Error("story_history_unavailable");
+  if (summaryResult.error) throw new Error("story_summary_unavailable");
 
   const snapshot = asDbRow(session.character_snapshot);
   const character = characterResult.data
@@ -105,6 +111,8 @@ async function buildStoryMessages(
 
   const profile = asDbRow(profileResult.data);
   const sessionData = asDbRow(session.session_data);
+  const storedSummary = asString(summaryResult.data?.summary);
+  if (storedSummary) sessionData.summary = storedSummary;
   const values = buildPromptVariableValues({
     profile,
     character: { ...character, personality_profile: personalityProfile },
@@ -179,7 +187,7 @@ async function requestStoryGeneration(
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
   apiKey: string,
   model: string,
-): Promise<{ result: ReturnType<typeof normalizeAiProviderResult>; httpStatus: number; requestId: string; provider: string }> {
+): Promise<{ result: ReturnType<typeof normalizeAiProviderResult>; httpStatus: number; requestId: string; provider: string; model: string; usage: DbRow }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), GENERATION_TIMEOUT_MS);
   try {
@@ -197,7 +205,7 @@ async function requestStoryGeneration(
         max_tokens: 1800,
         // Only approved non-training providers may receive player content.
         // No fallback is allowed: unavailable compliant providers fail closed.
-        provider: buildOpenRouterProviderOptions(),
+        provider: { only: ["deepinfra"], allow_fallbacks: false, data_collection: "deny" },
       }),
       signal: controller.signal,
     });
@@ -216,6 +224,8 @@ async function requestStoryGeneration(
       httpStatus: response.status,
       requestId: response.headers.get("x-request-id") || asString(payload.id),
       provider: asString(payload.provider),
+      model: asString(payload.model) || model,
+      usage: asDbRow(payload.usage),
     };
   } finally {
     clearTimeout(timeout);
@@ -283,7 +293,7 @@ Deno.serve(async (request) => {
 
   const { data: session, error: sessionError } = await admin
     .from("chat_sessions")
-    .select("id,user_id,deleted_at,character_id,character_snapshot,session_data,chat_mode")
+    .select("id,user_id,deleted_at,character_id,character_name,character_snapshot,session_data,chat_mode")
     .eq("id", sessionId)
     .eq("user_id", user.id)
     .is("deleted_at", null)
@@ -387,7 +397,7 @@ Deno.serve(async (request) => {
   }
   if (charge.status !== "reserved") return json({ error: "turn_not_processable" }, 409);
 
-  const model = Deno.env.get("OPENROUTER_MODEL") || DEFAULT_OPENROUTER_MODEL;
+  const model = DEFAULT_OPENROUTER_MODEL;
 
   // Atomically claim the reserved turn before calling the external provider.
   // A duplicate concurrent request sees needs_reconciliation and cannot make
@@ -446,6 +456,16 @@ Deno.serve(async (request) => {
   }
 
   const providerResult = providerResponse.result;
+  const recordUsage = (messageId: string | null, requestStatus: "completed" | "failed") =>
+    recordChatModelUsage(admin, {
+      userId: user.id,
+      sessionId,
+      turnId,
+      assistantMessageId: messageId,
+      requestedModel: model,
+      providerResponse,
+      requestStatus,
+    });
 
   // Persist only allowlisted diagnostic metadata. Never store provider messages,
   // prompts, player content, or credentials in operational event logs.
@@ -473,7 +493,10 @@ Deno.serve(async (request) => {
     });
   }
 
+  if (providerResult.kind !== "generated") await recordUsage(null, "failed");
+
   if (providerResult.kind === "generated" && findPrivateContextLeak(providerResult.text, protectedContext, priorAssistantOutputs)) {
+    await recordUsage(null, "failed");
     // Never persist or return a response that reproduces author-only source material.
     // Record only a fixed reason code; never log the matched phrase or private text.
     await admin.from("chat_turn_events").insert({
@@ -613,6 +636,7 @@ Deno.serve(async (request) => {
       .select("id,content").eq("id", assistantMessageId).eq("session_id", sessionId)
       .eq("role", "assistant").is("deleted_at", null).maybeSingle();
     if (verifyError) {
+      await recordUsage(null, "failed");
       await admin.from("chat_turn_events").insert({
         turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation",
         stage: "assistant_persistence", error_code: "reply_write_outcome_unknown",
@@ -620,6 +644,7 @@ Deno.serve(async (request) => {
       return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
     }
     if (!possibleReply || !String(possibleReply.content || "").trim()) {
+      await recordUsage(null, "failed");
       const { data: refunded, error: refundError } = await admin.rpc("refund_chat_turn", {
         p_user_id: user.id,
         p_turn_id: turnId,
@@ -645,9 +670,13 @@ Deno.serve(async (request) => {
       return json({ status: "needs_reconciliation", error: "assistant_persistence_refund_unknown", retryAllowed: false }, 503);
     }
     if (String(possibleReply.content) !== providerResult.text) {
+      await recordUsage(null, "failed");
       return json({ status: "needs_reconciliation", error: "assistant_message_id_collision", retryAllowed: false }, 409);
     }
   }
+
+  // The assistant message now exists, so the usage ledger's optional FK can be populated safely.
+  await recordUsage(assistantMessageId, "completed");
 
   const { data: settled, error: settleError } = await admin.rpc("settle_chat_turn", {
     p_user_id: user.id,
@@ -662,11 +691,32 @@ Deno.serve(async (request) => {
     return json({ status: "needs_reconciliation", replySaved: true, retryAllowed: false }, 503);
   }
 
+  const edgeRuntime = (globalThis as typeof globalThis & {
+    EdgeRuntime?: { waitUntil: (task: Promise<unknown>) => void };
+  }).EdgeRuntime;
+  const summaryTask = processDueStoryMemorySummary(admin, session, user.id, openRouterKey).catch((error) => {
+    console.error("Story memory summary background task failed:", error instanceof Error ? error.message : "unknown_error");
+  });
+  if (edgeRuntime?.waitUntil) {
+    edgeRuntime.waitUntil(summaryTask);
+  } else {
+    await summaryTask;
+  }
+
   return json({
     status: settled,
     assistantMessage: { id: assistantMessageId, content: providerResult.text, role: "assistant" },
     billing: { cost: 2, silver_reserved: charge.silver_reserved, diamonds_reserved: charge.diamonds_reserved },
-    provider: { gateway: "openrouter", model, upstream: providerResponse.provider || null },
+    provider: {
+      gateway: "openrouter", model: providerResponse.model || model,
+      upstream: providerResponse.provider || null,
+      usage: {
+        prompt_tokens: Number(providerResponse.usage.prompt_tokens) || null,
+        completion_tokens: Number(providerResponse.usage.completion_tokens) || null,
+        total_tokens: Number(providerResponse.usage.total_tokens) || null,
+        cost_usd: Number(providerResponse.usage.cost) || null,
+      },
+    },
   });
 
 });

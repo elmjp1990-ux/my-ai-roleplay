@@ -1,0 +1,35 @@
+name: Dual-model Story memory summary contract
+
+on:
+  pull_request:
+    paths:
+      - "supabase/functions/chat-turn/index.ts"
+      - "supabase/functions/_shared/story-memory-summary.ts"
+      - "scripts/test-dual-model-memory-summary.mjs"
+      - "supabase/migrations/20261105223613_ai_model_usage_and_memory_summaries.sql"
+  push:
+    branches:
+      - main
+    paths:
+      - "supabase/functions/chat-turn/index.ts"
+      - "supabase/functions/_shared/story-memory-summary.ts"
+      - "scripts/test-dual-model-memory-summary.mjs"
+      - "supabase/migrations/20261105223613_ai_model_usage_and_memory_summaries.sql"
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7.0.1
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify existing wallet preflight
+        run: node scripts/test-chat-turn-preflight.mjs
+      - name: Verify dual-model routing and five-turn summaries
+        run: node scripts/test-dual-model-memory-summary.mjs
