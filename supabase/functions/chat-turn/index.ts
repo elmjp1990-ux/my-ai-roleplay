@@ -271,6 +271,13 @@ Deno.serve(async (request) => {
   const { data: active, error: activeError } = await userClient.rpc("account_is_active");
   if (activeError || active !== true) return json({ error: "account_not_active" }, 403);
 
+  // Fail closed before wallet initialization or reservation. A missing provider
+  // credential must never create a charge or reduce the player's balance.
+  const openRouterKey = Deno.env.get("OPENROUTER_API_KEY")?.trim();
+  if (!openRouterKey) {
+    return json({ error: "openrouter_not_configured", retryAllowed: true }, 503);
+  }
+
   const { error: walletInitError } = await userClient.rpc("ensure_wallet_account");
   if (walletInitError) return json({ error: "wallet_not_ready" }, 409);
 
@@ -380,8 +387,6 @@ Deno.serve(async (request) => {
   }
   if (charge.status !== "reserved") return json({ error: "turn_not_processable" }, 409);
 
-  const openRouterKey = Deno.env.get("OPENROUTER_API_KEY");
-  if (!openRouterKey) return json({ error: "openrouter_not_configured", retryAllowed: true }, 503);
   const model = Deno.env.get("OPENROUTER_MODEL") || DEFAULT_OPENROUTER_MODEL;
 
   // Atomically claim the reserved turn before calling the external provider.
