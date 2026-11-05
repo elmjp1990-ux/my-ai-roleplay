@@ -71,8 +71,8 @@ async function requestMemorySummary(messages: Array<{ role: "system" | "user"; c
         model: SUMMARY_MODEL,
         messages,
         temperature: 0.2,
-        // Deliberately no max_tokens: the benchmark showed that client-side caps
-        // can truncate reasoning-heavy summaries.
+        // No client-side output limit is set; the benchmark showed that
+        // fixed caps can truncate reasoning-heavy summaries.
         provider: { only: ["deepinfra"], allow_fallbacks: false, data_collection: "deny" },
       }),
       signal: controller.signal,
