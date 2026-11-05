@@ -4,7 +4,7 @@ create table if not exists public.ai_model_usage (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   session_id uuid not null references public.chat_sessions(id) on delete cascade,
-  turn_id uuid references public.chat_turn_charges(turn_id) on delete set null,
+  turn_id uuid references public.chat_turn_charges(turn_id) on delete cascade,
   assistant_message_id uuid references public.chat_messages(id) on delete set null,
   generation_type text not null check (generation_type in ('chat_response', 'memory_summary')),
   batch_number integer,
@@ -21,7 +21,7 @@ create table if not exists public.ai_model_usage (
   created_at timestamptz not null default now(),
   processed_at timestamptz,
   constraint ai_model_usage_generation_fields_check check (
-    (generation_type = 'chat_response' and turn_id is not null and assistant_message_id is not null
+    (generation_type = 'chat_response' and turn_id is not null
       and batch_number is null and cardinality(source_turn_ids) = 0 and summary is null)
     or
     (generation_type = 'memory_summary' and turn_id is null and assistant_message_id is null
