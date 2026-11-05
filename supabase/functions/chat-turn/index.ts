@@ -3,7 +3,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildPromptVariableValues, applyPromptVariables } from "../_shared/prompt-context.ts";
 import { normalizeAiProviderResult } from "../_shared/ai-provider-result.ts";
 import { findPrivateContextLeak, preparePrivateContext } from "../_shared/private-context-guard.ts";
-import { buildOpenRouterProviderOptions } from "../_shared/openrouter-provider-policy.ts";
 import { releaseGenerationClaim } from "../_shared/chat-turn-claim.ts";
 import { classifyProviderFailure } from "../_shared/provider-failure-policy.ts";
 import { processDueStoryMemorySummary, recordChatModelUsage } from "../_shared/story-memory-summary.ts";
@@ -27,8 +26,6 @@ const isUuid = (value: unknown): value is string =>
 
 const OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions";
 const DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-v4-flash-0731";
-const MEMORY_SUMMARY_MODEL = "openai/gpt-oss-20b";
-const MEMORY_SUMMARY_INTERVAL = 5;
 const GENERATION_TIMEOUT_MS = 55_000;
 
 type DbRow = Record<string, unknown>;
