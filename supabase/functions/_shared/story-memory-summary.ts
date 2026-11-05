@@ -27,7 +27,7 @@ export async function recordChatModelUsage(
     userId: string;
     sessionId: string;
     turnId: string;
-    assistantMessageId: string;
+    assistantMessageId: string | null;
     requestedModel: string;
     providerResponse: { model: string; provider: string; requestId: string; usage: DbRow };
     requestStatus: "completed" | "failed";
