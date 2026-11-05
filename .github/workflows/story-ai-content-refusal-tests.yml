@@ -1,0 +1,141 @@
+name: Story AI content refusal tests
+
+on:
+  pull_request:
+    paths:
+      - "supabase/functions/_shared/ai-provider-result.ts"
+      - "supabase/functions/_shared/ai-provider-result.test.ts"
+      - "supabase/functions/_shared/private-context-guard.ts"
+      - "supabase/functions/_shared/private-context-guard.test.ts"
+      - "supabase/functions/_shared/openrouter-provider-policy.ts"
+      - "supabase/functions/_shared/openrouter-provider-policy.test.ts"
+      - "supabase/functions/_shared/chat-turn-claim.ts"
+      - "supabase/functions/_shared/chat-turn-claim.test.ts"
+      - "supabase/functions/_shared/provider-failure-policy.ts"
+      - "supabase/functions/_shared/provider-failure-policy.test.ts"
+      - "supabase/migrations/20261104062017_move_character_personality_profile_to_private_info.sql"
+      - "supabase/migrations/20261104095000_restrict_legacy_personality_profile_select.sql"
+      - "supabase/migrations/20261104140000_restrict_chat_turn_rpc_execution.sql"
+      - "supabase/migrations/20261104130000_reconcile_stale_story_chat_turns.sql"
+      - "scripts/test-character-personality-private-migration.sql"
+      - "scripts/test-private-personality-column-usage.mjs"
+      - "scripts/test-chat-turn-wallet-refund.sql"
+      - "scripts/test-chat-turn-reconciliation-ui.mjs"
+      - "supabase/migrations/20261104073621_add_ai_gateway_response_diagnostics.sql"
+      - "supabase/migrations/20261104130000_reconcile_stale_story_chat_turns.sql"
+      - "supabase/migrations/20261104140000_restrict_chat_turn_rpc_execution.sql"
+      - "memory-capture.js"
+      - "scripts/test-memory-capture.cjs"
+      - "scripts/test-memory-persistence-contract.mjs"
+      - "supabase/functions/chat-turn/index.ts"
+      - "scripts/test-story-roleplay-prompt.mjs"
+      - "supabase/functions/_shared/prompt-context.ts"
+      - "supabase/functions/_shared/prompt-variables.ts"
+      - "index.html"
+      - ".github/workflows/story-ai-content-refusal-tests.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "supabase/functions/_shared/ai-provider-result.ts"
+      - "supabase/functions/_shared/ai-provider-result.test.ts"
+      - "supabase/functions/_shared/private-context-guard.ts"
+      - "supabase/functions/_shared/openrouter-provider-policy.ts"
+      - "supabase/functions/_shared/openrouter-provider-policy.test.ts"
+      - "supabase/functions/_shared/private-context-guard.test.ts"
+      - "supabase/functions/_shared/chat-turn-claim.ts"
+      - "supabase/functions/_shared/chat-turn-claim.test.ts"
+      - "supabase/migrations/20261104062017_move_character_personality_profile_to_private_info.sql"
+      - "supabase/migrations/20261104095000_restrict_legacy_personality_profile_select.sql"
+      - "scripts/test-character-personality-private-migration.sql"
+      - "scripts/test-private-personality-column-usage.mjs"
+      - "scripts/test-chat-turn-wallet-refund.sql"
+      - "memory-capture.js"
+      - "scripts/test-memory-capture.cjs"
+      - "scripts/test-memory-persistence-contract.mjs"
+      - "supabase/functions/chat-turn/index.ts"
+      - "scripts/test-story-roleplay-prompt.mjs"
+      - "supabase/functions/_shared/prompt-context.ts"
+      - "supabase/functions/_shared/prompt-variables.ts"
+      - "index.html"
+      - ".github/workflows/story-ai-content-refusal-tests.yml"
+  workflow_dispatch:
+
+jobs:
+  chat-turn-wallet-refund:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Test Story wallet reservation, exact refunds, retries and reconciliation on disposable PostgreSQL
+        env:
+          PGPASSWORD: postgres
+        run: psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -f scripts/test-chat-turn-wallet-refund.sql
+
+  personality-private-migration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Replay personality privacy migration twice against disposable PostgreSQL
+        env:
+          PGPASSWORD: postgres
+        run: psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -f scripts/test-character-personality-private-migration.sql
+
+  story-ai-content-refusal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify author-only personality data never reads from public characters
+        run: node scripts/test-private-personality-column-usage.mjs
+      - name: Verify unresolved Story turns are not presented as safe retries
+        run: node scripts/test-chat-turn-reconciliation-ui.mjs
+      - name: Verify roleplay prose, character agency and player point-of-view rules
+        run: node scripts/test-story-roleplay-prompt.mjs
+      - name: Test five-turn player-first memory capture
+        run: node --test scripts/test-memory-capture.cjs
+      - name: Verify memory persistence, reload and correction-priority contracts
+        run: node scripts/test-memory-persistence-contract.mjs
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check Story chat-turn Edge Function
+        run: deno check supabase/functions/chat-turn/index.ts
+      - name: Run provider result normalization tests
+        run: deno test supabase/functions/_shared/ai-provider-result.test.ts
+      - name: Run provider failure safety policy tests
+        run: deno test supabase/functions/_shared/provider-failure-policy.test.ts
+      - name: Run private context output guard tests
+        run: deno test supabase/functions/_shared/private-context-guard.test.ts
+      - name: Run OpenRouter provider privacy policy tests
+        run: deno test supabase/functions/_shared/openrouter-provider-policy.test.ts
+      - name: Run generation claim release failure-path tests
+        run: deno test supabase/functions/_shared/chat-turn-claim.test.ts

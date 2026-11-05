@@ -1338,6 +1338,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 <div id="toast" class="hidden" role="status"></div>
 <input id="jsonFile" class="hidden" type="file" accept=".json,application/json">
 
+<script src="./memory-capture.js"></script>
 <script>
 'use strict';
 
@@ -1678,7 +1679,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     try {
       const { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, personality_profile, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible')
+        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible')
         .eq('visibility', 'public')
         .is('deleted_at', null)
         .order('first_published_at', { ascending: false, nullsFirst: false });
@@ -1732,7 +1733,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
           reviewStatus: row.review_status, intro: row.intro || '',
           opening: story?.opening_message || '', race: row.race || '',
           privateInfo: '', style: row.style || '',
-          personalityProfile: normalizePersonalityProfile(row.personality_profile),
+          personalityProfile: normalizePersonalityProfile({}),
           phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : {},
           nsfwWorkplaceWarning:row.nsfw_workplace_warning === true,
           isNSFW:row.is_nsfw === true,
@@ -1773,7 +1774,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       // 這可修復舊版匯入只存 localStorage 的資料；不會上傳其他帳號的本機角色。
       let { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, personality_profile, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
         .eq('author_id', user.id)
         .order('created_at', { ascending: false });
       if (error) throw new Error('讀取雲端角色失敗：' + error.message);
@@ -1799,7 +1800,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       if (migratedCount > 0) {
         const refreshed = await client
           .from('characters')
-          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, personality_profile, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
           .eq('author_id', user.id)
           .order('created_at', { ascending: false });
         if (refreshed.error) throw new Error('角色補傳後重新讀取失敗：' + refreshed.error.message);
@@ -1811,14 +1812,14 @@ const ids = (rows || []).map(row => row.id);
       const privateInfoById = new Map();
       if (ids.length) {
         const privateInfoResult = await client.from('character_private_info')
-          .select('character_id, private_info')
+          .select('character_id, private_info, personality_profile')
           .eq('author_id', user.id)
           .in('character_id', ids);
         if (privateInfoResult.error) {
           throw new Error('讀取角色隱藏設定失敗：' + privateInfoResult.error.message);
         }
         for (const item of privateInfoResult.data || []) {
-          privateInfoById.set(item.character_id, item.private_info || '');
+          privateInfoById.set(item.character_id, { privateInfo: item.private_info || '', personalityProfile: item.personality_profile || {} });
         }
       }
       // 私密角色不會經過公開角色載入器；在作者自己的角色載入流程也補齊作者 profile。
@@ -1874,9 +1875,9 @@ const ids = (rows || []).map(row => row.id);
           intro: row.intro ?? local.intro ?? '',
           opening: story?.opening_message ?? local.opening ?? '',
           race: row.race ?? local.race ?? '',
-          privateInfo: privateInfoById.get(row.id) ?? local.privateInfo ?? '',
+          privateInfo: privateInfoById.get(row.id)?.privateInfo ?? local.privateInfo ?? '',
           style: row.style ?? local.style ?? '',
-          personalityProfile: normalizePersonalityProfile(row.personality_profile ?? local.personalityProfile),
+          personalityProfile: normalizePersonalityProfile(privateInfoById.get(row.id)?.personalityProfile ?? local.personalityProfile),
           phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : (local.phoneSettings || {}),
           nsfwWorkplaceWarning:row.nsfw_workplace_warning === true,
           tags: Array.isArray(row.tags) ? row.tags : (local.tags || []),
@@ -2351,7 +2352,6 @@ async function saveSupabaseCharacter(character, expectedUserId) {
       intro: character.intro || '',
       race: character.race || '',
       style: character.style || '',
-      personality_profile: normalizePersonalityProfile(character.personalityProfile),
       phone_settings:character.phoneSettings && typeof character.phoneSettings==='object' ? {noticePrompts:(Array.isArray(character.phoneSettings.noticePrompts)?character.phoneSettings.noticePrompts:Array.isArray(character.phoneSettings.notices)?character.phoneSettings.notices:[]).slice(0,8).map(x=>String(x).slice(0,150))} : {},
       nsfw_workplace_warning: character.nsfwWorkplaceWarning === true,
       is_nsfw: character.isNSFW === true,
@@ -2370,7 +2370,8 @@ if (characterError) {
       .upsert({
         character_id: character.id,
         author_id: expectedUserId,
-        private_info: String(character.privateInfo || '').slice(0, 10000)
+        private_info: String(character.privateInfo || '').slice(0, 10000),
+        personality_profile: normalizePersonalityProfile(character.personalityProfile)
       }, { onConflict: 'character_id' });
     if (privateInfoError) {
       throw new Error('角色基本資料已寫入，但隱藏設定儲存失敗：' + privateInfoError.message);
@@ -2968,11 +2969,20 @@ async function saveChatSessionToCloud(s, options = {}) {
     throw new Error('登入狀態驗證失敗，聊天尚未同步。');
   }
   const character = state.characters.find(item => item.id === s.characterId) || null;
+  let expectedUpdatedAt = null;
   if (s.cloudOwned && s.cloudOwnerUid === localUser.uid) {
-    const currentRow = await client.from('chat_sessions').select('character_snapshot')
+    const currentRow = await client.from('chat_sessions').select('character_snapshot,updated_at')
       .eq('id',s.id).eq('user_id',localUser.uid).maybeSingle();
     if (currentRow.error) throw new Error('讀取既有聊天快照失敗：'+currentRow.error.message);
+    if (!currentRow.data?.updated_at) throw new Error('既有聊天已不存在或無法取得版本，已停止同步。');
     if (readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
+    if (!s.cloudUpdatedAt || !Number.isFinite(Date.parse(s.cloudUpdatedAt))) {
+      throw new Error('這段聊天缺少同步版本資訊，為避免舊資料覆蓋雲端內容，請重新載入聊天後再試。');
+    }
+    expectedUpdatedAt = s.cloudUpdatedAt;
+    if (currentRow.data.updated_at !== expectedUpdatedAt) {
+      throw new Error('此聊天已在其他分頁或裝置更新，為避免覆蓋新內容，請重新載入最新聊天後再試。');
+    }
     if (currentRow.data?.character_snapshot) s.cloudCharacterSnapshot = currentRow.data.character_snapshot;
   }
   const priorSnapshot = s.cloudCharacterSnapshot && typeof s.cloudCharacterSnapshot === 'object'
@@ -2983,8 +2993,14 @@ async function saveChatSessionToCloud(s, options = {}) {
   if (!character && (!s.cloudOwned || !priorSnapshot.id)) {
     throw new Error('找不到這段聊天所屬的正式角色或既有角色快照。');
   }
-// 舊版快照可能曾含隱藏設定；同步前先剔除，避免再次寫回玩家可讀的 chat_sessions。
-  const { privateInfo: _legacyPrivateInfo, ...safePriorSnapshot } = priorSnapshot;
+// 舊版快照可能曾含隱藏設定；同步前剔除 camelCase／snake_case 欄位，避免寫回玩家可讀的 chat_sessions。
+  const {
+    privateInfo: _legacyPrivateInfo,
+    personalityProfile: _legacyPersonalityProfile,
+    private_info: _legacyPrivateInfoSnakeCase,
+    personality_profile: _legacyPersonalityProfileSnakeCase,
+    ...safePriorSnapshot
+  } = priorSnapshot;
   const snapshot = {
     ...safePriorSnapshot,
     id:s.characterId,
@@ -3010,7 +3026,7 @@ async function saveChatSessionToCloud(s, options = {}) {
   };
   // 若本機未標記 cloudOwned，先確認這個 ID 是否已存在，避免對舊聊天誤做 INSERT。
   if (!s.cloudOwned) {
-    const existing = await client.from('chat_sessions').select('id,character_snapshot')
+    const existing = await client.from('chat_sessions').select('id,character_snapshot,updated_at')
       .eq('id',s.id).eq('user_id',localUser.uid).maybeSingle();
     if (existing.error) throw new Error('檢查既有聊天失敗：'+existing.error.message);
     if (existing.data) {
@@ -3018,9 +3034,18 @@ async function saveChatSessionToCloud(s, options = {}) {
       if (existingSnapshot?.id && existingSnapshot.id !== s.characterId) {
         throw new Error('雲端既有聊天的角色快照與角色 ID 不一致，已停止同步以避免覆寫錯誤角色資料。');
       }
+      if (!existing.data.updated_at) throw new Error('既有聊天缺少同步版本資訊，已停止同步。');
+      expectedUpdatedAt = existing.data.updated_at;
+      s.cloudUpdatedAt = existing.data.updated_at;
       s.cloudOwned = true;
       s.cloudOwnerUid = localUser.uid;
-      const { privateInfo: _legacyExistingPrivateInfo, ...safeExistingSnapshot } = existingSnapshot || {};
+      const {
+        privateInfo: _legacyExistingPrivateInfo,
+        personalityProfile: _legacyExistingPersonalityProfile,
+        private_info: _legacyExistingPrivateInfoSnakeCase,
+        personality_profile: _legacyExistingPersonalityProfileSnakeCase,
+        ...safeExistingSnapshot
+      } = existingSnapshot || {};
       s.cloudCharacterSnapshot = existingSnapshot ? safeExistingSnapshot : snapshot;
       const canonical = s.cloudCharacterSnapshot;
       if (Object.prototype.hasOwnProperty.call(canonical,'authorId') && canonical.authorId !== '') snapshot.authorId = canonical.authorId;
@@ -3032,29 +3057,37 @@ async function saveChatSessionToCloud(s, options = {}) {
       snapshot.deletedAt = canonical.deletedAt || snapshot.deletedAt;
     }
   }
+  const rowTimestamp = expectedUpdatedAt
+    ? new Date(window.POYOZZMemoryCapture.nextSessionUpdatedAt(expectedUpdatedAt))
+    : new Date();
   const row = {
     id:s.id, user_id:localUser.uid, character_id:s.characterId,
     character_name:snapshot.name,
     status:s.archived ? 'archived' : 'active',
     character_snapshot:snapshot, session_data:chatSessionData(s),
-    updated_at:new Date().toISOString()
+    updated_at:rowTimestamp.toISOString()
   };
   let sessionWrite;
   if (s.cloudOwned && s.cloudOwnerUid === localUser.uid) {
     // 已存在的聊天使用 UPDATE；即使角色已下架，也可繼續保存原有劇情。
     sessionWrite = await client.from('chat_sessions').update(row)
-      .eq('id', s.id).eq('user_id', localUser.uid).select('id').maybeSingle();
+      .eq('id', s.id).eq('user_id', localUser.uid).eq('updated_at', expectedUpdatedAt)
+      .select('id,updated_at').maybeSingle();
   } else {
     // 新聊天只能在角色仍可建立新對話時 INSERT。
     if (character.deletedAt || (character.visibility !== 'public' && character.firstPublishedAt)) {
       throw new Error('此角色已被作者調整為私密或刪除狀態，不支持開啟新對話');
     }
-    sessionWrite = await client.from('chat_sessions').insert(row).select('id').maybeSingle();
+    sessionWrite = await client.from('chat_sessions').insert(row).select('id,updated_at').maybeSingle();
   }
   if (sessionWrite.error) throw new Error('聊天基本資料同步失敗：'+sessionWrite.error.message);
   if (!sessionWrite.data?.id) {
+    if (s.cloudOwned && s.cloudOwnerUid === localUser.uid) {
+      throw new Error('此聊天已在其他分頁或裝置更新，或已被刪除；為避免覆蓋新內容，已停止同步。請重新載入最新聊天後再試。');
+    }
     throw new Error('資料庫未確認聊天基本資料已寫入；本次不會標記同步成功。');
   }
+  s.cloudUpdatedAt = sessionWrite.data.updated_at || row.updated_at;
   if (readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
   s.cloudOwned = true;
   s.cloudOwnerUid = localUser.uid;
@@ -3167,7 +3200,15 @@ async function loadCloudChatSessions(user) {
     for (const row of sessions) {
       if (!isUuid(row.id) || !isUuid(row.character_id)) continue;
       const data = row.session_data && typeof row.session_data === 'object' ? row.session_data : {};
-      const snapshot = row.character_snapshot && typeof row.character_snapshot === 'object' ? row.character_snapshot : {};
+      const rawSnapshot = row.character_snapshot && typeof row.character_snapshot === 'object' ? row.character_snapshot : {};
+      // Never hydrate author-only fields from legacy chat snapshots into player-visible client state.
+      const {
+        privateInfo: _legacyPrivateInfo,
+        personalityProfile: _legacyPersonalityProfile,
+        private_info: _legacyPrivateInfoSnakeCase,
+        personality_profile: _legacyPersonalityProfileSnakeCase,
+        ...snapshot
+      } = rawSnapshot;
       // Never hydrate a chat with a snapshot belonging to a different role.
       // The server also rejects this metadata before billing; fail closed in the UI too.
       if (snapshot.id && snapshot.id !== row.character_id) {
@@ -3218,7 +3259,7 @@ async function loadCloudChatSessions(user) {
         initialOpeningMessage:data.openingMessage && String(data.openingMessage.text || '').trim()
           ? {text:String(data.openingMessage.text),at:Number(data.openingMessage.at)||Date.now()}
           : null,
-        cloudOwned:true, cloudOwnerUid:user.id, cloudCharacterSnapshot:snapshot
+        cloudOwned:true, cloudOwnerUid:user.id, cloudCharacterSnapshot:snapshot, cloudUpdatedAt:row.updated_at || null
       };
       if (snapshot.id === row.character_id) {
         const existingCharacterIndex = state.characters.findIndex(character => character.id === row.character_id);
@@ -3260,21 +3301,54 @@ async function loadCloudChatSessions(user) {
   }
 }
 
+const chatSessionSaveQueue = window.POYOZZMemoryCapture?.createSerialQueue();
+const memoryMutationTracker = window.POYOZZMemoryCapture?.createMemoryMutationTracker();
+
 async function saveChatSessionSafely(s) {
-  try {
-    const uid=currentUser()?.uid;
-    if (s?.cloudOwned && uid && s.cloudOwnerUid===uid &&
-        readDeletedChatTombstones(uid).sessions[s.id]) return false;
-    const saved = await saveChatSessionToCloud(s);
-    return saved;
-  } catch (error) {
-    const uid=currentUser()?.uid;
-    if (s?.cloudOwned && uid && s.cloudOwnerUid===uid &&
-        readDeletedChatTombstones(uid).sessions[s.id]) return false;
-    console.error('PersonaX 聊天同步失敗：',error);
-    toast(error.message || '聊天已保存在本機，但雲端同步失敗。');
-    return false;
-  }
+  const requestedUid = currentUser()?.uid;
+  const key = requestedUid && s?.id ? requestedUid + ':' + s.id : '';
+  const snapshot = s ? clone(s) : s;
+  const performSave = async () => {
+    const uid = currentUser()?.uid;
+    const latest = s?.id && state.sessions?.[s.id] ? state.sessions[s.id] : s;
+    try {
+      if (requestedUid && uid !== requestedUid) return false;
+      // The queue may have waited behind an earlier successful save. Rebase only
+      // the version token, not the call-time content snapshot, onto that saved row.
+      if (snapshot) {
+        Object.assign(snapshot, window.POYOZZMemoryCapture.rebaseSessionSaveVersion(snapshot, latest, uid));
+      }
+      if (latest?.cloudOwned && uid && latest.cloudOwnerUid === uid &&
+          readDeletedChatTombstones(uid).sessions[latest.id]) return false;
+      const saved = await saveChatSessionToCloud(snapshot);
+      if (saved && s?.id) {
+        const target = state.sessions?.[s.id] || s;
+        target.cloudOwned = snapshot.cloudOwned;
+        target.cloudOwnerUid = snapshot.cloudOwnerUid;
+        target.cloudCharacterSnapshot = snapshot.cloudCharacterSnapshot;
+        target.cloudUpdatedAt = snapshot.cloudUpdatedAt;
+        memoryMutationTracker?.markSaved(s.id, snapshot.memories);
+      }
+      return saved;
+    } catch (error) {
+      // A row update can succeed before a later message upsert fails. Preserve
+      // that confirmed version token so a safe retry does not remain permanently stale.
+      if (snapshot?.cloudUpdatedAt && s?.id && snapshot.cloudOwned && snapshot.cloudOwnerUid === uid) {
+        const target = state.sessions?.[s.id] || s;
+        target.cloudOwned = true;
+        target.cloudOwnerUid = uid;
+        target.cloudUpdatedAt = snapshot.cloudUpdatedAt;
+        target.cloudCharacterSnapshot = snapshot.cloudCharacterSnapshot;
+      }
+      if (latest?.cloudOwned && uid && latest.cloudOwnerUid === uid &&
+          readDeletedChatTombstones(uid).sessions[latest.id]) return false;
+      console.error('PersonaX 聊天同步失敗：',error);
+      toast(error.message || '聊天已保存在本機，但雲端同步失敗。');
+      return false;
+    }
+  };
+  if (!key || !chatSessionSaveQueue) return performSave();
+  return chatSessionSaveQueue(key, performSave);
 }
 
 async function refreshWalletBalance() {
@@ -3295,12 +3369,10 @@ async function refreshWalletBalance() {
 
 async function clearCloudPendingTurn(s) {
   const user = currentUser();
-  const client = window.mySupabase;
-  if (!s || !user || !client || !s.cloudOwned || s.cloudOwnerUid !== user.uid) return;
-  const { error } = await client.from('chat_sessions')
-    .update({session_data:chatSessionData(s),updated_at:new Date().toISOString()})
-    .eq('id',s.id).eq('user_id',user.uid);
-  if (error) console.warn('清除雲端待處理回合標記失敗：',error.message);
+  if (!s || !user || !s.cloudOwned || s.cloudOwnerUid !== user.uid) return;
+  const latest = state.sessions?.[s.id] || s;
+  const saved = await saveChatSessionSafely(latest);
+  if (!saved) console.warn('清除雲端待處理回合標記失敗：同步未獲資料庫確認。');
 }
 
 async function runPendingChatTurn(s) {
@@ -3345,6 +3417,40 @@ async function runPendingChatTurn(s) {
     await clearCloudPendingTurn(s);
     await refreshWalletBalance();
     openInsufficientFundsDialog('single');
+    return;
+  }
+
+  if (result?.status === 'content_rejected') {
+    // The backend returns this state only after refund_chat_turn confirms the
+    // exact original silver/diamond reservation has been restored.
+    delete s.pendingTurn;
+    persist();
+    renderMessages();
+    await saveChatSessionSafely(s);
+    await clearCloudPendingTurn(s);
+    await refreshWalletBalance();
+    showDialog('本次生成未完成', `
+      <div class="stack">
+        <p>因內容限制因素，角色暫時無法生成回覆。</p>
+        <p>本次生成失敗，未扣除銀幣或鑽石。請調整輸入內容後再試一次。</p>
+        <div class="row end"><button class="primary" data-action="back">知道了</button></div>
+      </div>`);
+    return;
+  }
+
+  if (result?.status === 'provider_error_refunded') {
+    delete s.pendingTurn;
+    persist();
+    renderMessages();
+    await saveChatSessionSafely(s);
+    await clearCloudPendingTurn(s);
+    await refreshWalletBalance();
+    showDialog('AI 服務暫時無法完成', `
+      <div class="stack">
+        <p>目前 AI 服務無法完成這次生成，本次未扣除銀幣或鑽石。</p>
+        <p>你可以保留並修改原訊息，稍後再試。</p>
+        <div class="row end"><button class="primary" data-action="back">知道了</button></div>
+      </div>`);
     return;
   }
 
@@ -3420,6 +3526,19 @@ async function runPendingChatTurn(s) {
     return;
   }
 
+  if (result?.status === 'needs_reconciliation') {
+    // The provider may have completed even though the response or persistence acknowledgement was lost.
+    // Keep the stable pending turn and never imply that retrying can safely generate a second reply.
+    persist();
+    showDialog('回覆狀態確認中', `
+      <div class="stack">
+        <p>這次請求的處理結果尚未確認，角色可能已完成生成，但系統還沒有取得可核對的回覆紀錄。</p>
+        <p>為避免重複生成或重複扣款，請先不要再次送出相同訊息。本回合會保留待確認狀態；若重新整理後仍持續顯示，請聯絡客服並提供聊天回合資訊。</p>
+        <div class="row end"><button class="primary" data-action="back">知道了</button></div>
+      </div>`);
+    return;
+  }
+
   if (result?.status !== 'settled' || invokeError) {
     // Keep stable IDs locally. The next send action retries the same logical turn;
     // it must not append another user message or create another charge.
@@ -3449,7 +3568,8 @@ async function runPendingChatTurn(s) {
     return;
   }
 
-  if (!s.messages.some(message => message.id === reply.id)) {
+  const replyWasAdded = !s.messages.some(message => message.id === reply.id);
+  if (replyWasAdded) {
     s.messages.push({
       id:reply.id,
       role:'assistant',
@@ -3459,10 +3579,12 @@ async function runPendingChatTurn(s) {
   }
   delete s.pendingTurn;
 
-  const users = s.messages.filter(message => message.role === 'user');
-  if (users.length && users.length % 5 === 0) {
-    const snippets = users.slice(-5).map(message => [...message.text].slice(0,7).join('')).join('、');
-    addMemory(s,[...('本輪對話摘錄：'+snippets+'。')].slice(0,50).join(''));
+  if (replyWasAdded) {
+    const memoryText = window.POYOZZMemoryCapture?.buildPlayerMemoryExcerpt(
+      s.messages,
+      sessionCharacter(s)?.name || '角色',
+    ) || '';
+    if (memoryText) addMemory(s, memoryText);
   }
 
   persist();
@@ -4912,7 +5034,8 @@ async function createEncounterSession(character) {
     album: [],
     cloudOwned: true,
     cloudOwnerUid: authData.user.id,
-    cloudCharacterSnapshot: data.session.character_snapshot || {}
+    cloudCharacterSnapshot: data.session.character_snapshot || {},
+    cloudUpdatedAt: data.session.updated_at || null
   };
   state.sessions[sessionId] = session;
   persist();
@@ -5028,6 +5151,7 @@ async function createStorySession(characterId, originMode, sourceEncounterSessio
     cloudOwned:true,
     cloudOwnerUid:authData.user.id,
     cloudCharacterSnapshot:payload.session.character_snapshot || {},
+    cloudUpdatedAt:payload.session.updated_at || null,
     storyMode:true,
     storyOriginMode:relationship.origin_mode,
     storySourceEncounterSessionId:relationship.source_encounter_session_id || null,
@@ -6782,16 +6906,12 @@ function memorySize(list) {
 }
 function addMemory(s,text) {
   const item = {id:id(),text,important:false,at:Date.now()};
-  const next = [...s.memories,item];
-  while (memorySize(next)>10000) {
-    const i = next.findIndex(m => !m.important);
-    if (i<0 || next[i].id === item.id) {
-      toast('重大記憶占滿容量，本次無法新增日記。');
-      return;
-    }
-    next.splice(i,1);
+  const result = window.POYOZZMemoryCapture?.appendMemoryWithLimit(s.memories,item,10000);
+  if (!result?.added) {
+    toast('重大記憶占滿容量，本次無法新增日記。');
+    return;
   }
-  s.memories = next;
+  s.memories = result.memories;
 }
 function archiveSearchResults(query) {
   const q=String(query||'').trim().toLocaleLowerCase();
@@ -6902,8 +7022,8 @@ function renderChatOverlay(kind) {
     ? `<label class="field"><span>搜尋過往聊天記錄</span><input id="archiveSearchInput" type="search" placeholder="輸入聊天名稱或角色名稱…" autocomplete="off"></label>
       <div id="archiveSearchResults">${archiveSearchResults('')}</div>`
     : kind === 'diary'
-      ? '<section class="diary-summary"><div class="diary-summary-head"><div><p class="small muted diary-eyebrow">SWEET DIARY · LONG-TERM MEMORY</p><h3>把重要的瞬間，好好收藏</h3><p class="small muted">每 5 次玩家發言會建立一則日記摘錄；目前是測試文字，AI 摘要待串接。</p></div><div class="diary-count"><strong>'+memorySize(s.memories).toLocaleString()+'</strong><span>/ 10,000 字</span></div></div><div class="diary-meter"><span style="width:'+Math.min(100,memorySize(s.memories)/10000*100)+'%"></span></div><p class="small muted diary-hint">勾選「重大記憶」即可珍藏這段回憶；取消勾選後，就能再次編輯。</p></section>' +
-        ((s.memories||[]).map(m => '<article class="memory-item diary-memory-card '+(m.important?'is-important':'')+'"><div class="diary-memory-head"><label class="diary-check"><input type="checkbox" data-memory="'+e(m.id)+'" '+(m.important?'checked':'')+'><span class="diary-heart">'+(m.important?'♥':'♡')+'</span><span>'+(m.important?'重大記憶':'設為重大記憶')+'</span></label><span class="diary-memory-date">'+e(timeText(m.at))+'</span></div><p class="prose diary-memory-text">'+e(m.text)+'</p>'+(m.important?'<p class="small diary-lock-note">♥ 已珍藏，不會被自動清除</p>':'<button type="button" class="diary-edit-button" data-action="edit-memory" data-id="'+e(m.id)+'">編輯這則回憶</button>')+'</article>').join('') || '<div class="empty diary-empty"><strong>你們的故事，正等待被收藏</strong><p>當聊天累積到第 5 次玩家發言，系統會建立一則日記摘錄。測試模式可使用上方按鈕先驗收勾選與編輯功能。</p></div>')
+      ? '<section class="diary-summary"><div class="diary-summary-head"><div><p class="small muted diary-eyebrow">SWEET DIARY · LONG-TERM MEMORY</p><h3>把重要的瞬間，好好收藏</h3><p class="small muted">每 5 次玩家發言建立一則回憶摘錄，優先保留玩家原話與相關對話脈絡；重大記憶會優先保留。</p></div><div class="diary-count"><strong>'+memorySize(s.memories).toLocaleString()+'</strong><span>/ 10,000 字</span></div></div><div class="diary-meter"><span style="width:'+Math.min(100,memorySize(s.memories)/10000*100)+'%"></span></div><p class="small muted diary-hint">勾選「重大記憶」即可珍藏這段回憶；取消勾選後，就能再次編輯。</p></section>' +
+        ((s.memories||[]).map(m => '<article class="memory-item diary-memory-card '+(m.important?'is-important':'')+'"><div class="diary-memory-head"><label class="diary-check"><input type="checkbox" data-memory="'+e(m.id)+'" '+(m.important?'checked':'')+'><span class="diary-heart">'+(m.important?'♥':'♡')+'</span><span>'+(m.important?'重大記憶':'設為重大記憶')+'</span></label><span class="diary-memory-date">'+e(timeText(m.at))+'</span></div><p class="prose diary-memory-text">'+e(m.text)+'</p>'+(m.important?'<p class="small diary-lock-note">♥ 已珍藏，不會被自動清除</p>':'<button type="button" class="diary-edit-button" data-action="edit-memory" data-id="'+e(m.id)+'">編輯這則回憶</button>')+'</article>').join('') || '<div class="empty diary-empty"><strong>你們的故事，正等待被收藏</strong><p>當聊天累積到第 5 次玩家發言，系統會保存玩家原話與相關角色回應；你也可以將重要內容標記為重大記憶。</p></div>')
 
     : `${testControls}<div class="album-grid">${photos.map(p => `
         <button class="photo-button" data-action="photo" data-id="${e(p.id)}">
@@ -7956,11 +8076,15 @@ document.addEventListener('click',async event => {
                 const {data:photo,error:photoError}=await client.from('chat_memory_photos').select('id').eq('id',photoId).eq('owner_id',user.id).eq('chat_type','single').eq('session_id',session.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).maybeSingle();
                 if(photoError||!photo)throw photoError||new Error('這張回憶相片已刪除或到期，請重新選擇。');
               }
-              const {data:row,error:readError}=await client.from('chat_sessions').select('session_data').eq('id',session.id).eq('user_id',user.id).maybeSingle();
+              const {data:row,error:readError}=await client.from('chat_sessions').select('session_data,updated_at').eq('id',session.id).eq('user_id',user.id).maybeSingle();
               if(readError||!row)throw readError||new Error('讀取聊天設定失敗。');
+              const expectedUpdatedAt=session.cloudUpdatedAt;
+              if(!expectedUpdatedAt||row.updated_at!==expectedUpdatedAt)throw new Error('聊天版本已變更或遺失，請重新載入後再設定背景。');
               const nextData={...(row.session_data||{}),background:nextBackground};
-              const {data:saved,error:saveError}=await client.from('chat_sessions').update({session_data:nextData,updated_at:new Date().toISOString()}).eq('id',session.id).eq('user_id',user.id).select('id').maybeSingle();
-              if(saveError||!saved)throw saveError||new Error('資料庫未確認背景設定已儲存。');
+              const nextUpdatedAt=window.POYOZZMemoryCapture.nextSessionUpdatedAt(expectedUpdatedAt);
+              const {data:saved,error:saveError}=await client.from('chat_sessions').update({session_data:nextData,updated_at:nextUpdatedAt}).eq('id',session.id).eq('user_id',user.id).eq('updated_at',expectedUpdatedAt).select('id,updated_at').maybeSingle();
+              if(saveError||!saved)throw saveError||new Error('聊天已在其他分頁或裝置更新，請重新載入後再設定背景。');
+              session.cloudUpdatedAt=saved.updated_at||session.cloudUpdatedAt;
             }
             const previous=session.background;session.background=nextBackground;
             if(!persist()){session.background=previous;throw new Error('本機設定保存失敗。');}
@@ -8402,19 +8526,23 @@ document.addEventListener('click',async event => {
             }
             // 置頂只需更新 session_data.pinned；不要重傳訊息，避免無關的訊息同步失敗阻擋置頂。
             const {data:cloudRow,error:readError}=await client.from('chat_sessions')
-              .select('session_data').eq('id',item.id).eq('user_id',uid).maybeSingle();
+              .select('session_data,updated_at').eq('id',item.id).eq('user_id',uid).maybeSingle();
             if (readError) throw new Error(readError.message);
             if (!cloudRow) throw new Error('找不到這筆雲端聊天紀錄。');
             const currentData=cloudRow.session_data && typeof cloudRow.session_data==='object'
               ? cloudRow.session_data : {};
+            const expectedUpdatedAt=item.cloudUpdatedAt;
+            if(!expectedUpdatedAt||cloudRow.updated_at!==expectedUpdatedAt)throw new Error('聊天版本已變更或遺失，請重新載入後再設定置頂。');
+            const nextUpdatedAt=window.POYOZZMemoryCapture.nextSessionUpdatedAt(expectedUpdatedAt);
             const {data:updatedRow,error:updateError}=await client.from('chat_sessions')
               .update({
                 session_data:{...currentData,pinned:!!item.pinned},
-                updated_at:new Date().toISOString()
+                updated_at:nextUpdatedAt
               })
-              .eq('id',item.id).eq('user_id',uid).select('id').maybeSingle();
+              .eq('id',item.id).eq('user_id',uid).eq('updated_at',expectedUpdatedAt).select('id,updated_at').maybeSingle();
             if (updateError) throw new Error(updateError.message);
-            if (!updatedRow?.id) throw new Error('雲端未確認置頂設定已儲存。');
+            if (!updatedRow?.id) throw new Error('聊天已在其他分頁或裝置更新，請重新載入後再設定置頂。');
+            item.cloudUpdatedAt=updatedRow.updated_at||item.cloudUpdatedAt;
           } catch (error) {
             console.error('PersonaX 單人聊天置頂同步失敗：',error);
             item.pinned=previousPinned;
@@ -9255,7 +9383,13 @@ document.addEventListener('submit',async event => {
         c.visibility='private';c.deletedAt=deletedAt;c.deletionReason='author_deleted';
         for (const session of Object.values(state.sessions)) {
           if (session.characterId===c.id) {
-const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudCharacterSnapshot || {};
+const {
+              privateInfo: _legacyPrivateInfo,
+              personalityProfile: _legacyPersonalityProfile,
+              private_info: _legacyPrivateInfoSnakeCase,
+              personality_profile: _legacyPersonalityProfileSnakeCase,
+              ...safeCloudSnapshot
+            } = session.cloudCharacterSnapshot || {};
             session.cloudCharacterSnapshot={
               ...safeCloudSnapshot,
               id:c.id,name:c.name,gender:c.gender,age:c.age,image:c.image,intro:c.intro,
@@ -9588,19 +9722,25 @@ const { privateInfo: _legacyPrivateInfo, ...safeCloudSnapshot } = session.cloudC
           }
           m.text=text;
         }
+        const mutationVersion=memoryMutationTracker?.begin(s.id,previousMemories);
         if (!persist()) {
-          s.memories=previousMemories;
+          s.memories=memoryMutationTracker?.rollback(s.id,mutationVersion) || previousMemories;
           return;
         }
         if (s.cloudOwned && currentUser()?.uid===s.cloudOwnerUid) {
           const synced=await saveChatSessionSafely(s);
           if (!synced) {
-            s.memories=previousMemories;
-            persist();
-            render();
-            toast('回憶同步失敗，已還原原內容；請確認網路後再試。');
-            return;
+            const canRollback = !memoryMutationTracker || memoryMutationTracker.isCurrent(s.id,mutationVersion);
+            if (canRollback) {
+              s.memories = memoryMutationTracker?.rollback(s.id,mutationVersion) || previousMemories;
+              persist();
+              render();
+              toast('回憶同步失敗，已還原至最後一次成功同步的內容；請確認網路後再試。');
+              return;
+            }
           }
+        } else {
+          memoryMutationTracker?.markSaved(s.id,s.memories);
         }
         back();break;
       }
@@ -9893,11 +10033,15 @@ document.addEventListener('change',async event => {
           if(!client||!uid||!s.cloudOwned||s.cloudOwnerUid!==uid)throw new Error('請先使用目前帳號擁有的已同步聊天。');
           const {data:photo,error:photoError}=await client.from('chat_memory_photos').select('id').eq('id',photoId).eq('owner_id',uid).eq('chat_type','single').eq('session_id',s.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).maybeSingle();
           if(photoError||!photo)throw photoError||new Error('找不到這張有效的回憶相片。');
-          const {data:row,error:readError}=await client.from('chat_sessions').select('session_data').eq('id',s.id).eq('user_id',uid).maybeSingle();
+          const {data:row,error:readError}=await client.from('chat_sessions').select('session_data,updated_at').eq('id',s.id).eq('user_id',uid).maybeSingle();
           if(readError||!row)throw readError||new Error('讀取聊天設定失敗。');
+          const expectedUpdatedAt=s.cloudUpdatedAt;
+          if(!expectedUpdatedAt||row.updated_at!==expectedUpdatedAt)throw new Error('聊天版本已變更或遺失，請重新載入後再設定背景。');
           const nextData={...(row.session_data||{}),background:target.value};
-          const {data:saved,error:saveError}=await client.from('chat_sessions').update({session_data:nextData,updated_at:new Date().toISOString()}).eq('id',s.id).eq('user_id',uid).select('id').maybeSingle();
-          if(saveError||!saved)throw saveError||new Error('資料庫未確認背景設定已儲存。');
+          const nextUpdatedAt=window.POYOZZMemoryCapture.nextSessionUpdatedAt(expectedUpdatedAt);
+          const {data:saved,error:saveError}=await client.from('chat_sessions').update({session_data:nextData,updated_at:nextUpdatedAt}).eq('id',s.id).eq('user_id',uid).eq('updated_at',expectedUpdatedAt).select('id,updated_at').maybeSingle();
+          if(saveError||!saved)throw saveError||new Error('聊天已在其他分頁或裝置更新，請重新載入後再設定背景。');
+          s.cloudUpdatedAt=saved.updated_at||s.cloudUpdatedAt;
           s.background=target.value;persist();const panel=$('view').querySelector('.chat-main');if(panel)void window.applySingleMemoryPhotoBackground?.(s,panel);toast('已更新聊天背景。');
         } catch(err) {s.background=previousBackground;target.value=previousBackground;console.error('回憶相片背景設定失敗',err);toast('背景設定失敗：'+(err.message||'請稍後再試。')); }
       } else if (s && ['avatar','none'].includes(target.value)) {
@@ -9935,15 +10079,31 @@ document.addEventListener('change',async event => {
       const m=session?.memories.find(m=>m.id===target.dataset.memory);
       if (m) {
         const previousImportant=m.important;
+        const mutationVersion=memoryMutationTracker?.begin(session.id,session.memories);
         m.important=target.checked;
-        persist();render();
+        if (!persist()) {
+          const restored = memoryMutationTracker?.rollback(session.id,mutationVersion);
+          if (restored) session.memories=restored;
+          else m.important=previousImportant;
+          target.checked=previousImportant;
+          render();
+          return;
+        }
+        render();
         if (session.cloudOwned && currentUser()?.uid===session.cloudOwnerUid) {
           const synced=await saveChatSessionSafely(session);
           if (!synced) {
-            m.important=previousImportant;
-            persist();render();
-            toast('重大記憶同步失敗，已還原原設定。');
+            const canRollback = !memoryMutationTracker || memoryMutationTracker.isCurrent(session.id,mutationVersion);
+            if (canRollback) {
+              const restored = memoryMutationTracker?.rollback(session.id,mutationVersion);
+              if (restored) session.memories=restored;
+              else m.important=previousImportant;
+              persist();render();
+              toast('重大記憶同步失敗，已還原至最後一次成功同步的設定。');
+            }
           }
+        } else {
+          memoryMutationTracker?.markSaved(session.id,session.memories);
         }
       }
     }

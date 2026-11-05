@@ -60,7 +60,7 @@ Deno.serve(async (request: Request) => {
   // is Encounter mode, and targets the same character. Never adopt an ID collision.
   const { data: existing, error: existingError } = await admin
     .from("chat_sessions")
-    .select("id,user_id,character_id,character_name,character_snapshot,session_data,chat_mode,deleted_at")
+    .select("id,user_id,character_id,character_name,character_snapshot,session_data,chat_mode,deleted_at,updated_at")
     .eq("id", sessionId)
     .maybeSingle();
   if (existingError) return json({ error: "session_lookup_failed" }, 503);

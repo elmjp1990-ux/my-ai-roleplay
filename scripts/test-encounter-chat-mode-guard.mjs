@@ -6,7 +6,7 @@ const chatTurn = fs.readFileSync("supabase/functions/chat-turn/index.ts", "utf8"
 const modeMigration = fs.readFileSync("supabase/migrations/20261028170000_trusted_chat_mode_marker.sql", "utf8");
 const guardMigration = fs.readFileSync("supabase/migrations/20261028173000_enforce_trusted_chat_mode.sql", "utf8");
 
-assert.match(chatTurn, /select\(["']id,user_id,deleted_at,character_id,character_snapshot,chat_mode["']\)/);
+assert.match(chatTurn, /select\(["']id,user_id,deleted_at,character_id,character_snapshot,(?:session_data,)?chat_mode["']\)/);
 assert.match(chatTurn, /session\.chat_mode\s*===\s*["']encounter["']/);
 assert.match(chatTurn, /encounter_turn_handler_required/);
 assert.match(chatTurn, /session\.chat_mode\s*!==\s*["']story["']/);

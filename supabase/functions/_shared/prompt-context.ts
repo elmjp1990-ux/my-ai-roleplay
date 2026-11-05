@@ -26,8 +26,6 @@ const formatCharacterPersonality = (value: unknown): string => {
     ["價值觀與動機", "values", 500],
     ["說話方式", "speechStyle", 500],
     ["行為準則", "behaviorRules", 700],
-    ["喜好", "likes", 300],
-    ["雷點", "dislikes", 300],
     ["互動界線", "boundaries", 500],
     ["關係發展節奏", "relationshipPacing", 300],
   ];
@@ -38,6 +36,18 @@ const formatCharacterPersonality = (value: unknown): string => {
     .join("\n")
     .slice(0, 4000);
 };
+
+
+const formatCharacterPreferences = (value: unknown, key: "likes" | "dislikes", label: string): string => {
+  const text = str(obj(value)[key]).slice(0, 500);
+  return text ? `${label}：${text}` : "";
+};
+
+const formatCharacterAppearance = (character: Row): string => [
+  str(character.gender) ? `性別：${str(character.gender)}` : "",
+  str(character.age) ? `年齡：${str(character.age)}` : "",
+  str(character.race) ? `種族：${str(character.race)}` : "",
+].filter(Boolean).join("\n").slice(0, 1000);
 
 export function buildPromptVariableValues(input: PromptContextInput): PromptVariableValues {
   const profile = obj(input.profile);
@@ -66,12 +76,24 @@ export function buildPromptVariableValues(input: PromptContextInput): PromptVari
   const defaultPersona = personaPresets.find(p => p.isDefault === true);
   const playerPersona = str(session.persona) || str(group.player_persona ?? group.playerPersona) || str(defaultPersona?.text);
   const memorySource = session.memories ?? session.memory;
-  const memory = Array.isArray(memorySource) ? capMemory(memorySource.map(v => typeof v === "string" ? v : str(obj(v).summary ?? obj(v).content ?? obj(v).text)).filter(Boolean).join("\n")) : capMemory(memorySource);
+  const memory = Array.isArray(memorySource)
+    ? capMemory(memorySource.map((value, index) => {
+        if (typeof value === "string") return { text: value, important: false, at: index };
+        const item = obj(value);
+        return { text: str(item.text ?? item.summary ?? item.content), important: item.important === true, at: Number(item.at) || index };
+      }).filter(item => item.text)
+        .sort((a, b) => Number(b.important) - Number(a.important) || b.at - a.at)
+        .map(item => (item.important ? "【重大記憶】" : "【回憶摘錄】") + "\n" + item.text)
+        .join("\n\n"))
+    : capMemory(memorySource);
   const values: PromptVariableValues = {
     USER: str(group.player_name ?? group.playerName ?? profile.nickname ?? profile.handle), CHAR: str(character.name),
     USER_DESC: playerPersona, CHAR_DESC: str(character.intro ?? character.description),
     CHAR_STYLE: str(character.style).slice(0, 1000),
     CHAR_PERSONALITY: formatCharacterPersonality(character.personality_profile ?? character.personalityProfile),
+    CHAR_LIKES: formatCharacterPreferences(character.personality_profile ?? character.personalityProfile, "likes", "喜歡"),
+    CHAR_DISLIKES: formatCharacterPreferences(character.personality_profile ?? character.personalityProfile, "dislikes", "不喜歡／雷點"),
+    CHAR_APPEARANCE: formatCharacterAppearance(character),
     USER_GENDER: str(profile.gender), USER_PRONOUN: str(profile.pronoun),
     WORLD: world, SETTING: str(session.setting ?? character.setting ?? world),
     SCENE: str(session.scene ?? group.scene ?? group.initial_scene),
