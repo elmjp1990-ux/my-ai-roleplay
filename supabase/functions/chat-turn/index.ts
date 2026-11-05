@@ -6,6 +6,7 @@ import { findPrivateContextLeak, preparePrivateContext } from "../_shared/privat
 import { buildOpenRouterProviderOptions } from "../_shared/openrouter-provider-policy.ts";
 import { releaseGenerationClaim } from "../_shared/chat-turn-claim.ts";
 import { classifyProviderFailure } from "../_shared/provider-failure-policy.ts";
+import { processDueStoryMemorySummary, recordChatModelUsage } from "../_shared/story-memory-summary.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -458,6 +459,15 @@ Deno.serve(async (request) => {
   }
 
   const providerResult = providerResponse.result;
+  await recordChatModelUsage(admin, {
+    userId: user.id,
+    sessionId,
+    turnId,
+    assistantMessageId,
+    requestedModel: model,
+    providerResponse,
+    requestStatus: providerResult.kind === "generated" ? "completed" : "failed",
+  });
 
   // Persist only allowlisted diagnostic metadata. Never store provider messages,
   // prompts, player content, or credentials in operational event logs.
@@ -674,11 +684,28 @@ Deno.serve(async (request) => {
     return json({ status: "needs_reconciliation", replySaved: true, retryAllowed: false }, 503);
   }
 
+  if (typeof EdgeRuntime !== "undefined" && typeof EdgeRuntime.waitUntil === "function") {
+    EdgeRuntime.waitUntil(
+      processDueStoryMemorySummary(admin, session, user.id, openRouterKey).catch((error) => {
+        console.error("Story memory summary background task failed:", error instanceof Error ? error.message : "unknown_error");
+      }),
+    );
+  }
+
   return json({
     status: settled,
     assistantMessage: { id: assistantMessageId, content: providerResult.text, role: "assistant" },
     billing: { cost: 2, silver_reserved: charge.silver_reserved, diamonds_reserved: charge.diamonds_reserved },
-    provider: { gateway: "openrouter", model, upstream: providerResponse.provider || null },
+    provider: {
+      gateway: "openrouter", model: providerResponse.model || model,
+      upstream: providerResponse.provider || null,
+      usage: {
+        prompt_tokens: Number(providerResponse.usage.prompt_tokens) || null,
+        completion_tokens: Number(providerResponse.usage.completion_tokens) || null,
+        total_tokens: Number(providerResponse.usage.total_tokens) || null,
+        cost_usd: Number(providerResponse.usage.cost) || null,
+      },
+    },
   });
 
 });
