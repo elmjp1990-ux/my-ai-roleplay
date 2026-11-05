@@ -293,7 +293,7 @@ Deno.serve(async (request) => {
 
   const { data: session, error: sessionError } = await admin
     .from("chat_sessions")
-    .select("id,user_id,deleted_at,character_id,character_snapshot,session_data,chat_mode")
+    .select("id,user_id,deleted_at,character_id,character_name,character_snapshot,session_data,chat_mode")
     .eq("id", sessionId)
     .eq("user_id", user.id)
     .is("deleted_at", null)
