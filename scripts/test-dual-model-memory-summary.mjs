@@ -9,11 +9,11 @@ assert.match(source, /provider: \{ only: \["deepinfra"\], allow_fallbacks: false
 assert.match(source, /processDueStoryMemorySummary\(admin, session, user\.id, openRouterKey\)/);
 assert.match(source, /recordChatModelUsage\(admin/);
 assert.match(source, /storedSummary/);
+assert.match(source, /EdgeRuntime\.waitUntil/);
 assert.match(summary, /const SUMMARY_MODEL = "openai\/gpt-oss-20b"/);
 assert.match(summary, /const SUMMARY_INTERVAL = 5/);
 assert.match(summary, /generation_type: "memory_summary"/);
 assert.match(summary, /generation_type: "chat_response"/);
-assert.match(summary, /EdgeRuntime/);
 assert.match(summary, /prompt_tokens/);
 assert.match(summary, /cost_usd/);
 assert.match(summary, /data_collection: "deny"/);
@@ -23,6 +23,6 @@ const summaryStart = summary.indexOf("async function requestMemorySummary");
 const summaryEnd = summary.indexOf("export async function processDueStoryMemorySummary", summaryStart);
 assert.ok(summaryStart >= 0 && summaryEnd > summaryStart, "summary request helper must exist");
 const summaryRequest = summary.slice(summaryStart, summaryEnd);
-assert.doesNotMatch(summaryRequest, /max_tokens\s*:/, "memory summary request must not set a client-side token cap");
+assert.doesNotMatch(summaryRequest, /max_tokens\s*:/, "summary request must not set a client-side token cap");
 
 console.log("Dual-model Story chat and five-turn memory-summary contract passed.");
