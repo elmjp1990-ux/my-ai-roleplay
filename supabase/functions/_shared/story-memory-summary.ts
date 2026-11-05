@@ -46,10 +46,10 @@ export async function recordChatModelUsage(
     model: input.providerResponse.model || input.requestedModel,
     provider: input.providerResponse.provider || "deepinfra",
     gateway_request_id: requestId,
-    prompt_tokens: usage.prompt_tokens,
-    completion_tokens: usage.completion_tokens,
-    total_tokens: usage.total_tokens,
-    cost_usd: usage.cost_usd,
+    prompt_tokens: accumulatedUsage.prompt_tokens,
+    completion_tokens: accumulatedUsage.completion_tokens,
+    total_tokens: accumulatedUsage.total_tokens,
+    cost_usd: accumulatedUsage.cost_usd,
     status: input.requestStatus,
     processed_at: new Date().toISOString(),
   });
@@ -117,7 +117,7 @@ export async function processDueStoryMemorySummary(
 
   const { data: existingRows, error: existingError } = await admin
     .from("ai_model_usage")
-    .select("id,batch_number,status,summary,created_at")
+    .select("id,batch_number,status,summary,created_at,prompt_tokens,completion_tokens,total_tokens,cost_usd")
     .eq("session_id", sessionId)
     .eq("generation_type", "memory_summary")
     .order("batch_number", { ascending: true });
@@ -255,6 +255,18 @@ export async function processDueStoryMemorySummary(
   }
 
   const usage = usageSnapshot(response.usage);
+  const priorUsage = usageSnapshot({
+    prompt_tokens: existingBatch?.prompt_tokens,
+    completion_tokens: existingBatch?.completion_tokens,
+    total_tokens: existingBatch?.total_tokens,
+    cost: existingBatch?.cost_usd,
+  });
+  const accumulatedUsage = {
+    prompt_tokens: priorUsage.prompt_tokens === null && usage.prompt_tokens === null ? null : (priorUsage.prompt_tokens || 0) + (usage.prompt_tokens || 0),
+    completion_tokens: priorUsage.completion_tokens === null && usage.completion_tokens === null ? null : (priorUsage.completion_tokens || 0) + (usage.completion_tokens || 0),
+    total_tokens: priorUsage.total_tokens === null && usage.total_tokens === null ? null : (priorUsage.total_tokens || 0) + (usage.total_tokens || 0),
+    cost_usd: priorUsage.cost_usd === null && usage.cost_usd === null ? null : (priorUsage.cost_usd || 0) + (usage.cost_usd || 0),
+  };
   const requestId = /^[A-Za-z0-9._:-]{1,128}$/.test(response.requestId) ? response.requestId : null;
   const summary = response.result.kind === "generated" ? response.result.text.trim() : "";
   if (response.httpStatus < 200 || response.httpStatus >= 300 || !summary) {
@@ -263,10 +275,10 @@ export async function processDueStoryMemorySummary(
       model: response.model,
       provider: response.provider,
       gateway_request_id: requestId,
-      prompt_tokens: usage.prompt_tokens,
-      completion_tokens: usage.completion_tokens,
-      total_tokens: usage.total_tokens,
-      cost_usd: usage.cost_usd,
+      prompt_tokens: accumulatedUsage.prompt_tokens,
+      completion_tokens: accumulatedUsage.completion_tokens,
+      total_tokens: accumulatedUsage.total_tokens,
+      cost_usd: accumulatedUsage.cost_usd,
       processed_at: new Date().toISOString(),
     }).eq("id", batchRowId).eq("status", "processing");
     return;
