@@ -456,15 +456,16 @@ Deno.serve(async (request) => {
   }
 
   const providerResult = providerResponse.result;
-  await recordChatModelUsage(admin, {
-    userId: user.id,
-    sessionId,
-    turnId,
-    assistantMessageId,
-    requestedModel: model,
-    providerResponse,
-    requestStatus: providerResult.kind === "generated" ? "completed" : "failed",
-  });
+  const recordUsage = (messageId: string | null, requestStatus: "completed" | "failed") =>
+    recordChatModelUsage(admin, {
+      userId: user.id,
+      sessionId,
+      turnId,
+      assistantMessageId: messageId,
+      requestedModel: model,
+      providerResponse,
+      requestStatus,
+    });
 
   // Persist only allowlisted diagnostic metadata. Never store provider messages,
   // prompts, player content, or credentials in operational event logs.
@@ -492,7 +493,10 @@ Deno.serve(async (request) => {
     });
   }
 
+  if (providerResult.kind !== "generated") await recordUsage(null, "failed");
+
   if (providerResult.kind === "generated" && findPrivateContextLeak(providerResult.text, protectedContext, priorAssistantOutputs)) {
+    await recordUsage(null, "failed");
     // Never persist or return a response that reproduces author-only source material.
     // Record only a fixed reason code; never log the matched phrase or private text.
     await admin.from("chat_turn_events").insert({
@@ -667,6 +671,9 @@ Deno.serve(async (request) => {
       return json({ status: "needs_reconciliation", error: "assistant_message_id_collision", retryAllowed: false }, 409);
     }
   }
+
+  // The assistant message now exists, so the usage ledger's optional FK can be populated safely.
+  await recordUsage(assistantMessageId, "completed");
 
   const { data: settled, error: settleError } = await admin.rpc("settle_chat_turn", {
     p_user_id: user.id,
