@@ -189,7 +189,7 @@ async function requestStoryGeneration(
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
   apiKey: string,
   model: string,
-): Promise<{ result: ReturnType<typeof normalizeAiProviderResult>; httpStatus: number; requestId: string; provider: string }> {
+): Promise<{ result: ReturnType<typeof normalizeAiProviderResult>; httpStatus: number; requestId: string; provider: string; model: string; usage: DbRow }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), GENERATION_TIMEOUT_MS);
   try {
@@ -207,7 +207,7 @@ async function requestStoryGeneration(
         max_tokens: 1800,
         // Only approved non-training providers may receive player content.
         // No fallback is allowed: unavailable compliant providers fail closed.
-        provider: buildOpenRouterProviderOptions(),
+        provider: { only: ["deepinfra"], allow_fallbacks: false, data_collection: "deny" },
       }),
       signal: controller.signal,
     });
@@ -226,6 +226,8 @@ async function requestStoryGeneration(
       httpStatus: response.status,
       requestId: response.headers.get("x-request-id") || asString(payload.id),
       provider: asString(payload.provider),
+      model: asString(payload.model) || model,
+      usage: asDbRow(payload.usage),
     };
   } finally {
     clearTimeout(timeout);
@@ -397,7 +399,7 @@ Deno.serve(async (request) => {
   }
   if (charge.status !== "reserved") return json({ error: "turn_not_processable" }, 409);
 
-  const model = Deno.env.get("OPENROUTER_MODEL") || DEFAULT_OPENROUTER_MODEL;
+  const model = DEFAULT_OPENROUTER_MODEL;
 
   // Atomically claim the reserved turn before calling the external provider.
   // A duplicate concurrent request sees needs_reconciliation and cannot make
