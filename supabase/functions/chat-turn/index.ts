@@ -44,7 +44,7 @@ async function buildStoryMessages(
   currentUserMessage: DbRow,
 ): Promise<{ messages: Array<{ role: "system" | "user" | "assistant"; content: string }>; protectedContext: string[]; priorAssistantOutputs: string[] }> {
   const characterId = String(session.character_id);
-  const [characterResult, profileResult, historyResult] = await Promise.all([
+  const [characterResult, profileResult, historyResult, summaryResult] = await Promise.all([
     admin.from("characters")
       .select("id,author_id,name,intro,style,gender,age,race")
       .eq("id", characterId)
@@ -59,11 +59,17 @@ async function buildStoryMessages(
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(10),
+    admin.from("ai_model_usage").select("summary")
+      .eq("session_id", String(session.id))
+      .eq("generation_type", "memory_summary")
+      .eq("status", "completed")
+      .order("batch_number", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   if (characterResult.error) throw new Error("story_character_context_unavailable");
   if (profileResult.error) throw new Error("story_player_context_unavailable");
   if (historyResult.error) throw new Error("story_history_unavailable");
+  if (summaryResult.error) throw new Error("story_summary_unavailable");
 
   const snapshot = asDbRow(session.character_snapshot);
   const character = characterResult.data
@@ -107,6 +113,8 @@ async function buildStoryMessages(
 
   const profile = asDbRow(profileResult.data);
   const sessionData = asDbRow(session.session_data);
+  const storedSummary = asString(summaryResult.data?.summary);
+  if (storedSummary) sessionData.summary = storedSummary;
   const values = buildPromptVariableValues({
     profile,
     character: { ...character, personality_profile: personalityProfile },
