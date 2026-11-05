@@ -9,6 +9,7 @@ const row = (value: unknown): DbRow =>
 const str = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 const usageSnapshot = (usage: DbRow) => {
   const numeric = (value: unknown): number | null => {
+    if (value === null || value === undefined || value === "") return null;
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
   };
@@ -116,7 +117,7 @@ export async function processDueStoryMemorySummary(
 
   const { data: existingRows, error: existingError } = await admin
     .from("ai_model_usage")
-    .select("id,batch_number,status,summary")
+    .select("id,batch_number,status,summary,created_at")
     .eq("session_id", sessionId)
     .eq("generation_type", "memory_summary")
     .order("batch_number", { ascending: true });
@@ -129,9 +130,22 @@ export async function processDueStoryMemorySummary(
   for (let candidate = 1; candidate <= eligibleBatchCount; candidate++) {
     const found = rows.find((item: DbRow) => Number(item.batch_number) === candidate) || null;
     if (found?.status === "completed") continue;
-    if (found?.status === "processing") return;
+    if (found?.status === "processing") {
+      const createdAt = Date.parse(str(found.created_at));
+      if (!Number.isFinite(createdAt) || Date.now() - createdAt < 120_000) return;
+      const { data: released, error: releaseError } = await admin
+        .from("ai_model_usage")
+        .update({ status: "failed" })
+        .eq("id", str(found.id))
+        .eq("status", "processing")
+        .select("id")
+        .maybeSingle();
+      if (releaseError || !released) return;
+      existingBatch = { ...found, status: "failed" };
+    } else {
+      existingBatch = found;
+    }
     batchNumber = candidate;
-    existingBatch = found;
     break;
   }
   if (!batchNumber) return;
