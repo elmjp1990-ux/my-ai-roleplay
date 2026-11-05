@@ -6,7 +6,7 @@ on:
       - "supabase/functions/chat-turn/index.ts"
       - "supabase/functions/_shared/story-memory-summary.ts"
       - "scripts/test-dual-model-memory-summary.mjs"
-      - "supabase/migrations/20261106120000_ai_model_usage_and_memory_summaries.sql"
+      - "supabase/migrations/20261105223613_ai_model_usage_and_memory_summaries.sql"
   push:
     branches:
       - main
@@ -14,7 +14,7 @@ on:
       - "supabase/functions/chat-turn/index.ts"
       - "supabase/functions/_shared/story-memory-summary.ts"
       - "scripts/test-dual-model-memory-summary.mjs"
-      - "supabase/migrations/20261106120000_ai_model_usage_and_memory_summaries.sql"
+      - "supabase/migrations/20261105223613_ai_model_usage_and_memory_summaries.sql"
 
 permissions:
   contents: read
