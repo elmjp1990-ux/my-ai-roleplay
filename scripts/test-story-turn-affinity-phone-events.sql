@@ -123,7 +123,7 @@ BEGIN
   END IF;
 END $$;
 
-DO $
+DO $$
 BEGIN
   PERFORM set_config('request.jwt.claim.role','',true);
   PERFORM set_config('request.jwt.claims','{"role":"authenticated"}',true);
@@ -133,7 +133,7 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN
     IF SQLERRM <> 'service_role_required' THEN RAISE; END IF;
   END;
-END $;
+END $$;
 SELECT set_config('request.jwt.claim.role','service_role',true);
 UPDATE public.chat_turn_charges SET status='settled'
 WHERE turn_id='60000000-0000-4000-8000-000000000001';
