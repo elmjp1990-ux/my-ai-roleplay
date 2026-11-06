@@ -62,3 +62,31 @@ assert.ok(html.includes('normalizeCharacterTagsForRead'),
   'Legacy tags must be normalized on cloud read as well as save');
 
 console.log('Character editor: dynamic phone rows, illustration-name round-trip, and hashtag normalization checks passed.');
+
+const saveStart = html.indexOf('async function saveSupabaseCharacter');
+const saveEnd = html.indexOf('const stablePersonaJson', saveStart);
+assert.ok(saveStart >= 0 && saveEnd > saveStart, 'Character cloud-save flow must remain identifiable');
+const saveFlow = html.slice(saveStart, saveEnd);
+assert.match(saveFlow, /select\('name, intro, race, style, tags, phone_settings, visibility/,
+  'Save must load the previous AI source fields before writing');
+assert.match(saveFlow, /existingPrivateProfileError/,
+  'Save must read the previous author-only personality profile before diffing');
+assert.match(saveFlow, /characterValueChanged/,
+  'Save must compare normalized old/new values rather than triggering on every save');
+assert.match(saveFlow, /aiRelevantChanges/,
+  'Save must maintain a separate list of AI-impacting field changes');
+assert.match(saveFlow, /nonAiChanges/,
+  'Save must distinguish display/configuration changes from AI source changes');
+assert.match(saveFlow, /reason: isNewCharacter \? 'new_character'/,
+  'New characters must be marked for initial AI organization review');
+assert.match(saveFlow, /model: 'deepseek\/deepseek-v4-flash-20260423'/,
+  'Character data organization must use the confirmed conversation model');
+assert.match(saveFlow, /shouldCallModel: false/,
+  'This change must classify only; it must not call the model during this phase');
+assert.match(saveFlow, /aiOrganizationDecision/ ,
+  'The save result must expose the deterministic AI organization decision');
+assert.doesNotMatch(saveFlow, /chat\.completions|fetch\(.*openrouter/i,
+  'Character save classification must not call the AI provider directly');
+
+console.log('Character save performs deterministic AI-impact diffing without invoking the model.');
+
