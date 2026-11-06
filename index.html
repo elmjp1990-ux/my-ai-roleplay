@@ -2457,14 +2457,18 @@ async function loadEncounterScheduleDescriptionIntoEditor(characterId) {
   const client = window.mySupabase;
   const field = document.querySelector('form[data-form="character"] textarea[name="encounterScheduleDescription"]');
   const user = currentUser();
-  if (!client || !user?.uid || !characterId || !field || field.value.trim()) return;
+  if (!client || !user?.uid || !characterId || !field || field.dataset.scheduleHydrated === 'true') return;
+  if (field.value.trim()) { field.dataset.scheduleHydrated = 'true'; return; }
   const { data, error } = await client.from('character_schedule_descriptions')
     .select('description')
     .eq('character_id', characterId)
     .eq('author_id', user.uid)
     .maybeSingle();
   if (error) throw new Error('讀取作者自己的角色日程描述失敗：' + error.message);
-  if (field.isConnected && !field.value.trim()) field.value = data?.description || '';
+  if (field.isConnected) {
+    if (!field.value.trim()) field.value = data?.description || '';
+    field.dataset.scheduleHydrated = 'true';
+  }
 }
 
 async function saveSupabaseCharacter(character, expectedUserId) {
@@ -2566,10 +2570,21 @@ if (characterError) {
     if (privateInfoError) {
       throw new Error('角色基本資料已寫入，但隱藏設定儲存失敗：' + privateInfoError.message);
     }
+    const { data: verifiedPrivateInfo, error: privateInfoVerifyError } = await client
+      .from('character_private_info')
+      .select('private_info, personality_profile')
+      .eq('character_id', character.id)
+      .eq('author_id', expectedUserId)
+      .maybeSingle();
+    if (privateInfoVerifyError) throw new Error('角色隱藏設定寫入後無法回讀：' + privateInfoVerifyError.message);
+    if (!verifiedPrivateInfo || String(verifiedPrivateInfo.private_info || '') !== String(character.privateInfo || '').slice(0,10000)
+      || JSON.stringify(normalizePersonalityProfile(verifiedPrivateInfo.personality_profile)) !== JSON.stringify(normalizePersonalityProfile(character.personalityProfile))) {
+      throw new Error('第 7、8、10 項角色設定回讀結果與送出內容不一致，為避免資料遺失，本次請重新儲存。');
+    }
     // 重新讀取資料庫，避免 RLS／trigger／資料庫規則拒絕公開卻讓前端顯示成功。
     const { data: savedCharacter, error: verifyError } = await client
       .from('characters')
-      .select('visibility, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, deleted_at')
+      .select('visibility, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, deleted_at, phone_settings')
       .eq('id', character.id)
       .eq('author_id', expectedUserId)
       .maybeSingle();
@@ -2583,6 +2598,11 @@ if (characterError) {
     }
     if (savedCharacter.nsfw_workplace_warning !== (character.nsfwWorkplaceWarning === true)) {
       throw new Error('資料庫中的 NSFW 工作場所提醒未成功保存，請重試。');
+    }
+    const expectedPhonePrompts = Array.isArray(row.phone_settings?.noticePrompts) ? row.phone_settings.noticePrompts : [];
+    const savedPhonePrompts = Array.isArray(savedCharacter.phone_settings?.noticePrompts) ? savedCharacter.phone_settings.noticePrompts : [];
+    if (JSON.stringify(savedPhonePrompts) !== JSON.stringify(expectedPhonePrompts)) {
+      throw new Error('手機設定回讀結果與送出內容不一致，請重新儲存。');
     }
 
     // 每個角色先沿用最新的一筆故事；沒有故事時才新增，避免每次編輯都重複建立。
@@ -5230,7 +5250,11 @@ function renderEditor() {
         </div>
       </form>
     </div>`;
-  if (route.id && !savedDraft?.encounterScheduleDescription) void loadEncounterScheduleDescriptionIntoEditor(route.id).catch(error=>{console.warn('角色日程載入失敗：',error);toast(error.message);});
+  if (route.id) {
+    const scheduleField=$('view')?.querySelector('textarea[name="encounterScheduleDescription"]');
+    if (scheduleField && savedDraft && Object.prototype.hasOwnProperty.call(savedDraft,'encounterScheduleDescription')) scheduleField.dataset.scheduleHydrated='true';
+    else if (scheduleField) void loadEncounterScheduleDescriptionIntoEditor(route.id).catch(error=>{console.warn('角色日程載入失敗：',error);toast(error.message);});
+  }
   if (route.id && (editorIllustrationHydration.characterId!==route.id || editorIllustrationHydration.status==='idle')) {
     const characterId=route.id;
     editorIllustrationHydration={characterId,status:'loading',promise:null,error:null};
@@ -9794,7 +9818,7 @@ document.addEventListener('submit',async event => {
         // 自然語言日程只做長度與登入者檢查，不要求作者提供任何機器格式。
         if(route.id){
           const scheduleField=form.querySelector('textarea[name="encounterScheduleDescription"]');
-          if(scheduleField && !scheduleField.value.trim()) await loadEncounterScheduleDescriptionIntoEditor(route.id);
+          if(scheduleField && scheduleField.dataset.scheduleHydrated !== 'true') await loadEncounterScheduleDescriptionIntoEditor(route.id);
           if(scheduleField) f.set('encounterScheduleDescription',scheduleField.value);
         }
         const scheduleDescription = String(f.get('encounterScheduleDescription') || '').trim();
