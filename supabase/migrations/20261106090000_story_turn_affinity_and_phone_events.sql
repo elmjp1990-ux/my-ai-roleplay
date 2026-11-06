@@ -75,6 +75,40 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION public.story_relationship_stage_for_affinity(integer) FROM PUBLIC, anon, authenticated, service_role;
 
+
+-- Read the role from both PostgREST claim formats. The legacy scalar setting
+-- takes precedence when present; malformed/missing JSON claims fail closed.
+CREATE OR REPLACE FUNCTION public.is_service_role_request()
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SET search_path = ''
+AS $
+DECLARE
+  v_role text;
+  v_claims text;
+BEGIN
+  v_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
+  IF v_role IS NOT NULL THEN
+    RETURN v_role = 'service_role';
+  END IF;
+
+  v_claims := NULLIF(current_setting('request.jwt.claims', true), '');
+  IF v_claims IS NULL THEN
+    RETURN false;
+  END IF;
+
+  BEGIN
+    v_role := v_claims::jsonb ->> 'role';
+  EXCEPTION WHEN others THEN
+    RETURN false;
+  END;
+
+  RETURN v_role = 'service_role';
+END;
+$;
+REVOKE ALL ON FUNCTION public.is_service_role_request() FROM PUBLIC, anon, authenticated, service_role;
+
 CREATE OR REPLACE FUNCTION public.queue_story_turn_evaluation(
   p_turn_id uuid,
   p_session_id uuid,
@@ -98,7 +132,7 @@ DECLARE
   v_assistant_role text;
   v_existing public.story_turn_evaluations%ROWTYPE;
 BEGIN
-  IF current_setting('request.jwt.claim.role', true) IS DISTINCT FROM 'service_role' THEN
+  IF NOT public.is_service_role_request() THEN
     RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
   END IF;
   IF p_affinity_delta IS NULL OR p_affinity_delta NOT BETWEEN -3 AND 3
@@ -182,7 +216,7 @@ DECLARE
   v_event jsonb;
   v_index integer := 0;
 BEGIN
-  IF current_setting('request.jwt.claim.role', true) IS DISTINCT FROM 'service_role' THEN
+  IF NOT public.is_service_role_request() THEN
     RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
   END IF;
 
@@ -267,7 +301,7 @@ DECLARE
   v_source_count integer;
   v_affinity integer;
 BEGIN
-  IF current_setting('request.jwt.claim.role', true) IS DISTINCT FROM 'service_role' THEN
+  IF NOT public.is_service_role_request() THEN
     RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
   END IF;
   IF p_batch_number < 1 OR cardinality(p_source_turn_ids) <> 5
