@@ -3977,10 +3977,12 @@ async function runPendingChatTurn(s) {
 
   const replyWasAdded = !s.messages.some(message => message.id === reply.id);
   if (Array.isArray(result.suggestedReplies)) {
-    const generatedSuggestions = result.suggestedReplies.length === 3
-      ? result.suggestedReplies.map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90)
-      : [];
-    s.suggestedReplies = generatedSuggestions.length === 3 ? generatedSuggestions : [];
+    // The server parser already enforces a safe text length. Keep each usable
+    // suggestion independently so one imperfect item cannot erase the others.
+    s.suggestedReplies = result.suggestedReplies
+      .map(value=>String(value||'').trim())
+      .filter(value=>Array.from(value).length>=20&&Array.from(value).length<=120)
+      .slice(0,3);
   }
   if (replyWasAdded) {
     s.messages.push({
@@ -7083,7 +7085,7 @@ function renderConversation() {
               <summary>建議回覆 <span class="suggestions-count" data-collapsed="點擊可展開" data-expanded="滑動或點選燈號可切換">滑動或點選燈號可切換</span></summary>
               ${!hasUserMessage(s)
                 ? '<p class="suggestion-first-message-hint">請先自由的輸入第一句話，享受與角色對話的美好時光吧</p>'
-                : (Array.isArray(s.suggestedReplies) && s.suggestedReplies.length === 3
+                : (Array.isArray(s.suggestedReplies) && s.suggestedReplies.length > 0 && s.suggestedReplies.length <= 3
                   ? `<div class="suggestion-options" aria-label="選擇建議回覆">
                       <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="0" aria-label="切換建議回覆" aria-pressed="true"></button>
                       <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="1" aria-label="切換建議回覆" aria-pressed="false"></button>
