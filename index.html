@@ -4453,7 +4453,7 @@ function card(c,owner = false) {
   const knownTurnCount = characterTurnCountCache.get(c.id);
   const initialTurnCount = Number.isSafeInteger(knownTurnCount) ? knownTurnCount : (Number(c.chats) || 0);
   return `
-    <article class="card">
+    <article class="card" data-character-card-id="${e(c.id)}">
       <div class="card-image">
         <button class="image-button" data-action="detail" data-id="${e(c.id)}"
                 aria-label="查看${e(c.name)}">
@@ -4496,8 +4496,17 @@ function renderGrid({append=false}={}) {
   const maximum = Math.min(150,list.length);
   const shown = recommended ? list.slice(0,Math.min(limit,150)) : list;
   const grid = $('characterGrid');
-  // Infinite-scroll must append only the newly revealed cards. Replacing innerHTML
-  // destroys already-hydrated <video> elements and makes the same MP4 download again.
+  // Keep hydrated media elements alive when search/filter redraws the card markup.
+  // A new video element for the same Storage object can trigger another full MP4 GET.
+  const existingVideosByCharacter = new Map();
+  if (!append) {
+    grid.querySelectorAll(':scope > article.card').forEach(existingCard => {
+      const existingVideo = existingCard.querySelector('video[data-character-video]');
+      if (existingVideo && existingCard.dataset.characterCardId) {
+        existingVideosByCharacter.set(existingCard.dataset.characterCardId,existingVideo);
+      }
+    });
+  }
   const existingCardCount = append ? grid.querySelectorAll(':scope > article.card').length : 0;
   const newCards = append && existingCardCount > 0 ? shown.slice(existingCardCount) : shown;
   const cardMarkup = newCards.map(c => card(c)).join('');
@@ -4506,7 +4515,27 @@ function renderGrid({append=false}={}) {
   } else {
     grid.innerHTML = cardMarkup ||
       '<div class="empty">目前還沒有符合條件的公開角色。稍後再來看看，或試試其他標籤。</div>';
+    grid.querySelectorAll(':scope > article.card').forEach(nextCard => {
+      const previousVideo = existingVideosByCharacter.get(nextCard.dataset.characterCardId);
+      const nextVideo = nextCard.querySelector('video[data-character-video]');
+      if (previousVideo && nextVideo &&
+          previousVideo.dataset.characterVideo === nextVideo.dataset.characterVideo) {
+        nextVideo.replaceWith(previousVideo);
+        if (characterVideoObserver) {
+          characterVideoObserver.unobserve(previousVideo);
+          characterVideoObserver.observe(previousVideo);
+        }
+        existingVideosByCharacter.delete(nextCard.dataset.characterCardId);
+      }
+    });
+    // Any old media not reused is no longer part of the visible result set.
+    existingVideosByCharacter.forEach(video => {
+      characterVideoObserver?.unobserve(video);
+      pauseCharacterVideo(video);
+    });
   }
+  // Also hydrate newly appended cards; existing hydrated elements are guarded.
+  grid.querySelectorAll('video[data-character-video]').forEach(video => void hydrateCharacterVideo(video));
   void loadCharacterTurnCounts(shown.map(c => c.id));
   document.querySelectorAll('.explore-shortcut[data-filter]').forEach(button => {
     button.classList.toggle('active', button.dataset.filter === filter);
@@ -10929,9 +10958,22 @@ function renderCityMapMVP(){
       copy='<div class="city-character-copy"><h3>'+name+'｜角色介紹</h3><p>'+escapeHTML(intro)+'</p></div>';
       $('cityCharacterPageLabel').textContent='角色介紹 · 02 / 02';
     }
+    const previousCharacterVideo=body.querySelector('video.city-character-portrait-video[data-character-video]');
     body.innerHTML=left+copy+bookmarks;
     if(mode==='status'&&page===0)void loadCityCharacterAffinity(person.id);
-    const characterVideo=body.querySelector('video.city-character-portrait-video[data-character-video]');
+    let characterVideo=body.querySelector('video.city-character-portrait-video[data-character-video]');
+    if(previousCharacterVideo&&characterVideo&&
+       previousCharacterVideo.dataset.characterVideo===characterVideo.dataset.characterVideo){
+      characterVideo.replaceWith(previousCharacterVideo);
+      characterVideo=previousCharacterVideo;
+      if(characterVideoObserver){
+        characterVideoObserver.unobserve(characterVideo);
+        characterVideoObserver.observe(characterVideo);
+      }
+    }else if(previousCharacterVideo){
+      characterVideoObserver?.unobserve(previousCharacterVideo);
+      pauseCharacterVideo(previousCharacterVideo);
+    }
     if(characterVideo)void hydrateCharacterVideo(characterVideo);
     else{
       const directVideo=body.querySelector('video.city-character-portrait-video');
