@@ -9,6 +9,7 @@ export type StoryTurnEnvelope = {
   affinity_delta: number;
   affinity_reason: string;
   phone_events: StoryPhoneEvent[];
+  suggested_replies: string[];
 };
 
 const allowedPhoneEventTypes = new Set([
@@ -38,6 +39,7 @@ export function parseStoryTurnEnvelope(raw: string): StoryTurnEnvelope {
     affinity_delta: 0,
     affinity_reason: "",
     phone_events: [],
+    suggested_replies: [],
   };
 
   let parsed: unknown;
@@ -73,10 +75,19 @@ export function parseStoryTurnEnvelope(raw: string): StoryTurnEnvelope {
     }
   }
 
+  const suggestedReplies = Array.isArray(value.suggested_replies) && value.suggested_replies.length === 3
+    ? value.suggested_replies.map((item) => boundedText(item, 360))
+    : [];
+  const validSuggestedReplies = suggestedReplies.length === 3 && suggestedReplies.every((item) => {
+    const length = Array.from(item).length;
+    return length >= 30 && length <= 90;
+  }) ? suggestedReplies : [];
+
   return {
     reply,
     affinity_delta: affinityDelta,
     affinity_reason: boundedText(value.affinity_reason, 280),
     phone_events: phoneEvents,
+    suggested_replies: validSuggestedReplies,
   };
 }
