@@ -107,7 +107,7 @@ assert.ok(html.includes("const existingCardCount = append ? grid.querySelectorAl
 assert.ok(html.includes("const newCards = append && existingCardCount > 0 ? shown.slice(existingCardCount) : shown;"));
 assert.ok(html.includes("if (append && existingCardCount > 0) {"));
 assert.ok(html.includes("grid.insertAdjacentHTML('beforeend',cardMarkup)"));
-assert.ok((html.match(/renderGrid\\(\\{append:true\\}\\);/g)||[]).length >= 2);
+assert.ok((html.match(/renderGrid\(\{append:true\}\);/g)||[]).length >= 2);
 
 
 // Illustration metadata reads are single-flight and author cleanup is never implicit for public loads.
