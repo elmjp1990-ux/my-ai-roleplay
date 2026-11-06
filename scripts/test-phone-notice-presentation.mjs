@@ -20,7 +20,7 @@ const editorStart = html.indexOf('function normalizePhoneNoticeRows');
 const editorEnd = html.indexOf('function saveEditorDraft()', editorStart);
 assert.ok(editorStart >= 0 && editorEnd > editorStart, 'Structured author phone editor helpers must exist');
 const editorHelpers = html.slice(editorStart, editorEnd);
-assert.match(editorHelpers, /source\.slice\(0,5\)/, 'Phone editor must align with the eight-field Story contract');
+assert.match(editorHelpers, /source\.slice\(0,8\)/, 'Phone editor must align with the eight-field Story contract');
 assert.match(editorHelpers, /phoneDisplay/);
 assert.match(editorHelpers, /phoneInstruction/);
 assert.match(editorHelpers, /手機上的顯示/);
