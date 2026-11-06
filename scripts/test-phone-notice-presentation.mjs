@@ -40,5 +40,5 @@ assert.match(html, /phoneSettingAction="add"|data-phone-setting-action="add"/,
   'Phone editor must provide a dynamic add control');
 assert.match(html, /phoneSettingAction="remove"|data-phone-setting-action="remove"/,
   'Phone editor must provide a dynamic remove control');
-assert.match(html, /visibleRows\\.length>=8/,
+assert.match(html, /visibleRows\.length>=8/,
   'Phone editor must cap dynamic rows at eight');
