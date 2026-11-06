@@ -5372,9 +5372,10 @@ function hasUserMessage(session) {
 function isEncounterChatSession(session) {
   const data=session?.sessionData||session?.session_data||{};
   const encounterMetadata=session?.encounterMetadata||session?.encounter||data.encounter;
+  const encounterPlace=session?.encounterPlace||data.encounterPlace;
   return session?.encounterMode===true || session?.chatMode==='encounter' || session?.chat_mode==='encounter' ||
     data.encounterMode===true || data.chatMode==='encounter' || data.chat_mode==='encounter' ||
-    (typeof data.encounterPlace==='string' && data.encounterPlace.trim()!=='') ||
+    (typeof encounterPlace==='string' && encounterPlace.trim()!=='') ||
     (!!encounterMetadata && typeof encounterMetadata==='object' && !Array.isArray(encounterMetadata));
 }
 function sessionTitle(session) {
@@ -5610,13 +5611,15 @@ async function startChat(characterId) {
   if (!client || !userId) return toast('登入狀態尚未確認，請重新登入後再試。');
   try {
     const { data: rows, error: sessionsError } = await client.from('chat_sessions')
-      .select('id,chat_mode,status,created_at,updated_at,encounter_marker:session_data->encounter')
+      .select('id,chat_mode,status,created_at,updated_at,encounter_marker:session_data->encounter,encounter_mode_marker:session_data->>encounterMode,encounter_place_marker:session_data->>encounterPlace')
       .eq('user_id', userId).eq('character_id', characterId)
       .is('deleted_at', null).neq('chat_mode', 'encounter')
       .order('updated_at', { ascending:false });
     if (sessionsError) throw sessionsError;
     const candidateIds=(rows||[]).filter(row=>isUuid(row.id)&&
-      !(row.encounter_marker&&typeof row.encounter_marker==='object'&&!Array.isArray(row.encounter_marker))
+      !(row.encounter_marker&&typeof row.encounter_marker==='object'&&!Array.isArray(row.encounter_marker))&&
+      row.encounter_mode_marker!=='true'&&
+      !(typeof row.encounter_place_marker==='string'&&row.encounter_place_marker.trim())
     ).map(row=>row.id);
     let existingRow=null;
     if(candidateIds.length){
@@ -5649,11 +5652,25 @@ async function startChat(characterId) {
 }
 function visibleSessions() {
   const q=chatSearch.trim().toLowerCase();
-  return Object.values(state.sessions).filter(s=>{
+  const eligible=Object.values(state.sessions).filter(s=>{
     const c=sessionCharacter(s);
     const hasConversation=hasUserMessage(s)||(s.cloudOwned&&s.cloudHasUserMessage==null);
     return c&&!isEncounterChatSession(s)&&!s.archived&&hasConversation&&(!q||(s.name||c.name).toLowerCase().includes(q));
-  }).sort((a,b)=>Number(b.pinned)-Number(a.pinned)||
+  });
+  // Keep one ordinary Story room per character. Prefer the most recently active
+  // room so the list matches startChat()'s existing-room lookup.
+  eligible.sort((a,b)=>
+    Number(b.lastMessageAt||b.updatedAt||b.messages?.at(-1)?.at||b.startedAt||0)-
+    Number(a.lastMessageAt||a.updatedAt||a.messages?.at(-1)?.at||a.startedAt||0)
+  );
+  const seenCharacters=new Set();
+  const unique=eligible.filter(session=>{
+    const characterId=session.characterId||sessionCharacter(session)?.id||session.id;
+    if(seenCharacters.has(characterId))return false;
+    seenCharacters.add(characterId);
+    return true;
+  });
+  return unique.sort((a,b)=>Number(b.pinned)-Number(a.pinned)||
     (Number(b.lastMessageAt||b.updatedAt||b.messages?.at(-1)?.at||0)-Number(a.lastMessageAt||a.updatedAt||a.messages?.at(-1)?.at||0)));
 }
 function relativeDate(at) {
@@ -7100,9 +7117,9 @@ function renderConversation() {
   if (route.chatOverlay) renderChatOverlay(route.chatOverlay);
 }
 function formatMessage(text) {
-  // Text wrapped in **...** is narration, never a dialogue bubble.
-  // Legacy single-asterisk *...* narration remains supported.
-  return String(text).split(/(\*\*[\s\S]*?\*\*|\*(?!\*)[^*\n]+\*(?!\*))/g).filter(Boolean).map(part => {
+  // **...** and *...* are narration markers. Single-asterisk narration may
+  // span multiple lines in character opening messages, so parse across newlines.
+  return String(text).split(/(\\*\\*[\\s\\S]*?\\*\\*|\\*(?!\\*)[\\s\\S]+?\\*(?!\\*))/g).filter(Boolean).map(part => {
     const isDoubleNarration = part.startsWith('**') && part.endsWith('**') && part.length >= 4;
     const isSingleNarration = part.startsWith('*') && !part.startsWith('**') && part.endsWith('*') && !part.endsWith('**');
     if (isDoubleNarration) return `<em class="narration">${e(part.slice(2,-2))}</em>`;
@@ -7181,7 +7198,7 @@ function renderCharacterSpeechSegments(raw, role = {}) {
   const avatar = image
     ? '<img class="avatar" src="' + e(safeImage(image)) + '" alt="">'
     : '<span class="avatar avatar-fallback">' + e([...name][0] || '角') + '</span>';
-  const parts = String(raw || '').split(/(\*\*[\s\S]*?\*\*|\*(?!\*)[^*\n]+\*(?!\*))/gu).filter(Boolean);
+  const parts = String(raw || '').split(/(\*\*[\s\S]*?\*\*|\*(?!\*)[\s\S]+?\*(?!\*))/gu).filter(Boolean);
   return parts.map(part => {
     const isDoubleNarration = part.startsWith('**') && part.endsWith('**') && part.length >= 4;
     const isSingleNarration = part.startsWith('*') && !part.startsWith('**') && part.endsWith('*') && !part.endsWith('**');
@@ -7208,11 +7225,11 @@ function roleplaySegmentHTML(segment, options = {}) {
   // Split character speech around *actions*: every speech portion gets its own
   // character heading/avatar, while the action remains narration between them.
   if (segment.kind === 'character') {
-    const parts = String(segment.text || '').split(/(\*[^*]+\*)/gu).filter(Boolean);
+    const parts = String(segment.text || '').split(/(\*(?!\*)[\s\S]+?\*(?!\*))/gu).filter(Boolean);
     if (parts.length > 1) {
       let badgeUsed = false;
       return parts.map(part => {
-        const isAction = /^\*[^*]+\*$/u.test(part);
+        const isAction = /^\*(?!\*)[\s\S]+?\*(?!\*)$/u.test(part);
         if (isAction) return '<div class="roleplay-segment is-action"><div class="narration">' + formatMessage(part) + '</div></div>';
         const withBadge = options.summonedByPlayer && !badgeUsed;
         if (withBadge) badgeUsed = true;
