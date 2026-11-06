@@ -26,7 +26,7 @@ const isUuid = (value: unknown): value is string =>
 
 
 const OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-v4-flash-0731";
+const DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-v4-flash-20260423";
 const GENERATION_TIMEOUT_MS = 55_000;
 
 type DbRow = Record<string, unknown>;
