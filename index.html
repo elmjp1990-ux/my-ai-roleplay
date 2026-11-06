@@ -4314,6 +4314,37 @@ function renderShell() {
 
 let lastRenderedConversationId = null;
 
+// Preserve character-card media across route-level rerenders (Create, Favorites,
+// Author pages, etc.), not only Explore's renderGrid() updates.
+function captureCharacterCardVideos(root){
+  const videos=new Map();
+  root?.querySelectorAll('article.card[data-character-card-id]').forEach(card=>{
+    const video=card.querySelector('video[data-character-video]');
+    if(video)videos.set(card.dataset.characterCardId,video);
+  });
+  return videos;
+}
+function restoreCharacterCardVideos(root,previousVideos){
+  if(!previousVideos?.size)return;
+  root?.querySelectorAll('article.card[data-character-card-id]').forEach(card=>{
+    const id=card.dataset.characterCardId;
+    const previousVideo=previousVideos.get(id);
+    if(!previousVideo)return;
+    const nextVideo=card.querySelector('video[data-character-video]');
+    if(nextVideo&&previousVideo.dataset.characterVideo===nextVideo.dataset.characterVideo){
+      if(nextVideo!==previousVideo)nextVideo.replaceWith(previousVideo);
+      characterVideoObserver?.unobserve(previousVideo);
+      characterVideoObserver?.observe(previousVideo);
+      previousVideos.delete(id);
+    }
+  });
+  previousVideos.forEach(video=>{
+    characterVideoObserver?.unobserve(video);
+    releaseCharacterVideo(video);
+  });
+  previousVideos.clear();
+}
+
 function render() {
   // Encounter fullscreen scroll locking must follow the active route, not a stale
   // session left in memory after navigating back to the city or traditional pages.
@@ -4351,6 +4382,7 @@ function render() {
       }
     };
   }
+  const previousCardVideos=captureCharacterCardVideos($('view'));
   // City-map-only visual treatment must not leak into traditional pages.
   if (route.page !== 'citymap') document.body.classList.remove('city-map-mode','city-map-mode-immersive');
   renderShell();
@@ -4373,6 +4405,7 @@ function render() {
     case 'profile':renderProfile();break;
     case 'album':renderChatAlbumPage();break;
   }
+  restoreCharacterCardVideos($('view'),previousCardVideos);
   if (route.overlay) renderModal(route.overlay);
   updateCharacterCounters($('view'));
   // 公開卡片影片需取得私有儲存桶的短效簽名 URL，並在畫面渲染後啟動靜音循環播放。
