@@ -10,7 +10,8 @@ const memoryCapture = readFileSync("memory-capture.js", "utf8");
 
 // Memory must be persisted with the session metadata and hydrated on cloud reload.
 assert.match(html, /memories:\s*Array\.isArray\(s\.memories\)\s*\?\s*s\.memories\s*:\s*\[\]/);
-assert.match(html, /memories:\s*Array\.isArray\(data\.memories\)\s*\?\s*data\.memories\s*:\s*\[\]/);
+assert.match(html, /session\.memories\s*=\s*Array\.isArray\(data\.memories\)\s*\?\s*data\.memories\s*:\s*\(session\.memories\s*\|\|\s*\[\]\)/,
+  "lazy history hydration must restore cloud memories without discarding cached local memories");
 
 // Prompt context must prefer session memories, keep important/recent memories first,
 // and provide the current player message separately from older chat history.
@@ -78,13 +79,15 @@ const cloudSave = html.slice(cloudSaveStart, cloudSaveEnd);
 assert.match(cloudSave, /if \(!s\.cloudUpdatedAt \|\| !Number\.isFinite\(Date\.parse\(s\.cloudUpdatedAt\)\)\)/);
 assert.match(cloudSave, /currentRow\.data\.updated_at !== expectedUpdatedAt/);
 assert.doesNotMatch(cloudSave, /s\.cloudUpdatedAt \|\| currentRow\.data\.updated_at/);
-assert.match(cloudSave, /select\('id,character_snapshot,updated_at'\)/);
+assert.match(cloudSave, /select\('id,character_snapshot(?:,[^']+)?updated_at'\)/,
+  "cloud-owned session checks must fetch the updated_at compare-and-swap token");
 assert.match(cloudSave, /expectedUpdatedAt = existing\.data\.updated_at/);
 assert.match(memoryCapture, /function nextSessionUpdatedAt\(previous, now = Date\.now\(\)\)/);
 assert.match(memoryCapture, /Math\.max\(clockMs, previousMs \+ 1\)/);
 assert.match(storySession, /character_snapshot,chat_mode,deleted_at,updated_at/);
 assert.match(encounterSession, /character_snapshot,session_data,chat_mode,deleted_at,updated_at/);
-assert.match(cloudSave, /select\('character_snapshot,updated_at'\)/);
+assert.match(cloudSave, /select\(s\.cloudSessionDataLoaded \? 'character_snapshot,updated_at'/,
+  "lazy hydration may add session_data to the first cloud read while still fetching the version token");
 assert.match(cloudSave, /eq\('updated_at', expectedUpdatedAt\)/);
 assert.match(cloudSave, /s\.cloudUpdatedAt = sessionWrite\.data\.updated_at/);
 assert.match(cloudSave, /此聊天已在其他分頁或裝置更新/);
