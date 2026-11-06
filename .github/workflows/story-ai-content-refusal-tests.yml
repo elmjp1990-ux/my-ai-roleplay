@@ -11,6 +11,11 @@ on:
       - "supabase/functions/_shared/openrouter-provider-policy.test.ts"
       - "supabase/functions/_shared/chat-turn-claim.ts"
       - "supabase/functions/_shared/chat-turn-claim.test.ts"
+      - "supabase/functions/_shared/story-turn-envelope.ts"
+      - "supabase/functions/_shared/story-turn-envelope.test.ts"
+      - "supabase/functions/_shared/story-memory-summary.ts"
+      - "supabase/migrations/20261106090000_story_turn_affinity_and_phone_events.sql"
+      - "scripts/test-story-turn-affinity-phone-events.sql"
       - "supabase/functions/_shared/provider-failure-policy.ts"
       - "supabase/functions/_shared/provider-failure-policy.test.ts"
       - "supabase/migrations/20261104062017_move_character_personality_profile_to_private_info.sql"
@@ -45,6 +50,11 @@ on:
       - "supabase/functions/_shared/private-context-guard.test.ts"
       - "supabase/functions/_shared/chat-turn-claim.ts"
       - "supabase/functions/_shared/chat-turn-claim.test.ts"
+      - "supabase/functions/_shared/story-turn-envelope.ts"
+      - "supabase/functions/_shared/story-turn-envelope.test.ts"
+      - "supabase/functions/_shared/story-memory-summary.ts"
+      - "supabase/migrations/20261106090000_story_turn_affinity_and_phone_events.sql"
+      - "scripts/test-story-turn-affinity-phone-events.sql"
       - "supabase/migrations/20261104062017_move_character_personality_profile_to_private_info.sql"
       - "supabase/migrations/20261104095000_restrict_legacy_personality_profile_select.sql"
       - "scripts/test-character-personality-private-migration.sql"
@@ -85,6 +95,30 @@ jobs:
         env:
           PGPASSWORD: postgres
         run: psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -f scripts/test-chat-turn-wallet-refund.sql
+
+  story-turn-affinity-phone-events:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Test per-turn affinity, phone event ownership and five-turn calibration
+        env:
+          PGPASSWORD: postgres
+        run: psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -f scripts/test-story-turn-affinity-phone-events.sql
 
   personality-private-migration:
     runs-on: ubuntu-latest
@@ -129,6 +163,8 @@ jobs:
           deno-version: v2.x
       - name: Type-check Story chat-turn Edge Function
         run: deno check supabase/functions/chat-turn/index.ts
+      - name: Test structured Story turn evaluation parsing
+        run: deno test supabase/functions/_shared/story-turn-envelope.test.ts
       - name: Run provider result normalization tests
         run: deno test supabase/functions/_shared/ai-provider-result.test.ts
       - name: Run provider failure safety policy tests
