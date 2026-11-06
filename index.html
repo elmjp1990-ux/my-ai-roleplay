@@ -2308,6 +2308,7 @@ const characterVideoSignedUrlCache = new Map();
 const characterVideoSignedUrlInflight = new Map();
 let characterVideoObserver = null;
 const characterVideoLoaders = new WeakMap();
+let characterVideoDebugSequence = 0;
 async function getCharacterVideoSignedUrl(path){
   const now=Date.now();
   const cached=characterVideoSignedUrlCache.get(path);
@@ -2340,6 +2341,14 @@ function releaseCharacterVideo(video){
 function hydrateCharacterVideo(video){
   const path=video?.dataset?.characterVideo;
   if(!path||!window.mySupabase||video.dataset.videoFailed==='true'||video.dataset.videoHydrated==='true'||video.dataset.videoHydrated==='loading'||video.dataset.videoObservePending==='true')return;
+  if(!video.dataset.videoDebugId)video.dataset.videoDebugId=String(++characterVideoDebugSequence);
+  console.debug('[character-video] hydrate',{
+    instanceId:video.dataset.videoDebugId,
+    storagePath:path,
+    samePathElements:[...document.querySelectorAll('video[data-character-video]')].filter(item=>item.dataset.characterVideo===path).length,
+    connected:video.isConnected,
+    route:route?.page||'unknown'
+  });
   // 列表中的影片只在實際可視範圍內取得 Signed URL 並下載。
   video.controls=false;
   video.removeAttribute('controls');
@@ -2379,6 +2388,15 @@ function hydrateCharacterVideo(video){
       // Set preload before src. Assigning src starts media loading automatically;
       // calling load() again here restarts the same full-range MP4 request.
       video.preload='metadata';
+      console.debug('[character-video] attach-src',{
+        instanceId:video.dataset.videoDebugId||'unknown',
+        storagePath:path,
+        samePathElements:[...document.querySelectorAll('video[data-character-video]')].filter(item=>item.dataset.characterVideo===path).length,
+        existingSrc:!!video.getAttribute('src'),
+        cardId:video.closest('article.card')?.dataset.characterCardId||null,
+        cityPortrait:video.classList.contains('city-character-portrait-video'),
+        route:route?.page||'unknown'
+      });
       video.src=signedUrl;
       video.dataset.videoHydrated='true';
       video.play().catch(()=>{});
