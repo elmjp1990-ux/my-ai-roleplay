@@ -246,7 +246,7 @@ export async function processDueStoryMemorySummary(
         role: "system",
         content: [
           "你是 POYOZZ 的長期劇情記憶整理器與關係校正器。請將既有摘要與本批新增對話整合成一份可供角色下次自然接續的繁體中文記憶。",
-          "只輸出 JSON object：{\\"summary\\":\\"50～150 個中文字的累積摘要\\",\\"affinity_correction\\":0,\\"affinity_reason\\":\\"校正理由\\"}。不要 Markdown 或其他文字。",
+          "只輸出 JSON object：{\"summary\":\"50～150 個中文字的累積摘要\",\"affinity_correction\":0,\"affinity_reason\":\"校正理由\"}。不要 Markdown 或其他文字。",
           "摘要目標為 50～150 個中文字，單一精簡段落，不要標題、條列、分析或補充說明。",
           "好感度校正不是把這五回合的變化重新累加。每回合好感度已即時微調；請檢視五回合完整互動後，判斷目前累積值是否需要小幅修正，只回傳 -5 到 5 的整數 correction。若逐回合評估合理就填 0；不可把五回合淨變化再加一次，也不可因單次甜蜜互動直接跳級。",
           "優先保留玩家明確偏好、角色關係變化、重要共同事件、承諾、界線、情緒轉折，以及尚未完成或下次要接續的事情。",
