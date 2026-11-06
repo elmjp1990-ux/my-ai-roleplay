@@ -641,6 +641,12 @@ body.group-chat-page:has(.group-wizard) #view {
 .phone-notices{margin-top:10px;padding:11px 12px;border:1px solid var(--border);border-radius:15px;background:var(--panel2);color:var(--text)}
 .phone-notices p{margin:6px 0;font-size:10px;line-height:1.65}.phone-notice-list{max-height:132px;overflow-y:auto;overscroll-behavior:contain;padding-right:3px}.phone-notice-list p{margin:4px 0;font-size:10px;line-height:1.65}
 .phone-notice-title{font-size:11px;font-weight:650;color:var(--primary);margin-bottom:7px}body:not(.day) .phone-notice-title{color:#fff}body:not(.day) .phone-battery{color:#fff!important}
+.phone-story-events{margin-top:12px;padding:9px 10px;border:1px solid #b4bfd338;border-radius:12px;background:var(--panel2)}
+.phone-story-event{padding:8px 0;border-bottom:1px solid #b4bfd326}
+.phone-story-event:last-child{border-bottom:0;padding-bottom:0}
+.phone-story-event-meta{display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;color:var(--muted);font-size:9px}
+.phone-story-event strong{display:block;font-size:11px;line-height:1.5}
+.phone-story-event p{margin:3px 0 0;font-size:10px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
 .phone-close-row{display:flex;justify-content:center;margin-top:12px}
 .phone-close-row button{border:1px solid #ded4f5;background:var(--panel2);color:var(--text);border-radius:999px;padding:7px 18px;font-size:10px}
 .phone-bar{width:85px;height:3px;background:var(--muted);border-radius:5px;margin:12px auto 0}
@@ -705,6 +711,7 @@ body.group-chat-page:has(.group-wizard) #view {
 .suggestions-panel > summary::after { content:"⌄"; color:var(--muted); font-size:14px; line-height:1; transition:transform .15s ease; }
 .suggestions-panel[open] > summary::after { transform:rotate(180deg); }
 .suggestions-count { color:var(--muted); font-size:10px; font-weight:400; }
+.suggestion-first-message-hint { box-sizing:border-box; width:100%; margin:0; padding:7px 9px 9px; color:var(--muted); text-align:center; font-size:10px; font-weight:400; line-height:1.45; overflow-wrap:anywhere; }
 .suggestion-options { display:flex; align-items:center; gap:5px; padding:0 8px 5px; }
 .suggestion-light { width:10px; height:10px; min-width:10px; padding:0; border:0; border-radius:50%; background:var(--border); box-shadow:inset 0 0 0 1px var(--muted); }
 .suggestion-light[aria-pressed="true"] { background:#34d399; box-shadow:0 0 6px #34d399aa; }
@@ -3167,7 +3174,9 @@ function chatSessionData(s) {
     openingMessage:initialOpening && String(initialOpening.text || '').trim()
       ? {text:String(initialOpening.text),at:Number(initialOpening.at) || Date.now()} : null,
     pinned:!!s.pinned, persona:s.persona || '', personaCustom:s.personaCustom === true || (s.personaCustom !== false && !!s.persona),
-    suggestions:s.suggestions !== false, background:s.background || 'avatar',
+    suggestions:s.suggestions !== false,
+    suggestedReplies:Array.isArray(s.suggestedReplies) ? s.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90) : [],
+    background:s.background || 'avatar',
     startedAt:s.startedAt || Date.now(), archivedAt:s.archivedAt || null,
     hasUserMessage:s.cloudHasUserMessage===true ||
       (s.messages||[]).some(message=>message.role==='user'&&String(message.text||'').trim())
@@ -3238,6 +3247,7 @@ async function saveChatSessionToCloud(s, options = {}) {
       const savedData=currentRow.data.session_data&&typeof currentRow.data.session_data==='object'?currentRow.data.session_data:{};
       s.memories=Array.isArray(savedData.memories)?savedData.memories:[];
       s.album=Array.isArray(savedData.album)?savedData.album:[];
+      s.suggestedReplies=Array.isArray(savedData.suggestedReplies)?savedData.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90):[];
       s.cloudRoleplayMeta=savedData.roleplayMeta&&typeof savedData.roleplayMeta==='object'?savedData.roleplayMeta:{};
       s.pendingTurn=savedData.pendingTurn&&isUuid(savedData.pendingTurn.turnId)&&isUuid(savedData.pendingTurn.userMessageId)&&isUuid(savedData.pendingTurn.assistantMessageId)
         ? {turnId:savedData.pendingTurn.turnId,userMessageId:savedData.pendingTurn.userMessageId,assistantMessageId:savedData.pendingTurn.assistantMessageId,createdAt:Number(savedData.pendingTurn.createdAt)||Date.now()}
@@ -3303,6 +3313,7 @@ async function saveChatSessionToCloud(s, options = {}) {
       const existingData=existing.data.session_data&&typeof existing.data.session_data==='object'?existing.data.session_data:{};
       s.memories=Array.isArray(existingData.memories)?existingData.memories:[];
       s.album=Array.isArray(existingData.album)?existingData.album:[];
+      s.suggestedReplies=Array.isArray(existingData.suggestedReplies)?existingData.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90):[];
       s.cloudRoleplayMeta=existingData.roleplayMeta&&typeof existingData.roleplayMeta==='object'?existingData.roleplayMeta:{};
       s.encounterMode=existing.data.chat_mode==='encounter'||s.encounterMode===true;
       s.storyMode=existingData.storyMode===true||s.storyMode===true;
@@ -3426,6 +3437,7 @@ async function loadCloudChatSessions(user, options = {}) {
         'session_hidden:session_data->>hidden','session_pinned:session_data->>pinned',
         'session_archived_at:session_data->>archivedAt',
         'session_started_at:session_data->>startedAt','session_encounter_mode:session_data->>encounterMode',
+        'session_encounter_metadata:session_data->encounter',
         'session_story_mode:session_data->>storyMode','session_encounter_place:session_data->>encounterPlace',
         'session_encounter_day:session_data->>encounterDay','session_persona:session_data->>persona',
         'session_persona_custom:session_data->>personaCustom','session_suggestions:session_data->>suggestions',
@@ -3484,7 +3496,10 @@ async function loadCloudChatSessions(user, options = {}) {
       }
       const existing = state.sessions[row.id];
       const opening = row.session_opening_message && typeof row.session_opening_message === 'object'
-        ? row.session_opening_message : existing?.initialOpeningMessage || null;
+        ? row.session_opening_message
+        : existing?.initialOpeningMessage || (String(snapshot.opening || '').trim()
+          ? {text:String(snapshot.opening),at:row.created_at ? new Date(row.created_at).getTime() : Date.now()}
+          : null);
       const pending = row.session_pending_turn && typeof row.session_pending_turn === 'object'
         ? row.session_pending_turn : null;
       const marker = row.session_has_user_message;
@@ -3498,7 +3513,11 @@ async function loadCloudChatSessions(user, options = {}) {
         ...(existing || {}), id:row.id, characterId:row.character_id,
         characterName:row.character_name || snapshot.name || '角色', name:row.session_name || existing?.name || '',
         archived:parseBool(row.session_archived) || row.status === 'archived',
-        encounterMode:row.chat_mode === 'encounter' || parseBool(row.session_encounter_mode),
+        chatMode:row.chat_mode || existing?.chatMode || null,
+        encounterMetadata:row.session_encounter_metadata && typeof row.session_encounter_metadata==='object' && !Array.isArray(row.session_encounter_metadata)
+          ? row.session_encounter_metadata : existing?.encounterMetadata || null,
+        encounterMode:row.chat_mode === 'encounter' || parseBool(row.session_encounter_mode) ||
+          (!!row.session_encounter_metadata && typeof row.session_encounter_metadata==='object' && !Array.isArray(row.session_encounter_metadata)),
         storyMode:parseBool(row.session_story_mode),
         encounterPlace:row.session_encounter_place || existing?.encounterPlace || null,
         encounterDay:row.session_encounter_day || existing?.encounterDay || null,
@@ -3600,7 +3619,10 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
       session.album=Array.isArray(data.album)?data.album:(session.album||[]);
     }
     if(!older){
-      session.encounterMode=row.chat_mode==='encounter'||data.encounterMode===true||data.encounter?.mode==='encounter';
+      session.chatMode=row.chat_mode||session.chatMode||null;
+      session.encounterMetadata=data.encounter&&typeof data.encounter==='object'&&!Array.isArray(data.encounter)?data.encounter:session.encounterMetadata||null;
+      session.encounterMode=row.chat_mode==='encounter'||data.encounterMode===true||
+        (!!data.encounter&&typeof data.encounter==='object'&&!Array.isArray(data.encounter));
       session.storyMode=data.storyMode===true;
       session.encounterPlace=typeof data.encounterPlace==='string'?data.encounterPlace:session.encounterPlace||null;
       session.encounterDay=typeof data.encounterDay==='string'?data.encounterDay:session.encounterDay||null;
@@ -3954,13 +3976,23 @@ async function runPendingChatTurn(s) {
   }
 
   const replyWasAdded = !s.messages.some(message => message.id === reply.id);
+  if (Array.isArray(result.suggestedReplies)) {
+    const generatedSuggestions = result.suggestedReplies.length === 3
+      ? result.suggestedReplies.map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90)
+      : [];
+    s.suggestedReplies = generatedSuggestions.length === 3 ? generatedSuggestions : [];
+  }
   if (replyWasAdded) {
     s.messages.push({
       id:reply.id,
       role:'assistant',
       text:String(reply.content),
+      suggestedReplies:s.suggestedReplies,
       at:Date.now()
     });
+  } else {
+    const savedAssistant = s.messages.find(message=>message.id===reply.id);
+    if (savedAssistant) savedAssistant.suggestedReplies = s.suggestedReplies;
   }
   delete s.pendingTurn;
 
@@ -3973,7 +4005,7 @@ async function runPendingChatTurn(s) {
   }
 
   persist();
-  renderMessages();
+  render();
   await refreshWalletBalance();
 
   // The server has already durably saved and settled the assistant reply.
@@ -5323,7 +5355,7 @@ function newSession(character,options = {}) {
   const session = {
     id:sessionId,characterId:character.id,name:'',
     archived:false,hidden:false,pinned:false,
-    startedAt:Date.now(),persona:'',suggestions:true,background:'avatar',
+    startedAt:Date.now(),persona:'',suggestions:false,background:'avatar',
     messages:[{id:id(),role:'assistant',text:character.opening,at:Date.now()}],
     memories:[],album:[],...options
   };
@@ -5336,6 +5368,18 @@ function hasUserMessage(session) {
   return (session?.messages||[]).some(message=>
     message.role==='user'&&String(message.text||'').trim()
   );
+}
+// Older Encounter sessions created before the trusted chat_mode column may still
+// carry their original server-written session_data.encounter object while the
+// new column defaults to story. Treat that durable marker as Encounter too.
+function isEncounterChatSession(session) {
+  const data=session?.sessionData||session?.session_data||{};
+  const encounterMetadata=session?.encounterMetadata||session?.encounter||data.encounter;
+  const encounterPlace=session?.encounterPlace||data.encounterPlace;
+  return session?.encounterMode===true || session?.chatMode==='encounter' || session?.chat_mode==='encounter' ||
+    data.encounterMode===true || data.chatMode==='encounter' || data.chat_mode==='encounter' ||
+    (typeof encounterPlace==='string' && encounterPlace.trim()!=='') ||
+    (!!encounterMetadata && typeof encounterMetadata==='object' && !Array.isArray(encounterMetadata));
 }
 function sessionTitle(session) {
   return String(session?.name || sessionCharacter(session)?.name || session?.characterName || '角色').trim();
@@ -5536,11 +5580,17 @@ async function createStorySession(characterId, originMode, sourceEncounterSessio
   }
 
   const relationship = payload.relationship;
-  const session = newSession(character, {
+  const storySnapshot = payload.session.character_snapshot && typeof payload.session.character_snapshot === 'object'
+    ? payload.session.character_snapshot : {};
+  const openingText = String(storySnapshot.opening || character.opening || '').trim();
+  const storyCharacter = { ...character, opening:openingText };
+  const openingAt = Date.now();
+  const session = newSession(storyCharacter, {
     id:sessionId,
     cloudOwned:true,
     cloudOwnerUid:authData.user.id,
-    cloudCharacterSnapshot:payload.session.character_snapshot || {},
+    cloudCharacterSnapshot:storySnapshot,
+    initialOpeningMessage:openingText ? {text:openingText,at:openingAt} : null,
     cloudUpdatedAt:payload.session.updated_at || null,
     storyMode:true,
     storyOriginMode:relationship.origin_mode,
@@ -5570,12 +5620,16 @@ async function startChat(characterId) {
   if (!client || !userId) return toast('登入狀態尚未確認，請重新登入後再試。');
   try {
     const { data: rows, error: sessionsError } = await client.from('chat_sessions')
-      .select('id,chat_mode,status,created_at,updated_at')
+      .select('id,chat_mode,status,created_at,updated_at,encounter_marker:session_data->encounter,encounter_mode_marker:session_data->>encounterMode,encounter_place_marker:session_data->>encounterPlace')
       .eq('user_id', userId).eq('character_id', characterId)
       .is('deleted_at', null).neq('chat_mode', 'encounter')
       .order('updated_at', { ascending:false });
     if (sessionsError) throw sessionsError;
-    const candidateIds=(rows||[]).filter(row=>isUuid(row.id)).map(row=>row.id);
+    const candidateIds=(rows||[]).filter(row=>isUuid(row.id)&&
+      !(row.encounter_marker&&typeof row.encounter_marker==='object'&&!Array.isArray(row.encounter_marker))&&
+      row.encounter_mode_marker!=='true'&&
+      !(typeof row.encounter_place_marker==='string'&&row.encounter_place_marker.trim())
+    ).map(row=>row.id);
     let existingRow=null;
     if(candidateIds.length){
       const {data:latestPlayerMessage,error:messagesError}=await client.from('chat_messages')
@@ -5583,6 +5637,9 @@ async function startChat(characterId) {
         .is('deleted_at',null).order('created_at',{ascending:false}).limit(1).maybeSingle();
       if(messagesError)throw messagesError;
       if(latestPlayerMessage?.session_id)existingRow=(rows||[]).find(row=>row.id===latestPlayerMessage.session_id)||null;
+      // If the character has an existing but not-yet-started Story room, reuse it
+      // instead of creating another empty room for the same character.
+      if(!existingRow)existingRow=(rows||[]).find(row=>candidateIds.includes(row.id))||null;
     }
     if(existingRow){
       await loadCloudChatSessions({id:userId},{onlySessionId:existingRow.id});
@@ -5607,11 +5664,25 @@ async function startChat(characterId) {
 }
 function visibleSessions() {
   const q=chatSearch.trim().toLowerCase();
-  return Object.values(state.sessions).filter(s=>{
+  const eligible=Object.values(state.sessions).filter(s=>{
     const c=sessionCharacter(s);
     const hasConversation=hasUserMessage(s)||(s.cloudOwned&&s.cloudHasUserMessage==null);
-    return c&&!s.encounterMode&&!s.archived&&hasConversation&&(!q||(s.name||c.name).toLowerCase().includes(q));
-  }).sort((a,b)=>Number(b.pinned)-Number(a.pinned)||
+    return c&&!isEncounterChatSession(s)&&!s.archived&&hasConversation&&(!q||(s.name||c.name).toLowerCase().includes(q));
+  });
+  // Keep one ordinary Story room per character. Prefer the most recently active
+  // room so the list matches startChat()'s existing-room lookup.
+  eligible.sort((a,b)=>
+    Number(b.lastMessageAt||b.updatedAt||b.messages?.at(-1)?.at||b.startedAt||0)-
+    Number(a.lastMessageAt||a.updatedAt||a.messages?.at(-1)?.at||a.startedAt||0)
+  );
+  const seenCharacters=new Set();
+  const unique=eligible.filter(session=>{
+    const characterId=session.characterId||sessionCharacter(session)?.id||session.id;
+    if(seenCharacters.has(characterId))return false;
+    seenCharacters.add(characterId);
+    return true;
+  });
+  return unique.sort((a,b)=>Number(b.pinned)-Number(a.pinned)||
     (Number(b.lastMessageAt||b.updatedAt||b.messages?.at(-1)?.at||0)-Number(a.lastMessageAt||a.updatedAt||a.messages?.at(-1)?.at||0)));
 }
 function relativeDate(at) {
@@ -6327,7 +6398,7 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
       void loadEncounterMemoryList(panel,ctx.session);
       return;
     }
-    const archives=Object.values(state.sessions).filter(item=>item.characterId===ctx.session.characterId&&item.archived&&!item.encounterMode).sort((a,b)=>(b.archivedAt||0)-(a.archivedAt||0));
+    const archives=Object.values(state.sessions).filter(item=>item.characterId===ctx.session.characterId&&item.archived&&!isEncounterChatSession(item)).sort((a,b)=>(b.archivedAt||0)-(a.archivedAt||0));
     const archiveCards=archives.map(item=>{
       const messageCount=(item.messages||[]).filter(message=>message.role==='user'&&String(message.text||message.content||'').trim()).length;
       return '<article class="archive-card"><strong>'+e(item.name||sessionTitle(item))+'</strong><p class="small muted" style="margin:8px 0">'+e(timeText(item.archivedAt||item.startedAt))+'<br>玩家訊息 '+messageCount+' 筆 · 日記 '+item.memories.length+' 筆 · 相片 '+item.album.length+' 張</p><div class="row wrap"><button data-action="view-archive" data-id="'+e(item.id)+'">查看回憶</button><button data-action="resume-archive" data-id="'+e(item.id)+'">繼續聊天</button><button data-action="rename-archive" data-id="'+e(item.id)+'">編輯檔名</button></div></article>';
@@ -7010,26 +7081,16 @@ function renderConversation() {
           ${s.suggestions ? `<div class="suggestions">
             <details class="suggestions-panel" open>
               <summary>建議回覆 <span class="suggestions-count" data-collapsed="點擊可展開" data-expanded="滑動或點選燈號可切換">滑動或點選燈號可切換</span></summary>
-              <div class="suggestion-options" aria-label="選擇建議回覆">
-                <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="0" aria-label="第 1 則建議" aria-pressed="true"></button>
-                <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="1" aria-label="第 2 則建議" aria-pressed="false"></button>
-                <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="2" aria-label="第 3 則建議" aria-pressed="false"></button>
-              </div>
-              <button type="button" class="suggestion-card active" data-action="suggestion" data-index="0" data-text="${e('我先是微微一怔，隨後放下手邊的事情，仔細端詳你的神情，像是想從你的表情裡猜出真正的心思。\n\n「你今天看起來有點不一樣，是發生什麼事了嗎？如果你願意，我可以好好聽你說。」')}">
-                <span class="suggestion-card-title">① 溫柔關心</span>
-                <span class="suggestion-card-action">我先是微微一怔，隨後放下手邊的事情，仔細端詳你的神情，像是想從你的表情裡猜出真正的心思。</span>
-                <span class="suggestion-card-dialogue">「你今天看起來有點不一樣，是發生什麼事了嗎？如果你願意，我可以好好聽你說。」</span>
-              </button>
-              <button type="button" class="suggestion-card" data-action="suggestion" data-index="1" data-text="${e('我挑了挑眉，故意往你面前靠近半步，嘴角揚起一抹藏不住的笑，語氣裡帶著一點逗弄。\n\n「突然這麼主動來找我？先讓我猜猜看……你是有事拜託我，還是單純想我了？」')}">
-                <span class="suggestion-card-title">② 俏皮逗弄</span>
-                <span class="suggestion-card-action">我挑了挑眉，故意往你面前靠近半步，嘴角揚起一抹藏不住的笑，語氣裡帶著一點逗弄。</span>
-                <span class="suggestion-card-dialogue">「突然這麼主動來找我？先讓我猜猜看……你是有事拜託我，還是單純想我了？」</span>
-              </button>
-              <button type="button" class="suggestion-card" data-action="suggestion" data-index="2" data-text="${e('我收起原本輕鬆的神情，安靜地看著你，指尖不自覺地收緊，似乎猶豫了片刻才終於決定坦白。\n\n「其實有件事我一直想告訴你，只是不確定你會怎麼想。你願意聽我說完嗎？」')}">
-                <span class="suggestion-card-title">③ 坦率表達</span>
-                <span class="suggestion-card-action">我收起原本輕鬆的神情，安靜地看著你，指尖不自覺地收緊，似乎猶豫了片刻才終於決定坦白。</span>
-                <span class="suggestion-card-dialogue">「其實有件事我一直想告訴你，只是不確定你會怎麼想。你願意聽我說完嗎？」</span>
-              </button>
+              ${!hasUserMessage(s)
+                ? '<p class="suggestion-first-message-hint">請先自由的輸入第一句話，享受與角色對話的美好時光吧</p>'
+                : (Array.isArray(s.suggestedReplies) && s.suggestedReplies.length === 3
+                  ? `<div class="suggestion-options" aria-label="選擇建議回覆">
+                      <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="0" aria-label="切換建議回覆" aria-pressed="true"></button>
+                      <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="1" aria-label="切換建議回覆" aria-pressed="false"></button>
+                      <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="2" aria-label="切換建議回覆" aria-pressed="false"></button>
+                    </div>
+                    ${s.suggestedReplies.map((reply,index)=>`<button type="button" class="suggestion-card${index===0?' active':''}" data-action="suggestion" data-index="${index}" data-text="${e(reply)}"><span class="suggestion-card-action">${e(reply)}</span></button>`).join('')}`
+                  : '<p class="suggestion-first-message-hint">本回合暫時沒有可用的建議回覆。</p>')}
             </details>
           </div>` : ''}
                     <div class="composer-input-row">
@@ -7068,9 +7129,9 @@ function renderConversation() {
   if (route.chatOverlay) renderChatOverlay(route.chatOverlay);
 }
 function formatMessage(text) {
-  // Text wrapped in **...** is narration, never a dialogue bubble.
-  // Legacy single-asterisk *...* narration remains supported.
-  return String(text).split(/(\*\*[\s\S]*?\*\*|\*(?!\*)[^*\n]+\*(?!\*))/g).filter(Boolean).map(part => {
+  // **...** and *...* are narration markers. Legacy single-asterisk *...* narration remains supported.
+  // Single-asterisk narration may span multiple lines in character opening messages.
+  return String(text).split(/(\*\*[\s\S]*?\*\*|\*(?!\*)[\s\S]+?\*(?!\*))/g).filter(Boolean).map(part => {
     const isDoubleNarration = part.startsWith('**') && part.endsWith('**') && part.length >= 4;
     const isSingleNarration = part.startsWith('*') && !part.startsWith('**') && part.endsWith('*') && !part.endsWith('**');
     if (isDoubleNarration) return `<em class="narration">${e(part.slice(2,-2))}</em>`;
@@ -7149,7 +7210,7 @@ function renderCharacterSpeechSegments(raw, role = {}) {
   const avatar = image
     ? '<img class="avatar" src="' + e(safeImage(image)) + '" alt="">'
     : '<span class="avatar avatar-fallback">' + e([...name][0] || '角') + '</span>';
-  const parts = String(raw || '').split(/(\*\*[\s\S]*?\*\*|\*(?!\*)[^*\n]+\*(?!\*))/gu).filter(Boolean);
+  const parts = String(raw || '').split(/(\*\*[\s\S]*?\*\*|\*(?!\*)[\s\S]+?\*(?!\*))/gu).filter(Boolean);
   return parts.map(part => {
     const isDoubleNarration = part.startsWith('**') && part.endsWith('**') && part.length >= 4;
     const isSingleNarration = part.startsWith('*') && !part.startsWith('**') && part.endsWith('*') && !part.endsWith('**');
@@ -7176,11 +7237,11 @@ function roleplaySegmentHTML(segment, options = {}) {
   // Split character speech around *actions*: every speech portion gets its own
   // character heading/avatar, while the action remains narration between them.
   if (segment.kind === 'character') {
-    const parts = String(segment.text || '').split(/(\*[^*]+\*)/gu).filter(Boolean);
+    const parts = String(segment.text || '').split(/(\*(?!\*)[\s\S]+?\*(?!\*))/gu).filter(Boolean);
     if (parts.length > 1) {
       let badgeUsed = false;
       return parts.map(part => {
-        const isAction = /^\*[^*]+\*$/u.test(part);
+        const isAction = /^\*(?!\*)[\s\S]+?\*(?!\*)$/u.test(part);
         if (isAction) return '<div class="roleplay-segment is-action"><div class="narration">' + formatMessage(part) + '</div></div>';
         const withBadge = options.summonedByPlayer && !badgeUsed;
         if (withBadge) badgeUsed = true;
@@ -7287,7 +7348,7 @@ function addMemory(s,text) {
 function archiveSearchResults(query) {
   const q=String(query||'').trim().toLocaleLowerCase();
   const items=Object.values(state.sessions||{}).filter(item => {
-    if (!item || item.hidden || item.encounterMode === true) return false;
+    if (!item || item.hidden || isEncounterChatSession(item)) return false;
     const character=sessionCharacter(item);
     return !q || [item.name,character?.name].filter(Boolean).join(' ').toLocaleLowerCase().includes(q);
   }).sort((a,b)=>(b.startedAt||0)-(a.startedAt||0));
@@ -7301,7 +7362,7 @@ function archiveSearchResults(query) {
     </div></article>`;
   }).join('') || '<div class="empty">找不到符合的聊天記錄。</div>';
 }
-function renderPhoneModal() {
+async function renderPhoneModal() {
   document.querySelectorAll('.phone-modal-backdrop').forEach(node=>node.remove());
   const isGroup=route.page==='group',session=isGroup?null:currentSession(),group=isGroup?groupPrototype.active:null;
   if(isGroup&&!group){toast('請先開啟群組聊天。');return;} if(!isGroup&&!session){toast('請先開啟聊天。');return;}
@@ -7331,6 +7392,30 @@ function renderPhoneModal() {
     .map(item=>String(item||'').trim()).filter(Boolean).slice(0,8);
   const generated=isGroup?(group.phoneNotificationsByCharacter?.[String(character.id)]||[]):(session.phoneNotifications||[]);
   const notices=Array.isArray(generated)?generated.filter(Boolean).slice(0,10):[];
+  // Story phone events are fetched through the owner-checked RPC; never read the event table directly.
+  let storyPhoneEvents=[];
+  let storyPhoneEventsError='';
+  if(!isGroup && session.storyMode && session.cloudOwned && session.cloudOwnerUid===uid && isUuid(session.id)){
+    const client=window.mySupabase;
+    try{
+      const {data:authData,error:authError}=await client.auth.getUser();
+      if(authError||authData?.user?.id!==uid)throw new Error('登入狀態已變更，請重新開啟聊天室。');
+      const {data,error}=await client.rpc('get_story_phone_events',{p_session_id:session.id});
+      if(error)throw error;
+      storyPhoneEvents=Array.isArray(data)?data:[];
+    }catch(error){
+      storyPhoneEventsError=String(error?.message||'讀取故事手機通知失敗');
+      console.warn('讀取 Story 手機事件失敗：',storyPhoneEventsError);
+    }
+  }
+  const storyEventHTML=storyPhoneEvents.length
+    ? '<section class="phone-story-events"><div class="phone-notice-title">📨 故事新通知</div>'+storyPhoneEvents.slice(0,20).map(item=>{
+        const typeLabels={message:'訊息',social_post:'社群動態',missed_call:'未接來電',voice_message:'語音留言',notification:'通知'};
+        return '<article class="phone-story-event"><div class="phone-story-event-meta"><span>'+e(typeLabels[item.event_type]||'通知')+'</span><time>'+e(timeText(item.created_at||0))+'</time></div><strong>'+e(item.title||'新通知')+'</strong><p>'+e(item.body||'')+'</p></article>';
+      }).join('')+'</section>'
+    : storyPhoneEventsError
+      ? '<section class="phone-story-events"><div class="phone-notice-title">📨 故事新通知</div><p class="small muted">目前無法載入故事通知，請稍後重新開啟手機。</p></section>'
+      : (!isGroup && session.storyMode ? '<section class="phone-story-events"><div class="phone-notice-title">📨 故事新通知</div><p class="small muted">目前還沒有新的故事通知。</p></section>' : '');
   // Group sweet-diary excerpts are stored per group in localStorage, so use that same shared diary for every member phone's battery.
   const diaryList=isGroup?loadGroupDiaryMemories(group.id):(session.memories||[]);
   const diaryChars=Array.isArray(diaryList)?(isGroup?diaryList.reduce((n,item)=>n+countChars(typeof item==='string'?item:(item.text||'')),0):memorySize(diaryList)):0;
@@ -7339,7 +7424,7 @@ function renderPhoneModal() {
   const noticeLines=[...prompts,...notices.map(line=>String(line||'').trim()).filter(Boolean)].slice(0,18); const noticeHTML=noticeLines.length?noticeLines.map(line=>'<p>'+e(String(line))+'</p>').join(''):'<p>尚未設定通知揭露資訊。</p>';
   const memberSwitch=isGroup?'<div class="phone-member-switch"><button type="button" data-phone-action="prev" aria-label="上一位群組成員">‹</button><span class="phone-member-name">'+e(character.name)+'</span><button type="button" data-phone-action="next" aria-label="下一位群組成員">›</button></div>':'';
   const modal=document.createElement('div');modal.className='phone-modal-backdrop';modal.setAttribute('role','presentation');
-  modal.innerHTML='<section class="phone-device" role="dialog" aria-modal="true" aria-label="'+e(title)+'"><div class="phone-device-head"><span>'+e(title)+'</span><div class="phone-battery" style="color:'+batteryColor+'" aria-label="電量 '+battery+'%"><span>'+battery+'%</span><span class="phone-battery-shape"><span class="phone-battery-fill" style="display:block;width:'+battery+'%"></span></span></div></div>'+memberSwitch+'<div class="phone-content"><div class="phone-time">📆 星期五　🕧 19:30（傍晚）</div><div class="phone-location">📍 所在地　<span class="muted">尚未設定所在地</span></div><div class="phone-notices '+(warning?'phone-warning':'')+'">'+(warning?'<p><strong>回憶相簿快滿了，趕緊清理幫角色恢復電量吧</strong></p>':'')+'<div class="phone-notice-title">🔔 通知</div><div class="phone-notice-list">'+noticeHTML+'</div></div><p class="small muted" style="margin-top:10px;font-size:9px">電量依甜蜜日記容量計算：'+Math.min(diaryChars,capacity)+' / '+capacity+' 字</p></div><div class="phone-bar"></div><div class="phone-close-row"><button type="button" data-phone-action="close">關閉手機</button></div></section>';
+  modal.innerHTML='<section class="phone-device" role="dialog" aria-modal="true" aria-label="'+e(title)+'"><div class="phone-device-head"><span>'+e(title)+'</span><div class="phone-battery" style="color:'+batteryColor+'" aria-label="電量 '+battery+'%"><span>'+battery+'%</span><span class="phone-battery-shape"><span class="phone-battery-fill" style="display:block;width:'+battery+'%"></span></span></div></div>'+memberSwitch+'<div class="phone-content"><div class="phone-time">📆 星期五　🕧 19:30（傍晚）</div><div class="phone-location">📍 所在地　<span class="muted">尚未設定所在地</span></div><div class="phone-notices '+(warning?'phone-warning':'')+'">'+(warning?'<p><strong>回憶相簿快滿了，趕緊清理幫角色恢復電量吧</strong></p>':'')+'<div class="phone-notice-title">🔔 通知</div><div class="phone-notice-list">'+noticeHTML+'</div></div>'+storyEventHTML+'<p class="small muted" style="margin-top:10px;font-size:9px">電量依甜蜜日記容量計算：'+Math.min(diaryChars,capacity)+' / '+capacity+' 字</p></div><div class="phone-bar"></div><div class="phone-close-row"><button type="button" data-phone-action="close">關閉手機</button></div></section>';
   modal.addEventListener('click',event=>{
     if(event.target===modal){savePhoneState();modal.remove();return;}
     const button=event.target.closest('[data-phone-action]');if(!button)return;
@@ -9159,7 +9244,7 @@ document.addEventListener('click',async event => {
         s.name=uniqueSessionName(s.name || newArchiveName(c,s),s.id);
         s.archived=true;
         const existing=Object.values(state.sessions).filter(item =>
-          item.id !== s.id && item.characterId === c.id && !item.archived && item.encounterMode !== true
+          item.id !== s.id && item.characterId === c.id && !item.archived && !isEncounterChatSession(item)
         ).sort((a,b) =>
           Number(hasUserMessage(b))-Number(hasUserMessage(a)) ||
           (b.messages?.at(-1)?.at || b.startedAt || 0)-(a.messages?.at(-1)?.at || a.startedAt || 0)
@@ -9192,7 +9277,7 @@ document.addEventListener('click',async event => {
         if (!item || !canAccessSessionCharacter(item,sessionCharacter(item))) break;
         if (!confirm('恢復這段回憶？目前進行中的對話會先封存，這段歷史將接替聊天列表中的角色項目。')) break;
         const snapshot=clone(state);
-        const active=Object.values(state.sessions).filter(candidate=>candidate.id!==item.id&&candidate.characterId===item.characterId&&!candidate.archived&&candidate.encounterMode!==true)
+        const active=Object.values(state.sessions).filter(candidate=>candidate.id!==item.id&&candidate.characterId===item.characterId&&!candidate.archived&&!isEncounterChatSession(candidate))
           .sort((a,b)=>(b.messages?.at(-1)?.at||b.startedAt||0)-(a.messages?.at(-1)?.at||a.startedAt||0))[0];
         if(active) {
           active.archivedAt=Date.now();

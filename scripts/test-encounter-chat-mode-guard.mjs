@@ -247,11 +247,34 @@ assert.match(frontend, /if\(isNewEncounter && sessionData\.archived!==true\)grou
 assert.match(frontend, /encounter-dialog-dismiss/);
 assert.match(frontend, /saved!==true\)throw new Error\('雲端未確認儲存結果。'\)/);
 assert.match(frontend, /\.eq\(["']chat_mode["'],["']encounter["']\)/);
-assert.match(frontend, /item\.characterId === c\.id && !item\.archived && item\.encounterMode !== true/);
+assert.match(frontend, /item\.characterId === c\.id && !item\.archived && !isEncounterChatSession\(item\)/);
 assert.match(frontend, /const hasConversation=hasUserMessage\(s\)\|\|\(s\.cloudOwned&&s\.cloudHasUserMessage==null\)/);
-assert.match(frontend, /if \(!item \|\| item\.hidden \|\| item\.encounterMode === true\) return false;/);
-assert.match(frontend, /item\.id !== s\.id && item\.characterId === c\.id && !item\.archived && item\.encounterMode !== true/);
-assert.match(frontend, /candidate\.id!==item\.id&&candidate\.characterId===item\.characterId&&!candidate\.archived&&candidate\.encounterMode!==true/);
+assert.match(frontend, /session_encounter_metadata:session_data->encounter/);
+assert.match(frontend, /function isEncounterChatSession\(session\)/);
+assert.match(frontend, /session\?\.chatMode==='encounter'/);
+assert.match(frontend, /data\.encounter&&typeof data\.encounter==='object'/);
+assert.match(frontend, /session\?\.chat_mode==='encounter'/);
+assert.match(frontend, /data\.encounterMode===true/);
+assert.match(frontend, /data\.chatMode==='encounter'/);
+assert.match(frontend, /data\.chat_mode==='encounter'/);
+assert.match(frontend, /data\.encounterPlace==='string'/);
+assert.match(frontend, /const encounterPlace=session\?\.encounterPlace\|\|data\.encounterPlace/);
+assert.match(frontend, /encounter_mode_marker:session_data->>encounterMode/);
+assert.match(frontend, /encounter_place_marker:session_data->>encounterPlace/);
+assert.match(frontend, /row\.encounter_mode_marker!=='true'/);
+assert.match(frontend, /row\.encounter_place_marker==='string'/);
+assert.match(frontend, /const seenCharacters=new Set\(\)/);
+assert.match(frontend, /const characterId=session\.characterId\|\|sessionCharacter\(session\)\?\.id\|\|session\.id/);
+assert.match(frontend, /function formatMessage\(text\)[\s\S]*?\[\\s\\S\]\+\?/);
+assert.match(frontend, /\.suggestion-first-message-hint \{ box-sizing:border-box; width:100%; margin:0; padding:7px 9px 9px; color:var\(--muted\); text-align:center; font-size:10px;/);
+assert.match(frontend, /!isEncounterChatSession\(s\)/);
+assert.match(frontend, /encounter_marker:session_data->encounter/);
+assert.match(frontend, /row\.encounter_marker&&typeof row\.encounter_marker==='object'/);
+assert.match(frontend, /!isEncounterChatSession\(item\)/);
+assert.match(frontend, /!isEncounterChatSession\(candidate\)/);
+assert.match(frontend, /if \(!item \|\| item\.hidden \|\| isEncounterChatSession\(item\)\) return false;/);
+assert.match(frontend, /item\.id !== s\.id && item\.characterId === c\.id && !item\.archived && !isEncounterChatSession\(item\)/);
+assert.match(frontend, /candidate\.id!==item\.id&&candidate\.characterId===item\.characterId&&!candidate\.archived&&!isEncounterChatSession\(candidate\)/);
 assert.match(frontend, /route\.page === 'citymap' \? 'home'/);
 assert.match(frontend, /\['citymap','探索'\]/);
 assert.match(frontend, /ICON\[page === 'citymap' \? 'home' : page\]/);
@@ -432,3 +455,7 @@ assert.match(affinityMigration, /INSERT INTO public\.encounter_session_lifecycle
 assert.match(affinityMigration, /GRANT EXECUTE ON FUNCTION public\.create_encounter_session_with_lifecycle/);
 
 assert.match(affinityMigration, /INSERT INTO public\.story_relationship_states/);
+
+
+// Existing empty Story sessions must be reused instead of creating duplicates.
+assert.ok(frontend.includes('if(!existingRow)existingRow=(rows||[]).find(row=>candidateIds.includes(row.id))||null'));

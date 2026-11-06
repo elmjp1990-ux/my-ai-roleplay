@@ -6,6 +6,7 @@ import { findPrivateContextLeak, preparePrivateContext } from "../_shared/privat
 import { releaseGenerationClaim } from "../_shared/chat-turn-claim.ts";
 import { classifyProviderFailure } from "../_shared/provider-failure-policy.ts";
 import { processDueStoryMemorySummary, recordChatModelUsage } from "../_shared/story-memory-summary.ts";
+import { parseStoryTurnEnvelope } from "../_shared/story-turn-envelope.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,7 +26,7 @@ const isUuid = (value: unknown): value is string =>
 
 
 const OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-v4-flash-0731";
+const DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-v4-flash-20260423";
 const GENERATION_TIMEOUT_MS = 55_000;
 
 type DbRow = Record<string, unknown>;
@@ -140,6 +141,8 @@ async function buildStoryMessages(
     "開場情境：{SCENE}",
     "世界觀：{WORLD}",
     "目前關係：{RELATIONSHIP}",
+    "【角色手機設定】" + JSON.stringify(asDbRow(snapshot.phoneSettings)).slice(0, 4000),
+    "【每回合結構化輸出】只輸出一個 JSON object，不要 Markdown code fence。格式：{\"reply\":\"角色對玩家的完整自然回覆\",\"affinity_delta\":0,\"affinity_reason\":\"簡短說明這次互動為何影響或不影響關係\",\"phone_events\":[],\"suggested_replies\":[\"第一則玩家可直接送出的自然回覆\",\"第二則不同方向的自然回覆\",\"第三則不同方向的自然回覆\"]}。suggested_replies 必須恰好 3 則，每則 30～90 字，內容是玩家可以直接送出的完整自然回覆，必須根據角色人設、當前場景及最新對話提出三種不同的回應方向；不得使用固定模板、分類標籤、溫柔／俏皮等風格標題，不得加數字或項目編號，也不可把建議寫成給玩家的操作說明。三則要有實質差異、符合玩家視角，且不可替角色或玩家捏造已發生的事。無論前端建議回覆面板是否開啟，每回合都必須生成這三則內容。affinity_delta 必須是 -3 到 3 的整數；普通聊天、資訊交換或沒有情感意義的互動填 0。不要為討好玩家而加分；依角色人格、界線、信任與實際互動判斷。phone_events 最多 3 筆，沒有合理的新手機動態就回傳空陣列。每筆格式為 {\"event_type\":\"message|social_post|missed_call|voice_message|notification\",\"title\":\"標題\",\"body\":\"內容\"}。必須遵守角色手機設定，不得虛構與故事矛盾的事件；不得把玩家未說出的內心話當成角色已知資訊。reply 內的旁白仍使用單星號格式，實際對白不加星號。",
     "",
     "【第三優先｜喜好與不喜愛的點】自然融入角色的偏好、興趣、厭惡事項與雷點；遇到喜歡的事物可有符合個性的反應，遇到雷點則依角色設定表現，不要機械式列清單，也不要為迎合玩家而忽略角色界線。",
     "{CHAR_LIKES}",
@@ -202,6 +205,7 @@ async function requestStoryGeneration(
       body: JSON.stringify({
         model,
         messages,
+        response_format: { type: "json_object" },
         temperature: 0.85,
         // Only approved non-training providers may receive player content.
         // No fallback is allowed: unavailable compliant providers fail closed.
@@ -368,6 +372,8 @@ Deno.serve(async (request) => {
     if (savedReplyError || !savedReply || !String(savedReply.content || "").trim()) {
       return json({ status: "needs_reconciliation", error: "settled_reply_lookup_failed", retryAllowed: false }, 503);
     }
+    const { error: effectsError } = await admin.rpc("apply_story_turn_evaluation", { p_turn_id: turnId });
+    if (effectsError) console.error("Story turn effects recovery failed:", effectsError.message);
     return json({ status: "settled", assistantMessage: savedReply, idempotent: true });
   }
   if (charge.status === "refunded") return json({ error: "turn_already_refunded" }, 409);
@@ -387,6 +393,8 @@ Deno.serve(async (request) => {
         p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
       });
       if (settleAgainError) return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
+      const { error: effectsError } = await admin.rpc("apply_story_turn_evaluation", { p_turn_id: turnId });
+      if (effectsError) console.error("Story turn effects recovery failed:", effectsError.message);
       return json({ status: settledAgain, assistantMessage: recoveredReply, recovered: true });
     }
     return json({
@@ -623,11 +631,12 @@ Deno.serve(async (request) => {
     }, 503);
   }
 
+  const turnEnvelope = parseStoryTurnEnvelope(providerResult.text);
   const assistantRow = {
     id: assistantMessageId,
     session_id: sessionId,
     role: "assistant",
-    content: providerResult.text,
+    content: turnEnvelope.reply,
     created_at: new Date().toISOString(),
   };
   const { error: saveReplyError } = await admin.from("chat_messages").insert(assistantRow);
@@ -675,6 +684,27 @@ Deno.serve(async (request) => {
     }
   }
 
+  // Queue structured side effects before settlement. The database applies them
+  // only after the matching wallet charge is confirmed settled.
+  const { error: evaluationQueueError } = await admin.rpc("queue_story_turn_evaluation", {
+    p_turn_id: turnId,
+    p_session_id: sessionId,
+    p_user_id: user.id,
+    p_character_id: session.character_id,
+    p_user_message_id: userMessageId,
+    p_assistant_message_id: assistantMessageId,
+    p_affinity_delta: turnEnvelope.affinity_delta,
+    p_reason: turnEnvelope.affinity_reason,
+    p_phone_events: turnEnvelope.phone_events,
+  });
+  if (evaluationQueueError) {
+    await admin.from("chat_turn_events").insert({
+      turn_id: turnId, user_id: user.id, event_type: "story_turn_evaluation_queue_failed",
+      stage: "story_turn_effects", error_code: "evaluation_queue_failed",
+    });
+    console.error("Story turn evaluation queue failed:", evaluationQueueError.message);
+  }
+
   // The assistant message now exists, so the usage ledger's optional FK can be populated safely.
   await recordUsage(assistantMessageId, "completed");
 
@@ -691,6 +721,17 @@ Deno.serve(async (request) => {
     return json({ status: "needs_reconciliation", replySaved: true, retryAllowed: false }, 503);
   }
 
+  const { data: storyEffects, error: storyEffectsError } = await admin.rpc("apply_story_turn_evaluation", {
+    p_turn_id: turnId,
+  });
+  if (storyEffectsError) {
+    await admin.from("chat_turn_events").insert({
+      turn_id: turnId, user_id: user.id, event_type: "story_turn_evaluation_apply_failed",
+      stage: "story_turn_effects", error_code: "evaluation_apply_failed",
+    });
+    console.error("Story turn evaluation apply failed:", storyEffectsError.message);
+  }
+
   const edgeRuntime = (globalThis as typeof globalThis & {
     EdgeRuntime?: { waitUntil: (task: Promise<unknown>) => void };
   }).EdgeRuntime;
@@ -705,7 +746,9 @@ Deno.serve(async (request) => {
 
   return json({
     status: settled,
-    assistantMessage: { id: assistantMessageId, content: providerResult.text, role: "assistant" },
+    assistantMessage: { id: assistantMessageId, content: turnEnvelope.reply, role: "assistant" },
+    suggestedReplies: turnEnvelope.suggested_replies,
+    relationship: storyEffects || null,
     billing: { cost: 2, silver_reserved: charge.silver_reserved, diamonds_reserved: charge.diamonds_reserved },
     provider: {
       gateway: "openrouter", model: providerResponse.model || model,

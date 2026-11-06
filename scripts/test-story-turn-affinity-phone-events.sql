@@ -1,0 +1,206 @@
+\set ON_ERROR_STOP on
+BEGIN;
+
+CREATE SCHEMA IF NOT EXISTS auth;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role NOLOGIN; END IF;
+END $$;
+CREATE TABLE auth.users (id uuid PRIMARY KEY);
+CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
+LANGUAGE sql STABLE AS $$
+  SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid
+$$;
+
+CREATE TABLE public.characters (id uuid PRIMARY KEY);
+CREATE TABLE public.chat_sessions (
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL,
+  character_id uuid,
+  chat_mode text NOT NULL,
+  deleted_at timestamptz
+);
+CREATE TABLE public.chat_messages (
+  id uuid PRIMARY KEY,
+  session_id uuid NOT NULL REFERENCES public.chat_sessions(id),
+  role text NOT NULL,
+  content text NOT NULL
+);
+CREATE TABLE public.chat_turn_charges (
+  turn_id uuid PRIMARY KEY,
+  session_id uuid NOT NULL REFERENCES public.chat_sessions(id),
+  user_id uuid NOT NULL,
+  user_message_id uuid NOT NULL REFERENCES public.chat_messages(id),
+  assistant_message_id uuid NOT NULL REFERENCES public.chat_messages(id),
+  status text NOT NULL
+);
+CREATE TABLE public.story_relationship_states (
+  session_id uuid PRIMARY KEY REFERENCES public.chat_sessions(id),
+  user_id uuid NOT NULL,
+  character_id uuid,
+  affinity integer NOT NULL DEFAULT 0,
+  relationship_stage text NOT NULL DEFAULT 'first_meeting',
+  turn_count_since_summary integer NOT NULL DEFAULT 0,
+  last_processed_batch integer NOT NULL DEFAULT 0,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE public.story_relationship_batches (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id uuid NOT NULL REFERENCES public.chat_sessions(id),
+  user_id uuid NOT NULL,
+  character_id uuid,
+  batch_number integer NOT NULL,
+  first_turn_number integer NOT NULL,
+  last_turn_number integer NOT NULL,
+  source_turn_ids uuid[] NOT NULL,
+  status text NOT NULL DEFAULT 'pending',
+  summary text,
+  affinity_delta integer,
+  evaluation jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  processed_at timestamptz,
+  UNIQUE (session_id, batch_number),
+  CHECK (
+    (status = 'completed' AND summary IS NOT NULL AND affinity_delta IS NOT NULL AND processed_at IS NOT NULL)
+    OR status <> 'completed'
+  )
+);
+
+\ir ../supabase/migrations/20261106090000_story_turn_affinity_and_phone_events.sql
+
+INSERT INTO auth.users(id) VALUES
+  ('10000000-0000-4000-8000-000000000001'),
+  ('10000000-0000-4000-8000-000000000002');
+INSERT INTO public.characters(id) VALUES ('20000000-0000-4000-8000-000000000001');
+INSERT INTO public.chat_sessions(id,user_id,character_id,chat_mode) VALUES
+  ('30000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000001','story'),
+  ('30000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000002','20000000-0000-4000-8000-000000000001','story');
+INSERT INTO public.story_relationship_states(session_id,user_id,character_id,affinity)
+VALUES
+  ('30000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000001',10),
+  ('30000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000002','20000000-0000-4000-8000-000000000001',0);
+
+INSERT INTO public.chat_messages(id,session_id,role,content) VALUES
+  ('40000000-0000-4000-8000-000000000001','30000000-0000-4000-8000-000000000001','user','Hi'),
+  ('50000000-0000-4000-8000-000000000001','30000000-0000-4000-8000-000000000001','assistant','Hello'),
+  ('40000000-0000-4000-8000-000000000002','30000000-0000-4000-8000-000000000001','user','Turn two'),
+  ('50000000-0000-4000-8000-000000000002','30000000-0000-4000-8000-000000000001','assistant','Reply two'),
+  ('40000000-0000-4000-8000-000000000003','30000000-0000-4000-8000-000000000001','user','Turn three'),
+  ('50000000-0000-4000-8000-000000000003','30000000-0000-4000-8000-000000000001','assistant','Reply three'),
+  ('40000000-0000-4000-8000-000000000004','30000000-0000-4000-8000-000000000001','user','Turn four'),
+  ('50000000-0000-4000-8000-000000000004','30000000-0000-4000-8000-000000000001','assistant','Reply four'),
+  ('40000000-0000-4000-8000-000000000005','30000000-0000-4000-8000-000000000001','user','Turn five'),
+  ('50000000-0000-4000-8000-000000000005','30000000-0000-4000-8000-000000000001','assistant','Reply five');
+
+INSERT INTO public.chat_turn_charges(turn_id,session_id,user_id,user_message_id,assistant_message_id,status) VALUES
+  ('60000000-0000-4000-8000-000000000001','30000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000001','50000000-0000-4000-8000-000000000001','needs_reconciliation'),
+  ('60000000-0000-4000-8000-000000000002','30000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000002','50000000-0000-4000-8000-000000000002','settled'),
+  ('60000000-0000-4000-8000-000000000003','30000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000003','50000000-0000-4000-8000-000000000003','settled'),
+  ('60000000-0000-4000-8000-000000000004','30000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000004','50000000-0000-4000-8000-000000000004','settled'),
+  ('60000000-0000-4000-8000-000000000005','30000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000005','50000000-0000-4000-8000-000000000005','settled');
+
+SELECT set_config('request.jwt.claim.role','service_role',true);
+SELECT public.queue_story_turn_evaluation(
+  '60000000-0000-4000-8000-000000000001',
+  '30000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000001',
+  '40000000-0000-4000-8000-000000000001',
+  '50000000-0000-4000-8000-000000000001',
+  2,
+  'A meaningful trust-building moment',
+  '[{"event_type":"message","title":"訊息","body":"角色傳來一則新的訊息。"}]'::jsonb
+);
+DO $$
+DECLARE result jsonb;
+BEGIN
+  result := public.apply_story_turn_evaluation('60000000-0000-4000-8000-000000000001');
+  IF result->>'status' <> 'waiting_for_settlement' THEN
+    RAISE EXCEPTION 'pending wallet charge must not apply side effects';
+  END IF;
+END $$;
+
+UPDATE public.chat_turn_charges SET status='settled'
+WHERE turn_id='60000000-0000-4000-8000-000000000001';
+
+DO $$
+DECLARE result jsonb; current_affinity integer; event_count integer;
+BEGIN
+  result := public.apply_story_turn_evaluation('60000000-0000-4000-8000-000000000001');
+  IF result->>'status' <> 'applied' OR (result->>'affinity')::integer <> 12 THEN
+    RAISE EXCEPTION 'first affinity application failed: %', result;
+  END IF;
+  result := public.apply_story_turn_evaluation('60000000-0000-4000-8000-000000000001');
+  IF result->>'idempotent' <> 'true' THEN RAISE EXCEPTION 'duplicate application was not idempotent'; END IF;
+  SELECT affinity INTO current_affinity FROM public.story_relationship_states
+  WHERE session_id='30000000-0000-4000-8000-000000000001';
+  SELECT count(*) INTO event_count FROM public.story_phone_events
+  WHERE turn_id='60000000-0000-4000-8000-000000000001';
+  IF current_affinity <> 12 OR event_count <> 1 THEN
+    RAISE EXCEPTION 'side effects duplicated or missing';
+  END IF;
+END $$;
+
+SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',true);
+DO $$
+DECLARE event_count integer;
+BEGIN
+  SELECT count(*) INTO event_count FROM public.get_story_phone_events('30000000-0000-4000-8000-000000000001');
+  IF event_count <> 1 THEN RAISE EXCEPTION 'owner cannot read own phone events'; END IF;
+END $$;
+SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000002',true);
+DO $$
+DECLARE event_count integer;
+BEGIN
+  SELECT count(*) INTO event_count FROM public.get_story_phone_events('30000000-0000-4000-8000-000000000001');
+  IF event_count <> 0 THEN RAISE EXCEPTION 'cross-owner phone event read was allowed'; END IF;
+END $$;
+
+SELECT set_config('request.jwt.claim.role','service_role',true);
+SELECT public.complete_story_relationship_batch(
+  '30000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000001',
+  1,
+  ARRAY[
+    '60000000-0000-4000-8000-000000000001',
+    '60000000-0000-4000-8000-000000000002',
+    '60000000-0000-4000-8000-000000000003',
+    '60000000-0000-4000-8000-000000000004',
+    '60000000-0000-4000-8000-000000000005'
+  ]::uuid[],
+  '五回合累積記憶摘要。',
+  -2,
+  '{"reason":"The initial micro-adjustment was slightly optimistic."}'::jsonb
+);
+DO $$
+DECLARE result jsonb; current_affinity integer; current_batch integer; current_count integer;
+BEGIN
+  result := public.complete_story_relationship_batch(
+    '30000000-0000-4000-8000-000000000001',
+    '10000000-0000-4000-8000-000000000001',
+    '20000000-0000-4000-8000-000000000001',
+    1,
+    ARRAY[
+      '60000000-0000-4000-8000-000000000001',
+      '60000000-0000-4000-8000-000000000002',
+      '60000000-0000-4000-8000-000000000003',
+      '60000000-0000-4000-8000-000000000004',
+      '60000000-0000-4000-8000-000000000005'
+    ]::uuid[],
+    '五回合累積記憶摘要。',
+    -2,
+    '{"reason":"The initial micro-adjustment was slightly optimistic."}'::jsonb
+  );
+  IF result->>'idempotent' <> 'true' THEN RAISE EXCEPTION 'batch retry was not idempotent'; END IF;
+  SELECT affinity,last_processed_batch,turn_count_since_summary
+    INTO current_affinity,current_batch,current_count
+  FROM public.story_relationship_states
+  WHERE session_id='30000000-0000-4000-8000-000000000001';
+  IF current_affinity <> 10 OR current_batch <> 1 OR current_count <> 0 THEN
+    RAISE EXCEPTION 'batch calibration failed or applied more than once';
+  END IF;
+END $$;
+
+ROLLBACK;
