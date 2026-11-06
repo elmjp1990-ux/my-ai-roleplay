@@ -17,6 +17,7 @@ on:
       - "supabase/migrations/20261106090000_story_turn_affinity_and_phone_events.sql"
       - "supabase/migrations/20261106110000_harden_story_turn_service_role_claims.sql"
       - "supabase/migrations/20261106120000_fix_story_turn_evaluation_reserved_charge.sql"
+      - "supabase/migrations/20261106120000_fix_story_turn_evaluation_reserved_charge.sql"
       - "scripts/test-story-turn-affinity-phone-events.sql"
       - "supabase/functions/_shared/provider-failure-policy.ts"
       - "supabase/functions/_shared/provider-failure-policy.test.ts"
@@ -39,6 +40,7 @@ on:
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/prompt-variables.ts"
       - "index.html"
+      - "scripts/test-phone-notice-presentation.mjs"
       - ".github/workflows/story-ai-content-refusal-tests.yml"
   push:
     branches:
@@ -57,6 +59,7 @@ on:
       - "supabase/functions/_shared/story-memory-summary.ts"
       - "supabase/migrations/20261106090000_story_turn_affinity_and_phone_events.sql"
       - "supabase/migrations/20261106110000_harden_story_turn_service_role_claims.sql"
+      - "supabase/migrations/20261106120000_fix_story_turn_evaluation_reserved_charge.sql"
       - "scripts/test-story-turn-affinity-phone-events.sql"
       - "supabase/migrations/20261104062017_move_character_personality_profile_to_private_info.sql"
       - "supabase/migrations/20261104095000_restrict_legacy_personality_profile_select.sql"
@@ -71,6 +74,7 @@ on:
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/prompt-variables.ts"
       - "index.html"
+      - "scripts/test-phone-notice-presentation.mjs"
       - ".github/workflows/story-ai-content-refusal-tests.yml"
   workflow_dispatch:
 
@@ -157,6 +161,8 @@ jobs:
         run: node scripts/test-chat-turn-reconciliation-ui.mjs
       - name: Verify roleplay prose, character agency and player point-of-view rules
         run: node scripts/test-story-roleplay-prompt.mjs
+      - name: Verify phone UI never renders creator-only notification prompts
+        run: node scripts/test-phone-notice-presentation.mjs
       - name: Test five-turn player-first memory capture
         run: node --test scripts/test-memory-capture.cjs
       - name: Verify memory persistence, reload and correction-priority contracts
