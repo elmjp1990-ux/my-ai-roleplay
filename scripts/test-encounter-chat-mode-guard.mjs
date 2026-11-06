@@ -455,3 +455,7 @@ assert.match(affinityMigration, /INSERT INTO public\.encounter_session_lifecycle
 assert.match(affinityMigration, /GRANT EXECUTE ON FUNCTION public\.create_encounter_session_with_lifecycle/);
 
 assert.match(affinityMigration, /INSERT INTO public\.story_relationship_states/);
+
+
+// Existing empty Story sessions must be reused instead of creating duplicates.
+assert.match(frontend, /if\(!existingRow\)existingRow=\(rows\|\|\)\.find\(row=>candidateIds\.includes\(row\.id\)\)\|\|null/);
