@@ -20,7 +20,7 @@ const editorStart = html.indexOf('function normalizePhoneNoticeRows');
 const editorEnd = html.indexOf('function saveEditorDraft()', editorStart);
 assert.ok(editorStart >= 0 && editorEnd > editorStart, 'Structured author phone editor helpers must exist');
 const editorHelpers = html.slice(editorStart, editorEnd);
-assert.match(editorHelpers, /source\.slice\(0,5\)/, 'Phone editor must align with the five-field Story contract');
+assert.match(editorHelpers, /source\.slice\(0,5\)/, 'Phone editor must align with the eight-field Story contract');
 assert.match(editorHelpers, /phoneDisplay/);
 assert.match(editorHelpers, /phoneInstruction/);
 assert.match(editorHelpers, /手機上的顯示/);
@@ -34,4 +34,11 @@ assert.match(html, /verifiedPrivateInfo/,
 assert.match(html, /expectedPhonePrompts/,
   'Phone settings must be verified against the saved database row');
 
-console.log('Character editor preserves fields 7–10 and round-trips structured five-field phone settings.');
+console.log('Character editor preserves fields 7–10 and round-trips structured eight-field phone settings.');
+
+assert.match(html, /phoneSettingAction="add"|data-phone-setting-action="add"/,
+  'Phone editor must provide a dynamic add control');
+assert.match(html, /phoneSettingAction="remove"|data-phone-setting-action="remove"/,
+  'Phone editor must provide a dynamic remove control');
+assert.match(html, /visibleRows\\.length>=8/,
+  'Phone editor must cap dynamic rows at eight');
