@@ -75,13 +75,23 @@ export function parseStoryTurnEnvelope(raw: string): StoryTurnEnvelope {
     }
   }
 
-  const suggestedReplies = Array.isArray(value.suggested_replies) && value.suggested_replies.length === 3
-    ? value.suggested_replies.map((item) => boundedText(item, 360))
+  // Accept the canonical snake_case key plus common camelCase/provider aliases.
+  // Keep individually valid suggestions instead of discarding all three because
+  // one item is slightly outside the original 30-90 character target.
+  const rawSuggestions = Array.isArray(value.suggested_replies)
+    ? value.suggested_replies
+    : Array.isArray(value.suggestedReplies)
+    ? value.suggestedReplies
+    : Array.isArray(value.suggestions)
+    ? value.suggestions
     : [];
-  const validSuggestedReplies = suggestedReplies.length === 3 && suggestedReplies.every((item) => {
-    const length = Array.from(item).length;
-    return length >= 30 && length <= 90;
-  }) ? suggestedReplies : [];
+  const validSuggestedReplies = rawSuggestions
+    .map((item) => boundedText(item, 120).replace(/^\\s*(?:[-*•]|\\d+[.)、])\\s*/, ""))
+    .filter((item) => {
+      const length = Array.from(item).length;
+      return length >= 20 && length <= 120;
+    })
+    .slice(0, 3);
 
   return {
     reply,
