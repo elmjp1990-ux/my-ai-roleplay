@@ -70,6 +70,7 @@ CREATE TABLE public.story_relationship_batches (
 
 \ir ../supabase/migrations/20261106090000_story_turn_affinity_and_phone_events.sql
 \ir ../supabase/migrations/20261106110000_harden_story_turn_service_role_claims.sql
+\ir ../supabase/migrations/20261106120000_fix_story_turn_evaluation_reserved_charge.sql
 
 INSERT INTO auth.users(id) VALUES
   ('10000000-0000-4000-8000-000000000001'),
