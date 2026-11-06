@@ -88,11 +88,11 @@ assert.ok(html.includes("characterVideoLoaders.get(target)"));
 // Scrolling away or backgrounding pauses playback but preserves src and preload state;
 // changing preload while attached can restart the same full MP4 request.
 const pauseFnStart=html.indexOf("function pauseCharacterVideo(video){");
-const pauseFnEnd=html.indexOf("\\n}",pauseFnStart);
+const pauseFnEnd=html.indexOf("\n}",pauseFnStart);
 const pauseFn=html.slice(pauseFnStart,pauseFnEnd);
 assert.ok(pauseFn.includes("video.pause();"));
 assert.ok(!pauseFn.includes("video.preload="));
-assert.ok(html.includes("if(target.dataset.videoHydrated==='true'){if(target.paused)target.play().catch(()=>{});}"));\\}/);
+assert.ok(html.includes("if(target.dataset.videoHydrated==='true'){if(target.paused)target.play().catch(()=>{});}"));
 assert.ok(html.includes("function releaseCharacterVideo(video){"));
 assert.ok(html.includes("pauseCharacterVideo(target);"));
 assert.ok(html.includes("videos.forEach(pauseCharacterVideo);"));
