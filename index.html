@@ -4488,15 +4488,25 @@ function card(c,owner = false) {
       </div>
     </article>`;
 }
-function renderGrid() {
+function renderGrid({append=false}={}) {
   if (!$('characterGrid')) return;
   gridObserver?.disconnect();
   const list = exploreList();
   const recommended = filter === 'recommended';
   const maximum = Math.min(150,list.length);
   const shown = recommended ? list.slice(0,Math.min(limit,150)) : list;
-  $('characterGrid').innerHTML = shown.map(c => card(c)).join('') ||
-    '<div class="empty">目前還沒有符合條件的公開角色。稍後再來看看，或試試其他標籤。</div>';
+  const grid = $('characterGrid');
+  // Infinite-scroll must append only the newly revealed cards. Replacing innerHTML
+  // destroys already-hydrated <video> elements and makes the same MP4 download again.
+  const existingCardCount = append ? grid.querySelectorAll(':scope > article.card').length : 0;
+  const newCards = append && existingCardCount > 0 ? shown.slice(existingCardCount) : shown;
+  const cardMarkup = newCards.map(c => card(c)).join('');
+  if (append && existingCardCount > 0) {
+    if (cardMarkup) grid.insertAdjacentHTML('beforeend',cardMarkup);
+  } else {
+    grid.innerHTML = cardMarkup ||
+      '<div class="empty">目前還沒有符合條件的公開角色。稍後再來看看，或試試其他標籤。</div>';
+  }
   void loadCharacterTurnCounts(shown.map(c => c.id));
   document.querySelectorAll('.explore-shortcut[data-filter]').forEach(button => {
     button.classList.toggle('active', button.dataset.filter === filter);
@@ -4522,7 +4532,7 @@ function renderGrid() {
       if (!entries.some(entry => entry.isIntersecting)) return;
       gridObserver.disconnect();
       limit = Math.min(150,limit+24);
-      renderGrid();
+      renderGrid({append:true});
     },{rootMargin:'150px'});
     gridObserver.observe($('loadSentinel'));
   }
@@ -8805,7 +8815,7 @@ document.addEventListener('click',async event => {
         break;
       case 'banner':banner=Number(button.dataset.index);renderBanner();break;
       case 'scroll-grid':$('characterGrid')?.scrollIntoView({behavior:'smooth'});break;
-      case 'load-more':limit=Math.min(150,limit+24);renderGrid();break;
+      case 'load-more':limit=Math.min(150,limit+24);renderGrid({append:true});break;
       case 'new-batch':batch+=7;limit=24;renderGrid();break;
       case 'tags':openModal('tags',{mode:button.dataset.mode});break;
       case 'add-custom-tag': {
