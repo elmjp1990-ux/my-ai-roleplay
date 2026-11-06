@@ -86,7 +86,7 @@ export function parseStoryTurnEnvelope(raw: string): StoryTurnEnvelope {
     ? value.suggestions
     : [];
   const validSuggestedReplies = rawSuggestions
-    .map((item) => typeof item === "string" ? item.trim().replace(/^(?:[-*•]|\\d+[.)、])\\s*/, "") : "")
+    .map((item) => typeof item === "string" ? item.trim() : "")
     .filter((item) => {
       const length = Array.from(item).length;
       return length >= 20 && length <= 120;
