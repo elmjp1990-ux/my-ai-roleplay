@@ -137,6 +137,8 @@ END $;
 SELECT set_config('request.jwt.claim.role','service_role',true);
 UPDATE public.chat_turn_charges SET status='settled'
 WHERE turn_id='60000000-0000-4000-8000-000000000001';
+SELECT set_config('request.jwt.claim.role','',true);
+SELECT set_config('request.jwt.claims','{"role":"service_role"}',true);
 
 DO $$
 DECLARE result jsonb; current_affinity integer; event_count integer;
