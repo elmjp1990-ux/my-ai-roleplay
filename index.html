@@ -3977,11 +3977,10 @@ async function runPendingChatTurn(s) {
 
   const replyWasAdded = !s.messages.some(message => message.id === reply.id);
   if (Array.isArray(result.suggestedReplies)) {
-    // The server parser already enforces a safe text length. Keep each usable
-    // suggestion independently so one imperfect item cannot erase the others.
+    // Offer any non-empty suggestion; do not enforce a character-count range.
     s.suggestedReplies = result.suggestedReplies
       .map(value=>String(value||'').trim())
-      .filter(value=>Array.from(value).length>=20&&Array.from(value).length<=120)
+      .filter(value=>value.length>0)
       .slice(0,3);
   }
   if (replyWasAdded) {
