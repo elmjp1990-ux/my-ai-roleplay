@@ -4594,6 +4594,11 @@ function characterIsOffline(c) {
   return !c || !!c.deletedAt || c.visibility !== 'public';
 }
 function renderDetail() {
+  const view = $('view');
+  // Keep the detail-page video node alive across same-character rerenders.
+  // renderDetail() rebuilds #view.innerHTML, which otherwise creates a fresh
+  // media element and downloads the same private MP4 again.
+  const previousDetailVideo = view?.querySelector('.detail-portrait video[data-character-video]') || null;
   const session = route.page === 'session-detail' ? state.sessions[route.id] : null;
   const c = session ? sessionCharacter(session) : currentCharacter();
   const fromExistingSession = !!session && !!c &&
@@ -4657,7 +4662,19 @@ ${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline
         </form>
       </section>`}
     </div>`;
-  const detailVideo=$('view').querySelector('[data-character-video]');
+  let detailVideo=view.querySelector('.detail-portrait video[data-character-video]');
+  if(previousDetailVideo && detailVideo &&
+     previousDetailVideo.dataset.characterVideo===detailVideo.dataset.characterVideo){
+    detailVideo.replaceWith(previousDetailVideo);
+    detailVideo=previousDetailVideo;
+    if(characterVideoObserver){
+      characterVideoObserver.unobserve(detailVideo);
+      characterVideoObserver.observe(detailVideo);
+    }
+  }else if(previousDetailVideo){
+    characterVideoObserver?.unobserve(previousDetailVideo);
+    releaseCharacterVideo(previousDetailVideo);
+  }
   if(detailVideo)void hydrateCharacterVideo(detailVideo);
   void loadCharacterTurnCounts([c.id]);
   if (!offline && route.page !== 'session-detail') {
