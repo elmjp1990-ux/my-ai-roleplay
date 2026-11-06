@@ -1,0 +1,46 @@
+name: Chat history lazy-loading checks
+
+on:
+  pull_request:
+    paths:
+      - "index.html"
+      - "scripts/test-chat-history-lazy-loading.mjs"
+      - ".github/workflows/chat-history-lazy-loading.yml"
+  push:
+    branches:
+      - main
+      - perf/chat-history-lazy-hydration
+
+jobs:
+  chat-history-lazy-loading:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Test bounded chat hydration and pagination
+        run: node scripts/test-chat-history-lazy-loading.mjs
+      - name: Parse inline JavaScript in index.html
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const { spawnSync } = require('node:child_process');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const blocks = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)]
+            .filter(match => !/\bsrc\s*=/.test(match[1]))
+            .map(match => match[2]);
+          if (!blocks.length) throw new Error('No inline JavaScript blocks found.');
+          for (let i = 0; i < blocks.length; i++) {
+            const file = path.join('/tmp', 'personax-inline-' + i + '.js');
+            fs.writeFileSync(file, blocks[i]);
+            const result = spawnSync(process.execPath, ['--check', file], {encoding:'utf8'});
+            if (result.status !== 0) {
+              console.error('Syntax error in inline script block #' + (i + 1));
+              process.stderr.write(result.stderr || result.stdout || '');
+              process.exit(result.status || 1);
+            }
+          }
+          console.log('Parsed ' + blocks.length + ' inline JavaScript blocks.');
+          NODE

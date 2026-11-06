@@ -98,6 +98,8 @@ const appHarness = [
   extractFunction(indexHtml, "function readDeletedChatTombstones(uid)"),
   extractFunction(indexHtml, "function markDeletedChatTombstone(uid, kind, resourceId)"),
   extractFunction(indexHtml, "function filterDeletedChatSessions(uid, sessions)"),
+  extractFunction(indexHtml, "function compactCloudSessionForLocalStorage(session)"),
+  extractFunction(indexHtml, "function compactSessionsForLocalStorage(sessions)"),
   extractFunction(indexHtml, "function cacheSessionsForUser(uid)"),
   extractFunction(indexHtml, "function restoreSessionsForUser(uid)"),
   "let lastDeletedChatReconcileAt = 0;",

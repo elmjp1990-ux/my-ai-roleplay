@@ -1396,7 +1396,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
   function cacheSessionsForUser(uid) {
     if (!uid || typeof state === 'undefined') return;
     try {
-      localStorage.setItem(USER_SESSIONS_KEY_PREFIX + uid, JSON.stringify(state.sessions || {}));
+      localStorage.setItem(USER_SESSIONS_KEY_PREFIX + uid, JSON.stringify(compactSessionsForLocalStorage(state.sessions || {})));
     } catch (error) {
       console.warn('聊天本機備份失敗：', error);
     }
@@ -3049,11 +3049,45 @@ const isMobile = () => matchMedia('(max-width:767px)').matches;
 let localStorageCompactMode = false;
 let localStorageQuotaWarningShown = false;
 
-function compactLocalStateForQuota() {
+function compactCloudSessionForLocalStorage(session) {
+  if(!session?.cloudOwned||!session.cloudOwnerUid)return session;
+  const messages=Array.isArray(session.messages)?session.messages:[];
+  const pendingIds=new Set([
+    session.pendingTurn?.userMessageId,
+    session.pendingTurn?.assistantMessageId
+  ].filter(Boolean));
+  const kept=new Map(messages.slice(-50).map(message=>[message.id,message]));
+  for(const message of messages){
+    if(pendingIds.has(message.id)||message.id==='opening-'+session.id||
+       !isUuid(message.id)||message.localOnly===true||message.cloudSynced===false||message.syncPending===true){
+      kept.set(message.id,message);
+    }
+  }
+  const {cloudRoleplayMeta:_cloudRoleplayMeta,...safeSession}=session;
+  return {
+    ...safeSession,
+    messages:[...kept.values()].sort((a,b)=>(Number(a.at)||0)-(Number(b.at)||0)||String(a.id).localeCompare(String(b.id))),
+    cloudSessionDataLoaded:false,cloudMessagesLoaded:false,
+    cloudHasMoreMessages:false,cloudOldestMessageCursor:null,
+    cloudMessagesLoading:false,cloudMessagesError:''
+  };
+}
+
+function compactSessionsForLocalStorage(sessions) {
+  return Object.fromEntries(Object.entries(sessions||{}).map(([key,session])=>
+    [key,compactCloudSessionForLocalStorage(session)]
+  ));
+}
+
+function compactLocalStateForStorage() {
+  return {...state,sessions:compactSessionsForLocalStorage(state.sessions||{})};
+}
+
+function compactLocalStateForQuota(sourceState = state) {
   // Cloud-owned chats and cloud-backed character images have durable server
   // copies. Keep their text and relationship data locally, but avoid storing
   // duplicate embedded image payloads in localStorage.
-  const characters = (state.characters || []).map(character => {
+  const characters = (sourceState.characters || []).map(character => {
     const cloudBacked = isUuid(character.id) &&
       (character.cloudSnapshotOnly === true || character.owner !== true);
     if (cloudBacked && typeof character.image === 'string' && /^data:image\//i.test(character.image)) {
@@ -3061,7 +3095,7 @@ function compactLocalStateForQuota() {
     }
     return character;
   });
-  const sessions = Object.fromEntries(Object.entries(state.sessions || {}).map(([key, session]) => {
+  const sessions = Object.fromEntries(Object.entries(sourceState.sessions || {}).map(([key, session]) => {
     if (!session?.cloudOwned || !session.cloudCharacterSnapshot) return [key, session];
     const snapshot = session.cloudCharacterSnapshot;
     const compactSnapshot = typeof snapshot.image === 'string' && /^data:image\//i.test(snapshot.image)
@@ -3069,12 +3103,13 @@ function compactLocalStateForQuota() {
       : snapshot;
     return [key, compactSnapshot === snapshot ? session : {...session, cloudCharacterSnapshot:compactSnapshot}];
   }));
-  return {...state, characters, sessions};
+  return {...sourceState, characters, sessions};
 }
 
 function persist() {
   try {
-    const snapshot = localStorageCompactMode ? compactLocalStateForQuota() : state;
+    const baseSnapshot=compactLocalStateForStorage();
+    const snapshot=localStorageCompactMode?compactLocalStateForQuota(baseSnapshot):baseSnapshot;
     localStorage.setItem(STORE_KEY,JSON.stringify(snapshot));
     return true;
   } catch (error) {
@@ -3082,10 +3117,10 @@ function persist() {
       error?.code === 22 || error?.code === 1014;
     if (quotaExceeded && !localStorageCompactMode) {
       try {
-        const compact = compactLocalStateForQuota();
+        const compact = compactLocalStateForQuota(compactLocalStateForStorage());
         localStorage.setItem(STORE_KEY,JSON.stringify(compact));
         localStorageCompactMode = true;
-        console.warn('本機儲存空間不足：已改用精簡快取，保留聊天文字與雲端資料，僅省略雲端已有的重複內嵌圖片。');
+        console.warn('本機儲存空間不足：已改用精簡快取，保留最近聊天訊息、待處理回合與雲端資料，並省略雲端已有的重複內嵌圖片。');
         return true;
       } catch (compactError) {
         console.warn('精簡本機快取仍無法保存：',compactError);
@@ -3100,6 +3135,19 @@ function persist() {
   }
 }
 
+// One-time rewrite of older local caches: cloud-owned histories are kept in Supabase
+// and are rehydrated per conversation, so the local startup snapshot only needs a small tail.
+const CHAT_HISTORY_CACHE_COMPACTION_KEY='personax-chat-history-cache-v1';
+try {
+  if(localStorage.getItem(CHAT_HISTORY_CACHE_COMPACTION_KEY)!=='done'){
+    state.sessions=compactSessionsForLocalStorage(state.sessions||{});
+    if(persist()){
+      if(state.account?.uid)cacheSessionsForUser(state.account.uid);
+      localStorage.setItem(CHAT_HISTORY_CACHE_COMPACTION_KEY,'done');
+    }
+  }
+}catch(error){console.warn('聊天本機快取精簡初始化失敗：',error);}
+
 // 僅在網址明確帶上 ?chatDataTest=1 時顯示無成本測試控制項。
 const CHAT_DATA_TEST_MODE = new URLSearchParams(location.search).get('chatDataTest') === '1';
 
@@ -3108,42 +3156,34 @@ function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
 }
 function chatSessionData(s) {
-  const initialOpening = s.messages?.[0]?.role === 'assistant'
-    ? s.messages[0]
-    : s.initialOpeningMessage;
+  const initialOpening = s.initialOpeningMessage ||
+    (!s.cloudOwned && s.messages?.[0]?.role === 'assistant' ? s.messages[0] : null);
+  const lastMessage = (s.messages || []).at(-1);
   return {
     name:s.name || '', archived:!!s.archived, hidden:!!s.hidden,
-    // Keep the mode marker in session_data as a recovery source if a legacy sync row lacks chat_mode.
-    encounterMode:s.encounterMode === true,
-    storyMode:s.storyMode === true,
+    encounterMode:s.encounterMode === true, storyMode:s.storyMode === true,
     encounterPlace:typeof s.encounterPlace === 'string' ? s.encounterPlace : null,
     encounterDay:s.encounterDay || (s.startedAt ? new Date(s.startedAt).toLocaleDateString('en-CA') : null),
     openingMessage:initialOpening && String(initialOpening.text || '').trim()
-      ? {text:String(initialOpening.text),at:Number(initialOpening.at) || Date.now()}
-      : null,
-    pinned:!!s.pinned, persona:s.persona || '', personaCustom: s.personaCustom === true || (s.personaCustom !== false && !!s.persona),
+      ? {text:String(initialOpening.text),at:Number(initialOpening.at) || Date.now()} : null,
+    pinned:!!s.pinned, persona:s.persona || '', personaCustom:s.personaCustom === true || (s.personaCustom !== false && !!s.persona),
     suggestions:s.suggestions !== false, background:s.background || 'avatar',
     startedAt:s.startedAt || Date.now(), archivedAt:s.archivedAt || null,
+    hasUserMessage:s.cloudHasUserMessage===true ||
+      (s.messages||[]).some(message=>message.role==='user'&&String(message.text||'').trim())
+        ? true : (s.cloudHasUserMessage===null ? null : false),
+    lastMessagePreview:lastMessage ? String(lastMessage.text || '').slice(0,180) : String(s.lastMessagePreview || '').slice(0,180),
+    lastMessageAt:Number(lastMessage?.at || s.lastMessageAt || 0) || null,
     memories:Array.isArray(s.memories) ? s.memories : [],
     album:Array.isArray(s.album) ? s.album : [],
-    roleplayMeta:Object.fromEntries((s.messages || [])
-      .filter(message => message.role === 'user' &&
-        (Array.isArray(message.displaySegments) || message.aiTargetId || message.commandType))
-      .map(message => [message.id, {
-        displaySegments:message.displaySegments || null,
-        aiTargetId:message.aiTargetId || null,
-        commandType:message.commandType || null
-      }])),
-    pendingTurn:s.pendingTurn &&
-      isUuid(s.pendingTurn.turnId) &&
-      isUuid(s.pendingTurn.userMessageId) &&
-      isUuid(s.pendingTurn.assistantMessageId)
-      ? {
-          turnId:s.pendingTurn.turnId,
-          userMessageId:s.pendingTurn.userMessageId,
-          assistantMessageId:s.pendingTurn.assistantMessageId,
-          createdAt:Number(s.pendingTurn.createdAt) || Date.now()
-        }
+    roleplayMeta:{
+      ...(s.cloudRoleplayMeta && typeof s.cloudRoleplayMeta === 'object' ? s.cloudRoleplayMeta : {}),
+      ...Object.fromEntries((s.messages || [])
+        .filter(message => message.role === 'user' && (Array.isArray(message.displaySegments) || message.aiTargetId || message.commandType))
+        .map(message => [message.id, {displaySegments:message.displaySegments || null,aiTargetId:message.aiTargetId || null,commandType:message.commandType || null}]))
+    },
+    pendingTurn:s.pendingTurn && isUuid(s.pendingTurn.turnId) && isUuid(s.pendingTurn.userMessageId) && isUuid(s.pendingTurn.assistantMessageId)
+      ? {turnId:s.pendingTurn.turnId,userMessageId:s.pendingTurn.userMessageId,assistantMessageId:s.pendingTurn.assistantMessageId,createdAt:Number(s.pendingTurn.createdAt) || Date.now()}
       : null
   };
 }
@@ -3157,7 +3197,9 @@ async function saveChatSessionToCloud(s, options = {}) {
   // Generic blank chats remain local. Encounter and Story sessions are pre-created
   // by trusted Edge Functions, so their opening message and session metadata must sync
   // even before the player sends the first user message.
-  const hasUserMessage = (s.messages || []).some(message => message.role === 'user' && String(message.text || '').trim());
+  const hasLocalPlayerMessage=(s.messages||[]).some(message=>message.role==='user'&&String(message.text||'').trim());
+  const hasUserMessage=hasLocalPlayerMessage||s.cloudHasUserMessage===true||
+    (s.cloudOwned===true&&s.cloudOwnerUid===localUser.uid&&s.cloudHasUserMessage==null);
   const canSavePrecreatedSession = s.cloudOwned === true && s.cloudOwnerUid === localUser.uid &&
     (s.encounterMode === true || s.storyMode === true);
   if (!hasUserMessage && !canSavePrecreatedSession) return false;
@@ -3168,11 +3210,12 @@ async function saveChatSessionToCloud(s, options = {}) {
   const character = state.characters.find(item => item.id === s.characterId) || null;
   let expectedUpdatedAt = null;
   if (s.cloudOwned && s.cloudOwnerUid === localUser.uid) {
-    const currentRow = await client.from('chat_sessions').select('character_snapshot,updated_at')
-      .eq('id',s.id).eq('user_id',localUser.uid).maybeSingle();
+    const currentRow = await client.from('chat_sessions')
+      .select(s.cloudSessionDataLoaded ? 'character_snapshot,updated_at' : 'character_snapshot,session_data,updated_at')
+      .eq('id',s.id).eq('user_id',localUser.uid).is('deleted_at',null).maybeSingle();
     if (currentRow.error) throw new Error('讀取既有聊天快照失敗：'+currentRow.error.message);
-    if (!currentRow.data?.updated_at) throw new Error('既有聊天已不存在或無法取得版本，已停止同步。');
-    if (readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
+    if (!currentRow.data || readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
+    if (!currentRow.data.updated_at) throw new Error('既有聊天已不存在或無法取得版本，已停止同步。');
     if (!s.cloudUpdatedAt || !Number.isFinite(Date.parse(s.cloudUpdatedAt))) {
       throw new Error('這段聊天缺少同步版本資訊，為避免舊資料覆蓋雲端內容，請重新載入聊天後再試。');
     }
@@ -3180,7 +3223,28 @@ async function saveChatSessionToCloud(s, options = {}) {
     if (currentRow.data.updated_at !== expectedUpdatedAt) {
       throw new Error('此聊天已在其他分頁或裝置更新，為避免覆蓋新內容，請重新載入最新聊天後再試。');
     }
-    if (currentRow.data?.character_snapshot) s.cloudCharacterSnapshot = currentRow.data.character_snapshot;
+    if (currentRow.data.character_snapshot) {
+      const rawCurrentSnapshot = currentRow.data.character_snapshot;
+      const {
+        privateInfo: _legacyCurrentPrivateInfo,
+        personalityProfile: _legacyCurrentPersonalityProfile,
+        private_info: _legacyCurrentPrivateInfoSnakeCase,
+        personality_profile: _legacyCurrentPersonalityProfileSnakeCase,
+        ...safeCurrentSnapshot
+      } = rawCurrentSnapshot;
+      s.cloudCharacterSnapshot = safeCurrentSnapshot;
+    }
+    if (!s.cloudSessionDataLoaded) {
+      const savedData=currentRow.data.session_data&&typeof currentRow.data.session_data==='object'?currentRow.data.session_data:{};
+      s.memories=Array.isArray(savedData.memories)?savedData.memories:[];
+      s.album=Array.isArray(savedData.album)?savedData.album:[];
+      s.cloudRoleplayMeta=savedData.roleplayMeta&&typeof savedData.roleplayMeta==='object'?savedData.roleplayMeta:{};
+      s.pendingTurn=savedData.pendingTurn&&isUuid(savedData.pendingTurn.turnId)&&isUuid(savedData.pendingTurn.userMessageId)&&isUuid(savedData.pendingTurn.assistantMessageId)
+        ? {turnId:savedData.pendingTurn.turnId,userMessageId:savedData.pendingTurn.userMessageId,assistantMessageId:savedData.pendingTurn.assistantMessageId,createdAt:Number(savedData.pendingTurn.createdAt)||Date.now()}
+        : null;
+      if(s.cloudHasUserMessage==null&&typeof savedData.hasUserMessage==='boolean')s.cloudHasUserMessage=savedData.hasUserMessage;
+      s.cloudSessionDataLoaded=true;
+    }
   }
   const priorSnapshot = s.cloudCharacterSnapshot && typeof s.cloudCharacterSnapshot === 'object'
     ? s.cloudCharacterSnapshot : {};
@@ -3223,8 +3287,8 @@ async function saveChatSessionToCloud(s, options = {}) {
   };
   // 若本機未標記 cloudOwned，先確認這個 ID 是否已存在，避免對舊聊天誤做 INSERT。
   if (!s.cloudOwned) {
-    const existing = await client.from('chat_sessions').select('id,character_snapshot,updated_at')
-      .eq('id',s.id).eq('user_id',localUser.uid).maybeSingle();
+    const existing = await client.from('chat_sessions').select('id,character_snapshot,session_data,chat_mode,status,updated_at')
+      .eq('id',s.id).eq('user_id',localUser.uid).is('deleted_at',null).maybeSingle();
     if (existing.error) throw new Error('檢查既有聊天失敗：'+existing.error.message);
     if (existing.data) {
       const existingSnapshot = existing.data.character_snapshot;
@@ -3236,6 +3300,28 @@ async function saveChatSessionToCloud(s, options = {}) {
       s.cloudUpdatedAt = existing.data.updated_at;
       s.cloudOwned = true;
       s.cloudOwnerUid = localUser.uid;
+      const existingData=existing.data.session_data&&typeof existing.data.session_data==='object'?existing.data.session_data:{};
+      s.memories=Array.isArray(existingData.memories)?existingData.memories:[];
+      s.album=Array.isArray(existingData.album)?existingData.album:[];
+      s.cloudRoleplayMeta=existingData.roleplayMeta&&typeof existingData.roleplayMeta==='object'?existingData.roleplayMeta:{};
+      s.encounterMode=existing.data.chat_mode==='encounter'||s.encounterMode===true;
+      s.storyMode=existingData.storyMode===true||s.storyMode===true;
+      if(existing.data.status==='archived'||existingData.archived===true)s.archived=true;
+      if(!s.name&&existingData.name)s.name=existingData.name;
+      if(!s.persona&&existingData.persona)s.persona=existingData.persona;
+      if(!s.encounterPlace&&existingData.encounterPlace)s.encounterPlace=existingData.encounterPlace;
+      if(!s.encounterDay&&existingData.encounterDay)s.encounterDay=existingData.encounterDay;
+      if(typeof existingData.hasUserMessage==='boolean')s.cloudHasUserMessage=existingData.hasUserMessage;
+      s.pendingTurn=existingData.pendingTurn&&isUuid(existingData.pendingTurn.turnId)&&isUuid(existingData.pendingTurn.userMessageId)&&isUuid(existingData.pendingTurn.assistantMessageId)
+        ? {turnId:existingData.pendingTurn.turnId,userMessageId:existingData.pendingTurn.userMessageId,assistantMessageId:existingData.pendingTurn.assistantMessageId,createdAt:Number(existingData.pendingTurn.createdAt)||Date.now()}
+        : null;
+      if(!s.initialOpeningMessage&&existingData.openingMessage&&String(existingData.openingMessage.text||'').trim()){
+        s.initialOpeningMessage={text:String(existingData.openingMessage.text),at:Number(existingData.openingMessage.at)||Date.now()};
+      }
+      if(!s.lastMessagePreview&&existingData.lastMessagePreview)s.lastMessagePreview=String(existingData.lastMessagePreview).slice(0,180);
+      if(!s.lastMessageAt&&Number(existingData.lastMessageAt))s.lastMessageAt=Number(existingData.lastMessageAt);
+      if(!s.archivedAt&&existingData.archivedAt)s.archivedAt=existingData.archivedAt;
+      s.cloudSessionDataLoaded=true;
       const {
         privateInfo: _legacyExistingPrivateInfo,
         personalityProfile: _legacyExistingPersonalityProfile,
@@ -3307,96 +3393,83 @@ async function saveChatSessionToCloud(s, options = {}) {
   }
   return true;
 }
-async function loadCloudChatSessions(user) {
+async function loadChatSessionAuthorProfiles(uid, authorIds) {
+  const client=window.mySupabase;
+  if(!client||!uid||currentUser()?.uid!==uid||!Array.isArray(authorIds)||!authorIds.length)return;
+  try{
+    const result=await client.from('public_profiles')
+      .select('id, handle, nickname, avatar_url, bio, follower_count').in('id',authorIds);
+    if(currentUser()?.uid!==uid)return;
+    if(result.error){console.warn('既有聊天作者資料載入失敗：',result.error.message);return;}
+    for(const profile of result.data||[]){
+      state.authors[profile.id]={
+        uid:profile.id,handle:profile.handle||'',
+        nickname:profile.nickname||profile.handle||'PersonaX 使用者',
+        avatar:profile.avatar_url||'',bio:profile.bio||'',fans:Number(profile.follower_count||0)
+      };
+    }
+  }catch(error){console.warn('既有聊天作者資料載入失敗：',error?.message||error);}
+}
+
+async function loadCloudChatSessions(user, options = {}) {
   const client = window.mySupabase;
   if (!client || !user?.id) return;
-  // A session-list request can finish after a newer Encounter session was created.
-  // Only treat absent rows as deleted when the cached session predates this sync.
+  const onlySessionId = options.onlySessionId || null;
   const syncStartedAt = Date.now();
   try {
     const { data: authResult, error: authError } = await client.auth.getUser();
     if (authError || authResult?.user?.id !== user.id) return;
-    const { data: rows, error } = await client.from('chat_sessions')
-      .select('id,user_id,character_id,character_name,status,chat_mode,created_at,updated_at,character_snapshot,session_data')
-      .eq('user_id', user.id).is('deleted_at', null).order('updated_at', { ascending:false });
+    let sessionQuery = client.from('chat_sessions')
+      .select([
+        'id,user_id,character_id,character_name,status,chat_mode,created_at,updated_at,character_snapshot',
+        'session_name:session_data->>name','session_archived:session_data->>archived',
+        'session_hidden:session_data->>hidden','session_pinned:session_data->>pinned',
+        'session_archived_at:session_data->>archivedAt',
+        'session_started_at:session_data->>startedAt','session_encounter_mode:session_data->>encounterMode',
+        'session_story_mode:session_data->>storyMode','session_encounter_place:session_data->>encounterPlace',
+        'session_encounter_day:session_data->>encounterDay','session_persona:session_data->>persona',
+        'session_persona_custom:session_data->>personaCustom','session_suggestions:session_data->>suggestions',
+        'session_background:session_data->>background','session_has_user_message:session_data->>hasUserMessage',
+        'session_last_message_preview:session_data->>lastMessagePreview','session_last_message_at:session_data->>lastMessageAt',
+        'session_opening_message:session_data->openingMessage','session_pending_turn:session_data->pendingTurn'
+      ].join(','))
+      .eq('user_id', user.id).is('deleted_at', null);
+    if (onlySessionId) sessionQuery = sessionQuery.eq('id', onlySessionId);
+    const { data: rows, error } = await sessionQuery.order('updated_at', { ascending:false });
     if (error) throw new Error(error.message);
     if (state.account?.uid !== user.id) return;
-    let sessions = (rows || []).filter(row =>
-      !readDeletedChatTombstones(user.id).sessions[row.id]
-    );
+    let sessions = (rows || []).filter(row => !readDeletedChatTombstones(user.id).sessions[row.id]);
     const activeSessionIds = new Set(sessions.map(row => row.id));
     let changed = false;
-    // 雲端清單不再包含的本帳號聊天，可能已被軟刪除；清掉過期本機副本，避免刷新後復活。
-    for (const [sessionId, cached] of Object.entries(state.sessions || {})) {
-      if (cached?.cloudOwned && cached.cloudOwnerUid === user.id && !activeSessionIds.has(sessionId) && Number(cached.startedAt || 0) < syncStartedAt) {
-        delete state.sessions[sessionId];
-        changed = true;
+    if (!onlySessionId) {
+      for (const [sessionId, cached] of Object.entries(state.sessions || {})) {
+        if (cached?.cloudOwned && cached.cloudOwnerUid === user.id && !activeSessionIds.has(sessionId) && Number(cached.startedAt || 0) < syncStartedAt) {
+          delete state.sessions[sessionId]; changed = true;
+        }
       }
     }
     if (!sessions.length) {
       if (changed) { persist(); render(); }
       return;
     }
-    const sessionIds = sessions.map(row => row.id).filter(isUuid);
-    let messageRows = [];
-    if (sessionIds.length) {
-      const result = await client.from('chat_messages').select('id,session_id,role,content,created_at')
-        .in('session_id', sessionIds).is('deleted_at', null).order('created_at', { ascending:true });
-      if (result.error) throw new Error(result.error.message);
-      messageRows = result.data || [];
-    }
-    if (state.account?.uid !== user.id) return;
-
-    // 私密／已下架角色不會出現在公開角色清單；從既有聊天快照恢復作者 ID，
-    // 並只讀取作者公開的 profiles 欄位，讓其他帳號也能正確顯示 BY 名稱。
     const snapshotAuthorIds = [...new Set(sessions
-      .map(row => row.character_snapshot && typeof row.character_snapshot === 'object'
-        ? row.character_snapshot.authorId : null)
+      .map(row => row.character_snapshot && typeof row.character_snapshot === 'object' ? row.character_snapshot.authorId : null)
       .filter(Boolean))];
-    if (snapshotAuthorIds.length) {
-      const profileResult = await client.from('public_profiles')
-        .select('id, handle, nickname, avatar_url, bio, follower_count')
-        .in('id', snapshotAuthorIds);
-      // 帳號可能在 profiles 查詢等待期間切換；舊帳號請求不得再寫入目前畫面狀態。
-      if (state.account?.uid !== user.id) return;
-      if (profileResult.error) {
-        console.warn('既有聊天作者資料載入失敗：', profileResult.error.message);
-      } else {
-        for (const profile of profileResult.data || []) {
-          state.authors[profile.id] = {
-            uid:profile.id, handle:profile.handle || '',
-            nickname:profile.nickname || profile.handle || 'PersonaX 使用者',
-            avatar:profile.avatar_url || '', bio:profile.bio || '',
-            fans:Number(profile.follower_count || 0)
-          };
-        }
-      }
-    }
-
-    // Re-read tombstones after all awaited profile/message requests. A stale
-    // response that began before deletion must never repopulate the local cache.
+    // Public author profiles are secondary to the chat list; fetch them in the background
+    // so a slow profile query cannot block the session list or first conversation render.
+    if (snapshotAuthorIds.length) void loadChatSessionAuthorProfiles(user.id, snapshotAuthorIds);
     const latestDeletedSessions = readDeletedChatTombstones(user.id).sessions;
     const beforeFilterCount = sessions.length;
     sessions = sessions.filter(row => !latestDeletedSessions[row.id]);
     if (sessions.length !== beforeFilterCount) {
       for (const [sessionId, cached] of Object.entries(state.sessions || {})) {
-        if (latestDeletedSessions[sessionId] && cached?.cloudOwned && cached.cloudOwnerUid === user.id) {
-          delete state.sessions[sessionId];
-        }
+        if (latestDeletedSessions[sessionId] && cached?.cloudOwned && cached.cloudOwnerUid === user.id) delete state.sessions[sessionId];
       }
-      persist();
-      cacheSessionsForUser(user.id);
+      persist(); cacheSessionsForUser(user.id);
     }
-
-    const bySession = new Map();
-    for (const row of messageRows) {
-      if (!bySession.has(row.session_id)) bySession.set(row.session_id, []);
-      bySession.get(row.session_id).push({id:row.id, role:row.role === 'user' ? 'user' : 'assistant',
-        text:row.content || '', at:row.created_at ? new Date(row.created_at).getTime() : Date.now()});
-    }
+    const parseBool = value => value === true || value === 'true';
     for (const row of sessions) {
       if (!isUuid(row.id) || !isUuid(row.character_id)) continue;
-      const data = row.session_data && typeof row.session_data === 'object' ? row.session_data : {};
       const rawSnapshot = row.character_snapshot && typeof row.character_snapshot === 'object' ? row.character_snapshot : {};
       // Never hydrate author-only fields from legacy chat snapshots into player-visible client state.
       const {
@@ -3406,68 +3479,59 @@ async function loadCloudChatSessions(user) {
         personality_profile: _legacyPersonalityProfileSnakeCase,
         ...snapshot
       } = rawSnapshot;
-      // Never hydrate a chat with a snapshot belonging to a different role.
-      // The server also rejects this metadata before billing; fail closed in the UI too.
       if (snapshot.id && snapshot.id !== row.character_id) {
-        console.error('雲端聊天角色快照 ID 不一致，已略過此聊天：', row.id);
-        continue;
+        console.error('雲端聊天角色快照 ID 不一致，已略過此聊天：', row.id); continue;
       }
       const existing = state.sessions[row.id];
-      const cloudMessages = bySession.get(row.id) || [];
-      const roleplayMeta = data.roleplayMeta && typeof data.roleplayMeta === 'object' ? data.roleplayMeta : {};
-      for (const message of cloudMessages) {
-        const metadata = roleplayMeta[message.id];
-        if (metadata && typeof metadata === 'object') Object.assign(message, metadata);
-      }
+      const opening = row.session_opening_message && typeof row.session_opening_message === 'object'
+        ? row.session_opening_message : existing?.initialOpeningMessage || null;
+      const pending = row.session_pending_turn && typeof row.session_pending_turn === 'object'
+        ? row.session_pending_turn : null;
+      const marker = row.session_has_user_message;
+      const existingHasPlayerMessage=(existing?.messages||[]).some(message=>
+        message.role==='user'&&String(message.text||'').trim()
+      );
+      const cloudHasUserMessage = marker === null || marker === undefined
+        ? (existing?.cloudHasUserMessage===true||existingHasPlayerMessage ? true : null)
+        : (parseBool(marker)||existingHasPlayerMessage);
       state.sessions[row.id] = {
         ...(existing || {}), id:row.id, characterId:row.character_id,
-        characterName:row.character_name || snapshot.name || '角色',
-        name:data.name || '', archived:data.archived === true || row.status === 'archived',
-        encounterMode:row.chat_mode === 'encounter' || data.encounterMode === true || data.encounter?.mode === 'encounter',
-        storyMode:data.storyMode === true,
-        encounterPlace:typeof data.encounterPlace === 'string' ? data.encounterPlace : (existing?.encounterPlace || null),
-        encounterDay:typeof data.encounterDay === 'string' ? data.encounterDay : (existing?.encounterDay || (Number(data.startedAt) ? new Date(Number(data.startedAt)).toLocaleDateString('en-CA') : null)),
-        hidden:data.hidden === true, pinned:data.pinned === true,
-        startedAt:Number(data.startedAt) || (row.created_at ? new Date(row.created_at).getTime() : Date.now()),
-        archivedAt:data.archivedAt || null, persona:data.persona || '',
-        personaCustom: data.personaCustom === true || (data.personaCustom !== false && !!data.persona),
-        suggestions:data.suggestions !== false, background:data.background || 'avatar',
-        memories:Array.isArray(data.memories) ? data.memories : [],
-        album:Array.isArray(data.album) ? data.album : [],
-        pendingTurn:data.pendingTurn &&
-          isUuid(data.pendingTurn.turnId) &&
-          isUuid(data.pendingTurn.userMessageId) &&
-          isUuid(data.pendingTurn.assistantMessageId)
-          ? {
-              turnId:data.pendingTurn.turnId,
-              userMessageId:data.pendingTurn.userMessageId,
-              assistantMessageId:data.pendingTurn.assistantMessageId,
-              createdAt:Number(data.pendingTurn.createdAt) || Date.now()
-            }
-          : null,
-        messages:(()=>{
-          const opening=data.openingMessage && String(data.openingMessage.text || '').trim()
-            ? {id:'opening-'+row.id,role:'assistant',text:String(data.openingMessage.text),at:Number(data.openingMessage.at)||Date.now()}
-            : null;
-          const firstCloud=cloudMessages[0];
-          const alreadyStored=opening && firstCloud?.role==='assistant' && firstCloud.text===opening.text;
-          return opening && !alreadyStored ? [opening,...cloudMessages] : cloudMessages;
-        })(),
-        initialOpeningMessage:data.openingMessage && String(data.openingMessage.text || '').trim()
-          ? {text:String(data.openingMessage.text),at:Number(data.openingMessage.at)||Date.now()}
-          : null,
+        characterName:row.character_name || snapshot.name || '角色', name:row.session_name || existing?.name || '',
+        archived:parseBool(row.session_archived) || row.status === 'archived',
+        encounterMode:row.chat_mode === 'encounter' || parseBool(row.session_encounter_mode),
+        storyMode:parseBool(row.session_story_mode),
+        encounterPlace:row.session_encounter_place || existing?.encounterPlace || null,
+        encounterDay:row.session_encounter_day || existing?.encounterDay || null,
+        hidden:parseBool(row.session_hidden), pinned:parseBool(row.session_pinned),
+        startedAt:Number(row.session_started_at) || (existing?.startedAt || (row.created_at ? new Date(row.created_at).getTime() : Date.now())),
+        updatedAt:row.updated_at ? new Date(row.updated_at).getTime() : Number(existing?.updatedAt || 0),
+        lastMessagePreview:row.session_last_message_preview || existing?.lastMessagePreview || '',
+        lastMessageAt:Number(row.session_last_message_at) || Number(existing?.lastMessageAt || 0) || (row.updated_at ? new Date(row.updated_at).getTime() : 0),
+        archivedAt:Number(row.session_archived_at) || existing?.archivedAt || null, persona:row.session_persona || existing?.persona || '',
+        personaCustom:row.session_persona_custom===null||row.session_persona_custom===undefined
+          ? existing?.personaCustom===true : parseBool(row.session_persona_custom),
+        suggestions:row.session_suggestions === null || row.session_suggestions === undefined ? existing?.suggestions !== false : row.session_suggestions !== 'false',
+        background:row.session_background || existing?.background || 'avatar',
+        memories:Array.isArray(existing?.memories) ? existing.memories : [],
+        album:Array.isArray(existing?.album) ? existing.album : [],
+        pendingTurn:pending && isUuid(pending.turnId) && isUuid(pending.userMessageId) && isUuid(pending.assistantMessageId)
+          ? {turnId:pending.turnId,userMessageId:pending.userMessageId,assistantMessageId:pending.assistantMessageId,createdAt:Number(pending.createdAt)||Date.now()} : null,
+        initialOpeningMessage:opening && String(opening.text || '').trim() ? {text:String(opening.text),at:Number(opening.at)||Date.now()} : null,
+        messages:Array.isArray(existing?.messages) ? existing.messages : [],
+        cloudHasUserMessage, cloudSessionDataLoaded:false, cloudMessagesLoaded:false,
+        cloudHasMoreMessages:false, cloudOldestMessageCursor:null,
+        cloudMessagesLoading:false, cloudMessagesError:'',
         cloudOwned:true, cloudOwnerUid:user.id, cloudCharacterSnapshot:snapshot, cloudUpdatedAt:row.updated_at || null
       };
+      // Drop stale in-memory history tails too; the full transcript is fetched on demand.
+      state.sessions[row.id]=compactCloudSessionForLocalStorage(state.sessions[row.id]);
       if (snapshot.id === row.character_id) {
         const existingCharacterIndex = state.characters.findIndex(character => character.id === row.character_id);
         if (existingCharacterIndex >= 0) {
           const existingCharacter = state.characters[existingCharacterIndex];
-          // 雲端快照是既有聊天的權威來源；明確的 authorId:null 必須清除本機舊作者 ID。
-          if (Object.prototype.hasOwnProperty.call(snapshot,'authorId') &&
-              (snapshot.authorId === null || isUuid(snapshot.authorId))) {
+          if (Object.prototype.hasOwnProperty.call(snapshot,'authorId') && (snapshot.authorId === null || isUuid(snapshot.authorId))) {
             state.characters[existingCharacterIndex] = {
-              ...existingCharacter,
-              authorId:snapshot.authorId,
+              ...existingCharacter, authorId:snapshot.authorId,
               creatorDisplayName:snapshot.creatorDisplayName ?? existingCharacter.creatorDisplayName ?? '',
               creatorHandleSnapshot:snapshot.creatorHandleSnapshot ?? existingCharacter.creatorHandleSnapshot ?? '',
               accountArchivedAt:snapshot.accountArchivedAt ?? existingCharacter.accountArchivedAt ?? null,
@@ -3478,23 +3542,147 @@ async function loadCloudChatSessions(user) {
           state.characters.push({...snapshot, id:row.character_id, name:snapshot.name || row.character_name || '角色',
             visibility:'private', reviewStatus:'draft',
             authorId:Object.prototype.hasOwnProperty.call(snapshot,'authorId') && snapshot.authorId !== '' ? snapshot.authorId : null,
-            creatorDisplayName:snapshot.creatorDisplayName || '',
-            creatorHandleSnapshot:snapshot.creatorHandleSnapshot || '',
-            accountArchivedAt:snapshot.accountArchivedAt || null,
-            owner:false, cloudSnapshotOnly:true});
+            creatorDisplayName:snapshot.creatorDisplayName || '', creatorHandleSnapshot:snapshot.creatorHandleSnapshot || '',
+            accountArchivedAt:snapshot.accountArchivedAt || null, owner:false, cloudSnapshotOnly:true});
         }
       }
       changed = true;
     }
     if (changed) persist();
-    if (route.page === 'conversation' && route.id && !state.sessions[route.id]) {
-      go({page:'chat'});
-      return;
-    }
-    if (changed) render();
+    if (!onlySessionId && route.page === 'conversation' && route.id && !state.sessions[route.id]) { go({page:'chat'}); return; }
+    if (changed && (!onlySessionId || route.page === 'chat' || route.page === 'conversation')) render();
   } catch (error) {
     console.error('雲端聊天載入失敗：', error);
     if (state.account?.uid === user.id) toast('雲端聊天載入失敗：' + error.message);
+  }
+}
+
+async function loadCloudSessionMessages(sessionId, options = {}) {
+  const client = window.mySupabase, userId = currentUser()?.uid;
+  const session = state.sessions?.[sessionId];
+  if (!client || !userId || !session?.cloudOwned || session.cloudOwnerUid !== userId) return false;
+  if (readDeletedChatTombstones(userId).sessions[sessionId]) return false;
+  if (session.cloudMessagesLoading || (!options.older && session.cloudMessagesLoaded && options.refresh !== true)) return true;
+  const older = options.older === true, messagesNode = $('messages');
+  const previousHeight = messagesNode?.scrollHeight || 0, previousTop = messagesNode?.scrollTop || 0;
+  session.cloudMessagesLoading = true; session.cloudMessagesError = '';
+  if (route.page === 'conversation' && route.id === sessionId) renderMessages(false);
+  try {
+    const { data: authResult, error: authError } = await client.auth.getUser();
+    if (authError || authResult?.user?.id !== userId || currentUser()?.uid !== userId) throw new Error('登入狀態已變更，請重新登入。');
+    let sessionRowQuery=client.from('chat_sessions')
+      .select(older
+        ? 'id,user_id,character_id,chat_mode,status,character_snapshot'
+        : 'id,user_id,character_id,chat_mode,status,character_snapshot,session_data,updated_at')
+      .eq('id', sessionId).eq('user_id', userId).is('deleted_at', null);
+    const { data: row, error: sessionError } = await sessionRowQuery.maybeSingle();
+    if (sessionError) throw new Error(sessionError.message);
+    if (!row || row.character_id !== session.characterId || (row.character_snapshot?.id && row.character_snapshot.id !== row.character_id)) {
+      throw new Error('找不到這段聊天室，或角色資料已變更。');
+    }
+    if (readDeletedChatTombstones(userId).sessions[sessionId] || currentUser()?.uid !== userId) {
+      session.cloudMessagesLoading=false;
+      return false;
+    }
+    const data = row.session_data && typeof row.session_data === 'object' ? row.session_data : {};
+    if(!older){
+      session.cloudUpdatedAt=row.updated_at||session.cloudUpdatedAt||null;
+      session.name=data.name||session.name||'';
+      session.archived=data.archived===true||row.status==='archived';
+      session.archivedAt=Number(data.archivedAt)||session.archivedAt||null;
+      session.hidden=data.hidden===true; session.pinned=data.pinned===true;
+      session.persona=data.persona||session.persona||'';
+    }
+    if(!older){
+      session.personaCustom=data.personaCustom===true||(data.personaCustom!==false&&!!session.persona);
+      session.suggestions=data.suggestions!==false; session.background=data.background||session.background||'avatar';
+      session.memories=Array.isArray(data.memories)?data.memories:(session.memories||[]);
+      session.album=Array.isArray(data.album)?data.album:(session.album||[]);
+    }
+    if(!older){
+      session.encounterMode=row.chat_mode==='encounter'||data.encounterMode===true||data.encounter?.mode==='encounter';
+      session.storyMode=data.storyMode===true;
+      session.encounterPlace=typeof data.encounterPlace==='string'?data.encounterPlace:session.encounterPlace||null;
+      session.encounterDay=typeof data.encounterDay==='string'?data.encounterDay:session.encounterDay||null;
+      session.pendingTurn=data.pendingTurn&&isUuid(data.pendingTurn.turnId)&&isUuid(data.pendingTurn.userMessageId)&&isUuid(data.pendingTurn.assistantMessageId)
+        ? {turnId:data.pendingTurn.turnId,userMessageId:data.pendingTurn.userMessageId,assistantMessageId:data.pendingTurn.assistantMessageId,createdAt:Number(data.pendingTurn.createdAt)||Date.now()}
+        : null;
+      session.initialOpeningMessage=data.openingMessage&&String(data.openingMessage.text||'').trim()
+        ? {text:String(data.openingMessage.text),at:Number(data.openingMessage.at)||Date.now()} : session.initialOpeningMessage||null;
+      session.cloudRoleplayMeta=data.roleplayMeta&&typeof data.roleplayMeta==='object'?data.roleplayMeta:{};
+      session.cloudSessionDataLoaded=true;
+      if(session.cloudHasUserMessage==null&&typeof data.hasUserMessage==='boolean')session.cloudHasUserMessage=data.hasUserMessage;
+    }
+    if(row.character_snapshot){
+      const rawSnapshot=row.character_snapshot;
+      const {
+        privateInfo:_legacyPrivateInfo,
+        personalityProfile:_legacyPersonalityProfile,
+        private_info:_legacyPrivateInfoSnakeCase,
+        personality_profile:_legacyPersonalityProfileSnakeCase,
+        ...safeSnapshot
+      }=rawSnapshot;
+      session.cloudCharacterSnapshot=safeSnapshot;
+    }
+    const roleplayMeta=session.cloudRoleplayMeta||{};
+    const pageSize=50;
+    let messageQuery=client.from('chat_messages').select('id,session_id,role,content,created_at')
+      .eq('session_id',sessionId).is('deleted_at',null)
+      .order('created_at',{ascending:false}).order('id',{ascending:false});
+    if(older){
+      const cursor=session.cloudOldestMessageCursor;
+      if(!cursor?.createdAt||!cursor?.id){
+        session.cloudHasMoreMessages=false;session.cloudMessagesLoading=false;renderMessages(false);return true;
+      }
+      messageQuery=messageQuery.or('created_at.lt.'+cursor.createdAt+',and(created_at.eq.'+cursor.createdAt+',id.lt.'+cursor.id+')');
+    }
+    const {data:rows,error:messageError}=await messageQuery.limit(pageSize);
+    if(messageError)throw new Error(messageError.message);
+    if(readDeletedChatTombstones(userId).sessions[sessionId]||currentUser()?.uid!==userId){
+      session.cloudMessagesLoading=false;
+      return false;
+    }
+    const cloudMessages=(rows||[]).slice().reverse().map(message=>{
+      const normalized={id:message.id,role:message.role==='user'?'user':'assistant',text:message.content||'',at:message.created_at?new Date(message.created_at).getTime():Date.now()};
+      const metadata=roleplayMeta[message.id];if(metadata&&typeof metadata==='object')Object.assign(normalized,metadata);
+      return normalized;
+    });
+    const merged=new Map((session.messages||[]).map(message=>[message.id,message]));
+    for(const message of cloudMessages)merged.set(message.id,{...(merged.get(message.id)||{}),...message});
+    session.messages=[...merged.values()].sort((a,b)=>(Number(a.at)||0)-(Number(b.at)||0)||String(a.id).localeCompare(String(b.id)));
+    const opening=session.initialOpeningMessage;
+    if(opening){
+      const openingId='opening-'+sessionId;
+      const openingAlreadyStored=session.messages.some(message=>
+        message.id!==openingId&&message.role==='assistant'&&message.text===opening.text&&
+        Math.abs((Number(message.at)||0)-(Number(opening.at)||0))<=120000
+      );
+      if(openingAlreadyStored){
+        session.messages=session.messages.filter(message=>message.id!==openingId);
+      }else if(!session.messages.some(message=>message.id===openingId)){
+        session.messages.unshift({id:openingId,role:'assistant',text:opening.text,at:Number(opening.at)||Date.now()});
+      }
+    }
+    const newest=cloudMessages.at(-1);
+    if(!older){
+      if(newest){session.lastMessagePreview=String(newest.text||'').slice(0,180);session.lastMessageAt=newest.at;}
+      else{session.lastMessagePreview=String(data.lastMessagePreview||session.lastMessagePreview||'');session.lastMessageAt=Number(data.lastMessageAt||session.lastMessageAt||0);}
+    }
+    if(cloudMessages.some(message=>message.role==='user'&&String(message.text||'').trim()))session.cloudHasUserMessage=true;
+    else if(typeof data.hasUserMessage==='boolean')session.cloudHasUserMessage=data.hasUserMessage;
+    if(rows?.length){const oldest=rows[rows.length-1];session.cloudOldestMessageCursor={createdAt:oldest.created_at,id:oldest.id};}
+    session.cloudHasMoreMessages=(rows||[]).length===pageSize;
+    session.cloudMessagesLoaded=true;session.cloudMessagesLoading=false;session.cloudMessagesError='';
+    persist();
+    if(route.page==='conversation'&&route.id===sessionId){
+      renderMessages(!older);
+      if(older&&$('messages')){const node=$('messages');node.scrollTop=previousTop+Math.max(0,node.scrollHeight-previousHeight);}
+    }
+    return true;
+  }catch(error){
+    session.cloudMessagesLoading=false;session.cloudMessagesError=error?.message||'聊天訊息載入失敗。';
+    if(route.page==='conversation'&&route.id===sessionId)renderMessages(false);
+    console.error('單一聊天室訊息載入失敗：',error);return false;
   }
 }
 
@@ -4089,9 +4277,12 @@ function renderShell() {
     state.theme === 'day' ? '#f3f5fa' : '#090d16';
 }
 
+let lastRenderedConversationId = null;
+
 function render() {
   // Encounter fullscreen scroll locking must follow the active route, not a stale
   // session left in memory after navigating back to the city or traditional pages.
+  if (route.page !== 'conversation') lastRenderedConversationId = null;
   const encounterRouteActive = route.page === 'conversation' && !!currentSession()?.encounterMode;
   document.body.classList.toggle('encounter-mode-active', encounterRouteActive);
   if ($('modal').open) $('modal').close();
@@ -5140,8 +5331,10 @@ function newSession(character,options = {}) {
   return session;
 }
 function hasUserMessage(session) {
-  return (session?.messages || []).some(message =>
-    message.role === 'user' && String(message.text || '').trim()
+  if(session?.cloudHasUserMessage===true)return true;
+  if(session?.cloudHasUserMessage===false)return false;
+  return (session?.messages||[]).some(message=>
+    message.role==='user'&&String(message.text||'').trim()
   );
 }
 function sessionTitle(session) {
@@ -5371,51 +5564,36 @@ async function startChat(characterId) {
   const character = state.characters.find(item => item.id === characterId);
   if (!accessible(character)) return toast('此角色已被作者調整為私密或刪除狀態，不支持開啟新對話');
   if (!requireLogin({page:'detail',id:characterId})) return;
-
   const client = window.mySupabase;
   const { data: authData, error: authError } = await client?.auth?.getUser?.() || {};
   const userId = authData?.user?.id || currentUser()?.uid;
   if (!client || !userId) return toast('登入狀態尚未確認，請重新登入後再試。');
-
   try {
-    // Always inspect the owner's cloud history before deciding to create a new Story.
     const { data: rows, error: sessionsError } = await client.from('chat_sessions')
       .select('id,chat_mode,status,created_at,updated_at')
       .eq('user_id', userId).eq('character_id', characterId)
       .is('deleted_at', null).neq('chat_mode', 'encounter')
       .order('updated_at', { ascending:false });
     if (sessionsError) throw sessionsError;
-
-    const candidateIds = (rows || []).filter(row => row.id).map(row => row.id);
-    let chattedIds = new Set();
-    if (candidateIds.length) {
-      const { data: messages, error: messagesError } = await client.from('chat_messages')
-        .select('session_id,content').in('session_id', candidateIds)
-        .eq('role', 'user').is('deleted_at', null);
-      if (messagesError) throw messagesError;
-      chattedIds = new Set((messages || [])
-        .filter(message => String(message.content || '').trim())
-        .map(message => message.session_id));
+    const candidateIds=(rows||[]).filter(row=>isUuid(row.id)).map(row=>row.id);
+    let existingRow=null;
+    if(candidateIds.length){
+      const {data:latestPlayerMessage,error:messagesError}=await client.from('chat_messages')
+        .select('session_id').in('session_id',candidateIds).eq('role','user')
+        .is('deleted_at',null).order('created_at',{ascending:false}).limit(1).maybeSingle();
+      if(messagesError)throw messagesError;
+      if(latestPlayerMessage?.session_id)existingRow=(rows||[]).find(row=>row.id===latestPlayerMessage.session_id)||null;
     }
-
-    const existingRow = (rows || []).find(row => chattedIds.has(row.id));
-    if (existingRow) {
-      // Hydrate the exact cloud session before navigating; never create a duplicate
-      // just because this browser has not loaded the chat list yet.
-      await loadCloudChatSessions({ id:userId });
-      const existing = state.sessions[existingRow.id];
-      if (!existing) throw new Error('找到既有聊天室，但載入聊天內容失敗。請重新整理後再試。');
-      existing.hidden = false;
-      existing.archived = false;
-      existing.archivedAt = null;
-      persist();
-      await saveChatSessionSafely(existing);
-      go({page:'conversation',id:existing.id});
-      return;
+    if(existingRow){
+      await loadCloudChatSessions({id:userId},{onlySessionId:existingRow.id});
+      const existing=state.sessions[existingRow.id];
+      if(!existing)throw new Error('找到既有聊天室，但載入聊天基本資料失敗。請重新整理後再試。');
+      const loaded=await loadCloudSessionMessages(existingRow.id);
+      if(!loaded)throw new Error('找到既有聊天室，但載入聊天內容失敗。請重新整理後再試。');
+      existing.hidden=false;existing.archived=false;existing.archivedAt=null;
+      persist();await saveChatSessionSafely(existing);
+      go({page:'conversation',id:existing.id});return;
     }
-
-    // No ordinary Story chat exists. A settled Encounter offers carry-over;
-    // otherwise create a fresh Story directly.
     const { data: encounterRows, error: encounterError } = await client.rpc(
       'get_latest_settled_encounter_session', { p_character_id:characterId }
     );
@@ -5428,15 +5606,13 @@ async function startChat(characterId) {
   }
 }
 function visibleSessions() {
-  const q = chatSearch.trim().toLowerCase();
-  return Object.values(state.sessions).filter(s => {
-    const c = sessionCharacter(s);
-    return c && !s.encounterMode && !s.archived && hasUserMessage(s) &&
-      (!q || (s.name || c.name).toLowerCase().includes(q));
-  }).sort((a,b) =>
-    Number(b.pinned)-Number(a.pinned) ||
-    (b.messages.at(-1)?.at || 0)-(a.messages.at(-1)?.at || 0)
-  );
+  const q=chatSearch.trim().toLowerCase();
+  return Object.values(state.sessions).filter(s=>{
+    const c=sessionCharacter(s);
+    const hasConversation=hasUserMessage(s)||(s.cloudOwned&&s.cloudHasUserMessage==null);
+    return c&&!s.encounterMode&&!s.archived&&hasConversation&&(!q||(s.name||c.name).toLowerCase().includes(q));
+  }).sort((a,b)=>Number(b.pinned)-Number(a.pinned)||
+    (Number(b.lastMessageAt||b.updatedAt||b.messages?.at(-1)?.at||0)-Number(a.lastMessageAt||a.updatedAt||a.messages?.at(-1)?.at||0)));
 }
 function relativeDate(at) {
   const now = new Date();
@@ -5500,75 +5676,47 @@ async function toggleGroupPin(groupId) {
 }
 function chatEntries() {
   const q=chatSearch.trim().toLocaleLowerCase();
-  const items=visibleSessions().map(s=>({
-    kind:'session',value:s,sortAt:Number(s.messages?.at(-1)?.at||s.startedAt||0),pinned:!!s.pinned
-  }));
+  const items=visibleSessions().map(s=>({kind:'session',value:s,sortAt:Number(s.lastMessageAt||s.updatedAt||s.messages?.at(-1)?.at||s.startedAt||0),pinned:!!s.pinned}));
   const groupPinned=readGroupPins();
   const groupItems=(groupPrototype.groups||[]).filter(group=>{
     const preview=groupPrototype.groupPreviews?.[group.id];
-    return !q || String(group.name||'').toLocaleLowerCase().includes(q) ||
-      String(preview?.content||'').toLocaleLowerCase().includes(q);
-  }).map(group=>({
-    kind:'group',value:group,preview:groupPrototype.groupPreviews?.[group.id]||null,
-    sortAt:Date.parse(groupPrototype.groupPreviews?.[group.id]?.created_at||group.updated_at||group.created_at||'')||0,
-    pinned:groupPinned.includes(group.id)
-  }));
-  items.push(...groupItems);
-  items.sort((a,b)=>Number(b.pinned)-Number(a.pinned)||b.sortAt-a.sortAt);
-  const errorNotice=groupPrototype.loadError
-    ? '<div class="group-alert">'+e(groupPrototype.loadError)+'</div><button data-action="group-refresh-list">重新載入群組</button>'
-    : '';
-  if(!items.length) return errorNotice || '<div class="empty">還沒有符合條件的對話。</div>';
+    return !q||String(group.name||'').toLocaleLowerCase().includes(q)||String(preview?.content||'').toLocaleLowerCase().includes(q);
+  }).map(group=>({kind:'group',value:group,preview:groupPrototype.groupPreviews?.[group.id]||null,
+    sortAt:Date.parse(groupPrototype.groupPreviews?.[group.id]?.created_at||group.updated_at||group.created_at||'')||0,pinned:groupPinned.includes(group.id)}));
+  items.push(...groupItems);items.sort((a,b)=>Number(b.pinned)-Number(a.pinned)||b.sortAt-a.sortAt);
+  const errorNotice=groupPrototype.loadError?'<div class="group-alert">'+e(groupPrototype.loadError)+'</div><button data-action="group-refresh-list">重新載入群組</button>':'';
+  if(!items.length)return errorNotice||'<div class="empty">還沒有符合條件的對話。</div>';
   const rows=items.map(item=>{
-    if(item.kind==='group') {
-      const group=item.value;
-      const lastText=item.preview?.content||'尚未開始對話';
+    if(item.kind==='group'){
+      const group=item.value,lastText=item.preview?.content||'尚未開始對話';
       const lastAt=Date.parse(item.preview?.created_at||group.updated_at||group.created_at||'')||Date.now();
       const active=route.page==='group'&&groupPrototype.active?.id===group.id;
       const memberList=groupPrototype.groupMembers?.[group.id]||[];
       const avatarMarkup=memberList.slice(0,3).map(member=>{
         const image=safeImage(member.avatar_url||member.image||member.character_snapshot?.avatar_url||member.character_snapshot?.image);
-        return image
-          ? '<img class="group-avatar-image" src="'+e(image)+'" alt="">'
-          : '<span class="group-avatar-fallback" aria-hidden="true">'+e(String(member.name||member.character_snapshot?.name||'角').trim().slice(0,1)||'角')+'</span>';
+        return image?'<img class="group-avatar-image" src="'+e(image)+'" alt="">':'<span class="group-avatar-fallback" aria-hidden="true">'+e(String(member.name||member.character_snapshot?.name||'角').trim().slice(0,1)||'角')+'</span>';
       }).join('');
-      const groupAvatar=avatarMarkup
-        ? '<span class="group-avatar-stack" aria-hidden="true">'+avatarMarkup+'</span>'
-        : '<span class="group-list-avatar" aria-hidden="true">群</span>';
+      const groupAvatar=avatarMarkup?'<span class="group-avatar-stack" aria-hidden="true">'+avatarMarkup+'</span>':'<span class="group-list-avatar" aria-hidden="true">群</span>';
       return `<div class="chat-entry group-chat-entry ${active?'active':''}">
         <button class="pin group-pin ${item.pinned?'on':''}" data-action="group-pin" data-id="${e(group.id)}" aria-label="${item.pinned?'取消群組置頂':'置頂群組'}" title="${item.pinned?'取消置頂':'置頂'}">${ICON.pin}</button>
-        <button type="button" class="group-chat-open" data-action="group-open" data-id="${e(group.id)}" aria-label="開啟群組 ${e(group.name)}">
-          ${groupAvatar}
-          <span class="group-chat-copy">
-            <span class="group-chat-title-row"><strong class="group-chat-title">${e(group.name||'未命名群組')} <span class="small muted">· 群組</span></strong>
-              <span class="small muted group-chat-date">${chatListDate(lastAt)}</span></span>
-            <span class="small muted group-chat-preview" title="${e(lastText)}">${e(lastText)}</span>
-          </span>
-        </button>
-        <button type="button" class="entry-menu group-entry-menu" data-action="group-entry-menu" data-id="${e(group.id)}" aria-label="刪除這段對話與回憶" title="刪除這段對話與回憶">⋯</button>
-      </div>`;
+        <button type="button" class="group-chat-open" data-action="group-open" data-id="${e(group.id)}" aria-label="開啟群組 ${e(group.name)}">${groupAvatar}
+          <span class="group-chat-copy"><span class="group-chat-title-row"><strong class="group-chat-title">${e(group.name||'未命名群組')} <span class="small muted">· 群組</span></strong>
+          <span class="small muted group-chat-date">${chatListDate(lastAt)}</span></span><span class="small muted group-chat-preview" title="${e(lastText)}">${e(lastText)}</span></span>
+        </button><button type="button" class="entry-menu group-entry-menu" data-action="group-entry-menu" data-id="${e(group.id)}" aria-label="刪除這段對話與回憶" title="刪除這段對話與回憶">⋯</button></div>`;
     }
-    const s=item.value;
-    const c=sessionCharacter(s);
-    if(!c) return '';
-    const last=s.messages?.at(-1);
+    const s=item.value,c=sessionCharacter(s);if(!c)return '';
+    const last=s.messages?.at(-1),preview=last?.text||s.lastMessagePreview||(s.cloudMessagesLoaded?'':'點擊載入最近訊息');
+    const lastAt=last?.at||s.lastMessageAt||s.updatedAt||s.startedAt;
     return `<div class="chat-entry ${route.page==='conversation'&&route.id===s.id?'active':''}">
-      <button class="pin ${s.pinned?'on':''}" data-action="pin"
-              data-id="${e(s.id)}" aria-label="切換置頂">${ICON.pin}</button>
-      <button class="ghost" style="padding:0" data-action="session-detail" data-id="${e(s.id)}"
-              aria-label="查看${e(c.name)}角色簡介">
-        <span class="character-avatar-status ${characterIsOffline(c)?'is-offline':''}">
-          <img class="avatar" src="${e(safeImage(c.image))}" alt="${e(c.name)}">
-          <span class="character-status-dot" title="${characterIsOffline(c)?'角色離線／已下架':'角色公開中'}"></span>
-        </span>
+      <button class="pin ${s.pinned?'on':''}" data-action="pin" data-id="${e(s.id)}" aria-label="切換置頂">${ICON.pin}</button>
+      <button class="ghost" style="padding:0" data-action="session-detail" data-id="${e(s.id)}" aria-label="查看${e(c.name)}角色簡介">
+        <span class="character-avatar-status ${characterIsOffline(c)?'is-offline':''}"><img class="avatar" src="${e(safeImage(c.image))}" alt="${e(c.name)}">
+        <span class="character-status-dot" title="${characterIsOffline(c)?'角色離線／已下架':'角色公開中'}"></span></span>
       </button>
       <button class="select-chat" data-action="select-chat" data-id="${e(s.id)}">
-        <div class="row between"><strong class="ellipsis">${e(s.name||c.name)}</strong>
-          <span class="small muted">${chatListDate(last?.at||s.startedAt)}</span></div>
-        <div class="ellipsis small muted">${e(last?.text||'')}</div>
-      </button>
-      <button class="entry-menu" data-action="session-menu" data-id="${e(s.id)}" aria-label="刪除這段對話與回憶" title="刪除這段對話與回憶">⋯</button>
-    </div>`;
+        <div class="row between"><strong class="ellipsis">${e(s.name||c.name)}</strong><span class="small muted">${chatListDate(lastAt)}</span></div>
+        <div class="ellipsis small muted">${e(preview)}</div>
+      </button><button class="entry-menu" data-action="session-menu" data-id="${e(s.id)}" aria-label="刪除這段對話與回憶" title="刪除這段對話與回憶">⋯</button></div>`;
   }).join('')||'<div class="empty">還沒有符合條件的對話。</div>';
   return rows+errorNotice;
 }
@@ -6821,6 +6969,8 @@ async function loadStoryRelationshipState(session) {
 function renderConversation() {
   const s = currentSession();
   const c = sessionCharacter(s);
+  const isConversationEntry = !!s && lastRenderedConversationId !== s.id;
+  if (s) lastRenderedConversationId = s.id;
   if (!s || !canAccessSessionCharacter(s,c)) {
     $('view').innerHTML = '<div class="empty">此對話不存在或無法存取。</div>';
     return;
@@ -6904,6 +7054,14 @@ function renderConversation() {
   const panel = $('view').querySelector('.chat-main');
   panel.style.setProperty('--chat-photo',
     s.background === 'none' ? 'none' : `url(${JSON.stringify(safeImage(c.image))})`);
+  const messagesNode=$('messages');
+  if(messagesNode)messagesNode.addEventListener('click',event=>{
+    const button=event.target.closest('[data-chat-history-action]');
+    if(!button)return;
+    event.preventDefault();
+    void loadCloudSessionMessages(s.id,{older:button.dataset.chatHistoryAction==='older',refresh:button.dataset.chatHistoryAction==='retry'});
+  });
+  if(s.cloudOwned&&!s.cloudMessagesLoading&&(isConversationEntry||!s.cloudMessagesLoaded))void loadCloudSessionMessages(s.id,{refresh:true});
   renderMessages();
   if (s.storyMode) void loadStoryRelationshipState(s);
 
@@ -7054,7 +7212,12 @@ function renderMessages(scroll = true) {
   const c = sessionCharacter(s);
   if (!s || !c) return;
   const oldScroll = $('messages').scrollTop;
-  $('messages').innerHTML = s.messages.filter(m => !(m.role === 'user' && String(m.text||'').trim() === GROUP_CONTINUE_SENTINEL)).map(m => {
+  const historyControl=s.cloudOwned
+    ?(s.cloudMessagesLoading?'<div class="small muted" style="text-align:center;padding:10px">正在載入聊天紀錄…</div>'
+      :s.cloudMessagesError?'<div class="small muted" style="text-align:center;padding:10px"><span>'+e(s.cloudMessagesError)+'</span> <button type="button" data-chat-history-action="retry">重新載入</button></div>'
+      :s.cloudHasMoreMessages?'<div style="text-align:center;padding:10px"><button type="button" data-chat-history-action="older">載入更早的訊息</button></div>':'')
+    :'';
+  $('messages').innerHTML = historyControl + s.messages.filter(m => !(m.role === 'user' && String(m.text||'').trim() === GROUP_CONTINUE_SENTINEL)).map(m => {
     const user = m.role === 'user';
     const roles = [{id:c.id,name:c.name,image:c.image || c.avatar_url}];
     // Role prefixes can appear in AI replies as well as player-authored text.
@@ -7095,8 +7258,19 @@ function renderMessages(scroll = true) {
     </article>`;
   }).join('');
   $('messages').scrollTop = scroll ? $('messages').scrollHeight : oldScroll;
+  const loadingHistory=!!(s.cloudOwned&&!s.cloudMessagesLoaded);
   const sendButton=$('view')?.querySelector('.chat-main .composer-send');
-  if(sendButton){const sending=!!s?.pendingTurn;sendButton.disabled=sending;sendButton.innerHTML=sending?'<span aria-hidden="true">■</span>':ICON.send;sendButton.setAttribute('aria-label',sending?'訊息處理中':'送出或接續回應');sendButton.title=sending?'訊息處理中':'送出';sendButton.classList.toggle('is-sending',sending);}
+  if(sendButton){
+    const sending=!!s?.pendingTurn;
+    sendButton.disabled=sending||loadingHistory;
+    sendButton.innerHTML=sending?'<span aria-hidden="true">■</span>':ICON.send;
+    sendButton.setAttribute('aria-label',sending?'訊息處理中':loadingHistory?'聊天紀錄載入中':'送出或接續回應');
+    sendButton.title=sending?'訊息處理中':loadingHistory?'聊天紀錄載入中':'送出';
+    sendButton.classList.toggle('is-sending',sending);
+  }
+  const messageInput=$('messageInput');
+  if(messageInput&&loadingHistory){messageInput.disabled=true;messageInput.placeholder=s.cloudMessagesError?'聊天紀錄載入失敗，請重新載入':'正在載入聊天紀錄…';}
+  else if(messageInput&&s.cloudOwned){messageInput.disabled=false;messageInput.placeholder='留空發送，角色會繼續說下去';}
 }
 function memorySize(list) {
   return list.reduce((total,m) => total+countChars(m.text),0);
@@ -9779,6 +9953,7 @@ const {
         // cloud chat schema. Keep their test messages usable locally and never charge.
         if (!window.mySupabase || !isUuid(s.characterId) || !isUuid(s.id)) {
           s.messages.push({id:id(),role:'user',text,at:Date.now(),localOnly:true,...messageMeta});
+          s.cloudHasUserMessage=true;
           drafts[s.id]='';
           if($('messageInput')) $('messageInput').value='';
           const saved=persist();
@@ -9794,6 +9969,7 @@ const {
         const previousMemories = (s.memories || []).map(memory => ({...memory}));
         const userMessage = {id:id(),role:'user',text,at:Date.now(),...messageMeta};
         s.messages.push(userMessage);
+        s.cloudHasUserMessage=true;
         s.pendingTurn = {
           turnId:id(),
           userMessageId:userMessage.id,
