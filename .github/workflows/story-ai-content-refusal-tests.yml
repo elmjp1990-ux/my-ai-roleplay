@@ -17,7 +17,6 @@ on:
       - "supabase/migrations/20261106090000_story_turn_affinity_and_phone_events.sql"
       - "supabase/migrations/20261106110000_harden_story_turn_service_role_claims.sql"
       - "supabase/migrations/20261106120000_fix_story_turn_evaluation_reserved_charge.sql"
-      - "supabase/migrations/20261106120000_fix_story_turn_evaluation_reserved_charge.sql"
       - "scripts/test-story-turn-affinity-phone-events.sql"
       - "supabase/functions/_shared/provider-failure-policy.ts"
       - "supabase/functions/_shared/provider-failure-policy.test.ts"
