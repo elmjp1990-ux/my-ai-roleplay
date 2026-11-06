@@ -45,7 +45,7 @@ async function buildStoryMessages(
   const characterId = String(session.character_id);
   const [characterResult, profileResult, historyResult, summaryResult] = await Promise.all([
     admin.from("characters")
-      .select("id,author_id,name,intro,style,gender,age,race")
+      .select("id,author_id,name,intro,style,gender,age,race,phone_settings")
       .eq("id", characterId)
       .maybeSingle(),
     admin.from("profiles")
@@ -77,6 +77,8 @@ async function buildStoryMessages(
   if (!asString(character.name) && !asString(snapshot.name)) {
     throw new Error("story_character_context_missing");
   }
+  const phoneSettings = asDbRow(character.phone_settings ?? snapshot.phoneSettings ?? snapshot.phone_settings);
+
 
   const authorId = asString(character.author_id) || asString(snapshot.authorId);
   let privateInfo = "";
@@ -123,6 +125,17 @@ async function buildStoryMessages(
     currentUserMessageId: userMessageId,
   });
 
+  const phonePrompts = (Array.isArray(phoneSettings.noticePrompts) ? phoneSettings.noticePrompts : Array.isArray(phoneSettings.notices) ? phoneSettings.notices : [])
+    .map((item) => asString(item)).filter(Boolean).slice(0, 5);
+  const phoneSettingsPrompt = applyPromptVariables(JSON.stringify({ ...phoneSettings, noticePrompts: phonePrompts }), values).slice(0, 4000);
+  const { data: recentPhoneEvents, error: phoneHistoryError } = await admin.from("story_phone_events")
+    .select("event_type,title,body,created_at").eq("session_id", String(session.id))
+    .order("created_at", { ascending: false }).limit(10);
+  if (phoneHistoryError) throw new Error("story_phone_history_unavailable");
+  const phoneHistory = (Array.isArray(recentPhoneEvents) ? recentPhoneEvents : []).reverse().map((item: DbRow) => ({
+    title: asString(item.title), body: asString(item.body),
+  })).filter((item: DbRow) => item.title && item.body);
+
   const systemTemplate = [
     "你是 POYOZZ 互動故事中的角色扮演者。你的首要任務是持續、可信、細膩地扮演角色，讓玩家感覺自己正在與一個有連續人生、記憶和情感反應的角色互動。",
     "【語言與在地化】預設使用台灣繁體中文、台灣自然口語與符合台灣語境的用詞。先辨識玩家最新訊息主要使用的語言；若玩家持續使用其他語言，就自然切換成該語言及其常見的在地表達，不要混用不自然翻譯腔。專有名詞、角色口吻與故事世界設定保持一致。",
@@ -141,8 +154,9 @@ async function buildStoryMessages(
     "開場情境：{SCENE}",
     "世界觀：{WORLD}",
     "目前關係：{RELATIONSHIP}",
-    "【角色手機設定】" + JSON.stringify(asDbRow(snapshot.phoneSettings)).slice(0, 4000),
-    "【每回合結構化輸出】只輸出一個 JSON object，不要 Markdown code fence。格式：{\"reply\":\"角色對玩家的完整自然回覆\",\"affinity_delta\":0,\"affinity_reason\":\"簡短說明這次互動為何影響或不影響關係\",\"phone_events\":[],\"suggested_replies\":[\"第一則玩家可直接送出的自然回覆\",\"第二則不同方向的自然回覆\",\"第三則不同方向的自然回覆\"]}。suggested_replies 必須恰好 3 則，每則 30～90 字，內容是玩家可以直接送出的完整自然回覆，必須根據角色人設、當前場景及最新對話提出三種不同的回應方向；不得使用固定模板、分類標籤、溫柔／俏皮等風格標題，不得加數字或項目編號，也不可把建議寫成給玩家的操作說明。三則要有實質差異、符合玩家視角，且不可替角色或玩家捏造已發生的事。無論前端建議回覆面板是否開啟，每回合都必須生成這三則內容。affinity_delta 必須是 -3 到 3 的整數；普通聊天、資訊交換或沒有情感意義的互動填 0。不要為討好玩家而加分；依角色人格、界線、信任與實際互動判斷。phone_events 最多 3 筆，沒有合理的新手機動態就回傳空陣列。每筆格式為 {\"event_type\":\"message|social_post|missed_call|voice_message|notification\",\"title\":\"標題\",\"body\":\"內容\"}。必須遵守角色手機設定，不得虛構與故事矛盾的事件；不得把玩家未說出的內心話當成角色已知資訊。reply 內的旁白仍使用單星號格式，實際對白不加星號。",
+    "【角色手機設定｜作者定義的手機欄位】" + phoneSettingsPrompt,
+    "【最近手機狀態（用於延續，不可無故改寫）】" + JSON.stringify(phoneHistory).slice(0, 3000),
+    "【每回合結構化輸出】只輸出一個 JSON object，不要 Markdown code fence。格式：{\"reply\":\"角色對玩家的完整自然回覆\",\"affinity_delta\":0,\"affinity_reason\":\"簡短說明這次互動為何影響或不影響關係\",\"phone_events\":[],\"suggested_replies\":[\"第一則玩家可直接送出的自然回覆\",\"第二則不同方向的自然回覆\",\"第三則不同方向的自然回覆\"]}。suggested_replies 必須恰好 3 則，每則 30～90 字，內容是玩家可以直接送出的完整自然回覆，必須根據角色人設、當前場景及最新對話提出三種不同的回應方向；不得使用固定模板、分類標籤、溫柔／俏皮等風格標題，不得加數字或項目編號，也不可把建議寫成給玩家的操作說明。三則要有實質差異、符合玩家視角，且不可替角色或玩家捏造已發生的事。無論前端建議回覆面板是否開啟，每回合都必須生成這三則內容。affinity_delta 必須是 -3 到 3 的整數；普通聊天、資訊交換或沒有情感意義的互動填 0。不要為討好玩家而加分；依角色人格、界線、信任與實際互動判斷。phone_events 最多 5 筆。若角色手機設定含 noticePrompts，必須依設定順序為每個欄位各產生一筆 notification；不得因為本回合沒有新事件就回傳空陣列。每筆 title 使用設定文字中「|」之前的顯示名稱，並將 {CHAR}/{USER} 替換為實際稱呼；body 必須是玩家可閱讀的真實狀態內容，不可把提示詞原樣複製到 body。設定文字中「|」之後若有作者補充指示，必須遵守；若分隔符後為空，依欄位名稱、近期對話與最近手機狀態生成。角色想法要符合角色當下情緒與人設；最近收到的訊息只寫故事中確實收到的訊息；角色衣著／姿勢依最近已知狀態延續，除非劇情有明確變化；玩家衣著／姿勢只根據玩家明確描述或可觀察行動，不得臆測，未知時明確寫「目前沒有足夠資訊」；待辦事項只列出尚未完成且有對話依據的事項，沒有則寫「目前沒有待辦事項」。所有欄位都必須保持跨回合連續，不得無故更換衣著、位置或已知狀態。若未設定 noticePrompts，才可依劇情自然產生 0～5 筆手機動態。每筆格式為 {\"event_type\":\"message|social_post|missed_call|voice_message|notification\",\"title\":\"標題\",\"body\":\"內容\"}。必須遵守角色手機設定，不得虛構與故事矛盾的事件；不得把玩家未說出的內心話當成角色已知資訊。reply 內的旁白仍使用單星號格式，實際對白不加星號。",
     "",
     "【第三優先｜喜好與不喜愛的點】自然融入角色的偏好、興趣、厭惡事項與雷點；遇到喜歡的事物可有符合個性的反應，遇到雷點則依角色設定表現，不要機械式列清單，也不要為迎合玩家而忽略角色界線。",
     "{CHAR_LIKES}",
