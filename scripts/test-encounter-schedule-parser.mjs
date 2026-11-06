@@ -134,6 +134,12 @@ assert.ok((html.match(/renderGrid\(\{append:true\}\);/g)||[]).length >= 2);
  assert.ok(html.includes("previousCharacterVideo.dataset.characterVideo===characterVideo.dataset.characterVideo"));
  assert.ok(html.includes("characterVideo.replaceWith(previousCharacterVideo)"));
 
+ // Detail-page rerenders must reuse the same video DOM when the Storage path is unchanged.
+ assert.ok(html.includes("const previousDetailVideo = view?.querySelector('.detail-portrait video[data-character-video]') || null"));
+ assert.ok(html.includes("previousDetailVideo.dataset.characterVideo===detailVideo.dataset.characterVideo"));
+ assert.ok(html.includes("detailVideo.replaceWith(previousDetailVideo)"));
+ assert.ok(html.includes("releaseCharacterVideo(previousDetailVideo)"));
+
 
 
 // Illustration metadata reads are single-flight and author cleanup is never implicit for public loads.
