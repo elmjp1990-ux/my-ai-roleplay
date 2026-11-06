@@ -1,18 +1,18 @@
--- Five author-configured phone fields are regenerated as one coherent state snapshot per Story turn.
+-- Up to eight author-configured phone fields are regenerated as one coherent state snapshot per Story turn.
 -- Existing settled events remain intact; only the allowed per-turn field count expands.
 ALTER TABLE public.story_turn_evaluations
   DROP CONSTRAINT IF EXISTS story_turn_evaluations_phone_events_check;
 ALTER TABLE public.story_turn_evaluations
   ADD CONSTRAINT story_turn_evaluations_phone_events_check CHECK (
     jsonb_typeof(phone_events) = 'array'
-    AND jsonb_array_length(phone_events) <= 5
+    AND jsonb_array_length(phone_events) <= 8
     AND pg_column_size(phone_events) <= 8000
   );
 
 ALTER TABLE public.story_phone_events
   DROP CONSTRAINT IF EXISTS story_phone_events_event_index_check;
 ALTER TABLE public.story_phone_events
-  ADD CONSTRAINT story_phone_events_event_index_check CHECK (event_index BETWEEN 0 AND 4);
+  ADD CONSTRAINT story_phone_events_event_index_check CHECK (event_index BETWEEN 0 AND 7);
 
 CREATE OR REPLACE FUNCTION public.queue_story_turn_evaluation(
   p_turn_id uuid,
@@ -43,7 +43,7 @@ BEGIN
   IF p_affinity_delta IS NULL OR p_affinity_delta NOT BETWEEN -3 AND 3
      OR char_length(COALESCE(p_reason, '')) > 280
      OR jsonb_typeof(COALESCE(p_phone_events, '[]'::jsonb)) <> 'array'
-     OR jsonb_array_length(COALESCE(p_phone_events, '[]'::jsonb)) > 5
+     OR jsonb_array_length(COALESCE(p_phone_events, '[]'::jsonb)) > 8
      OR pg_column_size(COALESCE(p_phone_events, '[]'::jsonb)) > 8000 THEN
     RAISE EXCEPTION 'invalid_story_turn_evaluation' USING ERRCODE = '22023';
   END IF;
