@@ -113,6 +113,22 @@ Deno.serve(async (request: Request) => {
   if (characterError) return json({ error: "character_lookup_failed" }, 503);
   if (!character) return json({ error: "character_unavailable_for_story" }, 403);
 
+  // The opening line lives in character_stories, not characters. Read it on the
+  // trusted server so a newly-created Story snapshot never depends on stale client
+  // hydration (and so the opening can be persisted with the Story session).
+  const { data: characterStory, error: storyError } = await admin
+    .from("character_stories")
+    .select("opening_message")
+    .eq("character_id", characterId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (storyError) return json({ error: "character_story_lookup_failed" }, 503);
+
+  const openingMessage = typeof characterStory?.opening_message === "string"
+    ? characterStory.opening_message
+    : "";
+
   const snapshot = {
     id: character.id,
     name: character.name,
@@ -121,7 +137,7 @@ Deno.serve(async (request: Request) => {
     age: character.age ?? "",
     image: character.avatar_url || "",
     intro: character.intro || "",
-    opening: "",
+    opening: openingMessage,
     race: character.race || "",
     style: character.style || "",
     phoneSettings: character.phone_settings || {},
