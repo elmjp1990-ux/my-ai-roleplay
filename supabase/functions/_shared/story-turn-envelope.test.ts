@@ -69,8 +69,8 @@ Deno.test("suggested replies preserve valid options and accept supported aliases
       "我輕輕笑了笑，順著你的話題分享自己的經歷，再自然地問起你對這件事的看法。"];
   const parsed = parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: valid }));
   assertEquals(parsed.suggested_replies, valid);
-  assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: valid.slice(0, 2) })).suggested_replies, []);
-  assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: ["太短", valid[1], valid[2]] })).suggested_replies, []);
+  assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: valid.slice(0, 2) })).suggested_replies, valid.slice(0, 2));
+  assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: ["太短", valid[1], valid[2]] })).suggested_replies, valid.slice(1));
   assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: [valid[0], valid[1], valid[2] + "補充超過字數上限的內容".repeat(8)] })).suggested_replies, valid.slice(0, 2));
   assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: [valid[0], "太短", valid[2]] })).suggested_replies, [valid[0], valid[2]]);
   assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggestedReplies: valid })).suggested_replies, valid);
