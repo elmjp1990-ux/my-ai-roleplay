@@ -85,14 +85,12 @@ assert.match(html, /主要角色圖預覽/);
 assert.ok(html.includes("const characterVideoLoaders = new WeakMap()"));
 assert.ok(html.includes("characterVideoLoaders.set(video,load)"));
 assert.ok(html.includes("characterVideoLoaders.get(target)"));
-assert.ok(html.includes("if(target.dataset.videoHydrated==='true'){target.preload='metadata';target.play().catch"));
-// Scrolling away or backgrounding the tab must pause without detaching src,
-// otherwise revisiting the same card downloads the entire MP4 again.
-assert.ok(html.includes("function pauseCharacterVideo(video){"));
+// Scrolling away or backgrounding pauses playback but preserves src and preload state;
+// changing preload while attached can restart the same full MP4 request.
+assert.match(html, /function pauseCharacterVideo\\(video\\)\\{\\s*if\\(!video\\)return;\\s*video\\.pause\\(\\);\\s*\\}/);
+assert.doesNotMatch(html, /function pauseCharacterVideo\\(video\\)\\{[^}]*video\\.preload=/s);
+assert.match(html, /if\\(target\\.dataset\\.videoHydrated==='true'\\)\\{if\\(target\\.paused\\)target\\.play\\(\\)\\.catch\\(\\(\\)=>\\{\\}\\);\\}/);
 assert.ok(html.includes("function releaseCharacterVideo(video){"));
-assert.ok(html.includes("video.pause();"));
-assert.ok(html.includes("video.preload='none';"));
-assert.ok(html.includes("if(target.dataset.videoHydrated==='true'){target.preload='metadata';target.play().catch"));
 assert.ok(html.includes("pauseCharacterVideo(target);"));
 assert.ok(html.includes("videos.forEach(pauseCharacterVideo);"));
 // Only a real pagehide releases the media source.
