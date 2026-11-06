@@ -2498,6 +2498,10 @@ async function loadEncounterScheduleDescriptionIntoEditor(characterId) {
   }
 }
 
+  const rowPhoneSettingsForDiff = value => value && typeof value === 'object'
+    ? { noticePrompts: (Array.isArray(value.noticePrompts) ? value.noticePrompts : Array.isArray(value.notices) ? value.notices : []).slice(0, 8).map(item => String(item).slice(0, 230)) }
+    : {};
+
 async function saveSupabaseCharacter(character, expectedUserId) {
     const client = window.mySupabase;
     if (!client || !expectedUserId) throw new Error('請先使用 Google 帳號登入，再儲存角色。');
@@ -2570,33 +2574,54 @@ async function saveSupabaseCharacter(character, expectedUserId) {
     const previousProfile = normalizePersonalityProfile(existingPrivateProfile?.personality_profile || {});
     const nextProfile = normalizePersonalityProfile(character.personalityProfile || {});
     const aiRelevantChanges = [];
+    const runtimeAiChanges = [];
     const nonAiChanges = [];
 
-    const compareCharacterField = (key, label, before, after, aiRelevant) => {
+    const compareCharacterField = (target, key, label, before, after) => {
       if (!characterValueChanged(before, after)) return;
-      (aiRelevant ? aiRelevantChanges : nonAiChanges).push({ key, label });
+      target.push({ key, label });
     };
 
-    // 只把會改變角色理解／行為的原始設定列入 AI 影響欄位。
-    compareCharacterField('name', '角色名稱', existingCharacter?.name, String(character.name || '').trim(), true);
-    compareCharacterField('intro', '角色介紹／背景', existingCharacter?.intro, character.intro || '', true);
-    compareCharacterField('race', '種族／世界觀', existingCharacter?.race, character.race || '', true);
-    compareCharacterField('style', '角色風格', existingCharacter?.style, character.style || '', true);
-    compareCharacterField('private_info', '作者私密設定', existingPrivateProfile?.private_info || '', String(character.privateInfo || '').slice(0, 10000), true);
-    compareCharacterField('personality_profile', '個性與角色行為設定', previousProfile, nextProfile, true);
-    compareCharacterField('tags', '角色標籤', existingCharacter?.tags || [], character.tags || [], false);
-    compareCharacterField('phone_settings', '手機通知顯示設定', existingCharacter?.phone_settings || {}, character.phoneSettings || {}, false);
-    compareCharacterField('avatar', '角色圖片／影片', null, null, false);
+    // 角色原始設定：只有會改變角色理解、個性或行為的內容才需要重新評估衍生資料。
+    compareCharacterField(aiRelevantChanges, 'name', '角色名稱', existingCharacter?.name, String(character.name || '').trim());
+    compareCharacterField(aiRelevantChanges, 'intro', '角色介紹／背景', existingCharacter?.intro, character.intro || '');
+    compareCharacterField(aiRelevantChanges, 'race', '種族／世界觀', existingCharacter?.race, character.race || '');
+    compareCharacterField(aiRelevantChanges, 'style', '角色風格', existingCharacter?.style, character.style || '');
+    compareCharacterField(aiRelevantChanges, 'private_info', '作者私密設定', existingPrivateProfile?.private_info || '', String(character.privateInfo || '').slice(0, 10000));
+
+    // 個性欄位逐項比較，避免主要立繪名稱等純展示資料誤觸發 AI 整理。
+    const aiProfileFields = {
+      coreTraits: '核心特質',
+      values: '價值觀',
+      speechStyle: '說話方式',
+      behaviorRules: '行為規則',
+      likes: '喜好',
+      dislikes: '厭惡',
+      boundaries: '互動界線',
+      relationshipPacing: '關係進展節奏'
+    };
+    for (const [key, label] of Object.entries(aiProfileFields)) {
+      compareCharacterField(aiRelevantChanges, 'personality_profile.' + key, label, previousProfile[key], nextProfile[key]);
+    }
+    compareCharacterField(nonAiChanges, 'personality_profile.primaryIllustrationName', '主要立繪名稱', previousProfile.primaryIllustrationName, nextProfile.primaryIllustrationName);
+
+    // 手機通知指示會直接影響每回合生成，但由對話流程即時讀取，不必重做角色摘要。
+    compareCharacterField(runtimeAiChanges, 'phone_settings', '手機通知生成設定', existingCharacter?.phone_settings || {}, rowPhoneSettingsForDiff(character.phoneSettings));
+
+    // 標籤與媒體只影響展示／搜尋；不觸發角色衍生資料整理。
+    compareCharacterField(nonAiChanges, 'tags', '角色標籤', existingCharacter?.tags || [], character.tags || []);
 
     const isNewCharacter = !existingCharacter;
     const aiOrganizationDecision = {
-      version: 1,
+      version: 2,
       status: (isNewCharacter || aiRelevantChanges.length) ? 'needs_review' : 'not_needed',
       reason: isNewCharacter ? 'new_character' : (aiRelevantChanges.length ? 'ai_source_fields_changed' : 'no_ai_relevant_change'),
       model: 'deepseek/deepseek-v4-flash-20260423',
       changedFields: aiRelevantChanges.map(item => item.key),
       changedFieldLabels: aiRelevantChanges.map(item => item.label),
+      runtimeAiChangedFields: runtimeAiChanges.map(item => item.key),
       nonAiChangedFields: nonAiChanges.map(item => item.key),
+      requiresDerivedRefresh: isNewCharacter || aiRelevantChanges.length > 0,
       shouldCallModel: false
     };
 
