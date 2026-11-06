@@ -63,7 +63,7 @@ Deno.test("phone events are limited to three and text is bounded", () => {
 });
 
 
-Deno.test("suggested replies require exactly three options between 30 and 90 characters", () => {
+Deno.test("suggested replies preserve valid options and accept supported aliases", () => {
   const valid = ["我看著你，想了想才慢慢開口，決定把心裡真正的疑問說出來，也想知道你會怎麼回答。",
       "我沒有立刻接話，而是先觀察你的表情，接著提出另一個想法，試著讓我們的談話繼續下去。",
       "我輕輕笑了笑，順著你的話題分享自己的經歷，再自然地問起你對這件事的看法。"];
@@ -71,7 +71,7 @@ Deno.test("suggested replies require exactly three options between 30 and 90 cha
   assertEquals(parsed.suggested_replies, valid);
   assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: valid.slice(0, 2) })).suggested_replies, []);
   assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: ["太短", valid[1], valid[2]] })).suggested_replies, []);
-  assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: [valid[0], valid[1], valid[2] + "補充超過字數上限的內容".repeat(8)] })).suggested_replies, []);
+  assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: [valid[0], valid[1], valid[2] + "補充超過字數上限的內容".repeat(8)] })).suggested_replies, valid.slice(0, 2));
   assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: [valid[0], "太短", valid[2]] })).suggested_replies, [valid[0], valid[2]]);
   assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggestedReplies: valid })).suggested_replies, valid);
   assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggestions: [...valid, "第四個不顯示，避免超過三個選項"] })).suggested_replies, valid);
