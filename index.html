@@ -1759,7 +1759,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
           phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : {},
           nsfwWorkplaceWarning:row.nsfw_workplace_warning === true,
           isNSFW:row.is_nsfw === true,
-          tags: Array.isArray(row.tags) ? row.tags : [],
+          tags: Array.isArray(row.tags) ? validateCharacterTags(row.tags) : [],
           authorId: row.author_id, owner: state.account?.uid === row.author_id,
           chats: '0', users: null,
           createdAt: row.created_at ? new Date(row.created_at).getTime() : 0,
@@ -1904,7 +1904,7 @@ const ids = (rows || []).map(row => row.id);
           personalityProfile: normalizePersonalityProfile(privateInfoById.get(row.id)?.personalityProfile ?? local.personalityProfile),
           phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : (local.phoneSettings || {}),
           nsfwWorkplaceWarning:row.nsfw_workplace_warning === true,
-          tags: Array.isArray(row.tags) ? row.tags : (local.tags || []),
+          tags: Array.isArray(row.tags) ? validateCharacterTags(row.tags) : validateCharacterTags(local.tags || []),
           authorId: row.author_id,
           owner: true,
           chats: local.chats || '0',
@@ -4097,20 +4097,26 @@ function safeImage(value) {
   } catch (_) {}
   return '';
 }
+function normalizeCharacterTag(value) {
+  // UI 會自動加上 #，因此不把作者輸入的前綴存入資料庫。
+  return String(value ?? '').trim().replace(/^#+/u,'').trim();
+}
 function tagButton(tag) {
-  return `<button class="tag" data-action="tag" data-tag="${e(tag)}">#${e(tag)}</button>`;
+  const normalized=normalizeCharacterTag(tag);
+  return `<button class="tag" data-action="tag" data-tag="${e(normalized)}">#${e(normalized)}</button>`;
 }
 function draftTagButton(tag) {
-  return `<button type="button" class="tag" data-action="remove-draft-tag" data-tag="${e(tag)}" aria-label="移除標籤 ${e(tag)}">#${e(tag)} ×</button>`;
+  const normalized=normalizeCharacterTag(tag);
+  return `<button type="button" class="tag" data-action="remove-draft-tag" data-tag="${e(normalized)}" aria-label="移除標籤 ${e(normalized)}">#${e(normalized)} ×</button>`;
 }
 function validCharacterTag(value) {
-  const tag = String(value ?? '').trim();
+  const tag = normalizeCharacterTag(value);
   return countChars(tag) >= 2 && countChars(tag) <= 10;
 }
 function validateCharacterTags(tags) {
   if (!Array.isArray(tags)) throw new Error('請使用自訂標籤。');
   if (tags.length > 5) throw new Error('角色最多新增5個標籤。');
-  const normalized = tags.map(tag => String(tag ?? '').trim());
+  const normalized = tags.map(normalizeCharacterTag);
   if (normalized.some(tag => !validCharacterTag(tag))) throw new Error('每個標籤需為2–10個字。');
   if (new Set(normalized).size !== normalized.length) throw new Error('標籤不可重複。');
   return normalized;
@@ -8974,7 +8980,7 @@ document.addEventListener('click',async event => {
         const input=$('modal').querySelector('input[name="tagSearch"]');
         const list=$('modal').querySelector('#customTagList');
         if (!input || !list) break;
-        const value=String(input.value || '').trim();
+        const value=normalizeCharacterTag(input.value);
         if (!validCharacterTag(value)) { toast('每個標籤需為2–10個字。'); input.focus(); break; }
         const options=[...list.querySelectorAll('input[name="tag"]')];
         const existing=options.find(item=>item.value===value);
@@ -9821,6 +9827,7 @@ document.addEventListener('submit',async event => {
           encounterScheduleDescription:String(f.get('encounterScheduleDescription') || '').trim(),
           style:String(f.get('style')).trim(),
           personalityProfile:normalizePersonalityProfile({
+            primaryIllustrationName:f.get('primaryIllustrationName'),
             coreTraits:f.get('personalityDescription'), values:'', speechStyle:'', behaviorRules:'',
             likes:f.get('personalityLikes'), dislikes:f.get('personalityDislikes'),
             boundaries:'', relationshipPacing:''
@@ -9835,6 +9842,12 @@ document.addEventListener('submit',async event => {
           chats:old?.chats || '0',users:old?.users ?? null,
           createdAt:old?.createdAt || Date.now()
         };
+        c.primaryIllustrationName=String(f.get('primaryIllustrationName')||'').trim().slice(0,40);
+        // 表單輸入的附加立繪名稱必須同步回待上傳／既有素材物件，否則雲端同步會拿到舊名稱。
+        draftIllustrations=draftIllustrations.slice(0,5).map((item,index)=>({
+          ...((typeof item==='object'&&item)?item:{src:item}),
+          name:String(form.querySelector('[data-illustration-name="'+index+'"]')?.value||'').trim().slice(0,40)
+        }));
 
         if(draftVideoFile)c.avatarVideoPath=await uploadCharacterAvatarVideo(draftVideoFile,user.uid,c.id);
         // 自然語言日程只做長度與登入者檢查，不要求作者提供任何機器格式。
