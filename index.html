@@ -2342,7 +2342,7 @@ function hydrateCharacterVideo(video){
   const path=video?.dataset?.characterVideo;
   if(!path||!window.mySupabase||video.dataset.videoFailed==='true'||video.dataset.videoHydrated==='true'||video.dataset.videoHydrated==='loading'||video.dataset.videoObservePending==='true')return;
   if(!video.dataset.videoDebugId)video.dataset.videoDebugId=String(++characterVideoDebugSequence);
-  console.debug('[character-video] hydrate',{
+  console.info('[character-video] hydrate',{
     instanceId:video.dataset.videoDebugId,
     storagePath:path,
     samePathElements:[...document.querySelectorAll('video[data-character-video]')].filter(item=>item.dataset.characterVideo===path).length,
@@ -2388,7 +2388,7 @@ function hydrateCharacterVideo(video){
       // Set preload before src. Assigning src starts media loading automatically;
       // calling load() again here restarts the same full-range MP4 request.
       video.preload='metadata';
-      console.debug('[character-video] attach-src',{
+      console.info('[character-video] attach-src',{
         instanceId:video.dataset.videoDebugId||'unknown',
         storagePath:path,
         samePathElements:[...document.querySelectorAll('video[data-character-video]')].filter(item=>item.dataset.characterVideo===path).length,
