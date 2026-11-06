@@ -139,7 +139,11 @@ BEGIN
   IF FOUND THEN
     IF v_existing.session_id IS DISTINCT FROM p_session_id
        OR v_existing.user_id IS DISTINCT FROM p_user_id
-       OR v_existing.assistant_message_id IS DISTINCT FROM p_assistant_message_id THEN
+       OR v_existing.user_message_id IS DISTINCT FROM p_user_message_id
+       OR v_existing.assistant_message_id IS DISTINCT FROM p_assistant_message_id
+       OR v_existing.affinity_delta IS DISTINCT FROM p_affinity_delta
+       OR v_existing.reason IS DISTINCT FROM COALESCE(p_reason, '')
+       OR v_existing.phone_events IS DISTINCT FROM COALESCE(p_phone_events, '[]'::jsonb) THEN
       RAISE EXCEPTION 'story_turn_evaluation_idempotency_conflict' USING ERRCODE = '23505';
     END IF;
     RETURN jsonb_build_object('status', v_existing.status, 'idempotent', true);
@@ -208,7 +212,7 @@ BEGIN
   v_affinity := GREATEST(-100, LEAST(100, v_state.affinity + v_eval.affinity_delta));
   UPDATE public.story_relationship_states
   SET affinity = v_affinity,
-      relationship_stage = public.story_relationship_stage_for_affinity(v_affinity),
+      relationship_stage = CASE WHEN v_eval.affinity_delta = 0 THEN v_state.relationship_stage ELSE public.story_relationship_stage_for_affinity(v_affinity) END,
       turn_count_since_summary = mod(turn_count_since_summary + 1, 5),
       updated_at = clock_timestamp()
   WHERE session_id = v_eval.session_id;
@@ -319,7 +323,7 @@ BEGIN
 
   UPDATE public.story_relationship_states
   SET affinity = v_affinity,
-      relationship_stage = public.story_relationship_stage_for_affinity(v_affinity),
+      relationship_stage = CASE WHEN p_affinity_delta = 0 THEN v_state.relationship_stage ELSE public.story_relationship_stage_for_affinity(v_affinity) END,
       last_processed_batch = GREATEST(last_processed_batch, p_batch_number),
       turn_count_since_summary = 0,
       updated_at = clock_timestamp()
