@@ -2463,10 +2463,7 @@ async function loadEncounterScheduleDescriptionIntoEditor(characterId) {
     .eq('character_id', characterId)
     .eq('author_id', user.uid)
     .maybeSingle();
-  if (error) {
-    console.warn('讀取作者自己的角色日程描述失敗：', error.message);
-    return;
-  }
+  if (error) throw new Error('讀取作者自己的角色日程描述失敗：' + error.message);
   if (field.isConnected && !field.value.trim()) field.value = data?.description || '';
 }
 
@@ -2545,7 +2542,7 @@ async function saveSupabaseCharacter(character, expectedUserId) {
       intro: character.intro || '',
       race: character.race || '',
       style: character.style || '',
-      phone_settings:character.phoneSettings && typeof character.phoneSettings==='object' ? {noticePrompts:(Array.isArray(character.phoneSettings.noticePrompts)?character.phoneSettings.noticePrompts:Array.isArray(character.phoneSettings.notices)?character.phoneSettings.notices:[]).slice(0,8).map(x=>String(x).slice(0,150))} : {},
+      phone_settings:character.phoneSettings && typeof character.phoneSettings==='object' ? {noticePrompts:(Array.isArray(character.phoneSettings.noticePrompts)?character.phoneSettings.noticePrompts:Array.isArray(character.phoneSettings.notices)?character.phoneSettings.notices:[]).slice(0,5).map(x=>String(x).slice(0,150))} : {},
       nsfw_workplace_warning: character.nsfwWorkplaceWarning === true,
       is_nsfw: character.isNSFW === true,
       tags: Array.isArray(character.tags) ? character.tags : []
@@ -4986,6 +4983,45 @@ function readEditorDraft() {
   }
   return null;
 }
+function normalizePhoneNoticeRows(value) {
+  const source = Array.isArray(value) ? value : [];
+  return source.slice(0,5).map(item => {
+    const raw = String(item || '');
+    const separator = raw.indexOf('|');
+    return separator < 0
+      ? { display:raw.trim(), instruction:'' }
+      : { display:raw.slice(0,separator).trim(), instruction:raw.slice(separator+1).trim() };
+  });
+}
+function readPhoneNoticeRows(form) {
+  const values = new FormData(form);
+  return Array.from({length:5}, (_,index) => {
+    const display = String(values.get('phoneDisplay'+index) || '').trim().slice(0,80);
+    const instruction = String(values.get('phoneInstruction'+index) || '').trim().slice(0,150);
+    return display || instruction ? display + ' | ' + instruction : '';
+  }).filter(Boolean);
+}
+function renderPhoneSettingsFields(character, savedDraft) {
+  const draftPrompts = savedDraft?.phoneSettings?.noticePrompts;
+  const legacyDraftPrompts = String(savedDraft?.phoneNotices || '').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
+  const source = Array.isArray(draftPrompts) ? draftPrompts
+    : legacyDraftPrompts.length ? legacyDraftPrompts
+    : (Array.isArray(character.phoneSettings?.noticePrompts) ? character.phoneSettings.noticePrompts
+      : Array.isArray(character.phoneSettings?.notices) ? character.phoneSettings.notices : []);
+  const rows = normalizePhoneNoticeRows(source);
+  return Array.from({length:5}, (_,index) => {
+    const row = rows[index] || {display:'',instruction:''};
+    return \`<div class="two-col phone-setting-row" style="align-items:start">
+      <label class="field"><span>手機上的顯示 \${index+1}</span>
+        <input name="phoneDisplay\${index}" maxlength="80" value="\${e(row.display)}" placeholder="例如：💭{CHAR}目前的想法">
+      </label>
+      <label class="field"><span>AI 要顯示的內容</span>
+        <textarea name="phoneInstruction\${index}" maxlength="150" rows="2" placeholder="例如：根據角色當下情緒與最近對話，寫出簡短且連貫的想法">\${e(row.instruction)}</textarea>
+      </label>
+    </div>\`;
+  }).join('');
+}
+
 function saveEditorDraft() {
   const form = $('view')?.querySelector('form[data-form="character"]');
   const key = editorDraftKey();
@@ -5006,7 +5042,8 @@ function saveEditorDraft() {
       likes:values.get('personalityLikes'), dislikes:values.get('personalityDislikes'),
       boundaries:'', relationshipPacing:''
     }),
-    phoneNotices:String(values.get('phoneNotices') || ''),
+    encounterScheduleDescription:String(values.get('encounterScheduleDescription') || ''),
+    phoneSettings:{noticePrompts:readPhoneNoticeRows(form)},
     visibility:String(values.get('visibility') || 'private'),
     rightsConfirmed:values.get('rightsConfirmed') === 'on',
     isNSFW:values.get('isNSFW') === 'on',
@@ -5090,6 +5127,7 @@ function renderEditor() {
   const savedDraft = readEditorDraft();
   const original = draftCharacter || state.characters.find(c => c.id === route.id) || {};
   const c = savedDraft ? {...original, ...savedDraft} : original;
+  const phoneSettingsEditor = renderPhoneSettingsFields(c, savedDraft);
   if (savedDraft) {
     draftTags = Array.isArray(savedDraft.tags) ? [...savedDraft.tags] : draftTags;
     draftImage = savedDraft.image || draftImage || '';
@@ -5148,8 +5186,11 @@ function renderEditor() {
             <small class="char-counter" data-count-for="privateInfo">0/10000；僅作者可查看。</small>
           </label>
         </section>
-        <section class="memory-item stack" style="gap:10px"><strong>11. 角色手機設定</strong>
-          <label class="field"><span>手機通知揭露指示（每行 1 則，最多 8 則）</span><textarea name="phoneNotices" maxlength="1200" placeholder="💬心裡話 | 每回合揭露一則簡短心裡話\n🔎線索 | 當劇情出現新線索時，揭露線索通知">${e(savedDraft?.phoneNotices ?? (Array.isArray(c.phoneSettings?.noticePrompts) ? c.phoneSettings.noticePrompts.join('\n') : Array.isArray(c.phoneSettings?.notices) ? c.phoneSettings.notices.join('\n') : ''))}</textarea><small>每行填寫一則 AI 手機通知的揭露指示，最多 8 則。</small></label></section>
+        <section class="memory-item stack" style="gap:12px">
+          <strong>11. 角色手機設定</strong>
+          <small>每個欄位分成玩家手機上看到的顯示名稱，以及 AI 每回合要生成的內容。可使用 {CHAR} 代表角色、{USER} 代表玩家；最多設定 5 個欄位，順序會對應手機顯示順序。</small>
+          \${phoneSettingsEditor}
+        </section>
         <section class="memory-item stack" style="gap:12px">
           <strong>上傳主要角色圖</strong>
           <label class="field"><span>角色主圖 *</span>
@@ -5189,7 +5230,7 @@ function renderEditor() {
         </div>
       </form>
     </div>`;
-  if (route.id && !savedDraft?.encounterScheduleDescription) void loadEncounterScheduleDescriptionIntoEditor(route.id);
+  if (route.id && !savedDraft?.encounterScheduleDescription) void loadEncounterScheduleDescriptionIntoEditor(route.id).catch(error=>{console.warn('角色日程載入失敗：',error);toast(error.message);});
   if (route.id && (editorIllustrationHydration.characterId!==route.id || editorIllustrationHydration.status==='idle')) {
     const characterId=route.id;
     editorIllustrationHydration={characterId,status:'loading',promise:null,error:null};
@@ -9731,13 +9772,14 @@ document.addEventListener('submit',async event => {
           gender:String(f.get('gender')),age:String(f.get('age')).trim(),
           race:String(f.get('race')).trim(),intro,opening,
           privateInfo:String(f.get('privateInfo')).trim(),
+          encounterScheduleDescription:String(f.get('encounterScheduleDescription') || '').trim(),
           style:String(f.get('style')).trim(),
           personalityProfile:normalizePersonalityProfile({
             coreTraits:f.get('personalityDescription'), values:'', speechStyle:'', behaviorRules:'',
             likes:f.get('personalityLikes'), dislikes:f.get('personalityDislikes'),
             boundaries:'', relationshipPacing:''
           }),
-          phoneSettings:{noticePrompts:String(f.get('phoneNotices')||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,8).map(x=>x.slice(0,150))},
+          phoneSettings:{noticePrompts:readPhoneNoticeRows(form)},
           visibility:String(f.get('visibility')),image:draftImage,
           avatarVideoPath:draftVideoPath || '',
           isNSFW:f.get('isNSFW') === 'on',
@@ -9750,6 +9792,11 @@ document.addEventListener('submit',async event => {
 
         if(draftVideoFile)c.avatarVideoPath=await uploadCharacterAvatarVideo(draftVideoFile,user.uid,c.id);
         // 自然語言日程只做長度與登入者檢查，不要求作者提供任何機器格式。
+        if(route.id){
+          const scheduleField=form.querySelector('textarea[name="encounterScheduleDescription"]');
+          if(scheduleField && !scheduleField.value.trim()) await loadEncounterScheduleDescriptionIntoEditor(route.id);
+          if(scheduleField) f.set('encounterScheduleDescription',scheduleField.value);
+        }
         const scheduleDescription = String(f.get('encounterScheduleDescription') || '').trim();
         if (scheduleDescription.length > 20000) return toast('角色日程描述最多 20,000 字。');
         // 先寫入雲端；只有角色資料成功後才更新本機畫面狀態。
