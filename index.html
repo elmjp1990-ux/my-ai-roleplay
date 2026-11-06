@@ -2376,9 +2376,10 @@ function hydrateCharacterVideo(video){
         video.dataset.videoHydrated='false';
         return;
       }
-      video.src=signedUrl;
+      // Set preload before src. Assigning src starts media loading automatically;
+      // calling load() again here restarts the same full-range MP4 request.
       video.preload='metadata';
-      video.load();
+      video.src=signedUrl;
       video.dataset.videoHydrated='true';
       video.play().catch(()=>{});
     }catch(error){
