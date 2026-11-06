@@ -5038,26 +5038,29 @@ function renderPhoneSettingsFields(character, savedDraft) {
       : Array.isArray(character.phoneSettings?.notices) ? character.phoneSettings.notices : []);
   const rows = normalizePhoneNoticeRows(source);
   const visibleRows = rows.length ? rows : [{display:'',instruction:''}];
-  return \`<div id="phoneSettingsEditor" class="stack" style="gap:10px">
-    <div id="phoneSettingsRows" class="stack" style="gap:10px">\${visibleRows.map((row,index) => \`
-      <div class="phone-setting-row stack" data-phone-setting-row style="gap:6px;padding:10px;border:1px solid var(--border);border-radius:12px">
-        <div class="row" style="align-items:center;justify-content:space-between">
-          <strong>手機欄位 \${index+1}</strong>
-          <button type="button" class="small" data-phone-setting-action="remove" aria-label="刪除手機欄位 \${index+1}" \${visibleRows.length<=1?'disabled':''}>－</button>
-        </div>
-        <div class="two-col" style="align-items:start">
-          <label class="field"><span>手機上的顯示</span>
-            <input name="phoneDisplay\${index}" maxlength="80" value="\${e(row.display)}" placeholder="例如：💭{CHAR}目前的想法">
-          </label>
-          <label class="field"><span>AI 要顯示的內容</span>
-            <textarea name="phoneInstruction\${index}" maxlength="150" rows="2" placeholder="例如：根據角色當下情緒與最近對話，寫出簡短且連貫的想法">\${e(row.instruction)}</textarea>
-          </label>
-        </div>
-      </div>\`).join('')}</div>
-    <div class="row" style="justify-content:flex-start">
-      <button type="button" class="small" data-phone-setting-action="add" \${visibleRows.length>=8?'disabled':''}>＋ 新增手機欄位（\${visibleRows.length}/8）</button>
-    </div>
-  </div>\`;
+  return '<div id="phoneSettingsEditor" class="stack" style="gap:10px">' +
+    '<div id="phoneSettingsRows" class="stack" style="gap:10px">' +
+    visibleRows.map((row,index) =>
+      '<div class="phone-setting-row stack" data-phone-setting-row style="gap:6px;padding:10px;border:1px solid var(--border);border-radius:12px">' +
+        '<div class="row" style="align-items:center;justify-content:space-between">' +
+          '<strong>手機通知 '+(index+1)+'</strong>' +
+          '<button type="button" class="small" data-phone-setting-action="remove" aria-label="刪除手機通知 '+(index+1)+'" '+(visibleRows.length<=1?'disabled':'')+'>－</button>' +
+        '</div>' +
+        '<div class="two-col" style="align-items:start">' +
+          '<label class="field"><span>名稱</span>' +
+            '<input name="phoneDisplay'+index+'" maxlength="80" value="'+e(row.display)+'" placeholder="顯示在手機上的字">' +
+          '</label>' +
+          '<label class="field"><span>AI 內容生成指示</span>' +
+            '<textarea name="phoneInstruction'+index+'" maxlength="150" rows="2" placeholder="AI 自己產出的數據或內容">'+e(row.instruction)+'</textarea>' +
+          '</label>' +
+        '</div>' +
+      '</div>'
+    ).join('') +
+    '</div>' +
+    '<div class="row" style="justify-content:flex-start">' +
+      '<button type="button" class="small" data-phone-setting-action="add" '+(visibleRows.length>=8?'disabled':'')+'>＋ 新增通知（'+visibleRows.length+'/8）</button>' +
+    '</div>' +
+  '</div>';
 }
 
 
