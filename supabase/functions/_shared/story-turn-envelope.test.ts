@@ -46,7 +46,7 @@ Deno.test("out-of-range affinity is neutralized and invalid phone events are dro
   assertEquals(parsed.phone_events, [{ event_type: "message", title: "有效", body: "內容" }]);
 });
 
-Deno.test("phone events are limited to three and text is bounded", () => {
+Deno.test("phone events support five configured fields and text is bounded", () => {
   const parsed = parseStoryTurnEnvelope(JSON.stringify({
     reply: "回覆",
     affinity_delta: -3,
@@ -59,7 +59,7 @@ Deno.test("phone events are limited to three and text is bounded", () => {
   }));
   assertEquals(parsed.affinity_delta, -3);
   assertEquals(parsed.affinity_reason.length, 280);
-  assertEquals(parsed.phone_events.length, 3);
+  assertEquals(parsed.phone_events.length, 5);
 });
 
 
