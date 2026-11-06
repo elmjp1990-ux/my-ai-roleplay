@@ -85,7 +85,7 @@ assert.match(html, /主要角色圖預覽/);
 assert.ok(html.includes("const characterVideoLoaders = new WeakMap()"));
 assert.ok(html.includes("characterVideoLoaders.set(video,load)"));
 assert.ok(html.includes("characterVideoLoaders.get(target)"));
-assert.ok(html.includes("if(target.dataset.videoHydrated==='true')target.play().catch"));
+assert.ok(html.includes("if(target.dataset.videoHydrated==='true'){target.preload='metadata';target.play().catch"));
 // Scrolling away or backgrounding the tab must pause without detaching src,
 // otherwise revisiting the same card downloads the entire MP4 again.
 assert.ok(html.includes("function pauseCharacterVideo(video){"));
