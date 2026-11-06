@@ -2536,7 +2536,7 @@ async function saveSupabaseCharacter(character, expectedUserId) {
     // 先讀取既有上架紀錄，避免 upsert 把首次公開時間或資格重設。
     const { data: existingCharacter, error: existingCharacterError } = await client
       .from('characters')
-      .select('visibility, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, is_nsfw, deleted_at')
+      .select('name, intro, race, style, tags, phone_settings, visibility, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, is_nsfw, deleted_at')
       .eq('id', character.id)
       .eq('author_id', expectedUserId)
       .maybeSingle();
@@ -2546,6 +2546,59 @@ async function saveSupabaseCharacter(character, expectedUserId) {
     if (existingCharacter?.deleted_at) {
       throw new Error('此角色已被刪除，不能重新公開或修改。若要創作新版本，請建立新角色。');
     }
+
+    // 角色卡儲存先做確定性的欄位差異判斷；這裡只產生整理決策，不呼叫模型、不阻擋一般儲存。
+    const { data: existingPrivateProfile, error: existingPrivateProfileError } = await client
+      .from('character_private_info')
+      .select('private_info, personality_profile')
+      .eq('character_id', character.id)
+      .eq('author_id', expectedUserId)
+      .maybeSingle();
+    if (existingPrivateProfileError) {
+      throw new Error('讀取角色舊版隱藏設定失敗：' + existingPrivateProfileError.message);
+    }
+
+    const stableCharacterValue = value => {
+      if (Array.isArray(value)) return value.map(stableCharacterValue);
+      if (value && typeof value === 'object') {
+        return Object.fromEntries(Object.keys(value).sort().map(key => [key, stableCharacterValue(value[key])]));
+      }
+      return value ?? null;
+    };
+    const characterValueChanged = (before, after) =>
+      JSON.stringify(stableCharacterValue(before)) !== JSON.stringify(stableCharacterValue(after));
+    const previousProfile = normalizePersonalityProfile(existingPrivateProfile?.personality_profile || {});
+    const nextProfile = normalizePersonalityProfile(character.personalityProfile || {});
+    const aiRelevantChanges = [];
+    const nonAiChanges = [];
+
+    const compareCharacterField = (key, label, before, after, aiRelevant) => {
+      if (!characterValueChanged(before, after)) return;
+      (aiRelevant ? aiRelevantChanges : nonAiChanges).push({ key, label });
+    };
+
+    // 只把會改變角色理解／行為的原始設定列入 AI 影響欄位。
+    compareCharacterField('name', '角色名稱', existingCharacter?.name, String(character.name || '').trim(), true);
+    compareCharacterField('intro', '角色介紹／背景', existingCharacter?.intro, character.intro || '', true);
+    compareCharacterField('race', '種族／世界觀', existingCharacter?.race, character.race || '', true);
+    compareCharacterField('style', '角色風格', existingCharacter?.style, character.style || '', true);
+    compareCharacterField('private_info', '作者私密設定', existingPrivateProfile?.private_info || '', String(character.privateInfo || '').slice(0, 10000), true);
+    compareCharacterField('personality_profile', '個性與角色行為設定', previousProfile, nextProfile, true);
+    compareCharacterField('tags', '角色標籤', existingCharacter?.tags || [], character.tags || [], false);
+    compareCharacterField('phone_settings', '手機通知顯示設定', existingCharacter?.phone_settings || {}, character.phoneSettings || {}, false);
+    compareCharacterField('avatar', '角色圖片／影片', null, null, false);
+
+    const isNewCharacter = !existingCharacter;
+    const aiOrganizationDecision = {
+      version: 1,
+      status: (isNewCharacter || aiRelevantChanges.length) ? 'needs_review' : 'not_needed',
+      reason: isNewCharacter ? 'new_character' : (aiRelevantChanges.length ? 'ai_source_fields_changed' : 'no_ai_relevant_change'),
+      model: 'deepseek/deepseek-v4-flash-20260423',
+      changedFields: aiRelevantChanges.map(item => item.key),
+      changedFieldLabels: aiRelevantChanges.map(item => item.label),
+      nonAiChangedFields: nonAiChanges.map(item => item.key),
+      shouldCallModel: false
+    };
 
     const firstPublishedAt = existingCharacter?.first_published_at ||
       (nextVisibility === 'public' ? new Date().toISOString() : null);
@@ -2668,7 +2721,7 @@ if (characterError) {
     if (storyResult.error) {
       return { storyError: '角色已儲存，但開場故事儲存失敗：' + storyResult.error.message };
     }
-    return { storyError: null, visibility: savedCharacter.visibility, rightsConfirmed: savedCharacter.rights_confirmed === true, firstPublishedAt: savedCharacter.first_published_at ? new Date(savedCharacter.first_published_at).getTime() : null, latestEligible: savedCharacter.latest_eligible !== false };
+    return { storyError: null, visibility: savedCharacter.visibility, rightsConfirmed: savedCharacter.rights_confirmed === true, firstPublishedAt: savedCharacter.first_published_at ? new Date(savedCharacter.first_published_at).getTime() : null, latestEligible: savedCharacter.latest_eligible !== false, aiOrganizationDecision };
   }
 
   const stablePersonaJson = value => JSON.stringify(value, (key, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a],[b])=>a.localeCompare(b))) : item);
