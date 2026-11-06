@@ -77,8 +77,10 @@ assert.match(saveFlow, /aiRelevantChanges/,
   'Save must maintain a separate list of AI-impacting field changes');
 assert.match(saveFlow, /nonAiChanges/,
   'Save must distinguish display/configuration changes from AI source changes');
-assert.match(saveFlow, /reason: isNewCharacter \? 'new_character'/,
-  'New characters must be marked for initial AI organization review');
+assert.match(saveFlow, /new_character_source_fields_available/,
+  'New characters with no meaningful AI source fields must not trigger model organization');
+assert.match(saveFlow, /new_character_ai_source_present/,
+  'New characters with populated AI source fields may require derived organization');
 assert.match(saveFlow, /model: 'deepseek\/deepseek-v4-flash-20260423'/,
   'Character data organization must use the confirmed conversation model');
 assert.match(saveFlow, /shouldCallModel: false/,
