@@ -2444,6 +2444,10 @@ async function saveEncounterScheduleDescription(characterId, userId, description
     const { error } = await client.from('character_schedule_descriptions')
       .delete().eq('character_id', characterId).eq('author_id', userId);
     if (error) throw new Error('清除角色日程描述失敗：' + error.message);
+    const { data: remaining, error: verifyError } = await client.from('character_schedule_descriptions')
+      .select('character_id').eq('character_id', characterId).eq('author_id', userId).maybeSingle();
+    if (verifyError) throw new Error('清除日程後無法驗證：' + verifyError.message);
+    if (remaining) throw new Error('日程清除未完成，請重新儲存。');
     return;
   }
   const { error } = await client.from('character_schedule_descriptions').upsert({
@@ -2451,6 +2455,10 @@ async function saveEncounterScheduleDescription(characterId, userId, description
     updated_at: new Date().toISOString()
   }, { onConflict: 'character_id' });
   if (error) throw new Error('角色已儲存，但日程描述同步失敗：' + error.message);
+  const { data: saved, error: verifyError } = await client.from('character_schedule_descriptions')
+    .select('description').eq('character_id', characterId).eq('author_id', userId).maybeSingle();
+  if (verifyError) throw new Error('日程寫入後無法回讀：' + verifyError.message);
+  if (String(saved?.description || '') !== text) throw new Error('第 9 項角色日程回讀結果與送出內容不一致，請重新儲存。');
 }
 
 async function loadEncounterScheduleDescriptionIntoEditor(characterId) {
