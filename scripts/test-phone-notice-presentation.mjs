@@ -23,8 +23,8 @@ const editorHelpers = html.slice(editorStart, editorEnd);
 assert.match(editorHelpers, /source\.slice\(0,8\)/, 'Phone editor must align with the eight-field Story contract');
 assert.match(editorHelpers, /phoneDisplay/);
 assert.match(editorHelpers, /phoneInstruction/);
-assert.match(editorHelpers, /手機上的顯示/);
-assert.match(editorHelpers, /AI 要顯示的內容/);
+assert.match(editorHelpers, /<span>名稱<\/span>/);
+assert.match(editorHelpers, /AI 內容生成指示/);
 assert.match(html, /encounterScheduleDescription:String\(values\.get\('encounterScheduleDescription'\) \|\| ''\)/,
   'Editor draft must retain the schedule field');
 assert.match(html, /scheduleField\.dataset\.scheduleHydrated !== 'true'/,
