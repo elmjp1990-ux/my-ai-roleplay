@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.story_turn_evaluations (
     AND jsonb_array_length(phone_events) <= 3
     AND pg_column_size(phone_events) <= 8000
   ),
-  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'applied')),
+  status text NOT NULL DEFAULT 'pending',
   created_at timestamptz NOT NULL DEFAULT now(),
   applied_at timestamptz,
   CONSTRAINT story_turn_evaluations_status_check CHECK (
