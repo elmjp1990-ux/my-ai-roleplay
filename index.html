@@ -5148,7 +5148,7 @@ function clearEditorDraft() {
 }
 function startEditor(c = null) {
   draftCharacter = c ? clone(c) : null;
-  draftTags = [...(c?.tags || [])];
+  draftTags = normalizeCharacterTagsForRead(c?.tags || []);
   draftImage = c?.image || '';
   draftIllustrations = [];
   draftPrimaryIllustrationPath = '';
@@ -5200,7 +5200,7 @@ function renderEditor() {
   const c = savedDraft ? {...original, ...savedDraft} : original;
   const phoneSettingsEditor = renderPhoneSettingsFields(c, savedDraft);
   if (savedDraft) {
-    draftTags = Array.isArray(savedDraft.tags) ? [...savedDraft.tags] : draftTags;
+    draftTags = Array.isArray(savedDraft.tags) ? normalizeCharacterTagsForRead(savedDraft.tags) : draftTags;
     draftImage = savedDraft.image || draftImage || '';
     draftIllustrations = Array.isArray(savedDraft.illustrations) ? savedDraft.illustrations.slice(0,5) : draftIllustrations;
     draftPrimaryIllustrationPath = savedDraft.primaryIllustrationPath || draftPrimaryIllustrationPath || '';
@@ -5209,7 +5209,7 @@ function renderEditor() {
   if (!draftCharacter && route.id) {
     draftCharacter = clone(original);
     if (!savedDraft) {
-      draftTags = [...(original.tags || [])];
+      draftTags = normalizeCharacterTagsForRead(original.tags || []);
       draftImage = original.image || '';
       draftVideoPath = original.avatarVideoPath || '';
     }
@@ -5258,7 +5258,7 @@ function renderEditor() {
           </label>
         </section>
         <section class="memory-item stack" style="gap:12px">
-          <strong>11. 角色手機設定</strong>
+          <strong>11. 角色手機設定－手機通知揭露指示（每行 1 則，最多 8 則）</strong>
           <small>每組分成「手機上的顯示」與「AI 要顯示的內容」。可使用 {CHAR} 代表角色、{USER} 代表玩家；按「＋」新增、按「－」刪除，最多 8 組，順序會對應手機顯示順序。</small>
           ${phoneSettingsEditor}
         </section>
