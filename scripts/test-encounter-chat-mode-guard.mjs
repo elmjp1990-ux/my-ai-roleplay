@@ -249,6 +249,15 @@ assert.match(frontend, /saved!==true\)throw new Error\('雲端未確認儲存結
 assert.match(frontend, /\.eq\(["']chat_mode["'],["']encounter["']\)/);
 assert.match(frontend, /item\.characterId === c\.id && !item\.archived && item\.encounterMode !== true/);
 assert.match(frontend, /const hasConversation=hasUserMessage\(s\)\|\|\(s\.cloudOwned&&s\.cloudHasUserMessage==null\)/);
+assert.match(frontend, /session_encounter_metadata:session_data->encounter/);
+assert.match(frontend, /function isEncounterChatSession\(session\)/);
+assert.match(frontend, /session\?\.chatMode==='encounter'/);
+assert.match(frontend, /data\.encounter&&typeof data\.encounter==='object'/);
+assert.match(frontend, /!isEncounterChatSession\(s\)/);
+assert.match(frontend, /encounter_marker:session_data->encounter/);
+assert.match(frontend, /row\.encounter_marker&&typeof row\.encounter_marker==='object'/);
+assert.match(frontend, /!isEncounterChatSession\(item\)/);
+assert.match(frontend, /!isEncounterChatSession\(candidate\)/);
 assert.match(frontend, /if \(!item \|\| item\.hidden \|\| item\.encounterMode === true\) return false;/);
 assert.match(frontend, /item\.id !== s\.id && item\.characterId === c\.id && !item\.archived && item\.encounterMode !== true/);
 assert.match(frontend, /candidate\.id!==item\.id&&candidate\.characterId===item\.characterId&&!candidate\.archived&&candidate\.encounterMode!==true/);
