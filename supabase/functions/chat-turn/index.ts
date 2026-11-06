@@ -142,7 +142,7 @@ async function buildStoryMessages(
     "世界觀：{WORLD}",
     "目前關係：{RELATIONSHIP}",
     "【角色手機設定】" + JSON.stringify(asDbRow(snapshot.phoneSettings)).slice(0, 4000),
-    "【每回合結構化輸出】只輸出一個 JSON object，不要 Markdown code fence。格式：{\"reply\":\"角色對玩家的完整自然回覆\",\"affinity_delta\":0,\"affinity_reason\":\"簡短說明這次互動為何影響或不影響關係\",\"phone_events\":[]}。affinity_delta 必須是 -3 到 3 的整數；普通聊天、資訊交換或沒有情感意義的互動填 0。不要為討好玩家而加分；依角色人格、界線、信任與實際互動判斷。phone_events 最多 3 筆，沒有合理的新手機動態就回傳空陣列。每筆格式為 {\"event_type\":\"message|social_post|missed_call|voice_message|notification\",\"title\":\"標題\",\"body\":\"內容\"}。必須遵守角色手機設定，不得虛構與故事矛盾的事件；不得把玩家未說出的內心話當成角色已知資訊。reply 內的旁白仍使用單星號格式，實際對白不加星號。",
+    "【每回合結構化輸出】只輸出一個 JSON object，不要 Markdown code fence。格式：{\\"reply\\":\\"角色對玩家的完整自然回覆\\",\\"affinity_delta\\":0,\\"affinity_reason\\":\\"簡短說明這次互動為何影響或不影響關係\\",\\"phone_events\\":[],\\"suggested_replies\\":[\\"第一則玩家可直接送出的自然回覆\\",\\"第二則不同方向的自然回覆\\",\\"第三則不同方向的自然回覆\\"]}。suggested_replies 必須恰好 3 則，每則 30～90 字，內容是玩家可以直接送出的完整自然回覆，必須根據角色人設、當前場景及最新對話提出三種不同的回應方向；不得使用固定模板、分類標籤、溫柔／俏皮等風格標題，不得加數字或項目編號，也不可把建議寫成給玩家的操作說明。三則要有實質差異、符合玩家視角，且不可替角色或玩家捏造已發生的事。無論前端建議回覆面板是否開啟，每回合都必須生成這三則內容。affinity_delta 必須是 -3 到 3 的整數；普通聊天、資訊交換或沒有情感意義的互動填 0。不要為討好玩家而加分；依角色人格、界線、信任與實際互動判斷。phone_events 最多 3 筆，沒有合理的新手機動態就回傳空陣列。每筆格式為 {\\"event_type\\":\\"message|social_post|missed_call|voice_message|notification\\",\\"title\\":\\"標題\\",\\"body\\":\\"內容\\"}。必須遵守角色手機設定，不得虛構與故事矛盾的事件；不得把玩家未說出的內心話當成角色已知資訊。reply 內的旁白仍使用單星號格式，實際對白不加星號。",
     "",
     "【第三優先｜喜好與不喜愛的點】自然融入角色的偏好、興趣、厭惡事項與雷點；遇到喜歡的事物可有符合個性的反應，遇到雷點則依角色設定表現，不要機械式列清單，也不要為迎合玩家而忽略角色界線。",
     "{CHAR_LIKES}",
@@ -747,6 +747,7 @@ Deno.serve(async (request) => {
   return json({
     status: settled,
     assistantMessage: { id: assistantMessageId, content: turnEnvelope.reply, role: "assistant" },
+    suggestedReplies: turnEnvelope.suggested_replies,
     relationship: storyEffects || null,
     billing: { cost: 2, silver_reserved: charge.silver_reserved, diamonds_reserved: charge.diamonds_reserved },
     provider: {
