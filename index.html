@@ -3496,7 +3496,10 @@ async function loadCloudChatSessions(user, options = {}) {
       }
       const existing = state.sessions[row.id];
       const opening = row.session_opening_message && typeof row.session_opening_message === 'object'
-        ? row.session_opening_message : existing?.initialOpeningMessage || null;
+        ? row.session_opening_message
+        : existing?.initialOpeningMessage || (String(snapshot.opening || '').trim()
+          ? {text:String(snapshot.opening),at:row.created_at ? new Date(row.created_at).getTime() : Date.now()}
+          : null);
       const pending = row.session_pending_turn && typeof row.session_pending_turn === 'object'
         ? row.session_pending_turn : null;
       const marker = row.session_has_user_message;
