@@ -5628,6 +5628,9 @@ async function startChat(characterId) {
         .is('deleted_at',null).order('created_at',{ascending:false}).limit(1).maybeSingle();
       if(messagesError)throw messagesError;
       if(latestPlayerMessage?.session_id)existingRow=(rows||[]).find(row=>row.id===latestPlayerMessage.session_id)||null;
+      // If the character has an existing but not-yet-started Story room, reuse it
+      // instead of creating another empty room for the same character.
+      if(!existingRow)existingRow=(rows||[]).find(row=>candidateIds.includes(row.id))||null;
     }
     if(existingRow){
       await loadCloudChatSessions({id:userId},{onlySessionId:existingRow.id});
