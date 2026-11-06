@@ -7120,8 +7120,8 @@ function renderConversation() {
   if (route.chatOverlay) renderChatOverlay(route.chatOverlay);
 }
 function formatMessage(text) {
-  // **...** and *...* are narration markers. Single-asterisk narration may
-  // span multiple lines in character opening messages, so parse across newlines.
+  // **...** and *...* are narration markers. Legacy single-asterisk *...* narration remains supported.
+  // Single-asterisk narration may span multiple lines in character opening messages.
   return String(text).split(/(\*\*[\s\S]*?\*\*|\*(?!\*)[\s\S]+?\*(?!\*))/g).filter(Boolean).map(part => {
     const isDoubleNarration = part.startsWith('**') && part.endsWith('**') && part.length >= 4;
     const isSingleNarration = part.startsWith('*') && !part.startsWith('**') && part.endsWith('*') && !part.endsWith('**');
