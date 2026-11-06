@@ -88,5 +88,19 @@ assert.match(saveFlow, /aiOrganizationDecision/ ,
 assert.doesNotMatch(saveFlow, /chat\.completions|fetch\(.*openrouter/i,
   'Character save classification must not call the AI provider directly');
 
+
+assert.match(saveFlow, /runtimeAiChanges/,
+  'Phone notice instructions must be classified as runtime AI configuration changes');
+assert.match(saveFlow, /runtimeAiChangedFields/,
+  'Save result must expose runtime AI configuration changes separately');
+assert.match(saveFlow, /requiresDerivedRefresh: isNewCharacter \|\| aiRelevantChanges\.length > 0/,
+  'Only new characters or changed source/personality fields should require derived-data refresh');
+assert.match(saveFlow, /primaryIllustrationName/,
+  'Primary illustration naming must be treated as display metadata, not personality content');
+assert.match(saveFlow, /aiProfileFields/,
+  'Personality profile fields must be diffed individually instead of as one opaque object');
+assert.doesNotMatch(saveFlow, /compareCharacterField\('phone_settings'.*false/,
+  'Phone instructions must not be mislabeled as non-AI changes');
+
 console.log('Character save performs deterministic AI-impact diffing without invoking the model.');
 
