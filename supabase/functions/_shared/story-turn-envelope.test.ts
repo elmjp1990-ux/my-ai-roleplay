@@ -72,4 +72,7 @@ Deno.test("suggested replies require exactly three options between 30 and 90 cha
   assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: valid.slice(0, 2) })).suggested_replies, []);
   assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: ["太短", valid[1], valid[2]] })).suggested_replies, []);
   assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: [valid[0], valid[1], valid[2] + "補充超過字數上限的內容".repeat(8)] })).suggested_replies, []);
+  assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: [valid[0], "太短", valid[2]] })).suggested_replies, [valid[0], valid[2]]);
+  assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggestedReplies: valid })).suggested_replies, valid);
+  assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggestions: [...valid, "第四個不顯示，避免超過三個選項"] })).suggested_replies, valid);
 });
