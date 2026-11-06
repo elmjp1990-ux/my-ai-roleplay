@@ -61,7 +61,7 @@ export function parseStoryTurnEnvelope(raw: string): StoryTurnEnvelope {
 
   const phoneEvents: StoryPhoneEvent[] = [];
   if (Array.isArray(value.phone_events)) {
-    for (const item of value.phone_events.slice(0, 5)) {
+    for (const item of value.phone_events.slice(0, 8)) {
       const event = asObject(item);
       if (!event || typeof event.event_type !== "string" || !allowedPhoneEventTypes.has(event.event_type)) continue;
       const title = boundedText(event.title, 80);
