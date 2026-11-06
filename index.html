@@ -2324,10 +2324,9 @@ async function getCharacterVideoSignedUrl(path){
 }
 function pauseCharacterVideo(video){
   if(!video)return;
-  // Keep the media source attached while offscreen. Removing src here made the
-  // same 3-4 MB MP4 download again every time a card re-entered the viewport.
+  // Pause playback without changing preload or detaching src. Changing preload
+  // while a media resource is attached can restart its fetch from byte zero.
   video.pause();
-  video.preload='none';
 }
 function releaseCharacterVideo(video){
   if(!video)return;
@@ -2394,7 +2393,7 @@ function hydrateCharacterVideo(video){
         const target=entry.target;
         if(!target?.isConnected)continue;
         if(entry.isIntersecting&&!document.hidden){
-          if(target.dataset.videoHydrated==='true'){target.preload='metadata';target.play().catch(()=>{});}
+          if(target.dataset.videoHydrated==='true'){if(target.paused)target.play().catch(()=>{});}
           else {
             const loadTarget=characterVideoLoaders.get(target);
             if(loadTarget)void loadTarget();
