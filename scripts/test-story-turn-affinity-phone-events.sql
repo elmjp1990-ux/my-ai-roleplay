@@ -68,6 +68,7 @@ CREATE TABLE public.story_relationship_batches (
 );
 
 \ir ../supabase/migrations/20261106090000_story_turn_affinity_and_phone_events.sql
+\ir ../supabase/migrations/20261106110000_harden_story_turn_service_role_claims.sql
 
 INSERT INTO auth.users(id) VALUES
   ('10000000-0000-4000-8000-000000000001'),
@@ -100,7 +101,8 @@ INSERT INTO public.chat_turn_charges(turn_id,session_id,user_id,user_message_id,
   ('60000000-0000-4000-8000-000000000004','30000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000004','50000000-0000-4000-8000-000000000004','settled'),
   ('60000000-0000-4000-8000-000000000005','30000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000005','50000000-0000-4000-8000-000000000005','settled');
 
-SELECT set_config('request.jwt.claim.role','service_role',true);
+SELECT set_config('request.jwt.claim.role','',true);
+SELECT set_config('request.jwt.claims','{"role":"service_role"}',true);
 SELECT public.queue_story_turn_evaluation(
   '60000000-0000-4000-8000-000000000001',
   '30000000-0000-4000-8000-000000000001',
@@ -121,8 +123,22 @@ BEGIN
   END IF;
 END $$;
 
+DO $$
+BEGIN
+  PERFORM set_config('request.jwt.claim.role','',true);
+  PERFORM set_config('request.jwt.claims','{"role":"authenticated"}',true);
+  BEGIN
+    PERFORM public.apply_story_turn_evaluation('60000000-0000-4000-8000-000000000001');
+    RAISE EXCEPTION 'authenticated role unexpectedly passed service-role guard';
+  EXCEPTION WHEN insufficient_privilege THEN
+    IF SQLERRM <> 'service_role_required' THEN RAISE; END IF;
+  END;
+END $$;
+SELECT set_config('request.jwt.claim.role','service_role',true);
 UPDATE public.chat_turn_charges SET status='settled'
 WHERE turn_id='60000000-0000-4000-8000-000000000001';
+SELECT set_config('request.jwt.claim.role','',true);
+SELECT set_config('request.jwt.claims','{"role":"service_role"}',true);
 
 DO $$
 DECLARE result jsonb; current_affinity integer; event_count integer;

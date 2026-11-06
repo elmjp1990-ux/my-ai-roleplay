@@ -75,13 +75,20 @@ export function parseStoryTurnEnvelope(raw: string): StoryTurnEnvelope {
     }
   }
 
-  const suggestedReplies = Array.isArray(value.suggested_replies) && value.suggested_replies.length === 3
-    ? value.suggested_replies.map((item) => boundedText(item, 360))
+  // Accept the canonical snake_case key plus common camelCase/provider aliases.
+  // Do not impose a character-count rule on suggestions. Any non-empty
+  // string can be offered; keep at most three options for the chat UI.
+  const rawSuggestions = Array.isArray(value.suggested_replies)
+    ? value.suggested_replies
+    : Array.isArray(value.suggestedReplies)
+    ? value.suggestedReplies
+    : Array.isArray(value.suggestions)
+    ? value.suggestions
     : [];
-  const validSuggestedReplies = suggestedReplies.length === 3 && suggestedReplies.every((item) => {
-    const length = Array.from(item).length;
-    return length >= 30 && length <= 90;
-  }) ? suggestedReplies : [];
+  const validSuggestedReplies = rawSuggestions
+    .map((item) => typeof item === "string" ? item.trim() : "")
+    .filter((item) => item.length > 0)
+    .slice(0, 3);
 
   return {
     reply,

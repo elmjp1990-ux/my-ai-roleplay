@@ -3977,10 +3977,11 @@ async function runPendingChatTurn(s) {
 
   const replyWasAdded = !s.messages.some(message => message.id === reply.id);
   if (Array.isArray(result.suggestedReplies)) {
-    const generatedSuggestions = result.suggestedReplies.length === 3
-      ? result.suggestedReplies.map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90)
-      : [];
-    s.suggestedReplies = generatedSuggestions.length === 3 ? generatedSuggestions : [];
+    // Offer any non-empty suggestion; do not enforce a character-count range.
+    s.suggestedReplies = result.suggestedReplies
+      .map(value=>String(value||'').trim())
+      .filter(value=>value.length>0)
+      .slice(0,3);
   }
   if (replyWasAdded) {
     s.messages.push({
@@ -7083,11 +7084,9 @@ function renderConversation() {
               <summary>建議回覆 <span class="suggestions-count" data-collapsed="點擊可展開" data-expanded="滑動或點選燈號可切換">滑動或點選燈號可切換</span></summary>
               ${!hasUserMessage(s)
                 ? '<p class="suggestion-first-message-hint">請先自由的輸入第一句話，享受與角色對話的美好時光吧</p>'
-                : (Array.isArray(s.suggestedReplies) && s.suggestedReplies.length === 3
+                : (Array.isArray(s.suggestedReplies) && s.suggestedReplies.length > 0 && s.suggestedReplies.length <= 3
                   ? `<div class="suggestion-options" aria-label="選擇建議回覆">
-                      <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="0" aria-label="切換建議回覆" aria-pressed="true"></button>
-                      <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="1" aria-label="切換建議回覆" aria-pressed="false"></button>
-                      <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="2" aria-label="切換建議回覆" aria-pressed="false"></button>
+                      ${s.suggestedReplies.map((_,index)=>`<button type="button" class="suggestion-light" data-action="suggestion-select" data-index="${index}" aria-label="第 ${index+1} 則建議" aria-pressed="${index===0?'true':'false'}"></button>`).join('')}
                     </div>
                     ${s.suggestedReplies.map((reply,index)=>`<button type="button" class="suggestion-card${index===0?' active':''}" data-action="suggestion" data-index="${index}" data-text="${e(reply)}"><span class="suggestion-card-action">${e(reply)}</span></button>`).join('')}`
                   : '<p class="suggestion-first-message-hint">本回合暫時沒有可用的建議回覆。</p>')}
