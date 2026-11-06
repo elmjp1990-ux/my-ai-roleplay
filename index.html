@@ -7087,9 +7087,7 @@ function renderConversation() {
                 ? '<p class="suggestion-first-message-hint">請先自由的輸入第一句話，享受與角色對話的美好時光吧</p>'
                 : (Array.isArray(s.suggestedReplies) && s.suggestedReplies.length > 0 && s.suggestedReplies.length <= 3
                   ? `<div class="suggestion-options" aria-label="選擇建議回覆">
-                      <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="0" aria-label="切換建議回覆" aria-pressed="true"></button>
-                      <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="1" aria-label="切換建議回覆" aria-pressed="false"></button>
-                      <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="2" aria-label="切換建議回覆" aria-pressed="false"></button>
+                      ${s.suggestedReplies.map((_,index)=>`<button type="button" class="suggestion-light" data-action="suggestion-select" data-index="${index}" aria-label="第 ${index+1} 則建議" aria-pressed="${index===0?'true':'false'}"></button>`).join('')}
                     </div>
                     ${s.suggestedReplies.map((reply,index)=>`<button type="button" class="suggestion-card${index===0?' active':''}" data-action="suggestion" data-index="${index}" data-text="${e(reply)}"><span class="suggestion-card-action">${e(reply)}</span></button>`).join('')}`
                   : '<p class="suggestion-first-message-hint">本回合暫時沒有可用的建議回覆。</p>')}
