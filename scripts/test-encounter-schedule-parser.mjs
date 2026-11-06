@@ -139,6 +139,7 @@ assert.ok((html.match(/renderGrid\(\{append:true\}\);/g)||[]).length >= 2);
  assert.ok(html.includes("previousDetailVideo.dataset.characterVideo===detailVideo.dataset.characterVideo"));
  assert.ok(html.includes("detailVideo.replaceWith(previousDetailVideo)"));
  assert.ok(html.includes("releaseCharacterVideo(previousDetailVideo)"));
+ assert.ok(html.includes("if(previousDetailVideo){\n      characterVideoObserver?.unobserve(previousDetailVideo);\n      releaseCharacterVideo(previousDetailVideo);\n    }"));
 
 
 
