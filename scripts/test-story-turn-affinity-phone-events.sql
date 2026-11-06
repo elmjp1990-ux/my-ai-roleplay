@@ -71,6 +71,7 @@ CREATE TABLE public.story_relationship_batches (
 \ir ../supabase/migrations/20261106090000_story_turn_affinity_and_phone_events.sql
 \ir ../supabase/migrations/20261106110000_harden_story_turn_service_role_claims.sql
 \ir ../supabase/migrations/20261106120000_fix_story_turn_evaluation_reserved_charge.sql
+\ir ../supabase/migrations/20261106140000_expand_story_phone_events_to_five_fields.sql
 
 INSERT INTO auth.users(id) VALUES
   ('10000000-0000-4000-8000-000000000001'),
@@ -114,7 +115,7 @@ SELECT public.queue_story_turn_evaluation(
   '50000000-0000-4000-8000-000000000001',
   2,
   'A meaningful trust-building moment',
-  '[{"event_type":"message","title":"訊息","body":"角色傳來一則新的訊息。"}]'::jsonb
+  '[{"event_type":"notification","title":"💭江辰遠目前的想法","body":"他正在思考今天的安排。"},{"event_type":"notification","title":"📱最近收到的訊息","body":"目前沒有新的訊息。"},{"event_type":"notification","title":"📍江辰遠衣著／姿勢","body":"穿著目前已知的休閒襯衫。"},{"event_type":"notification","title":"📍玩家衣著／姿勢","body":"目前沒有足夠資訊。"},{"event_type":"notification","title":"🗒️江辰遠待辦事項","body":"目前沒有待辦事項。"}]'::jsonb
 );
 DO $$
 DECLARE result jsonb;
@@ -155,7 +156,7 @@ BEGIN
   WHERE session_id='30000000-0000-4000-8000-000000000001';
   SELECT count(*) INTO event_count FROM public.story_phone_events
   WHERE turn_id='60000000-0000-4000-8000-000000000001';
-  IF current_affinity <> 12 OR event_count <> 1 THEN
+  IF current_affinity <> 12 OR event_count <> 5 THEN
     RAISE EXCEPTION 'side effects duplicated or missing';
   END IF;
 END $$;
@@ -165,7 +166,7 @@ DO $$
 DECLARE event_count integer;
 BEGIN
   SELECT count(*) INTO event_count FROM public.get_story_phone_events('30000000-0000-4000-8000-000000000001');
-  IF event_count <> 1 THEN RAISE EXCEPTION 'owner cannot read own phone events'; END IF;
+  IF event_count <> 5 THEN RAISE EXCEPTION 'owner cannot read all five configured phone fields'; END IF;
 END $$;
 SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000002',true);
 DO $$
