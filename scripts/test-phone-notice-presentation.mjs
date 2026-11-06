@@ -93,8 +93,10 @@ assert.match(saveFlow, /runtimeAiChanges/,
   'Phone notice instructions must be classified as runtime AI configuration changes');
 assert.match(saveFlow, /runtimeAiChangedFields/,
   'Save result must expose runtime AI configuration changes separately');
-assert.match(saveFlow, /requiresDerivedRefresh: isNewCharacter \|\| aiRelevantChanges\.length > 0/,
-  'Only new characters or changed source/personality fields should require derived-data refresh');
+assert.match(saveFlow, /const requiresDerivedRefresh = aiRelevantChanges\.length > 0/,
+  'Derived refresh must be triggered only by meaningful AI source/personality fields');
+assert.match(saveFlow, /compareCharacterField\(nonAiChanges, 'name'/,
+  'Character renaming must be treated as metadata and must not trigger model organization');
 assert.match(saveFlow, /primaryIllustrationName/,
   'Primary illustration naming must be treated as display metadata, not personality content');
 assert.match(saveFlow, /aiProfileFields/,
