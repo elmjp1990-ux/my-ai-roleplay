@@ -458,4 +458,4 @@ assert.match(affinityMigration, /INSERT INTO public\.story_relationship_states/)
 
 
 // Existing empty Story sessions must be reused instead of creating duplicates.
-assert.match(frontend, /if\(!existingRow\)existingRow=\(rows\|\|\)\.find\(row=>candidateIds\.includes\(row\.id\)\)\|\|null/);
+assert.ok(frontend.includes('if(!existingRow)existingRow=(rows||[]).find(row=>candidateIds.includes(row.id))||null'));
