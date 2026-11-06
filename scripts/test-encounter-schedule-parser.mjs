@@ -86,9 +86,18 @@ assert.ok(html.includes("const characterVideoLoaders = new WeakMap()"));
 assert.ok(html.includes("characterVideoLoaders.set(video,load)"));
 assert.ok(html.includes("characterVideoLoaders.get(target)"));
 assert.ok(html.includes("if(target.dataset.videoHydrated==='true')target.play().catch"));
-assert.ok(html.includes("function stopCharacterVideo(video){"));
-assert.ok(html.includes("video.removeAttribute('src');"));
-assert.ok(html.includes("video.load();"));
+// Scrolling away or backgrounding the tab must pause without detaching src,
+// otherwise revisiting the same card downloads the entire MP4 again.
+assert.ok(html.includes("function pauseCharacterVideo(video){"));
+assert.ok(html.includes("function releaseCharacterVideo(video){"));
+assert.ok(html.includes("video.pause();"));
+assert.ok(html.includes("video.preload='none';"));
+assert.ok(html.includes("if(target.dataset.videoHydrated==='true'){target.preload='metadata';target.play().catch"));
+assert.ok(html.includes("pauseCharacterVideo(target);"));
+assert.ok(html.includes("videos.forEach(pauseCharacterVideo);"));
+// Only a real pagehide releases the media source.
+assert.ok(html.includes("document.querySelectorAll('video[data-character-video]').forEach(releaseCharacterVideo);"));
+assert.ok(!html.includes("function stopCharacterVideo(video){"));
 assert.ok(html.includes("document.addEventListener('visibilitychange'"));
 assert.ok(html.includes("window.addEventListener('pagehide'"));
 assert.ok(html.includes("},{rootMargin:'0px',threshold:0.01}"));
