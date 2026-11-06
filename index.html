@@ -1759,7 +1759,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
           phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : {},
           nsfwWorkplaceWarning:row.nsfw_workplace_warning === true,
           isNSFW:row.is_nsfw === true,
-          tags: Array.isArray(row.tags) ? validateCharacterTags(row.tags) : [],
+          tags: normalizeCharacterTagsForRead(row.tags),
           authorId: row.author_id, owner: state.account?.uid === row.author_id,
           chats: '0', users: null,
           createdAt: row.created_at ? new Date(row.created_at).getTime() : 0,
@@ -1904,7 +1904,7 @@ const ids = (rows || []).map(row => row.id);
           personalityProfile: normalizePersonalityProfile(privateInfoById.get(row.id)?.personalityProfile ?? local.personalityProfile),
           phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : (local.phoneSettings || {}),
           nsfwWorkplaceWarning:row.nsfw_workplace_warning === true,
-          tags: Array.isArray(row.tags) ? validateCharacterTags(row.tags) : validateCharacterTags(local.tags || []),
+          tags: normalizeCharacterTagsForRead(Array.isArray(row.tags) ? row.tags : (local.tags || [])),
           authorId: row.author_id,
           owner: true,
           chats: local.chats || '0',
@@ -2230,7 +2230,7 @@ async function syncCharacterIllustrations(character,userId) {
         }
       }
       const {error}=await client.from('character_illustrations')
-        .update({storage_path:nextPrimaryPath,sort_order:0,display_name:String(character.primaryIllustrationName||'').trim().slice(0,40),updated_at:new Date().toISOString()})
+        .update({storage_path:nextPrimaryPath,sort_order:0,display_name:String(character.primaryIllustrationName||character.personalityProfile?.primaryIllustrationName||'').trim().slice(0,40),updated_at:new Date().toISOString()})
         .eq('id',oldPrimary.id).eq('author_id',userId);
       if(error){
         if(oldPrimaryCleanupJob)await cancelCharacterIllustrationCleanupJob(oldPrimaryCleanupJob.id,userId);
@@ -2241,7 +2241,7 @@ async function syncCharacterIllustrations(character,userId) {
       if(oldPrimaryCleanupJob)await processCharacterIllustrationCleanupJob(oldPrimaryCleanupJob,userId);
     }else{
       const {error}=await client.from('character_illustrations')
-        .insert({character_id:character.id,author_id:userId,storage_path:nextPrimaryPath,asset_type:'primary',sort_order:0,display_name:String(character.primaryIllustrationName||'').trim().slice(0,40)});
+        .insert({character_id:character.id,author_id:userId,storage_path:nextPrimaryPath,asset_type:'primary',sort_order:0,display_name:String(character.primaryIllustrationName||character.personalityProfile?.primaryIllustrationName||'').trim().slice(0,40)});
       if(error){
         if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
         if(uploaded.length)await cleanupCharacterIllustrationUploads(uploaded,userId);
@@ -2290,6 +2290,25 @@ async function syncCharacterIllustrations(character,userId) {
   if(!character.avatarVideoPath&&nextPrimaryPath){
     const {error:avatarClearError}=await client.from('characters').update({avatar_url:null}).eq('id',character.id).eq('author_id',userId);
     if(avatarClearError)console.warn('舊的內嵌圖片欄位尚未清除：',avatarClearError.message);
+  }
+  // Verify every persisted illustration label; a successful UPDATE with zero matched rows
+  // must not be reported as a successful save.
+  const expectedGalleryNames=new Map(nextGallery.filter(item=>item?.id).map(item=>[item.id,String(item.name||'').trim().slice(0,40)]));
+  if(expectedGalleryNames.size){
+    const {data:verifiedGallery,error:galleryVerifyError}=await client.from('character_illustrations')
+      .select('id,display_name').eq('character_id',character.id).eq('author_id',userId).eq('asset_type','gallery');
+    if(galleryVerifyError)throw new Error('立繪名稱寫入後無法回讀：'+galleryVerifyError.message);
+    const savedNames=new Map((verifiedGallery||[]).map(item=>[item.id,String(item.display_name||'')]));
+    for(const [assetId,expectedName] of expectedGalleryNames){
+      if(savedNames.get(assetId)!==expectedName)throw new Error('立繪名稱「'+expectedName+'」未成功保存，請重新儲存。');
+    }
+  }
+  const expectedPrimaryName=String(character.primaryIllustrationName||character.personalityProfile?.primaryIllustrationName||'').trim().slice(0,40);
+  if(nextPrimaryPath){
+    const {data:verifiedPrimary,error:primaryVerifyError}=await client.from('character_illustrations')
+      .select('display_name').eq('character_id',character.id).eq('author_id',userId).eq('asset_type','primary').maybeSingle();
+    if(primaryVerifyError)throw new Error('主要立繪名稱寫入後無法回讀：'+primaryVerifyError.message);
+    if(!verifiedPrimary||String(verifiedPrimary.display_name||'')!==expectedPrimaryName)throw new Error('主要立繪名稱未成功保存，請重新儲存。');
   }
   nextGallery.sort((left,right)=>Number(left.sortOrder||0)-Number(right.sortOrder||0));
   draftPrimaryIllustrationPath=nextPrimaryPath;
@@ -2812,7 +2831,7 @@ function availableExploreTags() {
         character.cloudPublic === false || character.localOnly === true ||
         String(character.id || '').startsWith('seed-')) continue;
     for (const rawTag of (Array.isArray(character.tags) ? character.tags : [])) {
-      const tag = String(rawTag || '').trim();
+      const tag = normalizeCharacterTag(rawTag);
       if (validCharacterTag(tag)) tags.add(tag);
     }
   }
@@ -4113,13 +4132,17 @@ function validCharacterTag(value) {
   const tag = normalizeCharacterTag(value);
   return countChars(tag) >= 2 && countChars(tag) <= 10;
 }
+function normalizeCharacterTagsForRead(tags) {
+  if(!Array.isArray(tags))return [];
+  return [...new Set(tags.map(normalizeCharacterTag).filter(validCharacterTag))].slice(0,5);
+}
 function validateCharacterTags(tags) {
   if (!Array.isArray(tags)) throw new Error('請使用自訂標籤。');
-  if (tags.length > 5) throw new Error('角色最多新增5個標籤。');
   const normalized = tags.map(normalizeCharacterTag);
   if (normalized.some(tag => !validCharacterTag(tag))) throw new Error('每個標籤需為2–10個字。');
-  if (new Set(normalized).size !== normalized.length) throw new Error('標籤不可重複。');
-  return normalized;
+  const unique=[...new Set(normalized)];
+  if (unique.length > 5) throw new Error('角色最多新增5個標籤。');
+  return unique;
 }
 function environment() {
   return `<button class="environment" data-action="environment">
