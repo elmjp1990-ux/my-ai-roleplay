@@ -2337,6 +2337,7 @@ function releaseCharacterVideo(video){
   video.preload='none';
   video.load();
   video.dataset.videoHydrated='false';
+  video.dataset.videoObservePending='false';
 }
 function hydrateCharacterVideo(video){
   const path=video?.dataset?.characterVideo;
@@ -2446,6 +2447,15 @@ document.addEventListener('visibilitychange',()=>{
 });
 window.addEventListener('pagehide',()=>{
   document.querySelectorAll('video[data-character-video]').forEach(releaseCharacterVideo);
+});
+// pagehide may enter the browser back-forward cache instead of destroying the document.
+// Re-arm lazy loading on restore because pagehide deliberately detached every media src.
+window.addEventListener('pageshow',()=>{
+  document.querySelectorAll('video[data-character-video]').forEach(video=>{
+    characterVideoObserver?.unobserve(video);
+    video.dataset.videoObservePending='false';
+    void hydrateCharacterVideo(video);
+  });
 });
 function normalizePersonalityProfile(value) {
   const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
