@@ -265,7 +265,7 @@ assert.match(frontend, /row\.encounter_mode_marker!=='true'/);
 assert.match(frontend, /row\.encounter_place_marker==='string'/);
 assert.match(frontend, /const seenCharacters=new Set\(\)/);
 assert.match(frontend, /const characterId=session\.characterId\|\|sessionCharacter\(session\)\?\.id\|\|session\.id/);
-assert.ok(frontend.includes(String.raw`return String(text).split(/(\\*\\*[\\s\\S]*?\\*\\*|\\*(?!\\*)[\\s\\S]+?\\*(?!\\*))/g)`));
+assert.match(frontend, /function formatMessage\(text\)[\s\S]*?\[\\s\\S\]\+\?/);
 assert.match(frontend, /\.suggestion-first-message-hint \{ box-sizing:border-box; width:100%; margin:0; padding:7px 9px 9px; color:var\(--muted\); text-align:center; font-size:10px;/);
 assert.match(frontend, /!isEncounterChatSession\(s\)/);
 assert.match(frontend, /encounter_marker:session_data->encounter/);
