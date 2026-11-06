@@ -2322,10 +2322,16 @@ async function getCharacterVideoSignedUrl(path){
   characterVideoSignedUrlInflight.set(path,request);
   try{return await request;}finally{characterVideoSignedUrlInflight.delete(path);}
 }
-function stopCharacterVideo(video){
+function pauseCharacterVideo(video){
   if(!video)return;
-  // pause() alone may leave the media resource attached and buffered. Removing src
-  // and calling load() aborts the resource selection so an offscreen clip stops fetching.
+  // Keep the media source attached while offscreen. Removing src here made the
+  // same 3-4 MB MP4 download again every time a card re-entered the viewport.
+  video.pause();
+  video.preload='none';
+}
+function releaseCharacterVideo(video){
+  if(!video)return;
+  // Release the resource only when the page is leaving, not during ordinary scrolling.
   video.pause();
   video.removeAttribute('src');
   video.preload='none';
@@ -2334,7 +2340,7 @@ function stopCharacterVideo(video){
 }
 function hydrateCharacterVideo(video){
   const path=video?.dataset?.characterVideo;
-  if(!path||!window.mySupabase||video.dataset.videoHydrated==='true'||video.dataset.videoHydrated==='loading'||video.dataset.videoObservePending==='true')return;
+  if(!path||!window.mySupabase||video.dataset.videoFailed==='true'||video.dataset.videoHydrated==='true'||video.dataset.videoHydrated==='loading'||video.dataset.videoObservePending==='true')return;
   // 列表中的影片只在實際可視範圍內取得 Signed URL 並下載。
   video.controls=false;
   video.removeAttribute('controls');
@@ -2353,7 +2359,8 @@ function hydrateCharacterVideo(video){
     video.dataset.videoErrorHandler='true';
     video.addEventListener('error',()=>{
       // 不在錯誤事件中自動重試，避免壞檔或網路錯誤形成請求迴圈。
-      stopCharacterVideo(video);
+      pauseCharacterVideo(video);
+      video.dataset.videoFailed='true';
     });
   }
   const load=async()=>{
@@ -2387,13 +2394,13 @@ function hydrateCharacterVideo(video){
         const target=entry.target;
         if(!target?.isConnected)continue;
         if(entry.isIntersecting&&!document.hidden){
-          if(target.dataset.videoHydrated==='true')target.play().catch(()=>{});
+          if(target.dataset.videoHydrated==='true'){target.preload='metadata';target.play().catch(()=>{});}
           else {
             const loadTarget=characterVideoLoaders.get(target);
             if(loadTarget)void loadTarget();
           }
-        }else if(target.dataset.videoHydrated==='true'||target.dataset.videoHydrated==='loading'){
-          stopCharacterVideo(target);
+        }else if(target.dataset.videoHydrated==='true'){
+          pauseCharacterVideo(target);
         }
       }
     },{rootMargin:'0px',threshold:0.01});
@@ -2409,7 +2416,7 @@ function hydrateCharacterVideo(video){
 document.addEventListener('visibilitychange',()=>{
   const videos=document.querySelectorAll('video[data-character-video]');
   if(document.hidden){
-    videos.forEach(stopCharacterVideo);
+    videos.forEach(pauseCharacterVideo);
   }else{
     videos.forEach(video=>{
       if(characterVideoObserver){
@@ -2420,7 +2427,7 @@ document.addEventListener('visibilitychange',()=>{
   }
 });
 window.addEventListener('pagehide',()=>{
-  document.querySelectorAll('video[data-character-video]').forEach(stopCharacterVideo);
+  document.querySelectorAll('video[data-character-video]').forEach(releaseCharacterVideo);
 });
 function normalizePersonalityProfile(value) {
   const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
