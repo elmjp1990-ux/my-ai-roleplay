@@ -5577,11 +5577,17 @@ async function createStorySession(characterId, originMode, sourceEncounterSessio
   }
 
   const relationship = payload.relationship;
-  const session = newSession(character, {
+  const storySnapshot = payload.session.character_snapshot && typeof payload.session.character_snapshot === 'object'
+    ? payload.session.character_snapshot : {};
+  const openingText = String(storySnapshot.opening || character.opening || '').trim();
+  const storyCharacter = { ...character, opening:openingText };
+  const openingAt = Date.now();
+  const session = newSession(storyCharacter, {
     id:sessionId,
     cloudOwned:true,
     cloudOwnerUid:authData.user.id,
-    cloudCharacterSnapshot:payload.session.character_snapshot || {},
+    cloudCharacterSnapshot:storySnapshot,
+    initialOpeningMessage:openingText ? {text:openingText,at:openingAt} : null,
     cloudUpdatedAt:payload.session.updated_at || null,
     storyMode:true,
     storyOriginMode:relationship.origin_mode,
