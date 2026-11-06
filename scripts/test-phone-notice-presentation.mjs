@@ -42,3 +42,23 @@ assert.match(html, /phoneSettingAction="remove"|data-phone-setting-action="remov
   'Phone editor must provide a dynamic remove control');
 assert.match(html, /visibleRows\.length>=8/,
   'Phone editor must cap dynamic rows at eight');
+
+const phoneEditor = html.slice(html.indexOf('function renderPhoneSettingsFields'), html.indexOf('function saveEditorDraft()'));
+assert.match(phoneEditor, /<span>名稱<\\/span>/, 'Phone notice row must label the display name');
+assert.match(phoneEditor, /AI 內容生成指示/, 'Phone notice row must label the AI content instruction');
+assert.match(phoneEditor, /visibleRows\\.length<=1/, 'Phone editor must retain at least one row');
+assert.match(phoneEditor, /visibleRows\\.length>=8/, 'Phone editor must cap rows at eight');
+assert.match(html, /primaryIllustrationName:f\\.get\\('primaryIllustrationName'\\)/,
+  'Primary illustration name must be included in the persisted personality profile');
+assert.match(html, /draftIllustrations=draftIllustrations\\.slice\\(0,5\\)\\.map/,
+  'Gallery names typed in the form must be copied to the objects passed to cloud sync');
+assert.match(html, /立繪名稱寫入後無法回讀/,
+  'Gallery illustration names must be verified after database updates');
+assert.match(html, /主要立繪名稱未成功保存/,
+  'Primary illustration name must be verified after database updates');
+assert.match(html, /replace\\(\\/\\^#\\+\\/u,''\\)/,
+  'Leading hash characters must be stripped before storing tags');
+assert.match(html, /normalizeCharacterTagsForRead/,
+  'Legacy tags must be normalized on cloud read as well as save');
+
+console.log('Character editor: dynamic phone rows, illustration-name round-trip, and hashtag normalization checks passed.');
