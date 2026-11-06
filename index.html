@@ -4604,7 +4604,11 @@ function renderDetail() {
   const fromExistingSession = !!session && !!c &&
     canAccessSessionCharacter(session,c);
   if (!c || (!fromExistingSession && !accessible(c))) {
-    $('view').innerHTML = '<div class="empty">此角色已被修改為私密或已被刪除。</div>';
+    if(previousDetailVideo){
+      characterVideoObserver?.unobserve(previousDetailVideo);
+      releaseCharacterVideo(previousDetailVideo);
+    }
+    view.innerHTML = '<div class="empty">此角色已被修改為私密或已被刪除。</div>';
     return;
   }
   const offline = characterIsOffline(c);
