@@ -284,12 +284,12 @@ export async function processDueStoryMemorySummary(
   };
   const requestId = /^[A-Za-z0-9._:-]{1,128}$/.test(response.requestId) ? response.requestId : null;
   const rawOutput = response.result.kind === "generated" ? response.result.text.trim() : "";
-  let summary = rawOutput;
+  let summary = "";
   let affinityCorrection = 0;
   let affinityReason = "";
   try {
     const parsed = JSON.parse(rawOutput) as Record<string, unknown>;
-    if (typeof parsed.summary === "string" && parsed.summary.trim()) summary = parsed.summary.trim().slice(0, 2000);
+    summary = typeof parsed.summary === "string" ? parsed.summary.trim().slice(0, 2000) : "";
     const correction = parsed.affinity_correction;
     if (typeof correction === "number" && Number.isInteger(correction) && correction >= -5 && correction <= 5) {
       affinityCorrection = correction;
@@ -297,6 +297,7 @@ export async function processDueStoryMemorySummary(
     affinityReason = typeof parsed.affinity_reason === "string" ? parsed.affinity_reason.trim().slice(0, 280) : "";
   } catch {
     // A legacy plain-text summary remains usable, but cannot adjust affinity.
+    summary = rawOutput.slice(0, 2000);
     affinityCorrection = 0;
   }
   if (response.httpStatus < 200 || response.httpStatus >= 300 || !summary) {
