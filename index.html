@@ -7119,7 +7119,7 @@ function renderConversation() {
 function formatMessage(text) {
   // **...** and *...* are narration markers. Single-asterisk narration may
   // span multiple lines in character opening messages, so parse across newlines.
-  return String(text).split(/(\\*\\*[\\s\\S]*?\\*\\*|\\*(?!\\*)[\\s\\S]+?\\*(?!\\*))/g).filter(Boolean).map(part => {
+  return String(text).split(/(\*\*[\s\S]*?\*\*|\*(?!\*)[\s\S]+?\*(?!\*))/g).filter(Boolean).map(part => {
     const isDoubleNarration = part.startsWith('**') && part.endsWith('**') && part.length >= 4;
     const isSingleNarration = part.startsWith('*') && !part.startsWith('**') && part.endsWith('*') && !part.endsWith('**');
     if (isDoubleNarration) return `<em class="narration">${e(part.slice(2,-2))}</em>`;
