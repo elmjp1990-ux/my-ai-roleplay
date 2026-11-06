@@ -2582,8 +2582,10 @@ async function saveSupabaseCharacter(character, expectedUserId) {
       target.push({ key, label });
     };
 
-    // 角色原始設定：只有會改變角色理解、個性或行為的內容才需要重新評估衍生資料。
-    compareCharacterField(aiRelevantChanges, 'name', '角色名稱', existingCharacter?.name, String(character.name || '').trim());
+    // 角色名稱是提示詞中的即時識別資料；改名不改變角色個性，不需重建衍生資料。
+    compareCharacterField(nonAiChanges, 'name', '角色名稱', existingCharacter?.name, String(character.name || '').trim());
+
+    // 只有會改變角色理解、個性或行為的原始設定才需要重新評估衍生資料。
     compareCharacterField(aiRelevantChanges, 'intro', '角色介紹／背景', existingCharacter?.intro, character.intro || '');
     compareCharacterField(aiRelevantChanges, 'race', '種族／世界觀', existingCharacter?.race, character.race || '');
     compareCharacterField(aiRelevantChanges, 'style', '角色風格', existingCharacter?.style, character.style || '');
@@ -2612,16 +2614,19 @@ async function saveSupabaseCharacter(character, expectedUserId) {
     compareCharacterField(nonAiChanges, 'tags', '角色標籤', existingCharacter?.tags || [], character.tags || []);
 
     const isNewCharacter = !existingCharacter;
+    const requiresDerivedRefresh = aiRelevantChanges.length > 0;
     const aiOrganizationDecision = {
-      version: 2,
-      status: (isNewCharacter || aiRelevantChanges.length) ? 'needs_review' : 'not_needed',
-      reason: isNewCharacter ? 'new_character' : (aiRelevantChanges.length ? 'ai_source_fields_changed' : 'no_ai_relevant_change'),
+      version: 3,
+      status: requiresDerivedRefresh ? 'needs_review' : 'not_needed',
+      reason: requiresDerivedRefresh
+        ? (isNewCharacter ? 'new_character_ai_source_present' : 'ai_source_fields_changed')
+        : (isNewCharacter ? 'new_character_source_fields_available' : 'no_ai_relevant_change'),
       model: 'deepseek/deepseek-v4-flash-20260423',
       changedFields: aiRelevantChanges.map(item => item.key),
       changedFieldLabels: aiRelevantChanges.map(item => item.label),
       runtimeAiChangedFields: runtimeAiChanges.map(item => item.key),
       nonAiChangedFields: nonAiChanges.map(item => item.key),
-      requiresDerivedRefresh: isNewCharacter || aiRelevantChanges.length > 0,
+      requiresDerivedRefresh,
       shouldCallModel: false
     };
 
