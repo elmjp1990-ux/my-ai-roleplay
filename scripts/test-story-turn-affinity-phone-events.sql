@@ -115,7 +115,7 @@ SELECT public.queue_story_turn_evaluation(
   '50000000-0000-4000-8000-000000000001',
   2,
   'A meaningful trust-building moment',
-  '[{"event_type":"notification","title":"💭江辰遠目前的想法","body":"他正在思考今天的安排。"},{"event_type":"notification","title":"📱最近收到的訊息","body":"目前沒有新的訊息。"},{"event_type":"notification","title":"📍江辰遠衣著／姿勢","body":"穿著目前已知的休閒襯衫。"},{"event_type":"notification","title":"📍玩家衣著／姿勢","body":"目前沒有足夠資訊。"},{"event_type":"notification","title":"🗒️江辰遠待辦事項","body":"目前沒有待辦事項。"}]'::jsonb
+  '[{"event_type":"notification","title":"💭江辰遠目前的想法","body":"他正在思考今天的安排。"},{"event_type":"notification","title":"📱最近收到的訊息","body":"目前沒有新的訊息。"},{"event_type":"notification","title":"📍江辰遠衣著／姿勢","body":"穿著目前已知的休閒襯衫。"},{"event_type":"notification","title":"📍玩家衣著／姿勢","body":"目前沒有足夠資訊。"},{"event_type":"notification","title":"🗒️江辰遠待辦事項","body":"目前沒有待辦事項。"},{"event_type":"notification","title":"欄位六","body":"內容六。"},{"event_type":"notification","title":"欄位七","body":"內容七。"},{"event_type":"notification","title":"欄位八","body":"內容八。"}]'::jsonb
 );
 DO $$
 DECLARE result jsonb;
@@ -156,7 +156,7 @@ BEGIN
   WHERE session_id='30000000-0000-4000-8000-000000000001';
   SELECT count(*) INTO event_count FROM public.story_phone_events
   WHERE turn_id='60000000-0000-4000-8000-000000000001';
-  IF current_affinity <> 12 OR event_count <> 5 THEN
+  IF current_affinity <> 12 OR event_count <> 8 THEN
     RAISE EXCEPTION 'side effects duplicated or missing';
   END IF;
 END $$;
@@ -166,7 +166,7 @@ DO $$
 DECLARE event_count integer;
 BEGIN
   SELECT count(*) INTO event_count FROM public.get_story_phone_events('30000000-0000-4000-8000-000000000001');
-  IF event_count <> 5 THEN RAISE EXCEPTION 'owner cannot read all five configured phone fields'; END IF;
+  IF event_count <> 5 THEN RAISE EXCEPTION 'owner cannot read all eight configured phone fields'; END IF;
 END $$;
 SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000002',true);
 DO $$
