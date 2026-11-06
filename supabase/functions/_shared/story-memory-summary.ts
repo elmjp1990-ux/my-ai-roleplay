@@ -289,10 +289,10 @@ export async function processDueStoryMemorySummary(
   let affinityReason = "";
   try {
     const parsed = JSON.parse(rawOutput) as Record<string, unknown>;
-    if (typeof parsed.summary === "string" && parsed.summary.trim()) summary = parsed.summary.trim();
+    if (typeof parsed.summary === "string" && parsed.summary.trim()) summary = parsed.summary.trim().slice(0, 2000);
     const correction = parsed.affinity_correction;
-    if (Number.isInteger(correction) && Number(correction) >= -5 && Number(correction) <= 5) {
-      affinityCorrection = Number(correction);
+    if (typeof correction === "number" && Number.isInteger(correction) && correction >= -5 && correction <= 5) {
+      affinityCorrection = correction;
     }
     affinityReason = typeof parsed.affinity_reason === "string" ? parsed.affinity_reason.trim().slice(0, 280) : "";
   } catch {
