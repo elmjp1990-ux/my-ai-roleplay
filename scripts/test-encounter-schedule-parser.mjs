@@ -94,6 +94,14 @@ assert.ok(pauseFn.includes("video.pause();"));
 assert.ok(!pauseFn.includes("video.preload="));
 assert.ok(html.includes("if(target.dataset.videoHydrated==='true'){if(target.paused)target.play().catch(()=>{});}"));
 assert.ok(html.includes("function releaseCharacterVideo(video){"));
+// Assigning src already starts media loading; an immediate load() would restart a full-range request.
+const videoHydrationStart=html.indexOf("function hydrateCharacterVideo(video){");
+const videoLoadStart=html.indexOf("const load=async()=>{",videoHydrationStart);
+const videoLoadEnd=html.indexOf("\n  };",videoLoadStart);
+const videoLoadBlock=html.slice(videoLoadStart,videoLoadEnd);
+assert.ok(videoLoadBlock.indexOf("video.preload='metadata';") < videoLoadBlock.indexOf("video.src=signedUrl;"));
+assert.ok(!videoLoadBlock.includes("video.load();"));
+
 assert.ok(html.includes("pauseCharacterVideo(target);"));
 assert.ok(html.includes("videos.forEach(pauseCharacterVideo);"));
 // Only a real pagehide releases the media source.
