@@ -4592,7 +4592,7 @@ function renderGrid({append=false}={}) {
     // Any old media not reused is no longer part of the visible result set.
     existingVideosByCharacter.forEach(video => {
       characterVideoObserver?.unobserve(video);
-      pauseCharacterVideo(video);
+      releaseCharacterVideo(video);
     });
   }
   // Also hydrate newly appended cards; existing hydrated elements are guarded.
@@ -11054,7 +11054,7 @@ function renderCityMapMVP(){
       }
     }else if(previousCharacterVideo){
       characterVideoObserver?.unobserve(previousCharacterVideo);
-      pauseCharacterVideo(previousCharacterVideo);
+      releaseCharacterVideo(previousCharacterVideo);
     }
     if(characterVideo)void hydrateCharacterVideo(characterVideo);
     else{
