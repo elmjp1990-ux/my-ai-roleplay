@@ -69,6 +69,7 @@ async function requestMemorySummary(messages: Array<{ role: "system" | "user"; c
       },
       body: JSON.stringify({
         model: SUMMARY_MODEL,
+        response_format: { type: "json_object" },
         messages,
         temperature: 0.2,
         // No client-side output limit is set; the benchmark showed that
@@ -226,6 +227,17 @@ export async function processDueStoryMemorySummary(
   const transcript = sourceMessages.map((message: DbRow) =>
     (message.role === "assistant" ? characterName : "玩家") + "：" + str(message.content)
   ).join("\n");
+  const { data: relationshipState, error: relationshipStateError } = await admin
+    .from("story_relationship_states")
+    .select("affinity,relationship_stage")
+    .eq("session_id", sessionId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (relationshipStateError || !relationshipState) {
+    await admin.from("ai_model_usage").update({ status: "failed", processed_at: new Date().toISOString() })
+      .eq("id", batchRowId).eq("status", "processing");
+    throw new Error("story_relationship_state_unavailable");
+  }
 
   let response;
   try {
@@ -233,8 +245,10 @@ export async function processDueStoryMemorySummary(
       {
         role: "system",
         content: [
-          "你是 POYOZZ 的長期劇情記憶整理器。請將既有摘要與本批新增對話整合成一份可供角色下次自然接續的繁體中文記憶。",
+          "你是 POYOZZ 的長期劇情記憶整理器與關係校正器。請將既有摘要與本批新增對話整合成一份可供角色下次自然接續的繁體中文記憶。",
+          "只輸出 JSON object：{\\"summary\\":\\"50～150 個中文字的累積摘要\\",\\"affinity_correction\\":0,\\"affinity_reason\\":\\"校正理由\\"}。不要 Markdown 或其他文字。",
           "摘要目標為 50～150 個中文字，單一精簡段落，不要標題、條列、分析或補充說明。",
+          "好感度校正不是把這五回合的變化重新累加。每回合好感度已即時微調；請檢視五回合完整互動後，判斷目前累積值是否需要小幅修正，只回傳 -5 到 5 的整數 correction。若逐回合評估合理就填 0；不可把五回合淨變化再加一次，也不可因單次甜蜜互動直接跳級。",
           "優先保留玩家明確偏好、角色關係變化、重要共同事件、承諾、界線、情緒轉折，以及尚未完成或下次要接續的事情。",
           "只記錄確實發生或明確約定的內容。不可推測、補造事件、替玩家決定想法或行動，也不可把角色提出但未完成的事寫成已完成。",
           "若新對話明確更正舊記憶，以玩家最新明確更正為準。不要因追求精簡而遺失重要承諾或未完成事項。",
@@ -243,8 +257,9 @@ export async function processDueStoryMemorySummary(
       {
         role: "user",
         content: "【既有記憶摘要】\n" + (previousSummary || "尚無既有摘要") +
+          "\n\n【目前好感度】" + String(relationshipState.affinity) + "；目前關係階段：" + str(relationshipState.relationship_stage) +
           "\n\n【本次新增的五回合對話】\n" + transcript +
-          "\n\n請輸出更新後的完整累積摘要。",
+          "\n\n請依指定 JSON 格式輸出更新後的完整累積摘要與必要的好感度小幅校正。",
       },
     ], apiKey);
   } catch {
@@ -268,7 +283,22 @@ export async function processDueStoryMemorySummary(
     cost_usd: priorUsage.cost_usd === null && usage.cost_usd === null ? null : (priorUsage.cost_usd || 0) + (usage.cost_usd || 0),
   };
   const requestId = /^[A-Za-z0-9._:-]{1,128}$/.test(response.requestId) ? response.requestId : null;
-  const summary = response.result.kind === "generated" ? response.result.text.trim() : "";
+  const rawOutput = response.result.kind === "generated" ? response.result.text.trim() : "";
+  let summary = rawOutput;
+  let affinityCorrection = 0;
+  let affinityReason = "";
+  try {
+    const parsed = JSON.parse(rawOutput) as Record<string, unknown>;
+    if (typeof parsed.summary === "string" && parsed.summary.trim()) summary = parsed.summary.trim();
+    const correction = parsed.affinity_correction;
+    if (Number.isInteger(correction) && Number(correction) >= -5 && Number(correction) <= 5) {
+      affinityCorrection = Number(correction);
+    }
+    affinityReason = typeof parsed.affinity_reason === "string" ? parsed.affinity_reason.trim().slice(0, 280) : "";
+  } catch {
+    // A legacy plain-text summary remains usable, but cannot adjust affinity.
+    affinityCorrection = 0;
+  }
   if (response.httpStatus < 200 || response.httpStatus >= 300 || !summary) {
     await admin.from("ai_model_usage").update({
       status: "failed",
@@ -282,6 +312,22 @@ export async function processDueStoryMemorySummary(
       processed_at: new Date().toISOString(),
     }).eq("id", batchRowId).eq("status", "processing");
     return;
+  }
+
+  const { error: relationshipBatchError } = await admin.rpc("complete_story_relationship_batch", {
+    p_session_id: sessionId,
+    p_user_id: userId,
+    p_character_id: session.character_id ?? null,
+    p_batch_number: batchNumber,
+    p_source_turn_ids: sourceTurnIds,
+    p_summary: summary,
+    p_affinity_delta: affinityCorrection,
+    p_evaluation: { reason: affinityReason, source: "five_turn_summary_calibration" },
+  });
+  if (relationshipBatchError) {
+    await admin.from("ai_model_usage").update({ status: "failed", processed_at: new Date().toISOString() })
+      .eq("id", batchRowId).eq("status", "processing");
+    throw new Error("story_relationship_batch_persist_failed");
   }
 
   const { error: completeError } = await admin.from("ai_model_usage").update({
