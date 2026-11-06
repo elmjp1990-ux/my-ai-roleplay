@@ -53,7 +53,7 @@ export function parseStoryTurnEnvelope(raw: string): StoryTurnEnvelope {
   if (!reply) return fallback;
 
   const rawDelta = value.affinity_delta;
-  const affinityDelta = Number.isInteger(rawDelta) && Number(rawDelta) >= -3 && Number(rawDelta) <= 3
+  const affinityDelta = typeof rawDelta === "number" && Number.isInteger(rawDelta) && rawDelta >= -3 && rawDelta <= 3
     ? Number(rawDelta)
     : 0;
 
