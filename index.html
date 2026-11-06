@@ -3436,6 +3436,7 @@ async function loadCloudChatSessions(user, options = {}) {
         'session_hidden:session_data->>hidden','session_pinned:session_data->>pinned',
         'session_archived_at:session_data->>archivedAt',
         'session_started_at:session_data->>startedAt','session_encounter_mode:session_data->>encounterMode',
+        'session_encounter_metadata:session_data->encounter',
         'session_story_mode:session_data->>storyMode','session_encounter_place:session_data->>encounterPlace',
         'session_encounter_day:session_data->>encounterDay','session_persona:session_data->>persona',
         'session_persona_custom:session_data->>personaCustom','session_suggestions:session_data->>suggestions',
@@ -3508,7 +3509,11 @@ async function loadCloudChatSessions(user, options = {}) {
         ...(existing || {}), id:row.id, characterId:row.character_id,
         characterName:row.character_name || snapshot.name || '角色', name:row.session_name || existing?.name || '',
         archived:parseBool(row.session_archived) || row.status === 'archived',
-        encounterMode:row.chat_mode === 'encounter' || parseBool(row.session_encounter_mode),
+        chatMode:row.chat_mode || existing?.chatMode || null,
+        encounterMetadata:row.session_encounter_metadata && typeof row.session_encounter_metadata==='object' && !Array.isArray(row.session_encounter_metadata)
+          ? row.session_encounter_metadata : existing?.encounterMetadata || null,
+        encounterMode:row.chat_mode === 'encounter' || parseBool(row.session_encounter_mode) ||
+          (!!row.session_encounter_metadata && typeof row.session_encounter_metadata==='object' && !Array.isArray(row.session_encounter_metadata)),
         storyMode:parseBool(row.session_story_mode),
         encounterPlace:row.session_encounter_place || existing?.encounterPlace || null,
         encounterDay:row.session_encounter_day || existing?.encounterDay || null,
@@ -3610,7 +3615,10 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
       session.album=Array.isArray(data.album)?data.album:(session.album||[]);
     }
     if(!older){
-      session.encounterMode=row.chat_mode==='encounter'||data.encounterMode===true||data.encounter?.mode==='encounter';
+      session.chatMode=row.chat_mode||session.chatMode||null;
+      session.encounterMetadata=data.encounter&&typeof data.encounter==='object'&&!Array.isArray(data.encounter)?data.encounter:session.encounterMetadata||null;
+      session.encounterMode=row.chat_mode==='encounter'||data.encounterMode===true||
+        (!!data.encounter&&typeof data.encounter==='object'&&!Array.isArray(data.encounter));
       session.storyMode=data.storyMode===true;
       session.encounterPlace=typeof data.encounterPlace==='string'?data.encounterPlace:session.encounterPlace||null;
       session.encounterDay=typeof data.encounterDay==='string'?data.encounterDay:session.encounterDay||null;
@@ -5357,6 +5365,14 @@ function hasUserMessage(session) {
     message.role==='user'&&String(message.text||'').trim()
   );
 }
+// Older Encounter sessions created before the trusted chat_mode column may still
+// carry their original server-written session_data.encounter object while the
+// new column defaults to story. Treat that durable marker as Encounter too.
+function isEncounterChatSession(session) {
+  const encounterMetadata=session?.encounterMetadata||session?.encounter||session?.sessionData?.encounter;
+  return session?.encounterMode===true || session?.chatMode==='encounter' ||
+    (!!encounterMetadata && typeof encounterMetadata==='object' && !Array.isArray(encounterMetadata));
+}
 function sessionTitle(session) {
   return String(session?.name || sessionCharacter(session)?.name || session?.characterName || '角色').trim();
 }
@@ -5590,12 +5606,14 @@ async function startChat(characterId) {
   if (!client || !userId) return toast('登入狀態尚未確認，請重新登入後再試。');
   try {
     const { data: rows, error: sessionsError } = await client.from('chat_sessions')
-      .select('id,chat_mode,status,created_at,updated_at')
+      .select('id,chat_mode,status,created_at,updated_at,encounter_marker:session_data->encounter')
       .eq('user_id', userId).eq('character_id', characterId)
       .is('deleted_at', null).neq('chat_mode', 'encounter')
       .order('updated_at', { ascending:false });
     if (sessionsError) throw sessionsError;
-    const candidateIds=(rows||[]).filter(row=>isUuid(row.id)).map(row=>row.id);
+    const candidateIds=(rows||[]).filter(row=>isUuid(row.id)&&
+      !(row.encounter_marker&&typeof row.encounter_marker==='object'&&!Array.isArray(row.encounter_marker))
+    ).map(row=>row.id);
     let existingRow=null;
     if(candidateIds.length){
       const {data:latestPlayerMessage,error:messagesError}=await client.from('chat_messages')
@@ -5630,7 +5648,7 @@ function visibleSessions() {
   return Object.values(state.sessions).filter(s=>{
     const c=sessionCharacter(s);
     const hasConversation=hasUserMessage(s)||(s.cloudOwned&&s.cloudHasUserMessage==null);
-    return c&&!s.encounterMode&&!s.archived&&hasConversation&&(!q||(s.name||c.name).toLowerCase().includes(q));
+    return c&&!isEncounterChatSession(s)&&!s.archived&&hasConversation&&(!q||(s.name||c.name).toLowerCase().includes(q));
   }).sort((a,b)=>Number(b.pinned)-Number(a.pinned)||
     (Number(b.lastMessageAt||b.updatedAt||b.messages?.at(-1)?.at||0)-Number(a.lastMessageAt||a.updatedAt||a.messages?.at(-1)?.at||0)));
 }
@@ -6347,7 +6365,7 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
       void loadEncounterMemoryList(panel,ctx.session);
       return;
     }
-    const archives=Object.values(state.sessions).filter(item=>item.characterId===ctx.session.characterId&&item.archived&&!item.encounterMode).sort((a,b)=>(b.archivedAt||0)-(a.archivedAt||0));
+    const archives=Object.values(state.sessions).filter(item=>item.characterId===ctx.session.characterId&&item.archived&&!isEncounterChatSession(item)).sort((a,b)=>(b.archivedAt||0)-(a.archivedAt||0));
     const archiveCards=archives.map(item=>{
       const messageCount=(item.messages||[]).filter(message=>message.role==='user'&&String(message.text||message.content||'').trim()).length;
       return '<article class="archive-card"><strong>'+e(item.name||sessionTitle(item))+'</strong><p class="small muted" style="margin:8px 0">'+e(timeText(item.archivedAt||item.startedAt))+'<br>玩家訊息 '+messageCount+' 筆 · 日記 '+item.memories.length+' 筆 · 相片 '+item.album.length+' 張</p><div class="row wrap"><button data-action="view-archive" data-id="'+e(item.id)+'">查看回憶</button><button data-action="resume-archive" data-id="'+e(item.id)+'">繼續聊天</button><button data-action="rename-archive" data-id="'+e(item.id)+'">編輯檔名</button></div></article>';
@@ -7297,7 +7315,7 @@ function addMemory(s,text) {
 function archiveSearchResults(query) {
   const q=String(query||'').trim().toLocaleLowerCase();
   const items=Object.values(state.sessions||{}).filter(item => {
-    if (!item || item.hidden || item.encounterMode === true) return false;
+    if (!item || item.hidden || isEncounterChatSession(item)) return false;
     const character=sessionCharacter(item);
     return !q || [item.name,character?.name].filter(Boolean).join(' ').toLocaleLowerCase().includes(q);
   }).sort((a,b)=>(b.startedAt||0)-(a.startedAt||0));
@@ -9193,7 +9211,7 @@ document.addEventListener('click',async event => {
         s.name=uniqueSessionName(s.name || newArchiveName(c,s),s.id);
         s.archived=true;
         const existing=Object.values(state.sessions).filter(item =>
-          item.id !== s.id && item.characterId === c.id && !item.archived && item.encounterMode !== true
+          item.id !== s.id && item.characterId === c.id && !item.archived && !isEncounterChatSession(item)
         ).sort((a,b) =>
           Number(hasUserMessage(b))-Number(hasUserMessage(a)) ||
           (b.messages?.at(-1)?.at || b.startedAt || 0)-(a.messages?.at(-1)?.at || a.startedAt || 0)
@@ -9226,7 +9244,7 @@ document.addEventListener('click',async event => {
         if (!item || !canAccessSessionCharacter(item,sessionCharacter(item))) break;
         if (!confirm('恢復這段回憶？目前進行中的對話會先封存，這段歷史將接替聊天列表中的角色項目。')) break;
         const snapshot=clone(state);
-        const active=Object.values(state.sessions).filter(candidate=>candidate.id!==item.id&&candidate.characterId===item.characterId&&!candidate.archived&&candidate.encounterMode!==true)
+        const active=Object.values(state.sessions).filter(candidate=>candidate.id!==item.id&&candidate.characterId===item.characterId&&!candidate.archived&&!isEncounterChatSession(candidate))
           .sort((a,b)=>(b.messages?.at(-1)?.at||b.startedAt||0)-(a.messages?.at(-1)?.at||a.startedAt||0))[0];
         if(active) {
           active.archivedAt=Date.now();
