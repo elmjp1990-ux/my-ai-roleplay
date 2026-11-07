@@ -19,7 +19,7 @@ const sourcePayload: CharacterProfileSourcePayload = {
 };
 
 const emptySection = () => ({ status: "not_provided", items: [] });
-const makeProfile = () => ({
+const makeProfile = (): Record<string, unknown> => ({
   schema_version: "1.0",
   identity_background: emptySection(),
   core_personality: emptySection(),
