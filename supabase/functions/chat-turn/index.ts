@@ -34,7 +34,8 @@ const asDbRow = (value: unknown): DbRow =>
   value && typeof value === "object" && !Array.isArray(value) ? value as DbRow : {};
 const asString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
-\nconst collectDerivedPrivateProfileValues = (value: unknown): string[] => {
+
+const collectDerivedPrivateProfileValues = (value: unknown): string[] => {
   const profile = asDbRow(value);
   const protectedValues = new Set<string>();
   const collectItems = (items: unknown) => {
