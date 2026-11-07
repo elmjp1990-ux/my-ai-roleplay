@@ -162,12 +162,27 @@ BEGIN
     lease_generation = public.character_profile_organization_jobs.lease_generation + 1,
     completed_at = NULL,
     updated_at = now()
+  WHERE public.character_profile_organization_jobs.source_hash IS DISTINCT FROM EXCLUDED.source_hash
+     OR public.character_profile_organization_jobs.author_id IS DISTINCT FROM EXCLUDED.author_id
+     OR public.character_profile_organization_jobs.status = 'failed'
   RETURNING * INTO v_job;
+
+  -- Same source already pending/processing/completed: preserve its retry timing
+  -- and active lease. Re-saving unchanged author data must not trigger a second
+  -- model request or invalidate a Worker already generating this exact source.
+  IF NOT FOUND THEN
+    SELECT * INTO v_job
+    FROM public.character_profile_organization_jobs
+    WHERE character_id = p_character_id
+    FOR UPDATE;
+  END IF;
 
   RETURN jsonb_build_object(
     'status', v_job.status,
     'source_hash', v_job.source_hash,
-    'lease_generation', v_job.lease_generation
+    'lease_generation', v_job.lease_generation,
+    'reused_existing_job', v_job.source_hash = v_hash
+      AND v_job.status IN ('pending', 'processing', 'completed')
   );
 END;
 $$;
