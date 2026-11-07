@@ -293,3 +293,19 @@ Schema 只驗證資料形狀，不能單獨證明 source_refs 真實存在或使
 - worker 讀取來源時以欄位 allowlist、角色 author_id、私密資料權限共同驗證。
 - source hash 必須涵蓋本次全部 AI 來源欄位的正規化值；runtime-only 欄位不納入。
 - schedule／phone 每回合按需即時讀取，絕不可使用 Profile 內舊副本。
+
+
+## 最新實作狀態覆蓋更新（2026-11-07）
+
+本草案前段「尚未接入正式 Prompt」為建立當時的狀態；截至 PR #215 分支 commit `8aab78994a682f5542af3ceb2bc3424c03774e`，Story `chat-turn` 共用 system prompt 已加入並通過 CI 的共用輸出規範，包括星號敘事／對白區分、敘事動作與台詞自然交錯、臨場感／感官／身體互動、禁止重複灌水與段落循環、代詞主體、玩家內心資訊隔離，以及禁止以引導玩家行動的問題句收尾。
+
+測試 `scripts/test-story-roleplay-prompt.mjs` 已增加回歸斷言；`scripts/test-character-ai-profile-contract.mjs` 驗證 schema／source registry／classifier 的靜態契約。對應 Story AI workflow 中 Prompt 測試、Profile 契約測試與 `deno check supabase/functions/chat-turn/index.ts` 均通過。
+
+仍未完成：
+- Character AI Profile 與 OOC 尚未載入正式 chat-turn prompt。
+- 尚無正式 JSON Schema runtime validator。
+- 尚無 profile queue table、enqueue／claim／complete RPC、worker 或 DeepSeek 整理呼叫。
+- 尚未追到並接通短回覆模式的前端參數；目前 `chat-turn` 呼叫端只傳 turn/session/message IDs，沒有 reply-length mode，正式 prompt 目前以 300–600 字元長回覆為目標。
+- 未部署 Edge Function，未執行 hosted Supabase migration，未改動正式資料庫。
+
+上述狀態只描述 PR 分支程式與 CI，不代表正式網站已生效；需等 PR 合併及授權部署後才會上線。
