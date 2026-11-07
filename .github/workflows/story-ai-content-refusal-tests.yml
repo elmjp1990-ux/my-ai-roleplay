@@ -40,6 +40,9 @@ on:
       - "supabase/functions/_shared/prompt-variables.ts"
       - "index.html"
       - "scripts/test-phone-notice-presentation.mjs"
+      - "scripts/test-character-ai-profile-contract.mjs"
+      - "supabase/drafts/character-ai-profile-v1.schema.json"
+      - "supabase/drafts/character-ai-profile-source-registry-v1.json"
       - ".github/workflows/story-ai-content-refusal-tests.yml"
   push:
     branches:
@@ -162,6 +165,8 @@ jobs:
         run: node scripts/test-story-roleplay-prompt.mjs
       - name: Verify phone UI never renders creator-only notification prompts
         run: node scripts/test-phone-notice-presentation.mjs
+      - name: Verify Character AI Profile schema and source registry contracts
+        run: node scripts/test-character-ai-profile-contract.mjs
       - name: Test five-turn player-first memory capture
         run: node --test scripts/test-memory-capture.cjs
       - name: Verify memory persistence, reload and correction-priority contracts
