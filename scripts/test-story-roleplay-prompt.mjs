@@ -33,6 +33,28 @@ assert.ok(
   prompt.includes("星號只決定畫面呈現，不代表角色能得知其中資訊"),
   "Asterisks control presentation, not character knowledge",
 );
+
+const immersiveRules = [
+  ["narration and dialogue naturally interleave", "敘事、動作與台詞應依情境自然交錯推進"],
+  ["sensory detail when appropriate", "視覺、聽覺、觸覺、嗅覺等感官細節"],
+  ["physical interaction and emotional movement", "身體互動與攻防"],
+  ["clear pronoun subjects", "【代詞主體與段落推進】"],
+  ["no circular or stagnant paragraphs", "段落循環或劇情原地踏步"],
+  ["no player-action prompt at the ending", "最後一句／最後一段絕對不得以詢問、引導、提示或要求"],
+  ["only explicit author-defined mind-reading powers are exceptions", "除非作者角色設定明確賦予角色讀心或其他相應特殊能力"],
+];
+for (const [label, phrase] of immersiveRules) {
+  assert.ok(prompt.includes(phrase), `Missing immersive roleplay rule: ${label}`);
+}
+assert.ok(
+  prompt.includes("結尾應停留在角色自身的動作、對白、情緒、場景變化"),
+  "Reply endings must remain in-scene and must not instruct the player",
+);
+assert.ok(
+  !prompt.includes("只有在角色確實有動機詢問，或事情需要玩家作出關鍵選擇時才提問"),
+  "The former exception allowing player-directed question endings must stay removed",
+);
+
 const uiSource = readFileSync("index.html", "utf8");
 assert.ok(
   uiSource.includes("Legacy single-asterisk *...* narration remains supported"),
