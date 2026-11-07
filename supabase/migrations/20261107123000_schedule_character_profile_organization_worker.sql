@@ -52,7 +52,7 @@ BEGIN
   WHERE name = 'poyozz_service_role_key'
   LIMIT 1;
 
-  IF COALESCE(v_project_url, '') !~ '^https://[a-zA-Z0-9-]+\\.supabase\\.co/?$'
+  IF COALESCE(v_project_url, '') !~ '^https://[a-zA-Z0-9-]+[.]supabase[.]co/?$'
      OR COALESCE(v_service_key, '') = '' THEN
     RETURN 'vault_secrets_missing';
   END IF;
