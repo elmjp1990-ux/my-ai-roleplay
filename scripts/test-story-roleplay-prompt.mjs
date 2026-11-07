@@ -26,7 +26,7 @@ assert.ok(
   "Character card/world setting may explicitly authorize an abstract or poetic style",
 );
 assert.ok(
-  prompt.includes("角色實際說出口的話直接寫"),
+  prompt.includes("角色實際說出口的對白直接呈現"),
   "Spoken dialogue must remain visually distinct from narration",
 );
 assert.ok(
