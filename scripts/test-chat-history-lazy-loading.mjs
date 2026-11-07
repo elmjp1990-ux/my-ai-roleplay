@@ -47,7 +47,7 @@ assert.match(sessionSync, /character_snapshot_author_id:character_snapshot->>aut
 assert.match(sessionSync, /character_snapshot_opening:character_snapshot->>opening/);
 assert.doesNotMatch(sessionSync, /'character_snapshot'/,
   "chat-list hydration must not fetch the full image-heavy character snapshot");
-assert.match(sessionSync, /snapshot\.id:row\.character_id/);
+assert.match(sessionSync, /id:row\.character_id/);
 assert.match(sessionSync, /cloudCharacterSnapshotLoaded:false/);
 assert.match(sessionSync, /compactCloudSessionForLocalStorage\(state\.sessions\[row\.id\]\)/);
 
@@ -64,6 +64,8 @@ assert.match(messageLoader, /auth\.getUser\(\)/);
 assert.match(messageLoader, /snapshotRequested=!older&&session\.cloudCharacterSnapshotLoaded!==true/);
 assert.match(messageLoader, /\.\.\.\(snapshotRequested\?\['character_snapshot'\]:\[\]\)/);
 assert.match(messageLoader, /session\.cloudCharacterSnapshotLoaded=true/);
+assert.match(messageLoader, /if\(snapshotRequested\)renderConversation\(\)/,
+  "the selected chat header must refresh after its full snapshot is loaded");
 assert.match(messageLoader, /\.eq\('id', sessionId\)\.eq\('user_id', userId\)\.is\('deleted_at', null\)/);
 assert.match(messageLoader, /\.eq\('session_id',sessionId\)\.is\('deleted_at',null\)/);
 assert.match(messageLoader, /const pageSize=50/);
