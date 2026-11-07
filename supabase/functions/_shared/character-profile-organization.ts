@@ -79,11 +79,12 @@ export function validateCharacterAiProfile(
       errors.push(sectionName + "_invalid");
       continue;
     }
-    validateEvidenceItems(section.items, sourceKeys, errors, sectionName);
-    if (section.status === "not_provided" && (section.items as unknown[]).length !== 0) {
+    const sectionItems = Array.isArray(section.items) ? section.items : [];
+    validateEvidenceItems(sectionItems, sourceKeys, errors, sectionName);
+    if (section.status === "not_provided" && sectionItems.length !== 0) {
       errors.push(sectionName + "_not_provided_has_items");
     }
-    if (section.status === "populated" && (section.items as unknown[]).length === 0) {
+    if (section.status === "populated" && sectionItems.length === 0) {
       errors.push(sectionName + "_populated_empty");
     }
   }
