@@ -74,6 +74,14 @@ assert.ok(
   "The chat UI must preserve single-asterisk narration rendering",
 );
 assert.ok(
+  uiSource.includes("Array.from(value).length>=30&&Array.from(value).length<=80"),
+  "Persisted Story suggestions must use the same 30–80 character bound",
+);
+assert.ok(
+  !uiSource.includes("Array.from(value).length<=90"),
+  "The old 90-character Story suggestion limit must be removed",
+);
+assert.ok(
   !prompt.includes("每次至少包含兩段動作／背景描寫與兩處角色對話"),
   "Do not force repetitive narration/dialogue quotas",
 );
