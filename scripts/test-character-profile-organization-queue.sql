@@ -110,12 +110,12 @@ INSERT INTO claimed_data SELECT * FROM public.claim_character_profile_organizati
 CREATE TEMP TABLE competing_claim AS
   SELECT * FROM public.claim_character_profile_organization_jobs(1);
 RESET ROLE;
-DO $
+DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM competing_claim) THEN
     RAISE EXCEPTION 'a concurrent worker claimed a second profile job';
   END IF;
-END $;
+END $$;
 
 -- Change an AI source after claim. Completion must refuse the stale generation.
 UPDATE public.characters
