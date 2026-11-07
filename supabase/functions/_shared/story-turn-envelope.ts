@@ -90,7 +90,7 @@ export function parseStoryTurnEnvelope(raw: string): StoryTurnEnvelope {
     .filter((item) => {
       if (item.length < 30 || item.length > 80 || /[\r\n]/.test(item)) return false;
       const narration = item.match(/\*[^*]+\*/g) ?? [];
-      const spokenText = item.replace(/\\*[^*]+\\*/g, "").trim();
+      const spokenText = item.replace(/\*[^*]+\*/g, "").trim();
       return narration.length >= 1 && spokenText.length > 0;
     });
   const suggestedReplies = validSuggestedReplies.length === 3
