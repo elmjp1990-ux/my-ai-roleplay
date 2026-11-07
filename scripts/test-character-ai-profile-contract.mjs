@@ -127,22 +127,32 @@ assert.match(schedulerMigration, /poyozz_supabase_url/,
   "Worker scheduling must read the project URL from Supabase Vault");
 assert.match(schedulerMigration, /poyozz_service_role_key/,
   "Worker scheduling must read the service role key from Vault, never source code");
-const cronCommand = schedulerMigration.match(/v_command := \\$command\\$([\\s\\S]*?)\\$command\\$;/)?.[1] || "";
+const cronCommandStart = schedulerMigration.indexOf("v_command := $command$");
+const cronCommandEnd = schedulerMigration.indexOf("$command$;", cronCommandStart);
+const cronCommand = cronCommandStart >= 0 && cronCommandEnd > cronCommandStart
+  ? schedulerMigration.slice(cronCommandStart, cronCommandEnd)
+  : "";
 assert.ok(cronCommand.includes("vault.decrypted_secrets"),
   "Cron must resolve credentials from Vault at execution time");
-assert.doesNotMatch(cronCommand, /v_service_key/,
+assert.ok(!cronCommand.includes("v_service_key"),
   "Decrypted service-role key must never be interpolated into the persistent cron command");
-assert.doesNotMatch(schedulerMigration, /PERFORM public\\.schedule_character_profile_organization_worker\\(\\)/,
+assert.ok(!schedulerMigration.includes("PERFORM public.schedule_character_profile_organization_worker()"),
   "Migration must not activate the Worker schedule automatically");
-assert.match(schedulerMigration, /Intentionally no migration-time DO block/,
+assert.ok(schedulerMigration.includes("Intentionally no migration-time DO block"),
   "Worker scheduling must require explicit operator activation");
-assert.match(schedulerMigration, /\\* \\* \\* \\* \\*/,
+assert.ok(schedulerMigration.includes("p_enabled boolean DEFAULT false"),
+  "Worker scheduling must be disabled unless explicitly enabled");
+assert.ok(schedulerMigration.includes("IF p_enabled IS NOT TRUE"),
+  "The explicit scheduler switch must support disabling and unscheduling");
+assert.ok(schedulerMigration.includes("'* * * * *'"),
   "Worker cron should poll the queue every minute");
-assert.match(schedulerMigration, /vault_secrets_missing/,
+assert.ok(schedulerMigration.includes("vault_secrets_missing"),
   "Missing Vault secrets must fail closed without creating a schedule");
-assert.match(migration, /WHERE public\\.character_profile_organization_jobs\\.source_hash IS DISTINCT FROM EXCLUDED\\.source_hash/,
+assert.ok(migration.includes("WHERE public.character_profile_organization_jobs.source_hash IS DISTINCT FROM EXCLUDED.source_hash"),
   "Unchanged source hashes must not reset an existing queue job");
-assert.match(migration, /reused_existing_job/,
+assert.ok(migration.includes("reused_existing_job"),
   "Enqueue response must identify when an existing same-source job was reused");
+assert.ok(migration.includes("lease_source_hash"),
+  "The queue must fence an active Worker against its claimed source while coalescing newer saves");
 
 console.log("Character AI Profile schema, queue, Worker, scheduling, save enqueue, Story integration and privacy contracts passed.");
