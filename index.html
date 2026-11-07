@@ -3719,7 +3719,8 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
     session.cloudMessagesLoaded=true;session.cloudMessagesLoading=false;session.cloudMessagesError='';
     persist();
     if(route.page==='conversation'&&route.id===sessionId){
-      renderMessages(!older);
+      if(snapshotRequested)renderConversation();
+      else renderMessages(!older);
       if(older&&$('messages')){const node=$('messages');node.scrollTop=previousTop+Math.max(0,node.scrollHeight-previousHeight);}
     }
     return true;
