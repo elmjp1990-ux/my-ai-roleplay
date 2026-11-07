@@ -108,12 +108,14 @@ async function generateProfile(
 }
 
 const safeUsageInteger = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === "") return null;
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? Math.min(2_147_483_647, Math.trunc(parsed)) : null;
 };
 
 const safeUsageCost = (usage: Record<string, unknown>): number | null => {
   const raw = usage.cost ?? usage.total_cost;
+  if (raw === null || raw === undefined || raw === "") return null;
   const parsed = typeof raw === "number" ? raw : Number(raw);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 };
@@ -126,22 +128,29 @@ async function recordProfileUsage(
   errorCode: string | null = null,
 ): Promise<void> {
   const usage = generated?.usage ?? {};
-  const { error } = await supabase.from("character_profile_organization_usage").insert({
-    character_id: item.character_id,
-    author_id: item.author_id,
-    source_hash: item.source_hash,
-    model: generated?.model || CHARACTER_PROFILE_MODEL,
-    provider: generated?.provider || "deepinfra",
-    gateway_request_id: generated?.requestId || null,
-    prompt_tokens: safeUsageInteger(usage.prompt_tokens),
-    completion_tokens: safeUsageInteger(usage.completion_tokens),
-    total_tokens: safeUsageInteger(usage.total_tokens),
-    cost_usd: safeUsageCost(usage),
-    status,
-    error_code: errorCode,
-    processed_at: new Date().toISOString(),
-  });
-  if (error) {
+  try {
+    const { error } = await supabase.from("character_profile_organization_usage").insert({
+      character_id: item.character_id,
+      author_id: item.author_id,
+      source_hash: item.source_hash,
+      model: generated?.model || CHARACTER_PROFILE_MODEL,
+      provider: generated?.provider || "deepinfra",
+      gateway_request_id: generated?.requestId || null,
+      prompt_tokens: safeUsageInteger(usage.prompt_tokens),
+      completion_tokens: safeUsageInteger(usage.completion_tokens),
+      total_tokens: safeUsageInteger(usage.total_tokens),
+      cost_usd: safeUsageCost(usage),
+      status,
+      error_code: errorCode,
+      processed_at: new Date().toISOString(),
+    });
+    if (error) {
+      console.error("character_profile_usage_write_failed", {
+        code: safeCode(error, "usage_write_failed"),
+      });
+    }
+  } catch (error) {
+    // Usage-ledger outages must never strand a valid profile job.
     console.error("character_profile_usage_write_failed", {
       code: safeCode(error, "usage_write_failed"),
     });
