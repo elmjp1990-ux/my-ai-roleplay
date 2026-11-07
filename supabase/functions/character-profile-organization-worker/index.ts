@@ -35,13 +35,25 @@ const safeCode = (value: unknown, fallback: string): string => {
     : fallback;
 };
 
-type GeneratedProfile = {
-  profile: Record<string, unknown>;
+type ProfileUsageMetadata = {
   model: string;
   provider: string;
   requestId: string | null;
   usage: Record<string, unknown>;
 };
+
+type GeneratedProfile = ProfileUsageMetadata & {
+  profile: Record<string, unknown>;
+};
+
+class ProfileGenerationError extends Error {
+  metadata: ProfileUsageMetadata;
+  constructor(code: string, metadata: ProfileUsageMetadata) {
+    super(code);
+    this.name = "ProfileGenerationError";
+    this.metadata = metadata;
+  }
+}
 
 async function generateProfile(
   item: WorkItem,
@@ -75,32 +87,34 @@ async function generateProfile(
     });
     if (!response.ok) throw new Error("openrouter_http_" + response.status);
     const result = await response.json();
-    const content = result?.choices?.[0]?.message?.content;
-    if (typeof content !== "string" || !content.trim()) {
-      throw new Error("model_content_missing");
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      throw new Error("model_json_invalid");
-    }
-    const validation = validateCharacterAiProfile(parsed, item.source_payload);
-    if (!validation.ok) throw new Error("profile_schema_invalid_" + validation.errors[0]);
     const usage = result?.usage && typeof result.usage === "object" && !Array.isArray(result.usage)
       ? result.usage as Record<string, unknown>
       : {};
     const responseProvider = typeof result?.provider === "string" ? result.provider : "deepinfra";
     const requestIdValue = response.headers.get("x-request-id") ||
       (typeof result?.id === "string" ? result.id : null);
-    return {
-      profile: parsed as Record<string, unknown>,
+    const metadata: ProfileUsageMetadata = {
       model: CHARACTER_PROFILE_MODEL,
       provider: responseProvider.slice(0, 100),
       requestId: typeof requestIdValue === "string" &&
         /^[A-Za-z0-9._:-]{1,128}$/.test(requestIdValue) ? requestIdValue : null,
       usage,
     };
+    const content = result?.choices?.[0]?.message?.content;
+    if (typeof content !== "string" || !content.trim()) {
+      throw new ProfileGenerationError("model_content_missing", metadata);
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      throw new ProfileGenerationError("model_json_invalid", metadata);
+    }
+    const validation = validateCharacterAiProfile(parsed, item.source_payload);
+    if (!validation.ok) {
+      throw new ProfileGenerationError("profile_schema_invalid_" + validation.errors[0], metadata);
+    }
+    return { ...metadata, profile: parsed as Record<string, unknown> };
   } finally {
     clearTimeout(timeout);
   }
@@ -122,7 +136,7 @@ const safeUsageCost = (usage: Record<string, unknown>): number | null => {
 async function recordProfileUsage(
   supabase: any,
   item: WorkItem,
-  generated: GeneratedProfile | null,
+  generated: ProfileUsageMetadata | null,
   status: "generated" | "failed",
   errorCode: string | null = null,
 ): Promise<void> {
@@ -212,7 +226,8 @@ export default {
       } catch (error) {
         const code = safeCode(error, "profile_generation_failed");
         if (!usageRecorded && item.character_id && item.author_id && item.source_hash) {
-          await recordProfileUsage(supabase, item, null, "failed", code);
+          const failedUsage = error instanceof ProfileGenerationError ? error.metadata : null;
+          await recordProfileUsage(supabase, item, failedUsage, "failed", code);
           usageRecorded = true;
         }
         const { data: failureStatus, error: failureError } = await supabase.rpc(
