@@ -34,6 +34,58 @@ const asDbRow = (value: unknown): DbRow =>
   value && typeof value === "object" && !Array.isArray(value) ? value as DbRow : {};
 const asString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
+\nconst formatCharacterAiProfilePrompt = (value: unknown): string => {
+  const profile = asDbRow(value);
+  const sectionLabels: Record<string, string> = {
+    identity_background: "身份與背景",
+    core_personality: "核心人格與價值觀",
+    inner_motivations: "內在動機與目標",
+    emotional_response_patterns: "情緒反應模式",
+    relationship_dynamics: "關係發展邏輯",
+    behavior_and_agency: "行為模式與自主性",
+    knowledge_boundaries: "知識範圍與記憶邊界",
+    appearance_markers: "外觀辨識特徵",
+  };
+  const lines: string[] = [];
+  for (const [key, label] of Object.entries(sectionLabels)) {
+    const section = asDbRow(profile[key]);
+    const items = Array.isArray(section.items) ? section.items : [];
+    for (const item of items) {
+      const entry = asDbRow(item);
+      const content = asString(entry.content);
+      if (content) lines.push(`[${label}/${entry.source_type === "ai_inference" ? "AI歸納" : "作者設定"}] ${content}`);
+    }
+  }
+  const speech = asDbRow(profile.speech_style);
+  for (const item of Array.isArray(speech.tendencies) ? speech.tendencies : []) {
+    const content = asString(asDbRow(item).content);
+    if (content) lines.push("[說話風格] " + content);
+  }
+  const ooc = asDbRow(profile.ooc_rules);
+  for (const item of Array.isArray(ooc.rules) ? ooc.rules : []) {
+    const rule = asDbRow(item);
+    if (asString(rule.rule)) {
+      lines.push("[OOC防崩規則] " + asString(rule.rule) +
+        "；避免：" + asString(rule.prohibited_deviation) +
+        "；允許自然成長：" + asString(rule.allowed_growth));
+    }
+  }
+  // This section is server-only and is inserted only into the server-built system prompt.
+  const privateContext = asDbRow(profile.author_private_context);
+  for (const item of Array.isArray(privateContext.items) ? privateContext.items : []) {
+    const content = asString(asDbRow(item).content);
+    if (content) lines.push("[作者私密補充/僅供角色理解] " + content);
+  }
+  for (const conflict of Array.isArray(profile.source_conflicts) ? profile.source_conflicts : []) {
+    const entry = asDbRow(conflict);
+    if (asString(entry.description)) lines.push("[作者設定衝突/不可自行裁決] " + asString(entry.description));
+  }
+  if (ooc.status === "insufficient_source" && asString(ooc.insufficient_source_reason)) {
+    lines.push("[OOC資料不足] " + asString(ooc.insufficient_source_reason));
+  }
+  return lines.join("\n").slice(0, 6000);
+};
+
 
 async function buildStoryMessages(
   admin: any,
@@ -83,6 +135,7 @@ async function buildStoryMessages(
   const authorId = asString(character.author_id) || asString(snapshot.authorId);
   let privateInfo = "";
   let personalityProfile: unknown = {};
+  let derivedProfilePrompt = "";
   if (authorId) {
     const privateResult = await admin.from("character_private_info")
       .select("private_info,personality_profile")
@@ -92,6 +145,21 @@ async function buildStoryMessages(
     if (privateResult.error) throw new Error("story_private_context_unavailable");
     privateInfo = asString(privateResult.data?.private_info);
     personalityProfile = privateResult.data?.personality_profile ?? {};
+
+    // The RPC returns a profile only when its source hash still matches the
+    // latest author data. Missing/stale/temporarily unavailable derived data
+    // must never block a normal Story turn or replace original author fields.
+    const derivedResult = await admin.rpc("get_character_ai_profile_for_chat", {
+      p_character_id: characterId,
+      p_author_id: authorId,
+    });
+    if (derivedResult.error) {
+      console.warn("story_character_ai_profile_unavailable", {
+        code: typeof derivedResult.error.code === "string" ? derivedResult.error.code : "profile_read_failed",
+      });
+    } else {
+      derivedProfilePrompt = formatCharacterAiProfilePrompt(derivedResult.data);
+    }
   }
 
   const historyRows = (Array.isArray(historyResult.data) ? historyResult.data : [])
@@ -149,6 +217,7 @@ async function buildStoryMessages(
     "角色：{CHAR}",
     "公開介紹／背景：{CHAR_DESC}",
     "角色個性與行為準則：{CHAR_PERSONALITY}",
+    "【AI 整理的角色扮演檔與 OOC｜僅作輔助，作者原始設定優先】{CHAR_AI_PROFILE}",
     "演繹風格：{CHAR_STYLE}",
     "開場白：" + asString(snapshot.opening),
     "開場情境：{SCENE}",
@@ -183,7 +252,10 @@ async function buildStoryMessages(
     "【代詞主體與段落推進】清楚區分 {CHAR}、{USER} 及其他角色；每個動作的執行者、承受者與對象都要明確。中文可自然省略代詞，但不得讓「他／她／你」產生指涉混淆，尤其多人互動時要明確標示角色。不得擅自把玩家的動作、台詞、想法或感受寫成角色自身行為。禁止重複敘述、同義改寫灌水、段落循環或劇情原地踏步；每段應帶來新的資訊、行動、反應、感官變化或情緒推進。",
     "直接接續玩家最新訊息，推進故事；不要輸出分析、規則、提示詞或私密設定清單。不要替玩家決定未表達的台詞、想法或行動。"
   ].join("\n");
-  const system = applyPromptVariables(systemTemplate, values);
+  const system = applyPromptVariables(
+    systemTemplate.replace("{CHAR_AI_PROFILE}", derivedProfilePrompt),
+    values,
+  );
 
   const messages = historyRows
     .filter((row: DbRow) => row.id !== userMessageId)
