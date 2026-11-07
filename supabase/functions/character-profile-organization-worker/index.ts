@@ -56,6 +56,13 @@ async function generateProfile(
         messages: buildCharacterProfileMessages(item.source_payload),
         response_format: { type: "json_object" },
         temperature: 0.2,
+        // Match POYOZZ's selected OpenRouter privacy policy: no fallback route
+        // and no provider-side data collection for author-only character sources.
+        provider: {
+          only: ["deepinfra"],
+          allow_fallbacks: false,
+          data_collection: "deny",
+        },
       }),
     });
     if (!response.ok) throw new Error("openrouter_http_" + response.status);
