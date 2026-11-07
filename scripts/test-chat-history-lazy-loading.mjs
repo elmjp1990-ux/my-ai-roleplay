@@ -48,7 +48,7 @@ assert.match(sessionSync, /character_snapshot_opening:character_snapshot->>openi
 assert.doesNotMatch(sessionSync, /'character_snapshot'/,
   "chat-list hydration must not fetch the full image-heavy character snapshot");
 assert.match(sessionSync, /id:row\.character_id/);
-assert.match(sessionSync, /cloudCharacterSnapshotLoaded:false/);
+assert.match(sessionSync, /cloudCharacterSnapshotLoaded:existing\?\.cloudCharacterSnapshotLoaded===true/);
 assert.match(sessionSync, /compactCloudSessionForLocalStorage\(state\.sessions\[row\.id\]\)/);
 
 const hasUserHelper = between("function hasUserMessage(session)", "function sessionTitle");
