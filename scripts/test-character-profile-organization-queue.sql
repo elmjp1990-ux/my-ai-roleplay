@@ -161,11 +161,32 @@ BEGIN
   IF v_status <> 'completed' THEN
     RAISE EXCEPTION 'fresh profile completion failed: %', v_status;
   END IF;
-END $$;
+END $;
 RESET ROLE;
 
+INSERT INTO public.character_profile_organization_usage (
+  character_id, author_id, source_hash, model, provider,
+  prompt_tokens, completion_tokens, total_tokens, cost_usd, status
+)
+SELECT character_id, author_id, source_hash,
+  'deepseek/deepseek-v4-flash-20260423', 'deepinfra',
+  123, 45, 168, 0.000123, 'generated'
+FROM claimed_data
+ORDER BY lease_generation DESC
+LIMIT 1;
+
+DO $
+BEGIN
+  IF (SELECT count(*) FROM public.character_profile_organization_usage) <> 1 THEN
+    RAISE EXCEPTION 'Profile generation usage was not recorded';
+  END IF;
+  IF (SELECT cost_usd FROM public.character_profile_organization_usage LIMIT 1) <> 0.000123 THEN
+    RAISE EXCEPTION 'Profile generation cost was not preserved';
+  END IF;
+END $;
+
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
-DO $$
+DO $
 DECLARE
   v_profile jsonb;
 BEGIN
