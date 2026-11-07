@@ -359,6 +359,24 @@ BEGIN
 END $$;
 RESET ROLE;
 
+-- Oversized creator source must be replaced with a small sentinel inside
+-- Postgres, so the full private text is never returned to the Worker.
+DO $
+DECLARE
+  v_payload jsonb;
+BEGIN
+  UPDATE public.characters
+  SET intro = repeat('字', 70000)
+  WHERE id = '11111111-1111-4111-8111-111111111111';
+  v_payload := public.character_profile_source_payload(
+    '11111111-1111-4111-8111-111111111111',
+    '22222222-2222-4222-8222-222222222222'
+  );
+  IF v_payload <> '{"__profile_source_error":"source_payload_too_large"}'::jsonb THEN
+    RAISE EXCEPTION 'oversized source payload was returned instead of a safe sentinel';
+  END IF;
+END $;
+
 -- Soft delete must remove both queued work and private derived profile data.
 UPDATE public.characters
 SET deleted_at = now()
