@@ -110,11 +110,13 @@ export function validateCharacterAiProfile(
 
   const privateContext = value.author_private_context;
   if (!isRecord(privateContext) || privateContext.visibility !== "server_only" ||
-    !["populated", "not_provided", "conflict"].includes(String(privateContext.status))) {
+    !["populated", "not_provided", "conflict"].includes(String(privateContext.status)) ||
+    !Array.isArray(privateContext.items)) {
     errors.push("author_private_context_invalid");
   } else {
-    validateEvidenceItems(privateContext.items, sourceKeys, errors, "author_private_context");
-    for (const item of privateContext.items) {
+    const privateItems = privateContext.items;
+    validateEvidenceItems(privateItems, sourceKeys, errors, "author_private_context");
+    for (const item of privateItems) {
       if (!isRecord(item) || !Array.isArray(item.source_refs) ||
         !item.source_refs.every((ref) => typeof ref === "string" && ref.startsWith("character_private_info."))) {
         errors.push("author_private_context_source_not_private");
