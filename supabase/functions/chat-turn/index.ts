@@ -34,7 +34,33 @@ const asDbRow = (value: unknown): DbRow =>
   value && typeof value === "object" && !Array.isArray(value) ? value as DbRow : {};
 const asString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
-\nconst formatCharacterAiProfilePrompt = (value: unknown): string => {
+\nconst collectDerivedPrivateProfileValues = (value: unknown): string[] => {
+  const profile = asDbRow(value);
+  const protectedValues = new Set<string>();
+  const collectItems = (items: unknown) => {
+    if (!Array.isArray(items)) return;
+    for (const item of items) {
+      const entry = asDbRow(item);
+      const refs = Array.isArray(entry.source_refs) ? entry.source_refs : [];
+      const content = asString(entry.content);
+      if (content && refs.some((ref) => typeof ref === "string" && ref.startsWith("character_private_info."))) {
+        protectedValues.add(content);
+      }
+    }
+  };
+  for (const key of [
+    "identity_background", "core_personality", "inner_motivations",
+    "emotional_response_patterns", "relationship_dynamics",
+    "behavior_and_agency", "knowledge_boundaries", "appearance_markers",
+  ]) collectItems(asDbRow(profile[key]).items);
+  const speech = asDbRow(profile.speech_style);
+  collectItems(speech.tendencies);
+  collectItems(speech.creator_defined_quirks);
+  collectItems(asDbRow(profile.author_private_context).items);
+  return [...protectedValues].slice(0, 80);
+};
+
+const formatCharacterAiProfilePrompt = (value: unknown): string => {
   const profile = asDbRow(value);
   const sectionLabels: Record<string, string> = {
     identity_background: "身份與背景",
@@ -136,6 +162,7 @@ async function buildStoryMessages(
   let privateInfo = "";
   let personalityProfile: unknown = {};
   let derivedProfilePrompt = "";
+  let derivedProfilePrivateValues: string[] = [];
   if (authorId) {
     const privateResult = await admin.from("character_private_info")
       .select("private_info,personality_profile")
@@ -159,6 +186,7 @@ async function buildStoryMessages(
       });
     } else {
       derivedProfilePrompt = formatCharacterAiProfilePrompt(derivedResult.data);
+      derivedProfilePrivateValues = collectDerivedPrivateProfileValues(derivedResult.data);
     }
   }
 
@@ -268,7 +296,10 @@ async function buildStoryMessages(
   messages.push({ role: "user", content: asString(currentUserMessage.content) });
   return {
     messages: [{ role: "system", content: system }, ...messages],
-    protectedContext: preparePrivateContext(privateInfo, personalityProfile).protectedValues,
+    protectedContext: [
+      ...preparePrivateContext(privateInfo, personalityProfile).protectedValues,
+      ...derivedProfilePrivateValues,
+    ],
     priorAssistantOutputs: historyRows.filter((row: DbRow) => row.role === "assistant")
       .slice(-5).map((row: DbRow) => asString(row.content)).filter(Boolean),
   };
