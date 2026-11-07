@@ -1,6 +1,8 @@
 -- Optional pg_cron/pg_net scheduling for the Character AI Profile worker.
--- The worker is scheduled only when the operator has stored the project URL and
--- service-role key in Supabase Vault. No credentials are embedded in this file.
+-- The cron command stores only SQL that reads the current URL/key from Vault at
+-- execution time. No decrypted credential is persisted in cron.job.command.
+-- Creating this migration does NOT enable the schedule; an operator must call
+-- the service-role RPC explicitly after the Worker and Vault secrets are ready.
 
 CREATE OR REPLACE FUNCTION public.schedule_character_profile_organization_worker()
 RETURNS text
@@ -12,7 +14,6 @@ DECLARE
   v_project_url text;
   v_service_key text;
   v_job_id bigint;
-  v_headers jsonb;
   v_command text;
 BEGIN
   IF auth.role() <> 'service_role' THEN
@@ -37,22 +38,31 @@ BEGIN
   WHERE name = 'poyozz_service_role_key'
   LIMIT 1;
 
-  IF COALESCE(v_project_url, '') !~ '^https://[a-zA-Z0-9-]+\.supabase\.co/?$'
+  IF COALESCE(v_project_url, '') !~ '^https://[a-zA-Z0-9-]+\\.supabase\\.co/?$'
      OR COALESCE(v_service_key, '') = '' THEN
     RETURN 'vault_secrets_missing';
   END IF;
 
-  v_project_url := regexp_replace(v_project_url, '/+$', '');
-  v_headers := jsonb_build_object(
-    'Authorization', 'Bearer ' || v_service_key,
-    'Content-Type', 'application/json'
-  );
-  v_command := format(
-    'select net.http_post(url := %L, headers := %L::jsonb, body := %L::jsonb, timeout_milliseconds := 120000);',
-    v_project_url || '/functions/v1/character-profile-organization-worker',
-    v_headers::text,
-    '{}'::jsonb::text
-  );
+  -- Resolve both secrets at execution time. The persistent cron command contains
+  -- secret names only; it never contains the decrypted URL or service-role key.
+  v_command := $command$
+    SELECT net.http_post(
+      url := regexp_replace(
+        (SELECT decrypted_secret FROM vault.decrypted_secrets
+         WHERE name = 'poyozz_supabase_url' LIMIT 1),
+        '/+$', ''
+      ) || '/functions/v1/character-profile-organization-worker',
+      headers := jsonb_build_object(
+        'Authorization', 'Bearer ' || (
+          SELECT decrypted_secret FROM vault.decrypted_secrets
+          WHERE name = 'poyozz_service_role_key' LIMIT 1
+        ),
+        'Content-Type', 'application/json'
+      ),
+      body := '{}'::jsonb,
+      timeout_milliseconds := 120000
+    );
+  $command$;
 
   FOR v_job_id IN
     SELECT jobid FROM cron.job
@@ -76,12 +86,5 @@ REVOKE ALL ON FUNCTION public.schedule_character_profile_organization_worker()
 GRANT EXECUTE ON FUNCTION public.schedule_character_profile_organization_worker()
   TO service_role;
 
--- If the required Vault secrets and extensions already exist, install the
--- one-minute schedule now. Otherwise the service-role RPC can be called later
--- after adding the two Vault secrets; no schedule is created with missing keys.
-DO $$
-BEGIN
-  PERFORM set_config('request.jwt.claim.role', 'service_role', true);
-  PERFORM public.schedule_character_profile_organization_worker();
-END;
-$$;
+-- Intentionally no migration-time DO block: schedule activation is a separate,
+-- explicit operator action after deployment and secret verification.
