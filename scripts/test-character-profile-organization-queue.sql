@@ -248,13 +248,79 @@ SELECT set_config('request.jwt.claim.role', 'authenticated', false);
 SET ROLE authenticated;
 SELECT public.enqueue_character_profile_organization('11111111-1111-4111-8111-111111111111');
 RESET ROLE;
-DO $$
+DO $
 BEGIN
   IF (SELECT status FROM public.character_profile_organization_jobs
       WHERE character_id = '11111111-1111-4111-8111-111111111111') <> 'pending' THEN
     RAISE EXCEPTION 'explicit owner save did not requeue terminal failed job';
   END IF;
-END $$;
+END $;
+
+-- A database persistence failure after a successful provider response is
+-- terminal: the same paid generation must not be automatically requested again.
+SELECT set_config('request.jwt.claim.role', 'service_role', false);
+DO $
+DECLARE
+  v_job public.character_profile_organization_jobs%ROWTYPE;
+  v_status text;
+  v_claim_count integer;
+BEGIN
+  UPDATE public.character_profile_organization_jobs
+  SET status = 'processing',
+      lease_token = gen_random_uuid(),
+      lease_generation = lease_generation + 1,
+      lease_expires_at = now() + interval '3 minutes',
+      lease_source_hash = source_hash
+  WHERE character_id = '11111111-1111-4111-8111-111111111111'
+  RETURNING * INTO v_job;
+
+  v_status := public.fail_character_profile_organization_job(
+    v_job.character_id, v_job.lease_token, v_job.lease_generation,
+    'profile_persistence_failed_after_generation'
+  );
+  IF v_status <> 'failed' THEN
+    RAISE EXCEPTION 'post-generation persistence failure was not terminal: %', v_status;
+  END IF;
+
+  SELECT count(*) INTO v_claim_count
+  FROM public.claim_character_profile_organization_jobs(1);
+  IF v_claim_count <> 0 THEN
+    RAISE EXCEPTION 'post-generation persistence failure was automatically regenerated';
+  END IF;
+END $;
+
+-- An expired Worker lease is also ambiguous and must become terminal rather
+-- than being reclaimed by the next cron invocation.
+DO $
+DECLARE
+  v_claim_count integer;
+  v_status text;
+  v_error text;
+BEGIN
+  UPDATE public.character_profile_organization_jobs
+  SET status = 'processing',
+      lease_token = gen_random_uuid(),
+      lease_generation = lease_generation + 1,
+      lease_expires_at = now() - interval '1 second',
+      lease_source_hash = source_hash
+  WHERE character_id = '11111111-1111-4111-8111-111111111111';
+
+  SELECT count(*) INTO v_claim_count
+  FROM public.claim_character_profile_organization_jobs(1);
+  SELECT status, last_error_code INTO v_status, v_error
+  FROM public.character_profile_organization_jobs
+  WHERE character_id = '11111111-1111-4111-8111-111111111111';
+  IF v_claim_count <> 0 OR v_status <> 'failed'
+     OR v_error <> 'worker_lease_expired_manual_retry' THEN
+    RAISE EXCEPTION 'expired lease was automatically reclaimed: %, %, %', v_claim_count, v_status, v_error;
+  END IF;
+END $;
+
+-- Explicit owner save is still the recovery path for terminal jobs.
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SET ROLE authenticated;
+SELECT public.enqueue_character_profile_organization('11111111-1111-4111-8111-111111111111');
+RESET ROLE;
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
 
 INSERT INTO public.character_profile_organization_usage (
