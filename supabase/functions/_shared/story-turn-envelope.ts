@@ -75,9 +75,9 @@ export function parseStoryTurnEnvelope(raw: string): StoryTurnEnvelope {
     }
   }
 
-  // Accept the canonical snake_case key plus common camelCase/provider aliases.
-  // Do not impose a character-count rule on suggestions. Any non-empty
-  // string can be offered; keep at most three options for the chat UI.
+  // Suggestions are shown as ready-to-send player replies: one single-asterisk
+  // action/narration segment plus spoken dialogue, 30–80 characters total.
+  // Require all three valid options together so short fragments never reach the UI.
   const rawSuggestions = Array.isArray(value.suggested_replies)
     ? value.suggested_replies
     : Array.isArray(value.suggestedReplies)
@@ -87,8 +87,15 @@ export function parseStoryTurnEnvelope(raw: string): StoryTurnEnvelope {
     : [];
   const validSuggestedReplies = rawSuggestions
     .map((item) => typeof item === "string" ? item.trim() : "")
-    .filter((item) => item.length > 0)
-    .slice(0, 3);
+    .filter((item) => {
+      if (item.length < 30 || item.length > 80 || /[\\r\\n]/.test(item)) return false;
+      const narration = item.match(/\\*[^*]+\\*/g) ?? [];
+      const spokenText = item.replace(/\\*[^*]+\\*/g, "").trim();
+      return narration.length >= 1 && spokenText.length > 0;
+    });
+  const suggestedReplies = validSuggestedReplies.length === 3
+    ? validSuggestedReplies
+    : [];
 
   return {
     reply,
