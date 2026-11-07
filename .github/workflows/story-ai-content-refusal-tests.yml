@@ -25,6 +25,7 @@ on:
       - "supabase/migrations/20261104140000_restrict_chat_turn_rpc_execution.sql"
       - "supabase/migrations/20261104130000_reconcile_stale_story_chat_turns.sql"
       - "scripts/test-character-personality-private-migration.sql"
+      - "scripts/test-character-profile-organization-queue.sql"
       - "scripts/test-private-personality-column-usage.mjs"
       - "scripts/test-chat-turn-wallet-refund.sql"
       - "scripts/test-chat-turn-reconciliation-ui.mjs"
@@ -160,6 +161,30 @@ jobs:
         env:
           PGPASSWORD: postgres
         run: psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -f scripts/test-character-personality-private-migration.sql
+
+  character-profile-queue-migration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Test profile queue coalescing, private access, lease fencing and stale-source rejection
+        env:
+          PGPASSWORD: postgres
+        run: psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -f scripts/test-character-profile-organization-queue.sql
 
   story-ai-content-refusal:
     runs-on: ubuntu-latest
