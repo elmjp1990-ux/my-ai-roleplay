@@ -84,11 +84,7 @@ assert.match(html, /主要角色圖預覽/);
 // Lazy video observer must dispatch to each observed element, not capture the first card's loader.
 assert.ok(html.includes("const characterVideoLoaders = new WeakMap()"));
 assert.ok(html.includes("characterVideoLoaders.set(video,load)"));
-assert.ok(html.includes("let characterVideoDebugSequence = 0"));
-assert.ok(html.includes("[character-video] hydrate"));
-assert.ok(html.includes("[character-video] attach-src"));
-assert.ok(html.includes("samePathElements:"));
-assert.ok(html.includes("video.dataset.videoDebugId=String(++characterVideoDebugSequence)"));
+assert.doesNotMatch(html, /characterVideoDebugSequence|videoDebugId|\[character-video\]/, "Temporary media diagnostics must not ship in production UI code");
 assert.ok(html.includes("characterVideoLoaders.get(target)"));
 // Scrolling away or backgrounding pauses playback but preserves src and preload state;
 // changing preload while attached can restart the same full MP4 request.
