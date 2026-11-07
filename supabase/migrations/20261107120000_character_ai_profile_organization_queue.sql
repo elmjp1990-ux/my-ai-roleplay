@@ -175,6 +175,12 @@ BEGIN
     RAISE EXCEPTION 'invalid_claim_limit' USING ERRCODE = '22023';
   END IF;
 
+  -- Serialize claim transactions globally. The transaction lock closes the
+  -- race where two cron invocations could both observe an empty active queue.
+  IF NOT pg_try_advisory_xact_lock(748293, 20261107) THEN
+    RETURN;
+  END IF;
+
   -- Keep profile organization serial by default to control model spend and avoid
   -- overlapping generations for different roles. Expired leases remain reclaimable.
   IF EXISTS (
