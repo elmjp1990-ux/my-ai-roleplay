@@ -84,14 +84,71 @@ assert.match(html, /主要角色圖預覽/);
 // Lazy video observer must dispatch to each observed element, not capture the first card's loader.
 assert.ok(html.includes("const characterVideoLoaders = new WeakMap()"));
 assert.ok(html.includes("characterVideoLoaders.set(video,load)"));
+assert.doesNotMatch(html, /characterVideoDebugSequence|videoDebugId|\[character-video\]/, "Temporary media diagnostics must not ship in production UI code");
 assert.ok(html.includes("characterVideoLoaders.get(target)"));
-assert.ok(html.includes("if(target.dataset.videoHydrated==='true')target.play().catch"));
-assert.ok(html.includes("function stopCharacterVideo(video){"));
-assert.ok(html.includes("video.removeAttribute('src');"));
-assert.ok(html.includes("video.load();"));
+// Scrolling away or backgrounding pauses playback but preserves src and preload state;
+// changing preload while attached can restart the same full MP4 request.
+const pauseFnStart=html.indexOf("function pauseCharacterVideo(video){");
+const pauseFnEnd=html.indexOf("\n}",pauseFnStart);
+const pauseFn=html.slice(pauseFnStart,pauseFnEnd);
+assert.ok(pauseFn.includes("video.pause();"));
+assert.ok(!pauseFn.includes("video.preload="));
+assert.ok(html.includes("if(target.dataset.videoHydrated==='true'){if(target.paused)target.play().catch(()=>{});}"));
+assert.ok(html.includes("function releaseCharacterVideo(video){"));
+// Assigning src already starts media loading; an immediate load() would restart a full-range request.
+const videoHydrationStart=html.indexOf("function hydrateCharacterVideo(video){");
+const videoLoadStart=html.indexOf("const load=async()=>{",videoHydrationStart);
+const videoLoadEnd=html.indexOf("\n  };",videoLoadStart);
+const videoLoadBlock=html.slice(videoLoadStart,videoLoadEnd);
+assert.ok(videoLoadBlock.indexOf("video.preload='metadata';") < videoLoadBlock.indexOf("video.src=signedUrl;"));
+assert.ok(!videoLoadBlock.includes("video.load();"));
+
+assert.ok(html.includes("pauseCharacterVideo(target);"));
+assert.ok(html.includes("videos.forEach(pauseCharacterVideo);"));
+// Only a real pagehide releases the media source.
+assert.ok(html.includes("document.querySelectorAll('video[data-character-video]').forEach(releaseCharacterVideo);"));
+assert.ok(!html.includes("function stopCharacterVideo(video){"));
 assert.ok(html.includes("document.addEventListener('visibilitychange'"));
 assert.ok(html.includes("window.addEventListener('pagehide'"));
 assert.ok(html.includes("},{rootMargin:'0px',threshold:0.01}"));
+ // Infinite-scroll appends only new cards so existing video DOM nodes remain attached.
+assert.ok(html.includes("function renderGrid({append=false}={})"));
+assert.ok(html.includes("const existingCardCount = append ? grid.querySelectorAll(':scope > article.card').length : 0;"));
+assert.ok(html.includes("const newCards = append && existingCardCount > 0 ? shown.slice(existingCardCount) : shown;"));
+assert.ok(html.includes("if (append && existingCardCount > 0) {"));
+assert.ok(html.includes("grid.insertAdjacentHTML('beforeend',cardMarkup)"));
+assert.ok((html.match(/renderGrid\(\{append:true\}\);/g)||[]).length >= 2);
+
+ // Search/filter redraws preserve the same character's existing media DOM when the path is unchanged.
+ assert.ok(html.includes('data-character-card-id="${e(c.id)}"'));
+ assert.ok(html.includes("const existingVideosByCharacter = new Map()"));
+ assert.ok(html.includes("previousVideo.dataset.characterVideo === nextVideo.dataset.characterVideo"));
+ assert.ok(html.includes("nextVideo.replaceWith(previousVideo)"));
+ assert.ok(html.includes("grid.querySelectorAll('video[data-character-video]').forEach(video => void hydrateCharacterVideo(video))"));
+ // City-character tab/page redraws must reuse the existing portrait video for the same Storage path.
+ assert.ok(html.includes("const previousCharacterVideo=body.querySelector('video.city-character-portrait-video[data-character-video]')"));
+ assert.ok(html.includes("previousCharacterVideo.dataset.characterVideo===characterVideo.dataset.characterVideo"));
+ assert.ok(html.includes("characterVideo.replaceWith(previousCharacterVideo)"));
+ // Route-level rerenders preserve card videos outside Explore's renderGrid path.
+ assert.ok(html.includes("function captureCharacterCardVideos(root)"));
+ assert.ok(html.includes("function restoreCharacterCardVideos(root,previousVideos)"));
+ assert.ok(html.includes("const previousCardVideos=captureCharacterCardVideos($('view'));"));
+ assert.ok(html.includes("restoreCharacterCardVideos($('view'),previousCardVideos);"));
+
+ // Detail-page rerenders must reuse the same video DOM when the Storage path is unchanged.
+ assert.ok(html.includes("const previousDetailVideo = view?.querySelector('.detail-portrait video[data-character-video]') || null"));
+ assert.ok(html.includes("previousDetailVideo.dataset.characterVideo===detailVideo.dataset.characterVideo"));
+ assert.ok(html.includes("detailVideo.replaceWith(previousDetailVideo)"));
+ assert.ok(html.includes("releaseCharacterVideo(previousDetailVideo)"));
+ // Discarded Explore and city portrait nodes must release their detached media resources.
+ assert.ok(html.includes("existingVideosByCharacter.forEach(video => {\n      characterVideoObserver?.unobserve(video);\n      releaseCharacterVideo(video);"));
+ assert.ok(html.includes("}else if(previousCharacterVideo){\n      characterVideoObserver?.unobserve(previousCharacterVideo);\n      releaseCharacterVideo(previousCharacterVideo);"));
+ assert.ok(html.includes("video.dataset.videoObservePending='false';"));
+ assert.ok(html.includes("window.addEventListener('pageshow',()=>{"));
+ assert.ok(html.includes("void hydrateCharacterVideo(video);"));
+ assert.ok(html.includes("if(previousDetailVideo){\n      characterVideoObserver?.unobserve(previousDetailVideo);\n      releaseCharacterVideo(previousDetailVideo);\n    }"));
+
+
 
 // Illustration metadata reads are single-flight and author cleanup is never implicit for public loads.
 assert.ok(html.includes("const characterIllustrationMetadataInflight = new Map()"));
