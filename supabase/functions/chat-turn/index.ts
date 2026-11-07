@@ -88,6 +88,10 @@ const formatCharacterAiProfilePrompt = (value: unknown): string => {
     const content = asString(asDbRow(item).content);
     if (content) lines.push("[說話風格] " + content);
   }
+  for (const item of Array.isArray(speech.creator_defined_quirks) ? speech.creator_defined_quirks : []) {
+    const content = asString(asDbRow(item).content);
+    if (content) lines.push("[作者明確提供的固定慣用詞] " + content);
+  }
   const ooc = asDbRow(profile.ooc_rules);
   for (const item of Array.isArray(ooc.rules) ? ooc.rules : []) {
     const rule = asDbRow(item);
@@ -102,6 +106,9 @@ const formatCharacterAiProfilePrompt = (value: unknown): string => {
   for (const item of Array.isArray(privateContext.items) ? privateContext.items : []) {
     const content = asString(asDbRow(item).content);
     if (content) lines.push("[作者私密補充/僅供角色理解] " + content);
+  }
+  for (const unknown of Array.isArray(profile.unknowns) ? profile.unknowns : []) {
+    if (asString(unknown)) lines.push("[作者未提供/未知] " + asString(unknown));
   }
   for (const conflict of Array.isArray(profile.source_conflicts) ? profile.source_conflicts : []) {
     const entry = asDbRow(conflict);
