@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://poyozz.invalid/schemas/character-ai-profile-v1.schema.json",
   "title": "POYOZZ Character AI Profile v1",
-  "description": "Backend-only derived roleplay profile. Author source fields remain authoritative. This schema validates the model-generated payload, not database metadata.",
+  "description": "Backend-only derived roleplay profile. Author source fields remain authoritative. Runtime schedules and phone settings are loaded separately at turn time and are intentionally excluded from this long-lived profile. This schema validates the model-generated payload, not database metadata.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -16,7 +16,6 @@
     "knowledge_boundaries",
     "speech_style",
     "appearance_markers",
-    "life_schedule_context",
     "author_private_context",
     "ooc_rules",
     "unknowns",
@@ -81,9 +80,6 @@
       }
     },
     "appearance_markers": {
-      "$ref": "#/$defs/section"
-    },
-    "life_schedule_context": {
       "$ref": "#/$defs/section"
     },
     "author_private_context": {
