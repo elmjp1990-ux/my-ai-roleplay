@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS public.character_profile_organization_jobs (
   lease_token uuid,
   lease_generation bigint NOT NULL DEFAULT 0 CHECK (lease_generation >= 0),
   lease_expires_at timestamptz,
-  lease_source_hash text CHECK (lease_source_hash IS NULL OR lease_source_hash ~ '^[0-9a-f]{64}
+  lease_source_hash text CHECK (lease_source_hash IS NULL OR lease_source_hash ~ '^[0-9a-f]{64}$'),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   completed_at timestamptz,
