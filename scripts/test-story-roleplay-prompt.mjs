@@ -15,7 +15,7 @@ const requiredRules = [
   ["permit disagreement and boundaries", "允許角色有不同意見、遲疑、拒絕"],
   ["separate spoken dialogue from private thoughts", "只供 AI 理解劇情的內心話"],
   ["do not let characters read the player's mind", "不得讓角色直接引用、回應、猜中或表現得像讀心"],
-  ["narration and actions use the UI single-asterisk syntax", "一律使用 *單星號* 包住"],
+  ["narration and actions use the UI single-asterisk syntax", "一律使用單星號 *...* 包覆"],
 ];
 for (const [label, phrase] of requiredRules) {
   assert.ok(prompt.includes(phrase), `Missing roleplay prompt rule: ${label}`);
