@@ -258,15 +258,15 @@ BEGIN
   -- paid for the provider request before crashing or losing its DB connection.
   -- Never automatically regenerate an expired lease. Require an explicit owner
   -- save to enqueue it again, preventing duplicate provider charges.
-  UPDATE public.character_profile_organization_jobs
+  UPDATE public.character_profile_organization_jobs AS expired_job
   SET status = 'failed',
       lease_token = NULL,
       lease_expires_at = NULL,
       lease_source_hash = NULL,
       last_error_code = 'worker_lease_expired_manual_retry',
       updated_at = now()
-  WHERE status = 'processing'
-    AND lease_expires_at <= now();
+  WHERE expired_job.status = 'processing'
+    AND expired_job.lease_expires_at <= now();
 
   -- Keep profile organization serial by default to control model spend and avoid
   -- overlapping generations for different roles.
