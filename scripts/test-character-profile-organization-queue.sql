@@ -15,9 +15,11 @@ LANGUAGE sql STABLE AS $$
   SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid
 $$;
 CREATE OR REPLACE FUNCTION auth.role() RETURNS text
-LANGUAGE sql STABLE AS $$
+LANGUAGE sql STABLE AS $
   SELECT NULLIF(current_setting('request.jwt.claim.role', true), '')
-$$;
+$;
+
+CREATE TABLE auth.users (id uuid PRIMARY KEY);
 
 CREATE TABLE public.characters (
   id uuid PRIMARY KEY,
@@ -33,6 +35,9 @@ CREATE TABLE public.character_private_info (
   private_info text,
   personality_profile jsonb
 );
+
+INSERT INTO auth.users (id)
+VALUES ('22222222-2222-4222-8222-222222222222');
 
 \i supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql
 \i supabase/migrations/20261107123000_schedule_character_profile_organization_worker.sql
@@ -95,6 +100,9 @@ BEGIN
   END IF;
   IF has_table_privilege('authenticated', 'public.character_profile_organization', 'SELECT') THEN
     RAISE EXCEPTION 'authenticated can read private derived profile';
+  END IF;
+  IF has_table_privilege('authenticated', 'public.character_profile_organization_usage', 'SELECT') THEN
+    RAISE EXCEPTION 'authenticated can read private Profile usage ledger';
   END IF;
 END $$;
 
