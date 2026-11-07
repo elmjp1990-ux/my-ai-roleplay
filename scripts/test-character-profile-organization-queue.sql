@@ -173,9 +173,10 @@ BEGIN
      OR v_job.source_hash = v_claim.source_hash THEN
     RAISE EXCEPTION 'changed-source enqueue did not preserve lease and coalesce latest source';
   END IF;
-END $$;
+END $;
 
-DO $$
+SELECT set_config('request.jwt.claim.role', 'service_role', false);
+DO $
 DECLARE
   v_claim record;
   v_status text;
