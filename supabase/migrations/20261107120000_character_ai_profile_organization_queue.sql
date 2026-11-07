@@ -33,7 +33,30 @@ CREATE TABLE IF NOT EXISTS public.character_profile_organization_usage (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   character_id uuid REFERENCES public.characters(id) ON DELETE SET NULL,
   author_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  source_hash text NOT NULL CHECK (source_hash ~ '^[0-9a-f]{64}
+  source_hash text NOT NULL CHECK (source_hash ~ '^[0-9a-f]{64}$'),
+  model text NOT NULL CHECK (model = 'deepseek/deepseek-v4-flash-20260423'),
+  provider text CHECK (provider IS NULL OR char_length(provider) <= 100),
+  gateway_request_id text CHECK (gateway_request_id IS NULL OR char_length(gateway_request_id) <= 128),
+  prompt_tokens integer CHECK (prompt_tokens IS NULL OR prompt_tokens >= 0),
+  completion_tokens integer CHECK (completion_tokens IS NULL OR completion_tokens >= 0),
+  total_tokens integer CHECK (total_tokens IS NULL OR total_tokens >= 0),
+  cost_usd numeric(20,12) CHECK (cost_usd IS NULL OR cost_usd >= 0),
+  status text NOT NULL CHECK (status IN ('generated', 'failed')),
+  error_code text CHECK (error_code IS NULL OR char_length(error_code) <= 100),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  processed_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS character_profile_usage_author_created_idx
+  ON public.character_profile_organization_usage (author_id, created_at DESC);
+
+ALTER TABLE public.character_profile_organization_usage ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.character_profile_organization_usage FROM PUBLIC, anon, authenticated;
+GRANT ALL ON public.character_profile_organization_usage TO service_role;
+COMMENT ON TABLE public.character_profile_organization_usage IS
+  'Service-role-only token/cost ledger for character Profile organization. Stores usage metadata only, never source text or prompts.';
+
+CREATE TABLE IF NOT EXISTS public.character_profile_organization (
   character_id uuid PRIMARY KEY REFERENCES public.characters(id) ON DELETE CASCADE,
   author_id uuid NOT NULL,
   source_hash text NOT NULL CHECK (source_hash ~ '^[0-9a-f]{64}$'),
@@ -49,7 +72,6 @@ REVOKE ALL ON public.character_profile_organization_jobs FROM PUBLIC, anon, auth
 REVOKE ALL ON public.character_profile_organization FROM PUBLIC, anon, authenticated;
 GRANT ALL ON public.character_profile_organization_jobs TO service_role;
 GRANT ALL ON public.character_profile_organization TO service_role;
-
 -- Return only the exact allowlisted creator sources. This helper is callable only
 -- from the security-definer RPCs below and service_role.
 CREATE OR REPLACE FUNCTION public.character_profile_source_payload(
