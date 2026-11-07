@@ -193,7 +193,12 @@ export function buildCharacterProfileMessages(sourcePayload: CharacterProfileSou
     "speech_style.creator_defined_quirks 只收錄作者明確寫出的固定慣用詞或口頭禪，必須引用 speechStyle 來源；作者未提供則空陣列。speech_style.example_lines 永遠是空陣列。",
     "author_private_context.visibility 必須是 server_only；只整理私密來源中明確存在的內容。此欄位永遠只供伺服器內部 prompt 使用。",
     "不整理手機設定、行程表、即時位置或即時狀態；它們每回合由對話程式另外載入。",
-    "所有 section 都必須符合 schema：{status,items}。speech_style 必須有 {status,tendencies,creator_defined_quirks,example_lines}。",
+    "所有 section 都必須符合 schema：{status,items}；status 只能是 populated、not_provided、conflict，not_provided 的 items 必須為空，populated 的 items 不可為空。",
+    "每個 evidence item 必須是 {content:string,source_type:author_explicit|ai_inference,source_refs:string[],confidence:high|medium|low}，不可加入任何其他 key。",
+    "speech_style 必須是 {status,tendencies:[evidence item],creator_defined_quirks:[evidence item],example_lines:[]}；author_private_context 必須是 {visibility:server_only,status,items:[evidence item]}。",
+    "ooc_rules 必須是 {status:ready|insufficient_source,rules:[{rule,why_it_matters,prohibited_deviation,allowed_growth,source_refs}],insufficient_source_reason:string|null}；ready 至少 3 條且 reason 為 null；insufficient_source 最多 2 條且 reason 不可為空。",
+    "source_conflicts 每項必須是 {topic,conflicting_source_refs:[至少兩個來源路徑],description,resolution_status:needs_author_clarification}。unknowns 是字串陣列。",
+    "每個物件只允許 schema 明列的 key，不得新增其他欄位。",
     "輸出 root keys 必須完整且僅包含：schema_version, identity_background, core_personality, inner_motivations, emotional_response_patterns, relationship_dynamics, behavior_and_agency, knowledge_boundaries, speech_style, appearance_markers, author_private_context, ooc_rules, unknowns, source_conflicts。schema_version 固定 1.0。",
   ].join("\n");
   return [
