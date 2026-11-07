@@ -1,0 +1,6 @@
+# Keep repository-only tooling and backend project files out of Vercel deployments.
+# These remain version-controlled in GitHub and are managed by their own workflows.
+.github/
+docs/
+scripts/
+supabase/
