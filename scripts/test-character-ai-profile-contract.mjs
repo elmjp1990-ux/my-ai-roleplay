@@ -103,6 +103,12 @@ assert.match(worker, /deepseek\/deepseek-v4-flash-20260423|CHARACTER_PROFILE_MOD
 assert.match(worker, /OPENROUTER_API_KEY/, "Worker must read the provider key only from server environment");
 assert.match(worker, /data_collection: "deny"/, "Profile requests must enforce POYOZZ's no-provider-data-collection policy");
 assert.match(worker, /only: \["deepinfra"\]/, "Profile requests must use the same approved provider route as Story generation");
+assert.match(migration, /character_profile_organization_usage/,
+  "Profile generation must have a separate private usage/cost ledger, not reuse the queue");
+assert.match(worker, /character_profile_organization_usage/,
+  "Worker must record token and cost metadata for each generation");
+assert.match(worker, /prompt_tokens:[\s\S]*completion_tokens:[\s\S]*total_tokens:[\s\S]*cost_usd:/,
+  "Profile usage ledger must capture provider token and cost fields");
 assert.match(workerCore, /validateCharacterAiProfile/, "Worker output must pass strict profile validation");
 assert.match(workerCore, /source_refs/, "Every derived statement must cite allowlisted source paths");
 assert.match(storyTurn, /get_character_ai_profile_for_chat/,
