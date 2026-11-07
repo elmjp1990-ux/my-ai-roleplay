@@ -118,12 +118,12 @@ INSERT INTO claimed_data SELECT * FROM public.claim_character_profile_organizati
 CREATE TEMP TABLE competing_claim AS
   SELECT * FROM public.claim_character_profile_organization_jobs(1);
 RESET ROLE;
-DO $
+DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM competing_claim) THEN
     RAISE EXCEPTION 'a concurrent worker claimed a second profile job';
   END IF;
-END $;
+END $$;
 
 -- Re-saving the exact same source while a Worker owns a lease must preserve
 -- the lease token/generation and must not enqueue another model generation.
@@ -132,7 +132,7 @@ SELECT set_config('request.jwt.claim.role', 'authenticated', false);
 SET ROLE authenticated;
 SELECT public.enqueue_character_profile_organization('11111111-1111-4111-8111-111111111111');
 RESET ROLE;
-DO $
+DO $$
 DECLARE
   v_claim record;
   v_job public.character_profile_organization_jobs%ROWTYPE;
@@ -145,7 +145,7 @@ BEGIN
      OR v_job.lease_generation IS DISTINCT FROM v_claim.lease_generation THEN
     RAISE EXCEPTION 'same-source enqueue invalidated an active Worker lease';
   END IF;
-END $;
+END $$;
 
 -- Change an AI source after claim. Completion must refuse the stale generation.
 UPDATE public.characters
@@ -159,7 +159,7 @@ SELECT set_config('request.jwt.claim.role', 'authenticated', false);
 SET ROLE authenticated;
 SELECT public.enqueue_character_profile_organization('11111111-1111-4111-8111-111111111111');
 RESET ROLE;
-DO $
+DO $$
 DECLARE
   v_claim record;
   v_job public.character_profile_organization_jobs%ROWTYPE;
@@ -173,9 +173,9 @@ BEGIN
      OR v_job.source_hash = v_claim.source_hash THEN
     RAISE EXCEPTION 'changed-source enqueue did not preserve lease and coalesce latest source';
   END IF;
-END $;
+END $$;
 
-DO $
+DO $$
 DECLARE
   v_claim record;
   v_status text;
