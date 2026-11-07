@@ -152,7 +152,30 @@ UPDATE public.characters
 SET intro = '更新後的角色介紹。'
 WHERE id = '11111111-1111-4111-8111-111111111111';
 
-DO $$
+-- A changed source saved during processing is coalesced behind the current
+-- Worker lease; it must not start a concurrent generation.
+SELECT set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', false);
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SET ROLE authenticated;
+SELECT public.enqueue_character_profile_organization('11111111-1111-4111-8111-111111111111');
+RESET ROLE;
+DO $
+DECLARE
+  v_claim record;
+  v_job public.character_profile_organization_jobs%ROWTYPE;
+BEGIN
+  SELECT * INTO v_claim FROM claimed_data LIMIT 1;
+  SELECT * INTO v_job FROM public.character_profile_organization_jobs
+  WHERE character_id = v_claim.character_id;
+  IF v_job.status <> 'processing'
+     OR v_job.lease_token IS DISTINCT FROM v_claim.lease_token
+     OR v_job.lease_generation IS DISTINCT FROM v_claim.lease_generation
+     OR v_job.source_hash = v_claim.source_hash THEN
+    RAISE EXCEPTION 'changed-source enqueue did not preserve lease and coalesce latest source';
+  END IF;
+END $;
+
+DO $
 DECLARE
   v_claim record;
   v_status text;
