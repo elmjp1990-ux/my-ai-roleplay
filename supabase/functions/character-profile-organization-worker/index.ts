@@ -21,6 +21,10 @@ type WorkItem = {
 };
 
 const safeCode = (value: unknown, fallback: string): string => {
+  if (value && typeof value === "object" && "message" in value) {
+    const message = (value as { message?: unknown }).message;
+    if (typeof message === "string" && /^[a-zA-Z0-9:_-]{1,80}$/.test(message)) return message;
+  }
   const raw = value && typeof value === "object" && "code" in value
     ? (value as { code?: unknown }).code
     : value && typeof value === "object" && "name" in value
