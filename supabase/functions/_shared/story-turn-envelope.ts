@@ -88,8 +88,8 @@ export function parseStoryTurnEnvelope(raw: string): StoryTurnEnvelope {
   const validSuggestedReplies = rawSuggestions
     .map((item) => typeof item === "string" ? item.trim() : "")
     .filter((item) => {
-      if (item.length < 30 || item.length > 80 || /[\\r\\n]/.test(item)) return false;
-      const narration = item.match(/\\*[^*]+\\*/g) ?? [];
+      if (item.length < 30 || item.length > 80 || /[\r\n]/.test(item)) return false;
+      const narration = item.match(/\*[^*]+\*/g) ?? [];
       const spokenText = item.replace(/\\*[^*]+\\*/g, "").trim();
       return narration.length >= 1 && spokenText.length > 0;
     });
