@@ -3,12 +3,14 @@ import {
   buildCharacterProfileMessages,
   CHARACTER_PROFILE_MODEL,
   validateCharacterAiProfile,
+  validateCharacterProfileSourcePayload,
   type CharacterProfileSourcePayload,
 } from "../_shared/character-profile-organization.ts";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_BATCH = 1;
 const REQUEST_TIMEOUT_MS = 90_000;
+const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
 
 type WorkItem = {
   character_id: string;
@@ -53,6 +55,61 @@ class ProfileGenerationError extends Error {
     this.name = "ProfileGenerationError";
     this.metadata = metadata;
   }
+}
+
+async function readBoundedResponseText(response: Response): Promise<string> {
+  const declaredLength = Number(response.headers.get("content-length") || 0);
+  if (declaredLength > MAX_PROVIDER_RESPONSE_BYTES) {
+    await response.body?.cancel();
+    throw new Error("provider_response_too_large");
+  }
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let text = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_PROVIDER_RESPONSE_BYTES) {
+      await reader.cancel();
+      throw new Error("provider_response_too_large");
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
+}
+
+async function completeProfileWithRetry(
+  supabase: any,
+  item: WorkItem,
+  profile: Record<string, unknown>,
+): Promise<string> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const { data, error } = await supabase.rpc(
+        "complete_character_profile_organization_job",
+        {
+          p_character_id: item.character_id,
+          p_lease_token: item.lease_token,
+          p_lease_generation: item.lease_generation,
+          p_source_hash: item.source_hash,
+          p_profile: profile,
+        },
+      );
+      if (error) throw error;
+      return String(data ?? "");
+    } catch (error) {
+      lastError = error;
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 300 * (attempt + 1)));
+    }
+  }
+  console.error("character_profile_persistence_retry_exhausted", {
+    code: safeCode(lastError, "profile_persistence_failed"),
+  });
+  throw new Error("profile_persistence_failed_after_generation");
 }
 
 async function generateProfile(
@@ -112,9 +169,19 @@ async function generateProfile(
       throw new Error("openrouter_http_" + response.status);
     }
     let result: any;
+    let responseText: string;
     try {
-      result = await response.json();
-    } catch {
+      responseText = await readBoundedResponseText(response);
+      result = JSON.parse(responseText);
+    } catch (error) {
+      if (error instanceof Error && error.message === "provider_response_too_large") {
+        throw new ProfileGenerationError("provider_response_too_large", {
+          model: CHARACTER_PROFILE_MODEL,
+          provider: "deepinfra",
+          requestId: response.headers.get("x-request-id"),
+          usage: {},
+        });
+      }
       throw new ProfileGenerationError("provider_outcome_unknown", {
         model: CHARACTER_PROFILE_MODEL,
         provider: "deepinfra",
@@ -240,21 +307,14 @@ export default {
           !item.source_payload || typeof item.source_payload !== "object") {
           throw new Error("claimed_job_invalid");
         }
+        const sourceValidation = validateCharacterProfileSourcePayload(item.source_payload);
+        if (!sourceValidation.ok) throw new Error(sourceValidation.errors[0] || "source_payload_invalid");
         const generated = await generateProfile(item, apiKey);
         await recordProfileUsage(supabase, item, generated, "generated");
         usageRecorded = true;
-        const { data: completion, error: completionError } = await supabase.rpc(
-          "complete_character_profile_organization_job",
-          {
-            p_character_id: item.character_id,
-            p_lease_token: item.lease_token,
-            p_lease_generation: item.lease_generation,
-            p_source_hash: item.source_hash,
-            p_profile: generated.profile,
-          },
-        );
-        if (completionError) throw completionError;
-        const status = String(completion ?? "");
+        // The provider has already completed and may have billed this request.
+        // Retry persistence with the same in-memory profile; never regenerate here.
+        const status = await completeProfileWithRetry(supabase, item, generated.profile);
         if (status === "completed") summary.completed++;
         else if (status === "stale_source") summary.stale++;
         else summary.stale++;
