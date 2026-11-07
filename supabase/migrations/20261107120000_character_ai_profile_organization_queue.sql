@@ -175,6 +175,15 @@ BEGIN
     RAISE EXCEPTION 'invalid_claim_limit' USING ERRCODE = '22023';
   END IF;
 
+  -- Keep profile organization serial by default to control model spend and avoid
+  -- overlapping generations for different roles. Expired leases remain reclaimable.
+  IF EXISTS (
+    SELECT 1 FROM public.character_profile_organization_jobs
+    WHERE status = 'processing' AND lease_expires_at > now()
+  ) THEN
+    RETURN;
+  END IF;
+
   RETURN QUERY
   WITH candidates AS (
     SELECT j.character_id
