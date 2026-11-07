@@ -170,3 +170,19 @@ Deno.test("rejects private context sourced from public fields", () => {
     throw new Error("public source in private section was not rejected");
   }
 });
+
+Deno.test("rejects unexpected root and nested schema properties", () => {
+  const profile = makeProfile();
+  profile.unapproved_internal_field = "must not be persisted";
+  const rootResult = validateCharacterAiProfile(profile, sourcePayload);
+  if (rootResult.ok || !rootResult.errors.includes("root_keys_mismatch")) {
+    throw new Error("unexpected root property was not rejected");
+  }
+
+  const nested = makeProfile();
+  nested.core_personality = { status: "not_provided", items: [], unrecognized: true };
+  const nestedResult = validateCharacterAiProfile(nested, sourcePayload);
+  if (nestedResult.ok || !nestedResult.errors.includes("core_personality_invalid")) {
+    throw new Error("unexpected nested property was not rejected");
+  }
+});
