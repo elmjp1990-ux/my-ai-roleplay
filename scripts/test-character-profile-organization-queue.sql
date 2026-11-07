@@ -161,7 +161,7 @@ BEGIN
   IF v_status <> 'completed' THEN
     RAISE EXCEPTION 'fresh profile completion failed: %', v_status;
   END IF;
-END $;
+END $$;
 RESET ROLE;
 
 INSERT INTO public.character_profile_organization_usage (
@@ -175,7 +175,7 @@ FROM claimed_data
 ORDER BY lease_generation DESC
 LIMIT 1;
 
-DO $
+DO $$
 BEGIN
   IF (SELECT count(*) FROM public.character_profile_organization_usage) <> 1 THEN
     RAISE EXCEPTION 'Profile generation usage was not recorded';
@@ -183,10 +183,10 @@ BEGIN
   IF (SELECT cost_usd FROM public.character_profile_organization_usage LIMIT 1) <> 0.000123 THEN
     RAISE EXCEPTION 'Profile generation cost was not preserved';
   END IF;
-END $;
+END $$;
 
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
-DO $
+DO $$
 DECLARE
   v_profile jsonb;
 BEGIN
