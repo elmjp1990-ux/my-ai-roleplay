@@ -3554,8 +3554,10 @@ async function loadCloudChatSessions(user, options = {}) {
         cloudHasUserMessage, cloudSessionDataLoaded:false, cloudMessagesLoaded:false,
         cloudHasMoreMessages:false, cloudOldestMessageCursor:null,
         cloudMessagesLoading:false, cloudMessagesError:'',
-        cloudOwned:true, cloudOwnerUid:user.id, cloudCharacterSnapshot:snapshot,
-        cloudCharacterSnapshotLoaded:false, cloudUpdatedAt:row.updated_at || null
+        cloudOwned:true, cloudOwnerUid:user.id,
+        cloudCharacterSnapshot:existing?.cloudCharacterSnapshotLoaded===true?existing.cloudCharacterSnapshot:snapshot,
+        cloudCharacterSnapshotLoaded:existing?.cloudCharacterSnapshotLoaded===true,
+        cloudUpdatedAt:row.updated_at || null
       };
       // Drop stale in-memory history tails too; the full transcript is fetched on demand.
       state.sessions[row.id]=compactCloudSessionForLocalStorage(state.sessions[row.id]);
