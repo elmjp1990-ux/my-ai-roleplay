@@ -140,4 +140,24 @@ BEGIN
 END $$;
 RESET ROLE;
 
+-- Soft delete must remove both queued work and private derived profile data.
+UPDATE public.characters
+SET deleted_at = now()
+WHERE id = '11111111-1111-4111-8111-111111111111';
+DO $
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.character_profile_organization_jobs
+    WHERE character_id = '11111111-1111-4111-8111-111111111111'
+  ) THEN
+    RAISE EXCEPTION 'soft-deleted character retained a profile queue job';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.character_profile_organization
+    WHERE character_id = '11111111-1111-4111-8111-111111111111'
+  ) THEN
+    RAISE EXCEPTION 'soft-deleted character retained a derived profile';
+  END IF;
+END $;
+
 \echo 'Character AI Profile queue migration tests passed.'
