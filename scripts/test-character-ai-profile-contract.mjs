@@ -4,6 +4,10 @@ import fs from "node:fs";
 const schema = JSON.parse(fs.readFileSync("supabase/drafts/character-ai-profile-v1.schema.json", "utf8"));
 const registry = JSON.parse(fs.readFileSync("supabase/drafts/character-ai-profile-source-registry-v1.json", "utf8"));
 const frontend = fs.readFileSync("index.html", "utf8");
+const migration = fs.readFileSync("supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql", "utf8");
+const worker = fs.readFileSync("supabase/functions/character-profile-organization-worker/index.ts", "utf8");
+const workerCore = fs.readFileSync("supabase/functions/_shared/character-profile-organization.ts", "utf8");
+const storyTurn = fs.readFileSync("supabase/functions/chat-turn/index.ts", "utf8");
 
 assert.equal(schema.$schema, "https://json-schema.org/draft/2020-12/schema");
 assert.equal(schema.properties.schema_version.const, "1.0");
@@ -70,6 +74,35 @@ assert.match(frontend, /compareCharacterField\(runtimeAiChanges, 'phone_settings
 assert.match(frontend, /compareCharacterField\(nonAiChanges, 'name'/,
   "Character renaming must not trigger profile generation");
 assert.match(frontend, /shouldCallModel: false/,
-  "This phase must remain classification-only; it must not invoke the model");
+  "The browser must never call the model directly");
+assert.match(frontend, /enqueue_character_profile_organization/,
+  "A verified character save must enqueue a derived-profile refresh");
+assert.match(frontend, /if \(aiOrganizationDecision\.requiresDerivedRefresh === true\)/,
+  "Only AI-relevant source changes may enqueue a refresh");
+assert.ok(frontend.indexOf("const { data: savedCharacter") < frontend.indexOf("enqueue_character_profile_organization"),
+  "Profile enqueue must happen only after persisted character data is verified");
 
-console.log("Character AI Profile schema/source registry and current save-classifier contracts passed.");
+for (const rpc of [
+  "enqueue_character_profile_organization",
+  "claim_character_profile_organization_jobs",
+  "complete_character_profile_organization_job",
+  "fail_character_profile_organization_job",
+  "get_character_ai_profile_for_chat",
+]) assert.ok(migration.includes(rpc), `Migration must define ${rpc}`);
+assert.match(migration, /FOR UPDATE SKIP LOCKED/, "Worker claims must be atomic and skip locked jobs");
+assert.match(migration, /extensions\.digest[\s\S]*sha256/, "Source versions must use SHA-256");
+assert.match(migration, /REVOKE ALL ON public\.character_profile_organization[\s\S]*FROM PUBLIC, anon, authenticated/,
+  "Derived profile tables must not be directly readable by players");
+assert.match(worker, /deepseek\/deepseek-v4-flash-20260423|CHARACTER_PROFILE_MODEL/,
+  "Worker must use the confirmed DeepSeek V4 Flash 0423 model");
+assert.match(worker, /OPENROUTER_API_KEY/, "Worker must read the provider key only from server environment");
+assert.match(workerCore, /validateCharacterAiProfile/, "Worker output must pass strict profile validation");
+assert.match(workerCore, /source_refs/, "Every derived statement must cite allowlisted source paths");
+assert.match(storyTurn, /get_character_ai_profile_for_chat/,
+  "Story chat-turn must load only a source-current derived profile");
+assert.match(storyTurn, /collectDerivedPrivateProfileValues/,
+  "Private-derived evidence must join the server-side output leak guard");
+assert.match(storyTurn, /CHAR_AI_PROFILE/,
+  "Story system prompt must receive the derived profile and OOC context");
+
+console.log("Character AI Profile schema, queue, Worker, save enqueue, Story integration and privacy contracts passed.");
