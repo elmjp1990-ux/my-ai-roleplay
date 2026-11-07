@@ -69,7 +69,16 @@
           "type": "array",
           "description": "Only verbatim or faithfully normalized quirks explicitly supplied by the author. Must be empty when none were supplied.",
           "items": {
-            "$ref": "#/$defs/evidenceItem"
+            "$ref": "#/$defs/evidenceItem",
+            "allOf": [
+              {
+                "properties": {
+                  "source_type": {
+                    "const": "author_explicit"
+                  }
+                }
+              }
+            ]
           }
         },
         "example_lines": {
