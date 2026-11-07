@@ -50,6 +50,19 @@ assert.ok(
   prompt.includes("結尾應停留在角色自身的動作、對白、情緒、場景變化"),
   "Reply endings must remain in-scene and must not instruct the player",
 );
+
+assert.ok(
+  prompt.includes("每則 30～80 字"),
+  "Each of the three player suggestions must target 30–80 characters",
+);
+assert.ok(
+  prompt.includes("玩家旁白／動作（*...*）以及玩家實際說出口的自然對白"),
+  "Each suggestion must combine a single-asterisk player action/narration with spoken dialogue",
+);
+assert.ok(
+  prompt.includes("對白不加引號、不加星號"),
+  "Suggested spoken dialogue must follow the established dialogue formatting",
+);
 assert.ok(
   !prompt.includes("只有在角色確實有動機詢問，或事情需要玩家作出關鍵選擇時才提問"),
   "The former exception allowing player-directed question endings must stay removed",
