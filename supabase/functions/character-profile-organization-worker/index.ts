@@ -35,10 +35,18 @@ const safeCode = (value: unknown, fallback: string): string => {
     : fallback;
 };
 
+type GeneratedProfile = {
+  profile: Record<string, unknown>;
+  model: string;
+  provider: string;
+  requestId: string | null;
+  usage: Record<string, unknown>;
+};
+
 async function generateProfile(
   item: WorkItem,
   apiKey: string,
-): Promise<Record<string, unknown>> {
+): Promise<GeneratedProfile> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
@@ -79,9 +87,64 @@ async function generateProfile(
     }
     const validation = validateCharacterAiProfile(parsed, item.source_payload);
     if (!validation.ok) throw new Error("profile_schema_invalid_" + validation.errors[0]);
-    return parsed as Record<string, unknown>;
+    const usage = result?.usage && typeof result.usage === "object" && !Array.isArray(result.usage)
+      ? result.usage as Record<string, unknown>
+      : {};
+    const responseModel = typeof result?.model === "string" ? result.model : CHARACTER_PROFILE_MODEL;
+    const responseProvider = typeof result?.provider === "string" ? result.provider : "deepinfra";
+    const requestIdValue = response.headers.get("x-request-id") ||
+      (typeof result?.id === "string" ? result.id : null);
+    return {
+      profile: parsed as Record<string, unknown>,
+      model: responseModel.slice(0, 128),
+      provider: responseProvider.slice(0, 100),
+      requestId: typeof requestIdValue === "string" &&
+        /^[A-Za-z0-9._:-]{1,128}$/.test(requestIdValue) ? requestIdValue : null,
+      usage,
+    };
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+const safeUsageInteger = (value: unknown): number | null => {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.min(2_147_483_647, Math.trunc(parsed)) : null;
+};
+
+const safeUsageCost = (usage: Record<string, unknown>): number | null => {
+  const raw = usage.cost ?? usage.total_cost;
+  const parsed = typeof raw === "number" ? raw : Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+};
+
+async function recordProfileUsage(
+  supabase: any,
+  item: WorkItem,
+  generated: GeneratedProfile | null,
+  status: "generated" | "failed",
+  errorCode: string | null = null,
+): Promise<void> {
+  const usage = generated?.usage ?? {};
+  const { error } = await supabase.from("character_profile_organization_usage").insert({
+    character_id: item.character_id,
+    author_id: item.author_id,
+    source_hash: item.source_hash,
+    model: generated?.model || CHARACTER_PROFILE_MODEL,
+    provider: generated?.provider || "deepinfra",
+    gateway_request_id: generated?.requestId || null,
+    prompt_tokens: safeUsageInteger(usage.prompt_tokens),
+    completion_tokens: safeUsageInteger(usage.completion_tokens),
+    total_tokens: safeUsageInteger(usage.total_tokens),
+    cost_usd: safeUsageCost(usage),
+    status,
+    error_code: errorCode,
+    processed_at: new Date().toISOString(),
+  });
+  if (error) {
+    console.error("character_profile_usage_write_failed", {
+      code: safeCode(error, "usage_write_failed"),
+    });
   }
 }
 
@@ -113,13 +176,16 @@ export default {
     const summary = { claimed: items.length, completed: 0, retried: 0, failed: 0, stale: 0 };
 
     for (const item of items) {
+      let usageRecorded = false;
       try {
         if (!item.character_id || !item.author_id || !item.source_hash ||
           !item.lease_token || !Number.isSafeInteger(item.lease_generation) ||
           !item.source_payload || typeof item.source_payload !== "object") {
           throw new Error("claimed_job_invalid");
         }
-        const profile = await generateProfile(item, apiKey);
+        const generated = await generateProfile(item, apiKey);
+        await recordProfileUsage(supabase, item, generated, "generated");
+        usageRecorded = true;
         const { data: completion, error: completionError } = await supabase.rpc(
           "complete_character_profile_organization_job",
           {
@@ -127,7 +193,7 @@ export default {
             p_lease_token: item.lease_token,
             p_lease_generation: item.lease_generation,
             p_source_hash: item.source_hash,
-            p_profile: profile,
+            p_profile: generated.profile,
           },
         );
         if (completionError) throw completionError;
@@ -137,6 +203,10 @@ export default {
         else summary.stale++;
       } catch (error) {
         const code = safeCode(error, "profile_generation_failed");
+        if (!usageRecorded && item.character_id && item.author_id && item.source_hash) {
+          await recordProfileUsage(supabase, item, null, "failed", code);
+          usageRecorded = true;
+        }
         const { data: failureStatus, error: failureError } = await supabase.rpc(
           "fail_character_profile_organization_job",
           {
