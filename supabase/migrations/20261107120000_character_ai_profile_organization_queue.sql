@@ -449,19 +449,6 @@ AFTER UPDATE OF deleted_at ON public.characters
 FOR EACH ROW
 WHEN (OLD.deleted_at IS DISTINCT FROM NEW.deleted_at AND NEW.deleted_at IS NOT NULL)
 EXECUTE FUNCTION public.cleanup_character_profile_organization_on_soft_delete();
-),
-  model text NOT NULL CHECK (model = 'deepseek/deepseek-v4-flash-20260423'),
-  provider text CHECK (provider IS NULL OR char_length(provider) <= 100),
-  gateway_request_id text CHECK (gateway_request_id IS NULL OR char_length(gateway_request_id) <= 128),
-  prompt_tokens integer CHECK (prompt_tokens IS NULL OR prompt_tokens >= 0),
-  completion_tokens integer CHECK (completion_tokens IS NULL OR completion_tokens >= 0),
-  total_tokens integer CHECK (total_tokens IS NULL OR total_tokens >= 0),
-  cost_usd numeric(20,12) CHECK (cost_usd IS NULL OR cost_usd >= 0),
-  status text NOT NULL CHECK (status IN ('generated', 'failed')),
-  error_code text CHECK (error_code IS NULL OR char_length(error_code) <= 100),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  processed_at timestamptz NOT NULL DEFAULT now()
-);
 
 CREATE INDEX IF NOT EXISTS character_profile_usage_author_created_idx
   ON public.character_profile_organization_usage (author_id, created_at DESC);
