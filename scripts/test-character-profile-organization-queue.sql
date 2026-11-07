@@ -63,7 +63,29 @@ SELECT public.enqueue_character_profile_organization('11111111-1111-4111-8111-11
 SELECT public.enqueue_character_profile_organization('11111111-1111-4111-8111-111111111111');
 RESET ROLE;
 
-DO $$
+-- A different authenticated user cannot enqueue another author's character.
+SELECT set_config('request.jwt.claim.sub', '33333333-3333-4333-8333-333333333333', false);
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+DO $
+BEGIN
+  BEGIN
+    PERFORM public.enqueue_character_profile_organization('11111111-1111-4111-8111-111111111111');
+    RAISE EXCEPTION 'non-owner unexpectedly enqueued a character profile';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+  BEGIN
+    PERFORM * FROM public.claim_character_profile_organization_jobs(1);
+    RAISE EXCEPTION 'authenticated unexpectedly claimed a profile job';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+END $;
+
+SELECT set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', false);
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+
+DO $
 BEGIN
   IF (SELECT count(*) FROM public.character_profile_organization_jobs) <> 1 THEN
     RAISE EXCEPTION 'enqueue did not coalesce to one job per character';
