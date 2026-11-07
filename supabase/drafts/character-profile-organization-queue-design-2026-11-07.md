@@ -246,3 +246,50 @@ Schema 只驗證資料形狀，不能單獨證明 source_refs 真實存在或使
 5. 最後接入正式 Story 對話 prompt，並以網站實際路徑驗收。
 
 本 schema 目前為設計草案；尚未有程式驗證器、資料表、佇列或模型呼叫接入。
+
+
+## Source registry 對照與即時資料邊界（2026-11-07）
+
+已根據 PR #215 分支目前角色儲存 classifier 與正式 `chat-turn` 讀取方式，建立 `supabase/drafts/character-ai-profile-source-registry-v1.json`。這份 registry 是 worker 可讀來源的 allowlist 草案。
+
+### 目前確認會觸發 Profile 重整的欄位
+
+- `characters.intro`
+- `characters.race`
+- `characters.style`
+- `character_private_info.private_info`
+- `character_private_info.personality_profile.coreTraits`
+- `character_private_info.personality_profile.values`
+- `character_private_info.personality_profile.speechStyle`
+- `character_private_info.personality_profile.behaviorRules`
+- `character_private_info.personality_profile.likes`
+- `character_private_info.personality_profile.dislikes`
+- `character_private_info.personality_profile.boundaries`
+- `character_private_info.personality_profile.relationshipPacing`
+
+其中 `character_private_info.*` 是作者私密來源，只能由授權後端讀取；模型輸出的 source_refs 只能引用本次工作實際提供且通過 allowlist 的欄位。
+
+### 不觸發長期 Profile 重整的即時／展示資料
+
+- `characters.name`、`gender`、`age`：作為當回合角色識別／背景欄位直接提供，不因改名或這些即時欄位變動而重建衍生 Profile。
+- `characters.phone_settings`：每回合由對話流程即時讀取。
+- `character_schedules`、`character_schedule_descriptions`：保留原始結構與作者文字為權威來源，依相遇／故事模式需要即時載入；不複製成長期 Profile，避免排程更新後摘要過期。
+- tags、圖片／影片、立繪 metadata、`personality_profile.primaryIllustrationName`：展示或搜尋用途，不觸發重整。
+
+### Schema 修正
+
+`character-ai-profile-v1.schema.json` 已移除 `life_schedule_context`。行程與手機都是 runtime context，不是長期人格衍生資料；正式對話組裝時應獨立讀取最新資料。Profile 保留 `appearance_markers`，但只能根據本次工作提供的作者來源歸納，不得推測補完。
+
+### 已核對的程式現況與限制
+
+- PR #215 的角色儲存 classifier 目前只產生差異決策，`shouldCallModel: false)，尚未 enqueue 或呼叫整理模型。
+- Story `chat-turn` 已讀取 `characters` 的角色背景／外觀欄位及 `character_private_info.private_info, personality_profile`，並組裝既有 prompt context。
+- 目前 `prompt-context.ts` 只格式化既有 personality_profile 的六個主要欄位，尚未載入新的 Character AI Profile 或 OOC。
+- 因此本次建立的 schema 與 registry 是下一階段實作契約；沒有修改正式對話 prompt、資料庫或 Edge Function。
+
+### 實作時必須補上的防護
+
+- 將 classifier 的 changedFields 與 registry 對照，避免兩份 allowlist 漂移。
+- worker 讀取來源時以欄位 allowlist、角色 author_id、私密資料權限共同驗證。
+- source hash 必須涵蓋本次全部 AI 來源欄位的正規化值；runtime-only 欄位不納入。
+- schedule／phone 每回合按需即時讀取，絕不可使用 Profile 內舊副本。
