@@ -178,8 +178,8 @@ BEGIN
   -- Keep profile organization serial by default to control model spend and avoid
   -- overlapping generations for different roles. Expired leases remain reclaimable.
   IF EXISTS (
-    SELECT 1 FROM public.character_profile_organization_jobs
-    WHERE status = 'processing' AND lease_expires_at > now()
+    SELECT 1 FROM public.character_profile_organization_jobs AS active_job
+    WHERE active_job.status = 'processing' AND active_job.lease_expires_at > now()
   ) THEN
     RETURN;
   END IF;
