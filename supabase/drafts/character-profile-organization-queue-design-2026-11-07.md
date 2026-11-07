@@ -334,3 +334,6 @@ Schema 只驗證資料形狀，不能單獨證明 source_refs 真實存在或使
 
 - Additional hardening: claim RPC now takes a transaction-scoped advisory lock before checking active leases, preventing simultaneous cron invocations from claiming multiple characters; processing is globally serialized to one active generation. A character soft-delete trigger immediately removes its pending job and backend-only derived Profile; hard deletes remain covered by FK cascades. PostgreSQL regression tests cover the competing-claim and soft-delete cases.
 - The Profile validator now rejects unexpected properties at the root and each nested schema object, in addition to checking evidence references and OOC constraints.
+
+- Cost visibility: added a separate service-role-only `character_profile_organization_usage` ledger for model, provider, request ID, prompt/completion/total tokens, provider cost, and safe status/error code. It stores no source text or prompts and is not used as a queue. Worker usage writes are non-blocking so a ledger outage cannot strand a valid Profile job.
+- Profile requests follow the same approved OpenRouter policy as Story generation: `deepinfra` only, no provider fallback, and `data_collection: "deny"`; no `max_tokens` cap is added.
