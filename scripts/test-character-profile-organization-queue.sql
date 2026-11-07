@@ -66,7 +66,7 @@ RESET ROLE;
 -- A different authenticated user cannot enqueue another author's character.
 SELECT set_config('request.jwt.claim.sub', '33333333-3333-4333-8333-333333333333', false);
 SELECT set_config('request.jwt.claim.role', 'authenticated', false);
-DO $
+DO $$
 BEGIN
   BEGIN
     PERFORM public.enqueue_character_profile_organization('11111111-1111-4111-8111-111111111111');
@@ -80,12 +80,12 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN
     NULL;
   END;
-END $;
+END $$;
 
 SELECT set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', false);
 SELECT set_config('request.jwt.claim.role', 'authenticated', false);
 
-DO $
+DO $$
 BEGIN
   IF (SELECT count(*) FROM public.character_profile_organization_jobs) <> 1 THEN
     RAISE EXCEPTION 'enqueue did not coalesce to one job per character';
@@ -99,7 +99,7 @@ BEGIN
   IF EXISTS (SELECT 1 FROM competing_claim) THEN
     RAISE EXCEPTION 'a concurrent worker claimed a second profile job';
   END IF;
-END $;
+END $$;
 
 CREATE TEMP TABLE claimed_data (
   character_id uuid, author_id uuid, source_hash text, lease_token uuid,
@@ -119,7 +119,7 @@ UPDATE public.characters
 SET intro = '更新後的角色介紹。'
 WHERE id = '11111111-1111-4111-8111-111111111111';
 
-DO $
+DO $$
 DECLARE
   v_claim record;
   v_status text;
@@ -154,7 +154,7 @@ END $$;
 RESET ROLE;
 
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
-DO $
+DO $$
 DECLARE
   v_profile jsonb;
 BEGIN
@@ -172,7 +172,7 @@ RESET ROLE;
 UPDATE public.characters
 SET deleted_at = now()
 WHERE id = '11111111-1111-4111-8111-111111111111';
-DO $
+DO $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM public.character_profile_organization_jobs
@@ -186,6 +186,6 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'soft-deleted character retained a derived profile';
   END IF;
-END $;
+END $$;
 
 \echo 'Character AI Profile queue migration tests passed.'
