@@ -82,6 +82,10 @@ assert.match(frontend, /if \(aiOrganizationDecision\.requiresDerivedRefresh === 
   "Only AI-relevant source changes may enqueue a refresh");
 assert.ok(frontend.indexOf("const { data: savedCharacter") < frontend.indexOf("enqueue_character_profile_organization"),
   "Profile enqueue must happen only after persisted character data is verified");
+assert.ok(frontend.indexOf("enqueue_character_profile_organization") < frontend.indexOf("const { data: existingStory"),
+  "Profile enqueue must not be skipped by a later opening-story lookup/save failure");
+assert.match(frontend, /storyError: '角色已儲存，但讀取故事資料失敗：' \+ lookupError\.message, profileQueueError/,
+  "Story lookup failure must still report the independent profile enqueue result");
 
 for (const rpc of [
   "enqueue_character_profile_organization",
