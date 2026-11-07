@@ -35,6 +35,10 @@ on:
       - "scripts/test-memory-capture.cjs"
       - "scripts/test-memory-persistence-contract.mjs"
       - "supabase/functions/chat-turn/index.ts"
+      - "supabase/functions/character-profile-organization-worker/index.ts"
+      - "supabase/functions/_shared/character-profile-organization.ts"
+      - "supabase/functions/_shared/character-profile-organization.test.ts"
+      - "supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql"
       - "scripts/test-story-roleplay-prompt.mjs"
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/prompt-variables.ts"
@@ -72,6 +76,10 @@ on:
       - "scripts/test-memory-capture.cjs"
       - "scripts/test-memory-persistence-contract.mjs"
       - "supabase/functions/chat-turn/index.ts"
+      - "supabase/functions/character-profile-organization-worker/index.ts"
+      - "supabase/functions/_shared/character-profile-organization.ts"
+      - "supabase/functions/_shared/character-profile-organization.test.ts"
+      - "supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql"
       - "scripts/test-story-roleplay-prompt.mjs"
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/prompt-variables.ts"
@@ -176,6 +184,10 @@ jobs:
           deno-version: v2.x
       - name: Type-check Story chat-turn Edge Function
         run: deno check supabase/functions/chat-turn/index.ts
+      - name: Type-check Character Profile organization Worker
+        run: deno check supabase/functions/character-profile-organization-worker/index.ts
+      - name: Test Character AI Profile evidence, privacy and OOC validation
+        run: deno test supabase/functions/_shared/character-profile-organization.test.ts
       - name: Test structured Story turn evaluation parsing
         run: deno test supabase/functions/_shared/story-turn-envelope.test.ts
       - name: Run provider result normalization tests
