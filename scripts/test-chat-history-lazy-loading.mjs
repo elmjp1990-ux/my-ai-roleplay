@@ -27,6 +27,9 @@ assert.match(upgradeMigration, /state\.sessions=compactSessionsForLocalStorage/)
 assert.match(persistWriter, /compactLocalStateForQuota\(baseSnapshot\)/);
 
 const sessionSync = between("async function loadCloudChatSessions(user, options = {})", "async function loadCloudSessionMessages");
+const sessionCharacter = between("function sessionCharacter(s)", "function canAccessSessionCharacter");
+assert.match(sessionCharacter, /c\.cloudSnapshotOnly && s\.cloudCharacterSnapshotLoaded===true/,
+  "a loaded full snapshot must supersede the lightweight character stub");
 assert.doesNotMatch(sessionSync, /from\(['"]chat_messages['"]\)/,
   "login/session-list hydration must never download chat message rows");
 assert.match(sessionSync, /session_name:session_data->>name/);
