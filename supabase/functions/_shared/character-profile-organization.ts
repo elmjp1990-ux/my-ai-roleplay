@@ -73,6 +73,9 @@ export function validateCharacterProfileSourcePayload(
 ): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
   if (!isRecord(value)) return { ok: false, errors: ["source_payload_not_object"] };
+  if (value.__profile_source_error === "source_payload_too_large") {
+    return { ok: false, errors: ["source_payload_too_large"] };
+  }
   if (Object.keys(value).length !== CHARACTER_PROFILE_SOURCE_KEYS.length ||
     !CHARACTER_PROFILE_SOURCE_KEYS.every((key) => Object.prototype.hasOwnProperty.call(value, key))) {
     return { ok: false, errors: ["source_payload_keys_invalid"] };
