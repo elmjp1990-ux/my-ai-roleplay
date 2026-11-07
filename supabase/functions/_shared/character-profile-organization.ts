@@ -2,6 +2,21 @@ export const CHARACTER_PROFILE_MODEL = "deepseek/deepseek-v4-flash-20260423";
 
 export type CharacterProfileSourcePayload = Record<string, unknown>;
 
+const CHARACTER_PROFILE_SOURCE_KEYS = [
+  "characters.intro",
+  "characters.race",
+  "characters.style",
+  "character_private_info.private_info",
+  "character_private_info.personality_profile.coreTraits",
+  "character_private_info.personality_profile.values",
+  "character_private_info.personality_profile.speechStyle",
+  "character_private_info.personality_profile.behaviorRules",
+  "character_private_info.personality_profile.likes",
+  "character_private_info.personality_profile.dislikes",
+  "character_private_info.personality_profile.boundaries",
+  "character_private_info.personality_profile.relationshipPacing",
+] as const;
+
 const PROFILE_SECTIONS = [
   "identity_background",
   "core_personality",
@@ -58,6 +73,10 @@ export function validateCharacterProfileSourcePayload(
 ): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
   if (!isRecord(value)) return { ok: false, errors: ["source_payload_not_object"] };
+  if (Object.keys(value).length !== CHARACTER_PROFILE_SOURCE_KEYS.length ||
+    !CHARACTER_PROFILE_SOURCE_KEYS.every((key) => Object.prototype.hasOwnProperty.call(value, key))) {
+    return { ok: false, errors: ["source_payload_keys_invalid"] };
+  }
   let nodes = 0;
   const visit = (entry: unknown, depth: number): void => {
     nodes++;
