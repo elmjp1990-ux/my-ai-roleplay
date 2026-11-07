@@ -1,6 +1,6 @@
 # POYOZZ 角色卡 AI 衍生資料整理佇列設計（草案）
 
-狀態：設計草案，尚未建立正式 migration、worker 或部署。
+狀態：PR #215 分支已建立 migration、enqueue／claim／complete／fail RPC、DeepSeek Worker、Story prompt 讀取與測試；尚未套用 hosted migration 或部署。
 
 ## 目的
 
@@ -309,3 +309,25 @@ Schema 只驗證資料形狀，不能單獨證明 source_refs 真實存在或使
 - 未部署 Edge Function，未執行 hosted Supabase migration，未改動正式資料庫。
 
 上述狀態只描述 PR 分支程式與 CI，不代表正式網站已生效；需等 PR 合併及授權部署後才會上線。
+
+
+## PR #215 實作進度（2026-11-07）
+
+已在 PR #215 分支新增：
+
+- `supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql`：建立私有 job queue 與 derived profile 表；owner-checked enqueue；service-role claim／complete／fail；SHA-256 source hash；lease token + generation fencing；過期來源結果拒絕寫入；Story 讀取 RPC 只回傳與最新來源 hash 相符的 Profile。
+- `supabase/migrations/20261107123000_schedule_character_profile_organization_worker.sql`：可選 pg_cron + pg_net 排程。只在 Vault 內同時存在 `poyozz_supabase_url`、`poyozz_service_role_key` 且 scheduler extensions 可用時建立每分鐘排程；缺少條件會 fail closed，不會建立排程。加入 Vault secrets 後可由 service_role 呼叫 `schedule_character_profile_organization_worker()` 安裝／重建排程。
+- `supabase/functions/character-profile-organization-worker/index.ts`：以 `deepseek/deepseek-v4-flash-20260423` 單次整理整份角色 Profile，採單筆 claim，失敗指數退避最多 5 次。
+- `supabase/functions/_shared/character-profile-organization.ts`：模型輸出嚴格驗證、來源欄位參照 allowlist、作者私密來源限制、OOC ready 至少 3 條、禁止 AI 生成範例台詞。
+- `index.html`：角色原始資料寫入並回讀驗證後，僅 AI 相關欄位變更才呼叫 owner-checked enqueue；enqueue 失敗不回滾角色資料，並回報保存警告。
+- `supabase/functions/chat-turn/index.ts`：每回合透過 service-role RPC 讀取 source-hash 有效 Profile，將角色理解與 OOC 注入 Story system prompt；私密來源衍生項目加入既有輸出洩漏保護。
+- 新增 Deno Profile validator tests、PostgreSQL migration/lease/stale-source tests，並加入 Story AI GitHub Actions。
+
+排程部署前置條件：
+
+1. Supabase Edge Function 設定 `OPENROUTER_API_KEY`。
+2. Supabase Vault 建立 `poyozz_supabase_url`（專案 HTTPS URL）與 `poyozz_service_role_key`（service role JWT）。
+3. 套用 migration 後確認 pg_cron、pg_net 與 Vault 可用；若 migration 當時尚無 Vault secrets，新增後由 service_role 呼叫排程 RPC。
+4. Worker 每分鐘最多處理一筆，並以資料庫全域 active lease 避免同時生成多個角色，控制成本。
+
+目前 GitHub Actions 的 Story AI tests、Worker Deno type-check、Profile/OOC tests 已通過；最新 SQL migration replay 正在執行。此狀態只代表 PR 分支與 CI，不代表 hosted Supabase 已套用或 Edge Function 已部署。
