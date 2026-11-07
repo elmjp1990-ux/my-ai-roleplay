@@ -111,7 +111,17 @@ async function generateProfile(
       }
       throw new Error("openrouter_http_" + response.status);
     }
-    const result = await response.json();
+    let result: any;
+    try {
+      result = await response.json();
+    } catch {
+      throw new ProfileGenerationError("provider_outcome_unknown", {
+        model: CHARACTER_PROFILE_MODEL,
+        provider: "deepinfra",
+        requestId: response.headers.get("x-request-id"),
+        usage: {},
+      });
+    }
     const usage = result?.usage && typeof result.usage === "object" && !Array.isArray(result.usage)
       ? result.usage as Record<string, unknown>
       : {};
