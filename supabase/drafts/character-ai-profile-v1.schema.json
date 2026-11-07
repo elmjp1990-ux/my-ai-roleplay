@@ -1,0 +1,328 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://poyozz.invalid/schemas/character-ai-profile-v1.schema.json",
+  "title": "POYOZZ Character AI Profile v1",
+  "description": "Backend-only derived roleplay profile. Author source fields remain authoritative. Runtime schedules and phone settings are loaded separately at turn time and are intentionally excluded from this long-lived profile. This schema validates the model-generated payload, not database metadata.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "identity_background",
+    "core_personality",
+    "inner_motivations",
+    "emotional_response_patterns",
+    "relationship_dynamics",
+    "behavior_and_agency",
+    "knowledge_boundaries",
+    "speech_style",
+    "appearance_markers",
+    "author_private_context",
+    "ooc_rules",
+    "unknowns",
+    "source_conflicts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "identity_background": {
+      "$ref": "#/$defs/section"
+    },
+    "core_personality": {
+      "$ref": "#/$defs/section"
+    },
+    "inner_motivations": {
+      "$ref": "#/$defs/section"
+    },
+    "emotional_response_patterns": {
+      "$ref": "#/$defs/section"
+    },
+    "relationship_dynamics": {
+      "$ref": "#/$defs/section"
+    },
+    "behavior_and_agency": {
+      "$ref": "#/$defs/section"
+    },
+    "knowledge_boundaries": {
+      "$ref": "#/$defs/section"
+    },
+    "speech_style": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "tendencies",
+        "creator_defined_quirks",
+        "example_lines"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/sectionStatus"
+        },
+        "tendencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidenceItem"
+          }
+        },
+        "creator_defined_quirks": {
+          "type": "array",
+          "description": "Only verbatim or faithfully normalized quirks explicitly supplied by the author. Must be empty when none were supplied.",
+          "items": {
+            "$ref": "#/$defs/evidenceItem",
+            "allOf": [
+              {
+                "properties": {
+                  "source_type": {
+                    "const": "author_explicit"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "example_lines": {
+          "type": "array",
+          "maxItems": 0,
+          "description": "Example dialogue is prohibited to prevent phrase imitation."
+        }
+      }
+    },
+    "appearance_markers": {
+      "$ref": "#/$defs/section"
+    },
+    "author_private_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visibility",
+        "status",
+        "items"
+      ],
+      "properties": {
+        "visibility": {
+          "const": "server_only"
+        },
+        "status": {
+          "$ref": "#/$defs/sectionStatus"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidenceItem"
+          }
+        }
+      }
+    },
+    "ooc_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "rules",
+        "insufficient_source_reason"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "ready",
+            "insufficient_source"
+          ]
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "rule",
+              "why_it_matters",
+              "prohibited_deviation",
+              "allowed_growth",
+              "source_refs"
+            ],
+            "properties": {
+              "rule": {
+                "type": "string",
+                "minLength": 1
+              },
+              "why_it_matters": {
+                "type": "string",
+                "minLength": 1
+              },
+              "prohibited_deviation": {
+                "type": "string",
+                "minLength": 1
+              },
+              "allowed_growth": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_refs": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
+        "insufficient_source_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "ready"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "rules": {
+                "minItems": 3
+              },
+              "insufficient_source_reason": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "insufficient_source"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "rules": {
+                "maxItems": 2
+              },
+              "insufficient_source_reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "unknowns": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "source_conflicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "topic",
+          "conflicting_source_refs",
+          "description",
+          "resolution_status"
+        ],
+        "properties": {
+          "topic": {
+            "type": "string",
+            "minLength": 1
+          },
+          "conflicting_source_refs": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "resolution_status": {
+            "const": "needs_author_clarification"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sectionStatus": {
+      "enum": [
+        "populated",
+        "not_provided",
+        "conflict"
+      ]
+    },
+    "evidenceItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "content",
+        "source_type",
+        "source_refs",
+        "confidence"
+      ],
+      "properties": {
+        "content": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_type": {
+          "enum": [
+            "author_explicit",
+            "ai_inference"
+          ]
+        },
+        "source_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        }
+      }
+    },
+    "section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "items"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/sectionStatus"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidenceItem"
+          }
+        }
+      }
+    }
+  }
+}

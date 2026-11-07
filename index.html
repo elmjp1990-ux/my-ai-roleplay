@@ -1759,7 +1759,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
           phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : {},
           nsfwWorkplaceWarning:row.nsfw_workplace_warning === true,
           isNSFW:row.is_nsfw === true,
-          tags: Array.isArray(row.tags) ? row.tags : [],
+          tags: normalizeCharacterTagsForRead(row.tags),
           authorId: row.author_id, owner: state.account?.uid === row.author_id,
           chats: '0', users: null,
           createdAt: row.created_at ? new Date(row.created_at).getTime() : 0,
@@ -1813,6 +1813,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
           const result = await saveSupabaseCharacter(character, user.id);
           migratedCount++;
           if (result?.storyError) migrationErrors.push(character.name + '：' + result.storyError);
+          if (result?.profileQueueError) migrationErrors.push(character.name + '：' + result.profileQueueError);
         } catch (migrationError) {
           migrationErrors.push((character.name || '未命名角色') + '：' + migrationError.message);
         }
@@ -1904,7 +1905,7 @@ const ids = (rows || []).map(row => row.id);
           personalityProfile: normalizePersonalityProfile(privateInfoById.get(row.id)?.personalityProfile ?? local.personalityProfile),
           phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : (local.phoneSettings || {}),
           nsfwWorkplaceWarning:row.nsfw_workplace_warning === true,
-          tags: Array.isArray(row.tags) ? row.tags : (local.tags || []),
+          tags: normalizeCharacterTagsForRead(Array.isArray(row.tags) ? row.tags : (local.tags || [])),
           authorId: row.author_id,
           owner: true,
           chats: local.chats || '0',
@@ -2230,7 +2231,7 @@ async function syncCharacterIllustrations(character,userId) {
         }
       }
       const {error}=await client.from('character_illustrations')
-        .update({storage_path:nextPrimaryPath,sort_order:0,display_name:String(character.primaryIllustrationName||'').trim().slice(0,40),updated_at:new Date().toISOString()})
+        .update({storage_path:nextPrimaryPath,sort_order:0,display_name:String(character.primaryIllustrationName||character.personalityProfile?.primaryIllustrationName||'').trim().slice(0,40),updated_at:new Date().toISOString()})
         .eq('id',oldPrimary.id).eq('author_id',userId);
       if(error){
         if(oldPrimaryCleanupJob)await cancelCharacterIllustrationCleanupJob(oldPrimaryCleanupJob.id,userId);
@@ -2241,7 +2242,7 @@ async function syncCharacterIllustrations(character,userId) {
       if(oldPrimaryCleanupJob)await processCharacterIllustrationCleanupJob(oldPrimaryCleanupJob,userId);
     }else{
       const {error}=await client.from('character_illustrations')
-        .insert({character_id:character.id,author_id:userId,storage_path:nextPrimaryPath,asset_type:'primary',sort_order:0,display_name:String(character.primaryIllustrationName||'').trim().slice(0,40)});
+        .insert({character_id:character.id,author_id:userId,storage_path:nextPrimaryPath,asset_type:'primary',sort_order:0,display_name:String(character.primaryIllustrationName||character.personalityProfile?.primaryIllustrationName||'').trim().slice(0,40)});
       if(error){
         if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
         if(uploaded.length)await cleanupCharacterIllustrationUploads(uploaded,userId);
@@ -2290,6 +2291,25 @@ async function syncCharacterIllustrations(character,userId) {
   if(!character.avatarVideoPath&&nextPrimaryPath){
     const {error:avatarClearError}=await client.from('characters').update({avatar_url:null}).eq('id',character.id).eq('author_id',userId);
     if(avatarClearError)console.warn('舊的內嵌圖片欄位尚未清除：',avatarClearError.message);
+  }
+  // Verify every persisted illustration label; a successful UPDATE with zero matched rows
+  // must not be reported as a successful save.
+  const expectedGalleryNames=new Map(nextGallery.filter(item=>item?.id).map(item=>[item.id,String(item.name||'').trim().slice(0,40)]));
+  if(expectedGalleryNames.size){
+    const {data:verifiedGallery,error:galleryVerifyError}=await client.from('character_illustrations')
+      .select('id,display_name').eq('character_id',character.id).eq('author_id',userId).eq('asset_type','gallery');
+    if(galleryVerifyError)throw new Error('立繪名稱寫入後無法回讀：'+galleryVerifyError.message);
+    const savedNames=new Map((verifiedGallery||[]).map(item=>[item.id,String(item.display_name||'')]));
+    for(const [assetId,expectedName] of expectedGalleryNames){
+      if(savedNames.get(assetId)!==expectedName)throw new Error('立繪名稱「'+expectedName+'」未成功保存，請重新儲存。');
+    }
+  }
+  const expectedPrimaryName=String(character.primaryIllustrationName||character.personalityProfile?.primaryIllustrationName||'').trim().slice(0,40);
+  if(nextPrimaryPath){
+    const {data:verifiedPrimary,error:primaryVerifyError}=await client.from('character_illustrations')
+      .select('display_name').eq('character_id',character.id).eq('author_id',userId).eq('asset_type','primary').maybeSingle();
+    if(primaryVerifyError)throw new Error('主要立繪名稱寫入後無法回讀：'+primaryVerifyError.message);
+    if(!verifiedPrimary||String(verifiedPrimary.display_name||'')!==expectedPrimaryName)throw new Error('主要立繪名稱未成功保存，請重新儲存。');
   }
   nextGallery.sort((left,right)=>Number(left.sortOrder||0)-Number(right.sortOrder||0));
   draftPrimaryIllustrationPath=nextPrimaryPath;
@@ -2444,6 +2464,10 @@ async function saveEncounterScheduleDescription(characterId, userId, description
     const { error } = await client.from('character_schedule_descriptions')
       .delete().eq('character_id', characterId).eq('author_id', userId);
     if (error) throw new Error('清除角色日程描述失敗：' + error.message);
+    const { data: remaining, error: verifyError } = await client.from('character_schedule_descriptions')
+      .select('character_id').eq('character_id', characterId).eq('author_id', userId).maybeSingle();
+    if (verifyError) throw new Error('清除日程後無法驗證：' + verifyError.message);
+    if (remaining) throw new Error('日程清除未完成，請重新儲存。');
     return;
   }
   const { error } = await client.from('character_schedule_descriptions').upsert({
@@ -2451,24 +2475,33 @@ async function saveEncounterScheduleDescription(characterId, userId, description
     updated_at: new Date().toISOString()
   }, { onConflict: 'character_id' });
   if (error) throw new Error('角色已儲存，但日程描述同步失敗：' + error.message);
+  const { data: saved, error: verifyError } = await client.from('character_schedule_descriptions')
+    .select('description').eq('character_id', characterId).eq('author_id', userId).maybeSingle();
+  if (verifyError) throw new Error('日程寫入後無法回讀：' + verifyError.message);
+  if (String(saved?.description || '') !== text) throw new Error('第 9 項角色日程回讀結果與送出內容不一致，請重新儲存。');
 }
 
 async function loadEncounterScheduleDescriptionIntoEditor(characterId) {
   const client = window.mySupabase;
   const field = document.querySelector('form[data-form="character"] textarea[name="encounterScheduleDescription"]');
   const user = currentUser();
-  if (!client || !user?.uid || !characterId || !field || field.value.trim()) return;
+  if (!client || !user?.uid || !characterId || !field || field.dataset.scheduleHydrated === 'true') return;
+  if (field.value.trim()) { field.dataset.scheduleHydrated = 'true'; return; }
   const { data, error } = await client.from('character_schedule_descriptions')
     .select('description')
     .eq('character_id', characterId)
     .eq('author_id', user.uid)
     .maybeSingle();
-  if (error) {
-    console.warn('讀取作者自己的角色日程描述失敗：', error.message);
-    return;
+  if (error) throw new Error('讀取作者自己的角色日程描述失敗：' + error.message);
+  if (field.isConnected) {
+    if (!field.value.trim()) field.value = data?.description || '';
+    field.dataset.scheduleHydrated = 'true';
   }
-  if (field.isConnected && !field.value.trim()) field.value = data?.description || '';
 }
+
+  const rowPhoneSettingsForDiff = value => value && typeof value === 'object'
+    ? { noticePrompts: (Array.isArray(value.noticePrompts) ? value.noticePrompts : Array.isArray(value.notices) ? value.notices : []).slice(0, 8).map(item => String(item).slice(0, 230)) }
+    : {};
 
 async function saveSupabaseCharacter(character, expectedUserId) {
     const client = window.mySupabase;
@@ -2508,7 +2541,7 @@ async function saveSupabaseCharacter(character, expectedUserId) {
     // 先讀取既有上架紀錄，避免 upsert 把首次公開時間或資格重設。
     const { data: existingCharacter, error: existingCharacterError } = await client
       .from('characters')
-      .select('visibility, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, is_nsfw, deleted_at')
+      .select('name, intro, race, style, tags, phone_settings, visibility, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, is_nsfw, deleted_at')
       .eq('id', character.id)
       .eq('author_id', expectedUserId)
       .maybeSingle();
@@ -2518,6 +2551,85 @@ async function saveSupabaseCharacter(character, expectedUserId) {
     if (existingCharacter?.deleted_at) {
       throw new Error('此角色已被刪除，不能重新公開或修改。若要創作新版本，請建立新角色。');
     }
+
+    // 角色卡儲存先做確定性的欄位差異判斷；這裡只產生整理決策，不呼叫模型、不阻擋一般儲存。
+    const { data: existingPrivateProfile, error: existingPrivateProfileError } = await client
+      .from('character_private_info')
+      .select('private_info, personality_profile')
+      .eq('character_id', character.id)
+      .eq('author_id', expectedUserId)
+      .maybeSingle();
+    if (existingPrivateProfileError) {
+      throw new Error('讀取角色舊版隱藏設定失敗：' + existingPrivateProfileError.message);
+    }
+
+    const stableCharacterValue = value => {
+      if (Array.isArray(value)) return value.map(stableCharacterValue);
+      if (value && typeof value === 'object') {
+        return Object.fromEntries(Object.keys(value).sort().map(key => [key, stableCharacterValue(value[key])]));
+      }
+      return value ?? null;
+    };
+    const characterValueChanged = (before, after) =>
+      JSON.stringify(stableCharacterValue(before)) !== JSON.stringify(stableCharacterValue(after));
+    const previousProfile = normalizePersonalityProfile(existingPrivateProfile?.personality_profile || {});
+    const nextProfile = normalizePersonalityProfile(character.personalityProfile || {});
+    const aiRelevantChanges = [];
+    const runtimeAiChanges = [];
+    const nonAiChanges = [];
+
+    const compareCharacterField = (target, key, label, before, after) => {
+      if (!characterValueChanged(before, after)) return;
+      target.push({ key, label });
+    };
+
+    // 角色名稱是提示詞中的即時識別資料；改名不改變角色個性，不需重建衍生資料。
+    compareCharacterField(nonAiChanges, 'name', '角色名稱', existingCharacter?.name, String(character.name || '').trim());
+
+    // 只有會改變角色理解、個性或行為的原始設定才需要重新評估衍生資料。
+    compareCharacterField(aiRelevantChanges, 'intro', '角色介紹／背景', existingCharacter?.intro, character.intro || '');
+    compareCharacterField(aiRelevantChanges, 'race', '種族／世界觀', existingCharacter?.race, character.race || '');
+    compareCharacterField(aiRelevantChanges, 'style', '角色風格', existingCharacter?.style, character.style || '');
+    compareCharacterField(aiRelevantChanges, 'private_info', '作者私密設定', existingPrivateProfile?.private_info || '', String(character.privateInfo || '').slice(0, 10000));
+
+    // 個性欄位逐項比較，避免主要立繪名稱等純展示資料誤觸發 AI 整理。
+    const aiProfileFields = {
+      coreTraits: '核心特質',
+      values: '價值觀',
+      speechStyle: '說話方式',
+      behaviorRules: '行為規則',
+      likes: '喜好',
+      dislikes: '厭惡',
+      boundaries: '互動界線',
+      relationshipPacing: '關係進展節奏'
+    };
+    for (const [key, label] of Object.entries(aiProfileFields)) {
+      compareCharacterField(aiRelevantChanges, 'personality_profile.' + key, label, previousProfile[key], nextProfile[key]);
+    }
+    compareCharacterField(nonAiChanges, 'personality_profile.primaryIllustrationName', '主要立繪名稱', previousProfile.primaryIllustrationName, nextProfile.primaryIllustrationName);
+
+    // 手機通知指示會直接影響每回合生成，但由對話流程即時讀取，不必重做角色摘要。
+    compareCharacterField(runtimeAiChanges, 'phone_settings', '手機通知生成設定', existingCharacter?.phone_settings || {}, rowPhoneSettingsForDiff(character.phoneSettings));
+
+    // 標籤與媒體只影響展示／搜尋；不觸發角色衍生資料整理。
+    compareCharacterField(nonAiChanges, 'tags', '角色標籤', existingCharacter?.tags || [], character.tags || []);
+
+    const isNewCharacter = !existingCharacter;
+    const requiresDerivedRefresh = aiRelevantChanges.length > 0;
+    const aiOrganizationDecision = {
+      version: 3,
+      status: requiresDerivedRefresh ? 'needs_review' : 'not_needed',
+      reason: requiresDerivedRefresh
+        ? (isNewCharacter ? 'new_character_ai_source_present' : 'ai_source_fields_changed')
+        : (isNewCharacter ? 'new_character_source_fields_available' : 'no_ai_relevant_change'),
+      model: 'deepseek/deepseek-v4-flash-20260423',
+      changedFields: aiRelevantChanges.map(item => item.key),
+      changedFieldLabels: aiRelevantChanges.map(item => item.label),
+      runtimeAiChangedFields: runtimeAiChanges.map(item => item.key),
+      nonAiChangedFields: nonAiChanges.map(item => item.key),
+      requiresDerivedRefresh,
+      shouldCallModel: false
+    };
 
     const firstPublishedAt = existingCharacter?.first_published_at ||
       (nextVisibility === 'public' ? new Date().toISOString() : null);
@@ -2545,7 +2657,7 @@ async function saveSupabaseCharacter(character, expectedUserId) {
       intro: character.intro || '',
       race: character.race || '',
       style: character.style || '',
-      phone_settings:character.phoneSettings && typeof character.phoneSettings==='object' ? {noticePrompts:(Array.isArray(character.phoneSettings.noticePrompts)?character.phoneSettings.noticePrompts:Array.isArray(character.phoneSettings.notices)?character.phoneSettings.notices:[]).slice(0,8).map(x=>String(x).slice(0,150))} : {},
+      phone_settings:character.phoneSettings && typeof character.phoneSettings==='object' ? {noticePrompts:(Array.isArray(character.phoneSettings.noticePrompts)?character.phoneSettings.noticePrompts:Array.isArray(character.phoneSettings.notices)?character.phoneSettings.notices:[]).slice(0,8).map(x=>String(x).slice(0,230))} : {},
       nsfw_workplace_warning: character.nsfwWorkplaceWarning === true,
       is_nsfw: character.isNSFW === true,
       tags: Array.isArray(character.tags) ? character.tags : []
@@ -2569,10 +2681,21 @@ if (characterError) {
     if (privateInfoError) {
       throw new Error('角色基本資料已寫入，但隱藏設定儲存失敗：' + privateInfoError.message);
     }
+    const { data: verifiedPrivateInfo, error: privateInfoVerifyError } = await client
+      .from('character_private_info')
+      .select('private_info, personality_profile')
+      .eq('character_id', character.id)
+      .eq('author_id', expectedUserId)
+      .maybeSingle();
+    if (privateInfoVerifyError) throw new Error('角色隱藏設定寫入後無法回讀：' + privateInfoVerifyError.message);
+    if (!verifiedPrivateInfo || String(verifiedPrivateInfo.private_info || '') !== String(character.privateInfo || '').slice(0,10000)
+      || JSON.stringify(normalizePersonalityProfile(verifiedPrivateInfo.personality_profile)) !== JSON.stringify(normalizePersonalityProfile(character.personalityProfile))) {
+      throw new Error('第 7、8、10 項角色設定回讀結果與送出內容不一致，為避免資料遺失，本次請重新儲存。');
+    }
     // 重新讀取資料庫，避免 RLS／trigger／資料庫規則拒絕公開卻讓前端顯示成功。
     const { data: savedCharacter, error: verifyError } = await client
       .from('characters')
-      .select('visibility, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, deleted_at')
+      .select('visibility, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, deleted_at, phone_settings')
       .eq('id', character.id)
       .eq('author_id', expectedUserId)
       .maybeSingle();
@@ -2587,6 +2710,28 @@ if (characterError) {
     if (savedCharacter.nsfw_workplace_warning !== (character.nsfwWorkplaceWarning === true)) {
       throw new Error('資料庫中的 NSFW 工作場所提醒未成功保存，請重試。');
     }
+    const expectedPhonePrompts = Array.isArray(row.phone_settings?.noticePrompts) ? row.phone_settings.noticePrompts : [];
+    const savedPhonePrompts = Array.isArray(savedCharacter.phone_settings?.noticePrompts) ? savedCharacter.phone_settings.noticePrompts : [];
+    if (JSON.stringify(savedPhonePrompts) !== JSON.stringify(expectedPhonePrompts)) {
+      throw new Error('手機設定回讀結果與送出內容不一致，請重新儲存。');
+    }
+
+    // 只有 AI 來源欄位確實變更時才排隊；enqueue 失敗不回滾已成功保存的作者原始資料。
+    let profileQueueError = null;
+    if (aiOrganizationDecision.requiresDerivedRefresh === true) {
+      try {
+        const { error: enqueueError } = await client.rpc('enqueue_character_profile_organization', {
+          p_character_id: character.id
+        });
+        if (enqueueError) {
+          profileQueueError = '角色已儲存，但 AI 角色資料整理尚未排入佇列：' + enqueueError.message;
+          console.warn('character_profile_enqueue_failed', { code: enqueueError.code || 'enqueue_failed' });
+        }
+      } catch (enqueueError) {
+        profileQueueError = '角色已儲存，但 AI 角色資料整理尚未排入佇列。';
+        console.warn('character_profile_enqueue_failed');
+      }
+    }
 
     // 每個角色先沿用最新的一筆故事；沒有故事時才新增，避免每次編輯都重複建立。
     const { data: existingStory, error: lookupError } = await client
@@ -2598,7 +2743,7 @@ if (characterError) {
       .maybeSingle();
 
     if (lookupError) {
-      return { storyError: '角色已儲存，但讀取故事資料失敗：' + lookupError.message };
+      return { storyError: '角色已儲存，但讀取故事資料失敗：' + lookupError.message, profileQueueError };
     }
 
     const storyRow = {
@@ -2622,9 +2767,10 @@ if (characterError) {
     }
 
     if (storyResult.error) {
-      return { storyError: '角色已儲存，但開場故事儲存失敗：' + storyResult.error.message };
+      return { storyError: '角色已儲存，但開場故事儲存失敗：' + storyResult.error.message, profileQueueError };
     }
-    return { storyError: null, visibility: savedCharacter.visibility, rightsConfirmed: savedCharacter.rights_confirmed === true, firstPublishedAt: savedCharacter.first_published_at ? new Date(savedCharacter.first_published_at).getTime() : null, latestEligible: savedCharacter.latest_eligible !== false };
+
+    return { storyError: null, profileQueueError, visibility: savedCharacter.visibility, rightsConfirmed: savedCharacter.rights_confirmed === true, firstPublishedAt: savedCharacter.first_published_at ? new Date(savedCharacter.first_published_at).getTime() : null, latestEligible: savedCharacter.latest_eligible !== false, aiOrganizationDecision };
   }
 
   const stablePersonaJson = value => JSON.stringify(value, (key, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a],[b])=>a.localeCompare(b))) : item);
@@ -2787,7 +2933,7 @@ function availableExploreTags() {
         character.cloudPublic === false || character.localOnly === true ||
         String(character.id || '').startsWith('seed-')) continue;
     for (const rawTag of (Array.isArray(character.tags) ? character.tags : [])) {
-      const tag = String(rawTag || '').trim();
+      const tag = normalizeCharacterTag(rawTag);
       if (validCharacterTag(tag)) tags.add(tag);
     }
   }
@@ -3175,7 +3321,7 @@ function chatSessionData(s) {
       ? {text:String(initialOpening.text),at:Number(initialOpening.at) || Date.now()} : null,
     pinned:!!s.pinned, persona:s.persona || '', personaCustom:s.personaCustom === true || (s.personaCustom !== false && !!s.persona),
     suggestions:s.suggestions !== false,
-    suggestedReplies:Array.isArray(s.suggestedReplies) ? s.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90) : [],
+    suggestedReplies:Array.isArray(s.suggestedReplies) ? s.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=80) : [],
     background:s.background || 'avatar',
     startedAt:s.startedAt || Date.now(), archivedAt:s.archivedAt || null,
     hasUserMessage:s.cloudHasUserMessage===true ||
@@ -3247,7 +3393,7 @@ async function saveChatSessionToCloud(s, options = {}) {
       const savedData=currentRow.data.session_data&&typeof currentRow.data.session_data==='object'?currentRow.data.session_data:{};
       s.memories=Array.isArray(savedData.memories)?savedData.memories:[];
       s.album=Array.isArray(savedData.album)?savedData.album:[];
-      s.suggestedReplies=Array.isArray(savedData.suggestedReplies)?savedData.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90):[];
+      s.suggestedReplies=Array.isArray(savedData.suggestedReplies)?savedData.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=80):[];
       s.cloudRoleplayMeta=savedData.roleplayMeta&&typeof savedData.roleplayMeta==='object'?savedData.roleplayMeta:{};
       s.pendingTurn=savedData.pendingTurn&&isUuid(savedData.pendingTurn.turnId)&&isUuid(savedData.pendingTurn.userMessageId)&&isUuid(savedData.pendingTurn.assistantMessageId)
         ? {turnId:savedData.pendingTurn.turnId,userMessageId:savedData.pendingTurn.userMessageId,assistantMessageId:savedData.pendingTurn.assistantMessageId,createdAt:Number(savedData.pendingTurn.createdAt)||Date.now()}
@@ -3313,7 +3459,7 @@ async function saveChatSessionToCloud(s, options = {}) {
       const existingData=existing.data.session_data&&typeof existing.data.session_data==='object'?existing.data.session_data:{};
       s.memories=Array.isArray(existingData.memories)?existingData.memories:[];
       s.album=Array.isArray(existingData.album)?existingData.album:[];
-      s.suggestedReplies=Array.isArray(existingData.suggestedReplies)?existingData.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90):[];
+      s.suggestedReplies=Array.isArray(existingData.suggestedReplies)?existingData.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=80):[];
       s.cloudRoleplayMeta=existingData.roleplayMeta&&typeof existingData.roleplayMeta==='object'?existingData.roleplayMeta:{};
       s.encounterMode=existing.data.chat_mode==='encounter'||s.encounterMode===true;
       s.storyMode=existingData.storyMode===true||s.storyMode===true;
@@ -4072,23 +4218,33 @@ function safeImage(value) {
   } catch (_) {}
   return '';
 }
+function normalizeCharacterTag(value) {
+  // UI 會自動加上 #，因此不把作者輸入的前綴存入資料庫。
+  return String(value ?? '').trim().replace(/^#+/u,'').trim();
+}
 function tagButton(tag) {
-  return `<button class="tag" data-action="tag" data-tag="${e(tag)}">#${e(tag)}</button>`;
+  const normalized=normalizeCharacterTag(tag);
+  return `<button class="tag" data-action="tag" data-tag="${e(normalized)}">#${e(normalized)}</button>`;
 }
 function draftTagButton(tag) {
-  return `<button type="button" class="tag" data-action="remove-draft-tag" data-tag="${e(tag)}" aria-label="移除標籤 ${e(tag)}">#${e(tag)} ×</button>`;
+  const normalized=normalizeCharacterTag(tag);
+  return `<button type="button" class="tag" data-action="remove-draft-tag" data-tag="${e(normalized)}" aria-label="移除標籤 ${e(normalized)}">#${e(normalized)} ×</button>`;
 }
 function validCharacterTag(value) {
-  const tag = String(value ?? '').trim();
+  const tag = normalizeCharacterTag(value);
   return countChars(tag) >= 2 && countChars(tag) <= 10;
+}
+function normalizeCharacterTagsForRead(tags) {
+  if(!Array.isArray(tags))return [];
+  return [...new Set(tags.map(normalizeCharacterTag).filter(validCharacterTag))].slice(0,5);
 }
 function validateCharacterTags(tags) {
   if (!Array.isArray(tags)) throw new Error('請使用自訂標籤。');
-  if (tags.length > 5) throw new Error('角色最多新增5個標籤。');
-  const normalized = tags.map(tag => String(tag ?? '').trim());
+  const normalized = tags.map(normalizeCharacterTag);
   if (normalized.some(tag => !validCharacterTag(tag))) throw new Error('每個標籤需為2–10個字。');
-  if (new Set(normalized).size !== normalized.length) throw new Error('標籤不可重複。');
-  return normalized;
+  const unique=[...new Set(normalized)];
+  if (unique.length > 5) throw new Error('角色最多新增5個標籤。');
+  return unique;
 }
 function environment() {
   return `<button class="environment" data-action="environment">
@@ -4986,6 +5142,59 @@ function readEditorDraft() {
   }
   return null;
 }
+function normalizePhoneNoticeRows(value) {
+  const source = Array.isArray(value) ? value : [];
+  return source.slice(0,8).map(item => {
+    const raw = String(item || '');
+    const separator = raw.indexOf('|');
+    return separator < 0
+      ? { display:raw.trim(), instruction:'' }
+      : { display:raw.slice(0,separator).trim(), instruction:raw.slice(separator+1).trim() };
+  });
+}
+function readPhoneNoticeRows(form) {
+  const values = new FormData(form);
+  return Array.from({length:8}, (_,index) => {
+    const display = String(values.get('phoneDisplay'+index) || '').trim().slice(0,80);
+    const instruction = String(values.get('phoneInstruction'+index) || '').trim().slice(0,150);
+    return display || instruction ? display + ' | ' + instruction : '';
+  }).filter(Boolean);
+}
+function renderPhoneSettingsFields(character, savedDraft) {
+  const draftPrompts = savedDraft?.phoneSettings?.noticePrompts;
+  const legacyDraftPrompts = String(savedDraft?.phoneNotices || '').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
+  const source = Array.isArray(draftPrompts) ? draftPrompts
+    : legacyDraftPrompts.length ? legacyDraftPrompts
+    : (Array.isArray(character.phoneSettings?.noticePrompts) ? character.phoneSettings.noticePrompts
+      : Array.isArray(character.phoneSettings?.notices) ? character.phoneSettings.notices : []);
+  const rows = normalizePhoneNoticeRows(source);
+  const visibleRows = rows.length ? rows : [{display:'',instruction:''}];
+  return '<div id="phoneSettingsEditor" class="stack" style="gap:10px">' +
+    '<div id="phoneSettingsRows" class="stack" style="gap:10px">' +
+    visibleRows.map((row,index) =>
+      '<div class="phone-setting-row stack" data-phone-setting-row style="gap:6px;padding:10px;border:1px solid var(--border);border-radius:12px">' +
+        '<div class="row" style="align-items:center;justify-content:space-between">' +
+          '<strong>手機通知 '+(index+1)+'</strong>' +
+          '<button type="button" class="small" data-phone-setting-action="remove" aria-label="刪除手機通知 '+(index+1)+'" '+(visibleRows.length<=1?'disabled':'')+'>－</button>' +
+        '</div>' +
+        '<div class="two-col" style="align-items:start">' +
+          '<label class="field"><span>名稱</span>' +
+            '<input name="phoneDisplay'+index+'" maxlength="80" value="'+e(row.display)+'" placeholder="顯示在手機上的字">' +
+          '</label>' +
+          '<label class="field"><span>AI 內容生成指示</span>' +
+            '<textarea name="phoneInstruction'+index+'" maxlength="150" rows="2" placeholder="AI 自己產出的數據或內容">'+e(row.instruction)+'</textarea>' +
+          '</label>' +
+        '</div>' +
+      '</div>'
+    ).join('') +
+    '</div>' +
+    '<div class="row" style="justify-content:flex-start">' +
+      '<button type="button" class="small" data-phone-setting-action="add" '+(visibleRows.length>=8?'disabled':'')+'>＋ 新增通知（'+visibleRows.length+'/8）</button>' +
+    '</div>' +
+  '</div>';
+}
+
+
 function saveEditorDraft() {
   const form = $('view')?.querySelector('form[data-form="character"]');
   const key = editorDraftKey();
@@ -5006,7 +5215,8 @@ function saveEditorDraft() {
       likes:values.get('personalityLikes'), dislikes:values.get('personalityDislikes'),
       boundaries:'', relationshipPacing:''
     }),
-    phoneNotices:String(values.get('phoneNotices') || ''),
+    encounterScheduleDescription:String(values.get('encounterScheduleDescription') || ''),
+    phoneSettings:{noticePrompts:readPhoneNoticeRows(form)},
     visibility:String(values.get('visibility') || 'private'),
     rightsConfirmed:values.get('rightsConfirmed') === 'on',
     isNSFW:values.get('isNSFW') === 'on',
@@ -5040,7 +5250,7 @@ function clearEditorDraft() {
 }
 function startEditor(c = null) {
   draftCharacter = c ? clone(c) : null;
-  draftTags = [...(c?.tags || [])];
+  draftTags = normalizeCharacterTagsForRead(c?.tags || []);
   draftImage = c?.image || '';
   draftIllustrations = [];
   draftPrimaryIllustrationPath = '';
@@ -5090,8 +5300,9 @@ function renderEditor() {
   const savedDraft = readEditorDraft();
   const original = draftCharacter || state.characters.find(c => c.id === route.id) || {};
   const c = savedDraft ? {...original, ...savedDraft} : original;
+  const phoneSettingsEditor = renderPhoneSettingsFields(c, savedDraft);
   if (savedDraft) {
-    draftTags = Array.isArray(savedDraft.tags) ? [...savedDraft.tags] : draftTags;
+    draftTags = Array.isArray(savedDraft.tags) ? normalizeCharacterTagsForRead(savedDraft.tags) : draftTags;
     draftImage = savedDraft.image || draftImage || '';
     draftIllustrations = Array.isArray(savedDraft.illustrations) ? savedDraft.illustrations.slice(0,5) : draftIllustrations;
     draftPrimaryIllustrationPath = savedDraft.primaryIllustrationPath || draftPrimaryIllustrationPath || '';
@@ -5100,7 +5311,7 @@ function renderEditor() {
   if (!draftCharacter && route.id) {
     draftCharacter = clone(original);
     if (!savedDraft) {
-      draftTags = [...(original.tags || [])];
+      draftTags = normalizeCharacterTagsForRead(original.tags || []);
       draftImage = original.image || '';
       draftVideoPath = original.avatarVideoPath || '';
     }
@@ -5148,8 +5359,11 @@ function renderEditor() {
             <small class="char-counter" data-count-for="privateInfo">0/10000；僅作者可查看。</small>
           </label>
         </section>
-        <section class="memory-item stack" style="gap:10px"><strong>11. 角色手機設定</strong>
-          <label class="field"><span>手機通知揭露指示（每行 1 則，最多 8 則）</span><textarea name="phoneNotices" maxlength="1200" placeholder="💬心裡話 | 每回合揭露一則簡短心裡話\n🔎線索 | 當劇情出現新線索時，揭露線索通知">${e(savedDraft?.phoneNotices ?? (Array.isArray(c.phoneSettings?.noticePrompts) ? c.phoneSettings.noticePrompts.join('\n') : Array.isArray(c.phoneSettings?.notices) ? c.phoneSettings.notices.join('\n') : ''))}</textarea><small>每行填寫一則 AI 手機通知的揭露指示，最多 8 則。</small></label></section>
+        <section class="memory-item stack" style="gap:12px">
+          <strong>11. 角色手機設定－手機通知揭露指示（每行 1 則，最多 8 則）</strong>
+          <small>每行設定 1 則手機通知：填寫「名稱」及「AI 內容生成指示」。可使用 {CHAR} 代表角色、{USER} 代表玩家；按「＋」新增、按「－」刪除，最多 8 則，至少保留 1 則。</small>
+          ${phoneSettingsEditor}
+        </section>
         <section class="memory-item stack" style="gap:12px">
           <strong>上傳主要角色圖</strong>
           <label class="field"><span>角色主圖 *</span>
@@ -5189,7 +5403,11 @@ function renderEditor() {
         </div>
       </form>
     </div>`;
-  if (route.id && !savedDraft?.encounterScheduleDescription) void loadEncounterScheduleDescriptionIntoEditor(route.id);
+  if (route.id) {
+    const scheduleField=$('view')?.querySelector('textarea[name="encounterScheduleDescription"]');
+    if (scheduleField && savedDraft && Object.prototype.hasOwnProperty.call(savedDraft,'encounterScheduleDescription')) scheduleField.dataset.scheduleHydrated='true';
+    else if (scheduleField) void loadEncounterScheduleDescriptionIntoEditor(route.id).catch(error=>{console.warn('角色日程載入失敗：',error);toast(error.message);});
+  }
   if (route.id && (editorIllustrationHydration.characterId!==route.id || editorIllustrationHydration.status==='idle')) {
     const characterId=route.id;
     editorIllustrationHydration={characterId,status:'loading',promise:null,error:null};
@@ -8887,7 +9105,7 @@ document.addEventListener('click',async event => {
         const input=$('modal').querySelector('input[name="tagSearch"]');
         const list=$('modal').querySelector('#customTagList');
         if (!input || !list) break;
-        const value=String(input.value || '').trim();
+        const value=normalizeCharacterTag(input.value);
         if (!validCharacterTag(value)) { toast('每個標籤需為2–10個字。'); input.focus(); break; }
         const options=[...list.querySelectorAll('input[name="tag"]')];
         const existing=options.find(item=>item.value===value);
@@ -9731,13 +9949,15 @@ document.addEventListener('submit',async event => {
           gender:String(f.get('gender')),age:String(f.get('age')).trim(),
           race:String(f.get('race')).trim(),intro,opening,
           privateInfo:String(f.get('privateInfo')).trim(),
+          encounterScheduleDescription:String(f.get('encounterScheduleDescription') || '').trim(),
           style:String(f.get('style')).trim(),
           personalityProfile:normalizePersonalityProfile({
+            primaryIllustrationName:f.get('primaryIllustrationName'),
             coreTraits:f.get('personalityDescription'), values:'', speechStyle:'', behaviorRules:'',
             likes:f.get('personalityLikes'), dislikes:f.get('personalityDislikes'),
             boundaries:'', relationshipPacing:''
           }),
-          phoneSettings:{noticePrompts:String(f.get('phoneNotices')||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,8).map(x=>x.slice(0,150))},
+          phoneSettings:{noticePrompts:readPhoneNoticeRows(form)},
           visibility:String(f.get('visibility')),image:draftImage,
           avatarVideoPath:draftVideoPath || '',
           isNSFW:f.get('isNSFW') === 'on',
@@ -9747,9 +9967,20 @@ document.addEventListener('submit',async event => {
           chats:old?.chats || '0',users:old?.users ?? null,
           createdAt:old?.createdAt || Date.now()
         };
+        c.primaryIllustrationName=String(f.get('primaryIllustrationName')||'').trim().slice(0,40);
+        // 表單輸入的附加立繪名稱必須同步回待上傳／既有素材物件，否則雲端同步會拿到舊名稱。
+        draftIllustrations=draftIllustrations.slice(0,5).map((item,index)=>({
+          ...((typeof item==='object'&&item)?item:{src:item}),
+          name:String(form.querySelector('[data-illustration-name="'+index+'"]')?.value||'').trim().slice(0,40)
+        }));
 
         if(draftVideoFile)c.avatarVideoPath=await uploadCharacterAvatarVideo(draftVideoFile,user.uid,c.id);
         // 自然語言日程只做長度與登入者檢查，不要求作者提供任何機器格式。
+        if(route.id){
+          const scheduleField=form.querySelector('textarea[name="encounterScheduleDescription"]');
+          if(scheduleField && scheduleField.dataset.scheduleHydrated !== 'true') await loadEncounterScheduleDescriptionIntoEditor(route.id);
+          if(scheduleField) f.set('encounterScheduleDescription',scheduleField.value);
+        }
         const scheduleDescription = String(f.get('encounterScheduleDescription') || '').trim();
         if (scheduleDescription.length > 20000) return toast('角色日程描述最多 20,000 字。');
         // 先寫入雲端；只有角色資料成功後才更新本機畫面狀態。
@@ -9774,7 +10005,9 @@ document.addEventListener('submit',async event => {
         }
         persist();
         go({page:'create'});
-        if (saveResult.storyError) toast(saveResult.storyError);
+        if (saveResult.storyError && saveResult.profileQueueError) toast(saveResult.storyError + '；' + saveResult.profileQueueError);
+        else if (saveResult.storyError) toast(saveResult.storyError);
+        else if (saveResult.profileQueueError) toast(saveResult.profileQueueError);
         else toast('角色與開場故事已儲存到雲端。');
         break;
       }
@@ -10400,6 +10633,29 @@ document.addEventListener('keydown',event => {
   if(event.target.id==='groupMessageInput') void groupSendMock();
   else event.target.form?.requestSubmit();
 });
+document.addEventListener('click', event => {
+  const button=event.target.closest('[data-phone-setting-action]');
+  if(!button)return;
+  const editor=button.closest('#phoneSettingsEditor');
+  const rowsNode=editor?.querySelector('#phoneSettingsRows');
+  if(!editor||!rowsNode)return;
+  const rows=[...rowsNode.querySelectorAll('[data-phone-setting-row]')].map((row,index)=>({
+    display:String(row.querySelector('[name="phoneDisplay'+index+'"]')?.value||'').trim(),
+    instruction:String(row.querySelector('[name="phoneInstruction'+index+'"]')?.value||'').trim()
+  }));
+  const action=button.dataset.phoneSettingAction;
+  if(action==='add'){
+    if(rows.length>=8)return;
+    rows.push({display:'',instruction:''});
+  }else if(action==='remove'){
+    if(rows.length<=1)return;
+    const row=button.closest('[data-phone-setting-row]');
+    const index=[...rowsNode.querySelectorAll('[data-phone-setting-row]')].indexOf(row);
+    if(index<0)return;
+    rows.splice(index,1);
+  }else return;
+  editor.outerHTML=renderPhoneSettingsFields({phoneSettings:{noticePrompts:rows.map(row=>row.display+' | '+row.instruction)}},null);
+});
 document.addEventListener('click',function(event){
   const remove=event.target.closest('[data-action="remove-character-illustration"]');
   if(!remove)return;
@@ -10607,7 +10863,9 @@ async function importCharacter(file) {
   const saveResult = await saveSupabaseCharacter(character, user.uid);
   state.characters.unshift(character);
   persist();go({page:'create'});
-  if (saveResult.storyError) toast('角色已匯入雲端，但故事同步失敗：' + saveResult.storyError);
+  if (saveResult.storyError && saveResult.profileQueueError) toast(saveResult.storyError + '；' + saveResult.profileQueueError);
+  else if (saveResult.storyError) toast('角色已匯入雲端，但故事同步失敗：' + saveResult.storyError);
+  else if (saveResult.profileQueueError) toast(saveResult.profileQueueError);
   else toast('角色已匯入雲端，預設為私密。');
 }
 
