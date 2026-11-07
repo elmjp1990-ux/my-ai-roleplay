@@ -2715,6 +2715,23 @@ if (characterError) {
       throw new Error('手機設定回讀結果與送出內容不一致，請重新儲存。');
     }
 
+    // 只有 AI 來源欄位確實變更時才排隊；enqueue 失敗不回滾已成功保存的作者原始資料。
+    let profileQueueError = null;
+    if (aiOrganizationDecision.requiresDerivedRefresh === true) {
+      try {
+        const { error: enqueueError } = await client.rpc('enqueue_character_profile_organization', {
+          p_character_id: character.id
+        });
+        if (enqueueError) {
+          profileQueueError = '角色已儲存，但 AI 角色資料整理尚未排入佇列：' + enqueueError.message;
+          console.warn('character_profile_enqueue_failed', { code: enqueueError.code || 'enqueue_failed' });
+        }
+      } catch (enqueueError) {
+        profileQueueError = '角色已儲存，但 AI 角色資料整理尚未排入佇列。';
+        console.warn('character_profile_enqueue_failed');
+      }
+    }
+
     // 每個角色先沿用最新的一筆故事；沒有故事時才新增，避免每次編輯都重複建立。
     const { data: existingStory, error: lookupError } = await client
       .from('character_stories')
@@ -2725,7 +2742,7 @@ if (characterError) {
       .maybeSingle();
 
     if (lookupError) {
-      return { storyError: '角色已儲存，但讀取故事資料失敗：' + lookupError.message };
+      return { storyError: '角色已儲存，但讀取故事資料失敗：' + lookupError.message, profileQueueError };
     }
 
     const storyRow = {
@@ -2749,25 +2766,9 @@ if (characterError) {
     }
 
     if (storyResult.error) {
-      return { storyError: '角色已儲存，但開場故事儲存失敗：' + storyResult.error.message };
+      return { storyError: '角色已儲存，但開場故事儲存失敗：' + storyResult.error.message, profileQueueError };
     }
 
-    // 只有 AI 來源欄位確實變更時才排隊；enqueue 失敗不回滾已成功保存的作者原始資料。
-    let profileQueueError = null;
-    if (aiOrganizationDecision.requiresDerivedRefresh === true) {
-      try {
-        const { error: enqueueError } = await client.rpc('enqueue_character_profile_organization', {
-          p_character_id: character.id
-        });
-        if (enqueueError) {
-          profileQueueError = '角色已儲存，但 AI 角色資料整理尚未排入佇列：' + enqueueError.message;
-          console.warn('character_profile_enqueue_failed', { code: enqueueError.code || 'enqueue_failed' });
-        }
-      } catch (enqueueError) {
-        profileQueueError = '角色已儲存，但 AI 角色資料整理尚未排入佇列。';
-        console.warn('character_profile_enqueue_failed');
-      }
-    }
     return { storyError: null, profileQueueError, visibility: savedCharacter.visibility, rightsConfirmed: savedCharacter.rights_confirmed === true, firstPublishedAt: savedCharacter.first_published_at ? new Date(savedCharacter.first_published_at).getTime() : null, latestEligible: savedCharacter.latest_eligible !== false, aiOrganizationDecision };
   }
 
