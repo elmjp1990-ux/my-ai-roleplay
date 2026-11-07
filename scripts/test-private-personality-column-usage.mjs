@@ -20,7 +20,7 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(
   chatTurn,
-  /from\(["']characters["']\)\s*select\(["'][^"']*personality_profile/i,
+  /from\(["']characters["']\)\s*\.?select\(["'][^"']*personality_profile/i,
   "Story AI must not select personality_profile from public.characters",
 );
 
@@ -32,7 +32,7 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(
   chatTurn,
-  /from\(["']characters["']\)\s*select\(["']\*["']\)/i,
+  /from\(["']characters["']\)\s*\.?select\(["']\*["']\)/i,
   "Story AI must not wildcard-select public characters rows",
 );
 
