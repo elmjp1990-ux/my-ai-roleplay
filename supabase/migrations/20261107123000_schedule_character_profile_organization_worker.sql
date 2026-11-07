@@ -4,7 +4,11 @@
 -- Creating this migration does NOT enable the schedule; an operator must call
 -- the service-role RPC explicitly after the Worker and Vault secrets are ready.
 
-CREATE OR REPLACE FUNCTION public.schedule_character_profile_organization_worker()
+DROP FUNCTION IF EXISTS public.schedule_character_profile_organization_worker();
+
+CREATE OR REPLACE FUNCTION public.schedule_character_profile_organization_worker(
+  p_enabled boolean DEFAULT false
+)
 RETURNS text
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -26,6 +30,16 @@ BEGIN
      OR to_regprocedure('cron.unschedule(bigint)') IS NULL
      OR to_regprocedure('net.http_post(text,jsonb,jsonb,jsonb,integer)') IS NULL THEN
     RETURN 'scheduler_extensions_missing';
+  END IF;
+
+  IF p_enabled IS NOT TRUE THEN
+    FOR v_job_id IN
+      SELECT jobid FROM cron.job
+      WHERE jobname = 'poyozz-character-profile-organization-worker'
+    LOOP
+      PERFORM cron.unschedule(v_job_id);
+    END LOOP;
+    RETURN 'disabled';
   END IF;
 
   SELECT decrypted_secret INTO v_project_url
@@ -81,9 +95,9 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.schedule_character_profile_organization_worker()
+REVOKE ALL ON FUNCTION public.schedule_character_profile_organization_worker(boolean)
   FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.schedule_character_profile_organization_worker()
+GRANT EXECUTE ON FUNCTION public.schedule_character_profile_organization_worker(boolean)
   TO service_role;
 
 -- Intentionally no migration-time DO block: schedule activation is a separate,
