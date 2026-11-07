@@ -56,8 +56,8 @@ assert.match(
 );
 assert.match(
   frontend,
-  /const rawSnapshot = row\.character_snapshot[\s\S]{0,500}personalityProfile:\s*_legacyPersonalityProfile,[\s\S]{0,250}\.\.\.snapshot\s*\} = rawSnapshot/,
-  "chat hydration must strip legacy private fields before exposing snapshots to client state",
+  /const rawSnapshot=row\.character_snapshot[\s\S]{0,500}personalityProfile:\s*_legacyPersonalityProfile,[\s\S]{0,250}\.\.\.safeSnapshot\s*\}=rawSnapshot/,
+  "selected-chat snapshot hydration must strip legacy private fields before exposing snapshots to client state",
 );
 
 assert.match(
