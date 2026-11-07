@@ -29,6 +29,11 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const nonEmpty = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
 
+const hasExactKeys = (value: unknown, keys: readonly string[]): value is Record<string, unknown> =>
+  isRecord(value) &&
+  Object.keys(value).length === keys.length &&
+  keys.every((key) => Object.prototype.hasOwnProperty.call(value, key));
+
 function validateEvidenceItems(
   items: unknown,
   sourceKeys: Set<string>,
@@ -40,7 +45,8 @@ function validateEvidenceItems(
     return;
   }
   for (const item of items) {
-    if (!isRecord(item) || !nonEmpty(item.content) ||
+    if (!hasExactKeys(item, ["content", "source_type", "source_refs", "confidence"]) ||
+      !nonEmpty(item.content) ||
       !["author_explicit", "ai_inference"].includes(String(item.source_type)) ||
       !["high", "medium", "low"].includes(String(item.confidence)) ||
       !Array.isArray(item.source_refs) || item.source_refs.length < 1 ||
@@ -55,14 +61,7 @@ export function validateCharacterAiProfile(
   sourcePayload: CharacterProfileSourcePayload,
 ): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
-  if (!isRecord(value)) return { ok: false, errors: ["root_not_object"] };
-
-  const actualKeys = Object.keys(value).sort();
-  const expectedKeys = [...ROOT_KEYS].sort();
-  if (actualKeys.length !== expectedKeys.length ||
-    actualKeys.some((key, index) => key !== expectedKeys[index])) {
-    errors.push("root_keys_mismatch");
-  }
+  if (!hasExactKeys(value, ROOT_KEYS)) return { ok: false, errors: ["root_keys_mismatch"] };
   if (value.schema_version !== "1.0") errors.push("schema_version_invalid");
 
   const sourceKeys = new Set(
@@ -74,7 +73,7 @@ export function validateCharacterAiProfile(
 
   for (const sectionName of PROFILE_SECTIONS) {
     const section = value[sectionName];
-    if (!isRecord(section) ||
+    if (!hasExactKeys(section, ["status", "items"]) ||
       !["populated", "not_provided", "conflict"].includes(String(section.status))) {
       errors.push(sectionName + "_invalid");
       continue;
@@ -90,7 +89,7 @@ export function validateCharacterAiProfile(
   }
 
   const speech = value.speech_style;
-  if (!isRecord(speech) ||
+  if (!hasExactKeys(speech, ["status", "tendencies", "creator_defined_quirks", "example_lines"]) ||
     !["populated", "not_provided", "conflict"].includes(String(speech.status)) ||
     !Array.isArray(speech.tendencies) ||
     !Array.isArray(speech.creator_defined_quirks) ||
@@ -109,7 +108,7 @@ export function validateCharacterAiProfile(
   }
 
   const privateContext = value.author_private_context;
-  if (!isRecord(privateContext) || privateContext.visibility !== "server_only" ||
+  if (!hasExactKeys(privateContext, ["visibility", "status", "items"]) || privateContext.visibility !== "server_only" ||
     !["populated", "not_provided", "conflict"].includes(String(privateContext.status)) ||
     !Array.isArray(privateContext.items)) {
     errors.push("author_private_context_invalid");
@@ -125,7 +124,7 @@ export function validateCharacterAiProfile(
   }
 
   const ooc = value.ooc_rules;
-  if (!isRecord(ooc) || !["ready", "insufficient_source"].includes(String(ooc.status)) ||
+  if (!hasExactKeys(ooc, ["status", "rules", "insufficient_source_reason"]) || !["ready", "insufficient_source"].includes(String(ooc.status)) ||
     !Array.isArray(ooc.rules) ||
     !(ooc.insufficient_source_reason === null || nonEmpty(ooc.insufficient_source_reason))) {
     errors.push("ooc_rules_invalid");
@@ -138,7 +137,8 @@ export function validateCharacterAiProfile(
       errors.push("ooc_insufficient_source_invalid");
     }
     for (const rule of ooc.rules) {
-      if (!isRecord(rule) || !nonEmpty(rule.rule) || !nonEmpty(rule.why_it_matters) ||
+      if (!hasExactKeys(rule, ["rule", "why_it_matters", "prohibited_deviation", "allowed_growth", "source_refs"]) ||
+        !nonEmpty(rule.rule) || !nonEmpty(rule.why_it_matters) ||
         !nonEmpty(rule.prohibited_deviation) || !nonEmpty(rule.allowed_growth) ||
         !Array.isArray(rule.source_refs) || rule.source_refs.length < 1 ||
         !rule.source_refs.every((ref) => nonEmpty(ref) && sourceKeys.has(ref))) {
@@ -154,7 +154,8 @@ export function validateCharacterAiProfile(
     errors.push("source_conflicts_invalid");
   } else {
     for (const conflict of value.source_conflicts) {
-      if (!isRecord(conflict) || !nonEmpty(conflict.topic) ||
+      if (!hasExactKeys(conflict, ["topic", "conflicting_source_refs", "description", "resolution_status"]) ||
+        !nonEmpty(conflict.topic) ||
         !nonEmpty(conflict.description) ||
         conflict.resolution_status !== "needs_author_clarification" ||
         !Array.isArray(conflict.conflicting_source_refs) ||
