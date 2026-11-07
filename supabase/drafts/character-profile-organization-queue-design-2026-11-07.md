@@ -331,3 +331,6 @@ Schema 只驗證資料形狀，不能單獨證明 source_refs 真實存在或使
 4. Worker 每分鐘最多處理一筆，並以資料庫全域 active lease 避免同時生成多個角色，控制成本。
 
 目前 GitHub Actions 的 Story AI tests、Worker Deno type-check、Profile/OOC tests 已通過；最新 SQL migration replay 正在執行。此狀態只代表 PR 分支與 CI，不代表 hosted Supabase 已套用或 Edge Function 已部署。
+
+- Additional hardening: claim RPC now takes a transaction-scoped advisory lock before checking active leases, preventing simultaneous cron invocations from claiming multiple characters; processing is globally serialized to one active generation. A character soft-delete trigger immediately removes its pending job and backend-only derived Profile; hard deletes remain covered by FK cascades. PostgreSQL regression tests cover the competing-claim and soft-delete cases.
+- The Profile validator now rejects unexpected properties at the root and each nested schema object, in addition to checking evidence references and OOC constraints.
