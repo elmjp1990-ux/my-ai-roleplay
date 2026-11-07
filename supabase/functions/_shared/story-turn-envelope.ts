@@ -102,6 +102,6 @@ export function parseStoryTurnEnvelope(raw: string): StoryTurnEnvelope {
     affinity_delta: affinityDelta,
     affinity_reason: boundedText(value.affinity_reason, 280),
     phone_events: phoneEvents,
-    suggested_replies: validSuggestedReplies,
+    suggested_replies: suggestedReplies,
   };
 }
