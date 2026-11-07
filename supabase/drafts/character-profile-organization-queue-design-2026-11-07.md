@@ -214,3 +214,35 @@
 - 測試星號格式、敘事與對白交錯、臨場感、重複灌水、代詞指涉、玩家內心資訊隔離、禁止結尾引導，以及不同角色性格下的自然度。
 - 必須使用正式網站實際呼叫路徑做整合測試，不能只以盲測腳本通過作為驗收。
 - 本節是已確認的產品／Prompt 設計要求；尚未代表 Profile JSON Schema、資料表、Worker、正式 System Prompt 或網站行為已實作或驗收。
+
+
+## Character AI Profile v1 JSON Schema（2026-11-07）
+
+已建立獨立草案檔：`supabase/drafts/character-ai-profile-v1.schema.json`。這是模型輸出 payload 的驗證契約，不是資料庫 migration，也不代表已接入正式對話。
+
+### 結構與驗證規則
+
+- 固定 `schema_version: "1.0"`，拒絕未定義欄位（`additionalProperties: false`），避免模型自行增加不受控欄位。
+- Profile 分類：`identity_background`、`core_personality`、`inner_motivations`、`emotional_response_patterns`、`relationship_dynamics`、`behavior_and_agency`、`knowledge_boundaries`、`speech_style`、`appearance_markers`、`life_schedule_context`、`author_private_context`、`ooc_rules`、`unknowns`、`source_conflicts`。
+- 一般衍生項目需記錄 `content`、`source_type`（`author_explicit`／`ai_inference`）、`source_refs` 及 `confidence`，不得把推論偽裝成作者原文。
+- 分類狀態明確標記 `populated`、`not_provided` 或 `conflict`。未知資料不得由模型補造。
+- OOC 狀態為 `ready` 時必須至少 3 條，每條包含規則、重要性、禁止偏移、允許的自然成長及來源欄位參照。若作者來源不足，狀態改為 `insufficient_source`，最多保留 2 條有依據的規則並填寫原因；不得為滿足數量虛構規則。
+- `speech_style.creator_defined_quirks` 只接受作者明確提供的口頭禪；`example_lines` 強制為空陣列，避免模型模仿固定示範句。
+- `author_private_context.visibility` 固定為 `server_only`。資料庫、API、日誌及前端都必須維持私密隔離；只有經授權的後端角色對話 prompt 組裝流程可讀取必要內容。
+- `source_conflicts` 必須保留衝突來源參照，狀態為 `needs_author_clarification`，不得自行選邊。
+
+### 來源參照格式與實作注意
+
+`source_refs` 應使用穩定欄位路徑，例如 `characters.intro`、`characters.race`、`characters.style`、`character_private_info.private_info`、`character_private_info.personality_profile.coreTraits` 等；不可放入整段私密原文、prompt 或使用者對話。
+
+Schema 只驗證資料形狀，不能單獨證明 source_refs 真實存在或使用者有權讀取。Worker 還必須以程式 allowlist 驗證來源路徑、作者身份、source hash、欄位私密等級；模型不得自行發明 source_refs。模型輸出需在 server-side 驗證、正規化後才能寫入。
+
+### 後續實作順序
+
+1. 以實際資料庫欄位與 classifier allowlist 核對所有來源路徑，形成固定 source registry。
+2. 加入 JSON Schema validator 與 source_refs allowlist 測試。
+3. 明確定義資料庫儲存及對話 prompt 的 private/public 投影；私密作者補充不得進入玩家可見回應、一般 API 或日誌。
+4. 再設計 migration、owner-checked enqueue、worker、lease 與 stale-source 防護。
+5. 最後接入正式 Story 對話 prompt，並以網站實際路徑驗收。
+
+本 schema 目前為設計草案；尚未有程式驗證器、資料表、佇列或模型呼叫接入。
