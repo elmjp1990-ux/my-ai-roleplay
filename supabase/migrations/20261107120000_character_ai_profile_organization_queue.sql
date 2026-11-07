@@ -84,7 +84,7 @@ RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $source_payload$
+AS $$
 DECLARE
   v_payload jsonb;
 BEGIN
@@ -118,7 +118,7 @@ BEGIN
 
   RETURN v_payload;
 END;
-$source_payload$;
+$$;
 
 REVOKE ALL ON FUNCTION public.character_profile_source_payload(uuid, uuid)
   FROM PUBLIC, anon, authenticated;
@@ -254,7 +254,7 @@ BEGIN
     RETURN;
   END IF;
 
-  -- An expired lease is ambiguous: the previous Worker may have completed and
+  -- Expired leases are ambiguous: the previous Worker may have completed and
   -- paid for the provider request before crashing or losing its DB connection.
   -- Never automatically regenerate an expired lease. Require an explicit owner
   -- save to enqueue it again, preventing duplicate provider charges.
@@ -283,7 +283,7 @@ BEGIN
     FROM public.character_profile_organization_jobs j
     WHERE (
       (j.status = 'pending' AND j.available_at <= now())
-      
+
     )
     ORDER BY j.available_at, j.created_at
     FOR UPDATE SKIP LOCKED
@@ -335,265 +335,9 @@ BEGIN
   END IF;
   IF jsonb_typeof(p_profile) <> 'object'
      OR octet_length(p_profile::text) > 49152
-     OR p_source_hash !~ '^[0-9a-f]{64}
-  FROM public.character_profile_organization_jobs
-  WHERE character_id = p_character_id
-  FOR UPDATE;
-
-  IF NOT FOUND OR v_job.status <> 'processing'
-     OR v_job.lease_token IS DISTINCT FROM p_lease_token
-     OR v_job.lease_generation IS DISTINCT FROM p_lease_generation
-     OR v_job.lease_expires_at <= now()
-     OR v_job.lease_source_hash IS DISTINCT FROM p_source_hash THEN
-    RETURN 'lease_lost';
-  END IF;
-
-  v_current_payload := public.character_profile_source_payload(v_job.character_id, v_job.author_id);
-  IF v_current_payload IS NULL THEN
-    DELETE FROM public.character_profile_organization_jobs WHERE character_id = p_character_id;
-    DELETE FROM public.character_profile_organization WHERE character_id = p_character_id;
-    RETURN 'character_deleted';
-  END IF;
-  v_current_hash := encode(extensions.digest(convert_to(v_current_payload::text, 'UTF8'), 'sha256'), 'hex');
-
-  IF v_current_hash IS DISTINCT FROM p_source_hash THEN
-    UPDATE public.character_profile_organization_jobs
-    SET source_hash = v_current_hash, status = 'pending', attempt_count = 0,
-        available_at = now(), lease_token = NULL, lease_expires_at = NULL,
-        lease_source_hash = NULL, last_error_code = 'stale_source',
-        lease_generation = lease_generation + 1,
-        updated_at = now()
-    WHERE character_id = p_character_id;
-    RETURN 'stale_source';
-  END IF;
-
-  INSERT INTO public.character_profile_organization (
-    character_id, author_id, source_hash, model, profile, generated_at, updated_at
-  ) VALUES (
-    v_job.character_id, v_job.author_id, p_source_hash,
-    'deepseek/deepseek-v4-flash-20260423', p_profile, now(), now()
-  )
-  ON CONFLICT (character_id) DO UPDATE SET
-    author_id = EXCLUDED.author_id,
-    source_hash = EXCLUDED.source_hash,
-    model = EXCLUDED.model,
-    profile = EXCLUDED.profile,
-    generated_at = now(),
-    updated_at = now();
-
-  UPDATE public.character_profile_organization_jobs
-  SET source_hash = p_source_hash, status = 'completed',
-      lease_token = NULL, lease_expires_at = NULL, lease_source_hash = NULL,
-      last_error_code = NULL, completed_at = now(), updated_at = now()
-  WHERE character_id = p_character_id;
-
-  RETURN 'completed';
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.complete_character_profile_organization_job(uuid, uuid, bigint, text, jsonb)
-  FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.complete_character_profile_organization_job(uuid, uuid, bigint, text, jsonb)
-  TO service_role;
-
-CREATE OR REPLACE FUNCTION public.fail_character_profile_organization_job(
-  p_character_id uuid,
-  p_lease_token uuid,
-  p_lease_generation bigint,
-  p_error_code text
-)
-RETURNS text
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  v_job public.character_profile_organization_jobs%ROWTYPE;
-  v_attempt integer;
-  v_terminal boolean;
-BEGIN
-  IF auth.role() <> 'service_role' THEN
-    RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
-  END IF;
-
-  SELECT * INTO v_job
-  FROM public.character_profile_organization_jobs
-  WHERE character_id = p_character_id
-  FOR UPDATE;
-
-  IF NOT FOUND OR v_job.status <> 'processing'
-     OR v_job.lease_token IS DISTINCT FROM p_lease_token
-     OR v_job.lease_generation IS DISTINCT FROM p_lease_generation
-     OR v_job.lease_expires_at <= now() THEN
-    RETURN 'lease_lost';
-  END IF;
-
-  v_attempt := v_job.attempt_count + 1;
-  v_terminal := COALESCE(p_error_code, '') IN (
-    'provider_request_timeout',
-    'provider_outcome_unknown',
-    'provider_response_too_large',
-    'profile_persistence_failed_after_generation',
-    'worker_lease_expired_manual_retry',
-    'model_content_missing',
-    'model_json_invalid'
-  ) OR COALESCE(p_error_code, '') LIKE 'source_%'
-    OR COALESCE(p_error_code, '') LIKE 'profile_schema_invalid_%';
-
-  UPDATE public.character_profile_organization_jobs
-  SET attempt_count = v_attempt,
-      status = CASE WHEN v_terminal OR v_attempt >= 5 THEN 'failed' ELSE 'pending' END,
-      available_at = CASE
-        WHEN v_terminal THEN now()
-        ELSE now() + make_interval(secs => LEAST(3600, 30 * power(2, v_attempt - 1))::integer)
-      END,
-      lease_token = NULL,
-      lease_expires_at = NULL,
-      lease_source_hash = NULL,
-      last_error_code = left(regexp_replace(COALESCE(p_error_code, 'worker_failed'), '[^a-zA-Z0-9:_-]', '', 'g'), 100),
-      updated_at = now()
-  WHERE character_id = p_character_id;
-
-  -- Unknown provider outcomes are terminal for automatic retries: retrying
-  -- could charge twice if the provider completed after our request timed out.
-  RETURN CASE WHEN v_terminal OR v_attempt >= 5 THEN 'failed' ELSE 'retry_scheduled' END;
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.fail_character_profile_organization_job(uuid, uuid, bigint, text)
-  FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.fail_character_profile_organization_job(uuid, uuid, bigint, text)
-  TO service_role;
-
-CREATE OR REPLACE FUNCTION public.get_character_ai_profile_for_chat(
-  p_character_id uuid,
-  p_author_id uuid
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  v_payload jsonb;
-  v_hash text;
-  v_profile jsonb;
-BEGIN
-  IF auth.role() <> 'service_role' THEN
-    RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
-  END IF;
-
-  v_payload := public.character_profile_source_payload(p_character_id, p_author_id);
-  IF v_payload IS NULL THEN RETURN NULL; END IF;
-  v_hash := encode(extensions.digest(convert_to(v_payload::text, 'UTF8'), 'sha256'), 'hex');
-
-  SELECT p.profile INTO v_profile
-  FROM public.character_profile_organization p
-  WHERE p.character_id = p_character_id
-    AND p.author_id = p_author_id
-    AND p.source_hash = v_hash;
-
-  RETURN v_profile;
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.get_character_ai_profile_for_chat(uuid, uuid)
-  FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.get_character_ai_profile_for_chat(uuid, uuid)
-  TO service_role;
-
--- Soft-deleting a character invalidates pending work and removes the backend-only
--- derived profile immediately. Hard deletes are also covered by the FK cascades.
-CREATE OR REPLACE FUNCTION public.cleanup_character_profile_organization_on_soft_delete()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-BEGIN
-  IF NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS DISTINCT FROM NEW.deleted_at THEN
-    DELETE FROM public.character_profile_organization_jobs WHERE character_id = NEW.id;
-    DELETE FROM public.character_profile_organization WHERE character_id = NEW.id;
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.cleanup_character_profile_organization_on_soft_delete()
-  FROM PUBLIC, anon, authenticated;
-
-DROP TRIGGER IF EXISTS character_profile_organization_soft_delete_cleanup
-  ON public.characters;
-CREATE TRIGGER character_profile_organization_soft_delete_cleanup
-AFTER UPDATE OF deleted_at ON public.characters
-FOR EACH ROW
-WHEN (OLD.deleted_at IS DISTINCT FROM NEW.deleted_at AND NEW.deleted_at IS NOT NULL)
-EXECUTE FUNCTION public.cleanup_character_profile_organization_on_soft_delete();
- THEN
-    RAISE EXCEPTION 'invalid_profile_payload' USING ERRCODE = '22023';
-  END IF;
-
-  SELECT * INTO v_job
-  FROM public.character_profile_organization_jobs
-  WHERE character_id = p_character_id
-  FOR UPDATE;
-
-  IF NOT FOUND OR v_job.status <> 'processing'
-     OR v_job.lease_token IS DISTINCT FROM p_lease_token
-     OR v_job.lease_generation IS DISTINCT FROM p_lease_generation
-     OR v_job.lease_expires_at <= now()
-     OR v_job.lease_source_hash IS DISTINCT FROM p_source_hash THEN
-    RETURN 'lease_lost';
-  END IF;
-
-  v_current_payload := public.character_profile_source_payload(v_job.character_id, v_job.author_id);
-  IF v_current_payload IS NULL THEN
-    DELETE FROM public.character_profile_organization_jobs WHERE character_id = p_character_id;
-    DELETE FROM public.character_profile_organization WHERE character_id = p_character_id;
-    RETURN 'character_deleted';
-  END IF;
-  v_current_hash := encode(extensions.digest(convert_to(v_current_payload::text, 'UTF8'), 'sha256'), 'hex');
-
-  IF v_current_hash IS DISTINCT FROM p_source_hash THEN
-    UPDATE public.character_profile_organization_jobs
-    SET source_hash = v_current_hash, status = 'pending', attempt_count = 0,
-        available_at = now(), lease_token = NULL, lease_expires_at = NULL,
-        lease_source_hash = NULL, last_error_code = 'stale_source',
-        lease_generation = lease_generation + 1,
-        updated_at = now()
-    WHERE character_id = p_character_id;
-    RETURN 'stale_source';
-  END IF;
-
-  INSERT INTO public.character_profile_organization (
-    character_id, author_id, source_hash, model, profile, generated_at, updated_at
-  ) VALUES (
-    v_job.character_id, v_job.author_id, p_source_hash,
-    'deepseek/deepseek-v4-flash-20260423', p_profile, now(), now()
-  )
-  ON CONFLICT (character_id) DO UPDATE SET
-    author_id = EXCLUDED.author_id,
-    source_hash = EXCLUDED.source_hash,
-    model = EXCLUDED.model,
-    profile = EXCLUDED.profile,
-    generated_at = now(),
-    updated_at = now();
-
-  UPDATE public.character_profile_organization_jobs
-  SET source_hash = p_source_hash, status = 'completed',
-      lease_token = NULL, lease_expires_at = NULL, lease_source_hash = NULL,
-      last_error_code = NULL, completed_at = now(), updated_at = now()
-  WHERE character_id = p_character_id;
-
-  RETURN 'completed';
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.complete_character_profile_organization_job(uuid, uuid, bigint, text, jsonb)
-  FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.complete_character_profile_organization_job(uuid, uuid, bigint, text, jsonb)
-  TO service_role;
- THEN
+     OR p_source_hash IS NULL
+     OR char_length(p_source_hash) <> 64
+     OR p_source_hash ~ '[^0-9a-f]' THEN
     RAISE EXCEPTION 'invalid_profile_payload' USING ERRCODE = '22023';
   END IF;
 
@@ -791,67 +535,3 @@ AFTER UPDATE OF deleted_at ON public.characters
 FOR EACH ROW
 WHEN (OLD.deleted_at IS DISTINCT FROM NEW.deleted_at AND NEW.deleted_at IS NOT NULL)
 EXECUTE FUNCTION public.cleanup_character_profile_organization_on_soft_delete();
- THEN
-    RAISE EXCEPTION 'invalid_profile_payload' USING ERRCODE = '22023';
-  END IF;
-
-  SELECT * INTO v_job
-  FROM public.character_profile_organization_jobs
-  WHERE character_id = p_character_id
-  FOR UPDATE;
-
-  IF NOT FOUND OR v_job.status <> 'processing'
-     OR v_job.lease_token IS DISTINCT FROM p_lease_token
-     OR v_job.lease_generation IS DISTINCT FROM p_lease_generation
-     OR v_job.lease_expires_at <= now()
-     OR v_job.lease_source_hash IS DISTINCT FROM p_source_hash THEN
-    RETURN 'lease_lost';
-  END IF;
-
-  v_current_payload := public.character_profile_source_payload(v_job.character_id, v_job.author_id);
-  IF v_current_payload IS NULL THEN
-    DELETE FROM public.character_profile_organization_jobs WHERE character_id = p_character_id;
-    DELETE FROM public.character_profile_organization WHERE character_id = p_character_id;
-    RETURN 'character_deleted';
-  END IF;
-  v_current_hash := encode(extensions.digest(convert_to(v_current_payload::text, 'UTF8'), 'sha256'), 'hex');
-
-  IF v_current_hash IS DISTINCT FROM p_source_hash THEN
-    UPDATE public.character_profile_organization_jobs
-    SET source_hash = v_current_hash, status = 'pending', attempt_count = 0,
-        available_at = now(), lease_token = NULL, lease_expires_at = NULL,
-        lease_source_hash = NULL, last_error_code = 'stale_source',
-        lease_generation = lease_generation + 1,
-        updated_at = now()
-    WHERE character_id = p_character_id;
-    RETURN 'stale_source';
-  END IF;
-
-  INSERT INTO public.character_profile_organization (
-    character_id, author_id, source_hash, model, profile, generated_at, updated_at
-  ) VALUES (
-    v_job.character_id, v_job.author_id, p_source_hash,
-    'deepseek/deepseek-v4-flash-20260423', p_profile, now(), now()
-  )
-  ON CONFLICT (character_id) DO UPDATE SET
-    author_id = EXCLUDED.author_id,
-    source_hash = EXCLUDED.source_hash,
-    model = EXCLUDED.model,
-    profile = EXCLUDED.profile,
-    generated_at = now(),
-    updated_at = now();
-
-  UPDATE public.character_profile_organization_jobs
-  SET source_hash = p_source_hash, status = 'completed',
-      lease_token = NULL, lease_expires_at = NULL, lease_source_hash = NULL,
-      last_error_code = NULL, completed_at = now(), updated_at = now()
-  WHERE character_id = p_character_id;
-
-  RETURN 'completed';
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.complete_character_profile_organization_job(uuid, uuid, bigint, text, jsonb)
-  FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.complete_character_profile_organization_job(uuid, uuid, bigint, text, jsonb)
-  TO service_role;
