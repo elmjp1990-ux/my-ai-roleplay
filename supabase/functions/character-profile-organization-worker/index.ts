@@ -90,13 +90,12 @@ async function generateProfile(
     const usage = result?.usage && typeof result.usage === "object" && !Array.isArray(result.usage)
       ? result.usage as Record<string, unknown>
       : {};
-    const responseModel = typeof result?.model === "string" ? result.model : CHARACTER_PROFILE_MODEL;
     const responseProvider = typeof result?.provider === "string" ? result.provider : "deepinfra";
     const requestIdValue = response.headers.get("x-request-id") ||
       (typeof result?.id === "string" ? result.id : null);
     return {
       profile: parsed as Record<string, unknown>,
-      model: responseModel.slice(0, 128),
+      model: CHARACTER_PROFILE_MODEL,
       provider: responseProvider.slice(0, 100),
       requestId: typeof requestIdValue === "string" &&
         /^[A-Za-z0-9._:-]{1,128}$/.test(requestIdValue) ? requestIdValue : null,
