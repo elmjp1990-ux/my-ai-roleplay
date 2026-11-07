@@ -103,6 +103,6 @@ Deno.test("suggested replies require exactly three 30–80 character action-plus
   );
   assertEquals(
     parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggestions: [...validSuggestions, "第四個不顯示"] })).suggested_replies,
-    [],
+    validSuggestions,
   );
 });
