@@ -127,9 +127,22 @@ assert.match(schedulerMigration, /poyozz_supabase_url/,
   "Worker scheduling must read the project URL from Supabase Vault");
 assert.match(schedulerMigration, /poyozz_service_role_key/,
   "Worker scheduling must read the service role key from Vault, never source code");
-assert.match(schedulerMigration, /\* \* \* \* \*/,
+const cronCommand = schedulerMigration.match(/v_command := \\$command\\$([\\s\\S]*?)\\$command\\$;/)?.[1] || "";
+assert.ok(cronCommand.includes("vault.decrypted_secrets"),
+  "Cron must resolve credentials from Vault at execution time");
+assert.doesNotMatch(cronCommand, /v_service_key/,
+  "Decrypted service-role key must never be interpolated into the persistent cron command");
+assert.doesNotMatch(schedulerMigration, /PERFORM public\\.schedule_character_profile_organization_worker\\(\\)/,
+  "Migration must not activate the Worker schedule automatically");
+assert.match(schedulerMigration, /Intentionally no migration-time DO block/,
+  "Worker scheduling must require explicit operator activation");
+assert.match(schedulerMigration, /\\* \\* \\* \\* \\*/,
   "Worker cron should poll the queue every minute");
 assert.match(schedulerMigration, /vault_secrets_missing/,
   "Missing Vault secrets must fail closed without creating a schedule");
+assert.match(migration, /WHERE public\\.character_profile_organization_jobs\\.source_hash IS DISTINCT FROM EXCLUDED\\.source_hash/,
+  "Unchanged source hashes must not reset an existing queue job");
+assert.match(migration, /reused_existing_job/,
+  "Enqueue response must identify when an existing same-source job was reused");
 
 console.log("Character AI Profile schema, queue, Worker, scheduling, save enqueue, Story integration and privacy contracts passed.");
