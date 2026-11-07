@@ -107,6 +107,8 @@ assert.match(storyTurn, /CHAR_AI_PROFILE/,
   "Story system prompt must receive the derived profile and OOC context");
 assert.match(migration, /Keep profile organization serial by default/,
   "The queue should serialize model work to control generation spend");
+assert.match(migration, /cleanup_character_profile_organization_on_soft_delete/,
+  "Soft-deleting a character must clear its pending jobs and private derived profile");
 assert.match(schedulerMigration, /poyozz_supabase_url/,
   "Worker scheduling must read the project URL from Supabase Vault");
 assert.match(schedulerMigration, /poyozz_service_role_key/,
