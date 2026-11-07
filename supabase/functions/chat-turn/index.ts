@@ -58,7 +58,32 @@ const collectDerivedPrivateProfileValues = (value: unknown): string[] => {
   collectItems(speech.tendencies);
   collectItems(speech.creator_defined_quirks);
   collectItems(asDbRow(profile.author_private_context).items);
-  return [...protectedValues].slice(0, 80);
+  const ooc = asDbRow(profile.ooc_rules);
+  if (Array.isArray(ooc.rules)) {
+    for (const item of ooc.rules) {
+      const rule = asDbRow(item);
+      const refs = Array.isArray(rule.source_refs) ? rule.source_refs : [];
+      if (refs.some((ref) => typeof ref === "string" && ref.startsWith("character_private_info."))) {
+        for (const key of ["rule", "why_it_matters", "prohibited_deviation", "allowed_growth"]) {
+          const content = asString(rule[key]);
+          if (content) protectedValues.add(content);
+        }
+      }
+    }
+  }
+  if (Array.isArray(profile.source_conflicts)) {
+    for (const item of profile.source_conflicts) {
+      const conflict = asDbRow(item);
+      const refs = Array.isArray(conflict.conflicting_source_refs) ? conflict.conflicting_source_refs : [];
+      if (refs.some((ref) => typeof ref === "string" && ref.startsWith("character_private_info."))) {
+        for (const key of ["topic", "description"]) {
+          const content = asString(conflict[key]);
+          if (content) protectedValues.add(content);
+        }
+      }
+    }
+  }
+  return [...protectedValues].slice(0, 120);
 };
 
 const formatCharacterAiProfilePrompt = (value: unknown): string => {
