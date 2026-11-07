@@ -389,3 +389,31 @@ REVOKE ALL ON FUNCTION public.get_character_ai_profile_for_chat(uuid, uuid)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_character_ai_profile_for_chat(uuid, uuid)
   TO service_role;
+
+-- Soft-deleting a character invalidates pending work and removes the backend-only
+-- derived profile immediately. Hard deletes are also covered by the FK cascades.
+CREATE OR REPLACE FUNCTION public.cleanup_character_profile_organization_on_soft_delete()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS DISTINCT FROM NEW.deleted_at THEN
+    DELETE FROM public.character_profile_organization_jobs WHERE character_id = NEW.id;
+    DELETE FROM public.character_profile_organization WHERE character_id = NEW.id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.cleanup_character_profile_organization_on_soft_delete()
+  FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS character_profile_organization_soft_delete_cleanup
+  ON public.characters;
+CREATE TRIGGER character_profile_organization_soft_delete_cleanup
+AFTER UPDATE OF deleted_at ON public.characters
+FOR EACH ROW
+WHEN (OLD.deleted_at IS DISTINCT FROM NEW.deleted_at AND NEW.deleted_at IS NOT NULL)
+EXECUTE FUNCTION public.cleanup_character_profile_organization_on_soft_delete();
