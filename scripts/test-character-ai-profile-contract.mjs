@@ -158,5 +158,7 @@ assert.ok(migration.includes("v_terminal boolean") && migration.includes("provid
   "Ambiguous provider outcomes must become terminal instead of triggering automatic duplicate generations");
 assert.ok(worker.includes("provider_request_timeout") && worker.includes("provider_outcome_unknown"),
   "Worker must classify timeout/network failures as ambiguous provider outcomes");
+assert.ok(worker.includes("response.json();") && worker.includes("requestId: response.headers.get"),
+  "Malformed provider responses must be treated as ambiguous outcomes with a traceable request ID");
 
 console.log("Character AI Profile schema, queue, Worker, scheduling, save enqueue, Story integration and privacy contracts passed.");
