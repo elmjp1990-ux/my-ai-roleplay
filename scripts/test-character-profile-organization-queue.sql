@@ -97,8 +97,7 @@ UPDATE public.characters
 SET intro = '更新後的角色介紹。'
 WHERE id = '11111111-1111-4111-8111-111111111111';
 
-SET ROLE service_role;
-DO $$
+DO $
 DECLARE
   v_claim record;
   v_status text;
@@ -133,8 +132,7 @@ END $$;
 RESET ROLE;
 
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
-SET ROLE service_role;
-DO $$
+DO $
 DECLARE
   v_profile jsonb;
 BEGIN
