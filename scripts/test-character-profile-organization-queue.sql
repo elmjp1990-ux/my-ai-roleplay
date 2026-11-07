@@ -36,6 +36,9 @@ CREATE TABLE public.character_private_info (
 
 \i supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql
 \i supabase/migrations/20261107123000_schedule_character_profile_organization_worker.sql
+-- Replaying both migrations must be idempotent.
+\i supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql
+\i supabase/migrations/20261107123000_schedule_character_profile_organization_worker.sql
 
 INSERT INTO public.characters (id, author_id, intro, race, style)
 VALUES (
