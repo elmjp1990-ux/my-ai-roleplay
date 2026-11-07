@@ -98,6 +98,14 @@ export function validateCharacterAiProfile(
   } else {
     validateEvidenceItems(speech.tendencies, sourceKeys, errors, "speech_tendencies");
     validateEvidenceItems(speech.creator_defined_quirks, sourceKeys, errors, "speech_quirks");
+    if (speech.status === "not_provided" &&
+      (speech.tendencies.length > 0 || speech.creator_defined_quirks.length > 0)) {
+      errors.push("speech_not_provided_has_items");
+    }
+    if (speech.status === "populated" &&
+      speech.tendencies.length === 0 && speech.creator_defined_quirks.length === 0) {
+      errors.push("speech_populated_empty");
+    }
     for (const item of speech.creator_defined_quirks) {
       if (!isRecord(item) || item.source_type !== "author_explicit" ||
         !Array.isArray(item.source_refs) ||
@@ -115,6 +123,12 @@ export function validateCharacterAiProfile(
   } else {
     const privateItems = privateContext.items;
     validateEvidenceItems(privateItems, sourceKeys, errors, "author_private_context");
+    if (privateContext.status === "not_provided" && privateItems.length > 0) {
+      errors.push("author_private_context_not_provided_has_items");
+    }
+    if (privateContext.status === "populated" && privateItems.length === 0) {
+      errors.push("author_private_context_populated_empty");
+    }
     for (const item of privateItems) {
       if (!isRecord(item) || !Array.isArray(item.source_refs) ||
         !item.source_refs.every((ref) => typeof ref === "string" && ref.startsWith("character_private_info."))) {
