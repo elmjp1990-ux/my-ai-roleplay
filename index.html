@@ -1813,6 +1813,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
           const result = await saveSupabaseCharacter(character, user.id);
           migratedCount++;
           if (result?.storyError) migrationErrors.push(character.name + '：' + result.storyError);
+          if (result?.profileQueueError) migrationErrors.push(character.name + '：' + result.profileQueueError);
         } catch (migrationError) {
           migrationErrors.push((character.name || '未命名角色') + '：' + migrationError.message);
         }
@@ -10862,7 +10863,9 @@ async function importCharacter(file) {
   const saveResult = await saveSupabaseCharacter(character, user.uid);
   state.characters.unshift(character);
   persist();go({page:'create'});
-  if (saveResult.storyError) toast('角色已匯入雲端，但故事同步失敗：' + saveResult.storyError);
+  if (saveResult.storyError && saveResult.profileQueueError) toast(saveResult.storyError + '；' + saveResult.profileQueueError);
+  else if (saveResult.storyError) toast('角色已匯入雲端，但故事同步失敗：' + saveResult.storyError);
+  else if (saveResult.profileQueueError) toast(saveResult.profileQueueError);
   else toast('角色已匯入雲端，預設為私密。');
 }
 
