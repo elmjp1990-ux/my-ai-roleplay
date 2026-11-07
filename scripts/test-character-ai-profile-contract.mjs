@@ -154,5 +154,9 @@ assert.ok(migration.includes("reused_existing_job"),
   "Enqueue response must identify when an existing same-source job was reused");
 assert.ok(migration.includes("lease_source_hash"),
   "The queue must fence an active Worker against its claimed source while coalescing newer saves");
+assert.ok(migration.includes("v_terminal boolean") && migration.includes("provider_outcome_unknown"),
+  "Ambiguous provider outcomes must become terminal instead of triggering automatic duplicate generations");
+assert.ok(worker.includes("provider_request_timeout") && worker.includes("provider_outcome_unknown"),
+  "Worker must classify timeout/network failures as ambiguous provider outcomes");
 
 console.log("Character AI Profile schema, queue, Worker, scheduling, save enqueue, Story integration and privacy contracts passed.");
