@@ -1,0 +1,188 @@
+{
+  "version": "1.0",
+  "purpose": "Allowlisted creator-source registry for Character AI Profile generation and refresh decisions. Runtime-only sources are not copied into long-lived derived profile.",
+  "profile_refresh_sources": [
+    {
+      "path": "characters.intro",
+      "visibility": "public_character_source",
+      "categories": [
+        "identity_background",
+        "core_personality",
+        "inner_motivations",
+        "behavior_and_agency",
+        "knowledge_boundaries"
+      ],
+      "refresh_on_change": true
+    },
+    {
+      "path": "characters.race",
+      "visibility": "public_character_source",
+      "categories": [
+        "identity_background",
+        "appearance_markers"
+      ],
+      "refresh_on_change": true
+    },
+    {
+      "path": "characters.style",
+      "visibility": "public_character_source",
+      "categories": [
+        "core_personality",
+        "speech_style",
+        "behavior_and_agency"
+      ],
+      "refresh_on_change": true
+    },
+    {
+      "path": "character_private_info.private_info",
+      "visibility": "server_only",
+      "categories": [
+        "author_private_context",
+        "identity_background",
+        "core_personality",
+        "knowledge_boundaries"
+      ],
+      "refresh_on_change": true
+    },
+    {
+      "path": "character_private_info.personality_profile.coreTraits",
+      "visibility": "server_only",
+      "categories": [
+        "core_personality",
+        "emotional_response_patterns"
+      ],
+      "refresh_on_change": true
+    },
+    {
+      "path": "character_private_info.personality_profile.values",
+      "visibility": "server_only",
+      "categories": [
+        "core_personality",
+        "inner_motivations"
+      ],
+      "refresh_on_change": true
+    },
+    {
+      "path": "character_private_info.personality_profile.speechStyle",
+      "visibility": "server_only",
+      "categories": [
+        "speech_style"
+      ],
+      "refresh_on_change": true,
+      "constraints": [
+        "Do not invent catchphrases or example dialogue."
+      ]
+    },
+    {
+      "path": "character_private_info.personality_profile.behaviorRules",
+      "visibility": "server_only",
+      "categories": [
+        "behavior_and_agency",
+        "ooc_rules"
+      ],
+      "refresh_on_change": true
+    },
+    {
+      "path": "character_private_info.personality_profile.likes",
+      "visibility": "server_only",
+      "categories": [
+        "behavior_and_agency"
+      ],
+      "refresh_on_change": true
+    },
+    {
+      "path": "character_private_info.personality_profile.dislikes",
+      "visibility": "server_only",
+      "categories": [
+        "behavior_and_agency",
+        "relationship_dynamics"
+      ],
+      "refresh_on_change": true
+    },
+    {
+      "path": "character_private_info.personality_profile.boundaries",
+      "visibility": "server_only",
+      "categories": [
+        "relationship_dynamics",
+        "ooc_rules"
+      ],
+      "refresh_on_change": true
+    },
+    {
+      "path": "character_private_info.personality_profile.relationshipPacing",
+      "visibility": "server_only",
+      "categories": [
+        "relationship_dynamics",
+        "emotional_response_patterns"
+      ],
+      "refresh_on_change": true
+    }
+  ],
+  "runtime_only_sources": [
+    {
+      "path": "characters.name",
+      "visibility": "runtime_context",
+      "refresh_on_change": false,
+      "reason": "Current display/identity label is injected directly; renaming does not rebuild derived profile."
+    },
+    {
+      "path": "characters.gender",
+      "visibility": "runtime_context",
+      "refresh_on_change": false,
+      "reason": "Direct role context; no need to regenerate derived profile."
+    },
+    {
+      "path": "characters.age",
+      "visibility": "runtime_context",
+      "refresh_on_change": false,
+      "reason": "Direct role context; no need to regenerate derived profile."
+    },
+    {
+      "path": "characters.phone_settings",
+      "visibility": "server_runtime_config",
+      "refresh_on_change": false,
+      "reason": "Loaded on every turn; not a long-lived personality fact."
+    },
+    {
+      "path": "character_schedules",
+      "visibility": "server_runtime_context",
+      "refresh_on_change": false,
+      "reason": "Structured schedule remains authoritative and should be loaded for the relevant mode, not summarized into a stale profile."
+    },
+    {
+      "path": "character_schedule_descriptions",
+      "visibility": "server_runtime_context",
+      "refresh_on_change": false,
+      "reason": "Schedule description remains runtime context; changes do not rebuild personality profile."
+    }
+  ],
+  "excluded_sources": [
+    {
+      "path": "characters.tags",
+      "reason": "Display/search metadata."
+    },
+    {
+      "path": "characters.avatar_url",
+      "reason": "Media/display metadata."
+    },
+    {
+      "path": "characters.avatar_video_path",
+      "reason": "Media/display metadata."
+    },
+    {
+      "path": "character_illustrations.*",
+      "reason": "Illustration assets and display labels are not personality sources."
+    },
+    {
+      "path": "character_private_info.personality_profile.primaryIllustrationName",
+      "reason": "Display label only."
+    }
+  ],
+  "rules": [
+    "Worker may read only exact paths listed above and must enforce author ownership before reading server_only data.",
+    "source_refs emitted by the model must be a subset of profile_refresh_sources paths actually included in that job's input; the model cannot invent paths.",
+    "Runtime-only and excluded sources must never be used as evidence for derived OOC or personality rules.",
+    "phone_settings and schedule records must be fetched fresh by the conversation runtime when needed; never trust a stale copy from the derived profile.",
+    "A change to any profile_refresh_sources path invalidates the prior derived profile by source hash. A change to runtime-only or excluded sources does not."
+  ]
+}
