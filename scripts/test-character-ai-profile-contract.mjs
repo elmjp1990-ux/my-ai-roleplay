@@ -5,6 +5,7 @@ const schema = JSON.parse(fs.readFileSync("supabase/drafts/character-ai-profile-
 const registry = JSON.parse(fs.readFileSync("supabase/drafts/character-ai-profile-source-registry-v1.json", "utf8"));
 const frontend = fs.readFileSync("index.html", "utf8");
 const migration = fs.readFileSync("supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql", "utf8");
+const schedulerMigration = fs.readFileSync("supabase/migrations/20261107123000_schedule_character_profile_organization_worker.sql", "utf8");
 const worker = fs.readFileSync("supabase/functions/character-profile-organization-worker/index.ts", "utf8");
 const workerCore = fs.readFileSync("supabase/functions/_shared/character-profile-organization.ts", "utf8");
 const storyTurn = fs.readFileSync("supabase/functions/chat-turn/index.ts", "utf8");
@@ -104,5 +105,15 @@ assert.match(storyTurn, /collectDerivedPrivateProfileValues/,
   "Private-derived evidence must join the server-side output leak guard");
 assert.match(storyTurn, /CHAR_AI_PROFILE/,
   "Story system prompt must receive the derived profile and OOC context");
+assert.match(migration, /Keep profile organization serial by default/,
+  "The queue should serialize model work to control generation spend");
+assert.match(schedulerMigration, /poyozz_supabase_url/,
+  "Worker scheduling must read the project URL from Supabase Vault");
+assert.match(schedulerMigration, /poyozz_service_role_key/,
+  "Worker scheduling must read the service role key from Vault, never source code");
+assert.match(schedulerMigration, /\* \* \* \* \*/,
+  "Worker cron should poll the queue every minute");
+assert.match(schedulerMigration, /vault_secrets_missing/,
+  "Missing Vault secrets must fail closed without creating a schedule");
 
-console.log("Character AI Profile schema, queue, Worker, save enqueue, Story integration and privacy contracts passed.");
+console.log("Character AI Profile schema, queue, Worker, scheduling, save enqueue, Story integration and privacy contracts passed.");
