@@ -273,7 +273,7 @@ export function validateCharacterAiProfile(
       if (!hasExactKeys(rule, ["rule", "why_it_matters", "prohibited_deviation", "allowed_growth", "source_refs"]) ||
         !nonEmpty(rule.rule) || rule.rule.length > 600 || !nonEmpty(rule.why_it_matters) || rule.why_it_matters.length > 600 ||
         !nonEmpty(rule.prohibited_deviation) || rule.prohibited_deviation.length > 600 || !nonEmpty(rule.allowed_growth) || rule.allowed_growth.length > 600 ||
-        !Array.isArray(rule.source_refs) || rule.source_refs.length < 1 ||
+        !Array.isArray(rule.source_refs) || rule.source_refs.length < 1 || rule.source_refs.length > CHARACTER_PROFILE_LIMITS.sourceRefsPerItem ||
         !rule.source_refs.every((ref) => nonEmpty(ref) && sourceKeys.has(ref))) {
         errors.push("ooc_rule_invalid_or_unsupported");
       }
@@ -292,7 +292,7 @@ export function validateCharacterAiProfile(
         !nonEmpty(conflict.description) || conflict.description.length > 800 ||
         conflict.resolution_status !== "needs_author_clarification" ||
         !Array.isArray(conflict.conflicting_source_refs) ||
-        conflict.conflicting_source_refs.length < 2 ||
+        conflict.conflicting_source_refs.length < 2 || conflict.conflicting_source_refs.length > CHARACTER_PROFILE_LIMITS.sourceRefsPerItem ||
         !conflict.conflicting_source_refs.every((ref) => nonEmpty(ref) && sourceKeys.has(ref))) {
         errors.push("source_conflict_invalid");
       }
