@@ -97,6 +97,8 @@ assert.match(migration, /REVOKE ALL ON public\.character_profile_organization[\s
 assert.match(worker, /deepseek\/deepseek-v4-flash-20260423|CHARACTER_PROFILE_MODEL/,
   "Worker must use the confirmed DeepSeek V4 Flash 0423 model");
 assert.match(worker, /OPENROUTER_API_KEY/, "Worker must read the provider key only from server environment");
+assert.match(worker, /data_collection: "deny"/, "Profile requests must enforce POYOZZ's no-provider-data-collection policy");
+assert.match(worker, /only: \["deepinfra"\]/, "Profile requests must use the same approved provider route as Story generation");
 assert.match(workerCore, /validateCharacterAiProfile/, "Worker output must pass strict profile validation");
 assert.match(workerCore, /source_refs/, "Every derived statement must cite allowlisted source paths");
 assert.match(storyTurn, /get_character_ai_profile_for_chat/,
