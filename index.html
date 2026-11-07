@@ -10004,6 +10004,7 @@ document.addEventListener('submit',async event => {
         persist();
         go({page:'create'});
         if (saveResult.storyError) toast(saveResult.storyError);
+        else if (saveResult.profileQueueError) toast(saveResult.profileQueueError);
         else toast('角色與開場故事已儲存到雲端。');
         break;
       }
