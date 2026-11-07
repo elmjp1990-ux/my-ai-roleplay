@@ -40,6 +40,8 @@ on:
       - "supabase/functions/_shared/character-profile-organization.ts"
       - "supabase/functions/_shared/character-profile-organization.test.ts"
       - "supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql"
+      - "supabase/migrations/20261107123000_schedule_character_profile_organization_worker.sql"
+      - "scripts/test-character-profile-organization-queue.sql"
       - "scripts/test-story-roleplay-prompt.mjs"
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/prompt-variables.ts"
