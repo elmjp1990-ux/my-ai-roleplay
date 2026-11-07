@@ -3302,7 +3302,7 @@ function chatSessionData(s) {
       ? {text:String(initialOpening.text),at:Number(initialOpening.at) || Date.now()} : null,
     pinned:!!s.pinned, persona:s.persona || '', personaCustom:s.personaCustom === true || (s.personaCustom !== false && !!s.persona),
     suggestions:s.suggestions !== false,
-    suggestedReplies:Array.isArray(s.suggestedReplies) ? s.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90) : [],
+    suggestedReplies:Array.isArray(s.suggestedReplies) ? s.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=80) : [],
     background:s.background || 'avatar',
     startedAt:s.startedAt || Date.now(), archivedAt:s.archivedAt || null,
     hasUserMessage:s.cloudHasUserMessage===true ||
@@ -3374,7 +3374,7 @@ async function saveChatSessionToCloud(s, options = {}) {
       const savedData=currentRow.data.session_data&&typeof currentRow.data.session_data==='object'?currentRow.data.session_data:{};
       s.memories=Array.isArray(savedData.memories)?savedData.memories:[];
       s.album=Array.isArray(savedData.album)?savedData.album:[];
-      s.suggestedReplies=Array.isArray(savedData.suggestedReplies)?savedData.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90):[];
+      s.suggestedReplies=Array.isArray(savedData.suggestedReplies)?savedData.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=80):[];
       s.cloudRoleplayMeta=savedData.roleplayMeta&&typeof savedData.roleplayMeta==='object'?savedData.roleplayMeta:{};
       s.pendingTurn=savedData.pendingTurn&&isUuid(savedData.pendingTurn.turnId)&&isUuid(savedData.pendingTurn.userMessageId)&&isUuid(savedData.pendingTurn.assistantMessageId)
         ? {turnId:savedData.pendingTurn.turnId,userMessageId:savedData.pendingTurn.userMessageId,assistantMessageId:savedData.pendingTurn.assistantMessageId,createdAt:Number(savedData.pendingTurn.createdAt)||Date.now()}
@@ -3440,7 +3440,7 @@ async function saveChatSessionToCloud(s, options = {}) {
       const existingData=existing.data.session_data&&typeof existing.data.session_data==='object'?existing.data.session_data:{};
       s.memories=Array.isArray(existingData.memories)?existingData.memories:[];
       s.album=Array.isArray(existingData.album)?existingData.album:[];
-      s.suggestedReplies=Array.isArray(existingData.suggestedReplies)?existingData.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90):[];
+      s.suggestedReplies=Array.isArray(existingData.suggestedReplies)?existingData.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=80):[];
       s.cloudRoleplayMeta=existingData.roleplayMeta&&typeof existingData.roleplayMeta==='object'?existingData.roleplayMeta:{};
       s.encounterMode=existing.data.chat_mode==='encounter'||s.encounterMode===true;
       s.storyMode=existingData.storyMode===true||s.storyMode===true;
