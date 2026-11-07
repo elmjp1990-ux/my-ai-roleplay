@@ -3031,7 +3031,9 @@ const currentSession = () => state.sessions[route.id] || null;
 const currentCharacter = () => state.characters.find(c => c.id === route.id);
 function sessionCharacter(s) {
   if (!s) return null;
-  const found = s.forceCloudSnapshot ? null : state.characters.find(c => c.id === s.characterId);
+  const found = s.forceCloudSnapshot ? null : state.characters.find(c =>
+    c.id === s.characterId && !(c.cloudSnapshotOnly && s.cloudCharacterSnapshotLoaded===true)
+  );
   if (found) return found;
   const snap = s.cloudCharacterSnapshot;
   if (!snap || snap.id !== s.characterId) return null;
@@ -3219,8 +3221,13 @@ async function saveChatSessionToCloud(s, options = {}) {
   const character = state.characters.find(item => item.id === s.characterId) || null;
   let expectedUpdatedAt = null;
   if (s.cloudOwned && s.cloudOwnerUid === localUser.uid) {
+    const currentRowFields=[
+      ...(s.cloudCharacterSnapshotLoaded===true?[]:['character_snapshot']),
+      ...(s.cloudSessionDataLoaded?[]:['session_data']),
+      'updated_at'
+    ].join(',');
     const currentRow = await client.from('chat_sessions')
-      .select(s.cloudSessionDataLoaded ? 'character_snapshot,updated_at' : 'character_snapshot,session_data,updated_at')
+      .select(currentRowFields)
       .eq('id',s.id).eq('user_id',localUser.uid).is('deleted_at',null).maybeSingle();
     if (currentRow.error) throw new Error('讀取既有聊天快照失敗：'+currentRow.error.message);
     if (!currentRow.data || readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
@@ -3232,16 +3239,19 @@ async function saveChatSessionToCloud(s, options = {}) {
     if (currentRow.data.updated_at !== expectedUpdatedAt) {
       throw new Error('此聊天已在其他分頁或裝置更新，為避免覆蓋新內容，請重新載入最新聊天後再試。');
     }
-    if (currentRow.data.character_snapshot) {
-      const rawCurrentSnapshot = currentRow.data.character_snapshot;
-      const {
-        privateInfo: _legacyCurrentPrivateInfo,
-        personalityProfile: _legacyCurrentPersonalityProfile,
-        private_info: _legacyCurrentPrivateInfoSnakeCase,
-        personality_profile: _legacyCurrentPersonalityProfileSnakeCase,
-        ...safeCurrentSnapshot
-      } = rawCurrentSnapshot;
-      s.cloudCharacterSnapshot = safeCurrentSnapshot;
+    if(s.cloudCharacterSnapshotLoaded!==true){
+      if(currentRow.data.character_snapshot&&typeof currentRow.data.character_snapshot==='object'){
+        const rawCurrentSnapshot = currentRow.data.character_snapshot;
+        const {
+          privateInfo: _legacyCurrentPrivateInfo,
+          personalityProfile: _legacyCurrentPersonalityProfile,
+          private_info: _legacyCurrentPrivateInfoSnakeCase,
+          personality_profile: _legacyCurrentPersonalityProfileSnakeCase,
+          ...safeCurrentSnapshot
+        } = rawCurrentSnapshot;
+        s.cloudCharacterSnapshot = safeCurrentSnapshot;
+      }
+      s.cloudCharacterSnapshotLoaded=true;
     }
     if (!s.cloudSessionDataLoaded) {
       const savedData=currentRow.data.session_data&&typeof currentRow.data.session_data==='object'?currentRow.data.session_data:{};
@@ -3358,9 +3368,12 @@ async function saveChatSessionToCloud(s, options = {}) {
     id:s.id, user_id:localUser.uid, character_id:s.characterId,
     character_name:snapshot.name,
     status:s.archived ? 'archived' : 'active',
-    character_snapshot:snapshot, session_data:chatSessionData(s),
+    session_data:chatSessionData(s),
     updated_at:rowTimestamp.toISOString()
   };
+  // Character snapshots are historical and immutable for an existing chat. Do not
+  // resend the large base64 avatar on every turn; write it only when creating a chat
+  // or repairing a legacy row that has no valid snapshot.
   let sessionWrite;
   if (s.cloudOwned && s.cloudOwnerUid === localUser.uid) {
     // 已存在的聊天使用 UPDATE；即使角色已下架，也可繼續保存原有劇情。
@@ -3385,7 +3398,9 @@ async function saveChatSessionToCloud(s, options = {}) {
   if (readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
   s.cloudOwned = true;
   s.cloudOwnerUid = localUser.uid;
-  s.cloudCharacterSnapshot = snapshot;
+  s.cloudCharacterSnapshot = priorSnapshot.id ? priorSnapshot : snapshot;
+  s.cloudCharacterSnapshotLoaded=true;
+  if(!s.cloudOwned || !priorSnapshot.id) row.character_snapshot=snapshot;
   // Client writes only player messages. Assistant rows are inserted by the trusted
   // chat-turn Edge Function; the database trigger intentionally rejects client writes.
   const messages = (s.messages || []).filter(m => m.role === 'user' && isUuid(m.id)).map(m => ({
@@ -3432,7 +3447,10 @@ async function loadCloudChatSessions(user, options = {}) {
     if (authError || authResult?.user?.id !== user.id) return;
     let sessionQuery = client.from('chat_sessions')
       .select([
-        'id,user_id,character_id,character_name,status,chat_mode,created_at,updated_at,character_snapshot',
+        'id,user_id,character_id,character_name,status,chat_mode,created_at,updated_at',
+        'character_snapshot_id:character_snapshot->>id',
+        'character_snapshot_author_id:character_snapshot->>authorId',
+        'character_snapshot_opening:character_snapshot->>opening',
         'session_name:session_data->>name','session_archived:session_data->>archived',
         'session_hidden:session_data->>hidden','session_pinned:session_data->>pinned',
         'session_archived_at:session_data->>archivedAt',
@@ -3464,9 +3482,7 @@ async function loadCloudChatSessions(user, options = {}) {
       if (changed) { persist(); render(); }
       return;
     }
-    const snapshotAuthorIds = [...new Set(sessions
-      .map(row => row.character_snapshot && typeof row.character_snapshot === 'object' ? row.character_snapshot.authorId : null)
-      .filter(Boolean))];
+    const snapshotAuthorIds = [...new Set(sessions.map(row => row.character_snapshot_author_id).filter(Boolean))];
     // Public author profiles are secondary to the chat list; fetch them in the background
     // so a slow profile query cannot block the session list or first conversation render.
     if (snapshotAuthorIds.length) void loadChatSessionAuthorProfiles(user.id, snapshotAuthorIds);
@@ -3482,23 +3498,23 @@ async function loadCloudChatSessions(user, options = {}) {
     const parseBool = value => value === true || value === 'true';
     for (const row of sessions) {
       if (!isUuid(row.id) || !isUuid(row.character_id)) continue;
-      const rawSnapshot = row.character_snapshot && typeof row.character_snapshot === 'object' ? row.character_snapshot : {};
-      // Never hydrate author-only fields from legacy chat snapshots into player-visible client state.
-      const {
-        privateInfo: _legacyPrivateInfo,
-        personalityProfile: _legacyPersonalityProfile,
-        private_info: _legacyPrivateInfoSnakeCase,
-        personality_profile: _legacyPersonalityProfileSnakeCase,
-        ...snapshot
-      } = rawSnapshot;
-      if (snapshot.id && snapshot.id !== row.character_id) {
+      if (row.character_snapshot_id && row.character_snapshot_id !== row.character_id) {
         console.error('雲端聊天角色快照 ID 不一致，已略過此聊天：', row.id); continue;
       }
+      // Chat-list hydration uses only compact metadata. The full, potentially image-heavy
+      // snapshot is fetched once when this specific conversation is opened.
+      const snapshot = {
+        id:row.character_id,
+        name:row.character_name || '角色',
+        authorId:row.character_snapshot_author_id || '',
+        visibility:'private',
+        reviewStatus:'draft'
+      };
       const existing = state.sessions[row.id];
       const opening = row.session_opening_message && typeof row.session_opening_message === 'object'
         ? row.session_opening_message
-        : existing?.initialOpeningMessage || (String(snapshot.opening || '').trim()
-          ? {text:String(snapshot.opening),at:row.created_at ? new Date(row.created_at).getTime() : Date.now()}
+        : existing?.initialOpeningMessage || (String(row.character_snapshot_opening || '').trim()
+          ? {text:String(row.character_snapshot_opening),at:row.created_at ? new Date(row.created_at).getTime() : Date.now()}
           : null);
       const pending = row.session_pending_turn && typeof row.session_pending_turn === 'object'
         ? row.session_pending_turn : null;
@@ -3540,7 +3556,10 @@ async function loadCloudChatSessions(user, options = {}) {
         cloudHasUserMessage, cloudSessionDataLoaded:false, cloudMessagesLoaded:false,
         cloudHasMoreMessages:false, cloudOldestMessageCursor:null,
         cloudMessagesLoading:false, cloudMessagesError:'',
-        cloudOwned:true, cloudOwnerUid:user.id, cloudCharacterSnapshot:snapshot, cloudUpdatedAt:row.updated_at || null
+        cloudOwned:true, cloudOwnerUid:user.id,
+        cloudCharacterSnapshot:existing?.cloudCharacterSnapshotLoaded===true?existing.cloudCharacterSnapshot:snapshot,
+        cloudCharacterSnapshotLoaded:existing?.cloudCharacterSnapshotLoaded===true,
+        cloudUpdatedAt:row.updated_at || null
       };
       // Drop stale in-memory history tails too; the full transcript is fetched on demand.
       state.sessions[row.id]=compactCloudSessionForLocalStorage(state.sessions[row.id]);
@@ -3589,10 +3608,12 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
   try {
     const { data: authResult, error: authError } = await client.auth.getUser();
     if (authError || authResult?.user?.id !== userId || currentUser()?.uid !== userId) throw new Error('登入狀態已變更，請重新登入。');
+    const snapshotRequested=!older&&session.cloudCharacterSnapshotLoaded!==true;
+    const sessionColumns=older
+      ? 'id,user_id,character_id,chat_mode,status'
+      : ['id,user_id,character_id,chat_mode,status','session_data','updated_at',...(snapshotRequested?['character_snapshot']:[])].join(',');
     let sessionRowQuery=client.from('chat_sessions')
-      .select(older
-        ? 'id,user_id,character_id,chat_mode,status,character_snapshot'
-        : 'id,user_id,character_id,chat_mode,status,character_snapshot,session_data,updated_at')
+      .select(sessionColumns)
       .eq('id', sessionId).eq('user_id', userId).is('deleted_at', null);
     const { data: row, error: sessionError } = await sessionRowQuery.maybeSingle();
     if (sessionError) throw new Error(sessionError.message);
@@ -3635,16 +3656,19 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
       session.cloudSessionDataLoaded=true;
       if(session.cloudHasUserMessage==null&&typeof data.hasUserMessage==='boolean')session.cloudHasUserMessage=data.hasUserMessage;
     }
-    if(row.character_snapshot){
-      const rawSnapshot=row.character_snapshot;
-      const {
-        privateInfo:_legacyPrivateInfo,
-        personalityProfile:_legacyPersonalityProfile,
-        private_info:_legacyPrivateInfoSnakeCase,
-        personality_profile:_legacyPersonalityProfileSnakeCase,
-        ...safeSnapshot
-      }=rawSnapshot;
-      session.cloudCharacterSnapshot=safeSnapshot;
+    if(snapshotRequested){
+      if(row.character_snapshot&&typeof row.character_snapshot==='object'){
+        const rawSnapshot=row.character_snapshot;
+        const {
+          privateInfo:_legacyPrivateInfo,
+          personalityProfile:_legacyPersonalityProfile,
+          private_info:_legacyPrivateInfoSnakeCase,
+          personality_profile:_legacyPersonalityProfileSnakeCase,
+          ...safeSnapshot
+        }=rawSnapshot;
+        session.cloudCharacterSnapshot=safeSnapshot;
+      }
+      session.cloudCharacterSnapshotLoaded=true;
     }
     const roleplayMeta=session.cloudRoleplayMeta||{};
     const pageSize=50;
@@ -3697,7 +3721,8 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
     session.cloudMessagesLoaded=true;session.cloudMessagesLoading=false;session.cloudMessagesError='';
     persist();
     if(route.page==='conversation'&&route.id===sessionId){
-      renderMessages(!older);
+      if(snapshotRequested)renderConversation();
+      else renderMessages(!older);
       if(older&&$('messages')){const node=$('messages');node.scrollTop=previousTop+Math.max(0,node.scrollHeight-previousHeight);}
     }
     return true;
@@ -5470,6 +5495,7 @@ async function createEncounterSession(character) {
     cloudOwned: true,
     cloudOwnerUid: authData.user.id,
     cloudCharacterSnapshot: data.session.character_snapshot || {},
+    cloudCharacterSnapshotLoaded:true,
     cloudUpdatedAt: data.session.updated_at || null
   };
   state.sessions[sessionId] = session;
@@ -5591,6 +5617,7 @@ async function createStorySession(characterId, originMode, sourceEncounterSessio
     cloudOwned:true,
     cloudOwnerUid:authData.user.id,
     cloudCharacterSnapshot:storySnapshot,
+    cloudCharacterSnapshotLoaded:true,
     initialOpeningMessage:openingText ? {text:openingText,at:openingAt} : null,
     cloudUpdatedAt:payload.session.updated_at || null,
     storyMode:true,

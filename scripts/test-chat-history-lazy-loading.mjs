@@ -27,6 +27,9 @@ assert.match(upgradeMigration, /state\.sessions=compactSessionsForLocalStorage/)
 assert.match(persistWriter, /compactLocalStateForQuota\(baseSnapshot\)/);
 
 const sessionSync = between("async function loadCloudChatSessions(user, options = {})", "async function loadCloudSessionMessages");
+const sessionCharacter = between("function sessionCharacter(s)", "function canAccessSessionCharacter");
+assert.match(sessionCharacter, /c\.cloudSnapshotOnly && s\.cloudCharacterSnapshotLoaded===true/,
+  "a loaded full snapshot must supersede the lightweight character stub");
 assert.doesNotMatch(sessionSync, /from\(['"]chat_messages['"]\)/,
   "login/session-list hydration must never download chat message rows");
 assert.match(sessionSync, /session_name:session_data->>name/);
@@ -43,8 +46,12 @@ assert.match(sessionSync, /void loadChatSessionAuthorProfiles\(user\.id, snapsho
 assert.doesNotMatch(sessionSync, /await client\.from\(['"]public_profiles['"]\)/,
   "chat-list hydration must not await public profile rows");
 assert.match(sessionSync, /readDeletedChatTombstones/);
-assert.match(sessionSync, /character_snapshot/);
-assert.match(sessionSync, /snapshot\.id !== row\.character_id/);
+assert.match(sessionSync, /character_snapshot_author_id:character_snapshot->>authorId/);
+assert.match(sessionSync, /character_snapshot_opening:character_snapshot->>opening/);
+assert.doesNotMatch(sessionSync, /'character_snapshot'/,
+  "chat-list hydration must not fetch the full image-heavy character snapshot");
+assert.match(sessionSync, /id:row\.character_id/);
+assert.match(sessionSync, /cloudCharacterSnapshotLoaded:existing\?\.cloudCharacterSnapshotLoaded===true/);
 assert.match(sessionSync, /compactCloudSessionForLocalStorage\(state\.sessions\[row\.id\]\)/);
 
 const hasUserHelper = between("function hasUserMessage(session)", "function sessionTitle");
@@ -57,6 +64,11 @@ const messageLoader = between("async function loadCloudSessionMessages(sessionId
 assert.match(messageLoader, /options\.refresh !== true/,
   "an explicit refresh must bypass the already-loaded short circuit");
 assert.match(messageLoader, /auth\.getUser\(\)/);
+assert.match(messageLoader, /snapshotRequested=!older&&session\.cloudCharacterSnapshotLoaded!==true/);
+assert.match(messageLoader, /\.\.\.\(snapshotRequested\?\['character_snapshot'\]:\[\]\)/);
+assert.match(messageLoader, /session\.cloudCharacterSnapshotLoaded=true/);
+assert.match(messageLoader, /if\(snapshotRequested\)renderConversation\(\)/,
+  "the selected chat header must refresh after its full snapshot is loaded");
 assert.match(messageLoader, /\.eq\('id', sessionId\)\.eq\('user_id', userId\)\.is\('deleted_at', null\)/);
 assert.match(messageLoader, /\.eq\('session_id',sessionId\)\.is\('deleted_at',null\)/);
 assert.match(messageLoader, /const pageSize=50/);
@@ -96,6 +108,7 @@ assert.match(chatData, /s\.cloudHasUserMessage===null \? null : false/);
 assert.match(chatData, /s\.cloudRoleplayMeta/);
 
 const saveSession = between("async function saveChatSessionToCloud(s, options = {})", "  const row = {");
+const saveSessionBody = between("async function saveChatSessionToCloud(s, options = {})", "async function loadChatSessionAuthorProfiles");
 assert.match(saveSession, /cloudSessionDataLoaded/);
 assert.match(saveSession, /savedData\.memories/);
 assert.match(saveSession, /savedData\.album/);
@@ -104,7 +117,12 @@ assert.match(saveSession, /existingData\.pendingTurn/);
 assert.match(saveSession, /existingData\.openingMessage/);
 assert.match(saveSession, /existing\.data\.chat_mode==='encounter'/);
 assert.match(saveSession, /existing\.data\.status==='archived'/);
-assert.match(saveSession, /select\(s\.cloudSessionDataLoaded \?/);
+assert.match(saveSession, /const currentRowFields=\[/);
+assert.match(saveSession, /s\.cloudCharacterSnapshotLoaded===true\?\[\]:\['character_snapshot'\]/);
+assert.match(saveSession, /s\.cloudCharacterSnapshotLoaded=true/);
+assert.match(saveSessionBody, /if\(!s\.cloudOwned \|\| !priorSnapshot\.id\) row\.character_snapshot=snapshot/);
+assert.doesNotMatch(saveSessionBody, /character_snapshot:snapshot, session_data:/,
+  "existing chat updates must not rewrite the full character snapshot on every turn");
 assert.match(chatData, /lastMessagePreview/);
 assert.match(chatData, /lastMessageAt/);
 
