@@ -207,8 +207,55 @@ BEGIN
   IF v_status <> 'completed' THEN
     RAISE EXCEPTION 'fresh profile completion failed: %', v_status;
   END IF;
-END $$;
+END $;
 RESET ROLE;
+
+-- Unknown provider outcomes must stop automatic retries to avoid a possible
+-- second bill when a timed-out request actually completed upstream.
+DO $
+DECLARE
+  v_job public.character_profile_organization_jobs%ROWTYPE;
+  v_status text;
+  v_claim_count integer;
+BEGIN
+  UPDATE public.character_profile_organization_jobs
+  SET status = 'processing',
+      lease_token = gen_random_uuid(),
+      lease_generation = lease_generation + 1,
+      lease_expires_at = now() + interval '3 minutes',
+      lease_source_hash = source_hash
+  WHERE character_id = '11111111-1111-4111-8111-111111111111'
+  RETURNING * INTO v_job;
+
+  v_status := public.fail_character_profile_organization_job(
+    v_job.character_id, v_job.lease_token, v_job.lease_generation,
+    'provider_outcome_unknown'
+  );
+  IF v_status <> 'failed' THEN
+    RAISE EXCEPTION 'ambiguous provider outcome was automatically retried: %', v_status;
+  END IF;
+
+  SELECT count(*) INTO v_claim_count
+  FROM public.claim_character_profile_organization_jobs(1);
+  IF v_claim_count <> 0 THEN
+    RAISE EXCEPTION 'terminal provider outcome remained automatically claimable';
+  END IF;
+END $;
+
+-- An explicit owner save is the supported manual retry path after a terminal
+-- unknown provider outcome.
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SET ROLE authenticated;
+SELECT public.enqueue_character_profile_organization('11111111-1111-4111-8111-111111111111');
+RESET ROLE;
+DO $
+BEGIN
+  IF (SELECT status FROM public.character_profile_organization_jobs
+      WHERE character_id = '11111111-1111-4111-8111-111111111111') <> 'pending' THEN
+    RAISE EXCEPTION 'explicit owner save did not requeue terminal failed job';
+  END IF;
+END $;
+SELECT set_config('request.jwt.claim.role', 'service_role', false);
 
 INSERT INTO public.character_profile_organization_usage (
   character_id, author_id, source_hash, model, provider,
