@@ -74,7 +74,10 @@ BEGIN
   IF has_table_privilege('authenticated', 'public.character_profile_organization', 'SELECT') THEN
     RAISE EXCEPTION 'authenticated can read private derived profile';
   END IF;
-END $$;
+  IF EXISTS (SELECT 1 FROM competing_claim) THEN
+    RAISE EXCEPTION 'a concurrent worker claimed a second profile job';
+  END IF;
+END $;
 
 CREATE TEMP TABLE claimed_data (
   character_id uuid, author_id uuid, source_hash text, lease_token uuid,
@@ -85,6 +88,8 @@ GRANT ALL ON claimed_data TO service_role;
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
 SET ROLE service_role;
 INSERT INTO claimed_data SELECT * FROM public.claim_character_profile_organization_jobs(1);
+CREATE TEMP TABLE competing_claim AS
+  SELECT * FROM public.claim_character_profile_organization_jobs(1);
 RESET ROLE;
 
 -- Change an AI source after claim. Completion must refuse the stale generation.
