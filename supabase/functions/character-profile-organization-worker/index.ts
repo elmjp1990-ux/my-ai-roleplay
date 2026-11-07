@@ -62,30 +62,55 @@ async function generateProfile(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const response = await fetch(OPENROUTER_URL, {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://poyozz.com",
-        "X-Title": "POYOZZ Character Profile Organization",
-      },
-      body: JSON.stringify({
-        model: CHARACTER_PROFILE_MODEL,
-        messages: buildCharacterProfileMessages(item.source_payload),
-        response_format: { type: "json_object" },
-        temperature: 0.2,
-        // Match POYOZZ's selected OpenRouter privacy policy: no fallback route
-        // and no provider-side data collection for author-only character sources.
-        provider: {
-          only: ["deepinfra"],
-          allow_fallbacks: false,
-          data_collection: "deny",
+    let response: Response;
+    try {
+      response = await fetch(OPENROUTER_URL, {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://poyozz.com",
+          "X-Title": "POYOZZ Character Profile Organization",
         },
-      }),
-    });
-    if (!response.ok) throw new Error("openrouter_http_" + response.status);
+        body: JSON.stringify({
+          model: CHARACTER_PROFILE_MODEL,
+          messages: buildCharacterProfileMessages(item.source_payload),
+          response_format: { type: "json_object" },
+          temperature: 0.2,
+          // Match POYOZZ's selected OpenRouter privacy policy: no fallback route
+          // and no provider-side data collection for author-only character sources.
+          provider: {
+            only: ["deepinfra"],
+            allow_fallbacks: false,
+            data_collection: "deny",
+          },
+        }),
+      });
+    } catch (error) {
+      // A timeout/network failure has an ambiguous billing outcome. Do not
+      // automatically retry it; require an explicit author save to retry later.
+      const code = error instanceof Error && error.name === "AbortError"
+        ? "provider_request_timeout"
+        : "provider_outcome_unknown";
+      throw new ProfileGenerationError(code, {
+        model: CHARACTER_PROFILE_MODEL,
+        provider: "deepinfra",
+        requestId: null,
+        usage: {},
+      });
+    }
+    if (!response.ok) {
+      if (response.status >= 500) {
+        throw new ProfileGenerationError("provider_outcome_unknown", {
+          model: CHARACTER_PROFILE_MODEL,
+          provider: "deepinfra",
+          requestId: response.headers.get("x-request-id"),
+          usage: {},
+        });
+      }
+      throw new Error("openrouter_http_" + response.status);
+    }
     const result = await response.json();
     const usage = result?.usage && typeof result.usage === "object" && !Array.isArray(result.usage)
       ? result.usage as Record<string, unknown>
