@@ -2329,19 +2329,25 @@ async function getCharacterVideoSignedUrl(path){
   characterVideoSignedUrlInflight.set(path,request);
   try{return await request;}finally{characterVideoSignedUrlInflight.delete(path);}
 }
-function stopCharacterVideo(video){
+function pauseCharacterVideo(video){
   if(!video)return;
-  // pause() alone may leave the media resource attached and buffered. Removing src
-  // and calling load() aborts the resource selection so an offscreen clip stops fetching.
+  // Pause playback without changing preload or detaching src. Changing preload
+  // while a media resource is attached can restart its fetch from byte zero.
+  video.pause();
+}
+function releaseCharacterVideo(video){
+  if(!video)return;
+  // Release the resource only when the page is leaving, not during ordinary scrolling.
   video.pause();
   video.removeAttribute('src');
   video.preload='none';
   video.load();
   video.dataset.videoHydrated='false';
+  video.dataset.videoObservePending='false';
 }
 function hydrateCharacterVideo(video){
   const path=video?.dataset?.characterVideo;
-  if(!path||!window.mySupabase||video.dataset.videoHydrated==='true'||video.dataset.videoHydrated==='loading'||video.dataset.videoObservePending==='true')return;
+  if(!path||!window.mySupabase||video.dataset.videoFailed==='true'||video.dataset.videoHydrated==='true'||video.dataset.videoHydrated==='loading'||video.dataset.videoObservePending==='true')return;
   // 列表中的影片只在實際可視範圍內取得 Signed URL 並下載。
   video.controls=false;
   video.removeAttribute('controls');
@@ -2360,7 +2366,8 @@ function hydrateCharacterVideo(video){
     video.dataset.videoErrorHandler='true';
     video.addEventListener('error',()=>{
       // 不在錯誤事件中自動重試，避免壞檔或網路錯誤形成請求迴圈。
-      stopCharacterVideo(video);
+      pauseCharacterVideo(video);
+      video.dataset.videoFailed='true';
     });
   }
   const load=async()=>{
@@ -2377,9 +2384,10 @@ function hydrateCharacterVideo(video){
         video.dataset.videoHydrated='false';
         return;
       }
-      video.src=signedUrl;
+      // Set preload before src. Assigning src starts media loading automatically;
+      // calling load() again here restarts the same full-range MP4 request.
       video.preload='metadata';
-      video.load();
+      video.src=signedUrl;
       video.dataset.videoHydrated='true';
       video.play().catch(()=>{});
     }catch(error){
@@ -2394,13 +2402,13 @@ function hydrateCharacterVideo(video){
         const target=entry.target;
         if(!target?.isConnected)continue;
         if(entry.isIntersecting&&!document.hidden){
-          if(target.dataset.videoHydrated==='true')target.play().catch(()=>{});
+          if(target.dataset.videoHydrated==='true'){if(target.paused)target.play().catch(()=>{});}
           else {
             const loadTarget=characterVideoLoaders.get(target);
             if(loadTarget)void loadTarget();
           }
-        }else if(target.dataset.videoHydrated==='true'||target.dataset.videoHydrated==='loading'){
-          stopCharacterVideo(target);
+        }else if(target.dataset.videoHydrated==='true'){
+          pauseCharacterVideo(target);
         }
       }
     },{rootMargin:'0px',threshold:0.01});
@@ -2416,7 +2424,7 @@ function hydrateCharacterVideo(video){
 document.addEventListener('visibilitychange',()=>{
   const videos=document.querySelectorAll('video[data-character-video]');
   if(document.hidden){
-    videos.forEach(stopCharacterVideo);
+    videos.forEach(pauseCharacterVideo);
   }else{
     videos.forEach(video=>{
       if(characterVideoObserver){
@@ -2427,7 +2435,16 @@ document.addEventListener('visibilitychange',()=>{
   }
 });
 window.addEventListener('pagehide',()=>{
-  document.querySelectorAll('video[data-character-video]').forEach(stopCharacterVideo);
+  document.querySelectorAll('video[data-character-video]').forEach(releaseCharacterVideo);
+});
+// pagehide may enter the browser back-forward cache instead of destroying the document.
+// Re-arm lazy loading on restore because pagehide deliberately detached every media src.
+window.addEventListener('pageshow',()=>{
+  document.querySelectorAll('video[data-character-video]').forEach(video=>{
+    characterVideoObserver?.unobserve(video);
+    video.dataset.videoObservePending='false';
+    void hydrateCharacterVideo(video);
+  });
 });
 function normalizePersonalityProfile(value) {
   const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
@@ -4312,6 +4329,37 @@ function renderShell() {
 
 let lastRenderedConversationId = null;
 
+// Preserve character-card media across route-level rerenders (Create, Favorites,
+// Author pages, etc.), not only Explore's renderGrid() updates.
+function captureCharacterCardVideos(root){
+  const videos=new Map();
+  root?.querySelectorAll('article.card[data-character-card-id]').forEach(card=>{
+    const video=card.querySelector('video[data-character-video]');
+    if(video)videos.set(card.dataset.characterCardId,video);
+  });
+  return videos;
+}
+function restoreCharacterCardVideos(root,previousVideos){
+  if(!previousVideos?.size)return;
+  root?.querySelectorAll('article.card[data-character-card-id]').forEach(card=>{
+    const id=card.dataset.characterCardId;
+    const previousVideo=previousVideos.get(id);
+    if(!previousVideo)return;
+    const nextVideo=card.querySelector('video[data-character-video]');
+    if(nextVideo&&previousVideo.dataset.characterVideo===nextVideo.dataset.characterVideo){
+      if(nextVideo!==previousVideo)nextVideo.replaceWith(previousVideo);
+      characterVideoObserver?.unobserve(previousVideo);
+      characterVideoObserver?.observe(previousVideo);
+      previousVideos.delete(id);
+    }
+  });
+  previousVideos.forEach(video=>{
+    characterVideoObserver?.unobserve(video);
+    releaseCharacterVideo(video);
+  });
+  previousVideos.clear();
+}
+
 function render() {
   // Encounter fullscreen scroll locking must follow the active route, not a stale
   // session left in memory after navigating back to the city or traditional pages.
@@ -4349,6 +4397,7 @@ function render() {
       }
     };
   }
+  const previousCardVideos=captureCharacterCardVideos($('view'));
   // City-map-only visual treatment must not leak into traditional pages.
   if (route.page !== 'citymap') document.body.classList.remove('city-map-mode','city-map-mode-immersive');
   renderShell();
@@ -4371,6 +4420,7 @@ function render() {
     case 'profile':renderProfile();break;
     case 'album':renderChatAlbumPage();break;
   }
+  restoreCharacterCardVideos($('view'),previousCardVideos);
   if (route.overlay) renderModal(route.overlay);
   updateCharacterCounters($('view'));
   // 公開卡片影片需取得私有儲存桶的短效簽名 URL，並在畫面渲染後啟動靜音循環播放。
@@ -4479,7 +4529,7 @@ function card(c,owner = false) {
   const knownTurnCount = characterTurnCountCache.get(c.id);
   const initialTurnCount = Number.isSafeInteger(knownTurnCount) ? knownTurnCount : (Number(c.chats) || 0);
   return `
-    <article class="card">
+    <article class="card" data-character-card-id="${e(c.id)}">
       <div class="card-image">
         <button class="image-button" data-action="detail" data-id="${e(c.id)}"
                 aria-label="查看${e(c.name)}">
@@ -4514,15 +4564,54 @@ function card(c,owner = false) {
       </div>
     </article>`;
 }
-function renderGrid() {
+function renderGrid({append=false}={}) {
   if (!$('characterGrid')) return;
   gridObserver?.disconnect();
   const list = exploreList();
   const recommended = filter === 'recommended';
   const maximum = Math.min(150,list.length);
   const shown = recommended ? list.slice(0,Math.min(limit,150)) : list;
-  $('characterGrid').innerHTML = shown.map(c => card(c)).join('') ||
-    '<div class="empty">目前還沒有符合條件的公開角色。稍後再來看看，或試試其他標籤。</div>';
+  const grid = $('characterGrid');
+  // Keep hydrated media elements alive when search/filter redraws the card markup.
+  // A new video element for the same Storage object can trigger another full MP4 GET.
+  const existingVideosByCharacter = new Map();
+  if (!append) {
+    grid.querySelectorAll(':scope > article.card').forEach(existingCard => {
+      const existingVideo = existingCard.querySelector('video[data-character-video]');
+      if (existingVideo && existingCard.dataset.characterCardId) {
+        existingVideosByCharacter.set(existingCard.dataset.characterCardId,existingVideo);
+      }
+    });
+  }
+  const existingCardCount = append ? grid.querySelectorAll(':scope > article.card').length : 0;
+  const newCards = append && existingCardCount > 0 ? shown.slice(existingCardCount) : shown;
+  const cardMarkup = newCards.map(c => card(c)).join('');
+  if (append && existingCardCount > 0) {
+    if (cardMarkup) grid.insertAdjacentHTML('beforeend',cardMarkup);
+  } else {
+    grid.innerHTML = cardMarkup ||
+      '<div class="empty">目前還沒有符合條件的公開角色。稍後再來看看，或試試其他標籤。</div>';
+    grid.querySelectorAll(':scope > article.card').forEach(nextCard => {
+      const previousVideo = existingVideosByCharacter.get(nextCard.dataset.characterCardId);
+      const nextVideo = nextCard.querySelector('video[data-character-video]');
+      if (previousVideo && nextVideo &&
+          previousVideo.dataset.characterVideo === nextVideo.dataset.characterVideo) {
+        nextVideo.replaceWith(previousVideo);
+        if (characterVideoObserver) {
+          characterVideoObserver.unobserve(previousVideo);
+          characterVideoObserver.observe(previousVideo);
+        }
+        existingVideosByCharacter.delete(nextCard.dataset.characterCardId);
+      }
+    });
+    // Any old media not reused is no longer part of the visible result set.
+    existingVideosByCharacter.forEach(video => {
+      characterVideoObserver?.unobserve(video);
+      releaseCharacterVideo(video);
+    });
+  }
+  // Also hydrate newly appended cards; existing hydrated elements are guarded.
+  grid.querySelectorAll('video[data-character-video]').forEach(video => void hydrateCharacterVideo(video));
   void loadCharacterTurnCounts(shown.map(c => c.id));
   document.querySelectorAll('.explore-shortcut[data-filter]').forEach(button => {
     button.classList.toggle('active', button.dataset.filter === filter);
@@ -4548,7 +4637,7 @@ function renderGrid() {
       if (!entries.some(entry => entry.isIntersecting)) return;
       gridObserver.disconnect();
       limit = Math.min(150,limit+24);
-      renderGrid();
+      renderGrid({append:true});
     },{rootMargin:'150px'});
     gridObserver.observe($('loadSentinel'));
   }
@@ -4563,12 +4652,21 @@ function characterIsOffline(c) {
   return !c || !!c.deletedAt || c.visibility !== 'public';
 }
 function renderDetail() {
+  const view = $('view');
+  // Keep the detail-page video node alive across same-character rerenders.
+  // renderDetail() rebuilds #view.innerHTML, which otherwise creates a fresh
+  // media element and downloads the same private MP4 again.
+  const previousDetailVideo = view?.querySelector('.detail-portrait video[data-character-video]') || null;
   const session = route.page === 'session-detail' ? state.sessions[route.id] : null;
   const c = session ? sessionCharacter(session) : currentCharacter();
   const fromExistingSession = !!session && !!c &&
     canAccessSessionCharacter(session,c);
   if (!c || (!fromExistingSession && !accessible(c))) {
-    $('view').innerHTML = '<div class="empty">此角色已被修改為私密或已被刪除。</div>';
+    if(previousDetailVideo){
+      characterVideoObserver?.unobserve(previousDetailVideo);
+      releaseCharacterVideo(previousDetailVideo);
+    }
+    view.innerHTML = '<div class="empty">此角色已被修改為私密或已被刪除。</div>';
     return;
   }
   const offline = characterIsOffline(c);
@@ -4626,7 +4724,19 @@ ${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline
         </form>
       </section>`}
     </div>`;
-  const detailVideo=$('view').querySelector('[data-character-video]');
+  let detailVideo=view.querySelector('.detail-portrait video[data-character-video]');
+  if(previousDetailVideo && detailVideo &&
+     previousDetailVideo.dataset.characterVideo===detailVideo.dataset.characterVideo){
+    detailVideo.replaceWith(previousDetailVideo);
+    detailVideo=previousDetailVideo;
+    if(characterVideoObserver){
+      characterVideoObserver.unobserve(detailVideo);
+      characterVideoObserver.observe(detailVideo);
+    }
+  }else if(previousDetailVideo){
+    characterVideoObserver?.unobserve(previousDetailVideo);
+    releaseCharacterVideo(previousDetailVideo);
+  }
   if(detailVideo)void hydrateCharacterVideo(detailVideo);
   void loadCharacterTurnCounts([c.id]);
   if (!offline && route.page !== 'session-detail') {
@@ -8880,7 +8990,7 @@ document.addEventListener('click',async event => {
         break;
       case 'banner':banner=Number(button.dataset.index);renderBanner();break;
       case 'scroll-grid':$('characterGrid')?.scrollIntoView({behavior:'smooth'});break;
-      case 'load-more':limit=Math.min(150,limit+24);renderGrid();break;
+      case 'load-more':limit=Math.min(150,limit+24);renderGrid({append:true});break;
       case 'new-batch':batch+=7;limit=24;renderGrid();break;
       case 'tags':openModal('tags',{mode:button.dataset.mode});break;
       case 'add-custom-tag': {
@@ -10994,9 +11104,22 @@ function renderCityMapMVP(){
       copy='<div class="city-character-copy"><h3>'+name+'｜角色介紹</h3><p>'+escapeHTML(intro)+'</p></div>';
       $('cityCharacterPageLabel').textContent='角色介紹 · 02 / 02';
     }
+    const previousCharacterVideo=body.querySelector('video.city-character-portrait-video[data-character-video]');
     body.innerHTML=left+copy+bookmarks;
     if(mode==='status'&&page===0)void loadCityCharacterAffinity(person.id);
-    const characterVideo=body.querySelector('video.city-character-portrait-video[data-character-video]');
+    let characterVideo=body.querySelector('video.city-character-portrait-video[data-character-video]');
+    if(previousCharacterVideo&&characterVideo&&
+       previousCharacterVideo.dataset.characterVideo===characterVideo.dataset.characterVideo){
+      characterVideo.replaceWith(previousCharacterVideo);
+      characterVideo=previousCharacterVideo;
+      if(characterVideoObserver){
+        characterVideoObserver.unobserve(characterVideo);
+        characterVideoObserver.observe(characterVideo);
+      }
+    }else if(previousCharacterVideo){
+      characterVideoObserver?.unobserve(previousCharacterVideo);
+      releaseCharacterVideo(previousCharacterVideo);
+    }
     if(characterVideo)void hydrateCharacterVideo(characterVideo);
     else{
       const directVideo=body.querySelector('video.city-character-portrait-video');
