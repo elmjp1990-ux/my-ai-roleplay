@@ -35,7 +35,7 @@ const boundedText = (value: unknown, max: number): string =>
   typeof value === "string" ? value.trim().slice(0, max) : "";
 
 const hasExplicitPhoneSendAction = (message: string): boolean =>
-  /(?:拿起|打開|解鎖|操作)?\s*(?:手機|電話|LINE|line|簡訊|訊息).{0,24}(?:傳(?:訊息|簡訊|LINE|line)?|發(?:訊息|簡訊)?|傳送|撥打|打電話)|(?:我|玩家).{0,18}(?:傳(?:訊息|簡訊|LINE|line)?給|發(?:訊息|簡訊)?給|傳送(?:訊息)?給|撥打電話給|打電話給)/i.test(message);
+  /(?:我|玩家).{0,24}(?:傳|發|傳送)\\s*(?:一則|一封)?\\s*(?:訊息|簡訊|LINE|line).{0,12}(?:給|給了)|(?:我|玩家).{0,24}(?:撥打|打電話).{0,12}給/i.test(message);
 
 const isLikelyPlayerOriginMessage = (event: StoryPhoneEvent, playerName: string): boolean => {
   const source = `${event.title} ${event.body}`;
