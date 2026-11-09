@@ -42,7 +42,7 @@ const isLikelyPlayerOriginMessage = (event: StoryPhoneEvent, playerName: string)
   const genericPlayerSource = /(?:玩家|你)(?:的)?(?:簡訊|訊息|LINE)|(?:簡訊|訊息|LINE).{0,12}(?:來自|由)(?:玩家|你)/i.test(source);
   const normalizedSource = source.toLocaleLowerCase();
   const normalizedPlayerName = playerName.toLocaleLowerCase();
-  const namedPlayerSource = playerName && playerName !== "玩家" && [
+  const namedPlayerSource = Boolean(playerName && playerName !== "玩家" && [
     `${normalizedPlayerName}的簡訊`,
     `${normalizedPlayerName}的訊息`,
     `${normalizedPlayerName}的line`,
@@ -50,7 +50,7 @@ const isLikelyPlayerOriginMessage = (event: StoryPhoneEvent, playerName: string)
     `${normalizedPlayerName}發來`,
     `來自${normalizedPlayerName}`,
     `由${normalizedPlayerName}發送`,
-  ].some((token) => normalizedSource.includes(token));
+  ].some((token) => normalizedSource.includes(token)));
   return genericPlayerSource || namedPlayerSource;
 };
 
