@@ -152,7 +152,7 @@ async function buildStoryMessages(
   userId: string,
   userMessageId: string,
   currentUserMessage: DbRow,
-): Promise<{ messages: Array<{ role: "system" | "user" | "assistant"; content: string }>; protectedContext: string[]; priorAssistantOutputs: string[]; phonePrompts: string[]; currentUserMessage: string; playerName: string }> {
+): Promise<{ messages: Array<{ role: "system" | "user" | "assistant"; content: string }>; protectedContext: string[]; priorAssistantOutputs: string[]; phonePrompts: string[]; currentUserMessage: string; playerName: string; characterName: string }> {
   const characterId = String(session.character_id);
   const [characterResult, profileResult, historyResult, summaryResult] = await Promise.all([
     admin.from("characters")
@@ -338,6 +338,7 @@ async function buildStoryMessages(
     phonePrompts,
     currentUserMessage: asString(currentUserMessage.content),
     playerName: asString(profile.nickname) || "玩家",
+    characterName: asString(character.name) || asString(snapshot.name) || "角色",
   };
 }
 
@@ -590,6 +591,7 @@ Deno.serve(async (request) => {
   let phonePrompts: string[] = [];
   let currentUserMessageText = "";
   let playerName = "玩家";
+  let characterName = "角色";
   try {
     const storyContext = await buildStoryMessages(admin, session, user.id, userMessageId, userMessage);
     messages = storyContext.messages;
@@ -598,6 +600,7 @@ Deno.serve(async (request) => {
     phonePrompts = storyContext.phonePrompts;
     currentUserMessageText = storyContext.currentUserMessage;
     playerName = storyContext.playerName;
+    characterName = storyContext.characterName;
   } catch (error) {
     const code = String(error instanceof Error ? error.message : "story_context_failed").slice(0, 80);
     const released = await releaseGenerationClaim(admin, turnId, user.id);
@@ -795,6 +798,7 @@ Deno.serve(async (request) => {
     configuredPrompts: phonePrompts,
     currentUserMessage: currentUserMessageText,
     playerName,
+    characterName,
   });
   const assistantRow = {
     id: assistantMessageId,
