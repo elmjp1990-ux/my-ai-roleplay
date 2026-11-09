@@ -133,6 +133,19 @@ Deno.test("configured phone fields are returned in exact order with safe empty-s
   ]);
 });
 
+Deno.test("unconfigured phone mode also blocks invented player-origin messages", () => {
+  const parsed = parseStoryTurnEnvelope(JSON.stringify({
+    reply: "回覆",
+    phone_events: [
+      { event_type: "message", title: "Una的簡訊", body: "江大哥，今天工地順不順利？" },
+      { event_type: "message", title: "客戶訊息", body: "林小姐：想確認明天丈量的時間。" },
+    ],
+  }), { currentUserMessage: "今天工地順利嗎？", playerName: "Una" });
+  assertEquals(parsed.phone_events, [
+    { event_type: "message", title: "客戶訊息", body: "林小姐：想確認明天丈量的時間。" },
+  ]);
+});
+
 Deno.test("NPC work messages are allowed, but player SMS requires an explicit phone-send action", () => {
   const prompts = ["最近收到的訊息|最近的手機訊息"];
   const npcMessage = JSON.stringify({
