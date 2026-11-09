@@ -106,3 +106,58 @@ Deno.test("suggested replies require exactly three 30–80 character action-plus
     validSuggestions,
   );
 });
+
+
+Deno.test("configured phone fields are returned in exact order with safe empty-state fallbacks", () => {
+  const prompts = [
+    "最近收到的訊息|只記錄真正收到的手機訊息",
+    "角色衣著／姿勢|延續已知狀態",
+    "玩家衣著／姿勢|只根據明確描述",
+    "待辦事項|只列出尚未完成事項",
+    "手機通知|依生活情境生成",
+  ];
+  const parsed = parseStoryTurnEnvelope(JSON.stringify({
+    reply: "回覆",
+    phone_events: [
+      { event_type: "message", title: "Una的簡訊", body: "江大哥，今天工地順不順利？" },
+      { event_type: "notification", title: "角色衣著", body: "休閒襯衫挽至前臂。" },
+    ],
+  }), { configuredPrompts: prompts, currentUserMessage: "今天工地順利嗎？", playerName: "Una" });
+
+  assertEquals(parsed.phone_events, [
+    { event_type: "notification", title: "最近收到的訊息", body: "目前沒有新的手機訊息" },
+    { event_type: "notification", title: "角色衣著／姿勢", body: "休閒襯衫挽至前臂。" },
+    { event_type: "notification", title: "玩家衣著／姿勢", body: "目前沒有足夠資訊" },
+    { event_type: "notification", title: "待辦事項", body: "目前沒有待辦事項" },
+    { event_type: "notification", title: "手機通知", body: "目前沒有足夠資訊" },
+  ]);
+});
+
+Deno.test("NPC work messages are allowed, but player SMS requires an explicit phone-send action", () => {
+  const prompts = ["最近收到的訊息|最近的手機訊息"];
+  const npcMessage = JSON.stringify({
+    reply: "回覆",
+    phone_events: [{ event_type: "message", title: "客戶訊息", body: "林小姐：想確認明天現場丈量的時間。" }],
+  });
+  assertEquals(
+    parseStoryTurnEnvelope(npcMessage, {
+      configuredPrompts: prompts,
+      currentUserMessage: "今天工地順利嗎？",
+      playerName: "Una",
+    }).phone_events,
+    [{ event_type: "notification", title: "最近收到的訊息", body: "林小姐：想確認明天現場丈量的時間。" }],
+  );
+
+  const playerMessage = JSON.stringify({
+    reply: "回覆",
+    phone_events: [{ event_type: "message", title: "Una的簡訊", body: "江大哥，今天工地順不順利？" }],
+  });
+  assertEquals(
+    parseStoryTurnEnvelope(playerMessage, {
+      configuredPrompts: prompts,
+      currentUserMessage: "我拿起手機傳 LINE 給江辰遠，問他今天工地順不順利。",
+      playerName: "Una",
+    }).phone_events,
+    [{ event_type: "notification", title: "最近收到的訊息", body: "江大哥，今天工地順不順利？" }],
+  );
+});
