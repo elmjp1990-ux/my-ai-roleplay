@@ -46,6 +46,10 @@ const isLikelyPlayerOriginMessage = (event: StoryPhoneEvent, playerName: string)
     `${normalizedPlayerName}的簡訊`,
     `${normalizedPlayerName}的訊息`,
     `${normalizedPlayerName}的line`,
+    `${normalizedPlayerName}傳來`,
+    `${normalizedPlayerName}發來`,
+    `來自${normalizedPlayerName}`,
+    `由${normalizedPlayerName}發送`,
   ].some((token) => normalizedSource.includes(token));
   return genericPlayerSource || namedPlayerSource;
 };
@@ -116,23 +120,16 @@ export function parseStoryTurnEnvelope(raw: string, options: StoryTurnEnvelopeOp
 
   let phoneEvents = parsedPhoneEvents.filter((event): event is StoryPhoneEvent => event !== null);
   const configuredPrompts = (options.configuredPrompts ?? []).map((item) => boundedText(item, 500)).filter(Boolean).slice(0, 8);
-  if (configuredPrompts.length > 0) {
-    const explicitSend = hasExplicitPhoneSendAction(options.currentUserMessage ?? "");
-    const playerName = boundedText(options.playerName, 80) || "玩家";
+  const explicitSend = hasExplicitPhoneSendAction(options.currentUserMessage ?? "");
+  const playerName = boundedText(options.playerName, 80) || "玩家";
+  if (configuredPrompts.length === 0) {
+    phoneEvents = phoneEvents.filter((event) => explicitSend || !isLikelyPlayerOriginMessage(event, playerName));
+  } else {
     phoneEvents = configuredPrompts.map((prompt, index) => {
       const label = promptLabel(prompt);
       const candidate = parsedPhoneEvents[index] ?? undefined;
-      if (!candidate) {
+      if (!candidate || (!explicitSend && isLikelyPlayerOriginMessage(candidate, playerName))) {
         return { event_type: "notification", title: label, body: fallbackBodyForLabel(label) };
-      }
-      const isPlayerMessageField = /(?:最近|最新|收到).*(?:訊息|簡訊)|(?:訊息|簡訊).*(?:最近|最新|收到)/.test(label);
-      if (
-        isPlayerMessageField &&
-        !explicitSend &&
-        (candidate.event_type === "message" || candidate.event_type === "notification") &&
-        isLikelyPlayerOriginMessage(candidate, playerName)
-      ) {
-        return { event_type: "notification", title: label, body: "目前沒有新的手機訊息" };
       }
       return {
         event_type: "notification",
