@@ -63,8 +63,11 @@ const fallbackBodyForLabel = (label: string): string => {
   return "目前沒有足夠資訊";
 };
 
-const promptLabel = (prompt: string): string =>
-  (prompt.split("|", 1)[0] || "").trim().replace(/\{CHAR\}/g, "角色").replace(/\{USER\}/g, "玩家").slice(0, 80);
+const promptLabel = (prompt: string, characterName: string, playerName: string): string =>
+  (prompt.split("|", 1)[0] || "").trim()
+    .replace(/\{CHAR\}/g, characterName)
+    .replace(/\{USER\}/g, playerName)
+    .slice(0, 80);
 
 /**
  * Parses the single-call Story response envelope.
