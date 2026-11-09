@@ -16,6 +16,7 @@ export type StoryTurnEnvelopeOptions = {
   configuredPrompts?: string[];
   currentUserMessage?: string;
   playerName?: string;
+  characterName?: string;
 };
 
 const allowedPhoneEventTypes = new Set([
@@ -126,7 +127,7 @@ export function parseStoryTurnEnvelope(raw: string, options: StoryTurnEnvelopeOp
     phoneEvents = phoneEvents.filter((event) => explicitSend || !isLikelyPlayerOriginMessage(event, playerName));
   } else {
     phoneEvents = configuredPrompts.map((prompt, index) => {
-      const label = promptLabel(prompt);
+      const label = promptLabel(prompt, boundedText(options.characterName, 80) || "角色", playerName);
       const candidate = parsedPhoneEvents[index] ?? undefined;
       if (!candidate || (!explicitSend && isLikelyPlayerOriginMessage(candidate, playerName))) {
         return { event_type: "notification", title: label, body: fallbackBodyForLabel(label) };
