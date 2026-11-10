@@ -11,6 +11,7 @@ const affinityMigration = readFileSync("supabase/migrations/20261106090000_story
 const memoryImportanceMigration = readFileSync("supabase/migrations/20261110205546_story_memory_summary_important_toggle.sql", "utf8");
 const memoryEditMigration = readFileSync("supabase/migrations/20261111143000_story_memory_summary_edit.sql", "utf8");
 const memoryBlankMigration = readFileSync("supabase/migrations/20261111144500_story_memory_summary_blank_state.sql", "utf8");
+const memoryBlankMigration = readFileSync("supabase/migrations/20261111144500_story_memory_summary_blank_state.sql", "utf8");
 
 assert.match(html, /const \[eventsResult,stateResult,worldStateResult\]=await Promise\.all\(/);
 assert.match(html, /get_story_world_state/);
@@ -83,6 +84,11 @@ assert.match(memoryEditMigration, /v_summary := NULLIF\(btrim\(COALESCE\(p_summa
 assert.match(memoryEditMigration, /important = CASE WHEN v_summary IS NULL THEN false ELSE u\.important END/);
 assert.match(memoryEditMigration, /s\.user_id = \(SELECT auth\.uid\(\)\)/);
 assert.match(memoryEditMigration, /GRANT EXECUTE ON FUNCTION public\.update_story_memory_summary/);
+assert.match(memoryBlankMigration, /btrim\(u\.summary\) <> ''/);
+assert.match(memoryBlankMigration, /SET summary = COALESCE\(v_summary, ''\)/);
+assert.match(memoryBlankMigration, /important = CASE WHEN v_summary IS NULL THEN false ELSE u\.important END/);
+assert.match(edge, /\.neq\("summary", ""\)/);
+assert.match(html, /maxlength="1000" aria-label="編輯回憶內容"/);
 assert.match(memoryBlankMigration, /btrim\(u\.summary\) <> ''/);
 assert.match(memoryBlankMigration, /SET summary = COALESCE\(v_summary, ''\)/);
 assert.match(memoryBlankMigration, /important = CASE WHEN v_summary IS NULL THEN false ELSE u\.important END/);
