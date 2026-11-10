@@ -39,6 +39,10 @@ assert.ok(html.includes('if(isConversationEntry)') && html.includes('saveChatSes
 assert.ok(html.includes("if(route.page==='conversation'&&route.id===s.id)s.lastReadAt=assistantAt"),
   'Assistant replies received while their conversation is open must be marked read');
 
+const chatEntriesBlock=html.slice(html.indexOf('function chatEntries()'),html.indexOf('function chatListHTML()'));
+assert.ok(chatEntriesBlock.includes('const lastAt=s.lastMessageAt||s.updatedAt||s.messages?.at(-1)?.at||s.startedAt'), 'Chat list must derive lastAt from the session and never reference an undefined last variable');
+assert.ok(!chatEntriesBlock.includes('last?.at'), 'Chat list must not reference an undefined last variable');
+
 console.log('Phone notification UI hides creator prompts and renders generated notices only.');
 
 const editorStart = html.indexOf('function normalizePhoneNoticeRows');
