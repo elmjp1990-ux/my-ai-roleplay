@@ -14,6 +14,9 @@ assert.match(phoneBlock, /const noticeLines=notices\.map/);
 assert.match(phoneBlock, /目前還沒有新的手機通知/);
 assert.doesNotMatch(phoneBlock, /noticePrompts|settings\.notices|\.\.\.prompts/, 'Creator-only notice prompts must never be rendered as player-facing phone content');
 
+assert.match(html, /session\\.storyWorldState/, 'Phone must read the latest saved story-world state');
+assert.match(html, /故事時間尚未確認/, 'Unknown story time must remain explicitly unknown rather than use a hard-coded clock');
+assert.doesNotMatch(html, /星期五　🕧 19:30/, 'Phone must not show a hard-coded fictional time');
 assert.match(html, /phone-content\\{[^}]*overflow-y:auto/, 'Phone body must scroll independently');
 assert.match(html, /phone-device-head,\\.phone-member-switch,\\.phone-bar,\\.phone-close-row\\{flex-shrink:0\\}/,
   'Phone header, member switch, bar, and close control must remain fixed');
