@@ -100,4 +100,5 @@ assert.match(memoryImportanceMigration, /s\.user_id = \(SELECT auth\.uid\(\)\)/)
 assert.match(memoryImportanceMigration, /s\.chat_mode = 'story'/);
 assert.match(memoryImportanceMigration, /GRANT EXECUTE ON FUNCTION public\.set_story_memory_summary_important/);
 assert.match((await readFileSync("supabase/functions/_shared/story-memory-summary.ts", "utf8")), /Boolean\(str\(item\.summary\)\)/);
+assert.match((await readFileSync("supabase/functions/_shared/story-memory-summary.ts", "utf8")), /rows\.length === 0 \? str\(sessionData\.summary\) : ""/);
 console.log("Story phone, world-state, affinity, suggestions, and editable AI-summary memory checks passed.");
