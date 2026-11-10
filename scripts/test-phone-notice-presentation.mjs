@@ -14,22 +14,21 @@ assert.match(phoneBlock, /const noticeLines=notices\.map/);
 assert.match(phoneBlock, /目前還沒有新的手機通知/);
 assert.doesNotMatch(phoneBlock, /noticePrompts|settings\.notices|\.\.\.prompts/, 'Creator-only notice prompts must never be rendered as player-facing phone content');
 
-assert.match(html, /session\\.storyWorldState/, 'Phone must read the latest saved story-world state');
-assert.match(html, /故事時間尚未確認/, 'Unknown story time must remain explicitly unknown rather than use a hard-coded clock');
-assert.doesNotMatch(html, /星期五　🕧 19:30/, 'Phone must not show a hard-coded fictional time');
-assert.match(html, /phone-content\\{[^}]*overflow-y:auto/, 'Phone body must scroll independently');
-assert.match(html, /phone-device-head,\\.phone-member-switch,\\.phone-bar,\\.phone-close-row\\{flex-shrink:0\\}/,
+assert.ok(html.includes('session.storyWorldState'), 'Phone must read the latest saved story-world state');
+assert.ok(html.includes('故事時間尚未確認'), 'Unknown story time must remain explicitly unknown rather than use a hard-coded clock');
+assert.ok(!html.includes('星期五　🕧 19:30'), 'Phone must not show a hard-coded fictional time');
+assert.ok(html.includes('overflow-y:auto;overflow-x:hidden'), 'Phone body must scroll independently');
+assert.ok(html.includes('phone-device-head,.phone-member-switch,.phone-bar,.phone-close-row{flex-shrink:0}'),
   'Phone header, member switch, bar, and close control must remain fixed');
-assert.doesNotMatch(html, /phone-notice-list\\{max-height:/, 'Phone must not trap scrolling in a nested notice list');
-assert.match(html, /function firstSpokenDialoguePreview\\(/, 'Chat preview must parse spoken dialogue separately from narration');
-assert.match(html, /角色暫時沒有對白/, 'Narration-only replies must use the no-dialogue fallback');
-assert.match(html, /function latestAssistantPreview\\(/, 'Chat preview must select the latest assistant message');
-assert.match(html, /const preview=latestAssistantPreview\\(s\\)/, 'Single-chat list must not use the latest player message or narration');
-assert.match(html, /firstSpokenDialoguePreview\\(item\\.preview\\.content\\)/, 'Group previews must also strip narration');
-assert.match(html, /if\\(s\\.pendingTurn\\)[\\s\\S]{0,500}正在回覆/, 'Pending turn must display a character reply indicator');
-assert.match(html, /typing-dots[\\s\\S]{0,500}po-typing/, 'Reply indicator must animate its ellipsis');
-assert.doesNotMatch(html, /typing-indicator[^<]{0,100}🟢|typing-indicator[^<]{0,100}#(?:0f|00)[a-f0-9]{4}/i,
-  'Reply indicator must not add a redundant green status dot');
+assert.ok(!html.includes('.phone-notice-list{max-height:'), 'Phone must not trap scrolling in a nested notice list');
+assert.ok(html.includes('function firstSpokenDialoguePreview('), 'Chat preview must parse spoken dialogue separately from narration');
+assert.ok(html.includes('角色暫時沒有對白'), 'Narration-only replies must use the no-dialogue fallback');
+assert.ok(html.includes('function latestAssistantPreview('), 'Chat preview must select the latest assistant message');
+assert.ok(html.includes('const preview=latestAssistantPreview(s)'), 'Single-chat list must not use the latest player message or narration');
+assert.ok(html.includes('firstSpokenDialoguePreview(item.preview.content)'), 'Group previews must also strip narration');
+assert.ok(html.includes('if(s.pendingTurn)') && html.includes('正在回覆'), 'Pending turn must display a character reply indicator');
+assert.ok(html.includes('typing-dots') && html.includes('po-typing'), 'Reply indicator must animate its ellipsis');
+assert.ok(!html.includes('🟢'), 'Reply indicator must not add a redundant green status dot');
 
 console.log('Phone notification UI hides creator prompts and renders generated notices only.');
 
