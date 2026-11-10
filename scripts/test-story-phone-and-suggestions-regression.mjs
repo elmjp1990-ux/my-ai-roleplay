@@ -8,6 +8,7 @@ const worldMigration = readFileSync("supabase/migrations/20261110235500_story_wo
 const suggestionMigration = readFileSync("supabase/migrations/20261111100000_story_suggested_replies_persistence.sql", "utf8");
 const eightFieldMigration = readFileSync("supabase/migrations/20261106140000_expand_story_phone_events_to_five_fields.sql", "utf8");
 const affinityMigration = readFileSync("supabase/migrations/20261106090000_story_turn_affinity_and_phone_events.sql", "utf8");
+const memoryImportanceMigration = readFileSync("supabase/migrations/20261111120000_story_memory_summary_important_toggle.sql", "utf8");
 
 assert.match(html, /const \[eventsResult,stateResult,worldStateResult\]=await Promise\.all\(/);
 assert.match(html, /get_story_world_state/);
@@ -50,4 +51,16 @@ assert.match(edge, /suggested_replies: turnEnvelope\.suggested_replies/);
 assert.match(edge, /select\("id,content,suggested_replies"\)/);
 assert.match(suggestionMigration, /ADD COLUMN IF NOT EXISTS suggested_replies jsonb/);
 assert.match(suggestionMigration, /jsonb_array_length\(suggested_replies\) <= 3/);
-console.log("Story phone unified list, world-state persistence, per-turn affinity refresh, and suggested-reply persistence checks passed.");
+
+// Story long-term memory shows only AI-generated summaries, with timestamps
+// and a persisted, owner-checked important-memory toggle; raw quote cards stay hidden.
+assert.match(html, /get_story_memory_summaries/);
+assert.match(html, /data-story-memory-batch/);
+assert.match(html, /set_story_memory_summary_important/);
+assert.match(html, /s\.storyMode \? '' : \(\(s\.memories\|\|\[\]\)\.map/);
+assert.doesNotMatch(html, /系統會保存玩家原話與相關角色回應/);
+assert.match(memoryImportanceMigration, /ADD COLUMN IF NOT EXISTS important boolean NOT NULL DEFAULT false/);
+assert.match(memoryImportanceMigration, /s\.user_id = \(SELECT auth\.uid\(\)\)/);
+assert.match(memoryImportanceMigration, /s\.chat_mode = 'story'/);
+assert.match(memoryImportanceMigration, /GRANT EXECUTE ON FUNCTION public\.set_story_memory_summary_important/);
+console.log("Story phone, world-state, affinity, suggestions, and AI-summary-only memory checks passed.");
