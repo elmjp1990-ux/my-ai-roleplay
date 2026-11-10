@@ -9,6 +9,7 @@ const suggestionMigration = readFileSync("supabase/migrations/20261111100000_sto
 const eightFieldMigration = readFileSync("supabase/migrations/20261106140000_expand_story_phone_events_to_five_fields.sql", "utf8");
 const affinityMigration = readFileSync("supabase/migrations/20261106090000_story_turn_affinity_and_phone_events.sql", "utf8");
 const memoryImportanceMigration = readFileSync("supabase/migrations/20261110205546_story_memory_summary_important_toggle.sql", "utf8");
+const memoryEditMigration = readFileSync("supabase/migrations/20261111143000_story_memory_summary_edit.sql", "utf8");
 
 assert.match(html, /const \[eventsResult,stateResult,worldStateResult\]=await Promise\.all\(/);
 assert.match(html, /get_story_world_state/);
@@ -71,10 +72,21 @@ assert.match(suggestionMigration, /jsonb_array_length\(suggested_replies\) <= 3/
 assert.match(html, /get_story_memory_summaries/);
 assert.match(html, /data-story-memory-batch/);
 assert.match(html, /set_story_memory_summary_important/);
+assert.match(html, /data-action="edit-story-memory"/);
+assert.match(html, /data-form="story-memory-edit"/);
+assert.match(html, /data-action="cancel-story-memory-edit"/);
+assert.match(html, /update_story_memory_summary/);
+assert.match(edge, /\.not\("summary", "is", null\)/);
+assert.match(memoryEditMigration, /CREATE OR REPLACE FUNCTION public\.update_story_memory_summary/);
+assert.match(memoryEditMigration, /v_summary := NULLIF\(btrim\(COALESCE\(p_summary, ''\)\), ''\)/);
+assert.match(memoryEditMigration, /important = CASE WHEN v_summary IS NULL THEN false ELSE u\.important END/);
+assert.match(memoryEditMigration, /s\.user_id = \(SELECT auth\.uid\(\)\)/);
+assert.match(memoryEditMigration, /GRANT EXECUTE ON FUNCTION public\.update_story_memory_summary/);
 assert.match(html, /s\.storyMode \? '' : \(\(s\.memories\|\|\[\]\)\.map/);
 assert.doesNotMatch(html, /系統會保存玩家原話與相關角色回應/);
 assert.match(memoryImportanceMigration, /ADD COLUMN IF NOT EXISTS important boolean NOT NULL DEFAULT false/);
 assert.match(memoryImportanceMigration, /s\.user_id = \(SELECT auth\.uid\(\)\)/);
 assert.match(memoryImportanceMigration, /s\.chat_mode = 'story'/);
 assert.match(memoryImportanceMigration, /GRANT EXECUTE ON FUNCTION public\.set_story_memory_summary_important/);
-console.log("Story phone, world-state, affinity, suggestions, and AI-summary-only memory checks passed.");
+assert.match((await readFileSync("supabase/functions/_shared/story-memory-summary.ts", "utf8")), /Boolean\(str\(item\.summary\)\)/);
+console.log("Story phone, world-state, affinity, suggestions, and editable AI-summary memory checks passed.");
