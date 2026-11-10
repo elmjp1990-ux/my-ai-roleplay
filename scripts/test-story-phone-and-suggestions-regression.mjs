@@ -63,7 +63,7 @@ assert.match(edge, /suggested_replies: turnEnvelope\.suggested_replies/);
 assert.match(edge, /\.eq\("important", true\)/);
 assert.match(edge, /sessionData\.memories = importantSummaryRows\.map/);
 assert.match(edge, /sessionData\.memory = \[\]/);
-assert.match(edge, /never feed legacy player\/character quote cards/);
+assert.match(edge, /never feed legacy player\/character quote\s+cards/);
 assert.match(edge, /select\("id,content,suggested_replies"\)/);
 assert.match(suggestionMigration, /ADD COLUMN IF NOT EXISTS suggested_replies jsonb/);
 assert.match(suggestionMigration, /jsonb_array_length\(suggested_replies\) <= 3/);
