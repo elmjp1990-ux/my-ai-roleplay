@@ -8261,7 +8261,7 @@ async function loadWalletLedger(currency) {
 /* Preview-only local test entry. Never creates a fake auth identity. */
 function isPreviewDeployment() {
   const host=String(location.hostname||'').toLowerCase();
-  return /^my-ai-roleplay-[a-z0-9-]+-persona-x2\\.vercel\\.app$/.test(host);
+  return /^my-ai-roleplay-[a-z0-9-]+-persona-x2\.vercel\.app$/.test(host);
 }
 function enterPreviewTestMode() {
   if(!isPreviewDeployment()) {
