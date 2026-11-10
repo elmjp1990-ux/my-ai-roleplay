@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const frontend = fs.readFileSync("index.html", "utf8");
+assert.doesNotMatch(frontend, /isPreviewDeployment|enterPreviewTestMode|測試登入（僅本機介面）|不建立帳號、不連線雲端/,
+  "temporary preview-only test login must not remain in the production UI source");
 const between = (start, end) => {
   const from = frontend.indexOf(start);
   const to = frontend.indexOf(end, from + start.length);
