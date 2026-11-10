@@ -1,7 +1,5 @@
 -- Separate configured phone-field snapshots from real phone-event history.
 -- Existing notification rows are retained and used to seed the latest visible state.
-BEGIN;
-
 CREATE TABLE IF NOT EXISTS public.story_phone_states (
   session_id uuid NOT NULL REFERENCES public.chat_sessions(id) ON DELETE CASCADE,
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -224,4 +222,3 @@ $$;
 REVOKE ALL ON FUNCTION public.get_story_memory_summary(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_story_memory_summary(uuid) TO authenticated;
 
-COMMIT;
