@@ -7459,7 +7459,11 @@ async function loadStoryRelationshipState(session) {
 
 function conversationSuggestionsHTML(s) {
   if(!s?.suggestions)return '';
-  const replies=Array.isArray(s.suggestedReplies)?s.suggestedReplies.slice(0,3):[];
+  const latestAssistantSuggestions=[...(s.messages||[])].reverse().find(message=>
+    message.role==='assistant'&&Array.isArray(message.suggestedReplies)&&message.suggestedReplies.length>0
+  )?.suggestedReplies;
+  const replies=Array.isArray(latestAssistantSuggestions)?latestAssistantSuggestions.slice(0,3)
+    :(Array.isArray(s.suggestedReplies)?s.suggestedReplies.slice(0,3):[]);
   return `<div class="suggestions">
     <details class="suggestions-panel" open>
       <summary>建議回覆 <span class="suggestions-count" data-collapsed="點擊可展開" data-expanded="滑動或點選燈號可切換">滑動或點選燈號可切換</span></summary>
