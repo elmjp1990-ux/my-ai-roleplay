@@ -17,6 +17,7 @@ on:
       - "supabase/migrations/20261106090000_story_turn_affinity_and_phone_events.sql"
       - "supabase/migrations/20261106110000_harden_story_turn_service_role_claims.sql"
       - "supabase/migrations/20261110120000_story_phone_state_and_memory_summary_read.sql"
+      - "supabase/migrations/20261111100000_story_suggested_replies_persistence.sql"
       - "supabase/migrations/20261106120000_fix_story_turn_evaluation_reserved_charge.sql"
       - "scripts/test-story-turn-affinity-phone-events.sql"
       - "supabase/functions/_shared/provider-failure-policy.ts"
@@ -216,6 +217,8 @@ jobs:
         run: deno check supabase/functions/character-profile-organization-worker/index.ts
       - name: Test Character AI Profile evidence, privacy and OOC validation
         run: deno test supabase/functions/_shared/character-profile-organization.test.ts
+      - name: Verify Story phone RPC and suggested reply persistence regressions
+        run: node scripts/test-story-phone-and-suggestions-regression.mjs
       - name: Test structured Story turn evaluation parsing
         run: deno test supabase/functions/_shared/story-turn-envelope.test.ts
       - name: Run provider result normalization tests
