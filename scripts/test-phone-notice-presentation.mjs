@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const html = fs.readFileSync('index.html', 'utf8');
+const phoneStateMigration = fs.readFileSync('supabase/migrations/20261110120000_story_phone_state_and_memory_summary_read.sql', 'utf8');
+const storyPrompt = fs.readFileSync('supabase/functions/chat-turn/index.ts', 'utf8');
 const generatedStart = html.indexOf('  // Creator notice prompts guide AI generation only; never render raw instructions to players.');
 const generatedEnd = html.indexOf('  const memberSwitch=', generatedStart);
 
@@ -15,6 +17,14 @@ assert.match(phoneBlock, /get_story_phone_state/, 'Story phone must load current
 assert.match(phoneBlock, /get_story_phone_events/, 'Story phone must load genuine event history separately');
 assert.match(phoneBlock, /storyStateHTML/, 'Story phone must render current field snapshots in a dedicated section');
 assert.match(phoneBlock, /storyEventHTML/, 'Story phone must render genuine events in their own history section');
+assert.match(phoneStateMigration, /CREATE TABLE IF NOT EXISTS public\.story_phone_states/);
+assert.match(phoneStateMigration, /ON CONFLICT \(session_id, field_index\) DO UPDATE/);
+assert.match(phoneStateMigration, /IS DISTINCT FROM EXCLUDED\.body/,
+  'Unchanged phone field values must not be refreshed on every turn');
+assert.match(phoneStateMigration, /e\.event_type <> 'notification'/,
+  'Replaceable status snapshots must be hidden from historical event output');
+assert.match(storyPrompt, /每個手機欄位的 body 必須以簡短的一行為主/);
+assert.match(storyPrompt, /沒有新資訊或劇情變化時，原樣延續最近狀態/);
 assert.match(phoneBlock, /目前還沒有新的手機通知/);
 assert.doesNotMatch(phoneBlock, /noticePrompts|settings\.notices|\.\.\.prompts/, 'Creator-only notice prompts must never be rendered as player-facing phone content');
 
