@@ -4167,7 +4167,11 @@ async function runPendingChatTurn(s) {
     if(route.page==='conversation'&&route.id===s.id)s.lastReadAt=assistantAt;
   } else {
     const savedAssistant = s.messages.find(message=>message.id===reply.id);
-    if (savedAssistant) savedAssistant.suggestedReplies = s.suggestedReplies;
+    if (savedAssistant) {
+      savedAssistant.suggestedReplies = s.suggestedReplies;
+      s.lastAssistantMessageAt=Number(savedAssistant.at)||Number(s.lastAssistantMessageAt)||0;
+      if(route.page==='conversation'&&route.id===s.id)s.lastReadAt=s.lastAssistantMessageAt;
+    }
   }
   delete s.pendingTurn;
 
