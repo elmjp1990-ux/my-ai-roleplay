@@ -8,7 +8,7 @@ const worldMigration = readFileSync("supabase/migrations/20261110235500_story_wo
 const suggestionMigration = readFileSync("supabase/migrations/20261111100000_story_suggested_replies_persistence.sql", "utf8");
 const eightFieldMigration = readFileSync("supabase/migrations/20261106140000_expand_story_phone_events_to_five_fields.sql", "utf8");
 const affinityMigration = readFileSync("supabase/migrations/20261106090000_story_turn_affinity_and_phone_events.sql", "utf8");
-const memoryImportanceMigration = readFileSync("supabase/migrations/20261111120000_story_memory_summary_important_toggle.sql", "utf8");
+const memoryImportanceMigration = readFileSync("supabase/migrations/20261110205546_story_memory_summary_important_toggle.sql", "utf8");
 
 assert.match(html, /const \[eventsResult,stateResult,worldStateResult\]=await Promise\.all\(/);
 assert.match(html, /get_story_world_state/);
