@@ -1735,7 +1735,6 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
         if (!latestStory.has(story.character_id)) latestStory.set(story.character_id, story);
       }
 
-      const publicIllustrations = await loadCharacterIllustrationAssets((rows || []).map(row=>row.id));
       const publicCharacters = (rows || []).map(row => {
         const story = latestStory.get(row.id);
         // The public and owner hydrators run concurrently. Preserve already-hydrated
@@ -1750,9 +1749,12 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
           id: row.id, name: row.name || '未命名角色',
           gender: row.gender || 'ambiguous',
           age: row.age == null ? '' : String(row.age),
-          image: publicAssets?.primary?.src || row.avatar_url || ownerLocal?.image || '',
-          primaryIllustrationPath:publicAssets?.primary?.path || ownerLocal?.primaryIllustrationPath || '',
-          galleryIllustrations:publicAssets?.gallery?.length ? publicAssets.gallery : (ownerLocal?.galleryIllustrations || []),
+          // Explore cards need only the character cover/video. Full illustration assets
+          // are hydrated when a player opens this character's detail page or encounter.
+          image: ownerLocal?.image || row.avatar_url || '',
+          primaryIllustrationPath:ownerLocal?.primaryIllustrationPath || '',
+          galleryIllustrations:ownerLocal?.galleryIllustrations || [],
+          publicIllustrationsLoaded:ownerLocal?.publicIllustrationsLoaded === true,
           avatarVideoPath:row.avatar_video_path || '', visibility: 'public',
           reviewStatus: row.review_status, intro: row.intro || '',
           opening: story?.opening_message || '', race: row.race || '',
@@ -4875,6 +4877,33 @@ function renderGrid({append=false}={}) {
   }
 }
 
+const publicCharacterIllustrationHydration = new Map();
+async function hydratePublicCharacterIllustrations(characterId) {
+  const existing=state.characters.find(character=>character.id===characterId);
+  if(!existing||existing.publicIllustrationsLoaded===true||!window.mySupabase)return;
+  if(publicCharacterIllustrationHydration.has(characterId))return publicCharacterIllustrationHydration.get(characterId);
+  const request=(async()=>{
+    const assets=await loadCharacterIllustrationAssets([characterId]);
+    const current=state.characters.find(character=>character.id===characterId);
+    if(!current)return;
+    const loaded=assets.get(characterId)||{primary:null,gallery:[]};
+    if(loaded.primary){
+      current.image=loaded.primary.src;
+      current.primaryIllustrationPath=loaded.primary.path;
+    }
+    current.galleryIllustrations=loaded.gallery||[];
+    current.publicIllustrationsLoaded=true;
+    persist();
+    if(route?.page==='detail'&&route.id===characterId)renderDetail();
+  })().catch(error=>{
+    console.warn('角色詳情立繪延遲載入失敗：',error?.message||error);
+  });
+  publicCharacterIllustrationHydration.set(characterId,request);
+  try{return await request;}finally{
+    if(publicCharacterIllustrationHydration.get(characterId)===request)publicCharacterIllustrationHydration.delete(characterId);
+  }
+}
+
 /* Detail, author and comments */
 function accessible(c) {
   return !!c && canViewCharacterNsfw(c) && !c.deletedAt && (c.visibility === 'public' ||
@@ -4970,6 +4999,9 @@ ${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline
     releaseCharacterVideo(previousDetailVideo);
   }
   if(detailVideo)void hydrateCharacterVideo(detailVideo);
+  if(route.page==='detail'&&c.cloudPublic===true&&!c.owner&&c.publicIllustrationsLoaded!==true){
+    void hydratePublicCharacterIllustrations(c.id);
+  }
   void loadCharacterTurnCounts([c.id]);
   if (!offline && route.page !== 'session-detail') {
     renderComments();
