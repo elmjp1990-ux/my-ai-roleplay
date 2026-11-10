@@ -85,6 +85,11 @@ BEGIN
       updated_at = clock_timestamp()
   WHERE session_id = v_eval.session_id;
 
+  -- Remove stale state rows when the author removes configured fields.
+  DELETE FROM public.story_phone_states
+  WHERE session_id = v_eval.session_id
+    AND field_index >= jsonb_array_length(v_eval.phone_events);
+
   FOR v_item IN SELECT value FROM jsonb_array_elements(v_eval.phone_events)
   LOOP
     v_event_type := COALESCE(v_item->>'event_type', '');
@@ -115,6 +120,9 @@ BEGIN
       WHERE public.story_phone_states.title IS DISTINCT FROM EXCLUDED.title
          OR public.story_phone_states.body IS DISTINCT FROM EXCLUDED.body;
     ELSE
+      -- This configured field is event-only in this turn; remove its old snapshot.
+      DELETE FROM public.story_phone_states
+      WHERE session_id = v_eval.session_id AND field_index = v_index;
       -- Genuine new communication/activity remains in the append-only event log.
       INSERT INTO public.story_phone_events (
         session_id, user_id, character_id, turn_id, event_index,
