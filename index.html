@@ -3965,6 +3965,21 @@ async function clearCloudPendingTurn(s) {
 
 async function runPendingChatTurn(s) {
   const turn = s?.pendingTurn;
+  if (!turn || !currentUser() || !window.mySupabase) return;
+  // Persisted pendingTurn can survive reloads. Only this transient flag
+  // indicates that this page is actively invoking the AI right now.
+  s.activeTurnInFlight = true;
+  renderMessages();
+  try {
+    await executePendingChatTurn(s);
+  } finally {
+    s.activeTurnInFlight = false;
+    renderMessages();
+  }
+}
+
+async function executePendingChatTurn(s) {
+  const turn = s?.pendingTurn;
   const user = currentUser();
   const client = window.mySupabase;
   if (!turn || !user || !client) return;
@@ -7691,12 +7706,12 @@ function renderMessages(scroll = true) {
       <button class="message-more" data-action="message-menu" data-id="${e(m.id)}" aria-label="訊息操作">⋯</button>
     </article>`;
   }).join('');
-  if(s.pendingTurn){const characterName=sessionCharacter(s)?.name||'角色';$('messages').insertAdjacentHTML('beforeend','<article class="message assistant-typing" role="status" aria-live="polite"><div class="message-content"><div class="message-name">'+e(characterName)+'</div><div class="typing-indicator"><span>'+e(characterName)+'正在回覆</span><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span></div></div></article>');}
+  if(s.activeTurnInFlight){const characterName=sessionCharacter(s)?.name||'角色';$('messages').insertAdjacentHTML('beforeend','<article class="message assistant-typing" role="status" aria-live="polite"><div class="message-content"><div class="message-name">'+e(characterName)+'</div><div class="typing-indicator"><span>'+e(characterName)+'正在回覆</span><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span></div></div></article>');}
   $('messages').scrollTop = scroll ? $('messages').scrollHeight : oldScroll;
   const loadingHistory=!!(s.cloudOwned&&!s.cloudMessagesLoaded);
   const sendButton=$('view')?.querySelector('.chat-main .composer-send');
   if(sendButton){
-    const sending=!!s?.pendingTurn;
+    const sending=!!s?.activeTurnInFlight;
     sendButton.disabled=sending||loadingHistory;
     sendButton.innerHTML=sending?'<span aria-hidden="true">■</span>':ICON.send;
     sendButton.setAttribute('aria-label',sending?'訊息處理中':loadingHistory?'聊天紀錄載入中':'送出或接續回應');
