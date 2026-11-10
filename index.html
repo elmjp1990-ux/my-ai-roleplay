@@ -3428,6 +3428,7 @@ async function saveChatSessionToCloud(s, options = {}) {
         s.cloudCharacterSnapshot = safeCurrentSnapshot;
       }
       s.cloudCharacterSnapshotLoaded=true;
+      s.cloudSnapshotNeedsRepair=!currentRow.data.character_snapshot?.id;
     }
     if (!s.cloudSessionDataLoaded) {
       const savedData=currentRow.data.session_data&&typeof currentRow.data.session_data==='object'?currentRow.data.session_data:{};
