@@ -539,7 +539,7 @@ Deno.serve(async (request) => {
   }
   if (charge.status === "settled") {
     const { data: savedReply, error: savedReplyError } = await admin
-      .from("chat_messages").select("id,content")
+      .from("chat_messages").select("id,content,suggested_replies")
       .eq("id", assistantMessageId).eq("session_id", sessionId)
       .eq("role", "assistant").is("deleted_at", null).maybeSingle();
     if (savedReplyError || !savedReply || !String(savedReply.content || "").trim()) {
@@ -547,7 +547,7 @@ Deno.serve(async (request) => {
     }
     const { error: effectsError } = await admin.rpc("apply_story_turn_evaluation", { p_turn_id: turnId });
     if (effectsError) console.error("Story turn effects recovery failed:", effectsError.message);
-    return json({ status: "settled", assistantMessage: savedReply, idempotent: true });
+    return json({ status: "settled", assistantMessage: { id: savedReply.id, content: savedReply.content }, suggestedReplies: Array.isArray(savedReply.suggested_replies) ? savedReply.suggested_replies : [], idempotent: true });
   }
   if (charge.status === "refunded") return json({ error: "turn_already_refunded" }, 409);
 
@@ -555,7 +555,7 @@ Deno.serve(async (request) => {
   // Never call the provider again or refund based only on a missing assistant row.
   if (charge.status === "needs_reconciliation") {
     const { data: recoveredReply, error: recoveredReplyError } = await admin
-      .from("chat_messages").select("id,content")
+      .from("chat_messages").select("id,content,suggested_replies")
       .eq("id", assistantMessageId).eq("session_id", sessionId)
       .eq("role", "assistant").is("deleted_at", null).maybeSingle();
     if (recoveredReplyError) {
@@ -568,7 +568,7 @@ Deno.serve(async (request) => {
       if (settleAgainError) return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
       const { error: effectsError } = await admin.rpc("apply_story_turn_evaluation", { p_turn_id: turnId });
       if (effectsError) console.error("Story turn effects recovery failed:", effectsError.message);
-      return json({ status: settledAgain, assistantMessage: recoveredReply, recovered: true });
+      return json({ status: settledAgain, assistantMessage: { id: recoveredReply.id, content: recoveredReply.content }, suggestedReplies: Array.isArray(recoveredReply.suggested_replies) ? recoveredReply.suggested_replies : [], recovered: true });
     }
     return json({
       status: "needs_reconciliation",
@@ -826,6 +826,7 @@ Deno.serve(async (request) => {
     session_id: sessionId,
     role: "assistant",
     content: turnEnvelope.reply,
+    suggested_replies: turnEnvelope.suggested_replies,
     created_at: new Date().toISOString(),
   };
   const { error: saveReplyError } = await admin.from("chat_messages").insert(assistantRow);
