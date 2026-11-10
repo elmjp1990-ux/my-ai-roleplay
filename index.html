@@ -7918,12 +7918,23 @@ async function loadStoryMemorySummary(session) {
       target.innerHTML='<p class="small muted">目前無法取得回憶摘要資料。</p>';
       return;
     }
-    const summary=String(row.summary||'').trim();
     const status=String(row.generation_status||'collecting');
     const turns=Number(row.settled_turn_count)||0;
-    if(summary){
-      target.innerHTML='<div class="small muted" style="margin-bottom:6px">AI 劇情回憶摘要 · 第 '+e(row.batch_number||1)+' 批</div><p class="diary-memory-text">'+e(summary)+'</p>';
-    }else if(status==='processing'){
+    const {data:summaryRows,error:summaryRowsError}=await window.mySupabase.rpc('get_story_memory_summaries',{p_session_id:session.id});
+    if(summaryRowsError)throw summaryRowsError;
+    if(currentUser()?.uid!==uid||!document.getElementById('storyMemorySummary'))return;
+    const summaries=Array.isArray(summaryRows)?summaryRows:[];
+    const totalChars=summaries.reduce((total,item)=>total+String(item.summary||'').length,0);
+    const count=document.getElementById('storyMemoryCount');
+    if(count)count.textContent=totalChars.toLocaleString();
+    const cards=summaries.map(item=>{
+      const important=Boolean(item.important);
+      const batch=Number(item.batch_number)||0;
+      return '<article class="memory-item diary-memory-card '+(important?'is-important':'')+'"><div class="diary-memory-head"><label class="diary-check"><input type="checkbox" data-story-memory-batch="'+batch+'" '+(important?'checked':'')+'><span class="diary-heart">'+(important?'♥':'♡')+'</span><span>'+(important?'重大記憶':'設為重大記憶')+'</span></label><span class="diary-memory-date">'+e(timeText(item.memory_at||item.created_at))+'</span></div><div class="small muted" style="margin-bottom:6px">AI 劇情回憶摘要 · 第 '+batch+' 批</div><p class="prose diary-memory-text">'+e(item.summary||'')+'</p>'+(important?'<p class="small diary-lock-note">♥ 已珍藏，不會被自動清除</p>':'')+'</article>';
+    }).join('');
+    if(cards){
+      target.innerHTML=cards;
+    }else if(status==='processing'||status==='pending'){
       target.innerHTML='<p class="small muted">AI 正在整理這段故事的回憶摘要。</p>';
     }else if(status==='failed'){
       target.innerHTML='<p class="small muted">上一批摘要生成未成功，系統會在後續故事回合再次嘗試。</p>';
@@ -7977,8 +7988,8 @@ function renderChatOverlay(kind) {
     ? `<label class="field"><span>搜尋過往聊天記錄</span><input id="archiveSearchInput" type="search" placeholder="輸入聊天名稱或角色名稱…" autocomplete="off"></label>
       <div id="archiveSearchResults">${archiveSearchResults('')}</div>`
     : kind === 'diary'
-      ? '<section class="diary-summary"><div class="diary-summary-head"><div><p class="small muted diary-eyebrow">SWEET DIARY · LONG-TERM MEMORY</p><h3>把重要的瞬間，好好收藏</h3><p class="small muted">每累積 5 個已結算故事回合，AI 會整理一次長期劇情摘要，供後續對話延續。</p></div><div class="diary-count"><strong>'+memorySize(s.memories).toLocaleString()+'</strong><span>/ 10,000 字</span></div></div>'+(s.storyMode?'<div id="storyMemorySummary" class="memory-item" style="margin:12px 0;white-space:pre-wrap"><p class="small muted">正在載入 AI 回憶摘要…</p></div>':'')+'<div class="diary-meter"><span style="width:'+Math.min(100,memorySize(s.memories)/10000*100)+'%"></span></div><p class="small muted diary-hint">勾選「重大記憶」即可珍藏這段回憶；取消勾選後，就能再次編輯。</p></section>' +
-        ((s.memories||[]).map(m => '<article class="memory-item diary-memory-card '+(m.important?'is-important':'')+'"><div class="diary-memory-head"><label class="diary-check"><input type="checkbox" data-memory="'+e(m.id)+'" '+(m.important?'checked':'')+'><span class="diary-heart">'+(m.important?'♥':'♡')+'</span><span>'+(m.important?'重大記憶':'設為重大記憶')+'</span></label><span class="diary-memory-date">'+e(timeText(m.at))+'</span></div><p class="prose diary-memory-text">'+e(m.text)+'</p>'+(m.important?'<p class="small diary-lock-note">♥ 已珍藏，不會被自動清除</p>':'<button type="button" class="diary-edit-button" data-action="edit-memory" data-id="'+e(m.id)+'">編輯這則回憶</button>')+'</article>').join('') || '<div class="empty diary-empty"><strong>你們的故事，正等待被收藏</strong><p>當聊天累積到第 5 次玩家發言，系統會保存玩家原話與相關角色回應；你也可以將重要內容標記為重大記憶。</p></div>')
+      ? '<section class="diary-summary"><div class="diary-summary-head"><div><p class="small muted diary-eyebrow">SWEET DIARY · LONG-TERM MEMORY</p><h3>把重要的瞬間，好好收藏</h3><p class="small muted">每累積 5 個已結算故事回合，AI 會整理一次長期劇情摘要，供後續對話延續。</p></div><div class="diary-count"><strong id="storyMemoryCount">'+(s.storyMode?'0':memorySize(s.memories)).toLocaleString()+'</strong><span>/ 10,000 字</span></div></div>'+(s.storyMode?'<div id="storyMemorySummary" class="memory-item" style="margin:12px 0;white-space:pre-wrap"><p class="small muted">正在載入 AI 回憶摘要…</p></div>':'')+'<div class="diary-meter"><span style="width:'+Math.min(100,memorySize(s.memories)/10000*100)+'%"></span></div><p class="small muted diary-hint">勾選「重大記憶」即可珍藏這段回憶；取消勾選後，就能再次編輯。</p></section>' +
+        (s.storyMode ? '' : ((s.memories||[]).map(m => '<article class="memory-item diary-memory-card '+(m.important?'is-important':'')+'"><div class="diary-memory-head"><label class="diary-check"><input type="checkbox" data-memory="'+e(m.id)+'" '+(m.important?'checked':'')+'><span class="diary-heart">'+(m.important?'♥':'♡')+'</span><span>'+(m.important?'重大記憶':'設為重大記憶')+'</span></label><span class="diary-memory-date">'+e(timeText(m.at))+'</span></div><p class="prose diary-memory-text">'+e(m.text)+'</p>'+(m.important?'<p class="small diary-lock-note">♥ 已珍藏，不會被自動清除</p>':'<button type="button" class="diary-edit-button" data-action="edit-memory" data-id="'+e(m.id)+'">編輯這則回憶</button>')+'</article>').join('') || '<div class="empty diary-empty"><strong>你們的故事，正等待被收藏</strong><p>這裡會收藏整理後的回憶內容；累積 5 個已結算故事回合後，AI 會建立第一則摘要。</p></div>'))
 
     : `${testControls}<div class="album-grid">${photos.map(p => `
         <button class="photo-button" data-action="photo" data-id="${e(p.id)}">
@@ -11069,6 +11080,29 @@ document.addEventListener('change',async event => {
       const memories=loadGroupDiaryMemories();
       const memory=memories.find(item=>item.id===target.dataset.groupMemory);
       if(memory) {const previous=memory.important;memory.important=target.checked;if(!saveGroupDiaryMemories(memories)){memory.important=previous;target.checked=previous;}else renderGroupConversation();}
+    }
+    if (target.dataset.storyMemoryBatch) {
+      const session=currentSession(),uid=currentUser()?.uid,batch=Number(target.dataset.storyMemoryBatch),previous= !target.checked;
+      if(!session?.storyMode||!session.cloudOwned||session.cloudOwnerUid!==uid||!isUuid(session.id)||!window.mySupabase||!Number.isInteger(batch)||batch<1){
+        target.checked=previous;toast('無法確認這則回憶的擁有權，請重新開啟甜蜜日記。');return;
+      }
+      try{
+        const {data:authData,error:authError}=await window.mySupabase.auth.getUser();
+        if(authError||authData?.user?.id!==uid||currentUser()?.uid!==uid)throw new Error('登入狀態已變更');
+        const {data,error}=await window.mySupabase.rpc('set_story_memory_summary_important',{p_session_id:session.id,p_batch_number:batch,p_important:target.checked});
+        if(error||data!==true)throw error||new Error('資料庫未確認更新');
+        const card=target.closest('.diary-memory-card');
+        card?.classList.toggle('is-important',target.checked);
+        const heart=card?.querySelector('.diary-heart');if(heart)heart.textContent=target.checked?'♥':'♡';
+        const label=target.closest('.diary-check')?.querySelector('span:last-child');if(label)label.textContent=target.checked?'重大記憶':'設為重大記憶';
+        let note=card?.querySelector('.diary-lock-note');
+        if(target.checked&&!note){note=document.createElement('p');note.className='small diary-lock-note';note.textContent='♥ 已珍藏，不會被自動清除';card?.appendChild(note);}
+        if(!target.checked)note?.remove();
+      }catch(error){
+        target.checked=previous;
+        toast('重大記憶儲存失敗：'+(error?.message||'請稍後重試。'));
+      }
+      return;
     }
     if (target.dataset.memory) {
       const session=currentSession();
