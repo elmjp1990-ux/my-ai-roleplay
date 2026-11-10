@@ -6078,10 +6078,10 @@ async function toggleGroupPin(groupId) {
 function firstSpokenDialoguePreview(rawText) {
   const text=String(rawText||'');let outside='',inside=false;
   for(let i=0;i<text.length;i++){const ch=text[i];if(ch==='*'&&text[i-1]!=='\\'&&text[i+1]!=='*'){inside=!inside;continue;}if(!inside)outside+=ch;}
-  let value=outside.replace(/\\s+/g,' ').trim();if(!value)return '角色暫時沒有對白';
+  let value=outside.replace(/\s+/g,' ').trim();if(!value)return '角色暫時沒有對白';
   value=value.replace(/^[「『“”"＂]+/,'').trim();
   const sentence=value.match(/^(.+?[。！？!?…]+)(?:[」』”"＂])?/);
-  if(sentence)value=sentence[1];else value=value.split(/[\\r\\n]/,1)[0].trim();
+  if(sentence)value=sentence[1];else value=value.split(/[\r\n]/,1)[0].trim();
   value=value.replace(/[「『“”"＂]+$/,'').trim();return value||'角色暫時沒有對白';
 }
 function latestAssistantPreview(session) {
