@@ -16,7 +16,9 @@ assert.match(phoneBlock, /const noticeLines=notices\.map/);
 assert.match(phoneBlock, /get_story_phone_state/, 'Story phone must load current configured field state separately');
 assert.match(phoneBlock, /get_story_phone_events/, 'Story phone must load genuine event history separately');
 assert.match(phoneBlock, /storyStateHTML/, 'Story phone must render current field snapshots in a dedicated section');
-assert.match(phoneBlock, /storyEventHTML/, 'Story phone must render genuine events in their own history section');
+assert.match(phoneBlock, /const noticeContentHTML=/, 'Phone notifications and genuine Story events must share one notification section');
+assert.doesNotMatch(phoneBlock, /📨 故事新通知/, 'Phone must not render a duplicate Story notification heading');
+assert.match(phoneBlock, /storyEventHTML/, 'Story phone must include genuine events in the unified notification list');
 assert.match(phoneStateMigration, /CREATE TABLE IF NOT EXISTS public\.story_phone_states/);
 assert.match(phoneStateMigration, /ON CONFLICT \(session_id, field_index\) DO UPDATE/);
 assert.match(phoneStateMigration, /IS DISTINCT FROM EXCLUDED\.body/,
