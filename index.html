@@ -505,6 +505,7 @@ body.group-chat-page:has(.group-wizard) #view {
 .chat-layout.hide-list { grid-template-columns:1fr; }
 .chat-layout.hide-list .chat-list { display:none; }
 .chat-list { overflow-y:auto; padding:clamp(14px,2.4vw,22px); min-height:0; background:linear-gradient(180deg,var(--panel),color-mix(in srgb,var(--panel) 94%,var(--primary))); }
+.chat-entry-name{display:inline-flex;align-items:center;gap:7px;min-width:0;max-width:100%}.chat-entry-name strong{min-width:0}.chat-unread-pill{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;padding:2px 7px;border-radius:999px;background:var(--soft);border:1px solid color-mix(in srgb,var(--primary) 35%,var(--border));color:var(--primary);font-size:10px;font-weight:700;line-height:1.4;white-space:nowrap}
 .chat-list-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; }
 .chat-brand { display:inline-flex; align-items:center; gap:9px; padding:0; border:0; background:transparent; color:var(--text); font-size:18px; font-weight:800; letter-spacing:.02em; }
 .chat-brand-mark { display:grid; place-items:center; width:34px; height:34px; border-radius:12px; background:linear-gradient(135deg,#6366f1,#8b5cf6); color:white; box-shadow:0 5px 18px #6366f133; }
@@ -3347,6 +3348,8 @@ function chatSessionData(s) {
         ? true : (s.cloudHasUserMessage===null ? null : false),
     lastMessagePreview:lastMessage ? String(lastMessage.text || '').slice(0,180) : String(s.lastMessagePreview || '').slice(0,180),
     lastMessageAt:Number(lastMessage?.at || s.lastMessageAt || 0) || null,
+    lastAssistantMessageAt:Number(s.lastAssistantMessageAt||0)||null,
+    lastReadAt:Number(s.lastReadAt||0)||null,
     memories:Array.isArray(s.memories) ? s.memories : [],
     album:Array.isArray(s.album) ? s.album : [],
     roleplayMeta:{
@@ -3690,6 +3693,8 @@ async function loadCloudChatSessions(user, options = {}) {
         updatedAt:row.updated_at ? new Date(row.updated_at).getTime() : Number(existing?.updatedAt || 0),
         lastMessagePreview:row.session_last_message_preview || existing?.lastMessagePreview || '',
         lastMessageAt:Number(row.session_last_message_at) || Number(existing?.lastMessageAt || 0) || (row.updated_at ? new Date(row.updated_at).getTime() : 0),
+        lastAssistantMessageAt:Number(row.session_data?.lastAssistantMessageAt)||Number(existing?.lastAssistantMessageAt||0),
+        lastReadAt:Number(row.session_data?.lastReadAt)||Number(existing?.lastReadAt||0),
         archivedAt:Number(row.session_archived_at) || existing?.archivedAt || null, persona:row.session_persona || existing?.persona || '',
         personaCustom:row.session_persona_custom===null||row.session_persona_custom===undefined
           ? existing?.personaCustom===true : parseBool(row.session_persona_custom),
@@ -3851,6 +3856,8 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
     }
     const newest=cloudMessages.at(-1);
     if(!older){
+      const newestAssistant=[...cloudMessages].reverse().find(message=>message.role==='assistant');
+      if(newestAssistant)session.lastAssistantMessageAt=Number(newestAssistant.at)||0;
       if(newest){session.lastMessagePreview=String(newest.text||'').slice(0,180);session.lastMessageAt=newest.at;}
       else{session.lastMessagePreview=String(data.lastMessagePreview||session.lastMessagePreview||'');session.lastMessageAt=Number(data.lastMessageAt||session.lastMessageAt||0);}
     }
@@ -4148,13 +4155,16 @@ async function runPendingChatTurn(s) {
       .slice(0,3);
   }
   if (replyWasAdded) {
+    const assistantAt=Date.now();
     s.messages.push({
       id:reply.id,
       role:'assistant',
       text:String(reply.content),
       suggestedReplies:s.suggestedReplies,
-      at:Date.now()
+      at:assistantAt
     });
+    s.lastAssistantMessageAt=assistantAt;
+    if(route.page==='conversation'&&route.id===s.id)s.lastReadAt=assistantAt;
   } else {
     const savedAssistant = s.messages.find(message=>message.id===reply.id);
     if (savedAssistant) savedAssistant.suggestedReplies = s.suggestedReplies;
@@ -6082,12 +6092,12 @@ function firstSpokenDialoguePreview(rawText) {
   value=value.replace(/^[「『“”"＂]+/,'').trim();
   const sentence=value.match(/^(.+?[。！？!?…]+)(?:[」』”"＂])?/);
   if(sentence)value=sentence[1];else value=value.split(/[\r\n]/,1)[0].trim();
-  value=value.replace(/[「『“”"＂]+$/,'').trim();return value||'角色暫時沒有對白';
+  value=value.replace(/[「『“”"＂]+$/,'').trim();return value||'你有新訊息';
 }
 function latestAssistantPreview(session) {
   const latest=[...(session?.messages||[])].reverse().find(message=>message?.role==='assistant'&&String(message.text||'').trim());
   if(latest)return firstSpokenDialoguePreview(latest.text);
-  return session?.cloudMessagesLoaded===false?'點擊載入最近訊息':'角色暫時沒有對白';
+  return session?.cloudMessagesLoaded===false?'點擊載入最近訊息':'你有新訊息';
 }
 function chatEntries() {
   const q=chatSearch.trim().toLocaleLowerCase();
@@ -6122,6 +6132,7 @@ function chatEntries() {
     const s=item.value,c=sessionCharacter(s);if(!c)return '';
     const preview=latestAssistantPreview(s);
     const lastAt=last?.at||s.lastMessageAt||s.updatedAt||s.startedAt;
+    const hasUnread=Number(s.lastAssistantMessageAt||0)>Number(s.lastReadAt||0);
     return `<div class="chat-entry ${route.page==='conversation'&&route.id===s.id?'active':''}">
       <button class="pin ${s.pinned?'on':''}" data-action="pin" data-id="${e(s.id)}" aria-label="切換置頂">${ICON.pin}</button>
       <button class="ghost" style="padding:0" data-action="session-detail" data-id="${e(s.id)}" aria-label="查看${e(c.name)}角色簡介">
@@ -6129,7 +6140,7 @@ function chatEntries() {
         <span class="character-status-dot" title="${characterIsOffline(c)?'角色離線／已下架':'角色公開中'}"></span></span>
       </button>
       <button class="select-chat" data-action="select-chat" data-id="${e(s.id)}">
-        <div class="row between"><strong class="ellipsis">${e(s.name||c.name)}</strong><span class="small muted">${chatListDate(lastAt)}</span></div>
+        <div class="row between"><span class="chat-entry-name"><strong class="ellipsis">${e(s.name||c.name)}</strong>${hasUnread?'<span class="chat-unread-pill">新訊息</span>':''}</span><span class="small muted">${chatListDate(lastAt)}</span></div>
         <div class="ellipsis small muted">${e(preview)}</div>
       </button><button class="entry-menu" data-action="session-menu" data-id="${e(s.id)}" aria-label="刪除這段對話與回憶" title="刪除這段對話與回憶">⋯</button></div>`;
   }).join('')||'<div class="empty">還沒有符合條件的對話。</div>';
@@ -7389,6 +7400,12 @@ function renderConversation() {
   if (!s || !canAccessSessionCharacter(s,c)) {
     $('view').innerHTML = '<div class="empty">此對話不存在或無法存取。</div>';
     return;
+  }
+  if(isConversationEntry){
+    const latestAssistantAt=Number(s.lastAssistantMessageAt||0);
+    s.lastReadAt=Math.max(Number(s.lastReadAt||0),latestAssistantAt,Date.now());
+    persist();
+    if(s.cloudOwned)saveChatSessionSafely(s).catch(error=>console.warn('聊天室已讀狀態同步失敗：',error));
   }
   $('view').innerHTML = `
     <div class="chat-layout ${hideList ? 'hide-list' : ''}">
