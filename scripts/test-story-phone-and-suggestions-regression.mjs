@@ -16,6 +16,7 @@ assert.match(html, /select\('id,session_id,role,content,created_at,suggested_rep
 assert.match(html, /message\.suggested_replies/);
 assert.match(html, /result\.suggestedReplies\).*result\.suggested_replies/s);
 assert.match(html, /function conversationSuggestionsHTML\(s\)/);
+assert.match(html, /\[\.\.\.\(s\.messages\|\|\[\]\)\]\.reverse\(\)\.find/);
 assert.match(html, /suggestionHost\.innerHTML=conversationSuggestionsHTML\(session\)/);
 assert.match(html, /id="conversationSuggestions"/);
 assert.doesNotMatch(html, /SWEET DIARY · LONG-TERM MEMORY/);
