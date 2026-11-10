@@ -161,3 +161,7 @@ assert.doesNotMatch(saveFlow, /compareCharacterField\('phone_settings'.*false/,
 
 console.log('Character save performs deterministic AI-impact diffing without invoking the model.');
 
+
+assert.match(phoneBlock, /get_story_world_state/, 'Story phone must read the persisted contextual time and location');
+assert.match(phoneBlock, /依開場情境推定中/, 'Story phone must show a contextual initial location fallback');
+assert.match(phoneBlock, /initialStoryTimeText/, 'Story phone must show the session start time before the first AI turn');
