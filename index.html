@@ -3905,6 +3905,10 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
     if(clearedOrphanedPendingTurn)void saveChatSessionSafely(session);
     if(route.page==='conversation'&&route.id===sessionId){
       renderMessages(!older);
+      if(!older){
+        const suggestionHost=$('conversationSuggestions');
+        if(suggestionHost)suggestionHost.innerHTML=conversationSuggestionsHTML(session);
+      }
       if(older&&$('messages')){const node=$('messages');node.scrollTop=previousTop+Math.max(0,node.scrollHeight-previousHeight);}
     }
     return true;
@@ -7453,6 +7457,24 @@ async function loadStoryRelationshipState(session) {
   }
 }
 
+function conversationSuggestionsHTML(s) {
+  if(!s?.suggestions)return '';
+  const replies=Array.isArray(s.suggestedReplies)?s.suggestedReplies.slice(0,3):[];
+  return `<div class="suggestions">
+    <details class="suggestions-panel" open>
+      <summary>建議回覆 <span class="suggestions-count" data-collapsed="點擊可展開" data-expanded="滑動或點選燈號可切換">滑動或點選燈號可切換</span></summary>
+      ${!hasUserMessage(s)
+        ? '<p class="suggestion-first-message-hint">請先自由的輸入第一句話，享受與角色對話的美好時光吧</p>'
+        : (replies.length>0
+          ? `<div class="suggestion-options" aria-label="選擇建議回覆">
+              ${replies.map((_,index)=>`<button type="button" class="suggestion-light" data-action="suggestion-select" data-index="${index}" aria-label="第 ${index+1} 則建議" aria-pressed="${index===0?'true':'false'}"></button>`).join('')}
+            </div>
+            ${replies.map((reply,index)=>`<button type="button" class="suggestion-card${index===0?' active':''}" data-action="suggestion" data-index="${index}" data-text="${e(reply)}"><span class="suggestion-card-action">${e(reply)}</span></button>`).join('')}`
+          : '<p class="suggestion-first-message-hint">本回合暫時沒有可用的建議回覆。</p>')}
+    </details>
+  </div>`;
+}
+
 function renderConversation() {
   const s = currentSession();
   const c = sessionCharacter(s);
@@ -7500,19 +7522,7 @@ function renderConversation() {
         </div>
         <div class="messages" id="messages"></div>
         <form class="composer" data-form="message">
-          ${s.suggestions ? `<div class="suggestions">
-            <details class="suggestions-panel" open>
-              <summary>建議回覆 <span class="suggestions-count" data-collapsed="點擊可展開" data-expanded="滑動或點選燈號可切換">滑動或點選燈號可切換</span></summary>
-              ${!hasUserMessage(s)
-                ? '<p class="suggestion-first-message-hint">請先自由的輸入第一句話，享受與角色對話的美好時光吧</p>'
-                : (Array.isArray(s.suggestedReplies) && s.suggestedReplies.length > 0 && s.suggestedReplies.length <= 3
-                  ? `<div class="suggestion-options" aria-label="選擇建議回覆">
-                      ${s.suggestedReplies.map((_,index)=>`<button type="button" class="suggestion-light" data-action="suggestion-select" data-index="${index}" aria-label="第 ${index+1} 則建議" aria-pressed="${index===0?'true':'false'}"></button>`).join('')}
-                    </div>
-                    ${s.suggestedReplies.map((reply,index)=>`<button type="button" class="suggestion-card${index===0?' active':''}" data-action="suggestion" data-index="${index}" data-text="${e(reply)}"><span class="suggestion-card-action">${e(reply)}</span></button>`).join('')}`
-                  : '<p class="suggestion-first-message-hint">本回合暫時沒有可用的建議回覆。</p>')}
-            </details>
-          </div>` : ''}
+          <div id="conversationSuggestions">${conversationSuggestionsHTML(s)}</div>
                     <div class="composer-input-row">
             <textarea id="messageInput" name="text" maxlength="1000" rows="1" placeholder="留空發送，角色會繼續說下去" aria-label="輸入對話">${e(drafts[s.id] || '')}</textarea>
           </div>
@@ -7932,7 +7942,7 @@ async function loadStoryMemorySummary(session) {
     const cards=summaries.map(item=>{
       const important=Boolean(item.important);
       const batch=Number(item.batch_number)||0;
-      return '<article class="memory-item diary-memory-card '+(important?'is-important':'')+'"><div class="diary-memory-head"><label class="diary-check"><input type="checkbox" data-story-memory-batch="'+batch+'" '+(important?'checked':'')+'><span class="diary-heart">'+(important?'♥':'♡')+'</span><span>'+(important?'重大記憶':'設為重大記憶')+'</span></label><span class="diary-memory-date">'+e(timeText(item.memory_at||item.created_at))+'</span></div><div class="small muted" style="margin-bottom:6px">AI 劇情回憶摘要 · 第 '+batch+' 批</div><p class="prose diary-memory-text">'+e(item.summary||'')+'</p>'+(important?'<p class="small diary-lock-note">♥ 已珍藏，不會被自動清除</p>':'')+'</article>';
+      return '<article class="memory-item diary-memory-card '+(important?'is-important':'')+'"><div class="diary-memory-head"><label class="diary-check"><input type="checkbox" data-story-memory-batch="'+batch+'" '+(important?'checked':'')+'><span class="diary-heart">'+(important?'♥':'♡')+'</span><span>'+(important?'重大記憶':'設為重大記憶')+'</span></label><span class="diary-memory-date">'+e(timeText(item.memory_at||item.created_at))+'</span></div><p class="prose diary-memory-text">'+e(item.summary||'')+'</p>'+(important?'<p class="small diary-lock-note">♥ 已珍藏，不會被自動清除</p>':'')+'</article>';
     }).join('');
     if(cards){
       target.innerHTML=cards;
@@ -7990,7 +8000,7 @@ function renderChatOverlay(kind) {
     ? `<label class="field"><span>搜尋過往聊天記錄</span><input id="archiveSearchInput" type="search" placeholder="輸入聊天名稱或角色名稱…" autocomplete="off"></label>
       <div id="archiveSearchResults">${archiveSearchResults('')}</div>`
     : kind === 'diary'
-      ? '<section class="diary-summary"><div class="diary-summary-head"><div><p class="small muted diary-eyebrow">SWEET DIARY · LONG-TERM MEMORY</p><h3>把重要的瞬間，好好收藏</h3><p class="small muted">每累積 5 個已結算故事回合，AI 會整理一次長期劇情摘要，供後續對話延續。</p></div><div class="diary-count"><strong id="storyMemoryCount">'+(s.storyMode?'0':memorySize(s.memories)).toLocaleString()+'</strong><span>/ 10,000 字</span></div></div>'+(s.storyMode?'<div id="storyMemorySummary" class="memory-item" style="margin:12px 0;white-space:pre-wrap"><p class="small muted">正在載入 AI 回憶摘要…</p></div>':'')+'<div class="diary-meter"><span id="storyMemoryMeter" style="width:'+Math.min(100,(s.storyMode?0:memorySize(s.memories))/10000*100)+'%"></span></div><p class="small muted diary-hint">勾選「重大記憶」即可珍藏這段回憶；取消勾選後，就能再次編輯。</p></section>' +
+      ? '<section class="diary-summary"><div class="diary-summary-head"><div><h3>把重要的瞬間，好好收藏</h3></div><div class="diary-count"><strong id="storyMemoryCount">'+(s.storyMode?'0':memorySize(s.memories)).toLocaleString()+'</strong><span>/ 10,000 字</span></div></div>'+(s.storyMode?'<div id="storyMemorySummary" class="memory-item" style="margin:12px 0;white-space:pre-wrap"><p class="small muted">正在載入 AI 回憶摘要…</p></div>':'')+'<div class="diary-meter"><span id="storyMemoryMeter" style="width:'+Math.min(100,(s.storyMode?0:memorySize(s.memories))/10000*100)+'%"></span></div></section>' +
         (s.storyMode ? '' : ((s.memories||[]).map(m => '<article class="memory-item diary-memory-card '+(m.important?'is-important':'')+'"><div class="diary-memory-head"><label class="diary-check"><input type="checkbox" data-memory="'+e(m.id)+'" '+(m.important?'checked':'')+'><span class="diary-heart">'+(m.important?'♥':'♡')+'</span><span>'+(m.important?'重大記憶':'設為重大記憶')+'</span></label><span class="diary-memory-date">'+e(timeText(m.at))+'</span></div><p class="prose diary-memory-text">'+e(m.text)+'</p>'+(m.important?'<p class="small diary-lock-note">♥ 已珍藏，不會被自動清除</p>':'<button type="button" class="diary-edit-button" data-action="edit-memory" data-id="'+e(m.id)+'">編輯這則回憶</button>')+'</article>').join('') || '<div class="empty diary-empty"><strong>你們的故事，正等待被收藏</strong><p>這裡會收藏整理後的回憶內容；累積 5 個已結算故事回合後，AI 會建立第一則摘要。</p></div>'))
 
     : `${testControls}<div class="album-grid">${photos.map(p => `
