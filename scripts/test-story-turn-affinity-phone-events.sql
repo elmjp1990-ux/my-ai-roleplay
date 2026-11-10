@@ -184,22 +184,22 @@ BEGIN
 END $$;
 
 SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',true);
-DO $
+DO $$
 DECLARE event_count integer;
 BEGIN
   SELECT count(*) INTO event_count FROM public.get_story_phone_state('30000000-0000-4000-8000-000000000001');
   IF event_count <> 8 THEN RAISE EXCEPTION 'owner cannot read all eight current phone fields'; END IF;
   SELECT count(*) INTO event_count FROM public.get_story_phone_events('30000000-0000-4000-8000-000000000001');
   IF event_count <> 0 THEN RAISE EXCEPTION 'status snapshots must not render as historical events'; END IF;
-END $;
+END $$;
 SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000002',true);
-DO $
+DO $$
 DECLARE state_count integer; event_count integer;
 BEGIN
   SELECT count(*) INTO state_count FROM public.get_story_phone_state('30000000-0000-4000-8000-000000000001');
   SELECT count(*) INTO event_count FROM public.get_story_phone_events('30000000-0000-4000-8000-000000000001');
   IF state_count <> 0 OR event_count <> 0 THEN RAISE EXCEPTION 'cross-owner phone data read was allowed'; END IF;
-END $;
+END $$;
 
 INSERT INTO public.ai_model_usage (
   user_id,session_id,generation_type,batch_number,source_turn_ids,model,status,summary,processed_at
@@ -217,21 +217,21 @@ INSERT INTO public.ai_model_usage (
   'openai/gpt-oss-20b','completed','這是已完成的 AI 累積回憶摘要。',now()
 );
 SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',true);
-DO $
+DO $$
 DECLARE row_value record;
 BEGIN
   SELECT * INTO row_value FROM public.get_story_memory_summary('30000000-0000-4000-8000-000000000001');
   IF row_value.summary <> '這是已完成的 AI 累積回憶摘要。' OR row_value.generation_status <> 'completed' THEN
     RAISE EXCEPTION 'owner cannot read the latest AI memory summary';
   END IF;
-END $;
+END $$;
 SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000002',true);
-DO $
+DO $$
 DECLARE row_count integer;
 BEGIN
   SELECT count(*) INTO row_count FROM public.get_story_memory_summary('30000000-0000-4000-8000-000000000001');
   IF row_count <> 0 THEN RAISE EXCEPTION 'cross-owner memory summary read was allowed'; END IF;
-END $;
+END $$;
 
 SELECT set_config('request.jwt.claim.role','service_role',true);
 SELECT public.complete_story_relationship_batch(
