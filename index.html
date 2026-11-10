@@ -7775,6 +7775,13 @@ function archiveSearchResults(query) {
 }
 function formatStoryWorldTime(value) {
   const raw=String(value||'').trim();if(!raw)return '故事時間尚未確認';
+  const match=raw.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  if(match){
+    const year=Number(match[1]),month=Number(match[2]),day=Number(match[3]);
+    const date=new Date(Date.UTC(year,month-1,day));
+    const dateLabel=date.toLocaleDateString('zh-TW',{weekday:'long',month:'numeric',day:'numeric',timeZone:'UTC'});
+    return dateLabel+'　'+match[4]+':'+match[5];
+  }
   const date=new Date(raw);if(!Number.isFinite(date.getTime()))return raw.slice(0,80);
   const dateLabel=date.toLocaleDateString('zh-TW',{weekday:'long',month:'numeric',day:'numeric'});
   const timeLabel=date.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
@@ -7853,8 +7860,13 @@ async function renderPhoneModal() {
   const diaryChars=Array.isArray(diaryList)?(isGroup?diaryList.reduce((n,item)=>n+countChars(typeof item==='string'?item:(item.text||'')),0):memorySize(diaryList)):0;
   const capacity=10000,battery=Math.max(0,Math.min(100,Math.round((1-Math.min(diaryChars,capacity)/capacity)*100))),warning=battery<=20,batteryColor=warning?'#e07b39':battery<=50?'#d5b34a':'#4eaf78';
   const initialStoryTime=Number(session.startedAt||session.initialOpeningMessage?.at)||Date.now();
-  const storyTimeLabel=formatStoryWorldTime(storyWorldState.storyTime||storyWorldState.story_time||new Date(initialStoryTime).toISOString());
-  const storyLocationLabel=String(storyWorldState.storyLocation||storyWorldState.story_location||session.encounterPlace||'').trim().slice(0,120)||'依開場情境推定中';
+  const initialDate=new Date(initialStoryTime);
+  const initialStoryTimeText=initialDate.getFullYear()+'-'+String(initialDate.getMonth()+1).padStart(2,'0')+'-'+String(initialDate.getDate()).padStart(2,'0')+'T'+String(initialDate.getHours()).padStart(2,'0')+':'+String(initialDate.getMinutes()).padStart(2,'0');
+  const storyTimeLabel=formatStoryWorldTime(storyWorldState.storyTime||storyWorldState.story_time||initialStoryTimeText);
+  const openingContext=[session.initialOpeningMessage?.text,character.opening,character.intro,character.style].filter(Boolean).join(' ');
+  const openingLocationMatch=openingContext.match(/(?:目前在|此刻在|位於|來到|身處|地點[：:是]?|場景[：:是]?)([^，。！？；;\\n]{2,40})/);
+  const inferredOpeningLocation=openingLocationMatch?.[1]?.trim().replace(/[。！？；;]+$/,'')||'';
+  const storyLocationLabel=String(storyWorldState.storyLocation||storyWorldState.story_location||session.encounterPlace||inferredOpeningLocation).trim().slice(0,120)||'依開場情境推定中';
   const title=(character.name||group?.name||'角色')+' 的手機';
   const noticeLines=notices.map(line=>String(line||'').trim()).filter(Boolean).slice(0,10);
   const noticeContentHTML=[
