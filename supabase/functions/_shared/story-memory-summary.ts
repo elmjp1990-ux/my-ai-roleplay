@@ -218,9 +218,13 @@ export async function processDueStoryMemorySummary(
     throw new Error("memory_summary_source_messages_unavailable");
   }
 
-  const previousBatch = rows.find((item: DbRow) =>
-    Number(item.batch_number) === batchNumber - 1 && item.status === "completed"
-  );
+  const previousBatch = rows
+    .filter((item: DbRow) =>
+      Number(item.batch_number) < batchNumber &&
+      item.status === "completed" &&
+      Boolean(str(item.summary))
+    )
+    .sort((left: DbRow, right: DbRow) => Number(right.batch_number) - Number(left.batch_number))[0] || null;
   const sessionData = row(session.session_data);
   const previousSummary = str(previousBatch?.summary) || str(sessionData.summary);
   const characterName = str(session.character_name) || "角色";
