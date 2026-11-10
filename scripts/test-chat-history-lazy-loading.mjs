@@ -102,6 +102,7 @@ assert.match(chatData, /s\.cloudHasUserMessage===null \? null : false/);
 assert.match(chatData, /s\.cloudRoleplayMeta/);
 
 const saveSession = between("async function saveChatSessionToCloud(s, options = {})", "  const row = {");
+const saveSessionBody = between("async function saveChatSessionToCloud(s, options = {})", "async function loadChatSessionAuthorProfiles");
 assert.match(saveSession, /cloudSessionDataLoaded/);
 assert.match(saveSession, /savedData\.memories/);
 assert.match(saveSession, /savedData\.album/);
@@ -113,7 +114,7 @@ assert.match(saveSession, /existing\.data\.status==='archived'/);
 assert.match(saveSession, /const currentRowFields=\[/);
 assert.match(saveSession, /s\.cloudCharacterSnapshotLoaded===true\?\[\]:\['character_snapshot'\]/);
 assert.match(saveSession, /s\.cloudSessionDataLoaded\?\[\]:\['session_data'\]/);
-assert.match(saveSession, /if \(!s\.cloudOwned \|\| s\.cloudSnapshotNeedsRepair===true \|\| !priorSnapshot\.id\) row\.character_snapshot=snapshot/);
+assert.match(saveSessionBody, /if \(!s\.cloudOwned \|\| s\.cloudSnapshotNeedsRepair===true \|\| !priorSnapshot\.id\) row\.character_snapshot=snapshot/);
 assert.doesNotMatch(saveSession, /character_snapshot:snapshot, session_data:/);
 assert.match(chatData, /lastMessagePreview/);
 assert.match(chatData, /lastMessageAt/);
