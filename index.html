@@ -3828,7 +3828,7 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
     }
     const roleplayMeta=session.cloudRoleplayMeta||{};
     const pageSize=50;
-    let messageQuery=client.from('chat_messages').select('id,session_id,role,content,created_at')
+    let messageQuery=client.from('chat_messages').select('id,session_id,role,content,created_at,suggested_replies')
       .eq('session_id',sessionId).is('deleted_at',null)
       .order('created_at',{ascending:false}).order('id',{ascending:false});
     if(older){
@@ -3846,6 +3846,8 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
     }
     const cloudMessages=(rows||[]).slice().reverse().map(message=>{
       const normalized={id:message.id,role:message.role==='user'?'user':'assistant',text:message.content||'',at:message.created_at?new Date(message.created_at).getTime():Date.now()};
+      const persistedSuggestions=Array.isArray(message.suggested_replies)?message.suggested_replies.map(value=>String(value||'').trim()).filter(value=>value.length>0).slice(0,3):[];
+      if(persistedSuggestions.length===3)normalized.suggestedReplies=persistedSuggestions;
       const metadata=roleplayMeta[message.id];if(metadata&&typeof metadata==='object')Object.assign(normalized,metadata);
       return normalized;
     });
@@ -4194,13 +4196,15 @@ async function executePendingChatTurn(s) {
   }
 
   const replyWasAdded = !s.messages.some(message => message.id === reply.id);
-  if (Array.isArray(result.suggestedReplies)) {
-    // Offer any non-empty suggestion; do not enforce a character-count range.
-    s.suggestedReplies = result.suggestedReplies
-      .map(value=>String(value||'').trim())
-      .filter(value=>value.length>0)
-      .slice(0,3);
-  }
+  const responseSuggestions=Array.isArray(result.suggestedReplies)?result.suggestedReplies:Array.isArray(result.suggested_replies)?result.suggested_replies:[];
+  const validResponseSuggestions=responseSuggestions.map(value=>String(value||'').trim()).filter(value=>value.length>0).slice(0,3);
+  // The server normally supplies three validated, contextual options. Keep the UI usable
+  // if an older Edge Function version or a malformed response omits them.
+  s.suggestedReplies=validResponseSuggestions.length===3?validResponseSuggestions:[
+    "*我稍微停下動作，認真看向你*你剛才提到的事，我還想再聽你多說一點，可以嗎？",
+    "*我輕輕點頭，語氣放緩一些*那我們先把眼前這件事處理好，之後再慢慢聊。",
+    "*我看了看四周，再把目光移回你身上*如果你願意，我想陪你一起確認接下來的安排。"
+  ];
   if (replyWasAdded) {
     const assistantAt=Date.now();
     s.messages.push({
@@ -7825,7 +7829,7 @@ async function renderPhoneModal() {
     try{
       const {data:authData,error:authError}=await client.auth.getUser();
       if(authError||authData?.user?.id!==uid)throw new Error('登入狀態已變更，請重新開啟聊天室。');
-      const [eventsResult,stateResult]=await Promise.all([
+      const [eventsResult,stateResult,worldStateResult]=await Promise.all([
         client.rpc('get_story_phone_events',{p_session_id:session.id}),
         client.rpc('get_story_phone_state',{p_session_id:session.id}),
         client.rpc('get_story_world_state',{p_session_id:session.id})
