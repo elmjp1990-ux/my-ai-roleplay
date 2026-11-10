@@ -154,7 +154,7 @@ async function buildStoryMessages(
   currentUserMessage: DbRow,
 ): Promise<{ messages: Array<{ role: "system" | "user" | "assistant"; content: string }>; protectedContext: string[]; priorAssistantOutputs: string[]; phonePrompts: string[]; currentUserMessage: string; playerName: string; characterName: string; currentStoryWorldState: { story_time: string; story_location: string } | null }> {
   const characterId = String(session.character_id);
-  const [characterResult, profileResult, historyResult, summaryResult] = await Promise.all([
+  const [characterResult, profileResult, historyResult, summaryResult, importantMemoriesResult] = await Promise.all([
     admin.from("characters")
       .select("id,author_id,name,intro,style,gender,age,race,phone_settings")
       .eq("id", characterId)
@@ -174,6 +174,12 @@ async function buildStoryMessages(
       .eq("generation_type", "memory_summary")
       .eq("status", "completed")
       .order("batch_number", { ascending: false }).limit(1).maybeSingle(),
+    admin.from("ai_model_usage").select("batch_number,summary,processed_at,created_at")
+      .eq("session_id", String(session.id))
+      .eq("generation_type", "memory_summary")
+      .eq("status", "completed")
+      .eq("important", true)
+      .order("batch_number", { ascending: true }),
   ]);
 
   if (characterResult.error) throw new Error("story_character_context_unavailable");
@@ -245,6 +251,21 @@ async function buildStoryMessages(
   const sessionData = asDbRow(session.session_data);
   const storedSummary = asString(summaryResult.data?.summary);
   if (storedSummary) sessionData.summary = storedSummary;
+  // Story memory is AI-summary-only: never feed legacy player/character quote
+  // cards from session_data.memories back into the roleplay prompt.
+  // Only summaries explicitly marked important are promoted into MEMORY.
+  if (importantMemoriesResult.error) {
+    console.warn("story_important_memories_unavailable", {
+      code: typeof importantMemoriesResult.error.code === "string" ? importantMemoriesResult.error.code : "memory_read_failed",
+    });
+  }
+  const importantSummaryRows = Array.isArray(importantMemoriesResult.data) ? importantMemoriesResult.data : [];
+  sessionData.memories = importantSummaryRows.map((item: DbRow, index: number) => ({
+    text: asString(item.summary),
+    important: true,
+    at: Date.parse(asString(item.processed_at || item.created_at)) || Number(item.batch_number) || index,
+  })).filter((item: DbRow) => item.text);
+  sessionData.memory = [];
   const values = buildPromptVariableValues({
     profile,
     character: { ...character, personality_profile: personalityProfile },
