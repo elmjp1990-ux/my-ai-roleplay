@@ -143,7 +143,7 @@ export function parseStoryTurnEnvelope(raw: string, options: StoryTurnEnvelopeOp
         title: label,
         // Status fields are rendered as one concise line; multiple todo items use separators.
         body: candidate.event_type === "notification"
-          ? candidateBody.replace(/\\s*[\\r\\n]+\\s*/g, "；").slice(0, 600)
+          ? candidateBody.replace(/\s*[\r\n]+\s*/g, "；").slice(0, 600)
           : candidateBody,
       };
     });
