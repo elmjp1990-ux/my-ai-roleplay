@@ -201,6 +201,38 @@ BEGIN
   IF state_count <> 0 OR event_count <> 0 THEN RAISE EXCEPTION 'cross-owner phone data read was allowed'; END IF;
 END $$;
 
+INSERT INTO public.chat_messages(id,session_id,role,content) VALUES
+  ('40000000-0000-4000-8000-000000000006','30000000-0000-4000-8000-000000000001','user','Turn six'),
+  ('50000000-0000-4000-8000-000000000006','30000000-0000-4000-8000-000000000001','assistant','Reply six');
+INSERT INTO public.chat_turn_charges(turn_id,session_id,user_id,user_message_id,expected_assistant_message_id,assistant_message_id,status)
+VALUES ('60000000-0000-4000-8000-000000000006','30000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001',
+  '40000000-0000-4000-8000-000000000006','50000000-0000-4000-8000-000000000006','50000000-0000-4000-8000-000000000006','settled');
+SELECT public.queue_story_turn_evaluation(
+  '60000000-0000-4000-8000-000000000006',
+  '30000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000001',
+  '40000000-0000-4000-8000-000000000006',
+  '50000000-0000-4000-8000-000000000006',
+  0,
+  'No affinity change',
+  '[{"event_type":"notification","title":"目前想法","body":"正在思考明天安排。"},{"event_type":"message","title":"客戶訊息","body":"客戶確認明早十點丈量。"},{"event_type":"notification","title":"目前衣著","body":"深色襯衫。"},{"event_type":"notification","title":"待辦事項","body":"優先確認丈量時間；準備材料清單。"},{"event_type":"notification","title":"目前位置","body":"工作室。"}]'::jsonb
+);
+SELECT public.apply_story_turn_evaluation('60000000-0000-4000-8000-000000000006');
+SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',true);
+DO $$
+DECLARE state_count integer; event_count integer; current_count integer;
+BEGIN
+  SELECT count(*) INTO state_count FROM public.story_phone_states
+  WHERE session_id='30000000-0000-4000-8000-000000000001';
+  SELECT count(*) INTO event_count FROM public.story_phone_events
+  WHERE session_id='30000000-0000-4000-8000-000000000001';
+  SELECT count(*) INTO current_count FROM public.get_story_phone_state('30000000-0000-4000-8000-000000000001');
+  IF state_count <> 4 OR current_count <> 4 OR event_count <> 1 THEN
+    RAISE EXCEPTION 'removed field snapshots or genuine event history were not handled correctly';
+  END IF;
+END $$;
+
 INSERT INTO public.ai_model_usage (
   user_id,session_id,generation_type,batch_number,source_turn_ids,model,status,summary,processed_at
 ) VALUES (
