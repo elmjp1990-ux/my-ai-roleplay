@@ -11,6 +11,10 @@ const phoneBlock = html.slice(generatedStart, generatedEnd);
 assert.match(phoneBlock, /const generated=isGroup\?/);
 assert.match(phoneBlock, /const notices=Array\.isArray\(generated\)/);
 assert.match(phoneBlock, /const noticeLines=notices\.map/);
+assert.match(phoneBlock, /get_story_phone_state/, 'Story phone must load current configured field state separately');
+assert.match(phoneBlock, /get_story_phone_events/, 'Story phone must load genuine event history separately');
+assert.match(phoneBlock, /storyStateHTML/, 'Story phone must render current field snapshots in a dedicated section');
+assert.match(phoneBlock, /storyEventHTML/, 'Story phone must render genuine events in their own history section');
 assert.match(phoneBlock, /目前還沒有新的手機通知/);
 assert.doesNotMatch(phoneBlock, /noticePrompts|settings\.notices|\.\.\.prompts/, 'Creator-only notice prompts must never be rendered as player-facing phone content');
 
