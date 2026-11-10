@@ -3846,9 +3846,10 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
     }
     const cloudMessages=(rows||[]).slice().reverse().map(message=>{
       const normalized={id:message.id,role:message.role==='user'?'user':'assistant',text:message.content||'',at:message.created_at?new Date(message.created_at).getTime():Date.now()};
-      const persistedSuggestions=Array.isArray(message.suggested_replies)?message.suggested_replies.map(value=>String(value||'').trim()).filter(value=>value.length>0).slice(0,3):[];
-      if(persistedSuggestions.length===3)normalized.suggestedReplies=persistedSuggestions;
       const metadata=roleplayMeta[message.id];if(metadata&&typeof metadata==='object')Object.assign(normalized,metadata);
+      const persistedSuggestions=Array.isArray(message.suggested_replies)?message.suggested_replies.map(value=>String(value||'').trim()).filter(value=>value.length>0).slice(0,3):[];
+      // The dedicated message column is authoritative over legacy session metadata.
+      if(persistedSuggestions.length===3)normalized.suggestedReplies=persistedSuggestions;
       return normalized;
     });
     const merged=new Map((session.messages||[]).map(message=>[message.id,message]));
