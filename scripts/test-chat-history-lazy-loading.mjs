@@ -43,8 +43,10 @@ assert.match(sessionSync, /void loadChatSessionAuthorProfiles\(user\.id, snapsho
 assert.doesNotMatch(sessionSync, /await client\.from\(['"]public_profiles['"]\)/,
   "chat-list hydration must not await public profile rows");
 assert.match(sessionSync, /readDeletedChatTombstones/);
-assert.match(sessionSync, /character_snapshot/);
-assert.match(sessionSync, /snapshot\.id !== row\.character_id/);
+assert.match(sessionSync, /character_snapshot_author_id:character_snapshot->>authorId/);
+assert.match(sessionSync, /character_snapshot_opening:character_snapshot->>opening/);
+assert.doesNotMatch(sessionSync, /'character_snapshot'/, "chat-list hydration must not fetch the full image-heavy snapshot");
+assert.match(sessionSync, /cloudSnapshotNeedsRepair:!row\.character_snapshot_id/);
 assert.match(sessionSync, /compactCloudSessionForLocalStorage\(state\.sessions\[row\.id\]\)/);
 
 const hasUserHelper = between("function hasUserMessage(session)", "function sessionTitle");
@@ -57,6 +59,10 @@ const messageLoader = between("async function loadCloudSessionMessages(sessionId
 assert.match(messageLoader, /options\.refresh !== true/,
   "an explicit refresh must bypass the already-loaded short circuit");
 assert.match(messageLoader, /auth\.getUser\(\)/);
+assert.match(messageLoader, /snapshotRequested=!older&&session\.cloudCharacterSnapshotLoaded!==true/);
+assert.match(messageLoader, /\.\.\.\(snapshotRequested\?\['character_snapshot'\]:\[\]\)/);
+assert.match(messageLoader, /session\.cloudCharacterSnapshotLoaded=true/);
+assert.match(messageLoader, /session\.cloudSnapshotNeedsRepair=!row\.character_snapshot\?\.id/);
 assert.match(messageLoader, /\.eq\('id', sessionId\)\.eq\('user_id', userId\)\.is\('deleted_at', null\)/);
 assert.match(messageLoader, /\.eq\('session_id',sessionId\)\.is\('deleted_at',null\)/);
 assert.match(messageLoader, /const pageSize=50/);
@@ -104,7 +110,11 @@ assert.match(saveSession, /existingData\.pendingTurn/);
 assert.match(saveSession, /existingData\.openingMessage/);
 assert.match(saveSession, /existing\.data\.chat_mode==='encounter'/);
 assert.match(saveSession, /existing\.data\.status==='archived'/);
-assert.match(saveSession, /select\(s\.cloudSessionDataLoaded \?/);
+assert.match(saveSession, /const currentRowFields=\[/);
+assert.match(saveSession, /s\.cloudCharacterSnapshotLoaded===true\?\[\]:\['character_snapshot'\]/);
+assert.match(saveSession, /s\.cloudSessionDataLoaded\?\[\]:\['session_data'\]/);
+assert.match(saveSession, /if \(!s\.cloudOwned \|\| s\.cloudSnapshotNeedsRepair===true \|\| !priorSnapshot\.id\) row\.character_snapshot=snapshot/);
+assert.doesNotMatch(saveSession, /character_snapshot:snapshot, session_data:/);
 assert.match(chatData, /lastMessagePreview/);
 assert.match(chatData, /lastMessageAt/);
 
