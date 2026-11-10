@@ -195,20 +195,27 @@ AS $$
     FROM public.chat_turn_charges c
     JOIN owned o ON o.id = c.session_id AND o.user_id = c.user_id
     WHERE c.status = 'settled'
-  ), latest AS (
-    SELECT u.summary, u.status, u.batch_number, u.processed_at, u.created_at
+  ), latest_attempt AS (
+    SELECT u.status, u.batch_number, u.processed_at, u.created_at
     FROM public.ai_model_usage u
     JOIN owned o ON o.id = u.session_id AND o.user_id = u.user_id
     WHERE u.generation_type = 'memory_summary'
     ORDER BY u.batch_number DESC
     LIMIT 1
+  ), latest_completed AS (
+    SELECT u.summary, u.batch_number, u.processed_at
+    FROM public.ai_model_usage u
+    JOIN owned o ON o.id = u.session_id AND o.user_id = u.user_id
+    WHERE u.generation_type = 'memory_summary' AND u.status = 'completed'
+    ORDER BY u.batch_number DESC
+    LIMIT 1
   )
   SELECT
-    (SELECT l.summary FROM latest l WHERE l.status = 'completed'),
-    COALESCE((SELECT l.status FROM latest l), CASE WHEN c.settled_count >= 5 THEN 'pending' ELSE 'collecting' END),
-    (SELECT l.batch_number FROM latest l),
+    (SELECT l.summary FROM latest_completed l),
+    COALESCE((SELECT l.status FROM latest_attempt l), CASE WHEN c.settled_count >= 5 THEN 'pending' ELSE 'collecting' END),
+    COALESCE((SELECT l.batch_number FROM latest_attempt l), (SELECT l.batch_number FROM latest_completed l)),
     c.settled_count,
-    COALESCE((SELECT l.processed_at FROM latest l), (SELECT l.created_at FROM latest l))
+    COALESCE((SELECT l.processed_at FROM latest_attempt l), (SELECT l.created_at FROM latest_attempt l), (SELECT l.processed_at FROM latest_completed l))
   FROM counts c
   WHERE EXISTS (SELECT 1 FROM owned);
 $$;
