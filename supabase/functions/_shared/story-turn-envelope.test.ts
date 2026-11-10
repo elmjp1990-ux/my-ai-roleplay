@@ -133,6 +133,21 @@ Deno.test("configured phone fields are returned in exact order with safe empty-s
   ]);
 });
 
+Deno.test("configured phone fields preserve snapshot versus genuine event classification", () => {
+  const prompts = ["目前衣著與姿勢|只在劇情有變化時更新", "最近收到的訊息|只記錄本回合新收到的訊息"];
+  const parsed = parseStoryTurnEnvelope(JSON.stringify({
+    reply: "回覆",
+    phone_events: [
+      { event_type: "notification", title: "衣著", body: "深色襯衫，袖口捲起。" },
+      { event_type: "message", title: "客戶訊息", body: "客戶確認明早十點丈量。" },
+    ],
+  }), { configuredPrompts: prompts, currentUserMessage: "我今天穿什麼？" });
+  assertEquals(parsed.phone_events, [
+    { event_type: "notification", title: "目前衣著與姿勢", body: "深色襯衫，袖口捲起。" },
+    { event_type: "message", title: "最近收到的訊息", body: "客戶確認明早十點丈量。" },
+  ]);
+});
+
 Deno.test("unconfigured phone mode also blocks invented player-origin messages", () => {
   const parsed = parseStoryTurnEnvelope(JSON.stringify({
     reply: "回覆",
@@ -158,7 +173,7 @@ Deno.test("NPC work messages are allowed, but player SMS requires an explicit ph
       currentUserMessage: "今天工地順利嗎？",
       playerName: "Una",
     }).phone_events,
-    [{ event_type: "notification", title: "最近收到的訊息", body: "林小姐：想確認明天現場丈量的時間。" }],
+    [{ event_type: "message", title: "最近收到的訊息", body: "林小姐：想確認明天現場丈量的時間。" }],
   );
 
   const playerMessage = JSON.stringify({
@@ -171,6 +186,6 @@ Deno.test("NPC work messages are allowed, but player SMS requires an explicit ph
       currentUserMessage: "我拿起手機傳 LINE 給江辰遠，問他今天工地順不順利。",
       playerName: "Una",
     }).phone_events,
-    [{ event_type: "notification", title: "最近收到的訊息", body: "江大哥，今天工地順不順利？" }],
+    [{ event_type: "message", title: "最近收到的訊息", body: "江大哥，今天工地順不順利？" }],
   );
 });
