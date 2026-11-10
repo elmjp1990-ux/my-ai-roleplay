@@ -36,6 +36,21 @@ CREATE TABLE public.chat_turn_charges (
   assistant_message_id uuid REFERENCES public.chat_messages(id),
   status text NOT NULL
 );
+-- Minimal ledger shape for testing the owner-checked summary RPC without
+-- including the standalone migration's own transaction boundary in this script.
+CREATE TABLE public.ai_model_usage (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  session_id uuid NOT NULL,
+  generation_type text NOT NULL,
+  batch_number integer,
+  source_turn_ids uuid[] NOT NULL DEFAULT '{}'::uuid[],
+  model text NOT NULL,
+  status text NOT NULL,
+  summary text,
+  processed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
 CREATE TABLE public.story_relationship_states (
   session_id uuid PRIMARY KEY REFERENCES public.chat_sessions(id),
   user_id uuid NOT NULL,
@@ -72,7 +87,6 @@ CREATE TABLE public.story_relationship_batches (
 \ir ../supabase/migrations/20261106110000_harden_story_turn_service_role_claims.sql
 \ir ../supabase/migrations/20261106120000_fix_story_turn_evaluation_reserved_charge.sql
 \ir ../supabase/migrations/20261106140000_expand_story_phone_events_to_five_fields.sql
-\ir ../supabase/migrations/20261105223613_ai_model_usage_and_memory_summaries.sql
 \ir ../supabase/migrations/20261110120000_story_phone_state_and_memory_summary_read.sql
 
 INSERT INTO auth.users(id) VALUES
