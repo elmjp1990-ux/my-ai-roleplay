@@ -136,7 +136,9 @@ export function parseStoryTurnEnvelope(raw: string, options: StoryTurnEnvelopeOp
         return { event_type: "notification", title: label, body: fallbackBodyForLabel(label) };
       }
       return {
-        event_type: "notification",
+        // Preserve true event types only when the model identifies a new event
+        // in this turn. "notification" remains a replaceable configured-field snapshot.
+        event_type: candidate.event_type,
         title: label,
         body: candidate.body || fallbackBodyForLabel(label),
       };
