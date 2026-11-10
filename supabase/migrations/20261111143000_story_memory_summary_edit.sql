@@ -22,7 +22,7 @@ BEGIN
     OR p_session_id IS NULL
     OR p_batch_number IS NULL
     OR p_batch_number < 1
-    OR char_length(COALESCE(v_summary, '')) > 10000
+    OR char_length(COALESCE(v_summary, '')) > 1000
   THEN
     RETURN false;
   END IF;
@@ -42,7 +42,7 @@ BEGIN
   END IF;
 
   UPDATE public.ai_model_usage u
-  SET summary = v_summary,
+  SET summary = COALESCE(v_summary, ''),
       important = CASE WHEN v_summary IS NULL THEN false ELSE u.important END
   WHERE u.session_id = p_session_id
     AND u.user_id = (SELECT auth.uid())
