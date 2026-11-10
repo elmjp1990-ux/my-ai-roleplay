@@ -120,13 +120,13 @@ Deno.test("configured phone fields are returned in exact order with safe empty-s
     reply: "回覆",
     phone_events: [
       { event_type: "message", title: "Una的簡訊", body: "江大哥，今天工地順不順利？" },
-      { event_type: "notification", title: "角色衣著", body: "休閒襯衫挽至前臂。" },
+      { event_type: "notification", title: "角色衣著", body: "休閒襯衫挽至前臂。\n坐姿自然。" },
     ],
   }), { configuredPrompts: prompts, currentUserMessage: "今天工地順利嗎？", playerName: "Una", characterName: "江辰遠" });
 
   assertEquals(parsed.phone_events, [
     { event_type: "notification", title: "江辰遠最近收到Una的訊息", body: "目前沒有新的手機訊息" },
-    { event_type: "notification", title: "角色衣著／姿勢", body: "休閒襯衫挽至前臂。" },
+    { event_type: "notification", title: "角色衣著／姿勢", body: "休閒襯衫挽至前臂。；坐姿自然。" },
     { event_type: "notification", title: "玩家衣著／姿勢", body: "目前沒有足夠資訊" },
     { event_type: "notification", title: "待辦事項", body: "目前沒有待辦事項" },
     { event_type: "notification", title: "手機通知", body: "目前沒有足夠資訊" },
