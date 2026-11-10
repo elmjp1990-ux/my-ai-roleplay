@@ -3619,7 +3619,7 @@ async function loadCloudChatSessions(user, options = {}) {
         'session_persona_custom:session_data->>personaCustom','session_suggestions:session_data->>suggestions',
         'session_background:session_data->>background','session_has_user_message:session_data->>hasUserMessage',
         'session_last_message_preview:session_data->>lastMessagePreview','session_last_message_at:session_data->>lastMessageAt',
-        'session_opening_message:session_data->openingMessage','session_pending_turn:session_data->pendingTurn'
+        'session_opening_message:session_data->openingMessage','session_pending_turn:session_data->pendingTurn','session_story_world_state:session_data->storyWorldState'
       ].join(','))
       .eq('user_id', user.id).is('deleted_at', null);
     if (onlySessionId) sessionQuery = sessionQuery.eq('id', onlySessionId);
@@ -3695,6 +3695,7 @@ async function loadCloudChatSessions(user, options = {}) {
         encounterMode:row.chat_mode === 'encounter' || parseBool(row.session_encounter_mode) ||
           (!!row.session_encounter_metadata && typeof row.session_encounter_metadata==='object' && !Array.isArray(row.session_encounter_metadata)),
         storyMode:parseBool(row.session_story_mode),
+        storyWorldState:row.session_story_world_state&&typeof row.session_story_world_state==='object'?row.session_story_world_state:existing?.storyWorldState||null,
         encounterPlace:row.session_encounter_place || existing?.encounterPlace || null,
         encounterDay:row.session_encounter_day || existing?.encounterDay || null,
         hidden:parseBool(row.session_hidden), pinned:parseBool(row.session_pinned),
@@ -3802,6 +3803,7 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
       session.encounterMode=row.chat_mode==='encounter'||data.encounterMode===true||
         (!!data.encounter&&typeof data.encounter==='object'&&!Array.isArray(data.encounter));
       session.storyMode=data.storyMode===true;
+      session.storyWorldState=data.storyWorldState&&typeof data.storyWorldState==='object'?data.storyWorldState:session.storyWorldState||null;
       session.encounterPlace=typeof data.encounterPlace==='string'?data.encounterPlace:session.encounterPlace||null;
       session.encounterDay=typeof data.encounterDay==='string'?data.encounterDay:session.encounterDay||null;
       session.pendingTurn=data.pendingTurn&&isUuid(data.pendingTurn.turnId)&&isUuid(data.pendingTurn.userMessageId)&&isUuid(data.pendingTurn.assistantMessageId)
@@ -7809,6 +7811,7 @@ async function renderPhoneModal() {
   // Story phone events are fetched through the owner-checked RPC; never read the event table directly.
   let storyPhoneEvents=[];
   let storyPhoneStates=[];
+  let storyWorldState=!isGroup&&session.storyWorldState&&typeof session.storyWorldState==='object'?session.storyWorldState:{};
   let storyPhoneEventsError='';
   if(!isGroup && session.storyMode && session.cloudOwned && session.cloudOwnerUid===uid && isUuid(session.id)){
     const client=window.mySupabase;
@@ -7817,12 +7820,18 @@ async function renderPhoneModal() {
       if(authError||authData?.user?.id!==uid)throw new Error('登入狀態已變更，請重新開啟聊天室。');
       const [eventsResult,stateResult]=await Promise.all([
         client.rpc('get_story_phone_events',{p_session_id:session.id}),
-        client.rpc('get_story_phone_state',{p_session_id:session.id})
+        client.rpc('get_story_phone_state',{p_session_id:session.id}),
+        client.rpc('get_story_world_state',{p_session_id:session.id})
       ]);
       if(eventsResult.error)throw eventsResult.error;
       if(stateResult.error)throw stateResult.error;
+      if(worldStateResult.error)throw worldStateResult.error;
       storyPhoneEvents=Array.isArray(eventsResult.data)?eventsResult.data:[];
       storyPhoneStates=Array.isArray(stateResult.data)?stateResult.data:[];
+      if(worldStateResult.data&&typeof worldStateResult.data==='object'){
+        storyWorldState=worldStateResult.data;
+        session.storyWorldState=storyWorldState;
+      }
     }catch(error){
       storyPhoneEventsError=String(error?.message||'讀取故事手機通知失敗');
       console.warn('讀取 Story 手機狀態／事件失敗：',storyPhoneEventsError);
@@ -7843,9 +7852,9 @@ async function renderPhoneModal() {
   const diaryList=isGroup?loadGroupDiaryMemories(group.id):(session.memories||[]);
   const diaryChars=Array.isArray(diaryList)?(isGroup?diaryList.reduce((n,item)=>n+countChars(typeof item==='string'?item:(item.text||'')),0):memorySize(diaryList)):0;
   const capacity=10000,battery=Math.max(0,Math.min(100,Math.round((1-Math.min(diaryChars,capacity)/capacity)*100))),warning=battery<=20,batteryColor=warning?'#e07b39':battery<=50?'#d5b34a':'#4eaf78';
-  const storyWorldState=!isGroup&&session.storyWorldState&&typeof session.storyWorldState==='object'?session.storyWorldState:{};
-  const storyTimeLabel=formatStoryWorldTime(storyWorldState.storyTime||storyWorldState.story_time);
-  const storyLocationLabel=String(storyWorldState.storyLocation||storyWorldState.story_location||'').trim().slice(0,120)||'尚未設定所在地';
+  const initialStoryTime=Number(session.startedAt||session.initialOpeningMessage?.at)||Date.now();
+  const storyTimeLabel=formatStoryWorldTime(storyWorldState.storyTime||storyWorldState.story_time||new Date(initialStoryTime).toISOString());
+  const storyLocationLabel=String(storyWorldState.storyLocation||storyWorldState.story_location||session.encounterPlace||'').trim().slice(0,120)||'依開場情境推定中';
   const title=(character.name||group?.name||'角色')+' 的手機';
   const noticeLines=notices.map(line=>String(line||'').trim()).filter(Boolean).slice(0,10);
   const noticeContentHTML=[
