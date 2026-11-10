@@ -113,7 +113,9 @@ BEGIN
         title = EXCLUDED.title,
         body = EXCLUDED.body,
         source_turn_id = EXCLUDED.source_turn_id,
-        updated_at = EXCLUDED.updated_at;
+        updated_at = EXCLUDED.updated_at
+      WHERE public.story_phone_states.title IS DISTINCT FROM EXCLUDED.title
+         OR public.story_phone_states.body IS DISTINCT FROM EXCLUDED.body;
     ELSE
       -- Genuine new communication/activity remains in the append-only event log.
       INSERT INTO public.story_phone_events (
