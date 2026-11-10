@@ -79,7 +79,7 @@ assert.match(html, /data-action="cancel-story-memory-edit"/);
 assert.match(html, /update_story_memory_summary/);
 assert.match(edge, /\.not\("summary", "is", null\)/);
 assert.match(memoryEditMigration, /CREATE OR REPLACE FUNCTION public\.update_story_memory_summary/);
-assert.match(memoryEditMigration, /v_summary := NULLIF\(btrim\(COALESCE\(p_summary, ''\)\), ''\)/);
+assert.match(memoryEditMigration, /v_summary text := NULLIF\(btrim\(COALESCE\(p_summary, ''\)\), ''\)/);
 assert.match(memoryEditMigration, /important = CASE WHEN v_summary IS NULL THEN false ELSE u\.important END/);
 assert.match(memoryEditMigration, /s\.user_id = \(SELECT auth\.uid\(\)\)/);
 assert.match(memoryEditMigration, /GRANT EXECUTE ON FUNCTION public\.update_story_memory_summary/);
