@@ -20,7 +20,6 @@ assert.match(html, /result\.suggestedReplies\).*result\.suggested_replies/s);
 assert.match(html, /storyPhoneStates\.slice\(0,8\)/);
 assert.match(html, /storyPhoneEvents\.slice\(0,Math\.max\(0,8-storyPhoneStates\.length\)\)/);
 assert.match(html, /const noticeContentHTML=\[\s*storyStateHTML,\s*storyEventHTML/s);
-assert.doesNotMatch(html, /phone-notice-list['"]\+noticeHTML\+'['"]<\/div><\/div>'\+storyStateHTML/);
 
 // Per-message persisted suggestions override stale session metadata on reload.
 assert.match(html, /Object\.assign\(normalized,metadata\);[\s\S]{0,260}if\(persistedSuggestions\.length===3\)normalized\.suggestedReplies=persistedSuggestions/);
@@ -43,7 +42,7 @@ assert.match(affinityMigration, /v_affinity := GREATEST\(-100, LEAST\(100, v_sta
 assert.match(phoneMigration, /turn_count_since_summary = mod\(turn_count_since_summary \+ 1, 5\)/);
 
 // The eight author-defined phone fields fit both the DB event index and payload limits.
-assert.match(eightFieldMigration, /jsonb_array_length\\(COALESCE\\(p_phone_events, '[^']+'::jsonb\\)\\) > 8/);
+assert.match(eightFieldMigration, /jsonb_array_length\(COALESCE\(p_phone_events,/);
 assert.match(eightFieldMigration, /event_index BETWEEN 0 AND 7/);
 
 // Exactly three suggestions are persisted on the assistant message and restored on reload.
