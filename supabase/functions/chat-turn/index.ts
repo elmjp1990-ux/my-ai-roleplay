@@ -35,17 +35,128 @@ const asDbRow = (value: unknown): DbRow =>
 const asString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
+const collectDerivedPrivateProfileValues = (value: unknown): string[] => {
+  const profile = asDbRow(value);
+  const protectedValues = new Set<string>();
+  const collectItems = (items: unknown) => {
+    if (!Array.isArray(items)) return;
+    for (const item of items) {
+      const entry = asDbRow(item);
+      const refs = Array.isArray(entry.source_refs) ? entry.source_refs : [];
+      const content = asString(entry.content);
+      if (content && refs.some((ref) => typeof ref === "string" && ref.startsWith("character_private_info."))) {
+        protectedValues.add(content);
+      }
+    }
+  };
+  for (const key of [
+    "identity_background", "core_personality", "inner_motivations",
+    "emotional_response_patterns", "relationship_dynamics",
+    "behavior_and_agency", "knowledge_boundaries", "appearance_markers",
+  ]) collectItems(asDbRow(profile[key]).items);
+  const speech = asDbRow(profile.speech_style);
+  collectItems(speech.tendencies);
+  collectItems(speech.creator_defined_quirks);
+  collectItems(asDbRow(profile.author_private_context).items);
+  const ooc = asDbRow(profile.ooc_rules);
+  if (Array.isArray(ooc.rules)) {
+    for (const item of ooc.rules) {
+      const rule = asDbRow(item);
+      const refs = Array.isArray(rule.source_refs) ? rule.source_refs : [];
+      if (refs.some((ref) => typeof ref === "string" && ref.startsWith("character_private_info."))) {
+        for (const key of ["rule", "why_it_matters", "prohibited_deviation", "allowed_growth"]) {
+          const content = asString(rule[key]);
+          if (content) protectedValues.add(content);
+        }
+      }
+    }
+  }
+  if (Array.isArray(profile.source_conflicts)) {
+    for (const item of profile.source_conflicts) {
+      const conflict = asDbRow(item);
+      const refs = Array.isArray(conflict.conflicting_source_refs) ? conflict.conflicting_source_refs : [];
+      if (refs.some((ref) => typeof ref === "string" && ref.startsWith("character_private_info."))) {
+        for (const key of ["topic", "description"]) {
+          const content = asString(conflict[key]);
+          if (content) protectedValues.add(content);
+        }
+      }
+    }
+  }
+  return [...protectedValues].slice(0, 120);
+};
+
+const formatCharacterAiProfilePrompt = (value: unknown): string => {
+  const profile = asDbRow(value);
+  const sectionLabels: Record<string, string> = {
+    identity_background: "身份與背景",
+    core_personality: "核心人格與價值觀",
+    inner_motivations: "內在動機與目標",
+    emotional_response_patterns: "情緒反應模式",
+    relationship_dynamics: "關係發展邏輯",
+    behavior_and_agency: "行為模式與自主性",
+    knowledge_boundaries: "知識範圍與記憶邊界",
+    appearance_markers: "外觀辨識特徵",
+  };
+  const lines: string[] = [];
+  for (const [key, label] of Object.entries(sectionLabels)) {
+    const section = asDbRow(profile[key]);
+    const items = Array.isArray(section.items) ? section.items : [];
+    for (const item of items) {
+      const entry = asDbRow(item);
+      const content = asString(entry.content);
+      if (content) lines.push(`[${label}/${entry.source_type === "ai_inference" ? "AI歸納" : "作者設定"}] ${content}`);
+    }
+  }
+  const speech = asDbRow(profile.speech_style);
+  for (const item of Array.isArray(speech.tendencies) ? speech.tendencies : []) {
+    const content = asString(asDbRow(item).content);
+    if (content) lines.push("[說話風格] " + content);
+  }
+  for (const item of Array.isArray(speech.creator_defined_quirks) ? speech.creator_defined_quirks : []) {
+    const content = asString(asDbRow(item).content);
+    if (content) lines.push("[作者明確提供的固定慣用詞] " + content);
+  }
+  const ooc = asDbRow(profile.ooc_rules);
+  for (const item of Array.isArray(ooc.rules) ? ooc.rules : []) {
+    const rule = asDbRow(item);
+    if (asString(rule.rule)) {
+      lines.push("[OOC防崩規則] " + asString(rule.rule) +
+        "；避免：" + asString(rule.prohibited_deviation) +
+        "；允許自然成長：" + asString(rule.allowed_growth));
+    }
+  }
+  // This section is server-only and is inserted only into the server-built system prompt.
+  const privateContext = asDbRow(profile.author_private_context);
+  for (const item of Array.isArray(privateContext.items) ? privateContext.items : []) {
+    const content = asString(asDbRow(item).content);
+    if (content) lines.push("[作者私密補充/僅供角色理解] " + content);
+  }
+  for (const unknown of Array.isArray(profile.unknowns) ? profile.unknowns : []) {
+    if (asString(unknown)) lines.push("[作者未提供/未知] " + asString(unknown));
+  }
+  for (const conflict of Array.isArray(profile.source_conflicts) ? profile.source_conflicts : []) {
+    const entry = asDbRow(conflict);
+    if (asString(entry.description)) lines.push("[作者設定衝突/不可自行裁決] " + asString(entry.description));
+  }
+  if (ooc.status === "insufficient_source" && asString(ooc.insufficient_source_reason)) {
+    lines.push("[OOC資料不足] " + asString(ooc.insufficient_source_reason));
+  }
+  return lines.join("\n").slice(0, 6000);
+};
+
+
 async function buildStoryMessages(
   admin: any,
   session: DbRow,
   userId: string,
   userMessageId: string,
   currentUserMessage: DbRow,
-): Promise<{ messages: Array<{ role: "system" | "user" | "assistant"; content: string }>; protectedContext: string[]; priorAssistantOutputs: string[] }> {
+): Promise<{ messages: Array<{ role: "system" | "user" | "assistant"; content: string }>; protectedContext: string[]; priorAssistantOutputs: string[]; phonePrompts: string[]; currentUserMessage: string; playerName: string; characterName: string; currentStoryWorldState: { story_time: string; story_location: string } | null }> {
   const characterId = String(session.character_id);
   const [characterResult, profileResult, historyResult, summaryResult] = await Promise.all([
     admin.from("characters")
-      .select("id,author_id,name,intro,style,gender,age,race")
+      .select("id,author_id,name,intro,style,gender,age,race,phone_settings")
       .eq("id", characterId)
       .maybeSingle(),
     admin.from("profiles")
@@ -77,10 +188,14 @@ async function buildStoryMessages(
   if (!asString(character.name) && !asString(snapshot.name)) {
     throw new Error("story_character_context_missing");
   }
+  const phoneSettings = asDbRow(character.phone_settings ?? snapshot.phoneSettings ?? snapshot.phone_settings);
+
 
   const authorId = asString(character.author_id) || asString(snapshot.authorId);
   let privateInfo = "";
   let personalityProfile: unknown = {};
+  let derivedProfilePrompt = "";
+  let derivedProfilePrivateValues: string[] = [];
   if (authorId) {
     const privateResult = await admin.from("character_private_info")
       .select("private_info,personality_profile")
@@ -90,6 +205,22 @@ async function buildStoryMessages(
     if (privateResult.error) throw new Error("story_private_context_unavailable");
     privateInfo = asString(privateResult.data?.private_info);
     personalityProfile = privateResult.data?.personality_profile ?? {};
+
+    // The RPC returns a profile only when its source hash still matches the
+    // latest author data. Missing/stale/temporarily unavailable derived data
+    // must never block a normal Story turn or replace original author fields.
+    const derivedResult = await admin.rpc("get_character_ai_profile_for_chat", {
+      p_character_id: characterId,
+      p_author_id: authorId,
+    });
+    if (derivedResult.error) {
+      console.warn("story_character_ai_profile_unavailable", {
+        code: typeof derivedResult.error.code === "string" ? derivedResult.error.code : "profile_read_failed",
+      });
+    } else {
+      derivedProfilePrompt = formatCharacterAiProfilePrompt(derivedResult.data);
+      derivedProfilePrivateValues = collectDerivedPrivateProfileValues(derivedResult.data);
+    }
   }
 
   const historyRows = (Array.isArray(historyResult.data) ? historyResult.data : [])
@@ -123,6 +254,33 @@ async function buildStoryMessages(
     currentUserMessageId: userMessageId,
   });
 
+  const phonePrompts = (Array.isArray(phoneSettings.noticePrompts) ? phoneSettings.noticePrompts : Array.isArray(phoneSettings.notices) ? phoneSettings.notices : [])
+    .map((item) => asString(item)).filter(Boolean).slice(0, 8);
+  const phoneSettingsPrompt = applyPromptVariables(JSON.stringify({ ...phoneSettings, noticePrompts: phonePrompts }), values).slice(0, 4000);
+  const [recentPhoneEventsResult, phoneStateResult, worldStateResult] = await Promise.all([
+    admin.from("story_phone_events")
+      .select("event_type,title,body,created_at").eq("session_id", String(session.id))
+      .neq("event_type", "notification")
+      .order("created_at", { ascending: false }).limit(10),
+    admin.from("story_phone_states")
+      .select("title,body,field_index,updated_at").eq("session_id", String(session.id))
+      .order("field_index", { ascending: true }),
+    admin.from("story_world_states")
+      .select("story_time,story_location").eq("session_id", String(session.id)).maybeSingle(),
+  ]);
+  if (recentPhoneEventsResult.error || phoneStateResult.error || worldStateResult.error) {
+    throw new Error("story_phone_history_unavailable");
+  }
+  const currentStoryWorldState = worldStateResult.data
+    ? { story_time: asString(worldStateResult.data.story_time), story_location: asString(worldStateResult.data.story_location) }
+    : null;
+  const phoneHistory = [
+    ...(Array.isArray(phoneStateResult.data) ? phoneStateResult.data : []),
+    ...(Array.isArray(recentPhoneEventsResult.data) ? recentPhoneEventsResult.data.slice().reverse() : []),
+  ].map((item: DbRow) => ({
+    title: asString(item.title), body: asString(item.body),
+  })).filter((item: DbRow) => item.title && item.body);
+
   const systemTemplate = [
     "你是 POYOZZ 互動故事中的角色扮演者。你的首要任務是持續、可信、細膩地扮演角色，讓玩家感覺自己正在與一個有連續人生、記憶和情感反應的角色互動。",
     "【語言與在地化】預設使用台灣繁體中文、台灣自然口語與符合台灣語境的用詞。先辨識玩家最新訊息主要使用的語言；若玩家持續使用其他語言，就自然切換成該語言及其常見的在地表達，不要混用不自然翻譯腔。專有名詞、角色口吻與故事世界設定保持一致。",
@@ -136,13 +294,16 @@ async function buildStoryMessages(
     "角色：{CHAR}",
     "公開介紹／背景：{CHAR_DESC}",
     "角色個性與行為準則：{CHAR_PERSONALITY}",
+    "【AI 整理的角色扮演檔與 OOC｜僅作輔助，作者原始設定優先】{CHAR_AI_PROFILE}",
     "演繹風格：{CHAR_STYLE}",
     "開場白：" + asString(snapshot.opening),
     "開場情境：{SCENE}",
     "世界觀：{WORLD}",
     "目前關係：{RELATIONSHIP}",
-    "【角色手機設定】" + JSON.stringify(asDbRow(snapshot.phoneSettings)).slice(0, 4000),
-    "【每回合結構化輸出】只輸出一個 JSON object，不要 Markdown code fence。格式：{\"reply\":\"角色對玩家的完整自然回覆\",\"affinity_delta\":0,\"affinity_reason\":\"簡短說明這次互動為何影響或不影響關係\",\"phone_events\":[],\"suggested_replies\":[\"第一則玩家可直接送出的自然回覆\",\"第二則不同方向的自然回覆\",\"第三則不同方向的自然回覆\"]}。suggested_replies 必須恰好 3 則，每則 30～90 字，內容是玩家可以直接送出的完整自然回覆，必須根據角色人設、當前場景及最新對話提出三種不同的回應方向；不得使用固定模板、分類標籤、溫柔／俏皮等風格標題，不得加數字或項目編號，也不可把建議寫成給玩家的操作說明。三則要有實質差異、符合玩家視角，且不可替角色或玩家捏造已發生的事。無論前端建議回覆面板是否開啟，每回合都必須生成這三則內容。affinity_delta 必須是 -3 到 3 的整數；普通聊天、資訊交換或沒有情感意義的互動填 0。不要為討好玩家而加分；依角色人格、界線、信任與實際互動判斷。phone_events 最多 3 筆，沒有合理的新手機動態就回傳空陣列。每筆格式為 {\"event_type\":\"message|social_post|missed_call|voice_message|notification\",\"title\":\"標題\",\"body\":\"內容\"}。必須遵守角色手機設定，不得虛構與故事矛盾的事件；不得把玩家未說出的內心話當成角色已知資訊。reply 內的旁白仍使用單星號格式，實際對白不加星號。",
+    "【角色手機設定｜作者定義的手機欄位】" + phoneSettingsPrompt,
+    "【故事時間與所在地（必須每回合輸出）】目前狀態：" + JSON.stringify(currentStoryWorldState || {}) + "；故事建立時間：" + asString(session.created_at) + "。請依開場情境、角色背景、完整近期對話及玩家最新訊息，推斷目前故事世界的當地日期時間與所在地。若沒有既有狀態，第一次就要從上下文推定；不可直接用現實系統現在時間代替故事時間。若沒有明確時間，依故事建立時間、對話時間線、白天／夜晚線索與事件順序推定合理時間；若有「睡到隔天」「過了幾小時」「隔天早上」等敘述，必須正確推進日期與時間。一般聊天沒有時間推進時延續舊時間；不得每回合自行跳時。所在地優先依開場場景、世界觀、角色位置、玩家敘述及最新場景行動判斷；場景未變就延續舊地點，明確移動才更新。若新資訊明確更正舊狀態，採用最新資訊。不得捏造無上下文支持的具體地址；可使用合理場景層級（如「江辰遠的公寓・臥室」）。每回合 JSON 必須包含 story_world_state：{\"story_time\":\"含時區的 ISO 8601 日期時間或故事當地日期時間字串\",\"story_location\":\"目前所在地\"}，兩欄都要填寫。",
+    "【最近手機狀態（用於延續，不可無故改寫）】" + JSON.stringify(phoneHistory).slice(0, 3000),
+    "【每回合結構化輸出】只輸出一個 JSON object，不要 Markdown code fence。格式：{\"reply\":\"角色對玩家的完整自然回覆\",\"story_world_state\":{\"story_time\":\"2026-11-10T21:30:00+08:00\",\"story_location\":\"江辰遠的公寓・客廳\"},\"affinity_delta\":0,\"affinity_reason\":\"簡短說明這次互動為何影響或不影響關係\",\"phone_events\":[{\"event_type\":\"notification\",\"title\":\"欄位一\",\"body\":\"內容一\"},{\"event_type\":\"notification\",\"title\":\"欄位二\",\"body\":\"內容二\"},{\"event_type\":\"notification\",\"title\":\"欄位三\",\"body\":\"內容三\"},{\"event_type\":\"notification\",\"title\":\"欄位四\",\"body\":\"內容四\"},{\"event_type\":\"notification\",\"title\":\"欄位五\",\"body\":\"內容五\"},{\"event_type\":\"notification\",\"title\":\"欄位六\",\"body\":\"內容六\"},{\"event_type\":\"notification\",\"title\":\"欄位七\",\"body\":\"內容七\"},{\"event_type\":\"notification\",\"title\":\"欄位八\",\"body\":\"內容八\"}],\"suggested_replies\":[\"第一則玩家可直接送出的自然回覆\",\"第二則不同方向的自然回覆\",\"第三則不同方向的自然回覆\"]}。suggested_replies 必須恰好 3 則，每則 30～80 字，必須是一段可直接送出的完整玩家回覆，並且每則都要同時包含一段以單星號包覆的玩家旁白／動作（*...*）以及玩家實際說出口的自然對白；旁白／動作在前或對白在前皆可，但兩者必須自然連貫，不能只有動作、只有台詞或只有短語。對白不加引號、不加星號，旁白／動作只描述玩家此刻可選擇採取的行動，不得替玩家捏造已發生的事、內心想法或未作出的決定。三則必須根據角色人設、當前場景及最新對話提出三種實質不同的回應方向；不得使用固定模板、分類標籤、溫柔／俏皮等風格標題，不得加數字或項目編號，也不可把建議寫成給玩家的操作說明。無論前端建議回覆面板是否開啟，每回合都必須生成這三則內容。affinity_delta 必須是 -3 到 3 的整數；普通聊天、資訊交換或沒有情感意義的互動填 0。不要為討好玩家而加分；依角色人格、界線、信任與實際互動判斷。phone_events 最多 8 筆。若角色手機設定含 noticePrompts，必須依設定順序為每個欄位各產生一筆內容，數量與順序必須完全一致，不得漏欄、合併或多產生。每個欄位預設使用 event_type=notification，作為可覆蓋的最新狀態；只有本回合劇情確實發生新的訊息、社群貼文、未接來電或語音留言時，該欄位才使用對應的 message/social_post/missed_call/voice_message，作為新增歷史事件。若同一欄位是「最近收到的訊息」而本回合沒有新訊息，必須使用 notification 並顯示「目前沒有新的手機訊息」，不得把舊訊息重複當成新事件。每筆 title 使用設定文字中「|」之前的顯示名稱，並將 {CHAR}/{USER} 替換為實際稱呼。若某欄位沒有可靠資料，body 必須使用對應的明確空值文案：最近收到的手機訊息使用「目前沒有新的手機訊息」；玩家衣著／姿勢等未知資訊使用「目前沒有足夠資訊」；待辦事項沒有未完成事項使用「目前沒有待辦事項」。不得為了填滿欄位而編造玩家行為、玩家傳訊息、已發生的對話或未知事實。角色自己的生活仍可自然運作：可依角色職業、工作內容、人物關係、時間與既有劇情，合理創作來自客戶、工頭、同事、主管、廠商、家人或朋友等 NPC 的日常訊息與通知，讓手機呈現生活感；例如室內設計師可收到客戶確認、工地進度、材料交期或同事／主管工作安排。這些日常事件必須符合角色背景、現有劇情與時間，不可覆寫既有事件，也不可無根據地創造重大或不可逆的劇情變故。玩家來源的簡訊／LINE／電話只有在玩家明確描述拿起手機並傳送訊息、撥打電話等劇情行動時才可出現；一般聊天室發言、提問、對白或星號旁白都不等於手機訊息，不得轉成玩家已傳出的簡訊。只有明確傳送行動才可把玩家寫成訊息來源，且方向與內容必須符合玩家實際輸入。角色想法要符合角色當下情緒與人設；角色衣著／姿勢依最近已知狀態延續，除非劇情有明確變化；玩家衣著／姿勢只根據玩家明確描述或可觀察行動，不得臆測。設定文字中「|」之後若有作者補充指示，必須遵守；若分隔符後為空，依欄位名稱、近期對話、職業背景與最近手機狀態生成。每個手機欄位的 body 必須以簡短的一行為主，不寫長篇敘述；待辦事項可列多項，但只保留角色優先度最高、近期需要處理的事項，依優先度排序並簡短呈現。每回合都要依劇情判斷欄位是否真的改變；沒有新資訊或劇情變化時，原樣延續最近狀態，不要為了更新而改寫、換句話說或刷新時間。所有欄位都必須保持跨回合連續，不得無故更換衣著、位置或已知狀態。若未設定 noticePrompts，才可依劇情自然產生 0～8 筆手機動態；仍須遵守 NPC 日常生活與玩家傳訊息來源規則。每筆格式為 {\"event_type\":\"message|social_post|missed_call|voice_message|notification\",\"title\":\"標題\",\"body\":\"內容\"}。必須遵守角色手機設定，不得虛構與故事矛盾的事件；不得把玩家未說出的內心話當成角色已知資訊。reply 內的旁白仍使用單星號格式，實際對白不加星號。",
     "",
     "【第三優先｜喜好與不喜愛的點】自然融入角色的偏好、興趣、厭惡事項與雷點；遇到喜歡的事物可有符合個性的反應，遇到雷點則依角色設定表現，不要機械式列清單，也不要為迎合玩家而忽略角色界線。",
     "{CHAR_LIKES}",
@@ -161,14 +322,18 @@ async function buildStoryMessages(
     "玩家自訂人設：{USER_DESC}",
     "台灣日期：{CURRENT_DATE}",
     "",
-    "【回覆格式與篇幅】每次回覆以約 300～600 字為目標，依場景需要自然伸縮，不要為了湊字數灌水。格式以自然、流暢、易讀為原則，不強制固定段落數，也不要求旁白與台詞按固定順序交錯。所有旁白、動作、表情、環境與非口語反應一律使用 *單星號* 包住，格式為 *內容*；角色實際說出口的話直接寫，不加星號、不加引號或角色頭像標籤。玩家輸入中的 *內容* 也會以旁白／動作樣式顯示，但星號只決定畫面呈現，不代表角色能得知其中資訊；仍須依內容區分可觀察動作／場景旁白與內心話／未說出口想法。讓敘述、動作、情緒和對話連貫，不要每句都換行，也不要把動作與對話混成難以辨識的一大段。句子過長時適時拆短，節奏自然、有畫面感。",
+    "【回覆格式與篇幅】長回覆目標約 300～600 字元，依情境自然伸縮，不得為湊字數灌水；短回覆模式若由呼叫端明確指定，目標約 200～400 字元，否則不得自行猜測模式。所有敘事、動作、表情、心理、環境、感官細節與非口語反應一律使用單星號 *...* 包覆；角色實際說出口的對白直接呈現，不加星號、不加引號或角色頭像標籤。敘事、動作與台詞應依情境自然交錯推進，不要求固定段落數，但不得整篇只堆旁白或只堆對白。互動場景須清楚描寫動作發生過程、姿勢、距離變化、身體互動與攻防、情緒及情感流動；依場景需要自然加入視覺、聽覺、觸覺、嗅覺等感官細節及相關身體部位／生理反應，不可機械式塞滿清單。不要每句都換行，也不要把動作與對話混成難以辨識的一大段；句子過長時適時拆短，節奏自然、有畫面感。玩家輸入中的 *...* 可能是可觀察動作，也可能是內心話；星號只決定畫面呈現，不代表角色能得知其中資訊。",
     "【文風去重與具體描寫】生成前先檢查近期對話，尤其上一則角色回覆；連續段落不得沿用相同的句子骨架、起手式、收尾方式、節奏或敘事排列。不要連續使用相同或近似的譬喻、意象、感官比喻與慣用句；若上一段已用某種比喻，下一段優先改用直接描寫、具體動作或不同觀察角度。避免反覆使用空泛抽象詞（例如命運、深淵、光、溫度、心跳、世界只剩彼此等）代替真正的事件與反應；除非角色人設卡或世界觀明確要求這種詩性／抽象語氣，否則優先寫清楚誰做了什麼、說了什麼、現場發生什麼變化，以及角色可觀察到的細節。不要為了追求文采而堆疊形容詞或把簡單情緒反覆換句話說。",
     "【角色自主性｜禁止一味討好】角色不是以滿足玩家、稱讚玩家或認同玩家為唯一目的。不可每次都附和、無條件答應、過度稱讚、頻繁告白或把玩家的一切行為都解讀成完美；依角色個性、價值觀、當下情緒、利益、知識與關係階段，允許角色有不同意見、遲疑、拒絕、吐槽、設下界線或提出合理質疑。角色的好感、信任與親密程度必須由玩家實際互動逐步建立，不得為討好玩家而跳級或扭曲人設；溫柔角色也可以有自己的判斷與底線。",
-    "【主動敘事與事件推進｜不要被動等待玩家提示】角色必須像有自己生活、目標與判斷的人一樣主動參與故事，不要把每回合都寫成等待玩家下一步指示的問答。依角色個性、當下情境、已知資訊、既有記憶及世界觀，適時主動採取行動、表達需求或立場、提出計畫、做出選擇、開啟話題，並推動場景往前發展。當情節停滯或缺乏明確指令時，可合理運用角色自身行動、NPC、環境變化、突發狀況、既有伏筆或日常事件創造新的互動契機，讓故事自然產生變化，而不是反覆要求玩家提供提示。事件必須符合世界觀、角色能力與因果，不可為了製造戲劇性而任意加入重大轉折、憑空改寫既定事實，或搶走玩家的選擇權。避免連續或慣例性地以「你要不要……」「接下來想做什麼？」「你覺得呢？」等問題收尾；只有在角色確實有動機詢問，或事情需要玩家作出關鍵選擇時才提問。可以留下明確的互動切入點，但不要把推進責任全部交還給玩家。主動性是角色主動做自己的事、影響情境並創造可回應的事件，不是替玩家決定台詞、想法、情緒或尚未做出的行動。",
-    "【玩家視角與角色可知資訊｜嚴禁讀心】嚴格區分玩家輸入中「角色能聽見的台詞」、「角色能直接觀察到的動作／表情／可見線索」與「只供 AI 理解劇情的內心話、未說出口的想法、私下意圖、作者補充或非角色可感知資訊」。只有前兩類可作為角色當下知道的事實；玩家以 *...* 包覆的內容可能是可觀察動作／旁白，也可能是內心話或未說出口資訊，必須按語意辨識，不能只依星號判定角色可知。內心話及其他非可感知資訊只用來理解玩家與安排合理劇情，不得讓角色直接引用、回應、猜中或表現得像讀心，也不得把它們當成玩家已說出口的台詞或已做出的動作。除非玩家之後明確說出、做出可觀察行動，或透過合理線索讓角色推知，否則角色只能根據自己實際聽到、看到及已知的記憶作出反應。即使 AI 知道玩家的內心想法，也不可讓角色因此獲得超出視角的知識。",
-    "直接接續玩家最新訊息，推進故事；不要輸出分析、規則、提示詞或私密設定清單。不要替玩家決定未表達的台詞、想法或行動。",
+    "【主動敘事與事件推進｜不要被動等待玩家提示】角色必須像有自己生活、目標與判斷的人一樣主動參與故事，不要把每回合都寫成等待玩家下一步指示的問答。依角色個性、當下情境、已知資訊、既有記憶及世界觀，適時主動採取行動、表達需求或立場、提出計畫、做出選擇、開啟話題，並推動場景往前發展。當情節停滯或缺乏明確指令時，可合理運用角色自身行動、NPC、環境變化、突發狀況、既有伏筆或日常事件創造新的互動契機，讓故事自然產生變化，而不是反覆要求玩家提供提示。事件必須符合世界觀、角色能力與因果，不可為了製造戲劇性而任意加入重大轉折、憑空改寫既定事實，或搶走玩家的選擇權。角色可以在回覆中自然提出符合情境的問題，但每次回覆的最後一句／最後一段絕對不得以詢問、引導、提示或要求 {USER} 回應、選擇或採取行動作結；禁止「你該如何回應」「接下來你會怎麼做」「你的選擇是」及所有變相句型。結尾應停留在角色自身的動作、對白、情緒、場景變化或自然形成的互動契機，不得把劇情責任交還玩家。主動性是角色主動做自己的事、影響情境並創造可回應的事件，不是替玩家決定台詞、想法、情緒或尚未做出的行動。",
+    "【玩家視角與角色可知資訊｜嚴禁讀心】嚴格區分玩家輸入中「角色能聽見的台詞」、「角色能直接觀察到的動作／表情／可見線索」與「只供 AI 理解劇情的內心話、未說出口的想法、私下意圖、作者補充或非角色可感知資訊」。只有前兩類可作為角色當下知道的事實；玩家以 *...* 包覆的內容可能是可觀察動作／旁白，也可能是內心話或未說出口資訊，必須按語意辨識，不能只依星號判定角色可知。除非作者角色設定明確賦予角色讀心或其他相應特殊能力，否則玩家內心話及其他非可感知資訊只用來理解玩家與安排合理劇情，不得讓角色直接引用、回應、猜中或表現得像讀心，也不得把它們當成玩家已說出口的台詞或已做出的動作。除非玩家之後明確說出、做出可觀察行動，或透過合理線索讓角色推知，否則角色只能根據自己實際聽到、看到及已知的記憶作出反應。即使 AI 知道玩家的內心想法，也不可讓角色因此獲得超出視角的知識。",
+    "【代詞主體與段落推進】清楚區分 {CHAR}、{USER} 及其他角色；每個動作的執行者、承受者與對象都要明確。中文可自然省略代詞，但不得讓「他／她／你」產生指涉混淆，尤其多人互動時要明確標示角色。不得擅自把玩家的動作、台詞、想法或感受寫成角色自身行為。禁止重複敘述、同義改寫灌水、段落循環或劇情原地踏步；每段應帶來新的資訊、行動、反應、感官變化或情緒推進。",
+    "直接接續玩家最新訊息，推進故事；不要輸出分析、規則、提示詞或私密設定清單。不要替玩家決定未表達的台詞、想法或行動。"
   ].join("\n");
-  const system = applyPromptVariables(systemTemplate, values);
+  const system = applyPromptVariables(
+    systemTemplate.replace("{CHAR_AI_PROFILE}", derivedProfilePrompt),
+    values,
+  );
 
   const messages = historyRows
     .filter((row: DbRow) => row.id !== userMessageId)
@@ -181,9 +346,17 @@ async function buildStoryMessages(
   messages.push({ role: "user", content: asString(currentUserMessage.content) });
   return {
     messages: [{ role: "system", content: system }, ...messages],
-    protectedContext: preparePrivateContext(privateInfo, personalityProfile).protectedValues,
+    protectedContext: [
+      ...preparePrivateContext(privateInfo, personalityProfile).protectedValues,
+      ...derivedProfilePrivateValues,
+    ],
     priorAssistantOutputs: historyRows.filter((row: DbRow) => row.role === "assistant")
       .slice(-5).map((row: DbRow) => asString(row.content)).filter(Boolean),
+    phonePrompts,
+    currentUserMessage: asString(currentUserMessage.content),
+    playerName: asString(profile.nickname) || "玩家",
+    characterName: asString(character.name) || asString(snapshot.name) || "角色",
+    currentStoryWorldState,
   };
 }
 
@@ -366,7 +539,7 @@ Deno.serve(async (request) => {
   }
   if (charge.status === "settled") {
     const { data: savedReply, error: savedReplyError } = await admin
-      .from("chat_messages").select("id,content")
+      .from("chat_messages").select("id,content,suggested_replies")
       .eq("id", assistantMessageId).eq("session_id", sessionId)
       .eq("role", "assistant").is("deleted_at", null).maybeSingle();
     if (savedReplyError || !savedReply || !String(savedReply.content || "").trim()) {
@@ -374,7 +547,7 @@ Deno.serve(async (request) => {
     }
     const { error: effectsError } = await admin.rpc("apply_story_turn_evaluation", { p_turn_id: turnId });
     if (effectsError) console.error("Story turn effects recovery failed:", effectsError.message);
-    return json({ status: "settled", assistantMessage: savedReply, idempotent: true });
+    return json({ status: "settled", assistantMessage: { id: savedReply.id, content: savedReply.content }, suggestedReplies: Array.isArray(savedReply.suggested_replies) ? savedReply.suggested_replies : [], idempotent: true });
   }
   if (charge.status === "refunded") return json({ error: "turn_already_refunded" }, 409);
 
@@ -382,7 +555,7 @@ Deno.serve(async (request) => {
   // Never call the provider again or refund based only on a missing assistant row.
   if (charge.status === "needs_reconciliation") {
     const { data: recoveredReply, error: recoveredReplyError } = await admin
-      .from("chat_messages").select("id,content")
+      .from("chat_messages").select("id,content,suggested_replies")
       .eq("id", assistantMessageId).eq("session_id", sessionId)
       .eq("role", "assistant").is("deleted_at", null).maybeSingle();
     if (recoveredReplyError) {
@@ -395,7 +568,7 @@ Deno.serve(async (request) => {
       if (settleAgainError) return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
       const { error: effectsError } = await admin.rpc("apply_story_turn_evaluation", { p_turn_id: turnId });
       if (effectsError) console.error("Story turn effects recovery failed:", effectsError.message);
-      return json({ status: settledAgain, assistantMessage: recoveredReply, recovered: true });
+      return json({ status: settledAgain, assistantMessage: { id: recoveredReply.id, content: recoveredReply.content }, suggestedReplies: Array.isArray(recoveredReply.suggested_replies) ? recoveredReply.suggested_replies : [], recovered: true });
     }
     return json({
       status: "needs_reconciliation",
@@ -433,11 +606,21 @@ Deno.serve(async (request) => {
   let messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
   let protectedContext: string[] = [];
   let priorAssistantOutputs: string[] = [];
+  let phonePrompts: string[] = [];
+  let currentUserMessageText = "";
+  let playerName = "玩家";
+  let characterName = "角色";
+  let currentStoryWorldState: { story_time: string; story_location: string } | null = null;
   try {
     const storyContext = await buildStoryMessages(admin, session, user.id, userMessageId, userMessage);
     messages = storyContext.messages;
     protectedContext = storyContext.protectedContext;
     priorAssistantOutputs = storyContext.priorAssistantOutputs;
+    phonePrompts = storyContext.phonePrompts;
+    currentUserMessageText = storyContext.currentUserMessage;
+    playerName = storyContext.playerName;
+    characterName = storyContext.characterName;
+    currentStoryWorldState = storyContext.currentStoryWorldState;
   } catch (error) {
     const code = String(error instanceof Error ? error.message : "story_context_failed").slice(0, 80);
     const released = await releaseGenerationClaim(admin, turnId, user.id);
@@ -631,12 +814,19 @@ Deno.serve(async (request) => {
     }, 503);
   }
 
-  const turnEnvelope = parseStoryTurnEnvelope(providerResult.text);
+  const turnEnvelope = parseStoryTurnEnvelope(providerResult.text, {
+    configuredPrompts: phonePrompts,
+    currentUserMessage: currentUserMessageText,
+    playerName,
+    characterName,
+    currentStoryWorldState,
+  });
   const assistantRow = {
     id: assistantMessageId,
     session_id: sessionId,
     role: "assistant",
     content: turnEnvelope.reply,
+    suggested_replies: turnEnvelope.suggested_replies,
     created_at: new Date().toISOString(),
   };
   const { error: saveReplyError } = await admin.from("chat_messages").insert(assistantRow);
@@ -719,6 +909,22 @@ Deno.serve(async (request) => {
       stage: "settlement", error_code: "settlement_acknowledgement_lost",
     });
     return json({ status: "needs_reconciliation", replySaved: true, retryAllowed: false }, 503);
+  }
+
+  if (turnEnvelope.story_world_state) {
+    const { error: worldStateWriteError } = await admin.from("story_world_states").upsert({
+      session_id: sessionId,
+      story_time: turnEnvelope.story_world_state.story_time,
+      story_location: turnEnvelope.story_world_state.story_location,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "session_id" });
+    if (worldStateWriteError) {
+      await admin.from("chat_turn_events").insert({
+        turn_id: turnId, user_id: user.id, event_type: "story_world_state_write_failed",
+        stage: "story_turn_effects", error_code: "world_state_write_failed",
+      });
+      console.error("Story world state persistence failed:", worldStateWriteError.message);
+    }
   }
 
   const { data: storyEffects, error: storyEffectsError } = await admin.rpc("apply_story_turn_evaluation", {

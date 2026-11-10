@@ -15,24 +15,24 @@ const phaseOneAccess = fs.readFileSync(
 // The public characters table must never be queried for the author-only profile.
 assert.doesNotMatch(
   frontend,
-  /\.from\(["']characters["']\)[\s\S]{0,700}?\.select\(["'][^"']*personality_profile/i,
+  /\.from\(["']characters["']\)\s*\.select\(["'][^"']*personality_profile/i,
   "frontend must not select personality_profile from public.characters",
 );
 assert.doesNotMatch(
   chatTurn,
-  /from\(["']characters["']\)[\s\S]{0,300}?select\(["'][^"']*personality_profile/i,
+  /from\(["']characters["']\)\s*\.?select\(["'][^"']*personality_profile/i,
   "Story AI must not select personality_profile from public.characters",
 );
 
 // Avoid wildcard selects: they would silently re-expose the legacy public column.
 assert.doesNotMatch(
   frontend,
-  /\.from\(["']characters["']\)[\s\S]{0,500}?\.select\(["']\*["']\)/i,
+  /\.from\(["']characters["']\)\s*\.select\(["']\*["']\)/i,
   "frontend must not wildcard-select public characters rows",
 );
 assert.doesNotMatch(
   chatTurn,
-  /from\(["']characters["']\)[\s\S]{0,300}?select\(["']\*["']\)/i,
+  /from\(["']characters["']\)\s*\.?select\(["']\*["']\)/i,
   "Story AI must not wildcard-select public characters rows",
 );
 

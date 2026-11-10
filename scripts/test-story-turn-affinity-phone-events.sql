@@ -36,6 +36,21 @@ CREATE TABLE public.chat_turn_charges (
   assistant_message_id uuid REFERENCES public.chat_messages(id),
   status text NOT NULL
 );
+-- Minimal ledger shape for testing the owner-checked summary RPC without
+-- including the standalone migration's own transaction boundary in this script.
+CREATE TABLE public.ai_model_usage (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  session_id uuid NOT NULL,
+  generation_type text NOT NULL,
+  batch_number integer,
+  source_turn_ids uuid[] NOT NULL DEFAULT '{}'::uuid[],
+  model text NOT NULL,
+  status text NOT NULL,
+  summary text,
+  processed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
 CREATE TABLE public.story_relationship_states (
   session_id uuid PRIMARY KEY REFERENCES public.chat_sessions(id),
   user_id uuid NOT NULL,
@@ -71,6 +86,8 @@ CREATE TABLE public.story_relationship_batches (
 \ir ../supabase/migrations/20261106090000_story_turn_affinity_and_phone_events.sql
 \ir ../supabase/migrations/20261106110000_harden_story_turn_service_role_claims.sql
 \ir ../supabase/migrations/20261106120000_fix_story_turn_evaluation_reserved_charge.sql
+\ir ../supabase/migrations/20261106140000_expand_story_phone_events_to_five_fields.sql
+\ir ../supabase/migrations/20261110120000_story_phone_state_and_memory_summary_read.sql
 
 INSERT INTO auth.users(id) VALUES
   ('10000000-0000-4000-8000-000000000001'),
@@ -103,8 +120,9 @@ INSERT INTO public.chat_turn_charges(turn_id,session_id,user_id,user_message_id,
   ('60000000-0000-4000-8000-000000000004','30000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000004','50000000-0000-4000-8000-000000000004','50000000-0000-4000-8000-000000000004','settled'),
   ('60000000-0000-4000-8000-000000000005','30000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000005','50000000-0000-4000-8000-000000000005','50000000-0000-4000-8000-000000000005','settled');
 
-SELECT set_config('request.jwt.claim.role','',true);
 SELECT set_config('request.jwt.claims','{"role":"service_role"}',true);
+SELECT set_config('request.jwt.claim.role','service_role',true);
+SELECT current_setting('request.jwt.claim.role', true) AS role_claim, current_setting('request.jwt.claims', true) AS claims, public.is_service_role_request() AS helper_result;
 SELECT public.queue_story_turn_evaluation(
   '60000000-0000-4000-8000-000000000001',
   '30000000-0000-4000-8000-000000000001',
@@ -114,7 +132,7 @@ SELECT public.queue_story_turn_evaluation(
   '50000000-0000-4000-8000-000000000001',
   2,
   'A meaningful trust-building moment',
-  '[{"event_type":"message","title":"訊息","body":"角色傳來一則新的訊息。"}]'::jsonb
+  '[{"event_type":"notification","title":"💭江辰遠目前的想法","body":"他正在思考今天的安排。"},{"event_type":"notification","title":"📱最近收到的訊息","body":"目前沒有新的訊息。"},{"event_type":"notification","title":"📍江辰遠衣著／姿勢","body":"穿著目前已知的休閒襯衫。"},{"event_type":"notification","title":"📍玩家衣著／姿勢","body":"目前沒有足夠資訊。"},{"event_type":"notification","title":"🗒️江辰遠待辦事項","body":"目前沒有待辦事項。"},{"event_type":"notification","title":"欄位六","body":"內容六。"},{"event_type":"notification","title":"欄位七","body":"內容七。"},{"event_type":"notification","title":"欄位八","body":"內容八。"}]'::jsonb
 );
 DO $$
 DECLARE result jsonb;
@@ -139,8 +157,8 @@ END $$;
 SELECT set_config('request.jwt.claim.role','service_role',true);
 UPDATE public.chat_turn_charges SET status='settled', assistant_message_id=expected_assistant_message_id
 WHERE turn_id='60000000-0000-4000-8000-000000000001';
-SELECT set_config('request.jwt.claim.role','',true);
 SELECT set_config('request.jwt.claims','{"role":"service_role"}',true);
+SELECT set_config('request.jwt.claim.role','service_role',true);
 
 DO $$
 DECLARE result jsonb; current_affinity integer; event_count integer;
@@ -153,10 +171,15 @@ BEGIN
   IF result->>'idempotent' <> 'true' THEN RAISE EXCEPTION 'duplicate application was not idempotent'; END IF;
   SELECT affinity INTO current_affinity FROM public.story_relationship_states
   WHERE session_id='30000000-0000-4000-8000-000000000001';
+  SELECT count(*) INTO event_count FROM public.story_phone_states
+  WHERE source_turn_id='60000000-0000-4000-8000-000000000001';
+  IF current_affinity <> 12 OR event_count <> 8 THEN
+    RAISE EXCEPTION 'phone state snapshots duplicated or missing';
+  END IF;
   SELECT count(*) INTO event_count FROM public.story_phone_events
   WHERE turn_id='60000000-0000-4000-8000-000000000001';
-  IF current_affinity <> 12 OR event_count <> 1 THEN
-    RAISE EXCEPTION 'side effects duplicated or missing';
+  IF event_count <> 0 THEN
+    RAISE EXCEPTION 'replaceable notification snapshots leaked into event history';
   END IF;
 END $$;
 
@@ -164,15 +187,82 @@ SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001'
 DO $$
 DECLARE event_count integer;
 BEGIN
+  SELECT count(*) INTO event_count FROM public.get_story_phone_state('30000000-0000-4000-8000-000000000001');
+  IF event_count <> 8 THEN RAISE EXCEPTION 'owner cannot read all eight current phone fields'; END IF;
   SELECT count(*) INTO event_count FROM public.get_story_phone_events('30000000-0000-4000-8000-000000000001');
-  IF event_count <> 1 THEN RAISE EXCEPTION 'owner cannot read own phone events'; END IF;
+  IF event_count <> 0 THEN RAISE EXCEPTION 'status snapshots must not render as historical events'; END IF;
 END $$;
 SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000002',true);
 DO $$
-DECLARE event_count integer;
+DECLARE state_count integer; event_count integer;
 BEGIN
+  SELECT count(*) INTO state_count FROM public.get_story_phone_state('30000000-0000-4000-8000-000000000001');
   SELECT count(*) INTO event_count FROM public.get_story_phone_events('30000000-0000-4000-8000-000000000001');
-  IF event_count <> 0 THEN RAISE EXCEPTION 'cross-owner phone event read was allowed'; END IF;
+  IF state_count <> 0 OR event_count <> 0 THEN RAISE EXCEPTION 'cross-owner phone data read was allowed'; END IF;
+END $$;
+
+INSERT INTO public.chat_messages(id,session_id,role,content) VALUES
+  ('40000000-0000-4000-8000-000000000006','30000000-0000-4000-8000-000000000001','user','Turn six'),
+  ('50000000-0000-4000-8000-000000000006','30000000-0000-4000-8000-000000000001','assistant','Reply six');
+INSERT INTO public.chat_turn_charges(turn_id,session_id,user_id,user_message_id,expected_assistant_message_id,assistant_message_id,status)
+VALUES ('60000000-0000-4000-8000-000000000006','30000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001',
+  '40000000-0000-4000-8000-000000000006','50000000-0000-4000-8000-000000000006','50000000-0000-4000-8000-000000000006','settled');
+SELECT public.queue_story_turn_evaluation(
+  '60000000-0000-4000-8000-000000000006',
+  '30000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000001',
+  '40000000-0000-4000-8000-000000000006',
+  '50000000-0000-4000-8000-000000000006',
+  0,
+  'No affinity change',
+  '[{"event_type":"notification","title":"目前想法","body":"正在思考明天安排。"},{"event_type":"message","title":"客戶訊息","body":"客戶確認明早十點丈量。"},{"event_type":"notification","title":"目前衣著","body":"深色襯衫。"},{"event_type":"notification","title":"待辦事項","body":"優先確認丈量時間；準備材料清單。"},{"event_type":"notification","title":"目前位置","body":"工作室。"}]'::jsonb
+);
+SELECT public.apply_story_turn_evaluation('60000000-0000-4000-8000-000000000006');
+SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',true);
+DO $$
+DECLARE state_count integer; event_count integer; current_count integer;
+BEGIN
+  SELECT count(*) INTO state_count FROM public.story_phone_states
+  WHERE session_id='30000000-0000-4000-8000-000000000001';
+  SELECT count(*) INTO event_count FROM public.story_phone_events
+  WHERE session_id='30000000-0000-4000-8000-000000000001';
+  SELECT count(*) INTO current_count FROM public.get_story_phone_state('30000000-0000-4000-8000-000000000001');
+  IF state_count <> 4 OR current_count <> 4 OR event_count <> 1 THEN
+    RAISE EXCEPTION 'removed field snapshots or genuine event history were not handled correctly';
+  END IF;
+END $$;
+
+INSERT INTO public.ai_model_usage (
+  user_id,session_id,generation_type,batch_number,source_turn_ids,model,status,summary,processed_at
+) VALUES (
+  '10000000-0000-4000-8000-000000000001',
+  '30000000-0000-4000-8000-000000000001',
+  'memory_summary',1,
+  ARRAY[
+    '60000000-0000-4000-8000-000000000001',
+    '60000000-0000-4000-8000-000000000002',
+    '60000000-0000-4000-8000-000000000003',
+    '60000000-0000-4000-8000-000000000004',
+    '60000000-0000-4000-8000-000000000005'
+  ]::uuid[],
+  'openai/gpt-oss-20b','completed','這是已完成的 AI 累積回憶摘要。',now()
+);
+SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',true);
+DO $$
+DECLARE row_value record;
+BEGIN
+  SELECT * INTO row_value FROM public.get_story_memory_summary('30000000-0000-4000-8000-000000000001');
+  IF row_value.summary <> '這是已完成的 AI 累積回憶摘要。' OR row_value.generation_status <> 'completed' THEN
+    RAISE EXCEPTION 'owner cannot read the latest AI memory summary';
+  END IF;
+END $$;
+SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000002',true);
+DO $$
+DECLARE row_count integer;
+BEGIN
+  SELECT count(*) INTO row_count FROM public.get_story_memory_summary('30000000-0000-4000-8000-000000000001');
+  IF row_count <> 0 THEN RAISE EXCEPTION 'cross-owner memory summary read was allowed'; END IF;
 END $$;
 
 SELECT set_config('request.jwt.claim.role','service_role',true);

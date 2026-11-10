@@ -16,6 +16,8 @@ on:
       - "supabase/functions/_shared/story-memory-summary.ts"
       - "supabase/migrations/20261106090000_story_turn_affinity_and_phone_events.sql"
       - "supabase/migrations/20261106110000_harden_story_turn_service_role_claims.sql"
+      - "supabase/migrations/20261110120000_story_phone_state_and_memory_summary_read.sql"
+      - "supabase/migrations/20261111100000_story_suggested_replies_persistence.sql"
       - "supabase/migrations/20261106120000_fix_story_turn_evaluation_reserved_charge.sql"
       - "scripts/test-story-turn-affinity-phone-events.sql"
       - "supabase/functions/_shared/provider-failure-policy.ts"
@@ -25,6 +27,7 @@ on:
       - "supabase/migrations/20261104140000_restrict_chat_turn_rpc_execution.sql"
       - "supabase/migrations/20261104130000_reconcile_stale_story_chat_turns.sql"
       - "scripts/test-character-personality-private-migration.sql"
+      - "scripts/test-character-profile-organization-queue.sql"
       - "scripts/test-private-personality-column-usage.mjs"
       - "scripts/test-chat-turn-wallet-refund.sql"
       - "scripts/test-chat-turn-reconciliation-ui.mjs"
@@ -35,11 +38,20 @@ on:
       - "scripts/test-memory-capture.cjs"
       - "scripts/test-memory-persistence-contract.mjs"
       - "supabase/functions/chat-turn/index.ts"
+      - "supabase/functions/character-profile-organization-worker/index.ts"
+      - "supabase/functions/_shared/character-profile-organization.ts"
+      - "supabase/functions/_shared/character-profile-organization.test.ts"
+      - "supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql"
+      - "supabase/migrations/20261107123000_schedule_character_profile_organization_worker.sql"
+      - "scripts/test-character-profile-organization-queue.sql"
       - "scripts/test-story-roleplay-prompt.mjs"
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/prompt-variables.ts"
       - "index.html"
       - "scripts/test-phone-notice-presentation.mjs"
+      - "scripts/test-character-ai-profile-contract.mjs"
+      - "supabase/drafts/character-ai-profile-v1.schema.json"
+      - "supabase/drafts/character-ai-profile-source-registry-v1.json"
       - ".github/workflows/story-ai-content-refusal-tests.yml"
   push:
     branches:
@@ -69,6 +81,10 @@ on:
       - "scripts/test-memory-capture.cjs"
       - "scripts/test-memory-persistence-contract.mjs"
       - "supabase/functions/chat-turn/index.ts"
+      - "supabase/functions/character-profile-organization-worker/index.ts"
+      - "supabase/functions/_shared/character-profile-organization.ts"
+      - "supabase/functions/_shared/character-profile-organization.test.ts"
+      - "supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql"
       - "scripts/test-story-roleplay-prompt.mjs"
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/prompt-variables.ts"
@@ -150,6 +166,30 @@ jobs:
           PGPASSWORD: postgres
         run: psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -f scripts/test-character-personality-private-migration.sql
 
+  character-profile-queue-migration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Test profile queue coalescing, private access, lease fencing and stale-source rejection
+        env:
+          PGPASSWORD: postgres
+        run: psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -f scripts/test-character-profile-organization-queue.sql
+
   story-ai-content-refusal:
     runs-on: ubuntu-latest
     steps:
@@ -162,6 +202,8 @@ jobs:
         run: node scripts/test-story-roleplay-prompt.mjs
       - name: Verify phone UI never renders creator-only notification prompts
         run: node scripts/test-phone-notice-presentation.mjs
+      - name: Verify Character AI Profile schema and source registry contracts
+        run: node scripts/test-character-ai-profile-contract.mjs
       - name: Test five-turn player-first memory capture
         run: node --test scripts/test-memory-capture.cjs
       - name: Verify memory persistence, reload and correction-priority contracts
@@ -171,6 +213,12 @@ jobs:
           deno-version: v2.x
       - name: Type-check Story chat-turn Edge Function
         run: deno check supabase/functions/chat-turn/index.ts
+      - name: Type-check Character Profile organization Worker
+        run: deno check supabase/functions/character-profile-organization-worker/index.ts
+      - name: Test Character AI Profile evidence, privacy and OOC validation
+        run: deno test supabase/functions/_shared/character-profile-organization.test.ts
+      - name: Verify Story phone RPC and suggested reply persistence regressions
+        run: node scripts/test-story-phone-and-suggestions-regression.mjs
       - name: Test structured Story turn evaluation parsing
         run: deno test supabase/functions/_shared/story-turn-envelope.test.ts
       - name: Run provider result normalization tests

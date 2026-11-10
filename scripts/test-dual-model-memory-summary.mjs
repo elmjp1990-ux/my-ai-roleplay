@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 const source = readFileSync("supabase/functions/chat-turn/index.ts", "utf8");
 const summary = readFileSync("supabase/functions/_shared/story-memory-summary.ts", "utf8");
 const migration = readFileSync("supabase/migrations/20261105223613_ai_model_usage_and_memory_summaries.sql", "utf8");
+const summaryReadMigration = readFileSync("supabase/migrations/20261110120000_story_phone_state_and_memory_summary_read.sql", "utf8");
+const ui = readFileSync("index.html", "utf8");
 assert.match(source, /const DEFAULT_OPENROUTER_MODEL = "deepseek\/deepseek-v4-flash-20260423"/);
 assert.doesNotMatch(source, /Deno\.env\.get\("OPENROUTER_MODEL"\)/);
 assert.match(source, /provider: \{ only: \["deepinfra"\], allow_fallbacks: false, data_collection: "deny" \}/);
@@ -19,6 +21,13 @@ assert.match(summary, /prompt_tokens/);
 assert.match(summary, /cost_usd/);
 assert.match(summary, /accumulatedUsage/);
 assert.match(summary, /data_collection: "deny"/);
+assert.match(summaryReadMigration, /CREATE OR REPLACE FUNCTION public\.get_story_memory_summary/);
+assert.match(summaryReadMigration, /auth\.uid\(\)/);
+assert.match(ui, /function loadStoryMemorySummary\(session\)/);
+assert.match(ui, /get_story_memory_summary/);
+assert.match(ui, /AI 劇情回憶摘要/);
+assert.match(ui, /累積中：目前已完成/);
+assert.match(summaryReadMigration, /latest_completed/);
 
 // Usage rows with a persisted assistant reply must be written only after that
 // message exists; failed or blocked generations intentionally store a null FK.

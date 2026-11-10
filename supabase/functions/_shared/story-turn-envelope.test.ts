@@ -1,23 +1,27 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { parseStoryTurnEnvelope } from "./story-turn-envelope.ts";
 
+const validSuggestions = [
+  "*我稍微靠近桌邊，指尖輕敲杯沿*那你呢？你平常也會這麼晚才休息嗎？",
+  "*我把手中的飲料推到你面前，語氣放輕*先喝一點吧，等你舒服些，我再陪你慢慢聊今天發生的事。",
+  "*我停下腳步，回頭看向你，忍不住笑了*其實我還有件事想告訴你，只是一直在想該怎麼開口。",
+];
+
 Deno.test("parses a valid reply and bounded side effects", () => {
   assertEquals(parseStoryTurnEnvelope(JSON.stringify({
     reply: "*他微微一笑*你好。",
     affinity_delta: 2,
     affinity_reason: "角色感受到玩家的信任。",
     phone_events: [{ event_type: "message", title: "晚安", body: "今天聊得很開心。" }],
-    suggested_replies: ["我看著你，想了想才慢慢開口，決定把心裡真正的疑問說出來，也想知道你會怎麼回答。",
-      "我沒有立刻接話，而是先觀察你的表情，接著提出另一個想法，試著讓我們的談話繼續下去。",
-      "我輕輕笑了笑，順著你的話題分享自己的經歷，再自然地問起你對這件事的看法。"],
+    suggested_replies: validSuggestions,
+    story_world_state: { story_time: "2026-11-10T21:30:00+08:00", story_location: "江辰遠的公寓・客廳" },
   })), {
     reply: "*他微微一笑*你好。",
     affinity_delta: 2,
     affinity_reason: "角色感受到玩家的信任。",
     phone_events: [{ event_type: "message", title: "晚安", body: "今天聊得很開心。" }],
-    suggested_replies: ["我看著你，想了想才慢慢開口，決定把心裡真正的疑問說出來，也想知道你會怎麼回答。",
-      "我沒有立刻接話，而是先觀察你的表情，接著提出另一個想法，試著讓我們的談話繼續下去。",
-      "我輕輕笑了笑，順著你的話題分享自己的經歷，再自然地問起你對這件事的看法。"],
+    suggested_replies: validSuggestions,
+    story_world_state: { story_time: "2026-11-10T21:30:00+08:00", story_location: "江辰遠的公寓・客廳" },
   });
 });
 
@@ -27,7 +31,12 @@ Deno.test("legacy plain text remains a reply without inferred effects", () => {
     affinity_delta: 0,
     affinity_reason: "",
     phone_events: [],
-    suggested_replies: [],
+    suggested_replies: [
+      "*我稍微停下動作，認真看向你*你剛才提到的事，我還想再聽你多說一點，可以嗎？",
+      "*我輕輕點頭，語氣放緩一些*那我們先把眼前這件事處理好，之後再慢慢聊。",
+      "*我看了看四周，再把目光移回你身上*如果你願意，我想陪你一起確認接下來的安排。",
+    ],
+    story_world_state: null,
   });
 });
 
@@ -46,12 +55,12 @@ Deno.test("out-of-range affinity is neutralized and invalid phone events are dro
   assertEquals(parsed.phone_events, [{ event_type: "message", title: "有效", body: "內容" }]);
 });
 
-Deno.test("phone events are limited to three and text is bounded", () => {
+Deno.test("phone events support eight configured fields and text is bounded", () => {
   const parsed = parseStoryTurnEnvelope(JSON.stringify({
     reply: "回覆",
     affinity_delta: -3,
     affinity_reason: "x".repeat(400),
-    phone_events: Array.from({ length: 5 }, (_, index) => ({
+    phone_events: Array.from({ length: 8 }, (_, index) => ({
       event_type: "notification",
       title: "事件" + index,
       body: "內文",
@@ -59,20 +68,184 @@ Deno.test("phone events are limited to three and text is bounded", () => {
   }));
   assertEquals(parsed.affinity_delta, -3);
   assertEquals(parsed.affinity_reason.length, 280);
-  assertEquals(parsed.phone_events.length, 3);
+  assertEquals(parsed.phone_events.length, 8);
+});
+
+Deno.test("suggested replies require exactly three 30–80 character action-plus-dialogue options", () => {
+  const parsed = parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: validSuggestions }));
+  assertEquals(parsed.suggested_replies, validSuggestions);
+
+  assertEquals(
+    parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: validSuggestions.slice(0, 2) })).suggested_replies,
+    [
+      "*我稍微停下動作，認真看向你*你剛才提到的事，我還想再聽你多說一點，可以嗎？",
+      "*我輕輕點頭，語氣放緩一些*那我們先把眼前這件事處理好，之後再慢慢聊。",
+      "*我看了看四周，再把目光移回你身上*如果你願意，我想陪你一起確認接下來的安排。",
+    ],
+  );
+  assertEquals(
+    parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: ["太短", validSuggestions[1], validSuggestions[2]] })).suggested_replies,
+    [
+      "*我稍微停下動作，認真看向你*你剛才提到的事，我還想再聽你多說一點，可以嗎？",
+      "*我輕輕點頭，語氣放緩一些*那我們先把眼前這件事處理好，之後再慢慢聊。",
+      "*我看了看四周，再把目光移回你身上*如果你願意，我想陪你一起確認接下來的安排。",
+    ],
+  );
+  assertEquals(
+    parseStoryTurnEnvelope(JSON.stringify({
+      reply: "回覆",
+      suggested_replies: [validSuggestions[0], validSuggestions[1], validSuggestions[2] + "補充超過字數上限的內容".repeat(8)],
+    })).suggested_replies,
+    [
+      "*我稍微停下動作，認真看向你*你剛才提到的事，我還想再聽你多說一點，可以嗎？",
+      "*我輕輕點頭，語氣放緩一些*那我們先把眼前這件事處理好，之後再慢慢聊。",
+      "*我看了看四周，再把目光移回你身上*如果你願意，我想陪你一起確認接下來的安排。",
+    ],
+  );
+  assertEquals(
+    parseStoryTurnEnvelope(JSON.stringify({
+      reply: "回覆",
+      suggested_replies: [validSuggestions[0], "這是一段沒有旁白動作、只有對白而且字數足夠的玩家建議回覆內容。", validSuggestions[2]],
+    })).suggested_replies,
+    [
+      "*我稍微停下動作，認真看向你*你剛才提到的事，我還想再聽你多說一點，可以嗎？",
+      "*我輕輕點頭，語氣放緩一些*那我們先把眼前這件事處理好，之後再慢慢聊。",
+      "*我看了看四周，再把目光移回你身上*如果你願意，我想陪你一起確認接下來的安排。",
+    ],
+  );
+  assertEquals(
+    parseStoryTurnEnvelope(JSON.stringify({
+      reply: "回覆",
+      suggested_replies: [validSuggestions[0], "*我看著你，稍微停頓了一下* ", validSuggestions[2]],
+    })).suggested_replies,
+    [
+      "*我稍微停下動作，認真看向你*你剛才提到的事，我還想再聽你多說一點，可以嗎？",
+      "*我輕輕點頭，語氣放緩一些*那我們先把眼前這件事處理好，之後再慢慢聊。",
+      "*我看了看四周，再把目光移回你身上*如果你願意，我想陪你一起確認接下來的安排。",
+    ],
+  );
+  assertEquals(
+    parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggestedReplies: validSuggestions })).suggested_replies,
+    validSuggestions,
+  );
+  assertEquals(
+    parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggestions: [...validSuggestions, "第四個不顯示"] })).suggested_replies,
+    validSuggestions,
+  );
 });
 
 
-Deno.test("suggested replies preserve valid options and accept supported aliases", () => {
-  const valid = ["我看著你，想了想才慢慢開口，決定把心裡真正的疑問說出來，也想知道你會怎麼回答。",
-      "我沒有立刻接話，而是先觀察你的表情，接著提出另一個想法，試著讓我們的談話繼續下去。",
-      "我輕輕笑了笑，順著你的話題分享自己的經歷，再自然地問起你對這件事的看法。"];
-  const parsed = parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: valid }));
-  assertEquals(parsed.suggested_replies, valid);
-  assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: valid.slice(0, 2) })).suggested_replies, valid.slice(0, 2));
-  assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: ["短", valid[1], valid[2]] })).suggested_replies, ["短", valid[1], valid[2]]);
-  assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: [valid[0], valid[1], valid[2] + "補充超過字數上限的內容".repeat(8)] })).suggested_replies, [valid[0], valid[1], valid[2] + "補充超過字數上限的內容".repeat(8)]);
-  assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: [valid[0], "短", valid[2]] })).suggested_replies, [valid[0], "短", valid[2]]);
-  assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggestedReplies: valid })).suggested_replies, valid);
-  assertEquals(parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggestions: [...valid, "第四個不顯示，避免超過三個選項"] })).suggested_replies, valid);
+Deno.test("configured phone fields are returned in exact order with safe empty-state fallbacks", () => {
+  const prompts = [
+    "{CHAR}最近收到{USER}的訊息|只記錄真正收到的手機訊息",
+    "角色衣著／姿勢|延續已知狀態",
+    "玩家衣著／姿勢|只根據明確描述",
+    "待辦事項|只列出尚未完成事項",
+    "手機通知|依生活情境生成",
+  ];
+  const parsed = parseStoryTurnEnvelope(JSON.stringify({
+    reply: "回覆",
+    phone_events: [
+      { event_type: "message", title: "Una的簡訊", body: "江大哥，今天工地順不順利？" },
+      { event_type: "notification", title: "角色衣著", body: "休閒襯衫挽至前臂。\n坐姿自然。" },
+    ],
+  }), { configuredPrompts: prompts, currentUserMessage: "今天工地順利嗎？", playerName: "Una", characterName: "江辰遠" });
+
+  assertEquals(parsed.phone_events, [
+    { event_type: "notification", title: "江辰遠最近收到Una的訊息", body: "目前沒有新的手機訊息" },
+    { event_type: "notification", title: "角色衣著／姿勢", body: "休閒襯衫挽至前臂。；坐姿自然。" },
+    { event_type: "notification", title: "玩家衣著／姿勢", body: "目前沒有足夠資訊" },
+    { event_type: "notification", title: "待辦事項", body: "目前沒有待辦事項" },
+    { event_type: "notification", title: "手機通知", body: "目前沒有足夠資訊" },
+  ]);
+});
+
+Deno.test("configured phone fields preserve snapshot versus genuine event classification", () => {
+  const prompts = ["目前衣著與姿勢|只在劇情有變化時更新", "最近收到的訊息|只記錄本回合新收到的訊息"];
+  const parsed = parseStoryTurnEnvelope(JSON.stringify({
+    reply: "回覆",
+    phone_events: [
+      { event_type: "notification", title: "衣著", body: "深色襯衫，袖口捲起。" },
+      { event_type: "message", title: "客戶訊息", body: "客戶確認明早十點丈量。" },
+    ],
+  }), { configuredPrompts: prompts, currentUserMessage: "我今天穿什麼？" });
+  assertEquals(parsed.phone_events, [
+    { event_type: "notification", title: "目前衣著與姿勢", body: "深色襯衫，袖口捲起。" },
+    { event_type: "message", title: "最近收到的訊息", body: "客戶確認明早十點丈量。" },
+  ]);
+});
+
+Deno.test("unconfigured phone mode also blocks invented player-origin messages", () => {
+  const parsed = parseStoryTurnEnvelope(JSON.stringify({
+    reply: "回覆",
+    phone_events: [
+      { event_type: "message", title: "Una的簡訊", body: "江大哥，今天工地順不順利？" },
+      { event_type: "message", title: "客戶訊息", body: "林小姐：想確認明天丈量的時間。" },
+    ],
+  }), { currentUserMessage: "今天工地順利嗎？", playerName: "Una" });
+  assertEquals(parsed.phone_events, [
+    { event_type: "message", title: "客戶訊息", body: "林小姐：想確認明天丈量的時間。" },
+  ]);
+});
+
+Deno.test("NPC work messages are allowed, but player SMS requires an explicit phone-send action", () => {
+  const prompts = ["最近收到的訊息|最近的手機訊息"];
+  const npcMessage = JSON.stringify({
+    reply: "回覆",
+    phone_events: [{ event_type: "message", title: "客戶訊息", body: "林小姐：想確認明天現場丈量的時間。" }],
+  });
+  assertEquals(
+    parseStoryTurnEnvelope(npcMessage, {
+      configuredPrompts: prompts,
+      currentUserMessage: "今天工地順利嗎？",
+      playerName: "Una",
+    }).phone_events,
+    [{ event_type: "message", title: "最近收到的訊息", body: "林小姐：想確認明天現場丈量的時間。" }],
+  );
+
+  const playerMessage = JSON.stringify({
+    reply: "回覆",
+    phone_events: [{ event_type: "message", title: "Una的簡訊", body: "江大哥，今天工地順不順利？" }],
+  });
+  assertEquals(
+    parseStoryTurnEnvelope(playerMessage, {
+      configuredPrompts: prompts,
+      currentUserMessage: "我拿起手機傳 LINE 給江辰遠，問他今天工地順不順利。",
+      playerName: "Una",
+    }).phone_events,
+    [{ event_type: "message", title: "最近收到的訊息", body: "江大哥，今天工地順不順利？" }],
+  );
+});
+
+
+Deno.test("story world state follows contextual time jumps and location corrections, and preserves prior state when omitted", () => {
+  const previous = {
+    story_time: "2026-11-10T23:30:00+08:00",
+    story_location: "江辰遠的公寓・臥室",
+  };
+  const advanced = parseStoryTurnEnvelope(JSON.stringify({
+    reply: "隔天清晨。",
+    story_world_state: {
+      story_time: "2026-11-11T07:10:00+08:00",
+      story_location: "江辰遠的公寓・臥室",
+    },
+  }), { currentStoryWorldState: previous });
+  assertEquals(advanced.story_world_state, {
+    story_time: "2026-11-11T07:10:00+08:00",
+    story_location: "江辰遠的公寓・臥室",
+  });
+
+  const moved = parseStoryTurnEnvelope(JSON.stringify({
+    reply: "兩人來到咖啡廳。",
+    story_world_state: {
+      story_time: "2026-11-11T09:20:00+08:00",
+      story_location: "街角咖啡廳",
+    },
+  }), { currentStoryWorldState: previous });
+  assertEquals(moved.story_world_state?.story_location, "街角咖啡廳");
+
+  const omitted = parseStoryTurnEnvelope(JSON.stringify({ reply: "繼續聊天。" }), {
+    currentStoryWorldState: previous,
+  });
+  assertEquals(omitted.story_world_state, previous);
 });
