@@ -24,9 +24,13 @@ assert.match(summary, /data_collection: "deny"/);
 assert.match(summaryReadMigration, /CREATE OR REPLACE FUNCTION public\.get_story_memory_summary/);
 assert.match(summaryReadMigration, /auth\.uid\(\)/);
 assert.match(ui, /function loadStoryMemorySummary\(session\)/);
-assert.match(ui, /get_story_memory_summary/);
-assert.match(ui, /AI 劇情回憶摘要/);
-assert.match(ui, /累積中：目前已完成/);
+assert.match(ui, /get_story_memory_summaries/);
+assert.match(ui, /data-action="edit-story-memory"/);
+assert.match(ui, /data-form="story-memory-edit"/);
+assert.match(ui, /update_story_memory_summary/);
+assert.doesNotMatch(ui, /AI 劇情回憶摘要 · 第 /);
+assert.doesNotMatch(ui, /SWEET DIARY · LONG-TERM MEMORY/);
+assert.match(ui, /設為重大記憶/);
 assert.match(summaryReadMigration, /latest_completed/);
 
 // Usage rows with a persisted assistant reply must be written only after that

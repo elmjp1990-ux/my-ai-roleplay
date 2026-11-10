@@ -154,7 +154,7 @@ async function buildStoryMessages(
   currentUserMessage: DbRow,
 ): Promise<{ messages: Array<{ role: "system" | "user" | "assistant"; content: string }>; protectedContext: string[]; priorAssistantOutputs: string[]; phonePrompts: string[]; currentUserMessage: string; playerName: string; characterName: string; currentStoryWorldState: { story_time: string; story_location: string } | null }> {
   const characterId = String(session.character_id);
-  const [characterResult, profileResult, historyResult, summaryResult] = await Promise.all([
+  const [characterResult, profileResult, historyResult, summaryResult, importantMemoriesResult] = await Promise.all([
     admin.from("characters")
       .select("id,author_id,name,intro,style,gender,age,race,phone_settings")
       .eq("id", characterId)
@@ -173,7 +173,17 @@ async function buildStoryMessages(
       .eq("session_id", String(session.id))
       .eq("generation_type", "memory_summary")
       .eq("status", "completed")
+      .not("summary", "is", null)
+      .neq("summary", "")
       .order("batch_number", { ascending: false }).limit(1).maybeSingle(),
+    admin.from("ai_model_usage").select("batch_number,summary,processed_at,created_at")
+      .eq("session_id", String(session.id))
+      .eq("generation_type", "memory_summary")
+      .eq("status", "completed")
+      .eq("important", true)
+      .not("summary", "is", null)
+      .neq("summary", "")
+      .order("batch_number", { ascending: true }),
   ]);
 
   if (characterResult.error) throw new Error("story_character_context_unavailable");
@@ -245,6 +255,21 @@ async function buildStoryMessages(
   const sessionData = asDbRow(session.session_data);
   const storedSummary = asString(summaryResult.data?.summary);
   if (storedSummary) sessionData.summary = storedSummary;
+  // Story memory is AI-summary-only: never feed legacy player/character quote
+  // cards from session_data.memories back into the roleplay prompt.
+  // Only summaries explicitly marked important are promoted into MEMORY.
+  if (importantMemoriesResult.error) {
+    console.warn("story_important_memories_unavailable", {
+      code: typeof importantMemoriesResult.error.code === "string" ? importantMemoriesResult.error.code : "memory_read_failed",
+    });
+  }
+  const importantSummaryRows = Array.isArray(importantMemoriesResult.data) ? importantMemoriesResult.data : [];
+  sessionData.memories = importantSummaryRows.map((item: DbRow, index: number) => ({
+    text: asString(item.summary),
+    important: true,
+    at: Date.parse(asString(item.processed_at || item.created_at)) || Number(item.batch_number) || index,
+  })).filter((item: DbRow) => item.text);
+  sessionData.memory = [];
   const values = buildPromptVariableValues({
     profile,
     character: { ...character, personality_profile: personalityProfile },
@@ -303,7 +328,7 @@ async function buildStoryMessages(
     "【角色手機設定｜作者定義的手機欄位】" + phoneSettingsPrompt,
     "【故事時間與所在地（必須每回合輸出）】目前狀態：" + JSON.stringify(currentStoryWorldState || {}) + "；故事建立時間：" + asString(session.created_at) + "。請依開場情境、角色背景、完整近期對話及玩家最新訊息，推斷目前故事世界的當地日期時間與所在地。若沒有既有狀態，第一次就要從上下文推定；不可直接用現實系統現在時間代替故事時間。若沒有明確時間，依故事建立時間、對話時間線、白天／夜晚線索與事件順序推定合理時間；若有「睡到隔天」「過了幾小時」「隔天早上」等敘述，必須正確推進日期與時間。一般聊天沒有時間推進時延續舊時間；不得每回合自行跳時。所在地優先依開場場景、世界觀、角色位置、玩家敘述及最新場景行動判斷；場景未變就延續舊地點，明確移動才更新。若新資訊明確更正舊狀態，採用最新資訊。不得捏造無上下文支持的具體地址；可使用合理場景層級（如「江辰遠的公寓・臥室」）。每回合 JSON 必須包含 story_world_state：{\"story_time\":\"含時區的 ISO 8601 日期時間或故事當地日期時間字串\",\"story_location\":\"目前所在地\"}，兩欄都要填寫。",
     "【最近手機狀態（用於延續，不可無故改寫）】" + JSON.stringify(phoneHistory).slice(0, 3000),
-    "【每回合結構化輸出】只輸出一個 JSON object，不要 Markdown code fence。格式：{\"reply\":\"角色對玩家的完整自然回覆\",\"story_world_state\":{\"story_time\":\"2026-11-10T21:30:00+08:00\",\"story_location\":\"江辰遠的公寓・客廳\"},\"affinity_delta\":0,\"affinity_reason\":\"簡短說明這次互動為何影響或不影響關係\",\"phone_events\":[{\"event_type\":\"notification\",\"title\":\"欄位一\",\"body\":\"內容一\"},{\"event_type\":\"notification\",\"title\":\"欄位二\",\"body\":\"內容二\"},{\"event_type\":\"notification\",\"title\":\"欄位三\",\"body\":\"內容三\"},{\"event_type\":\"notification\",\"title\":\"欄位四\",\"body\":\"內容四\"},{\"event_type\":\"notification\",\"title\":\"欄位五\",\"body\":\"內容五\"},{\"event_type\":\"notification\",\"title\":\"欄位六\",\"body\":\"內容六\"},{\"event_type\":\"notification\",\"title\":\"欄位七\",\"body\":\"內容七\"},{\"event_type\":\"notification\",\"title\":\"欄位八\",\"body\":\"內容八\"}],\"suggested_replies\":[\"第一則玩家可直接送出的自然回覆\",\"第二則不同方向的自然回覆\",\"第三則不同方向的自然回覆\"]}。suggested_replies 必須恰好 3 則，每則 30～80 字，必須是一段可直接送出的完整玩家回覆，並且每則都要同時包含一段以單星號包覆的玩家旁白／動作（*...*）以及玩家實際說出口的自然對白；旁白／動作在前或對白在前皆可，但兩者必須自然連貫，不能只有動作、只有台詞或只有短語。對白不加引號、不加星號，旁白／動作只描述玩家此刻可選擇採取的行動，不得替玩家捏造已發生的事、內心想法或未作出的決定。三則必須根據角色人設、當前場景及最新對話提出三種實質不同的回應方向；不得使用固定模板、分類標籤、溫柔／俏皮等風格標題，不得加數字或項目編號，也不可把建議寫成給玩家的操作說明。無論前端建議回覆面板是否開啟，每回合都必須生成這三則內容。affinity_delta 必須是 -3 到 3 的整數；普通聊天、資訊交換或沒有情感意義的互動填 0。不要為討好玩家而加分；依角色人格、界線、信任與實際互動判斷。phone_events 最多 8 筆。若角色手機設定含 noticePrompts，必須依設定順序為每個欄位各產生一筆內容，數量與順序必須完全一致，不得漏欄、合併或多產生。每個欄位預設使用 event_type=notification，作為可覆蓋的最新狀態；只有本回合劇情確實發生新的訊息、社群貼文、未接來電或語音留言時，該欄位才使用對應的 message/social_post/missed_call/voice_message，作為新增歷史事件。若同一欄位是「最近收到的訊息」而本回合沒有新訊息，必須使用 notification 並顯示「目前沒有新的手機訊息」，不得把舊訊息重複當成新事件。每筆 title 使用設定文字中「|」之前的顯示名稱，並將 {CHAR}/{USER} 替換為實際稱呼。若某欄位沒有可靠資料，body 必須使用對應的明確空值文案：最近收到的手機訊息使用「目前沒有新的手機訊息」；玩家衣著／姿勢等未知資訊使用「目前沒有足夠資訊」；待辦事項沒有未完成事項使用「目前沒有待辦事項」。不得為了填滿欄位而編造玩家行為、玩家傳訊息、已發生的對話或未知事實。角色自己的生活仍可自然運作：可依角色職業、工作內容、人物關係、時間與既有劇情，合理創作來自客戶、工頭、同事、主管、廠商、家人或朋友等 NPC 的日常訊息與通知，讓手機呈現生活感；例如室內設計師可收到客戶確認、工地進度、材料交期或同事／主管工作安排。這些日常事件必須符合角色背景、現有劇情與時間，不可覆寫既有事件，也不可無根據地創造重大或不可逆的劇情變故。玩家來源的簡訊／LINE／電話只有在玩家明確描述拿起手機並傳送訊息、撥打電話等劇情行動時才可出現；一般聊天室發言、提問、對白或星號旁白都不等於手機訊息，不得轉成玩家已傳出的簡訊。只有明確傳送行動才可把玩家寫成訊息來源，且方向與內容必須符合玩家實際輸入。角色想法要符合角色當下情緒與人設；角色衣著／姿勢依最近已知狀態延續，除非劇情有明確變化；玩家衣著／姿勢只根據玩家明確描述或可觀察行動，不得臆測。設定文字中「|」之後若有作者補充指示，必須遵守；若分隔符後為空，依欄位名稱、近期對話、職業背景與最近手機狀態生成。每個手機欄位的 body 必須以簡短的一行為主，不寫長篇敘述；待辦事項可列多項，但只保留角色優先度最高、近期需要處理的事項，依優先度排序並簡短呈現。每回合都要依劇情判斷欄位是否真的改變；沒有新資訊或劇情變化時，原樣延續最近狀態，不要為了更新而改寫、換句話說或刷新時間。所有欄位都必須保持跨回合連續，不得無故更換衣著、位置或已知狀態。若未設定 noticePrompts，才可依劇情自然產生 0～8 筆手機動態；仍須遵守 NPC 日常生活與玩家傳訊息來源規則。每筆格式為 {\"event_type\":\"message|social_post|missed_call|voice_message|notification\",\"title\":\"標題\",\"body\":\"內容\"}。必須遵守角色手機設定，不得虛構與故事矛盾的事件；不得把玩家未說出的內心話當成角色已知資訊。reply 內的旁白仍使用單星號格式，實際對白不加星號。",
+    "【每回合結構化輸出】只輸出一個 JSON object，不要 Markdown code fence。格式：{\"reply\":\"角色對玩家的完整自然回覆\",\"story_world_state\":{\"story_time\":\"2026-11-10T21:30:00+08:00\",\"story_location\":\"江辰遠的公寓・客廳\"},\"affinity_delta\":0,\"affinity_reason\":\"簡短說明這次互動為何影響或不影響關係\",\"phone_events\":[{\"event_type\":\"notification\",\"title\":\"欄位一\",\"body\":\"內容一\"},{\"event_type\":\"notification\",\"title\":\"欄位二\",\"body\":\"內容二\"},{\"event_type\":\"notification\",\"title\":\"欄位三\",\"body\":\"內容三\"},{\"event_type\":\"notification\",\"title\":\"欄位四\",\"body\":\"內容四\"},{\"event_type\":\"notification\",\"title\":\"欄位五\",\"body\":\"內容五\"},{\"event_type\":\"notification\",\"title\":\"欄位六\",\"body\":\"內容六\"},{\"event_type\":\"notification\",\"title\":\"欄位七\",\"body\":\"內容七\"},{\"event_type\":\"notification\",\"title\":\"欄位八\",\"body\":\"內容八\"}],\"suggested_replies\":[\"第一則玩家可直接送出的自然回覆\",\"第二則不同方向的自然回覆\",\"第三則不同方向的自然回覆\"]}。suggested_replies 必須恰好 3 則，每則 30～80 字，必須是一段可直接送出的完整玩家回覆，並且每則都要同時包含一段以單星號包覆的玩家旁白／動作（*...*）以及玩家實際說出口的自然對白；旁白／動作在前或對白在前皆可，但兩者必須自然連貫，不能只有動作、只有台詞或只有短語。對白不加引號、不加星號，旁白／動作只描述玩家此刻可選擇採取的行動，不得替玩家捏造已發生的事、內心想法或未作出的決定。三則必須根據角色人設、當前場景及最新對話提出三種實質不同的回應方向；不得使用固定模板、分類標籤、溫柔／俏皮等風格標題，不得加數字或項目編號，也不可把建議寫成給玩家的操作說明。無論前端建議回覆面板是否開啟，每回合都必須生成這三則內容。affinity_delta 必須是 -3 到 3 的整數，而且每回合都要重新評估，不可因為前幾回合沒有變化就持續填 0，也不可把 0 當預設答案。只有本回合確實沒有改變信任、好感、親近感、失望或衝突時才填 0；小幅但明確的正向互動（主動關心、尊重界線、真誠回應、互相分享）可填 +1，明顯加深信任或情感連結可填 +2，重大且有充分劇情依據的關係轉折才填 +3；負向互動依影響程度使用 -1 到 -3。必須依角色人格、當下關係、互動脈絡與玩家實際行為判斷，不得為討好玩家而加分，也不得把一般禮貌自動視為好感增加。affinity_reason 必須簡短說明本回合變化或維持不變的具體原因。phone_events 最多 8 筆。若角色手機設定含 noticePrompts，必須依設定順序為每個欄位各產生一筆內容，數量與順序必須完全一致，不得漏欄、合併或多產生。每個欄位預設使用 event_type=notification，作為可覆蓋的最新狀態；只有本回合劇情確實發生新的訊息、社群貼文、未接來電或語音留言時，該欄位才使用對應的 message/social_post/missed_call/voice_message，作為新增歷史事件。若同一欄位是「最近收到的訊息」而本回合沒有新訊息，必須使用 notification 並顯示「目前沒有新的手機訊息」，不得把舊訊息重複當成新事件。每筆 title 使用設定文字中「|」之前的顯示名稱，並將 {CHAR}/{USER} 替換為實際稱呼。若某欄位沒有可靠資料，body 必須使用對應的明確空值文案：最近收到的手機訊息使用「目前沒有新的手機訊息」；玩家衣著／姿勢等未知資訊使用「目前沒有足夠資訊」；待辦事項沒有未完成事項使用「目前沒有待辦事項」。不得為了填滿欄位而編造玩家行為、玩家傳訊息、已發生的對話或未知事實。角色自己的生活仍可自然運作：可依角色職業、工作內容、人物關係、時間與既有劇情，合理創作來自客戶、工頭、同事、主管、廠商、家人或朋友等 NPC 的日常訊息與通知，讓手機呈現生活感；例如室內設計師可收到客戶確認、工地進度、材料交期或同事／主管工作安排。這些日常事件必須符合角色背景、現有劇情與時間，不可覆寫既有事件，也不可無根據地創造重大或不可逆的劇情變故。玩家來源的簡訊／LINE／電話只有在玩家明確描述拿起手機並傳送訊息、撥打電話等劇情行動時才可出現；一般聊天室發言、提問、對白或星號旁白都不等於手機訊息，不得轉成玩家已傳出的簡訊。只有明確傳送行動才可把玩家寫成訊息來源，且方向與內容必須符合玩家實際輸入。角色想法要符合角色當下情緒與人設；角色衣著／姿勢依最近已知狀態延續，除非劇情有明確變化；玩家衣著／姿勢只根據玩家明確描述或可觀察行動，不得臆測。設定文字中「|」之後若有作者補充指示，必須遵守；若分隔符後為空，依欄位名稱、近期對話、職業背景與最近手機狀態生成。每個手機欄位的 body 必須以簡短的一行為主，不寫長篇敘述；待辦事項可列多項，但只保留角色優先度最高、近期需要處理的事項，依優先度排序並簡短呈現。每回合都要依劇情判斷欄位是否真的改變；沒有新資訊或劇情變化時，原樣延續最近狀態，不要為了更新而改寫、換句話說或刷新時間。所有欄位都必須保持跨回合連續，不得無故更換衣著、位置或已知狀態。若未設定 noticePrompts，才可依劇情自然產生 0～8 筆手機動態；仍須遵守 NPC 日常生活與玩家傳訊息來源規則。每筆格式為 {\"event_type\":\"message|social_post|missed_call|voice_message|notification\",\"title\":\"標題\",\"body\":\"內容\"}。必須遵守角色手機設定，不得虛構與故事矛盾的事件；不得把玩家未說出的內心話當成角色已知資訊。reply 內的旁白仍使用單星號格式，實際對白不加星號。",
     "",
     "【第三優先｜喜好與不喜愛的點】自然融入角色的偏好、興趣、厭惡事項與雷點；遇到喜歡的事物可有符合個性的反應，遇到雷點則依角色設定表現，不要機械式列清單，也不要為迎合玩家而忽略角色界線。",
     "{CHAR_LIKES}",
