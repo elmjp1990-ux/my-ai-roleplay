@@ -3865,8 +3865,18 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
     else if(typeof data.hasUserMessage==='boolean')session.cloudHasUserMessage=data.hasUserMessage;
     if(rows?.length){const oldest=rows[rows.length-1];session.cloudOldestMessageCursor={createdAt:oldest.created_at,id:oldest.id};}
     session.cloudHasMoreMessages=(rows||[]).length===pageSize;
+    // A pending marker is valid only while its exact player message exists in
+    // the hydrated transcript. Old/orphaned markers can survive an interrupted
+    // save and otherwise leave a newly opened chat stuck in the typing state.
+    const pendingUserMessageId=session.pendingTurn?.userMessageId;
+    const hasPendingUserMessage=!!pendingUserMessageId&&session.messages.some(message=>
+      message.id===pendingUserMessageId&&message.role==='user'&&String(message.text||'').trim()
+    );
+    const clearedOrphanedPendingTurn=!!session.pendingTurn&&!hasPendingUserMessage;
+    if(clearedOrphanedPendingTurn)delete session.pendingTurn;
     session.cloudMessagesLoaded=true;session.cloudMessagesLoading=false;session.cloudMessagesError='';
     persist();
+    if(clearedOrphanedPendingTurn)void saveChatSessionSafely(session);
     if(route.page==='conversation'&&route.id===sessionId){
       renderMessages(!older);
       if(older&&$('messages')){const node=$('messages');node.scrollTop=previousTop+Math.max(0,node.scrollHeight-previousHeight);}
