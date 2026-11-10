@@ -30,6 +30,15 @@ assert.ok(html.includes('if(s.pendingTurn)') && html.includes('正在回覆'), '
 assert.ok(html.includes('typing-dots') && html.includes('po-typing'), 'Reply indicator must animate its ellipsis');
 assert.ok(!html.includes('🟢'), 'Reply indicator must not add a redundant green status dot');
 
+assert.ok(html.includes("return value||'你有新訊息'"), 'Narration-only assistant replies must show the new-message fallback');
+assert.ok(html.includes("return session?.cloudMessagesLoaded===false?'點擊載入最近訊息':'你有新訊息'"),
+  'Missing spoken dialogue must never fall back to narration');
+assert.ok(html.includes('lastAssistantMessageAt') && html.includes('lastReadAt'), 'Unread state must track assistant messages and read watermark');
+assert.ok(html.includes('chat-unread-pill') && html.includes('新訊息'), 'Unread sessions must show the compact new-message pill');
+assert.ok(html.includes('if(isConversationEntry)') && html.includes('saveChatSessionSafely(s)'), 'Opening a conversation must mark it read and sync its watermark');
+assert.ok(html.includes("if(route.page==='conversation'&&route.id===s.id)s.lastReadAt=assistantAt"),
+  'Assistant replies received while their conversation is open must be marked read');
+
 console.log('Phone notification UI hides creator prompts and renders generated notices only.');
 
 const editorStart = html.indexOf('function normalizePhoneNoticeRows');
