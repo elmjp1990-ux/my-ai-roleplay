@@ -108,7 +108,7 @@ INSERT INTO public.chat_turn_charges(turn_id,session_id,user_id,user_message_id,
 
 SELECT set_config('request.jwt.claims','{"role":"service_role"}',true);
 SELECT set_config('request.jwt.claim.role','service_role',true);
-SELECT 1 / CASE WHEN public.is_service_role_request() THEN 1 ELSE 0 END;
+SELECT current_setting('request.jwt.claim.role', true) AS role_claim, current_setting('request.jwt.claims', true) AS claims, public.is_service_role_request() AS helper_result;
 SELECT public.queue_story_turn_evaluation(
   '60000000-0000-4000-8000-000000000001',
   '30000000-0000-4000-8000-000000000001',
