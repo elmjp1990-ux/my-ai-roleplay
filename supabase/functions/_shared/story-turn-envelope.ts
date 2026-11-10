@@ -10,6 +10,7 @@ export type StoryTurnEnvelope = {
   affinity_reason: string;
   phone_events: StoryPhoneEvent[];
   suggested_replies: string[];
+  story_world_state: { story_time: string; story_location: string } | null;
 };
 
 export type StoryTurnEnvelopeOptions = {
@@ -17,6 +18,7 @@ export type StoryTurnEnvelopeOptions = {
   currentUserMessage?: string;
   playerName?: string;
   characterName?: string;
+  currentStoryWorldState?: { story_time?: string; story_location?: string } | null;
 };
 
 const fallbackSuggestedReplies = (): string[] => [
@@ -87,6 +89,9 @@ export function parseStoryTurnEnvelope(raw: string, options: StoryTurnEnvelopeOp
     affinity_reason: "",
     phone_events: [],
     suggested_replies: fallbackSuggestedReplies(),
+    story_world_state: options.currentStoryWorldState?.story_time && options.currentStoryWorldState?.story_location
+      ? { story_time: boundedText(options.currentStoryWorldState.story_time, 80), story_location: boundedText(options.currentStoryWorldState.story_location, 120) }
+      : null,
   };
 
   let parsed: unknown;
@@ -174,6 +179,15 @@ export function parseStoryTurnEnvelope(raw: string, options: StoryTurnEnvelopeOp
   const suggestedReplies = validSuggestedReplies.length === 3
     ? validSuggestedReplies
     : fallbackSuggestedReplies();
+  const rawWorldState = asObject(value.story_world_state);
+  const storyTime = boundedText(rawWorldState?.story_time, 80);
+  const storyLocation = boundedText(rawWorldState?.story_location, 120);
+  const previousWorldState = options.currentStoryWorldState;
+  const storyWorldState = storyTime && storyLocation
+    ? { story_time: storyTime, story_location: storyLocation }
+    : previousWorldState?.story_time && previousWorldState?.story_location
+    ? { story_time: boundedText(previousWorldState.story_time, 80), story_location: boundedText(previousWorldState.story_location, 120) }
+    : null;
 
   return {
     reply,
@@ -181,5 +195,6 @@ export function parseStoryTurnEnvelope(raw: string, options: StoryTurnEnvelopeOp
     affinity_reason: boundedText(value.affinity_reason, 280),
     phone_events: phoneEvents,
     suggested_replies: suggestedReplies,
+    story_world_state: storyWorldState,
   };
 }
