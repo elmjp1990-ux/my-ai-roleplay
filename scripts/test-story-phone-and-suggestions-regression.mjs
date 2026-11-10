@@ -48,6 +48,12 @@ assert.match(eightFieldMigration, /event_index BETWEEN 0 AND 7/);
 
 // Exactly three suggestions are persisted on the assistant message and restored on reload.
 assert.match(edge, /suggested_replies: turnEnvelope\.suggested_replies/);
+// Legacy raw quote memories are excluded from Story prompts; only AI summaries
+// explicitly marked important are promoted into the long-term MEMORY slot.
+assert.match(edge, /\.eq\("important", true\)/);
+assert.match(edge, /sessionData\.memories = importantSummaryRows\.map/);
+assert.match(edge, /sessionData\.memory = \[\]/);
+assert.match(edge, /never feed legacy player\/character quote cards/);
 assert.match(edge, /select\("id,content,suggested_replies"\)/);
 assert.match(suggestionMigration, /ADD COLUMN IF NOT EXISTS suggested_replies jsonb/);
 assert.match(suggestionMigration, /jsonb_array_length\(suggested_replies\) <= 3/);
