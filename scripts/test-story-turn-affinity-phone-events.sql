@@ -108,13 +108,7 @@ INSERT INTO public.chat_turn_charges(turn_id,session_id,user_id,user_message_id,
 
 SELECT set_config('request.jwt.claims','{"role":"service_role"}',true);
 SELECT set_config('request.jwt.claim.role','service_role',true);
-DO $ BEGIN
-  IF NOT public.is_service_role_request() THEN
-    RAISE EXCEPTION 'service-role test setup failed: role=%, claims=%',
-      current_setting('request.jwt.claim.role', true),
-      current_setting('request.jwt.claims', true);
-  END IF;
-END $;
+SELECT 1 / CASE WHEN public.is_service_role_request() THEN 1 ELSE 0 END;
 SELECT public.queue_story_turn_evaluation(
   '60000000-0000-4000-8000-000000000001',
   '30000000-0000-4000-8000-000000000001',
@@ -149,8 +143,8 @@ END $$;
 SELECT set_config('request.jwt.claim.role','service_role',true);
 UPDATE public.chat_turn_charges SET status='settled', assistant_message_id=expected_assistant_message_id
 WHERE turn_id='60000000-0000-4000-8000-000000000001';
-SELECT set_config('request.jwt.claim.role','',true);
 SELECT set_config('request.jwt.claims','{"role":"service_role"}',true);
+SELECT set_config('request.jwt.claim.role','service_role',true);
 
 DO $$
 DECLARE result jsonb; current_affinity integer; event_count integer;
