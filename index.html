@@ -623,6 +623,7 @@ body.group-chat-page:has(.group-wizard) #view {
   align-self:center;
 }
 .message:hover .message-more,.message:focus-within .message-more,.message.selected .message-more { opacity:1; }
+.typing-indicator{display:flex;align-items:center;gap:8px;padding:10px 13px;border-radius:16px;background:var(--panel2);color:var(--muted);font-size:13px}.typing-dots{display:inline-flex;align-items:center;gap:4px}.typing-dots i{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.35;animation:po-typing 1.1s infinite ease-in-out}.typing-dots i:nth-child(2){animation-delay:.15s}.typing-dots i:nth-child(3){animation-delay:.3s}@keyframes po-typing{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
 
 /* Character phone */
 .phone-modal-backdrop{position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(7,10,22,.68);backdrop-filter:blur(8px)}
@@ -635,11 +636,11 @@ body.group-chat-page:has(.group-wizard) #view {
 .phone-member-switch{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0 4px}
 .phone-member-switch button{min-width:30px;height:28px;padding:3px 9px;font-size:13px;border:1px solid #ded4fa;background:var(--panel2);border-radius:10px;color:var(--text)}
 .phone-member-name{flex:1;min-width:0;text-align:center;font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.phone-content{padding:13px 2px 7px;font-size:11px;flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.phone-content{padding:13px 2px 7px;font-size:11px;flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}.phone-device-head,.phone-member-switch,.phone-bar,.phone-close-row{flex-shrink:0}
 .phone-time{font-size:12px;font-weight:600;letter-spacing:.01em;margin-bottom:9px;color:var(--text)}
 .phone-location{padding:9px 11px;border-radius:13px;background:var(--panel2);border:1px solid var(--border);margin-top:9px;font-size:10px;line-height:1.65;color:var(--text)}
 .phone-notices{margin-top:10px;padding:11px 12px;border:1px solid var(--border);border-radius:15px;background:var(--panel2);color:var(--text)}
-.phone-notices p{margin:6px 0;font-size:10px;line-height:1.65}.phone-notice-list{max-height:132px;overflow-y:auto;overscroll-behavior:contain;padding-right:3px}.phone-notice-list p{margin:4px 0;font-size:10px;line-height:1.65}
+.phone-notices p{margin:6px 0;font-size:10px;line-height:1.65}.phone-notice-list{padding-right:3px}.phone-notice-list p{margin:4px 0;font-size:10px;line-height:1.65}
 .phone-notice-title{font-size:11px;font-weight:650;color:var(--primary);margin-bottom:7px}body:not(.day) .phone-notice-title{color:#fff}body:not(.day) .phone-battery{color:#fff!important}
 .phone-story-events{margin-top:12px;padding:9px 10px;border:1px solid #b4bfd338;border-radius:12px;background:var(--panel2)}
 .phone-story-event{padding:8px 0;border-bottom:1px solid #b4bfd326}
@@ -6074,6 +6075,20 @@ async function toggleGroupPin(groupId) {
     console.error('群組置頂同步失敗：',error);
   }
 }
+function firstSpokenDialoguePreview(rawText) {
+  const text=String(rawText||'');let outside='',inside=false;
+  for(let i=0;i<text.length;i++){const ch=text[i];if(ch==='*'&&text[i-1]!=='\\\\'&&text[i+1]!=='*'){inside=!inside;continue;}if(!inside)outside+=ch;}
+  let value=outside.replace(/\\s+/g,' ').trim();if(!value)return '角色暫時沒有對白';
+  value=value.replace(/^[「『“”"＂]+/,'').trim();
+  const sentence=value.match(/^(.+?[。！？!?…]+)(?:[」』”"＂])?/);
+  if(sentence)value=sentence[1];else value=value.split(/[\\r\\n]/,1)[0].trim();
+  value=value.replace(/[「『“”"＂]+$/,'').trim();return value||'角色暫時沒有對白';
+}
+function latestAssistantPreview(session) {
+  const latest=[...(session?.messages||[])].reverse().find(message=>message?.role==='assistant'&&String(message.text||'').trim());
+  if(latest)return firstSpokenDialoguePreview(latest.text);
+  return session?.cloudMessagesLoaded===false?'點擊載入最近訊息':'角色暫時沒有對白';
+}
 function chatEntries() {
   const q=chatSearch.trim().toLocaleLowerCase();
   const items=visibleSessions().map(s=>({kind:'session',value:s,sortAt:Number(s.lastMessageAt||s.updatedAt||s.messages?.at(-1)?.at||s.startedAt||0),pinned:!!s.pinned}));
@@ -6088,7 +6103,7 @@ function chatEntries() {
   if(!items.length)return errorNotice||'<div class="empty">還沒有符合條件的對話。</div>';
   const rows=items.map(item=>{
     if(item.kind==='group'){
-      const group=item.value,lastText=item.preview?.content||'尚未開始對話';
+      const group=item.value,lastText=item.preview?.content?firstSpokenDialoguePreview(item.preview.content):'尚未開始對話';
       const lastAt=Date.parse(item.preview?.created_at||group.updated_at||group.created_at||'')||Date.now();
       const active=route.page==='group'&&groupPrototype.active?.id===group.id;
       const memberList=groupPrototype.groupMembers?.[group.id]||[];
@@ -6105,7 +6120,7 @@ function chatEntries() {
         </button><button type="button" class="entry-menu group-entry-menu" data-action="group-entry-menu" data-id="${e(group.id)}" aria-label="刪除這段對話與回憶" title="刪除這段對話與回憶">⋯</button></div>`;
     }
     const s=item.value,c=sessionCharacter(s);if(!c)return '';
-    const last=s.messages?.at(-1),preview=last?.text||s.lastMessagePreview||(s.cloudMessagesLoaded?'':'點擊載入最近訊息');
+    const preview=latestAssistantPreview(s);
     const lastAt=last?.at||s.lastMessageAt||s.updatedAt||s.startedAt;
     return `<div class="chat-entry ${route.page==='conversation'&&route.id===s.id?'active':''}">
       <button class="pin ${s.pinned?'on':''}" data-action="pin" data-id="${e(s.id)}" aria-label="切換置頂">${ICON.pin}</button>
@@ -7645,6 +7660,7 @@ function renderMessages(scroll = true) {
       <button class="message-more" data-action="message-menu" data-id="${e(m.id)}" aria-label="訊息操作">⋯</button>
     </article>`;
   }).join('');
+  if(s.pendingTurn){const characterName=sessionCharacter(s)?.name||'角色';$('messages').insertAdjacentHTML('beforeend','<article class="message assistant-typing" role="status" aria-live="polite"><div class="message-content"><div class="message-name">'+e(characterName)+'</div><div class="typing-indicator"><span>'+e(characterName)+'正在回覆</span><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span></div></div></article>');}
   $('messages').scrollTop = scroll ? $('messages').scrollHeight : oldScroll;
   const loadingHistory=!!(s.cloudOwned&&!s.cloudMessagesLoaded);
   const sendButton=$('view')?.querySelector('.chat-main .composer-send');
