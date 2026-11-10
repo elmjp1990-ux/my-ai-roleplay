@@ -3579,7 +3579,7 @@ async function saveChatSessionToCloud(s, options = {}) {
   s.cloudSnapshotNeedsRepair=false;
   // Client writes only player messages. Assistant rows are inserted by the trusted
   // chat-turn Edge Function; the database trigger intentionally rejects client writes.
-  const messages = (s.messages || []).filter(m => m.role === 'user' && isUuid(m.id)).map(m => ({
+  const messages = (s.messages || []).filter(m => m.role === 'user' && isUuid(m.id) && m.cloudSynced !== true).map(m => ({
     id:m.id, session_id:s.id, role:'user',
     content:String(m.text ?? ''), created_at:new Date(Number(m.at) || Date.now()).toISOString()
   }));
@@ -3591,6 +3591,8 @@ async function saveChatSessionToCloud(s, options = {}) {
     if (!Array.isArray(savedMessages) || savedMessages.length !== messages.length) {
       throw new Error('資料庫回報的已儲存訊息數量不符；請重新整理確認，勿視為同步完成。');
     }
+    const savedUserMessageIds=new Set(savedMessages.map(message=>message.id));
+    for(const message of s.messages||[]){if(savedUserMessageIds.has(message.id))message.cloudSynced=true;}
     if (readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
   }
   return true;
@@ -3864,7 +3866,7 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
       return false;
     }
     const cloudMessages=(rows||[]).slice().reverse().map(message=>{
-      const normalized={id:message.id,role:message.role==='user'?'user':'assistant',text:message.content||'',at:message.created_at?new Date(message.created_at).getTime():Date.now()};
+      const normalized={id:message.id,role:message.role==='user'?'user':'assistant',text:message.content||'',at:message.created_at?new Date(message.created_at).getTime():Date.now(),cloudSynced:true};
       const persistedSuggestions=Array.isArray(message.suggested_replies)?message.suggested_replies.map(value=>String(value||'').trim()).filter(value=>value.length>0).slice(0,3):[];
       const metadata=roleplayMeta[message.id];if(metadata&&typeof metadata==='object')Object.assign(normalized,metadata);
       // The per-message database column is authoritative; stale session metadata
@@ -3965,6 +3967,8 @@ async function saveChatSessionSafely(s) {
         target.cloudOwnerUid = snapshot.cloudOwnerUid;
         target.cloudCharacterSnapshot = snapshot.cloudCharacterSnapshot;
         target.cloudUpdatedAt = snapshot.cloudUpdatedAt;
+        const syncedUserMessageIds=new Set((snapshot.messages||[]).filter(message=>message.role==='user'&&message.cloudSynced===true).map(message=>message.id));
+        if(syncedUserMessageIds.size)target.messages=(target.messages||[]).map(message=>syncedUserMessageIds.has(message.id)?{...message,cloudSynced:true}:message);
         memoryMutationTracker?.markSaved(s.id, snapshot.memories);
       }
       return saved;
