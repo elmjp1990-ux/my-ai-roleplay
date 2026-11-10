@@ -3355,8 +3355,14 @@ function chatSessionData(s) {
     roleplayMeta:{
       ...(s.cloudRoleplayMeta && typeof s.cloudRoleplayMeta === 'object' ? s.cloudRoleplayMeta : {}),
       ...Object.fromEntries((s.messages || [])
-        .filter(message => message.role === 'user' && (Array.isArray(message.displaySegments) || message.aiTargetId || message.commandType))
-        .map(message => [message.id, {displaySegments:message.displaySegments || null,aiTargetId:message.aiTargetId || null,commandType:message.commandType || null}]))
+        .filter(message =>
+          (message.role === 'user' && (Array.isArray(message.displaySegments) || message.aiTargetId || message.commandType)) ||
+          (message.role === 'assistant' && Array.isArray(message.suggestedReplies) && message.suggestedReplies.length === 3)
+        )
+        .map(message => [message.id, {
+          ...(message.role === 'user' ? {displaySegments:message.displaySegments || null,aiTargetId:message.aiTargetId || null,commandType:message.commandType || null} : {}),
+          ...(message.role === 'assistant' ? {suggestedReplies:message.suggestedReplies.slice(0,3).map(value=>String(value||'').trim())} : {})
+        }]))
     },
     pendingTurn:s.pendingTurn && isUuid(s.pendingTurn.turnId) && isUuid(s.pendingTurn.userMessageId) && isUuid(s.pendingTurn.assistantMessageId)
       ? {turnId:s.pendingTurn.turnId,userMessageId:s.pendingTurn.userMessageId,assistantMessageId:s.pendingTurn.assistantMessageId,createdAt:Number(s.pendingTurn.createdAt) || Date.now()}
@@ -3841,6 +3847,17 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
     const merged=new Map((session.messages||[]).map(message=>[message.id,message]));
     for(const message of cloudMessages)merged.set(message.id,{...(merged.get(message.id)||{}),...message});
     session.messages=[...merged.values()].sort((a,b)=>(Number(a.at)||0)-(Number(b.at)||0)||String(a.id).localeCompare(String(b.id)));
+    // Restore the suggestion set attached to the newest assistant turn first.
+    // session_data remains a backward-compatible fallback for older sessions.
+    const latestAssistantSuggestions=[...session.messages].reverse().find(message=>
+      message.role==='assistant'&&Array.isArray(message.suggestedReplies)&&message.suggestedReplies.length===3
+    )?.suggestedReplies;
+    if(Array.isArray(latestAssistantSuggestions)){
+      session.suggestedReplies=latestAssistantSuggestions.map(value=>String(value||'').trim()).filter(Boolean).slice(0,3);
+    }else if(!Array.isArray(session.suggestedReplies)||!session.suggestedReplies.length){
+      const fallbackSuggestions=Array.isArray(data.suggestedReplies)?data.suggestedReplies:[];
+      session.suggestedReplies=fallbackSuggestions.map(value=>String(value||'').trim()).filter(value=>value.length>0).slice(0,3);
+    }
     const opening=session.initialOpeningMessage;
     if(opening){
       const openingId='opening-'+sessionId;
