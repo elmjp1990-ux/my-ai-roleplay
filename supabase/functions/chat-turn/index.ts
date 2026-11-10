@@ -911,11 +911,12 @@ Deno.serve(async (request) => {
   }
 
   if (turnEnvelope.story_world_state) {
-    const { error: worldStateWriteError } = await admin.rpc("upsert_story_world_state", {
-      p_session_id: sessionId,
-      p_story_time: turnEnvelope.story_world_state.story_time,
-      p_story_location: turnEnvelope.story_world_state.story_location,
-    });
+    const { error: worldStateWriteError } = await admin.from("story_world_states").upsert({
+      session_id: sessionId,
+      story_time: turnEnvelope.story_world_state.story_time,
+      story_location: turnEnvelope.story_world_state.story_location,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "session_id" });
     if (worldStateWriteError) {
       await admin.from("chat_turn_events").insert({
         turn_id: turnId, user_id: user.id, event_type: "story_world_state_write_failed",
