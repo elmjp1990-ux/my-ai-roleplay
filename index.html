@@ -6135,7 +6135,7 @@ function chatEntries() {
     }
     const s=item.value,c=sessionCharacter(s);if(!c)return '';
     const preview=latestAssistantPreview(s);
-    const lastAt=last?.at||s.lastMessageAt||s.updatedAt||s.startedAt;
+    const lastAt=s.lastMessageAt||s.updatedAt||s.messages?.at(-1)?.at||s.startedAt;
     const hasUnread=Number(s.lastAssistantMessageAt||0)>Number(s.lastReadAt||0);
     return `<div class="chat-entry ${route.page==='conversation'&&route.id===s.id?'active':''}">
       <button class="pin ${s.pinned?'on':''}" data-action="pin" data-id="${e(s.id)}" aria-label="切換置頂">${ICON.pin}</button>
