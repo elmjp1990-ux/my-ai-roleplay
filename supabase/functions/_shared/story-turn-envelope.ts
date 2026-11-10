@@ -19,6 +19,12 @@ export type StoryTurnEnvelopeOptions = {
   characterName?: string;
 };
 
+const fallbackSuggestedReplies = (): string[] => [
+  "*我稍微停下動作，認真看向你*你剛才提到的事，我還想再聽你多說一點，可以嗎？",
+  "*我輕輕點頭，語氣放緩一些*那我們先把眼前這件事處理好，之後再慢慢聊。",
+  "*我看了看四周，再把目光移回你身上*如果你願意，我想陪你一起確認接下來的安排。",
+];
+
 const allowedPhoneEventTypes = new Set([
   "message",
   "social_post",
@@ -80,7 +86,7 @@ export function parseStoryTurnEnvelope(raw: string, options: StoryTurnEnvelopeOp
     affinity_delta: 0,
     affinity_reason: "",
     phone_events: [],
-    suggested_replies: [],
+    suggested_replies: fallbackSuggestedReplies(),
   };
 
   let parsed: unknown;
@@ -165,7 +171,9 @@ export function parseStoryTurnEnvelope(raw: string, options: StoryTurnEnvelopeOp
       const spokenText = item.replace(/\*[^*]+\*/g, "").trim();
       return narration.length >= 1 && spokenText.length > 0;
     });
-  const suggestedReplies = validSuggestedReplies.length === 3 ? validSuggestedReplies : [];
+  const suggestedReplies = validSuggestedReplies.length === 3
+    ? validSuggestedReplies
+    : fallbackSuggestedReplies();
 
   return {
     reply,
