@@ -14,12 +14,14 @@ Deno.test("parses a valid reply and bounded side effects", () => {
     affinity_reason: "角色感受到玩家的信任。",
     phone_events: [{ event_type: "message", title: "晚安", body: "今天聊得很開心。" }],
     suggested_replies: validSuggestions,
+    story_world_state: { story_time: "2026-11-10T21:30:00+08:00", story_location: "江辰遠的公寓・客廳" },
   })), {
     reply: "*他微微一笑*你好。",
     affinity_delta: 2,
     affinity_reason: "角色感受到玩家的信任。",
     phone_events: [{ event_type: "message", title: "晚安", body: "今天聊得很開心。" }],
     suggested_replies: validSuggestions,
+    story_world_state: { story_time: "2026-11-10T21:30:00+08:00", story_location: "江辰遠的公寓・客廳" },
   });
 });
 
@@ -34,6 +36,7 @@ Deno.test("legacy plain text remains a reply without inferred effects", () => {
       "*我輕輕點頭，語氣放緩一些*那我們先把眼前這件事處理好，之後再慢慢聊。",
       "*我看了看四周，再把目光移回你身上*如果你願意，我想陪你一起確認接下來的安排。",
     ],
+    story_world_state: null,
   });
 });
 
@@ -212,4 +215,37 @@ Deno.test("NPC work messages are allowed, but player SMS requires an explicit ph
     }).phone_events,
     [{ event_type: "message", title: "最近收到的訊息", body: "江大哥，今天工地順不順利？" }],
   );
+});
+
+
+Deno.test("story world state follows contextual time jumps and location corrections, and preserves prior state when omitted", () => {
+  const previous = {
+    story_time: "2026-11-10T23:30:00+08:00",
+    story_location: "江辰遠的公寓・臥室",
+  };
+  const advanced = parseStoryTurnEnvelope(JSON.stringify({
+    reply: "隔天清晨。",
+    story_world_state: {
+      story_time: "2026-11-11T07:10:00+08:00",
+      story_location: "江辰遠的公寓・臥室",
+    },
+  }), { currentStoryWorldState: previous });
+  assertEquals(advanced.story_world_state, {
+    story_time: "2026-11-11T07:10:00+08:00",
+    story_location: "江辰遠的公寓・臥室",
+  });
+
+  const moved = parseStoryTurnEnvelope(JSON.stringify({
+    reply: "兩人來到咖啡廳。",
+    story_world_state: {
+      story_time: "2026-11-11T09:20:00+08:00",
+      story_location: "街角咖啡廳",
+    },
+  }), { currentStoryWorldState: previous });
+  assertEquals(moved.story_world_state?.story_location, "街角咖啡廳");
+
+  const omitted = parseStoryTurnEnvelope(JSON.stringify({ reply: "繼續聊天。" }), {
+    currentStoryWorldState: previous,
+  });
+  assertEquals(omitted.story_world_state, previous);
 });
