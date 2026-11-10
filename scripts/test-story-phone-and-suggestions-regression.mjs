@@ -10,6 +10,7 @@ const eightFieldMigration = readFileSync("supabase/migrations/20261106140000_exp
 const affinityMigration = readFileSync("supabase/migrations/20261106090000_story_turn_affinity_and_phone_events.sql", "utf8");
 const memoryImportanceMigration = readFileSync("supabase/migrations/20261110205546_story_memory_summary_important_toggle.sql", "utf8");
 const memoryEditMigration = readFileSync("supabase/migrations/20261111143000_story_memory_summary_edit.sql", "utf8");
+const memoryBlankMigration = readFileSync("supabase/migrations/20261111144500_story_memory_summary_blank_state.sql", "utf8");
 
 assert.match(html, /const \[eventsResult,stateResult,worldStateResult\]=await Promise\.all\(/);
 assert.match(html, /get_story_world_state/);
@@ -82,6 +83,10 @@ assert.match(memoryEditMigration, /v_summary := NULLIF\(btrim\(COALESCE\(p_summa
 assert.match(memoryEditMigration, /important = CASE WHEN v_summary IS NULL THEN false ELSE u\.important END/);
 assert.match(memoryEditMigration, /s\.user_id = \(SELECT auth\.uid\(\)\)/);
 assert.match(memoryEditMigration, /GRANT EXECUTE ON FUNCTION public\.update_story_memory_summary/);
+assert.match(memoryBlankMigration, /btrim\(u\.summary\) <> ''/);
+assert.match(memoryBlankMigration, /SET summary = COALESCE\(v_summary, ''\)/);
+assert.match(memoryBlankMigration, /important = CASE WHEN v_summary IS NULL THEN false ELSE u\.important END/);
+assert.match(edge, /\.neq\("summary", ""\)/);
 assert.match(html, /s\.storyMode \? '' : \(\(s\.memories\|\|\[\]\)\.map/);
 assert.doesNotMatch(html, /系統會保存玩家原話與相關角色回應/);
 assert.match(memoryImportanceMigration, /ADD COLUMN IF NOT EXISTS important boolean NOT NULL DEFAULT false/);
