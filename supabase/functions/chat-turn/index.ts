@@ -174,6 +174,7 @@ async function buildStoryMessages(
       .eq("generation_type", "memory_summary")
       .eq("status", "completed")
       .not("summary", "is", null)
+      .neq("summary", "")
       .order("batch_number", { ascending: false }).limit(1).maybeSingle(),
     admin.from("ai_model_usage").select("batch_number,summary,processed_at,created_at")
       .eq("session_id", String(session.id))
@@ -181,6 +182,7 @@ async function buildStoryMessages(
       .eq("status", "completed")
       .eq("important", true)
       .not("summary", "is", null)
+      .neq("summary", "")
       .order("batch_number", { ascending: true }),
   ]);
 
