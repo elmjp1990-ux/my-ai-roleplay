@@ -10,6 +10,7 @@ on:
     branches:
       - main
       - perf/chat-history-lazy-hydration
+      - perf/mainline-chat-egress-lazy-snapshot
 
 jobs:
   chat-history-lazy-loading:
