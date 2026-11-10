@@ -38,8 +38,10 @@ assert.ok(!html.includes('.phone-notice-list{max-height:'), 'Phone must not trap
 assert.ok(html.includes('function firstSpokenDialoguePreview('), 'Chat preview must parse spoken dialogue separately from narration');
 assert.ok(html.includes('角色暫時沒有對白'), 'Narration-only replies must use the no-dialogue fallback');
 assert.ok(html.includes('function latestAssistantPreview('), 'Chat preview must select the latest assistant message');
-assert.match(html, /message\.role === 'assistant' && Array\.isArray\(message\.suggestedReplies\)/,
-  'Cloud roleplay metadata must persist suggestions on the exact assistant message');
+assert.match(html, /latestAssistantSuggestionMessage/,
+  'Cloud roleplay metadata must identify the latest assistant message with suggestions');
+assert.match(html, /message === latestAssistantSuggestionMessage/,
+  'Cloud roleplay metadata must persist suggestions on the exact latest assistant message');
 assert.match(html, /latestAssistantSuggestions/,
   'Cloud hydration must restore suggestions from the latest assistant turn before session fallback');
 assert.match(html, /suggestedReplies:message\.suggestedReplies\.slice\(0,3\)/,
