@@ -8258,27 +8258,6 @@ async function loadWalletLedger(currency) {
   return true;
 }
 
-/* Preview-only local test entry. Never creates a fake auth identity. */
-function isPreviewDeployment() {
-  const host=String(location.hostname||'').toLowerCase();
-  return /^my-ai-roleplay-[a-z0-9-]+-persona-x2\.vercel\.app$/.test(host);
-}
-function enterPreviewTestMode() {
-  if(!isPreviewDeployment()) {
-    toast('此功能僅能在 Vercel Preview 環境使用。');
-    return;
-  }
-  // Keep the app explicitly unauthenticated and disable the shared Supabase client
-  // for this tab so local UI inspection cannot issue database, storage, wallet or AI requests.
-  state.signedIn=false;
-  state.account=null;
-  state.previewTestMode=true;
-  window.mySupabase=null;
-  closeModal();
-  go({page:'citymap'});
-  toast('已進入本機介面測試；雲端資料、AI 與扣款功能皆停用。');
-}
-
 /* Modal content */
 function renderModal(o) {
   const s = currentSession();
@@ -8296,8 +8275,7 @@ function renderModal(o) {
       break;
     case 'login':
       showDialog('登入 PersonaX',`
-        <button onclick="loginWithGoogle()" class="primary" style="width:100%">Google登入</button>
-        ${isPreviewDeployment()?'<button onclick="enterPreviewTestMode()" style="width:100%;margin-top:10px">測試登入（僅本機介面）</button><p class="small muted" style="margin:10px 0 0">不建立帳號、不連線雲端、不呼叫 AI，也不會扣款。</p>':''}`);
+        <button onclick="loginWithGoogle()" class="primary" style="width:100%">Google登入</button>`);
       break;
       break;
     case 'tags':
