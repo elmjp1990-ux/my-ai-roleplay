@@ -106,8 +106,15 @@ INSERT INTO public.chat_turn_charges(turn_id,session_id,user_id,user_message_id,
   ('60000000-0000-4000-8000-000000000004','30000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000004','50000000-0000-4000-8000-000000000004','50000000-0000-4000-8000-000000000004','settled'),
   ('60000000-0000-4000-8000-000000000005','30000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000005','50000000-0000-4000-8000-000000000005','50000000-0000-4000-8000-000000000005','settled');
 
-SELECT set_config('request.jwt.claim.role','service_role',true);
 SELECT set_config('request.jwt.claims','{"role":"service_role"}',true);
+SELECT set_config('request.jwt.claim.role','service_role',true);
+DO $ BEGIN
+  IF NOT public.is_service_role_request() THEN
+    RAISE EXCEPTION 'service-role test setup failed: role=%, claims=%',
+      current_setting('request.jwt.claim.role', true),
+      current_setting('request.jwt.claims', true);
+  END IF;
+END $;
 SELECT public.queue_story_turn_evaluation(
   '60000000-0000-4000-8000-000000000001',
   '30000000-0000-4000-8000-000000000001',
