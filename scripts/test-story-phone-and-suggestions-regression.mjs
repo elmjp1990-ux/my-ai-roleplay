@@ -15,6 +15,13 @@ assert.match(html, /get_story_world_state/);
 assert.match(html, /select\('id,session_id,role,content,created_at,suggested_replies'\)/);
 assert.match(html, /message\.suggested_replies/);
 assert.match(html, /result\.suggestedReplies\).*result\.suggested_replies/s);
+assert.match(html, /function conversationSuggestionsHTML\(s\)/);
+assert.match(html, /suggestionHost\.innerHTML=conversationSuggestionsHTML\(session\)/);
+assert.match(html, /id="conversationSuggestions"/);
+assert.doesNotMatch(html, /SWEET DIARY · LONG-TERM MEMORY/);
+assert.doesNotMatch(html, /每累積 5 個已結算故事回合，AI 會整理一次長期劇情摘要/);
+assert.doesNotMatch(html, /AI 劇情回憶摘要 · 第 /);
+assert.doesNotMatch(html, /勾選「重大記憶」即可珍藏這段回憶/);
 
 // Author-configured phone fields and genuine event history render inside one list,
 // with the configured fields first and no more than eight combined rows.
