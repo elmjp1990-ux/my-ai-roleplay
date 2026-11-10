@@ -74,32 +74,52 @@ Deno.test("suggested replies require exactly three 30–80 character action-plus
 
   assertEquals(
     parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: validSuggestions.slice(0, 2) })).suggested_replies,
-    [],
+    [
+      "*我稍微停下動作，認真看向你*你剛才提到的事，我還想再聽你多說一點，可以嗎？",
+      "*我輕輕點頭，語氣放緩一些*那我們先把眼前這件事處理好，之後再慢慢聊。",
+      "*我看了看四周，再把目光移回你身上*如果你願意，我想陪你一起確認接下來的安排。",
+    ],
   );
   assertEquals(
     parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggested_replies: ["太短", validSuggestions[1], validSuggestions[2]] })).suggested_replies,
-    [],
+    [
+      "*我稍微停下動作，認真看向你*你剛才提到的事，我還想再聽你多說一點，可以嗎？",
+      "*我輕輕點頭，語氣放緩一些*那我們先把眼前這件事處理好，之後再慢慢聊。",
+      "*我看了看四周，再把目光移回你身上*如果你願意，我想陪你一起確認接下來的安排。",
+    ],
   );
   assertEquals(
     parseStoryTurnEnvelope(JSON.stringify({
       reply: "回覆",
       suggested_replies: [validSuggestions[0], validSuggestions[1], validSuggestions[2] + "補充超過字數上限的內容".repeat(8)],
     })).suggested_replies,
-    [],
+    [
+      "*我稍微停下動作，認真看向你*你剛才提到的事，我還想再聽你多說一點，可以嗎？",
+      "*我輕輕點頭，語氣放緩一些*那我們先把眼前這件事處理好，之後再慢慢聊。",
+      "*我看了看四周，再把目光移回你身上*如果你願意，我想陪你一起確認接下來的安排。",
+    ],
   );
   assertEquals(
     parseStoryTurnEnvelope(JSON.stringify({
       reply: "回覆",
       suggested_replies: [validSuggestions[0], "這是一段沒有旁白動作、只有對白而且字數足夠的玩家建議回覆內容。", validSuggestions[2]],
     })).suggested_replies,
-    [],
+    [
+      "*我稍微停下動作，認真看向你*你剛才提到的事，我還想再聽你多說一點，可以嗎？",
+      "*我輕輕點頭，語氣放緩一些*那我們先把眼前這件事處理好，之後再慢慢聊。",
+      "*我看了看四周，再把目光移回你身上*如果你願意，我想陪你一起確認接下來的安排。",
+    ],
   );
   assertEquals(
     parseStoryTurnEnvelope(JSON.stringify({
       reply: "回覆",
       suggested_replies: [validSuggestions[0], "*我看著你，稍微停頓了一下* ", validSuggestions[2]],
     })).suggested_replies,
-    [],
+    [
+      "*我稍微停下動作，認真看向你*你剛才提到的事，我還想再聽你多說一點，可以嗎？",
+      "*我輕輕點頭，語氣放緩一些*那我們先把眼前這件事處理好，之後再慢慢聊。",
+      "*我看了看四周，再把目光移回你身上*如果你願意，我想陪你一起確認接下來的安排。",
+    ],
   );
   assertEquals(
     parseStoryTurnEnvelope(JSON.stringify({ reply: "回覆", suggestedReplies: validSuggestions })).suggested_replies,
