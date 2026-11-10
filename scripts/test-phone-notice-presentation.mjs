@@ -46,7 +46,7 @@ assert.match(html, /suggestedReplies:message\.suggestedReplies\.slice\(0,3\)/,
   'Assistant-turn suggestion metadata must be bounded to three options');
 assert.ok(html.includes('const preview=latestAssistantPreview(s)'), 'Single-chat list must not use the latest player message or narration');
 assert.ok(html.includes('firstSpokenDialoguePreview(item.preview.content)'), 'Group previews must also strip narration');
-assert.ok(html.includes('if(s.pendingTurn)') && html.includes('正在回覆'), 'Pending turn must display a character reply indicator');
+assert.ok((html.includes('if(s.activeTurnInFlight)') || html.includes('if (s.activeTurnInFlight)') || html.includes('if(s.pendingTurn)') ) && html.includes('正在回覆'), 'Transient active turn must display a character reply indicator');
 assert.ok(html.includes('typing-dots') && html.includes('po-typing'), 'Reply indicator must animate its ellipsis');
 assert.ok(!html.includes('🟢'), 'Reply indicator must not add a redundant green status dot');
 
