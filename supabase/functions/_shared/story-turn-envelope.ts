@@ -135,12 +135,16 @@ export function parseStoryTurnEnvelope(raw: string, options: StoryTurnEnvelopeOp
       if (!candidate || (!explicitSend && isLikelyPlayerOriginMessage(candidate, playerName))) {
         return { event_type: "notification", title: label, body: fallbackBodyForLabel(label) };
       }
+      const candidateBody = candidate.body || fallbackBodyForLabel(label);
       return {
         // Preserve true event types only when the model identifies a new event
         // in this turn. "notification" remains a replaceable configured-field snapshot.
         event_type: candidate.event_type,
         title: label,
-        body: candidate.body || fallbackBodyForLabel(label),
+        // Status fields are rendered as one concise line; multiple todo items use separators.
+        body: candidate.event_type === "notification"
+          ? candidateBody.replace(/\\s*[\\r\\n]+\\s*/g, "；").slice(0, 600)
+          : candidateBody,
       };
     });
   }
