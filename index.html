@@ -3331,6 +3331,9 @@ function chatSessionData(s) {
   const initialOpening = s.initialOpeningMessage ||
     (!s.cloudOwned && s.messages?.[0]?.role === 'assistant' ? s.messages[0] : null);
   const lastMessage = (s.messages || []).at(-1);
+  const latestAssistantSuggestionMessage=[...(s.messages||[])].reverse().find(message=>
+    message.role==='assistant'&&Array.isArray(message.suggestedReplies)&&message.suggestedReplies.length===3
+  );
   return {
     name:s.name || '', archived:!!s.archived, hidden:!!s.hidden,
     encounterMode:s.encounterMode === true, storyMode:s.storyMode === true,
@@ -3357,7 +3360,7 @@ function chatSessionData(s) {
       ...Object.fromEntries((s.messages || [])
         .filter(message =>
           (message.role === 'user' && (Array.isArray(message.displaySegments) || message.aiTargetId || message.commandType)) ||
-          (message.role === 'assistant' && Array.isArray(message.suggestedReplies) && message.suggestedReplies.length === 3)
+          (message.role === 'assistant' && message === latestAssistantSuggestionMessage)
         )
         .map(message => [message.id, {
           ...(message.role === 'user' ? {displaySegments:message.displaySegments || null,aiTargetId:message.aiTargetId || null,commandType:message.commandType || null} : {}),
