@@ -7844,6 +7844,43 @@ async function renderPhoneModal() {
   });
   document.body.appendChild(modal);modal.querySelector('[data-phone-action="close"]')?.focus();
 }
+async function loadStoryMemorySummary(session) {
+  const target=document.getElementById('storyMemorySummary');
+  const uid=currentUser()?.uid;
+  if(!target||!session?.storyMode||!session.cloudOwned||session.cloudOwnerUid!==uid||!isUuid(session.id)||!window.mySupabase){
+    if(target)target.innerHTML='<p class="small muted">此聊天室尚未同步到雲端，暫時無法讀取 AI 回憶摘要。</p>';
+    return;
+  }
+  try{
+    const {data:authData,error:authError}=await window.mySupabase.auth.getUser();
+    if(authError||authData?.user?.id!==uid||currentUser()?.uid!==uid)throw new Error('登入狀態已變更');
+    const {data,error}=await window.mySupabase.rpc('get_story_memory_summary',{p_session_id:session.id});
+    if(error)throw error;
+    if(currentUser()?.uid!==uid||!document.getElementById('storyMemorySummary'))return;
+    const row=Array.isArray(data)?data[0]:data;
+    if(!row){
+      target.innerHTML='<p class="small muted">目前無法取得回憶摘要資料。</p>';
+      return;
+    }
+    const summary=String(row.summary||'').trim();
+    const status=String(row.generation_status||'collecting');
+    const turns=Number(row.settled_turn_count)||0;
+    if(summary){
+      target.innerHTML='<div class="small muted" style="margin-bottom:6px">AI 劇情回憶摘要 · 第 '+e(row.batch_number||1)+' 批</div><p class="diary-memory-text">'+e(summary)+'</p>';
+    }else if(status==='processing'){
+      target.innerHTML='<p class="small muted">AI 正在整理這段故事的回憶摘要。</p>';
+    }else if(status==='failed'){
+      target.innerHTML='<p class="small muted">上一批摘要生成未成功，系統會在後續故事回合再次嘗試。</p>';
+    }else{
+      const remainder=turns%5;
+      target.innerHTML='<p class="small muted">AI 回憶摘要累積中：目前已完成 '+turns+' 個故事回合'+(remainder?'，再 '+(5-remainder)+' 回合建立下一則摘要。':'，達到 5 回合後建立第一則摘要。')+'</p>';
+    }
+  }catch(error){
+    if(document.getElementById('storyMemorySummary'))document.getElementById('storyMemorySummary').innerHTML='<p class="small muted">目前無法載入 AI 回憶摘要，請稍後重試。</p>';
+    console.warn('載入 Story AI 回憶摘要失敗：',error?.message||error);
+  }
+}
+
 function renderChatOverlay(kind) {
   const s = currentSession();
   const panel = $('view').querySelector('.chat-main');
@@ -7884,7 +7921,7 @@ function renderChatOverlay(kind) {
     ? `<label class="field"><span>搜尋過往聊天記錄</span><input id="archiveSearchInput" type="search" placeholder="輸入聊天名稱或角色名稱…" autocomplete="off"></label>
       <div id="archiveSearchResults">${archiveSearchResults('')}</div>`
     : kind === 'diary'
-      ? '<section class="diary-summary"><div class="diary-summary-head"><div><p class="small muted diary-eyebrow">SWEET DIARY · LONG-TERM MEMORY</p><h3>把重要的瞬間，好好收藏</h3><p class="small muted">每 5 次玩家發言建立一則回憶摘錄，優先保留玩家原話與相關對話脈絡；重大記憶會優先保留。</p></div><div class="diary-count"><strong>'+memorySize(s.memories).toLocaleString()+'</strong><span>/ 10,000 字</span></div></div><div class="diary-meter"><span style="width:'+Math.min(100,memorySize(s.memories)/10000*100)+'%"></span></div><p class="small muted diary-hint">勾選「重大記憶」即可珍藏這段回憶；取消勾選後，就能再次編輯。</p></section>' +
+      ? '<section class="diary-summary"><div class="diary-summary-head"><div><p class="small muted diary-eyebrow">SWEET DIARY · LONG-TERM MEMORY</p><h3>把重要的瞬間，好好收藏</h3><p class="small muted">每累積 5 個已結算故事回合，AI 會整理一次長期劇情摘要，供後續對話延續。</p></div><div class="diary-count"><strong>'+memorySize(s.memories).toLocaleString()+'</strong><span>/ 10,000 字</span></div></div><div id="storyMemorySummary" class="memory-item" style="margin:12px 0;white-space:pre-wrap"><p class="small muted">正在載入 AI 回憶摘要…</p></div><div class="diary-meter"><span style="width:'+Math.min(100,memorySize(s.memories)/10000*100)+'%"></span></div><p class="small muted diary-hint">勾選「重大記憶」即可珍藏這段回憶；取消勾選後，就能再次編輯。</p></section>' +
         ((s.memories||[]).map(m => '<article class="memory-item diary-memory-card '+(m.important?'is-important':'')+'"><div class="diary-memory-head"><label class="diary-check"><input type="checkbox" data-memory="'+e(m.id)+'" '+(m.important?'checked':'')+'><span class="diary-heart">'+(m.important?'♥':'♡')+'</span><span>'+(m.important?'重大記憶':'設為重大記憶')+'</span></label><span class="diary-memory-date">'+e(timeText(m.at))+'</span></div><p class="prose diary-memory-text">'+e(m.text)+'</p>'+(m.important?'<p class="small diary-lock-note">♥ 已珍藏，不會被自動清除</p>':'<button type="button" class="diary-edit-button" data-action="edit-memory" data-id="'+e(m.id)+'">編輯這則回憶</button>')+'</article>').join('') || '<div class="empty diary-empty"><strong>你們的故事，正等待被收藏</strong><p>當聊天累積到第 5 次玩家發言，系統會保存玩家原話與相關角色回應；你也可以將重要內容標記為重大記憶。</p></div>')
 
     : `${testControls}<div class="album-grid">${photos.map(p => `
@@ -7900,6 +7937,7 @@ function renderChatOverlay(kind) {
         <h2>${kind === 'diary' ? '甜蜜日記' : kind === 'search' ? '搜尋過往聊天' : '回憶相簿'}</h2>
       </div>${kind === 'album' ? '<div class="row wrap" style="margin-bottom:12px"><button type="button" data-action="persona">專屬人設設定</button><button type="button" data-action="chat-overlay" data-kind="diary">甜蜜日記</button></div>' : ''}${content}
     </section>`);
+  if(kind==='diary'&&s.storyMode)void loadStoryMemorySummary(s);
 }
 
 /* Account */
