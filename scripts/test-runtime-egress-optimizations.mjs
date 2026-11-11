@@ -1,0 +1,34 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+
+const html=fs.readFileSync("index.html","utf8");
+const between=(start,end)=>{
+  const from=html.indexOf(start),to=html.indexOf(end,from+start.length);
+  assert.notEqual(from,-1,"missing source block: "+start);
+  assert.notEqual(to,-1,"missing end marker: "+end);
+  return html.slice(from,to);
+};
+
+const turn=between("async function executePendingChatTurn(s)","function toast(text)");
+assert.doesNotMatch(turn,/await loadStoryRelationshipState\(s\)/,
+  "settled Story turns must not fetch relationship state a second time after render");
+assert.match(turn,/if\(s\.storyMode\) s\.storyPhoneStateCache=null/,
+  "a settled Story turn must invalidate the phone state cache");
+
+const conversation=between("function renderConversation()","function formatMessage");
+assert.match(conversation,/if \(s\.storyMode\) void loadStoryRelationshipState\(s\)/,
+  "the relationship meter must still refresh through the normal render path");
+
+const groupOpen=between("async function groupOpen(groupId)","async function openGroupBackgroundSettings");
+assert.match(groupOpen,/const groupListWasLoaded=g\.groupsLoaded===true/);
+assert.match(groupOpen,/if\(groupListWasLoaded\)\{/);
+assert.match(groupOpen,/g\.groupMembers\[group\.id\]/);
+assert.doesNotMatch(groupOpen,/void groupLoadList\(true\)/,
+  "opening a group must not force a full group-list/member/preview reload");
+
+const phone=between("async function renderPhoneModal()","function groupDiaryStorageKey");
+assert.match(phone,/cacheIsFresh/);
+assert.match(phone,/Date\.now\(\)-cached\.fetchedAt<15000/);
+assert.match(phone,/session\.storyPhoneStateCache=\{uid,sessionId:session\.id/);
+
+console.log("Story relationship RPC dedupe, group list refresh avoidance, and phone-state cache checks passed.");
