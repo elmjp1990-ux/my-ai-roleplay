@@ -20,7 +20,7 @@ const ownerLoader = between("async function loadSupabaseCharacters(user)", "cons
 assert.match(ownerLoader, /loadCharacterPrimaryIllustrationAssets\(ids,user\.id\)/);
 assert.doesNotMatch(ownerLoader, /loadCharacterIllustrationAssets\(ids,user\.id\)/,
   "login must not fetch all gallery assets for every owned character");
-assert.match(ownerLoader, /galleryIllustrations:local\.galleryIllustrations\|\|\[\]/);
+assert.match(ownerLoader, /galleryIllustrations:local\.galleryIllustrations\s*\|\|\s*\[\]/);
 assert.match(ownerLoader, /void retryCharacterIllustrationCleanup\(user\.id\)/);
 
 const editorLoader = between("async function hydrateCharacterIllustrationsIntoEditor(characterId)", "function renderCharacterIllustrationGallery");
