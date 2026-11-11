@@ -5203,8 +5203,12 @@ async function loadCloudComments(characterId,{force=false}={}) {
   if(!client||!characterId)return;
   const requestUid=currentUser()?.uid||null;
   const cacheKey=(requestUid||'anonymous')+':'+characterId;
-  const loadedAt=cloudCommentHydrationCache.get(cacheKey)||0;
-  if(!force&&Array.isArray(state.comments[characterId])&&Date.now()-loadedAt<CLOUD_COMMENT_CACHE_TTL_MS)return;
+  const cached=cloudCommentHydrationCache.get(cacheKey);
+  if(!force&&cached&&Date.now()-cached.loadedAt<CLOUD_COMMENT_CACHE_TTL_MS){
+    state.comments[characterId]=cached.rows;
+    if(route.page==='detail'&&route.id===characterId)renderComments();
+    return;
+  }
   if(cloudCommentHydrationInflight.has(cacheKey))return cloudCommentHydrationInflight.get(cacheKey);
   const request=(async()=>{
   try {
@@ -5242,7 +5246,7 @@ async function loadCloudComments(characterId,{force=false}={}) {
     }));
     if(currentUser()?.uid!==requestUid||route.page!=='detail'||route.id!==characterId)return;
     state.comments[characterId]=mapped;
-    cloudCommentHydrationCache.set(cacheKey,Date.now());
+    cloudCommentHydrationCache.set(cacheKey,{loadedAt:Date.now(),rows:mapped});
     renderComments();
   } catch(error) {
     console.error('PersonaX 雲端評論載入失敗：',error);
@@ -5264,6 +5268,10 @@ function renderComments() {
   }
   if (!$('comments')) return;
   const allComments = state.comments[route.id] || [];
+  const cacheUid=currentUser()?.uid||null;
+  const cacheKey=(cacheUid||'anonymous')+':'+route.id;
+  const cached=cloudCommentHydrationCache.get(cacheKey);
+  if(cached)cached.rows=allComments;
   const character = currentCharacter();
   const uid = currentUser()?.uid;
   const list = allComments;
