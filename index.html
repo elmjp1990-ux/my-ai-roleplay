@@ -6037,15 +6037,6 @@ function updateAICost() {
   $('aiCost').textContent = `預計${cost}鑽石：角色30鑽石，每張圖片2鑽石。`;
   $('aiSubmit').disabled = Number(currentUser()?.diamonds || 0) < cost;
 }
-async function readImage(file) {
-  if (!file || !['image/png','image/jpeg','image/webp'].includes(file.type)) throw Error('請選擇PNG、JPG或WebP。');
-  return await new Promise((resolve,reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(Error('圖片讀取失敗。'));
-    reader.readAsDataURL(file);
-  });
-}
 async function compressProfileImage(file) {
   const compressed=await compressUploadImage(file,{maxEdge:256,targetBytes:120*1024,preserveAlpha:true});
   return compressed.dataUrl;
@@ -6470,13 +6461,6 @@ function visibleSessions() {
   return unique.sort((a,b)=>Number(b.pinned)-Number(a.pinned)||
     (Number(b.lastMessageAt||b.updatedAt||b.messages?.at(-1)?.at||0)-Number(a.lastMessageAt||a.updatedAt||a.messages?.at(-1)?.at||0)));
 }
-function relativeDate(at) {
-  const now = new Date();
-  const today = new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
-  if (at >= today) return '今天';
-  if (at >= today-DAY) return '昨天';
-  return new Date(at).toLocaleDateString('zh-TW');
-}
 function chatListDate(at) {
   const timestamp=Number(at||0);
   if(!timestamp) return '';
@@ -6790,15 +6774,6 @@ async function groupLoadList(force=false) {
   }
   if(route.page==='group'&&!g.active) render();
   refreshChatEntryList();
-}
-function groupRenderList() {
-  const g=groupPrototype;
-  let body='';
-  if(g.loadingGroups) body='<p class="muted">正在讀取雲端群組…</p>';
-  else if(g.loadError) body='<div class="group-alert">'+e(g.loadError)+'</div><button data-action="group-refresh-list">重新載入</button>';
-  else if(!g.groups.length) body='<p class="muted">目前還沒有已保存的群組。建立後即可在這裡重新開啟。</p>';
-  else body='<div class="group-character-grid">'+g.groups.map(x=>'<div class="group-character-option"><span style="flex:1;min-width:0;overflow:hidden"><strong class="ellipsis" style="display:block;max-width:100%">'+e(x.name)+'</strong><span class="muted small" style="display:block">'+(x.scene_mode==='shared'?'共用場景':'分開場景')+' · '+e(String(x.created_at||'').slice(0,10))+'</span></span><div class="row wrap" style="gap:6px"><button data-action="group-open" data-id="'+e(x.id)+'">開啟</button><button data-action="group-rename" data-id="'+e(x.id)+'">重新命名</button><button data-action="group-archive" data-id="'+e(x.id)+'">封存</button></div></div>').join('')+'</div>';
-  return '<section class="group-panel"><div class="row between wrap"><h2>已保存的群組</h2><button data-action="group-refresh-list">重新載入</button></div>'+body+'</section>';
 }
 async function groupOpen(groupId) {
   const g=groupPrototype;
