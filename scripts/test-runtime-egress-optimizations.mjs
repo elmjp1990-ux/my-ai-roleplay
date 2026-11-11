@@ -26,7 +26,9 @@ assert.match(groupOpen,/g\.groupMembers\[group\.id\]/);
 assert.doesNotMatch(groupOpen,/void groupLoadList\(true\)/,
   "opening a group must not force a full group-list/member/preview reload");
 
-const phone=between("async function renderPhoneModal()","function groupDiaryStorageKey");
+const phoneStart=html.indexOf("async function renderPhoneModal()");
+assert.notEqual(phoneStart,-1,"missing Story phone modal function");
+const phone=html.slice(phoneStart,phoneStart+18000);
 assert.match(phone,/cacheIsFresh/);
 assert.match(phone,/Date\.now\(\)-cached\.fetchedAt<15000/);
 assert.match(phone,/session\.storyPhoneStateCache=\{uid,sessionId:session\.id/);
