@@ -4875,26 +4875,49 @@ function renderGrid({append=false}={}) {
   }
 }
 
+async function loadPublicCharacterPrimaryIllustration(characterId) {
+  const client=window.mySupabase;
+  if(!client||!characterId)return null;
+  const {data,error}=await client.from('character_illustrations')
+    .select('id,character_id,storage_path,sort_order,display_name')
+    .eq('character_id',characterId)
+    .eq('asset_type','primary')
+    .order('sort_order',{ascending:true})
+    .limit(1);
+  if(error)throw new Error('讀取角色主立繪資料失敗：'+error.message);
+  const row=data?.[0];
+  if(!row?.storage_path)return null;
+  const src=await getCharacterIllustrationSignedUrl(row.storage_path);
+  return {id:row.id,path:row.storage_path,src,sortOrder:row.sort_order,name:row.display_name||''};
+}
 const publicCharacterIllustrationHydration = new Map();
 async function hydratePublicCharacterIllustrations(characterId) {
   const existing=state.characters.find(character=>character.id===characterId);
   if(!existing||existing.publicIllustrationsLoaded===true||!window.mySupabase)return;
   if(publicCharacterIllustrationHydration.has(characterId))return publicCharacterIllustrationHydration.get(characterId);
   const request=(async()=>{
-    const assets=await loadCharacterIllustrationAssets([characterId]);
+    const primary=await loadPublicCharacterPrimaryIllustration(characterId);
     const current=state.characters.find(character=>character.id===characterId);
     if(!current)return;
-    const loaded=assets.get(characterId)||{primary:null,gallery:[]};
-    if(loaded.primary){
-      current.image=loaded.primary.src;
-      current.primaryIllustrationPath=loaded.primary.path;
+    if(primary){
+      current.image=primary.src;
+      current.primaryIllustrationPath=primary.path;
     }
-    current.galleryIllustrations=loaded.gallery||[];
     current.publicIllustrationsLoaded=true;
     persist();
-    if(route?.page==='detail'&&route.id===characterId)renderDetail();
+    if(route?.page==='detail'&&route.id===characterId){
+      const image=document.querySelector('.detail-portrait .detail-image');
+      if(image){
+        if(image.tagName==='IMG'){
+          if(primary?.path)image.dataset.characterIllustrationPath=primary.path;
+          image.src=safeImage(current.image);
+        }else if(image.tagName==='VIDEO'){
+          image.poster=safeImage(current.image);
+        }
+      }
+    }
   })().catch(error=>{
-    console.warn('角色詳情立繪延遲載入失敗：',error?.message||error);
+    console.warn('角色詳情主立繪延遲載入失敗：',error?.message||error);
   });
   publicCharacterIllustrationHydration.set(characterId,request);
   try{return await request;}finally{
