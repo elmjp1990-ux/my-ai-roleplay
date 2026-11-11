@@ -111,12 +111,21 @@ jobs:
           --health-retries 12
     steps:
       - uses: actions/checkout@v4
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Resolve disposable PostgreSQL service container
+        shell: bash
+        run: |
+          set -euo pipefail
+          db_container="$(docker ps --filter ancestor=postgres:16 --format '{{.Names}}' | head -n1)"
+          if [[ -z "$db_container" ]]; then
+            echo "Could not identify the disposable PostgreSQL 16 service container."
+            docker ps --format 'table {{.Names}}\t{{.Image}}'
+            exit 1
+          fi
+          echo "LOCAL_DB_CONTAINER=$db_container" >> "$GITHUB_ENV"
       - name: Test Story wallet reservation, exact refunds, retries and reconciliation on disposable PostgreSQL
         env:
           PGPASSWORD: postgres
-        run: psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -f scripts/test-chat-turn-wallet-refund.sql
+        run: docker exec -i "$LOCAL_DB_CONTAINER" psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/test-chat-turn-wallet-refund.sql
 
   story-turn-affinity-phone-events:
     runs-on: ubuntu-latest
@@ -135,12 +144,21 @@ jobs:
           --health-retries 12
     steps:
       - uses: actions/checkout@v4
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Resolve disposable PostgreSQL service container
+        shell: bash
+        run: |
+          set -euo pipefail
+          db_container="$(docker ps --filter ancestor=postgres:16 --format '{{.Names}}' | head -n1)"
+          if [[ -z "$db_container" ]]; then
+            echo "Could not identify the disposable PostgreSQL 16 service container."
+            docker ps --format 'table {{.Names}}\t{{.Image}}'
+            exit 1
+          fi
+          echo "LOCAL_DB_CONTAINER=$db_container" >> "$GITHUB_ENV"
       - name: Test per-turn affinity, phone event ownership and five-turn calibration
         env:
           PGPASSWORD: postgres
-        run: psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -f scripts/test-story-turn-affinity-phone-events.sql
+        run: docker exec -i "$LOCAL_DB_CONTAINER" psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/test-story-turn-affinity-phone-events.sql
 
   personality-private-migration:
     runs-on: ubuntu-latest
@@ -159,12 +177,21 @@ jobs:
           --health-retries 12
     steps:
       - uses: actions/checkout@v4
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Resolve disposable PostgreSQL service container
+        shell: bash
+        run: |
+          set -euo pipefail
+          db_container="$(docker ps --filter ancestor=postgres:16 --format '{{.Names}}' | head -n1)"
+          if [[ -z "$db_container" ]]; then
+            echo "Could not identify the disposable PostgreSQL 16 service container."
+            docker ps --format 'table {{.Names}}\t{{.Image}}'
+            exit 1
+          fi
+          echo "LOCAL_DB_CONTAINER=$db_container" >> "$GITHUB_ENV"
       - name: Replay personality privacy migration twice against disposable PostgreSQL
         env:
           PGPASSWORD: postgres
-        run: psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -f scripts/test-character-personality-private-migration.sql
+        run: docker exec -i "$LOCAL_DB_CONTAINER" psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/test-character-personality-private-migration.sql
 
   character-profile-queue-migration:
     runs-on: ubuntu-latest
@@ -183,12 +210,21 @@ jobs:
           --health-retries 12
     steps:
       - uses: actions/checkout@v4
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Resolve disposable PostgreSQL service container
+        shell: bash
+        run: |
+          set -euo pipefail
+          db_container="$(docker ps --filter ancestor=postgres:16 --format '{{.Names}}' | head -n1)"
+          if [[ -z "$db_container" ]]; then
+            echo "Could not identify the disposable PostgreSQL 16 service container."
+            docker ps --format 'table {{.Names}}\t{{.Image}}'
+            exit 1
+          fi
+          echo "LOCAL_DB_CONTAINER=$db_container" >> "$GITHUB_ENV"
       - name: Test profile queue coalescing, private access, lease fencing and stale-source rejection
         env:
           PGPASSWORD: postgres
-        run: psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -f scripts/test-character-profile-organization-queue.sql
+        run: docker exec -i "$LOCAL_DB_CONTAINER" psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/test-character-profile-organization-queue.sql
 
   story-ai-content-refusal:
     runs-on: ubuntu-latest
