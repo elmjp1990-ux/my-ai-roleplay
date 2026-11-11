@@ -8,6 +8,7 @@ on:
       - "scripts/test-public-illustration-lazy-loading.mjs"
       - "scripts/test-character-video-visibility.mjs"
       - "scripts/test-public-comment-hydration-cache.mjs"
+      - "scripts/test-owned-character-illustration-lazy-hydration.mjs"
       - ".github/workflows/chat-history-lazy-loading.yml"
   push:
     branches:
@@ -33,6 +34,8 @@ jobs:
         run: node scripts/test-character-video-visibility.mjs
       - name: Test public comment hydration cache and account isolation
         run: node scripts/test-public-comment-hydration-cache.mjs
+      - name: Test owned-character primary-only login hydration
+        run: node scripts/test-owned-character-illustration-lazy-hydration.mjs
       - name: Parse inline JavaScript in index.html
         run: |
           node <<'NODE'
