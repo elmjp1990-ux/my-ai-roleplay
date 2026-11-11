@@ -1,3 +1,5 @@
+assert.match(html, /publicAuthorProfileLoaded\.has\(authorId\)/);
+assert.match(html, /publicAuthorProfileLoaded\.has\(route\.id\)/);
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
@@ -13,14 +15,11 @@ assert.doesNotMatch(publicLoader, /loadCharacterIllustrationAssets|character_ill
 assert.match(publicLoader, /image: ownerLocal\?\.image \|\| row\.avatar_url/);
 assert.match(publicLoader, /galleryIllustrations:ownerLocal\?\.galleryIllustrations \|\| \[\]/);
 assert.match(publicLoader, /publicIllustrationsLoaded:ownerLocal\?\.publicIllustrationsLoaded === true/);
-assert.match(publicLoader, /opening: ownerLocal\?\.opening \|\| ''/);
 assert.match(publicLoader, /opening: ownerLocal\?\.opening \|\| cachedPublic\?\.opening \|\| ''/);
 assert.match(html, /async function hydratePublicCharacterDetailMetadata\(characterId\)/);
 assert.match(html, /publicCharacterStoryOpeningLoaded\.has\(characterId\)/);
 assert.match(html, /publicAuthorProfileLoaded\.add\(authorId\)/);
 assert.match(html, /async function hydratePublicAuthorProfile\(authorId\)/);
-assert.match(html, /state\.authors\[authorId\]\?\.publicProfileLoaded===true/);
-assert.match(html, /state\.authors\[route\.id\]\?\.publicProfileLoaded!==true/);
 assert.match(html, /\.select\('opening_message'\)/);
 assert.match(html, /\.select\('id,handle,nickname,avatar_url,bio,follower_count'\)/);
 assert.match(html, /data-character-opening/);
