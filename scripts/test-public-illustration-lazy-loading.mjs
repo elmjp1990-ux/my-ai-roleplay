@@ -2,6 +2,12 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const html = fs.readFileSync("index.html", "utf8");
+const between = (start, end) => {
+  const from = html.indexOf(start);
+  const to = html.indexOf(end, from + start.length);
+  assert.ok(from >= 0 && to > from, "missing source block: " + start);
+  return html.slice(from, to);
+};
 const publicLoaderStart = html.indexOf("async function loadPublicSupabaseCharactersImpl()");
 const publicLoaderEnd = html.indexOf("async function loadSupabaseCharacters(user)", publicLoaderStart);
 assert.ok(publicLoaderStart >= 0 && publicLoaderEnd > publicLoaderStart, "public character loader boundaries must exist");
