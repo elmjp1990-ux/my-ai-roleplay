@@ -14,7 +14,7 @@ assert.match(publicLoader, /image: ownerLocal\?\.image \|\| row\.avatar_url/);
 assert.match(publicLoader, /galleryIllustrations:ownerLocal\?\.galleryIllustrations \|\| \[\]/);
 assert.match(publicLoader, /publicIllustrationsLoaded:ownerLocal\?\.publicIllustrationsLoaded === true/);
 
-// Full art is fetched for one role only when its detail page is opened, with in-flight deduplication.
+// Primary art is fetched only for visible Explore cards, a selected city-map character, or an opened detail page.
 assert.match(html, /const publicCharacterIllustrationHydration = new Map\(\)/);
 assert.match(html, /async function hydratePublicCharacterIllustrations\(characterId\)/);
 assert.match(html, /publicCharacterIllustrationHydration\.has\(characterId\)/);
