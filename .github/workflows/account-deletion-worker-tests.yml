@@ -179,6 +179,7 @@ jobs:
             exit 1
           fi
           echo "LOCAL_DB_CONTAINER=$db_container" >> "$GITHUB_ENV"
+          docker cp "$GITHUB_WORKSPACE/." "$db_container:/workspace"
           mkdir -p "$RUNNER_TEMP/bin"
           cat > "$RUNNER_TEMP/bin/psql" <<'PSQL_WRAPPER'
           #!/usr/bin/env bash
@@ -195,9 +196,15 @@ jobs:
             fi
           done
           if [[ -n "$input_file" ]]; then
-            exec docker exec -i -e PGAPPNAME="${PGAPPNAME:-}" -e PGPASSWORD="${PGPASSWORD:-}" "$LOCAL_DB_CONTAINER" psql "${args[@]}" < "$input_file"
+            if [[ -f "$GITHUB_WORKSPACE/$input_file" ]]; then
+              remote_file="/workspace/$input_file"
+            else
+              remote_file="/tmp/$(basename "$input_file")"
+              docker cp "$input_file" "$LOCAL_DB_CONTAINER:$remote_file"
+            fi
+            exec docker exec -i -w /workspace -e PGAPPNAME="${PGAPPNAME:-}" -e PGPASSWORD="${PGPASSWORD:-}" "$LOCAL_DB_CONTAINER" psql "${args[@]}" -f "$remote_file"
           fi
-          exec docker exec -i -e PGAPPNAME="${PGAPPNAME:-}" -e PGPASSWORD="${PGPASSWORD:-}" "$LOCAL_DB_CONTAINER" psql "${args[@]}"
+          exec docker exec -i -w /workspace -e PGAPPNAME="${PGAPPNAME:-}" -e PGPASSWORD="${PGPASSWORD:-}" "$LOCAL_DB_CONTAINER" psql "${args[@]}"
           PSQL_WRAPPER
           chmod +x "$RUNNER_TEMP/bin/psql"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
