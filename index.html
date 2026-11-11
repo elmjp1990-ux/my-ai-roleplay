@@ -4878,7 +4878,7 @@ async function hydratePublicAuthorProfile(authorId) {
       .maybeSingle();
     if(error)throw error;
     publicAuthorProfileLoaded.add(authorId);
-    if(!data)return;
+    if(!data){if(route?.page==='author'&&route.id===authorId)renderAuthor();return;}
     state.authors[authorId]={
       ...(state.authors[authorId]||{}),
       uid:data.id,handle:data.handle||'',
@@ -5258,7 +5258,9 @@ async function refreshAuthorFollowState(authorId) {
     const [followResult, profileResult, followerCountResult] = await Promise.all([
       client.from('author_follows').select('author_id')
         .eq('follower_id', user.uid).eq('author_id', authorId).maybeSingle(),
-      client.from('public_profiles').select('follower_count').eq('id', authorId).maybeSingle(),
+      publicAuthorProfileLoaded.has(authorId)
+        ? Promise.resolve({data:null,error:null})
+        : client.from('public_profiles').select('follower_count').eq('id', authorId).maybeSingle(),
       client.from('author_follows').select('author_id', {count:'exact', head:true})
         .eq('author_id', authorId)
     ]);
@@ -5267,7 +5269,7 @@ async function refreshAuthorFollowState(authorId) {
     if (followerCountResult.error) throw followerCountResult.error;
     const followerCount = Number.isFinite(followerCountResult.count)
       ? followerCountResult.count
-      : Number(profileResult.data?.follower_count || 0);
+      : Number(profileResult.data?.follower_count ?? state.authors[authorId]?.fans ?? 0);
     if (currentUser()?.uid !== user.uid || route.page !== 'author' || route.id !== authorId) return;
 
     const existingIndex = state.following.indexOf(authorId);
@@ -5291,7 +5293,8 @@ async function refreshAuthorFollowState(authorId) {
 
 function renderAuthor() {
   const a = author(route.id);
-  if(window.mySupabase&&isUuid(route.id)&&!publicAuthorProfileLoaded.has(route.id))void hydratePublicAuthorProfile(route.id);
+  const needsPublicProfile=!!(window.mySupabase&&isUuid(route.id)&&!publicAuthorProfileLoaded.has(route.id));
+  if(needsPublicProfile)void hydratePublicAuthorProfile(route.id);
   const following = state.following.includes(a.uid);
   const list = state.characters.filter(c => c.visibility === 'public' && c.authorId === a.uid &&
     !String(c.id).startsWith('seed-') && c.cloudPublic !== false && c.localOnly !== true);
@@ -5316,7 +5319,7 @@ function renderAuthor() {
       <h2>公開角色</h2>
       <div class="grid">${list.map(c => card(c)).join('') || '<div class="empty">目前沒有公開角色。</div>'}</div>
     </div>`;
-  void refreshAuthorFollowState(a.uid);
+  if(!needsPublicProfile)void refreshAuthorFollowState(a.uid);
 }
 function renderFavorites() {
   const list = state.characters.filter(c => state.favorites.includes(c.id) && accessible(c));
