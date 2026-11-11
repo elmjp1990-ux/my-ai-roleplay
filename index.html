@@ -1926,6 +1926,32 @@ async function getCharacterIllustrationSignedUrl(storagePath) {
   characterIllustrationSignedUrlInflight.set(storagePath,request);
   try{return await request;}finally{characterIllustrationSignedUrlInflight.delete(storagePath);}
 }
+const memoryPhotoSignedUrlCache = new Map();
+const memoryPhotoSignedUrlInflight = new Map();
+async function getMemoryPhotoSignedUrl(storagePath) {
+  const client=window.mySupabase,uid=currentUser()?.uid||null;
+  if(!client||!uid||!storagePath)return null;
+  const key=uid+':'+storagePath,now=Date.now();
+  const cached=memoryPhotoSignedUrlCache.get(key);
+  if(cached&&cached.expiresAt>now+15000)return cached.url;
+  if(memoryPhotoSignedUrlInflight.has(key))return memoryPhotoSignedUrlInflight.get(key);
+  const request=(async()=>{
+    const {data,error}=await client.storage.from('personax-memory-photos').createSignedUrl(storagePath,300);
+    if(error||!data?.signedUrl)throw new Error(error?.message||'無法取得回憶相片網址');
+    if((currentUser()?.uid||null)!==uid)return null;
+    memoryPhotoSignedUrlCache.set(key,{url:data.signedUrl,expiresAt:Date.now()+240000});
+    while(memoryPhotoSignedUrlCache.size>250)memoryPhotoSignedUrlCache.delete(memoryPhotoSignedUrlCache.keys().next().value);
+    return data.signedUrl;
+  })();
+  memoryPhotoSignedUrlInflight.set(key,request);
+  try{return await request;}finally{
+    if(memoryPhotoSignedUrlInflight.get(key)===request)memoryPhotoSignedUrlInflight.delete(key);
+  }
+}
+function invalidateMemoryPhotoSignedUrl(storagePath,uid=currentUser()?.uid||null) {
+  if(uid&&storagePath)memoryPhotoSignedUrlCache.delete(uid+':'+storagePath);
+}
+
 const characterIllustrationMetadataInflight = new Map();
 async function loadCharacterPrimaryIllustrationAssets(characterIds, scopeUserId=null) {
   const client=window.mySupabase;
@@ -5970,19 +5996,8 @@ async function readImage(file) {
   });
 }
 async function compressProfileImage(file) {
-  if (!file || !['image/png','image/jpeg','image/webp'].includes(file.type)) throw Error('請選擇 PNG、JPG 或 WebP 圖片。');
-  if (file.size > 15 * 1024 * 1024) throw Error('頭像原始檔請小於 15 MB。');
-  const source=await readImage(file);
-  const image=await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(Error('無法讀取這張圖片。'));img.src=source;});
-  const size=256, canvas=document.createElement('canvas');canvas.width=size;canvas.height=size;
-  const ctx=canvas.getContext('2d');if(!ctx)throw Error('目前瀏覽器無法壓縮圖片。');
-  const scale=Math.max(size/image.width,size/image.height),width=image.width*scale,height=image.height*scale;
-  ctx.drawImage(image,(size-width)/2,(size-height)/2,width,height);
-  let result=canvas.toDataURL('image/webp',0.62);
-  if(result.length>120000)result=canvas.toDataURL('image/jpeg',0.55);
-  if(result.length>180000)result=canvas.toDataURL('image/jpeg',0.38);
-  if(result.length>220000)throw Error('壓縮後圖片仍太大，請改用較簡單的圖片。');
-  return result;
+  const compressed=await compressUploadImage(file,{maxEdge:256,targetBytes:120*1024,preserveAlpha:true});
+  return compressed.dataUrl;
 }
 
 // IMG-01: compress user-selected upload images before they enter app state.
@@ -6807,9 +6822,9 @@ async function openGroupBackgroundSettings() {
       .order('created_at',{ascending:false});
     if(error)throw error;
     group.memoryPhotos=await Promise.all((data||[]).map(async photo=>{
-      const {data:signed,error:signedError}=await client.storage.from('personax-memory-photos').createSignedUrl(photo.storage_path,300);
-      if(signedError)console.warn('群組背景相片簽名網址失敗',signedError.message);
-      return {...photo,image_url:!signedError&&signed?.signedUrl?signed.signedUrl:''};
+      let imageUrl='';
+      try{imageUrl=await getMemoryPhotoSignedUrl(photo.storage_path)||'';}catch(signedError){console.warn('群組背景相片簽名網址失敗',signedError.message);}
+      return {...photo,image_url:imageUrl};
     }));
     const photos=group.memoryPhotos,mode=group.backgroundMode||'avatar';
     showDialog('群組聊天背景',
@@ -12203,8 +12218,8 @@ if (window.__pendingSupabaseUser) {
         .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false});
       if(error)throw error;
       const cards=await Promise.all((data||[]).map(async photo=>{
-        const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,300);
-        const imageUrl=!signedError&&signed?.signedUrl?signed.signedUrl:'';
+        let imageUrl='';
+        try{imageUrl=await getMemoryPhotoSignedUrl(photo.storage_path)||'';}catch(signedError){console.warn('相簿簽名網址取得失敗',signedError?.message);}
         if(!imageUrl)console.warn('相簿簽名網址取得失敗',signedError?.message);
         urlCache.set(photo.id,{url:imageUrl,photo});
         const thumbnail=imageUrl
@@ -12240,6 +12255,8 @@ if (window.__pendingSupabaseUser) {
       return new File([bestBlob],(file.name.replace(/\.[^.]+$/,'')||'memory-photo')+'.webp',{type:'image/webp',lastModified:Date.now()});
     }finally{image.close?.();}
   }
+  // Future AI-generated memory images must use this same mobile-first encoder before Storage upload.
+  window.compressMemoryImageForStorage=compressMemoryImage;
   function setAlbumUploadStatus(input,message,isError=false){
     const stack=input.closest('.memory-album-stack');
     if(!stack)return;
@@ -12304,9 +12321,9 @@ if (window.__pendingSupabaseUser) {
         .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).maybeSingle();
       if(error)throw error;
       if(!photo){session.background='none';persist();panel.style.setProperty('--chat-photo','none');return;}
-      const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,300);
-      if(signedError||!signed?.signedUrl)throw signedError||new Error('無法取得背景圖片。');
-      if(currentSession()?.id===session.id)panel.style.setProperty('--chat-photo','url('+JSON.stringify(signed.signedUrl)+')');
+      const signedUrl=await getMemoryPhotoSignedUrl(photo.storage_path);
+      if(!signedUrl)throw new Error('無法取得背景圖片。');
+      if(currentSession()?.id===session.id)panel.style.setProperty('--chat-photo','url('+JSON.stringify(signedUrl)+')');
     }catch(err){console.error('讀取單聊相簿背景失敗',err);panel.style.setProperty('--chat-photo','none');}
   }
   async function applyGroupMemoryPhotoBackground(group,panel){
@@ -12327,9 +12344,9 @@ if (window.__pendingSupabaseUser) {
         if(cleared&&groupPrototype.active?.id===group.id){group.backgroundMode='none';group.backgroundMemoryPhotoId=null;}
         return;
       }
-      const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,300);
-      if(signedError||!signed?.signedUrl)throw signedError||new Error('無法取得群組背景圖片。');
-      if(groupPrototype.active?.id===group.id)panel.style.setProperty('--chat-photo','url('+JSON.stringify(signed.signedUrl)+')');
+      const signedUrl=await getMemoryPhotoSignedUrl(photo.storage_path);
+      if(!signedUrl)throw new Error('無法取得群組背景圖片。');
+      if(groupPrototype.active?.id===group.id)panel.style.setProperty('--chat-photo','url('+JSON.stringify(signedUrl)+')');
     }catch(err){console.error('讀取群組相簿背景失敗',err);panel.style.setProperty('--chat-photo','none');}
   }
   window.applySingleMemoryPhotoBackground=applySingleMemoryPhotoBackground;
