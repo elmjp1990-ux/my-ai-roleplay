@@ -6816,7 +6816,7 @@ async function groupOpen(groupId) {
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('請重新登入後再開啟群組。');
     g.ownerUid=user.id;
     const [groupRes,sceneRes,memberRes,messageRes]=await groupWithTimeout(Promise.all([
-      window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,background_mode,background_memory_photo_id,created_at,updated_at').eq('id',groupId).single(),
+      window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,background_mode,background_memory_photo_id,created_at,updated_at,archived_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:true}).order('sequence_no',{ascending:true})
@@ -6850,13 +6850,19 @@ async function groupOpen(groupId) {
     if(groupListWasLoaded){
       const existingIndex=g.groups.findIndex(item=>item.id===group.id);
       const listRow={id:group.id,name:group.name,world_background:group.world_background,scene_mode:group.scene_mode,created_at:group.created_at,updated_at:group.updated_at,pinned:existingIndex>=0?g.groups[existingIndex].pinned===true:false};
-      if(existingIndex>=0)g.groups[existingIndex]=listRow;else g.groups.unshift(listRow);
-      g.groupMembers ||= {};
-      g.groupPreviews ||= {};
-      g.groupMembers[group.id]=members.map(member=>({name:member.name,avatar_url:member.avatar_url||member.image||'',character_snapshot:member.characterSnapshot||{}}));
-      const latestMessage=messages.at(-1);
-      if(latestMessage)g.groupPreviews[group.id]={group_id:group.id,content:latestMessage.content||'',created_at:latestMessage.createdAt||'',speaker_type:latestMessage.type==='user'?'user':'character'};
-      else delete g.groupPreviews[group.id];
+      if(group.archived_at){
+        if(existingIndex>=0)g.groups.splice(existingIndex,1);
+        if(g.groupMembers)delete g.groupMembers[group.id];
+        if(g.groupPreviews)delete g.groupPreviews[group.id];
+      }else{
+        if(existingIndex>=0)g.groups[existingIndex]=listRow;else g.groups.unshift(listRow);
+        g.groupMembers ||= {};
+        g.groupPreviews ||= {};
+        g.groupMembers[group.id]=members.map(member=>({name:member.name,avatar_url:member.avatar_url||member.image||'',character_snapshot:member.characterSnapshot||{}}));
+        const latestMessage=messages.at(-1);
+        if(latestMessage)g.groupPreviews[group.id]={group_id:group.id,content:latestMessage.content||'',created_at:latestMessage.createdAt||'',speaker_type:latestMessage.type==='user'?'user':'character'};
+        else delete g.groupPreviews[group.id];
+      }
     }
     try { await syncGroupDiaryCloud(group.id); }
     catch(syncError) { console.error('群組甜蜜日記雲端同步載入失敗：',syncError);toast('群組日記雲端同步暫時失敗，已保留本機資料；請檢查網路後重試。'); }
