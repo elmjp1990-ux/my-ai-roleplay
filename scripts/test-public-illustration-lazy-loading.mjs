@@ -16,6 +16,9 @@ assert.match(publicLoader, /publicIllustrationsLoaded:ownerLocal\?\.publicIllust
 assert.match(publicLoader, /opening: ownerLocal\?\.opening \|\| ''/);
 assert.match(publicLoader, /publicStoryOpeningLoaded:!!ownerLocal/);
 assert.match(html, /async function hydratePublicCharacterDetailMetadata\(characterId\)/);
+assert.match(html, /async function hydratePublicAuthorProfile\(authorId\)/);
+assert.match(html, /state\.authors\[authorId\]\?\.publicProfileLoaded===true/);
+assert.match(html, /state\.authors\[route\.id\]\?\.publicProfileLoaded!==true/);
 assert.match(html, /\.select\('opening_message'\)/);
 assert.match(html, /\.select\('id,handle,nickname,avatar_url,bio,follower_count'\)/);
 assert.match(html, /data-character-opening/);
