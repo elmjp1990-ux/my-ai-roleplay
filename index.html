@@ -1737,14 +1737,12 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 
       const publicCharacters = (rows || []).map(row => {
         const story = latestStory.get(row.id);
-        // The public and owner hydrators run concurrently. Preserve already-hydrated
-        // owner assets for the current user's own public character if the public
-        // response finishes later and has a narrower RLS-visible asset set.
+        // The owner hydrator may complete before or after this public-list request.
+        // Preserve its already-hydrated assets for the current user's own public character.
         const ownerLocal = state.characters.find(character =>
           character.id === row.id && character.authorId === row.author_id &&
           character.authorId === state.account?.uid
         );
-        const publicAssets = publicIllustrations.get(row.id);
         return {
           id: row.id, name: row.name || '未命名角色',
           gender: row.gender || 'ambiguous',
