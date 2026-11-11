@@ -63,7 +63,7 @@ assert.doesNotMatch(groupOpen,/from\('chat_memory_photos'\)/,
 assert.match(groupOpen,/memoryPhotos:\[\]/);
 const groupBackgroundSettings=block("async function openGroupBackgroundSettings","function ");
 assert.match(groupBackgroundSettings,/from\('chat_memory_photos'\)/);
-assert.match(groupBackgroundSettings,/createSignedUrl/);
+assert.match(groupBackgroundSettings,/getMemoryPhotoSignedUrl\(photo\.storage_path\)/);
 
 assert.match(html,/href="\.\/LOGO_WEBICON\.webp"/);
 assert.match(html,/src="\.\/LOGO_WEBLOGO\.webp"/);
