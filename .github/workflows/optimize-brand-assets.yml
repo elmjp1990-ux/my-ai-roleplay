@@ -1,0 +1,45 @@
+name: Optimize brand and encounter image assets
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "index.html"
+      - "LOGO_WEBLOGO.png"
+      - "LOGO_WEBICON.png"
+      - "Prosperous_daytime_cityscape_pai…_2K_20261027142908 (1).webp"
+      - "scripts/optimize-brand-assets.mjs"
+      - ".github/workflows/optimize-brand-assets.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  optimize:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install temporary image optimizer
+        run: npm install --no-save --package-lock=false sharp@0.34.3
+      - name: Generate mobile-optimized WebP assets
+        run: node scripts/optimize-brand-assets.mjs
+      - name: Commit optimized assets to this PR branch
+        env:
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add LOGO_WEBLOGO.webp LOGO_WEBICON.webp encounter-default-scene.webp
+          if git diff --cached --quiet; then
+            echo "Optimized assets are already up to date."
+          else
+            git commit -m "perf: add mobile-optimized WebP brand and scene assets"
+            git push origin "HEAD:${BRANCH_NAME}"
+          fi
