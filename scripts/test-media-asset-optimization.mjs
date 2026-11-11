@@ -64,6 +64,9 @@ assert.match(groupOpen,/memoryPhotos:\[\]/);
 const groupBackgroundSettings=block("async function openGroupBackgroundSettings","function ");
 assert.match(groupBackgroundSettings,/from\('chat_memory_photos'\)/);
 assert.match(groupBackgroundSettings,/getMemoryPhotoSignedUrl\(photo\.storage_path\)/);
+assert.match(html,/getMemoryPhotoSignedUrl\(p\.storage_path\)/);
+assert.doesNotMatch(html,/createSignedUrl\([^)]*\.storage_path/,
+  "all memory-photo signed URL callsites must use the shared UID/path cache");
 
 assert.match(html,/href="\.\/LOGO_WEBICON\.webp"/);
 assert.match(html,/src="\.\/LOGO_WEBLOGO\.webp"/);

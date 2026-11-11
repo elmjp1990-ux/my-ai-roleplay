@@ -1682,6 +1682,47 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 
   // 探索頁公開角色獨立於登入帳號載入，訪客也能看見。
   // 每次登入／登出都以雲端公開清單為準，避免沿用前一個帳號的過期本機資料。
+  let publicCharacterRowsCache = null;
+  let publicCharacterRowsCacheAt = 0;
+  let publicCharacterRowsCacheVersion = 0;
+  let publicCharacterRowsInflight = null;
+  function invalidatePublicCharacterRowsCache() {
+    publicCharacterRowsCacheVersion += 1;
+    publicCharacterRowsCache = null;
+    publicCharacterRowsCacheAt = 0;
+    publicCharacterRowsInflight = null;
+  }
+  async function loadPublicCharacterRows() {
+    const client = window.mySupabase;
+    if (!client) return [];
+    const now = Date.now();
+    if (Array.isArray(publicCharacterRowsCache) && now - publicCharacterRowsCacheAt < 30000) {
+      return publicCharacterRowsCache;
+    }
+    const version = publicCharacterRowsCacheVersion;
+    if (publicCharacterRowsInflight?.version === version) return publicCharacterRowsInflight.promise;
+    const request = (async () => {
+      const { data, error } = await client
+        .from('characters')
+        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible')
+        .eq('visibility', 'public')
+        .is('deleted_at', null)
+        .order('first_published_at', { ascending: false, nullsFirst: false });
+      if (error) throw new Error(error.message);
+      const rows = Array.isArray(data) ? data : [];
+      if (version === publicCharacterRowsCacheVersion) {
+        publicCharacterRowsCache = rows;
+        publicCharacterRowsCacheAt = Date.now();
+      }
+      return rows;
+    })();
+    publicCharacterRowsInflight = { version, promise: request };
+    try {
+      return await request;
+    } finally {
+      if (publicCharacterRowsInflight?.promise === request) publicCharacterRowsInflight = null;
+    }
+  }
   let publicCharactersLoadPromise = null;
   function loadPublicSupabaseCharacters() {
     if (publicCharactersLoadPromise) return publicCharactersLoadPromise;
@@ -1693,13 +1734,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     const client = window.mySupabase;
     if (!client) return;
     try {
-      const { data: rows, error } = await client
-        .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible')
-        .eq('visibility', 'public')
-        .is('deleted_at', null)
-        .order('first_published_at', { ascending: false, nullsFirst: false });
-      if (error) throw new Error(error.message);
+      const rows = await loadPublicCharacterRows();
 
       // Author profile and story opening are detail-page data; do not fetch them for every public role.
       const publicCharacters = (rows || []).map(row => {
@@ -2819,6 +2854,7 @@ async function saveSupabaseCharacter(character, expectedUserId) {
 if (characterError) {
       throw new Error('角色資料寫入 Supabase 失敗：' + characterError.message);
     }
+    invalidatePublicCharacterRowsCache();
     // 隱藏設定獨立儲存，characters 公開資料列永遠不包含 privateInfo。
     const { error: privateInfoError } = await client
       .from('character_private_info')
@@ -5093,17 +5129,29 @@ async function hydratePublicCharacterDetailMetadata(characterId) {
   if(!existing||!client||publicCharacterStoryOpeningLoaded.has(characterId))return;
   if(publicCharacterDetailMetadataInflight.has(characterId))return publicCharacterDetailMetadataInflight.get(characterId);
   const request=(async()=>{
-    const {data,error}=await client.from('character_stories')
-      .select('opening_message')
-      .eq('character_id',characterId)
-      .eq('visibility','public')
-      .order('created_at',{ascending:false})
-      .limit(1)
-      .maybeSingle();
-    if(error)throw error;
+    const [storyResult,characterResult]=await Promise.all([
+      client.from('character_stories')
+        .select('opening_message')
+        .eq('character_id',characterId)
+        .eq('visibility','public')
+        .order('created_at',{ascending:false})
+        .limit(1)
+        .maybeSingle(),
+      client.from('characters')
+        .select('phone_settings,nsfw_workplace_warning')
+        .eq('id',characterId)
+        .eq('visibility','public')
+        .is('deleted_at',null)
+        .maybeSingle()
+    ]);
+    if(storyResult.error)throw storyResult.error;
+    if(characterResult.error)throw characterResult.error;
     const current=state.characters.find(character=>character.id===characterId);
     if(!current)return;
-    current.opening=data?.opening_message||'';
+    current.opening=storyResult.data?.opening_message||'';
+    current.phoneSettings=characterResult.data?.phone_settings&&typeof characterResult.data.phone_settings==='object'
+      ?characterResult.data.phone_settings:{};
+    current.nsfwWorkplaceWarning=characterResult.data?.nsfw_workplace_warning===true;
     publicCharacterStoryOpeningLoaded.add(characterId);
     persist();
     if(route?.page==='detail'&&route.id===characterId){
@@ -7179,7 +7227,7 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
         if(!ctx.session.cloudOwned||ctx.session.cloudOwnerUid!==uid)throw new Error('請先使用目前帳號擁有的雲端聊天。');
         const {data,error}=await client.from('chat_memory_photos').select('id,caption,storage_path,created_at').eq('owner_id',uid).eq('chat_type','single').eq('session_id',ctx.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false});
         if(error)throw error;
-        rows=await Promise.all((data||[]).map(async p=>{const {data:signed,error:signedError}=await client.storage.from('personax-memory-photos').createSignedUrl(p.storage_path,300);return !signedError&&signed?.signedUrl?{id:p.id,caption:p.caption||'',url:signed.signedUrl}:null;}));
+        rows=await Promise.all((data||[]).map(async p=>{const signedUrl=await getMemoryPhotoSignedUrl(p.storage_path).catch(()=>null);return signedUrl?{id:p.id,caption:p.caption||'',url:signedUrl}:null;}));
         rows=rows.filter(Boolean);
       }
       if(chatBackgroundDraft?.key!==ctx.key)return;draft.photos=rows;draft.loaded=true;draft.loading=false;
@@ -10721,6 +10769,7 @@ document.addEventListener('submit',async event => {
           .rpc('soft_delete_character',{p_character_id:c.id});
         if (deleteError) throw new Error('角色刪除失敗：'+deleteError.message);
         if (!deletedAt) throw new Error('資料庫未確認角色刪除成功，請重新整理後再試。');
+        invalidatePublicCharacterRowsCache();
         c.visibility='private';c.deletedAt=deletedAt;c.deletionReason='author_deleted';
         for (const session of Object.values(state.sessions)) {
           if (session.characterId===c.id) {

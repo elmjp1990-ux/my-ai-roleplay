@@ -18,7 +18,15 @@ assert.match(publicLoader, /galleryIllustrations:ownerLocal\?\.galleryIllustrati
 assert.match(publicLoader, /publicIllustrationsLoaded:ownerLocal\?\.publicIllustrationsLoaded === true \|\| cachedPublic\?\.publicIllustrationsLoaded === true/);
 assert.match(publicLoader, /opening: ownerLocal\?\.opening \|\| cachedPublic\?\.opening \|\| ''/);
 
-// Opening text and complete public author profile are loaded only when their pages need them.
+// Public catalogue rows are cached briefly and invalidated after this account changes a character.
+const publicRowsCache = between("let publicCharacterRowsCache = null;", "async function loadPublicSupabaseCharactersImpl");
+assert.match(publicRowsCache, /now - publicCharacterRowsCacheAt < 30000/);
+assert.match(publicRowsCache, /publicCharacterRowsInflight/);
+assert.match(publicRowsCache, /publicCharacterRowsCacheVersion/);
+assert.match(html, /upsert\(row, \{ onConflict: 'id' \}\);[\s\S]{0,180}invalidatePublicCharacterRowsCache\(\);/);
+assert.match(html, /rpc\('soft_delete_character',[\s\S]{0,300}invalidatePublicCharacterRowsCache\(\);/);
+
+// Opening text and creator-only runtime settings are loaded only when a public character detail is opened.
 assert.match(html, /async function hydratePublicCharacterDetailMetadata\(characterId\)/);
 assert.match(html, /publicCharacterStoryOpeningLoaded\.has\(characterId\)/);
 assert.match(html, /async function hydratePublicAuthorProfile\(authorId\)/);
@@ -26,6 +34,10 @@ assert.match(html, /publicAuthorProfileLoaded\.has\(authorId\)/);
 assert.match(html, /publicAuthorProfileLoaded\.has\(route\.id\)/);
 assert.match(html, /if\(c\.authorId\)void hydratePublicAuthorProfile\(c\.authorId\)/);
 assert.match(html, /\.select\('opening_message'\)/);
+const detailMetadata = between("async function hydratePublicCharacterDetailMetadata", "async function hydratePublicCharacterIllustrations");
+assert.match(detailMetadata, /\.select\('phone_settings,nsfw_workplace_warning'\)/);
+assert.match(detailMetadata, /current\.phoneSettings=/);
+assert.match(detailMetadata, /current\.nsfwWorkplaceWarning=/);
 assert.match(html, /\.select\('id,handle,nickname,avatar_url,bio,follower_count'\)/);
 assert.match(html, /data-character-opening/);
 assert.match(html, /data-character-author-name/);
