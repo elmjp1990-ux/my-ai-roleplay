@@ -12,7 +12,7 @@ const between=(start,end)=>{
 const turn=between("async function executePendingChatTurn(s)","function toast(text)");
 assert.doesNotMatch(turn,/await loadStoryRelationshipState\(s\)/,
   "settled Story turns must not fetch relationship state a second time after render");
-assert.match(turn,/if\(s\.storyMode\) storyPhoneRuntimeCache\.delete\(String\(user\.uid\|\|'\'\)\+': '\+s\.id\)/,
+assert.match(turn,/storyPhoneRuntimeCache\.delete\(String\(user\.uid\|\|''\)\+':'\+s\.id\)/,
   "a settled Story turn must invalidate the in-memory phone state cache");
 
 const conversation=between("function renderConversation()","function formatMessage");
