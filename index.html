@@ -4439,7 +4439,7 @@ async function executePendingChatTurn(s) {
   render();
   // render() refreshes the Story relationship meter once through renderConversation().
   // Avoid issuing a second owner-checked relationship RPC for the same settled turn.
-  if(s.storyMode) s.storyPhoneStateCache=null;
+  if(s.storyMode) storyPhoneRuntimeCache.delete(String(user.uid||'')+':'+s.id);
   await refreshWalletBalance();
 
   // The server has already durably saved and settled the assistant reply.
@@ -8210,6 +8210,7 @@ function formatStoryWorldTime(value) {
   const timeLabel=date.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
   return dateLabel+'　'+timeLabel;
 }
+const storyPhoneRuntimeCache = new Map();
 async function renderPhoneModal() {
   document.querySelectorAll('.phone-modal-backdrop').forEach(node=>node.remove());
   const isGroup=route.page==='group',session=isGroup?null:currentSession(),group=isGroup?groupPrototype.active:null;
@@ -8248,9 +8249,9 @@ async function renderPhoneModal() {
     try{
       const {data:authData,error:authError}=await client.auth.getUser();
       if(authError||authData?.user?.id!==uid)throw new Error('登入狀態已變更，請重新開啟聊天室。');
-      const cached=session.storyPhoneStateCache;
-      const cacheIsFresh=cached?.uid===uid&&cached?.sessionId===session.id&&
-        Number.isFinite(cached?.fetchedAt)&&Date.now()-cached.fetchedAt<15000;
+      const cacheKey=String(uid)+':'+session.id;
+      const cached=storyPhoneRuntimeCache.get(cacheKey);
+      const cacheIsFresh=Number.isFinite(cached?.fetchedAt)&&Date.now()-cached.fetchedAt<15000;
       if(cacheIsFresh){
         storyPhoneEvents=Array.isArray(cached.events)?cached.events:[];
         storyPhoneStates=Array.isArray(cached.states)?cached.states:[];
@@ -8270,7 +8271,11 @@ async function renderPhoneModal() {
           storyWorldState=worldStateResult.data;
           session.storyWorldState=storyWorldState;
         }
-        session.storyPhoneStateCache={uid,sessionId:session.id,fetchedAt:Date.now(),events:storyPhoneEvents,states:storyPhoneStates,worldState:storyWorldState};
+        storyPhoneRuntimeCache.set(cacheKey,{fetchedAt:Date.now(),events:storyPhoneEvents,states:storyPhoneStates,worldState:storyWorldState});
+        if(storyPhoneRuntimeCache.size>100){
+          const oldestKey=storyPhoneRuntimeCache.keys().next().value;
+          if(oldestKey!==cacheKey)storyPhoneRuntimeCache.delete(oldestKey);
+        }
       }
     }catch(error){
       storyPhoneEventsError=String(error?.message||'讀取故事手機通知失敗');
