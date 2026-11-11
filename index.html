@@ -4765,7 +4765,7 @@ function card(c,owner = false) {
       <div class="card-image">
         <button class="image-button" data-action="detail" data-id="${e(c.id)}"
                 aria-label="查看${e(c.name)}">
-          ${c.avatarVideoPath ? `<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline preload="none" aria-label="${e(c.name)}影片預覽"></video>` : `<img src="${e(safeImage(c.image))}" ${c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath)+'"' : ''} alt="${e(c.name)}" loading="lazy">`}
+          ${c.avatarVideoPath ? `<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline preload="none" aria-label="${e(c.name)}影片預覽"></video>` : `<img src="${e(safeImage(c.image))}" ${c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath)+'"' : ''} ${c.cloudPublic===true&&!c.owner&&c.publicIllustrationsLoaded!==true ? 'data-character-primary-illustration="'+e(c.id)+'"' : ''} alt="${e(c.name)}" loading="lazy">`}
         </button>
         ${c.deletedAt ? '' : `<span class="card-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(initialTurnCount)}" title="對話回合數">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
@@ -4799,6 +4799,7 @@ function card(c,owner = false) {
 function renderGrid({append=false}={}) {
   if (!$('characterGrid')) return;
   gridObserver?.disconnect();
+  publicCharacterIllustrationObserver?.disconnect();
   const list = exploreList();
   const recommended = filter === 'recommended';
   const maximum = Math.min(150,list.length);
@@ -4844,6 +4845,7 @@ function renderGrid({append=false}={}) {
   }
   // Also hydrate newly appended cards; existing hydrated elements are guarded.
   grid.querySelectorAll('video[data-character-video]').forEach(video => void hydrateCharacterVideo(video));
+  observePublicCharacterIllustrationCards(grid);
   void loadCharacterTurnCounts(shown.map(c => c.id));
   document.querySelectorAll('.explore-shortcut[data-filter]').forEach(button => {
     button.classList.toggle('active', button.dataset.filter === filter);
@@ -4905,6 +4907,12 @@ async function hydratePublicCharacterIllustrations(characterId) {
     }
     current.publicIllustrationsLoaded=true;
     persist();
+    document.querySelectorAll('img[data-character-primary-illustration]').forEach(image=>{
+      if(image.dataset.characterPrimaryIllustration!==characterId)return;
+      if(primary?.path)image.dataset.characterIllustrationPath=primary.path;
+      image.src=safeImage(current.image);
+      image.removeAttribute('data-character-primary-illustration');
+    });
     if(route?.page==='detail'&&route.id===characterId){
       const image=document.querySelector('.detail-portrait .detail-image');
       if(image){
@@ -4923,6 +4931,28 @@ async function hydratePublicCharacterIllustrations(characterId) {
   try{return await request;}finally{
     if(publicCharacterIllustrationHydration.get(characterId)===request)publicCharacterIllustrationHydration.delete(characterId);
   }
+}
+
+let publicCharacterIllustrationObserver=null;
+function observePublicCharacterIllustrationCards(root) {
+  if(!root)return;
+  const images=root.querySelectorAll('img[data-character-primary-illustration]');
+  if(!images.length)return;
+  if(!('IntersectionObserver' in window)){
+    images.forEach(image=>void hydratePublicCharacterIllustrations(image.dataset.characterPrimaryIllustration));
+    return;
+  }
+  if(!publicCharacterIllustrationObserver){
+    publicCharacterIllustrationObserver=new IntersectionObserver(entries=>{
+      entries.forEach(entry=>{
+        if(!entry.isIntersecting)return;
+        const image=entry.target;
+        publicCharacterIllustrationObserver.unobserve(image);
+        void hydratePublicCharacterIllustrations(image.dataset.characterPrimaryIllustration);
+      });
+    },{rootMargin:'300px'});
+  }
+  images.forEach(image=>publicCharacterIllustrationObserver.observe(image));
 }
 
 /* Detail, author and comments */
@@ -11629,6 +11659,20 @@ function renderCityMapMVP(){
     locationModal.dataset.cardMode=mode;
     locationModal.dataset.selectedPersonIndex=String((cityPresenceByPlace[locationModal.dataset.place]||[]).findIndex(item=>item.id===person.id));
     const image=safeImage(person.image||person.avatar_url||person.avatar);
+    if(person.cloudPublic===true&&!image&&person.publicIllustrationsLoaded!==true){
+      const selectedIndex=locationModal.dataset.selectedPersonIndex;
+      const selectedPlace=locationModal.dataset.place;
+      void hydratePublicCharacterIllustrations(person.id).then(()=>{
+        const current=state.characters.find(character=>character.id===person.id);
+        if(!current)return;
+        person.image=current.image||'';
+        person.primaryIllustrationPath=current.primaryIllustrationPath||'';
+        person.publicIllustrationsLoaded=current.publicIllustrationsLoaded===true;
+        if(locationModal.dataset.place===selectedPlace&&locationModal.dataset.selectedPersonIndex===selectedIndex&&card.isConnected){
+          renderCityCharacterCard(person,page,mode);
+        }
+      });
+    }
     // Uploaded character videos are private Storage objects, so hydrate their signed URL.
     const videoPath=String(person.avatarVideoPath||person.avatar_video_path||person.characterVideoPath||'').trim();
     const videoRaw=String(person.videoUrl||person.video_url||person.introVideoUrl||person.intro_video_url||'').trim();
