@@ -92,4 +92,17 @@ assert.ok(photoDownload.includes("getMemoryPhotoSignedUrl(cached.photo.storage_p
 const profileCompressorUpdated=block("async function compressProfileImage","// IMG-01:");
 assert.ok(profileCompressorUpdated.includes("compressUploadImage(file,{maxEdge:256,targetBytes:120*1024,preserveAlpha:true})"));
 
+const illustrationUploader=block("async function uploadCharacterIllustrationDataUrl","async function syncCharacterIllustrations");
+assert.match(illustrationUploader,/blob\.size>10\*1024\*1024/);
+assert.match(html,/window\.compressMemoryImageForStorage=compressMemoryImage/);
+assert.equal([...html.matchAll(/\.upload\(/g)].length,3,
+  "all Storage upload paths must stay covered by the image/video compression checks");
+
+const wordmarkBytes=fs.statSync("LOGO_WEBLOGO.webp").size;
+const iconBytes=fs.statSync("LOGO_WEBICON.webp").size;
+const encounterSceneBytes=fs.statSync("encounter-default-scene.webp").size;
+assert.ok(wordmarkBytes<30*1024, "optimized wordmark should remain below 30 KB");
+assert.ok(iconBytes<20*1024, "optimized icon should remain below 20 KB");
+assert.ok(encounterSceneBytes<300*1024, "optimized encounter scene should remain below 300 KB");
+
 console.log("Mobile image standards, video transcode, encounter-only media, and lazy memory-photo checks passed.");
