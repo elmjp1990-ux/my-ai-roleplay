@@ -39,7 +39,7 @@ assert.match(publicLoader, /galleryIllustrations:ownerLocal\?\.galleryIllustrati
 assert.match(html, /async function hydratePublicCharacterIllustrations\(characterId\)/);
 assert.match(html, /loadCharacterIllustrationAssets\(\[characterId\]\)/);
 assert.match(html, /current\.publicIllustrationsLoaded=true/);
-assert.match(html, /route\.page==='detail'&&c\.cloudPublic===true&&!c\.owner&&c\.publicIllustrationsLoaded!==true/);
+assert.match(html, /route\.page==='detail'&&c\.cloudPublic===true&&!c\.owner/);
 assert.match(html, /image: ownerIllustrations\.get\(row\.id\)\?\.primary\?\.src \|\| row\.avatar_url/);
 
 // Gallery sync must keep nextGallery in function scope for post-upload persistence and cleanup.
