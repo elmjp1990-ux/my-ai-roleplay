@@ -30,6 +30,7 @@ assert.match(html, /observePublicCharacterIllustrationCards\(grid\)/);
 assert.match(html, /new IntersectionObserver\(entries=>/);
 assert.match(html, /person\.cloudPublic===true&&!image&&person\.publicIllustrationsLoaded!==true/);
 assert.match(html, /cityVideo\.poster=safeImage\(person\.image\)/);
+assert.match(html, /locationModal\.dataset\.cardMode===mode&&card\.dataset\.page===String\(page\)/);
 assert.match(html, /route\.page==='detail'&&c\.cloudPublic===true&&!c\.owner&&c\.publicIllustrationsLoaded!==true/);
 
 // Encounter art remains independently lazy-loaded; owner/editor hydration remains unchanged.
