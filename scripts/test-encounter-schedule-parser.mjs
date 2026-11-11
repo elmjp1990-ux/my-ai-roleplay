@@ -110,7 +110,7 @@ assert.ok(html.includes("document.querySelectorAll('video[data-character-video]'
 assert.ok(!html.includes("function stopCharacterVideo(video){"));
 assert.ok(html.includes("document.addEventListener('visibilitychange'"));
 assert.ok(html.includes("window.addEventListener('pagehide'"));
-assert.ok(html.includes("},{rootMargin:'0px',threshold:0.01}"));
+assert.ok(html.includes("},{rootMargin:'0px',threshold:[0,0.15,0.35]}"));
  // Infinite-scroll appends only new cards so existing video DOM nodes remain attached.
 assert.ok(html.includes("function renderGrid({append=false}={})"));
 assert.ok(html.includes("const existingCardCount = append ? grid.querySelectorAll(':scope > article.card').length : 0;"));
