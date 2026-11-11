@@ -1705,6 +1705,9 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       const publicCharacters = (rows || []).map(row => {
         // The owner hydrator may complete before or after this public-list request.
         // Preserve its already-hydrated assets for the current user's own public character.
+        const cachedPublic = state.characters.find(character =>
+          character.id === row.id && character.cloudPublic === true
+        );
         const ownerLocal = state.characters.find(character =>
           character.id === row.id && character.authorId === row.author_id &&
           character.authorId === state.account?.uid
@@ -1721,7 +1724,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
           publicIllustrationsLoaded:ownerLocal?.publicIllustrationsLoaded === true,
           avatarVideoPath:row.avatar_video_path || '', visibility: 'public',
           reviewStatus: row.review_status, intro: row.intro || '',
-          opening: ownerLocal?.opening || '', publicStoryOpeningLoaded:!!ownerLocal, race: row.race || '',
+          opening: ownerLocal?.opening || cachedPublic?.opening || '', race: row.race || '',
           privateInfo: '', style: row.style || '',
           personalityProfile: normalizePersonalityProfile({}),
           phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : {},
@@ -4861,10 +4864,12 @@ async function loadPublicCharacterPrimaryIllustration(characterId) {
 }
 const publicCharacterIllustrationHydration = new Map();
 const publicCharacterDetailMetadataInflight = new Map();
+const publicCharacterStoryOpeningLoaded = new Set();
 const publicAuthorProfileInflight = new Map();
+const publicAuthorProfileLoaded = new Set();
 async function hydratePublicAuthorProfile(authorId) {
   const client=window.mySupabase;
-  if(!client||!authorId||state.authors[authorId]?.publicProfileLoaded===true)return;
+  if(!client||!authorId||publicAuthorProfileLoaded.has(authorId))return;
   if(publicAuthorProfileInflight.has(authorId))return publicAuthorProfileInflight.get(authorId);
   const request=(async()=>{
     const {data,error}=await client.from('public_profiles')
@@ -4872,13 +4877,14 @@ async function hydratePublicAuthorProfile(authorId) {
       .eq('id',authorId)
       .maybeSingle();
     if(error)throw error;
+    publicAuthorProfileLoaded.add(authorId);
     if(!data)return;
     state.authors[authorId]={
       ...(state.authors[authorId]||{}),
       uid:data.id,handle:data.handle||'',
       nickname:data.nickname||data.handle||'PersonaX 使用者',
       avatar:data.avatar_url||'',bio:data.bio||'',
-      fans:Number(data.follower_count||0),publicProfileLoaded:true
+      fans:Number(data.follower_count||0)
     };
     persist();
     if(route?.page==='author'&&route.id===authorId)renderAuthor();
@@ -4898,7 +4904,7 @@ async function hydratePublicAuthorProfile(authorId) {
 async function hydratePublicCharacterDetailMetadata(characterId) {
   const existing=state.characters.find(character=>character.id===characterId);
   const client=window.mySupabase;
-  if(!existing||!client||existing.publicStoryOpeningLoaded===true)return;
+  if(!existing||!client||publicCharacterStoryOpeningLoaded.has(characterId))return;
   if(publicCharacterDetailMetadataInflight.has(characterId))return publicCharacterDetailMetadataInflight.get(characterId);
   const request=(async()=>{
     const {data,error}=await client.from('character_stories')
@@ -4912,7 +4918,7 @@ async function hydratePublicCharacterDetailMetadata(characterId) {
     const current=state.characters.find(character=>character.id===characterId);
     if(!current)return;
     current.opening=data?.opening_message||'';
-    current.publicStoryOpeningLoaded=true;
+    publicCharacterStoryOpeningLoaded.add(characterId);
     persist();
     if(route?.page==='detail'&&route.id===characterId){
       const opening=document.querySelector('[data-character-opening]');
@@ -5285,7 +5291,7 @@ async function refreshAuthorFollowState(authorId) {
 
 function renderAuthor() {
   const a = author(route.id);
-  if(window.mySupabase&&isUuid(route.id)&&state.authors[route.id]?.publicProfileLoaded!==true)void hydratePublicAuthorProfile(route.id);
+  if(window.mySupabase&&isUuid(route.id)&&!publicAuthorProfileLoaded.has(route.id))void hydratePublicAuthorProfile(route.id);
   const following = state.following.includes(a.uid);
   const list = state.characters.filter(c => c.visibility === 'public' && c.authorId === a.uid &&
     !String(c.id).startsWith('seed-') && c.cloudPublic !== false && c.localOnly !== true);
