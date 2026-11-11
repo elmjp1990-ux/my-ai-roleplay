@@ -13,13 +13,21 @@ assert.match(source, /cloudCommentHydrationInflight\s*=\s*new Map\(\)/);
 assert.match(source, /async function loadCloudComments\(characterId,\{force=false\}=\{\}\)/);
 assert.match(source, /const requestUid=currentUser\(\)\?\.uid\|\|null/);
 assert.match(source, /const cacheKey=\(requestUid\|\|'anonymous'\)\+':'\+characterId/);
-assert.match(source, /if\(!force&&Array\.isArray\(state\.comments\[characterId\]\)&&Date\.now\(\)-loadedAt<CLOUD_COMMENT_CACHE_TTL_MS\)return/);
+assert.match(source, /if\(!force&&cached&&Date\.now\(\)-cached\.loadedAt<CLOUD_COMMENT_CACHE_TTL_MS\)/);
+assert.match(source, /state\.comments\[characterId\]=cached\.rows/);
 assert.match(source, /cloudCommentHydrationInflight\.has\(cacheKey\)/);
-assert.match(source, /cloudCommentHydrationCache\.set\(cacheKey,Date\.now\(\)\)/);
+assert.match(source, /cloudCommentHydrationCache\.set\(cacheKey,\{loadedAt:Date\.now\(\),rows:mapped\}\)/);
 assert.match(source, /currentUser\(\)\?\.uid!==requestUid/);
 assert.match(source, /cloudCommentHydrationInflight\.get\(cacheKey\)===request/);
 assert.match(source, /cloudCommentHydrationInflight\.delete\(cacheKey\)/);
 assert.match(source, /\.rpc\('get_character_comments_safe'/);
 assert.match(source, /\.select\('comment_id,user_id'\)/);
+
+const renderStart = html.indexOf("function renderComments()");
+const renderEnd = html.indexOf("async function refreshAuthorFollowState", renderStart);
+assert.ok(renderStart >= 0 && renderEnd > renderStart, "comment rendering block must exist");
+const renderSource = html.slice(renderStart, renderEnd);
+assert.match(renderSource, /const cacheUid=currentUser\(\)\?\.uid\|\|null/);
+assert.match(renderSource, /if\(cached\)cached\.rows=allComments/);
 
 console.log("Public comment hydration cache and account-isolation checks passed.");
