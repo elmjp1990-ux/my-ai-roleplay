@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const frontend = fs.readFileSync("index.html", "utf8");
+assert.doesNotMatch(frontend, /isPreviewDeployment|enterPreviewTestMode|測試登入（僅本機介面）|不建立帳號、不連線雲端/,
+  "temporary preview-only test login must not remain in the production UI source");
 const between = (start, end) => {
   const from = frontend.indexOf(start);
   const to = frontend.indexOf(end, from + start.length);
@@ -43,8 +45,10 @@ assert.match(sessionSync, /void loadChatSessionAuthorProfiles\(user\.id, snapsho
 assert.doesNotMatch(sessionSync, /await client\.from\(['"]public_profiles['"]\)/,
   "chat-list hydration must not await public profile rows");
 assert.match(sessionSync, /readDeletedChatTombstones/);
-assert.match(sessionSync, /character_snapshot/);
-assert.match(sessionSync, /snapshot\.id !== row\.character_id/);
+assert.match(sessionSync, /character_snapshot_author_id:character_snapshot->>authorId/);
+assert.match(sessionSync, /character_snapshot_opening:character_snapshot->>opening/);
+assert.doesNotMatch(sessionSync, /'character_snapshot'/, "chat-list hydration must not fetch the full image-heavy snapshot");
+assert.match(sessionSync, /cloudSnapshotNeedsRepair:!row\.character_snapshot_id/);
 assert.match(sessionSync, /compactCloudSessionForLocalStorage\(state\.sessions\[row\.id\]\)/);
 
 const hasUserHelper = between("function hasUserMessage(session)", "function sessionTitle");
@@ -57,6 +61,12 @@ const messageLoader = between("async function loadCloudSessionMessages(sessionId
 assert.match(messageLoader, /options\.refresh !== true/,
   "an explicit refresh must bypass the already-loaded short circuit");
 assert.match(messageLoader, /auth\.getUser\(\)/);
+assert.match(messageLoader, /snapshotRequested=!older&&session\.cloudCharacterSnapshotLoaded!==true/);
+assert.match(messageLoader, /\.\.\.\(snapshotRequested\?\['character_snapshot'\]:\[\]\)/);
+assert.match(messageLoader, /session\.cloudCharacterSnapshotLoaded=true/);
+assert.match(messageLoader, /session\.cloudSnapshotNeedsRepair=!row\.character_snapshot\?\.id/);
+assert.match(messageLoader, /cloudSynced:true/,
+  "messages fetched from Supabase must be marked as already synchronized");
 assert.match(messageLoader, /\.eq\('id', sessionId\)\.eq\('user_id', userId\)\.is\('deleted_at', null\)/);
 assert.match(messageLoader, /\.eq\('session_id',sessionId\)\.is\('deleted_at',null\)/);
 assert.match(messageLoader, /const pageSize=50/);
@@ -96,6 +106,7 @@ assert.match(chatData, /s\.cloudHasUserMessage===null \? null : false/);
 assert.match(chatData, /s\.cloudRoleplayMeta/);
 
 const saveSession = between("async function saveChatSessionToCloud(s, options = {})", "  const row = {");
+const saveSessionBody = between("async function saveChatSessionToCloud(s, options = {})", "async function loadChatSessionAuthorProfiles");
 assert.match(saveSession, /cloudSessionDataLoaded/);
 assert.match(saveSession, /savedData\.memories/);
 assert.match(saveSession, /savedData\.album/);
@@ -104,9 +115,20 @@ assert.match(saveSession, /existingData\.pendingTurn/);
 assert.match(saveSession, /existingData\.openingMessage/);
 assert.match(saveSession, /existing\.data\.chat_mode==='encounter'/);
 assert.match(saveSession, /existing\.data\.status==='archived'/);
-assert.match(saveSession, /select\(s\.cloudSessionDataLoaded \?/);
+assert.match(saveSession, /const currentRowFields=\[/);
+assert.match(saveSession, /s\.cloudCharacterSnapshotLoaded===true\?\[\]:\['character_snapshot'\]/);
+assert.match(saveSession, /s\.cloudSessionDataLoaded\?\[\]:\['session_data'\]/);
+assert.match(saveSessionBody, /if \(!s\.cloudOwned \|\| s\.cloudSnapshotNeedsRepair===true \|\| !priorSnapshot\.id\) row\.character_snapshot=snapshot/);
+assert.doesNotMatch(saveSession, /character_snapshot:snapshot, session_data:/);
+assert.match(saveSessionBody, /m\.cloudSynced !== true/,
+  "saving a chat must not upsert player messages already persisted in Supabase");
+assert.match(saveSessionBody, /message\.cloudSynced=true/,
+  "successfully upserted player messages must be marked as synchronized");
 assert.match(chatData, /lastMessagePreview/);
 assert.match(chatData, /lastMessageAt/);
+const safeSaver = between("async function saveChatSessionSafely(s)", "async function refreshWalletBalance");
+assert.match(safeSaver, /syncedUserMessageIds/,
+  "serialized saves must propagate successful message sync markers to the live session");
 
 const renderConversation = between("function renderConversation()", "function formatMessage");
 assert.match(renderConversation, /data-chat-history-action/);
