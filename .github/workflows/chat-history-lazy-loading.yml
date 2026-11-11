@@ -5,6 +5,7 @@ on:
     paths:
       - "index.html"
       - "scripts/test-chat-history-lazy-loading.mjs"
+      - "scripts/test-character-video-visibility.mjs"
       - ".github/workflows/chat-history-lazy-loading.yml"
   push:
     branches:
@@ -21,6 +22,8 @@ jobs:
           node-version: "22"
       - name: Test bounded chat hydration and pagination
         run: node scripts/test-chat-history-lazy-loading.mjs
+      - name: Test character video visibility threshold
+        run: node scripts/test-character-video-visibility.mjs
       - name: Parse inline JavaScript in index.html
         run: |
           node <<'NODE'
