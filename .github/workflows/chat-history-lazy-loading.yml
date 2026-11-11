@@ -5,11 +5,16 @@ on:
     paths:
       - "index.html"
       - "scripts/test-chat-history-lazy-loading.mjs"
+      - "scripts/test-public-illustration-lazy-loading.mjs"
+      - "scripts/test-character-video-visibility.mjs"
       - ".github/workflows/chat-history-lazy-loading.yml"
   push:
     branches:
       - main
       - perf/chat-history-lazy-hydration
+      - perf/mainline-chat-egress-lazy-snapshot
+      - perf/lazy-public-character-illustrations
+      - perf/visible-video-start-threshold
 
 jobs:
   chat-history-lazy-loading:
@@ -21,6 +26,10 @@ jobs:
           node-version: "22"
       - name: Test bounded chat hydration and pagination
         run: node scripts/test-chat-history-lazy-loading.mjs
+      - name: Test public illustration lazy hydration
+        run: node scripts/test-public-illustration-lazy-loading.mjs
+      - name: Test character video visibility threshold
+        run: node scripts/test-character-video-visibility.mjs
       - name: Parse inline JavaScript in index.html
         run: |
           node <<'NODE'
