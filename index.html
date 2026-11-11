@@ -4437,10 +4437,9 @@ async function executePendingChatTurn(s) {
 
   persist();
   render();
-  // The Edge Function applies the affinity evaluation after charge settlement.
-  // Re-read the owner-checked relationship RPC after every successful Story turn
-  // so the in-chat meter cannot remain stale until the next navigation.
-  if(s.storyMode) await loadStoryRelationshipState(s);
+  // render() refreshes the Story relationship meter once through renderConversation().
+  // Avoid issuing a second owner-checked relationship RPC for the same settled turn.
+  if(s.storyMode) s.storyPhoneStateCache=null;
   await refreshWalletBalance();
 
   // The server has already durably saved and settled the assistant reply.
@@ -6804,6 +6803,7 @@ function groupRenderList() {
 async function groupOpen(groupId) {
   const g=groupPrototype;
   groupResetForAccount(currentUser()?.uid||null);
+  const groupListWasLoaded=g.groupsLoaded===true;
   if(!isUuid(groupId)||!window.mySupabase) { g.loading=false;g.openError='群組識別碼無效或 Supabase 尚未載入。';g.failedGroupId=groupId;render();toast(g.openError);return; }
   // Keep the group ID in the URL so rerenders, auth refreshes, and post-send reloads
   // can recover the same group instead of silently falling back to the creation wizard.
@@ -6847,13 +6847,26 @@ async function groupOpen(groupId) {
     });
     g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,memoryPhotos:[],scenes,members};
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;
+    if(groupListWasLoaded){
+      const existingIndex=g.groups.findIndex(item=>item.id===group.id);
+      const listRow={id:group.id,name:group.name,world_background:group.world_background,scene_mode:group.scene_mode,created_at:group.created_at,updated_at:group.updated_at,pinned:existingIndex>=0?g.groups[existingIndex].pinned===true:false};
+      if(existingIndex>=0)g.groups[existingIndex]=listRow;else g.groups.unshift(listRow);
+      g.groupMembers ||= {};
+      g.groupPreviews ||= {};
+      g.groupMembers[group.id]=members.map(member=>({name:member.name,avatar_url:member.avatar_url||member.image||'',character_snapshot:member.characterSnapshot||{}}));
+      const latestMessage=messages.at(-1);
+      if(latestMessage)g.groupPreviews[group.id]={group_id:group.id,content:latestMessage.content||'',created_at:latestMessage.createdAt||'',speaker_type:latestMessage.type==='user'?'user':'character'};
+      else delete g.groupPreviews[group.id];
+    }
     try { await syncGroupDiaryCloud(group.id); }
     catch(syncError) { console.error('群組甜蜜日記雲端同步載入失敗：',syncError);toast('群組日記雲端同步暫時失敗，已保留本機資料；請檢查網路後重試。'); }
     if(requestId!==g.openRequestId)return;
     ensureGroupDiaryMemories();g.formError='';
-    g.loading=false;g.openError='';g.failedGroupId=null;g.groupsLoaded=false;
+    g.loading=false;g.openError='';g.failedGroupId=null;
+    // If the list was already loaded, the active group row was updated locally above.
+    // Otherwise render() starts the normal first-time list load.
+    if(!groupListWasLoaded)g.groupsLoaded=false;
     render();
-    void groupLoadList(true);
   } catch(error) {
     if(requestId!==g.openRequestId) return;
     g.loading=false;g.active=null;g.openError=groupFriendlyError(error)||'開啟群組失敗。';g.failedGroupId=groupId;
@@ -8229,19 +8242,29 @@ async function renderPhoneModal() {
     try{
       const {data:authData,error:authError}=await client.auth.getUser();
       if(authError||authData?.user?.id!==uid)throw new Error('登入狀態已變更，請重新開啟聊天室。');
-      const [eventsResult,stateResult,worldStateResult]=await Promise.all([
-        client.rpc('get_story_phone_events',{p_session_id:session.id}),
-        client.rpc('get_story_phone_state',{p_session_id:session.id}),
-        client.rpc('get_story_world_state',{p_session_id:session.id})
-      ]);
-      if(eventsResult.error)throw eventsResult.error;
-      if(stateResult.error)throw stateResult.error;
-      if(worldStateResult.error)throw worldStateResult.error;
-      storyPhoneEvents=Array.isArray(eventsResult.data)?eventsResult.data:[];
-      storyPhoneStates=Array.isArray(stateResult.data)?stateResult.data:[];
-      if(worldStateResult.data&&typeof worldStateResult.data==='object'){
-        storyWorldState=worldStateResult.data;
-        session.storyWorldState=storyWorldState;
+      const cached=session.storyPhoneStateCache;
+      const cacheIsFresh=cached?.uid===uid&&cached?.sessionId===session.id&&
+        Number.isFinite(cached?.fetchedAt)&&Date.now()-cached.fetchedAt<15000;
+      if(cacheIsFresh){
+        storyPhoneEvents=Array.isArray(cached.events)?cached.events:[];
+        storyPhoneStates=Array.isArray(cached.states)?cached.states:[];
+        if(cached.worldState&&typeof cached.worldState==='object')storyWorldState=cached.worldState;
+      }else{
+        const [eventsResult,stateResult,worldStateResult]=await Promise.all([
+          client.rpc('get_story_phone_events',{p_session_id:session.id}),
+          client.rpc('get_story_phone_state',{p_session_id:session.id}),
+          client.rpc('get_story_world_state',{p_session_id:session.id})
+        ]);
+        if(eventsResult.error)throw eventsResult.error;
+        if(stateResult.error)throw stateResult.error;
+        if(worldStateResult.error)throw worldStateResult.error;
+        storyPhoneEvents=Array.isArray(eventsResult.data)?eventsResult.data:[];
+        storyPhoneStates=Array.isArray(stateResult.data)?stateResult.data:[];
+        if(worldStateResult.data&&typeof worldStateResult.data==='object'){
+          storyWorldState=worldStateResult.data;
+          session.storyWorldState=storyWorldState;
+        }
+        session.storyPhoneStateCache={uid,sessionId:session.id,fetchedAt:Date.now(),events:storyPhoneEvents,states:storyPhoneStates,worldState:storyWorldState};
       }
     }catch(error){
       storyPhoneEventsError=String(error?.message||'讀取故事手機通知失敗');
