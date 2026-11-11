@@ -53,7 +53,7 @@ assert.match(encounterLoader,/encounterGalleryIllustrationInflight\.has\(key\)/)
 assert.match(encounterLoader,/requestUid=currentUser\(\)\?\.uid\|\|null/);
 assert.match(html,/encounterGalleryIllustrationCache\.delete\(userId\+':'\+character\.id\)/);
 
-const encounterWrapper=block("const installEncounterRenderWrapper","const encounterRenderObserver");
+const encounterWrapper=block("const installEncounterRenderWrapper","installEncounterRenderWrapper();");
 assert.match(encounterWrapper,/if\(!session\?\.encounterMode\)return/);
 assert.match(encounterWrapper,/panel\.style\.setProperty\('--encounter-scene-photo'/);
 assert.match(encounterWrapper,/if\(halfBodyImage\)/);
