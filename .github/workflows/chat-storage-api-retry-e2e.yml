@@ -88,12 +88,13 @@ jobs:
             exit 1
           fi
           printf 'LOCAL_DB_CONTAINER=%s\n' "$db_container" >> "$GITHUB_ENV"
+          docker cp "$GITHUB_WORKSPACE/." "$db_container:/workspace"
 
       - name: Load synthetic current-state schema and final ACL migration
         shell: bash
         run: |
           set -euo pipefail
-          psql_local() { docker exec -i "$LOCAL_DB_CONTAINER" psql -U postgres -d postgres "$@"; }
+          psql_local() { docker exec -i -w /workspace "$LOCAL_DB_CONTAINER" psql -U postgres -d postgres "$@"; }
           node scripts/build-disposable-schema-fixture.mjs > "$RUNNER_TEMP/current-state-schema.sql"
           psql_local -v ON_ERROR_STOP=1 < "$RUNNER_TEMP/current-state-schema.sql"
           psql_local -v ON_ERROR_STOP=1 < supabase/drafts/verify-current-state-schema-fixture.sql
@@ -104,7 +105,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          psql_local() { docker exec -i "$LOCAL_DB_CONTAINER" psql -U postgres -d postgres "$@"; }
+          psql_local() { docker exec -i -w /workspace "$LOCAL_DB_CONTAINER" psql -U postgres -d postgres "$@"; }
           psql_local -v ON_ERROR_STOP=1 < supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql
           psql_local -v ON_ERROR_STOP=1 < supabase/drafts/seed-character-deletion-legacy-fixtures.sql
           psql_local -v ON_ERROR_STOP=1 < supabase/drafts/character-history-aware-deletion.sql
