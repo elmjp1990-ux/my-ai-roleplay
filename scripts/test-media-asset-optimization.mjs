@@ -16,9 +16,8 @@ assert.match(html,/compressUploadImage\(file,\{maxEdge:1440,targetBytes:500\*102
 assert.doesNotMatch(html,/compressUploadImage\(file,\{maxEdge:(?:1600|1800),targetBytes:(?:500|700)\*1024,preserveAlpha:true\}\)/);
 
 const profileCompressor=block("async function compressProfileImage","// IMG-01:");
-assert.match(profileCompressor,/canvas\.width=size;canvas\.height=size/);
-assert.match(profileCompressor,/toDataURL\('image\/webp',0\.62\)/);
-assert.match(profileCompressor,/result\.length>220000/);
+assert.match(profileCompressor,/compressUploadImage\(file,\{maxEdge:256,targetBytes:120\*1024,preserveAlpha:true\}\)/);
+assert.match(profileCompressor,/return compressed\.dataUrl/);
 
 const memoryCompressor=block("async function compressMemoryImage","function setAlbumUploadStatus");
 assert.match(memoryCompressor,/maxSide=1200,targetBytes=450\*1024/);
