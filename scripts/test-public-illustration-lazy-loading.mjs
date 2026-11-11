@@ -18,7 +18,10 @@ assert.match(publicLoader, /publicIllustrationsLoaded:ownerLocal\?\.publicIllust
 assert.match(html, /const publicCharacterIllustrationHydration = new Map\(\)/);
 assert.match(html, /async function hydratePublicCharacterIllustrations\(characterId\)/);
 assert.match(html, /publicCharacterIllustrationHydration\.has\(characterId\)/);
-assert.match(html, /loadCharacterIllustrationAssets\(\[characterId\]\)/);
+assert.match(html, /async function loadPublicCharacterPrimaryIllustration\(characterId\)/);
+assert.match(html, /\.eq\(['"]asset_type['"],['"]primary['"]\)/);
+assert.match(html, /\.limit\(1\)/);
+assert.match(html, /loadPublicCharacterPrimaryIllustration\(characterId\)/);
 assert.match(html, /current\.publicIllustrationsLoaded=true/);
 assert.match(html, /route\?\.page==='detail'&&route\.id===characterId\)renderDetail\(\)/);
 assert.match(html, /route\.page==='detail'&&c\.cloudPublic===true&&!c\.owner&&c\.publicIllustrationsLoaded!==true/);
