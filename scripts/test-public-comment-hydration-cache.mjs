@@ -12,7 +12,7 @@ assert.match(source, /cloudCommentHydrationCache\s*=\s*new Map\(\)/);
 assert.match(source, /cloudCommentHydrationInflight\s*=\s*new Map\(\)/);
 assert.match(source, /async function loadCloudComments\(characterId,\{force=false\}=\{\}\)/);
 assert.match(source, /const requestUid=currentUser\(\)\?\.uid\|\|null/);
-assert.match(source, /const cacheKey=\(requestUid\|\|'anonymous'\)\+': '\+characterId/);
+assert.match(source, /const cacheKey=\(requestUid\|\|'anonymous'\)\+':'\+characterId/);
 assert.match(source, /if\(!force&&Array\.isArray\(state\.comments\[characterId\]\)&&Date\.now\(\)-loadedAt<CLOUD_COMMENT_CACHE_TTL_MS\)return/);
 assert.match(source, /cloudCommentHydrationInflight\.has\(cacheKey\)/);
 assert.match(source, /cloudCommentHydrationCache\.set\(cacheKey,Date\.now\(\)\)/);
