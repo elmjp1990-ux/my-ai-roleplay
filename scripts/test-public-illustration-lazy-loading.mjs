@@ -10,7 +10,7 @@ const publicLoader = html.slice(publicLoaderStart, publicLoaderEnd);
 // Keep all public roles available for search, filters, sorting and city schedules,
 // while avoiding bulk profile/story/illustration reads for the entire catalogue.
 assert.doesNotMatch(publicLoader, /loadCharacterIllustrationAssets|character_illustrations|createSignedUrl|public_profiles|character_stories/);
-assert.match(publicLoader, /image: ownerLocal\?\.image \|\| row\.avatar_url/);
+assert.match(publicLoader, /image: ownerLocal\?\.image \|\| cachedPublic\?\.image \|\| row\.avatar_url/);
 assert.match(publicLoader, /galleryIllustrations:ownerLocal\?\.galleryIllustrations \|\| \[\]/);
 assert.match(publicLoader, /publicIllustrationsLoaded:ownerLocal\?\.publicIllustrationsLoaded === true/);
 assert.match(publicLoader, /opening: ownerLocal\?\.opening \|\| cachedPublic\?\.opening \|\| ''/);
