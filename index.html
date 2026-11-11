@@ -4619,6 +4619,7 @@ function render() {
     case 'album':renderChatAlbumPage();break;
   }
   restoreCharacterCardVideos($('view'),previousCardVideos);
+  observePublicCharacterIllustrationCards($('view'));
   if (route.overlay) renderModal(route.overlay);
   updateCharacterCounters($('view'));
   // 公開卡片影片需取得私有儲存桶的短效簽名 URL，並在畫面渲染後啟動靜音循環播放。
@@ -4888,7 +4889,7 @@ async function hydratePublicCharacterDetailMetadata(characterId) {
       tasks.push({
         kind:'author',
         promise:client.from('public_profiles')
-          .select('id,handle,nickname')
+          .select('id,handle,nickname,avatar_url,bio,follower_count')
           .eq('id',authorId)
           .maybeSingle()
       });
@@ -4913,7 +4914,10 @@ async function hydratePublicCharacterDetailMetadata(characterId) {
         state.authors[authorId]={
           ...(state.authors[authorId]||{}),
           uid:profile.id,handle:profile.handle||'',
-          nickname:profile.nickname||profile.handle||'PersonaX 使用者'
+          nickname:profile.nickname||profile.handle||'PersonaX 使用者',
+          avatar:profile.avatar_url||state.authors[authorId]?.avatar||'',
+          bio:profile.bio||state.authors[authorId]?.bio||'',
+          fans:Number(profile.follower_count??state.authors[authorId]?.fans??0)
         };
         changed=true;
       }
