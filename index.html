@@ -5195,9 +5195,18 @@ function updateCharacterTurnCountElements(characterId,count) {
   });
 }
 
-async function loadCloudComments(characterId) {
+const CLOUD_COMMENT_CACHE_TTL_MS = 30_000;
+const cloudCommentHydrationCache = new Map();
+const cloudCommentHydrationInflight = new Map();
+async function loadCloudComments(characterId,{force=false}={}) {
   const client=window.mySupabase;
   if(!client||!characterId)return;
+  const requestUid=currentUser()?.uid||null;
+  const cacheKey=(requestUid||'anonymous')+':'+characterId;
+  const loadedAt=cloudCommentHydrationCache.get(cacheKey)||0;
+  if(!force&&Array.isArray(state.comments[characterId])&&Date.now()-loadedAt<CLOUD_COMMENT_CACHE_TTL_MS)return;
+  if(cloudCommentHydrationInflight.has(cacheKey))return cloudCommentHydrationInflight.get(cacheKey);
+  const request=(async()=>{
   try {
     const {data:rows,error}=await client.rpc('get_character_comments_safe',{p_character_id:characterId});
     if(error)throw error;
@@ -5231,13 +5240,19 @@ async function loadCloudComments(characterId) {
       at:Date.parse(row.created_at)||Date.now(),
       likes:likes.filter(item=>item.comment_id===row.id).map(item=>item.user_id),cloud:true
     }));
-    if(route.page!=='detail'||route.id!==characterId)return;
+    if(currentUser()?.uid!==requestUid||route.page!=='detail'||route.id!==characterId)return;
     state.comments[characterId]=mapped;
+    cloudCommentHydrationCache.set(cacheKey,Date.now());
     renderComments();
   } catch(error) {
     console.error('PersonaX 雲端評論載入失敗：',error);
     const target=$('comments');
     if(target&&route.id===characterId)target.innerHTML='<div class="empty">雲端評論載入失敗，請重新整理或稍後再試。</div>';
+  }
+  })();
+  cloudCommentHydrationInflight.set(cacheKey,request);
+  try{return await request;}finally{
+    if(cloudCommentHydrationInflight.get(cacheKey)===request)cloudCommentHydrationInflight.delete(cacheKey);
   }
 }
 
