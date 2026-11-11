@@ -23,6 +23,9 @@ const groupOpen=between("async function groupOpen(groupId)","async function open
 assert.match(groupOpen,/const groupListWasLoaded=g\.groupsLoaded===true/);
 assert.match(groupOpen,/if\(groupListWasLoaded\)\{/);
 assert.match(groupOpen,/g\.groupMembers\[group\.id\]/);
+assert.match(groupOpen,/archived_at/);
+assert.match(groupOpen,/if\(group\.archived_at\)/,
+  "opening an archived group must not reinsert it into the visible list");
 assert.doesNotMatch(groupOpen,/void groupLoadList\(true\)/,
   "opening a group must not force a full group-list/member/preview reload");
 
