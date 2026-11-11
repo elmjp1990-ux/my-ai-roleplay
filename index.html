@@ -2000,34 +2000,57 @@ async function loadCharacterIllustrationAssets(characterIds, cleanupUserId=null)
   return result;
 }
 
-// Encounter scenes can be opened before the concurrent public/owner hydration settles.
-// If the gallery is still missing, fetch its metadata on demand instead of permanently
-// showing the "素材待補" fallback. This remains RLS-scoped by the current Supabase user.
+// Encounter scenes fetch only the first gallery sprite actually displayed.
+// Do not sign the primary image or every unused gallery item just to render one sprite.
 const encounterGalleryIllustrationCache = new Map();
 const encounterGalleryIllustrationInflight = new Map();
+function applyEncounterGalleryIllustration(characterId,asset) {
+  if(!asset)return;
+  const current=state.characters.find(character=>character.id===characterId);
+  if(current&&(!Array.isArray(current.galleryIllustrations)||!current.galleryIllustrations.length)){
+    current.galleryIllustrations=[asset];
+  }
+  const session=currentSession();
+  if(session?.characterId===characterId&&session.cloudCharacterSnapshot&&
+     (!Array.isArray(session.cloudCharacterSnapshot.galleryIllustrations)||!session.cloudCharacterSnapshot.galleryIllustrations.length)){
+    session.cloudCharacterSnapshot.galleryIllustrations=[asset];
+  }
+  persist();
+}
 async function hydrateEncounterGalleryIllustration(characterId) {
   const client=window.mySupabase;
   if(!client||!characterId)return null;
   const requestUid=currentUser()?.uid||null;
   const key=(requestUid||'public')+':'+characterId;
-  if(encounterGalleryIllustrationCache.has(key))return encounterGalleryIllustrationCache.get(key);
+  const cached=encounterGalleryIllustrationCache.get(key);
+  if(cached&&cached.checkedAt>Date.now()-30000){
+    if(!cached.asset)return null;
+    const src=await getCharacterIllustrationSignedUrl(cached.asset.path);
+    const asset={...cached.asset,src};
+    applyEncounterGalleryIllustration(characterId,asset);
+    return asset;
+  }
   if(encounterGalleryIllustrationInflight.has(key))return encounterGalleryIllustrationInflight.get(key);
   const request=(async()=>{
-    const assets=await loadCharacterIllustrationAssets([characterId]);
+    const {data:row,error}=await client.from('character_illustrations')
+      .select('id,character_id,storage_path,sort_order,display_name')
+      .eq('character_id',characterId)
+      .eq('asset_type','gallery')
+      .order('sort_order',{ascending:true})
+      .limit(1)
+      .maybeSingle();
+    if(error)throw new Error('讀取相遇立繪資料失敗：'+error.message);
     if((currentUser()?.uid||null)!==requestUid)return null;
-    const gallery=assets.get(characterId)?.gallery||[];
-    const first=gallery[0]||null;
-    if(first){
-      const current=state.characters.find(character=>character.id===characterId);
-      if(current)current.galleryIllustrations=gallery;
-      const session=currentSession();
-      if(session?.characterId===characterId&&session.cloudCharacterSnapshot){
-        session.cloudCharacterSnapshot.galleryIllustrations=gallery;
-      }
-      persist();
+    if(!row){
+      encounterGalleryIllustrationCache.set(key,{asset:null,checkedAt:Date.now()});
+      return null;
     }
-    encounterGalleryIllustrationCache.set(key,first);
-    return first;
+    const src=await getCharacterIllustrationSignedUrl(row.storage_path);
+    if((currentUser()?.uid||null)!==requestUid)return null;
+    const asset={id:row.id,path:row.storage_path,src,sortOrder:row.sort_order,name:row.display_name||''};
+    encounterGalleryIllustrationCache.set(key,{asset:{...asset,src:''},checkedAt:Date.now()});
+    applyEncounterGalleryIllustration(characterId,asset);
+    return asset;
   })();
   encounterGalleryIllustrationInflight.set(key,request);
   try{return await request;}finally{
@@ -2327,14 +2350,83 @@ async function syncCharacterIllustrations(character,userId) {
   return {primaryPath:nextPrimaryPath,gallery:nextGallery};
 }
 
-  async function uploadCharacterAvatarVideo(file,userId,characterId){
+async function compressCharacterAvatarVideo(file){
+  if(!file||!['video/mp4','video/webm','video/quicktime'].includes(file.type))throw new Error('影片格式僅支援 MP4、WebM 或 MOV。');
+  if(file.size>15*1024*1024)throw new Error('影片原始檔不可超過 15 MB。');
+  const sourceUrl=URL.createObjectURL(file);
+  const video=document.createElement('video');
+  video.muted=true;video.defaultMuted=true;video.playsInline=true;video.preload='metadata';
+  let stream=null,recorder=null,frameId=0,timeoutId=0;
+  try{
+    video.src=sourceUrl;
+    const metadata=await new Promise((resolve,reject)=>{
+      video.onloadedmetadata=()=>resolve({duration:video.duration,width:video.videoWidth,height:video.videoHeight});
+      video.onerror=()=>reject(new Error('無法讀取影片，請確認檔案格式。'));
+    });
+    if(!Number.isFinite(metadata.duration)||metadata.duration<=0||metadata.duration>10)throw new Error('影片長度需在 10 秒內。');
+    if(!metadata.width||!metadata.height)throw new Error('影片尺寸無效，請重新選擇。');
+    const maxEdge=Math.max(metadata.width,metadata.height);
+    // Small, already web-ready clips do not need a lossy second encode.
+    if(file.size<=1536*1024&&maxEdge<=960)return file;
+    if(typeof MediaRecorder==='undefined'||typeof HTMLCanvasElement.prototype.captureStream!=='function'){
+      throw new Error('目前瀏覽器不支援影片自動壓縮；請先將影片轉為 960px 以下、2 MB 內的 MP4 或 WebM 再上傳。');
+    }
+    const mimeType=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/mp4']
+      .find(type=>MediaRecorder.isTypeSupported(type));
+    if(!mimeType)throw new Error('目前瀏覽器沒有可用的影片壓縮格式；請先轉為 960px 以下、2 MB 內的 MP4 或 WebM。');
+    const scale=Math.min(1,960/maxEdge);
+    const width=Math.max(2,Math.round(metadata.width*scale/2)*2);
+    const height=Math.max(2,Math.round(metadata.height*scale/2)*2);
+    const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+    const ctx=canvas.getContext('2d',{alpha:false});
+    if(!ctx)throw new Error('目前裝置無法建立影片壓縮畫面。');
+    ctx.fillStyle='#000';ctx.fillRect(0,0,width,height);
+    stream=canvas.captureStream(24);
+    // Character-card videos are always muted by the player; encode only the
+    // visual track instead of uploading audio that the product never plays.
+    recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:650000});
+    const chunks=[];
+    const finished=new Promise((resolve,reject)=>{
+      recorder.ondataavailable=event=>{if(event.data?.size)chunks.push(event.data);};
+      recorder.onerror=()=>reject(new Error('影片壓縮失敗，請重新選擇影片。'));
+      recorder.onstop=()=>resolve(new Blob(chunks,{type:recorder.mimeType||mimeType}));
+    });
+    const stop=()=>{if(recorder&&recorder.state!=='inactive')recorder.stop();};
+    const drawFrame=()=>{
+      if(video.readyState>=2)ctx.drawImage(video,0,0,width,height);
+      if(!video.ended&&recorder.state==='recording')frameId=requestAnimationFrame(drawFrame);
+    };
+    recorder.start(250);
+    await video.play();
+    drawFrame();
+    video.addEventListener('ended',stop,{once:true});
+    timeoutId=setTimeout(()=>stop(),Math.ceil((metadata.duration+3)*1000));
+    const blob=await finished;
+    if(!blob.size)throw new Error('影片壓縮沒有產生有效檔案。');
+    if(blob.size>2*1024*1024)throw new Error('影片壓縮後仍超過 2 MB，請改用較短或較低解析度的影片。');
+    if(blob.size>=file.size)throw new Error('影片原檔已比壓縮結果更小，請改用 2 MB 以下、960px 以下的影片。');
+    const type=blob.type.split(';')[0];
+    const extension=type==='video/mp4'?'mp4':type==='video/webm'?'webm':'';
+    if(!extension)throw new Error('瀏覽器輸出的影片格式不受支援。');
+    return new File([blob],(file.name.replace(/\.[^.]+$/,'')||'character-video')+'.'+extension,{type,lastModified:Date.now()});
+  }finally{
+    if(timeoutId)clearTimeout(timeoutId);
+    if(frameId)cancelAnimationFrame(frameId);
+    video.pause();video.removeAttribute('src');video.load();
+    if(stream)stream.getTracks().forEach(track=>track.stop());
+    URL.revokeObjectURL(sourceUrl);
+  }
+}
+async function uploadCharacterAvatarVideo(file,userId,characterId){
   const client=window.mySupabase;
   if(!client||!userId||!characterId)throw new Error('請先登入再上傳角色影片。');
   if(file.size>15*1024*1024)throw new Error('影片不可超過 15 MB。');
-  const ext=({'video/mp4':'mp4','video/webm':'webm','video/quicktime':'mov'})[file.type];
-  if(!ext)throw new Error('影片格式僅支援 MP4、WebM 或 MOV。');
+  const optimized=await compressCharacterAvatarVideo(file);
+  if(optimized.size>2*1024*1024)throw new Error('角色影片壓縮後不可超過 2 MB。');
+  const ext=({'video/mp4':'mp4','video/webm':'webm'})[optimized.type];
+  if(!ext)throw new Error('影片壓縮格式僅支援 MP4 或 WebM。');
   const path=userId+'/'+characterId+'/'+id()+'.'+ext;
-  const {error}=await client.storage.from('character-avatar-videos').upload(path,file,{upsert:false,contentType:file.type,cacheControl:'3600'});
+  const {error}=await client.storage.from('character-avatar-videos').upload(path,optimized,{upsert:false,contentType:optimized.type,cacheControl:'3600'});
   if(error)throw new Error('角色影片上傳失敗：'+error.message);
   return path;
 }
