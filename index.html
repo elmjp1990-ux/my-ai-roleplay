@@ -2423,17 +2423,20 @@ function hydrateCharacterVideo(video){
       for(const entry of entries){
         const target=entry.target;
         if(!target?.isConnected)continue;
-        if(entry.isIntersecting&&!document.hidden){
+        // Start only when a meaningful portion of the card is visible.
+        // Pause as soon as it becomes mostly off-screen; keep src attached to avoid
+        // forcing a fresh media request when the user scrolls back.
+        if(entry.isIntersecting&&!document.hidden&&entry.intersectionRatio>=0.35){
           if(target.dataset.videoHydrated==='true'){if(target.paused)target.play().catch(()=>{});}
           else {
             const loadTarget=characterVideoLoaders.get(target);
             if(loadTarget)void loadTarget();
           }
-        }else if(target.dataset.videoHydrated==='true'){
+        }else if(target.dataset.videoHydrated==='true'&&entry.intersectionRatio<0.15){
           pauseCharacterVideo(target);
         }
       }
-    },{rootMargin:'0px',threshold:0.01});
+    },{rootMargin:'0px',threshold:[0,0.15,0.35]});
     video.dataset.videoObservePending='true';
     characterVideoObserver.observe(video);
   }else{
