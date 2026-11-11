@@ -40,7 +40,8 @@ assert.match(html, /async function hydratePublicCharacterIllustrations\(characte
 assert.match(html, /loadCharacterIllustrationAssets\(\[characterId\]\)/);
 assert.match(html, /current\.publicIllustrationsLoaded=true/);
 assert.match(html, /route\.page==='detail'&&c\.cloudPublic===true&&!c\.owner/);
-assert.match(html, /image: ownerIllustrations\.get\(row\.id\)\?\.primary\?\.src \|\| row\.avatar_url/);
+assert.match(html, /image: ownerPrimaryIllustrations\.get\(row\.id\)\?\.primary\?\.src \|\| row\.avatar_url/);
+assert.match(html, /galleryIllustrations:local\.galleryIllustrations \|\| \[\]/);
 
 // Gallery sync must keep nextGallery in function scope for post-upload persistence and cleanup.
 assert.ok(html.includes("function retryCharacterIllustrationCleanup(userId) {"));
