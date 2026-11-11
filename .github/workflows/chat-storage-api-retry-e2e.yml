@@ -79,31 +79,39 @@ jobs:
           printf 'API_URL=%s\n' "$api_url" >> "$GITHUB_ENV"
           printf 'SERVICE_ROLE_KEY=%s\n' "$service_role_key" >> "$GITHUB_ENV"
           printf 'ANON_KEY=%s\n' "$anon_key" >> "$GITHUB_ENV"
-
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+          # Reuse psql already bundled in the isolated Supabase database container.
+          # This avoids apt repository DNS availability becoming a false test failure.
+          db_container="$(docker ps --format '{{.Names}} {{.Ports}}' | awk '$0 ~ /:54322->5432/ {print $1; exit}')"
+          if [[ -z "$db_container" ]]; then
+            echo "Could not identify the local Supabase database container on port 54322."
+            docker ps --format 'table {{.Names}}\t{{.Ports}}'
+            exit 1
+          fi
+          printf 'LOCAL_DB_CONTAINER=%s\n' "$db_container" >> "$GITHUB_ENV"
 
       - name: Load synthetic current-state schema and final ACL migration
         shell: bash
         run: |
           set -euo pipefail
+          psql_local() { docker exec -i "$LOCAL_DB_CONTAINER" psql -U postgres -d postgres "$@"; }
           node scripts/build-disposable-schema-fixture.mjs > "$RUNNER_TEMP/current-state-schema.sql"
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-current-state-schema-fixture.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261103195621_poyozz_chat_deletion_privilege_hardening.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261104200000_account_is_active_auth_user_existence_guard.sql
+          psql_local -v ON_ERROR_STOP=1 < "$RUNNER_TEMP/current-state-schema.sql"
+          psql_local -v ON_ERROR_STOP=1 < supabase/drafts/verify-current-state-schema-fixture.sql
+          psql_local -v ON_ERROR_STOP=1 < supabase/migrations/20261103195621_poyozz_chat_deletion_privilege_hardening.sql
+          psql_local -v ON_ERROR_STOP=1 < supabase/migrations/20261104200000_account_is_active_auth_user_existence_guard.sql
 
       - name: Load account deletion photo-queue helper in the disposable local schema
         shell: bash
         run: |
           set -euo pipefail
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/seed-character-deletion-legacy-fixtures.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/character-history-aware-deletion.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/account-deletion-character-preservation-draft.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/account-archived-character-session-insert-guard.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/prepare-account-deletion-character-preservation-integration.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/test-account-photo-storage-e2e-fixture.sql
+          psql_local() { docker exec -i "$LOCAL_DB_CONTAINER" psql -U postgres -d postgres "$@"; }
+          psql_local -v ON_ERROR_STOP=1 < supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql
+          psql_local -v ON_ERROR_STOP=1 < supabase/drafts/seed-character-deletion-legacy-fixtures.sql
+          psql_local -v ON_ERROR_STOP=1 < supabase/drafts/character-history-aware-deletion.sql
+          psql_local -v ON_ERROR_STOP=1 < supabase/drafts/account-deletion-character-preservation-draft.sql
+          psql_local -v ON_ERROR_STOP=1 < supabase/drafts/account-archived-character-session-insert-guard.sql
+          psql_local -v ON_ERROR_STOP=1 < supabase/drafts/prepare-account-deletion-character-preservation-integration.sql
+          psql_local -v ON_ERROR_STOP=1 < supabase/drafts/test-account-photo-storage-e2e-fixture.sql
 
       - name: Exercise account-prepare photo path through Storage HTTP 503 and retry
         run: deno run --allow-net --allow-env scripts/test-chat-storage-api-retry-e2e.ts
