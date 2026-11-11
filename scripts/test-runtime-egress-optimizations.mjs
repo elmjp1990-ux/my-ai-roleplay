@@ -12,8 +12,8 @@ const between=(start,end)=>{
 const turn=between("async function executePendingChatTurn(s)","function toast(text)");
 assert.doesNotMatch(turn,/await loadStoryRelationshipState\(s\)/,
   "settled Story turns must not fetch relationship state a second time after render");
-assert.match(turn,/if\(s\.storyMode\) s\.storyPhoneStateCache=null/,
-  "a settled Story turn must invalidate the phone state cache");
+assert.match(turn,/if\(s\.storyMode\) storyPhoneRuntimeCache\.delete\(String\(user\.uid\|\|'\'\)\+': '\+s\.id\)/,
+  "a settled Story turn must invalidate the in-memory phone state cache");
 
 const conversation=between("function renderConversation()","function formatMessage");
 assert.match(conversation,/if \(s\.storyMode\) void loadStoryRelationshipState\(s\)/,
@@ -34,6 +34,8 @@ assert.notEqual(phoneStart,-1,"missing Story phone modal function");
 const phone=html.slice(phoneStart,phoneStart+18000);
 assert.match(phone,/cacheIsFresh/);
 assert.match(phone,/Date\.now\(\)-cached\.fetchedAt<15000/);
-assert.match(phone,/session\.storyPhoneStateCache=\{uid,sessionId:session\.id/);
+assert.match(phone,/storyPhoneRuntimeCache\.get\(cacheKey\)/);
+assert.match(phone,/storyPhoneRuntimeCache\.set\(cacheKey/);
+assert.match(phone,/storyPhoneRuntimeCache\.size>100/);
 
 console.log("Story relationship RPC dedupe, group list refresh avoidance, and phone-state cache checks passed.");
