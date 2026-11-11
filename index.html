@@ -2006,16 +2006,17 @@ const encounterGalleryIllustrationCache = new Map();
 const encounterGalleryIllustrationInflight = new Map();
 function applyEncounterGalleryIllustration(characterId,asset) {
   if(!asset)return;
+  let changed=false;
   const current=state.characters.find(character=>character.id===characterId);
   if(current&&(!Array.isArray(current.galleryIllustrations)||!current.galleryIllustrations.length)){
-    current.galleryIllustrations=[asset];
+    current.galleryIllustrations=[asset];changed=true;
   }
   const session=currentSession();
   if(session?.characterId===characterId&&session.cloudCharacterSnapshot&&
      (!Array.isArray(session.cloudCharacterSnapshot.galleryIllustrations)||!session.cloudCharacterSnapshot.galleryIllustrations.length)){
-    session.cloudCharacterSnapshot.galleryIllustrations=[asset];
+    session.cloudCharacterSnapshot.galleryIllustrations=[asset];changed=true;
   }
-  persist();
+  if(changed)persist();
 }
 async function hydrateEncounterGalleryIllustration(characterId) {
   const client=window.mySupabase;
@@ -2023,13 +2024,13 @@ async function hydrateEncounterGalleryIllustration(characterId) {
   const requestUid=currentUser()?.uid||null;
   const key=(requestUid||'public')+':'+characterId;
   const cached=encounterGalleryIllustrationCache.get(key);
-  if(cached&&cached.checkedAt>Date.now()-30000){
-    if(!cached.asset)return null;
+  if(cached?.asset){
     const src=await getCharacterIllustrationSignedUrl(cached.asset.path);
     const asset={...cached.asset,src};
     applyEncounterGalleryIllustration(characterId,asset);
     return asset;
   }
+  if(cached&&!cached.asset&&cached.checkedAt>Date.now()-30000)return null;
   if(encounterGalleryIllustrationInflight.has(key))return encounterGalleryIllustrationInflight.get(key);
   const request=(async()=>{
     const {data:row,error}=await client.from('character_illustrations')
@@ -2347,6 +2348,8 @@ async function syncCharacterIllustrations(character,userId) {
   draftIllustrations=nextGallery;
   character.primaryIllustrationPath=nextPrimaryPath;
   character.galleryIllustrations=nextGallery.map(item=>({id:item.id,path:item.path,sortOrder:item.sortOrder,name:item.name||''}));
+  encounterGalleryIllustrationCache.delete(userId+':'+character.id);
+  encounterGalleryIllustrationCache.delete('public:'+character.id);
   return {primaryPath:nextPrimaryPath,gallery:nextGallery};
 }
 
