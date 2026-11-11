@@ -30,6 +30,8 @@ const publicRowsCache = between("let publicCharacterRowsCache = null;", "async f
 assert.match(publicRowsCache, /now - publicCharacterRowsCacheAt < 30000/);
 assert.match(publicRowsCache, /publicCharacterRowsInflight/);
 assert.match(publicRowsCache, /publicCharacterRowsCacheVersion/);
+assert.match(publicLoader, /const rowsVersion = publicCharacterRowsCacheVersion/);
+assert.match(publicLoader, /if \(rowsVersion !== publicCharacterRowsCacheVersion\) return loadPublicSupabaseCharactersImpl\(\)/);
 assert.match(html, /upsert\(row, \{ onConflict: 'id' \}\);[\s\S]{0,180}invalidatePublicCharacterRowsCache\(\);/);
 assert.match(html, /rpc\('soft_delete_character',[\s\S]{0,300}invalidatePublicCharacterRowsCache\(\);/);
 

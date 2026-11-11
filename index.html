@@ -1734,7 +1734,11 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     const client = window.mySupabase;
     if (!client) return;
     try {
+      const rowsVersion = publicCharacterRowsCacheVersion;
       const rows = await loadPublicCharacterRows();
+      // If a save/delete invalidated the cache while this request was in flight,
+      // discard the stale result and read the current public catalogue before hydration.
+      if (rowsVersion !== publicCharacterRowsCacheVersion) return loadPublicSupabaseCharactersImpl();
 
       // Author profile and story opening are detail-page data; do not fetch them for every public role.
       const publicCharacters = (rows || []).map(row => {
