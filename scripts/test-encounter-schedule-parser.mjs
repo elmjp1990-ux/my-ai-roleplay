@@ -81,7 +81,7 @@ assert.ok(html.includes("function hydrateEncounterGalleryIllustration(characterI
 assert.ok(html.includes("正在載入角色立繪…"));
 assert.ok(html.includes("角色半立繪素材待補"));
 assert.ok(html.includes("const ownerLocal = state.characters.find(character =>"));
-assert.ok(html.includes("ownerLocal?.galleryIllustrations || []"));
+assert.ok(html.includes("ownerLocal?.galleryIllustrations || cachedPublic?.galleryIllustrations || []"));
 assert.match(html, /const halfBodyImage=dedicatedSprite\|\|sceneIllustration/);
 assert.doesNotMatch(html, /const cardPortrait=safeImage\(character\?\.image/);
 assert.match(html, /相遇模式立繪（最多 5 張）/);
