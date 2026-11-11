@@ -1695,7 +1695,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     try {
       const { data: rows, error } = await client
         .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible')
+        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible')
         .eq('visibility', 'public')
         .is('deleted_at', null)
         .order('first_published_at', { ascending: false, nullsFirst: false });
@@ -1727,8 +1727,8 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
           opening: ownerLocal?.opening || cachedPublic?.opening || '', race: row.race || '',
           privateInfo: '', style: row.style || '',
           personalityProfile: normalizePersonalityProfile({}),
-          phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : {},
-          nsfwWorkplaceWarning:row.nsfw_workplace_warning === true,
+          ...(ownerLocal && Object.prototype.hasOwnProperty.call(ownerLocal,'phoneSettings') ? {phoneSettings:ownerLocal.phoneSettings} : {}),
+          ...(ownerLocal && Object.prototype.hasOwnProperty.call(ownerLocal,'nsfwWorkplaceWarning') ? {nsfwWorkplaceWarning:ownerLocal.nsfwWorkplaceWarning===true} : {}),
           isNSFW:row.is_nsfw === true,
           tags: normalizeCharacterTagsForRead(row.tags),
           authorId: row.author_id, owner: state.account?.uid === row.author_id,
