@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#090d16">
 <title>PersonaX｜AI 角色世界</title>
-<link rel="icon" type="image/png" href="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBICON.png">
+<link rel="icon" type="image/webp" href="./LOGO_WEBICON.webp">
 
 <style>
 :root {
@@ -1119,7 +1119,7 @@ body.city-map-mode .app{margin-left:0!important}
 body.city-map-mode .sidebar,body.city-map-mode header{display:none!important}
 body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
 .city-map-stage{position:fixed;inset:0;width:100vw;height:100dvh;min-height:560px;overflow:hidden;background:#b9d9c5;isolation:isolate;touch-action:none;user-select:none;z-index:1}
-.city-map-world{position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:center;will-change:transform;background-image:url('https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp');background-position:center;background-size:100% 100%;background-repeat:no-repeat;overflow:visible}
+.city-map-world{position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:center;will-change:transform;background-image:url('./encounter-default-scene.webp');background-position:center;background-size:100% 100%;background-repeat:no-repeat;overflow:visible}
 .city-map-world:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#18253e12,transparent 30%,#18253e18);pointer-events:none}
 .city-map-river{display:none!important;position:absolute;left:-5%;top:28%;width:112%;height:18%;background:#8fc8df;border:12px solid #d6e6d7;border-radius:50%;transform:rotate(-12deg);box-shadow:0 0 0 8px #b4d8bf}
 .city-map-road{display:none!important;position:absolute;background:#f3e8cf;border:5px solid #fff8e8;border-radius:30px;box-shadow:0 2px 0 #8ba994}
@@ -1316,15 +1316,15 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 <aside class="sidebar">
   <div class="sidebar-heading">
     <button class="ghost logo-button" data-action="home" aria-label="首頁">
-      <img class="logo-img" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="PersonaX">
+      <img class="logo-img" src="./LOGO_WEBLOGO.webp" alt="PersonaX">
     </button>
     <button class="ghost" data-action="collapse" aria-label="收合或展開網站選單">☰</button>
   </div>
   <nav id="desktopNav"></nav>
   <div class="sidebar-footer">
     <button class="ghost sidebar-footer-logo" data-action="home" aria-label="首頁">
-      <img class="logo-img sidebar-wordmark" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="PersonaX">
-      <img class="sidebar-iconmark" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBICON.png?v=20261024-1" alt="PersonaX">
+      <img class="logo-img sidebar-wordmark" src="./LOGO_WEBLOGO.webp" alt="PersonaX">
+      <img class="sidebar-iconmark" src="./LOGO_WEBICON.webp" alt="PersonaX">
     </button>
   </div>
 </aside>
@@ -1333,7 +1333,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
   <header>
     <div class="row">
       <button class="ghost mobile-logo" data-action="home" aria-label="首頁">
-        <img class="logo-img" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="PersonaX">
+        <img class="logo-img" src="./LOGO_WEBLOGO.webp" alt="PersonaX">
       </button>
       <strong class="desktop-title" id="pageTitle"></strong>
     </div>
@@ -3095,7 +3095,7 @@ const ICON = {
   pin:svg('<path d="M9 3h6l-1 6 4 4v2H6v-2l4-4-1-6ZM12 15v7"></path>')
 };
 
-const LOGO_URL = 'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4';
+const LOGO_URL = './LOGO_WEBLOGO.webp';
 document.querySelectorAll('.logo-img').forEach(img => img.src = LOGO_URL);
 
 const seeds = [
@@ -6748,12 +6748,11 @@ async function groupOpen(groupId) {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('請重新登入後再開啟群組。');
     g.ownerUid=user.id;
-    const [groupRes,sceneRes,memberRes,messageRes,photoRes]=await groupWithTimeout(Promise.all([
+    const [groupRes,sceneRes,memberRes,messageRes]=await groupWithTimeout(Promise.all([
       window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,background_mode,background_memory_photo_id,created_at,updated_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:true}).order('sequence_no',{ascending:true}),
-      window.mySupabase.from('chat_memory_photos').select('id,owner_id,chat_type,group_id,storage_path,caption,created_at,expires_at').eq('chat_type','group').eq('group_id',groupId).eq('owner_id',user.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false})
     ]),15000,'群組資料讀取逾時，請檢查網路後重試。')
     if(requestId!==g.openRequestId) return;
     const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error||photoRes.error;
@@ -6770,7 +6769,7 @@ async function groupOpen(groupId) {
     }
     const members=memberRows.map(m=>{const snapshot=m.character_snapshot||{};const characterId=m.character_id||null;const snapshotId=snapshot.id||characterId||null;const displayId=characterId||snapshotId||m.id;return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,avatar_url:avatarById[characterId]||snapshot.avatar_url||snapshot.image||'',position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};});
     groupExpandedMemberId=null;
-    const memoryPhotos=await Promise.all((photoRes.data||[]).map(async photo=>{const {data:signed,error:signedError}=await window.mySupabase.storage.from('personax-memory-photos').createSignedUrl(photo.storage_path,300);if(signedError)console.warn('群組背景相片簽名網址失敗',signedError.message);return {...photo,image_url:!signedError&&signed?.signedUrl?signed.signedUrl:''};}));
+    // Memory photo metadata and signed URLs are loaded only when the player opens background settings.
     const messages=(messageRes.data||[]).map(m=>{
       const speakerSnapshot=m.speaker_snapshot||{};
       const member=members.find(x=>x.characterId===m.character_id)||members.find(x=>x.characterSnapshotId===speakerSnapshot.id||x.id===speakerSnapshot.id);
@@ -6779,7 +6778,7 @@ async function groupOpen(groupId) {
       const speaker=type==='user'?'你':type==='system'?'系統':(speakerSnapshot.name||member?.name||'角色')+(scene?' · '+scene.name:'');
       return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user' && m.content===GROUP_CONTINUE_SENTINEL ? '' : m.content,createdAt:m.created_at};
     });
-    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,memoryPhotos,scenes,members};
+    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,memoryPhotos:[],scenes,members};
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;
     try { await syncGroupDiaryCloud(group.id); }
     catch(syncError) { console.error('群組甜蜜日記雲端同步載入失敗：',syncError);toast('群組日記雲端同步暫時失敗，已保留本機資料；請檢查網路後重試。'); }
@@ -11361,7 +11360,7 @@ document.addEventListener('change',async event => {
           const preview=$('characterVideoPreview');preview.removeAttribute('src');preview.classList.add('hidden');
           $('imagePreview').classList.remove('hidden');
           toast('正在壓縮角色圖片，請稍候…');
-          const compressed=await compressUploadImage(file,{maxEdge:1600,targetBytes:500*1024,preserveAlpha:true});
+          const compressed=await compressUploadImage(file,{maxEdge:1440,targetBytes:500*1024,preserveAlpha:true});
           if(requestId!==characterImageCompressionRequest)return;
           draftImage=compressed.dataUrl;$('imagePreview').src=draftImage;$('imagePreview').classList.remove('hidden');
           toast('角色頭像已自動壓縮。');saveEditorDraft();
@@ -11380,7 +11379,7 @@ document.addEventListener('change',async event => {
       }
       toast('正在處理附加立繪…');
       for(const file of files){
-        const compressed=await compressUploadImage(file,{maxEdge:1800,targetBytes:700*1024,preserveAlpha:true});
+        const compressed=await compressUploadImage(file,{maxEdge:1440,targetBytes:500*1024,preserveAlpha:true});
         draftIllustrations.push({src:compressed.dataUrl,path:'',id:'',sortOrder:draftIllustrations.length});
       }
       const gallery=$('characterIllustrationGallery');
@@ -11534,7 +11533,7 @@ async function importCharacter(file) {
     const extension=({'image/png':'png','image/jpeg':'jpg','image/webp':'webp'})[originalBlob.type];
     if(!extension)throw Error('匯入角色圖片格式不受支援。');
     const importedFile=new File([originalBlob],'imported-character.'+extension,{type:originalBlob.type});
-    const compressed=await compressUploadImage(importedFile,{maxEdge:1600,targetBytes:500*1024,preserveAlpha:true});
+    const compressed=await compressUploadImage(importedFile,{maxEdge:1440,targetBytes:500*1024,preserveAlpha:true});
     importedPrimaryDataUrl=compressed.dataUrl;
     image='';
   }
@@ -11613,7 +11612,7 @@ function renderCityMapMVP(){
       </div>
       <div class="city-map-ui" id="cityMapUI">
         <aside class="city-map-info">
-          <h2 class="city-map-title"><img src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="POYOZZ"> <span>城市</span></h2>
+          <h2 class="city-map-title"><img src="./LOGO_WEBLOGO.webp" alt="POYOZZ"> <span>城市</span></h2>
           <div id="cityMapDate">台灣時間</div>
           <div class="city-map-weather"><span>🌤️</span><span id="cityMapWeather">天氣資料待串接</span><span id="cityMapTemp">溫度待串接</span></div>
           <p>這座城市充滿各種可能，也許今天你會在某個角落遇見特別的那個人。</p>
@@ -11704,7 +11703,7 @@ function renderCityMapMVP(){
     const sunrise=Math.round(sun.sunrise*60),sunset=Math.round(sun.sunset*60);
     const isDay=minuteOfDay>=sunrise&&minuteOfDay<sunset;
     $('cityMapDate').textContent=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);
-    const mapImage=isDay?'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp':'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Add_nighttime_lighting_to_buildings_2K_20261027142959%20(1).webp';
+    const mapImage=isDay?'./encounter-default-scene.webp':'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Add_nighttime_lighting_to_buildings_2K_20261027142959%20(1).webp';
     stage.style.backgroundColor=isDay?'#b9d9c5':'#18253e';stage.style.backgroundImage='none';world.style.backgroundImage='url("'+mapImage+'")';world.style.filter='none';
   };
   taipeiTime();
@@ -12222,7 +12221,7 @@ if (window.__pendingSupabaseUser) {
   async function compressMemoryImage(file){
     const image=await createImageBitmap(file);
     try{
-      const maxSide=1600,targetBytes=1536*1024;
+      const maxSide=1200,targetBytes=450*1024;
       let scale=Math.min(1,maxSide/Math.max(image.width,image.height));
       let bestBlob=null;
       while(scale>=0.4){
@@ -12230,14 +12229,14 @@ if (window.__pendingSupabaseUser) {
         const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
         const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw new Error('目前裝置無法壓縮圖片。');
         ctx.fillStyle='#fff';ctx.fillRect(0,0,width,height);ctx.drawImage(image,0,0,width,height);
-        for(const quality of [.82,.74,.66,.58]){
+        for(const quality of [.80,.72,.64,.56,.48]){
           const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('圖片壓縮失敗。')),'image/webp',quality));
           if(!bestBlob||blob.size<bestBlob.size)bestBlob=blob;
           if(blob.size<=targetBytes)return new File([blob],(file.name.replace(/\.[^.]+$/,'')||'memory-photo')+'.webp',{type:'image/webp',lastModified:Date.now()});
         }
         scale*=.85;
       }
-      if(!bestBlob||bestBlob.size>2*1024*1024)throw new Error('圖片壓縮後仍超過 2 MB，請改選較小的圖片。');
+      if(!bestBlob||bestBlob.size>1024*1024)throw new Error('圖片壓縮後仍超過 1 MB，請改選較小的圖片。');
       return new File([bestBlob],(file.name.replace(/\.[^.]+$/,'')||'memory-photo')+'.webp',{type:'image/webp',lastModified:Date.now()});
     }finally{image.close?.();}
   }
@@ -12273,7 +12272,7 @@ if (window.__pendingSupabaseUser) {
       const compressed=await compressMemoryImage(file);
       const ext='webp';
       path=user.id+'/'+type+'/'+chatId+'/'+(crypto.randomUUID?crypto.randomUUID():id())+'.'+ext;
-      const {error:upError}=await client.storage.from(BUCKET).upload(path,compressed,{contentType:'image/webp',upsert:false});
+      const {error:upError}=await client.storage.from(BUCKET).upload(path,compressed,{contentType:'image/webp',upsert:false,cacheControl:'3600'});
       if(upError)throw upError;
       const created=new Date(),expires=new Date(created);expires.setFullYear(expires.getFullYear()+1);
       const {error:dbError}=await client.from('chat_memory_photos').insert({
@@ -12888,7 +12887,7 @@ document.addEventListener('submit',function(event){
     panel.classList.add('encounter-scene');
     const character=sessionCharacter(session);
     const sceneImage=safeImage(character?.encounterSceneImage||session?.encounterSceneImage||character?.sceneImage||'');
-    const defaultSceneImage='https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp';
+    const defaultSceneImage='./encounter-default-scene.webp';
     panel.style.setProperty('--encounter-scene-photo','url('+JSON.stringify(sceneImage||defaultSceneImage)+')');
     panel.dataset.encounterPlace=session.encounterPlace||'';
     // Encounter scenes use dedicated encounter art or the author's scene-illustration gallery.
