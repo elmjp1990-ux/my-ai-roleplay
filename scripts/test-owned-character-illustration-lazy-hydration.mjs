@@ -27,7 +27,11 @@ const editorLoader = between("async function hydrateCharacterIllustrationsIntoEd
 assert.match(editorLoader, /loadCharacterIllustrationAssets\(\[characterId\]\)/,
   "the editor must still hydrate the selected character's full gallery");
 const encounterLoader = between("async function hydrateEncounterGalleryIllustration(characterId)", "async function refreshCharacterIllustrationSignedUrl");
-assert.match(encounterLoader, /loadCharacterIllustrationAssets\(\[characterId\]\)/,
-  "Encounter must still hydrate gallery assets on demand");
+assert.match(encounterLoader, /\.eq\('asset_type','gallery'\)/,
+  "Encounter must query only gallery artwork when the encounter view needs it");
+assert.match(encounterLoader, /\.limit\(1\)/,
+  "Encounter should fetch only the first required gallery illustration");
+assert.match(encounterLoader, /getCharacterIllustrationSignedUrl\(row\.storage_path\)/,
+  "Encounter should sign only the selected illustration");
 
 console.log("Owned-character primary-only login hydration and on-demand gallery checks passed.");
