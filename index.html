@@ -2368,7 +2368,7 @@ async function compressCharacterAvatarVideo(file){
     const maxEdge=Math.max(metadata.width,metadata.height);
     // Small, already web-ready clips do not need a lossy second encode.
     if(file.size<=1536*1024&&maxEdge<=960)return file;
-    if(typeof MediaRecorder==='undefined'||typeof HTMLCanvasElement.prototype.captureStream!=='function'){
+    if(typeof MediaRecorder==='undefined'||typeof MediaRecorder.isTypeSupported!=='function'||typeof HTMLCanvasElement.prototype.captureStream!=='function'){
       throw new Error('目前瀏覽器不支援影片自動壓縮；請先將影片轉為 960px 以下、2 MB 內的 MP4 或 WebM 再上傳。');
     }
     const mimeType=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/mp4']
@@ -2396,10 +2396,10 @@ async function compressCharacterAvatarVideo(file){
       if(video.readyState>=2)ctx.drawImage(video,0,0,width,height);
       if(!video.ended&&recorder.state==='recording')frameId=requestAnimationFrame(drawFrame);
     };
+    video.addEventListener('ended',stop,{once:true});
     recorder.start(250);
     await video.play();
     drawFrame();
-    video.addEventListener('ended',stop,{once:true});
     timeoutId=setTimeout(()=>stop(),Math.ceil((metadata.duration+3)*1000));
     const blob=await finished;
     if(!blob.size)throw new Error('影片壓縮沒有產生有效檔案。');
@@ -2412,6 +2412,7 @@ async function compressCharacterAvatarVideo(file){
   }finally{
     if(timeoutId)clearTimeout(timeoutId);
     if(frameId)cancelAnimationFrame(frameId);
+    if(recorder&&recorder.state!=='inactive'){try{recorder.stop();}catch(_){}}
     video.pause();video.removeAttribute('src');video.load();
     if(stream)stream.getTracks().forEach(track=>track.stop());
     URL.revokeObjectURL(sourceUrl);
@@ -12189,11 +12190,26 @@ if (window.__pendingSupabaseUser) {
     }catch(err){console.error('讀取回憶相簿失敗',err);mount.innerHTML='<div class="empty">相簿讀取失敗：'+e(err.message||'請稍後重試。')+'</div>';}
   }
   async function compressMemoryImage(file){
-    const image=await createImageBitmap(file);const maxSide=1920;const scale=Math.min(1,maxSide/Math.max(image.width,image.height));
-    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));
-    const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw new Error('目前裝置無法壓縮圖片。');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(image,0,0,canvas.width,canvas.height);image.close?.();
-    const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('圖片壓縮失敗。')),'image/webp',.86));
-    return new File([blob],(file.name.replace(/\.[^.]+$/,'')||'memory-photo')+'.webp',{type:'image/webp',lastModified:Date.now()});
+    const image=await createImageBitmap(file);
+    try{
+      const maxSide=1600,targetBytes=1536*1024;
+      let scale=Math.min(1,maxSide/Math.max(image.width,image.height));
+      let bestBlob=null;
+      while(scale>=0.4){
+        const width=Math.max(1,Math.round(image.width*scale)),height=Math.max(1,Math.round(image.height*scale));
+        const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+        const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw new Error('目前裝置無法壓縮圖片。');
+        ctx.fillStyle='#fff';ctx.fillRect(0,0,width,height);ctx.drawImage(image,0,0,width,height);
+        for(const quality of [.82,.74,.66,.58]){
+          const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('圖片壓縮失敗。')),'image/webp',quality));
+          if(!bestBlob||blob.size<bestBlob.size)bestBlob=blob;
+          if(blob.size<=targetBytes)return new File([blob],(file.name.replace(/\.[^.]+$/,'')||'memory-photo')+'.webp',{type:'image/webp',lastModified:Date.now()});
+        }
+        scale*=.85;
+      }
+      if(!bestBlob||bestBlob.size>2*1024*1024)throw new Error('圖片壓縮後仍超過 2 MB，請改選較小的圖片。');
+      return new File([bestBlob],(file.name.replace(/\.[^.]+$/,'')||'memory-photo')+'.webp',{type:'image/webp',lastModified:Date.now()});
+    }finally{image.close?.();}
   }
   function setAlbumUploadStatus(input,message,isError=false){
     const stack=input.closest('.memory-album-stack');
