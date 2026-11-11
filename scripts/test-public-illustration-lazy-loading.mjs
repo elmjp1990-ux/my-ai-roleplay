@@ -17,7 +17,7 @@ assert.match(publicLoader, /opening: ownerLocal\?\.opening \|\| ''/);
 assert.match(publicLoader, /publicStoryOpeningLoaded:!!ownerLocal/);
 assert.match(html, /async function hydratePublicCharacterDetailMetadata\(characterId\)/);
 assert.match(html, /\.select\('opening_message'\)/);
-assert.match(html, /\.select\('id,handle,nickname'\)/);
+assert.match(html, /\.select\('id,handle,nickname,avatar_url,bio,follower_count'\)/);
 assert.match(html, /data-character-opening/);
 assert.match(html, /data-character-author-name/);
 
@@ -34,6 +34,7 @@ assert.match(html, /document\.querySelector\('\.detail-portrait \.detail-image'\
 assert.match(html, /data-character-primary-illustration=/);
 assert.match(html, /function observePublicCharacterIllustrationCards\(root\)/);
 assert.match(html, /observePublicCharacterIllustrationCards\(grid\)/);
+assert.match(html, /observePublicCharacterIllustrationCards\(\$\('view'\)\)/);
 assert.match(html, /new IntersectionObserver\(entries=>/);
 assert.match(html, /person\.cloudPublic===true&&!image&&person\.publicIllustrationsLoaded!==true/);
 assert.match(html, /cityVideo\.poster=safeImage\(person\.image\)/);
