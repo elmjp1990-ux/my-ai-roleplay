@@ -11670,7 +11670,7 @@ function renderCityMapMVP(){
         person.publicIllustrationsLoaded=current.publicIllustrationsLoaded===true;
         const cityVideo=body.querySelector('video.city-character-portrait-video[data-character-video]');
         if(cityVideo)cityVideo.poster=safeImage(person.image);
-        if(locationModal.dataset.place===selectedPlace&&locationModal.dataset.selectedPersonIndex===selectedIndex&&card.isConnected){
+        if(locationModal.dataset.place===selectedPlace&&locationModal.dataset.selectedPersonIndex===selectedIndex&&locationModal.dataset.cardMode===mode&&card.dataset.page===String(page)&&card.isConnected){
           renderCityCharacterCard(person,page,mode);
         }
       });
