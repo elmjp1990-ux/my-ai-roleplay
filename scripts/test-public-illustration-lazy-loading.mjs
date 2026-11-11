@@ -23,7 +23,7 @@ assert.match(html, /\.eq\(['"]asset_type['"],['"]primary['"]\)/);
 assert.match(html, /\.limit\(1\)/);
 assert.match(html, /loadPublicCharacterPrimaryIllustration\(characterId\)/);
 assert.match(html, /current\.publicIllustrationsLoaded=true/);
-assert.match(html, /route\?\.page==='detail'&&route\.id===characterId\)renderDetail\(\)/);
+assert.match(html, /document\.querySelector\('\.detail-portrait \.detail-image'\)/);
 assert.match(html, /route\.page==='detail'&&c\.cloudPublic===true&&!c\.owner&&c\.publicIllustrationsLoaded!==true/);
 
 // Encounter art remains independently lazy-loaded; owner/editor hydration remains unchanged.
