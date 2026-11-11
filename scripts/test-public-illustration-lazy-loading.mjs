@@ -1,5 +1,3 @@
-assert.match(html, /publicAuthorProfileLoaded\.has\(authorId\)/);
-assert.match(html, /publicAuthorProfileLoaded\.has\(route\.id\)/);
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
@@ -9,23 +7,27 @@ const publicLoaderEnd = html.indexOf("async function loadSupabaseCharacters(user
 assert.ok(publicLoaderStart >= 0 && publicLoaderEnd > publicLoaderStart, "public character loader boundaries must exist");
 const publicLoader = html.slice(publicLoaderStart, publicLoaderEnd);
 
-// Explore still loads the full public character list for search, filters, recommendations and map use,
-// but it must not fan out illustration metadata reads or signed URL requests for every public role.
+// Keep all public roles available for search, filters, sorting and city schedules,
+// while avoiding bulk profile/story/illustration reads for the entire catalogue.
 assert.doesNotMatch(publicLoader, /loadCharacterIllustrationAssets|character_illustrations|createSignedUrl|public_profiles|character_stories/);
 assert.match(publicLoader, /image: ownerLocal\?\.image \|\| row\.avatar_url/);
 assert.match(publicLoader, /galleryIllustrations:ownerLocal\?\.galleryIllustrations \|\| \[\]/);
 assert.match(publicLoader, /publicIllustrationsLoaded:ownerLocal\?\.publicIllustrationsLoaded === true/);
 assert.match(publicLoader, /opening: ownerLocal\?\.opening \|\| cachedPublic\?\.opening \|\| ''/);
+
+// Opening text and complete public author profile are loaded only when their pages need them.
 assert.match(html, /async function hydratePublicCharacterDetailMetadata\(characterId\)/);
 assert.match(html, /publicCharacterStoryOpeningLoaded\.has\(characterId\)/);
-assert.match(html, /publicAuthorProfileLoaded\.add\(authorId\)/);
 assert.match(html, /async function hydratePublicAuthorProfile\(authorId\)/);
+assert.match(html, /publicAuthorProfileLoaded\.has\(authorId\)/);
+assert.match(html, /publicAuthorProfileLoaded\.has\(route\.id\)/);
+assert.match(html, /if\(c\.authorId\)void hydratePublicAuthorProfile\(c\.authorId\)/);
 assert.match(html, /\.select\('opening_message'\)/);
 assert.match(html, /\.select\('id,handle,nickname,avatar_url,bio,follower_count'\)/);
 assert.match(html, /data-character-opening/);
 assert.match(html, /data-character-author-name/);
 
-// Primary art, author nickname and story opening are fetched only when the matching UI needs them.
+// Primary art is fetched only for visible cards, an opened detail, or a selected city character.
 assert.match(html, /const publicCharacterIllustrationHydration = new Map\(\)/);
 assert.match(html, /async function hydratePublicCharacterIllustrations\(characterId\)/);
 assert.match(html, /publicCharacterIllustrationHydration\.has\(characterId\)/);
@@ -45,7 +47,7 @@ assert.match(html, /cityVideo\.poster=safeImage\(person\.image\)/);
 assert.match(html, /locationModal\.dataset\.cardMode===mode&&card\.dataset\.page===String\(page\)/);
 assert.match(html, /route\.page==='detail'&&c\.cloudPublic===true&&!c\.owner/);
 
-// Encounter art remains independently lazy-loaded; owner/editor hydration remains unchanged.
+// Encounter gallery and owner/editor asset hydration remain unchanged.
 assert.match(html, /async function hydrateEncounterGalleryIllustration\(characterId\)/);
 assert.match(html, /async function hydrateCharacterIllustrationsIntoEditor\(characterId\)/);
-console.log("Public character illustration lazy-loading tests passed.");
+console.log("Public character detail payload lazy-loading tests passed.");
