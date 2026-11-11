@@ -1718,10 +1718,10 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
           age: row.age == null ? '' : String(row.age),
           // Explore cards need only the character cover/video. Full illustration assets
           // are hydrated when a player opens this character's detail page or encounter.
-          image: ownerLocal?.image || row.avatar_url || '',
-          primaryIllustrationPath:ownerLocal?.primaryIllustrationPath || '',
-          galleryIllustrations:ownerLocal?.galleryIllustrations || [],
-          publicIllustrationsLoaded:ownerLocal?.publicIllustrationsLoaded === true,
+          image: ownerLocal?.image || cachedPublic?.image || row.avatar_url || '',
+          primaryIllustrationPath:ownerLocal?.primaryIllustrationPath || cachedPublic?.primaryIllustrationPath || '',
+          galleryIllustrations:ownerLocal?.galleryIllustrations || cachedPublic?.galleryIllustrations || [],
+          publicIllustrationsLoaded:ownerLocal?.publicIllustrationsLoaded === true || cachedPublic?.publicIllustrationsLoaded === true,
           avatarVideoPath:row.avatar_video_path || '', visibility: 'public',
           reviewStatus: row.review_status, intro: row.intro || '',
           opening: ownerLocal?.opening || cachedPublic?.opening || '', race: row.race || '',
