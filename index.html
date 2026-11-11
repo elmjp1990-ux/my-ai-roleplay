@@ -1701,42 +1701,8 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
         .order('first_published_at', { ascending: false, nullsFirst: false });
       if (error) throw new Error(error.message);
 
-      const ids = (rows || []).map(row => row.id);
-      const authorIds = [...new Set((rows || []).map(row => row.author_id).filter(Boolean))];
-      if (authorIds.length) {
-        const profileResult = await client.from('public_profiles')
-          .select('id, handle, nickname, avatar_url, bio, follower_count')
-          .in('id', authorIds);
-        if (profileResult.error) {
-          console.warn('角色作者資料載入失敗，仍繼續顯示公開角色：', profileResult.error.message);
-        }
-        for (const profile of profileResult.data || []) {
-          state.authors[profile.id] = {
-            uid:profile.id, handle:profile.handle || '',
-            nickname:profile.nickname || profile.handle || 'PersonaX 使用者',
-            avatar:profile.avatar_url || '', bio:profile.bio || '',
-            fans:Number(profile.follower_count || 0)
-          };
-        }
-      }
-      let stories = [];
-      if (ids.length) {
-        const result = await client
-          .from('character_stories')
-          .select('character_id, opening_message, visibility, created_at')
-          .in('character_id', ids)
-          .eq('visibility', 'public')
-          .order('created_at', { ascending: false });
-        if (result.error) throw new Error(result.error.message);
-        stories = result.data || [];
-      }
-      const latestStory = new Map();
-      for (const story of stories) {
-        if (!latestStory.has(story.character_id)) latestStory.set(story.character_id, story);
-      }
-
+      // Author profile and story opening are detail-page data; do not fetch them for every public role.
       const publicCharacters = (rows || []).map(row => {
-        const story = latestStory.get(row.id);
         // The owner hydrator may complete before or after this public-list request.
         // Preserve its already-hydrated assets for the current user's own public character.
         const ownerLocal = state.characters.find(character =>
@@ -1755,7 +1721,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
           publicIllustrationsLoaded:ownerLocal?.publicIllustrationsLoaded === true,
           avatarVideoPath:row.avatar_video_path || '', visibility: 'public',
           reviewStatus: row.review_status, intro: row.intro || '',
-          opening: story?.opening_message || '', race: row.race || '',
+          opening: ownerLocal?.opening || '', publicStoryOpeningLoaded:!!ownerLocal, race: row.race || '',
           privateInfo: '', style: row.style || '',
           personalityProfile: normalizePersonalityProfile({}),
           phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : {},
@@ -4893,6 +4859,81 @@ async function loadPublicCharacterPrimaryIllustration(characterId) {
   return {id:row.id,path:row.storage_path,src,sortOrder:row.sort_order,name:row.display_name||''};
 }
 const publicCharacterIllustrationHydration = new Map();
+const publicCharacterDetailMetadataInflight = new Map();
+async function hydratePublicCharacterDetailMetadata(characterId) {
+  const existing=state.characters.find(character=>character.id===characterId);
+  const client=window.mySupabase;
+  if(!existing||!client)return;
+  const authorId=existing.authorId;
+  const cachedAuthor=authorId&&state.authors[authorId]?.nickname&&state.authors[authorId].nickname!=='故事創作者';
+  const needsStory=existing.publicStoryOpeningLoaded!==true;
+  const needsAuthor=!!authorId&&!cachedAuthor;
+  if(!needsStory&&!needsAuthor)return;
+  if(publicCharacterDetailMetadataInflight.has(characterId))return publicCharacterDetailMetadataInflight.get(characterId);
+  const request=(async()=>{
+    const tasks=[];
+    if(needsStory){
+      tasks.push({
+        kind:'story',
+        promise:client.from('character_stories')
+          .select('opening_message')
+          .eq('character_id',characterId)
+          .eq('visibility','public')
+          .order('created_at',{ascending:false})
+          .limit(1)
+          .maybeSingle()
+      });
+    }
+    if(needsAuthor){
+      tasks.push({
+        kind:'author',
+        promise:client.from('public_profiles')
+          .select('id,handle,nickname')
+          .eq('id',authorId)
+          .maybeSingle()
+      });
+    }
+    const results=await Promise.all(tasks.map(task=>task.promise
+      .then(value=>({kind:task.kind,value}))
+      .catch(error=>({kind:task.kind,error}))));
+    const current=state.characters.find(character=>character.id===characterId);
+    if(!current)return;
+    let changed=false;
+    for(const result of results){
+      if(result.error||result.value?.error){
+        console.warn(result.kind==='story'?'角色開場白延遲載入失敗：':'角色作者資料延遲載入失敗：',result.error||result.value.error);
+        continue;
+      }
+      if(result.kind==='story'){
+        current.opening=result.value?.data?.opening_message||'';
+        current.publicStoryOpeningLoaded=true;
+        changed=true;
+      }else if(result.kind==='author'&&result.value?.data){
+        const profile=result.value.data;
+        state.authors[authorId]={
+          ...(state.authors[authorId]||{}),
+          uid:profile.id,handle:profile.handle||'',
+          nickname:profile.nickname||profile.handle||'PersonaX 使用者'
+        };
+        changed=true;
+      }
+    }
+    if(changed)persist();
+    if(route?.page==='detail'&&route.id===characterId){
+      const opening=document.querySelector('[data-character-opening]');
+      if(opening)opening.textContent=replaceRoleplayVariables(current.opening,currentUser()?.nickname||'你',current.name);
+      const authorNode=document.querySelector('[data-character-author-name]');
+      if(authorNode&&current.authorId){
+        authorNode.textContent='BY @'+author(current.authorId).nickname;
+      }
+    }
+  })();
+  publicCharacterDetailMetadataInflight.set(characterId,request);
+  try{return await request;}finally{
+    if(publicCharacterDetailMetadataInflight.get(characterId)===request)publicCharacterDetailMetadataInflight.delete(characterId);
+  }
+}
+
 async function hydratePublicCharacterIllustrations(characterId) {
   const existing=state.characters.find(character=>character.id===characterId);
   if(!existing||existing.publicIllustrationsLoaded===true||!window.mySupabase)return;
@@ -4998,7 +5039,7 @@ function renderDetail() {
 ${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline-image' : ''}" data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline aria-label="${e(c.name)} 的角色影片"></video>` : `<img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" ${c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath)+'"' : ''} alt="${e(c.name)}">`}
           <div class="detail-portrait-meta">
             <h1>${e(c.name)}</h1>
-            ${c.authorId ? `<button class="author-link" data-action="author" data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>` : `<span class="small muted">BY ${e(creatorAttribution)}</span>`}
+            ${c.authorId ? `<button class="author-link" data-action="author" data-character-author-name data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>` : `<span class="small muted">BY ${e(creatorAttribution)}</span>`}
             ${c.deletedAt ? '' : `<div class="detail-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(c.chats || 0)}" title="對話回合數">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
               <span>${e(c.chats || 0)}</span>
@@ -5011,7 +5052,7 @@ ${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline
           <div><h3>角色介紹</h3><div class="prose">${e(replaceRoleplayVariables(c.intro, currentUser()?.nickname || '你', c.name))}</div></div>
           <div class="row wrap">${(c.tags || []).map(tagButton).join('')}</div>
            ${c.isNSFW === true ? '<div class="nsfw-card-badge nsfw-detail-badge" aria-label="成人敏感內容，限 18 歲以上">18+ NSFW</div>' : ''}
-          <div><h3>開場白</h3><div class="prose muted">${e(replaceRoleplayVariables(c.opening, currentUser()?.nickname || '你', c.name))}</div></div>
+          <div><h3>開場白</h3><div class="prose muted" data-character-opening>${e(replaceRoleplayVariables(c.opening, currentUser()?.nickname || '你', c.name))}</div></div>
           ${offline
             ? '<div class="character-status-label"><span class="character-status-dot" style="position:static;background:#8993a4"></span>離線／已下架</div>'
             : `<div class="row wrap">
@@ -5050,8 +5091,9 @@ ${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline
     releaseCharacterVideo(previousDetailVideo);
   }
   if(detailVideo)void hydrateCharacterVideo(detailVideo);
-  if(route.page==='detail'&&c.cloudPublic===true&&!c.owner&&c.publicIllustrationsLoaded!==true){
-    void hydratePublicCharacterIllustrations(c.id);
+  if(route.page==='detail'&&c.cloudPublic===true&&!c.owner){
+    if(c.publicIllustrationsLoaded!==true)void hydratePublicCharacterIllustrations(c.id);
+    void hydratePublicCharacterDetailMetadata(c.id);
   }
   void loadCharacterTurnCounts([c.id]);
   if (!offline && route.page !== 'session-detail') {
