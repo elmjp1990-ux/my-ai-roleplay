@@ -18,6 +18,7 @@ const publicLoader = html.slice(publicLoaderStart, publicLoaderEnd);
 assert.doesNotMatch(publicLoader, /loadCharacterIllustrationAssets|character_illustrations|createSignedUrl|public_profiles|character_stories/);
 assert.doesNotMatch(publicLoader, /phone_settings|nsfw_workplace_warning/);
 assert.match(publicLoader, /Object\.prototype\.hasOwnProperty\.call\(ownerLocal,'phoneSettings'\)/);
+assert.match(publicLoader, /Object\.prototype\.hasOwnProperty\.call\(cachedPublic,'phoneSettings'\)/);
 assert.match(publicLoader, /image: ownerLocal\?\.image \|\| cachedPublic\?\.image \|\| row\.avatar_url/);
 assert.match(publicLoader, /primaryIllustrationPath:ownerLocal\?\.primaryIllustrationPath \|\| cachedPublic\?\.primaryIllustrationPath/);
 assert.match(publicLoader, /galleryIllustrations:ownerLocal\?\.galleryIllustrations \|\| cachedPublic\?\.galleryIllustrations \|\| \[\]/);
