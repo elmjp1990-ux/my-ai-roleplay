@@ -95,7 +95,7 @@ assert.doesNotMatch(startChat, /await loadCloudChatSessions\(\{ id:userId \}\);/
 const localSend = between("if (!window.mySupabase || !isUuid(s.characterId) || !isUuid(s.id))", "if (!walletPreflight('single'))");
 assert.match(localSend, /s\.cloudHasUserMessage=true/);
 
-const visible = between("function visibleSessions()", "function relativeDate");
+const visible = between("function visibleSessions()", "function chatListDate");
 assert.match(visible, /cloudHasUserMessage\s*==\s*null/,
   "legacy chat rows without the new marker must remain discoverable");
 assert.match(visible, /lastMessageAt\|\|b\.updatedAt/);
