@@ -7509,29 +7509,30 @@ async function groupSendMock() {
     if(!g.pendingRequest || g.pendingRequest.groupId!==g.active.id || g.pendingRequest.content!==content) {
       g.pendingRequest={groupId:g.active.id,content,requestKey:window.crypto.randomUUID()};
     }
-    const {error}=await groupWithTimeout(window.mySupabase.rpc('append_chat_group_mock_turn',{
+    const {data:turnId,error}=await groupWithTimeout(window.mySupabase.rpc('append_chat_group_mock_turn',{
       p_group_id:g.active.id,p_request_key:g.pendingRequest.requestKey,p_content:content
     }),15000,'訊息保存逾時。請重新開啟群組確認訊息是否已保存，再決定是否重試。');
     if(error) throw error;
+    if(!turnId) throw new Error('群組回合已保存，但未取得回合識別碼。請重新開啟群組確認訊息。');
     const activeGroupId=g.active.id;
     // The RPC commits the group turn and wallet debit atomically. Refresh the visible
     // wallet immediately so the header/composer never keeps showing the pre-charge balance.
     await refreshWalletBalance();
-    // Keep the same request key until the saved messages are reloaded successfully. If
-    // that read times out, retrying the send reuses the key and cannot charge twice.
-    // Refresh only the message rows; do not reopen the entire group, clear its active
-    // state, or flash the loading screen after every send.
+    // The RPC returns the durable turn ID, including on an idempotent retry.
+    // Fetch only this turn's two messages instead of retransmitting the group's full history.
+    // Keep the same request key until this narrow read succeeds so retries cannot double-charge.
     const {data:rows,error:rowsError}=await groupWithTimeout(
       window.mySupabase.from('chat_group_messages')
         .select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at')
-        .eq('group_id',activeGroupId).is('deleted_at',null)
-        .order('created_at',{ascending:true}).order('sequence_no',{ascending:true}),
-      15000,'訊息已送出，但重新整理訊息清單逾時。請稍後重新開啟群組確認。'
+        .eq('group_id',activeGroupId).eq('turn_id',turnId).is('deleted_at',null)
+        .order('sequence_no',{ascending:true}),
+      15000,'訊息已送出，但重新整理本回合訊息逾時。請稍後重新開啟群組確認。'
     );
     if(rowsError) throw rowsError;
     if(g.active?.id!==activeGroupId) return;
+    if(!rows?.length) throw new Error('群組回合已保存，但暫時讀取不到訊息。請稍後重新開啟群組確認。');
     const members=g.active.members||[], scenes=g.active.scenes||[];
-    g.messages=(rows||[]).map(m=>{
+    const newMessages=rows.map(m=>{
       const speakerSnapshot=m.speaker_snapshot||{};
       const member=members.find(x=>x.characterId===m.character_id)||members.find(x=>x.characterSnapshotId===speakerSnapshot.id||x.id===speakerSnapshot.id);
       const scene=scenes.find(x=>x.id===m.scene_id);
@@ -7539,6 +7540,8 @@ async function groupSendMock() {
       const speaker=type==='user'?'你':type==='system'?'系統':(speakerSnapshot.name||member?.name||'角色')+(scene?' · '+scene.name:'');
       return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user' && m.content===GROUP_CONTINUE_SENTINEL ? '' : m.content,createdAt:m.created_at};
     });
+    const existingMessageIds=new Set((g.messages||[]).map(message=>message.id));
+    g.messages=[...(g.messages||[]),...newMessages.filter(message=>!existingMessageIds.has(message.id))];
     g.turn=g.messages.filter(m=>m.type==='user').length;
     g.pendingRequest=null;
     // Refresh cumulative character-card counts after a group turn has been saved.
