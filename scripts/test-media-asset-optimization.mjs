@@ -71,4 +71,25 @@ assert.match(html,/src="\.\/LOGO_WEBLOGO\.webp"/);
 assert.match(html,/src="\.\/LOGO_WEBICON\.webp"/);
 assert.doesNotMatch(html,/raw\.githubusercontent\.com\/elmjp1990-ux\/my-ai-roleplay\/main\/LOGO_WEB/);
 
+
+const memoryUrlCache=block("async function getMemoryPhotoSignedUrl","const characterIllustrationMetadataInflight");
+assert.match(memoryUrlCache,/const key=uid\\+':'\\+storagePath/);
+assert.match(memoryUrlCache,/memoryPhotoSignedUrlCache\\.get\\(key\\)/);
+assert.match(memoryUrlCache,/memoryPhotoSignedUrlInflight\\.has\\(key\\)/);
+assert.match(memoryUrlCache,/expiresAt:Date\\.now\\(\\)\\+240000/);
+assert.match(memoryUrlCache,/memoryPhotoSignedUrlCache\\.size>250/);
+assert.match(memoryUrlCache,/currentUser\\(\\)\\?\\.uid\\|\\|null\\)!==uid/);
+assert.match(memoryUrlCache,/function invalidateMemoryPhotoSignedUrl/);
+
+const albumLoader=block("async function loadAlbum(type,chatId)","async function compressMemoryImage");
+assert.match(albumLoader,/getMemoryPhotoSignedUrl\\(photo\\.storage_path\\)/);
+assert.doesNotMatch(albumLoader,/if\\(!imageUrl\\)[^\\n]*signedError/);
+const photoDelete=block("if(button.dataset.action==='memory-photo-delete')","if(button.dataset.action==='memory-photo-background')");
+assert.match(photoDelete,/invalidateMemoryPhotoSignedUrl\\(photo\\.storage_path,uid\\)/);
+const photoDownload=block("async function downloadCompressedMemoryPhoto","document\\.addEventListener");
+assert.match(photoDownload,/getMemoryPhotoSignedUrl\\(cached\\.photo\\.storage_path\\)/);
+
+const profileCompressorUpdated=block("async function compressProfileImage","// IMG-01:");
+assert.match(profileCompressorUpdated,/compressUploadImage\\(file,\\{maxEdge:256,targetBytes:120\\*1024,preserveAlpha:true\\}\\)/);
+
 console.log("Mobile image standards, video transcode, encounter-only media, and lazy memory-photo checks passed.");
