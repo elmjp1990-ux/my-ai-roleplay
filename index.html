@@ -1851,8 +1851,10 @@ const ids = (rows || []).map(row => row.id);
       }
       if (state.account?.uid !== user.id) return;
       const localOwnedForMerge = state.characters.filter(c => c.authorId === user.id);
-      const ownerIllustrations = await loadCharacterIllustrationAssets(ids,user.id);
-      // 立繪查詢期間可能發生登出或切換帳號；舊帳號請求不得覆寫新帳號角色狀態。
+      // 登入時只載入每個自有角色的主立繪；附加立繪留到編輯器／相遇畫面再取用。
+      const ownerPrimaryIllustrations = await loadCharacterPrimaryIllustrationAssets(ids,user.id);
+      void retryCharacterIllustrationCleanup(user.id);
+      // 主要立繪查詢期間可能發生登出或切換帳號；舊帳號請求不得覆寫新帳號角色狀態。
       if (state.account?.uid !== user.id) return;
       const cloudCharacters = (rows || []).filter(row => !row.deleted_at).map(row => {
         const local = localOwnedForMerge.find(c => c.id === row.id) || {};
@@ -1863,9 +1865,9 @@ const ids = (rows || []).map(row => row.id);
           name: row.name || local.name || '未命名角色',
           gender: row.gender || local.gender || 'ambiguous',
           age: row.age == null ? (local.age || '') : String(row.age),
-          image: ownerIllustrations.get(row.id)?.primary?.src || row.avatar_url || local.image || '',
-          primaryIllustrationPath:ownerIllustrations.get(row.id)?.primary?.path || local.primaryIllustrationPath || '',
-          galleryIllustrations:ownerIllustrations.get(row.id)?.gallery || local.galleryIllustrations || [],
+          image: ownerPrimaryIllustrations.get(row.id)?.primary?.src || row.avatar_url || local.image || '',
+          primaryIllustrationPath:ownerPrimaryIllustrations.get(row.id)?.primary?.path || local.primaryIllustrationPath || '',
+          galleryIllustrations:local.galleryIllustrations || [],
           avatarVideoPath:row.avatar_video_path || local.avatarVideoPath || '',
           visibility: row.visibility || 'private',
           intro: row.intro ?? local.intro ?? '',
@@ -1925,6 +1927,41 @@ async function getCharacterIllustrationSignedUrl(storagePath) {
   try{return await request;}finally{characterIllustrationSignedUrlInflight.delete(storagePath);}
 }
 const characterIllustrationMetadataInflight = new Map();
+async function loadCharacterPrimaryIllustrationAssets(characterIds, scopeUserId=null) {
+  const client=window.mySupabase;
+  const ids=[...new Set((characterIds||[]).filter(Boolean))].sort();
+  const result=new Map();
+  if(!client||!ids.length)return result;
+  const scope=scopeUserId||'public';
+  const key='primary:'+scope+':'+ids.join(',');
+  let rowsPromise=characterIllustrationMetadataInflight.get(key);
+  if(!rowsPromise){
+    rowsPromise=client.from('character_illustrations')
+      .select('id, character_id, storage_path, sort_order, display_name')
+      .in('character_id',ids)
+      .eq('asset_type','primary')
+      .order('sort_order',{ascending:true})
+      .then(({data,error})=>{
+        if(error)throw new Error('讀取角色主要立繪資料失敗：'+error.message);
+        return data||[];
+      });
+    characterIllustrationMetadataInflight.set(key,rowsPromise);
+  }
+  let rows;
+  try{rows=await rowsPromise;}finally{
+    if(characterIllustrationMetadataInflight.get(key)===rowsPromise)characterIllustrationMetadataInflight.delete(key);
+  }
+  for(const row of rows){
+    let signedUrl;
+    try{signedUrl=await getCharacterIllustrationSignedUrl(row.storage_path);}catch(_){continue;}
+    result.set(row.character_id,{
+      primary:{id:row.id,path:row.storage_path,src:signedUrl,sortOrder:row.sort_order,name:row.display_name||''},
+      gallery:[]
+    });
+  }
+  return result;
+}
+
 async function loadCharacterIllustrationAssets(characterIds, cleanupUserId=null) {
   const client=window.mySupabase;
   const ids=[...new Set((characterIds||[]).filter(Boolean))].sort();
