@@ -12238,7 +12238,7 @@ if (window.__pendingSupabaseUser) {
       const maxSide=1200,targetBytes=450*1024;
       let scale=Math.min(1,maxSide/Math.max(image.width,image.height));
       let bestBlob=null;
-      while(scale>=0.4){
+      while(scale>=0.25){
         const width=Math.max(1,Math.round(image.width*scale)),height=Math.max(1,Math.round(image.height*scale));
         const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
         const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw new Error('目前裝置無法壓縮圖片。');
@@ -12428,6 +12428,7 @@ if (window.__pendingSupabaseUser) {
       if(error){console.error('相簿刪除 RPC 失敗',error);toast('刪除失敗：'+error.message);return;}
       invalidateMemoryPhotoSignedUrl(photo.storage_path,uid);
       const {error:removeError}=await client.storage.from(BUCKET).remove([photo.storage_path]);if(removeError)console.warn('相片紀錄已移出相簿，但儲存檔案清理失敗',removeError.message);
+      invalidateMemoryPhotoSignedUrl(photo.storage_path,uid);
       if(photo.chat_type==='single'){const session=state.sessions[photo.session_id];if(session?.background==='memory-photo:'+photo.id){session.background='none';persist();}}
       else{
         const group=groupPrototype.active;
