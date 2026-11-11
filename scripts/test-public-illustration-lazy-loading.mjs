@@ -9,12 +9,19 @@ const publicLoader = html.slice(publicLoaderStart, publicLoaderEnd);
 
 // Explore still loads the full public character list for search, filters, recommendations and map use,
 // but it must not fan out illustration metadata reads or signed URL requests for every public role.
-assert.doesNotMatch(publicLoader, /loadCharacterIllustrationAssets|character_illustrations|createSignedUrl/);
+assert.doesNotMatch(publicLoader, /loadCharacterIllustrationAssets|character_illustrations|createSignedUrl|public_profiles|character_stories/);
 assert.match(publicLoader, /image: ownerLocal\?\.image \|\| row\.avatar_url/);
 assert.match(publicLoader, /galleryIllustrations:ownerLocal\?\.galleryIllustrations \|\| \[\]/);
 assert.match(publicLoader, /publicIllustrationsLoaded:ownerLocal\?\.publicIllustrationsLoaded === true/);
+assert.match(publicLoader, /opening: ownerLocal\?\.opening \|\| ''/);
+assert.match(publicLoader, /publicStoryOpeningLoaded:!!ownerLocal/);
+assert.match(html, /async function hydratePublicCharacterDetailMetadata\(characterId\)/);
+assert.match(html, /\.select\('opening_message'\)/);
+assert.match(html, /\.select\('id,handle,nickname'\)/);
+assert.match(html, /data-character-opening/);
+assert.match(html, /data-character-author-name/);
 
-// Primary art is fetched only for visible Explore cards, a selected city-map character, or an opened detail page.
+// Primary art, author nickname and story opening are fetched only when the matching UI needs them.
 assert.match(html, /const publicCharacterIllustrationHydration = new Map\(\)/);
 assert.match(html, /async function hydratePublicCharacterIllustrations\(characterId\)/);
 assert.match(html, /publicCharacterIllustrationHydration\.has\(characterId\)/);
