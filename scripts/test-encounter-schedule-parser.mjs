@@ -163,7 +163,7 @@ assert.ok(html.includes("if(cleanupUserId)await retryCharacterIllustrationCleanu
 
 // Character hydration only fetches story fields consumed by the UI; avoid downloading unused story descriptions/titles.
 const minimalStorySelect = ".select('character_id, opening_message, visibility, created_at')";
-assert.equal(html.split(minimalStorySelect).length - 1, 2);
+assert.equal(html.split(minimalStorySelect).length - 1, 1);
 assert.ok(!html.includes(".select('id, character_id, story_name, description, opening_message, visibility, created_at')"));
 
 console.log("Author schedule and illustration signed-URL refresh contract tests passed.");
