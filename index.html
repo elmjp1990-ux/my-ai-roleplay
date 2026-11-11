@@ -11521,8 +11521,20 @@ async function importCharacter(file) {
   if (String(data.privateInfo || '').length>10000 || String(data.style || '').length>1000) {
     throw Error('私密資訊或風格超過長度限制。');
   }
-  const image=safeImage(data.image);
+  let image=safeImage(data.image);
   if (!image) throw Error('需提供有效的HTTPS或支援的圖片資料。');
+  // Imported base64 images used to bypass the normal image compressor and could
+  // be stored inline in characters.avatar_url. Compress and move them to Storage.
+  let importedPrimaryDataUrl='';
+  if(/^data:image\/(png|jpeg|webp);base64,/i.test(image)){
+    const originalBlob=await (await fetch(image)).blob();
+    const extension=({'image/png':'png','image/jpeg':'jpg','image/webp':'webp'})[originalBlob.type];
+    if(!extension)throw Error('匯入角色圖片格式不受支援。');
+    const importedFile=new File([originalBlob],'imported-character.'+extension,{type:originalBlob.type});
+    const compressed=await compressUploadImage(importedFile,{maxEdge:1600,targetBytes:500*1024,preserveAlpha:true});
+    importedPrimaryDataUrl=compressed.dataUrl;
+    image='';
+  }
   let tags=[];
   try { tags=validateCharacterTags(Array.isArray(data.tags) ? [...new Set(data.tags)] : []); }
   catch(error) { throw Error('匯入標籤格式不符：' + error.message); }
@@ -11540,13 +11552,28 @@ async function importCharacter(file) {
     chats:'0',users:null,createdAt:Date.now()
   };
   // 匯入完成即建立雲端私密角色，不必先公開才上傳。
-  const saveResult = await saveSupabaseCharacter(character, user.uid);
-  state.characters.unshift(character);
-  persist();go({page:'create'});
-  if (saveResult.storyError && saveResult.profileQueueError) toast(saveResult.storyError + '；' + saveResult.profileQueueError);
-  else if (saveResult.storyError) toast('角色已匯入雲端，但故事同步失敗：' + saveResult.storyError);
-  else if (saveResult.profileQueueError) toast(saveResult.profileQueueError);
-  else toast('角色已匯入雲端，預設為私密。');
+  const previousDraft={image:draftImage,illustrations:draftIllustrations,primaryPath:draftPrimaryIllustrationPath};
+  try{
+    const saveResult = await saveSupabaseCharacter(character, user.uid);
+    if(importedPrimaryDataUrl){
+      draftImage=importedPrimaryDataUrl;
+      draftIllustrations=[];
+      draftPrimaryIllustrationPath='';
+      const synced=await syncCharacterIllustrations(character,user.uid);
+      if(!synced.primaryPath)throw new Error('匯入圖片未能儲存至雲端素材庫。');
+      character.image=await getCharacterIllustrationSignedUrl(synced.primaryPath);
+    }
+    state.characters.unshift(character);
+    persist();go({page:'create'});
+    if (saveResult.storyError && saveResult.profileQueueError) toast(saveResult.storyError + '；' + saveResult.profileQueueError);
+    else if (saveResult.storyError) toast('角色已匯入雲端，但故事同步失敗：' + saveResult.storyError);
+    else if (saveResult.profileQueueError) toast(saveResult.profileQueueError);
+    else toast('角色已匯入雲端，預設為私密。');
+  }finally{
+    draftImage=previousDraft.image;
+    draftIllustrations=previousDraft.illustrations;
+    draftPrimaryIllustrationPath=previousDraft.primaryPath;
+  }
 }
 
 /* Image errors do not inject HTML. */
