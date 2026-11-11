@@ -4861,77 +4861,66 @@ async function loadPublicCharacterPrimaryIllustration(characterId) {
 }
 const publicCharacterIllustrationHydration = new Map();
 const publicCharacterDetailMetadataInflight = new Map();
+const publicAuthorProfileInflight = new Map();
+async function hydratePublicAuthorProfile(authorId) {
+  const client=window.mySupabase;
+  if(!client||!authorId||state.authors[authorId]?.publicProfileLoaded===true)return;
+  if(publicAuthorProfileInflight.has(authorId))return publicAuthorProfileInflight.get(authorId);
+  const request=(async()=>{
+    const {data,error}=await client.from('public_profiles')
+      .select('id,handle,nickname,avatar_url,bio,follower_count')
+      .eq('id',authorId)
+      .maybeSingle();
+    if(error)throw error;
+    if(!data)return;
+    state.authors[authorId]={
+      ...(state.authors[authorId]||{}),
+      uid:data.id,handle:data.handle||'',
+      nickname:data.nickname||data.handle||'PersonaX 使用者',
+      avatar:data.avatar_url||'',bio:data.bio||'',
+      fans:Number(data.follower_count||0),publicProfileLoaded:true
+    };
+    persist();
+    if(route?.page==='author'&&route.id===authorId)renderAuthor();
+    if(route?.page==='detail'){
+      const character=state.characters.find(item=>item.id===route.id);
+      const authorNode=document.querySelector('[data-character-author-name]');
+      if(character?.authorId===authorId&&authorNode)authorNode.textContent='BY @'+author(authorId).nickname;
+    }
+  })().catch(error=>{
+    console.warn('作者公開資料延遲載入失敗：',error?.message||error);
+  });
+  publicAuthorProfileInflight.set(authorId,request);
+  try{return await request;}finally{
+    if(publicAuthorProfileInflight.get(authorId)===request)publicAuthorProfileInflight.delete(authorId);
+  }
+}
 async function hydratePublicCharacterDetailMetadata(characterId) {
   const existing=state.characters.find(character=>character.id===characterId);
   const client=window.mySupabase;
-  if(!existing||!client)return;
-  const authorId=existing.authorId;
-  const cachedAuthor=authorId&&state.authors[authorId]?.nickname&&state.authors[authorId].nickname!=='故事創作者';
-  const needsStory=existing.publicStoryOpeningLoaded!==true;
-  const needsAuthor=!!authorId&&!cachedAuthor;
-  if(!needsStory&&!needsAuthor)return;
+  if(!existing||!client||existing.publicStoryOpeningLoaded===true)return;
   if(publicCharacterDetailMetadataInflight.has(characterId))return publicCharacterDetailMetadataInflight.get(characterId);
   const request=(async()=>{
-    const tasks=[];
-    if(needsStory){
-      tasks.push({
-        kind:'story',
-        promise:client.from('character_stories')
-          .select('opening_message')
-          .eq('character_id',characterId)
-          .eq('visibility','public')
-          .order('created_at',{ascending:false})
-          .limit(1)
-          .maybeSingle()
-      });
-    }
-    if(needsAuthor){
-      tasks.push({
-        kind:'author',
-        promise:client.from('public_profiles')
-          .select('id,handle,nickname,avatar_url,bio,follower_count')
-          .eq('id',authorId)
-          .maybeSingle()
-      });
-    }
-    const results=await Promise.all(tasks.map(task=>task.promise
-      .then(value=>({kind:task.kind,value}))
-      .catch(error=>({kind:task.kind,error}))));
+    const {data,error}=await client.from('character_stories')
+      .select('opening_message')
+      .eq('character_id',characterId)
+      .eq('visibility','public')
+      .order('created_at',{ascending:false})
+      .limit(1)
+      .maybeSingle();
+    if(error)throw error;
     const current=state.characters.find(character=>character.id===characterId);
     if(!current)return;
-    let changed=false;
-    for(const result of results){
-      if(result.error||result.value?.error){
-        console.warn(result.kind==='story'?'角色開場白延遲載入失敗：':'角色作者資料延遲載入失敗：',result.error||result.value.error);
-        continue;
-      }
-      if(result.kind==='story'){
-        current.opening=result.value?.data?.opening_message||'';
-        current.publicStoryOpeningLoaded=true;
-        changed=true;
-      }else if(result.kind==='author'&&result.value?.data){
-        const profile=result.value.data;
-        state.authors[authorId]={
-          ...(state.authors[authorId]||{}),
-          uid:profile.id,handle:profile.handle||'',
-          nickname:profile.nickname||profile.handle||'PersonaX 使用者',
-          avatar:profile.avatar_url||state.authors[authorId]?.avatar||'',
-          bio:profile.bio||state.authors[authorId]?.bio||'',
-          fans:Number(profile.follower_count??state.authors[authorId]?.fans??0)
-        };
-        changed=true;
-      }
-    }
-    if(changed)persist();
+    current.opening=data?.opening_message||'';
+    current.publicStoryOpeningLoaded=true;
+    persist();
     if(route?.page==='detail'&&route.id===characterId){
       const opening=document.querySelector('[data-character-opening]');
       if(opening)opening.textContent=replaceRoleplayVariables(current.opening,currentUser()?.nickname||'你',current.name);
-      const authorNode=document.querySelector('[data-character-author-name]');
-      if(authorNode&&current.authorId){
-        authorNode.textContent='BY @'+author(current.authorId).nickname;
-      }
     }
-  })();
+  })().catch(error=>{
+    console.warn('角色開場白延遲載入失敗：',error?.message||error);
+  });
   publicCharacterDetailMetadataInflight.set(characterId,request);
   try{return await request;}finally{
     if(publicCharacterDetailMetadataInflight.get(characterId)===request)publicCharacterDetailMetadataInflight.delete(characterId);
@@ -5098,6 +5087,7 @@ ${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline
   if(route.page==='detail'&&c.cloudPublic===true&&!c.owner){
     if(c.publicIllustrationsLoaded!==true)void hydratePublicCharacterIllustrations(c.id);
     void hydratePublicCharacterDetailMetadata(c.id);
+    if(c.authorId)void hydratePublicAuthorProfile(c.authorId);
   }
   void loadCharacterTurnCounts([c.id]);
   if (!offline && route.page !== 'session-detail') {
@@ -5295,6 +5285,7 @@ async function refreshAuthorFollowState(authorId) {
 
 function renderAuthor() {
   const a = author(route.id);
+  if(window.mySupabase&&isUuid(route.id)&&state.authors[route.id]?.publicProfileLoaded!==true)void hydratePublicAuthorProfile(route.id);
   const following = state.following.includes(a.uid);
   const list = state.characters.filter(c => c.visibility === 'public' && c.authorId === a.uid &&
     !String(c.id).startsWith('seed-') && c.cloudPublic !== false && c.localOnly !== true);
