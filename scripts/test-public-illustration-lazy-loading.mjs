@@ -24,6 +24,12 @@ assert.match(html, /\.limit\(1\)/);
 assert.match(html, /loadPublicCharacterPrimaryIllustration\(characterId\)/);
 assert.match(html, /current\.publicIllustrationsLoaded=true/);
 assert.match(html, /document\.querySelector\('\.detail-portrait \.detail-image'\)/);
+assert.match(html, /data-character-primary-illustration=/);
+assert.match(html, /function observePublicCharacterIllustrationCards\\(root\\)/);
+assert.match(html, /observePublicCharacterIllustrationCards\\(grid\\)/);
+assert.match(html, /new IntersectionObserver\\(entries=>/);
+assert.match(html, /person\\.cloudPublic===true&&!image&&person\\.publicIllustrationsLoaded!==true/);
+assert.match(html, /cityVideo\\.poster=safeImage\\(person\\.image\\)/);
 assert.match(html, /route\.page==='detail'&&c\.cloudPublic===true&&!c\.owner&&c\.publicIllustrationsLoaded!==true/);
 
 // Encounter art remains independently lazy-loaded; owner/editor hydration remains unchanged.
