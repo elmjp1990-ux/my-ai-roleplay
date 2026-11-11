@@ -11668,6 +11668,8 @@ function renderCityMapMVP(){
         person.image=current.image||'';
         person.primaryIllustrationPath=current.primaryIllustrationPath||'';
         person.publicIllustrationsLoaded=current.publicIllustrationsLoaded===true;
+        const cityVideo=body.querySelector('video.city-character-portrait-video[data-character-video]');
+        if(cityVideo)cityVideo.poster=safeImage(person.image);
         if(locationModal.dataset.place===selectedPlace&&locationModal.dataset.selectedPersonIndex===selectedIndex&&card.isConnected){
           renderCityCharacterCard(person,page,mode);
         }
