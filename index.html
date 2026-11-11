@@ -6005,7 +6005,7 @@ async function compressUploadImage(file, options = {}) {
     if (!image.naturalWidth || !image.naturalHeight) throw Error('圖片尺寸無效，請換一張再試。');
 
     const targetBytes=Number(options.targetBytes)||500*1024;
-    const maxEdge=Number(options.maxEdge)||1600;
+    const maxEdge=Number(options.maxEdge)||1440;
     let scale=Math.min(1,maxEdge/Math.max(image.naturalWidth,image.naturalHeight));
     const formats=options.preserveAlpha
       ?[{type:'image/webp',qualities:[0.86,0.78,0.70,0.62,0.54]},{type:'image/png',qualities:[1]}]
@@ -6047,7 +6047,7 @@ async function compressUploadImage(file, options = {}) {
       }
       scale*=0.85;
     }
-    if(!bestBlob || bestBlob.size>2*1024*1024) {
+    if(!bestBlob || bestBlob.size>1*1024*1024) {
       throw Error('圖片壓縮後仍過大，請改選較小的圖片。');
     }
     const dataUrl=await new Promise((resolve,reject)=>{
