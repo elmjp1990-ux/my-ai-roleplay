@@ -10,6 +10,7 @@ on:
       - "scripts/test-public-comment-hydration-cache.mjs"
       - "scripts/test-owned-character-illustration-lazy-hydration.mjs"
       - "scripts/test-media-asset-optimization.mjs"
+      - "scripts/test-runtime-egress-optimizations.mjs"
       - ".github/workflows/chat-history-lazy-loading.yml"
   push:
     branches:
@@ -39,6 +40,8 @@ jobs:
         run: node scripts/test-owned-character-illustration-lazy-hydration.mjs
       - name: Test media compression and encounter-only asset loading
         run: node scripts/test-media-asset-optimization.mjs
+      - name: Test runtime egress optimizations
+        run: node scripts/test-runtime-egress-optimizations.mjs
       - name: Parse inline JavaScript in index.html
         run: |
           node <<'NODE'
