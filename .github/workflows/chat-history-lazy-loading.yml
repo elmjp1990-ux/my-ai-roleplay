@@ -5,11 +5,13 @@ on:
     paths:
       - "index.html"
       - "scripts/test-chat-history-lazy-loading.mjs"
+      - "scripts/test-public-illustration-lazy-loading.mjs"
       - ".github/workflows/chat-history-lazy-loading.yml"
   push:
     branches:
       - main
       - perf/chat-history-lazy-hydration
+      - perf/lazy-public-character-illustrations
 
 jobs:
   chat-history-lazy-loading:
@@ -21,6 +23,8 @@ jobs:
           node-version: "22"
       - name: Test bounded chat hydration and pagination
         run: node scripts/test-chat-history-lazy-loading.mjs
+      - name: Test public illustration lazy hydration
+        run: node scripts/test-public-illustration-lazy-loading.mjs
       - name: Parse inline JavaScript in index.html
         run: |
           node <<'NODE'
