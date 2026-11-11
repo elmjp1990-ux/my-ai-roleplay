@@ -21,7 +21,7 @@ assert.match(profileCompressor,/return compressed\.dataUrl/);
 
 const memoryCompressor=block("async function compressMemoryImage","function setAlbumUploadStatus");
 assert.match(memoryCompressor,/maxSide=1200,targetBytes=450\*1024/);
-assert.match(memoryCompressor,/blob\.size>1024\*1024/);
+assert.match(memoryCompressor,/bestBlob\.size>1024\*1024/);
 assert.match(memoryCompressor,/toBlob\([\s\S]*?'image\/webp'/);
 assert.match(html,/upload\(path,compressed,\{contentType:'image\/webp',upsert:false,cacheControl:'3600'\}\)/);
 
