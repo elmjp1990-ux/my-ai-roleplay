@@ -29,6 +29,16 @@ assert.match(groupOpen,/if\(group\.archived_at\)/,
 assert.doesNotMatch(groupOpen,/void groupLoadList\(true\)/,
   "opening a group must not force a full group-list/member/preview reload");
 
+const groupSend=between("async function groupSendMock()","async function groupRefreshList()");
+assert.match(groupSend,/data:turnId,error/,"group turn RPC result must retain the stable turn ID");
+assert.match(groupSend,/\.eq\('turn_id',turnId\)/,
+  "after sending, only the persisted turn's messages may be fetched");
+assert.doesNotMatch(groupSend,/\.eq\('group_id',activeGroupId\)\.is\('deleted_at',null\)\s*\.order\('created_at'/,
+  "after sending, the client must not refetch the full group history");
+assert.match(groupSend,/existingMessageIds/,"idempotent retries must not append duplicate local messages");
+assert.match(groupSend,/g\.messages=\[\.\.\.\(g\.messages\|\|\[\]\),\.\.\.newMessages\.filter/,
+  "new turn messages must append to the existing complete history");
+
 const phoneStart=html.indexOf("async function renderPhoneModal()");
 assert.notEqual(phoneStart,-1,"missing Story phone modal function");
 const phone=html.slice(phoneStart,phoneStart+18000);
@@ -38,4 +48,4 @@ assert.match(phone,/storyPhoneRuntimeCache\.get\(cacheKey\)/);
 assert.match(phone,/storyPhoneRuntimeCache\.set\(cacheKey/);
 assert.match(phone,/storyPhoneRuntimeCache\.size>100/);
 
-console.log("Story relationship RPC dedupe, group list refresh avoidance, and phone-state cache checks passed.");
+console.log("Story relationship RPC dedupe, group list refresh avoidance, incremental group-turn loading, and phone-state cache checks passed.");
