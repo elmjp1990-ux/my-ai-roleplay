@@ -6752,10 +6752,10 @@ async function groupOpen(groupId) {
       window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,background_mode,background_memory_photo_id,created_at,updated_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position'),
-      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:true}).order('sequence_no',{ascending:true}),
+      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:true}).order('sequence_no',{ascending:true})
     ]),15000,'群組資料讀取逾時，請檢查網路後重試。')
     if(requestId!==g.openRequestId) return;
-    const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error||photoRes.error;
+    const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error;
     if(error) throw error;
     if(user.id!==currentUser()?.uid) throw new Error('帳號已切換，已停止顯示先前帳號的群組。');
     const group=groupRes.data, scenes=sceneRes.data||[], memberRows=memberRes.data||[];
