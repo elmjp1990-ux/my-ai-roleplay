@@ -79,14 +79,17 @@ const cloudSave = html.slice(cloudSaveStart, cloudSaveEnd);
 assert.match(cloudSave, /if \(!s\.cloudUpdatedAt \|\| !Number\.isFinite\(Date\.parse\(s\.cloudUpdatedAt\)\)\)/);
 assert.match(cloudSave, /currentRow\.data\.updated_at !== expectedUpdatedAt/);
 assert.doesNotMatch(cloudSave, /s\.cloudUpdatedAt \|\| currentRow\.data\.updated_at/);
-assert.match(cloudSave, /select\('id,character_snapshot(?:,[^']+)?updated_at'\)/,
-  "cloud-owned session checks must fetch the updated_at compare-and-swap token");
+assert.match(cloudSave, /const currentRowFields=\[/,
+  "cloud-owned session checks must build a bounded projection for the updated_at compare-and-swap token");
+assert.match(cloudSave, /'updated_at'/, "cloud-owned session checks must fetch the updated_at compare-and-swap token");
 assert.match(cloudSave, /expectedUpdatedAt = existing\.data\.updated_at/);
 assert.match(memoryCapture, /function nextSessionUpdatedAt\(previous, now = Date\.now\(\)\)/);
 assert.match(memoryCapture, /Math\.max\(clockMs, previousMs \+ 1\)/);
 assert.match(storySession, /character_snapshot,chat_mode,deleted_at,updated_at/);
 assert.match(encounterSession, /character_snapshot,session_data,chat_mode,deleted_at,updated_at/);
-assert.match(cloudSave, /select\(s\.cloudSessionDataLoaded \? 'character_snapshot,updated_at'/,
+assert.match(cloudSave, /s\.cloudCharacterSnapshotLoaded===true\?\[\]:\['character_snapshot'\]/,
+  "already hydrated snapshots must not be fetched again during session saves");
+assert.match(cloudSave, /s\.cloudSessionDataLoaded\?\[\]:\['session_data'\]/,
   "lazy hydration may add session_data to the first cloud read while still fetching the version token");
 assert.match(cloudSave, /eq\('updated_at', expectedUpdatedAt\)/);
 assert.match(cloudSave, /s\.cloudUpdatedAt = sessionWrite\.data\.updated_at/);

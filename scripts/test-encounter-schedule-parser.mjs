@@ -32,9 +32,16 @@ assert.match(html, /createSignedUrl\(storagePath,3600\)/);
 assert.match(html, /data-character-illustration-path/);
 assert.match(html, /document\.addEventListener\('error',[\s\S]*refreshCharacterIllustrationSignedUrl/);
 assert.match(html, /document\.addEventListener\('load'/);
-assert.match(html, /image: publicAssets\?\.primary\?\.src \|\| row\.avatar_url \|\| ownerLocal\?\.image/);
-assert.match(html, /galleryIllustrations:publicAssets\?\.gallery\?\.length \? publicAssets\.gallery : \(ownerLocal\?\.galleryIllustrations \|\| \[\]\)/);
-assert.match(html, /image: ownerIllustrations\.get\(row\.id\)\?\.primary\?\.src \|\| row\.avatar_url/);
+const publicLoader = html.slice(html.indexOf("async function loadPublicSupabaseCharactersImpl()"), html.indexOf("async function loadSupabaseCharacters(user)"));
+assert.doesNotMatch(publicLoader, /loadCharacterIllustrationAssets|character_illustrations|createSignedUrl/);
+assert.match(publicLoader, /image: ownerLocal\?\.image \|\| cachedPublic\?\.image \|\| row\.avatar_url/);
+assert.match(publicLoader, /galleryIllustrations:ownerLocal\?\.galleryIllustrations \|\| cachedPublic\?\.galleryIllustrations \|\| \[\]/);
+assert.match(html, /async function hydratePublicCharacterIllustrations\(characterId\)/);
+assert.match(html, /loadCharacterIllustrationAssets\(\[characterId\]\)/);
+assert.match(html, /current\.publicIllustrationsLoaded=true/);
+assert.match(html, /route\.page==='detail'&&c\.cloudPublic===true&&!c\.owner/);
+assert.match(html, /image: ownerPrimaryIllustrations\.get\(row\.id\)\?\.primary\?\.src \|\| row\.avatar_url/);
+assert.match(html, /galleryIllustrations:local\.galleryIllustrations \|\| \[\]/);
 
 // Gallery sync must keep nextGallery in function scope for post-upload persistence and cleanup.
 assert.ok(html.includes("function retryCharacterIllustrationCleanup(userId) {"));
@@ -75,7 +82,7 @@ assert.ok(html.includes("function hydrateEncounterGalleryIllustration(characterI
 assert.ok(html.includes("正在載入角色立繪…"));
 assert.ok(html.includes("角色半立繪素材待補"));
 assert.ok(html.includes("const ownerLocal = state.characters.find(character =>"));
-assert.ok(html.includes("ownerLocal?.galleryIllustrations || []"));
+assert.ok(html.includes("ownerLocal?.galleryIllustrations || cachedPublic?.galleryIllustrations || []"));
 assert.match(html, /const halfBodyImage=dedicatedSprite\|\|sceneIllustration/);
 assert.doesNotMatch(html, /const cardPortrait=safeImage\(character\?\.image/);
 assert.match(html, /相遇模式立繪（最多 5 張）/);
@@ -110,7 +117,7 @@ assert.ok(html.includes("document.querySelectorAll('video[data-character-video]'
 assert.ok(!html.includes("function stopCharacterVideo(video){"));
 assert.ok(html.includes("document.addEventListener('visibilitychange'"));
 assert.ok(html.includes("window.addEventListener('pagehide'"));
-assert.ok(html.includes("},{rootMargin:'0px',threshold:0.01}"));
+assert.ok(html.includes("},{rootMargin:'0px',threshold:[0,0.15,0.35]}"));
  // Infinite-scroll appends only new cards so existing video DOM nodes remain attached.
 assert.ok(html.includes("function renderGrid({append=false}={})"));
 assert.ok(html.includes("const existingCardCount = append ? grid.querySelectorAll(':scope > article.card').length : 0;"));
@@ -157,7 +164,7 @@ assert.ok(html.includes("if(cleanupUserId)await retryCharacterIllustrationCleanu
 
 // Character hydration only fetches story fields consumed by the UI; avoid downloading unused story descriptions/titles.
 const minimalStorySelect = ".select('character_id, opening_message, visibility, created_at')";
-assert.equal(html.split(minimalStorySelect).length - 1, 2);
+assert.equal(html.split(minimalStorySelect).length - 1, 1);
 assert.ok(!html.includes(".select('id, character_id, story_name, description, opening_message, visibility, created_at')"));
 
 console.log("Author schedule and illustration signed-URL refresh contract tests passed.");

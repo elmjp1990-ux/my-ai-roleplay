@@ -35,8 +35,11 @@ assert.match(html, /const noticeContentHTML=\[\s*storyStateHTML,\s*storyEventHTM
 // Per-message persisted suggestions override stale session metadata on reload.
 assert.match(html, /Object\.assign\(normalized,metadata\);[\s\S]{0,260}if\(persistedSuggestions\.length===3\)normalized\.suggestedReplies=persistedSuggestions/);
 
-// Refresh the owner-checked relationship RPC after every successful Story turn.
-assert.match(html, /if\(s\.storyMode\) await loadStoryRelationshipState\(s\)/);
+// Refresh Story relationship state once through renderConversation after settlement.
+assert.match(html, /render\(\);\s*\/\/ render\(\) refreshes the Story relationship meter once through renderConversation\(\)\./);
+assert.doesNotMatch(html, /await loadStoryRelationshipState\(s\)/,
+  "settled Story turns must not issue a duplicate relationship RPC");
+assert.match(html, /function renderConversation\(\)[\s\S]*?if\s*\(s\.storyMode\)\s*void loadStoryRelationshipState\(s\)/);
 assert.match(html, /get_story_relationship_state/);
 
 // World state is generated in the same Story call, persisted after settlement,

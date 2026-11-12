@@ -5,11 +5,20 @@ on:
     paths:
       - "index.html"
       - "scripts/test-chat-history-lazy-loading.mjs"
+      - "scripts/test-public-illustration-lazy-loading.mjs"
+      - "scripts/test-character-video-visibility.mjs"
+      - "scripts/test-public-comment-hydration-cache.mjs"
+      - "scripts/test-owned-character-illustration-lazy-hydration.mjs"
+      - "scripts/test-media-asset-optimization.mjs"
+      - "scripts/test-runtime-egress-optimizations.mjs"
       - ".github/workflows/chat-history-lazy-loading.yml"
   push:
     branches:
       - main
       - perf/chat-history-lazy-hydration
+      - perf/mainline-chat-egress-lazy-snapshot
+      - perf/lazy-public-character-illustrations
+      - perf/visible-video-start-threshold
 
 jobs:
   chat-history-lazy-loading:
@@ -21,6 +30,18 @@ jobs:
           node-version: "22"
       - name: Test bounded chat hydration and pagination
         run: node scripts/test-chat-history-lazy-loading.mjs
+      - name: Test public illustration lazy hydration
+        run: node scripts/test-public-illustration-lazy-loading.mjs
+      - name: Test character video visibility threshold
+        run: node scripts/test-character-video-visibility.mjs
+      - name: Test public comment hydration cache and account isolation
+        run: node scripts/test-public-comment-hydration-cache.mjs
+      - name: Test owned-character primary-only login hydration
+        run: node scripts/test-owned-character-illustration-lazy-hydration.mjs
+      - name: Test media compression and encounter-only asset loading
+        run: node scripts/test-media-asset-optimization.mjs
+      - name: Test runtime egress optimizations
+        run: node scripts/test-runtime-egress-optimizations.mjs
       - name: Parse inline JavaScript in index.html
         run: |
           node <<'NODE'

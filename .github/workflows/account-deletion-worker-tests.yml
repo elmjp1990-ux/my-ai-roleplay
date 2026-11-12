@@ -168,8 +168,46 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/poyo_disposable
     steps:
       - uses: actions/checkout@v4
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Provide psql from the disposable PostgreSQL service container
+        shell: bash
+        run: |
+          set -euo pipefail
+          db_container="$(docker ps --filter ancestor=postgres:17 --format '{{.Names}}' | head -n1)"
+          if [[ -z "$db_container" ]]; then
+            echo "Could not identify the disposable PostgreSQL 17 service container."
+            docker ps --format 'table {{.Names}}\t{{.Image}}'
+            exit 1
+          fi
+          echo "LOCAL_DB_CONTAINER=$db_container" >> "$GITHUB_ENV"
+          docker cp "$GITHUB_WORKSPACE/." "$db_container:/workspace"
+          mkdir -p "$RUNNER_TEMP/bin"
+          cat > "$RUNNER_TEMP/bin/psql" <<'PSQL_WRAPPER'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          args=()
+          input_file=''
+          while (($#)); do
+            if [[ "$1" == "-f" ]]; then
+              input_file="$2"
+              shift 2
+            else
+              args+=("$1")
+              shift
+            fi
+          done
+          if [[ -n "$input_file" ]]; then
+            if [[ -f "$GITHUB_WORKSPACE/$input_file" ]]; then
+              remote_file="/workspace/$input_file"
+            else
+              remote_file="/tmp/$(basename "$input_file")"
+              docker cp "$input_file" "$LOCAL_DB_CONTAINER:$remote_file"
+            fi
+            exec docker exec -i -w /workspace -e PGAPPNAME="${PGAPPNAME:-}" -e PGPASSWORD="${PGPASSWORD:-}" "$LOCAL_DB_CONTAINER" psql "${args[@]}" -f "$remote_file"
+          fi
+          exec docker exec -i -w /workspace -e PGAPPNAME="${PGAPPNAME:-}" -e PGPASSWORD="${PGPASSWORD:-}" "$LOCAL_DB_CONTAINER" psql "${args[@]}"
+          PSQL_WRAPPER
+          chmod +x "$RUNNER_TEMP/bin/psql"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Bootstrap disposable Auth compatibility layer
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/disposable-platform-bootstrap.sql
       - name: Generate current-state schema fixture

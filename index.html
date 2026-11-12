@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#090d16">
 <title>PersonaX｜AI 角色世界</title>
-<link rel="icon" type="image/png" href="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBICON.png">
+<link rel="icon" type="image/webp" href="./LOGO_WEBICON.webp">
 
 <style>
 :root {
@@ -198,7 +198,6 @@ body.day .tag { color:#4f46b8; }
 .group-chat-entry .group-chat-title{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .group-chat-entry .group-chat-preview{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .group-chat-entry .group-chat-date{flex:0 0 auto;white-space:nowrap}
-.group-chat-entry .group-entry-menu-spacer{visibility:hidden;pointer-events:none;flex:0 0 auto}
 .ellipsis { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .character-avatar-status {
   position:relative;
@@ -420,13 +419,7 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .whisper-option input{width:14px;height:14px;margin:0;accent-color:#8b5cf6}
 .whisper-option small{color:var(--muted);font-size:10px}
 .comment-whisper-label{display:inline-flex;align-items:center;gap:4px;margin-left:7px;padding:2px 6px;border:1px solid #a78bfa55;border-radius:999px;color:#c4b5fd;font-size:10px}
-
-
-/* UI-02-01: premium mobile-first exploration polish */
-.explore-topline{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 4px}
 .explore-eyebrow{color:var(--muted);font-size:10px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:7px}
-.explore-title{margin:0;font-size:clamp(24px,3vw,31px);letter-spacing:-.04em}
-.explore-subtitle{margin:7px 0 0;color:var(--muted);font-size:12px}
 .explore-shortcuts{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
 .explore-shortcut{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:13px 4px 11px;border-radius:15px;background:linear-gradient(155deg,var(--panel2),var(--panel));border:1px solid var(--border);color:var(--muted);font-size:11px;transition:transform .18s ease,border-color .18s ease,background .18s ease}
 .explore-shortcut .icon{width:19px;height:19px;color:var(--text)}
@@ -434,7 +427,6 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .explore-shortcut:active{transform:scale(.97)}
 .explore-search-row{display:flex;gap:8px;align-items:center}
 .explore-search-row input{min-width:0;flex:1}
-.explore-search-row .icon-button{flex:0 0 auto;width:42px;height:42px;display:grid;place-items:center;padding:0}
 .explore-section-heading{display:flex;align-items:end;justify-content:space-between;gap:12px;margin:24px 0 12px}
 .explore-section-heading h2{margin:0;font-size:19px;letter-spacing:-.02em}
 .explore-section-heading p{margin:5px 0 0;font-size:11px;color:var(--muted)}
@@ -444,13 +436,11 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .card-image::after{content:"";position:absolute;inset:45% 0 0;pointer-events:none;background:linear-gradient(transparent,#080b12a8)}
 .card-image .image-button{display:block}
 .card-body h3{letter-spacing:-.02em}
-.card-stats{position:absolute;z-index:2;left:10px;bottom:10px;display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid #ffffff30;border-radius:999px;background:#090d16b8;color:#f8fafc;font-size:10px;backdrop-filter:blur(12px)}
 .card-image .heart,.card-image .card-chat-count{position:absolute;z-index:4;top:9px;height:29px;display:flex;align-items:center;justify-content:center;padding:0;border:0;background:transparent;color:#fff;font-size:16px;text-shadow:0 1px 4px #000b;backdrop-filter:none;box-shadow:none}
 .card-image .heart{right:9px;width:29px;font-size:19px}
 .card-image .heart.on{color:#fb7185;background:transparent}
 .card-image .card-chat-count{left:9px;right:auto;gap:4px;width:auto;min-width:0;padding:0;font-size:11px;border-radius:0;color:#fff}
 .card-image .card-chat-count svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8}
-.card-image .card-stats{display:none}
 .card-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
 .card-tags .tag{padding:4px 7px;font-size:10px}
 
@@ -506,12 +496,6 @@ body.group-chat-page:has(.group-wizard) #view {
 .chat-layout.hide-list .chat-list { display:none; }
 .chat-list { overflow-y:auto; padding:clamp(14px,2.4vw,22px); min-height:0; background:linear-gradient(180deg,var(--panel),color-mix(in srgb,var(--panel) 94%,var(--primary))); }
 .chat-entry-name{display:inline-flex;align-items:center;gap:7px;min-width:0;max-width:100%}.chat-entry-name strong{min-width:0}.chat-unread-pill{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;padding:2px 7px;border-radius:999px;background:var(--soft);border:1px solid color-mix(in srgb,var(--primary) 35%,var(--border));color:var(--primary);font-size:10px;font-weight:700;line-height:1.4;white-space:nowrap}
-.chat-list-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; }
-.chat-brand { display:inline-flex; align-items:center; gap:9px; padding:0; border:0; background:transparent; color:var(--text); font-size:18px; font-weight:800; letter-spacing:.02em; }
-.chat-brand-mark { display:grid; place-items:center; width:34px; height:34px; border-radius:12px; background:linear-gradient(135deg,#6366f1,#8b5cf6); color:white; box-shadow:0 5px 18px #6366f133; }
-.chat-list-actions { display:flex; align-items:center; gap:6px; }
-.chat-list-icon { display:grid; place-items:center; width:40px; height:40px; border:1px solid var(--border); border-radius:13px; background:var(--panel2); color:var(--text); }
-.chat-list-icon svg { width:19px; height:19px; }
 .chat-list-search { display:flex; gap:9px; margin-bottom:13px; }
 .chat-list-search input { min-width:0; width:100%; border-radius:14px; padding:12px 14px; background:var(--input); }
 .chat-list-search.collapsed { display:none; }
@@ -567,7 +551,6 @@ body.group-chat-page:has(.group-wizard) #view {
 .chat-heading .avatar { width:31px; height:31px; }
 .chat-heading button { padding:6px; }
 .chat-name { font-size:13px; font-weight:bold; }
-.chat-meta { display:none; }
 .messages { flex:1 1 0; min-height:0; overflow-y:auto; padding:20px; overscroll-behavior:contain; }
 .message { display:flex; gap:8px; margin-bottom:19px; position:relative; }
 .message.user { flex-direction:row-reverse; }
@@ -587,9 +570,6 @@ body.group-chat-page:has(.group-wizard) #view {
 .roleplay-segment.is-character .bubble { background:var(--bubble); color:var(--text); border-color:var(--border); }
 .roleplay-segment.is-temporary .bubble { background:var(--panel2); color:var(--text); border:1px dashed var(--border); }
 .roleplay-segment.is-user .bubble { background:var(--primary); color:white; border-color:transparent; }
-.roleplay-message-character .message-content { text-align:left; }
-.roleplay-message-character .message-name { text-align:left; }
-.roleplay-message-player .message-name { text-align:right; }
 .bubble {
   font-size:16px;
   padding:12px 14px;
@@ -643,7 +623,6 @@ body.group-chat-page:has(.group-wizard) #view {
 .phone-notices{margin-top:10px;padding:11px 12px;border:1px solid var(--border);border-radius:15px;background:var(--panel2);color:var(--text)}
 .phone-notices p{margin:6px 0;font-size:10px;line-height:1.65}.phone-notice-list{padding-right:3px}.phone-notice-list p{margin:4px 0;font-size:10px;line-height:1.65}
 .phone-notice-title{font-size:11px;font-weight:650;color:var(--primary);margin-bottom:7px}body:not(.day) .phone-notice-title{color:#fff}body:not(.day) .phone-battery{color:#fff!important}
-.phone-story-events{margin-top:12px;padding:9px 10px;border:1px solid #b4bfd338;border-radius:12px;background:var(--panel2)}
 .phone-story-event{padding:8px 0;border-bottom:1px solid #b4bfd326}
 .phone-story-event:last-child{border-bottom:0;padding-bottom:0}
 .phone-story-event-meta{display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;color:var(--muted);font-size:9px}
@@ -691,11 +670,6 @@ body.group-chat-page:has(.group-wizard) #view {
 .composer-icon-button .icon { width:16px; height:16px; }
 .composer-send { width:38px; height:38px; min-width:38px; padding:7px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; }
 .composer-cost{display:inline-flex;align-items:center;white-space:nowrap;font-size:12px;line-height:1.2;color:var(--muted);padding:5px 7px;border:1px solid var(--border);border-radius:999px;background:var(--surface);}
-.composer-wallet { display:flex; align-items:center; gap:8px; font-size:11px; white-space:nowrap; }
-.composer-wallet .wallet-value { display:inline-flex; align-items:center; gap:3px; }
-.composer-wallet .wallet-diamond { color:#dcad35; }
-.composer-wallet .wallet-silver { color:var(--muted); }
-.composer-wallet button { padding:0; border:0; background:transparent; font-size:11px; }
 .composer .chat-tools { display:flex; align-items:center; gap:5px; flex:1 1 auto; min-width:0; overflow-x:auto; overflow-y:hidden; margin:0; padding:0 0 2px; scrollbar-width:none; }
 .composer .chat-tools::-webkit-scrollbar { display:none; }
 .composer .chat-tools.hidden { display:none !important; }
@@ -726,9 +700,6 @@ body.group-chat-page:has(.group-wizard) #view {
 .suggestion-card-dialogue { display:-webkit-box; margin-top:2px; }
 .chat-tools { display:flex; gap:6px; overflow-x:auto; margin-top:6px; padding-bottom:2px; }
 .chat-tools button { white-space:nowrap; font-size:10px; padding:4px 7px; flex-shrink:0; }
-.reply-draft-entry { margin-top:7px; gap:8px; }
-.reply-draft-entry .reply-draft-hint { color:var(--muted); font-size:11px; line-height:1.5; }
-.reply-draft-entry button { white-space:nowrap; flex-shrink:0; background:var(--soft); border-color:#818cf866; }
 .reply-draft-editor { min-height:170px; max-height:42dvh; font-size:14px; }
 .reply-draft-notice { padding:10px 12px; border:1px solid var(--border); border-radius:12px; color:var(--muted); font-size:12px; line-height:1.7; background:var(--panel2); }
 .chat-overlay { position:absolute; inset:0; z-index:15; background:var(--header); backdrop-filter:blur(20px); padding:18px; padding-bottom:calc(18px + env(safe-area-inset-bottom)); overflow-y:auto; }
@@ -772,7 +743,6 @@ button[data-action="group-return-list"] .icon, .overlay-heading > button.ghost .
 .profile-setting small { color:var(--muted); font-size:12px; font-weight:400; }
 .profile-setting.danger { color:#ef7373; }
 .ledger-scroll { height:min(360px,44dvh); min-height:180px; overflow-y:auto; overscroll-behavior:contain; margin-top:10px; padding-right:4px; }
-.switch-row { display:flex; gap:12px; align-items:center; padding:12px 0; }
 .notice { padding:18px; border:1px solid var(--border); border-radius:16px; margin-top:12px; background:var(--panel); }
 
 /* Dialog */
@@ -838,10 +808,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .hero h1 { font-size:25px; line-height:1.3; margin:17px 0 10px; }
   .hero p { font-size:12px; line-height:1.8; margin-bottom:14px; }
   .hero .primary { font-size:12px; padding:9px 12px; }
-  .explore-topline { margin:1px 2px 13px; }
   .explore-eyebrow { font-size:9px; }
-  .explore-title { font-size:25px; }
-  .explore-subtitle { font-size:11px; }
   .explore-shortcuts { grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
   .explore-shortcut { flex-direction:row; justify-content:flex-start; padding:12px 13px; gap:9px; font-size:12px; border-radius:13px; }
   .explore-shortcut .icon { width:17px;height:17px; }
@@ -857,7 +824,6 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .card-intro { font-size:11px; line-height:1.65; min-height:36px; }
   .card-tags { gap:4px; margin-top:8px; }
   .card-tags .tag { font-size:9px; padding:4px 6px; }
-  .card-stats { left:7px;bottom:7px;font-size:9px;padding:4px 7px; }
   .card-image .heart { top:7px;right:7px;width:31px;height:31px;font-size:19px; }
 
   .grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:11px; }
@@ -909,9 +875,6 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   body.conversation .chat-list { display:none; }
   body.conversation .chat-main { height:100%; border:0; border-radius:0; }
   .chat-heading { padding:6px 8px; }
-  .chat-meta { display:flex; justify-content:flex-end; gap:7px; align-items:center; margin-top:3px; }
-  .chat-meta .wallet-button { padding:2px 6px; }
-  .chat-meta .avatar { display:none; }
   .messages { padding:14px 10px; }
   .composer { padding:5px 8px calc(5px + env(safe-area-inset-bottom)); }
   .composer-input-row textarea { height:36px; min-height:36px; padding:7px 9px; font-size:13px; }
@@ -919,8 +882,6 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .composer-bottom-right { gap:6px; }
   .composer-icon-button { width:28px; height:28px; min-width:28px; padding:4px; }
   .composer-send { width:34px; height:34px; min-width:34px; }
-  .composer-wallet { gap:6px; font-size:10px; }
-  .composer-wallet button { font-size:10px; }
   .suggestions { margin-bottom:4px; }
   .suggestions-panel > summary { min-height:30px; padding:5px 8px; font-size:11px; }
   .suggestion-options { gap:6px; padding:0 8px 4px; }
@@ -953,22 +914,9 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 .group-character-option{display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid var(--border);border-radius:12px}
 .group-character-option input{width:auto;margin-top:5px}
 .group-actions{display:flex;justify-content:space-between;gap:8px;margin-top:18px}
-.group-chat-log{display:grid;gap:10px;margin:18px 0}
-.group-bubble{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--panel2);padding:12px 14px;border-radius:13px}
-.group-bubble.user{margin-left:auto;background:#3730a3;color:#fff;max-width:88%}
-.group-bubble small{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}
 .group-alert{background:var(--soft);border:1px solid var(--border);border-radius:10px;padding:11px;color:var(--muted);font-size:13px}
 .group-scene-input-wrap{position:relative}.group-scene-input-wrap textarea{padding-right:110px}.group-inspiration{position:absolute;right:8px;top:8px;padding:6px 9px;font-size:12px;background:var(--soft);border-color:#818cf866}.group-scene-help{font-size:12px;color:var(--muted);line-height:1.7}
-.group-member-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
-.group-member-card{min-width:0;border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--panel)}
-.group-member-head{display:flex;align-items:center;gap:9px;width:100%;min-width:0;text-align:left}
-.group-member-avatar{width:48px;height:48px;flex:0 0 48px;display:grid;place-items:center;overflow:hidden;border-radius:12px;background:var(--soft);font-size:19px;font-weight:750}
-.group-member-avatar img{width:100%;height:100%;object-fit:cover}
-.group-member-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
-.group-member-details{margin-top:10px;padding-top:9px;border-top:1px solid var(--border);font-size:13px;line-height:1.65;overflow-wrap:anywhere}
-.group-member-details[hidden]{display:none}
-.group-member-card button{min-width:0}
-@media(max-width:560px){.group-panel{padding:14px}.group-steps{font-size:12px}.group-member-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.group-member-card{padding:8px}.group-member-avatar{width:40px;height:40px;flex-basis:40px;border-radius:10px}.group-member-name{font-size:13px}.group-member-head{gap:7px}}
+@media(max-width:560px){.group-panel{padding:14px}.group-steps{font-size:12px}}
 
 .group-chat-entry{width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer;border:0;background:transparent;}
 .group-chat-entry .select-chat{display:block;min-width:0;flex:1;}
@@ -1058,19 +1006,16 @@ button:not(.ghost):not(.primary):not(.danger):not(.card-chat):not(.chat-cta):hov
   color:var(--text);
   background-color:#202a41;
 }
-.chat-list,.chat-list-head,.chat-overlay {
+.chat-list,.chat-overlay {
   background-color:var(--panel);
-}
-.chat-brand-mark,.group-list-avatar,.group-avatar-fallback {
+}.group-list-avatar,.group-avatar-fallback {
   background:linear-gradient(135deg,#6256a8,#30294f);
   color:#f4f3ff;
   box-shadow:0 4px 14px #080b1260;
-}
-.chat-list-icon,.chat-top-action,.composer-icon-button {
+}.chat-top-action,.composer-icon-button {
   background:linear-gradient(145deg,#1b2440,#151c2d);
   border-color:#303b54;
-}
-.chat-list-icon:hover,.chat-top-action:hover,.composer-icon-button:hover {
+}.chat-top-action:hover,.composer-icon-button:hover {
   background:linear-gradient(145deg,#30294f,#202a41);
   border-color:#6256a8;
 }
@@ -1081,7 +1026,7 @@ input:focus,textarea:focus,select:focus {
 :where(button,a,input,textarea,select):focus-visible {
   outline-color:#a99bff;
 }
-.modal-heading,.modal-content {
+.modal-heading{
   color:var(--text);
 }
 body:not(.day) .modal,body:not(.day) dialog {
@@ -1119,7 +1064,7 @@ body.city-map-mode .app{margin-left:0!important}
 body.city-map-mode .sidebar,body.city-map-mode header{display:none!important}
 body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
 .city-map-stage{position:fixed;inset:0;width:100vw;height:100dvh;min-height:560px;overflow:hidden;background:#b9d9c5;isolation:isolate;touch-action:none;user-select:none;z-index:1}
-.city-map-world{position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:center;will-change:transform;background-image:url('https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp');background-position:center;background-size:100% 100%;background-repeat:no-repeat;overflow:visible}
+.city-map-world{position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:center;will-change:transform;background-image:url('./encounter-default-scene.webp');background-position:center;background-size:100% 100%;background-repeat:no-repeat;overflow:visible}
 .city-map-world:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#18253e12,transparent 30%,#18253e18);pointer-events:none}
 .city-map-river{display:none!important;position:absolute;left:-5%;top:28%;width:112%;height:18%;background:#8fc8df;border:12px solid #d6e6d7;border-radius:50%;transform:rotate(-12deg);box-shadow:0 0 0 8px #b4d8bf}
 .city-map-road{display:none!important;position:absolute;background:#f3e8cf;border:5px solid #fff8e8;border-radius:30px;box-shadow:0 2px 0 #8ba994}
@@ -1142,13 +1087,8 @@ body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
 .city-place-marker:focus-visible{outline:none}
 @keyframes city-marker-float{0%,100%{translate:0 0}50%{translate:0 -5px}}
 @media(prefers-reduced-motion:reduce){.city-place-marker{animation:none!important;transition:none!important}}
-
-.city-map-landmark{position:absolute;z-index:2;display:flex;flex-direction:column;align-items:center;gap:3px;transform:translate(-50%,-50%);border:2px solid #fff;background:#19233be8;color:#fff;border-radius:13px;padding:8px 9px;min-width:68px;box-shadow:0 5px 14px #203a3340;font-size:11px;font-weight:700;touch-action:manipulation}
-.city-map-landmark span{font-size:22px;line-height:1}
-.city-map-landmark:focus-visible{outline:3px solid #8b7cff;outline-offset:3px}
 .city-map-ui{position:absolute;z-index:5;inset:0;pointer-events:none;transition:opacity .18s ease}
 .city-map-ui>*{pointer-events:auto}
-.city-map-logo{position:absolute;top:calc(env(safe-area-inset-top) + 12px);left:14px;width:105px;padding:8px 11px;border:1px solid #ffffff90;border-radius:14px;background:#101726d9;color:#fff;font-weight:800;letter-spacing:.12em}
 .city-map-info{position:absolute;left:12px;top:calc(env(safe-area-inset-top) + 18px);width:min(52vw,230px);max-height:30vh;overflow:auto;padding:11px;border:1px solid #ffffffa8;border-radius:15px;background:#101726e8;color:#f4f3ff;box-shadow:0 12px 32px #172a2d30;backdrop-filter:blur(12px);font-size:11px;line-height:1.45}
 .city-map-info h2{font-size:15px;margin:0 0 4px}
 .city-map-info p{font-size:10px;line-height:1.45;margin:6px 0}
@@ -1165,7 +1105,7 @@ body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
 .city-map-empty{position:absolute;left:50%;bottom:calc(70px + env(safe-area-inset-bottom));transform:translateX(-50%);padding:6px 10px;border-radius:99px;background:#101726a8;color:#fff;font-size:10px;white-space:nowrap}
 .city-map-mode-immersive .city-map-ui{opacity:0;visibility:hidden;pointer-events:none}
 .city-map-mode-immersive .city-map-zoom,.city-map-mode-immersive .city-map-empty{opacity:0;visibility:hidden;pointer-events:none}
-@media(min-width:768px){.city-map-stage{height:calc(100dvh - 0px)}.city-map-info{left:24px;top:24px;width:230px}.city-map-logo{left:24px}.city-map-bottom{left:50%;right:auto;transform:translateX(-50%);width:min(560px,70vw)}}
+@media(min-width:768px){.city-map-stage{height:calc(100dvh - 0px)}.city-map-info{left:24px;top:24px;width:230px}.city-map-bottom{left:50%;right:auto;transform:translateX(-50%);width:min(560px,70vw)}}
 @media(max-width:380px){.city-map-info{width:54vw;padding:8px}.city-map-info h2{font-size:13px}.city-map-info p{font-size:9px}.city-map-traditional{padding:6px 3px;font-size:9px}.city-map-bottom button{font-size:9px}}
 </style>
 
@@ -1175,17 +1115,14 @@ body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
 .city-map-title img{display:block;width:clamp(88px,11vw,112px);height:auto;max-height:27px;object-fit:contain;object-position:left center}
 .city-map-title span{font-weight:650;white-space:nowrap}
 .city-map-info{background:rgba(70,76,87,.68)!important;border-color:rgba(255,255,255,.38)!important;color:#fff!important;box-shadow:0 12px 32px rgba(20,25,35,.18)!important;backdrop-filter:blur(18px) saturate(125%)!important;-webkit-backdrop-filter:blur(18px) saturate(125%)!important}
-.city-map-weather{color:rgba(255,255,255,.9)!important}
-.city-map-landmark,.city-map-zoom button,.city-map-bottom,.city-map-empty,.city-map-people{
+.city-map-weather{color:rgba(255,255,255,.9)!important}.city-map-zoom button,.city-map-bottom,.city-map-empty,.city-map-people{
  background:rgba(66,72,83,.70)!important;
  border-color:rgba(255,255,255,.38)!important;
  color:#fff!important;
  box-shadow:0 8px 24px rgba(18,24,35,.18)!important;
  backdrop-filter:blur(16px) saturate(125%)!important;
  -webkit-backdrop-filter:blur(16px) saturate(125%)!important;
-}
-.city-map-landmark{font-weight:650;border-width:1px!important}
-.city-map-landmark:active,.city-map-zoom button:active,.city-map-bottom button:active{background:rgba(45,51,62,.88)!important}
+}.city-map-zoom button:active,.city-map-bottom button:active{background:rgba(45,51,62,.88)!important}
 .city-map-traditional,.city-map-bottom button,.city-map-zoom button,.city-map-people button{
  background:rgba(82,88,99,.66)!important;
  border:1px solid rgba(255,255,255,.42)!important;
@@ -1196,7 +1133,6 @@ body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
 .city-map-bottom button.active{background:rgba(104,108,121,.88)!important}
 .city-map-info p{color:rgba(255,255,255,.91)}
 .city-map-empty{background:rgba(66,72,83,.58)!important;color:rgba(255,255,255,.96)!important}
-.city-map-logo{display:none!important}
 /* City map navigation stays available, styled as a translucent in-world glass dock. */
 .city-map-bottom{
  display:flex!important;
@@ -1316,15 +1252,15 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 <aside class="sidebar">
   <div class="sidebar-heading">
     <button class="ghost logo-button" data-action="home" aria-label="首頁">
-      <img class="logo-img" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="PersonaX">
+      <img class="logo-img" src="./LOGO_WEBLOGO.webp" alt="PersonaX">
     </button>
     <button class="ghost" data-action="collapse" aria-label="收合或展開網站選單">☰</button>
   </div>
   <nav id="desktopNav"></nav>
   <div class="sidebar-footer">
     <button class="ghost sidebar-footer-logo" data-action="home" aria-label="首頁">
-      <img class="logo-img sidebar-wordmark" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="PersonaX">
-      <img class="sidebar-iconmark" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBICON.png?v=20261024-1" alt="PersonaX">
+      <img class="logo-img sidebar-wordmark" src="./LOGO_WEBLOGO.webp" alt="PersonaX">
+      <img class="sidebar-iconmark" src="./LOGO_WEBICON.webp" alt="PersonaX">
     </button>
   </div>
 </aside>
@@ -1333,7 +1269,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
   <header>
     <div class="row">
       <button class="ghost mobile-logo" data-action="home" aria-label="首頁">
-        <img class="logo-img" src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="PersonaX">
+        <img class="logo-img" src="./LOGO_WEBLOGO.webp" alt="PersonaX">
       </button>
       <strong class="desktop-title" id="pageTitle"></strong>
     </div>
@@ -1682,6 +1618,47 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 
   // 探索頁公開角色獨立於登入帳號載入，訪客也能看見。
   // 每次登入／登出都以雲端公開清單為準，避免沿用前一個帳號的過期本機資料。
+  let publicCharacterRowsCache = null;
+  let publicCharacterRowsCacheAt = 0;
+  let publicCharacterRowsCacheVersion = 0;
+  let publicCharacterRowsInflight = null;
+  function invalidatePublicCharacterRowsCache() {
+    publicCharacterRowsCacheVersion += 1;
+    publicCharacterRowsCache = null;
+    publicCharacterRowsCacheAt = 0;
+    publicCharacterRowsInflight = null;
+  }
+  async function loadPublicCharacterRows() {
+    const client = window.mySupabase;
+    if (!client) return [];
+    const now = Date.now();
+    if (Array.isArray(publicCharacterRowsCache) && now - publicCharacterRowsCacheAt < 30000) {
+      return publicCharacterRowsCache;
+    }
+    const version = publicCharacterRowsCacheVersion;
+    if (publicCharacterRowsInflight?.version === version) return publicCharacterRowsInflight.promise;
+    const request = (async () => {
+      const { data, error } = await client
+        .from('characters')
+        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible')
+        .eq('visibility', 'public')
+        .is('deleted_at', null)
+        .order('first_published_at', { ascending: false, nullsFirst: false });
+      if (error) throw new Error(error.message);
+      const rows = Array.isArray(data) ? data : [];
+      if (version === publicCharacterRowsCacheVersion) {
+        publicCharacterRowsCache = rows;
+        publicCharacterRowsCacheAt = Date.now();
+      }
+      return rows;
+    })();
+    publicCharacterRowsInflight = { version, promise: request };
+    try {
+      return await request;
+    } finally {
+      if (publicCharacterRowsInflight?.promise === request) publicCharacterRowsInflight = null;
+    }
+  }
   let publicCharactersLoadPromise = null;
   function loadPublicSupabaseCharacters() {
     if (publicCharactersLoadPromise) return publicCharactersLoadPromise;
@@ -1693,73 +1670,40 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     const client = window.mySupabase;
     if (!client) return;
     try {
-      const { data: rows, error } = await client
-        .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible')
-        .eq('visibility', 'public')
-        .is('deleted_at', null)
-        .order('first_published_at', { ascending: false, nullsFirst: false });
-      if (error) throw new Error(error.message);
+      const rowsVersion = publicCharacterRowsCacheVersion;
+      const rows = await loadPublicCharacterRows();
+      // If a save/delete invalidated the cache while this request was in flight,
+      // discard the stale result and read the current public catalogue before hydration.
+      if (rowsVersion !== publicCharacterRowsCacheVersion) return loadPublicSupabaseCharactersImpl();
 
-      const ids = (rows || []).map(row => row.id);
-      const authorIds = [...new Set((rows || []).map(row => row.author_id).filter(Boolean))];
-      if (authorIds.length) {
-        const profileResult = await client.from('public_profiles')
-          .select('id, handle, nickname, avatar_url, bio, follower_count')
-          .in('id', authorIds);
-        if (profileResult.error) {
-          console.warn('角色作者資料載入失敗，仍繼續顯示公開角色：', profileResult.error.message);
-        }
-        for (const profile of profileResult.data || []) {
-          state.authors[profile.id] = {
-            uid:profile.id, handle:profile.handle || '',
-            nickname:profile.nickname || profile.handle || 'PersonaX 使用者',
-            avatar:profile.avatar_url || '', bio:profile.bio || '',
-            fans:Number(profile.follower_count || 0)
-          };
-        }
-      }
-      let stories = [];
-      if (ids.length) {
-        const result = await client
-          .from('character_stories')
-          .select('character_id, opening_message, visibility, created_at')
-          .in('character_id', ids)
-          .eq('visibility', 'public')
-          .order('created_at', { ascending: false });
-        if (result.error) throw new Error(result.error.message);
-        stories = result.data || [];
-      }
-      const latestStory = new Map();
-      for (const story of stories) {
-        if (!latestStory.has(story.character_id)) latestStory.set(story.character_id, story);
-      }
-
-      const publicIllustrations = await loadCharacterIllustrationAssets((rows || []).map(row=>row.id));
+      // Author profile and story opening are detail-page data; do not fetch them for every public role.
       const publicCharacters = (rows || []).map(row => {
-        const story = latestStory.get(row.id);
-        // The public and owner hydrators run concurrently. Preserve already-hydrated
-        // owner assets for the current user's own public character if the public
-        // response finishes later and has a narrower RLS-visible asset set.
+        // The owner hydrator may complete before or after this public-list request.
+        // Preserve its already-hydrated assets for the current user's own public character.
+        const cachedPublic = state.characters.find(character =>
+          character.id === row.id && character.cloudPublic === true
+        );
         const ownerLocal = state.characters.find(character =>
           character.id === row.id && character.authorId === row.author_id &&
           character.authorId === state.account?.uid
         );
-        const publicAssets = publicIllustrations.get(row.id);
         return {
           id: row.id, name: row.name || '未命名角色',
           gender: row.gender || 'ambiguous',
           age: row.age == null ? '' : String(row.age),
-          image: publicAssets?.primary?.src || row.avatar_url || ownerLocal?.image || '',
-          primaryIllustrationPath:publicAssets?.primary?.path || ownerLocal?.primaryIllustrationPath || '',
-          galleryIllustrations:publicAssets?.gallery?.length ? publicAssets.gallery : (ownerLocal?.galleryIllustrations || []),
+          // Explore cards need only the character cover/video. Full illustration assets
+          // are hydrated when a player opens this character's detail page or encounter.
+          image: ownerLocal?.image || cachedPublic?.image || row.avatar_url || '',
+          primaryIllustrationPath:ownerLocal?.primaryIllustrationPath || cachedPublic?.primaryIllustrationPath || '',
+          galleryIllustrations:ownerLocal?.galleryIllustrations || cachedPublic?.galleryIllustrations || [],
+          publicIllustrationsLoaded:ownerLocal?.publicIllustrationsLoaded === true || cachedPublic?.publicIllustrationsLoaded === true,
           avatarVideoPath:row.avatar_video_path || '', visibility: 'public',
           reviewStatus: row.review_status, intro: row.intro || '',
-          opening: story?.opening_message || '', race: row.race || '',
+          opening: ownerLocal?.opening || cachedPublic?.opening || '', race: row.race || '',
           privateInfo: '', style: row.style || '',
           personalityProfile: normalizePersonalityProfile({}),
-          phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : {},
-          nsfwWorkplaceWarning:row.nsfw_workplace_warning === true,
+          ...((ownerLocal && Object.prototype.hasOwnProperty.call(ownerLocal,'phoneSettings')) || (cachedPublic && Object.prototype.hasOwnProperty.call(cachedPublic,'phoneSettings')) ? {phoneSettings:ownerLocal?.phoneSettings ?? cachedPublic?.phoneSettings ?? {}} : {}),
+          ...((ownerLocal && Object.prototype.hasOwnProperty.call(ownerLocal,'nsfwWorkplaceWarning')) || (cachedPublic && Object.prototype.hasOwnProperty.call(cachedPublic,'nsfwWorkplaceWarning')) ? {nsfwWorkplaceWarning:(ownerLocal?.nsfwWorkplaceWarning ?? cachedPublic?.nsfwWorkplaceWarning)===true} : {}),
           isNSFW:row.is_nsfw === true,
           tags: normalizeCharacterTagsForRead(row.tags),
           authorId: row.author_id, owner: state.account?.uid === row.author_id,
@@ -1787,12 +1731,30 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     }
   }
 
+  // Concurrent login hydrators share one server-verified auth lookup per UID.
+  // This map only coalesces in-flight checks; it never caches auth beyond the request.
+  const verifiedAuthUserInflight = new Map();
+  function getVerifiedAuthUser(expectedUid) {
+    const client=window.mySupabase;
+    if(!client||!expectedUid)return Promise.resolve(null);
+    const existing=verifiedAuthUserInflight.get(expectedUid);
+    if(existing)return existing;
+    const request=client.auth.getUser().then(({data,error})=>{
+      if(error||data?.user?.id!==expectedUid)return null;
+      return data.user;
+    }).catch(()=>null).finally(()=>{
+      if(verifiedAuthUserInflight.get(expectedUid)===request)verifiedAuthUserInflight.delete(expectedUid);
+    });
+    verifiedAuthUserInflight.set(expectedUid,request);
+    return request;
+  }
+
   async function loadSupabaseCharacters(user) {
     const client = window.mySupabase;
     if (!client || !user?.id) return;
     try {
-      const { data: authResult, error: authError } = await client.auth.getUser();
-      if (authError || authResult?.user?.id !== user.id) return;
+      const verifiedUser = await getVerifiedAuthUser(user.id);
+      if (!verifiedUser) return;
 
       // 先讀取雲端角色；將此裝置上屬於目前帳號、但雲端尚不存在的舊角色補上雲端。
       // 這可修復舊版匯入只存 localStorage 的資料；不會上傳其他帳號的本機角色。
@@ -1882,8 +1844,10 @@ const ids = (rows || []).map(row => row.id);
       }
       if (state.account?.uid !== user.id) return;
       const localOwnedForMerge = state.characters.filter(c => c.authorId === user.id);
-      const ownerIllustrations = await loadCharacterIllustrationAssets(ids,user.id);
-      // 立繪查詢期間可能發生登出或切換帳號；舊帳號請求不得覆寫新帳號角色狀態。
+      // 登入時只載入每個自有角色的主立繪；附加立繪留到編輯器／相遇畫面再取用。
+      const ownerPrimaryIllustrations = await loadCharacterPrimaryIllustrationAssets(ids,user.id);
+      void retryCharacterIllustrationCleanup(user.id);
+      // 主要立繪查詢期間可能發生登出或切換帳號；舊帳號請求不得覆寫新帳號角色狀態。
       if (state.account?.uid !== user.id) return;
       const cloudCharacters = (rows || []).filter(row => !row.deleted_at).map(row => {
         const local = localOwnedForMerge.find(c => c.id === row.id) || {};
@@ -1894,9 +1858,9 @@ const ids = (rows || []).map(row => row.id);
           name: row.name || local.name || '未命名角色',
           gender: row.gender || local.gender || 'ambiguous',
           age: row.age == null ? (local.age || '') : String(row.age),
-          image: ownerIllustrations.get(row.id)?.primary?.src || row.avatar_url || local.image || '',
-          primaryIllustrationPath:ownerIllustrations.get(row.id)?.primary?.path || local.primaryIllustrationPath || '',
-          galleryIllustrations:ownerIllustrations.get(row.id)?.gallery || local.galleryIllustrations || [],
+          image: ownerPrimaryIllustrations.get(row.id)?.primary?.src || row.avatar_url || local.image || '',
+          primaryIllustrationPath:ownerPrimaryIllustrations.get(row.id)?.primary?.path || local.primaryIllustrationPath || '',
+          galleryIllustrations:local.galleryIllustrations || [],
           avatarVideoPath:row.avatar_video_path || local.avatarVideoPath || '',
           visibility: row.visibility || 'private',
           intro: row.intro ?? local.intro ?? '',
@@ -1955,7 +1919,68 @@ async function getCharacterIllustrationSignedUrl(storagePath) {
   characterIllustrationSignedUrlInflight.set(storagePath,request);
   try{return await request;}finally{characterIllustrationSignedUrlInflight.delete(storagePath);}
 }
+const memoryPhotoSignedUrlCache = new Map();
+const memoryPhotoSignedUrlInflight = new Map();
+async function getMemoryPhotoSignedUrl(storagePath) {
+  const client=window.mySupabase,uid=currentUser()?.uid||null;
+  if(!client||!uid||!storagePath)return null;
+  const key=uid+':'+storagePath,now=Date.now();
+  const cached=memoryPhotoSignedUrlCache.get(key);
+  if(cached&&cached.expiresAt>now+15000)return cached.url;
+  if(memoryPhotoSignedUrlInflight.has(key))return memoryPhotoSignedUrlInflight.get(key);
+  const request=(async()=>{
+    const {data,error}=await client.storage.from('personax-memory-photos').createSignedUrl(storagePath,300);
+    if(error||!data?.signedUrl)throw new Error(error?.message||'無法取得回憶相片網址');
+    if((currentUser()?.uid||null)!==uid)return null;
+    memoryPhotoSignedUrlCache.set(key,{url:data.signedUrl,expiresAt:Date.now()+240000});
+    while(memoryPhotoSignedUrlCache.size>250)memoryPhotoSignedUrlCache.delete(memoryPhotoSignedUrlCache.keys().next().value);
+    return data.signedUrl;
+  })();
+  memoryPhotoSignedUrlInflight.set(key,request);
+  try{return await request;}finally{
+    if(memoryPhotoSignedUrlInflight.get(key)===request)memoryPhotoSignedUrlInflight.delete(key);
+  }
+}
+function invalidateMemoryPhotoSignedUrl(storagePath,uid=currentUser()?.uid||null) {
+  if(uid&&storagePath)memoryPhotoSignedUrlCache.delete(uid+':'+storagePath);
+}
+
 const characterIllustrationMetadataInflight = new Map();
+async function loadCharacterPrimaryIllustrationAssets(characterIds, scopeUserId=null) {
+  const client=window.mySupabase;
+  const ids=[...new Set((characterIds||[]).filter(Boolean))].sort();
+  const result=new Map();
+  if(!client||!ids.length)return result;
+  const scope=scopeUserId||'public';
+  const key='primary:'+scope+':'+ids.join(',');
+  let rowsPromise=characterIllustrationMetadataInflight.get(key);
+  if(!rowsPromise){
+    rowsPromise=client.from('character_illustrations')
+      .select('id, character_id, storage_path, sort_order, display_name')
+      .in('character_id',ids)
+      .eq('asset_type','primary')
+      .order('sort_order',{ascending:true})
+      .then(({data,error})=>{
+        if(error)throw new Error('讀取角色主要立繪資料失敗：'+error.message);
+        return data||[];
+      });
+    characterIllustrationMetadataInflight.set(key,rowsPromise);
+  }
+  let rows;
+  try{rows=await rowsPromise;}finally{
+    if(characterIllustrationMetadataInflight.get(key)===rowsPromise)characterIllustrationMetadataInflight.delete(key);
+  }
+  for(const row of rows){
+    let signedUrl;
+    try{signedUrl=await getCharacterIllustrationSignedUrl(row.storage_path);}catch(_){continue;}
+    result.set(row.character_id,{
+      primary:{id:row.id,path:row.storage_path,src:signedUrl,sortOrder:row.sort_order,name:row.display_name||''},
+      gallery:[]
+    });
+  }
+  return result;
+}
+
 async function loadCharacterIllustrationAssets(characterIds, cleanupUserId=null) {
   const client=window.mySupabase;
   const ids=[...new Set((characterIds||[]).filter(Boolean))].sort();
@@ -1994,34 +2019,58 @@ async function loadCharacterIllustrationAssets(characterIds, cleanupUserId=null)
   return result;
 }
 
-// Encounter scenes can be opened before the concurrent public/owner hydration settles.
-// If the gallery is still missing, fetch its metadata on demand instead of permanently
-// showing the "素材待補" fallback. This remains RLS-scoped by the current Supabase user.
+// Encounter scenes fetch only the first gallery sprite actually displayed.
+// Do not sign the primary image or every unused gallery item just to render one sprite.
 const encounterGalleryIllustrationCache = new Map();
 const encounterGalleryIllustrationInflight = new Map();
+function applyEncounterGalleryIllustration(characterId,asset) {
+  if(!asset)return;
+  let changed=false;
+  const current=state.characters.find(character=>character.id===characterId);
+  if(current&&(!Array.isArray(current.galleryIllustrations)||!current.galleryIllustrations.length)){
+    current.galleryIllustrations=[asset];changed=true;
+  }
+  const session=currentSession();
+  if(session?.characterId===characterId&&session.cloudCharacterSnapshot&&
+     (!Array.isArray(session.cloudCharacterSnapshot.galleryIllustrations)||!session.cloudCharacterSnapshot.galleryIllustrations.length)){
+    session.cloudCharacterSnapshot.galleryIllustrations=[asset];changed=true;
+  }
+  if(changed)persist();
+}
 async function hydrateEncounterGalleryIllustration(characterId) {
   const client=window.mySupabase;
   if(!client||!characterId)return null;
   const requestUid=currentUser()?.uid||null;
   const key=(requestUid||'public')+':'+characterId;
-  if(encounterGalleryIllustrationCache.has(key))return encounterGalleryIllustrationCache.get(key);
+  const cached=encounterGalleryIllustrationCache.get(key);
+  if(cached?.asset){
+    const src=await getCharacterIllustrationSignedUrl(cached.asset.path);
+    const asset={...cached.asset,src};
+    applyEncounterGalleryIllustration(characterId,asset);
+    return asset;
+  }
+  if(cached&&!cached.asset&&cached.checkedAt>Date.now()-30000)return null;
   if(encounterGalleryIllustrationInflight.has(key))return encounterGalleryIllustrationInflight.get(key);
   const request=(async()=>{
-    const assets=await loadCharacterIllustrationAssets([characterId]);
+    const {data:row,error}=await client.from('character_illustrations')
+      .select('id,character_id,storage_path,sort_order,display_name')
+      .eq('character_id',characterId)
+      .eq('asset_type','gallery')
+      .order('sort_order',{ascending:true})
+      .limit(1)
+      .maybeSingle();
+    if(error)throw new Error('讀取相遇立繪資料失敗：'+error.message);
     if((currentUser()?.uid||null)!==requestUid)return null;
-    const gallery=assets.get(characterId)?.gallery||[];
-    const first=gallery[0]||null;
-    if(first){
-      const current=state.characters.find(character=>character.id===characterId);
-      if(current)current.galleryIllustrations=gallery;
-      const session=currentSession();
-      if(session?.characterId===characterId&&session.cloudCharacterSnapshot){
-        session.cloudCharacterSnapshot.galleryIllustrations=gallery;
-      }
-      persist();
+    if(!row){
+      encounterGalleryIllustrationCache.set(key,{asset:null,checkedAt:Date.now()});
+      return null;
     }
-    encounterGalleryIllustrationCache.set(key,first);
-    return first;
+    const src=await getCharacterIllustrationSignedUrl(row.storage_path);
+    if((currentUser()?.uid||null)!==requestUid)return null;
+    const asset={id:row.id,path:row.storage_path,src,sortOrder:row.sort_order,name:row.display_name||''};
+    encounterGalleryIllustrationCache.set(key,{asset:{...asset,src:''},checkedAt:Date.now()});
+    applyEncounterGalleryIllustration(characterId,asset);
+    return asset;
   })();
   encounterGalleryIllustrationInflight.set(key,request);
   try{return await request;}finally{
@@ -2166,6 +2215,7 @@ async function syncCharacterIllustrations(character,userId) {
   if(readError)throw new Error('讀取既有立繪失敗：'+readError.message);
   const oldPrimary=(existing||[]).find(row=>row.asset_type==='primary')||null;
   const oldGallery=(existing||[]).filter(row=>row.asset_type==='gallery');
+  const oldGalleryById=new Map(oldGallery.map(row=>[row.id,row]));
   const uploaded=[];
   const insertedGallery=[];
   let nextPrimaryPath=draftPrimaryIllustrationPath||'';
@@ -2210,8 +2260,12 @@ async function syncCharacterIllustrations(character,userId) {
   // Scope every update by both asset ID and author UID.
   for(const item of nextGallery){
     if(!item?.id)continue;
+    const expectedName=String(item.name||'').trim().slice(0,40);
+    const previous=oldGalleryById.get(item.id);
+    // New rows already received their label in INSERT; unchanged retained rows need no UPDATE.
+    if(insertedGallery.includes(item.id)||(previous&&String(previous.display_name||'')===expectedName))continue;
     const {error}=await client.from('character_illustrations')
-      .update({display_name:String(item.name||'').trim().slice(0,40),updated_at:new Date().toISOString()})
+      .update({display_name:expectedName,updated_at:new Date().toISOString()})
       .eq('id',item.id).eq('author_id',userId);
     if(error){
       if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
@@ -2318,17 +2372,89 @@ async function syncCharacterIllustrations(character,userId) {
   draftIllustrations=nextGallery;
   character.primaryIllustrationPath=nextPrimaryPath;
   character.galleryIllustrations=nextGallery.map(item=>({id:item.id,path:item.path,sortOrder:item.sortOrder,name:item.name||''}));
+  encounterGalleryIllustrationCache.delete(userId+':'+character.id);
+  encounterGalleryIllustrationCache.delete('public:'+character.id);
   return {primaryPath:nextPrimaryPath,gallery:nextGallery};
 }
 
-  async function uploadCharacterAvatarVideo(file,userId,characterId){
+async function compressCharacterAvatarVideo(file){
+  if(!file||!['video/mp4','video/webm','video/quicktime'].includes(file.type))throw new Error('影片格式僅支援 MP4、WebM 或 MOV。');
+  if(file.size>15*1024*1024)throw new Error('影片原始檔不可超過 15 MB。');
+  const sourceUrl=URL.createObjectURL(file);
+  const video=document.createElement('video');
+  video.muted=true;video.defaultMuted=true;video.playsInline=true;video.preload='metadata';
+  let stream=null,recorder=null,frameId=0,timeoutId=0;
+  try{
+    video.src=sourceUrl;
+    const metadata=await new Promise((resolve,reject)=>{
+      video.onloadedmetadata=()=>resolve({duration:video.duration,width:video.videoWidth,height:video.videoHeight});
+      video.onerror=()=>reject(new Error('無法讀取影片，請確認檔案格式。'));
+    });
+    if(!Number.isFinite(metadata.duration)||metadata.duration<=0||metadata.duration>10)throw new Error('影片長度需在 10 秒內。');
+    if(!metadata.width||!metadata.height)throw new Error('影片尺寸無效，請重新選擇。');
+    const maxEdge=Math.max(metadata.width,metadata.height);
+    // Small, already web-ready clips do not need a lossy second encode.
+    if(file.size<=1536*1024&&maxEdge<=960)return file;
+    if(typeof MediaRecorder==='undefined'||typeof MediaRecorder.isTypeSupported!=='function'||typeof HTMLCanvasElement.prototype.captureStream!=='function'){
+      throw new Error('目前瀏覽器不支援影片自動壓縮；請先將影片轉為 960px 以下、2 MB 內的 MP4 或 WebM 再上傳。');
+    }
+    const mimeType=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/mp4']
+      .find(type=>MediaRecorder.isTypeSupported(type));
+    if(!mimeType)throw new Error('目前瀏覽器沒有可用的影片壓縮格式；請先轉為 960px 以下、2 MB 內的 MP4 或 WebM。');
+    const scale=Math.min(1,960/maxEdge);
+    const width=Math.max(2,Math.round(metadata.width*scale/2)*2);
+    const height=Math.max(2,Math.round(metadata.height*scale/2)*2);
+    const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+    const ctx=canvas.getContext('2d',{alpha:false});
+    if(!ctx)throw new Error('目前裝置無法建立影片壓縮畫面。');
+    ctx.fillStyle='#000';ctx.fillRect(0,0,width,height);
+    stream=canvas.captureStream(24);
+    // Character-card videos are always muted by the player; encode only the
+    // visual track instead of uploading audio that the product never plays.
+    recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:650000});
+    const chunks=[];
+    const finished=new Promise((resolve,reject)=>{
+      recorder.ondataavailable=event=>{if(event.data?.size)chunks.push(event.data);};
+      recorder.onerror=()=>reject(new Error('影片壓縮失敗，請重新選擇影片。'));
+      recorder.onstop=()=>resolve(new Blob(chunks,{type:recorder.mimeType||mimeType}));
+    });
+    const stop=()=>{if(recorder&&recorder.state!=='inactive')recorder.stop();};
+    const drawFrame=()=>{
+      if(video.readyState>=2)ctx.drawImage(video,0,0,width,height);
+      if(!video.ended&&recorder.state==='recording')frameId=requestAnimationFrame(drawFrame);
+    };
+    video.addEventListener('ended',stop,{once:true});
+    recorder.start(250);
+    await video.play();
+    drawFrame();
+    timeoutId=setTimeout(()=>stop(),Math.ceil((metadata.duration+3)*1000));
+    const blob=await finished;
+    if(!blob.size)throw new Error('影片壓縮沒有產生有效檔案。');
+    if(blob.size>2*1024*1024)throw new Error('影片壓縮後仍超過 2 MB，請改用較短或較低解析度的影片。');
+    if(blob.size>=file.size)throw new Error('影片原檔已比壓縮結果更小，請改用 2 MB 以下、960px 以下的影片。');
+    const type=blob.type.split(';')[0];
+    const extension=type==='video/mp4'?'mp4':type==='video/webm'?'webm':'';
+    if(!extension)throw new Error('瀏覽器輸出的影片格式不受支援。');
+    return new File([blob],(file.name.replace(/\.[^.]+$/,'')||'character-video')+'.'+extension,{type,lastModified:Date.now()});
+  }finally{
+    if(timeoutId)clearTimeout(timeoutId);
+    if(frameId)cancelAnimationFrame(frameId);
+    if(recorder&&recorder.state!=='inactive'){try{recorder.stop();}catch(_){}}
+    video.pause();video.removeAttribute('src');video.load();
+    if(stream)stream.getTracks().forEach(track=>track.stop());
+    URL.revokeObjectURL(sourceUrl);
+  }
+}
+async function uploadCharacterAvatarVideo(file,userId,characterId){
   const client=window.mySupabase;
   if(!client||!userId||!characterId)throw new Error('請先登入再上傳角色影片。');
   if(file.size>15*1024*1024)throw new Error('影片不可超過 15 MB。');
-  const ext=({'video/mp4':'mp4','video/webm':'webm','video/quicktime':'mov'})[file.type];
-  if(!ext)throw new Error('影片格式僅支援 MP4、WebM 或 MOV。');
+  const optimized=await compressCharacterAvatarVideo(file);
+  if(optimized.size>2*1024*1024)throw new Error('角色影片壓縮後不可超過 2 MB。');
+  const ext=({'video/mp4':'mp4','video/webm':'webm'})[optimized.type];
+  if(!ext)throw new Error('影片壓縮格式僅支援 MP4 或 WebM。');
   const path=userId+'/'+characterId+'/'+id()+'.'+ext;
-  const {error}=await client.storage.from('character-avatar-videos').upload(path,file,{upsert:false,contentType:file.type,cacheControl:'3600'});
+  const {error}=await client.storage.from('character-avatar-videos').upload(path,optimized,{upsert:false,contentType:optimized.type,cacheControl:'3600'});
   if(error)throw new Error('角色影片上傳失敗：'+error.message);
   return path;
 }
@@ -2423,17 +2549,20 @@ function hydrateCharacterVideo(video){
       for(const entry of entries){
         const target=entry.target;
         if(!target?.isConnected)continue;
-        if(entry.isIntersecting&&!document.hidden){
+        // Start only when a meaningful portion of the card is visible.
+        // Pause as soon as it becomes mostly off-screen; keep src attached to avoid
+        // forcing a fresh media request when the user scrolls back.
+        if(entry.isIntersecting&&!document.hidden&&entry.intersectionRatio>=0.35){
           if(target.dataset.videoHydrated==='true'){if(target.paused)target.play().catch(()=>{});}
           else {
             const loadTarget=characterVideoLoaders.get(target);
             if(loadTarget)void loadTarget();
           }
-        }else if(target.dataset.videoHydrated==='true'){
+        }else if(target.dataset.videoHydrated==='true'&&entry.intersectionRatio<0.15){
           pauseCharacterVideo(target);
         }
       }
-    },{rootMargin:'0px',threshold:0.01});
+    },{rootMargin:'0px',threshold:[0,0.15,0.35]});
     video.dataset.videoObservePending='true';
     characterVideoObserver.observe(video);
   }else{
@@ -2688,6 +2817,7 @@ async function saveSupabaseCharacter(character, expectedUserId) {
 if (characterError) {
       throw new Error('角色資料寫入 Supabase 失敗：' + characterError.message);
     }
+    invalidatePublicCharacterRowsCache();
     // 隱藏設定獨立儲存，characters 公開資料列永遠不包含 privateInfo。
     const { error: privateInfoError } = await client
       .from('character_private_info')
@@ -2824,12 +2954,9 @@ if (characterError) {
 
   async function savePersonaPresets(account) {
     if (!account?.uid || !window.mySupabase) throw new Error('無法確認登入帳號或 Supabase 連線。');
+    // saveSupabaseProfile already verifies both private birthdate and persona data after the write.
+    // Reuse that verified result instead of issuing a second identical private-profile RPC.
     await saveSupabaseProfile(account);
-    const { data, error: verifyError } = await window.mySupabase.rpc('get_my_private_profile_data');
-    if (verifyError) throw new Error('驗證人設儲存結果失敗：' + verifyError.message);
-    const presets = Array.isArray(account.personas) ? account.personas : [];
-    if (!data) throw new Error('雲端沒有更新這個帳號的人設資料，請重新登入後再試。');
-    if (stablePersonaJson(data.persona_presets || []) !== stablePersonaJson(presets)) throw new Error('雲端回讀的人設內容與送出內容不一致，請重新儲存。');
   }
 
   async function loginWithGoogle() {
@@ -2990,7 +3117,7 @@ const ICON = {
   pin:svg('<path d="M9 3h6l-1 6 4 4v2H6v-2l4-4-1-6ZM12 15v7"></path>')
 };
 
-const LOGO_URL = 'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4';
+const LOGO_URL = './LOGO_WEBLOGO.webp';
 document.querySelectorAll('.logo-img').forEach(img => img.src = LOGO_URL);
 
 const seeds = [
@@ -3196,7 +3323,9 @@ const currentSession = () => state.sessions[route.id] || null;
 const currentCharacter = () => state.characters.find(c => c.id === route.id);
 function sessionCharacter(s) {
   if (!s) return null;
-  const found = s.forceCloudSnapshot ? null : state.characters.find(c => c.id === s.characterId);
+  const found = s.forceCloudSnapshot ? null : state.characters.find(c =>
+    c.id === s.characterId && !(c.cloudSnapshotOnly && s.cloudCharacterSnapshotLoaded===true)
+  );
   if (found) return found;
   const snap = s.cloudCharacterSnapshot;
   if (!snap || snap.id !== s.characterId) return null;
@@ -3395,8 +3524,13 @@ async function saveChatSessionToCloud(s, options = {}) {
   const character = state.characters.find(item => item.id === s.characterId) || null;
   let expectedUpdatedAt = null;
   if (s.cloudOwned && s.cloudOwnerUid === localUser.uid) {
+    const currentRowFields=[
+      ...(s.cloudCharacterSnapshotLoaded===true?[]:['character_snapshot']),
+      ...(s.cloudSessionDataLoaded?[]:['session_data']),
+      'updated_at'
+    ].join(',');
     const currentRow = await client.from('chat_sessions')
-      .select(s.cloudSessionDataLoaded ? 'character_snapshot,updated_at' : 'character_snapshot,session_data,updated_at')
+      .select(currentRowFields)
       .eq('id',s.id).eq('user_id',localUser.uid).is('deleted_at',null).maybeSingle();
     if (currentRow.error) throw new Error('讀取既有聊天快照失敗：'+currentRow.error.message);
     if (!currentRow.data || readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
@@ -3408,16 +3542,20 @@ async function saveChatSessionToCloud(s, options = {}) {
     if (currentRow.data.updated_at !== expectedUpdatedAt) {
       throw new Error('此聊天已在其他分頁或裝置更新，為避免覆蓋新內容，請重新載入最新聊天後再試。');
     }
-    if (currentRow.data.character_snapshot) {
-      const rawCurrentSnapshot = currentRow.data.character_snapshot;
-      const {
-        privateInfo: _legacyCurrentPrivateInfo,
-        personalityProfile: _legacyCurrentPersonalityProfile,
-        private_info: _legacyCurrentPrivateInfoSnakeCase,
-        personality_profile: _legacyCurrentPersonalityProfileSnakeCase,
-        ...safeCurrentSnapshot
-      } = rawCurrentSnapshot;
-      s.cloudCharacterSnapshot = safeCurrentSnapshot;
+    if(s.cloudCharacterSnapshotLoaded!==true){
+      if(currentRow.data.character_snapshot&&typeof currentRow.data.character_snapshot==='object'){
+        const rawCurrentSnapshot = currentRow.data.character_snapshot;
+        const {
+          privateInfo: _legacyCurrentPrivateInfo,
+          personalityProfile: _legacyCurrentPersonalityProfile,
+          private_info: _legacyCurrentPrivateInfoSnakeCase,
+          personality_profile: _legacyCurrentPersonalityProfileSnakeCase,
+          ...safeCurrentSnapshot
+        } = rawCurrentSnapshot;
+        s.cloudCharacterSnapshot = safeCurrentSnapshot;
+      }
+      s.cloudCharacterSnapshotLoaded=true;
+      s.cloudSnapshotNeedsRepair=!currentRow.data.character_snapshot?.id;
     }
     if (!s.cloudSessionDataLoaded) {
       const savedData=currentRow.data.session_data&&typeof currentRow.data.session_data==='object'?currentRow.data.session_data:{};
@@ -3534,9 +3672,11 @@ async function saveChatSessionToCloud(s, options = {}) {
     id:s.id, user_id:localUser.uid, character_id:s.characterId,
     character_name:snapshot.name,
     status:s.archived ? 'archived' : 'active',
-    character_snapshot:snapshot, session_data:chatSessionData(s),
+    session_data:chatSessionData(s),
     updated_at:rowTimestamp.toISOString()
   };
+  // Historical snapshots are immutable; only insert or repair a missing legacy snapshot.
+  if (!s.cloudOwned || s.cloudSnapshotNeedsRepair===true || !priorSnapshot.id) row.character_snapshot=snapshot;
   let sessionWrite;
   if (s.cloudOwned && s.cloudOwnerUid === localUser.uid) {
     // 已存在的聊天使用 UPDATE；即使角色已下架，也可繼續保存原有劇情。
@@ -3561,10 +3701,12 @@ async function saveChatSessionToCloud(s, options = {}) {
   if (readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
   s.cloudOwned = true;
   s.cloudOwnerUid = localUser.uid;
-  s.cloudCharacterSnapshot = snapshot;
+  s.cloudCharacterSnapshot = priorSnapshot.id ? priorSnapshot : snapshot;
+  s.cloudCharacterSnapshotLoaded=true;
+  s.cloudSnapshotNeedsRepair=false;
   // Client writes only player messages. Assistant rows are inserted by the trusted
   // chat-turn Edge Function; the database trigger intentionally rejects client writes.
-  const messages = (s.messages || []).filter(m => m.role === 'user' && isUuid(m.id)).map(m => ({
+  const messages = (s.messages || []).filter(m => m.role === 'user' && isUuid(m.id) && m.cloudSynced !== true).map(m => ({
     id:m.id, session_id:s.id, role:'user',
     content:String(m.text ?? ''), created_at:new Date(Number(m.at) || Date.now()).toISOString()
   }));
@@ -3576,6 +3718,8 @@ async function saveChatSessionToCloud(s, options = {}) {
     if (!Array.isArray(savedMessages) || savedMessages.length !== messages.length) {
       throw new Error('資料庫回報的已儲存訊息數量不符；請重新整理確認，勿視為同步完成。');
     }
+    const savedUserMessageIds=new Set(savedMessages.map(message=>message.id));
+    for(const message of s.messages||[]){if(savedUserMessageIds.has(message.id))message.cloudSynced=true;}
     if (readDeletedChatTombstones(localUser.uid).sessions[s.id]) return false;
   }
   return true;
@@ -3594,6 +3738,8 @@ async function loadChatSessionAuthorProfiles(uid, authorIds) {
         nickname:profile.nickname||profile.handle||'PersonaX 使用者',
         avatar:profile.avatar_url||'',bio:profile.bio||'',fans:Number(profile.follower_count||0)
       };
+      // Reuse this complete public-profile result if the same author page is opened later.
+      publicAuthorProfileLoaded.add(profile.id);
     }
   }catch(error){console.warn('既有聊天作者資料載入失敗：',error?.message||error);}
 }
@@ -3604,11 +3750,14 @@ async function loadCloudChatSessions(user, options = {}) {
   const onlySessionId = options.onlySessionId || null;
   const syncStartedAt = Date.now();
   try {
-    const { data: authResult, error: authError } = await client.auth.getUser();
-    if (authError || authResult?.user?.id !== user.id) return;
+    const verifiedUser = await getVerifiedAuthUser(user.id);
+    if (!verifiedUser) return;
     let sessionQuery = client.from('chat_sessions')
       .select([
-        'id,user_id,character_id,character_name,status,chat_mode,created_at,updated_at,character_snapshot',
+        'id,user_id,character_id,character_name,status,chat_mode,created_at,updated_at',
+        'character_snapshot_id:character_snapshot->>id',
+        'character_snapshot_author_id:character_snapshot->>authorId',
+        'character_snapshot_opening:character_snapshot->>opening',
         'session_name:session_data->>name','session_archived:session_data->>archived',
         'session_hidden:session_data->>hidden','session_pinned:session_data->>pinned',
         'session_archived_at:session_data->>archivedAt',
@@ -3640,9 +3789,7 @@ async function loadCloudChatSessions(user, options = {}) {
       if (changed) { persist(); render(); }
       return;
     }
-    const snapshotAuthorIds = [...new Set(sessions
-      .map(row => row.character_snapshot && typeof row.character_snapshot === 'object' ? row.character_snapshot.authorId : null)
-      .filter(Boolean))];
+    const snapshotAuthorIds = [...new Set(sessions.map(row => row.character_snapshot_author_id).filter(Boolean))];
     // Public author profiles are secondary to the chat list; fetch them in the background
     // so a slow profile query cannot block the session list or first conversation render.
     if (snapshotAuthorIds.length) void loadChatSessionAuthorProfiles(user.id, snapshotAuthorIds);
@@ -3658,23 +3805,16 @@ async function loadCloudChatSessions(user, options = {}) {
     const parseBool = value => value === true || value === 'true';
     for (const row of sessions) {
       if (!isUuid(row.id) || !isUuid(row.character_id)) continue;
-      const rawSnapshot = row.character_snapshot && typeof row.character_snapshot === 'object' ? row.character_snapshot : {};
-      // Never hydrate author-only fields from legacy chat snapshots into player-visible client state.
-      const {
-        privateInfo: _legacyPrivateInfo,
-        personalityProfile: _legacyPersonalityProfile,
-        private_info: _legacyPrivateInfoSnakeCase,
-        personality_profile: _legacyPersonalityProfileSnakeCase,
-        ...snapshot
-      } = rawSnapshot;
-      if (snapshot.id && snapshot.id !== row.character_id) {
+      if (row.character_snapshot_id && row.character_snapshot_id !== row.character_id) {
         console.error('雲端聊天角色快照 ID 不一致，已略過此聊天：', row.id); continue;
       }
+      // The chat list uses compact metadata; hydrate the full image-heavy snapshot only on open.
+      const snapshot = {id:row.character_id,name:row.character_name||'角色',authorId:row.character_snapshot_author_id||'',visibility:'private',reviewStatus:'draft'};
       const existing = state.sessions[row.id];
       const opening = row.session_opening_message && typeof row.session_opening_message === 'object'
         ? row.session_opening_message
-        : existing?.initialOpeningMessage || (String(snapshot.opening || '').trim()
-          ? {text:String(snapshot.opening),at:row.created_at ? new Date(row.created_at).getTime() : Date.now()}
+        : existing?.initialOpeningMessage || (String(row.character_snapshot_opening || '').trim()
+          ? {text:String(row.character_snapshot_opening),at:row.created_at ? new Date(row.created_at).getTime() : Date.now()}
           : null);
       const pending = row.session_pending_turn && typeof row.session_pending_turn === 'object'
         ? row.session_pending_turn : null;
@@ -3719,7 +3859,11 @@ async function loadCloudChatSessions(user, options = {}) {
         cloudHasUserMessage, cloudSessionDataLoaded:false, cloudMessagesLoaded:false,
         cloudHasMoreMessages:false, cloudOldestMessageCursor:null,
         cloudMessagesLoading:false, cloudMessagesError:'',
-        cloudOwned:true, cloudOwnerUid:user.id, cloudCharacterSnapshot:snapshot, cloudUpdatedAt:row.updated_at || null
+        cloudOwned:true, cloudOwnerUid:user.id,
+        cloudCharacterSnapshot:existing?.cloudCharacterSnapshotLoaded===true?existing.cloudCharacterSnapshot:snapshot,
+        cloudCharacterSnapshotLoaded:existing?.cloudCharacterSnapshotLoaded===true,
+        cloudSnapshotNeedsRepair:!row.character_snapshot_id,
+        cloudUpdatedAt:row.updated_at || null
       };
       // Drop stale in-memory history tails too; the full transcript is fetched on demand.
       state.sessions[row.id]=compactCloudSessionForLocalStorage(state.sessions[row.id]);
@@ -3768,10 +3912,12 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
   try {
     const { data: authResult, error: authError } = await client.auth.getUser();
     if (authError || authResult?.user?.id !== userId || currentUser()?.uid !== userId) throw new Error('登入狀態已變更，請重新登入。');
+    const snapshotRequested=!older&&session.cloudCharacterSnapshotLoaded!==true;
+    const sessionColumns=older
+      ? 'id,user_id,character_id,chat_mode,status'
+      : ['id,user_id,character_id,chat_mode,status','session_data','updated_at',...(snapshotRequested?['character_snapshot']:[])].join(',');
     let sessionRowQuery=client.from('chat_sessions')
-      .select(older
-        ? 'id,user_id,character_id,chat_mode,status,character_snapshot'
-        : 'id,user_id,character_id,chat_mode,status,character_snapshot,session_data,updated_at')
+      .select(sessionColumns)
       .eq('id', sessionId).eq('user_id', userId).is('deleted_at', null);
     const { data: row, error: sessionError } = await sessionRowQuery.maybeSingle();
     if (sessionError) throw new Error(sessionError.message);
@@ -3815,16 +3961,20 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
       session.cloudSessionDataLoaded=true;
       if(session.cloudHasUserMessage==null&&typeof data.hasUserMessage==='boolean')session.cloudHasUserMessage=data.hasUserMessage;
     }
-    if(row.character_snapshot){
-      const rawSnapshot=row.character_snapshot;
-      const {
-        privateInfo:_legacyPrivateInfo,
-        personalityProfile:_legacyPersonalityProfile,
-        private_info:_legacyPrivateInfoSnakeCase,
-        personality_profile:_legacyPersonalityProfileSnakeCase,
-        ...safeSnapshot
-      }=rawSnapshot;
-      session.cloudCharacterSnapshot=safeSnapshot;
+    if(snapshotRequested){
+      if(row.character_snapshot&&typeof row.character_snapshot==='object'){
+        const rawSnapshot=row.character_snapshot;
+        const {
+          privateInfo:_legacyPrivateInfo,
+          personalityProfile:_legacyPersonalityProfile,
+          private_info:_legacyPrivateInfoSnakeCase,
+          personality_profile:_legacyPersonalityProfileSnakeCase,
+          ...safeSnapshot
+        }=rawSnapshot;
+        session.cloudCharacterSnapshot=safeSnapshot;
+      }
+      session.cloudCharacterSnapshotLoaded=true;
+      session.cloudSnapshotNeedsRepair=!row.character_snapshot?.id;
     }
     const roleplayMeta=session.cloudRoleplayMeta||{};
     const pageSize=50;
@@ -3845,7 +3995,7 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
       return false;
     }
     const cloudMessages=(rows||[]).slice().reverse().map(message=>{
-      const normalized={id:message.id,role:message.role==='user'?'user':'assistant',text:message.content||'',at:message.created_at?new Date(message.created_at).getTime():Date.now()};
+      const normalized={id:message.id,role:message.role==='user'?'user':'assistant',text:message.content||'',at:message.created_at?new Date(message.created_at).getTime():Date.now(),cloudSynced:true};
       const persistedSuggestions=Array.isArray(message.suggested_replies)?message.suggested_replies.map(value=>String(value||'').trim()).filter(value=>value.length>0).slice(0,3):[];
       const metadata=roleplayMeta[message.id];if(metadata&&typeof metadata==='object')Object.assign(normalized,metadata);
       // The per-message database column is authoritative; stale session metadata
@@ -3904,7 +4054,8 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
     persist();
     if(clearedOrphanedPendingTurn)void saveChatSessionSafely(session);
     if(route.page==='conversation'&&route.id===sessionId){
-      renderMessages(!older);
+      if(snapshotRequested)renderConversation();
+      else renderMessages(!older);
       if(!older){
         const suggestionHost=$('conversationSuggestions');
         if(suggestionHost)suggestionHost.innerHTML=conversationSuggestionsHTML(session);
@@ -3945,6 +4096,8 @@ async function saveChatSessionSafely(s) {
         target.cloudOwnerUid = snapshot.cloudOwnerUid;
         target.cloudCharacterSnapshot = snapshot.cloudCharacterSnapshot;
         target.cloudUpdatedAt = snapshot.cloudUpdatedAt;
+        const syncedUserMessageIds=new Set((snapshot.messages||[]).filter(message=>message.role==='user'&&message.cloudSynced===true).map(message=>message.id));
+        if(syncedUserMessageIds.size)target.messages=(target.messages||[]).map(message=>syncedUserMessageIds.has(message.id)?{...message,cloudSynced:true}:message);
         memoryMutationTracker?.markSaved(s.id, snapshot.memories);
       }
       return saved;
@@ -4242,10 +4395,9 @@ async function executePendingChatTurn(s) {
 
   persist();
   render();
-  // The Edge Function applies the affinity evaluation after charge settlement.
-  // Re-read the owner-checked relationship RPC after every successful Story turn
-  // so the in-chat meter cannot remain stale until the next navigation.
-  if(s.storyMode) await loadStoryRelationshipState(s);
+  // render() refreshes the Story relationship meter once through renderConversation().
+  // Avoid issuing a second owner-checked relationship RPC for the same settled turn.
+  if(s.storyMode) storyPhoneRuntimeCache.delete(String(user.uid||'')+':'+s.id);
   await refreshWalletBalance();
 
   // The server has already durably saved and settled the assistant reply.
@@ -4653,6 +4805,7 @@ function render() {
     case 'album':renderChatAlbumPage();break;
   }
   restoreCharacterCardVideos($('view'),previousCardVideos);
+  observePublicCharacterIllustrationCards($('view'));
   if (route.overlay) renderModal(route.overlay);
   updateCharacterCounters($('view'));
   // 公開卡片影片需取得私有儲存桶的短效簽名 URL，並在畫面渲染後啟動靜音循環播放。
@@ -4765,7 +4918,7 @@ function card(c,owner = false) {
       <div class="card-image">
         <button class="image-button" data-action="detail" data-id="${e(c.id)}"
                 aria-label="查看${e(c.name)}">
-          ${c.avatarVideoPath ? `<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline preload="none" aria-label="${e(c.name)}影片預覽"></video>` : `<img src="${e(safeImage(c.image))}" ${c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath)+'"' : ''} alt="${e(c.name)}" loading="lazy">`}
+          ${c.avatarVideoPath ? `<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline preload="none" aria-label="${e(c.name)}影片預覽"></video>` : `<img src="${e(safeImage(c.image))}" ${c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath)+'"' : ''} ${c.cloudPublic===true&&!c.owner&&c.publicIllustrationsLoaded!==true ? 'data-character-primary-illustration="'+e(c.id)+'"' : ''} alt="${e(c.name)}" loading="lazy">`}
         </button>
         ${c.deletedAt ? '' : `<span class="card-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(initialTurnCount)}" title="對話回合數">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
@@ -4799,6 +4952,7 @@ function card(c,owner = false) {
 function renderGrid({append=false}={}) {
   if (!$('characterGrid')) return;
   gridObserver?.disconnect();
+  publicCharacterIllustrationObserver?.disconnect();
   const list = exploreList();
   const recommended = filter === 'recommended';
   const maximum = Math.min(150,list.length);
@@ -4844,6 +4998,7 @@ function renderGrid({append=false}={}) {
   }
   // Also hydrate newly appended cards; existing hydrated elements are guarded.
   grid.querySelectorAll('video[data-character-video]').forEach(video => void hydrateCharacterVideo(video));
+  observePublicCharacterIllustrationCards(grid);
   void loadCharacterTurnCounts(shown.map(c => c.id));
   document.querySelectorAll('.explore-shortcut[data-filter]').forEach(button => {
     button.classList.toggle('active', button.dataset.filter === filter);
@@ -4873,6 +5028,166 @@ function renderGrid({append=false}={}) {
     },{rootMargin:'150px'});
     gridObserver.observe($('loadSentinel'));
   }
+}
+
+async function loadPublicCharacterPrimaryIllustration(characterId) {
+  const client=window.mySupabase;
+  if(!client||!characterId)return null;
+  const {data,error}=await client.from('character_illustrations')
+    .select('id,character_id,storage_path,sort_order,display_name')
+    .eq('character_id',characterId)
+    .eq('asset_type','primary')
+    .order('sort_order',{ascending:true})
+    .limit(1);
+  if(error)throw new Error('讀取角色主立繪資料失敗：'+error.message);
+  const row=data?.[0];
+  if(!row?.storage_path)return null;
+  const src=await getCharacterIllustrationSignedUrl(row.storage_path);
+  return {id:row.id,path:row.storage_path,src,sortOrder:row.sort_order,name:row.display_name||''};
+}
+const publicCharacterIllustrationHydration = new Map();
+const publicCharacterDetailMetadataInflight = new Map();
+const publicCharacterStoryOpeningLoaded = new Set();
+const publicAuthorProfileInflight = new Map();
+const publicAuthorProfileLoaded = new Set();
+async function hydratePublicAuthorProfile(authorId) {
+  const client=window.mySupabase;
+  if(!client||!authorId||publicAuthorProfileLoaded.has(authorId))return;
+  if(publicAuthorProfileInflight.has(authorId))return publicAuthorProfileInflight.get(authorId);
+  const request=(async()=>{
+    const {data,error}=await client.from('public_profiles')
+      .select('id,handle,nickname,avatar_url,bio,follower_count')
+      .eq('id',authorId)
+      .maybeSingle();
+    if(error)throw error;
+    publicAuthorProfileLoaded.add(authorId);
+    if(!data){if(route?.page==='author'&&route.id===authorId)renderAuthor();return;}
+    state.authors[authorId]={
+      ...(state.authors[authorId]||{}),
+      uid:data.id,handle:data.handle||'',
+      nickname:data.nickname||data.handle||'PersonaX 使用者',
+      avatar:data.avatar_url||'',bio:data.bio||'',
+      fans:Number(data.follower_count||0)
+    };
+    persist();
+    if(route?.page==='author'&&route.id===authorId)renderAuthor();
+    if(route?.page==='detail'){
+      const character=state.characters.find(item=>item.id===route.id);
+      const authorNode=document.querySelector('[data-character-author-name]');
+      if(character?.authorId===authorId&&authorNode)authorNode.textContent='BY @'+author(authorId).nickname;
+    }
+  })().catch(error=>{
+    console.warn('作者公開資料延遲載入失敗：',error?.message||error);
+  });
+  publicAuthorProfileInflight.set(authorId,request);
+  try{return await request;}finally{
+    if(publicAuthorProfileInflight.get(authorId)===request)publicAuthorProfileInflight.delete(authorId);
+  }
+}
+async function hydratePublicCharacterDetailMetadata(characterId) {
+  const existing=state.characters.find(character=>character.id===characterId);
+  const client=window.mySupabase;
+  if(!existing||!client||publicCharacterStoryOpeningLoaded.has(characterId))return;
+  if(publicCharacterDetailMetadataInflight.has(characterId))return publicCharacterDetailMetadataInflight.get(characterId);
+  const request=(async()=>{
+    const [storyResult,characterResult]=await Promise.all([
+      client.from('character_stories')
+        .select('opening_message')
+        .eq('character_id',characterId)
+        .eq('visibility','public')
+        .order('created_at',{ascending:false})
+        .limit(1)
+        .maybeSingle(),
+      client.from('characters')
+        .select('phone_settings,nsfw_workplace_warning')
+        .eq('id',characterId)
+        .eq('visibility','public')
+        .is('deleted_at',null)
+        .maybeSingle()
+    ]);
+    if(storyResult.error)throw storyResult.error;
+    if(characterResult.error)throw characterResult.error;
+    const current=state.characters.find(character=>character.id===characterId);
+    if(!current)return;
+    current.opening=storyResult.data?.opening_message||'';
+    current.phoneSettings=characterResult.data?.phone_settings&&typeof characterResult.data.phone_settings==='object'
+      ?characterResult.data.phone_settings:{};
+    current.nsfwWorkplaceWarning=characterResult.data?.nsfw_workplace_warning===true;
+    publicCharacterStoryOpeningLoaded.add(characterId);
+    persist();
+    if(route?.page==='detail'&&route.id===characterId){
+      const opening=document.querySelector('[data-character-opening]');
+      if(opening)opening.textContent=replaceRoleplayVariables(current.opening,currentUser()?.nickname||'你',current.name);
+    }
+  })().catch(error=>{
+    console.warn('角色開場白延遲載入失敗：',error?.message||error);
+  });
+  publicCharacterDetailMetadataInflight.set(characterId,request);
+  try{return await request;}finally{
+    if(publicCharacterDetailMetadataInflight.get(characterId)===request)publicCharacterDetailMetadataInflight.delete(characterId);
+  }
+}
+
+async function hydratePublicCharacterIllustrations(characterId) {
+  const existing=state.characters.find(character=>character.id===characterId);
+  if(!existing||existing.publicIllustrationsLoaded===true||!window.mySupabase)return;
+  if(publicCharacterIllustrationHydration.has(characterId))return publicCharacterIllustrationHydration.get(characterId);
+  const request=(async()=>{
+    const primary=await loadPublicCharacterPrimaryIllustration(characterId);
+    const current=state.characters.find(character=>character.id===characterId);
+    if(!current)return;
+    if(primary){
+      current.image=primary.src;
+      current.primaryIllustrationPath=primary.path;
+    }
+    current.publicIllustrationsLoaded=true;
+    persist();
+    document.querySelectorAll('img[data-character-primary-illustration]').forEach(image=>{
+      if(image.dataset.characterPrimaryIllustration!==characterId)return;
+      if(primary?.path)image.dataset.characterIllustrationPath=primary.path;
+      image.src=safeImage(current.image);
+      image.removeAttribute('data-character-primary-illustration');
+    });
+    if(route?.page==='detail'&&route.id===characterId){
+      const image=document.querySelector('.detail-portrait .detail-image');
+      if(image){
+        if(image.tagName==='IMG'){
+          if(primary?.path)image.dataset.characterIllustrationPath=primary.path;
+          image.src=safeImage(current.image);
+        }else if(image.tagName==='VIDEO'){
+          image.poster=safeImage(current.image);
+        }
+      }
+    }
+  })().catch(error=>{
+    console.warn('角色詳情主立繪延遲載入失敗：',error?.message||error);
+  });
+  publicCharacterIllustrationHydration.set(characterId,request);
+  try{return await request;}finally{
+    if(publicCharacterIllustrationHydration.get(characterId)===request)publicCharacterIllustrationHydration.delete(characterId);
+  }
+}
+
+let publicCharacterIllustrationObserver=null;
+function observePublicCharacterIllustrationCards(root) {
+  if(!root)return;
+  const images=root.querySelectorAll('img[data-character-primary-illustration]');
+  if(!images.length)return;
+  if(!('IntersectionObserver' in window)){
+    images.forEach(image=>void hydratePublicCharacterIllustrations(image.dataset.characterPrimaryIllustration));
+    return;
+  }
+  if(!publicCharacterIllustrationObserver){
+    publicCharacterIllustrationObserver=new IntersectionObserver(entries=>{
+      entries.forEach(entry=>{
+        if(!entry.isIntersecting)return;
+        const image=entry.target;
+        publicCharacterIllustrationObserver.unobserve(image);
+        void hydratePublicCharacterIllustrations(image.dataset.characterPrimaryIllustration);
+      });
+    },{rootMargin:'300px'});
+  }
+  images.forEach(image=>publicCharacterIllustrationObserver.observe(image));
 }
 
 /* Detail, author and comments */
@@ -4918,7 +5233,7 @@ function renderDetail() {
 ${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline-image' : ''}" data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline aria-label="${e(c.name)} 的角色影片"></video>` : `<img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" ${c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath)+'"' : ''} alt="${e(c.name)}">`}
           <div class="detail-portrait-meta">
             <h1>${e(c.name)}</h1>
-            ${c.authorId ? `<button class="author-link" data-action="author" data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>` : `<span class="small muted">BY ${e(creatorAttribution)}</span>`}
+            ${c.authorId ? `<button class="author-link" data-action="author" data-character-author-name data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>` : `<span class="small muted">BY ${e(creatorAttribution)}</span>`}
             ${c.deletedAt ? '' : `<div class="detail-chat-count" data-character-turn-count="${e(c.id)}" aria-label="對話回合數 ${e(c.chats || 0)}" title="對話回合數">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-9.5A7.5 7.5 0 0 1 10.5 4h2A7.5 7.5 0 0 1 20 11.5Z"/><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none"/></svg>
               <span>${e(c.chats || 0)}</span>
@@ -4931,7 +5246,7 @@ ${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline
           <div><h3>角色介紹</h3><div class="prose">${e(replaceRoleplayVariables(c.intro, currentUser()?.nickname || '你', c.name))}</div></div>
           <div class="row wrap">${(c.tags || []).map(tagButton).join('')}</div>
            ${c.isNSFW === true ? '<div class="nsfw-card-badge nsfw-detail-badge" aria-label="成人敏感內容，限 18 歲以上">18+ NSFW</div>' : ''}
-          <div><h3>開場白</h3><div class="prose muted">${e(replaceRoleplayVariables(c.opening, currentUser()?.nickname || '你', c.name))}</div></div>
+          <div><h3>開場白</h3><div class="prose muted" data-character-opening>${e(replaceRoleplayVariables(c.opening, currentUser()?.nickname || '你', c.name))}</div></div>
           ${offline
             ? '<div class="character-status-label"><span class="character-status-dot" style="position:static;background:#8993a4"></span>離線／已下架</div>'
             : `<div class="row wrap">
@@ -4970,6 +5285,11 @@ ${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline
     releaseCharacterVideo(previousDetailVideo);
   }
   if(detailVideo)void hydrateCharacterVideo(detailVideo);
+  if(route.page==='detail'&&c.cloudPublic===true&&!c.owner){
+    if(c.publicIllustrationsLoaded!==true)void hydratePublicCharacterIllustrations(c.id);
+    void hydratePublicCharacterDetailMetadata(c.id);
+    if(c.authorId)void hydratePublicAuthorProfile(c.authorId);
+  }
   void loadCharacterTurnCounts([c.id]);
   if (!offline && route.page !== 'session-detail') {
     renderComments();
@@ -5043,9 +5363,22 @@ function updateCharacterTurnCountElements(characterId,count) {
   });
 }
 
-async function loadCloudComments(characterId) {
+const CLOUD_COMMENT_CACHE_TTL_MS = 30_000;
+const cloudCommentHydrationCache = new Map();
+const cloudCommentHydrationInflight = new Map();
+async function loadCloudComments(characterId,{force=false}={}) {
   const client=window.mySupabase;
   if(!client||!characterId)return;
+  const requestUid=currentUser()?.uid||null;
+  const cacheKey=(requestUid||'anonymous')+':'+characterId;
+  const cached=cloudCommentHydrationCache.get(cacheKey);
+  if(!force&&cached&&Date.now()-cached.loadedAt<CLOUD_COMMENT_CACHE_TTL_MS){
+    state.comments[characterId]=cached.rows;
+    if(route.page==='detail'&&route.id===characterId)renderComments();
+    return;
+  }
+  if(cloudCommentHydrationInflight.has(cacheKey))return cloudCommentHydrationInflight.get(cacheKey);
+  const request=(async()=>{
   try {
     const {data:rows,error}=await client.rpc('get_character_comments_safe',{p_character_id:characterId});
     if(error)throw error;
@@ -5079,13 +5412,19 @@ async function loadCloudComments(characterId) {
       at:Date.parse(row.created_at)||Date.now(),
       likes:likes.filter(item=>item.comment_id===row.id).map(item=>item.user_id),cloud:true
     }));
-    if(route.page!=='detail'||route.id!==characterId)return;
+    if(currentUser()?.uid!==requestUid||route.page!=='detail'||route.id!==characterId)return;
     state.comments[characterId]=mapped;
+    cloudCommentHydrationCache.set(cacheKey,{loadedAt:Date.now(),rows:mapped});
     renderComments();
   } catch(error) {
     console.error('PersonaX 雲端評論載入失敗：',error);
     const target=$('comments');
     if(target&&route.id===characterId)target.innerHTML='<div class="empty">雲端評論載入失敗，請重新整理或稍後再試。</div>';
+  }
+  })();
+  cloudCommentHydrationInflight.set(cacheKey,request);
+  try{return await request;}finally{
+    if(cloudCommentHydrationInflight.get(cacheKey)===request)cloudCommentHydrationInflight.delete(cacheKey);
   }
 }
 
@@ -5097,6 +5436,10 @@ function renderComments() {
   }
   if (!$('comments')) return;
   const allComments = state.comments[route.id] || [];
+  const cacheUid=currentUser()?.uid||null;
+  const cacheKey=(cacheUid||'anonymous')+':'+route.id;
+  const cached=cloudCommentHydrationCache.get(cacheKey);
+  if(cached)cached.rows=allComments;
   const character = currentCharacter();
   const uid = currentUser()?.uid;
   const list = allComments;
@@ -5133,7 +5476,9 @@ async function refreshAuthorFollowState(authorId) {
     const [followResult, profileResult, followerCountResult] = await Promise.all([
       client.from('author_follows').select('author_id')
         .eq('follower_id', user.uid).eq('author_id', authorId).maybeSingle(),
-      client.from('public_profiles').select('follower_count').eq('id', authorId).maybeSingle(),
+      publicAuthorProfileLoaded.has(authorId)
+        ? Promise.resolve({data:null,error:null})
+        : client.from('public_profiles').select('follower_count').eq('id', authorId).maybeSingle(),
       client.from('author_follows').select('author_id', {count:'exact', head:true})
         .eq('author_id', authorId)
     ]);
@@ -5142,7 +5487,7 @@ async function refreshAuthorFollowState(authorId) {
     if (followerCountResult.error) throw followerCountResult.error;
     const followerCount = Number.isFinite(followerCountResult.count)
       ? followerCountResult.count
-      : Number(profileResult.data?.follower_count || 0);
+      : Number(profileResult.data?.follower_count ?? state.authors[authorId]?.fans ?? 0);
     if (currentUser()?.uid !== user.uid || route.page !== 'author' || route.id !== authorId) return;
 
     const existingIndex = state.following.indexOf(authorId);
@@ -5166,6 +5511,8 @@ async function refreshAuthorFollowState(authorId) {
 
 function renderAuthor() {
   const a = author(route.id);
+  const needsPublicProfile=!!(window.mySupabase&&isUuid(route.id)&&!publicAuthorProfileLoaded.has(route.id));
+  if(needsPublicProfile)void hydratePublicAuthorProfile(route.id);
   const following = state.following.includes(a.uid);
   const list = state.characters.filter(c => c.visibility === 'public' && c.authorId === a.uid &&
     !String(c.id).startsWith('seed-') && c.cloudPublic !== false && c.localOnly !== true);
@@ -5190,7 +5537,7 @@ function renderAuthor() {
       <h2>公開角色</h2>
       <div class="grid">${list.map(c => card(c)).join('') || '<div class="empty">目前沒有公開角色。</div>'}</div>
     </div>`;
-  void refreshAuthorFollowState(a.uid);
+  if(!needsPublicProfile)void refreshAuthorFollowState(a.uid);
 }
 function renderFavorites() {
   const list = state.characters.filter(c => state.favorites.includes(c.id) && accessible(c));
@@ -5648,29 +5995,9 @@ function updateAICost() {
   $('aiCost').textContent = `預計${cost}鑽石：角色30鑽石，每張圖片2鑽石。`;
   $('aiSubmit').disabled = Number(currentUser()?.diamonds || 0) < cost;
 }
-async function readImage(file) {
-  if (!file || !['image/png','image/jpeg','image/webp'].includes(file.type)) throw Error('請選擇PNG、JPG或WebP。');
-  return await new Promise((resolve,reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(Error('圖片讀取失敗。'));
-    reader.readAsDataURL(file);
-  });
-}
 async function compressProfileImage(file) {
-  if (!file || !['image/png','image/jpeg','image/webp'].includes(file.type)) throw Error('請選擇 PNG、JPG 或 WebP 圖片。');
-  if (file.size > 15 * 1024 * 1024) throw Error('頭像原始檔請小於 15 MB。');
-  const source=await readImage(file);
-  const image=await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(Error('無法讀取這張圖片。'));img.src=source;});
-  const size=256, canvas=document.createElement('canvas');canvas.width=size;canvas.height=size;
-  const ctx=canvas.getContext('2d');if(!ctx)throw Error('目前瀏覽器無法壓縮圖片。');
-  const scale=Math.max(size/image.width,size/image.height),width=image.width*scale,height=image.height*scale;
-  ctx.drawImage(image,(size-width)/2,(size-height)/2,width,height);
-  let result=canvas.toDataURL('image/webp',0.62);
-  if(result.length>120000)result=canvas.toDataURL('image/jpeg',0.55);
-  if(result.length>180000)result=canvas.toDataURL('image/jpeg',0.38);
-  if(result.length>220000)throw Error('壓縮後圖片仍太大，請改用較簡單的圖片。');
-  return result;
+  const compressed=await compressUploadImage(file,{maxEdge:256,targetBytes:120*1024,preserveAlpha:true});
+  return compressed.dataUrl;
 }
 
 // IMG-01: compress user-selected upload images before they enter app state.
@@ -5693,7 +6020,7 @@ async function compressUploadImage(file, options = {}) {
     if (!image.naturalWidth || !image.naturalHeight) throw Error('圖片尺寸無效，請換一張再試。');
 
     const targetBytes=Number(options.targetBytes)||500*1024;
-    const maxEdge=Number(options.maxEdge)||1600;
+    const maxEdge=Number(options.maxEdge)||1440;
     let scale=Math.min(1,maxEdge/Math.max(image.naturalWidth,image.naturalHeight));
     const formats=options.preserveAlpha
       ?[{type:'image/webp',qualities:[0.86,0.78,0.70,0.62,0.54]},{type:'image/png',qualities:[1]}]
@@ -5735,7 +6062,7 @@ async function compressUploadImage(file, options = {}) {
       }
       scale*=0.85;
     }
-    if(!bestBlob || bestBlob.size>2*1024*1024) {
+    if(!bestBlob || bestBlob.size>1*1024*1024) {
       throw Error('圖片壓縮後仍過大，請改選較小的圖片。');
     }
     const dataUrl=await new Promise((resolve,reject)=>{
@@ -5874,6 +6201,7 @@ async function createEncounterSession(character) {
     cloudOwned: true,
     cloudOwnerUid: authData.user.id,
     cloudCharacterSnapshot: data.session.character_snapshot || {},
+    cloudCharacterSnapshotLoaded:true,
     cloudUpdatedAt: data.session.updated_at || null
   };
   state.sessions[sessionId] = session;
@@ -5995,6 +6323,7 @@ async function createStorySession(characterId, originMode, sourceEncounterSessio
     cloudOwned:true,
     cloudOwnerUid:authData.user.id,
     cloudCharacterSnapshot:storySnapshot,
+    cloudCharacterSnapshotLoaded:true,
     initialOpeningMessage:openingText ? {text:openingText,at:openingAt} : null,
     cloudUpdatedAt:payload.session.updated_at || null,
     storyMode:true,
@@ -6089,13 +6418,6 @@ function visibleSessions() {
   });
   return unique.sort((a,b)=>Number(b.pinned)-Number(a.pinned)||
     (Number(b.lastMessageAt||b.updatedAt||b.messages?.at(-1)?.at||0)-Number(a.lastMessageAt||a.updatedAt||a.messages?.at(-1)?.at||0)));
-}
-function relativeDate(at) {
-  const now = new Date();
-  const today = new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
-  if (at >= today) return '今天';
-  if (at >= today-DAY) return '昨天';
-  return new Date(at).toLocaleDateString('zh-TW');
 }
 function chatListDate(at) {
   const timestamp=Number(at||0);
@@ -6411,18 +6733,10 @@ async function groupLoadList(force=false) {
   if(route.page==='group'&&!g.active) render();
   refreshChatEntryList();
 }
-function groupRenderList() {
-  const g=groupPrototype;
-  let body='';
-  if(g.loadingGroups) body='<p class="muted">正在讀取雲端群組…</p>';
-  else if(g.loadError) body='<div class="group-alert">'+e(g.loadError)+'</div><button data-action="group-refresh-list">重新載入</button>';
-  else if(!g.groups.length) body='<p class="muted">目前還沒有已保存的群組。建立後即可在這裡重新開啟。</p>';
-  else body='<div class="group-character-grid">'+g.groups.map(x=>'<div class="group-character-option"><span style="flex:1;min-width:0;overflow:hidden"><strong class="ellipsis" style="display:block;max-width:100%">'+e(x.name)+'</strong><span class="muted small" style="display:block">'+(x.scene_mode==='shared'?'共用場景':'分開場景')+' · '+e(String(x.created_at||'').slice(0,10))+'</span></span><div class="row wrap" style="gap:6px"><button data-action="group-open" data-id="'+e(x.id)+'">開啟</button><button data-action="group-rename" data-id="'+e(x.id)+'">重新命名</button><button data-action="group-archive" data-id="'+e(x.id)+'">封存</button></div></div>').join('')+'</div>';
-  return '<section class="group-panel"><div class="row between wrap"><h2>已保存的群組</h2><button data-action="group-refresh-list">重新載入</button></div>'+body+'</section>';
-}
 async function groupOpen(groupId) {
   const g=groupPrototype;
   groupResetForAccount(currentUser()?.uid||null);
+  const groupListWasLoaded=g.groupsLoaded===true;
   if(!isUuid(groupId)||!window.mySupabase) { g.loading=false;g.openError='群組識別碼無效或 Supabase 尚未載入。';g.failedGroupId=groupId;render();toast(g.openError);return; }
   // Keep the group ID in the URL so rerenders, auth refreshes, and post-send reloads
   // can recover the same group instead of silently falling back to the creation wizard.
@@ -6434,15 +6748,14 @@ async function groupOpen(groupId) {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('請重新登入後再開啟群組。');
     g.ownerUid=user.id;
-    const [groupRes,sceneRes,memberRes,messageRes,photoRes]=await groupWithTimeout(Promise.all([
-      window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,background_mode,background_memory_photo_id,created_at,updated_at').eq('id',groupId).single(),
+    const [groupRes,sceneRes,memberRes,messageRes]=await groupWithTimeout(Promise.all([
+      window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,background_mode,background_memory_photo_id,created_at,updated_at,archived_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position'),
-      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:true}).order('sequence_no',{ascending:true}),
-      window.mySupabase.from('chat_memory_photos').select('id,owner_id,chat_type,group_id,storage_path,caption,created_at,expires_at').eq('chat_type','group').eq('group_id',groupId).eq('owner_id',user.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false})
+      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:true}).order('sequence_no',{ascending:true})
     ]),15000,'群組資料讀取逾時，請檢查網路後重試。')
     if(requestId!==g.openRequestId) return;
-    const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error||photoRes.error;
+    const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error;
     if(error) throw error;
     if(user.id!==currentUser()?.uid) throw new Error('帳號已切換，已停止顯示先前帳號的群組。');
     const group=groupRes.data, scenes=sceneRes.data||[], memberRows=memberRes.data||[];
@@ -6456,7 +6769,7 @@ async function groupOpen(groupId) {
     }
     const members=memberRows.map(m=>{const snapshot=m.character_snapshot||{};const characterId=m.character_id||null;const snapshotId=snapshot.id||characterId||null;const displayId=characterId||snapshotId||m.id;return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,avatar_url:avatarById[characterId]||snapshot.avatar_url||snapshot.image||'',position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};});
     groupExpandedMemberId=null;
-    const memoryPhotos=await Promise.all((photoRes.data||[]).map(async photo=>{const {data:signed,error:signedError}=await window.mySupabase.storage.from('personax-memory-photos').createSignedUrl(photo.storage_path,300);if(signedError)console.warn('群組背景相片簽名網址失敗',signedError.message);return {...photo,image_url:!signedError&&signed?.signedUrl?signed.signedUrl:''};}));
+    // Memory photo metadata and signed URLs are loaded only when the player opens background settings.
     const messages=(messageRes.data||[]).map(m=>{
       const speakerSnapshot=m.speaker_snapshot||{};
       const member=members.find(x=>x.characterId===m.character_id)||members.find(x=>x.characterSnapshotId===speakerSnapshot.id||x.id===speakerSnapshot.id);
@@ -6465,15 +6778,34 @@ async function groupOpen(groupId) {
       const speaker=type==='user'?'你':type==='system'?'系統':(speakerSnapshot.name||member?.name||'角色')+(scene?' · '+scene.name:'');
       return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user' && m.content===GROUP_CONTINUE_SENTINEL ? '' : m.content,createdAt:m.created_at};
     });
-    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,memoryPhotos,scenes,members};
+    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,memoryPhotos:[],scenes,members};
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;
+    if(groupListWasLoaded){
+      const existingIndex=g.groups.findIndex(item=>item.id===group.id);
+      const listRow={id:group.id,name:group.name,world_background:group.world_background,scene_mode:group.scene_mode,created_at:group.created_at,updated_at:group.updated_at,pinned:existingIndex>=0?g.groups[existingIndex].pinned===true:false};
+      if(group.archived_at){
+        if(existingIndex>=0)g.groups.splice(existingIndex,1);
+        if(g.groupMembers)delete g.groupMembers[group.id];
+        if(g.groupPreviews)delete g.groupPreviews[group.id];
+      }else{
+        if(existingIndex>=0)g.groups[existingIndex]=listRow;else g.groups.unshift(listRow);
+        g.groupMembers ||= {};
+        g.groupPreviews ||= {};
+        g.groupMembers[group.id]=members.map(member=>({name:member.name,avatar_url:member.avatar_url||member.image||'',character_snapshot:member.characterSnapshot||{}}));
+        const latestMessage=messages.at(-1);
+        if(latestMessage)g.groupPreviews[group.id]={group_id:group.id,content:latestMessage.content||'',created_at:latestMessage.createdAt||'',speaker_type:latestMessage.type==='user'?'user':'character'};
+        else delete g.groupPreviews[group.id];
+      }
+    }
     try { await syncGroupDiaryCloud(group.id); }
     catch(syncError) { console.error('群組甜蜜日記雲端同步載入失敗：',syncError);toast('群組日記雲端同步暫時失敗，已保留本機資料；請檢查網路後重試。'); }
     if(requestId!==g.openRequestId)return;
     ensureGroupDiaryMemories();g.formError='';
-    g.loading=false;g.openError='';g.failedGroupId=null;g.groupsLoaded=false;
+    g.loading=false;g.openError='';g.failedGroupId=null;
+    // If the list was already loaded, the active group row was updated locally above.
+    // Otherwise render() starts the normal first-time list load.
+    if(!groupListWasLoaded)g.groupsLoaded=false;
     render();
-    void groupLoadList(true);
   } catch(error) {
     if(requestId!==g.openRequestId) return;
     g.loading=false;g.active=null;g.openError=groupFriendlyError(error)||'開啟群組失敗。';g.failedGroupId=groupId;
@@ -6494,9 +6826,9 @@ async function openGroupBackgroundSettings() {
       .order('created_at',{ascending:false});
     if(error)throw error;
     group.memoryPhotos=await Promise.all((data||[]).map(async photo=>{
-      const {data:signed,error:signedError}=await client.storage.from('personax-memory-photos').createSignedUrl(photo.storage_path,300);
-      if(signedError)console.warn('群組背景相片簽名網址失敗',signedError.message);
-      return {...photo,image_url:!signedError&&signed?.signedUrl?signed.signedUrl:''};
+      let imageUrl='';
+      try{imageUrl=await getMemoryPhotoSignedUrl(photo.storage_path)||'';}catch(signedError){console.warn('群組背景相片簽名網址失敗',signedError.message);}
+      return {...photo,image_url:imageUrl};
     }));
     const photos=group.memoryPhotos,mode=group.backgroundMode||'avatar';
     showDialog('群組聊天背景',
@@ -6851,7 +7183,7 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
         if(!ctx.session.cloudOwned||ctx.session.cloudOwnerUid!==uid)throw new Error('請先使用目前帳號擁有的雲端聊天。');
         const {data,error}=await client.from('chat_memory_photos').select('id,caption,storage_path,created_at').eq('owner_id',uid).eq('chat_type','single').eq('session_id',ctx.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false});
         if(error)throw error;
-        rows=await Promise.all((data||[]).map(async p=>{const {data:signed,error:signedError}=await client.storage.from('personax-memory-photos').createSignedUrl(p.storage_path,300);return !signedError&&signed?.signedUrl?{id:p.id,caption:p.caption||'',url:signed.signedUrl}:null;}));
+        rows=await Promise.all((data||[]).map(async p=>{const signedUrl=await getMemoryPhotoSignedUrl(p.storage_path).catch(()=>null);return signedUrl?{id:p.id,caption:p.caption||'',url:signedUrl}:null;}));
         rows=rows.filter(Boolean);
       }
       if(chatBackgroundDraft?.key!==ctx.key)return;draft.photos=rows;draft.loaded=true;draft.loading=false;
@@ -7199,29 +7531,30 @@ async function groupSendMock() {
     if(!g.pendingRequest || g.pendingRequest.groupId!==g.active.id || g.pendingRequest.content!==content) {
       g.pendingRequest={groupId:g.active.id,content,requestKey:window.crypto.randomUUID()};
     }
-    const {error}=await groupWithTimeout(window.mySupabase.rpc('append_chat_group_mock_turn',{
+    const {data:turnId,error}=await groupWithTimeout(window.mySupabase.rpc('append_chat_group_mock_turn',{
       p_group_id:g.active.id,p_request_key:g.pendingRequest.requestKey,p_content:content
     }),15000,'訊息保存逾時。請重新開啟群組確認訊息是否已保存，再決定是否重試。');
     if(error) throw error;
+    if(!turnId) throw new Error('群組回合已保存，但未取得回合識別碼。請重新開啟群組確認訊息。');
     const activeGroupId=g.active.id;
     // The RPC commits the group turn and wallet debit atomically. Refresh the visible
     // wallet immediately so the header/composer never keeps showing the pre-charge balance.
     await refreshWalletBalance();
-    // Keep the same request key until the saved messages are reloaded successfully. If
-    // that read times out, retrying the send reuses the key and cannot charge twice.
-    // Refresh only the message rows; do not reopen the entire group, clear its active
-    // state, or flash the loading screen after every send.
+    // The RPC returns the durable turn ID, including on an idempotent retry.
+    // Fetch only this turn's two messages instead of retransmitting the group's full history.
+    // Keep the same request key until this narrow read succeeds so retries cannot double-charge.
     const {data:rows,error:rowsError}=await groupWithTimeout(
       window.mySupabase.from('chat_group_messages')
         .select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at')
-        .eq('group_id',activeGroupId).is('deleted_at',null)
-        .order('created_at',{ascending:true}).order('sequence_no',{ascending:true}),
-      15000,'訊息已送出，但重新整理訊息清單逾時。請稍後重新開啟群組確認。'
+        .eq('group_id',activeGroupId).eq('turn_id',turnId).is('deleted_at',null)
+        .order('sequence_no',{ascending:true}),
+      15000,'訊息已送出，但重新整理本回合訊息逾時。請稍後重新開啟群組確認。'
     );
     if(rowsError) throw rowsError;
     if(g.active?.id!==activeGroupId) return;
+    if(!rows?.length) throw new Error('群組回合已保存，但暫時讀取不到訊息。請稍後重新開啟群組確認。');
     const members=g.active.members||[], scenes=g.active.scenes||[];
-    g.messages=(rows||[]).map(m=>{
+    const newMessages=rows.map(m=>{
       const speakerSnapshot=m.speaker_snapshot||{};
       const member=members.find(x=>x.characterId===m.character_id)||members.find(x=>x.characterSnapshotId===speakerSnapshot.id||x.id===speakerSnapshot.id);
       const scene=scenes.find(x=>x.id===m.scene_id);
@@ -7229,6 +7562,8 @@ async function groupSendMock() {
       const speaker=type==='user'?'你':type==='system'?'系統':(speakerSnapshot.name||member?.name||'角色')+(scene?' · '+scene.name:'');
       return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user' && m.content===GROUP_CONTINUE_SENTINEL ? '' : m.content,createdAt:m.created_at};
     });
+    const existingMessageIds=new Set((g.messages||[]).map(message=>message.id));
+    g.messages=[...(g.messages||[]),...newMessages.filter(message=>!existingMessageIds.has(message.id))];
     g.turn=g.messages.filter(m=>m.type==='user').length;
     g.pendingRequest=null;
     // Refresh cumulative character-card counts after a group turn has been saved.
@@ -7811,6 +8146,7 @@ function formatStoryWorldTime(value) {
   const timeLabel=date.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
   return dateLabel+'　'+timeLabel;
 }
+const storyPhoneRuntimeCache = new Map();
 async function renderPhoneModal() {
   document.querySelectorAll('.phone-modal-backdrop').forEach(node=>node.remove());
   const isGroup=route.page==='group',session=isGroup?null:currentSession(),group=isGroup?groupPrototype.active:null;
@@ -7849,19 +8185,33 @@ async function renderPhoneModal() {
     try{
       const {data:authData,error:authError}=await client.auth.getUser();
       if(authError||authData?.user?.id!==uid)throw new Error('登入狀態已變更，請重新開啟聊天室。');
-      const [eventsResult,stateResult,worldStateResult]=await Promise.all([
-        client.rpc('get_story_phone_events',{p_session_id:session.id}),
-        client.rpc('get_story_phone_state',{p_session_id:session.id}),
-        client.rpc('get_story_world_state',{p_session_id:session.id})
-      ]);
-      if(eventsResult.error)throw eventsResult.error;
-      if(stateResult.error)throw stateResult.error;
-      if(worldStateResult.error)throw worldStateResult.error;
-      storyPhoneEvents=Array.isArray(eventsResult.data)?eventsResult.data:[];
-      storyPhoneStates=Array.isArray(stateResult.data)?stateResult.data:[];
-      if(worldStateResult.data&&typeof worldStateResult.data==='object'){
-        storyWorldState=worldStateResult.data;
-        session.storyWorldState=storyWorldState;
+      const cacheKey=String(uid)+':'+session.id;
+      const cached=storyPhoneRuntimeCache.get(cacheKey);
+      const cacheIsFresh=Number.isFinite(cached?.fetchedAt)&&Date.now()-cached.fetchedAt<15000;
+      if(cacheIsFresh){
+        storyPhoneEvents=Array.isArray(cached.events)?cached.events:[];
+        storyPhoneStates=Array.isArray(cached.states)?cached.states:[];
+        if(cached.worldState&&typeof cached.worldState==='object')storyWorldState=cached.worldState;
+      }else{
+        const [eventsResult,stateResult,worldStateResult]=await Promise.all([
+          client.rpc('get_story_phone_events',{p_session_id:session.id}),
+          client.rpc('get_story_phone_state',{p_session_id:session.id}),
+          client.rpc('get_story_world_state',{p_session_id:session.id})
+        ]);
+        if(eventsResult.error)throw eventsResult.error;
+        if(stateResult.error)throw stateResult.error;
+        if(worldStateResult.error)throw worldStateResult.error;
+        storyPhoneEvents=Array.isArray(eventsResult.data)?eventsResult.data:[];
+        storyPhoneStates=Array.isArray(stateResult.data)?stateResult.data:[];
+        if(worldStateResult.data&&typeof worldStateResult.data==='object'){
+          storyWorldState=worldStateResult.data;
+          session.storyWorldState=storyWorldState;
+        }
+        storyPhoneRuntimeCache.set(cacheKey,{fetchedAt:Date.now(),events:storyPhoneEvents,states:storyPhoneStates,worldState:storyWorldState});
+        if(storyPhoneRuntimeCache.size>100){
+          const oldestKey=storyPhoneRuntimeCache.keys().next().value;
+          if(oldestKey!==cacheKey)storyPhoneRuntimeCache.delete(oldestKey);
+        }
       }
     }catch(error){
       storyPhoneEventsError=String(error?.message||'讀取故事手機通知失敗');
@@ -10393,6 +10743,7 @@ document.addEventListener('submit',async event => {
           .rpc('soft_delete_character',{p_character_id:c.id});
         if (deleteError) throw new Error('角色刪除失敗：'+deleteError.message);
         if (!deletedAt) throw new Error('資料庫未確認角色刪除成功，請重新整理後再試。');
+        invalidatePublicCharacterRowsCache();
         c.visibility='private';c.deletedAt=deletedAt;c.deletionReason='author_deleted';
         for (const session of Object.values(state.sessions)) {
           if (session.characterId===c.id) {
@@ -11047,7 +11398,7 @@ document.addEventListener('change',async event => {
           const preview=$('characterVideoPreview');preview.removeAttribute('src');preview.classList.add('hidden');
           $('imagePreview').classList.remove('hidden');
           toast('正在壓縮角色圖片，請稍候…');
-          const compressed=await compressUploadImage(file,{maxEdge:1600,targetBytes:500*1024,preserveAlpha:true});
+          const compressed=await compressUploadImage(file,{maxEdge:1440,targetBytes:500*1024,preserveAlpha:true});
           if(requestId!==characterImageCompressionRequest)return;
           draftImage=compressed.dataUrl;$('imagePreview').src=draftImage;$('imagePreview').classList.remove('hidden');
           toast('角色頭像已自動壓縮。');saveEditorDraft();
@@ -11066,7 +11417,7 @@ document.addEventListener('change',async event => {
       }
       toast('正在處理附加立繪…');
       for(const file of files){
-        const compressed=await compressUploadImage(file,{maxEdge:1800,targetBytes:700*1024,preserveAlpha:true});
+        const compressed=await compressUploadImage(file,{maxEdge:1440,targetBytes:500*1024,preserveAlpha:true});
         draftIllustrations.push({src:compressed.dataUrl,path:'',id:'',sortOrder:draftIllustrations.length});
       }
       const gallery=$('characterIllustrationGallery');
@@ -11210,8 +11561,20 @@ async function importCharacter(file) {
   if (String(data.privateInfo || '').length>10000 || String(data.style || '').length>1000) {
     throw Error('私密資訊或風格超過長度限制。');
   }
-  const image=safeImage(data.image);
+  let image=safeImage(data.image);
   if (!image) throw Error('需提供有效的HTTPS或支援的圖片資料。');
+  // Imported base64 images used to bypass the normal image compressor and could
+  // be stored inline in characters.avatar_url. Compress and move them to Storage.
+  let importedPrimaryDataUrl='';
+  if(/^data:image\/(png|jpeg|webp);base64,/i.test(image)){
+    const originalBlob=await (await fetch(image)).blob();
+    const extension=({'image/png':'png','image/jpeg':'jpg','image/webp':'webp'})[originalBlob.type];
+    if(!extension)throw Error('匯入角色圖片格式不受支援。');
+    const importedFile=new File([originalBlob],'imported-character.'+extension,{type:originalBlob.type});
+    const compressed=await compressUploadImage(importedFile,{maxEdge:1440,targetBytes:500*1024,preserveAlpha:true});
+    importedPrimaryDataUrl=compressed.dataUrl;
+    image='';
+  }
   let tags=[];
   try { tags=validateCharacterTags(Array.isArray(data.tags) ? [...new Set(data.tags)] : []); }
   catch(error) { throw Error('匯入標籤格式不符：' + error.message); }
@@ -11229,13 +11592,28 @@ async function importCharacter(file) {
     chats:'0',users:null,createdAt:Date.now()
   };
   // 匯入完成即建立雲端私密角色，不必先公開才上傳。
-  const saveResult = await saveSupabaseCharacter(character, user.uid);
-  state.characters.unshift(character);
-  persist();go({page:'create'});
-  if (saveResult.storyError && saveResult.profileQueueError) toast(saveResult.storyError + '；' + saveResult.profileQueueError);
-  else if (saveResult.storyError) toast('角色已匯入雲端，但故事同步失敗：' + saveResult.storyError);
-  else if (saveResult.profileQueueError) toast(saveResult.profileQueueError);
-  else toast('角色已匯入雲端，預設為私密。');
+  const previousDraft={image:draftImage,illustrations:draftIllustrations,primaryPath:draftPrimaryIllustrationPath};
+  try{
+    const saveResult = await saveSupabaseCharacter(character, user.uid);
+    if(importedPrimaryDataUrl){
+      draftImage=importedPrimaryDataUrl;
+      draftIllustrations=[];
+      draftPrimaryIllustrationPath='';
+      const synced=await syncCharacterIllustrations(character,user.uid);
+      if(!synced.primaryPath)throw new Error('匯入圖片未能儲存至雲端素材庫。');
+      character.image=await getCharacterIllustrationSignedUrl(synced.primaryPath);
+    }
+    state.characters.unshift(character);
+    persist();go({page:'create'});
+    if (saveResult.storyError && saveResult.profileQueueError) toast(saveResult.storyError + '；' + saveResult.profileQueueError);
+    else if (saveResult.storyError) toast('角色已匯入雲端，但故事同步失敗：' + saveResult.storyError);
+    else if (saveResult.profileQueueError) toast(saveResult.profileQueueError);
+    else toast('角色已匯入雲端，預設為私密。');
+  }finally{
+    draftImage=previousDraft.image;
+    draftIllustrations=previousDraft.illustrations;
+    draftPrimaryIllustrationPath=previousDraft.primaryPath;
+  }
 }
 
 /* Image errors do not inject HTML. */
@@ -11272,7 +11650,7 @@ function renderCityMapMVP(){
       </div>
       <div class="city-map-ui" id="cityMapUI">
         <aside class="city-map-info">
-          <h2 class="city-map-title"><img src="https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/LOGO_WEBLOGO.png?v=20261024-4" alt="POYOZZ"> <span>城市</span></h2>
+          <h2 class="city-map-title"><img src="./LOGO_WEBLOGO.webp" alt="POYOZZ"> <span>城市</span></h2>
           <div id="cityMapDate">台灣時間</div>
           <div class="city-map-weather"><span>🌤️</span><span id="cityMapWeather">天氣資料待串接</span><span id="cityMapTemp">溫度待串接</span></div>
           <p>這座城市充滿各種可能，也許今天你會在某個角落遇見特別的那個人。</p>
@@ -11363,7 +11741,7 @@ function renderCityMapMVP(){
     const sunrise=Math.round(sun.sunrise*60),sunset=Math.round(sun.sunset*60);
     const isDay=minuteOfDay>=sunrise&&minuteOfDay<sunset;
     $('cityMapDate').textContent=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);
-    const mapImage=isDay?'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp':'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Add_nighttime_lighting_to_buildings_2K_20261027142959%20(1).webp';
+    const mapImage=isDay?'./encounter-default-scene.webp':'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Add_nighttime_lighting_to_buildings_2K_20261027142959%20(1).webp';
     stage.style.backgroundColor=isDay?'#b9d9c5':'#18253e';stage.style.backgroundImage='none';world.style.backgroundImage='url("'+mapImage+'")';world.style.filter='none';
   };
   taipeiTime();
@@ -11576,6 +11954,22 @@ function renderCityMapMVP(){
     locationModal.dataset.cardMode=mode;
     locationModal.dataset.selectedPersonIndex=String((cityPresenceByPlace[locationModal.dataset.place]||[]).findIndex(item=>item.id===person.id));
     const image=safeImage(person.image||person.avatar_url||person.avatar);
+    if(person.cloudPublic===true&&!image&&person.publicIllustrationsLoaded!==true){
+      const selectedIndex=locationModal.dataset.selectedPersonIndex;
+      const selectedPlace=locationModal.dataset.place;
+      void hydratePublicCharacterIllustrations(person.id).then(()=>{
+        const current=state.characters.find(character=>character.id===person.id);
+        if(!current)return;
+        person.image=current.image||'';
+        person.primaryIllustrationPath=current.primaryIllustrationPath||'';
+        person.publicIllustrationsLoaded=current.publicIllustrationsLoaded===true;
+        const cityVideo=body.querySelector('video.city-character-portrait-video[data-character-video]');
+        if(cityVideo)cityVideo.poster=safeImage(person.image);
+        if(locationModal.dataset.place===selectedPlace&&locationModal.dataset.selectedPersonIndex===selectedIndex&&locationModal.dataset.cardMode===mode&&card.dataset.page===String(page)&&card.isConnected){
+          renderCityCharacterCard(person,page,mode);
+        }
+      });
+    }
     // Uploaded character videos are private Storage objects, so hydrate their signed URL.
     const videoPath=String(person.avatarVideoPath||person.avatar_video_path||person.characterVideoPath||'').trim();
     const videoRaw=String(person.videoUrl||person.video_url||person.introVideoUrl||person.intro_video_url||'').trim();
@@ -11847,9 +12241,8 @@ if (window.__pendingSupabaseUser) {
         .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false});
       if(error)throw error;
       const cards=await Promise.all((data||[]).map(async photo=>{
-        const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,300);
-        const imageUrl=!signedError&&signed?.signedUrl?signed.signedUrl:'';
-        if(!imageUrl)console.warn('相簿簽名網址取得失敗',signedError?.message);
+        let imageUrl='';
+        try{imageUrl=await getMemoryPhotoSignedUrl(photo.storage_path)||'';}catch(signedError){console.warn('相簿簽名網址取得失敗',signedError?.message);}
         urlCache.set(photo.id,{url:imageUrl,photo});
         const thumbnail=imageUrl
           ? '<button type="button" class="memory-photo-thumb" data-action="memory-photo-open" data-id="'+e(photo.id)+'" aria-label="開啟相片"><img src="'+e(imageUrl)+'" alt="'+e(photo.caption||'回憶相片')+'" loading="lazy"></button>'
@@ -11863,12 +12256,29 @@ if (window.__pendingSupabaseUser) {
     }catch(err){console.error('讀取回憶相簿失敗',err);mount.innerHTML='<div class="empty">相簿讀取失敗：'+e(err.message||'請稍後重試。')+'</div>';}
   }
   async function compressMemoryImage(file){
-    const image=await createImageBitmap(file);const maxSide=1920;const scale=Math.min(1,maxSide/Math.max(image.width,image.height));
-    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));
-    const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw new Error('目前裝置無法壓縮圖片。');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(image,0,0,canvas.width,canvas.height);image.close?.();
-    const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('圖片壓縮失敗。')),'image/webp',.86));
-    return new File([blob],(file.name.replace(/\.[^.]+$/,'')||'memory-photo')+'.webp',{type:'image/webp',lastModified:Date.now()});
+    const image=await createImageBitmap(file);
+    try{
+      const maxSide=1200,targetBytes=450*1024;
+      let scale=Math.min(1,maxSide/Math.max(image.width,image.height));
+      let bestBlob=null;
+      while(scale>=0.25){
+        const width=Math.max(1,Math.round(image.width*scale)),height=Math.max(1,Math.round(image.height*scale));
+        const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+        const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw new Error('目前裝置無法壓縮圖片。');
+        ctx.fillStyle='#fff';ctx.fillRect(0,0,width,height);ctx.drawImage(image,0,0,width,height);
+        for(const quality of [.80,.72,.64,.56,.48]){
+          const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('圖片壓縮失敗。')),'image/webp',quality));
+          if(!bestBlob||blob.size<bestBlob.size)bestBlob=blob;
+          if(blob.size<=targetBytes)return new File([blob],(file.name.replace(/\.[^.]+$/,'')||'memory-photo')+'.webp',{type:'image/webp',lastModified:Date.now()});
+        }
+        scale*=.85;
+      }
+      if(!bestBlob||bestBlob.size>1024*1024)throw new Error('圖片壓縮後仍超過 1 MB，請改選較小的圖片。');
+      return new File([bestBlob],(file.name.replace(/\.[^.]+$/,'')||'memory-photo')+'.webp',{type:'image/webp',lastModified:Date.now()});
+    }finally{image.close?.();}
   }
+  // Future AI-generated memory images must use this same mobile-first encoder before Storage upload.
+  window.compressMemoryImageForStorage=compressMemoryImage;
   function setAlbumUploadStatus(input,message,isError=false){
     const stack=input.closest('.memory-album-stack');
     if(!stack)return;
@@ -11901,7 +12311,7 @@ if (window.__pendingSupabaseUser) {
       const compressed=await compressMemoryImage(file);
       const ext='webp';
       path=user.id+'/'+type+'/'+chatId+'/'+(crypto.randomUUID?crypto.randomUUID():id())+'.'+ext;
-      const {error:upError}=await client.storage.from(BUCKET).upload(path,compressed,{contentType:'image/webp',upsert:false});
+      const {error:upError}=await client.storage.from(BUCKET).upload(path,compressed,{contentType:'image/webp',upsert:false,cacheControl:'3600'});
       if(upError)throw upError;
       const created=new Date(),expires=new Date(created);expires.setFullYear(expires.getFullYear()+1);
       const {error:dbError}=await client.from('chat_memory_photos').insert({
@@ -11933,9 +12343,9 @@ if (window.__pendingSupabaseUser) {
         .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).maybeSingle();
       if(error)throw error;
       if(!photo){session.background='none';persist();panel.style.setProperty('--chat-photo','none');return;}
-      const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,300);
-      if(signedError||!signed?.signedUrl)throw signedError||new Error('無法取得背景圖片。');
-      if(currentSession()?.id===session.id)panel.style.setProperty('--chat-photo','url('+JSON.stringify(signed.signedUrl)+')');
+      const signedUrl=await getMemoryPhotoSignedUrl(photo.storage_path);
+      if(!signedUrl)throw new Error('無法取得背景圖片。');
+      if(currentSession()?.id===session.id)panel.style.setProperty('--chat-photo','url('+JSON.stringify(signedUrl)+')');
     }catch(err){console.error('讀取單聊相簿背景失敗',err);panel.style.setProperty('--chat-photo','none');}
   }
   async function applyGroupMemoryPhotoBackground(group,panel){
@@ -11956,9 +12366,9 @@ if (window.__pendingSupabaseUser) {
         if(cleared&&groupPrototype.active?.id===group.id){group.backgroundMode='none';group.backgroundMemoryPhotoId=null;}
         return;
       }
-      const {data:signed,error:signedError}=await client.storage.from(BUCKET).createSignedUrl(photo.storage_path,300);
-      if(signedError||!signed?.signedUrl)throw signedError||new Error('無法取得群組背景圖片。');
-      if(groupPrototype.active?.id===group.id)panel.style.setProperty('--chat-photo','url('+JSON.stringify(signed.signedUrl)+')');
+      const signedUrl=await getMemoryPhotoSignedUrl(photo.storage_path);
+      if(!signedUrl)throw new Error('無法取得群組背景圖片。');
+      if(groupPrototype.active?.id===group.id)panel.style.setProperty('--chat-photo','url('+JSON.stringify(signedUrl)+')');
     }catch(err){console.error('讀取群組相簿背景失敗',err);panel.style.setProperty('--chat-photo','none');}
   }
   window.applySingleMemoryPhotoBackground=applySingleMemoryPhotoBackground;
@@ -12011,7 +12421,7 @@ if (window.__pendingSupabaseUser) {
     const panel=$('view').querySelector('.chat-main');if(panel)void applySingleMemoryPhotoBackground(currentSession(),panel);
   }
   async function downloadCompressedMemoryPhoto(cached){
-    try{const client=window.mySupabase;let url=cached.url;let response=await fetch(url);if(!response.ok){const {data,error}=await client.storage.from(BUCKET).createSignedUrl(cached.photo.storage_path,300);if(error||!data?.signedUrl)throw error||new Error('下載連結失效。');url=data.signedUrl;response=await fetch(url);}if(!response.ok)throw new Error('下載連結已失效，請重新開啟相簿後再試。');const blob=await response.blob(),objectUrl=URL.createObjectURL(blob);const a=document.createElement('a');a.href=objectUrl;a.download=(cached.photo.caption||'personax-memory')+'.webp';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),1500);}catch(error){toast('下載失敗：'+(error.message||'請重新開啟相簿後再試。'));}
+    try{const client=window.mySupabase;let url=cached.url;let response=await fetch(url);if(!response.ok){invalidateMemoryPhotoSignedUrl(cached.photo.storage_path,cached.photo.owner_id);url=await getMemoryPhotoSignedUrl(cached.photo.storage_path);if(!url)throw new Error('下載連結失效。');response=await fetch(url);}if(!response.ok)throw new Error('下載連結已失效，請重新開啟相簿後再試。');const blob=await response.blob(),objectUrl=URL.createObjectURL(blob);const a=document.createElement('a');a.href=objectUrl;a.download=(cached.photo.caption||'personax-memory')+'.webp';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),1500);}catch(error){toast('下載失敗：'+(error.message||'請重新開啟相簿後再試。'));}
   }
   document.addEventListener('change',event=>{
     const input=event.target;
@@ -12039,7 +12449,9 @@ if (window.__pendingSupabaseUser) {
       if(!confirm('刪除後不可復原哦，確認要刪除嗎?'))return;const client=window.mySupabase,uid=currentUser()?.uid,photo=cached.photo;if(!client||uid!==photo.owner_id){toast('請確認登入帳號。');return;}
       const {data:deleted,error}=await client.rpc('soft_delete_chat_memory_photo',{p_photo_id:photo.id});
       if(error){console.error('相簿刪除 RPC 失敗',error);toast('刪除失敗：'+error.message);return;}
+      invalidateMemoryPhotoSignedUrl(photo.storage_path,uid);
       const {error:removeError}=await client.storage.from(BUCKET).remove([photo.storage_path]);if(removeError)console.warn('相片紀錄已移出相簿，但儲存檔案清理失敗',removeError.message);
+      invalidateMemoryPhotoSignedUrl(photo.storage_path,uid);
       if(photo.chat_type==='single'){const session=state.sessions[photo.session_id];if(session?.background==='memory-photo:'+photo.id){session.background='none';persist();}}
       else{
         const group=groupPrototype.active;
@@ -12251,8 +12663,6 @@ document.addEventListener('click',async event=>{
 <style id="poyozz-ui-quick-polish">
 /* UI-172 quick polish: consistent compact hints, touch targets, and stable form affordances */
 .followed-authors-back{display:inline-flex;align-items:center;gap:8px;margin:0 0 14px;padding:9px 12px;border-radius:12px}
-.followed-authors-header{display:flex;align-items:center;gap:10px;margin-bottom:16px}
-.followed-authors-header .avatar{width:42px;height:42px}
 .group-member-avatar-link{cursor:pointer}
 .group-member-avatar-link .avatar{width:44px;height:44px}
 .group-member-avatar-link:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
@@ -12516,7 +12926,7 @@ document.addEventListener('submit',function(event){
     panel.classList.add('encounter-scene');
     const character=sessionCharacter(session);
     const sceneImage=safeImage(character?.encounterSceneImage||session?.encounterSceneImage||character?.sceneImage||'');
-    const defaultSceneImage='https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Prosperous_daytime_cityscape_pai%E2%80%A6_2K_20261027142908%20(1).webp';
+    const defaultSceneImage='./encounter-default-scene.webp';
     panel.style.setProperty('--encounter-scene-photo','url('+JSON.stringify(sceneImage||defaultSceneImage)+')');
     panel.dataset.encounterPlace=session.encounterPlace||'';
     // Encounter scenes use dedicated encounter art or the author's scene-illustration gallery.
@@ -12709,7 +13119,6 @@ document.addEventListener('submit',function(event){
 .city-location-title-icon{display:grid;place-items:center;flex:0 0 32px}
 .city-location-close{flex:0 0 38px;position:relative;z-index:3}
 .city-character-card-body{display:grid;grid-template-columns:104px minmax(0,1fr) 34px;gap:10px;align-items:stretch;min-height:0}
-.city-character-layout{display:contents}
 .city-character-photo-column{display:flex;flex-direction:column;gap:9px;min-width:0}
 .city-character-affinity{width:100%;padding:7px 8px;border:1px solid rgba(255,255,255,.2);border-radius:10px;background:linear-gradient(135deg,rgba(25,29,43,.54),rgba(72,61,76,.34));color:rgba(255,255,255,.92);font-size:10px;line-height:1.35;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);min-height:35px;display:flex;flex-direction:column;justify-content:center;gap:5px}
 .city-character-affinity-heading{display:flex;align-items:center;gap:5px;white-space:nowrap}
@@ -12728,7 +13137,6 @@ document.addEventListener('submit',function(event){
 .city-character-card-footer{flex:0 0 auto;margin-top:8px;justify-content:center}
 .city-character-page-button{width:34px;height:30px;padding:0;display:grid;place-items:center}
 .city-character-page-dots{min-width:30px;text-align:center}
-.city-character-story-cta{margin-top:10px;width:100%;font-size:12px}
 .city-encounter-history-list{display:grid;gap:9px}
 .city-encounter-history-item{padding:10px;border:1px solid rgba(255,255,255,.17);border-radius:11px;background:rgba(18,22,32,.18)}
 .city-encounter-history-item strong{display:block;font-size:11px;margin-bottom:4px}
@@ -12738,7 +13146,6 @@ document.addEventListener('submit',function(event){
 .encounter-memory-card:hover,.encounter-memory-card:focus-visible{border-color:rgba(205,184,255,.65);background:rgba(110,96,145,.24);outline:none}
 .encounter-memory-excerpt{margin:8px 0!important;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--muted);line-height:1.65}
 .encounter-memory-place{display:block;margin-top:6px;color:var(--primary);letter-spacing:.02em}
-.encounter-leave-dialog-copy{line-height:1.7;color:var(--muted)}
 .encounter-memory-detail-place{margin:0 0 10px;padding:9px 11px;border:1px solid var(--border);border-radius:10px;background:var(--soft)}
 .encounter-memory-detail{max-height:min(68dvh,620px);overflow:auto;overscroll-behavior:contain;display:grid;gap:10px}
 .encounter-memory-message{padding:11px 12px;border:1px solid var(--border);border-radius:12px;background:var(--panel)}
@@ -12755,9 +13162,6 @@ document.addEventListener('submit',function(event){
 .city-location-open-inline{display:inline-flex;align-items:center;gap:6px;margin-left:2px;color:#e5f9eb;font-size:11px;white-space:nowrap}
 .city-location-open-inline i{display:block;width:7px;height:7px;border-radius:50%;background:#4ade80;box-shadow:0 0 8px #4ade8070}
 .city-location-close{width:38px;height:38px;padding:0;display:grid;place-items:center;border-radius:50%;font-size:26px;line-height:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff}
-.city-location-open{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:#e5e2f5}
-.city-location-status-dot{width:8px;height:8px;flex:0 0 8px;border-radius:50%;background:#9da3b5;box-shadow:0 0 12px #9da3b555}
-.city-location-status-note{margin-left:auto;color:#c2bad7;font-size:10px}
 .city-location-rule{height:1px;flex:0 0 1px;margin:14px 0;background:linear-gradient(90deg,transparent,rgba(231,226,255,.24) 12%,rgba(231,226,255,.24) 88%,transparent)}
 .city-location-section-title{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;font-weight:650}
 .city-location-section-title span{font-size:10px;color:#c4bddb;font-weight:400}
@@ -12774,16 +13178,14 @@ document.addEventListener('submit',function(event){
 .city-location-news-items{display:grid;gap:7px}
 .city-location-news-items p{margin:0;color:#e5e1ef;font-size:11px;line-height:1.65;overflow-wrap:anywhere}
 .city-location-empty{margin:0;padding:14px 12px;width:100%;border:1px dashed rgba(235,225,255,.22);border-radius:14px;color:#d2cfe0;font-size:12px;line-height:1.7;text-align:center}
-.city-location-empty{margin:0;padding:14px 12px;width:100%;border:1px dashed rgba(235,225,255,.22);border-radius:14px;color:#d2cfe0;font-size:12px;line-height:1.7;text-align:center}
 .city-location-person{display:flex;flex-direction:column;align-items:center;gap:6px;flex:0 0 72px;min-width:72px;padding:4px 3px 8px;border:0!important;border-radius:0;background:transparent!important;box-shadow:none!important;color:#fff;cursor:pointer;outline:none}
 .city-location-person:hover,.city-location-person:focus,.city-location-person:focus-visible{background:transparent!important;box-shadow:none!important;outline:none}
 .city-location-person .city-location-avatar-fallback,.city-location-person-image{display:grid;place-items:center;width:54px;height:54px;flex:0 0 54px;border-radius:50%;border:0!important;background:transparent!important;box-shadow:none!important;filter:none;font-size:20px;overflow:hidden}
 .city-location-person-image{display:block;object-fit:cover;object-position:center 25%;outline:none!important;clip-path:circle(50% at 50% 50%);-webkit-mask-image:none}
 .city-location-person-name{max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#f3efff}
-.city-location-person-activity{max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px;color:#c9c1e2}
 .city-location-person:disabled{opacity:.6}
 @media(max-width:600px){.city-location-modal{padding:14px}.city-location-glass{width:100%;height:calc(100dvh - 28px);min-height:0;max-height:calc(100dvh - 28px);padding:17px 18px;border-radius:23px}.city-location-title-row h2{font-size:20px}.city-location-rule{margin:12px 0}.city-character-card-body{grid-template-columns:104px minmax(0,1fr);gap:10px}.city-character-portrait{width:104px;height:150px;flex-basis:104px}}
-.city-character-card[hidden]{display:none!important}
+
 .city-character-card{margin-top:8px;padding:14px;border:1px solid rgba(255,255,255,.2);border-radius:18px;background:linear-gradient(145deg,rgba(240,241,246,.13),rgba(122,130,149,.13));box-shadow:inset 0 1px rgba(255,255,255,.12)}
 .city-character-card-head,.city-character-card-footer{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .city-character-page-label{font-size:10px;letter-spacing:.12em;color:#d3cde5}
