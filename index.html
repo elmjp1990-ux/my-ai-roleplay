@@ -12249,7 +12249,7 @@ if (window.__pendingSupabaseUser) {
       encodeError:'圖片壓縮失敗。',
       tooLargeError:'圖片壓縮後仍超過 1 MB，請改選較小的圖片。'
     });
-    return new File([result.blob],(file.name.replace(/\\.[^.]+$/,'')||'memory-photo')+'.webp',{type:'image/webp',lastModified:Date.now()});
+    return new File([result.blob],(file.name.replace(/\.[^.]+$/,'')||'memory-photo')+'.webp',{type:'image/webp',lastModified:Date.now()});
   }
   // Future AI-generated memory images must use this same mobile-first encoder before Storage upload.
   window.compressMemoryImageForStorage=compressMemoryImage;
