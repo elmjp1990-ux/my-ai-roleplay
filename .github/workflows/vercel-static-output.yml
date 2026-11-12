@@ -9,6 +9,8 @@ on:
       - "image-compression.js"
       - "signed-url-manager.js"
       - "city-map.js"
+      - "followed-authors.js"
+      - "scripts/test-followed-authors-module.mjs"
       - "scripts/test-city-map-module.mjs"
       - "memory-album.js"
       - "encounter-scene.js"
@@ -42,6 +44,10 @@ jobs:
         run: node scripts/test-vercel-static-output.mjs
       - name: Parse extracted city map module
         run: node --check city-map.js
+      - name: Parse extracted followed authors module
+        run: node --check followed-authors.js
+      - name: Verify followed authors module contract
+        run: node scripts/test-followed-authors-module.mjs
       - name: Verify extracted city map module contract
         run: node scripts/test-city-map-module.mjs
       - name: Verify chat render lifecycle contract

@@ -13,6 +13,7 @@ const runtimeFiles = [
   'image-compression.js',
   'signed-url-manager.js',
   'city-map.js',
+  'followed-authors.js',
   'memory-album.js',
   'encounter-scene.js',
   'LOGO_WEBICON.webp',
