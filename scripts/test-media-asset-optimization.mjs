@@ -3,6 +3,8 @@ import fs from "node:fs";
 
 const html=fs.readFileSync("index.html","utf8");
 const compressor=fs.readFileSync("image-compression.js","utf8");
+const memoryAlbum=fs.readFileSync("memory-album.js","utf8");
+assert.ok(html.includes('<script src="./memory-album.js"></script>'));
 assert.ok(html.includes('<script src="./image-compression.js"></script>'));
 assert.ok(compressor.includes("window.PoyozzImageCompression=Object.freeze(api)"));
 assert.ok(compressor.includes("createImageBitmap"));
@@ -28,7 +30,8 @@ const profileCompressor=block("async function compressProfileImage","// IMG-01:"
 assert.ok(profileCompressor.includes("compressUploadImage(file,{maxEdge:256,targetBytes:120*1024,preserveAlpha:true})"));
 assert.ok(profileCompressor.includes("return compressed.dataUrl"));
 
-const memoryCompressor=block("async function compressMemoryImage","// Future AI-generated memory images");
+const memoryCompressor=memoryAlbum.slice(memoryAlbum.indexOf("async function compressMemoryImage"),memoryAlbum.indexOf("// Future AI-generated memory images"));
+assert.ok(memoryCompressor.length>0);
 assert.ok(memoryCompressor.includes("window.PoyozzImageCompression.compress(file"));
 assert.ok(memoryCompressor.includes("decoder:'bitmap'"));
 assert.ok(memoryCompressor.includes("maxEdge:1200"));
@@ -37,7 +40,7 @@ assert.ok(memoryCompressor.includes("minScale:.25"));
 assert.ok(memoryCompressor.includes("contextAttributes:{alpha:false}"));
 assert.ok(memoryCompressor.includes("background:'#fff'"));
 assert.ok(memoryCompressor.includes("qualities:[.80,.72,.64,.56,.48]"));
-assert.ok(html.includes("upload(path,compressed,{contentType:'image/webp',upsert:false,cacheControl:'3600'})"));
+assert.ok(memoryAlbum.includes("upload(path,compressed,{contentType:'image/webp',upsert:false,cacheControl:'3600'})"));
 
 const videoCompressor=block("async function compressCharacterAvatarVideo","async function uploadCharacterAvatarVideo");
 assert.match(videoCompressor,/maxEdge<=960/);
@@ -101,12 +104,17 @@ assert.ok(memoryUrlAdapter.includes("from('personax-memory-photos').createSigned
 assert.ok(memoryUrlAdapter.includes("uid+':'+storagePath"));
 assert.ok(memoryUrlAdapter.includes("memoryPhotoSignedUrlManager.invalidate(uid+':'+storagePath)"));
 
-const albumLoader=block("async function loadAlbum(type,chatId)","async function compressMemoryImage");
+function albumBlock(start,end){
+  const a=memoryAlbum.indexOf(start),b=memoryAlbum.indexOf(end,a+start.length);
+  assert.ok(a>=0&&b>a,"missing memory album source block: "+start);
+  return memoryAlbum.slice(a,b);
+}
+const albumLoader=albumBlock("async function loadAlbum(type,chatId)","async function compressMemoryImage");
 assert.ok(albumLoader.includes("getMemoryPhotoSignedUrl(photo.storage_path)"));
 assert.doesNotMatch(albumLoader,/if\(!imageUrl\)[^\n]*signedError/);
-const photoDelete=block("if(button.dataset.action==='memory-photo-delete')","if(button.dataset.action==='memory-photo-background')");
+const photoDelete=albumBlock("if(button.dataset.action==='memory-photo-delete')","if(button.dataset.action==='memory-photo-background')");
 assert.ok(photoDelete.includes("invalidateMemoryPhotoSignedUrl(photo.storage_path,uid)"));
-const photoDownload=block("async function downloadCompressedMemoryPhoto","document.addEventListener");
+const photoDownload=albumBlock("async function downloadCompressedMemoryPhoto","document.addEventListener");
 assert.ok(photoDownload.includes("getMemoryPhotoSignedUrl(cached.photo.storage_path)"));
 
 const profileCompressorUpdated=block("async function compressProfileImage","// IMG-01:");
@@ -114,7 +122,7 @@ assert.ok(profileCompressorUpdated.includes("compressUploadImage(file,{maxEdge:2
 
 const illustrationUploader=block("async function uploadCharacterIllustrationDataUrl","async function syncCharacterIllustrations");
 assert.match(illustrationUploader,/blob\.size>10\*1024\*1024/);
-assert.match(html,/window\.compressMemoryImageForStorage=compressMemoryImage/);
+assert.match(memoryAlbum,/window\.compressMemoryImageForStorage=compressMemoryImage/);
 assert.equal([...html.matchAll(/\.upload\(/g)].length,3,
   "all Storage upload paths must stay covered by the image/video compression checks");
 
