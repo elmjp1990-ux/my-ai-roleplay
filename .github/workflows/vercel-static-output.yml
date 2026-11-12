@@ -5,6 +5,9 @@ on:
     paths:
       - "index.html"
       - "memory-capture.js"
+      - "chat-render-lifecycle.js"
+      - "scripts/test-chat-render-lifecycle.mjs"
+      - ".github/workflows/chat-render-lifecycle.yml"
       - "*.webp"
       - "vercel.json"
       - "scripts/build-vercel-static.mjs"
