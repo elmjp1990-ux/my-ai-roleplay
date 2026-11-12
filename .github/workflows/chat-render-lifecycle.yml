@@ -5,6 +5,8 @@ on:
     paths:
       - "chat-render-lifecycle.js"
       - "image-compression.js"
+      - "signed-url-manager.js"
+      - "scripts/test-signed-url-manager.mjs"
       - "scripts/test-image-compression.mjs"
       - "scripts/test-media-asset-optimization.mjs"
       - "scripts/test-chat-render-lifecycle.mjs"
@@ -25,6 +27,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Verify shared signed URL manager
+        run: node --test scripts/test-signed-url-manager.mjs
       - name: Verify shared image compression presets
         run: node --test scripts/test-image-compression.mjs
       - name: Verify media asset and compression adapter contracts

@@ -11,6 +11,7 @@ const runtimeFiles = [
   'memory-capture.js',
   'chat-render-lifecycle.js',
   'image-compression.js',
+  'signed-url-manager.js',
   'LOGO_WEBICON.webp',
   'LOGO_WEBLOGO.webp',
   'encounter-default-scene.webp',
