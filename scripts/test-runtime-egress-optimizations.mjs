@@ -59,4 +59,12 @@ assert.match(personaSave,/await saveSupabaseProfile\(account\)/);
 assert.doesNotMatch(personaSave,/\.rpc\(/,
   "persona save must not repeat the private-profile verification RPC already performed by saveSupabaseProfile");
 
-console.log("Story relationship RPC dedupe, group list refresh avoidance, incremental group-turn loading, and phone-state cache checks passed.");
+const illustrations=between("async function syncCharacterIllustrations(character,userId)","async function ");
+assert.match(illustrations,/oldGalleryById=new Map\(oldGallery\.map\(row=>\[row\.id,row\]\)\)/,
+  "illustration sync must reuse the already-loaded gallery metadata for change detection");
+assert.match(illustrations,/insertedGallery\.includes\(item\.id\)\|\|\(previous&&String\(previous\.display_name\|\|''\)===expectedName\)/,
+  "new rows and unchanged labels must not trigger redundant UPDATE requests");
+assert.match(illustrations,/expectedGalleryNames=new Map/,
+  "persisted gallery labels must still be verified after synchronization");
+
+console.log("Story relationship RPC dedupe, illustration write dedupe, group list refresh avoidance, incremental group-turn loading, and phone-state cache checks passed.");
