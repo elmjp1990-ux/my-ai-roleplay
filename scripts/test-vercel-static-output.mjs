@@ -12,6 +12,7 @@ const fileBudgets = {
   'index.html': 900_000,
   'memory-capture.js': 12_000,
   'chat-render-lifecycle.js': 8_000,
+  'image-compression.js': 12_000,
 };
 const expectedFiles = Object.keys(fileBudgets).sort();
 const assetExtensions = '(?:webp|png|jpe?g|svg|js|css|json|ico|woff2?|ttf|mp4|webm|avif)';
@@ -74,6 +75,7 @@ const runtimeJs = [
   html,
   fs.readFileSync(path.join(outputDir, 'memory-capture.js'), 'utf8'),
   fs.readFileSync(path.join(outputDir, 'chat-render-lifecycle.js'), 'utf8'),
+  fs.readFileSync(path.join(outputDir, 'image-compression.js'), 'utf8'),
 ];
 const localAssetPatterns = [
   new RegExp('"((?:\\.\\/|\\/)[^"\\s?#]+' + assetExtensions + ')"', 'gi'),
