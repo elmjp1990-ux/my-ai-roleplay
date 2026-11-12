@@ -3738,6 +3738,8 @@ async function loadChatSessionAuthorProfiles(uid, authorIds) {
         nickname:profile.nickname||profile.handle||'PersonaX 使用者',
         avatar:profile.avatar_url||'',bio:profile.bio||'',fans:Number(profile.follower_count||0)
       };
+      // Reuse this complete public-profile result if the same author page is opened later.
+      publicAuthorProfileLoaded.add(profile.id);
     }
   }catch(error){console.warn('既有聊天作者資料載入失敗：',error?.message||error);}
 }
