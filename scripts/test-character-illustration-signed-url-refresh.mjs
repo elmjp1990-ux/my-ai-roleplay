@@ -36,6 +36,22 @@ const galleryHydration = html.slice(galleryHydrationStart, galleryHydrationEnd);
 assert.match(galleryHydration, /\.order\('sort_order',\{ascending:true\}\)\s*\.limit\(1\)/,
   'encounter must not eagerly sign and download all five gallery images');
 
+const refreshHandlerStart = html.indexOf("if(!window.__characterIllustrationRefreshHandlerInstalled){");
+const refreshHandlerEnd = html.indexOf("\nasync function enqueueCharacterIllustrationCleanup", refreshHandlerStart);
+assert.notEqual(refreshHandlerStart, -1, 'signed URL image error handler must exist');
+assert.ok(refreshHandlerEnd > refreshHandlerStart, 'signed URL image error handler boundary must exist');
+const refreshHandler = html.slice(refreshHandlerStart, refreshHandlerEnd);
+assert.match(html.slice(refreshStart, refreshEnd), /getCharacterIllustrationSignedUrl\(storagePath,\{forceRefresh:true\}\)/,
+  'an image load error must bypass the possibly expired signed URL cache');
+assert.match(refreshHandler, /image\.dataset\.refreshingSignedUrl==='true'\|\|image\.dataset\.signedUrlRefreshAttempted==='true'\)return;/,
+  'each image element must be protected from overlapping or repeated refresh attempts');
+assert.match(refreshHandler, /if\(image\.isConnected&&url\)image\.src=url;/,
+  'a refreshed URL must not be assigned to an image element that has been removed');
+assert.match(refreshHandler, /image\.dataset\.signedUrlRefreshAttempted='false';/,
+  'a failed refresh must release the per-image retry guard');
+assert.match(refreshHandler, /document\.addEventListener\('load',[\s\S]*?image\.dataset\.signedUrlRefreshAttempted='false';/,
+  'a successfully loaded replacement image must reset its retry guard');
+
 const pending = [];
 let createCalls = 0;
 const sandbox = {
