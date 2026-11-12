@@ -6,6 +6,7 @@ on:
       - "index.html"
       - "encounter-scene.js"
       - "city-map.js"
+      - "followed-authors.js"
       - "scripts/test-encounter-schedule-parser.mjs"
       - "scripts/test-encounter-chat-mode-guard.mjs"
       - "supabase/functions/encounter-session/**"
@@ -52,6 +53,8 @@ jobs:
           NODE
       - name: Parse extracted City map module
         run: node --check city-map.js
+      - name: Parse extracted Followed authors module
+        run: node --check followed-authors.js
       - name: Parse extracted Encounter scene module
         run: node --check encounter-scene.js
       - name: Test Encounter schedule parser
