@@ -6,6 +6,7 @@ on:
       - "index.html"
       - "memory-capture.js"
       - "chat-render-lifecycle.js"
+      - "image-compression.js"
       - "scripts/test-chat-render-lifecycle.mjs"
       - ".github/workflows/chat-render-lifecycle.yml"
       - "*.webp"

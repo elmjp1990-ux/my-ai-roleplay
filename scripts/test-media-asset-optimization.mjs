@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const html=fs.readFileSync("index.html","utf8");
+const compressor=fs.readFileSync("image-compression.js","utf8");
+assert.ok(html.includes('<script src="./image-compression.js"></script>'));
+assert.ok(compressor.includes("window.PoyozzImageCompression=Object.freeze(api)"));
+assert.ok(compressor.includes("createImageBitmap"));
+assert.ok(compressor.includes("URL.revokeObjectURL"));
 function block(start,end){
   const a=html.indexOf(start),b=html.indexOf(end,a+start.length);
   assert.ok(a>=0&&b>a,"missing source block: "+start);
@@ -9,21 +14,30 @@ function block(start,end){
 }
 
 const imageCompressor=block("async function compressUploadImage","/* Chat sessions:");
-assert.match(imageCompressor,/maxEdge\)\|\|1440/);
-assert.match(imageCompressor,/targetBytes\)\|\|500\*1024/);
-assert.match(imageCompressor,/bestBlob\.size>1\*1024\*1024/);
-assert.match(html,/compressUploadImage\(file,\{maxEdge:1440,targetBytes:500\*1024,preserveAlpha:true\}\)/);
-assert.doesNotMatch(html,/compressUploadImage\(file,\{maxEdge:(?:1600|1800),targetBytes:(?:500|700)\*1024,preserveAlpha:true\}\)/);
+assert.ok(imageCompressor.includes("window.PoyozzImageCompression.compress(file"));
+assert.ok(imageCompressor.includes("maxEdge:Number(options.maxEdge)||1440"));
+assert.ok(imageCompressor.includes("targetBytes:Number(options.targetBytes)||500*1024"));
+assert.ok(imageCompressor.includes("maxOutputBytes:1*1024*1024"));
+assert.ok(imageCompressor.includes("preserveAlpha"));
+assert.ok(imageCompressor.includes("return {...result,dataUrl}"));
+assert.ok(html.includes("compressUploadImage(file,{maxEdge:1440,targetBytes:500*1024,preserveAlpha:true})"));
+assert.ok(!html.includes("compressUploadImage(file,{maxEdge:1600,targetBytes:500*1024,preserveAlpha:true})"));
+assert.ok(!html.includes("compressUploadImage(file,{maxEdge:1800,targetBytes:700*1024,preserveAlpha:true})"));
 
 const profileCompressor=block("async function compressProfileImage","// IMG-01:");
-assert.match(profileCompressor,/compressUploadImage\(file,\{maxEdge:256,targetBytes:120\*1024,preserveAlpha:true\}\)/);
-assert.match(profileCompressor,/return compressed\.dataUrl/);
+assert.ok(profileCompressor.includes("compressUploadImage(file,{maxEdge:256,targetBytes:120*1024,preserveAlpha:true})"));
+assert.ok(profileCompressor.includes("return compressed.dataUrl"));
 
-const memoryCompressor=block("async function compressMemoryImage","function setAlbumUploadStatus");
-assert.match(memoryCompressor,/maxSide=1200,targetBytes=450\*1024/);
-assert.match(memoryCompressor,/bestBlob\.size>1024\*1024/);
-assert.match(memoryCompressor,/toBlob\([\s\S]*?'image\/webp'/);
-assert.match(html,/upload\(path,compressed,\{contentType:'image\/webp',upsert:false,cacheControl:'3600'\}\)/);
+const memoryCompressor=block("async function compressMemoryImage","// Future AI-generated memory images");
+assert.ok(memoryCompressor.includes("window.PoyozzImageCompression.compress(file"));
+assert.ok(memoryCompressor.includes("decoder:'bitmap'"));
+assert.ok(memoryCompressor.includes("maxEdge:1200"));
+assert.ok(memoryCompressor.includes("targetBytes:450*1024"));
+assert.ok(memoryCompressor.includes("minScale:.25"));
+assert.ok(memoryCompressor.includes("contextAttributes:{alpha:false}"));
+assert.ok(memoryCompressor.includes("background:'#fff'"));
+assert.ok(memoryCompressor.includes("qualities:[.80,.72,.64,.56,.48]"));
+assert.ok(html.includes("upload(path,compressed,{contentType:'image/webp',upsert:false,cacheControl:'3600'})"));
 
 const videoCompressor=block("async function compressCharacterAvatarVideo","async function uploadCharacterAvatarVideo");
 assert.match(videoCompressor,/maxEdge<=960/);
