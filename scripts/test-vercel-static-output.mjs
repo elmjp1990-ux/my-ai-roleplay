@@ -95,7 +95,7 @@ for (const reference of references) {
   assert.ok(fs.existsSync(resolved) && fs.statSync(resolved).isFile(), 'Local runtime reference is missing from Vercel output: ' + reference);
 }
 
-for (const required of ['LOGO_WEBICON.webp', 'LOGO_WEBLOGO.webp', 'encounter-default-scene.webp', 'memory-capture.js', 'chat-render-lifecycle.js']) {
+for (const required of ['LOGO_WEBICON.webp', 'LOGO_WEBLOGO.webp', 'encounter-default-scene.webp', 'memory-capture.js', 'chat-render-lifecycle.js', 'image-compression.js']) {
   assert.ok(references.has('./' + required) || references.has('/' + required) || html.includes(required),
     'Required runtime asset must remain referenced: ' + required);
 }
