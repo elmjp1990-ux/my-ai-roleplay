@@ -5,6 +5,7 @@ on:
     paths:
       - "index.html"
       - "scripts/test-chat-history-lazy-loading.mjs"
+      - "scripts/test-character-illustration-signed-url-refresh.mjs"
       - "scripts/test-public-illustration-lazy-loading.mjs"
       - "scripts/test-character-video-visibility.mjs"
       - "scripts/test-public-comment-hydration-cache.mjs"
@@ -30,6 +31,8 @@ jobs:
           node-version: "22"
       - name: Test bounded chat hydration and pagination
         run: node scripts/test-chat-history-lazy-loading.mjs
+      - name: Test expired character illustration URL refresh
+        run: node scripts/test-character-illustration-signed-url-refresh.mjs
       - name: Test public illustration lazy hydration
         run: node scripts/test-public-illustration-lazy-loading.mjs
       - name: Test character video visibility threshold
