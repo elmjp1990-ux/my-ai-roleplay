@@ -48,4 +48,15 @@ assert.match(phone,/storyPhoneRuntimeCache\.get\(cacheKey\)/);
 assert.match(phone,/storyPhoneRuntimeCache\.set\(cacheKey/);
 assert.match(phone,/storyPhoneRuntimeCache\.size>100/);
 
+
+const profileSave=between("async function saveSupabaseProfile(account)","async function savePersonaPresets(account)");
+assert.match(profileSave,/rpc\('save_my_profile'/);
+assert.match(profileSave,/rpc\('get_my_private_profile_data'/,
+  "profile save must retain owner-scoped private-field verification");
+assert.match(profileSave,/stablePersonaJson\(privateData\.persona_presets/);
+const personaSave=between("async function savePersonaPresets(account)","async function loginWithGoogle()");
+assert.match(personaSave,/await saveSupabaseProfile\(account\)/);
+assert.doesNotMatch(personaSave,/\.rpc\(/,
+  "persona save must not repeat the private-profile verification RPC already performed by saveSupabaseProfile");
+
 console.log("Story relationship RPC dedupe, group list refresh avoidance, incremental group-turn loading, and phone-state cache checks passed.");
