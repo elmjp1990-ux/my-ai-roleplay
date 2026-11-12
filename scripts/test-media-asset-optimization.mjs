@@ -91,14 +91,15 @@ assert.match(html,/src="\.\/LOGO_WEBICON\.webp"/);
 assert.doesNotMatch(html,/raw\.githubusercontent\.com\/elmjp1990-ux\/my-ai-roleplay\/main\/LOGO_WEB/);
 
 
-const memoryUrlCache=block("async function getMemoryPhotoSignedUrl","const characterIllustrationMetadataInflight");
-assert.ok(memoryUrlCache.includes("const key=uid+':'+storagePath"));
-assert.ok(memoryUrlCache.includes("memoryPhotoSignedUrlCache.get(key)"));
-assert.ok(memoryUrlCache.includes("memoryPhotoSignedUrlInflight.has(key)"));
-assert.ok(memoryUrlCache.includes("expiresAt:Date.now()+240000"));
-assert.ok(memoryUrlCache.includes("memoryPhotoSignedUrlCache.size>250"));
-assert.ok(memoryUrlCache.includes("(currentUser()?.uid||null)!==uid"));
-assert.ok(memoryUrlCache.includes("function invalidateMemoryPhotoSignedUrl"));
+const memoryUrlAdapter=block("const memoryPhotoSignedUrlManager","const characterIllustrationMetadataInflight");
+assert.ok(memoryUrlAdapter.includes("window.PoyozzSignedUrlManager.create"));
+assert.ok(memoryUrlAdapter.includes("cacheTtlMs:240000"));
+assert.ok(memoryUrlAdapter.includes("refreshSkewMs:15000"));
+assert.ok(memoryUrlAdapter.includes("maxEntries:250"));
+assert.ok(memoryUrlAdapter.includes("isCurrent:context=>(currentUser()?.uid||null)===(context?.uid||null)"));
+assert.ok(memoryUrlAdapter.includes("from('personax-memory-photos').createSignedUrl(context.storagePath,300)"));
+assert.ok(memoryUrlAdapter.includes("uid+':'+storagePath"));
+assert.ok(memoryUrlAdapter.includes("memoryPhotoSignedUrlManager.invalidate(uid+':'+storagePath)"));
 
 const albumLoader=block("async function loadAlbum(type,chatId)","async function compressMemoryImage");
 assert.ok(albumLoader.includes("getMemoryPhotoSignedUrl(photo.storage_path)"));
