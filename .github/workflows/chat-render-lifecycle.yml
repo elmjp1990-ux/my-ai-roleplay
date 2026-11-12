@@ -8,6 +8,7 @@ on:
       - "signed-url-manager.js"
       - "memory-album.js"
       - "encounter-scene.js"
+      - "city-map.js"
       - "encounter-scene.js"
       - "scripts/test-signed-url-manager.mjs"
       - "scripts/test-image-compression.mjs"
@@ -36,6 +37,8 @@ jobs:
         run: node --test scripts/test-image-compression.mjs
       - name: Verify media asset and compression adapter contracts
         run: node scripts/test-media-asset-optimization.mjs
+      - name: Parse extracted City map module
+        run: node --check city-map.js
       - name: Parse extracted Encounter scene module
         run: node --check encounter-scene.js
       - name: Verify render lifecycle registration and dispatch contract
