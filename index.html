@@ -1905,19 +1905,37 @@ const ids = (rows || []).map(row => row.id);
 
 const characterIllustrationSignedUrlCache = new Map();
 const characterIllustrationSignedUrlInflight = new Map();
-async function getCharacterIllustrationSignedUrl(storagePath) {
+const characterIllustrationForcedRefreshInflight = new Map();
+async function getCharacterIllustrationSignedUrl(storagePath, options={}) {
+  const forceRefresh=options?.forceRefresh===true;
+  if(forceRefresh){
+    // Several images can fail for the same path in one render. Share one forced
+    // refresh instead of creating a burst of identical Storage requests.
+    const forced=characterIllustrationForcedRefreshInflight.get(storagePath);
+    if(forced)return forced;
+    characterIllustrationSignedUrlCache.delete(storagePath);
+    // Supersede a possibly expired normal request. Its completion is fenced below.
+    characterIllustrationSignedUrlInflight.delete(storagePath);
+  }
   const now=Date.now();
   const cached=characterIllustrationSignedUrlCache.get(storagePath);
-  if(cached&&cached.expiresAt>now+60000)return cached.url;
-  if(characterIllustrationSignedUrlInflight.has(storagePath))return characterIllustrationSignedUrlInflight.get(storagePath);
+  if(!forceRefresh&&cached&&cached.expiresAt>now+60000)return cached.url;
+  if(!forceRefresh&&characterIllustrationSignedUrlInflight.has(storagePath))return characterIllustrationSignedUrlInflight.get(storagePath);
   const request=(async()=>{
     const {data,error}=await window.mySupabase.storage.from('character-illustrations').createSignedUrl(storagePath,3600);
     if(error||!data?.signedUrl)throw new Error(error?.message||'無法取得角色立繪網址');
-    characterIllustrationSignedUrlCache.set(storagePath,{url:data.signedUrl,expiresAt:Date.now()+3300000});
+    // Only the newest request may populate cache state.
+    if(characterIllustrationSignedUrlInflight.get(storagePath)===request){
+      characterIllustrationSignedUrlCache.set(storagePath,{url:data.signedUrl,expiresAt:Date.now()+3300000});
+    }
     return data.signedUrl;
   })();
   characterIllustrationSignedUrlInflight.set(storagePath,request);
-  try{return await request;}finally{characterIllustrationSignedUrlInflight.delete(storagePath);}
+  if(forceRefresh)characterIllustrationForcedRefreshInflight.set(storagePath,request);
+  try{return await request;}finally{
+    if(characterIllustrationSignedUrlInflight.get(storagePath)===request)characterIllustrationSignedUrlInflight.delete(storagePath);
+    if(characterIllustrationForcedRefreshInflight.get(storagePath)===request)characterIllustrationForcedRefreshInflight.delete(storagePath);
+  }
 }
 const memoryPhotoSignedUrlCache = new Map();
 const memoryPhotoSignedUrlInflight = new Map();
@@ -2080,7 +2098,7 @@ async function hydrateEncounterGalleryIllustration(characterId) {
 async function refreshCharacterIllustrationSignedUrl(storagePath) {
   const client=window.mySupabase;
   if(!client||typeof storagePath!=='string'||!storagePath)return null;
-  try{return await getCharacterIllustrationSignedUrl(storagePath);}
+  try{return await getCharacterIllustrationSignedUrl(storagePath,{forceRefresh:true});}
   catch(error){throw new Error('角色立繪簽名網址更新失敗：'+(error?.message||'missing_signed_url'));}
 }
 if(!window.__characterIllustrationRefreshHandlerInstalled){
