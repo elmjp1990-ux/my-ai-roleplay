@@ -3,6 +3,7 @@ import fs from "node:fs";
 
 const html = fs.readFileSync("index.html", "utf8");
 const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
+const cityMap = fs.readFileSync("city-map.js", "utf8");
 const cleanupMigration = fs.readFileSync("supabase/migrations/20261031211200_character_illustration_cleanup_queue.sql", "utf8");
 
 // The author-facing field must accept ordinary prose, not a pipe-delimited schema.
@@ -134,9 +135,9 @@ assert.ok((html.match(/renderGrid\(\{append:true\}\);/g)||[]).length >= 2);
  assert.ok(html.includes("nextVideo.replaceWith(previousVideo)"));
  assert.ok(html.includes("grid.querySelectorAll('video[data-character-video]').forEach(video => void hydrateCharacterVideo(video))"));
  // City-character tab/page redraws must reuse the existing portrait video for the same Storage path.
- assert.ok(html.includes("const previousCharacterVideo=body.querySelector('video.city-character-portrait-video[data-character-video]')"));
- assert.ok(html.includes("previousCharacterVideo.dataset.characterVideo===characterVideo.dataset.characterVideo"));
- assert.ok(html.includes("characterVideo.replaceWith(previousCharacterVideo)"));
+ assert.ok(cityMap.includes("const previousCharacterVideo=body.querySelector('video.city-character-portrait-video[data-character-video]')"));
+ assert.ok(cityMap.includes("previousCharacterVideo.dataset.characterVideo===characterVideo.dataset.characterVideo"));
+ assert.ok(cityMap.includes("characterVideo.replaceWith(previousCharacterVideo)"));
  // Route-level rerenders preserve card videos outside Explore's renderGrid path.
  assert.ok(html.includes("function captureCharacterCardVideos(root)"));
  assert.ok(html.includes("function restoreCharacterCardVideos(root,previousVideos)"));
@@ -150,7 +151,7 @@ assert.ok((html.match(/renderGrid\(\{append:true\}\);/g)||[]).length >= 2);
  assert.ok(html.includes("releaseCharacterVideo(previousDetailVideo)"));
  // Discarded Explore and city portrait nodes must release their detached media resources.
  assert.ok(html.includes("existingVideosByCharacter.forEach(video => {\n      characterVideoObserver?.unobserve(video);\n      releaseCharacterVideo(video);"));
- assert.ok(html.includes("}else if(previousCharacterVideo){\n      characterVideoObserver?.unobserve(previousCharacterVideo);\n      releaseCharacterVideo(previousCharacterVideo);"));
+ assert.ok(cityMap.includes("}else if(previousCharacterVideo){\n      characterVideoObserver?.unobserve(previousCharacterVideo);\n      releaseCharacterVideo(previousCharacterVideo);"));
  assert.ok(html.includes("video.dataset.videoObservePending='false';"));
  assert.ok(html.includes("window.addEventListener('pageshow',()=>{"));
  assert.ok(html.includes("void hydrateCharacterVideo(video);"));

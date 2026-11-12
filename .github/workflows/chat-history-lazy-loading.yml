@@ -5,6 +5,7 @@ on:
     paths:
       - "index.html"
       - "encounter-scene.js"
+      - "city-map.js"
       - "scripts/test-chat-history-lazy-loading.mjs"
       - "scripts/test-character-illustration-signed-url-refresh.mjs"
       - "scripts/test-public-illustration-lazy-loading.mjs"
