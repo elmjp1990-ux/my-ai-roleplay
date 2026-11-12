@@ -13075,8 +13075,7 @@ document.addEventListener('submit',function(event){
       const panel=renderPanel||$('view')?.querySelector('.chat-main');
       if(panel){panel.classList.add('encounter-scene');applyEncounterDialogue(panel,session);}
     });
-  }t.addEventListener('DOMContentLoaded',installEncounterRenderWrapper,{once:true});
-  else installEncounterRenderWrapper();
+  }
   document.addEventListener('click',event=>{
     const target=event.target.closest('[data-action="encounter-next-beat"]');
     if(!target)return;
