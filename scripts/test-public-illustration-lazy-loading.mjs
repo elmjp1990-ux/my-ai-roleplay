@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const html = fs.readFileSync("index.html", "utf8");
+const cityMap = fs.readFileSync("city-map.js", "utf8");
 const between = (start, end) => {
   const from = html.indexOf(start);
   const to = html.indexOf(end, from + start.length);
@@ -66,9 +67,9 @@ assert.match(html, /function observePublicCharacterIllustrationCards\(root\)/);
 assert.match(html, /observePublicCharacterIllustrationCards\(grid\)/);
 assert.match(html, /observePublicCharacterIllustrationCards\(\$\('view'\)\)/);
 assert.match(html, /new IntersectionObserver\(entries=>/);
-assert.match(html, /person\.cloudPublic===true&&!image&&person\.publicIllustrationsLoaded!==true/);
-assert.match(html, /cityVideo\.poster=safeImage\(person\.image\)/);
-assert.match(html, /locationModal\.dataset\.cardMode===mode&&card\.dataset\.page===String\(page\)/);
+assert.match(cityMap, /person\.cloudPublic===true&&!image&&person\.publicIllustrationsLoaded!==true/);
+assert.match(cityMap, /cityVideo\.poster=safeImage\(person\.image\)/);
+assert.match(cityMap, /locationModal\.dataset\.cardMode===mode&&card\.dataset\.page===String\(page\)/);
 assert.match(html, /route\.page==='detail'&&c\.cloudPublic===true&&!c\.owner/);
 
 // Encounter gallery and owner/editor asset hydration remain unchanged.
