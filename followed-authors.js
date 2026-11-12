@@ -5,9 +5,8 @@
   'use strict';
 
   global.PoyozzFollowedAuthors = Object.freeze({
-    render(dependencies) {
-      async function render(dependencies) {
-        const { $, currentUser, getRoute, getSupabaseClient, isUuid, state, loadPublicSupabaseCharacters, ICON, e, avatar, card, persist, toast } = dependencies;
+    async render(dependencies) {
+      const { $, currentUser, getRoute, getSupabaseClient, isUuid, state, loadPublicSupabaseCharacters, author, ICON, e, avatar, card, persist, toast } = dependencies;
         const user = currentUser();
         if (!user) return;
         $('view').innerHTML = '<div class="stack"><div class="followed-authors-title-row"><button type="button" class="ghost followed-authors-back" data-action="back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h1>喜愛作者</h1></div><div class="empty">正在載入追蹤作者…</div></div>';
@@ -83,7 +82,6 @@
           $('view').innerHTML = '<div class="stack"><div class="followed-authors-title-row"><button type="button" class="ghost followed-authors-back" data-action="back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h1>喜愛作者</h1></div><div class="empty">讀取失敗，請重新整理後再試。</div></div>';
           toast(error.message || '讀取喜愛作者失敗。');
         }
-      }
     }
   });
 })(window);
