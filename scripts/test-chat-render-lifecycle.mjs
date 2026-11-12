@@ -126,3 +126,23 @@ test('base conversation renderers dispatch lifecycle hooks after their existing 
   assert.match(appHtml, /if \(route\.chatOverlay\) renderChatOverlay\(route\.chatOverlay\);\s*window\.PoyozzChatRenderLifecycle\?\.run\('afterSingleConversation'/);
   assert.match(appHtml, /applyGroupChatBackground\(\);\s*window\.PoyozzChatRenderLifecycle\?\.run\('afterGroupConversation'/);
 });
+
+
+test('encounter scene setup is registered as a conversation lifecycle hook', () => {
+  assert.match(appHtml, /register\('afterSingleConversation',\s*'encounter\.single-scene'/);
+  assert.match(appHtml, /register\('afterMessages',\s*'encounter\.progressive-dialogue'/);
+  assert.match(appHtml, /applyEncounterDialogue\(panel,session\)/);
+  assert.match(appHtml, /function render\(\)[\s\S]*?classList\.toggle\('encounter-mode-active',\s*encounterRouteActive\)/);
+});
+
+test('base message renderer dispatches the afterMessages lifecycle phase', () => {
+  assert.match(appHtml, /window\.PoyozzChatRenderLifecycle\?\.run\('afterMessages',\s*\{\s*session:\s*s,\s*panel:/);
+});
+
+test('encounter mode no longer wraps or replaces base render functions', () => {
+  assert.doesNotMatch(appHtml, /const installEncounterRenderWrapper/);
+  assert.doesNotMatch(appHtml, /const baseRenderConversation\s*=\s*renderConversation/);
+  assert.doesNotMatch(appHtml, /const baseRenderMessages\s*=\s*renderMessages/);
+  assert.doesNotMatch(appHtml, /renderConversation\s*=\s*wrappedRenderConversation/);
+  assert.doesNotMatch(appHtml, /renderMessages\s*=\s*wrappedRenderMessages/);
+});
