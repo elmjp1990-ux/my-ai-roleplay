@@ -4,13 +4,15 @@ import path from 'node:path';
 
 const root = process.cwd();
 const outputDir = path.join(root, 'dist');
-const expectedFiles = [
-  'LOGO_WEBICON.webp',
-  'LOGO_WEBLOGO.webp',
-  'encounter-default-scene.webp',
-  'index.html',
-  'memory-capture.js',
-].sort();
+const fileBudgets = {
+  'LOGO_WEBICON.webp': 20_000,
+  'LOGO_WEBLOGO.webp': 40_000,
+  'encounter-default-scene.webp': 350_000,
+  'index.html': 900_000,
+  'memory-capture.js': 12_000,
+};
+const expectedFiles = Object.keys(fileBudgets).sort();
+const assetExtensions = '(?:webp|png|jpe?g|svg|js|css|json|ico|woff2?|ttf|mp4|webm|avif)';
 
 const vercelConfig = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
 assert.equal(vercelConfig.buildCommand, 'node scripts/build-vercel-static.mjs');
@@ -20,35 +22,65 @@ assert.ok(fs.existsSync(outputDir), 'Vercel output directory must exist.');
 const actualFiles = fs.readdirSync(outputDir).sort();
 assert.deepEqual(actualFiles, expectedFiles, 'Vercel output must contain only the runtime allowlist.');
 
-const totalBytes = actualFiles.reduce(
-  (total, file) => total + fs.statSync(path.join(outputDir, file)).size,
-  0
-);
+let totalBytes = 0;
+for (const [file, maxBytes] of Object.entries(fileBudgets)) {
+  const filePath = path.join(outputDir, file);
+  const stat = fs.lstatSync(filePath);
+  assert.ok(stat.isFile() && !stat.isSymbolicLink(), 'Runtime output must be a regular file: ' + file);
+  assert.ok(stat.size > 0, 'Runtime output must not be empty: ' + file);
+  assert.ok(stat.size <= maxBytes, file + ' exceeds its individual deployment budget: ' + stat.size + ' > ' + maxBytes);
+  totalBytes += stat.size;
+}
 assert.ok(totalBytes <= 1_500_000, 'Vercel static output exceeds the 1.5 MB deployment budget: ' + totalBytes + ' bytes.');
 
 const html = fs.readFileSync(path.join(outputDir, 'index.html'), 'utf8');
 const references = new Set();
+const addReference = (value) => {
+  if (!value || value.startsWith('data:') || value.startsWith('blob:') || value.startsWith('http:') || value.startsWith('https:')) return;
+  const clean = value.split(/[?#]/, 1)[0].trim();
+  if (!clean || !/^(?:\.\/|\/)/.test(clean) || !new RegExp('\\.' + assetExtensions + '$', 'i').test(clean)) return;
+  references.add(clean);
+};
 
-for (const match of html.matchAll(/(?:src|href)\s*=\s*["']((?:\.\/|\/)[^"'?#]+)["']/gi)) {
-  references.add(match[1]);
+// HTML resource attributes, including responsive image candidates.
+for (const tag of html.matchAll(/<[a-z][^>]*>/gi)) {
+  for (const attr of tag[0].matchAll(/\b(?:src|href|poster|data-src|data-href)\s*=\s*["']([^"']+)["']/gi)) {
+    addReference(attr[1]);
+  }
+  for (const attr of tag[0].matchAll(/\bsrcset\s*=\s*["']([^"']+)["']/gi)) {
+    for (const candidate of attr[1].split(',')) addReference(candidate.trim().split(/\s+/)[0]);
+  }
 }
 
-for (const match of html.matchAll(/["'\x60](\.\/[^"'\x60\s?#]+\.(?:webp|png|jpe?g|svg|js|css|json))["'\x60]/gi)) {
-  references.add(match[1]);
+// CSS url() references in style blocks and inline style attributes only.
+for (const styleBlock of html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)) {
+  for (const url of styleBlock[1].matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/gi)) addReference(url[1]);
+}
+for (const styleAttr of html.matchAll(/\bstyle\s*=\s*["']([^"']*)["']/gi)) {
+  for (const url of styleAttr[1].matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/gi)) addReference(url[1]);
+}
+
+// Literal local asset paths in inline and external runtime JavaScript.
+const runtimeJs = [html, fs.readFileSync(path.join(outputDir, 'memory-capture.js'), 'utf8')];
+const localAssetPattern = new RegExp('["\\']((?:\\.\\/|\\/)[^"\\'\\s?#]+' + assetExtensions + ')["\\']', 'gi');
+for (const source of runtimeJs) {
+  for (const match of source.matchAll(localAssetPattern)) addReference(match[1]);
 }
 
 for (const reference of references) {
   const relativePath = reference.replace(/^\.\//, '').replace(/^\//, '');
-  assert.ok(fs.existsSync(path.join(outputDir, relativePath)), 'Local runtime reference is missing from Vercel output: ' + reference);
+  const resolved = path.resolve(outputDir, relativePath);
+  assert.ok(resolved.startsWith(outputDir + path.sep), 'Runtime reference must not escape the output directory: ' + reference);
+  assert.ok(fs.existsSync(resolved) && fs.statSync(resolved).isFile(), 'Local runtime reference is missing from Vercel output: ' + reference);
 }
 
-assert.ok(html.includes('memory-capture.js'), 'The memory capture script must remain referenced.');
-assert.ok(html.includes('LOGO_WEBICON.webp'), 'The WebP favicon must remain referenced.');
-assert.ok(html.includes('LOGO_WEBLOGO.webp'), 'The WebP logo must remain referenced.');
-assert.ok(html.includes('encounter-default-scene.webp'), 'The encounter scene must remain referenced.');
-
-for (const excluded of ['.github', 'docs', 'scripts', 'supabase', 'LOGO_WEBICON.png', 'LOGO_WEBLOGO.png']) {
-  assert.ok(!actualFiles.includes(excluded), 'Repository-only content must not be deployed: ' + excluded);
+for (const required of ['LOGO_WEBICON.webp', 'LOGO_WEBLOGO.webp', 'encounter-default-scene.webp', 'memory-capture.js']) {
+  assert.ok(references.has('./' + required) || references.has('/' + required) || html.includes(required),
+    'Required runtime asset must remain referenced: ' + required);
 }
 
-console.log('Vercel static output verified: ' + actualFiles.length + ' files, ' + references.size + ' local references resolved, ' + totalBytes + ' bytes total.');
+console.log(
+  'Vercel static output verified: ' + actualFiles.length + ' files, ' +
+  references.size + ' local asset references resolved, ' + totalBytes +
+  ' bytes total. Individual file budgets passed.'
+);
