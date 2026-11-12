@@ -84,5 +84,8 @@ assert.doesNotMatch(ownerLoader,/client\.auth\.getUser\(\)/,
   "owner hydration must not issue its own duplicate auth verification");
 assert.doesNotMatch(cloudSessions,/client\.auth\.getUser\(\)/,
   "chat hydration must not issue its own duplicate auth verification");
+const chatAuthorProfiles=between("async function loadChatSessionAuthorProfiles(uid, authorIds)", "async function loadCloudChatSessions");
+assert.match(chatAuthorProfiles,/publicAuthorProfileLoaded\.add\(profile\.id\)/,
+  "chat-list profile hydration must populate the shared loaded-profile cache to avoid refetching the same author on detail navigation");
 
-console.log("Story relationship RPC dedupe, illustration write dedupe, group list refresh avoidance, incremental group-turn loading, phone-state cache, and shared login auth verification checks passed.");
+console.log("Story relationship RPC dedupe, illustration write dedupe, group list refresh avoidance, incremental group-turn loading, phone-state cache, shared login auth verification, and author-profile hydration reuse checks passed.");
