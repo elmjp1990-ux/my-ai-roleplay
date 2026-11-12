@@ -12,6 +12,30 @@ assert.notEqual(helperEnd, -1);
 assert.notEqual(refreshStart, -1);
 assert.ok(refreshEnd > refreshStart);
 
+// Guard encounter rendering against reassigning an unchanged image URL.
+// Reassigning img.src on every AI/render update can trigger unnecessary image requests.
+const encounterRenderStart = html.indexOf("const dedicatedSprite=safeImage(character?.encounterPortraitImage");
+const encounterRenderEnd = html.indexOf("const title=panel.querySelector('.chat-heading')", encounterRenderStart);
+assert.notEqual(encounterRenderStart, -1, 'encounter sprite renderer must exist');
+assert.ok(encounterRenderEnd > encounterRenderStart, 'encounter sprite renderer boundary must exist');
+const encounterRender = html.slice(encounterRenderStart, encounterRenderEnd);
+assert.match(encounterRender, /if\(existingSprite\.dataset\.encounterSource!==halfBodyImage\)\s*\{/,
+  'existing encounter sprite must only update its source when the selected URL changes');
+assert.match(encounterRender, /existingSprite\.src=halfBodyImage;/,
+  'new or changed encounter sprite must receive its selected URL');
+assert.match(encounterRender, /existingSprite\.dataset\.encounterSource=halfBodyImage;/,
+  'encounter sprite must remember the URL already assigned');
+assert.match(html, /\.upload\(path,blob,\{upsert:false,contentType:blob\.type,cacheControl:'3600'\}\)/,
+  'illustration uploads must retain one-hour HTTP cache headers for immutable unique storage paths');
+
+const galleryHydrationStart = html.indexOf('async function hydrateEncounterGalleryIllustration(characterId) {');
+const galleryHydrationEnd = html.indexOf('\nasync function refreshCharacterIllustrationSignedUrl', galleryHydrationStart);
+assert.notEqual(galleryHydrationStart, -1, 'encounter gallery hydration must exist');
+assert.ok(galleryHydrationEnd > galleryHydrationStart, 'encounter gallery hydration boundary must exist');
+const galleryHydration = html.slice(galleryHydrationStart, galleryHydrationEnd);
+assert.match(galleryHydration, /\.order\('sort_order',\{ascending:true\}\)\s*\.limit\(1\)/,
+  'encounter must not eagerly sign and download all five gallery images');
+
 const pending = [];
 let createCalls = 0;
 const sandbox = {
