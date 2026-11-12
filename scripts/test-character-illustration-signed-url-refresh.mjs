@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 const html = readFileSync('index.html', 'utf8');
+const encounterScene = readFileSync('encounter-scene.js', 'utf8');
 assert.ok(html.includes('<script src="./signed-url-manager.js"></script>'));
 const helperStart = html.indexOf('const characterIllustrationSignedUrlManager');
 const helperEnd = html.indexOf('const characterIllustrationMetadataInflight', helperStart);
@@ -58,11 +59,11 @@ assert.equal(JSON.stringify(pending[1]),JSON.stringify({key:'user-a:owner/memory
 sandbox.testApi.invalidateMemoryPhotoSignedUrl('owner/memory.webp','user-a');
 assert.equal(JSON.stringify(pending[2]),JSON.stringify({invalidate:'user-a:owner/memory.webp'}));
 
-const encounterRenderStart = html.indexOf("const dedicatedSprite=safeImage(character?.encounterPortraitImage");
-const encounterRenderEnd = html.indexOf("const title=panel.querySelector('.chat-heading')", encounterRenderStart);
+const encounterRenderStart = encounterScene.indexOf("const dedicatedSprite=safeImage(character?.encounterPortraitImage");
+const encounterRenderEnd = encounterScene.indexOf("const title=panel.querySelector('.chat-heading')", encounterRenderStart);
 assert.notEqual(encounterRenderStart, -1, 'encounter sprite renderer must exist');
 assert.ok(encounterRenderEnd > encounterRenderStart, 'encounter sprite renderer boundary must exist');
-const encounterRender = html.slice(encounterRenderStart, encounterRenderEnd);
+const encounterRender = encounterScene.slice(encounterRenderStart, encounterRenderEnd);
 assert.match(encounterRender, /if\(existingSprite\.dataset\.encounterSource!==halfBodyImage\)\s*\{/);
 assert.match(encounterRender, /existingSprite\.src=halfBodyImage;/);
 assert.match(encounterRender, /existingSprite\.dataset\.encounterSource=halfBodyImage;/);
