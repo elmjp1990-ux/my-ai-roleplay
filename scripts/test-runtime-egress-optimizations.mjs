@@ -74,7 +74,7 @@ assert.match(authCoalescer,/verifiedAuthUserInflight\.get\(expectedUid\)/,
   "concurrent auth verification for the same UID must share the in-flight request");
 assert.match(authCoalescer,/verifiedAuthUserInflight\.delete\(expectedUid\)/,
   "auth verification must not be cached after the request settles");
-const ownerLoader=between("async function loadSupabaseCharacters(user)","async function loadSupabaseProfileAndWallet");
+const ownerLoader=between("async function loadSupabaseCharacters(user)","async function getCharacterIllustrationSignedUrl");
 assert.match(ownerLoader,/getVerifiedAuthUser\(user\.id\)/,
   "owner character hydration must use the shared verified-auth request");
 const cloudSessions=between("async function loadCloudChatSessions(user, options = {})","async function ");
