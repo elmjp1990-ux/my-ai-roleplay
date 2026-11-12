@@ -123,8 +123,10 @@ assert.ok(profileCompressorUpdated.includes("compressUploadImage(file,{maxEdge:2
 const illustrationUploader=block("async function uploadCharacterIllustrationDataUrl","async function syncCharacterIllustrations");
 assert.match(illustrationUploader,/blob\.size>10\*1024\*1024/);
 assert.match(memoryAlbum,/window\.compressMemoryImageForStorage=compressMemoryImage/);
-assert.equal([...html.matchAll(/\.upload\(/g)].length,3,
-  "all Storage upload paths must stay covered by the image/video compression checks");
+assert.equal([...html.matchAll(/\.upload\(/g)].length,2,
+  "main application upload paths must stay covered by the image/video compression checks");
+assert.equal([...memoryAlbum.matchAll(/\.upload\(/g)].length,1,
+  "the extracted memory album upload path must stay covered by the image compression checks");
 
 const wordmarkBytes=fs.statSync("LOGO_WEBLOGO.webp").size;
 const iconBytes=fs.statSync("LOGO_WEBICON.webp").size;
