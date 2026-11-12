@@ -6,6 +6,7 @@ on:
       - "chat-render-lifecycle.js"
       - "image-compression.js"
       - "scripts/test-image-compression.mjs"
+      - "scripts/test-media-asset-optimization.mjs"
       - "scripts/test-chat-render-lifecycle.mjs"
       - ".github/workflows/chat-render-lifecycle.yml"
       - "index.html"
