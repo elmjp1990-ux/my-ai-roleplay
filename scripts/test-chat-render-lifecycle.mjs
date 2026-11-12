@@ -105,17 +105,18 @@ test('a failing overlay extension does not block the base renderer', () => {
 });
 
 const appHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const memoryAlbum = fs.readFileSync(new URL('../memory-album.js', import.meta.url), 'utf8');
 
 test('memory album background integrations use registered lifecycle hooks, not render wrappers', () => {
-  assert.match(appHtml, /register\('afterSingleConversation',\s*'memory-album\.single-background'/);
-  assert.match(appHtml, /register\('afterGroupConversation',\s*'memory-album\.group-background'/);
+  assert.match(memoryAlbum, /register\('afterSingleConversation',\s*'memory-album\.single-background'/);
+  assert.match(memoryAlbum, /register\('afterGroupConversation',\s*'memory-album\.group-background'/);
   assert.doesNotMatch(appHtml, /const oldRenderConversation\s*=\s*renderConversation/);
   assert.doesNotMatch(appHtml, /const oldRenderGroupConversation\s*=\s*renderGroupConversation/);
 });
 
 test('single and group album overlays are dispatched through the lifecycle registry', () => {
-  assert.match(appHtml, /register\('renderSingleOverlay',\s*'memory-album\.single-overlay'/);
-  assert.match(appHtml, /register\('renderGroupOverlay',\s*'memory-album\.group-overlay'/);
+  assert.match(memoryAlbum, /register\('renderSingleOverlay',\s*'memory-album\.single-overlay'/);
+  assert.match(memoryAlbum, /register\('renderGroupOverlay',\s*'memory-album\.group-overlay'/);
   assert.match(appHtml, /lifecycle\.render\('renderSingleOverlay'/);
   assert.match(appHtml, /lifecycle\.render\('renderGroupOverlay'/);
   assert.doesNotMatch(appHtml, /const oldSingle\s*=\s*renderChatOverlay/);
