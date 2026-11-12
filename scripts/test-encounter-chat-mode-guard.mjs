@@ -242,7 +242,7 @@ assert.match(frontend, /function showEncounterLeaveDialog\(session\)/);
 assert.match(frontend, /data-action="encounter-temporary-leave"/);
 assert.match(frontend, /data-action="encounter-end-confirm"/);
 assert.match(frontend, /activeEncounter\?\.encounterMode===true\)\{showEncounterLeaveDialog/);
-assert.match(frontend, /findResumableEncounterSession\(person\.id,placeKey\)/);
+assert.match(cityMap, /findResumableEncounterSession\(person\.id,placeKey\)/);
 assert.match(frontend, /encounterDay/);
 assert.match(frontend, /if\(isNewEncounter && sessionData\.archived!==true\)groups\.delete\(groupKey\)/);
 assert.match(frontend, /encounter-dialog-dismiss/);
