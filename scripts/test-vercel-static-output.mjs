@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const outputDir = path.join(process.cwd(), 'dist');
+const root = process.cwd();
+const outputDir = path.join(root, 'dist');
 const expectedFiles = [
   'LOGO_WEBICON.webp',
   'LOGO_WEBLOGO.webp',
@@ -11,9 +12,19 @@ const expectedFiles = [
   'memory-capture.js',
 ].sort();
 
+const vercelConfig = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
+assert.equal(vercelConfig.buildCommand, 'node scripts/build-vercel-static.mjs');
+assert.equal(vercelConfig.outputDirectory, 'dist');
+
 assert.ok(fs.existsSync(outputDir), 'Vercel output directory must exist.');
 const actualFiles = fs.readdirSync(outputDir).sort();
 assert.deepEqual(actualFiles, expectedFiles, 'Vercel output must contain only the runtime allowlist.');
+
+const totalBytes = actualFiles.reduce(
+  (total, file) => total + fs.statSync(path.join(outputDir, file)).size,
+  0
+);
+assert.ok(totalBytes <= 1_500_000, 'Vercel static output exceeds the 1.5 MB deployment budget: ' + totalBytes + ' bytes.');
 
 const html = fs.readFileSync(path.join(outputDir, 'index.html'), 'utf8');
 const references = new Set();
@@ -40,4 +51,4 @@ for (const excluded of ['.github', 'docs', 'scripts', 'supabase', 'LOGO_WEBICON.
   assert.ok(!actualFiles.includes(excluded), 'Repository-only content must not be deployed: ' + excluded);
 }
 
-console.log('Vercel static output verified: ' + actualFiles.length + ' files, ' + references.size + ' local references resolved.');
+console.log('Vercel static output verified: ' + actualFiles.length + ' files, ' + references.size + ' local references resolved, ' + totalBytes + ' bytes total.');
