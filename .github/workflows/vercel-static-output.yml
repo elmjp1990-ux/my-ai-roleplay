@@ -9,6 +9,7 @@ on:
       - "image-compression.js"
       - "signed-url-manager.js"
       - "memory-album.js"
+      - "encounter-scene.js"
       - "scripts/test-media-asset-optimization.mjs"
       - "scripts/test-signed-url-manager.mjs"
       - "scripts/test-chat-render-lifecycle.mjs"

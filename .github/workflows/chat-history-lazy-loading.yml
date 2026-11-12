@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "index.html"
+      - "encounter-scene.js"
       - "scripts/test-chat-history-lazy-loading.mjs"
       - "scripts/test-character-illustration-signed-url-refresh.mjs"
       - "scripts/test-public-illustration-lazy-loading.mjs"

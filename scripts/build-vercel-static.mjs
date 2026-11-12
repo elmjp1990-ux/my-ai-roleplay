@@ -13,6 +13,7 @@ const runtimeFiles = [
   'image-compression.js',
   'signed-url-manager.js',
   'memory-album.js',
+  'encounter-scene.js',
   'LOGO_WEBICON.webp',
   'LOGO_WEBLOGO.webp',
   'encounter-default-scene.webp',
