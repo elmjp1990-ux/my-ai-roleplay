@@ -1905,30 +1905,36 @@ const ids = (rows || []).map(row => row.id);
 
 const characterIllustrationSignedUrlCache = new Map();
 const characterIllustrationSignedUrlInflight = new Map();
+const characterIllustrationForcedRefreshInflight = new Map();
 async function getCharacterIllustrationSignedUrl(storagePath, options={}) {
   const forceRefresh=options?.forceRefresh===true;
   if(forceRefresh){
-    // A Storage 400 InvalidJWT may mean the browser still has a URL the server
-    // considers expired. Evict both layers before requesting a replacement.
+    // Several images can fail for the same path in one render. Share one forced
+    // refresh instead of creating a burst of identical Storage requests.
+    const forced=characterIllustrationForcedRefreshInflight.get(storagePath);
+    if(forced)return forced;
     characterIllustrationSignedUrlCache.delete(storagePath);
+    // Supersede a possibly expired normal request. Its completion is fenced below.
     characterIllustrationSignedUrlInflight.delete(storagePath);
   }
   const now=Date.now();
   const cached=characterIllustrationSignedUrlCache.get(storagePath);
-  if(cached&&cached.expiresAt>now+60000)return cached.url;
-  if(characterIllustrationSignedUrlInflight.has(storagePath))return characterIllustrationSignedUrlInflight.get(storagePath);
+  if(!forceRefresh&&cached&&cached.expiresAt>now+60000)return cached.url;
+  if(!forceRefresh&&characterIllustrationSignedUrlInflight.has(storagePath))return characterIllustrationSignedUrlInflight.get(storagePath);
   const request=(async()=>{
     const {data,error}=await window.mySupabase.storage.from('character-illustrations').createSignedUrl(storagePath,3600);
     if(error||!data?.signedUrl)throw new Error(error?.message||'無法取得角色立繪網址');
-    // Do not let a superseded request repopulate the cache after a forced refresh.
+    // Only the newest request may populate cache state.
     if(characterIllustrationSignedUrlInflight.get(storagePath)===request){
       characterIllustrationSignedUrlCache.set(storagePath,{url:data.signedUrl,expiresAt:Date.now()+3300000});
     }
     return data.signedUrl;
   })();
   characterIllustrationSignedUrlInflight.set(storagePath,request);
+  if(forceRefresh)characterIllustrationForcedRefreshInflight.set(storagePath,request);
   try{return await request;}finally{
     if(characterIllustrationSignedUrlInflight.get(storagePath)===request)characterIllustrationSignedUrlInflight.delete(storagePath);
+    if(characterIllustrationForcedRefreshInflight.get(storagePath)===request)characterIllustrationForcedRefreshInflight.delete(storagePath);
   }
 }
 const memoryPhotoSignedUrlCache = new Map();
