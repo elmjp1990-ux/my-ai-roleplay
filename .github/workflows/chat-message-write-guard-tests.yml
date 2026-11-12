@@ -1,0 +1,98 @@
+name: Chat message write guard disposable integration tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "supabase/migrations/20261111130000_activate_chat_message_write_guards.sql"
+      - "supabase/drafts/test-chat-message-write-guards.sql"
+      - "supabase/drafts/setup-chat-write-guard-concurrency.sql"
+      - "scripts/test-chat-write-guard-concurrency.sh"
+      - "supabase/drafts/current-state-*.json"
+      - "scripts/build-disposable-schema-fixture.mjs"
+      - ".github/workflows/chat-message-write-guard-tests.yml"
+  push:
+    branches:
+      - fix/chat-message-write-security-hardening
+    paths:
+      - "supabase/migrations/20261111130000_activate_chat_message_write_guards.sql"
+      - "supabase/drafts/test-chat-message-write-guards.sql"
+      - "supabase/drafts/setup-chat-write-guard-concurrency.sql"
+      - "scripts/test-chat-write-guard-concurrency.sh"
+      - ".github/workflows/chat-message-write-guard-tests.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: chat-message-write-guards-${{ github.event.pull_request.head.ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-chat-write-guards:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out PR branch
+        uses: actions/checkout@v7.0.1
+
+      - name: Install pinned Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.84.2
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Verify no hosted Supabase credentials are available
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${SUPABASE_ACCESS_TOKEN:-}" || -n "${SUPABASE_DB_PASSWORD:-}" ]]; then
+            echo "Hosted Supabase credentials must not be present in this workflow."
+            exit 1
+          fi
+          supabase --version
+
+      - name: Start isolated local Supabase database
+        shell: bash
+        run: |
+          set -euo pipefail
+          local_project="$RUNNER_TEMP/poyozz-chat-write-guards"
+          mkdir -p "$local_project/supabase/migrations"
+          sed 's/^project_id = .*/project_id = "poyozz-chat-write-guards"/' \
+            supabase/config.toml > "$local_project/supabase/config.toml"
+          cd "$local_project"
+          supabase db start
+          DB_URL="$(supabase status --output env | sed -n 's/^DB_URL=//p' | sed 's/^"//;s/"$//')"
+          if [[ -z "$DB_URL" ]]; then
+            echo "Could not resolve the isolated local Supabase DB_URL."
+            exit 1
+          fi
+          echo "DATABASE_URL=$DB_URL" >> "$GITHUB_ENV"
+          echo "LOCAL_SUPABASE_PROJECT=$local_project" >> "$GITHUB_ENV"
+
+      - name: Load synthetic schema, apply PR migration, and run security cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/build-disposable-schema-fixture.mjs > "$RUNNER_TEMP/current-state-schema.sql"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -f supabase/migrations/20261111130000_activate_chat_message_write_guards.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -f supabase/drafts/test-chat-message-write-guards.sql
+          DATABASE_URL="$DATABASE_URL" bash scripts/test-chat-write-guard-concurrency.sh
+
+      - name: Stop and discard local database
+        if: always()
+        shell: bash
+        run: |
+          local_project="$RUNNER_TEMP/poyozz-chat-write-guards"
+          if [[ -d "$local_project" ]]; then
+            cd "$local_project"
+            supabase stop --no-backup
+          fi
