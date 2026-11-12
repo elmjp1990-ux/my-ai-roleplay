@@ -7,6 +7,7 @@ on:
       - "image-compression.js"
       - "signed-url-manager.js"
       - "memory-album.js"
+      - "encounter-scene.js"
       - "scripts/test-signed-url-manager.mjs"
       - "scripts/test-image-compression.mjs"
       - "scripts/test-media-asset-optimization.mjs"
