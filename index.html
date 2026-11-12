@@ -1731,12 +1731,30 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     }
   }
 
+  // Concurrent login hydrators share one server-verified auth lookup per UID.
+  // This map only coalesces in-flight checks; it never caches auth beyond the request.
+  const verifiedAuthUserInflight = new Map();
+  function getVerifiedAuthUser(expectedUid) {
+    const client=window.mySupabase;
+    if(!client||!expectedUid)return Promise.resolve(null);
+    const existing=verifiedAuthUserInflight.get(expectedUid);
+    if(existing)return existing;
+    const request=client.auth.getUser().then(({data,error})=>{
+      if(error||data?.user?.id!==expectedUid)return null;
+      return data.user;
+    }).catch(()=>null).finally(()=>{
+      if(verifiedAuthUserInflight.get(expectedUid)===request)verifiedAuthUserInflight.delete(expectedUid);
+    });
+    verifiedAuthUserInflight.set(expectedUid,request);
+    return request;
+  }
+
   async function loadSupabaseCharacters(user) {
     const client = window.mySupabase;
     if (!client || !user?.id) return;
     try {
-      const { data: authResult, error: authError } = await client.auth.getUser();
-      if (authError || authResult?.user?.id !== user.id) return;
+      const verifiedUser = await getVerifiedAuthUser(user.id);
+      if (!verifiedUser) return;
 
       // 先讀取雲端角色；將此裝置上屬於目前帳號、但雲端尚不存在的舊角色補上雲端。
       // 這可修復舊版匯入只存 localStorage 的資料；不會上傳其他帳號的本機角色。
@@ -3730,8 +3748,8 @@ async function loadCloudChatSessions(user, options = {}) {
   const onlySessionId = options.onlySessionId || null;
   const syncStartedAt = Date.now();
   try {
-    const { data: authResult, error: authError } = await client.auth.getUser();
-    if (authError || authResult?.user?.id !== user.id) return;
+    const verifiedUser = await getVerifiedAuthUser(user.id);
+    if (!verifiedUser) return;
     let sessionQuery = client.from('chat_sessions')
       .select([
         'id,user_id,character_id,character_name,status,chat_mode,created_at,updated_at',
