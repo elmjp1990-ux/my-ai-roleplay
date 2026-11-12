@@ -62,9 +62,14 @@ for (const styleAttr of html.matchAll(/\bstyle\s*=\s*["']([^"']*)["']/gi)) {
 
 // Literal local asset paths in inline and external runtime JavaScript.
 const runtimeJs = [html, fs.readFileSync(path.join(outputDir, 'memory-capture.js'), 'utf8')];
-const localAssetPattern = new RegExp('["\\']((?:\\.\\/|\\/)[^"\\'\\s?#]+' + assetExtensions + ')["\\']', 'gi');
+const localAssetPatterns = [
+  new RegExp('"((?:\\.\\/|\\/)[^"\\s?#]+' + assetExtensions + ')"', 'gi'),
+  new RegExp("'((?:\\.\\/|\\/)[^'\\s?#]+" + assetExtensions + ")'", 'gi'),
+];
 for (const source of runtimeJs) {
-  for (const match of source.matchAll(localAssetPattern)) addReference(match[1]);
+  for (const pattern of localAssetPatterns) {
+    for (const match of source.matchAll(pattern)) addReference(match[1]);
+  }
 }
 
 for (const reference of references) {
