@@ -8,6 +8,8 @@ on:
       - "chat-render-lifecycle.js"
       - "image-compression.js"
       - "signed-url-manager.js"
+      - "city-map.js"
+      - "scripts/test-city-map-module.mjs"
       - "memory-album.js"
       - "encounter-scene.js"
       - "scripts/test-media-asset-optimization.mjs"
@@ -38,5 +40,9 @@ jobs:
         run: node scripts/build-vercel-static.mjs
       - name: Verify deployed files and local asset references
         run: node scripts/test-vercel-static-output.mjs
+      - name: Parse extracted city map module
+        run: node --check city-map.js
+      - name: Verify extracted city map module contract
+        run: node scripts/test-city-map-module.mjs
       - name: Verify chat render lifecycle contract
         run: node --test scripts/test-chat-render-lifecycle.mjs
