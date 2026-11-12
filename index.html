@@ -12933,7 +12933,12 @@ document.addEventListener('submit',function(event){
     if(composer){
       const suggestions=composer.querySelector('.suggestions');
       if(suggestions)suggestions.hidden=beats.length>0&&idx<beats.length-1;
-      composer.classList.toggle('encounter-awaiting-beat',beats.length>0&&idx<beats.l  const encounterRenderLifecycle=window.PoyozzChatRenderLifecycle;
+      composer.classList.toggle('encounter-awaiting-beat',beats.length>0&&idx<beats.length-1);
+    }
+    messages.dataset.encounterBeatKey=beatKey;
+    messages.dataset.encounterBeatIndex=String(idx);
+  };
+  const encounterRenderLifecycle=window.PoyozzChatRenderLifecycle;
   if(encounterRenderLifecycle){
     encounterRenderLifecycle.register('afterSingleConversation','encounter.single-scene',({session:renderSession,panel:renderPanel})=>{
       const session=renderSession||currentSession();
