@@ -8,7 +8,7 @@
   global.PoyozzCityMap = Object.freeze({
     render(dependencies) {
       const {
-        $, state, escapeHTML, safeImage, currentUser, toast, go, requireLogin,
+        $, state, accessible, escapeHTML, safeImage, currentUser, toast, go, requireLogin,
         persist, hydratePublicCharacterIllustrations, characterVideoObserver,
         releaseCharacterVideo, hydrateCharacterVideo, findResumableEncounterSession,
         setEncounterLifecycleState, saveChatSessionSafely, createEncounterSession
