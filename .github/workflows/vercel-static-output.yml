@@ -7,6 +7,8 @@ on:
       - "memory-capture.js"
       - "chat-render-lifecycle.js"
       - "image-compression.js"
+      - "signed-url-manager.js"
+      - "scripts/test-signed-url-manager.mjs"
       - "scripts/test-chat-render-lifecycle.mjs"
       - ".github/workflows/chat-render-lifecycle.yml"
       - "*.webp"
