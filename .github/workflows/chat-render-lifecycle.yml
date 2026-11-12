@@ -26,5 +26,7 @@ jobs:
           node-version: "22"
       - name: Verify shared image compression presets
         run: node --test scripts/test-image-compression.mjs
+      - name: Verify media asset and compression adapter contracts
+        run: node scripts/test-media-asset-optimization.mjs
       - name: Verify render lifecycle registration and dispatch contract
         run: node --test scripts/test-chat-render-lifecycle.mjs
