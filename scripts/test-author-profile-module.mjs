@@ -14,12 +14,12 @@ const favoritesStart = html.indexOf('function renderFavorites()', adapterStart);
 assert.ok(adapterStart >= 0 && favoritesStart > adapterStart && favoritesStart - adapterStart < 900,
   'index.html must retain only a thin author-profile adapter.');
 const adapter = html.slice(adapterStart, favoritesStart);
-assert.match(adapter, /window\\.PoyozzAuthorProfile\\?\\.render/);
-assert.match(adapter, /getSupabaseClient:\\(\\) => window\\.mySupabase/);
+assert.match(adapter, /window\.PoyozzAuthorProfile\?\.render/);
+assert.match(adapter, /getSupabaseClient:\(\) => window\.mySupabase/);
 
-assert.match(moduleSource, /global\\.PoyozzAuthorProfile = Object\\.freeze/);
-assert.match(moduleSource, /render\\(dependencies\\)/);
-assert.doesNotMatch(moduleSource, /window\\.mySupabase/,
+assert.match(moduleSource, /global\.PoyozzAuthorProfile = Object\.freeze/);
+assert.match(moduleSource, /render\(dependencies\)/);
+assert.doesNotMatch(moduleSource, /window\.mySupabase/,
   'The extracted module must receive Supabase access through dependency injection.');
 
 for (const dependency of [
