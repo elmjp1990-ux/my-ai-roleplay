@@ -19,8 +19,12 @@ fs.mkdirSync(outputDir, { recursive: true });
 
 for (const relativePath of runtimeFiles) {
   const source = path.join(root, relativePath);
-  if (!fs.existsSync(source) || !fs.statSync(source).isFile()) {
+  if (!fs.existsSync(source)) {
     throw new Error('Required Vercel runtime file is missing: ' + relativePath);
+  }
+  const sourceStat = fs.lstatSync(source);
+  if (!sourceStat.isFile() || sourceStat.isSymbolicLink()) {
+    throw new Error('Vercel runtime source must be a regular, non-symlink file: ' + relativePath);
   }
   fs.copyFileSync(source, path.join(outputDir, relativePath));
 }
