@@ -17,6 +17,7 @@ assert.match(guardMigration, /SET search_path = ['"]{2}/);
 assert.match(guardMigration, /NEW\.chat_mode IS DISTINCT FROM OLD\.chat_mode/);
 
 const frontend = fs.readFileSync("index.html", "utf8");
+const cityMap = fs.readFileSync("city-map.js", "utf8");
 assert.doesNotMatch(frontend, /data-action="start-new-story"/);
 assert.ok(frontend.includes('const sessionId = options.id || id();'));
 assert.ok(frontend.includes('state.sessions[sessionId] = session;'));
@@ -24,7 +25,7 @@ assert.match(frontend, /function compactLocalStateForQuota\(sourceState = state\
 assert.match(frontend, /localStorageCompactMode = true/);
 assert.match(frontend, /雲端聊天仍會照常同步/);
 assert.match(frontend, /character\\?\\.visibility!==['\"]public['\"]\\|\\|character\\.deletedAt\\|\\|!accessible\\(character\\)/);
-assert.match(frontend, /Author access to a private character is for management only/);
+assert.match(cityMap, /Author access to a private character is for management only/);
 
 assert.ok(frontend.includes("Object.prototype.hasOwnProperty.call(priorSnapshot,'authorId') && priorSnapshot.authorId !== ''"));
 assert.ok(frontend.includes("snapshot.authorId === null || isUuid(snapshot.authorId)"));
@@ -38,9 +39,9 @@ assert.ok(frontend.includes("BY ${e(creatorAttribution)}"));
 assert.ok(frontend.includes("c.authorId ? `<button class=\"author-link\""));
 
 assert.doesNotMatch(frontend, /const cityScheduleCache=new Map\(\)/);
-assert.match(frontend, /Always re-check through the server RPC when opening a city location/);
-assert.match(frontend, /character.encounterSchedules='';/);
-assert.match(frontend, /const isCurrentCityCharacterEligible=\(person\)=>/);
+assert.match(cityMap, /Always re-check through the server RPC when opening a city location/);
+assert.match(cityMap, /character.encounterSchedules='';/);
+assert.match(cityMap, /const isCurrentCityCharacterEligible=\(person\)=>/);
 assert.match(frontend, /isCurrentCityCharacterEligible\(person\)/);
 assert.match(frontend, /async function startChat\(characterId\)/);
 assert.match(frontend, /\.eq\('user_id', userId\)\.eq\('character_id', characterId\)/);
@@ -442,9 +443,9 @@ assert.match(frontend, /async function loadStoryRelationshipState\(session\)/);
 assert.match(frontend, /get_story_relationship_state/);
 assert.match(frontend, /storyRelationshipLabel/);
 assert.match(frontend, /story-relationship-meter/);
-assert.match(frontend, /get_latest_settled_encounter_affinity/);
+assert.match(cityMap, /get_latest_settled_encounter_affinity/);
 assert.match(frontend, /city-character-affinity/);
-assert.match(frontend, /你們還不認識/);
+assert.match(cityMap, /你們還不認識/);
 assert.match(frontend, /登入後查看與角色的好感度/);
 assert.match(frontend, /loadCityCharacterAffinity\(person.id\)/);
 assert.match(frontend, /city-character-affinity-meter/);
