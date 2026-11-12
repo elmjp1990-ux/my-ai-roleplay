@@ -4,15 +4,17 @@ import fs from "node:fs";
 const html=fs.readFileSync("index.html","utf8");
 const compressor=fs.readFileSync("image-compression.js","utf8");
 const memoryAlbum=fs.readFileSync("memory-album.js","utf8");
+const encounterScene=fs.readFileSync("encounter-scene.js","utf8");
 assert.ok(html.includes('<script src="./memory-album.js"></script>'));
+assert.ok(html.includes('<script src="./encounter-scene.js"></script>'));
 assert.ok(html.includes('<script src="./image-compression.js"></script>'));
 assert.ok(compressor.includes("window.PoyozzImageCompression=Object.freeze(api)"));
 assert.ok(compressor.includes("createImageBitmap"));
 assert.ok(compressor.includes("URL.revokeObjectURL"));
-function block(start,end){
-  const a=html.indexOf(start),b=html.indexOf(end,a+start.length);
+function block(start,end,source=html){
+  const a=source.indexOf(start),b=source.indexOf(end,a+start.length);
   assert.ok(a>=0&&b>a,"missing source block: "+start);
-  return html.slice(a,b);
+  return source.slice(a,b);
 }
 
 const imageCompressor=block("async function compressUploadImage","/* Chat sessions:");
@@ -67,7 +69,7 @@ assert.match(encounterLoader,/encounterGalleryIllustrationCache\.get\(key\)/);
 assert.match(encounterLoader,/encounterGalleryIllustrationInflight\.has\(key\)/);
 assert.match(encounterLoader,/requestUid=currentUser\(\)\?\.uid\|\|null/);
 
-const encounterLifecycle=block("const encounterRenderLifecycle=window.PoyozzChatRenderLifecycle","document.addEventListener('click',event=>{");
+const encounterLifecycle=block("const encounterRenderLifecycle=window.PoyozzChatRenderLifecycle","document.addEventListener('click',event=>{",encounterScene);
 assert.match(encounterLifecycle,/register\('afterSingleConversation','encounter\.single-scene'/);
 assert.match(encounterLifecycle,/register\('afterMessages','encounter\.progressive-dialogue'/);
 assert.match(encounterLifecycle,/if\(!session\?\.encounterMode\|\|!panel\)return/);
