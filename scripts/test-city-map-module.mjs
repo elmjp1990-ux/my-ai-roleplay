@@ -16,7 +16,7 @@ assert.ok(wrapperStart >= 0 && initializationStart > wrapperStart && initializat
 assert.match(cityMap, /global\.PoyozzCityMap = Object\.freeze/);
 assert.match(cityMap, /render\(dependencies\)/);
 for (const name of [
-  'state', 'escapeHTML', 'safeImage', 'currentUser', 'toast', 'go', 'requireLogin',
+  'state', 'accessible', 'escapeHTML', 'safeImage', 'currentUser', 'toast', 'go', 'requireLogin',
   'persist', 'hydratePublicCharacterIllustrations', 'characterVideoObserver',
   'releaseCharacterVideo', 'hydrateCharacterVideo', 'findResumableEncounterSession',
   'setEncounterLifecycleState', 'saveChatSessionSafely', 'createEncounterSession'
