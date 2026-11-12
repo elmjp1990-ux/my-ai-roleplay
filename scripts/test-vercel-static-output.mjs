@@ -18,11 +18,11 @@ assert.deepEqual(actualFiles, expectedFiles, 'Vercel output must contain only th
 const html = fs.readFileSync(path.join(outputDir, 'index.html'), 'utf8');
 const references = new Set();
 
-for (const match of html.matchAll(/(?:src|href)\s*=\s*[\"']((?:\.\/|\/)[^\"'?#]+)[\"']/gi)) {
+for (const match of html.matchAll(/(?:src|href)\s*=\s*["']((?:\.\/|\/)[^"'?#]+)["']/gi)) {
   references.add(match[1]);
 }
 
-for (const match of html.matchAll(/[\"'\x60](\.\/[^\"'\x60\s?#]+\.(?:webp|png|jpe?g|svg|js|css|json))[\"'\x60]/gi)) {
+for (const match of html.matchAll(/["'\x60](\.\/[^"'\x60\s?#]+\.(?:webp|png|jpe?g|svg|js|css|json))["'\x60]/gi)) {
   references.add(match[1]);
 }
 
