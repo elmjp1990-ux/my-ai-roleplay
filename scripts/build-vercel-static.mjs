@@ -14,6 +14,7 @@ const runtimeFiles = [
   'signed-url-manager.js',
   'city-map.js',
   'followed-authors.js',
+  'author-profile.js',
   'memory-album.js',
   'encounter-scene.js',
   'LOGO_WEBICON.webp',
