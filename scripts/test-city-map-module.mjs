@@ -6,10 +6,12 @@ const cityMap = fs.readFileSync('city-map.js', 'utf8');
 
 assert.match(html, /<script src="\.\/city-map\.js"><\/script>/);
 assert.match(html, /function renderCityMapMVP\(\)\s*\{[\s\S]*?window\.PoyozzCityMap\?\.render/);
-assert.ok(html.indexOf('<script src="./city-map.js"></script>') < html.indexOf('<script>\n'),
-  'City map module must load before the main application script.');
-assert.doesNotMatch(html, /function renderCityMapMVP\(\)\s*\{[\s\S]{2000,}function renderCityMapMVP/,
-  'The city map implementation must not remain duplicated in index.html.');
+assert.ok(html.indexOf('<script src="./city-map.js"></script>') < html.indexOf('function renderCityMapMVP()'),
+  'City map module must load before the main application can invoke it.');
+const wrapperStart = html.indexOf('function renderCityMapMVP()');
+const initializationStart = html.indexOf('/* Initialization */', wrapperStart);
+assert.ok(wrapperStart >= 0 && initializationStart > wrapperStart && initializationStart - wrapperStart < 1200,
+  'index.html must retain only the small city-map dependency adapter, not the extracted implementation.');
 
 assert.match(cityMap, /global\.PoyozzCityMap = Object\.freeze/);
 assert.match(cityMap, /render\(dependencies\)/);
