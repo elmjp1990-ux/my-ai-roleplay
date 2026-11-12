@@ -2,8 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const root = process.cwd();
-const outputDir = path.join(root, 'dist');
+const outputDir = path.join(process.cwd(), 'dist');
 const expectedFiles = [
   'LOGO_WEBICON.webp',
   'LOGO_WEBLOGO.webp',
@@ -19,16 +18,16 @@ assert.deepEqual(actualFiles, expectedFiles, 'Vercel output must contain only th
 const html = fs.readFileSync(path.join(outputDir, 'index.html'), 'utf8');
 const references = new Set();
 
-for (const match of html.matchAll(/(?:src|href)\\s*=\\s*[\"']((?:\\.\\/|\\/)[^\"'?#]+)[\"']/gi)) {
+for (const match of html.matchAll(/(?:src|href)\s*=\s*[\"']((?:\.\/|\/)[^\"'?#]+)[\"']/gi)) {
   references.add(match[1]);
 }
 
-for (const match of html.matchAll(/[\"'\x60](\\.\\/[^\"'\x60\\s?#]+\\.(?:webp|png|jpe?g|svg|js|css|json))[\"'\x60]/gi)) {
+for (const match of html.matchAll(/[\"'\x60](\.\/[^\"'\x60\s?#]+\.(?:webp|png|jpe?g|svg|js|css|json))[\"'\x60]/gi)) {
   references.add(match[1]);
 }
 
 for (const reference of references) {
-  const relativePath = reference.replace(/^\\.\\//, '').replace(/^\\//, '');
+  const relativePath = reference.replace(/^\.\//, '').replace(/^\//, '');
   assert.ok(fs.existsSync(path.join(outputDir, relativePath)), 'Local runtime reference is missing from Vercel output: ' + reference);
 }
 
