@@ -32,3 +32,5 @@ jobs:
         run: node scripts/build-vercel-static.mjs
       - name: Verify deployed files and local asset references
         run: node scripts/test-vercel-static-output.mjs
+      - name: Verify chat render lifecycle contract
+        run: node --test scripts/test-chat-render-lifecycle.mjs
