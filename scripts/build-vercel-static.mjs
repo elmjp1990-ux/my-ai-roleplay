@@ -9,6 +9,7 @@ const outputDir = path.join(root, 'dist');
 const runtimeFiles = [
   'index.html',
   'memory-capture.js',
+  'chat-render-lifecycle.js',
   'LOGO_WEBICON.webp',
   'LOGO_WEBLOGO.webp',
   'encounter-default-scene.webp',

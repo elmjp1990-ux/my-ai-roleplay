@@ -1,0 +1,26 @@
+name: Chat render lifecycle contract
+
+on:
+  pull_request:
+    paths:
+      - "chat-render-lifecycle.js"
+      - "scripts/test-chat-render-lifecycle.mjs"
+      - ".github/workflows/chat-render-lifecycle.yml"
+      - "index.html"
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  render-lifecycle-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify render lifecycle registration and dispatch contract
+        run: node --test scripts/test-chat-render-lifecycle.mjs
