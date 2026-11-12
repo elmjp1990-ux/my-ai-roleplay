@@ -65,6 +65,7 @@ const runtimeJs = [html, fs.readFileSync(path.join(outputDir, 'memory-capture.js
 const localAssetPatterns = [
   new RegExp('"((?:\\.\\/|\\/)[^"\\s?#]+' + assetExtensions + ')"', 'gi'),
   new RegExp("'((?:\\.\\/|\\/)[^'\\s?#]+" + assetExtensions + ")'", 'gi'),
+  new RegExp('`((?:\\.\\/|\\/)[^`\\s?#]+' + assetExtensions + ')`', 'gi'),
 ];
 for (const source of runtimeJs) {
   for (const pattern of localAssetPatterns) {
@@ -84,8 +85,12 @@ for (const required of ['LOGO_WEBICON.webp', 'LOGO_WEBLOGO.webp', 'encounter-def
     'Required runtime asset must remain referenced: ' + required);
 }
 
+for (const file of expectedFiles) {
+  const bytes = fs.statSync(path.join(outputDir, file)).size;
+  console.log('  ' + file + ': ' + bytes + ' bytes / ' + fileBudgets[file] + ' byte budget');
+}
 console.log(
   'Vercel static output verified: ' + actualFiles.length + ' files, ' +
   references.size + ' local asset references resolved, ' + totalBytes +
-  ' bytes total. Individual file budgets passed.'
+  ' bytes total. Individual and total file budgets passed.'
 );
