@@ -2931,12 +2931,9 @@ if (characterError) {
 
   async function savePersonaPresets(account) {
     if (!account?.uid || !window.mySupabase) throw new Error('無法確認登入帳號或 Supabase 連線。');
+    // saveSupabaseProfile already verifies both private birthdate and persona data after the write.
+    // Reuse that verified result instead of issuing a second identical private-profile RPC.
     await saveSupabaseProfile(account);
-    const { data, error: verifyError } = await window.mySupabase.rpc('get_my_private_profile_data');
-    if (verifyError) throw new Error('驗證人設儲存結果失敗：' + verifyError.message);
-    const presets = Array.isArray(account.personas) ? account.personas : [];
-    if (!data) throw new Error('雲端沒有更新這個帳號的人設資料，請重新登入後再試。');
-    if (stablePersonaJson(data.persona_presets || []) !== stablePersonaJson(presets)) throw new Error('雲端回讀的人設內容與送出內容不一致，請重新儲存。');
   }
 
   async function loginWithGoogle() {
