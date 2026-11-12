@@ -8125,6 +8125,7 @@ function renderMessages(scroll = true) {
   const messageInput=$('messageInput');
   if(messageInput&&loadingHistory){messageInput.disabled=true;messageInput.placeholder=s.cloudMessagesError?'聊天紀錄載入失敗，請重新載入':'正在載入聊天紀錄…';}
   else if(messageInput&&s.cloudOwned){messageInput.disabled=false;messageInput.placeholder='留空發送，角色會繼續說下去';}
+  window.PoyozzChatRenderLifecycle?.run('afterMessages', { session: s, panel: $('view')?.querySelector('.chat-main') });
 }
 function memorySize(list) {
   return list.reduce((total,m) => total+countChars(m.text),0);
@@ -12932,169 +12933,149 @@ document.addEventListener('submit',function(event){
     if(composer){
       const suggestions=composer.querySelector('.suggestions');
       if(suggestions)suggestions.hidden=beats.length>0&&idx<beats.length-1;
-      composer.classList.toggle('encounter-awaiting-beat',beats.length>0&&idx<beats.length-1);
-    }
-    messages.dataset.encounterBeatKey=beatKey;
-    messages.dataset.encounterBeatIndex=String(idx);
-  };
-  const installEncounterRenderWrapper=()=>{
-  const baseRenderConversation=renderConversation;
-  if(typeof baseRenderConversation!=='function'||baseRenderConversation.__encounterWrapped)return;
-  const wrappedRenderConversation=function(){
-    baseRenderConversation.apply(this,arguments);
-    const session=currentSession();
-    document.body.classList.toggle('encounter-mode-active',!!session?.encounterMode);
-    if(!session?.encounterMode)return;
-    const panel=$('view').querySelector('.chat-main');
-    if(!panel)return;
-    panel.classList.add('encounter-scene');
-    const character=sessionCharacter(session);
-    const sceneImage=safeImage(character?.encounterSceneImage||session?.encounterSceneImage||character?.sceneImage||'');
-    const defaultSceneImage='./encounter-default-scene.webp';
-    panel.style.setProperty('--encounter-scene-photo','url('+JSON.stringify(sceneImage||defaultSceneImage)+')');
-    panel.dataset.encounterPlace=session.encounterPlace||'';
-    // Encounter scenes use dedicated encounter art or the author's scene-illustration gallery.
-    // The character-card primary image is intentionally never reused as a scene sprite.
-    const dedicatedSprite=safeImage(character?.encounterPortraitImage||character?.halfBodyImage||character?.transparentPortrait||character?.encounterSprite||'');
-    const sceneIllustration=safeImage(character?.galleryIllustrations?.[0]?.src||'');
-    const halfBodyImage=dedicatedSprite||sceneIllustration;
-    let existingSprite=panel.querySelector('.encounter-character-sprite');
-    const missingArt=panel.querySelector('.encounter-missing-art');
-    if(halfBodyImage){
-      if(missingArt)missingArt.remove();
-      if(!existingSprite){
-        existingSprite=document.createElement('img');
-        existingSprite.className='encounter-character-sprite';
-        existingSprite.alt='';
-        existingSprite.setAttribute('aria-hidden','true');
-        existingSprite.loading='eager';
-        panel.insertBefore(existingSprite,panel.firstChild);
-      }
-      existingSprite.classList.toggle('encounter-card-portrait-fallback',!dedicatedSprite);
-      if(existingSprite.dataset.encounterSource!==halfBodyImage){
-        existingSprite.dataset.encounterSource=halfBodyImage;
-        existingSprite.dataset.encounterProcessed='';
-        existingSprite.classList.remove('encounter-auto-bg-fallback');
-        if(!dedicatedSprite){
-          existingSprite.crossOrigin='anonymous';
-          existingSprite.onload=()=>{
-            if(existingSprite.dataset.encounterSource!==halfBodyImage||existingSprite.dataset.encounterProcessed===halfBodyImage)return;
-            try{
-              const sourceImage=existingSprite;
-              const canvas=document.createElement('canvas');
-              canvas.width=sourceImage.naturalWidth;
-              canvas.height=sourceImage.naturalHeight;
-              const ctx=canvas.getContext('2d',{willReadFrequently:true});
-              ctx.drawImage(sourceImage,0,0);
-              const frame=ctx.getImageData(0,0,canvas.width,canvas.height);
-              const pixels=frame.data,w=canvas.width,h=canvas.height,total=w*h;
-              const visited=new Uint8Array(total);
-              const stack=new Int32Array(total);
-              let top=0;
-              const nearWhite=(i)=>{
-                const p=i*4,red=pixels[p],green=pixels[p+1],blue=pixels[p+2];
-                return red>=218&&green>=218&&blue>=218&&Math.max(red,green,blue)-Math.min(red,green,blue)<= thirty;
-              };
-              const thirty=34;
-              const push=(i)=>{if(i>=0&&i<total&&!visited[i]&&nearWhite(i)){visited[i]=1;stack[top++]=i;}};
-              for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
-              for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
-              while(top){
-                const i=stack[--top];
-                const p=i*4;
-                pixels[p+3]=0;
-                const x=i%w,y=(i/w)|0;
-                if(x>0)push(i-1);
-                if(x<w-1)push(i+1);
-                if(y>0)push(i-w);
-                if(y<h-1)push(i+w);
-              }
-              ctx.putImageData(frame,0,0);
-              const transparentImage=canvas.toDataURL('image/png');
-              existingSprite.dataset.encounterProcessed=halfBodyImage;
-              existingSprite.onload=null;
-              existingSprite.src=transparentImage;
-            }catch(error){
-              // If the image host disallows canvas access, use a visual blend fallback.
-              existingSprite.dataset.encounterProcessed=halfBodyImage;
-              existingSprite.classList.add('encounter-auto-bg-fallback');
-            }
-          };
+      composer.classList.toggle('encounter-awaiting-beat',beats.length>0&&idx<beats.l  const encounterRenderLifecycle=window.PoyozzChatRenderLifecycle;
+  if(encounterRenderLifecycle){
+    encounterRenderLifecycle.register('afterSingleConversation','encounter.single-scene',({session:renderSession,panel:renderPanel})=>{
+      const session=renderSession||currentSession();
+      const panel=renderPanel||$('view')?.querySelector('.chat-main');
+      if(!session?.encounterMode||!panel)return;
+      panel.classList.add('encounter-scene');
+      const character=sessionCharacter(session);
+      const sceneImage=safeImage(character?.encounterSceneImage||session?.encounterSceneImage||character?.sceneImage||'');
+      const defaultSceneImage='./encounter-default-scene.webp';
+      panel.style.setProperty('--encounter-scene-photo','url('+JSON.stringify(sceneImage||defaultSceneImage)+')');
+      panel.dataset.encounterPlace=session.encounterPlace||'';
+      // Encounter scenes use dedicated encounter art or the author's scene-illustration gallery.
+      // The character-card primary image is intentionally never reused as a scene sprite.
+      const dedicatedSprite=safeImage(character?.encounterPortraitImage||character?.halfBodyImage||character?.transparentPortrait||character?.encounterSprite||'');
+      const sceneIllustration=safeImage(character?.galleryIllustrations?.[0]?.src||'');
+      const halfBodyImage=dedicatedSprite||sceneIllustration;
+      let existingSprite=panel.querySelector('.encounter-character-sprite');
+      const missingArt=panel.querySelector('.encounter-missing-art');
+      if(halfBodyImage){
+        if(missingArt)missingArt.remove();
+        if(!existingSprite){
+          existingSprite=document.createElement('img');
+          existingSprite.className='encounter-character-sprite';
+          existingSprite.alt='';
+          existingSprite.setAttribute('aria-hidden','true');
+          existingSprite.loading='eager';
+          panel.insertBefore(existingSprite,panel.firstChild);
         }
-        existingSprite.src=halfBodyImage;
-      }
-    }else{
-      if(existingSprite)existingSprite.remove();
-      let artNote=missingArt;
-      if(!artNote){
-        artNote=document.createElement('div');
-        artNote.className='encounter-missing-art';
-        artNote.textContent='正在載入角色立繪…';
-        artNote.setAttribute('aria-hidden','true');
-        panel.insertBefore(artNote,panel.firstChild);
-      }
-      if(character?.id){
-        const encounterSessionId=session.id;
-        void hydrateEncounterGalleryIllustration(character.id).then(asset=>{
-          if(!panel.isConnected||currentSession()?.id!==encounterSessionId)return;
-          if(asset?.src){
-            if(panel.querySelector('.encounter-character-sprite'))return;
-            const sprite=document.createElement('img');
-            sprite.className='encounter-character-sprite encounter-card-portrait-fallback';
-            sprite.alt='';
-            sprite.setAttribute('aria-hidden','true');
-            sprite.loading='eager';
-            sprite.dataset.encounterSource=asset.src;
-            if(asset.path)sprite.dataset.characterIllustrationPath=asset.path;
-            sprite.src=asset.src;
-            panel.insertBefore(sprite,panel.firstChild);
-            panel.querySelector('.encounter-missing-art')?.remove();
-          }else if(artNote.isConnected){
-            artNote.textContent='角色半立繪素材待補';
+        existingSprite.classList.toggle('encounter-card-portrait-fallback',!dedicatedSprite);
+        if(existingSprite.dataset.encounterSource!==halfBodyImage){
+          existingSprite.dataset.encounterSource=halfBodyImage;
+          existingSprite.dataset.encounterProcessed='';
+          existingSprite.classList.remove('encounter-auto-bg-fallback');
+          if(!dedicatedSprite){
+            existingSprite.crossOrigin='anonymous';
+            existingSprite.onload=()=>{
+              if(existingSprite.dataset.encounterSource!==halfBodyImage||existingSprite.dataset.encounterProcessed===halfBodyImage)return;
+              try{
+                const sourceImage=existingSprite;
+                const canvas=document.createElement('canvas');
+                canvas.width=sourceImage.naturalWidth;
+                canvas.height=sourceImage.naturalHeight;
+                const ctx=canvas.getContext('2d',{willReadFrequently:true});
+                ctx.drawImage(sourceImage,0,0);
+                const frame=ctx.getImageData(0,0,canvas.width,canvas.height);
+                const pixels=frame.data,w=canvas.width,h=canvas.height,total=w*h;
+                const visited=new Uint8Array(total);
+                const stack=new Int32Array(total);
+                let top=0;
+                const nearWhite=(i)=>{
+                  const p=i*4,red=pixels[p],green=pixels[p+1],blue=pixels[p+2];
+                  return red>=218&&green>=218&&blue>=218&&Math.max(red,green,blue)-Math.min(red,green,blue)<= thirty;
+                };
+                const thirty=34;
+                const push=(i)=>{if(i>=0&&i<total&&!visited[i]&&nearWhite(i)){visited[i]=1;stack[top++]=i;}};
+                for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
+                for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
+                while(top){
+                  const i=stack[--top];
+                  const p=i*4;
+                  pixels[p+3]=0;
+                  const x=i%w,y=(i/w)|0;
+                  if(x>0)push(i-1);
+                  if(x<w-1)push(i+1);
+                  if(y>0)push(i-w);
+                  if(y<h-1)push(i+w);
+                }
+                ctx.putImageData(frame,0,0);
+                const transparentImage=canvas.toDataURL('image/png');
+                existingSprite.dataset.encounterProcessed=halfBodyImage;
+                existingSprite.onload=null;
+                existingSprite.src=transparentImage;
+              }catch(error){
+                // If the image host disallows canvas access, use a visual blend fallback.
+                existingSprite.dataset.encounterProcessed=halfBodyImage;
+                existingSprite.classList.add('encounter-auto-bg-fallback');
+              }
+            };
           }
-        }).catch(error=>{
-          if(artNote.isConnected)artNote.textContent='角色立繪暫時無法載入';
-          console.warn('相遇場景立繪延遲載入失敗：',error?.message||error);
-        });
-      }else if(artNote){
-        artNote.textContent='角色半立繪素材待補';
+          existingSprite.src=halfBodyImage;
+        }
+      }else{
+        if(existingSprite)existingSprite.remove();
+        let artNote=missingArt;
+        if(!artNote){
+          artNote=document.createElement('div');
+          artNote.className='encounter-missing-art';
+          artNote.textContent='正在載入角色立繪…';
+          artNote.setAttribute('aria-hidden','true');
+          panel.insertBefore(artNote,panel.firstChild);
+        }
+        if(character?.id){
+          const encounterSessionId=session.id;
+          void hydrateEncounterGalleryIllustration(character.id).then(asset=>{
+            if(!panel.isConnected||currentSession()?.id!==encounterSessionId)return;
+            if(asset?.src){
+              if(panel.querySelector('.encounter-character-sprite'))return;
+              const sprite=document.createElement('img');
+              sprite.className='encounter-character-sprite encounter-card-portrait-fallback';
+              sprite.alt='';
+              sprite.setAttribute('aria-hidden','true');
+              sprite.loading='eager';
+              sprite.dataset.encounterSource=asset.src;
+              if(asset.path)sprite.dataset.characterIllustrationPath=asset.path;
+              sprite.src=asset.src;
+              panel.insertBefore(sprite,panel.firstChild);
+              panel.querySelector('.encounter-missing-art')?.remove();
+            }else if(artNote.isConnected){
+              artNote.textContent='角色半立繪素材待補';
+            }
+          }).catch(error=>{
+            if(artNote.isConnected)artNote.textContent='角色立繪暫時無法載入';
+            console.warn('相遇場景立繪延遲載入失敗：',error?.message||error);
+          });
+        }else if(artNote){
+          artNote.textContent='角色半立繪素材待補';
+        }
       }
-    }
-    const title=panel.querySelector('.chat-heading');
-    if(title){
-      let tag=title.querySelector('.encounter-scene-label');
-      if(!tag){
-        tag=document.createElement('span');tag.className='encounter-scene-label';tag.textContent='✦ 相遇模式';
-        const identityRow=title.querySelector('.row.grow');
-        tag.style.cssText='font-size:10px;letter-spacing:.04em;color:#f1f1f4;padding:3px 7px;border-radius:999px;background:rgba(225,226,232,.13);border:1px solid rgba(255,255,255,.18);white-space:nowrap';
-        if(identityRow)identityRow.appendChild(tag);else title.appendChild(tag);
+      const title=panel.querySelector('.chat-heading');
+      if(title){
+        let tag=title.querySelector('.encounter-scene-label');
+        if(!tag){
+          tag=document.createElement('span');tag.className='encounter-scene-label';tag.textContent='✦ 相遇模式';
+          const identityRow=title.querySelector('.row.grow');
+          tag.style.cssText='font-size:10px;letter-spacing:.04em;color:#f1f1f4;padding:3px 7px;border-radius:999px;background:rgba(225,226,232,.13);border:1px solid rgba(255,255,255,.18);white-space:nowrap';
+          if(identityRow)identityRow.appendChild(tag);else title.appendChild(tag);
+        }
       }
-    }
-    const composer=panel.querySelector('.composer');
-    if(composer){
-      const input=composer.querySelector('#messageInput');
-      if(input){input.placeholder='說點什麼，或留空讓角色繼續…';input.setAttribute('aria-label','相遇模式對話');}
-    }
-    applyEncounterDialogue(panel,session);
-  };
-  wrappedRenderConversation.__encounterWrapped=true;
-  renderConversation=wrappedRenderConversation;
-  // Normal send/streaming paths call renderMessages independently. Wrap that path too,
-  // so the standard renderer cannot overwrite the progressive dialogue box after each update.
-  const baseRenderMessages=renderMessages;
-  if(typeof baseRenderMessages==='function'&&!baseRenderMessages.__encounterWrapped){
-    const wrappedRenderMessages=function(){
-      baseRenderMessages.apply(this,arguments);
-      const session=currentSession();
+      const composer=panel.querySelector('.composer');
+      if(composer){
+        const input=composer.querySelector('#messageInput');
+        if(input){input.placeholder='說點什麼，或留空讓角色繼續…';input.setAttribute('aria-label','相遇模式對話');}
+      }
+      applyEncounterDialogue(panel,session);
+    });
+    encounterRenderLifecycle.register('afterMessages','encounter.progressive-dialogue',({session:renderSession,panel:renderPanel})=>{
+      const session=renderSession||currentSession();
       if(!session?.encounterMode)return;
-      const panel=$('view')?.querySelector('.chat-main');
+      const panel=renderPanel||$('view')?.querySelector('.chat-main');
       if(panel){panel.classList.add('encounter-scene');applyEncounterDialogue(panel,session);}
-    };
-    wrappedRenderMessages.__encounterWrapped=true;
-    renderMessages=wrappedRenderMessages;
-  }
-  };
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installEncounterRenderWrapper,{once:true});
+    });
+  }t.addEventListener('DOMContentLoaded',installEncounterRenderWrapper,{once:true});
   else installEncounterRenderWrapper();
   document.addEventListener('click',event=>{
     const target=event.target.closest('[data-action="encounter-next-beat"]');
