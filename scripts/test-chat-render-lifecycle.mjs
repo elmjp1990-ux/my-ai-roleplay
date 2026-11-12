@@ -106,6 +106,7 @@ test('a failing overlay extension does not block the base renderer', () => {
 
 const appHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const memoryAlbum = fs.readFileSync(new URL('../memory-album.js', import.meta.url), 'utf8');
+const encounterScene = fs.readFileSync(new URL('../encounter-scene.js', import.meta.url), 'utf8');
 
 test('memory album background integrations use registered lifecycle hooks, not render wrappers', () => {
   assert.match(memoryAlbum, /register\('afterSingleConversation',\s*'memory-album\.single-background'/);
@@ -130,9 +131,9 @@ test('base conversation renderers dispatch lifecycle hooks after their existing 
 
 
 test('encounter scene setup is registered as a conversation lifecycle hook', () => {
-  assert.match(appHtml, /register\('afterSingleConversation',\s*'encounter\.single-scene'/);
-  assert.match(appHtml, /register\('afterMessages',\s*'encounter\.progressive-dialogue'/);
-  assert.match(appHtml, /applyEncounterDialogue\(panel,session\)/);
+  assert.match(encounterScene, /register\('afterSingleConversation',\s*'encounter\.single-scene'/);
+  assert.match(encounterScene, /register\('afterMessages',\s*'encounter\.progressive-dialogue'/);
+  assert.match(encounterScene, /applyEncounterDialogue\(panel,session\)/);
   assert.match(appHtml, /function render\(\)[\s\S]*?classList\.toggle\('encounter-mode-active',\s*encounterRouteActive\)/);
 });
 
