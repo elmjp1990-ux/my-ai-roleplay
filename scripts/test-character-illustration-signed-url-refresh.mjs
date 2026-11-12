@@ -51,12 +51,12 @@ assert.equal(managers[1].refreshSkewMs,15000);
 assert.equal(managers[1].maxEntries,250);
 assert.equal(await sandbox.testApi.getCharacterIllustrationSignedUrl('owner/role.webp',{forceRefresh:true}),
   'https://storage.example/owner/role.webp');
-assert.deepEqual(pending[0],{key:'owner/role.webp',requestOptions:{forceRefresh:true}});
+assert.equal(JSON.stringify(pending[0]),JSON.stringify({key:'owner/role.webp',requestOptions:{forceRefresh:true}}));
 assert.equal(await sandbox.testApi.getMemoryPhotoSignedUrl('owner/memory.webp'),
   'https://storage.example/user-a:owner/memory.webp');
-assert.deepEqual(pending[1],{key:'user-a:owner/memory.webp',requestOptions:{context:{uid:'user-a',storagePath:'owner/memory.webp'}}});
+assert.equal(JSON.stringify(pending[1]),JSON.stringify({key:'user-a:owner/memory.webp',requestOptions:{context:{uid:'user-a',storagePath:'owner/memory.webp'}}}));
 sandbox.testApi.invalidateMemoryPhotoSignedUrl('owner/memory.webp','user-a');
-assert.deepEqual(pending[2],{invalidate:'user-a:owner/memory.webp'});
+assert.equal(JSON.stringify(pending[2]),JSON.stringify({invalidate:'user-a:owner/memory.webp'}));
 
 const encounterRenderStart = html.indexOf("const dedicatedSprite=safeImage(character?.encounterPortraitImage");
 const encounterRenderEnd = html.indexOf("const title=panel.querySelector('.chat-heading')", encounterRenderStart);
