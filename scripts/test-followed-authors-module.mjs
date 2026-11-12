@@ -15,10 +15,11 @@ assert.ok(adapterStart >= 0 && charactersStart > adapterStart && charactersStart
 assert.match(html.slice(adapterStart, charactersStart), /window\.PoyozzFollowedAuthors\?\.render/);
 
 assert.match(moduleSource, /global\.PoyozzFollowedAuthors = Object\.freeze/);
-assert.match(moduleSource, /async function render\(dependencies\)/);
+assert.match(moduleSource, /async render\(dependencies\)/);
+assert.doesNotMatch(moduleSource, /async function render\(dependencies\)/);
 for (const dependency of [
   '$', 'currentUser', 'getRoute', 'getSupabaseClient', 'isUuid', 'state',
-  'loadPublicSupabaseCharacters', 'ICON', 'e', 'avatar', 'card', 'persist', 'toast'
+  'loadPublicSupabaseCharacters', 'author', 'ICON', 'e', 'avatar', 'card', 'persist', 'toast'
 ]) {
   assert.ok(moduleSource.includes(dependency), 'App-owned dependency must be explicit: ' + dependency);
 }
