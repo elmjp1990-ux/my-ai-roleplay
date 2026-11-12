@@ -67,4 +67,22 @@ assert.match(illustrations,/insertedGallery\.includes\(item\.id\)\|\|\(previous&
 assert.match(illustrations,/expectedGalleryNames=new Map/,
   "persisted gallery labels must still be verified after synchronization");
 
-console.log("Story relationship RPC dedupe, illustration write dedupe, group list refresh avoidance, incremental group-turn loading, and phone-state cache checks passed.");
+const authCoalescer=between("const verifiedAuthUserInflight = new Map()","async function loadSupabaseCharacters(user)");
+assert.match(authCoalescer,/client\.auth\.getUser\(\)/,
+  "concurrent login hydration must still verify the current user with Supabase");
+assert.match(authCoalescer,/verifiedAuthUserInflight\.get\(expectedUid\)/,
+  "concurrent auth verification for the same UID must share the in-flight request");
+assert.match(authCoalescer,/verifiedAuthUserInflight\.delete\(expectedUid\)/,
+  "auth verification must not be cached after the request settles");
+const ownerLoader=between("async function loadSupabaseCharacters(user)","async function loadSupabaseProfileAndWallet");
+assert.match(ownerLoader,/getVerifiedAuthUser\(user\.id\)/,
+  "owner character hydration must use the shared verified-auth request");
+const cloudSessions=between("async function loadCloudChatSessions(user, options = {})","async function ");
+assert.match(cloudSessions,/getVerifiedAuthUser\(user\.id\)/,
+  "chat session hydration must use the shared verified-auth request");
+assert.doesNotMatch(ownerLoader,/client\.auth\.getUser\(\)/,
+  "owner hydration must not issue its own duplicate auth verification");
+assert.doesNotMatch(cloudSessions,/client\.auth\.getUser\(\)/,
+  "chat hydration must not issue its own duplicate auth verification");
+
+console.log("Story relationship RPC dedupe, illustration write dedupe, group list refresh avoidance, incremental group-turn loading, phone-state cache, and shared login auth verification checks passed.");
