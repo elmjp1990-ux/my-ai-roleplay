@@ -1286,6 +1286,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 <script src="./memory-capture.js"></script>
 <script src="./chat-render-lifecycle.js"></script>
 <script src="./image-compression.js"></script>
+<script src="./signed-url-manager.js"></script>
 <script>
 'use strict';
 
@@ -1905,64 +1906,40 @@ const ids = (rows || []).map(row => row.id);
     }
   }
 
-const characterIllustrationSignedUrlCache = new Map();
-const characterIllustrationSignedUrlInflight = new Map();
-const characterIllustrationForcedRefreshInflight = new Map();
-async function getCharacterIllustrationSignedUrl(storagePath, options={}) {
-  const forceRefresh=options?.forceRefresh===true;
-  if(forceRefresh){
-    // Several images can fail for the same path in one render. Share one forced
-    // refresh instead of creating a burst of identical Storage requests.
-    const forced=characterIllustrationForcedRefreshInflight.get(storagePath);
-    if(forced)return forced;
-    characterIllustrationSignedUrlCache.delete(storagePath);
-    // Supersede a possibly expired normal request. Its completion is fenced below.
-    characterIllustrationSignedUrlInflight.delete(storagePath);
-  }
-  const now=Date.now();
-  const cached=characterIllustrationSignedUrlCache.get(storagePath);
-  if(!forceRefresh&&cached&&cached.expiresAt>now+60000)return cached.url;
-  if(!forceRefresh&&characterIllustrationSignedUrlInflight.has(storagePath))return characterIllustrationSignedUrlInflight.get(storagePath);
-  const request=(async()=>{
+const characterIllustrationSignedUrlManager = window.PoyozzSignedUrlManager.create({
+  cacheTtlMs:3300000,
+  refreshSkewMs:60000,
+  createSignedUrl:async storagePath=>{
     const {data,error}=await window.mySupabase.storage.from('character-illustrations').createSignedUrl(storagePath,3600);
     if(error||!data?.signedUrl)throw new Error(error?.message||'無法取得角色立繪網址');
-    // Only the newest request may populate cache state.
-    if(characterIllustrationSignedUrlInflight.get(storagePath)===request){
-      characterIllustrationSignedUrlCache.set(storagePath,{url:data.signedUrl,expiresAt:Date.now()+3300000});
-    }
     return data.signedUrl;
-  })();
-  characterIllustrationSignedUrlInflight.set(storagePath,request);
-  if(forceRefresh)characterIllustrationForcedRefreshInflight.set(storagePath,request);
-  try{return await request;}finally{
-    if(characterIllustrationSignedUrlInflight.get(storagePath)===request)characterIllustrationSignedUrlInflight.delete(storagePath);
-    if(characterIllustrationForcedRefreshInflight.get(storagePath)===request)characterIllustrationForcedRefreshInflight.delete(storagePath);
   }
+});
+async function getCharacterIllustrationSignedUrl(storagePath,options={}) {
+  return characterIllustrationSignedUrlManager.get(storagePath,{forceRefresh:options?.forceRefresh===true});
 }
-const memoryPhotoSignedUrlCache = new Map();
-const memoryPhotoSignedUrlInflight = new Map();
-async function getMemoryPhotoSignedUrl(storagePath) {
-  const client=window.mySupabase,uid=currentUser()?.uid||null;
-  if(!client||!uid||!storagePath)return null;
-  const key=uid+':'+storagePath,now=Date.now();
-  const cached=memoryPhotoSignedUrlCache.get(key);
-  if(cached&&cached.expiresAt>now+15000)return cached.url;
-  if(memoryPhotoSignedUrlInflight.has(key))return memoryPhotoSignedUrlInflight.get(key);
-  const request=(async()=>{
-    const {data,error}=await client.storage.from('personax-memory-photos').createSignedUrl(storagePath,300);
+async function refreshCharacterIllustrationSignedUrl(storagePath) {
+  return getCharacterIllustrationSignedUrl(storagePath,{forceRefresh:true});
+}
+
+const memoryPhotoSignedUrlManager = window.PoyozzSignedUrlManager.create({
+  cacheTtlMs:240000,
+  refreshSkewMs:15000,
+  maxEntries:250,
+  isCurrent:context=>(currentUser()?.uid||null)===(context?.uid||null),
+  createSignedUrl:async(_key,context)=>{
+    const {data,error}=await window.mySupabase.storage.from('personax-memory-photos').createSignedUrl(context.storagePath,300);
     if(error||!data?.signedUrl)throw new Error(error?.message||'無法取得回憶相片網址');
-    if((currentUser()?.uid||null)!==uid)return null;
-    memoryPhotoSignedUrlCache.set(key,{url:data.signedUrl,expiresAt:Date.now()+240000});
-    while(memoryPhotoSignedUrlCache.size>250)memoryPhotoSignedUrlCache.delete(memoryPhotoSignedUrlCache.keys().next().value);
     return data.signedUrl;
-  })();
-  memoryPhotoSignedUrlInflight.set(key,request);
-  try{return await request;}finally{
-    if(memoryPhotoSignedUrlInflight.get(key)===request)memoryPhotoSignedUrlInflight.delete(key);
   }
+});
+async function getMemoryPhotoSignedUrl(storagePath) {
+  const uid=currentUser()?.uid||null;
+  if(!window.mySupabase||!uid||!storagePath)return null;
+  return memoryPhotoSignedUrlManager.get(uid+':'+storagePath,{context:{uid,storagePath}});
 }
 function invalidateMemoryPhotoSignedUrl(storagePath,uid=currentUser()?.uid||null) {
-  if(uid&&storagePath)memoryPhotoSignedUrlCache.delete(uid+':'+storagePath);
+  if(uid&&storagePath)memoryPhotoSignedUrlManager.invalidate(uid+':'+storagePath);
 }
 
 const characterIllustrationMetadataInflight = new Map();
