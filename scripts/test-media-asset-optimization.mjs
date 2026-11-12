@@ -21,11 +21,12 @@ assert.ok(imageCompressor.includes("maxOutputBytes:1*1024*1024"));
 assert.ok(imageCompressor.includes("preserveAlpha"));
 assert.ok(imageCompressor.includes("return {...result,dataUrl}"));
 assert.ok(html.includes("compressUploadImage(file,{maxEdge:1440,targetBytes:500*1024,preserveAlpha:true})"));
-assert.ok(!/compressUploadImage\\(file,\\{maxEdge:(?:1600|1800),targetBytes:(?:500|700)\\*1024,preserveAlpha:true\\}\\)/.test(html));
+assert.ok(!html.includes("compressUploadImage(file,{maxEdge:1600,targetBytes:500*1024,preserveAlpha:true})"));
+assert.ok(!html.includes("compressUploadImage(file,{maxEdge:1800,targetBytes:700*1024,preserveAlpha:true})"));
 
 const profileCompressor=block("async function compressProfileImage","// IMG-01:");
-assert.match(profileCompressor,/compressUploadImage\\(file,\\{maxEdge:256,targetBytes:120\\*1024,preserveAlpha:true\\}\\)/);
-assert.match(profileCompressor,/return compressed\\.dataUrl/);
+assert.ok(profileCompressor.includes("compressUploadImage(file,{maxEdge:256,targetBytes:120*1024,preserveAlpha:true})"));
+assert.ok(profileCompressor.includes("return compressed.dataUrl"));
 
 const memoryCompressor=block("async function compressMemoryImage","// Future AI-generated memory images");
 assert.ok(memoryCompressor.includes("window.PoyozzImageCompression.compress(file"));
