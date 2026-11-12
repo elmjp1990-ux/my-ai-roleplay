@@ -10,7 +10,7 @@
         publicAuthorProfileLoaded, hydratePublicAuthorProfile,
         $, e, avatar, card, refreshAuthorFollowState } = dependencies;
         const a = author(route.id);
-  const needsPublicProfile=!!(window.mySupabase&&isUuid(route.id)&&!publicAuthorProfileLoaded.has(route.id));
+  const needsPublicProfile=!!(getSupabaseClient()&&isUuid(route.id)&&!publicAuthorProfileLoaded.has(route.id));
   if(needsPublicProfile)void hydratePublicAuthorProfile(route.id);
   const following = state.following.includes(a.uid);
   const list = state.characters.filter(c => c.visibility === 'public' && c.authorId === a.uid &&
