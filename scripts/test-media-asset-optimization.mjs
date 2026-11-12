@@ -50,12 +50,15 @@ assert.match(encounterLoader,/encounterGalleryIllustrationCache\.get\(key\)/);
 assert.match(encounterLoader,/encounterGalleryIllustrationInflight\.has\(key\)/);
 assert.match(encounterLoader,/requestUid=currentUser\(\)\?\.uid\|\|null/);
 
-const encounterWrapper=block("const installEncounterRenderWrapper","installEncounterRenderWrapper();");
-assert.match(encounterWrapper,/if\(!session\?\.encounterMode\)return/);
-assert.match(encounterWrapper,/panel\.style\.setProperty\('--encounter-scene-photo'/);
-assert.match(encounterWrapper,/void hydrateEncounterGalleryIllustration\(character\.id\)/);
-assert.match(encounterWrapper,/existingSprite\.dataset\.encounterSource!==halfBodyImage/);
-assert.match(encounterWrapper,/defaultSceneImage='\.\/encounter-default-scene\.webp'/);
+const encounterLifecycle=block("const encounterRenderLifecycle=window.PoyozzChatRenderLifecycle","document.addEventListener('click',event=>{");
+assert.match(encounterLifecycle,/register\('afterSingleConversation','encounter\.single-scene'/);
+assert.match(encounterLifecycle,/register\('afterMessages','encounter\.progressive-dialogue'/);
+assert.match(encounterLifecycle,/if\(!session\?\.encounterMode\|\|!panel\)return/);
+assert.match(encounterLifecycle,/panel\.style\.setProperty\('--encounter-scene-photo'/);
+assert.match(encounterLifecycle,/void hydrateEncounterGalleryIllustration\(character\.id\)/);
+assert.match(encounterLifecycle,/existingSprite\.dataset\.encounterSource!==halfBodyImage/);
+assert.match(encounterLifecycle,/defaultSceneImage='\.\/encounter-default-scene\.webp'/);
+assert.doesNotMatch(html,/installEncounterRenderWrapper|wrappedRenderConversation|wrappedRenderMessages/);
 
 const groupOpen=block("async function groupOpen(groupId)","async function openGroupBackgroundSettings");
 assert.doesNotMatch(groupOpen,/from\('chat_memory_photos'\)/,
