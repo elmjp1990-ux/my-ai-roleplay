@@ -6034,7 +6034,7 @@ async function compressUploadImage(file, options = {}) {
     maxOutputBytes:1*1024*1024,
     formats:preserveAlpha
       ?[{type:'image/webp',qualities:[0.86,0.78,0.70,0.62,0.54]},{type:'image/png',qualities:[1]}]
-      :[{type:'image/webp',qualities:[0.84,0.76,0.68,0.60,0.52]},{type:'image/jpeg',qualities:[0.82,0.72,0.62,0.52]}],
+      :[{type:'image/webp',qualities:[0.84,0.76,0.68,0.60,0.52]},{type:'image/jpeg',qualities:[0.82,0.72,0.62,0.52],background:'#ffffff'}],
     tooLargeError:'圖片壓縮後仍過大，請改選較小的圖片。',
     decodeError:'無法讀取這張圖片，請換一張再試。',
     invalidDimensionsError:'圖片尺寸無效，請換一張再試。',
