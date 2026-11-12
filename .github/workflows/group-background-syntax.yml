@@ -49,6 +49,8 @@ jobs:
           }
           console.log('Parsed ' + blocks.length + ' inline JavaScript blocks.');
           NODE
+      - name: Parse extracted Encounter scene module
+        run: node --check encounter-scene.js
       - name: Test Encounter schedule parser
         run: node scripts/test-encounter-schedule-parser.mjs
       - name: Test Encounter chat-mode security guard
