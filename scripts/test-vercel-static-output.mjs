@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 const root = process.cwd();
 const outputDir = path.join(root, 'dist');
@@ -19,6 +20,13 @@ assert.equal(vercelConfig.buildCommand, 'node scripts/build-vercel-static.mjs');
 assert.equal(vercelConfig.outputDirectory, 'dist');
 
 assert.ok(fs.existsSync(outputDir), 'Vercel output directory must exist.');
+
+// Prove that the build starts clean and cannot accidentally publish stale files.
+const staleSentinel = path.join(outputDir, '__stale_build_artifact__.txt');
+fs.writeFileSync(staleSentinel, 'must not be deployed');
+execFileSync(process.execPath, [path.join(root, 'scripts/build-vercel-static.mjs')], { cwd: root, stdio: 'pipe' });
+assert.ok(!fs.existsSync(staleSentinel), 'Build must remove stale files from the previous output directory.');
+
 const actualFiles = fs.readdirSync(outputDir).sort();
 assert.deepEqual(actualFiles, expectedFiles, 'Vercel output must contain only the runtime allowlist.');
 
