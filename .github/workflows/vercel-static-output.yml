@@ -1,0 +1,31 @@
+name: Vercel static deployment output
+
+on:
+  pull_request:
+    paths:
+      - "index.html"
+      - "memory-capture.js"
+      - "*.webp"
+      - "vercel.json"
+      - "scripts/build-vercel-static.mjs"
+      - "scripts/test-vercel-static-output.mjs"
+      - ".github/workflows/vercel-static-output.yml"
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  static-output:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build the allowlisted static output
+        run: node scripts/build-vercel-static.mjs
+      - name: Verify deployed files and local asset references
+        run: node scripts/test-vercel-static-output.mjs
