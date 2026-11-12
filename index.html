@@ -2197,6 +2197,7 @@ async function syncCharacterIllustrations(character,userId) {
   if(readError)throw new Error('讀取既有立繪失敗：'+readError.message);
   const oldPrimary=(existing||[]).find(row=>row.asset_type==='primary')||null;
   const oldGallery=(existing||[]).filter(row=>row.asset_type==='gallery');
+  const oldGalleryById=new Map(oldGallery.map(row=>[row.id,row]));
   const uploaded=[];
   const insertedGallery=[];
   let nextPrimaryPath=draftPrimaryIllustrationPath||'';
@@ -2241,8 +2242,12 @@ async function syncCharacterIllustrations(character,userId) {
   // Scope every update by both asset ID and author UID.
   for(const item of nextGallery){
     if(!item?.id)continue;
+    const expectedName=String(item.name||'').trim().slice(0,40);
+    const previous=oldGalleryById.get(item.id);
+    // New rows already received their label in INSERT; unchanged retained rows need no UPDATE.
+    if(insertedGallery.includes(item.id)||(previous&&String(previous.display_name||'')===expectedName))continue;
     const {error}=await client.from('character_illustrations')
-      .update({display_name:String(item.name||'').trim().slice(0,40),updated_at:new Date().toISOString()})
+      .update({display_name:expectedName,updated_at:new Date().toISOString()})
       .eq('id',item.id).eq('author_id',userId);
     if(error){
       if(insertedGallery.length)await client.from('character_illustrations').delete().in('id',insertedGallery).eq('author_id',userId);
