@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const html = fs.readFileSync("index.html", "utf8");
+const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
 const cleanupMigration = fs.readFileSync("supabase/migrations/20261031211200_character_illustration_cleanup_queue.sql", "utf8");
 
 // The author-facing field must accept ordinary prose, not a pipe-delimited schema.
@@ -75,7 +76,7 @@ assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_job
 assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_jobs_insert_own[\s\S]*?auth\.uid\(\)/);
 
 // The card primary image is not reused as encounter-scene art.
-assert.match(html, /const sceneIllustration=safeImage\(character\?\.galleryIllustrations\?\.\[0\]\?\.src\|\|\x27\x27\)/);
+assert.match(encounterScene, /const sceneIllustration=safeImage\(character\?\.galleryIllustrations\?\.\[0\]\?\.src\|\|\x27\x27\)/);
 // Restore muted inline card video playback while retaining lazy signed-URL hydration.
 assert.ok(html.includes('<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline preload="none"'));
 assert.ok(html.includes("function hydrateEncounterGalleryIllustration(characterId) {"));
@@ -83,7 +84,7 @@ assert.ok(html.includes("正在載入角色立繪…"));
 assert.ok(html.includes("角色半立繪素材待補"));
 assert.ok(html.includes("const ownerLocal = state.characters.find(character =>"));
 assert.ok(html.includes("ownerLocal?.galleryIllustrations || cachedPublic?.galleryIllustrations || []"));
-assert.match(html, /const halfBodyImage=dedicatedSprite\|\|sceneIllustration/);
+assert.match(encounterScene, /const halfBodyImage=dedicatedSprite\|\|sceneIllustration/);
 assert.doesNotMatch(html, /const cardPortrait=safeImage\(character\?\.image/);
 assert.match(html, /相遇模式立繪（最多 5 張）/);
 assert.match(html, /主要角色圖預覽/);
