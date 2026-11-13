@@ -15,6 +15,8 @@
  */
 
 import { createHash } from "node:crypto";
+import { pathToFileURL } from "node:url";
+import { resolve } from "node:path";
 
 const EXPECTED = Object.freeze({ characters: 8, currentSnapshots: 74, historicalSnapshots: 13 });
 const DATA_URI = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/i;
@@ -175,6 +177,6 @@ async function main() {
   console.log(JSON.stringify(safePlan, null, 2));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   main().catch(error => { console.error(error.message); process.exitCode = 1; });
 }
