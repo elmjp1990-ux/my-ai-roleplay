@@ -16,7 +16,10 @@
 
 import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
-import { resolve } from "node:path";
+import { resolve, dirname } from "node:path";
+import { existsSync, readFileSync, writeFileSync, renameSync } from "node:fs";
+import { createResumableManifest } from "./legacy-image-migration-runner.mjs";
+import { assertLocalSupabaseUrl, runLocalMigration } from "./apply-legacy-chat-image-migration-local.mjs";
 
 const EXPECTED = Object.freeze({ characters: 8, currentSnapshots: 74, historicalSnapshots: 13 });
 const DATA_URI = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/i;
@@ -149,6 +152,7 @@ export function buildMigrationPlan({ characters, sessions, strictCounts = true }
 async function readTable(url, key, table, select) {
   const endpoint = new URL(`/rest/v1/${table}`, url);
   endpoint.searchParams.set("select", select);
+  endpoint.searchParams.set("limit", "1000");
   const response = await fetch(endpoint, {
     headers: { apikey: key, Authorization: `Bearer ${key}` },
   });
@@ -157,14 +161,61 @@ async function readTable(url, key, table, select) {
 }
 
 async function main() {
-  if (process.argv.includes("--apply")) {
-    throw new Error("Apply mode is intentionally not implemented. This version is read-only dry-run only.");
+  const args = new Set(process.argv.slice(2));
+  const apply = args.has("--apply");
+  const confirmLocal = args.has("--confirm-local");
+  const manifestArg = process.argv.slice(2).find(value => value.startsWith("--manifest="));
+  const manifestPath = manifestArg?.slice("--manifest=".length);
+  if (apply && !confirmLocal) {
+    throw new Error("Local apply requires BOTH --apply and --confirm-local.");
   }
+  if (confirmLocal && !apply) throw new Error("--confirm-local is valid only together with --apply.");
+  if (apply && !manifestPath) throw new Error("Local apply requires --manifest=./path/to/migration-manifest.json.");
+
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (read-only dry-run credentials recommended).");
+  if (!url || !key) throw new Error("Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
   const base = new URL(url);
   if (base.protocol !== "http:" && base.protocol !== "https:") throw new Error("Unsupported SUPABASE_URL protocol");
+
+  if (apply) {
+    assertLocalSupabaseUrl(url);
+    let manifest;
+    if (existsSync(manifestPath)) {
+      manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+      if (manifest.version !== 1) throw new Error("Unsupported migration manifest version.");
+    } else {
+      const [characters, sessions] = await Promise.all([
+        readTable(url, key, "characters", "id,author_id,avatar_url"),
+        readTable(url, key, "chat_sessions", "id,character_id,character_snapshot"),
+      ]);
+      const plan = buildMigrationPlan({ characters, sessions });
+      manifest = createResumableManifest(plan, characters);
+      persistManifest(manifestPath, manifest);
+    }
+    const completed = await runLocalMigration({
+      url,
+      serviceRoleKey: key,
+      manifest,
+      persist: next => persistManifest(manifestPath, next),
+    });
+    console.log(JSON.stringify({
+      status: completed.status,
+      counts: completed.counts,
+      assets: {
+        objectsVerified: completed.assets.filter(row => row.objectVerified).length,
+        metadataVerified: completed.assets.filter(row => row.metadataVerified).length,
+        avatarsCleared: completed.assets.filter(row => row.avatarCleared).length,
+      },
+      snapshots: {
+        currentPathified: completed.currentSnapshots.filter(row => row.completed).length,
+        historicalCleared: completed.historicalSnapshots.filter(row => row.completed).length,
+      },
+      manifestPath,
+    }, null, 2));
+    return;
+  }
+
   const [characters, sessions] = await Promise.all([
     readTable(url, key, "characters", "id,author_id,avatar_url"),
     readTable(url, key, "chat_sessions", "id,character_id,character_snapshot"),
@@ -179,6 +230,14 @@ async function main() {
   console.log(JSON.stringify(safePlan, null, 2));
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  main().catch(error => { console.error(error.message); process.exitCode = 1; });
+function persistManifest(path, manifest) {
+  const serialized = JSON.stringify(manifest, null, 2);
+  if (serialized.includes("data:image/")) {
+    throw new Error("Refusing to persist a manifest containing embedded image data.");
+  }
+  const absolute = resolve(path);
+  const temporary = absolute + ".tmp";
+  writeFileSync(temporary, serialized + "\\n", { mode: 0o600 });
+  renameSync(temporary, absolute);
 }
+
