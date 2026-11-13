@@ -207,7 +207,6 @@ export async function applyLegacyImageMigration({ manifest, adapter, persist = (
   }
 
   for (const asset of manifest.historicalAssets) {
-    if (asset.objectVerified) continue;
     const sourceItem = manifest.historicalSnapshots.find(item => item.targetSnapshot.imagePath === asset.storagePath);
     if (!sourceItem) throw new Error(`No historical snapshot references Storage asset: ${asset.storagePath}`);
     const sourceSession = await adapter.getSession(sourceItem.sessionId);
