@@ -6757,7 +6757,7 @@ function renderGroupConversation() {
       ? '<span class="avatar avatar-fallback player-avatar">你</span>'
       : isSystem
         ? '<span class="avatar avatar-fallback">系</span>'
-        : (hasSpeaker ? '' : avatar?'<img class="avatar" src="'+e(avatar)+'" alt="">':'<span class="avatar avatar-fallback">'+e(String(who).trim().slice(0,1)||'角')+'</span>');
+        : '';
     const bodyHTML=hasSpeaker
       ? '<div class="roleplay-segments">'+segments.map(roleplaySegmentHTML).join('')+'</div>'
       : (!isUser && !isSystem)
@@ -7960,16 +7960,17 @@ function renderMessages(scroll = true) {
     const summonedByPlayer = user && segments.some(segment => segment.kind === 'character');
     const contentHTML = hasSpeaker
       ? '<div class="roleplay-segments">' + segments.map(segment => roleplaySegmentHTML(segment, {summonedByPlayer})).join('') + '</div>'
-      : '<div class="message-name">' + e(user ? (currentUser()?.nickname || '你') : c.name) + '</div>' + formatMessage(displayText);
+      : !user
+        ? '<div class="roleplay-segments">' + renderCharacterSpeechSegments(displayText,{name:c.name,image:c.image || c.avatar_url || ''}) + '</div>'
+        : '<div class="message-name">' + e(currentUser()?.nickname || '你') + '</div>' + formatMessage(displayText);
     // When the player explicitly summons a character with a role prefix, move the
     // player identity onto that portrait as a small badge instead of showing a
     // second, separate player avatar beside it.
     // Player-authored messages do not show a separate outer player avatar.
     // When a role prefix summons a character, the player marker is shown only
     // as a small badge over that character's portrait.
-    const outerAvatar = user
-      ? ''
-      : (hasSpeaker ? '' : `<img class="avatar" src="${e(safeImage(c.image || c.avatar_url))}" alt="">`);
+    // Character identity is rendered inside each speech segment so narration never inherits an outer avatar column.
+    const outerAvatar = '';
     return `<article class="message ${user ? 'user' : ''} ${hasSpeaker && !user ? 'roleplay-prefixed-message' : ''}" data-message="${e(m.id)}">
       ${outerAvatar}
       <div class="message-content">${contentHTML}</div>

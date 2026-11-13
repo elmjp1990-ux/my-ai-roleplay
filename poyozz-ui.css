@@ -242,3 +242,20 @@ body.group-chat-page .message-content { flex:1 1 auto; width:100%; max-width:100
   color:var(--text)!important;
   border:1px solid var(--border)!important;
 }
+
+
+/* Chat header and composer use the same neutral glass surface as message controls. */
+body:not(.encounter-mode-active) .chat-heading {
+  background:var(--px-glass-bg);
+  border-color:var(--px-glass-border);
+  box-shadow:inset 0 1px 0 var(--px-glass-highlight);
+  -webkit-backdrop-filter:blur(var(--px-glass-blur)) saturate(115%);
+  backdrop-filter:blur(var(--px-glass-blur)) saturate(115%);
+}
+body:not(.encounter-mode-active) .composer {
+  background:var(--px-glass-bg-strong);
+  border-color:var(--px-glass-border);
+  box-shadow:inset 0 1px 0 var(--px-glass-highlight);
+  -webkit-backdrop-filter:blur(var(--px-glass-blur)) saturate(115%);
+  backdrop-filter:blur(var(--px-glass-blur)) saturate(115%);
+}
