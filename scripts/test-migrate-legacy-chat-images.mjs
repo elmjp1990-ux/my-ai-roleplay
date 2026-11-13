@@ -37,7 +37,7 @@ test("source reads are scoped to legacy-avatar characters and only their chat se
   });
   assert.deepEqual(queries.sessions, {
     select: "id,character_id,character_snapshot",
-    filters: { character_id: `in.(${uuid(1)},${uuid(8)})` },
+    filters: { character_id: `in.(${uuid(1)},${uuid(8)})`, deleted_at: "is.null" },
   });
   assert.equal(buildMigrationReadQueries([]).sessions, null);
   assert.throws(() => buildMigrationReadQueries(["not-a-uuid"]), /Invalid character UUID/);
