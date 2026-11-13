@@ -161,6 +161,30 @@ test("resumable runner recovers after interruption without duplicate objects or 
 });
 
 
+test("rejects corrupted or edited resume manifests before any adapter operation", async () => {
+  const input = fixture();
+  const plan = buildMigrationPlan(input);
+  const makeManifest = () => createResumableManifest(plan, input.characters);
+
+  const badCounts = makeManifest();
+  badCounts.counts.currentSnapshots = 73;
+  await assert.rejects(applyLegacyImageMigration({ manifest: badCounts }), /currentSnapshots must be 74/);
+
+  const badPath = makeManifest();
+  badPath.currentSnapshots[0].targetSnapshot.imagePath = "other-user/other-character/unsafe.png";
+  badPath.currentSnapshots[0].targetSnapshotHash = hashJson(badPath.currentSnapshots[0].targetSnapshot);
+  await assert.rejects(applyLegacyImageMigration({ manifest: badPath }), /does not match its primary asset/);
+
+  const badHash = makeManifest();
+  badHash.historicalSnapshots[0].targetSnapshot.opening = "changed";
+  await assert.rejects(applyLegacyImageMigration({ manifest: badHash }), /malformed or duplicate historical snapshot/);
+
+  const embeddedData = makeManifest();
+  embeddedData.historicalSnapshots[0].targetSnapshot.privateImage = data("should-not-be-in-manifest");
+  await assert.rejects(applyLegacyImageMigration({ manifest: embeddedData }), /embedded image data/);
+});
+
+
 test("apply target is restricted to loopback Supabase on port 54321", () => {
   assert.doesNotThrow(() => assertLocalSupabaseUrl("http://127.0.0.1:54321"));
   assert.doesNotThrow(() => assertLocalSupabaseUrl("http://localhost:54321"));
