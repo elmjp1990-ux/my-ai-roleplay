@@ -34,7 +34,7 @@ test('archived chat avatar hydration is visibility-lazy and updates only the mat
   assert.match(hydration, /IntersectionObserver/);
   assert.match(hydration, /root:list,rootMargin:'120px 0px'/);
   assert.match(hydration, /node\.dataset\.chatAvatarSessionId!==session\.id/);
-  assert.match(hydration, /node\.dataset\.chatAvatarPath!==session\.cloudCharacterSnapshot\?\.imagePath/);
+  assert.match(hydration, /node\.dataset\.chatAvatarPath!==\(session\.cloudCharacterSnapshot\?\.imagePath\|\|''\)/);
   assert.match(hydration, /image\.dataset\.characterIllustrationPath=session\.cloudCharacterSnapshot\.imagePath/);
 });
 
@@ -55,7 +55,7 @@ test('encounter still requests only the first gallery illustration and reports a
 
 test('hidden and deleted characters prefer their own chat snapshot portrait over current card art', () => {
   const sessionCharacter = between(html, 'function sessionCharacter(s) {', 'async function hydrateCloudSessionCharacterImage(s)');
-  assert.match(sessionCharacter, /hasMatchingSnapshot&&snap\.imagePath&&characterIsOffline\(found\)/);
+  assert.match(sessionCharacter, /hasMatchingSnapshot&&characterIsOffline\(found\)/);
   assert.match(sessionCharacter, /image:snap\.imagePath \? \(snap\.image \|\| hydratedImage \|\| ''\)/);
   const hydration = between(html, 'async function hydrateCloudSessionCharacterImage(s)', 'function applyCloudChatSessionAvatarUrl(session,url)');
   assert.doesNotMatch(hydration, /liveCharacter\?\.image/);
