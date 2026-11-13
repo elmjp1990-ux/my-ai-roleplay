@@ -1784,10 +1784,6 @@ const characterIllustrationSignedUrlManager = window.PoyozzSignedUrlManager.crea
 async function getCharacterIllustrationSignedUrl(storagePath,options={}) {
   return characterIllustrationSignedUrlManager.get(storagePath,{forceRefresh:options?.forceRefresh===true});
 }
-async function refreshCharacterIllustrationSignedUrl(storagePath) {
-  return getCharacterIllustrationSignedUrl(storagePath,{forceRefresh:true});
-}
-
 const memoryPhotoSignedUrlManager = window.PoyozzSignedUrlManager.create({
   cacheTtlMs:240000,
   refreshSkewMs:15000,
@@ -7990,7 +7986,7 @@ async function runChatMessageSearch(query,append=false){
         if(error)throw error;
         rows=(data||[]).map(r=>({...r,query:q,speaker:r.role==='user'?'你':sessionCharacter(ctx.session)?.name||'角色',stamp:new Date(r.created_at).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}));
       }else{
-        if(groupPrototype.active?.id!==ctx.id||groupPrototype.ownerUid!==uid)throw Error('目前群組不可搜尋，請重新開啟後再試。');
+        if(groupPrototype.active?.id!==ctx.id||groupPrototype.ownerUid!==uid||readDeletedChatTombstones(uid).groups[ctx.id])throw Error('目前群組不可搜尋，請重新開啟後再試。');
         const {data,error}=await client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,speaker_snapshot,content,created_at')
           .eq('group_id',ctx.id).is('deleted_at',null).ilike('content',pattern)
           .order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).range(offset,offset+CHAT_SEARCH_PAGE_SIZE-1);
@@ -8004,7 +8000,7 @@ async function runChatMessageSearch(query,append=false){
       rows=(groupPrototype.messages||[]).filter(r=>String(r.content||'').toLocaleLowerCase().includes(q.toLocaleLowerCase())).slice().reverse().slice(offset,offset+CHAT_SEARCH_PAGE_SIZE)
         .map(r=>({id:r.id,query:q,content:r.content,speaker:r.speaker||'角色',stamp:r.createdAt||''}));
     }
-    if(request!==chatMessageSearchState.request||currentChatSearchContext()?.id!==ctx.id||$('chatMessageSearchInput')?.value.trim()!==q)return;
+    if(request!==chatMessageSearchState.request||currentChatSearchContext()?.kind!==ctx.kind||currentChatSearchContext()?.id!==ctx.id||$('chatMessageSearchInput')?.value.trim()!==q)return;
     chatMessageSearchState.rows=append?[...chatMessageSearchState.rows,...rows]:rows;
     chatMessageSearchState.offset=chatMessageSearchState.rows.length;
     node.innerHTML=renderChatMessageSearchResults(chatMessageSearchState.rows,'',rows.length===CHAT_SEARCH_PAGE_SIZE);
@@ -8025,7 +8021,7 @@ async function jumpToChatSearchHit(button){
     const {data:{user},error:authError}=await client.auth.getUser();
     if(authError||user?.id!==uid||currentUser()?.uid!==uid)throw Error('登入狀態已變更，請重新登入。');
     if(ctx.kind==='single'){
-      const s=ctx.session;if(s.cloudOwnerUid!==uid||readDeletedChatTombstones(uid).sessions[s.id])throw Error('目前聊天室不可存取。');
+      const s=ctx.session;if(s.cloudOwnerUid!==uid||s.hidden||readDeletedChatTombstones(uid).sessions[s.id])throw Error('目前聊天室不可存取。');
       const {data:t,error:te}=await client.from('chat_messages').select('id,session_id,role,content,created_at').eq('id',id).eq('session_id',s.id).is('deleted_at',null).maybeSingle();
       if(te)throw te;if(!t)throw Error('這則訊息已刪除或無法存取。');
       const bf='created_at.lt.'+t.created_at+',and(created_at.eq.'+t.created_at+',id.lt.'+t.id+')';
@@ -8043,7 +8039,7 @@ async function jumpToChatSearchHit(button){
       renderMessages(false);
       requestAnimationFrame(()=>{const n=[...($('messages')?.querySelectorAll('[data-message]')||[])].find(x=>x.dataset.message===id);if(n){n.scrollIntoView({behavior:'smooth',block:'center'});n.classList.add('search-hit-highlight');setTimeout(()=>n.classList.remove('search-hit-highlight'),1800);}});
     }else{
-      const g=ctx.group;if(g.id!==ctx.id||groupPrototype.ownerUid!==uid)return;
+      const g=ctx.group;if(g.id!==ctx.id||groupPrototype.ownerUid!==uid||readDeletedChatTombstones(uid).groups[g.id])return;
       const {data:t,error:te}=await client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('id',id).eq('group_id',g.id).is('deleted_at',null).maybeSingle();
       if(te)throw te;if(!t)throw Error('這則群組訊息已刪除或無法存取。');
       const bf='created_at.lt.'+t.created_at+',and(created_at.eq.'+t.created_at+',sequence_no.lt.'+t.sequence_no+'),and(created_at.eq.'+t.created_at+',sequence_no.eq.'+t.sequence_no+',id.lt.'+t.id+')';
