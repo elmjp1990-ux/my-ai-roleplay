@@ -157,7 +157,8 @@ export function buildMigrationPlan({ characters, sessions, strictCounts = true }
       historicalSnapshots: historicalSnapshots.length,
       historicalAssets: historicalAssetByKey.size,
       totalSnapshotUpdates: currentSnapshots.length + historicalSnapshots.length,
-      estimatedImageBytes: primaryAssets.reduce((sum, row) => sum + row.bytes, 0) +\n        [...historicalAssetByKey.values()].reduce((sum, row) => sum + row.bytes, 0),
+      estimatedImageBytes: primaryAssets.reduce((sum, row) => sum + row.bytes, 0) +
+        [...historicalAssetByKey.values()].reduce((sum, row) => sum + row.bytes, 0),
     },
     primaryAssets,
     currentSnapshots,
@@ -247,7 +248,8 @@ async function main() {
       },
       snapshots: {
         currentPathified: completed.currentSnapshots.filter(row => row.completed).length,
-        historicalPreserved: completed.historicalSnapshots.filter(row => row.completed).length,\n        historicalObjectsVerified: completed.historicalAssets.filter(row => row.objectVerified).length,
+        historicalPreserved: completed.historicalSnapshots.filter(row => row.completed).length,
+        historicalObjectsVerified: completed.historicalAssets.filter(row => row.objectVerified).length,
       },
       manifestPath,
     }, null, 2));
@@ -277,7 +279,8 @@ function persistManifest(path, manifest) {
   const absolute = resolve(path);
   mkdirSync(dirname(absolute), { recursive: true });
   const temporary = absolute + ".tmp";
-  writeFileSync(temporary, serialized + "\n", { mode: 0o600 });
+  writeFileSync(temporary, serialized + "
+", { mode: 0o600 });
   renameSync(temporary, absolute);
 }
 
