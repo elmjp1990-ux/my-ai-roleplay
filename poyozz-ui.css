@@ -366,3 +366,11 @@ body.day {
 .phone-warning{border-color:var(--px-phone-border);background:var(--px-phone-surface-soft)}
 @media(prefers-reduced-transparency:reduce){.phone-modal-backdrop,.phone-device,.phone-member-switch button,.phone-close-row button,.phone-location,.phone-notices{-webkit-backdrop-filter:none;backdrop-filter:none}}
 
+
+/* Scoped chat message search */
+.chat-search-result{display:flex;width:100%;flex-direction:column;gap:7px;text-align:left;padding:12px 13px;margin:0 0 8px;border:1px solid var(--px-glass-border,rgba(150,155,162,.22));border-radius:13px;background:var(--px-glass-surface,rgba(145,150,158,.12));color:var(--text);cursor:pointer}
+.chat-search-result:hover{background:var(--px-glass-surface-hover,rgba(145,150,158,.2))}
+.chat-search-excerpt{font-size:13px;line-height:1.6;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
+.chat-search-status{margin:8px 0 12px}
+.chat-search-more{display:flex;justify-content:center;padding:8px}
+.search-hit-highlight{outline:2px solid var(--px-accent,#8f7bc1);outline-offset:3px;border-radius:10px}

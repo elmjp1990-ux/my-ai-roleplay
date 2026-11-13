@@ -6501,7 +6501,7 @@ async function groupOpen(groupId) {
   // Keep the group ID in the URL so rerenders, auth refreshes, and post-send reloads
   // can recover the same group instead of silently falling back to the creation wizard.
   const requestId=g.openRequestId=(g.openRequestId||0)+1;
-  g.loading=true;g.formError='';g.openError='';g.failedGroupId=groupId;g.active=null;
+  g.loading=true;g.formError='';g.openError='';g.failedGroupId=groupId;g.active=null;g.searchJump=false;
   if(route.page!=='group'||route.id!==groupId||route.overlay) go({page:'group',id:groupId});
   else render();
   try {
@@ -6736,7 +6736,8 @@ function renderGroupConversation() {
             </div>
           </div>
         </div>
-        <div class="group-history-pagination" style="display:flex;justify-content:center;padding:8px 0 2px">
+        <div class="group-history-pagination" style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding:8px 0 2px">
+          ${g.searchJump?'<button type="button" class="ghost small" data-chat-search-return-latest="group">返回最新訊息</button>':''}
           ${g.historyHasMore?'<button type="button" class="ghost small" data-action="group-history-load-older" '+(g.historyLoading?'disabled':'')+'>'+(g.historyLoading?'正在載入較早訊息…':'載入更早的訊息')+'</button>':''}
           ${g.historyError?'<span class="small muted" role="status">'+e(g.historyError)+'</span>':''}
         </div>
@@ -7189,19 +7190,13 @@ function renderGroupChatOverlay(kind) {
   let content='';
   if(kind==='search') {
     const results=groupPrototype.messages||[];
-    content='<label class="field"><span>搜尋這個群組的對話</span><input id="groupArchiveSearchInput" type="search" placeholder="輸入角色名稱或訊息內容…" autocomplete="off"></label>'+
-      '<div id="groupArchiveSearchResults">'+groupArchiveSearchResults('')+'</div>';
+    content='<label class="field"><span>搜尋目前群組的訊息</span><input id="chatMessageSearchInput" type="search" placeholder="輸入訊息關鍵字（至少 2 字）…" autocomplete="off"></label>'+
+      '<div id="chatMessageSearchResults"><p class="small muted">輸入至少 2 個字，搜尋目前開啟的群組。</p></div>';
   } else {
     content='<p class="small muted">這裡顯示目前群組內角色的頭像。群組專屬回憶照片尚未有資料來源，因此不會把單人聊天的相簿誤顯示在群組中。</p>'+
       (members.map(avatarCard).join('')||'<div class="empty">目前沒有角色頭像。</div>');
   }
   panel.insertAdjacentHTML('beforeend','<section class="chat-overlay" aria-label="'+(kind==='search'?'搜尋群組聊天':'群組相簿')+'"><div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回">'+ICON.back+'</button><h2>'+(kind==='search'?'搜尋群組聊天':'群組相簿')+'</h2></div>'+content+'</section>');
-}
-function groupArchiveSearchResults(query) {
-  const q=String(query||'').trim().toLocaleLowerCase();
-  const rows=(groupPrototype.messages||[]).filter(m=>!q||String(m.content||'').toLocaleLowerCase().includes(q)||String(m.speaker||'').toLocaleLowerCase().includes(q));
-  if(!rows.length) return '<div class="empty">'+(q?'沒有符合的群組訊息。':'目前還沒有可搜尋的群組訊息。')+'</div>';
-  return rows.map(m=>'<article class="archive-card"><div class="message-name">'+e(m.speaker||'角色')+'</div><p style="white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0">'+e(m.content||'')+'</p></article>').join('');
 }
 function renderGroupStatusShell({title,message,error=false,groupId=''}) {
   const safeMessage=e(message||'');
@@ -7877,9 +7872,9 @@ function renderMessages(scroll = true) {
   if (!s || !c) return;
   const oldScroll = $('messages').scrollTop;
   const historyControl=s.cloudOwned
-    ?(s.cloudMessagesLoading?'<div class="small muted" style="text-align:center;padding:10px">正在載入聊天紀錄…</div>'
+    ?((s.cloudSearchJump?'<div class="small muted" style="text-align:center;padding:6px">已定位到搜尋結果附近　<button type="button" class="ghost small" data-chat-search-return-latest="single">返回最新訊息</button></div>':'')+(s.cloudMessagesLoading?'<div class="small muted" style="text-align:center;padding:10px">正在載入聊天紀錄…</div>'
       :s.cloudMessagesError?'<div class="small muted" style="text-align:center;padding:10px"><span>'+e(s.cloudMessagesError)+'</span> <button type="button" data-chat-history-action="retry">重新載入</button></div>'
-      :s.cloudHasMoreMessages?'<div style="text-align:center;padding:10px"><button type="button" data-chat-history-action="older">載入更早的訊息</button></div>':'')
+      :s.cloudHasMoreMessages?'<div style="text-align:center;padding:10px"><button type="button" data-chat-history-action="older">載入更早的訊息</button></div>':''))
     :'';
   $('messages').innerHTML = historyControl + s.messages.filter(m => !(m.role === 'user' && String(m.text||'').trim() === GROUP_CONTINUE_SENTINEL)).map(m => {
     const user = m.role === 'user';
@@ -7951,23 +7946,127 @@ function addMemory(s,text) {
   }
   s.memories = result.memories;
 }
-function archiveSearchResults(query) {
-  const q=String(query||'').trim().toLocaleLowerCase();
-  const items=Object.values(state.sessions||{}).filter(item => {
-    if (!item || item.hidden || isEncounterChatSession(item)) return false;
-    const character=sessionCharacter(item);
-    return !q || [item.name,character?.name].filter(Boolean).join(' ').toLocaleLowerCase().includes(q);
-  }).sort((a,b)=>(b.startedAt||0)-(a.startedAt||0));
-  return items.map(item => {
-    const character=sessionCharacter(item);
-    const last=[...(item.messages||[])].reverse().find(m=>String(m.text||'').trim());
-    return `<article class="memory-item"><div class="row" style="gap:9px">
-      ${avatar(character)}<div class="grow" style="min-width:0"><strong class="ellipsis">${e(item.name||character?.name||'聊天')}</strong>
-      <div class="small muted ellipsis">${e(last?.text||'尚未開始的聊天')}</div></div>
-      <button type="button" data-action="resume-chat" data-id="${e(item.id)}">續聊</button>
-    </div></article>`;
-  }).join('') || '<div class="empty">找不到符合的聊天記錄。</div>';
+
+let chatMessageSearchState={key:'',query:'',offset:0,request:0,timer:null,loading:false,rows:[]};
+const CHAT_SEARCH_PAGE_SIZE=20;
+function chatSearchSnippet(value,query){
+  const text=String(value||'').replace(/\s+/gu,' ').trim(),q=String(query||'').trim();
+  const index=text.toLocaleLowerCase().indexOf(q.toLocaleLowerCase());
+  if(text.length<=150)return text;
+  const start=Math.max(0,(index<0?0:index)-55);
+  return (start?'…':'')+text.slice(start,start+150)+(start+150<text.length?'…':'');
 }
+function renderChatMessageSearchResults(rows=[],message='',hasMore=false){
+  const list=rows.map(row=>'<button type="button" class="chat-search-result" data-chat-search-hit data-id="'+e(row.id)+'"><span class="row between"><strong>'+e(row.speaker||'角色')+'</strong><span class="small muted">'+e(row.stamp||'')+'</span></span><span class="chat-search-excerpt">'+e(chatSearchSnippet(row.content,row.query||''))+'</span></button>').join('');
+  return (message?'<p class="small muted chat-search-status" role="status">'+e(message)+'</p>':'')+(list||(!message?'<div class="empty">沒有符合的訊息。</div>':''))+(hasMore?'<div class="chat-search-more"><button type="button" class="ghost small" data-chat-search-more>載入更多搜尋結果</button></div>':'');
+}
+function currentChatSearchContext(){
+  if(route.page==='group')return groupPrototype.active?{kind:'group',id:groupPrototype.active.id,group:groupPrototype.active}:null;
+  if(route.page==='conversation')return currentSession()?{kind:'single',id:currentSession().id,session:currentSession()}:null;
+  return null;
+}
+async function runChatMessageSearch(query,append=false){
+  const ctx=currentChatSearchContext(),node=$('chatMessageSearchResults'),q=String(query||'').trim();
+  if(!ctx||!node)return;
+  const key=ctx.kind+':'+ctx.id;
+  if(chatMessageSearchState.key!==key||chatMessageSearchState.query!==q){
+    chatMessageSearchState={key,query:q,offset:0,request:chatMessageSearchState.request+1,timer:null,loading:false,rows:[]};append=false;
+  }
+  if(q.length<2){chatMessageSearchState.rows=[];node.innerHTML=renderChatMessageSearchResults([],q?'請再輸入至少 2 個字。':'輸入至少 2 個字，搜尋目前開啟的聊天室。');return;}
+  if(chatMessageSearchState.loading)return;
+  const request=++chatMessageSearchState.request,offset=append?chatMessageSearchState.offset:0;
+  chatMessageSearchState.loading=true;node.innerHTML=renderChatMessageSearchResults(chatMessageSearchState.rows,append?'正在載入更多結果…':'正在搜尋目前聊天室…');
+  try{
+    const client=window.mySupabase,uid=currentUser()?.uid;let rows=[];
+    if(client&&uid&&isUuid(ctx.id)){
+      const {data:{user},error:authError}=await client.auth.getUser();
+      if(authError||user?.id!==uid||currentUser()?.uid!==uid)throw Error('登入狀態已變更，請重新登入。');
+      const pattern='%'+q.replace(/[\\%_]/gu,'\\$&')+'%';
+      if(ctx.kind==='single'){
+        if(!ctx.session.cloudOwned||ctx.session.cloudOwnerUid!==uid||ctx.session.hidden||readDeletedChatTombstones(uid).sessions[ctx.id])throw Error('目前聊天室不可搜尋，請重新開啟後再試。');
+        const {data,error}=await client.from('chat_messages').select('id,session_id,role,content,created_at')
+          .eq('session_id',ctx.id).is('deleted_at',null).ilike('content',pattern)
+          .order('created_at',{ascending:false}).order('id',{ascending:false}).range(offset,offset+CHAT_SEARCH_PAGE_SIZE-1);
+        if(error)throw error;
+        rows=(data||[]).map(r=>({...r,query:q,speaker:r.role==='user'?'你':sessionCharacter(ctx.session)?.name||'角色',stamp:new Date(r.created_at).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}));
+      }else{
+        if(groupPrototype.active?.id!==ctx.id||groupPrototype.ownerUid!==uid)throw Error('目前群組不可搜尋，請重新開啟後再試。');
+        const {data,error}=await client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,speaker_snapshot,content,created_at')
+          .eq('group_id',ctx.id).is('deleted_at',null).ilike('content',pattern)
+          .order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).range(offset,offset+CHAT_SEARCH_PAGE_SIZE-1);
+        if(error)throw error;
+        rows=(data||[]).map(r=>({...r,query:q,speaker:r.speaker_type==='user'?'你':r.speaker_type==='system'?'系統':r.speaker_snapshot?.name||'角色',stamp:new Date(r.created_at).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}));
+      }
+    }else if(ctx.kind==='single'){
+      rows=(ctx.session.messages||[]).filter(r=>String(r.text||'').toLocaleLowerCase().includes(q.toLocaleLowerCase())).slice().reverse().slice(offset,offset+CHAT_SEARCH_PAGE_SIZE)
+        .map(r=>({id:r.id,query:q,content:r.text,speaker:r.role==='user'?'你':sessionCharacter(ctx.session)?.name||'角色',stamp:new Date(Number(r.at)||Date.now()).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}));
+    }else{
+      rows=(groupPrototype.messages||[]).filter(r=>String(r.content||'').toLocaleLowerCase().includes(q.toLocaleLowerCase())).slice().reverse().slice(offset,offset+CHAT_SEARCH_PAGE_SIZE)
+        .map(r=>({id:r.id,query:q,content:r.content,speaker:r.speaker||'角色',stamp:r.createdAt||''}));
+    }
+    if(request!==chatMessageSearchState.request||currentChatSearchContext()?.id!==ctx.id)return;
+    chatMessageSearchState.rows=append?[...chatMessageSearchState.rows,...rows]:rows;
+    chatMessageSearchState.offset=chatMessageSearchState.rows.length;
+    node.innerHTML=renderChatMessageSearchResults(chatMessageSearchState.rows,'',rows.length===CHAT_SEARCH_PAGE_SIZE);
+  }catch(error){if(request===chatMessageSearchState.request)node.innerHTML=renderChatMessageSearchResults(chatMessageSearchState.rows,error?.message||'搜尋失敗，請稍後重試。');}
+  finally{if(request===chatMessageSearchState.request)chatMessageSearchState.loading=false;}
+}
+async function jumpToChatSearchHit(button){
+  const ctx=currentChatSearchContext(),id=String(button.dataset.id||'');
+  if(!ctx||!id)return;
+  $('view').querySelector('.chat-main .chat-overlay')?.remove();
+  const client=window.mySupabase,uid=currentUser()?.uid;
+  if(ctx.kind==='single'&&!ctx.session.cloudOwned){
+    const n=[...($('messages')?.querySelectorAll('[data-message]')||[])].find(x=>x.dataset.message===id);
+    if(n){n.scrollIntoView({behavior:'smooth',block:'center'});n.classList.add('search-hit-highlight');setTimeout(()=>n.classList.remove('search-hit-highlight'),1800);}else toast('這則訊息不在目前已載入的本機紀錄中。');return;
+  }
+  if(!client||!uid||!isUuid(id))return;
+  try{
+    const {data:{user},error:authError}=await client.auth.getUser();
+    if(authError||user?.id!==uid||currentUser()?.uid!==uid)throw Error('登入狀態已變更，請重新登入。');
+    if(ctx.kind==='single'){
+      const s=ctx.session;if(s.cloudOwnerUid!==uid||readDeletedChatTombstones(uid).sessions[s.id])throw Error('目前聊天室不可存取。');
+      const {data:t,error:te}=await client.from('chat_messages').select('id,session_id,role,content,created_at').eq('id',id).eq('session_id',s.id).is('deleted_at',null).maybeSingle();
+      if(te)throw te;if(!t)throw Error('這則訊息已刪除或無法存取。');
+      const bf='created_at.lt.'+t.created_at+',and(created_at.eq.'+t.created_at+',id.lt.'+t.id+'),and(created_at.eq.'+t.created_at+',id.lt.'+t.id+')';
+      const af='created_at.gt.'+t.created_at+',and(created_at.eq.'+t.created_at+',id.gt.'+t.id+')';
+      const [b,a]=await Promise.all([
+        client.from('chat_messages').select('id,session_id,role,content,created_at').eq('session_id',s.id).is('deleted_at',null).or(bf).order('created_at',{ascending:false}).order('id',{ascending:false}).limit(24),
+        client.from('chat_messages').select('id,session_id,role,content,created_at').eq('session_id',s.id).is('deleted_at',null).or(af).order('created_at',{ascending:true}).order('id',{ascending:true}).limit(24)
+      ]);
+      if(b.error)throw b.error;if(a.error)throw a.error;
+      if(currentSession()?.id!==s.id||currentUser()?.uid!==uid)return;
+      const all=[...(b.data||[]),t,...(a.data||[])].sort((x,y)=>String(x.created_at).localeCompare(String(y.created_at))||String(x.id).localeCompare(String(y.id)));
+      s.messages=all.map(r=>({id:r.id,role:r.role==='user'?'user':'assistant',text:r.content||'',at:new Date(r.created_at).getTime(),cloudSynced:true}));
+      const first=all[0];s.cloudOldestMessageCursor=first?{createdAt:first.created_at,id:first.id}:null;
+      s.cloudHasMoreMessages=(b.data||[]).length===24;s.cloudMessagesLoaded=true;s.cloudSearchJump=true;
+      renderMessages(false);
+      requestAnimationFrame(()=>{const n=[...($('messages')?.querySelectorAll('[data-message]')||[])].find(x=>x.dataset.message===id);if(n){n.scrollIntoView({behavior:'smooth',block:'center'});n.classList.add('search-hit-highlight');setTimeout(()=>n.classList.remove('search-hit-highlight'),1800);}});
+    }else{
+      const g=ctx.group;if(g.id!==ctx.id||groupPrototype.ownerUid!==uid)return;
+      const {data:t,error:te}=await client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('id',id).eq('group_id',g.id).is('deleted_at',null).maybeSingle();
+      if(te)throw te;if(!t)throw Error('這則群組訊息已刪除或無法存取。');
+      const bf='created_at.lt.'+t.created_at+',and(created_at.eq.'+t.created_at+',sequence_no.lt.'+t.sequence_no+'),and(created_at.eq.'+t.created_at+',sequence_no.eq.'+t.sequence_no+',id.lt.'+t.id+')';
+      const af='created_at.gt.'+t.created_at+',and(created_at.eq.'+t.created_at+',sequence_no.gt.'+t.sequence_no+'),and(created_at.eq.'+t.created_at+',sequence_no.eq.'+t.sequence_no+',id.gt.'+t.id+')';
+      const [b,a]=await Promise.all([
+        client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',g.id).is('deleted_at',null).or(bf).order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(24),
+        client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',g.id).is('deleted_at',null).or(af).order('created_at',{ascending:true}).order('sequence_no',{ascending:true}).order('id',{ascending:true}).limit(24)
+      ]);
+      if(b.error)throw b.error;if(a.error)throw a.error;if(groupPrototype.active?.id!==g.id)return;
+      const all=[...(b.data||[]),t,...(a.data||[])].sort((x,y)=>String(x.created_at).localeCompare(String(y.created_at))||Number(x.sequence_no)-Number(y.sequence_no)||String(x.id).localeCompare(String(y.id)));
+      g.messages=all.map(r=>{const snap=r.speaker_snapshot||{},m=g.members.find(x=>x.characterId===r.character_id)||g.members.find(x=>x.characterSnapshotId===snap.id||x.id===snap.id),type=r.speaker_type==='user'?'user':r.speaker_type==='system'?'system':'character';return {id:r.id,type,speaker:type==='user'?'你':type==='system'?'系統':snap.name||m?.name||'角色',characterId:r.character_id||null,speakerSnapshot:snap,content:type==='user'&&r.content===GROUP_CONTINUE_SENTINEL?'':r.content,createdAt:r.created_at};});
+      const first=all[0];groupPrototype.historyCursor=first?{createdAt:first.created_at,sequenceNo:first.sequence_no,id:first.id}:null;
+      groupPrototype.historyHasMore=(b.data||[]).length===24;groupPrototype.searchJump=true;groupPrototype.historyError='';
+      renderGroupConversation();
+      requestAnimationFrame(()=>{const n=[...($('groupMessages')?.querySelectorAll('[data-message]')||[])].find(x=>x.dataset.message===id);if(n){n.scrollIntoView({behavior:'smooth',block:'center'});n.classList.add('search-hit-highlight');setTimeout(()=>n.classList.remove('search-hit-highlight'),1800);}});
+    }
+  }catch(error){toast(error?.message||'無法定位這則訊息。');}
+}
+async function returnChatToLatest(kind){
+  if(kind==='single'){const s=currentSession();if(!s?.cloudOwned)return;const pending=(s.messages||[]).filter(m=>m.cloudSynced!==true);s.messages=pending;s.cloudSearchJump=false;s.cloudMessagesLoaded=false;s.cloudOldestMessageCursor=null;s.cloudHasMoreMessages=false;await loadCloudSessionMessages(s.id,{refresh:true});}
+  else if(groupPrototype.active?.id)await groupOpen(groupPrototype.active.id);
+}
+
 function formatStoryWorldTime(value) {
   const raw=String(value||'').trim();if(!raw)return '故事時間尚未確認';
   const match=raw.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
@@ -8214,8 +8313,8 @@ function renderChatOverlay(kind) {
       </section>`
     : '';
   const content = kind === 'search'
-    ? `<label class="field"><span>搜尋過往聊天記錄</span><input id="archiveSearchInput" type="search" placeholder="輸入聊天名稱或角色名稱…" autocomplete="off"></label>
-      <div id="archiveSearchResults">${archiveSearchResults('')}</div>`
+    ? `<label class="field"><span>搜尋目前聊天室的訊息</span><input id="chatMessageSearchInput" type="search" placeholder="輸入訊息關鍵字（至少 2 字）…" autocomplete="off"></label>
+      <div id="chatMessageSearchResults"><p class="small muted">輸入至少 2 個字，搜尋目前開啟的聊天室。</p></div>`
     : kind === 'diary'
       ? '<section class="diary-summary"><div class="diary-summary-head"><div><h3>把重要的瞬間，好好收藏</h3></div><div class="diary-count"><strong id="storyMemoryCount">'+(s.storyMode?'0':memorySize(s.memories)).toLocaleString()+'</strong><span>/ 10,000 字</span></div></div>'+(s.storyMode?'<div id="storyMemorySummary" class="memory-item" style="margin:12px 0;white-space:pre-wrap"><p class="small muted">正在載入 AI 回憶摘要…</p></div>':'')+'<div class="diary-meter"><span id="storyMemoryMeter" style="width:'+Math.min(100,(s.storyMode?0:memorySize(s.memories))/10000*100)+'%"></span></div></section>' +
         (s.storyMode ? '' : ((s.memories||[]).map(m => '<article class="memory-item diary-memory-card '+(m.important?'is-important':'')+'"><div class="diary-memory-head"><label class="diary-check"><input type="checkbox" data-memory="'+e(m.id)+'" '+(m.important?'checked':'')+'><span class="diary-heart">'+(m.important?'♥':'♡')+'</span><span>'+(m.important?'重大記憶':'設為重大記憶')+'</span></label><span class="diary-memory-date">'+e(timeText(m.at))+'</span></div><p class="prose diary-memory-text">'+e(m.text)+'</p>'+(m.important?'<p class="small diary-lock-note">♥ 已珍藏，不會被自動清除</p>':'<button type="button" class="diary-edit-button" data-action="edit-memory" data-id="'+e(m.id)+'">編輯這則回憶</button>')+'</article>').join('') || '<div class="empty diary-empty"><strong>你們的故事，正等待被收藏</strong><p>這裡會收藏整理後的回憶內容；累積 5 個已結算故事回合後，AI 會建立第一則摘要。</p></div>'))
@@ -8956,6 +9055,19 @@ document.addEventListener('click', event => {
   }
   void groupOpen(groupId);
 }, true);
+
+
+/* CHAT SEARCH: intercept scoped search controls before the general action router. */
+document.addEventListener('click',async event=>{
+  const hit=event.target instanceof Element?event.target.closest('[data-chat-search-hit]'):null;
+  const more=event.target instanceof Element?event.target.closest('[data-chat-search-more]'):null;
+  const latest=event.target instanceof Element?event.target.closest('[data-chat-search-return-latest]'):null;
+  if(!hit&&!more&&!latest)return;
+  event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();
+  if(hit){await jumpToChatSearchHit(hit);return;}
+  if(more){await runChatMessageSearch(chatMessageSearchState.query,true);return;}
+  await returnChatToLatest(latest.dataset.chatSearchReturnLatest);
+},true);
 
 /* GROUP MESSAGE ACTION CAPTURE FIX
    Handle group-message menu and delete clicks in capture phase so an ancestor
@@ -11085,13 +11197,10 @@ document.addEventListener('input',event => {
     chatSearch=target.value;
     $('chatEntries').innerHTML=chatEntries();
   }
-  if (target.id==='archiveSearchInput') {
-    const results=$('archiveSearchResults');
-    if (results) results.innerHTML=archiveSearchResults(target.value);
-  }
-  if (target.id==='groupArchiveSearchInput') {
-    const results=$('groupArchiveSearchResults');
-    if (results) results.innerHTML=groupArchiveSearchResults(target.value);
+  if(target.id==='chatMessageSearchInput'){
+    if(chatMessageSearchState.timer)clearTimeout(chatMessageSearchState.timer);
+    const query=target.value;
+    chatMessageSearchState.timer=setTimeout(()=>void runChatMessageSearch(query,false),280);
   }
   if (target.id==='groupCharacterSearch') {
     groupCharacterSearch=target.value;
