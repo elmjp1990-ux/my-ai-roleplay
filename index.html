@@ -3290,7 +3290,7 @@ let route = {page:'citymap'};
 const GROUP_CONTINUE_SENTINEL = '（請接續目前的故事。）';
 let personaPickerSelection = null;
 let groupPersonaPickerSelection = null;
-let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupMembers:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null,openRequestId:0};
+let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupMembers:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null,openRequestId:0,historyCursor:null,historyHasMore:false,historyLoading:false,historyError:'',historyScrollAnchor:null};
 let search = '';
 let filter = 'recommended';
 let exploreTags = [];
@@ -6594,7 +6594,7 @@ async function groupOpen(groupId) {
       window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,background_mode,background_memory_photo_id,created_at,updated_at,archived_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position'),
-      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:true}).order('sequence_no',{ascending:true})
+      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(50)
     ]),15000,'群組資料讀取逾時，請檢查網路後重試。')
     if(requestId!==g.openRequestId) return;
     const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error;
@@ -6612,7 +6612,11 @@ async function groupOpen(groupId) {
     const members=memberRows.map(m=>{const snapshot=m.character_snapshot||{};const characterId=m.character_id||null;const snapshotId=snapshot.id||characterId||null;const displayId=characterId||snapshotId||m.id;return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,avatar_url:avatarById[characterId]||snapshot.avatar_url||snapshot.image||'',position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};});
     groupExpandedMemberId=null;
     // Memory photo metadata and signed URLs are loaded only when the player opens background settings.
-    const messages=(messageRes.data||[]).map(m=>{
+    const initialMessageRows=messageRes.data||[];
+    g.historyHasMore=initialMessageRows.length===50;
+    g.historyCursor=initialMessageRows.length?{createdAt:initialMessageRows[0].created_at,sequenceNo:initialMessageRows[0].sequence_no,id:initialMessageRows[0].id}:null;
+    g.historyLoading=false;g.historyError='';g.historyScrollAnchor=null;
+    const messages=[...initialMessageRows].reverse().map(m=>{
       const speakerSnapshot=m.speaker_snapshot||{};
       const member=members.find(x=>x.characterId===m.character_id)||members.find(x=>x.characterSnapshotId===speakerSnapshot.id||x.id===speakerSnapshot.id);
       const scene=scenes.find(x=>x.id===m.scene_id);
@@ -6655,6 +6659,59 @@ async function groupOpen(groupId) {
     render();
   }
 }
+async function groupLoadOlderMessages() {
+  const g=groupPrototype,groupId=g.active?.id,uid=currentUser()?.uid,cursor=g.historyCursor;
+  if(!groupId||!uid||!window.mySupabase||!g.historyHasMore||g.historyLoading||!cursor)return;
+  const pane=$('groupMessages');
+  if(!pane)return;
+  const requestId=g.openRequestId;
+  const before={scrollHeight:pane.scrollHeight,scrollTop:pane.scrollTop};
+  g.historyLoading=true;g.historyError='';
+  renderGroupConversation();
+  try {
+    const createdAt=String(cursor.createdAt||'');
+    const sequenceNo=Number(cursor.sequenceNo);
+    const messageId=String(cursor.id||'');
+    if(!createdAt||!Number.isFinite(sequenceNo)||!isUuid(messageId))throw new Error('歷史訊息游標無效，請重新開啟群組。');
+    const olderFilter='created_at.lt.'+createdAt+',and(created_at.eq.'+createdAt+',sequence_no.lt.'+sequenceNo+'),and(created_at.eq.'+createdAt+',sequence_no.eq.'+sequenceNo+',id.lt.'+messageId+')';
+    const {data:rows,error}=await groupWithTimeout(
+      window.mySupabase.from('chat_group_messages')
+        .select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at')
+        .eq('group_id',groupId).is('deleted_at',null).or(olderFilter)
+        .order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(50),
+      15000,'較早的群組訊息載入逾時，請稍後重試。'
+    );
+    if(requestId!==g.openRequestId||g.active?.id!==groupId||currentUser()?.uid!==uid)return;
+    if(error)throw error;
+    const page=rows||[];
+    g.historyHasMore=page.length===50;
+    if(page.length){
+      const oldest=page[0];
+      g.historyCursor={createdAt:oldest.created_at,sequenceNo:oldest.sequence_no,id:oldest.id};
+      const members=g.active.members||[],scenes=g.active.scenes||[];
+      const mapped=[...page].reverse().map(m=>{
+        const speakerSnapshot=m.speaker_snapshot||{};
+        const member=members.find(x=>x.characterId===m.character_id)||members.find(x=>x.characterSnapshotId===speakerSnapshot.id||x.id===speakerSnapshot.id);
+        const scene=scenes.find(x=>x.id===m.scene_id);
+        const type=m.speaker_type==='user'?'user':m.speaker_type==='system'?'system':'character';
+        const speaker=type==='user'?'你':type==='system'?'系統':(speakerSnapshot.name||member?.name||'角色')+(scene?' · '+scene.name:'');
+        return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user'&&m.content===GROUP_CONTINUE_SENTINEL?'':m.content,createdAt:m.created_at};
+      });
+      const existing=new Set((g.messages||[]).map(message=>message.id));
+      g.messages=[...mapped.filter(message=>!existing.has(message.id)),...(g.messages||[])];
+    }
+    g.historyScrollAnchor=before;
+  } catch(error) {
+    if(requestId!==g.openRequestId||g.active?.id!==groupId)return;
+    g.historyError=groupFriendlyError(error)||'較早的群組訊息載入失敗，請重試。';
+  } finally {
+    if(requestId===g.openRequestId&&g.active?.id===groupId){
+      g.historyLoading=false;
+      renderGroupConversation();
+    }
+  }
+}
+
 async function openGroupBackgroundSettings() {
   const group=groupPrototype.active,client=window.mySupabase;
   if(!group||!client)return;
@@ -6760,6 +6817,10 @@ function renderGroupConversation() {
             </div>
           </div>
         </div>
+        <div class="group-history-pagination" style="display:flex;justify-content:center;padding:8px 0 2px">
+          ${g.historyHasMore?'<button type="button" class="ghost small" data-action="group-history-load-older" '+(g.historyLoading?'disabled':'')+'>'+(g.historyLoading?'正在載入較早訊息…':'載入更早的訊息')+'</button>':''}
+          ${g.historyError?'<span class="small muted" role="status">'+e(g.historyError)+'</span>':''}
+        </div>
         <div class="messages" id="groupMessages">${messageRows}</div>
         <form class="composer" data-form="group-message">
 ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
@@ -6815,9 +6876,16 @@ ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
   // Keep the newest group messages in view when opening or re-rendering the chat.
   const groupMessages=$('groupMessages');
   if(groupMessages) {
-    const scrollToLatest=()=>{if(groupMessages.isConnected) groupMessages.scrollTop=groupMessages.scrollHeight;};
-    requestAnimationFrame(()=>{scrollToLatest();requestAnimationFrame(scrollToLatest);});
-    setTimeout(scrollToLatest,80);
+    const anchor=g.historyScrollAnchor;
+    g.historyScrollAnchor=null;
+    if(anchor){
+      const restore=()=>{if(groupMessages.isConnected)groupMessages.scrollTop=anchor.scrollTop+(groupMessages.scrollHeight-anchor.scrollHeight);};
+      requestAnimationFrame(restore);
+    }else{
+      const scrollToLatest=()=>{if(groupMessages.isConnected) groupMessages.scrollTop=groupMessages.scrollHeight;};
+      requestAnimationFrame(()=>{scrollToLatest();requestAnimationFrame(scrollToLatest);});
+      setTimeout(scrollToLatest,80);
+    }
   }
 }
 let groupBackgroundTimer=null;
@@ -9357,6 +9425,7 @@ document.addEventListener('click',async event => {
       case 'group-world-character': { groupPrototype.draft.worldCharacterId=button.value||button.dataset.value||'';const selected=groupSelectedCharacters().find(c=>c.id===groupPrototype.draft.worldCharacterId);const preview=$('groupWorldReference');if(preview) preview.textContent=selected?.worldBackground||selected?.world||selected?.intro||'所選角色目前沒有可用的公開介紹；可先繼續建立，後續再完善世界觀資料。';break; }
       case 'group-create':groupCreateMock();break;
       case 'group-send':groupSendMock();break;
+      case 'group-history-load-older':groupLoadOlderMessages();break;
       case 'group-message-menu': {
         const message=groupPrototype.messages.find(item=>item.id===key);
         const latest=message&&groupPrototype.messages.filter(item=>item.type===message.type).at(-1);
