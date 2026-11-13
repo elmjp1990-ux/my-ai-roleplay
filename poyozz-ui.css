@@ -316,3 +316,53 @@ body.day {
   }
 }
 
+/* Character phone: one neutral glass system for single and group chats. */
+:root {
+  --px-phone-surface:rgba(79,84,92,.94);
+  --px-phone-surface-soft:rgba(118,123,131,.34);
+  --px-phone-border:rgba(222,226,231,.24);
+  --px-phone-text:rgba(248,249,250,.96);
+  --px-phone-muted:rgba(224,227,231,.68);
+  --px-phone-battery:rgba(215,219,224,.92);
+  --px-phone-battery-track:rgba(255,255,255,.20);
+}
+body.day {
+  --px-phone-surface:rgba(244,245,247,.98);
+  --px-phone-surface-soft:rgba(224,227,231,.78);
+  --px-phone-border:rgba(91,96,104,.20);
+  --px-phone-text:#292c31;
+  --px-phone-muted:rgba(64,68,75,.66);
+  --px-phone-battery:#777e87;
+  --px-phone-battery-track:rgba(75,80,88,.18);
+}
+.phone-modal-backdrop{position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(7,10,16,.68);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.phone-device{width:min(360px,100%);height:min(500px,90dvh);min-height:min(440px,90dvh);display:flex;flex-direction:column;overflow:hidden;padding:17px;border:1px solid var(--px-phone-border);border-radius:30px;border-top:3px solid var(--px-phone-border);background:linear-gradient(155deg,var(--px-phone-surface),var(--px-phone-surface-soft));color:var(--px-phone-text);box-shadow:0 24px 90px #0008,inset 0 1px 0 rgba(255,255,255,.14);-webkit-backdrop-filter:blur(22px) saturate(115%);backdrop-filter:blur(22px) saturate(115%)}
+.phone-device-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-shrink:0;font-size:12px;font-weight:650;letter-spacing:.01em;color:var(--px-phone-text)}
+.phone-battery{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--px-phone-battery)!important}
+.phone-battery-shape{width:28px;height:13px;border:1px solid currentColor;border-radius:4px;padding:2px;position:relative;background:var(--px-phone-battery-track);box-shadow:inset 0 1px 0 rgba(255,255,255,.15)}
+.phone-battery-shape:after{content:"";position:absolute;right:-3px;top:3px;width:2px;height:5px;background:currentColor;border-radius:0 2px 2px 0}
+.phone-battery-fill{height:100%;min-width:0;border-radius:2px;background:var(--px-phone-battery);transition:width .18s ease}
+.phone-member-switch{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0 4px;flex-shrink:0}
+.phone-member-switch button,.phone-close-row button{border:1px solid var(--px-phone-border);background:var(--px-phone-surface-soft);color:var(--px-phone-text);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.phone-member-switch button{min-width:30px;height:28px;padding:3px 9px;font-size:13px;border-radius:10px}
+.phone-member-name{flex:1;min-width:0;text-align:center;font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--px-phone-text)}
+.phone-content{padding:13px 2px 7px;font-size:11px;flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;color:var(--px-phone-text)}
+.phone-time{font-size:17px;font-weight:650;letter-spacing:.015em;margin-bottom:10px;color:var(--px-phone-text)}
+.phone-location,.phone-notices{padding:10px 11px;border:1px solid var(--px-phone-border);border-radius:14px;background:var(--px-phone-surface-soft);color:var(--px-phone-text);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.phone-location{margin-top:9px;font-size:10px;line-height:1.65}
+.phone-notices{margin-top:10px;padding:11px 12px}
+.phone-notices p{margin:6px 0;font-size:10px;line-height:1.65}
+.phone-notice-list{padding-right:3px}
+.phone-notice-list p{margin:4px 0;font-size:10px;line-height:1.65}
+.phone-notice-title{font-size:11px;font-weight:650;color:var(--px-phone-text);margin-bottom:7px}
+.phone-story-event{padding:8px 0;border-bottom:1px solid var(--px-phone-border)}
+.phone-story-event:last-child{border-bottom:0;padding-bottom:0}
+.phone-story-event-meta{display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;color:var(--px-phone-muted);font-size:9px}
+.phone-story-event strong{display:block;font-size:11px;line-height:1.5}
+.phone-story-event p{margin:3px 0 0;font-size:10px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
+.phone-close-row{display:flex;justify-content:center;margin-top:12px;flex-shrink:0}
+.phone-close-row button{border-radius:999px;padding:7px 18px;font-size:10px}
+.phone-bar{width:85px;height:3px;background:var(--px-phone-muted);border-radius:5px;margin:12px auto 0;flex-shrink:0}
+.phone-warning{border-color:var(--px-phone-border);background:var(--px-phone-surface-soft)}
+@media(prefers-reduced-transparency:reduce){.phone-modal-backdrop,.phone-device,.phone-member-switch button,.phone-close-row button,.phone-location,.phone-notices{-webkit-backdrop-filter:none;backdrop-filter:none}}
+
