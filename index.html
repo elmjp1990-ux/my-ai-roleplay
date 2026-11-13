@@ -426,7 +426,7 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .explore-shortcut.active{border-color:#818cf8a8;background:var(--soft);color:var(--text);box-shadow:inset 0 0 0 1px #818cf822}
 .explore-shortcut:active{transform:scale(.97)}
 .explore-search-row{display:flex;gap:8px;align-items:center}
-.explore-search-row input{min-width:0;flex:1}
+.explore-search-row input{min-width:0;flex:1;box-sizing:border-box}
 .explore-section-heading{display:flex;align-items:end;justify-content:space-between;gap:12px;margin:24px 0 12px}
 .explore-section-heading h2{margin:0;font-size:19px;letter-spacing:-.02em}
 .explore-section-heading p{margin:5px 0 0;font-size:11px;color:var(--muted)}
@@ -812,7 +812,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .explore-shortcuts { grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
   .explore-shortcut { flex-direction:row; justify-content:flex-start; padding:12px 13px; gap:9px; font-size:12px; border-radius:13px; }
   .explore-shortcut .icon { width:17px;height:17px; }
-  .explore-search-row { margin-top:2px; }
+  .explore-search-row { margin-top:7px; }
   .explore-section-heading { margin:20px 1px 10px; }
   .explore-section-heading h2 { font-size:18px; }
   .explore-section-heading p { font-size:10px; }
@@ -4912,7 +4912,7 @@ function exploreList() {
       Number.isFinite(Number(c.firstPublishedAt ?? c.createdAt)) &&
       Date.now()-Number(c.firstPublishedAt ?? c.createdAt) >= 0 &&
       Date.now()-Number(c.firstPublishedAt ?? c.createdAt) <= DAY)
-      .sort((a,b) => (b.firstPublishedAt ?? b.createdAt)-(a.firstPublishedAt ?? a.createdAt)).slice(0,30);
+      .sort((a,b) => (b.firstPublishedAt ?? b.createdAt)-(a.firstPublishedAt ?? a.createdAt)).slice(0,50);
   } else if (filter === 'favorites') {
     list = list.filter(c => state.favorites.includes(c.id));
   } else if (filter === 'popular') {
@@ -4953,7 +4953,6 @@ function card(c,owner = false) {
                 data-id="${e(c.id)}" aria-label="切換喜愛角色"
                 aria-pressed="${favorite}">♥</button>
         <button class="card-chat" data-action="start-chat" data-id="${e(c.id)}">開始聊天</button>
-        <button class="card-chat encounter-start-button" data-action="start-encounter" data-id="${e(c.id)}">相遇模式</button>
       </div>
       <div class="card-body">
         <h3>${e(c.name)}</h3>
@@ -5032,7 +5031,7 @@ function renderGrid({append=false}={}) {
   document.querySelector('.explore-shortcut[data-action="toggle-search"]')?.classList.toggle('active', !!search || !!($('exploreSearch') && !$('exploreSearch').classList.contains('hidden')));
   $('selectedTags').innerHTML = exploreTags.map(tagButton).join('');
   $('exploreHint').textContent = filter === 'latest'
-    ? '最近24小時公開上架的角色，最多30位。'
+    ? '最近24小時公開上架的角色，最多50位。'
     : filter === 'popular' ? '目前依角色資料中的聊天數排序；全站回合統計仍待後端實作。'
     : `共有${list.length}位符合條件的角色。`;
   const sectionTitle = document.querySelector('.explore-section-heading h2');
