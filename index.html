@@ -5032,7 +5032,7 @@ function renderGrid({append=false}={}) {
   $('selectedTags').innerHTML = exploreTags.map(tagButton).join('');
   $('exploreHint').textContent = filter === 'latest'
     ? '最近24小時公開上架的角色，最多50位。'
-    : filter === 'popular' ? '目前依角色資料中的聊天數排序；全站回合統計仍待後端實作。'
+    : filter === 'popular' ? '依角色累積對話回合數排序。'
     : `共有${list.length}位符合條件的角色。`;
   const sectionTitle = document.querySelector('.explore-section-heading h2');
   if (sectionTitle) sectionTitle.textContent = filter === 'popular' ? '熱門角色' : filter === 'favorites' ? '喜愛的角色' : filter === 'latest' ? '新登場角色' : '為你推薦';
@@ -5346,9 +5346,12 @@ async function loadCharacterTurnCounts(characterIds, forceRefresh = false) {
   if (forceRefresh) {
     const pending = requestedIds.map(id => characterTurnCountRequests.get(id)).filter(Boolean);
     if (pending.length) await Promise.all(pending.map(request => request.catch(() => {})));
-    requestedIds.forEach(id => characterTurnCountCache.delete(id));
+    requestedIds.forEach(id => {
+      characterTurnCountCache.delete(id);
+      characterTurnCountAttempted.delete(id);
+    });
   }
-  const ids = requestedIds.filter(id => !characterTurnCountCache.has(id) && !characterTurnCountRequests.has(id));
+  const ids = requestedIds.filter(id => !characterTurnCountCache.has(id) && !characterTurnCountRequests.has(id) && !characterTurnCountAttempted.has(id));
   if (!ids.length || !window.mySupabase) {
     for (const id of (Array.isArray(characterIds) ? characterIds : [characterIds])) {
       if (characterTurnCountCache.has(id)) updateCharacterTurnCountElements(id, characterTurnCountCache.get(id));
@@ -5360,6 +5363,9 @@ async function loadCharacterTurnCounts(characterIds, forceRefresh = false) {
     const {data,error} = await window.mySupabase.rpc('get_character_turn_counts',{p_character_ids:ids});
     if (error) throw error;
     if (!Array.isArray(data)) throw new Error('角色回合統計回傳格式無效');
+    // Mark every requested ID as attempted, including IDs intentionally omitted by RLS.
+    // This prevents renderGrid() from repeatedly issuing the same RPC for omitted rows.
+    ids.forEach(id => characterTurnCountAttempted.add(id));
     for (const row of data) {
       if (!isUuid(row.character_id)) continue;
       const count = Number(row.turn_count);
@@ -5380,6 +5386,9 @@ async function loadCharacterTurnCounts(characterIds, forceRefresh = false) {
   try {
     await request;
   } catch (error) {
+    // Avoid an automatic render/retry loop when the RPC is unavailable; a later explicit
+    // refresh (forceRefresh) can retry these IDs.
+    ids.forEach(id => characterTurnCountAttempted.add(id));
     // 統計載入失敗時保留現有數字，不留下「載入中」或額外統計列。
     console.warn('角色對話回合統計載入失敗：',error?.message || error);
   } finally {
@@ -5563,6 +5572,7 @@ async function renderFollowedAuthors() {
 let createVisibilityFilter = 'all';
 const characterTurnCountCache = new Map();
 const characterTurnCountRequests = new Map();
+const characterTurnCountAttempted = new Set();
 function creationTabs() {
   return `<div class="tabs">
     <button data-action="new-character">建立新角色</button>
