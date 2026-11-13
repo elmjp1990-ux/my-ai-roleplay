@@ -51,8 +51,11 @@ export function createLocalSupabaseAdapter({ url, serviceRoleKey, fetchImpl = fe
 
   async function downloadObject(path) {
     const response = await fetchImpl(endpoint(`storage/v1/object/authenticated/${BUCKET}/${encodedPath(path)}`), { headers });
-    if (response.status === 404) return null;
-    if (!response.ok) throw new Error(`Storage verification failed (${response.status}): ${await response.text()}`);
+    if (!response.ok) {
+      const body = await response.text();
+      if (response.status === 404 || /"statusCode"\\s*:\\s*"404"|object not found/i.test(body)) return null;
+      throw new Error(`Storage verification failed (${response.status}): ${body.slice(0, 800)}`);
+    }
     return Buffer.from(await response.arrayBuffer());
   }
 
@@ -80,12 +83,11 @@ export function createLocalSupabaseAdapter({ url, serviceRoleKey, fetchImpl = fe
         headers: { ...headers, "Content-Type": asset.mimeType, "x-upsert": "false" },
         body: asset.bytes,
       });
-      if (!response.ok && response.status !== 409) {
-        throw new Error(`Storage upload failed (${response.status}): ${(await response.text()).slice(0, 800)}`);
-      }
+      const uploadError = response.ok ? null : (await response.text()).slice(0, 800);
+      // Confirm the final bytes even if an upload raced with an existing object.
       existing = await downloadObject(asset.storagePath);
       if (!existing || createHash("sha256").update(existing).digest("hex") !== asset.sourceSha256) {
-        throw new Error(`Uploaded Storage object failed hash verification: ${asset.storagePath}`);
+        throw new Error(`Storage upload/verification failed for ${asset.storagePath}: ${uploadError || "downloaded bytes do not match"}`);
       }
     },
 
@@ -115,16 +117,15 @@ export function createLocalSupabaseAdapter({ url, serviceRoleKey, fetchImpl = fe
           sort_order: 0,
         }),
       });
-      if (!inserted.ok) {
-        // A concurrent/retried insert is accepted only after an exact reread.
-        const reread = await fetchImpl(query, { headers });
-        if (!reread.ok) throw new Error(`Metadata insert and reread failed: ${await reread.text()}`);
-        const found = await reread.json();
-        if (found.length !== 1 || found[0].character_id !== asset.characterId ||
-            found[0].author_id !== asset.authorId || found[0].asset_type !== "primary" ||
-            found[0].sort_order !== 0) {
-          throw new Error(`Metadata insert failed or conflicted: ${(await inserted.text()).slice(0, 500)}`);
-        }
+      const insertError = inserted.ok ? null : (await inserted.text()).slice(0, 500);
+      // Verify metadata after both normal insert and conflict/retry paths.
+      const reread = await fetchImpl(query, { headers });
+      if (!reread.ok) throw new Error(`Metadata post-write read failed: ${await reread.text()}`);
+      const found = await reread.json();
+      if (found.length !== 1 || found[0].character_id !== asset.characterId ||
+          found[0].author_id !== asset.authorId || found[0].asset_type !== "primary" ||
+          found[0].sort_order !== 0) {
+        throw new Error(`Metadata insert/verification failed: ${insertError || "expected one exact metadata row"}`);
       }
     },
 
