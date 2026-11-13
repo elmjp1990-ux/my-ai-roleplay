@@ -16,6 +16,7 @@ on:
       - "scripts/test-owned-character-illustration-lazy-hydration.mjs"
       - "scripts/test-media-asset-optimization.mjs"
       - "scripts/test-runtime-egress-optimizations.mjs"
+      - "scripts/test-guest-nsfw-visibility.mjs"
       - ".github/workflows/chat-history-lazy-loading.yml"
   push:
     branches:
@@ -49,6 +50,8 @@ jobs:
         run: node scripts/test-media-asset-optimization.mjs
       - name: Test runtime egress optimizations
         run: node scripts/test-runtime-egress-optimizations.mjs
+      - name: Test guest NSFW visibility age gate
+        run: node scripts/test-guest-nsfw-visibility.mjs
       - name: Parse inline JavaScript in index.html
         run: |
           node <<'NODE'
