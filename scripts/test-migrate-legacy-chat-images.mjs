@@ -12,7 +12,7 @@ function fixture() {
   const sessions=[];
   let id=1;
   for(let i=0;i<8;i++) {
-    const count=i===0?9: i===1?9: i===2?9: i===3?9: i===4?9: i===5?9: i===6?9: 10;
+    const count=i<6?9:10;
     for(let j=0;j<count;j++) sessions.push({
       id:uuid(1000+id++),character_id:characters[i].id,
       character_snapshot:{id:characters[i].id,name:"Role "+i,image:characters[i].avatar_url,opening:"Keep me"},
@@ -41,7 +41,7 @@ test("plans exactly 8 primary images, 74 path snapshots, and 13 historical clear
   });
   assert.equal(plan.primaryAssets.every(x=>x.assetType==="primary"&&x.sortOrder===0),true);
   assert.equal(plan.currentSnapshots.every(x=>x.nextSnapshot.image===""&&x.nextSnapshot.imagePath===x.storagePath),true);
-  assert.equal(plan.historicalSnapshots.every(x=>x.nextSnapshot.image===""&&x.nextSnapshot.imagePath===""),true);
+  assert.equal(plan.historicalSnapshots.every(x=>x.nextSnapshot.image===""&&!Object.hasOwn(x.nextSnapshot,"imagePath")),true);
   assert.equal(plan.currentSnapshots.every(x=>x.nextSnapshot.opening==="Keep me"),true);
   assert.equal(plan.historicalSnapshots.every(x=>x.nextSnapshot.opening==="Preserve text"),true);
   assert.equal(plan.safety.databaseWrites,false);
