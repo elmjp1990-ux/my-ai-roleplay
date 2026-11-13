@@ -1,0 +1,27 @@
+name: Archived chat avatar lazy-loading contract
+on:
+  pull_request:
+    paths:
+      - "index.html"
+      - "encounter-scene.js"
+      - "scripts/test-chat-list-archived-avatar-loading.mjs"
+      - ".github/workflows/chat-list-archived-avatar-loading.yml"
+  push:
+    branches: ["fix/archived-chat-avatar-and-encounter-illustrations"]
+    paths:
+      - "index.html"
+      - "encounter-scene.js"
+      - "scripts/test-chat-list-archived-avatar-loading.mjs"
+      - ".github/workflows/chat-list-archived-avatar-loading.yml"
+permissions:
+  contents: read
+jobs:
+  archived-chat-avatar-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify archived chat avatar and encounter image contracts
+        run: node --test scripts/test-chat-list-archived-avatar-loading.mjs
