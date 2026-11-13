@@ -7,6 +7,7 @@ declare
   v_historical integer;
   v_historical_objects integer;
   v_total_cleared integer;
+  v_deleted_untouched integer;
 begin
   select count(*) into v_characters
   from public.characters
@@ -49,6 +50,16 @@ begin
   if v_historical <> 13 then raise exception 'Expected 13 historical snapshots with preserved image paths, got %', v_historical; end if;
   if v_historical_objects <> 13 then raise exception 'Expected 13 historical Storage objects, got %', v_historical_objects; end if;
   if v_total_cleared <> 87 then raise exception 'Expected 87 total snapshot clears, got %', v_total_cleared; end if;
+
+  select count(*) into v_deleted_untouched
+  from public.chat_sessions
+  where id = '50000000-0000-4000-8000-000000000001'::uuid
+    and deleted_at is not null
+    and character_snapshot->>'image' like 'data:image/%'
+    and character_snapshot->>'imagePath' is null;
+  if v_deleted_untouched <> 1 then
+    raise exception 'Deleted chat snapshot must remain unchanged and unmigrated, got %', v_deleted_untouched;
+  end if;
 end;
 $$;
 
