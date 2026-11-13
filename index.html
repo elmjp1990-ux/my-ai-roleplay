@@ -6704,7 +6704,7 @@ async function groupLoadOlderMessages() {
     g.historyScrollAnchor=before;
   } catch(error) {
     if(requestId!==g.openRequestId||g.active?.id!==groupId)return;
-    g.historyError=groupFriendlyError(error)||'較早的群組訊息載入失敗，請重試。';
+    g.historyError=groupFriendlyError(error)||'較早的群組訊息載入失敗，請重試。';g.historyScrollAnchor=before;
   } finally {
     if(requestId===g.openRequestId&&g.active?.id===groupId){
       g.historyLoading=false;
