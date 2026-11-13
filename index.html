@@ -3,6 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+  // Prevent the legacy Explore shell from flashing before the city-map module loads.
+  // Explicit #home remains the traditional Explore page.
+  (() => {
+    const initialPage = location.hash.slice(1).split(/[/?]/, 1)[0];
+    if (!initialPage || initialPage === 'citymap') {
+      document.documentElement.classList.add('city-map-boot');
+    }
+  })();
+</script>
 <meta name="theme-color" content="#090d16">
 <title>PersonaX｜AI 角色世界</title>
 <link rel="icon" type="image/webp" href="./LOGO_WEBICON.webp">
@@ -41,6 +51,17 @@ body.day {
   --shade:#f3f5fae0;
 }
 * { box-sizing:border-box; }
+/* Apply city-map startup presentation before parser-blocking app scripts execute. */
+html.city-map-boot body {
+  min-height:100vh;
+  background:#b9d9c5 url('./encounter-default-scene.webp') center/cover no-repeat fixed;
+}
+html.city-map-boot .sidebar,
+html.city-map-boot header,
+html.city-map-boot #mobileNav { display:none!important; }
+html.city-map-boot .app { margin-left:0!important; }
+html.city-map-boot main#view { max-width:none; min-height:100dvh; padding:0!important; margin:0!important; }
+
 body {
   margin:0;
   background:var(--bg);
