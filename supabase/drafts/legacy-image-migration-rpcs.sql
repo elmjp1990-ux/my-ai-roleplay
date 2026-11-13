@@ -2,6 +2,8 @@
 -- REVIEW DRAFT ONLY: do not apply to hosted Supabase without separate approval.
 -- These functions are intentionally callable only by service_role.
 
+create extension if not exists pgcrypto with schema extensions;
+
 create or replace function public.poyozz_migrate_legacy_chat_snapshot(
   p_session_id uuid,
   p_character_id uuid,
