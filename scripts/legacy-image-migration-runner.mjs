@@ -125,11 +125,13 @@ export async function applyLegacyImageMigration({ manifest, adapter, persist = (
   return manifest;
 }
 
-export function createResumableManifest(plan, parseDataUri) {
+export function createResumableManifest(plan, characters) {
+  if (!Array.isArray(characters)) throw new TypeError("Source character rows are required");
+  const characterById = new Map(characters.map(row => [row.id, row]));
   const assets = plan.primaryAssets.map(asset => {
-    const source = plan._sourceCharacters?.find(row => row.id === asset.characterId);
-    if (!source || typeof source.avatar_url !== "string") {
-      throw new Error("Manifest creation requires source character rows in memory");
+    const source = characterById.get(asset.characterId);
+    if (!source || typeof source.avatar_url !== "string" || !source.avatar_url.startsWith("data:image/")) {
+      throw new Error("Missing original Data URI for manifest: " + asset.characterId);
     }
     return {
       ...asset,
@@ -148,9 +150,6 @@ export function createResumableManifest(plan, parseDataUri) {
     expectedImageSha256: item.sourceSha256,
     completed: false,
   });
-  // Validate the parser dependency at manifest creation time; image bytes are
-  // deliberately not copied into the manifest.
-  if (typeof parseDataUri !== "function") throw new TypeError("parseDataUri is required");
   return {
     version: 1,
     status: "pending",
