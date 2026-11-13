@@ -114,7 +114,7 @@ test("fails closed on count drift and mismatched current snapshot ownership",()=
   assert.throws(()=>buildMigrationPlan({...input,sessions:input.sessions.slice(0,-1)}),/Inventory drift/);
   const bad=fixture();
   bad.sessions[0].character_id=uuid(999);
-  assert.throws(()=>buildMigrationPlan(bad),/but session.character_id/);
+  assert.throws(()=>buildMigrationPlan(bad),/has no matching character row/);
 });
 
 test("fails closed on unsupported historical image formats",()=>{
