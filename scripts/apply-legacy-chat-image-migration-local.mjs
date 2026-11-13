@@ -6,7 +6,7 @@ const BUCKET = "character-illustrations";
 
 export function assertLocalSupabaseUrl(value) {
   const url = new URL(value);
-  const localHosts = new Set(["localhost", "127.0.0.1", "::1"]);
+  const localHosts = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
   if (url.protocol !== "http:" || !localHosts.has(url.hostname) || url.port !== "54321") {
     throw new Error("Apply is restricted to http://localhost:54321 (or loopback equivalent). Hosted Supabase is never an apply target.");
   }
