@@ -7686,6 +7686,9 @@ function renderConversation() {
   const c = sessionCharacter(s);
   const isConversationEntry = !!s && lastRenderedConversationId !== s.id;
   if (s) lastRenderedConversationId = s.id;
+  // Search-result positioning is transient UI state. Clear stale state whenever
+  // the player re-enters a conversation normally; a fresh search jump sets it again.
+  if (isConversationEntry && s?.cloudSearchJump) s.cloudSearchJump = false;
   if (!s || !canAccessSessionCharacter(s,c)) {
     $('view').innerHTML = '<div class="empty">此對話不存在或無法存取。</div>';
     return;
