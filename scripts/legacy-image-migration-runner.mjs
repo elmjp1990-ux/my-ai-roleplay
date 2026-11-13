@@ -111,6 +111,20 @@ export function validateMigrationManifest(manifest) {
   };
   for (const item of manifest.currentSnapshots) validateSnapshot(item, "current");
   for (const item of manifest.historicalSnapshots) validateSnapshot(item, "historical");
+
+  const allAssetsVerified = manifest.assets.every(asset => asset.objectVerified && asset.metadataVerified);
+  const allSnapshotsCompleted = [...manifest.currentSnapshots, ...manifest.historicalSnapshots]
+    .every(item => item.completed);
+  if (manifest.assets.some(asset => asset.avatarCleared && (!asset.objectVerified || !asset.metadataVerified))) {
+    throw new Error("Invalid migration manifest: avatar was cleared before its object and metadata were verified");
+  }
+  if (manifest.assets.some(asset => asset.avatarCleared) && !allSnapshotsCompleted) {
+    throw new Error("Invalid migration manifest: avatar was cleared before all snapshots completed");
+  }
+  if (manifest.status === "complete" &&
+      (!allAssetsVerified || !allSnapshotsCompleted || !manifest.assets.every(asset => asset.avatarCleared))) {
+    throw new Error("Invalid migration manifest: complete status requires every migration step to be verified");
+  }
   return manifest;
 }
 
