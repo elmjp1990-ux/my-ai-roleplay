@@ -12,7 +12,7 @@ for (const [name,source] of [['story',story],['encounter',encounter]]) {
   assert.match(source,/imagePath: primaryIllustration\?\.storage_path \|\| ""/,name+' must persist stable path metadata');
 }
 assert.match(html,/async function hydrateCloudSessionCharacterImage\(s\)/);
-assert.match(html,/getCharacterIllustrationSignedUrl\(path\)/);
+assert.match(html,/getCharacterIllustrationSignedUrl\(path,\{forceRefresh:!!cached\}\)/);
 assert.match(html,/cloudSessionImageUrlCache\.set\(key,\{url,expiresAt:Date\.now\(\)\+55\*60\*1000\}\)/);
 assert.match(html,/forceRefresh:!!cached/);
 assert.match(html,/data-character-illustration-path=.*c\.imagePath/);
