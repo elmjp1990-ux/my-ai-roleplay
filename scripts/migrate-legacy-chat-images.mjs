@@ -175,7 +175,22 @@ export function buildMigrationPlan({ characters, sessions, strictCounts = true }
   };
 }
 
-async function readTable(url, key, table, select) {
+export function buildMigrationReadQueries(characterIds = []) {
+  const ids = [...new Set(characterIds)].sort();
+  if (ids.some(id => !UUID.test(id))) throw new Error("Invalid character UUID in migration read scope");
+  return {
+    characters: {
+      select: "id,author_id,avatar_url",
+      filters: { avatar_url: "ilike.data:image/*" },
+    },
+    sessions: ids.length ? {
+      select: "id,character_id,character_snapshot",
+      filters: { character_id: `in.(${ids.join(",")})` },
+    } : null,
+  };
+}
+
+async function readTable(url, key, table, select, filters = {}) {
   const rows = [];
   const pageSize = 1000;
   for (let offset = 0; ; offset += pageSize) {
@@ -183,6 +198,7 @@ async function readTable(url, key, table, select) {
     endpoint.searchParams.set("select", select);
     endpoint.searchParams.set("order", "id.asc");
     endpoint.searchParams.set("limit", String(pageSize));
+    for (const [column, filter] of Object.entries(filters)) endpoint.searchParams.set(column, filter);
     const response = await fetch(endpoint, {
       headers: {
         apikey: key,
@@ -197,6 +213,18 @@ async function readTable(url, key, table, select) {
     rows.push(...page);
     if (page.length < pageSize) return rows;
   }
+}
+
+async function readMigrationSources(url, key) {
+  const queries = buildMigrationReadQueries();
+  const characters = await readTable(
+    url, key, "characters", queries.characters.select, queries.characters.filters,
+  );
+  const sessionQuery = buildMigrationReadQueries(characters.map(row => row.id)).sessions;
+  const sessions = sessionQuery
+    ? await readTable(url, key, "chat_sessions", sessionQuery.select, sessionQuery.filters)
+    : [];
+  return { characters, sessions };
 }
 
 async function main() {
@@ -224,10 +252,7 @@ async function main() {
       manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
       if (manifest.version !== 1) throw new Error("Unsupported migration manifest version.");
     } else {
-      const [characters, sessions] = await Promise.all([
-        readTable(url, key, "characters", "id,author_id,avatar_url"),
-        readTable(url, key, "chat_sessions", "id,character_id,character_snapshot"),
-      ]);
+      const { characters, sessions } = await readMigrationSources(url, key);
       const plan = buildMigrationPlan({ characters, sessions });
       manifest = createResumableManifest(plan, characters);
       persistManifest(manifestPath, manifest);
@@ -256,10 +281,7 @@ async function main() {
     return;
   }
 
-  const [characters, sessions] = await Promise.all([
-    readTable(url, key, "characters", "id,author_id,avatar_url"),
-    readTable(url, key, "chat_sessions", "id,character_id,character_snapshot"),
-  ]);
+  const { characters, sessions } = await readMigrationSources(url, key);
   const plan = buildMigrationPlan({ characters, sessions });
   const safePlan = {
     ...plan,
