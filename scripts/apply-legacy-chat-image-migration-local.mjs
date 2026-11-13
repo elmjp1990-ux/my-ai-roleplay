@@ -38,13 +38,15 @@ export function createLocalSupabaseAdapter({ url, serviceRoleKey, fetchImpl = fe
     return response;
   }
 
-  async function getOne(table, filters) {
+  async function getOne(table, filters, select) {
     const url = new URL(endpoint(`rest/v1/${table}`));
-    url.searchParams.set("select", "*");
+    url.searchParams.set("select", select);
+    url.searchParams.set("limit", "2");
     for (const [key, value] of Object.entries(filters)) url.searchParams.set(key, value);
     const response = await fetchImpl(url, { headers });
     if (!response.ok) throw new Error(`Read ${table} failed (${response.status}): ${await response.text()}`);
     const rows = await response.json();
+    if (!Array.isArray(rows)) throw new Error(`Read ${table} returned an unexpected payload`);
     if (rows.length > 1) throw new Error(`Expected at most one ${table} row`);
     return rows[0] ?? null;
   }
@@ -63,11 +65,11 @@ export function createLocalSupabaseAdapter({ url, serviceRoleKey, fetchImpl = fe
     parseDataUri: parseImageDataUri,
 
     async getCharacter(id) {
-      return getOne("characters", { id: `eq.${id}` });
+      return getOne("characters", { id: `eq.${id}` }, "id,author_id,avatar_url");
     },
 
     async getSession(id) {
-      return getOne("chat_sessions", { id: `eq.${id}` });
+      return getOne("chat_sessions", { id: `eq.${id}` }, "id,character_id,character_snapshot");
     },
 
     async ensureObject(asset) {
