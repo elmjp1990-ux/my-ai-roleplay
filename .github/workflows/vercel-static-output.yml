@@ -8,6 +8,8 @@ on:
       - "chat-render-lifecycle.js"
       - "image-compression.js"
       - "signed-url-manager.js"
+      - "core-utils.js"
+      - "scripts/test-core-utils-module.mjs"
       - "city-map.js"
       - "followed-authors.js"
       - "author-profile.js"
@@ -48,6 +50,10 @@ jobs:
         run: node scripts/build-vercel-static.mjs
       - name: Verify deployed files and local asset references
         run: node scripts/test-vercel-static-output.mjs
+      - name: Parse shared core utilities module
+        run: node --check core-utils.js
+      - name: Verify shared core utilities contract
+        run: node scripts/test-core-utils-module.mjs
       - name: Parse extracted city map module
         run: node --check city-map.js
       - name: Parse extracted followed authors module

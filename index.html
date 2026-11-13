@@ -1287,6 +1287,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 <script src="./chat-render-lifecycle.js"></script>
 <script src="./image-compression.js"></script>
 <script src="./signed-url-manager.js"></script>
+<script src="./core-utils.js"></script>
 <script src="./city-map.js"></script>
 <script src="./followed-authors.js"></script>
 <script src="./author-profile.js"></script>
@@ -3053,9 +3054,8 @@ const id = () => {
   return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' +
     hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20);
 };
-const countChars = value => [...String(value)].length;
+const { countChars, clone, isUuid } = window.PoyozzCoreUtils;
 const timeText = value => new Date(value).toLocaleString('zh-TW');
-const clone = value => JSON.parse(JSON.stringify(value));
 
 function currentUserCanViewNsfw() {
   const birthdate = String(state.account?.birthdate || '');
@@ -3454,10 +3454,7 @@ try {
 // 僅在網址明確帶上 ?chatDataTest=1 時顯示無成本測試控制項。
 const CHAT_DATA_TEST_MODE = new URLSearchParams(location.search).get('chatDataTest') === '1';
 
-// Chat cloud persistence (official UUID characters only).
-function isUuid(value) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
-}
+// Chat cloud persistence uses the shared, pure UUID validator from core-utils.js.
 function chatSessionData(s) {
   const initialOpening = s.initialOpeningMessage ||
     (!s.cloudOwned && s.messages?.[0]?.role === 'assistant' ? s.messages[0] : null);
