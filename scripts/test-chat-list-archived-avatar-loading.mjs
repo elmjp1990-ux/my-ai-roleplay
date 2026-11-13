@@ -60,3 +60,31 @@ test('hidden and deleted characters prefer their own chat snapshot portrait over
   const hydration = between(html, 'async function hydrateCloudSessionCharacterImage(s)', 'function applyCloudChatSessionAvatarUrl(session,url)');
   assert.doesNotMatch(hydration, /liveCharacter\?\.image/);
 });
+
+
+test('legacy archived chat avatars hydrate only when visible and only from the owned session snapshot', () => {
+  const hydration = between(html, 'async function hydrateCloudSessionCharacterImage(s)', 'function applyCloudChatSessionAvatarUrl(session,url)');
+  assert.match(hydration, /legacy-snapshot-image/);
+  assert.match(hydration, /\.select\('character_snapshot'\)/);
+  assert.match(hydration, /\.eq\('id',s\.id\)\.eq\('user_id',uid\)\.is\('deleted_at',null\)/);
+  assert.match(hydration, /stored\.id!==s\.characterId/);
+  assert.match(hydration, /safeImage\(stored\.image\)/);
+  assert.match(hydration, /state\.sessions\?\.\[s\.id\]!==s/);
+  const observer = between(html, 'function observeCloudChatSessionAvatars(root=', 'function canAccessSessionCharacter(s,c)');
+  assert.match(observer, /list\.querySelectorAll\('\[data-chat-avatar-session-id\]'\)/);
+});
+
+test('legacy snapshot hydration does not fetch Base64 for every chat in the initial list query', () => {
+  const loader = between(html, 'async function loadCloudChatSessions(user, options = {})', 'async function ');
+  assert.doesNotMatch(loader, /character_snapshot_image\s*:/);
+  assert.doesNotMatch(loader, /character_snapshot\s*[,)]/);
+  const list = between(html, 'function chatEntries() {', 'function chatListHTML()');
+  assert.match(list, /s\.cloudOwned\)\?'<span class="avatar avatar-fallback" data-chat-avatar-session-id=/);
+});
+
+test('PR 249 preserves the guest NSFW age gate from PR 250', () => {
+  const guard = between(html, 'function canViewCharacterNsfw(character)', 'function availableExploreTags()');
+  assert.match(guard, /if \(!uid\) return false;/);
+  assert.match(guard, /return currentUserCanViewNsfw\(\);/);
+  assert.doesNotMatch(guard, /cloudPublic\s*===\s*true/);
+});
