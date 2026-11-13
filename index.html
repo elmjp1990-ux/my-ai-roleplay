@@ -3335,7 +3335,8 @@ function sessionCharacter(s) {
   if (!snap || snap.id !== s.characterId) return null;
   const uid=currentUser()?.uid||'';
   const imageCacheKey=snap.imagePath&&uid&&s.id ? uid+':'+s.id+':'+snap.imagePath : '';
-  const hydratedImage=imageCacheKey ? cloudSessionImageUrlCache.get(imageCacheKey) : '';
+  const cachedImage=imageCacheKey ? cloudSessionImageUrlCache.get(imageCacheKey) : null;
+  const hydratedImage=cachedImage&&cachedImage.expiresAt>Date.now()?cachedImage.url:'';
   return {...snap, image:snap.image || hydratedImage || '', id:s.characterId, name:snap.name || s.characterName || '角色',
     visibility:snap.visibility || 'private', reviewStatus:'draft',
     authorId:Object.prototype.hasOwnProperty.call(snap,'authorId') ? snap.authorId : '',
@@ -3350,13 +3351,16 @@ async function hydrateCloudSessionCharacterImage(s) {
   const uid=currentUser()?.uid||'';
   const path=snap?.imagePath;
   if(!s?.cloudOwned||!uid||!path||snap?.image) return;
+  const liveCharacter=state.characters.find(character=>character.id===s.characterId);
+  if(liveCharacter?.image) return;
   const key=uid+':'+s.id+':'+path;
-  if(cloudSessionImageUrlCache.has(key)) return;
+  const cached=cloudSessionImageUrlCache.get(key);
+  if(cached&&cached.expiresAt>Date.now()) return;
   if(cloudSessionImageUrlInflight.has(key)) return cloudSessionImageUrlInflight.get(key);
   const request=(async()=>{
-    const url=await getCharacterIllustrationSignedUrl(path);
+    const url=await getCharacterIllustrationSignedUrl(path,{forceRefresh:!!cached});
     if((currentUser()?.uid||'')!==uid||state.sessions?.[s.id]!==s||s.cloudCharacterSnapshot?.imagePath!==path)return;
-    cloudSessionImageUrlCache.set(key,url);
+    cloudSessionImageUrlCache.set(key,{url,expiresAt:Date.now()+55*60*1000});
     if(route.id===s.id&&(route.page==='conversation'||route.page==='session-detail'))render();
   })();
   cloudSessionImageUrlInflight.set(key,request);
@@ -5252,7 +5256,7 @@ function renderDetail() {
       ${offline ? '<div class="character-status-banner">● 此角色目前離線或已下架。你仍可查看這段既有聊天所保留的角色簡介與開場白，但不能開啟新對話。</div>' : ''}
       <div class="detail-layout">
         <div class="detail-portrait">
-${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline-image' : ''}" data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline aria-label="${e(c.name)} 的角色影片"></video>` : `<img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" ${c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath)+'"' : ''} alt="${e(c.name)}">`}
+${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline-image' : ''}" data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline aria-label="${e(c.name)} 的角色影片"></video>` : `<img class="detail-image \${offline ? 'character-offline-image' : ''}" src="\${e(safeImage(c.image))}" \${(c.primaryIllustrationPath||c.imagePath) ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath||c.imagePath)+'"' : ''} alt="\${e(c.name)}">`}
           <div class="detail-portrait-meta">
             <h1>${e(c.name)}</h1>
             ${c.authorId ? `<button class="author-link" data-action="author" data-character-author-name data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>` : `<span class="small muted">BY ${e(creatorAttribution)}</span>`}
@@ -7775,7 +7779,7 @@ function renderConversation() {
               <button class="ghost" data-action="session-detail" data-id="${e(s.id)}" style="padding:0"
                       aria-label="查看角色簡介">
                 <span class="character-avatar-status ${characterIsOffline(c) ? 'is-offline' : ''}">
-                  <img class="avatar" src="${e(safeImage(c.image))}" alt="">
+                  <img class="avatar" src="\${e(safeImage(c.image))}" \${c.imagePath ? 'data-character-illustration-path="'+e(c.imagePath)+'"' : ''} alt="">
                   <span class="character-status-dot" title="${characterIsOffline(c) ? '角色離線／已下架' : '角色公開中'}"></span>
                 </span>
               </button>
