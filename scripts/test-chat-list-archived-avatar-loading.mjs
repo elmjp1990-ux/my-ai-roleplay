@@ -35,7 +35,7 @@ test('archived chat avatar hydration is visibility-lazy and updates only the mat
   assert.match(hydration, /root:list,rootMargin:'120px 0px'/);
   assert.match(hydration, /node\.dataset\.chatAvatarSessionId!==session\.id/);
   assert.match(hydration, /node\.dataset\.chatAvatarPath!==session\.cloudCharacterSnapshot\?\.imagePath/);
-  assert.match(hydration, /data\.characterIllustrationPath=session\.cloudCharacterSnapshot\.imagePath/);
+  assert.match(hydration, /image\.dataset\.characterIllustrationPath=session\.cloudCharacterSnapshot\.imagePath/);
 });
 
 test('offline styling remains attached to the character avatar wrapper', () => {
