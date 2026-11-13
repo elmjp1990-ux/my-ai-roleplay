@@ -1,0 +1,37 @@
+name: Chat snapshot image path contract
+
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'supabase/functions/story-session/**'
+      - 'supabase/functions/encounter-session/**'
+      - 'scripts/test-chat-snapshot-image-path.mjs'
+      - '.github/workflows/chat-snapshot-image-path.yml'
+  push:
+    branches:
+      - perf/store-chat-character-images-by-path
+    paths:
+      - 'index.html'
+      - 'supabase/functions/story-session/**'
+      - 'supabase/functions/encounter-session/**'
+      - 'scripts/test-chat-snapshot-image-path.mjs'
+      - '.github/workflows/chat-snapshot-image-path.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot-image-path-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check Edge Function syntax
+        run: |
+          node --check supabase/functions/story-session/index.ts
+          node --check supabase/functions/encounter-session/index.ts
+      - name: Verify snapshot image path behavior
+        run: node scripts/test-chat-snapshot-image-path.mjs

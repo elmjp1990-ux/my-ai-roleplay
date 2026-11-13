@@ -107,6 +107,15 @@ Deno.serve(async (request: Request) => {
   if (characterError) return json({ error: "character_lookup_failed" }, 503);
   if (!character) return json({ error: "character_unavailable_for_encounter" }, 403);
 
+  // Prefer a stable private Storage path over embedding image bytes in every chat snapshot.
+  const { data: primaryIllustration, error: illustrationError } = await admin
+    .from("character_illustrations")
+    .select("storage_path")
+    .eq("character_id", character.id)
+    .eq("asset_type", "primary")
+    .maybeSingle();
+  if (illustrationError) return json({ error: "character_illustration_lookup_failed" }, 503);
+
   // All snapshot identity fields are built from the database, never the request body.
   const snapshot = {
     id: character.id,
@@ -114,7 +123,8 @@ Deno.serve(async (request: Request) => {
     title: character.title || "",
     gender: character.gender || "ambiguous",
     age: character.age ?? "",
-    image: character.avatar_url || "",
+    image: primaryIllustration?.storage_path ? "" : (character.avatar_url || ""),
+    imagePath: primaryIllustration?.storage_path || "",
     intro: character.intro || "",
     opening: "",
     race: character.race || "",
