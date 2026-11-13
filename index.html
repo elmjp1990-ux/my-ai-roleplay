@@ -3181,11 +3181,18 @@ function sessionCharacter(s) {
   const found = s.forceCloudSnapshot ? null : state.characters.find(c =>
     c.id === s.characterId && !(c.cloudSnapshotOnly && s.cloudCharacterSnapshotLoaded===true)
   );
-  if (found) return found;
+  if (found) {
+    const snap=s.cloudCharacterSnapshot;
+    const portraitPath=snap?.imagePath||snap?.primaryIllustrationPath||snap?.primary_illustration_path||'';
+    const uid=currentUser()?.uid||'';
+    const cached=portraitPath&&uid&&s.id?cloudSessionImageUrlCache.get(uid+':'+s.id+':'+portraitPath):null;
+    return !found.image&&cached&&cached.expiresAt>Date.now()?{...found,image:cached.url}:found;
+  }
   const snap = s.cloudCharacterSnapshot;
   if (!snap || snap.id !== s.characterId) return null;
   const uid=currentUser()?.uid||'';
-  const imageCacheKey=snap.imagePath&&uid&&s.id ? uid+':'+s.id+':'+snap.imagePath : '';
+  const portraitPath=snap.imagePath||snap.primaryIllustrationPath||snap.primary_illustration_path||'';
+  const imageCacheKey=portraitPath&&uid&&s.id ? uid+':'+s.id+':'+portraitPath : '';
   const cachedImage=imageCacheKey ? cloudSessionImageUrlCache.get(imageCacheKey) : null;
   const hydratedImage=cachedImage&&cachedImage.expiresAt>Date.now()?cachedImage.url:'';
   return {...snap, image:snap.image || hydratedImage || '', id:s.characterId, name:snap.name || s.characterName || '角色',
@@ -3200,7 +3207,7 @@ function sessionCharacter(s) {
 async function hydrateCloudSessionCharacterImage(s) {
   const snap=s?.cloudCharacterSnapshot;
   const uid=currentUser()?.uid||'';
-  const path=snap?.imagePath;
+  const path=snap?.imagePath||snap?.primaryIllustrationPath||snap?.primary_illustration_path||'';
   if(!s?.cloudOwned||!uid||!path||snap?.image) return;
   const liveCharacter=state.characters.find(character=>character.id===s.characterId);
   if(liveCharacter?.image) return;
@@ -3210,9 +3217,9 @@ async function hydrateCloudSessionCharacterImage(s) {
   if(cloudSessionImageUrlInflight.has(key)) return cloudSessionImageUrlInflight.get(key);
   const request=(async()=>{
     const url=await getCharacterIllustrationSignedUrl(path,{forceRefresh:!!cached});
-    if((currentUser()?.uid||'')!==uid||state.sessions?.[s.id]!==s||s.cloudCharacterSnapshot?.imagePath!==path)return;
+    if((currentUser()?.uid||'')!==uid||state.sessions?.[s.id]!==s||(s.cloudCharacterSnapshot?.imagePath||s.cloudCharacterSnapshot?.primaryIllustrationPath||s.cloudCharacterSnapshot?.primary_illustration_path)!==path)return;
     cloudSessionImageUrlCache.set(key,{url,expiresAt:Date.now()+55*60*1000});
-    if(route.id===s.id&&(route.page==='conversation'||route.page==='session-detail'))render();
+    if(route.page==='chat'||(route.id===s.id&&(route.page==='conversation'||route.page==='session-detail')))render();
   })();
   cloudSessionImageUrlInflight.set(key,request);
   try{await request;}finally{if(cloudSessionImageUrlInflight.get(key)===request)cloudSessionImageUrlInflight.delete(key);}
@@ -6285,13 +6292,14 @@ function chatEntries() {
         </button><button type="button" class="entry-menu group-entry-menu" data-action="group-entry-menu" data-id="${e(group.id)}" aria-label="刪除這段對話與回憶" title="刪除這段對話與回憶">⋯</button></div>`;
     }
     const s=item.value,c=sessionCharacter(s);if(!c)return '';
+    if(s.cloudOwned&&s.cloudCharacterSnapshot&&(s.cloudCharacterSnapshot.imagePath||s.cloudCharacterSnapshot.primaryIllustrationPath||s.cloudCharacterSnapshot.primary_illustration_path))void hydrateCloudSessionCharacterImage(s);
     const preview=latestAssistantPreview(s);
     const lastAt=s.lastMessageAt||s.updatedAt||s.messages?.at(-1)?.at||s.startedAt;
     const hasUnread=Number(s.lastAssistantMessageAt||0)>Number(s.lastReadAt||0);
     return `<div class="chat-entry ${route.page==='conversation'&&route.id===s.id?'active':''}">
       <button class="pin ${s.pinned?'on':''}" data-action="pin" data-id="${e(s.id)}" aria-label="切換置頂">${ICON.pin}</button>
       <button class="ghost" style="padding:0" data-action="session-detail" data-id="${e(s.id)}" aria-label="查看${e(c.name)}角色簡介">
-        <span class="character-avatar-status ${characterIsOffline(c)?'is-offline':''}"><img class="avatar" src="${e(safeImage(c.image))}" alt="${e(c.name)}">
+        <span class="character-avatar-status ${characterIsOffline(c)?'is-offline':''}"><img class="avatar" src="${e(safeImage(c.image||c.avatar_url))}" alt="${e(c.name)}">
         <span class="character-status-dot" title="${characterIsOffline(c)?'角色離線／已下架':'角色公開中'}"></span></span>
       </button>
       <button class="select-chat" data-action="select-chat" data-id="${e(s.id)}">
@@ -7643,7 +7651,7 @@ async function loadStoryRelationshipState(session) {
     session.storyRelationshipStage = row.relationship_stage;
     persist();
     const progress = Math.round((affinity + 100) / 2);
-    target.innerHTML = '<span>關係 · '+e(label)+'</span><span class="story-relationship-meter" aria-hidden="true"><i style="width:'+progress+'%"></i></span>';
+    target.innerHTML = '<span class="story-relationship-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20.8 4.9a5.5 5.5 0 0 0-7.8 0L12 5.9l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.3 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg></span><span>關係 · '+e(label)+'</span><span class="story-relationship-meter" aria-hidden="true"><i style="width:'+progress+'%"></i></span>';
     target.setAttribute('aria-label','關係階段 '+label+'，好感度進度 '+progress+'%');
   } catch (error) {
     console.warn('Story 關係狀態載入失敗：',error?.message||error);
@@ -7682,7 +7690,7 @@ function renderConversation() {
     $('view').innerHTML = '<div class="empty">此對話不存在或無法存取。</div>';
     return;
   }
-  if(s.cloudOwned&&s.cloudCharacterSnapshot?.imagePath)void hydrateCloudSessionCharacterImage(s);
+  if(s.cloudOwned&&s.cloudCharacterSnapshot&&(s.cloudCharacterSnapshot.imagePath||s.cloudCharacterSnapshot.primaryIllustrationPath||s.cloudCharacterSnapshot.primary_illustration_path))void hydrateCloudSessionCharacterImage(s);
   if(isConversationEntry){
     const latestAssistantAt=Number(s.lastAssistantMessageAt||0);
     s.lastReadAt=Math.max(Number(s.lastReadAt||0),latestAssistantAt,Date.now());
@@ -7700,7 +7708,7 @@ function renderConversation() {
               <button class="ghost" data-action="session-detail" data-id="${e(s.id)}" style="padding:0"
                       aria-label="查看角色簡介">
                 <span class="character-avatar-status ${characterIsOffline(c) ? 'is-offline' : ''}">
-                  <img class="avatar" src="${e(safeImage(c.image))}" ${c.imagePath ? 'data-character-illustration-path="'+e(c.imagePath)+'"' : ''} alt="">
+                  <img class="avatar" src="${e(safeImage(c.image||c.avatar_url))}" ${c.imagePath||c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.imagePath||c.primaryIllustrationPath)+'"' : ''} alt="">
                   <span class="character-status-dot" title="${characterIsOffline(c) ? '角色離線／已下架' : '角色公開中'}"></span>
                 </span>
               </button>
@@ -8299,14 +8307,14 @@ async function renderPhoneModal() {
   const [storyDateDisplay,storyClockDisplay]=String(storyTimeLabel).split('　');
   const phoneClock=storyClockDisplay||'--:--';
   const modal=document.createElement('div');modal.className='phone-modal-backdrop';modal.setAttribute('role','presentation');
-  modal.innerHTML='<section class="phone-device phone-device--ios" role="dialog" aria-modal="true" aria-label="'+e(title)+'">'+
+  modal.innerHTML='<section class="phone-device phone-device--ios" role="dialog" aria-modal="true" aria-label="'+e(title)+'"><div class="phone-screen">'+
     '<div class="phone-statusbar"><span>'+e(phoneClock)+'</span><span class="phone-status-icons" aria-label="行動網路與電量"><i></i><i></i><i></i><span>⌁</span><span class="phone-battery" style="color:'+batteryColor+'" aria-label="'+(battery===null?'回憶容量暫時無法讀取':'剩餘回憶容量 '+battery+'%')+'"><span>'+(battery===null?'--':battery+'%')+'</span><span class="phone-battery-shape"><span class="phone-battery-fill" style="display:block;width:'+(battery===null?0:battery)+'%"></span></span></span></span></div>'+
     '<div class="phone-device-head"><span>'+e(title)+'</span><span class="phone-device-caption">STORY PHONE</span></div>'+memberSwitch+
     '<div class="phone-content"><div class="phone-lockscreen"><div class="phone-lockscreen-date">'+e(storyDateDisplay||'故事時間')+'</div><div class="phone-lockscreen-clock">'+e(phoneClock)+'</div><div class="phone-lockscreen-location">⌖　'+e(storyLocationLabel)+'</div></div>'+
     '<section class="phone-notices '+(warning?'phone-warning':'')+'">'+(warning?'<div class="phone-memory-warning">回憶空間即將用盡，整理甜蜜日記可釋放容量</div>':'')+
     '<div class="phone-notice-heading"><strong>通知</strong><span>'+(noticeContentHTML?String(Math.min(8,storyPhoneStates.length+storyPhoneEvents.length+noticeLines.length))+' 則':'通知中心')+'</span></div><div class="phone-notice-list">'+noticeHTML+'</div></section>'+
     '<p class="phone-memory-caption">'+(diaryChars===null?'甜蜜日記容量暫時無法同步':('甜蜜日記　'+Math.min(diaryChars,capacity).toLocaleString()+' / '+capacity.toLocaleString()+' 字 · 剩餘 '+(battery===null?'--':battery+'%')) )+'</p></div>'+
-    '<div class="phone-home-indicator"></div><div class="phone-close-row"><button type="button" data-phone-action="close">完成</button></div></section>';
+    '<div class="phone-home-indicator"></div><div class="phone-close-row"><button type="button" data-phone-action="close">完成</button></div></div></section>';
   modal.addEventListener('click',event=>{
     if(event.target===modal){savePhoneState();modal.remove();return;}
     const button=event.target.closest('[data-phone-action]');if(!button)return;
