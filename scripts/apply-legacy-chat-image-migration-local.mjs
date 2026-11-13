@@ -53,7 +53,7 @@ export function createLocalSupabaseAdapter({ url, serviceRoleKey, fetchImpl = fe
     const response = await fetchImpl(endpoint(`storage/v1/object/authenticated/${BUCKET}/${encodedPath(path)}`), { headers });
     if (!response.ok) {
       const body = await response.text();
-      if (response.status === 404 || /"statusCode"\\s*:\\s*"404"|object not found/i.test(body)) return null;
+      if (response.status === 404 || /object not found/i.test(body)) return null;
       throw new Error(`Storage verification failed (${response.status}): ${body.slice(0, 800)}`);
     }
     return Buffer.from(await response.arrayBuffer());
