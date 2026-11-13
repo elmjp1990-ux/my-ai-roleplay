@@ -8028,7 +8028,7 @@ async function jumpToChatSearchHit(button){
       const s=ctx.session;if(s.cloudOwnerUid!==uid||readDeletedChatTombstones(uid).sessions[s.id])throw Error('目前聊天室不可存取。');
       const {data:t,error:te}=await client.from('chat_messages').select('id,session_id,role,content,created_at').eq('id',id).eq('session_id',s.id).is('deleted_at',null).maybeSingle();
       if(te)throw te;if(!t)throw Error('這則訊息已刪除或無法存取。');
-      const bf='created_at.lt.'+t.created_at+',and(created_at.eq.'+t.created_at+',id.lt.'+t.id+'),and(created_at.eq.'+t.created_at+',id.lt.'+t.id+')';
+      const bf='created_at.lt.'+t.created_at+',and(created_at.eq.'+t.created_at+',id.lt.'+t.id+')';
       const af='created_at.gt.'+t.created_at+',and(created_at.eq.'+t.created_at+',id.gt.'+t.id+')';
       const [b,a]=await Promise.all([
         client.from('chat_messages').select('id,session_id,role,content,created_at').eq('session_id',s.id).is('deleted_at',null).or(bf).order('created_at',{ascending:false}).order('id',{ascending:false}).limit(24),
@@ -8056,7 +8056,7 @@ async function jumpToChatSearchHit(button){
       const all=[...(b.data||[]),t,...(a.data||[])].sort((x,y)=>String(x.created_at).localeCompare(String(y.created_at))||Number(x.sequence_no)-Number(y.sequence_no)||String(x.id).localeCompare(String(y.id)));
       g.messages=all.map(r=>{const snap=r.speaker_snapshot||{},m=g.members.find(x=>x.characterId===r.character_id)||g.members.find(x=>x.characterSnapshotId===snap.id||x.id===snap.id),type=r.speaker_type==='user'?'user':r.speaker_type==='system'?'system':'character';return {id:r.id,type,speaker:type==='user'?'你':type==='system'?'系統':snap.name||m?.name||'角色',characterId:r.character_id||null,speakerSnapshot:snap,content:type==='user'&&r.content===GROUP_CONTINUE_SENTINEL?'':r.content,createdAt:r.created_at};});
       const first=all[0];groupPrototype.historyCursor=first?{createdAt:first.created_at,sequenceNo:first.sequence_no,id:first.id}:null;
-      groupPrototype.historyHasMore=(b.data||[]).length===24;groupPrototype.searchJump=true;groupPrototype.historyError='';
+      groupPrototype.historyHasMore=(b.data||[]).length===24;groupPrototype.searchJump=true;groupPrototype.historyError='';groupPrototype.historyScrollAnchor=null;
       renderGroupConversation();
       requestAnimationFrame(()=>{const n=[...($('groupMessages')?.querySelectorAll('[data-message]')||[])].find(x=>x.dataset.message===id);if(n){n.scrollIntoView({behavior:'smooth',block:'center'});n.classList.add('search-hit-highlight');setTimeout(()=>n.classList.remove('search-hit-highlight'),1800);}});
     }
