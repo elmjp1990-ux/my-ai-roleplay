@@ -759,7 +759,15 @@ dialog {
 }
 dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 .modal-heading { margin-bottom:20px; }
-.modal-heading h2 { margin:0; }
+ .modal-heading h2 { margin:0; }
+.modal-close-button{
+  display:grid;place-items:center;flex:0 0 48px;
+  width:48px;height:48px;min-width:48px;min-height:48px;
+  margin:-6px -6px -6px 8px;padding:0;
+  border:1px solid var(--border);border-radius:50%;
+  font-size:20px;line-height:1;touch-action:manipulation;
+  position:relative;z-index:2;
+}
 .profile-account-header { position:relative; display:flex; align-items:center; justify-content:space-between; gap:8px; padding-top:4px; }
 .profile-edit-button { position:absolute; top:0; right:0; padding:5px 9px; min-height:28px; font-size:12px; line-height:1.2; border-radius:8px; white-space:nowrap; }
 #toast {
@@ -4671,6 +4679,11 @@ function showDialog(title,content) {
               title="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}">✕</button>
     </div>${content}`;
 
+  if(storyStartDialog){
+    modal.querySelector('[data-action="story-start-dialog-close"]')?.addEventListener('click',()=>{
+      if(modal.open)modal.close();
+    },{once:true});
+  }
   if (!modal.open) modal.showModal();
 }
 function requireLogin(next) {
@@ -11563,7 +11576,7 @@ document.addEventListener('error',event => {
 },true);
 document.addEventListener('load',event => {
   const image=event.target;
-  if (image instanceof HTMLImageElement) image.style.opacity='1';
+  if (image instanceof HTMLImageElement && image.style.opacity==='.15') image.style.opacity='1';
 },true);
 
 function renderCityMapMVP() {
