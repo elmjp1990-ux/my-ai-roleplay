@@ -17,7 +17,7 @@
 import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { resolve, dirname } from "node:path";
-import { existsSync, readFileSync, writeFileSync, renameSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync } from "node:fs";
 import { createResumableManifest } from "./legacy-image-migration-runner.mjs";
 import { assertLocalSupabaseUrl, runLocalMigration } from "./apply-legacy-chat-image-migration-local.mjs";
 
