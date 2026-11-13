@@ -3,6 +3,9 @@
  * Page-specific layout and city-map / encounter scene styling remain in their own styles.
  */
 :root {
+  --px-chat-character-bg:rgba(105,110,117,.56);
+  --px-chat-player-bg:rgba(165,170,177,.42);
+  --px-chat-player-avatar-bg:rgba(165,170,177,.42);
   --px-glass-bg:rgba(112,116,122,.22);
   --px-glass-bg-strong:rgba(104,109,116,.34);
   --px-glass-border:rgba(255,255,255,.24);
@@ -13,6 +16,9 @@
   --px-glass-selected-border:rgba(180,151,222,.62);
 }
 body.day {
+  --px-chat-character-bg:rgba(205,209,214,.92);
+  --px-chat-player-bg:rgba(235,237,240,.98);
+  --px-chat-player-avatar-bg:rgba(235,237,240,.98);
   --px-glass-bg:rgba(255,255,255,.48);
   --px-glass-bg-strong:rgba(255,255,255,.68);
   --px-glass-border:rgba(92,96,104,.19);
@@ -193,28 +199,28 @@ body:not(.day) .chat-entry.active,body.day .chat-entry.active {
 body .message:not(.user) .bubble,
 body .roleplay-segment.is-character .bubble,
 body .roleplay-segment.is-temporary .bubble {
-  background:rgba(105,110,117,.56)!important;
+  background:var(--px-chat-character-bg)!important;
   border-color:rgba(210,214,219,.30)!important;
   color:var(--text)!important;
 }
 body .message.user .bubble,
 body .roleplay-segment.is-user .bubble,
 body .user .bubble {
-  background:rgba(155,160,167,.32)!important;
+  background:var(--px-chat-player-bg)!important;
   border-color:rgba(225,228,232,.36)!important;
   color:var(--text)!important;
 }
 body.day .message:not(.user) .bubble,
 body.day .roleplay-segment.is-character .bubble,
 body.day .roleplay-segment.is-temporary .bubble {
-  background:rgba(205,209,214,.92)!important;
+  background:var(--px-chat-character-bg)!important;
   border-color:rgba(112,117,124,.25)!important;
   color:#252628!important;
 }
 body.day .message.user .bubble,
 body.day .roleplay-segment.is-user .bubble,
 body.day .user .bubble {
-  background:rgba(235,237,240,.98)!important;
+  background:var(--px-chat-player-bg)!important;
   border-color:rgba(112,117,124,.30)!important;
   color:#252628!important;
 }
@@ -229,4 +235,10 @@ body.group-chat-page .message-content { flex:1 1 auto; width:100%; max-width:100
 @media(max-width:600px) {
   body.conversation .messages,
   body.group-chat-page .messages { padding-inline:12px; }
+}
+
+.player-avatar {
+  background:var(--px-chat-player-avatar-bg)!important;
+  color:var(--text)!important;
+  border:1px solid var(--border)!important;
 }

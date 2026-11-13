@@ -471,8 +471,6 @@ main { max-width:1500px; margin:auto; padding:25px; }
 /* Chat */
 /* 單人對話使用完整視窗高度，不顯示全站標頭（頁名／測試環境／錢包／帳號）。 */
 body.conversation .app > header { display:none !important; }
-body.conversation .sidebar { display:none!important; }
-body.conversation .app { margin-left:0!important; }
 body.conversation main { max-width:none; height:100dvh; padding:0; }
 body.conversation .chat-layout { height:100dvh; }
 body.chat-page main { max-width:none; padding:12px; }
@@ -6756,7 +6754,7 @@ function renderGroupConversation() {
     const segments=!isSystem ? parseRoleplaySegments(displayContent,roleplayRoles) : [];
     const hasSpeaker=segments.some(segment=>segment.kind!=='user');
     const avatarHTML=isUser
-      ? '<span class="avatar avatar-fallback" style="background:#4f46e5">你</span>'
+      ? '<span class="avatar avatar-fallback player-avatar">你</span>'
       : isSystem
         ? '<span class="avatar avatar-fallback">系</span>'
         : (hasSpeaker ? '' : avatar?'<img class="avatar" src="'+e(avatar)+'" alt="">':'<span class="avatar avatar-fallback">'+e(String(who).trim().slice(0,1)||'角')+'</span>');
@@ -7887,7 +7885,7 @@ function roleplaySegmentHTML(segment, options = {}) {
   const name = segment.kind === 'user' ? (currentUser()?.nickname || '你') : segment.speakerName;
   const characterAvatar = segment.kind === 'character' && segment.avatar
     ? '<img class="avatar" src="' + e(safeImage(segment.avatar)) + '" alt="">'
-    : '<span class="avatar avatar-fallback">' + e(segment.kind === 'user' ? '你' : [...String(name || '?')][0] || '?') + '</span>';
+    : '<span class="avatar avatar-fallback' + (segment.kind === 'user' ? ' player-avatar' : '') + '">' + e(segment.kind === 'user' ? '你' : [...String(name || '?')][0] || '?') + '</span>';
   // The summon marker is a text label, not the player's profile photo.
   const playerBadge = ''; // The visible badge is drawn by the wrapper's ::after pseudo-element.
   const avatarHTML = options.summonedByPlayer && segment.kind === 'character'
