@@ -6687,7 +6687,7 @@ async function groupLoadOlderMessages() {
     const page=rows||[];
     g.historyHasMore=page.length===50;
     if(page.length){
-      const oldest=page[0];
+      const oldest=page.at(-1);
       g.historyCursor={createdAt:oldest.created_at,sequenceNo:oldest.sequence_no,id:oldest.id};
       const members=g.active.members||[],scenes=g.active.scenes||[];
       const mapped=[...page].reverse().map(m=>{
