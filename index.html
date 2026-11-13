@@ -5256,7 +5256,7 @@ function renderDetail() {
       ${offline ? '<div class="character-status-banner">● 此角色目前離線或已下架。你仍可查看這段既有聊天所保留的角色簡介與開場白，但不能開啟新對話。</div>' : ''}
       <div class="detail-layout">
         <div class="detail-portrait">
-${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline-image' : ''}" data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline aria-label="${e(c.name)} 的角色影片"></video>` : `<img class="detail-image \${offline ? 'character-offline-image' : ''}" src="\${e(safeImage(c.image))}" \${(c.primaryIllustrationPath||c.imagePath) ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath||c.imagePath)+'"' : ''} alt="\${e(c.name)}">`}
+${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline-image' : ''}" data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline aria-label="${e(c.name)} 的角色影片"></video>` : `<img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" ${(c.primaryIllustrationPath||c.imagePath) ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath||c.imagePath)+'"' : ''} alt="${e(c.name)}">`}
           <div class="detail-portrait-meta">
             <h1>${e(c.name)}</h1>
             ${c.authorId ? `<button class="author-link" data-action="author" data-character-author-name data-id="${e(c.authorId)}">BY @${e(a.nickname)}</button>` : `<span class="small muted">BY ${e(creatorAttribution)}</span>`}
@@ -7779,7 +7779,7 @@ function renderConversation() {
               <button class="ghost" data-action="session-detail" data-id="${e(s.id)}" style="padding:0"
                       aria-label="查看角色簡介">
                 <span class="character-avatar-status ${characterIsOffline(c) ? 'is-offline' : ''}">
-                  <img class="avatar" src="\${e(safeImage(c.image))}" \${c.imagePath ? 'data-character-illustration-path="'+e(c.imagePath)+'"' : ''} alt="">
+                  <img class="avatar" src="${e(safeImage(c.image))}" ${c.imagePath ? 'data-character-illustration-path="'+e(c.imagePath)+'"' : ''} alt="">
                   <span class="character-status-dot" title="${characterIsOffline(c) ? '角色離線／已下架' : '角色公開中'}"></span>
                 </span>
               </button>
