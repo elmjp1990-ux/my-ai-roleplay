@@ -11566,8 +11566,9 @@ async function importCharacter(file) {
   }
 }
 
-/* Image errors do not inject HTML. Keep role portraits visible while their signed
-   Storage URL is being hydrated/refreshed, and restore opacity after any later load. */
+/* Image errors do not inject HTML. */
+/* Keep role portraits visible while their signed Storage URL is being hydrated/refreshed,
+   and restore opacity after a later successful load. */
 document.addEventListener('error',event => {
   const image=event.target;
   if (!(image instanceof HTMLImageElement)) return;
