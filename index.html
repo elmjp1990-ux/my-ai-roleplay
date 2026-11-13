@@ -10891,6 +10891,7 @@ const {
           card.querySelector('.diary-memory-text')?.classList.remove('hidden');
           card.querySelector('.diary-edit-icon')?.classList.remove('hidden');
         }
+        storyPhoneRuntimeCache.delete(String(uid)+':'+session.id);
         await loadStoryMemorySummary(session);
         toast(summaryText?'回憶已儲存。':'已刪除這則回憶。');
         break;
