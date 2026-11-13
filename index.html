@@ -3340,7 +3340,7 @@ function sessionCharacter(s) {
   );
   const snap = s.cloudCharacterSnapshot;
   const hasMatchingSnapshot=!!snap&&snap.id===s.characterId;
-  const snapshotAuthorId=hasMatchingSnapshot&&Object.prototype.hasOwnProperty.call(snap,'authorId') ? snap.authorId : '';
+  const snapshotAuthorId=hasMatchingSnapshot ? (Object.prototype.hasOwnProperty.call(snap,'authorId') ? snap.authorId : '') : '';
   const uid=currentUser()?.uid||'';
   const imageCacheKey=hasMatchingSnapshot&&snap.imagePath&&uid&&s.id ? uid+':'+s.id+':'+snap.imagePath : '';
   const cachedImage=imageCacheKey ? cloudSessionImageUrlCache.get(imageCacheKey) : null;
