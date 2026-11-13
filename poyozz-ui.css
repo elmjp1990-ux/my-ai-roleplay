@@ -9,8 +9,8 @@
   --px-glass-highlight:rgba(255,255,255,.16);
   --px-glass-shadow:0 8px 24px rgba(12,15,20,.12);
   --px-glass-blur:14px;
-  --px-glass-selected:rgba(190,174,226,.24);
-  --px-glass-selected-border:rgba(213,199,242,.48);
+  --px-glass-selected:rgba(145,116,190,.34);
+  --px-glass-selected-border:rgba(180,151,222,.62);
 }
 body.day {
   --px-glass-bg:rgba(255,255,255,.48);
@@ -18,8 +18,8 @@ body.day {
   --px-glass-border:rgba(92,96,104,.19);
   --px-glass-highlight:rgba(255,255,255,.62);
   --px-glass-shadow:0 8px 24px rgba(40,43,48,.08);
-  --px-glass-selected:rgba(198,184,226,.25);
-  --px-glass-selected-border:rgba(155,136,195,.42);
+  --px-glass-selected:rgba(145,116,190,.22);
+  --px-glass-selected-border:rgba(139,108,184,.48);
 }
 
 /* Common controls */
@@ -185,4 +185,35 @@ body:not(.day) .chat-entry.active,body.day .chat-entry.active {
     -webkit-backdrop-filter:none;
     backdrop-filter:none;
   }
+}
+
+
+/* Chat speaker surfaces: readable neutral greys, with distinct authorship. */
+.roleplay-segment.is-character .bubble,
+.roleplay-segment.is-temporary .bubble,
+.message:not(.user) .bubble {
+  background:rgba(92,97,104,.78);
+  border-color:rgba(210,214,219,.24);
+  color:var(--text);
+}
+.roleplay-segment.is-user .bubble,
+.message.user .bubble,
+.user .bubble {
+  background:rgba(137,142,149,.58);
+  border-color:rgba(225,228,232,.32);
+  color:var(--text);
+}
+body.day .roleplay-segment.is-character .bubble,
+body.day .roleplay-segment.is-temporary .bubble,
+body.day .message:not(.user) .bubble {
+  background:rgba(211,214,218,.94);
+  border-color:rgba(112,117,124,.22);
+  color:#252628;
+}
+body.day .roleplay-segment.is-user .bubble,
+body.day .message.user .bubble,
+body.day .user .bubble {
+  background:rgba(235,237,239,.98);
+  border-color:rgba(112,117,124,.28);
+  color:#252628;
 }
