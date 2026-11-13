@@ -32,7 +32,9 @@ AS $function$
             AND s.deleted_at IS NULL
             AND s.character_snapshot->>'imagePath' = p_object_name
             AND split_part(p_object_name, '/', 1) = c.author_id::text
-            AND split_part(p_object_name, '/', 2) = s.character_id::text\n            AND p_object_name ~* ('^' || c.author_id::text || '/' || s.character_id::text ||\n              '/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.(jpg|jpeg|png|webp)
+            AND split_part(p_object_name, '/', 2) = s.character_id::text
+            AND p_object_name ~* ('^' || c.author_id::text || '/' || s.character_id::text ||
+              '/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.(jpg|jpeg|png|webp)
         )
       )
       ELSE false
