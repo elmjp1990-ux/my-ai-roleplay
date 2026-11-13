@@ -60,12 +60,11 @@ const extractFunction = (source, signature) => {
   throw new Error(`Unclosed function: ${signature}`);
 };
 
+const coreUtilsSource = fs.readFileSync("core-utils.js", "utf8");
 const extractUuidFunction = () => {
-  const start = indexHtml.indexOf("function isUuid(value)");
-  assert.notEqual(start, -1, "Missing actual isUuid helper");
-  const end = indexHtml.indexOf("\n}", start);
-  assert.notEqual(end, -1, "Could not locate isUuid helper end");
-  return indexHtml.slice(start, end + 2);
+  assert.ok(coreUtilsSource.includes("window.PoyozzCoreUtils"),
+    "Missing shared core utilities module");
+  return extractFunction(coreUtilsSource, "function isUuid(value)");
 };
 const extractStorageListener = () => {
   const marker = "window.addEventListener('storage', event => {";
