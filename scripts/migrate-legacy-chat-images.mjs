@@ -185,7 +185,7 @@ export function buildMigrationReadQueries(characterIds = []) {
     },
     sessions: ids.length ? {
       select: "id,character_id,character_snapshot",
-      filters: { character_id: `in.(${ids.join(",")})` },
+      filters: { character_id: `in.(${ids.join(",")})`, deleted_at: "is.null" },
     } : null,
   };
 }
