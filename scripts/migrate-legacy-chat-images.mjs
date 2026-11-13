@@ -90,12 +90,10 @@ export function buildMigrationPlan({ characters, sessions, strictCounts = true }
     const parsedSnapshot = parseImageDataUri(image);
     if (!parsedSnapshot) throw new Error(`Unsupported or malformed snapshot Data URI in session ${session.id}`);
 
-    const exact = [...byId.entries()].find(([, item]) => item.character.avatar_url === image);
-    if (exact) {
-      const [characterId, item] = exact;
-      if (session.character_id !== characterId) {
-        throw new Error(`Snapshot ${session.id} image matches character ${characterId}, but session.character_id is ${session.character_id}`);
-      }
+    const currentCharacter = byId.get(session.character_id);
+    if (currentCharacter && currentCharacter.character.avatar_url === image) {
+      const characterId = session.character_id;
+      const item = currentCharacter;
       const asset = primaryAssets.find(row => row.characterId === characterId);
       currentSnapshots.push({
         sessionId: session.id,
