@@ -3075,10 +3075,11 @@ function currentUserCanViewNsfw() {
 }
 function canViewCharacterNsfw(character) {
   if (character?.isNSFW !== true) return true;
-  // 作者可以在自己的介面辨識／管理自己建立的 NSFW 角色；其他人的公開 NSFW 內容，
-  // 以 Supabase RLS 已完成的伺服器端成年資格判定為準。
-  if (currentUser()?.uid && currentUser().uid === character.authorId) return true;
-  if (character?.cloudPublic === true) return true;
+  // 作者可管理自己的 NSFW 角色；其他人必須登入且通過成年資格。
+  // cloudPublic 只代表資料來自公開目錄，絕不能視為已通過年齡驗證。
+  const uid = currentUser()?.uid || null;
+  if (uid && uid === character.authorId) return true;
+  if (!uid) return false;
   return currentUserCanViewNsfw();
 }
 function availableExploreTags() {
@@ -3347,10 +3348,10 @@ function sessionCharacter(s) {
   const hydratedImage=cachedImage&&cachedImage.expiresAt>Date.now()?cachedImage.url:'';
   // For hidden/deleted characters, the chat's own snapshot is the source of truth.
   // Never replace its historical portrait with a newer public-card image.
-  if(found&&!(s.forceCloudSnapshot)&&!(hasMatchingSnapshot&&snap.imagePath&&characterIsOffline(found)))return found;
+  if(found&&!(s.forceCloudSnapshot)&&!(hasMatchingSnapshot&&characterIsOffline(found)))return found;
   if (!hasMatchingSnapshot) return found || null;
   return {...(found||{}),...snap,
-    image:snap.imagePath ? (snap.image || hydratedImage || '') : (snap.image || found?.image || hydratedImage || ''),
+    image:snap.imagePath ? (snap.image || hydratedImage || '') : (snap.image || (characterIsOffline(found)?'':found?.image) || hydratedImage || ''),
     imagePath:snap.imagePath || found?.imagePath || '',
     id:s.characterId, name:snap.name || found?.name || s.characterName || '角色',
     visibility:snap.visibility || found?.visibility || 'private', reviewStatus:found?.reviewStatus || 'draft',
@@ -3365,8 +3366,33 @@ function sessionCharacter(s) {
 async function hydrateCloudSessionCharacterImage(s) {
   const snap=s?.cloudCharacterSnapshot;
   const uid=currentUser()?.uid||'';
-  const path=snap?.imagePath;
-  if(!s?.cloudOwned||!uid||!path||snap?.image) return;
+  if(!s?.cloudOwned||!uid||snap?.image) return;
+
+  // Legacy snapshots have no imagePath yet. Fetch only the visible row's own
+  // image payload, rather than downloading Base64 for every chat in the list.
+  if(!snap?.imagePath) {
+    const key=uid+':'+s.id+':legacy-snapshot-image';
+    if(cloudSessionImageUrlInflight.has(key))return cloudSessionImageUrlInflight.get(key);
+    const request=(async()=>{
+      const {data,error}=await window.mySupabase.from('chat_sessions')
+        .select('character_snapshot')
+        .eq('id',s.id).eq('user_id',uid).is('deleted_at',null).maybeSingle();
+      if(error)throw new Error(error.message);
+      if((currentUser()?.uid||'')!==uid||state.sessions?.[s.id]!==s)return;
+      const stored=data?.character_snapshot;
+      if(!stored||stored.id!==s.characterId)return;
+      const image=safeImage(stored.image);
+      if(!image)return;
+      s.cloudCharacterSnapshot={...s.cloudCharacterSnapshot,...stored,image};
+      applyCloudChatSessionAvatarUrl(s,image);
+      if(route.id===s.id&&(route.page==='conversation'||route.page==='session-detail'))render();
+    })();
+    cloudSessionImageUrlInflight.set(key,request);
+    try{await request;}finally{if(cloudSessionImageUrlInflight.get(key)===request)cloudSessionImageUrlInflight.delete(key);}
+    return;
+  }
+
+  const path=snap.imagePath;
   const key=uid+':'+s.id+':'+path;
   const cached=cloudSessionImageUrlCache.get(key);
   if(cached&&cached.expiresAt>Date.now()) { applyCloudChatSessionAvatarUrl(s,cached.url); return; }
@@ -3384,12 +3410,13 @@ async function hydrateCloudSessionCharacterImage(s) {
 function applyCloudChatSessionAvatarUrl(session,url) {
   if(!session?.id||!url)return;
   document.querySelectorAll('[data-chat-avatar-session-id]').forEach(node=>{
-    if(node.dataset.chatAvatarSessionId!==session.id||node.dataset.chatAvatarPath!==session.cloudCharacterSnapshot?.imagePath)return;
+    if(node.dataset.chatAvatarSessionId!==session.id||
+       node.dataset.chatAvatarPath!==(session.cloudCharacterSnapshot?.imagePath||''))return;
     const image=document.createElement('img');
     image.className='avatar';
     image.alt=session.cloudCharacterSnapshot?.name||session.characterName||'角色';
     image.src=url;
-    image.dataset.characterIllustrationPath=session.cloudCharacterSnapshot.imagePath;
+    if(session.cloudCharacterSnapshot?.imagePath)image.dataset.characterIllustrationPath=session.cloudCharacterSnapshot.imagePath;
     node.replaceWith(image);
   });
 }
@@ -3407,7 +3434,7 @@ function observeCloudChatSessionAvatars(root=$('view')) {
       if(session)void hydrateCloudSessionCharacterImage(session).catch(error=>console.warn('聊天室角色頭像載入失敗：',error?.message||error));
     }
   },{root:list,rootMargin:'120px 0px'});
-  list.querySelectorAll('[data-chat-avatar-session-id][data-chat-avatar-path]').forEach(node=>chatSessionAvatarObserver.observe(node));
+  list.querySelectorAll('[data-chat-avatar-session-id]').forEach(node=>chatSessionAvatarObserver.observe(node));
 }
 function canAccessSessionCharacter(s,c) {
   const uid = currentUser()?.uid;
@@ -6467,7 +6494,7 @@ function chatEntries() {
     return `<div class="chat-entry ${route.page==='conversation'&&route.id===s.id?'active':''}">
       <button class="pin ${s.pinned?'on':''}" data-action="pin" data-id="${e(s.id)}" aria-label="切換置頂">${ICON.pin}</button>
       <button class="ghost" style="padding:0" data-action="session-detail" data-id="${e(s.id)}" aria-label="查看${e(c.name)}角色簡介">
-        <span class="character-avatar-status ${characterIsOffline(c)?'is-offline':''}">${safeImage(c.image)?'<img class="avatar" src="'+e(safeImage(c.image))+'" '+(c.imagePath?'data-character-illustration-path="'+e(c.imagePath)+'"':'')+' alt="'+e(c.name)+'">':(c.imagePath?'<span class="avatar avatar-fallback" data-chat-avatar-session-id="'+e(s.id)+'" data-chat-avatar-path="'+e(c.imagePath)+'" aria-label="'+e(c.name)+'">'+e(String(c.name||'角').trim().slice(0,1)||'角')+'</span>':'<span class="avatar avatar-fallback" aria-label="'+e(c.name)+'">'+e(String(c.name||'角').trim().slice(0,1)||'角')+'</span>')}
+        <span class="character-avatar-status ${characterIsOffline(c)?'is-offline':''}">${safeImage(c.image)?'<img class="avatar" src="'+e(safeImage(c.image))+'" '+(c.imagePath?'data-character-illustration-path="'+e(c.imagePath)+'"':'')+' alt="'+e(c.name)+'">':((c.imagePath||s.cloudOwned)?'<span class="avatar avatar-fallback" data-chat-avatar-session-id="'+e(s.id)+'" data-chat-avatar-path="'+e(c.imagePath||'')+'" aria-label="'+e(c.name)+'">'+e(String(c.name||'角').trim().slice(0,1)||'角')+'</span>':'<span class="avatar avatar-fallback" aria-label="'+e(c.name)+'">'+e(String(c.name||'角').trim().slice(0,1)||'角')+'</span>')}
         <span class="character-status-dot" title="${characterIsOffline(c)?'角色離線／已下架':'角色公開中'}"></span></span>
       </button>
       <button class="select-chat" data-action="select-chat" data-id="${e(s.id)}">
