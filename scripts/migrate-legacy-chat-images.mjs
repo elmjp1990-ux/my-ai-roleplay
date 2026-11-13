@@ -247,7 +247,7 @@ async function main() {
       },
       snapshots: {
         currentPathified: completed.currentSnapshots.filter(row => row.completed).length,
-        historicalCleared: completed.historicalSnapshots.filter(row => row.completed).length,
+        historicalPreserved: completed.historicalSnapshots.filter(row => row.completed).length,\n        historicalObjectsVerified: completed.historicalAssets.filter(row => row.objectVerified).length,
       },
       manifestPath,
     }, null, 2));
