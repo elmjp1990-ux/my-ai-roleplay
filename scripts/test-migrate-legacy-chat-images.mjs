@@ -49,7 +49,8 @@ test("plans 8 primary images, 74 current snapshots, and preserves 13 historical 
   assert.equal(plan.currentSnapshots.every(x=>x.nextSnapshot.opening==="Keep me"),true);
   assert.equal(plan.historicalSnapshots.every(x=>x.nextSnapshot.opening==="Preserve text"),true);
   assert.equal(plan.safety.databaseWrites,false);
-  assert.equal(plan.safety.storageWrites,false);\n  assert.equal(plan.safety.historicalImagesPreserved,true);
+  assert.equal(plan.safety.storageWrites,false);
+  assert.equal(plan.safety.historicalImagesPreserved,true);
 });
 
 test("is deterministic and safe to rerun",()=>{
