@@ -6614,7 +6614,8 @@ async function groupOpen(groupId) {
     // Memory photo metadata and signed URLs are loaded only when the player opens background settings.
     const initialMessageRows=messageRes.data||[];
     g.historyHasMore=initialMessageRows.length===50;
-    g.historyCursor=initialMessageRows.length?{createdAt:initialMessageRows[0].created_at,sequenceNo:initialMessageRows[0].sequence_no,id:initialMessageRows[0].id}:null;
+    const oldestInitialMessage=initialMessageRows.at(-1);
+    g.historyCursor=oldestInitialMessage?{createdAt:oldestInitialMessage.created_at,sequenceNo:oldestInitialMessage.sequence_no,id:oldestInitialMessage.id}:null;
     g.historyLoading=false;g.historyError='';g.historyScrollAnchor=null;
     const messages=[...initialMessageRows].reverse().map(m=>{
       const speakerSnapshot=m.speaker_snapshot||{};
@@ -6666,7 +6667,7 @@ async function groupLoadOlderMessages() {
   if(!pane)return;
   const requestId=g.openRequestId;
   const before={scrollHeight:pane.scrollHeight,scrollTop:pane.scrollTop};
-  g.historyLoading=true;g.historyError='';
+  g.historyLoading=true;g.historyError='';g.historyScrollAnchor=before;
   renderGroupConversation();
   try {
     const createdAt=String(cursor.createdAt||'');
