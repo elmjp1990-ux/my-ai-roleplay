@@ -6509,6 +6509,11 @@ async function groupOpen(groupId) {
   const g=groupPrototype;
   groupResetForAccount(currentUser()?.uid||null);
   const groupListWasLoaded=g.groupsLoaded===true;
+  const previousActiveId=g.active?.id||null;
+  if(previousActiveId!==groupId){
+    g.sending=false;
+    if(g.pendingRequest?.groupId!==groupId)g.pendingRequest=null;
+  }
   if(!isUuid(groupId)||!window.mySupabase) { g.loading=false;g.openError='群組識別碼無效或 Supabase 尚未載入。';g.failedGroupId=groupId;render();toast(g.openError);return; }
   // Keep the group ID in the URL so rerenders, auth refreshes, and post-send reloads
   // can recover the same group instead of silently falling back to the creation wizard.
@@ -7427,6 +7432,7 @@ async function groupSendMock() {
       }
     });
   } catch(error) {
+    if(g.active!==activeGroup||g.active?.id!==activeGroupId||g.ownerUid!==requestUid||currentUser()?.uid!==requestUid)return;
     g.sending=false;
     const rawError=String(error?.message||error||'');
     if(rawError.includes('group_insufficient_funds')||rawError.includes('insufficient_funds')) {
