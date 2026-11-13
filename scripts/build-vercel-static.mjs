@@ -12,6 +12,7 @@ const runtimeFiles = [
   'chat-render-lifecycle.js',
   'image-compression.js',
   'signed-url-manager.js',
+  'core-utils.js',
   'city-map.js',
   'followed-authors.js',
   'author-profile.js',
