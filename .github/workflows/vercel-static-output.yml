@@ -10,6 +10,8 @@ on:
       - "signed-url-manager.js"
       - "city-map.js"
       - "followed-authors.js"
+      - "author-profile.js"
+      - "scripts/test-author-profile-module.mjs"
       - "scripts/test-followed-authors-module.mjs"
       - "scripts/test-city-map-module.mjs"
       - "memory-album.js"
@@ -46,6 +48,10 @@ jobs:
         run: node --check city-map.js
       - name: Parse extracted followed authors module
         run: node --check followed-authors.js
+      - name: Parse extracted author profile module
+        run: node --check author-profile.js
+      - name: Verify extracted author profile module contract
+        run: node scripts/test-author-profile-module.mjs
       - name: Verify followed authors module contract
         run: node scripts/test-followed-authors-module.mjs
       - name: Verify extracted city map module contract

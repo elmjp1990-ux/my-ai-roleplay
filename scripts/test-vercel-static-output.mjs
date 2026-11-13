@@ -16,6 +16,7 @@ const fileBudgets = {
   'signed-url-manager.js': 8_000,
   'city-map.js': 52_000,
   'followed-authors.js': 8_000,
+  'author-profile.js': 5_000,
   'memory-album.js': 26_000,
   'encounter-scene.js': 36_000,
 };
@@ -84,6 +85,7 @@ const runtimeJs = [
   fs.readFileSync(path.join(outputDir, 'signed-url-manager.js'), 'utf8'),
   fs.readFileSync(path.join(outputDir, 'city-map.js'), 'utf8'),
   fs.readFileSync(path.join(outputDir, 'followed-authors.js'), 'utf8'),
+  fs.readFileSync(path.join(outputDir, 'author-profile.js'), 'utf8'),
   fs.readFileSync(path.join(outputDir, 'memory-album.js'), 'utf8'),
   fs.readFileSync(path.join(outputDir, 'encounter-scene.js'), 'utf8'),
 ];
@@ -105,7 +107,7 @@ for (const reference of references) {
   assert.ok(fs.existsSync(resolved) && fs.statSync(resolved).isFile(), 'Local runtime reference is missing from Vercel output: ' + reference);
 }
 
-for (const required of ['LOGO_WEBICON.webp', 'LOGO_WEBLOGO.webp', 'encounter-default-scene.webp', 'memory-capture.js', 'chat-render-lifecycle.js', 'image-compression.js', 'signed-url-manager.js', 'city-map.js', 'followed-authors.js', 'memory-album.js', 'encounter-scene.js']) {
+for (const required of ['LOGO_WEBICON.webp', 'LOGO_WEBLOGO.webp', 'encounter-default-scene.webp', 'memory-capture.js', 'chat-render-lifecycle.js', 'image-compression.js', 'signed-url-manager.js', 'city-map.js', 'followed-authors.js', 'author-profile.js', 'memory-album.js', 'encounter-scene.js']) {
   assert.ok(references.has('./' + required) || references.has('/' + required) || html.includes(required),
     'Required runtime asset must remain referenced: ' + required);
 }

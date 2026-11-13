@@ -6,6 +6,7 @@ on:
       - "index.html"
       - "encounter-scene.js"
       - "city-map.js"
+      - "author-profile.js"
       - "scripts/test-chat-history-lazy-loading.mjs"
       - "scripts/test-character-illustration-signed-url-refresh.mjs"
       - "scripts/test-public-illustration-lazy-loading.mjs"
