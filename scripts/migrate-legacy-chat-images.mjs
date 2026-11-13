@@ -47,11 +47,13 @@ function stableUuid(input) {
 export function buildMigrationPlan({ characters, sessions, strictCounts = true }) {
   if (!Array.isArray(characters) || !Array.isArray(sessions)) throw new TypeError("characters and sessions must be arrays");
   const byId = new Map();
+  const characterById = new Map();
   for (const character of characters) {
     if (!UUID.test(character?.id || "") || !UUID.test(character?.author_id || "")) {
       throw new Error("Invalid character or author UUID in source rows");
     }
-    if (byId.has(character.id)) throw new Error("Duplicate character id: " + character.id);
+    if (characterById.has(character.id)) throw new Error("Duplicate character id: " + character.id);
+    characterById.set(character.id, character);
     const parsed = parseImageDataUri(character.avatar_url);
     if (parsed) byId.set(character.id, { character, parsed });
   }
@@ -74,6 +76,7 @@ export function buildMigrationPlan({ characters, sessions, strictCounts = true }
 
   const currentSnapshots = [];
   const historicalSnapshots = [];
+  const historicalAssetByKey = new Map();
   const matchedByCharacter = new Map([...byId.keys()].map(id => [id, 0]));
   const seenSessionIds = new Set();
   for (const session of sessions) {
@@ -104,14 +107,33 @@ export function buildMigrationPlan({ characters, sessions, strictCounts = true }
       });
       matchedByCharacter.set(characterId, matchedByCharacter.get(characterId) + 1);
     } else {
-      // Historical images intentionally have no replacement path: their exact
-      // visual version is being retired, not substituted with today's portrait.
+      // Preserve the exact historical image bytes in a private Storage object.
+      // Never replace an old portrait with the character's current primary image.
+      const owner = characterById.get(session.character_id);
+      if (!owner) throw new Error(`Historical snapshot ${session.id} has no matching character row`);
+      const historicalKey = session.character_id + ":" + parsedSnapshot.sha256;
+      let historicalAsset = historicalAssetByKey.get(historicalKey);
+      if (!historicalAsset) {
+        const fileId = stableUuid(`poyozz-legacy-historical:${session.character_id}:${parsedSnapshot.sha256}`);
+        historicalAsset = {
+          characterId: session.character_id,
+          authorId: owner.author_id,
+          sourceSha256: parsedSnapshot.sha256,
+          mimeType: parsedSnapshot.mimeType,
+          extension: parsedSnapshot.extension,
+          bytes: parsedSnapshot.bytes.length,
+          storagePath: `${owner.author_id}/${session.character_id}/${fileId}.${parsedSnapshot.extension}`,
+          assetType: "historical",
+        };
+        historicalAssetByKey.set(historicalKey, historicalAsset);
+      }
       historicalSnapshots.push({
         sessionId: session.id,
         characterId: session.character_id,
         sourceSha256: parsedSnapshot.sha256,
         expectedSnapshot: snapshot,
-        nextSnapshot: { ...snapshot, image: "" },
+        storagePath: historicalAsset.storagePath,
+        nextSnapshot: { ...snapshot, image: "", imagePath: historicalAsset.storagePath },
       });
     }
   }
@@ -133,18 +155,21 @@ export function buildMigrationPlan({ characters, sessions, strictCounts = true }
       primaryImages: primaryAssets.length,
       currentSnapshots: currentSnapshots.length,
       historicalSnapshots: historicalSnapshots.length,
+      historicalAssets: historicalAssetByKey.size,
       totalSnapshotUpdates: currentSnapshots.length + historicalSnapshots.length,
       estimatedImageBytes: primaryAssets.reduce((sum, row) => sum + row.bytes, 0),
     },
     primaryAssets,
     currentSnapshots,
     historicalSnapshots,
+    historicalAssets: [...historicalAssetByKey.values()],
     safety: {
       sourceRowsOnly: true,
       storageWrites: false,
       databaseWrites: false,
       deletes: false,
       historicalImageReplacement: false,
+      historicalImagesPreserved: true,
     },
   };
 }
@@ -239,6 +264,7 @@ async function main() {
     primaryAssets: plan.primaryAssets.map(({ ...row }) => ({ ...row, bytes: row.bytes })),
     currentSnapshots: plan.currentSnapshots.map(({ nextSnapshot, expectedSnapshot, ...row }) => row),
     historicalSnapshots: plan.historicalSnapshots.map(({ nextSnapshot, expectedSnapshot, ...row }) => row),
+    historicalAssets: plan.historicalAssets.map(({ ...row }) => row),
   };
   console.log(JSON.stringify(safePlan, null, 2));
 }
