@@ -1,0 +1,29 @@
+name: Existing chat character media read policy contract
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/*existing*chat*character*media*read*'
+      - 'scripts/test-existing-chat-character-media-read.mjs'
+      - '.github/workflows/existing-chat-character-media-read.yml'
+  push:
+    branches:
+      - security/existing-chat-character-media-read
+    paths:
+      - 'supabase/migrations/*existing*chat*character*media*read*'
+      - 'scripts/test-existing-chat-character-media-read.mjs'
+      - '.github/workflows/existing-chat-character-media-read.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  existing-chat-character-media-read-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify exact existing-chat media read scope
+        run: node scripts/test-existing-chat-character-media-read.mjs
