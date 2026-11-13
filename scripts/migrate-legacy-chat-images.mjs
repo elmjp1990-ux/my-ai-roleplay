@@ -150,14 +150,27 @@ export function buildMigrationPlan({ characters, sessions, strictCounts = true }
 }
 
 async function readTable(url, key, table, select) {
-  const endpoint = new URL(`/rest/v1/${table}`, url);
-  endpoint.searchParams.set("select", select);
-  endpoint.searchParams.set("limit", "1000");
-  const response = await fetch(endpoint, {
-    headers: { apikey: key, Authorization: `Bearer ${key}` },
-  });
-  if (!response.ok) throw new Error(`Read ${table} failed (${response.status}): ${await response.text()}`);
-  return response.json();
+  const rows = [];
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const endpoint = new URL(`/rest/v1/${table}`, url);
+    endpoint.searchParams.set("select", select);
+    endpoint.searchParams.set("order", "id.asc");
+    endpoint.searchParams.set("limit", String(pageSize));
+    const response = await fetch(endpoint, {
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        Range: `${offset}-${offset + pageSize - 1}`,
+        "Range-Unit": "items",
+      },
+    });
+    if (!response.ok) throw new Error(`Read ${table} failed (${response.status}): ${await response.text()}`);
+    const page = await response.json();
+    if (!Array.isArray(page)) throw new Error(`Read ${table} returned an unexpected payload`);
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
 }
 
 async function main() {
