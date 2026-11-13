@@ -13,7 +13,9 @@ for (const [name,source] of [['story',story],['encounter',encounter]]) {
 }
 assert.match(html,/async function hydrateCloudSessionCharacterImage\(s\)/);
 assert.match(html,/getCharacterIllustrationSignedUrl\(path\)/);
-assert.match(html,/cloudSessionImageUrlCache\.set\(key,url\)/);
+assert.match(html,/cloudSessionImageUrlCache\.set\(key,\{url,expiresAt:Date\.now\(\)\+55\*60\*1000\}\)/);
+assert.match(html,/forceRefresh:!!cached/);
+assert.match(html,/data-character-illustration-path=.*c\.imagePath/);
 assert.match(html,/priorSnapshot\.imagePath \? '' : \(character\?\.image \|\| priorSnapshot\.image \|\| ''\)/);
 assert.match(html,/hydrateCloudSessionCharacterImage\(session\)/);
 assert.match(html,/hydrateCloudSessionCharacterImage\(s\)/);
