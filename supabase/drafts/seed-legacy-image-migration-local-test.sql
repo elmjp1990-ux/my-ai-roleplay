@@ -10,6 +10,16 @@ insert into auth.users (
   '', now(), now(), now(), '{}'::jsonb, '{}'::jsonb
 ) on conflict (id) do nothing;
 
+-- A second authenticated user proves historical paths are not shared.
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  created_at, updated_at, raw_app_meta_data, raw_user_meta_data
+) values (
+  '10000000-0000-4000-8000-000000000002',
+  'authenticated', 'authenticated', 'legacy-image-outsider@example.invalid',
+  '', now(), now(), now(), '{}'::jsonb, '{}'::jsonb
+) on conflict (id) do nothing;
+
 insert into public.profiles (id, handle, nickname)
 values ('10000000-0000-4000-8000-000000000001', 'legacy-image-fixture', 'Fixture')
 on conflict (id) do nothing;
@@ -79,6 +89,15 @@ on conflict (id) do update set
   file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
 
+
+-- An object with a valid-looking owner/character path but no metadata
+-- or chat-snapshot reference must remain unreadable.
+insert into storage.objects (bucket_id, name)
+values (
+  'character-illustrations',
+  '10000000-0000-4000-8000-000000000001/20000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000099.png'
+)
+on conflict (bucket_id, name) do nothing;
 
 -- A deleted chat is retained by the application for its retention window,
 -- but it must not be migrated into a readable private Storage snapshot path.
