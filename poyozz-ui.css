@@ -1,0 +1,188 @@
+/* POYOZZ shared UI system
+ * Central home for site-wide neutral glass surfaces and controls.
+ * Page-specific layout and city-map / encounter scene styling remain in their own styles.
+ */
+:root {
+  --px-glass-bg:rgba(112,116,122,.22);
+  --px-glass-bg-strong:rgba(104,109,116,.34);
+  --px-glass-border:rgba(255,255,255,.24);
+  --px-glass-highlight:rgba(255,255,255,.16);
+  --px-glass-shadow:0 8px 24px rgba(12,15,20,.12);
+  --px-glass-blur:14px;
+  --px-glass-selected:rgba(190,174,226,.24);
+  --px-glass-selected-border:rgba(213,199,242,.48);
+}
+body.day {
+  --px-glass-bg:rgba(255,255,255,.48);
+  --px-glass-bg-strong:rgba(255,255,255,.68);
+  --px-glass-border:rgba(92,96,104,.19);
+  --px-glass-highlight:rgba(255,255,255,.62);
+  --px-glass-shadow:0 8px 24px rgba(40,43,48,.08);
+  --px-glass-selected:rgba(198,184,226,.25);
+  --px-glass-selected-border:rgba(155,136,195,.42);
+}
+
+/* Common controls */
+button {
+  background:var(--px-glass-bg);
+  border-color:var(--px-glass-border);
+  box-shadow:inset 0 1px 0 var(--px-glass-highlight);
+  -webkit-backdrop-filter:blur(var(--px-glass-blur)) saturate(115%);
+  backdrop-filter:blur(var(--px-glass-blur)) saturate(115%);
+}
+button:hover:not(:disabled) {
+  background:var(--px-glass-bg-strong);
+  border-color:rgba(255,255,255,.34);
+  filter:none;
+}
+button:active:not(:disabled) { transform:translateY(1px); }
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,
+:where(button,a,input,textarea,select):focus-visible {
+  outline:2px solid var(--px-primary-hover);
+  outline-offset:2px;
+}
+button.ghost,.ghost {
+  background:transparent;
+  border-color:transparent;
+  box-shadow:none;
+  -webkit-backdrop-filter:none;
+  backdrop-filter:none;
+}
+button.ghost:hover:not(:disabled),.ghost:hover:not(:disabled) {
+  background:var(--px-glass-bg);
+  border-color:var(--px-glass-border);
+}
+.primary,.primary:hover:not(:disabled) {
+  color:var(--text);
+  background:var(--px-glass-bg-strong);
+  border:1px solid var(--px-glass-border);
+  box-shadow:var(--px-glass-shadow),inset 0 1px 0 var(--px-glass-highlight);
+}
+.danger,.danger:hover:not(:disabled) {
+  color:#f08a98;
+  border-color:rgba(240,138,152,.38);
+  background:rgba(180,75,88,.12);
+}
+input,textarea,select {
+  background:var(--input);
+  border-color:var(--border);
+  -webkit-backdrop-filter:blur(10px);
+  backdrop-filter:blur(10px);
+}
+input:focus,textarea:focus,select:focus {
+  border-color:var(--px-primary-hover);
+  box-shadow:0 0 0 3px rgba(200,185,237,.16);
+}
+
+/* Shared surfaces */
+.panel,.group-panel,.group-step,.group-alert,
+.suggestions-panel,.chat-list,.chat-overlay,
+.wallet-modal-cost,.wallet-resource-row {
+  background:var(--px-glass-bg);
+  border-color:var(--px-glass-border);
+  box-shadow:var(--px-glass-shadow),inset 0 1px 0 var(--px-glass-highlight);
+  -webkit-backdrop-filter:blur(var(--px-glass-blur)) saturate(115%);
+  backdrop-filter:blur(var(--px-glass-blur)) saturate(115%);
+}
+.card {
+  background:var(--px-glass-bg);
+  border-color:var(--px-glass-border);
+  box-shadow:var(--px-glass-shadow);
+}
+.card:hover,.card:focus-within {
+  border-color:var(--px-glass-selected-border);
+  box-shadow:0 12px 30px rgba(12,15,20,.16);
+}
+
+/* Explore and navigation */
+.hero {
+  color:var(--text);
+  background:linear-gradient(135deg,rgba(122,127,135,.38),rgba(74,79,87,.25));
+  border:1px solid var(--px-glass-border);
+  box-shadow:var(--px-glass-shadow),inset 0 1px 0 var(--px-glass-highlight);
+  -webkit-backdrop-filter:blur(18px) saturate(115%);
+  backdrop-filter:blur(18px) saturate(115%);
+}
+.hero p { color:var(--muted); }
+.hero-dot.active { background:var(--px-primary-hover); box-shadow:0 0 10px rgba(200,185,237,.35); }
+.explore-shortcut {
+  color:var(--muted);
+  background:var(--px-glass-bg);
+  border-color:var(--px-glass-border);
+  box-shadow:inset 0 1px 0 var(--px-glass-highlight);
+  -webkit-backdrop-filter:blur(var(--px-glass-blur));
+  backdrop-filter:blur(var(--px-glass-blur));
+}
+.explore-shortcut .icon { color:var(--text); }
+.explore-shortcut.active {
+  color:var(--text);
+  background:var(--px-glass-selected);
+  border-color:var(--px-glass-selected-border);
+  box-shadow:inset 0 1px 0 var(--px-glass-highlight);
+}
+.nav-btn,.tab,.tabs .tab {
+  background:transparent;
+  border-color:transparent;
+  color:var(--muted);
+}
+.nav-btn:hover,.tab:hover,.tabs .tab:hover {
+  color:var(--text);
+  background:var(--px-glass-bg);
+  border-color:var(--px-glass-border);
+}
+.nav-btn.active,.nav-btn[aria-current="page"],
+.tabs .tab[aria-selected="true"],.tabs .tab.active,
+.group-step.active {
+  color:var(--text);
+  background:var(--px-glass-selected);
+  border-color:var(--px-glass-selected-border);
+  box-shadow:inset 0 1px 0 var(--px-glass-highlight);
+}
+
+/* Character cards and chat actions */
+.chat-cta,.card-chat {
+  color:var(--text);
+  background:var(--px-glass-bg-strong);
+  border:1px solid var(--px-glass-border);
+  box-shadow:var(--px-glass-shadow),inset 0 1px 0 var(--px-glass-highlight);
+  -webkit-backdrop-filter:blur(16px) saturate(120%);
+  backdrop-filter:blur(16px) saturate(120%);
+}
+.chat-cta:hover,.card-chat:hover,.card:hover .card-chat,.card:focus-within .card-chat {
+  color:var(--text);
+  background:rgba(155,158,165,.42);
+  border-color:rgba(255,255,255,.4);
+}
+.chat-top-action,.composer-icon-button {
+  background:var(--px-glass-bg);
+  border-color:var(--px-glass-border);
+  box-shadow:inset 0 1px 0 var(--px-glass-highlight);
+}
+.chat-top-action:hover,.composer-icon-button:hover {
+  background:var(--px-glass-bg-strong);
+  border-color:var(--px-glass-selected-border);
+}
+.group-list-avatar,.group-avatar-fallback {
+  background:var(--px-glass-bg-strong);
+  color:var(--text);
+  border:1px solid var(--px-glass-border);
+  box-shadow:var(--px-glass-shadow);
+}
+body:not(.day) .chat-entry:hover,body:not(.day) .chat-entry.active,
+body.day .chat-entry:hover,body.day .chat-entry.active {
+  background:var(--px-glass-bg);
+  border-color:var(--px-glass-border);
+}
+body:not(.day) .chat-entry.active,body.day .chat-entry.active {
+  box-shadow:inset 3px 0 var(--px-primary-hover);
+}
+.heart.on { color:var(--px-accent-pink); }
+
+@media(prefers-reduced-transparency:reduce) {
+  button,.panel,.group-panel,.group-step,.group-alert,
+  .suggestions-panel,.chat-list,.chat-overlay,.card,.hero,
+  .explore-shortcut,.chat-cta,.card-chat {
+    -webkit-backdrop-filter:none;
+    backdrop-filter:none;
+  }
+}
