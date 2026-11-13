@@ -8070,15 +8070,23 @@ async function jumpToChatSearchHit(button){
 }
 async function returnChatToLatest(kind){
   if(kind==='single'){
-    const s=currentSession();if(!s?.cloudOwned)return;
+    const s=currentSession(),uid=currentUser()?.uid;
+    if(!s?.cloudOwned||s.cloudOwnerUid!==uid||!uid||s.hidden||readDeletedChatTombstones(uid).sessions[s.id])return;
+    if(s.cloudMessagesLoading){toast('聊天紀錄仍在載入，請稍後再返回最新訊息。');return;}
     const previous=s.messages,pending=(s.messages||[]).filter(m=>m.cloudSynced!==true);
     s.messages=pending;s.cloudSearchJump=false;s.cloudMessagesLoaded=false;s.cloudOldestMessageCursor=null;s.cloudHasMoreMessages=false;
     const loaded=await loadCloudSessionMessages(s.id,{refresh:true});
-    if(!loaded&&!readDeletedChatTombstones(currentUser()?.uid||'').sessions[s.id]){
+    if(currentUser()?.uid!==uid||currentSession()?.id!==s.id)return;
+    if(!loaded&&!readDeletedChatTombstones(uid).sessions[s.id]){
       s.messages=previous;s.cloudSearchJump=true;renderMessages(false);
       toast('最新訊息暫時無法載入，已保留目前搜尋定位。');
     }
-  }else if(groupPrototype.active?.id)await groupOpen(groupPrototype.active.id);
+  }else{
+    const group=groupPrototype.active,uid=currentUser()?.uid;
+    if(!group?.id||!uid||groupPrototype.ownerUid!==uid||readDeletedChatTombstones(uid).groups[group.id])return;
+    if(groupPrototype.loading){toast('群組仍在載入，請稍後再返回最新訊息。');return;}
+    await groupOpen(group.id);
+  }
 }
 
 function formatStoryWorldTime(value) {
