@@ -363,30 +363,30 @@ body:not(.encounter-mode-active) .composer {
 
 
 /* Apple-inspired lock-screen phone and notification cards */
-.phone-device{width:min(390px,100%);height:min(680px,90dvh);min-height:min(500px,90dvh);padding:13px 15px 10px;border-radius:34px;border:1px solid rgba(255,255,255,.34);background:linear-gradient(155deg,rgba(244,246,249,.96),rgba(207,212,219,.91));box-shadow:0 28px 100px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.78);color:#252a31}
+.phone-device.phone-device--ios{width:min(390px,100%);height:min(680px,90dvh);min-height:min(500px,90dvh);padding:13px 15px 10px;border-radius:34px;border:1px solid rgba(255,255,255,.34);background:linear-gradient(155deg,rgba(244,246,249,.96),rgba(207,212,219,.91));box-shadow:0 28px 100px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.78);color:#252a31}
 .phone-statusbar{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:25px;padding:0 5px;color:#252a31;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
 .phone-status-icons{display:inline-flex;align-items:center;gap:4px}
 .phone-status-icons i{display:block;width:3px;border-radius:3px;background:currentColor}
 .phone-status-icons i:nth-child(1){height:5px}.phone-status-icons i:nth-child(2){height:7px}.phone-status-icons i:nth-child(3){height:9px}
 .phone-status-icons>span:not(.phone-battery){font-size:14px;line-height:1}
-.phone-device-head{padding:3px 5px 8px;color:#343941;font-size:11px}
+.phone-device--ios .phone-device-head{padding:3px 5px 8px;color:#343941;font-size:11px}
 .phone-device-caption{font-size:8px;letter-spacing:.14em;color:rgba(48,54,63,.48)}
-.phone-battery{color:#4c535d!important}
-.phone-battery-shape{width:25px;height:12px}
-.phone-member-switch{margin:2px 0 3px}
-.phone-member-switch button{border-color:rgba(255,255,255,.6);background:rgba(255,255,255,.42);color:#343941}
-.phone-member-name{color:#343941}
-.phone-content{padding:5px 1px 8px;color:#252a31;gap:0}
+.phone-device--ios .phone-battery{color:#4c535d!important}
+.phone-device--ios .phone-battery-shape{width:25px;height:12px}
+.phone-device--ios .phone-member-switch{margin:2px 0 3px}
+.phone-device--ios .phone-member-switch button{border-color:rgba(255,255,255,.6);background:rgba(255,255,255,.42);color:#343941}
+.phone-device--ios .phone-member-name{color:#343941}
+.phone-device--ios .phone-content{padding:5px 1px 8px;color:#252a31;gap:0}
 .phone-lockscreen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:166px;padding:13px 8px 18px;text-align:center}
 .phone-lockscreen-date{font-size:12px;font-weight:600;letter-spacing:.025em;color:rgba(38,43,51,.72)}
 .phone-lockscreen-clock{font-size:64px;line-height:1.08;font-weight:250;letter-spacing:-.065em;font-variant-numeric:tabular-nums;color:#272d35;text-shadow:0 1px 0 rgba(255,255,255,.5)}
 .phone-lockscreen-location{margin-top:8px;padding:5px 11px;border:1px solid rgba(255,255,255,.52);border-radius:999px;background:rgba(255,255,255,.36);font-size:10px;color:rgba(38,43,51,.74);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
-.phone-location{display:none}
-.phone-notices{margin-top:0;padding:10px;border:1px solid rgba(255,255,255,.62);border-radius:22px;background:rgba(255,255,255,.43);box-shadow:0 8px 26px rgba(50,57,67,.08);backdrop-filter:blur(24px) saturate(145%);-webkit-backdrop-filter:blur(24px) saturate(145%)}
+.phone-device--ios .phone-location{display:none}
+.phone-device--ios .phone-notices{margin-top:0;padding:10px;border:1px solid rgba(255,255,255,.62);border-radius:22px;background:rgba(255,255,255,.43);box-shadow:0 8px 26px rgba(50,57,67,.08);backdrop-filter:blur(24px) saturate(145%);-webkit-backdrop-filter:blur(24px) saturate(145%)}
 .phone-notice-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 3px 9px}
 .phone-notice-heading strong{font-size:14px;font-weight:750;color:#292e36}
 .phone-notice-heading span{font-size:9px;color:rgba(48,54,63,.55)}
-.phone-notice-list{display:flex;flex-direction:column;gap:7px;padding:0}
+.phone-device--ios .phone-notice-list{display:flex;flex-direction:column;gap:7px;padding:0}
 .phone-notification-card{display:flex;align-items:flex-start;gap:9px;padding:10px;border:1px solid rgba(255,255,255,.7);border-radius:15px;background:rgba(255,255,255,.68);box-shadow:0 2px 8px rgba(49,56,66,.045);color:#292e36}
 .phone-app-icon{display:flex;align-items:center;justify-content:center;flex:0 0 29px;width:29px;height:29px;border-radius:9px;background:linear-gradient(145deg,#858d98,#626b77);color:white;font-size:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.42)}
 .phone-notification-copy{flex:1;min-width:0}
@@ -397,8 +397,8 @@ body:not(.encounter-mode-active) .composer {
 .phone-memory-warning{margin:0 0 8px;padding:8px 10px;border:1px solid rgba(137,143,151,.2);border-radius:12px;background:rgba(220,224,229,.62);font-size:9px;line-height:1.5;color:#4b525c}
 .phone-memory-caption{margin:8px 4px 0;font-size:8px;line-height:1.5;text-align:center;color:rgba(48,54,63,.52)}
 .phone-home-indicator{width:92px;height:4px;flex:0 0 4px;margin:10px auto 0;border-radius:999px;background:rgba(37,43,51,.62)}
-.phone-close-row{margin-top:8px}
-.phone-close-row button{border-color:rgba(255,255,255,.72);background:rgba(255,255,255,.56);color:#303640;padding:7px 22px;font-size:10px}
-.phone-story-event{border:0;padding:0}
-.phone-warning{border-color:rgba(137,143,151,.28);background:rgba(255,255,255,.5)}
-@media(max-width:420px){.phone-modal-backdrop{padding:8px}.phone-device{height:min(720px,92dvh);min-height:min(480px,92dvh);padding:11px 12px 8px;border-radius:29px}.phone-lockscreen{min-height:145px}.phone-lockscreen-clock{font-size:58px}}
+.phone-device--ios .phone-close-row{margin-top:8px}
+.phone-device--ios .phone-close-row button{border-color:rgba(255,255,255,.72);background:rgba(255,255,255,.56);color:#303640;padding:7px 22px;font-size:10px}
+.phone-device--ios .phone-story-event{border:0;padding:0}
+.phone-device--ios .phone-warning{border-color:rgba(137,143,151,.28);background:rgba(255,255,255,.5)}
+@media(max-width:420px){.phone-device.phone-device--ios{height:min(720px,92dvh);min-height:min(480px,92dvh);padding:11px 12px 8px;border-radius:29px}.phone-lockscreen{min-height:145px}.phone-lockscreen-clock{font-size:58px}}

@@ -8261,7 +8261,7 @@ async function renderPhoneModal() {
   const [storyDateDisplay,storyClockDisplay]=String(storyTimeLabel).split('　');
   const phoneClock=storyClockDisplay||'--:--';
   const modal=document.createElement('div');modal.className='phone-modal-backdrop';modal.setAttribute('role','presentation');
-  modal.innerHTML='<section class="phone-device" role="dialog" aria-modal="true" aria-label="'+e(title)+'">'+
+  modal.innerHTML='<section class="phone-device phone-device--ios" role="dialog" aria-modal="true" aria-label="'+e(title)+'">'+
     '<div class="phone-statusbar"><span>'+e(phoneClock)+'</span><span class="phone-status-icons" aria-label="行動網路與電量"><i></i><i></i><i></i><span>⌁</span><span class="phone-battery" style="color:'+batteryColor+'" aria-label="'+(battery===null?'回憶容量暫時無法讀取':'剩餘回憶容量 '+battery+'%')+'"><span>'+(battery===null?'--':battery+'%')+'</span><span class="phone-battery-shape"><span class="phone-battery-fill" style="display:block;width:'+(battery===null?0:battery)+'%"></span></span></span></span></div>'+
     '<div class="phone-device-head"><span>'+e(title)+'</span><span class="phone-device-caption">STORY PHONE</span></div>'+memberSwitch+
     '<div class="phone-content"><div class="phone-lockscreen"><div class="phone-lockscreen-date">'+e(storyDateDisplay||'故事時間')+'</div><div class="phone-lockscreen-clock">'+e(phoneClock)+'</div><div class="phone-lockscreen-location">⌖　'+e(storyLocationLabel)+'</div></div>'+
