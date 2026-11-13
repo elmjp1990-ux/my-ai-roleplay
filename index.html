@@ -8014,7 +8014,7 @@ async function renderPhoneModal() {
   // Story phone events are fetched through the owner-checked RPC; never read the event table directly.
   let storyPhoneEvents=[];
   let storyPhoneStates=[];
-  let storyMemorySummaries=[];
+  let storyMemorySummaries=null;
   let storyWorldState=!isGroup&&session.storyWorldState&&typeof session.storyWorldState==='object'?session.storyWorldState:{};
   let storyPhoneEventsError='';
   let storyMemorySummaryError='';
@@ -8029,7 +8029,7 @@ async function renderPhoneModal() {
       if(cacheIsFresh){
         storyPhoneEvents=Array.isArray(cached.events)?cached.events:[];
         storyPhoneStates=Array.isArray(cached.states)?cached.states:[];
-        storyMemorySummaries=Array.isArray(cached.summaries)?cached.summaries:[];
+        storyMemorySummaries=Array.isArray(cached.summaries)?cached.summaries:null;
         storyMemorySummaryError=String(cached.summaryError||'');
         if(cached.worldState&&typeof cached.worldState==='object')storyWorldState=cached.worldState;
       }else{
@@ -8039,12 +8039,12 @@ async function renderPhoneModal() {
           client.rpc('get_story_world_state',{p_session_id:session.id}),
           client.rpc('get_story_memory_summaries',{p_session_id:session.id})
         ]);
+        // Read the diary summary result first so a phone-event error cannot turn a valid diary into a false 100% battery.
+        storyMemorySummaryError=summaryResult.error?String(summaryResult.error.message||'讀取 AI 回憶摘要失敗'):'';
+        storyMemorySummaries=summaryResult.error?[]:(Array.isArray(summaryResult.data)?summaryResult.data:[]);
         if(eventsResult.error)throw eventsResult.error;
         if(stateResult.error)throw stateResult.error;
         if(worldStateResult.error)throw worldStateResult.error;
-        // Summary retrieval is independent: a summary failure must not hide phone notifications.
-        storyMemorySummaryError=summaryResult.error?String(summaryResult.error.message||'讀取 AI 回憶摘要失敗'):'';
-        storyMemorySummaries=summaryResult.error?[]:(Array.isArray(summaryResult.data)?summaryResult.data:[]);
         storyPhoneEvents=Array.isArray(eventsResult.data)?eventsResult.data:[];
         storyPhoneStates=Array.isArray(stateResult.data)?stateResult.data:[];
         if(worldStateResult.data&&typeof worldStateResult.data==='object'){
@@ -8059,7 +8059,20 @@ async function renderPhoneModal() {
       }
     }catch(error){
       storyPhoneEventsError=String(error?.message||'讀取故事手機通知失敗');
+      if(storyMemorySummaries===null)storyMemorySummaryError=String(error?.message||'讀取 AI 回憶摘要失敗');
       console.warn('讀取 Story 手機狀態／事件失敗：',storyPhoneEventsError);
+    }
+    if(storyMemorySummaries===null&&!storyMemorySummaryError){
+      try{
+        const {data,error}=await client.rpc('get_story_memory_summaries',{p_session_id:session.id});
+        if(error)throw error;
+        storyMemorySummaries=Array.isArray(data)?data:[];
+        const cacheKey=String(uid)+':'+session.id;
+        const cached=storyPhoneRuntimeCache.get(cacheKey);
+        if(cached)storyPhoneRuntimeCache.set(cacheKey,{...cached,summaries:storyMemorySummaries,summaryError:''});
+      }catch(error){
+        storyMemorySummaryError=String(error?.message||'讀取 AI 回憶摘要失敗');
+      }
     }
   }
   // The author's configured phone fields are the primary rows in the single
@@ -8075,9 +8088,9 @@ async function renderPhoneModal() {
   // Group sweet-diary excerpts are stored per group in localStorage, so use that same shared diary for every member phone's battery.
   const diaryList=isGroup?loadGroupDiaryMemories(group.id):(session.memories||[]);
   const usesCloudStoryMemory=!isGroup&&session.storyMode&&session.cloudOwned;
-  const storySummaryChars=storyMemorySummaries.reduce((total,item)=>total+countChars(item.summary||''),0);
+  const storySummaryChars=Array.isArray(storyMemorySummaries)?storyMemorySummaries.reduce((total,item)=>total+countChars(item.summary||''),0):0;
   const diaryChars=usesCloudStoryMemory
-    ?(storyMemorySummaryError?null:storySummaryChars)
+    ?(storyMemorySummaryError||!Array.isArray(storyMemorySummaries)?null:storySummaryChars)
     :(Array.isArray(diaryList)?(isGroup?diaryList.reduce((n,item)=>n+countChars(typeof item==='string'?item:(item.text||'')),0):memorySize(diaryList)):0);
   const capacity=10000,battery=diaryChars===null?null:Math.max(0,Math.min(100,Math.round((1-Math.min(diaryChars,capacity)/capacity)*100))),warning=battery!==null&&battery<=20,batteryColor=battery===null?'#9ca3af':warning?'#8d9299':'#c1c5cb';
   const initialStoryTime=Number(session.startedAt||session.initialOpeningMessage?.at)||Date.now();
