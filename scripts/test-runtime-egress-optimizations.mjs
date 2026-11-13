@@ -31,7 +31,7 @@ assert.doesNotMatch(groupOpen,/void groupLoadList\(true\)/,
 
 assert.match(groupOpen,/\.order\('created_at',\{ascending:false\}\).*\.limit\(50\)/,
   "opening a group must fetch only the newest bounded page in reverse chronological query order");
-assert.match(groupOpen,/historyCursor=initialMessageRows\[0\]/,
+assert.match(groupOpen,/oldestInitialMessage=initialMessageRows\.at\(-1\)/,
   "the first page must retain a stable cursor at its oldest fetched row");
 const groupHistory=between("async function groupLoadOlderMessages()","async function openGroupBackgroundSettings");
 assert.match(groupHistory,/\.or\(olderFilter\)/,
