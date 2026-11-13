@@ -12,6 +12,8 @@ on:
       - "followed-authors.js"
       - "author-profile.js"
       - "comment-renderer.js"
+      - "custom-tag-picker.js"
+      - "scripts/test-custom-tag-picker-module.mjs"
       - "scripts/test-comment-renderer-module.mjs"
       - "scripts/test-author-profile-module.mjs"
       - "scripts/test-followed-authors-module.mjs"
@@ -54,6 +56,10 @@ jobs:
         run: node --check author-profile.js
       - name: Parse extracted comment renderer module
         run: node --check comment-renderer.js
+      - name: Parse extracted custom tag picker module
+        run: node --check custom-tag-picker.js
+      - name: Verify extracted custom tag picker module contract
+        run: node scripts/test-custom-tag-picker-module.mjs
       - name: Verify extracted comment renderer module contract
         run: node scripts/test-comment-renderer-module.mjs
       - name: Verify extracted author profile module contract
