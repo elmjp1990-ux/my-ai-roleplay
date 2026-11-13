@@ -19,6 +19,8 @@
   document.querySelectorAll('#cityMapPeople').forEach(modal=>modal.remove());
   document.body.classList.remove('city-location-active');
   document.body.classList.add('city-map-mode');
+  // The early document boot class is no longer needed once the real map is mounted.
+  document.documentElement.classList.remove('city-map-boot');
   const view=$('view');
   view.innerHTML=`
     <section class="city-map-stage" id="cityMapStage" aria-label="POYOZZ 城市地圖">
