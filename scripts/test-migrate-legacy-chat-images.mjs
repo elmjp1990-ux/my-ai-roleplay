@@ -208,5 +208,9 @@ test("historical image Storage reads are restricted to the exact owned chat snap
   assert.match(migration, /s\.character_snapshot->>'imagePath' = p_object_name/);
   assert.match(migration, /split_part\(p_object_name, '\/', 1\) = c\.author_id::text/);
   assert.match(migration, /split_part\(p_object_name, '\/', 2\) = s\.character_id::text/);
+  assert.match(migration, /\[\.\]\(jpg\|jpeg\|png\|webp\)\
+/);
+  assert.equal((migration.match(/\$function\$/g) || []).length, 2);
+  assert.equal((migration.match(/COMMENT ON FUNCTION/g) || []).length, 1);
   assert.doesNotMatch(migration, /TO anon|TO public|FOR INSERT|FOR UPDATE|FOR DELETE/i);
 });
