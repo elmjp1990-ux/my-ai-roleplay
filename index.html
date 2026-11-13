@@ -471,8 +471,10 @@ main { max-width:1500px; margin:auto; padding:25px; }
 /* Chat */
 /* 單人對話使用完整視窗高度，不顯示全站標頭（頁名／測試環境／錢包／帳號）。 */
 body.conversation .app > header { display:none !important; }
+body.conversation .sidebar { display:none!important; }
+body.conversation .app { margin-left:0!important; }
 body.conversation main { max-width:none; height:100dvh; padding:0; }
-body.conversation .chat-layout { height:100dvh; grid-template-columns:1fr; gap:0; }
+body.conversation .chat-layout { height:100dvh; }
 body.chat-page main { max-width:none; padding:12px; }
 body.group-chat-page .app > header,body.group-chat-page .mobile-nav { display:none !important; }
 body.group-chat-page .sidebar { display:none!important; }
@@ -480,7 +482,7 @@ body.group-chat-page .app { margin-left:0!important; }
 body.group-chat-page:has(.group-wizard) .sidebar { display:none !important; }
 body.group-chat-page:has(.group-wizard) .app { margin-left:0; }
 body.group-chat-page main { max-width:none; height:100dvh; min-height:0; padding:0; overflow:hidden; }
-body.group-chat-page .chat-layout { height:100dvh; grid-template-columns:1fr; gap:0; }
+body.group-chat-page .chat-layout { height:100dvh; }
 body.group-chat-page .chat-main { height:100%; border:0; border-radius:0; }
 body.group-chat-page .chat-heading { padding-top:calc(8px + env(safe-area-inset-top)); }
 body.group-chat-page .messages { padding:12px 12px; }
