@@ -104,7 +104,7 @@ export function buildMigrationPlan({ characters, sessions, strictCounts = true }
         sessionId: session.id,
         characterId: session.character_id,
         sourceSha256: parsedSnapshot.sha256,
-        nextSnapshot: { ...snapshot, image: "", imagePath: "" },
+        nextSnapshot: { ...snapshot, image: "" },
       });
     }
   }
