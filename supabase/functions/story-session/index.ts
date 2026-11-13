@@ -113,6 +113,15 @@ Deno.serve(async (request: Request) => {
   if (characterError) return json({ error: "character_lookup_failed" }, 503);
   if (!character) return json({ error: "character_unavailable_for_story" }, 403);
 
+  // Prefer a stable private Storage path over embedding image bytes in every chat snapshot.
+  const { data: primaryIllustration, error: illustrationError } = await admin
+    .from("character_illustrations")
+    .select("storage_path")
+    .eq("character_id", character.id)
+    .eq("asset_type", "primary")
+    .maybeSingle();
+  if (illustrationError) return json({ error: "character_illustration_lookup_failed" }, 503);
+
   // The opening line lives in character_stories, not characters. Read it on the
   // trusted server so a newly-created Story snapshot never depends on stale client
   // hydration (and so the opening can be persisted with the Story session).
@@ -135,7 +144,8 @@ Deno.serve(async (request: Request) => {
     title: character.title || "",
     gender: character.gender || "ambiguous",
     age: character.age ?? "",
-    image: character.avatar_url || "",
+    image: primaryIllustration?.storage_path ? "" : (character.avatar_url || ""),
+    imagePath: primaryIllustration?.storage_path || "",
     intro: character.intro || "",
     opening: openingMessage,
     race: character.race || "",
