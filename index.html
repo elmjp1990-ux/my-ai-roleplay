@@ -6801,7 +6801,7 @@ ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
     if(anchor){
       const restore=()=>{if(groupMessages.isConnected)groupMessages.scrollTop=anchor.scrollTop+(groupMessages.scrollHeight-anchor.scrollHeight);};
       requestAnimationFrame(restore);
-    }else{
+    }else if(!g.searchJump){
       const scrollToLatest=()=>{if(groupMessages.isConnected) groupMessages.scrollTop=groupMessages.scrollHeight;};
       requestAnimationFrame(()=>{scrollToLatest();requestAnimationFrame(scrollToLatest);});
       setTimeout(scrollToLatest,80);
@@ -8004,7 +8004,7 @@ async function runChatMessageSearch(query,append=false){
       rows=(groupPrototype.messages||[]).filter(r=>String(r.content||'').toLocaleLowerCase().includes(q.toLocaleLowerCase())).slice().reverse().slice(offset,offset+CHAT_SEARCH_PAGE_SIZE)
         .map(r=>({id:r.id,query:q,content:r.content,speaker:r.speaker||'角色',stamp:r.createdAt||''}));
     }
-    if(request!==chatMessageSearchState.request||currentChatSearchContext()?.id!==ctx.id)return;
+    if(request!==chatMessageSearchState.request||currentChatSearchContext()?.id!==ctx.id||$('chatMessageSearchInput')?.value.trim()!==q)return;
     chatMessageSearchState.rows=append?[...chatMessageSearchState.rows,...rows]:rows;
     chatMessageSearchState.offset=chatMessageSearchState.rows.length;
     node.innerHTML=renderChatMessageSearchResults(chatMessageSearchState.rows,'',rows.length===CHAT_SEARCH_PAGE_SIZE);
@@ -11199,6 +11199,8 @@ document.addEventListener('input',event => {
   }
   if(target.id==='chatMessageSearchInput'){
     if(chatMessageSearchState.timer)clearTimeout(chatMessageSearchState.timer);
+    chatMessageSearchState.request++;
+    chatMessageSearchState.loading=false;
     const query=target.value;
     chatMessageSearchState.timer=setTimeout(()=>void runChatMessageSearch(query,false),280);
   }
