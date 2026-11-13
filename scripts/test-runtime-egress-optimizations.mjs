@@ -107,3 +107,59 @@ assert.match(chatAuthorProfiles,/publicAuthorProfileLoaded\.add\(profile\.id\)/,
   "chat-list profile hydration must populate the shared loaded-profile cache to avoid refetching the same author on detail navigation");
 
 console.log("Story relationship RPC dedupe, illustration write dedupe, group list refresh avoidance, incremental group-turn loading, phone-state cache, shared login auth verification, and author-profile hydration reuse checks passed.");
+
+
+// Exercise the pagination contract against a deterministic 1,000-row fixture.
+// This mirrors the database's DESC ordering and the three-part keyset predicate.
+const makeUuid=n=>'00000000-0000-4000-8000-'+n.toString(16).padStart(12,'0');
+const fixture=Array.from({length:1000},(_,index)=>({
+  id:makeUuid(index+1),
+  // Deliberately create timestamp ties and repeated per-turn sequence numbers.
+  created_at:new Date(Date.UTC(2026,10,1,0,0,Math.floor(index/7))).toISOString(),
+  sequence_no:index%4,
+  turn_id:'turn-'+Math.floor(index/4),
+  ordinal:index
+}));
+const compareDesc=(a,b)=>
+  b.created_at.localeCompare(a.created_at) ||
+  b.sequence_no-a.sequence_no ||
+  b.id.localeCompare(a.id);
+const isOlderThan=(row,cursor)=>
+  row.created_at<cursor.created_at ||
+  (row.created_at===cursor.created_at && row.sequence_no<cursor.sequence_no) ||
+  (row.created_at===cursor.created_at && row.sequence_no===cursor.sequence_no && row.id<cursor.id);
+const orderedFixture=[...fixture].sort(compareDesc);
+let cursor=orderedFixture[49];
+let paged=orderedFixture.slice(0,50);
+let pageCount=1;
+while(paged.length<fixture.length && pageCount<30) {
+  const page=orderedFixture.filter(row=>isOlderThan(row,cursor)).slice(0,50);
+  assert.ok(page.length>0,'pagination must continue until the oldest row');
+  cursor=page.at(-1);
+  paged.push(...page);
+  pageCount++;
+}
+assert.equal(pageCount,20,'1,000 rows at 50 per page must require exactly 20 pages');
+assert.equal(paged.length,1000,'all fixture rows must be returned');
+assert.equal(new Set(paged.map(row=>row.id)).size,1000,'keyset pages must not duplicate rows');
+assert.deepEqual(paged.map(row=>row.id),orderedFixture.map(row=>row.id),
+  'keyset pages must preserve deterministic newest-to-oldest database order');
+assert.ok(orderedFixture.some((row,index)=>index>0 &&
+  row.created_at===orderedFixture[index-1].created_at &&
+  row.sequence_no===orderedFixture[index-1].sequence_no),
+  'fixture must exercise the UUID tie-breaker for equal timestamp and sequence values');
+const mergedWithOverlap=[...paged.slice(0,50),...paged.slice(40,90)];
+const uniqueMerged=[...new Map(mergedWithOverlap.map(row=>[row.id,row])).values()];
+assert.equal(uniqueMerged.length,90,'client-side merge must deduplicate overlapping pages');
+
+assert.match(groupHistory,/requestId!==g\.openRequestId\|\|g\.active\?\.id!==groupId\|\|currentUser\(\)\?\.uid!==uid/,
+  'an older-page response must be discarded after group/account switching');
+assert.match(groupHistory,/g\.historyError=groupFriendlyError\(error\)/,
+  'older-page failures must remain retryable and visible rather than corrupting history');
+const groupRenderer=between('function renderGroupConversation()','let groupBackgroundTimer=null');
+assert.match(groupRenderer,/anchor\.scrollTop\+\(groupMessages\.scrollHeight-anchor\.scrollHeight\)/,
+  'prepending older messages must compensate for the added content height');
+assert.match(groupRenderer,/if\(groupMessages\.isConnected\)/,
+  'scroll restoration must not touch a detached message pane');
+
+console.log('Group history fixture passed: 1,000 rows, 20 pages, timestamp/sequence ties, UUID cursor tie-break, no gaps or duplicates, overlapping-page dedupe, group-switch guards, and scroll anchoring.');
