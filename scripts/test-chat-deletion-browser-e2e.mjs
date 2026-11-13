@@ -62,7 +62,7 @@ const extractFunction = (source, signature) => {
 
 const coreUtilsSource = fs.readFileSync("core-utils.js", "utf8");
 const extractUuidFunction = () => {
-  assert.ok(coreUtilsSource.includes("window.PoyozzCoreUtils"),
+  assert.ok(/(?:global|window)\.PoyozzCoreUtils\s*=/.test(coreUtilsSource),
     "Missing shared core utilities module");
   return extractFunction(coreUtilsSource, "function isUuid(value)");
 };
