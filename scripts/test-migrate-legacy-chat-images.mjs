@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildMigrationPlan, parseImageDataUri } from "./migrate-legacy-chat-images.mjs";
 import { applyLegacyImageMigration, createResumableManifest, hashJson } from "./legacy-image-migration-runner.mjs";
-import { assertLocalSupabaseUrl } from "./apply-legacy-chat-image-migration-local.mjs";
+import { assertLocalSupabaseUrl } from "./apply-legacy-chat-image-migration-local.mjs";\nimport { readFileSync } from "node:fs";
 
 const uuid = n => `00000000-0000-4000-8000-${String(n).padStart(12,"0")}`;
 const data = (text, mime="image/png") => `data:${mime};base64,${Buffer.from(text).toString("base64")}`;
@@ -195,4 +195,14 @@ test("apply target is restricted to loopback Supabase on port 54321", () => {
   assert.throws(() => assertLocalSupabaseUrl("https://ouyewoagbmtqehbofrje.supabase.co"), /restricted to/);
   assert.throws(() => assertLocalSupabaseUrl("http://127.0.0.1:54322"), /restricted to/);
   assert.throws(() => assertLocalSupabaseUrl("http://localhost.evil.example:54321"), /restricted to/);
+});
+
+test("historical image Storage reads are restricted to the exact owned chat snapshot path", () => {
+  const migration = readFileSync(new URL("../supabase/migrations/20261113060000_allow_chat_snapshot_image_storage_reads.sql", import.meta.url), "utf8");
+  assert.match(migration, /s\.user_id = auth\.uid\(\)/);
+  assert.match(migration, /s\.deleted_at IS NULL/);
+  assert.match(migration, /s\.character_snapshot->>'imagePath' = p_object_name/);
+  assert.match(migration, /split_part\(p_object_name, '\/', 1\) = c\.author_id::text/);
+  assert.match(migration, /split_part\(p_object_name, '\/', 2\) = s\.character_id::text/);
+  assert.doesNotMatch(migration, /TO anon|TO public|FOR INSERT|FOR UPDATE|FOR DELETE/i);
 });
