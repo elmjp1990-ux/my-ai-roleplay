@@ -74,7 +74,8 @@ jobs:
           sed 's/^project_id = .*/project_id = "poyozz-legacy-image-migration"/' \
             supabase/config.toml > "$local_project/supabase/config.toml"
           cd "$local_project"
-          supabase db start
+          # Start the full stack: the integration job needs both PostgreSQL and Storage/Auth API.
+          supabase start
           status="$(supabase status --output env)"
           db_url="$(printf '%s\n' "$status" | sed -n 's/^DB_URL=//p' | sed 's/^"//;s/"$//')"
           service_key="$(printf '%s\n' "$status" | sed -n 's/^SERVICE_ROLE_KEY=//p' | sed 's/^"//;s/"$//')"
