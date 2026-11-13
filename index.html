@@ -3956,7 +3956,9 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
         const suggestionHost=$('conversationSuggestions');
         if(suggestionHost)suggestionHost.innerHTML=conversationSuggestionsHTML(session);
       }
-      if(older&&$('messages'))requestAnimationFrame(()=>restoreChatScrollAnchor($('messages'),previousAnchor));
+      if(older&&$('messages'))requestAnimationFrame(()=>{
+        if(route.page==='conversation'&&route.id===sessionId&&state.sessions?.[sessionId]===session)restoreChatScrollAnchor($('messages'),previousAnchor);
+      });
     }
     return true;
   }catch(error){
@@ -6809,7 +6811,7 @@ ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
     const anchor=g.historyScrollAnchor;
     g.historyScrollAnchor=null;
     if(anchor){
-      const restore=()=>{if(groupMessages.isConnected)restoreChatScrollAnchor(groupMessages,anchor);};
+      const restore=()=>{if(groupMessages.isConnected&&route.page==='group'&&route.id===group.id&&groupPrototype.active?.id===group.id)restoreChatScrollAnchor(groupMessages,anchor);};
       requestAnimationFrame(restore);
     }else if(!g.searchJump){
       const scrollToLatest=()=>{if(groupMessages.isConnected) groupMessages.scrollTop=groupMessages.scrollHeight;};
