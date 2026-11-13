@@ -78,3 +78,27 @@ on conflict (id) do update set
   public = excluded.public,
   file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
+
+
+-- A deleted chat is retained by the application for its retention window,
+-- but it must not be migrated into a readable private Storage snapshot path.
+insert into public.chat_sessions (
+  id, user_id, character_id, character_name, status,
+  character_snapshot, session_data, chat_mode, deleted_at
+)
+select
+  '50000000-0000-4000-8000-000000000001'::uuid,
+  '10000000-0000-4000-8000-000000000001'::uuid,
+  c.id,
+  c.name,
+  'active',
+  jsonb_build_object(
+    'id', c.id, 'name', c.name,
+    'image', 'data:image/png;base64,' || encode(convert_to('deleted-session-image', 'UTF8'), 'base64'),
+    'opening', 'deleted-snapshot-must-remain-untouched'
+  ),
+  '{}'::jsonb,
+  'story',
+  now()
+from public.characters c
+where right(c.id::text, 12)::integer = 1;
