@@ -52,10 +52,12 @@ export function validateMigrationManifest(manifest) {
       throw new Error(`Invalid migration manifest: ${key} must be ${expected}`);
     }
   }
-  if (!Array.isArray(manifest.assets) || manifest.assets.length !== EXPECTED_COUNTS.primaryImages ||
+  if (!Number.isSafeInteger(manifest.counts.historicalAssets) || manifest.counts.historicalAssets < 1 ||
+      !Array.isArray(manifest.historicalAssets) || manifest.historicalAssets.length !== manifest.counts.historicalAssets ||
+      !Array.isArray(manifest.assets) || manifest.assets.length !== EXPECTED_COUNTS.primaryImages ||
       !Array.isArray(manifest.currentSnapshots) || manifest.currentSnapshots.length !== EXPECTED_COUNTS.currentSnapshots ||
       !Array.isArray(manifest.historicalSnapshots) || manifest.historicalSnapshots.length !== EXPECTED_COUNTS.historicalSnapshots) {
-    throw new Error("Invalid migration manifest: item counts do not match the approved 8/74/13 inventory");
+    throw new Error("Invalid migration manifest: item counts do not match the approved 8/74/13 inventory and historical asset inventory");
   }
 
   const assetsByCharacter = new Map();
@@ -89,6 +91,30 @@ export function validateMigrationManifest(manifest) {
     storagePaths.add(asset.storagePath);
   }
 
+  const historicalAssetsByPath = new Map();
+  for (const asset of manifest.historicalAssets) {
+    assertPlainObject(asset, "historical asset");
+    if (!UUID.test(asset.characterId || "") || !UUID.test(asset.authorId || "") ||
+        !SHA256.test(asset.sourceSha256 || "") || !Number.isSafeInteger(asset.bytes) || asset.bytes <= 0 ||
+        !["image/jpeg", "image/png", "image/webp"].includes(asset.mimeType) ||
+        !["jpg", "png", "webp"].includes(asset.extension) ||
+        (asset.mimeType === "image/jpeg" ? "jpg" : asset.mimeType.split("/")[1]) !== asset.extension ||
+        asset.assetType !== "historical" || typeof asset.objectVerified !== "boolean") {
+      throw new Error("Invalid migration manifest: malformed historical asset entry");
+    }
+    const pathParts = typeof asset.storagePath === "string" ? asset.storagePath.split("/") : [];
+    const filename = pathParts[2] || "";
+    const fileId = filename.endsWith("." + asset.extension)
+      ? filename.slice(0, -(asset.extension.length + 1))
+      : "";
+    if (pathParts.length !== 3 || pathParts[0] !== asset.authorId || pathParts[1] !== asset.characterId ||
+        !UUID.test(fileId) || storagePaths.has(asset.storagePath)) {
+      throw new Error("Invalid migration manifest: unsafe or duplicate historical Storage path");
+    }
+    storagePaths.add(asset.storagePath);
+    historicalAssetsByPath.set(asset.storagePath, asset);
+  }
+
   const sessionIds = new Set();
   const validateSnapshot = (item, kind) => {
     assertPlainObject(item, `${kind} snapshot`);
@@ -106,13 +132,19 @@ export function validateMigrationManifest(manifest) {
           item.targetSnapshot.imagePath !== asset.storagePath) {
         throw new Error("Invalid migration manifest: current snapshot does not match its primary asset");
       }
+    } else {
+      const asset = historicalAssetsByPath.get(item.targetSnapshot.imagePath);
+      if (!asset || asset.characterId !== item.characterId || asset.sourceSha256 !== item.expectedImageSha256) {
+        throw new Error("Invalid migration manifest: historical snapshot does not point to its exact preserved image asset");
+      }
     }
     sessionIds.add(item.sessionId);
   };
   for (const item of manifest.currentSnapshots) validateSnapshot(item, "current");
   for (const item of manifest.historicalSnapshots) validateSnapshot(item, "historical");
 
-  const allAssetsVerified = manifest.assets.every(asset => asset.objectVerified && asset.metadataVerified);
+  const allAssetsVerified = manifest.assets.every(asset => asset.objectVerified && asset.metadataVerified) &&
+    manifest.historicalAssets.every(asset => asset.objectVerified);
   const allSnapshotsCompleted = [...manifest.currentSnapshots, ...manifest.historicalSnapshots]
     .every(item => item.completed);
   if (manifest.assets.some(asset => asset.avatarCleared && (!asset.objectVerified || !asset.metadataVerified))) {
@@ -171,6 +203,31 @@ export async function applyLegacyImageMigration({ manifest, adapter, persist = (
     await adapter.ensureMetadata(asset);
     asset.objectVerified = true;
     asset.metadataVerified = true;
+    checkpoint(manifest, persist);
+  }
+
+  for (const asset of manifest.historicalAssets) {
+    if (asset.objectVerified) continue;
+    const sourceItem = manifest.historicalSnapshots.find(item => item.targetSnapshot.imagePath === asset.storagePath);
+    if (!sourceItem) throw new Error(`No historical snapshot references Storage asset: ${asset.storagePath}`);
+    const sourceSession = await adapter.getSession(sourceItem.sessionId);
+    if (!sourceSession || sourceSession.character_id !== asset.characterId) {
+      throw new Error(`Historical image source session changed: ${sourceItem.sessionId}`);
+    }
+    let bytes = null;
+    const image = sourceSession.character_snapshot?.image;
+    if (typeof image === "string" && image.startsWith("data:image/")) {
+      const parsed = adapter.parseDataUri(image);
+      if (!parsed || parsed.sha256 !== asset.sourceSha256 ||
+          parsed.mimeType !== asset.mimeType || parsed.extension !== asset.extension) {
+        throw new Error(`Historical source image changed: ${sourceItem.sessionId}`);
+      }
+      bytes = parsed.bytes;
+    } else if (sourceSession.character_snapshot?.imagePath !== asset.storagePath) {
+      throw new Error(`Historical image bytes are unavailable before upload: ${sourceItem.sessionId}`);
+    }
+    await adapter.ensureObject({ ...asset, bytes });
+    asset.objectVerified = true;
     checkpoint(manifest, persist);
   }
 
@@ -270,6 +327,10 @@ export function createResumableManifest(plan, characters) {
     createdAt: new Date().toISOString(),
     counts: { ...plan.counts },
     assets,
+    historicalAssets: plan.historicalAssets.map(asset => ({
+      ...asset,
+      objectVerified: false,
+    })),
     currentSnapshots: plan.currentSnapshots.map(toItem),
     historicalSnapshots: plan.historicalSnapshots.map(toItem),
   };
