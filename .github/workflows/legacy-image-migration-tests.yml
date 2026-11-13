@@ -12,7 +12,8 @@ on:
       - "supabase/drafts/current-state-*.json"
       - "supabase/drafts/legacy-image-migration-rpcs.sql"
       - "supabase/drafts/seed-legacy-image-migration-local-test.sql"
-      - "supabase/drafts/verify-legacy-image-migration-local-test.sql"\n      - "supabase/migrations/20261113060000_allow_chat_snapshot_image_storage_reads.sql"
+      - "supabase/drafts/verify-legacy-image-migration-local-test.sql"
+      - "supabase/migrations/20261113060000_allow_chat_snapshot_image_storage_reads.sql"
       - ".github/workflows/legacy-image-migration-tests.yml"
   pull_request:
     paths:
@@ -77,8 +78,10 @@ jobs:
           # Start the full stack: the integration job needs both PostgreSQL and Storage/Auth API.
           supabase start
           status="$(supabase status --output env)"
-          db_url="$(printf '%s\n' "$status" | sed -n 's/^DB_URL=//p' | sed 's/^"//;s/"$//')"
-          service_key="$(printf '%s\n' "$status" | sed -n 's/^SERVICE_ROLE_KEY=//p' | sed 's/^"//;s/"$//')"
+          db_url="$(printf '%s
+' "$status" | sed -n 's/^DB_URL=//p' | sed 's/^"//;s/"$//')"
+          service_key="$(printf '%s
+' "$status" | sed -n 's/^SERVICE_ROLE_KEY=//p' | sed 's/^"//;s/"$//')"
           if [[ -z "$db_url" || -z "$service_key" ]]; then
             echo "Could not resolve local Supabase DB_URL or SERVICE_ROLE_KEY."
             exit 1
