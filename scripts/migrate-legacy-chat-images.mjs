@@ -95,6 +95,7 @@ export function buildMigrationPlan({ characters, sessions, strictCounts = true }
         sessionId: session.id,
         characterId,
         sourceSha256: item.parsed.sha256,
+        expectedSnapshot: snapshot,
         storagePath: asset.storagePath,
         nextSnapshot: { ...snapshot, image: "", imagePath: asset.storagePath },
       });
@@ -106,6 +107,7 @@ export function buildMigrationPlan({ characters, sessions, strictCounts = true }
         sessionId: session.id,
         characterId: session.character_id,
         sourceSha256: parsedSnapshot.sha256,
+        expectedSnapshot: snapshot,
         nextSnapshot: { ...snapshot, image: "" },
       });
     }
@@ -171,8 +173,8 @@ async function main() {
   const safePlan = {
     ...plan,
     primaryAssets: plan.primaryAssets.map(({ ...row }) => ({ ...row, bytes: row.bytes })),
-    currentSnapshots: plan.currentSnapshots.map(({ nextSnapshot, ...row }) => row),
-    historicalSnapshots: plan.historicalSnapshots.map(({ nextSnapshot, ...row }) => row),
+    currentSnapshots: plan.currentSnapshots.map(({ nextSnapshot, expectedSnapshot, ...row }) => row),
+    historicalSnapshots: plan.historicalSnapshots.map(({ nextSnapshot, expectedSnapshot, ...row }) => row),
   };
   console.log(JSON.stringify(safePlan, null, 2));
 }
