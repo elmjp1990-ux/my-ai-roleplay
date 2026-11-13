@@ -129,6 +129,8 @@ BEGIN
   IF v_count <> 0 THEN
     RAISE EXCEPTION 'unreferenced object must not be readable, got %', v_count;
   END IF;
+
+  PERFORM pg_catalog.set_config('test.legacy_image_historical_path', v_historical_path, true);
 END;
 $storage_owner_assert$;
 
@@ -142,10 +144,7 @@ SELECT pg_catalog.set_config(
 
 DO $storage_outsider_assert$
 DECLARE
-  v_historical_path text :=
-    (SELECT character_snapshot->>'imagePath'
-     FROM public.chat_sessions
-     WHERE id = '40000000-0000-4000-8000-000000000001'::uuid);
+  v_historical_path text := pg_catalog.current_setting('test.legacy_image_historical_path', true);
   v_count integer;
 BEGIN
   SELECT count(*) INTO v_count
