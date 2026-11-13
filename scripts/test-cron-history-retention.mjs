@@ -16,10 +16,11 @@ assert.match(sql, /end_time < clock_timestamp\(\) - interval '7 days'/);
 
 // The maintenance task must not alter application data, job definitions,
 // Storage objects, or use a table rewrite/locking VACUUM FULL.
-assert.doesNotMatch(sql, /DELETE FROM public\./i);
-assert.doesNotMatch(sql, /TRUNCATE\s/i);
-assert.doesNotMatch(sql, /DROP\s+TABLE/i);
-assert.doesNotMatch(sql, /VACUUM\s+FULL/i);
-assert.doesNotMatch(sql, /UPDATE\s+cron\.job\b/i);
+const executableSql = sql.replace(/--.*$/gm, '');
+assert.doesNotMatch(executableSql, /DELETE FROM public\./i);
+assert.doesNotMatch(executableSql, /TRUNCATE\s/i);
+assert.doesNotMatch(executableSql, /DROP\s+TABLE/i);
+assert.doesNotMatch(executableSql, /VACUUM\s+FULL/i);
+assert.doesNotMatch(executableSql, /UPDATE\s+cron\.job\b/i);
 
 console.log('Cron history retention contract passed (7-day retention, named-job replacement, cron metadata only).');
