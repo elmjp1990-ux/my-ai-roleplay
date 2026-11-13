@@ -3957,7 +3957,7 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
         if(suggestionHost)suggestionHost.innerHTML=conversationSuggestionsHTML(session);
       }
       if(older&&$('messages'))requestAnimationFrame(()=>{
-        if(route.page==='conversation'&&route.id===sessionId&&state.sessions?.[sessionId]===session)restoreChatScrollAnchor($('messages'),previousAnchor);
+        if(route.page==='conversation'&&route.id===sessionId&&state.sessions?.[sessionId]===session&&currentUser()?.uid===userId)restoreChatScrollAnchor($('messages'),previousAnchor);
       });
     }
     return true;
@@ -6814,7 +6814,11 @@ ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
       const restore=()=>{if(groupMessages.isConnected&&route.page==='group'&&route.id===group.id&&groupPrototype.active?.id===group.id)restoreChatScrollAnchor(groupMessages,anchor);};
       requestAnimationFrame(restore);
     }else if(!g.searchJump){
-      const scrollToLatest=()=>{if(groupMessages.isConnected) groupMessages.scrollTop=groupMessages.scrollHeight;};
+      const scrollToLatest=()=>{
+        if(groupMessages.isConnected&&route.page==='group'&&route.id===group.id&&groupPrototype.active?.id===group.id&&!groupPrototype.historyLoading&&!groupPrototype.searchJump){
+          groupMessages.scrollTop=groupMessages.scrollHeight;
+        }
+      };
       requestAnimationFrame(()=>{scrollToLatest();requestAnimationFrame(scrollToLatest);});
       setTimeout(scrollToLatest,80);
     }
@@ -7414,7 +7418,11 @@ async function groupSendMock() {
     renderGroupConversation();
     const sendButton=$('view')?.querySelector('[data-action="group-send"]');if(sendButton){sendButton.disabled=false;sendButton.innerHTML=ICON.send;sendButton.setAttribute('aria-label','送出群組訊息');sendButton.title='送出訊息';}
     const messagePane=$('groupMessages');
-    if(messagePane) requestAnimationFrame(()=>{if(messagePane.isConnected) messagePane.scrollTop=messagePane.scrollHeight;});
+    if(messagePane) requestAnimationFrame(()=>{
+      if(messagePane.isConnected&&route.page==='group'&&route.id===activeGroupId&&g.active?.id===activeGroupId){
+        messagePane.scrollTop=messagePane.scrollHeight;
+      }
+    });
   } catch(error) {
     g.sending=false;
     const rawError=String(error?.message||error||'');
@@ -7967,6 +7975,17 @@ function resetChatMessageSearchState(){
   if(chatMessageSearchState.timer)clearTimeout(chatMessageSearchState.timer);
   chatSearchJumpRequest++;
   chatMessageSearchState={key:'',query:'',offset:0,request:chatMessageSearchState.request+1,timer:null,loading:false,rows:[]};
+}
+function refreshOpenChatSearchAfterMutation(kind,id){
+  if(route.chatOverlay!=='search')return;
+  const ctx=currentChatSearchContext();
+  if(!ctx||ctx.kind!==kind||ctx.id!==id)return;
+  const query=String(chatMessageSearchState.query||$('chatMessageSearchInput')?.value||'').trim();
+  if(query.length<2)return;
+  if(chatMessageSearchState.timer)clearTimeout(chatMessageSearchState.timer);
+  chatMessageSearchState.request++;
+  chatMessageSearchState.loading=false;
+  requestAnimationFrame(()=>void runChatMessageSearch(query,false));
 }
 function chatSearchSnippet(value,query){
   const text=String(value||'').replace(/\s+/gu,' ').trim(),q=String(query||'').trim();
@@ -10222,6 +10241,7 @@ document.addEventListener('click',async event => {
         }
         closeModal();
         renderMessages();
+        refreshOpenChatSearchAfterMutation('single',s.id);
         break;
       }
       case 'photo':openModal('photo',{id:key});break;
@@ -11146,6 +11166,7 @@ const {
           break;
         }
         back();renderMessages();
+        refreshOpenChatSearchAfterMutation('single',s.id);
         toast('訊息已更新；未重新生成 AI，也未扣款。');
         break;
       }
@@ -11179,6 +11200,7 @@ const {
         message.content=text;message.edited=true;
         $('modal')?.close();
         renderGroupConversation();
+        refreshOpenChatSearchAfterMutation('group',group.id);
         toast('群組訊息已更新；未重新生成 AI，也未扣款。');
         break;
       }
