@@ -7368,22 +7368,25 @@ async function groupSendMock() {
   }
   if(!g.active?.id) {g.formError='群組尚未保存，請重新開啟群組。';render();return;}
   if(!window.crypto?.randomUUID) {g.formError='此瀏覽器無法產生安全的回合識別碼，請更新瀏覽器後重試。';render();return;}
+  const activeGroup=g.active,activeGroupId=activeGroup.id,requestUid=currentUser()?.uid;
+  if(!requestUid||g.ownerUid!==requestUid){g.formError='群組擁有者驗證失敗，請重新開啟群組。';render();return;}
+  if(!g.pendingRequest || g.pendingRequest.groupId!==activeGroupId || g.pendingRequest.content!==content) {
+    g.pendingRequest={groupId:activeGroupId,content,requestKey:window.crypto.randomUUID()};
+  }
+  const requestKey=g.pendingRequest.requestKey;
   g.sending=true;g.formError='';render();
   try {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
-    if(authError||!user||user.id!==currentUser()?.uid) throw new Error('登入狀態已失效，請重新登入。');
-    if(!g.pendingRequest || g.pendingRequest.groupId!==g.active.id || g.pendingRequest.content!==content) {
-      g.pendingRequest={groupId:g.active.id,content,requestKey:window.crypto.randomUUID()};
-    }
+    if(authError||!user||user.id!==requestUid||currentUser()?.uid!==requestUid) throw new Error('登入狀態已變更，請重新登入。');
     const {data:turnId,error}=await groupWithTimeout(window.mySupabase.rpc('append_chat_group_mock_turn',{
-      p_group_id:g.active.id,p_request_key:g.pendingRequest.requestKey,p_content:content
+      p_group_id:activeGroupId,p_request_key:requestKey,p_content:content
     }),15000,'訊息保存逾時。請重新開啟群組確認訊息是否已保存，再決定是否重試。');
     if(error) throw error;
     if(!turnId) throw new Error('群組回合已保存，但未取得回合識別碼。請重新開啟群組確認訊息。');
-    const activeGroupId=g.active.id;
     // The RPC commits the group turn and wallet debit atomically. Refresh the visible
     // wallet immediately so the header/composer never keeps showing the pre-charge balance.
     await refreshWalletBalance();
+    if(currentUser()?.uid!==requestUid) return;
     // The RPC returns the durable turn ID, including on an idempotent retry.
     // Fetch only this turn's two messages instead of retransmitting the group's full history.
     // Keep the same request key until this narrow read succeeds so retries cannot double-charge.
@@ -7395,7 +7398,7 @@ async function groupSendMock() {
       15000,'訊息已送出，但重新整理本回合訊息逾時。請稍後重新開啟群組確認。'
     );
     if(rowsError) throw rowsError;
-    if(g.active?.id!==activeGroupId) return;
+    if(g.active!==activeGroup||g.active?.id!==activeGroupId||g.ownerUid!==requestUid||currentUser()?.uid!==requestUid) return;
     if(!rows?.length) throw new Error('群組回合已保存，但暫時讀取不到訊息。請稍後重新開啟群組確認。');
     const members=g.active.members||[], scenes=g.active.scenes||[];
     const newMessages=rows.map(m=>{
