@@ -8059,6 +8059,7 @@ async function jumpToChatSearchHit(button){
       const g=ctx.group;if(g.id!==ctx.id||groupPrototype.ownerUid!==uid||readDeletedChatTombstones(uid).groups[g.id])return;
       const {data:t,error:te}=await client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('id',id).eq('group_id',g.id).is('deleted_at',null).maybeSingle();
       if(te)throw te;if(!t)throw Error('這則群組訊息已刪除或無法存取。');
+      if(!isCurrent())return;
       const bf='created_at.lt.'+t.created_at+',and(created_at.eq.'+t.created_at+',sequence_no.lt.'+t.sequence_no+'),and(created_at.eq.'+t.created_at+',sequence_no.eq.'+t.sequence_no+',id.lt.'+t.id+')';
       const af='created_at.gt.'+t.created_at+',and(created_at.eq.'+t.created_at+',sequence_no.gt.'+t.sequence_no+'),and(created_at.eq.'+t.created_at+',sequence_no.eq.'+t.sequence_no+',id.gt.'+t.id+')';
       const [b,a]=await Promise.all([
