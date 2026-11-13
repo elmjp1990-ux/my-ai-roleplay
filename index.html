@@ -7147,6 +7147,7 @@ function renderGroupChatOverlay(kind) {
   const group=groupPrototype.active;
   const panel=$('view').querySelector('.chat-main');
   if(!group||!panel) return;
+  if(kind==='search')resetChatMessageSearchState();
   const lifecycle=window.PoyozzChatRenderLifecycle;
   if(lifecycle&&lifecycle.render('renderGroupOverlay',{kind,group,panel},()=>false).handled)return;
   if(kind==='settings'||kind==='settings-background'||kind==='delete-confirm'){renderChatSettingsOverlay(panel,true,kind);return;}
@@ -7945,6 +7946,10 @@ function addMemory(s,text) {
 
 let chatMessageSearchState={key:'',query:'',offset:0,request:0,timer:null,loading:false,rows:[]};
 const CHAT_SEARCH_PAGE_SIZE=20;
+function resetChatMessageSearchState(){
+  if(chatMessageSearchState.timer)clearTimeout(chatMessageSearchState.timer);
+  chatMessageSearchState={key:'',query:'',offset:0,request:chatMessageSearchState.request+1,timer:null,loading:false,rows:[]};
+}
 function chatSearchSnippet(value,query){
   const text=String(value||'').replace(/\s+/gu,' ').trim(),q=String(query||'').trim();
   const index=text.toLocaleLowerCase().indexOf(q.toLocaleLowerCase());
@@ -8011,6 +8016,11 @@ async function jumpToChatSearchHit(button){
   const ctx=currentChatSearchContext(),id=String(button.dataset.id||'');
   if(!ctx||!id)return;
   $('view').querySelector('.chat-main .chat-overlay')?.remove();
+  if(ctx.kind==='group'&&route.chatOverlay==='search'){
+    const next={...route};delete next.chatOverlay;route=next;
+    const depth=history.state?.personax?history.state.depth:0;
+    history.replaceState({personax:true,depth,route:next},'',routeURL(next));
+  }
   const client=window.mySupabase,uid=currentUser()?.uid;
   if(ctx.kind==='single'&&!ctx.session.cloudOwned){
     const n=[...($('messages')?.querySelectorAll('[data-message]')||[])].find(x=>x.dataset.message===id);
@@ -8282,6 +8292,7 @@ function renderChatOverlay(kind) {
   const s = currentSession();
   const panel = $('view').querySelector('.chat-main');
   if (!s || !panel) return;
+  if(kind==='search')resetChatMessageSearchState();
   const lifecycle = window.PoyozzChatRenderLifecycle;
   if (lifecycle && lifecycle.render('renderSingleOverlay', { kind, session: s, panel }, () => false).handled) return;
   if(kind==='settings'||kind==='settings-background'||kind==='delete-confirm'||kind==='manage-conversation'){renderChatSettingsOverlay(panel,false,kind);return;}
