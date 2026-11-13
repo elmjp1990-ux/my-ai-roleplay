@@ -1,5 +1,14 @@
 import { createHash } from "node:crypto";
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SHA256 = /^[0-9a-f]{64}$/;
+const EXPECTED_COUNTS = Object.freeze({
+  primaryImages: 8,
+  currentSnapshots: 74,
+  historicalSnapshots: 13,
+  totalSnapshotUpdates: 87,
+});
+
 export function stableJson(value) {
   if (Array.isArray(value)) return value.map(stableJson);
   if (value && typeof value === "object") {
@@ -10,6 +19,95 @@ export function stableJson(value) {
 
 export function hashJson(value) {
   return createHash("sha256").update(JSON.stringify(stableJson(value))).digest("hex");
+}
+
+function assertPlainObject(value, label) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`Invalid migration manifest: ${label} must be an object`);
+  }
+}
+
+function containsEmbeddedImageData(value) {
+  if (typeof value === "string") return /^data:image\//i.test(value);
+  if (Array.isArray(value)) return value.some(containsEmbeddedImageData);
+  if (value && typeof value === "object") return Object.values(value).some(containsEmbeddedImageData);
+  return false;
+}
+
+/**
+ * Validate persisted resume state before it can drive any local database or
+ * Storage operation. The manifest is user-editable JSON, so never trust it.
+ */
+export function validateMigrationManifest(manifest) {
+  assertPlainObject(manifest, "root");
+  if (manifest.version !== 1 || !["pending", "running", "complete"].includes(manifest.status)) {
+    throw new Error("Invalid migration manifest: unsupported version or status");
+  }
+  if (containsEmbeddedImageData(manifest)) {
+    throw new Error("Invalid migration manifest: embedded image data is not allowed");
+  }
+  assertPlainObject(manifest.counts, "counts");
+  for (const [key, expected] of Object.entries(EXPECTED_COUNTS)) {
+    if (manifest.counts[key] !== expected) {
+      throw new Error(`Invalid migration manifest: ${key} must be ${expected}`);
+    }
+  }
+  if (!Array.isArray(manifest.assets) || manifest.assets.length !== EXPECTED_COUNTS.primaryImages ||
+      !Array.isArray(manifest.currentSnapshots) || manifest.currentSnapshots.length !== EXPECTED_COUNTS.currentSnapshots ||
+      !Array.isArray(manifest.historicalSnapshots) || manifest.historicalSnapshots.length !== EXPECTED_COUNTS.historicalSnapshots) {
+    throw new Error("Invalid migration manifest: item counts do not match the approved 8/74/13 inventory");
+  }
+
+  const assetsByCharacter = new Map();
+  const storagePaths = new Set();
+  for (const asset of manifest.assets) {
+    assertPlainObject(asset, "asset");
+    if (!UUID.test(asset.characterId || "") || !UUID.test(asset.authorId || "") ||
+        !SHA256.test(asset.sourceSha256 || "") || !SHA256.test(asset.sourceDataUriSha256 || "") ||
+        !Number.isSafeInteger(asset.bytes) || asset.bytes <= 0 ||
+        !["image/jpeg", "image/png", "image/webp"].includes(asset.mimeType) ||
+        !["jpg", "png", "webp"].includes(asset.extension) ||
+        (asset.mimeType === "image/jpeg" ? "jpg" : asset.mimeType.split("/")[1]) !== asset.extension ||
+        asset.assetType !== "primary" || asset.sortOrder !== 0 ||
+        typeof asset.objectVerified !== "boolean" || typeof asset.metadataVerified !== "boolean" ||
+        typeof asset.avatarCleared !== "boolean") {
+      throw new Error("Invalid migration manifest: malformed primary asset entry");
+    }
+    const pathPattern = new RegExp(`^${asset.authorId}/${asset.characterId}/[0-9a-f-]{36}\\.${asset.extension}$`, "i");
+    if (typeof asset.storagePath !== "string" || !pathPattern.test(asset.storagePath) ||
+        asset.storagePath.split("/").length !== 3 || storagePaths.has(asset.storagePath)) {
+      throw new Error("Invalid migration manifest: unsafe or duplicate Storage path");
+    }
+    if (assetsByCharacter.has(asset.characterId)) {
+      throw new Error("Invalid migration manifest: duplicate character asset");
+    }
+    assetsByCharacter.set(asset.characterId, asset);
+    storagePaths.add(asset.storagePath);
+  }
+
+  const sessionIds = new Set();
+  const validateSnapshot = (item, kind) => {
+    assertPlainObject(item, `${kind} snapshot`);
+    assertPlainObject(item.targetSnapshot, `${kind} targetSnapshot`);
+    if (!UUID.test(item.sessionId || "") || !UUID.test(item.characterId || "") ||
+        !SHA256.test(item.expectedSnapshotHash || "") || !SHA256.test(item.targetSnapshotHash || "") ||
+        !SHA256.test(item.expectedImageSha256 || "") || item.targetSnapshot.image !== "" ||
+        item.targetSnapshotHash !== hashJson(item.targetSnapshot) ||
+        typeof item.completed !== "boolean" || sessionIds.has(item.sessionId)) {
+      throw new Error(`Invalid migration manifest: malformed or duplicate ${kind} snapshot entry`);
+    }
+    if (kind === "current") {
+      const asset = assetsByCharacter.get(item.characterId);
+      if (!asset || item.expectedImageSha256 !== asset.sourceSha256 ||
+          item.targetSnapshot.imagePath !== asset.storagePath) {
+        throw new Error("Invalid migration manifest: current snapshot does not match its primary asset");
+      }
+    }
+    sessionIds.add(item.sessionId);
+  };
+  for (const item of manifest.currentSnapshots) validateSnapshot(item, "current");
+  for (const item of manifest.historicalSnapshots) validateSnapshot(item, "historical");
+  return manifest;
 }
 
 function checkpoint(manifest, persist) {
@@ -23,10 +121,8 @@ function checkpoint(manifest, persist) {
  * a partially completed write succeeded.
  */
 export async function applyLegacyImageMigration({ manifest, adapter, persist = () => {} }) {
-  if (!manifest || manifest.version !== 1 || manifest.status === "complete") {
-    if (manifest?.status === "complete") return manifest;
-    throw new Error("Unsupported or missing migration manifest");
-  }
+  validateMigrationManifest(manifest);
+  if (manifest.status === "complete") return manifest;
   if (!adapter || typeof adapter.ensureObject !== "function" ||
       typeof adapter.ensureMetadata !== "function" ||
       typeof adapter.getSession !== "function" ||
@@ -150,7 +246,7 @@ export function createResumableManifest(plan, characters) {
     expectedImageSha256: item.sourceSha256,
     completed: false,
   });
-  return {
+  const manifest = {
     version: 1,
     status: "pending",
     createdAt: new Date().toISOString(),
@@ -159,4 +255,5 @@ export function createResumableManifest(plan, characters) {
     currentSnapshots: plan.currentSnapshots.map(toItem),
     historicalSnapshots: plan.historicalSnapshots.map(toItem),
   };
+  return validateMigrationManifest(manifest);
 }
