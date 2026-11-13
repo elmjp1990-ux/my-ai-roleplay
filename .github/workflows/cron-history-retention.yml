@@ -1,0 +1,29 @@
+name: Cron history retention contract
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/*cron*history*'
+      - 'scripts/test-cron-history-retention.mjs'
+      - '.github/workflows/cron-history-retention.yml'
+  push:
+    branches:
+      - perf/retain-cron-history-seven-days
+    paths:
+      - 'supabase/migrations/*cron*history*'
+      - 'scripts/test-cron-history-retention.mjs'
+      - '.github/workflows/cron-history-retention.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  cron-history-retention-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify retention policy scope
+        run: node scripts/test-cron-history-retention.mjs
