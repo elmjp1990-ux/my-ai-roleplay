@@ -27,6 +27,7 @@ on:
       - "supabase/drafts/legacy-image-migration-rpcs.sql"
       - "supabase/drafts/seed-legacy-image-migration-local-test.sql"
       - "supabase/drafts/verify-legacy-image-migration-local-test.sql"
+      - "supabase/migrations/20261113050000_allow_existing_chat_character_media_read.sql"
       - "supabase/migrations/20261113060000_allow_chat_snapshot_image_storage_reads.sql"
       - ".github/workflows/legacy-image-migration-tests.yml"
 
