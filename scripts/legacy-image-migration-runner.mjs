@@ -73,7 +73,82 @@ export function validateMigrationManifest(manifest) {
         typeof asset.avatarCleared !== "boolean") {
       throw new Error("Invalid migration manifest: malformed primary asset entry");
     }
-    const pathPattern = new RegExp(`^${asset.authorId}/${asset.characterId}/[0-9a-f-]{36}\\.${asset.extension}$`, "i");
+    const pathPattern = new RegExp(`^${asset.authorId}/${asset.characterId}/${UUID.source.slice(1, -1)}\\.${asset.extension}import { createHash } from "node:crypto";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SHA256 = /^[0-9a-f]{64}$/;
+const EXPECTED_COUNTS = Object.freeze({
+  primaryImages: 8,
+  currentSnapshots: 74,
+  historicalSnapshots: 13,
+  totalSnapshotUpdates: 87,
+});
+
+export function stableJson(value) {
+  if (Array.isArray(value)) return value.map(stableJson);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.keys(value).sort().map(key => [key, stableJson(value[key])]));
+  }
+  return value;
+}
+
+export function hashJson(value) {
+  return createHash("sha256").update(JSON.stringify(stableJson(value))).digest("hex");
+}
+
+function assertPlainObject(value, label) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`Invalid migration manifest: ${label} must be an object`);
+  }
+}
+
+function containsEmbeddedImageData(value) {
+  if (typeof value === "string") return /^data:image\//i.test(value);
+  if (Array.isArray(value)) return value.some(containsEmbeddedImageData);
+  if (value && typeof value === "object") return Object.values(value).some(containsEmbeddedImageData);
+  return false;
+}
+
+/**
+ * Validate persisted resume state before it can drive any local database or
+ * Storage operation. The manifest is user-editable JSON, so never trust it.
+ */
+export function validateMigrationManifest(manifest) {
+  assertPlainObject(manifest, "root");
+  if (manifest.version !== 1 || !["pending", "running", "complete"].includes(manifest.status)) {
+    throw new Error("Invalid migration manifest: unsupported version or status");
+  }
+  if (containsEmbeddedImageData(manifest)) {
+    throw new Error("Invalid migration manifest: embedded image data is not allowed");
+  }
+  assertPlainObject(manifest.counts, "counts");
+  for (const [key, expected] of Object.entries(EXPECTED_COUNTS)) {
+    if (manifest.counts[key] !== expected) {
+      throw new Error(`Invalid migration manifest: ${key} must be ${expected}`);
+    }
+  }
+  if (!Array.isArray(manifest.assets) || manifest.assets.length !== EXPECTED_COUNTS.primaryImages ||
+      !Array.isArray(manifest.currentSnapshots) || manifest.currentSnapshots.length !== EXPECTED_COUNTS.currentSnapshots ||
+      !Array.isArray(manifest.historicalSnapshots) || manifest.historicalSnapshots.length !== EXPECTED_COUNTS.historicalSnapshots) {
+    throw new Error("Invalid migration manifest: item counts do not match the approved 8/74/13 inventory");
+  }
+
+  const assetsByCharacter = new Map();
+  const storagePaths = new Set();
+  for (const asset of manifest.assets) {
+    assertPlainObject(asset, "asset");
+    if (!UUID.test(asset.characterId || "") || !UUID.test(asset.authorId || "") ||
+        !SHA256.test(asset.sourceSha256 || "") || !SHA256.test(asset.sourceDataUriSha256 || "") ||
+        !Number.isSafeInteger(asset.bytes) || asset.bytes <= 0 ||
+        !["image/jpeg", "image/png", "image/webp"].includes(asset.mimeType) ||
+        !["jpg", "png", "webp"].includes(asset.extension) ||
+        (asset.mimeType === "image/jpeg" ? "jpg" : asset.mimeType.split("/")[1]) !== asset.extension ||
+        asset.assetType !== "primary" || asset.sortOrder !== 0 ||
+        typeof asset.objectVerified !== "boolean" || typeof asset.metadataVerified !== "boolean" ||
+        typeof asset.avatarCleared !== "boolean") {
+      throw new Error("Invalid migration manifest: malformed primary asset entry");
+    }
+    , "i");
     if (typeof asset.storagePath !== "string" || !pathPattern.test(asset.storagePath) ||
         asset.storagePath.split("/").length !== 3 || storagePaths.has(asset.storagePath)) {
       throw new Error("Invalid migration manifest: unsafe or duplicate Storage path");
@@ -241,7 +316,7 @@ export function createResumableManifest(plan, characters) {
     sessionId: item.sessionId,
     characterId: item.characterId,
     expectedSnapshotHash: hashJson(item.expectedSnapshot),
-    targetSnapshot: item.nextSnapshot,
+    targetSnapshot: structuredClone(item.nextSnapshot),
     targetSnapshotHash: hashJson(item.nextSnapshot),
     expectedImageSha256: item.sourceSha256,
     completed: false,
