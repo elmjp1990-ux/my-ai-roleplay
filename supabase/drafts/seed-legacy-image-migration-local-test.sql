@@ -63,11 +63,8 @@ select
   '{}'::jsonb,
   'story'
 from generate_series(1, 13) n
-join lateral (
-  select id, name from public.characters
-  order by id
-  offset ((n - 1) % 8) limit 1
-) c on true;
+join public.characters c
+  on right(c.id::text, 12)::integer = ((n - 1) % 8) + 1;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
