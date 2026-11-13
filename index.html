@@ -426,7 +426,7 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .explore-shortcut.active{border-color:#818cf8a8;background:var(--soft);color:var(--text);box-shadow:inset 0 0 0 1px #818cf822}
 .explore-shortcut:active{transform:scale(.97)}
 .explore-search-row{display:flex;gap:8px;align-items:center}
-.explore-search-row input{min-width:0;flex:1}
+.explore-search-row input{min-width:0;flex:1;box-sizing:border-box}
 .explore-section-heading{display:flex;align-items:end;justify-content:space-between;gap:12px;margin:24px 0 12px}
 .explore-section-heading h2{margin:0;font-size:19px;letter-spacing:-.02em}
 .explore-section-heading p{margin:5px 0 0;font-size:11px;color:var(--muted)}
@@ -759,7 +759,15 @@ dialog {
 }
 dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 .modal-heading { margin-bottom:20px; }
-.modal-heading h2 { margin:0; }
+ .modal-heading h2 { margin:0; }
+.modal-close-button{
+  display:grid;place-items:center;flex:0 0 48px;
+  width:48px;height:48px;min-width:48px;min-height:48px;
+  margin:-6px -6px -6px 8px;padding:0;
+  border:1px solid var(--border);border-radius:50%;
+  font-size:20px;line-height:1;touch-action:manipulation;
+  position:relative;z-index:2;
+}
 .profile-account-header { position:relative; display:flex; align-items:center; justify-content:space-between; gap:8px; padding-top:4px; }
 .profile-edit-button { position:absolute; top:0; right:0; padding:5px 9px; min-height:28px; font-size:12px; line-height:1.2; border-radius:8px; white-space:nowrap; }
 #toast {
@@ -812,7 +820,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .explore-shortcuts { grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
   .explore-shortcut { flex-direction:row; justify-content:flex-start; padding:12px 13px; gap:9px; font-size:12px; border-radius:13px; }
   .explore-shortcut .icon { width:17px;height:17px; }
-  .explore-search-row { margin-top:2px; }
+  .explore-search-row { margin-top:7px; }
   .explore-section-heading { margin:20px 1px 10px; }
   .explore-section-heading h2 { font-size:18px; }
   .explore-section-heading p { font-size:10px; }
@@ -4612,7 +4620,7 @@ window.addEventListener('popstate',event => {
   render();
 });
 $('modal').addEventListener('cancel',event => {
-  if ($('modal').dataset.walletDialog === 'true' || $('modal').dataset.encounterLeaveDialog === 'true') {
+  if ($('modal').dataset.walletDialog === 'true' || $('modal').dataset.encounterLeaveDialog === 'true' || $('modal').dataset.storyStartDialog === 'true') {
     event.preventDefault();
     $('modal').close();
     return;
@@ -4625,7 +4633,7 @@ $('modal').addEventListener('click',event => {
   const r = $('modal').getBoundingClientRect();
   if (event.clientX < r.left || event.clientX > r.right ||
       event.clientY < r.top || event.clientY > r.bottom) {
-    if ($('modal').dataset.walletDialog === 'true' || $('modal').dataset.encounterLeaveDialog === 'true') $('modal').close();
+    if ($('modal').dataset.walletDialog === 'true' || $('modal').dataset.encounterLeaveDialog === 'true' || $('modal').dataset.storyStartDialog === 'true') $('modal').close();
     else dismissPendingDeletionModal();
   }
 });
@@ -4658,17 +4666,24 @@ function showDialog(title,content) {
   const encounterLeaveDialog = title === '離開相遇';
   const encounterMemoryDialog = title === '相遇回憶';
   const walletDialog = title === '我的資源' || title === '銀幣或鑽石不足' || title === '廣告功能尚未串接';
+  const storyStartDialog = title === '選擇故事開始方式';
   modal.dataset.walletDialog = walletDialog ? 'true' : 'false';
+  modal.dataset.storyStartDialog = storyStartDialog ? 'true' : 'false';
   modal.dataset.encounterLeaveDialog = encounterLeaveDialog ? 'true' : 'false';
   modal.dataset.encounterMemoryDialog = encounterMemoryDialog ? 'true' : 'false';
   modal.innerHTML = `
     <div class="row between modal-heading">
       <h2>${e(title)}</h2>
-      <button class="ghost" data-action="${walletDialog ? 'wallet-dialog-close' : encounterLeaveDialog ? 'encounter-dialog-dismiss' : encounterMemoryDialog ? 'encounter-memory-detail-dismiss' : pendingDeletionDialog ? 'pending-switch-account' : deleteConfirmDialog ? 'delete-dialog-back' : 'back'}"
+      <button type="button" class="ghost modal-close-button" data-action="${walletDialog ? 'wallet-dialog-close' : encounterLeaveDialog ? 'encounter-dialog-dismiss' : encounterMemoryDialog ? 'encounter-memory-detail-dismiss' : pendingDeletionDialog ? 'pending-switch-account' : deleteConfirmDialog ? 'delete-dialog-back' : storyStartDialog ? 'story-start-dialog-close' : 'back'}"
               aria-label="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}"
               title="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}">✕</button>
     </div>${content}`;
 
+  if(storyStartDialog){
+    modal.querySelector('[data-action="story-start-dialog-close"]')?.addEventListener('click',()=>{
+      if(modal.open)modal.close();
+    },{once:true});
+  }
   if (!modal.open) modal.showModal();
 }
 function requireLogin(next) {
@@ -4870,7 +4885,6 @@ function renderHome() {
         <button data-action="clear-search" aria-label="清除搜尋">×</button>
       </div>
       <div class="row wrap" id="selectedTags"></div>
-      <p id="exploreHint" class="muted small"></p>
       <div id="characterGrid" class="grid"></div>
       <div id="moreArea" style="text-align:center"></div>
     </div>`;
@@ -4912,11 +4926,11 @@ function exploreList() {
       Number.isFinite(Number(c.firstPublishedAt ?? c.createdAt)) &&
       Date.now()-Number(c.firstPublishedAt ?? c.createdAt) >= 0 &&
       Date.now()-Number(c.firstPublishedAt ?? c.createdAt) <= DAY)
-      .sort((a,b) => (b.firstPublishedAt ?? b.createdAt)-(a.firstPublishedAt ?? a.createdAt)).slice(0,30);
+      .sort((a,b) => (b.firstPublishedAt ?? b.createdAt)-(a.firstPublishedAt ?? a.createdAt)).slice(0,50);
   } else if (filter === 'favorites') {
     list = list.filter(c => state.favorites.includes(c.id));
   } else if (filter === 'popular') {
-    list.sort((a,b) => Number(b.chats || 0)-Number(a.chats || 0));
+    list.sort((a,b) => (characterTurnCountCache.get(b.id) ?? Number(b.chats || 0))-(characterTurnCountCache.get(a.id) ?? Number(a.chats || 0)));
   } else if (['male','female'].includes(filter)) {
     list = list.filter(c => c.gender === filter);
   } else {
@@ -4953,7 +4967,6 @@ function card(c,owner = false) {
                 data-id="${e(c.id)}" aria-label="切換喜愛角色"
                 aria-pressed="${favorite}">♥</button>
         <button class="card-chat" data-action="start-chat" data-id="${e(c.id)}">開始聊天</button>
-        <button class="card-chat encounter-start-button" data-action="start-encounter" data-id="${e(c.id)}">相遇模式</button>
       </div>
       <div class="card-body">
         <h3>${e(c.name)}</h3>
@@ -5031,10 +5044,6 @@ function renderGrid({append=false}={}) {
   document.querySelector('.explore-shortcut[data-action="tags"]')?.classList.toggle('active', exploreTags.length > 0);
   document.querySelector('.explore-shortcut[data-action="toggle-search"]')?.classList.toggle('active', !!search || !!($('exploreSearch') && !$('exploreSearch').classList.contains('hidden')));
   $('selectedTags').innerHTML = exploreTags.map(tagButton).join('');
-  $('exploreHint').textContent = filter === 'latest'
-    ? '最近24小時公開上架的角色，最多30位。'
-    : filter === 'popular' ? '目前依角色資料中的聊天數排序；全站回合統計仍待後端實作。'
-    : `共有${list.length}位符合條件的角色。`;
   const sectionTitle = document.querySelector('.explore-section-heading h2');
   if (sectionTitle) sectionTitle.textContent = filter === 'popular' ? '熱門角色' : filter === 'favorites' ? '喜愛的角色' : filter === 'latest' ? '新登場角色' : '為你推薦';
 
@@ -5155,7 +5164,11 @@ async function hydratePublicCharacterDetailMetadata(characterId) {
 
 async function hydratePublicCharacterIllustrations(characterId) {
   const existing=state.characters.find(character=>character.id===characterId);
-  if(!existing||existing.publicIllustrationsLoaded===true||!window.mySupabase)return;
+  if(!existing||existing.publicIllustrationsLoaded===true)return;
+  if(!window.mySupabase){
+    schedulePublicCharacterIllustrationRetry(characterId);
+    return;
+  }
   if(publicCharacterIllustrationHydration.has(characterId))return publicCharacterIllustrationHydration.get(characterId);
   const request=(async()=>{
     const primary=await loadPublicCharacterPrimaryIllustration(characterId);
@@ -5170,6 +5183,7 @@ async function hydratePublicCharacterIllustrations(characterId) {
     document.querySelectorAll('img[data-character-primary-illustration]').forEach(image=>{
       if(image.dataset.characterPrimaryIllustration!==characterId)return;
       if(primary?.path)image.dataset.characterIllustrationPath=primary.path;
+      image.style.opacity='1';
       image.src=safeImage(current.image);
       image.removeAttribute('data-character-primary-illustration');
     });
@@ -5186,6 +5200,7 @@ async function hydratePublicCharacterIllustrations(characterId) {
     }
   })().catch(error=>{
     console.warn('角色詳情主立繪延遲載入失敗：',error?.message||error);
+    schedulePublicCharacterIllustrationRetry(characterId);
   });
   publicCharacterIllustrationHydration.set(characterId,request);
   try{return await request;}finally{
@@ -5194,6 +5209,17 @@ async function hydratePublicCharacterIllustrations(characterId) {
 }
 
 let publicCharacterIllustrationObserver=null;
+function schedulePublicCharacterIllustrationRetry(characterId){
+  document.querySelectorAll('img[data-character-primary-illustration]').forEach(image=>{
+    if(image.dataset.characterPrimaryIllustration!==characterId)return;
+    const attempts=Number(image.dataset.primaryIllustrationRetry||0);
+    if(attempts>=3)return;
+    image.dataset.primaryIllustrationRetry=String(attempts+1);
+    setTimeout(()=>{
+      if(image.isConnected)observePublicCharacterIllustrationCards(image.parentElement||document);
+    },500*(attempts+1));
+  });
+}
 function observePublicCharacterIllustrationCards(root) {
   if(!root)return;
   const images=root.querySelectorAll('img[data-character-primary-illustration]');
@@ -5210,7 +5236,7 @@ function observePublicCharacterIllustrationCards(root) {
         publicCharacterIllustrationObserver.unobserve(image);
         void hydratePublicCharacterIllustrations(image.dataset.characterPrimaryIllustration);
       });
-    },{rootMargin:'300px'});
+    },{rootMargin:'900px 0px'});
   }
   images.forEach(image=>publicCharacterIllustrationObserver.observe(image));
 }
@@ -5331,9 +5357,12 @@ async function loadCharacterTurnCounts(characterIds, forceRefresh = false) {
   if (forceRefresh) {
     const pending = requestedIds.map(id => characterTurnCountRequests.get(id)).filter(Boolean);
     if (pending.length) await Promise.all(pending.map(request => request.catch(() => {})));
-    requestedIds.forEach(id => characterTurnCountCache.delete(id));
+    requestedIds.forEach(id => {
+      characterTurnCountCache.delete(id);
+      characterTurnCountAttempted.delete(id);
+    });
   }
-  const ids = requestedIds.filter(id => !characterTurnCountCache.has(id) && !characterTurnCountRequests.has(id));
+  const ids = requestedIds.filter(id => !characterTurnCountCache.has(id) && !characterTurnCountRequests.has(id) && !characterTurnCountAttempted.has(id));
   if (!ids.length || !window.mySupabase) {
     for (const id of (Array.isArray(characterIds) ? characterIds : [characterIds])) {
       if (characterTurnCountCache.has(id)) updateCharacterTurnCountElements(id, characterTurnCountCache.get(id));
@@ -5345,6 +5374,9 @@ async function loadCharacterTurnCounts(characterIds, forceRefresh = false) {
     const {data,error} = await window.mySupabase.rpc('get_character_turn_counts',{p_character_ids:ids});
     if (error) throw error;
     if (!Array.isArray(data)) throw new Error('角色回合統計回傳格式無效');
+    // Mark every requested ID as attempted, including IDs intentionally omitted by RLS.
+    // This prevents renderGrid() from repeatedly issuing the same RPC for omitted rows.
+    ids.forEach(id => characterTurnCountAttempted.add(id));
     for (const row of data) {
       if (!isUuid(row.character_id)) continue;
       const count = Number(row.turn_count);
@@ -5365,10 +5397,18 @@ async function loadCharacterTurnCounts(characterIds, forceRefresh = false) {
   try {
     await request;
   } catch (error) {
+    // Avoid an automatic render/retry loop when the RPC is unavailable; a later explicit
+    // refresh (forceRefresh) can retry these IDs.
+    ids.forEach(id => characterTurnCountAttempted.add(id));
     // 統計載入失敗時保留現有數字，不留下「載入中」或額外統計列。
     console.warn('角色對話回合統計載入失敗：',error?.message || error);
   } finally {
     ids.forEach(id => characterTurnCountRequests.delete(id));
+    // Popular ordering must use the authoritative turn-count RPC result, not the
+    // possibly stale count embedded in the initially loaded character record.
+    if(ids.length && route?.page==='home' && filter==='popular' && $('characterGrid')){
+      renderGrid();
+    }
   }
 }
 function updateCharacterTurnCountElements(characterId,count) {
@@ -5543,6 +5583,7 @@ async function renderFollowedAuthors() {
 let createVisibilityFilter = 'all';
 const characterTurnCountCache = new Map();
 const characterTurnCountRequests = new Map();
+const characterTurnCountAttempted = new Set();
 function creationTabs() {
   return `<div class="tabs">
     <button data-action="new-character">建立新角色</button>
@@ -9476,6 +9517,10 @@ document.addEventListener('click',async event => {
         createVisibilityFilter = ['all','public','private'].includes(button.dataset.value) ? button.dataset.value : 'all';
         renderCreate();
         break;
+      case 'story-start-dialog-close': {
+        $('modal')?.close();
+        break;
+      }
       case 'delete-dialog-back': {
         $('modal')?.close();
         if (route.page === 'conversation' || route.page === 'group') go({page:'chat'});
@@ -11522,8 +11567,17 @@ async function importCharacter(file) {
 }
 
 /* Image errors do not inject HTML. */
+/* Keep role portraits visible while their signed Storage URL is being hydrated/refreshed,
+   and restore opacity after a later successful load. */
 document.addEventListener('error',event => {
-  if (event.target instanceof HTMLImageElement) event.target.style.opacity='.15';
+  const image=event.target;
+  if (!(image instanceof HTMLImageElement)) return;
+  if (image.dataset.characterPrimaryIllustration || image.dataset.characterIllustrationPath) return;
+  image.style.opacity='.15';
+},true);
+document.addEventListener('load',event => {
+  const image=event.target;
+  if (image instanceof HTMLImageElement && image.style.opacity==='.15') image.style.opacity='1';
 },true);
 
 function renderCityMapMVP() {
