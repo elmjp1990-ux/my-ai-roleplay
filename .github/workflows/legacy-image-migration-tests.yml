@@ -1,0 +1,28 @@
+name: Legacy image migration planner tests
+
+on:
+  push:
+    branches: [main, "data/migrate-legacy-chat-images-dry-run"]
+    paths:
+      - "scripts/migrate-legacy-chat-images.mjs"
+      - "scripts/test-migrate-legacy-chat-images.mjs"
+      - ".github/workflows/legacy-image-migration-tests.yml"
+  pull_request:
+    paths:
+      - "scripts/migrate-legacy-chat-images.mjs"
+      - "scripts/test-migrate-legacy-chat-images.mjs"
+      - ".github/workflows/legacy-image-migration-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  planner-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run isolated migration planner tests
+        run: node --test scripts/test-migrate-legacy-chat-images.mjs
