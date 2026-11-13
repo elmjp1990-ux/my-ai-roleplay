@@ -3339,41 +3339,101 @@ function sessionCharacter(s) {
   const found = s.forceCloudSnapshot ? null : state.characters.find(c =>
     c.id === s.characterId && !(c.cloudSnapshotOnly && s.cloudCharacterSnapshotLoaded===true)
   );
-  if (found) return found;
   const snap = s.cloudCharacterSnapshot;
-  if (!snap || snap.id !== s.characterId) return null;
+  const hasMatchingSnapshot=!!snap&&snap.id===s.characterId;
+  const snapshotAuthorId=hasMatchingSnapshot ? (Object.prototype.hasOwnProperty.call(snap,'authorId') ? snap.authorId : '') : '';
   const uid=currentUser()?.uid||'';
-  const imageCacheKey=snap.imagePath&&uid&&s.id ? uid+':'+s.id+':'+snap.imagePath : '';
+  const imageCacheKey=hasMatchingSnapshot&&snap.imagePath&&uid&&s.id ? uid+':'+s.id+':'+snap.imagePath : '';
   const cachedImage=imageCacheKey ? cloudSessionImageUrlCache.get(imageCacheKey) : null;
   const hydratedImage=cachedImage&&cachedImage.expiresAt>Date.now()?cachedImage.url:'';
-  return {...snap, image:snap.image || hydratedImage || '', id:s.characterId, name:snap.name || s.characterName || '角色',
-    visibility:snap.visibility || 'private', reviewStatus:'draft',
-    authorId:Object.prototype.hasOwnProperty.call(snap,'authorId') ? snap.authorId : '',
-    creatorDisplayName:snap.creatorDisplayName || '',
-    creatorHandleSnapshot:snap.creatorHandleSnapshot || '',
-    accountArchivedAt:snap.accountArchivedAt || null,
-    firstPublishedAt:snap.firstPublishedAt || null, deletedAt:snap.deletedAt || null,
+  // For hidden/deleted characters, the chat's own snapshot is the source of truth.
+  // Never replace its historical portrait with a newer public-card image.
+  if(found&&!(s.forceCloudSnapshot)&&!(hasMatchingSnapshot&&characterIsOffline(found)))return found;
+  if (!hasMatchingSnapshot) return found || null;
+  return {...(found||{}),...snap,
+    image:snap.imagePath ? (snap.image || hydratedImage || '') : (snap.image || (characterIsOffline(found)?'':found?.image) || hydratedImage || ''),
+    imagePath:snap.imagePath || found?.imagePath || '',
+    id:s.characterId, name:snap.name || found?.name || s.characterName || '角色',
+    visibility:snap.visibility || found?.visibility || 'private', reviewStatus:found?.reviewStatus || 'draft',
+    authorId:snapshotAuthorId || found?.authorId || '',
+    creatorDisplayName:snap.creatorDisplayName || found?.creatorDisplayName || '',
+    creatorHandleSnapshot:snap.creatorHandleSnapshot || found?.creatorHandleSnapshot || '',
+    accountArchivedAt:snap.accountArchivedAt || found?.accountArchivedAt || null,
+    firstPublishedAt:snap.firstPublishedAt || found?.firstPublishedAt || null,
+    deletedAt:snap.deletedAt || found?.deletedAt || null,
     owner:false, cloudSnapshotOnly:true};
 }
 async function hydrateCloudSessionCharacterImage(s) {
   const snap=s?.cloudCharacterSnapshot;
   const uid=currentUser()?.uid||'';
-  const path=snap?.imagePath;
-  if(!s?.cloudOwned||!uid||!path||snap?.image) return;
-  const liveCharacter=state.characters.find(character=>character.id===s.characterId);
-  if(liveCharacter?.image) return;
+  if(!s?.cloudOwned||!uid||snap?.image) return;
+
+  // Legacy snapshots have no imagePath yet. Fetch only the visible row's own
+  // image payload, rather than downloading Base64 for every chat in the list.
+  if(!snap?.imagePath) {
+    const key=uid+':'+s.id+':legacy-snapshot-image';
+    if(cloudSessionImageUrlInflight.has(key))return cloudSessionImageUrlInflight.get(key);
+    const request=(async()=>{
+      const {data,error}=await window.mySupabase.from('chat_sessions')
+        .select('snapshot_id:character_snapshot->>id,snapshot_image:character_snapshot->>image')
+        .eq('id',s.id).eq('user_id',uid).is('deleted_at',null).maybeSingle();
+      if(error)throw new Error(error.message);
+      if((currentUser()?.uid||'')!==uid||state.sessions?.[s.id]!==s)return;
+      if(data?.snapshot_id!==s.characterId)return;
+      const image=safeImage(data?.snapshot_image);
+      if(!image)return;
+      s.cloudCharacterSnapshot={...s.cloudCharacterSnapshot,image};
+      applyCloudChatSessionAvatarUrl(s,image);
+      if(route.id===s.id&&(route.page==='conversation'||route.page==='session-detail'))render();
+    })();
+    cloudSessionImageUrlInflight.set(key,request);
+    try{await request;}finally{if(cloudSessionImageUrlInflight.get(key)===request)cloudSessionImageUrlInflight.delete(key);}
+    return;
+  }
+
+  const path=snap.imagePath;
   const key=uid+':'+s.id+':'+path;
   const cached=cloudSessionImageUrlCache.get(key);
-  if(cached&&cached.expiresAt>Date.now()) return;
+  if(cached&&cached.expiresAt>Date.now()) { applyCloudChatSessionAvatarUrl(s,cached.url); return; }
   if(cloudSessionImageUrlInflight.has(key)) return cloudSessionImageUrlInflight.get(key);
   const request=(async()=>{
     const url=await getCharacterIllustrationSignedUrl(path,{forceRefresh:!!cached});
     if((currentUser()?.uid||'')!==uid||state.sessions?.[s.id]!==s||s.cloudCharacterSnapshot?.imagePath!==path)return;
     cloudSessionImageUrlCache.set(key,{url,expiresAt:Date.now()+55*60*1000});
+    applyCloudChatSessionAvatarUrl(s,url);
     if(route.id===s.id&&(route.page==='conversation'||route.page==='session-detail'))render();
   })();
   cloudSessionImageUrlInflight.set(key,request);
   try{await request;}finally{if(cloudSessionImageUrlInflight.get(key)===request)cloudSessionImageUrlInflight.delete(key);}
+}
+function applyCloudChatSessionAvatarUrl(session,url) {
+  if(!session?.id||!url)return;
+  document.querySelectorAll('[data-chat-avatar-session-id]').forEach(node=>{
+    if(node.dataset.chatAvatarSessionId!==session.id||
+       node.dataset.chatAvatarPath!==(session.cloudCharacterSnapshot?.imagePath||''))return;
+    const image=document.createElement('img');
+    image.className='avatar';
+    image.alt=session.cloudCharacterSnapshot?.name||session.characterName||'角色';
+    image.src=url;
+    if(session.cloudCharacterSnapshot?.imagePath)image.dataset.characterIllustrationPath=session.cloudCharacterSnapshot.imagePath;
+    node.replaceWith(image);
+  });
+}
+let chatSessionAvatarObserver=null;
+function observeCloudChatSessionAvatars(root=$('view')) {
+  const list=root?.querySelector('.chat-list');
+  if(chatSessionAvatarObserver){chatSessionAvatarObserver.disconnect();chatSessionAvatarObserver=null;}
+  if(!list||typeof IntersectionObserver!=='function')return;
+  chatSessionAvatarObserver=new IntersectionObserver(entries=>{
+    for(const entry of entries){
+      if(!entry.isIntersecting)continue;
+      const node=entry.target;
+      chatSessionAvatarObserver.unobserve(node);
+      const session=state.sessions?.[node.dataset.chatAvatarSessionId];
+      if(session)void hydrateCloudSessionCharacterImage(session).catch(error=>console.warn('聊天室角色頭像載入失敗：',error?.message||error));
+    }
+  },{root:list,rootMargin:'120px 0px'});
+  list.querySelectorAll('[data-chat-avatar-session-id]').forEach(node=>chatSessionAvatarObserver.observe(node));
 }
 function canAccessSessionCharacter(s,c) {
   const uid = currentUser()?.uid;
@@ -3791,6 +3851,7 @@ async function loadCloudChatSessions(user, options = {}) {
         'id,user_id,character_id,character_name,status,chat_mode,created_at,updated_at',
         'character_snapshot_id:character_snapshot->>id',
         'character_snapshot_author_id:character_snapshot->>authorId',
+        'character_snapshot_image_path:character_snapshot->>imagePath',
         'character_snapshot_opening:character_snapshot->>opening',
         'session_name:session_data->>name','session_archived:session_data->>archived',
         'session_hidden:session_data->>hidden','session_pinned:session_data->>pinned',
@@ -3843,7 +3904,7 @@ async function loadCloudChatSessions(user, options = {}) {
         console.error('雲端聊天角色快照 ID 不一致，已略過此聊天：', row.id); continue;
       }
       // The chat list uses compact metadata; hydrate the full image-heavy snapshot only on open.
-      const snapshot = {id:row.character_id,name:row.character_name||'角色',authorId:row.character_snapshot_author_id||'',visibility:'private',reviewStatus:'draft'};
+      const snapshot = {id:row.character_id,name:row.character_name||'角色',authorId:row.character_snapshot_author_id||'',imagePath:row.character_snapshot_image_path||'',visibility:'private',reviewStatus:'draft'};
       const existing = state.sessions[row.id];
       const opening = row.session_opening_message && typeof row.session_opening_message === 'object'
         ? row.session_opening_message
@@ -4847,6 +4908,7 @@ function render() {
   }
   restoreCharacterCardVideos($('view'),previousCardVideos);
   observePublicCharacterIllustrationCards($('view'));
+  observeCloudChatSessionAvatars($('view'));
   if (route.overlay) renderModal(route.overlay);
   updateCharacterCounters($('view'));
   // 公開卡片影片需取得私有儲存桶的短效簽名 URL，並在畫面渲染後啟動靜音循環播放。
@@ -6431,7 +6493,7 @@ function chatEntries() {
     return `<div class="chat-entry ${route.page==='conversation'&&route.id===s.id?'active':''}">
       <button class="pin ${s.pinned?'on':''}" data-action="pin" data-id="${e(s.id)}" aria-label="切換置頂">${ICON.pin}</button>
       <button class="ghost" style="padding:0" data-action="session-detail" data-id="${e(s.id)}" aria-label="查看${e(c.name)}角色簡介">
-        <span class="character-avatar-status ${characterIsOffline(c)?'is-offline':''}"><img class="avatar" src="${e(safeImage(c.image))}" alt="${e(c.name)}">
+        <span class="character-avatar-status ${characterIsOffline(c)?'is-offline':''}">${safeImage(c.image)?'<img class="avatar" src="'+e(safeImage(c.image))+'" '+(c.imagePath?'data-character-illustration-path="'+e(c.imagePath)+'"':'')+' alt="'+e(c.name)+'">':((c.imagePath||s.cloudOwned)?'<span class="avatar avatar-fallback" data-chat-avatar-session-id="'+e(s.id)+'" data-chat-avatar-path="'+e(c.imagePath||'')+'" aria-label="'+e(c.name)+'">'+e(String(c.name||'角').trim().slice(0,1)||'角')+'</span>':'<span class="avatar avatar-fallback" aria-label="'+e(c.name)+'">'+e(String(c.name||'角').trim().slice(0,1)||'角')+'</span>')}
         <span class="character-status-dot" title="${characterIsOffline(c)?'角色離線／已下架':'角色公開中'}"></span></span>
       </button>
       <button class="select-chat" data-action="select-chat" data-id="${e(s.id)}">
