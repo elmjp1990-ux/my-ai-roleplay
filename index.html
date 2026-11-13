@@ -3075,10 +3075,11 @@ function currentUserCanViewNsfw() {
 }
 function canViewCharacterNsfw(character) {
   if (character?.isNSFW !== true) return true;
-  // 作者可以在自己的介面辨識／管理自己建立的 NSFW 角色；其他人的公開 NSFW 內容，
-  // 以 Supabase RLS 已完成的伺服器端成年資格判定為準。
-  if (currentUser()?.uid && currentUser().uid === character.authorId) return true;
-  if (character?.cloudPublic === true) return true;
+  // 作者可管理自己的 NSFW 角色；其他人必須登入且通過成年資格。
+  // cloudPublic 只代表資料來自公開目錄，絕不能視為已通過年齡驗證。
+  const uid = currentUser()?.uid || null;
+  if (uid && uid === character.authorId) return true;
+  if (!uid) return false;
   return currentUserCanViewNsfw();
 }
 function availableExploreTags() {
