@@ -402,3 +402,33 @@ body:not(.encounter-mode-active) .composer {
 .phone-device--ios .phone-story-event{border:0;padding:0}
 .phone-device--ios .phone-warning{border-color:rgba(137,143,151,.28);background:rgba(255,255,255,.5)}
 @media(max-width:420px){.phone-device.phone-device--ios{height:min(720px,92dvh);min-height:min(480px,92dvh);padding:11px 12px 8px;border-radius:29px}.phone-lockscreen{min-height:145px}.phone-lockscreen-clock{font-size:58px}}
+
+
+/* Message actions: reveal a compact icon row only after selecting the message. */
+.message-action-bar {
+  display:flex; align-items:center; justify-content:flex-start; gap:5px;
+  min-height:28px; margin-top:6px; opacity:0; visibility:hidden; pointer-events:none;
+  transform:translateY(-2px);
+  transition:opacity .16s ease,transform .16s ease,visibility .16s ease;
+}
+.message.user .message-action-bar { justify-content:flex-end; }
+.message.selected .message-action-bar,
+.message:focus-within .message-action-bar {
+  opacity:1; visibility:visible; pointer-events:auto; transform:translateY(0);
+}
+.message-action-icon {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:27px; height:27px; min-width:27px; padding:5px;
+  border:1px solid transparent; border-radius:9px;
+  background:transparent; color:var(--muted); box-shadow:none;
+  -webkit-backdrop-filter:none; backdrop-filter:none;
+}
+.message-action-icon .icon { width:15px; height:15px; }
+.message-action-icon:hover:not(:disabled) {
+  color:var(--text); background:var(--px-glass-bg); border-color:var(--px-glass-border);
+}
+.message-action-icon[data-action="delete-message"]:hover:not(:disabled),
+.message-action-icon[data-action="delete-group-message"]:hover:not(:disabled) {
+  color:#ef8997; background:rgba(180,75,88,.12);
+}
+@media(prefers-reduced-motion:reduce) { .message-action-bar { transition:none; transform:none; } }

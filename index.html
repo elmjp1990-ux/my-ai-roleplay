@@ -614,15 +614,7 @@ body.group-chat-page:has(.group-wizard) #view {
   margin:3px 0;
 }
 .user .narration { text-align:right; }
-.message-more {
-  opacity:0;
-  padding:3px 7px;
-  border:0;
-  background:var(--panel2);
-  height:28px;
-  align-self:center;
-}
-.message:hover .message-more,.message:focus-within .message-more,.message.selected .message-more { opacity:1; }
+
 .typing-indicator{display:flex;align-items:center;gap:8px;padding:10px 13px;border-radius:16px;background:var(--panel2);color:var(--muted);font-size:13px}.typing-dots{display:inline-flex;align-items:center;gap:4px}.typing-dots i{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.35;animation:po-typing 1.1s infinite ease-in-out}.typing-dots i:nth-child(2){animation-delay:.15s}.typing-dots i:nth-child(3){animation-delay:.3s}@keyframes po-typing{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
 
 /* Character phone modal styles are centralized in poyozz-ui.css. */
@@ -2971,7 +2963,11 @@ const ICON = {
   plus:svg('<path d="M12 5v14M5 12h14"></path>'),
   send:svg('<path d="m3 11 18-8-8 18-2.5-7.5L3 11Z"></path><path d="m10.5 13.5 4-4"></path>'),
   menu:svg('<path d="M4 6h16M4 12h16M4 18h16"></path>'),
-  pin:svg('<path d="M9 3h6l-1 6 4 4v2H6v-2l4-4-1-6ZM12 15v7"></path>')
+  pin:svg('<path d="M9 3h6l-1 6 4 4v2H6v-2l4-4-1-6ZM12 15v7"></path>'),
+  copy:svg('<rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"></path>'),
+  trash:svg('<path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6"></path>'),
+  flag:svg('<path d="M5 21V4m0 0c5-4 9 4 14 0v11c-5 4-9-4-14 0"></path>'),
+  edit:svg('<path d="m4 16.5-.8 4.3 4.3-.8L19 8.5 15.5 5 4 16.5Z"></path><path d="m13.8 6.7 3.5 3.5"></path>')
 };
 
 const LOGO_URL = './LOGO_WEBLOGO.webp';
@@ -6725,12 +6721,18 @@ function renderGroupConversation() {
       : (!isUser && !isSystem)
         ? '<div class="roleplay-segments">'+renderCharacterSpeechSegments(displayContent,{name:who,image:member?.avatar_url||member?.image||''})+'</div>'
         : '<div class="message-name">'+e(who)+'</div>'+(isSystem?'<div class="bubble">'+e(displayContent)+'</div>':formatMessage(displayContent));
-    const latestEditableGroupMessage = !g.searchJump && !isSystem && ['user','character'].includes(m.type) &&
+    const actionableGroupMessage=!isSystem&&['user','character'].includes(m.type);
+    const latestEditableGroupMessage = actionableGroupMessage && !g.searchJump &&
       g.messages.filter(item=>item.type===m.type).at(-1)?.id===m.id;
-    const editButton = latestEditableGroupMessage
-      ? '<button class="message-more" data-action="group-message-menu" data-id="'+e(m.id)+'" aria-label="訊息操作">⋯</button>' : '';
+    const actionButtons = actionableGroupMessage
+      ? '<div class="message-action-bar" aria-label="訊息操作">'+
+        '<button type="button" class="message-action-icon" data-action="copy-group-message" data-id="'+e(m.id)+'" aria-label="複製" title="複製">'+ICON.copy+'</button>'+
+        (latestEditableGroupMessage?'<button type="button" class="message-action-icon" data-action="delete-group-message" data-id="'+e(m.id)+'" aria-label="刪除" title="刪除">'+ICON.trash+'</button>':'')+
+        (m.type==='character'?'<button type="button" class="message-action-icon" data-action="report" data-kind="AI訊息" data-id="'+e(m.id)+'" aria-label="舉報" title="舉報">'+ICON.flag+'</button>':'')+
+        (latestEditableGroupMessage?'<button type="button" class="message-action-icon" data-action="edit-group-message" data-id="'+e(m.id)+'" aria-label="編輯" title="編輯">'+ICON.edit+'</button>':'')+
+        '</div>' : '';
     return '<div class="message '+(isUser?'user':'')+(hasSpeaker?' roleplay-prefixed-message':'')+'" data-message="'+e(m.id)+'">'+avatarHTML+
-      '<div class="message-content">'+bodyHTML+'</div>'+editButton+'</div>';
+      '<div class="message-content">'+bodyHTML+actionButtons+'</div></div>';
   }).join('') || '<div class="empty">這段群組對話還沒有訊息，輸入第一句話開始故事。</div>';
   const sceneNames=(group.scenes||[]).map(x=>x.name).filter(Boolean).join('、');
   const initialScene=(group.scenes||[]).find(x=>Number(x.position||1)===1)||(group.scenes||[])[0];
@@ -7941,10 +7943,18 @@ function renderMessages(scroll = true) {
     // as a small badge over that character's portrait.
     // Character identity is rendered inside each speech segment so narration never inherits an outer avatar column.
     const outerAvatar = '';
+    const latestEditableMessage=!s.cloudSearchJump && (m.role==='user'||m.role==='assistant') &&
+      s.messages.filter(item=>item.role===m.role).at(-1)?.id===m.id;
+    const actionButtons=(m.role==='user'||m.role==='assistant')
+      ? '<div class="message-action-bar" aria-label="訊息操作">'+
+        '<button type="button" class="message-action-icon" data-action="copy-message" data-id="'+e(m.id)+'" aria-label="複製" title="複製">'+ICON.copy+'</button>'+
+        '<button type="button" class="message-action-icon" data-action="delete-message" data-id="'+e(m.id)+'" aria-label="刪除" title="刪除">'+ICON.trash+'</button>'+
+        (m.role==='assistant'?'<button type="button" class="message-action-icon" data-action="report" data-kind="AI訊息" data-id="'+e(m.id)+'" aria-label="舉報" title="舉報">'+ICON.flag+'</button>':'')+
+        (latestEditableMessage?'<button type="button" class="message-action-icon" data-action="edit-message" data-id="'+e(m.id)+'" aria-label="編輯" title="編輯">'+ICON.edit+'</button>':'')+
+        '</div>' : '';
     return `<article class="message ${user ? 'user' : ''} ${hasSpeaker && !user ? 'roleplay-prefixed-message' : ''}" data-message="${e(m.id)}">
       ${outerAvatar}
-      <div class="message-content">${contentHTML}</div>
-      <button class="message-more" data-action="message-menu" data-id="${e(m.id)}" aria-label="訊息操作">⋯</button>
+      <div class="message-content">${contentHTML}${actionButtons}</div>
     </article>`;
   }).join('');
   if(s.activeTurnInFlight){const characterName=sessionCharacter(s)?.name||'角色';$('messages').insertAdjacentHTML('beforeend','<article class="message assistant-typing" role="status" aria-live="polite"><div class="message-content"><div class="message-name">'+e(characterName)+'</div><div class="typing-indicator"><span>'+e(characterName)+'正在回覆</span><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span></div></div></article>');}
@@ -8915,21 +8925,6 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
         </form>`);
       break;
     }
-    case 'message-menu': {
-      const m = s?.messages.find(m => m.id === o.id);
-      if (!m) return;
-      const latestEditableMessage = !s.cloudSearchJump && (m.role === 'user' || m.role === 'assistant') &&
-        s.messages.filter(item => item.role === m.role).at(-1)?.id === m.id;
-      showDialog('訊息操作',`
-        <div class="stack">
-          <button style="width:100%" data-action="copy-message" data-id="${e(m.id)}">複製</button>
-          ${latestEditableMessage ? `<button style="width:100%" data-action="edit-message" data-id="${e(m.id)}">編輯</button>` : ''}
-          <button class="danger" style="width:100%" data-action="delete-message" data-id="${e(m.id)}">刪除</button>
-          ${m.role === 'assistant' ? `<button style="width:100%" data-action="report"
-            data-kind="AI訊息" data-id="${e(m.id)}">舉報</button>` : ''}
-        </div>`);
-      break;
-    }
     case 'edit-message': {
       const m = s?.messages.find(m => m.id === o.id);
       const latestEditableMessage = m && !s.cloudSearchJump && (m.role === 'user' || m.role === 'assistant') &&
@@ -9302,9 +9297,10 @@ document.addEventListener('click',async event => {
   const button = event.target.closest('[data-action]');
   if (!button || button.disabled) {
     const message = event.target.closest('[data-message]');
-    if (message) {
+    if (message && !event.target.closest('a,button,input,textarea,select,[contenteditable="true"]')) {
+      const wasSelected=message.classList.contains('selected');
       document.querySelectorAll('.message.selected').forEach(item => item.classList.remove('selected'));
-      message.classList.add('selected');
+      if(!wasSelected) message.classList.add('selected');
     }
     return;
   }
@@ -10209,7 +10205,6 @@ document.addEventListener('click',async event => {
         break;
       }
       case 'edit-memory':openModal('edit-memory',{id:key});break;
-      case 'message-menu':openModal('message-menu',{id:key});break;
       case 'edit-message':openModal('edit-message',{id:key});break;
       case 'copy-message': {
         const m=s?.messages.find(m=>m.id===key);
