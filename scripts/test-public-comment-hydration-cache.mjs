@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const html = fs.readFileSync("index.html", "utf8");
+const commentRenderer = fs.readFileSync("comment-renderer.js", "utf8");
 const start = html.indexOf("const CLOUD_COMMENT_CACHE_TTL_MS");
 const end = html.indexOf("function renderComments()", start);
 assert.ok(start >= 0 && end > start, "comment hydration cache block must exist");
@@ -23,10 +24,7 @@ assert.match(source, /cloudCommentHydrationInflight\.delete\(cacheKey\)/);
 assert.match(source, /\.rpc\('get_character_comments_safe'/);
 assert.match(source, /\.select\('comment_id,user_id'\)/);
 
-const renderStart = html.indexOf("function renderComments()");
-const renderEnd = html.indexOf("async function refreshAuthorFollowState", renderStart);
-assert.ok(renderStart >= 0 && renderEnd > renderStart, "comment rendering block must exist");
-const renderSource = html.slice(renderStart, renderEnd);
+const renderSource = commentRenderer;
 assert.match(renderSource, /const cacheUid=currentUser\(\)\?\.uid\|\|null/);
 assert.match(renderSource, /if\(cached\)cached\.rows=allComments/);
 

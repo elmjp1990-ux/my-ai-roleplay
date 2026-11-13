@@ -8,6 +8,7 @@ on:
       - "city-map.js"
       - "followed-authors.js"
       - "author-profile.js"
+      - "comment-renderer.js"
       - "scripts/test-encounter-schedule-parser.mjs"
       - "scripts/test-encounter-chat-mode-guard.mjs"
       - "supabase/functions/encounter-session/**"
@@ -58,6 +59,8 @@ jobs:
         run: node --check followed-authors.js
       - name: Parse extracted Author profile module
         run: node --check author-profile.js
+      - name: Parse extracted Comment renderer module
+        run: node --check comment-renderer.js
       - name: Parse extracted Encounter scene module
         run: node --check encounter-scene.js
       - name: Test Encounter schedule parser
