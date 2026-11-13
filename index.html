@@ -4870,7 +4870,6 @@ function renderHome() {
         <button data-action="clear-search" aria-label="清除搜尋">×</button>
       </div>
       <div class="row wrap" id="selectedTags"></div>
-      <p id="exploreHint" class="muted small"></p>
       <div id="characterGrid" class="grid"></div>
       <div id="moreArea" style="text-align:center"></div>
     </div>`;
@@ -5030,10 +5029,6 @@ function renderGrid({append=false}={}) {
   document.querySelector('.explore-shortcut[data-action="tags"]')?.classList.toggle('active', exploreTags.length > 0);
   document.querySelector('.explore-shortcut[data-action="toggle-search"]')?.classList.toggle('active', !!search || !!($('exploreSearch') && !$('exploreSearch').classList.contains('hidden')));
   $('selectedTags').innerHTML = exploreTags.map(tagButton).join('');
-  $('exploreHint').textContent = filter === 'latest'
-    ? '最近24小時公開上架的角色，最多50位。'
-    : filter === 'popular' ? '依角色累積對話回合數排序。'
-    : `共有${list.length}位符合條件的角色。`;
   const sectionTitle = document.querySelector('.explore-section-heading h2');
   if (sectionTitle) sectionTitle.textContent = filter === 'popular' ? '熱門角色' : filter === 'favorites' ? '喜愛的角色' : filter === 'latest' ? '新登場角色' : '為你推薦';
 
