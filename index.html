@@ -7943,9 +7943,11 @@ function addMemory(s,text) {
 }
 
 let chatMessageSearchState={key:'',query:'',offset:0,request:0,timer:null,loading:false,rows:[]};
+let chatSearchJumpRequest=0;
 const CHAT_SEARCH_PAGE_SIZE=20;
 function resetChatMessageSearchState(){
   if(chatMessageSearchState.timer)clearTimeout(chatMessageSearchState.timer);
+  chatSearchJumpRequest++;
   chatMessageSearchState={key:'',query:'',offset:0,request:chatMessageSearchState.request+1,timer:null,loading:false,rows:[]};
 }
 function chatSearchSnippet(value,query){
@@ -8010,22 +8012,34 @@ async function runChatMessageSearch(query,append=false){
   }catch(error){if(request===chatMessageSearchState.request)node.innerHTML=renderChatMessageSearchResults(chatMessageSearchState.rows,error?.message||'搜尋失敗，請稍後重試。');}
   finally{if(request===chatMessageSearchState.request)chatMessageSearchState.loading=false;}
 }
+function closeChatSearchOverlay(){
+  if(route.chatOverlay==='search'){
+    const next={...route};delete next.chatOverlay;route=next;
+    const depth=history.state?.personax?history.state.depth:0;
+    history.replaceState({personax:true,depth,route:next},'',routeURL(next));
+  }
+  $('view').querySelector('.chat-main .chat-overlay')?.remove();
+}
 async function jumpToChatSearchHit(button){
   const ctx=currentChatSearchContext(),id=String(button.dataset.id||'');
   if(!ctx||!id)return;
+  const request=++chatSearchJumpRequest;
   const client=window.mySupabase,uid=currentUser()?.uid;
+  const isCurrent=()=>{const current=currentChatSearchContext();return request===chatSearchJumpRequest&&current?.kind===ctx.kind&&current?.id===ctx.id&&(ctx.kind==='single'?current.session===ctx.session:current.group===ctx.group)&&currentUser()?.uid===uid;};
   if(ctx.kind==='single'&&!ctx.session.cloudOwned){
     const n=[...($('messages')?.querySelectorAll('[data-message]')||[])].find(x=>x.dataset.message===id);
-    if(n){$('view').querySelector('.chat-main .chat-overlay')?.remove();n.scrollIntoView({behavior:'smooth',block:'center'});n.classList.add('search-hit-highlight');setTimeout(()=>n.classList.remove('search-hit-highlight'),1800);}else toast('這則訊息不在目前已載入的本機紀錄中。');return;
+    if(n){closeChatSearchOverlay();n.scrollIntoView({behavior:'smooth',block:'center'});n.classList.add('search-hit-highlight');setTimeout(()=>n.classList.remove('search-hit-highlight'),1800);}else toast('這則訊息不在目前已載入的本機紀錄中。');return;
   }
   if(!client||!uid||!isUuid(id)){toast('目前無法連線或訊息識別碼無效，搜尋結果仍會保留。');return;}
   try{
     const {data:{user},error:authError}=await client.auth.getUser();
     if(authError||user?.id!==uid||currentUser()?.uid!==uid)throw Error('登入狀態已變更，請重新登入。');
+    if(!isCurrent())return;
     if(ctx.kind==='single'){
       const s=ctx.session;if(s.cloudOwnerUid!==uid||s.hidden||readDeletedChatTombstones(uid).sessions[s.id])throw Error('目前聊天室不可存取。');
       const {data:t,error:te}=await client.from('chat_messages').select('id,session_id,role,content,created_at').eq('id',id).eq('session_id',s.id).is('deleted_at',null).maybeSingle();
       if(te)throw te;if(!t)throw Error('這則訊息已刪除或無法存取。');
+      if(!isCurrent())return;
       const bf='created_at.lt.'+t.created_at+',and(created_at.eq.'+t.created_at+',id.lt.'+t.id+')';
       const af='created_at.gt.'+t.created_at+',and(created_at.eq.'+t.created_at+',id.gt.'+t.id+')';
       const [b,a]=await Promise.all([
@@ -8033,8 +8047,8 @@ async function jumpToChatSearchHit(button){
         client.from('chat_messages').select('id,session_id,role,content,created_at').eq('session_id',s.id).is('deleted_at',null).or(af).order('created_at',{ascending:true}).order('id',{ascending:true}).limit(24)
       ]);
       if(b.error)throw b.error;if(a.error)throw a.error;
-      if(currentSession()?.id!==s.id||currentUser()?.uid!==uid)return;
-      $('view').querySelector('.chat-main .chat-overlay')?.remove();
+      if(!isCurrent())return;
+      closeChatSearchOverlay();
       const all=[...(b.data||[]),t,...(a.data||[])].sort((x,y)=>String(x.created_at).localeCompare(String(y.created_at))||String(x.id).localeCompare(String(y.id)));
       s.messages=all.map(r=>({id:r.id,role:r.role==='user'?'user':'assistant',text:r.content||'',at:new Date(r.created_at).getTime(),cloudSynced:true}));
       const first=all[0];s.cloudOldestMessageCursor=first?{createdAt:first.created_at,id:first.id}:null;
@@ -8051,13 +8065,8 @@ async function jumpToChatSearchHit(button){
         client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',g.id).is('deleted_at',null).or(bf).order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(24),
         client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',g.id).is('deleted_at',null).or(af).order('created_at',{ascending:true}).order('sequence_no',{ascending:true}).order('id',{ascending:true}).limit(24)
       ]);
-      if(b.error)throw b.error;if(a.error)throw a.error;if(groupPrototype.active?.id!==g.id)return;
-      if(route.chatOverlay==='search'){
-        const next={...route};delete next.chatOverlay;route=next;
-        const depth=history.state?.personax?history.state.depth:0;
-        history.replaceState({personax:true,depth,route:next},'',routeURL(next));
-      }
-      $('view').querySelector('.chat-main .chat-overlay')?.remove();
+      if(b.error)throw b.error;if(a.error)throw a.error;if(!isCurrent())return;
+      closeChatSearchOverlay();
       const all=[...(b.data||[]),t,...(a.data||[])].sort((x,y)=>String(x.created_at).localeCompare(String(y.created_at))||Number(x.sequence_no)-Number(y.sequence_no)||String(x.id).localeCompare(String(y.id)));
       g.messages=all.map(r=>{const snap=r.speaker_snapshot||{},m=g.members.find(x=>x.characterId===r.character_id)||g.members.find(x=>x.characterSnapshotId===snap.id||x.id===snap.id),type=r.speaker_type==='user'?'user':r.speaker_type==='system'?'system':'character';return {id:r.id,type,speaker:type==='user'?'你':type==='system'?'系統':snap.name||m?.name||'角色',characterId:r.character_id||null,speakerSnapshot:snap,content:type==='user'&&r.content===GROUP_CONTINUE_SENTINEL?'':r.content,createdAt:r.created_at};});
       const first=all[0];groupPrototype.historyCursor=first?{createdAt:first.created_at,sequenceNo:first.sequence_no,id:first.id}:null;
@@ -8065,7 +8074,7 @@ async function jumpToChatSearchHit(button){
       renderGroupConversation();
       requestAnimationFrame(()=>{const n=[...($('groupMessages')?.querySelectorAll('[data-message]')||[])].find(x=>x.dataset.message===id);if(n){n.scrollIntoView({behavior:'smooth',block:'center'});n.classList.add('search-hit-highlight');setTimeout(()=>n.classList.remove('search-hit-highlight'),1800);}});
     }
-  }catch(error){toast(error?.message||'無法定位這則訊息。');}
+  }catch(error){if(request===chatSearchJumpRequest)toast(error?.message||'無法定位這則訊息。');}
 }
 async function returnChatToLatest(kind){
   if(kind==='single'){
