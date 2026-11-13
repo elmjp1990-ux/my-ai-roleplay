@@ -30,7 +30,7 @@ const copied = utils.clone(original);
 assert.equal(JSON.stringify(copied), JSON.stringify(original));
 copied.nested.value = 2;
 assert.equal(original.nested.value, 1, 'clone must remain a detached JSON deep copy.');
-assert.throws(() => utils.clone(undefined), 'Preserve JSON clone behavior for unsupported top-level values.');
+assert.throws(() => utils.clone(undefined));
 assert.doesNotMatch(source, /document\.|localStorage|sessionStorage|fetch\(|\.from\(|\.rpc\(/,
   'Core utilities must not own browser, network, Supabase, or persistence side effects.');
 console.log('Shared core utilities contract passed: Unicode length, strict UUID validation, JSON clone semantics, immutable API, and no side effects.');
