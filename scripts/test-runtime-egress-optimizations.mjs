@@ -34,7 +34,7 @@ assert.match(groupOpen,/\.order\('created_at',\{ascending:false\}\).*\.limit\(50
 assert.match(groupOpen,/oldestInitialMessage=initialMessageRows\.at\(-1\)/,
   "the first page must retain a stable cursor at its oldest fetched row");
 const groupHistory=between("async function groupLoadOlderMessages()","async function openGroupBackgroundSettings");
-assert.match(groupHistory,/const oldest=page\\.at\\(-1\\)/,
+assert.ok(groupHistory.includes("const oldest=page.at(-1);"),
   "the next cursor must use the oldest row in the descending page to avoid skipping messages");
 assert.match(groupHistory,/\.or\(olderFilter\)/,
   "older pages must use a keyset cursor instead of offset pagination");
