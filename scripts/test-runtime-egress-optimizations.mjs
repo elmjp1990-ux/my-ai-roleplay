@@ -29,6 +29,24 @@ assert.match(groupOpen,/if\(group\.archived_at\)/,
 assert.doesNotMatch(groupOpen,/void groupLoadList\(true\)/,
   "opening a group must not force a full group-list/member/preview reload");
 
+assert.match(groupOpen,/\.order\('created_at',\{ascending:false\}\).*\.limit\(50\)/,
+  "opening a group must fetch only the newest bounded page in reverse chronological query order");
+assert.match(groupOpen,/historyCursor=initialMessageRows\[0\]/,
+  "the first page must retain a stable cursor at its oldest fetched row");
+const groupHistory=between("async function groupLoadOlderMessages()","async function openGroupBackgroundSettings");
+assert.match(groupHistory,/\.or\(olderFilter\)/,
+  "older pages must use a keyset cursor instead of offset pagination");
+assert.match(groupHistory,/\.order\('id',\{ascending:false\}\)\.limit\(50\)/,
+  "older pages must use a deterministic tie-breaker and a fixed page size");
+assert.match(groupHistory,/existing=new Set/,
+  "overlapping page results must not duplicate already loaded messages");
+assert.match(groupHistory,/historyScrollAnchor=before/,
+  "loading older messages must preserve the reader's scroll position");
+assert.match(html,/data-action="group-history-load-older"/,
+  "the group conversation must expose a control for loading older history");
+assert.match(html,/case 'group-history-load-older':groupLoadOlderMessages\(\);break;/,
+  "the delegated action handler must load older group messages");
+
 const groupSend=between("async function groupSendMock()","async function groupRefreshList()");
 assert.match(groupSend,/data:turnId,error/,"group turn RPC result must retain the stable turn ID");
 assert.match(groupSend,/\.eq\('turn_id',turnId\)/,
