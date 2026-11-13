@@ -19,8 +19,7 @@
   document.querySelectorAll('#cityMapPeople').forEach(modal=>modal.remove());
   document.body.classList.remove('city-location-active');
   document.body.classList.add('city-map-mode');
-  // The early document boot class is no longer needed once the real map is mounted.
-  document.documentElement.classList.remove('city-map-boot');
+  // Keep the early boot cover until the time-appropriate map asset is ready.
   const view=$('view');
   view.innerHTML=`
     <section class="city-map-stage" id="cityMapStage" aria-label="POYOZZ 城市地圖">
@@ -87,6 +86,7 @@
     </section>`;
   document.body.classList.remove('city-map-mode-immersive');
   const stage=$('cityMapStage'),world=$('cityMapWorld');
+  stage.classList.add('is-loading');
   const mapAspect=2752/1536;
   let scale=1,tx=0,ty=0,pointers=new Map(),start=null,lastTap=0,lastTapX=0,lastTapY=0,moved=false;
   const sizeWorld=()=>{const sw=stage.clientWidth,sh=stage.clientHeight;const nav=$('cityMapUI')?.querySelector('.city-map-bottom');const navExtra=Math.max(76,(nav?.offsetHeight||68)+12);const h=Math.max(sh+navExtra,sw/mapAspect);const w=h*mapAspect;world.style.width=w+'px';world.style.height=h+'px';world.style.left=((sw-w)/2)+'px';world.style.top=((sh-h)/2)+'px';world.style.backgroundSize='100% 100%';};
@@ -126,6 +126,26 @@
     const solarNoon=12-lon/15+8;
     return {sunrise:solarNoon-ha/15,sunset:solarNoon+ha/15};
   };
+  let activeMapImage='';
+  const applyCityMapImage=mapImage=>{
+    if(activeMapImage===mapImage)return;
+    activeMapImage=mapImage;
+    const image=new Image();
+    image.onload=()=>{
+      if(activeMapImage!==mapImage)return;
+      world.style.backgroundImage='url("'+mapImage+'")';
+      world.style.filter='none';
+      stage.classList.remove('is-loading');
+      document.documentElement.classList.remove('city-map-boot');
+    };
+    image.onerror=()=>{
+      if(activeMapImage!==mapImage)return;
+      stage.style.backgroundColor='#18253e';
+      stage.classList.remove('is-loading');
+      document.documentElement.classList.remove('city-map-boot');
+    };
+    image.src=mapImage;
+  };
   const taipeiTime=()=>{
     const d=new Date();
     const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d);
@@ -136,7 +156,7 @@
     const isDay=minuteOfDay>=sunrise&&minuteOfDay<sunset;
     $('cityMapDate').textContent=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);
     const mapImage=isDay?'./encounter-default-scene.webp':'https://raw.githubusercontent.com/elmjp1990-ux/my-ai-roleplay/main/Add_nighttime_lighting_to_buildings_2K_20261027142959%20(1).webp';
-    stage.style.backgroundColor=isDay?'#b9d9c5':'#18253e';stage.style.backgroundImage='none';world.style.backgroundImage='url("'+mapImage+'")';world.style.filter='none';
+    stage.style.backgroundColor=isDay?'#b9d9c5':'#18253e';stage.style.backgroundImage='none';applyCityMapImage(mapImage);
   };
   taipeiTime();
   const cityMapClock=setInterval(taipeiTime,30000);

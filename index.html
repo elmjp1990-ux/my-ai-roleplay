@@ -32,6 +32,7 @@
   --input:rgba(255,255,255,.075);
   --header:rgba(58,60,63,.72);
   --bubble:rgba(255,255,255,.09);
+  --user-bubble:rgba(155,160,167,.32);
   --shade:rgba(12,13,15,.82);
   --sidebar:232px;
   --px-primary-hover:#b49adf;
@@ -47,15 +48,17 @@ body.day {
   --border:rgba(90,94,101,.19);
   --input:rgba(255,255,255,.72);
   --header:rgba(245,245,244,.78);
-  --bubble:rgba(255,255,255,.72);
+  --bubble:rgba(205,209,214,.92);
+  --user-bubble:rgba(235,237,240,.98);
   --shade:rgba(235,235,233,.86);
 }
 * { box-sizing:border-box; }
 /* Apply city-map startup presentation before parser-blocking app scripts execute. */
 html.city-map-boot body {
   min-height:100vh;
-  background:#b9d9c5 url('./encounter-default-scene.webp') center/cover no-repeat fixed;
+  background:#18253e;
 }
+html.city-map-boot .city-map-stage { visibility:hidden; }
 html.city-map-boot .sidebar,
 html.city-map-boot header,
 html.city-map-boot #mobileNav { display:none!important; }
@@ -469,18 +472,18 @@ main { max-width:1500px; margin:auto; padding:25px; }
 /* 單人對話使用完整視窗高度，不顯示全站標頭（頁名／測試環境／錢包／帳號）。 */
 body.conversation .app > header { display:none !important; }
 body.conversation main { max-width:none; height:100dvh; padding:0; }
-body.conversation .chat-layout { height:100dvh; }
+body.conversation .chat-layout { height:100dvh; grid-template-columns:1fr; gap:0; }
 body.chat-page main { max-width:none; padding:12px; }
 body.group-chat-page .app > header,body.group-chat-page .mobile-nav { display:none !important; }
-body.group-chat-page .sidebar { display:flex; }
-body.group-chat-page .app { margin-left:var(--sidebar); }
+body.group-chat-page .sidebar { display:none!important; }
+body.group-chat-page .app { margin-left:0!important; }
 body.group-chat-page:has(.group-wizard) .sidebar { display:none !important; }
 body.group-chat-page:has(.group-wizard) .app { margin-left:0; }
 body.group-chat-page main { max-width:none; height:100dvh; min-height:0; padding:0; overflow:hidden; }
-body.group-chat-page .chat-layout { height:100dvh; }
+body.group-chat-page .chat-layout { height:100dvh; grid-template-columns:1fr; gap:0; }
 body.group-chat-page .chat-main { height:100%; border:0; border-radius:0; }
 body.group-chat-page .chat-heading { padding-top:calc(8px + env(safe-area-inset-top)); }
-body.group-chat-page .messages { padding:14px 10px; }
+body.group-chat-page .messages { padding:12px 12px; }
 body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-bottom)); }
 
 /* Group creation wizard must scroll independently from the full-screen chat shell. */
@@ -572,12 +575,12 @@ body.group-chat-page:has(.group-wizard) #view {
 .chat-heading .avatar { width:31px; height:31px; }
 .chat-heading button { padding:6px; }
 .chat-name { font-size:13px; font-weight:bold; }
-.messages { flex:1 1 0; min-height:0; overflow-y:auto; padding:20px; overscroll-behavior:contain; }
+ .messages { flex:1 1 0; min-height:0; overflow-y:auto; padding:14px 16px; overscroll-behavior:contain; }
 .message { display:flex; gap:8px; margin-bottom:19px; position:relative; }
 .message.user { flex-direction:row-reverse; }
 .message.user > .avatar { display:none !important; }
 .message .avatar { width:30px; height:30px; }
-.message-content { max-width:85%; min-width:0; }
+.message-content { flex:1 1 auto; width:100%; max-width:100%; min-width:0; }
 .message-name { color:var(--muted); font-size:10px; margin-bottom:5px; }
 .user .message-name { text-align:right; }
 .roleplay-segments { display:grid; gap:5px; }
@@ -587,10 +590,10 @@ body.group-chat-page:has(.group-wizard) #view {
 .roleplay-avatar-wrap { position:relative; display:block; flex:0 0 30px; width:30px; min-width:30px; height:30px; min-height:30px; overflow:visible; }
 .roleplay-avatar-wrap > .avatar { display:block; box-sizing:border-box; width:30px !important; height:30px !important; min-width:30px; min-height:30px; max-width:30px; max-height:30px; }
 .roleplay-avatar-wrap.has-player-badge::after { content:'你'; position:absolute; z-index:20; right:-3px; bottom:-3px; display:flex; box-sizing:border-box; width:16px; height:16px; min-width:16px; min-height:16px; align-items:center; justify-content:center; border:1px solid var(--panel); border-radius:3px; background:var(--primary); color:#fff; font-size:8px; font-weight:700; line-height:1; white-space:nowrap; pointer-events:none; }
-.roleplay-prefixed-message .message-content { max-width:calc(100% - 8px); }
+.roleplay-prefixed-message .message-content { flex:1 1 auto; width:100%; max-width:100%; }
 .roleplay-segment.is-character .bubble { background:var(--bubble); color:var(--text); border-color:var(--border); }
 .roleplay-segment.is-temporary .bubble { background:var(--panel2); color:var(--text); border:1px dashed var(--border); }
-.roleplay-segment.is-user .bubble { background:var(--primary); color:white; border-color:transparent; }
+.roleplay-segment.is-user .bubble { background:var(--user-bubble); color:var(--text); border-color:var(--border); }
 .bubble {
   font-size:16px;
   padding:12px 14px;
@@ -602,7 +605,7 @@ body.group-chat-page:has(.group-wizard) #view {
   line-height:1.85;
   margin-bottom:3px;
 }
-.user .bubble { background:var(--primary); color:white; border-color:transparent; }
+.user .bubble { background:var(--user-bubble); color:var(--text); border-color:var(--border); }
 .narration {
   display:block;
   font-size:16px;
@@ -904,7 +907,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   body.conversation .chat-list { display:none; }
   body.conversation .chat-main { height:100%; border:0; border-radius:0; }
   .chat-heading { padding:6px 8px; }
-  .messages { padding:14px 10px; }
+  .messages { padding:12px 12px; }
   .composer { padding:5px 8px calc(5px + env(safe-area-inset-bottom)); }
   .composer-input-row textarea { height:36px; min-height:36px; padding:7px 9px; font-size:13px; }
   .composer-bottom-row { gap:5px; margin-top:6px; }
@@ -919,8 +922,9 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .suggestion-card-action,.suggestion-card-dialogue { font-size:15px; }
   .composer .chat-tools button { font-size:9px; padding:4px 6px; }
   .chat-tools { margin-top:0; }
-  .message-content { max-width:80%; }
-  .bubble,.narration { font-size:16px; }
+  .message-content { max-width:100%; }
+  .bubble { font-size:15px; padding:10px 12px; }
+  .narration { font-size:15px; }
   .comment.reply { margin-left:12px; }
   #toast {
     top:max(18px, env(safe-area-inset-top));
@@ -973,8 +977,9 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 body.city-map-mode .app{margin-left:0!important}
 body.city-map-mode .sidebar,body.city-map-mode header{display:none!important}
 body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
-.city-map-stage{position:fixed;inset:0;width:100vw;height:100dvh;min-height:560px;overflow:hidden;background:#b9d9c5;isolation:isolate;touch-action:none;user-select:none;z-index:1}
-.city-map-world{position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:center;will-change:transform;background-image:url('./encounter-default-scene.webp');background-position:center;background-size:100% 100%;background-repeat:no-repeat;overflow:visible}
+.city-map-stage{position:fixed;inset:0;width:100vw;height:100dvh;min-height:560px;overflow:hidden;background:#18253e;isolation:isolate;touch-action:none;user-select:none;z-index:1}
+.city-map-stage.is-loading .city-map-world{visibility:hidden}
+.city-map-world{position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:center;will-change:transform;background-image:none;background-position:center;background-size:100% 100%;background-repeat:no-repeat;overflow:visible}
 .city-map-world:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#18253e12,transparent 30%,#18253e18);pointer-events:none}
 .city-map-river{display:none!important;position:absolute;left:-5%;top:28%;width:112%;height:18%;background:#8fc8df;border:12px solid #d6e6d7;border-radius:50%;transform:rotate(-12deg);box-shadow:0 0 0 8px #b4d8bf}
 .city-map-road{display:none!important;position:absolute;background:#f3e8cf;border:5px solid #fff8e8;border-radius:30px;box-shadow:0 2px 0 #8ba994}

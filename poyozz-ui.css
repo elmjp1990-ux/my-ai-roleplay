@@ -189,31 +189,44 @@ body:not(.day) .chat-entry.active,body.day .chat-entry.active {
 
 
 /* Chat speaker surfaces: readable neutral greys, with distinct authorship. */
-.roleplay-segment.is-character .bubble,
-.roleplay-segment.is-temporary .bubble,
-.message:not(.user) .bubble {
-  background:rgba(92,97,104,.78);
-  border-color:rgba(210,214,219,.24);
-  color:var(--text);
+/* Explicit, high-specificity speaker rules override the legacy purple player bubble. */
+body .message:not(.user) .bubble,
+body .roleplay-segment.is-character .bubble,
+body .roleplay-segment.is-temporary .bubble {
+  background:rgba(105,110,117,.56)!important;
+  border-color:rgba(210,214,219,.30)!important;
+  color:var(--text)!important;
 }
-.roleplay-segment.is-user .bubble,
-.message.user .bubble,
-.user .bubble {
-  background:rgba(137,142,149,.58);
-  border-color:rgba(225,228,232,.32);
-  color:var(--text);
+body .message.user .bubble,
+body .roleplay-segment.is-user .bubble,
+body .user .bubble {
+  background:rgba(155,160,167,.32)!important;
+  border-color:rgba(225,228,232,.36)!important;
+  color:var(--text)!important;
 }
+body.day .message:not(.user) .bubble,
 body.day .roleplay-segment.is-character .bubble,
-body.day .roleplay-segment.is-temporary .bubble,
-body.day .message:not(.user) .bubble {
-  background:rgba(211,214,218,.94);
-  border-color:rgba(112,117,124,.22);
-  color:#252628;
+body.day .roleplay-segment.is-temporary .bubble {
+  background:rgba(205,209,214,.92)!important;
+  border-color:rgba(112,117,124,.25)!important;
+  color:#252628!important;
 }
-body.day .roleplay-segment.is-user .bubble,
 body.day .message.user .bubble,
+body.day .roleplay-segment.is-user .bubble,
 body.day .user .bubble {
-  background:rgba(235,237,239,.98);
-  border-color:rgba(112,117,124,.28);
-  color:#252628;
+  background:rgba(235,237,240,.98)!important;
+  border-color:rgba(112,117,124,.30)!important;
+  color:#252628!important;
+}
+
+/* Full-width single/group chat surfaces and readable message measure. */
+body.conversation .chat-main,
+body.group-chat-page .chat-main { width:100%; border-radius:0; }
+body.conversation .messages,
+body.group-chat-page .messages { width:100%; }
+body.conversation .message-content,
+body.group-chat-page .message-content { flex:1 1 auto; width:100%; max-width:100%; min-width:0; }
+@media(max-width:600px) {
+  body.conversation .messages,
+  body.group-chat-page .messages { padding-inline:12px; }
 }
