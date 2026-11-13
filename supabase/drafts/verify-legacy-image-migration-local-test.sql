@@ -4,7 +4,8 @@ declare
   v_metadata integer;
   v_objects integer;
   v_current integer;
-  v_historical integer;\n  v_historical_objects integer;
+  v_historical integer;
+  v_historical_objects integer;
   v_total_cleared integer;
 begin
   select count(*) into v_characters
@@ -45,7 +46,8 @@ begin
   if v_metadata <> 8 then raise exception 'Expected 8 primary metadata rows, got %', v_metadata; end if;
   if v_objects <> 21 then raise exception 'Expected 21 Storage objects (8 primary + 13 historical), got %', v_objects; end if;
   if v_current <> 74 then raise exception 'Expected 74 pathified snapshots, got %', v_current; end if;
-  if v_historical <> 13 then raise exception 'Expected 13 historical snapshots with preserved image paths, got %', v_historical; end if;\n  if v_historical_objects <> 13 then raise exception 'Expected 13 historical Storage objects, got %', v_historical_objects; end if;
+  if v_historical <> 13 then raise exception 'Expected 13 historical snapshots with preserved image paths, got %', v_historical; end if;
+  if v_historical_objects <> 13 then raise exception 'Expected 13 historical Storage objects, got %', v_historical_objects; end if;
   if v_total_cleared <> 87 then raise exception 'Expected 87 total snapshot clears, got %', v_total_cleared; end if;
 end;
 $$;
