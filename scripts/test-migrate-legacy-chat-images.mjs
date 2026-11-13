@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildMigrationPlan, parseImageDataUri } from "./migrate-legacy-chat-images.mjs";
 import { applyLegacyImageMigration, createResumableManifest, hashJson } from "./legacy-image-migration-runner.mjs";
-import { assertLocalSupabaseUrl } from "./apply-legacy-chat-image-migration-local.mjs";\nimport { readFileSync } from "node:fs";
+import { assertLocalSupabaseUrl } from "./apply-legacy-chat-image-migration-local.mjs";
+import { readFileSync } from "node:fs";
 
 const uuid = n => `00000000-0000-4000-8000-${String(n).padStart(12,"0")}`;
 const data = (text, mime="image/png") => `data:${mime};base64,${Buffer.from(text).toString("base64")}`;
@@ -43,7 +44,8 @@ test("plans 8 primary images, 74 current snapshots, and preserves 13 historical 
   });
   assert.equal(plan.primaryAssets.every(x=>x.assetType==="primary"&&x.sortOrder===0),true);
   assert.equal(plan.currentSnapshots.every(x=>x.nextSnapshot.image===""&&x.nextSnapshot.imagePath===x.storagePath),true);
-  assert.equal(plan.historicalSnapshots.every(x=>x.nextSnapshot.image===""&&typeof x.nextSnapshot.imagePath==="string"),true);\n  assert.equal(plan.historicalAssets.length,13);
+  assert.equal(plan.historicalSnapshots.every(x=>x.nextSnapshot.image===""&&typeof x.nextSnapshot.imagePath==="string"),true);
+  assert.equal(plan.historicalAssets.length,13);
   assert.equal(plan.currentSnapshots.every(x=>x.nextSnapshot.opening==="Keep me"),true);
   assert.equal(plan.historicalSnapshots.every(x=>x.nextSnapshot.opening==="Preserve text"),true);
   assert.equal(plan.safety.databaseWrites,false);
@@ -152,7 +154,8 @@ test("resumable runner recovers after interruption without duplicate objects or 
   assert.equal([...characters.values()].every(x => x.avatar_url == null), true);
   assert.equal([...sessions.values()].filter(x => x.character_snapshot.imagePath).length, 87);
   assert.equal([...sessions.values()].filter(x => x.character_snapshot.image === "").length, 87);
-  assert.equal(metadata.size, 8);\n  assert.equal(manifest.historicalAssets.filter(x => x.objectVerified).length, 13);
+  assert.equal(metadata.size, 8);
+  assert.equal(manifest.historicalAssets.filter(x => x.objectVerified).length, 13);
   assert.ok(checkpoints.length > 90);
 
   const before = { uploadCount, metadataInsertCount, snapshotWrites };
