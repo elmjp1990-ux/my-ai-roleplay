@@ -30,7 +30,12 @@ begin
   from public.chat_sessions
   where id::text like '40000000-0000-4000-8000-%'
     and character_snapshot->>'image' = ''
-    and not (character_snapshot ? 'imagePath');
+    and character_snapshot->>'imagePath' is not null;
+  select count(*) into v_historical_objects
+  from storage.objects
+  where bucket_id = 'character-illustrations'
+    and name like '10000000-0000-4000-8000-000000000001/20000000-0000-4000-8000-%'
+    and name not in (select storage_path from public.character_illustrations);
   select count(*) into v_total_cleared
   from public.chat_sessions
   where (id::text like '30000000-0000-4000-8000-%' or id::text like '40000000-0000-4000-8000-%')
