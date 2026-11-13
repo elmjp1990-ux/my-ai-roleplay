@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildMigrationPlan, parseImageDataUri } from "./migrate-legacy-chat-images.mjs";
+import { buildMigrationPlan, buildMigrationReadQueries, parseImageDataUri } from "./migrate-legacy-chat-images.mjs";
 import { applyLegacyImageMigration, createResumableManifest, hashJson } from "./legacy-image-migration-runner.mjs";
-import { assertLocalSupabaseUrl } from "./apply-legacy-chat-image-migration-local.mjs";
+import { assertLocalSupabaseUrl, createLocalSupabaseAdapter } from "./apply-legacy-chat-image-migration-local.mjs";
 import { readFileSync } from "node:fs";
 
 const uuid = n => `00000000-0000-4000-8000-${String(n).padStart(12,"0")}`;
@@ -28,6 +28,39 @@ function fixture() {
   });
   return {characters,sessions};
 }
+
+test("source reads are scoped to legacy-avatar characters and only their chat sessions", () => {
+  const queries = buildMigrationReadQueries([uuid(8), uuid(1), uuid(8)]);
+  assert.deepEqual(queries.characters, {
+    select: "id,author_id,avatar_url",
+    filters: { avatar_url: "ilike.data:image/*" },
+  });
+  assert.deepEqual(queries.sessions, {
+    select: "id,character_id,character_snapshot",
+    filters: { character_id: `in.(${uuid(1)},${uuid(8)})` },
+  });
+  assert.equal(buildMigrationReadQueries([]).sessions, null);
+  assert.throws(() => buildMigrationReadQueries(["not-a-uuid"]), /Invalid character UUID/);
+});
+
+test("single-row verification reads select only the required columns", async () => {
+  const requested = [];
+  const adapter = createLocalSupabaseAdapter({
+    url: "http://127.0.0.1:54321",
+    serviceRoleKey: "local-test-key",
+    fetchImpl: async input => {
+      requested.push(new URL(input).searchParams);
+      return new Response(JSON.stringify([{ id: uuid(1) }]), {
+        status: 200, headers: { "Content-Type": "application/json" },
+      });
+    },
+  });
+  await adapter.getCharacter(uuid(1));
+  await adapter.getSession(uuid(2));
+  assert.equal(requested[0].get("select"), "id,author_id,avatar_url");
+  assert.equal(requested[1].get("select"), "id,character_id,character_snapshot");
+  assert.equal(requested.every(query => query.get("limit") === "2"), true);
+});
 
 test("parses supported image data URIs and rejects malformed payloads",()=>{
   assert.equal(parseImageDataUri(data("x","image/jpeg")).extension,"jpg");
