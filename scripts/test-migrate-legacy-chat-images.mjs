@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildMigrationPlan, parseImageDataUri } from "./migrate-legacy-chat-images.mjs";
 import { applyLegacyImageMigration, createResumableManifest, hashJson } from "./legacy-image-migration-runner.mjs";
+import { assertLocalSupabaseUrl } from "./apply-legacy-chat-image-migration-local.mjs";
 
 const uuid = n => `00000000-0000-4000-8000-${String(n).padStart(12,"0")}`;
 const data = (text, mime="image/png") => `data:${mime};base64,${Buffer.from(text).toString("base64")}`;
@@ -157,4 +158,13 @@ test("resumable runner recovers after interruption without duplicate objects or 
   const before = { uploadCount, metadataInsertCount, snapshotWrites };
   await applyLegacyImageMigration({ manifest, adapter });
   assert.deepEqual({ uploadCount, metadataInsertCount, snapshotWrites }, before);
+});
+
+
+test("apply target is restricted to loopback Supabase on port 54321", () => {
+  assert.doesNotThrow(() => assertLocalSupabaseUrl("http://127.0.0.1:54321"));
+  assert.doesNotThrow(() => assertLocalSupabaseUrl("http://localhost:54321"));
+  assert.throws(() => assertLocalSupabaseUrl("https://ouyewoagbmtqehbofrje.supabase.co"), /restricted to/);
+  assert.throws(() => assertLocalSupabaseUrl("http://127.0.0.1:54322"), /restricted to/);
+  assert.throws(() => assertLocalSupabaseUrl("http://localhost.evil.example:54321"), /restricted to/);
 });
