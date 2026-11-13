@@ -65,10 +65,10 @@ test('hidden and deleted characters prefer their own chat snapshot portrait over
 test('legacy archived chat avatars hydrate only when visible and only from the owned session snapshot', () => {
   const hydration = between(html, 'async function hydrateCloudSessionCharacterImage(s)', 'function applyCloudChatSessionAvatarUrl(session,url)');
   assert.match(hydration, /legacy-snapshot-image/);
-  assert.match(hydration, /\.select\('character_snapshot'\)/);
+  assert.match(hydration, /\.select\('snapshot_id:character_snapshot->>id,snapshot_image:character_snapshot->>image'\)/);
   assert.match(hydration, /\.eq\('id',s\.id\)\.eq\('user_id',uid\)\.is\('deleted_at',null\)/);
-  assert.match(hydration, /stored\.id!==s\.characterId/);
-  assert.match(hydration, /safeImage\(stored\.image\)/);
+  assert.match(hydration, /data\?\.snapshot_id!==s\.characterId/);
+  assert.match(hydration, /safeImage\(data\?\.snapshot_image\)/);
   assert.match(hydration, /state\.sessions\?\.\[s\.id\]!==s/);
   const observer = between(html, 'function observeCloudChatSessionAvatars(root=', 'function canAccessSessionCharacter(s,c)');
   assert.match(observer, /list\.querySelectorAll\('\[data-chat-avatar-session-id\]'\)/);
