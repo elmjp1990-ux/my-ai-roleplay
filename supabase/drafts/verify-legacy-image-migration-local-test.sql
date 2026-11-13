@@ -22,7 +22,8 @@ begin
   select count(*) into v_objects
   from storage.objects
   where bucket_id = 'character-illustrations'
-    and name like '10000000-0000-4000-8000-000000000001/20000000-0000-4000-8000-%';
+    and name like '10000000-0000-4000-8000-000000000001/20000000-0000-4000-8000-%'
+    and name <> '10000000-0000-4000-8000-000000000001/20000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000099.png';
   select count(*) into v_current
   from public.chat_sessions
   where id::text like '30000000-0000-4000-8000-%'
@@ -37,6 +38,7 @@ begin
   from storage.objects
   where bucket_id = 'character-illustrations'
     and name like '10000000-0000-4000-8000-000000000001/20000000-0000-4000-8000-%'
+    and name <> '10000000-0000-4000-8000-000000000001/20000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000099.png'
     and name not in (select storage_path from public.character_illustrations);
   select count(*) into v_total_cleared
   from public.chat_sessions
@@ -68,7 +70,8 @@ select
     and character_id between '20000000-0000-4000-8000-000000000001'::uuid
                          and '20000000-0000-4000-8000-000000000008'::uuid) as primary_metadata,
   (select count(*) from storage.objects where bucket_id = 'character-illustrations'
-    and name like '10000000-0000-4000-8000-000000000001/20000000-0000-4000-8000-%') as storage_objects,
+    and name like '10000000-0000-4000-8000-000000000001/20000000-0000-4000-8000-%'
+    and name <> '10000000-0000-4000-8000-000000000001/20000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000099.png') as storage_objects,
   (select count(*) from public.chat_sessions where id::text like '30000000-0000-4000-8000-%'
     and character_snapshot->>'imagePath' is not null and character_snapshot->>'image' = '') as pathified_snapshots,
   (select count(*) from public.chat_sessions where id::text like '40000000-0000-4000-8000-%'
