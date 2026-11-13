@@ -28,7 +28,8 @@ insert into public.chat_sessions (
   character_snapshot, session_data, chat_mode
 )
 select
-  ('30000000-0000-4000-8000-' || lpad((n)::text, 12, '0'))::uuid,
+  ('30000000-0000-4000-8000-' ||
+    lpad((((right(c.id::text, 12)::integer - 1) * 10) + n)::text, 12, '0'))::uuid,
   '10000000-0000-4000-8000-000000000001'::uuid,
   c.id,
   c.name,
@@ -39,14 +40,8 @@ select
 from public.characters c
 cross join lateral generate_series(
   1,
-  case when right(c.id::text, 1)::integer <= 6 then 9 else 10 end
-) n
-cross join lateral (
-  select row_number() over (order by c.id) as character_no
-) x
-cross join lateral (
-  select (x.character_no - 1) * 10 + n as n
-) seq;
+  case when right(c.id::text, 12)::integer <= 6 then 9 else 10 end
+) n;
 
 -- Historical versions deliberately use a different MIME casing so their bytes
 -- parse as PNG but never compare equal to today's avatar_url string.
