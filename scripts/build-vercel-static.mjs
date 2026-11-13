@@ -16,6 +16,7 @@ const runtimeFiles = [
   'followed-authors.js',
   'author-profile.js',
   'comment-renderer.js',
+  'custom-tag-picker.js',
   'memory-album.js',
   'encounter-scene.js',
   'LOGO_WEBICON.webp',
