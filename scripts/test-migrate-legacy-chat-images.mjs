@@ -170,6 +170,10 @@ test("rejects corrupted or edited resume manifests before any adapter operation"
   badCounts.counts.currentSnapshots = 73;
   await assert.rejects(applyLegacyImageMigration({ manifest: badCounts }), /currentSnapshots must be 74/);
 
+  const falseComplete = makeManifest();
+  falseComplete.status = "complete";
+  await assert.rejects(applyLegacyImageMigration({ manifest: falseComplete }), /complete status requires every migration step/);
+
   const badPath = makeManifest();
   badPath.currentSnapshots[0].targetSnapshot.imagePath = "other-user/other-character/unsafe.png";
   badPath.currentSnapshots[0].targetSnapshotHash = hashJson(badPath.currentSnapshots[0].targetSnapshot);
