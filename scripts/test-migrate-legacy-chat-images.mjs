@@ -86,6 +86,22 @@ test("plans 8 primary images, 74 current snapshots, and preserves 13 historical 
   assert.equal(plan.safety.historicalImagesPreserved,true);
 });
 
+test("classifies identical image bytes by the owning session character", () => {
+  const shared = data("same-image-bytes");
+  const characters = [
+    { id: uuid(1), author_id: uuid(101), avatar_url: shared },
+    { id: uuid(2), author_id: uuid(102), avatar_url: shared },
+  ];
+  const sessions = characters.map((character, index) => ({
+    id: uuid(3000 + index),
+    character_id: character.id,
+    character_snapshot: { id: character.id, image: shared },
+  }));
+  const plan = buildMigrationPlan({ characters, sessions, strictCounts: false });
+  assert.deepEqual(plan.currentSnapshots.map(row => row.characterId).sort(), [uuid(1), uuid(2)]);
+  assert.equal(plan.historicalSnapshots.length, 0);
+});
+
 test("is deterministic and safe to rerun",()=>{
   const input=fixture();
   const first=buildMigrationPlan(input);
@@ -241,8 +257,7 @@ test("historical image Storage reads are restricted to the exact owned chat snap
   assert.match(migration, /s\.character_snapshot->>'imagePath' = p_object_name/);
   assert.match(migration, /split_part\(p_object_name, '\/', 1\) = c\.author_id::text/);
   assert.match(migration, /split_part\(p_object_name, '\/', 2\) = s\.character_id::text/);
-  assert.match(migration, /\[\.\]\(jpg\|jpeg\|png\|webp\)\
-/);
+  assert.ok(migration.includes("[.](jpg|jpeg|png|webp)$"));
   assert.equal((migration.match(/\$function\$/g) || []).length, 2);
   assert.equal((migration.match(/COMMENT ON FUNCTION/g) || []).length, 1);
   assert.doesNotMatch(migration, /TO anon|TO public|FOR INSERT|FOR UPDATE|FOR DELETE/i);
