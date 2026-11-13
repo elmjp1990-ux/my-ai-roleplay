@@ -1,0 +1,312 @@
+#!/usr/bin/env node
+/**
+ * Legacy character image migration planner.
+ *
+ * Safe by default: this tool only reads Supabase and prints a migration plan.
+ * It deliberately does not upload, update, delete, or apply SQL.
+ *
+ * Usage:
+ *   SUPABASE_URL=http://127.0.0.1:54321 \
+ *   SUPABASE_SERVICE_ROLE_KEY=... \
+ *   node scripts/migrate-legacy-chat-images.mjs
+ *
+ * Explicit apply mode is implemented separately and is hard-restricted to a
+ * disposable local Supabase instance on loopback port 54321.
+ */
+
+import { createHash } from "node:crypto";
+import { pathToFileURL } from "node:url";
+import { resolve, dirname } from "node:path";
+import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync } from "node:fs";
+import { createResumableManifest } from "./legacy-image-migration-runner.mjs";
+import { assertLocalSupabaseUrl, runLocalMigration } from "./apply-legacy-chat-image-migration-local.mjs";
+
+const EXPECTED = Object.freeze({ characters: 8, currentSnapshots: 74, historicalSnapshots: 13 });
+const DATA_URI = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function parseImageDataUri(value) {
+  if (typeof value !== "string") return null;
+  const match = DATA_URI.exec(value);
+  if (!match) return null;
+  const mimeType = match[1].toLowerCase();
+  const bytes = Buffer.from(match[2], "base64");
+  if (!bytes.length || bytes.toString("base64").replace(/=+$/, "") !== match[2].replace(/=+$/, "")) return null;
+  const extension = mimeType === "image/jpeg" ? "jpg" : mimeType.split("/")[1];
+  return { mimeType, extension, bytes, sha256: createHash("sha256").update(bytes).digest("hex") };
+}
+
+function stableUuid(input) {
+  const bytes = createHash("sha256").update(input).digest().subarray(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.toString("hex");
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+}
+
+export function buildMigrationPlan({ characters, sessions, strictCounts = true }) {
+  if (!Array.isArray(characters) || !Array.isArray(sessions)) throw new TypeError("characters and sessions must be arrays");
+  const byId = new Map();
+  const characterById = new Map();
+  for (const character of characters) {
+    if (!UUID.test(character?.id || "") || !UUID.test(character?.author_id || "")) {
+      throw new Error("Invalid character or author UUID in source rows");
+    }
+    if (characterById.has(character.id)) throw new Error("Duplicate character id: " + character.id);
+    characterById.set(character.id, character);
+    const parsed = parseImageDataUri(character.avatar_url);
+    if (parsed) byId.set(character.id, { character, parsed });
+  }
+
+  const primaryAssets = [];
+  for (const { character, parsed } of byId.values()) {
+    const fileId = stableUuid(`poyozz-legacy-primary:${character.id}:${parsed.sha256}`);
+    primaryAssets.push({
+      characterId: character.id,
+      authorId: character.author_id,
+      sourceSha256: parsed.sha256,
+      mimeType: parsed.mimeType,
+      extension: parsed.extension,
+      bytes: parsed.bytes.length,
+      storagePath: `${character.author_id}/${character.id}/${fileId}.${parsed.extension}`,
+      assetType: "primary",
+      sortOrder: 0,
+    });
+  }
+
+  const currentSnapshots = [];
+  const historicalSnapshots = [];
+  const historicalAssetByKey = new Map();
+  const matchedByCharacter = new Map([...byId.keys()].map(id => [id, 0]));
+  const seenSessionIds = new Set();
+  for (const session of sessions) {
+    if (!UUID.test(session?.id || "")) throw new Error("Invalid chat_sessions.id");
+    if (seenSessionIds.has(session.id)) throw new Error("Duplicate chat session id: " + session.id);
+    seenSessionIds.add(session.id);
+    const snapshot = session.character_snapshot;
+    if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) continue;
+    const image = snapshot.image;
+    if (typeof image !== "string" || !image.startsWith("data:image/")) continue;
+    const parsedSnapshot = parseImageDataUri(image);
+    if (!parsedSnapshot) throw new Error(`Unsupported or malformed snapshot Data URI in session ${session.id}`);
+
+    const currentCharacter = byId.get(session.character_id);
+    if (currentCharacter && currentCharacter.character.avatar_url === image) {
+      const characterId = session.character_id;
+      const item = currentCharacter;
+      const asset = primaryAssets.find(row => row.characterId === characterId);
+      currentSnapshots.push({
+        sessionId: session.id,
+        characterId,
+        sourceSha256: item.parsed.sha256,
+        expectedSnapshot: snapshot,
+        storagePath: asset.storagePath,
+        nextSnapshot: { ...snapshot, image: "", imagePath: asset.storagePath },
+      });
+      matchedByCharacter.set(characterId, matchedByCharacter.get(characterId) + 1);
+    } else {
+      // Preserve the exact historical image bytes in a private Storage object.
+      // Never replace an old portrait with the character's current primary image.
+      const owner = characterById.get(session.character_id);
+      if (!owner) throw new Error(`Historical snapshot ${session.id} has no matching character row`);
+      const historicalKey = session.character_id + ":" + parsedSnapshot.sha256;
+      let historicalAsset = historicalAssetByKey.get(historicalKey);
+      if (!historicalAsset) {
+        const fileId = stableUuid(`poyozz-legacy-historical:${session.character_id}:${parsedSnapshot.sha256}`);
+        historicalAsset = {
+          characterId: session.character_id,
+          authorId: owner.author_id,
+          sourceSha256: parsedSnapshot.sha256,
+          mimeType: parsedSnapshot.mimeType,
+          extension: parsedSnapshot.extension,
+          bytes: parsedSnapshot.bytes.length,
+          storagePath: `${owner.author_id}/${session.character_id}/${fileId}.${parsedSnapshot.extension}`,
+          assetType: "historical",
+        };
+        historicalAssetByKey.set(historicalKey, historicalAsset);
+      }
+      historicalSnapshots.push({
+        sessionId: session.id,
+        characterId: session.character_id,
+        sourceSha256: parsedSnapshot.sha256,
+        expectedSnapshot: snapshot,
+        storagePath: historicalAsset.storagePath,
+        nextSnapshot: { ...snapshot, image: "", imagePath: historicalAsset.storagePath },
+      });
+    }
+  }
+
+  const unmatchedCurrent = [...matchedByCharacter].filter(([, count]) => count === 0).map(([id]) => id);
+  if (strictCounts) {
+    if (primaryAssets.length !== EXPECTED.characters ||
+        currentSnapshots.length !== EXPECTED.currentSnapshots ||
+        historicalSnapshots.length !== EXPECTED.historicalSnapshots) {
+      throw new Error(`Inventory drift: expected 8/74/13, found ${primaryAssets.length}/${currentSnapshots.length}/${historicalSnapshots.length}`);
+    }
+    if (unmatchedCurrent.length) throw new Error("Some current character images have no matching chat snapshot: " + unmatchedCurrent.join(", "));
+  }
+
+  return {
+    version: 1,
+    mode: "dry-run",
+    counts: {
+      primaryImages: primaryAssets.length,
+      currentSnapshots: currentSnapshots.length,
+      historicalSnapshots: historicalSnapshots.length,
+      historicalAssets: historicalAssetByKey.size,
+      totalSnapshotUpdates: currentSnapshots.length + historicalSnapshots.length,
+      estimatedImageBytes: primaryAssets.reduce((sum, row) => sum + row.bytes, 0) +
+        [...historicalAssetByKey.values()].reduce((sum, row) => sum + row.bytes, 0),
+    },
+    primaryAssets,
+    currentSnapshots,
+    historicalSnapshots,
+    historicalAssets: [...historicalAssetByKey.values()],
+    safety: {
+      sourceRowsOnly: true,
+      storageWrites: false,
+      databaseWrites: false,
+      deletes: false,
+      historicalImageReplacement: false,
+      historicalImagesPreserved: true,
+    },
+  };
+}
+
+export function buildMigrationReadQueries(characterIds = []) {
+  const ids = [...new Set(characterIds)].sort();
+  if (ids.some(id => !UUID.test(id))) throw new Error("Invalid character UUID in migration read scope");
+  return {
+    characters: {
+      select: "id,author_id,avatar_url",
+      filters: { avatar_url: "ilike.data:image/*" },
+    },
+    sessions: ids.length ? {
+      select: "id,character_id,character_snapshot",
+      filters: { character_id: `in.(${ids.join(",")})`, deleted_at: "is.null" },
+    } : null,
+  };
+}
+
+async function readTable(url, key, table, select, filters = {}) {
+  const rows = [];
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const endpoint = new URL(`/rest/v1/${table}`, url);
+    endpoint.searchParams.set("select", select);
+    endpoint.searchParams.set("order", "id.asc");
+    endpoint.searchParams.set("limit", String(pageSize));
+    for (const [column, filter] of Object.entries(filters)) endpoint.searchParams.set(column, filter);
+    const response = await fetch(endpoint, {
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        Range: `${offset}-${offset + pageSize - 1}`,
+        "Range-Unit": "items",
+      },
+    });
+    if (!response.ok) throw new Error(`Read ${table} failed (${response.status}): ${await response.text()}`);
+    const page = await response.json();
+    if (!Array.isArray(page)) throw new Error(`Read ${table} returned an unexpected payload`);
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
+}
+
+async function readMigrationSources(url, key) {
+  const queries = buildMigrationReadQueries();
+  const characters = await readTable(
+    url, key, "characters", queries.characters.select, queries.characters.filters,
+  );
+  const sessionQuery = buildMigrationReadQueries(characters.map(row => row.id)).sessions;
+  const sessions = sessionQuery
+    ? await readTable(url, key, "chat_sessions", sessionQuery.select, sessionQuery.filters)
+    : [];
+  return { characters, sessions };
+}
+
+async function main() {
+  const args = new Set(process.argv.slice(2));
+  const apply = args.has("--apply");
+  const confirmLocal = args.has("--confirm-local");
+  const manifestArg = process.argv.slice(2).find(value => value.startsWith("--manifest="));
+  const manifestPath = manifestArg?.slice("--manifest=".length);
+  if (apply && !confirmLocal) {
+    throw new Error("Local apply requires BOTH --apply and --confirm-local.");
+  }
+  if (confirmLocal && !apply) throw new Error("--confirm-local is valid only together with --apply.");
+  if (apply && !manifestPath) throw new Error("Local apply requires --manifest=./path/to/migration-manifest.json.");
+
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error("Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
+  const base = new URL(url);
+  if (base.protocol !== "http:" && base.protocol !== "https:") throw new Error("Unsupported SUPABASE_URL protocol");
+
+  if (apply) {
+    assertLocalSupabaseUrl(url);
+    let manifest;
+    if (existsSync(manifestPath)) {
+      manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+      if (manifest.version !== 1) throw new Error("Unsupported migration manifest version.");
+    } else {
+      const { characters, sessions } = await readMigrationSources(url, key);
+      const plan = buildMigrationPlan({ characters, sessions });
+      manifest = createResumableManifest(plan, characters);
+      persistManifest(manifestPath, manifest);
+    }
+    const completed = await runLocalMigration({
+      url,
+      serviceRoleKey: key,
+      manifest,
+      persist: next => persistManifest(manifestPath, next),
+    });
+    console.log(JSON.stringify({
+      status: completed.status,
+      counts: completed.counts,
+      assets: {
+        objectsVerified: completed.assets.filter(row => row.objectVerified).length,
+        metadataVerified: completed.assets.filter(row => row.metadataVerified).length,
+        avatarsCleared: completed.assets.filter(row => row.avatarCleared).length,
+      },
+      snapshots: {
+        currentPathified: completed.currentSnapshots.filter(row => row.completed).length,
+        historicalPreserved: completed.historicalSnapshots.filter(row => row.completed).length,
+        historicalObjectsVerified: completed.historicalAssets.filter(row => row.objectVerified).length,
+      },
+      manifestPath,
+    }, null, 2));
+    return;
+  }
+
+  const { characters, sessions } = await readMigrationSources(url, key);
+  const plan = buildMigrationPlan({ characters, sessions });
+  const safePlan = {
+    ...plan,
+    primaryAssets: plan.primaryAssets.map(({ ...row }) => ({ ...row, bytes: row.bytes })),
+    currentSnapshots: plan.currentSnapshots.map(({ nextSnapshot, expectedSnapshot, ...row }) => row),
+    historicalSnapshots: plan.historicalSnapshots.map(({ nextSnapshot, expectedSnapshot, ...row }) => row),
+    historicalAssets: plan.historicalAssets.map(({ ...row }) => row),
+  };
+  console.log(JSON.stringify(safePlan, null, 2));
+}
+
+function persistManifest(path, manifest) {
+  const serialized = JSON.stringify(manifest, null, 2);
+  if (serialized.includes("data:image/")) {
+    throw new Error("Refusing to persist a manifest containing embedded image data.");
+  }
+  const absolute = resolve(path);
+  mkdirSync(dirname(absolute), { recursive: true });
+  const temporary = absolute + ".tmp";
+  writeFileSync(temporary, serialized + "\n", { mode: 0o600 });
+  renameSync(temporary, absolute);
+}
+
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  main().catch(error => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}
