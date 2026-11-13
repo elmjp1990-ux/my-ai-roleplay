@@ -299,8 +299,7 @@ function persistManifest(path, manifest) {
   const absolute = resolve(path);
   mkdirSync(dirname(absolute), { recursive: true });
   const temporary = absolute + ".tmp";
-  writeFileSync(temporary, serialized + "
-", { mode: 0o600 });
+  writeFileSync(temporary, serialized + "\n", { mode: 0o600 });
   renameSync(temporary, absolute);
 }
 
