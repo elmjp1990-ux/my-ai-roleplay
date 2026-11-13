@@ -33,17 +33,10 @@ AS $function$
             AND s.character_snapshot->>'imagePath' = p_object_name
             AND split_part(p_object_name, '/', 1) = c.author_id::text
             AND split_part(p_object_name, '/', 2) = s.character_id::text
-            AND p_object_name ~* ('^' || c.author_id::text || '/' || s.character_id::text ||
-              '/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.(jpg|jpeg|png|webp)
-        )
-      )
-      ELSE false
-    END;
-$function$;
-
-COMMENT ON FUNCTION private.can_read_character_asset(text, text) IS
-  'Allows exact character illustration metadata paths for existing chats and exact historical image paths stored in an owned undeleted chat snapshot; no general bucket access.';
-)
+            AND p_object_name ~* (
+              '^' || c.author_id::text || '/' || s.character_id::text ||
+              '/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](jpg|jpeg|png|webp)$'
+            )
         )
       )
       ELSE false
