@@ -157,7 +157,7 @@ export function buildMigrationPlan({ characters, sessions, strictCounts = true }
       historicalSnapshots: historicalSnapshots.length,
       historicalAssets: historicalAssetByKey.size,
       totalSnapshotUpdates: currentSnapshots.length + historicalSnapshots.length,
-      estimatedImageBytes: primaryAssets.reduce((sum, row) => sum + row.bytes, 0),
+      estimatedImageBytes: primaryAssets.reduce((sum, row) => sum + row.bytes, 0) +\n        [...historicalAssetByKey.values()].reduce((sum, row) => sum + row.bytes, 0),
     },
     primaryAssets,
     currentSnapshots,
