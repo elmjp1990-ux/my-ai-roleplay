@@ -13,6 +13,7 @@ on:
       - "supabase/drafts/legacy-image-migration-rpcs.sql"
       - "supabase/drafts/seed-legacy-image-migration-local-test.sql"
       - "supabase/drafts/verify-legacy-image-migration-local-test.sql"
+      - "supabase/migrations/20261113050000_allow_existing_chat_character_media_read.sql"
       - "supabase/migrations/20261113060000_allow_chat_snapshot_image_storage_reads.sql"
       - ".github/workflows/legacy-image-migration-tests.yml"
   pull_request:
@@ -96,6 +97,9 @@ jobs:
           set -euo pipefail
           node scripts/build-disposable-schema-fixture.mjs > "$RUNNER_TEMP/current-state-schema.sql"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
+          # Apply both private-read migrations only to this disposable local Supabase.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261113050000_allow_existing_chat_character_media_read.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261113060000_allow_chat_snapshot_image_storage_reads.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/seed-legacy-image-migration-local-test.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/legacy-image-migration-rpcs.sql
       - name: Run local-only apply and verify Storage plus database state
