@@ -3340,6 +3340,7 @@ function sessionCharacter(s) {
   );
   const snap = s.cloudCharacterSnapshot;
   const hasMatchingSnapshot=!!snap&&snap.id===s.characterId;
+  const snapshotAuthorId=hasMatchingSnapshot&&Object.prototype.hasOwnProperty.call(snap,'authorId') ? snap.authorId : '';
   const uid=currentUser()?.uid||'';
   const imageCacheKey=hasMatchingSnapshot&&snap.imagePath&&uid&&s.id ? uid+':'+s.id+':'+snap.imagePath : '';
   const cachedImage=imageCacheKey ? cloudSessionImageUrlCache.get(imageCacheKey) : null;
@@ -3353,7 +3354,7 @@ function sessionCharacter(s) {
     imagePath:snap.imagePath || found?.imagePath || '',
     id:s.characterId, name:snap.name || found?.name || s.characterName || '角色',
     visibility:snap.visibility || found?.visibility || 'private', reviewStatus:found?.reviewStatus || 'draft',
-    authorId:Object.prototype.hasOwnProperty.call(snap,'authorId') ? snap.authorId : (found?.authorId || ''),
+    authorId:snapshotAuthorId || found?.authorId || '',
     creatorDisplayName:snap.creatorDisplayName || found?.creatorDisplayName || '',
     creatorHandleSnapshot:snap.creatorHandleSnapshot || found?.creatorHandleSnapshot || '',
     accountArchivedAt:snap.accountArchivedAt || found?.accountArchivedAt || null,
