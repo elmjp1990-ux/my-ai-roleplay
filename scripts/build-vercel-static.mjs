@@ -15,6 +15,7 @@ const runtimeFiles = [
   'city-map.js',
   'followed-authors.js',
   'author-profile.js',
+  'comment-renderer.js',
   'memory-album.js',
   'encounter-scene.js',
   'LOGO_WEBICON.webp',
