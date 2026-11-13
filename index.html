@@ -4916,7 +4916,7 @@ function exploreList() {
   } else if (filter === 'favorites') {
     list = list.filter(c => state.favorites.includes(c.id));
   } else if (filter === 'popular') {
-    list.sort((a,b) => Number(b.chats || 0)-Number(a.chats || 0));
+    list.sort((a,b) => (characterTurnCountCache.get(b.id) ?? Number(b.chats || 0))-(characterTurnCountCache.get(a.id) ?? Number(a.chats || 0)));
   } else if (['male','female'].includes(filter)) {
     list = list.filter(c => c.gender === filter);
   } else {
@@ -5154,7 +5154,11 @@ async function hydratePublicCharacterDetailMetadata(characterId) {
 
 async function hydratePublicCharacterIllustrations(characterId) {
   const existing=state.characters.find(character=>character.id===characterId);
-  if(!existing||existing.publicIllustrationsLoaded===true||!window.mySupabase)return;
+  if(!existing||existing.publicIllustrationsLoaded===true)return;
+  if(!window.mySupabase){
+    schedulePublicCharacterIllustrationRetry(characterId);
+    return;
+  }
   if(publicCharacterIllustrationHydration.has(characterId))return publicCharacterIllustrationHydration.get(characterId);
   const request=(async()=>{
     const primary=await loadPublicCharacterPrimaryIllustration(characterId);
@@ -5185,6 +5189,7 @@ async function hydratePublicCharacterIllustrations(characterId) {
     }
   })().catch(error=>{
     console.warn('角色詳情主立繪延遲載入失敗：',error?.message||error);
+    schedulePublicCharacterIllustrationRetry(characterId);
   });
   publicCharacterIllustrationHydration.set(characterId,request);
   try{return await request;}finally{
@@ -5193,6 +5198,17 @@ async function hydratePublicCharacterIllustrations(characterId) {
 }
 
 let publicCharacterIllustrationObserver=null;
+function schedulePublicCharacterIllustrationRetry(characterId){
+  document.querySelectorAll('img[data-character-primary-illustration]').forEach(image=>{
+    if(image.dataset.characterPrimaryIllustration!==characterId)return;
+    const attempts=Number(image.dataset.primaryIllustrationRetry||0);
+    if(attempts>=3)return;
+    image.dataset.primaryIllustrationRetry=String(attempts+1);
+    setTimeout(()=>{
+      if(image.isConnected)observePublicCharacterIllustrationCards(image.parentElement||document);
+    },500*(attempts+1));
+  });
+}
 function observePublicCharacterIllustrationCards(root) {
   if(!root)return;
   const images=root.querySelectorAll('img[data-character-primary-illustration]');
@@ -5368,6 +5384,11 @@ async function loadCharacterTurnCounts(characterIds, forceRefresh = false) {
     console.warn('角色對話回合統計載入失敗：',error?.message || error);
   } finally {
     ids.forEach(id => characterTurnCountRequests.delete(id));
+    // Popular ordering must use the authoritative turn-count RPC result, not the
+    // possibly stale count embedded in the initially loaded character record.
+    if(ids.length && route?.page==='home' && filter==='popular' && $('characterGrid')){
+      renderGrid();
+    }
   }
 }
 function updateCharacterTurnCountElements(characterId,count) {
