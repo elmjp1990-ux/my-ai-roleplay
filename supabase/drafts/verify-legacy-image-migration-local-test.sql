@@ -73,3 +73,87 @@ select
     and character_snapshot->>'imagePath' is not null and character_snapshot->>'image' = '') as pathified_snapshots,
   (select count(*) from public.chat_sessions where id::text like '40000000-0000-4000-8000-%'
     and character_snapshot->>'image' = '' and character_snapshot->>'imagePath' is not null) as historical_pathified;
+
+-- Exercise the actual Storage RLS policy as an authenticated chat owner and outsider.
+BEGIN;
+SET LOCAL ROLE authenticated;
+SELECT pg_catalog.set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000001', true);
+SELECT pg_catalog.set_config('request.jwt.claim.role', 'authenticated', true);
+SELECT pg_catalog.set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-4000-8000-000000000001","role":"authenticated"}',
+  true
+);
+
+DO $storage_owner_assert$
+DECLARE
+  v_primary_path text;
+  v_historical_path text;
+  v_unreferenced_path text :=
+    '10000000-0000-4000-8000-000000000001/20000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000099.png';
+  v_count integer;
+BEGIN
+  SELECT storage_path INTO v_primary_path
+  FROM public.character_illustrations
+  WHERE character_id = '20000000-0000-4000-8000-000000000001'::uuid
+    AND asset_type = 'primary' AND sort_order = 0;
+  IF v_primary_path IS NULL THEN
+    RAISE EXCEPTION 'owner cannot read primary illustration metadata';
+  END IF;
+
+  SELECT character_snapshot->>'imagePath' INTO v_historical_path
+  FROM public.chat_sessions
+  WHERE id = '40000000-0000-4000-8000-000000000001'::uuid
+    AND deleted_at IS NULL;
+  IF v_historical_path IS NULL THEN
+    RAISE EXCEPTION 'owner cannot read historical snapshot path';
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM storage.objects
+  WHERE bucket_id = 'character-illustrations' AND name = v_primary_path;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'owner must read exact primary object, got %', v_count;
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM storage.objects
+  WHERE bucket_id = 'character-illustrations' AND name = v_historical_path;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'owner must read exact historical snapshot object, got %', v_count;
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM storage.objects
+  WHERE bucket_id = 'character-illustrations' AND name = v_unreferenced_path;
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'unreferenced object must not be readable, got %', v_count;
+  END IF;
+END;
+$storage_owner_assert$;
+
+SELECT pg_catalog.set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000002', true);
+SELECT pg_catalog.set_config('request.jwt.claim.role', 'authenticated', true);
+SELECT pg_catalog.set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-4000-8000-000000000002","role":"authenticated"}',
+  true
+);
+
+DO $storage_outsider_assert$
+DECLARE
+  v_historical_path text :=
+    (SELECT character_snapshot->>'imagePath'
+     FROM public.chat_sessions
+     WHERE id = '40000000-0000-4000-8000-000000000001'::uuid);
+  v_count integer;
+BEGIN
+  SELECT count(*) INTO v_count
+  FROM storage.objects
+  WHERE bucket_id = 'character-illustrations' AND name = v_historical_path;
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'unrelated authenticated user must not read historical object, got %', v_count;
+  END IF;
+END;
+$storage_outsider_assert$;
+ROLLBACK;
