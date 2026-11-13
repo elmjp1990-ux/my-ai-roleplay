@@ -10,8 +10,8 @@
  *   SUPABASE_SERVICE_ROLE_KEY=... \
  *   node scripts/migrate-legacy-chat-images.mjs
  *
- * A later, separately reviewed implementation will add an explicit local-only
- * apply mode after this planner has passed fixture and disposable-local tests.
+ * Explicit apply mode is implemented separately and is hard-restricted to a
+ * disposable local Supabase instance on loopback port 54321.
  */
 
 import { createHash } from "node:crypto";
