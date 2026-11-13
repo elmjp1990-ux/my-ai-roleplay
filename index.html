@@ -9214,9 +9214,11 @@ document.addEventListener('click', async event => {
       .eq('id',message.id).eq('group_id',group.id).is('deleted_at',null).select('id').maybeSingle();
     if (error) throw new Error('群組訊息刪除同步失敗：'+error.message);
     if (!data) throw new Error('雲端未確認這則訊息的刪除狀態，請重新載入後再試。');
+    if(groupPrototype.active!==group||groupPrototype.active?.id!==group.id||currentUser()?.uid!==user.uid)return;
     groupPrototype.messages = groupPrototype.messages.filter(item => item.id !== message.id);
     $('modal')?.close();
     renderGroupConversation();
+    refreshOpenChatSearchAfterMutation('group',group.id);
     toast('群組訊息已刪除。');
   } catch (error) {
     console.error('群組訊息操作失敗：', error);
@@ -10240,8 +10242,7 @@ document.addEventListener('click',async event => {
           break;
         }
         closeModal();
-        renderMessages();
-        refreshOpenChatSearchAfterMutation('single',s.id);
+        if(currentSession()===s){renderMessages();refreshOpenChatSearchAfterMutation('single',s.id);}
         break;
       }
       case 'photo':openModal('photo',{id:key});break;
@@ -11165,8 +11166,8 @@ const {
           if(isCloudMessage) await client.from('chat_messages').update({content:previousText}).eq('id',m.id).eq('session_id',s.id);
           break;
         }
-        back();renderMessages();
-        refreshOpenChatSearchAfterMutation('single',s.id);
+        back();
+        if(currentSession()===s){renderMessages();refreshOpenChatSearchAfterMutation('single',s.id);}
         toast('訊息已更新；未重新生成 AI，也未扣款。');
         break;
       }
@@ -11197,6 +11198,7 @@ const {
           .eq('id',message.id).eq('group_id',group.id).select('id').maybeSingle();
         if(error) throw new Error('群組訊息雲端更新失敗：'+error.message);
         if(!data) throw new Error('雲端未確認這則群組訊息的更新，請重新載入後再試。');
+        if(groupPrototype.active!==group||groupPrototype.active?.id!==group.id||currentUser()?.uid!==user.uid)return;
         message.content=text;message.edited=true;
         $('modal')?.close();
         renderGroupConversation();
