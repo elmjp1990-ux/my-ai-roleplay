@@ -52,3 +52,11 @@ test('encounter still requests only the first gallery illustration and reports a
   assert.match(encounter, /hydrateEncounterGalleryIllustration\(character\.id\)/);
   assert.match(encounter, /角色立繪暫時無法載入/);
 });
+
+test('hidden and deleted characters prefer their own chat snapshot portrait over current card art', () => {
+  const sessionCharacter = between(html, 'function sessionCharacter(s) {', 'async function hydrateCloudSessionCharacterImage(s)');
+  assert.match(sessionCharacter, /hasMatchingSnapshot&&snap\.imagePath&&characterIsOffline\(found\)/);
+  assert.match(sessionCharacter, /image:snap\.imagePath \? \(snap\.image \|\| hydratedImage \|\| ''\)/);
+  const hydration = between(html, 'async function hydrateCloudSessionCharacterImage(s)', 'function applyCloudChatSessionAvatarUrl(session,url)');
+  assert.doesNotMatch(hydration, /liveCharacter\?\.image/);
+});
