@@ -6727,7 +6727,7 @@ function renderGroupConversation() {
     const actionButtons = actionableGroupMessage
       ? '<div class="message-action-bar" aria-label="訊息操作">'+
         '<button type="button" class="message-action-icon" data-action="copy-group-message" data-id="'+e(m.id)+'" aria-label="複製" title="複製">'+ICON.copy+'</button>'+
-        (latestEditableGroupMessage?'<button type="button" class="message-action-icon" data-action="delete-group-message" data-id="'+e(m.id)+'" aria-label="刪除" title="刪除">'+ICON.trash+'</button>':'')+
+        '<button type="button" class="message-action-icon" data-action="delete-group-message" data-id="'+e(m.id)+'" aria-label="刪除" title="刪除">'+ICON.trash+'</button>'+
         (m.type==='character'?'<button type="button" class="message-action-icon" data-action="report" data-kind="AI訊息" data-id="'+e(m.id)+'" aria-label="舉報" title="舉報">'+ICON.flag+'</button>':'')+
         (latestEditableGroupMessage?'<button type="button" class="message-action-icon" data-action="edit-group-message" data-id="'+e(m.id)+'" aria-label="編輯" title="編輯">'+ICON.edit+'</button>':'')+
         '</div>' : '';
@@ -9158,7 +9158,7 @@ document.addEventListener('click', async event => {
   const target = event.target instanceof Element ? event.target.closest('[data-action]') : null;
   if (!target || target.disabled) return;
   const action = target.dataset.action;
-  if (!['group-message-menu','delete-group-message','confirm-delete-group-message'].includes(action)) return;
+  if (!['delete-group-message','confirm-delete-group-message'].includes(action)) return;
   event.preventDefault();
   event.stopPropagation();
   event.stopImmediatePropagation();
@@ -9172,25 +9172,11 @@ document.addEventListener('click', async event => {
       toast('此帳號正在等待刪除，目前暫停使用功能。你可以取消刪除申請以恢復帳號。');
       return;
     }
-    if (action === 'group-message-menu') {
-      const message = groupPrototype.messages.find(item => item.id === id);
-      const latest = message && groupPrototype.messages.filter(item => item.type === message.type).at(-1);
-      if (!message || message.id !== latest?.id || !['user','character'].includes(message.type)) {
-        toast('只能操作各自最新的一則玩家或角色訊息。');
-        return;
-      }
-      showDialog('訊息操作','<div class="stack">'+
-        '<button style="width:100%" data-action="copy-group-message" data-id="'+e(message.id)+'">複製</button>'+
-        '<button style="width:100%" data-action="edit-group-message" data-id="'+e(message.id)+'">編輯</button>'+
-        '<button class="danger" style="width:100%" data-action="delete-group-message" data-id="'+e(message.id)+'">刪除</button></div>');
-      return;
-    }
     if (action === 'delete-group-message') {
       const group = groupPrototype.active;
       const message = groupPrototype.messages.find(item => item.id === id);
-      const latest = message && groupPrototype.messages.filter(item => item.type === message.type).at(-1);
-      if (!group || !message || message.id !== latest?.id || !['user','character'].includes(message.type)) {
-        toast('只能刪除各自最新的一則玩家或角色訊息。');
+      if (!group || !message || !['user','character'].includes(message.type)) {
+        toast('找不到可刪除的群組訊息。');
         return;
       }
       showDialog('確認刪除訊息',
@@ -9203,9 +9189,8 @@ document.addEventListener('click', async event => {
     const group = groupPrototype.active;
     const message = groupPrototype.messages.find(item => item.id === id);
     const user = currentUser(), client = window.mySupabase;
-    const latest = message && groupPrototype.messages.filter(item => item.type === message.type).at(-1);
-    if (!group || !message || message.id !== latest?.id || !['user','character'].includes(message.type)) {
-      toast('找不到可刪除的最新群組訊息，請重新開啟群組後再試。');
+    if (!group || !message || !['user','character'].includes(message.type)) {
+      toast('找不到可刪除的群組訊息，請重新開啟群組後再試。');
       return;
     }
     if (!user?.uid || !client || !isUuid(group.id) || !isUuid(message.id)) {
