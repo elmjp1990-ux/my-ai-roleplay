@@ -4612,7 +4612,7 @@ window.addEventListener('popstate',event => {
   render();
 });
 $('modal').addEventListener('cancel',event => {
-  if ($('modal').dataset.walletDialog === 'true' || $('modal').dataset.encounterLeaveDialog === 'true') {
+  if ($('modal').dataset.walletDialog === 'true' || $('modal').dataset.encounterLeaveDialog === 'true' || $('modal').dataset.storyStartDialog === 'true') {
     event.preventDefault();
     $('modal').close();
     return;
@@ -4625,7 +4625,7 @@ $('modal').addEventListener('click',event => {
   const r = $('modal').getBoundingClientRect();
   if (event.clientX < r.left || event.clientX > r.right ||
       event.clientY < r.top || event.clientY > r.bottom) {
-    if ($('modal').dataset.walletDialog === 'true' || $('modal').dataset.encounterLeaveDialog === 'true') $('modal').close();
+    if ($('modal').dataset.walletDialog === 'true' || $('modal').dataset.encounterLeaveDialog === 'true' || $('modal').dataset.storyStartDialog === 'true') $('modal').close();
     else dismissPendingDeletionModal();
   }
 });
@@ -4658,13 +4658,15 @@ function showDialog(title,content) {
   const encounterLeaveDialog = title === '離開相遇';
   const encounterMemoryDialog = title === '相遇回憶';
   const walletDialog = title === '我的資源' || title === '銀幣或鑽石不足' || title === '廣告功能尚未串接';
+  const storyStartDialog = title === '選擇故事開始方式';
   modal.dataset.walletDialog = walletDialog ? 'true' : 'false';
+  modal.dataset.storyStartDialog = storyStartDialog ? 'true' : 'false';
   modal.dataset.encounterLeaveDialog = encounterLeaveDialog ? 'true' : 'false';
   modal.dataset.encounterMemoryDialog = encounterMemoryDialog ? 'true' : 'false';
   modal.innerHTML = `
     <div class="row between modal-heading">
       <h2>${e(title)}</h2>
-      <button class="ghost" data-action="${walletDialog ? 'wallet-dialog-close' : encounterLeaveDialog ? 'encounter-dialog-dismiss' : encounterMemoryDialog ? 'encounter-memory-detail-dismiss' : pendingDeletionDialog ? 'pending-switch-account' : deleteConfirmDialog ? 'delete-dialog-back' : 'back'}"
+      <button type="button" class="ghost modal-close-button" data-action="${walletDialog ? 'wallet-dialog-close' : encounterLeaveDialog ? 'encounter-dialog-dismiss' : encounterMemoryDialog ? 'encounter-memory-detail-dismiss' : pendingDeletionDialog ? 'pending-switch-account' : deleteConfirmDialog ? 'delete-dialog-back' : storyStartDialog ? 'story-start-dialog-close' : 'back'}"
               aria-label="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}"
               title="${pendingDeletionDialog ? '登出並切換其他帳號' : '關閉'}">✕</button>
     </div>${content}`;
@@ -5168,6 +5170,7 @@ async function hydratePublicCharacterIllustrations(characterId) {
     document.querySelectorAll('img[data-character-primary-illustration]').forEach(image=>{
       if(image.dataset.characterPrimaryIllustration!==characterId)return;
       if(primary?.path)image.dataset.characterIllustrationPath=primary.path;
+      image.style.opacity='1';
       image.src=safeImage(current.image);
       image.removeAttribute('data-character-primary-illustration');
     });
@@ -5220,7 +5223,7 @@ function observePublicCharacterIllustrationCards(root) {
         publicCharacterIllustrationObserver.unobserve(image);
         void hydratePublicCharacterIllustrations(image.dataset.characterPrimaryIllustration);
       });
-    },{rootMargin:'300px'});
+    },{rootMargin:'900px 0px'});
   }
   images.forEach(image=>publicCharacterIllustrationObserver.observe(image));
 }
@@ -9501,6 +9504,10 @@ document.addEventListener('click',async event => {
         createVisibilityFilter = ['all','public','private'].includes(button.dataset.value) ? button.dataset.value : 'all';
         renderCreate();
         break;
+      case 'story-start-dialog-close': {
+        $('modal')?.close();
+        break;
+      }
       case 'delete-dialog-back': {
         $('modal')?.close();
         if (route.page === 'conversation' || route.page === 'group') go({page:'chat'});
@@ -11546,9 +11553,17 @@ async function importCharacter(file) {
   }
 }
 
-/* Image errors do not inject HTML. */
+/* Image errors do not inject HTML. Keep role portraits visible while their signed
+   Storage URL is being hydrated/refreshed, and restore opacity after any later load. */
 document.addEventListener('error',event => {
-  if (event.target instanceof HTMLImageElement) event.target.style.opacity='.15';
+  const image=event.target;
+  if (!(image instanceof HTMLImageElement)) return;
+  if (image.dataset.characterPrimaryIllustration || image.dataset.characterIllustrationPath) return;
+  image.style.opacity='.15';
+},true);
+document.addEventListener('load',event => {
+  const image=event.target;
+  if (image instanceof HTMLImageElement) image.style.opacity='1';
 },true);
 
 function renderCityMapMVP() {
