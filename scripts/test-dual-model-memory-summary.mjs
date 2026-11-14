@@ -23,7 +23,7 @@ assert.match(summary, /prompt_tokens/);
 assert.match(summary, /cost_usd/);
 assert.match(summary, /accumulatedUsage/);
 assert.match(summary, /requestOpenRouterChatCompletion/);
-assert.doesNotMatch(summary, /OPENROUTER_URL|fetch\\(/, "summary module must not retain a duplicate provider transport");
+assert.doesNotMatch(summary, /OPENROUTER_URL|fetch\(/, "summary module must not retain a duplicate provider transport");
 assert.match(summaryReadMigration, /CREATE OR REPLACE FUNCTION public\.get_story_memory_summary/);
 assert.match(summaryReadMigration, /auth\.uid\(\)/);
 assert.match(ui, /function loadStoryMemorySummary\(session\)/);
