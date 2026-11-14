@@ -464,6 +464,17 @@ BEGIN
     '* * * * *',
     'SELECT public.run_group_chat_turn_watchdog(100);'
   );
+  SELECT jobid INTO v_job_id FROM cron.job
+  WHERE jobname = 'poyozz-group-watchdog-cron-history-cleanup'
+  LIMIT 1;
+  IF v_job_id IS NOT NULL THEN
+    PERFORM cron.unschedule(v_job_id);
+  END IF;
+  PERFORM cron.schedule(
+    'poyozz-group-watchdog-cron-history-cleanup',
+    '17 3 * * *',
+    $cleanup$DELETE FROM cron.job_run_details WHERE end_time < now() - interval '7 days';$cleanup$
+  );
 END;
 $cron$;
 
