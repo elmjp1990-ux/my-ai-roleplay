@@ -1898,6 +1898,11 @@ const memoryPhotoSignedUrlManager = window.PoyozzSignedUrlManager.create({
     return Object.fromEntries((data||[]).filter(row=>row.signedUrl).map(row=>[prefix+row.path,row.signedUrl]));
   }
 });
+async function getMemoryPhotoSignedUrl(storagePath) {
+  const uid=currentUser()?.uid||null;
+  if(!window.mySupabase||!uid||!storagePath)return null;
+  return memoryPhotoSignedUrlManager.get(uid+':'+storagePath,{context:{uid}});
+}
 function invalidateMemoryPhotoSignedUrl(storagePath,uid=currentUser()?.uid||null) {
   if(uid&&storagePath)memoryPhotoSignedUrlManager.invalidate(uid+':'+storagePath);
 }
