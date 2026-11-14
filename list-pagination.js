@@ -14,7 +14,8 @@
     favorites: 10,
     notifications: 10,
     characterComments: 10,
-    memoryPhotos: 10
+    memoryPhotos: 10,
+    walletLedger: 10
   });
 
   function createState(kind) {
