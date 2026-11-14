@@ -536,10 +536,10 @@ assert.match(ownerListSource,/ownedCharactersSentinel[\s\S]*observeEnd/,
 const cityMapSource=fs.readFileSync('city-map.js','utf8');
 assert.match(paginationSizes,/citySceneCharacters:\s*10/,'each Encounter scene must load ten candidate characters per page');
 assert.match(paginationSizes,/groupCharacterPicker:\s*10/,'Group creation character picker must use ten-row pages');
-assert.match(ownerListSource,/async function groupLoadCharacterPickerPage/);
-assert.match(ownerListSource,/pageSize\('groupCharacterPicker'\)/);
-assert.match(ownerListSource,/group-character-load-more/);
-assert.doesNotMatch(ownerListSource,/ordered=\[\.\.\.byRecent,[\s\S]{0,100}\.slice\(0,500\)/,'Group character picker must not cap a client-side full list at 500 rows');
+assert.match(html,/async function groupLoadCharacterPickerPage/);
+assert.match(html,/pageSize\('groupCharacterPicker'\)/);
+assert.match(html,/group-character-load-more/);
+assert.doesNotMatch(html,/ordered=\[\.\.\.byRecent,[\s\S]{0,100}\.slice\(0,500\)/,'Group character picker must not cap a client-side full list at 500 rows');
 assert.match(ownerListSource,/async function loadCityCharacterPage\(offset=0\)/);
 assert.match(ownerListSource,/pageSize\('citySceneCharacters'\)/);
 assert.match(ownerListSource,/\.range\(offset,offset\+pageSize-1\)/);
