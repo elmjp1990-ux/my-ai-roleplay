@@ -183,6 +183,25 @@ assert.doesNotMatch(html,/append_chat_group_mock_turn/,"frontend must no longer 
 assert.match(html,/group_chat_turn_charge: '群組聊天回覆扣款'/,"wallet history must label group turn charges");
 assert.match(html,/group_chat_turn_refund: '群組聊天失敗退款'/,"wallet history must label group turn refunds");
 
+const groupList=between("async function groupLoadList(force=false,loadMore=false)","async function groupOpen(groupId)");
+assert.match(groupList,/pageSize\('groupSessions'\)/,
+  "group chat lists must use the shared ten-row page size");
+assert.match(groupList,/\.eq\('pinned',true\)/,
+  "pinned groups must load independently from the unpinned ten-row page");
+assert.match(groupList,/pinned\.eq\.false,pinned\.is\.null/,
+  "the paginated group query must exclude pinned rows");
+assert.match(groupList,/\.range\(g\.groupListOffset,g\.groupListOffset\+pageSize-1\)/,
+  "group list pages must be fetched by the backend in bounded ranges");
+assert.match(groupList,/groupHydrateListRows\(newRows,user\.id\)/,
+  "member, avatar and preview hydration must be restricted to newly loaded groups");
+assert.match(groupList,/g\.groupListHasMore=currentPage\.length===pageSize/,
+  "group list continuation must stop when the backend returns a short page");
+assert.match(groupList,/mergeUnique\(g\.groups,newRows,group=>group\.id\)/,
+  "group list continuation must append without duplicating already loaded groups");
+assert.match(html,/data-group-list-sentinel/);
+assert.match(html,/groupLoadList\(false,true\)/,
+  "the group list sentinel must request the next page");
+
 const paginationModule=fs.readFileSync("list-pagination.js","utf8");
 assert.match(paginationModule,/explore:\s*20/);
 assert.match(paginationModule,/chatSessions:\s*10/);
