@@ -77,5 +77,5 @@ AS $function$
   OFFSET GREATEST(COALESCE(p_offset, 0), 0);
 $function$;
 
-REVOKE ALL ON FUNCTION public.get_character_comments_safe_page(uuid, integer, integer) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.get_character_comments_safe_page(uuid, integer, integer) TO authenticated;
+REVOKE ALL ON FUNCTION public.get_character_comments_safe_page(uuid, integer, integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_character_comments_safe_page(uuid, integer, integer) TO anon, authenticated;
