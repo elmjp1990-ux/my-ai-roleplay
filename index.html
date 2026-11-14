@@ -5485,24 +5485,36 @@ function updateCharacterTurnCountElements(characterId,count) {
 const CLOUD_COMMENT_CACHE_TTL_MS = 30_000;
 const cloudCommentHydrationCache = new Map();
 const cloudCommentHydrationInflight = new Map();
-async function loadCloudComments(characterId,{force=false}={}) {
+const cloudCommentPageStates = new Map();
+async function loadCloudComments(characterId,{force=false,loadMore=false}={}) {
   const client=window.mySupabase;
   if(!client||!characterId)return;
   const requestUid=currentUser()?.uid||null;
   const cacheKey=(requestUid||'anonymous')+':'+characterId;
+  let pager=cloudCommentPageStates.get(cacheKey);
+  if(!loadMore&&(!pager||force)){
+    pager={offset:0,hasMore:true,loading:false};
+    cloudCommentPageStates.set(cacheKey,pager);
+    if(force){state.comments[characterId]=[];cloudCommentHydrationCache.delete(cacheKey);}
+  }
+  if(!pager||pager.loading||(!pager.hasMore&&loadMore))return;
   const cached=cloudCommentHydrationCache.get(cacheKey);
-  if(!force&&cached&&Date.now()-cached.loadedAt<CLOUD_COMMENT_CACHE_TTL_MS){
+  if(!loadMore&&!force&&cached&&Date.now()-cached.loadedAt<CLOUD_COMMENT_CACHE_TTL_MS){
     state.comments[characterId]=cached.rows;
     if(route.page==='detail'&&route.id===characterId)renderComments();
     return;
   }
   if(cloudCommentHydrationInflight.has(cacheKey))return cloudCommentHydrationInflight.get(cacheKey);
+  pager.loading=true;
   const request=(async()=>{
   try {
-    const {data:rows,error}=await client.rpc('get_character_comments_safe',{p_character_id:characterId});
+    const pageSize=window.PoyozzListPagination?.pageSize('characterComments')||10;
+    const {data:rows,error}=await client.rpc('get_character_comments_safe_page',{
+      p_character_id:characterId,p_limit:pageSize,p_offset:pager.offset
+    });
     if(error)throw error;
-    const safeRows=(rows||[]).sort((a,b)=>Date.parse(a.created_at)-Date.parse(b.created_at));
-    // 評論 RPC 只回傳安全的留言內容；另取公開個人資料，避免其他帳號的留言者被錯誤顯示成「故事創作者」。
+    const safeRows=rows||[];
+    // The SECURITY DEFINER page RPC preserves owner/public, NSFW and whisper-ancestry checks.
     const profileIds=[...new Set(safeRows.map(row=>row.author_id).filter(Boolean))];
     if(profileIds.length){
       const {data:profiles,error:profilesError}=await client.from('public_profiles')
@@ -5523,7 +5535,7 @@ async function loadCloudComments(characterId,{force=false}={}) {
       const {data,error:likesError}=await client.from('character_comment_likes')
         .select('comment_id,user_id').in('comment_id',ids);
       if(likesError)throw likesError;
-      likes=data||[];
+      likes= data||[];
     }
     const mapped=safeRows.map(row=>({
       id:row.id,authorId:row.author_id,text:row.content,parentId:row.parent_id,
@@ -5532,13 +5544,20 @@ async function loadCloudComments(characterId,{force=false}={}) {
       likes:likes.filter(item=>item.comment_id===row.id).map(item=>item.user_id),cloud:true
     }));
     if(currentUser()?.uid!==requestUid||route.page!=='detail'||route.id!==characterId)return;
-    state.comments[characterId]=mapped;
-    cloudCommentHydrationCache.set(cacheKey,{loadedAt:Date.now(),rows:mapped});
+    const existing=loadMore?(state.comments[characterId]||[]):[];
+    state.comments[characterId]=window.PoyozzListPagination?.mergeUnique
+      ? window.PoyozzListPagination.mergeUnique(existing,mapped,row=>row.id)
+      : [...existing,...mapped.filter(row=>!existing.some(old=>old.id===row.id))];
+    pager.offset+=safeRows.length;
+    pager.hasMore=safeRows.length===pageSize;
+    cloudCommentHydrationCache.set(cacheKey,{loadedAt:Date.now(),rows:state.comments[characterId]});
     renderComments();
   } catch(error) {
     console.error('PersonaX 雲端評論載入失敗：',error);
     const target=$('comments');
     if(target&&route.id===characterId)target.innerHTML='<div class="empty">雲端評論載入失敗，請重新整理或稍後再試。</div>';
+  } finally {
+    pager.loading=false;
   }
   })();
   cloudCommentHydrationInflight.set(cacheKey,request);
@@ -5553,11 +5572,24 @@ function renderComments() {
     console.error('POYOZZ comment-renderer module is unavailable.');
     return;
   }
-  return renderCommentsModule({
+  const result=renderCommentsModule({
     $, state, route, currentUser, currentCharacter,
     author, avatar, e, timeText, cloudCommentHydrationCache
   });
+  const uid=currentUser()?.uid||null,characterId=route.id;
+  const pager=cloudCommentPageStates.get((uid||'anonymous')+':'+characterId);
+  const mount=$('comments');
+  if(mount&&pager?.hasMore&&!pager.loading){
+    mount.insertAdjacentHTML('beforeend','<button type="button" class="button secondary" data-action="comments-load-more">載入更多評論</button>');
+  }
+  return result;
 }
+document.addEventListener('click',event=>{
+  const button=event.target.closest('[data-action="comments-load-more"]');
+  if(!button)return;
+  button.disabled=true;
+  void loadCloudComments(route.id,{loadMore:true});
+});
 async function refreshAuthorFollowState(authorId) {
   const user = currentUser();
   const client = window.mySupabase;
