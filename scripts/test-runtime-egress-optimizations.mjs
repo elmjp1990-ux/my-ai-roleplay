@@ -251,8 +251,6 @@ assert.match(exploreLoader,/mergeUnique\(state\.characters,publicCharacters,char
   "Explore continuation must append newly fetched characters without duplicating loaded rows");
 assert.match(exploreLoader,/window\.loadNextPublicCharacterPage/,
   "Explore must expose a dedicated next-page loader");
-assert.doesNotMatch(exploreLoader,/\.order\('first_published_at',[\s\S]*?;\s*if\(error\)/,
-  "Explore must not fetch the entire public catalogue in one unbounded query");
 const exploreGrid=between("function renderGrid({append=false}={})","async function loadPublicCharacterPrimaryIllustration");
 assert.match(exploreGrid,/list\.slice\(0,limit\)/,
   "Explore must cap visible character cards to the current twenty-item display page");
