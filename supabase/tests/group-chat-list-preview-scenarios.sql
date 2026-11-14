@@ -12,11 +12,11 @@ VALUES
 
 INSERT INTO public.chat_group_messages(group_id,turn_id,sequence_no,speaker_type,content,created_at,deleted_at)
 VALUES
- ('20000000-0000-4000-8000-000000000001','50000000-0000-4000-8000-000000000001',1,'character','older owned preview','2026-11-14T00:00:00Z',NULL),
- ('20000000-0000-4000-8000-000000000001','50000000-0000-4000-8000-000000000002',1,'character','newest owned preview','2026-11-14T00:01:00Z',NULL),
- ('20000000-0000-4000-8000-000000000002','50000000-0000-4000-8000-000000000003',1,'character','other owner preview','2026-11-14T00:02:00Z',NULL),
- ('20000000-0000-4000-8000-000000000003','50000000-0000-4000-8000-000000000004',1,'character','deleted group preview','2026-11-14T00:03:00Z',NULL),
- ('20000000-0000-4000-8000-000000000001','50000000-0000-4000-8000-000000000005',1,'character','deleted message must not win','2026-11-14T00:04:00Z','2026-11-14T00:05:00Z');
+ ('20000000-0000-4000-8000-000000000001','50000000-0000-4000-8000-000000000001',1,'character','older owned preview',clock_timestamp() - interval '1 second',NULL),
+ ('20000000-0000-4000-8000-000000000001','50000000-0000-4000-8000-000000000002',1,'character','newest owned preview',clock_timestamp() + interval '1 second',NULL),
+ ('20000000-0000-4000-8000-000000000002','50000000-0000-4000-8000-000000000003',1,'character','other owner preview',clock_timestamp(),NULL),
+ ('20000000-0000-4000-8000-000000000003','50000000-0000-4000-8000-000000000004',1,'character','deleted group preview',clock_timestamp(),NULL),
+ ('20000000-0000-4000-8000-000000000001','50000000-0000-4000-8000-000000000005',1,'character','deleted message must not win',clock_timestamp() + interval '2 minutes',clock_timestamp());
 
 SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',false);
 SET ROLE authenticated;
