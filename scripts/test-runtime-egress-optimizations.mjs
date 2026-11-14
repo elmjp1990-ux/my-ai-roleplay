@@ -519,6 +519,8 @@ for(const listName of ['authorCharacters','chatSessions','groupSessions','follow
 assert.match(paginationSizes,/explore:\s*20/,'Explore must preserve its twenty-character page size');
 assert.match(html,/let limit = window\.PoyozzListPagination\?\.pageSize\('explore'\)\|\|20;/,'Explore must initially render twenty roles, not ten');
 assert.match(paginationSizes,/messages:\s*5/,'single, Encounter, and group chat history must preserve five-message pages');
+assert.match(paginationSizes,/chatSearch:\s*10/,'Chat search results must use ten-row pages');
+assert.match(html,/const CHAT_SEARCH_PAGE_SIZE=window\.PoyozzListPagination\?\.pageSize\('chatSearch'\)\|\|10;/,'Chat search must use the shared ten-row page size');
 const ownerListSource=fs.readFileSync('index.html','utf8');
 const ownedCharacterPageLoaderSource=ownerListSource.slice(ownerListSource.indexOf('async function loadSupabaseCharacters(user'),ownerListSource.indexOf('const characterIllustrationSignedUrlManager'));
 assert.match(ownedCharacterPageLoaderSource,/\.range\(pager\.offset,pager\.offset\+pageSize-1\)/,

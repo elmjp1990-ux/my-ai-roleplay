@@ -8,6 +8,7 @@
     encounterMemories: 10,
     messages: 5,
     citySceneCharacters: 10,
+    chatSearch: 10,
     ownedCharacters: 10,
     favorites: 10,
     notifications: 10,

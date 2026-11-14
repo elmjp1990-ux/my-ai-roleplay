@@ -7000,7 +7000,7 @@ async function openGroupBackgroundSettings() {
       .select('id,owner_id,chat_type,group_id,storage_path,caption,created_at,expires_at')
       .eq('owner_id',user.id).eq('chat_type','group').eq('group_id',group.id)
       .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString())
-      .order('created_at',{ascending:false}).limit(10);
+      .order('created_at',{ascending:false}).limit(window.PoyozzListPagination.pageSize('memoryPhotos'));
     if(error)throw error;
     group.memoryPhotos=await Promise.all((data||[]).map(async photo=>{
       let imageUrl='';
@@ -7476,7 +7476,7 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
       if(ctx.isGroup)rows=(ctx.group.memoryPhotos||[]).filter(p=>p.id&&p.image_url).map(p=>({id:p.id,caption:p.caption||'',url:p.image_url}));
       else{
         if(!ctx.session.cloudOwned||ctx.session.cloudOwnerUid!==uid)throw new Error('請先使用目前帳號擁有的雲端聊天。');
-        const {data,error}=await client.from('chat_memory_photos').select('id,caption,storage_path,created_at').eq('owner_id',uid).eq('chat_type','single').eq('session_id',ctx.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false}).limit(10);
+        const {data,error}=await client.from('chat_memory_photos').select('id,caption,storage_path,created_at').eq('owner_id',uid).eq('chat_type','single').eq('session_id',ctx.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false}).limit(window.PoyozzListPagination.pageSize('memoryPhotos'));
         if(error)throw error;
         rows=await Promise.all((data||[]).map(async p=>{const signedUrl=await getMemoryPhotoSignedUrl(p.storage_path).catch(()=>null);return signedUrl?{id:p.id,caption:p.caption||'',url:signedUrl}:null;}));
         rows=rows.filter(Boolean);
@@ -8498,7 +8498,7 @@ function addMemory(s,text) {
 
 let chatMessageSearchState={key:'',query:'',offset:0,request:0,timer:null,loading:false,rows:[]};
 let chatSearchJumpRequest=0;
-const CHAT_SEARCH_PAGE_SIZE=10;
+const CHAT_SEARCH_PAGE_SIZE=window.PoyozzListPagination?.pageSize('chatSearch')||10;
 function resetChatMessageSearchState(){
   if(chatMessageSearchState.timer)clearTimeout(chatMessageSearchState.timer);
   chatSearchJumpRequest++;
@@ -9356,7 +9356,7 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
       void (async()=>{
         const select=$('backgroundSetting'),client=window.mySupabase,uid=currentUser()?.uid;
         if(!select||!client||!uid||!selected.cloudOwned||selected.cloudOwnerUid!==uid)return;
-        const {data,error}=await client.from('chat_memory_photos').select('id,caption').eq('owner_id',uid).eq('chat_type','single').eq('session_id',selected.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false}).limit(10);
+        const {data,error}=await client.from('chat_memory_photos').select('id,caption').eq('owner_id',uid).eq('chat_type','single').eq('session_id',selected.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false}).limit(window.PoyozzListPagination.pageSize('memoryPhotos'));
         if(error){console.warn('載入聊天背景選項失敗',error.message);return;}
         for(const photo of data||[]){const value='memory-photo:'+photo.id;let option=Array.from(select.options).find(item=>item.value===value);if(!option){option=document.createElement('option');option.value=value;option.textContent='回憶相片：'+(photo.caption||'回憶快照');select.appendChild(option);}if(selected.background===value)option.selected=true;}
         select.value=selected.background||'avatar';
@@ -10256,7 +10256,7 @@ document.addEventListener('click',async event => {
         persist();render();break;
       }
       case 'tag':
-        search = '';filter = 'recommended';limit = 10;
+        search = '';filter = 'recommended';limit = window.PoyozzListPagination.pageSize('explore');
         exploreTags = [button.dataset.tag];
         state.preferences = [...new Set([...state.preferences,button.dataset.tag])];
         persist();
@@ -10279,7 +10279,7 @@ document.addEventListener('click',async event => {
       case 'clear-search':
         search='';renderHome();$('exploreSearch')?.classList.remove('hidden');$('searchInput')?.focus();break;
       case 'clear-filter':
-        search='';exploreTags=[];limit=10;
+        search='';exploreTags=[];limit=window.PoyozzListPagination.pageSize('explore');
         go({page:'home'},true);
         renderHome();
         break;
