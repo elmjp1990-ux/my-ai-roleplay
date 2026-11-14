@@ -20,6 +20,8 @@ on:
       - main
     paths:
       - "supabase/functions/chat-turn/index.ts"
+      - "supabase/functions/_shared/ai-provider-result.ts"
+      - "supabase/functions/_shared/ai-provider-result.test.ts"
       - "supabase/functions/group-chat-turn/index.ts"
       - "supabase/functions/_shared/ai-value-utils.ts"
       - "supabase/functions/_shared/ai-value-utils.test.ts"
