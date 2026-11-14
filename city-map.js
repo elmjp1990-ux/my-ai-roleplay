@@ -5,8 +5,18 @@
 (function (global) {
   'use strict';
 
+  let activeMapCleanup = null;
+  const destroyActiveMap = () => {
+    if (!activeMapCleanup) return;
+    const cleanup = activeMapCleanup;
+    activeMapCleanup = null;
+    cleanup();
+  };
+
   global.PoyozzCityMap = Object.freeze({
+    destroy: destroyActiveMap,
     render(dependencies) {
+      destroyActiveMap();
       const {
         $, state, accessible, escapeHTML, safeImage, currentUser, toast, go, requireLogin,
         persist, hydratePublicCharacterIllustrations, characterVideoObserver,
@@ -160,10 +170,26 @@
   };
   taipeiTime();
   const cityMapClock=setInterval(taipeiTime,30000);
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)taipeiTime();});
+  const onVisibilityChange=()=>{if(!document.hidden)taipeiTime();};
+  document.addEventListener('visibilitychange',onVisibilityChange);
+  let locationModal=null;
+  let resizeHandler=null;
+  activeMapCleanup=()=>{
+    clearInterval(cityMapClock);
+    document.removeEventListener('visibilitychange',onVisibilityChange);
+    if(resizeHandler)window.removeEventListener('resize',resizeHandler);
+    const mapVideos=[...stage.querySelectorAll('video'),...(locationModal?.querySelectorAll('video')||[])];
+    mapVideos.forEach(video=>{
+      characterVideoObserver?.unobserve(video);
+      releaseCharacterVideo(video);
+    });
+    locationModal?.remove();
+    stage.remove();
+    document.body.classList.remove('city-location-active','city-map-mode','city-map-mode-immersive');
+  };
 
   // Keep the location dialog outside the transformed map stage to isolate it from map gestures.
-  const locationModal=$('cityMapPeople');
+  locationModal=$('cityMapPeople');
   if(locationModal && locationModal.parentElement!==document.body) document.body.appendChild(locationModal);
   const cityPlaceNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園'};
   // These are authored scene descriptions, not live opening hours, character presence, or dynamically generated events.
@@ -609,7 +635,8 @@
     if(button.dataset.action==='city-zoom-out'){event.preventDefault();event.stopPropagation();zoomBy(.85);return;}
     if(button.dataset.action==='city-traditional'){event.preventDefault();event.stopPropagation();go({page:'home'});}
   });
-  window.addEventListener('resize',()=>{sizeWorld();clamp();},{passive:true});
+  resizeHandler=()=>{sizeWorld();clamp();};
+  window.addEventListener('resize',resizeHandler,{passive:true});
     }
   });
 })(window);
