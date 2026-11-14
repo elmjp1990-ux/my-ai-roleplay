@@ -222,10 +222,25 @@ assert.match(groupRenderer,/const outerAvatar=isSystem \? '<span class="avatar a
   'group messages may render a system avatar, but must not create a separate player avatar');
 assert.doesNotMatch(groupRenderer,/avatar-fallback player-avatar/,
   'group player messages must not create an outer “you” avatar');
-assert.match(singleRenderer,/const outerAvatar = '';/,
-  'single chat remains the source of truth: player messages have no outer avatar');
+assert.doesNotMatch(singleRenderer,/outerAvatar/,
+  'single chat player messages must not allocate or render a redundant outer avatar');
+const messageActionHelper=between('function renderMessageActionBar(','function roleplaySegmentHTML(');
+assert.match(messageActionHelper,/message-action-bar/);
+assert.match(messageActionHelper,/copyAction/);
+assert.match(messageActionHelper,/deleteAction/);
+assert.match(messageActionHelper,/reportKind/);
+assert.match(messageActionHelper,/editAction/);
+assert.match(groupRenderer,/renderMessageActionBar\(\{[\s\S]*copy-group-message[\s\S]*delete-group-message[\s\S]*edit-group-message/);
+assert.match(singleRenderer,/renderMessageActionBar\(\{[\s\S]*copy-message[\s\S]*delete-message[\s\S]*edit-message/,
+  'single and group chats must share one message-action UI renderer while retaining their distinct action handlers');
+assert.equal((html.match(/message-action-bar" aria-label="訊息操作"/g)||[]).length,0,
+  'message-action markup must not be duplicated in the two chat renderers');
+assert.doesNotMatch(html,/body\.group-chat-page body\.group-chat-page \.composer/,
+  'the invalid nested-body group composer selector must be removed');
 assert.doesNotMatch(html,/\.message\.user\s*>\s*\.avatar/,
   'the obsolete CSS rule hiding redundant outer player avatars must be removed');
+assert.doesNotMatch(html,/body\.group-chat-page \.message-content/,
+  'group chat must inherit the single-chat message-content sizing rule');
 assert.match(groupRenderer,/roleplaySegmentHTML\(segment,\{summonedByPlayer\}\)/);
 assert.match(singleRenderer,/roleplaySegmentHTML\(segment, \{summonedByPlayer\}\)/,
   'single and group chat must share the same roleplay segment renderer rather than duplicate avatar logic');
