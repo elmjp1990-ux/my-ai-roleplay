@@ -603,7 +603,7 @@ assert.match(favoritesLoader,/\.in\('id',validIds\)/,'favorite characters must h
 assert.match(ownerListSource,/favoriteCharactersSentinel[\s\S]*observeEnd/);
 
 const notificationsModuleSource=fs.readFileSync("notifications-screen.js","utf8");
-assert.match(notificationsModuleSource,/notificationsSentinel[\s\\S]*observeEnd/,'system notifications must reveal ten rows at a time');
+assert.match(notificationsModuleSource,/notificationsSentinel[\s\S]*observeEnd/,'system notifications must reveal ten rows at a time');
 assert.match(notificationsModuleSource,/pageSize\('notifications'\)/);
 
 const primaryIllustrationLoader=between("async function loadCharacterPrimaryIllustrationAssets","async function loadCharacterIllustrationAssets");
