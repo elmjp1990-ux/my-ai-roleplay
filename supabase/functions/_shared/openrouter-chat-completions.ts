@@ -1,4 +1,5 @@
 import { normalizeAiProviderResult, type AiProviderResult } from "./ai-provider-result.ts";
+import { buildOpenRouterProviderOptions } from "./openrouter-provider-policy.ts";
 
 export const POYOZZ_DEFAULT_CHAT_MODEL = "deepseek/deepseek-v4-flash-20260423";
 
@@ -39,7 +40,7 @@ export async function requestOpenRouterChatCompletion(options: RequestOptions): 
       model,
       messages: options.messages,
       temperature: options.temperature ?? 0.85,
-      provider: { only: ["deepinfra"], allow_fallbacks: false, data_collection: "deny" },
+      provider: buildOpenRouterProviderOptions(),
     };
     if (options.responseFormat) body.response_format = options.responseFormat;
 
