@@ -42,7 +42,7 @@ INSERT INTO public.chat_group_members(group_id,character_id,position,character_s
 
 SET ROLE service_role;
 DO $$
-DECLARE r record; v_turn uuid; v_count integer; v_balance public.wallet_accounts%rowtype;
+DECLARE r record; v_turn uuid; v_count integer; v_balance public.wallet_accounts%rowtype; v_phone jsonb;
 BEGIN
   -- 2 members cost 6; consume 4 silver first and 2 diamonds second.
   SELECT * INTO r FROM public.reserve_group_chat_turn(
@@ -73,6 +73,11 @@ BEGIN
     '[{"speaker_id":"30000000-0000-4000-8000-000000000001","content":"completed reply"}]'::jsonb,
     '[{"character_id":"30000000-0000-4000-8000-000000000001","notifications":[{"title":"最新訊息","body":"客戶確認會議時間。"}]},{"character_id":"30000000-0000-4000-8000-000000000002","notifications":[{"title":"待辦事項","body":"目前沒有待辦事項"}]}]'::jsonb
   ) <> 'completed' THEN RAISE EXCEPTION 'completion did not settle'; END IF;
+  SELECT phone_notifications INTO v_phone FROM public.chat_group_members
+  WHERE group_id='20000000-0000-4000-8000-000000000001' AND character_id='30000000-0000-4000-8000-000000000001';
+  IF v_phone->0->>'title' <> '最新訊息' OR v_phone->0->>'body' <> '客戶確認會議時間。' THEN
+    RAISE EXCEPTION 'group character phone state was not saved with the turn: %', v_phone;
+  END IF;
   BEGIN
     PERFORM * FROM public.refund_group_chat_turn(
       '10000000-0000-4000-8000-000000000001',v_turn,'should_not_refund'
