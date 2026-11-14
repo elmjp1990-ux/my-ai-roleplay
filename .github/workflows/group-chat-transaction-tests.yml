@@ -84,6 +84,12 @@ jobs:
       - name: Verify migration contracts and transaction outcomes
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/group-chat-transaction-scenarios.sql
 
+      - name: Apply bounded group list preview RPC
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261114230000_batch_group_list_previews.sql
+
+      - name: Verify bounded owner-scoped group list previews
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/group-chat-list-preview-scenarios.sql
+
       - name: Verify real concurrent reservations and idempotency
         run: bash scripts/test-group-chat-transaction-concurrency.sh
 
