@@ -21,7 +21,7 @@ assert.match(source, /cloudCommentHydrationCache\.set\(cacheKey,\{loadedAt:Date\
 assert.match(source, /currentUser\(\)\?\.uid!==requestUid/);
 assert.match(source, /cloudCommentHydrationInflight\.get\(cacheKey\)===request/);
 assert.match(source, /cloudCommentHydrationInflight\.delete\(cacheKey\)/);
-assert.match(source, /\.rpc\('get_character_comments_safe'/);
+assert.match(source, /\.rpc\('get_character_comments_safe_page'/);
 assert.match(source, /\.select\('comment_id,user_id'\)/);
 
 const renderSource = commentRenderer;
