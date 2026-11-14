@@ -83,8 +83,8 @@ assert.ok(html.includes('<video data-character-video="${e(c.avatarVideoPath)}" p
 assert.ok(html.includes("function hydrateEncounterGalleryIllustration(characterId) {"));
 assert.ok(encounterScene.includes("正在載入角色立繪…"));
 assert.ok(encounterScene.includes("角色半立繪素材待補"));
-assert.ok(html.includes("const ownerLocal = state.characters.find(character =>"));
-assert.ok(html.includes("ownerLocal?.galleryIllustrations || cachedPublic?.galleryIllustrations || []"));
+assert.ok(html.includes("const ownerLocal=state.characters.find(character=>"));
+assert.ok(html.includes("ownerLocal?.galleryIllustrations||cachedPublic?.galleryIllustrations||[]"));
 assert.match(encounterScene, /const halfBodyImage=dedicatedSprite\|\|sceneIllustration/);
 assert.doesNotMatch(html, /const cardPortrait=safeImage\(character\?\.image/);
 assert.match(html, /相遇模式立繪（最多 5 張）/);
