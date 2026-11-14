@@ -8,7 +8,6 @@ const migration = readFileSync("supabase/migrations/20261105223613_ai_model_usag
 const summaryReadMigration = readFileSync("supabase/migrations/20261110120000_story_phone_state_and_memory_summary_read.sql", "utf8");
 const groupSource = readFileSync("supabase/functions/group-chat-turn/index.ts", "utf8");
 const sharedValueUtils = readFileSync("supabase/functions/_shared/ai-value-utils.ts", "utf8");
-const groupSource = readFileSync("supabase/functions/group-chat-turn/index.ts", "utf8");
 const ui = readFileSync("index.html", "utf8");
 assert.match(source, /const DEFAULT_OPENROUTER_MODEL = POYOZZ_DEFAULT_CHAT_MODEL/);
 assert.match(source, /ai-value-utils\.ts/);
