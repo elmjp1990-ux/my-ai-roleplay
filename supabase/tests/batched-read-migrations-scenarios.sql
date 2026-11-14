@@ -25,7 +25,7 @@ VALUES
  ('40000000-0000-4000-8000-000000000005','20000000-0000-4000-8000-000000000004',1,'weekday','09:00','10:00','city','deleted schedule',10,true),
  ('40000000-0000-4000-8000-000000000006','20000000-0000-4000-8000-000000000005',1,'weekday','09:00','10:00','city','unapproved schedule',10,true),
  ('40000000-0000-4000-8000-000000000007','20000000-0000-4000-8000-000000000006',1,'weekday','09:00','10:00','city','rights missing schedule',10,true),
- ('40000000-0000-4000-8000-000000000008','20000000-0000-4000-8000-000000000007',1,'weekday','09:00','10:00','city','other author schedule',10,true);
+;
 
 INSERT INTO public.chat_sessions (id, user_id, character_id, deleted_at, chat_mode, session_data, updated_at)
 VALUES
