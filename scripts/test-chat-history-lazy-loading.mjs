@@ -19,6 +19,7 @@ assert.match(cacheCompaction, /message\.localOnly===true/);
 assert.match(cacheCompaction, /!isUuid\(message\.id\)/);
 assert.match(cacheCompaction, /cloudSessionDataLoaded:false/);
 assert.match(cacheCompaction, /cloudMessagesLoaded:false/);
+assert.match(cacheCompaction, /cloudMessagesErrorOlder:false/);
 assert.match(cacheCompaction, /cloudRoleplayMeta/);
 const cacheRestore = between("function restoreSessionsForUser(uid)", "function isolateSessionsForUser");
 assert.match(cacheRestore, /compactCloudSessionForLocalStorage\(session\)/,
