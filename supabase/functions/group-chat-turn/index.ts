@@ -102,7 +102,7 @@ Deno.serve(async (request) => {
   });
   if (reserveError) {
     const message = asText(reserveError.message);
-    if (message.includes("group_insufficient_funds")) return json({ status: "insufficient_funds", error: "group_insufficient_funds" }, 402);
+    if (message.includes("group_insufficient_funds")) return json({ status: "insufficient_funds", error: "group_insufficient_funds" });
     if (message.includes("group_not_found_or_not_accessible")) return json({ error: "group_not_found_or_not_accessible" }, 403);
     return json({ error: "group_turn_reservation_failed" }, 503);
   }
@@ -129,7 +129,7 @@ Deno.serve(async (request) => {
     .eq("id", groupId).eq("owner_id", user.id).is("archived_at", null).maybeSingle();
   if (groupError || !group) {
     const refunded = await refund(admin, user.id, turnId, "group_context_unavailable");
-    return json({ status: refunded.confirmed ? "refunded" : "needs_reconciliation", error: "group_context_unavailable", balance: refunded.balance, retryAllowed: false }, 503);
+    return json({ status: refunded.confirmed ? "refunded" : "needs_reconciliation", error: "group_context_unavailable", balance: refunded.balance, retryAllowed: false }, refunded.confirmed ? 200 : 503);
   }
 
   const [memberResult, sceneResult, historyResult, playerResult] = await Promise.all([
