@@ -10,7 +10,7 @@ const ui = readFileSync("index.html", "utf8");
 assert.match(source, /const DEFAULT_OPENROUTER_MODEL = POYOZZ_DEFAULT_CHAT_MODEL/);
 assert.match(openRouterShared, /POYOZZ_DEFAULT_CHAT_MODEL = "deepseek\/deepseek-v4-flash-20260423"/);
 assert.doesNotMatch(source, /Deno\.env\.get\("OPENROUTER_MODEL"\)/);
-assert.match(source, /provider: \{ only: \["deepinfra"\], allow_fallbacks: false, data_collection: "deny" \}/);
+assert.match(openRouterShared, /provider: \{ only: \["deepinfra"\], allow_fallbacks: false, data_collection: "deny" \}/);
 assert.match(source, /processDueStoryMemorySummary\(admin, session, user\.id, openRouterKey\)/);
 assert.match(source, /recordChatModelUsage\(admin/);
 assert.match(source, /storedSummary/);
