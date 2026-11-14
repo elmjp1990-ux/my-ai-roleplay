@@ -241,7 +241,7 @@ assert.match(groupMigration,/CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA 
   "the database watchdog must be scheduled independently every minute");
 assert.match(groupMigration,/public\.expire_group_chat_turn\(v_expired\.user_id, v_expired\.id\)/,
   "new reservations after reload must first expire abandoned turns that crossed the deadline");
-assert.match(groupMigration,/SET processing_started_at = COALESCE\(processing_started_at, created_at, now\)[\s\S]*WHERE status = 'processing' AND processing_started_at IS NULL/,
+assert.match(groupMigration,/SET processing_started_at = COALESCE\(processing_started_at, created_at, now\(\)\)[\s\S]*WHERE status = 'processing' AND processing_started_at IS NULL/,
   "legacy processing turns must receive a start timestamp so the watchdog can recover them");
 assert.match(completeRpc,/clock_timestamp\(\) >= v_turn\.processing_started_at \+ interval '55 seconds'[\s\S]*group_turn_deadline_exceeded/,
   "completion must reject replies that lose the deadline race after acquiring transaction locks");
