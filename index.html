@@ -576,7 +576,7 @@ body.group-chat-page:has(.group-wizard) #view {
 .message.user { flex-direction:row-reverse; }
 .message.user > .avatar { display:none !important; }
 .message .avatar { width:30px; height:30px; }
-.message-content { flex:0 1 auto; width:fit-content; max-width:min(17em,calc(100% - 38px)); min-width:0; }
+.message-content { flex:0 1 auto; width:fit-content; max-width:min(24em,calc(100% - 38px)); min-width:0; }
 .message:not(.user) > .message-content { margin-right:auto; }
 .message.user > .message-content { margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; }
 .message-name { color:var(--muted); font-size:10px; margin-bottom:5px; }
@@ -596,7 +596,7 @@ body.group-chat-page:has(.group-wizard) #view {
 .bubble {
   display:table;
   width:fit-content;
-  max-width:min(17em,100%);
+  max-width:min(19em,100%);
   box-sizing:border-box;
   font-size:16px;
   padding:12px 14px;
@@ -608,6 +608,10 @@ body.group-chat-page:has(.group-wizard) #view {
   line-height:1.85;
   margin-bottom:3px;
 }
+/* Spoken dialogue stays compact; italic *actions* can use a wider reading line. */
+.roleplay-segment.is-character { max-width:min(19em,100%); }
+.roleplay-segment.is-action { width:fit-content; max-width:min(24em,100%); }
+.roleplay-segment.is-action .narration { max-width:min(24em,100%); }
 .user .bubble { background:var(--user-bubble); color:var(--text); border-color:var(--border); }
 .narration {
   display:block;
