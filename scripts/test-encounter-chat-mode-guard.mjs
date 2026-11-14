@@ -276,7 +276,7 @@ assert.match(frontend, /function formatMessage\(text\)[\s\S]*?\[\\s\\S\]\+\?/);
 assert.match(frontend, /\.suggestion-first-message-hint \{ box-sizing:border-box; width:100%; margin:0; padding:7px 9px 9px; color:var\(--muted\); text-align:center; font-size:10px;/);
 assert.match(frontend, /!isEncounterChatSession\(s\)/);
 assert.match(frontend, /session_encounter_metadata:session_data->encounter/);
-assert.match(frontend, /row\.session_encounter_metadata&&typeof row\.session_encounter_metadata==='object'/);
+assert.match(frontend, /row\.session_encounter_metadata\s*&&\s*typeof\s+row\.session_encounter_metadata\s*===\s*'object'/);
 assert.match(frontend, /!isEncounterChatSession\(item\)/);
 assert.match(frontend, /!isEncounterChatSession\(candidate\)/);
 assert.match(frontend, /if \(!item \|\| item\.hidden \|\| isEncounterChatSession\(item\)\) return false;/);
