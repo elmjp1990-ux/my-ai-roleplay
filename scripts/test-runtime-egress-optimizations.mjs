@@ -269,8 +269,8 @@ console.log('Group history fixture passed: 1,000 rows, 20 pages, timestamp/seque
 const groupPhoneMigration = fs.readFileSync('supabase/migrations/20261114180000_group_ai_single_orchestrator.sql', 'utf8');
 const groupPhoneFunction = fs.readFileSync('supabase/functions/group-chat-turn/index.ts', 'utf8');
 const groupPhoneParser = fs.readFileSync('supabase/functions/_shared/group-turn-envelope.ts', 'utf8');
-const groupPhoneUI = await readFile('index.html', 'utf8');
-const groupPhoneStyles = await readFile('poyozz-ui.css', 'utf8');
+const groupPhoneUI = fs.readFileSync('index.html', 'utf8');
+const groupPhoneStyles = fs.readFileSync('poyozz-ui.css', 'utf8');
 assert.match(groupPhoneMigration, /ADD COLUMN IF NOT EXISTS phone_notifications jsonb NOT NULL DEFAULT '\[\]'::jsonb/);
 assert.match(groupPhoneMigration, /p_phone_updates jsonb/);
 assert.match(groupPhoneMigration, /SET phone_notifications = v_phone_notifications/);
