@@ -17,7 +17,7 @@
     if(!client||!currentUser()?.uid){mount.innerHTML='<div class="empty">請先登入，才能查看與保存回憶相片。</div>';return;}
     const key=type+':'+chatId;
     let pager=albumPageStates.get(key);
-    if(!options.loadMore||!pager){pager={offset:0,hasMore:true,loading:false,ids:new Set()};albumPageStates.set(key,pager);mount.innerHTML='';}
+    if(!options.loadMore||!pager){pager=window.PoyozzListPagination.createState('memoryPhotos',{ids:new Set()});albumPageStates.set(key,pager);mount.innerHTML='';}
     if(pager.loading||!pager.hasMore)return;
     pager.loading=true;
     const uid=currentUser()?.uid;
