@@ -1165,6 +1165,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 <script src="./comment-renderer.js"></script>
 <script src="./custom-tag-picker.js"></script>
 <script src="./list-pagination.js"></script>
+<script src="./notifications-screen.js"></script>
 <script>
 'use strict';
 
@@ -4907,6 +4908,7 @@ function render() {
   window.PoyozzCityMap?.destroy?.();
   // City-map-only visual treatment must not leak into traditional pages.
   if (route.page !== 'citymap') document.body.classList.remove('city-map-mode','city-map-mode-immersive');
+  if (route.page !== 'notifications') window.PoyozzNotifications?.destroy();
   renderShell();
   switch(route.page) {
     case 'citymap':renderCityMapMVP();break;
@@ -9153,37 +9155,16 @@ async function refreshDailyCheckinCard() {
   })().finally(() => { window.dailyCheckinStatusPromise = null; });
   return window.dailyCheckinStatusPromise;
 }
-let notificationListPager={filterKey:null,limit:10,observer:null};
 function renderNotifications() {
-  const unread=route.unread;
-  const filterKey=unread?'unread':'all';
-  if(notificationListPager.filterKey!==filterKey){
-    notificationListPager.observer?.disconnect();
-    notificationListPager={filterKey,limit:window.PoyozzListPagination?.pageSize('notifications')||10,observer:null};
+  const renderer = window.PoyozzNotifications?.render;
+  if (typeof renderer !== 'function') {
+    console.error('POYOZZ notifications module is unavailable.');
+    toast('系統通知暫時無法載入，請重新整理後再試。');
+    return;
   }
-  const filtered=state.notifications.filter(n=>!unread||!n.read);
-  const list=filtered.slice(0,notificationListPager.limit);
-  $('view').innerHTML=`<div class="stack">
-    <div class="row between"><h1 style="margin:0">系統通知</h1>
-      <button data-action="read-all">全部已讀</button></div>
-    <div class="tabs">
-      <button class="tab ${!unread ? 'active' : ''}" data-action="notice-tab">全部訊息</button>
-      <button class="tab ${unread ? 'active' : ''}" data-action="notice-tab" data-value="unread">未讀訊息</button>
-    </div>
-    <div>${list.map(n => `<article class="notice">
-      <div class="row between"><h3 style="margin:0">${n.read ? '' : '● '}${e(n.title)}</h3>
-        ${!n.read ? `<button data-action="read-notice" data-id="${e(n.id)}">已讀</button>` : ''}</div>
-      <p class="muted" style="margin:12px 0">${e(n.body)}</p>
-      <span class="small muted">${e(timeText(n.at))}</span>
-    </article>`).join('') || '<div class="empty">目前沒有訊息。</div>'}</div>
-    ${filtered.length>notificationListPager.limit?'<div id="notificationsSentinel" class="small muted" style="text-align:center;padding:16px">向下滑動載入更多通知…</div>':''}
-  </div>`;
-  notificationListPager.observer?.disconnect();
-  const sentinel=$('notificationsSentinel');
-  if(sentinel)notificationListPager.observer=window.PoyozzListPagination?.observeEnd(sentinel,()=>{
-    if(route.page!=='notifications')return;
-    notificationListPager.limit+=window.PoyozzListPagination?.pageSize('notifications')||10;
-    renderNotifications();
+  return renderer({
+    route, state, $, e, timeText,
+    PoyozzListPagination: window.PoyozzListPagination
   });
 }
 
