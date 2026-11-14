@@ -6805,7 +6805,7 @@ function groupFriendlyError(error) {
   if(message.includes('authentication_required')||message.includes('JWT')||message.includes('登入狀態')) return '登入狀態已失效，請重新登入後再試。';
   return message||'操作失敗，請稍後再試。';
 }
-async function groupHydrateListRows(groups,uid){
+async function groupHydrateListRows(groups){
   const g=groupPrototype,client=window.mySupabase;
   if(!groups.length)return;
   const groupIds=groups.map(group=>group.id);
@@ -6831,19 +6831,13 @@ async function groupHydrateListRows(groups,uid){
     }
     g.groupMembers[row.group_id]=members;
   }
-  // Only the current page's groups receive one compact latest-message preview.
-  for(let i=0;i<groupIds.length;i+=10){
-    const batchIds=groupIds.slice(i,i+10);
-    const previews=await Promise.all(batchIds.map(async groupId=>{
-      const {data:message,error:messageError}=await client.from('chat_group_messages')
-        .select('group_id,content,speaker_type,created_at,sequence_no')
-        .eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:false})
-        .order('sequence_no',{ascending:false}).limit(1).maybeSingle();
-      if(messageError)throw messageError;
-      return [groupId,message||null];
-    }));
-    for(const [groupId,message] of previews)if(message)g.groupPreviews[groupId]=message;
-  }
+  // One owner-scoped RPC returns one latest message per group for this page.
+  const {data:previewRows,error:previewError}=await client.rpc(
+    'get_my_group_list_previews',
+    {p_group_ids:groupIds}
+  );
+  if(previewError)throw previewError;
+  for(const preview of previewRows||[])g.groupPreviews[preview.group_id]=preview;
 }
 async function groupLoadList(force=false,loadMore=false) {
   const g=groupPrototype;
@@ -6890,7 +6884,7 @@ async function groupLoadList(force=false,loadMore=false) {
     const existingIds=new Set((g.groups||[]).map(group=>group.id));
     const newRows=[...pinnedRows,...currentPage].filter(group=>!deletedGroupIds[group.id]&&!existingIds.has(group.id));
     if(newRows.length){
-      await groupHydrateListRows(newRows,user.id);
+      await groupHydrateListRows(newRows);
       if(user.id!==currentUser()?.uid){groupResetForAccount(currentUser()?.uid||null);return;}
       g.groups=window.PoyozzListPagination.mergeUnique(g.groups,newRows,group=>group.id);
     }
