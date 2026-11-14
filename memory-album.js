@@ -10,21 +10,33 @@
       '<label class="field"><span>上傳回憶相片（JPEG、PNG、WebP，單張上限 10 MB）</span><input id="memoryAlbumFile" type="file" accept="image/jpeg,image/png,image/webp" data-album-type="'+e(type)+'" data-album-id="'+e(id)+'"></label></div>'+
       '<div id="memoryAlbumItems" class="memory-album-items"><div class="empty">正在讀取回憶相簿…</div></div></section>';
   }
-  async function loadAlbum(type,chatId){
+  const albumPageStates=new Map();
+  async function loadAlbum(type,chatId,options={}){
     const mount=$('memoryAlbumItems');if(!mount)return;
     const client=window.mySupabase;
     if(!client||!currentUser()?.uid){mount.innerHTML='<div class="empty">請先登入，才能查看與保存回憶相片。</div>';return;}
+    const key=type+':'+chatId;
+    let pager=albumPageStates.get(key);
+    if(!options.loadMore||!pager){pager={offset:0,hasMore:true,loading:false,ids:new Set()};albumPageStates.set(key,pager);mount.innerHTML='';}
+    if(pager.loading||!pager.hasMore)return;
+    pager.loading=true;
+    const uid=currentUser()?.uid;
     try{
       const {data:{user},error:authError}=await client.auth.getUser();
-      if(authError||!user||user.id!==currentUser()?.uid)throw new Error('登入狀態驗證失敗，請重新登入。');
+      if(authError||!user||user.id!==uid||currentUser()?.uid!==uid)throw new Error('登入狀態驗證失敗，請重新登入。');
+      const pageSize=window.PoyozzListPagination?.pageSize('memoryPhotos')||10;
       const {data,error}=await client.from('chat_memory_photos').select('id,owner_id,chat_type,session_id,group_id,storage_path,caption,created_at,expires_at')
         .eq('owner_id',user.id).eq('chat_type',type).eq(type==='single'?'session_id':'group_id',chatId)
-        .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false});
+        .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString())
+        .order('created_at',{ascending:false}).order('id',{ascending:false})
+        .range(pager.offset,pager.offset+pageSize-1);
       if(error)throw error;
-      const cards=await Promise.all((data||[]).map(async photo=>{
+      if(!mount.isConnected||currentUser()?.uid!==uid)return;
+      const rows=(data||[]).filter(photo=>!pager.ids.has(photo.id));
+      const cards=await Promise.all(rows.map(async photo=>{
         let imageUrl='';
         try{imageUrl=await getMemoryPhotoSignedUrl(photo.storage_path)||'';}catch(signedError){console.warn('相簿簽名網址取得失敗',signedError?.message);}
-        urlCache.set(photo.id,{url:imageUrl,photo});
+        urlCache.set(photo.id,{url:imageUrl,photo});pager.ids.add(photo.id);
         const thumbnail=imageUrl
           ? '<button type="button" class="memory-photo-thumb" data-action="memory-photo-open" data-id="'+e(photo.id)+'" aria-label="開啟相片"><img src="'+e(imageUrl)+'" alt="'+e(photo.caption||'回憶相片')+'" loading="lazy"></button>'
           : '<div class="memory-photo-thumb" style="display:grid;place-items:center;color:var(--muted);font-size:11px;padding:6px;text-align:center">圖片檔案遺失<br>仍可刪除紀錄</div>';
@@ -32,9 +44,23 @@
           '<div class="memory-photo-details"><div class="memory-photo-title-edit"><strong>'+e(photo.caption||'回憶快照')+'</strong>'+(imageUrl?'<button type="button" class="ghost memory-photo-icon" data-action="memory-photo-edit" data-id="'+e(photo.id)+'" aria-label="修改標題" title="修改標題">✎</button>':'')+'</div><span class="small muted">'+e(dateLabel(photo.created_at))+'</span><span class="memory-photo-expiry">到期日：'+e(dateLabel(photo.expires_at))+'</span></div>'+
           '<div class="memory-photo-actions"><button type="button" class="ghost memory-photo-icon" data-action="memory-photo-delete" data-id="'+e(photo.id)+'" aria-label="刪除相片" title="刪除相片">🗑</button></div></article>';
       }));
-      if(!mount.isConnected)return;
-      mount.innerHTML=cards.filter(Boolean).join('')||'<div class="empty">目前還沒有回憶相片哦</div>';
-    }catch(err){console.error('讀取回憶相簿失敗',err);mount.innerHTML='<div class="empty">相簿讀取失敗：'+e(err.message||'請稍後重試。')+'</div>';}
+      if(!mount.isConnected||currentUser()?.uid!==uid)return;
+      const html=cards.filter(Boolean).join('');
+      if(html)mount.insertAdjacentHTML('beforeend',html);
+      pager.offset+=((data||[]).length);
+      pager.hasMore=(data||[]).length===pageSize;
+      mount.querySelector('[data-memory-photos-more]')?.remove();
+      if(pager.hasMore){
+        mount.insertAdjacentHTML('beforeend','<button type="button" class="button secondary" data-memory-photos-more data-album-type="'+e(type)+'" data-album-id="'+e(chatId)+'">載入更多相片</button>');
+      }else if(!pager.ids.size){
+        mount.innerHTML='<div class="empty">目前還沒有回憶相片哦</div>';
+      }
+    }catch(err){
+      console.error('讀取回憶相簿失敗',err);
+      mount.querySelector('[data-memory-photos-more]')?.remove();
+      if(!pager.ids.size)mount.innerHTML='<div class="empty">相簿讀取失敗：'+e(err.message||'請稍後重試。')+'</div>';
+      else mount.insertAdjacentHTML('beforeend','<div class="empty">載入更多相片失敗，請稍後再試。</div>');
+    }finally{pager.loading=false;}
   }
   async function compressMemoryImage(file){
     const result=await window.PoyozzImageCompression.compress(file,{
@@ -202,6 +228,12 @@
   document.addEventListener('change',event=>{
     const input=event.target;
     if(input?.id==='memoryAlbumFile')void uploadAlbum(input);
+  });
+  document.addEventListener('click',event=>{
+    const more=event.target.closest('[data-memory-photos-more]');
+    if(!more)return;
+    more.disabled=true;
+    void loadAlbum(more.dataset.albumType,more.dataset.albumId,{loadMore:true});
   });
   document.addEventListener('click',async event=>{
     const button=event.target.closest('[data-action="memory-photo-open"],[data-action="memory-photo-download"],[data-action="memory-photo-background"],[data-action="memory-photo-edit"],[data-action="memory-photo-delete"],[data-action="memory-photo-save-title"],[data-action="memory-photo-cancel-title"]');
