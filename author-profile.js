@@ -5,7 +5,6 @@
   'use strict';
 
   const authorPages = new Map();
-  const CHARACTER_FIELDS = 'id,author_id,name,gender,age,avatar_url,avatar_video_path,is_nsfw,visibility,review_status,intro,race,style,tags,created_at,first_published_at,latest_eligible';
 
   function pageFor(authorId, pagination) {
     if (!authorPages.has(authorId)) {
