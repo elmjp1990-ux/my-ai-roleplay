@@ -65,6 +65,13 @@
       if (needsPublicProfile) void hydratePublicAuthorProfile(authorId);
       const following = state.following.includes(a.uid);
       const page = pageFor(authorId, PoyozzListPagination);
+      if(!page.loaded&&(!getSupabaseClient()||!isUuid(authorId))){
+        page.characters=state.characters.filter(character=>
+          character.visibility==='public'&&character.authorId===authorId&&
+          !String(character.id).startsWith('seed-')&&character.cloudPublic!==false&&character.localOnly!==true
+        );
+        page.loaded=true;page.hasMore=false;
+      }
 
       const renderPage = () => {
         if (route.page !== 'author' || route.id !== authorId) return;
