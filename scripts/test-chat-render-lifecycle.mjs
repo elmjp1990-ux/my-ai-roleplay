@@ -166,7 +166,7 @@ test('city map exposes teardown and releases its timer, listeners and videos', (
 
 test('memory album photo metadata is weakly held by mounted rows', () => {
   assert.match(memoryAlbum, /const urlCache\s*=\s*new WeakMap\(\)/);
-  assert.match(memoryAlbum, /urlCache\.set\(row,\s*cached\)/);
+  assert.match(memoryAlbum, /cards\.forEach\(\(card,index\)=>urlCache\.set\(renderedRows\[/);
   assert.match(memoryAlbum, /urlCache\.get\(row\)/);
   assert.doesNotMatch(memoryAlbum, /urlCache\.(?:set|get|delete)\(photo\.id/);
 });
