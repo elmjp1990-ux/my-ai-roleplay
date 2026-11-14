@@ -217,8 +217,11 @@ assert.match(groupHistory,/requestId!==g\.openRequestId\|\|g\.active\?\.id!==gro
 assert.match(groupHistory,/g\.historyError=groupFriendlyError\(error\)/,
   'older-page failures must remain retryable and visible rather than corrupting history');
 const groupRenderer=between('function renderGroupConversation()','let groupBackgroundTimer=null');
-assert.match(groupRenderer,/anchor\.scrollTop\+\(groupMessages\.scrollHeight-anchor\.scrollHeight\)/,
-  'prepending older messages must compensate for the added content height');
+const scrollAnchorHelper=between('function captureChatScrollAnchor(pane)','async function loadCloudSessionMessages');
+assert.match(scrollAnchorHelper,/pane\.scrollTop=anchor\.scrollTop\+Math\.max\(0,pane\.scrollHeight-anchor\.scrollHeight\)/,
+  'prepending older messages must compensate for added content height when the original anchor is unavailable');
+assert.match(groupRenderer,/restoreChatScrollAnchor\(groupMessages,anchor\)/,
+  'group history rendering must restore the saved visible-message anchor after prepending older messages');
 assert.match(groupRenderer,/if\(groupMessages\.isConnected\)/,
   'scroll restoration must not touch a detached message pane');
 
