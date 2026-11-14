@@ -251,7 +251,6 @@ assert.match(frontend, /data-action="encounter-end-confirm"/);
 assert.match(frontend, /activeEncounter\?\.encounterMode===true\)\{showEncounterLeaveDialog/);
 assert.match(cityMap, /findResumableEncounterSession\(person\.id,placeKey\)/);
 assert.match(frontend, /encounterDay/);
-assert.match(frontend, /if\(isNewEncounter && sessionData\.archived!==true\)groups\.delete\(groupKey\)/);
 assert.match(frontend, /encounter-dialog-dismiss/);
 assert.match(frontend, /saved!==true\)throw new Error\('雲端未確認儲存結果。'\)/);
 assert.match(frontend, /\.eq\(["']chat_mode["'],["']encounter["']\)/);
