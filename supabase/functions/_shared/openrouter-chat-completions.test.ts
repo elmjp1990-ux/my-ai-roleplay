@@ -1,4 +1,4 @@
-import { assertEquals, assertMatch } from "jsr:@std/assert";
+import { assertEquals } from "jsr:@std/assert";
 import { buildOpenRouterProviderOptions } from "./openrouter-provider-policy.ts";
 import { requestOpenRouterChatCompletion } from "./openrouter-chat-completions.ts";
 
@@ -13,7 +13,7 @@ Deno.test("shared OpenRouter transport applies model options, privacy policy and
       id: "request-123",
       provider: "deepinfra",
       model: "openai/gpt-oss-20b",
-      choices: [{ message: { content: "{\\"summary\\":\\"ok\\"}" } }],
+      choices: [{ message: { content: '{"summary":"ok"}',
       usage: { prompt_tokens: 12, completion_tokens: 8, total_tokens: 20 },
     }), {
       status: 200,
@@ -41,7 +41,7 @@ Deno.test("shared OpenRouter transport applies model options, privacy policy and
     assertEquals(body.response_format, { type: "json_object" });
     assertEquals(body.provider, buildOpenRouterProviderOptions());
     assertEquals(body.messages, [{ role: "user", content: "summarize" }]);
-    assertEquals(result.result, { kind: "generated", text: "{\\"summary\\":\\"ok\\"}" });
+    assertEquals(result.result, { kind: "generated", text: '{"summary":"ok"}' });
     assertEquals(result.httpStatus, 200);
     assertEquals(result.requestId, "gateway-123");
     assertEquals(result.provider, "deepinfra");
