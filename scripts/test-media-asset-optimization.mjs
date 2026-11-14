@@ -112,7 +112,7 @@ function albumBlock(start,end){
   return memoryAlbum.slice(a,b);
 }
 const albumLoader=albumBlock("async function loadAlbum(type,chatId,options={})","async function compressMemoryImage");
-assert.ok(albumLoader.includes("getMemoryPhotoSignedUrl(photo.storage_path)"));
+assert.ok(albumLoader.includes("memoryPhotoSignedUrlManager.getMany"));
 assert.doesNotMatch(albumLoader,/if\(!imageUrl\)[^\n]*signedError/);
 const photoDelete=albumBlock("if(button.dataset.action==='memory-photo-delete')","if(button.dataset.action==='memory-photo-background')");
 assert.ok(photoDelete.includes("invalidateMemoryPhotoSignedUrl(photo.storage_path,uid)"));
