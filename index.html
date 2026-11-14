@@ -1566,7 +1566,10 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       const rowsVersion=publicCharacterRowsCacheVersion;
       const pageOffset=loadMore?pager.offset:0;
       const rows=await loadPublicCharacterRows(pageOffset);
-      if(rowsVersion!==publicCharacterRowsCacheVersion)return;
+      if(rowsVersion!==publicCharacterRowsCacheVersion){
+        window.__poyozzExploreLoading=false;
+        return loadPublicSupabaseCharactersImpl({loadMore:false});
+      }
       const publicCharacters=(rows||[]).map(row=>{
         const cachedPublic=state.characters.find(character=>character.id===row.id&&character.cloudPublic===true);
         const ownerLocal=state.characters.find(character=>character.id===row.id&&character.authorId===row.author_id&&character.authorId===state.account?.uid);
