@@ -82,9 +82,9 @@ CREATE TABLE public.character_comments (
 CREATE OR REPLACE FUNCTION private.current_user_is_adult()
 RETURNS boolean
 LANGUAGE sql STABLE
-AS $
+AS $$
   SELECT COALESCE(current_setting('request.jwt.claim.adult', true), 'false') = 'true';
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION private.comment_is_whisper_thread(p_comment_id uuid)
 RETURNS boolean
