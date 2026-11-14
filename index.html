@@ -8382,7 +8382,7 @@ function addMemory(s,text) {
 
 let chatMessageSearchState={key:'',query:'',offset:0,request:0,timer:null,loading:false,rows:[]};
 let chatSearchJumpRequest=0;
-const CHAT_SEARCH_PAGE_SIZE=20;
+const CHAT_SEARCH_PAGE_SIZE=10;
 function resetChatMessageSearchState(){
   if(chatMessageSearchState.timer)clearTimeout(chatMessageSearchState.timer);
   chatSearchJumpRequest++;
