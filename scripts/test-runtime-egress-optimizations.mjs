@@ -126,6 +126,18 @@ assert.match(groupMigration,/complete_group_chat_turn/);
 assert.match(groupMigration,/refund_group_chat_turn/);
 assert.match(groupMigration,/status IN \('reserved', 'settled', 'refunded'\)/);
 assert.match(groupMigration,/GRANT EXECUTE ON FUNCTION public\.reserve_group_chat_turn[\s\S]*TO service_role/);
+assert.match(groupMigration,/g\.deleted_at IS NULL/,
+  "new group reservations must reject soft-deleted groups while holding the parent lock");
+assert.match(groupEdge,/\.is\("deleted_at", null\)/,
+  "the Edge Function must not load context from a group deleted after reservation");
+const completeRpc=groupMigration.slice(groupMigration.indexOf("CREATE OR REPLACE FUNCTION public.complete_group_chat_turn"),groupMigration.indexOf("CREATE OR REPLACE FUNCTION public.refund_group_chat_turn"));
+assert.match(completeRpc,/SELECT g\.deleted_at INTO v_group_deleted_at[\s\S]*FOR UPDATE[\s\S]*group_deleted_during_generation/,
+  "completion must lock the parent and reject writes when deletion won the generation race");
+const refundRpc=groupMigration.slice(groupMigration.indexOf("CREATE OR REPLACE FUNCTION public.refund_group_chat_turn"),groupMigration.indexOf("REVOKE ALL ON FUNCTION public.reserve_group_chat_turn"));
+assert.match(refundRpc,/FROM public\.chat_groups g WHERE g\.id = v_group_id FOR UPDATE/,
+  "refund must use parent-first locking while remaining available for soft-deleted groups");
+assert.match(groupMigration,/wallet_transactions_group_turn_idempotency_uidx/,
+  "group charge/refund ledger entries must have a unique per-turn operation/currency guard");
 assert.match(speakerParser,/\[：:\]/,"speaker parser must accept full-width and ASCII colons");
 assert.match(speakerParser,/角色名稱：/,"speaker parser must document explicit character-name labels");
 assert.doesNotMatch(html,/append_chat_group_mock_turn/,"frontend must no longer call the deterministic mock RPC");
