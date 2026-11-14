@@ -43,7 +43,7 @@ for (const relativePath of runtimeFiles) {
 
 // Every local stylesheet linked by index.html must be present in the static output.
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const linkedStylesheets = [...html.matchAll(/<link\b(?=[^>]*\\brel=["']stylesheet["'])(?=[^>]*\\bhref=["']([^"'?#]+)["'])[^>]*>/gi)]
+const linkedStylesheets = [...html.matchAll(/<link\b(?=[^>]*\brel=["']stylesheet["'])(?=[^>]*\bhref=["']([^"'?#]+)["'])[^>]*>/gi)]
   .map(match => match[1].replace(/^\.\//, ''));
 for (const stylesheet of linkedStylesheets) {
   if (path.isAbsolute(stylesheet) || stylesheet.split(/[\\/]/).includes('..')) {
