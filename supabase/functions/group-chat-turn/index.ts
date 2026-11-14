@@ -125,7 +125,7 @@ Deno.serve(async (request) => {
   }
 
   const { data: group, error: groupError } = await admin.from("chat_groups")
-    .select("id,owner_id,name,world_background,scene_mode")
+    .select("id,owner_id,name,world_background,scene_mode,player_name,player_persona,world_character_id")
     .eq("id", groupId).eq("owner_id", user.id).is("archived_at", null).maybeSingle();
   if (groupError || !group) {
     const refunded = await refund(admin, user.id, turnId, "group_context_unavailable");
@@ -141,7 +141,7 @@ Deno.serve(async (request) => {
     admin.from("chat_group_messages")
       .select("turn_id,scene_id,speaker_type,character_id,speaker_snapshot,content,created_at,sequence_no")
       .eq("group_id", groupId).is("deleted_at", null)
-      .order("created_at", { ascending: false }).limit(40),
+      .order("created_at", { ascending: false }).order("sequence_no", { ascending: false }).order("id", { ascending: false }).limit(40),
     admin.from("profiles").select("id,nickname,persona_presets").eq("id", user.id).maybeSingle(),
   ]);
   if (memberResult.error || sceneResult.error || historyResult.error || playerResult.error ||
@@ -230,7 +230,7 @@ Deno.serve(async (request) => {
   const systemPrompt = [
     "你是 POYOZZ 群組互動故事中的唯一 AI 扮演者。你同時讀取所有角色卡，但必須嚴格區分每位角色的人格、記憶、說話方式與場景位置。",
     "【世界與玩家】群組名稱：" + asText(group.name) + "。共同世界觀：" + asText(group.world_background),
-    "玩家稱呼：" + playerName + "。玩家是劇情主導者；絕不可替玩家創作台詞、思想、感受、決定或未描述的行動。",
+    "玩家稱呼：" + (asText(group.player_name) || playerName) + "。玩家人設：" + asText(group.player_persona) + "。玩家是劇情主導者；絕不可替玩家創作台詞、思想、感受、決定或未描述的行動。",
     "【角色卡】\n" + profileSections.join("\n\n").slice(0, 24000),
     "【群組場景模式】" + asText(group.scene_mode) + "。shared 代表角色處於同一共同場景；separate 代表每位角色只知道自己所屬場景。近期對話每行都有場景 ID；separate 模式下，角色只能依自己所屬場景的訊息回應，除非對話已合理建立資訊傳遞，否則不可引用其他場景的即時事件。",
     "【近期群組對話】\n" + history.slice(-14000),
