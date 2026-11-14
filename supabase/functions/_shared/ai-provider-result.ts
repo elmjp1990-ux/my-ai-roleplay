@@ -11,15 +11,9 @@ export type AiProviderResult =
   | { kind: "empty_output" }
   | { kind: "provider_error"; retryable: boolean; code: string };
 
+import { asRecord as asObject, asTrimmedString as asText } from "./ai-value-utils.ts";
+
 type JsonObject = Record<string, unknown>;
-
-const asObject = (value: unknown): JsonObject =>
-  value && typeof value === "object" && !Array.isArray(value)
-    ? value as JsonObject
-    : {};
-
-const asText = (value: unknown): string =>
-  typeof value === "string" ? value.trim() : "";
 
 const POLICY_CODES = new Set([
   "content_filter",
