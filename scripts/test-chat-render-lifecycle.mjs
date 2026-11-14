@@ -179,3 +179,45 @@ test('memory album pagination state uses a bounded LRU', () => {
   assert.match(memoryAlbum, /let pager=getAlbumPageState\(key\)/);
   assert.match(memoryAlbum, /rememberAlbumPageState\(key,pager\)/);
 });
+
+
+const paginationSource = fs.readFileSync(new URL('../list-pagination.js', import.meta.url), 'utf8');
+test('pagination scope changes invalidate in-flight requests and disconnect observers', () => {
+  const observers = [];
+  class FakeIntersectionObserver {
+    constructor(callback) { this.callback = callback; this.disconnected = false; observers.push(this); }
+    observe() {}
+    disconnect() { this.disconnected = true; }
+  }
+  const window = {};
+  vm.runInNewContext(paginationSource, { window, Map, Set, Object, Number, String, IntersectionObserver: FakeIntersectionObserver });
+  const pagination = window.PoyozzListPagination;
+  const state = pagination.createState('authorCharacters');
+  const requestId = state.beginRequest();
+  const observer = pagination.observeEnd({}, () => {});
+  assert.equal(state.loading, true);
+  assert.equal(state.isRequestCurrent(requestId), true);
+  assert.equal(pagination.beginScope('author:one:user-a'), true);
+  assert.equal(state.isRequestCurrent(requestId), false);
+  assert.equal(state.loading, false);
+  assert.equal(observer.disconnected, true);
+  assert.equal(pagination.beginScope('author:one:user-a'), false);
+  assert.equal(pagination.beginScope('author:two:user-a'), true);
+});
+
+test('author profile pagination cache is bounded and stale requests cannot append rows', () => {
+  const authorProfile = fs.readFileSync(new URL('../author-profile.js', import.meta.url), 'utf8');
+  assert.match(authorProfile, /MAX_AUTHOR_PAGES\s*=\s*8/);
+  assert.match(authorProfile, /page\.beginRequest\(\)/);
+  assert.match(authorProfile, /if \(!page\.isRequestCurrent\(requestId\)\) return/);
+  assert.match(authorProfile, /authorPages\.get\(oldestId\)\?\.invalidate\(\)/);
+  assert.match(appHtml, /PoyozzListPagination\?\.beginScope\?\.\(route\.page\+':'/);
+});
+
+test('followed authors and memory albums guard every awaited page against route-scope invalidation', () => {
+  const followedAuthors = fs.readFileSync(new URL('../followed-authors.js', import.meta.url), 'utf8');
+  assert.match(followedAuthors, /current\.beginRequest\(\)/);
+  assert.match(followedAuthors, /current\.isRequestCurrent\(requestId\)/);
+  assert.match(memoryAlbum, /pager\.beginRequest\(\)/);
+  assert.match(memoryAlbum, /pager\.isRequestCurrent\(requestId\)/);
+});
