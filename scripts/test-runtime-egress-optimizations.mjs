@@ -129,6 +129,8 @@ assert.match(groupMigration,/GRANT EXECUTE ON FUNCTION public\.reserve_group_cha
 assert.match(speakerParser,/\[：:\]/,"speaker parser must accept full-width and ASCII colons");
 assert.match(speakerParser,/角色名稱：/,"speaker parser must document explicit character-name labels");
 assert.doesNotMatch(html,/append_chat_group_mock_turn/,"frontend must no longer call the deterministic mock RPC");
+assert.match(html,/group_chat_turn_charge: '群組聊天回覆扣款'/,"wallet history must label group turn charges");
+assert.match(html,/group_chat_turn_refund: '群組聊天失敗退款'/,"wallet history must label group turn refunds");
 
 console.log("Story relationship RPC dedupe, illustration write dedupe, group list refresh avoidance, incremental group-turn loading, phone-state cache, shared login auth verification, and author-profile hydration reuse checks passed.");
 
