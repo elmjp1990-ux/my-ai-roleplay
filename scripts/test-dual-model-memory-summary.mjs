@@ -22,7 +22,7 @@ assert.match(summary, /generation_type: "chat_response"/);
 assert.match(summary, /prompt_tokens/);
 assert.match(summary, /cost_usd/);
 assert.match(summary, /accumulatedUsage/);
-assert.match(summary, /data_collection: "deny"/);
+assert.match(summary, /requestOpenRouterChatCompletion/);
 assert.match(summaryReadMigration, /CREATE OR REPLACE FUNCTION public\.get_story_memory_summary/);
 assert.match(summaryReadMigration, /auth\.uid\(\)/);
 assert.match(ui, /function loadStoryMemorySummary\(session\)/);
