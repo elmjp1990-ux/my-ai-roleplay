@@ -1543,30 +1543,38 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
   let publicCharactersLoadPromise = null;
   function loadPublicSupabaseCharacters(options={}) {
     const loadMore=options.loadMore===true;
+    const characterId=options.characterId||null;
+    if(characterId)return loadPublicSupabaseCharactersImpl({characterId});
     if(publicCharactersLoadPromise)return publicCharactersLoadPromise;
     publicCharactersLoadPromise=loadPublicSupabaseCharactersImpl({loadMore})
       .finally(()=>{publicCharactersLoadPromise=null;});
     return publicCharactersLoadPromise;
   }
-  async function loadPublicSupabaseCharactersImpl({loadMore=false}={}) {
+  async function loadPublicSupabaseCharactersImpl({loadMore=false,characterId=null}={}) {
     const client=window.mySupabase;
     if(!client)return;
     const pager=publicCharacterListPager;
-    if(pager.loading|| (loadMore&&!pager.hasMore))return;
-    if(!loadMore){
+    if(!characterId&&(pager.loading||(loadMore&&!pager.hasMore)))return;
+    if(!characterId&&!loadMore){
       pager.observer?.disconnect();
       pager.offset=0;pager.hasMore=true;pager.loading=false;
       pager.ownerUid=state.account?.uid||null;
       publicCharacterRowsCache.clear();
       publicCharacterRowsCacheAt=0;
     }
-    pager.loading=true;
-    window.__poyozzExploreLoading=true;
+    if(!characterId){pager.loading=true;window.__poyozzExploreLoading=true;}
     try{
       const rowsVersion=publicCharacterRowsCacheVersion;
       const pageOffset=loadMore?pager.offset:0;
-      const rows=await loadPublicCharacterRows(pageOffset);
-      if(rowsVersion!==publicCharacterRowsCacheVersion){
+      let rows=[];
+      if(characterId){
+        const {data,error}=await client.from('characters')
+          .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible')
+          .eq('id',characterId).eq('visibility','public').is('deleted_at',null).maybeSingle();
+        if(error)throw new Error(error.message);
+        if(data)rows=[data];
+      }else rows=await loadPublicCharacterRows(pageOffset);
+      if(!characterId&&rowsVersion!==publicCharacterRowsCacheVersion){
         window.__poyozzExploreLoading=false;
         return loadPublicSupabaseCharactersImpl({loadMore:false});
       }
@@ -1595,7 +1603,9 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       });
       const publicIds=new Set(publicCharacters.map(character=>character.id));
       const currentUid=state.account?.uid||null;
-      if(!loadMore){
+      if(characterId){
+        state.characters=window.PoyozzListPagination.mergeUnique(state.characters,publicCharacters,character=>character.id);
+      }else if(!loadMore){
         const keepLocal=state.characters.filter(character=>
           String(character.id).startsWith('seed-')||
           (!!currentUid&&character.authorId===currentUid&&!character.deletedAt)
@@ -1608,11 +1618,13 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
           return refreshed?{...existing,...refreshed}:existing;
         });
       }
-      pager.offset+=rows.length;
-      pager.hasMore=rows.length===publicCharacterPageSize;
-      pager.loading=false;
-      window.__poyozzExploreHasMore=pager.hasMore;
-      window.__poyozzExploreLoading=false;
+      if(!characterId){
+        pager.offset+=rows.length;
+        pager.hasMore=rows.length===publicCharacterPageSize;
+        pager.loading=false;
+        window.__poyozzExploreHasMore=pager.hasMore;
+        window.__poyozzExploreLoading=false;
+      }
       persist();
       if(route?.page!=='citymap')render();
     }catch(error){
@@ -1623,6 +1635,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     }
   }
   window.loadNextPublicCharacterPage=()=>loadPublicSupabaseCharacters({loadMore:true});
+  window.loadPublicCharacterById=characterId=>loadPublicSupabaseCharacters({characterId});
   window.__poyozzExploreHasMore=true;
   window.__poyozzExploreLoading=false;
 
