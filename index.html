@@ -10054,7 +10054,7 @@ document.addEventListener('click',async event => {
       case 'banner':banner=Number(button.dataset.index);renderBanner();break;
       case 'scroll-grid':$('characterGrid')?.scrollIntoView({behavior:'smooth'});break;
       case 'load-more':limit+=window.PoyozzListPagination.pageSize('explore');renderGrid({append:true});break;
-      case 'new-batch':batch+=7;limit=24;renderGrid();break;
+      case 'new-batch':batch+=7;limit=20;renderGrid();break;
       case 'tags':openModal('tags',{mode:button.dataset.mode});break;
       case 'add-custom-tag': {
         const input=$('modal').querySelector('input[name="tagSearch"]');
@@ -11541,7 +11541,7 @@ window.addEventListener('blur', saveEditorDraft);
 document.addEventListener('input',event => {
   const target=event.target;
   if (target.closest('form[data-form="character"]')) saveEditorDraft();
-  if (target.id==='searchInput') {search=target.value;renderGrid();}
+  if (target.id==='searchInput') {search=target.value;limit=20;renderGrid();}
   if (target.id==='chatSearch') {
     chatSearch=target.value;
     refreshChatEntryList();
