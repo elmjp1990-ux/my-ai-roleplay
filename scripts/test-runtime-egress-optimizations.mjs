@@ -235,6 +235,16 @@ assert.match(html,/chatListSentinel/);
 assert.match(html,/groupLoadList\(false,true\)/,
   "the group list sentinel must request the next page");
 
+const authorProfileModule=fs.readFileSync("author-profile.js","utf8");
+const followedAuthorsModule=fs.readFileSync("followed-authors.js","utf8");
+assert.match(authorProfileModule,/\.range\(page\.offset,page\.offset\+page\.pageSize-1\)/,
+  "author profile character lists must use bounded twenty-row backend pages");
+assert.match(authorProfileModule,/PoyozzListPagination\.observeEnd/,
+  "author profile lists must use the shared scroll pagination observer");
+assert.match(followedAuthorsModule,/\.limit\(4\)/,
+  "followed-author cards must fetch only each author's four newest public characters");
+assert.doesNotMatch(followedAuthorsModule,/await loadPublicSupabaseCharacters\(\)/,
+  "followed-author cards must not trigger a full public-character catalogue fetch");
 const paginationModule=fs.readFileSync("list-pagination.js","utf8");
 assert.match(paginationModule,/explore:\s*20/);
 assert.match(paginationModule,/chatSessions:\s*10/);
