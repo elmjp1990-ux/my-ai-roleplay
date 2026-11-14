@@ -22,7 +22,7 @@ assert.match(html, /載入更多公開角色（每次 10 位）/, 'group picker 
 
 assert.match(html, /let groupCharacterIntroExpandedId = null/, 'character introductions must start collapsed');
 assert.match(html, /data-action="group-toggle-character-intro"/, 'character name must expose an intro toggle');
-assert.match(html, /group-character-intro '\+\(expanded\?'':'hidden'\)/, 'character intro must be hidden until expanded');
+assert.ok(html.includes("group-character-intro '+(expanded?'':'hidden')+'"), 'character intro must be hidden until expanded');
 
 assert.match(html, /value="__player_custom__"/, 'group world choices must include player-defined background');
 assert.match(html, /id="groupCustomWorldBackground" maxlength="3000" data-count-for="groupCustomWorldBackground"/, 'custom world field must be limited to 3000 characters and counted');
