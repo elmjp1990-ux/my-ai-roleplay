@@ -229,9 +229,22 @@ Deno.serve(async (request) => {
       timeoutMs: TIMEOUT_MS,
     });
   } catch (error) {
-    // A timeout/network disconnect has an ambiguous provider outcome; keep the
-    // reservation locked rather than risk a duplicate generation or double refund.
-    return json({ status: "needs_reconciliation", error: error instanceof Error && error.name === "AbortError" ? "provider_timeout_outcome_unknown" : "provider_outcome_unknown", retryAllowed: false }, 503);
+    // The provider request has a firm 55-second deadline. If our own AbortController
+    // fires, this turn did not produce a usable reply for the player: refund the
+    // reserved in-app charge and report a timeout. Provider-side usage may still
+    // have occurred, but it must never be passed on to the player for this turn.
+    if (error instanceof Error && error.name === "AbortError") {
+      const refunded = await refund(admin, user.id, turnId, "provider_timeout");
+      return json({
+        status: refunded.confirmed ? "timed_out" : "needs_reconciliation",
+        error: refunded.confirmed ? "provider_timeout" : "timeout_refund_unconfirmed",
+        balance: refunded.balance,
+        retryAllowed: false,
+      }, refunded.confirmed ? 200 : 503);
+    }
+    // A non-timeout network disconnect has no reliable signal that the provider
+    // request was cancelled; leave it unresolved for reconciliation.
+    return json({ status: "needs_reconciliation", error: "provider_outcome_unknown", retryAllowed: false }, 503);
   }
 
   const safeRequestId = /^[A-Za-z0-9._:-]{1,128}$/.test(provider.requestId) ? provider.requestId : null;
