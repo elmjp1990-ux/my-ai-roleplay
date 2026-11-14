@@ -5693,10 +5693,11 @@ function creationTabs() {
 function owned(c) { return currentUser() && c?.authorId === currentUser().uid; }
 function renderCreate() {
   const ownedCharacters = state.characters.filter(c => owned(c) && !c.deletedAt);
+  const ownedPageLimit=ownedCharacterPager?.uid===currentUser()?.uid?Math.max(10,ownedCharacterPager.offset||0):10;
   const visibleCharacters = ownedCharacters.filter(c =>
     createVisibilityFilter === 'all' ||
     (createVisibilityFilter === 'public' ? c.visibility === 'public' : c.visibility !== 'public')
-  );
+  ).slice(0,ownedPageLimit);
   $('view').innerHTML = `<div class="stack"><h1>創建角色</h1>${creationTabs()}
     <div class="row between wrap" style="align-items:center;gap:12px">
       <h2 style="margin:0">你的角色</h2>
