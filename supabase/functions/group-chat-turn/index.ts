@@ -252,6 +252,22 @@ Deno.serve(async (request) => {
     return json({ status: "needs_reconciliation", error: error instanceof Error && error.name === "AbortError" ? "provider_timeout_outcome_unknown" : "provider_outcome_unknown", retryAllowed: false }, 503);
   }
 
+  const safeRequestId = /^[A-Za-z0-9._:-]{1,128}$/.test(provider.requestId) ? provider.requestId : null;
+  await admin.from("chat_group_ai_usage").upsert({
+    group_id: groupId,
+    group_turn_id: turnId,
+    user_id: user.id,
+    requested_model: MODEL,
+    returned_model: provider.model,
+    upstream_provider: provider.provider || null,
+    gateway_request_id: safeRequestId,
+    prompt_tokens: Number(provider.usage.prompt_tokens) || null,
+    completion_tokens: Number(provider.usage.completion_tokens) || null,
+    total_tokens: Number(provider.usage.total_tokens) || null,
+    cost_usd: Number(provider.usage.cost) || null,
+    status: provider.result.kind === "generated" ? "completed" : "failed",
+  }, { onConflict: "group_turn_id" });
+
   if (provider.result.kind === "content_rejected") {
     const refunded = await refund(admin, user.id, turnId, "provider_content_rejected");
     return json({ status: refunded.confirmed ? "content_rejected" : "needs_reconciliation", balance: refunded.balance, retryAllowed: false }, refunded.confirmed ? 200 : 503);
