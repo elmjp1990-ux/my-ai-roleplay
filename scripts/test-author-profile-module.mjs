@@ -45,3 +45,6 @@ for (const contract of [
 }
 
 console.log('Author profile module extraction and dependency contract passed.');
+
+assert.match(moduleSource, /page\.observer\?\.disconnect\(\)/, 'Author profile rerenders must disconnect the previous pagination observer.');
+assert.match(moduleSource, /createState\('authorCharacters'/, 'Author profile must use the shared pagination state.');
