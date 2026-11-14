@@ -172,7 +172,7 @@ test('memory album photo metadata is weakly held by mounted rows', () => {
 });
 
 test('memory album pagination state uses a bounded LRU', () => {
-  assert.match(memoryAlbum, /const MAX_ALBUM_PAGE_STATES\s*=\s*8/);
+  assert.match(memoryAlbum, /MAX_ALBUM_PAGE_STATES\s*=\s*8/);
   assert.match(memoryAlbum, /function getAlbumPageState\(key\)/);
   assert.match(memoryAlbum, /function rememberAlbumPageState\(key,pager\)/);
   assert.match(memoryAlbum, /while\(albumPageStates\.size>MAX_ALBUM_PAGE_STATES\)/);
