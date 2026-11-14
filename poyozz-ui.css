@@ -1,0 +1,489 @@
+/* POYOZZ shared UI system
+ * Central home for site-wide neutral glass surfaces and controls.
+ * Page-specific layout and city-map / encounter scene styling remain in their own styles.
+ */
+:root {
+  --px-chat-character-bg:rgba(79,84,91,.76);
+  --px-chat-player-bg:rgba(165,170,177,.42);
+  --px-chat-player-avatar-bg:rgba(165,170,177,.42);
+  --px-glass-bg:rgba(112,116,122,.22);
+  --px-glass-bg-strong:rgba(104,109,116,.34);
+  --px-glass-border:rgba(255,255,255,.24);
+  --px-glass-highlight:rgba(255,255,255,.16);
+  --px-glass-shadow:0 8px 24px rgba(12,15,20,.12);
+  --px-glass-blur:14px;
+  --px-glass-selected:rgba(145,116,190,.34);
+  --px-glass-selected-border:rgba(180,151,222,.62);
+  --px-affinity-bg:linear-gradient(120deg,rgba(112,91,139,.48),rgba(139,105,137,.38) 58%,rgba(116,111,145,.42));
+  --px-affinity-border:rgba(222,190,229,.42);
+  --px-affinity-text:rgba(250,239,250,.96);
+  --px-affinity-track:rgba(255,255,255,.24);
+  --px-affinity-fill:linear-gradient(90deg,#e7b8d5 0%,#c7b4ee 100%);
+  --px-affinity-shadow:0 4px 14px rgba(22,13,34,.18),inset 0 1px 0 rgba(255,255,255,.24);
+  --px-phone-surface:rgba(79,84,92,.94);
+  --px-phone-surface-soft:rgba(118,123,131,.34);
+  --px-phone-border:rgba(222,226,231,.24);
+  --px-phone-text:rgba(248,249,250,.96);
+  --px-phone-muted:rgba(224,227,231,.68);
+  --px-phone-battery:rgba(215,219,224,.92);
+  --px-phone-battery-track:rgba(255,255,255,.20);
+}
+body.day {
+  --px-chat-character-bg:rgba(185,190,197,.96);
+  --px-chat-player-bg:rgba(235,237,240,.98);
+  --px-chat-player-avatar-bg:rgba(235,237,240,.98);
+  --px-glass-bg:rgba(255,255,255,.48);
+  --px-glass-bg-strong:rgba(255,255,255,.68);
+  --px-glass-border:rgba(92,96,104,.19);
+  --px-glass-highlight:rgba(255,255,255,.62);
+  --px-glass-shadow:0 8px 24px rgba(40,43,48,.08);
+  --px-glass-selected:rgba(145,116,190,.22);
+  --px-glass-selected-border:rgba(139,108,184,.48);
+  --px-affinity-bg:linear-gradient(120deg,rgba(246,225,242,.94),rgba(233,224,249,.92) 58%,rgba(225,233,248,.94));
+  --px-affinity-border:rgba(174,143,190,.38);
+  --px-affinity-text:#57465f;
+  --px-affinity-track:rgba(112,86,126,.16);
+  --px-affinity-fill:linear-gradient(90deg,#d99bc3 0%,#a995dc 100%);
+  --px-affinity-shadow:0 3px 12px rgba(103,77,116,.09),inset 0 1px 0 rgba(255,255,255,.88);
+  --px-phone-surface:rgba(244,245,247,.98);
+  --px-phone-surface-soft:rgba(224,227,231,.78);
+  --px-phone-border:rgba(91,96,104,.20);
+  --px-phone-text:#292c31;
+  --px-phone-muted:rgba(64,68,75,.66);
+  --px-phone-battery:#777e87;
+  --px-phone-battery-track:rgba(75,80,88,.18);
+}
+
+/* Common controls */
+button {
+  background:var(--px-glass-bg);
+  border-color:var(--px-glass-border);
+  box-shadow:inset 0 1px 0 var(--px-glass-highlight);
+  -webkit-backdrop-filter:blur(var(--px-glass-blur)) saturate(115%);
+  backdrop-filter:blur(var(--px-glass-blur)) saturate(115%);
+}
+button:hover:not(:disabled) {
+  background:var(--px-glass-bg-strong);
+  border-color:rgba(255,255,255,.34);
+  filter:none;
+}
+button:active:not(:disabled) { transform:translateY(1px); }
+:where(button,a,input,textarea,select):focus-visible {
+  outline:2px solid var(--px-primary-hover);
+  outline-offset:2px;
+}
+button.ghost,.ghost {
+  background:transparent;
+  border-color:transparent;
+  box-shadow:none;
+  -webkit-backdrop-filter:none;
+  backdrop-filter:none;
+}
+button.ghost:hover:not(:disabled),.ghost:hover:not(:disabled) {
+  background:var(--px-glass-bg);
+  border-color:var(--px-glass-border);
+}
+.primary,.primary:hover:not(:disabled) {
+  color:var(--text);
+  background:var(--px-glass-bg-strong);
+  border:1px solid var(--px-glass-border);
+  box-shadow:var(--px-glass-shadow),inset 0 1px 0 var(--px-glass-highlight);
+}
+.danger,.danger:hover:not(:disabled) {
+  color:#f08a98;
+  border-color:rgba(240,138,152,.38);
+  background:rgba(180,75,88,.12);
+}
+input,textarea,select {
+  background:var(--input);
+  border-color:var(--border);
+  -webkit-backdrop-filter:blur(10px);
+  backdrop-filter:blur(10px);
+}
+input:focus,textarea:focus,select:focus {
+  border-color:var(--px-primary-hover);
+  box-shadow:0 0 0 3px rgba(200,185,237,.16);
+}
+
+/* Shared surfaces */
+.panel,.group-panel,.group-step,.group-alert,
+.suggestions-panel,.chat-list,.chat-overlay,
+.wallet-modal-cost,.wallet-resource-row {
+  background:var(--px-glass-bg);
+  border-color:var(--px-glass-border);
+  box-shadow:var(--px-glass-shadow),inset 0 1px 0 var(--px-glass-highlight);
+  -webkit-backdrop-filter:blur(var(--px-glass-blur)) saturate(115%);
+  backdrop-filter:blur(var(--px-glass-blur)) saturate(115%);
+}
+.card {
+  background:var(--px-glass-bg);
+  border-color:var(--px-glass-border);
+  box-shadow:var(--px-glass-shadow);
+}
+.card:hover,.card:focus-within {
+  border-color:var(--px-glass-selected-border);
+  box-shadow:0 12px 30px rgba(12,15,20,.16);
+}
+
+/* Explore and navigation */
+.hero {
+  color:var(--text);
+  background:linear-gradient(135deg,rgba(122,127,135,.38),rgba(74,79,87,.25));
+  border:1px solid var(--px-glass-border);
+  box-shadow:var(--px-glass-shadow),inset 0 1px 0 var(--px-glass-highlight);
+  -webkit-backdrop-filter:blur(18px) saturate(115%);
+  backdrop-filter:blur(18px) saturate(115%);
+}
+.hero p { color:var(--muted); }
+.hero-dot.active { background:var(--px-primary-hover); box-shadow:0 0 10px rgba(200,185,237,.35); }
+.explore-shortcut {
+  color:var(--muted);
+  background:var(--px-glass-bg);
+  border-color:var(--px-glass-border);
+  box-shadow:inset 0 1px 0 var(--px-glass-highlight);
+  -webkit-backdrop-filter:blur(var(--px-glass-blur));
+  backdrop-filter:blur(var(--px-glass-blur));
+}
+.explore-shortcut .icon { color:var(--text); }
+.explore-shortcut.active {
+  color:var(--text);
+  background:var(--px-glass-selected);
+  border-color:var(--px-glass-selected-border);
+  box-shadow:inset 0 1px 0 var(--px-glass-highlight);
+}
+.nav-btn,.tab,.tabs .tab {
+  background:transparent;
+  border-color:transparent;
+  color:var(--muted);
+}
+.nav-btn:hover,.tab:hover,.tabs .tab:hover {
+  color:var(--text);
+  background:var(--px-glass-bg);
+  border-color:var(--px-glass-border);
+}
+.nav-btn.active,.nav-btn[aria-current="page"],
+.tabs .tab[aria-selected="true"],.tabs .tab.active,
+.group-step.active {
+  color:var(--text);
+  background:var(--px-glass-selected);
+  border-color:var(--px-glass-selected-border);
+  box-shadow:inset 0 1px 0 var(--px-glass-highlight);
+}
+
+/* Character cards and chat actions */
+.chat-cta,.card-chat {
+  color:var(--text);
+  background:var(--px-glass-bg-strong);
+  border:1px solid var(--px-glass-border);
+  box-shadow:var(--px-glass-shadow),inset 0 1px 0 var(--px-glass-highlight);
+  -webkit-backdrop-filter:blur(16px) saturate(120%);
+  backdrop-filter:blur(16px) saturate(120%);
+}
+.chat-cta:hover,.card-chat:hover,.card:hover .card-chat,.card:focus-within .card-chat {
+  color:var(--text);
+  background:rgba(155,158,165,.42);
+  border-color:rgba(255,255,255,.4);
+}
+.chat-top-action,.composer-icon-button {
+  background:var(--px-glass-bg);
+  border-color:var(--px-glass-border);
+  box-shadow:inset 0 1px 0 var(--px-glass-highlight);
+}
+.chat-top-action:hover,.composer-icon-button:hover {
+  background:var(--px-glass-bg-strong);
+  border-color:var(--px-glass-selected-border);
+}
+.group-list-avatar,.group-avatar-fallback {
+  background:var(--px-glass-bg-strong);
+  color:var(--text);
+  border:1px solid var(--px-glass-border);
+  box-shadow:var(--px-glass-shadow);
+}
+.chat-entry:hover,.chat-entry.active {
+  background:var(--px-glass-bg);
+  border-color:var(--px-glass-border);
+}
+.chat-entry.active {
+  box-shadow:inset 3px 0 var(--px-primary-hover);
+}
+.heart.on { color:var(--px-accent-pink); }
+
+@media(prefers-reduced-transparency:reduce) {
+  button,.panel,.group-panel,.group-step,.group-alert,
+  .suggestions-panel,.chat-list,.chat-overlay,.card,.hero,
+  .explore-shortcut,.chat-cta,.card-chat,.story-relationship-chip,
+  .phone-modal-backdrop,.phone-device,.phone-member-switch button,
+  .phone-close-row button,.phone-location,.phone-notices {
+    -webkit-backdrop-filter:none;
+    backdrop-filter:none;
+  }
+}
+
+
+/* Chat speaker surfaces: readable neutral greys, with distinct authorship. */
+/* Explicit, high-specificity speaker rules override the legacy purple player bubble. */
+body .message:not(.user) .bubble,
+body .roleplay-segment.is-character .bubble,
+body .roleplay-segment.is-temporary .bubble {
+  background:var(--px-chat-character-bg)!important;
+  border-color:rgba(210,214,219,.30)!important;
+  color:var(--text)!important;
+}
+body .message.user .bubble,
+body .roleplay-segment.is-user .bubble,
+body .user .bubble {
+  background:var(--px-chat-player-bg)!important;
+  border-color:rgba(225,228,232,.36)!important;
+  color:var(--text)!important;
+}
+body.day .message:not(.user) .bubble,
+body.day .roleplay-segment.is-character .bubble,
+body.day .roleplay-segment.is-temporary .bubble {
+  background:var(--px-chat-character-bg)!important;
+  border-color:rgba(112,117,124,.25)!important;
+  color:#252628!important;
+}
+body.day .message.user .bubble,
+body.day .roleplay-segment.is-user .bubble,
+body.day .user .bubble {
+  background:var(--px-chat-player-bg)!important;
+  border-color:rgba(112,117,124,.30)!important;
+  color:#252628!important;
+}
+
+/* Full-bleed single/group chat shell: header and composer surfaces meet the device edges. */
+body.conversation .chat-main,
+body.group-chat-page .chat-main { width:100%; max-width:none; margin:0; border:0; border-radius:0; }
+body.conversation .chat-heading,
+body.group-chat-page .chat-heading { width:100%; margin:0; padding-inline:0; border-radius:0; }
+body.conversation .composer,
+body.group-chat-page .composer { width:100%; margin:0; padding-inline:0; border-radius:0; }
+body.conversation .composer-input-row,
+body.group-chat-page .composer-input-row { width:100%; margin:0; }
+body.conversation .composer-input-row textarea,
+body.group-chat-page .composer-input-row textarea { display:block; width:100%; border-left:0; border-right:0; border-radius:0; }
+body.conversation .composer-bottom-row,
+body.group-chat-page .composer-bottom-row { padding-inline:10px; }
+body.conversation .messages,
+body.group-chat-page .messages { width:100%; }
+body.conversation .message-content,
+body.group-chat-page .message-content {
+  flex:0 1 auto;
+  width:fit-content;
+  max-width:min(24em,calc(100% - 38px));
+  min-width:0;
+}
+@media(max-width:600px) {
+  body.conversation .messages,
+  body.group-chat-page .messages { padding-inline:12px; }
+}
+
+.player-avatar {
+  background:var(--px-chat-player-avatar-bg)!important;
+  color:var(--text)!important;
+  border:1px solid var(--border)!important;
+}
+
+
+/* Chat header and composer use the same neutral glass surface as message controls. */
+body:not(.encounter-mode-active) .chat-heading {
+  background:var(--px-glass-bg);
+  border-color:var(--px-glass-border);
+  box-shadow:inset 0 1px 0 var(--px-glass-highlight);
+  -webkit-backdrop-filter:blur(var(--px-glass-blur)) saturate(115%);
+  backdrop-filter:blur(var(--px-glass-blur)) saturate(115%);
+}
+body:not(.encounter-mode-active) .composer {
+  background:var(--px-glass-bg-strong);
+  border-color:var(--px-glass-border);
+  box-shadow:inset 0 1px 0 var(--px-glass-highlight);
+  -webkit-backdrop-filter:blur(var(--px-glass-blur)) saturate(115%);
+  backdrop-filter:blur(var(--px-glass-blur)) saturate(115%);
+}
+
+/* Story relationship indicator: neutral grey glass in both themes. */
+.story-relationship-chip {
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  max-width:calc(100% - 48px);
+  margin:5px 0 0 46px;
+  padding:5px 10px;
+  border:1px solid var(--px-affinity-border);
+  border-radius:999px;
+  background:var(--px-affinity-bg);
+  color:var(--px-affinity-text);
+  font-size:10px;
+  line-height:1.2;
+  letter-spacing:.025em;
+  box-shadow:var(--px-affinity-shadow);
+  -webkit-backdrop-filter:blur(14px) saturate(125%);
+  backdrop-filter:blur(14px) saturate(125%);
+}
+.story-relationship-icon { display:inline-flex; align-items:center; justify-content:center; flex:0 0 15px; width:15px; height:15px; color:#efb9d8; filter:drop-shadow(0 1px 3px rgba(224,160,205,.28)); }
+.story-relationship-icon svg { display:block; flex:0 0 15px; width:15px!important; height:15px!important; max-width:15px; max-height:15px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+body.day .story-relationship-icon { color:#c27cae; filter:none; }
+.story-relationship-meter {
+  display:inline-block;
+  flex:0 0 auto;
+  width:58px;
+  height:4px;
+  overflow:hidden;
+  border-radius:999px;
+  background:var(--px-affinity-track);
+}
+.story-relationship-meter i {
+  display:block;
+  height:100%;
+  border-radius:inherit;
+  background:var(--px-affinity-fill);
+}
+
+
+.phone-modal-backdrop{position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(7,10,16,.68);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.phone-device{width:min(360px,100%);height:min(500px,90dvh);min-height:min(440px,90dvh);display:flex;flex-direction:column;overflow:hidden;padding:17px;border:1px solid var(--px-phone-border);border-radius:30px;border-top:3px solid var(--px-phone-border);background:linear-gradient(155deg,var(--px-phone-surface),var(--px-phone-surface-soft));color:var(--px-phone-text);box-shadow:0 24px 90px #0008,inset 0 1px 0 rgba(255,255,255,.14);-webkit-backdrop-filter:blur(22px) saturate(115%);backdrop-filter:blur(22px) saturate(115%)}
+.phone-device-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-shrink:0;font-size:12px;font-weight:650;letter-spacing:.01em;color:var(--px-phone-text)}
+.phone-battery{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--px-phone-battery)!important}
+.phone-battery-shape{width:28px;height:13px;border:1px solid currentColor;border-radius:4px;padding:2px;position:relative;background:var(--px-phone-battery-track);box-shadow:inset 0 1px 0 rgba(255,255,255,.15)}
+.phone-battery-shape:after{content:"";position:absolute;right:-3px;top:3px;width:2px;height:5px;background:currentColor;border-radius:0 2px 2px 0}
+.phone-battery-fill{height:100%;min-width:0;border-radius:2px;background:var(--px-phone-battery);transition:width .18s ease}
+.phone-member-switch{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0 4px;flex-shrink:0}
+.phone-member-switch button,.phone-close-row button{border:1px solid var(--px-phone-border);background:var(--px-phone-surface-soft);color:var(--px-phone-text);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.phone-member-switch button{min-width:30px;height:28px;padding:3px 9px;font-size:13px;border-radius:10px}
+.phone-member-name{flex:1;min-width:0;text-align:center;font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--px-phone-text)}
+.phone-content{padding:13px 2px 7px;font-size:11px;flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;color:var(--px-phone-text)}
+.phone-time{font-size:17px;font-weight:650;letter-spacing:.015em;margin-bottom:10px;color:var(--px-phone-text)}
+.phone-location,.phone-notices{padding:10px 11px;border:1px solid var(--px-phone-border);border-radius:14px;background:var(--px-phone-surface-soft);color:var(--px-phone-text);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.phone-location{margin-top:9px;font-size:10px;line-height:1.65}
+.phone-notices{margin-top:10px;padding:11px 12px}
+.phone-notices p{margin:6px 0;font-size:10px;line-height:1.65}
+.phone-notice-list{padding-right:3px}
+.phone-notice-list p{margin:4px 0;font-size:10px;line-height:1.65}
+.phone-notice-title{font-size:11px;font-weight:650;color:var(--px-phone-text);margin-bottom:7px}
+.phone-story-event{padding:8px 0;border-bottom:1px solid var(--px-phone-border)}
+.phone-story-event:last-child{border-bottom:0;padding-bottom:0}
+.phone-story-event-meta{display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;color:var(--px-phone-muted);font-size:9px}
+.phone-story-event strong{display:block;font-size:11px;line-height:1.5}
+.phone-story-event p{margin:3px 0 0;font-size:10px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
+.phone-close-row{display:flex;justify-content:center;margin-top:12px;flex-shrink:0}
+.phone-close-row button{border-radius:999px;padding:7px 18px;font-size:10px}
+.phone-bar{width:85px;height:3px;background:var(--px-phone-muted);border-radius:5px;margin:12px auto 0;flex-shrink:0}
+.phone-warning{border-color:var(--px-phone-border);background:var(--px-phone-surface-soft)}
+
+
+
+/* Scoped chat message search */
+.chat-search-result{display:flex;width:100%;flex-direction:column;gap:7px;text-align:left;padding:12px 13px;margin:0 0 8px;border:1px solid var(--px-glass-border,rgba(150,155,162,.22));border-radius:13px;background:var(--px-glass-surface,rgba(145,150,158,.12));color:var(--text);cursor:pointer}
+.chat-search-result:hover{background:var(--px-glass-surface-hover,rgba(145,150,158,.2))}
+.chat-search-excerpt{font-size:13px;line-height:1.6;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
+.chat-search-status{margin:8px 0 12px}
+.chat-search-more{display:flex;justify-content:center;padding:8px}
+.search-hit-highlight{outline:2px solid var(--px-accent,#8f7bc1);outline-offset:3px;border-radius:10px}
+
+
+/* iPhone-style device frame and native-feeling lock screen / notification surface. */
+.phone-device.phone-device--ios { position:relative; box-sizing:border-box; width:min(390px,calc(100vw - 28px)); height:min(760px,94dvh); min-height:min(500px,90dvh); padding:8px; overflow:hidden; border:2px solid #aeb4bd; border-radius:48px; background:linear-gradient(145deg,#d8dce2 0%,#535b67 13%,#171b22 38%,#69717c 72%,#252a32 100%); box-shadow:0 30px 100px rgba(0,0,0,.52),inset 0 1px 2px rgba(255,255,255,.78),inset 0 -2px 5px rgba(0,0,0,.78); color:#252a31; }
+.phone-device.phone-device--ios::before { content:""; position:absolute; z-index:5; top:13px; left:50%; transform:translateX(-50%); width:112px; height:30px; border-radius:999px; background:#030405; box-shadow:inset 0 1px 3px #000,0 0 0 1px rgba(255,255,255,.10); pointer-events:none; }
+.phone-device.phone-device--ios::after { content:""; position:absolute; z-index:6; top:21px; left:calc(50% + 34px); width:8px; height:8px; border-radius:50%; background:radial-gradient(circle at 35% 35%,#293c65 0 18%,#101827 42%,#020305 75%); box-shadow:0 0 0 1px rgba(95,117,158,.2); pointer-events:none; }
+.phone-screen { position:relative; z-index:1; display:flex; flex-direction:column; box-sizing:border-box; width:100%; height:100%; min-height:0; overflow:hidden; padding:9px 15px 9px; border:1px solid rgba(255,255,255,.74); border-radius:39px; background:
+    radial-gradient(ellipse 70% 78% at 82% 34%,rgba(38,73,151,.98) 0%,rgba(38,73,151,0) 70%),
+    radial-gradient(ellipse 88% 58% at 12% 4%,rgba(202,231,235,.98) 0%,rgba(202,231,235,0) 70%),
+    radial-gradient(ellipse 85% 56% at 12% 82%,rgba(133,196,179,.98) 0%,rgba(133,196,179,0) 72%),
+    linear-gradient(145deg,#dce9ef 0%,#a8bfd4 42%,#263f78 100%); color:#252a31; }
+.phone-screen::before { content:""; position:absolute; inset:0; z-index:0; pointer-events:none; border-radius:inherit; background:linear-gradient(125deg,transparent 20%,rgba(255,255,255,.16) 42%,transparent 66%); }
+.phone-screen > * { position:relative; z-index:1; }
+.phone-statusbar { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:34px; flex:0 0 auto; padding:10px 7px 0; color:#252a31; font-size:11px; font-weight:700; font-variant-numeric:tabular-nums; }
+.phone-status-icons { display:inline-flex; align-items:center; gap:4px; }
+.phone-status-icons i { display:block; width:3px; border-radius:3px; background:currentColor; }
+.phone-status-icons i:nth-child(1){height:5px}.phone-status-icons i:nth-child(2){height:7px}.phone-status-icons i:nth-child(3){height:9px}
+.phone-status-icons>span:not(.phone-battery){font-size:14px;line-height:1}
+.phone-device--ios .phone-device-head { padding:3px 5px 8px; color:#343941; font-size:11px; }
+.phone-device-caption { font-size:8px; letter-spacing:.14em; color:rgba(48,54,63,.48); }
+.phone-device--ios .phone-battery { color:#4c535d!important; }
+.phone-device--ios .phone-battery-shape { width:25px; height:12px; }
+.phone-device--ios .phone-member-switch { margin:2px 0 3px; }
+.phone-device--ios .phone-member-switch button { border-color:rgba(255,255,255,.6); background:rgba(255,255,255,.42); color:#343941; }
+.phone-device--ios .phone-member-name { color:#343941; }
+.phone-device--ios .phone-content { padding:5px 1px 8px; color:#252a31; gap:0; }
+.phone-lockscreen { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:190px; padding:18px 8px 22px; text-align:center; }
+.phone-lockscreen-date { font-size:13px; font-weight:650; letter-spacing:.035em; color:rgba(246,249,255,.92); text-shadow:0 1px 8px rgba(28,49,91,.24); }
+.phone-lockscreen-clock { font-size:clamp(66px,18vw,78px); line-height:1.02; font-weight:220; letter-spacing:-.075em; font-variant-numeric:tabular-nums; color:rgba(246,249,255,.88); text-shadow:0 2px 14px rgba(28,49,91,.18),0 1px 0 rgba(255,255,255,.55); }
+.phone-lockscreen-location { margin-top:10px; padding:5px 12px; border:1px solid rgba(255,255,255,.48); border-radius:999px; background:rgba(255,255,255,.24); font-size:10px; color:rgba(250,252,255,.92); text-shadow:0 1px 6px rgba(28,49,91,.2); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); }
+.phone-device--ios .phone-location { display:none; }
+.phone-device--ios .phone-notices { margin-top:0; padding:10px; border:1px solid rgba(255,255,255,.58); border-radius:22px; background:rgba(241,247,255,.34); box-shadow:0 8px 26px rgba(50,57,67,.10),inset 0 1px 0 rgba(255,255,255,.42); backdrop-filter:blur(26px) saturate(155%); -webkit-backdrop-filter:blur(26px) saturate(155%); }
+.phone-notice-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:0 3px 9px; }
+.phone-notice-heading strong { font-size:14px; font-weight:750; color:#292e36; }
+.phone-notice-heading span { font-size:9px; color:rgba(48,54,63,.55); }
+.phone-device--ios .phone-notice-list { display:flex; flex-direction:column; gap:7px; padding:0; }
+.phone-notification-card { display:flex; align-items:flex-start; gap:9px; padding:10px; border:1px solid rgba(255,255,255,.72); border-radius:16px; background:rgba(250,252,255,.68); box-shadow:0 3px 10px rgba(49,56,66,.06),inset 0 1px 0 rgba(255,255,255,.72); color:#292e36; }
+.phone-app-icon { display:flex; align-items:center; justify-content:center; flex:0 0 29px; width:29px; height:29px; border-radius:9px; background:linear-gradient(145deg,#858d98,#626b77); color:white; font-size:14px; box-shadow:inset 0 1px 0 rgba(255,255,255,.42); }
+.phone-notification-copy { flex:1; min-width:0; }
+.phone-notification-meta { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:3px; color:rgba(54,60,69,.56); font-size:8px; }
+.phone-notification-copy strong { display:block; font-size:10px; line-height:1.45; color:#292e36; }
+.phone-notification-copy p { margin:3px 0 0; font-size:9px; line-height:1.55; color:rgba(42,47,55,.78); white-space:pre-wrap; overflow-wrap:anywhere; }
+.phone-notification-empty { padding:22px 8px; text-align:center; font-size:10px; color:rgba(48,54,63,.55); }
+.phone-memory-warning { margin:0 0 8px; padding:8px 10px; border:1px solid rgba(137,143,151,.2); border-radius:12px; background:rgba(220,224,229,.62); font-size:9px; line-height:1.5; color:#4b525c; }
+.phone-memory-caption { margin:8px 4px 0; font-size:8px; line-height:1.5; text-align:center; color:rgba(48,54,63,.52); }
+.phone-home-indicator { width:92px; height:4px; flex:0 0 4px; margin:10px auto 0; border-radius:999px; background:rgba(37,43,51,.72); box-shadow:0 1px 0 rgba(255,255,255,.35); }
+.phone-device--ios .phone-close-row { margin-top:8px; }
+.phone-device--ios .phone-close-row button { border-color:rgba(255,255,255,.72); background:rgba(255,255,255,.56); color:#303640; padding:7px 22px; font-size:10px; }
+.phone-device--ios .phone-story-event { border:0; padding:0; }
+.phone-device--ios .phone-warning { border-color:rgba(137,143,151,.28); background:rgba(255,255,255,.5); }
+@media(max-width:420px) {
+  .phone-device.phone-device--ios { width:calc(100vw - 24px); height:min(720px,94dvh); min-height:min(460px,90dvh); padding:7px; border-radius:43px; }
+  .phone-screen { padding:8px 12px 8px; border-radius:35px; }
+  .phone-device.phone-device--ios::before { top:11px; width:94px; height:24px; }
+  .phone-statusbar { min-height:32px; }
+  .phone-lockscreen { min-height:140px; }
+  .phone-lockscreen-clock { font-size:66px; }
+}
+
+/* Message actions: reveal a compact icon row only after selecting the message. */
+.message-action-bar {
+  display:flex; align-items:center; justify-content:flex-start; gap:5px;
+  min-height:28px; margin-top:6px; opacity:0; visibility:hidden; pointer-events:none;
+  transform:translateY(-2px);
+  transition:opacity .16s ease,transform .16s ease,visibility .16s ease;
+}
+.message.user .message-action-bar { justify-content:flex-end; }
+.message.selected .message-action-bar,
+.message:focus-within .message-action-bar {
+  opacity:1; visibility:visible; pointer-events:auto; transform:translateY(0);
+}
+.message-action-icon {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:25px; height:25px; min-width:25px; padding:4px;
+  border:1px solid transparent; border-radius:9px;
+  background:transparent; color:var(--muted); box-shadow:none;
+  -webkit-backdrop-filter:none; backdrop-filter:none;
+}
+.message-action-icon .icon { width:13px; height:13px; }
+.message-action-icon:hover:not(:disabled) {
+  color:var(--text); background:var(--px-glass-bg); border-color:var(--px-glass-border);
+}
+.message-action-icon[data-action="delete-message"]:hover:not(:disabled),
+.message-action-icon[data-action="delete-group-message"]:hover:not(:disabled) {
+  color:#ef8997; background:rgba(180,75,88,.12);
+}
+@media(prefers-reduced-motion:reduce) { .message-action-bar { transition:none; transform:none; } }
+
+/* Encounter chat: let the top identity bar and bottom composer frame bleed to the viewport edges.
+   Keep their inner controls safely inset while the glass frame itself spans the full screen. */
+body.encounter-mode-active .chat-main.encounter-scene > .chat-heading,
+body.encounter-mode-active .chat-main.encounter-scene > .composer {
+  position:relative;
+  left:50%;
+  width:100vw;
+  max-width:100vw;
+  margin-left:-50vw;
+  box-sizing:border-box;
+  border-radius:0!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene > .chat-heading {
+  padding-left:max(12px,env(safe-area-inset-left));
+  padding-right:max(12px,env(safe-area-inset-right));
+}
+body.encounter-mode-active .chat-main.encounter-scene > .composer {
+  padding-left:max(12px,env(safe-area-inset-left));
+  padding-right:max(12px,env(safe-area-inset-right));
+}

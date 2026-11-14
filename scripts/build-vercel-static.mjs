@@ -8,6 +8,7 @@ const outputDir = path.join(root, 'dist');
 // source assets in GitHub, but do not publish them as Vercel static files.
 const runtimeFiles = [
   'index.html',
+  'poyozz-ui.css',
   'memory-capture.js',
   'chat-render-lifecycle.js',
   'image-compression.js',
@@ -38,6 +39,19 @@ for (const relativePath of runtimeFiles) {
     throw new Error('Vercel runtime source must be a regular, non-symlink file: ' + relativePath);
   }
   fs.copyFileSync(source, path.join(outputDir, relativePath));
+}
+
+// Every local stylesheet linked by index.html must be present in the static output.
+const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const linkedStylesheets = [...html.matchAll(/<link\b(?=[^>]*\brel=["']stylesheet["'])(?=[^>]*\bhref=["']([^"'?#]+)["'])[^>]*>/gi)]
+  .map(match => match[1].replace(/^\.\//, ''));
+for (const stylesheet of linkedStylesheets) {
+  if (path.isAbsolute(stylesheet) || stylesheet.split(/[\\/]/).includes('..')) {
+    throw new Error('Unsafe local stylesheet path in index.html: ' + stylesheet);
+  }
+  if (!runtimeFiles.includes(stylesheet)) {
+    throw new Error('Linked stylesheet is missing from Vercel runtime allowlist: ' + stylesheet);
+  }
 }
 
 console.log('Prepared Vercel static output with ' + runtimeFiles.length + ' runtime files.');

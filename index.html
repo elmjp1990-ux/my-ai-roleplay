@@ -3,6 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+  // Prevent the legacy Explore shell from flashing before the city-map module loads.
+  // Explicit #home remains the traditional Explore page.
+  (() => {
+    const initialPage = location.hash.slice(1).split(/[/?]/, 1)[0];
+    if (!initialPage || initialPage === 'citymap') {
+      document.documentElement.classList.add('city-map-boot');
+    }
+  })();
+</script>
 <meta name="theme-color" content="#090d16">
 <title>PersonaX｜AI 角色世界</title>
 <link rel="icon" type="image/webp" href="./LOGO_WEBICON.webp">
@@ -10,37 +20,51 @@
 <style>
 :root {
   color-scheme: dark;
-  /* POYOZZ premium immersive palette preview */
-  --bg:#090c14;
-  --panel:#151c2d;
-  --panel2:#1b2440;
-  --text:#f4f3ff;
-  --muted:#a4adc2;
-  --border:#2a3349;
-  --primary:#8b7cff;
-  --soft:#272347;
-  --input:#101726;
-  --header:#101726ed;
-  --bubble:#20243b;
-  --shade:#090c14e8;
+  /* Shared neutral-glass design tokens. Lavender is reserved for selection and focus. */
+  --bg:#17191b;
+  --panel:rgba(255,255,255,.075);
+  --panel2:rgba(255,255,255,.105);
+  --text:#f3f3f2;
+  --muted:#b7b9ba;
+  --border:rgba(255,255,255,.17);
+  --primary:#9b7bd0;
+  --soft:rgba(203,194,222,.13);
+  --input:rgba(255,255,255,.075);
+  --header:rgba(58,60,63,.72);
+  --bubble:rgba(255,255,255,.09);
+  --user-bubble:rgba(155,160,167,.32);
+  --shade:rgba(12,13,15,.82);
   --sidebar:232px;
-  --px-primary-hover:#a99bff;
-  --px-accent-pink:#e9b7e8;
+  --px-primary-hover:#b49adf;
+  --px-accent-pink:#e9c6df;
 }
 body.day {
   color-scheme:light;
-  --bg:#f3f5fa;
-  --panel:#ffffff;
-  --panel2:#edf0f7;
-  --text:#182235;
-  --muted:#617087;
-  --border:#d6ddea;
-  --input:#ffffff;
-  --header:#ffffffef;
-  --bubble:#ffffff;
-  --shade:#f3f5fae0;
+  --bg:#f0f0ef;
+  --panel:rgba(255,255,255,.66);
+  --panel2:rgba(255,255,255,.48);
+  --text:#252628;
+  --muted:#686b70;
+  --border:rgba(90,94,101,.19);
+  --input:rgba(255,255,255,.72);
+  --header:rgba(245,245,244,.78);
+  --bubble:rgba(205,209,214,.92);
+  --user-bubble:rgba(235,237,240,.98);
+  --shade:rgba(235,235,233,.86);
 }
 * { box-sizing:border-box; }
+/* Apply city-map startup presentation before parser-blocking app scripts execute. */
+html.city-map-boot body {
+  min-height:100vh;
+  background:#18253e;
+}
+html.city-map-boot .city-map-stage { visibility:hidden; }
+html.city-map-boot .sidebar,
+html.city-map-boot header,
+html.city-map-boot #mobileNav { display:none!important; }
+html.city-map-boot .app { margin-left:0!important; }
+html.city-map-boot main#view { max-width:none; min-height:100dvh; padding:0!important; margin:0!important; }
+
 body {
   margin:0;
   background:var(--bg);
@@ -241,11 +265,7 @@ body.day .tag { color:#4f46b8; }
   display:inline-block;
   flex:0 0 auto;
 }
-.story-relationship-chip{display:inline-flex;align-items:center;gap:9px;max-width:calc(100% - 48px);margin:5px 0 0 46px;padding:5px 10px;border:1px solid #756bb5;border-radius:999px;background:linear-gradient(100deg,#292744,#302640);color:#e5ddff;font-size:11px;line-height:1.2}
-.story-relationship-meter{display:inline-block;width:58px;height:4px;overflow:hidden;border-radius:999px;background:#ffffff28}
-.story-relationship-meter i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#9c8cff,#e9b7e8)}
-body.day .story-relationship-chip{background:linear-gradient(100deg,#efedff,#f8edf7);color:#50466f;border-color:#c9bde9}
-body.day .story-relationship-meter{background:#8a7ca833}
+/* Story relationship chip styling is centralized in poyozz-ui.css. */
 
 .character-status-banner {
   border:1px solid var(--border);
@@ -451,15 +471,15 @@ body.conversation main { max-width:none; height:100dvh; padding:0; }
 body.conversation .chat-layout { height:100dvh; }
 body.chat-page main { max-width:none; padding:12px; }
 body.group-chat-page .app > header,body.group-chat-page .mobile-nav { display:none !important; }
-body.group-chat-page .sidebar { display:flex; }
-body.group-chat-page .app { margin-left:var(--sidebar); }
+body.group-chat-page .sidebar { display:none!important; }
+body.group-chat-page .app { margin-left:0!important; }
 body.group-chat-page:has(.group-wizard) .sidebar { display:none !important; }
 body.group-chat-page:has(.group-wizard) .app { margin-left:0; }
 body.group-chat-page main { max-width:none; height:100dvh; min-height:0; padding:0; overflow:hidden; }
 body.group-chat-page .chat-layout { height:100dvh; }
 body.group-chat-page .chat-main { height:100%; border:0; border-radius:0; }
 body.group-chat-page .chat-heading { padding-top:calc(8px + env(safe-area-inset-top)); }
-body.group-chat-page .messages { padding:14px 10px; }
+body.group-chat-page .messages { padding:12px 12px; }
 body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-bottom)); }
 
 /* Group creation wizard must scroll independently from the full-screen chat shell. */
@@ -551,26 +571,33 @@ body.group-chat-page:has(.group-wizard) #view {
 .chat-heading .avatar { width:31px; height:31px; }
 .chat-heading button { padding:6px; }
 .chat-name { font-size:13px; font-weight:bold; }
-.messages { flex:1 1 0; min-height:0; overflow-y:auto; padding:20px; overscroll-behavior:contain; }
+ .messages { flex:1 1 0; min-height:0; overflow-y:auto; padding:14px 16px; overscroll-behavior:contain; }
 .message { display:flex; gap:8px; margin-bottom:19px; position:relative; }
 .message.user { flex-direction:row-reverse; }
 .message.user > .avatar { display:none !important; }
 .message .avatar { width:30px; height:30px; }
-.message-content { max-width:85%; min-width:0; }
+.message-content { flex:0 1 auto; width:fit-content; max-width:min(24em,calc(100% - 38px)); min-width:0; }
+.message:not(.user) > .message-content { margin-right:auto; }
+.message.user > .message-content { margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; }
 .message-name { color:var(--muted); font-size:10px; margin-bottom:5px; }
 .user .message-name { text-align:right; }
-.roleplay-segments { display:grid; gap:5px; }
-.roleplay-segment { min-width:0; }
+.roleplay-segments { display:grid; gap:5px; width:fit-content; max-width:100%; }
+.roleplay-segment { min-width:0; max-width:100%; }
+.message.user .roleplay-segment.is-user { justify-self:end; }
+.message.user .roleplay-segment.is-user .roleplay-segment-heading { justify-content:flex-end; }
 .roleplay-segment-heading { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:11px; margin:4px 0 5px; }
 .roleplay-segment-heading .avatar { width:30px !important; height:30px !important; flex:0 0 30px; object-fit:cover; }
 .roleplay-avatar-wrap { position:relative; display:block; flex:0 0 30px; width:30px; min-width:30px; height:30px; min-height:30px; overflow:visible; }
 .roleplay-avatar-wrap > .avatar { display:block; box-sizing:border-box; width:30px !important; height:30px !important; min-width:30px; min-height:30px; max-width:30px; max-height:30px; }
 .roleplay-avatar-wrap.has-player-badge::after { content:'你'; position:absolute; z-index:20; right:-3px; bottom:-3px; display:flex; box-sizing:border-box; width:16px; height:16px; min-width:16px; min-height:16px; align-items:center; justify-content:center; border:1px solid var(--panel); border-radius:3px; background:var(--primary); color:#fff; font-size:8px; font-weight:700; line-height:1; white-space:nowrap; pointer-events:none; }
-.roleplay-prefixed-message .message-content { max-width:calc(100% - 8px); }
 .roleplay-segment.is-character .bubble { background:var(--bubble); color:var(--text); border-color:var(--border); }
 .roleplay-segment.is-temporary .bubble { background:var(--panel2); color:var(--text); border:1px dashed var(--border); }
-.roleplay-segment.is-user .bubble { background:var(--primary); color:white; border-color:transparent; }
+.roleplay-segment.is-user .bubble { background:var(--user-bubble); color:var(--text); border-color:var(--border); }
 .bubble {
+  display:table;
+  width:fit-content;
+  max-width:min(19em,100%);
+  box-sizing:border-box;
   font-size:16px;
   padding:12px 14px;
   background:var(--bubble);
@@ -581,7 +608,11 @@ body.group-chat-page:has(.group-wizard) #view {
   line-height:1.85;
   margin-bottom:3px;
 }
-.user .bubble { background:var(--primary); color:white; border-color:transparent; }
+/* Spoken dialogue stays compact; italic *actions* can use a wider reading line. */
+.roleplay-segment.is-character { max-width:min(19em,100%); }
+.roleplay-segment.is-action { width:fit-content; max-width:min(24em,100%); }
+.roleplay-segment.is-action .narration { max-width:min(24em,100%); }
+.user .bubble { background:var(--user-bubble); color:var(--text); border-color:var(--border); }
 .narration {
   display:block;
   font-size:16px;
@@ -595,69 +626,10 @@ body.group-chat-page:has(.group-wizard) #view {
   margin:3px 0;
 }
 .user .narration { text-align:right; }
-.message-more {
-  opacity:0;
-  padding:3px 7px;
-  border:0;
-  background:var(--panel2);
-  height:28px;
-  align-self:center;
-}
-.message:hover .message-more,.message:focus-within .message-more,.message.selected .message-more { opacity:1; }
+
 .typing-indicator{display:flex;align-items:center;gap:8px;padding:10px 13px;border-radius:16px;background:var(--panel2);color:var(--muted);font-size:13px}.typing-dots{display:inline-flex;align-items:center;gap:4px}.typing-dots i{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.35;animation:po-typing 1.1s infinite ease-in-out}.typing-dots i:nth-child(2){animation-delay:.15s}.typing-dots i:nth-child(3){animation-delay:.3s}@keyframes po-typing{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
 
-/* Character phone */
-.phone-modal-backdrop{position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(7,10,22,.68);backdrop-filter:blur(8px)}
-.phone-device{width:min(360px,100%);height:min(500px,90dvh);min-height:min(440px,90dvh);display:flex;flex-direction:column;overflow:hidden;padding:17px;border:1px solid var(--border);border-radius:30px;background:linear-gradient(155deg,var(--panel) 0%,var(--panel2) 100%);color:var(--text);box-shadow:0 24px 90px #0008,inset 0 1px #ffffff12;border-top:4px solid var(--primary)}
-.phone-device-head{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px;font-weight:650;letter-spacing:.01em;color:var(--text)}
-.phone-battery{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:500;font-variant-numeric:tabular-nums;color:var(--primary)!important}
-.phone-battery-shape{width:28px;height:13px;border:1px solid currentColor;border-radius:4px;padding:2px;position:relative;box-shadow:inset 0 0 0 1px #ffffff88;background:var(--panel2)}
-.phone-battery-shape:after{content:"";position:absolute;right:-3px;top:3px;width:2px;height:5px;background:currentColor;border-radius:0 2px 2px 0}
-.phone-battery-fill{height:100%;min-width:0;border-radius:2px;background:linear-gradient(90deg,#80c9a4,#4eaf78);transition:width .18s ease}
-.phone-member-switch{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0 4px}
-.phone-member-switch button{min-width:30px;height:28px;padding:3px 9px;font-size:13px;border:1px solid #ded4fa;background:var(--panel2);border-radius:10px;color:var(--text)}
-.phone-member-name{flex:1;min-width:0;text-align:center;font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.phone-content{padding:13px 2px 7px;font-size:11px;flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}.phone-device-head,.phone-member-switch,.phone-bar,.phone-close-row{flex-shrink:0}
-.phone-time{font-size:12px;font-weight:600;letter-spacing:.01em;margin-bottom:9px;color:var(--text)}
-.phone-location{padding:9px 11px;border-radius:13px;background:var(--panel2);border:1px solid var(--border);margin-top:9px;font-size:10px;line-height:1.65;color:var(--text)}
-.phone-notices{margin-top:10px;padding:11px 12px;border:1px solid var(--border);border-radius:15px;background:var(--panel2);color:var(--text)}
-.phone-notices p{margin:6px 0;font-size:10px;line-height:1.65}.phone-notice-list{padding-right:3px}.phone-notice-list p{margin:4px 0;font-size:10px;line-height:1.65}
-.phone-notice-title{font-size:11px;font-weight:650;color:var(--primary);margin-bottom:7px}body:not(.day) .phone-notice-title{color:#fff}body:not(.day) .phone-battery{color:#fff!important}
-.phone-story-event{padding:8px 0;border-bottom:1px solid #b4bfd326}
-.phone-story-event:last-child{border-bottom:0;padding-bottom:0}
-.phone-story-event-meta{display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;color:var(--muted);font-size:9px}
-.phone-story-event strong{display:block;font-size:11px;line-height:1.5}
-.phone-story-event p{margin:3px 0 0;font-size:10px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
-.phone-close-row{display:flex;justify-content:center;margin-top:12px}
-.phone-close-row button{border:1px solid #ded4f5;background:var(--panel2);color:var(--text);border-radius:999px;padding:7px 18px;font-size:10px}
-.phone-bar{width:85px;height:3px;background:var(--muted);border-radius:5px;margin:12px auto 0}
-.phone-warning{border-color:#e5a34b;background:rgba(229,163,75,.12)}
-.phone {
-  flex:0 0 auto;
-  margin:0 12px 7px;
-  border:1px solid #b4bfd338;
-  border-radius:21px;
-  overflow:hidden;
-  background:var(--header);
-  backdrop-filter:blur(18px);
-  box-shadow:0 8px 25px #0002;
-}
-.phone summary {
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  list-style:none;
-  cursor:pointer;
-  padding:6px 12px;
-  font-size:10px;
-  color:var(--muted);
-}
-.phone summary::-webkit-details-marker { display:none; }
-.phone-content { padding:8px 14px 13px; font-size:11px; }
-.phone-time { font-size:17px; font-weight:600; letter-spacing:.015em; margin-bottom:10px; }
-.phone-notices { margin-top:9px; padding:10px; border:1px solid var(--border); border-radius:14px; background:var(--soft); }
-.phone-notices p { margin:5px 0; font-size:11px; }
-.phone-bar { width:85px; height:3px; background:var(--muted); border-radius:5px; margin:12px auto 0; }
+/* Character phone modal styles are centralized in poyozz-ui.css. */
 
 /* Composer: compact tools and wallet share the same bottom row. */
 .composer { flex:0 0 auto; padding:8px 12px 10px; border-top:1px solid var(--border); background:var(--header); }
@@ -883,7 +855,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   body.conversation .chat-list { display:none; }
   body.conversation .chat-main { height:100%; border:0; border-radius:0; }
   .chat-heading { padding:6px 8px; }
-  .messages { padding:14px 10px; }
+  .messages { padding:12px 12px; }
   .composer { padding:5px 8px calc(5px + env(safe-area-inset-bottom)); }
   .composer-input-row textarea { height:36px; min-height:36px; padding:7px 9px; font-size:13px; }
   .composer-bottom-row { gap:5px; margin-top:6px; }
@@ -898,8 +870,8 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .suggestion-card-action,.suggestion-card-dialogue { font-size:15px; }
   .composer .chat-tools button { font-size:9px; padding:4px 6px; }
   .chat-tools { margin-top:0; }
-  .message-content { max-width:80%; }
-  .bubble,.narration { font-size:16px; }
+  .bubble { font-size:15px; padding:10px 12px; }
+  .narration { font-size:15px; }
   .comment.reply { margin-left:12px; }
   #toast {
     top:max(18px, env(safe-area-inset-top));
@@ -931,126 +903,6 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 .group-chat-entry:focus-visible{outline:2px solid var(--accent,#7c6cf2);outline-offset:2px;}
 .inline-help{display:inline-flex;position:relative;vertical-align:middle;margin-left:5px;font-size:12px}.inline-help summary{display:inline-grid;place-items:center;width:17px;height:17px;border:1px solid currentColor;border-radius:50%;cursor:pointer;list-style:none}.inline-help summary::-webkit-details-marker{display:none}.inline-help>span{position:absolute;z-index:30;left:22px;top:-6px;width:min(260px,70vw);padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--panel);box-shadow:0 8px 24px #0003;font-weight:400;line-height:1.5}.char-counter{display:block;font-variant-numeric:tabular-nums}
 
-/* POYOZZ premium immersive explore-page preview: color-only refinement */
-.hero {
-  color:var(--text);
-  background:
-    radial-gradient(circle at 84% 16%,#a99bff2b,transparent 34%),
-    radial-gradient(circle at 72% 100%,#e9b7e80d,transparent 42%),
-    linear-gradient(115deg,#101726 0%,#171b35 54%,#211936 100%);
-  border-color:#8b7cff45;
-  box-shadow:inset 0 1px 0 #ffffff08;
-}
-.hero p { color:#c6c9dc; }
-.hero-dot.active { background:var(--px-primary-hover); box-shadow:0 0 12px #a99bff65; }
-.card {
-  border-color:var(--border);
-  background:linear-gradient(180deg,#171e30 0%,#131a29 100%);
-  box-shadow:0 8px 28px #00000020;
-  transition:border-color .2s ease,box-shadow .2s ease,transform .2s ease;
-}
-.card:hover,.card:focus-within {
-  border-color:#7668d966;
-  box-shadow:0 12px 32px #00000032,0 0 0 1px #8b7cff12;
-}
-.chat-cta,.card-chat {
-  border:1px solid #6256a8;
-  background:linear-gradient(135deg,#30294f 0%,#24243f 58%,#1d263c 100%);
-  color:#f4f3ff;
-  box-shadow:0 5px 16px #05071155,inset 0 1px #ffffff12;
-}
-.chat-cta:hover,.card-chat:hover,
-.card:hover .card-chat,.card:focus-within .card-chat {
-  border-color:#8b7cff;
-  background:linear-gradient(135deg,#403563 0%,#2d2c4b 58%,#26334c 100%);
-  color:#ffffff;
-  box-shadow:0 7px 20px #05071170,inset 0 1px #ffffff18;
-}
-.heart.on { color:var(--px-accent-pink); }
-:where(button,a,input,textarea,select):focus-visible {
-  outline:2px solid var(--px-primary-hover);
-  outline-offset:2px;
-}
-@media (prefers-reduced-motion: reduce) {
-  .card { transition:none; }
-}
-
-/* POYOZZ premium immersive system: carry the approved palette across all screens. */
-:root {
-  --px-surface-raised:#1a2235;
-  --px-surface-hover:#202a41;
-  --px-button-start:#30294f;
-  --px-button-end:#24243f;
-  --px-button-hover-start:#403563;
-  --px-button-hover-end:#26334c;
-}
-.primary {
-  color:#f4f3ff;
-  border:1px solid #6256a8;
-  background:linear-gradient(135deg,var(--px-button-start),var(--px-button-end));
-  box-shadow:0 4px 14px #05071135,inset 0 1px #ffffff10;
-}
-.primary:hover:not(:disabled) {
-  background:linear-gradient(135deg,var(--px-button-hover-start),var(--px-button-hover-end));
-  border-color:#8b7cff;
-  filter:none;
-}
-button:not(.ghost):not(.primary):not(.danger):not(.card-chat):not(.chat-cta):hover:not(:disabled) {
-  background-color:var(--px-surface-hover);
-  border-color:#465071;
-}
-.panel,.suggestions-panel {
-  background:linear-gradient(180deg,#151c2d 0%,#111827 100%);
-  border-color:var(--border);
-  box-shadow:0 8px 26px #00000018;
-}
-.tabs .tab[aria-selected="true"],.tabs .tab.active,
-.nav-btn.active,.nav-btn[aria-current="page"] {
-  color:#e4dfff;
-  background:linear-gradient(135deg,#30294f88,#24243f88);
-  border-color:#6256a8;
-}
-.tab:hover,.nav-btn:hover {
-  color:var(--text);
-  background-color:#202a41;
-}
-.chat-list,.chat-overlay {
-  background-color:var(--panel);
-}.group-list-avatar,.group-avatar-fallback {
-  background:linear-gradient(135deg,#6256a8,#30294f);
-  color:#f4f3ff;
-  box-shadow:0 4px 14px #080b1260;
-}.chat-top-action,.composer-icon-button {
-  background:linear-gradient(145deg,#1b2440,#151c2d);
-  border-color:#303b54;
-}.chat-top-action:hover,.composer-icon-button:hover {
-  background:linear-gradient(145deg,#30294f,#202a41);
-  border-color:#6256a8;
-}
-input:focus,textarea:focus,select:focus {
-  border-color:#7668d9;
-  box-shadow:0 0 0 3px #8b7cff18;
-}
-:where(button,a,input,textarea,select):focus-visible {
-  outline-color:#a99bff;
-}
-.modal-heading{
-  color:var(--text);
-}
-body:not(.day) .modal,body:not(.day) dialog {
-  background:var(--panel);
-  color:var(--text);
-  border-color:var(--border);
-}
-body:not(.day) .chat-entry:hover,body:not(.day) .chat-entry.active {
-  background:#202a41;
-  border-color:#35415d;
-}
-body:not(.day) .chat-entry.active {
-  box-shadow:inset 3px 0 #8b7cff;
-}
-
-
 /* Character card v2: video-ready portrait, edge tabs, typography-only pagination */
 .city-character-portrait-video{display:block;object-fit:cover;object-position:center top;background:rgba(8,12,24,.55)}
 .city-character-bookmarks{top:54px!important;right:-1px!important;gap:0!important;width:34px!important}
@@ -1065,14 +917,16 @@ body:not(.day) .chat-entry.active {
 @media(max-width:600px){.city-character-bookmarks{top:49px!important;right:-1px!important;width:29px!important}.city-character-bookmark{width:29px!important;min-width:29px!important;min-height:64px!important;padding:7px 4px!important;font-size:10px!important}.city-character-page-button:before{width:8px!important;height:8px!important}}
 
 </style>
+<link rel="stylesheet" href="./poyozz-ui.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style id="poyozz-city-map-mvp">
 body.city-map-mode .app{margin-left:0!important}
 body.city-map-mode .sidebar,body.city-map-mode header{display:none!important}
 body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
-.city-map-stage{position:fixed;inset:0;width:100vw;height:100dvh;min-height:560px;overflow:hidden;background:#b9d9c5;isolation:isolate;touch-action:none;user-select:none;z-index:1}
-.city-map-world{position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:center;will-change:transform;background-image:url('./encounter-default-scene.webp');background-position:center;background-size:100% 100%;background-repeat:no-repeat;overflow:visible}
+.city-map-stage{position:fixed;inset:0;width:100vw;height:100dvh;min-height:560px;overflow:hidden;background:#18253e;isolation:isolate;touch-action:none;user-select:none;z-index:1}
+.city-map-stage.is-loading .city-map-world{visibility:hidden}
+.city-map-world{position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:center;will-change:transform;background-image:none;background-position:center;background-size:100% 100%;background-repeat:no-repeat;overflow:visible}
 .city-map-world:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#18253e12,transparent 30%,#18253e18);pointer-events:none}
 .city-map-river{display:none!important;position:absolute;left:-5%;top:28%;width:112%;height:18%;background:#8fc8df;border:12px solid #d6e6d7;border-radius:50%;transform:rotate(-12deg);box-shadow:0 0 0 8px #b4d8bf}
 .city-map-road{display:none!important;position:absolute;background:#f3e8cf;border:5px solid #fff8e8;border-radius:30px;box-shadow:0 2px 0 #8ba994}
@@ -1932,10 +1786,6 @@ const characterIllustrationSignedUrlManager = window.PoyozzSignedUrlManager.crea
 async function getCharacterIllustrationSignedUrl(storagePath,options={}) {
   return characterIllustrationSignedUrlManager.get(storagePath,{forceRefresh:options?.forceRefresh===true});
 }
-async function refreshCharacterIllustrationSignedUrl(storagePath) {
-  return getCharacterIllustrationSignedUrl(storagePath,{forceRefresh:true});
-}
-
 const memoryPhotoSignedUrlManager = window.PoyozzSignedUrlManager.create({
   cacheTtlMs:240000,
   refreshSkewMs:15000,
@@ -3125,7 +2975,11 @@ const ICON = {
   plus:svg('<path d="M12 5v14M5 12h14"></path>'),
   send:svg('<path d="m3 11 18-8-8 18-2.5-7.5L3 11Z"></path><path d="m10.5 13.5 4-4"></path>'),
   menu:svg('<path d="M4 6h16M4 12h16M4 18h16"></path>'),
-  pin:svg('<path d="M9 3h6l-1 6 4 4v2H6v-2l4-4-1-6ZM12 15v7"></path>')
+  pin:svg('<path d="M9 3h6l-1 6 4 4v2H6v-2l4-4-1-6ZM12 15v7"></path>'),
+  copy:svg('<rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"></path>'),
+  trash:svg('<path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6"></path>'),
+  flag:svg('<path d="M5 21V4m0 0c5-4 9 4 14 0v11c-5 4-9-4-14 0"></path>'),
+  edit:svg('<path d="m4 16.5-.8 4.3 4.3-.8L19 8.5 15.5 5 4 16.5Z"></path><path d="m13.8 6.7 3.5 3.5"></path>')
 };
 
 const LOGO_URL = './LOGO_WEBLOGO.webp';
@@ -3339,14 +3193,25 @@ function sessionCharacter(s) {
   const found = s.forceCloudSnapshot ? null : state.characters.find(c =>
     c.id === s.characterId && !(c.cloudSnapshotOnly && s.cloudCharacterSnapshotLoaded===true)
   );
-  if (found) return found;
+  if (found) {
+    const snap=s.cloudCharacterSnapshot;
+    const portraitPath=snap?.imagePath||snap?.primaryIllustrationPath||snap?.primary_illustration_path||
+      found.imagePath||found.primaryIllustrationPath||found.primary_illustration_path||'';
+    const uid=currentUser()?.uid||'';
+    const cached=portraitPath&&uid&&s.id?cloudSessionImageUrlCache.get(uid+':'+s.id+':'+portraitPath):null;
+    const cachedImage=cached&&cached.expiresAt>Date.now()?cached.url:'';
+    const image=cachedImage||safeImage(found.image)||safeImage(found.avatar_url)||'';
+    return image===found.image?found:{...found,image};
+  }
   const snap = s.cloudCharacterSnapshot;
   if (!snap || snap.id !== s.characterId) return null;
   const uid=currentUser()?.uid||'';
-  const imageCacheKey=snap.imagePath&&uid&&s.id ? uid+':'+s.id+':'+snap.imagePath : '';
+  const portraitPath=snap.imagePath||snap.primaryIllustrationPath||snap.primary_illustration_path||'';
+  const imageCacheKey=portraitPath&&uid&&s.id ? uid+':'+s.id+':'+portraitPath : '';
   const cachedImage=imageCacheKey ? cloudSessionImageUrlCache.get(imageCacheKey) : null;
   const hydratedImage=cachedImage&&cachedImage.expiresAt>Date.now()?cachedImage.url:'';
-  return {...snap, image:snap.image || hydratedImage || '', id:s.characterId, name:snap.name || s.characterName || '角色',
+  const snapshotImage=safeImage(snap.image)||safeImage(snap.avatar_url)||'';
+  return {...snap, image:hydratedImage || snapshotImage, id:s.characterId, name:snap.name || s.characterName || '角色',
     visibility:snap.visibility || 'private', reviewStatus:'draft',
     authorId:Object.prototype.hasOwnProperty.call(snap,'authorId') ? snap.authorId : '',
     creatorDisplayName:snap.creatorDisplayName || '',
@@ -3358,19 +3223,22 @@ function sessionCharacter(s) {
 async function hydrateCloudSessionCharacterImage(s) {
   const snap=s?.cloudCharacterSnapshot;
   const uid=currentUser()?.uid||'';
-  const path=snap?.imagePath;
-  if(!s?.cloudOwned||!uid||!path||snap?.image) return;
   const liveCharacter=state.characters.find(character=>character.id===s.characterId);
-  if(liveCharacter?.image) return;
+  const path=snap?.imagePath||snap?.primaryIllustrationPath||snap?.primary_illustration_path||
+    liveCharacter?.imagePath||liveCharacter?.primaryIllustrationPath||liveCharacter?.primary_illustration_path||'';
+  if(!s?.cloudOwned||!uid||!path) return;
   const key=uid+':'+s.id+':'+path;
   const cached=cloudSessionImageUrlCache.get(key);
   if(cached&&cached.expiresAt>Date.now()) return;
   if(cloudSessionImageUrlInflight.has(key)) return cloudSessionImageUrlInflight.get(key);
   const request=(async()=>{
     const url=await getCharacterIllustrationSignedUrl(path,{forceRefresh:!!cached});
-    if((currentUser()?.uid||'')!==uid||state.sessions?.[s.id]!==s||s.cloudCharacterSnapshot?.imagePath!==path)return;
+    const currentCharacter=state.characters.find(character=>character.id===s.characterId);
+    const currentPath=s.cloudCharacterSnapshot?.imagePath||s.cloudCharacterSnapshot?.primaryIllustrationPath||s.cloudCharacterSnapshot?.primary_illustration_path||
+      currentCharacter?.imagePath||currentCharacter?.primaryIllustrationPath||currentCharacter?.primary_illustration_path||'';
+    if((currentUser()?.uid||'')!==uid||state.sessions?.[s.id]!==s||currentPath!==path)return;
     cloudSessionImageUrlCache.set(key,{url,expiresAt:Date.now()+55*60*1000});
-    if(route.id===s.id&&(route.page==='conversation'||route.page==='session-detail'))render();
+    if(route.page==='chat'||(route.id===s.id&&(route.page==='conversation'||route.page==='session-detail')))render();
   })();
   cloudSessionImageUrlInflight.set(key,request);
   try{await request;}finally{if(cloudSessionImageUrlInflight.get(key)===request)cloudSessionImageUrlInflight.delete(key);}
@@ -3933,6 +3801,22 @@ async function loadCloudChatSessions(user, options = {}) {
   }
 }
 
+function captureChatScrollAnchor(pane) {
+  if(!pane)return null;
+  const paneRect=pane.getBoundingClientRect();
+  const firstVisible=[...pane.querySelectorAll('[data-message]')].find(node=>node.getBoundingClientRect().bottom>paneRect.top+1);
+  return firstVisible?{id:firstVisible.dataset.message,offset:firstVisible.getBoundingClientRect().top-paneRect.top,scrollTop:pane.scrollTop,scrollHeight:pane.scrollHeight}:{id:'',offset:0,scrollTop:pane.scrollTop,scrollHeight:pane.scrollHeight};
+}
+function restoreChatScrollAnchor(pane,anchor) {
+  if(!pane||!anchor)return;
+  const target=anchor.id?[...pane.querySelectorAll('[data-message]')].find(node=>node.dataset.message===anchor.id):null;
+  if(target){
+    const delta=target.getBoundingClientRect().top-pane.getBoundingClientRect().top-anchor.offset;
+    pane.scrollTop+=delta;
+  }else{
+    pane.scrollTop=anchor.scrollTop+Math.max(0,pane.scrollHeight-anchor.scrollHeight);
+  }
+}
 async function loadCloudSessionMessages(sessionId, options = {}) {
   const client = window.mySupabase, userId = currentUser()?.uid;
   const session = state.sessions?.[sessionId];
@@ -3940,7 +3824,7 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
   if (readDeletedChatTombstones(userId).sessions[sessionId]) return false;
   if (session.cloudMessagesLoading || (!options.older && session.cloudMessagesLoaded && options.refresh !== true)) return true;
   const older = options.older === true, messagesNode = $('messages');
-  const previousHeight = messagesNode?.scrollHeight || 0, previousTop = messagesNode?.scrollTop || 0;
+  const previousAnchor = older ? captureChatScrollAnchor(messagesNode) : null;
   session.cloudMessagesLoading = true; session.cloudMessagesError = '';
   if (route.page === 'conversation' && route.id === sessionId) renderMessages(false);
   try {
@@ -4094,7 +3978,9 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
         const suggestionHost=$('conversationSuggestions');
         if(suggestionHost)suggestionHost.innerHTML=conversationSuggestionsHTML(session);
       }
-      if(older&&$('messages')){const node=$('messages');node.scrollTop=previousTop+Math.max(0,node.scrollHeight-previousHeight);}
+      if(older&&$('messages'))requestAnimationFrame(()=>{
+        if(route.page==='conversation'&&route.id===sessionId&&state.sessions?.[sessionId]===session&&currentUser()?.uid===userId)restoreChatScrollAnchor($('messages'),previousAnchor);
+      });
     }
     return true;
   }catch(error){
@@ -6425,13 +6311,14 @@ function chatEntries() {
         </button><button type="button" class="entry-menu group-entry-menu" data-action="group-entry-menu" data-id="${e(group.id)}" aria-label="刪除這段對話與回憶" title="刪除這段對話與回憶">⋯</button></div>`;
     }
     const s=item.value,c=sessionCharacter(s);if(!c)return '';
+    if(s.cloudOwned)void hydrateCloudSessionCharacterImage(s);
     const preview=latestAssistantPreview(s);
     const lastAt=s.lastMessageAt||s.updatedAt||s.messages?.at(-1)?.at||s.startedAt;
     const hasUnread=Number(s.lastAssistantMessageAt||0)>Number(s.lastReadAt||0);
     return `<div class="chat-entry ${route.page==='conversation'&&route.id===s.id?'active':''}">
       <button class="pin ${s.pinned?'on':''}" data-action="pin" data-id="${e(s.id)}" aria-label="切換置頂">${ICON.pin}</button>
       <button class="ghost" style="padding:0" data-action="session-detail" data-id="${e(s.id)}" aria-label="查看${e(c.name)}角色簡介">
-        <span class="character-avatar-status ${characterIsOffline(c)?'is-offline':''}"><img class="avatar" src="${e(safeImage(c.image))}" alt="${e(c.name)}">
+        <span class="character-avatar-status ${characterIsOffline(c)?'is-offline':''}"><img class="avatar" src="${e(safeImage(c.image||c.avatar_url))}" alt="${e(c.name)}">
         <span class="character-status-dot" title="${characterIsOffline(c)?'角色離線／已下架':'角色公開中'}"></span></span>
       </button>
       <button class="select-chat" data-action="select-chat" data-id="${e(s.id)}">
@@ -6645,11 +6532,16 @@ async function groupOpen(groupId) {
   const g=groupPrototype;
   groupResetForAccount(currentUser()?.uid||null);
   const groupListWasLoaded=g.groupsLoaded===true;
+  const previousActiveId=g.active?.id||null;
+  if(previousActiveId!==groupId){
+    g.sending=false;
+    if(g.pendingRequest?.groupId!==groupId)g.pendingRequest=null;
+  }
   if(!isUuid(groupId)||!window.mySupabase) { g.loading=false;g.openError='群組識別碼無效或 Supabase 尚未載入。';g.failedGroupId=groupId;render();toast(g.openError);return; }
   // Keep the group ID in the URL so rerenders, auth refreshes, and post-send reloads
   // can recover the same group instead of silently falling back to the creation wizard.
   const requestId=g.openRequestId=(g.openRequestId||0)+1;
-  g.loading=true;g.formError='';g.openError='';g.failedGroupId=groupId;g.active=null;
+  g.loading=true;g.formError='';g.openError='';g.failedGroupId=groupId;g.active=null;g.searchJump=false;
   if(route.page!=='group'||route.id!==groupId||route.overlay) go({page:'group',id:groupId});
   else render();
   try {
@@ -6732,7 +6624,7 @@ async function groupLoadOlderMessages() {
   const pane=$('groupMessages');
   if(!pane)return;
   const requestId=g.openRequestId;
-  const before={scrollHeight:pane.scrollHeight,scrollTop:pane.scrollTop};
+  const before=captureChatScrollAnchor(pane);
   g.historyLoading=true;g.historyError='';g.historyScrollAnchor=before;
   renderGroupConversation();
   try {
@@ -6846,22 +6738,29 @@ function renderGroupConversation() {
     const displayContent=replaceRoleplayVariables(m.content || '',group.playerName || state.account?.nickname || '你',member?.name || '角色');
     const segments=!isSystem ? parseRoleplaySegments(displayContent,roleplayRoles) : [];
     const hasSpeaker=segments.some(segment=>segment.kind!=='user');
+    const summonedByPlayer=isUser && segments.some(segment=>segment.kind==='character');
     const avatarHTML=isUser
-      ? '<span class="avatar avatar-fallback" style="background:#4f46e5">你</span>'
+      ? '<span class="avatar avatar-fallback player-avatar">你</span>'
       : isSystem
         ? '<span class="avatar avatar-fallback">系</span>'
-        : (hasSpeaker ? '' : avatar?'<img class="avatar" src="'+e(avatar)+'" alt="">':'<span class="avatar avatar-fallback">'+e(String(who).trim().slice(0,1)||'角')+'</span>');
+        : '';
     const bodyHTML=hasSpeaker
-      ? '<div class="roleplay-segments">'+segments.map(roleplaySegmentHTML).join('')+'</div>'
+      ? '<div class="roleplay-segments">'+segments.map(segment=>roleplaySegmentHTML(segment,{summonedByPlayer})).join('')+'</div>'
       : (!isUser && !isSystem)
         ? '<div class="roleplay-segments">'+renderCharacterSpeechSegments(displayContent,{name:who,image:member?.avatar_url||member?.image||''})+'</div>'
         : '<div class="message-name">'+e(who)+'</div>'+(isSystem?'<div class="bubble">'+e(displayContent)+'</div>':formatMessage(displayContent));
-    const latestEditableGroupMessage = !isSystem && ['user','character'].includes(m.type) &&
+    const actionableGroupMessage=!isSystem&&['user','character'].includes(m.type);
+    const latestEditableGroupMessage = actionableGroupMessage && !g.searchJump &&
       g.messages.filter(item=>item.type===m.type).at(-1)?.id===m.id;
-    const editButton = latestEditableGroupMessage
-      ? '<button class="message-more" data-action="group-message-menu" data-id="'+e(m.id)+'" aria-label="訊息操作">⋯</button>' : '';
+    const actionButtons = actionableGroupMessage
+      ? '<div class="message-action-bar" aria-label="訊息操作">'+
+        '<button type="button" class="message-action-icon" data-action="copy-group-message" data-id="'+e(m.id)+'" aria-label="複製" title="複製">'+ICON.copy+'</button>'+
+        '<button type="button" class="message-action-icon" data-action="delete-group-message" data-id="'+e(m.id)+'" aria-label="刪除" title="刪除">'+ICON.trash+'</button>'+
+        (m.type==='character'?'<button type="button" class="message-action-icon" data-action="report" data-kind="AI訊息" data-id="'+e(m.id)+'" aria-label="舉報" title="舉報">'+ICON.flag+'</button>':'')+
+        (latestEditableGroupMessage?'<button type="button" class="message-action-icon" data-action="edit-group-message" data-id="'+e(m.id)+'" aria-label="編輯" title="編輯">'+ICON.edit+'</button>':'')+
+        '</div>' : '';
     return '<div class="message '+(isUser?'user':'')+(hasSpeaker?' roleplay-prefixed-message':'')+'" data-message="'+e(m.id)+'">'+avatarHTML+
-      '<div class="message-content">'+bodyHTML+'</div>'+editButton+'</div>';
+      '<div class="message-content">'+bodyHTML+actionButtons+'</div></div>';
   }).join('') || '<div class="empty">這段群組對話還沒有訊息，輸入第一句話開始故事。</div>';
   const sceneNames=(group.scenes||[]).map(x=>x.name).filter(Boolean).join('、');
   const initialScene=(group.scenes||[]).find(x=>Number(x.position||1)===1)||(group.scenes||[])[0];
@@ -6884,7 +6783,8 @@ function renderGroupConversation() {
             </div>
           </div>
         </div>
-        <div class="group-history-pagination" style="display:flex;justify-content:center;padding:8px 0 2px">
+        <div class="group-history-pagination" style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding:8px 0 2px">
+          ${g.searchJump?'<button type="button" class="ghost small" data-chat-search-return-latest="group">返回最新訊息</button>':''}
           ${g.historyHasMore?'<button type="button" class="ghost small" data-action="group-history-load-older" '+(g.historyLoading?'disabled':'')+'>'+(g.historyLoading?'正在載入較早訊息…':'載入更早的訊息')+'</button>':''}
           ${g.historyError?'<span class="small muted" role="status">'+e(g.historyError)+'</span>':''}
         </div>
@@ -6946,10 +6846,14 @@ ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
     const anchor=g.historyScrollAnchor;
     g.historyScrollAnchor=null;
     if(anchor){
-      const restore=()=>{if(groupMessages.isConnected)groupMessages.scrollTop=anchor.scrollTop+(groupMessages.scrollHeight-anchor.scrollHeight);};
+      const restore=()=>{if(groupMessages.isConnected&&route.page==='group'&&route.id===group.id&&groupPrototype.active?.id===group.id)restoreChatScrollAnchor(groupMessages,anchor);};
       requestAnimationFrame(restore);
-    }else{
-      const scrollToLatest=()=>{if(groupMessages.isConnected) groupMessages.scrollTop=groupMessages.scrollHeight;};
+    }else if(!g.searchJump){
+      const scrollToLatest=()=>{
+        if(groupMessages.isConnected&&route.page==='group'&&route.id===group.id&&groupPrototype.active?.id===group.id&&!groupPrototype.historyLoading&&!groupPrototype.searchJump){
+          groupMessages.scrollTop=groupMessages.scrollHeight;
+        }
+      };
       requestAnimationFrame(()=>{scrollToLatest();requestAnimationFrame(scrollToLatest);});
       setTimeout(scrollToLatest,80);
     }
@@ -7298,6 +7202,7 @@ function renderGroupChatOverlay(kind) {
   const group=groupPrototype.active;
   const panel=$('view').querySelector('.chat-main');
   if(!group||!panel) return;
+  if(kind==='search')resetChatMessageSearchState();
   const lifecycle=window.PoyozzChatRenderLifecycle;
   if(lifecycle&&lifecycle.render('renderGroupOverlay',{kind,group,panel},()=>false).handled)return;
   if(kind==='settings'||kind==='settings-background'||kind==='delete-confirm'){renderChatSettingsOverlay(panel,true,kind);return;}
@@ -7337,19 +7242,13 @@ function renderGroupChatOverlay(kind) {
   let content='';
   if(kind==='search') {
     const results=groupPrototype.messages||[];
-    content='<label class="field"><span>搜尋這個群組的對話</span><input id="groupArchiveSearchInput" type="search" placeholder="輸入角色名稱或訊息內容…" autocomplete="off"></label>'+
-      '<div id="groupArchiveSearchResults">'+groupArchiveSearchResults('')+'</div>';
+    content='<label class="field"><span>搜尋目前群組的訊息</span><input id="chatMessageSearchInput" type="search" placeholder="輸入訊息關鍵字（至少 2 字）…" autocomplete="off"></label>'+
+      '<div id="chatMessageSearchResults"><p class="small muted">輸入至少 2 個字，搜尋目前開啟的群組。</p></div>';
   } else {
     content='<p class="small muted">這裡顯示目前群組內角色的頭像。群組專屬回憶照片尚未有資料來源，因此不會把單人聊天的相簿誤顯示在群組中。</p>'+
       (members.map(avatarCard).join('')||'<div class="empty">目前沒有角色頭像。</div>');
   }
   panel.insertAdjacentHTML('beforeend','<section class="chat-overlay" aria-label="'+(kind==='search'?'搜尋群組聊天':'群組相簿')+'"><div class="overlay-heading"><button class="ghost" data-action="back" aria-label="返回">'+ICON.back+'</button><h2>'+(kind==='search'?'搜尋群組聊天':'群組相簿')+'</h2></div>'+content+'</section>');
-}
-function groupArchiveSearchResults(query) {
-  const q=String(query||'').trim().toLocaleLowerCase();
-  const rows=(groupPrototype.messages||[]).filter(m=>!q||String(m.content||'').toLocaleLowerCase().includes(q)||String(m.speaker||'').toLocaleLowerCase().includes(q));
-  if(!rows.length) return '<div class="empty">'+(q?'沒有符合的群組訊息。':'目前還沒有可搜尋的群組訊息。')+'</div>';
-  return rows.map(m=>'<article class="archive-card"><div class="message-name">'+e(m.speaker||'角色')+'</div><p style="white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0">'+e(m.content||'')+'</p></article>').join('');
 }
 function renderGroupStatusShell({title,message,error=false,groupId=''}) {
   const safeMessage=e(message||'');
@@ -7504,22 +7403,25 @@ async function groupSendMock() {
   }
   if(!g.active?.id) {g.formError='群組尚未保存，請重新開啟群組。';render();return;}
   if(!window.crypto?.randomUUID) {g.formError='此瀏覽器無法產生安全的回合識別碼，請更新瀏覽器後重試。';render();return;}
+  const activeGroup=g.active,activeGroupId=activeGroup.id,requestUid=currentUser()?.uid;
+  if(!requestUid||g.ownerUid!==requestUid){g.formError='群組擁有者驗證失敗，請重新開啟群組。';render();return;}
+  if(!g.pendingRequest || g.pendingRequest.groupId!==activeGroupId || g.pendingRequest.content!==content) {
+    g.pendingRequest={groupId:activeGroupId,content,requestKey:window.crypto.randomUUID()};
+  }
+  const requestKey=g.pendingRequest.requestKey;
   g.sending=true;g.formError='';render();
   try {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
-    if(authError||!user||user.id!==currentUser()?.uid) throw new Error('登入狀態已失效，請重新登入。');
-    if(!g.pendingRequest || g.pendingRequest.groupId!==g.active.id || g.pendingRequest.content!==content) {
-      g.pendingRequest={groupId:g.active.id,content,requestKey:window.crypto.randomUUID()};
-    }
+    if(authError||!user||user.id!==requestUid||currentUser()?.uid!==requestUid) throw new Error('登入狀態已變更，請重新登入。');
     const {data:turnId,error}=await groupWithTimeout(window.mySupabase.rpc('append_chat_group_mock_turn',{
-      p_group_id:g.active.id,p_request_key:g.pendingRequest.requestKey,p_content:content
+      p_group_id:activeGroupId,p_request_key:requestKey,p_content:content
     }),15000,'訊息保存逾時。請重新開啟群組確認訊息是否已保存，再決定是否重試。');
     if(error) throw error;
     if(!turnId) throw new Error('群組回合已保存，但未取得回合識別碼。請重新開啟群組確認訊息。');
-    const activeGroupId=g.active.id;
     // The RPC commits the group turn and wallet debit atomically. Refresh the visible
     // wallet immediately so the header/composer never keeps showing the pre-charge balance.
     await refreshWalletBalance();
+    if(currentUser()?.uid!==requestUid) return;
     // The RPC returns the durable turn ID, including on an idempotent retry.
     // Fetch only this turn's two messages instead of retransmitting the group's full history.
     // Keep the same request key until this narrow read succeeds so retries cannot double-charge.
@@ -7531,7 +7433,7 @@ async function groupSendMock() {
       15000,'訊息已送出，但重新整理本回合訊息逾時。請稍後重新開啟群組確認。'
     );
     if(rowsError) throw rowsError;
-    if(g.active?.id!==activeGroupId) return;
+    if(g.active!==activeGroup||g.active?.id!==activeGroupId||g.ownerUid!==requestUid||currentUser()?.uid!==requestUid) return;
     if(!rows?.length) throw new Error('群組回合已保存，但暫時讀取不到訊息。請稍後重新開啟群組確認。');
     const members=g.active.members||[], scenes=g.active.scenes||[];
     const newMessages=rows.map(m=>{
@@ -7554,8 +7456,13 @@ async function groupSendMock() {
     renderGroupConversation();
     const sendButton=$('view')?.querySelector('[data-action="group-send"]');if(sendButton){sendButton.disabled=false;sendButton.innerHTML=ICON.send;sendButton.setAttribute('aria-label','送出群組訊息');sendButton.title='送出訊息';}
     const messagePane=$('groupMessages');
-    if(messagePane) requestAnimationFrame(()=>{if(messagePane.isConnected) messagePane.scrollTop=messagePane.scrollHeight;});
+    if(messagePane) requestAnimationFrame(()=>{
+      if(messagePane.isConnected&&route.page==='group'&&route.id===activeGroupId&&g.active?.id===activeGroupId){
+        messagePane.scrollTop=messagePane.scrollHeight;
+      }
+    });
   } catch(error) {
+    if(g.active!==activeGroup||g.active?.id!==activeGroupId||g.ownerUid!==requestUid||currentUser()?.uid!==requestUid)return;
     g.sending=false;
     const rawError=String(error?.message||error||'');
     if(rawError.includes('group_insufficient_funds')||rawError.includes('insufficient_funds')) {
@@ -7764,7 +7671,7 @@ async function loadStoryRelationshipState(session) {
     session.storyRelationshipStage = row.relationship_stage;
     persist();
     const progress = Math.round((affinity + 100) / 2);
-    target.innerHTML = '<span>關係 · '+e(label)+'</span><span class="story-relationship-meter" aria-hidden="true"><i style="width:'+progress+'%"></i></span>';
+    target.innerHTML = '<span class="story-relationship-icon" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M20.8 4.9a5.5 5.5 0 0 0-7.8 0L12 5.9l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.3 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg></span><span>關係 · '+e(label)+'</span><span class="story-relationship-meter" aria-hidden="true"><i style="width:'+progress+'%"></i></span>';
     target.setAttribute('aria-label','關係階段 '+label+'，好感度進度 '+progress+'%');
   } catch (error) {
     console.warn('Story 關係狀態載入失敗：',error?.message||error);
@@ -7799,11 +7706,14 @@ function renderConversation() {
   const c = sessionCharacter(s);
   const isConversationEntry = !!s && lastRenderedConversationId !== s.id;
   if (s) lastRenderedConversationId = s.id;
+  // Search-result positioning is transient UI state. Clear stale state whenever
+  // the player re-enters a conversation normally; a fresh search jump sets it again.
+  if (isConversationEntry && s?.cloudSearchJump) s.cloudSearchJump = false;
   if (!s || !canAccessSessionCharacter(s,c)) {
     $('view').innerHTML = '<div class="empty">此對話不存在或無法存取。</div>';
     return;
   }
-  if(s.cloudOwned&&s.cloudCharacterSnapshot?.imagePath)void hydrateCloudSessionCharacterImage(s);
+  if(s.cloudOwned)void hydrateCloudSessionCharacterImage(s);
   if(isConversationEntry){
     const latestAssistantAt=Number(s.lastAssistantMessageAt||0);
     s.lastReadAt=Math.max(Number(s.lastReadAt||0),latestAssistantAt,Date.now());
@@ -7821,7 +7731,7 @@ function renderConversation() {
               <button class="ghost" data-action="session-detail" data-id="${e(s.id)}" style="padding:0"
                       aria-label="查看角色簡介">
                 <span class="character-avatar-status ${characterIsOffline(c) ? 'is-offline' : ''}">
-                  <img class="avatar" src="${e(safeImage(c.image))}" ${c.imagePath ? 'data-character-illustration-path="'+e(c.imagePath)+'"' : ''} alt="">
+                  <img class="avatar" src="${e(safeImage(c.image||c.avatar_url))}" ${c.imagePath||c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.imagePath||c.primaryIllustrationPath)+'"' : ''} alt="">
                   <span class="character-status-dot" title="${characterIsOffline(c) ? '角色離線／已下架' : '角色公開中'}"></span>
                 </span>
               </button>
@@ -7907,7 +7817,14 @@ function parseRoleplaySegments(raw, roles = []) {
     const match = line.match(/^\s*([：:]?)([^:：\n]{1,40})[:：]\s?(.*)$/u);
     const speakerName = match?.[2]?.trim() || '';
     const exact = match ? roles.filter(role => String(role.name || '').trim() === speakerName) : [];
-    const knownRole = exact.length === 1 ? exact[0] : null;
+    // Player-authored roleplay can use the natural phrase “夜辰說：內容”.
+    // Only strip the trailing 說 when the remaining name exactly matches one
+    // known role, so ordinary text and similarly named characters stay intact.
+    const spokenName = speakerName.replace(/\s*說$/u, '').trim();
+    const spokenMatches = match && !exact.length && spokenName !== speakerName
+      ? roles.filter(role => String(role.name || '').trim() === spokenName)
+      : [];
+    const knownRole = exact.length === 1 ? exact[0] : spokenMatches.length === 1 ? spokenMatches[0] : null;
     const isExplicitPrefix = Boolean(match && match[1]);
     // Some group replies prepend narration before a role label, e.g.
     // “聽見你的話，寒川（1016測試）回應：實際台詞”.
@@ -7978,7 +7895,7 @@ function roleplaySegmentHTML(segment, options = {}) {
   const name = segment.kind === 'user' ? (currentUser()?.nickname || '你') : segment.speakerName;
   const characterAvatar = segment.kind === 'character' && segment.avatar
     ? '<img class="avatar" src="' + e(safeImage(segment.avatar)) + '" alt="">'
-    : '<span class="avatar avatar-fallback">' + e(segment.kind === 'user' ? '你' : [...String(name || '?')][0] || '?') + '</span>';
+    : '<span class="avatar avatar-fallback' + (segment.kind === 'user' ? ' player-avatar' : '') + '">' + e(segment.kind === 'user' ? '你' : [...String(name || '?')][0] || '?') + '</span>';
   // The summon marker is a text label, not the player's profile photo.
   const playerBadge = ''; // The visible badge is drawn by the wrapper's ::after pseudo-element.
   const avatarHTML = options.summonedByPlayer && segment.kind === 'character'
@@ -8025,9 +7942,9 @@ function renderMessages(scroll = true) {
   if (!s || !c) return;
   const oldScroll = $('messages').scrollTop;
   const historyControl=s.cloudOwned
-    ?(s.cloudMessagesLoading?'<div class="small muted" style="text-align:center;padding:10px">正在載入聊天紀錄…</div>'
+    ?((s.cloudSearchJump?'<div class="small muted" style="text-align:center;padding:6px">已定位到搜尋結果附近　<button type="button" class="ghost small" data-chat-search-return-latest="single">返回最新訊息</button></div>':'')+(s.cloudMessagesLoading?'<div class="small muted" style="text-align:center;padding:10px">正在載入聊天紀錄…</div>'
       :s.cloudMessagesError?'<div class="small muted" style="text-align:center;padding:10px"><span>'+e(s.cloudMessagesError)+'</span> <button type="button" data-chat-history-action="retry">重新載入</button></div>'
-      :s.cloudHasMoreMessages?'<div style="text-align:center;padding:10px"><button type="button" data-chat-history-action="older">載入更早的訊息</button></div>':'')
+      :s.cloudHasMoreMessages?'<div style="text-align:center;padding:10px"><button type="button" data-chat-history-action="older">載入更早的訊息</button></div>':''))
     :'';
   $('messages').innerHTML = historyControl + s.messages.filter(m => !(m.role === 'user' && String(m.text||'').trim() === GROUP_CONTINUE_SENTINEL)).map(m => {
     const user = m.role === 'user';
@@ -8039,10 +7956,13 @@ function renderMessages(scroll = true) {
     // displaySegments may have been saved before the single-chat character was
     // available to the prefix parser, leaving the summon as a plain user segment.
     const trimmedDisplayText = String(displayText || '').trimStart();
-    const startsWithActiveCharacter = user && (
-      trimmedDisplayText.startsWith(String(c.name || '') + ':') ||
-      trimmedDisplayText.startsWith(String(c.name || '') + '：')
-    );
+    const activeCharacterName = String(c.name || '');
+    const startsWithActiveCharacter = user && [
+      activeCharacterName + ':',
+      activeCharacterName + '：',
+      activeCharacterName + '說:',
+      activeCharacterName + '說：'
+    ].some(prefix => prefix !== ':' && trimmedDisplayText.startsWith(prefix));
     const segments = user && Array.isArray(m.displaySegments) && !startsWithActiveCharacter
       ? m.displaySegments.map(segment => ({
           ...segment,
@@ -8053,20 +7973,29 @@ function renderMessages(scroll = true) {
     const summonedByPlayer = user && segments.some(segment => segment.kind === 'character');
     const contentHTML = hasSpeaker
       ? '<div class="roleplay-segments">' + segments.map(segment => roleplaySegmentHTML(segment, {summonedByPlayer})).join('') + '</div>'
-      : '<div class="message-name">' + e(user ? (currentUser()?.nickname || '你') : c.name) + '</div>' + formatMessage(displayText);
+      : !user
+        ? '<div class="roleplay-segments">' + renderCharacterSpeechSegments(displayText,{name:c.name,image:c.image || c.avatar_url || ''}) + '</div>'
+        : '<div class="message-name">' + e(currentUser()?.nickname || '你') + '</div>' + formatMessage(displayText);
     // When the player explicitly summons a character with a role prefix, move the
     // player identity onto that portrait as a small badge instead of showing a
     // second, separate player avatar beside it.
     // Player-authored messages do not show a separate outer player avatar.
     // When a role prefix summons a character, the player marker is shown only
     // as a small badge over that character's portrait.
-    const outerAvatar = user
-      ? ''
-      : (hasSpeaker ? '' : `<img class="avatar" src="${e(safeImage(c.image || c.avatar_url))}" alt="">`);
+    // Character identity is rendered inside each speech segment so narration never inherits an outer avatar column.
+    const outerAvatar = '';
+    const latestEditableMessage=!s.cloudSearchJump && (m.role==='user'||m.role==='assistant') &&
+      s.messages.filter(item=>item.role===m.role).at(-1)?.id===m.id;
+    const actionButtons=(m.role==='user'||m.role==='assistant')
+      ? '<div class="message-action-bar" aria-label="訊息操作">'+
+        '<button type="button" class="message-action-icon" data-action="copy-message" data-id="'+e(m.id)+'" aria-label="複製" title="複製">'+ICON.copy+'</button>'+
+        '<button type="button" class="message-action-icon" data-action="delete-message" data-id="'+e(m.id)+'" aria-label="刪除" title="刪除">'+ICON.trash+'</button>'+
+        (m.role==='assistant'?'<button type="button" class="message-action-icon" data-action="report" data-kind="AI訊息" data-id="'+e(m.id)+'" aria-label="舉報" title="舉報">'+ICON.flag+'</button>':'')+
+        (latestEditableMessage?'<button type="button" class="message-action-icon" data-action="edit-message" data-id="'+e(m.id)+'" aria-label="編輯" title="編輯">'+ICON.edit+'</button>':'')+
+        '</div>' : '';
     return `<article class="message ${user ? 'user' : ''} ${hasSpeaker && !user ? 'roleplay-prefixed-message' : ''}" data-message="${e(m.id)}">
       ${outerAvatar}
-      <div class="message-content">${contentHTML}</div>
-      <button class="message-more" data-action="message-menu" data-id="${e(m.id)}" aria-label="訊息操作">⋯</button>
+      <div class="message-content">${contentHTML}${actionButtons}</div>
     </article>`;
   }).join('');
   if(s.activeTurnInFlight){const characterName=sessionCharacter(s)?.name||'角色';$('messages').insertAdjacentHTML('beforeend','<article class="message assistant-typing" role="status" aria-live="polite"><div class="message-content"><div class="message-name">'+e(characterName)+'</div><div class="typing-indicator"><span>'+e(characterName)+'正在回覆</span><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span></div></div></article>');}
@@ -8098,23 +8027,174 @@ function addMemory(s,text) {
   }
   s.memories = result.memories;
 }
-function archiveSearchResults(query) {
-  const q=String(query||'').trim().toLocaleLowerCase();
-  const items=Object.values(state.sessions||{}).filter(item => {
-    if (!item || item.hidden || isEncounterChatSession(item)) return false;
-    const character=sessionCharacter(item);
-    return !q || [item.name,character?.name].filter(Boolean).join(' ').toLocaleLowerCase().includes(q);
-  }).sort((a,b)=>(b.startedAt||0)-(a.startedAt||0));
-  return items.map(item => {
-    const character=sessionCharacter(item);
-    const last=[...(item.messages||[])].reverse().find(m=>String(m.text||'').trim());
-    return `<article class="memory-item"><div class="row" style="gap:9px">
-      ${avatar(character)}<div class="grow" style="min-width:0"><strong class="ellipsis">${e(item.name||character?.name||'聊天')}</strong>
-      <div class="small muted ellipsis">${e(last?.text||'尚未開始的聊天')}</div></div>
-      <button type="button" data-action="resume-chat" data-id="${e(item.id)}">續聊</button>
-    </div></article>`;
-  }).join('') || '<div class="empty">找不到符合的聊天記錄。</div>';
+
+let chatMessageSearchState={key:'',query:'',offset:0,request:0,timer:null,loading:false,rows:[]};
+let chatSearchJumpRequest=0;
+const CHAT_SEARCH_PAGE_SIZE=20;
+function resetChatMessageSearchState(){
+  if(chatMessageSearchState.timer)clearTimeout(chatMessageSearchState.timer);
+  chatSearchJumpRequest++;
+  chatMessageSearchState={key:'',query:'',offset:0,request:chatMessageSearchState.request+1,timer:null,loading:false,rows:[]};
 }
+function refreshOpenChatSearchAfterMutation(kind,id){
+  if(route.chatOverlay!=='search')return;
+  const ctx=currentChatSearchContext();
+  if(!ctx||ctx.kind!==kind||ctx.id!==id)return;
+  const query=String(chatMessageSearchState.query||$('chatMessageSearchInput')?.value||'').trim();
+  if(query.length<2)return;
+  if(chatMessageSearchState.timer)clearTimeout(chatMessageSearchState.timer);
+  chatMessageSearchState.request++;
+  chatMessageSearchState.loading=false;
+  requestAnimationFrame(()=>void runChatMessageSearch(query,false));
+}
+function chatSearchSnippet(value,query){
+  const text=String(value||'').replace(/\s+/gu,' ').trim(),q=String(query||'').trim();
+  const index=text.toLocaleLowerCase().indexOf(q.toLocaleLowerCase());
+  if(text.length<=150)return text;
+  const start=Math.max(0,(index<0?0:index)-55);
+  return (start?'…':'')+text.slice(start,start+150)+(start+150<text.length?'…':'');
+}
+function renderChatMessageSearchResults(rows=[],message='',hasMore=false){
+  const list=rows.map(row=>'<button type="button" class="chat-search-result" data-chat-search-hit data-id="'+e(row.id)+'"><span class="row between"><strong>'+e(row.speaker||'角色')+'</strong><span class="small muted">'+e(row.stamp||'')+'</span></span><span class="chat-search-excerpt">'+e(chatSearchSnippet(row.content,row.query||''))+'</span></button>').join('');
+  return (message?'<p class="small muted chat-search-status" role="status">'+e(message)+'</p>':'')+(list||(!message?'<div class="empty">沒有符合的訊息。</div>':''))+(hasMore?'<div class="chat-search-more"><button type="button" class="ghost small" data-chat-search-more>載入更多搜尋結果</button></div>':'');
+}
+function currentChatSearchContext(){
+  if(route.page==='group')return groupPrototype.active?{kind:'group',id:groupPrototype.active.id,group:groupPrototype.active}:null;
+  if(route.page==='conversation')return currentSession()?{kind:'single',id:currentSession().id,session:currentSession()}:null;
+  return null;
+}
+async function runChatMessageSearch(query,append=false){
+  const ctx=currentChatSearchContext(),node=$('chatMessageSearchResults'),q=String(query||'').trim();
+  if(!ctx||!node)return;
+  const key=ctx.kind+':'+ctx.id;
+  if(chatMessageSearchState.key!==key||chatMessageSearchState.query!==q){
+    chatMessageSearchState={key,query:q,offset:0,request:chatMessageSearchState.request+1,timer:null,loading:false,rows:[]};append=false;
+  }
+  if(q.length<2){chatMessageSearchState.rows=[];node.innerHTML=renderChatMessageSearchResults([],q?'請再輸入至少 2 個字。':'輸入至少 2 個字，搜尋目前開啟的聊天室。');return;}
+  if(chatMessageSearchState.loading)return;
+  const request=++chatMessageSearchState.request,offset=append?chatMessageSearchState.offset:0;
+  chatMessageSearchState.loading=true;node.innerHTML=renderChatMessageSearchResults(chatMessageSearchState.rows,append?'正在載入更多結果…':'正在搜尋目前聊天室…');
+  try{
+    const client=window.mySupabase,uid=currentUser()?.uid;let rows=[];
+    if(client&&uid&&isUuid(ctx.id)){
+      const {data:{user},error:authError}=await client.auth.getUser();
+      if(authError||user?.id!==uid||currentUser()?.uid!==uid)throw Error('登入狀態已變更，請重新登入。');
+      const pattern='%'+q.replace(/[\\%_]/gu,'\\$&')+'%';
+      if(ctx.kind==='single'){
+        if(!ctx.session.cloudOwned||ctx.session.cloudOwnerUid!==uid||ctx.session.hidden||readDeletedChatTombstones(uid).sessions[ctx.id])throw Error('目前聊天室不可搜尋，請重新開啟後再試。');
+        const {data,error}=await client.from('chat_messages').select('id,session_id,role,content,created_at')
+          .eq('session_id',ctx.id).is('deleted_at',null).ilike('content',pattern)
+          .order('created_at',{ascending:false}).order('id',{ascending:false}).range(offset,offset+CHAT_SEARCH_PAGE_SIZE-1);
+        if(error)throw error;
+        rows=(data||[]).map(r=>({...r,query:q,speaker:r.role==='user'?'你':sessionCharacter(ctx.session)?.name||'角色',stamp:new Date(r.created_at).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}));
+      }else{
+        if(groupPrototype.active?.id!==ctx.id||groupPrototype.ownerUid!==uid||readDeletedChatTombstones(uid).groups[ctx.id])throw Error('目前群組不可搜尋，請重新開啟後再試。');
+        const {data,error}=await client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,speaker_snapshot,content,created_at')
+          .eq('group_id',ctx.id).is('deleted_at',null).ilike('content',pattern)
+          .order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).range(offset,offset+CHAT_SEARCH_PAGE_SIZE-1);
+        if(error)throw error;
+        rows=(data||[]).map(r=>({...r,query:q,speaker:r.speaker_type==='user'?'你':r.speaker_type==='system'?'系統':r.speaker_snapshot?.name||'角色',stamp:new Date(r.created_at).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}));
+      }
+    }else if(ctx.kind==='single'){
+      rows=(ctx.session.messages||[]).filter(r=>String(r.text||'').toLocaleLowerCase().includes(q.toLocaleLowerCase())).slice().reverse().slice(offset,offset+CHAT_SEARCH_PAGE_SIZE)
+        .map(r=>({id:r.id,query:q,content:r.text,speaker:r.role==='user'?'你':sessionCharacter(ctx.session)?.name||'角色',stamp:new Date(Number(r.at)||Date.now()).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}));
+    }else{
+      rows=(groupPrototype.messages||[]).filter(r=>String(r.content||'').toLocaleLowerCase().includes(q.toLocaleLowerCase())).slice().reverse().slice(offset,offset+CHAT_SEARCH_PAGE_SIZE)
+        .map(r=>({id:r.id,query:q,content:r.content,speaker:r.speaker||'角色',stamp:r.createdAt||''}));
+    }
+    if(request!==chatMessageSearchState.request||currentChatSearchContext()?.kind!==ctx.kind||currentChatSearchContext()?.id!==ctx.id||$('chatMessageSearchInput')?.value.trim()!==q)return;
+    chatMessageSearchState.rows=append?[...chatMessageSearchState.rows,...rows]:rows;
+    chatMessageSearchState.offset=chatMessageSearchState.rows.length;
+    node.innerHTML=renderChatMessageSearchResults(chatMessageSearchState.rows,'',rows.length===CHAT_SEARCH_PAGE_SIZE);
+  }catch(error){if(request===chatMessageSearchState.request)node.innerHTML=renderChatMessageSearchResults(chatMessageSearchState.rows,error?.message||'搜尋失敗，請稍後重試。');}
+  finally{if(request===chatMessageSearchState.request)chatMessageSearchState.loading=false;}
+}
+function closeChatSearchOverlay(){
+  if(route.chatOverlay==='search'){
+    const next={...route};delete next.chatOverlay;route=next;
+    const depth=history.state?.personax?history.state.depth:0;
+    history.replaceState({personax:true,depth,route:next},'',routeURL(next));
+  }
+  $('view').querySelector('.chat-main .chat-overlay')?.remove();
+}
+async function jumpToChatSearchHit(button){
+  const ctx=currentChatSearchContext(),id=String(button.dataset.id||'');
+  if(!ctx||!id)return;
+  const request=++chatSearchJumpRequest;
+  const client=window.mySupabase,uid=currentUser()?.uid;
+  const isCurrent=()=>{const current=currentChatSearchContext();return request===chatSearchJumpRequest&&current?.kind===ctx.kind&&current?.id===ctx.id&&(ctx.kind==='single'?current.session===ctx.session:current.group===ctx.group)&&currentUser()?.uid===uid;};
+  if(ctx.kind==='single'&&!ctx.session.cloudOwned){
+    const n=[...($('messages')?.querySelectorAll('[data-message]')||[])].find(x=>x.dataset.message===id);
+    if(n){closeChatSearchOverlay();n.scrollIntoView({behavior:'smooth',block:'center'});n.classList.add('search-hit-highlight');setTimeout(()=>n.classList.remove('search-hit-highlight'),1800);}else toast('這則訊息不在目前已載入的本機紀錄中。');return;
+  }
+  if(!client||!uid||!isUuid(id)){toast('目前無法連線或訊息識別碼無效，搜尋結果仍會保留。');return;}
+  try{
+    const {data:{user},error:authError}=await client.auth.getUser();
+    if(authError||user?.id!==uid||currentUser()?.uid!==uid)throw Error('登入狀態已變更，請重新登入。');
+    if(!isCurrent())return;
+    if(ctx.kind==='single'){
+      const s=ctx.session;if(s.cloudOwnerUid!==uid||s.hidden||readDeletedChatTombstones(uid).sessions[s.id])throw Error('目前聊天室不可存取。');
+      const {data:t,error:te}=await client.from('chat_messages').select('id,session_id,role,content,created_at').eq('id',id).eq('session_id',s.id).is('deleted_at',null).maybeSingle();
+      if(te)throw te;if(!t)throw Error('這則訊息已刪除或無法存取。');
+      if(!isCurrent())return;
+      const bf='created_at.lt.'+t.created_at+',and(created_at.eq.'+t.created_at+',id.lt.'+t.id+')';
+      const af='created_at.gt.'+t.created_at+',and(created_at.eq.'+t.created_at+',id.gt.'+t.id+')';
+      const [b,a]=await Promise.all([
+        client.from('chat_messages').select('id,session_id,role,content,created_at').eq('session_id',s.id).is('deleted_at',null).or(bf).order('created_at',{ascending:false}).order('id',{ascending:false}).limit(24),
+        client.from('chat_messages').select('id,session_id,role,content,created_at').eq('session_id',s.id).is('deleted_at',null).or(af).order('created_at',{ascending:true}).order('id',{ascending:true}).limit(24)
+      ]);
+      if(b.error)throw b.error;if(a.error)throw a.error;
+      if(!isCurrent())return;
+      closeChatSearchOverlay();
+      const all=[...(b.data||[]),t,...(a.data||[])].sort((x,y)=>String(x.created_at).localeCompare(String(y.created_at))||String(x.id).localeCompare(String(y.id)));
+      s.messages=all.map(r=>({id:r.id,role:r.role==='user'?'user':'assistant',text:r.content||'',at:new Date(r.created_at).getTime(),cloudSynced:true}));
+      const first=all[0];s.cloudOldestMessageCursor=first?{createdAt:first.created_at,id:first.id}:null;
+      s.cloudHasMoreMessages=(b.data||[]).length===24;s.cloudMessagesLoaded=true;s.cloudSearchJump=true;
+      renderMessages(false);
+      requestAnimationFrame(()=>{const n=[...($('messages')?.querySelectorAll('[data-message]')||[])].find(x=>x.dataset.message===id);if(n){n.scrollIntoView({behavior:'smooth',block:'center'});n.classList.add('search-hit-highlight');setTimeout(()=>n.classList.remove('search-hit-highlight'),1800);}});
+    }else{
+      const g=ctx.group;if(g.id!==ctx.id||groupPrototype.ownerUid!==uid||readDeletedChatTombstones(uid).groups[g.id])return;
+      const {data:t,error:te}=await client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('id',id).eq('group_id',g.id).is('deleted_at',null).maybeSingle();
+      if(te)throw te;if(!t)throw Error('這則群組訊息已刪除或無法存取。');
+      if(!isCurrent())return;
+      const bf='created_at.lt.'+t.created_at+',and(created_at.eq.'+t.created_at+',sequence_no.lt.'+t.sequence_no+'),and(created_at.eq.'+t.created_at+',sequence_no.eq.'+t.sequence_no+',id.lt.'+t.id+')';
+      const af='created_at.gt.'+t.created_at+',and(created_at.eq.'+t.created_at+',sequence_no.gt.'+t.sequence_no+'),and(created_at.eq.'+t.created_at+',sequence_no.eq.'+t.sequence_no+',id.gt.'+t.id+')';
+      const [b,a]=await Promise.all([
+        client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',g.id).is('deleted_at',null).or(bf).order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(24),
+        client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',g.id).is('deleted_at',null).or(af).order('created_at',{ascending:true}).order('sequence_no',{ascending:true}).order('id',{ascending:true}).limit(24)
+      ]);
+      if(b.error)throw b.error;if(a.error)throw a.error;if(!isCurrent())return;
+      closeChatSearchOverlay();
+      const all=[...(b.data||[]),t,...(a.data||[])].sort((x,y)=>String(x.created_at).localeCompare(String(y.created_at))||Number(x.sequence_no)-Number(y.sequence_no)||String(x.id).localeCompare(String(y.id)));
+      g.messages=all.map(r=>{const snap=r.speaker_snapshot||{},m=g.members.find(x=>x.characterId===r.character_id)||g.members.find(x=>x.characterSnapshotId===snap.id||x.id===snap.id),type=r.speaker_type==='user'?'user':r.speaker_type==='system'?'system':'character';return {id:r.id,type,speaker:type==='user'?'你':type==='system'?'系統':snap.name||m?.name||'角色',characterId:r.character_id||null,speakerSnapshot:snap,content:type==='user'&&r.content===GROUP_CONTINUE_SENTINEL?'':r.content,createdAt:r.created_at};});
+      const first=all[0];groupPrototype.historyCursor=first?{createdAt:first.created_at,sequenceNo:first.sequence_no,id:first.id}:null;
+      groupPrototype.historyHasMore=(b.data||[]).length===24;groupPrototype.searchJump=true;groupPrototype.historyError='';groupPrototype.historyScrollAnchor=null;
+      renderGroupConversation();
+      requestAnimationFrame(()=>{const n=[...($('groupMessages')?.querySelectorAll('[data-message]')||[])].find(x=>x.dataset.message===id);if(n){n.scrollIntoView({behavior:'smooth',block:'center'});n.classList.add('search-hit-highlight');setTimeout(()=>n.classList.remove('search-hit-highlight'),1800);}});
+    }
+  }catch(error){if(request===chatSearchJumpRequest)toast(error?.message||'無法定位這則訊息。');}
+}
+async function returnChatToLatest(kind){
+  if(kind==='single'){
+    const s=currentSession(),uid=currentUser()?.uid;
+    if(!s?.cloudOwned||s.cloudOwnerUid!==uid||!uid||s.hidden||readDeletedChatTombstones(uid).sessions[s.id])return;
+    if(s.cloudMessagesLoading){toast('聊天紀錄仍在載入，請稍後再返回最新訊息。');return;}
+    const previous=s.messages,pending=(s.messages||[]).filter(m=>m.cloudSynced!==true);
+    s.messages=pending;s.cloudSearchJump=false;s.cloudMessagesLoaded=false;s.cloudOldestMessageCursor=null;s.cloudHasMoreMessages=false;
+    const loaded=await loadCloudSessionMessages(s.id,{refresh:true});
+    if(currentUser()?.uid!==uid||currentSession()?.id!==s.id)return;
+    if(!loaded&&!readDeletedChatTombstones(uid).sessions[s.id]){
+      s.messages=previous;s.cloudSearchJump=true;renderMessages(false);
+      toast('最新訊息暫時無法載入，已保留目前搜尋定位。');
+    }
+  }else{
+    const group=groupPrototype.active,uid=currentUser()?.uid;
+    if(!group?.id||!uid||groupPrototype.ownerUid!==uid||readDeletedChatTombstones(uid).groups[group.id])return;
+    if(groupPrototype.loading){toast('群組仍在載入，請稍後再返回最新訊息。');return;}
+    await groupOpen(group.id);
+  }
+}
+
 function formatStoryWorldTime(value) {
   const raw=String(value||'').trim();if(!raw)return '故事時間尚未確認';
   const match=raw.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
@@ -8161,8 +8241,10 @@ async function renderPhoneModal() {
   // Story phone events are fetched through the owner-checked RPC; never read the event table directly.
   let storyPhoneEvents=[];
   let storyPhoneStates=[];
+  let storyMemorySummaries=null;
   let storyWorldState=!isGroup&&session.storyWorldState&&typeof session.storyWorldState==='object'?session.storyWorldState:{};
   let storyPhoneEventsError='';
+  let storyMemorySummaryError='';
   if(!isGroup && session.storyMode && session.cloudOwned && session.cloudOwnerUid===uid && isUuid(session.id)){
     const client=window.mySupabase;
     try{
@@ -8174,13 +8256,19 @@ async function renderPhoneModal() {
       if(cacheIsFresh){
         storyPhoneEvents=Array.isArray(cached.events)?cached.events:[];
         storyPhoneStates=Array.isArray(cached.states)?cached.states:[];
+        storyMemorySummaries=Array.isArray(cached.summaries)?cached.summaries:null;
+        storyMemorySummaryError=String(cached.summaryError||'');
         if(cached.worldState&&typeof cached.worldState==='object')storyWorldState=cached.worldState;
       }else{
-        const [eventsResult,stateResult,worldStateResult]=await Promise.all([
+        const [eventsResult,stateResult,worldStateResult,summaryResult]=await Promise.all([
           client.rpc('get_story_phone_events',{p_session_id:session.id}),
           client.rpc('get_story_phone_state',{p_session_id:session.id}),
-          client.rpc('get_story_world_state',{p_session_id:session.id})
+          client.rpc('get_story_world_state',{p_session_id:session.id}),
+          client.rpc('get_story_memory_summaries',{p_session_id:session.id})
         ]);
+        // Read the diary summary result first so a phone-event error cannot turn a valid diary into a false 100% battery.
+        storyMemorySummaryError=summaryResult.error?String(summaryResult.error.message||'讀取 AI 回憶摘要失敗'):'';
+        storyMemorySummaries=summaryResult.error?[]:(Array.isArray(summaryResult.data)?summaryResult.data:[]);
         if(eventsResult.error)throw eventsResult.error;
         if(stateResult.error)throw stateResult.error;
         if(worldStateResult.error)throw worldStateResult.error;
@@ -8190,7 +8278,7 @@ async function renderPhoneModal() {
           storyWorldState=worldStateResult.data;
           session.storyWorldState=storyWorldState;
         }
-        storyPhoneRuntimeCache.set(cacheKey,{fetchedAt:Date.now(),events:storyPhoneEvents,states:storyPhoneStates,worldState:storyWorldState});
+        storyPhoneRuntimeCache.set(cacheKey,{fetchedAt:Date.now(),events:storyPhoneEvents,states:storyPhoneStates,summaries:storyMemorySummaries,summaryError:storyMemorySummaryError,worldState:storyWorldState});
         if(storyPhoneRuntimeCache.size>100){
           const oldestKey=storyPhoneRuntimeCache.keys().next().value;
           if(oldestKey!==cacheKey)storyPhoneRuntimeCache.delete(oldestKey);
@@ -8198,7 +8286,20 @@ async function renderPhoneModal() {
       }
     }catch(error){
       storyPhoneEventsError=String(error?.message||'讀取故事手機通知失敗');
+      if(storyMemorySummaries===null)storyMemorySummaryError=String(error?.message||'讀取 AI 回憶摘要失敗');
       console.warn('讀取 Story 手機狀態／事件失敗：',storyPhoneEventsError);
+    }
+    if(storyMemorySummaries===null&&!storyMemorySummaryError){
+      try{
+        const {data,error}=await client.rpc('get_story_memory_summaries',{p_session_id:session.id});
+        if(error)throw error;
+        storyMemorySummaries=Array.isArray(data)?data:[];
+        const cacheKey=String(uid)+':'+session.id;
+        const cached=storyPhoneRuntimeCache.get(cacheKey);
+        if(cached)storyPhoneRuntimeCache.set(cacheKey,{...cached,summaries:storyMemorySummaries,summaryError:''});
+      }catch(error){
+        storyMemorySummaryError=String(error?.message||'讀取 AI 回憶摘要失敗');
+      }
     }
   }
   // The author's configured phone fields are the primary rows in the single
@@ -8206,15 +8307,20 @@ async function renderPhoneModal() {
   // never exceeds eight rows, matching the editor's eight-field limit.
   const storyEventHTML=storyPhoneEvents.slice(0,Math.max(0,8-storyPhoneStates.length)).map(item=>{
     const typeLabels={message:'訊息',social_post:'社群動態',missed_call:'未接來電',voice_message:'語音留言',notification:'通知'};
-    return '<article class="phone-story-event"><div class="phone-story-event-meta"><span>'+e(typeLabels[item.event_type]||'通知')+'</span><time>'+e(timeText(item.created_at||0))+'</time></div><strong>'+e(item.title||'新通知')+'</strong><p>'+e(item.body||'')+'</p></article>';
+    const eventIcon=item.event_type==='missed_call'?'☎️':item.event_type==='voice_message'?'🎙️':item.event_type==='social_post'?'◎':'💬';
+    return '<article class="phone-notification-card"><span class="phone-app-icon">'+eventIcon+'</span><div class="phone-notification-copy"><div class="phone-notification-meta"><span>'+e(typeLabels[item.event_type]||'通知')+'</span><time>'+e(timeText(item.created_at||0))+'</time></div><strong>'+e(item.title||'新通知')+'</strong><p>'+e(item.body||'')+'</p></div></article>';
   }).join('');
   const storyStateHTML=storyPhoneStates.slice(0,8).map(item=>
-    '<article class="phone-story-event"><strong>'+e(item.title||'')+'</strong><p>'+e(item.body||'')+'</p></article>'
+    '<article class="phone-notification-card"><span class="phone-app-icon">📱</span><div class="phone-notification-copy"><div class="phone-notification-meta"><span>手機狀態</span><span>剛剛</span></div><strong>'+e(item.title||'')+'</strong><p>'+e(item.body||'')+'</p></div></article>'
   ).join('');
   // Group sweet-diary excerpts are stored per group in localStorage, so use that same shared diary for every member phone's battery.
   const diaryList=isGroup?loadGroupDiaryMemories(group.id):(session.memories||[]);
-  const diaryChars=Array.isArray(diaryList)?(isGroup?diaryList.reduce((n,item)=>n+countChars(typeof item==='string'?item:(item.text||'')),0):memorySize(diaryList)):0;
-  const capacity=10000,battery=Math.max(0,Math.min(100,Math.round((1-Math.min(diaryChars,capacity)/capacity)*100))),warning=battery<=20,batteryColor=warning?'#e07b39':battery<=50?'#d5b34a':'#4eaf78';
+  const usesCloudStoryMemory=!isGroup&&session.storyMode&&session.cloudOwned;
+  const storySummaryChars=Array.isArray(storyMemorySummaries)?storyMemorySummaries.reduce((total,item)=>total+countChars(item.summary||''),0):0;
+  const diaryChars=usesCloudStoryMemory
+    ?(storyMemorySummaryError||!Array.isArray(storyMemorySummaries)?null:storySummaryChars)
+    :(Array.isArray(diaryList)?(isGroup?diaryList.reduce((n,item)=>n+countChars(typeof item==='string'?item:(item.text||'')),0):memorySize(diaryList)):0);
+  const capacity=10000,battery=diaryChars===null?null:Math.max(0,Math.min(100,Math.round((1-Math.min(diaryChars,capacity)/capacity)*100))),warning=battery!==null&&battery<=20,batteryColor=battery===null?'#9ca3af':warning?'#8d9299':'#c1c5cb';
   const initialStoryTime=Number(session.startedAt||session.initialOpeningMessage?.at)||Date.now();
   const initialDate=new Date(initialStoryTime);
   const initialStoryTimeText=initialDate.getFullYear()+'-'+String(initialDate.getMonth()+1).padStart(2,'0')+'-'+String(initialDate.getDate()).padStart(2,'0')+'T'+String(initialDate.getHours()).padStart(2,'0')+':'+String(initialDate.getMinutes()).padStart(2,'0');
@@ -8225,15 +8331,23 @@ async function renderPhoneModal() {
   const storyLocationLabel=String(storyWorldState.storyLocation||storyWorldState.story_location||session.encounterPlace||inferredOpeningLocation).trim().slice(0,120)||'依開場情境推定中';
   const title=(character.name||group?.name||'角色')+' 的手機';
   const noticeLines=notices.map(line=>String(line||'').trim()).filter(Boolean);
-  const noticeContentHTML=[
-    storyStateHTML,
-    storyEventHTML,
-    ...noticeLines.slice(0,Math.max(0,8-storyPhoneStates.length-storyPhoneEvents.length)).map(line=>'<p>'+e(String(line))+'</p>')
-  ].filter(Boolean).join('');
-  const noticeHTML=noticeContentHTML||(storyPhoneEventsError?'<p class="small muted">目前無法載入手機通知，請稍後重新開啟手機。</p>':'<p>目前還沒有新的手機通知。</p>');
+  const configuredNoticeHTML=noticeLines.slice(0,Math.max(0,8-storyPhoneStates.length-storyPhoneEvents.length)).map(line=>
+    '<article class="phone-notification-card"><span class="phone-app-icon">🔔</span><div class="phone-notification-copy"><div class="phone-notification-meta"><span>'+e(character.name||'角色通知')+'</span><span>通知</span></div><p>'+e(String(line))+'</p></div></article>'
+  ).join('');
+  const noticeContentHTML=[storyStateHTML,storyEventHTML,configuredNoticeHTML].filter(Boolean).join('');
+  const noticeHTML=noticeContentHTML||(storyPhoneEventsError?'<div class="phone-notification-empty">目前無法載入手機通知，請稍後重新開啟手機。</div>':'<div class="phone-notification-empty">目前還沒有新的通知</div>');
   const memberSwitch=isGroup?'<div class="phone-member-switch"><button type="button" data-phone-action="prev" aria-label="上一位群組成員">‹</button><span class="phone-member-name">'+e(character.name)+'</span><button type="button" data-phone-action="next" aria-label="下一位群組成員">›</button></div>':'';
+  const [storyDateDisplay,storyClockDisplay]=String(storyTimeLabel).split('　');
+  const phoneClock=storyClockDisplay||'--:--';
   const modal=document.createElement('div');modal.className='phone-modal-backdrop';modal.setAttribute('role','presentation');
-  modal.innerHTML='<section class="phone-device" role="dialog" aria-modal="true" aria-label="'+e(title)+'"><div class="phone-device-head"><span>'+e(title)+'</span><div class="phone-battery" style="color:'+batteryColor+'" aria-label="電量 '+battery+'%"><span>'+battery+'%</span><span class="phone-battery-shape"><span class="phone-battery-fill" style="display:block;width:'+battery+'%"></span></span></div></div>'+memberSwitch+'<div class="phone-content"><div class="phone-time">📆 '+e(storyTimeLabel)+'</div><div class="phone-location">📍 所在地　<span class="muted">'+e(storyLocationLabel)+'</span></div><div class="phone-notices '+(warning?'phone-warning':'')+'">'+(warning?'<p><strong>回憶相簿快滿了，趕緊清理幫角色恢復電量吧</strong></p>':'')+'<div class="phone-notice-title">🔔 通知</div><div class="phone-notice-list">'+noticeHTML+'</div></div><p class="small muted" style="margin-top:10px;font-size:9px">電量依甜蜜日記容量計算：'+Math.min(diaryChars,capacity)+' / '+capacity+' 字</p></div><div class="phone-bar"></div><div class="phone-close-row"><button type="button" data-phone-action="close">關閉手機</button></div></section>';
+  modal.innerHTML='<section class="phone-device phone-device--ios" role="dialog" aria-modal="true" aria-label="'+e(title)+'"><div class="phone-screen">'+
+    '<div class="phone-statusbar"><span>'+e(phoneClock)+'</span><span class="phone-status-icons" aria-label="行動網路與電量"><i></i><i></i><i></i><span>⌁</span><span class="phone-battery" style="color:'+batteryColor+'" aria-label="'+(battery===null?'回憶容量暫時無法讀取':'剩餘回憶容量 '+battery+'%')+'"><span>'+(battery===null?'--':battery+'%')+'</span><span class="phone-battery-shape"><span class="phone-battery-fill" style="display:block;width:'+(battery===null?0:battery)+'%"></span></span></span></span></div>'+
+    '<div class="phone-device-head"><span>'+e(title)+'</span><span class="phone-device-caption">STORY PHONE</span></div>'+memberSwitch+
+    '<div class="phone-content"><div class="phone-lockscreen"><div class="phone-lockscreen-date">'+e(storyDateDisplay||'故事時間')+'</div><div class="phone-lockscreen-clock">'+e(phoneClock)+'</div><div class="phone-lockscreen-location">⌖　'+e(storyLocationLabel)+'</div></div>'+
+    '<section class="phone-notices '+(warning?'phone-warning':'')+'">'+(warning?'<div class="phone-memory-warning">回憶空間即將用盡，整理甜蜜日記可釋放容量</div>':'')+
+    '<div class="phone-notice-heading"><strong>通知</strong><span>'+(noticeContentHTML?String(Math.min(8,storyPhoneStates.length+storyPhoneEvents.length+noticeLines.length))+' 則':'通知中心')+'</span></div><div class="phone-notice-list">'+noticeHTML+'</div></section>'+
+    '<p class="phone-memory-caption">'+(diaryChars===null?'甜蜜日記容量暫時無法同步':('甜蜜日記　'+Math.min(diaryChars,capacity).toLocaleString()+' / '+capacity.toLocaleString()+' 字 · 剩餘 '+(battery===null?'--':battery+'%')) )+'</p></div>'+
+    '<div class="phone-home-indicator"></div><div class="phone-close-row"><button type="button" data-phone-action="close">完成</button></div></div></section>';
   modal.addEventListener('click',event=>{
     if(event.target===modal){savePhoneState();modal.remove();return;}
     const button=event.target.closest('[data-phone-action]');if(!button)return;
@@ -8271,7 +8385,7 @@ async function loadStoryMemorySummary(session) {
     if(summaryRowsError)throw summaryRowsError;
     if(currentUser()?.uid!==uid||!document.getElementById('storyMemorySummary'))return;
     const summaries=Array.isArray(summaryRows)?summaryRows:[];
-    const totalChars=summaries.reduce((total,item)=>total+String(item.summary||'').length,0);
+    const totalChars=summaries.reduce((total,item)=>total+countChars(item.summary||''),0);
     const count=document.getElementById('storyMemoryCount');
     if(count)count.textContent=totalChars.toLocaleString();
     const meter=document.getElementById('storyMemoryMeter');
@@ -8301,6 +8415,7 @@ function renderChatOverlay(kind) {
   const s = currentSession();
   const panel = $('view').querySelector('.chat-main');
   if (!s || !panel) return;
+  if(kind==='search')resetChatMessageSearchState();
   const lifecycle = window.PoyozzChatRenderLifecycle;
   if (lifecycle && lifecycle.render('renderSingleOverlay', { kind, session: s, panel }, () => false).handled) return;
   if(kind==='settings'||kind==='settings-background'||kind==='delete-confirm'||kind==='manage-conversation'){renderChatSettingsOverlay(panel,false,kind);return;}
@@ -8336,8 +8451,8 @@ function renderChatOverlay(kind) {
       </section>`
     : '';
   const content = kind === 'search'
-    ? `<label class="field"><span>搜尋過往聊天記錄</span><input id="archiveSearchInput" type="search" placeholder="輸入聊天名稱或角色名稱…" autocomplete="off"></label>
-      <div id="archiveSearchResults">${archiveSearchResults('')}</div>`
+    ? `<label class="field"><span>搜尋目前聊天室的訊息</span><input id="chatMessageSearchInput" type="search" placeholder="輸入訊息關鍵字（至少 2 字）…" autocomplete="off"></label>
+      <div id="chatMessageSearchResults"><p class="small muted">輸入至少 2 個字，搜尋目前開啟的聊天室。</p></div>`
     : kind === 'diary'
       ? '<section class="diary-summary"><div class="diary-summary-head"><div><h3>把重要的瞬間，好好收藏</h3></div><div class="diary-count"><strong id="storyMemoryCount">'+(s.storyMode?'0':memorySize(s.memories)).toLocaleString()+'</strong><span>/ 10,000 字</span></div></div>'+(s.storyMode?'<div id="storyMemorySummary" class="memory-item" style="margin:12px 0;white-space:pre-wrap"><p class="small muted">正在載入 AI 回憶摘要…</p></div>':'')+'<div class="diary-meter"><span id="storyMemoryMeter" style="width:'+Math.min(100,(s.storyMode?0:memorySize(s.memories))/10000*100)+'%"></span></div></section>' +
         (s.storyMode ? '' : ((s.memories||[]).map(m => '<article class="memory-item diary-memory-card '+(m.important?'is-important':'')+'"><div class="diary-memory-head"><label class="diary-check"><input type="checkbox" data-memory="'+e(m.id)+'" '+(m.important?'checked':'')+'><span class="diary-heart">'+(m.important?'♥':'♡')+'</span><span>'+(m.important?'重大記憶':'設為重大記憶')+'</span></label><span class="diary-memory-date">'+e(timeText(m.at))+'</span></div><p class="prose diary-memory-text">'+e(m.text)+'</p>'+(m.important?'<p class="small diary-lock-note">♥ 已珍藏，不會被自動清除</p>':'<button type="button" class="diary-edit-button" data-action="edit-memory" data-id="'+e(m.id)+'">編輯這則回憶</button>')+'</article>').join('') || '<div class="empty diary-empty"><strong>你們的故事，正等待被收藏</strong><p>這裡會收藏整理後的回憶內容；累積 5 個已結算故事回合後，AI 會建立第一則摘要。</p></div>'))
@@ -8851,24 +8966,9 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
         </form>`);
       break;
     }
-    case 'message-menu': {
-      const m = s?.messages.find(m => m.id === o.id);
-      if (!m) return;
-      const latestEditableMessage = (m.role === 'user' || m.role === 'assistant') &&
-        s.messages.filter(item => item.role === m.role).at(-1)?.id === m.id;
-      showDialog('訊息操作',`
-        <div class="stack">
-          <button style="width:100%" data-action="copy-message" data-id="${e(m.id)}">複製</button>
-          ${latestEditableMessage ? `<button style="width:100%" data-action="edit-message" data-id="${e(m.id)}">編輯</button>` : ''}
-          <button class="danger" style="width:100%" data-action="delete-message" data-id="${e(m.id)}">刪除</button>
-          ${m.role === 'assistant' ? `<button style="width:100%" data-action="report"
-            data-kind="AI訊息" data-id="${e(m.id)}">舉報</button>` : ''}
-        </div>`);
-      break;
-    }
     case 'edit-message': {
       const m = s?.messages.find(m => m.id === o.id);
-      const latestEditableMessage = m && (m.role === 'user' || m.role === 'assistant') &&
+      const latestEditableMessage = m && !s.cloudSearchJump && (m.role === 'user' || m.role === 'assistant') &&
         s.messages.filter(item => item.role === m.role).at(-1)?.id === m.id;
       if (!m || !latestEditableMessage) return;
       showDialog('編輯最後一則訊息',`
@@ -9079,6 +9179,19 @@ document.addEventListener('click', event => {
   void groupOpen(groupId);
 }, true);
 
+
+/* CHAT SEARCH: intercept scoped search controls before the general action router. */
+document.addEventListener('click',async event=>{
+  const hit=event.target instanceof Element?event.target.closest('[data-chat-search-hit]'):null;
+  const more=event.target instanceof Element?event.target.closest('[data-chat-search-more]'):null;
+  const latest=event.target instanceof Element?event.target.closest('[data-chat-search-return-latest]'):null;
+  if(!hit&&!more&&!latest)return;
+  event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();
+  if(hit){await jumpToChatSearchHit(hit);return;}
+  if(more){await runChatMessageSearch(chatMessageSearchState.query,true);return;}
+  await returnChatToLatest(latest.dataset.chatSearchReturnLatest);
+},true);
+
 /* GROUP MESSAGE ACTION CAPTURE FIX
    Handle group-message menu and delete clicks in capture phase so an ancestor
    handler cannot swallow the click before the action reaches the delegated router. */
@@ -9086,35 +9199,25 @@ document.addEventListener('click', async event => {
   const target = event.target instanceof Element ? event.target.closest('[data-action]') : null;
   if (!target || target.disabled) return;
   const action = target.dataset.action;
-  if (!['group-message-menu','delete-group-message','confirm-delete-group-message'].includes(action)) return;
+  if (!['delete-group-message','confirm-delete-group-message'].includes(action)) return;
   event.preventDefault();
   event.stopPropagation();
   event.stopImmediatePropagation();
   const id = target.dataset.id || '';
   try {
-    if (state.account?.accountDeletionPending) {
-      toast('此帳號正在等待刪除，目前暫停使用功能。你可以取消刪除申請以恢復帳號。');
+    if(groupPrototype.searchJump){
+      toast('請先返回最新訊息，再操作群組訊息。');
       return;
     }
-    if (action === 'group-message-menu') {
-      const message = groupPrototype.messages.find(item => item.id === id);
-      const latest = message && groupPrototype.messages.filter(item => item.type === message.type).at(-1);
-      if (!message || message.id !== latest?.id || !['user','character'].includes(message.type)) {
-        toast('只能操作各自最新的一則玩家或角色訊息。');
-        return;
-      }
-      showDialog('訊息操作','<div class="stack">'+
-        '<button style="width:100%" data-action="copy-group-message" data-id="'+e(message.id)+'">複製</button>'+
-        '<button style="width:100%" data-action="edit-group-message" data-id="'+e(message.id)+'">編輯</button>'+
-        '<button class="danger" style="width:100%" data-action="delete-group-message" data-id="'+e(message.id)+'">刪除</button></div>');
+    if (state.account?.accountDeletionPending) {
+      toast('此帳號正在等待刪除，目前暫停使用功能。你可以取消刪除申請以恢復帳號。');
       return;
     }
     if (action === 'delete-group-message') {
       const group = groupPrototype.active;
       const message = groupPrototype.messages.find(item => item.id === id);
-      const latest = message && groupPrototype.messages.filter(item => item.type === message.type).at(-1);
-      if (!group || !message || message.id !== latest?.id || !['user','character'].includes(message.type)) {
-        toast('只能刪除各自最新的一則玩家或角色訊息。');
+      if (!group || !message || !['user','character'].includes(message.type)) {
+        toast('找不到可刪除的群組訊息。');
         return;
       }
       showDialog('確認刪除訊息',
@@ -9127,9 +9230,8 @@ document.addEventListener('click', async event => {
     const group = groupPrototype.active;
     const message = groupPrototype.messages.find(item => item.id === id);
     const user = currentUser(), client = window.mySupabase;
-    const latest = message && groupPrototype.messages.filter(item => item.type === message.type).at(-1);
-    if (!group || !message || message.id !== latest?.id || !['user','character'].includes(message.type)) {
-      toast('找不到可刪除的最新群組訊息，請重新開啟群組後再試。');
+    if (!group || !message || !['user','character'].includes(message.type)) {
+      toast('找不到可刪除的群組訊息，請重新開啟群組後再試。');
       return;
     }
     if (!user?.uid || !client || !isUuid(group.id) || !isUuid(message.id)) {
@@ -9142,9 +9244,11 @@ document.addEventListener('click', async event => {
       .eq('id',message.id).eq('group_id',group.id).is('deleted_at',null).select('id').maybeSingle();
     if (error) throw new Error('群組訊息刪除同步失敗：'+error.message);
     if (!data) throw new Error('雲端未確認這則訊息的刪除狀態，請重新載入後再試。');
+    if(groupPrototype.active!==group||groupPrototype.active?.id!==group.id||currentUser()?.uid!==user.uid)return;
     groupPrototype.messages = groupPrototype.messages.filter(item => item.id !== message.id);
     $('modal')?.close();
     renderGroupConversation();
+    refreshOpenChatSearchAfterMutation('group',group.id);
     toast('群組訊息已刪除。');
   } catch (error) {
     console.error('群組訊息操作失敗：', error);
@@ -9219,9 +9323,10 @@ document.addEventListener('click',async event => {
   const button = event.target.closest('[data-action]');
   if (!button || button.disabled) {
     const message = event.target.closest('[data-message]');
-    if (message) {
+    if (message && !event.target.closest('a,button,input,textarea,select,[contenteditable="true"]')) {
+      const wasSelected=message.classList.contains('selected');
       document.querySelectorAll('.message.selected').forEach(item => item.classList.remove('selected'));
-      message.classList.add('selected');
+      if(!wasSelected) message.classList.add('selected');
     }
     return;
   }
@@ -9494,20 +9599,10 @@ document.addEventListener('click',async event => {
       case 'group-create':groupCreateMock();break;
       case 'group-send':groupSendMock();break;
       case 'group-history-load-older':groupLoadOlderMessages();break;
-      case 'group-message-menu': {
-        const message=groupPrototype.messages.find(item=>item.id===key);
-        const latest=message&&groupPrototype.messages.filter(item=>item.type===message.type).at(-1);
-        if(!message||message.id!==latest?.id||!['user','character'].includes(message.type)) break;
-        showDialog('訊息操作','<div class="stack">'+
-          '<button style="width:100%" data-action="copy-group-message" data-id="'+e(message.id)+'">複製</button>'+
-          '<button style="width:100%" data-action="edit-group-message" data-id="'+e(message.id)+'">編輯</button>'+
-          '<button class="danger" style="width:100%" data-action="delete-group-message" data-id="'+e(message.id)+'">刪除</button></div>');
-        break;
-      }
       case 'edit-group-message': {
         const message=groupPrototype.messages.find(item=>item.id===key);
         const latest=message&&groupPrototype.messages.filter(item=>item.type===message.type).at(-1);
-        if(!message||message.id!==latest?.id||!['user','character'].includes(message.type)) break;
+        if(groupPrototype.searchJump||!message||message.id!==latest?.id||!['user','character'].includes(message.type)) break;
         showDialog('編輯最後一則訊息','<form data-form="group-message-edit" data-id="'+e(message.id)+'"><textarea name="text" required maxlength="10000">'+e(message.content||'')+'</textarea><button class="primary" style="margin-top:15px">儲存</button></form>');
         break;
       }
@@ -10136,7 +10231,6 @@ document.addEventListener('click',async event => {
         break;
       }
       case 'edit-memory':openModal('edit-memory',{id:key});break;
-      case 'message-menu':openModal('message-menu',{id:key});break;
       case 'edit-message':openModal('edit-message',{id:key});break;
       case 'copy-message': {
         const m=s?.messages.find(m=>m.id===key);
@@ -10178,7 +10272,7 @@ document.addEventListener('click',async event => {
           break;
         }
         closeModal();
-        renderMessages();
+        if(currentSession()===s){renderMessages();refreshOpenChatSearchAfterMutation('single',s.id);}
         break;
       }
       case 'photo':openModal('photo',{id:key});break;
@@ -11031,6 +11125,7 @@ const {
           card.querySelector('.diary-memory-text')?.classList.remove('hidden');
           card.querySelector('.diary-edit-icon')?.classList.remove('hidden');
         }
+        storyPhoneRuntimeCache.delete(String(uid)+':'+session.id);
         await loadStoryMemorySummary(session);
         toast(summaryText?'回憶已儲存。':'已刪除這則回憶。');
         break;
@@ -11082,7 +11177,7 @@ const {
       }
       case 'message-edit': {
         const m=s?.messages.find(m=>m.id===o.id);
-        const latestEditableMessage = m && (m.role==='user'||m.role==='assistant') &&
+        const latestEditableMessage = m && !s.cloudSearchJump && (m.role==='user'||m.role==='assistant') &&
           s.messages.filter(item=>item.role===m.role).at(-1)?.id===m.id;
         if (!m || !latestEditableMessage) return;
         if (!text) return toast('訊息不可為空。');
@@ -11101,7 +11196,8 @@ const {
           if(isCloudMessage) await client.from('chat_messages').update({content:previousText}).eq('id',m.id).eq('session_id',s.id);
           break;
         }
-        back();renderMessages();
+        back();
+        if(currentSession()===s){renderMessages();refreshOpenChatSearchAfterMutation('single',s.id);}
         toast('訊息已更新；未重新生成 AI，也未扣款。');
         break;
       }
@@ -11118,45 +11214,13 @@ const {
         }
         break;
       }
-      case 'delete-group-message': {
-        const group=groupPrototype.active, message=groupPrototype.messages.find(item=>item.id===key);
-        if(!group||!message||!['user','character'].includes(message.type)) break;
-        const latest=groupPrototype.messages.filter(item=>item.type===message.type).at(-1);
-        if(message.id!==latest?.id) { toast('只能刪除各自最新的一則玩家或角色訊息。'); break; }
-        // Use an in-app confirmation dialog instead of window.confirm, which may be
-        // suppressed or behave inconsistently in embedded/mobile browser contexts.
-        showDialog('確認刪除訊息',
-          '<p>確定刪除此訊息？此操作無法復原。</p>'+
-          '<div class="row end" style="gap:8px;margin-top:16px">'+
-          '<button type="button" data-action="back">取消</button>'+
-          '<button type="button" class="danger" data-action="confirm-delete-group-message" data-id="'+e(message.id)+'">確定刪除</button></div>');
-        break;
-      }
-      case 'confirm-delete-group-message': {
-        const group=groupPrototype.active, message=groupPrototype.messages.find(item=>item.id===key);
-        const user=currentUser(), client=window.mySupabase;
-        if(!group||!message||!['user','character'].includes(message.type)) throw new Error('找不到要刪除的群組訊息，請重新開啟群組後再試。');
-        const latest=groupPrototype.messages.filter(item=>item.type===message.type).at(-1);
-        if(message.id!==latest?.id) throw new Error('只能刪除各自最新的一則玩家或角色訊息。');
-        if(!user?.uid||!client||!isUuid(group.id)||!isUuid(message.id)) throw new Error('群組尚未連結有效的雲端資料，無法刪除訊息。');
-        const deletedAt=new Date().toISOString();
-        const {data,error}=await client.from('chat_group_messages').update({deleted_at:deletedAt})
-          .eq('id',message.id).eq('group_id',group.id).is('deleted_at',null).select('id').maybeSingle();
-        if(error) throw new Error('群組訊息刪除同步失敗：'+error.message);
-        if(!data) throw new Error('雲端未確認這則群組訊息的刪除狀態，請重新載入後再試。');
-        groupPrototype.messages=groupPrototype.messages.filter(item=>item.id!==message.id);
-        $('modal')?.close();
-        renderGroupConversation();
-        toast('群組訊息已刪除。');
-        break;
-      }
       case 'group-message-edit': {
         const group=groupPrototype.active;
         const message=groupPrototype.messages.find(item=>item.id===messageId);
         const latest=message&&groupPrototype.messages.filter(item=>item.type===message.type).at(-1);
         const user=currentUser(), client=window.mySupabase;
-        if(!group||!message||message.id!==latest?.id||!['user','character'].includes(message.type)) {
-          toast('只能編輯各自最新的一則玩家或角色訊息。');break;
+        if(groupPrototype.searchJump||!group||!message||message.id!==latest?.id||!['user','character'].includes(message.type)) {
+          toast('請返回最新訊息後，再編輯群組訊息。');break;
         }
         if(!text) return toast('訊息不可為空。');
         if(!user?.uid||!client||!isUuid(group.id)||!isUuid(message.id)) throw new Error('群組尚未連結有效的雲端資料，無法更新訊息。');
@@ -11164,9 +11228,11 @@ const {
           .eq('id',message.id).eq('group_id',group.id).select('id').maybeSingle();
         if(error) throw new Error('群組訊息雲端更新失敗：'+error.message);
         if(!data) throw new Error('雲端未確認這則群組訊息的更新，請重新載入後再試。');
+        if(groupPrototype.active!==group||groupPrototype.active?.id!==group.id||currentUser()?.uid!==user.uid)return;
         message.content=text;message.edited=true;
         $('modal')?.close();
         renderGroupConversation();
+        refreshOpenChatSearchAfterMutation('group',group.id);
         toast('群組訊息已更新；未重新生成 AI，也未扣款。');
         break;
       }
@@ -11248,13 +11314,12 @@ document.addEventListener('input',event => {
     chatSearch=target.value;
     $('chatEntries').innerHTML=chatEntries();
   }
-  if (target.id==='archiveSearchInput') {
-    const results=$('archiveSearchResults');
-    if (results) results.innerHTML=archiveSearchResults(target.value);
-  }
-  if (target.id==='groupArchiveSearchInput') {
-    const results=$('groupArchiveSearchResults');
-    if (results) results.innerHTML=groupArchiveSearchResults(target.value);
+  if(target.id==='chatMessageSearchInput'){
+    if(chatMessageSearchState.timer)clearTimeout(chatMessageSearchState.timer);
+    chatMessageSearchState.request++;
+    chatMessageSearchState.loading=false;
+    const query=target.value;
+    chatMessageSearchState.timer=setTimeout(()=>void runChatMessageSearch(query,false),280);
   }
   if (target.id==='groupCharacterSearch') {
     groupCharacterSearch=target.value;
@@ -11825,7 +11890,7 @@ document.addEventListener('submit',function(event){
 .composer-send[disabled] span[aria-hidden="true"],.composer-send.is-sending span[aria-hidden="true"]{font-size:17px;line-height:1}
 .followed-authors-back{display:inline-flex;align-items:center;justify-content:center;flex:0 0 40px;width:40px;height:40px;padding:8px;margin:0;color:var(--muted);border:1px solid var(--border);background:var(--panel)}.followed-authors-title-row{display:flex;align-items:center;gap:10px}.followed-authors-title-row h1{margin:0}.group-wizard-title{min-width:0;flex:1}.group-member-confirm-row{display:flex;align-items:center;gap:12px;flex-wrap:nowrap;overflow-x:auto;padding:4px 2px 8px}.group-member-confirm-avatar{display:inline-flex;align-items:center;justify-content:center;flex:0 0 58px;width:58px;height:58px;padding:4px;border-radius:50%;background:var(--panel2);border:1px solid var(--border)}.group-member-confirm-avatar .avatar{width:48px;height:48px;border-radius:50%}
 .followed-authors-back:hover{color:var(--text);background:var(--panel2)}
-@media(max-width:767px){body.group-chat-page .sidebar{display:none!important}body.group-chat-page .app{margin-left:0!important}body.group-chat-page .chat-layout{display:block;height:100dvh}body.group-chat-page .chat-layout.hide-list .chat-list{display:none!important}body.group-chat-page .chat-main{height:100dvh;border:0;border-radius:0}body.group-chat-page .chat-heading{padding:6px 8px}body.group-chat-page .messages{padding:14px 10px}body.group-chat-page .composer{padding:5px 8px calc(5px + env(safe-area-inset-bottom))}}
+@media(max-width:767px){body.group-chat-page .sidebar{display:none!important}body.group-chat-page .app{margin-left:0!important}body.group-chat-page .chat-layout{display:block;height:100dvh}body.group-chat-page .chat-layout.hide-list .chat-list{display:none!important}body.group-chat-page .chat-main{height:100dvh;border:0;border-radius:0}body.group-chat-page .chat-heading{padding:6px 8px}body.group-chat-page body.group-chat-page .composer{padding:5px 8px calc(5px + env(safe-area-inset-bottom))}}
 </style>
 
 
