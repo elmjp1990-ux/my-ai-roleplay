@@ -1,5 +1,5 @@
 (()=>{const PAGE_SIZES=Object.freeze({explore:20,authorCharacters:10,chatSessions:10,groupSessions:10,followedAuthors:10,encounterMemories:10,messages:5,citySceneCharacters:10,chatSearch:10,groupCharacterPicker:10,ownedCharacters:10,favorites:10,notifications:10,characterComments:10,memoryPhotos:10}),states=new Set(),observers=new Set();let scope='';
-function createState(kind,initial={}){let version=0;const s={kind,pageSize:PAGE_SIZES[kind]||10,offset:0,hasMore:true,loading:false,observer:null,...initial,
+function createState(kind, initial = {}){let version=0;const s={kind,pageSize:PAGE_SIZES[kind]||10,offset:0,hasMore:true,loading:false,observer:null,...initial,
 beginRequest(){states.add(s);s.loading=true;return ++version},
 isRequestCurrent(id){return version===id},
 invalidate(){++version;s.loading=false;s.observer?.disconnect();s.observer=null},
