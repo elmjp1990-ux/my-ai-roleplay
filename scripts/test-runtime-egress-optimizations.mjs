@@ -49,8 +49,9 @@ assert.match(html,/data-action="group-history-load-older"/,
 assert.match(html,/case 'group-history-load-older':groupLoadOlderMessages\(\);break;/,
   "the delegated action handler must load older group messages");
 
-const groupSend=between("async function groupSendMock()","async function groupRefreshList()");
-assert.match(groupSend,/data:turnId,error/,"group turn RPC result must retain the stable turn ID");
+const groupSend=between("async function groupSendTurn()","async function groupRefreshList()");
+assert.match(groupSend,/functions\.invoke\('group-chat-turn'/,"group sends must use the server-authoritative AI Edge Function");
+assert.match(groupSend,/requestKey,content/,"group sends must reuse a stable idempotency key and exact message content");
 assert.match(groupSend,/\.eq\('turn_id',turnId\)/,
   "after sending, only the persisted turn's messages may be fetched");
 assert.doesNotMatch(groupSend,/\.eq\('group_id',activeGroupId\)\.is\('deleted_at',null\)\s*\.order\('created_at'/,
@@ -107,6 +108,24 @@ assert.doesNotMatch(cloudSessions,/client\.auth\.getUser\(\)/,
 const chatAuthorProfiles=between("async function loadChatSessionAuthorProfiles(uid, authorIds)", "async function loadCloudChatSessions");
 assert.match(chatAuthorProfiles,/publicAuthorProfileLoaded\.add\(profile\.id\)/,
   "chat-list profile hydration must populate the shared loaded-profile cache to avoid refetching the same author on detail navigation");
+
+
+const groupEdge=fs.readFileSync("supabase/functions/group-chat-turn/index.ts","utf8");
+const groupMigration=fs.readFileSync("supabase/migrations/20261114180000_group_ai_single_orchestrator.sql","utf8");
+const speakerParser=fs.readFileSync("supabase/functions/_shared/group-speaker-output.ts","utf8");
+assert.match(groupEdge,/deepseek\/deepseek-v4-flash-20260423/,"group AI must use the approved DeepSeek V4 Flash model");
+assert.match(groupEdge,/parseGroupSpeakerOutput\(provider\.result\.text, speakers\)/,"the single model response must be mapped to explicit roster speaker IDs");
+assert.match(groupEdge,/provider: \{ only: \["deepinfra"\], allow_fallbacks: false, data_collection: "deny" \}/,"group generation must retain the approved no-data-collection provider restriction");
+assert.match(groupEdge,/findPrivateContextLeak/,"group output must pass private-context leak screening");
+assert.match(groupEdge,/requestGeneration\(\[/,"group turns must call the shared provider request helper");
+assert.match(groupMigration,/reserve_group_chat_turn/);
+assert.match(groupMigration,/complete_group_chat_turn/);
+assert.match(groupMigration,/refund_group_chat_turn/);
+assert.match(groupMigration,/status IN \('reserved', 'settled', 'refunded'\)/);
+assert.match(groupMigration,/GRANT EXECUTE ON FUNCTION public\.reserve_group_chat_turn[\s\S]*TO service_role/);
+assert.match(speakerParser,/\[：:\]/,"speaker parser must accept full-width and ASCII colons");
+assert.match(speakerParser,/group speaker labels/,"speaker parser source must document explicit labels");
+assert.doesNotMatch(html,/append_chat_group_mock_turn/,"frontend must no longer call the deterministic mock RPC");
 
 console.log("Story relationship RPC dedupe, illustration write dedupe, group list refresh avoidance, incremental group-turn loading, phone-state cache, shared login auth verification, and author-profile hydration reuse checks passed.");
 
