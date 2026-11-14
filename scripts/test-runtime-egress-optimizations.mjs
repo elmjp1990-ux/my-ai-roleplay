@@ -222,4 +222,35 @@ assert.match(groupRenderer,/anchor\.scrollTop\+\(groupMessages\.scrollHeight-anc
 assert.match(groupRenderer,/if\(groupMessages\.isConnected\)/,
   'scroll restoration must not touch a detached message pane');
 
+
+// Group transaction recovery / watchdog static contract checks.
+assert.match(groupMigration,/CREATE OR REPLACE FUNCTION public\.expire_group_chat_turn\([\s\S]*?RETURNS TABLE\(status text, balance_silver integer, balance_diamonds integer\)/,
+  "a per-turn database expiration primitive must return the authoritative refund state and balances");
+const expireRpc=groupMigration.slice(groupMigration.indexOf("CREATE OR REPLACE FUNCTION public.expire_group_chat_turn"),groupMigration.indexOf("CREATE OR REPLACE FUNCTION public.run_group_chat_turn_watchdog"));
+assert.match(expireRpc,/FROM public\.chat_groups g WHERE g\.id = v_group_id FOR UPDATE[\s\S]*FROM public\.chat_group_turns t[\s\S]*FOR UPDATE[\s\S]*FROM public\.chat_group_turn_charges c[\s\S]*FOR UPDATE[\s\S]*FROM public\.wallet_accounts w[\s\S]*FOR UPDATE/,
+  "timeout recovery must lock parent -> turn -> charge -> wallet in the global order");
+assert.match(expireRpc,/clock_timestamp\(\) < v_turn\.processing_started_at \+ interval '55 seconds'/,
+  "watchdog must re-check the 55-second deadline after acquiring locks");
+assert.match(expireRpc,/status = 'refunded'[\s\S]*failure_code = 'provider_timeout_watchdog'/,
+  "watchdog must atomically mark the charge refunded and persist a recoverable timeout reason");
+assert.match(expireRpc,/silver_coins = w\.silver_coins \+ v_charge\.silver_charged[\s\S]*diamonds = w\.diamonds \+ v_charge\.diamonds_charged/,
+  "watchdog must restore the exact originally reserved currency split");
+assert.match(groupMigration,/CREATE OR REPLACE FUNCTION public\.run_group_chat_turn_watchdog\(p_batch_size integer DEFAULT 100\)/,
+  "a bounded database-side watchdog batch must exist");
+assert.match(groupMigration,/CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA pg_catalog[\s\S]*cron\.schedule\([\s\S]*'\* \* \* \* \*'[\s\S]*public\.run_group_chat_turn_watchdog\(100\)/,
+  "the database watchdog must be scheduled independently every minute");
+assert.match(groupMigration,/public\.expire_group_chat_turn\(v_expired\.user_id, v_expired\.id\)/,
+  "new reservations after reload must first expire abandoned turns that crossed the deadline");
+assert.match(completeRpc,/clock_timestamp\(\) >= v_turn\.processing_started_at \+ interval '55 seconds'[\s\S]*group_turn_deadline_exceeded/,
+  "completion must reject replies that lose the deadline race after acquiring transaction locks");
+assert.match(groupEdge,/admin\.rpc\("expire_group_chat_turn"/,
+  "same-key retries must proactively recover an expired processing turn without waiting for cron");
+assert.match(groupEdge,/provider_timeout_watchdog/,
+  "idempotent retries must preserve the watchdog timeout outcome");
+assert.match(groupEdge,/group_turn_deadline_exceeded[\s\S]*status: refunded\.confirmed \? "timed_out"/,
+  "completion losing the deadline race must refund and report a timeout");
+assert.match(groupSend,/responseBody\?\.status==='timed_out'[\s\S]*pendingRequest=null/,
+  "the client must clear the old idempotency key only after a confirmed timeout refund");
+
+console.log('Group watchdog, deadline race, abandoned-request recovery, idempotent timeout status, and exact-currency refund checks passed.');
 console.log('Group history fixture passed: 1,000 rows, 20 pages, timestamp/sequence ties, UUID cursor tie-break, no gaps or duplicates, overlapping-page dedupe, group-switch guards, and scroll anchoring.');
