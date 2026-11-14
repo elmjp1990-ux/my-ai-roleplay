@@ -16,6 +16,11 @@ SET status = 'completed',
     completed_at = COALESCE(completed_at, created_at)
 WHERE status NOT IN ('processing', 'completed', 'failed');
 
+-- Backfill any legacy in-flight rows before the watchdog starts scanning.
+UPDATE public.chat_group_turns
+SET processing_started_at = COALESCE(processing_started_at, created_at, now())
+WHERE status = 'processing' AND processing_started_at IS NULL;
+
 ALTER TABLE public.chat_group_turn_charges
   DROP CONSTRAINT IF EXISTS chat_group_turn_charges_status_check;
 ALTER TABLE public.chat_group_turn_charges
