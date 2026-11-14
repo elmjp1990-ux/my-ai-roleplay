@@ -3,6 +3,7 @@ import fs from 'node:fs';
 
 const html = fs.readFileSync('index.html', 'utf8');
 const moduleSource = fs.readFileSync('followed-authors.js', 'utf8');
+const authorDataSource = fs.readFileSync('author-data.js', 'utf8');
 
 const moduleTag = '<script src="./followed-authors.js"></script>';
 assert.ok(html.includes(moduleTag), 'Followed authors module must be included in the page.');
@@ -47,6 +48,7 @@ const authorPreviewLoader = html.slice(
   html.indexOf("async function loadPublicAuthorLatestCharacters"),
   html.indexOf("let publicCharactersLoadPromise", html.indexOf("async function loadPublicAuthorLatestCharacters"))
 );
-assert.match(authorPreviewLoader, /client\.rpc\('get_public_author_latest_characters'/);
-assert.match(authorPreviewLoader, /offset\+=10/);
+assert.match(authorPreviewLoader, /PoyozzAuthorData\.fetchLatestCharactersByAuthor\(client,authorIds\)/);
+assert.match(authorDataSource, /client\.rpc\('get_public_author_latest_characters'/);
+assert.match(authorDataSource, /offset\s*\+=\s*10/);
 assert.doesNotMatch(authorPreviewLoader, /\.from\('characters'\)/);
