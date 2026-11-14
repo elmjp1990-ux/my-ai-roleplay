@@ -257,9 +257,11 @@ assert.match(followedAuthorsPaginationSource,/loadPublicAuthorLatestCharacters\(
   "followed-author presentation must delegate latest-character hydration to the app data layer");
 assert.match(html,/async function loadPublicAuthorLatestCharacters\(authorIds=\[\]\)/,
   "followed-author latest characters must use a centralized app-owned query");
-assert.match(html,/\.order\('id',\{ascending:false\}\)\.limit\(5\)/,
-  "followed-author cards fetch four visible characters plus one lookahead row");
-assert.match(html,/rows\.slice\(0,4\),hasMore:rows\.length>4/,
+assert.match(authorLatestLoader,/get_public_author_latest_characters/,
+  "followed-author cards must use the bounded batch RPC");
+assert.match(authorLatestLoader,/rows\.slice\(0,4\)\.map\(mapPublicCharacterRow\)/,
+  "followed-author cards must render only four of the five fetched previews");
+assert.match(authorLatestLoader,/hasMore:rows\.length>4/,
   "the fifth row must be used only to determine whether MORE is available");
 assert.doesNotMatch(followedAuthorsPaginationSource,/await loadPublicSupabaseCharacters\(\)/,
   "followed-author cards must not trigger a full public-character catalogue fetch");
