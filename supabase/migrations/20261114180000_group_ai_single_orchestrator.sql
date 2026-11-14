@@ -57,6 +57,8 @@ DECLARE
   v_cost integer;
   v_silver integer;
   v_diamonds integer;
+  v_expired record;
+  v_expiration record;
 BEGIN
   IF p_user_id IS NULL OR p_group_id IS NULL OR p_request_key IS NULL THEN
     RAISE EXCEPTION 'group_turn_identifiers_required' USING ERRCODE = '22023';
@@ -79,6 +81,21 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'group_not_found_or_not_accessible' USING ERRCODE = '42501';
   END IF;
+
+  -- A fresh request after a browser reload must not be blocked forever by an
+  -- abandoned turn. Expire overdue turns before idempotency lookup/new-turn
+  -- admission; the helper re-locks in the same parent-first order.
+  FOR v_expired IN
+    SELECT t.id, t.user_id
+    FROM public.chat_group_turns t
+    WHERE t.group_id = p_group_id
+      AND t.status = 'processing'
+      AND t.processing_started_at <= clock_timestamp() - interval '55 seconds'
+    ORDER BY t.processing_started_at ASC
+  LOOP
+    SELECT * INTO v_expiration
+    FROM public.expire_group_chat_turn(v_expired.user_id, v_expired.id);
+  END LOOP;
 
   SELECT t.* INTO v_turn
   FROM public.chat_group_turns t
