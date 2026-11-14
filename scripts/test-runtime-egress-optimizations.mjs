@@ -501,8 +501,10 @@ assert.match(sharedPaginationSource,/followedAuthors:\s*10/,
   "followed-author pagination must use the shared ten-row page size");
 assert.match(followedAuthorsPageTestSource2026,/pageSize:global\.PoyozzListPagination\.pageSize\('followedAuthors'\)/,
   "followed-author page size must come from the shared pagination module");
-assert.match(followedAuthorsPageTestSource2026,/\.from\('author_follows'\)\.select\('author_id,created_at',\{count:'exact'\}\)/,
-  "followed authors must be counted and selected from the server-side relation");
+assert.match(followedAuthorsPageTestSource2026,/\.from\('author_follows'\)\.select\('author_id,created_at'\)/,
+  "followed authors must be selected from the server-side relation without requesting an exact total");
+assert.doesNotMatch(followedAuthorsPageTestSource2026,/count:\s*['"]exact['"]/,
+  "followed-author list pages must not calculate an exact count");
 assert.match(followedAuthorsPageTestSource2026,/\.range\(current\.offset,current\.offset\+current\.pageSize-1\)/,
   "followed authors must be fetched in ten-row backend pages");
 assert.match(followedAuthorsPageTestSource2026,/loadPublicAuthorLatestCharacters\(pageAuthorIds\)/,
@@ -516,7 +518,7 @@ assert.doesNotMatch(followedAuthorsPageTestSource2026,/\.from\('author_follows'\
 
 
 const paginationSizes=sharedPaginationSource.slice(sharedPaginationSource.indexOf('const PAGE_SIZES'),sharedPaginationSource.indexOf('});',sharedPaginationSource.indexOf('const PAGE_SIZES'))+3);
-for(const listName of ['authorCharacters','chatSessions','groupSessions','followedAuthors','encounterMemories','ownedCharacters','favorites','notifications','characterComments','memoryPhotos']){
+for(const listName of ['authorCharacters','chatSessions','groupSessions','followedAuthors','encounterMemories','ownedCharacters','favorites','notifications','characterComments','memoryPhotos','walletLedger']){
   assert.match(paginationSizes,new RegExp(listName+':\\s*10'),listName+' must use ten-row pages');
 }
 assert.match(paginationSizes,/explore:\s*20/,'Explore must preserve its twenty-character page size');
