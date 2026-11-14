@@ -539,6 +539,16 @@ assert.match(cityMapSource,/loadCityCharacterPage\(pager\.offset\)/);
 assert.match(cityMapSource,/city-people-load-more/);
 assert.doesNotMatch(cityMapSource,/Promise\.all\(\(Array\.isArray\(state\.characters\)/,
   'opening a scene must not hydrate schedules for every character already in client state');
+const encounterMemoryDetailStart=html.indexOf('async function openEncounterMemoryDetail(button)');
+const encounterMemoryDetailEnd=html.indexOf('\nfunction ',encounterMemoryDetailStart+10);
+assert.ok(encounterMemoryDetailStart>=0&&encounterMemoryDetailEnd>encounterMemoryDetailStart,'Encounter memory detail loader must remain identifiable');
+const encounterMemoryDetailSource=html.slice(encounterMemoryDetailStart,encounterMemoryDetailEnd);
+assert.match(encounterMemoryDetailSource,/pageSize\('messages'\)\|\|5/,'Encounter memory transcript must use five-message pages');
+assert.match(encounterMemoryDetailSource,/\.limit\(pageSize\)/,'Encounter memory transcript query must be bounded');
+assert.match(html,/data-action="encounter-memory-load-older"/,'Encounter memory transcript must expose an older-page action');
+assert.match(html,/async function loadEncounterMemoryDetailOlder\(\)/,'Encounter memory transcript must support loading older pages');
+const exploreLatestSource=html.slice(html.indexOf('function exploreList()'),html.indexOf('function card('));
+assert.doesNotMatch(exploreLatestSource,/\.slice\(0,50\)/,'Explore latest must not truncate the 20-row server-paged stream at 50 candidates');
 const memoryAlbumSource=fs.readFileSync('memory-album.js','utf8');
 assert.match(memoryAlbumSource,/pageSize\('memoryPhotos'\)/);
 assert.match(memoryAlbumSource,/\.range\(pager\.offset,pager\.offset\+pageSize-1\)/,
