@@ -636,3 +636,8 @@ assert.ok(cloudSessionLoader.includes("currentUser()?.uid!==user.id"));
 
 const followedAuthorsSource=fs.readFileSync("followed-authors.js","utf8");
 assert.doesNotMatch(followedAuthorsSource,/count:\s*['"]exact['"]/,"followed-author pages must not calculate an exact total count");
+
+const paginationHelper = fs.readFileSync('list-pagination.js','utf8');
+assert.match(paginationHelper,/function createState\(kind, initial = \{\}\)/,'shared pagination state must accept module-specific fields');
+assert.doesNotMatch(paginationHelper,/legacyOffset|legacyHasMore|buffer: \[\]/,'shared pagination state must not retain unused legacy fields');
+assert.match(fs.readFileSync('memory-album.js','utf8'),/createState\('memoryPhotos'/,'memory album must reuse shared pagination state');
