@@ -15,11 +15,15 @@ DECLARE
   v_constraint text;
 BEGIN
   IF to_regprocedure('public.reserve_group_chat_turn(uuid,uuid,uuid,text)') IS NOT NULL
-    OR to_regprocedure('public.complete_group_chat_turn(uuid,uuid,jsonb)') IS NOT NULL
+    OR to_regprocedure('public.complete_group_chat_turn(uuid,uuid,jsonb,jsonb)') IS NOT NULL
     OR to_regprocedure('public.expire_group_chat_turn(uuid,uuid)') IS NOT NULL
     OR to_regprocedure('public.run_group_chat_turn_watchdog(integer)') IS NOT NULL
     OR to_regprocedure('public.refund_group_chat_turn(uuid,uuid,text)') IS NOT NULL THEN
     RAISE EXCEPTION 'rollback left group transaction RPCs behind';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='chat_group_members' AND column_name='phone_notifications') THEN
+    RAISE EXCEPTION 'rollback left group member phone_notifications column behind';
   END IF;
 
   IF to_regclass('public.chat_group_ai_usage') IS NOT NULL
