@@ -5256,6 +5256,7 @@ function renderDetail() {
       publicCharacterDetailLoads.add(characterId);
       view.innerHTML='<div class="empty">角色資料載入中…</div>';
       void window.loadPublicCharacterById(characterId).then(()=>{
+        publicCharacterDetailLoads.delete(characterId);
         if(route.page==='detail'&&route.id===characterId)renderDetail();
       }).catch(error=>{
         console.warn('公開角色詳細資料載入失敗：',error?.message||error);
