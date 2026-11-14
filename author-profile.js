@@ -18,8 +18,7 @@
 
   async function loadAuthorCharacters(authorId, page, dependencies) {
     if (page.loading || !page.hasMore) return;
-    const client = dependencies.getSupabaseClient();
-    if (!client) return;
+    if (typeof dependencies.loadAuthorCharacterPage !== 'function') return;
     page.loading = true;
     try {
       const result = await dependencies.loadAuthorCharacterPage(authorId, page.offset);
