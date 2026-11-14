@@ -265,3 +265,24 @@ assert.match(groupSend,/responseBody\?\.status==='timed_out'[\s\S]*pendingReques
 
 console.log('Group watchdog, deadline race, abandoned-request recovery, idempotent timeout status, and exact-currency refund checks passed.');
 console.log('Group history fixture passed: 1,000 rows, 20 pages, timestamp/sequence ties, UUID cursor tie-break, no gaps or duplicates, overlapping-page dedupe, group-switch guards, and scroll anchoring.');
+
+const groupPhoneMigration = await readFile('supabase/migrations/20261114180000_group_ai_single_orchestrator.sql', 'utf8');
+const groupPhoneFunction = await readFile('supabase/functions/group-chat-turn/index.ts', 'utf8');
+const groupPhoneParser = await readFile('supabase/functions/_shared/group-turn-envelope.ts', 'utf8');
+const groupPhoneUI = await readFile('index.html', 'utf8');
+const groupPhoneStyles = await readFile('poyozz-ui.css', 'utf8');
+assert.match(groupPhoneMigration, /ADD COLUMN IF NOT EXISTS phone_notifications jsonb NOT NULL DEFAULT '\[\]'::jsonb/);
+assert.match(groupPhoneMigration, /p_phone_updates jsonb/);
+assert.match(groupPhoneMigration, /SET phone_notifications = v_phone_notifications/);
+assert.match(groupPhoneMigration, /GRANT EXECUTE ON FUNCTION public\.complete_group_chat_turn\(uuid, uuid, jsonb, jsonb\) TO service_role/);
+assert.match(groupPhoneFunction, /parseGroupTurnEnvelope/);
+assert.match(groupPhoneFunction, /phone_settings/);
+assert.match(groupPhoneFunction, /p_phone_updates: parsed\.phoneUpdates/);
+assert.match(groupPhoneFunction, /phone_updates: parsed\.phoneUpdates/);
+assert.match(groupPhoneParser, /phoneById\.size !== speakers\.length/);
+assert.match(groupPhoneUI, /character\.phoneNotifications\|\|group\.phoneNotificationsByCharacter/);
+assert.match(groupPhoneUI, /phone-device-head--group/);
+assert.match(groupPhoneUI, /phone_notifications/);
+assert.match(groupPhoneUI, /initialStoryTime=Number\(isGroup\?/);
+assert.match(groupPhoneUI, /phoneHeader\+/);
+assert.match(groupPhoneStyles, /phone-device-head--group \.phone-member-switch/);
