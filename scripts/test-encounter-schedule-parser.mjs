@@ -34,7 +34,7 @@ assert.match(html, /createSignedUrl\(storagePath,3600\)/);
 assert.match(html, /data-character-illustration-path/);
 assert.match(html, /document\.addEventListener\('error',[\s\S]*refreshCharacterIllustrationSignedUrl/);
 assert.match(html, /document\.addEventListener\('load'/);
-const publicLoader = html.slice(html.indexOf("async function loadPublicSupabaseCharactersImpl()"), html.indexOf("async function loadSupabaseCharacters(user)"));
+const publicLoader = html.slice(html.indexOf("async function loadPublicSupabaseCharactersImpl()"), html.indexOf("async function loadSupabaseCharacters(user,{loadMore=false}={})"));
 assert.doesNotMatch(publicLoader, /loadCharacterIllustrationAssets|character_illustrations|createSignedUrl/);
 assert.match(publicLoader, /image: ownerLocal\?\.image \|\| cachedPublic\?\.image \|\| row\.avatar_url/);
 assert.match(publicLoader, /galleryIllustrations:ownerLocal\?\.galleryIllustrations \|\| cachedPublic\?\.galleryIllustrations \|\| \[\]/);
