@@ -129,7 +129,7 @@ test('batches missing keys, preserves input order, and reuses the shared cache',
       return Object.fromEntries(keys.map(key => [key, 'https://storage.example/' + key]));
     }
   });
-  assert.deepEqual(await manager.getMany(['a', 'b', 'a']), [
+  assert.deepEqual(Array.from(await manager.getMany(['a', 'b', 'a'])), [
     'https://storage.example/a', 'https://storage.example/b', 'https://storage.example/a'
   ]);
   assert.equal(batchCalls, 1);
@@ -153,10 +153,10 @@ test('batched signed URLs are not cached after the identity scope changes', asyn
     'user-a:path/a': 'https://storage.example/a',
     'user-a:path/b': 'https://storage.example/b'
   });
-  assert.deepEqual(await request, [null, null]);
+  assert.deepEqual(Array.from(await request), [null, null]);
   currentUid = 'user-a';
-  assert.deepEqual(await manager.getMany(['user-a:path/a', 'user-a:path/b'], {
+  assert.deepEqual(Array.from(await manager.getMany(['user-a:path/a', 'user-a:path/b'], {
     context: { uid: 'user-a' }
-  }), ['https://storage.example/a', 'https://storage.example/b']);
+  })), ['https://storage.example/a', 'https://storage.example/b']);
   assert.equal(calls, 2);
 });
