@@ -10,7 +10,7 @@ assert.ok(html.indexOf(moduleTag) < html.indexOf('function renderAuthor()'),
   'Author profile module must load before the app adapter can invoke it.');
 
 const adapterStart = html.indexOf('function renderAuthor()');
-const favoritesStart = html.indexOf('function renderFavorites()', adapterStart);
+const favoritesStart = html.indexOf('async function renderFavorites({loadMore=false}={})', adapterStart);
 assert.ok(adapterStart >= 0 && favoritesStart > adapterStart && favoritesStart - adapterStart < 900,
   'index.html must retain only a thin author-profile adapter.');
 const adapter = html.slice(adapterStart, favoritesStart);
