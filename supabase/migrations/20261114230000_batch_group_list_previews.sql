@@ -22,21 +22,26 @@ BEGIN
   END IF;
 
   RETURN QUERY
-  SELECT DISTINCT ON (m.group_id)
-    m.group_id,
-    m.content,
-    m.speaker_type,
-    m.created_at,
-    m.sequence_no
+  SELECT
+    g.id,
+    latest.content,
+    latest.speaker_type,
+    latest.created_at,
+    latest.sequence_no
   FROM public.chat_groups AS g
-  JOIN public.chat_group_messages AS m
-    ON m.group_id = g.id
+  CROSS JOIN LATERAL (
+    SELECT m.content, m.speaker_type, m.created_at, m.sequence_no
+    FROM public.chat_group_messages AS m
+    WHERE m.group_id = g.id
+      AND m.deleted_at IS NULL
+    ORDER BY m.created_at DESC, m.sequence_no DESC
+    LIMIT 1
+  ) AS latest
   WHERE g.id = ANY (p_group_ids)
     AND g.owner_id = auth.uid()
     AND g.archived_at IS NULL
     AND g.deleted_at IS NULL
-    AND m.deleted_at IS NULL
-  ORDER BY m.group_id, m.created_at DESC, m.sequence_no DESC;
+  ORDER BY g.id;
 END;
 $function$;
 
