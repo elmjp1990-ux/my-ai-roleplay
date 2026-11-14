@@ -447,6 +447,7 @@ $function$;
 REVOKE ALL ON FUNCTION public.expire_group_chat_turn(uuid, uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.run_group_chat_turn_watchdog(integer) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.expire_group_chat_turn(uuid, uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.run_group_chat_turn_watchdog(integer) TO service_role;
 
 -- Supabase Cron runs the database watchdog independently of Edge Function life.
 -- Every minute is deliberately conservative; retries also invoke the per-turn
