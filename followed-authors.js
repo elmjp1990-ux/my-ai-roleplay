@@ -26,7 +26,7 @@
     const current = pager;
     if (!current || current.loading || (!current.hasMore && append)) return;
     if (currentUser()?.uid !== current.userId || getRoute()?.page !== 'followed-authors') return;
-    current.loading = true;
+    const requestId = current.beginRequest();
     try {
       let authors = [];
       let pageAuthorIds = [];
@@ -37,6 +37,7 @@
           .order('created_at',{ascending:false})
           .order('author_id',{ascending:false})
           .range(current.offset,current.offset+current.pageSize-1);
+        if (!current.isRequestCurrent(requestId)) return;
         if (error) throw new Error('讀取追蹤作者失敗：'+error.message);
         pageAuthorIds=[...new Set((follows||[]).map(row=>row.author_id).filter(Boolean))];
         if (!append) state.following=[];
@@ -45,6 +46,7 @@
           const {data:profiles,error:profilesError}=await current.client
             .from('public_profiles').select('id,handle,nickname,avatar_url,bio,follower_count')
             .in('id',pageAuthorIds);
+          if (!current.isRequestCurrent(requestId)) return;
           if (profilesError) throw new Error('讀取作者資料失敗：'+profilesError.message);
           const byId=new Map((profiles||[]).map(profile=>[profile.id,profile]));
           authors=pageAuthorIds.map(id=>{
@@ -62,11 +64,12 @@
         pageAuthorIds=all.slice(current.offset,current.offset+current.pageSize);
         authors=pageAuthorIds.map(id=>author(id));
       }
-      if (currentUser()?.uid!==current.userId || getRoute()?.page!=='followed-authors' || pager!==current) return;
+      if (!current.isRequestCurrent(requestId) || currentUser()?.uid!==current.userId || getRoute()?.page!=='followed-authors' || pager!==current) return;
 
       let charactersByAuthor;
       if(current.client&&pageAuthorIds.length&&typeof loadPublicAuthorLatestCharacters==='function') {
         charactersByAuthor=await loadPublicAuthorLatestCharacters(pageAuthorIds);
+        if (!current.isRequestCurrent(requestId)) return;
       } else {
         charactersByAuthor=new Map();
         for(const info of authors) {
@@ -93,6 +96,7 @@
 
       current.offset+=pageAuthorIds.length;
       current.hasMore=pageAuthorIds.length===current.pageSize;
+      if (!current.isRequestCurrent(requestId)) return;
       current.loading=false;
       if(append) {
         const container=$('followedAuthorsItems');
@@ -106,6 +110,7 @@
       else document.getElementById('followedAuthorsSentinel')?.remove();
       persist();
     } catch(error) {
+      if (!current.isRequestCurrent(requestId)) return;
       current.loading=false;
       console.error('喜愛作者載入失敗：',error);
       if(!append) $('view').innerHTML='<div class="stack"><div class="followed-authors-title-row"><button type="button" class="ghost followed-authors-back" data-action="back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h1>喜愛作者</h1></div><div class="empty">讀取失敗，請重新整理後再試。</div></div>';
