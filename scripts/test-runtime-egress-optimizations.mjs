@@ -30,17 +30,17 @@ assert.match(groupOpen,/if\(group\.archived_at\)/,
 assert.doesNotMatch(groupOpen,/void groupLoadList\(true\)/,
   "opening a group must not force a full group-list/member/preview reload");
 
-assert.match(groupOpen,/\.order\('created_at',\{ascending:false\}\).*\.limit\(5\)/,
+assert.match(groupOpen,/\.order\('created_at',\{ascending:false\}\).*\.limit\(10\)/,
   "opening a group must fetch only the newest bounded page in reverse chronological query order");
 assert.doesNotMatch(groupOpen,/\.limit\(50\)/,
   "group initial history must not fetch fifty messages");
 assert.match(groupOpen,/oldestInitialMessage=initialMessageRows\.at\(-1\)/,
   "the first page must retain a stable cursor at its oldest fetched row");
 const singleHistory=between("async function loadCloudSessionMessages(sessionId, options = {})","const chatSessionSaveQueue =");
-assert.match(singleHistory,/const pageSize=5;/,
-  "single Story and Encounter chats must initially hydrate only five messages per request");
+assert.match(singleHistory,/pageSize\('messages'\)\|\|10/,
+  "single Story and Encounter chats must initially hydrate only ten messages per request");
 assert.match(singleHistory,/\.limit\(pageSize\)/,
-  "single Story and Encounter chat pagination must apply the shared five-message page size");
+  "single Story and Encounter chat pagination must apply the shared ten-message page size");
 assert.match(singleHistory,/session\.encounterMode/,
   "the shared single-chat history loader must retain Encounter metadata handling");
 assert.doesNotMatch(singleHistory,/\.limit\(50\)|pageSize=50/,
@@ -53,10 +53,10 @@ assert.ok(groupHistory.includes("const oldest=page.at(-1);"),
   "the next cursor must use the oldest row in the descending page to avoid skipping messages");
 assert.match(groupHistory,/\.or\(olderFilter\)/,
   "older pages must use a keyset cursor instead of offset pagination");
-assert.match(groupHistory,/\.order\('id',\{ascending:false\}\)\.limit\(5\)/,
+assert.match(groupHistory,/\.order\('id',\{ascending:false\}\)\.limit\(10\)/,
   "older pages must use a deterministic tie-breaker and a fixed page size");
 assert.doesNotMatch(groupHistory,/\.limit\(50\)/,
-  "older group history must also remain limited to five messages per request");
+  "older group history must also remain limited to ten messages per request");
 assert.match(groupHistory,/existing=new Set/,
   "overlapping page results must not duplicate already loaded messages");
 assert.match(groupHistory,/historyScrollAnchor=before/,
@@ -325,7 +325,7 @@ assert.doesNotMatch(encounterMemory,/select\('id,chat_mode,session_data,updated_
 console.log("Story relationship RPC dedupe, illustration write dedupe, group list refresh avoidance, incremental group-turn loading, phone-state cache, shared login auth verification, and author-profile hydration reuse checks passed.");
 
 
-// Exercise the five-message pagination contract against a deterministic 1,000-row fixture.
+// Exercise the ten-message pagination contract against a deterministic 1,000-row fixture.
 // This mirrors the database's DESC ordering and the three-part keyset predicate.
 const makeUuid=n=>'00000000-0000-4000-8000-'+n.toString(16).padStart(12,'0');
 const fixture=Array.from({length:1000},(_,index)=>({
@@ -345,17 +345,17 @@ const isOlderThan=(row,cursor)=>
   (row.created_at===cursor.created_at && row.sequence_no<cursor.sequence_no) ||
   (row.created_at===cursor.created_at && row.sequence_no===cursor.sequence_no && row.id<cursor.id);
 const orderedFixture=[...fixture].sort(compareDesc);
-let cursor=orderedFixture[4];
-let paged=orderedFixture.slice(0,5);
+let cursor=orderedFixture[9];
+let paged=orderedFixture.slice(0,10);
 let pageCount=1;
-while(paged.length<fixture.length && pageCount<210) {
-  const page=orderedFixture.filter(row=>isOlderThan(row,cursor)).slice(0,5);
+while(paged.length<fixture.length && pageCount<110) {
+  const page=orderedFixture.filter(row=>isOlderThan(row,cursor)).slice(0,10);
   assert.ok(page.length>0,'pagination must continue until the oldest row');
   cursor=page.at(-1);
   paged.push(...page);
   pageCount++;
 }
-assert.equal(pageCount,200,'1,000 rows at 5 per page must require exactly 200 pages');
+assert.equal(pageCount,100,'1,000 rows at 10 per page must require exactly 100 pages');
 assert.equal(paged.length,1000,'all fixture rows must be returned');
 assert.equal(new Set(paged.map(row=>row.id)).size,1000,'keyset pages must not duplicate rows');
 assert.deepEqual(paged.map(row=>row.id),orderedFixture.map(row=>row.id),
@@ -364,10 +364,10 @@ assert.ok(orderedFixture.some((row,index)=>index>0 &&
   row.created_at===orderedFixture[index-1].created_at &&
   row.sequence_no===orderedFixture[index-1].sequence_no),
   'fixture must exercise the UUID tie-breaker for equal timestamp and sequence values');
-const firstTwoPages=paged.slice(0,10);
-const overlappingNextPage=[...paged.slice(5,10),...paged.slice(10,15)];
+const firstTwoPages=paged.slice(0,20);
+const overlappingNextPage=[...paged.slice(15,20),...paged.slice(20,25)];
 const uniqueMerged=[...new Map([...firstTwoPages,...overlappingNextPage].map(row=>[row.id,row])).values()];
-assert.equal(uniqueMerged.length,15,'client-side merge must deduplicate overlapping five-message pages');
+assert.equal(uniqueMerged.length,25,'client-side merge must deduplicate overlapping ten-message pages');
 
 assert.match(groupHistory,/requestId!==g\.openRequestId\|\|g\.active\?\.id!==groupId\|\|currentUser\(\)\?\.uid!==uid/,
   'an older-page response must be discarded after group/account switching');
@@ -469,7 +469,7 @@ assert.match(groupSend,/responseBody\?\.status==='timed_out'[\s\S]*pendingReques
   "the client must clear the old idempotency key only after a confirmed timeout refund");
 
 console.log('Group watchdog, deadline race, abandoned-request recovery, idempotent timeout status, and exact-currency refund checks passed.');
-console.log('Group history fixture passed: 1,000 rows, 200 pages, timestamp/sequence ties, UUID cursor tie-break, no gaps or duplicates, overlapping-page dedupe, group-switch guards, and scroll anchoring.');
+console.log('Group history fixture passed: 1,000 rows, 100 pages, timestamp/sequence ties, UUID cursor tie-break, no gaps or duplicates, overlapping-page dedupe, group-switch guards, and scroll anchoring.');
 
 const groupPhoneMigration = fs.readFileSync('supabase/migrations/20261114180000_group_ai_single_orchestrator.sql', 'utf8');
 const groupPhoneFunction = fs.readFileSync('supabase/functions/group-chat-turn/index.ts', 'utf8');
@@ -542,3 +542,9 @@ assert.match(ownerListSource,/data-action="comments-load-more"/);
 assert.match(ownerListSource,/pageSize\('characterComments'\)/);
 assert.match(ownerListSource,/\.range\(g\.groupPinnedOffset,g\.groupPinnedOffset\+pageSize-1\)/,
   'pinned group chats must be bounded and paged in ten-row batches');
+
+assert.match(groupOpen,/\.limit\(10\)/,"group initial history must load ten rows");
+assert.match(groupHistory,/\.limit\(10\)/,"group older history must load ten rows");
+assert.match(html,/pinnedOffset\+pageSize-1/,"single pinned chats must be paginated in ten-row batches");
+assert.match(html,/groupPinnedOffset\+pageSize-1/,"group pinned chats must be paginated in ten-row batches");
+assert.match(html,/chat_memory_photos[\s\S]{0,500}\.limit\(10\)/,"group background photo picker must cap reads at ten photos");
