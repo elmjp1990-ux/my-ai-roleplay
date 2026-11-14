@@ -227,9 +227,10 @@ Deno.serve(async (request) => {
     : content;
   const player = asRow(playerResult.data);
   const playerName = asText(player.nickname) || "玩家";
+  const worldAnchor = speakers.find(speaker => speaker.id === asText(group.world_character_id));
   const systemPrompt = [
     "你是 POYOZZ 群組互動故事中的唯一 AI 扮演者。你同時讀取所有角色卡，但必須嚴格區分每位角色的人格、記憶、說話方式與場景位置。",
-    "【世界與玩家】群組名稱：" + asText(group.name) + "。共同世界觀：" + asText(group.world_background),
+    "【世界與玩家】群組名稱：" + asText(group.name) + "。共同世界觀：" + asText(group.world_background) + "。世界觀參照角色：" + (worldAnchor?.name || "未指定") + "。"
     "玩家稱呼：" + (asText(group.player_name) || playerName) + "。玩家人設：" + asText(group.player_persona) + "。玩家是劇情主導者；絕不可替玩家創作台詞、思想、感受、決定或未描述的行動。",
     "【角色卡】\n" + profileSections.join("\n\n").slice(0, 24000),
     "【群組場景模式】" + asText(group.scene_mode) + "。shared 代表角色處於同一共同場景；separate 代表每位角色只知道自己所屬場景。近期對話每行都有場景 ID；separate 模式下，角色只能依自己所屬場景的訊息回應，除非對話已合理建立資訊傳遞，否則不可引用其他場景的即時事件。",
