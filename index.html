@@ -7479,7 +7479,14 @@ async function groupSendTurn() {
   } catch(error) {
     if(g.active!==activeGroup||g.active?.id!==activeGroupId||g.ownerUid!==requestUid||currentUser()?.uid!==requestUid)return;
     g.sending=false;
+    let responseBody=null;
+    try { if(error?.context?.clone) responseBody=await error.context.clone().json(); } catch (_) {}
     const rawError=String(error?.message||error||'');
+    if(responseBody?.status==='needs_reconciliation'||responseBody?.error==='group_turn_in_progress') {
+      g.formError='上一個群組回合仍在確認中，為避免重複生成或扣款，暫時無法送出新回合。請稍後重新開啟群組確認。';
+      renderGroupConversation();
+      return;
+    }
     if(rawError.includes('group_insufficient_funds')||rawError.includes('insufficient_funds')) {
       g.formError='';
       openInsufficientFundsDialog('group');
