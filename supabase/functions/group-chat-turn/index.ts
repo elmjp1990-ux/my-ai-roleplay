@@ -139,9 +139,9 @@ Deno.serve(async (request) => {
     admin.from("chat_group_scenes")
       .select("id,name,description,position").eq("group_id", groupId).order("position", { ascending: true }),
     admin.from("chat_group_messages")
-      .select("speaker_type,character_id,speaker_snapshot,content,created_at,sequence_no")
+      .select("turn_id,scene_id,speaker_type,character_id,speaker_snapshot,content,created_at,sequence_no")
       .eq("group_id", groupId).is("deleted_at", null)
-      .order("created_at", { ascending: false }).limit(30),
+      .order("created_at", { ascending: false }).limit(40),
     admin.from("profiles").select("id,nickname,persona_presets").eq("id", user.id).maybeSingle(),
   ]);
   if (memberResult.error || sceneResult.error || historyResult.error || playerResult.error ||
@@ -207,7 +207,7 @@ Deno.serve(async (request) => {
       "標籤：" + JSON.stringify(character.tags || snapshot.tags || []),
       "開場情境：" + asText(snapshot.opening),
       "角色衍生扮演檔：\n" + derivedProfilePrompt,
-      "所屬場景：" + asText(scene.name) + "｜" + asText(scene.description),
+      "所屬場景 ID：" + asText(member.scene_id) + "｜場景：" + asText(scene.name) + "｜" + asText(scene.description),
     ].join("\n"));
   }
   if (speakers.length !== members.length) {
@@ -215,10 +215,10 @@ Deno.serve(async (request) => {
     return json({ status: refunded.confirmed ? "refunded" : "needs_reconciliation", error: "group_speaker_snapshot_invalid", balance: refunded.balance, retryAllowed: false }, 503);
   }
 
-  const history = (historyResult.data || []).slice().reverse().map((row: any) => {
+  const history = (historyResult.data || []).filter((row: any) => row.turn_id !== turnId).slice().reverse().map((row: any) => {
     const speaker = row.speaker_type === "user" ? "玩家" :
       row.speaker_type === "character" ? (asText(asRow(row.speaker_snapshot).name) || "角色") : "系統";
-    return speaker + "：" + asText(row.content);
+    return "[場景 " + (asText(row.scene_id) || "共同") + "] " + speaker + "：" + asText(row.content);
   }).filter(Boolean).join("\n");
   const currentMessage = content === "__GROUP_CONTINUE__"
     ? "（玩家沒有輸入新文字，請自然延續目前場景，不要替玩家發言或決定行動。）"
