@@ -1,4 +1,6 @@
--- Single-call group AI orchestration with atomic per-character billing.
+-- Single-call group AI orchestration with atomic per-character billing and phone state.
+ALTER TABLE public.chat_group_members
+  ADD COLUMN IF NOT EXISTS phone_notifications jsonb NOT NULL DEFAULT '[]'::jsonb;
 -- The Edge Function is the only caller of the service-role RPCs below.
 ALTER TABLE public.chat_group_turns
   DROP CONSTRAINT IF EXISTS chat_group_turns_status_check;
@@ -200,7 +202,8 @@ $function$;
 CREATE OR REPLACE FUNCTION public.complete_group_chat_turn(
   p_user_id uuid,
   p_turn_id uuid,
-  p_speeches jsonb
+  p_speeches jsonb,
+  p_phone_updates jsonb
 )
 RETURNS text
 LANGUAGE plpgsql
@@ -219,6 +222,11 @@ DECLARE
   v_snapshot jsonb;
   v_sequence integer := 0;
   v_count integer := 0;
+  v_phone_update jsonb;
+  v_phone_notice jsonb;
+  v_phone_character_id uuid;
+  v_phone_notifications jsonb;
+  v_phone_count integer := 0;
 BEGIN
   -- Lock the parent first, matching reserve/delete lock order. If deletion won
   -- the race while the provider was generating, reject persistence so the
@@ -302,6 +310,49 @@ BEGIN
     );
     v_count := v_count + 1;
   END LOOP;
+
+  -- Persist each member's phone state in the same transaction as the
+  -- assistant messages and wallet settlement. A partial phone update is invalid.
+  IF jsonb_typeof(p_phone_updates) IS DISTINCT FROM 'array'
+    OR jsonb_array_length(p_phone_updates) <> (
+      SELECT count(*) FROM public.chat_group_members m WHERE m.group_id = v_turn.group_id
+    ) THEN
+    RAISE EXCEPTION 'invalid_group_phone_updates' USING ERRCODE = '22023';
+  END IF;
+
+  FOR v_phone_update IN SELECT value FROM jsonb_array_elements(p_phone_updates)
+  LOOP
+    IF jsonb_typeof(v_phone_update) IS DISTINCT FROM 'object'
+      OR jsonb_typeof(v_phone_update->'character_id') IS DISTINCT FROM 'string'
+      OR jsonb_typeof(v_phone_update->'notifications') IS DISTINCT FROM 'array'
+      OR jsonb_array_length(v_phone_update->'notifications') > 8 THEN
+      RAISE EXCEPTION 'invalid_group_phone_update' USING ERRCODE = '22023';
+    END IF;
+    BEGIN
+      v_phone_character_id := (v_phone_update->>'character_id')::uuid;
+    EXCEPTION WHEN invalid_text_representation THEN
+      RAISE EXCEPTION 'invalid_group_phone_character_id' USING ERRCODE = '22023';
+    END;
+    v_phone_notifications := v_phone_update->'notifications';
+    FOR v_phone_notice IN SELECT value FROM jsonb_array_elements(v_phone_notifications)
+    LOOP
+      IF jsonb_typeof(v_phone_notice) IS DISTINCT FROM 'object'
+        OR char_length(btrim(COALESCE(v_phone_notice->>'title', ''))) NOT BETWEEN 1 AND 80
+        OR char_length(btrim(COALESCE(v_phone_notice->>'body', ''))) NOT BETWEEN 1 AND 500 THEN
+        RAISE EXCEPTION 'invalid_group_phone_notification' USING ERRCODE = '22023';
+      END IF;
+    END LOOP;
+
+    UPDATE public.chat_group_members
+    SET phone_notifications = v_phone_notifications
+    WHERE group_id = v_turn.group_id
+      AND COALESCE(character_id, NULLIF(character_snapshot->>'id', '')::uuid) = v_phone_character_id;
+    IF NOT FOUND THEN RAISE EXCEPTION 'group_phone_character_not_member' USING ERRCODE = '22023'; END IF;
+    v_phone_count := v_phone_count + 1;
+  END LOOP;
+  IF v_phone_count <> (SELECT count(*) FROM public.chat_group_members m WHERE m.group_id = v_turn.group_id) THEN
+    RAISE EXCEPTION 'incomplete_group_phone_updates' USING ERRCODE = '22023';
+  END IF;
 
   UPDATE public.chat_group_turn_charges
   SET status = 'settled'
@@ -585,7 +636,7 @@ END;
 $function$;
 
 REVOKE ALL ON FUNCTION public.reserve_group_chat_turn(uuid, uuid, uuid, text) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.complete_group_chat_turn(uuid, uuid, jsonb) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.complete_group_chat_turn(uuid, uuid, jsonb, jsonb) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.refund_group_chat_turn(uuid, uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.reserve_group_chat_turn(uuid, uuid, uuid, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.complete_group_chat_turn(uuid, uuid, jsonb) TO service_role;
