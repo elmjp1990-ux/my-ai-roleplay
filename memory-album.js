@@ -12,7 +12,7 @@
   }
   const albumPageStates=new Map(),MAX_ALBUM_PAGE_STATES=8;
   function getAlbumPageState(key){const pager=albumPageStates.get(key);if(pager){albumPageStates.delete(key);albumPageStates.set(key,pager);}return pager||null;}
-  function rememberAlbumPageState(key,pager){albumPageStates.delete(key);albumPageStates.set(key,pager);while(albumPageStates.size>MAX_ALBUM_PAGE_STATES)albumPageStates.delete(albumPageStates.keys().next().value);}
+  function rememberAlbumPageState(key,pager){albumPageStates.delete(key);albumPageStates.set(key,pager);while(albumPageStates.size>MAX_ALBUM_PAGE_STATES){const oldest=albumPageStates.keys().next().value;albumPageStates.get(oldest)?.dispose();albumPageStates.delete(oldest);}}
   async function loadAlbum(type,chatId,options={}){
     const mount=$('memoryAlbumItems');if(!mount)return;
     const client=window.mySupabase;
