@@ -245,7 +245,7 @@ assert.match(html,/\.range\(offset,offset\+pageSize-1\)/,
   "author profile data must use bounded twenty-row backend pages");
 assert.match(authorProfileModule,/PoyozzListPagination\.observeEnd/,
   "author profile lists must use the shared scroll pagination observer");
-assert.match(followedAuthorsPaginationSource,/loadPublicAuthorLatestCharacters\(authorIds\)/,
+assert.match(followedAuthorsPaginationSource,/loadPublicAuthorLatestCharacters\(pageAuthorIds\)/,
   "followed-author presentation must delegate latest-character hydration to the app data layer");
 assert.match(html,/async function loadPublicAuthorLatestCharacters\(authorIds=\[\]\)/,
   "followed-author latest characters must use a centralized app-owned query");
