@@ -119,7 +119,7 @@ const groupMigration=fs.readFileSync("supabase/migrations/20261114180000_group_a
 const speakerParser=fs.readFileSync("supabase/functions/_shared/group-speaker-output.ts","utf8");
 const sharedOpenRouter=fs.readFileSync("supabase/functions/_shared/openrouter-chat-completions.ts","utf8");
 assert.match(sharedOpenRouter,/deepseek\/deepseek-v4-flash-20260423/,"single and group chat must share the approved DeepSeek V4 Flash model");
-assert.match(groupEdge,/parseGroupSpeakerOutput\(provider\.result\.text, speakers\)/,"the single model response must be mapped to explicit roster speaker IDs");
+assert.match(groupEdge,/parseGroupTurnEnvelope\(provider\.result\.text, speakers\)/,"the single model response must validate speaker IDs and per-character phone states");
 assert.match(groupEdge,/requestOpenRouterChatCompletion\(/,"group chat must reuse the shared OpenRouter client");
 assert.match(sharedOpenRouter,/provider: \{ only: \["deepinfra"\], allow_fallbacks: false, data_collection: "deny" \}/,"all chat modes must share the approved no-data-collection provider restriction");
 assert.match(sharedOpenRouter,/AbortController/,"the shared provider request must retain a bounded timeout");
