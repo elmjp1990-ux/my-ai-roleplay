@@ -7056,7 +7056,7 @@ async function openGroupBackgroundSettings() {
       .order('created_at',{ascending:false}).limit(window.PoyozzListPagination.pageSize('memoryPhotos'));
     if(error)throw error;
     const photoRows=data||[];let signedUrls=[];
-    try{signedUrls=await memoryPhotoSignedUrlManager.getMany(photoRows.map(photo=>uid+':'+photo.storage_path),{context:{uid}});}
+    try{signedUrls=await memoryPhotoSignedUrlManager.getMany(photoRows.map(photo=>user.id+':'+photo.storage_path),{context:{uid:user.id}});}
     catch(error){console.warn('群組背景相片簽名網址批次載入失敗',error?.message);}
     group.memoryPhotos=photoRows.map((photo,index)=>({...photo,image_url:signedUrls[index]||''}));
     const photos=group.memoryPhotos,mode=group.backgroundMode||'avatar';
