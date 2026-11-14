@@ -531,7 +531,7 @@ assert.doesNotMatch(followedAuthorsPageTestSource2026,/\.from\('author_follows'\
 
 const paginationSizes=sharedPaginationSource.slice(sharedPaginationSource.indexOf('const PAGE_SIZES'),sharedPaginationSource.indexOf('});',sharedPaginationSource.indexOf('const PAGE_SIZES'))+3);
 for(const listName of ['authorCharacters','chatSessions','groupSessions','followedAuthors','encounterMemories','ownedCharacters','favorites','notifications','characterComments','memoryPhotos']){
-  assert.match(paginationSizes,new RegExp(listName+':\\s*10'),listName+' must use ten-row pages');
+  assert.match(paginationSizes,new RegExp(listName+':\s*10'),listName+' must use ten-row pages');
 }
 assert.match(paginationSizes,/explore:\s*20/,'Explore must preserve its twenty-character page size');
 assert.match(html,/let limit = window\.PoyozzListPagination\?\.pageSize\('explore'\)\|\|20;/,'Explore must initially render twenty roles, not ten');
@@ -603,8 +603,8 @@ assert.match(favoritesLoader,/\.in\('id',validIds\)/,'favorite characters must h
 assert.match(ownerListSource,/favoriteCharactersSentinel[\s\S]*observeEnd/);
 
 const notificationsModuleSource=fs.readFileSync("notifications-screen.js","utf8");
-assert.match(notificationsModuleSource,/notificationsSentinel[\\s\\S]*observeEnd/,'system notifications must reveal ten rows at a time');
-assert.match(notificationsModuleSource,/pageSize\\('notifications'\\)/);
+assert.match(notificationsModuleSource,/notificationsSentinel[\s\\S]*observeEnd/,'system notifications must reveal ten rows at a time');
+assert.match(notificationsModuleSource,/pageSize\('notifications'\)/);
 
 const primaryIllustrationLoader=between("async function loadCharacterPrimaryIllustrationAssets","async function loadCharacterIllustrationAssets");
 assert.ok(primaryIllustrationLoader.includes("characterIllustrationSignedUrlManager.getMany"));
