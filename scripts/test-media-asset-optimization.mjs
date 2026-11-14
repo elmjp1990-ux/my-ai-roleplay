@@ -102,7 +102,8 @@ assert.ok(memoryUrlAdapter.includes("cacheTtlMs:240000"));
 assert.ok(memoryUrlAdapter.includes("refreshSkewMs:15000"));
 assert.ok(memoryUrlAdapter.includes("maxEntries:250"));
 assert.ok(memoryUrlAdapter.includes("isCurrent:context=>(currentUser()?.uid||null)===(context?.uid||null)"));
-assert.ok(memoryUrlAdapter.includes("from('personax-memory-photos').createSignedUrl(context.storagePath,300)"));
+assert.ok(memoryUrlAdapter.includes("from('personax-memory-photos').createSignedUrl(path,300)"));
+assert.ok(memoryUrlAdapter.includes("from('personax-memory-photos').createSignedUrls(paths,300)"));
 assert.ok(memoryUrlAdapter.includes("uid+':'+storagePath"));
 assert.ok(memoryUrlAdapter.includes("memoryPhotoSignedUrlManager.invalidate(uid+':'+storagePath)"));
 
