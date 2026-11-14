@@ -5566,6 +5566,7 @@ async function loadCloudComments(characterId,{force=false,loadMore=false}={}) {
     if(target&&route.id===characterId)target.innerHTML='<div class="empty">雲端評論載入失敗，請重新整理或稍後再試。</div>';
   } finally {
     pager.loading=false;
+    if(route.page==='detail'&&route.id===characterId)renderCommentLoadMoreButton();
   }
   })();
   cloudCommentHydrationInflight.set(cacheKey,request);
@@ -5584,6 +5585,7 @@ function renderCommentLoadMoreButton(){
   const uid=currentUser()?.uid||null;
   const pager=cloudCommentPageStates.get((uid||'anonymous')+':'+route.id);
   const mount=$('comments');
+  mount?.querySelector('[data-action="comments-load-more"]')?.remove();
   if(mount&&pager?.hasMore&&!pager.loading){
     mount.insertAdjacentHTML('beforeend','<button type="button" class="button secondary" data-action="comments-load-more">載入更多評論</button>');
   }
