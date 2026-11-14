@@ -5,7 +5,7 @@ const asDbRow = (value: unknown): DbRow =>
 const asString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
-const collectDerivedPrivateProfileValues = (value: unknown): string[] => {
+export const collectDerivedPrivateProfileValues = (value: unknown): string[] => {
   const profile = asDbRow(value);
   const protectedValues = new Set<string>();
   const collectItems = (items: unknown) => {
@@ -56,7 +56,7 @@ const collectDerivedPrivateProfileValues = (value: unknown): string[] => {
   return [...protectedValues].slice(0, 120);
 };
 
-const formatCharacterAiProfilePrompt = (value: unknown): string => {
+export const formatCharacterAiProfilePrompt = (value: unknown): string => {
   const profile = asDbRow(value);
   const sectionLabels: Record<string, string> = {
     identity_background: "身份與背景",
