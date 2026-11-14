@@ -8,7 +8,7 @@ import { processDueStoryMemorySummary, recordChatModelUsage } from "../_shared/s
 import { parseStoryTurnEnvelope } from "../_shared/story-turn-envelope.ts";
 import { collectDerivedPrivateProfileValues, formatCharacterAiProfilePrompt } from "../_shared/character-ai-profile-prompt.ts";
 import { requestOpenRouterChatCompletion, POYOZZ_DEFAULT_CHAT_MODEL } from "../_shared/openrouter-chat-completions.ts";
-import { asRecord as asDbRow, asTrimmedString as asString, isUuid } from "../_shared/ai-value-utils.ts";
+import { asRecord as asDbRow, asTrimmedString as asString, isUuid, jsonResponse } from "../_shared/ai-value-utils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,11 +16,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+const json = (body: unknown, status = 200) => jsonResponse(body, status, corsHeaders);
 
 
 const DEFAULT_OPENROUTER_MODEL = POYOZZ_DEFAULT_CHAT_MODEL;
