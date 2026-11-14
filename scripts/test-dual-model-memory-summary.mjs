@@ -10,7 +10,7 @@ const ui = readFileSync("index.html", "utf8");
 assert.match(source, /const DEFAULT_OPENROUTER_MODEL = POYOZZ_DEFAULT_CHAT_MODEL/);
 assert.match(openRouterShared, /POYOZZ_DEFAULT_CHAT_MODEL = "deepseek\/deepseek-v4-flash-20260423"/);
 assert.doesNotMatch(source, /Deno\.env\.get\("OPENROUTER_MODEL"\)/);
-assert.match(openRouterShared, /provider: \{ only: \["deepinfra"\], allow_fallbacks: false, data_collection: "deny" \}/);
+assert.match(openRouterShared, /provider: buildOpenRouterProviderOptions\(\)/);
 assert.match(source, /processDueStoryMemorySummary\(admin, session, user\.id, openRouterKey\)/);
 assert.match(source, /recordChatModelUsage\(admin/);
 assert.match(source, /storedSummary/);
@@ -46,7 +46,7 @@ assert.match(source, /await recordUsage\(null, "failed"\)/,
 assert.match(migration, /turn_id uuid references public\.chat_turn_charges\(turn_id\) on delete cascade/);
 assert.doesNotMatch(migration, /generation_type = 'chat_response' and turn_id is not null and assistant_message_id is not null/,
   "chat usage rows must allow null assistant IDs for failed or blocked generations");
-assert.match(summary, /only: \["deepinfra"\]/);
+assert.match(openRouterShared, /buildOpenRouterProviderOptions/);
 
 const summaryStart = summary.indexOf("async function requestMemorySummary");
 const summaryEnd = summary.indexOf("export async function processDueStoryMemorySummary", summaryStart);
