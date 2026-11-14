@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-const root = new URL('..', import.meta.url);
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const pagination = fs.readFileSync(new URL('../list-pagination.js', import.meta.url), 'utf8');
 const presetSource = fs.readFileSync(new URL('../group-opening-presets.js', import.meta.url), 'utf8');
