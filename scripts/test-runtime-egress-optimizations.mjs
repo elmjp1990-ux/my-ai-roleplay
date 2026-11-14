@@ -228,6 +228,18 @@ assert.doesNotMatch(groupRenderer,/avatar-fallback player-avatar/,
   'group player messages must not create an outer “you” avatar');
 assert.doesNotMatch(singleRenderer,/outerAvatar/,
   'single chat player messages must not allocate or render a redundant outer avatar');
+const copyHelper=between('async function copyChatMessageContent(content)','function isLatestEditableChatMessage(');
+assert.match(copyHelper,/navigator\.clipboard\.writeText\(text\)/);
+assert.match(copyHelper,/showDialog\('複製訊息'/);
+assert.match(html,/case 'copy-message':[\s\S]*copyChatMessageContent\(m\.text\)/);
+assert.match(html,/case 'copy-group-message':[\s\S]*copyChatMessageContent\(message\.content\)/);
+assert.match(html,/function confirmChatMessageDeletion\(\)[\s\S]*return confirm\('確定刪除此訊息？此操作無法復原。'\)/);
+assert.match(html,/if \(!s \|\| !message \|\| !confirmChatMessageDeletion\(\)\) break/);
+assert.match(html,/if \(action !== 'delete-group-message'\) return;[\s\S]*if \(!confirmChatMessageDeletion\(\)\) return;/);
+assert.doesNotMatch(html,/confirm-delete-group-message/,
+  'group delete confirmation must use the same single-chat confirmation flow instead of a duplicate modal');
+assert.equal((html.match(/confirmChatMessageDeletion\(\)/g)||[]).length,3,
+  'single and group delete handlers must share one confirmation helper');
 const latestEditHelper=between('function isLatestEditableChatMessage(','function renderMessageActionBar(');
 assert.match(latestEditHelper,/allowedTypes\.includes\(message\[typeField\]\)/);
 assert.match(latestEditHelper,/messages\.filter\(item=>item\[typeField\]===message\[typeField\]\)\.at\(-1\)/);
