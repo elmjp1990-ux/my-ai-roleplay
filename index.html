@@ -3155,7 +3155,7 @@ let route = {page:'citymap'};
 const GROUP_CONTINUE_SENTINEL = '（請接續目前的故事。）';
 let personaPickerSelection = null;
 let groupPersonaPickerSelection = null;
-let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupMembers:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null,openRequestId:0,historyCursor:null,historyHasMore:false,historyLoading:false,historyError:'',historyScrollAnchor:null};
+let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupMembers:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null,openRequestId:0,groupListOffset:0,groupListHasMore:false,groupPinnedLoaded:false,groupListObserver:null,historyCursor:null,historyHasMore:false,historyLoading:false,historyError:'',historyScrollAnchor:null};
 let search = '';
 let filter = 'recommended';
 let exploreTags = [];
@@ -6421,14 +6421,27 @@ function groupRenderCharacters() {
 }
 function refreshChatEntryList() {
   const entries=$('chatEntries');
-  if(entries) entries.innerHTML=chatEntries();
+  if(!entries)return;
+  groupPrototype.groupListObserver?.disconnect();
+  entries.innerHTML=chatEntries();
+  if(groupPrototype.groupListHasMore&&!groupPrototype.loadingGroups){
+    const sentinel=document.createElement('div');
+    sentinel.dataset.groupListSentinel='true';
+    sentinel.className='small muted';
+    sentinel.style.cssText='padding:12px;text-align:center';
+    sentinel.textContent='繼續往下滑動，載入更多群組…';
+    entries.appendChild(sentinel);
+    groupPrototype.groupListObserver=window.PoyozzListPagination.observeEnd(
+      sentinel,()=>void groupLoadList(false,true)
+    );
+  }
 }
 function groupResetForAccount(uid) {
   const g=groupPrototype;
   if(g.ownerUid && g.ownerUid!==uid) {
     g.step=1;
     g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''};
-    g.active=null;g.turn=0;g.messages=[];g.groups=[];g.groupPreviews={};g.groupsLoaded=false;
+    g.active=null;g.turn=0;g.messages=[];g.groups=[];g.groupPreviews={};g.groupMembers={};g.groupsLoaded=false;g.groupListOffset=0;g.groupListHasMore=false;g.groupPinnedLoaded=false;g.groupListObserver?.disconnect();
     g.loadingGroups=false;g.loading=false;g.sending=false;g.pendingRequest=null;
     g.formError='';g.loadError='';g.openError='';g.failedGroupId=null;g.ownerUid=null;
   }
@@ -6454,85 +6467,105 @@ function groupFriendlyError(error) {
   if(message.includes('authentication_required')||message.includes('JWT')||message.includes('登入狀態')) return '登入狀態已失效，請重新登入後再試。';
   return message||'操作失敗，請稍後再試。';
 }
-async function groupLoadList(force=false) {
+async function groupHydrateListRows(groups,uid){
+  const g=groupPrototype,client=window.mySupabase;
+  if(!groups.length)return;
+  const groupIds=groups.map(group=>group.id);
+  const {data:memberRows,error:memberError}=await client.from('chat_group_members')
+    .select('group_id,character_id,position,character_snapshot').in('group_id',groupIds).order('position');
+  if(memberError)throw memberError;
+  const characterIds=[...new Set((memberRows||[]).map(row=>row.character_id).filter(isUuid))];
+  let avatars={};
+  if(characterIds.length){
+    const {data:characterRows,error:avatarError}=await client.from('characters')
+      .select('id,avatar_url').in('id',characterIds);
+    if(avatarError)console.warn('讀取群組列表角色頭像失敗：',avatarError.message);
+    else avatars=Object.fromEntries((characterRows||[]).map(row=>[row.id,row.avatar_url||'']));
+  }
+  for(const row of memberRows||[]){
+    const members=g.groupMembers[row.group_id]||=[];
+    if(!members.some(member=>member.character_snapshot?.id===row.character_snapshot?.id&&member.name===(row.character_snapshot?.name||'角色'))){
+      members.push({
+        name:row.character_snapshot?.name||'角色',
+        avatar_url:avatars[row.character_id]||row.character_snapshot?.avatar_url||'',
+        character_snapshot:row.character_snapshot||{}
+      });
+    }
+    g.groupMembers[row.group_id]=members;
+  }
+  // Only the current page's groups receive one compact latest-message preview.
+  for(let i=0;i<groupIds.length;i+=10){
+    const batchIds=groupIds.slice(i,i+10);
+    const previews=await Promise.all(batchIds.map(async groupId=>{
+      const {data:message,error:messageError}=await client.from('chat_group_messages')
+        .select('group_id,content,speaker_type,created_at,sequence_no')
+        .eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:false})
+        .order('sequence_no',{ascending:false}).limit(1).maybeSingle();
+      if(messageError)throw messageError;
+      return [groupId,message||null];
+    }));
+    for(const [groupId,message] of previews)if(message)g.groupPreviews[groupId]=message;
+  }
+}
+async function groupLoadList(force=false,loadMore=false) {
   const g=groupPrototype;
-  // Clear a prior account's cached group rows before rendering the shared chat list.
   groupResetForAccount(currentUser()?.uid||null);
-  if(g.loadingGroups||(!force&&g.groupsLoaded)) return;
+  if(g.loadingGroups||(!force&&!loadMore&&g.groupsLoaded)||(loadMore&&!g.groupListHasMore))return;
+  if(force){
+    g.groupListObserver?.disconnect();
+    g.groups=[];g.groupPreviews={};g.groupMembers={};
+    g.groupListOffset=0;g.groupListHasMore=false;g.groupPinnedLoaded=false;g.groupsLoaded=false;
+  }
   g.loadingGroups=true;g.loadError='';
-  if(!window.mySupabase) {
+  if(!window.mySupabase){
     g.groupsLoaded=true;g.loadingGroups=false;g.loadError='Supabase 用戶端尚未載入。';
     refreshChatEntryList();return;
   }
-  try {
+  try{
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
-    if(authError||!user||user.id!==currentUser()?.uid) {
+    if(authError||!user||user.id!==currentUser()?.uid){
       g.groupsLoaded=true;g.loadingGroups=false;g.loadError='請使用已連結 Supabase 的帳號登入，才能讀取或建立雲端群組。';
-      if(route.page==='group'&&!g.active) render();
+      if(route.page==='group'&&!g.active)render();
       refreshChatEntryList();return;
     }
-    const {data,error}=await window.mySupabase.from('chat_groups')
-      .select('id,name,world_background,scene_mode,created_at,updated_at,pinned')
-      .is('archived_at',null).order('updated_at',{ascending:false});
-    if(error) throw error;
-    if(user.id!==currentUser()?.uid) { groupResetForAccount(currentUser()?.uid||null); return; }
-    const deletedGroupIds = readDeletedChatTombstones(user.id).groups;
-    g.ownerUid=user.id;g.groups=(data||[]).filter(group=>!deletedGroupIds[group.id]);g.groupPreviews={};g.groupMembers={};
-    if(g.groups.length) {
-      try {
-        const groupIdsForMembers=g.groups.map(group=>group.id);
-        const {data:memberRows,error:memberError}=await window.mySupabase.from('chat_group_members')
-          .select('group_id,character_id,position,character_snapshot').in('group_id',groupIdsForMembers).order('position');
-        if(memberError) throw memberError;
-        const characterIds=[...new Set((memberRows||[]).map(row=>row.character_id).filter(isUuid))];
-        let avatars={};
-        if(characterIds.length) {
-          const {data:characterRows,error:avatarError}=await window.mySupabase.from('characters')
-            .select('id,avatar_url').in('id',characterIds);
-          if(avatarError) console.warn('讀取群組列表角色頭像失敗：',avatarError.message);
-          else avatars=Object.fromEntries((characterRows||[]).map(row=>[row.id,row.avatar_url||'']));
-        }
-        for(const row of memberRows||[]) {
-          (g.groupMembers[row.group_id] ||= []).push({
-            name:row.character_snapshot?.name||'角色',
-            avatar_url:avatars[row.character_id]||row.character_snapshot?.avatar_url||'',
-            character_snapshot:row.character_snapshot||{}
-          });
-        }
-      } catch(memberLoadError) {
-        console.warn('讀取群組列表成員頭像失敗：',memberLoadError.message);
-      }
-      const groupIds=g.groups.map(group=>group.id);
-      // Fetch at most one newest message per group. Batch requests to avoid an
-      // unbounded all-history read and to keep concurrent requests modest.
-      for(let i=0;i<groupIds.length;i+=10) {
-        const batchIds=groupIds.slice(i,i+10);
-        const previews=await Promise.all(batchIds.map(async groupId=>{
-          const {data:message,error:messageError}=await window.mySupabase.from('chat_group_messages')
-            .select('group_id,content,speaker_type,created_at,sequence_no')
-            .eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:false})
-            .order('sequence_no',{ascending:false}).limit(1).maybeSingle();
-          if(messageError) throw messageError;
-          return [groupId,message||null];
-        }));
-        for(const [groupId,message] of previews) {
-          if(message) g.groupPreviews[groupId]=message;
-        }
-      }
+    const client=window.mySupabase,pageSize=window.PoyozzListPagination.pageSize('groupSessions');
+    let pinnedRows=[];
+    if(!loadMore&&!g.groupPinnedLoaded){
+      const {data,error}=await client.from('chat_groups')
+        .select('id,name,world_background,scene_mode,created_at,updated_at,pinned')
+        .eq('pinned',true).is('archived_at',null).order('updated_at',{ascending:false});
+      if(error)throw error;
+      pinnedRows=data||[];
+      g.groupPinnedLoaded=true;
     }
-    if(user.id!==currentUser()?.uid) { groupResetForAccount(currentUser()?.uid||null); return; }
-    // A group may have been deleted while member/preview requests were in flight.
-    const latestDeletedGroups = readDeletedChatTombstones(user.id).groups;
-    const retainedGroups = g.groups.filter(group=>!latestDeletedGroups[group.id]);
-    const retainedIds = new Set(retainedGroups.map(group=>group.id));
-    g.groups = retainedGroups;
-    for (const groupId of Object.keys(g.groupPreviews)) if (!retainedIds.has(groupId)) delete g.groupPreviews[groupId];
-    for (const groupId of Object.keys(g.groupMembers)) if (!retainedIds.has(groupId)) delete g.groupMembers[groupId];
-    g.groupsLoaded=true;g.loadingGroups=false;g.loadError='';
-  } catch(error) {
-    g.groupsLoaded=true;g.loadingGroups=false;g.loadError=groupFriendlyError(error)||'讀取群組清單失敗。';
+    const {data:pageRows,error:pageError}=await client.from('chat_groups')
+      .select('id,name,world_background,scene_mode,created_at,updated_at,pinned')
+      .or('pinned.eq.false,pinned.is.null').is('archived_at',null)
+      .order('updated_at',{ascending:false}).order('id',{ascending:false})
+      .range(g.groupListOffset,g.groupListOffset+pageSize-1);
+    if(pageError)throw pageError;
+    if(user.id!==currentUser()?.uid){groupResetForAccount(currentUser()?.uid||null);return;}
+    const deletedGroupIds=readDeletedChatTombstones(user.id).groups;
+    const currentPage=pageRows||[];
+    g.groupListOffset+=currentPage.length;
+    g.groupListHasMore=currentPage.length===pageSize;
+    const existingIds=new Set((g.groups||[]).map(group=>group.id));
+    const newRows=[...pinnedRows,...currentPage].filter(group=>!deletedGroupIds[group.id]&&!existingIds.has(group.id));
+    if(newRows.length){
+      await groupHydrateListRows(newRows,user.id);
+      if(user.id!==currentUser()?.uid){groupResetForAccount(currentUser()?.uid||null);return;}
+      g.groups=window.PoyozzListPagination.mergeUnique(g.groups,newRows,group=>group.id);
+    }
+    const latestDeletedGroups=readDeletedChatTombstones(user.id).groups;
+    g.groups=g.groups.filter(group=>!latestDeletedGroups[group.id]);
+    const retainedIds=new Set(g.groups.map(group=>group.id));
+    for(const groupId of Object.keys(g.groupPreviews))if(!retainedIds.has(groupId))delete g.groupPreviews[groupId];
+    for(const groupId of Object.keys(g.groupMembers))if(!retainedIds.has(groupId))delete g.groupMembers[groupId];
+    g.ownerUid=user.id;g.groupsLoaded=true;g.loadingGroups=false;g.loadError='';
+  }catch(error){
+    g.loadingGroups=false;g.loadError=groupFriendlyError(error)||'讀取群組清單失敗。';
   }
-  if(route.page==='group'&&!g.active) render();
+  if(route.page==='group'&&!g.active)render();
   refreshChatEntryList();
 }
 async function groupOpen(groupId) {
