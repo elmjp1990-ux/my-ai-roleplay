@@ -126,6 +126,22 @@ assert.doesNotMatch(ownerLoader,/client\.auth\.getUser\(\)/,
   "owner hydration must not issue its own duplicate auth verification");
 assert.doesNotMatch(cloudSessions,/client\.auth\.getUser\(\)/,
   "chat hydration must not issue its own duplicate auth verification");
+assert.match(cloudSessions,/pageSize\('chatSessions'\)/,
+  "single chat list pages must use the shared ten-row page size");
+assert.match(cloudSessions,/\.eq\('session_data->>pinned','true'\)/,
+  "pinned single chats must load independently from the unpinned page");
+assert.match(cloudSessions,/session_data->>pinned\.eq\.false,session_data->>pinned\.is\.null/,
+  "the single chat page query must exclude pinned sessions");
+assert.match(cloudSessions,/\.range\(pager\.offset,pager\.offset\+pageSize-1\)/,
+  "single chat list continuation must use bounded backend pages");
+assert.match(cloudSessions,/if \(!onlySessionId && !pagedList\)/,
+  "loading another single-chat page must not evict sessions already loaded from prior pages");
+assert.match(html,/loadCloudChatSessions\(currentUser\(\),\{loadMore:true\}\)/,
+  "the shared chat-list sentinel must request the next single-chat page");
+assert.match(html,/canLoadSessions=chatSessionListPager\.initialLoaded&&chatSessionListPager\.hasMore/,
+  "the chat list must keep a continuation sentinel while single-chat pages remain");
+
+
 const chatAuthorProfiles=between("async function loadChatSessionAuthorProfiles(uid, authorIds)", "async function loadCloudChatSessions");
 assert.match(chatAuthorProfiles,/publicAuthorProfileLoaded\.add\(profile\.id\)/,
   "chat-list profile hydration must populate the shared loaded-profile cache to avoid refetching the same author on detail navigation");
