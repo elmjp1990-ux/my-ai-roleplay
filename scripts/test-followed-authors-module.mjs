@@ -26,7 +26,7 @@ for (const dependency of [
 for (const contract of [
   "from('author_follows')", "from('public_profiles')",
   "eq('follower_id',current.userId)", "order('created_at',{ascending:false})",
-  "getRoute()?.page !== 'followed-authors'", '公開角色 '+entry.total+' 名',
+  "getRoute()?.page !== 'followed-authors'", "公開角色 '+entry.total+' 名",
   '你還沒有追蹤任何作者。', '讀取失敗，請重新整理後再試。'
 ]) {
   assert.ok(moduleSource.includes(contract), 'Followed authors behavior is missing: ' + contract);
