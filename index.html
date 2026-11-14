@@ -7014,14 +7014,16 @@ async function loadEncounterMemoryPage(list,session,pager){
     }
     pager.offset=pageStart+rows.length;
     pager.hasMore=rows.length===pageSize;
-    cards.sort((a,b)=>new Date(b.at||0)-new Date(a.at||0));
-    const markup=cards.map(item=>item.html).join('');
+    const combinedCards=[...(pager.buffer||[]),...cards].sort((a,b)=>new Date(b.at||0)-new Date(a.at||0));
+    const visibleCards=combinedCards.slice(0,pageSize);
+    pager.buffer=combinedCards.slice(pageSize);
+    const markup=visibleCards.map(item=>item.html).join('');
     const empty=list.querySelector('.empty');
     if(empty)empty.remove();
     if(markup)list.insertAdjacentHTML('beforeend',markup);
     list.querySelector('[data-encounter-memory-sentinel]')?.remove();
     pager.observer?.disconnect();
-    if(pager.hasMore){
+    if(pager.hasMore||pager.buffer.length){
       const sentinel=document.createElement('div');
       sentinel.dataset.encounterMemorySentinel='true';
       sentinel.className='small muted';
@@ -7030,7 +7032,7 @@ async function loadEncounterMemoryPage(list,session,pager){
       list.appendChild(sentinel);
       pager.observer=window.PoyozzListPagination.observeEnd(sentinel,()=>void loadEncounterMemoryPage(list,session,pager));
     }
-    if(!list.querySelector('.encounter-memory-card')&&!pager.hasMore){
+    if(!list.querySelector('.encounter-memory-card')&&!pager.hasMore&&!pager.buffer.length){
       list.innerHTML='<div class="empty"><strong>你們的相遇，正等待被收藏</strong><p>完成相遇對話後，系統會自動保存回憶摘要。每段相遇都會獨立整理，不會混入故事模式。</p></div>';
     }
   }catch(error){
