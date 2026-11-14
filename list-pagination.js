@@ -15,6 +15,7 @@
       hasMore: true,
       loading: false,
       legacyLoaded: false,
+      buffer: [],
       observer: null
     };
   }
