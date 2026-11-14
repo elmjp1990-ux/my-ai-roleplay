@@ -183,6 +183,27 @@ assert.doesNotMatch(html,/append_chat_group_mock_turn/,"frontend must no longer 
 assert.match(html,/group_chat_turn_charge: '群組聊天回覆扣款'/,"wallet history must label group turn charges");
 assert.match(html,/group_chat_turn_refund: '群組聊天失敗退款'/,"wallet history must label group turn refunds");
 
+const paginationModule=fs.readFileSync("list-pagination.js","utf8");
+assert.match(paginationModule,/explore:\s*20/);
+assert.match(paginationModule,/chatSessions:\s*10/);
+assert.match(paginationModule,/groupSessions:\s*10/);
+assert.match(paginationModule,/encounterMemories:\s*20/);
+assert.match(paginationModule,/messages:\s*5/);
+assert.match(paginationModule,/function observeEnd/);
+const encounterMemory=between("function loadEncounterMemoryList(panel,session)","async function openEncounterMemoryDetail(button)");
+assert.match(encounterMemory,/pageSize\('encounterMemories'\)/,
+  "Encounter memory lists must use the shared twenty-session page size");
+assert.match(encounterMemory,/\.range\(pager\.offset,pager\.offset\+pageSize-1\)/,
+  "Encounter sessions must be paginated by the backend instead of fetching 200 diary rows");
+assert.match(encounterMemory,/\.in\('metadata->>session_id',sessionIds\)/,
+  "diary summaries must be hydrated only for the current page of Encounter sessions");
+assert.match(encounterMemory,/data\.archived!==true/,
+  "unfinished new Encounter sessions must remain hidden from the memory archive");
+assert.match(encounterMemory,/PoyozzListPagination\.observeEnd/,
+  "Encounter memory lists must load the next twenty sessions when the user reaches the end");
+assert.doesNotMatch(encounterMemory,/\.limit\(200\)/,
+  "Encounter memory list initialization must not fetch 200 diary records");
+
 console.log("Story relationship RPC dedupe, illustration write dedupe, group list refresh avoidance, incremental group-turn loading, phone-state cache, shared login auth verification, and author-profile hydration reuse checks passed.");
 
 
