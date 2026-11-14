@@ -6,7 +6,7 @@
 
   global.PoyozzFollowedAuthors = Object.freeze({
     async render(dependencies) {
-      const { $, currentUser, getRoute, getSupabaseClient, isUuid, state, loadPublicSupabaseCharacters, author, ICON, e, avatar, card, persist, toast } = dependencies;
+      const { $, currentUser, getRoute, getSupabaseClient, isUuid, state, author, ICON, e, avatar, card, persist, toast, PoyozzListPagination } = dependencies;
         const user = currentUser();
         if (!user) return;
         $('view').innerHTML = '<div class="stack"><div class="followed-authors-title-row"><button type="button" class="ghost followed-authors-back" data-action="back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h1>喜愛作者</h1></div><div class="empty">正在載入追蹤作者…</div></div>';
@@ -42,22 +42,41 @@
                 return authorInfo;
               });
             }
-            await loadPublicSupabaseCharacters();
           } else {
             authors = (state.following || []).map(id => author(id));
           }
-      
+
+          if (getRoute()?.page !== 'followed-authors' || currentUser()?.uid !== user.uid) return;
+          const charactersByAuthor = new Map();
+          if(client&&authorIds?.length){
+            for(let offset=0;offset<authorIds.length;offset+=5){
+              const batch=authorIds.slice(offset,offset+5);
+              const results=await Promise.all(batch.map(async authorId=>{
+                const {data,error,count}=await client.from('characters')
+                  .select('id,author_id,name,gender,age,avatar_url,avatar_video_path,is_nsfw,visibility,review_status,intro,race,style,tags,created_at,first_published_at,latest_eligible',{count:'exact'})
+                  .eq('author_id',authorId).eq('visibility','public').is('deleted_at',null)
+                  .order('first_published_at',{ascending:false,nullsFirst:false})
+                  .order('id',{ascending:false}).limit(4);
+                if(error)throw new Error('讀取作者最新公開角色失敗：'+error.message);
+                const items=(data||[]).map(row=>global.mapPublicCharacterRow(row));
+                state.characters=PoyozzListPagination.mergeUnique(state.characters,items,character=>character.id);
+                return [authorId,{items,total:Number(count??items.length)}];
+              }));
+              for(const [authorId,entry] of results)charactersByAuthor.set(authorId,entry);
+            }
+          }else{
+            for(const authorInfo of authors){
+              const items=state.characters.filter(character=>character.visibility==='public'&&character.authorId===authorInfo.uid&&
+                !String(character.id).startsWith('seed-')&&character.cloudPublic!==false&&character.localOnly!==true&&!character.deletedAt)
+                .sort((a,b)=>Number(b.firstPublishedAt||b.createdAt||0)-Number(a.firstPublishedAt||a.createdAt||0));
+              charactersByAuthor.set(authorInfo.uid,{items:items.slice(0,4),total:items.length});
+            }
+          }
           if (getRoute()?.page !== 'followed-authors' || currentUser()?.uid !== user.uid) return;
           const html = authors.map(authorInfo => {
-            const characters = state.characters
-              .filter(character => character.visibility === 'public' &&
-                character.authorId === authorInfo.uid &&
-                !String(character.id).startsWith('seed-') &&
-                character.cloudPublic !== false && character.localOnly !== true &&
-                !character.deletedAt)
-              .sort((a,b) => Number(b.firstPublishedAt || b.createdAt || 0) -
-                Number(a.firstPublishedAt || a.createdAt || 0));
-            const latest = characters.slice(0, 4);
+            const entry=charactersByAuthor.get(authorInfo.uid)||{items:[],total:0};
+            const characters=entry.items;
+            const latest=characters.slice(0,4);
             const authorPageButton = `<button type="button" class="followed-author-profile-link" data-action="author" data-id="${e(authorInfo.uid)}" aria-label="前往作者 ${e(authorInfo.nickname || '作者')} 的頁面">${avatar(authorInfo)}</button>`;
             return `<section class="panel stack followed-author-card" style="gap:14px">
               <div class="row between" style="align-items:center;gap:12px">
@@ -65,10 +84,10 @@
                   ${authorPageButton}
                   <div style="min-width:0">
                     <button type="button" class="followed-author-name" data-action="author" data-id="${e(authorInfo.uid)}">${e(authorInfo.nickname || 'PersonaX 使用者')}</button>
-                    <span class="small muted" style="display:block">公開角色 ${characters.length} 名</span>
+                    <span class="small muted" style="display:block">公開角色 ${entry.total} 名</span>
                   </div>
                 </div>
-                ${characters.length > 4 ? `<button type="button" class="followed-author-more" data-action="author" data-id="${e(authorInfo.uid)}">MORE</button>` : ''}
+                ${entry.total > 4 ? `<button type="button" class="followed-author-more" data-action="author" data-id="${e(authorInfo.uid)}">MORE</button>` : ''}
               </div>
               ${latest.length ? `<div class="grid">${latest.map(character => card(character)).join('')}</div>` : '<div class="empty">目前沒有公開角色。</div>'}
             </section>`;
