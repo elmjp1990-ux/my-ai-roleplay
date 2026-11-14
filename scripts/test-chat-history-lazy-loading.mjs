@@ -13,7 +13,7 @@ const between = (start, end) => {
 };
 
 const cacheCompaction = between("function compactCloudSessionForLocalStorage(session)", "function compactLocalStateForQuota");
-assert.match(cacheCompaction, /slice\(-50\)/);
+assert.match(cacheCompaction, /slice\(-5\)/);
 assert.match(cacheCompaction, /pendingIds/);
 assert.match(cacheCompaction, /message\.localOnly===true/);
 assert.match(cacheCompaction, /!isUuid\(message\.id\)/);
@@ -69,9 +69,13 @@ assert.match(messageLoader, /cloudSynced:true/,
   "messages fetched from Supabase must be marked as already synchronized");
 assert.match(messageLoader, /\.eq\('id', sessionId\)\.eq\('user_id', userId\)\.is\('deleted_at', null\)/);
 assert.match(messageLoader, /\.eq\('session_id',sessionId\)\.is\('deleted_at',null\)/);
-assert.match(messageLoader, /const pageSize=50/);
+assert.match(messageLoader, /const pageSize=5/);
 assert.match(messageLoader, /messageQuery\.limit\(pageSize\)/);
 assert.match(messageLoader, /cloudOldestMessageCursor/);
+assert.match(messageLoader, /const currentPageIds=new Set\(cloudMessages\.map\(message=>message\.id\)\)/);
+assert.match(messageLoader, /cachedMessages=older\?\(session\.messages\|\|\[\]\):/);
+assert.match(messageLoader, /currentPageIds\.has\(message\.id\)/,
+  "initial refresh must discard stale cached cloud messages outside the newest five-row page");
 assert.match(messageLoader, /created_at\.lt\./);
 assert.match(messageLoader, /roleplayMeta/);
 assert.match(messageLoader, /data\.memories/);
@@ -129,6 +133,12 @@ assert.match(chatData, /lastMessageAt/);
 const safeSaver = between("async function saveChatSessionSafely(s)", "async function refreshWalletBalance");
 assert.match(safeSaver, /syncedUserMessageIds/,
   "serialized saves must propagate successful message sync markers to the live session");
+
+const searchJump = between("async function jumpToChatSearchHit(button)", "async function returnChatToLatest(kind)");
+assert.equal((searchJump.match(/\.limit\(2\)/g)||[]).length,4,
+  "single and group search jumps must load only two neighboring messages on each side of the target");
+assert.match(searchJump, /s\.cloudHasMoreMessages=\(b\.data\|\|\[\]\)\.length===2/);
+assert.match(searchJump, /groupPrototype\.historyHasMore=\(b\.data\|\|\[\]\)\.length===2/);
 
 const renderConversation = between("function renderConversation()", "function formatMessage");
 assert.match(renderConversation, /data-chat-history-action/);
