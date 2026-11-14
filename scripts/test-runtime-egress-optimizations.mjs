@@ -245,6 +245,7 @@ assert.match(html,/groupLoadList\(false,true\)/,
 
 const authorProfileModule=fs.readFileSync("author-profile.js","utf8");
 const followedAuthorsPaginationSource=fs.readFileSync("followed-authors.js","utf8");
+const authorLatestLoader=between("async function loadPublicAuthorLatestCharacters","let publicCharactersLoadPromise");
 assert.match(authorProfileModule,/loadAuthorCharacterPage\(authorId,\s*page\.offset\)/,
   "author profile presentation must delegate each page to the app-owned data loader");
 assert.match(html,/async function loadPublicAuthorCharacterPage\(authorId,offset=0\)/,
@@ -612,7 +613,7 @@ assert.ok(!galleryIllustrationLoader.includes("for(const row of rows)"));
 const ownedCharacterLoader=between("async function loadSupabaseCharacters(user,{loadMore=false}={})","function ");
 assert.ok(ownedCharacterLoader.includes("get_latest_owned_character_stories"));
 assert.ok(!ownedCharacterLoader.includes(".from('character_stories')"));
-const authorLatestLoader=between("async function loadPublicAuthorLatestCharacters","let publicCharactersLoadPromise");
+
 assert.ok(!authorLatestLoader.includes("count:'exact'"));
 assert.ok(authorLatestLoader.includes("get_public_author_latest_characters"));
 assert.ok(!authorLatestLoader.includes(".from('characters')"));
