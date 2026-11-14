@@ -430,7 +430,7 @@ body.day .story-relationship-icon { color:#c27cae; filter:none; }
   .phone-device.phone-device--ios::before { top:11px; width:94px; height:24px; }
   .phone-statusbar { min-height:32px; }
   .phone-lockscreen { min-height:140px; }
-  .phone-lockscreen-clock { font-size:58px; }
+  .phone-lockscreen-clock { font-size:66px; }
 }
 
 /* Message actions: reveal a compact icon row only after selecting the message. */
