@@ -320,6 +320,10 @@ BEGIN
     RAISE EXCEPTION 'invalid_group_phone_updates' USING ERRCODE = '22023';
   END IF;
 
+  IF (SELECT count(DISTINCT value->>'character_id') FROM jsonb_array_elements(p_phone_updates)) <> jsonb_array_length(p_phone_updates) THEN
+    RAISE EXCEPTION 'duplicate_group_phone_character' USING ERRCODE = '22023';
+  END IF;
+
   FOR v_phone_update IN SELECT value FROM jsonb_array_elements(p_phone_updates)
   LOOP
     IF jsonb_typeof(v_phone_update) IS DISTINCT FROM 'object'
@@ -639,7 +643,7 @@ REVOKE ALL ON FUNCTION public.reserve_group_chat_turn(uuid, uuid, uuid, text) FR
 REVOKE ALL ON FUNCTION public.complete_group_chat_turn(uuid, uuid, jsonb, jsonb) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.refund_group_chat_turn(uuid, uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.reserve_group_chat_turn(uuid, uuid, uuid, text) TO service_role;
-GRANT EXECUTE ON FUNCTION public.complete_group_chat_turn(uuid, uuid, jsonb) TO service_role;
+GRANT EXECUTE ON FUNCTION public.complete_group_chat_turn(uuid, uuid, jsonb, jsonb) TO service_role;
 GRANT EXECUTE ON FUNCTION public.refund_group_chat_turn(uuid, uuid, text) TO service_role;
 
 -- Defense in depth: one wallet ledger entry per group turn, operation and currency.
