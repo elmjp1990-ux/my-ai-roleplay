@@ -147,7 +147,7 @@ Deno.serve(async (request) => {
   if (memberResult.error || sceneResult.error || historyResult.error || playerResult.error ||
       !Array.isArray(memberResult.data) || memberResult.data.length < 1 || memberResult.data.length > 3) {
     const refunded = await refund(admin, user.id, turnId, "group_context_lookup_failed");
-    return json({ status: refunded.confirmed ? "refunded" : "needs_reconciliation", error: "group_context_unavailable", balance: refunded.balance, retryAllowed: false }, 503);
+    return json({ status: refunded.confirmed ? "refunded" : "needs_reconciliation", error: "group_context_unavailable", balance: refunded.balance, retryAllowed: false }, refunded.confirmed ? 200 : 503);
   }
 
   const scenes = new Map((sceneResult.data || []).map((scene: any) => [scene.id, scene]));
@@ -163,7 +163,7 @@ Deno.serve(async (request) => {
   ]);
   if (charactersResult.error || privateRowsResult.error) {
     const refunded = await refund(admin, user.id, turnId, "character_context_lookup_failed");
-    return json({ status: refunded.confirmed ? "refunded" : "needs_reconciliation", error: "character_context_unavailable", balance: refunded.balance, retryAllowed: false }, 503);
+    return json({ status: refunded.confirmed ? "refunded" : "needs_reconciliation", error: "character_context_unavailable", balance: refunded.balance, retryAllowed: false }, refunded.confirmed ? 200 : 503);
   }
 
   const characters = new Map((charactersResult.data || []).map((row: any) => [row.id, row]));
