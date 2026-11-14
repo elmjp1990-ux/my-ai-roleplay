@@ -242,6 +242,27 @@ assert.match(paginationModule,/groupSessions:\s*10/);
 assert.match(paginationModule,/encounterMemories:\s*20/);
 assert.match(paginationModule,/messages:\s*5/);
 assert.match(paginationModule,/function observeEnd/);
+const exploreLoader=between("async function loadPublicCharacterRows(offset=0)","// Concurrent login hydrators");
+assert.match(exploreLoader,/pageSize\('explore'\)/,
+  "Explore must use the shared twenty-character page size");
+assert.match(exploreLoader,/\.range\(offset,offset\+publicCharacterPageSize-1\)/,
+  "Explore public characters must be fetched from Supabase in bounded backend pages");
+assert.match(exploreLoader,/mergeUnique\(state\.characters,publicCharacters,character=>character\.id\)/,
+  "Explore continuation must append newly fetched characters without duplicating loaded rows");
+assert.match(exploreLoader,/window\.loadNextPublicCharacterPage/,
+  "Explore must expose a dedicated next-page loader");
+assert.doesNotMatch(exploreLoader,/\.order\('first_published_at',[\s\S]*?;\s*if\(error\)/,
+  "Explore must not fetch the entire public catalogue in one unbounded query");
+const exploreGrid=between("function renderGrid({append=false}={})","async function loadPublicCharacterPrimaryIllustration");
+assert.match(exploreGrid,/list\.slice\(0,limit\)/,
+  "Explore must cap visible character cards to the current twenty-item display page");
+assert.match(exploreGrid,/pageSize\('explore'\)/,
+  "Explore scroll continuation must advance by twenty visible cards");
+assert.match(exploreGrid,/window\.loadNextPublicCharacterPage\(\)/,
+  "Explore must fetch another backend page when the loaded rows are exhausted");
+assert.match(exploreGrid,/characterVideoObserver\.unobserve\(previousVideo\)/,
+  "Explore pagination must preserve the existing video-node reuse behavior");
+
 const encounterMemory=between("function loadEncounterMemoryList(panel,session)","async function openEncounterMemoryDetail(button)");
 assert.match(encounterMemory,/pageSize\('encounterMemories'\)/,
   "Encounter memory lists must use the shared twenty-session page size");
