@@ -1222,7 +1222,9 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     try {
       const saved = JSON.parse(localStorage.getItem(USER_SESSIONS_KEY_PREFIX + uid) || '{}');
       return saved && typeof saved === 'object' && !Array.isArray(saved)
-        ? filterDeletedChatSessions(uid, saved)
+        ? Object.fromEntries(Object.entries(filterDeletedChatSessions(uid, saved)).map(([id, session]) =>
+            [id, compactCloudSessionForLocalStorage(session)]
+          ))
         : {};
     } catch (_) {
       return {};
