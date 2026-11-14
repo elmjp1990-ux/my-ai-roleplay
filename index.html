@@ -5581,7 +5581,8 @@ async function renderFollowedAuthors() {
   }
   return renderFollowedAuthorsModule({
     $, currentUser, getRoute:() => route, getSupabaseClient:() => window.mySupabase,
-    isUuid, state, loadPublicSupabaseCharacters, author, ICON, e, avatar, card, persist, toast
+    isUuid, state, loadPublicSupabaseCharacters, author, ICON, e, avatar, card, persist, toast,
+    PoyozzListPagination:window.PoyozzListPagination
   });
 }
 
