@@ -1720,7 +1720,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 
       const pageSize=window.PoyozzListPagination?.pageSize('ownedCharacters')||10;
       if(!ownedCharacterPager||ownedCharacterPager.uid!==user.id){
-        ownedCharacterPager={uid:user.id,offset:0,hasMore:true,loading:false};
+        ownedCharacterPager=window.PoyozzListPagination.createState('ownedCharacters',{uid:user.id,cloudIds:new Set()});
       }
       const pager=ownedCharacterPager;
       if(pager.loading|| (loadMore&&!pager.hasMore))return;
@@ -3280,7 +3280,7 @@ let batch = 0;
 let chatSearch = '';
 let chatSearchExpanded = false;
 let groupCharacterSearch = '';
-let groupCharacterPickerPager={uid:null,offset:0,hasMore:true,loading:false,request:0,items:[],initialized:false,error:''};
+let groupCharacterPickerPager=window.PoyozzListPagination.createState('groupCharacterPicker',{uid:null,request:0,items:[],initialized:false,error:''});
 let groupCharacterPickerSearchTimer=null;
 let groupExpandedMemberId = null;
 let hideList = false;
@@ -5690,7 +5690,7 @@ function renderAuthor() {
   const uid=currentUser()?.uid||null;
   if(!loadMore||favoriteListPager.uid!==uid){
     favoriteListPager.observer?.disconnect();
-    favoriteListPager={uid,offset:0,hasMore:state.favorites.length>0,loading:false,observer:null};
+    favoriteListPager=window.PoyozzListPagination.createState('favorites',{uid,hasMore:state.favorites.length>0});
   }
   const pager=favoriteListPager;
   if(pager.loading||(loadMore&&!pager.hasMore))return;
@@ -5726,7 +5726,7 @@ function renderAuthor() {
   }
 }
 
-let favoriteListPager={uid:null,offset:0,hasMore:true,loading:false,observer:null};
+let favoriteListPager=window.PoyozzListPagination.createState('favorites',{uid:null});
 function renderFavoriteList(){
   const visibleIds=state.favorites.slice(0,Math.max(10,favoriteListPager.offset));
   const list=visibleIds.map(id=>state.characters.find(character=>character.id===id)).filter(character=>character&&!character.deletedAt&&accessible(character));
@@ -5758,7 +5758,7 @@ async function renderFollowedAuthors() {
 }
 
 /* Characters */
-let ownedCharacterPager={uid:null,offset:0,hasMore:true,loading:false,cloudIds:new Set()};
+let ownedCharacterPager=window.PoyozzListPagination.createState('ownedCharacters',{uid:null,cloudIds:new Set()});
 let ownedCharacterListObserver=null;
 let createVisibilityFilter = 'all';
 const characterTurnCountCache = new Map();
@@ -6676,7 +6676,7 @@ async function groupLoadCharacterPickerPage({reset=false}={}){
   if(!user?.uid||!client)return;
   if(reset||groupCharacterPickerPager.uid!==user.uid){
     const request=Number(groupCharacterPickerPager.request||0)+1;
-    groupCharacterPickerPager={uid:user.uid,offset:0,hasMore:true,loading:false,request,items:[],initialized:true,error:''};
+    groupCharacterPickerPager=window.PoyozzListPagination.createState('groupCharacterPicker',{uid:user.uid,request,items:[],initialized:true,error:''});
   }
   const pager=groupCharacterPickerPager;
   if(pager.loading||!pager.hasMore)return;
@@ -8150,7 +8150,7 @@ async function groupArchive(groupId) {
     toast(groupFriendlyError(error)||'封存失敗，請稍後重試。');
   }
 }
-function groupList() { const g=groupPrototype;g.openRequestId=(g.openRequestId||0)+1;g.active=null;g.loading=false;g.sending=false;g.pendingRequest=null;g.openError='';g.failedGroupId=null;g.step=1;g.formError='';g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:state.account?.nickname||'玩家',playerPersona:state.account?.bio||'',worldCharacterId:''};groupCharacterSearch='';groupCharacterPickerPager={uid:null,offset:0,hasMore:true,loading:false,request:groupCharacterPickerPager.request+1,items:[],initialized:false,error:''};if(route.page!=='group'||route.id||route.overlay) go({page:'group'}); else render(); }
+function groupList() { const g=groupPrototype;g.openRequestId=(g.openRequestId||0)+1;g.active=null;g.loading=false;g.sending=false;g.pendingRequest=null;g.openError='';g.failedGroupId=null;g.step=1;g.formError='';g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:state.account?.nickname||'玩家',playerPersona:state.account?.bio||'',worldCharacterId:''};groupCharacterSearch='';groupCharacterPickerPager=window.PoyozzListPagination.createState('groupCharacterPicker',{uid:null,request:groupCharacterPickerPager.request+1,items:[],initialized:false,error:''});if(route.page!=='group'||route.id||route.overlay) go({page:'group'}); else render(); }
 function groupRestart() { groupList(); }
 function chatSidebarToggleButton(mobileAction) {
   const isMobile=window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
