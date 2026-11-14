@@ -10,7 +10,7 @@
     if (!authorPages.has(authorId)) {
       authorPages.set(authorId, {
         characters: [], offset: 0, hasMore: true, loading: false,
-        loaded: false, observer: null, pageSize: pagination.pageSize('explore')
+        loaded: false, observer: null, pageSize: pagination.pageSize('authorCharacters')
       });
     }
     return authorPages.get(authorId);
