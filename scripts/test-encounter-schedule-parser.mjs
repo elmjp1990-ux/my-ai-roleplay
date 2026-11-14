@@ -30,7 +30,8 @@ assert.doesNotMatch(html, /saveEncounterSchedules\(/);
 
  // Private Storage images must refresh expired signed URLs without exposing object paths.
 assert.match(html, /async function refreshCharacterIllustrationSignedUrl\(storagePath\)/);
-assert.match(html, /createSignedUrl\(storagePath,3600\)/);
+assert.match(html, /from\('character-illustrations'\)\.createSignedUrl\(path,3600\)/);
+assert.match(html, /from\('character-illustrations'\)\.createSignedUrls\(paths,3600\)/);
 assert.match(html, /data-character-illustration-path/);
 assert.match(html, /document\.addEventListener\('error',[\s\S]*refreshCharacterIllustrationSignedUrl/);
 assert.match(html, /document\.addEventListener\('load'/);
