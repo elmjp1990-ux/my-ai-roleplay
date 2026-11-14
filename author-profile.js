@@ -8,10 +8,9 @@
 
   function pageFor(authorId, pagination) {
     if (!authorPages.has(authorId)) {
-      authorPages.set(authorId, {
-        characters: [], offset: 0, hasMore: true, loading: false,
-        loaded: false, observer: null, pageSize: pagination.pageSize('authorCharacters')
-      });
+      authorPages.set(authorId, pagination.createState('authorCharacters', {
+        characters: [], loaded: false
+      }));
     }
     return authorPages.get(authorId);
   }
@@ -91,10 +90,12 @@
           </div>`;
         const sentinel = $('authorCharacterSentinel');
         if (sentinel && !page.loading) {
+          page.observer?.disconnect();
           page.observer = PoyozzListPagination.observeEnd(sentinel, async () => {
+            if (route.page !== 'author' || route.id !== authorId) return;
             try {
               await loadAuthorCharacters(authorId, page, dependencies);
-              rerender();
+              if (route.page === 'author' && route.id === authorId) rerender();
             } catch (error) {
               console.warn('作者公開角色載入失敗：', error?.message || error);
             }
