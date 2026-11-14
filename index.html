@@ -5580,22 +5580,21 @@ document.addEventListener('click',event=>{
   button.disabled=true;
   void loadCloudComments(route.id,{loadMore:true});
 });
-function renderComments() {
-  const renderCommentsModule = window.PoyozzCommentRenderer?.render;
-  if (typeof renderCommentsModule !== 'function') {
-    console.error('POYOZZ comment-renderer module is unavailable.');
-    return;
-  }
-  const result=renderCommentsModule({
-    $, state, route, currentUser, currentCharacter,
-    author, avatar, e, timeText, cloudCommentHydrationCache
-  });
-  const uid=currentUser()?.uid||null,characterId=route.id;
-  const pager=cloudCommentPageStates.get((uid||'anonymous')+':'+characterId);
+function renderCommentLoadMoreButton(){
+  const uid=currentUser()?.uid||null;
+  const pager=cloudCommentPageStates.get((uid||'anonymous')+':'+route.id);
   const mount=$('comments');
   if(mount&&pager?.hasMore&&!pager.loading){
     mount.insertAdjacentHTML('beforeend','<button type="button" class="button secondary" data-action="comments-load-more">載入更多評論</button>');
   }
+}
+function renderComments() {
+  const renderCommentsModule=window.PoyozzCommentRenderer?.render;
+  if(typeof renderCommentsModule!=='function')return;
+  const result=renderCommentsModule({
+    $,state,route,currentUser,currentCharacter,author,avatar,e,timeText,cloudCommentHydrationCache
+  });
+  renderCommentLoadMoreButton();
   return result;
 }
 async function refreshAuthorFollowState(authorId) {
