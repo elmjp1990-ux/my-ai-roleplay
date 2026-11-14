@@ -7,6 +7,8 @@ on:
       - "supabase/functions/group-chat-turn/index.ts"
       - "supabase/functions/_shared/ai-value-utils.ts"
       - "supabase/functions/_shared/ai-value-utils.test.ts"
+      - "supabase/functions/_shared/ai-provider-result.ts"
+      - "supabase/functions/_shared/ai-provider-result.test.ts"
       - "supabase/functions/_shared/openrouter-chat-completions.test.ts"
       - "supabase/functions/_shared/story-memory-summary.ts"
       - "supabase/functions/_shared/openrouter-chat-completions.ts"
@@ -48,5 +50,7 @@ jobs:
         run: node scripts/test-dual-model-memory-summary.mjs
       - name: Test shared AI value guards
         run: deno test --no-check supabase/functions/_shared/ai-value-utils.test.ts
+      - name: Test provider result normalization
+        run: deno test --no-check supabase/functions/_shared/ai-provider-result.test.ts
       - name: Test shared OpenRouter transport
         run: deno test --no-check supabase/functions/_shared/openrouter-chat-completions.test.ts
