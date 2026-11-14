@@ -1,4 +1,4 @@
-import { normalizeAiProviderResult } from "./ai-provider-result.ts";
+import { requestOpenRouterChatCompletion } from "./openrouter-chat-completions.ts";
 
 type DbRow = Record<string, unknown>;
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -57,46 +57,14 @@ export async function recordChatModelUsage(
 }
 
 async function requestMemorySummary(messages: Array<{ role: "system" | "user"; content: string }>, apiKey: string) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 45_000);
-  try {
-    const response = await fetch(OPENROUTER_URL, {
-      method: "POST",
-      headers: {
-        "Authorization": "Bearer " + apiKey,
-        "Content-Type": "application/json",
-        "X-OpenRouter-Title": "POYOZZ",
-      },
-      body: JSON.stringify({
-        model: SUMMARY_MODEL,
-        response_format: { type: "json_object" },
-        messages,
-        temperature: 0.2,
-        // No client-side output limit is set; the benchmark showed that
-        // fixed caps can truncate reasoning-heavy summaries.
-        provider: { only: ["deepinfra"], allow_fallbacks: false, data_collection: "deny" },
-      }),
-      signal: controller.signal,
-    });
-    let payload: DbRow;
-    try {
-      payload = row(await response.json());
-    } catch {
-      payload = { error: { code: "invalid_provider_response" } };
-    }
-    payload.status = response.status;
-    if (!response.ok && payload.error == null) payload.error = { code: "http_" + response.status };
-    return {
-      result: normalizeAiProviderResult(payload),
-      httpStatus: response.status,
-      requestId: response.headers.get("x-request-id") || str(payload.id),
-      provider: str(payload.provider) || "deepinfra",
-      model: str(payload.model) || SUMMARY_MODEL,
-      usage: row(payload.usage),
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
+  return requestOpenRouterChatCompletion({
+    messages,
+    apiKey,
+    model: SUMMARY_MODEL,
+    timeoutMs: 45_000,
+    temperature: 0.2,
+    responseFormat: { type: "json_object" },
+  });
 }
 
 export async function processDueStoryMemorySummary(
