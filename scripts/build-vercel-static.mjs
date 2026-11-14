@@ -22,6 +22,7 @@ const runtimeFiles = [
   'custom-tag-picker.js',
   'memory-album.js',
   'encounter-scene.js',
+  'group-opening-presets.js',
   'LOGO_WEBICON.webp',
   'LOGO_WEBLOGO.webp',
   'encounter-default-scene.webp',
