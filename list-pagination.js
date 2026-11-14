@@ -8,6 +8,7 @@
     encounterMemories: 10,
     messages: 10,
     ownedCharacters: 10,
+    favorites: 10,
     characterComments: 10,
     memoryPhotos: 10
   });
