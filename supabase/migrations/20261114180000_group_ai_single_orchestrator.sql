@@ -313,11 +313,13 @@ BEGIN
 
   -- Persist each member's phone state in the same transaction as the
   -- assistant messages and wallet settlement. A partial phone update is invalid.
-  IF jsonb_typeof(p_phone_updates) IS DISTINCT FROM 'array'
-    OR jsonb_array_length(p_phone_updates) <> (
-      SELECT count(*) FROM public.chat_group_members m WHERE m.group_id = v_turn.group_id
-    ) THEN
+  IF jsonb_typeof(p_phone_updates) IS DISTINCT FROM 'array' THEN
     RAISE EXCEPTION 'invalid_group_phone_updates' USING ERRCODE = '22023';
+  END IF;
+  IF jsonb_array_length(p_phone_updates) <> (
+    SELECT count(*) FROM public.chat_group_members m WHERE m.group_id = v_turn.group_id
+  ) THEN
+    RAISE EXCEPTION 'incomplete_group_phone_updates' USING ERRCODE = '22023';
   END IF;
 
   IF (SELECT count(DISTINCT value->>'character_id') FROM jsonb_array_elements(p_phone_updates)) <> jsonb_array_length(p_phone_updates) THEN
@@ -328,9 +330,11 @@ BEGIN
   LOOP
     IF jsonb_typeof(v_phone_update) IS DISTINCT FROM 'object'
       OR jsonb_typeof(v_phone_update->'character_id') IS DISTINCT FROM 'string'
-      OR jsonb_typeof(v_phone_update->'notifications') IS DISTINCT FROM 'array'
-      OR jsonb_array_length(v_phone_update->'notifications') > 8 THEN
+      OR jsonb_typeof(v_phone_update->'notifications') IS DISTINCT FROM 'array' THEN
       RAISE EXCEPTION 'invalid_group_phone_update' USING ERRCODE = '22023';
+    END IF;
+    IF jsonb_array_length(v_phone_update->'notifications') > 8 THEN
+      RAISE EXCEPTION 'too_many_group_phone_notifications' USING ERRCODE = '22023';
     END IF;
     BEGIN
       v_phone_character_id := (v_phone_update->>'character_id')::uuid;
