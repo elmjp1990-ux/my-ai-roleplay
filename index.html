@@ -6747,13 +6747,14 @@ function renderGroupConversation() {
     const actionableGroupMessage=!isSystem&&['user','character'].includes(m.type);
     const latestEditableGroupMessage = actionableGroupMessage && !g.searchJump &&
       g.messages.filter(item=>item.type===m.type).at(-1)?.id===m.id;
-    const actionButtons = actionableGroupMessage
-      ? '<div class="message-action-bar" aria-label="訊息操作">'+
-        '<button type="button" class="message-action-icon" data-action="copy-group-message" data-id="'+e(m.id)+'" aria-label="複製" title="複製">'+ICON.copy+'</button>'+
-        '<button type="button" class="message-action-icon" data-action="delete-group-message" data-id="'+e(m.id)+'" aria-label="刪除" title="刪除">'+ICON.trash+'</button>'+
-        (m.type==='character'?'<button type="button" class="message-action-icon" data-action="report" data-kind="AI訊息" data-id="'+e(m.id)+'" aria-label="舉報" title="舉報">'+ICON.flag+'</button>':'')+
-        (latestEditableGroupMessage?'<button type="button" class="message-action-icon" data-action="edit-group-message" data-id="'+e(m.id)+'" aria-label="編輯" title="編輯">'+ICON.edit+'</button>':'')+
-        '</div>' : '';
+    const actionButtons = actionableGroupMessage ? renderMessageActionBar({
+      id:m.id,
+      copyAction:'copy-group-message',
+      deleteAction:'delete-group-message',
+      reportKind:m.type==='character'?'AI訊息':'',
+      editAction:'edit-group-message',
+      canEdit:latestEditableGroupMessage
+    }) : '';
     return '<div class="message '+(isUser?'user':'')+(hasSpeaker?' roleplay-prefixed-message':'')+'" data-message="'+e(m.id)+'">'+outerAvatar+
       '<div class="message-content">'+bodyHTML+actionButtons+'</div></div>';
   }).join('') || '<div class="empty">這段群組對話還沒有訊息，輸入第一句話開始故事。</div>';
@@ -7922,6 +7923,15 @@ function renderCharacterSpeechSegments(raw, role = {}) {
     ).join('');
   }).join('');
 }
+function renderMessageActionBar({id,copyAction,deleteAction,reportKind='',editAction,canEdit=false}) {
+  const messageId=e(id);
+  return '<div class="message-action-bar" aria-label="訊息操作">'+
+    '<button type="button" class="message-action-icon" data-action="'+e(copyAction)+'" data-id="'+messageId+'" aria-label="複製" title="複製">'+ICON.copy+'</button>'+
+    '<button type="button" class="message-action-icon" data-action="'+e(deleteAction)+'" data-id="'+messageId+'" aria-label="刪除" title="刪除">'+ICON.trash+'</button>'+
+    (reportKind?'<button type="button" class="message-action-icon" data-action="report" data-kind="'+e(reportKind)+'" data-id="'+messageId+'" aria-label="舉報" title="舉報">'+ICON.flag+'</button>':'')+
+    (canEdit?'<button type="button" class="message-action-icon" data-action="'+e(editAction)+'" data-id="'+messageId+'" aria-label="編輯" title="編輯">'+ICON.edit+'</button>':'')+
+    '</div>';
+}
 function roleplaySegmentHTML(segment, options = {}) {
   const name = segment.kind === 'user' ? (currentUser()?.nickname || '你') : segment.speakerName;
   const characterAvatar = segment.kind === 'character' && segment.avatar
@@ -8007,25 +8017,19 @@ function renderMessages(scroll = true) {
       : !user
         ? '<div class="roleplay-segments">' + renderCharacterSpeechSegments(displayText,{name:c.name,image:c.image || c.avatar_url || ''}) + '</div>'
         : '<div class="message-name">' + e(currentUser()?.nickname || '你') + '</div>' + formatMessage(displayText);
-    // When the player explicitly summons a character with a role prefix, move the
-    // player identity onto that portrait as a small badge instead of showing a
-    // second, separate player avatar beside it.
-    // Player-authored messages do not show a separate outer player avatar.
-    // When a role prefix summons a character, the player marker is shown only
-    // as a small badge over that character's portrait.
-    // Character identity is rendered inside each speech segment so narration never inherits an outer avatar column.
-    const outerAvatar = '';
     const latestEditableMessage=!s.cloudSearchJump && (m.role==='user'||m.role==='assistant') &&
       s.messages.filter(item=>item.role===m.role).at(-1)?.id===m.id;
     const actionButtons=(m.role==='user'||m.role==='assistant')
-      ? '<div class="message-action-bar" aria-label="訊息操作">'+
-        '<button type="button" class="message-action-icon" data-action="copy-message" data-id="'+e(m.id)+'" aria-label="複製" title="複製">'+ICON.copy+'</button>'+
-        '<button type="button" class="message-action-icon" data-action="delete-message" data-id="'+e(m.id)+'" aria-label="刪除" title="刪除">'+ICON.trash+'</button>'+
-        (m.role==='assistant'?'<button type="button" class="message-action-icon" data-action="report" data-kind="AI訊息" data-id="'+e(m.id)+'" aria-label="舉報" title="舉報">'+ICON.flag+'</button>':'')+
-        (latestEditableMessage?'<button type="button" class="message-action-icon" data-action="edit-message" data-id="'+e(m.id)+'" aria-label="編輯" title="編輯">'+ICON.edit+'</button>':'')+
-        '</div>' : '';
+      ? renderMessageActionBar({
+          id:m.id,
+          copyAction:'copy-message',
+          deleteAction:'delete-message',
+          reportKind:m.role==='assistant'?'AI訊息':'',
+          editAction:'edit-message',
+          canEdit:latestEditableMessage
+        })
+      : '';
     return `<article class="message ${user ? 'user' : ''} ${hasSpeaker && !user ? 'roleplay-prefixed-message' : ''}" data-message="${e(m.id)}">
-      ${outerAvatar}
       <div class="message-content">${contentHTML}${actionButtons}</div>
     </article>`;
   }).join('');
@@ -11931,7 +11935,7 @@ document.addEventListener('submit',function(event){
 .composer-send[disabled] span[aria-hidden="true"],.composer-send.is-sending span[aria-hidden="true"]{font-size:17px;line-height:1}
 .followed-authors-back{display:inline-flex;align-items:center;justify-content:center;flex:0 0 40px;width:40px;height:40px;padding:8px;margin:0;color:var(--muted);border:1px solid var(--border);background:var(--panel)}.followed-authors-title-row{display:flex;align-items:center;gap:10px}.followed-authors-title-row h1{margin:0}.group-wizard-title{min-width:0;flex:1}.group-member-confirm-row{display:flex;align-items:center;gap:12px;flex-wrap:nowrap;overflow-x:auto;padding:4px 2px 8px}.group-member-confirm-avatar{display:inline-flex;align-items:center;justify-content:center;flex:0 0 58px;width:58px;height:58px;padding:4px;border-radius:50%;background:var(--panel2);border:1px solid var(--border)}.group-member-confirm-avatar .avatar{width:48px;height:48px;border-radius:50%}
 .followed-authors-back:hover{color:var(--text);background:var(--panel2)}
-@media(max-width:767px){body.group-chat-page .sidebar{display:none!important}body.group-chat-page .app{margin-left:0!important}body.group-chat-page .chat-layout{display:block;height:100dvh}body.group-chat-page .chat-layout.hide-list .chat-list{display:none!important}body.group-chat-page .chat-main{height:100dvh;border:0;border-radius:0}body.group-chat-page .chat-heading{padding:6px 8px}body.group-chat-page body.group-chat-page .composer{padding:5px 8px calc(5px + env(safe-area-inset-bottom))}}
+@media(max-width:767px){body.group-chat-page .chat-layout.hide-list .chat-list{display:none!important}}
 </style>
 
 
