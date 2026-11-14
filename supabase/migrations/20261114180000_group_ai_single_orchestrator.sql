@@ -74,6 +74,7 @@ BEGIN
   WHERE g.id = p_group_id
     AND g.owner_id = p_user_id
     AND g.archived_at IS NULL
+    AND g.deleted_at IS NULL
   FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'group_not_found_or_not_accessible' USING ERRCODE = '42501';
@@ -187,6 +188,8 @@ AS $function$
 DECLARE
   v_turn public.chat_group_turns%rowtype;
   v_charge public.chat_group_turn_charges%rowtype;
+  v_group_id uuid;
+  v_group_deleted_at timestamptz;
   v_speech jsonb;
   v_character_id uuid;
   v_content text;
@@ -195,6 +198,23 @@ DECLARE
   v_sequence integer := 0;
   v_count integer := 0;
 BEGIN
+  -- Lock the parent first, matching reserve/delete lock order. If deletion won
+  -- the race while the provider was generating, reject persistence so the
+  -- caller can refund the still-reserved charge.
+  SELECT t.group_id INTO v_group_id
+  FROM public.chat_group_turns t
+  WHERE t.id = p_turn_id AND t.user_id = p_user_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'group_turn_not_found'; END IF;
+
+  SELECT g.deleted_at INTO v_group_deleted_at
+  FROM public.chat_groups g
+  WHERE g.id = v_group_id
+  FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'group_not_found'; END IF;
+  IF v_group_deleted_at IS NOT NULL THEN
+    RAISE EXCEPTION 'group_deleted_during_generation';
+  END IF;
+
   SELECT t.* INTO v_turn
   FROM public.chat_group_turns t
   WHERE t.id = p_turn_id AND t.user_id = p_user_id
@@ -283,7 +303,16 @@ DECLARE
   v_turn public.chat_group_turns%rowtype;
   v_charge public.chat_group_turn_charges%rowtype;
   v_wallet public.wallet_accounts%rowtype;
+  v_group_id uuid;
 BEGIN
+  -- Keep the same parent-first lock order as reservation/deletion. The soft-
+  -- deleted parent remains available so an already-reserved turn can refund.
+  SELECT t.group_id INTO v_group_id
+  FROM public.chat_group_turns t
+  WHERE t.id = p_turn_id AND t.user_id = p_user_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'group_turn_not_found'; END IF;
+  PERFORM 1 FROM public.chat_groups g WHERE g.id = v_group_id FOR UPDATE;
+
   SELECT t.* INTO v_turn
   FROM public.chat_group_turns t
   WHERE t.id = p_turn_id AND t.user_id = p_user_id
@@ -345,6 +374,12 @@ GRANT EXECUTE ON FUNCTION public.reserve_group_chat_turn(uuid, uuid, uuid, text)
 GRANT EXECUTE ON FUNCTION public.complete_group_chat_turn(uuid, uuid, jsonb) TO service_role;
 GRANT EXECUTE ON FUNCTION public.refund_group_chat_turn(uuid, uuid, text) TO service_role;
 
+-- Defense in depth: one wallet ledger entry per group turn, operation and currency.
+-- The RPC row locks/state transitions remain the primary idempotency mechanism.
+CREATE UNIQUE INDEX IF NOT EXISTS wallet_transactions_group_turn_idempotency_uidx
+  ON public.wallet_transactions(user_id, biz_type, reference_id, currency_type)
+  WHERE reference_id IS NOT NULL
+    AND biz_type IN ('group_chat_turn_charge', 'group_chat_turn_refund');
 
 -- Store provider diagnostics and token/cost metadata without storing prompts,
 -- player messages, raw model output, or credentials.
