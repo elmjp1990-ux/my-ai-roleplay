@@ -626,3 +626,8 @@ assert.match(queryOptimizationMigration,/find_existing_story_chat_session/);
 assert.match(queryOptimizationMigration,/SECURITY INVOKER/);
 assert.match(queryOptimizationMigration,/get_encounter_character_schedules/);
 assert.match(queryOptimizationMigration,/SECURITY DEFINER/);
+
+
+const cloudSessionLoader=between("async function loadCloudChatSessions(user, options = {})","function captureChatScrollAnchor");
+assert.ok(cloudSessionLoader.includes("options.verifiedUser?.id===user.id"));
+assert.ok(cloudSessionLoader.includes("currentUser()?.uid!==user.id"));

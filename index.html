@@ -3772,8 +3772,10 @@ async function loadCloudChatSessions(user, options = {}) {
   const onlySessionId = options.onlySessionId || null;
   const syncStartedAt = Date.now();
   try {
-    const verifiedUser = await getVerifiedAuthUser(user.id);
-    if (!verifiedUser) return;
+    const verifiedUser = options.verifiedUser?.id===user.id && currentUser()?.uid===user.id
+      ? options.verifiedUser
+      : await getVerifiedAuthUser(user.id);
+    if (!verifiedUser || currentUser()?.uid!==user.id) return;
     const pagedList=!onlySessionId&&options.listPage!==false;
     const pager=chatSessionListPager;
     if(pagedList){
