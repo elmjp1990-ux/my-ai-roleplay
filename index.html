@@ -1580,6 +1580,29 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     state.characters=window.PoyozzListPagination.mergeUnique(state.characters,items,character=>character.id);
     return {items,hasMore:rows.length===pageSize};
   }
+  async function loadPublicAuthorLatestCharacters(authorIds=[]){
+    const client=window.mySupabase;
+    const result=new Map();
+    if(!client)return result;
+    for(let offset=0;offset<authorIds.length;offset+=5){
+      const batch=authorIds.slice(offset,offset+5);
+      const rows=await Promise.all(batch.map(async authorId=>{
+        const {data,error,count}=await client.from('characters')
+          .select('id,author_id,name,gender,age,avatar_url,avatar_video_path,is_nsfw,visibility,review_status,intro,race,style,tags,created_at,first_published_at,latest_eligible',{count:'exact'})
+          .eq('author_id',authorId).eq('visibility','public').is('deleted_at',null)
+          .order('first_published_at',{ascending:false,nullsFirst:false})
+          .order('id',{ascending:false}).limit(4);
+        if(error)throw new Error('讀取作者最新公開角色失敗：'+error.message);
+        return [authorId,{rows:data||[],total:Number(count??(data||[]).length)}];
+      }));
+      for(const [authorId,entry] of rows){
+        const items=entry.rows.map(mapPublicCharacterRow);
+        state.characters=window.PoyozzListPagination.mergeUnique(state.characters,items,character=>character.id);
+        result.set(authorId,{items,total:entry.total});
+      }
+    }
+    return result;
+  }
   let publicCharactersLoadPromise = null;
   function loadPublicSupabaseCharacters(options={}) {
     const loadMore=options.loadMore===true;
@@ -5597,8 +5620,8 @@ async function renderFollowedAuthors() {
   }
   return renderFollowedAuthorsModule({
     $, currentUser, getRoute:() => route, getSupabaseClient:() => window.mySupabase,
-    isUuid, state, loadPublicSupabaseCharacters, author, ICON, e, avatar, card, persist, toast,
-    PoyozzListPagination:window.PoyozzListPagination
+    isUuid, state, author, ICON, e, avatar, card, persist, toast,
+    loadPublicAuthorLatestCharacters
   });
 }
 
