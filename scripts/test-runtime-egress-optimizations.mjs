@@ -214,7 +214,7 @@ assert.match(html,/group_chat_turn_charge: '群組聊天回覆扣款'/,"wallet h
 assert.match(html,/group_chat_turn_refund: '群組聊天失敗退款'/,"wallet history must label group turn refunds");
 
 const groupListHydration=between("async function groupHydrateListRows(groups)","async function groupLoadList(force=false,loadMore=false)");
-assert.match(groupListHydration,/rpc\('get_my_group_list_previews'/,'group list must batch latest-message previews through one RPC per page');
+assert.match(groupListHydration,/rpc\(\s*'get_my_group_list_previews'/,'group list must batch latest-message previews through one RPC per page');
 assert.doesNotMatch(groupListHydration,/chat_group_messages/,'group list must not issue one latest-message query per group');
 assert.match(groupListHydration,/for\(let i=0;i<groupIds\.length;i\+=10\)/,'group list must split pinned and regular pages into at-most-ten-ID preview batches');
 const groupPreviewMigration=fs.readFileSync('supabase/migrations/20261114230000_batch_group_list_previews.sql','utf8');
