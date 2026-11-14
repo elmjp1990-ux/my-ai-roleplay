@@ -233,7 +233,7 @@ assert.match(groupList,/pinned\.eq\.false,pinned\.is\.null/,
   "the paginated group query must exclude pinned rows");
 assert.match(groupList,/\.range\(g\.groupListOffset,g\.groupListOffset\+pageSize-1\)/,
   "group list pages must be fetched by the backend in bounded ranges");
-assert.match(groupList,/groupHydrateListRows\(newRows,user\.id\)/,
+assert.match(groupList,/groupHydrateListRows\(newRows\)/,
   "member, avatar and preview hydration must be restricted to newly loaded groups");
 assert.match(groupList,/g\.groupListHasMore=currentPage\.length===pageSize/,
   "group list continuation must stop when the backend returns a short page");
