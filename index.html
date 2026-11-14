@@ -892,6 +892,16 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 .group-character-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
 .group-character-option{display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid var(--border);border-radius:12px}
 .group-character-option input{width:auto;margin-top:5px}
+.group-character-select{display:flex;align-items:flex-start;gap:10px;cursor:pointer}
+.group-character-copy{min-width:0;flex:1;overflow-wrap:anywhere}
+.group-character-intro-toggle{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:2px 0;border:0;background:transparent;text-align:left;color:var(--text)}
+.group-character-intro-toggle>span{font-size:11px;color:var(--muted);white-space:nowrap}
+.group-character-intro{margin:7px 0 0;font-size:12px;line-height:1.55;color:var(--muted);white-space:pre-wrap}
+.group-opening-preset-list{max-height:min(62vh,560px);overflow:auto;display:grid;gap:8px}
+.group-opening-preset-category{border:1px solid var(--border);border-radius:10px;padding:9px 11px}
+.group-opening-preset-category>summary{cursor:pointer;font-weight:600}
+.group-opening-preset{display:grid;gap:4px;width:100%;margin-top:8px;padding:9px 10px;text-align:left}
+.group-opening-preset>span{white-space:normal;line-height:1.45}
 .group-actions{display:flex;justify-content:space-between;gap:8px;margin-top:18px}
 .group-alert{background:var(--soft);border:1px solid var(--border);border-radius:10px;padding:11px;color:var(--muted);font-size:13px}
 .group-scene-input-wrap{position:relative}.group-scene-input-wrap textarea{padding-right:110px}.group-inspiration{position:absolute;right:8px;top:8px;padding:6px 9px;font-size:12px;background:var(--soft);border-color:#818cf866}.group-scene-help{font-size:12px;color:var(--muted);line-height:1.7}
@@ -3272,6 +3282,7 @@ let groupCharacterSearch = '';
 let groupCharacterPickerPager=window.PoyozzListPagination.createState('groupCharacterPicker',{uid:null,request:0,items:[],initialized:false,error:''});
 let groupCharacterPickerSearchTimer=null;
 let groupExpandedMemberId = null;
+let groupCharacterIntroExpandedId = null;
 let hideList = false;
 let banner = 0;
 let draftCharacter = null;
@@ -6663,7 +6674,7 @@ function groupRenderSteps() {
 function groupRenderScenes() {
   const g=groupPrototype;
   const scene=g.draft.scenes[0]||{name:'初始相遇',description:''};
-  return '<div class="group-field"><span>初始開場情境</span><div class="group-scene-input-wrap"><textarea id="groupSceneDesc0" maxlength="3000" data-count-for="groupSceneDesc0" placeholder="描寫時間、地點、角色如何相遇，以及故事此刻正在發生什麼。">'+e(scene.description||'')+'</textarea><button type="button" class="group-inspiration" data-action="group-inspiration">✨ AI 靈感</button></div><small class="group-scene-help char-counter" data-count-for="groupSceneDesc0">'+Array.from(scene.description||'').length+'/3000</small></div>';
+  return '<div class="group-field"><span>初始開場情境</span><div class="group-scene-input-wrap"><textarea id="groupSceneDesc0" maxlength="3000" data-count-for="groupSceneDesc0" placeholder="描寫時間、地點、角色如何相遇，以及故事此刻正在發生什麼。">'+e(scene.description||'')+'</textarea><button type="button" class="group-inspiration" data-action="group-inspiration">✨ 開場靈感</button></div><small class="group-scene-help char-counter" data-count-for="groupSceneDesc0">'+Array.from(scene.description||'').length+'/3000</small></div>';
 }
 async function groupLoadCharacterPickerPage({reset=false}={}){
   const user=currentUser(),client=window.mySupabase;
@@ -6727,7 +6738,10 @@ function groupRenderCharacterResults() {
   const favoriteIds=new Set(byFavorite.map(c=>c.id));
   const byPublic=matches.filter(c=>!recentIds.has(c.id)&&!favoriteIds.has(c.id));
   const ordered=[...byRecent,...byFavorite,...byPublic];
-  const renderRows=rows=>rows.map(c=>'<label class="group-character-option"><input type="checkbox" data-action="group-toggle-character" data-id="'+e(c.id)+'" '+(groupPrototype.draft.memberIds.includes(c.id)?'checked':'')+' '+(groupPrototype.draft.memberIds.length>=3&&!groupPrototype.draft.memberIds.includes(c.id)?'disabled':'')+'><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt="" style="width:46px;height:46px"><span style="min-width:0;overflow-wrap:anywhere"><strong>'+e(c.name)+'</strong><span class="muted small" style="display:block">'+e(c.intro||'尚無角色介紹')+'</span></span></label>').join('');
+  const renderRows=rows=>rows.map(c=>{
+    const expanded=groupCharacterIntroExpandedId===c.id;
+    return '<div class="group-character-option"><label class="group-character-select"><input type="checkbox" data-action="group-toggle-character" data-id="'+e(c.id)+'" '+(groupPrototype.draft.memberIds.includes(c.id)?'checked':'')+' '+(groupPrototype.draft.memberIds.length>=3&&!groupPrototype.draft.memberIds.includes(c.id)?'disabled':'')+'><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt="" style="width:46px;height:46px"></label><div class="group-character-copy"><button type="button" class="group-character-intro-toggle" data-action="group-toggle-character-intro" data-id="'+e(c.id)+'" aria-expanded="'+expanded+'"><strong>'+e(c.name)+'</strong><span aria-hidden="true">'+(expanded?'收合 −':'介紹 +')+'</span></button><p class="group-character-intro '+(expanded?'':'hidden')+'">'+e(c.intro||'尚無角色介紹')+'</p></div></div>';
+  }).join('');
   const section=(title,rows)=>rows.length?'<h3 class="group-character-section-title">'+e(title)+' ('+rows.length+')</h3><div class="group-character-grid">'+renderRows(rows)+'</div>':'';
   const empty=ordered.length?'':(pager.error?'<div class="group-alert">'+e(pager.error)+'</div>':pager.loading?'<div class="group-alert">正在載入公開角色…</div>':'<div class="group-alert">'+(q?'目前載入的角色中沒有符合搜尋條件的結果。可以載入更多搜尋結果。':'正在等待公開角色資料。')+'</div>');
   const more=pager.hasMore?'<button type="button" class="ghost" data-action="group-character-load-more" '+(pager.loading?'disabled':'')+'>'+(pager.loading?'載入中…':'載入更多公開角色（每次 10 位）')+'</button>':'';
@@ -7758,14 +7772,17 @@ function renderGroupPrototype() {
     const nameValue=g.draft.name||suggestedName;
     const worldId=g.draft.worldCharacterId||members[0]?.id||'';
     const avatarPieces=members.map(c=>'<span title="'+e(c.name)+'" class="group-list-avatar" style="width:42px;height:42px;border-radius:50%;overflow:hidden">'+(safeImage(c.image||c.avatar_url)?'<img src="'+e(safeImage(c.image||c.avatar_url))+'" alt="" style="width:100%;height:100%;object-fit:cover">':e((c.name||'角').slice(0,1)))+'</span>').join('');
-    const worldChoices=members.map(c=>'<label class="group-character-option"><input type="radio" name="groupWorldCharacter" data-action="group-world-character" value="'+e(c.id)+'" '+(worldId===c.id?'checked':'')+'><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt=""><span><strong>'+e(c.name)+'</strong><span class="muted small" style="display:block">以此角色的現有介紹作為背景參考</span></span></label>').join('');
+    const customWorldSelected=worldId==='__player_custom__';
+    const worldChoices=members.map(c=>'<label class="group-character-option"><input type="radio" name="groupWorldCharacter" data-action="group-world-character" value="'+e(c.id)+'" '+(worldId===c.id?'checked':'')+'><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt=""><span><strong>'+e(c.name)+'</strong><span class="muted small" style="display:block">以此角色的現有介紹作為背景參考</span></span></label>').join('')+
+      '<label class="group-character-option"><input type="radio" name="groupWorldCharacter" data-action="group-world-character" value="__player_custom__" '+(customWorldSelected?'checked':'')+'><span><strong>玩家自設</strong><span class="muted small" style="display:block">可以自行填入時空背景</span></span></label>';
     body='<h2>設立群組檔案</h2>'+
       '<div class="group-panel" style="padding:12px;margin-bottom:16px"><div class="row" style="gap:8px;align-items:center">'+avatarPieces+'</div><p class="muted small" style="margin:8px 0 0">群組頭像依照已選角色組合顯示，現階段不可自行更換。</p></div>'+
       '<label class="group-field"><span>群組名稱（最多 25 字）</span><input id="groupNameInput" maxlength="25" value="'+e(nameValue)+'" placeholder="輸入群組名稱"></label>'+
       '<label class="group-field"><span>玩家角色名稱（提供給 AI）</span><input id="groupPlayerName" maxlength="80" value="'+e(g.draft.playerName||state.account?.nickname||"玩家")+'" placeholder="你的角色名稱"></label>'+
       '<div class="group-field"><span>玩家角色與人設</span><button type="button" data-action="group-persona-choose" style="width:100%;text-align:left;margin-bottom:8px">'+e(g.draft.personaPresetName||'從聊天室「人設管理」選擇人設')+'</button><textarea id="groupPlayerPersona" maxlength="3000" placeholder="描述你在這個故事中的身分、個性、背景與說話方式。">'+e(g.draft.playerPersona||state.account?.bio||'')+'</textarea><small class="muted">選擇後會帶入人設內容，仍可在此編輯；不會修改原本人設。</small></div>'+
       '<div class="group-field"><span>選擇哪位角色的世界觀作為整體背景？</span><div class="group-character-grid">'+worldChoices+'</div></div>'+
-      '<div class="group-field"><span>背景參考</span><div class="group-alert" id="groupWorldReference">'+e((members.find(c=>c.id===worldId)?.worldBackground||members.find(c=>c.id===worldId)?.world||members.find(c=>c.id===worldId)?.intro)||'所選角色目前沒有可用的公開介紹；可先繼續建立，後續再完善世界觀資料。')+'</div></div>'+
+      '<label id="groupCustomWorldField" class="group-field" '+(customWorldSelected?'':'hidden')+'><span>自設時空背景</span><textarea id="groupCustomWorldBackground" maxlength="3000" data-count-for="groupCustomWorldBackground" placeholder="可以自行填入時空背景">'+e(g.draft.world||'')+'</textarea><small class="char-counter" data-count-for="groupCustomWorldBackground">'+Array.from(g.draft.world||'').length+'/3000</small></label>'+
+      '<div class="group-field" id="groupWorldReferenceField" '+(customWorldSelected?'hidden':'')+'><span>背景參考</span><div class="group-alert" id="groupWorldReference">'+e((members.find(c=>c.id===worldId)?.worldBackground||members.find(c=>c.id===worldId)?.world||members.find(c=>c.id===worldId)?.intro)||'所選角色目前沒有可用的公開介紹；可先繼續建立，後續再完善世界觀資料。')+'</div></div>'+
       groupRenderScenes()+
       '<div class="group-field"><span>確認群組成員</span><div class="group-member-confirm-row">'+members.map(c=>'<button type="button" class="group-member-confirm-avatar" data-action="group-member-detail" data-id="'+e(c.id)+'" aria-label="查看 '+e(c.name)+' 的角色卡" title="'+e(c.name)+'"><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt=""></button>').join('')+'</div></div>';
   }
@@ -7791,12 +7808,17 @@ function groupReadStep() {
     g.draft.playerPersona=$('groupPlayerPersona')?.value||'';
     g.draft.worldCharacterId=$('view').querySelector('input[name="groupWorldCharacter"]:checked')?.value||members[0]?.id||'';
     const worldCharacter=members.find(c=>c.id===g.draft.worldCharacterId);
-    g.draft.world=String(worldCharacter?.worldBackground||worldCharacter?.world||worldCharacter?.intro||'').slice(0,10000);
+    g.draft.world=g.draft.worldCharacterId==='__player_custom__'
+      ? String($('groupCustomWorldBackground')?.value||'')
+      : String(worldCharacter?.worldBackground||worldCharacter?.world||worldCharacter?.intro||'').slice(0,10000);
     g.draft.scenes=[{name:$('groupSceneName0')?.value.trim()||'初始相遇',description:$('groupSceneDesc0')?.value||''}];
     if(!g.draft.name||g.draft.name.length>25) return '群組名稱需為 1–25 字。';
     if(!g.draft.playerName||g.draft.playerName.length>80) return '請填寫 1–80 字的玩家角色名稱。';
     if(g.draft.playerPersona.length>3000) return '玩家人設不可超過 3000 字。';
-    if(!worldCharacter) return '請選擇一位角色作為整體世界觀背景。';
+    if(g.draft.worldCharacterId==='__player_custom__'){
+      if(!g.draft.world.trim())return '請填寫玩家自設的時空背景。';
+      if(g.draft.world.length>3000)return '玩家自設的時空背景最多 3000 字。';
+    }else if(!worldCharacter)return '請選擇一位角色或玩家自設作為整體世界觀背景。';
     if(g.draft.scenes[0].description.length>3000) return '初始開場情境最多 3000 字。';
   }
   return '';
@@ -7827,9 +7849,9 @@ async function groupCreate() {
     }),15000,'建立群組逾時，請重新載入群組清單確認是否已建立，避免重複建立。');
     if(error) throw error;
     const {data:updated,error:updateError}=await window.mySupabase.from('chat_groups')
-      .update({player_name:g.draft.playerName,player_persona:g.draft.playerPersona,world_character_id:g.draft.worldCharacterId,updated_at:new Date().toISOString()})
+      .update({player_name:g.draft.playerName,player_persona:g.draft.playerPersona,world_character_id:g.draft.worldCharacterId==='__player_custom__'?null:g.draft.worldCharacterId,updated_at:new Date().toISOString()})
       .eq('id',groupId).eq('owner_id',user.id).select('id,player_name,player_persona,world_character_id').maybeSingle();
-    if(updateError||!updated||updated.player_name!==g.draft.playerName||updated.player_persona!==g.draft.playerPersona||updated.world_character_id!==g.draft.worldCharacterId) throw new Error('群組已建立，但雲端未能確認玩家人設與世界觀選擇完整保存。請重新開啟群組確認，勿重複建立。');
+    if(updateError||!updated||updated.player_name!==g.draft.playerName||updated.player_persona!==g.draft.playerPersona||updated.world_character_id!==(g.draft.worldCharacterId==='__player_custom__'?null:g.draft.worldCharacterId)) throw new Error('群組已建立，但雲端未能確認玩家人設與世界觀選擇完整保存。請重新開啟群組確認，勿重複建立。');
     g.loading=false;
     await groupOpen(groupId);
   } catch(error) {
@@ -9812,7 +9834,7 @@ function refreshExploreTagPicker() {
 function updateCharacterCounters(root=document) {
   root.querySelectorAll('.char-counter[data-count-for]').forEach(counter => {
     const name=counter.dataset.countFor;
-    const field=name==='groupSceneDesc0' ? root.querySelector('#groupSceneDesc0') : root.querySelector('[name="'+name+'"]');
+    const field=(name==='groupSceneDesc0'||name==='groupCustomWorldBackground') ? root.querySelector('#'+name) : root.querySelector('[name="'+name+'"]');
     if(!field) return;
     const max=field.maxLength > 0 ? field.maxLength : 3000;
     const actualCount=typeof Intl!=='undefined'&&Intl.Segmenter?[...new Intl.Segmenter('zh-Hant',{granularity:'grapheme'}).segment(field.value)].length:Array.from(field.value).length;
@@ -9879,11 +9901,16 @@ document.addEventListener('click',async event => {
       case 'phone-close':document.querySelector('.phone-modal-backdrop')?.remove();break;
       case 'group-next':groupNext();break;
       case 'group-inspiration': {
-        const members=groupSelectedCharacters();
-        const names=members.map(c=>c.name).join('、')||'角色們';
-        const sceneName=$('groupSceneName0')?.value.trim()||'初始相遇';
-        const sample='【測試用靈感範例，非 AI 生成】故事從「'+sceneName+'」開始。'+names+'在同一個時空中意外相遇，周遭的環境藏著尚未揭曉的線索。有人率先打破沉默，有人則保持觀望，每個人都帶著自己的目的與過往。此刻，一個突如其來的事件讓眾人的目光交會，也讓原本平靜的氣氛開始改變。你可以接著補上時間、地點、角色之間的關係，以及玩家角色如何加入這場故事。';
-        const scene=$('groupSceneDesc0');if(scene){scene.value=sample;scene.dispatchEvent(new Event('input',{bubbles:true}));toast('已填入測試用 Mock 靈感文字，可自行修改；未呼叫 AI、未扣款。');}
+        const presets=window.PoyozzGroupOpeningPresets||[];
+        if(!presets.length){toast('開場模式資料尚未載入，請重新整理後再試。');break;}
+        const groups=new Map();
+        for(const preset of presets){const rows=groups.get(preset.category)||[];rows.push(preset);groups.set(preset.category,rows);}
+        const content='<p class="small muted">從 100 組預設開場中挑選一組，套用後仍可自由修改。這些內容為固定範本，不會呼叫 AI，也不會扣款。</p>'+
+          '<div class="group-opening-preset-list">'+[...groups].map(([category,rows])=>
+            '<details class="group-opening-preset-category"><summary>'+e(category)+' <span class="small muted">('+rows.length+')</span></summary>'+
+            rows.map(item=>'<button type="button" class="group-opening-preset" data-action="group-opening-preset" data-id="'+item.id+'"><strong>'+e(item.title)+'</strong><span class="small muted">'+e(item.text)+'</span></button>').join('')+
+            '</details>').join('')+'</div>';
+        showDialog('選擇開場模式',content);
         break;
       }
       case 'chat-settings-menu': { const next={...route,chatOverlay:'settings'};delete next.overlay;go(next);break; }
@@ -10129,7 +10156,34 @@ document.addEventListener('click',async event => {
       case 'group-back':groupBack();break;
       case 'group-toggle-character':groupToggleCharacter(key);break;
       case 'group-character-load-more': { void groupLoadCharacterPickerPage();break; }
-      case 'group-world-character': { groupPrototype.draft.worldCharacterId=button.value||button.dataset.value||'';const selected=groupSelectedCharacters().find(c=>c.id===groupPrototype.draft.worldCharacterId);const preview=$('groupWorldReference');if(preview) preview.textContent=selected?.worldBackground||selected?.world||selected?.intro||'所選角色目前沒有可用的公開介紹；可先繼續建立，後續再完善世界觀資料。';break; }
+      case 'group-world-character': {
+        groupPrototype.draft.worldCharacterId=button.value||button.dataset.value||'';
+        const custom=groupPrototype.draft.worldCharacterId==='__player_custom__';
+        const customField=$('groupCustomWorldField'),referenceField=$('groupWorldReferenceField');
+        if(customField)customField.hidden=!custom;
+        if(referenceField)referenceField.hidden=custom;
+        const selected=groupSelectedCharacters().find(c=>c.id===groupPrototype.draft.worldCharacterId);
+        const preview=$('groupWorldReference');
+        if(preview)preview.textContent=selected?.worldBackground||selected?.world||selected?.intro||'所選角色目前沒有可用的公開介紹；可先繼續建立，後續再完善世界觀資料。';
+        if(custom)$('groupCustomWorldBackground')?.focus();
+        break;
+      }
+      case 'group-toggle-character-intro':
+        groupCharacterIntroExpandedId=groupCharacterIntroExpandedId===key?null:key;
+        render();
+        break;
+      case 'group-opening-preset': {
+        const preset=(window.PoyozzGroupOpeningPresets||[]).find(item=>String(item.id)===String(key));
+        if(!preset){toast('找不到這組開場模式，請重新開啟靈感選單。');break;}
+        const scene=$('groupSceneDesc0');
+        if(scene){
+          scene.value=preset.text;
+          scene.dispatchEvent(new Event('input',{bubbles:true}));
+          $('modal')?.close();
+          toast('已套用「'+preset.title+'」，可再依照角色與故事調整。');
+        }
+        break;
+      }
       case 'group-create':groupCreate();break;
       case 'group-send':groupSendTurn();break;
       case 'group-history-load-older':groupLoadOlderMessages();break;
@@ -11829,6 +11883,7 @@ document.addEventListener('input',event => {
   const target=event.target;
   if (target.closest('form[data-form="character"]')) saveEditorDraft();
   if (target.id==='searchInput') {search=target.value;limit=20;renderGrid();}
+  if(target.id==='groupCustomWorldBackground')groupPrototype.draft.world=target.value;
   if (target.id==='chatSearch') {
     chatSearch=target.value;
     refreshChatEntryList();
@@ -12463,6 +12518,7 @@ document.addEventListener('submit',function(event){
 // Group persona selection uses the same saved-persona list as the chat's persona management UI.
 </script>
 
+<script src="./group-opening-presets.js"></script>
 <script src="./encounter-scene.js"></script>
 <style id="poyozz-city-location-panel">
 .city-location-modal[hidden]{display:none!important}
