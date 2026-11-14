@@ -273,8 +273,9 @@ Deno.serve(async (request) => {
     return json({ status: refunded.confirmed ? "content_rejected" : "needs_reconciliation", balance: refunded.balance, retryAllowed: false }, refunded.confirmed ? 200 : 503);
   }
   if (provider.result.kind !== "generated") {
-    const confirmedClientRejection = provider.result.kind === "provider_error" &&
-      provider.status >= 400 && provider.status < 500 && provider.status !== 408 && provider.status !== 409 && provider.status !== 429;
+    const confirmedClientRejection = provider.result.kind === "empty_output" ||
+      (provider.result.kind === "provider_error" &&
+       provider.status >= 400 && provider.status < 500 && provider.status !== 408 && provider.status !== 409);
     if (confirmedClientRejection) {
       const refunded = await refund(admin, user.id, turnId, "provider_request_rejected");
       return json({ status: refunded.confirmed ? "refunded" : "needs_reconciliation", error: provider.result.kind === "provider_error" ? provider.result.code : "provider_error", balance: refunded.balance, retryAllowed: false }, refunded.confirmed ? 200 : 503);
@@ -298,8 +299,13 @@ Deno.serve(async (request) => {
     p_user_id: user.id, p_turn_id: turnId, p_speeches: speeches,
   });
   if (completeError || completed !== "completed") {
-    // The provider result is known, but persistence may have committed before
-    // the acknowledgement was lost. Do not refund or call the model again.
+    // If persistence definitely did not settle, refund atomically. If the
+    // completion committed but its acknowledgement was lost, the refund RPC
+    // refuses to reverse a settled charge and the turn remains reconcilable.
+    const refunded = await refund(admin, user.id, turnId, "group_reply_persistence_failed");
+    if (refunded.confirmed) {
+      return json({ status: "refunded", error: "group_reply_persistence_failed", balance: refunded.balance, retryAllowed: false });
+    }
     return json({ status: "needs_reconciliation", error: "group_reply_persistence_unknown", retryAllowed: false }, 503);
   }
 
