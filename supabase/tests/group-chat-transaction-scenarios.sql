@@ -8,7 +8,7 @@ INSERT INTO auth.users(id,aud,role,email,encrypted_password,raw_app_meta_data,ra
  ('10000000-0000-4000-8000-000000000004','authenticated','authenticated','insufficient@example.test','','{}'::jsonb,'{}'::jsonb,now(),now(),now()),
  ('10000000-0000-4000-8000-000000000005','authenticated','authenticated','race@example.test','','{}'::jsonb,'{}'::jsonb,now(),now(),now()),
  ('10000000-0000-4000-8000-000000000006','authenticated','authenticated','idempotent@example.test','','{}'::jsonb,'{}'::jsonb,now(),now(),now()),
- ('10000000-0000-4000-8000-000000000007','authenticated','authenticated','completion-race@example.test','','{}'::jsonb,'{}'::jsonb,now(),now(),now())
+ ('10000000-0000-4000-8000-000000000007','authenticated','authenticated','completion-race@example.test','','{}'::jsonb,'{}'::jsonb,now(),now(),now());
 
 INSERT INTO public.wallet_accounts(user_id,silver_coins,diamonds) VALUES
  ('10000000-0000-4000-8000-000000000001',4,5),
