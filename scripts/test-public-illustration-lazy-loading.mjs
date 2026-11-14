@@ -22,10 +22,10 @@ assert.doesNotMatch(publicLoader, /phone_settings|nsfw_workplace_warning/);
 assert.match(publicLoader, /ownerLocal&&Object\.prototype\.hasOwnProperty\.call\(ownerLocal,'phoneSettings'\)/);
 assert.match(publicLoader, /cachedPublic&&Object\.prototype\.hasOwnProperty\.call\(cachedPublic,'phoneSettings'\)/);
 assert.match(publicLoader, /image:ownerLocal\?\.image\|\|cachedPublic\?\.image\|\|row\.avatar_url/);
-assert.match(publicLoader, /primaryIllustrationPath:ownerLocal\?\.primaryIllustrationPath \|\| cachedPublic\?\.primaryIllustrationPath/);
-assert.match(publicLoader, /galleryIllustrations:ownerLocal\?\.galleryIllustrations \|\| cachedPublic\?\.galleryIllustrations \|\| \[\]/);
-assert.match(publicLoader, /publicIllustrationsLoaded:ownerLocal\?\.publicIllustrationsLoaded === true \|\| cachedPublic\?\.publicIllustrationsLoaded === true/);
-assert.match(publicLoader, /opening: ownerLocal\?\.opening \|\| cachedPublic\?\.opening \|\| ''/);
+assert.match(publicLoader, /primaryIllustrationPath:ownerLocal\?\.primaryIllustrationPath\|\|cachedPublic\?\.primaryIllustrationPath/);
+assert.match(publicLoader, /galleryIllustrations:ownerLocal\?\.galleryIllustrations\|\|cachedPublic\?\.galleryIllustrations\|\|\[\]/);
+assert.match(publicLoader, /publicIllustrationsLoaded:ownerLocal\?\.publicIllustrationsLoaded===true\|\|cachedPublic\?\.publicIllustrationsLoaded===true/);
+assert.match(publicLoader, /opening:ownerLocal\?\.opening\|\|cachedPublic\?\.opening\|\|''/);
 
 // Public catalogue rows are cached briefly and invalidated after this account changes a character.
 const publicRowsCache = between("let publicCharacterRowsCache = null;", "async function loadPublicSupabaseCharactersImpl");
