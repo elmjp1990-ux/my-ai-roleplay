@@ -5561,7 +5561,9 @@ function renderAuthor() {
     route, state, currentUser, author, isUuid,
     getSupabaseClient:() => window.mySupabase,
     publicAuthorProfileLoaded, hydratePublicAuthorProfile,
-    $, e, avatar, card, refreshAuthorFollowState
+    $, e, avatar, card, refreshAuthorFollowState,
+    PoyozzListPagination:window.PoyozzListPagination,
+    rerender:()=>render()
   });
 }function renderFavorites() {
   const list = state.characters.filter(c => state.favorites.includes(c.id) && accessible(c));
