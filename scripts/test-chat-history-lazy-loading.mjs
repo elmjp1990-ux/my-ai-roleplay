@@ -73,7 +73,7 @@ assert.match(messageLoader, /cloudSynced:true/,
   "messages fetched from Supabase must be marked as already synchronized");
 assert.match(messageLoader, /\.eq\('id', sessionId\)\.eq\('user_id', userId\)\.is\('deleted_at', null\)/);
 assert.match(messageLoader, /\.eq\('session_id',sessionId\)\.is\('deleted_at',null\)/);
-assert.match(messageLoader, /const pageSize=5/);
+assert.match(messageLoader, /pageSize\('messages'\)\|\|10/);
 assert.match(messageLoader, /messageQuery\.limit\(pageSize\)/);
 assert.match(messageLoader, /session\.cloudMessagesErrorOlder=older/);
 assert.match(messageLoader, /session\.cloudMessagesErrorOlder=false/);
@@ -81,7 +81,7 @@ assert.match(messageLoader, /cloudOldestMessageCursor/);
 assert.match(messageLoader, /const currentPageIds=new Set\(cloudMessages\.map\(message=>message\.id\)\)/);
 assert.match(messageLoader, /cachedMessages=older\?\(session\.messages\|\|\[\]\):/);
 assert.match(messageLoader, /currentPageIds\.has\(message\.id\)/,
-  "initial refresh must discard stale cached cloud messages outside the newest five-row page");
+  "initial refresh must discard stale cached cloud messages outside the newest ten-row page");
 assert.match(messageLoader, /created_at\.lt\./);
 assert.match(messageLoader, /roleplayMeta/);
 assert.match(messageLoader, /data\.memories/);
