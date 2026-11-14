@@ -7382,7 +7382,7 @@ function groupToggleCharacter(idValue) {
   if(!members.some(c=>c.id===g.draft.worldCharacterId)) g.draft.worldCharacterId=members[0]?.id||'';
   g.formError='';render();
 }
-async function groupSendMock() {
+async function groupSendTurn() {
   const input=$('groupMessageInput');
   const typedContent=input?.value.trim() || '';
   const isContinueRequest=!typedContent;
@@ -7394,7 +7394,7 @@ async function groupSendMock() {
   if(!isContinueRequest) {
     const platformCommand=parsePlatformCommand(content);
     if(platformCommand.type==='platform') {
-      if(platformCommand.name==='help') toast('群組語法：@角色 指定 AI 回覆；:人名:內容 指定玩家發言顯示；/help 查看平台指令。AI 尚未串接，指定角色目前只做語法驗證。');
+      if(platformCommand.name==='help') toast('群組語法：@角色 可指定 AI 優先回應；:人名:內容 指定玩家發言顯示；/help 查看平台指令。');
       else toast('尚未支援平台指令 /'+platformCommand.name+'；本次沒有保存訊息。');
       return;
     }
@@ -9613,7 +9613,7 @@ document.addEventListener('click',async event => {
       case 'group-toggle-character':groupToggleCharacter(key);break;
       case 'group-world-character': { groupPrototype.draft.worldCharacterId=button.value||button.dataset.value||'';const selected=groupSelectedCharacters().find(c=>c.id===groupPrototype.draft.worldCharacterId);const preview=$('groupWorldReference');if(preview) preview.textContent=selected?.worldBackground||selected?.world||selected?.intro||'所選角色目前沒有可用的公開介紹；可先繼續建立，後續再完善世界觀資料。';break; }
       case 'group-create':groupCreateMock();break;
-      case 'group-send':groupSendMock();break;
+      case 'group-send':groupSendTurn();break;
       case 'group-history-load-older':groupLoadOlderMessages();break;
       case 'edit-group-message': {
         const message=groupPrototype.messages.find(item=>item.id===key);
@@ -10962,14 +10962,14 @@ const {
         break;
       }
       case 'group-message': {
-        await groupSendMock();
+        await groupSendTurn();
         break;
       }
       case 'message': {
         // Defensive routing: if a group composer is present, never run single-chat
         // empty-message validation for its blank-send/continue action.
         if (route.page === 'group' || $('groupMessageInput')) {
-          await groupSendMock();
+          await groupSendTurn();
           break;
         }
         if (!s || !currentUser()) return;
@@ -11359,7 +11359,7 @@ document.addEventListener('keydown',event => {
       event.key!=='Enter' || event.isComposing ||
       !(event.ctrlKey || event.metaKey)) return;
   event.preventDefault();
-  if(event.target.id==='groupMessageInput') void groupSendMock();
+  if(event.target.id==='groupMessageInput') void groupSendTurn();
   else event.target.form?.requestSubmit();
 });
 document.addEventListener('click', event => {
@@ -11849,7 +11849,7 @@ document.addEventListener('click',async event=>{
     walletDiamondConsentOnce=mode;
     const modal=$('modal'); if(modal?.open) modal.close();
     // Explicit player consent: only now retry the intended send action.
-    if(mode==='group') await groupSendMock();
+    if(mode==='group') await groupSendTurn();
     else {
       const form=$('view').querySelector('form[data-form="message"]');
       if(form) form.requestSubmit();
