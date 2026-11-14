@@ -492,7 +492,7 @@ assert.match(groupPhoneUI, /initialStoryTime=Number\(isGroup\?/);
 assert.match(groupPhoneUI, /phoneHeader\+/);
 assert.match(groupPhoneStyles, /phone-device-head--group \.phone-member-switch/);
 
-const followedAuthorsPaginationSource=fs.readFileSync('followed-authors.js','utf8');
+const followedAuthorsPageTestSource2026=fs.readFileSync('followed-authors.js','utf8');
 const sharedPaginationSource=fs.readFileSync('list-pagination.js','utf8');
 assert.match(sharedPaginationSource,/followedAuthors:\s*10/,
   "followed-author pagination must use the shared ten-row page size");
