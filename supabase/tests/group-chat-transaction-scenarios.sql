@@ -70,7 +70,8 @@ BEGIN
 
   IF public.complete_group_chat_turn(
     '10000000-0000-4000-8000-000000000001', v_turn,
-    '[{"speaker_id":"30000000-0000-4000-8000-000000000001","content":"completed reply"}]'::jsonb
+    '[{"speaker_id":"30000000-0000-4000-8000-000000000001","content":"completed reply"}]'::jsonb,
+    '[{"character_id":"30000000-0000-4000-8000-000000000001","notifications":[{"title":"最新訊息","body":"客戶確認會議時間。"}]},{"character_id":"30000000-0000-4000-8000-000000000002","notifications":[{"title":"待辦事項","body":"目前沒有待辦事項"}]}]'::jsonb
   ) <> 'completed' THEN RAISE EXCEPTION 'completion did not settle'; END IF;
   BEGIN
     PERFORM * FROM public.refund_group_chat_turn(
