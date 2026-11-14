@@ -1868,51 +1868,41 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
   }
 
 const characterIllustrationSignedUrlManager = window.PoyozzSignedUrlManager.create({
-  cacheTtlMs:3300000,
-  refreshSkewMs:60000,
-  createSignedUrl:async storagePath=>{
-    const {data,error}=await window.mySupabase.storage.from('character-illustrations').createSignedUrl(storagePath,3600);
+  cacheTtlMs:3300000,refreshSkewMs:60000,maxEntries:500,
+  createSignedUrl:async path=>{
+    const {data,error}=await window.mySupabase.storage.from('character-illustrations').createSignedUrl(path,3600);
     if(error||!data?.signedUrl)throw new Error(error?.message||'無法取得角色立繪網址');
     return data.signedUrl;
+  },
+  createSignedUrls:async paths=>{
+    const {data,error}=await window.mySupabase.storage.from('character-illustrations').createSignedUrls(paths,3600);
+    if(error)throw error;
+    return Object.fromEntries((data||[]).filter(row=>row.signedUrl).map(row=>[row.path,row.signedUrl]));
   }
 });
 async function getCharacterIllustrationSignedUrl(storagePath,options={}) {
   return characterIllustrationSignedUrlManager.get(storagePath,{forceRefresh:options?.forceRefresh===true});
 }
 const memoryPhotoSignedUrlManager = window.PoyozzSignedUrlManager.create({
-  cacheTtlMs:240000,
-  refreshSkewMs:15000,
-  maxEntries:250,
+  cacheTtlMs:240000,refreshSkewMs:15000,maxEntries:250,
   isCurrent:context=>(currentUser()?.uid||null)===(context?.uid||null),
-  createSignedUrl:async(_key,context)=>{
-    const {data,error}=await window.mySupabase.storage.from('personax-memory-photos').createSignedUrl(context.storagePath,300);
+  createSignedUrl:async(key,context)=>{
+    const path=key.slice(String(context.uid).length+1);
+    const {data,error}=await window.mySupabase.storage.from('personax-memory-photos').createSignedUrl(path,300);
     if(error||!data?.signedUrl)throw new Error(error?.message||'無法取得回憶相片網址');
     return data.signedUrl;
+  },
+  createSignedUrls:async(keys,context)=>{
+    const prefix=String(context.uid)+':',paths=keys.map(key=>key.slice(prefix.length));
+    const {data,error}=await window.mySupabase.storage.from('personax-memory-photos').createSignedUrls(paths,300);
+    if(error)throw error;
+    return Object.fromEntries((data||[]).filter(row=>row.signedUrl).map(row=>[prefix+row.path,row.signedUrl]));
   }
 });
-async function getMemoryPhotoSignedUrl(storagePath) {
-  const uid=currentUser()?.uid||null;
-  if(!window.mySupabase||!uid||!storagePath)return null;
-  return memoryPhotoSignedUrlManager.get(uid+':'+storagePath,{context:{uid,storagePath}});
-}
 function invalidateMemoryPhotoSignedUrl(storagePath,uid=currentUser()?.uid||null) {
   if(uid&&storagePath)memoryPhotoSignedUrlManager.invalidate(uid+':'+storagePath);
 }
 
-async function mapWithConcurrency(items,concurrency,mapper){
-  const list=Array.isArray(items)?items:[];
-  const limit=Math.min(list.length,Math.max(1,Math.floor(Number(concurrency)||1)));
-  const results=new Array(list.length);
-  let cursor=0;
-  await Promise.all(Array.from({length:limit},async()=>{
-    while(true){
-      const index=cursor++;
-      if(index>=list.length)return;
-      results[index]=await mapper(list[index],index);
-    }
-  }));
-  return results;
-}
 
 const characterIllustrationMetadataInflight = new Map();
 async function loadCharacterPrimaryIllustrationAssets(characterIds, scopeUserId=null) {
