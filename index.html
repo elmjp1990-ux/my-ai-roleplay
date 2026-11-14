@@ -6536,7 +6536,6 @@ async function groupLoadList(force=false,loadMore=false) {
         .eq('pinned',true).is('archived_at',null).order('updated_at',{ascending:false});
       if(error)throw error;
       pinnedRows=data||[];
-      g.groupPinnedLoaded=true;
     }
     const {data:pageRows,error:pageError}=await client.from('chat_groups')
       .select('id,name,world_background,scene_mode,created_at,updated_at,pinned')
@@ -6547,8 +6546,6 @@ async function groupLoadList(force=false,loadMore=false) {
     if(user.id!==currentUser()?.uid){groupResetForAccount(currentUser()?.uid||null);return;}
     const deletedGroupIds=readDeletedChatTombstones(user.id).groups;
     const currentPage=pageRows||[];
-    g.groupListOffset+=currentPage.length;
-    g.groupListHasMore=currentPage.length===pageSize;
     const existingIds=new Set((g.groups||[]).map(group=>group.id));
     const newRows=[...pinnedRows,...currentPage].filter(group=>!deletedGroupIds[group.id]&&!existingIds.has(group.id));
     if(newRows.length){
@@ -6556,6 +6553,9 @@ async function groupLoadList(force=false,loadMore=false) {
       if(user.id!==currentUser()?.uid){groupResetForAccount(currentUser()?.uid||null);return;}
       g.groups=window.PoyozzListPagination.mergeUnique(g.groups,newRows,group=>group.id);
     }
+    if(!loadMore)g.groupPinnedLoaded=true;
+    g.groupListOffset+=currentPage.length;
+    g.groupListHasMore=currentPage.length===pageSize;
     const latestDeletedGroups=readDeletedChatTombstones(user.id).groups;
     g.groups=g.groups.filter(group=>!latestDeletedGroups[group.id]);
     const retainedIds=new Set(g.groups.map(group=>group.id));
