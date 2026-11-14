@@ -16,7 +16,7 @@ assert.match(primaryLoader, /getCharacterIllustrationSignedUrl\(row\.storage_pat
 assert.match(primaryLoader, /primary:\{id:row\.id,path:row\.storage_path,src:signedUrl/);
 assert.match(primaryLoader, /const key='primary:'\+scope\+':'\+ids\.join\(','\)/);
 
-const ownerLoader = between("async function loadSupabaseCharacters(user)", "const characterIllustrationSignedUrlManager");
+const ownerLoader = between("async function loadSupabaseCharacters(user,{loadMore=false}={})", "const characterIllustrationSignedUrlManager");
 assert.match(ownerLoader, /loadCharacterPrimaryIllustrationAssets\(ids,user\.id\)/);
 assert.doesNotMatch(ownerLoader, /loadCharacterIllustrationAssets\(ids,user\.id\)/,
   "login must not fetch all gallery assets for every owned character");
