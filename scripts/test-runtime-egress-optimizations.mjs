@@ -513,7 +513,7 @@ assert.doesNotMatch(followedAuthorsPageTestSource2026,/\.from\('author_follows'\
 
 
 const paginationSizes=sharedPaginationSource.slice(sharedPaginationSource.indexOf('const PAGE_SIZES'),sharedPaginationSource.indexOf('});',sharedPaginationSource.indexOf('const PAGE_SIZES'))+3);
-for(const listName of ['explore','authorCharacters','chatSessions','groupSessions','followedAuthors','encounterMemories','messages','ownedCharacters','characterComments','memoryPhotos']){
+for(const listName of ['explore','authorCharacters','chatSessions','groupSessions','followedAuthors','encounterMemories','messages','ownedCharacters','favorites','characterComments','memoryPhotos']){
   assert.match(paginationSizes,new RegExp(listName+':\\s*10'),listName+' must use ten-row pages');
 }
 const ownerListSource=fs.readFileSync('index.html','utf8');
@@ -548,3 +548,8 @@ assert.match(groupHistory,/\.limit\(10\)/,"group older history must load ten row
 assert.match(html,/pinnedOffset\+pageSize-1/,"single pinned chats must be paginated in ten-row batches");
 assert.match(html,/groupPinnedOffset\+pageSize-1/,"group pinned chats must be paginated in ten-row batches");
 assert.match(html,/chat_memory_photos[\s\S]{0,500}\.limit\(10\)/,"group background photo picker must cap reads at ten photos");
+
+const favoritesLoader=ownerListSource.slice(ownerListSource.indexOf('async function renderFavorites({loadMore=false}={})'),ownerListSource.indexOf('/* Characters */',ownerListSource.indexOf('async function renderFavorites({loadMore=false}={})')));
+assert.match(favoritesLoader,/pageSize\('favorites'\)/);
+assert.match(favoritesLoader,/\.in\('id',validIds\)/,'favorite characters must hydrate only the current ten favorite IDs');
+assert.match(ownerListSource,/favoriteCharactersSentinel[\s\S]*observeEnd/);
