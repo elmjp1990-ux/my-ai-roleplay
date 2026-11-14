@@ -573,7 +573,7 @@ assert.match(groupOpen,/\.limit\(window\.PoyozzListPagination\.pageSize\('messag
 assert.match(groupHistory,/\.limit\(window\.PoyozzListPagination\.pageSize\('messages'\)\)/,"group older history must use the shared five-message page size");
 assert.match(html,/pinnedOffset\+pageSize-1/,"single pinned chats must be paginated in ten-row batches");
 assert.match(html,/groupPinnedOffset\+pageSize-1/,"group pinned chats must be paginated in ten-row batches");
-assert.match(html,/chat_memory_photos[\s\S]{0,500}\.limit\(10\)/,"group background photo picker must cap reads at ten photos");
+assert.match(html,/chat_memory_photos[\s\S]{0,500}\.limit\(window\.PoyozzListPagination\.pageSize\('memoryPhotos'\)/,"group background photo picker must use the shared ten-photo page size");
 
 const favoritesLoader=ownerListSource.slice(ownerListSource.indexOf('async function renderFavorites({loadMore=false}={})'),ownerListSource.indexOf('/* Characters */',ownerListSource.indexOf('async function renderFavorites({loadMore=false}={})')));
 assert.match(favoritesLoader,/pageSize\('favorites'\)/);
