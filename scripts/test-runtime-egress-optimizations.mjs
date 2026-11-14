@@ -237,11 +237,19 @@ assert.match(html,/groupLoadList\(false,true\)/,
 
 const authorProfileModule=fs.readFileSync("author-profile.js","utf8");
 const followedAuthorsModule=fs.readFileSync("followed-authors.js","utf8");
-assert.match(authorProfileModule,/\.range\(page\.offset,\s*page\.offset\s*\+\s*page\.pageSize\s*-\s*1\)/,
-  "author profile character lists must use bounded twenty-row backend pages");
+assert.match(authorProfileModule,/loadAuthorCharacterPage\(authorId,page\.offset\)/,
+  "author profile presentation must delegate each page to the app-owned data loader");
+assert.match(html,/async function loadPublicAuthorCharacterPage\(authorId,offset=0\)/,
+  "author profile character data must be loaded through the app data layer");
+assert.match(html,/\.range\(offset,offset\+pageSize-1\)/,
+  "author profile data must use bounded twenty-row backend pages");
 assert.match(authorProfileModule,/PoyozzListPagination\.observeEnd/,
   "author profile lists must use the shared scroll pagination observer");
-assert.match(followedAuthorsModule,/\.limit\(4\)/,
+assert.match(followedAuthorsModule,/loadPublicAuthorLatestCharacters\(authorIds\)/,
+  "followed-author presentation must delegate latest-character hydration to the app data layer");
+assert.match(html,/async function loadPublicAuthorLatestCharacters\(authorIds=\[\]\)/,
+  "followed-author latest characters must use a centralized app-owned query");
+assert.match(html,/\.order\('id',\{ascending:false\}\)\.limit\(4\)/,
   "followed-author cards must fetch only each author's four newest public characters");
 assert.doesNotMatch(followedAuthorsModule,/await loadPublicSupabaseCharacters\(\)/,
   "followed-author cards must not trigger a full public-character catalogue fetch");
