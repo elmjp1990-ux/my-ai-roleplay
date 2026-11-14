@@ -148,3 +148,34 @@ test('encounter mode no longer wraps or replaces base render functions', () => {
   assert.doesNotMatch(appHtml, /renderConversation\s*=\s*wrappedRenderConversation/);
   assert.doesNotMatch(appHtml, /renderMessages\s*=\s*wrappedRenderMessages/);
 });
+
+
+const cityMap = fs.readFileSync(new URL('../city-map.js', import.meta.url), 'utf8');
+
+test('city map exposes teardown and releases its timer, listeners and videos', () => {
+  assert.match(cityMap, /destroy:\s*destroyActiveMap/);
+  assert.match(cityMap, /clearInterval\(cityMapClock\)/);
+  assert.match(cityMap, /removeEventListener\('visibilitychange',\s*onVisibilityChange\)/);
+  assert.match(cityMap, /removeEventListener\('resize',\s*resizeHandler\)/);
+  assert.match(cityMap, /characterVideoObserver\?\.unobserve\(video\)/);
+  assert.match(cityMap, /releaseCharacterVideo\(video\)/);
+  assert.match(cityMap, /locationModal\?\.remove\(\)/);
+  assert.match(cityMap, /stage\.remove\(\)/);
+  assert.match(appHtml, /const previousCardVideos[\s\S]*?window\.PoyozzCityMap\?\.destroy\?\.\(\);/);
+});
+
+test('memory album photo metadata is weakly held by mounted rows', () => {
+  assert.match(memoryAlbum, /const urlCache\s*=\s*new WeakMap\(\)/);
+  assert.match(memoryAlbum, /urlCache\.set\(row,\s*cached\)/);
+  assert.match(memoryAlbum, /urlCache\.get\(row\)/);
+  assert.doesNotMatch(memoryAlbum, /urlCache\.(?:set|get|delete)\(photo\.id/);
+});
+
+test('memory album pagination state uses a bounded LRU', () => {
+  assert.match(memoryAlbum, /const MAX_ALBUM_PAGE_STATES\s*=\s*8/);
+  assert.match(memoryAlbum, /function getAlbumPageState\(key\)/);
+  assert.match(memoryAlbum, /function rememberAlbumPageState\(key,pager\)/);
+  assert.match(memoryAlbum, /while\(albumPageStates\.size>MAX_ALBUM_PAGE_STATES\)/);
+  assert.match(memoryAlbum, /let pager=getAlbumPageState\(key\)/);
+  assert.match(memoryAlbum, /rememberAlbumPageState\(key,pager\)/);
+});
