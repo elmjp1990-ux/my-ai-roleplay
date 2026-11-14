@@ -10,6 +10,7 @@ on:
       - "supabase/functions/group-chat-turn/**"
       - "supabase/functions/_shared/**"
       - "scripts/test-group-chat-transaction-concurrency.sh"
+      - "scripts/test-group-chat-migration-rollback.sh"
       - "scripts/test-runtime-egress-optimizations.mjs"
       - ".github/workflows/group-chat-transaction-tests.yml"
   pull_request:
@@ -59,11 +60,13 @@ jobs:
             if pg_isready -h localhost -U supabase_admin -d postgres; then break; fi
             sleep 2
           done
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA pg_catalog;"
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT extname FROM pg_extension WHERE extname='pg_cron';"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_available_extensions WHERE name='pg_cron') THEN RAISE EXCEPTION 'pg_cron package is unavailable'; END IF; END \$\$;"
 
       - name: Bootstrap isolated Supabase-compatible schema
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/fixtures/group-chat-transaction-base.sql
+
+      - name: Verify migration rollback safety
+        run: bash scripts/test-group-chat-migration-rollback.sh
 
       - name: Apply group AI transaction migration
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261114180000_group_ai_single_orchestrator.sql
