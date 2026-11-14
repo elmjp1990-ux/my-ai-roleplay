@@ -21,6 +21,7 @@ const fileBudgets = {
   'comment-renderer.js': 5_000,
   'custom-tag-picker.js': 5_000,
   'memory-album.js': 26_000,
+  'poyozz-ui.css': 40_000,
   'encounter-scene.js': 36_000,
 };
 const expectedFiles = Object.keys(fileBudgets).sort();
