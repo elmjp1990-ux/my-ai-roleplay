@@ -3662,6 +3662,7 @@ async function loadCloudChatSessions(user, options = {}) {
     const pager=chatSessionListPager;
     if(pagedList){
       if(pager.ownerUid!==user.id||options.force){
+        pager.observer?.disconnect();chatListPaginationObserver?.disconnect();
         Object.assign(pager,window.PoyozzListPagination.createState('chatSessions'),{
           ownerUid:user.id,pinnedLoaded:false,initialLoaded:false
         });
@@ -3684,6 +3685,7 @@ async function loadCloudChatSessions(user, options = {}) {
       'session_persona_custom:session_data->>personaCustom','session_suggestions:session_data->>suggestions',
       'session_background:session_data->>background','session_has_user_message:session_data->>hasUserMessage',
       'session_last_message_preview:session_data->>lastMessagePreview','session_last_message_at:session_data->>lastMessageAt',
+      'session_last_assistant_message_at:session_data->>lastAssistantMessageAt','session_last_read_at:session_data->>lastReadAt',
       'session_opening_message:session_data->openingMessage','session_pending_turn:session_data->pendingTurn','session_story_world_state:session_data->storyWorldState'
     ].join(',');
     let rows=[];
@@ -3787,8 +3789,8 @@ async function loadCloudChatSessions(user, options = {}) {
         updatedAt:row.updated_at ? new Date(row.updated_at).getTime() : Number(existing?.updatedAt || 0),
         lastMessagePreview:row.session_last_message_preview || existing?.lastMessagePreview || '',
         lastMessageAt:Number(row.session_last_message_at) || Number(existing?.lastMessageAt || 0) || (row.updated_at ? new Date(row.updated_at).getTime() : 0),
-        lastAssistantMessageAt:Number(row.session_data?.lastAssistantMessageAt)||Number(existing?.lastAssistantMessageAt||0),
-        lastReadAt:Number(row.session_data?.lastReadAt)||Number(existing?.lastReadAt||0),
+        lastAssistantMessageAt:Number(row.session_last_assistant_message_at)||Number(existing?.lastAssistantMessageAt||0),
+        lastReadAt:Number(row.session_last_read_at)||Number(existing?.lastReadAt||0),
         archivedAt:Number(row.session_archived_at) || existing?.archivedAt || null, persona:row.session_persona || existing?.persona || '',
         personaCustom:row.session_persona_custom===null||row.session_persona_custom===undefined
           ? existing?.personaCustom===true : parseBool(row.session_persona_custom),
@@ -11476,7 +11478,7 @@ document.addEventListener('input',event => {
   if (target.id==='searchInput') {search=target.value;renderGrid();}
   if (target.id==='chatSearch') {
     chatSearch=target.value;
-    $('chatEntries').innerHTML=chatEntries();
+    refreshChatEntryList();
   }
   if(target.id==='chatMessageSearchInput'){
     if(chatMessageSearchState.timer)clearTimeout(chatMessageSearchState.timer);
