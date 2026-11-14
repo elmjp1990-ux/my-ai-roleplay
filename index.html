@@ -7423,10 +7423,10 @@ async function groupSendTurn() {
       renderGroupConversation();
       return;
     }
-    if(turnResult?.status==='refunded'||turnResult?.status==='content_rejected') {
+    if(turnResult?.status==='refunded'||turnResult?.status==='content_rejected'||turnResult?.status==='timed_out') {
       await refreshWalletBalance();
       g.sending=false;g.pendingRequest=null;
-      g.formError=turnResult.status==='content_rejected'?'這次 AI 回覆未能完成，費用已退還，請調整內容後重試。':'這次 AI 服務未能完成，費用已退還，請重新送出。';
+      g.formError=turnResult.status==='timed_out'?'本次 AI 請求逾時，費用已全額退還，沒有扣款。請稍後重試。':turnResult.status==='content_rejected'?'這次 AI 回覆未能完成，費用已退還，請調整內容後重試。':'這次 AI 服務未能完成，費用已退還，請重新送出。';
       renderGroupConversation();
       return;
     }
@@ -7482,10 +7482,10 @@ async function groupSendTurn() {
     let responseBody=null;
     try { if(error?.context?.clone) responseBody=await error.context.clone().json(); } catch (_) {}
     const rawError=String(error?.message||error||'');
-    if(responseBody?.status==='refunded'||responseBody?.status==='content_rejected'||responseBody?.error==='turn_already_refunded') {
+    if(responseBody?.status==='refunded'||responseBody?.status==='content_rejected'||responseBody?.status==='timed_out'||responseBody?.error==='turn_already_refunded') {
       try { await refreshWalletBalance(); } catch (_) {}
       g.pendingRequest=null;
-      g.formError=responseBody?.status==='content_rejected'?'這次 AI 回覆未能完成，費用已退還，請調整內容後重試。':'這次 AI 服務未能完成，費用已退還，請重新送出。';
+      g.formError=responseBody?.status==='timed_out'?'本次 AI 請求逾時，費用已全額退還，沒有扣款。請稍後重試。':responseBody?.status==='content_rejected'?'這次 AI 回覆未能完成，費用已退還，請調整內容後重試。':'這次 AI 服務未能完成，費用已退還，請重新送出。';
       renderGroupConversation();
       return;
     }
