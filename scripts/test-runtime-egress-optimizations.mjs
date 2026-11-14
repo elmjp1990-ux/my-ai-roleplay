@@ -243,7 +243,7 @@ assert.match(paginationModule,/encounterMemories:\s*20/);
 assert.match(paginationModule,/messages:\s*5/);
 assert.match(paginationModule,/function observeEnd/);
 const exploreLoader=between("async function loadPublicCharacterRows(offset=0)","// Concurrent login hydrators");
-assert.match(exploreLoader,/pageSize\('explore'\)/,
+assert.match(html,/publicCharacterPageSize = window\.PoyozzListPagination\.pageSize\('explore'\)/,
   "Explore must use the shared twenty-character page size");
 assert.match(exploreLoader,/\.range\(offset,offset\+publicCharacterPageSize-1\)/,
   "Explore public characters must be fetched from Supabase in bounded backend pages");
