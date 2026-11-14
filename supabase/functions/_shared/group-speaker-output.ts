@@ -4,7 +4,13 @@ export type ParsedGroupSpeech = { speakerId: string; speakerName: string; conten
 const normalizeName = (value: string): string =>
   value.normalize("NFKC").replace(/[\s　]+/g, "").trim();
 
-const escapeRegExp = (value: string): string => value.replace(/[.*+?^()|[\]\\$]/g, "\\$&");
+const escapeRegExp = (value: string): string => {
+  let escaped = value;
+  for (const character of ["\\\\", ".", "*", "+", "?", "^", "$", "{", "}", "(", ")", "|", "[", "]"]) {
+    escaped = escaped.split(character).join("\\\\" + character);
+  }
+  return escaped;
+};
 
 /**
  * Parses explicit "角色名稱：" lines into persisted per-character messages.
@@ -61,7 +67,8 @@ export function parseGroupSpeakerOutput(output: unknown, speakers: GroupSpeaker[
     if (/^\s*[^：:]{1,40}[：:]/u.test(line)) {
       flush();
       continue;
-    }\n    if (current) current.content += (current.content ? "\n" : "") + line;
+    }
+    if (current) current.content += (current.content ? "\n" : "") + line;
   }
   flush();
   return result;
