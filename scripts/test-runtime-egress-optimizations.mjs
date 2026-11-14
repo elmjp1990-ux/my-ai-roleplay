@@ -247,6 +247,12 @@ assert.match(groupEdge,/admin\.rpc\("expire_group_chat_turn"/,
   "same-key retries must proactively recover an expired processing turn without waiting for cron");
 assert.match(groupEdge,/provider_timeout_watchdog/,
   "idempotent retries must preserve the watchdog timeout outcome");
+assert.match(groupEdge,/const processingDeadlineAt = Date\.now\(\) \+ TIMEOUT_MS - 1000/,
+  "context loading must consume the same absolute request deadline with a one-second safety margin");
+assert.match(groupEdge,/const providerTimeoutMs = processingDeadlineAt - Date\.now\(\)[\s\S]*timeoutMs: providerTimeoutMs/,
+  "provider timeout must use only the remaining turn budget rather than restarting a fresh 55 seconds");
+assert.match(groupMigration,/poyozz-group-watchdog-cron-history-cleanup[\s\S]*interval '7 days'/,
+  "the cron run-history cleanup must prevent unbounded pg_cron diagnostics growth");
 assert.match(groupEdge,/group_turn_deadline_exceeded[\s\S]*status: refunded\.confirmed \? "timed_out"/,
   "completion losing the deadline race must refund and report a timeout");
 assert.match(groupSend,/responseBody\?\.status==='timed_out'[\s\S]*pendingRequest=null/,
