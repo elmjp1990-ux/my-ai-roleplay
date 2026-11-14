@@ -5656,24 +5656,7 @@ function renderAuthor() {
     rerender:()=>render(),
     loadAuthorCharacterPage:loadPublicAuthorCharacterPage
   });
-}let favoriteListPager={uid:null,offset:0,hasMore:true,loading:false,observer:null};
-function renderFavoriteList(){
-  const visibleIds=state.favorites.slice(0,Math.max(10,favoriteListPager.offset));
-  const list=visibleIds.map(id=>state.characters.find(character=>character.id===id)).filter(character=>character&&!character.deletedAt&&accessible(character));
-  $('view').innerHTML=`<div class="stack"><h1>喜愛角色</h1>
-    <div class="grid">${list.map(character=>card(character)).join('')||'<div class="empty">尚未收藏角色。</div>'}</div>
-    ${favoriteListPager.hasMore?'<div id="favoriteCharactersSentinel" class="small muted" style="text-align:center;padding:16px">向下滑動載入更多喜愛角色…</div>':''}
-  </div>`;
-  void loadCharacterTurnCounts(list.map(character=>character.id));
-  favoriteListPager.observer?.disconnect();
-  const sentinel=$('favoriteCharactersSentinel');
-  if(sentinel&&favoriteListPager.hasMore){
-    favoriteListPager.observer=window.PoyozzListPagination?.observeEnd(sentinel,()=>{
-      if(route.page==='favorites'&&!favoriteListPager.loading&&favoriteListPager.hasMore)void renderFavorites({loadMore:true});
-    });
-  }
-}
-async function renderFavorites({loadMore=false}={}){
+}async function renderFavorites({loadMore=false}={}){
   const uid=currentUser()?.uid||null;
   if(!loadMore||favoriteListPager.uid!==uid){
     favoriteListPager.observer?.disconnect();
@@ -5713,6 +5696,23 @@ async function renderFavorites({loadMore=false}={}){
   }
 }
 
+let favoriteListPager={uid:null,offset:0,hasMore:true,loading:false,observer:null};
+function renderFavoriteList(){
+  const visibleIds=state.favorites.slice(0,Math.max(10,favoriteListPager.offset));
+  const list=visibleIds.map(id=>state.characters.find(character=>character.id===id)).filter(character=>character&&!character.deletedAt&&accessible(character));
+  $('view').innerHTML=`<div class="stack"><h1>喜愛角色</h1>
+    <div class="grid">${list.map(character=>card(character)).join('')||'<div class="empty">尚未收藏角色。</div>'}</div>
+    ${favoriteListPager.hasMore?'<div id="favoriteCharactersSentinel" class="small muted" style="text-align:center;padding:16px">向下滑動載入更多喜愛角色…</div>':''}
+  </div>`;
+  void loadCharacterTurnCounts(list.map(character=>character.id));
+  favoriteListPager.observer?.disconnect();
+  const sentinel=$('favoriteCharactersSentinel');
+  if(sentinel&&favoriteListPager.hasMore){
+    favoriteListPager.observer=window.PoyozzListPagination?.observeEnd(sentinel,()=>{
+      if(route.page==='favorites'&&!favoriteListPager.loading&&favoriteListPager.hasMore)void renderFavorites({loadMore:true});
+    });
+  }
+}
 async function renderFollowedAuthors() {
   const renderFollowedAuthorsModule = window.PoyozzFollowedAuthors?.render;
   if (typeof renderFollowedAuthorsModule !== 'function') {
