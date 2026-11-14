@@ -511,3 +511,34 @@ assert.match(followedAuthorsPageTestSource2026,/insertAdjacentHTML\('beforeend',
 assert.doesNotMatch(followedAuthorsPageTestSource2026,/\.from\('author_follows'\)[\s\S]*?\.order\('created_at',[\s\S]*?\.in\('id',authorIds\)/,
   "followed-author initial load must not fetch the complete followed-author list");
 
+
+const paginationSizes=sharedPaginationSource.slice(sharedPaginationSource.indexOf('const PAGE_SIZES'),sharedPaginationSource.indexOf('});',sharedPaginationSource.indexOf('const PAGE_SIZES'))+3);
+for(const listName of ['explore','authorCharacters','chatSessions','groupSessions','followedAuthors','encounterMemories','messages','ownedCharacters','characterComments','memoryPhotos']){
+  assert.match(paginationSizes,new RegExp(listName+':\\s*10'),listName+' must use ten-row pages');
+}
+const ownerListSource=fs.readFileSync('index.html','utf8');
+const ownerLoader=ownerListSource.slice(ownerListSource.indexOf('async function loadSupabaseCharacters(user'),ownerListSource.indexOf('const characterIllustrationSignedUrlManager'));
+assert.match(ownerLoader,/\.range\(pager\.offset,pager\.offset\+pageSize-1\)/,
+  'owned character details must be fetched in bounded server-side pages');
+assert.match(ownerLoader,/\.select\('id'\)\.eq\('author_id',user\.id\)/,
+  'owned character migration reconciliation may fetch only the minimal ID index');
+assert.match(ownerLoader,/ownedCharacterPager\.hasMore/,
+  'owned character list must stop requesting pages after the last page');
+assert.match(ownerListSource,/ownedCharactersSentinel[\s\S]*observeEnd/,
+  'owned character list must load more on scroll');
+const memoryAlbumSource=fs.readFileSync('memory-album.js','utf8');
+assert.match(memoryAlbumSource,/pageSize\('memoryPhotos'\)/);
+assert.match(memoryAlbumSource,/\.range\(pager\.offset,pager\.offset\+pageSize-1\)/,
+  'memory album must query only the current ten-photo page');
+assert.match(memoryAlbumSource,/insertAdjacentHTML\('beforeend',html\)/,
+  'memory album pages must append without replacing earlier photos');
+const commentPageMigration=fs.readFileSync('supabase/migrations/20261114130000_add_bounded_character_comment_reads.sql','utf8');
+assert.match(commentPageMigration,/get_character_comments_safe_page/);
+assert.match(commentPageMigration,/private\.comment_is_whisper_thread\(cm\.id\)/);
+assert.match(commentPageMigration,/private\.current_user_is_adult\(\)/);
+assert.match(commentPageMigration,/LIMIT GREATEST\(1, LEAST\(COALESCE\(p_limit, 10\), 10\)\)/);
+assert.match(ownerListSource,/rpc\('get_character_comments_safe_page'/);
+assert.match(ownerListSource,/data-action="comments-load-more"/);
+assert.match(ownerListSource,/pageSize\('characterComments'\)/);
+assert.match(ownerListSource,/\.range\(g\.groupPinnedOffset,g\.groupPinnedOffset\+pageSize-1\)/,
+  'pinned group chats must be bounded and paged in ten-row batches');
