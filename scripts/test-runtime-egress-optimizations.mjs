@@ -113,11 +113,14 @@ assert.match(chatAuthorProfiles,/publicAuthorProfileLoaded\.add\(profile\.id\)/,
 const groupEdge=fs.readFileSync("supabase/functions/group-chat-turn/index.ts","utf8");
 const groupMigration=fs.readFileSync("supabase/migrations/20261114180000_group_ai_single_orchestrator.sql","utf8");
 const speakerParser=fs.readFileSync("supabase/functions/_shared/group-speaker-output.ts","utf8");
-assert.match(groupEdge,/deepseek\/deepseek-v4-flash-20260423/,"group AI must use the approved DeepSeek V4 Flash model");
+const sharedOpenRouter=fs.readFileSync("supabase/functions/_shared/openrouter-chat-completions.ts","utf8");
+assert.match(sharedOpenRouter,/deepseek\/deepseek-v4-flash-20260423/,"single and group chat must share the approved DeepSeek V4 Flash model");
 assert.match(groupEdge,/parseGroupSpeakerOutput\(provider\.result\.text, speakers\)/,"the single model response must be mapped to explicit roster speaker IDs");
-assert.match(groupEdge,/provider: \{ only: \["deepinfra"\], allow_fallbacks: false, data_collection: "deny" \}/,"group generation must retain the approved no-data-collection provider restriction");
+assert.match(groupEdge,/requestOpenRouterChatCompletion\(/,"group chat must reuse the shared OpenRouter client");
+assert.match(sharedOpenRouter,/provider: \{ only: \["deepinfra"\], allow_fallbacks: false, data_collection: "deny" \}/,"all chat modes must share the approved no-data-collection provider restriction");
+assert.match(sharedOpenRouter,/AbortController/,"the shared provider request must retain a bounded timeout");
 assert.match(groupEdge,/findPrivateContextLeak/,"group output must pass private-context leak screening");
-assert.match(groupEdge,/requestGeneration\(\[/,"group turns must call the shared provider request helper");
+assert.match(groupEdge,/requestOpenRouterChatCompletion\(/,"group turns must call the shared provider request helper");
 assert.match(groupMigration,/reserve_group_chat_turn/);
 assert.match(groupMigration,/complete_group_chat_turn/);
 assert.match(groupMigration,/refund_group_chat_turn/);
