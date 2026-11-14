@@ -5678,10 +5678,11 @@ async function renderFavorites({loadMore=false}={}){
     favoriteListPager.observer?.disconnect();
     favoriteListPager={uid,offset:0,hasMore:state.favorites.length>0,loading:false,observer:null};
   }
-  if(favoriteListPager.loading||(loadMore&&!favoriteListPager.hasMore))return;
+  const pager=favoriteListPager;
+  if(pager.loading||(loadMore&&!pager.hasMore))return;
   const pageSize=window.PoyozzListPagination?.pageSize('favorites')||10;
-  const pageIds=state.favorites.slice(favoriteListPager.offset,favoriteListPager.offset+pageSize);
-  favoriteListPager.loading=true;
+  const pageIds=state.favorites.slice(pager.offset,pager.offset+pageSize);
+  pager.loading=true;
   if(!loadMore)renderFavoriteList();
   try{
     const client=window.mySupabase;
@@ -5702,10 +5703,12 @@ async function renderFavorites({loadMore=false}={}){
     console.error('載入喜愛角色分頁失敗：',error);
     if(!loadMore)toast('喜愛角色載入失敗，部分角色可能暫時無法顯示。');
   }finally{
-    favoriteListPager.offset+=pageIds.length;
-    favoriteListPager.hasMore=favoriteListPager.offset<state.favorites.length;
-    favoriteListPager.loading=false;
-    if(route.page==='favorites')renderFavoriteList();
+    if(favoriteListPager===pager){
+      pager.offset+=pageIds.length;
+      pager.hasMore=pager.offset<state.favorites.length;
+      pager.loading=false;
+      if(route.page==='favorites')renderFavoriteList();
+    }
   }
 }
 
