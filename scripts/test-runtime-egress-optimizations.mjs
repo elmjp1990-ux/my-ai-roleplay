@@ -517,12 +517,12 @@ for(const listName of ['explore','authorCharacters','chatSessions','groupSession
   assert.match(paginationSizes,new RegExp(listName+':\\s*10'),listName+' must use ten-row pages');
 }
 const ownerListSource=fs.readFileSync('index.html','utf8');
-const ownerLoader=ownerListSource.slice(ownerListSource.indexOf('async function loadSupabaseCharacters(user'),ownerListSource.indexOf('const characterIllustrationSignedUrlManager'));
-assert.match(ownerLoader,/\.range\(pager\.offset,pager\.offset\+pageSize-1\)/,
+const ownedCharacterPageLoaderSource=ownerListSource.slice(ownerListSource.indexOf('async function loadSupabaseCharacters(user'),ownerListSource.indexOf('const characterIllustrationSignedUrlManager'));
+assert.match(ownedCharacterPageLoaderSource,/\.range\(pager\.offset,pager\.offset\+pageSize-1\)/,
   'owned character details must be fetched in bounded server-side pages');
-assert.match(ownerLoader,/\.select\('id'\)\.eq\('author_id',user\.id\)/,
+assert.match(ownedCharacterPageLoaderSource,/\.select\('id'\)\.eq\('author_id',user\.id\)/,
   'owned character migration reconciliation may fetch only the minimal ID index');
-assert.match(ownerLoader,/ownedCharacterPager\.hasMore/,
+assert.match(ownedCharacterPageLoaderSource,/ownedCharacterPager\.hasMore/,
   'owned character list must stop requesting pages after the last page');
 assert.match(ownerListSource,/ownedCharactersSentinel[\s\S]*observeEnd/,
   'owned character list must load more on scroll');
