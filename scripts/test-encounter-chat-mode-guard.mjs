@@ -233,7 +233,7 @@ assert.match(frontend, /async function createEncounterSession\(character\)/);
 assert.match(frontend, /functions\.invoke\(["']encounter-session["']/);
 assert.match(frontend, /const endpointName = s\.encounterMode \? ["']encounter-turn["'] : ["']chat-turn["']/);
 assert.ok(frontend.includes("function loadEncounterMemoryList(panel,session)"));
-assert.match(frontend, /sessionData\.encounterPlace/);
+assert.match(frontend, /encounter_place:session_data->>encounterPlace/);
 assert.match(frontend, /相遇地點：/);
 assert.match(frontend, /canSavePrecreatedSession = s\.cloudOwned === true/);
 assert.match(frontend, /s\.encounterMode === true \|\| s\.storyMode === true/);
