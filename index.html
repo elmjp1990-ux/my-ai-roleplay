@@ -3180,7 +3180,7 @@ let chatListPaginationObserver=null;
 let search = '';
 let filter = 'recommended';
 let exploreTags = [];
-let limit = 24;
+let limit = 20;
 let batch = 0;
 let chatSearch = '';
 let chatSearchExpanded = false;
@@ -4960,78 +4960,80 @@ function card(c,owner = false) {
     </article>`;
 }
 function renderGrid({append=false}={}) {
-  if (!$('characterGrid')) return;
+  if(!$('characterGrid'))return;
   gridObserver?.disconnect();
   publicCharacterIllustrationObserver?.disconnect();
-  const list = exploreList();
-  const recommended = filter === 'recommended';
-  const maximum = Math.min(150,list.length);
-  const shown = recommended ? list.slice(0,Math.min(limit,150)) : list;
-  const grid = $('characterGrid');
-  // Keep hydrated media elements alive when search/filter redraws the card markup.
-  // A new video element for the same Storage object can trigger another full MP4 GET.
-  const existingVideosByCharacter = new Map();
-  if (!append) {
-    grid.querySelectorAll(':scope > article.card').forEach(existingCard => {
-      const existingVideo = existingCard.querySelector('video[data-character-video]');
-      if (existingVideo && existingCard.dataset.characterCardId) {
+  const list=exploreList();
+  const shown=list.slice(0,limit);
+  const grid=$('characterGrid');
+  // Keep existing hydrated video elements alive; replacing a video node can
+  // trigger another full MP4 request even when its Storage path is unchanged.
+  const existingVideosByCharacter=new Map();
+  if(!append){
+    grid.querySelectorAll(':scope > article.card').forEach(existingCard=>{
+      const existingVideo=existingCard.querySelector('video[data-character-video]');
+      if(existingVideo&&existingCard.dataset.characterCardId){
         existingVideosByCharacter.set(existingCard.dataset.characterCardId,existingVideo);
       }
     });
   }
-  const existingCardCount = append ? grid.querySelectorAll(':scope > article.card').length : 0;
-  const newCards = append && existingCardCount > 0 ? shown.slice(existingCardCount) : shown;
-  const cardMarkup = newCards.map(c => card(c)).join('');
-  if (append && existingCardCount > 0) {
-    if (cardMarkup) grid.insertAdjacentHTML('beforeend',cardMarkup);
-  } else {
-    grid.innerHTML = cardMarkup ||
-      '<div class="empty">目前還沒有符合條件的公開角色。稍後再來看看，或試試其他標籤。</div>';
-    grid.querySelectorAll(':scope > article.card').forEach(nextCard => {
-      const previousVideo = existingVideosByCharacter.get(nextCard.dataset.characterCardId);
-      const nextVideo = nextCard.querySelector('video[data-character-video]');
-      if (previousVideo && nextVideo &&
-          previousVideo.dataset.characterVideo === nextVideo.dataset.characterVideo) {
+  const existingCardCount=append?grid.querySelectorAll(':scope > article.card').length:0;
+  const newCards=append&&existingCardCount>0?shown.slice(existingCardCount):shown;
+  const cardMarkup=newCards.map(character=>card(character)).join('');
+  if(append&&existingCardCount>0){
+    if(cardMarkup)grid.insertAdjacentHTML('beforeend',cardMarkup);
+  }else{
+    grid.innerHTML=cardMarkup||'<div class="empty">目前還沒有符合條件的公開角色。稍後再來看看，或試試其他標籤。</div>';
+    grid.querySelectorAll(':scope > article.card').forEach(nextCard=>{
+      const previousVideo=existingVideosByCharacter.get(nextCard.dataset.characterCardId);
+      const nextVideo=nextCard.querySelector('video[data-character-video]');
+      if(previousVideo&&nextVideo&&previousVideo.dataset.characterVideo===nextVideo.dataset.characterVideo){
         nextVideo.replaceWith(previousVideo);
-        if (characterVideoObserver) {
+        if(characterVideoObserver){
           characterVideoObserver.unobserve(previousVideo);
           characterVideoObserver.observe(previousVideo);
         }
         existingVideosByCharacter.delete(nextCard.dataset.characterCardId);
       }
     });
-    // Any old media not reused is no longer part of the visible result set.
-    existingVideosByCharacter.forEach(video => {
+    existingVideosByCharacter.forEach(video=>{
       characterVideoObserver?.unobserve(video);
       releaseCharacterVideo(video);
     });
   }
-  // Also hydrate newly appended cards; existing hydrated elements are guarded.
-  grid.querySelectorAll('video[data-character-video]').forEach(video => void hydrateCharacterVideo(video));
+  grid.querySelectorAll('video[data-character-video]').forEach(video=>void hydrateCharacterVideo(video));
   observePublicCharacterIllustrationCards(grid);
-  void loadCharacterTurnCounts(shown.map(c => c.id));
-  document.querySelectorAll('.explore-shortcut[data-filter]').forEach(button => {
-    button.classList.toggle('active', button.dataset.filter === filter);
+  void loadCharacterTurnCounts(shown.map(character=>character.id));
+  document.querySelectorAll('.explore-shortcut[data-filter]').forEach(button=>{
+    button.classList.toggle('active',button.dataset.filter===filter);
   });
-  document.querySelector('.explore-shortcut[data-action="tags"]')?.classList.toggle('active', exploreTags.length > 0);
-  document.querySelector('.explore-shortcut[data-action="toggle-search"]')?.classList.toggle('active', !!search || !!($('exploreSearch') && !$('exploreSearch').classList.contains('hidden')));
-  $('selectedTags').innerHTML = exploreTags.map(tagButton).join('');
-  const sectionTitle = document.querySelector('.explore-section-heading h2');
-  if (sectionTitle) sectionTitle.textContent = filter === 'popular' ? '熱門角色' : filter === 'favorites' ? '喜愛的角色' : filter === 'latest' ? '新登場角色' : '為你推薦';
+  document.querySelector('.explore-shortcut[data-action="tags"]')?.classList.toggle('active',exploreTags.length>0);
+  document.querySelector('.explore-shortcut[data-action="toggle-search"]')?.classList.toggle('active',!!search||!!($('exploreSearch')&&!$('exploreSearch').classList.contains('hidden')));
+  $('selectedTags').innerHTML=exploreTags.map(tagButton).join('');
+  const sectionTitle=document.querySelector('.explore-section-heading h2');
+  if(sectionTitle)sectionTitle.textContent=filter==='popular'?'熱門角色':filter==='favorites'?'喜愛的角色':filter==='latest'?'新登場角色':'為你推薦';
 
-  $('moreArea').innerHTML = recommended && list.length
-    ? shown.length < maximum
-      ? '<div id="loadSentinel"><button data-action="load-more">載入更多</button></div>'
-      : '<button data-action="new-batch">換一批</button>'
-    : '';
-
-  if ($('loadSentinel') && 'IntersectionObserver' in window) {
-    gridObserver = new IntersectionObserver(entries => {
-      if (!entries.some(entry => entry.isIntersecting)) return;
+  const hasLoadedMore=list.length>shown.length;
+  const hasServerMore=window.__poyozzExploreHasMore===true;
+  $('moreArea').innerHTML=hasLoadedMore||hasServerMore
+    ? '<div id="loadSentinel" class="small muted" style="padding:14px;text-align:center">繼續往下滑動，載入更多角色…</div>'
+    : filter==='recommended'&&list.length
+      ? '<button data-action="new-batch">換一批</button>'
+      : '';
+  if($('loadSentinel')&&'IntersectionObserver'in window){
+    gridObserver=new IntersectionObserver(entries=>{
+      if(!entries.some(entry=>entry.isIntersecting))return;
       gridObserver.disconnect();
-      limit = Math.min(150,limit+24);
-      renderGrid({append:true});
-    },{rootMargin:'150px'});
+      const previousLimit=limit;
+      limit=previousLimit+window.PoyozzListPagination.pageSize('explore');
+      if(list.length>previousLimit){
+        renderGrid({append:true});
+      }else if(window.__poyozzExploreHasMore&&!window.__poyozzExploreLoading){
+        void window.loadNextPublicCharacterPage();
+      }else{
+        renderGrid({append:true});
+      }
+    },{rootMargin:'220px 0px',threshold:0});
     gridObserver.observe($('loadSentinel'));
   }
 }
