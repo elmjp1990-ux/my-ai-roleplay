@@ -3183,10 +3183,13 @@ function sessionCharacter(s) {
   );
   if (found) {
     const snap=s.cloudCharacterSnapshot;
-    const portraitPath=snap?.imagePath||snap?.primaryIllustrationPath||snap?.primary_illustration_path||'';
+    const portraitPath=snap?.imagePath||snap?.primaryIllustrationPath||snap?.primary_illustration_path||
+      found.imagePath||found.primaryIllustrationPath||found.primary_illustration_path||'';
     const uid=currentUser()?.uid||'';
     const cached=portraitPath&&uid&&s.id?cloudSessionImageUrlCache.get(uid+':'+s.id+':'+portraitPath):null;
-    return !found.image&&cached&&cached.expiresAt>Date.now()?{...found,image:cached.url}:found;
+    const cachedImage=cached&&cached.expiresAt>Date.now()?cached.url:'';
+    const image=cachedImage||safeImage(found.image)||safeImage(found.avatar_url)||'';
+    return image===found.image?found:{...found,image};
   }
   const snap = s.cloudCharacterSnapshot;
   if (!snap || snap.id !== s.characterId) return null;
@@ -3195,7 +3198,8 @@ function sessionCharacter(s) {
   const imageCacheKey=portraitPath&&uid&&s.id ? uid+':'+s.id+':'+portraitPath : '';
   const cachedImage=imageCacheKey ? cloudSessionImageUrlCache.get(imageCacheKey) : null;
   const hydratedImage=cachedImage&&cachedImage.expiresAt>Date.now()?cachedImage.url:'';
-  return {...snap, image:snap.image || hydratedImage || '', id:s.characterId, name:snap.name || s.characterName || '角色',
+  const snapshotImage=safeImage(snap.image)||safeImage(snap.avatar_url)||'';
+  return {...snap, image:hydratedImage || snapshotImage, id:s.characterId, name:snap.name || s.characterName || '角色',
     visibility:snap.visibility || 'private', reviewStatus:'draft',
     authorId:Object.prototype.hasOwnProperty.call(snap,'authorId') ? snap.authorId : '',
     creatorDisplayName:snap.creatorDisplayName || '',
@@ -3207,17 +3211,20 @@ function sessionCharacter(s) {
 async function hydrateCloudSessionCharacterImage(s) {
   const snap=s?.cloudCharacterSnapshot;
   const uid=currentUser()?.uid||'';
-  const path=snap?.imagePath||snap?.primaryIllustrationPath||snap?.primary_illustration_path||'';
-  if(!s?.cloudOwned||!uid||!path||snap?.image) return;
   const liveCharacter=state.characters.find(character=>character.id===s.characterId);
-  if(liveCharacter?.image) return;
+  const path=snap?.imagePath||snap?.primaryIllustrationPath||snap?.primary_illustration_path||
+    liveCharacter?.imagePath||liveCharacter?.primaryIllustrationPath||liveCharacter?.primary_illustration_path||'';
+  if(!s?.cloudOwned||!uid||!path) return;
   const key=uid+':'+s.id+':'+path;
   const cached=cloudSessionImageUrlCache.get(key);
   if(cached&&cached.expiresAt>Date.now()) return;
   if(cloudSessionImageUrlInflight.has(key)) return cloudSessionImageUrlInflight.get(key);
   const request=(async()=>{
     const url=await getCharacterIllustrationSignedUrl(path,{forceRefresh:!!cached});
-    if((currentUser()?.uid||'')!==uid||state.sessions?.[s.id]!==s||(s.cloudCharacterSnapshot?.imagePath||s.cloudCharacterSnapshot?.primaryIllustrationPath||s.cloudCharacterSnapshot?.primary_illustration_path)!==path)return;
+    const currentCharacter=state.characters.find(character=>character.id===s.characterId);
+    const currentPath=s.cloudCharacterSnapshot?.imagePath||s.cloudCharacterSnapshot?.primaryIllustrationPath||s.cloudCharacterSnapshot?.primary_illustration_path||
+      currentCharacter?.imagePath||currentCharacter?.primaryIllustrationPath||currentCharacter?.primary_illustration_path||'';
+    if((currentUser()?.uid||'')!==uid||state.sessions?.[s.id]!==s||currentPath!==path)return;
     cloudSessionImageUrlCache.set(key,{url,expiresAt:Date.now()+55*60*1000});
     if(route.page==='chat'||(route.id===s.id&&(route.page==='conversation'||route.page==='session-detail')))render();
   })();
@@ -6292,7 +6299,7 @@ function chatEntries() {
         </button><button type="button" class="entry-menu group-entry-menu" data-action="group-entry-menu" data-id="${e(group.id)}" aria-label="刪除這段對話與回憶" title="刪除這段對話與回憶">⋯</button></div>`;
     }
     const s=item.value,c=sessionCharacter(s);if(!c)return '';
-    if(s.cloudOwned&&s.cloudCharacterSnapshot&&(s.cloudCharacterSnapshot.imagePath||s.cloudCharacterSnapshot.primaryIllustrationPath||s.cloudCharacterSnapshot.primary_illustration_path))void hydrateCloudSessionCharacterImage(s);
+    if(s.cloudOwned)void hydrateCloudSessionCharacterImage(s);
     const preview=latestAssistantPreview(s);
     const lastAt=s.lastMessageAt||s.updatedAt||s.messages?.at(-1)?.at||s.startedAt;
     const hasUnread=Number(s.lastAssistantMessageAt||0)>Number(s.lastReadAt||0);
@@ -7651,7 +7658,7 @@ async function loadStoryRelationshipState(session) {
     session.storyRelationshipStage = row.relationship_stage;
     persist();
     const progress = Math.round((affinity + 100) / 2);
-    target.innerHTML = '<span class="story-relationship-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20.8 4.9a5.5 5.5 0 0 0-7.8 0L12 5.9l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.3 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg></span><span>關係 · '+e(label)+'</span><span class="story-relationship-meter" aria-hidden="true"><i style="width:'+progress+'%"></i></span>';
+    target.innerHTML = '<span class="story-relationship-icon" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M20.8 4.9a5.5 5.5 0 0 0-7.8 0L12 5.9l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.3 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg></span><span>關係 · '+e(label)+'</span><span class="story-relationship-meter" aria-hidden="true"><i style="width:'+progress+'%"></i></span>';
     target.setAttribute('aria-label','關係階段 '+label+'，好感度進度 '+progress+'%');
   } catch (error) {
     console.warn('Story 關係狀態載入失敗：',error?.message||error);
@@ -7693,7 +7700,7 @@ function renderConversation() {
     $('view').innerHTML = '<div class="empty">此對話不存在或無法存取。</div>';
     return;
   }
-  if(s.cloudOwned&&s.cloudCharacterSnapshot&&(s.cloudCharacterSnapshot.imagePath||s.cloudCharacterSnapshot.primaryIllustrationPath||s.cloudCharacterSnapshot.primary_illustration_path))void hydrateCloudSessionCharacterImage(s);
+  if(s.cloudOwned)void hydrateCloudSessionCharacterImage(s);
   if(isConversationEntry){
     const latestAssistantAt=Number(s.lastAssistantMessageAt||0);
     s.lastReadAt=Math.max(Number(s.lastReadAt||0),latestAssistantAt,Date.now());

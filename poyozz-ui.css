@@ -315,7 +315,7 @@ body:not(.encounter-mode-active) .composer {
   backdrop-filter:blur(12px) saturate(110%);
 }
 .story-relationship-icon { display:inline-flex; align-items:center; justify-content:center; flex:0 0 15px; width:15px; height:15px; color:#c4c9d0; }
-.story-relationship-icon svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.story-relationship-icon svg { display:block; flex:0 0 15px; width:15px!important; height:15px!important; max-width:15px; max-height:15px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 body.day .story-relationship-icon { color:#737b86; }
 .story-relationship-meter {
   display:inline-block;
@@ -378,7 +378,13 @@ body.day .story-relationship-icon { color:#737b86; }
 /* iPhone-style device frame and native-feeling lock screen / notification surface. */
 .phone-device.phone-device--ios { position:relative; box-sizing:border-box; width:min(390px,calc(100vw - 28px)); height:min(700px,92dvh); min-height:min(470px,88dvh); padding:8px; overflow:hidden; border:2px solid #59616c; border-radius:48px; background:linear-gradient(145deg,#454c56 0%,#171b21 36%,#343b45 100%); box-shadow:0 30px 100px rgba(0,0,0,.48),inset 0 1px 1px rgba(255,255,255,.34),inset 0 -2px 4px rgba(0,0,0,.72); color:#252a31; }
 .phone-device.phone-device--ios::before { content:""; position:absolute; z-index:5; top:13px; left:50%; transform:translateX(-50%); width:104px; height:27px; border-radius:999px; background:#050608; box-shadow:inset 0 1px 2px #000,0 0 0 1px rgba(255,255,255,.06); pointer-events:none; }
-.phone-screen { position:relative; z-index:1; display:flex; flex-direction:column; box-sizing:border-box; width:100%; height:100%; min-height:0; overflow:hidden; padding:9px 15px 9px; border:1px solid rgba(255,255,255,.74); border-radius:39px; background:linear-gradient(155deg,#f4f6f9 0%,#e6e9ee 58%,#d4d9e1 100%); color:#252a31; }
+.phone-screen { position:relative; z-index:1; display:flex; flex-direction:column; box-sizing:border-box; width:100%; height:100%; min-height:0; overflow:hidden; padding:9px 15px 9px; border:1px solid rgba(255,255,255,.74); border-radius:39px; background:
+    radial-gradient(ellipse 78% 56% at 8% 12%,rgba(197,237,239,.98) 0%,rgba(197,237,239,0) 72%),
+    radial-gradient(ellipse 72% 64% at 92% 34%,rgba(73,112,190,.96) 0%,rgba(73,112,190,0) 72%),
+    radial-gradient(ellipse 85% 58% at 26% 92%,rgba(145,207,190,.96) 0%,rgba(145,207,190,0) 72%),
+    linear-gradient(145deg,#dce9ef 0%,#a8bfd4 42%,#263f78 100%); color:#252a31; }
+.phone-screen::before { content:""; position:absolute; inset:0; z-index:0; pointer-events:none; border-radius:inherit; background:linear-gradient(125deg,transparent 20%,rgba(255,255,255,.16) 42%,transparent 66%); }
+.phone-screen > * { position:relative; z-index:1; }
 .phone-statusbar { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:34px; flex:0 0 auto; padding:10px 7px 0; color:#252a31; font-size:11px; font-weight:700; font-variant-numeric:tabular-nums; }
 .phone-status-icons { display:inline-flex; align-items:center; gap:4px; }
 .phone-status-icons i { display:block; width:3px; border-radius:3px; background:currentColor; }
