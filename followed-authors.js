@@ -6,19 +6,16 @@
   'use strict';
 
   let pager = null;
-  let renderGeneration = 0;
 
   global.PoyozzFollowedAuthors = Object.freeze({
     async render(dependencies) {
       const { $, currentUser, getRoute, getSupabaseClient, isUuid, state, author, ICON, e, avatar, card, persist, toast, loadPublicAuthorLatestCharacters } = dependencies;
       const user = currentUser();
       if (!user) return;
-      const generation = ++renderGeneration;
       pager?.observer?.disconnect();
-      pager = {
-        userId:user.uid, offset:0, pageSize:global.PoyozzListPagination.pageSize('followedAuthors'), hasMore:true, loading:false,
-        total:0, generation, observer:null, client:getSupabaseClient()
-      };
+      pager = global.PoyozzListPagination.createState('followedAuthors', {
+        userId:user.uid, client:getSupabaseClient()
+      });
       $('view').innerHTML = '<div class="stack"><div class="followed-authors-title-row"><button type="button" class="ghost followed-authors-back" data-action="back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h1>喜愛作者</h1></div><div class="empty">正在載入追蹤作者…</div></div>';
       await loadPage(dependencies, false);
     }
@@ -42,7 +39,6 @@
           .range(current.offset,current.offset+current.pageSize-1);
         if (error) throw new Error('讀取追蹤作者失敗：'+error.message);
         pageAuthorIds=[...new Set((follows||[]).map(row=>row.author_id).filter(Boolean))];
-        current.total=null;
         if (!append) state.following=[];
         state.following=[...new Set([...(state.following||[]),...pageAuthorIds])];
         if (pageAuthorIds.length) {
@@ -64,7 +60,6 @@
       } else {
         const all=(state.following||[]);
         pageAuthorIds=all.slice(current.offset,current.offset+current.pageSize);
-        current.total=all.length;
         authors=pageAuthorIds.map(id=>author(id));
       }
       if (currentUser()?.uid!==current.userId || getRoute()?.page!=='followed-authors' || pager!==current) return;
