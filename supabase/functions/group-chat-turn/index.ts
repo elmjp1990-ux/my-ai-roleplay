@@ -203,7 +203,8 @@ Deno.serve(async (request) => {
       "【角色卡 " + (speakers.length) + "｜" + name + "｜角色 ID " + characterId + "】",
       "身份與背景：" + [asText(character.gender || snapshot.gender), asText(character.age || snapshot.age), asText(character.race || snapshot.race)].filter(Boolean).join("／"),
       "角色介紹：" + (asText(character.intro) || asText(snapshot.intro)),
-      "性格與演繹風格：" + [personality, asText(character.style || snapshot.style)].filter(Boolean).join("\n"),
+      "作者人格與性格設定：" + JSON.stringify(privateInfo.personality_profile || {}).slice(0, 5000),
+      "性格摘要與演繹風格：" + [personality, asText(character.style || snapshot.style)].filter(Boolean).join("\n"),
       "標籤：" + JSON.stringify(character.tags || snapshot.tags || []),
       "開場情境：" + asText(snapshot.opening),
       "角色衍生扮演檔：\n" + derivedProfilePrompt,
@@ -212,13 +213,14 @@ Deno.serve(async (request) => {
   }
   if (speakers.length !== members.length) {
     const refunded = await refund(admin, user.id, turnId, "group_speaker_snapshot_invalid");
-    return json({ status: refunded.confirmed ? "refunded" : "needs_reconciliation", error: "group_speaker_snapshot_invalid", balance: refunded.balance, retryAllowed: false }, 503);
+    return json({ status: refunded.confirmed ? "refunded" : "needs_reconciliation", error: "group_speaker_snapshot_invalid", balance: refunded.balance, retryAllowed: false }, refunded.confirmed ? 200 : 503);
   }
 
   const history = (historyResult.data || []).filter((row: any) => row.turn_id !== turnId).slice().reverse().map((row: any) => {
     const speaker = row.speaker_type === "user" ? "玩家" :
       row.speaker_type === "character" ? (asText(asRow(row.speaker_snapshot).name) || "角色") : "系統";
-    return "[場景 " + (asText(row.scene_id) || "共同") + "] " + speaker + "：" + asText(row.content);
+    const message = asText(row.content) === "__GROUP_CONTINUE__" ? "（玩家要求延續劇情）" : asText(row.content);
+    return "[場景 " + (asText(row.scene_id) || "共同") + "] " + speaker + "：" + message;
   }).filter(Boolean).join("\n");
   const currentMessage = content === "__GROUP_CONTINUE__"
     ? "（玩家沒有輸入新文字，請自然延續目前場景，不要替玩家發言或決定行動。）"
@@ -230,7 +232,7 @@ Deno.serve(async (request) => {
     "【世界與玩家】群組名稱：" + asText(group.name) + "。共同世界觀：" + asText(group.world_background),
     "玩家稱呼：" + playerName + "。玩家是劇情主導者；絕不可替玩家創作台詞、思想、感受、決定或未描述的行動。",
     "【角色卡】\n" + profileSections.join("\n\n").slice(0, 24000),
-    "【群組場景模式】" + asText(group.scene_mode) + "。shared 代表角色處於同一共同場景；separate 代表每位角色只知道自己所屬場景，除非對話已合理建立資訊傳遞，否則不可讓角色知道其他場景的即時事件。",
+    "【群組場景模式】" + asText(group.scene_mode) + "。shared 代表角色處於同一共同場景；separate 代表每位角色只知道自己所屬場景。近期對話每行都有場景 ID；separate 模式下，角色只能依自己所屬場景的訊息回應，除非對話已合理建立資訊傳遞，否則不可引用其他場景的即時事件。",
     "【近期群組對話】\n" + history.slice(-14000),
     "【本輪玩家訊息】\n" + currentMessage,
     "【本輪角色選擇與發言規則】每輪由你自行判斷 1～3 名最適合回應的角色，不要求每個角色輪流發言，也不可為了湊人數讓所有人都說話。可以由一位角色回應，也可以讓角色之間自然互動。若玩家明確以 @角色名稱 指定對象，優先由該角色回應，但仍可在劇情確有必要時讓另一角色補充。未被選中的角色保持安靜，不要輸出空白發言。",
