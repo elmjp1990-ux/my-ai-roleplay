@@ -17,8 +17,8 @@ CREATE TABLE auth.users (
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
-CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
-LANGUAGE sql STABLE AS $$ SELECT NULL::uuid $$;
+-- The Supabase Postgres image already provides auth.users and auth.uid().
+-- Keep its Auth schema intact; tests use explicit user IDs through service RPCs.
 
 CREATE TABLE public.account_deletion_requests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
