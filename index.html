@@ -1599,7 +1599,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
   }
   async function loadPublicAuthorLatestCharacters(authorIds=[]){
     const client=window.mySupabase,result=new Map();
-    if(!client||!authorIds.length)return result;
+    if(!client||!Array.isArray(authorIds)||!authorIds.length)return result;
     const grouped=await window.PoyozzAuthorData.fetchLatestCharactersByAuthor(client,authorIds);
     for(const [authorId,rows] of grouped){
       const items=rows.slice(0,4).map(mapPublicCharacterRow);
