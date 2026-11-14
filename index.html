@@ -6443,7 +6443,6 @@ function groupFriendlyError(error) {
   if(message.includes('idempotency_key_reused_with_different_content')) return '這次送出識別碼已對應其他內容，請重新送出。';
   if(message.includes('group_insufficient_funds')) return '群組聊天點數不足：每位角色每回合需 3 點，2 位角色需 6 點、3 位需 9 點。系統會優先扣銀幣，不足部分再扣鑽石。請先補充點數。';
   if(message.includes('invalid_message_content')) return '訊息需為 1–2000 字。';
-  if(message.includes('group_insufficient_funds')) return '錢包餘額不足，請先取得銀幣或鑽石後再送出群組訊息。';
   if(message.includes('authentication_required')||message.includes('JWT')||message.includes('登入狀態')) return '登入狀態已失效，請重新登入後再試。';
   return message||'操作失敗，請稍後再試。';
 }
@@ -7340,9 +7339,9 @@ async function groupNext() {
   if(err) {groupPrototype.formError=err;render();return;}
   groupPrototype.formError='';
   if(groupPrototype.step===1) {groupPrototype.step=2;render();return;}
-  await groupCreateMock();
+  await groupCreate();
 }
-async function groupCreateMock() {
+async function groupCreate() {
   const g=groupPrototype;
   if(g.loading) return;
   const err=groupReadStep();
@@ -9612,7 +9611,7 @@ document.addEventListener('click',async event => {
       case 'group-back':groupBack();break;
       case 'group-toggle-character':groupToggleCharacter(key);break;
       case 'group-world-character': { groupPrototype.draft.worldCharacterId=button.value||button.dataset.value||'';const selected=groupSelectedCharacters().find(c=>c.id===groupPrototype.draft.worldCharacterId);const preview=$('groupWorldReference');if(preview) preview.textContent=selected?.worldBackground||selected?.world||selected?.intro||'所選角色目前沒有可用的公開介紹；可先繼續建立，後續再完善世界觀資料。';break; }
-      case 'group-create':groupCreateMock();break;
+      case 'group-create':groupCreate();break;
       case 'group-send':groupSendTurn();break;
       case 'group-history-load-older':groupLoadOlderMessages();break;
       case 'edit-group-message': {
