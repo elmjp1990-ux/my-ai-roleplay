@@ -130,10 +130,10 @@ assert.ok((html.match(/renderGrid\(\{append:true\}\);/g)||[]).length >= 2);
 
  // Search/filter redraws preserve the same character's existing media DOM when the path is unchanged.
  assert.ok(html.includes('data-character-card-id="${e(c.id)}"'));
- assert.ok(html.includes("const existingVideosByCharacter = new Map()"));
+ assert.ok(html.includes("const existingVideosByCharacter=new Map()"));
  assert.ok(html.includes("previousVideo.dataset.characterVideo===nextVideo.dataset.characterVideo"));
  assert.ok(html.includes("nextVideo.replaceWith(previousVideo)"));
- assert.ok(html.includes("grid.querySelectorAll('video[data-character-video]').forEach(video => void hydrateCharacterVideo(video))"));
+ assert.ok(html.includes("grid.querySelectorAll('video[data-character-video]').forEach(video=>void hydrateCharacterVideo(video))"));
  // City-character tab/page redraws must reuse the existing portrait video for the same Storage path.
  assert.ok(cityMap.includes("const previousCharacterVideo=body.querySelector('video.city-character-portrait-video[data-character-video]')"));
  assert.ok(cityMap.includes("previousCharacterVideo.dataset.characterVideo===characterVideo.dataset.characterVideo"));
