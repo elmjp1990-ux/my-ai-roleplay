@@ -213,6 +213,15 @@ assert.doesNotMatch(html,/append_chat_group_mock_turn/,"frontend must no longer 
 assert.match(html,/group_chat_turn_charge: '群組聊天回覆扣款'/,"wallet history must label group turn charges");
 assert.match(html,/group_chat_turn_refund: '群組聊天失敗退款'/,"wallet history must label group turn refunds");
 
+const groupListHydration=between("async function groupHydrateListRows(groups)","async function groupLoadList(force=false,loadMore=false)");
+assert.match(groupListHydration,/rpc\('get_my_group_list_previews'/,'group list must batch latest-message previews through one RPC per page');
+assert.doesNotMatch(groupListHydration,/chat_group_messages|Promise\.all\(batchIds\.map/,'group list must not issue one latest-message query per group');
+const groupPreviewMigration=fs.readFileSync('supabase/migrations/20261114230000_batch_group_list_previews.sql','utf8');
+assert.match(groupPreviewMigration,/cardinality\(p_group_ids\) NOT BETWEEN 1 AND 10/,'group preview RPC must reject unbounded ID arrays');
+assert.match(groupPreviewMigration,/g\.owner_id = auth\.uid\(\)/,'group preview RPC must scope results to the authenticated owner');
+assert.match(groupPreviewMigration,/DISTINCT ON \(m\.group_id\)/,'group preview RPC must return only one latest message per group');
+assert.match(groupPreviewMigration,/SECURITY INVOKER/,'group preview RPC must preserve caller RLS');
+assert.match(fs.readFileSync('.github/workflows/group-chat-transaction-tests.yml','utf8'),/group-chat-list-preview-scenarios\.sql/,'group preview RPC SQL behavior must run in CI');
 const groupList=between("async function groupLoadList(force=false,loadMore=false)","async function groupOpen(groupId)");
 assert.match(groupList,/pageSize\('groupSessions'\)/,
   "group chat lists must use the shared ten-row page size");
