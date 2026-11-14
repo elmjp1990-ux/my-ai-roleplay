@@ -138,6 +138,18 @@ assert.match(refundRpc,/FROM public\.chat_groups g WHERE g\.id = v_group_id FOR 
   "refund must use parent-first locking while remaining available for soft-deleted groups");
 assert.match(groupMigration,/wallet_transactions_group_turn_idempotency_uidx/,
   "group charge/refund ledger entries must have a unique per-turn operation/currency guard");
+assert.match(groupMigration,/v_cost := v_member_count \* 3/,
+  "group price must remain 3 credits per character");
+assert.match(groupMigration,/v_silver := LEAST\(COALESCE\(v_wallet\.silver_coins, 0\), v_cost\)/,
+  "silver coins must be consumed before diamonds");
+assert.match(groupMigration,/v_diamonds := v_cost - v_silver/,
+  "diamonds must cover only the remaining group-turn cost");
+assert.match(groupMigration,/v_charge\.status = 'refunded'[\s\S]*RETURN QUERY SELECT 'refunded'/,
+  "repeating a refund must return the prior refund without crediting the wallet again");
+assert.match(groupMigration,/v_charge\.status = 'settled' OR v_turn\.status = 'completed'[\s\S]*completed_group_turn_cannot_be_refunded/,
+  "a settled/completed turn must never be refundable");
+assert.match(groupMigration,/SET status = 'settled'[\s\S]*WHERE group_turn_id = p_turn_id AND status = 'reserved'/,
+  "settlement must transition only a reserved charge");
 assert.match(speakerParser,/\[：:\]/,"speaker parser must accept full-width and ASCII colons");
 assert.match(speakerParser,/角色名稱：/,"speaker parser must document explicit character-name labels");
 assert.doesNotMatch(html,/append_chat_group_mock_turn/,"frontend must no longer call the deterministic mock RPC");
