@@ -1517,15 +1517,26 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     const client = window.mySupabase;
     if (!client) return [];
     const version = publicCharacterRowsCacheVersion;
-    const cacheKey=String(offset);
+    const querySignature=JSON.stringify({
+      filter,exploreTags:[...exploreTags].sort(),
+      ownerUid:state.account?.uid||null
+    });
+    const cacheKey=querySignature+':'+String(offset);
     if(publicCharacterRowsCacheAt&&Date.now()-publicCharacterRowsCacheAt<30000&&publicCharacterRowsCache.has(cacheKey)){
       return publicCharacterRowsCache.get(cacheKey);
     }
     if(publicCharacterRowsInflight.has(cacheKey))return publicCharacterRowsInflight.get(cacheKey);
     const request=(async()=>{
-      const {data,error}=await client.from('characters')
+      let query=client.from('characters')
         .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible')
-        .eq('visibility','public').is('deleted_at',null)
+        .eq('visibility','public').is('deleted_at',null);
+      if(filter==='male'||filter==='female')query=query.eq('gender',filter);
+      if(filter==='latest'){
+        const latestSince=new Date(Date.now()-DAY).toISOString();
+        query=query.gte('first_published_at',latestSince);
+      }
+      if(exploreTags.length)query=query.contains('tags',exploreTags);
+      const {data,error}=await query
         .order('first_published_at',{ascending:false,nullsFirst:false})
         .order('id',{ascending:false})
         .range(offset,offset+publicCharacterPageSize-1);
