@@ -602,17 +602,21 @@ assert.match(ownerListSource,/notificationsSentinel[\s\S]*observeEnd/,'system no
 assert.match(ownerListSource,/pageSize\('notifications'\)/);
 
 const primaryIllustrationLoader=between("async function loadCharacterPrimaryIllustrationAssets","async function loadCharacterIllustrationAssets");
-assert.ok(primaryIllustrationLoader.includes("mapWithConcurrency(rows,4"));
+assert.ok(primaryIllustrationLoader.includes("characterIllustrationSignedUrlManager.getMany"));
 assert.ok(!primaryIllustrationLoader.includes("for(const row of rows)"));
 const galleryIllustrationLoader=between("async function loadCharacterIllustrationAssets","// Encounter scenes fetch");
-assert.ok(galleryIllustrationLoader.includes("mapWithConcurrency(rows,4"));
+assert.ok(galleryIllustrationLoader.includes("characterIllustrationSignedUrlManager.getMany"));
 assert.ok(!galleryIllustrationLoader.includes("for(const row of rows)"));
 const ownedCharacterLoader=between("async function loadSupabaseCharacters(user,{loadMore=false}={})","function ");
 assert.ok(ownedCharacterLoader.includes("get_latest_owned_character_stories"));
 assert.ok(!ownedCharacterLoader.includes(".from('character_stories')"));
 const authorLatestLoader=between("async function loadPublicAuthorLatestCharacters","let publicCharactersLoadPromise");
 assert.ok(!authorLatestLoader.includes("count:'exact'"));
-assert.ok(authorLatestLoader.includes(".limit(5)"));
+assert.ok(authorLatestLoader.includes("get_public_author_latest_characters"));
+assert.ok(!authorLatestLoader.includes(".from('characters')"));
+assert.match(followedAuthorBatchMigration,/ROW_NUMBER\(\) OVER/);
+assert.match(followedAuthorBatchMigration,/SECURITY INVOKER/);
+assert.match(followedAuthorBatchMigration,/cardinality\(p_author_ids\) BETWEEN 1 AND 10/);
 const startChatLoader=between("async function startChat(characterId)","function visibleSessions()");
 assert.ok(startChatLoader.includes("getVerifiedAuthUser(userId)"));
 assert.ok(!startChatLoader.includes("auth?.getUser"));
@@ -630,6 +634,7 @@ assert.ok(html.includes("options.verifiedUser?.id===user.id"));
 assert.ok(html.includes("options.verifiedUser?.id===userId"));
 
 const queryOptimizationMigration=fs.readFileSync('supabase/migrations/20261114200000_batch_character_story_and_encounter_schedule_reads.sql','utf8');
+const followedAuthorBatchMigration=fs.readFileSync('supabase/migrations/20261115090000_batch_followed_author_latest_characters.sql','utf8');
 assert.match(queryOptimizationMigration,/DISTINCT ON \(s\.character_id\)/);
 assert.match(queryOptimizationMigration,/cardinality\(p_character_ids\) BETWEEN 1 AND 10/);
 assert.match(queryOptimizationMigration,/find_existing_story_chat_session/);
