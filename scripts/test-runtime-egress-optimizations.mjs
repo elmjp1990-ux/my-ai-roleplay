@@ -223,7 +223,7 @@ assert.match(groupList,/g\.groupListHasMore=currentPage\.length===pageSize/,
   "group list continuation must stop when the backend returns a short page");
 assert.match(groupList,/mergeUnique\(g\.groups,newRows,group=>group\.id\)/,
   "group list continuation must append without duplicating already loaded groups");
-assert.match(html,/data-chat-list-sentinel/);
+assert.match(html,/chatListSentinel/);
 assert.match(html,/groupLoadList\(false,true\)/,
   "the group list sentinel must request the next page");
 
