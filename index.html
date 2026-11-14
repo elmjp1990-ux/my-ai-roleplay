@@ -4740,6 +4740,7 @@ function renderShell() {
 }
 
 let lastRenderedConversationId = null;
+const publicCharacterDetailLoads = new Set();
 
 // Preserve character-card media across route-level rerenders (Create, Favorites,
 // Author pages, etc.), not only Explore's renderGrid() updates.
@@ -5249,6 +5250,19 @@ function renderDetail() {
   const c = session ? sessionCharacter(session) : currentCharacter();
   const fromExistingSession = !!session && !!c &&
     canAccessSessionCharacter(session,c);
+  if(!c&&route.page==='detail'&&route.id&&typeof window.loadPublicCharacterById==='function'){
+    const characterId=route.id;
+    if(!publicCharacterDetailLoads.has(characterId)){
+      publicCharacterDetailLoads.add(characterId);
+      view.innerHTML='<div class="empty">角色資料載入中…</div>';
+      void window.loadPublicCharacterById(characterId).then(()=>{
+        if(route.page==='detail'&&route.id===characterId)renderDetail();
+      }).catch(error=>{
+        console.warn('公開角色詳細資料載入失敗：',error?.message||error);
+      }).finally(()=>publicCharacterDetailLoads.delete(characterId));
+    }
+    return;
+  }
   if (!c || (!fromExistingSession && !accessible(c))) {
     if(previousDetailVideo){
       characterVideoObserver?.unobserve(previousDetailVideo);
