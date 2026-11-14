@@ -11,7 +11,7 @@ turn_race="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -qAt -c "SET ROLE servic
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -c "UPDATE public.chat_group_turns SET processing_started_at=clock_timestamp()-interval '60 seconds' WHERE id='$turn_race';" >/dev/null
 
 set +e
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -c "SET ROLE service_role; SELECT public.complete_group_chat_turn('10000000-0000-4000-8000-000000000007','$turn_race','[{\"speaker_id\":\"30000000-0000-4000-8000-000000000009\",\"content\":\"late reply must not persist\"}]'::jsonb);" >/tmp/group-complete-race.log 2>&1 &
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -c "SET ROLE service_role; SELECT public.complete_group_chat_turn('10000000-0000-4000-8000-000000000007','$turn_race','[{\"speaker_id\":\"30000000-0000-4000-8000-000000000009\",\"content\":\"late reply must not persist\"}]'::jsonb,'[{\"character_id\":\"30000000-0000-4000-8000-000000000009\",\"notifications\":[]}]'::jsonb);" >/tmp/group-complete-race.log 2>&1 &
 pid_complete=$!
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -c "SET ROLE service_role; SELECT * FROM public.expire_group_chat_turn('10000000-0000-4000-8000-000000000007','$turn_race');" >/tmp/group-expire-race.log 2>&1 &
 pid_expire=$!
