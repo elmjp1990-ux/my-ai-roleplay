@@ -42,7 +42,7 @@ assert.match(html, /async function hydratePublicCharacterDetailMetadata\(charact
 assert.match(html, /publicCharacterStoryOpeningLoaded\.has\(characterId\)/);
 assert.match(html, /async function hydratePublicAuthorProfile\(authorId\)/);
 assert.match(html, /publicAuthorProfileLoaded\.has\(authorId\)/);
-assert.match(authorProfile, /publicAuthorProfileLoaded\.has\(route\.id\)/);
+assert.match(authorProfile, /publicAuthorProfileLoaded\.has\(authorId\)/);
 assert.match(html, /if\(c\.authorId\)void hydratePublicAuthorProfile\(c\.authorId\)/);
 assert.match(html, /\.select\('opening_message'\)/);
 const detailMetadata = between("async function hydratePublicCharacterDetailMetadata", "async function hydratePublicCharacterIllustrations");
