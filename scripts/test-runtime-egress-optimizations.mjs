@@ -249,8 +249,10 @@ assert.match(followedAuthorsPaginationSource,/loadPublicAuthorLatestCharacters\(
   "followed-author presentation must delegate latest-character hydration to the app data layer");
 assert.match(html,/async function loadPublicAuthorLatestCharacters\(authorIds=\[\]\)/,
   "followed-author latest characters must use a centralized app-owned query");
-assert.match(html,/\.order\('id',\{ascending:false\}\)\.limit\(4\)/,
-  "followed-author cards must fetch only each author's four newest public characters");
+assert.match(html,/\.order\('id',\{ascending:false\}\)\.limit\(5\)/,
+  "followed-author cards fetch four visible characters plus one lookahead row");
+assert.match(html,/rows\.slice\(0,4\),hasMore:rows\.length>4/,
+  "the fifth row must be used only to determine whether MORE is available");
 assert.doesNotMatch(followedAuthorsPaginationSource,/await loadPublicSupabaseCharacters\(\)/,
   "followed-author cards must not trigger a full public-character catalogue fetch");
 const paginationModule=fs.readFileSync("list-pagination.js","utf8");
