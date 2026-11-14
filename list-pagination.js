@@ -43,6 +43,10 @@
         state.loading = false;
         state.observer?.disconnect();
         state.observer = null;
+      },
+      dispose() {
+        state.invalidate();
+        activeStates.delete(state);
       }
     };
     activeStates.add(state);
