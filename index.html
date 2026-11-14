@@ -3276,7 +3276,7 @@ function compactCloudSessionForLocalStorage(session) {
     messages:[...kept.values()].sort((a,b)=>(Number(a.at)||0)-(Number(b.at)||0)||String(a.id).localeCompare(String(b.id))),
     cloudSessionDataLoaded:false,cloudMessagesLoaded:false,
     cloudHasMoreMessages:false,cloudOldestMessageCursor:null,
-    cloudMessagesLoading:false,cloudMessagesError:''
+    cloudMessagesLoading:false,cloudMessagesError:'',cloudMessagesErrorOlder:false
   };
 }
 
