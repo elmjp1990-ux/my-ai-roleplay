@@ -41,3 +41,12 @@ assert.ok(!moduleSource.includes("entry.total"));
 
 assert.match(moduleSource, /createState\('followedAuthors'/, 'Followed authors must use the shared pagination state.');
 assert.doesNotMatch(moduleSource, /renderGeneration|current\.total/, 'Unused pagination generation and total-count state must stay removed.');
+
+
+const authorPreviewLoader = html.slice(
+  html.indexOf("async function loadPublicAuthorLatestCharacters"),
+  html.indexOf("let publicCharactersLoadPromise", html.indexOf("async function loadPublicAuthorLatestCharacters"))
+);
+assert.match(authorPreviewLoader, /client\.rpc\('get_public_author_latest_characters'/);
+assert.match(authorPreviewLoader, /offset\+=10/);
+assert.doesNotMatch(authorPreviewLoader, /\.from\('characters'\)/);
