@@ -148,7 +148,7 @@ assert.match(cloudSessions,/const listSessionSelect=\[/,
   "chat list hydration must use a dedicated compact field projection");
 assert.doesNotMatch(cloudSessions,/const listSessionSelect=\[[\s\S]*session_story_world_state/,
   "chat list pages must not transfer story-world state, full opening messages or pending-turn payloads");
-assert.match(cloudSessions,/pagedList \? listSessionSelect : fullSessionSelect/,
+assert.match(cloudSessions,/pagedList\?listSessionSelect:fullSessionSelect/,
   "full session metadata must remain available for direct session hydration only");
 
 assert.match(cloudSessions,/pager\.pinnedLoaded=true[\s\S]*pager\.initialLoaded=true/,
