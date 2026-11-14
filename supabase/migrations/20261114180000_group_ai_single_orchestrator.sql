@@ -504,64 +504,6 @@ CREATE TABLE IF NOT EXISTS public.chat_group_ai_usage (
 ALTER TABLE public.chat_group_ai_usage ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.chat_group_ai_usage FROM PUBLIC, anon, authenticated;
 GRANT ALL ON TABLE public.chat_group_ai_usage TO service_role;
-    RAISE EXCEPTION 'group_turn_not_completable';
-  END IF;
-  IF jsonb_typeof(p_speeches) IS DISTINCT FROM 'array'
-    OR jsonb_array_length(p_speeches) NOT BETWEEN 1 AND 3 THEN
-    RAISE EXCEPTION 'invalid_group_speeches' USING ERRCODE = '22023';
-  END IF;
-
-  FOR v_speech IN SELECT value FROM jsonb_array_elements(p_speeches)
-  LOOP
-    IF jsonb_typeof(v_speech) IS DISTINCT FROM 'object'
-      OR jsonb_typeof(v_speech->'speaker_id') IS DISTINCT FROM 'string'
-      OR jsonb_typeof(v_speech->'content') IS DISTINCT FROM 'string' THEN
-      RAISE EXCEPTION 'invalid_group_speech' USING ERRCODE = '22023';
-    END IF;
-    BEGIN
-      v_character_id := (v_speech->>'speaker_id')::uuid;
-    EXCEPTION WHEN invalid_text_representation THEN
-      RAISE EXCEPTION 'invalid_group_speaker_id' USING ERRCODE = '22023';
-    END;
-    v_content := btrim(v_speech->>'content');
-    IF char_length(v_content) NOT BETWEEN 1 AND 20000 THEN
-      RAISE EXCEPTION 'invalid_group_speech_content' USING ERRCODE = '22023';
-    END IF;
-
-    SELECT m.scene_id, m.character_snapshot INTO v_scene_id, v_snapshot
-    FROM public.chat_group_members m
-    WHERE m.group_id = v_turn.group_id
-      AND COALESCE(m.character_id, NULLIF(m.character_snapshot->>'id', '')::uuid) = v_character_id
-    FOR SHARE;
-    IF NOT FOUND THEN RAISE EXCEPTION 'group_speaker_not_member' USING ERRCODE = '22023'; END IF;
-
-    v_sequence := v_sequence + 1;
-    INSERT INTO public.chat_group_messages(
-      group_id, scene_id, turn_id, sequence_no, speaker_type, character_id,
-      content, speaker_snapshot
-    ) VALUES (
-      v_turn.group_id, v_scene_id, p_turn_id, v_sequence, 'character',
-      v_character_id, v_content,
-      jsonb_build_object('id', COALESCE(v_snapshot->>'id', v_character_id::text),
-                         'name', COALESCE(v_snapshot->>'name', '角色'))
-    );
-    v_count := v_count + 1;
-  END LOOP;
-
-  UPDATE public.chat_group_turn_charges
-  SET status = 'settled'
-  WHERE group_turn_id = p_turn_id AND status = 'reserved';
-  IF NOT FOUND THEN RAISE EXCEPTION 'group_charge_settlement_conflict'; END IF;
-
-  UPDATE public.chat_group_turns
-  SET status = 'completed', completed_at = now(), failure_code = NULL
-  WHERE id = p_turn_id AND status = 'processing';
-  IF NOT FOUND THEN RAISE EXCEPTION 'group_turn_completion_conflict'; END IF;
-
-  UPDATE public.chat_groups SET updated_at = now() WHERE id = v_turn.group_id;
-  RETURN 'completed';
-END;
-$function$;
 
 CREATE OR REPLACE FUNCTION public.refund_group_chat_turn(
   p_user_id uuid,
@@ -655,24 +597,3 @@ CREATE UNIQUE INDEX IF NOT EXISTS wallet_transactions_group_turn_idempotency_uid
   WHERE reference_id IS NOT NULL
     AND biz_type IN ('group_chat_turn_charge', 'group_chat_turn_refund');
 
--- Store provider diagnostics and token/cost metadata without storing prompts,
--- player messages, raw model output, or credentials.
-CREATE TABLE IF NOT EXISTS public.chat_group_ai_usage (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  group_id uuid NOT NULL REFERENCES public.chat_groups(id) ON DELETE CASCADE,
-  group_turn_id uuid NOT NULL UNIQUE REFERENCES public.chat_group_turns(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  requested_model text NOT NULL,
-  returned_model text,
-  upstream_provider text,
-  gateway_request_id text,
-  prompt_tokens integer,
-  completion_tokens integer,
-  total_tokens integer,
-  cost_usd numeric(14,8),
-  status text NOT NULL CHECK (status IN ('completed', 'failed')),
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-ALTER TABLE public.chat_group_ai_usage ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON TABLE public.chat_group_ai_usage FROM PUBLIC, anon, authenticated;
-GRANT ALL ON TABLE public.chat_group_ai_usage TO service_role;
