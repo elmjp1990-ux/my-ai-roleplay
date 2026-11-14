@@ -53,5 +53,13 @@ const summaryEnd = summary.indexOf("export async function processDueStoryMemoryS
 assert.ok(summaryStart >= 0 && summaryEnd > summaryStart, "summary request helper must exist");
 const summaryRequest = summary.slice(summaryStart, summaryEnd);
 assert.doesNotMatch(summaryRequest, /max_tokens\s*:/, "summary request must not set a client-side token cap");
+assert.match(summaryRequest, /model: SUMMARY_MODEL/);
+assert.match(summaryRequest, /timeoutMs: 45_000/);
+assert.match(summaryRequest, /temperature: 0\.2/);
+assert.match(summaryRequest, /responseFormat: \{ type: "json_object" \}/);
+assert.doesNotMatch(summaryRequest, /fetch\(|new AbortController|normalizeAiProviderResult/,
+  "memory summary must reuse the shared transport rather than duplicating request and response handling");
+assert.match(openRouterShared, /provider: buildOpenRouterProviderOptions\(\)/,
+  "all chat and summary requests must use the shared approved provider allowlist");
 
 console.log("Dual-model Story chat and five-turn memory-summary contract passed.");
