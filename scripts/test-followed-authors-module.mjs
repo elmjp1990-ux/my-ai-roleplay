@@ -19,7 +19,7 @@ assert.match(moduleSource, /async render\(dependencies\)/);
 assert.doesNotMatch(moduleSource, /async function render\(dependencies\)/);
 for (const dependency of [
   '$', 'currentUser', 'getRoute', 'getSupabaseClient', 'isUuid', 'state',
-  'loadPublicSupabaseCharacters', 'author', 'ICON', 'e', 'avatar', 'card', 'persist', 'toast'
+  'loadPublicAuthorLatestCharacters', 'author', 'ICON', 'e', 'avatar', 'card', 'persist', 'toast'
 ]) {
   assert.ok(moduleSource.includes(dependency), 'App-owned dependency must be explicit: ' + dependency);
 }
