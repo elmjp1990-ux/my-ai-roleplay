@@ -6753,8 +6753,8 @@ function renderGroupConversation() {
         ? '<div class="roleplay-segments">'+renderCharacterSpeechSegments(displayContent,{name:who,image:member?.avatar_url||member?.image||''})+'</div>'
         : '<div class="message-name">'+e(who)+'</div>'+(isSystem?'<div class="bubble">'+e(displayContent)+'</div>':formatMessage(displayContent));
     const actionableGroupMessage=!isSystem&&['user','character'].includes(m.type);
-    const latestEditableGroupMessage = actionableGroupMessage && !g.searchJump &&
-      g.messages.filter(item=>item.type===m.type).at(-1)?.id===m.id;
+    const latestEditableGroupMessage = actionableGroupMessage &&
+      isLatestEditableChatMessage(g.messages,m,'type',['user','character'],g.searchJump);
     const actionButtons = actionableGroupMessage ? renderMessageActionBar({
       id:m.id,
       copyAction:'copy-group-message',
@@ -7931,6 +7931,10 @@ function renderCharacterSpeechSegments(raw, role = {}) {
     ).join('');
   }).join('');
 }
+function isLatestEditableChatMessage(messages,message,typeField,allowedTypes,blocked=false) {
+  if(blocked||!message||!Array.isArray(messages)||!allowedTypes.includes(message[typeField]))return false;
+  return messages.filter(item=>item[typeField]===message[typeField]).at(-1)?.id===message.id;
+}
 function renderMessageActionBar({id,copyAction,deleteAction,reportKind='',editAction,canEdit=false}) {
   const messageId=e(id);
   return '<div class="message-action-bar" aria-label="訊息操作">'+
@@ -8025,8 +8029,7 @@ function renderMessages(scroll = true) {
       : !user
         ? '<div class="roleplay-segments">' + renderCharacterSpeechSegments(displayText,{name:c.name,image:c.image || c.avatar_url || ''}) + '</div>'
         : '<div class="message-name">' + e(currentUser()?.nickname || '你') + '</div>' + formatMessage(displayText);
-    const latestEditableMessage=!s.cloudSearchJump && (m.role==='user'||m.role==='assistant') &&
-      s.messages.filter(item=>item.role===m.role).at(-1)?.id===m.id;
+    const latestEditableMessage=isLatestEditableChatMessage(s.messages,m,'role',['user','assistant'],s.cloudSearchJump);
     const actionButtons=(m.role==='user'||m.role==='assistant')
       ? renderMessageActionBar({
           id:m.id,
@@ -9021,8 +9024,7 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
     }
     case 'edit-message': {
       const m = s?.messages.find(m => m.id === o.id);
-      const latestEditableMessage = m && !s.cloudSearchJump && (m.role === 'user' || m.role === 'assistant') &&
-        s.messages.filter(item => item.role === m.role).at(-1)?.id === m.id;
+      const latestEditableMessage=isLatestEditableChatMessage(s?.messages,m,'role',['user','assistant'],s?.cloudSearchJump);
       if (!m || !latestEditableMessage) return;
       showDialog('編輯最後一則訊息',`
         <form data-form="message-edit">
@@ -9654,8 +9656,7 @@ document.addEventListener('click',async event => {
       case 'group-history-load-older':groupLoadOlderMessages();break;
       case 'edit-group-message': {
         const message=groupPrototype.messages.find(item=>item.id===key);
-        const latest=message&&groupPrototype.messages.filter(item=>item.type===message.type).at(-1);
-        if(groupPrototype.searchJump||!message||message.id!==latest?.id||!['user','character'].includes(message.type)) break;
+        if(!isLatestEditableChatMessage(groupPrototype.messages,message,'type',['user','character'],groupPrototype.searchJump)) break;
         showDialog('編輯最後一則訊息','<form data-form="group-message-edit" data-id="'+e(message.id)+'"><textarea name="text" required maxlength="10000">'+e(message.content||'')+'</textarea><button class="primary" style="margin-top:15px">儲存</button></form>');
         break;
       }
@@ -11230,8 +11231,7 @@ const {
       }
       case 'message-edit': {
         const m=s?.messages.find(m=>m.id===o.id);
-        const latestEditableMessage = m && !s.cloudSearchJump && (m.role==='user'||m.role==='assistant') &&
-          s.messages.filter(item=>item.role===m.role).at(-1)?.id===m.id;
+        const latestEditableMessage=isLatestEditableChatMessage(s?.messages,m,'role',['user','assistant'],s?.cloudSearchJump);
         if (!m || !latestEditableMessage) return;
         if (!text) return toast('訊息不可為空。');
         const previousText=m.text, wasEdited=!!m.edited;
@@ -11270,9 +11270,8 @@ const {
       case 'group-message-edit': {
         const group=groupPrototype.active;
         const message=groupPrototype.messages.find(item=>item.id===messageId);
-        const latest=message&&groupPrototype.messages.filter(item=>item.type===message.type).at(-1);
         const user=currentUser(), client=window.mySupabase;
-        if(groupPrototype.searchJump||!group||!message||message.id!==latest?.id||!['user','character'].includes(message.type)) {
+        if(!group||!isLatestEditableChatMessage(groupPrototype.messages,message,'type',['user','character'],groupPrototype.searchJump)) {
           toast('請返回最新訊息後，再編輯群組訊息。');break;
         }
         if(!text) return toast('訊息不可為空。');
