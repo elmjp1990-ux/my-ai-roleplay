@@ -11,7 +11,7 @@
         $, state, accessible, escapeHTML, safeImage, currentUser, toast, go, requireLogin,
         persist, hydratePublicCharacterIllustrations, characterVideoObserver,
         releaseCharacterVideo, hydrateCharacterVideo, findResumableEncounterSession,
-        setEncounterLifecycleState, saveChatSessionSafely, createEncounterSession, loadCityCharacterPage
+        setEncounterLifecycleState, saveChatSessionSafely, createEncounterSession, loadCityCharacterPage, loadCityCharacterSchedules
       } = dependencies;
 
   // A previous city-map render moves its dialog to <body>. Remove stale dialogs first;
@@ -189,33 +189,6 @@
   // Public schedules live in character_schedules, not in the character row.
   // Always re-check through the server RPC when opening a city location. A cached
   // public schedule can outlive a public -> private change, so never reuse it.
-  const hydrateCitySchedule=async(character)=>{
-    if(!character?.id)return '';
-    if(character.visibility!=='public'||character.deletedAt){
-      character.encounterSchedules='';
-      return '';
-    }
-    try{
-      const client=window.mySupabase;
-      if(!client)throw new Error('城市日程雲端連線不可用');
-      const {data,error}=await client.rpc('get_encounter_character_schedule',{p_character_id:character.id});
-      if(error)throw error;
-      // The RPC independently enforces public/approved/not-deleted/rights-confirmed.
-      // An empty result is authoritative; do not fall back to local author-only schedules.
-      character.encounterSchedules=(data||[]).map(row=>[
-        row.weekday==null?'*':row.weekday,
-        String(row.start_time||'').slice(0,5),
-        String(row.end_time||'').slice(0,5),
-        row.location_key,
-        row.activity
-      ].join('|')).join('\n');
-      return character.encounterSchedules;
-    }catch(error){
-      character.encounterSchedules='';
-      console.warn('城市角色日程載入失敗：',character.id,error?.message||error);
-      return '';
-    }
-  };
   const isCurrentCityCharacterEligible=(person)=>{
     const live=(Array.isArray(state.characters)?state.characters:[]).find(item=>item?.id===person?.id);
     return !!live&&live.visibility==='public'&&!live.deletedAt&&live.cloudPublic!==false&&live.localOnly!==true&&!String(live.id||'').startsWith('seed-')&&accessible(live);
@@ -289,7 +262,8 @@
       pager.offset+=items.length;
       pager.hasMore=result?.hasMore===true;
       pager.candidates=[...pager.candidates,...items];
-      await Promise.all(items.map(hydrateCitySchedule));
+      const schedules=await loadCityCharacterSchedules(items.map(person=>person.id));
+      for(const person of items)person.encounterSchedules=schedules.get(person.id)||'';
       pager.people=getCityPresence(place,pager.candidates);
       cityPresenceByPlace[place]=pager.people;
     }catch(error){

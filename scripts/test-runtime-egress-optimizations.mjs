@@ -469,6 +469,28 @@ assert.match(groupSend,/responseBody\?\.status==='timed_out'[\s\S]*pendingReques
   "the client must clear the old idempotency key only after a confirmed timeout refund");
 
 console.log('Group watchdog, deadline race, abandoned-request recovery, idempotent timeout status, and exact-currency refund checks passed.');
+
+const primaryIllustrationLoader=between("async function loadCharacterPrimaryIllustrationAssets","async function loadCharacterIllustrationAssets");
+assert.match(primaryIllustrationLoader,/mapWithConcurrency\\(rows,4/);
+assert.doesNotMatch(primaryIllustrationLoader,/for\\(const row of rows\\)/);
+const galleryIllustrationLoader=between("async function loadCharacterIllustrationAssets","// Encounter scenes fetch");
+assert.match(galleryIllustrationLoader,/mapWithConcurrency\\(rows,4/);
+assert.doesNotMatch(galleryIllustrationLoader,/for\\(const row of rows\\)/);
+const ownedCharacterLoader=between("async function loadSupabaseCharacters(user,{loadMore=false}={})","function ");
+assert.match(ownedCharacterLoader,/rpc\\('get_latest_owned_character_stories'/);
+assert.doesNotMatch(ownedCharacterLoader,/from\\('character_stories'\\)/);
+const authorLatestLoader=between("async function loadPublicAuthorLatestCharacters","let publicCharactersLoadPromise");
+assert.doesNotMatch(authorLatestLoader,/count:'exact'/);
+assert.match(authorLatestLoader,/\\.limit\\(5\\)/);
+const startChatLoader=between("async function startChat(characterId)","function visibleSessions()");
+assert.match(startChatLoader,/getVerifiedAuthUser\\(userId\\)/);
+assert.doesNotMatch(startChatLoader,/auth\\?\\.getUser/);
+const notificationRenderer=between("function renderNotifications()","/* Cloud wallet ledger");
+assert.match(notificationRenderer,/state\\.notifications\\.filter/);
+assert.match(notificationRenderer,/filtered\\.slice\\(0,notificationListPager\\.limit\\)/);
+assert.doesNotMatch(notificationRenderer,/\\.from\\(|\\.rpc\\(/,
+  "system notifications are local-state-only; the current 10-item reveal is not backend pagination");
+
 console.log('Group history fixture passed: 1,000 rows, 200 pages of five, timestamp/sequence ties, UUID cursor tie-break, no gaps or duplicates, overlapping-page dedupe, group-switch guards, and scroll anchoring.');
 
 const groupPhoneMigration = fs.readFileSync('supabase/migrations/20261114180000_group_ai_single_orchestrator.sql', 'utf8');

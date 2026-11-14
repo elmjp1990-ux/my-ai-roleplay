@@ -78,20 +78,20 @@
           const items=state.characters.filter(character=>character.visibility==='public'&&character.authorId===info.uid&&
             !String(character.id).startsWith('seed-')&&character.cloudPublic!==false&&character.localOnly!==true&&!character.deletedAt)
             .sort((a,b)=>Number(b.firstPublishedAt||b.createdAt||0)-Number(a.firstPublishedAt||a.createdAt||0));
-          charactersByAuthor.set(info.uid,{items:items.slice(0,4),total:items.length});
+          charactersByAuthor.set(info.uid,{items:items.slice(0,4),hasMore:items.length>4});
         }
       }
       if (currentUser()?.uid!==current.userId || getRoute()?.page!=='followed-authors' || pager!==current) return;
 
       const html=authors.map(info=>{
-        const entry=charactersByAuthor.get(info.uid)||{items:[],total:0};
+        const entry=charactersByAuthor.get(info.uid)||{items:[],hasMore:false};
         const latest=(entry.items||[]).slice(0,4);
         const profileButton='<button type="button" class="followed-author-profile-link" data-action="author" data-id="'+e(info.uid)+'" aria-label="前往作者 '+e(info.nickname||'作者')+' 的頁面">'+avatar(info)+'</button>';
         return '<section class="panel stack followed-author-card" style="gap:14px">'+
           '<div class="row between" style="align-items:center;gap:12px"><div class="row" style="min-width:0;gap:10px">'+profileButton+
           '<div style="min-width:0"><button type="button" class="followed-author-name" data-action="author" data-id="'+e(info.uid)+'">'+e(info.nickname||'PersonaX 使用者')+'</button>'+
-          '<span class="small muted" style="display:block">公開角色 '+entry.total+' 名</span></div></div>'+
-          (entry.total>4?'<button type="button" class="followed-author-more" data-action="author" data-id="'+e(info.uid)+'">MORE</button>':'')+'</div>'+
+          '<span class="small muted" style="display:block">最新公開角色</span></div></div>'+
+          (entry.hasMore?'<button type="button" class="followed-author-more" data-action="author" data-id="'+e(info.uid)+'">MORE</button>':'')+'</div>'+
           (latest.length?'<div class="grid">'+latest.map(character=>card(character)).join('')+'</div>':'<div class="empty">目前沒有公開角色。</div>')+
           '</section>';
       }).join('');

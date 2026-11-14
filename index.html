@@ -1598,18 +1598,19 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     for(let offset=0;offset<authorIds.length;offset+=5){
       const batch=authorIds.slice(offset,offset+5);
       const rows=await Promise.all(batch.map(async authorId=>{
-        const {data,error,count}=await client.from('characters')
-          .select('id,author_id,name,gender,age,avatar_url,avatar_video_path,is_nsfw,visibility,review_status,intro,race,style,tags,created_at,first_published_at,latest_eligible',{count:'exact'})
+        const {data,error}=await client.from('characters')
+          .select('id,author_id,name,gender,age,avatar_url,avatar_video_path,is_nsfw,visibility,review_status,intro,race,style,tags,created_at,first_published_at,latest_eligible')
           .eq('author_id',authorId).eq('visibility','public').is('deleted_at',null)
           .order('first_published_at',{ascending:false,nullsFirst:false})
-          .order('id',{ascending:false}).limit(4);
+          .order('id',{ascending:false}).limit(5);
         if(error)throw new Error('讀取作者最新公開角色失敗：'+error.message);
-        return [authorId,{rows:data||[],total:Number(count??(data||[]).length)}];
+        const rows=Array.isArray(data)?data:[];
+        return [authorId,{rows:rows.slice(0,4),hasMore:rows.length>4}];
       }));
       for(const [authorId,entry] of rows){
         const items=entry.rows.map(mapPublicCharacterRow);
         state.characters=window.PoyozzListPagination.mergeUnique(state.characters,items,character=>character.id);
-        result.set(authorId,{items,total:entry.total});
+        result.set(authorId,{items,hasMore:entry.hasMore});
       }
     }
     return result;
@@ -1791,12 +1792,10 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       }
       let stories = [];
       if (ids.length) {
-        const result = await client
-          .from('character_stories')
-          .select('character_id, opening_message, visibility, created_at')
-          .in('character_id', ids)
-          .order('created_at', { ascending: false });
-        if (result.error) throw new Error('讀取雲端角色故事失敗：' + result.error.message);
+        const result = await client.rpc('get_latest_owned_character_stories', {
+          p_character_ids: ids
+        });
+        if (result.error) throw new Error('讀取雲端角色最新故事失敗：' + result.error.message);
         stories = result.data || [];
       }
       const latestStory = new Map();
@@ -1898,6 +1897,21 @@ function invalidateMemoryPhotoSignedUrl(storagePath,uid=currentUser()?.uid||null
   if(uid&&storagePath)memoryPhotoSignedUrlManager.invalidate(uid+':'+storagePath);
 }
 
+async function mapWithConcurrency(items,concurrency,mapper){
+  const list=Array.isArray(items)?items:[];
+  const limit=Math.min(list.length,Math.max(1,Math.floor(Number(concurrency)||1)));
+  const results=new Array(list.length);
+  let cursor=0;
+  await Promise.all(Array.from({length:limit},async()=>{
+    while(true){
+      const index=cursor++;
+      if(index>=list.length)return;
+      results[index]=await mapper(list[index],index);
+    }
+  }));
+  return results;
+}
+
 const characterIllustrationMetadataInflight = new Map();
 async function loadCharacterPrimaryIllustrationAssets(characterIds, scopeUserId=null) {
   const client=window.mySupabase;
@@ -1923,9 +1937,13 @@ async function loadCharacterPrimaryIllustrationAssets(characterIds, scopeUserId=
   try{rows=await rowsPromise;}finally{
     if(characterIllustrationMetadataInflight.get(key)===rowsPromise)characterIllustrationMetadataInflight.delete(key);
   }
-  for(const row of rows){
-    let signedUrl;
-    try{signedUrl=await getCharacterIllustrationSignedUrl(row.storage_path);}catch(_){continue;}
+  const signedAssets=await mapWithConcurrency(rows,4,async row=>{
+    try{return {row,signedUrl:await getCharacterIllustrationSignedUrl(row.storage_path)};}
+    catch(_){return null;}
+  });
+  for(const entry of signedAssets){
+    if(!entry)continue;
+    const {row,signedUrl}=entry;
     result.set(row.character_id,{
       primary:{id:row.id,path:row.storage_path,src:signedUrl,sortOrder:row.sort_order,name:row.display_name||''},
       gallery:[]
@@ -1960,9 +1978,13 @@ async function loadCharacterIllustrationAssets(characterIds, cleanupUserId=null)
   try{rows=await rowsPromise;}finally{
     if(characterIllustrationMetadataInflight.get(key)===rowsPromise)characterIllustrationMetadataInflight.delete(key);
   }
-  for(const row of rows){
-    let signedUrl;
-    try{signedUrl=await getCharacterIllustrationSignedUrl(row.storage_path);}catch(_){continue;}
+  const signedAssets=await mapWithConcurrency(rows,4,async row=>{
+    try{return {row,signedUrl:await getCharacterIllustrationSignedUrl(row.storage_path)};}
+    catch(_){return null;}
+  });
+  for(const entry of signedAssets){
+    if(!entry)continue;
+    const {row,signedUrl}=entry;
     const list=result.get(row.character_id)||{primary:null,gallery:[]};
     const asset={id:row.id,path:row.storage_path,src:signedUrl,sortOrder:row.sort_order,name:row.display_name||''};
     if(row.asset_type==='primary')list.primary=asset;
@@ -6419,9 +6441,10 @@ async function startChat(characterId) {
   if (!accessible(character)) return toast('此角色已被作者調整為私密或刪除狀態，不支持開啟新對話');
   if (!requireLogin({page:'detail',id:characterId})) return;
   const client = window.mySupabase;
-  const { data: authData, error: authError } = await client?.auth?.getUser?.() || {};
-  const userId = authData?.user?.id || currentUser()?.uid;
+  const userId = currentUser()?.uid;
   if (!client || !userId) return toast('登入狀態尚未確認，請重新登入後再試。');
+  const verifiedUser = await getVerifiedAuthUser(userId);
+  if (!verifiedUser) return toast('登入狀態尚未確認，請重新登入後再試。');
   try {
     const { data: rows, error: sessionsError } = await client.from('chat_sessions')
       .select('id,chat_mode,status,created_at,updated_at,encounter_marker:session_data->encounter,encounter_mode_marker:session_data->>encounterMode,encounter_place_marker:session_data->>encounterPlace')
@@ -12177,6 +12200,28 @@ async function loadCityCharacterPage(offset=0){
   return {items,hasMore:rows.length===pageSize};
 }
 
+async function loadCityCharacterSchedules(characterIds=[]){
+  const client=window.mySupabase;
+  const ids=[...new Set((characterIds||[]).filter(Boolean))].slice(0,10);
+  const schedules=new Map();
+  if(!client||!ids.length)return schedules;
+  const {data,error}=await client.rpc('get_encounter_character_schedules',{p_character_ids:ids});
+  if(error)throw new Error('讀取場景角色排程失敗：'+error.message);
+  for(const row of data||[]){
+    const lines=schedules.get(row.character_id)||[];
+    lines.push([
+      row.weekday==null?'*':row.weekday,
+      String(row.start_time||'').slice(0,5),
+      String(row.end_time||'').slice(0,5),
+      row.location_key,
+      row.activity
+    ].join('|'));
+    schedules.set(row.character_id,lines);
+  }
+  for(const [id,lines] of schedules)schedules.set(id,lines.join('\\n'));
+  return schedules;
+}
+
 function renderCityMapMVP() {
   const renderCityMap = window.PoyozzCityMap?.render;
   if (typeof renderCityMap !== 'function') {
@@ -12189,7 +12234,7 @@ function renderCityMapMVP() {
     persist, hydratePublicCharacterIllustrations, characterVideoObserver,
     releaseCharacterVideo, hydrateCharacterVideo, findResumableEncounterSession,
     setEncounterLifecycleState, saveChatSessionSafely, createEncounterSession,
-    loadCityCharacterPage
+    loadCityCharacterPage, loadCityCharacterSchedules
   });
 }
 
