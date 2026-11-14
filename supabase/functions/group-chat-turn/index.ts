@@ -1,9 +1,9 @@
 // Single-call group AI: one model reads every character card and selects speakers.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { normalizeAiProviderResult } from "../_shared/ai-provider-result.ts";
 import { findPrivateContextLeak, preparePrivateContext } from "../_shared/private-context-guard.ts";
 import { collectDerivedPrivateProfileValues, formatCharacterAiProfilePrompt } from "../_shared/character-ai-profile-prompt.ts";
 import { parseGroupSpeakerOutput } from "../_shared/group-speaker-output.ts";
+import { requestOpenRouterChatCompletion, POYOZZ_DEFAULT_CHAT_MODEL } from "../_shared/openrouter-chat-completions.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,35 +18,10 @@ const asRow = (value: unknown): Record<string, unknown> =>
 const asText = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 const isUuid = (value: unknown): value is string =>
   typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-const MODEL = "deepseek/deepseek-v4-flash-20260423";
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const MODEL = POYOZZ_DEFAULT_CHAT_MODEL;
 const TIMEOUT_MS = 55_000;
 
 type Speaker = { id: string; name: string; sceneId: string | null; sceneName: string; snapshot: Record<string, unknown> };
-
-async function requestGeneration(messages: Array<{role: string; content: string}>, apiKey: string) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    const response = await fetch(OPENROUTER_URL, {
-      method: "POST",
-      headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json", "X-OpenRouter-Title": "POYOZZ" },
-      body: JSON.stringify({
-        model: MODEL,
-        messages,
-        temperature: 0.85,
-        provider: { only: ["deepinfra"], allow_fallbacks: false, data_collection: "deny" },
-      }),
-      signal: controller.signal,
-    });
-    let payload = asRow(await response.json().catch(() => ({ error: { code: "invalid_provider_response" } })));
-    payload.status = response.status;
-    if (!response.ok && payload.error == null) payload.error = { code: "http_" + response.status };
-    return { result: normalizeAiProviderResult(payload), status: response.status, usage: asRow(payload.usage), provider: asText(payload.provider), model: asText(payload.model) || MODEL, requestId: response.headers.get("x-request-id") || asText(payload.id) };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
 
 async function refund(admin: any, userId: string, turnId: string, code: string) {
   const { data, error } = await admin.rpc("refund_group_chat_turn", {
@@ -244,10 +219,15 @@ Deno.serve(async (request) => {
 
   let provider;
   try {
-    provider = await requestGeneration([
-      { role: "system", content: systemPrompt },
-      { role: "user", content: currentMessage },
-    ], apiKey);
+    provider = await requestOpenRouterChatCompletion({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: currentMessage },
+      ],
+      apiKey,
+      model: MODEL,
+      timeoutMs: TIMEOUT_MS,
+    });
   } catch (error) {
     // A timeout/network disconnect has an ambiguous provider outcome; keep the
     // reservation locked rather than risk a duplicate generation or double refund.
