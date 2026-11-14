@@ -215,7 +215,8 @@ assert.match(html,/group_chat_turn_refund: '群組聊天失敗退款'/,"wallet h
 
 const groupListHydration=between("async function groupHydrateListRows(groups)","async function groupLoadList(force=false,loadMore=false)");
 assert.match(groupListHydration,/rpc\('get_my_group_list_previews'/,'group list must batch latest-message previews through one RPC per page');
-assert.doesNotMatch(groupListHydration,/chat_group_messages|Promise\.all\(batchIds\.map/,'group list must not issue one latest-message query per group');
+assert.doesNotMatch(groupListHydration,/chat_group_messages/,'group list must not issue one latest-message query per group');
+assert.match(groupListHydration,/for\(let i=0;i<groupIds\.length;i\+=10\)/,'group list must split pinned and regular pages into at-most-ten-ID preview batches');
 const groupPreviewMigration=fs.readFileSync('supabase/migrations/20261114230000_batch_group_list_previews.sql','utf8');
 assert.match(groupPreviewMigration,/cardinality\(p_group_ids\) NOT BETWEEN 1 AND 10/,'group preview RPC must reject unbounded ID arrays');
 assert.match(groupPreviewMigration,/g\.owner_id = auth\.uid\(\)/,'group preview RPC must scope results to the authenticated owner');
