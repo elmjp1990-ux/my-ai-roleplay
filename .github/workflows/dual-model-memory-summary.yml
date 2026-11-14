@@ -17,6 +17,11 @@ on:
       - main
     paths:
       - "supabase/functions/chat-turn/index.ts"
+      - "supabase/functions/group-chat-turn/index.ts"
+      - "supabase/functions/_shared/openrouter-chat-completions.ts"
+      - "supabase/functions/_shared/ai-provider-result.ts"
+      - "supabase/functions/_shared/ai-value-utils.ts"
+      - "supabase/functions/_shared/ai-value-utils.test.ts"
       - "supabase/functions/_shared/story-memory-summary.ts"
       - "scripts/test-dual-model-memory-summary.mjs"
       - "supabase/migrations/20261105223613_ai_model_usage_and_memory_summaries.sql"
