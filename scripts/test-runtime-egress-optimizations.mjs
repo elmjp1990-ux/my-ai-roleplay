@@ -665,3 +665,4 @@ for(const [name,kind] of [['groupCharacterPickerPager','groupCharacterPicker'],[
 assert.match(appIndexSource,/groupCharacterPickerPager=window\.PoyozzListPagination\.createState\('groupCharacterPicker'/,'group picker resets must use shared pagination state');
 assert.match(appIndexSource,/favoriteListPager=window\.PoyozzListPagination\.createState\('favorites'/,'favorite pager resets must use shared pagination state');
 assert.match(appIndexSource,/ownedCharacterPager=window\.PoyozzListPagination\.createState\('ownedCharacters'/,'owned-character pager resets must use shared pagination state');
+assert.match(appIndexSource,/encounterMemoryDetailPager=window\.PoyozzListPagination\.createState\('messages'/,'Encounter transcript must reuse shared five-message pager state');
