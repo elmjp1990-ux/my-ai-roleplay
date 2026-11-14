@@ -522,7 +522,7 @@ assert.match(ownedCharacterPageLoaderSource,/\.range\(pager\.offset,pager\.offse
   'owned character details must be fetched in bounded server-side pages');
 assert.match(ownedCharacterPageLoaderSource,/\.select\('id'\)\.eq\('author_id',user\.id\)/,
   'owned character migration reconciliation may fetch only the minimal ID index');
-assert.match(ownedCharacterPageLoaderSource,/ownedCharacterPager\.hasMore/,
+assert.match(ownedCharacterPageLoaderSource,/loadMore\s*&&\s*!pager\.hasMore/,
   'owned character list must stop requesting pages after the last page');
 assert.match(ownerListSource,/ownedCharactersSentinel[\s\S]*observeEnd/,
   'owned character list must load more on scroll');
