@@ -330,3 +330,26 @@ REVOKE ALL ON FUNCTION public.refund_group_chat_turn(uuid, uuid, text) FROM PUBL
 GRANT EXECUTE ON FUNCTION public.reserve_group_chat_turn(uuid, uuid, uuid, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.complete_group_chat_turn(uuid, uuid, jsonb) TO service_role;
 GRANT EXECUTE ON FUNCTION public.refund_group_chat_turn(uuid, uuid, text) TO service_role;
+
+
+-- Store provider diagnostics and token/cost metadata without storing prompts,
+-- player messages, raw model output, or credentials.
+CREATE TABLE IF NOT EXISTS public.chat_group_ai_usage (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id uuid NOT NULL REFERENCES public.chat_groups(id) ON DELETE CASCADE,
+  group_turn_id uuid NOT NULL UNIQUE REFERENCES public.chat_group_turns(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  requested_model text NOT NULL,
+  returned_model text,
+  upstream_provider text,
+  gateway_request_id text,
+  prompt_tokens integer,
+  completion_tokens integer,
+  total_tokens integer,
+  cost_usd numeric(14,8),
+  status text NOT NULL CHECK (status IN ('completed', 'failed')),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.chat_group_ai_usage ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.chat_group_ai_usage FROM PUBLIC, anon, authenticated;
+GRANT ALL ON TABLE public.chat_group_ai_usage TO service_role;
