@@ -25,7 +25,7 @@ ALTER TABLE public.chat_group_turn_charges
 -- Retire the old direct-to-database mock path. All new turns must go through
 -- the authenticated group-chat-turn Edge Function.
 REVOKE ALL ON FUNCTION public.append_chat_group_mock_turn(uuid, uuid, text)
-  FROM PUBLIC, anon, authenticated;
+  FROM PUBLIC, anon, authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION public.reserve_group_chat_turn(
   p_user_id uuid,
