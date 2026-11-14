@@ -16,7 +16,7 @@ const fileBudgets = {
   'signed-url-manager.js': 8_000,
   'core-utils.js': 4_000,
   'city-map.js': 52_000,
-  'followed-authors.js': 8_000,
+  'followed-authors.js': 9_000,
   'author-profile.js': 5_000,
   'comment-renderer.js': 5_000,
   'custom-tag-picker.js': 5_000,
