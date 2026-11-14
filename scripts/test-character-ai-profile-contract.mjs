@@ -7,6 +7,7 @@ const frontend = fs.readFileSync("index.html", "utf8");
 const migration = fs.readFileSync("supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql", "utf8");
 const schedulerMigration = fs.readFileSync("supabase/migrations/20261107123000_schedule_character_profile_organization_worker.sql", "utf8");
 const worker = fs.readFileSync("supabase/functions/character-profile-organization-worker/index.ts", "utf8");
+const providerPolicy = fs.readFileSync("supabase/functions/_shared/openrouter-provider-policy.ts", "utf8");
 const workerCore = fs.readFileSync("supabase/functions/_shared/character-profile-organization.ts", "utf8");
 const storyTurn = fs.readFileSync("supabase/functions/chat-turn/index.ts", "utf8");
 
@@ -101,8 +102,9 @@ assert.match(migration, /REVOKE ALL ON public\.character_profile_organization[\s
 assert.match(worker, /deepseek\/deepseek-v4-flash-20260423|CHARACTER_PROFILE_MODEL/,
   "Worker must use the confirmed DeepSeek V4 Flash 0423 model");
 assert.match(worker, /OPENROUTER_API_KEY/, "Worker must read the provider key only from server environment");
-assert.match(worker, /data_collection: "deny"/, "Profile requests must enforce POYOZZ's no-provider-data-collection policy");
-assert.match(worker, /only: \["deepinfra"\]/, "Profile requests must use the same approved provider route as Story generation");
+assert.match(worker, /buildOpenRouterProviderOptions\(\)/, "Profile requests must use the shared OpenRouter provider policy");
+assert.match(providerPolicy, /data_collection: "deny"/, "Profile requests must enforce POYOZZ's no-provider-data-collection policy");
+assert.match(providerPolicy, /APPROVED_OPENROUTER_PROVIDERS = \["deepinfra", "inference-net"\]/, "Profile requests must use the same approved provider allowlist as Story generation");
 assert.match(migration, /character_profile_organization_usage/,
   "Profile generation must have a separate private usage/cost ledger, not reuse the queue");
 assert.match(worker, /character_profile_organization_usage/,
