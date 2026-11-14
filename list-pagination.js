@@ -4,6 +4,7 @@
     authorCharacters: 20,
     chatSessions: 10,
     groupSessions: 10,
+    followedAuthors: 10,
     encounterMemories: 20,
     messages: 5
   });
