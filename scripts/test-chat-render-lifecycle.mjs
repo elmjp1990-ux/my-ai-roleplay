@@ -201,6 +201,10 @@ test('pagination scope changes invalidate in-flight requests and disconnect obse
   assert.equal(state.isRequestCurrent(requestId), false);
   assert.equal(state.loading, false);
   assert.equal(observer.disconnected, true);
+  const disposable = pagination.createState('memoryPhotos');
+  const disposableRequest = disposable.beginRequest();
+  disposable.dispose();
+  assert.equal(disposable.isRequestCurrent(disposableRequest), false);
   assert.equal(pagination.beginScope('author:one:user-a'), false);
   assert.equal(pagination.beginScope('author:two:user-a'), true);
 });
@@ -210,7 +214,7 @@ test('author profile pagination cache is bounded and stale requests cannot appen
   assert.match(authorProfile, /MAX_AUTHOR_PAGES\s*=\s*8/);
   assert.match(authorProfile, /page\.beginRequest\(\)/);
   assert.match(authorProfile, /if \(!page\.isRequestCurrent\(requestId\)\) return/);
-  assert.match(authorProfile, /authorPages\.get\(oldestId\)\?\.invalidate\(\)/);
+  assert.match(authorProfile, /authorPages\.get\(oldestId\)\?\.dispose\(\)/);
   assert.match(appHtml, /PoyozzListPagination\?\.beginScope\?\.\(route\.page\+':'/);
 });
 
@@ -220,4 +224,5 @@ test('followed authors and memory albums guard every awaited page against route-
   assert.match(followedAuthors, /current\.isRequestCurrent\(requestId\)/);
   assert.match(memoryAlbum, /pager\.beginRequest\(\)/);
   assert.match(memoryAlbum, /pager\.isRequestCurrent\(requestId\)/);
+  assert.match(memoryAlbum, /albumPageStates\.get\(oldest\)\?\.dispose\(\)/);
 });
