@@ -8272,7 +8272,11 @@ async function renderPhoneModal() {
   }
   // Creator notice prompts guide AI generation only; never render raw instructions to players.
   const generated=isGroup?(character.phoneNotifications||group.phoneNotificationsByCharacter?.[String(character.id)]||[]):(session.phoneNotifications||[]);
-  const notices=Array.isArray(generated)?generated.filter(Boolean).slice(0,8):[];
+  const savedNotices=Array.isArray(generated)?generated.filter(Boolean).slice(0,8):[];
+  const configuredPhonePrompts=Array.isArray(character.phoneSettings?.noticePrompts)?character.phoneSettings.noticePrompts:Array.isArray(character.phoneSettings?.notices)?character.phoneSettings.notices:[];
+  const notices=isGroup&&!savedNotices.length
+    ?configuredPhonePrompts.slice(0,8).map(row=>({title:String(row||'').split('|')[0].trim()||'手機通知',body:'目前尚未有更新'}))
+    :savedNotices;
   // Story phone events are fetched through the owner-checked RPC; never read the event table directly.
   let storyPhoneEvents=[];
   let storyPhoneStates=[];
