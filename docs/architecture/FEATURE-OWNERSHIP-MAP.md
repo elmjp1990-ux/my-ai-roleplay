@@ -49,6 +49,7 @@
 | `author-profile.js` | Author profile presentation | Follow mutations or profile authorization |
 | `comment-renderer.js` | Comment presentation | Comment fetch/mutations or privacy filtering |
 | `custom-tag-picker.js` | Custom tag picker rendering and local event binding | Tag persistence or character save |
+| `notifications-view.js` | System-notification list markup and presentation | Notification state, filtering, pagination, read mutations or remote data access |
 | `list-pagination.js` | Shared page-size configuration, pager-state initialization, IntersectionObserver lifecycle, and duplicate-safe page merging for Explore, author/followed-author pages, chat lists, group picker, favorites, owned characters, Encounter memories, chat history, and memory photos | Feature-specific queries, ordering, filtering, authorization, or persistence |
 | `memory-album.js` | Memory album UI and render lifecycle adapters | Chat/wallet transaction rules |
 | `encounter-scene.js` | Encounter visual-novel presentation | Encounter authorization, lifecycle settlement, billing |
@@ -58,7 +59,7 @@
 | Concern | Current location(s) | Ownership rule |
 |---|---|---|
 | Story AI turn orchestration | `supabase/functions/chat-turn/index.ts`; `supabase/functions/group-chat-turn/index.ts` | Authentication, ownership, prompt assembly, one-call provider orchestration, turn state, and downstream coordination stay server-authoritative. Group AI selects 1–3 speakers from the roster in one model call. |
-| Shared AI prompt/context | `supabase/functions/_shared/prompt-context.ts`, `prompt-variables.ts`, `character-ai-profile-prompt.ts`, `group-turn-envelope.ts`, `openrouter-chat-completions.ts`, `story-memory-summary.ts` and related shared files | Single and group chat reuse character AI-profile formatting and the same privacy-restricted OpenRouter request client; group output is parsed into explicit speaker IDs. Keep model/prompt behavior separate from generic frontend refactors. |
+| Shared AI prompt/context and provider runtime | `supabase/functions/_shared/prompt-context.ts`, `prompt-variables.ts`, `character-ai-profile-prompt.ts`, `group-turn-envelope.ts`, `openrouter-chat-completions.ts`, `ai-provider-result.ts`, `ai-value-utils.ts`, `provider-failure-policy.ts`, `story-memory-summary.ts` and related shared files | Story, group and memory-summary generations use one privacy-restricted OpenRouter transport and normalized provider result contract. Side-effect-free row/string/UUID guards are shared; wallet/turn failure transitions remain mode-specific and must not be mechanically unified. |
 | Encounter session and turns | `supabase/functions/encounter-session/`, `encounter-session-state/`, `encounter-turn/`, plus encounter shared helpers | Server validates session ownership, current lifecycle, schedule and turn eligibility. |
 | Character AI profile organization | `supabase/functions/character-profile-organization-worker/`, `supabase/functions/_shared/character-profile-organization.ts` | Background derived-data workflow; distinct from user-facing character form persistence. |
 | Chat retention/purge | `supabase/functions/purge-chat-deletions/`, `supabase/functions/_shared/chat-deletion-worker.ts` | Retention, tombstones and purge are backend-owned; do not replace with frontend deletion. |
@@ -153,3 +154,10 @@
 ## Known current-state caveat
 
 This is a source-navigation map, not yet a complete dependency graph. `index.html` still owns many cross-feature functions and direct Supabase calls. Before moving any feature, trace the exact call graph, shared state, event listeners, data queries and tests for that feature. The proposed `src/` directory layout is a destination model, not a claim that these folders already exist.
+
+
+## Refactor batch 3–5 progress (2026-11-15)
+
+- **Batch 3:** Story memory-summary requests now call the shared OpenRouter transport used by Story and Group turns. Provider privacy settings, response parsing, request IDs, usage extraction and timeout cleanup therefore have one implementation. ai-value-utils.ts centralizes side-effect-free record, trimmed-string and UUID guards used by Story, Group and memory-summary code. Group and Story billing/failure state transitions remain intentionally separate because their refund/reconciliation rules differ.
+- **Batch 4:** notifications-view.js owns only system-notification list markup. Notification state, unread filtering, pager lifecycle and read mutations remain in index.html. This is a presentation-only extraction with no additional database or network request. Data-access extraction remains staged behind per-feature query/authorization/cache contracts.
+- **Batch 5:** CSS duplicate-selector review found responsive/iOS overrides rather than safe duplicate declarations; no visual rules were deleted in this pass. Existing SQL migrations remain append-only; do not rename, squash or relocate historical files. Continue classifying drafts by evidence/status before any deletion or promotion.
