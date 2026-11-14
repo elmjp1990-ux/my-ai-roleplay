@@ -13,7 +13,7 @@ Deno.test("shared OpenRouter transport applies model options, privacy policy and
       id: "request-123",
       provider: "deepinfra",
       model: "openai/gpt-oss-20b",
-      choices: [{ message: { content: '{"summary":"ok"}',
+      choices: [{ message: { content: '{"summary":"ok"}' } }],
       usage: { prompt_tokens: 12, completion_tokens: 8, total_tokens: 20 },
     }), {
       status: 200,
