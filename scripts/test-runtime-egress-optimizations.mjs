@@ -170,7 +170,7 @@ const sharedOpenRouter=fs.readFileSync("supabase/functions/_shared/openrouter-ch
 assert.match(sharedOpenRouter,/deepseek\/deepseek-v4-flash-20260423/,"single and group chat must share the approved DeepSeek V4 Flash model");
 assert.match(groupEdge,/parseGroupTurnEnvelope\(provider\.result\.text, speakers\)/,"the single model response must validate speaker IDs and per-character phone states");
 assert.match(groupEdge,/requestOpenRouterChatCompletion\(/,"group chat must reuse the shared OpenRouter client");
-assert.match(sharedOpenRouter,/buildOpenRouterProviderOptions\\(\\)/,"all chat modes must share the approved no-data-collection provider restriction");
+assert.match(sharedOpenRouter,/buildOpenRouterProviderOptions\(\)/,"all chat modes must share the approved no-data-collection provider restriction");
 assert.match(sharedOpenRouter,/AbortController/,"the shared provider request must retain a bounded timeout");
 assert.match(groupEdge,/findPrivateContextLeak/,"group output must pass private-context leak screening");
 assert.match(groupEdge,/requestOpenRouterChatCompletion\(/,"group turns must call the shared provider request helper");
