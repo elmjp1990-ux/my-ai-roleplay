@@ -14,7 +14,7 @@
     authorPages.set(authorId, page);
     while (authorPages.size > MAX_AUTHOR_PAGES) {
       const oldestId = authorPages.keys().next().value;
-      authorPages.get(oldestId)?.invalidate();
+      authorPages.get(oldestId)?.dispose();
       authorPages.delete(oldestId);
     }
     return page;
