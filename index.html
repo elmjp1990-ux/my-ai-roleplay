@@ -9993,7 +9993,7 @@ document.addEventListener('click',async event => {
         persist();render();break;
       }
       case 'tag':
-        search = '';filter = 'recommended';limit = 24;
+        search = '';filter = 'recommended';limit = 20;
         exploreTags = [button.dataset.tag];
         state.preferences = [...new Set([...state.preferences,button.dataset.tag])];
         persist();
@@ -10016,13 +10016,13 @@ document.addEventListener('click',async event => {
       case 'clear-search':
         search='';renderHome();$('exploreSearch')?.classList.remove('hidden');$('searchInput')?.focus();break;
       case 'clear-filter':
-        search='';exploreTags=[];limit=24;
+        search='';exploreTags=[];limit=20;
         go({page:'home'},true);
         renderHome();
         break;
       case 'banner':banner=Number(button.dataset.index);renderBanner();break;
       case 'scroll-grid':$('characterGrid')?.scrollIntoView({behavior:'smooth'});break;
-      case 'load-more':limit=Math.min(150,limit+24);renderGrid({append:true});break;
+      case 'load-more':limit+=window.PoyozzListPagination.pageSize('explore');renderGrid({append:true});break;
       case 'new-batch':batch+=7;limit=24;renderGrid();break;
       case 'tags':openModal('tags',{mode:button.dataset.mode});break;
       case 'add-custom-tag': {
