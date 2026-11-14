@@ -2429,24 +2429,19 @@ async function uploadCharacterAvatarVideo(file,userId,characterId){
   if(error)throw new Error('角色影片上傳失敗：'+error.message);
   return path;
 }
-// Signed URL 依 storage path 共用快取與進行中的請求，避免同一影片被重複簽名。
-const characterVideoSignedUrlCache = new Map();
-const characterVideoSignedUrlInflight = new Map();
+// Visible character videos share the same bounded cache and in-flight deduplication.
+const characterVideoSignedUrlManager=window.PoyozzSignedUrlManager.create({
+  cacheTtlMs:270000,refreshSkewMs:30000,maxEntries:100,
+  createSignedUrl:async path=>{
+    const {data,error}=await window.mySupabase.storage.from('character-avatar-videos').createSignedUrl(path,300);
+    if(error||!data?.signedUrl)throw new Error(error?.message||'無法取得角色影片網址');
+    return data.signedUrl;
+  }
+});
 let characterVideoObserver = null;
 const characterVideoLoaders = new WeakMap();
 async function getCharacterVideoSignedUrl(path){
-  const now=Date.now();
-  const cached=characterVideoSignedUrlCache.get(path);
-  if(cached&&cached.expiresAt>now+30000)return cached.url;
-  if(characterVideoSignedUrlInflight.has(path))return characterVideoSignedUrlInflight.get(path);
-  const request=(async()=>{
-    const {data,error}=await window.mySupabase.storage.from('character-avatar-videos').createSignedUrl(path,300);
-    if(error||!data?.signedUrl)throw new Error(error?.message||'無法取得角色影片網址');
-    characterVideoSignedUrlCache.set(path,{url:data.signedUrl,expiresAt:Date.now()+270000});
-    return data.signedUrl;
-  })();
-  characterVideoSignedUrlInflight.set(path,request);
-  try{return await request;}finally{characterVideoSignedUrlInflight.delete(path);}
+  return characterVideoSignedUrlManager.get(path);
 }
 function pauseCharacterVideo(video){
   if(!video)return;
