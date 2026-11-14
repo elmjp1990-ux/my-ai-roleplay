@@ -507,8 +507,8 @@ const followedAuthorsPageTestSource2026=fs.readFileSync('followed-authors.js','u
 const sharedPaginationSource=fs.readFileSync('list-pagination.js','utf8');
 assert.match(sharedPaginationSource,/followedAuthors:\s*10/,
   "followed-author pagination must use the shared ten-row page size");
-assert.match(followedAuthorsPageTestSource2026,/pageSize:global\.PoyozzListPagination\.pageSize\('followedAuthors'\)/,
-  "followed-author page size must come from the shared pagination module");
+assert.match(followedAuthorsPageTestSource2026,/createState\('followedAuthors'/,
+  "followed-author pager state must use the shared pagination module");
 assert.match(followedAuthorsPageTestSource2026,/\.from\('author_follows'\)\.select\('author_id,created_at'\)/,
   "followed authors must be selected from the server-side relation without requesting an exact total");
 assert.doesNotMatch(followedAuthorsPageTestSource2026,/count:\s*['"]exact['"]/,
