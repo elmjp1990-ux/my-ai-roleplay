@@ -4,6 +4,47 @@ set -euo pipefail
 : "\${DATABASE_URL:?DATABASE_URL is required}"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -At -c "SELECT 1" >/dev/null
 
+
+# Completion racing the watchdog on an already-expired turn: the deadline
+# check must prevent late persistence whichever transaction obtains the lock.
+turn_race="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -qAt -c "SET ROLE service_role; SELECT turn_id FROM public.reserve_group_chat_turn('10000000-0000-4000-8000-000000000007','20000000-0000-4000-8000-000000000008','40000000-0000-4000-8000-000000000008','completion vs watchdog');")"
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -c "UPDATE public.chat_group_turns SET processing_started_at=clock_timestamp()-interval '60 seconds' WHERE id='$turn_race';" >/dev/null
+
+set +e
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -c "SET ROLE service_role; SELECT public.complete_group_chat_turn('10000000-0000-4000-8000-000000000007','$turn_race','[{\"speaker_id\":\"30000000-0000-4000-8000-000000000009\",\"content\":\"late reply must not persist\"}]'::jsonb);" >/tmp/group-complete-race.log 2>&1 &
+pid_complete=$!
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -c "SET ROLE service_role; SELECT * FROM public.expire_group_chat_turn('10000000-0000-4000-8000-000000000007','$turn_race');" >/tmp/group-expire-race.log 2>&1 &
+pid_expire=$!
+wait "$pid_complete"; complete_status=$?
+wait "$pid_expire"; expire_status=$?
+set -e
+
+if [[ "$complete_status" -eq 0 || "$expire_status" -ne 0 ]]; then
+  echo "Expected the overdue completion to lose and the watchdog refund to succeed." >&2
+  cat /tmp/group-complete-race.log /tmp/group-expire-race.log >&2
+  exit 1
+fi
+if ! grep -Eq "group_turn_deadline_exceeded|group_turn_not_completable" /tmp/group-complete-race.log; then
+  cat /tmp/group-complete-race.log >&2; exit 1
+fi
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X <<SQL
+DO \$\$
+DECLARE n integer;
+BEGIN
+  IF (SELECT status FROM public.chat_group_turns WHERE id='$turn_race') <> 'failed'
+    OR (SELECT status FROM public.chat_group_turn_charges WHERE group_turn_id='$turn_race') <> 'refunded' THEN
+    RAISE EXCEPTION 'completion/watchdog race did not end in one refunded terminal state';
+  END IF;
+  SELECT count(*) INTO n FROM public.chat_group_messages
+  WHERE turn_id='$turn_race' AND speaker_type='character';
+  IF n <> 0 THEN RAISE EXCEPTION 'late AI reply persisted after timeout'; END IF;
+  SELECT count(*) INTO n FROM public.wallet_transactions
+  WHERE reference_id='$turn_race' AND biz_type='group_chat_turn_refund';
+  IF n <> 1 THEN RAISE EXCEPTION 'completion/watchdog race created % refund ledger rows', n; END IF;
+END
+\$\$;
+SQL
+
 # Different groups, same wallet: row locking must allow exactly one 3-credit
 # reservation when the shared wallet contains only 5 silver coins.
 set +e
