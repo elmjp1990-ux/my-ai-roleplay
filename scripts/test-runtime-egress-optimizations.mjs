@@ -251,6 +251,16 @@ assert.match(exploreLoader,/mergeUnique\(state\.characters,publicCharacters,char
   "Explore continuation must append newly fetched characters without duplicating loaded rows");
 assert.match(exploreLoader,/window\.loadNextPublicCharacterPage/,
   "Explore must expose a dedicated next-page loader");
+assert.match(exploreLoader,/if\(characterId\)[\s\S]*?\.eq\('id',characterId\)/,
+  "direct public-character links must hydrate their exact character without scanning the catalogue");
+assert.match(html,/loadPublicCharacterById=characterId=>loadPublicSupabaseCharacters\(\{characterId\}\)/,
+  "the direct character hydrator must be available to detail and group routes");
+const detailPage=between("function renderDetail()","function renderAuthor()");
+assert.match(detailPage,/window\.loadPublicCharacterById\(characterId\)/,
+  "a directly opened public character detail page must fetch its own row when it is not in the current Explore page");
+assert.match(html,/await window\.loadPublicCharacterById\(characterId\)/,
+  "opening a public character from a group must hydrate that exact character instead of resetting Explore to page one");
+
 const exploreGrid=between("function renderGrid({append=false}={})","async function loadPublicCharacterPrimaryIllustration");
 assert.match(exploreGrid,/list\.slice\(0,limit\)/,
   "Explore must cap visible character cards to the current twenty-item display page");
