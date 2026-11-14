@@ -265,7 +265,7 @@ assert.match(html,/async function loadPublicAuthorLatestCharacters\(authorIds=\[
 assert.match(authorLatestLoader,/fetchLatestCharactersByAuthor\(client,authorIds\)/,
   "followed-author cards must delegate their batch read to the author data adapter");
 assert.match(authorDataModule,/get_public_author_latest_characters/);
-assert.match(authorDataModule,/offset\+pageSize-1/);
+assert.match(authorDataModule,/offset\s*\+\s*pageSize\s*-\s*1/);
 assert.match(authorLatestLoader,/rows\.slice\(0,4\)\.map\(mapPublicCharacterRow\)/,
   "followed-author cards must render only four of the five fetched previews");
 assert.match(authorLatestLoader,/hasMore:rows\.length>4/,
