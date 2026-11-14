@@ -1491,118 +1491,137 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 
   // 探索頁公開角色獨立於登入帳號載入，訪客也能看見。
   // 每次登入／登出都以雲端公開清單為準，避免沿用前一個帳號的過期本機資料。
-  let publicCharacterRowsCache = null;
+  const publicCharacterPageSize = window.PoyozzListPagination.pageSize('explore');
+  let publicCharacterRowsCache = new Map();
   let publicCharacterRowsCacheAt = 0;
   let publicCharacterRowsCacheVersion = 0;
-  let publicCharacterRowsInflight = null;
+  let publicCharacterRowsInflight = new Map();
+  let publicCharacterListPager = {
+    ...window.PoyozzListPagination.createState('explore'),
+    ownerUid:null
+  };
   function invalidatePublicCharacterRowsCache() {
     publicCharacterRowsCacheVersion += 1;
-    publicCharacterRowsCache = null;
+    publicCharacterRowsCache.clear();
     publicCharacterRowsCacheAt = 0;
-    publicCharacterRowsInflight = null;
+    publicCharacterRowsInflight.clear();
+    publicCharacterListPager.observer?.disconnect();
+    publicCharacterListPager = {
+      ...window.PoyozzListPagination.createState('explore'),
+      ownerUid:state.account?.uid||null
+    };
+    window.__poyozzExploreHasMore = true;
   }
-  async function loadPublicCharacterRows() {
+  async function loadPublicCharacterRows(offset=0) {
     const client = window.mySupabase;
     if (!client) return [];
-    const now = Date.now();
-    if (Array.isArray(publicCharacterRowsCache) && now - publicCharacterRowsCacheAt < 30000) {
-      return publicCharacterRowsCache;
-    }
     const version = publicCharacterRowsCacheVersion;
-    if (publicCharacterRowsInflight?.version === version) return publicCharacterRowsInflight.promise;
-    const request = (async () => {
-      const { data, error } = await client
-        .from('characters')
+    const cacheKey=String(offset);
+    if(publicCharacterRowsCacheAt&&Date.now()-publicCharacterRowsCacheAt<30000&&publicCharacterRowsCache.has(cacheKey)){
+      return publicCharacterRowsCache.get(cacheKey);
+    }
+    if(publicCharacterRowsInflight.has(cacheKey))return publicCharacterRowsInflight.get(cacheKey);
+    const request=(async()=>{
+      const {data,error}=await client.from('characters')
         .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible')
-        .eq('visibility', 'public')
-        .is('deleted_at', null)
-        .order('first_published_at', { ascending: false, nullsFirst: false });
-      if (error) throw new Error(error.message);
-      const rows = Array.isArray(data) ? data : [];
-      if (version === publicCharacterRowsCacheVersion) {
-        publicCharacterRowsCache = rows;
-        publicCharacterRowsCacheAt = Date.now();
+        .eq('visibility','public').is('deleted_at',null)
+        .order('first_published_at',{ascending:false,nullsFirst:false})
+        .order('id',{ascending:false})
+        .range(offset,offset+publicCharacterPageSize-1);
+      if(error)throw new Error(error.message);
+      const rows=Array.isArray(data)?data:[];
+      if(version===publicCharacterRowsCacheVersion){
+        publicCharacterRowsCache.set(cacheKey,rows);
+        publicCharacterRowsCacheAt=Date.now();
       }
       return rows;
     })();
-    publicCharacterRowsInflight = { version, promise: request };
-    try {
-      return await request;
-    } finally {
-      if (publicCharacterRowsInflight?.promise === request) publicCharacterRowsInflight = null;
-    }
+    publicCharacterRowsInflight.set(cacheKey,request);
+    try{return await request;}
+    finally{if(publicCharacterRowsInflight.get(cacheKey)===request)publicCharacterRowsInflight.delete(cacheKey);}
   }
   let publicCharactersLoadPromise = null;
-  function loadPublicSupabaseCharacters() {
-    if (publicCharactersLoadPromise) return publicCharactersLoadPromise;
-    publicCharactersLoadPromise = loadPublicSupabaseCharactersImpl()
-      .finally(() => { publicCharactersLoadPromise = null; });
+  function loadPublicSupabaseCharacters(options={}) {
+    const loadMore=options.loadMore===true;
+    if(publicCharactersLoadPromise)return publicCharactersLoadPromise;
+    publicCharactersLoadPromise=loadPublicSupabaseCharactersImpl({loadMore})
+      .finally(()=>{publicCharactersLoadPromise=null;});
     return publicCharactersLoadPromise;
   }
-  async function loadPublicSupabaseCharactersImpl() {
-    const client = window.mySupabase;
-    if (!client) return;
-    try {
-      const rowsVersion = publicCharacterRowsCacheVersion;
-      const rows = await loadPublicCharacterRows();
-      // If a save/delete invalidated the cache while this request was in flight,
-      // discard the stale result and read the current public catalogue before hydration.
-      if (rowsVersion !== publicCharacterRowsCacheVersion) return loadPublicSupabaseCharactersImpl();
-
-      // Author profile and story opening are detail-page data; do not fetch them for every public role.
-      const publicCharacters = (rows || []).map(row => {
-        // The owner hydrator may complete before or after this public-list request.
-        // Preserve its already-hydrated assets for the current user's own public character.
-        const cachedPublic = state.characters.find(character =>
-          character.id === row.id && character.cloudPublic === true
-        );
-        const ownerLocal = state.characters.find(character =>
-          character.id === row.id && character.authorId === row.author_id &&
-          character.authorId === state.account?.uid
-        );
+  async function loadPublicSupabaseCharactersImpl({loadMore=false}={}) {
+    const client=window.mySupabase;
+    if(!client)return;
+    const pager=publicCharacterListPager;
+    if(pager.loading|| (loadMore&&!pager.hasMore))return;
+    if(!loadMore){
+      pager.observer?.disconnect();
+      pager.offset=0;pager.hasMore=true;pager.loading=false;
+      pager.ownerUid=state.account?.uid||null;
+      publicCharacterRowsCache.clear();
+      publicCharacterRowsCacheAt=0;
+    }
+    pager.loading=true;
+    window.__poyozzExploreLoading=true;
+    try{
+      const rowsVersion=publicCharacterRowsCacheVersion;
+      const pageOffset=loadMore?pager.offset:0;
+      const rows=await loadPublicCharacterRows(pageOffset);
+      if(rowsVersion!==publicCharacterRowsCacheVersion)return;
+      const publicCharacters=(rows||[]).map(row=>{
+        const cachedPublic=state.characters.find(character=>character.id===row.id&&character.cloudPublic===true);
+        const ownerLocal=state.characters.find(character=>character.id===row.id&&character.authorId===row.author_id&&character.authorId===state.account?.uid);
         return {
-          id: row.id, name: row.name || '未命名角色',
-          gender: row.gender || 'ambiguous',
-          age: row.age == null ? '' : String(row.age),
-          // Explore cards need only the character cover/video. Full illustration assets
-          // are hydrated when a player opens this character's detail page or encounter.
-          image: ownerLocal?.image || cachedPublic?.image || row.avatar_url || '',
-          primaryIllustrationPath:ownerLocal?.primaryIllustrationPath || cachedPublic?.primaryIllustrationPath || '',
-          galleryIllustrations:ownerLocal?.galleryIllustrations || cachedPublic?.galleryIllustrations || [],
-          publicIllustrationsLoaded:ownerLocal?.publicIllustrationsLoaded === true || cachedPublic?.publicIllustrationsLoaded === true,
-          avatarVideoPath:row.avatar_video_path || '', visibility: 'public',
-          reviewStatus: row.review_status, intro: row.intro || '',
-          opening: ownerLocal?.opening || cachedPublic?.opening || '', race: row.race || '',
-          privateInfo: '', style: row.style || '',
-          personalityProfile: normalizePersonalityProfile({}),
-          ...((ownerLocal && Object.prototype.hasOwnProperty.call(ownerLocal,'phoneSettings')) || (cachedPublic && Object.prototype.hasOwnProperty.call(cachedPublic,'phoneSettings')) ? {phoneSettings:ownerLocal?.phoneSettings ?? cachedPublic?.phoneSettings ?? {}} : {}),
-          ...((ownerLocal && Object.prototype.hasOwnProperty.call(ownerLocal,'nsfwWorkplaceWarning')) || (cachedPublic && Object.prototype.hasOwnProperty.call(cachedPublic,'nsfwWorkplaceWarning')) ? {nsfwWorkplaceWarning:(ownerLocal?.nsfwWorkplaceWarning ?? cachedPublic?.nsfwWorkplaceWarning)===true} : {}),
-          isNSFW:row.is_nsfw === true,
-          tags: normalizeCharacterTagsForRead(row.tags),
-          authorId: row.author_id, owner: state.account?.uid === row.author_id,
-          chats: '0', users: null,
-          createdAt: row.created_at ? new Date(row.created_at).getTime() : 0,
-          firstPublishedAt: row.first_published_at ? new Date(row.first_published_at).getTime() : null,
-          latestEligible: row.latest_eligible !== false,
-          rightsConfirmed: false, cloudPublic: true
+          id:row.id,name:row.name||'未命名角色',gender:row.gender||'ambiguous',
+          age:row.age==null?'':String(row.age),
+          image:ownerLocal?.image||cachedPublic?.image||row.avatar_url||'',
+          primaryIllustrationPath:ownerLocal?.primaryIllustrationPath||cachedPublic?.primaryIllustrationPath||'',
+          galleryIllustrations:ownerLocal?.galleryIllustrations||cachedPublic?.galleryIllustrations||[],
+          publicIllustrationsLoaded:ownerLocal?.publicIllustrationsLoaded===true||cachedPublic?.publicIllustrationsLoaded===true,
+          avatarVideoPath:row.avatar_video_path||'',visibility:'public',
+          reviewStatus:row.review_status,intro:row.intro||'',
+          opening:ownerLocal?.opening||cachedPublic?.opening||'',race:row.race||'',
+          privateInfo:'',style:row.style||'',personalityProfile:normalizePersonalityProfile({}),
+          ...((ownerLocal&&Object.prototype.hasOwnProperty.call(ownerLocal,'phoneSettings'))||(cachedPublic&&Object.prototype.hasOwnProperty.call(cachedPublic,'phoneSettings'))?{phoneSettings:ownerLocal?.phoneSettings??cachedPublic?.phoneSettings??{}}:{}),
+          ...((ownerLocal&&Object.prototype.hasOwnProperty.call(ownerLocal,'nsfwWorkplaceWarning'))||(cachedPublic&&Object.prototype.hasOwnProperty.call(cachedPublic,'nsfwWorkplaceWarning'))?{nsfwWorkplaceWarning:(ownerLocal?.nsfwWorkplaceWarning??cachedPublic?.nsfwWorkplaceWarning)===true}:{}),
+          isNSFW:row.is_nsfw===true,tags:normalizeCharacterTagsForRead(row.tags),
+          authorId:row.author_id,owner:state.account?.uid===row.author_id,
+          chats:'0',users:null,createdAt:row.created_at?new Date(row.created_at).getTime():0,
+          firstPublishedAt:row.first_published_at?new Date(row.first_published_at).getTime():null,
+          latestEligible:row.latest_eligible!==false,rightsConfirmed:false,cloudPublic:true
         };
       });
-
-      const publicIds = new Set(publicCharacters.map(character => character.id));
-      const currentUid = state.account?.uid || null;
-      // 只保留示範角色與目前登入帳號自己的未刪除角色，避免帳號切換時顯示其他帳號的本機私密草稿。
-      const keepLocal = state.characters.filter(character =>
-        String(character.id).startsWith('seed-') ||
-        (!!currentUid && character.authorId === currentUid && !character.deletedAt)
-      );
-      state.characters = [...publicCharacters, ...keepLocal.filter(character => !publicIds.has(character.id))];
+      const publicIds=new Set(publicCharacters.map(character=>character.id));
+      const currentUid=state.account?.uid||null;
+      if(!loadMore){
+        const keepLocal=state.characters.filter(character=>
+          String(character.id).startsWith('seed-')||
+          (!!currentUid&&character.authorId===currentUid&&!character.deletedAt)
+        );
+        state.characters=[...publicCharacters,...keepLocal.filter(character=>!publicIds.has(character.id))];
+      }else{
+        state.characters=window.PoyozzListPagination.mergeUnique(state.characters,publicCharacters,character=>character.id);
+        state.characters=state.characters.map(existing=>{
+          const refreshed=publicCharacters.find(character=>character.id===existing.id);
+          return refreshed?{...existing,...refreshed}:existing;
+        });
+      }
+      pager.offset+=rows.length;
+      pager.hasMore=rows.length===publicCharacterPageSize;
+      pager.loading=false;
+      window.__poyozzExploreHasMore=pager.hasMore;
+      window.__poyozzExploreLoading=false;
       persist();
-      if (route?.page !== 'citymap') render();
-    } catch (error) {
-      console.error('公開角色載入失敗：', error);
-      if (state.account?.uid) toast('公開角色載入失敗：' + error.message);
+      if(route?.page!=='citymap')render();
+    }catch(error){
+      pager.loading=false;
+      window.__poyozzExploreLoading=false;
+      console.error('公開角色載入失敗：',error);
+      if(state.account?.uid)toast('公開角色載入失敗：'+error.message);
     }
   }
+  window.loadNextPublicCharacterPage=()=>loadPublicSupabaseCharacters({loadMore:true});
+  window.__poyozzExploreHasMore=true;
+  window.__poyozzExploreLoading=false;
 
   // Concurrent login hydrators share one server-verified auth lookup per UID.
   // This map only coalesces in-flight checks; it never caches auth beyond the request.
