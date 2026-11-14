@@ -37,7 +37,7 @@ assert.match(html, /document\.addEventListener\('load'/);
 const publicLoader = html.slice(html.indexOf("function mapPublicCharacterRow(row)"), html.indexOf("async function loadSupabaseCharacters(user,{loadMore=false}={})"));
 assert.doesNotMatch(publicLoader, /loadCharacterIllustrationAssets|character_illustrations|createSignedUrl/);
 assert.match(publicLoader, /image:ownerLocal\?\.image\|\|cachedPublic\?\.image\|\|row\.avatar_url/);
-assert.match(publicLoader, /galleryIllustrations:ownerLocal\?\.galleryIllustrations \|\| cachedPublic\?\.galleryIllustrations \|\| \[\]/);
+assert.match(publicLoader, /galleryIllustrations:ownerLocal\?\.galleryIllustrations\|\|cachedPublic\?\.galleryIllustrations\|\|\[\]/);
 assert.match(html, /async function hydratePublicCharacterIllustrations\(characterId\)/);
 assert.match(html, /loadCharacterIllustrationAssets\(\[characterId\]\)/);
 assert.match(html, /current\.publicIllustrationsLoaded=true/);
