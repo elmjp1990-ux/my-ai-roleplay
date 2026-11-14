@@ -102,7 +102,6 @@ BEGIN
   END IF;
 
   v_cost := v_member_count * 3;
-  PERFORM public.ensure_wallet_account();
   SELECT w.* INTO v_wallet
   FROM public.wallet_accounts w
   WHERE w.user_id = p_user_id
@@ -224,7 +223,7 @@ BEGIN
     SELECT m.scene_id, m.character_snapshot INTO v_scene_id, v_snapshot
     FROM public.chat_group_members m
     WHERE m.group_id = v_turn.group_id
-      AND m.character_id = v_character_id
+      AND COALESCE(m.character_id, NULLIF(m.character_snapshot->>'id', '')::uuid) = v_character_id
     FOR SHARE;
     IF NOT FOUND THEN RAISE EXCEPTION 'group_speaker_not_member' USING ERRCODE = '22023'; END IF;
 
