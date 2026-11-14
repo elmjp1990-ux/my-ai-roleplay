@@ -3251,7 +3251,7 @@ let chatListPaginationObserver=null;
 let search = '';
 let filter = 'recommended';
 let exploreTags = [];
-let limit = 20;
+let limit = 10;
 let batch = 0;
 let chatSearch = '';
 let chatSearchExpanded = false;
@@ -4045,7 +4045,7 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
       session.cloudSnapshotNeedsRepair=!row.character_snapshot?.id;
     }
     const roleplayMeta=session.cloudRoleplayMeta||{};
-    const pageSize=5;
+    const pageSize=window.PoyozzListPagination?.pageSize('messages')||10;
     let messageQuery=client.from('chat_messages').select('id,session_id,role,content,created_at,suggested_replies')
       .eq('session_id',sessionId).is('deleted_at',null)
       .order('created_at',{ascending:false}).order('id',{ascending:false});
@@ -10124,7 +10124,7 @@ document.addEventListener('click',async event => {
         persist();render();break;
       }
       case 'tag':
-        search = '';filter = 'recommended';limit = 20;
+        search = '';filter = 'recommended';limit = 10;
         exploreTags = [button.dataset.tag];
         state.preferences = [...new Set([...state.preferences,button.dataset.tag])];
         persist();
@@ -10147,7 +10147,7 @@ document.addEventListener('click',async event => {
       case 'clear-search':
         search='';renderHome();$('exploreSearch')?.classList.remove('hidden');$('searchInput')?.focus();break;
       case 'clear-filter':
-        search='';exploreTags=[];limit=20;
+        search='';exploreTags=[];limit=10;
         go({page:'home'},true);
         renderHome();
         break;
