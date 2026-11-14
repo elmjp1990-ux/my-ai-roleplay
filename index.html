@@ -7437,8 +7437,8 @@ async function groupSendTurn() {
     // Refresh the visible wallet after the server confirms settlement.
     await refreshWalletBalance();
     if(currentUser()?.uid!==requestUid) return;
-    // The RPC returns the durable turn ID, including on an idempotent retry.
-    // Fetch only this turn's two messages instead of retransmitting the group's full history.
+    // The Edge Function returns the durable turn ID, including on an idempotent retry.
+    // Fetch only this turn's messages instead of retransmitting the group's full history.
     // Keep the same request key until this narrow read succeeds so retries cannot double-charge.
     const {data:rows,error:rowsError}=await groupWithTimeout(
       window.mySupabase.from('chat_group_messages')
@@ -8683,6 +8683,8 @@ async function loadWalletLedger(currency) {
           signup_bonus: '註冊贈送',
           chat_turn_charge: '聊天回覆扣款',
           chat_turn_refund: '聊天失敗退款',
+          group_chat_turn_charge: '群組聊天回覆扣款',
+          group_chat_turn_refund: '群組聊天失敗退款',
           daily_checkin: '每日簽到',
           reward_ad: '觀看獎勵廣告',
           purchase: '購買',
