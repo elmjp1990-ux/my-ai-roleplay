@@ -4900,6 +4900,9 @@ function render() {
     };
   }
   const previousCardVideos=captureCharacterCardVideos($('view'));
+  // Release map-owned timers and global listeners before any route render.
+  // The map view may be re-rendered without a full page reload.
+  window.PoyozzCityMap?.destroy?.();
   // City-map-only visual treatment must not leak into traditional pages.
   if (route.page !== 'citymap') document.body.classList.remove('city-map-mode','city-map-mode-immersive');
   renderShell();
