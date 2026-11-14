@@ -30,15 +30,15 @@ assert.match(groupOpen,/if\(group\.archived_at\)/,
 assert.doesNotMatch(groupOpen,/void groupLoadList\(true\)/,
   "opening a group must not force a full group-list/member/preview reload");
 
-assert.match(groupOpen,/\.order\('created_at',\{ascending:false\}\).*\.limit\(10\)/,
-  "opening a group must fetch only the newest bounded page in reverse chronological query order");
+assert.match(groupOpen,/\.order\('created_at',\{ascending:false\}\).*\.limit\(window\.PoyozzListPagination\.pageSize\('messages'\)\)/,
+  "opening a group must fetch only the newest five-message page in reverse chronological query order");
 assert.doesNotMatch(groupOpen,/\.limit\(50\)/,
   "group initial history must not fetch fifty messages");
 assert.match(groupOpen,/oldestInitialMessage=initialMessageRows\.at\(-1\)/,
   "the first page must retain a stable cursor at its oldest fetched row");
 const singleHistory=between("async function loadCloudSessionMessages(sessionId, options = {})","const chatSessionSaveQueue =");
-assert.match(singleHistory,/pageSize\('messages'\)\|\|10/,
-  "single Story and Encounter chats must initially hydrate only ten messages per request");
+assert.match(singleHistory,/pageSize\('messages'\)\|\|5/,
+  "single Story and Encounter chats must initially hydrate only five messages per request");
 assert.match(singleHistory,/\.limit\(pageSize\)/,
   "single Story and Encounter chat pagination must apply the shared ten-message page size");
 assert.match(singleHistory,/session\.encounterMode/,
@@ -53,8 +53,8 @@ assert.ok(groupHistory.includes("const oldest=page.at(-1);"),
   "the next cursor must use the oldest row in the descending page to avoid skipping messages");
 assert.match(groupHistory,/\.or\(olderFilter\)/,
   "older pages must use a keyset cursor instead of offset pagination");
-assert.match(groupHistory,/\.order\('id',\{ascending:false\}\)\.limit\(10\)/,
-  "older pages must use a deterministic tie-breaker and a fixed page size");
+assert.match(groupHistory,/\.order\('id',\{ascending:false\}\)\.limit\(window\.PoyozzListPagination\.pageSize\('messages'\)\)/,
+  "older pages must use a deterministic tie-breaker and the shared five-message page size");
 assert.doesNotMatch(groupHistory,/\.limit\(50\)/,
   "older group history must also remain limited to ten messages per request");
 assert.match(groupHistory,/existing=new Set/,
@@ -254,16 +254,16 @@ assert.match(html,/\.order\('id',\{ascending:false\}\)\.limit\(4\)/,
 assert.doesNotMatch(followedAuthorsPaginationSource,/await loadPublicSupabaseCharacters\(\)/,
   "followed-author cards must not trigger a full public-character catalogue fetch");
 const paginationModule=fs.readFileSync("list-pagination.js","utf8");
-assert.match(paginationModule,/explore:\s*10/);
+assert.match(paginationModule,/explore:\s*20/);
 assert.match(paginationModule,/authorCharacters:\s*10/);
 assert.match(paginationModule,/chatSessions:\s*10/);
 assert.match(paginationModule,/groupSessions:\s*10/);
 assert.match(paginationModule,/encounterMemories:\s*10/);
-assert.match(paginationModule,/messages:\s*10/);
+assert.match(paginationModule,/messages:\s*5/);
 assert.match(paginationModule,/function observeEnd/);
 const exploreLoader=between("async function loadPublicCharacterRows(offset=0)","// Concurrent login hydrators");
 assert.match(html,/publicCharacterPageSize = window\.PoyozzListPagination\.pageSize\('explore'\)/,
-  "Explore must use the shared ten-character page size");
+  "Explore must use the shared twenty-character page size");
 assert.match(exploreLoader,/\.range\(offset,offset\+publicCharacterPageSize-1\)/,
   "Explore public characters must be fetched from Supabase in bounded backend pages");
 assert.match(exploreLoader,/mergeUnique\(state\.characters,publicCharacters,character=>character\.id\)/,
@@ -282,9 +282,9 @@ assert.match(html,/await window\.loadPublicCharacterById\(characterId\)/,
 
 const exploreGrid=between("function renderGrid({append=false}={})","async function loadPublicCharacterPrimaryIllustration");
 assert.match(exploreGrid,/list\.slice\(0,limit\)/,
-  "Explore must cap visible character cards to the current ten-item display page");
+  "Explore must cap visible character cards to the current twenty-item display page");
 assert.match(exploreGrid,/pageSize\('explore'\)/,
-  "Explore scroll continuation must advance by ten visible cards");
+  "Explore scroll continuation must advance by twenty visible cards");
 assert.match(exploreGrid,/PoyozzListPagination\.observeEnd/,
   "Explore must use the shared IntersectionObserver lifecycle rather than a separate observer implementation");
 
@@ -325,7 +325,7 @@ assert.doesNotMatch(encounterMemory,/select\('id,chat_mode,session_data,updated_
 console.log("Story relationship RPC dedupe, illustration write dedupe, group list refresh avoidance, incremental group-turn loading, phone-state cache, shared login auth verification, and author-profile hydration reuse checks passed.");
 
 
-// Exercise the ten-message pagination contract against a deterministic 1,000-row fixture.
+// Exercise the five-message pagination contract against a deterministic 1,000-row fixture.
 // This mirrors the database's DESC ordering and the three-part keyset predicate.
 const makeUuid=n=>'00000000-0000-4000-8000-'+n.toString(16).padStart(12,'0');
 const fixture=Array.from({length:1000},(_,index)=>({
@@ -345,17 +345,17 @@ const isOlderThan=(row,cursor)=>
   (row.created_at===cursor.created_at && row.sequence_no<cursor.sequence_no) ||
   (row.created_at===cursor.created_at && row.sequence_no===cursor.sequence_no && row.id<cursor.id);
 const orderedFixture=[...fixture].sort(compareDesc);
-let cursor=orderedFixture[9];
-let paged=orderedFixture.slice(0,10);
+let cursor=orderedFixture[4];
+let paged=orderedFixture.slice(0,5);
 let pageCount=1;
 while(paged.length<fixture.length && pageCount<110) {
-  const page=orderedFixture.filter(row=>isOlderThan(row,cursor)).slice(0,10);
+  const page=orderedFixture.filter(row=>isOlderThan(row,cursor)).slice(0,5);
   assert.ok(page.length>0,'pagination must continue until the oldest row');
   cursor=page.at(-1);
   paged.push(...page);
   pageCount++;
 }
-assert.equal(pageCount,100,'1,000 rows at 10 per page must require exactly 100 pages');
+assert.equal(pageCount,200,'1,000 rows at 5 per page must require exactly 200 pages');
 assert.equal(paged.length,1000,'all fixture rows must be returned');
 assert.equal(new Set(paged.map(row=>row.id)).size,1000,'keyset pages must not duplicate rows');
 assert.deepEqual(paged.map(row=>row.id),orderedFixture.map(row=>row.id),
@@ -364,10 +364,10 @@ assert.ok(orderedFixture.some((row,index)=>index>0 &&
   row.created_at===orderedFixture[index-1].created_at &&
   row.sequence_no===orderedFixture[index-1].sequence_no),
   'fixture must exercise the UUID tie-breaker for equal timestamp and sequence values');
-const firstTwoPages=paged.slice(0,20);
-const overlappingNextPage=[...paged.slice(15,20),...paged.slice(20,25)];
+const firstTwoPages=paged.slice(0,10);
+const overlappingNextPage=[...paged.slice(5,10),...paged.slice(10,15)];
 const uniqueMerged=[...new Map([...firstTwoPages,...overlappingNextPage].map(row=>[row.id,row])).values()];
-assert.equal(uniqueMerged.length,25,'client-side merge must deduplicate overlapping ten-message pages');
+assert.equal(uniqueMerged.length,15,'client-side merge must deduplicate overlapping five-message pages');
 
 assert.match(groupHistory,/requestId!==g\.openRequestId\|\|g\.active\?\.id!==groupId\|\|currentUser\(\)\?\.uid!==uid/,
   'an older-page response must be discarded after group/account switching');
@@ -516,14 +516,16 @@ const paginationSizes=sharedPaginationSource.slice(sharedPaginationSource.indexO
 for(const listName of ['authorCharacters','chatSessions','groupSessions','followedAuthors','encounterMemories','ownedCharacters','favorites','notifications','characterComments','memoryPhotos']){
   assert.match(paginationSizes,new RegExp(listName+':\\s*10'),listName+' must use ten-row pages');
 }
-assert.match(paginationSizes,/explore:\\s*20/,'Explore must preserve its twenty-character page size');
-assert.match(paginationSizes,/messages:\\s*5/,'single, Encounter, and group chat history must preserve five-message pages');
+assert.match(paginationSizes,/explore:\s*20/,'Explore must preserve its twenty-character page size');
+assert.match(paginationSizes,/messages:\s*5/,'single, Encounter, and group chat history must preserve five-message pages');
 const ownerListSource=fs.readFileSync('index.html','utf8');
 const ownedCharacterPageLoaderSource=ownerListSource.slice(ownerListSource.indexOf('async function loadSupabaseCharacters(user'),ownerListSource.indexOf('const characterIllustrationSignedUrlManager'));
 assert.match(ownedCharacterPageLoaderSource,/\.range\(pager\.offset,pager\.offset\+pageSize-1\)/,
   'owned character details must be fetched in bounded server-side pages');
-assert.match(ownedCharacterPageLoaderSource,/\.select\('id'\)\.eq\('author_id',user\.id\)/,
-  'owned character migration reconciliation may fetch only the minimal ID index');
+assert.match(ownedCharacterPageLoaderSource,/\.in\('id',batch\)/,
+  'owned-character migration reconciliation must compare only local IDs in bounded batches');
+assert.doesNotMatch(ownedCharacterPageLoaderSource,/\.select\('id'\)\.eq\('author_id',user\.id\);/,
+  'owned-character migration must not scan every cloud character ID');
 assert.match(ownedCharacterPageLoaderSource,/loadMore\s*&&\s*!pager\.hasMore/,
   'owned character list must stop requesting pages after the last page');
 assert.match(ownerListSource,/ownedCharactersSentinel[\s\S]*observeEnd/,
@@ -545,8 +547,8 @@ assert.match(ownerListSource,/pageSize\('characterComments'\)/);
 assert.match(ownerListSource,/\.range\(g\.groupPinnedOffset,g\.groupPinnedOffset\+pageSize-1\)/,
   'pinned group chats must be bounded and paged in ten-row batches');
 
-assert.match(groupOpen,/\.limit\(10\)/,"group initial history must load ten rows");
-assert.match(groupHistory,/\.limit\(10\)/,"group older history must load ten rows");
+assert.match(groupOpen,/\.limit\(window\.PoyozzListPagination\.pageSize\('messages'\)\)/,"group initial history must use the shared five-message page size");
+assert.match(groupHistory,/\.limit\(window\.PoyozzListPagination\.pageSize\('messages'\)\)/,"group older history must use the shared five-message page size");
 assert.match(html,/pinnedOffset\+pageSize-1/,"single pinned chats must be paginated in ten-row batches");
 assert.match(html,/groupPinnedOffset\+pageSize-1/,"group pinned chats must be paginated in ten-row batches");
 assert.match(html,/chat_memory_photos[\s\S]{0,500}\.limit\(10\)/,"group background photo picker must cap reads at ten photos");

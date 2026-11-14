@@ -1,13 +1,12 @@
 (() => {
   const PAGE_SIZES = Object.freeze({
-    explore: 20,
+    explore: 10,
     authorCharacters: 10,
     chatSessions: 10,
     groupSessions: 10,
     followedAuthors: 10,
     encounterMemories: 10,
-    citySceneCharacters: 10,
-    messages: 5,
+    messages: 10,
     ownedCharacters: 10,
     favorites: 10,
     notifications: 10,
