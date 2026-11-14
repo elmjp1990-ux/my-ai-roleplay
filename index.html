@@ -576,11 +576,15 @@ body.group-chat-page:has(.group-wizard) #view {
 .message.user { flex-direction:row-reverse; }
 .message.user > .avatar { display:none !important; }
 .message .avatar { width:30px; height:30px; }
-.message-content { flex:1 1 auto; width:100%; max-width:100%; min-width:0; }
+.message-content { flex:0 1 auto; width:fit-content; max-width:min(17em,calc(100% - 38px)); min-width:0; }
+.message:not(.user) > .message-content { margin-right:auto; }
+.message.user > .message-content { margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; }
 .message-name { color:var(--muted); font-size:10px; margin-bottom:5px; }
 .user .message-name { text-align:right; }
-.roleplay-segments { display:grid; gap:5px; }
-.roleplay-segment { min-width:0; }
+.roleplay-segments { display:grid; gap:5px; width:fit-content; max-width:100%; }
+.roleplay-segment { min-width:0; max-width:100%; }
+.message.user .roleplay-segment.is-user { justify-self:end; }
+.message.user .roleplay-segment.is-user .roleplay-segment-heading { justify-content:flex-end; }
 .roleplay-segment-heading { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:11px; margin:4px 0 5px; }
 .roleplay-segment-heading .avatar { width:30px !important; height:30px !important; flex:0 0 30px; object-fit:cover; }
 .roleplay-avatar-wrap { position:relative; display:block; flex:0 0 30px; width:30px; min-width:30px; height:30px; min-height:30px; overflow:visible; }
@@ -590,6 +594,10 @@ body.group-chat-page:has(.group-wizard) #view {
 .roleplay-segment.is-temporary .bubble { background:var(--panel2); color:var(--text); border:1px dashed var(--border); }
 .roleplay-segment.is-user .bubble { background:var(--user-bubble); color:var(--text); border-color:var(--border); }
 .bubble {
+  display:table;
+  width:fit-content;
+  max-width:min(17em,100%);
+  box-sizing:border-box;
   font-size:16px;
   padding:12px 14px;
   background:var(--bubble);
