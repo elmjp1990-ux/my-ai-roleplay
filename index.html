@@ -6811,7 +6811,7 @@ async function groupOpen(groupId) {
       window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,background_mode,background_memory_photo_id,created_at,updated_at,archived_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot,phone_notifications').eq('group_id',groupId).order('position'),
-      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(5)
+      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(10)
     ]),15000,'群組資料讀取逾時，請檢查網路後重試。')
     if(requestId!==g.openRequestId) return;
     const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error;
@@ -6896,13 +6896,13 @@ async function groupLoadOlderMessages() {
       window.mySupabase.from('chat_group_messages')
         .select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at')
         .eq('group_id',groupId).is('deleted_at',null).or(olderFilter)
-        .order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(5),
+        .order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(10),
       15000,'較早的群組訊息載入逾時，請稍後重試。'
     );
     if(requestId!==g.openRequestId||g.active?.id!==groupId||currentUser()?.uid!==uid)return;
     if(error)throw error;
     const page=rows||[];
-    g.historyHasMore=page.length===5;
+    g.historyHasMore=page.length===10;
     if(page.length){
       const oldest=page.at(-1);
       g.historyCursor={createdAt:oldest.created_at,sequenceNo:oldest.sequence_no,id:oldest.id};
