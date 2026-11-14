@@ -132,7 +132,7 @@ assert.match(cloudSessions,/\.eq\('session_data->>pinned','true'\)/,
   "pinned single chats must load independently from the unpinned page");
 assert.match(cloudSessions,/session_data->>pinned\.eq\.false,session_data->>pinned\.is\.null/,
   "the single chat page query must exclude pinned sessions");
-assert.match(cloudSessions,/\.range\(pageStart,pageStart\+pageSize-1\)/,
+assert.match(cloudSessions,/\.range\(pager\.offset,pager\.offset\+pageSize-1\)/,
   "single chat list continuation must use bounded backend pages");
 assert.match(cloudSessions,/if \(!onlySessionId && !pagedList\)/,
   "loading another single-chat page must not evict sessions already loaded from prior pages");
@@ -237,7 +237,7 @@ assert.match(paginationModule,/function observeEnd/);
 const encounterMemory=between("function loadEncounterMemoryList(panel,session)","async function openEncounterMemoryDetail(button)");
 assert.match(encounterMemory,/pageSize\('encounterMemories'\)/,
   "Encounter memory lists must use the shared twenty-session page size");
-assert.match(encounterMemory,/\.range\(pager\.offset,pager\.offset\+pageSize-1\)/,
+assert.match(encounterMemory,/\.range\(pageStart,pageStart\+pageSize-1\)/,
   "Encounter sessions must be paginated by the backend instead of fetching 200 diary rows");
 assert.match(encounterMemory,/\.in\('metadata->>session_id',sessionIds\)/,
   "diary summaries must be hydrated only for the current page of Encounter sessions");
