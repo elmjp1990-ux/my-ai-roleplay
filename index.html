@@ -3777,7 +3777,7 @@ async function loadCloudChatSessions(user, options = {}) {
           ? {text:String(row.character_snapshot_opening),at:row.created_at ? new Date(row.created_at).getTime() : Date.now()}
           : null);
       const pending = row.session_pending_turn && typeof row.session_pending_turn === 'object'
-        ? row.session_pending_turn : null;
+        ? row.session_pending_turn : (pagedList ? existing?.pendingTurn || null : null);
       const marker = row.session_has_user_message;
       const existingHasPlayerMessage=(existing?.messages||[]).some(message=>
         message.role==='user'&&String(message.text||'').trim()
@@ -3794,7 +3794,7 @@ async function loadCloudChatSessions(user, options = {}) {
           ? row.session_encounter_metadata : existing?.encounterMetadata || null,
         encounterMode:row.chat_mode === 'encounter' || parseBool(row.session_encounter_mode) ||
           (!!row.session_encounter_metadata && typeof row.session_encounter_metadata==='object' && !Array.isArray(row.session_encounter_metadata)),
-        storyMode:parseBool(row.session_story_mode),
+        storyMode:row.session_story_mode===undefined ? existing?.storyMode===true : parseBool(row.session_story_mode),
         storyWorldState:row.session_story_world_state&&typeof row.session_story_world_state==='object'?row.session_story_world_state:existing?.storyWorldState||null,
         encounterPlace:row.session_encounter_place || existing?.encounterPlace || null,
         encounterDay:row.session_encounter_day || existing?.encounterDay || null,
