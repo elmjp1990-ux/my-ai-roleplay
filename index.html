@@ -10031,7 +10031,7 @@ document.addEventListener('click',async event => {
         go({page:'home',tag:button.dataset.tag});
         break;
       case 'filter':
-        filter = button.dataset.filter;limit = 24;
+        filter = button.dataset.filter;limit = 20;
         exploreTags = [];
         if (route.tag) {
           const next = {...route};delete next.tag;
