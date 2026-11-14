@@ -1725,26 +1725,26 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       let rows=[];
       const migrationErrors=[];
       let migratedCount=0;
-      // 只讀取所有角色 ID 以避免重複補傳舊版本機角色；完整角色欄位仍採 10 筆分頁。
+      // 舊版本機角色補同步只比對本機已有的角色 ID；不再掃描雲端帳號下的完整角色索引。
       if(!loadMore){
-        const idsResult=await client.from('characters').select('id').eq('author_id',user.id);
-        if(idsResult.error)throw new Error('讀取雲端角色索引失敗：'+idsResult.error.message);
-        pager.cloudIds=new Set((idsResult.data||[]).map(row=>row.id));
         const localOwned=state.characters.filter(c=>c.authorId===user.id&&c.id);
-        const localOnly=localOwned.filter(c=>!pager.cloudIds.has(c.id));
+        const localIds=localOwned.map(character=>character.id).filter(isUuid);
+        const existingLocalIds=new Set();
+        for(let start=0;start<localIds.length;start+=pageSize){
+          const batch=localIds.slice(start,start+pageSize);
+          const existingResult=await client.from('characters').select('id')
+            .eq('author_id',user.id).in('id',batch);
+          if(existingResult.error)throw new Error('比對本機角色同步狀態失敗：'+existingResult.error.message);
+          for(const row of existingResult.data||[])existingLocalIds.add(row.id);
+        }
+        const localOnly=localOwned.filter(character=>!existingLocalIds.has(character.id));
         for(const character of localOnly){
           try{
             const result=await saveSupabaseCharacter(character,user.id);
             migratedCount++;
-            pager.cloudIds.add(character.id);
             if(result?.storyError)migrationErrors.push(character.name+'：'+result.storyError);
             if(result?.profileQueueError)migrationErrors.push(character.name+'：'+result.profileQueueError);
           }catch(migrationError){migrationErrors.push((character.name||'未命名角色')+'：'+migrationError.message);}
-        }
-        if(migratedCount>0){
-          const refreshedIds=await client.from('characters').select('id').eq('author_id',user.id);
-          if(refreshedIds.error)throw new Error('角色補傳後重新讀取索引失敗：'+refreshedIds.error.message);
-          pager.cloudIds=new Set((refreshedIds.data||[]).map(row=>row.id));
         }
       }
       const pageResult=await client.from('characters')
@@ -6871,7 +6871,7 @@ async function groupOpen(groupId) {
       window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,background_mode,background_memory_photo_id,created_at,updated_at,archived_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot,phone_notifications').eq('group_id',groupId).order('position'),
-      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(10)
+      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(window.PoyozzListPagination.pageSize('messages'))
     ]),15000,'群組資料讀取逾時，請檢查網路後重試。')
     if(requestId!==g.openRequestId) return;
     const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error;
@@ -6890,7 +6890,7 @@ async function groupOpen(groupId) {
     groupExpandedMemberId=null;
     // Memory photo metadata and signed URLs are loaded only when the player opens background settings.
     const initialMessageRows=messageRes.data||[];
-    g.historyHasMore=initialMessageRows.length===5;
+    g.historyHasMore=initialMessageRows.length===window.PoyozzListPagination.pageSize('messages');
     const oldestInitialMessage=initialMessageRows.at(-1);
     g.historyCursor=oldestInitialMessage?{createdAt:oldestInitialMessage.created_at,sequenceNo:oldestInitialMessage.sequence_no,id:oldestInitialMessage.id}:null;
     g.historyLoading=false;g.historyError='';g.historyScrollAnchor=null;
@@ -6956,13 +6956,13 @@ async function groupLoadOlderMessages() {
       window.mySupabase.from('chat_group_messages')
         .select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at')
         .eq('group_id',groupId).is('deleted_at',null).or(olderFilter)
-        .order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(10),
+        .order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(window.PoyozzListPagination.pageSize('messages')),
       15000,'較早的群組訊息載入逾時，請稍後重試。'
     );
     if(requestId!==g.openRequestId||g.active?.id!==groupId||currentUser()?.uid!==uid)return;
     if(error)throw error;
     const page=rows||[];
-    g.historyHasMore=page.length===10;
+    g.historyHasMore=page.length===window.PoyozzListPagination.pageSize('messages');
     if(page.length){
       const oldest=page.at(-1);
       g.historyCursor={createdAt:oldest.created_at,sequenceNo:oldest.sequence_no,id:oldest.id};

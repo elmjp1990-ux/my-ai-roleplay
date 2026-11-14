@@ -513,9 +513,11 @@ assert.doesNotMatch(followedAuthorsPageTestSource2026,/\.from\('author_follows'\
 
 
 const paginationSizes=sharedPaginationSource.slice(sharedPaginationSource.indexOf('const PAGE_SIZES'),sharedPaginationSource.indexOf('});',sharedPaginationSource.indexOf('const PAGE_SIZES'))+3);
-for(const listName of ['explore','authorCharacters','chatSessions','groupSessions','followedAuthors','encounterMemories','messages','ownedCharacters','favorites','notifications','characterComments','memoryPhotos']){
+for(const listName of ['authorCharacters','chatSessions','groupSessions','followedAuthors','encounterMemories','ownedCharacters','favorites','notifications','characterComments','memoryPhotos']){
   assert.match(paginationSizes,new RegExp(listName+':\\s*10'),listName+' must use ten-row pages');
 }
+assert.match(paginationSizes,/explore:\\s*20/,'Explore must preserve its twenty-character page size');
+assert.match(paginationSizes,/messages:\\s*5/,'single, Encounter, and group chat history must preserve five-message pages');
 const ownerListSource=fs.readFileSync('index.html','utf8');
 const ownedCharacterPageLoaderSource=ownerListSource.slice(ownerListSource.indexOf('async function loadSupabaseCharacters(user'),ownerListSource.indexOf('const characterIllustrationSignedUrlManager'));
 assert.match(ownedCharacterPageLoaderSource,/\.range\(pager\.offset,pager\.offset\+pageSize-1\)/,
