@@ -7413,13 +7413,29 @@ async function groupSendMock() {
   try {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
     if(authError||!user||user.id!==requestUid||currentUser()?.uid!==requestUid) throw new Error('登入狀態已變更，請重新登入。');
-    const {data:turnId,error}=await groupWithTimeout(window.mySupabase.rpc('append_chat_group_mock_turn',{
-      p_group_id:activeGroupId,p_request_key:requestKey,p_content:content
-    }),15000,'訊息保存逾時。請重新開啟群組確認訊息是否已保存，再決定是否重試。');
+    const {data:turnResult,error}=await groupWithTimeout(window.mySupabase.functions.invoke('group-chat-turn',{
+      body:{groupId:activeGroupId,requestKey,content}
+    }),70000,'群組 AI 回覆逾時。請稍後重新開啟群組確認回合狀態；不要建立新的重複訊息。');
     if(error) throw error;
-    if(!turnId) throw new Error('群組回合已保存，但未取得回合識別碼。請重新開啟群組確認訊息。');
-    // The RPC commits the group turn and wallet debit atomically. Refresh the visible
-    // wallet immediately so the header/composer never keeps showing the pre-charge balance.
+    if(turnResult?.status==='insufficient_funds') {
+      await refreshWalletBalance();
+      openInsufficientFundsDialog('group');
+      g.sending=false;g.pendingRequest=null;g.formError='';
+      renderGroupConversation();
+      return;
+    }
+    if(turnResult?.status==='refunded'||turnResult?.status==='content_rejected') {
+      await refreshWalletBalance();
+      g.sending=false;g.pendingRequest=null;
+      g.formError=turnResult.status==='content_rejected'?'這次 AI 回覆未能完成，費用已退還，請調整內容後重試。':'這次 AI 服務未能完成，費用已退還，請重新送出。';
+      renderGroupConversation();
+      return;
+    }
+    if(turnResult?.status!=='completed'||!turnResult?.turnId) {
+      throw new Error('群組 AI 回合尚未確認完成，為避免重複扣款，請稍後重新開啟群組確認狀態。');
+    }
+    const turnId=turnResult.turnId;
+    // Refresh the visible wallet after the server confirms settlement.
     await refreshWalletBalance();
     if(currentUser()?.uid!==requestUid) return;
     // The RPC returns the durable turn ID, including on an idempotent retry.
