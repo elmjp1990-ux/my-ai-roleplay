@@ -38,3 +38,6 @@ console.log('Followed authors module extraction and dependency contract passed.'
 
 assert.ok(moduleSource.includes("entry.hasMore?'<button type=\"button\" class=\"followed-author-more\""));
 assert.ok(!moduleSource.includes("entry.total"));
+
+assert.match(moduleSource, /createState\('followedAuthors'/, 'Followed authors must use the shared pagination state.');
+assert.doesNotMatch(moduleSource, /renderGeneration|current\.total/, 'Unused pagination generation and total-count state must stay removed.');
