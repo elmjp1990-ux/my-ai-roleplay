@@ -333,6 +333,12 @@ Deno.serve(async (request) => {
     // refuses to reverse a settled charge and the turn remains reconcilable.
     const refunded = await refund(admin, user.id, turnId, "group_reply_persistence_failed");
     if (refunded.confirmed) {
+      const { data: persistedTurn } = await admin.from("chat_group_turns")
+        .select("failure_code").eq("id", turnId).eq("user_id", user.id).maybeSingle();
+      if (persistedTurn?.failure_code === "provider_timeout" ||
+          persistedTurn?.failure_code === "provider_timeout_watchdog") {
+        return json({ status: "timed_out", error: "provider_timeout", balance: refunded.balance, retryAllowed: false });
+      }
       return json({ status: "refunded", error: "group_reply_persistence_failed", balance: refunded.balance, retryAllowed: false });
     }
     return json({ status: "needs_reconciliation", error: "group_reply_persistence_unknown", retryAllowed: false }, 503);
