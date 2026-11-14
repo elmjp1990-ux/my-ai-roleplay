@@ -37,7 +37,10 @@ assert.ok(html.includes('session.storyWorldState'), 'Phone must read the latest 
 assert.ok(html.includes('故事時間尚未確認'), 'Unknown story time must remain explicitly unknown rather than use a hard-coded clock');
 assert.ok(!html.includes('星期五　🕧 19:30'), 'Phone must not show a hard-coded fictional time');
 assert.ok(uiStyles.includes('overflow-y:auto;overflow-x:hidden'), 'Phone content body must scroll independently in the extracted UI stylesheet');
-assert.ok(html.includes('phone-device-head,.phone-member-switch,.phone-bar,.phone-close-row{flex-shrink:0}'),
+assert.match(uiStyles, /\.phone-device-head\{[^}]*flex-shrink:0/);
+assert.match(uiStyles, /\.phone-member-switch\{[^}]*flex-shrink:0/);
+assert.match(uiStyles, /\.phone-bar\{[^}]*flex-shrink:0/);
+assert.match(uiStyles, /\.phone-close-row\{[^}]*flex-shrink:0/,
   'Phone header, member switch, bar, and close control must remain fixed');
 assert.ok(!html.includes('.phone-notice-list{max-height:'), 'Phone must not trap scrolling in a nested notice list');
 assert.ok(html.includes('function firstSpokenDialoguePreview('), 'Chat preview must parse spoken dialogue separately from narration');

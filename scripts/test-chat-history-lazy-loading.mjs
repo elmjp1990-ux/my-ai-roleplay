@@ -96,11 +96,10 @@ assert.match(messageLoader, /readDeletedChatTombstones/);
 assert.match(messageLoader, /session\.cloudMessagesLoading=false/);
 
 const startChat = between("async function startChat(characterId)", "function visibleSessions");
-assert.match(startChat, /\.select\('session_id'\)/);
-assert.match(startChat, /\.limit\(1\)\.maybeSingle\(\)/);
-assert.doesNotMatch(startChat, /\.select\('session_id,content'\)/);
-assert.match(startChat, /onlySessionId:existingRow\.id/);
-assert.match(startChat, /loadCloudSessionMessages\(existingRow\.id\)/);
+assert.match(startChat, /rpc\('find_existing_story_chat_session'/);
+assert.match(startChat, /onlySessionId:existingSessionId/);
+assert.match(startChat, /loadCloudSessionMessages\(existingSessionId,\{verifiedUser\}\)/);
+assert.doesNotMatch(startChat, /\.from\('chat_sessions'\)|\.from\('chat_messages'\)/);
 assert.doesNotMatch(startChat, /await loadCloudChatSessions\(\{ id:userId \}\);/);
 
 const localSend = between("if (!window.mySupabase || !isUuid(s.characterId) || !isUuid(s.id))", "if (!walletPreflight('single'))");

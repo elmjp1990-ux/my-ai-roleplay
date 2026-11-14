@@ -39,12 +39,19 @@ assert.ok(frontend.includes("BY ${e(creatorAttribution)}"));
 assert.ok(frontend.includes("c.authorId ? `<button class=\"author-link\""));
 
 assert.doesNotMatch(frontend, /const cityScheduleCache=new Map\(\)/);
-assert.match(cityMap, /Always re-check through the server RPC when opening a city location/);
-assert.match(cityMap, /character.encounterSchedules='';/);
+assert.match(frontend, /async function loadCityCharacterSchedules/);
+assert.match(frontend, /get_encounter_character_schedules/);
+assert.match(frontend, /城市角色排程批次載入失敗/);
+assert.match(cityMap, /person\.encounterSchedules=schedules\.get\(person\.id\)\|\|''/);
+assert.doesNotMatch(cityMap, /hydrateCitySchedule/);
 assert.match(cityMap, /const isCurrentCityCharacterEligible=\(person\)=>/);
 assert.match(cityMap, /isCurrentCityCharacterEligible\(person\)/);
 assert.match(frontend, /async function startChat\(characterId\)/);
-assert.match(frontend, /\.eq\('user_id', userId\)\.eq\('character_id', characterId\)/);
+assert.match(frontend, /find_existing_story_chat_session/);
+const queryOptimizationMigration = fs.readFileSync("supabase/migrations/20261114200000_batch_character_story_and_encounter_schedule_reads.sql", "utf8");
+assert.match(queryOptimizationMigration, /s\.user_id = \(SELECT auth\.uid\(\)\)/);
+assert.match(queryOptimizationMigration, /LIMIT 10/);
+assert.match(queryOptimizationMigration, /SECURITY INVOKER/);
 assert.match(frontend, /get_latest_settled_encounter_session/);
 assert.match(frontend, /代入相遇好感度/);
 assert.match(frontend, /開啟全新故事/);
@@ -459,4 +466,4 @@ assert.match(affinityMigration, /INSERT INTO public\.story_relationship_states/)
 
 
 // Existing empty Story sessions must be reused instead of creating duplicates.
-assert.ok(frontend.includes('if(!existingRow)existingRow=(rows||[]).find(row=>candidateIds.includes(row.id))||null'));
+assert.ok(frontend.includes("client.rpc('find_existing_story_chat_session'"));
