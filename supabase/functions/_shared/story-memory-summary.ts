@@ -1,10 +1,10 @@
 import { requestOpenRouterChatCompletion } from "./openrouter-chat-completions.ts";
+import { asRecord as row, asTrimmedString as str } from "./ai-value-utils.ts";
 
 type DbRow = Record<string, unknown>;
 const SUMMARY_MODEL = "openai/gpt-oss-20b";
 const SUMMARY_INTERVAL = 5;
-const row = (value: unknown): DbRow =>
-  value && typeof value === "object" && !Array.isArray(value) ? value as DbRow : {};
+;
 const str = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 const usageSnapshot = (usage: DbRow) => {
   const numeric = (value: unknown): number | null => {
