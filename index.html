@@ -6946,7 +6946,7 @@ function loadEncounterMemoryList(panel,session){
   void loadEncounterMemoryPage(list,session,pager);
 }
 async function loadEncounterMemoryPage(list,session,pager){
-  if(!list?.isConnected||pager.loading||!pager.hasMore)return;
+  if(!list?.isConnected||pager.loading||(!pager.hasMore&&!pager.buffer?.length))return;
   const client=window.mySupabase,uid=currentUser()?.uid;
   if(!client||!uid||session?.cloudOwnerUid!==uid)return;
   pager.loading=true;
