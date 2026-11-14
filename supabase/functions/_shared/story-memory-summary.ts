@@ -1,7 +1,6 @@
 import { requestOpenRouterChatCompletion } from "./openrouter-chat-completions.ts";
 
 type DbRow = Record<string, unknown>;
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const SUMMARY_MODEL = "openai/gpt-oss-20b";
 const SUMMARY_INTERVAL = 5;
 const row = (value: unknown): DbRow =>
