@@ -641,3 +641,11 @@ const paginationHelper = fs.readFileSync('list-pagination.js','utf8');
 assert.match(paginationHelper,/function createState\(kind, initial = \{\}\)/,'shared pagination state must accept module-specific fields');
 assert.doesNotMatch(paginationHelper,/legacyOffset|legacyHasMore|buffer: \[\]/,'shared pagination state must not retain unused legacy fields');
 assert.match(fs.readFileSync('memory-album.js','utf8'),/createState\('memoryPhotos'/,'memory album must reuse shared pagination state');
+
+const appIndexSource=fs.readFileSync('index.html','utf8');
+for(const [name,kind] of [['groupCharacterPickerPager','groupCharacterPicker'],['favoriteListPager','favorites'],['ownedCharacterPager','ownedCharacters']]) {
+  assert.match(appIndexSource,new RegExp('let '+name+'=window\\.PoyozzListPagination\\.createState\\(\\''+kind+'\\''),' + name + ' must use the shared pagination state');
+}
+assert.match(appIndexSource,/groupCharacterPickerPager=window\.PoyozzListPagination\.createState\('groupCharacterPicker'/,'group picker resets must use shared pagination state');
+assert.match(appIndexSource,/favoriteListPager=window\.PoyozzListPagination\.createState\('favorites'/,'favorite pager resets must use shared pagination state');
+assert.match(appIndexSource,/ownedCharacterPager=window\.PoyozzListPagination\.createState\('ownedCharacters'/,'owned-character pager resets must use shared pagination state');
