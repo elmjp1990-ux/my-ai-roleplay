@@ -9759,6 +9759,63 @@ document.addEventListener('click',async event=>{
   await returnChatToLatest(latest.dataset.chatSearchReturnLatest);
 },true);
 
+async function toggleChatSessionPin(sessionId) {
+  const key=sessionId;
+  const item = state.sessions[key];
+        if (!item) return;
+        const previousPinned=!!item.pinned;
+        captureDraft();
+        item.pinned=!previousPinned;
+        if (!persist()) {
+          item.pinned=previousPinned;
+          return;
+        }
+        if (item.cloudOwned && currentUser()?.uid===item.cloudOwnerUid && hasUserMessage(item)) {
+          try {
+            const client=window.mySupabase;
+            const uid=currentUser()?.uid;
+            if (!client || !uid || uid!==item.cloudOwnerUid) {
+              throw new Error('登入狀態已變更，請重新整理後再試。');
+            }
+            // 置頂只需更新 session_data.pinned；不要重傳訊息，避免無關的訊息同步失敗阻擋置頂。
+            const {data:cloudRow,error:readError}=await client.from('chat_sessions')
+              .select('session_data,updated_at').eq('id',item.id).eq('user_id',uid).maybeSingle();
+            if (readError) throw new Error(readError.message);
+            if (!cloudRow) throw new Error('找不到這筆雲端聊天紀錄。');
+            const currentData=cloudRow.session_data && typeof cloudRow.session_data==='object'
+              ? cloudRow.session_data : {};
+            const expectedUpdatedAt=item.cloudUpdatedAt;
+            if(!expectedUpdatedAt||cloudRow.updated_at!==expectedUpdatedAt)throw new Error('聊天版本已變更或遺失，請重新載入後再設定置頂。');
+            const nextUpdatedAt=window.POYOZZMemoryCapture.nextSessionUpdatedAt(expectedUpdatedAt);
+            const {data:updatedRow,error:updateError}=await client.from('chat_sessions')
+              .update({
+                session_data:{...currentData,pinned:!!item.pinned},
+                updated_at:nextUpdatedAt
+              })
+              .eq('id',item.id).eq('user_id',uid).eq('updated_at',expectedUpdatedAt).select('id,updated_at').maybeSingle();
+            if (updateError) throw new Error(updateError.message);
+            if (!updatedRow?.id) throw new Error('聊天已在其他分頁或裝置更新，請重新載入後再設定置頂。');
+            item.cloudUpdatedAt=updatedRow.updated_at||item.cloudUpdatedAt;
+          } catch (error) {
+            console.error('PersonaX 單人聊天置頂同步失敗：',error);
+            item.pinned=previousPinned;
+            persist();render();
+            toast('聊天置頂同步失敗，已還原原設定。');
+            return;
+          }
+        }
+        render();return;
+}
+/* Isolate chat-list pin clicks before other delegated message actions can see them. */
+document.addEventListener('click',event=>{
+  const button=event.target instanceof Element?event.target.closest('[data-action="pin"]'):null;
+  if(!button||button.disabled)return;
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation();
+  void toggleChatSessionPin(button.dataset.id||'');
+},true);
+
 /* GROUP MESSAGE ACTION CAPTURE FIX
    Handle group-message menu and delete clicks in capture phase so an ancestor
    handler cannot swallow the click before the action reaches the delegated router. */
@@ -10473,52 +10530,7 @@ document.addEventListener('click',async event => {
         toggleGroupPin(key);
         break;
       }
-      case 'pin': {
-        const item = state.sessions[key];
-        if (!item) break;
-        const previousPinned=!!item.pinned;
-        captureDraft();
-        item.pinned=!previousPinned;
-        if (!persist()) {
-          item.pinned=previousPinned;
-          break;
-        }
-        if (item.cloudOwned && currentUser()?.uid===item.cloudOwnerUid && hasUserMessage(item)) {
-          try {
-            const client=window.mySupabase;
-            const uid=currentUser()?.uid;
-            if (!client || !uid || uid!==item.cloudOwnerUid) {
-              throw new Error('登入狀態已變更，請重新整理後再試。');
-            }
-            // 置頂只需更新 session_data.pinned；不要重傳訊息，避免無關的訊息同步失敗阻擋置頂。
-            const {data:cloudRow,error:readError}=await client.from('chat_sessions')
-              .select('session_data,updated_at').eq('id',item.id).eq('user_id',uid).maybeSingle();
-            if (readError) throw new Error(readError.message);
-            if (!cloudRow) throw new Error('找不到這筆雲端聊天紀錄。');
-            const currentData=cloudRow.session_data && typeof cloudRow.session_data==='object'
-              ? cloudRow.session_data : {};
-            const expectedUpdatedAt=item.cloudUpdatedAt;
-            if(!expectedUpdatedAt||cloudRow.updated_at!==expectedUpdatedAt)throw new Error('聊天版本已變更或遺失，請重新載入後再設定置頂。');
-            const nextUpdatedAt=window.POYOZZMemoryCapture.nextSessionUpdatedAt(expectedUpdatedAt);
-            const {data:updatedRow,error:updateError}=await client.from('chat_sessions')
-              .update({
-                session_data:{...currentData,pinned:!!item.pinned},
-                updated_at:nextUpdatedAt
-              })
-              .eq('id',item.id).eq('user_id',uid).eq('updated_at',expectedUpdatedAt).select('id,updated_at').maybeSingle();
-            if (updateError) throw new Error(updateError.message);
-            if (!updatedRow?.id) throw new Error('聊天已在其他分頁或裝置更新，請重新載入後再設定置頂。');
-            item.cloudUpdatedAt=updatedRow.updated_at||item.cloudUpdatedAt;
-          } catch (error) {
-            console.error('PersonaX 單人聊天置頂同步失敗：',error);
-            item.pinned=previousPinned;
-            persist();render();
-            toast('聊天置頂同步失敗，已還原原設定。');
-            break;
-          }
-        }
-        render();break;
-      }
+      case 'pin': { await toggleChatSessionPin(key);break; }
       case 'chat-back': {
         const encounterSession=currentSession();
         if(encounterSession?.encounterMode){showEncounterLeaveDialog(encounterSession);break;}
