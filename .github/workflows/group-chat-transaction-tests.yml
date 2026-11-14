@@ -103,4 +103,4 @@ jobs:
         run: bash scripts/test-group-chat-transaction-concurrency.sh
 
       - name: Run existing frontend and architecture regression checks
-        run: node scripts/test-runtime-egress-optimizations.mjs
+        run: node scripts/test-runtime-egress-optimizations.mjs && node scripts/test-group-creation-ui.mjs
