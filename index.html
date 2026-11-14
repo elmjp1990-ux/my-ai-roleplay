@@ -3241,7 +3241,7 @@ let route = {page:'citymap'};
 const GROUP_CONTINUE_SENTINEL = '（請接續目前的故事。）';
 let personaPickerSelection = null;
 let groupPersonaPickerSelection = null;
-let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupMembers:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null,openRequestId:0,groupListOffset:0,groupListHasMore:false,groupPinnedLoaded:false,groupListObserver:null,historyCursor:null,historyHasMore:false,historyLoading:false,historyError:'',historyScrollAnchor:null};
+let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupMembers:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null,openRequestId:0,groupListOffset:0,groupListHasMore:false,groupPinnedLoaded:false,groupPinnedOffset:0,groupListObserver:null,historyCursor:null,historyHasMore:false,historyLoading:false,historyError:'',historyScrollAnchor:null};
 let chatSessionListPager = {...window.PoyozzListPagination.createState('chatSessions'),ownerUid:null,pinnedLoaded:false,initialLoaded:false};
 let chatListPaginationObserver=null;
 let search = '';
@@ -6644,7 +6644,7 @@ function groupResetForAccount(uid) {
   if(g.ownerUid && g.ownerUid!==uid) {
     g.step=1;
     g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''};
-    g.active=null;g.turn=0;g.messages=[];g.groups=[];g.groupPreviews={};g.groupMembers={};g.groupsLoaded=false;g.groupListOffset=0;g.groupListHasMore=false;g.groupPinnedLoaded=false;g.groupListObserver?.disconnect();
+    g.active=null;g.turn=0;g.messages=[];g.groups=[];g.groupPreviews={};g.groupMembers={};g.groupsLoaded=false;g.groupListOffset=0;g.groupListHasMore=false;g.groupPinnedLoaded=false;g.groupPinnedOffset=0;g.groupListObserver?.disconnect();
     g.loadingGroups=false;g.loading=false;g.sending=false;g.pendingRequest=null;
     g.formError='';g.loadError='';g.openError='';g.failedGroupId=null;g.ownerUid=null;
   }
@@ -6717,7 +6717,7 @@ async function groupLoadList(force=false,loadMore=false) {
   if(force){
     g.groupListObserver?.disconnect();
     g.groups=[];g.groupPreviews={};g.groupMembers={};
-    g.groupListOffset=0;g.groupListHasMore=false;g.groupPinnedLoaded=false;g.groupsLoaded=false;
+    g.groupListOffset=0;g.groupListHasMore=false;g.groupPinnedLoaded=false;g.groupPinnedOffset=0;g.groupsLoaded=false;
   }
   g.loadingGroups=true;g.loadError='';
   if(!window.mySupabase){
@@ -6732,14 +6732,13 @@ async function groupLoadList(force=false,loadMore=false) {
       refreshChatEntryList();return;
     }
     const client=window.mySupabase,pageSize=window.PoyozzListPagination.pageSize('groupSessions');
-    let pinnedRows=[];
-    if(!loadMore&&!g.groupPinnedLoaded){
-      const {data,error}=await client.from('chat_groups')
-        .select('id,name,world_background,scene_mode,created_at,updated_at,pinned')
-        .eq('pinned',true).is('archived_at',null).order('updated_at',{ascending:false});
-      if(error)throw error;
-      pinnedRows=data||[];
-    }
+    const {data:pinnedPage,error:pinnedError}=await client.from('chat_groups')
+      .select('id,name,world_background,scene_mode,created_at,updated_at,pinned')
+      .eq('pinned',true).is('archived_at',null)
+      .order('updated_at',{ascending:false}).order('id',{ascending:false})
+      .range(g.groupPinnedOffset,g.groupPinnedOffset+pageSize-1);
+    if(pinnedError)throw pinnedError;
+    const pinnedRows=pinnedPage||[];
     const {data:pageRows,error:pageError}=await client.from('chat_groups')
       .select('id,name,world_background,scene_mode,created_at,updated_at,pinned')
       .or('pinned.eq.false,pinned.is.null').is('archived_at',null)
@@ -6756,9 +6755,10 @@ async function groupLoadList(force=false,loadMore=false) {
       if(user.id!==currentUser()?.uid){groupResetForAccount(currentUser()?.uid||null);return;}
       g.groups=window.PoyozzListPagination.mergeUnique(g.groups,newRows,group=>group.id);
     }
-    if(!loadMore)g.groupPinnedLoaded=true;
+    g.groupPinnedLoaded=true;
+    g.groupPinnedOffset+=pinnedRows.length;
     g.groupListOffset+=currentPage.length;
-    g.groupListHasMore=currentPage.length===pageSize;
+    g.groupListHasMore=currentPage.length===pageSize||pinnedRows.length===pageSize;
     const latestDeletedGroups=readDeletedChatTombstones(user.id).groups;
     g.groups=g.groups.filter(group=>!latestDeletedGroups[group.id]);
     const retainedIds=new Set(g.groups.map(group=>group.id));
