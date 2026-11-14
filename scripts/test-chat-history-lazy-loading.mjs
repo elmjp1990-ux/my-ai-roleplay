@@ -74,6 +74,8 @@ assert.match(messageLoader, /\.eq\('id', sessionId\)\.eq\('user_id', userId\)\.i
 assert.match(messageLoader, /\.eq\('session_id',sessionId\)\.is\('deleted_at',null\)/);
 assert.match(messageLoader, /const pageSize=5/);
 assert.match(messageLoader, /messageQuery\.limit\(pageSize\)/);
+assert.match(messageLoader, /session\.cloudMessagesErrorOlder=older/);
+assert.match(messageLoader, /session\.cloudMessagesErrorOlder=false/);
 assert.match(messageLoader, /cloudOldestMessageCursor/);
 assert.match(messageLoader, /const currentPageIds=new Set\(cloudMessages\.map\(message=>message\.id\)\)/);
 assert.match(messageLoader, /cachedMessages=older\?\(session\.messages\|\|\[\]\):/);
@@ -153,6 +155,8 @@ assert.match(renderConversation, /refresh:button\.dataset\.chatHistoryAction==='
   "the retry control must be able to retry a previously loaded session");
 const renderMessages = between("function renderMessages(scroll = true)", "function memorySize");
 assert.match(renderMessages, /載入更早的訊息/);
+assert.match(renderMessages, /s\.cloudMessagesErrorOlder\?'older':'retry'/,
+  "a failed older page must retry the same cursor instead of refreshing the newest page");
 assert.match(renderMessages, /重新載入/);
 assert.match(renderMessages, /messageInput\.disabled=true/);
 assert.match(renderMessages, /sendButton\.disabled=sending\|\|loadingHistory/);
