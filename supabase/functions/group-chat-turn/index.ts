@@ -324,7 +324,7 @@ Deno.serve(async (request) => {
   if (provider.result.kind !== "generated") {
     const confirmedClientRejection = provider.result.kind === "empty_output" ||
       (provider.result.kind === "provider_error" &&
-       provider.status >= 400 && provider.status < 500 && provider.status !== 408 && provider.status !== 409);
+       provider.httpStatus >= 400 && provider.httpStatus < 500 && provider.httpStatus !== 408 && provider.httpStatus !== 409);
     if (confirmedClientRejection) {
       const refunded = await refund(admin, user.id, turnId, "provider_request_rejected");
       return json({ status: refunded.confirmed ? "refunded" : "needs_reconciliation", error: provider.result.kind === "provider_error" ? provider.result.code : "provider_error", balance: refunded.balance, retryAllowed: false }, refunded.confirmed ? 200 : 503);
