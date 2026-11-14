@@ -115,3 +115,6 @@ RETURNS uuid LANGUAGE sql AS $$ SELECT NULL::uuid $$;
 GRANT USAGE ON SCHEMA public, auth TO anon, authenticated, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public, auth TO service_role;
 GRANT ALL ON ALL FUNCTIONS IN SCHEMA public, auth TO service_role;
+
+-- The invoker-rights list-preview RPC must have the same read grant as the app.
+GRANT SELECT ON public.chat_groups, public.chat_group_messages TO authenticated;
