@@ -1929,10 +1929,10 @@ async function loadCharacterPrimaryIllustrationAssets(characterIds, scopeUserId=
   try{rows=await rowsPromise;}finally{
     if(characterIllustrationMetadataInflight.get(key)===rowsPromise)characterIllustrationMetadataInflight.delete(key);
   }
-  const signedAssets=await mapWithConcurrency(rows,4,async row=>{
-    try{return {row,signedUrl:await getCharacterIllustrationSignedUrl(row.storage_path)};}
-    catch(_){return null;}
-  });
+  let signedUrls=[];
+  try{signedUrls=await characterIllustrationSignedUrlManager.getMany(rows.map(row=>row.storage_path));}
+  catch(error){console.warn('角色立繪簽名網址批次載入失敗',error?.message);}
+  const signedAssets=rows.map((row,index)=>signedUrls[index]?{row,signedUrl:signedUrls[index]}:null);
   for(const entry of signedAssets){
     if(!entry)continue;
     const {row,signedUrl}=entry;
@@ -1970,10 +1970,10 @@ async function loadCharacterIllustrationAssets(characterIds, cleanupUserId=null)
   try{rows=await rowsPromise;}finally{
     if(characterIllustrationMetadataInflight.get(key)===rowsPromise)characterIllustrationMetadataInflight.delete(key);
   }
-  const signedAssets=await mapWithConcurrency(rows,4,async row=>{
-    try{return {row,signedUrl:await getCharacterIllustrationSignedUrl(row.storage_path)};}
-    catch(_){return null;}
-  });
+  let signedUrls=[];
+  try{signedUrls=await characterIllustrationSignedUrlManager.getMany(rows.map(row=>row.storage_path));}
+  catch(error){console.warn('角色立繪簽名網址批次載入失敗',error?.message);}
+  const signedAssets=rows.map((row,index)=>signedUrls[index]?{row,signedUrl:signedUrls[index]}:null);
   for(const entry of signedAssets){
     if(!entry)continue;
     const {row,signedUrl}=entry;
