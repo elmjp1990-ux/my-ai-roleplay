@@ -5,22 +5,28 @@
   'use strict';
 
   const authorPages = new Map();
+  const MAX_AUTHOR_PAGES = 8;
 
   function pageFor(authorId, pagination) {
-    if (!authorPages.has(authorId)) {
-      authorPages.set(authorId, pagination.createState('authorCharacters', {
-        characters: [], loaded: false
-      }));
+    let page = authorPages.get(authorId);
+    if (page) authorPages.delete(authorId);
+    else page = pagination.createState('authorCharacters', { characters: [], loaded: false });
+    authorPages.set(authorId, page);
+    while (authorPages.size > MAX_AUTHOR_PAGES) {
+      const oldestId = authorPages.keys().next().value;
+      authorPages.get(oldestId)?.invalidate();
+      authorPages.delete(oldestId);
     }
-    return authorPages.get(authorId);
+    return page;
   }
 
   async function loadAuthorCharacters(authorId, page, dependencies) {
     if (page.loading || !page.hasMore) return;
     if (typeof dependencies.loadAuthorCharacterPage !== 'function') return;
-    page.loading = true;
+    const requestId = page.beginRequest();
     try {
       const result = await dependencies.loadAuthorCharacterPage(authorId, page.offset);
+      if (!page.isRequestCurrent(requestId)) return;
       const mapped = Array.isArray(result?.items) ? result.items : [];
       page.characters = dependencies.PoyozzListPagination.mergeUnique(
         page.characters, mapped, character => character.id
@@ -35,7 +41,7 @@
       page.error = error;
       throw error;
     } finally {
-      page.loading = false;
+      if (page.isRequestCurrent(requestId)) page.loading = false;
     }
   }
 
