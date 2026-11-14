@@ -17,6 +17,7 @@ on:
   pull_request:
     paths:
       - "supabase/migrations/**"
+      - "scripts/test-pr252-migration-source-contract.mjs"
       - "supabase/tests/**"
       - "supabase/functions/group-chat-turn/**"
       - "supabase/functions/_shared/**"
