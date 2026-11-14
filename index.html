@@ -4049,7 +4049,7 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
       session.cloudSnapshotNeedsRepair=!row.character_snapshot?.id;
     }
     const roleplayMeta=session.cloudRoleplayMeta||{};
-    const pageSize=window.PoyozzListPagination?.pageSize('messages')||10;
+    const pageSize=window.PoyozzListPagination?.pageSize('messages')||5;
     let messageQuery=client.from('chat_messages').select('id,session_id,role,content,created_at,suggested_replies')
       .eq('session_id',sessionId).is('deleted_at',null)
       .order('created_at',{ascending:false}).order('id',{ascending:false});
