@@ -4,6 +4,7 @@ import { findPrivateContextLeak, preparePrivateContext } from "../_shared/privat
 import { collectDerivedPrivateProfileValues, formatCharacterAiProfilePrompt } from "../_shared/character-ai-profile-prompt.ts";
 import { parseGroupTurnEnvelope } from "../_shared/group-turn-envelope.ts";
 import { requestOpenRouterChatCompletion, POYOZZ_DEFAULT_CHAT_MODEL } from "../_shared/openrouter-chat-completions.ts";
+import { asRecord as asRow, asTrimmedString as asText, isUuid } from "../_shared/ai-value-utils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,11 +14,6 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { ...corsHeaders, "Content-Type": "application/json" },
 });
-const asRow = (value: unknown): Record<string, unknown> =>
-  value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-const asText = (value: unknown): string => typeof value === "string" ? value.trim() : "";
-const isUuid = (value: unknown): value is string =>
-  typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 const MODEL = POYOZZ_DEFAULT_CHAT_MODEL;
 const TIMEOUT_MS = 55_000;
 
