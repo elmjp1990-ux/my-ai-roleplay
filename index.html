@@ -6831,13 +6831,15 @@ async function groupHydrateListRows(groups){
     }
     g.groupMembers[row.group_id]=members;
   }
-  // One owner-scoped RPC returns one latest message per group for this page.
-  const {data:previewRows,error:previewError}=await client.rpc(
-    'get_my_group_list_previews',
-    {p_group_ids:groupIds}
-  );
-  if(previewError)throw previewError;
-  for(const preview of previewRows||[])g.groupPreviews[preview.group_id]=preview;
+  // Each RPC accepts at most ten IDs; pinned and regular pages can total twenty.
+  for(let i=0;i<groupIds.length;i+=10){
+    const {data:previewRows,error:previewError}=await client.rpc(
+      'get_my_group_list_previews',
+      {p_group_ids:groupIds.slice(i,i+10)}
+    );
+    if(previewError)throw previewError;
+    for(const preview of previewRows||[])g.groupPreviews[preview.group_id]=preview;
+  }
 }
 async function groupLoadList(force=false,loadMore=false) {
   const g=groupPrototype;
