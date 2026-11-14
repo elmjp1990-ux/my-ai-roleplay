@@ -574,7 +574,6 @@ body.group-chat-page:has(.group-wizard) #view {
  .messages { flex:1 1 0; min-height:0; overflow-y:auto; padding:14px 16px; overscroll-behavior:contain; }
 .message { display:flex; gap:8px; margin-bottom:19px; position:relative; }
 .message.user { flex-direction:row-reverse; }
-.message.user > .avatar { display:none !important; }
 .message .avatar { width:30px; height:30px; }
 .message-content { flex:0 1 auto; width:fit-content; max-width:min(24em,calc(100% - 38px)); min-width:0; }
 .message:not(.user) > .message-content { margin-right:auto; }
@@ -6738,11 +6737,8 @@ function renderGroupConversation() {
     const segments=!isSystem ? parseRoleplaySegments(displayContent,roleplayRoles) : [];
     const hasSpeaker=segments.some(segment=>segment.kind!=='user');
     const summonedByPlayer=isUser && segments.some(segment=>segment.kind==='character');
-    const avatarHTML=isUser
-      ? '<span class="avatar avatar-fallback player-avatar">你</span>'
-      : isSystem
-        ? '<span class="avatar avatar-fallback">系</span>'
-        : '';
+    // Match single chat: player identity is rendered only inside roleplay segments when needed.
+    const outerAvatar=isSystem ? '<span class="avatar avatar-fallback">系</span>' : '';
     const bodyHTML=hasSpeaker
       ? '<div class="roleplay-segments">'+segments.map(segment=>roleplaySegmentHTML(segment,{summonedByPlayer})).join('')+'</div>'
       : (!isUser && !isSystem)
@@ -6758,7 +6754,7 @@ function renderGroupConversation() {
         (m.type==='character'?'<button type="button" class="message-action-icon" data-action="report" data-kind="AI訊息" data-id="'+e(m.id)+'" aria-label="舉報" title="舉報">'+ICON.flag+'</button>':'')+
         (latestEditableGroupMessage?'<button type="button" class="message-action-icon" data-action="edit-group-message" data-id="'+e(m.id)+'" aria-label="編輯" title="編輯">'+ICON.edit+'</button>':'')+
         '</div>' : '';
-    return '<div class="message '+(isUser?'user':'')+(hasSpeaker?' roleplay-prefixed-message':'')+'" data-message="'+e(m.id)+'">'+avatarHTML+
+    return '<div class="message '+(isUser?'user':'')+(hasSpeaker?' roleplay-prefixed-message':'')+'" data-message="'+e(m.id)+'">'+outerAvatar+
       '<div class="message-content">'+bodyHTML+actionButtons+'</div></div>';
   }).join('') || '<div class="empty">這段群組對話還沒有訊息，輸入第一句話開始故事。</div>';
   const sceneNames=(group.scenes||[]).map(x=>x.name).filter(Boolean).join('、');
