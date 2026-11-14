@@ -32,9 +32,9 @@ for (const dependency of [
 
 for (const contract of [
   "state.following.includes(a.uid)",
-  "c.visibility === 'public'",
-  "c.cloudPublic !== false",
-  "c.localOnly !== true",
+  "character.visibility==='public'",
+  "character.cloudPublic!==false",
+  "character.localOnly!==true",
   'id="authorFollowerCount"',
   'data-action="follow"',
   'data-action="share"',

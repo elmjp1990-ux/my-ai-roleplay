@@ -5,7 +5,7 @@ const html = fs.readFileSync('index.html', 'utf8');
 const phoneStateMigration = fs.readFileSync('supabase/migrations/20261110120000_story_phone_state_and_memory_summary_read.sql', 'utf8');
 const storyPrompt = fs.readFileSync('supabase/functions/chat-turn/index.ts', 'utf8');
 const generatedStart = html.indexOf('  // Creator notice prompts guide AI generation only; never render raw instructions to players.');
-const generatedEnd = html.indexOf('  const memberSwitch=', generatedStart);
+const generatedEnd = html.indexOf('  const phoneHeader=', generatedStart);
 
 assert.ok(generatedStart >= 0 && generatedEnd > generatedStart, 'Phone notification rendering block must exist');
 const phoneBlock = html.slice(generatedStart, generatedEnd);
