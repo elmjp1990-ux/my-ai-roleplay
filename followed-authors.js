@@ -16,7 +16,7 @@
       const generation = ++renderGeneration;
       pager?.observer?.disconnect();
       pager = {
-        userId:user.uid, offset:0, pageSize:10, hasMore:true, loading:false,
+        userId:user.uid, offset:0, pageSize:global.PoyozzListPagination.pageSize('followedAuthors'), hasMore:true, loading:false,
         total:0, generation, observer:null, client:getSupabaseClient()
       };
       $('view').innerHTML = '<div class="stack"><div class="followed-authors-title-row"><button type="button" class="ghost followed-authors-back" data-action="back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h1>喜愛作者</h1></div><div class="empty">正在載入追蹤作者…</div></div>';
