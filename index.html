@@ -6921,18 +6921,17 @@ async function loadEncounterMemoryPage(list,session,pager){
     const {data:{user},error:authError}=await client.auth.getUser();
     if(authError||!user||user.id!==uid||currentUser()?.uid!==uid)throw new Error('登入狀態已失效，請重新登入後查看相遇回憶。');
     const pageSize=window.PoyozzListPagination.pageSize('encounterMemories');
+    const pageStart=pager.offset;
     let sessionQuery=client.from('chat_sessions')
       .select('id,chat_mode,session_data,updated_at')
       .eq('user_id',uid).eq('character_id',session.characterId).is('deleted_at',null)
       .or('chat_mode.eq.encounter,session_data->>encounterMode.eq.true')
       .order('updated_at',{ascending:false}).order('id',{ascending:false})
-      .range(pager.offset,pager.offset+pageSize-1);
+      .range(pageStart,pageStart+pageSize-1);
     const {data:sessionRows,error:sessionError}=await sessionQuery;
     if(sessionError)throw sessionError;
     if(!list.isConnected||currentUser()?.uid!==uid)return;
     const rows=sessionRows||[];
-    pager.offset+=rows.length;
-    pager.hasMore=rows.length===pageSize;
     const completedSessions=rows.filter(row=>{
       const data=row.session_data&&typeof row.session_data==='object'?row.session_data:{};
       return !(typeof data.encounterDay==='string'&&data.archived!==true);
@@ -6966,7 +6965,7 @@ async function loadEncounterMemoryPage(list,session,pager){
     }
     // Preserve older diary rows that predate session_id metadata; only fetch this
     // compatibility slice once instead of scanning 200 diary rows on every open.
-    if(pager.offset===rows.length&&pager.offset>0){
+    if(!pager.legacyLoaded){
       const {data:legacyRows,error:legacyError}=await client.from('encounter_diary')
         .select('id,summary,occurred_at,metadata')
         .eq('user_id',uid).eq('character_id',session.characterId)
@@ -6980,6 +6979,8 @@ async function loadEncounterMemoryPage(list,session,pager){
       }
       pager.legacyLoaded=true;
     }
+    pager.offset=pageStart+rows.length;
+    pager.hasMore=rows.length===pageSize;
     cards.sort((a,b)=>new Date(b.at||0)-new Date(a.at||0));
     const markup=cards.map(item=>item.html).join('');
     const empty=list.querySelector('.empty');
