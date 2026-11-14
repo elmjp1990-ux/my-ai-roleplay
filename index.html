@@ -5574,6 +5574,12 @@ async function loadCloudComments(characterId,{force=false,loadMore=false}={}) {
   }
 }
 
+document.addEventListener('click',event=>{
+  const button=event.target.closest('[data-action="comments-load-more"]');
+  if(!button)return;
+  button.disabled=true;
+  void loadCloudComments(route.id,{loadMore:true});
+});
 function renderComments() {
   const renderCommentsModule = window.PoyozzCommentRenderer?.render;
   if (typeof renderCommentsModule !== 'function') {
@@ -5592,12 +5598,6 @@ function renderComments() {
   }
   return result;
 }
-document.addEventListener('click',event=>{
-  const button=event.target.closest('[data-action="comments-load-more"]');
-  if(!button)return;
-  button.disabled=true;
-  void loadCloudComments(route.id,{loadMore:true});
-});
 async function refreshAuthorFollowState(authorId) {
   const user = currentUser();
   const client = window.mySupabase;
