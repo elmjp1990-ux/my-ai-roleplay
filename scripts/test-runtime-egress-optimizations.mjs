@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const html=fs.readFileSync("index.html","utf8");
+assert.doesNotMatch(html,/function installSuggestionSwipe\s*\(/,"unused legacy swipe listener helper must stay removed");
 const uiCss=fs.readFileSync("poyozz-ui.css","utf8");
 const between=(start,end)=>{
   const from=html.indexOf(start),to=html.indexOf(end,from+start.length);
@@ -244,23 +245,27 @@ assert.match(html,/groupLoadList\(false,true\)/,
   "the group list sentinel must request the next page");
 
 const authorProfileModule=fs.readFileSync("author-profile.js","utf8");
+const authorDataModule=fs.readFileSync("author-data.js","utf8");
 const followedAuthorsPaginationSource=fs.readFileSync("followed-authors.js","utf8");
 const authorLatestLoader=between("async function loadPublicAuthorLatestCharacters","let publicCharactersLoadPromise");
+const authorPageLoader=between("async function loadPublicAuthorCharacterPage","async function loadPublicAuthorLatestCharacters");
 const followedAuthorBatchMigration=fs.readFileSync('supabase/migrations/20261115090000_batch_followed_author_latest_characters.sql','utf8');
 assert.match(authorProfileModule,/loadAuthorCharacterPage\(authorId,\s*page\.offset\)/,
   "author profile presentation must delegate each page to the app-owned data loader");
 assert.match(html,/async function loadPublicAuthorCharacterPage\(authorId,offset=0\)/,
   "author profile character data must be loaded through the app data layer");
-assert.match(html,/\.range\(offset,offset\+pageSize-1\)/,
-  "author profile data must use bounded twenty-row backend pages");
+assert.match(authorPageLoader,/fetchPublicCharacterPage\(client,authorId,offset,pageSize\)/,
+  "author profile pages must delegate their bounded read to the author data adapter");
 assert.match(authorProfileModule,/PoyozzListPagination\.observeEnd/,
   "author profile lists must use the shared scroll pagination observer");
 assert.match(followedAuthorsPaginationSource,/loadPublicAuthorLatestCharacters\(pageAuthorIds\)/,
   "followed-author presentation must delegate latest-character hydration to the app data layer");
 assert.match(html,/async function loadPublicAuthorLatestCharacters\(authorIds=\[\]\)/,
   "followed-author latest characters must use a centralized app-owned query");
-assert.match(authorLatestLoader,/get_public_author_latest_characters/,
-  "followed-author cards must use the bounded batch RPC");
+assert.match(authorLatestLoader,/fetchLatestCharactersByAuthor\(client,authorIds\)/,
+  "followed-author cards must delegate their batch read to the author data adapter");
+assert.match(authorDataModule,/get_public_author_latest_characters/);
+assert.match(authorDataModule,/offset\+pageSize-1/);
 assert.match(authorLatestLoader,/rows\.slice\(0,4\)\.map\(mapPublicCharacterRow\)/,
   "followed-author cards must render only four of the five fetched previews");
 assert.match(authorLatestLoader,/hasMore:rows\.length>4/,
@@ -617,8 +622,9 @@ assert.ok(ownedCharacterLoader.includes("get_latest_owned_character_stories"));
 assert.ok(!ownedCharacterLoader.includes(".from('character_stories')"));
 
 assert.ok(!authorLatestLoader.includes("count:'exact'"));
-assert.ok(authorLatestLoader.includes("get_public_author_latest_characters"));
+assert.ok(authorLatestLoader.includes("fetchLatestCharactersByAuthor"));
 assert.ok(!authorLatestLoader.includes(".from('characters')"));
+assert.ok(authorDataModule.includes("get_public_author_latest_characters"));
 assert.match(followedAuthorBatchMigration,/row_number\(\) OVER/i);
 assert.match(followedAuthorBatchMigration,/SECURITY INVOKER/);
 assert.match(followedAuthorBatchMigration,/cardinality\(p_author_ids\) BETWEEN 1 AND 10/);
