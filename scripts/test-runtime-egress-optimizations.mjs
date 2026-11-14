@@ -144,6 +144,13 @@ assert.match(cloudSessions,/session_last_assistant_message_at:session_data->>las
   "paged session metadata must still include the unread indicator timestamp");
 assert.match(cloudSessions,/session_last_read_at:session_data->>lastReadAt/,
   "paged session metadata must still include the read cursor");
+assert.match(cloudSessions,/const listSessionSelect=\[/,
+  "chat list hydration must use a dedicated compact field projection");
+assert.doesNotMatch(cloudSessions,/const listSessionSelect=\[[\s\S]*session_story_world_state/,
+  "chat list pages must not transfer story-world state, full opening messages or pending-turn payloads");
+assert.match(cloudSessions,/pagedList \? listSessionSelect : fullSessionSelect/,
+  "full session metadata must remain available for direct session hydration only");
+
 assert.match(cloudSessions,/pager\.pinnedLoaded=true[\s\S]*pager\.initialLoaded=true/,
   "the pinned set and first unpinned page must be marked loaded only after both queries succeed");
 assert.match(cloudSessions,/if \(pagedList && route\.page === 'chat'\) render\(\)/,
