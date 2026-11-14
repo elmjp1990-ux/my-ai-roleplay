@@ -4974,7 +4974,7 @@ function exploreList() {
       Number.isFinite(Number(c.firstPublishedAt ?? c.createdAt)) &&
       Date.now()-Number(c.firstPublishedAt ?? c.createdAt) >= 0 &&
       Date.now()-Number(c.firstPublishedAt ?? c.createdAt) <= DAY)
-      .sort((a,b) => (b.firstPublishedAt ?? b.createdAt)-(a.firstPublishedAt ?? a.createdAt)).slice(0,50);
+      .sort((a,b) => (b.firstPublishedAt ?? b.createdAt)-(a.firstPublishedAt ?? a.createdAt));
   } else if (filter === 'favorites') {
     list = list.filter(c => state.favorites.includes(c.id));
   } else if (filter === 'popular') {
@@ -7326,6 +7326,56 @@ async function loadEncounterMemoryPage(list,session,pager){
     pager.loading=false;
   }
 }
+let encounterMemoryDetailPager=null;
+function renderEncounterMemoryDetailDialog(){
+  const pager=encounterMemoryDetailPager;
+  if(!pager)return;
+  const body=pager.messages.map(message=>{
+    const speaker=message.role==='user'?'你':pager.characterName;
+    const stamp=message.created_at?new Date(message.created_at).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+    return '<article class="encounter-memory-message"><div class="row between"><strong>'+e(speaker)+'</strong><span class="small muted">'+e(stamp)+'</span></div><p>'+e(message.content||'')+'</p></article>';
+  }).join('');
+  const loadMore=pager.hasMore
+    ?'<button type="button" class="ghost" data-action="encounter-memory-load-older" '+(pager.loading?'disabled':'')+'>'+ (pager.loading?'正在載入…':'載入更早的 5 則訊息')+'</button>'
+    :'';
+  showDialog('相遇回憶','<div class="small muted encounter-memory-detail-place">📍 相遇地點：'+e(pager.placeLabel)+'</div>'+loadMore+'<div class="encounter-memory-detail">'+(body||'<p class="muted">目前沒有可顯示的詳細對話內容。</p>')+'</div>'+loadMore);
+}
+async function loadEncounterMemoryDetailOlder(){
+  const pager=encounterMemoryDetailPager;
+  const client=window.mySupabase,uid=currentUser()?.uid;
+  if(!pager||pager.loading||!pager.hasMore||!pager.cursor||uid!==pager.uid||currentSession()?.id!==pager.sessionId||!client)return;
+  pager.loading=true;renderEncounterMemoryDetailDialog();
+  try{
+    const {data:{user},error:authError}=await client.auth.getUser();
+    if(authError||!user||user.id!==uid)throw new Error('登入狀態已失效，請重新登入。');
+    const {data:ownedSession,error:sessionError}=await client.from('chat_sessions')
+      .select('id,user_id,character_id,chat_mode').eq('id',pager.sessionId)
+      .eq('user_id',uid).eq('character_id',pager.characterId)
+      .eq('chat_mode','encounter').maybeSingle();
+    if(sessionError)throw sessionError;
+    if(!ownedSession)throw new Error('無法讀取這段相遇回憶。');
+    const pageSize=window.PoyozzListPagination?.pageSize('messages')||5;
+    const cursor=pager.cursor;
+    const {data:rows,error}=await client.from('chat_messages')
+      .select('id,role,content,created_at').eq('session_id',pager.sessionId)
+      .is('deleted_at',null)
+      .or('created_at.lt.'+cursor.created_at+',and(created_at.eq.'+cursor.created_at+',id.lt.'+cursor.id+')')
+      .order('created_at',{ascending:false}).order('id',{ascending:false}).limit(pageSize);
+    if(error)throw error;
+    const descendingRows=Array.isArray(rows)?rows:[];
+    const olderRows=[...descendingRows].reverse();
+    if(currentUser()?.uid!==uid||currentSession()?.id!==pager.sessionId)return;
+    pager.messages=window.PoyozzListPagination.mergeUnique(olderRows,pager.messages,message=>message.id);
+    pager.cursor=descendingRows.length?descendingRows[descendingRows.length-1]:pager.cursor;
+    pager.hasMore=descendingRows.length===pageSize;
+  }catch(error){
+    console.error('載入更早的相遇回憶失敗：',error);
+    toast(error?.message||'載入更早的相遇回憶失敗，請稍後重試。');
+  }finally{
+    pager.loading=false;
+    if(encounterMemoryDetailPager===pager&&currentSession()?.id===pager.sessionId)renderEncounterMemoryDetailDialog();
+  }
+}
 async function openEncounterMemoryDetail(button){
   const session=currentSession();
   const client=window.mySupabase,uid=currentUser()?.uid;
@@ -7336,6 +7386,8 @@ async function openEncounterMemoryDetail(button){
     const {data:{user},error:authError}=await client.auth.getUser();
     if(authError||!user||user.id!==uid||session.cloudOwnerUid!==uid)throw new Error('登入狀態已失效，請重新登入。');
     let messages=[];
+    let hasMoreMessages=false;
+    let messageCursor=null;
     if(isUuid(sessionId)){
       const {data:ownedSession,error:sessionError}=await client.from('chat_sessions')
         .select('id,user_id,character_id,chat_mode').eq('id',sessionId)
@@ -7343,33 +7395,37 @@ async function openEncounterMemoryDetail(button){
         .eq('chat_mode','encounter').maybeSingle();
       if(sessionError)throw sessionError;
       if(ownedSession){
+        const pageSize=window.PoyozzListPagination?.pageSize('messages')||5;
         const {data:messageRows,error:messageError}=await client.from('chat_messages')
           .select('id,role,content,created_at').eq('session_id',sessionId)
-          .is('deleted_at',null).order('created_at',{ascending:true}).limit(500);
+          .is('deleted_at',null).order('created_at',{ascending:false}).order('id',{ascending:false}).limit(pageSize);
         if(messageError)throw messageError;
-        messages=messageRows||[];
+        const descendingRows=Array.isArray(messageRows)?messageRows:[];
+        messages=[...descendingRows].reverse();
+        hasMoreMessages=descendingRows.length===pageSize;
+        messageCursor=descendingRows.length?descendingRows[descendingRows.length-1]:null;
       }
     }
-    let body='';
-    if(messages.length){
-      const characterName=sessionCharacter(session)?.name||'角色';
-      body=messages.map(message=>{
-        const speaker=message.role==='user'?'你':characterName;
-        const stamp=message.created_at?new Date(message.created_at).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
-        return '<article class="encounter-memory-message"><div class="row between"><strong>'+e(speaker)+'</strong><span class="small muted">'+e(stamp)+'</span></div><p>'+e(message.content||'')+'</p></article>';
-      }).join('');
-    }else{
-      let query=client.from('encounter_diary').select('summary,occurred_at')
-        .eq('user_id',uid).eq('character_id',session.characterId).order('occurred_at',{ascending:true});
-      if(isUuid(sessionId))query=query.eq('metadata->>session_id',sessionId);
-      else if(isUuid(memoryId))query=query.eq('id',memoryId);
-      const {data:diaries,error:diaryError}=await query;
-      if(diaryError)throw diaryError;
-      body=(diaries||[]).map(row=>'<article class="encounter-memory-message"><div class="small muted">'+e(new Date(row.occurred_at||Date.now()).toLocaleString('zh-TW'))+'</div><p>'+e(row.summary||'')+'</p></article>').join('');
-    }
-    if(!body)body='<p class="muted">目前沒有可顯示的詳細對話內容。</p>';
     const placeLabel=String(button.dataset.place||'地點資料未保存');
-    showDialog('相遇回憶','<div class="small muted encounter-memory-detail-place">📍 相遇地點：'+e(placeLabel)+'</div><div class="encounter-memory-detail">'+body+'</div>');
+    if(messages.length){
+      encounterMemoryDetailPager={
+        uid,sessionId,characterId:session.characterId,
+        characterName:sessionCharacter(session)?.name||'角色',
+        placeLabel,messages,hasMore:hasMoreMessages,cursor:messageCursor,loading:false
+      };
+      renderEncounterMemoryDetailDialog();
+      return;
+    }
+    let query=client.from('encounter_diary').select('summary,occurred_at')
+      .eq('user_id',uid).eq('character_id',session.characterId)
+      .order('occurred_at',{ascending:true}).limit(window.PoyozzListPagination?.pageSize('encounterMemories')||10);
+    if(isUuid(sessionId))query=query.eq('metadata->>session_id',sessionId);
+    else if(isUuid(memoryId))query=query.eq('id',memoryId);
+    const {data:diaries,error:diaryError}=await query;
+    if(diaryError)throw diaryError;
+    const body=(diaries||[]).map(row=>'<article class="encounter-memory-message"><div class="small muted">'+e(new Date(row.occurred_at||Date.now()).toLocaleString('zh-TW'))+'</div><p>'+e(row.summary||'')+'</p></article>').join('');
+    encounterMemoryDetailPager=null;
+    showDialog('相遇回憶','<div class="small muted encounter-memory-detail-place">📍 相遇地點：'+e(placeLabel)+'</div><div class="encounter-memory-detail">'+(body||'<p class="muted">目前沒有可顯示的詳細對話內容。</p>')+'</div>');
   }catch(error){
     console.error('讀取相遇回憶詳細內容失敗：',error);
     toast(error?.message||'相遇回憶詳細內容載入失敗，請稍後重試。');
@@ -9793,6 +9849,7 @@ document.addEventListener('click',async event => {
         break;
       }
       case 'encounter-memory-open': { await openEncounterMemoryDetail(button);break; }
+      case 'encounter-memory-load-older': { await loadEncounterMemoryDetailOlder();break; }
       case 'encounter-dialog-dismiss': { $('modal')?.close(); break; }
       case 'encounter-memory-detail-dismiss': { $('modal')?.close(); break; }
       case 'encounter-temporary-leave': {
