@@ -96,9 +96,9 @@ assert.match(html,/src="\.\/LOGO_WEBICON\.webp"/);
 assert.doesNotMatch(html,/raw\.githubusercontent\.com\/elmjp1990-ux\/my-ai-roleplay\/main\/LOGO_WEB/);
 
 
-assert.match(html,/characterVideoSignedUrlManager=window\\.PoyozzSignedUrlManager\\.create/);
+assert.match(html,/characterVideoSignedUrlManager=window\.PoyozzSignedUrlManager\.create/);
 assert.match(html,/cacheTtlMs:270000,refreshSkewMs:30000,maxEntries:100/);
-assert.match(html,/getCharacterVideoSignedUrl\\(draftVideoPath\\)/);
+assert.match(html,/getCharacterVideoSignedUrl\(draftVideoPath\)/);
 assert.doesNotMatch(html,/characterVideoSignedUrlCache|characterVideoSignedUrlInflight/);
 
 const memoryUrlAdapter=block("const memoryPhotoSignedUrlManager","const characterIllustrationMetadataInflight");
