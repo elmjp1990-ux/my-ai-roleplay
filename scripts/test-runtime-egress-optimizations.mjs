@@ -32,8 +32,19 @@ assert.doesNotMatch(groupOpen,/void groupLoadList\(true\)/,
 
 assert.match(groupOpen,/\.order\('created_at',\{ascending:false\}\).*\.limit\(5\)/,
   "opening a group must fetch only the newest bounded page in reverse chronological query order");
+assert.doesNotMatch(groupOpen,/\.limit\(50\)/,
+  "group initial history must not fetch fifty messages");
 assert.match(groupOpen,/oldestInitialMessage=initialMessageRows\.at\(-1\)/,
   "the first page must retain a stable cursor at its oldest fetched row");
+const singleHistory=between("async function loadCloudSessionMessages(sessionId, options = {})","const chatSessionSaveQueue =");
+assert.match(singleHistory,/const pageSize=5;/,
+  "single Story and Encounter chats must initially hydrate only five messages per request");
+assert.match(singleHistory,/\.limit\(pageSize\)/,
+  "single Story and Encounter chat pagination must apply the shared five-message page size");
+assert.match(singleHistory,/session\.encounterMode/,
+  "the shared single-chat history loader must retain Encounter metadata handling");
+assert.doesNotMatch(singleHistory,/\.limit\(50\)|pageSize=50/,
+  "single and Encounter chat history must not regress to large initial pages");
 const groupHistory=between("async function groupLoadOlderMessages()","async function openGroupBackgroundSettings");
 const searchJump=between("async function jumpToChatSearchHit(button)","async function returnChatToLatest(kind)");
 assert.equal((searchJump.match(/\.limit\(2\)/g)||[]).length,4,
@@ -44,6 +55,8 @@ assert.match(groupHistory,/\.or\(olderFilter\)/,
   "older pages must use a keyset cursor instead of offset pagination");
 assert.match(groupHistory,/\.order\('id',\{ascending:false\}\)\.limit\(5\)/,
   "older pages must use a deterministic tie-breaker and a fixed page size");
+assert.doesNotMatch(groupHistory,/\.limit\(50\)/,
+  "older group history must also remain limited to five messages per request");
 assert.match(groupHistory,/existing=new Set/,
   "overlapping page results must not duplicate already loaded messages");
 assert.match(groupHistory,/historyScrollAnchor=before/,
@@ -212,9 +225,10 @@ assert.ok(orderedFixture.some((row,index)=>index>0 &&
   row.created_at===orderedFixture[index-1].created_at &&
   row.sequence_no===orderedFixture[index-1].sequence_no),
   'fixture must exercise the UUID tie-breaker for equal timestamp and sequence values');
-const mergedWithOverlap=[...paged.slice(0,50),...paged.slice(40,90)];
-const uniqueMerged=[...new Map(mergedWithOverlap.map(row=>[row.id,row])).values()];
-assert.equal(uniqueMerged.length,90,'client-side merge must deduplicate overlapping pages');
+const firstTwoPages=paged.slice(0,10);
+const overlappingNextPage=[...paged.slice(5,10),...paged.slice(10,15)];
+const uniqueMerged=[...new Map([...firstTwoPages,...overlappingNextPage].map(row=>[row.id,row])).values()];
+assert.equal(uniqueMerged.length,15,'client-side merge must deduplicate overlapping five-message pages');
 
 assert.match(groupHistory,/requestId!==g\.openRequestId\|\|g\.active\?\.id!==groupId\|\|currentUser\(\)\?\.uid!==uid/,
   'an older-page response must be discarded after group/account switching');
