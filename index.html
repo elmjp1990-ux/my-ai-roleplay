@@ -6095,7 +6095,7 @@ function renderEditor() {
       toast('角色立繪載入失敗：'+error.message);
     });
   }
-  if(draftVideoPath){const preview=$('characterVideoPreview');void window.mySupabase?.storage.from('character-avatar-videos').createSignedUrl(draftVideoPath,300).then(({data,error})=>{if(!error&&data?.signedUrl&&preview?.isConnected){preview.src=data.signedUrl;preview.classList.remove('hidden');}});}
+  if(draftVideoPath){const preview=$('characterVideoPreview');void getCharacterVideoSignedUrl(draftVideoPath).then(url=>{if(url&&preview?.isConnected){preview.src=url;preview.classList.remove('hidden');}}).catch(error=>console.warn('角色影片預覽網址載入失敗',error?.message));}
   void isNsfwTermsAdmin().then(isAdmin=>{const button=$('view')?.querySelector('[data-action="nsfw-term-manager"]');if(button&&isAdmin)button.hidden=false;});
   if(c.aiGeneratedDraft)void (async()=>{
     const matches=findNsfwTerms(c,await loadNsfwTerms());
