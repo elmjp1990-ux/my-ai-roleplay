@@ -40,7 +40,7 @@ const singleHistory=between("async function loadCloudSessionMessages(sessionId, 
 assert.match(singleHistory,/pageSize\('messages'\)\|\|5/,
   "single Story and Encounter chats must initially hydrate only five messages per request");
 assert.match(singleHistory,/\.limit\(pageSize\)/,
-  "single Story and Encounter chat pagination must apply the shared ten-message page size");
+  "single Story and Encounter chat pagination must apply the shared five-message page size");
 assert.match(singleHistory,/session\.encounterMode/,
   "the shared single-chat history loader must retain Encounter metadata handling");
 assert.doesNotMatch(singleHistory,/\.limit\(50\)|pageSize=50/,
@@ -56,7 +56,7 @@ assert.match(groupHistory,/\.or\(olderFilter\)/,
 assert.match(groupHistory,/\.order\('id',\{ascending:false\}\)\.limit\(window\.PoyozzListPagination\.pageSize\('messages'\)\)/,
   "older pages must use a deterministic tie-breaker and the shared five-message page size");
 assert.doesNotMatch(groupHistory,/\.limit\(50\)/,
-  "older group history must also remain limited to ten messages per request");
+  "older group history must also remain limited to five messages per request");
 assert.match(groupHistory,/existing=new Set/,
   "overlapping page results must not duplicate already loaded messages");
 assert.match(groupHistory,/historyScrollAnchor=before/,
@@ -348,7 +348,7 @@ const orderedFixture=[...fixture].sort(compareDesc);
 let cursor=orderedFixture[4];
 let paged=orderedFixture.slice(0,5);
 let pageCount=1;
-while(paged.length<fixture.length && pageCount<110) {
+while(paged.length<fixture.length && pageCount<210) {
   const page=orderedFixture.filter(row=>isOlderThan(row,cursor)).slice(0,5);
   assert.ok(page.length>0,'pagination must continue until the oldest row');
   cursor=page.at(-1);
@@ -469,7 +469,7 @@ assert.match(groupSend,/responseBody\?\.status==='timed_out'[\s\S]*pendingReques
   "the client must clear the old idempotency key only after a confirmed timeout refund");
 
 console.log('Group watchdog, deadline race, abandoned-request recovery, idempotent timeout status, and exact-currency refund checks passed.');
-console.log('Group history fixture passed: 1,000 rows, 100 pages, timestamp/sequence ties, UUID cursor tie-break, no gaps or duplicates, overlapping-page dedupe, group-switch guards, and scroll anchoring.');
+console.log('Group history fixture passed: 1,000 rows, 200 pages of five, timestamp/sequence ties, UUID cursor tie-break, no gaps or duplicates, overlapping-page dedupe, group-switch guards, and scroll anchoring.');
 
 const groupPhoneMigration = fs.readFileSync('supabase/migrations/20261114180000_group_ai_single_orchestrator.sql', 'utf8');
 const groupPhoneFunction = fs.readFileSync('supabase/functions/group-chat-turn/index.ts', 'utf8');
