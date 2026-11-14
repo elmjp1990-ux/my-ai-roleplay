@@ -397,12 +397,12 @@ BEGIN
   END IF;
 
   DELETE FROM public.chat_group_messages WHERE turn_id = p_turn_id;
-  UPDATE public.chat_group_turn_charges SET status = 'refunded'
-  WHERE group_turn_id = p_turn_id AND status = 'reserved';
+  UPDATE public.chat_group_turn_charges AS c SET status = 'refunded'
+  WHERE c.group_turn_id = p_turn_id AND c.status = 'reserved';
   IF NOT FOUND THEN RAISE EXCEPTION 'group_charge_expiration_conflict'; END IF;
-  UPDATE public.chat_group_turns SET status = 'failed',
+  UPDATE public.chat_group_turns AS t SET status = 'failed',
     failure_code = 'provider_timeout_watchdog'
-  WHERE id = p_turn_id AND status = 'processing';
+  WHERE t.id = p_turn_id AND t.status = 'processing';
   IF NOT FOUND THEN RAISE EXCEPTION 'group_turn_expiration_conflict'; END IF;
 
   RETURN QUERY SELECT 'refunded'::text, v_wallet.silver_coins, v_wallet.diamonds;
