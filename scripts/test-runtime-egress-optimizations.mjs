@@ -253,6 +253,15 @@ assert.match(encounterMemory,/pager\.buffer=combinedCards\.slice\(pageSize\)/,
   "overflow cards must be buffered for the next page instead of rendering more than twenty initially");
 assert.match(encounterMemory,/pager\.hasMore\|\|pager\.buffer\.length/,
   "the Encounter sentinel must remain available while buffered cards remain");
+assert.match(encounterMemory,/\.limit\(pageSize\)/,
+  "only one compact diary preview per page may be hydrated for Encounter list cards");
+assert.match(encounterMemory,/legacyOffset,pager\.legacyOffset\+pageSize-1/,
+  "legacy Encounter diary rows must also use bounded backend pagination");
+assert.match(encounterMemory,/encounter_place:session_data->>encounterPlace/,
+  "Encounter list hydration must select only the required place metadata");
+assert.doesNotMatch(encounterMemory,/select\('id,chat_mode,session_data,updated_at'\)/,
+  "Encounter list pages must not transfer the entire session_data JSON payload");
+
 
 console.log("Story relationship RPC dedupe, illustration write dedupe, group list refresh avoidance, incremental group-turn loading, phone-state cache, shared login auth verification, and author-profile hydration reuse checks passed.");
 
