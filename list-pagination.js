@@ -17,17 +17,15 @@
     memoryPhotos: 10
   });
 
-  function createState(kind) {
+  function createState(kind, initial = {}) {
     return {
       kind,
       pageSize: PAGE_SIZES[kind] || 10,
       offset: 0,
       hasMore: true,
       loading: false,
-      legacyOffset: 0,
-      legacyHasMore: true,
-      buffer: [],
-      observer: null
+      observer: null,
+      ...initial
     };
   }
 
