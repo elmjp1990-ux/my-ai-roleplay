@@ -1,5 +1,6 @@
 import { normalizeAiProviderResult, type AiProviderResult } from "./ai-provider-result.ts";
 import { buildOpenRouterProviderOptions } from "./openrouter-provider-policy.ts";
+import { asRecord as asRow, asTrimmedString as asText } from "./ai-value-utils.ts";
 
 export const POYOZZ_DEFAULT_CHAT_MODEL = "deepseek/deepseek-v4-flash-20260423";
 
@@ -25,10 +26,6 @@ type RequestOptions = {
   temperature?: number;
   responseFormat?: { type: "json_object" };
 };
-
-const asRow = (value: unknown): Record<string, unknown> =>
-  value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-const asText = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 
 /** Shared OpenRouter request path; provider privacy restrictions cannot drift between chat modes. */
 export async function requestOpenRouterChatCompletion(options: RequestOptions): Promise<OpenRouterCompletionResult> {
