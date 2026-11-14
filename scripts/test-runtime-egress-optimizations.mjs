@@ -57,6 +57,10 @@ assert.match(groupSend,/\.eq\('turn_id',turnId\)/,
 assert.doesNotMatch(groupSend,/\.eq\('group_id',activeGroupId\)\.is\('deleted_at',null\)\s*\.order\('created_at'/,
   "after sending, the client must not refetch the full group history");
 assert.match(groupSend,/existingMessageIds/,"idempotent retries must not append duplicate local messages");
+assert.match(groupSend,/responseBody\?\.status==='refunded'[\s\S]*await refreshWalletBalance\(\)[\s\S]*g\.pendingRequest=null/,
+  "a lost refund response followed by an idempotent retry must refresh the wallet and release the pending request key");
+assert.match(groupSend,/responseBody\?\.status==='content_rejected'/,
+  "a retried content rejection must be presented as refunded instead of a generic failure");
 assert.match(groupSend,/g\.messages=\[\.\.\.\(g\.messages\|\|\[\]\),\.\.\.newMessages\.filter/,
   "new turn messages must append to the existing complete history");
 
