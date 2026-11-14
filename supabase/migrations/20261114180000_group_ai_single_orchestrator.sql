@@ -99,6 +99,15 @@ BEGIN
     RETURN;
   END IF;
 
+  -- A group may have only one unresolved turn at a time. This prevents a new
+  -- request key after a browser reload from bypassing an ambiguous AI outcome.
+  IF EXISTS (
+    SELECT 1 FROM public.chat_group_turns t
+    WHERE t.group_id = p_group_id AND t.status = 'processing'
+  ) THEN
+    RAISE EXCEPTION 'group_turn_in_progress' USING ERRCODE = '55000';
+  END IF;
+
   SELECT count(*)::integer INTO v_member_count
   FROM public.chat_group_members m
   WHERE m.group_id = p_group_id AND m.character_snapshot IS NOT NULL;
