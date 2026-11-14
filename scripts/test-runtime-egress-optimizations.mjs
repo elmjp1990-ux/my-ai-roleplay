@@ -530,6 +530,15 @@ assert.match(ownedCharacterPageLoaderSource,/loadMore\s*&&\s*!pager\.hasMore/,
   'owned character list must stop requesting pages after the last page');
 assert.match(ownerListSource,/ownedCharactersSentinel[\s\S]*observeEnd/,
   'owned character list must load more on scroll');
+const cityMapSource=fs.readFileSync('city-map.js','utf8');
+assert.match(paginationSizes,/citySceneCharacters:\\s*10/,'each Encounter scene must load ten candidate characters per page');
+assert.match(ownerListSource,/async function loadCityCharacterPage\(offset=0\)/);
+assert.match(ownerListSource,/pageSize\('citySceneCharacters'\)/);
+assert.match(ownerListSource,/\.range\(offset,offset\+pageSize-1\)/);
+assert.match(cityMapSource,/loadCityCharacterPage\(pager\.offset\)/);
+assert.match(cityMapSource,/city-people-load-more/);
+assert.doesNotMatch(cityMapSource,/Promise\.all\(\(Array\.isArray\(state\.characters\)/,
+  'opening a scene must not hydrate schedules for every character already in client state');
 const memoryAlbumSource=fs.readFileSync('memory-album.js','utf8');
 assert.match(memoryAlbumSource,/pageSize\('memoryPhotos'\)/);
 assert.match(memoryAlbumSource,/\.range\(pager\.offset,pager\.offset\+pageSize-1\)/,

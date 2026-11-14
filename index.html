@@ -12053,6 +12053,22 @@ document.addEventListener('load',event => {
   if (image instanceof HTMLImageElement && image.style.opacity==='.15') image.style.opacity='1';
 },true);
 
+async function loadCityCharacterPage(offset=0){
+  const client=window.mySupabase;
+  if(!client)return {items:[],hasMore:false};
+  const pageSize=window.PoyozzListPagination.pageSize('citySceneCharacters');
+  const {data,error}=await client.from('characters')
+    .select('id,author_id,name,gender,age,avatar_url,avatar_video_path,is_nsfw,visibility,review_status,intro,race,style,tags,created_at,first_published_at,latest_eligible')
+    .eq('visibility','public').is('deleted_at',null)
+    .order('first_published_at',{ascending:false,nullsFirst:false})
+    .order('id',{ascending:false}).range(offset,offset+pageSize-1);
+  if(error)throw new Error('讀取場景公開角色失敗：'+error.message);
+  const rows=Array.isArray(data)?data:[];
+  const items=rows.map(mapPublicCharacterRow);
+  state.characters=window.PoyozzListPagination.mergeUnique(state.characters,items,character=>character.id);
+  return {items,hasMore:rows.length===pageSize};
+}
+
 function renderCityMapMVP() {
   const renderCityMap = window.PoyozzCityMap?.render;
   if (typeof renderCityMap !== 'function') {
@@ -12064,7 +12080,8 @@ function renderCityMapMVP() {
     $, state, accessible, escapeHTML, safeImage, currentUser, toast, go, requireLogin,
     persist, hydratePublicCharacterIllustrations, characterVideoObserver,
     releaseCharacterVideo, hydrateCharacterVideo, findResumableEncounterSession,
-    setEncounterLifecycleState, saveChatSessionSafely, createEncounterSession
+    setEncounterLifecycleState, saveChatSessionSafely, createEncounterSession,
+    loadCityCharacterPage
   });
 }
 
