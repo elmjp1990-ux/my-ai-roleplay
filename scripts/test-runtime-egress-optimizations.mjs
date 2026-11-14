@@ -166,7 +166,6 @@ assert.match(chatAuthorProfiles,/publicAuthorProfileLoaded\.add\(profile\.id\)/,
 
 const groupEdge=fs.readFileSync("supabase/functions/group-chat-turn/index.ts","utf8");
 const groupMigration=fs.readFileSync("supabase/migrations/20261114180000_group_ai_single_orchestrator.sql","utf8");
-const speakerParser=fs.readFileSync("supabase/functions/_shared/group-speaker-output.ts","utf8");
 const sharedOpenRouter=fs.readFileSync("supabase/functions/_shared/openrouter-chat-completions.ts","utf8");
 assert.match(sharedOpenRouter,/deepseek\/deepseek-v4-flash-20260423/,"single and group chat must share the approved DeepSeek V4 Flash model");
 assert.match(groupEdge,/parseGroupTurnEnvelope\(provider\.result\.text, speakers\)/,"the single model response must validate speaker IDs and per-character phone states");
@@ -210,8 +209,6 @@ assert.match(groupMigration,/v_charge\.status = 'settled' OR v_turn\.status = 'c
   "a settled/completed turn must never be refundable");
 assert.match(groupMigration,/SET status = 'settled'[\s\S]*WHERE group_turn_id = p_turn_id AND status = 'reserved'/,
   "settlement must transition only a reserved charge");
-assert.match(speakerParser,/\[：:\]/,"speaker parser must accept full-width and ASCII colons");
-assert.match(speakerParser,/角色名稱：/,"speaker parser must document explicit character-name labels");
 assert.doesNotMatch(html,/append_chat_group_mock_turn/,"frontend must no longer call the deterministic mock RPC");
 assert.match(html,/group_chat_turn_charge: '群組聊天回覆扣款'/,"wallet history must label group turn charges");
 assert.match(html,/group_chat_turn_refund: '群組聊天失敗退款'/,"wallet history must label group turn refunds");
