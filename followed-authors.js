@@ -103,7 +103,7 @@
         const container=$('followedAuthorsItems');
         if(container&&html)container.insertAdjacentHTML('beforeend',html);
       } else {
-        $('view').innerHTML='<div class="stack"><div class="followed-authors-title-row"><button type="button" class="ghost followed-authors-back" data-action="back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><div class="row between"><h1 style="margin:0">喜愛作者</h1><span class="small muted">'+current.total+' 位作者</span></div></div>'+
+        $('view').innerHTML='<div class="stack"><div class="followed-authors-title-row"><button type="button" class="ghost followed-authors-back" data-action="back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><div class="row between"><h1 style="margin:0">喜愛作者</h1></div></div>'+
           '<div class="small muted">已追蹤作者</div><div id="followedAuthorsItems" class="stack">'+(html||'<div class="empty">你還沒有追蹤任何作者。到作者頁點擊「追蹤」，就會在這裡看到作者與最新公開角色。</div>')+'</div>'+
           (current.hasMore?'<div id="followedAuthorsSentinel" class="small muted" style="padding:14px;text-align:center">繼續往下滑動，載入更多作者…</div>':'')+'</div>';
       }
