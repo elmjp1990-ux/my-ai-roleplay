@@ -1713,7 +1713,9 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     const client = window.mySupabase;
     if (!client || !user?.id) return;
     try {
-      const verifiedUser = await getVerifiedAuthUser(user.id);
+      const verifiedUser = options.verifiedUser?.id===user.id && currentUser()?.uid===user.id
+      ? options.verifiedUser
+      : await getVerifiedAuthUser(user.id);
       if (!verifiedUser) return;
 
       const pageSize=window.PoyozzListPagination?.pageSize('ownedCharacters')||10;
@@ -4006,8 +4008,10 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
   session.cloudMessagesLoading = true; session.cloudMessagesError = ''; session.cloudMessagesErrorOlder=false;
   if (route.page === 'conversation' && route.id === sessionId) renderMessages(false);
   try {
-    const { data: authResult, error: authError } = await client.auth.getUser();
-    if (authError || authResult?.user?.id !== userId || currentUser()?.uid !== userId) throw new Error('登入狀態已變更，請重新登入。');
+    const verifiedUser=options.verifiedUser?.id===userId && currentUser()?.uid===userId
+      ? options.verifiedUser
+      : await getVerifiedAuthUser(userId);
+    if(!verifiedUser||currentUser()?.uid!==userId)throw new Error('登入狀態已變更，請重新登入。');
     const snapshotRequested=!older&&session.cloudCharacterSnapshotLoaded!==true;
     const sessionColumns=older
       ? 'id,user_id,character_id,chat_mode,status'
@@ -6446,33 +6450,17 @@ async function startChat(characterId) {
   const verifiedUser = await getVerifiedAuthUser(userId);
   if (!verifiedUser) return toast('登入狀態尚未確認，請重新登入後再試。');
   try {
-    const { data: rows, error: sessionsError } = await client.from('chat_sessions')
-      .select('id,chat_mode,status,created_at,updated_at,encounter_marker:session_data->encounter,encounter_mode_marker:session_data->>encounterMode,encounter_place_marker:session_data->>encounterPlace')
-      .eq('user_id', userId).eq('character_id', characterId)
-      .is('deleted_at', null).neq('chat_mode', 'encounter')
-      .order('updated_at', { ascending:false }).limit(10);
-    if (sessionsError) throw sessionsError;
-    const candidateIds=(rows||[]).filter(row=>isUuid(row.id)&&
-      !(row.encounter_marker&&typeof row.encounter_marker==='object'&&!Array.isArray(row.encounter_marker))&&
-      row.encounter_mode_marker!=='true'&&
-      !(typeof row.encounter_place_marker==='string'&&row.encounter_place_marker.trim())
-    ).map(row=>row.id);
-    let existingRow=null;
-    if(candidateIds.length){
-      const {data:latestPlayerMessage,error:messagesError}=await client.from('chat_messages')
-        .select('session_id').in('session_id',candidateIds).eq('role','user')
-        .is('deleted_at',null).order('created_at',{ascending:false}).limit(1).maybeSingle();
-      if(messagesError)throw messagesError;
-      if(latestPlayerMessage?.session_id)existingRow=(rows||[]).find(row=>row.id===latestPlayerMessage.session_id)||null;
-      // If the character has an existing but not-yet-started Story room, reuse it
-      // instead of creating another empty room for the same character.
-      if(!existingRow)existingRow=(rows||[]).find(row=>candidateIds.includes(row.id))||null;
-    }
-    if(existingRow){
-      await loadCloudChatSessions({id:userId},{onlySessionId:existingRow.id});
-      const existing=state.sessions[existingRow.id];
+    // One owner-scoped RPC replaces the separate session-list and user-message lookups.
+    const {data:existingRows,error:existingError}=await client.rpc('find_existing_story_chat_session',{
+      p_character_id:characterId
+    });
+    if(existingError)throw existingError;
+    const existingSessionId=Array.isArray(existingRows)?existingRows[0]?.session_id:null;
+    if(existingSessionId){
+      await loadCloudChatSessions({id:userId},{onlySessionId:existingSessionId,verifiedUser});
+      const existing=state.sessions[existingSessionId];
       if(!existing)throw new Error('找到既有聊天室，但載入聊天基本資料失敗。請重新整理後再試。');
-      const loaded=await loadCloudSessionMessages(existingRow.id);
+      const loaded=await loadCloudSessionMessages(existingSessionId,{verifiedUser});
       if(!loaded)throw new Error('找到既有聊天室，但載入聊天內容失敗。請重新整理後再試。');
       existing.hidden=false;existing.archived=false;existing.archivedAt=null;
       persist();await saveChatSessionSafely(existing);
@@ -12205,9 +12193,16 @@ async function loadCityCharacterSchedules(characterIds=[]){
   const ids=[...new Set((characterIds||[]).filter(Boolean))].slice(0,10);
   const schedules=new Map();
   if(!client||!ids.length)return schedules;
-  const {data,error}=await client.rpc('get_encounter_character_schedules',{p_character_ids:ids});
-  if(error)throw new Error('讀取場景角色排程失敗：'+error.message);
-  for(const row of data||[]){
+  let data=[];
+  try{
+    const result=await client.rpc('get_encounter_character_schedules',{p_character_ids:ids});
+    if(result.error)throw result.error;
+    data=result.data||[];
+  }catch(error){
+    console.warn('城市角色排程批次載入失敗：',error?.message||error);
+    return schedules;
+  }
+  for(const row of data){
     const lines=schedules.get(row.character_id)||[];
     lines.push([
       row.weekday==null?'*':row.weekday,

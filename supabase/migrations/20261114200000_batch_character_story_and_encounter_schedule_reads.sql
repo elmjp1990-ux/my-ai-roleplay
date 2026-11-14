@@ -83,3 +83,54 @@ GRANT EXECUTE ON FUNCTION public.get_encounter_character_schedules(uuid[]) TO an
 
 COMMENT ON FUNCTION public.get_encounter_character_schedules(uuid[]) IS
   'Batch counterpart to get_encounter_character_schedule. Returns active schedules only for public, non-deleted, approved, rights-confirmed characters; accepts at most 10 IDs and preserves the existing NSFW adult gate.';
+
+
+-- Resolve the latest ordinary Story session in one owner-scoped query.
+-- The candidate window and ordering mirror the previous two-query client flow.
+CREATE OR REPLACE FUNCTION public.find_existing_story_chat_session(p_character_id uuid)
+RETURNS TABLE (session_id uuid)
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+  WITH candidates AS (
+    SELECT s.id, s.updated_at
+    FROM public.chat_sessions s
+    WHERE s.user_id = (SELECT auth.uid())
+      AND s.character_id = p_character_id
+      AND s.deleted_at IS NULL
+      AND s.chat_mode <> 'encounter'
+      AND jsonb_typeof(s.session_data -> 'encounter') IS DISTINCT FROM 'object'
+      AND COALESCE(s.session_data ->> 'encounterMode', '') <> 'true'
+      AND NULLIF(pg_catalog.btrim(s.session_data ->> 'encounterPlace'), '') IS NULL
+    ORDER BY s.updated_at DESC, s.id DESC
+    LIMIT 10
+  ),
+  latest_user_message AS (
+    SELECT
+      c.id,
+      c.updated_at,
+      message.created_at AS last_user_message_at
+    FROM candidates c
+    LEFT JOIN LATERAL (
+      SELECT cm.created_at
+      FROM public.chat_messages cm
+      WHERE cm.session_id = c.id
+        AND cm.role = 'user'
+        AND cm.deleted_at IS NULL
+      ORDER BY cm.created_at DESC, cm.id DESC
+      LIMIT 1
+    ) message ON TRUE
+  )
+  SELECT id
+  FROM latest_user_message
+  ORDER BY last_user_message_at DESC NULLS LAST, updated_at DESC, id DESC
+  LIMIT 1;
+$$;
+
+REVOKE ALL ON FUNCTION public.find_existing_story_chat_session(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.find_existing_story_chat_session(uuid) TO authenticated;
+
+COMMENT ON FUNCTION public.find_existing_story_chat_session(uuid) IS
+  'Returns the most recently active player Story session among the newest 10 eligible non-Encounter sessions for auth.uid(). Uses invoker privileges and existing chat_sessions/chat_messages RLS.';

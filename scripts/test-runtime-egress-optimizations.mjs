@@ -630,3 +630,12 @@ assert.ok(notificationRenderer.includes("state.notifications.filter"));
 assert.ok(notificationRenderer.includes("filtered.slice(0,notificationListPager.limit)"));
 assert.ok(!notificationRenderer.includes(".from(")&&!notificationRenderer.includes(".rpc("),
   "system notifications are local-state-only; the current ten-item reveal is not backend pagination");
+
+const startChatQuery=between("async function startChat(characterId)","function visibleSessions()");
+assert.ok(startChatQuery.includes("find_existing_story_chat_session"));
+assert.ok(!startChatQuery.includes(".from('chat_sessions')"));
+assert.ok(!startChatQuery.includes(".from('chat_messages')"));
+const sessionHydrator=between("async function loadCloudChatSessions(user, options = {})","async function loadCloudSessionMessages");
+assert.ok(sessionHydrator.includes("options.verifiedUser"));
+const messageHydrator=between("async function loadCloudSessionMessages","function ");
+assert.ok(messageHydrator.includes("options.verifiedUser"));
