@@ -246,6 +246,7 @@ assert.match(html,/groupLoadList\(false,true\)/,
 const authorProfileModule=fs.readFileSync("author-profile.js","utf8");
 const followedAuthorsPaginationSource=fs.readFileSync("followed-authors.js","utf8");
 const authorLatestLoader=between("async function loadPublicAuthorLatestCharacters","let publicCharactersLoadPromise");
+const followedAuthorBatchMigration=fs.readFileSync('supabase/migrations/20261115090000_batch_followed_author_latest_characters.sql','utf8');
 assert.match(authorProfileModule,/loadAuthorCharacterPage\(authorId,\s*page\.offset\)/,
   "author profile presentation must delegate each page to the app-owned data loader");
 assert.match(html,/async function loadPublicAuthorCharacterPage\(authorId,offset=0\)/,
@@ -637,7 +638,6 @@ assert.ok(html.includes("options.verifiedUser?.id===user.id"));
 assert.ok(html.includes("options.verifiedUser?.id===userId"));
 
 const queryOptimizationMigration=fs.readFileSync('supabase/migrations/20261114200000_batch_character_story_and_encounter_schedule_reads.sql','utf8');
-const followedAuthorBatchMigration=fs.readFileSync('supabase/migrations/20261115090000_batch_followed_author_latest_characters.sql','utf8');
 assert.match(queryOptimizationMigration,/DISTINCT ON \(s\.character_id\)/);
 assert.match(queryOptimizationMigration,/cardinality\(p_character_ids\) BETWEEN 1 AND 10/);
 assert.match(queryOptimizationMigration,/find_existing_story_chat_session/);
