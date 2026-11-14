@@ -16,17 +16,37 @@
     characterComments: 10,
     memoryPhotos: 10
   });
+  const activeStates = new Set();
+  const activeObservers = new Set();
+  let activeScope = '';
 
   function createState(kind, initial = {}) {
-    return {
+    let requestId = 0;
+    const state = {
       kind,
       pageSize: PAGE_SIZES[kind] || 10,
       offset: 0,
       hasMore: true,
       loading: false,
       observer: null,
-      ...initial
+      ...initial,
+      beginRequest() {
+        activeStates.add(state);
+        state.loading = true;
+        return ++requestId;
+      },
+      isRequestCurrent(id) {
+        return requestId === id;
+      },
+      invalidate() {
+        requestId += 1;
+        state.loading = false;
+        state.observer?.disconnect();
+        state.observer = null;
+      }
     };
+    activeStates.add(state);
+    return state;
   }
 
   function observeEnd(sentinel, onIntersect, options = {}) {
@@ -38,8 +58,25 @@
       rootMargin: options.rootMargin || '220px 0px',
       threshold: 0
     });
+    const disconnect = observer.disconnect.bind(observer);
+    observer.disconnect = () => {
+      disconnect();
+      activeObservers.delete(observer);
+    };
+    activeObservers.add(observer);
     observer.observe(sentinel);
     return observer;
+  }
+
+  function beginScope(scope) {
+    const nextScope = String(scope || '');
+    if (nextScope === activeScope) return false;
+    activeScope = nextScope;
+    for (const observer of activeObservers) observer.disconnect();
+    activeObservers.clear();
+    for (const state of activeStates) state.invalidate();
+    activeStates.clear();
+    return true;
   }
 
   function mergeUnique(existing, incoming, keyOf = item => item?.id) {
@@ -56,6 +93,7 @@
     pageSize: kind => PAGE_SIZES[kind] || 10,
     createState,
     observeEnd,
+    beginScope,
     mergeUnique
   });
 })();
