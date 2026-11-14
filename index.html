@@ -7532,8 +7532,9 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
         if(!ctx.session.cloudOwned||ctx.session.cloudOwnerUid!==uid)throw new Error('請先使用目前帳號擁有的雲端聊天。');
         const {data,error}=await client.from('chat_memory_photos').select('id,caption,storage_path,created_at').eq('owner_id',uid).eq('chat_type','single').eq('session_id',ctx.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false}).limit(window.PoyozzListPagination.pageSize('memoryPhotos'));
         if(error)throw error;
-        rows=await Promise.all((data||[]).map(async p=>{const signedUrl=await getMemoryPhotoSignedUrl(p.storage_path).catch(()=>null);return signedUrl?{id:p.id,caption:p.caption||'',url:signedUrl}:null;}));
-        rows=rows.filter(Boolean);
+        const photos=data||[];let signedUrls=[];
+        try{signedUrls=await memoryPhotoSignedUrlManager.getMany(photos.map(p=>uid+':'+p.storage_path),{context:{uid}});}catch(_){}
+        rows=photos.map((p,index)=>signedUrls[index]?{id:p.id,caption:p.caption||'',url:signedUrls[index]}:null).filter(Boolean);
       }
       if(chatBackgroundDraft?.key!==ctx.key)return;draft.photos=rows;draft.loaded=true;draft.loading=false;
       panel.querySelector('.chat-overlay')?.remove();renderChatSettingsOverlay(panel,isGroup,'settings-background');
