@@ -34,15 +34,15 @@
       let authors = [];
       let pageAuthorIds = [];
       if (current.client && isUuid(current.userId)) {
-        const {data:follows,error,count} = await current.client
-          .from('author_follows').select('author_id,created_at',{count:'exact'})
+        const {data:follows,error} = await current.client
+          .from('author_follows').select('author_id,created_at')
           .eq('follower_id',current.userId)
           .order('created_at',{ascending:false})
           .order('author_id',{ascending:false})
           .range(current.offset,current.offset+current.pageSize-1);
         if (error) throw new Error('讀取追蹤作者失敗：'+error.message);
         pageAuthorIds=[...new Set((follows||[]).map(row=>row.author_id).filter(Boolean))];
-        current.total=Number(count??current.total??0);
+        current.total=null;
         if (!append) state.following=[];
         state.following=[...new Set([...(state.following||[]),...pageAuthorIds])];
         if (pageAuthorIds.length) {
@@ -104,7 +104,7 @@
         if(container&&html)container.insertAdjacentHTML('beforeend',html);
       } else {
         $('view').innerHTML='<div class="stack"><div class="followed-authors-title-row"><button type="button" class="ghost followed-authors-back" data-action="back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><div class="row between"><h1 style="margin:0">喜愛作者</h1><span class="small muted">'+current.total+' 位作者</span></div></div>'+
-          '<div id="followedAuthorsItems" class="stack">'+(html||'<div class="empty">你還沒有追蹤任何作者。到作者頁點擊「追蹤」，就會在這裡看到作者與最新公開角色。</div>')+'</div>'+
+          '<div class="small muted">已追蹤作者</div><div id="followedAuthorsItems" class="stack">'+(html||'<div class="empty">你還沒有追蹤任何作者。到作者頁點擊「追蹤」，就會在這裡看到作者與最新公開角色。</div>')+'</div>'+
           (current.hasMore?'<div id="followedAuthorsSentinel" class="small muted" style="padding:14px;text-align:center">繼續往下滑動，載入更多作者…</div>':'')+'</div>';
       }
       if(current.hasMore) observeNextPage(deps,current);
