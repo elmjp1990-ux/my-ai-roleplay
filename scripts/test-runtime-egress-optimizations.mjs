@@ -624,9 +624,9 @@ assert.match(followedAuthorBatchMigration,/cardinality\(p_author_ids\) BETWEEN 1
 const startChatLoader=between("async function startChat(characterId)","function visibleSessions()");
 assert.ok(startChatLoader.includes("getVerifiedAuthUser(userId)"));
 assert.ok(!startChatLoader.includes("auth?.getUser"));
-const notificationRenderer=between("function renderNotifications()","/* Cloud wallet ledger");
+const notificationRenderer=fs.readFileSync("notifications-screen.js","utf8");
 assert.ok(notificationRenderer.includes("state.notifications.filter"));
-assert.ok(notificationRenderer.includes("filtered.slice(0,notificationListPager.limit)"));
+assert.ok(notificationRenderer.includes("filtered.slice(0, pager.limit)"));
 assert.ok(!notificationRenderer.includes(".from(")&&!notificationRenderer.includes(".rpc("),
   "system notifications are local-state-only; the current ten-item reveal is not backend pagination");
 
@@ -636,6 +636,14 @@ assert.ok(!startChatQuery.includes(".from('chat_sessions')"));
 assert.ok(!startChatQuery.includes(".from('chat_messages')"));
 assert.ok(html.includes("options.verifiedUser?.id===user.id"));
 assert.ok(html.includes("options.verifiedUser?.id===userId"));
+
+const boundedCommentMigration=fs.readFileSync('supabase/migrations/20261114130000_add_bounded_character_comment_reads.sql','utf8');
+assert.match(boundedCommentMigration,/get_character_comments_safe_page/);
+assert.match(boundedCommentMigration,/SECURITY DEFINER/);
+assert.match(boundedCommentMigration,/private\.comment_is_whisper_thread/);
+assert.match(boundedCommentMigration,/LIMIT GREATEST\(1, LEAST\(COALESCE\(p_limit, 10\), 10\)\)/);
+assert.match(boundedCommentMigration,/REVOKE ALL ON FUNCTION public\.get_character_comments_safe_page/);
+assert.match(boundedCommentMigration,/GRANT EXECUTE ON FUNCTION public\.get_character_comments_safe_page/);
 
 const queryOptimizationMigration=fs.readFileSync('supabase/migrations/20261114200000_batch_character_story_and_encounter_schedule_reads.sql','utf8');
 assert.match(queryOptimizationMigration,/DISTINCT ON \(s\.character_id\)/);
