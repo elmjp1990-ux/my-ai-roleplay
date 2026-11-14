@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const html=fs.readFileSync("index.html","utf8");
+const uiCss=fs.readFileSync("poyozz-ui.css","utf8");
 const between=(start,end)=>{
   const from=html.indexOf(start),to=html.indexOf(end,from+start.length);
   assert.notEqual(from,-1,"missing source block: "+start);
@@ -233,7 +234,7 @@ assert.match(messageActionHelper,/editAction/);
 assert.match(groupRenderer,/renderMessageActionBar\(\{[\s\S]*copy-group-message[\s\S]*delete-group-message[\s\S]*edit-group-message/);
 assert.match(singleRenderer,/renderMessageActionBar\(\{[\s\S]*copy-message[\s\S]*delete-message[\s\S]*edit-message/,
   'single and group chats must share one message-action UI renderer while retaining their distinct action handlers');
-assert.equal((html.match(/message-action-bar" aria-label="訊息操作"/g)||[]).length,0,
+assert.equal(((groupRenderer+singleRenderer).match(/message-action-bar" aria-label="訊息操作"/g)||[]).length,0,
   'message-action markup must not be duplicated in the two chat renderers');
 assert.doesNotMatch(html,/body\.group-chat-page body\.group-chat-page \.composer/,
   'the invalid nested-body group composer selector must be removed');
@@ -241,6 +242,8 @@ assert.doesNotMatch(html,/\.message\.user\s*>\s*\.avatar/,
   'the obsolete CSS rule hiding redundant outer player avatars must be removed');
 assert.doesNotMatch(html,/body\.group-chat-page \.message-content/,
   'group chat must inherit the single-chat message-content sizing rule');
+assert.doesNotMatch(uiCss,/body\.group-chat-page \.message-content/,
+  'the shared stylesheet must not redefine message-content sizing for group chat');
 assert.match(groupRenderer,/roleplaySegmentHTML\(segment,\{summonedByPlayer\}\)/);
 assert.match(singleRenderer,/roleplaySegmentHTML\(segment, \{summonedByPlayer\}\)/,
   'single and group chat must share the same roleplay segment renderer rather than duplicate avatar logic');
