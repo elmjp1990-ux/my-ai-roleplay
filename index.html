@@ -6550,7 +6550,7 @@ async function groupOpen(groupId) {
     const [groupRes,sceneRes,memberRes,messageRes]=await groupWithTimeout(Promise.all([
       window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,background_mode,background_memory_photo_id,created_at,updated_at,archived_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
-      window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position'),
+      window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot,phone_notifications').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(50)
     ]),15000,'群組資料讀取逾時，請檢查網路後重試。')
     if(requestId!==g.openRequestId) return;
@@ -6566,7 +6566,7 @@ async function groupOpen(groupId) {
       const avatarRes=await window.mySupabase.from('characters').select('id,avatar_url').in('id',characterIds);
       if(!avatarRes.error) avatarById=Object.fromEntries((avatarRes.data||[]).map(x=>[x.id,x.avatar_url||'']));
     }
-    const members=memberRows.map(m=>{const snapshot=m.character_snapshot||{};const characterId=m.character_id||null;const snapshotId=snapshot.id||characterId||null;const displayId=characterId||snapshotId||m.id;return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,avatar_url:avatarById[characterId]||snapshot.avatar_url||snapshot.image||'',position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};});
+    const members=memberRows.map(m=>{const snapshot=m.character_snapshot||{};const characterId=m.character_id||null;const snapshotId=snapshot.id||characterId||null;const displayId=characterId||snapshotId||m.id;return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,avatar_url:avatarById[characterId]||snapshot.avatar_url||snapshot.image||'',phoneNotifications:Array.isArray(m.phone_notifications)?m.phone_notifications:[],position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};});
     groupExpandedMemberId=null;
     // Memory photo metadata and signed URLs are loaded only when the player opens background settings.
     const initialMessageRows=messageRes.data||[];
@@ -7451,6 +7451,12 @@ async function groupSendTurn() {
     if(g.active!==activeGroup||g.active?.id!==activeGroupId||g.ownerUid!==requestUid||currentUser()?.uid!==requestUid) return;
     if(!rows?.length) throw new Error('群組回合已保存，但暫時讀取不到訊息。請稍後重新開啟群組確認。');
     const members=g.active.members||[], scenes=g.active.scenes||[];
+    if(Array.isArray(turnResult.phone_updates)){
+      for(const update of turnResult.phone_updates){
+        const target=members.find(member=>String(member.characterId||member.id)===String(update.characterId));
+        if(target&&Array.isArray(update.notifications))target.phoneNotifications=update.notifications;
+      }
+    }
     const newMessages=rows.map(m=>{
       const speakerSnapshot=m.speaker_snapshot||{};
       const member=members.find(x=>x.characterId===m.character_id)||members.find(x=>x.characterSnapshotId===speakerSnapshot.id||x.id===speakerSnapshot.id);
@@ -8265,8 +8271,8 @@ async function renderPhoneModal() {
     character={...savedRole,...sessionRole,phoneSettings:savedRole?.phoneSettings||savedRole?.phone_settings||sessionRole.phoneSettings||sessionRole.phone_settings||{}};
   }
   // Creator notice prompts guide AI generation only; never render raw instructions to players.
-  const generated=isGroup?(group.phoneNotificationsByCharacter?.[String(character.id)]||[]):(session.phoneNotifications||[]);
-  const notices=Array.isArray(generated)?generated.filter(Boolean).slice(0,10):[];
+  const generated=isGroup?(character.phoneNotifications||group.phoneNotificationsByCharacter?.[String(character.id)]||[]):(session.phoneNotifications||[]);
+  const notices=Array.isArray(generated)?generated.filter(Boolean).slice(0,8):[];
   // Story phone events are fetched through the owner-checked RPC; never read the event table directly.
   let storyPhoneEvents=[];
   let storyPhoneStates=[];
@@ -8359,19 +8365,23 @@ async function renderPhoneModal() {
   const inferredOpeningLocation=openingLocationMatch?.[1]?.trim().replace(/[。！？；;]+$/,'')||'';
   const storyLocationLabel=String(storyWorldState.storyLocation||storyWorldState.story_location||session.encounterPlace||inferredOpeningLocation).trim().slice(0,120)||'依開場情境推定中';
   const title=(character.name||group?.name||'角色')+' 的手機';
-  const noticeLines=notices.map(line=>String(line||'').trim()).filter(Boolean);
-  const configuredNoticeHTML=noticeLines.slice(0,Math.max(0,8-storyPhoneStates.length-storyPhoneEvents.length)).map(line=>
-    '<article class="phone-notification-card"><span class="phone-app-icon">🔔</span><div class="phone-notification-copy"><div class="phone-notification-meta"><span>'+e(character.name||'角色通知')+'</span><span>通知</span></div><p>'+e(String(line))+'</p></div></article>'
-  ).join('');
+  const noticeLines=notices.map(item=>typeof item==='string'?item.trim():String(item?.body||'').trim()).filter(Boolean);
+  const configuredNoticeHTML=notices.slice(0,Math.max(0,8-storyPhoneStates.length-storyPhoneEvents.length)).map(item=>{
+    const title=typeof item==='string'?(character.name||'角色通知'):String(item?.title||character.name||'角色通知');
+    const body=typeof item==='string'?item:String(item?.body||'');
+    return '<article class="phone-notification-card"><span class="phone-app-icon">🔔</span><div class="phone-notification-copy"><div class="phone-notification-meta"><span>'+e(title)+'</span><span>通知</span></div><p>'+e(body)+'</p></div></article>';
+  }).join('');
   const noticeContentHTML=[storyStateHTML,storyEventHTML,configuredNoticeHTML].filter(Boolean).join('');
   const noticeHTML=noticeContentHTML||(storyPhoneEventsError?'<div class="phone-notification-empty">目前無法載入手機通知，請稍後重新開啟手機。</div>':'<div class="phone-notification-empty">目前還沒有新的通知</div>');
-  const memberSwitch=isGroup?'<div class="phone-member-switch"><button type="button" data-phone-action="prev" aria-label="上一位群組成員">‹</button><span class="phone-member-name">'+e(character.name)+'</span><button type="button" data-phone-action="next" aria-label="下一位群組成員">›</button></div>':'';
+  const phoneHeader=isGroup
+    ? '<div class="phone-device-head phone-device-head--group"><div class="phone-member-switch"><button type="button" data-phone-action="prev" aria-label="上一位群組成員">‹</button><span class="phone-member-name">'+e(character.name)+'</span><button type="button" data-phone-action="next" aria-label="下一位群組成員">›</button><span class="phone-member-phone-label">的手機</span></div><span class="phone-device-caption">STORY PHONE</span></div>'
+    : '<div class="phone-device-head"><span>'+e(title)+'</span><span class="phone-device-caption">STORY PHONE</span></div>';
   const [storyDateDisplay,storyClockDisplay]=String(storyTimeLabel).split('　');
   const phoneClock=storyClockDisplay||'--:--';
   const modal=document.createElement('div');modal.className='phone-modal-backdrop';modal.setAttribute('role','presentation');
   modal.innerHTML='<section class="phone-device phone-device--ios" role="dialog" aria-modal="true" aria-label="'+e(title)+'"><div class="phone-screen">'+
     '<div class="phone-statusbar"><span>'+e(phoneClock)+'</span><span class="phone-status-icons" aria-label="行動網路與電量"><i></i><i></i><i></i><span>⌁</span><span class="phone-battery" style="color:'+batteryColor+'" aria-label="'+(battery===null?'回憶容量暫時無法讀取':'剩餘回憶容量 '+battery+'%')+'"><span>'+(battery===null?'--':battery+'%')+'</span><span class="phone-battery-shape"><span class="phone-battery-fill" style="display:block;width:'+(battery===null?0:battery)+'%"></span></span></span></span></div>'+
-    '<div class="phone-device-head"><span>'+e(title)+'</span><span class="phone-device-caption">STORY PHONE</span></div>'+memberSwitch+
+    '<div class="phone-device-head"><span>'+phoneHeader+
     '<div class="phone-content"><div class="phone-lockscreen"><div class="phone-lockscreen-date">'+e(storyDateDisplay||'故事時間')+'</div><div class="phone-lockscreen-clock">'+e(phoneClock)+'</div><div class="phone-lockscreen-location">⌖　'+e(storyLocationLabel)+'</div></div>'+
     '<section class="phone-notices '+(warning?'phone-warning':'')+'">'+(warning?'<div class="phone-memory-warning">回憶空間即將用盡，整理甜蜜日記可釋放容量</div>':'')+
     '<div class="phone-notice-heading"><strong>通知</strong><span>'+(noticeContentHTML?String(Math.min(8,storyPhoneStates.length+storyPhoneEvents.length+noticeLines.length))+' 則':'通知中心')+'</span></div><div class="phone-notice-list">'+noticeHTML+'</div></section>'+
