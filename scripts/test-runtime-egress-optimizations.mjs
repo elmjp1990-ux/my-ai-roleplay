@@ -222,6 +222,12 @@ assert.match(encounterMemory,/PoyozzListPagination\.observeEnd/,
   "Encounter memory lists must load the next twenty sessions when the user reaches the end");
 assert.doesNotMatch(encounterMemory,/\.limit\(200\)/,
   "Encounter memory list initialization must not fetch 200 diary records");
+assert.match(encounterMemory,/visibleCards=combinedCards\.slice\(0,pageSize\)/,
+  "Encounter list rendering must cap each visible page at twenty cards, including legacy rows");
+assert.match(encounterMemory,/pager\.buffer=combinedCards\.slice\(pageSize\)/,
+  "overflow cards must be buffered for the next page instead of rendering more than twenty initially");
+assert.match(encounterMemory,/pager\.hasMore\|\|pager\.buffer\.length/,
+  "the Encounter sentinel must remain available while buffered cards remain");
 
 console.log("Story relationship RPC dedupe, illustration write dedupe, group list refresh avoidance, incremental group-turn loading, phone-state cache, shared login auth verification, and author-profile hydration reuse checks passed.");
 
