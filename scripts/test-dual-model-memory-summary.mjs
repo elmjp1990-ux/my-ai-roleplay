@@ -57,7 +57,7 @@ assert.match(source, /await recordUsage\(null, "failed"\)/,
 assert.match(migration, /turn_id uuid references public\.chat_turn_charges\(turn_id\) on delete cascade/);
 assert.doesNotMatch(migration, /generation_type = 'chat_response' and turn_id is not null and assistant_message_id is not null/,
   "chat usage rows must allow null assistant IDs for failed or blocked generations");
-assert.match(summary, /only: \["deepinfra"\]/);
+assert.match(openRouterShared, /only: \["deepinfra"\]/);
 
 const summaryStart = summary.indexOf("async function requestMemorySummary");
 const summaryEnd = summary.indexOf("export async function processDueStoryMemorySummary", summaryStart);
