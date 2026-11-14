@@ -23,25 +23,16 @@
     if (!client) return;
     page.loading = true;
     try {
-      const { data, error } = await client.from('characters')
-        .select(CHARACTER_FIELDS)
-        .eq('author_id', authorId)
-        .eq('visibility', 'public')
-        .is('deleted_at', null)
-        .order('first_published_at', { ascending: false, nullsFirst: false })
-        .order('id', { ascending: false })
-        .range(page.offset, page.offset + page.pageSize - 1);
-      if (error) throw error;
-      const rows = Array.isArray(data) ? data : [];
-      const mapped = rows.map(row => global.mapPublicCharacterRow(row));
+      const result = await dependencies.loadAuthorCharacterPage(authorId, page.offset);
+      const mapped = Array.isArray(result?.items) ? result.items : [];
       page.characters = dependencies.PoyozzListPagination.mergeUnique(
         page.characters, mapped, character => character.id
       );
       dependencies.state.characters = dependencies.PoyozzListPagination.mergeUnique(
         dependencies.state.characters, mapped, character => character.id
       );
-      page.offset += rows.length;
-      page.hasMore = rows.length === page.pageSize;
+      page.offset += mapped.length;
+      page.hasMore = result?.hasMore === true;
       page.loaded = true;
     } catch (error) {
       page.error = error;
@@ -65,7 +56,7 @@
       if (needsPublicProfile) void hydratePublicAuthorProfile(authorId);
       const following = state.following.includes(a.uid);
       const page = pageFor(authorId, PoyozzListPagination);
-      if(!page.loaded&&(!getSupabaseClient()||!isUuid(authorId))){
+      if(!page.loaded&&typeof dependencies.loadAuthorCharacterPage!=='function'){
         page.characters=state.characters.filter(character=>
           character.visibility==='public'&&character.authorId===authorId&&
           !String(character.id).startsWith('seed-')&&character.cloudPublic!==false&&character.localOnly!==true
@@ -114,7 +105,7 @@
       };
 
       renderPage();
-      if (!page.loaded && !page.loading && getSupabaseClient() && isUuid(authorId)) {
+      if (!page.loaded && !page.loading && typeof dependencies.loadAuthorCharacterPage==='function') {
         void loadAuthorCharacters(authorId, page, dependencies).then(() => {
           if (route.page === 'author' && route.id === authorId) rerender();
         }).catch(error => {
