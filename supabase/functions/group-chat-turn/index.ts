@@ -86,12 +86,21 @@ Deno.serve(async (request) => {
   if (!reservation?.turn_id) return json({ error: "group_reservation_state_missing" }, 503);
   const turnId = String(reservation.turn_id);
   if (reservation.turn_status === "completed" && reservation.charge_status === "settled") {
-    const { data: saved, error: savedError } = await admin.from("chat_group_messages")
-      .select("id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at")
-      .eq("group_id", groupId).eq("turn_id", turnId).is("deleted_at", null)
-      .order("sequence_no", { ascending: true });
-    if (savedError) return json({ status: "needs_reconciliation", error: "completed_turn_read_failed", retryAllowed: false }, 503);
-    return json({ status: "completed", turnId, messages: saved || [], idempotent: true });
+    const [{ data: saved, error: savedError }, { data: phoneRows, error: phoneError }] = await Promise.all([
+      admin.from("chat_group_messages")
+        .select("id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at")
+        .eq("group_id", groupId).eq("turn_id", turnId).is("deleted_at", null)
+        .order("sequence_no", { ascending: true }),
+      admin.from("chat_group_members").select("character_id,phone_notifications").eq("group_id", groupId),
+    ]);
+    if (savedError || phoneError) return json({ status: "needs_reconciliation", error: "completed_turn_read_failed", retryAllowed: false }, 503);
+    return json({
+      status: "completed", turnId, messages: saved || [], idempotent: true,
+      phone_updates: (phoneRows || []).map((row: any) => ({
+        characterId: row.character_id,
+        notifications: Array.isArray(row.phone_notifications) ? row.phone_notifications : [],
+      })),
+    });
   }
   if (!reservation.is_new) {
     if (reservation.charge_status === "refunded" || reservation.turn_status === "failed") {
