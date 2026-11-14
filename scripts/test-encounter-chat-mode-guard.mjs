@@ -279,7 +279,7 @@ assert.match(frontend, /session_encounter_metadata:session_data->encounter/);
 assert.match(frontend, /row\.session_encounter_metadata\s*&&\s*typeof\s+row\.session_encounter_metadata\s*===\s*'object'/);
 assert.match(frontend, /!isEncounterChatSession\(item\)/);
 assert.match(frontend, /!isEncounterChatSession\(candidate\)/);
-assert.match(frontend, /if \(!item \|\| item\.hidden \|\| isEncounterChatSession\(item\)\) return false;/);
+assert.match(frontend, /if \(!item \|\| !canAccessSessionCharacter\(item,sessionCharacter\(item\)\)\) break;/);
 assert.match(frontend, /item\.id !== s\.id && item\.characterId === c\.id && !item\.archived && !isEncounterChatSession\(item\)/);
 assert.match(frontend, /candidate\.id!==item\.id&&candidate\.characterId===item\.characterId&&!candidate\.archived&&!isEncounterChatSession\(candidate\)/);
 assert.match(frontend, /route\.page === 'citymap' \? 'home'/);
