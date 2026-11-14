@@ -46,6 +46,7 @@
 | `signed-url-manager.js` | Signed URL cache, expiry buffer, in-flight dedupe and invalidation | Bucket policy, access decisions, object deletion |
 | `city-map.js` | City map presentation using injected dependencies | Persistence, authentication, chat/encounter creation rules |
 | `followed-authors.js` | Followed-author presentation | Follow mutations or RLS |
+| `author-data.js` | Read-only public author character page and bounded latest-preview RPC adapters | Rendering, local state merging, follow mutations or authorization policy; RLS/RPC remain authoritative |
 | `author-profile.js` | Author profile presentation | Follow mutations or profile authorization |
 | `comment-renderer.js` | Comment presentation | Comment fetch/mutations or privacy filtering |
 | `custom-tag-picker.js` | Custom tag picker rendering and local event binding | Tag persistence or character save |
