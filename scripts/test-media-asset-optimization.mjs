@@ -51,7 +51,7 @@ assert.match(videoCompressor,/captureStream\(24\)/);
 assert.match(videoCompressor,/blob\.size>2\*1024\*1024/);
 assert.match(videoCompressor,/new File\(\[blob\]/);
 assert.match(videoCompressor,/stream\.getTracks\(\)\.forEach/);
-const videoUploader=block("async function uploadCharacterAvatarVideo","// Signed URL 依 storage path");
+const videoUploader=block("async function uploadCharacterAvatarVideo","// Visible character videos share");
 assert.match(videoUploader,/const optimized=await compressCharacterAvatarVideo\(file\)/);
 assert.match(videoUploader,/upload\(path,optimized/);
 assert.doesNotMatch(videoUploader,/upload\(path,file/);
