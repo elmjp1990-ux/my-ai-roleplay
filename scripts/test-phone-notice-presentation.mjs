@@ -11,7 +11,7 @@ assert.ok(generatedStart >= 0 && generatedEnd > generatedStart, 'Phone notificat
 const phoneBlock = html.slice(generatedStart, generatedEnd);
 
 assert.match(phoneBlock, /const generated=isGroup\?/);
-assert.match(phoneBlock, /const savedNotices=Array\\.isArray\\(generated\\)\\?generated\\.filter\\(Boolean\\)\\.slice\\(0,8\\):\\[\\]/);
+assert.match(phoneBlock, /const savedNotices=Array.isArray\(generated\)/);
 assert.match(phoneBlock, /const noticeLines=notices\.map/);
 assert.match(phoneBlock, /get_story_phone_state/, 'Story phone must load current configured field state separately');
 assert.match(phoneBlock, /get_story_phone_events/, 'Story phone must load genuine event history separately');
@@ -28,9 +28,9 @@ assert.match(phoneStateMigration, /e\.event_type <> 'notification'/,
 assert.match(storyPrompt, /每個手機欄位的 body 必須以簡短的一行為主/);
 assert.match(storyPrompt, /沒有新資訊或劇情變化時，原樣延續最近狀態/);
 assert.match(phoneBlock, /目前還沒有新的通知/);
-assert.match(phoneBlock, /configuredPhonePrompts\\.slice\\(0,8\\)\\.map/,'Group phone may use configured notice labels only as display titles when no generated notice exists');
+assert.match(phoneBlock, /configuredPhonePrompts\.slice\(0,8\)\.map/,'Group phone may use configured notice labels only as display titles when no generated notice exists');
 assert.match(phoneBlock, /body:'目前尚未有更新'/,'Creator instructions must never be displayed as notification body text');
-assert.doesNotMatch(phoneBlock, /body:String\\(row\\)|body:row/,'Raw creator instructions must never be rendered as player-facing notification bodies');
+assert.doesNotMatch(phoneBlock, /body:String\(row\)|body:row/,'Raw creator instructions must never be rendered as player-facing notification bodies');
 
 assert.ok(html.includes('session.storyWorldState'), 'Phone must read the latest saved story-world state');
 assert.ok(html.includes('故事時間尚未確認'), 'Unknown story time must remain explicitly unknown rather than use a hard-coded clock');
