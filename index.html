@@ -3246,7 +3246,7 @@ const GROUP_CONTINUE_SENTINEL = '（請接續目前的故事。）';
 let personaPickerSelection = null;
 let groupPersonaPickerSelection = null;
 let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupMembers:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null,openRequestId:0,groupListOffset:0,groupListHasMore:false,groupPinnedLoaded:false,groupPinnedOffset:0,groupListObserver:null,historyCursor:null,historyHasMore:false,historyLoading:false,historyError:'',historyScrollAnchor:null};
-let chatSessionListPager = {...window.PoyozzListPagination.createState('chatSessions'),ownerUid:null,pinnedLoaded:false,initialLoaded:false};
+let chatSessionListPager = {...window.PoyozzListPagination.createState('chatSessions'),ownerUid:null,pinnedLoaded:false,pinnedOffset:0,initialLoaded:false};
 let chatListPaginationObserver=null;
 let search = '';
 let filter = 'recommended';
@@ -3754,7 +3754,7 @@ async function loadCloudChatSessions(user, options = {}) {
       if(pager.ownerUid!==user.id||options.force){
         pager.observer?.disconnect();chatListPaginationObserver?.disconnect();
         Object.assign(pager,window.PoyozzListPagination.createState('chatSessions'),{
-          ownerUid:user.id,pinnedLoaded:false,initialLoaded:false
+          ownerUid:user.id,pinnedLoaded:false,pinnedOffset:0,initialLoaded:false
         });
       }
       if(pager.loading||(options.loadMore&&!pager.hasMore)||(!options.loadMore&&pager.initialLoaded))return;
@@ -3795,14 +3795,13 @@ async function loadCloudChatSessions(user, options = {}) {
     let rows=[];
     if(pagedList){
       const pageSize=window.PoyozzListPagination.pageSize('chatSessions');
-      let pinnedRows=[];
-      if(!options.loadMore&&!pager.pinnedLoaded){
-        const {data:pinnedData,error:pinnedError}=await client.from('chat_sessions')
-          .select(sessionSelect).eq('user_id',user.id).is('deleted_at',null)
-          .eq('session_data->>pinned','true').order('updated_at',{ascending:false}).order('id',{ascending:false});
-        if(pinnedError)throw new Error(pinnedError.message);
-        pinnedRows=pinnedData||[];
-      }
+      const {data:pinnedData,error:pinnedError}=await client.from('chat_sessions')
+        .select(sessionSelect).eq('user_id',user.id).is('deleted_at',null)
+        .eq('session_data->>pinned','true')
+        .order('updated_at',{ascending:false}).order('id',{ascending:false})
+        .range(pager.pinnedOffset,pager.pinnedOffset+pageSize-1);
+      if(pinnedError)throw new Error(pinnedError.message);
+      const pinnedRows=pinnedData||[];
       const {data:pageRows,error:pageError}=await client.from('chat_sessions')
         .select(sessionSelect).eq('user_id',user.id).is('deleted_at',null)
         .or('session_data->>pinned.eq.false,session_data->>pinned.is.null')
@@ -3811,7 +3810,8 @@ async function loadCloudChatSessions(user, options = {}) {
       if(pageError)throw new Error(pageError.message);
       rows=[...pinnedRows,...(pageRows||[])];
       pager.offset+=(pageRows||[]).length;
-      pager.hasMore=(pageRows||[]).length===pageSize;
+      pager.pinnedOffset+=pinnedRows.length;
+      pager.hasMore=(pageRows||[]).length===pageSize||pinnedRows.length===pageSize;
       pager.pinnedLoaded=true;
       pager.initialLoaded=true;
       pager.loading=false;
