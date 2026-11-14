@@ -5037,10 +5037,8 @@ function renderGrid({append=false}={}) {
     : filter==='recommended'&&list.length
       ? '<button data-action="new-batch">換一批</button>'
       : '';
-  if($('loadSentinel')&&'IntersectionObserver'in window){
-    gridObserver=new IntersectionObserver(entries=>{
-      if(!entries.some(entry=>entry.isIntersecting))return;
-      gridObserver.disconnect();
+  if($('loadSentinel')){
+    gridObserver=window.PoyozzListPagination.observeEnd($('loadSentinel'),()=>{
       const previousLimit=limit;
       limit=previousLimit+window.PoyozzListPagination.pageSize('explore');
       if(list.length>previousLimit){
@@ -5050,8 +5048,7 @@ function renderGrid({append=false}={}) {
       }else{
         renderGrid({append:true});
       }
-    },{rootMargin:'220px 0px',threshold:0});
-    gridObserver.observe($('loadSentinel'));
+    },{rootMargin:'220px 0px'});
   }
 }
 
