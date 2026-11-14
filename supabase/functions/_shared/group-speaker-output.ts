@@ -6,8 +6,8 @@ const normalizeName = (value: string): string =>
 
 const escapeRegExp = (value: string): string => {
   let escaped = value;
-  for (const character of ["\\\\", ".", "*", "+", "?", "^", "$", "{", "}", "(", ")", "|", "[", "]"]) {
-    escaped = escaped.split(character).join("\\\\" + character);
+  for (const character of ["\\", ".", "*", "+", "?", "^", "$", "{", "}", "(", ")", "|", "[", "]"]) {
+    escaped = escaped.split(character).join("\\" + character);
   }
   return escaped;
 };
