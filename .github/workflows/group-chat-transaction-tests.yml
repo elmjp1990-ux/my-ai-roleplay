@@ -23,6 +23,10 @@ on:
       - ".github/workflows/group-chat-transaction-tests.yml"
   workflow_dispatch:
 
+concurrency:
+  group: group-chat-transaction-tests-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
