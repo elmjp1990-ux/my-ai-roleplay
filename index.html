@@ -3826,7 +3826,7 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
   if (session.cloudMessagesLoading || (!options.older && session.cloudMessagesLoaded && options.refresh !== true)) return true;
   const older = options.older === true, messagesNode = $('messages');
   const previousAnchor = older ? captureChatScrollAnchor(messagesNode) : null;
-  session.cloudMessagesLoading = true; session.cloudMessagesError = '';
+  session.cloudMessagesLoading = true; session.cloudMessagesError = ''; session.cloudMessagesErrorOlder=false;
   if (route.page === 'conversation' && route.id === sessionId) renderMessages(false);
   try {
     const { data: authResult, error: authError } = await client.auth.getUser();
@@ -3975,7 +3975,7 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
     );
     const clearedOrphanedPendingTurn=!!session.pendingTurn&&!hasPendingUserMessage;
     if(clearedOrphanedPendingTurn)delete session.pendingTurn;
-    session.cloudMessagesLoaded=true;session.cloudMessagesLoading=false;session.cloudMessagesError='';
+    session.cloudMessagesLoaded=true;session.cloudMessagesLoading=false;session.cloudMessagesError='';session.cloudMessagesErrorOlder=false;
     persist();
     if(clearedOrphanedPendingTurn)void saveChatSessionSafely(session);
     if(route.page==='conversation'&&route.id===sessionId){
@@ -3991,7 +3991,7 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
     }
     return true;
   }catch(error){
-    session.cloudMessagesLoading=false;session.cloudMessagesError=error?.message||'聊天訊息載入失敗。';
+    session.cloudMessagesLoading=false;session.cloudMessagesError=error?.message||'聊天訊息載入失敗。';session.cloudMessagesErrorOlder=older;
     if(route.page==='conversation'&&route.id===sessionId)renderMessages(false);
     console.error('單一聊天室訊息載入失敗：',error);return false;
   }
@@ -8009,7 +8009,7 @@ function renderMessages(scroll = true) {
   const oldScroll = $('messages').scrollTop;
   const historyControl=s.cloudOwned
     ?((s.cloudSearchJump?'<div class="small muted" style="text-align:center;padding:6px">已定位到搜尋結果附近　<button type="button" class="ghost small" data-chat-search-return-latest="single">返回最新訊息</button></div>':'')+(s.cloudMessagesLoading?'<div class="small muted" style="text-align:center;padding:10px">正在載入聊天紀錄…</div>'
-      :s.cloudMessagesError?'<div class="small muted" style="text-align:center;padding:10px"><span>'+e(s.cloudMessagesError)+'</span> <button type="button" data-chat-history-action="retry">重新載入</button></div>'
+      :s.cloudMessagesError?'<div class="small muted" style="text-align:center;padding:10px"><span>'+e(s.cloudMessagesError)+'</span> <button type="button" data-chat-history-action="'+(s.cloudMessagesErrorOlder?'older':'retry')+'">'+(s.cloudMessagesErrorOlder?'重試載入較早訊息':'重新載入')+'</button></div>'
       :s.cloudHasMoreMessages?'<div style="text-align:center;padding:10px"><button type="button" data-chat-history-action="older">載入更早的訊息</button></div>':''))
     :'';
   $('messages').innerHTML = historyControl + s.messages.filter(m => !(m.role === 'user' && String(m.text||'').trim() === GROUP_CONTINUE_SENTINEL)).map(m => {
