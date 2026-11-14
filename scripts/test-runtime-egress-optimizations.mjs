@@ -237,7 +237,7 @@ assert.match(html,/groupLoadList\(false,true\)/,
 
 const authorProfileModule=fs.readFileSync("author-profile.js","utf8");
 const followedAuthorsModule=fs.readFileSync("followed-authors.js","utf8");
-assert.match(authorProfileModule,/loadAuthorCharacterPage\(authorId,page\.offset\)/,
+assert.match(authorProfileModule,/loadAuthorCharacterPage\(authorId,\s*page\.offset\)/,
   "author profile presentation must delegate each page to the app-owned data loader");
 assert.match(html,/async function loadPublicAuthorCharacterPage\(authorId,offset=0\)/,
   "author profile character data must be loaded through the app data layer");
