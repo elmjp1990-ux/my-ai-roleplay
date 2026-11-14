@@ -1708,52 +1708,54 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     return request;
   }
 
-  async function loadSupabaseCharacters(user) {
+  async function loadSupabaseCharacters(user,{loadMore=false}={}) {
     const client = window.mySupabase;
     if (!client || !user?.id) return;
     try {
       const verifiedUser = await getVerifiedAuthUser(user.id);
       if (!verifiedUser) return;
 
-      // 先讀取雲端角色；將此裝置上屬於目前帳號、但雲端尚不存在的舊角色補上雲端。
-      // 這可修復舊版匯入只存 localStorage 的資料；不會上傳其他帳號的本機角色。
-      let { data: rows, error } = await client
-        .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
-        .eq('author_id', user.id)
-        .order('created_at', { ascending: false });
-      if (error) throw new Error('讀取雲端角色失敗：' + error.message);
-
-      if (state.account?.uid !== user.id) return;
-      const localOwned = state.characters.filter(c => c.authorId === user.id && c.id);
-      const cloudIdsBeforeMigration = new Set((rows || []).map(row => row.id));
-      const localOnly = localOwned.filter(c => !cloudIdsBeforeMigration.has(c.id));
-      const migrationErrors = [];
-      let migratedCount = 0;
-
-      for (const character of localOnly) {
-        try {
-          const result = await saveSupabaseCharacter(character, user.id);
-          migratedCount++;
-          if (result?.storyError) migrationErrors.push(character.name + '：' + result.storyError);
-          if (result?.profileQueueError) migrationErrors.push(character.name + '：' + result.profileQueueError);
-        } catch (migrationError) {
-          migrationErrors.push((character.name || '未命名角色') + '：' + migrationError.message);
+      const pageSize=window.PoyozzListPagination?.pageSize('ownedCharacters')||10;
+      if(!ownedCharacterPager||ownedCharacterPager.uid!==user.id){
+        ownedCharacterPager={uid:user.id,offset:0,hasMore:true,loading:false,cloudIds:new Set()};
+      }
+      const pager=ownedCharacterPager;
+      if(pager.loading|| (loadMore&&!pager.hasMore))return;
+      pager.loading=true;
+      let rows=[];
+      const migrationErrors=[];
+      let migratedCount=0;
+      // 只讀取所有角色 ID 以避免重複補傳舊版本機角色；完整角色欄位仍採 10 筆分頁。
+      if(!loadMore){
+        const idsResult=await client.from('characters').select('id').eq('author_id',user.id);
+        if(idsResult.error)throw new Error('讀取雲端角色索引失敗：'+idsResult.error.message);
+        pager.cloudIds=new Set((idsResult.data||[]).map(row=>row.id));
+        const localOwned=state.characters.filter(c=>c.authorId===user.id&&c.id);
+        const localOnly=localOwned.filter(c=>!pager.cloudIds.has(c.id));
+        for(const character of localOnly){
+          try{
+            const result=await saveSupabaseCharacter(character,user.id);
+            migratedCount++;
+            pager.cloudIds.add(character.id);
+            if(result?.storyError)migrationErrors.push(character.name+'：'+result.storyError);
+            if(result?.profileQueueError)migrationErrors.push(character.name+'：'+result.profileQueueError);
+          }catch(migrationError){migrationErrors.push((character.name||'未命名角色')+'：'+migrationError.message);}
+        }
+        if(migratedCount>0){
+          const refreshedIds=await client.from('characters').select('id').eq('author_id',user.id);
+          if(refreshedIds.error)throw new Error('角色補傳後重新讀取索引失敗：'+refreshedIds.error.message);
+          pager.cloudIds=new Set((refreshedIds.data||[]).map(row=>row.id));
         }
       }
-
-      // 補傳後重新讀取，以資料庫結果為準；失敗的本機角色仍會保留在本機。
-      if (migratedCount > 0) {
-        const refreshed = await client
-          .from('characters')
-          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
-          .eq('author_id', user.id)
-          .order('created_at', { ascending: false });
-        if (refreshed.error) throw new Error('角色補傳後重新讀取失敗：' + refreshed.error.message);
-        rows = refreshed.data || [];
-      }
-
-const ids = (rows || []).map(row => row.id);
+      const pageResult=await client.from('characters')
+        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+        .eq('author_id',user.id)
+        .order('created_at',{ascending:false}).order('id',{ascending:false})
+        .range(pager.offset,pager.offset+pageSize-1);
+      if(pageResult.error)throw new Error('讀取雲端角色失敗：'+pageResult.error.message);
+      rows=pageResult.data||[];
+      if(state.account?.uid!==user.id)return;
+      const ids=(rows||[]).map(row=>row.id);
       // 隱藏設定只從作者專用資料表讀取，不再從公開 characters 資料列取得。
       const privateInfoById = new Map();
       if (ids.length) {
@@ -1841,13 +1843,14 @@ const ids = (rows || []).map(row => row.id);
           rightsConfirmed: row.rights_confirmed === true
         };
       });
-      const cloudIds = new Set((rows || []).map(row => row.id));
-      state.characters = [
-        ...cloudCharacters,
-        ...state.characters.filter(c => c.authorId !== user.id || !cloudIds.has(c.id))
-      ];
+      const mergedCharacters=new Map(state.characters.map(character=>[character.id,character]));
+      for(const character of cloudCharacters)mergedCharacters.set(character.id,character);
+      state.characters=[...mergedCharacters.values()];
+      pager.offset+=(rows||[]).length;
+      pager.hasMore=(rows||[]).length===pageSize;
+      pager.loading=false;
       persist();
-      render();
+      if(route.page==='create'||!loadMore)render();
       if (migrationErrors.length) {
         console.warn('PersonaX 舊角色補傳有部分失敗：', migrationErrors);
         toast('有些本機角色尚未同步：' + migrationErrors.slice(0, 2).join('；'));
@@ -1855,6 +1858,7 @@ const ids = (rows || []).map(row => row.id);
         toast('已將 ' + migratedCount + ' 個本機角色補同步到雲端。');
       }
     } catch (error) {
+      if(ownedCharacterPager?.uid===user.id)ownedCharacterPager.loading=false;
       console.error('PersonaX 雲端角色載入失敗：', error);
       if (state.account?.uid === user.id) {
         toast('登入成功，但雲端角色載入失敗：' + error.message);
@@ -5669,6 +5673,8 @@ async function renderFollowedAuthors() {
 }
 
 /* Characters */
+let ownedCharacterPager={uid:null,offset:0,hasMore:true,loading:false,cloudIds:new Set()};
+let ownedCharacterListObserver=null;
 let createVisibilityFilter = 'all';
 const characterTurnCountCache = new Map();
 const characterTurnCountRequests = new Map();
@@ -5699,8 +5705,18 @@ function renderCreate() {
     <div class="grid">
       ${visibleCharacters.map(c => card(c,true)).join('') ||
       (createVisibilityFilter === 'public' ? '<div class="empty">目前沒有公開角色。</div>' : createVisibilityFilter === 'private' ? '<div class="empty">目前沒有私密角色。</div>' : '<div class="empty">尚未建立角色。</div>')}
-    </div></div>`;
+    </div>
+    ${ownedCharacterPager?.uid===currentUser()?.uid&&ownedCharacterPager.hasMore?'<div id="ownedCharactersSentinel" class="small muted" style="text-align:center;padding:16px">向下滑動載入更多角色…</div>':''}
+    </div>`;
   void loadCharacterTurnCounts(visibleCharacters.map(c => c.id));
+  ownedCharacterListObserver?.disconnect();
+  const sentinel=$('ownedCharactersSentinel');
+  if(sentinel&&ownedCharacterPager?.hasMore){
+    ownedCharacterListObserver=window.PoyozzListPagination?.observeEnd(sentinel,()=>{
+      if(ownedCharacterPager?.loading||!ownedCharacterPager?.hasMore)return;
+      void loadSupabaseCharacters({id:currentUser()?.uid},{loadMore:true});
+    });
+  }
 }
 function editorDraftKey() {
   const uid = currentUser()?.uid;
