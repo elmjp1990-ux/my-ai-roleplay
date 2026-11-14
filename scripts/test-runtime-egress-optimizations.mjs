@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const html=fs.readFileSync("index.html","utf8");
+assert.doesNotMatch(html,/function installSuggestionSwipe\s*\(/,"unused legacy swipe listener helper must stay removed");
 const uiCss=fs.readFileSync("poyozz-ui.css","utf8");
 const between=(start,end)=>{
   const from=html.indexOf(start),to=html.indexOf(end,from+start.length);
