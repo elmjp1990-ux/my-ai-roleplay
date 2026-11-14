@@ -2,7 +2,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { findPrivateContextLeak, preparePrivateContext } from "../_shared/private-context-guard.ts";
 import { collectDerivedPrivateProfileValues, formatCharacterAiProfilePrompt } from "../_shared/character-ai-profile-prompt.ts";
-import { parseGroupSpeakerOutput } from "../_shared/group-speaker-output.ts";
+import { parseGroupTurnEnvelope } from "../_shared/group-turn-envelope.ts";
 import { requestOpenRouterChatCompletion, POYOZZ_DEFAULT_CHAT_MODEL } from "../_shared/openrouter-chat-completions.ts";
 
 const corsHeaders = {
@@ -21,7 +21,7 @@ const isUuid = (value: unknown): value is string =>
 const MODEL = POYOZZ_DEFAULT_CHAT_MODEL;
 const TIMEOUT_MS = 55_000;
 
-type Speaker = { id: string; name: string; sceneId: string | null; sceneName: string; snapshot: Record<string, unknown> };
+type Speaker = { id: string; name: string; sceneId: string | null; sceneName: string; snapshot: Record<string, unknown>; phoneSettings: Record<string, unknown>; phoneNotifications: Array<{ title: string; body: string }> };
 
 async function refund(admin: any, userId: string, turnId: string, code: string) {
   const { data, error } = await admin.rpc("refund_group_chat_turn", {
@@ -137,7 +137,7 @@ Deno.serve(async (request) => {
 
   const [memberResult, sceneResult, historyResult, playerResult] = await Promise.all([
     admin.from("chat_group_members")
-      .select("id,group_id,character_id,position,scene_id,character_snapshot")
+      .select("id,group_id,character_id,position,scene_id,character_snapshot,phone_notifications")
       .eq("group_id", groupId).order("position", { ascending: true }),
     admin.from("chat_group_scenes")
       .select("id,name,description,position").eq("group_id", groupId).order("position", { ascending: true }),
@@ -158,7 +158,7 @@ Deno.serve(async (request) => {
   const characterIds = members.map(m => m.character_id).filter(isUuid);
   const [charactersResult, privateRowsResult] = await Promise.all([
     characterIds.length ? admin.from("characters")
-      .select("id,author_id,name,intro,style,gender,age,race,tags,deleted_at")
+      .select("id,author_id,name,intro,style,gender,age,race,tags,phone_settings,deleted_at")
       .in("id", characterIds) : Promise.resolve({ data: [], error: null }),
     characterIds.length ? admin.from("character_private_info")
       .select("character_id,author_id,private_info,personality_profile")
@@ -198,9 +198,15 @@ Deno.serve(async (request) => {
     protectedContext.push(...rawPrivate.protectedValues);
     const personality = asText(asRow(privateInfo.personality_profile).personality) ||
       asText(asRow(privateInfo.personality_profile).personality_summary);
+    const phoneSettings = asRow(character.phone_settings ?? snapshot.phoneSettings ?? snapshot.phone_settings);
+    const rawPhoneNotifications = Array.isArray(member.phone_notifications) ? member.phone_notifications : [];
+    const phoneNotifications = rawPhoneNotifications.map((item: unknown) => {
+      const notice = asRow(item);
+      return { title: asText(notice.title), body: asText(notice.body) };
+    }).filter((notice: { title: string; body: string }) => notice.title && notice.body).slice(0, 8);
     speakers.push({
       id: characterId, name, sceneId: isUuid(member.scene_id) ? member.scene_id : null,
-      sceneName: asText(scene.name), snapshot,
+      sceneName: asText(scene.name), snapshot, phoneSettings, phoneNotifications,
     });
     profileSections.push([
       "【角色卡 " + (speakers.length) + "｜" + name + "｜角色 ID " + characterId + "】",
@@ -212,6 +218,8 @@ Deno.serve(async (request) => {
       "開場情境：" + asText(snapshot.opening),
       "角色衍生扮演檔：\n" + derivedProfilePrompt,
       "所屬場景 ID：" + asText(member.scene_id) + "｜場景：" + asText(scene.name) + "｜" + asText(scene.description),
+      "角色手機欄位設定：" + JSON.stringify(speakers.at(-1)?.phoneSettings || {}).slice(0, 1800),
+      "角色目前手機通知狀態：" + JSON.stringify(speakers.at(-1)?.phoneNotifications || []).slice(0, 1800),
     ].join("\n"));
   }
   if (speakers.length !== members.length) {
@@ -241,7 +249,7 @@ Deno.serve(async (request) => {
     "【本輪玩家訊息】\n" + currentMessage,
     "【本輪角色選擇與發言規則】每輪由你自行判斷 1～3 名最適合回應的角色，不要求每個角色輪流發言，也不可為了湊人數讓所有人都說話。可以由一位角色回應，也可以讓角色之間自然互動。若玩家明確以 @角色名稱 指定對象，優先由該角色回應，但仍可在劇情確有必要時讓另一角色補充。未被選中的角色保持安靜，不要輸出空白發言。",
     "【角色卡遵循】每位角色只能以自己的角色卡、已知記憶、可觀察資訊和合理推論行動。不得混用人格、口吻或背景；不得擅自替另一角色決定內心或行為。角色可對玩家說話，也可彼此對話。分開場景的角色不得跨場景瞬間出現。",
-    "【輸出格式】只輸出純文字，不要 Markdown code fence、JSON 或旁白說明。每段發言必須以角色卡中的精確名稱加全形冒號開始，例如：夜辰：*抬眼看向你*妳終於回來了。若同一角色有多段連續內容，可合併為一段；不同角色必須各自另起一行並重新標記名稱。每段只可使用群組中實際存在的角色名稱。不要輸出「旁白：」「導演：」或未加入群組的人物標記。每輪至少一段、最多三段。角色動作與敘述使用單星號包覆，對白直接書寫。不要替玩家補寫台詞。",
+    "【輸出格式】只輸出一個 JSON object，不要 Markdown code fence 或額外說明。格式：{\"speeches\":[{\"speaker_id\":\"群組內角色 ID\",\"content\":\"角色完整發言\"}],\"phone_updates\":[{\"character_id\":\"群組內角色 ID\",\"notifications\":[{\"title\":\"手機欄位顯示名稱\",\"body\":\"最新狀態\"}]}]}。speeches 必須輸出 1～3 段，speaker_id 只能使用上方角色卡提供的精確 UUID，絕不可輸出群組外人物作為發言者；NPC 可以在角色對白、手機通知內容中自然出現，但不得成為群組 AI 發言標籤。phone_updates 必須為群組內每位角色各輸出一筆，character_id 必須使用角色卡提供的精確 UUID，不得漏掉任何一位。每位角色 notifications 最多 8 筆；若角色手機欄位設定含 noticePrompts，必須依設定順序逐欄輸出，title 使用「|」前的顯示名稱，body 遵守「|」後的作者指示；每個欄位一筆，不可漏欄、合併或多產生。若沒有設定欄位，可依角色職業、人物關係、時間與目前劇情產生 0～8 筆合理通知。手機內容只記錄該角色自己的生活、訊息、工作與可知狀態，不可把玩家在聊天室說的話當成已傳送的簡訊；玩家只有明確描述拿起手機傳訊息／打電話時才可成為手機事件來源。未知資訊不得編造；無新資訊時沿用最近手機狀態，不得為了更新而改寫。每個通知 title 1～80 字、body 1～500 字，必須是可顯示給玩家的一行簡短內容。speeches 中角色動作與敘述使用單星號包覆，對白直接書寫；絕不可替玩家補寫台詞、思想、感受或行動。",
   ].join("\n\n");
 
   let provider;
@@ -320,15 +328,15 @@ Deno.serve(async (request) => {
     return json({ status: refunded.confirmed ? "content_rejected" : "needs_reconciliation", error: "private_context_output_blocked", balance: refunded.balance, retryAllowed: false }, refunded.confirmed ? 200 : 503);
   }
 
-  const parsed = parseGroupSpeakerOutput(provider.result.text, speakers);
-  if (!parsed.length || parsed.length > 3) {
-    const refunded = await refund(admin, user.id, turnId, "invalid_speaker_output");
-    return json({ status: refunded.confirmed ? "refunded" : "needs_reconciliation", error: "invalid_speaker_output", balance: refunded.balance, retryAllowed: false }, refunded.confirmed ? 200 : 503);
+  const parsed = parseGroupTurnEnvelope(provider.result.text, speakers);
+  if (!parsed) {
+    const refunded = await refund(admin, user.id, turnId, "invalid_group_turn_envelope");
+    return json({ status: refunded.confirmed ? "refunded" : "needs_reconciliation", error: "invalid_group_turn_envelope", balance: refunded.balance, retryAllowed: false }, refunded.confirmed ? 200 : 503);
   }
 
-  const speeches = parsed.map(item => ({ speaker_id: item.speakerId, content: item.content }));
+  const speeches = parsed.speeches.map(item => ({ speaker_id: item.speakerId, content: item.content }));
   const { data: completed, error: completeError } = await admin.rpc("complete_group_chat_turn", {
-    p_user_id: user.id, p_turn_id: turnId, p_speeches: speeches,
+    p_user_id: user.id, p_turn_id: turnId, p_speeches: speeches, p_phone_updates: parsed.phoneUpdates,
   });
   if (completeError || completed !== "completed") {
     // A completion RPC that acquires the transaction locks after the deadline
@@ -368,6 +376,7 @@ Deno.serve(async (request) => {
     status: "completed",
     turnId,
     messages: saved,
+    phone_updates: parsed.phoneUpdates,
     billing: { cost: reservation.cost, silver_charged: reservation.silver_charged, diamonds_charged: reservation.diamonds_charged },
     provider: {
       gateway: "openrouter", model: provider.model, upstream: provider.provider || null,
