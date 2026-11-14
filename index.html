@@ -6976,7 +6976,7 @@ async function loadEncounterMemoryPage(list,session,pager){
         .select('id,event_type,summary,occurred_at,metadata')
         .eq('user_id',uid).eq('character_id',session.characterId)
         .in('metadata->>session_id',sessionIds)
-        .order('occurred_at',{ascending:false}).limit(100);
+        .order('occurred_at',{ascending:false}).limit(pageSize);
       if(diaryError)throw diaryError;
       for(const row of diaryRows||[]){
         const rawId=row.metadata&&typeof row.metadata==='object'?row.metadata.session_id:null;
