@@ -513,7 +513,7 @@ assert.doesNotMatch(followedAuthorsPageTestSource2026,/\.from\('author_follows'\
 
 
 const paginationSizes=sharedPaginationSource.slice(sharedPaginationSource.indexOf('const PAGE_SIZES'),sharedPaginationSource.indexOf('});',sharedPaginationSource.indexOf('const PAGE_SIZES'))+3);
-for(const listName of ['explore','authorCharacters','chatSessions','groupSessions','followedAuthors','encounterMemories','messages','ownedCharacters','favorites','characterComments','memoryPhotos']){
+for(const listName of ['explore','authorCharacters','chatSessions','groupSessions','followedAuthors','encounterMemories','messages','ownedCharacters','favorites','notifications','characterComments','memoryPhotos']){
   assert.match(paginationSizes,new RegExp(listName+':\\s*10'),listName+' must use ten-row pages');
 }
 const ownerListSource=fs.readFileSync('index.html','utf8');
@@ -553,3 +553,6 @@ const favoritesLoader=ownerListSource.slice(ownerListSource.indexOf('async funct
 assert.match(favoritesLoader,/pageSize\('favorites'\)/);
 assert.match(favoritesLoader,/\.in\('id',validIds\)/,'favorite characters must hydrate only the current ten favorite IDs');
 assert.match(ownerListSource,/favoriteCharactersSentinel[\s\S]*observeEnd/);
+
+assert.match(ownerListSource,/notificationsSentinel[\s\S]*observeEnd/,'system notifications must reveal ten rows at a time');
+assert.match(ownerListSource,/pageSize\('notifications'\)/);
