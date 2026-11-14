@@ -146,8 +146,9 @@ assert.match(cloudSessions,/session_last_read_at:session_data->>lastReadAt/,
   "paged session metadata must still include the read cursor");
 assert.match(cloudSessions,/const listSessionSelect=\[/,
   "chat list hydration must use a dedicated compact field projection");
-assert.doesNotMatch(cloudSessions,/const listSessionSelect=\[[\s\S]*session_story_world_state/,
-  "chat list pages must not transfer story-world state, full opening messages or pending-turn payloads");
+const compactChatListProjection=cloudSessions.slice(cloudSessions.indexOf("const listSessionSelect=["),cloudSessions.indexOf("const sessionSelect=",cloudSessions.indexOf("const listSessionSelect=[")));
+assert.doesNotMatch(compactChatListProjection,/session_story_world_state|session_opening_message|session_pending_turn|session_persona/,
+  "chat list pages must not transfer story-world state, full opening messages, persona or pending-turn payloads");
 assert.match(cloudSessions,/pagedList\?listSessionSelect:fullSessionSelect/,
   "full session metadata must remain available for direct session hydration only");
 
