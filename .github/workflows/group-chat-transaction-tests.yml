@@ -52,7 +52,7 @@ jobs:
       - name: Verify PostgreSQL and pg_cron
         run: |
           for attempt in {1..30}; do
-            if pg_isready -h localhost -U postgres -d postgres; then break; fi
+            if pg_isready -h localhost -U supabase_admin -d postgres; then break; fi
             sleep 2
           done
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA pg_catalog;"
