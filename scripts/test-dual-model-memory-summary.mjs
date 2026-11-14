@@ -22,7 +22,7 @@ assert.match(summary, /generation_type: "chat_response"/);
 assert.match(summary, /prompt_tokens/);
 assert.match(summary, /cost_usd/);
 assert.match(summary, /accumulatedUsage/);
-assert.match(summary, /data_collection: "deny"/);
+assert.match(openRouterShared, /data_collection: "deny"/);
 assert.match(summaryReadMigration, /CREATE OR REPLACE FUNCTION public\.get_story_memory_summary/);
 assert.match(summaryReadMigration, /auth\.uid\(\)/);
 assert.match(ui, /function loadStoryMemorySummary\(session\)/);
@@ -52,6 +52,14 @@ const summaryStart = summary.indexOf("async function requestMemorySummary");
 const summaryEnd = summary.indexOf("export async function processDueStoryMemorySummary", summaryStart);
 assert.ok(summaryStart >= 0 && summaryEnd > summaryStart, "summary request helper must exist");
 const summaryRequest = summary.slice(summaryStart, summaryEnd);
+assert.match(summaryRequest, /requestOpenRouterChatCompletion\(/,
+  "memory summaries must use the same shared OpenRouter transport as chat turns");
+assert.doesNotMatch(summaryRequest, /\bfetch\s*\(/,
+  "memory summaries must not duplicate provider HTTP transport");
+assert.match(summaryRequest, /timeoutMs: 45_000/);
+assert.match(summaryRequest, /temperature: 0\.2/);
+assert.match(summaryRequest, /responseFormat: \{ type: "json_object" \}/);
+
 assert.doesNotMatch(summaryRequest, /max_tokens\s*:/, "summary request must not set a client-side token cap");
 
 console.log("Dual-model Story chat and five-turn memory-summary contract passed.");
