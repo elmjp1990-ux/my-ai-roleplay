@@ -16,6 +16,7 @@ const runtimeFiles = [
   'core-utils.js',
   'city-map.js',
   'followed-authors.js',
+  'list-pagination.js',
   'author-profile.js',
   'comment-renderer.js',
   'custom-tag-picker.js',

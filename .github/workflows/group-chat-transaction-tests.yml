@@ -1,0 +1,97 @@
+name: Group chat transaction tests
+
+on:
+  push:
+    branches:
+      - feat/group-ai-single-orchestrator
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/tests/**"
+      - "supabase/functions/group-chat-turn/**"
+      - "supabase/functions/_shared/**"
+      - "scripts/test-group-chat-transaction-concurrency.sh"
+      - "scripts/test-group-chat-migration-rollback.sh"
+      - "scripts/test-runtime-egress-optimizations.mjs"
+      - ".github/workflows/group-chat-transaction-tests.yml"
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/tests/**"
+      - "supabase/functions/group-chat-turn/**"
+      - "supabase/functions/_shared/**"
+      - "scripts/test-group-chat-transaction-concurrency.sh"
+      - "scripts/test-runtime-egress-optimizations.mjs"
+      - ".github/workflows/group-chat-transaction-tests.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: group-chat-transaction-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  group-chat-transactions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: supabase/postgres:17.11.0.019
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U supabase_admin -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://supabase_admin:postgres@localhost:5432/postgres
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Test group AI output parsers
+        run: |
+          deno test supabase/functions/_shared/group-turn-envelope.test.ts
+          deno check supabase/functions/group-chat-turn/index.ts
+
+      - name: Verify PostgreSQL and pg_cron
+        run: |
+          for attempt in {1..30}; do
+            if pg_isready -h localhost -U supabase_admin -d postgres; then break; fi
+            sleep 2
+          done
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_available_extensions WHERE name='pg_cron') THEN RAISE EXCEPTION 'pg_cron package is unavailable'; END IF; END \$\$;"
+
+      - name: Bootstrap isolated Supabase-compatible schema
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/fixtures/group-chat-transaction-base.sql
+
+      - name: Verify migration rollback safety
+        run: bash scripts/test-group-chat-migration-rollback.sh
+
+      - name: Apply group AI transaction migration
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261114180000_group_ai_single_orchestrator.sql
+
+      - name: Verify migration contracts and transaction outcomes
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/group-chat-transaction-scenarios.sql
+
+      - name: Apply bounded group list preview RPC
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261114230000_batch_group_list_previews.sql
+
+      - name: Verify bounded owner-scoped group list previews
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/group-chat-list-preview-scenarios.sql
+
+      - name: Verify real concurrent reservations and idempotency
+        run: bash scripts/test-group-chat-transaction-concurrency.sh
+
+      - name: Run existing frontend and architecture regression checks
+        run: node scripts/test-runtime-egress-optimizations.mjs

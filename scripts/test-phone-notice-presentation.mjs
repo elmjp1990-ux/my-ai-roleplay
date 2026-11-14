@@ -2,16 +2,17 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const html = fs.readFileSync('index.html', 'utf8');
+const uiStyles = fs.readFileSync('poyozz-ui.css', 'utf8');
 const phoneStateMigration = fs.readFileSync('supabase/migrations/20261110120000_story_phone_state_and_memory_summary_read.sql', 'utf8');
 const storyPrompt = fs.readFileSync('supabase/functions/chat-turn/index.ts', 'utf8');
 const generatedStart = html.indexOf('  // Creator notice prompts guide AI generation only; never render raw instructions to players.');
-const generatedEnd = html.indexOf('  const memberSwitch=', generatedStart);
+const generatedEnd = html.indexOf('  const phoneHeader=', generatedStart);
 
 assert.ok(generatedStart >= 0 && generatedEnd > generatedStart, 'Phone notification rendering block must exist');
 const phoneBlock = html.slice(generatedStart, generatedEnd);
 
 assert.match(phoneBlock, /const generated=isGroup\?/);
-assert.match(phoneBlock, /const notices=Array\.isArray\(generated\)/);
+assert.match(phoneBlock, /const savedNotices=Array.isArray\(generated\)/);
 assert.match(phoneBlock, /const noticeLines=notices\.map/);
 assert.match(phoneBlock, /get_story_phone_state/, 'Story phone must load current configured field state separately');
 assert.match(phoneBlock, /get_story_phone_events/, 'Story phone must load genuine event history separately');
@@ -27,14 +28,19 @@ assert.match(phoneStateMigration, /e\.event_type <> 'notification'/,
   'Replaceable status snapshots must be hidden from historical event output');
 assert.match(storyPrompt, /每個手機欄位的 body 必須以簡短的一行為主/);
 assert.match(storyPrompt, /沒有新資訊或劇情變化時，原樣延續最近狀態/);
-assert.match(phoneBlock, /目前還沒有新的手機通知/);
-assert.doesNotMatch(phoneBlock, /noticePrompts|settings\.notices|\.\.\.prompts/, 'Creator-only notice prompts must never be rendered as player-facing phone content');
+assert.match(phoneBlock, /目前還沒有新的通知/);
+assert.match(phoneBlock, /configuredPhonePrompts\.slice\(0,8\)\.map/,'Group phone may use configured notice labels only as display titles when no generated notice exists');
+assert.match(phoneBlock, /body:'目前尚未有更新'/,'Creator instructions must never be displayed as notification body text');
+assert.doesNotMatch(phoneBlock, /body:String\(row\)|body:row/,'Raw creator instructions must never be rendered as player-facing notification bodies');
 
 assert.ok(html.includes('session.storyWorldState'), 'Phone must read the latest saved story-world state');
 assert.ok(html.includes('故事時間尚未確認'), 'Unknown story time must remain explicitly unknown rather than use a hard-coded clock');
 assert.ok(!html.includes('星期五　🕧 19:30'), 'Phone must not show a hard-coded fictional time');
-assert.ok(html.includes('overflow-y:auto;overflow-x:hidden'), 'Phone body must scroll independently');
-assert.ok(html.includes('phone-device-head,.phone-member-switch,.phone-bar,.phone-close-row{flex-shrink:0}'),
+assert.ok(uiStyles.includes('overflow-y:auto;overflow-x:hidden'), 'Phone content body must scroll independently in the extracted UI stylesheet');
+assert.match(uiStyles, /\.phone-device-head\{[^}]*flex-shrink:0/);
+assert.match(uiStyles, /\.phone-member-switch\{[^}]*flex-shrink:0/);
+assert.match(uiStyles, /\.phone-bar\{[^}]*flex-shrink:0/);
+assert.match(uiStyles, /\.phone-close-row\{[^}]*flex-shrink:0/,
   'Phone header, member switch, bar, and close control must remain fixed');
 assert.ok(!html.includes('.phone-notice-list{max-height:'), 'Phone must not trap scrolling in a nested notice list');
 assert.ok(html.includes('function firstSpokenDialoguePreview('), 'Chat preview must parse spoken dialogue separately from narration');

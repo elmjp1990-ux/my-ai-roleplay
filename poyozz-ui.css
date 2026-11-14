@@ -266,13 +266,6 @@ body.conversation .composer-bottom-row,
 body.group-chat-page .composer-bottom-row { padding-inline:10px; }
 body.conversation .messages,
 body.group-chat-page .messages { width:100%; }
-body.conversation .message-content,
-body.group-chat-page .message-content {
-  flex:0 1 auto;
-  width:fit-content;
-  max-width:min(24em,calc(100% - 38px));
-  min-width:0;
-}
 @media(max-width:600px) {
   body.conversation .messages,
   body.group-chat-page .messages { padding-inline:12px; }
@@ -343,6 +336,11 @@ body.day .story-relationship-icon { color:#c27cae; filter:none; }
 .phone-modal-backdrop{position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(7,10,16,.68);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 .phone-device{width:min(360px,100%);height:min(500px,90dvh);min-height:min(440px,90dvh);display:flex;flex-direction:column;overflow:hidden;padding:17px;border:1px solid var(--px-phone-border);border-radius:30px;border-top:3px solid var(--px-phone-border);background:linear-gradient(155deg,var(--px-phone-surface),var(--px-phone-surface-soft));color:var(--px-phone-text);box-shadow:0 24px 90px #0008,inset 0 1px 0 rgba(255,255,255,.14);-webkit-backdrop-filter:blur(22px) saturate(115%);backdrop-filter:blur(22px) saturate(115%)}
 .phone-device-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-shrink:0;font-size:12px;font-weight:650;letter-spacing:.01em;color:var(--px-phone-text)}
+.phone-device-head--group .phone-member-switch{justify-content:flex-start;gap:5px;margin:0;min-width:0;flex:1}
+.phone-device-head--group .phone-member-switch button{min-width:24px;width:24px;height:24px;padding:0;font-size:15px;line-height:1}
+.phone-device-head--group .phone-member-name{flex:0 1 auto;max-width:132px;text-align:left}
+.phone-member-phone-label{flex:0 0 auto;font-size:11px;font-weight:650;color:var(--px-phone-text)}
+.phone-device-caption{flex:0 0 auto;font-size:8px;letter-spacing:.12em;opacity:.62}
 .phone-battery{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--px-phone-battery)!important}
 .phone-battery-shape{width:28px;height:13px;border:1px solid currentColor;border-radius:4px;padding:2px;position:relative;background:var(--px-phone-battery-track);box-shadow:inset 0 1px 0 rgba(255,255,255,.15)}
 .phone-battery-shape:after{content:"";position:absolute;right:-3px;top:3px;width:2px;height:5px;background:currentColor;border-radius:0 2px 2px 0}

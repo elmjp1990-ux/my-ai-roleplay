@@ -34,10 +34,10 @@ assert.match(html, /createSignedUrl\(storagePath,3600\)/);
 assert.match(html, /data-character-illustration-path/);
 assert.match(html, /document\.addEventListener\('error',[\s\S]*refreshCharacterIllustrationSignedUrl/);
 assert.match(html, /document\.addEventListener\('load'/);
-const publicLoader = html.slice(html.indexOf("async function loadPublicSupabaseCharactersImpl()"), html.indexOf("async function loadSupabaseCharacters(user)"));
+const publicLoader = html.slice(html.indexOf("function mapPublicCharacterRow(row)"), html.indexOf("async function loadSupabaseCharacters(user,{loadMore=false}={})"));
 assert.doesNotMatch(publicLoader, /loadCharacterIllustrationAssets|character_illustrations|createSignedUrl/);
-assert.match(publicLoader, /image: ownerLocal\?\.image \|\| cachedPublic\?\.image \|\| row\.avatar_url/);
-assert.match(publicLoader, /galleryIllustrations:ownerLocal\?\.galleryIllustrations \|\| cachedPublic\?\.galleryIllustrations \|\| \[\]/);
+assert.match(publicLoader, /image:ownerLocal\?\.image\|\|cachedPublic\?\.image\|\|row\.avatar_url/);
+assert.match(publicLoader, /galleryIllustrations:ownerLocal\?\.galleryIllustrations\|\|cachedPublic\?\.galleryIllustrations\|\|\[\]/);
 assert.match(html, /async function hydratePublicCharacterIllustrations\(characterId\)/);
 assert.match(html, /loadCharacterIllustrationAssets\(\[characterId\]\)/);
 assert.match(html, /current\.publicIllustrationsLoaded=true/);
@@ -83,8 +83,8 @@ assert.ok(html.includes('<video data-character-video="${e(c.avatarVideoPath)}" p
 assert.ok(html.includes("function hydrateEncounterGalleryIllustration(characterId) {"));
 assert.ok(encounterScene.includes("正在載入角色立繪…"));
 assert.ok(encounterScene.includes("角色半立繪素材待補"));
-assert.ok(html.includes("const ownerLocal = state.characters.find(character =>"));
-assert.ok(html.includes("ownerLocal?.galleryIllustrations || cachedPublic?.galleryIllustrations || []"));
+assert.ok(html.includes("const ownerLocal=state.characters.find(character=>"));
+assert.ok(html.includes("ownerLocal?.galleryIllustrations||cachedPublic?.galleryIllustrations||[]"));
 assert.match(encounterScene, /const halfBodyImage=dedicatedSprite\|\|sceneIllustration/);
 assert.doesNotMatch(html, /const cardPortrait=safeImage\(character\?\.image/);
 assert.match(html, /相遇模式立繪（最多 5 張）/);
@@ -122,18 +122,18 @@ assert.ok(html.includes("window.addEventListener('pagehide'"));
 assert.ok(html.includes("},{rootMargin:'0px',threshold:[0,0.15,0.35]}"));
  // Infinite-scroll appends only new cards so existing video DOM nodes remain attached.
 assert.ok(html.includes("function renderGrid({append=false}={})"));
-assert.ok(html.includes("const existingCardCount = append ? grid.querySelectorAll(':scope > article.card').length : 0;"));
-assert.ok(html.includes("const newCards = append && existingCardCount > 0 ? shown.slice(existingCardCount) : shown;"));
-assert.ok(html.includes("if (append && existingCardCount > 0) {"));
+assert.ok(html.includes("const existingCardCount=append?grid.querySelectorAll(':scope > article.card').length:0;"));
+assert.ok(html.includes("const newCards=append&&existingCardCount>0?shown.slice(existingCardCount):shown;"));
+assert.ok(html.includes("if(append&&existingCardCount>0){"));
 assert.ok(html.includes("grid.insertAdjacentHTML('beforeend',cardMarkup)"));
 assert.ok((html.match(/renderGrid\(\{append:true\}\);/g)||[]).length >= 2);
 
  // Search/filter redraws preserve the same character's existing media DOM when the path is unchanged.
  assert.ok(html.includes('data-character-card-id="${e(c.id)}"'));
- assert.ok(html.includes("const existingVideosByCharacter = new Map()"));
- assert.ok(html.includes("previousVideo.dataset.characterVideo === nextVideo.dataset.characterVideo"));
+ assert.ok(html.includes("const existingVideosByCharacter=new Map()"));
+ assert.ok(html.includes("previousVideo.dataset.characterVideo===nextVideo.dataset.characterVideo"));
  assert.ok(html.includes("nextVideo.replaceWith(previousVideo)"));
- assert.ok(html.includes("grid.querySelectorAll('video[data-character-video]').forEach(video => void hydrateCharacterVideo(video))"));
+ assert.ok(html.includes("grid.querySelectorAll('video[data-character-video]').forEach(video=>void hydrateCharacterVideo(video))"));
  // City-character tab/page redraws must reuse the existing portrait video for the same Storage path.
  assert.ok(cityMap.includes("const previousCharacterVideo=body.querySelector('video.city-character-portrait-video[data-character-video]')"));
  assert.ok(cityMap.includes("previousCharacterVideo.dataset.characterVideo===characterVideo.dataset.characterVideo"));
@@ -150,7 +150,7 @@ assert.ok((html.match(/renderGrid\(\{append:true\}\);/g)||[]).length >= 2);
  assert.ok(html.includes("detailVideo.replaceWith(previousDetailVideo)"));
  assert.ok(html.includes("releaseCharacterVideo(previousDetailVideo)"));
  // Discarded Explore and city portrait nodes must release their detached media resources.
- assert.ok(html.includes("existingVideosByCharacter.forEach(video => {\n      characterVideoObserver?.unobserve(video);\n      releaseCharacterVideo(video);"));
+ assert.ok(html.includes("existingVideosByCharacter.forEach(video=>{\n      characterVideoObserver?.unobserve(video);\n      releaseCharacterVideo(video);"));
  assert.ok(cityMap.includes("}else if(previousCharacterVideo){\n      characterVideoObserver?.unobserve(previousCharacterVideo);\n      releaseCharacterVideo(previousCharacterVideo);"));
  assert.ok(html.includes("video.dataset.videoObservePending='false';"));
  assert.ok(html.includes("window.addEventListener('pageshow',()=>{"));
@@ -165,8 +165,8 @@ assert.ok(html.includes("async function loadCharacterIllustrationAssets(characte
 assert.ok(html.includes("if(cleanupUserId)await retryCharacterIllustrationCleanup(cleanupUserId)"));
 
 // Character hydration only fetches story fields consumed by the UI; avoid downloading unused story descriptions/titles.
-const minimalStorySelect = ".select('character_id, opening_message, visibility, created_at')";
-assert.equal(html.split(minimalStorySelect).length - 1, 1);
+assert.ok(html.includes("client.rpc('get_latest_owned_character_stories'"), "Owned character hydration must fetch only the latest story per character through the bounded RPC.");
+assert.ok(html.includes(".select('opening_message')"), "Public character detail must select only the opening field it displays.");
 assert.ok(!html.includes(".select('id, character_id, story_name, description, opening_message, visibility, created_at')"));
 
 console.log("Author schedule and illustration signed-URL refresh contract tests passed.");

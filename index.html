@@ -574,7 +574,6 @@ body.group-chat-page:has(.group-wizard) #view {
  .messages { flex:1 1 0; min-height:0; overflow-y:auto; padding:14px 16px; overscroll-behavior:contain; }
 .message { display:flex; gap:8px; margin-bottom:19px; position:relative; }
 .message.user { flex-direction:row-reverse; }
-.message.user > .avatar { display:none !important; }
 .message .avatar { width:30px; height:30px; }
 .message-content { flex:0 1 auto; width:fit-content; max-width:min(24em,calc(100% - 38px)); min-width:0; }
 .message:not(.user) > .message-content { margin-right:auto; }
@@ -1155,6 +1154,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 <script src="./author-profile.js"></script>
 <script src="./comment-renderer.js"></script>
 <script src="./custom-tag-picker.js"></script>
+<script src="./list-pagination.js"></script>
 <script>
 'use strict';
 
@@ -1223,7 +1223,9 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     try {
       const saved = JSON.parse(localStorage.getItem(USER_SESSIONS_KEY_PREFIX + uid) || '{}');
       return saved && typeof saved === 'object' && !Array.isArray(saved)
-        ? filterDeletedChatSessions(uid, saved)
+        ? Object.fromEntries(Object.entries(filterDeletedChatSessions(uid, saved)).map(([id, session]) =>
+            [id, compactCloudSessionForLocalStorage(session)]
+          ))
         : {};
     } catch (_) {
       return {};
@@ -1489,118 +1491,205 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 
   // 探索頁公開角色獨立於登入帳號載入，訪客也能看見。
   // 每次登入／登出都以雲端公開清單為準，避免沿用前一個帳號的過期本機資料。
-  let publicCharacterRowsCache = null;
+  const publicCharacterPageSize = window.PoyozzListPagination.pageSize('explore');
+  let publicCharacterRowsCache = new Map();
   let publicCharacterRowsCacheAt = 0;
   let publicCharacterRowsCacheVersion = 0;
-  let publicCharacterRowsInflight = null;
+  let publicCharacterRowsInflight = new Map();
+  let publicCharacterListPager = {
+    ...window.PoyozzListPagination.createState('explore'),
+    ownerUid:null
+  };
   function invalidatePublicCharacterRowsCache() {
     publicCharacterRowsCacheVersion += 1;
-    publicCharacterRowsCache = null;
+    publicCharacterRowsCache.clear();
     publicCharacterRowsCacheAt = 0;
-    publicCharacterRowsInflight = null;
+    publicCharacterRowsInflight.clear();
+    publicCharacterListPager.observer?.disconnect();
+    gridObserver?.disconnect();
+    publicCharacterListPager = {
+      ...window.PoyozzListPagination.createState('explore'),
+      ownerUid:state.account?.uid||null
+    };
+    window.__poyozzExploreHasMore = true;
   }
-  async function loadPublicCharacterRows() {
+  async function loadPublicCharacterRows(offset=0) {
     const client = window.mySupabase;
     if (!client) return [];
-    const now = Date.now();
-    if (Array.isArray(publicCharacterRowsCache) && now - publicCharacterRowsCacheAt < 30000) {
-      return publicCharacterRowsCache;
-    }
     const version = publicCharacterRowsCacheVersion;
-    if (publicCharacterRowsInflight?.version === version) return publicCharacterRowsInflight.promise;
-    const request = (async () => {
-      const { data, error } = await client
-        .from('characters')
+    const querySignature=JSON.stringify({
+      filter,exploreTags:[...exploreTags].sort(),
+      ownerUid:state.account?.uid||null
+    });
+    const cacheKey=querySignature+':'+String(offset);
+    if(publicCharacterRowsCacheAt&&Date.now()-publicCharacterRowsCacheAt<30000&&publicCharacterRowsCache.has(cacheKey)){
+      return publicCharacterRowsCache.get(cacheKey);
+    }
+    if(publicCharacterRowsInflight.has(cacheKey))return publicCharacterRowsInflight.get(cacheKey);
+    const request=(async()=>{
+      let query=client.from('characters')
         .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible')
-        .eq('visibility', 'public')
-        .is('deleted_at', null)
-        .order('first_published_at', { ascending: false, nullsFirst: false });
-      if (error) throw new Error(error.message);
-      const rows = Array.isArray(data) ? data : [];
-      if (version === publicCharacterRowsCacheVersion) {
-        publicCharacterRowsCache = rows;
-        publicCharacterRowsCacheAt = Date.now();
+        .eq('visibility','public').is('deleted_at',null);
+      if(filter==='male'||filter==='female')query=query.eq('gender',filter);
+      if(filter==='latest'){
+        const latestSince=new Date(Date.now()-DAY).toISOString();
+        query=query.gte('first_published_at',latestSince);
+      }
+      if(exploreTags.length)query=query.contains('tags',exploreTags);
+      const {data,error}=await query
+        .order('first_published_at',{ascending:false,nullsFirst:false})
+        .order('id',{ascending:false})
+        .range(offset,offset+publicCharacterPageSize-1);
+      if(error)throw new Error(error.message);
+      const rows=Array.isArray(data)?data:[];
+      if(version===publicCharacterRowsCacheVersion){
+        publicCharacterRowsCache.set(cacheKey,rows);
+        publicCharacterRowsCacheAt=Date.now();
       }
       return rows;
     })();
-    publicCharacterRowsInflight = { version, promise: request };
-    try {
-      return await request;
-    } finally {
-      if (publicCharacterRowsInflight?.promise === request) publicCharacterRowsInflight = null;
+    publicCharacterRowsInflight.set(cacheKey,request);
+    try{return await request;}
+    finally{if(publicCharacterRowsInflight.get(cacheKey)===request)publicCharacterRowsInflight.delete(cacheKey);}
+  }
+  function mapPublicCharacterRow(row){
+          const cachedPublic=state.characters.find(character=>character.id===row.id&&character.cloudPublic===true);
+          const ownerLocal=state.characters.find(character=>character.id===row.id&&character.authorId===row.author_id&&character.authorId===state.account?.uid);
+          return {
+            id:row.id,name:row.name||'未命名角色',gender:row.gender||'ambiguous',
+            age:row.age==null?'':String(row.age),
+            image:ownerLocal?.image||cachedPublic?.image||row.avatar_url||'',
+            primaryIllustrationPath:ownerLocal?.primaryIllustrationPath||cachedPublic?.primaryIllustrationPath||'',
+            galleryIllustrations:ownerLocal?.galleryIllustrations||cachedPublic?.galleryIllustrations||[],
+            publicIllustrationsLoaded:ownerLocal?.publicIllustrationsLoaded===true||cachedPublic?.publicIllustrationsLoaded===true,
+            avatarVideoPath:row.avatar_video_path||'',visibility:'public',
+            reviewStatus:row.review_status,intro:row.intro||'',
+            opening:ownerLocal?.opening||cachedPublic?.opening||'',race:row.race||'',
+            privateInfo:'',style:row.style||'',personalityProfile:normalizePersonalityProfile({}),
+            ...((ownerLocal&&Object.prototype.hasOwnProperty.call(ownerLocal,'phoneSettings'))||(cachedPublic&&Object.prototype.hasOwnProperty.call(cachedPublic,'phoneSettings'))?{phoneSettings:ownerLocal?.phoneSettings??cachedPublic?.phoneSettings??{}}:{}),
+            ...((ownerLocal&&Object.prototype.hasOwnProperty.call(ownerLocal,'nsfwWorkplaceWarning'))||(cachedPublic&&Object.prototype.hasOwnProperty.call(cachedPublic,'nsfwWorkplaceWarning'))?{nsfwWorkplaceWarning:(ownerLocal?.nsfwWorkplaceWarning??cachedPublic?.nsfwWorkplaceWarning)===true}:{}),
+            isNSFW:row.is_nsfw===true,tags:normalizeCharacterTagsForRead(row.tags),
+            authorId:row.author_id,owner:state.account?.uid===row.author_id,
+            chats:'0',users:null,createdAt:row.created_at?new Date(row.created_at).getTime():0,
+            firstPublishedAt:row.first_published_at?new Date(row.first_published_at).getTime():null,
+            latestEligible:row.latest_eligible!==false,rightsConfirmed:false,cloudPublic:true
+          };
+  }
+  window.mapPublicCharacterRow=mapPublicCharacterRow;
+  async function loadPublicAuthorCharacterPage(authorId,offset=0){
+    const client=window.mySupabase;
+    if(!client||!isUuid(authorId))return {items:[],hasMore:false};
+    const pageSize=window.PoyozzListPagination.pageSize('authorCharacters');
+    const {data,error}=await client.from('characters')
+      .select('id,author_id,name,gender,age,avatar_url,avatar_video_path,is_nsfw,visibility,review_status,intro,race,style,tags,created_at,first_published_at,latest_eligible')
+      .eq('author_id',authorId).eq('visibility','public').is('deleted_at',null)
+      .order('first_published_at',{ascending:false,nullsFirst:false})
+      .order('id',{ascending:false}).range(offset,offset+pageSize-1);
+    if(error)throw new Error(error.message);
+    const rows=Array.isArray(data)?data:[];
+    const items=rows.map(mapPublicCharacterRow);
+    state.characters=window.PoyozzListPagination.mergeUnique(state.characters,items,character=>character.id);
+    return {items,hasMore:rows.length===pageSize};
+  }
+  async function loadPublicAuthorLatestCharacters(authorIds=[]){
+    const client=window.mySupabase;
+    const result=new Map();
+    if(!client)return result;
+    for(let offset=0;offset<authorIds.length;offset+=5){
+      const batch=authorIds.slice(offset,offset+5);
+      const rows=await Promise.all(batch.map(async authorId=>{
+        const {data,error}=await client.from('characters')
+          .select('id,author_id,name,gender,age,avatar_url,avatar_video_path,is_nsfw,visibility,review_status,intro,race,style,tags,created_at,first_published_at,latest_eligible')
+          .eq('author_id',authorId).eq('visibility','public').is('deleted_at',null)
+          .order('first_published_at',{ascending:false,nullsFirst:false})
+          .order('id',{ascending:false}).limit(5);
+        if(error)throw new Error('讀取作者最新公開角色失敗：'+error.message);
+        const rows=Array.isArray(data)?data:[];
+        return [authorId,{rows:rows.slice(0,4),hasMore:rows.length>4}];
+      }));
+      for(const [authorId,entry] of rows){
+        const items=entry.rows.map(mapPublicCharacterRow);
+        state.characters=window.PoyozzListPagination.mergeUnique(state.characters,items,character=>character.id);
+        result.set(authorId,{items,hasMore:entry.hasMore});
+      }
     }
+    return result;
   }
   let publicCharactersLoadPromise = null;
-  function loadPublicSupabaseCharacters() {
-    if (publicCharactersLoadPromise) return publicCharactersLoadPromise;
-    publicCharactersLoadPromise = loadPublicSupabaseCharactersImpl()
-      .finally(() => { publicCharactersLoadPromise = null; });
+  function loadPublicSupabaseCharacters(options={}) {
+    const loadMore=options.loadMore===true;
+    const characterId=options.characterId||null;
+    if(characterId)return loadPublicSupabaseCharactersImpl({characterId});
+    if(publicCharactersLoadPromise)return publicCharactersLoadPromise;
+    publicCharactersLoadPromise=loadPublicSupabaseCharactersImpl({loadMore})
+      .finally(()=>{publicCharactersLoadPromise=null;});
     return publicCharactersLoadPromise;
   }
-  async function loadPublicSupabaseCharactersImpl() {
-    const client = window.mySupabase;
-    if (!client) return;
-    try {
-      const rowsVersion = publicCharacterRowsCacheVersion;
-      const rows = await loadPublicCharacterRows();
-      // If a save/delete invalidated the cache while this request was in flight,
-      // discard the stale result and read the current public catalogue before hydration.
-      if (rowsVersion !== publicCharacterRowsCacheVersion) return loadPublicSupabaseCharactersImpl();
-
-      // Author profile and story opening are detail-page data; do not fetch them for every public role.
-      const publicCharacters = (rows || []).map(row => {
-        // The owner hydrator may complete before or after this public-list request.
-        // Preserve its already-hydrated assets for the current user's own public character.
-        const cachedPublic = state.characters.find(character =>
-          character.id === row.id && character.cloudPublic === true
+  async function loadPublicSupabaseCharactersImpl({loadMore=false,characterId=null}={}) {
+    const client=window.mySupabase;
+    if(!client)return;
+    const pager=publicCharacterListPager;
+    if(!characterId&&(pager.loading||(loadMore&&!pager.hasMore)))return;
+    if(!characterId&&!loadMore){
+      pager.observer?.disconnect();
+      pager.offset=0;pager.hasMore=true;pager.loading=false;
+      pager.ownerUid=state.account?.uid||null;
+      publicCharacterRowsCache.clear();
+      publicCharacterRowsCacheAt=0;
+    }
+    if(!characterId){pager.loading=true;window.__poyozzExploreLoading=true;}
+    try{
+      const rowsVersion=publicCharacterRowsCacheVersion;
+      const pageOffset=loadMore?pager.offset:0;
+      let rows=[];
+      if(characterId){
+        const {data,error}=await client.from('characters')
+          .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible')
+          .eq('id',characterId).eq('visibility','public').is('deleted_at',null).maybeSingle();
+        if(error)throw new Error(error.message);
+        if(data)rows=[data];
+      }else rows=await loadPublicCharacterRows(pageOffset);
+      if(!characterId&&rowsVersion!==publicCharacterRowsCacheVersion){
+        window.__poyozzExploreLoading=false;
+        return loadPublicSupabaseCharactersImpl({loadMore:false});
+      }
+      const publicCharacters=(rows||[]).map(mapPublicCharacterRow);
+      const publicIds=new Set(publicCharacters.map(character=>character.id));
+      const currentUid=state.account?.uid||null;
+      if(characterId){
+        state.characters=window.PoyozzListPagination.mergeUnique(state.characters,publicCharacters,character=>character.id);
+      }else if(!loadMore){
+        const keepLocal=state.characters.filter(character=>
+          String(character.id).startsWith('seed-')||
+          (!!currentUid&&character.authorId===currentUid&&!character.deletedAt)
         );
-        const ownerLocal = state.characters.find(character =>
-          character.id === row.id && character.authorId === row.author_id &&
-          character.authorId === state.account?.uid
-        );
-        return {
-          id: row.id, name: row.name || '未命名角色',
-          gender: row.gender || 'ambiguous',
-          age: row.age == null ? '' : String(row.age),
-          // Explore cards need only the character cover/video. Full illustration assets
-          // are hydrated when a player opens this character's detail page or encounter.
-          image: ownerLocal?.image || cachedPublic?.image || row.avatar_url || '',
-          primaryIllustrationPath:ownerLocal?.primaryIllustrationPath || cachedPublic?.primaryIllustrationPath || '',
-          galleryIllustrations:ownerLocal?.galleryIllustrations || cachedPublic?.galleryIllustrations || [],
-          publicIllustrationsLoaded:ownerLocal?.publicIllustrationsLoaded === true || cachedPublic?.publicIllustrationsLoaded === true,
-          avatarVideoPath:row.avatar_video_path || '', visibility: 'public',
-          reviewStatus: row.review_status, intro: row.intro || '',
-          opening: ownerLocal?.opening || cachedPublic?.opening || '', race: row.race || '',
-          privateInfo: '', style: row.style || '',
-          personalityProfile: normalizePersonalityProfile({}),
-          ...((ownerLocal && Object.prototype.hasOwnProperty.call(ownerLocal,'phoneSettings')) || (cachedPublic && Object.prototype.hasOwnProperty.call(cachedPublic,'phoneSettings')) ? {phoneSettings:ownerLocal?.phoneSettings ?? cachedPublic?.phoneSettings ?? {}} : {}),
-          ...((ownerLocal && Object.prototype.hasOwnProperty.call(ownerLocal,'nsfwWorkplaceWarning')) || (cachedPublic && Object.prototype.hasOwnProperty.call(cachedPublic,'nsfwWorkplaceWarning')) ? {nsfwWorkplaceWarning:(ownerLocal?.nsfwWorkplaceWarning ?? cachedPublic?.nsfwWorkplaceWarning)===true} : {}),
-          isNSFW:row.is_nsfw === true,
-          tags: normalizeCharacterTagsForRead(row.tags),
-          authorId: row.author_id, owner: state.account?.uid === row.author_id,
-          chats: '0', users: null,
-          createdAt: row.created_at ? new Date(row.created_at).getTime() : 0,
-          firstPublishedAt: row.first_published_at ? new Date(row.first_published_at).getTime() : null,
-          latestEligible: row.latest_eligible !== false,
-          rightsConfirmed: false, cloudPublic: true
-        };
-      });
-
-      const publicIds = new Set(publicCharacters.map(character => character.id));
-      const currentUid = state.account?.uid || null;
-      // 只保留示範角色與目前登入帳號自己的未刪除角色，避免帳號切換時顯示其他帳號的本機私密草稿。
-      const keepLocal = state.characters.filter(character =>
-        String(character.id).startsWith('seed-') ||
-        (!!currentUid && character.authorId === currentUid && !character.deletedAt)
-      );
-      state.characters = [...publicCharacters, ...keepLocal.filter(character => !publicIds.has(character.id))];
+        state.characters=[...publicCharacters,...keepLocal.filter(character=>!publicIds.has(character.id))];
+      }else{
+        state.characters=window.PoyozzListPagination.mergeUnique(state.characters,publicCharacters,character=>character.id);
+        state.characters=state.characters.map(existing=>{
+          const refreshed=publicCharacters.find(character=>character.id===existing.id);
+          return refreshed?{...existing,...refreshed}:existing;
+        });
+      }
+      if(!characterId){
+        pager.offset+=rows.length;
+        pager.hasMore=rows.length===publicCharacterPageSize;
+        pager.loading=false;
+        window.__poyozzExploreHasMore=pager.hasMore;
+        window.__poyozzExploreLoading=false;
+      }
       persist();
-      if (route?.page !== 'citymap') render();
-    } catch (error) {
-      console.error('公開角色載入失敗：', error);
-      if (state.account?.uid) toast('公開角色載入失敗：' + error.message);
+      if(route?.page!=='citymap')render();
+    }catch(error){
+      if(!characterId){pager.loading=false;window.__poyozzExploreLoading=false;}
+      console.error('公開角色載入失敗：',error);
+      if(state.account?.uid)toast('公開角色載入失敗：'+error.message);
     }
   }
+  window.loadNextPublicCharacterPage=()=>loadPublicSupabaseCharacters({loadMore:true});
+  window.loadPublicCharacterById=characterId=>loadPublicSupabaseCharacters({characterId});
+  window.__poyozzExploreHasMore=true;
+  window.__poyozzExploreLoading=false;
 
   // Concurrent login hydrators share one server-verified auth lookup per UID.
   // This map only coalesces in-flight checks; it never caches auth beyond the request.
@@ -1620,52 +1709,56 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     return request;
   }
 
-  async function loadSupabaseCharacters(user) {
+  async function loadSupabaseCharacters(user,{loadMore=false}={}) {
     const client = window.mySupabase;
     if (!client || !user?.id) return;
     try {
-      const verifiedUser = await getVerifiedAuthUser(user.id);
+      const verifiedUser = options.verifiedUser?.id===user.id && currentUser()?.uid===user.id
+      ? options.verifiedUser
+      : await getVerifiedAuthUser(user.id);
       if (!verifiedUser) return;
 
-      // 先讀取雲端角色；將此裝置上屬於目前帳號、但雲端尚不存在的舊角色補上雲端。
-      // 這可修復舊版匯入只存 localStorage 的資料；不會上傳其他帳號的本機角色。
-      let { data: rows, error } = await client
-        .from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
-        .eq('author_id', user.id)
-        .order('created_at', { ascending: false });
-      if (error) throw new Error('讀取雲端角色失敗：' + error.message);
-
-      if (state.account?.uid !== user.id) return;
-      const localOwned = state.characters.filter(c => c.authorId === user.id && c.id);
-      const cloudIdsBeforeMigration = new Set((rows || []).map(row => row.id));
-      const localOnly = localOwned.filter(c => !cloudIdsBeforeMigration.has(c.id));
-      const migrationErrors = [];
-      let migratedCount = 0;
-
-      for (const character of localOnly) {
-        try {
-          const result = await saveSupabaseCharacter(character, user.id);
-          migratedCount++;
-          if (result?.storyError) migrationErrors.push(character.name + '：' + result.storyError);
-          if (result?.profileQueueError) migrationErrors.push(character.name + '：' + result.profileQueueError);
-        } catch (migrationError) {
-          migrationErrors.push((character.name || '未命名角色') + '：' + migrationError.message);
+      const pageSize=window.PoyozzListPagination?.pageSize('ownedCharacters')||10;
+      if(!ownedCharacterPager||ownedCharacterPager.uid!==user.id){
+        ownedCharacterPager=window.PoyozzListPagination.createState('ownedCharacters',{uid:user.id,cloudIds:new Set()});
+      }
+      const pager=ownedCharacterPager;
+      if(pager.loading|| (loadMore&&!pager.hasMore))return;
+      pager.loading=true;
+      let rows=[];
+      const migrationErrors=[];
+      let migratedCount=0;
+      // 舊版本機角色補同步只比對本機已有的角色 ID；不再掃描雲端帳號下的完整角色索引。
+      if(!loadMore){
+        const localOwned=state.characters.filter(c=>c.authorId===user.id&&c.id);
+        const localIds=localOwned.map(character=>character.id).filter(isUuid);
+        const existingLocalIds=new Set();
+        for(let start=0;start<localIds.length;start+=pageSize){
+          const batch=localIds.slice(start,start+pageSize);
+          const existingResult=await client.from('characters').select('id')
+            .eq('author_id',user.id).in('id',batch);
+          if(existingResult.error)throw new Error('比對本機角色同步狀態失敗：'+existingResult.error.message);
+          for(const row of existingResult.data||[])existingLocalIds.add(row.id);
+        }
+        const localOnly=localOwned.filter(character=>!existingLocalIds.has(character.id));
+        for(const character of localOnly){
+          try{
+            const result=await saveSupabaseCharacter(character,user.id);
+            migratedCount++;
+            if(result?.storyError)migrationErrors.push(character.name+'：'+result.storyError);
+            if(result?.profileQueueError)migrationErrors.push(character.name+'：'+result.profileQueueError);
+          }catch(migrationError){migrationErrors.push((character.name||'未命名角色')+'：'+migrationError.message);}
         }
       }
-
-      // 補傳後重新讀取，以資料庫結果為準；失敗的本機角色仍會保留在本機。
-      if (migratedCount > 0) {
-        const refreshed = await client
-          .from('characters')
-          .select('id, author_id, name, gender, age, avatar_url, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
-          .eq('author_id', user.id)
-          .order('created_at', { ascending: false });
-        if (refreshed.error) throw new Error('角色補傳後重新讀取失敗：' + refreshed.error.message);
-        rows = refreshed.data || [];
-      }
-
-const ids = (rows || []).map(row => row.id);
+      const pageResult=await client.from('characters')
+        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+        .eq('author_id',user.id)
+        .order('created_at',{ascending:false}).order('id',{ascending:false})
+        .range(pager.offset,pager.offset+pageSize-1);
+      if(pageResult.error)throw new Error('讀取雲端角色失敗：'+pageResult.error.message);
+      rows=pageResult.data||[];
+      if(state.account?.uid!==user.id)return;
+      const ids=(rows||[]).map(row=>row.id);
       // 隱藏設定只從作者專用資料表讀取，不再從公開 characters 資料列取得。
       const privateInfoById = new Map();
       if (ids.length) {
@@ -1701,12 +1794,10 @@ const ids = (rows || []).map(row => row.id);
       }
       let stories = [];
       if (ids.length) {
-        const result = await client
-          .from('character_stories')
-          .select('character_id, opening_message, visibility, created_at')
-          .in('character_id', ids)
-          .order('created_at', { ascending: false });
-        if (result.error) throw new Error('讀取雲端角色故事失敗：' + result.error.message);
+        const result = await client.rpc('get_latest_owned_character_stories', {
+          p_character_ids: ids
+        });
+        if (result.error) throw new Error('讀取雲端角色最新故事失敗：' + result.error.message);
         stories = result.data || [];
       }
       const latestStory = new Map();
@@ -1753,13 +1844,14 @@ const ids = (rows || []).map(row => row.id);
           rightsConfirmed: row.rights_confirmed === true
         };
       });
-      const cloudIds = new Set((rows || []).map(row => row.id));
-      state.characters = [
-        ...cloudCharacters,
-        ...state.characters.filter(c => c.authorId !== user.id || !cloudIds.has(c.id))
-      ];
+      const mergedCharacters=new Map(state.characters.map(character=>[character.id,character]));
+      for(const character of cloudCharacters)mergedCharacters.set(character.id,character);
+      state.characters=[...mergedCharacters.values()];
+      pager.offset+=(rows||[]).length;
+      pager.hasMore=(rows||[]).length===pageSize;
+      pager.loading=false;
       persist();
-      render();
+      if(route.page==='create'||!loadMore)render();
       if (migrationErrors.length) {
         console.warn('PersonaX 舊角色補傳有部分失敗：', migrationErrors);
         toast('有些本機角色尚未同步：' + migrationErrors.slice(0, 2).join('；'));
@@ -1767,6 +1859,7 @@ const ids = (rows || []).map(row => row.id);
         toast('已將 ' + migratedCount + ' 個本機角色補同步到雲端。');
       }
     } catch (error) {
+      if(ownedCharacterPager?.uid===user.id)ownedCharacterPager.loading=false;
       console.error('PersonaX 雲端角色載入失敗：', error);
       if (state.account?.uid === user.id) {
         toast('登入成功，但雲端角色載入失敗：' + error.message);
@@ -1806,6 +1899,21 @@ function invalidateMemoryPhotoSignedUrl(storagePath,uid=currentUser()?.uid||null
   if(uid&&storagePath)memoryPhotoSignedUrlManager.invalidate(uid+':'+storagePath);
 }
 
+async function mapWithConcurrency(items,concurrency,mapper){
+  const list=Array.isArray(items)?items:[];
+  const limit=Math.min(list.length,Math.max(1,Math.floor(Number(concurrency)||1)));
+  const results=new Array(list.length);
+  let cursor=0;
+  await Promise.all(Array.from({length:limit},async()=>{
+    while(true){
+      const index=cursor++;
+      if(index>=list.length)return;
+      results[index]=await mapper(list[index],index);
+    }
+  }));
+  return results;
+}
+
 const characterIllustrationMetadataInflight = new Map();
 async function loadCharacterPrimaryIllustrationAssets(characterIds, scopeUserId=null) {
   const client=window.mySupabase;
@@ -1831,9 +1939,13 @@ async function loadCharacterPrimaryIllustrationAssets(characterIds, scopeUserId=
   try{rows=await rowsPromise;}finally{
     if(characterIllustrationMetadataInflight.get(key)===rowsPromise)characterIllustrationMetadataInflight.delete(key);
   }
-  for(const row of rows){
-    let signedUrl;
-    try{signedUrl=await getCharacterIllustrationSignedUrl(row.storage_path);}catch(_){continue;}
+  const signedAssets=await mapWithConcurrency(rows,4,async row=>{
+    try{return {row,signedUrl:await getCharacterIllustrationSignedUrl(row.storage_path)};}
+    catch(_){return null;}
+  });
+  for(const entry of signedAssets){
+    if(!entry)continue;
+    const {row,signedUrl}=entry;
     result.set(row.character_id,{
       primary:{id:row.id,path:row.storage_path,src:signedUrl,sortOrder:row.sort_order,name:row.display_name||''},
       gallery:[]
@@ -1868,9 +1980,13 @@ async function loadCharacterIllustrationAssets(characterIds, cleanupUserId=null)
   try{rows=await rowsPromise;}finally{
     if(characterIllustrationMetadataInflight.get(key)===rowsPromise)characterIllustrationMetadataInflight.delete(key);
   }
-  for(const row of rows){
-    let signedUrl;
-    try{signedUrl=await getCharacterIllustrationSignedUrl(row.storage_path);}catch(_){continue;}
+  const signedAssets=await mapWithConcurrency(rows,4,async row=>{
+    try{return {row,signedUrl:await getCharacterIllustrationSignedUrl(row.storage_path)};}
+    catch(_){return null;}
+  });
+  for(const entry of signedAssets){
+    if(!entry)continue;
+    const {row,signedUrl}=entry;
     const list=result.get(row.character_id)||{primary:null,gallery:[]};
     const asset={id:row.id,path:row.storage_path,src:signedUrl,sortOrder:row.sort_order,name:row.display_name||''};
     if(row.asset_type==='primary')list.primary=asset;
@@ -3153,15 +3269,19 @@ let route = {page:'citymap'};
 const GROUP_CONTINUE_SENTINEL = '（請接續目前的故事。）';
 let personaPickerSelection = null;
 let groupPersonaPickerSelection = null;
-let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupMembers:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null,openRequestId:0,historyCursor:null,historyHasMore:false,historyLoading:false,historyError:'',historyScrollAnchor:null};
+let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupMembers:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null,openRequestId:0,groupListOffset:0,groupListHasMore:false,groupPinnedLoaded:false,groupPinnedOffset:0,groupPinnedHasMore:null,groupListObserver:null,historyCursor:null,historyHasMore:false,historyLoading:false,historyError:'',historyScrollAnchor:null};
+let chatSessionListPager = {...window.PoyozzListPagination.createState('chatSessions'),ownerUid:null,pinnedLoaded:false,pinnedOffset:0,pinnedHasMore:null,initialLoaded:false};
+let chatListPaginationObserver=null;
 let search = '';
 let filter = 'recommended';
 let exploreTags = [];
-let limit = 24;
+let limit = window.PoyozzListPagination?.pageSize('explore')||20;
 let batch = 0;
 let chatSearch = '';
 let chatSearchExpanded = false;
 let groupCharacterSearch = '';
+let groupCharacterPickerPager=window.PoyozzListPagination.createState('groupCharacterPicker',{uid:null,request:0,items:[],initialized:false,error:''});
+let groupCharacterPickerSearchTimer=null;
 let groupExpandedMemberId = null;
 let hideList = false;
 let banner = 0;
@@ -3262,7 +3382,7 @@ function compactCloudSessionForLocalStorage(session) {
     session.pendingTurn?.userMessageId,
     session.pendingTurn?.assistantMessageId
   ].filter(Boolean));
-  const kept=new Map(messages.slice(-50).map(message=>[message.id,message]));
+  const kept=new Map(messages.slice(-5).map(message=>[message.id,message]));
   for(const message of messages){
     if(pendingIds.has(message.id)||message.id==='opening-'+session.id||
        !isUuid(message.id)||message.localOnly===true||message.cloudSynced===false||message.syncPending===true){
@@ -3275,7 +3395,7 @@ function compactCloudSessionForLocalStorage(session) {
     messages:[...kept.values()].sort((a,b)=>(Number(a.at)||0)-(Number(b.at)||0)||String(a.id).localeCompare(String(b.id))),
     cloudSessionDataLoaded:false,cloudMessagesLoaded:false,
     cloudHasMoreMessages:false,cloudOldestMessageCursor:null,
-    cloudMessagesLoading:false,cloudMessagesError:''
+    cloudMessagesLoading:false,cloudMessagesError:'',cloudMessagesErrorOlder:false
   };
 }
 
@@ -3652,35 +3772,94 @@ async function loadCloudChatSessions(user, options = {}) {
   const onlySessionId = options.onlySessionId || null;
   const syncStartedAt = Date.now();
   try {
-    const verifiedUser = await getVerifiedAuthUser(user.id);
-    if (!verifiedUser) return;
-    let sessionQuery = client.from('chat_sessions')
-      .select([
-        'id,user_id,character_id,character_name,status,chat_mode,created_at,updated_at',
-        'character_snapshot_id:character_snapshot->>id',
-        'character_snapshot_author_id:character_snapshot->>authorId',
-        'character_snapshot_opening:character_snapshot->>opening',
-        'session_name:session_data->>name','session_archived:session_data->>archived',
-        'session_hidden:session_data->>hidden','session_pinned:session_data->>pinned',
-        'session_archived_at:session_data->>archivedAt',
-        'session_started_at:session_data->>startedAt','session_encounter_mode:session_data->>encounterMode',
-        'session_encounter_metadata:session_data->encounter',
-        'session_story_mode:session_data->>storyMode','session_encounter_place:session_data->>encounterPlace',
-        'session_encounter_day:session_data->>encounterDay','session_persona:session_data->>persona',
-        'session_persona_custom:session_data->>personaCustom','session_suggestions:session_data->>suggestions',
-        'session_background:session_data->>background','session_has_user_message:session_data->>hasUserMessage',
-        'session_last_message_preview:session_data->>lastMessagePreview','session_last_message_at:session_data->>lastMessageAt',
-        'session_opening_message:session_data->openingMessage','session_pending_turn:session_data->pendingTurn','session_story_world_state:session_data->storyWorldState'
-      ].join(','))
-      .eq('user_id', user.id).is('deleted_at', null);
-    if (onlySessionId) sessionQuery = sessionQuery.eq('id', onlySessionId);
-    const { data: rows, error } = await sessionQuery.order('updated_at', { ascending:false });
-    if (error) throw new Error(error.message);
+    const verifiedUser = options.verifiedUser?.id===user.id && currentUser()?.uid===user.id
+      ? options.verifiedUser
+      : await getVerifiedAuthUser(user.id);
+    if (!verifiedUser || currentUser()?.uid!==user.id) return;
+    const pagedList=!onlySessionId&&options.listPage!==false;
+    const pager=chatSessionListPager;
+    if(pagedList){
+      if(pager.ownerUid!==user.id||options.force){
+        pager.observer?.disconnect();chatListPaginationObserver?.disconnect();
+        Object.assign(pager,window.PoyozzListPagination.createState('chatSessions'),{
+          ownerUid:user.id,pinnedLoaded:false,pinnedOffset:0,pinnedHasMore:null,initialLoaded:false
+        });
+      }
+      if(pager.loading||(options.loadMore&&!pager.hasMore)||(!options.loadMore&&pager.initialLoaded))return;
+      pager.loading=true;
+    }
+    const fullSessionSelect=[
+      'id,user_id,character_id,character_name,status,chat_mode,created_at,updated_at',
+      'character_snapshot_id:character_snapshot->>id',
+      'character_snapshot_author_id:character_snapshot->>authorId',
+      'character_snapshot_opening:character_snapshot->>opening',
+      'session_name:session_data->>name','session_archived:session_data->>archived',
+      'session_hidden:session_data->>hidden','session_pinned:session_data->>pinned',
+      'session_archived_at:session_data->>archivedAt',
+      'session_started_at:session_data->>startedAt','session_encounter_mode:session_data->>encounterMode',
+      'session_encounter_metadata:session_data->encounter',
+      'session_story_mode:session_data->>storyMode','session_encounter_place:session_data->>encounterPlace',
+      'session_encounter_day:session_data->>encounterDay','session_persona:session_data->>persona',
+      'session_persona_custom:session_data->>personaCustom','session_suggestions:session_data->>suggestions',
+      'session_background:session_data->>background','session_has_user_message:session_data->>hasUserMessage',
+      'session_last_message_preview:session_data->>lastMessagePreview','session_last_message_at:session_data->>lastMessageAt',
+      'session_last_assistant_message_at:session_data->>lastAssistantMessageAt','session_last_read_at:session_data->>lastReadAt',
+      'session_opening_message:session_data->openingMessage','session_pending_turn:session_data->pendingTurn','session_story_world_state:session_data->storyWorldState'
+    ].join(',');
+    // Chat-list rows need only compact display metadata; the full session payload
+    // is selected only when a specific session is requested for hydration.
+    const listSessionSelect=[
+      'id,user_id,character_id,character_name,status,chat_mode,created_at,updated_at',
+      'character_snapshot_id:character_snapshot->>id',
+      'character_snapshot_author_id:character_snapshot->>authorId',
+      'session_name:session_data->>name','session_archived:session_data->>archived',
+      'session_hidden:session_data->>hidden','session_pinned:session_data->>pinned',
+      'session_started_at:session_data->>startedAt','session_encounter_mode:session_data->>encounterMode',
+      'session_has_user_message:session_data->>hasUserMessage',
+      'session_last_message_preview:session_data->>lastMessagePreview','session_last_message_at:session_data->>lastMessageAt',
+      'session_last_assistant_message_at:session_data->>lastAssistantMessageAt','session_last_read_at:session_data->>lastReadAt'
+    ].join(',');
+    const sessionSelect=pagedList?listSessionSelect:fullSessionSelect;
+    let rows=[];
+    if(pagedList){
+      const pageSize=window.PoyozzListPagination.pageSize('chatSessions');
+      let pinnedRows=[];
+      if(pager.pinnedHasMore!==false){
+        const {data:pinnedData,error:pinnedError}=await client.from('chat_sessions')
+          .select(sessionSelect).eq('user_id',user.id).is('deleted_at',null)
+          .eq('session_data->>pinned','true')
+          .order('updated_at',{ascending:false}).order('id',{ascending:false})
+          .range(pager.pinnedOffset,pager.pinnedOffset+pageSize-1);
+        if(pinnedError)throw new Error(pinnedError.message);
+        pinnedRows=pinnedData||[];
+        pager.pinnedHasMore=pinnedRows.length===pageSize;
+      }
+      const {data:pageRows,error:pageError}=await client.from('chat_sessions')
+        .select(sessionSelect).eq('user_id',user.id).is('deleted_at',null)
+        .or('session_data->>pinned.eq.false,session_data->>pinned.is.null')
+        .order('updated_at',{ascending:false}).order('id',{ascending:false})
+        .range(pager.offset,pager.offset+pageSize-1);
+      if(pageError)throw new Error(pageError.message);
+      rows=[...pinnedRows,...(pageRows||[])];
+      pager.offset+=(pageRows||[]).length;
+      pager.pinnedOffset+=pinnedRows.length;
+      pager.hasMore=(pageRows||[]).length===pageSize||pager.pinnedHasMore===true;
+      pager.pinnedLoaded=true;
+      pager.initialLoaded=true;
+      pager.loading=false;
+    }else{
+      let sessionQuery=client.from('chat_sessions').select(sessionSelect)
+        .eq('user_id',user.id).is('deleted_at',null);
+      if(onlySessionId)sessionQuery=sessionQuery.eq('id',onlySessionId);
+      const {data:allRows,error}=await sessionQuery.order('updated_at',{ascending:false});
+      if(error)throw new Error(error.message);
+      rows=allRows||[];
+    }
     if (state.account?.uid !== user.id) return;
     let sessions = (rows || []).filter(row => !readDeletedChatTombstones(user.id).sessions[row.id]);
     const activeSessionIds = new Set(sessions.map(row => row.id));
     let changed = false;
-    if (!onlySessionId) {
+    if (!onlySessionId && !pagedList) {
       for (const [sessionId, cached] of Object.entries(state.sessions || {})) {
         if (cached?.cloudOwned && cached.cloudOwnerUid === user.id && !activeSessionIds.has(sessionId) && Number(cached.startedAt || 0) < syncStartedAt) {
           delete state.sessions[sessionId]; changed = true;
@@ -3689,6 +3868,7 @@ async function loadCloudChatSessions(user, options = {}) {
     }
     if (!sessions.length) {
       if (changed) { persist(); render(); }
+      if (pagedList && route.page === 'chat') render();
       return;
     }
     const snapshotAuthorIds = [...new Set(sessions.map(row => row.character_snapshot_author_id).filter(Boolean))];
@@ -3736,7 +3916,7 @@ async function loadCloudChatSessions(user, options = {}) {
           ? row.session_encounter_metadata : existing?.encounterMetadata || null,
         encounterMode:row.chat_mode === 'encounter' || parseBool(row.session_encounter_mode) ||
           (!!row.session_encounter_metadata && typeof row.session_encounter_metadata==='object' && !Array.isArray(row.session_encounter_metadata)),
-        storyMode:parseBool(row.session_story_mode),
+        storyMode:row.session_story_mode===undefined ? existing?.storyMode===true : parseBool(row.session_story_mode),
         storyWorldState:row.session_story_world_state&&typeof row.session_story_world_state==='object'?row.session_story_world_state:existing?.storyWorldState||null,
         encounterPlace:row.session_encounter_place || existing?.encounterPlace || null,
         encounterDay:row.session_encounter_day || existing?.encounterDay || null,
@@ -3745,8 +3925,8 @@ async function loadCloudChatSessions(user, options = {}) {
         updatedAt:row.updated_at ? new Date(row.updated_at).getTime() : Number(existing?.updatedAt || 0),
         lastMessagePreview:row.session_last_message_preview || existing?.lastMessagePreview || '',
         lastMessageAt:Number(row.session_last_message_at) || Number(existing?.lastMessageAt || 0) || (row.updated_at ? new Date(row.updated_at).getTime() : 0),
-        lastAssistantMessageAt:Number(row.session_data?.lastAssistantMessageAt)||Number(existing?.lastAssistantMessageAt||0),
-        lastReadAt:Number(row.session_data?.lastReadAt)||Number(existing?.lastReadAt||0),
+        lastAssistantMessageAt:Number(row.session_last_assistant_message_at)||Number(existing?.lastAssistantMessageAt||0),
+        lastReadAt:Number(row.session_last_read_at)||Number(existing?.lastReadAt||0),
         archivedAt:Number(row.session_archived_at) || existing?.archivedAt || null, persona:row.session_persona || existing?.persona || '',
         personaCustom:row.session_persona_custom===null||row.session_persona_custom===undefined
           ? existing?.personaCustom===true : parseBool(row.session_persona_custom),
@@ -3794,8 +3974,10 @@ async function loadCloudChatSessions(user, options = {}) {
     }
     if (changed) persist();
     if (!onlySessionId && route.page === 'conversation' && route.id && !state.sessions[route.id]) { go({page:'chat'}); return; }
-    if (changed && (!onlySessionId || route.page === 'chat' || route.page === 'conversation')) render();
+    if (pagedList && route.page === 'chat') render();
+    else if (changed && (!onlySessionId || route.page === 'chat' || route.page === 'conversation')) render();
   } catch (error) {
+    if(!onlySessionId&&options.listPage!==false)chatSessionListPager.loading=false;
     console.error('雲端聊天載入失敗：', error);
     if (state.account?.uid === user.id) toast('雲端聊天載入失敗：' + error.message);
   }
@@ -3825,11 +4007,13 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
   if (session.cloudMessagesLoading || (!options.older && session.cloudMessagesLoaded && options.refresh !== true)) return true;
   const older = options.older === true, messagesNode = $('messages');
   const previousAnchor = older ? captureChatScrollAnchor(messagesNode) : null;
-  session.cloudMessagesLoading = true; session.cloudMessagesError = '';
+  session.cloudMessagesLoading = true; session.cloudMessagesError = ''; session.cloudMessagesErrorOlder=false;
   if (route.page === 'conversation' && route.id === sessionId) renderMessages(false);
   try {
-    const { data: authResult, error: authError } = await client.auth.getUser();
-    if (authError || authResult?.user?.id !== userId || currentUser()?.uid !== userId) throw new Error('登入狀態已變更，請重新登入。');
+    const verifiedUser=options.verifiedUser?.id===userId && currentUser()?.uid===userId
+      ? options.verifiedUser
+      : await getVerifiedAuthUser(userId);
+    if(!verifiedUser||currentUser()?.uid!==userId)throw new Error('登入狀態已變更，請重新登入。');
     const snapshotRequested=!older&&session.cloudCharacterSnapshotLoaded!==true;
     const sessionColumns=older
       ? 'id,user_id,character_id,chat_mode,status'
@@ -3895,7 +4079,7 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
       session.cloudSnapshotNeedsRepair=!row.character_snapshot?.id;
     }
     const roleplayMeta=session.cloudRoleplayMeta||{};
-    const pageSize=50;
+    const pageSize=window.PoyozzListPagination?.pageSize('messages')||5;
     let messageQuery=client.from('chat_messages').select('id,session_id,role,content,created_at,suggested_replies')
       .eq('session_id',sessionId).is('deleted_at',null)
       .order('created_at',{ascending:false}).order('id',{ascending:false});
@@ -3921,7 +4105,13 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
       if(persistedSuggestions.length===3)normalized.suggestedReplies=persistedSuggestions;
       return normalized;
     });
-    const merged=new Map((session.messages||[]).map(message=>[message.id,message]));
+    const pendingMessageIds=new Set([session.pendingTurn?.userMessageId,session.pendingTurn?.assistantMessageId].filter(Boolean));
+    const currentPageIds=new Set(cloudMessages.map(message=>message.id));
+    const cachedMessages=older?(session.messages||[]):(session.messages||[]).filter(message=>
+      currentPageIds.has(message.id)||pendingMessageIds.has(message.id)||message.localOnly===true||
+      message.cloudSynced===false||message.syncPending===true||message.id==='opening-'+sessionId
+    );
+    const merged=new Map(cachedMessages.map(message=>[message.id,message]));
     for(const message of cloudMessages)merged.set(message.id,{...(merged.get(message.id)||{}),...message});
     session.messages=[...merged.values()].sort((a,b)=>(Number(a.at)||0)-(Number(b.at)||0)||String(a.id).localeCompare(String(b.id)));
     // Restore the suggestion set attached to the newest assistant turn first.
@@ -3968,7 +4158,7 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
     );
     const clearedOrphanedPendingTurn=!!session.pendingTurn&&!hasPendingUserMessage;
     if(clearedOrphanedPendingTurn)delete session.pendingTurn;
-    session.cloudMessagesLoaded=true;session.cloudMessagesLoading=false;session.cloudMessagesError='';
+    session.cloudMessagesLoaded=true;session.cloudMessagesLoading=false;session.cloudMessagesError='';session.cloudMessagesErrorOlder=false;
     persist();
     if(clearedOrphanedPendingTurn)void saveChatSessionSafely(session);
     if(route.page==='conversation'&&route.id===sessionId){
@@ -3984,7 +4174,7 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
     }
     return true;
   }catch(error){
-    session.cloudMessagesLoading=false;session.cloudMessagesError=error?.message||'聊天訊息載入失敗。';
+    session.cloudMessagesLoading=false;session.cloudMessagesError=error?.message||'聊天訊息載入失敗。';session.cloudMessagesErrorOlder=older;
     if(route.page==='conversation'&&route.id===sessionId)renderMessages(false);
     console.error('單一聊天室訊息載入失敗：',error);return false;
   }
@@ -4639,6 +4829,7 @@ function renderShell() {
 }
 
 let lastRenderedConversationId = null;
+const publicCharacterDetailLoads = new Set();
 
 // Preserve character-card media across route-level rerenders (Create, Favorites,
 // Author pages, etc.), not only Explore's renderGrid() updates.
@@ -4709,6 +4900,9 @@ function render() {
     };
   }
   const previousCardVideos=captureCharacterCardVideos($('view'));
+  // Release map-owned timers and global listeners before any route render.
+  // The map view may be re-rendered without a full page reload.
+  window.PoyozzCityMap?.destroy?.();
   // City-map-only visual treatment must not leak into traditional pages.
   if (route.page !== 'citymap') document.body.classList.remove('city-map-mode','city-map-mode-immersive');
   renderShell();
@@ -4813,7 +5007,7 @@ function exploreList() {
       Number.isFinite(Number(c.firstPublishedAt ?? c.createdAt)) &&
       Date.now()-Number(c.firstPublishedAt ?? c.createdAt) >= 0 &&
       Date.now()-Number(c.firstPublishedAt ?? c.createdAt) <= DAY)
-      .sort((a,b) => (b.firstPublishedAt ?? b.createdAt)-(a.firstPublishedAt ?? a.createdAt)).slice(0,50);
+      .sort((a,b) => (b.firstPublishedAt ?? b.createdAt)-(a.firstPublishedAt ?? a.createdAt));
   } else if (filter === 'favorites') {
     list = list.filter(c => state.favorites.includes(c.id));
   } else if (filter === 'popular') {
@@ -4875,79 +5069,78 @@ function card(c,owner = false) {
     </article>`;
 }
 function renderGrid({append=false}={}) {
-  if (!$('characterGrid')) return;
+  if(!$('characterGrid'))return;
   gridObserver?.disconnect();
   publicCharacterIllustrationObserver?.disconnect();
-  const list = exploreList();
-  const recommended = filter === 'recommended';
-  const maximum = Math.min(150,list.length);
-  const shown = recommended ? list.slice(0,Math.min(limit,150)) : list;
-  const grid = $('characterGrid');
-  // Keep hydrated media elements alive when search/filter redraws the card markup.
-  // A new video element for the same Storage object can trigger another full MP4 GET.
-  const existingVideosByCharacter = new Map();
-  if (!append) {
-    grid.querySelectorAll(':scope > article.card').forEach(existingCard => {
-      const existingVideo = existingCard.querySelector('video[data-character-video]');
-      if (existingVideo && existingCard.dataset.characterCardId) {
+  const list=exploreList();
+  const shown=list.slice(0,limit);
+  const grid=$('characterGrid');
+  // Keep existing hydrated video elements alive; replacing a video node can
+  // trigger another full MP4 request even when its Storage path is unchanged.
+  const existingVideosByCharacter=new Map();
+  if(!append){
+    grid.querySelectorAll(':scope > article.card').forEach(existingCard=>{
+      const existingVideo=existingCard.querySelector('video[data-character-video]');
+      if(existingVideo&&existingCard.dataset.characterCardId){
         existingVideosByCharacter.set(existingCard.dataset.characterCardId,existingVideo);
       }
     });
   }
-  const existingCardCount = append ? grid.querySelectorAll(':scope > article.card').length : 0;
-  const newCards = append && existingCardCount > 0 ? shown.slice(existingCardCount) : shown;
-  const cardMarkup = newCards.map(c => card(c)).join('');
-  if (append && existingCardCount > 0) {
-    if (cardMarkup) grid.insertAdjacentHTML('beforeend',cardMarkup);
-  } else {
-    grid.innerHTML = cardMarkup ||
-      '<div class="empty">目前還沒有符合條件的公開角色。稍後再來看看，或試試其他標籤。</div>';
-    grid.querySelectorAll(':scope > article.card').forEach(nextCard => {
-      const previousVideo = existingVideosByCharacter.get(nextCard.dataset.characterCardId);
-      const nextVideo = nextCard.querySelector('video[data-character-video]');
-      if (previousVideo && nextVideo &&
-          previousVideo.dataset.characterVideo === nextVideo.dataset.characterVideo) {
+  const existingCardCount=append?grid.querySelectorAll(':scope > article.card').length:0;
+  const newCards=append&&existingCardCount>0?shown.slice(existingCardCount):shown;
+  const cardMarkup=newCards.map(character=>card(character)).join('');
+  if(append&&existingCardCount>0){
+    if(cardMarkup)grid.insertAdjacentHTML('beforeend',cardMarkup);
+  }else{
+    grid.innerHTML=cardMarkup||'<div class="empty">目前還沒有符合條件的公開角色。稍後再來看看，或試試其他標籤。</div>';
+    grid.querySelectorAll(':scope > article.card').forEach(nextCard=>{
+      const previousVideo=existingVideosByCharacter.get(nextCard.dataset.characterCardId);
+      const nextVideo=nextCard.querySelector('video[data-character-video]');
+      if(previousVideo&&nextVideo&&previousVideo.dataset.characterVideo===nextVideo.dataset.characterVideo){
         nextVideo.replaceWith(previousVideo);
-        if (characterVideoObserver) {
+        if(characterVideoObserver){
           characterVideoObserver.unobserve(previousVideo);
           characterVideoObserver.observe(previousVideo);
         }
         existingVideosByCharacter.delete(nextCard.dataset.characterCardId);
       }
     });
-    // Any old media not reused is no longer part of the visible result set.
-    existingVideosByCharacter.forEach(video => {
+    existingVideosByCharacter.forEach(video=>{
       characterVideoObserver?.unobserve(video);
       releaseCharacterVideo(video);
     });
   }
-  // Also hydrate newly appended cards; existing hydrated elements are guarded.
-  grid.querySelectorAll('video[data-character-video]').forEach(video => void hydrateCharacterVideo(video));
+  grid.querySelectorAll('video[data-character-video]').forEach(video=>void hydrateCharacterVideo(video));
   observePublicCharacterIllustrationCards(grid);
-  void loadCharacterTurnCounts(shown.map(c => c.id));
-  document.querySelectorAll('.explore-shortcut[data-filter]').forEach(button => {
-    button.classList.toggle('active', button.dataset.filter === filter);
+  void loadCharacterTurnCounts(shown.map(character=>character.id));
+  document.querySelectorAll('.explore-shortcut[data-filter]').forEach(button=>{
+    button.classList.toggle('active',button.dataset.filter===filter);
   });
-  document.querySelector('.explore-shortcut[data-action="tags"]')?.classList.toggle('active', exploreTags.length > 0);
-  document.querySelector('.explore-shortcut[data-action="toggle-search"]')?.classList.toggle('active', !!search || !!($('exploreSearch') && !$('exploreSearch').classList.contains('hidden')));
-  $('selectedTags').innerHTML = exploreTags.map(tagButton).join('');
-  const sectionTitle = document.querySelector('.explore-section-heading h2');
-  if (sectionTitle) sectionTitle.textContent = filter === 'popular' ? '熱門角色' : filter === 'favorites' ? '喜愛的角色' : filter === 'latest' ? '新登場角色' : '為你推薦';
+  document.querySelector('.explore-shortcut[data-action="tags"]')?.classList.toggle('active',exploreTags.length>0);
+  document.querySelector('.explore-shortcut[data-action="toggle-search"]')?.classList.toggle('active',!!search||!!($('exploreSearch')&&!$('exploreSearch').classList.contains('hidden')));
+  $('selectedTags').innerHTML=exploreTags.map(tagButton).join('');
+  const sectionTitle=document.querySelector('.explore-section-heading h2');
+  if(sectionTitle)sectionTitle.textContent=filter==='popular'?'熱門角色':filter==='favorites'?'喜愛的角色':filter==='latest'?'新登場角色':'為你推薦';
 
-  $('moreArea').innerHTML = recommended && list.length
-    ? shown.length < maximum
-      ? '<div id="loadSentinel"><button data-action="load-more">載入更多</button></div>'
-      : '<button data-action="new-batch">換一批</button>'
-    : '';
-
-  if ($('loadSentinel') && 'IntersectionObserver' in window) {
-    gridObserver = new IntersectionObserver(entries => {
-      if (!entries.some(entry => entry.isIntersecting)) return;
-      gridObserver.disconnect();
-      limit = Math.min(150,limit+24);
-      renderGrid({append:true});
-    },{rootMargin:'150px'});
-    gridObserver.observe($('loadSentinel'));
+  const hasLoadedMore=list.length>shown.length;
+  const hasServerMore=window.__poyozzExploreHasMore===true;
+  $('moreArea').innerHTML=hasLoadedMore||hasServerMore
+    ? '<div id="loadSentinel" class="small muted" style="padding:14px;text-align:center">繼續往下滑動，載入更多角色…</div>'
+    : filter==='recommended'&&list.length
+      ? '<button data-action="new-batch">換一批</button>'
+      : '';
+  if($('loadSentinel')){
+    gridObserver=window.PoyozzListPagination.observeEnd($('loadSentinel'),()=>{
+      const previousLimit=limit;
+      limit=previousLimit+window.PoyozzListPagination.pageSize('explore');
+      if(list.length>previousLimit){
+        renderGrid({append:true});
+      }else if(window.__poyozzExploreHasMore&&!window.__poyozzExploreLoading){
+        void window.loadNextPublicCharacterPage();
+      }else{
+        renderGrid({append:true});
+      }
+    },{rootMargin:'220px 0px'});
   }
 }
 
@@ -5146,6 +5339,20 @@ function renderDetail() {
   const c = session ? sessionCharacter(session) : currentCharacter();
   const fromExistingSession = !!session && !!c &&
     canAccessSessionCharacter(session,c);
+  if(!c&&route.page==='detail'&&route.id&&typeof window.loadPublicCharacterById==='function'){
+    const characterId=route.id;
+    if(!publicCharacterDetailLoads.has(characterId)){
+      publicCharacterDetailLoads.add(characterId);
+      view.innerHTML='<div class="empty">角色資料載入中…</div>';
+      void window.loadPublicCharacterById(characterId).then(()=>{
+        publicCharacterDetailLoads.delete(characterId);
+        if(route.page==='detail'&&route.id===characterId)renderDetail();
+      }).catch(error=>{
+        console.warn('公開角色詳細資料載入失敗：',error?.message||error);
+      }).finally(()=>publicCharacterDetailLoads.delete(characterId));
+    }
+    return;
+  }
   if (!c || (!fromExistingSession && !accessible(c))) {
     if(previousDetailVideo){
       characterVideoObserver?.unobserve(previousDetailVideo);
@@ -5319,24 +5526,36 @@ function updateCharacterTurnCountElements(characterId,count) {
 const CLOUD_COMMENT_CACHE_TTL_MS = 30_000;
 const cloudCommentHydrationCache = new Map();
 const cloudCommentHydrationInflight = new Map();
-async function loadCloudComments(characterId,{force=false}={}) {
+const cloudCommentPageStates = new Map();
+async function loadCloudComments(characterId,{force=false,loadMore=false}={}) {
   const client=window.mySupabase;
   if(!client||!characterId)return;
   const requestUid=currentUser()?.uid||null;
   const cacheKey=(requestUid||'anonymous')+':'+characterId;
+  let pager=cloudCommentPageStates.get(cacheKey);
+  if(!loadMore&&(!pager||force)){
+    pager={offset:0,hasMore:true,loading:false};
+    cloudCommentPageStates.set(cacheKey,pager);
+    if(force){state.comments[characterId]=[];cloudCommentHydrationCache.delete(cacheKey);}
+  }
+  if(!pager||pager.loading||(!pager.hasMore&&loadMore))return;
   const cached=cloudCommentHydrationCache.get(cacheKey);
-  if(!force&&cached&&Date.now()-cached.loadedAt<CLOUD_COMMENT_CACHE_TTL_MS){
+  if(!loadMore&&!force&&cached&&Date.now()-cached.loadedAt<CLOUD_COMMENT_CACHE_TTL_MS){
     state.comments[characterId]=cached.rows;
     if(route.page==='detail'&&route.id===characterId)renderComments();
     return;
   }
   if(cloudCommentHydrationInflight.has(cacheKey))return cloudCommentHydrationInflight.get(cacheKey);
+  pager.loading=true;
   const request=(async()=>{
   try {
-    const {data:rows,error}=await client.rpc('get_character_comments_safe',{p_character_id:characterId});
+    const pageSize=window.PoyozzListPagination?.pageSize('characterComments')||10;
+    const {data:rows,error}=await client.rpc('get_character_comments_safe_page',{
+      p_character_id:characterId,p_limit:pageSize,p_offset:pager.offset
+    });
     if(error)throw error;
-    const safeRows=(rows||[]).sort((a,b)=>Date.parse(a.created_at)-Date.parse(b.created_at));
-    // 評論 RPC 只回傳安全的留言內容；另取公開個人資料，避免其他帳號的留言者被錯誤顯示成「故事創作者」。
+    const safeRows=rows||[];
+    // The SECURITY DEFINER page RPC preserves owner/public, NSFW and whisper-ancestry checks.
     const profileIds=[...new Set(safeRows.map(row=>row.author_id).filter(Boolean))];
     if(profileIds.length){
       const {data:profiles,error:profilesError}=await client.from('public_profiles')
@@ -5357,7 +5576,7 @@ async function loadCloudComments(characterId,{force=false}={}) {
       const {data,error:likesError}=await client.from('character_comment_likes')
         .select('comment_id,user_id').in('comment_id',ids);
       if(likesError)throw likesError;
-      likes=data||[];
+      likes= data||[];
     }
     const mapped=safeRows.map(row=>({
       id:row.id,authorId:row.author_id,text:row.content,parentId:row.parent_id,
@@ -5366,13 +5585,21 @@ async function loadCloudComments(characterId,{force=false}={}) {
       likes:likes.filter(item=>item.comment_id===row.id).map(item=>item.user_id),cloud:true
     }));
     if(currentUser()?.uid!==requestUid||route.page!=='detail'||route.id!==characterId)return;
-    state.comments[characterId]=mapped;
-    cloudCommentHydrationCache.set(cacheKey,{loadedAt:Date.now(),rows:mapped});
+    const existing=loadMore?(state.comments[characterId]||[]):[];
+    state.comments[characterId]=window.PoyozzListPagination?.mergeUnique
+      ? window.PoyozzListPagination.mergeUnique(existing,mapped,row=>row.id)
+      : [...existing,...mapped.filter(row=>!existing.some(old=>old.id===row.id))];
+    pager.offset+=safeRows.length;
+    pager.hasMore=safeRows.length===pageSize;
+    cloudCommentHydrationCache.set(cacheKey,{loadedAt:Date.now(),rows:state.comments[characterId]});
     renderComments();
   } catch(error) {
     console.error('PersonaX 雲端評論載入失敗：',error);
     const target=$('comments');
     if(target&&route.id===characterId)target.innerHTML='<div class="empty">雲端評論載入失敗，請重新整理或稍後再試。</div>';
+  } finally {
+    pager.loading=false;
+    if(route.page==='detail'&&route.id===characterId)renderCommentLoadMoreButton();
   }
   })();
   cloudCommentHydrationInflight.set(cacheKey,request);
@@ -5381,16 +5608,29 @@ async function loadCloudComments(characterId,{force=false}={}) {
   }
 }
 
-function renderComments() {
-  const renderCommentsModule = window.PoyozzCommentRenderer?.render;
-  if (typeof renderCommentsModule !== 'function') {
-    console.error('POYOZZ comment-renderer module is unavailable.');
-    return;
+document.addEventListener('click',event=>{
+  const button=event.target.closest('[data-action="comments-load-more"]');
+  if(!button)return;
+  button.disabled=true;
+  void loadCloudComments(route.id,{loadMore:true});
+});
+function renderCommentLoadMoreButton(){
+  const uid=currentUser()?.uid||null;
+  const pager=cloudCommentPageStates.get((uid||'anonymous')+':'+route.id);
+  const mount=$('comments');
+  mount?.querySelector('[data-action="comments-load-more"]')?.remove();
+  if(mount&&pager?.hasMore&&!pager.loading){
+    mount.insertAdjacentHTML('beforeend','<button type="button" class="button secondary" data-action="comments-load-more">載入更多評論</button>');
   }
-  return renderCommentsModule({
-    $, state, route, currentUser, currentCharacter,
-    author, avatar, e, timeText, cloudCommentHydrationCache
+}
+function renderComments() {
+  const renderCommentsModule=window.PoyozzCommentRenderer?.render;
+  if(typeof renderCommentsModule!=='function')return;
+  const result=renderCommentsModule({
+    $,state,route,currentUser,currentCharacter,author,avatar,e,timeText,cloudCommentHydrationCache
   });
+  renderCommentLoadMoreButton();
+  return result;
 }
 async function refreshAuthorFollowState(authorId) {
   const user = currentUser();
@@ -5444,15 +5684,68 @@ function renderAuthor() {
     route, state, currentUser, author, isUuid,
     getSupabaseClient:() => window.mySupabase,
     publicAuthorProfileLoaded, hydratePublicAuthorProfile,
-    $, e, avatar, card, refreshAuthorFollowState
+    $, e, avatar, card, refreshAuthorFollowState,
+    PoyozzListPagination:window.PoyozzListPagination,
+    rerender:()=>render(),
+    loadAuthorCharacterPage:loadPublicAuthorCharacterPage
   });
-}function renderFavorites() {
-  const list = state.characters.filter(c => state.favorites.includes(c.id) && accessible(c));
-  $('view').innerHTML = `<div class="stack"><h1>喜愛角色</h1>
-    <div class="grid">${list.map(c => card(c)).join('') ||
-      '<div class="empty">尚未收藏角色。</div>'}</div></div>`;
+}async function renderFavorites({loadMore=false}={}){
+  const uid=currentUser()?.uid||null;
+  if(!loadMore||favoriteListPager.uid!==uid){
+    favoriteListPager.observer?.disconnect();
+    favoriteListPager=window.PoyozzListPagination.createState('favorites',{uid,hasMore:state.favorites.length>0});
+  }
+  const pager=favoriteListPager;
+  if(pager.loading||(loadMore&&!pager.hasMore))return;
+  const pageSize=window.PoyozzListPagination?.pageSize('favorites')||10;
+  const pageIds=state.favorites.slice(pager.offset,pager.offset+pageSize);
+  pager.loading=true;
+  if(!loadMore)renderFavoriteList();
+  try{
+    const client=window.mySupabase;
+    const validIds=pageIds.filter(isUuid);
+    if(client&&uid&&validIds.length){
+      const {data:{user},error:authError}=await client.auth.getUser();
+      if(authError||!user||user.id!==uid||currentUser()?.uid!==uid)throw new Error('登入狀態已失效，請重新登入後查看喜愛角色。');
+      const {data:rows,error}=await client.from('characters')
+        .select('id,author_id,name,gender,age,avatar_url,avatar_video_path,is_nsfw,visibility,review_status,intro,race,style,tags,created_at,first_published_at,latest_eligible')
+        .in('id',validIds).is('deleted_at',null);
+      if(error)throw error;
+      const mapped=(rows||[]).map(row=>({...mapPublicCharacterRow(row),visibility:row.visibility||'public',owner:row.author_id===uid}));
+      const byId=new Map(mapped.map(character=>[character.id,character]));
+      state.characters=window.PoyozzListPagination.mergeUnique(state.characters,mapped,character=>character.id)
+        .map(character=>byId.has(character.id)?{...character,...byId.get(character.id)}:character);
+    }
+  }catch(error){
+    console.error('載入喜愛角色分頁失敗：',error);
+    if(!loadMore)toast('喜愛角色載入失敗，部分角色可能暫時無法顯示。');
+  }finally{
+    if(favoriteListPager===pager){
+      pager.offset+=pageIds.length;
+      pager.hasMore=pager.offset<state.favorites.length;
+      pager.loading=false;
+      if(route.page==='favorites')renderFavoriteList();
+    }
+  }
 }
 
+let favoriteListPager=window.PoyozzListPagination.createState('favorites',{uid:null});
+function renderFavoriteList(){
+  const visibleIds=state.favorites.slice(0,Math.max(10,favoriteListPager.offset));
+  const list=visibleIds.map(id=>state.characters.find(character=>character.id===id)).filter(character=>character&&!character.deletedAt&&accessible(character));
+  $('view').innerHTML=`<div class="stack"><h1>喜愛角色</h1>
+    <div class="grid">${list.map(character=>card(character)).join('')||'<div class="empty">尚未收藏角色。</div>'}</div>
+    ${favoriteListPager.hasMore?'<div id="favoriteCharactersSentinel" class="small muted" style="text-align:center;padding:16px">向下滑動載入更多喜愛角色…</div>':''}
+  </div>`;
+  void loadCharacterTurnCounts(list.map(character=>character.id));
+  favoriteListPager.observer?.disconnect();
+  const sentinel=$('favoriteCharactersSentinel');
+  if(sentinel&&favoriteListPager.hasMore){
+    favoriteListPager.observer=window.PoyozzListPagination?.observeEnd(sentinel,()=>{
+      if(route.page==='favorites'&&!favoriteListPager.loading&&favoriteListPager.hasMore)void renderFavorites({loadMore:true});
+    });
+  }
+}
 async function renderFollowedAuthors() {
   const renderFollowedAuthorsModule = window.PoyozzFollowedAuthors?.render;
   if (typeof renderFollowedAuthorsModule !== 'function') {
@@ -5462,11 +5755,14 @@ async function renderFollowedAuthors() {
   }
   return renderFollowedAuthorsModule({
     $, currentUser, getRoute:() => route, getSupabaseClient:() => window.mySupabase,
-    isUuid, state, loadPublicSupabaseCharacters, author, ICON, e, avatar, card, persist, toast
+    isUuid, state, author, ICON, e, avatar, card, persist, toast,
+    loadPublicAuthorLatestCharacters
   });
 }
 
 /* Characters */
+let ownedCharacterPager=window.PoyozzListPagination.createState('ownedCharacters',{uid:null,cloudIds:new Set()});
+let ownedCharacterListObserver=null;
 let createVisibilityFilter = 'all';
 const characterTurnCountCache = new Map();
 const characterTurnCountRequests = new Map();
@@ -5481,10 +5777,11 @@ function creationTabs() {
 function owned(c) { return currentUser() && c?.authorId === currentUser().uid; }
 function renderCreate() {
   const ownedCharacters = state.characters.filter(c => owned(c) && !c.deletedAt);
+  const ownedPageLimit=ownedCharacterPager?.uid===currentUser()?.uid?Math.max(10,ownedCharacterPager.offset||0):10;
   const visibleCharacters = ownedCharacters.filter(c =>
     createVisibilityFilter === 'all' ||
     (createVisibilityFilter === 'public' ? c.visibility === 'public' : c.visibility !== 'public')
-  );
+  ).slice(0,ownedPageLimit);
   $('view').innerHTML = `<div class="stack"><h1>創建角色</h1>${creationTabs()}
     <div class="row between wrap" style="align-items:center;gap:12px">
       <h2 style="margin:0">你的角色</h2>
@@ -5497,8 +5794,18 @@ function renderCreate() {
     <div class="grid">
       ${visibleCharacters.map(c => card(c,true)).join('') ||
       (createVisibilityFilter === 'public' ? '<div class="empty">目前沒有公開角色。</div>' : createVisibilityFilter === 'private' ? '<div class="empty">目前沒有私密角色。</div>' : '<div class="empty">尚未建立角色。</div>')}
-    </div></div>`;
+    </div>
+    ${ownedCharacterPager?.uid===currentUser()?.uid&&ownedCharacterPager.hasMore?'<div id="ownedCharactersSentinel" class="small muted" style="text-align:center;padding:16px">向下滑動載入更多角色…</div>':''}
+    </div>`;
   void loadCharacterTurnCounts(visibleCharacters.map(c => c.id));
+  ownedCharacterListObserver?.disconnect();
+  const sentinel=$('ownedCharactersSentinel');
+  if(sentinel&&ownedCharacterPager?.hasMore){
+    ownedCharacterListObserver=window.PoyozzListPagination?.observeEnd(sentinel,()=>{
+      if(ownedCharacterPager?.loading||!ownedCharacterPager?.hasMore)return;
+      void loadSupabaseCharacters({id:currentUser()?.uid},{loadMore:true});
+    });
+  }
 }
 function editorDraftKey() {
   const uid = currentUser()?.uid;
@@ -6143,37 +6450,22 @@ async function startChat(characterId) {
   if (!accessible(character)) return toast('此角色已被作者調整為私密或刪除狀態，不支持開啟新對話');
   if (!requireLogin({page:'detail',id:characterId})) return;
   const client = window.mySupabase;
-  const { data: authData, error: authError } = await client?.auth?.getUser?.() || {};
-  const userId = authData?.user?.id || currentUser()?.uid;
+  const userId = currentUser()?.uid;
   if (!client || !userId) return toast('登入狀態尚未確認，請重新登入後再試。');
+  const verifiedUser = await getVerifiedAuthUser(userId);
+  if (!verifiedUser) return toast('登入狀態尚未確認，請重新登入後再試。');
   try {
-    const { data: rows, error: sessionsError } = await client.from('chat_sessions')
-      .select('id,chat_mode,status,created_at,updated_at,encounter_marker:session_data->encounter,encounter_mode_marker:session_data->>encounterMode,encounter_place_marker:session_data->>encounterPlace')
-      .eq('user_id', userId).eq('character_id', characterId)
-      .is('deleted_at', null).neq('chat_mode', 'encounter')
-      .order('updated_at', { ascending:false });
-    if (sessionsError) throw sessionsError;
-    const candidateIds=(rows||[]).filter(row=>isUuid(row.id)&&
-      !(row.encounter_marker&&typeof row.encounter_marker==='object'&&!Array.isArray(row.encounter_marker))&&
-      row.encounter_mode_marker!=='true'&&
-      !(typeof row.encounter_place_marker==='string'&&row.encounter_place_marker.trim())
-    ).map(row=>row.id);
-    let existingRow=null;
-    if(candidateIds.length){
-      const {data:latestPlayerMessage,error:messagesError}=await client.from('chat_messages')
-        .select('session_id').in('session_id',candidateIds).eq('role','user')
-        .is('deleted_at',null).order('created_at',{ascending:false}).limit(1).maybeSingle();
-      if(messagesError)throw messagesError;
-      if(latestPlayerMessage?.session_id)existingRow=(rows||[]).find(row=>row.id===latestPlayerMessage.session_id)||null;
-      // If the character has an existing but not-yet-started Story room, reuse it
-      // instead of creating another empty room for the same character.
-      if(!existingRow)existingRow=(rows||[]).find(row=>candidateIds.includes(row.id))||null;
-    }
-    if(existingRow){
-      await loadCloudChatSessions({id:userId},{onlySessionId:existingRow.id});
-      const existing=state.sessions[existingRow.id];
+    // One owner-scoped RPC replaces the separate session-list and user-message lookups.
+    const {data:existingRows,error:existingError}=await client.rpc('find_existing_story_chat_session',{
+      p_character_id:characterId
+    });
+    if(existingError)throw existingError;
+    const existingSessionId=Array.isArray(existingRows)?existingRows[0]?.session_id:null;
+    if(existingSessionId){
+      await loadCloudChatSessions({id:userId},{onlySessionId:existingSessionId,verifiedUser});
+      const existing=state.sessions[existingSessionId];
       if(!existing)throw new Error('找到既有聊天室，但載入聊天基本資料失敗。請重新整理後再試。');
-      const loaded=await loadCloudSessionMessages(existingRow.id);
+      const loaded=await loadCloudSessionMessages(existingSessionId,{verifiedUser});
       if(!loaded)throw new Error('找到既有聊天室，但載入聊天內容失敗。請重新整理後再試。');
       existing.hidden=false;existing.archived=false;existing.archivedAt=null;
       persist();await saveChatSessionSafely(existing);
@@ -6357,6 +6649,7 @@ function renderChatAlbumPage() {
 }
 function renderChatListPage() {
   $('view').innerHTML = `<div class="chat-layout list-only">${chatListHTML()}</div>`;
+  refreshChatEntryList();
 }
 /* GROUP-01: Supabase-persisted group core with deterministic mock director; no AI or wallet calls. */
 function groupAvailableCharacters() {
@@ -6381,46 +6674,115 @@ function groupRenderScenes() {
   const scene=g.draft.scenes[0]||{name:'初始相遇',description:''};
   return '<div class="group-field"><span>初始開場情境</span><div class="group-scene-input-wrap"><textarea id="groupSceneDesc0" maxlength="3000" data-count-for="groupSceneDesc0" placeholder="描寫時間、地點、角色如何相遇，以及故事此刻正在發生什麼。">'+e(scene.description||'')+'</textarea><button type="button" class="group-inspiration" data-action="group-inspiration">✨ AI 靈感</button></div><small class="group-scene-help char-counter" data-count-for="groupSceneDesc0">'+Array.from(scene.description||'').length+'/3000</small></div>';
 }
+async function groupLoadCharacterPickerPage({reset=false}={}){
+  const user=currentUser(),client=window.mySupabase;
+  if(!user?.uid||!client)return;
+  if(reset||groupCharacterPickerPager.uid!==user.uid){
+    const request=Number(groupCharacterPickerPager.request||0)+1;
+    groupCharacterPickerPager=window.PoyozzListPagination.createState('groupCharacterPicker',{uid:user.uid,request,items:[],initialized:true,error:''});
+  }
+  const pager=groupCharacterPickerPager;
+  if(pager.loading||!pager.hasMore)return;
+  pager.loading=true;
+  const request=pager.request;
+  const results=$('groupCharacterResults');
+  if(results)results.innerHTML=groupRenderCharacterResults();
+  try{
+    const pageSize=window.PoyozzListPagination.pageSize('groupCharacterPicker');
+    const {data,error}=await client.from('characters')
+      .select('id,author_id,name,gender,age,avatar_url,avatar_video_path,is_nsfw,visibility,review_status,intro,race,style,tags,created_at,first_published_at,latest_eligible')
+      .eq('visibility','public').is('deleted_at',null)
+      .order('first_published_at',{ascending:false,nullsFirst:false})
+      .order('id',{ascending:false}).range(pager.offset,pager.offset+pageSize-1);
+    if(error)throw error;
+    if(currentUser()?.uid!==user.uid||groupCharacterPickerPager!==pager||pager.request!==request)return;
+    const rows=Array.isArray(data)?data:[];
+    const items=rows.map(mapPublicCharacterRow);
+    pager.items=window.PoyozzListPagination.mergeUnique(pager.items,items,character=>character.id);
+    state.characters=window.PoyozzListPagination.mergeUnique(state.characters,items,character=>character.id);
+    pager.offset+=rows.length;
+    pager.hasMore=rows.length===pageSize;
+    pager.error='';
+  }catch(error){
+    if(groupCharacterPickerPager===pager){
+      pager.error=error?.message||'公開角色載入失敗。';
+      console.error('群組角色選擇清單載入失敗：',error);
+    }
+  }finally{
+    if(groupCharacterPickerPager===pager){
+      pager.loading=false;
+      const target=$('groupCharacterResults');
+      if(target)target.innerHTML=groupRenderCharacterResults();
+    }
+  }
+}
 function groupRenderCharacterResults() {
-  const all=groupAvailableCharacters();
+  const pager=groupCharacterPickerPager;
+  const all=pager.uid===currentUser()?.uid?pager.items:[];
   const q=groupCharacterSearch.trim().toLocaleLowerCase();
   const matches=all.filter(c=>!q||String(c.name||'').toLocaleLowerCase().includes(q)||
     String(c.intro||'').toLocaleLowerCase().includes(q)||
     (c.tags||[]).some(tag=>String(tag).toLocaleLowerCase().includes(q)));
   const recentAt=new Map();
-  for(const s of Object.values(state.sessions||{})) {
-    if(!s||s.archived||!s.characterId) continue;
-    const last=s.messages?.at(-1);
-    const at=Number(last?.at||s.startedAt||0);
-    if(at>0&&(!recentAt.has(s.characterId)||at>recentAt.get(s.characterId))) recentAt.set(s.characterId,at);
+  for(const session of Object.values(state.sessions||{})) {
+    if(!session||session.archived||!session.characterId) continue;
+    const last=session.messages?.at(-1);
+    const at=Number(last?.at||session.startedAt||0);
+    if(at>0&&(!recentAt.has(session.characterId)||at>recentAt.get(session.characterId))) recentAt.set(session.characterId,at);
   }
   const byRecent=matches.filter(c=>recentAt.has(c.id)).sort((a,b)=>recentAt.get(b.id)-recentAt.get(a.id));
   const recentIds=new Set(byRecent.map(c=>c.id));
   const byFavorite=matches.filter(c=>!recentIds.has(c.id)&&state.favorites.includes(c.id));
   const favoriteIds=new Set(byFavorite.map(c=>c.id));
   const byPublic=matches.filter(c=>!recentIds.has(c.id)&&!favoriteIds.has(c.id));
-  const ordered=[...byRecent,...byFavorite,...byPublic].slice(0,500);
-  if(!ordered.length) return '<div class="group-alert">'+(q?'找不到符合搜尋條件的公開角色。':'目前沒有可選的雲端角色。請先確認角色已儲存在 Supabase，且目前為公開狀態、尚未刪除或下架。')+'</div>';
+  const ordered=[...byRecent,...byFavorite,...byPublic];
   const renderRows=rows=>rows.map(c=>'<label class="group-character-option"><input type="checkbox" data-action="group-toggle-character" data-id="'+e(c.id)+'" '+(groupPrototype.draft.memberIds.includes(c.id)?'checked':'')+' '+(groupPrototype.draft.memberIds.length>=3&&!groupPrototype.draft.memberIds.includes(c.id)?'disabled':'')+'><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt="" style="width:46px;height:46px"><span style="min-width:0;overflow-wrap:anywhere"><strong>'+e(c.name)+'</strong><span class="muted small" style="display:block">'+e(c.intro||'尚無角色介紹')+'</span></span></label>').join('');
   const section=(title,rows)=>rows.length?'<h3 class="group-character-section-title">'+e(title)+' ('+rows.length+')</h3><div class="group-character-grid">'+renderRows(rows)+'</div>':'';
-  return '<div class="group-alert"><strong>已選 '+groupPrototype.draft.memberIds.length+' / 3 位角色</strong><br>💎 預估每次對話 '+(groupPrototype.draft.memberIds.length*3)+' 鑽石（預估費用，不會實際扣款）。</div>'+section('最近聊天',byRecent.filter(c=>ordered.some(x=>x.id===c.id)))+section('喜愛角色',byFavorite.filter(c=>ordered.some(x=>x.id===c.id)))+section('公開角色',byPublic.filter(c=>ordered.some(x=>x.id===c.id)))+'<p class="muted small">只能選擇公開的角色。</p>';
+  const empty=ordered.length?'':(pager.error?'<div class="group-alert">'+e(pager.error)+'</div>':pager.loading?'<div class="group-alert">正在載入公開角色…</div>':'<div class="group-alert">'+(q?'目前載入的角色中沒有符合搜尋條件的結果。可以載入更多搜尋結果。':'正在等待公開角色資料。')+'</div>');
+  const more=pager.hasMore?'<button type="button" class="ghost" data-action="group-character-load-more" '+(pager.loading?'disabled':'')+'>'+(pager.loading?'載入中…':'載入更多公開角色（每次 10 位）')+'</button>':'';
+  return '<div class="group-alert"><strong>已選 '+groupPrototype.draft.memberIds.length+' / 3 位角色</strong><br>💎 預估每次對話 '+(groupPrototype.draft.memberIds.length*3)+' 鑽石（預估費用，不會實際扣款）。</div>'+empty+section('最近聊天',byRecent)+section('喜愛角色',byFavorite)+section('公開角色',byPublic)+more+'<p class="muted small">只能選擇公開的角色；每次載入 10 位，搜尋會比對已載入的角色。</p>';
 }
 
 function groupRenderCharacters() {
-  const chars=groupAvailableCharacters();
-  if (!chars.length) return '<div class="group-alert">目前沒有可選的雲端角色。請先登入並確認角色已儲存在 Supabase，且角色目前為公開狀態、尚未刪除或下架。</div>';
+  const user=currentUser();
+  if(user?.uid&&window.mySupabase&&groupCharacterPickerPager.uid!==user.uid){
+    void groupLoadCharacterPickerPage({reset:true});
+  }else if(user?.uid&&window.mySupabase&&!groupCharacterPickerPager.initialized){
+    void groupLoadCharacterPickerPage({reset:true});
+  }
   return '<div id="groupCharacterPicker"><label class="group-field"><span>搜尋角色名稱、介紹或標籤</span><input id="groupCharacterSearch" type="search" maxlength="100" value="'+e(groupCharacterSearch)+'" placeholder="輸入角色名稱…"></label><div id="groupCharacterResults">'+groupRenderCharacterResults()+'</div></div>';
 }
 function refreshChatEntryList() {
   const entries=$('chatEntries');
-  if(entries) entries.innerHTML=chatEntries();
+  if(!entries)return;
+  chatListPaginationObserver?.disconnect();
+  groupPrototype.groupListObserver?.disconnect();
+  entries.innerHTML=chatEntries();
+  const canLoadSessions=chatSessionListPager.initialLoaded&&chatSessionListPager.hasMore;
+  const canLoadGroups=groupPrototype.groupsLoaded&&groupPrototype.groupListHasMore;
+  if((canLoadSessions||canLoadGroups)&&!groupPrototype.loadingGroups&&!chatSessionListPager.loading){
+    const sentinel=document.createElement('div');
+    sentinel.dataset.chatListSentinel='true';
+    sentinel.className='small muted';
+    sentinel.style.cssText='padding:12px;text-align:center';
+    sentinel.textContent='繼續往下滑動，載入更多對話…';
+    entries.appendChild(sentinel);
+    chatListPaginationObserver=window.PoyozzListPagination.observeEnd(sentinel,async()=>{
+      if(chatSessionListPager.initialLoaded&&chatSessionListPager.hasMore){
+        await loadCloudChatSessions(currentUser(),{loadMore:true});
+      }
+      if(groupPrototype.groupsLoaded&&groupPrototype.groupListHasMore){
+        await groupLoadList(false,true);
+      }
+    });
+  }
 }
 function groupResetForAccount(uid) {
   const g=groupPrototype;
   if(g.ownerUid && g.ownerUid!==uid) {
     g.step=1;
     g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''};
-    g.active=null;g.turn=0;g.messages=[];g.groups=[];g.groupPreviews={};g.groupsLoaded=false;
+    g.active=null;g.turn=0;g.messages=[];g.groups=[];g.groupPreviews={};g.groupMembers={};g.groupsLoaded=false;g.groupListOffset=0;g.groupListHasMore=false;g.groupPinnedLoaded=false;g.groupPinnedOffset=0;g.groupPinnedHasMore=null;g.groupListObserver?.disconnect();
     g.loadingGroups=false;g.loading=false;g.sending=false;g.pendingRequest=null;
     g.formError='';g.loadError='';g.openError='';g.failedGroupId=null;g.ownerUid=null;
   }
@@ -6443,89 +6805,108 @@ function groupFriendlyError(error) {
   if(message.includes('idempotency_key_reused_with_different_content')) return '這次送出識別碼已對應其他內容，請重新送出。';
   if(message.includes('group_insufficient_funds')) return '群組聊天點數不足：每位角色每回合需 3 點，2 位角色需 6 點、3 位需 9 點。系統會優先扣銀幣，不足部分再扣鑽石。請先補充點數。';
   if(message.includes('invalid_message_content')) return '訊息需為 1–2000 字。';
-  if(message.includes('group_insufficient_funds')) return '錢包餘額不足，請先取得銀幣或鑽石後再送出群組訊息。';
   if(message.includes('authentication_required')||message.includes('JWT')||message.includes('登入狀態')) return '登入狀態已失效，請重新登入後再試。';
   return message||'操作失敗，請稍後再試。';
 }
-async function groupLoadList(force=false) {
+async function groupHydrateListRows(groups){
+  const g=groupPrototype,client=window.mySupabase;
+  if(!groups.length)return;
+  const groupIds=groups.map(group=>group.id);
+  const {data:memberRows,error:memberError}=await client.from('chat_group_members')
+    .select('group_id,character_id,position,character_snapshot').in('group_id',groupIds).order('position');
+  if(memberError)throw memberError;
+  const characterIds=[...new Set((memberRows||[]).map(row=>row.character_id).filter(isUuid))];
+  let avatars={};
+  if(characterIds.length){
+    const {data:characterRows,error:avatarError}=await client.from('characters')
+      .select('id,avatar_url').in('id',characterIds);
+    if(avatarError)console.warn('讀取群組列表角色頭像失敗：',avatarError.message);
+    else avatars=Object.fromEntries((characterRows||[]).map(row=>[row.id,row.avatar_url||'']));
+  }
+  for(const row of memberRows||[]){
+    const members=g.groupMembers[row.group_id]||=[];
+    if(!members.some(member=>member.character_snapshot?.id===row.character_snapshot?.id&&member.name===(row.character_snapshot?.name||'角色'))){
+      members.push({
+        name:row.character_snapshot?.name||'角色',
+        avatar_url:avatars[row.character_id]||row.character_snapshot?.avatar_url||'',
+        character_snapshot:row.character_snapshot||{}
+      });
+    }
+    g.groupMembers[row.group_id]=members;
+  }
+  // Each RPC accepts at most ten IDs; pinned and regular pages can total twenty.
+  for(let i=0;i<groupIds.length;i+=10){
+    const {data:previewRows,error:previewError}=await client.rpc(
+      'get_my_group_list_previews',
+      {p_group_ids:groupIds.slice(i,i+10)}
+    );
+    if(previewError)throw previewError;
+    for(const preview of previewRows||[])g.groupPreviews[preview.group_id]=preview;
+  }
+}
+async function groupLoadList(force=false,loadMore=false) {
   const g=groupPrototype;
-  // Clear a prior account's cached group rows before rendering the shared chat list.
   groupResetForAccount(currentUser()?.uid||null);
-  if(g.loadingGroups||(!force&&g.groupsLoaded)) return;
+  if(g.loadingGroups||(!force&&!loadMore&&g.groupsLoaded)||(loadMore&&!g.groupListHasMore))return;
+  if(force){
+    g.groupListObserver?.disconnect();
+    g.groups=[];g.groupPreviews={};g.groupMembers={};
+    g.groupListOffset=0;g.groupListHasMore=false;g.groupPinnedLoaded=false;g.groupPinnedOffset=0;g.groupsLoaded=false;
+  }
   g.loadingGroups=true;g.loadError='';
-  if(!window.mySupabase) {
+  if(!window.mySupabase){
     g.groupsLoaded=true;g.loadingGroups=false;g.loadError='Supabase 用戶端尚未載入。';
     refreshChatEntryList();return;
   }
-  try {
+  try{
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
-    if(authError||!user||user.id!==currentUser()?.uid) {
+    if(authError||!user||user.id!==currentUser()?.uid){
       g.groupsLoaded=true;g.loadingGroups=false;g.loadError='請使用已連結 Supabase 的帳號登入，才能讀取或建立雲端群組。';
-      if(route.page==='group'&&!g.active) render();
+      if(route.page==='group'&&!g.active)render();
       refreshChatEntryList();return;
     }
-    const {data,error}=await window.mySupabase.from('chat_groups')
-      .select('id,name,world_background,scene_mode,created_at,updated_at,pinned')
-      .is('archived_at',null).order('updated_at',{ascending:false});
-    if(error) throw error;
-    if(user.id!==currentUser()?.uid) { groupResetForAccount(currentUser()?.uid||null); return; }
-    const deletedGroupIds = readDeletedChatTombstones(user.id).groups;
-    g.ownerUid=user.id;g.groups=(data||[]).filter(group=>!deletedGroupIds[group.id]);g.groupPreviews={};g.groupMembers={};
-    if(g.groups.length) {
-      try {
-        const groupIdsForMembers=g.groups.map(group=>group.id);
-        const {data:memberRows,error:memberError}=await window.mySupabase.from('chat_group_members')
-          .select('group_id,character_id,position,character_snapshot').in('group_id',groupIdsForMembers).order('position');
-        if(memberError) throw memberError;
-        const characterIds=[...new Set((memberRows||[]).map(row=>row.character_id).filter(isUuid))];
-        let avatars={};
-        if(characterIds.length) {
-          const {data:characterRows,error:avatarError}=await window.mySupabase.from('characters')
-            .select('id,avatar_url').in('id',characterIds);
-          if(avatarError) console.warn('讀取群組列表角色頭像失敗：',avatarError.message);
-          else avatars=Object.fromEntries((characterRows||[]).map(row=>[row.id,row.avatar_url||'']));
-        }
-        for(const row of memberRows||[]) {
-          (g.groupMembers[row.group_id] ||= []).push({
-            name:row.character_snapshot?.name||'角色',
-            avatar_url:avatars[row.character_id]||row.character_snapshot?.avatar_url||'',
-            character_snapshot:row.character_snapshot||{}
-          });
-        }
-      } catch(memberLoadError) {
-        console.warn('讀取群組列表成員頭像失敗：',memberLoadError.message);
-      }
-      const groupIds=g.groups.map(group=>group.id);
-      // Fetch at most one newest message per group. Batch requests to avoid an
-      // unbounded all-history read and to keep concurrent requests modest.
-      for(let i=0;i<groupIds.length;i+=10) {
-        const batchIds=groupIds.slice(i,i+10);
-        const previews=await Promise.all(batchIds.map(async groupId=>{
-          const {data:message,error:messageError}=await window.mySupabase.from('chat_group_messages')
-            .select('group_id,content,speaker_type,created_at,sequence_no')
-            .eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:false})
-            .order('sequence_no',{ascending:false}).limit(1).maybeSingle();
-          if(messageError) throw messageError;
-          return [groupId,message||null];
-        }));
-        for(const [groupId,message] of previews) {
-          if(message) g.groupPreviews[groupId]=message;
-        }
-      }
+    const client=window.mySupabase,pageSize=window.PoyozzListPagination.pageSize('groupSessions');
+    let pinnedRows=[];
+    if(g.groupPinnedHasMore!==false){
+      const {data:pinnedPage,error:pinnedError}=await client.from('chat_groups')
+        .select('id,name,world_background,scene_mode,created_at,updated_at,pinned')
+        .eq('pinned',true).is('archived_at',null)
+        .order('updated_at',{ascending:false}).order('id',{ascending:false})
+        .range(g.groupPinnedOffset,g.groupPinnedOffset+pageSize-1);
+      if(pinnedError)throw pinnedError;
+      pinnedRows=pinnedPage||[];
+      g.groupPinnedHasMore=pinnedRows.length===pageSize;
     }
-    if(user.id!==currentUser()?.uid) { groupResetForAccount(currentUser()?.uid||null); return; }
-    // A group may have been deleted while member/preview requests were in flight.
-    const latestDeletedGroups = readDeletedChatTombstones(user.id).groups;
-    const retainedGroups = g.groups.filter(group=>!latestDeletedGroups[group.id]);
-    const retainedIds = new Set(retainedGroups.map(group=>group.id));
-    g.groups = retainedGroups;
-    for (const groupId of Object.keys(g.groupPreviews)) if (!retainedIds.has(groupId)) delete g.groupPreviews[groupId];
-    for (const groupId of Object.keys(g.groupMembers)) if (!retainedIds.has(groupId)) delete g.groupMembers[groupId];
-    g.groupsLoaded=true;g.loadingGroups=false;g.loadError='';
-  } catch(error) {
-    g.groupsLoaded=true;g.loadingGroups=false;g.loadError=groupFriendlyError(error)||'讀取群組清單失敗。';
+    const {data:pageRows,error:pageError}=await client.from('chat_groups')
+      .select('id,name,world_background,scene_mode,created_at,updated_at,pinned')
+      .or('pinned.eq.false,pinned.is.null').is('archived_at',null)
+      .order('updated_at',{ascending:false}).order('id',{ascending:false})
+      .range(g.groupListOffset,g.groupListOffset+pageSize-1);
+    if(pageError)throw pageError;
+    if(user.id!==currentUser()?.uid){groupResetForAccount(currentUser()?.uid||null);return;}
+    const deletedGroupIds=readDeletedChatTombstones(user.id).groups;
+    const currentPage=pageRows||[];
+    const existingIds=new Set((g.groups||[]).map(group=>group.id));
+    const newRows=[...pinnedRows,...currentPage].filter(group=>!deletedGroupIds[group.id]&&!existingIds.has(group.id));
+    if(newRows.length){
+      await groupHydrateListRows(newRows);
+      if(user.id!==currentUser()?.uid){groupResetForAccount(currentUser()?.uid||null);return;}
+      g.groups=window.PoyozzListPagination.mergeUnique(g.groups,newRows,group=>group.id);
+    }
+    g.groupPinnedLoaded=true;
+    g.groupPinnedOffset+=pinnedRows.length;
+    g.groupListOffset+=currentPage.length;
+    g.groupListHasMore=currentPage.length===pageSize||g.groupPinnedHasMore===true;
+    const latestDeletedGroups=readDeletedChatTombstones(user.id).groups;
+    g.groups=g.groups.filter(group=>!latestDeletedGroups[group.id]);
+    const retainedIds=new Set(g.groups.map(group=>group.id));
+    for(const groupId of Object.keys(g.groupPreviews))if(!retainedIds.has(groupId))delete g.groupPreviews[groupId];
+    for(const groupId of Object.keys(g.groupMembers))if(!retainedIds.has(groupId))delete g.groupMembers[groupId];
+    g.ownerUid=user.id;g.groupsLoaded=true;g.loadingGroups=false;g.loadError='';
+  }catch(error){
+    g.loadingGroups=false;g.loadError=groupFriendlyError(error)||'讀取群組清單失敗。';
   }
-  if(route.page==='group'&&!g.active) render();
+  if(route.page==='group'&&!g.active)render();
   refreshChatEntryList();
 }
 async function groupOpen(groupId) {
@@ -6551,8 +6932,8 @@ async function groupOpen(groupId) {
     const [groupRes,sceneRes,memberRes,messageRes]=await groupWithTimeout(Promise.all([
       window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,background_mode,background_memory_photo_id,created_at,updated_at,archived_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
-      window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot').eq('group_id',groupId).order('position'),
-      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(50)
+      window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot,phone_notifications').eq('group_id',groupId).order('position'),
+      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(window.PoyozzListPagination.pageSize('messages'))
     ]),15000,'群組資料讀取逾時，請檢查網路後重試。')
     if(requestId!==g.openRequestId) return;
     const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error;
@@ -6567,11 +6948,11 @@ async function groupOpen(groupId) {
       const avatarRes=await window.mySupabase.from('characters').select('id,avatar_url').in('id',characterIds);
       if(!avatarRes.error) avatarById=Object.fromEntries((avatarRes.data||[]).map(x=>[x.id,x.avatar_url||'']));
     }
-    const members=memberRows.map(m=>{const snapshot=m.character_snapshot||{};const characterId=m.character_id||null;const snapshotId=snapshot.id||characterId||null;const displayId=characterId||snapshotId||m.id;return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,avatar_url:avatarById[characterId]||snapshot.avatar_url||snapshot.image||'',position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};});
+    const members=memberRows.map(m=>{const snapshot=m.character_snapshot||{};const characterId=m.character_id||null;const snapshotId=snapshot.id||characterId||null;const displayId=characterId||snapshotId||m.id;return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,avatar_url:avatarById[characterId]||snapshot.avatar_url||snapshot.image||'',phoneNotifications:Array.isArray(m.phone_notifications)?m.phone_notifications:[],position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};});
     groupExpandedMemberId=null;
     // Memory photo metadata and signed URLs are loaded only when the player opens background settings.
     const initialMessageRows=messageRes.data||[];
-    g.historyHasMore=initialMessageRows.length===50;
+    g.historyHasMore=initialMessageRows.length===window.PoyozzListPagination.pageSize('messages');
     const oldestInitialMessage=initialMessageRows.at(-1);
     g.historyCursor=oldestInitialMessage?{createdAt:oldestInitialMessage.created_at,sequenceNo:oldestInitialMessage.sequence_no,id:oldestInitialMessage.id}:null;
     g.historyLoading=false;g.historyError='';g.historyScrollAnchor=null;
@@ -6637,13 +7018,13 @@ async function groupLoadOlderMessages() {
       window.mySupabase.from('chat_group_messages')
         .select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at')
         .eq('group_id',groupId).is('deleted_at',null).or(olderFilter)
-        .order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(50),
+        .order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(window.PoyozzListPagination.pageSize('messages')),
       15000,'較早的群組訊息載入逾時，請稍後重試。'
     );
     if(requestId!==g.openRequestId||g.active?.id!==groupId||currentUser()?.uid!==uid)return;
     if(error)throw error;
     const page=rows||[];
-    g.historyHasMore=page.length===50;
+    g.historyHasMore=page.length===window.PoyozzListPagination.pageSize('messages');
     if(page.length){
       const oldest=page.at(-1);
       g.historyCursor={createdAt:oldest.created_at,sequenceNo:oldest.sequence_no,id:oldest.id};
@@ -6681,7 +7062,7 @@ async function openGroupBackgroundSettings() {
       .select('id,owner_id,chat_type,group_id,storage_path,caption,created_at,expires_at')
       .eq('owner_id',user.id).eq('chat_type','group').eq('group_id',group.id)
       .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString())
-      .order('created_at',{ascending:false});
+      .order('created_at',{ascending:false}).limit(window.PoyozzListPagination.pageSize('memoryPhotos'));
     if(error)throw error;
     group.memoryPhotos=await Promise.all((data||[]).map(async photo=>{
       let imageUrl='';
@@ -6739,27 +7120,25 @@ function renderGroupConversation() {
     const segments=!isSystem ? parseRoleplaySegments(displayContent,roleplayRoles) : [];
     const hasSpeaker=segments.some(segment=>segment.kind!=='user');
     const summonedByPlayer=isUser && segments.some(segment=>segment.kind==='character');
-    const avatarHTML=isUser
-      ? '<span class="avatar avatar-fallback player-avatar">你</span>'
-      : isSystem
-        ? '<span class="avatar avatar-fallback">系</span>'
-        : '';
+    // Match single chat: player identity is rendered only inside roleplay segments when needed.
+    const outerAvatar=isSystem ? '<span class="avatar avatar-fallback">系</span>' : '';
     const bodyHTML=hasSpeaker
       ? '<div class="roleplay-segments">'+segments.map(segment=>roleplaySegmentHTML(segment,{summonedByPlayer})).join('')+'</div>'
       : (!isUser && !isSystem)
         ? '<div class="roleplay-segments">'+renderCharacterSpeechSegments(displayContent,{name:who,image:member?.avatar_url||member?.image||''})+'</div>'
         : '<div class="message-name">'+e(who)+'</div>'+(isSystem?'<div class="bubble">'+e(displayContent)+'</div>':formatMessage(displayContent));
     const actionableGroupMessage=!isSystem&&['user','character'].includes(m.type);
-    const latestEditableGroupMessage = actionableGroupMessage && !g.searchJump &&
-      g.messages.filter(item=>item.type===m.type).at(-1)?.id===m.id;
-    const actionButtons = actionableGroupMessage
-      ? '<div class="message-action-bar" aria-label="訊息操作">'+
-        '<button type="button" class="message-action-icon" data-action="copy-group-message" data-id="'+e(m.id)+'" aria-label="複製" title="複製">'+ICON.copy+'</button>'+
-        '<button type="button" class="message-action-icon" data-action="delete-group-message" data-id="'+e(m.id)+'" aria-label="刪除" title="刪除">'+ICON.trash+'</button>'+
-        (m.type==='character'?'<button type="button" class="message-action-icon" data-action="report" data-kind="AI訊息" data-id="'+e(m.id)+'" aria-label="舉報" title="舉報">'+ICON.flag+'</button>':'')+
-        (latestEditableGroupMessage?'<button type="button" class="message-action-icon" data-action="edit-group-message" data-id="'+e(m.id)+'" aria-label="編輯" title="編輯">'+ICON.edit+'</button>':'')+
-        '</div>' : '';
-    return '<div class="message '+(isUser?'user':'')+(hasSpeaker?' roleplay-prefixed-message':'')+'" data-message="'+e(m.id)+'">'+avatarHTML+
+    const latestEditableGroupMessage = actionableGroupMessage &&
+      isLatestEditableChatMessage(g.messages,m,'type',['user','character'],g.searchJump);
+    const actionButtons = actionableGroupMessage ? renderMessageActionBar({
+      id:m.id,
+      copyAction:'copy-group-message',
+      deleteAction:'delete-group-message',
+      reportKind:m.type==='character'?'AI訊息':'',
+      editAction:'edit-group-message',
+      canEdit:latestEditableGroupMessage
+    }) : '';
+    return '<div class="message '+(isUser?'user':'')+(hasSpeaker?' roleplay-prefixed-message':'')+'" data-message="'+e(m.id)+'">'+outerAvatar+
       '<div class="message-content">'+bodyHTML+actionButtons+'</div></div>';
   }).join('') || '<div class="empty">這段群組對話還沒有訊息，輸入第一句話開始故事。</div>';
   const sceneNames=(group.scenes||[]).map(x=>x.name).filter(Boolean).join('、');
@@ -6889,84 +7268,174 @@ function setChatOverlayRoute(next){
   render();
   window.scrollTo(0,0);
 }
-async function loadEncounterMemoryList(panel,session){
+function loadEncounterMemoryList(panel,session){
   const list=panel.querySelector('#encounterMemoryList');
   if(!list||!session?.encounterMode)return;
   const client=window.mySupabase;
   const uid=currentUser()?.uid;
   if(!client||!uid){list.innerHTML='<div class="empty">請先登入，才能查看你的相遇回憶。</div>';return;}
+  const pager=window.PoyozzListPagination.createState('encounterMemories');
+  list._encounterPager=pager;
+  if(!list.dataset.paginationBound){
+    list.dataset.paginationBound='true';
+    list.addEventListener('click',event=>{
+      const retry=event.target.closest('[data-action="encounter-memory-retry"]');
+      if(retry&&list._encounterPager)void loadEncounterMemoryPage(list,session,list._encounterPager);
+    });
+  }
+  list.innerHTML='<div class="empty">正在整理你們的相遇回憶…</div>';
+  void loadEncounterMemoryPage(list,session,pager);
+}
+async function loadEncounterMemoryPage(list,session,pager){
+  if(!list?.isConnected||pager.loading||(!pager.hasMore&&!pager.buffer?.length))return;
+  const client=window.mySupabase,uid=currentUser()?.uid;
+  if(!client||!uid||session?.cloudOwnerUid!==uid)return;
+  pager.loading=true;
   try{
     const {data:{user},error:authError}=await client.auth.getUser();
-    if(authError||!user||user.id!==uid||session.cloudOwnerUid!==uid){
-      throw new Error('登入狀態已失效，請重新登入後查看相遇回憶。');
-    }
-    const {data:rows,error}=await client.from('encounter_diary')
-      .select('id,event_type,summary,occurred_at,metadata')
-      .eq('user_id',uid).eq('character_id',session.characterId)
-      .order('occurred_at',{ascending:false}).limit(200);
-    if(error)throw error;
-    const groups=new Map();
-    for(const row of rows||[]){
-      const rawSessionId=row.metadata&&typeof row.metadata==='object'?row.metadata.session_id:null;
-      const sessionId=isUuid(rawSessionId)?rawSessionId:null;
-      const groupKey=sessionId||('diary:'+row.id);
-      if(!groups.has(groupKey))groups.set(groupKey,{sessionId,rows:[],latestAt:row.occurred_at});
-      groups.get(groupKey).rows.push(row);
-    }
-    // 地點是在建立相遇 session 時寫入 session_data.encounterPlace；
-    // 從本人擁有的 encounter chat_sessions 讀回，避免依摘要文字猜測地點。
-    const sessionIds=[...new Set([...groups.values()].map(group=>group.sessionId).filter(Boolean))];
-    const sessionPlaces=new Map();
-    const sessionMetadataById=new Map();
+    if(authError||!user||user.id!==uid||currentUser()?.uid!==uid)throw new Error('登入狀態已失效，請重新登入後查看相遇回憶。');
+    const pageSize=window.PoyozzListPagination.pageSize('encounterMemories');
+    const pageStart=pager.offset;
+    let sessionQuery=client.from('chat_sessions')
+      .select('id,chat_mode,updated_at,encounter_mode:session_data->>encounterMode,encounter_day:session_data->>encounterDay,encounter_archived:session_data->>archived,encounter_place:session_data->>encounterPlace,last_message_preview:session_data->>lastMessagePreview')
+      .eq('user_id',uid).eq('character_id',session.characterId).is('deleted_at',null)
+      .or('chat_mode.eq.encounter,session_data->>encounterMode.eq.true')
+      .order('updated_at',{ascending:false}).order('id',{ascending:false})
+      .range(pageStart,pageStart+pageSize-1);
+    const {data:sessionRows,error:sessionError}=await sessionQuery;
+    if(sessionError)throw sessionError;
+    if(!list.isConnected||currentUser()?.uid!==uid)return;
+    const rows=sessionRows||[];
+    const completedSessions=rows.filter(row=>
+      !(typeof row.encounter_day==='string'&&row.encounter_archived!=='true')
+    );
+    const sessionIds=completedSessions.map(row=>row.id).filter(isUuid);
+    const diaryBySession=new Map();
     if(sessionIds.length){
-      // 舊版相遇 session 可能沒有 chat_mode 欄位；以本人 session ID 查詢，
-      // 並同時讀取 session_data 的新舊欄位，避免把舊回憶整批排除。
-      const {data:sessionRows,error:sessionRowsError}=await client.from('chat_sessions')
-        .select('id,chat_mode,session_data').eq('user_id',uid).eq('chat_mode','encounter').in('id',sessionIds);
-      if(sessionRowsError){console.warn('讀取相遇地點／狀態失敗：',sessionRowsError.message);}
-      else for(const sessionRow of sessionRows||[]){
-        const sessionData=sessionRow.session_data&&typeof sessionRow.session_data==='object'?sessionRow.session_data:{};
-        sessionMetadataById.set(sessionRow.id,sessionData);
-        sessionPlaces.set(sessionRow.id,typeof sessionData.encounterPlace==='string'?sessionData.encounterPlace:'');
-      }
-      // Legacy rows may predate the chat_mode column; only recover them through
-      // the owner's explicit Encounter marker stored in session_data.
-      const missingLegacyIds=sessionIds.filter(id=>!sessionMetadataById.has(id));
-      if(missingLegacyIds.length){
-        const {data:legacyRows,error:legacyRowsError}=await client.from('chat_sessions')
-          .select('id,session_data').eq('user_id',uid).eq('session_data->>encounterMode','true').in('id',missingLegacyIds);
-        if(legacyRowsError){console.warn('讀取舊版相遇回憶狀態失敗：',legacyRowsError.message);}
-        else for(const sessionRow of legacyRows||[]){
-          const sessionData=sessionRow.session_data&&typeof sessionRow.session_data==='object'?sessionRow.session_data:{};
-          sessionMetadataById.set(sessionRow.id,sessionData);
-          sessionPlaces.set(sessionRow.id,typeof sessionData.encounterPlace==='string'?sessionData.encounterPlace:'');
-        }
+      const {data:diaryRows,error:diaryError}=await client.from('encounter_diary')
+        .select('id,event_type,summary,occurred_at,metadata')
+        .eq('user_id',uid).eq('character_id',session.characterId)
+        .in('metadata->>session_id',sessionIds)
+        .order('occurred_at',{ascending:false}).limit(pageSize);
+      if(diaryError)throw diaryError;
+      for(const row of diaryRows||[]){
+        const rawId=row.metadata&&typeof row.metadata==='object'?row.metadata.session_id:null;
+        if(!isUuid(rawId))continue;
+        if(!diaryBySession.has(rawId))diaryBySession.set(rawId,row);
       }
     }
-    // 新版 session 會有 encounterDay：只有明確結束的才顯示；
-    // 舊版 session 沒有 encounterDay，保留既有回憶，不因缺少 archived 標記而消失。
-    // 找不到對應 session 的舊 diary 資料也保留，避免誤隱藏歷史紀錄。
-    for(const [groupKey,group] of groups){
-      if(!group.sessionId)continue;
-      const sessionData=sessionMetadataById.get(group.sessionId);
-      if(!sessionData)continue;
-      const isNewEncounter=typeof sessionData.encounterDay==='string';
-      if(isNewEncounter && sessionData.archived!==true)groups.delete(groupKey);
-    }
+    const cards=[];
     const placeNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308 公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園'};
-    const cards=[...groups.values()].sort((a,b)=>new Date(b.latestAt||0)-new Date(a.latestAt||0)).map(group=>{
-      const newest=group.rows[0];
-      const date=new Date(newest.occurred_at||Date.now()).toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
-      const preview=String(newest.summary||'這次相遇留下了一段回憶。').slice(0,180);
-      const rawPlace=group.sessionId?sessionPlaces.get(group.sessionId):'';
+    for(const sessionRow of completedSessions){
+      const newest=diaryBySession.get(sessionRow.id);
+      const preview=String(newest?.summary||sessionRow.last_message_preview||'這次相遇留下了一段回憶。').slice(0,180);
+      const at=newest?.occurred_at||sessionRow.updated_at;
+      const date=new Date(at||Date.now()).toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+      const rawPlace=typeof sessionRow.encounter_place==='string'?sessionRow.encounter_place:'';
       const place=rawPlace?(placeNames[rawPlace]||rawPlace):'地點資料未保存';
-      return '<button type="button" class="archive-card encounter-memory-card" data-action="encounter-memory-open" data-id="'+e(group.sessionId||'')+'" data-memory-id="'+e(newest.id)+'" data-place="'+e(place)+'"><span class="row between" style="gap:8px"><strong>相遇 · '+e(date)+'</strong><span class="small muted">'+group.rows.length+' 則紀錄</span></span><span class="small muted encounter-memory-place">📍 '+e(place)+'</span><p class="encounter-memory-excerpt">'+e(preview)+(String(newest.summary||'').length>180?'…':'')+'</p><span class="small muted">點擊查看完整對話　›</span></button>';
-    }).join('');
-    if(!list.isConnected)return;
-    list.innerHTML=cards||'<div class="empty"><strong>你們的相遇，正等待被收藏</strong><p>完成相遇對話後，系統會自動保存回憶摘要。每段相遇都會獨立整理，不會混入故事模式。</p></div>';
+      cards.push({at,html:'<button type="button" class="archive-card encounter-memory-card" data-action="encounter-memory-open" data-id="'+e(sessionRow.id)+'" data-memory-id="'+e(newest?.id||'')+'" data-place="'+e(place)+'"><span class="row between" style="gap:8px"><strong>相遇 · '+e(date)+'</strong><span class="small muted">相遇紀錄</span></span><span class="small muted encounter-memory-place">📍 '+e(place)+'</span><p class="encounter-memory-excerpt">'+e(preview)+(preview.length>=180?'…':'')+'</p><span class="small muted">點擊查看完整對話　›</span></button>'});
+    }
+    // Preserve legacy diary rows without session_id, using their own bounded cursor.
+    let legacyCount=0;
+    if(pager.legacyHasMore){
+      const {data:legacyRows,error:legacyError}=await client.from('encounter_diary')
+        .select('id,summary,occurred_at,metadata')
+        .eq('user_id',uid).eq('character_id',session.characterId)
+        .is('metadata->>session_id',null)
+        .order('occurred_at',{ascending:false}).order('id',{ascending:false})
+        .range(pager.legacyOffset,pager.legacyOffset+pageSize-1);
+      if(legacyError)throw legacyError;
+      legacyCount=(legacyRows||[]).length;
+      for(const row of legacyRows||[]){
+        const date=new Date(row.occurred_at||Date.now()).toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+        const preview=String(row.summary||'這次相遇留下了一段回憶。').slice(0,180);
+        cards.push({at:row.occurred_at,html:'<button type="button" class="archive-card encounter-memory-card" data-action="encounter-memory-open" data-id="" data-memory-id="'+e(row.id)+'" data-place="地點資料未保存"><span class="row between" style="gap:8px"><strong>相遇 · '+e(date)+'</strong><span class="small muted">舊版回憶</span></span><span class="small muted encounter-memory-place">📍 地點資料未保存</span><p class="encounter-memory-excerpt">'+e(preview)+(preview.length>=180?'…':'')+'</p><span class="small muted">點擊查看完整回憶　›</span></button>'});
+      }
+    }
+    pager.offset=pageStart+rows.length;
+    pager.hasMore=rows.length===pageSize;
+    pager.legacyOffset+=legacyCount;
+    pager.legacyHasMore=legacyCount===pageSize;
+    pager.hasMore=pager.hasMore||pager.legacyHasMore;
+    const combinedCards=[...(pager.buffer||[]),...cards].sort((a,b)=>new Date(b.at||0)-new Date(a.at||0));
+    const visibleCards=combinedCards.slice(0,pageSize);
+    pager.buffer=combinedCards.slice(pageSize);
+    const markup=visibleCards.map(item=>item.html).join('');
+    const empty=list.querySelector('.empty');
+    if(empty)empty.remove();
+    if(markup)list.insertAdjacentHTML('beforeend',markup);
+    list.querySelector('[data-encounter-memory-sentinel]')?.remove();
+    pager.observer?.disconnect();
+    if(pager.hasMore||pager.buffer.length){
+      const sentinel=document.createElement('div');
+      sentinel.dataset.encounterMemorySentinel='true';
+      sentinel.className='small muted';
+      sentinel.style.cssText='padding:12px;text-align:center';
+      sentinel.textContent='繼續往下滑動，載入更早的相遇…';
+      list.appendChild(sentinel);
+      pager.observer=window.PoyozzListPagination.observeEnd(sentinel,()=>void loadEncounterMemoryPage(list,session,pager));
+    }
+    if(!list.querySelector('.encounter-memory-card')&&!pager.hasMore&&!pager.buffer.length){
+      list.innerHTML='<div class="empty"><strong>你們的相遇，正等待被收藏</strong><p>完成相遇對話後，系統會自動保存回憶摘要。每段相遇都會獨立整理，不會混入故事模式。</p></div>';
+    }
   }catch(error){
     console.error('載入相遇回憶失敗：',error);
-    if(list.isConnected)list.innerHTML='<div class="empty">'+e(error?.message||'相遇回憶載入失敗，請稍後重試。')+'</div>';
+    if(list.isConnected){
+      list.querySelector('[data-encounter-memory-sentinel]')?.remove();
+      list.insertAdjacentHTML('beforeend','<div class="empty">'+e(error?.message||'相遇回憶載入失敗，請稍後重試。')+'<div style="margin-top:10px"><button type="button" data-action="encounter-memory-retry">重試</button></div></div>');
+    }
+  }finally{
+    pager.loading=false;
+  }
+}
+let encounterMemoryDetailPager=null;
+function renderEncounterMemoryDetailDialog(){
+  const pager=encounterMemoryDetailPager;
+  if(!pager)return;
+  const body=pager.messages.map(message=>{
+    const speaker=message.role==='user'?'你':pager.characterName;
+    const stamp=message.created_at?new Date(message.created_at).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+    return '<article class="encounter-memory-message"><div class="row between"><strong>'+e(speaker)+'</strong><span class="small muted">'+e(stamp)+'</span></div><p>'+e(message.content||'')+'</p></article>';
+  }).join('');
+  const loadMore=pager.hasMore
+    ?'<button type="button" class="ghost" data-action="encounter-memory-load-older" '+(pager.loading?'disabled':'')+'>'+ (pager.loading?'正在載入…':'載入更早的 5 則訊息')+'</button>'
+    :'';
+  showDialog('相遇回憶','<div class="small muted encounter-memory-detail-place">📍 相遇地點：'+e(pager.placeLabel)+'</div>'+loadMore+'<div class="encounter-memory-detail">'+(body||'<p class="muted">目前沒有可顯示的詳細對話內容。</p>')+'</div>'+loadMore);
+}
+async function loadEncounterMemoryDetailOlder(){
+  const pager=encounterMemoryDetailPager;
+  const client=window.mySupabase,uid=currentUser()?.uid;
+  if(!pager||pager.loading||!pager.hasMore||!pager.cursor||uid!==pager.uid||currentSession()?.id!==pager.sessionId||!client)return;
+  pager.loading=true;renderEncounterMemoryDetailDialog();
+  try{
+    const {data:{user},error:authError}=await client.auth.getUser();
+    if(authError||!user||user.id!==uid)throw new Error('登入狀態已失效，請重新登入。');
+    const {data:ownedSession,error:sessionError}=await client.from('chat_sessions')
+      .select('id,user_id,character_id,chat_mode').eq('id',pager.sessionId)
+      .eq('user_id',uid).eq('character_id',pager.characterId)
+      .eq('chat_mode','encounter').maybeSingle();
+    if(sessionError)throw sessionError;
+    if(!ownedSession)throw new Error('無法讀取這段相遇回憶。');
+    const pageSize=window.PoyozzListPagination?.pageSize('messages')||5;
+    const cursor=pager.cursor;
+    const {data:rows,error}=await client.from('chat_messages')
+      .select('id,role,content,created_at').eq('session_id',pager.sessionId)
+      .is('deleted_at',null)
+      .or('created_at.lt.'+cursor.created_at+',and(created_at.eq.'+cursor.created_at+',id.lt.'+cursor.id+')')
+      .order('created_at',{ascending:false}).order('id',{ascending:false}).limit(pageSize);
+    if(error)throw error;
+    const descendingRows=Array.isArray(rows)?rows:[];
+    const olderRows=[...descendingRows].reverse();
+    if(currentUser()?.uid!==uid||currentSession()?.id!==pager.sessionId)return;
+    pager.messages=window.PoyozzListPagination.mergeUnique(olderRows,pager.messages,message=>message.id);
+    pager.cursor=descendingRows.length?descendingRows[descendingRows.length-1]:pager.cursor;
+    pager.hasMore=descendingRows.length===pageSize;
+  }catch(error){
+    console.error('載入更早的相遇回憶失敗：',error);
+    toast(error?.message||'載入更早的相遇回憶失敗，請稍後重試。');
+  }finally{
+    pager.loading=false;
+    if(encounterMemoryDetailPager===pager&&currentSession()?.id===pager.sessionId)renderEncounterMemoryDetailDialog();
   }
 }
 async function openEncounterMemoryDetail(button){
@@ -6979,6 +7448,8 @@ async function openEncounterMemoryDetail(button){
     const {data:{user},error:authError}=await client.auth.getUser();
     if(authError||!user||user.id!==uid||session.cloudOwnerUid!==uid)throw new Error('登入狀態已失效，請重新登入。');
     let messages=[];
+    let hasMoreMessages=false;
+    let messageCursor=null;
     if(isUuid(sessionId)){
       const {data:ownedSession,error:sessionError}=await client.from('chat_sessions')
         .select('id,user_id,character_id,chat_mode').eq('id',sessionId)
@@ -6986,33 +7457,37 @@ async function openEncounterMemoryDetail(button){
         .eq('chat_mode','encounter').maybeSingle();
       if(sessionError)throw sessionError;
       if(ownedSession){
+        const pageSize=window.PoyozzListPagination?.pageSize('messages')||5;
         const {data:messageRows,error:messageError}=await client.from('chat_messages')
           .select('id,role,content,created_at').eq('session_id',sessionId)
-          .is('deleted_at',null).order('created_at',{ascending:true}).limit(500);
+          .is('deleted_at',null).order('created_at',{ascending:false}).order('id',{ascending:false}).limit(pageSize);
         if(messageError)throw messageError;
-        messages=messageRows||[];
+        const descendingRows=Array.isArray(messageRows)?messageRows:[];
+        messages=[...descendingRows].reverse();
+        hasMoreMessages=descendingRows.length===pageSize;
+        messageCursor=descendingRows.length?descendingRows[descendingRows.length-1]:null;
       }
     }
-    let body='';
-    if(messages.length){
-      const characterName=sessionCharacter(session)?.name||'角色';
-      body=messages.map(message=>{
-        const speaker=message.role==='user'?'你':characterName;
-        const stamp=message.created_at?new Date(message.created_at).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
-        return '<article class="encounter-memory-message"><div class="row between"><strong>'+e(speaker)+'</strong><span class="small muted">'+e(stamp)+'</span></div><p>'+e(message.content||'')+'</p></article>';
-      }).join('');
-    }else{
-      let query=client.from('encounter_diary').select('summary,occurred_at')
-        .eq('user_id',uid).eq('character_id',session.characterId).order('occurred_at',{ascending:true});
-      if(isUuid(sessionId))query=query.eq('metadata->>session_id',sessionId);
-      else if(isUuid(memoryId))query=query.eq('id',memoryId);
-      const {data:diaries,error:diaryError}=await query;
-      if(diaryError)throw diaryError;
-      body=(diaries||[]).map(row=>'<article class="encounter-memory-message"><div class="small muted">'+e(new Date(row.occurred_at||Date.now()).toLocaleString('zh-TW'))+'</div><p>'+e(row.summary||'')+'</p></article>').join('');
-    }
-    if(!body)body='<p class="muted">目前沒有可顯示的詳細對話內容。</p>';
     const placeLabel=String(button.dataset.place||'地點資料未保存');
-    showDialog('相遇回憶','<div class="small muted encounter-memory-detail-place">📍 相遇地點：'+e(placeLabel)+'</div><div class="encounter-memory-detail">'+body+'</div>');
+    if(messages.length){
+      encounterMemoryDetailPager=window.PoyozzListPagination.createState('messages',{
+        uid,sessionId,characterId:session.characterId,
+        characterName:sessionCharacter(session)?.name||'角色',
+        placeLabel,messages,hasMore:hasMoreMessages,cursor:messageCursor
+      });
+      renderEncounterMemoryDetailDialog();
+      return;
+    }
+    let query=client.from('encounter_diary').select('summary,occurred_at')
+      .eq('user_id',uid).eq('character_id',session.characterId)
+      .order('occurred_at',{ascending:true}).limit(window.PoyozzListPagination?.pageSize('encounterMemories')||10);
+    if(isUuid(sessionId))query=query.eq('metadata->>session_id',sessionId);
+    else if(isUuid(memoryId))query=query.eq('id',memoryId);
+    const {data:diaries,error:diaryError}=await query;
+    if(diaryError)throw diaryError;
+    const body=(diaries||[]).map(row=>'<article class="encounter-memory-message"><div class="small muted">'+e(new Date(row.occurred_at||Date.now()).toLocaleString('zh-TW'))+'</div><p>'+e(row.summary||'')+'</p></article>').join('');
+    encounterMemoryDetailPager=null;
+    showDialog('相遇回憶','<div class="small muted encounter-memory-detail-place">📍 相遇地點：'+e(placeLabel)+'</div><div class="encounter-memory-detail">'+(body||'<p class="muted">目前沒有可顯示的詳細對話內容。</p>')+'</div>');
   }catch(error){
     console.error('讀取相遇回憶詳細內容失敗：',error);
     toast(error?.message||'相遇回憶詳細內容載入失敗，請稍後重試。');
@@ -7063,7 +7538,7 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
       if(ctx.isGroup)rows=(ctx.group.memoryPhotos||[]).filter(p=>p.id&&p.image_url).map(p=>({id:p.id,caption:p.caption||'',url:p.image_url}));
       else{
         if(!ctx.session.cloudOwned||ctx.session.cloudOwnerUid!==uid)throw new Error('請先使用目前帳號擁有的雲端聊天。');
-        const {data,error}=await client.from('chat_memory_photos').select('id,caption,storage_path,created_at').eq('owner_id',uid).eq('chat_type','single').eq('session_id',ctx.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false});
+        const {data,error}=await client.from('chat_memory_photos').select('id,caption,storage_path,created_at').eq('owner_id',uid).eq('chat_type','single').eq('session_id',ctx.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false}).limit(window.PoyozzListPagination.pageSize('memoryPhotos'));
         if(error)throw error;
         rows=await Promise.all((data||[]).map(async p=>{const signedUrl=await getMemoryPhotoSignedUrl(p.storage_path).catch(()=>null);return signedUrl?{id:p.id,caption:p.caption||'',url:signedUrl}:null;}));
         rows=rows.filter(Boolean);
@@ -7340,9 +7815,9 @@ async function groupNext() {
   if(err) {groupPrototype.formError=err;render();return;}
   groupPrototype.formError='';
   if(groupPrototype.step===1) {groupPrototype.step=2;render();return;}
-  await groupCreateMock();
+  await groupCreate();
 }
-async function groupCreateMock() {
+async function groupCreate() {
   const g=groupPrototype;
   if(g.loading) return;
   const err=groupReadStep();
@@ -7382,7 +7857,7 @@ function groupToggleCharacter(idValue) {
   if(!members.some(c=>c.id===g.draft.worldCharacterId)) g.draft.worldCharacterId=members[0]?.id||'';
   g.formError='';render();
 }
-async function groupSendMock() {
+async function groupSendTurn() {
   const input=$('groupMessageInput');
   const typedContent=input?.value.trim() || '';
   const isContinueRequest=!typedContent;
@@ -7394,7 +7869,7 @@ async function groupSendMock() {
   if(!isContinueRequest) {
     const platformCommand=parsePlatformCommand(content);
     if(platformCommand.type==='platform') {
-      if(platformCommand.name==='help') toast('群組語法：@角色 指定 AI 回覆；:人名:內容 指定玩家發言顯示；/help 查看平台指令。AI 尚未串接，指定角色目前只做語法驗證。');
+      if(platformCommand.name==='help') toast('群組語法：@角色 可指定 AI 優先回應；:人名:內容 指定玩家發言顯示；/help 查看平台指令。');
       else toast('尚未支援平台指令 /'+platformCommand.name+'；本次沒有保存訊息。');
       return;
     }
@@ -7413,17 +7888,33 @@ async function groupSendMock() {
   try {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
     if(authError||!user||user.id!==requestUid||currentUser()?.uid!==requestUid) throw new Error('登入狀態已變更，請重新登入。');
-    const {data:turnId,error}=await groupWithTimeout(window.mySupabase.rpc('append_chat_group_mock_turn',{
-      p_group_id:activeGroupId,p_request_key:requestKey,p_content:content
-    }),15000,'訊息保存逾時。請重新開啟群組確認訊息是否已保存，再決定是否重試。');
+    const {data:turnResult,error}=await groupWithTimeout(window.mySupabase.functions.invoke('group-chat-turn',{
+      body:{groupId:activeGroupId,requestKey,content}
+    }),70000,'群組 AI 回覆逾時。請稍後重新開啟群組確認回合狀態；不要建立新的重複訊息。');
     if(error) throw error;
-    if(!turnId) throw new Error('群組回合已保存，但未取得回合識別碼。請重新開啟群組確認訊息。');
-    // The RPC commits the group turn and wallet debit atomically. Refresh the visible
-    // wallet immediately so the header/composer never keeps showing the pre-charge balance.
+    if(turnResult?.status==='insufficient_funds') {
+      await refreshWalletBalance();
+      openInsufficientFundsDialog('group');
+      g.sending=false;g.pendingRequest=null;g.formError='';
+      renderGroupConversation();
+      return;
+    }
+    if(turnResult?.status==='refunded'||turnResult?.status==='content_rejected'||turnResult?.status==='timed_out') {
+      await refreshWalletBalance();
+      g.sending=false;g.pendingRequest=null;
+      g.formError=turnResult.status==='timed_out'?'本次 AI 請求逾時，費用已全額退還，沒有扣款。請稍後重試。':turnResult.status==='content_rejected'?'這次 AI 回覆未能完成，費用已退還，請調整內容後重試。':'這次 AI 服務未能完成，費用已退還，請重新送出。';
+      renderGroupConversation();
+      return;
+    }
+    if(turnResult?.status!=='completed'||!turnResult?.turnId) {
+      throw new Error('群組 AI 回合尚未確認完成，為避免重複扣款，請稍後重新開啟群組確認狀態。');
+    }
+    const turnId=turnResult.turnId;
+    // Refresh the visible wallet after the server confirms settlement.
     await refreshWalletBalance();
     if(currentUser()?.uid!==requestUid) return;
-    // The RPC returns the durable turn ID, including on an idempotent retry.
-    // Fetch only this turn's two messages instead of retransmitting the group's full history.
+    // The Edge Function returns the durable turn ID, including on an idempotent retry.
+    // Fetch only this turn's messages instead of retransmitting the group's full history.
     // Keep the same request key until this narrow read succeeds so retries cannot double-charge.
     const {data:rows,error:rowsError}=await groupWithTimeout(
       window.mySupabase.from('chat_group_messages')
@@ -7436,6 +7927,12 @@ async function groupSendMock() {
     if(g.active!==activeGroup||g.active?.id!==activeGroupId||g.ownerUid!==requestUid||currentUser()?.uid!==requestUid) return;
     if(!rows?.length) throw new Error('群組回合已保存，但暫時讀取不到訊息。請稍後重新開啟群組確認。');
     const members=g.active.members||[], scenes=g.active.scenes||[];
+    if(Array.isArray(turnResult.phone_updates)){
+      for(const update of turnResult.phone_updates){
+        const target=members.find(member=>String(member.characterId||member.id)===String(update.characterId));
+        if(target&&Array.isArray(update.notifications))target.phoneNotifications=update.notifications;
+      }
+    }
     const newMessages=rows.map(m=>{
       const speakerSnapshot=m.speaker_snapshot||{};
       const member=members.find(x=>x.characterId===m.character_id)||members.find(x=>x.characterSnapshotId===speakerSnapshot.id||x.id===speakerSnapshot.id);
@@ -7464,7 +7961,21 @@ async function groupSendMock() {
   } catch(error) {
     if(g.active!==activeGroup||g.active?.id!==activeGroupId||g.ownerUid!==requestUid||currentUser()?.uid!==requestUid)return;
     g.sending=false;
+    let responseBody=null;
+    try { if(error?.context?.clone) responseBody=await error.context.clone().json(); } catch (_) {}
     const rawError=String(error?.message||error||'');
+    if(responseBody?.status==='refunded'||responseBody?.status==='content_rejected'||responseBody?.status==='timed_out'||responseBody?.error==='turn_already_refunded') {
+      try { await refreshWalletBalance(); } catch (_) {}
+      g.pendingRequest=null;
+      g.formError=responseBody?.status==='timed_out'?'本次 AI 請求逾時，費用已全額退還，沒有扣款。請稍後重試。':responseBody?.status==='content_rejected'?'這次 AI 回覆未能完成，費用已退還，請調整內容後重試。':'這次 AI 服務未能完成，費用已退還，請重新送出。';
+      renderGroupConversation();
+      return;
+    }
+    if(responseBody?.status==='needs_reconciliation'||responseBody?.error==='group_turn_in_progress') {
+      g.formError='上一個群組回合仍在確認中，為避免重複生成或扣款，暫時無法送出新回合。請稍後重新開啟群組確認。';
+      renderGroupConversation();
+      return;
+    }
     if(rawError.includes('group_insufficient_funds')||rawError.includes('insufficient_funds')) {
       g.formError='';
       openInsufficientFundsDialog('group');
@@ -7638,7 +8149,7 @@ async function groupArchive(groupId) {
     toast(groupFriendlyError(error)||'封存失敗，請稍後重試。');
   }
 }
-function groupList() { const g=groupPrototype;g.openRequestId=(g.openRequestId||0)+1;g.active=null;g.loading=false;g.sending=false;g.pendingRequest=null;g.openError='';g.failedGroupId=null;g.step=1;g.formError='';g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:state.account?.nickname||'玩家',playerPersona:state.account?.bio||'',worldCharacterId:''};groupCharacterSearch='';if(route.page!=='group'||route.id||route.overlay) go({page:'group'}); else render(); }
+function groupList() { const g=groupPrototype;g.openRequestId=(g.openRequestId||0)+1;g.active=null;g.loading=false;g.sending=false;g.pendingRequest=null;g.openError='';g.failedGroupId=null;g.step=1;g.formError='';g.draft={name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:state.account?.nickname||'玩家',playerPersona:state.account?.bio||'',worldCharacterId:''};groupCharacterSearch='';groupCharacterPickerPager=window.PoyozzListPagination.createState('groupCharacterPicker',{uid:null,request:groupCharacterPickerPager.request+1,items:[],initialized:false,error:''});if(route.page!=='group'||route.id||route.overlay) go({page:'group'}); else render(); }
 function groupRestart() { groupList(); }
 function chatSidebarToggleButton(mobileAction) {
   const isMobile=window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
@@ -7891,6 +8402,32 @@ function renderCharacterSpeechSegments(raw, role = {}) {
     ).join('');
   }).join('');
 }
+function confirmChatMessageDeletion() {
+  return confirm('確定刪除此訊息？此操作無法復原。');
+}
+async function copyChatMessageContent(content) {
+  const text=String(content||'');
+  if(navigator.clipboard&&isSecureContext){
+    await navigator.clipboard.writeText(text);
+    toast('已複製訊息。');
+  }else{
+    showDialog('複製訊息','<textarea readonly>'+e(text)+'</textarea>');
+    $('modal').querySelector('textarea').select();
+  }
+}
+function isLatestEditableChatMessage(messages,message,typeField,allowedTypes,blocked=false) {
+  if(blocked||!message||!Array.isArray(messages)||!allowedTypes.includes(message[typeField]))return false;
+  return messages.filter(item=>item[typeField]===message[typeField]).at(-1)?.id===message.id;
+}
+function renderMessageActionBar({id,copyAction,deleteAction,reportKind='',editAction,canEdit=false}) {
+  const messageId=e(id);
+  return '<div class="message-action-bar" aria-label="訊息操作">'+
+    '<button type="button" class="message-action-icon" data-action="'+e(copyAction)+'" data-id="'+messageId+'" aria-label="複製" title="複製">'+ICON.copy+'</button>'+
+    '<button type="button" class="message-action-icon" data-action="'+e(deleteAction)+'" data-id="'+messageId+'" aria-label="刪除" title="刪除">'+ICON.trash+'</button>'+
+    (reportKind?'<button type="button" class="message-action-icon" data-action="report" data-kind="'+e(reportKind)+'" data-id="'+messageId+'" aria-label="舉報" title="舉報">'+ICON.flag+'</button>':'')+
+    (canEdit?'<button type="button" class="message-action-icon" data-action="'+e(editAction)+'" data-id="'+messageId+'" aria-label="編輯" title="編輯">'+ICON.edit+'</button>':'')+
+    '</div>';
+}
 function roleplaySegmentHTML(segment, options = {}) {
   const name = segment.kind === 'user' ? (currentUser()?.nickname || '你') : segment.speakerName;
   const characterAvatar = segment.kind === 'character' && segment.avatar
@@ -7943,7 +8480,7 @@ function renderMessages(scroll = true) {
   const oldScroll = $('messages').scrollTop;
   const historyControl=s.cloudOwned
     ?((s.cloudSearchJump?'<div class="small muted" style="text-align:center;padding:6px">已定位到搜尋結果附近　<button type="button" class="ghost small" data-chat-search-return-latest="single">返回最新訊息</button></div>':'')+(s.cloudMessagesLoading?'<div class="small muted" style="text-align:center;padding:10px">正在載入聊天紀錄…</div>'
-      :s.cloudMessagesError?'<div class="small muted" style="text-align:center;padding:10px"><span>'+e(s.cloudMessagesError)+'</span> <button type="button" data-chat-history-action="retry">重新載入</button></div>'
+      :s.cloudMessagesError?'<div class="small muted" style="text-align:center;padding:10px"><span>'+e(s.cloudMessagesError)+'</span> <button type="button" data-chat-history-action="'+(s.cloudMessagesErrorOlder?'older':'retry')+'">'+(s.cloudMessagesErrorOlder?'重試載入較早訊息':'重新載入')+'</button></div>'
       :s.cloudHasMoreMessages?'<div style="text-align:center;padding:10px"><button type="button" data-chat-history-action="older">載入更早的訊息</button></div>':''))
     :'';
   $('messages').innerHTML = historyControl + s.messages.filter(m => !(m.role === 'user' && String(m.text||'').trim() === GROUP_CONTINUE_SENTINEL)).map(m => {
@@ -7976,25 +8513,18 @@ function renderMessages(scroll = true) {
       : !user
         ? '<div class="roleplay-segments">' + renderCharacterSpeechSegments(displayText,{name:c.name,image:c.image || c.avatar_url || ''}) + '</div>'
         : '<div class="message-name">' + e(currentUser()?.nickname || '你') + '</div>' + formatMessage(displayText);
-    // When the player explicitly summons a character with a role prefix, move the
-    // player identity onto that portrait as a small badge instead of showing a
-    // second, separate player avatar beside it.
-    // Player-authored messages do not show a separate outer player avatar.
-    // When a role prefix summons a character, the player marker is shown only
-    // as a small badge over that character's portrait.
-    // Character identity is rendered inside each speech segment so narration never inherits an outer avatar column.
-    const outerAvatar = '';
-    const latestEditableMessage=!s.cloudSearchJump && (m.role==='user'||m.role==='assistant') &&
-      s.messages.filter(item=>item.role===m.role).at(-1)?.id===m.id;
+    const latestEditableMessage=isLatestEditableChatMessage(s.messages,m,'role',['user','assistant'],s.cloudSearchJump);
     const actionButtons=(m.role==='user'||m.role==='assistant')
-      ? '<div class="message-action-bar" aria-label="訊息操作">'+
-        '<button type="button" class="message-action-icon" data-action="copy-message" data-id="'+e(m.id)+'" aria-label="複製" title="複製">'+ICON.copy+'</button>'+
-        '<button type="button" class="message-action-icon" data-action="delete-message" data-id="'+e(m.id)+'" aria-label="刪除" title="刪除">'+ICON.trash+'</button>'+
-        (m.role==='assistant'?'<button type="button" class="message-action-icon" data-action="report" data-kind="AI訊息" data-id="'+e(m.id)+'" aria-label="舉報" title="舉報">'+ICON.flag+'</button>':'')+
-        (latestEditableMessage?'<button type="button" class="message-action-icon" data-action="edit-message" data-id="'+e(m.id)+'" aria-label="編輯" title="編輯">'+ICON.edit+'</button>':'')+
-        '</div>' : '';
+      ? renderMessageActionBar({
+          id:m.id,
+          copyAction:'copy-message',
+          deleteAction:'delete-message',
+          reportKind:m.role==='assistant'?'AI訊息':'',
+          editAction:'edit-message',
+          canEdit:latestEditableMessage
+        })
+      : '';
     return `<article class="message ${user ? 'user' : ''} ${hasSpeaker && !user ? 'roleplay-prefixed-message' : ''}" data-message="${e(m.id)}">
-      ${outerAvatar}
       <div class="message-content">${contentHTML}${actionButtons}</div>
     </article>`;
   }).join('');
@@ -8030,7 +8560,7 @@ function addMemory(s,text) {
 
 let chatMessageSearchState={key:'',query:'',offset:0,request:0,timer:null,loading:false,rows:[]};
 let chatSearchJumpRequest=0;
-const CHAT_SEARCH_PAGE_SIZE=20;
+const CHAT_SEARCH_PAGE_SIZE=window.PoyozzListPagination?.pageSize('chatSearch')||10;
 function resetChatMessageSearchState(){
   if(chatMessageSearchState.timer)clearTimeout(chatMessageSearchState.timer);
   chatSearchJumpRequest++;
@@ -8140,8 +8670,8 @@ async function jumpToChatSearchHit(button){
       const bf='created_at.lt.'+t.created_at+',and(created_at.eq.'+t.created_at+',id.lt.'+t.id+')';
       const af='created_at.gt.'+t.created_at+',and(created_at.eq.'+t.created_at+',id.gt.'+t.id+')';
       const [b,a]=await Promise.all([
-        client.from('chat_messages').select('id,session_id,role,content,created_at').eq('session_id',s.id).is('deleted_at',null).or(bf).order('created_at',{ascending:false}).order('id',{ascending:false}).limit(24),
-        client.from('chat_messages').select('id,session_id,role,content,created_at').eq('session_id',s.id).is('deleted_at',null).or(af).order('created_at',{ascending:true}).order('id',{ascending:true}).limit(24)
+        client.from('chat_messages').select('id,session_id,role,content,created_at').eq('session_id',s.id).is('deleted_at',null).or(bf).order('created_at',{ascending:false}).order('id',{ascending:false}).limit(2),
+        client.from('chat_messages').select('id,session_id,role,content,created_at').eq('session_id',s.id).is('deleted_at',null).or(af).order('created_at',{ascending:true}).order('id',{ascending:true}).limit(2)
       ]);
       if(b.error)throw b.error;if(a.error)throw a.error;
       if(!isCurrent())return;
@@ -8149,7 +8679,7 @@ async function jumpToChatSearchHit(button){
       const all=[...(b.data||[]),t,...(a.data||[])].sort((x,y)=>String(x.created_at).localeCompare(String(y.created_at))||String(x.id).localeCompare(String(y.id)));
       s.messages=all.map(r=>({id:r.id,role:r.role==='user'?'user':'assistant',text:r.content||'',at:new Date(r.created_at).getTime(),cloudSynced:true}));
       const first=all[0];s.cloudOldestMessageCursor=first?{createdAt:first.created_at,id:first.id}:null;
-      s.cloudHasMoreMessages=(b.data||[]).length===24;s.cloudMessagesLoaded=true;s.cloudSearchJump=true;
+      s.cloudHasMoreMessages=(b.data||[]).length===2;s.cloudMessagesLoaded=true;s.cloudSearchJump=true;
       renderMessages(false);
       requestAnimationFrame(()=>{const n=[...($('messages')?.querySelectorAll('[data-message]')||[])].find(x=>x.dataset.message===id);if(n){n.scrollIntoView({behavior:'smooth',block:'center'});n.classList.add('search-hit-highlight');setTimeout(()=>n.classList.remove('search-hit-highlight'),1800);}});
     }else{
@@ -8160,15 +8690,15 @@ async function jumpToChatSearchHit(button){
       const bf='created_at.lt.'+t.created_at+',and(created_at.eq.'+t.created_at+',sequence_no.lt.'+t.sequence_no+'),and(created_at.eq.'+t.created_at+',sequence_no.eq.'+t.sequence_no+',id.lt.'+t.id+')';
       const af='created_at.gt.'+t.created_at+',and(created_at.eq.'+t.created_at+',sequence_no.gt.'+t.sequence_no+'),and(created_at.eq.'+t.created_at+',sequence_no.eq.'+t.sequence_no+',id.gt.'+t.id+')';
       const [b,a]=await Promise.all([
-        client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',g.id).is('deleted_at',null).or(bf).order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(24),
-        client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',g.id).is('deleted_at',null).or(af).order('created_at',{ascending:true}).order('sequence_no',{ascending:true}).order('id',{ascending:true}).limit(24)
+        client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',g.id).is('deleted_at',null).or(bf).order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(2),
+        client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',g.id).is('deleted_at',null).or(af).order('created_at',{ascending:true}).order('sequence_no',{ascending:true}).order('id',{ascending:true}).limit(2)
       ]);
       if(b.error)throw b.error;if(a.error)throw a.error;if(!isCurrent())return;
       closeChatSearchOverlay();
       const all=[...(b.data||[]),t,...(a.data||[])].sort((x,y)=>String(x.created_at).localeCompare(String(y.created_at))||Number(x.sequence_no)-Number(y.sequence_no)||String(x.id).localeCompare(String(y.id)));
       g.messages=all.map(r=>{const snap=r.speaker_snapshot||{},m=g.members.find(x=>x.characterId===r.character_id)||g.members.find(x=>x.characterSnapshotId===snap.id||x.id===snap.id),type=r.speaker_type==='user'?'user':r.speaker_type==='system'?'system':'character';return {id:r.id,type,speaker:type==='user'?'你':type==='system'?'系統':snap.name||m?.name||'角色',characterId:r.character_id||null,speakerSnapshot:snap,content:type==='user'&&r.content===GROUP_CONTINUE_SENTINEL?'':r.content,createdAt:r.created_at};});
       const first=all[0];groupPrototype.historyCursor=first?{createdAt:first.created_at,sequenceNo:first.sequence_no,id:first.id}:null;
-      groupPrototype.historyHasMore=(b.data||[]).length===24;groupPrototype.searchJump=true;groupPrototype.historyError='';groupPrototype.historyScrollAnchor=null;
+      groupPrototype.historyHasMore=(b.data||[]).length===2;groupPrototype.searchJump=true;groupPrototype.historyError='';groupPrototype.historyScrollAnchor=null;
       renderGroupConversation();
       requestAnimationFrame(()=>{const n=[...($('groupMessages')?.querySelectorAll('[data-message]')||[])].find(x=>x.dataset.message===id);if(n){n.scrollIntoView({behavior:'smooth',block:'center'});n.classList.add('search-hit-highlight');setTimeout(()=>n.classList.remove('search-hit-highlight'),1800);}});
     }
@@ -8236,8 +8766,12 @@ async function renderPhoneModal() {
     character={...savedRole,...sessionRole,phoneSettings:savedRole?.phoneSettings||savedRole?.phone_settings||sessionRole.phoneSettings||sessionRole.phone_settings||{}};
   }
   // Creator notice prompts guide AI generation only; never render raw instructions to players.
-  const generated=isGroup?(group.phoneNotificationsByCharacter?.[String(character.id)]||[]):(session.phoneNotifications||[]);
-  const notices=Array.isArray(generated)?generated.filter(Boolean).slice(0,10):[];
+  const generated=isGroup?(character.phoneNotifications||group.phoneNotificationsByCharacter?.[String(character.id)]||[]):(session.phoneNotifications||[]);
+  const savedNotices=Array.isArray(generated)?generated.filter(Boolean).slice(0,8):[];
+  const configuredPhonePrompts=Array.isArray(character.phoneSettings?.noticePrompts)?character.phoneSettings.noticePrompts:Array.isArray(character.phoneSettings?.notices)?character.phoneSettings.notices:[];
+  const notices=isGroup&&!savedNotices.length
+    ?configuredPhonePrompts.slice(0,8).map(row=>({title:String(row||'').split('|')[0].trim()||'手機通知',body:'目前尚未有更新'}))
+    :savedNotices;
   // Story phone events are fetched through the owner-checked RPC; never read the event table directly.
   let storyPhoneEvents=[];
   let storyPhoneStates=[];
@@ -8321,28 +8855,32 @@ async function renderPhoneModal() {
     ?(storyMemorySummaryError||!Array.isArray(storyMemorySummaries)?null:storySummaryChars)
     :(Array.isArray(diaryList)?(isGroup?diaryList.reduce((n,item)=>n+countChars(typeof item==='string'?item:(item.text||'')),0):memorySize(diaryList)):0);
   const capacity=10000,battery=diaryChars===null?null:Math.max(0,Math.min(100,Math.round((1-Math.min(diaryChars,capacity)/capacity)*100))),warning=battery!==null&&battery<=20,batteryColor=battery===null?'#9ca3af':warning?'#8d9299':'#c1c5cb';
-  const initialStoryTime=Number(session.startedAt||session.initialOpeningMessage?.at)||Date.now();
+  const initialStoryTime=Number(isGroup?(group.startedAt||group.createdAt||group.created_at):(session?.startedAt||session?.initialOpeningMessage?.at))||Date.now();
   const initialDate=new Date(initialStoryTime);
   const initialStoryTimeText=initialDate.getFullYear()+'-'+String(initialDate.getMonth()+1).padStart(2,'0')+'-'+String(initialDate.getDate()).padStart(2,'0')+'T'+String(initialDate.getHours()).padStart(2,'0')+':'+String(initialDate.getMinutes()).padStart(2,'0');
   const storyTimeLabel=formatStoryWorldTime(storyWorldState.storyTime||storyWorldState.story_time||initialStoryTimeText);
-  const openingContext=[session.initialOpeningMessage?.text,character.opening,character.intro,character.style].filter(Boolean).join(' ');
+  const openingContext=[isGroup?'':session?.initialOpeningMessage?.text,character.opening,character.intro,character.style].filter(Boolean).join(' ');
   const openingLocationMatch=openingContext.match(/(?:目前在|此刻在|位於|來到|身處|地點[：:是]?|場景[：:是]?)([^，。！？；;\\n]{2,40})/);
   const inferredOpeningLocation=openingLocationMatch?.[1]?.trim().replace(/[。！？；;]+$/,'')||'';
-  const storyLocationLabel=String(storyWorldState.storyLocation||storyWorldState.story_location||session.encounterPlace||inferredOpeningLocation).trim().slice(0,120)||'依開場情境推定中';
+  const storyLocationLabel=String(storyWorldState.storyLocation||storyWorldState.story_location||(!isGroup?session?.encounterPlace:'')||inferredOpeningLocation).trim().slice(0,120)||'依開場情境推定中';
   const title=(character.name||group?.name||'角色')+' 的手機';
-  const noticeLines=notices.map(line=>String(line||'').trim()).filter(Boolean);
-  const configuredNoticeHTML=noticeLines.slice(0,Math.max(0,8-storyPhoneStates.length-storyPhoneEvents.length)).map(line=>
-    '<article class="phone-notification-card"><span class="phone-app-icon">🔔</span><div class="phone-notification-copy"><div class="phone-notification-meta"><span>'+e(character.name||'角色通知')+'</span><span>通知</span></div><p>'+e(String(line))+'</p></div></article>'
-  ).join('');
+  const noticeLines=notices.map(item=>typeof item==='string'?item.trim():String(item?.body||'').trim()).filter(Boolean);
+  const configuredNoticeHTML=notices.slice(0,Math.max(0,8-storyPhoneStates.length-storyPhoneEvents.length)).map(item=>{
+    const title=typeof item==='string'?(character.name||'角色通知'):String(item?.title||character.name||'角色通知');
+    const body=typeof item==='string'?item:String(item?.body||'');
+    return '<article class="phone-notification-card"><span class="phone-app-icon">🔔</span><div class="phone-notification-copy"><div class="phone-notification-meta"><span>'+e(title)+'</span><span>通知</span></div><p>'+e(body)+'</p></div></article>';
+  }).join('');
   const noticeContentHTML=[storyStateHTML,storyEventHTML,configuredNoticeHTML].filter(Boolean).join('');
   const noticeHTML=noticeContentHTML||(storyPhoneEventsError?'<div class="phone-notification-empty">目前無法載入手機通知，請稍後重新開啟手機。</div>':'<div class="phone-notification-empty">目前還沒有新的通知</div>');
-  const memberSwitch=isGroup?'<div class="phone-member-switch"><button type="button" data-phone-action="prev" aria-label="上一位群組成員">‹</button><span class="phone-member-name">'+e(character.name)+'</span><button type="button" data-phone-action="next" aria-label="下一位群組成員">›</button></div>':'';
+  const phoneHeader=isGroup
+    ? '<div class="phone-device-head phone-device-head--group"><div class="phone-member-switch"><button type="button" data-phone-action="prev" aria-label="上一位群組成員">‹</button><span class="phone-member-name">'+e(character.name)+'</span><button type="button" data-phone-action="next" aria-label="下一位群組成員">›</button><span class="phone-member-phone-label">的手機</span></div><span class="phone-device-caption">STORY PHONE</span></div>'
+    : '<div class="phone-device-head"><span>'+e(title)+'</span><span class="phone-device-caption">STORY PHONE</span></div>';
   const [storyDateDisplay,storyClockDisplay]=String(storyTimeLabel).split('　');
   const phoneClock=storyClockDisplay||'--:--';
   const modal=document.createElement('div');modal.className='phone-modal-backdrop';modal.setAttribute('role','presentation');
   modal.innerHTML='<section class="phone-device phone-device--ios" role="dialog" aria-modal="true" aria-label="'+e(title)+'"><div class="phone-screen">'+
     '<div class="phone-statusbar"><span>'+e(phoneClock)+'</span><span class="phone-status-icons" aria-label="行動網路與電量"><i></i><i></i><i></i><span>⌁</span><span class="phone-battery" style="color:'+batteryColor+'" aria-label="'+(battery===null?'回憶容量暫時無法讀取':'剩餘回憶容量 '+battery+'%')+'"><span>'+(battery===null?'--':battery+'%')+'</span><span class="phone-battery-shape"><span class="phone-battery-fill" style="display:block;width:'+(battery===null?0:battery)+'%"></span></span></span></span></div>'+
-    '<div class="phone-device-head"><span>'+e(title)+'</span><span class="phone-device-caption">STORY PHONE</span></div>'+memberSwitch+
+    phoneHeader+
     '<div class="phone-content"><div class="phone-lockscreen"><div class="phone-lockscreen-date">'+e(storyDateDisplay||'故事時間')+'</div><div class="phone-lockscreen-clock">'+e(phoneClock)+'</div><div class="phone-lockscreen-location">⌖　'+e(storyLocationLabel)+'</div></div>'+
     '<section class="phone-notices '+(warning?'phone-warning':'')+'">'+(warning?'<div class="phone-memory-warning">回憶空間即將用盡，整理甜蜜日記可釋放容量</div>':'')+
     '<div class="phone-notice-heading"><strong>通知</strong><span>'+(noticeContentHTML?String(Math.min(8,storyPhoneStates.length+storyPhoneEvents.length+noticeLines.length))+' 則':'通知中心')+'</span></div><div class="phone-notice-list">'+noticeHTML+'</div></section>'+
@@ -8602,10 +9140,17 @@ async function refreshDailyCheckinCard() {
   })().finally(() => { window.dailyCheckinStatusPromise = null; });
   return window.dailyCheckinStatusPromise;
 }
+let notificationListPager={filterKey:null,limit:10,observer:null};
 function renderNotifications() {
-  const unread = route.unread;
-  const list = state.notifications.filter(n => !unread || !n.read);
-  $('view').innerHTML = `<div class="stack">
+  const unread=route.unread;
+  const filterKey=unread?'unread':'all';
+  if(notificationListPager.filterKey!==filterKey){
+    notificationListPager.observer?.disconnect();
+    notificationListPager={filterKey,limit:window.PoyozzListPagination?.pageSize('notifications')||10,observer:null};
+  }
+  const filtered=state.notifications.filter(n=>!unread||!n.read);
+  const list=filtered.slice(0,notificationListPager.limit);
+  $('view').innerHTML=`<div class="stack">
     <div class="row between"><h1 style="margin:0">系統通知</h1>
       <button data-action="read-all">全部已讀</button></div>
     <div class="tabs">
@@ -8618,7 +9163,15 @@ function renderNotifications() {
       <p class="muted" style="margin:12px 0">${e(n.body)}</p>
       <span class="small muted">${e(timeText(n.at))}</span>
     </article>`).join('') || '<div class="empty">目前沒有訊息。</div>'}</div>
+    ${filtered.length>notificationListPager.limit?'<div id="notificationsSentinel" class="small muted" style="text-align:center;padding:16px">向下滑動載入更多通知…</div>':''}
   </div>`;
+  notificationListPager.observer?.disconnect();
+  const sentinel=$('notificationsSentinel');
+  if(sentinel)notificationListPager.observer=window.PoyozzListPagination?.observeEnd(sentinel,()=>{
+    if(route.page!=='notifications')return;
+    notificationListPager.limit+=window.PoyozzListPagination?.pageSize('notifications')||10;
+    renderNotifications();
+  });
 }
 
 /* Cloud wallet ledger: read the authoritative transaction journal from Supabase. */
@@ -8661,6 +9214,8 @@ async function loadWalletLedger(currency) {
           signup_bonus: '註冊贈送',
           chat_turn_charge: '聊天回覆扣款',
           chat_turn_refund: '聊天失敗退款',
+          group_chat_turn_charge: '群組聊天回覆扣款',
+          group_chat_turn_refund: '群組聊天失敗退款',
           daily_checkin: '每日簽到',
           reward_ad: '觀看獎勵廣告',
           purchase: '購買',
@@ -8863,7 +9418,7 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
       void (async()=>{
         const select=$('backgroundSetting'),client=window.mySupabase,uid=currentUser()?.uid;
         if(!select||!client||!uid||!selected.cloudOwned||selected.cloudOwnerUid!==uid)return;
-        const {data,error}=await client.from('chat_memory_photos').select('id,caption').eq('owner_id',uid).eq('chat_type','single').eq('session_id',selected.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false});
+        const {data,error}=await client.from('chat_memory_photos').select('id,caption').eq('owner_id',uid).eq('chat_type','single').eq('session_id',selected.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false}).limit(window.PoyozzListPagination.pageSize('memoryPhotos'));
         if(error){console.warn('載入聊天背景選項失敗',error.message);return;}
         for(const photo of data||[]){const value='memory-photo:'+photo.id;let option=Array.from(select.options).find(item=>item.value===value);if(!option){option=document.createElement('option');option.value=value;option.textContent='回憶相片：'+(photo.caption||'回憶快照');select.appendChild(option);}if(selected.background===value)option.selected=true;}
         select.value=selected.background||'avatar';
@@ -8968,8 +9523,7 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
     }
     case 'edit-message': {
       const m = s?.messages.find(m => m.id === o.id);
-      const latestEditableMessage = m && !s.cloudSearchJump && (m.role === 'user' || m.role === 'assistant') &&
-        s.messages.filter(item => item.role === m.role).at(-1)?.id === m.id;
+      const latestEditableMessage=isLatestEditableChatMessage(s?.messages,m,'role',['user','assistant'],s?.cloudSearchJump);
       if (!m || !latestEditableMessage) return;
       showDialog('編輯最後一則訊息',`
         <form data-form="message-edit">
@@ -9199,7 +9753,7 @@ document.addEventListener('click', async event => {
   const target = event.target instanceof Element ? event.target.closest('[data-action]') : null;
   if (!target || target.disabled) return;
   const action = target.dataset.action;
-  if (!['delete-group-message','confirm-delete-group-message'].includes(action)) return;
+  if (action !== 'delete-group-message') return;
   event.preventDefault();
   event.stopPropagation();
   event.stopImmediatePropagation();
@@ -9213,20 +9767,7 @@ document.addEventListener('click', async event => {
       toast('此帳號正在等待刪除，目前暫停使用功能。你可以取消刪除申請以恢復帳號。');
       return;
     }
-    if (action === 'delete-group-message') {
-      const group = groupPrototype.active;
-      const message = groupPrototype.messages.find(item => item.id === id);
-      if (!group || !message || !['user','character'].includes(message.type)) {
-        toast('找不到可刪除的群組訊息。');
-        return;
-      }
-      showDialog('確認刪除訊息',
-        '<p>確定刪除此訊息？此操作無法復原。</p>'+
-        '<div class="row end" style="gap:8px;margin-top:16px">'+
-        '<button type="button" data-action="back">取消</button>'+
-        '<button type="button" class="danger" data-action="confirm-delete-group-message" data-id="'+e(message.id)+'">確定刪除</button></div>');
-      return;
-    }
+    if (!confirmChatMessageDeletion()) return;
     const group = groupPrototype.active;
     const message = groupPrototype.messages.find(item => item.id === id);
     const user = currentUser(), client = window.mySupabase;
@@ -9370,6 +9911,7 @@ document.addEventListener('click',async event => {
         break;
       }
       case 'encounter-memory-open': { await openEncounterMemoryDetail(button);break; }
+      case 'encounter-memory-load-older': { await loadEncounterMemoryDetailOlder();break; }
       case 'encounter-dialog-dismiss': { $('modal')?.close(); break; }
       case 'encounter-memory-detail-dismiss': { $('modal')?.close(); break; }
       case 'encounter-temporary-leave': {
@@ -9523,7 +10065,7 @@ document.addEventListener('click',async event => {
           }catch(error){console.warn('確認群組角色公開狀態失敗，改顯示既有快照。',error);}
         }
         if(publicCharacter){
-          await loadPublicSupabaseCharacters();
+          await window.loadPublicCharacterById(characterId);
           const character=state.characters.find(item=>String(item.id)===characterId);
           if(character&&accessible(character)&&character.visibility==='public'){
             visit('detail',characterId);
@@ -9595,14 +10137,14 @@ document.addEventListener('click',async event => {
       }
       case 'group-back':groupBack();break;
       case 'group-toggle-character':groupToggleCharacter(key);break;
+      case 'group-character-load-more': { void groupLoadCharacterPickerPage();break; }
       case 'group-world-character': { groupPrototype.draft.worldCharacterId=button.value||button.dataset.value||'';const selected=groupSelectedCharacters().find(c=>c.id===groupPrototype.draft.worldCharacterId);const preview=$('groupWorldReference');if(preview) preview.textContent=selected?.worldBackground||selected?.world||selected?.intro||'所選角色目前沒有可用的公開介紹；可先繼續建立，後續再完善世界觀資料。';break; }
-      case 'group-create':groupCreateMock();break;
-      case 'group-send':groupSendMock();break;
+      case 'group-create':groupCreate();break;
+      case 'group-send':groupSendTurn();break;
       case 'group-history-load-older':groupLoadOlderMessages();break;
       case 'edit-group-message': {
         const message=groupPrototype.messages.find(item=>item.id===key);
-        const latest=message&&groupPrototype.messages.filter(item=>item.type===message.type).at(-1);
-        if(groupPrototype.searchJump||!message||message.id!==latest?.id||!['user','character'].includes(message.type)) break;
+        if(!isLatestEditableChatMessage(groupPrototype.messages,message,'type',['user','character'],groupPrototype.searchJump)) break;
         showDialog('編輯最後一則訊息','<form data-form="group-message-edit" data-id="'+e(message.id)+'"><textarea name="text" required maxlength="10000">'+e(message.content||'')+'</textarea><button class="primary" style="margin-top:15px">儲存</button></form>');
         break;
       }
@@ -9777,14 +10319,14 @@ document.addEventListener('click',async event => {
         persist();render();break;
       }
       case 'tag':
-        search = '';filter = 'recommended';limit = 24;
+        search = '';filter = 'recommended';limit = window.PoyozzListPagination.pageSize('explore');
         exploreTags = [button.dataset.tag];
         state.preferences = [...new Set([...state.preferences,button.dataset.tag])];
         persist();
         go({page:'home',tag:button.dataset.tag});
         break;
       case 'filter':
-        filter = button.dataset.filter;limit = 24;
+        filter = button.dataset.filter;limit = 20;
         exploreTags = [];
         if (route.tag) {
           const next = {...route};delete next.tag;
@@ -9800,14 +10342,14 @@ document.addEventListener('click',async event => {
       case 'clear-search':
         search='';renderHome();$('exploreSearch')?.classList.remove('hidden');$('searchInput')?.focus();break;
       case 'clear-filter':
-        search='';exploreTags=[];limit=24;
+        search='';exploreTags=[];limit=window.PoyozzListPagination.pageSize('explore');
         go({page:'home'},true);
         renderHome();
         break;
       case 'banner':banner=Number(button.dataset.index);renderBanner();break;
       case 'scroll-grid':$('characterGrid')?.scrollIntoView({behavior:'smooth'});break;
-      case 'load-more':limit=Math.min(150,limit+24);renderGrid({append:true});break;
-      case 'new-batch':batch+=7;limit=24;renderGrid();break;
+      case 'load-more':limit+=window.PoyozzListPagination.pageSize('explore');renderGrid({append:true});break;
+      case 'new-batch':batch+=7;limit=20;renderGrid();break;
       case 'tags':openModal('tags',{mode:button.dataset.mode});break;
       case 'add-custom-tag': {
         const input=$('modal').querySelector('input[name="tagSearch"]');
@@ -10235,18 +10777,12 @@ document.addEventListener('click',async event => {
       case 'copy-message': {
         const m=s?.messages.find(m=>m.id===key);
         if (!m) break;
-        if (navigator.clipboard && isSecureContext) {
-          await navigator.clipboard.writeText(m.text);
-          toast('已複製訊息。');
-        } else {
-          showDialog('複製訊息',`<textarea readonly>${e(m.text)}</textarea>`);
-          $('modal').querySelector('textarea').select();
-        }
+        await copyChatMessageContent(m.text);
         break;
       }
       case 'delete-message': {
         const message = s?.messages.find(m=>m.id===key);
-        if (!s || !message || !confirm('確定刪除此訊息？此操作無法復原。')) break;
+        if (!s || !message || !confirmChatMessageDeletion()) break;
         // 雲端聊天先將訊息標記為軟刪除，確認成功後才移除本機副本，
         // 避免重新載入時該訊息又從 chat_messages 出現。
         if (s.cloudOwned && currentUser()?.uid === s.cloudOwnerUid && window.mySupabase && isUuid(message.id)) {
@@ -10448,6 +10984,7 @@ document.addEventListener('click',async event => {
         if(index<0 || !confirm('確定刪除此組人設？')) break;
         const previous=clone(list);list.splice(index,1);if(!list.some(item=>item.isDefault)&&list.length)list[0].isDefault=true;state.account.personas=list;persist();try { if(!window.mySupabase?.auth)throw new Error('請先登入。');const {data,error}=await window.mySupabase.auth.getUser();if(error||data?.user?.id!==state.account?.uid)throw new Error('登入狀態驗證失敗，請重新登入。');await savePersonaPresets(state.account);route.overlay={name:'personas'};render();toast('儲存成功');}catch(error){state.account.personas=previous;persist();openModal('personas');toast('人設刪除未能同步：'+(error.message||'請稍後再試。'));}break;
       }
+
 
       case 'ledger-retry': {
         const currency = button.dataset.value === 'silver' ? 'silver' : 'diamond';
@@ -10946,14 +11483,14 @@ const {
         break;
       }
       case 'group-message': {
-        await groupSendMock();
+        await groupSendTurn();
         break;
       }
       case 'message': {
         // Defensive routing: if a group composer is present, never run single-chat
         // empty-message validation for its blank-send/continue action.
         if (route.page === 'group' || $('groupMessageInput')) {
-          await groupSendMock();
+          await groupSendTurn();
           break;
         }
         if (!s || !currentUser()) return;
@@ -11177,8 +11714,7 @@ const {
       }
       case 'message-edit': {
         const m=s?.messages.find(m=>m.id===o.id);
-        const latestEditableMessage = m && !s.cloudSearchJump && (m.role==='user'||m.role==='assistant') &&
-          s.messages.filter(item=>item.role===m.role).at(-1)?.id===m.id;
+        const latestEditableMessage=isLatestEditableChatMessage(s?.messages,m,'role',['user','assistant'],s?.cloudSearchJump);
         if (!m || !latestEditableMessage) return;
         if (!text) return toast('訊息不可為空。');
         const previousText=m.text, wasEdited=!!m.edited;
@@ -11204,22 +11740,14 @@ const {
       case 'copy-group-message': {
         const message=groupPrototype.messages.find(item=>item.id===key);
         if(!message) break;
-        const content=String(message.content||'');
-        if(navigator.clipboard && isSecureContext) {
-          await navigator.clipboard.writeText(content);
-          toast('已複製訊息。');
-        } else {
-          showDialog('複製訊息','<textarea readonly>'+e(content)+'</textarea>');
-          $('modal').querySelector('textarea').select();
-        }
+        await copyChatMessageContent(message.content);
         break;
       }
       case 'group-message-edit': {
         const group=groupPrototype.active;
         const message=groupPrototype.messages.find(item=>item.id===messageId);
-        const latest=message&&groupPrototype.messages.filter(item=>item.type===message.type).at(-1);
         const user=currentUser(), client=window.mySupabase;
-        if(groupPrototype.searchJump||!group||!message||message.id!==latest?.id||!['user','character'].includes(message.type)) {
+        if(!group||!isLatestEditableChatMessage(groupPrototype.messages,message,'type',['user','character'],groupPrototype.searchJump)) {
           toast('請返回最新訊息後，再編輯群組訊息。');break;
         }
         if(!text) return toast('訊息不可為空。');
@@ -11309,10 +11837,10 @@ window.addEventListener('blur', saveEditorDraft);
 document.addEventListener('input',event => {
   const target=event.target;
   if (target.closest('form[data-form="character"]')) saveEditorDraft();
-  if (target.id==='searchInput') {search=target.value;renderGrid();}
+  if (target.id==='searchInput') {search=target.value;limit=20;renderGrid();}
   if (target.id==='chatSearch') {
     chatSearch=target.value;
-    $('chatEntries').innerHTML=chatEntries();
+    refreshChatEntryList();
   }
   if(target.id==='chatMessageSearchInput'){
     if(chatMessageSearchState.timer)clearTimeout(chatMessageSearchState.timer);
@@ -11323,8 +11851,8 @@ document.addEventListener('input',event => {
   }
   if (target.id==='groupCharacterSearch') {
     groupCharacterSearch=target.value;
-    const results=$('groupCharacterResults');
-    if(results) results.innerHTML=groupRenderCharacterResults();
+    if(groupCharacterPickerSearchTimer)clearTimeout(groupCharacterPickerSearchTimer);
+    groupCharacterPickerSearchTimer=setTimeout(()=>void groupLoadCharacterPickerPage({reset:true}),220);
   }
   if (target.id==='messageInput') {
     drafts[route.id]=target.value;
@@ -11343,7 +11871,7 @@ document.addEventListener('keydown',event => {
       event.key!=='Enter' || event.isComposing ||
       !(event.ctrlKey || event.metaKey)) return;
   event.preventDefault();
-  if(event.target.id==='groupMessageInput') void groupSendMock();
+  if(event.target.id==='groupMessageInput') void groupSendTurn();
   else event.target.form?.requestSubmit();
 });
 document.addEventListener('click', event => {
@@ -11646,6 +12174,51 @@ document.addEventListener('load',event => {
   if (image instanceof HTMLImageElement && image.style.opacity==='.15') image.style.opacity='1';
 },true);
 
+async function loadCityCharacterPage(offset=0){
+  const client=window.mySupabase;
+  if(!client)return {items:[],hasMore:false};
+  const pageSize=window.PoyozzListPagination.pageSize('citySceneCharacters');
+  const {data,error}=await client.from('characters')
+    .select('id,author_id,name,gender,age,avatar_url,avatar_video_path,is_nsfw,visibility,review_status,intro,race,style,tags,created_at,first_published_at,latest_eligible')
+    .eq('visibility','public').is('deleted_at',null)
+    .order('first_published_at',{ascending:false,nullsFirst:false})
+    .order('id',{ascending:false}).range(offset,offset+pageSize-1);
+  if(error)throw new Error('讀取場景公開角色失敗：'+error.message);
+  const rows=Array.isArray(data)?data:[];
+  const items=rows.map(mapPublicCharacterRow);
+  state.characters=window.PoyozzListPagination.mergeUnique(state.characters,items,character=>character.id);
+  return {items,hasMore:rows.length===pageSize};
+}
+
+async function loadCityCharacterSchedules(characterIds=[]){
+  const client=window.mySupabase;
+  const ids=[...new Set((characterIds||[]).filter(Boolean))].slice(0,10);
+  const schedules=new Map();
+  if(!client||!ids.length)return schedules;
+  let data=[];
+  try{
+    const result=await client.rpc('get_encounter_character_schedules',{p_character_ids:ids});
+    if(result.error)throw result.error;
+    data=result.data||[];
+  }catch(error){
+    console.warn('城市角色排程批次載入失敗：',error?.message||error);
+    return schedules;
+  }
+  for(const row of data){
+    const lines=schedules.get(row.character_id)||[];
+    lines.push([
+      row.weekday==null?'*':row.weekday,
+      String(row.start_time||'').slice(0,5),
+      String(row.end_time||'').slice(0,5),
+      row.location_key,
+      row.activity
+    ].join('|'));
+    schedules.set(row.character_id,lines);
+  }
+  for(const [id,lines] of schedules)schedules.set(id,lines.join('\n'));
+  return schedules;
+}
+
 function renderCityMapMVP() {
   const renderCityMap = window.PoyozzCityMap?.render;
   if (typeof renderCityMap !== 'function') {
@@ -11657,7 +12230,8 @@ function renderCityMapMVP() {
     $, state, accessible, escapeHTML, safeImage, currentUser, toast, go, requireLogin,
     persist, hydratePublicCharacterIllustrations, characterVideoObserver,
     releaseCharacterVideo, hydrateCharacterVideo, findResumableEncounterSession,
-    setEncounterLifecycleState, saveChatSessionSafely, createEncounterSession
+    setEncounterLifecycleState, saveChatSessionSafely, createEncounterSession,
+    loadCityCharacterPage, loadCityCharacterSchedules
   });
 }
 
@@ -11833,7 +12407,7 @@ document.addEventListener('click',async event=>{
     walletDiamondConsentOnce=mode;
     const modal=$('modal'); if(modal?.open) modal.close();
     // Explicit player consent: only now retry the intended send action.
-    if(mode==='group') await groupSendMock();
+    if(mode==='group') await groupSendTurn();
     else {
       const form=$('view').querySelector('form[data-form="message"]');
       if(form) form.requestSubmit();
@@ -11890,7 +12464,7 @@ document.addEventListener('submit',function(event){
 .composer-send[disabled] span[aria-hidden="true"],.composer-send.is-sending span[aria-hidden="true"]{font-size:17px;line-height:1}
 .followed-authors-back{display:inline-flex;align-items:center;justify-content:center;flex:0 0 40px;width:40px;height:40px;padding:8px;margin:0;color:var(--muted);border:1px solid var(--border);background:var(--panel)}.followed-authors-title-row{display:flex;align-items:center;gap:10px}.followed-authors-title-row h1{margin:0}.group-wizard-title{min-width:0;flex:1}.group-member-confirm-row{display:flex;align-items:center;gap:12px;flex-wrap:nowrap;overflow-x:auto;padding:4px 2px 8px}.group-member-confirm-avatar{display:inline-flex;align-items:center;justify-content:center;flex:0 0 58px;width:58px;height:58px;padding:4px;border-radius:50%;background:var(--panel2);border:1px solid var(--border)}.group-member-confirm-avatar .avatar{width:48px;height:48px;border-radius:50%}
 .followed-authors-back:hover{color:var(--text);background:var(--panel2)}
-@media(max-width:767px){body.group-chat-page .sidebar{display:none!important}body.group-chat-page .app{margin-left:0!important}body.group-chat-page .chat-layout{display:block;height:100dvh}body.group-chat-page .chat-layout.hide-list .chat-list{display:none!important}body.group-chat-page .chat-main{height:100dvh;border:0;border-radius:0}body.group-chat-page .chat-heading{padding:6px 8px}body.group-chat-page body.group-chat-page .composer{padding:5px 8px calc(5px + env(safe-area-inset-bottom))}}
+@media(max-width:767px){body.group-chat-page .chat-layout.hide-list .chat-list{display:none!important}}
 </style>
 
 

@@ -26,14 +26,20 @@ for (const name of [
 for (const contract of [
   'POYOZZ 城市地圖',
   'taipeiSunTimes2025',
-  'get_encounter_character_schedule',
+  'loadCityCharacterSchedules',
   'get_latest_settled_encounter_affinity',
   'city-character-meet',
   'findResumableEncounterSession',
   'setEncounterLifecycleState',
-  'saveChatSessionSafely'
+  'saveChatSessionSafely',
+  'loadCityCharacterSchedules'
 ]) {
   assert.ok(cityMap.includes(contract), 'Extracted city-map behavior is missing: ' + contract);
 }
 
 console.log('City map module extraction and dependency contract passed.');
+
+assert.match(html,/get_encounter_character_schedules/);
+assert.doesNotMatch(cityMap,/hydrateCitySchedule/);
+assert.ok(cityMap.includes("const schedules=await loadCityCharacterSchedules(items.map(person=>person.id))"));
+assert.ok(!cityMap.includes("Promise.all(items.map(hydrateCitySchedule)"));

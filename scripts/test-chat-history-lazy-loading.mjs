@@ -13,13 +13,17 @@ const between = (start, end) => {
 };
 
 const cacheCompaction = between("function compactCloudSessionForLocalStorage(session)", "function compactLocalStateForQuota");
-assert.match(cacheCompaction, /slice\(-50\)/);
+assert.match(cacheCompaction, /slice\(-5\)/);
 assert.match(cacheCompaction, /pendingIds/);
 assert.match(cacheCompaction, /message\.localOnly===true/);
 assert.match(cacheCompaction, /!isUuid\(message\.id\)/);
 assert.match(cacheCompaction, /cloudSessionDataLoaded:false/);
 assert.match(cacheCompaction, /cloudMessagesLoaded:false/);
+assert.match(cacheCompaction, /cloudMessagesErrorOlder:false/);
 assert.match(cacheCompaction, /cloudRoleplayMeta/);
+const cacheRestore = between("function restoreSessionsForUser(uid)", "function isolateSessionsForUser");
+assert.match(cacheRestore, /compactCloudSessionForLocalStorage\(session\)/,
+  "restored cloud chats must be compacted before the first conversation render");
 const cacheWriter = between("function cacheSessionsForUser(uid)", "function restoreSessionsForUser");
 assert.match(cacheWriter, /compactSessionsForLocalStorage/);
 const persistWriter = between("function persist()", "const CHAT_HISTORY_CACHE_COMPACTION_KEY");
@@ -60,7 +64,8 @@ assert.ok(hasUserHelper.indexOf("cloudHasUserMessage===true") < hasUserHelper.in
 const messageLoader = between("async function loadCloudSessionMessages(sessionId, options = {})", "async function saveChatSessionSafely");
 assert.match(messageLoader, /options\.refresh !== true/,
   "an explicit refresh must bypass the already-loaded short circuit");
-assert.match(messageLoader, /auth\.getUser\(\)/);
+assert.ok(messageLoader.includes("getVerifiedAuthUser(userId)"));
+assert.ok(messageLoader.includes("options.verifiedUser"));
 assert.match(messageLoader, /snapshotRequested=!older&&session\.cloudCharacterSnapshotLoaded!==true/);
 assert.match(messageLoader, /\.\.\.\(snapshotRequested\?\['character_snapshot'\]:\[\]\)/);
 assert.match(messageLoader, /session\.cloudCharacterSnapshotLoaded=true/);
@@ -69,9 +74,15 @@ assert.match(messageLoader, /cloudSynced:true/,
   "messages fetched from Supabase must be marked as already synchronized");
 assert.match(messageLoader, /\.eq\('id', sessionId\)\.eq\('user_id', userId\)\.is\('deleted_at', null\)/);
 assert.match(messageLoader, /\.eq\('session_id',sessionId\)\.is\('deleted_at',null\)/);
-assert.match(messageLoader, /const pageSize=50/);
+assert.match(messageLoader, /pageSize\('messages'\)\|\|5/);
 assert.match(messageLoader, /messageQuery\.limit\(pageSize\)/);
+assert.match(messageLoader, /session\.cloudMessagesErrorOlder=older/);
+assert.match(messageLoader, /session\.cloudMessagesErrorOlder=false/);
 assert.match(messageLoader, /cloudOldestMessageCursor/);
+assert.match(messageLoader, /const currentPageIds=new Set\(cloudMessages\.map\(message=>message\.id\)\)/);
+assert.match(messageLoader, /cachedMessages=older\?\(session\.messages\|\|\[\]\):/);
+assert.match(messageLoader, /currentPageIds\.has\(message\.id\)/,
+  "initial refresh must discard stale cached cloud messages outside the newest five-row page");
 assert.match(messageLoader, /created_at\.lt\./);
 assert.match(messageLoader, /roleplayMeta/);
 assert.match(messageLoader, /data\.memories/);
@@ -85,11 +96,10 @@ assert.match(messageLoader, /readDeletedChatTombstones/);
 assert.match(messageLoader, /session\.cloudMessagesLoading=false/);
 
 const startChat = between("async function startChat(characterId)", "function visibleSessions");
-assert.match(startChat, /\.select\('session_id'\)/);
-assert.match(startChat, /\.limit\(1\)\.maybeSingle\(\)/);
-assert.doesNotMatch(startChat, /\.select\('session_id,content'\)/);
-assert.match(startChat, /onlySessionId:existingRow\.id/);
-assert.match(startChat, /loadCloudSessionMessages\(existingRow\.id\)/);
+assert.match(startChat, /rpc\('find_existing_story_chat_session'/);
+assert.match(startChat, /onlySessionId:existingSessionId/);
+assert.match(startChat, /loadCloudSessionMessages\(existingSessionId,\{verifiedUser\}\)/);
+assert.doesNotMatch(startChat, /\.from\('chat_sessions'\)|\.from\('chat_messages'\)/);
 assert.doesNotMatch(startChat, /await loadCloudChatSessions\(\{ id:userId \}\);/);
 
 const localSend = between("if (!window.mySupabase || !isUuid(s.characterId) || !isUuid(s.id))", "if (!walletPreflight('single'))");
@@ -130,6 +140,12 @@ const safeSaver = between("async function saveChatSessionSafely(s)", "async func
 assert.match(safeSaver, /syncedUserMessageIds/,
   "serialized saves must propagate successful message sync markers to the live session");
 
+const searchJump = between("async function jumpToChatSearchHit(button)", "async function returnChatToLatest(kind)");
+assert.equal((searchJump.match(/\.limit\(2\)/g)||[]).length,4,
+  "single and group search jumps must load only two neighboring messages on each side of the target");
+assert.match(searchJump, /s\.cloudHasMoreMessages=\(b\.data\|\|\[\]\)\.length===2/);
+assert.match(searchJump, /groupPrototype\.historyHasMore=\(b\.data\|\|\[\]\)\.length===2/);
+
 const renderConversation = between("function renderConversation()", "function formatMessage");
 assert.match(renderConversation, /data-chat-history-action/);
 assert.match(renderConversation, /lastRenderedConversationId !== s\.id/);
@@ -140,6 +156,8 @@ assert.match(renderConversation, /refresh:button\.dataset\.chatHistoryAction==='
   "the retry control must be able to retry a previously loaded session");
 const renderMessages = between("function renderMessages(scroll = true)", "function memorySize");
 assert.match(renderMessages, /載入更早的訊息/);
+assert.match(renderMessages, /s\.cloudMessagesErrorOlder\?'older':'retry'/,
+  "a failed older page must retry the same cursor instead of refreshing the newest page");
 assert.match(renderMessages, /重新載入/);
 assert.match(renderMessages, /messageInput\.disabled=true/);
 assert.match(renderMessages, /sendButton\.disabled=sending\|\|loadingHistory/);

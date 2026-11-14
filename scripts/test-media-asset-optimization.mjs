@@ -111,7 +111,7 @@ function albumBlock(start,end){
   assert.ok(a>=0&&b>a,"missing memory album source block: "+start);
   return memoryAlbum.slice(a,b);
 }
-const albumLoader=albumBlock("async function loadAlbum(type,chatId)","async function compressMemoryImage");
+const albumLoader=albumBlock("async function loadAlbum(type,chatId,options={})","async function compressMemoryImage");
 assert.ok(albumLoader.includes("getMemoryPhotoSignedUrl(photo.storage_path)"));
 assert.doesNotMatch(albumLoader,/if\(!imageUrl\)[^\n]*signedError/);
 const photoDelete=albumBlock("if(button.dataset.action==='memory-photo-delete')","if(button.dataset.action==='memory-photo-background')");

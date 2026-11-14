@@ -10,7 +10,7 @@ assert.ok(html.indexOf(moduleTag) < html.indexOf('function renderAuthor()'),
   'Author profile module must load before the app adapter can invoke it.');
 
 const adapterStart = html.indexOf('function renderAuthor()');
-const favoritesStart = html.indexOf('function renderFavorites()', adapterStart);
+const favoritesStart = html.indexOf('async function renderFavorites({loadMore=false}={})', adapterStart);
 assert.ok(adapterStart >= 0 && favoritesStart > adapterStart && favoritesStart - adapterStart < 900,
   'index.html must retain only a thin author-profile adapter.');
 const adapter = html.slice(adapterStart, favoritesStart);
@@ -32,9 +32,9 @@ for (const dependency of [
 
 for (const contract of [
   "state.following.includes(a.uid)",
-  "c.visibility === 'public'",
-  "c.cloudPublic !== false",
-  "c.localOnly !== true",
+  "character.visibility==='public'",
+  "character.cloudPublic!==false",
+  "character.localOnly!==true",
   'id="authorFollowerCount"',
   'data-action="follow"',
   'data-action="share"',
@@ -45,3 +45,6 @@ for (const contract of [
 }
 
 console.log('Author profile module extraction and dependency contract passed.');
+
+assert.match(moduleSource, /page\.observer\?\.disconnect\(\)/, 'Author profile rerenders must disconnect the previous pagination observer.');
+assert.match(moduleSource, /createState\('authorCharacters'/, 'Author profile must use the shared pagination state.');

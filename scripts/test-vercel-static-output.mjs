@@ -16,11 +16,13 @@ const fileBudgets = {
   'signed-url-manager.js': 8_000,
   'core-utils.js': 4_000,
   'city-map.js': 52_000,
-  'followed-authors.js': 8_000,
-  'author-profile.js': 5_000,
+  'followed-authors.js': 9_000,
+  'list-pagination.js': 2_000,
+  'author-profile.js': 6_000,
   'comment-renderer.js': 5_000,
   'custom-tag-picker.js': 5_000,
-  'memory-album.js': 26_000,
+  'memory-album.js': 27_000,
+  'poyozz-ui.css': 40_000,
   'encounter-scene.js': 36_000,
 };
 const expectedFiles = Object.keys(fileBudgets).sort();

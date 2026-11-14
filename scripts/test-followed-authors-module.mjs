@@ -19,14 +19,14 @@ assert.match(moduleSource, /async render\(dependencies\)/);
 assert.doesNotMatch(moduleSource, /async function render\(dependencies\)/);
 for (const dependency of [
   '$', 'currentUser', 'getRoute', 'getSupabaseClient', 'isUuid', 'state',
-  'loadPublicSupabaseCharacters', 'author', 'ICON', 'e', 'avatar', 'card', 'persist', 'toast'
+  'loadPublicAuthorLatestCharacters', 'author', 'ICON', 'e', 'avatar', 'card', 'persist', 'toast'
 ]) {
   assert.ok(moduleSource.includes(dependency), 'App-owned dependency must be explicit: ' + dependency);
 }
 for (const contract of [
   "from('author_follows')", "from('public_profiles')",
-  "eq('follower_id', user.uid)", "order('created_at', {ascending:false})",
-  "getRoute()?.page !== 'followed-authors'", '公開角色 ${characters.length} 名',
+  "eq('follower_id',current.userId)", "order('created_at',{ascending:false})",
+  "getRoute()?.page !== 'followed-authors'", "最新公開角色",
   '你還沒有追蹤任何作者。', '讀取失敗，請重新整理後再試。'
 ]) {
   assert.ok(moduleSource.includes(contract), 'Followed authors behavior is missing: ' + contract);
@@ -35,3 +35,9 @@ assert.doesNotMatch(moduleSource, /window\.mySupabase/,
   'The extracted module must receive the Supabase client through dependency injection.');
 
 console.log('Followed authors module extraction and dependency contract passed.');
+
+assert.ok(moduleSource.includes("entry.hasMore?'<button type=\"button\" class=\"followed-author-more\""));
+assert.ok(!moduleSource.includes("entry.total"));
+
+assert.match(moduleSource, /createState\('followedAuthors'/, 'Followed authors must use the shared pagination state.');
+assert.doesNotMatch(moduleSource, /renderGeneration|current\.total/, 'Unused pagination generation and total-count state must stay removed.');

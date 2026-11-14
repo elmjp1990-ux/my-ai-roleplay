@@ -2,13 +2,15 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const source = readFileSync("supabase/functions/chat-turn/index.ts", "utf8");
+const openRouterShared = readFileSync("supabase/functions/_shared/openrouter-chat-completions.ts", "utf8");
 const summary = readFileSync("supabase/functions/_shared/story-memory-summary.ts", "utf8");
 const migration = readFileSync("supabase/migrations/20261105223613_ai_model_usage_and_memory_summaries.sql", "utf8");
 const summaryReadMigration = readFileSync("supabase/migrations/20261110120000_story_phone_state_and_memory_summary_read.sql", "utf8");
 const ui = readFileSync("index.html", "utf8");
-assert.match(source, /const DEFAULT_OPENROUTER_MODEL = "deepseek\/deepseek-v4-flash-20260423"/);
+assert.match(source, /const DEFAULT_OPENROUTER_MODEL = POYOZZ_DEFAULT_CHAT_MODEL/);
+assert.match(openRouterShared, /POYOZZ_DEFAULT_CHAT_MODEL = "deepseek\/deepseek-v4-flash-20260423"/);
 assert.doesNotMatch(source, /Deno\.env\.get\("OPENROUTER_MODEL"\)/);
-assert.match(source, /provider: \{ only: \["deepinfra"\], allow_fallbacks: false, data_collection: "deny" \}/);
+assert.match(openRouterShared, /provider: \{ only: \["deepinfra"\], allow_fallbacks: false, data_collection: "deny" \}/);
 assert.match(source, /processDueStoryMemorySummary\(admin, session, user\.id, openRouterKey\)/);
 assert.match(source, /recordChatModelUsage\(admin/);
 assert.match(source, /storedSummary/);

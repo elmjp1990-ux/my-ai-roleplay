@@ -1,12 +1,13 @@
 // POYOZZ single-player Story turn orchestrator: reservation, OpenRouter generation, privacy screening, persistence, and settlement.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildPromptVariableValues, applyPromptVariables } from "../_shared/prompt-context.ts";
-import { normalizeAiProviderResult } from "../_shared/ai-provider-result.ts";
 import { findPrivateContextLeak, preparePrivateContext } from "../_shared/private-context-guard.ts";
 import { releaseGenerationClaim } from "../_shared/chat-turn-claim.ts";
 import { classifyProviderFailure } from "../_shared/provider-failure-policy.ts";
 import { processDueStoryMemorySummary, recordChatModelUsage } from "../_shared/story-memory-summary.ts";
 import { parseStoryTurnEnvelope } from "../_shared/story-turn-envelope.ts";
+import { collectDerivedPrivateProfileValues, formatCharacterAiProfilePrompt } from "../_shared/character-ai-profile-prompt.ts";
+import { requestOpenRouterChatCompletion, POYOZZ_DEFAULT_CHAT_MODEL } from "../_shared/openrouter-chat-completions.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,8 +26,7 @@ const isUuid = (value: unknown): value is string =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
 
-const OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-v4-flash-20260423";
+const DEFAULT_OPENROUTER_MODEL = POYOZZ_DEFAULT_CHAT_MODEL;
 const GENERATION_TIMEOUT_MS = 55_000;
 
 type DbRow = Record<string, unknown>;
@@ -34,117 +34,6 @@ const asDbRow = (value: unknown): DbRow =>
   value && typeof value === "object" && !Array.isArray(value) ? value as DbRow : {};
 const asString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
-
-const collectDerivedPrivateProfileValues = (value: unknown): string[] => {
-  const profile = asDbRow(value);
-  const protectedValues = new Set<string>();
-  const collectItems = (items: unknown) => {
-    if (!Array.isArray(items)) return;
-    for (const item of items) {
-      const entry = asDbRow(item);
-      const refs = Array.isArray(entry.source_refs) ? entry.source_refs : [];
-      const content = asString(entry.content);
-      if (content && refs.some((ref) => typeof ref === "string" && ref.startsWith("character_private_info."))) {
-        protectedValues.add(content);
-      }
-    }
-  };
-  for (const key of [
-    "identity_background", "core_personality", "inner_motivations",
-    "emotional_response_patterns", "relationship_dynamics",
-    "behavior_and_agency", "knowledge_boundaries", "appearance_markers",
-  ]) collectItems(asDbRow(profile[key]).items);
-  const speech = asDbRow(profile.speech_style);
-  collectItems(speech.tendencies);
-  collectItems(speech.creator_defined_quirks);
-  collectItems(asDbRow(profile.author_private_context).items);
-  const ooc = asDbRow(profile.ooc_rules);
-  if (Array.isArray(ooc.rules)) {
-    for (const item of ooc.rules) {
-      const rule = asDbRow(item);
-      const refs = Array.isArray(rule.source_refs) ? rule.source_refs : [];
-      if (refs.some((ref) => typeof ref === "string" && ref.startsWith("character_private_info."))) {
-        for (const key of ["rule", "why_it_matters", "prohibited_deviation", "allowed_growth"]) {
-          const content = asString(rule[key]);
-          if (content) protectedValues.add(content);
-        }
-      }
-    }
-  }
-  if (Array.isArray(profile.source_conflicts)) {
-    for (const item of profile.source_conflicts) {
-      const conflict = asDbRow(item);
-      const refs = Array.isArray(conflict.conflicting_source_refs) ? conflict.conflicting_source_refs : [];
-      if (refs.some((ref) => typeof ref === "string" && ref.startsWith("character_private_info."))) {
-        for (const key of ["topic", "description"]) {
-          const content = asString(conflict[key]);
-          if (content) protectedValues.add(content);
-        }
-      }
-    }
-  }
-  return [...protectedValues].slice(0, 120);
-};
-
-const formatCharacterAiProfilePrompt = (value: unknown): string => {
-  const profile = asDbRow(value);
-  const sectionLabels: Record<string, string> = {
-    identity_background: "身份與背景",
-    core_personality: "核心人格與價值觀",
-    inner_motivations: "內在動機與目標",
-    emotional_response_patterns: "情緒反應模式",
-    relationship_dynamics: "關係發展邏輯",
-    behavior_and_agency: "行為模式與自主性",
-    knowledge_boundaries: "知識範圍與記憶邊界",
-    appearance_markers: "外觀辨識特徵",
-  };
-  const lines: string[] = [];
-  for (const [key, label] of Object.entries(sectionLabels)) {
-    const section = asDbRow(profile[key]);
-    const items = Array.isArray(section.items) ? section.items : [];
-    for (const item of items) {
-      const entry = asDbRow(item);
-      const content = asString(entry.content);
-      if (content) lines.push(`[${label}/${entry.source_type === "ai_inference" ? "AI歸納" : "作者設定"}] ${content}`);
-    }
-  }
-  const speech = asDbRow(profile.speech_style);
-  for (const item of Array.isArray(speech.tendencies) ? speech.tendencies : []) {
-    const content = asString(asDbRow(item).content);
-    if (content) lines.push("[說話風格] " + content);
-  }
-  for (const item of Array.isArray(speech.creator_defined_quirks) ? speech.creator_defined_quirks : []) {
-    const content = asString(asDbRow(item).content);
-    if (content) lines.push("[作者明確提供的固定慣用詞] " + content);
-  }
-  const ooc = asDbRow(profile.ooc_rules);
-  for (const item of Array.isArray(ooc.rules) ? ooc.rules : []) {
-    const rule = asDbRow(item);
-    if (asString(rule.rule)) {
-      lines.push("[OOC防崩規則] " + asString(rule.rule) +
-        "；避免：" + asString(rule.prohibited_deviation) +
-        "；允許自然成長：" + asString(rule.allowed_growth));
-    }
-  }
-  // This section is server-only and is inserted only into the server-built system prompt.
-  const privateContext = asDbRow(profile.author_private_context);
-  for (const item of Array.isArray(privateContext.items) ? privateContext.items : []) {
-    const content = asString(asDbRow(item).content);
-    if (content) lines.push("[作者私密補充/僅供角色理解] " + content);
-  }
-  for (const unknown of Array.isArray(profile.unknowns) ? profile.unknowns : []) {
-    if (asString(unknown)) lines.push("[作者未提供/未知] " + asString(unknown));
-  }
-  for (const conflict of Array.isArray(profile.source_conflicts) ? profile.source_conflicts : []) {
-    const entry = asDbRow(conflict);
-    if (asString(entry.description)) lines.push("[作者設定衝突/不可自行裁決] " + asString(entry.description));
-  }
-  if (ooc.status === "insufficient_source" && asString(ooc.insufficient_source_reason)) {
-    lines.push("[OOC資料不足] " + asString(ooc.insufficient_source_reason));
-  }
-  return lines.join("\n").slice(0, 6000);
-};
-
 
 async function buildStoryMessages(
   admin: any,
@@ -389,49 +278,14 @@ async function requestStoryGeneration(
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
   apiKey: string,
   model: string,
-): Promise<{ result: ReturnType<typeof normalizeAiProviderResult>; httpStatus: number; requestId: string; provider: string; model: string; usage: DbRow }> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), GENERATION_TIMEOUT_MS);
-  try {
-    const response = await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, {
-      method: "POST",
-      headers: {
-        "Authorization": "Bearer " + apiKey,
-        "Content-Type": "application/json",
-        "X-OpenRouter-Title": "POYOZZ",
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        response_format: { type: "json_object" },
-        temperature: 0.85,
-        // Only approved non-training providers may receive player content.
-        // No fallback is allowed: unavailable compliant providers fail closed.
-        provider: { only: ["deepinfra"], allow_fallbacks: false, data_collection: "deny" },
-      }),
-      signal: controller.signal,
-    });
-    let payload: DbRow;
-    try {
-      payload = asDbRow(await response.json());
-    } catch {
-      payload = { error: { code: "invalid_provider_response" } };
-    }
-    payload.status = response.status;
-    if (!response.ok && payload.error == null) {
-      payload.error = { code: "http_" + response.status };
-    }
-    return {
-      result: normalizeAiProviderResult(payload),
-      httpStatus: response.status,
-      requestId: response.headers.get("x-request-id") || asString(payload.id),
-      provider: asString(payload.provider),
-      model: asString(payload.model) || model,
-      usage: asDbRow(payload.usage),
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
+) {
+  return requestOpenRouterChatCompletion({
+    messages,
+    apiKey,
+    model,
+    timeoutMs: GENERATION_TIMEOUT_MS,
+    responseFormat: { type: "json_object" },
+  });
 }
 
 Deno.serve(async (request) => {
