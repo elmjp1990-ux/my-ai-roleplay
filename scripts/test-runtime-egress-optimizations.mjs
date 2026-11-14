@@ -228,6 +228,13 @@ assert.doesNotMatch(groupRenderer,/avatar-fallback player-avatar/,
   'group player messages must not create an outer “you” avatar');
 assert.doesNotMatch(singleRenderer,/outerAvatar/,
   'single chat player messages must not allocate or render a redundant outer avatar');
+const latestEditHelper=between('function isLatestEditableChatMessage(','function renderMessageActionBar(');
+assert.match(latestEditHelper,/allowedTypes\.includes\(message\[typeField\]\)/);
+assert.match(latestEditHelper,/messages\.filter\(item=>item\[typeField\]===message\[typeField\]\)\.at\(-1\)/);
+assert.match(groupRenderer,/isLatestEditableChatMessage\(g\.messages,m,'type',\['user','character'\],g\.searchJump\)/);
+assert.match(singleRenderer,/isLatestEditableChatMessage\(s\.messages,m,'role',\['user','assistant'\],s\.cloudSearchJump\)/);
+assert.equal((html.match(/isLatestEditableChatMessage\(/g)||[]).length,7,
+  'single and group render/edit handlers must share the same latest-message eligibility rule');
 const messageActionHelper=between('function renderMessageActionBar(','function roleplaySegmentHTML(');
 assert.match(messageActionHelper,/message-action-bar/);
 assert.match(messageActionHelper,/copyAction/);
