@@ -20,6 +20,9 @@ assert.match(cacheCompaction, /!isUuid\(message\.id\)/);
 assert.match(cacheCompaction, /cloudSessionDataLoaded:false/);
 assert.match(cacheCompaction, /cloudMessagesLoaded:false/);
 assert.match(cacheCompaction, /cloudRoleplayMeta/);
+const cacheRestore = between("function restoreSessionsForUser(uid)", "function isolateSessionsForUser");
+assert.match(cacheRestore, /compactCloudSessionForLocalStorage\(session\)/,
+  "restored cloud chats must be compacted before the first conversation render");
 const cacheWriter = between("function cacheSessionsForUser(uid)", "function restoreSessionsForUser");
 assert.match(cacheWriter, /compactSessionsForLocalStorage/);
 const persistWriter = between("function persist()", "const CHAT_HISTORY_CACHE_COMPACTION_KEY");
