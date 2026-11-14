@@ -266,6 +266,9 @@ assert.match(exploreGrid,/list\.slice\(0,limit\)/,
   "Explore must cap visible character cards to the current twenty-item display page");
 assert.match(exploreGrid,/pageSize\('explore'\)/,
   "Explore scroll continuation must advance by twenty visible cards");
+assert.match(exploreGrid,/PoyozzListPagination\.observeEnd/,
+  "Explore must use the shared IntersectionObserver lifecycle rather than a separate observer implementation");
+
 assert.match(exploreGrid,/window\.loadNextPublicCharacterPage\(\)/,
   "Explore must fetch another backend page when the loaded rows are exhausted");
 assert.match(exploreGrid,/characterVideoObserver\.unobserve\(previousVideo\)/,
