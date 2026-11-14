@@ -3261,7 +3261,7 @@ function compactCloudSessionForLocalStorage(session) {
     session.pendingTurn?.userMessageId,
     session.pendingTurn?.assistantMessageId
   ].filter(Boolean));
-  const kept=new Map(messages.slice(-50).map(message=>[message.id,message]));
+  const kept=new Map(messages.slice(-5).map(message=>[message.id,message]));
   for(const message of messages){
     if(pendingIds.has(message.id)||message.id==='opening-'+session.id||
        !isUuid(message.id)||message.localOnly===true||message.cloudSynced===false||message.syncPending===true){
@@ -3894,7 +3894,7 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
       session.cloudSnapshotNeedsRepair=!row.character_snapshot?.id;
     }
     const roleplayMeta=session.cloudRoleplayMeta||{};
-    const pageSize=50;
+    const pageSize=5;
     let messageQuery=client.from('chat_messages').select('id,session_id,role,content,created_at,suggested_replies')
       .eq('session_id',sessionId).is('deleted_at',null)
       .order('created_at',{ascending:false}).order('id',{ascending:false});
@@ -3920,7 +3920,13 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
       if(persistedSuggestions.length===3)normalized.suggestedReplies=persistedSuggestions;
       return normalized;
     });
-    const merged=new Map((session.messages||[]).map(message=>[message.id,message]));
+    const pendingMessageIds=new Set([session.pendingTurn?.userMessageId,session.pendingTurn?.assistantMessageId].filter(Boolean));
+    const currentPageIds=new Set(cloudMessages.map(message=>message.id));
+    const cachedMessages=older?(session.messages||[]):(session.messages||[]).filter(message=>
+      currentPageIds.has(message.id)||pendingMessageIds.has(message.id)||message.localOnly===true||
+      message.cloudSynced===false||message.syncPending===true||message.id==='opening-'+sessionId
+    );
+    const merged=new Map(cachedMessages.map(message=>[message.id,message]));
     for(const message of cloudMessages)merged.set(message.id,{...(merged.get(message.id)||{}),...message});
     session.messages=[...merged.values()].sort((a,b)=>(Number(a.at)||0)-(Number(b.at)||0)||String(a.id).localeCompare(String(b.id)));
     // Restore the suggestion set attached to the newest assistant turn first.
@@ -6550,7 +6556,7 @@ async function groupOpen(groupId) {
       window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,background_mode,background_memory_photo_id,created_at,updated_at,archived_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
       window.mySupabase.from('chat_group_members').select('id,group_id,character_id,position,scene_id,character_snapshot,phone_notifications').eq('group_id',groupId).order('position'),
-      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(50)
+      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(5)
     ]),15000,'群組資料讀取逾時，請檢查網路後重試。')
     if(requestId!==g.openRequestId) return;
     const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error;
@@ -6569,7 +6575,7 @@ async function groupOpen(groupId) {
     groupExpandedMemberId=null;
     // Memory photo metadata and signed URLs are loaded only when the player opens background settings.
     const initialMessageRows=messageRes.data||[];
-    g.historyHasMore=initialMessageRows.length===50;
+    g.historyHasMore=initialMessageRows.length===5;
     const oldestInitialMessage=initialMessageRows.at(-1);
     g.historyCursor=oldestInitialMessage?{createdAt:oldestInitialMessage.created_at,sequenceNo:oldestInitialMessage.sequence_no,id:oldestInitialMessage.id}:null;
     g.historyLoading=false;g.historyError='';g.historyScrollAnchor=null;
@@ -6635,13 +6641,13 @@ async function groupLoadOlderMessages() {
       window.mySupabase.from('chat_group_messages')
         .select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at')
         .eq('group_id',groupId).is('deleted_at',null).or(olderFilter)
-        .order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(50),
+        .order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(5),
       15000,'較早的群組訊息載入逾時，請稍後重試。'
     );
     if(requestId!==g.openRequestId||g.active?.id!==groupId||currentUser()?.uid!==uid)return;
     if(error)throw error;
     const page=rows||[];
-    g.historyHasMore=page.length===50;
+    g.historyHasMore=page.length===5;
     if(page.length){
       const oldest=page.at(-1);
       g.historyCursor={createdAt:oldest.created_at,sequenceNo:oldest.sequence_no,id:oldest.id};
@@ -8175,8 +8181,8 @@ async function jumpToChatSearchHit(button){
       const bf='created_at.lt.'+t.created_at+',and(created_at.eq.'+t.created_at+',id.lt.'+t.id+')';
       const af='created_at.gt.'+t.created_at+',and(created_at.eq.'+t.created_at+',id.gt.'+t.id+')';
       const [b,a]=await Promise.all([
-        client.from('chat_messages').select('id,session_id,role,content,created_at').eq('session_id',s.id).is('deleted_at',null).or(bf).order('created_at',{ascending:false}).order('id',{ascending:false}).limit(24),
-        client.from('chat_messages').select('id,session_id,role,content,created_at').eq('session_id',s.id).is('deleted_at',null).or(af).order('created_at',{ascending:true}).order('id',{ascending:true}).limit(24)
+        client.from('chat_messages').select('id,session_id,role,content,created_at').eq('session_id',s.id).is('deleted_at',null).or(bf).order('created_at',{ascending:false}).order('id',{ascending:false}).limit(2),
+        client.from('chat_messages').select('id,session_id,role,content,created_at').eq('session_id',s.id).is('deleted_at',null).or(af).order('created_at',{ascending:true}).order('id',{ascending:true}).limit(2)
       ]);
       if(b.error)throw b.error;if(a.error)throw a.error;
       if(!isCurrent())return;
@@ -8184,7 +8190,7 @@ async function jumpToChatSearchHit(button){
       const all=[...(b.data||[]),t,...(a.data||[])].sort((x,y)=>String(x.created_at).localeCompare(String(y.created_at))||String(x.id).localeCompare(String(y.id)));
       s.messages=all.map(r=>({id:r.id,role:r.role==='user'?'user':'assistant',text:r.content||'',at:new Date(r.created_at).getTime(),cloudSynced:true}));
       const first=all[0];s.cloudOldestMessageCursor=first?{createdAt:first.created_at,id:first.id}:null;
-      s.cloudHasMoreMessages=(b.data||[]).length===24;s.cloudMessagesLoaded=true;s.cloudSearchJump=true;
+      s.cloudHasMoreMessages=(b.data||[]).length===2;s.cloudMessagesLoaded=true;s.cloudSearchJump=true;
       renderMessages(false);
       requestAnimationFrame(()=>{const n=[...($('messages')?.querySelectorAll('[data-message]')||[])].find(x=>x.dataset.message===id);if(n){n.scrollIntoView({behavior:'smooth',block:'center'});n.classList.add('search-hit-highlight');setTimeout(()=>n.classList.remove('search-hit-highlight'),1800);}});
     }else{
@@ -8195,15 +8201,15 @@ async function jumpToChatSearchHit(button){
       const bf='created_at.lt.'+t.created_at+',and(created_at.eq.'+t.created_at+',sequence_no.lt.'+t.sequence_no+'),and(created_at.eq.'+t.created_at+',sequence_no.eq.'+t.sequence_no+',id.lt.'+t.id+')';
       const af='created_at.gt.'+t.created_at+',and(created_at.eq.'+t.created_at+',sequence_no.gt.'+t.sequence_no+'),and(created_at.eq.'+t.created_at+',sequence_no.eq.'+t.sequence_no+',id.gt.'+t.id+')';
       const [b,a]=await Promise.all([
-        client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',g.id).is('deleted_at',null).or(bf).order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(24),
-        client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',g.id).is('deleted_at',null).or(af).order('created_at',{ascending:true}).order('sequence_no',{ascending:true}).order('id',{ascending:true}).limit(24)
+        client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',g.id).is('deleted_at',null).or(bf).order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(2),
+        client.from('chat_group_messages').select('id,group_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',g.id).is('deleted_at',null).or(af).order('created_at',{ascending:true}).order('sequence_no',{ascending:true}).order('id',{ascending:true}).limit(2)
       ]);
       if(b.error)throw b.error;if(a.error)throw a.error;if(!isCurrent())return;
       closeChatSearchOverlay();
       const all=[...(b.data||[]),t,...(a.data||[])].sort((x,y)=>String(x.created_at).localeCompare(String(y.created_at))||Number(x.sequence_no)-Number(y.sequence_no)||String(x.id).localeCompare(String(y.id)));
       g.messages=all.map(r=>{const snap=r.speaker_snapshot||{},m=g.members.find(x=>x.characterId===r.character_id)||g.members.find(x=>x.characterSnapshotId===snap.id||x.id===snap.id),type=r.speaker_type==='user'?'user':r.speaker_type==='system'?'system':'character';return {id:r.id,type,speaker:type==='user'?'你':type==='system'?'系統':snap.name||m?.name||'角色',characterId:r.character_id||null,speakerSnapshot:snap,content:type==='user'&&r.content===GROUP_CONTINUE_SENTINEL?'':r.content,createdAt:r.created_at};});
       const first=all[0];groupPrototype.historyCursor=first?{createdAt:first.created_at,sequenceNo:first.sequence_no,id:first.id}:null;
-      groupPrototype.historyHasMore=(b.data||[]).length===24;groupPrototype.searchJump=true;groupPrototype.historyError='';groupPrototype.historyScrollAnchor=null;
+      groupPrototype.historyHasMore=(b.data||[]).length===2;groupPrototype.searchJump=true;groupPrototype.historyError='';groupPrototype.historyScrollAnchor=null;
       renderGroupConversation();
       requestAnimationFrame(()=>{const n=[...($('groupMessages')?.querySelectorAll('[data-message]')||[])].find(x=>x.dataset.message===id);if(n){n.scrollIntoView({behavior:'smooth',block:'center'});n.classList.add('search-hit-highlight');setTimeout(()=>n.classList.remove('search-hit-highlight'),1800);}});
     }
