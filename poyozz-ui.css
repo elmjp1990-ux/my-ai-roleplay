@@ -466,3 +466,24 @@ body.day .story-relationship-icon { color:#c27cae; filter:none; }
   color:#ef8997; background:rgba(180,75,88,.12);
 }
 @media(prefers-reduced-motion:reduce) { .message-action-bar { transition:none; transform:none; } }
+
+/* Encounter chat: let the top identity bar and bottom composer frame bleed to the viewport edges.
+   Keep their inner controls safely inset while the glass frame itself spans the full screen. */
+body.encounter-mode-active .chat-main.encounter-scene > .chat-heading,
+body.encounter-mode-active .chat-main.encounter-scene > .composer {
+  position:relative;
+  left:50%;
+  width:100vw;
+  max-width:100vw;
+  margin-left:-50vw;
+  box-sizing:border-box;
+  border-radius:0!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene > .chat-heading {
+  padding-left:max(12px,env(safe-area-inset-left));
+  padding-right:max(12px,env(safe-area-inset-right));
+}
+body.encounter-mode-active .chat-main.encounter-scene > .composer {
+  padding-left:max(12px,env(safe-area-inset-left));
+  padding-right:max(12px,env(safe-area-inset-right));
+}
