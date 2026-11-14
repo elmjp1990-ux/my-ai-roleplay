@@ -11,7 +11,7 @@ const source = html.slice(start, end);
 assert.match(source, /CLOUD_COMMENT_CACHE_TTL_MS\s*=\s*30_000/);
 assert.match(source, /cloudCommentHydrationCache\s*=\s*new Map\(\)/);
 assert.match(source, /cloudCommentHydrationInflight\s*=\s*new Map\(\)/);
-assert.match(source, /async function loadCloudComments\(characterId,\{force=false\}=\{\}\)/);
+assert.match(source, /async function loadCloudComments\(characterId,\{force=false,loadMore=false\}=\{\}\)/);
 assert.match(source, /const requestUid=currentUser\(\)\?\.uid\|\|null/);
 assert.match(source, /const cacheKey=\(requestUid\|\|'anonymous'\)\+':'\+characterId/);
 assert.match(source, /if\(!force&&cached&&Date\.now\(\)-cached\.loadedAt<CLOUD_COMMENT_CACHE_TTL_MS\)/);
