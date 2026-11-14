@@ -101,8 +101,8 @@ Deno.serve(async (request) => {
   }
 
   const { data: group, error: groupError } = await admin.from("chat_groups")
-    .select("id,owner_id,name,world_background,scene_mode,player_name,player_persona,world_character_id")
-    .eq("id", groupId).eq("owner_id", user.id).is("archived_at", null).maybeSingle();
+    .select("id,owner_id,name,world_background,scene_mode,player_name,player_persona,world_character_id,deleted_at")
+    .eq("id", groupId).eq("owner_id", user.id).is("archived_at", null).is("deleted_at", null).maybeSingle();
   if (groupError || !group) {
     const refunded = await refund(admin, user.id, turnId, "group_context_unavailable");
     return json({ status: refunded.confirmed ? "refunded" : "needs_reconciliation", error: "group_context_unavailable", balance: refunded.balance, retryAllowed: false }, refunded.confirmed ? 200 : 503);
