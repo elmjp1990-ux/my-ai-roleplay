@@ -34,10 +34,12 @@
      if(error)throw error;
      if(!pager.isRequestCurrent(requestId)||!mount.isConnected||currentUser()?.uid!==uid)return;
      const rows=(data||[]).filter(photo=>!pager.ids.has(photo.id));
-     const cards=await Promise.all(rows.map(async photo=>{
-       let imageUrl='';
-       try{imageUrl=await getMemoryPhotoSignedUrl(photo.storage_path)||'';}catch(signedError){console.warn('相簿簽名網址取得失敗',signedError?.message);}
-       if(!pager.isRequestCurrent(requestId))return null;
+     let signedUrls=[];
+     try{signedUrls=await memoryPhotoSignedUrlManager.getMany(rows.map(photo=>uid+':'+photo.storage_path),{context:{uid}});}
+     catch(signedError){console.warn('相簿簽名網址批次載入失敗',signedError?.message);}
+     if(!pager.isRequestCurrent(requestId)||!mount.isConnected||currentUser()?.uid!==uid)return;
+     const cards=rows.map((photo,index)=>{
+       const imageUrl=signedUrls[index]||'';
        pager.ids.add(photo.id);
        const thumbnail=imageUrl
          ?'<button type="button" class="memory-photo-thumb" data-action="memory-photo-open" data-id="'+e(photo.id)+'" aria-label="開啟相片"><img src="'+e(imageUrl)+'" alt="'+e(photo.caption||'回憶相片')+'" loading="lazy"></button>'
@@ -45,7 +47,7 @@
        return {cached:{url:imageUrl,photo},html:'<article class="memory-photo-row">'+thumbnail+
          '<div class="memory-photo-details"><div class="memory-photo-title-edit"><strong>'+e(photo.caption||'回憶快照')+'</strong>'+(imageUrl?'<button type="button" class="ghost memory-photo-icon" data-action="memory-photo-edit" data-id="'+e(photo.id)+'" aria-label="修改標題" title="修改標題">✎</button>':'')+'</div><span class="small muted">'+e(dateLabel(photo.created_at))+'</span><span class="memory-photo-expiry">到期日：'+e(dateLabel(photo.expires_at))+'</span></div>'+
          '<div class="memory-photo-actions"><button type="button" class="ghost memory-photo-icon" data-action="memory-photo-delete" data-id="'+e(photo.id)+'" aria-label="刪除相片" title="刪除相片">🗑</button></div></article>'};
-     }));
+     });
      if(!pager.isRequestCurrent(requestId)||!mount.isConnected||currentUser()?.uid!==uid)return;
      const validCards=cards.filter(Boolean),html=validCards.map(card=>card.html).join('');
      if(html){mount.insertAdjacentHTML('beforeend',html);const renderedRows=mount.querySelectorAll('.memory-photo-row');validCards.forEach((card,index)=>urlCache.set(renderedRows[renderedRows.length-validCards.length+index],card.cached));}
