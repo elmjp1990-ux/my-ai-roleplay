@@ -1541,6 +1541,30 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     try{return await request;}
     finally{if(publicCharacterRowsInflight.get(cacheKey)===request)publicCharacterRowsInflight.delete(cacheKey);}
   }
+  function mapPublicCharacterRow(row){
+          const cachedPublic=state.characters.find(character=>character.id===row.id&&character.cloudPublic===true);
+          const ownerLocal=state.characters.find(character=>character.id===row.id&&character.authorId===row.author_id&&character.authorId===state.account?.uid);
+          return {
+            id:row.id,name:row.name||'未命名角色',gender:row.gender||'ambiguous',
+            age:row.age==null?'':String(row.age),
+            image:ownerLocal?.image||cachedPublic?.image||row.avatar_url||'',
+            primaryIllustrationPath:ownerLocal?.primaryIllustrationPath||cachedPublic?.primaryIllustrationPath||'',
+            galleryIllustrations:ownerLocal?.galleryIllustrations||cachedPublic?.galleryIllustrations||[],
+            publicIllustrationsLoaded:ownerLocal?.publicIllustrationsLoaded===true||cachedPublic?.publicIllustrationsLoaded===true,
+            avatarVideoPath:row.avatar_video_path||'',visibility:'public',
+            reviewStatus:row.review_status,intro:row.intro||'',
+            opening:ownerLocal?.opening||cachedPublic?.opening||'',race:row.race||'',
+            privateInfo:'',style:row.style||'',personalityProfile:normalizePersonalityProfile({}),
+            ...((ownerLocal&&Object.prototype.hasOwnProperty.call(ownerLocal,'phoneSettings'))||(cachedPublic&&Object.prototype.hasOwnProperty.call(cachedPublic,'phoneSettings'))?{phoneSettings:ownerLocal?.phoneSettings??cachedPublic?.phoneSettings??{}}:{}),
+            ...((ownerLocal&&Object.prototype.hasOwnProperty.call(ownerLocal,'nsfwWorkplaceWarning'))||(cachedPublic&&Object.prototype.hasOwnProperty.call(cachedPublic,'nsfwWorkplaceWarning'))?{nsfwWorkplaceWarning:(ownerLocal?.nsfwWorkplaceWarning??cachedPublic?.nsfwWorkplaceWarning)===true}:{}),
+            isNSFW:row.is_nsfw===true,tags:normalizeCharacterTagsForRead(row.tags),
+            authorId:row.author_id,owner:state.account?.uid===row.author_id,
+            chats:'0',users:null,createdAt:row.created_at?new Date(row.created_at).getTime():0,
+            firstPublishedAt:row.first_published_at?new Date(row.first_published_at).getTime():null,
+            latestEligible:row.latest_eligible!==false,rightsConfirmed:false,cloudPublic:true
+          };
+  }
+  window.mapPublicCharacterRow=mapPublicCharacterRow;
   let publicCharactersLoadPromise = null;
   function loadPublicSupabaseCharacters(options={}) {
     const loadMore=options.loadMore===true;
@@ -1579,29 +1603,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
         window.__poyozzExploreLoading=false;
         return loadPublicSupabaseCharactersImpl({loadMore:false});
       }
-      const publicCharacters=(rows||[]).map(row=>{
-        const cachedPublic=state.characters.find(character=>character.id===row.id&&character.cloudPublic===true);
-        const ownerLocal=state.characters.find(character=>character.id===row.id&&character.authorId===row.author_id&&character.authorId===state.account?.uid);
-        return {
-          id:row.id,name:row.name||'未命名角色',gender:row.gender||'ambiguous',
-          age:row.age==null?'':String(row.age),
-          image:ownerLocal?.image||cachedPublic?.image||row.avatar_url||'',
-          primaryIllustrationPath:ownerLocal?.primaryIllustrationPath||cachedPublic?.primaryIllustrationPath||'',
-          galleryIllustrations:ownerLocal?.galleryIllustrations||cachedPublic?.galleryIllustrations||[],
-          publicIllustrationsLoaded:ownerLocal?.publicIllustrationsLoaded===true||cachedPublic?.publicIllustrationsLoaded===true,
-          avatarVideoPath:row.avatar_video_path||'',visibility:'public',
-          reviewStatus:row.review_status,intro:row.intro||'',
-          opening:ownerLocal?.opening||cachedPublic?.opening||'',race:row.race||'',
-          privateInfo:'',style:row.style||'',personalityProfile:normalizePersonalityProfile({}),
-          ...((ownerLocal&&Object.prototype.hasOwnProperty.call(ownerLocal,'phoneSettings'))||(cachedPublic&&Object.prototype.hasOwnProperty.call(cachedPublic,'phoneSettings'))?{phoneSettings:ownerLocal?.phoneSettings??cachedPublic?.phoneSettings??{}}:{}),
-          ...((ownerLocal&&Object.prototype.hasOwnProperty.call(ownerLocal,'nsfwWorkplaceWarning'))||(cachedPublic&&Object.prototype.hasOwnProperty.call(cachedPublic,'nsfwWorkplaceWarning'))?{nsfwWorkplaceWarning:(ownerLocal?.nsfwWorkplaceWarning??cachedPublic?.nsfwWorkplaceWarning)===true}:{}),
-          isNSFW:row.is_nsfw===true,tags:normalizeCharacterTagsForRead(row.tags),
-          authorId:row.author_id,owner:state.account?.uid===row.author_id,
-          chats:'0',users:null,createdAt:row.created_at?new Date(row.created_at).getTime():0,
-          firstPublishedAt:row.first_published_at?new Date(row.first_published_at).getTime():null,
-          latestEligible:row.latest_eligible!==false,rightsConfirmed:false,cloudPublic:true
-        };
-      });
+      const publicCharacters=(rows||[]).map(mapPublicCharacterRow);
       const publicIds=new Set(publicCharacters.map(character=>character.id));
       const currentUid=state.account?.uid||null;
       if(characterId){
