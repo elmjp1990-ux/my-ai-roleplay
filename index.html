@@ -6734,13 +6734,14 @@ function renderGroupConversation() {
     const displayContent=replaceRoleplayVariables(m.content || '',group.playerName || state.account?.nickname || '你',member?.name || '角色');
     const segments=!isSystem ? parseRoleplaySegments(displayContent,roleplayRoles) : [];
     const hasSpeaker=segments.some(segment=>segment.kind!=='user');
+    const summonedByPlayer=isUser && segments.some(segment=>segment.kind==='character');
     const avatarHTML=isUser
       ? '<span class="avatar avatar-fallback player-avatar">你</span>'
       : isSystem
         ? '<span class="avatar avatar-fallback">系</span>'
         : '';
     const bodyHTML=hasSpeaker
-      ? '<div class="roleplay-segments">'+segments.map(roleplaySegmentHTML).join('')+'</div>'
+      ? '<div class="roleplay-segments">'+segments.map(segment=>roleplaySegmentHTML(segment,{summonedByPlayer})).join('')+'</div>'
       : (!isUser && !isSystem)
         ? '<div class="roleplay-segments">'+renderCharacterSpeechSegments(displayContent,{name:who,image:member?.avatar_url||member?.image||''})+'</div>'
         : '<div class="message-name">'+e(who)+'</div>'+(isSystem?'<div class="bubble">'+e(displayContent)+'</div>':formatMessage(displayContent));
@@ -7812,7 +7813,14 @@ function parseRoleplaySegments(raw, roles = []) {
     const match = line.match(/^\s*([：:]?)([^:：\n]{1,40})[:：]\s?(.*)$/u);
     const speakerName = match?.[2]?.trim() || '';
     const exact = match ? roles.filter(role => String(role.name || '').trim() === speakerName) : [];
-    const knownRole = exact.length === 1 ? exact[0] : null;
+    // Player-authored roleplay can use the natural phrase “夜辰說：內容”.
+    // Only strip the trailing 說 when the remaining name exactly matches one
+    // known role, so ordinary text and similarly named characters stay intact.
+    const spokenName = speakerName.replace(/\s*說$/u, '').trim();
+    const spokenMatches = match && !exact.length && spokenName !== speakerName
+      ? roles.filter(role => String(role.name || '').trim() === spokenName)
+      : [];
+    const knownRole = exact.length === 1 ? exact[0] : spokenMatches.length === 1 ? spokenMatches[0] : null;
     const isExplicitPrefix = Boolean(match && match[1]);
     // Some group replies prepend narration before a role label, e.g.
     // “聽見你的話，寒川（1016測試）回應：實際台詞”.
@@ -7944,10 +7952,13 @@ function renderMessages(scroll = true) {
     // displaySegments may have been saved before the single-chat character was
     // available to the prefix parser, leaving the summon as a plain user segment.
     const trimmedDisplayText = String(displayText || '').trimStart();
-    const startsWithActiveCharacter = user && (
-      trimmedDisplayText.startsWith(String(c.name || '') + ':') ||
-      trimmedDisplayText.startsWith(String(c.name || '') + '：')
-    );
+    const activeCharacterName = String(c.name || '');
+    const startsWithActiveCharacter = user && [
+      activeCharacterName + ':',
+      activeCharacterName + '：',
+      activeCharacterName + '說:',
+      activeCharacterName + '說：'
+    ].some(prefix => prefix !== ':' && trimmedDisplayText.startsWith(prefix));
     const segments = user && Array.isArray(m.displaySegments) && !startsWithActiveCharacter
       ? m.displaySegments.map(segment => ({
           ...segment,
