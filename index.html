@@ -1565,6 +1565,21 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
           };
   }
   window.mapPublicCharacterRow=mapPublicCharacterRow;
+  async function loadPublicAuthorCharacterPage(authorId,offset=0){
+    const client=window.mySupabase;
+    if(!client||!isUuid(authorId))return {items:[],hasMore:false};
+    const pageSize=window.PoyozzListPagination.pageSize('explore');
+    const {data,error}=await client.from('characters')
+      .select('id,author_id,name,gender,age,avatar_url,avatar_video_path,is_nsfw,visibility,review_status,intro,race,style,tags,created_at,first_published_at,latest_eligible')
+      .eq('author_id',authorId).eq('visibility','public').is('deleted_at',null)
+      .order('first_published_at',{ascending:false,nullsFirst:false})
+      .order('id',{ascending:false}).range(offset,offset+pageSize-1);
+    if(error)throw new Error(error.message);
+    const rows=Array.isArray(data)?data:[];
+    const items=rows.map(mapPublicCharacterRow);
+    state.characters=window.PoyozzListPagination.mergeUnique(state.characters,items,character=>character.id);
+    return {items,hasMore:rows.length===pageSize};
+  }
   let publicCharactersLoadPromise = null;
   function loadPublicSupabaseCharacters(options={}) {
     const loadMore=options.loadMore===true;
@@ -5563,7 +5578,8 @@ function renderAuthor() {
     publicAuthorProfileLoaded, hydratePublicAuthorProfile,
     $, e, avatar, card, refreshAuthorFollowState,
     PoyozzListPagination:window.PoyozzListPagination,
-    rerender:()=>render()
+    rerender:()=>render(),
+    loadAuthorCharacterPage:loadPublicAuthorCharacterPage
   });
 }function renderFavorites() {
   const list = state.characters.filter(c => state.favorites.includes(c.id) && accessible(c));
