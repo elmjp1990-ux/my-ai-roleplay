@@ -3239,6 +3239,7 @@ function load() {
 
 let state = load();
 let walletLedgerLoadError = '';
+let walletLedgerPager = {currency:null,offset:0,balance:0,hasMore:false,loading:false};
 
 // 一次性清除舊版共用 localStorage 中無法確認所屬帳號的聊天，避免升級後仍顯示跨帳號紀錄。
 // 已同步的正式聊天會在登入後依目前 UID 從 Supabase 重新載入。
@@ -9175,73 +9176,99 @@ function renderNotifications() {
   });
 }
 
-/* Cloud wallet ledger: read the authoritative transaction journal from Supabase. */
-async function loadWalletLedger(currency) {
+/* Cloud wallet ledger: fetch only the selected currency in ten-row backend pages. */
+async function loadWalletLedger(currency, {loadMore = false} = {}) {
   walletLedgerLoadError = '';
   const uid = state.account?.uid;
   const client = window.mySupabase;
   if (!uid || !client) return false;
-
-  const { data, error } = await client
-    .from('wallet_transactions')
-    .select('id, currency_type, amount, biz_type, reference_id, created_at')
-    .eq('user_id', uid)
-    .order('created_at', { ascending: false })
-    .limit(100);
-  if (error) {
+  const selectedType = currency === 'silver' ? 'silver_coins' : 'diamonds';
+  const currencyKey = currency === 'silver' ? 'silver' : 'diamond';
+  const pageSize = window.PoyozzListPagination?.pageSize('walletLedger') || 10;
+  if (!loadMore || walletLedgerPager.currency !== currencyKey) {
+    walletLedgerPager = {
+      currency: currencyKey, offset: 0,
+      balance: Number(currency === 'silver' ? state.account.silver : state.account.diamonds) || 0,
+      hasMore: true, loading: false
+    };
+  }
+  const pager = walletLedgerPager;
+  if (pager.loading || !pager.hasMore) return false;
+  pager.loading = true;
+  try {
+    const { data, error } = await client
+      .from('wallet_transactions')
+      .select('id, currency_type, amount, biz_type, reference_id, created_at')
+      .eq('user_id', uid)
+      .eq('currency_type', selectedType)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(pager.offset, pager.offset + pageSize - 1);
+    if (error) throw error;
+    if (state.account?.uid !== uid) return false;
+    const rows = Array.isArray(data) ? data : [];
+    const referenceIds = [...new Set(rows
+      .filter(row => ['chat_turn_charge', 'chat_turn_refund'].includes(row.biz_type))
+      .map(row => String(row.reference_id || '')).filter(Boolean))];
+    let roleNames = new Map();
+    if (referenceIds.length) {
+      const { data: roleNameRows, error: roleNameError } = await client.rpc(
+        'get_my_wallet_transaction_character_names_page',
+        { p_reference_ids: referenceIds }
+      );
+      if (roleNameError) console.warn('讀取交易對應角色名稱失敗：', roleNameError.message);
+      roleNames = new Map((roleNameRows || []).map(item => [item.reference_id, item.character_name]));
+    }
+    const mappedNewestFirst = rows.map(row => {
+      const amount = Number(row.amount) || 0;
+      const entry = {
+        id: row.id,
+        currency: row.currency_type === 'silver_coins' ? 'silver' : 'diamond',
+        change: amount,
+        reason: (() => {
+          const baseReason = ({
+            signup_bonus: '註冊贈送',
+            chat_turn_charge: '聊天回覆扣款',
+            chat_turn_refund: '聊天失敗退款',
+            group_chat_turn_charge: '群組聊天回覆扣款',
+            group_chat_turn_refund: '群組聊天失敗退款',
+            daily_checkin: '每日簽到',
+            reward_ad: '觀看獎勵廣告',
+            purchase: '購買',
+            test_purchase_200: '測試領取 200 鑽石',
+            admin_adjustment: '餘額調整'
+          })[row.biz_type] || row.biz_type || '錢包交易';
+          const characterName = roleNames.get(row.reference_id);
+          return characterName && ['chat_turn_charge', 'chat_turn_refund'].includes(row.biz_type)
+            ? baseReason + ' · ' + characterName
+            : baseReason;
+        })(),
+        at: Date.parse(row.created_at) || Date.now(),
+        balance: pager.balance,
+        referenceId: row.reference_id || null
+      };
+      pager.balance -= amount;
+      return entry;
+    });
+    const chronologicalPage = mappedNewestFirst.reverse();
+    const existingCurrencyRows = state.ledger.filter(entry => entry.currency === currencyKey);
+    const otherCurrencyRows = state.ledger.filter(entry => entry.currency !== currencyKey);
+    const mergedCurrencyRows = loadMore
+      ? [...chronologicalPage, ...existingCurrencyRows]
+      : chronologicalPage;
+    state.ledger = [...otherCurrencyRows, ...mergedCurrencyRows];
+    pager.offset += rows.length;
+    pager.hasMore = rows.length === pageSize;
+    return true;
+  } catch (error) {
     console.error('讀取錢包花費日誌失敗：', error);
     walletLedgerLoadError = currency;
     toast('花費日誌讀取失敗，請稍後再試。');
     return false;
+  } finally {
+    pager.loading = false;
   }
-
-  // Resolve a chat charge/refund to the character through the secure, user-scoped RPC.
-  const { data: roleNameRows, error: roleNameError } = await client.rpc('get_my_wallet_transaction_character_names');
-  if (roleNameError) console.warn('讀取交易對應角色名稱失敗：', roleNameError.message);
-  const roleNames = new Map((roleNameRows || []).map(item => [item.reference_id, item.character_name]));
-
-  const selectedType = currency === 'silver' ? 'silver_coins' : 'diamonds';
-  let runningBalance = Number(currency === 'silver'
-    ? state.account.silver : state.account.diamonds) || 0;
-  const rows = (data || []).filter(row => row.currency_type === selectedType);
-  const mappedNewestFirst = rows.map(row => {
-    const amount = Number(row.amount) || 0;
-    const entry = {
-      id: row.id,
-      currency: row.currency_type === 'silver_coins' ? 'silver' : 'diamond',
-      change: amount,
-      reason: (() => {
-        const baseReason = ({
-          signup_bonus: '註冊贈送',
-          chat_turn_charge: '聊天回覆扣款',
-          chat_turn_refund: '聊天失敗退款',
-          group_chat_turn_charge: '群組聊天回覆扣款',
-          group_chat_turn_refund: '群組聊天失敗退款',
-          daily_checkin: '每日簽到',
-          reward_ad: '觀看獎勵廣告',
-          purchase: '購買',
-          test_purchase_200: '測試領取 200 鑽石',
-          admin_adjustment: '餘額調整'
-        })[row.biz_type] || row.biz_type || '錢包交易';
-        const characterName = roleNames.get(row.reference_id);
-        return characterName && ['chat_turn_charge', 'chat_turn_refund'].includes(row.biz_type)
-          ? baseReason + ' · ' + characterName
-          : baseReason;
-      })(),
-      at: Date.parse(row.created_at) || Date.now(),
-      balance: runningBalance,
-      referenceId: row.reference_id || null
-    };
-    runningBalance -= amount;
-    return entry;
-  });
-  state.ledger = [
-    ...state.ledger.filter(entry => entry.currency !== (currency === 'silver' ? 'silver' : 'diamond')),
-    ...mappedNewestFirst.reverse()
-  ];
-  return true;
 }
-
 /* Modal content */
 function renderModal(o) {
   const s = currentSession();
@@ -9375,7 +9402,7 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
       const walletLogs = state.ledger.filter(l => l.currency === currency && (kind === 'all' || (kind === 'gain' && Number(l.change) > 0) || (kind === 'spend' && Number(l.change) < 0)));
       const purchaseLogs = currency === 'diamond' && kind !== 'spend' ? (state.purchases || []).map(p => ({...p, reason: '購買紀錄 · ' + (p.title || '方案'), at: p.at || Date.now(), isPurchase: true, change: null, balance: p.status || '紀錄'})) : [];
       const logs = [...walletLogs, ...purchaseLogs];
-      const listMarkup = walletLedgerLoadError === currency ? `<div class="empty">雲端交易紀錄暫時無法讀取，請重新載入。</div><button style="width:100%;margin-top:12px" data-action="ledger-retry" data-value="${e(currency)}">重新載入</button>` : (logs.slice().reverse().map(l => `<article class="log-row"><div class="row between" style="gap:10px"><strong>${e(l.reason)}</strong>${l.isPurchase ? `<strong>${e(l.status || '已記錄')}</strong>` : `<strong>${Number(l.change) >= 0 ? '+' : ''}${e(l.change)}</strong>`}</div><p class="small muted" style="margin:6px 0">${e(timeText(l.at))}${l.isPurchase ? '' : ' · 餘額 ' + e(l.balance)}</p></article>`).join('') || '<div class="empty">目前沒有紀錄。</div>');
+      const listMarkup = walletLedgerLoadError === currency ? `<div class="empty">雲端交易紀錄暫時無法讀取，請重新載入。</div><button style="width:100%;margin-top:12px" data-action="ledger-retry" data-value="${e(currency)}">重新載入</button>` : (logs.slice().reverse().map(l => `<article class="log-row"><div class="row between" style="gap:10px"><strong>${e(l.reason)}</strong>${l.isPurchase ? `<strong>${e(l.status || '已記錄')}</strong>` : `<strong>${Number(l.change) >= 0 ? '+' : ''}${e(l.change)}</strong>`}</div><p class="small muted" style="margin:6px 0">${e(timeText(l.at))}${l.isPurchase ? '' : ' · 餘額 ' + e(l.balance)}</p></article>`).join('') || '<div class="empty">目前沒有紀錄。</div>') + (walletLedgerPager.currency === currency && walletLedgerPager.hasMore ? '<button type="button" data-action="ledger-load-more" data-value="'+e(currency)+'" style="width:100%;margin-top:12px">載入更多紀錄</button>' : ''));
       showDialog('交易紀錄',`<div class="tabs"><button class="tab ${currency === 'diamond' ? 'active' : ''}" data-action="ledger-tab" data-value="diamond">鑽石</button><button class="tab ${currency === 'silver' ? 'active' : ''}" data-action="ledger-tab" data-value="silver">銀幣</button></div><div class="tabs" style="margin-top:10px"><button class="tab ${kind === 'all' ? 'active' : ''}" data-action="ledger-filter" data-value="all">全部</button><button class="tab ${kind === 'gain' ? 'active' : ''}" data-action="ledger-filter" data-value="gain">獲得</button><button class="tab ${kind === 'spend' ? 'active' : ''}" data-action="ledger-filter" data-value="spend">花費</button></div><div class="ledger-scroll">${listMarkup}</div>`);
       $('modal').style.height='min(590px,82dvh)'; $('modal').style.overflowY='hidden';
       break;
@@ -10986,6 +11013,12 @@ document.addEventListener('click',async event => {
         const previous=clone(list);list.splice(index,1);if(!list.some(item=>item.isDefault)&&list.length)list[0].isDefault=true;state.account.personas=list;persist();try { if(!window.mySupabase?.auth)throw new Error('請先登入。');const {data,error}=await window.mySupabase.auth.getUser();if(error||data?.user?.id!==state.account?.uid)throw new Error('登入狀態驗證失敗，請重新登入。');await savePersonaPresets(state.account);route.overlay={name:'personas'};render();toast('儲存成功');}catch(error){state.account.personas=previous;persist();openModal('personas');toast('人設刪除未能同步：'+(error.message||'請稍後再試。'));}break;
       }
 
+      case 'ledger-load-more': {
+        const currency = button.dataset.value === 'silver' ? 'silver' : 'diamond';
+        await loadWalletLedger(currency,{loadMore:true});
+        openModal('ledger',{currency,kind:route.overlay?.kind || 'all'});
+        break;
+      }
       case 'ledger-retry': {
         const currency = button.dataset.value === 'silver' ? 'silver' : 'diamond';
         await loadWalletLedger(currency);
