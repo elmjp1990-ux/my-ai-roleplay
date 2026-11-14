@@ -1717,7 +1717,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 
       const pageSize=window.PoyozzListPagination?.pageSize('ownedCharacters')||10;
       if(!ownedCharacterPager||ownedCharacterPager.uid!==user.id){
-        ownedCharacterPager={uid:user.id,offset:0,hasMore:true,loading:false,cloudIds:new Set()};
+        ownedCharacterPager={uid:user.id,offset:0,hasMore:true,loading:false};
       }
       const pager=ownedCharacterPager;
       if(pager.loading|| (loadMore&&!pager.hasMore))return;
