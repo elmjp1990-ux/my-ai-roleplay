@@ -602,8 +602,9 @@ assert.match(favoritesLoader,/pageSize\('favorites'\)/);
 assert.match(favoritesLoader,/\.in\('id',validIds\)/,'favorite characters must hydrate only the current ten favorite IDs');
 assert.match(ownerListSource,/favoriteCharactersSentinel[\s\S]*observeEnd/);
 
-assert.match(ownerListSource,/notificationsSentinel[\s\S]*observeEnd/,'system notifications must reveal ten rows at a time');
-assert.match(ownerListSource,/pageSize\('notifications'\)/);
+const notificationsModuleSource=fs.readFileSync("notifications-screen.js","utf8");
+assert.match(notificationsModuleSource,/notificationsSentinel[\\s\\S]*observeEnd/,'system notifications must reveal ten rows at a time');
+assert.match(notificationsModuleSource,/pageSize\\('notifications'\\)/);
 
 const primaryIllustrationLoader=between("async function loadCharacterPrimaryIllustrationAssets","async function loadCharacterIllustrationAssets");
 assert.ok(primaryIllustrationLoader.includes("characterIllustrationSignedUrlManager.getMany"));
