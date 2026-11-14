@@ -496,18 +496,18 @@ const followedAuthorsPageTestSource2026=fs.readFileSync('followed-authors.js','u
 const sharedPaginationSource=fs.readFileSync('list-pagination.js','utf8');
 assert.match(sharedPaginationSource,/followedAuthors:\s*10/,
   "followed-author pagination must use the shared ten-row page size");
-assert.match(followedAuthorsPaginationSource,/pageSize:global\.PoyozzListPagination\.pageSize\('followedAuthors'\)/,
+assert.match(followedAuthorsPageTestSource2026,/pageSize:global\.PoyozzListPagination\.pageSize\('followedAuthors'\)/,
   "followed-author page size must come from the shared pagination module");
-assert.match(followedAuthorsPaginationSource,/\.from\('author_follows'\)\.select\('author_id,created_at',\{count:'exact'\}\)/,
+assert.match(followedAuthorsPageTestSource2026,/\.from\('author_follows'\)\.select\('author_id,created_at',\{count:'exact'\}\)/,
   "followed authors must be counted and selected from the server-side relation");
-assert.match(followedAuthorsPaginationSource,/\.range\(current\.offset,current\.offset\+current\.pageSize-1\)/,
+assert.match(followedAuthorsPageTestSource2026,/\.range\(current\.offset,current\.offset\+current\.pageSize-1\)/,
   "followed authors must be fetched in ten-row backend pages");
-assert.match(followedAuthorsPaginationSource,/loadPublicAuthorLatestCharacters\(pageAuthorIds\)/,
+assert.match(followedAuthorsPageTestSource2026,/loadPublicAuthorLatestCharacters\(pageAuthorIds\)/,
   "latest character previews must only hydrate for the currently loaded author page");
-assert.match(followedAuthorsPaginationSource,/PoyozzListPagination\.observeEnd/,
+assert.match(followedAuthorsPageTestSource2026,/PoyozzListPagination\.observeEnd/,
   "followed-author list must fetch the next page when the player scrolls to the end");
-assert.match(followedAuthorsPaginationSource,/insertAdjacentHTML\('beforeend',html\)/,
+assert.match(followedAuthorsPageTestSource2026,/insertAdjacentHTML\('beforeend',html\)/,
   "next followed-author pages must append without replacing the already rendered authors");
-assert.doesNotMatch(followedAuthorsPaginationSource,/\.from\('author_follows'\)[\s\S]*?\.order\('created_at',[\s\S]*?\.in\('id',authorIds\)/,
+assert.doesNotMatch(followedAuthorsPageTestSource2026,/\.from\('author_follows'\)[\s\S]*?\.order\('created_at',[\s\S]*?\.in\('id',authorIds\)/,
   "followed-author initial load must not fetch the complete followed-author list");
 
