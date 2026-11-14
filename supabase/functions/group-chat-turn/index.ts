@@ -123,6 +123,10 @@ Deno.serve(async (request) => {
     return json({ status: "needs_reconciliation", error: "turn_already_processing", retryAllowed: false }, 409);
   }
 
+  // The DB deadline starts at reservation. Leave a one-second safety margin
+  // for the small RPC/clock skew between Postgres and this Edge Function.
+  const processingDeadlineAt = Date.now() + TIMEOUT_MS - 1000;
+
   const { data: group, error: groupError } = await admin.from("chat_groups")
     .select("id,owner_id,name,world_background,scene_mode,player_name,player_persona,world_character_id,deleted_at")
     .eq("id", groupId).eq("owner_id", user.id).is("archived_at", null).is("deleted_at", null).maybeSingle();
@@ -241,6 +245,16 @@ Deno.serve(async (request) => {
   ].join("\n\n");
 
   let provider;
+  const providerTimeoutMs = processingDeadlineAt - Date.now();
+  if (providerTimeoutMs <= 0) {
+    const refunded = await refund(admin, user.id, turnId, "provider_timeout");
+    return json({
+      status: refunded.confirmed ? "timed_out" : "needs_reconciliation",
+      error: refunded.confirmed ? "provider_timeout" : "timeout_refund_unconfirmed",
+      balance: refunded.balance,
+      retryAllowed: false,
+    }, refunded.confirmed ? 200 : 503);
+  }
   try {
     provider = await requestOpenRouterChatCompletion({
       messages: [
@@ -249,7 +263,7 @@ Deno.serve(async (request) => {
       ],
       apiKey,
       model: MODEL,
-      timeoutMs: TIMEOUT_MS,
+      timeoutMs: providerTimeoutMs,
     });
   } catch (error) {
     // The provider request has a firm 55-second deadline. If our own AbortController
