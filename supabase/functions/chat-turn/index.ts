@@ -22,21 +22,11 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
-const asDbRow = (value: unknown): DbRow =>
-  value && typeof value === "object" && !Array.isArray(value) ? value as DbRow : {};
-const asString = (value: unknown): string =>
-  typeof value === "string" ? value.trim() : "";
-
 
 const DEFAULT_OPENROUTER_MODEL = POYOZZ_DEFAULT_CHAT_MODEL;
 const GENERATION_TIMEOUT_MS = 55_000;
 
 type DbRow = Record<string, unknown>;
-const asDbRow = (value: unknown): DbRow =>
-  value && typeof value === "object" && !Array.isArray(value) ? value as DbRow : {};
-const asString = (value: unknown): string =>
-  typeof value === "string" ? value.trim() : "";
-
 async function buildStoryMessages(
   admin: any,
   session: DbRow,
