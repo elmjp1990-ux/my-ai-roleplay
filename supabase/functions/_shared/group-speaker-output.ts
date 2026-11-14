@@ -58,7 +58,7 @@ export function parseGroupSpeakerOutput(output: unknown, speakers: GroupSpeaker[
       };
       continue;
     }
-    if (current) current.content += (current.content ? "\n" : "") + line;
+    if (/^\s*[^：:]{1,40}[：:]/u.test(line)) {\n      flush();\n      continue;\n    }\n    if (current) current.content += (current.content ? "\n" : "") + line;
   }
   flush();
   return result;
