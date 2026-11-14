@@ -217,6 +217,18 @@ assert.match(groupHistory,/requestId!==g\.openRequestId\|\|g\.active\?\.id!==gro
 assert.match(groupHistory,/g\.historyError=groupFriendlyError\(error\)/,
   'older-page failures must remain retryable and visible rather than corrupting history');
 const groupRenderer=between('function renderGroupConversation()','let groupBackgroundTimer=null');
+const singleRenderer=between('function renderMessages(scroll = true)','if(s.activeTurnInFlight)');
+assert.match(groupRenderer,/const outerAvatar=isSystem \? '<span class="avatar avatar-fallback">系<\/span>' : '';/,
+  'group messages may render a system avatar, but must not create a separate player avatar');
+assert.doesNotMatch(groupRenderer,/avatar-fallback player-avatar/,
+  'group player messages must not create an outer “you” avatar');
+assert.match(singleRenderer,/const outerAvatar = '';/,
+  'single chat remains the source of truth: player messages have no outer avatar');
+assert.doesNotMatch(html,/\.message\.user\s*>\s*\.avatar/,
+  'the obsolete CSS rule hiding redundant outer player avatars must be removed');
+assert.match(groupRenderer,/roleplaySegmentHTML\(segment,\{summonedByPlayer\}\)/);
+assert.match(singleRenderer,/roleplaySegmentHTML\(segment, \{summonedByPlayer\}\)/,
+  'single and group chat must share the same roleplay segment renderer rather than duplicate avatar logic');
 const scrollAnchorHelper=between('function captureChatScrollAnchor(pane)','async function loadCloudSessionMessages');
 assert.match(scrollAnchorHelper,/pane\.scrollTop=anchor\.scrollTop\+Math\.max\(0,pane\.scrollHeight-anchor\.scrollHeight\)/,
   'prepending older messages must compensate for added content height when the original anchor is unavailable');
