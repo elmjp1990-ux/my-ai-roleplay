@@ -104,6 +104,7 @@ Deno.serve(async (request) => {
     const message = asText(reserveError.message);
     if (message.includes("group_insufficient_funds")) return json({ status: "insufficient_funds", error: "group_insufficient_funds" });
     if (message.includes("group_not_found_or_not_accessible")) return json({ error: "group_not_found_or_not_accessible" }, 403);
+    if (message.includes("group_turn_in_progress")) return json({ status: "needs_reconciliation", error: "group_turn_in_progress", retryAllowed: false }, 409);
     return json({ error: "group_turn_reservation_failed" }, 503);
   }
   const reservation = Array.isArray(reservationRows) ? reservationRows[0] : reservationRows;
