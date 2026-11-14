@@ -254,16 +254,16 @@ assert.match(html,/\.order\('id',\{ascending:false\}\)\.limit\(4\)/,
 assert.doesNotMatch(followedAuthorsPaginationSource,/await loadPublicSupabaseCharacters\(\)/,
   "followed-author cards must not trigger a full public-character catalogue fetch");
 const paginationModule=fs.readFileSync("list-pagination.js","utf8");
-assert.match(paginationModule,/explore:\s*20/);
-assert.match(paginationModule,/authorCharacters:\s*20/);
+assert.match(paginationModule,/explore:\s*10/);
+assert.match(paginationModule,/authorCharacters:\s*10/);
 assert.match(paginationModule,/chatSessions:\s*10/);
 assert.match(paginationModule,/groupSessions:\s*10/);
-assert.match(paginationModule,/encounterMemories:\s*20/);
-assert.match(paginationModule,/messages:\s*5/);
+assert.match(paginationModule,/encounterMemories:\s*10/);
+assert.match(paginationModule,/messages:\s*10/);
 assert.match(paginationModule,/function observeEnd/);
 const exploreLoader=between("async function loadPublicCharacterRows(offset=0)","// Concurrent login hydrators");
 assert.match(html,/publicCharacterPageSize = window\.PoyozzListPagination\.pageSize\('explore'\)/,
-  "Explore must use the shared twenty-character page size");
+  "Explore must use the shared ten-character page size");
 assert.match(exploreLoader,/\.range\(offset,offset\+publicCharacterPageSize-1\)/,
   "Explore public characters must be fetched from Supabase in bounded backend pages");
 assert.match(exploreLoader,/mergeUnique\(state\.characters,publicCharacters,character=>character\.id\)/,
@@ -282,9 +282,9 @@ assert.match(html,/await window\.loadPublicCharacterById\(characterId\)/,
 
 const exploreGrid=between("function renderGrid({append=false}={})","async function loadPublicCharacterPrimaryIllustration");
 assert.match(exploreGrid,/list\.slice\(0,limit\)/,
-  "Explore must cap visible character cards to the current twenty-item display page");
+  "Explore must cap visible character cards to the current ten-item display page");
 assert.match(exploreGrid,/pageSize\('explore'\)/,
-  "Explore scroll continuation must advance by twenty visible cards");
+  "Explore scroll continuation must advance by ten visible cards");
 assert.match(exploreGrid,/PoyozzListPagination\.observeEnd/,
   "Explore must use the shared IntersectionObserver lifecycle rather than a separate observer implementation");
 
@@ -295,7 +295,7 @@ assert.match(exploreGrid,/characterVideoObserver\.unobserve\(previousVideo\)/,
 
 const encounterMemory=between("function loadEncounterMemoryList(panel,session)","async function openEncounterMemoryDetail(button)");
 assert.match(encounterMemory,/pageSize\('encounterMemories'\)/,
-  "Encounter memory lists must use the shared twenty-session page size");
+  "Encounter memory lists must use the shared ten-session page size");
 assert.match(encounterMemory,/\.range\(pageStart,pageStart\+pageSize-1\)/,
   "Encounter sessions must be paginated by the backend instead of fetching 200 diary rows");
 assert.match(encounterMemory,/\.in\('metadata->>session_id',sessionIds\)/,
@@ -303,11 +303,11 @@ assert.match(encounterMemory,/\.in\('metadata->>session_id',sessionIds\)/,
 assert.match(encounterMemory,/encounter_archived!=='true'/,
   "unfinished new Encounter sessions must remain hidden from the memory archive");
 assert.match(encounterMemory,/PoyozzListPagination\.observeEnd/,
-  "Encounter memory lists must load the next twenty sessions when the user reaches the end");
+  "Encounter memory lists must load the next ten sessions when the user reaches the end");
 assert.doesNotMatch(encounterMemory,/\.limit\(200\)/,
   "Encounter memory list initialization must not fetch 200 diary records");
 assert.match(encounterMemory,/visibleCards=combinedCards\.slice\(0,pageSize\)/,
-  "Encounter list rendering must cap each visible page at twenty cards, including legacy rows");
+  "Encounter list rendering must cap each visible page at ten cards, including legacy rows");
 assert.match(encounterMemory,/pager\.buffer=combinedCards\.slice\(pageSize\)/,
   "overflow cards must be buffered for the next page instead of rendering more than twenty initially");
 assert.match(encounterMemory,/pager\.hasMore\|\|pager\.buffer\.length/,
