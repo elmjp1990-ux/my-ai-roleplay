@@ -140,6 +140,15 @@ assert.match(html,/loadCloudChatSessions\(currentUser\(\),\{loadMore:true\}\)/,
   "the shared chat-list sentinel must request the next single-chat page");
 assert.match(html,/canLoadSessions=chatSessionListPager\.initialLoaded&&chatSessionListPager\.hasMore/,
   "the chat list must keep a continuation sentinel while single-chat pages remain");
+assert.match(cloudSessions,/session_last_assistant_message_at:session_data->>lastAssistantMessageAt/,
+  "paged session metadata must still include the unread indicator timestamp");
+assert.match(cloudSessions,/session_last_read_at:session_data->>lastReadAt/,
+  "paged session metadata must still include the read cursor");
+assert.match(cloudSessions,/pager\.pinnedLoaded=true[\s\S]*pager\.initialLoaded=true/,
+  "the pinned set and first unpinned page must be marked loaded only after both queries succeed");
+assert.match(cloudSessions,/if \(pagedList && route\.page === 'chat'\) render\(\)/,
+  "a completed page must refresh the visible chat list and its continuation sentinel");
+
 
 
 const chatAuthorProfiles=between("async function loadChatSessionAuthorProfiles(uid, authorIds)", "async function loadCloudChatSessions");
