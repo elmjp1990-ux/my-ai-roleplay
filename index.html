@@ -7467,11 +7467,11 @@ async function openEncounterMemoryDetail(button){
     }
     const placeLabel=String(button.dataset.place||'地點資料未保存');
     if(messages.length){
-      encounterMemoryDetailPager={
+      encounterMemoryDetailPager=window.PoyozzListPagination.createState('messages',{
         uid,sessionId,characterId:session.characterId,
         characterName:sessionCharacter(session)?.name||'角色',
-        placeLabel,messages,hasMore:hasMoreMessages,cursor:messageCursor,loading:false
-      };
+        placeLabel,messages,hasMore:hasMoreMessages,cursor:messageCursor
+      });
       renderEncounterMemoryDetailDialog();
       return;
     }
