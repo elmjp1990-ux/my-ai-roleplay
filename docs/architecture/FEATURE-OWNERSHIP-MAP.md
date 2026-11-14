@@ -1,7 +1,7 @@
 # POYOZZ Feature Ownership Map
 
 > Status: inventory of the current implementation and proposed ownership boundaries.
-> Baseline: `main` at `c3ae257e2e4bbe9c27661bc9b10d99a7e6f511d2` (PR #242 merged; includes #240).
+> Baseline: `main` at `4f29691fee3ad7e47f1af69e4dd1c0105d140c2b` (current main at PR #252 review).
 > This document is a navigation guide, not permission to change backend semantics. File/line locations can drift; search by the named function when line numbers change.
 
 ## How to find the right place
@@ -21,7 +21,7 @@
 | Character create/edit and AI settings | `index.html`: `renderCreate`, `renderEditor`, `renderAI`, `saveSupabaseCharacter`, `renderCharacterIllustrationGallery`, `uploadCharacterIllustrationDataUrl`, `compressUploadImage` | Character/profile writes; illustration Storage; private character info; AI profile organization worker | `features/characters/` | Medium–High |
 | Character media / video | `index.html`: `getCharacterIllustrationSignedUrl`, `getCharacterVideoSignedUrl`, `hydrateCharacterVideo`, `releaseCharacterVideo`; shared modules below | Supabase Storage buckets and metadata; visibility/ownership checks | `services/media/` + character feature adapters | High (privacy/storage) |
 | Single Story chat | `index.html`: `startChat`, `renderConversation`, `renderMessages`, `formatMessage`, `conversationSuggestionsHTML`, `renderPhoneModal` | `chat_sessions`, `chat_messages`; `supabase/functions/chat-turn/index.ts`; shared prompt/context and memory summary | `features/chat/single/` | Very high |
-| Group chat | `index.html`: `groupOpen`, `groupLoadOlderMessages`, `renderGroupConversation`, `groupSendTurn`, `renderGroupChatOverlay`, `groupDiaryStorageKey`, `syncGroupDiaryCloud`, `saveGroupDiaryCloudNow` | `chat_groups`, members, turns/messages, diary; `group-chat-turn` Edge Function; shared character AI profile formatter and speaker parser; service-role reserve/complete/refund RPCs and group usage ledger | `features/chat/group/` + `features/memory/group-diary/` | Very high |
+| Group chat | `index.html`: `groupOpen`, `groupLoadOlderMessages`, `renderGroupConversation`, `groupSendTurn`, `renderGroupChatOverlay`, `groupDiaryStorageKey`, `syncGroupDiaryCloud`, `saveGroupDiaryCloudNow` | `chat_groups`, members, turns/messages, diary; `group-chat-turn` Edge Function; shared character AI profile formatter and `group-turn-envelope`; service-role reserve/complete/refund RPCs; page-scoped `get_my_group_list_previews` batches latest previews for at most 10 owned groups per call | `features/chat/group/` + `features/memory/group-diary/` | Very high |
 | Chat list / history / deletion | `index.html`: `renderChatListPage`, `loadCloudChatSessions`, `loadCloudSessionMessages`, `saveChatSessionSafely`, `reconcileDeletedCloudChatParents`; `list-pagination.js`: shared 10-row chat lists and 5-message history pages | Chat tables, tombstones, deletion RPCs, purge workers and retention migrations | `features/chat/history/` | Critical |
 | Encounter mode | `encounter-scene.js` presentation lifecycle; `index.html`: `createEncounterSession`, `findResumableEncounterSession`, `setEncounterLifecycleState` | `encounter-session`, `encounter-session-state`, `encounter-turn`, lifecycle/evaluation RPCs and migrations | `features/encounter/` | Very high |
 | Memory album / photos | `memory-album.js`; `memory-capture.js`; `index.html`: `renderChatAlbumPage`, `addMemory`, `loadStoryMemorySummary` | `chat_memory_photos`, memory summary RPCs, expiry worker and Storage | `features/memory/album/` | High |
@@ -48,7 +48,7 @@
 | `author-profile.js` | Author profile presentation | Follow mutations or profile authorization |
 | `comment-renderer.js` | Comment presentation | Comment fetch/mutations or privacy filtering |
 | `custom-tag-picker.js` | Custom tag picker rendering and local event binding | Tag persistence or character save |
-| `list-pagination.js` | Shared page-size configuration, IntersectionObserver lifecycle, and duplicate-safe page merging for Explore, author profiles, chat lists, Encounter memories, and chat history | Feature-specific queries, ordering, filtering, authorization, or persistence |
+| `list-pagination.js` | Shared page-size configuration, pager-state initialization, IntersectionObserver lifecycle, and duplicate-safe page merging for Explore, author/followed-author pages, chat lists, group picker, favorites, owned characters, Encounter memories, chat history, and memory photos | Feature-specific queries, ordering, filtering, authorization, or persistence |
 | `memory-album.js` | Memory album UI and render lifecycle adapters | Chat/wallet transaction rules |
 | `encounter-scene.js` | Encounter visual-novel presentation | Encounter authorization, lifecycle settlement, billing |
 
@@ -57,7 +57,7 @@
 | Concern | Current location(s) | Ownership rule |
 |---|---|---|
 | Story AI turn orchestration | `supabase/functions/chat-turn/index.ts`; `supabase/functions/group-chat-turn/index.ts` | Authentication, ownership, prompt assembly, one-call provider orchestration, turn state, and downstream coordination stay server-authoritative. Group AI selects 1–3 speakers from the roster in one model call. |
-| Shared AI prompt/context | `supabase/functions/_shared/prompt-context.ts`, `prompt-variables.ts`, `character-ai-profile-prompt.ts`, `group-speaker-output.ts`, `openrouter-chat-completions.ts`, `story-memory-summary.ts` and related shared files | Single and group chat reuse character AI-profile formatting and the same privacy-restricted OpenRouter request client; group output is parsed into explicit speaker IDs. Keep model/prompt behavior separate from generic frontend refactors. |
+| Shared AI prompt/context | `supabase/functions/_shared/prompt-context.ts`, `prompt-variables.ts`, `character-ai-profile-prompt.ts`, `group-turn-envelope.ts`, `openrouter-chat-completions.ts`, `story-memory-summary.ts` and related shared files | Single and group chat reuse character AI-profile formatting and the same privacy-restricted OpenRouter request client; group output is parsed into explicit speaker IDs. Keep model/prompt behavior separate from generic frontend refactors. |
 | Encounter session and turns | `supabase/functions/encounter-session/`, `encounter-session-state/`, `encounter-turn/`, plus encounter shared helpers | Server validates session ownership, current lifecycle, schedule and turn eligibility. |
 | Character AI profile organization | `supabase/functions/character-profile-organization-worker/`, `supabase/functions/_shared/character-profile-organization.ts` | Background derived-data workflow; distinct from user-facing character form persistence. |
 | Chat retention/purge | `supabase/functions/purge-chat-deletions/`, `supabase/functions/_shared/chat-deletion-worker.ts` | Retention, tombstones and purge are backend-owned; do not replace with frontend deletion. |
