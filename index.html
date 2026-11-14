@@ -6996,24 +6996,28 @@ async function loadEncounterMemoryPage(list,session,pager){
       const place=rawPlace?(placeNames[rawPlace]||rawPlace):'地點資料未保存';
       cards.push({at,html:'<button type="button" class="archive-card encounter-memory-card" data-action="encounter-memory-open" data-id="'+e(sessionRow.id)+'" data-memory-id="'+e(newest?.id||'')+'" data-place="'+e(place)+'"><span class="row between" style="gap:8px"><strong>相遇 · '+e(date)+'</strong><span class="small muted">相遇紀錄</span></span><span class="small muted encounter-memory-place">📍 '+e(place)+'</span><p class="encounter-memory-excerpt">'+e(preview)+(preview.length>=180?'…':'')+'</p><span class="small muted">點擊查看完整對話　›</span></button>'});
     }
-    // Preserve older diary rows that predate session_id metadata; only fetch this
-    // compatibility slice once instead of scanning 200 diary rows on every open.
-    if(!pager.legacyLoaded){
+    // Preserve legacy diary rows without session_id, using their own bounded cursor.
+    let legacyCount=0;
+    if(pager.legacyHasMore){
       const {data:legacyRows,error:legacyError}=await client.from('encounter_diary')
         .select('id,summary,occurred_at,metadata')
         .eq('user_id',uid).eq('character_id',session.characterId)
         .is('metadata->>session_id',null)
-        .order('occurred_at',{ascending:false}).limit(pageSize);
+        .order('occurred_at',{ascending:false}).order('id',{ascending:false})
+        .range(pager.legacyOffset,pager.legacyOffset+pageSize-1);
       if(legacyError)throw legacyError;
+      legacyCount=(legacyRows||[]).length;
       for(const row of legacyRows||[]){
         const date=new Date(row.occurred_at||Date.now()).toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
         const preview=String(row.summary||'這次相遇留下了一段回憶。').slice(0,180);
         cards.push({at:row.occurred_at,html:'<button type="button" class="archive-card encounter-memory-card" data-action="encounter-memory-open" data-id="" data-memory-id="'+e(row.id)+'" data-place="地點資料未保存"><span class="row between" style="gap:8px"><strong>相遇 · '+e(date)+'</strong><span class="small muted">舊版回憶</span></span><span class="small muted encounter-memory-place">📍 地點資料未保存</span><p class="encounter-memory-excerpt">'+e(preview)+(preview.length>=180?'…':'')+'</p><span class="small muted">點擊查看完整回憶　›</span></button>'});
       }
-      pager.legacyLoaded=true;
     }
     pager.offset=pageStart+rows.length;
     pager.hasMore=rows.length===pageSize;
+    pager.legacyOffset+=legacyCount;
+    pager.legacyHasMore=legacyCount===pageSize;
+    pager.hasMore=pager.hasMore||pager.legacyHasMore;
     const combinedCards=[...(pager.buffer||[]),...cards].sort((a,b)=>new Date(b.at||0)-new Date(a.at||0));
     const visibleCards=combinedCards.slice(0,pageSize);
     pager.buffer=combinedCards.slice(pageSize);
