@@ -64,6 +64,11 @@ BEGIN
   IF p_content IS NULL OR char_length(btrim(p_content)) NOT BETWEEN 1 AND 2000 THEN
     RAISE EXCEPTION 'invalid_message_content' USING ERRCODE = '22023';
   END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.account_deletion_requests r WHERE r.user_id = p_user_id
+  ) THEN
+    RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE = '42501';
+  END IF;
 
   PERFORM 1 FROM public.chat_groups g
   WHERE g.id = p_group_id
