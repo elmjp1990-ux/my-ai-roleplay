@@ -14,7 +14,8 @@
       offset: 0,
       hasMore: true,
       loading: false,
-      legacyLoaded: false,
+      legacyOffset: 0,
+      legacyHasMore: true,
       buffer: [],
       observer: null
     };
