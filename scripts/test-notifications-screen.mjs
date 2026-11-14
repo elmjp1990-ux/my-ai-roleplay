@@ -62,6 +62,7 @@ assert.doesNotMatch(markup, /notificationsSentinel/,
 module.destroy();
 assert.ok(disconnectCount >= 1, "destroy must disconnect the active observer");
 
+notifications.forEach(item => { item.read = true; });
 deps.route.unread = true;
 module.render(deps);
 assert.equal((markup.match(/class="notice"/g) || []).length, 0,
