@@ -6369,7 +6369,7 @@ async function startChat(characterId) {
       .select('id,chat_mode,status,created_at,updated_at,encounter_marker:session_data->encounter,encounter_mode_marker:session_data->>encounterMode,encounter_place_marker:session_data->>encounterPlace')
       .eq('user_id', userId).eq('character_id', characterId)
       .is('deleted_at', null).neq('chat_mode', 'encounter')
-      .order('updated_at', { ascending:false });
+      .order('updated_at', { ascending:false }).limit(10);
     if (sessionsError) throw sessionsError;
     const candidateIds=(rows||[]).filter(row=>isUuid(row.id)&&
       !(row.encounter_marker&&typeof row.encounter_marker==='object'&&!Array.isArray(row.encounter_marker))&&
@@ -6940,7 +6940,7 @@ async function openGroupBackgroundSettings() {
       .select('id,owner_id,chat_type,group_id,storage_path,caption,created_at,expires_at')
       .eq('owner_id',user.id).eq('chat_type','group').eq('group_id',group.id)
       .eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString())
-      .order('created_at',{ascending:false});
+      .order('created_at',{ascending:false}).limit(10);
     if(error)throw error;
     group.memoryPhotos=await Promise.all((data||[]).map(async photo=>{
       let imageUrl='';
@@ -7360,7 +7360,7 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
       if(ctx.isGroup)rows=(ctx.group.memoryPhotos||[]).filter(p=>p.id&&p.image_url).map(p=>({id:p.id,caption:p.caption||'',url:p.image_url}));
       else{
         if(!ctx.session.cloudOwned||ctx.session.cloudOwnerUid!==uid)throw new Error('請先使用目前帳號擁有的雲端聊天。');
-        const {data,error}=await client.from('chat_memory_photos').select('id,caption,storage_path,created_at').eq('owner_id',uid).eq('chat_type','single').eq('session_id',ctx.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false});
+        const {data,error}=await client.from('chat_memory_photos').select('id,caption,storage_path,created_at').eq('owner_id',uid).eq('chat_type','single').eq('session_id',ctx.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false}).limit(10);
         if(error)throw error;
         rows=await Promise.all((data||[]).map(async p=>{const signedUrl=await getMemoryPhotoSignedUrl(p.storage_path).catch(()=>null);return signedUrl?{id:p.id,caption:p.caption||'',url:signedUrl}:null;}));
         rows=rows.filter(Boolean);
@@ -9225,7 +9225,7 @@ ${p.isDefault ? '<div class="small" style="color:var(--primary);font-weight:700;
       void (async()=>{
         const select=$('backgroundSetting'),client=window.mySupabase,uid=currentUser()?.uid;
         if(!select||!client||!uid||!selected.cloudOwned||selected.cloudOwnerUid!==uid)return;
-        const {data,error}=await client.from('chat_memory_photos').select('id,caption').eq('owner_id',uid).eq('chat_type','single').eq('session_id',selected.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false});
+        const {data,error}=await client.from('chat_memory_photos').select('id,caption').eq('owner_id',uid).eq('chat_type','single').eq('session_id',selected.id).eq('status','active').is('deleted_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false}).limit(10);
         if(error){console.warn('載入聊天背景選項失敗',error.message);return;}
         for(const photo of data||[]){const value='memory-photo:'+photo.id;let option=Array.from(select.options).find(item=>item.value===value);if(!option){option=document.createElement('option');option.value=value;option.textContent='回憶相片：'+(photo.caption||'回憶快照');select.appendChild(option);}if(selected.background===value)option.selected=true;}
         select.value=selected.background||'avatar';
