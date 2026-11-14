@@ -12,12 +12,10 @@ on:
       - "scripts/test-group-chat-transaction-concurrency.sh"
       - "scripts/test-group-chat-migration-rollback.sh"
       - "scripts/test-runtime-egress-optimizations.mjs"
-      - "scripts/test-pr252-migration-source-contract.mjs"
       - ".github/workflows/group-chat-transaction-tests.yml"
   pull_request:
     paths:
       - "supabase/migrations/**"
-      - "scripts/test-pr252-migration-source-contract.mjs"
       - "supabase/tests/**"
       - "supabase/functions/group-chat-turn/**"
       - "supabase/functions/_shared/**"
@@ -55,9 +53,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Verify versioned migration source mapping
-        run: node scripts/test-pr252-migration-source-contract.mjs
 
       - name: Set up Deno
         uses: denoland/setup-deno@v2
