@@ -150,7 +150,7 @@ assert.ok((html.match(/renderGrid\(\{append:true\}\);/g)||[]).length >= 2);
  assert.ok(html.includes("detailVideo.replaceWith(previousDetailVideo)"));
  assert.ok(html.includes("releaseCharacterVideo(previousDetailVideo)"));
  // Discarded Explore and city portrait nodes must release their detached media resources.
- assert.ok(html.includes("existingVideosByCharacter.forEach(video => {\n      characterVideoObserver?.unobserve(video);\n      releaseCharacterVideo(video);"));
+ assert.ok(html.includes("existingVideosByCharacter.forEach(video=>{\n      characterVideoObserver?.unobserve(video);\n      releaseCharacterVideo(video);"));
  assert.ok(cityMap.includes("}else if(previousCharacterVideo){\n      characterVideoObserver?.unobserve(previousCharacterVideo);\n      releaseCharacterVideo(previousCharacterVideo);"));
  assert.ok(html.includes("video.dataset.videoObservePending='false';"));
  assert.ok(html.includes("window.addEventListener('pageshow',()=>{"));
@@ -165,8 +165,8 @@ assert.ok(html.includes("async function loadCharacterIllustrationAssets(characte
 assert.ok(html.includes("if(cleanupUserId)await retryCharacterIllustrationCleanup(cleanupUserId)"));
 
 // Character hydration only fetches story fields consumed by the UI; avoid downloading unused story descriptions/titles.
-const minimalStorySelect = ".select('character_id, opening_message, visibility, created_at')";
-assert.equal(html.split(minimalStorySelect).length - 1, 1);
+assert.ok(html.includes("client.rpc('get_latest_owned_character_stories'"), "Owned character hydration must fetch only the latest story per character through the bounded RPC.");
+assert.ok(html.includes(".select('opening_message')"), "Public character detail must select only the opening field it displays.");
 assert.ok(!html.includes(".select('id, character_id, story_name, description, opening_message, visibility, created_at')"));
 
 console.log("Author schedule and illustration signed-URL refresh contract tests passed.");

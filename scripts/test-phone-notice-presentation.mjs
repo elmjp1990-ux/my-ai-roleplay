@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const html = fs.readFileSync('index.html', 'utf8');
+const uiStyles = fs.readFileSync('poyozz-ui.css', 'utf8');
 const phoneStateMigration = fs.readFileSync('supabase/migrations/20261110120000_story_phone_state_and_memory_summary_read.sql', 'utf8');
 const storyPrompt = fs.readFileSync('supabase/functions/chat-turn/index.ts', 'utf8');
 const generatedStart = html.indexOf('  // Creator notice prompts guide AI generation only; never render raw instructions to players.');
@@ -35,7 +36,7 @@ assert.doesNotMatch(phoneBlock, /body:String\(row\)|body:row/,'Raw creator instr
 assert.ok(html.includes('session.storyWorldState'), 'Phone must read the latest saved story-world state');
 assert.ok(html.includes('故事時間尚未確認'), 'Unknown story time must remain explicitly unknown rather than use a hard-coded clock');
 assert.ok(!html.includes('星期五　🕧 19:30'), 'Phone must not show a hard-coded fictional time');
-assert.ok(html.includes('overflow-y:auto;overflow-x:hidden'), 'Phone body must scroll independently');
+assert.ok(uiStyles.includes('overflow-y:auto;overflow-x:hidden'), 'Phone content body must scroll independently in the extracted UI stylesheet');
 assert.ok(html.includes('phone-device-head,.phone-member-switch,.phone-bar,.phone-close-row{flex-shrink:0}'),
   'Phone header, member switch, bar, and close control must remain fixed');
 assert.ok(!html.includes('.phone-notice-list{max-height:'), 'Phone must not trap scrolling in a nested notice list');

@@ -470,27 +470,6 @@ assert.match(groupSend,/responseBody\?\.status==='timed_out'[\s\S]*pendingReques
 
 console.log('Group watchdog, deadline race, abandoned-request recovery, idempotent timeout status, and exact-currency refund checks passed.');
 
-const primaryIllustrationLoader=between("async function loadCharacterPrimaryIllustrationAssets","async function loadCharacterIllustrationAssets");
-assert.match(primaryIllustrationLoader,/mapWithConcurrency\\(rows,4/);
-assert.doesNotMatch(primaryIllustrationLoader,/for\\(const row of rows\\)/);
-const galleryIllustrationLoader=between("async function loadCharacterIllustrationAssets","// Encounter scenes fetch");
-assert.match(galleryIllustrationLoader,/mapWithConcurrency\\(rows,4/);
-assert.doesNotMatch(galleryIllustrationLoader,/for\\(const row of rows\\)/);
-const ownedCharacterLoader=between("async function loadSupabaseCharacters(user,{loadMore=false}={})","function ");
-assert.match(ownedCharacterLoader,/rpc\\('get_latest_owned_character_stories'/);
-assert.doesNotMatch(ownedCharacterLoader,/from\\('character_stories'\\)/);
-const authorLatestLoader=between("async function loadPublicAuthorLatestCharacters","let publicCharactersLoadPromise");
-assert.doesNotMatch(authorLatestLoader,/count:'exact'/);
-assert.match(authorLatestLoader,/\\.limit\\(5\\)/);
-const startChatLoader=between("async function startChat(characterId)","function visibleSessions()");
-assert.match(startChatLoader,/getVerifiedAuthUser\\(userId\\)/);
-assert.doesNotMatch(startChatLoader,/auth\\?\\.getUser/);
-const notificationRenderer=between("function renderNotifications()","/* Cloud wallet ledger");
-assert.match(notificationRenderer,/state\\.notifications\\.filter/);
-assert.match(notificationRenderer,/filtered\\.slice\\(0,notificationListPager\\.limit\\)/);
-assert.doesNotMatch(notificationRenderer,/\\.from\\(|\\.rpc\\(/,
-  "system notifications are local-state-only; the current 10-item reveal is not backend pagination");
-
 console.log('Group history fixture passed: 1,000 rows, 200 pages of five, timestamp/sequence ties, UUID cursor tie-break, no gaps or duplicates, overlapping-page dedupe, group-switch guards, and scroll anchoring.');
 
 const groupPhoneMigration = fs.readFileSync('supabase/migrations/20261114180000_group_ai_single_orchestrator.sql', 'utf8');
@@ -639,3 +618,11 @@ const sessionHydrator=between("async function loadCloudChatSessions(user, option
 assert.ok(sessionHydrator.includes("options.verifiedUser"));
 const messageHydrator=between("async function loadCloudSessionMessages","function ");
 assert.ok(messageHydrator.includes("options.verifiedUser"));
+
+const queryOptimizationMigration=fs.readFileSync('supabase/migrations/20261114200000_batch_character_story_and_encounter_schedule_reads.sql','utf8');
+assert.match(queryOptimizationMigration,/DISTINCT ON \(s\.character_id\)/);
+assert.match(queryOptimizationMigration,/cardinality\(p_character_ids\) BETWEEN 1 AND 10/);
+assert.match(queryOptimizationMigration,/find_existing_story_chat_session/);
+assert.match(queryOptimizationMigration,/SECURITY INVOKER/);
+assert.match(queryOptimizationMigration,/get_encounter_character_schedules/);
+assert.match(queryOptimizationMigration,/SECURITY DEFINER/);

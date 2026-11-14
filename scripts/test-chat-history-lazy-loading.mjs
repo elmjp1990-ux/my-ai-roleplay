@@ -64,7 +64,8 @@ assert.ok(hasUserHelper.indexOf("cloudHasUserMessage===true") < hasUserHelper.in
 const messageLoader = between("async function loadCloudSessionMessages(sessionId, options = {})", "async function saveChatSessionSafely");
 assert.match(messageLoader, /options\.refresh !== true/,
   "an explicit refresh must bypass the already-loaded short circuit");
-assert.match(messageLoader, /auth\.getUser\(\)/);
+assert.match(messageLoader, /getVerifiedAuthUser\\(userId\\)/);
+assert.match(messageLoader, /options\\.verifiedUser/);
 assert.match(messageLoader, /snapshotRequested=!older&&session\.cloudCharacterSnapshotLoaded!==true/);
 assert.match(messageLoader, /\.\.\.\(snapshotRequested\?\['character_snapshot'\]:\[\]\)/);
 assert.match(messageLoader, /session\.cloudCharacterSnapshotLoaded=true/);
