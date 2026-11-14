@@ -13,6 +13,8 @@ on:
       - "city-map.js"
       - "followed-authors.js"
       - "author-profile.js"
+      - "author-data.js"
+      - "scripts/test-author-data-module.mjs"
       - "comment-renderer.js"
       - "custom-tag-picker.js"
       - "scripts/test-custom-tag-picker-module.mjs"
@@ -60,6 +62,10 @@ jobs:
         run: node --check followed-authors.js
       - name: Parse extracted author profile module
         run: node --check author-profile.js
+      - name: Parse author data adapter
+        run: node --check author-data.js
+      - name: Verify author data adapter contract
+        run: node scripts/test-author-data-module.mjs
       - name: Parse extracted comment renderer module
         run: node --check comment-renderer.js
       - name: Parse extracted custom tag picker module
