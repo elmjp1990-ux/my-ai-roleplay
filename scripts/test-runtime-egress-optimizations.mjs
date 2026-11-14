@@ -255,6 +255,7 @@ assert.doesNotMatch(followedAuthorsModule,/await loadPublicSupabaseCharacters\(\
   "followed-author cards must not trigger a full public-character catalogue fetch");
 const paginationModule=fs.readFileSync("list-pagination.js","utf8");
 assert.match(paginationModule,/explore:\s*20/);
+assert.match(paginationModule,/authorCharacters:\s*20/);
 assert.match(paginationModule,/chatSessions:\s*10/);
 assert.match(paginationModule,/groupSessions:\s*10/);
 assert.match(paginationModule,/encounterMemories:\s*20/);
