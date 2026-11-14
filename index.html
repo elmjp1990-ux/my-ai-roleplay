@@ -12218,7 +12218,7 @@ async function loadCityCharacterSchedules(characterIds=[]){
     ].join('|'));
     schedules.set(row.character_id,lines);
   }
-  for(const [id,lines] of schedules)schedules.set(id,lines.join('\\n'));
+  for(const [id,lines] of schedules)schedules.set(id,lines.join('\n'));
   return schedules;
 }
 

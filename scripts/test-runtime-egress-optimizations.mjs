@@ -609,3 +609,24 @@ assert.match(ownerListSource,/favoriteCharactersSentinel[\s\S]*observeEnd/);
 
 assert.match(ownerListSource,/notificationsSentinel[\s\S]*observeEnd/,'system notifications must reveal ten rows at a time');
 assert.match(ownerListSource,/pageSize\('notifications'\)/);
+
+const primaryIllustrationLoader=between("async function loadCharacterPrimaryIllustrationAssets","async function loadCharacterIllustrationAssets");
+assert.ok(primaryIllustrationLoader.includes("mapWithConcurrency(rows,4"));
+assert.ok(!primaryIllustrationLoader.includes("for(const row of rows)"));
+const galleryIllustrationLoader=between("async function loadCharacterIllustrationAssets","// Encounter scenes fetch");
+assert.ok(galleryIllustrationLoader.includes("mapWithConcurrency(rows,4"));
+assert.ok(!galleryIllustrationLoader.includes("for(const row of rows)"));
+const ownedCharacterLoader=between("async function loadSupabaseCharacters(user,{loadMore=false}={})","function ");
+assert.ok(ownedCharacterLoader.includes("get_latest_owned_character_stories"));
+assert.ok(!ownedCharacterLoader.includes(".from('character_stories')"));
+const authorLatestLoader=between("async function loadPublicAuthorLatestCharacters","let publicCharactersLoadPromise");
+assert.ok(!authorLatestLoader.includes("count:'exact'"));
+assert.ok(authorLatestLoader.includes(".limit(5)"));
+const startChatLoader=between("async function startChat(characterId)","function visibleSessions()");
+assert.ok(startChatLoader.includes("getVerifiedAuthUser(userId)"));
+assert.ok(!startChatLoader.includes("auth?.getUser"));
+const notificationRenderer=between("function renderNotifications()","/* Cloud wallet ledger");
+assert.ok(notificationRenderer.includes("state.notifications.filter"));
+assert.ok(notificationRenderer.includes("filtered.slice(0,notificationListPager.limit)"));
+assert.ok(!notificationRenderer.includes(".from(")&&!notificationRenderer.includes(".rpc("),
+  "system notifications are local-state-only; the current ten-item reveal is not backend pagination");

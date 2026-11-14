@@ -41,5 +41,5 @@ console.log('City map module extraction and dependency contract passed.');
 
 assert.match(html,/get_encounter_character_schedules/);
 assert.doesNotMatch(cityMap,/hydrateCitySchedule/);
-assert.match(cityMap,/const schedules=await loadCityCharacterSchedules\\(items\\.map\\(person=>person\\.id\\)\\)/);
-assert.doesNotMatch(cityMap,/Promise\\.all\\(items\\.map\\(hydrateCitySchedule\\)\\)/);
+assert.ok(cityMap.includes("const schedules=await loadCityCharacterSchedules(items.map(person=>person.id))"));
+assert.ok(!cityMap.includes("Promise.all(items.map(hydrateCitySchedule)"));

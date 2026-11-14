@@ -36,5 +36,5 @@ assert.doesNotMatch(moduleSource, /window\.mySupabase/,
 
 console.log('Followed authors module extraction and dependency contract passed.');
 
-assert.match(moduleSource,/entry\\.hasMore\\?'<button type="button" class="followed-author-more"/);
-assert.doesNotMatch(moduleSource,/entry\\.total/);
+assert.ok(moduleSource.includes("entry.hasMore?'<button type=\"button\" class=\"followed-author-more\""));
+assert.ok(!moduleSource.includes("entry.total"));
