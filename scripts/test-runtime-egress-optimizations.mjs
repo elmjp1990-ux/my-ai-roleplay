@@ -236,7 +236,7 @@ assert.match(html,/groupLoadList\(false,true\)/,
   "the group list sentinel must request the next page");
 
 const authorProfileModule=fs.readFileSync("author-profile.js","utf8");
-const followedAuthorsModule=fs.readFileSync("followed-authors.js","utf8");
+const followedAuthorsPaginationSource=fs.readFileSync("followed-authors.js","utf8");
 assert.match(authorProfileModule,/loadAuthorCharacterPage\(authorId,\s*page\.offset\)/,
   "author profile presentation must delegate each page to the app-owned data loader");
 assert.match(html,/async function loadPublicAuthorCharacterPage\(authorId,offset=0\)/,
@@ -245,13 +245,13 @@ assert.match(html,/\.range\(offset,offset\+pageSize-1\)/,
   "author profile data must use bounded twenty-row backend pages");
 assert.match(authorProfileModule,/PoyozzListPagination\.observeEnd/,
   "author profile lists must use the shared scroll pagination observer");
-assert.match(followedAuthorsModule,/loadPublicAuthorLatestCharacters\(authorIds\)/,
+assert.match(followedAuthorsPaginationSource,/loadPublicAuthorLatestCharacters\(authorIds\)/,
   "followed-author presentation must delegate latest-character hydration to the app data layer");
 assert.match(html,/async function loadPublicAuthorLatestCharacters\(authorIds=\[\]\)/,
   "followed-author latest characters must use a centralized app-owned query");
 assert.match(html,/\.order\('id',\{ascending:false\}\)\.limit\(4\)/,
   "followed-author cards must fetch only each author's four newest public characters");
-assert.doesNotMatch(followedAuthorsModule,/await loadPublicSupabaseCharacters\(\)/,
+assert.doesNotMatch(followedAuthorsPaginationSource,/await loadPublicSupabaseCharacters\(\)/,
   "followed-author cards must not trigger a full public-character catalogue fetch");
 const paginationModule=fs.readFileSync("list-pagination.js","utf8");
 assert.match(paginationModule,/explore:\s*20/);
@@ -492,22 +492,22 @@ assert.match(groupPhoneUI, /initialStoryTime=Number\(isGroup\?/);
 assert.match(groupPhoneUI, /phoneHeader\+/);
 assert.match(groupPhoneStyles, /phone-device-head--group \.phone-member-switch/);
 
-const followedAuthorsModule=fs.readFileSync('followed-authors.js','utf8');
-const paginationConfig=fs.readFileSync('list-pagination.js','utf8');
-assert.match(paginationConfig,/followedAuthors:\s*10/,
+const followedAuthorsPaginationSource=fs.readFileSync('followed-authors.js','utf8');
+const sharedPaginationSource=fs.readFileSync('list-pagination.js','utf8');
+assert.match(sharedPaginationSource,/followedAuthors:\s*10/,
   "followed-author pagination must use the shared ten-row page size");
-assert.match(followedAuthorsModule,/pageSize:global\.PoyozzListPagination\.pageSize\('followedAuthors'\)/,
+assert.match(followedAuthorsPaginationSource,/pageSize:global\.PoyozzListPagination\.pageSize\('followedAuthors'\)/,
   "followed-author page size must come from the shared pagination module");
-assert.match(followedAuthorsModule,/\.from\('author_follows'\)\.select\('author_id,created_at',\{count:'exact'\}\)/,
+assert.match(followedAuthorsPaginationSource,/\.from\('author_follows'\)\.select\('author_id,created_at',\{count:'exact'\}\)/,
   "followed authors must be counted and selected from the server-side relation");
-assert.match(followedAuthorsModule,/\.range\(current\.offset,current\.offset\+current\.pageSize-1\)/,
+assert.match(followedAuthorsPaginationSource,/\.range\(current\.offset,current\.offset\+current\.pageSize-1\)/,
   "followed authors must be fetched in ten-row backend pages");
-assert.match(followedAuthorsModule,/loadPublicAuthorLatestCharacters\(pageAuthorIds\)/,
+assert.match(followedAuthorsPaginationSource,/loadPublicAuthorLatestCharacters\(pageAuthorIds\)/,
   "latest character previews must only hydrate for the currently loaded author page");
-assert.match(followedAuthorsModule,/PoyozzListPagination\.observeEnd/,
+assert.match(followedAuthorsPaginationSource,/PoyozzListPagination\.observeEnd/,
   "followed-author list must fetch the next page when the player scrolls to the end");
-assert.match(followedAuthorsModule,/insertAdjacentHTML\('beforeend',html\)/,
+assert.match(followedAuthorsPaginationSource,/insertAdjacentHTML\('beforeend',html\)/,
   "next followed-author pages must append without replacing the already rendered authors");
-assert.doesNotMatch(followedAuthorsModule,/\.from\('author_follows'\)[\s\S]*?\.order\('created_at',[\s\S]*?\.in\('id',authorIds\)/,
+assert.doesNotMatch(followedAuthorsPaginationSource,/\.from\('author_follows'\)[\s\S]*?\.order\('created_at',[\s\S]*?\.in\('id',authorIds\)/,
   "followed-author initial load must not fetch the complete followed-author list");
 
