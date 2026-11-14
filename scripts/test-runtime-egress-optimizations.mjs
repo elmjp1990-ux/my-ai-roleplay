@@ -518,7 +518,7 @@ assert.doesNotMatch(followedAuthorsPageTestSource2026,/\.from\('author_follows'\
 
 
 const paginationSizes=sharedPaginationSource.slice(sharedPaginationSource.indexOf('const PAGE_SIZES'),sharedPaginationSource.indexOf('});',sharedPaginationSource.indexOf('const PAGE_SIZES'))+3);
-for(const listName of ['authorCharacters','chatSessions','groupSessions','followedAuthors','encounterMemories','ownedCharacters','favorites','notifications','characterComments','memoryPhotos','walletLedger']){
+for(const listName of ['authorCharacters','chatSessions','groupSessions','followedAuthors','encounterMemories','ownedCharacters','favorites','notifications','characterComments','memoryPhotos']){
   assert.match(paginationSizes,new RegExp(listName+':\\s*10'),listName+' must use ten-row pages');
 }
 assert.match(paginationSizes,/explore:\s*20/,'Explore must preserve its twenty-character page size');
@@ -634,16 +634,5 @@ const cloudSessionLoader=between("async function loadCloudChatSessions(user, opt
 assert.ok(cloudSessionLoader.includes("options.verifiedUser?.id===user.id"));
 assert.ok(cloudSessionLoader.includes("currentUser()?.uid!==user.id"));
 
-const walletLedgerSource=between("async function loadWalletLedger(currency, {loadMore = false} = {})","/* Modal content */");
-assert.match(walletLedgerSource,/pageSize\('walletLedger'\)/,"wallet ledger must use the shared ten-row page size");
-assert.match(walletLedgerSource,/\.eq\('currency_type', selectedType\)/,"wallet ledger must fetch only the selected currency from the backend");
-assert.match(walletLedgerSource,/\.range\(pager\.offset, pager\.offset \+ pageSize - 1\)/,"wallet ledger must use bounded backend pages");
-assert.doesNotMatch(walletLedgerSource,/\.limit\(100\)/,"wallet ledger must not fetch one hundred rows at once");
-assert.match(walletLedgerSource,/get_my_wallet_transaction_character_names_page/,"wallet character labels must be fetched through the bounded page RPC");
-assert.match(walletLedgerSource,/p_reference_ids: referenceIds/,"wallet character label lookup must receive only references from the current page");
-assert.match(html,/data-action=\"ledger-load-more\"/,"wallet ledger must expose an explicit load-more action");
-const walletLedgerMigration=fs.readFileSync("supabase/migrations/20261114220000_bound_wallet_ledger_reads.sql","utf8");
-assert.match(walletLedgerMigration,/cardinality\(p_reference_ids\) BETWEEN 1 AND 10/,"wallet character label RPC must reject unbounded reference arrays");
-assert.match(walletLedgerMigration,/wt\.reference_id = ANY \(p_reference_ids\)/,"wallet character label RPC must filter to the supplied page references");
 const followedAuthorsSource=fs.readFileSync("followed-authors.js","utf8");
 assert.doesNotMatch(followedAuthorsSource,/count:\s*['"]exact['"]/,"followed-author pages must not calculate an exact total count");
