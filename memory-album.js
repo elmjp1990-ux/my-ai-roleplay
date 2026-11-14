@@ -1,7 +1,5 @@
 (function(){
   const BUCKET='personax-memory-photos';
-  // Weak keys tie signed-URL/photo metadata to rendered rows. Removing an album
-  // releases its cache entries without invalidating actions in the still-visible album.
   const urlCache=new WeakMap();
   const dateLabel=value=>{const d=new Date(value);return Number.isNaN(d.getTime())?'日期不明':d.toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'});};
   function albumMount(type,id){
@@ -12,23 +10,9 @@
       '<label class="field"><span>上傳回憶相片（JPEG、PNG、WebP，單張上限 10 MB）</span><input id="memoryAlbumFile" type="file" accept="image/jpeg,image/png,image/webp" data-album-type="'+e(type)+'" data-album-id="'+e(id)+'"></label></div>'+
       '<div id="memoryAlbumItems" class="memory-album-items"><div class="empty">正在讀取回憶相簿…</div></div></section>';
   }
-  const albumPageStates=new Map();
-  const MAX_ALBUM_PAGE_STATES=8;
-  function getAlbumPageState(key){
-    const pager=albumPageStates.get(key);
-    if(!pager)return null;
-    albumPageStates.delete(key);
-    albumPageStates.set(key,pager);
-    return pager;
-  }
-  function rememberAlbumPageState(key,pager){
-    albumPageStates.delete(key);
-    albumPageStates.set(key,pager);
-    while(albumPageStates.size>MAX_ALBUM_PAGE_STATES){
-      const oldestKey=albumPageStates.keys().next().value;
-      albumPageStates.delete(oldestKey);
-    }
-  }
+  const albumPageStates=new Map(),MAX_ALBUM_PAGE_STATES=8;
+  function getAlbumPageState(key){const pager=albumPageStates.get(key);if(pager){albumPageStates.delete(key);albumPageStates.set(key,pager);}return pager||null;}
+  function rememberAlbumPageState(key,pager){albumPageStates.delete(key);albumPageStates.set(key,pager);while(albumPageStates.size>MAX_ALBUM_PAGE_STATES)albumPageStates.delete(albumPageStates.keys().next().value);}
   async function loadAlbum(type,chatId,options={}){
     const mount=$('memoryAlbumItems');if(!mount)return;
     const client=window.mySupabase;
@@ -61,20 +45,17 @@
         return {
           photo,
           cached:{url:imageUrl,photo},
-          html:'<article class="memory-photo-row" data-memory-photo-id="'+e(photo.id)+'">'+thumbnail+
+          html:'<article class="memory-photo-row">'+thumbnail+
             '<div class="memory-photo-details"><div class="memory-photo-title-edit"><strong>'+e(photo.caption||'回憶快照')+'</strong>'+(imageUrl?'<button type="button" class="ghost memory-photo-icon" data-action="memory-photo-edit" data-id="'+e(photo.id)+'" aria-label="修改標題" title="修改標題">✎</button>':'')+'</div><span class="small muted">'+e(dateLabel(photo.created_at))+'</span><span class="memory-photo-expiry">到期日：'+e(dateLabel(photo.expires_at))+'</span></div>'+
             '<div class="memory-photo-actions"><button type="button" class="ghost memory-photo-icon" data-action="memory-photo-delete" data-id="'+e(photo.id)+'" aria-label="刪除相片" title="刪除相片">🗑</button></div></article>'
         };
       }));
       if(!mount.isConnected||currentUser()?.uid!==uid)return;
-      const html=cards.filter(Boolean).map(card=>card.html).join('');
+      const html=cards.map(card=>card.html).join('');
       if(html){
         mount.insertAdjacentHTML('beforeend',html);
-        const cacheById=new Map(cards.filter(Boolean).map(card=>[card.photo.id,card.cached]));
-        mount.querySelectorAll('[data-memory-photo-id]').forEach(row=>{
-          const cached=cacheById.get(row.dataset.memoryPhotoId);
-          if(cached)urlCache.set(row,cached);
-        });
+        const renderedRows=mount.querySelectorAll('.memory-photo-row');
+        cards.forEach((card,index)=>urlCache.set(renderedRows[renderedRows.length-cards.length+index],card.cached));
       }
       pager.offset+=((data||[]).length);
       pager.hasMore=(data||[]).length===pageSize;
