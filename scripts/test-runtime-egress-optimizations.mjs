@@ -638,6 +638,15 @@ const paginationHelper = fs.readFileSync('list-pagination.js','utf8');
 assert.match(paginationHelper,/function createState\(kind, initial = \{\}\)/,'shared pagination state must accept module-specific fields');
 assert.doesNotMatch(paginationHelper,/legacyOffset|legacyHasMore|buffer: \[\]/,'shared pagination state must not retain unused legacy fields');
 assert.match(fs.readFileSync('memory-album.js','utf8'),/createState\('memoryPhotos'/,'memory album must reuse shared pagination state');
+const authorProfileModule = fs.readFileSync('author-profile.js','utf8');
+assert.match(authorProfileModule,/createState\('authorCharacters'/,'author profile must reuse shared pagination state');
+assert.match(authorProfileModule,/page\.observer\?\.disconnect\(\)/,'author profile rerenders must disconnect stale observers');
+assert.match(authorProfileModule,/route\.page !== 'author' \|\| route\.id !== authorId/,'author profile load-more must ignore stale routes');
+const followedAuthorModule = fs.readFileSync('followed-authors.js','utf8');
+assert.match(followedAuthorModule,/createState\('followedAuthors'/,'followed authors must reuse shared pagination state');
+assert.doesNotMatch(followedAuthorModule,/renderGeneration|current\.total/,'followed-author unused pager state must stay removed');
+assert.ok(!fs.existsSync('supabase/functions/_shared/group-speaker-output.ts'),'superseded group speaker parser must remain removed');
+
 
 const appIndexSource=fs.readFileSync('index.html','utf8');
 for(const [name,kind] of [['groupCharacterPickerPager','groupCharacterPicker'],['favoriteListPager','favorites'],['ownedCharacterPager','ownedCharacters']]) {
