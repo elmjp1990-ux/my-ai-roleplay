@@ -6,7 +6,7 @@
 
   global.PoyozzFollowedAuthors = Object.freeze({
     async render(dependencies) {
-      const { $, currentUser, getRoute, getSupabaseClient, isUuid, state, author, ICON, e, avatar, card, persist, toast, PoyozzListPagination } = dependencies;
+      const { $, currentUser, getRoute, getSupabaseClient, isUuid, state, author, ICON, e, avatar, card, persist, toast, loadPublicAuthorLatestCharacters } = dependencies;
         const user = currentUser();
         if (!user) return;
         $('view').innerHTML = '<div class="stack"><div class="followed-authors-title-row"><button type="button" class="ghost followed-authors-back" data-action="back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h1>喜愛作者</h1></div><div class="empty">正在載入追蹤作者…</div></div>';
@@ -48,24 +48,11 @@
           }
 
           if (getRoute()?.page !== 'followed-authors' || currentUser()?.uid !== user.uid) return;
-          const charactersByAuthor = new Map();
-          if(client&&authorIds?.length){
-            for(let offset=0;offset<authorIds.length;offset+=5){
-              const batch=authorIds.slice(offset,offset+5);
-              const results=await Promise.all(batch.map(async authorId=>{
-                const {data,error,count}=await client.from('characters')
-                  .select('id,author_id,name,gender,age,avatar_url,avatar_video_path,is_nsfw,visibility,review_status,intro,race,style,tags,created_at,first_published_at,latest_eligible',{count:'exact'})
-                  .eq('author_id',authorId).eq('visibility','public').is('deleted_at',null)
-                  .order('first_published_at',{ascending:false,nullsFirst:false})
-                  .order('id',{ascending:false}).limit(4);
-                if(error)throw new Error('讀取作者最新公開角色失敗：'+error.message);
-                const items=(data||[]).map(row=>global.mapPublicCharacterRow(row));
-                state.characters=PoyozzListPagination.mergeUnique(state.characters,items,character=>character.id);
-                return [authorId,{items,total:Number(count??items.length)}];
-              }));
-              for(const [authorId,entry] of results)charactersByAuthor.set(authorId,entry);
-            }
+          let charactersByAuthor;
+          if(client&&authorIds.length&&typeof loadPublicAuthorLatestCharacters==='function'){
+            charactersByAuthor=await loadPublicAuthorLatestCharacters(authorIds);
           }else{
+            charactersByAuthor=new Map();
             for(const authorInfo of authors){
               const items=state.characters.filter(character=>character.visibility==='public'&&character.authorId===authorInfo.uid&&
                 !String(character.id).startsWith('seed-')&&character.cloudPublic!==false&&character.localOnly!==true&&!character.deletedAt)
