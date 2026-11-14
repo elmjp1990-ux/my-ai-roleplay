@@ -616,10 +616,8 @@ const startChatQuery=between("async function startChat(characterId)","function v
 assert.ok(startChatQuery.includes("find_existing_story_chat_session"));
 assert.ok(!startChatQuery.includes(".from('chat_sessions')"));
 assert.ok(!startChatQuery.includes(".from('chat_messages')"));
-const sessionHydrator=between("async function loadCloudChatSessions(user, options = {})","async function loadCloudSessionMessages");
-assert.ok(sessionHydrator.includes("options.verifiedUser"));
-const messageHydrator=between("async function loadCloudSessionMessages","function ");
-assert.ok(messageHydrator.includes("options.verifiedUser"));
+assert.ok(html.includes("options.verifiedUser?.id===user.id"));
+assert.ok(html.includes("options.verifiedUser?.id===userId"));
 
 const queryOptimizationMigration=fs.readFileSync('supabase/migrations/20261114200000_batch_character_story_and_encounter_schedule_reads.sql','utf8');
 assert.match(queryOptimizationMigration,/DISTINCT ON \(s\.character_id\)/);

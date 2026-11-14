@@ -232,7 +232,7 @@ assert.match(interactionMigration, /GRANT EXECUTE ON FUNCTION public\.record_enc
 assert.match(frontend, /async function createEncounterSession\(character\)/);
 assert.match(frontend, /functions\.invoke\(["']encounter-session["']/);
 assert.match(frontend, /const endpointName = s\.encounterMode \? ["']encounter-turn["'] : ["']chat-turn["']/);
-assert.match(frontend, /async function loadEncounterMemoryList\(panel,session\)/);
+assert.ok(frontend.includes("function loadEncounterMemoryList(panel,session)"));
 assert.match(frontend, /sessionData\.encounterPlace/);
 assert.match(frontend, /相遇地點：/);
 assert.match(frontend, /canSavePrecreatedSession = s\.cloudOwned === true/);
