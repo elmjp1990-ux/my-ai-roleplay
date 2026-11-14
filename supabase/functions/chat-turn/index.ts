@@ -1,13 +1,13 @@
 // POYOZZ single-player Story turn orchestrator: reservation, OpenRouter generation, privacy screening, persistence, and settlement.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildPromptVariableValues, applyPromptVariables } from "../_shared/prompt-context.ts";
-import { normalizeAiProviderResult } from "../_shared/ai-provider-result.ts";
 import { findPrivateContextLeak, preparePrivateContext } from "../_shared/private-context-guard.ts";
 import { releaseGenerationClaim } from "../_shared/chat-turn-claim.ts";
 import { classifyProviderFailure } from "../_shared/provider-failure-policy.ts";
 import { processDueStoryMemorySummary, recordChatModelUsage } from "../_shared/story-memory-summary.ts";
 import { parseStoryTurnEnvelope } from "../_shared/story-turn-envelope.ts";
 import { collectDerivedPrivateProfileValues, formatCharacterAiProfilePrompt } from "../_shared/character-ai-profile-prompt.ts";
+import { requestOpenRouterChatCompletion, POYOZZ_DEFAULT_CHAT_MODEL } from "../_shared/openrouter-chat-completions.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,8 +26,7 @@ const isUuid = (value: unknown): value is string =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
 
-const OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-v4-flash-20260423";
+const DEFAULT_OPENROUTER_MODEL = POYOZZ_DEFAULT_CHAT_MODEL;
 const GENERATION_TIMEOUT_MS = 55_000;
 
 type DbRow = Record<string, unknown>;
@@ -279,49 +278,14 @@ async function requestStoryGeneration(
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
   apiKey: string,
   model: string,
-): Promise<{ result: ReturnType<typeof normalizeAiProviderResult>; httpStatus: number; requestId: string; provider: string; model: string; usage: DbRow }> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), GENERATION_TIMEOUT_MS);
-  try {
-    const response = await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, {
-      method: "POST",
-      headers: {
-        "Authorization": "Bearer " + apiKey,
-        "Content-Type": "application/json",
-        "X-OpenRouter-Title": "POYOZZ",
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        response_format: { type: "json_object" },
-        temperature: 0.85,
-        // Only approved non-training providers may receive player content.
-        // No fallback is allowed: unavailable compliant providers fail closed.
-        provider: { only: ["deepinfra"], allow_fallbacks: false, data_collection: "deny" },
-      }),
-      signal: controller.signal,
-    });
-    let payload: DbRow;
-    try {
-      payload = asDbRow(await response.json());
-    } catch {
-      payload = { error: { code: "invalid_provider_response" } };
-    }
-    payload.status = response.status;
-    if (!response.ok && payload.error == null) {
-      payload.error = { code: "http_" + response.status };
-    }
-    return {
-      result: normalizeAiProviderResult(payload),
-      httpStatus: response.status,
-      requestId: response.headers.get("x-request-id") || asString(payload.id),
-      provider: asString(payload.provider),
-      model: asString(payload.model) || model,
-      usage: asDbRow(payload.usage),
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
+) {
+  return requestOpenRouterChatCompletion({
+    messages,
+    apiKey,
+    model,
+    timeoutMs: GENERATION_TIMEOUT_MS,
+    responseFormat: { type: "json_object" },
+  });
 }
 
 Deno.serve(async (request) => {
