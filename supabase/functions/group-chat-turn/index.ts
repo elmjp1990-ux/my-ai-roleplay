@@ -97,10 +97,28 @@ Deno.serve(async (request) => {
     if (reservation.charge_status === "refunded" || reservation.turn_status === "failed") {
       const { data: priorTurn } = await admin.from("chat_group_turns")
         .select("failure_code").eq("id", turnId).eq("user_id", user.id).maybeSingle();
-      if (priorTurn?.failure_code === "provider_timeout") {
+      if (priorTurn?.failure_code === "provider_timeout" ||
+          priorTurn?.failure_code === "provider_timeout_watchdog") {
         return json({ status: "timed_out", error: "provider_timeout", retryAllowed: false }, 200);
       }
       return json({ status: "refunded", error: "turn_already_refunded", retryAllowed: false }, 409);
+    }
+    if (reservation.turn_status === "processing" && reservation.charge_status === "reserved") {
+      // A retry after a lost Edge Function response can expire the original turn
+      // immediately, without waiting for the next cron tick.
+      const { data: expirationRows, error: expirationError } = await admin.rpc("expire_group_chat_turn", {
+        p_user_id: user.id, p_turn_id: turnId,
+      });
+      const expiration = Array.isArray(expirationRows) ? expirationRows[0] : expirationRows;
+      if (expirationError) {
+        return json({ status: "needs_reconciliation", error: "turn_expiration_unavailable", retryAllowed: false }, 503);
+      }
+      if (expiration?.status === "refunded") {
+        return json({ status: "timed_out", error: "provider_timeout", retryAllowed: false }, 200);
+      }
+      if (expiration?.status === "completed") {
+        return json({ status: "needs_reconciliation", error: "turn_completed_reload_required", retryAllowed: false }, 409);
+      }
     }
     return json({ status: "needs_reconciliation", error: "turn_already_processing", retryAllowed: false }, 409);
   }
@@ -299,6 +317,17 @@ Deno.serve(async (request) => {
     p_user_id: user.id, p_turn_id: turnId, p_speeches: speeches,
   });
   if (completeError || completed !== "completed") {
+    // A completion RPC that acquires the transaction locks after the deadline
+    // must lose to the timeout policy, even if the provider returned content.
+    if (asText(completeError?.message).includes("group_turn_deadline_exceeded")) {
+      const refunded = await refund(admin, user.id, turnId, "provider_timeout");
+      return json({
+        status: refunded.confirmed ? "timed_out" : "needs_reconciliation",
+        error: refunded.confirmed ? "provider_timeout" : "timeout_refund_unconfirmed",
+        balance: refunded.balance,
+        retryAllowed: false,
+      }, refunded.confirmed ? 200 : 503);
+    }
     // If persistence definitely did not settle, refund atomically. If the
     // completion committed but its acknowledgement was lost, the refund RPC
     // refuses to reverse a settled charge and the turn remains reconcilable.
