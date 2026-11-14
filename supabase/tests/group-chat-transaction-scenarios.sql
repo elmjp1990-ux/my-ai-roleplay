@@ -1,14 +1,14 @@
 -- Executes against the disposable PostgreSQL service used by GitHub Actions.
 \set ON_ERROR_STOP on
 
-INSERT INTO auth.users(id,email) VALUES
- ('10000000-0000-4000-8000-000000000001','complete@example.test'),
- ('10000000-0000-4000-8000-000000000002','timeout@example.test'),
- ('10000000-0000-4000-8000-000000000003','deleted@example.test'),
- ('10000000-0000-4000-8000-000000000004','insufficient@example.test'),
- ('10000000-0000-4000-8000-000000000005','race@example.test'),
- ('10000000-0000-4000-8000-000000000006','idempotent@example.test'),
- ('10000000-0000-4000-8000-000000000007','completion-race@example.test');
+INSERT INTO auth.users(id,aud,role,email,encrypted_password,raw_app_meta_data,raw_user_meta_data,created_at,updated_at,email_confirmed_at) VALUES
+ ('10000000-0000-4000-8000-000000000001','complete@example.test','','{}'::jsonb,'{}'::jsonb,now(),now(),now()),
+ ('10000000-0000-4000-8000-000000000002','timeout@example.test','','{}'::jsonb,'{}'::jsonb,now(),now(),now()),
+ ('10000000-0000-4000-8000-000000000003','deleted@example.test','','{}'::jsonb,'{}'::jsonb,now(),now(),now()),
+ ('10000000-0000-4000-8000-000000000004','insufficient@example.test','','{}'::jsonb,'{}'::jsonb,now(),now(),now()),
+ ('10000000-0000-4000-8000-000000000005','race@example.test','','{}'::jsonb,'{}'::jsonb,now(),now(),now()),
+ ('10000000-0000-4000-8000-000000000006','idempotent@example.test','','{}'::jsonb,'{}'::jsonb,now(),now(),now()),
+ ('10000000-0000-4000-8000-000000000007','completion-race@example.test','','{}'::jsonb,'{}'::jsonb,now(),now(),now());
 
 INSERT INTO public.wallet_accounts(user_id,silver_coins,diamonds) VALUES
  ('10000000-0000-4000-8000-000000000001',4,5),
