@@ -267,7 +267,12 @@ body.group-chat-page .composer-bottom-row { padding-inline:10px; }
 body.conversation .messages,
 body.group-chat-page .messages { width:100%; }
 body.conversation .message-content,
-body.group-chat-page .message-content { flex:1 1 auto; width:100%; max-width:100%; min-width:0; }
+body.group-chat-page .message-content {
+  flex:0 1 auto;
+  width:fit-content;
+  max-width:min(24em,calc(100% - 38px));
+  min-width:0;
+}
 @media(max-width:600px) {
   body.conversation .messages,
   body.group-chat-page .messages { padding-inline:12px; }
