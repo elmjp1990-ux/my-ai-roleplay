@@ -614,7 +614,7 @@ const authorLatestLoader=between("async function loadPublicAuthorLatestCharacter
 assert.ok(!authorLatestLoader.includes("count:'exact'"));
 assert.ok(authorLatestLoader.includes("get_public_author_latest_characters"));
 assert.ok(!authorLatestLoader.includes(".from('characters')"));
-assert.match(followedAuthorBatchMigration,/ROW_NUMBER\(\) OVER/);
+assert.match(followedAuthorBatchMigration,/row_number\(\) OVER/i);
 assert.match(followedAuthorBatchMigration,/SECURITY INVOKER/);
 assert.match(followedAuthorBatchMigration,/cardinality\(p_author_ids\) BETWEEN 1 AND 10/);
 const startChatLoader=between("async function startChat(characterId)","function visibleSessions()");
