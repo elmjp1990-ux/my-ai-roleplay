@@ -220,7 +220,8 @@ assert.match(groupListHydration,/for\(let i=0;i<groupIds\.length;i\+=10\)/,'grou
 const groupPreviewMigration=fs.readFileSync('supabase/migrations/20261114230000_batch_group_list_previews.sql','utf8');
 assert.match(groupPreviewMigration,/cardinality\(p_group_ids\) NOT BETWEEN 1 AND 10/,'group preview RPC must reject unbounded ID arrays');
 assert.match(groupPreviewMigration,/g\.owner_id = auth\.uid\(\)/,'group preview RPC must scope results to the authenticated owner');
-assert.match(groupPreviewMigration,/DISTINCT ON \(m\.group_id\)/,'group preview RPC must return only one latest message per group');
+assert.match(groupPreviewMigration,/CROSS JOIN LATERAL/,'group preview RPC must perform a bounded latest-message lookup per group');
+assert.match(groupPreviewMigration,/ORDER BY m\.created_at DESC, m\.sequence_no DESC[\s\S]*LIMIT 1/,'group preview RPC must fetch only the newest message per group');
 assert.match(groupPreviewMigration,/SECURITY INVOKER/,'group preview RPC must preserve caller RLS');
 assert.match(fs.readFileSync('.github/workflows/group-chat-transaction-tests.yml','utf8'),/group-chat-list-preview-scenarios\.sql/,'group preview RPC SQL behavior must run in CI');
 const groupList=between("async function groupLoadList(force=false,loadMore=false)","async function groupOpen(groupId)");
