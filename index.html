@@ -1592,25 +1592,24 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
     return {items,hasMore:rows.length===pageSize};
   }
   async function loadPublicAuthorLatestCharacters(authorIds=[]){
-    const client=window.mySupabase;
-    const result=new Map();
-    if(!client)return result;
-    for(let offset=0;offset<authorIds.length;offset+=5){
-      const batch=authorIds.slice(offset,offset+5);
-      const rows=await Promise.all(batch.map(async authorId=>{
-        const {data,error}=await client.from('characters')
-          .select('id,author_id,name,gender,age,avatar_url,avatar_video_path,is_nsfw,visibility,review_status,intro,race,style,tags,created_at,first_published_at,latest_eligible')
-          .eq('author_id',authorId).eq('visibility','public').is('deleted_at',null)
-          .order('first_published_at',{ascending:false,nullsFirst:false})
-          .order('id',{ascending:false}).limit(5);
-        if(error)throw new Error('讀取作者最新公開角色失敗：'+error.message);
-        const rows=Array.isArray(data)?data:[];
-        return [authorId,{rows:rows.slice(0,4),hasMore:rows.length>4}];
-      }));
-      for(const [authorId,entry] of rows){
-        const items=entry.rows.map(mapPublicCharacterRow);
+    const client=window.mySupabase,result=new Map();
+    const ids=[...new Set((authorIds||[]).filter(Boolean))];
+    if(!client||!ids.length)return result;
+    for(let offset=0;offset<ids.length;offset+=10){
+      const batch=ids.slice(offset,offset+10);
+      const {data,error}=await client.rpc('get_public_author_latest_characters',{p_author_ids:batch});
+      if(error)throw new Error('讀取作者最新公開角色失敗：'+error.message);
+      const grouped=new Map();
+      for(const row of data||[]){
+        if(!row.author_id||!row.character_data)continue;
+        const rows=grouped.get(row.author_id)||[];
+        rows.push(row.character_data);grouped.set(row.author_id,rows);
+      }
+      for(const authorId of batch){
+        const rows=grouped.get(authorId)||[];
+        const items=rows.slice(0,4).map(mapPublicCharacterRow);
         state.characters=window.PoyozzListPagination.mergeUnique(state.characters,items,character=>character.id);
-        result.set(authorId,{items,hasMore:entry.hasMore});
+        result.set(authorId,{items,hasMore:rows.length>4});
       }
     }
     return result;
