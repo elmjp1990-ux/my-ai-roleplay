@@ -124,7 +124,7 @@ assert.match(groupMigration,/refund_group_chat_turn/);
 assert.match(groupMigration,/status IN \('reserved', 'settled', 'refunded'\)/);
 assert.match(groupMigration,/GRANT EXECUTE ON FUNCTION public\.reserve_group_chat_turn[\s\S]*TO service_role/);
 assert.match(speakerParser,/\[：:\]/,"speaker parser must accept full-width and ASCII colons");
-assert.match(speakerParser,/group speaker labels/,"speaker parser source must document explicit labels");
+assert.match(speakerParser,/角色名稱：/,"speaker parser must document explicit character-name labels");
 assert.doesNotMatch(html,/append_chat_group_mock_turn/,"frontend must no longer call the deterministic mock RPC");
 
 console.log("Story relationship RPC dedupe, illustration write dedupe, group list refresh avoidance, incremental group-turn loading, phone-state cache, shared login auth verification, and author-profile hydration reuse checks passed.");
