@@ -531,7 +531,7 @@ assert.match(ownedCharacterPageLoaderSource,/loadMore\s*&&\s*!pager\.hasMore/,
 assert.match(ownerListSource,/ownedCharactersSentinel[\s\S]*observeEnd/,
   'owned character list must load more on scroll');
 const cityMapSource=fs.readFileSync('city-map.js','utf8');
-assert.match(paginationSizes,/citySceneCharacters:\\s*10/,'each Encounter scene must load ten candidate characters per page');
+assert.match(paginationSizes,/citySceneCharacters:\s*10/,'each Encounter scene must load ten candidate characters per page');
 assert.match(ownerListSource,/async function loadCityCharacterPage\(offset=0\)/);
 assert.match(ownerListSource,/pageSize\('citySceneCharacters'\)/);
 assert.match(ownerListSource,/\.range\(offset,offset\+pageSize-1\)/);
