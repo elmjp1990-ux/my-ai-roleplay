@@ -95,6 +95,11 @@ Deno.serve(async (request) => {
   }
   if (!reservation.is_new) {
     if (reservation.charge_status === "refunded" || reservation.turn_status === "failed") {
+      const { data: priorTurn } = await admin.from("chat_group_turns")
+        .select("failure_code").eq("id", turnId).eq("user_id", user.id).maybeSingle();
+      if (priorTurn?.failure_code === "provider_timeout") {
+        return json({ status: "timed_out", error: "provider_timeout", retryAllowed: false }, 200);
+      }
       return json({ status: "refunded", error: "turn_already_refunded", retryAllowed: false }, 409);
     }
     return json({ status: "needs_reconciliation", error: "turn_already_processing", retryAllowed: false }, 409);
