@@ -9,6 +9,7 @@
     messages: 10,
     ownedCharacters: 10,
     favorites: 10,
+    notifications: 10,
     characterComments: 10,
     memoryPhotos: 10
   });
