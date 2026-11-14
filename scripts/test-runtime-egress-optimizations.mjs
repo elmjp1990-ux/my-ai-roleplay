@@ -109,14 +109,14 @@ assert.match(illustrations,/insertedGallery\.includes\(item\.id\)\|\|\(previous&
 assert.match(illustrations,/expectedGalleryNames=new Map/,
   "persisted gallery labels must still be verified after synchronization");
 
-const authCoalescer=between("const verifiedAuthUserInflight = new Map()","async function loadSupabaseCharacters(user)");
+const authCoalescer=between("const verifiedAuthUserInflight = new Map()","async function loadSupabaseCharacters(user,{loadMore=false}={})");
 assert.match(authCoalescer,/client\.auth\.getUser\(\)/,
   "concurrent login hydration must still verify the current user with Supabase");
 assert.match(authCoalescer,/verifiedAuthUserInflight\.get\(expectedUid\)/,
   "concurrent auth verification for the same UID must share the in-flight request");
 assert.match(authCoalescer,/verifiedAuthUserInflight\.delete\(expectedUid\)/,
   "auth verification must not be cached after the request settles");
-const ownerLoader=between("async function loadSupabaseCharacters(user)","async function getCharacterIllustrationSignedUrl");
+const ownerLoader=between("async function loadSupabaseCharacters(user,{loadMore=false}={})","async function getCharacterIllustrationSignedUrl");
 assert.match(ownerLoader,/getVerifiedAuthUser\(user\.id\)/,
   "owner character hydration must use the shared verified-auth request");
 const cloudSessions=between("async function loadCloudChatSessions(user, options = {})","async function ");
