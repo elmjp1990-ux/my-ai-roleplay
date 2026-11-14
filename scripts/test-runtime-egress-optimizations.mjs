@@ -132,7 +132,7 @@ assert.match(cloudSessions,/\.eq\('session_data->>pinned','true'\)/,
   "pinned single chats must load independently from the unpinned page");
 assert.match(cloudSessions,/session_data->>pinned\.eq\.false,session_data->>pinned\.is\.null/,
   "the single chat page query must exclude pinned sessions");
-assert.match(cloudSessions,/\.range\(pager\.offset,pager\.offset\+pageSize-1\)/,
+assert.match(cloudSessions,/\.range\(pageStart,pageStart\+pageSize-1\)/,
   "single chat list continuation must use bounded backend pages");
 assert.match(cloudSessions,/if \(!onlySessionId && !pagedList\)/,
   "loading another single-chat page must not evict sessions already loaded from prior pages");
@@ -223,7 +223,7 @@ assert.match(groupList,/g\.groupListHasMore=currentPage\.length===pageSize/,
   "group list continuation must stop when the backend returns a short page");
 assert.match(groupList,/mergeUnique\(g\.groups,newRows,group=>group\.id\)/,
   "group list continuation must append without duplicating already loaded groups");
-assert.match(html,/data-group-list-sentinel/);
+assert.match(html,/data-chat-list-sentinel/);
 assert.match(html,/groupLoadList\(false,true\)/,
   "the group list sentinel must request the next page");
 
@@ -241,7 +241,7 @@ assert.match(encounterMemory,/\.range\(pager\.offset,pager\.offset\+pageSize-1\)
   "Encounter sessions must be paginated by the backend instead of fetching 200 diary rows");
 assert.match(encounterMemory,/\.in\('metadata->>session_id',sessionIds\)/,
   "diary summaries must be hydrated only for the current page of Encounter sessions");
-assert.match(encounterMemory,/data\.archived!==true/,
+assert.match(encounterMemory,/encounter_archived!=='true'/,
   "unfinished new Encounter sessions must remain hidden from the memory archive");
 assert.match(encounterMemory,/PoyozzListPagination\.observeEnd/,
   "Encounter memory lists must load the next twenty sessions when the user reaches the end");
