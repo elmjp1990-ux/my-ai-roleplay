@@ -13,13 +13,14 @@
       
         try {
           let authors = [];
+          let authorIds = [];
           const client = getSupabaseClient();
           if (client && isUuid(user.uid)) {
             const {data: follows, error: followsError} = await client
               .from('author_follows').select('author_id, created_at')
               .eq('follower_id', user.uid).order('created_at', {ascending:false});
             if (followsError) throw new Error('讀取追蹤作者失敗：' + followsError.message);
-            const authorIds = [...new Set((follows || []).map(row => row.author_id).filter(Boolean))];
+            authorIds = [...new Set((follows || []).map(row => row.author_id).filter(Boolean))];
             state.following = authorIds;
             if (authorIds.length) {
               const {data: profiles, error: profilesError} = await client
