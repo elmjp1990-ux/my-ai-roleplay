@@ -237,7 +237,7 @@ assert.match(html,/groupLoadList\(false,true\)/,
 
 const authorProfileModule=fs.readFileSync("author-profile.js","utf8");
 const followedAuthorsModule=fs.readFileSync("followed-authors.js","utf8");
-assert.match(authorProfileModule,/\.range\(page\.offset,page\.offset\+page\.pageSize-1\)/,
+assert.match(authorProfileModule,/\.range\(page\.offset,\s*page\.offset\s*\+\s*page\.pageSize\s*-\s*1\)/,
   "author profile character lists must use bounded twenty-row backend pages");
 assert.match(authorProfileModule,/PoyozzListPagination\.observeEnd/,
   "author profile lists must use the shared scroll pagination observer");
