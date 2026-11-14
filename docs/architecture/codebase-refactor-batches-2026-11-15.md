@@ -43,7 +43,7 @@
 | 項目 | 本輪結果 |
 |---|---|
 | Migration 來源核對 | 新增 `migration-source-audit-2026-11-15.md`；確認 PR #252 新增 migration，未改寫歷史 migration |
-| SQL 測試證據 | 群組交易、群組預覽、喜愛作者批次 RPC 有 disposable PostgreSQL 情境；留言分頁與角色故事／遭遇排程讀取目前仍有 SQL 行為 fixture 待補，Node source contract 不等同 SQL 執行測試 |
+| SQL 測試證據 | 群組交易、群組預覽、喜愛作者批次 RPC 有 disposable PostgreSQL 情境；已新增並通過 disposable PostgreSQL 行為 fixture，驗證留言分頁與角色故事／遭遇排程讀取的 masking、權限、NSFW gate、分頁與 ACL |
 | Draft 分類 | 新增 `supabase/drafts/README.md`，先分類已核對檔案；明確標示非全目錄盤點，未刪除或搬移任何草案 |
 | CSS 條件式去重 | 掃描 `poyozz-ui.css` 與 index 內 13 個 style 區塊，共 1,059 個一般 rule blocks；相同條件上下文中沒有完整相同的可安全刪除規則。重複 selector 多為 cascade／主題／裝置差異，未自動刪除 |
 | 行為測試 | 新增通知列表 10 筆分頁、篩選、observer dispose 測試；新增 OpenRouter transport Deno contract test |
