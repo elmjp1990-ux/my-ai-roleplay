@@ -491,3 +491,23 @@ assert.match(groupPhoneUI, /phone_notifications/);
 assert.match(groupPhoneUI, /initialStoryTime=Number\(isGroup\?/);
 assert.match(groupPhoneUI, /phoneHeader\+/);
 assert.match(groupPhoneStyles, /phone-device-head--group \.phone-member-switch/);
+
+const followedAuthorsModule=fs.readFileSync('followed-authors.js','utf8');
+const paginationConfig=fs.readFileSync('list-pagination.js','utf8');
+assert.match(paginationConfig,/followedAuthors:\s*10/,
+  "followed-author pagination must use the shared ten-row page size");
+assert.match(followedAuthorsModule,/pageSize:global\.PoyozzListPagination\.pageSize\('followedAuthors'\)/,
+  "followed-author page size must come from the shared pagination module");
+assert.match(followedAuthorsModule,/\.from\('author_follows'\)\.select\('author_id,created_at',\{count:'exact'\}\)/,
+  "followed authors must be counted and selected from the server-side relation");
+assert.match(followedAuthorsModule,/\.range\(current\.offset,current\.offset\+current\.pageSize-1\)/,
+  "followed authors must be fetched in ten-row backend pages");
+assert.match(followedAuthorsModule,/loadPublicAuthorLatestCharacters\(pageAuthorIds\)/,
+  "latest character previews must only hydrate for the currently loaded author page");
+assert.match(followedAuthorsModule,/PoyozzListPagination\.observeEnd/,
+  "followed-author list must fetch the next page when the player scrolls to the end");
+assert.match(followedAuthorsModule,/insertAdjacentHTML\('beforeend',html\)/,
+  "next followed-author pages must append without replacing the already rendered authors");
+assert.doesNotMatch(followedAuthorsModule,/\.from\('author_follows'\)[\s\S]*?\.order\('created_at',[\s\S]*?\.in\('id',authorIds\)/,
+  "followed-author initial load must not fetch the complete followed-author list");
+
