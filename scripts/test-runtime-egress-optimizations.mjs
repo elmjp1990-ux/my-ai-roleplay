@@ -266,9 +266,9 @@ assert.match(groupSend,/responseBody\?\.status==='timed_out'[\s\S]*pendingReques
 console.log('Group watchdog, deadline race, abandoned-request recovery, idempotent timeout status, and exact-currency refund checks passed.');
 console.log('Group history fixture passed: 1,000 rows, 20 pages, timestamp/sequence ties, UUID cursor tie-break, no gaps or duplicates, overlapping-page dedupe, group-switch guards, and scroll anchoring.');
 
-const groupPhoneMigration = await readFile('supabase/migrations/20261114180000_group_ai_single_orchestrator.sql', 'utf8');
-const groupPhoneFunction = await readFile('supabase/functions/group-chat-turn/index.ts', 'utf8');
-const groupPhoneParser = await readFile('supabase/functions/_shared/group-turn-envelope.ts', 'utf8');
+const groupPhoneMigration = fs.readFileSync('supabase/migrations/20261114180000_group_ai_single_orchestrator.sql', 'utf8');
+const groupPhoneFunction = fs.readFileSync('supabase/functions/group-chat-turn/index.ts', 'utf8');
+const groupPhoneParser = fs.readFileSync('supabase/functions/_shared/group-turn-envelope.ts', 'utf8');
 const groupPhoneUI = await readFile('index.html', 'utf8');
 const groupPhoneStyles = await readFile('poyozz-ui.css', 'utf8');
 assert.match(groupPhoneMigration, /ADD COLUMN IF NOT EXISTS phone_notifications jsonb NOT NULL DEFAULT '\[\]'::jsonb/);
