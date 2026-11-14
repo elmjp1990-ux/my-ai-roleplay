@@ -5,6 +5,8 @@ on:
     paths:
       - "supabase/functions/chat-turn/index.ts"
       - "supabase/functions/_shared/story-memory-summary.ts"
+      - "supabase/functions/_shared/openrouter-chat-completions.ts"
+      - "supabase/functions/_shared/openrouter-provider-policy.ts"
       - "scripts/test-dual-model-memory-summary.mjs"
       - "supabase/migrations/20261105223613_ai_model_usage_and_memory_summaries.sql"
   push:
