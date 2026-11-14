@@ -9624,10 +9624,7 @@ document.addEventListener('toggle', event => {
   hint.textContent = panel.open ? (hint.dataset.expanded || '滑動或點選燈號可切換') : (hint.dataset.collapsed || '點擊可展開');
 }, true);
 
-/* UI-1024: robust horizontal swipe navigation for single/group suggested replies.
-   Touch devices use touch events (with vertical scrolling preserved); mouse uses pointer events.
-   Delegation keeps the behavior alive across chat rerenders. */
-()();
+/* UI-1024 legacy suggestion swipe helper removed: no call sites remain. */
  
 /* GROUP-01-OPEN: capture group-open clicks before other delegated handlers.
    This makes group navigation independent of nested list markup or another handler
