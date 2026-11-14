@@ -10,7 +10,7 @@ const between = (start, end) => {
   assert.ok(from >= 0 && to > from, "missing source block: " + start);
   return html.slice(from, to);
 };
-const publicLoaderStart = html.indexOf("async function loadPublicSupabaseCharactersImpl({loadMore=false,characterId=null}={})");
+const publicLoaderStart = html.indexOf("function mapPublicCharacterRow(row)");
 const publicLoaderEnd = html.indexOf("async function loadSupabaseCharacters(user,{loadMore=false}={})", publicLoaderStart);
 assert.ok(publicLoaderStart >= 0 && publicLoaderEnd > publicLoaderStart, "public character loader boundaries must exist");
 const publicLoader = html.slice(publicLoaderStart, publicLoaderEnd);
