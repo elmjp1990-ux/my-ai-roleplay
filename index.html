@@ -3670,7 +3670,7 @@ async function loadCloudChatSessions(user, options = {}) {
       if(pager.loading||(options.loadMore&&!pager.hasMore)||(!options.loadMore&&pager.initialLoaded))return;
       pager.loading=true;
     }
-    const sessionSelect=[
+    const fullSessionSelect=[
       'id,user_id,character_id,character_name,status,chat_mode,created_at,updated_at',
       'character_snapshot_id:character_snapshot->>id',
       'character_snapshot_author_id:character_snapshot->>authorId',
@@ -3688,6 +3688,20 @@ async function loadCloudChatSessions(user, options = {}) {
       'session_last_assistant_message_at:session_data->>lastAssistantMessageAt','session_last_read_at:session_data->>lastReadAt',
       'session_opening_message:session_data->openingMessage','session_pending_turn:session_data->pendingTurn','session_story_world_state:session_data->storyWorldState'
     ].join(',');
+    // Chat-list rows need only compact display metadata; the full session payload
+    // is selected only when a specific session is requested for hydration.
+    const listSessionSelect=[
+      'id,user_id,character_id,character_name,status,chat_mode,created_at,updated_at',
+      'character_snapshot_id:character_snapshot->>id',
+      'character_snapshot_author_id:character_snapshot->>authorId',
+      'session_name:session_data->>name','session_archived:session_data->>archived',
+      'session_hidden:session_data->>hidden','session_pinned:session_data->>pinned',
+      'session_started_at:session_data->>startedAt','session_encounter_mode:session_data->>encounterMode',
+      'session_has_user_message:session_data->>hasUserMessage',
+      'session_last_message_preview:session_data->>lastMessagePreview','session_last_message_at:session_data->>lastMessageAt',
+      'session_last_assistant_message_at:session_data->>lastAssistantMessageAt','session_last_read_at:session_data->>lastReadAt'
+    ].join(',');
+    const sessionSelect=pagedList?listSessionSelect:fullSessionSelect;
     let rows=[];
     if(pagedList){
       const pageSize=window.PoyozzListPagination.pageSize('chatSessions');
