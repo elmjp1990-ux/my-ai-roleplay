@@ -28,12 +28,12 @@ assert.match(publicLoader, /publicIllustrationsLoaded:ownerLocal\?\.publicIllust
 assert.match(publicLoader, /opening:ownerLocal\?\.opening\|\|cachedPublic\?\.opening\|\|''/);
 
 // Public catalogue rows are cached briefly and invalidated after this account changes a character.
-const publicRowsCache = between("let publicCharacterRowsCache = null;", "async function loadPublicSupabaseCharactersImpl");
-assert.match(publicRowsCache, /now - publicCharacterRowsCacheAt < 30000/);
+const publicRowsCache = between("let publicCharacterRowsCache = new Map();", "async function loadPublicSupabaseCharactersImpl({loadMore=false,characterId=null}={})");
+assert.match(publicRowsCache, /Date\.now\(\)-publicCharacterRowsCacheAt<30000/);
 assert.match(publicRowsCache, /publicCharacterRowsInflight/);
 assert.match(publicRowsCache, /publicCharacterRowsCacheVersion/);
-assert.match(publicLoader, /const rowsVersion = publicCharacterRowsCacheVersion/);
-assert.match(publicLoader, /if \(rowsVersion !== publicCharacterRowsCacheVersion\) return loadPublicSupabaseCharactersImpl\(\)/);
+assert.match(publicLoader, /const rowsVersion=publicCharacterRowsCacheVersion/);
+assert.match(publicLoader, /if\(!characterId&&rowsVersion!==publicCharacterRowsCacheVersion\)[\s\S]*?loadPublicSupabaseCharactersImpl\(\{loadMore:false\}\)/);
 assert.match(html, /upsert\(row, \{ onConflict: 'id' \}\);[\s\S]{0,180}invalidatePublicCharacterRowsCache\(\);/);
 assert.match(html, /rpc\('soft_delete_character',[\s\S]{0,300}invalidatePublicCharacterRowsCache\(\);/);
 
