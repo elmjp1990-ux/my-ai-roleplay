@@ -114,6 +114,32 @@ BEGIN
   WHERE reference_id = v_turn::text AND biz_type = 'group_chat_turn_refund';
   IF v_count <> 1 THEN RAISE EXCEPTION 'refund was not idempotent: %', v_count; END IF;
 
+  -- Replaying the old request key must return its refunded terminal state;
+  -- a fresh key after reload may create a new, separately charged turn.
+  SELECT * INTO r FROM public.reserve_group_chat_turn(
+    '10000000-0000-4000-8000-000000000002',
+    '20000000-0000-4000-8000-000000000002',
+    '40000000-0000-4000-8000-000000000002',
+    'timeout this turn'
+  );
+  IF r.turn_id <> v_turn OR r.is_new OR r.turn_status <> 'failed' OR r.charge_status <> 'refunded' THEN
+    RAISE EXCEPTION 'retry of the timed-out request did not recover its refunded state';
+  END IF;
+  SELECT * INTO r FROM public.reserve_group_chat_turn(
+    '10000000-0000-4000-8000-000000000002',
+    '20000000-0000-4000-8000-000000000002',
+    '40000000-0000-4000-8000-000000000009',
+    'fresh request after reload'
+  );
+  IF r.turn_id = v_turn OR NOT r.is_new OR r.turn_status <> 'processing' THEN
+    RAISE EXCEPTION 'fresh request after timeout did not create a new processing turn';
+  END IF;
+  SELECT * INTO v_balance FROM public.wallet_accounts
+  WHERE user_id = '10000000-0000-4000-8000-000000000002';
+  IF v_balance.silver_coins <> 7 OR v_balance.diamonds <> 0 THEN
+    RAISE EXCEPTION 'fresh post-timeout request did not charge exactly once';
+  END IF;
+
   -- A soft-deleted group must still allow a previously reserved refund.
   SELECT * INTO r FROM public.reserve_group_chat_turn(
     '10000000-0000-4000-8000-000000000003',
