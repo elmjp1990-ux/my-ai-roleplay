@@ -328,3 +328,228 @@ export async function processDueStoryMemorySummary(
   }).eq("id", batchRowId).eq("status", "processing");
   if (completeError) throw new Error("memory_summary_result_persist_failed");
 }
+
+/**
+ * Group Story memory uses the same five-completed-turn cadence and summary model
+ * as single Story chats. Group transcripts are read from durable group turn rows;
+ * raw prompts and provider output are never copied into operational logs.
+ */
+export async function processDueGroupMemorySummary(
+  admin: any,
+  groupId: string,
+  userId: string,
+  apiKey: string,
+): Promise<void> {
+  const { count: completedTurnCount, error: countError } = await admin
+    .from("chat_group_turns")
+    .select("id", { count: "exact", head: true })
+    .eq("group_id", groupId)
+    .eq("user_id", userId)
+    .eq("status", "completed");
+  if (countError) throw new Error("group_memory_summary_turn_count_failed");
+  const eligibleBatchCount = Math.floor(Number(completedTurnCount || 0) / SUMMARY_INTERVAL);
+  if (eligibleBatchCount < 1) return;
+
+  const { data: existingRows, error: existingError } = await admin
+    .from("chat_group_memory_summaries")
+    .select("id,batch_number,status,summary,created_at,prompt_tokens,completion_tokens,total_tokens,cost_usd")
+    .eq("group_id", groupId)
+    .eq("user_id", userId)
+    .order("batch_number", { ascending: true });
+  if (existingError) throw new Error("group_memory_summary_batch_lookup_failed");
+  const rows = Array.isArray(existingRows) ? existingRows : [];
+
+  let batchNumber = 0;
+  let existingBatch: DbRow | null = null;
+  for (let candidate = 1; candidate <= eligibleBatchCount; candidate++) {
+    const found = rows.find((item: DbRow) => Number(item.batch_number) === candidate) || null;
+    if (found?.status === "completed") continue;
+    if (found?.status === "processing") {
+      const createdAt = Date.parse(str(found.created_at));
+      if (!Number.isFinite(createdAt) || Date.now() - createdAt < 120_000) return;
+      const { data: released, error: releaseError } = await admin
+        .from("chat_group_memory_summaries")
+        .update({ status: "failed" })
+        .eq("id", str(found.id))
+        .eq("status", "processing")
+        .select("id")
+        .maybeSingle();
+      if (releaseError || !released) return;
+      existingBatch = { ...found, status: "failed" };
+    } else {
+      existingBatch = found;
+    }
+    batchNumber = candidate;
+    break;
+  }
+  if (!batchNumber) return;
+
+  const offset = (batchNumber - 1) * SUMMARY_INTERVAL;
+  const { data: turns, error: turnsError } = await admin
+    .from("chat_group_turns")
+    .select("id,request_content,created_at,completed_at")
+    .eq("group_id", groupId)
+    .eq("user_id", userId)
+    .eq("status", "completed")
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
+    .range(offset, offset + SUMMARY_INTERVAL - 1);
+  if (turnsError || !Array.isArray(turns) || turns.length !== SUMMARY_INTERVAL) {
+    throw new Error("group_memory_summary_source_turns_unavailable");
+  }
+  const sourceTurnIds = turns.map((turn: DbRow) => str(turn.id)).filter(Boolean);
+  if (sourceTurnIds.length !== SUMMARY_INTERVAL) {
+    throw new Error("group_memory_summary_source_turn_ids_invalid");
+  }
+
+  let batchRowId = str(existingBatch?.id);
+  if (existingBatch?.status === "failed") {
+    const { data: claimed, error: claimError } = await admin
+      .from("chat_group_memory_summaries")
+      .update({
+        status: "processing",
+        summary: null,
+        processed_at: null,
+        source_turn_ids: sourceTurnIds,
+      })
+      .eq("id", batchRowId)
+      .eq("status", "failed")
+      .select("id")
+      .maybeSingle();
+    if (claimError || !claimed) return;
+    batchRowId = str(claimed.id);
+  } else if (!existingBatch) {
+    const { data: created, error: createError } = await admin
+      .from("chat_group_memory_summaries")
+      .insert({
+        group_id: groupId,
+        user_id: userId,
+        batch_number: batchNumber,
+        source_turn_ids: sourceTurnIds,
+        model: SUMMARY_MODEL,
+        status: "processing",
+      })
+      .select("id")
+      .maybeSingle();
+    if (createError || !created) {
+      if (createError?.code === "23505") return;
+      throw new Error("group_memory_summary_batch_create_failed");
+    }
+    batchRowId = str(created.id);
+  }
+  if (!batchRowId) return;
+
+  const { data: sourceMessages, error: messagesError } = await admin
+    .from("chat_group_messages")
+    .select("turn_id,speaker_type,speaker_snapshot,content,created_at,sequence_no")
+    .eq("group_id", groupId)
+    .is("deleted_at", null)
+    .in("turn_id", sourceTurnIds)
+    .order("created_at", { ascending: true })
+    .order("sequence_no", { ascending: true });
+  if (messagesError || !Array.isArray(sourceMessages) ||
+      !sourceTurnIds.every((turnId) => sourceMessages.some((message: DbRow) => str(message.turn_id) === turnId))) {
+    await admin.from("chat_group_memory_summaries").update({
+      status: "failed", processed_at: new Date().toISOString(),
+    }).eq("id", batchRowId).eq("status", "processing");
+    throw new Error("group_memory_summary_source_messages_unavailable");
+  }
+
+  const previousBatch = rows
+    .filter((item: DbRow) =>
+      Number(item.batch_number) < batchNumber &&
+      item.status === "completed" &&
+      Boolean(str(item.summary))
+    )
+    .sort((left: DbRow, right: DbRow) => Number(right.batch_number) - Number(left.batch_number))[0] || null;
+  const previousSummary = str(previousBatch?.summary);
+  const transcript = sourceMessages.map((message: DbRow) => {
+    const speaker = message.speaker_type === "user"
+      ? "玩家"
+      : str(row(message.speaker_snapshot).name) || "角色";
+    const content = str(message.content) === "__GROUP_CONTINUE__"
+      ? "（玩家要求延續劇情）"
+      : str(message.content);
+    return speaker + "：" + content;
+  }).filter((line: string) => line.length > 1).join("\n");
+
+  let response;
+  try {
+    response = await requestMemorySummary([
+      {
+        role: "system",
+        content: [
+          "你是 POYOZZ 群組故事的長期記憶整理器。請將既有摘要與本批新增的五個已完成群組回合整合成一段可供下次自然接續的繁體中文記憶。",
+          "只輸出 JSON object：{\"summary\":\"50～150 個中文字的累積摘要\"}。不要 Markdown、標題、條列或其他文字。",
+          "摘要必須是 50～150 個中文字、單一精簡段落。保留玩家偏好、角色關係、重要共同事件、承諾、界線、情緒轉折，以及尚未完成或下次要接續的事情。",
+          "群組內每位角色的人格與發言必須分清楚，不可把不同角色的行動、背景或想法混在一起。",
+          "只記錄確實發生或明確約定的內容。不可推測、補造事件、替玩家決定想法或行動，也不可把角色提出但未完成的事寫成已完成。",
+          "若新對話明確更正舊記憶，以玩家最新明確更正為準；不可為追求精簡而遺失仍有效的重要承諾或未完成事項。",
+        ].join("\n"),
+      },
+      {
+        role: "user",
+        content: "【既有群組記憶摘要】\n" + (previousSummary || "尚無既有摘要") +
+          "\n\n【本次新增的五個群組回合】\n" + transcript +
+          "\n\n請輸出更新後的完整累積摘要。",
+      },
+    ], apiKey);
+  } catch {
+    await admin.from("chat_group_memory_summaries").update({
+      status: "failed", processed_at: new Date().toISOString(),
+    }).eq("id", batchRowId).eq("status", "processing");
+    throw new Error("group_memory_summary_provider_request_failed");
+  }
+
+  const usage = usageSnapshot(response.usage);
+  const priorUsage = usageSnapshot({
+    prompt_tokens: existingBatch?.prompt_tokens,
+    completion_tokens: existingBatch?.completion_tokens,
+    total_tokens: existingBatch?.total_tokens,
+    cost: existingBatch?.cost_usd,
+  });
+  const accumulatedUsage = {
+    prompt_tokens: priorUsage.prompt_tokens === null && usage.prompt_tokens === null ? null : (priorUsage.prompt_tokens || 0) + (usage.prompt_tokens || 0),
+    completion_tokens: priorUsage.completion_tokens === null && usage.completion_tokens === null ? null : (priorUsage.completion_tokens || 0) + (usage.completion_tokens || 0),
+    total_tokens: priorUsage.total_tokens === null && usage.total_tokens === null ? null : (priorUsage.total_tokens || 0) + (usage.total_tokens || 0),
+    cost_usd: priorUsage.cost_usd === null && usage.cost_usd === null ? null : (priorUsage.cost_usd || 0) + (usage.cost_usd || 0),
+  };
+  const requestId = /^[A-Za-z0-9._:-]{1,128}$/.test(response.requestId) ? response.requestId : null;
+  const rawOutput = response.result.kind === "generated" ? response.result.text.trim() : "";
+  let summary = "";
+  try {
+    const parsed = JSON.parse(rawOutput) as Record<string, unknown>;
+    summary = normalizeStoryMemorySummaryText(parsed.summary);
+  } catch {
+    summary = normalizeStoryMemorySummaryText(rawOutput);
+  }
+
+  if (response.httpStatus < 200 || response.httpStatus >= 300 || !summary) {
+    await admin.from("chat_group_memory_summaries").update({
+      status: "failed",
+      model: response.model,
+      provider: response.provider,
+      gateway_request_id: requestId,
+      prompt_tokens: accumulatedUsage.prompt_tokens,
+      completion_tokens: accumulatedUsage.completion_tokens,
+      total_tokens: accumulatedUsage.total_tokens,
+      cost_usd: accumulatedUsage.cost_usd,
+      processed_at: new Date().toISOString(),
+    }).eq("id", batchRowId).eq("status", "processing");
+    return;
+  }
+
+  const { data: completed, error: completeError } = await admin.from("chat_group_memory_summaries").update({
+    status: "completed",
+    summary,
+    model: response.model,
+    provider: response.provider,
+    gateway_request_id: requestId,
+    prompt_tokens: accumulatedUsage.prompt_tokens,
+    completion_tokens: accumulatedUsage.completion_tokens,
+    total_tokens: accumulatedUsage.total_tokens,
+    cost_usd: accumulatedUsage.cost_usd,
+    processed_at: new Date().toISOString(),
+  }).eq("id", batchRowId).eq("status", "processing").select("id").maybeSingle();
+  if (completeError || !completed) throw new Error("group_memory_summary_result_persist_failed");
+}

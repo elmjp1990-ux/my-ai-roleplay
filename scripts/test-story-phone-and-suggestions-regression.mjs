@@ -20,10 +20,13 @@ assert.match(html, /if\(stateResult\.error\)[\s\S]*?else storyPhoneStates=/,
   'phone state snapshots must be kept when the world-state RPC fails');
 assert.match(html, /phoneReadErrors\.join\('；'\)/,
   'phone section failures must be reported independently instead of discarding all data');
-assert.match(html, /\.roleplay-segment\.is-character \{ max-width:min\(19em,100%\); \}/,
-  'character speech bubbles must retain their existing 19em width');
+assert.match(html, /\.roleplay-segment\.is-character \{ max-width:min\(20em,100%\); \}/,
+  'spoken dialogue containers must allow 18 full-width Chinese characters after bubble padding');
 assert.doesNotMatch(html, /\.roleplay-segment\.is-character,\.roleplay-segment\.is-action \{ width:100%; max-width:100%; \}/,
   'mobile single/group narration and dialogue widths must remain unchanged');
+assert.match(html,/LOCKED FINAL CHAT FORMAT[\s\S]{0,180}22–24 full-width CJK chars per line/);
+assert.match(html,/max-width:min\(24em,100%\)/,'star-wrapped narration must retain its independent 22–24 CJK character line width');
+assert.match(html,/max-width:min\(20em,100%\)/,'dialogue bubbles must wrap at about 18 full-width Chinese characters');
 assert.match(html, /select\('id,session_id,role,content,created_at,suggested_replies'\)/);
 assert.match(html, /message\.suggested_replies/);
 assert.match(html, /result\.suggestedReplies\).*result\.suggested_replies/s);

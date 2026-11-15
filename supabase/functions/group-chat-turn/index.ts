@@ -4,6 +4,7 @@ import { findPrivateContextLeak, preparePrivateContext } from "../_shared/privat
 import { collectDerivedPrivateProfileValues, formatCharacterAiProfilePrompt } from "../_shared/character-ai-profile-prompt.ts";
 import { parseGroupTurnEnvelope } from "../_shared/group-turn-envelope.ts";
 import { requestOpenRouterChatCompletion, POYOZZ_DEFAULT_CHAT_MODEL } from "../_shared/openrouter-chat-completions.ts";
+import { processDueGroupMemorySummary } from "../_shared/story-memory-summary.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,6 +31,18 @@ async function refund(admin: any, userId: string, turnId: string, code: string) 
   if (error) return { confirmed: false, error: error.message };
   const result = Array.isArray(data) ? data[0] : data;
   return { confirmed: result?.status === "refunded", balance: result ? { silver_coins: result.balance_silver, diamonds: result.balance_diamonds } : null };
+}
+
+
+function scheduleGroupMemorySummary(admin: any, groupId: string, userId: string, apiKey: string) {
+  const task = processDueGroupMemorySummary(admin, groupId, userId, apiKey).catch((error) => {
+    console.error("Group memory summary background task failed:", error instanceof Error ? error.message : "unknown_error");
+  });
+  const edgeRuntime = (globalThis as typeof globalThis & {
+    EdgeRuntime?: { waitUntil: (task: Promise<unknown>) => void };
+  }).EdgeRuntime;
+  if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(task);
+  else void task;
 }
 
 Deno.serve(async (request) => {
@@ -86,6 +99,7 @@ Deno.serve(async (request) => {
   if (!reservation?.turn_id) return json({ error: "group_reservation_state_missing" }, 503);
   const turnId = String(reservation.turn_id);
   if (reservation.turn_status === "completed" && reservation.charge_status === "settled") {
+    scheduleGroupMemorySummary(admin, groupId, user.id, apiKey);
     const [{ data: saved, error: savedError }, { data: phoneRows, error: phoneError }] = await Promise.all([
       admin.from("chat_group_messages")
         .select("id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at")
@@ -386,6 +400,7 @@ Deno.serve(async (request) => {
     .eq("group_id", groupId).eq("turn_id", turnId).is("deleted_at", null)
     .order("sequence_no", { ascending: true });
   if (savedError || !saved?.length) return json({ status: "needs_reconciliation", error: "completed_turn_read_failed", retryAllowed: false }, 503);
+  scheduleGroupMemorySummary(admin, groupId, user.id, apiKey);
 
   return json({
     status: "completed",
