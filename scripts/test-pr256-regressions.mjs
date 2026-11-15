@@ -11,12 +11,12 @@ assert.match(conversation,/loadCloudChatSessions\(owner,\{onlySessionId:sessionI
 assert.match(html,/if\(route\?\.overlay\)[\s\S]*?delete next\.overlay;[\s\S]*?go\(next,true\)/,
   'closing a route overlay must replace the current route without the stale overlay');
 assert.match(html,/已經到底了～/,'chat list must explicitly show the end state after all pages are loaded');
-assert.match(html,/root:scrollRoot\\|\\|null,rootMargin:'0px'/,
+assert.ok(html.includes("root:scrollRoot||null,rootMargin:'0px'"),
   'chat pagination must use the chat list as root and only trigger at the true end');
-assert.match(html,/range\\(pager\\.offset,pager\\.offset\\+pageSize\\)/,'chat list must use one-row lookahead to avoid a false has-more state');
-assert.match(html,/range\\(g\\.groupListOffset,g\\.groupListOffset\\+pageSize\\)/,'group list must use one-row lookahead');
-assert.match(html,/findExistingStoryChatSessionFallback\\(client,userId,characterId\\)/,'missing Story lookup RPC must fall back to bounded owner-scoped reads');
-assert.match(html,/confirmedUserMessageSessionIds\\.has\\(row\\.id\\)/,'legacy false user-message markers must not hide existing chats');
+assert.ok(html.includes("range(pager.offset,pager.offset+pageSize)"),'chat list must use one-row lookahead to avoid a false has-more state');
+assert.ok(html.includes("range(g.groupListOffset,g.groupListOffset+pageSize)"),'group list must use one-row lookahead');
+assert.ok(html.includes("findExistingStoryChatSessionFallback(client,userId,characterId)"),'missing Story lookup RPC must fall back to bounded owner-scoped reads');
+assert.ok(html.includes("confirmedUserMessageSessionIds.has(row.id)"),'legacy false user-message markers must not hide existing chats');
 assert.match(html,/data-history-top-control hidden/,'older message controls must remain hidden until the reader reaches the top');
 assert.match(html,/character-visibility-choice/,'character visibility must use explicit selected controls');
 assert.match(pager,/function observeEnd[\s\S]*?for\(let p=node\.parentElement/);
