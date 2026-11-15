@@ -1575,6 +1575,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
             publicIllustrationsLoaded:ownerLocal?.publicIllustrationsLoaded===true||cachedPublic?.publicIllustrationsLoaded===true,
             avatarVideoPath:row.avatar_video_path||'',visibility:'public',
             reviewStatus:row.review_status,intro:row.intro||'',
+            worldBackground:ownerLocal?.worldBackground||ownerLocal?.world||cachedPublic?.worldBackground||cachedPublic?.world||row.intro||'',
             opening:ownerLocal?.opening||cachedPublic?.opening||'',race:row.race||'',
             privateInfo:'',style:row.style||'',personalityProfile:normalizePersonalityProfile({}),
             ...((ownerLocal&&Object.prototype.hasOwnProperty.call(ownerLocal,'phoneSettings'))||(cachedPublic&&Object.prototype.hasOwnProperty.call(cachedPublic,'phoneSettings'))?{phoneSettings:ownerLocal?.phoneSettings??cachedPublic?.phoneSettings??{}}:{}),
@@ -6710,9 +6711,12 @@ async function groupLoadCharacterPickerPage({reset=false}={}){
     if(currentUser()?.uid!==user.uid||groupCharacterPickerPager!==pager||pager.request!==request)return;
     const rows=Array.isArray(data)?data:[];
     let items=rows.map(mapPublicCharacterRow);
-    const recentCharacterIds=[...new Set(Object.values(state.sessions||{})
+    const recentSessionCharacters=Object.values(state.sessions||{})
       .filter(session=>session&&!session.archived&&!session.hidden&&session.characterId)
-      .map(session=>session.characterId).filter(isUuid))];
+      .map(session=>({id:session.characterId,at:Number(session.messages?.at(-1)?.at||session.startedAt||0)}))
+      .filter(session=>isUuid(session.id))
+      .sort((a,b)=>b.at-a.at);
+    const recentCharacterIds=[...new Set(recentSessionCharacters.map(session=>session.id))].slice(0,10);
     const pageIds=new Set(items.map(character=>character.id));
     const missingRecentIds=recentCharacterIds.filter(id=>!pageIds.has(id));
     if(missingRecentIds.length){
