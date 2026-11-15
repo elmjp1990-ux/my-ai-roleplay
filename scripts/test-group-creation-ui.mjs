@@ -37,7 +37,7 @@ assert.ok(!pinHelper.includes('confirmChatMessageDeletion'), 'pin helper must ne
 
 const groupTurn = fs.readFileSync(new URL('../supabase/functions/group-chat-turn/index.ts', import.meta.url), 'utf8');
 assert.ok(html.includes("const initialOpening=String(initialScene?.description||'').trim()"), 'group chat must read the saved initial scene description');
-assert.ok(html.includes('const initialOpeningRow=initialOpening'), 'group chat must render the original opening before messages');
+assert.ok(html.includes('const initialOpeningRow=initialOpening && !g.historyHasMore'), 'group chat must render the original opening before the earliest loaded messages, not above a recent partial page');
 assert.ok(html.includes('const messageRows=initialOpeningRow+g.messages.map'), 'opening display must be prepended without inserting a duplicate chat message');
 assert.ok(html.includes("if(!typedContent && !(g.messages||[]).length)"), 'empty first send must not start a paid AI turn');
 assert.ok(html.includes("💎 本群組每次對話 '+(groupPrototype.draft.memberIds.length*3)+' 鑽石（每加一位角色3鑽石）。"), 'group picker must show the requested per-turn cost wording');
