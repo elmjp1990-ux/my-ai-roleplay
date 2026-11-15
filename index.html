@@ -529,9 +529,9 @@ body.group-chat-page:has(.group-wizard) #view {
 .chat-announcement-copy strong { font-size:13px; }
 .chat-announcement-copy span { color:var(--muted); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .chat-list-section { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:17px 2px 8px; color:var(--muted); font-size:12px; font-weight:700; letter-spacing:.04em; }
-.chat-entry { display:flex; gap:10px; align-items:center; padding:10px 8px; margin-top:5px; border:1px solid transparent; border-radius:15px; transition:background .16s,border-color .16s; }
-.chat-entry:hover { background:var(--panel2); }
-.chat-entry.active { background:var(--soft); border-color:color-mix(in srgb,var(--primary) 32%,transparent); }
+.chat-entry { display:flex; gap:12px; align-items:center; padding:13px 9px; margin-top:7px; border:1px solid transparent; border-radius:17px; transition:background .18s,border-color .18s,box-shadow .18s; }
+.chat-entry:hover { background:color-mix(in srgb,var(--panel2) 78%,transparent); }
+.chat-entry.active { background:color-mix(in srgb,var(--soft) 82%,var(--panel)); border-color:transparent; box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--primary) 16%,transparent); }
 .select-chat { flex:1; min-width:0; border:0; background:transparent; text-align:left; padding:2px; }
 .pin { padding:3px; border:0; background:transparent; color:var(--muted); }
 .pin.on { color:#fb7185; }
@@ -6403,7 +6403,7 @@ function groupRenderCharacterResults() {
   if(!ordered.length) return '<div class="group-alert">'+(q?'找不到符合搜尋條件的公開角色。':'目前沒有可選的雲端角色。請先確認角色已儲存在 Supabase，且目前為公開狀態、尚未刪除或下架。')+'</div>';
   const renderRows=rows=>rows.map(c=>'<label class="group-character-option"><input type="checkbox" data-action="group-toggle-character" data-id="'+e(c.id)+'" '+(groupPrototype.draft.memberIds.includes(c.id)?'checked':'')+' '+(groupPrototype.draft.memberIds.length>=3&&!groupPrototype.draft.memberIds.includes(c.id)?'disabled':'')+'><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt="" style="width:46px;height:46px"><span style="min-width:0;overflow-wrap:anywhere"><strong>'+e(c.name)+'</strong><span class="muted small" style="display:block">'+e(c.intro||'尚無角色介紹')+'</span></span></label>').join('');
   const section=(title,rows)=>rows.length?'<h3 class="group-character-section-title">'+e(title)+' ('+rows.length+')</h3><div class="group-character-grid">'+renderRows(rows)+'</div>':'';
-  return '<div class="group-alert"><strong>已選 '+groupPrototype.draft.memberIds.length+' / 3 位角色</strong><br>💎 預估每次對話 '+(groupPrototype.draft.memberIds.length*3)+' 鑽石（預估費用，不會實際扣款）。</div>'+section('最近聊天',byRecent.filter(c=>ordered.some(x=>x.id===c.id)))+section('喜愛角色',byFavorite.filter(c=>ordered.some(x=>x.id===c.id)))+section('公開角色',byPublic.filter(c=>ordered.some(x=>x.id===c.id)))+'<p class="muted small">只能選擇公開的角色。</p>';
+  return '<div class="group-alert"><strong>已選 '+groupPrototype.draft.memberIds.length+' / 3 位角色</strong><br>💎 本群組每次對話 '+(groupPrototype.draft.memberIds.length*3)+' 鑽石（每加一位角色3鑽石）。</div>'+section('最近聊天',byRecent.filter(c=>ordered.some(x=>x.id===c.id)))+section('喜愛角色',byFavorite.filter(c=>ordered.some(x=>x.id===c.id)))+section('公開角色',byPublic.filter(c=>ordered.some(x=>x.id===c.id)))+'<p class="muted small">只能選擇公開的角色。</p>';
 }
 
 function groupRenderCharacters() {
