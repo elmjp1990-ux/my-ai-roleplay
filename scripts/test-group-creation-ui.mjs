@@ -18,7 +18,6 @@ assert.match(html, /不會呼叫 AI，也不會扣款/, 'preset picker must expl
 assert.doesNotMatch(presetSource, /fetch\s*\(|createSignedUrl|supabase|openrouter/i, 'preset asset must not make network or AI requests');
 
 assert.match(pagination, /groupCharacterPicker:10/, 'group character picker page size must remain ten');
-
 assert.match(html, /載入更多公開角色（每次 10 位）/, 'group picker must disclose its ten-item page size');
 
 assert.match(html, /let groupCharacterIntroExpandedId = null/, 'character introductions must start collapsed');
