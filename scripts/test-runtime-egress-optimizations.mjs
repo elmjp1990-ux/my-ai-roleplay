@@ -27,6 +27,10 @@ assert.match(groupOpen,/g\.groupMembers\[group\.id\]/);
 assert.match(groupOpen,/archived_at/);
 assert.match(groupOpen,/if\(group\.archived_at\)/,
   "opening an archived group must not reinsert it into the visible list");
+assert.doesNotMatch(groupOpen,/phone_notifications/,
+  "group hydration must not select the phone_notifications column because it is absent from the deployed chat_group_members schema");
+assert.match(groupOpen,/phoneNotifications:Array\.isArray\(snapshot\.phoneNotifications\)/,
+  "group phone notifications must use the optional JSON snapshot value rather than a missing database column");
 assert.doesNotMatch(groupOpen,/void groupLoadList\(true\)/,
   "opening a group must not force a full group-list/member/preview reload");
 
