@@ -12,6 +12,8 @@ assert.ok(generatedStart >= 0 && generatedEnd > generatedStart, 'Phone notificat
 const phoneBlock = html.slice(generatedStart, generatedEnd);
 
 assert.match(phoneBlock, /const generated=isGroup\?/);
+assert.doesNotMatch(phoneBlock, /const notices=savedNotices;/,
+  'phone rows must be composed only after configured labels and AI snapshots are joined');
 assert.match(phoneBlock, /const configuredRows=configuredPhonePrompts\.slice\(0,8\)\.map/,
   'configured phone labels must always render as primary rows in single and group phones');
 assert.match(phoneBlock, /const stateByIndex=new Map\(storyPhoneStates\.map/,

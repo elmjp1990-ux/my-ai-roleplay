@@ -8928,7 +8928,6 @@ async function renderPhoneModal() {
   const generated=isGroup?(character.phoneNotifications||group.phoneNotificationsByCharacter?.[String(character.id)]||[]):(session.phoneNotifications||[]);
   const savedNotices=Array.isArray(generated)?generated.filter(Boolean).slice(0,8):[];
   const configuredPhonePrompts=Array.isArray(character.phoneSettings?.noticePrompts)?character.phoneSettings.noticePrompts:Array.isArray(character.phoneSettings?.notices)?character.phoneSettings.notices:[];
-  const notices=savedNotices;
   // Story phone events are fetched through the owner-checked RPC; never read the event table directly.
   let storyPhoneEvents=[];
   let storyPhoneStates=[];
@@ -9000,9 +8999,8 @@ async function renderPhoneModal() {
       }
     }
   }
-  // The author's configured phone fields are the primary rows in the single
-  // notification list. Historical messages/events follow them; the combined list
-  // never exceeds eight rows, matching the editor's eight-field limit.
+  // Author-configured phone fields are the primary rows for both single and group phones.
+  // Current AI snapshots match by field_index; unmatched states and historical events follow.
 
   // Group sweet-diary excerpts are stored per group in localStorage, so use that same shared diary for every member phone's battery.
   const diaryList=isGroup?loadGroupDiaryMemories(group.id):(session.memories||[]);
