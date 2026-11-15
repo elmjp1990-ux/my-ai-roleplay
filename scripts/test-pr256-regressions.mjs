@@ -11,14 +11,24 @@ assert.match(conversation,/loadCloudChatSessions\(owner,\{onlySessionId:sessionI
 assert.match(html,/if\(route\?\.overlay\)[\s\S]*?delete next\.overlay;[\s\S]*?go\(next,true\)/,
   'closing a route overlay must replace the current route without the stale overlay');
 assert.match(html,/已經到底了～/,'chat list must explicitly show the end state after all pages are loaded');
-assert.match(html,/root:scrollRoot&&scrollRoot\.scrollHeight>scrollRoot\.clientHeight\?scrollRoot:null/,
-  'chat list pagination must use its actual scroll container when it is independently scrollable');
+assert.match(html,/root:scrollRoot\\|\\|null,rootMargin:'0px'/,
+  'chat pagination must use the chat list as root and only trigger at the true end');
+assert.match(html,/range\\(pager\\.offset,pager\\.offset\\+pageSize\\)/,'chat list must use one-row lookahead to avoid a false has-more state');
+assert.match(html,/range\\(g\\.groupListOffset,g\\.groupListOffset\\+pageSize\\)/,'group list must use one-row lookahead');
+assert.match(html,/findExistingStoryChatSessionFallback\\(client,userId,characterId\\)/,'missing Story lookup RPC must fall back to bounded owner-scoped reads');
+assert.match(html,/confirmedUserMessageSessionIds\\.has\\(row\\.id\\)/,'legacy false user-message markers must not hide existing chats');
+assert.match(html,/data-history-top-control hidden/,'older message controls must remain hidden until the reader reaches the top');
+assert.match(html,/character-visibility-choice/,'character visibility must use explicit selected controls');
 assert.match(pager,/function observeEnd[\s\S]*?for\(let p=node\.parentElement/);
 assert.match(pager,/getComputedStyle\(p\)/);
 assert.match(html,/group-picker-avatar/);
 assert.match(html,/image\.replaceWith\(fallback\)/,'broken group portraits must fall back to a character initial');
-assert.match(css,/\.chat-list \.chat-entry \{[^}]*border-color:rgba\(255,255,255,\.045\)/,
-  'chat list row separators must be softened without altering dimensions');
+assert.match(css,/\.chat-list \.chat-entry \{[^}]*min-height:68px/,
+  'chat list rows must be compact and consistently aligned');
+assert.match(css,/border-bottom:1px solid rgba\(255,255,255,\.055\)/,
+  'chat list should use a subtle separator rather than individual card borders');
+assert.match(css,/\.character-visibility-option:has\(input:checked\)/,
+  'selected public/private option must be marked with a purple outline');
 assert.doesNotMatch(css.slice(css.indexOf('/* Refined chat-list rows')),/\.message[^}]*width:/,
   'PR #256 must not modify chat message widths');
 console.log('PR #256 conversation, overlay, pagination, avatar and chat-list regressions passed.');

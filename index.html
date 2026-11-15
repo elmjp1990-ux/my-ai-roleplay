@@ -7435,11 +7435,11 @@ ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
   // Keep the newest group messages in view when opening or re-rendering the chat.
   const groupMessages=$('groupMessages');
   if(groupMessages) {
-    bindHistoryTopControl(groupMessages,()=>document.querySelector('.group-history-pagination [data-history-top-control]'));
+    bindHistoryTopControl(groupMessages,()=>document.querySelector('.group-history-pagination [data-history-top-control]'),false);
     const anchor=g.historyScrollAnchor;
     g.historyScrollAnchor=null;
     if(anchor){
-      const restore=()=>{if(groupMessages.isConnected&&route.page==='group'&&route.id===group.id&&groupPrototype.active?.id===group.id)restoreChatScrollAnchor(groupMessages,anchor);};
+      const restore=()=>{if(groupMessages.isConnected&&route.page==='group'&&route.id===group.id&&groupPrototype.active?.id===group.id){restoreChatScrollAnchor(groupMessages,anchor);syncHistoryTopControl(groupMessages,document.querySelector('.group-history-pagination [data-history-top-control]'));}};
       requestAnimationFrame(restore);
     }else if(!g.searchJump){
       const scrollToLatest=()=>{
@@ -8727,11 +8727,11 @@ function syncHistoryTopControl(messagesNode,controlNode=messagesNode?.querySelec
   const hasOverflow=messagesNode.scrollHeight>messagesNode.clientHeight+8;
   controlNode.hidden=hasOverflow&&messagesNode.scrollTop>24;
 }
-function bindHistoryTopControl(messagesNode,controlGetter=()=>messagesNode?.querySelector('[data-history-top-control]')) {
+function bindHistoryTopControl(messagesNode,controlGetter=()=>messagesNode?.querySelector('[data-history-top-control]'),syncImmediately=true) {
   if(!messagesNode||messagesNode.dataset.historyTopControlBound==='true')return;
   messagesNode.dataset.historyTopControlBound='true';
   messagesNode.addEventListener('scroll',()=>syncHistoryTopControl(messagesNode,controlGetter()),{passive:true});
-  syncHistoryTopControl(messagesNode,controlGetter());
+  if(syncImmediately)syncHistoryTopControl(messagesNode,controlGetter());
 }
 function renderMessages(scroll = true) {
   if (!$('messages')) return;

@@ -489,7 +489,7 @@ body.encounter-mode-active .chat-main.encounter-scene > .composer {
 
 /* Refined chat-list rows: soften card edges without changing widths or hit areas. */
 .chat-list .chat-entry {
-  width:min(100%,560px);
+  width:min(94%,560px);
   min-height:68px;
   gap:10px;
   padding:9px 9px;
