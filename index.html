@@ -9939,7 +9939,7 @@ async function toggleChatSessionPin(sessionId) {
         }
         render();return;
 }
-/* Isolate both single and group pin clicks before the delegated delete/menu router can see them. */
+/* Isolate chat-list pin clicks for both single and group rows before the delegated delete/menu router can see them. */
 document.addEventListener('click',event=>{
   const origin=event.target instanceof Element?event.target:event.target?.parentElement;
   const button=origin?.closest('[data-chat-list-pin]');
