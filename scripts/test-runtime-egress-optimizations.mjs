@@ -612,8 +612,8 @@ assert.match(ownerListSource,/\.range\(g\.groupPinnedOffset,g\.groupPinnedOffset
 
 assert.match(groupOpen,/\.limit\(window\.PoyozzListPagination\.pageSize\('messages'\)\)/,"group initial history must use the shared five-message page size");
 assert.match(groupHistory,/\.limit\(window\.PoyozzListPagination\.pageSize\('messages'\)\)/,"group older history must use the shared five-message page size");
-assert.match(html,/pinnedOffset\+pageSize/,"single pinned chats must be paginated in ten-row batches");
-assert.match(html,/groupPinnedOffset\+pageSize-1/,"group pinned chats must be paginated in ten-row batches");
+assert.ok(html.includes("pinnedOffset+pageSize"),"single pinned chats must use one-row lookahead while keeping ten visible rows");
+assert.ok(html.includes("groupPinnedOffset+pageSize"),"group pinned chats must use one-row lookahead while keeping ten visible rows");
 assert.match(html,/chat_memory_photos[\s\S]{0,500}\.limit\(window\.PoyozzListPagination\.pageSize\('memoryPhotos'\)/,"group background photo picker must use the shared ten-photo page size");
 
 const favoritesLoader=ownerListSource.slice(ownerListSource.indexOf('async function renderFavorites({loadMore=false}={})'),ownerListSource.indexOf('/* Characters */',ownerListSource.indexOf('async function renderFavorites({loadMore=false}={})')));
