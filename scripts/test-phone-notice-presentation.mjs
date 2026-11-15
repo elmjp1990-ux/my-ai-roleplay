@@ -12,8 +12,12 @@ assert.ok(generatedStart >= 0 && generatedEnd > generatedStart, 'Phone notificat
 const phoneBlock = html.slice(generatedStart, generatedEnd);
 
 assert.match(phoneBlock, /const generated=isGroup\?/);
-assert.match(phoneBlock, /const notices=!savedNotices\.length/,
-  'single and group phones must both show configured notice labels when no AI-generated rows exist');
+assert.match(phoneBlock, /const configuredRows=configuredPhonePrompts\.slice\(0,8\)\.map/,
+  'configured phone labels must always render as primary rows in single and group phones');
+assert.match(phoneBlock, /const stateByIndex=new Map\(storyPhoneStates\.map/,
+  'AI-generated phone state must be joined to the configured field by field_index');
+assert.match(phoneBlock, /generatedNotice\?\.body\|\|state\?\.body\|\|'目前尚未有更新'/,
+  'configured rows must show generated content when available and a safe empty state otherwise');
 assert.match(phoneBlock, /const savedNotices=Array.isArray\(generated\)/);
 assert.match(phoneBlock, /const noticeLines=notices\.map/);
 assert.match(phoneBlock, /get_story_phone_state/, 'Story phone must load current configured field state separately');
@@ -31,8 +35,10 @@ assert.match(phoneStateMigration, /e\.event_type <> 'notification'/,
 assert.match(storyPrompt, /每個手機欄位的 body 必須以簡短的一行為主/);
 assert.match(storyPrompt, /沒有新資訊或劇情變化時，原樣延續最近狀態/);
 assert.match(phoneBlock, /目前還沒有新的通知/);
-assert.match(phoneBlock, /configuredPhonePrompts\.slice\(0,8\)\.map/,'Single/group phone may use configured notice labels only as display titles when no generated notice exists');
-assert.match(phoneBlock, /body:'目前尚未有更新'/,'Creator instructions must never be displayed as notification body text');
+assert.match(phoneBlock, /configuredPhonePrompts\.slice\(0,8\)\.map/,'Single/group phone must always include configured display labels without exposing AI instructions');
+assert.match(phoneBlock, /目前尚未有更新/,'Creator instructions must never be displayed as notification body text');
+assert.match(phoneBlock, /const noticeContentHTML=\[configuredNoticeHTML,storyStateHTML,storyEventHTML\]/,
+  'configured rows must appear before state snapshots and historical events');
 assert.match(phoneBlock, /phoneReadErrors/, 'a failed optional phone RPC must not clear successful phone sections');
 assert.match(phoneBlock, /cached\.phoneReadError/, 'per-section phone read errors must survive the short-lived cache');
 assert.match(phoneBlock, /const safePhoneRpc=async\(name,args\)/, 'phone RPCs must be awaited through a rejection-safe helper because Supabase builders are thenables');

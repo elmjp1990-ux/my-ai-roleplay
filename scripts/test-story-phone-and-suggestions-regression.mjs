@@ -38,9 +38,11 @@ assert.doesNotMatch(html, /勾選「重大記憶」即可珍藏這段回憶/);
 
 // Author-configured phone fields and genuine event history render inside one list,
 // with the configured fields first and no more than eight combined rows.
-assert.match(html, /storyPhoneStates\.slice\(0,8\)/);
-assert.match(html, /storyPhoneEvents\.slice\(0,Math\.max\(0,8-storyPhoneStates\.length\)\)/);
-assert.match(html, /const noticeContentHTML=\[\s*storyStateHTML,\s*storyEventHTML/s);
+assert.match(html, /const extraStoryStates=storyPhoneStates\.filter/);
+assert.match(html, /const storyEventsToShow=storyPhoneEvents\.slice\(0,remainingAfterStates\)/);
+assert.match(html, /const noticeContentHTML=\[configuredNoticeHTML,storyStateHTML,storyEventHTML\]/,
+  'configured phone rows must be first, followed by extra states and historical events');
+assert.match(html, /const configuredFieldIndexes=new Set\(configuredPhonePrompts\.slice\(0,8\)/);
 
 // Per-message persisted suggestions override stale session metadata on reload.
 assert.match(html, /Object\.assign\(normalized,metadata\);[\s\S]{0,260}if\(persistedSuggestions\.length===3\)normalized\.suggestedReplies=persistedSuggestions/);

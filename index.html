@@ -8928,9 +8928,7 @@ async function renderPhoneModal() {
   const generated=isGroup?(character.phoneNotifications||group.phoneNotificationsByCharacter?.[String(character.id)]||[]):(session.phoneNotifications||[]);
   const savedNotices=Array.isArray(generated)?generated.filter(Boolean).slice(0,8):[];
   const configuredPhonePrompts=Array.isArray(character.phoneSettings?.noticePrompts)?character.phoneSettings.noticePrompts:Array.isArray(character.phoneSettings?.notices)?character.phoneSettings.notices:[];
-  const notices=!savedNotices.length
-    ?configuredPhonePrompts.slice(0,8).map(row=>({title:String(row||'').split('|')[0].trim()||'手機通知',body:'目前尚未有更新'}))
-    :savedNotices;
+  const notices=savedNotices;
   // Story phone events are fetched through the owner-checked RPC; never read the event table directly.
   let storyPhoneEvents=[];
   let storyPhoneStates=[];
@@ -9005,14 +9003,7 @@ async function renderPhoneModal() {
   // The author's configured phone fields are the primary rows in the single
   // notification list. Historical messages/events follow them; the combined list
   // never exceeds eight rows, matching the editor's eight-field limit.
-  const storyEventHTML=storyPhoneEvents.slice(0,Math.max(0,8-storyPhoneStates.length)).map(item=>{
-    const typeLabels={message:'訊息',social_post:'社群動態',missed_call:'未接來電',voice_message:'語音留言',notification:'通知'};
-    const eventIcon=item.event_type==='missed_call'?'☎️':item.event_type==='voice_message'?'🎙️':item.event_type==='social_post'?'◎':'💬';
-    return '<article class="phone-notification-card"><span class="phone-app-icon">'+eventIcon+'</span><div class="phone-notification-copy"><div class="phone-notification-meta"><span>'+e(typeLabels[item.event_type]||'通知')+'</span><time>'+e(timeText(item.created_at||0))+'</time></div><strong>'+e(item.title||'新通知')+'</strong><p>'+e(item.body||'')+'</p></div></article>';
-  }).join('');
-  const storyStateHTML=storyPhoneStates.slice(0,8).map(item=>
-    '<article class="phone-notification-card"><span class="phone-app-icon">📱</span><div class="phone-notification-copy"><div class="phone-notification-meta"><span>手機狀態</span><span>剛剛</span></div><strong>'+e(item.title||'')+'</strong><p>'+e(item.body||'')+'</p></div></article>'
-  ).join('');
+
   // Group sweet-diary excerpts are stored per group in localStorage, so use that same shared diary for every member phone's battery.
   const diaryList=isGroup?loadGroupDiaryMemories(group.id):(session.memories||[]);
   const usesCloudStoryMemory=!isGroup&&session.storyMode&&session.cloudOwned;
@@ -9030,13 +9021,37 @@ async function renderPhoneModal() {
   const inferredOpeningLocation=openingLocationMatch?.[1]?.trim().replace(/[。！？；;]+$/,'')||'';
   const storyLocationLabel=String(storyWorldState.storyLocation||storyWorldState.story_location||(!isGroup?session?.encounterPlace:'')||inferredOpeningLocation).trim().slice(0,120)||'依開場情境推定中';
   const title=(character.name||group?.name||'角色')+' 的手機';
+  const stateByIndex=new Map(storyPhoneStates.map(item=>[Number(item.field_index),item]));
+  const configuredRows=configuredPhonePrompts.slice(0,8).map((row,index)=>{
+    const title=String(row||'').split('|')[0].trim();
+    if(!title)return null;
+    const state=stateByIndex.get(index);
+    const generatedNotice=savedNotices.find(item=>String(item?.title||'')===title);
+    return {title,body:String(generatedNotice?.body||state?.body||'目前尚未有更新')};
+  }).filter(Boolean);
+  const configuredTitles=new Set(configuredRows.map(item=>item.title));
+  const extraGeneratedNotices=savedNotices.filter(item=>typeof item==='string'||!configuredTitles.has(String(item?.title||'')));
+  const notices=[...configuredRows,...extraGeneratedNotices].slice(0,8);
   const noticeLines=notices.map(item=>typeof item==='string'?item.trim():String(item?.body||'').trim()).filter(Boolean);
-  const configuredNoticeHTML=notices.slice(0,Math.max(0,8-storyPhoneStates.length-storyPhoneEvents.length)).map(item=>{
+  const configuredFieldIndexes=new Set(configuredPhonePrompts.slice(0,8).map((row,index)=>String(row||'').split('|')[0].trim()?index:null).filter(index=>index!==null));
+  const remainingAfterNotices=Math.max(0,8-notices.length);
+  const extraStoryStates=storyPhoneStates.filter(item=>!configuredFieldIndexes.has(Number(item.field_index))).slice(0,remainingAfterNotices);
+  const remainingAfterStates=Math.max(0,remainingAfterNotices-extraStoryStates.length);
+  const storyEventsToShow=storyPhoneEvents.slice(0,remainingAfterStates);
+  const configuredNoticeHTML=notices.map(item=>{
     const title=typeof item==='string'?(character.name||'角色通知'):String(item?.title||character.name||'角色通知');
     const body=typeof item==='string'?item:String(item?.body||'');
     return '<article class="phone-notification-card"><span class="phone-app-icon">🔔</span><div class="phone-notification-copy"><div class="phone-notification-meta"><span>'+e(title)+'</span><span>通知</span></div><p>'+e(body)+'</p></div></article>';
   }).join('');
-  const noticeContentHTML=[storyStateHTML,storyEventHTML,configuredNoticeHTML].filter(Boolean).join('');
+  const storyStateHTML=extraStoryStates.map(item=>
+    '<article class="phone-notification-card"><span class="phone-app-icon">📱</span><div class="phone-notification-copy"><div class="phone-notification-meta"><span>手機狀態</span><span>剛剛</span></div><strong>'+e(item.title||'')+'</strong><p>'+e(item.body||'')+'</p></div></article>'
+  ).join('');
+  const storyEventHTML=storyEventsToShow.map(item=>{
+    const typeLabels={message:'訊息',social_post:'社群動態',missed_call:'未接來電',voice_message:'語音留言',notification:'通知'};
+    const eventIcon=item.event_type==='missed_call'?'☎️':item.event_type==='voice_message'?'🎙️':item.event_type==='social_post'?'◎':'💬';
+    return '<article class="phone-notification-card"><span class="phone-app-icon">'+eventIcon+'</span><div class="phone-notification-copy"><div class="phone-notification-meta"><span>'+e(typeLabels[item.event_type]||'通知')+'</span><time>'+e(timeText(item.created_at||0))+'</time></div><strong>'+e(item.title||'新通知')+'</strong><p>'+e(item.body||'')+'</p></div></article>';
+  }).join('');
+  const noticeContentHTML=[configuredNoticeHTML,storyStateHTML,storyEventHTML].filter(Boolean).join('');
   const noticeHTML=noticeContentHTML||(storyPhoneEventsError?'<div class="phone-notification-empty">目前無法載入手機通知，請稍後重新開啟手機。</div>':'<div class="phone-notification-empty">目前還沒有新的通知</div>');
   const phoneHeader=isGroup
     ? '<div class="phone-device-head phone-device-head--group"><div class="phone-member-switch"><button type="button" data-phone-action="prev" aria-label="上一位群組成員">‹</button><span class="phone-member-name">'+e(character.name)+'</span><button type="button" data-phone-action="next" aria-label="下一位群組成員">›</button><span class="phone-member-phone-label">的手機</span></div><span class="phone-device-caption">STORY PHONE</span></div>'
@@ -9049,7 +9064,7 @@ async function renderPhoneModal() {
     phoneHeader+
     '<div class="phone-content"><div class="phone-lockscreen"><div class="phone-lockscreen-date">'+e(storyDateDisplay||'故事時間')+'</div><div class="phone-lockscreen-clock">'+e(phoneClock)+'</div><div class="phone-lockscreen-location">⌖　'+e(storyLocationLabel)+'</div></div>'+
     '<section class="phone-notices '+(warning?'phone-warning':'')+'">'+(warning?'<div class="phone-memory-warning">回憶空間即將用盡，整理甜蜜日記可釋放容量</div>':'')+
-    '<div class="phone-notice-heading"><strong>通知</strong><span>'+(noticeContentHTML?String(Math.min(8,storyPhoneStates.length+storyPhoneEvents.length+noticeLines.length))+' 則':'通知中心')+'</span></div><div class="phone-notice-list">'+noticeHTML+'</div></section>'+
+    '<div class="phone-notice-heading"><strong>通知</strong><span>'+(noticeContentHTML?String(Math.min(8,notices.length+extraStoryStates.length+storyEventsToShow.length))+' 則':'通知中心')+'</span></div><div class="phone-notice-list">'+noticeHTML+'</div></section>'+
     '<p class="phone-memory-caption">'+(diaryChars===null?'甜蜜日記容量暫時無法同步':('甜蜜日記　'+Math.min(diaryChars,capacity).toLocaleString()+' / '+capacity.toLocaleString()+' 字 · 剩餘 '+(battery===null?'--':battery+'%')) )+'</p></div>'+
     '<div class="phone-home-indicator"></div><div class="phone-close-row"><button type="button" data-phone-action="close">關閉</button></div></div></section>';
   modal.addEventListener('click',event=>{
