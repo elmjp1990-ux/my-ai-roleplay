@@ -1736,6 +1736,27 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       if(pager.loading|| (loadMore&&!pager.hasMore))return;
       pager.loading=true;
       let rows=[];
+      let localOnlyCharacterCount=0;
+      // 保留舊角色同步狀態的 bounded ID 比對，但登入時絕不寫入角色資料。
+      // 本機快照只用來提示作者；雲端不存在的角色仍留在本機，等待作者確認後手動儲存。
+      if(!loadMore){
+        const localOwned=state.characters.filter(c=>c.authorId===user.id&&c.id);
+        const localIds=localOwned.map(character=>character.id).filter(isUuid);
+        const existingLocalIds=new Set();
+        try{
+          for(let start=0;start<localIds.length;start+=pageSize){
+            const batch=localIds.slice(start,start+pageSize);
+            const existingResult=await client.from('characters').select('id')
+              .eq('author_id',user.id).in('id',batch);
+            if(existingResult.error)throw existingResult.error;
+            for(const row of existingResult.data||[])existingLocalIds.add(row.id);
+          }
+          localOnlyCharacterCount=localOwned.filter(character=>!existingLocalIds.has(character.id)).length;
+        }catch(reconcileError){
+          // 此比對只提供遺留本機資料提示，失敗不得阻斷真正的雲端角色載入。
+          console.warn('舊版角色同步狀態比對失敗；略過本機待同步提示。',reconcileError);
+        }
+      }
       // 登入階段只讀取雲端角色，不自動把本機快照寫回 Supabase。
       // 舊版本機角色仍保留在 state.characters；只有作者進入編輯器並明確儲存時才同步，
       // 避免過期本機資料意外建立／覆蓋雲端角色狀態。
@@ -1851,6 +1872,9 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       pager.loading=false;
       persist();
       if(route.page==='create'||!loadMore)render();
+      if(localOnlyCharacterCount>0){
+        toast('偵測到 '+localOnlyCharacterCount+' 個尚未同步的本機角色；為保護雲端資料，登入時不會自動上傳，請確認內容後再到編輯器手動儲存。');
+      }
     } catch (error) {
       if(ownedCharacterPager?.uid===user.id)ownedCharacterPager.loading=false;
       console.error('PersonaX 雲端角色載入失敗：', error);
