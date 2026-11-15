@@ -14,7 +14,9 @@ assert.equal(presets.length, 100, 'exactly 100 static group opening presets must
 assert.equal(new Set(presets.map(item => item.id)).size, 100, 'preset IDs must be unique');
 assert.ok(presets.every(item => item.title && item.category && item.text), 'every preset needs a category, title, and text');
 assert.match(html, /\.\/group-opening-presets\.js/, 'preset asset must be loaded by the page');
-assert.match(html, /不會呼叫 AI，也不會扣款/, 'preset picker must explain that selection is local and free');
+assert.match(html, /data-action="group-inspiration">✨ AI靈感/, 'group inspiration must be a one-click AI-style button');
+assert.match(html, /Math\.random\(\)/, 'group inspiration must randomly apply a preset without showing a selection dialog');
+assert.match(html, /const roleIntro=members\.length===1/, 'group inspiration must adapt the opening sentence to the selected role count');
 assert.doesNotMatch(presetSource, /fetch\s*\(|createSignedUrl|supabase|openrouter/i, 'preset asset must not make network or AI requests');
 
 assert.match(pagination, /groupCharacterPicker:10/, 'group character picker page size must remain ten');
@@ -25,10 +27,11 @@ assert.match(html, /data-action="group-toggle-character-intro"/, 'character name
 assert.ok(html.includes("group-character-intro '+(expanded?'':'hidden')+'"), 'character intro must be hidden until expanded');
 
 assert.match(html, /value="__player_custom__"/, 'group world choices must include player-defined background');
-assert.match(html, /id="groupCustomWorldBackground" maxlength="3000" data-count-for="groupCustomWorldBackground"/, 'custom world field must be limited to 3000 characters and counted');
-assert.match(html, /可以自行填入時空背景/, 'custom world option must show its helper copy');
+assert.match(html, /id="groupWorldBackground" maxlength="3000" data-count-for="groupWorldBackground"/, 'the single group background field must be limited to 3000 characters and counted');
+assert.doesNotMatch(html, /groupCustomWorldBackground/, 'group background must not render a second custom textarea');
+assert.match(html, /清空下方背景框/, 'custom world option must clear the shared background field');
 assert.match(html, /world_character_id:g\.draft\.worldCharacterId==='__player_custom__'\?null:g\.draft\.worldCharacterId/, 'custom world must save without a character foreign-key reference');
-assert.match(html, /g\.draft\.worldCharacterId==='__player_custom__'[\s\S]{0,260}最多 3000 字/, 'custom world text must be validated at 3000 characters');
+assert.match(html, /g\.draft\.world\.length>3000\)return '群組背景最多 3000 字'/, 'all group background text must be validated at 3000 characters');
 
 assert.match(html, /\[data-action="pin"\][\s\S]{0,280}stopImmediatePropagation\(\)/, 'pin click must be isolated before other delegated actions');
 const pinHelper = html.slice(html.indexOf('async function toggleChatSessionPin'), html.indexOf('/* Isolate chat-list pin clicks'));
