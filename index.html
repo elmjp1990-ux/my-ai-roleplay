@@ -7910,7 +7910,11 @@ function groupToggleCharacter(idValue) {
   const members=groupSelectedCharacters();
   if(!g.draft.name||g.draft.name===g._suggestedName) g.draft.name=members.map(c=>c.name).join('、').slice(0,25);
   g._suggestedName=g.draft.name;
-  if(!members.some(c=>c.id===g.draft.worldCharacterId)) g.draft.worldCharacterId=members[0]?.id||'';
+  if(!members.some(c=>c.id===g.draft.worldCharacterId)){
+    g.draft.worldCharacterId=members[0]?.id||'';
+    const selectedWorld=members[0];
+    g.draft.world=String(selectedWorld?.worldBackground||selectedWorld?.world||selectedWorld?.intro||'').slice(0,3000);
+  }
   g.formError='';render();
 }
 async function groupSendTurn() {
@@ -9997,7 +10001,14 @@ document.addEventListener('click',async event => {
         const userName=String($('groupPlayerName')?.value||g.draft.playerName||state.account?.nickname||'玩家').trim()||'玩家';
         const names=[members[0]?.name||'一位主角',members[1]?.name||'一位神祕的轉學生',members[2]?.name||'一名來歷不明的陌生人'];
         const replacements={CHAR1:names[0],CHAR2:names[1],CHAR3:names[2],USER:userName,VILLAIN:'神祕的反派',NPC:'一位路人'};
-        const text=String(preset.text||'').replace(/\{(CHAR1|CHAR2|CHAR3|USER|VILLAIN|NPC)\}/g,(_,key)=>replacements[key]||'');
+        const templateText=String(preset.text||'').replace(/\{(CHAR1|CHAR2|CHAR3|USER|VILLAIN|NPC)\}/g,(_,key)=>replacements[key]||'');
+        const roleIntro=members.length===1
+          ? names[0]+'在路上遇見'+userName+'，兩人決定一起展開旅程。途中可能遇見一位身分不明的神祕人物，以及一名看似友善的陌生人。'
+          : members.length===2
+            ? names[0]+'與'+names[1]+'在路上遇見'+userName，三人決定一起展開旅程。途中可能遇見一位是敵是友的神祕人物。'
+            : names[0]+'、'+names[1]+'與'+names[2]+'在路上遇見'+userName+'，四人決定一起展開旅程。';
+        const hasRolePlaceholders=/\{(CHAR1|CHAR2|CHAR3|USER)\}/.test(String(preset.text||''));
+        const text=(hasRolePlaceholders?templateText:roleIntro+'\n\n'+templateText);
         const scene=$('groupSceneDesc0');
         if(scene){scene.value=text.slice(0,3000);scene.dispatchEvent(new Event('input',{bubbles:true}));}
         break;
