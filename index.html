@@ -7116,7 +7116,7 @@ function renderGroupConversation() {
   const initialScene=(group.scenes||[]).find(x=>Number(x.position||1)===1)||(group.scenes||[])[0];
   const initialOpening=String(initialScene?.description||'').trim();
   const initialOpeningRow=initialOpening
-    ? '<div class="message group-opening-message"><span class="avatar avatar-fallback">序</span><div class="message-content"><div class="message-name">初始開場情境</div><div class="bubble">'+e(initialOpening).replace(/\\n/g,'<br>')+'</div></div></div>'
+    ? '<div class="message group-opening-message"><span class="avatar avatar-fallback">序</span><div class="message-content"><div class="message-name">初始開場情境</div><div class="bubble">'+e(initialOpening).replace(/\n/g,'<br>')+'</div></div></div>'
     : '';
   const messageRows=initialOpeningRow+g.messages.map(m=>{
     const member=group.members.find(x=>m.characterId&&x.characterId===m.characterId) ||
@@ -7883,6 +7883,11 @@ async function groupSendTurn() {
   const content=typedContent || GROUP_CONTINUE_SENTINEL;
   const g=groupPrototype;
   if(g.sending) return;
+  if(!typedContent && !(g.messages||[]).length) {
+    g.formError='請先輸入第一句訊息，再開始群組 AI 對話。';
+    render();
+    return;
+  }
   if(!walletPreflight('group')) return;
   if(!window.mySupabase) { g.formError='Supabase 用戶端尚未載入。';render();return; }
   if(!isContinueRequest) {
