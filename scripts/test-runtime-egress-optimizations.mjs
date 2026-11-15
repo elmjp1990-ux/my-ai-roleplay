@@ -544,6 +544,18 @@ assert.match(ownedCharacterPageLoaderSource,/\.range\(pager\.offset,pager\.offse
   'owned character details must be fetched in bounded server-side pages');
 assert.match(ownedCharacterPageLoaderSource,/\.in\('id',batch\)/,
   'owned-character migration reconciliation must compare only local IDs in bounded batches');
+
+assert.doesNotMatch(ownedCharacterPageLoaderSource,/saveSupabaseCharacter\(character,user\.id\)/,
+  'login hydration must never upsert a stale local character snapshot into Supabase');
+assert.match(ownedCharacterPageLoaderSource,/missingStoryRpc/,
+  'a missing latest-owned-story RPC must not abort cloud character hydration');
+const groupPreviewStart=ownerListSource.indexOf('async function groupHydrateListRows(groups)');
+const groupPreviewEnd=ownerListSource.indexOf('async function groupLoadList',groupPreviewStart);
+assert.ok(groupPreviewStart>=0&&groupPreviewEnd>groupPreviewStart,'group list hydration must remain identifiable');
+const groupPreviewSource=ownerListSource.slice(groupPreviewStart,groupPreviewEnd);
+assert.match(groupPreviewSource,/missingPreviewRpc/,
+  'a missing group preview RPC must not prevent group rows from loading');
+
 assert.doesNotMatch(ownedCharacterPageLoaderSource,/\.select\('id'\)\.eq\('author_id',user\.id\);/,
   'owned-character migration must not scan every cloud character ID');
 assert.match(ownedCharacterPageLoaderSource,/loadMore\s*&&\s*!pager\.hasMore/,
