@@ -4681,6 +4681,12 @@ function go(next, replace = false) {
   window.scrollTo(0,0);
 }
 function back() {
+  if(route?.overlay){
+    const next={...route};
+    delete next.overlay;
+    go(next,true);
+    return;
+  }
   if (history.state?.personax && history.state.depth > 0) history.back();
   else go({page:'home'},true);
 }
@@ -6822,10 +6828,20 @@ async function groupLoadCharacterPickerPage({reset=false}={}){
 }
 function groupCharacterPickerAvatar(character){
   const image=safeImage(character?.image||character?.avatar_url);
-  if(image)return '<img class="avatar" src="'+e(image)+'" alt="" style="width:46px;height:46px">';
   const initial=String(character?.name||'角').trim().slice(0,1)||'角';
+  if(image)return '<img class="avatar group-picker-avatar" src="'+e(image)+'" alt="" loading="lazy" decoding="async" data-avatar-fallback="'+e(initial)+'" style="width:46px;height:46px">';
   return '<span class="avatar avatar-fallback" aria-hidden="true" style="width:46px;height:46px">'+e(initial)+'</span>';
 }
+document.addEventListener('error',event=>{
+  const image=event.target;
+  if(!(image instanceof HTMLImageElement)||!image.matches('.group-picker-avatar'))return;
+  const fallback=document.createElement('span');
+  fallback.className='avatar avatar-fallback';
+  fallback.setAttribute('aria-hidden','true');
+  fallback.style.cssText='width:46px;height:46px';
+  fallback.textContent=image.dataset.avatarFallback||'角';
+  image.replaceWith(fallback);
+},true);
 function groupRenderCharacterResults() {
   const pager=groupCharacterPickerPager;
   const all=pager.uid===currentUser()?.uid?pager.items:[];
@@ -6880,6 +6896,7 @@ function refreshChatEntryList() {
     sentinel.style.cssText='padding:12px;text-align:center';
     sentinel.textContent='繼續往下滑動，載入更多對話…';
     entries.appendChild(sentinel);
+    const scrollRoot=entries.closest('.chat-list');
     chatListPaginationObserver=window.PoyozzListPagination.observeEnd(sentinel,async()=>{
       if(chatSessionListPager.initialLoaded&&chatSessionListPager.hasMore){
         await loadCloudChatSessions(currentUser(),{loadMore:true});
@@ -6887,7 +6904,14 @@ function refreshChatEntryList() {
       if(groupPrototype.groupsLoaded&&groupPrototype.groupListHasMore){
         await groupLoadList(false,true);
       }
-    });
+    },{root:scrollRoot&&scrollRoot.scrollHeight>scrollRoot.clientHeight?scrollRoot:null,rootMargin:'40px 0px'});
+  }else if(chatSessionListPager.initialLoaded&&groupPrototype.groupsLoaded){
+    const end=document.createElement('div');
+    end.className='small muted';
+    end.dataset.chatListEnd='true';
+    end.style.cssText='padding:12px;text-align:center';
+    end.textContent='已經到底了～';
+    entries.appendChild(end);
   }
 }
 function groupResetForAccount(uid) {
@@ -8368,10 +8392,24 @@ function renderConversation() {
   }
   if(s.cloudOwned)void hydrateCloudSessionCharacterImage(s);
   if(isConversationEntry){
-    const latestAssistantAt=Number(s.lastAssistantMessageAt||0);
-    s.lastReadAt=Math.max(Number(s.lastReadAt||0),latestAssistantAt,Date.now());
-    persist();
-    if(s.cloudOwned)saveChatSessionSafely(s).catch(error=>console.warn('聊天室已讀狀態同步失敗：',error));
+    const sessionId=s.id,owner=currentUser();
+    if(s.cloudOwned&&owner?.uid===s.cloudOwnerUid){
+      // Hydrate the authoritative updated_at/session_data before writing the read watermark.
+      // This prevents the first render of a stale list row from causing a false version conflict.
+      void loadCloudChatSessions(owner,{onlySessionId:sessionId,listPage:false})
+        .then(()=>{
+          const latest=state.sessions?.[sessionId];
+          if(!latest||currentUser()?.uid!==owner.uid||route.page!=='conversation'||route.id!==sessionId)return;
+          const latestAssistantAt=Number(latest.lastAssistantMessageAt||0);
+          latest.lastReadAt=Math.max(Number(latest.lastReadAt||0),latestAssistantAt,Date.now());
+          persist();
+          return saveChatSessionSafely(latest);
+        })
+        .catch(error=>console.warn('聊天室已讀狀態同步失敗：',error));
+    }else{
+      s.lastReadAt=Math.max(Number(s.lastReadAt||0),Number(s.lastAssistantMessageAt||0),Date.now());
+      persist();
+    }
   }
   $('view').innerHTML = `
     <div class="chat-layout ${hideList ? 'hide-list' : ''}">
@@ -8925,8 +8963,20 @@ async function renderPhoneModal() {
     character={...savedRole,...sessionRole,phoneSettings:savedRole?.phoneSettings||savedRole?.phone_settings||sessionRole.phoneSettings||sessionRole.phone_settings||{}};
   }
   // Creator notice prompts guide AI generation only; never render raw instructions to players.
-  const generated=isGroup?(character.phoneNotifications||group.phoneNotificationsByCharacter?.[String(character.id)]||[]):(session.phoneNotifications||[]);
-  const savedNotices=Array.isArray(generated)?generated.filter(Boolean).slice(0,8):[];
+  const noticeSources=isGroup
+    ?[character.phoneNotifications,group.phoneNotificationsByCharacter?.[String(character.id)],group.phoneNotifications]
+    :[session.phoneNotifications,character.phoneNotifications,session.phoneNotificationsByCharacter?.[String(character.id)]];
+  const noticeByTitle=new Map();
+  noticeSources.filter(Array.isArray).flat().filter(Boolean).forEach((item,index)=>{
+    const title=typeof item==='string'?'':String(item?.title||'').trim();
+    const key=title||('notice-'+index+'-'+String(typeof item==='string'?item:item?.body||''));
+    if(!noticeByTitle.has(key))noticeByTitle.set(key,item);
+    else if(title&&typeof item==='object'&&String(item.body||'').trim()){
+      const previous=noticeByTitle.get(key);
+      noticeByTitle.set(key,{...previous,...item,body:String(item.body||previous?.body||'')});
+    }
+  });
+  const savedNotices=[...noticeByTitle.values()].slice(0,8);
   const configuredPhonePrompts=Array.isArray(character.phoneSettings?.noticePrompts)?character.phoneSettings.noticePrompts:Array.isArray(character.phoneSettings?.notices)?character.phoneSettings.notices:[];
   // Story phone events are fetched through the owner-checked RPC; never read the event table directly.
   let storyPhoneEvents=[];
@@ -8949,7 +8999,9 @@ async function renderPhoneModal() {
         storyMemorySummaries=Array.isArray(cached.summaries)?cached.summaries:null;
         storyMemorySummaryError=String(cached.summaryError||'');
         storyPhoneEventsError=String(cached.phoneReadError||'');
-        if(cached.worldState&&typeof cached.worldState==='object')storyWorldState=cached.worldState;
+        if(cached.worldState&&typeof cached.worldState==='object'&&Object.values(cached.worldState).some(value=>String(value??'').trim())){
+          storyWorldState={...storyWorldState,...cached.worldState};
+        }
       }else{
         const safePhoneRpc=async(name,args)=>{
           try{return await client.rpc(name,args);}
@@ -8970,8 +9022,8 @@ async function renderPhoneModal() {
         if(stateResult.error)phoneReadErrors.push('手機狀態：'+String(stateResult.error.message||'讀取失敗'));
         else storyPhoneStates=Array.isArray(stateResult.data)?stateResult.data:[];
         if(worldStateResult.error)phoneReadErrors.push('故事時間地點：'+String(worldStateResult.error.message||'讀取失敗'));
-        else if(worldStateResult.data&&typeof worldStateResult.data==='object'){
-          storyWorldState=worldStateResult.data;
+        else if(worldStateResult.data&&typeof worldStateResult.data==='object'&&Object.values(worldStateResult.data).some(value=>String(value??'').trim())){
+          storyWorldState={...storyWorldState,...worldStateResult.data};
           session.storyWorldState=storyWorldState;
         }
         storyPhoneEventsError=phoneReadErrors.join('；');

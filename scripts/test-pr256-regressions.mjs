@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const html=fs.readFileSync('index.html','utf8');
+const pager=fs.readFileSync('list-pagination.js','utf8');
+const css=fs.readFileSync('poyozz-ui.css','utf8');
+
+const conversation=html.slice(html.indexOf('function renderConversation()'),html.indexOf('function renderGroupConversation()'));
+assert.match(conversation,/loadCloudChatSessions\(owner,\{onlySessionId:sessionId,listPage:false\}\)/,
+  'opening a cloud conversation must hydrate the authoritative session version before read-state sync');
+assert.match(html,/if\(route\?\.overlay\)[\s\S]*?delete next\.overlay;[\s\S]*?go\(next,true\)/,
+  'closing a route overlay must replace the current route without the stale overlay');
+assert.match(html,/已經到底了～/,'chat list must explicitly show the end state after all pages are loaded');
+assert.match(html,/root:scrollRoot&&scrollRoot\.scrollHeight>scrollRoot\.clientHeight\?scrollRoot:null/,
+  'chat list pagination must use its actual scroll container when it is independently scrollable');
+assert.match(pager,/function findScrollRoot\(node\)/);
+assert.match(pager,/findScrollRoot\(node\)/);
+assert.match(html,/group-picker-avatar/);
+assert.match(html,/image\.replaceWith\(fallback\)/,'broken group portraits must fall back to a character initial');
+assert.match(css,/\.chat-list \.chat-entry \{[^}]*border-color:rgba\(255,255,255,\.045\)/,
+  'chat list row separators must be softened without altering dimensions');
+assert.doesNotMatch(css,/\.message[^}]*width:/,
+  'PR #256 must not modify chat message widths');
+console.log('PR #256 conversation, overlay, pagination, avatar and chat-list regressions passed.');

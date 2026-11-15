@@ -200,3 +200,12 @@ console.log('Character save performs deterministic AI-impact diffing without inv
 assert.match(phoneBlock, /get_story_world_state/, 'Story phone must read the persisted contextual time and location');
 assert.match(phoneBlock, /依開場情境推定中/, 'Story phone must show a contextual initial location fallback');
 assert.match(phoneBlock, /initialStoryTimeText/, 'Story phone must show the session start time before the first AI turn');
+
+
+// PR #256 regression coverage: preserve runtime state and use a neutral graphite phone surface.
+assert.match(phoneBlock, /noticeSources=isGroup/);
+assert.match(phoneBlock, /noticeByTitle/);
+assert.match(phoneBlock, /Object\.values\(worldStateResult\.data\)\.some/);
+assert.match(uiStyles, /\.phone-screen \{[\s\S]*?linear-gradient\(155deg,#252a31 0%,#15191e 54%,#0c0f13 100%\)/);
+assert.match(uiStyles, /phone-notification-card \{[^}]*background:rgba\(155,162,172/);
+console.log('PR #256 phone state preservation and graphite iPhone styling checks passed.');
