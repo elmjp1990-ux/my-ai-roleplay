@@ -5,6 +5,8 @@ const html = fs.readFileSync('index.html', 'utf8');
 const uiStyles = fs.readFileSync('poyozz-ui.css', 'utf8');
 const phoneStateMigration = fs.readFileSync('supabase/migrations/20261110120000_story_phone_state_and_memory_summary_read.sql', 'utf8');
 const storyPrompt = fs.readFileSync('supabase/functions/chat-turn/index.ts', 'utf8');
+const groupTurnSource = fs.readFileSync('supabase/functions/group-chat-turn/index.ts', 'utf8');
+const memorySummaryWorker = fs.readFileSync('supabase/functions/_shared/story-memory-summary.ts', 'utf8');
 const chatReadMigration = fs.readFileSync('supabase/migrations/20261116130000_mark_chat_session_read_and_story_chat_paging.sql', 'utf8');
 const generatedStart = html.indexOf('  // Creator notice prompts guide AI generation only; never render raw instructions to players.');
 const generatedEnd = html.indexOf('  const phoneHeader=', generatedStart);
@@ -215,5 +217,6 @@ console.log('PR #256 phone state preservation and graphite iPhone styling checks
 
 assert.match(phoneBlock,/const savedNotices=\[\.\.\.noticeByTitle\.values\(\)\]/);
 assert.match(html,/get_group_memory_summaries/,'Group Sweet Diary must read persisted AI summaries');
-assert.match(html,/processDueGroupMemorySummary/,'Group turns must invoke the same five-turn AI summary pipeline');
+assert.match(groupTurnSource,/processDueGroupMemorySummary/,'Group turns must invoke the shared five-turn AI summary pipeline');
+assert.match(memorySummaryWorker,/export async function processDueGroupMemorySummary/,'The shared worker must implement group summaries');
 assert.match(html,/每 5 個已完成的群組回合，由 AI 整理一則 50–150 字摘要/,'Group diary must state the same 50–150 character summary contract as single Story');

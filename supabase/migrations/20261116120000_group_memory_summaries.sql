@@ -11,12 +11,18 @@ ALTER TABLE public.chat_group_members
 
 -- Previous single-chat workers could mark an empty result as completed.
 -- Make only those invalid batches retryable by the corrected worker.
-UPDATE public.ai_model_usage
-SET status = 'failed',
-    processed_at = now()
-WHERE generation_type = 'memory_summary'
-  AND status = 'completed'
-  AND NULLIF(btrim(summary), '') IS NULL;
+DO $migration$
+BEGIN
+  IF to_regclass('public.ai_model_usage') IS NOT NULL THEN
+    UPDATE public.ai_model_usage
+    SET status = 'failed',
+        processed_at = now()
+    WHERE generation_type = 'memory_summary'
+      AND status = 'completed'
+      AND NULLIF(btrim(summary), '') IS NULL;
+  END IF;
+END;
+$migration$;
 
 -- Backfill legacy group phone notices; preserve non-empty member values.
 -- Only copy non-empty arrays; leave empty/default rows untouched.
