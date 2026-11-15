@@ -20,13 +20,13 @@ FROM generate_series(1,5) n;
 INSERT INTO public.chat_group_messages(group_id,turn_id,sequence_no,speaker_type,content,speaker_snapshot)
 SELECT
  '20000000-0000-4000-8000-000000000009'::uuid,
- t.id,'user',t.request_content,'{"name":"玩家"}'::jsonb
+ t.id,0,'user',t.request_content,'{"name":"玩家"}'::jsonb
 FROM public.chat_group_turns t
 WHERE t.group_id='20000000-0000-4000-8000-000000000009'
 UNION ALL
 SELECT
  '20000000-0000-4000-8000-000000000009'::uuid,
- t.id,'character','角色回應：已確認本回合的調查進度。','{"name":"角色A"}'::jsonb
+ t.id,1,'character','角色回應：已確認本回合的調查進度。','{"name":"角色A"}'::jsonb
 FROM public.chat_group_turns t
 WHERE t.group_id='20000000-0000-4000-8000-000000000009';
 
