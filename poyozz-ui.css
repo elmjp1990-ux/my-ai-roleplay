@@ -333,7 +333,7 @@ body.day .story-relationship-icon { color:#c27cae; filter:none; }
 }
 
 
-.phone-modal-backdrop{position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(7,10,16,.68);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.phone-modal-backdrop{position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(7,10,16,.68);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);overscroll-behavior:contain;touch-action:pan-y}
 .phone-device{width:min(360px,100%);height:min(500px,90dvh);min-height:min(440px,90dvh);display:flex;flex-direction:column;overflow:hidden;padding:17px;border:1px solid var(--px-phone-border);border-radius:30px;border-top:3px solid var(--px-phone-border);background:linear-gradient(155deg,var(--px-phone-surface),var(--px-phone-surface-soft));color:var(--px-phone-text);box-shadow:0 24px 90px #0008,inset 0 1px 0 rgba(255,255,255,.14);-webkit-backdrop-filter:blur(22px) saturate(115%);backdrop-filter:blur(22px) saturate(115%)}
 .phone-device-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-shrink:0;font-size:12px;font-weight:650;letter-spacing:.01em;color:var(--px-phone-text)}
 .phone-device-head--group .phone-member-switch{justify-content:flex-start;gap:5px;margin:0;min-width:0;flex:1}

@@ -506,7 +506,7 @@ body.group-chat-page:has(.group-wizard) #view {
 
 .chat-layout {
   display:grid;
-  grid-template-columns:250px minmax(0,1fr);
+  grid-template-columns:280px minmax(0,1fr);
   gap:12px;
   height:calc(100dvh - 88px);
   min-height:0;
@@ -529,7 +529,7 @@ body.group-chat-page:has(.group-wizard) #view {
 .chat-announcement-copy strong { font-size:13px; }
 .chat-announcement-copy span { color:var(--muted); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .chat-list-section { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:17px 2px 8px; color:var(--muted); font-size:12px; font-weight:700; letter-spacing:.04em; }
-.chat-entry { display:flex; gap:12px; align-items:center; padding:13px 9px; margin-top:7px; border:1px solid transparent; border-radius:17px; transition:background .18s,border-color .18s,box-shadow .18s; }
+.chat-entry { display:flex; gap:14px; align-items:center; min-height:88px; padding:17px 12px; margin-top:9px; border:1px solid transparent; border-radius:20px; transition:background .18s,border-color .18s,box-shadow .18s; }
 .chat-entry:hover { background:color-mix(in srgb,var(--panel2) 78%,transparent); }
 .chat-entry.active { background:color-mix(in srgb,var(--soft) 82%,var(--panel)); border-color:transparent; box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--primary) 16%,transparent); }
 .select-chat { flex:1; min-width:0; border:0; background:transparent; text-align:left; padding:2px; }
@@ -595,7 +595,7 @@ body.group-chat-page:has(.group-wizard) #view {
 .bubble {
   display:table;
   width:fit-content;
-  max-width:min(19em,100%);
+  max-width:min(24em,100%);
   box-sizing:border-box;
   font-size:16px;
   padding:12px 14px;
@@ -608,7 +608,7 @@ body.group-chat-page:has(.group-wizard) #view {
   margin-bottom:3px;
 }
 /* Spoken dialogue stays compact; italic *actions* can use a wider reading line. */
-.roleplay-segment.is-character { max-width:min(19em,100%); }
+.roleplay-segment.is-character { max-width:min(24em,100%); }
 .roleplay-segment.is-action { width:fit-content; max-width:min(24em,100%); }
 .roleplay-segment.is-action .narration { max-width:min(24em,100%); }
 .user .bubble { background:var(--user-bubble); color:var(--text); border-color:var(--border); }
@@ -760,7 +760,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   box-shadow:0 8px 32px #0005;
 }
 @media(max-width:1050px) {
-  .chat-layout { grid-template-columns:210px minmax(0,1fr); }
+  .chat-layout { grid-template-columns:235px minmax(0,1fr); }
 }
 @media(max-width:767px) {
   .sidebar { display:none; }
@@ -871,6 +871,12 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .chat-tools { margin-top:0; }
   .bubble { font-size:15px; padding:10px 12px; }
   .narration { font-size:15px; }
+  .messages { padding-left:8px; padding-right:8px; }
+  .message-content { width:100%; max-width:100%; }
+  .roleplay-segments { width:100%; }
+  .roleplay-segment.is-character,.roleplay-segment.is-action { width:100%; max-width:100%; }
+  .bubble { max-width:100%; padding-left:9px; padding-right:9px; }
+  .narration { width:100%; max-width:100%; }
   .comment.reply { margin-left:12px; }
   #toast {
     top:max(18px, env(safe-area-inset-top));
@@ -1814,10 +1820,18 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
           const missingStoryRpc=result.error.code==='PGRST202' ||
             (/schema cache/i.test(message) && message.includes('get_latest_owned_character_stories'));
           if (!missingStoryRpc) throw new Error('讀取雲端角色最新故事失敗：' + result.error.message);
-          // 舊版／尚未套用 migration 的資料庫沒有此批次 RPC 時，略過故事補充資料，
-          // 仍繼續合併角色主資料，避免登入流程整段中斷。
-          console.warn('略過尚未部署的 get_latest_owned_character_stories RPC；角色主資料仍會載入。',result.error);
-          stories=[];
+          // 舊版／尚未套用 migration 的資料庫沒有批次 RPC 時，以 owner RLS 直接補讀
+          // 每頁最多 10 個角色的最新開場白；只取必要欄位並限制回傳列數。
+          console.warn('批次故事 RPC 尚未部署，改用有界限的角色開場白查詢。',result.error);
+          const fallbackLimit=Math.min(50,Math.max(10,ids.length*3));
+          const fallbackResult=await client.from('character_stories')
+            .select('id,character_id,opening_message,visibility,created_at')
+            .in('character_id',ids)
+            .order('created_at',{ascending:false})
+            .order('id',{ascending:false})
+            .limit(fallbackLimit);
+          if(fallbackResult.error)throw new Error('讀取雲端角色開場白失敗：'+fallbackResult.error.message);
+          stories=fallbackResult.data||[];
         } else {
           stories = result.data || [];
         }
@@ -4702,6 +4716,16 @@ function dismissPendingDeletionModal() {
   }
 }
 window.addEventListener('popstate',event => {
+  if(phoneModalClosingByButton){
+    phoneModalClosingByButton=false;
+    phoneModalHistoryBaseState=null;
+    return;
+  }
+  if(document.querySelector('.phone-modal-backdrop')){
+    const base=phoneModalHistoryBaseState&&typeof phoneModalHistoryBaseState==='object'?phoneModalHistoryBaseState:{};
+    history.pushState({...base,personax:true,route:{...route},phoneModal:true},'',location.href);
+    return;
+  }
   captureDraft();
   route = event.state?.personax ? event.state.route : parseRoute();
   render();
@@ -6609,7 +6633,7 @@ function chatEntries() {
       }).join('');
       const groupAvatar=avatarMarkup?'<span class="group-avatar-stack" aria-hidden="true">'+avatarMarkup+'</span>':'<span class="group-list-avatar" aria-hidden="true">群</span>';
       return `<div class="chat-entry group-chat-entry ${active?'active':''}">
-        <button class="pin group-pin ${item.pinned?'on':''}" data-action="group-pin" data-id="${e(group.id)}" aria-label="${item.pinned?'取消群組置頂':'置頂群組'}" title="${item.pinned?'取消置頂':'置頂'}">${ICON.pin}</button>
+        <button type="button" class="pin group-pin ${item.pinned?'on':''}" data-chat-list-pin="group" data-action="group-pin" data-id="${e(group.id)}" aria-label="${item.pinned?'取消群組置頂':'置頂群組'}" title="${item.pinned?'取消置頂':'置頂'}">${ICON.pin}</button>
         <button type="button" class="group-chat-open" data-action="group-open" data-id="${e(group.id)}" aria-label="開啟群組 ${e(group.name)}">${groupAvatar}
           <span class="group-chat-copy"><span class="group-chat-title-row"><strong class="group-chat-title">${e(group.name||'未命名群組')} <span class="small muted">· 群組</span></strong>
           <span class="small muted group-chat-date">${chatListDate(lastAt)}</span></span><span class="small muted group-chat-preview" title="${e(lastText)}">${e(lastText)}</span></span>
@@ -6621,7 +6645,7 @@ function chatEntries() {
     const lastAt=s.lastMessageAt||s.updatedAt||s.messages?.at(-1)?.at||s.startedAt;
     const hasUnread=Number(s.lastAssistantMessageAt||0)>Number(s.lastReadAt||0);
     return `<div class="chat-entry ${route.page==='conversation'&&route.id===s.id?'active':''}">
-      <button class="pin ${s.pinned?'on':''}" data-action="pin" data-id="${e(s.id)}" aria-label="切換置頂">${ICON.pin}</button>
+      <button type="button" class="pin ${s.pinned?'on':''}" data-chat-list-pin="single" data-action="pin" data-id="${e(s.id)}" aria-label="切換置頂">${ICON.pin}</button>
       <button class="ghost" style="padding:0" data-action="session-detail" data-id="${e(s.id)}" aria-label="查看${e(c.name)}角色簡介">
         <span class="character-avatar-status ${characterIsOffline(c)?'is-offline':''}"><img class="avatar" src="${e(safeImage(c.image||c.avatar_url))}" alt="${e(c.name)}">
         <span class="character-status-dot" title="${characterIsOffline(c)?'角色離線／已下架':'角色公開中'}"></span></span>
@@ -6682,6 +6706,36 @@ function groupRenderSteps() {
   const labels=['選擇角色','設立群組檔案'];
   return '<div class="group-steps">'+labels.map((x,i)=>'<div class="group-step '+(g.step===i+1?'active':'')+'">'+(i+1)+' · '+x+'</div>').join('')+'</div>';
 }
+function groupOpeningRoleIntro(members,userName){
+  const names=members.map(member=>member.name);
+  const player=String(userName||'玩家').trim()||'你';
+  const oneRoleOpeners=[
+    player+'本來只是想把今天的事處理完，'+names[0]+'卻在最意外的時刻出現在眼前。對方似乎有話想說，卻先被眼前的狀況打斷。',
+    names[0]+'注意到'+player+'停下腳步，沒有急著追問，只是走近了一點：「需要幫忙嗎？」',
+    '一件小小的意外讓'+player+'和'+names[0]+'暫時留在同一個地方，原本各自的行程也因此有了變化。',
+    player+'收到一則沒有署名的訊息，抬起頭時，'+names[0]+'正站在不遠處，像是也在等一個答案。',
+    '這一天看起來和平常沒什麼不同，直到'+names[0]+'把一樣東西放到'+player+'面前，問：「你知道這是誰留下的嗎？」',
+    names[0]+'似乎猶豫了很久，最後還是走向'+player+'。看起來，這次不是一句普通的問候。'
+  ];
+  const twoRoleOpeners=[
+    names[0]+'和'+names[1]+'正為同一件事爭論，兩人各有理由，誰也不肯先退讓；'+player+'剛好成了他們注意到的第三個人。',
+    names[0]+'先向'+player+'打了招呼，'+names[1]+'卻在一旁露出意外的表情，像是這場碰面早有安排。',
+    '一件突發的小事讓'+names[0]+'與'+names[1]+'暫時站在同一邊，'+player+'的出現，讓原本的計畫多了一個變數。',
+    names[0]+'手上握著線索，'+names[1]+'似乎知道更多，兩人卻都沒有把話說完；直到'+player+'走近，他們才停下交談。',
+    player+'原以為只是普通的碰面，沒想到'+names[0]+'和'+names[1]+'都認得自己，而且對今天的事各有不同說法。',
+    names[0]+'看起來想開口，'+names[1]+'卻先一步把話題岔開。'+player+'很快發現，兩人似乎都隱瞞了一部分。'
+  ];
+  const threeRoleOpeners=[
+    names[0]+'、'+names[1]+'與'+names[2]+'已經先到了一步，桌上的東西顯然和三人都有關；'+player+'一出現，他們才終於開始談正事。',
+    '三個人，三種說法。'+names[0]+'、'+names[1]+'和'+names[2]+'對眼前的狀況各有判斷，而'+player+'手上的線索，可能正好能把它們串起來。',
+    names[0]+'和'+names[1]+'似乎在等一個決定，'+names[2]+'卻已經準備採取行動；'+player+'來得正是時候，也可能打亂他們的安排。',
+    '原本只是一次簡單的碰面，'+names[0]+'、'+names[1]+'和'+names[2]+'卻各自帶著不同目的前來；'+player+'加入後，事情才真正開始。',
+    names[0]+'、'+names[1]+'與'+names[2]+'終於聚在同一個地方，卻沒有人願意先說明來意。'+player+'一到，沉默才被打破。',
+    '有人先到、有人遲到，'+names[0]+'、'+names[1]+'和'+names[2]+'總算碰上了面；看起來，今天沒有人能輕易抽身。'
+  ];
+  const options=members.length===1?oneRoleOpeners:members.length===2?twoRoleOpeners:threeRoleOpeners;
+  return options[Math.floor(Math.random()*options.length)];
+}
 function groupRenderScenes() {
   const g=groupPrototype;
   const scene=g.draft.scenes[0]||{name:'初始相遇',description:''};
@@ -6731,6 +6785,18 @@ async function groupLoadCharacterPickerPage({reset=false}={}){
         console.warn('最近聊天角色補充載入失敗；保留一般公開角色清單。',recentError);
       }
     }
+    const missingImageItems=items.filter(character=>!safeImage(character.image||character.avatar_url));
+    if(missingImageItems.length){
+      const primaryAssets=await loadCharacterPrimaryIllustrationAssets(missingImageItems.map(character=>character.id));
+      if(currentUser()?.uid!==user.uid||groupCharacterPickerPager!==pager||pager.request!==request)return;
+      for(const character of missingImageItems){
+        const primary=primaryAssets.get(character.id)?.primary;
+        if(primary?.src){
+          character.image=primary.src;
+          character.primaryIllustrationPath=primary.path;
+        }
+      }
+    }
     pager.items=window.PoyozzListPagination.mergeUnique(pager.items,items,character=>character.id);
     state.characters=window.PoyozzListPagination.mergeUnique(state.characters,items,character=>character.id);
     pager.offset+=rows.length;
@@ -6748,6 +6814,12 @@ async function groupLoadCharacterPickerPage({reset=false}={}){
       if(target)target.innerHTML=groupRenderCharacterResults();
     }
   }
+}
+function groupCharacterPickerAvatar(character){
+  const image=safeImage(character?.image||character?.avatar_url);
+  if(image)return '<img class="avatar" src="'+e(image)+'" alt="" style="width:46px;height:46px">';
+  const initial=String(character?.name||'角').trim().slice(0,1)||'角';
+  return '<span class="avatar avatar-fallback" aria-hidden="true" style="width:46px;height:46px">'+e(initial)+'</span>';
 }
 function groupRenderCharacterResults() {
   const pager=groupCharacterPickerPager;
@@ -6771,7 +6843,7 @@ function groupRenderCharacterResults() {
   const ordered=[...byRecent,...byFavorite,...byPublic];
   const renderRows=rows=>rows.map(c=>{
     const expanded=groupCharacterIntroExpandedId===c.id;
-    return '<div class="group-character-option"><label class="group-character-select"><input type="checkbox" data-action="group-toggle-character" data-id="'+e(c.id)+'" '+(groupPrototype.draft.memberIds.includes(c.id)?'checked':'')+' '+(groupPrototype.draft.memberIds.length>=3&&!groupPrototype.draft.memberIds.includes(c.id)?'disabled':'')+'><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt="" style="width:46px;height:46px"></label><div class="group-character-copy"><button type="button" class="group-character-intro-toggle" data-action="group-toggle-character-intro" data-id="'+e(c.id)+'" aria-expanded="'+expanded+'"><strong>'+e(c.name)+'</strong><span aria-hidden="true">'+(expanded?'收合 −':'介紹 +')+'</span></button><p class="group-character-intro '+(expanded?'':'hidden')+'">'+e(c.intro||'尚無角色介紹')+'</p></div></div>';
+    return '<div class="group-character-option"><label class="group-character-select"><input type="checkbox" data-action="group-toggle-character" data-id="'+e(c.id)+'" '+(groupPrototype.draft.memberIds.includes(c.id)?'checked':'')+' '+(groupPrototype.draft.memberIds.length>=3&&!groupPrototype.draft.memberIds.includes(c.id)?'disabled':'')+'>'+groupCharacterPickerAvatar(c)+'</label><div class="group-character-copy"><button type="button" class="group-character-intro-toggle" data-action="group-toggle-character-intro" data-id="'+e(c.id)+'" aria-expanded="'+expanded+'"><strong>'+e(c.name)+'</strong><span aria-hidden="true">'+(expanded?'收合 −':'介紹 +')+'</span></button><p class="group-character-intro '+(expanded?'':'hidden')+'">'+e(c.intro||'尚無角色介紹')+'</p></div></div>';
   }).join('');
   const section=(title,rows)=>rows.length?'<h3 class="group-character-section-title">'+e(title)+' ('+rows.length+')</h3><div class="group-character-grid">'+renderRows(rows)+'</div>':'';
   const empty=ordered.length?'':(pager.error?'<div class="group-alert">'+e(pager.error)+'</div>':pager.loading?'<div class="group-alert">正在載入公開角色…</div>':'<div class="group-alert">'+(q?'目前載入的角色中沒有符合搜尋條件的結果。可以載入更多搜尋結果。':'正在等待公開角色資料。')+'</div>');
@@ -8805,6 +8877,23 @@ function formatStoryWorldTime(value) {
   return dateLabel+'　'+timeLabel;
 }
 const storyPhoneRuntimeCache = new Map();
+let phoneModalHistoryGuard=false;
+let phoneModalClosingByButton=false;
+let phoneModalHistoryBaseState=null;
+function ensurePhoneModalHistoryGuard(){
+  if(phoneModalHistoryGuard)return;
+  const base=history.state&&typeof history.state==='object'?{...history.state}:{};
+  phoneModalHistoryBaseState=base;
+  history.pushState({...base,personax:true,route:{...route},phoneModal:true},'',location.href);
+  phoneModalHistoryGuard=true;
+}
+function closePhoneModalWithButton(modal){
+  if(modal?.isConnected)modal.remove();
+  if(!phoneModalHistoryGuard)return;
+  phoneModalHistoryGuard=false;
+  phoneModalClosingByButton=true;
+  history.back();
+}
 async function renderPhoneModal() {
   document.querySelectorAll('.phone-modal-backdrop').forEach(node=>node.remove());
   const isGroup=route.page==='group',session=isGroup?null:currentSession(),group=isGroup?groupPrototype.active:null;
@@ -8834,7 +8923,7 @@ async function renderPhoneModal() {
   const generated=isGroup?(character.phoneNotifications||group.phoneNotificationsByCharacter?.[String(character.id)]||[]):(session.phoneNotifications||[]);
   const savedNotices=Array.isArray(generated)?generated.filter(Boolean).slice(0,8):[];
   const configuredPhonePrompts=Array.isArray(character.phoneSettings?.noticePrompts)?character.phoneSettings.noticePrompts:Array.isArray(character.phoneSettings?.notices)?character.phoneSettings.notices:[];
-  const notices=isGroup&&!savedNotices.length
+  const notices=!savedNotices.length
     ?configuredPhonePrompts.slice(0,8).map(row=>({title:String(row||'').split('|')[0].trim()||'手機通知',body:'目前尚未有更新'}))
     :savedNotices;
   // Story phone events are fetched through the owner-checked RPC; never read the event table directly.
@@ -8857,27 +8946,30 @@ async function renderPhoneModal() {
         storyPhoneStates=Array.isArray(cached.states)?cached.states:[];
         storyMemorySummaries=Array.isArray(cached.summaries)?cached.summaries:null;
         storyMemorySummaryError=String(cached.summaryError||'');
+        storyPhoneEventsError=String(cached.phoneReadError||'');
         if(cached.worldState&&typeof cached.worldState==='object')storyWorldState=cached.worldState;
       }else{
         const [eventsResult,stateResult,worldStateResult,summaryResult]=await Promise.all([
-          client.rpc('get_story_phone_events',{p_session_id:session.id}),
-          client.rpc('get_story_phone_state',{p_session_id:session.id}),
-          client.rpc('get_story_world_state',{p_session_id:session.id}),
-          client.rpc('get_story_memory_summaries',{p_session_id:session.id})
+          client.rpc('get_story_phone_events',{p_session_id:session.id}).catch(error=>({data:null,error})),
+          client.rpc('get_story_phone_state',{p_session_id:session.id}).catch(error=>({data:null,error})),
+          client.rpc('get_story_world_state',{p_session_id:session.id}).catch(error=>({data:null,error})),
+          client.rpc('get_story_memory_summaries',{p_session_id:session.id}).catch(error=>({data:null,error}))
         ]);
-        // Read the diary summary result first so a phone-event error cannot turn a valid diary into a false 100% battery.
+        // Each phone section is independent: a missing world-state RPC must not hide valid notifications or snapshots.
         storyMemorySummaryError=summaryResult.error?String(summaryResult.error.message||'讀取 AI 回憶摘要失敗'):'';
         storyMemorySummaries=summaryResult.error?[]:(Array.isArray(summaryResult.data)?summaryResult.data:[]);
-        if(eventsResult.error)throw eventsResult.error;
-        if(stateResult.error)throw stateResult.error;
-        if(worldStateResult.error)throw worldStateResult.error;
-        storyPhoneEvents=Array.isArray(eventsResult.data)?eventsResult.data:[];
-        storyPhoneStates=Array.isArray(stateResult.data)?stateResult.data:[];
-        if(worldStateResult.data&&typeof worldStateResult.data==='object'){
+        const phoneReadErrors=[];
+        if(eventsResult.error)phoneReadErrors.push('通知事件：'+String(eventsResult.error.message||'讀取失敗'));
+        else storyPhoneEvents=Array.isArray(eventsResult.data)?eventsResult.data:[];
+        if(stateResult.error)phoneReadErrors.push('手機狀態：'+String(stateResult.error.message||'讀取失敗'));
+        else storyPhoneStates=Array.isArray(stateResult.data)?stateResult.data:[];
+        if(worldStateResult.error)phoneReadErrors.push('故事時間地點：'+String(worldStateResult.error.message||'讀取失敗'));
+        else if(worldStateResult.data&&typeof worldStateResult.data==='object'){
           storyWorldState=worldStateResult.data;
           session.storyWorldState=storyWorldState;
         }
-        storyPhoneRuntimeCache.set(cacheKey,{fetchedAt:Date.now(),events:storyPhoneEvents,states:storyPhoneStates,summaries:storyMemorySummaries,summaryError:storyMemorySummaryError,worldState:storyWorldState});
+        storyPhoneEventsError=phoneReadErrors.join('；');
+        storyPhoneRuntimeCache.set(cacheKey,{fetchedAt:Date.now(),events:storyPhoneEvents,states:storyPhoneStates,summaries:storyMemorySummaries,summaryError:storyMemorySummaryError,worldState:storyWorldState,phoneReadError:storyPhoneEventsError});
         if(storyPhoneRuntimeCache.size>100){
           const oldestKey=storyPhoneRuntimeCache.keys().next().value;
           if(oldestKey!==cacheKey)storyPhoneRuntimeCache.delete(oldestKey);
@@ -8950,18 +9042,19 @@ async function renderPhoneModal() {
     '<section class="phone-notices '+(warning?'phone-warning':'')+'">'+(warning?'<div class="phone-memory-warning">回憶空間即將用盡，整理甜蜜日記可釋放容量</div>':'')+
     '<div class="phone-notice-heading"><strong>通知</strong><span>'+(noticeContentHTML?String(Math.min(8,storyPhoneStates.length+storyPhoneEvents.length+noticeLines.length))+' 則':'通知中心')+'</span></div><div class="phone-notice-list">'+noticeHTML+'</div></section>'+
     '<p class="phone-memory-caption">'+(diaryChars===null?'甜蜜日記容量暫時無法同步':('甜蜜日記　'+Math.min(diaryChars,capacity).toLocaleString()+' / '+capacity.toLocaleString()+' 字 · 剩餘 '+(battery===null?'--':battery+'%')) )+'</p></div>'+
-    '<div class="phone-home-indicator"></div><div class="phone-close-row"><button type="button" data-phone-action="close">完成</button></div></div></section>';
+    '<div class="phone-home-indicator"></div><div class="phone-close-row"><button type="button" data-phone-action="close">關閉</button></div></div></section>';
   modal.addEventListener('click',event=>{
-    if(event.target===modal){savePhoneState();modal.remove();return;}
+    if(event.target===modal)return;
     const button=event.target.closest('[data-phone-action]');if(!button)return;
     const action=button.dataset.phoneAction;
-    if(action==='close'){savePhoneState();modal.remove();return;}
+    if(action==='close'){savePhoneState();closePhoneModalWithButton(modal);return;}
     if(action==='prev'||action==='next'){
       if(!isGroup||!members.length)return;
       const i=Math.max(0,members.findIndex(member=>String(member.id)===String(phoneState.selectedCharacterId)));
       phoneState.selectedCharacterId=String(members[(i+(action==='next'?1:members.length-1))%members.length].id);savePhoneState();renderPhoneModal();return;
     }
   });
+  ensurePhoneModalHistoryGuard();
   document.body.appendChild(modal);modal.querySelector('[data-phone-action="close"]')?.focus();
 }
 async function loadStoryMemorySummary(session) {
@@ -9815,8 +9908,8 @@ async function toggleChatSessionPin(sessionId) {
             if (!cloudRow) throw new Error('找不到這筆雲端聊天紀錄。');
             const currentData=cloudRow.session_data && typeof cloudRow.session_data==='object'
               ? cloudRow.session_data : {};
-            const expectedUpdatedAt=item.cloudUpdatedAt;
-            if(!expectedUpdatedAt||cloudRow.updated_at!==expectedUpdatedAt)throw new Error('聊天版本已變更或遺失，請重新載入後再設定置頂。');
+            const expectedUpdatedAt=cloudRow.updated_at;
+            if(!expectedUpdatedAt)throw new Error('雲端聊天版本資訊缺失，請重新載入後再設定置頂。');
             const nextUpdatedAt=window.POYOZZMemoryCapture.nextSessionUpdatedAt(expectedUpdatedAt);
             const {data:updatedRow,error:updateError}=await client.from('chat_sessions')
               .update({
@@ -9837,14 +9930,19 @@ async function toggleChatSessionPin(sessionId) {
         }
         render();return;
 }
-/* Isolate chat-list pin clicks before other delegated message actions can see them. */
+/* Isolate both single and group pin clicks before the delegated delete/menu router can see them. */
 document.addEventListener('click',event=>{
-  const button=event.target instanceof Element?event.target.closest('[data-action="pin"]'):null;
+  const origin=event.target instanceof Element?event.target:event.target?.parentElement;
+  const button=origin?.closest('[data-chat-list-pin]');
   if(!button||button.disabled)return;
+  const action=button.dataset.action;
+  if(action!=='pin'&&action!=='group-pin')return;
   event.preventDefault();
   event.stopPropagation();
   event.stopImmediatePropagation();
-  void toggleChatSessionPin(button.dataset.id||'');
+  const id=button.dataset.id||'';
+  if(action==='group-pin')void toggleGroupPin(id);
+  else void toggleChatSessionPin(id);
 },true);
 
 /* GROUP MESSAGE ACTION CAPTURE FIX
@@ -9986,7 +10084,7 @@ document.addEventListener('click',async event => {
     switch(action) {
       case 'home':go({page:'citymap'});break;
       case 'phone-open':renderPhoneModal();break;
-      case 'phone-close':document.querySelector('.phone-modal-backdrop')?.remove();break;
+      case 'phone-close':closePhoneModalWithButton(document.querySelector('.phone-modal-backdrop'));break;
       case 'group-next':groupNext();break;
       case 'group-inspiration': {
         const presets=window.PoyozzGroupOpeningPresets||[];
@@ -10002,11 +10100,7 @@ document.addEventListener('click',async event => {
         const names=[members[0]?.name||'一位主角',members[1]?.name||'一位神祕的轉學生',members[2]?.name||'一名來歷不明的陌生人'];
         const replacements={CHAR1:names[0],CHAR2:names[1],CHAR3:names[2],USER:userName,VILLAIN:'神祕的反派',NPC:'一位路人'};
         const templateText=String(preset.text||'').replace(/\{(CHAR1|CHAR2|CHAR3|USER|VILLAIN|NPC)\}/g,(_,key)=>replacements[key]||'');
-        const roleIntro=members.length===1
-          ? names[0]+'在路上遇見'+userName+'，兩人決定一起展開旅程。途中可能遇見一位身分不明的神祕人物，以及一名看似友善的陌生人。'
-          : members.length===2
-            ? names[0]+'與'+names[1]+'在路上遇見'+userName+'，三人決定一起展開旅程。途中可能遇見一位是敵是友的神祕人物。'
-            : names[0]+'、'+names[1]+'與'+names[2]+'在路上遇見'+userName+'，四人決定一起展開旅程。';
+        const roleIntro=groupOpeningRoleIntro(members,userName);
         const hasRolePlaceholders=/\{(CHAR1|CHAR2|CHAR3|USER)\}/.test(String(preset.text||''));
         const text=(hasRolePlaceholders?templateText:roleIntro+'\n\n'+templateText);
         const scene=$('groupSceneDesc0');
@@ -11765,6 +11859,7 @@ const {
         }
         storyPhoneRuntimeCache.delete(String(uid)+':'+session.id);
         await loadStoryMemorySummary(session);
+        if(document.querySelector('.phone-modal-backdrop')&&route.page==='conversation'&&route.id===session.id)await renderPhoneModal();
         toast(summaryText?'回憶已儲存。':'已刪除這則回憶。');
         break;
       }

@@ -12,6 +12,8 @@ assert.ok(generatedStart >= 0 && generatedEnd > generatedStart, 'Phone notificat
 const phoneBlock = html.slice(generatedStart, generatedEnd);
 
 assert.match(phoneBlock, /const generated=isGroup\?/);
+assert.match(phoneBlock, /const notices=!savedNotices\.length/,
+  'single and group phones must both show configured notice labels when no AI-generated rows exist');
 assert.match(phoneBlock, /const savedNotices=Array.isArray\(generated\)/);
 assert.match(phoneBlock, /const noticeLines=notices\.map/);
 assert.match(phoneBlock, /get_story_phone_state/, 'Story phone must load current configured field state separately');
@@ -29,8 +31,11 @@ assert.match(phoneStateMigration, /e\.event_type <> 'notification'/,
 assert.match(storyPrompt, /每個手機欄位的 body 必須以簡短的一行為主/);
 assert.match(storyPrompt, /沒有新資訊或劇情變化時，原樣延續最近狀態/);
 assert.match(phoneBlock, /目前還沒有新的通知/);
-assert.match(phoneBlock, /configuredPhonePrompts\.slice\(0,8\)\.map/,'Group phone may use configured notice labels only as display titles when no generated notice exists');
+assert.match(phoneBlock, /configuredPhonePrompts\.slice\(0,8\)\.map/,'Single/group phone may use configured notice labels only as display titles when no generated notice exists');
 assert.match(phoneBlock, /body:'目前尚未有更新'/,'Creator instructions must never be displayed as notification body text');
+assert.match(phoneBlock, /phoneReadErrors/, 'a failed optional phone RPC must not clear successful phone sections');
+assert.match(phoneBlock, /cached\.phoneReadError/, 'per-section phone read errors must survive the short-lived cache');
+assert.match(phoneBlock, /\.catch\(error=>\(\{data:null,error\}\)\)/, 'one rejected phone RPC must be isolated from the other reads');
 assert.doesNotMatch(phoneBlock, /body:String\(row\)|body:row/,'Raw creator instructions must never be rendered as player-facing notification bodies');
 
 assert.ok(html.includes('session.storyWorldState'), 'Phone must read the latest saved story-world state');
@@ -42,8 +47,22 @@ assert.match(uiStyles, /\.phone-member-switch\{[^}]*flex-shrink:0/);
 assert.match(uiStyles, /\.phone-bar\{[^}]*flex-shrink:0/);
 assert.match(uiStyles, /\.phone-close-row\{[^}]*flex-shrink:0/,
   'Phone header, member switch, bar, and close control must remain fixed');
+assert.match(uiStyles, /\.phone-modal-backdrop\{[^}]*overscroll-behavior:contain/,
+  'phone surface must contain touch overscroll');
+assert.match(html, /data-phone-action="close">關閉<\/button>/,
+  'phone close control must be labeled 關閉 rather than 完成');
+assert.match(html, /function ensurePhoneModalHistoryGuard\(\)/,
+  'opening the phone must add a history guard against browser-back gestures');
+assert.match(html, /function closePhoneModalWithButton\(modal\)/,
+  'the phone must release its history guard only through the explicit close control');
+assert.match(html, /if\(document\.querySelector\('\.phone-modal-backdrop'\)\)/,
+  'popstate must keep the chat route while the phone panel remains open');
+assert.match(html, /if\(event\.target===modal\)return/,
+  'tapping the backdrop must not dismiss the phone panel');
 assert.ok(!html.includes('.phone-notice-list{max-height:'), 'Phone must not trap scrolling in a nested notice list');
 assert.ok(html.includes('function firstSpokenDialoguePreview('), 'Chat preview must parse spoken dialogue separately from narration');
+assert.match(html, /storyPhoneRuntimeCache\.delete\(String\(uid\)\+'\:'\+session\.id\);[\s\S]*?await loadStoryMemorySummary\(session\);[\s\S]*?await renderPhoneModal\(\)/,
+  'deleting/editing a Story diary entry must invalidate cached phone memory and refresh an open phone panel');
 assert.ok(html.includes('角色暫時沒有對白'), 'Narration-only replies must use the no-dialogue fallback');
 assert.ok(html.includes('function latestAssistantPreview('), 'Chat preview must select the latest assistant message');
 assert.match(html, /latestAssistantSuggestionMessage/,

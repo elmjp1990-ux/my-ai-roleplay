@@ -16,11 +16,17 @@ assert.ok(presets.every(item => item.title && item.category && item.text), 'ever
 assert.match(html, /\.\/group-opening-presets\.js/, 'preset asset must be loaded by the page');
 assert.match(html, /data-action="group-inspiration">✨ AI靈感/, 'group inspiration must be a one-click AI-style button');
 assert.match(html, /Math\.random\(\)/, 'group inspiration must randomly apply a preset without showing a selection dialog');
-assert.match(html, /const roleIntro=members\.length===1/, 'group inspiration must adapt the opening sentence to the selected role count');
+assert.match(html, /function groupOpeningRoleIntro\(members,userName\)/, 'group inspiration must use a dedicated natural-opening helper');
+assert.match(html, /oneRoleOpeners=\[/, 'single-role inspiration must have varied opening styles');
+assert.match(html, /twoRoleOpeners=\[/, 'two-role inspiration must have varied opening styles');
+assert.match(html, /threeRoleOpeners=\[/, 'three-role inspiration must have varied opening styles');
+assert.match(html, /groupOpeningRoleIntro\(members,userName\)/, 'inspiration must select a natural opener based on formal member count');
 assert.doesNotMatch(presetSource, /fetch\s*\(|createSignedUrl|supabase|openrouter/i, 'preset asset must not make network or AI requests');
 
 assert.match(pagination, /groupCharacterPicker:10/, 'group character picker page size must remain ten');
 assert.match(html, /載入更多公開角色（每次 10 位）/, 'group picker must disclose its ten-item page size');
+assert.match(html, /function groupCharacterPickerAvatar\(character\)/, 'group picker must render a safe initial fallback when an avatar URL is missing');
+assert.match(html, /loadCharacterPrimaryIllustrationAssets\(missingImageItems\.map\(character=>character\.id\)\)/, 'group picker must hydrate only missing primary portraits with signed URLs');
 
 assert.match(html, /let groupCharacterIntroExpandedId = null/, 'character introductions must start collapsed');
 assert.match(html, /data-action="group-toggle-character-intro"/, 'character name must expose an intro toggle');
@@ -33,10 +39,13 @@ assert.match(html, /清空下方背景框/, 'custom world option must clear the 
 assert.match(html, /world_character_id:g\.draft\.worldCharacterId==='__player_custom__'\?null:g\.draft\.worldCharacterId/, 'custom world must save without a character foreign-key reference');
 assert.match(html, /if\(g\.draft\.world\.length>3000\)return '群組背景最多 3000 字。'/, 'all group background text must be validated at 3000 characters');
 
-assert.match(html, /\[data-action="pin"\][\s\S]{0,280}stopImmediatePropagation\(\)/, 'pin click must be isolated before other delegated actions');
+assert.match(html, /data-chat-list-pin="single"/, 'single-chat pin must have a dedicated isolated target');
+assert.match(html, /data-chat-list-pin="group"/, 'group-chat pin must have a dedicated isolated target');
+assert.match(html, /\[data-chat-list-pin\][\s\S]{0,420}stopImmediatePropagation\(\)/, 'both pin clicks must be isolated before delete/menu delegation');
 const pinHelper = html.slice(html.indexOf('async function toggleChatSessionPin'), html.indexOf('/* Isolate chat-list pin clicks'));
 assert.ok(pinHelper.includes('item.pinned=!previousPinned'), 'pin helper must toggle the pinned state');
 assert.ok(!pinHelper.includes('confirmChatMessageDeletion'), 'pin helper must never request message deletion confirmation');
+assert.doesNotMatch(pinHelper, /cloudRow\.updated_at!==expectedUpdatedAt/, 'pin sync must compare against the freshly-read cloud version, not stale local metadata');
 
 const groupTurn = fs.readFileSync(new URL('../supabase/functions/group-chat-turn/index.ts', import.meta.url), 'utf8');
 assert.ok(html.includes("const initialOpening=String(initialScene?.description||'').trim()"), 'group chat must read the saved initial scene description');
@@ -44,7 +53,8 @@ assert.ok(html.includes('const initialOpeningRow=initialOpening && !g.historyHas
 assert.ok(html.includes('const messageRows=initialOpeningRow+g.messages.map'), 'opening display must be prepended without inserting a duplicate chat message');
 assert.ok(html.includes("if(!typedContent && !(g.messages||[]).length)"), 'empty first send must not start a paid AI turn');
 assert.ok(html.includes("💎 本群組每次對話 '+(groupPrototype.draft.memberIds.length*3)+' 鑽石（每加一位角色3鑽石）。"), 'group picker must show the requested per-turn cost wording');
-assert.ok(html.includes('padding:13px 9px'), 'chat list rows must have the updated larger spacing');
+assert.ok(html.includes('padding:17px 12px')&&html.includes('min-height:88px'), 'chat-list cards must be visibly enlarged, not only slightly spaced');
+assert.ok(html.includes('grid-template-columns:280px minmax(0,1fr)'), 'desktop chat list column must be widened');
 const groupCreateStart = html.indexOf('async function groupCreate()');
 const groupCreateEnd = html.indexOf('\nfunction groupBack()', groupCreateStart);
 const groupCreateSource = html.slice(groupCreateStart, groupCreateEnd);

@@ -633,7 +633,9 @@ assert.ok(galleryIllustrationLoader.includes("characterIllustrationSignedUrlMana
 assert.ok(!galleryIllustrationLoader.includes("for(const row of rows)"));
 const ownedCharacterLoader=between("async function loadSupabaseCharacters(user,options={})","function ");
 assert.ok(ownedCharacterLoader.includes("get_latest_owned_character_stories"));
-assert.ok(!ownedCharacterLoader.includes(".from('character_stories')"));
+assert.ok(ownedCharacterLoader.includes(".from('character_stories')"), 'missing batch RPC must fall back to the owner-visible story table');
+assert.match(ownedCharacterLoader,/limit\(fallbackLimit\)/, 'story fallback must remain row-bounded');
+assert.match(ownedCharacterLoader,/fallbackLimit=Math\.min\(50,Math\.max\(10,ids\.length\*3\)\)/, 'story fallback must cap rows for a ten-character page');
 
 assert.ok(!authorLatestLoader.includes("count:'exact'"));
 assert.ok(authorLatestLoader.includes("get_public_author_latest_characters"));
@@ -663,6 +665,11 @@ assert.match(html,/const recentCharacterIds=\[\.\.\.new Set\(recentSessionCharac
   "group picker must hydrate a bounded set of recent-chat character IDs independently of the visible page");
 assert.match(html,/\.in\('id',missingRecentIds\)\.eq\('visibility','public'\)/,
   "recent-chat group candidates must still be verified as public cloud characters");
+const groupPickerLoader=between("async function groupLoadCharacterPickerPage","function groupCharacterPickerAvatar");
+assert.match(groupPickerLoader,/missingImageItems=items\.filter\(character=>!safeImage\(character\.image\|\|character\.avatar_url\)\)/,
+  "group picker must only request portrait metadata for cards without a usable image URL");
+assert.match(groupPickerLoader,/loadCharacterPrimaryIllustrationAssets\(missingImageItems\.map\(character=>character\.id\)\)/,
+  "group picker image hydration must be bounded to the current page");
 assert.match(html,/id="groupWorldBackground" maxlength="3000"/,
   "group world background must use one editable 3000-character field");
 assert.doesNotMatch(html,/groupCustomWorldBackground/,
@@ -676,8 +683,11 @@ assert.match(html,/usedInspirationIds/,
 const groupOpeningPresetsSource=fs.readFileSync('group-opening-presets.js','utf8');
 assert.equal((groupOpeningPresetsSource.match(/\['[^']+','/g)||[]).length,100,
   "the static group inspiration library must retain exactly 100 scenario templates");
-assert.match(html,/const roleIntro=members\.length===1[\s\S]*members\.length===2[\s\S]*names\[2\]/,
-  "random group inspiration must adapt the opening sentence to one, two, or three selected characters");
+assert.match(html,/function groupOpeningRoleIntro\(members,userName\)/,
+  "random group inspiration must use a natural, role-count-aware opening helper");
+assert.match(html,/oneRoleOpeners=\[/);
+assert.match(html,/twoRoleOpeners=\[/);
+assert.match(html,/threeRoleOpeners=\[/);
 assert.ok(html.includes("options.verifiedUser?.id===userId"));
 
 const boundedCommentMigration=fs.readFileSync('supabase/migrations/20261114130000_add_bounded_character_comment_reads.sql','utf8');
