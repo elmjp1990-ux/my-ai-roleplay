@@ -3,6 +3,15 @@ import { requestOpenRouterChatCompletion } from "./openrouter-chat-completions.t
 type DbRow = Record<string, unknown>;
 const SUMMARY_MODEL = "openai/gpt-oss-20b";
 const SUMMARY_INTERVAL = 5;
+function normalizeStoryMemorySummaryText(value: unknown): string {
+  const compact = str(value).replace(/\s+/g, " ").trim();
+  const chars = Array.from(compact);
+  if (chars.length < 50) return "";
+  if (chars.length <= 150) return compact;
+  const clipped = chars.slice(0, 150).join("");
+  const sentenceEnd = Math.max(...["。", "！", "？", "!", "?"].map(mark => clipped.lastIndexOf(mark)));
+  return (sentenceEnd >= 49 ? clipped.slice(0, sentenceEnd + 1) : clipped).trim();
+}
 const row = (value: unknown): DbRow =>
   value && typeof value === "object" && !Array.isArray(value) ? value as DbRow : {};
 const str = (value: unknown): string => typeof value === "string" ? value.trim() : "";
@@ -263,7 +272,7 @@ export async function processDueStoryMemorySummary(
   let affinityReason = "";
   try {
     const parsed = JSON.parse(rawOutput) as Record<string, unknown>;
-    summary = typeof parsed.summary === "string" ? parsed.summary.trim().slice(0, 2000) : "";
+    summary = normalizeStoryMemorySummaryText(parsed.summary);
     const correction = parsed.affinity_correction;
     if (typeof correction === "number" && Number.isInteger(correction) && correction >= -5 && correction <= 5) {
       affinityCorrection = correction;
@@ -271,7 +280,7 @@ export async function processDueStoryMemorySummary(
     affinityReason = typeof parsed.affinity_reason === "string" ? parsed.affinity_reason.trim().slice(0, 280) : "";
   } catch {
     // A legacy plain-text summary remains usable, but cannot adjust affinity.
-    summary = rawOutput.slice(0, 2000);
+    summary = normalizeStoryMemorySummaryText(rawOutput);
     affinityCorrection = 0;
   }
   if (response.httpStatus < 200 || response.httpStatus >= 300 || !summary) {

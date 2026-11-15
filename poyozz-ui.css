@@ -545,6 +545,6 @@ body.encounter-mode-active .chat-main.encounter-scene > .composer {
 .character-visibility-option span{display:grid;gap:3px;min-width:0;}
 .character-visibility-option strong{font-size:13px;color:var(--text);}
 .character-visibility-option small{font-size:11px;line-height:1.4;color:var(--muted);}
-.character-visibility-option:has(input:checked){border:1.5px solid #b99ae9;background:rgba(155,123,208,.16);box-shadow:0 0 0 2px rgba(155,123,208,.18),inset 0 0 0 1px rgba(185,154,233,.16);}
+.character-visibility-option:has(input:checked),.character-visibility-option.is-selected{border:1.5px solid #c7b1ef;background:rgba(180,155,224,.18);box-shadow:0 0 0 2px rgba(185,154,233,.24),inset 0 0 0 1px rgba(199,177,239,.2);}
 .character-visibility-option:focus-within{outline:2px solid rgba(185,154,233,.42);outline-offset:2px;}
 @media(max-width:380px){.character-visibility-choice{gap:7px}.character-visibility-option{padding:9px 8px;gap:7px}}

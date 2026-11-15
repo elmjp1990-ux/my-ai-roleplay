@@ -10,7 +10,13 @@ assert.match(conversation,/loadCloudChatSessions\(owner,\{onlySessionId:sessionI
   'opening a cloud conversation must hydrate the authoritative session version before read-state sync');
 assert.match(html,/if\(route\?\.overlay\)[\s\S]*?delete next\.overlay;[\s\S]*?go\(next,true\)/,
   'closing a route overlay must replace the current route without the stale overlay');
-assert.match(html,/已經到底了～/,'chat list must explicitly show the end state after all pages are loaded');
+assert.match(html,/已經滑到底了/,'chat list must explicitly show the requested end state after all pages are loaded');
+assert.match(html,/row\.session_story_mode===null\|\|row\.session_story_mode===undefined[\s\S]*?row\.chat_mode==='story'/,'older Story sessions must recover story mode from the authoritative chat_mode column');
+assert.match(html,/not\('deleted_at','is',null\)/,'creator cache reconciliation must read soft-deleted character IDs');
+assert.match(html,/character\.authorId===user\.id&&deletedCharacterIds\.has\(character\.id\)/,'soft-deleted owned characters must be purged from the local creator cache');
+assert.match(html,/phoneNotifications=memberNotices\.length\?memberNotices:foundNotices/,'group phone notifications must not be overwritten by an empty global character cache');
+assert.match(html,/phoneSettings=Object\.keys\(memberPhoneSettings\)\.length\?memberPhoneSettings:foundPhoneSettings/,'group phone settings must prefer the character snapshot when the global cache is empty');
+assert.match(html,/classList\.toggle\('is-selected'/,'public/private selection must update a persistent selected class on change');
 assert.ok(html.includes("root:scrollRoot||null,rootMargin:'0px'"),
   'chat pagination must use the chat list as root and only trigger at the true end');
 assert.ok(html.includes("range(pager.offset,pager.offset+pageSize)"),'chat list must use one-row lookahead to avoid a false has-more state');
@@ -27,8 +33,8 @@ assert.match(css,/\.chat-list \.chat-entry \{[^}]*min-height:68px/,
   'chat list rows must be compact and consistently aligned');
 assert.match(css,/border-bottom:1px solid rgba\(255,255,255,\.055\)/,
   'chat list should use a subtle separator rather than individual card borders');
-assert.match(css,/\.character-visibility-option:has\(input:checked\)/,
-  'selected public/private option must be marked with a purple outline');
+assert.match(css,/\.character-visibility-option:has\(input:checked\),\.character-visibility-option\.is-selected/,
+  'selected public/private option must be marked with a purple outline even without :has support');
 assert.doesNotMatch(css.slice(css.indexOf('/* Refined chat-list rows')),/\.message[^}]*width:/,
   'PR #256 must not modify chat message widths');
 console.log('PR #256 conversation, overlay, pagination, avatar and chat-list regressions passed.');

@@ -595,7 +595,7 @@ body.group-chat-page:has(.group-wizard) #view {
 .bubble {
   display:table;
   width:fit-content;
-  max-width:min(24em,100%);
+  max-width:min(19em,100%);
   box-sizing:border-box;
   font-size:16px;
   padding:12px 14px;
@@ -608,7 +608,7 @@ body.group-chat-page:has(.group-wizard) #view {
   margin-bottom:3px;
 }
 /* Spoken dialogue stays compact; italic *actions* can use a wider reading line. */
-.roleplay-segment.is-character { max-width:min(24em,100%); }
+.roleplay-segment.is-character { max-width:min(19em,100%); }
 .roleplay-segment.is-action { width:fit-content; max-width:min(24em,100%); }
 .roleplay-segment.is-action .narration { max-width:min(24em,100%); }
 .user .bubble { background:var(--user-bubble); color:var(--text); border-color:var(--border); }
@@ -871,12 +871,6 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .chat-tools { margin-top:0; }
   .bubble { font-size:15px; padding:10px 12px; }
   .narration { font-size:15px; }
-  .messages { padding-left:8px; padding-right:8px; }
-  .message-content { width:100%; max-width:100%; }
-  .roleplay-segments { width:100%; }
-  .roleplay-segment.is-character,.roleplay-segment.is-action { width:100%; max-width:100%; }
-  .bubble { max-width:100%; padding-left:9px; padding-right:9px; }
-  .narration { width:100%; max-width:100%; }
   .comment.reply { margin-left:12px; }
   #toast {
     top:max(18px, env(safe-area-inset-top));
@@ -1745,32 +1739,45 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       pager.loading=true;
       let rows=[];
       let localOnlyCharacterCount=0;
-      // 保留舊角色同步狀態的 bounded ID 比對，但登入時絕不寫入角色資料。
-      // 本機快照只用來提示作者；雲端不存在的角色仍留在本機，等待作者確認後手動儲存。
+      let deletedCharacterIds=new Set();
+      // 先讀取作者自己的軟刪除 ID，清除舊版本機快取，避免已刪除角色重新出現在創建列表。
       if(!loadMore){
-        const localOwned=state.characters.filter(c=>c.authorId===user.id&&c.id);
+        const deletedResult=await client.from('characters').select('id')
+          .eq('author_id',user.id).not('deleted_at','is',null).limit(1000);
+        if(deletedResult.error){
+          console.warn('已刪除角色快取核對失敗；保留現有本機資料。',deletedResult.error);
+        }else{
+          deletedCharacterIds=new Set((deletedResult.data||[]).map(row=>row.id).filter(Boolean));
+          if(deletedCharacterIds.size){
+            const beforeCount=state.characters.length;
+            state.characters=state.characters.filter(character=>
+              !(character.authorId===user.id&&deletedCharacterIds.has(character.id))
+            );
+            if(state.characters.length!==beforeCount)persist();
+          }
+        }
+        // 保留舊角色同步狀態的 bounded ID 比對，但登入時絕不寫入角色資料。
+        // 軟刪除 ID 已排除；其餘本機-only 角色仍保留，等待作者確認後手動儲存。
+        const localOwned=state.characters.filter(c=>c.authorId===user.id&&c.id&&!c.deletedAt);
         const localIds=localOwned.map(character=>character.id).filter(isUuid);
         const existingLocalIds=new Set();
         try{
           for(let start=0;start<localIds.length;start+=pageSize){
             const batch=localIds.slice(start,start+pageSize);
             const existingResult=await client.from('characters').select('id')
-              .eq('author_id',user.id).in('id',batch);
+              .eq('author_id',user.id).in('id',batch).is('deleted_at',null);
             if(existingResult.error)throw existingResult.error;
             for(const row of existingResult.data||[])existingLocalIds.add(row.id);
           }
           localOnlyCharacterCount=localOwned.filter(character=>!existingLocalIds.has(character.id)).length;
         }catch(reconcileError){
-          // 此比對只提供遺留本機資料提示，失敗不得阻斷真正的雲端角色載入。
           console.warn('舊版角色同步狀態比對失敗；略過本機待同步提示。',reconcileError);
         }
       }
-      // 登入階段只讀取雲端角色，不自動把本機快照寫回 Supabase。
-      // 舊版本機角色仍保留在 state.characters；只有作者進入編輯器並明確儲存時才同步，
-      // 避免過期本機資料意外建立／覆蓋雲端角色狀態。
+      // 登入階段只讀取未刪除的雲端角色；不會把本機快照自動寫回 Supabase。
       const pageResult=await client.from('characters')
         .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
-        .eq('author_id',user.id)
+        .eq('author_id',user.id).is('deleted_at',null)
         .order('created_at',{ascending:false}).order('id',{ascending:false})
         .range(pager.offset,pager.offset+pageSize-1);
       if(pageResult.error)throw new Error('讀取雲端角色失敗：'+pageResult.error.message);
@@ -3959,7 +3966,9 @@ async function loadCloudChatSessions(user, options = {}) {
           ? row.session_encounter_metadata : existing?.encounterMetadata || null,
         encounterMode:row.chat_mode === 'encounter' || parseBool(row.session_encounter_mode) ||
           (!!row.session_encounter_metadata && typeof row.session_encounter_metadata==='object' && !Array.isArray(row.session_encounter_metadata)),
-        storyMode:row.session_story_mode===undefined ? existing?.storyMode===true : parseBool(row.session_story_mode),
+        storyMode:row.session_story_mode===null||row.session_story_mode===undefined
+          ? (row.chat_mode==='story'||existing?.storyMode===true)
+          : parseBool(row.session_story_mode),
         storyWorldState:row.session_story_world_state&&typeof row.session_story_world_state==='object'?row.session_story_world_state:existing?.storyWorldState||null,
         encounterPlace:row.session_encounter_place || existing?.encounterPlace || null,
         encounterDay:row.session_encounter_day || existing?.encounterDay || null,
@@ -6130,8 +6139,8 @@ function renderEditor() {
         </section>
         <fieldset class="field character-visibility-field"><legend>角色權限</legend>
           <div class="character-visibility-choice" role="radiogroup" aria-label="選擇角色公開或私密狀態">
-            <label class="character-visibility-option"><input type="radio" name="visibility" value="private" ${c.visibility !== 'public' ? 'checked' : ''}><span><strong>私密</strong><small>僅自己可見</small></span></label>
-            <label class="character-visibility-option"><input type="radio" name="visibility" value="public" ${c.visibility === 'public' ? 'checked' : ''}><span><strong>公開</strong><small>符合條件後可供其他玩家瀏覽</small></span></label>
+            <label class="character-visibility-option ${c.visibility !== 'public' ? 'is-selected' : ''}"><input type="radio" name="visibility" value="private" ${c.visibility !== 'public' ? 'checked' : ''}><span><strong>私密</strong><small>僅自己可見</small></span></label>
+            <label class="character-visibility-option ${c.visibility === 'public' ? 'is-selected' : ''}"><input type="radio" name="visibility" value="public" ${c.visibility === 'public' ? 'checked' : ''}><span><strong>公開</strong><small>符合條件後可供其他玩家瀏覽</small></span></label>
           </div>
         </fieldset>
         <div class="field"><span>標籤，最多5個</span>
@@ -6971,7 +6980,7 @@ function refreshChatEntryList() {
     end.className='small muted';
     end.dataset.chatListEnd='true';
     end.style.cssText='padding:12px;text-align:center';
-    end.textContent='已經到底了～';
+    end.textContent='已經滑到底了';
     entries.appendChild(end);
   }
 }
@@ -7158,7 +7167,7 @@ async function groupOpen(groupId) {
       const avatarRes=await window.mySupabase.from('characters').select('id,avatar_url').in('id',characterIds);
       if(!avatarRes.error) avatarById=Object.fromEntries((avatarRes.data||[]).map(x=>[x.id,x.avatar_url||'']));
     }
-    const members=memberRows.map(m=>{const snapshot=m.character_snapshot||{};const characterId=m.character_id||null;const snapshotId=snapshot.id||characterId||null;const displayId=characterId||snapshotId||m.id;return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,avatar_url:avatarById[characterId]||snapshot.avatar_url||snapshot.image||'',phoneNotifications:Array.isArray(snapshot.phoneNotifications)?snapshot.phoneNotifications:[],position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};});
+    const members=memberRows.map(m=>{const snapshot=m.character_snapshot||{};const characterId=m.character_id||null;const snapshotId=snapshot.id||characterId||null;const displayId=characterId||snapshotId||m.id;return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,avatar_url:avatarById[characterId]||snapshot.avatar_url||snapshot.image||'',phoneNotifications:Array.isArray(snapshot.phoneNotifications)?snapshot.phoneNotifications:[],phoneSettings:snapshot.phoneSettings||snapshot.phone_settings||{},position:m.position,sceneId:m.scene_id,sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};});
     groupExpandedMemberId=null;
     // Memory photo metadata and signed URLs are loaded only when the player opens background settings.
     const initialMessageRows=messageRes.data||[];
@@ -8163,9 +8172,13 @@ async function groupSendTurn() {
     if(!rows?.length) throw new Error('群組回合已保存，但暫時讀取不到訊息。請稍後重新開啟群組確認。');
     const members=g.active.members||[], scenes=g.active.scenes||[];
     if(Array.isArray(turnResult.phone_updates)){
+      g.active.phoneNotificationsByCharacter=g.active.phoneNotificationsByCharacter||{};
       for(const update of turnResult.phone_updates){
         const target=members.find(member=>String(member.characterId||member.id)===String(update.characterId));
-        if(target&&Array.isArray(update.notifications))target.phoneNotifications=update.notifications;
+        if(target&&Array.isArray(update.notifications)){
+          target.phoneNotifications=update.notifications;
+          g.active.phoneNotificationsByCharacter[String(target.characterId||target.id)]=update.notifications;
+        }
       }
     }
     const newMessages=rows.map(m=>{
@@ -9031,7 +9044,13 @@ async function renderPhoneModal() {
   const members=isGroup?(Array.isArray(group.members)?group.members:[]).map(member=>{
     const characterId=member.characterId||member.character_id||member.id;
     const found=state.characters.find(item=>String(item.id)===String(characterId));
-    return {...member,...(found||{}),id:characterId,name:found?.name||member.name||'角色',phoneSettings:found?.phoneSettings||found?.phone_settings||member.phoneSettings||member.phone_settings||{}};
+    const memberPhoneSettings=member.phoneSettings||member.phone_settings||{};
+    const foundPhoneSettings=found?.phoneSettings||found?.phone_settings||{};
+    const phoneSettings=Object.keys(memberPhoneSettings).length?memberPhoneSettings:foundPhoneSettings;
+    const memberNotices=Array.isArray(member.phoneNotifications)?member.phoneNotifications:[];
+    const foundNotices=Array.isArray(found?.phoneNotifications)?found.phoneNotifications:[];
+    const phoneNotifications=memberNotices.length?memberNotices:foundNotices;
+    return {...member,...(found||{}),id:characterId,name:found?.name||member.name||'角色',phoneSettings,phoneNotifications};
   }):[];
   let character;
   if(isGroup){
@@ -9139,7 +9158,7 @@ async function renderPhoneModal() {
   // Group sweet-diary excerpts are stored per group in localStorage, so use that same shared diary for every member phone's battery.
   const diaryList=isGroup?loadGroupDiaryMemories(group.id):(session.memories||[]);
   const usesCloudStoryMemory=!isGroup&&session.storyMode&&session.cloudOwned;
-  const storySummaryChars=Array.isArray(storyMemorySummaries)?storyMemorySummaries.reduce((total,item)=>total+countChars(item.summary||''),0):0;
+  const storySummaryChars=Array.isArray(storyMemorySummaries)?storyMemorySummaries.reduce((total,item)=>total+countChars(normalizeStoryMemorySummaryText(item.summary||'')),0):0;
   const diaryChars=usesCloudStoryMemory
     ?(storyMemorySummaryError||!Array.isArray(storyMemorySummaries)?null:storySummaryChars)
     :(Array.isArray(diaryList)?(isGroup?diaryList.reduce((n,item)=>n+countChars(typeof item==='string'?item:(item.text||'')),0):memorySize(diaryList)):0);
@@ -9213,6 +9232,14 @@ async function renderPhoneModal() {
   ensurePhoneModalHistoryGuard();
   document.body.appendChild(modal);modal.querySelector('[data-phone-action="close"]')?.focus();
 }
+function normalizeStoryMemorySummaryText(value) {
+  const text=String(value??'').replace(/\s+/g,' ').trim();
+  const chars=Array.from(text);
+  if(chars.length<=150)return text;
+  const clipped=chars.slice(0,150).join('');
+  const sentenceEnd=Math.max(...['。','！','？','!','?'].map(mark=>clipped.lastIndexOf(mark)));
+  return (sentenceEnd>=49?clipped.slice(0,sentenceEnd+1):clipped).trim();
+}
 async function loadStoryMemorySummary(session) {
   const target=document.getElementById('storyMemorySummary');
   const uid=currentUser()?.uid;
@@ -9236,7 +9263,9 @@ async function loadStoryMemorySummary(session) {
     const {data:summaryRows,error:summaryRowsError}=await window.mySupabase.rpc('get_story_memory_summaries',{p_session_id:session.id});
     if(summaryRowsError)throw summaryRowsError;
     if(currentUser()?.uid!==uid||!document.getElementById('storyMemorySummary'))return;
-    const summaries=Array.isArray(summaryRows)?summaryRows:[];
+    const summaries=Array.isArray(summaryRows)?summaryRows.map(item=>({
+      ...item,summary:normalizeStoryMemorySummaryText(item.summary||'')
+    })):[];
     const totalChars=summaries.reduce((total,item)=>total+countChars(item.summary||''),0);
     const count=document.getElementById('storyMemoryCount');
     if(count)count.textContent=totalChars.toLocaleString();
@@ -12273,6 +12302,11 @@ document.addEventListener('click',function(event){
 document.addEventListener('change',async event => {
   const target=event.target;
   if (target.closest('form[data-form="character"]')) saveEditorDraft();
+  if(target.name==='visibility'&&target.form?.dataset.form==='character'){
+    target.closest('.character-visibility-choice')?.querySelectorAll('.character-visibility-option').forEach(option=>{
+      option.classList.toggle('is-selected',option.querySelector('input[name="visibility"]')?.checked===true);
+    });
+  }
   try {
     if(target.id==='characterImage'){
       const file=target.files?.[0];if(!file)return;
