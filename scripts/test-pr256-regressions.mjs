@@ -15,6 +15,8 @@ assert.match(html,/row\.chat_mode!==null&&row\.chat_mode!==undefined[\s\S]*?row\
 assert.match(html,/session\.storyMode=row\.chat_mode!==null&&row\.chat_mode!==undefined[\s\S]*?row\.chat_mode==='story'/,'full session hydration must preserve the authoritative Story mode');
 assert.match(html,/mark_chat_session_read/,'read-state sync must use the narrow owner-checked RPC instead of optimistic full-session writes');
 assert.match(html,/\.eq\('chat_mode','story'\)\.eq\('status','active'\)/,'chat-list pagination must exclude encounter and archived sessions before calculating hasMore');
+assert.match(html,/rpc\('get_story_chat_sessions_page'/,'chat-list pagination must deduplicate to the latest active Story session per character before paging');
+
 assert.match(html,/\.is\('archived_at',null\)\.is\('deleted_at',null\)/,'group pagination must exclude deleted groups before calculating hasMore');
 assert.match(html,/not\('deleted_at','is',null\)/,'creator cache reconciliation must read soft-deleted character IDs');
 assert.match(html,/character\.authorId===user\.id&&deletedCharacterIds\.has\(character\.id\)/,'soft-deleted owned characters must be purged from the local creator cache');

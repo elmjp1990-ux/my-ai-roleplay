@@ -27,10 +27,13 @@ assert.match(groupOpen,/g\.groupMembers\[group\.id\]/);
 assert.match(groupOpen,/archived_at/);
 assert.match(groupOpen,/if\(group\.archived_at\)/,
   "opening an archived group must not reinsert it into the visible list");
-assert.doesNotMatch(groupOpen,/phone_notifications/,
-  "group hydration must not select the phone_notifications column because it is absent from the deployed chat_group_members schema");
-assert.match(groupOpen,/phoneNotifications:Array\.isArray\(snapshot\.phoneNotifications\)/,
-  "group phone notifications must use the optional JSON snapshot value rather than a missing database column");
+assert.match(groupOpen,/loadGroupMembersWithPhoneNotifications/,
+  "group hydration must use the optional phone_notifications column through a schema-cache-safe loader");
+assert.match(groupOpen,/phoneNotifications:Array\.isArray\(m\.phone_notifications\)/,
+  "group phone notifications must prefer the persisted member column and retain snapshot fallback");
+const groupMemberPhoneLoader=between("async function loadGroupMembersWithPhoneNotifications","async function groupOpen");
+assert.match(groupMemberPhoneLoader,/phone_notifications/);
+assert.match(groupMemberPhoneLoader,/PGRST204|42703/);
 assert.doesNotMatch(groupOpen,/void groupLoadList\(true\)/,
   "opening a group must not force a full group-list/member/preview reload");
 
@@ -133,11 +136,17 @@ assert.doesNotMatch(cloudSessions,/client\.auth\.getUser\(\)/,
 assert.match(cloudSessions,/pageSize\('chatSessions'\)/,
   "single chat list pages must use the shared ten-row page size");
 assert.match(cloudSessions,/\.eq\('session_data->>pinned','true'\)/,
-  "pinned single chats must load independently from the unpinned page");
+  "the missing-RPC fallback must retain pinned-only single-chat filtering");
+assert.match(cloudSessions,/rpc\('get_story_chat_sessions_page'/,
+  "normal operation must deduplicate the latest active Story session per character on the server");
 assert.match(cloudSessions,/session_data->>pinned\.eq\.false,session_data->>pinned\.is\.null/,
   "the single chat page query must exclude pinned sessions");
-assert.match(cloudSessions,/\.range\(pager\.offset,pager\.offset\+pageSize\)/,
-  "single chat list continuation must use bounded backend pages");
+assert.match(cloudSessions,/rpc\('get_story_chat_sessions_page'/,
+  "single chat list pages must use server-side latest-session-per-character pagination");
+assert.match(cloudSessions,/p_pinned:pinned,p_offset:offset,p_limit:pageSize\+1/,
+  "story chat pagination must use bounded one-row-lookahead RPC requests");
+assert.match(cloudSessions,/\.range\(offset,offset\+pageSize\)/,
+  "the missing-RPC compatibility fallback must remain bounded");
 assert.match(cloudSessions,/if \(!onlySessionId && !pagedList\)/,
   "loading another single-chat page must not evict sessions already loaded from prior pages");
 assert.match(html,/loadCloudChatSessions\(currentUser\(\),\{loadMore:true\}\)/,
@@ -491,6 +500,14 @@ console.log('Group watchdog, deadline race, abandoned-request recovery, idempote
 console.log('Group history fixture passed: 1,000 rows, 200 pages of five, timestamp/sequence ties, UUID cursor tie-break, no gaps or duplicates, overlapping-page dedupe, group-switch guards, and scroll anchoring.');
 
 const groupPhoneMigration = fs.readFileSync('supabase/migrations/20261114180000_group_ai_single_orchestrator.sql', 'utf8');
+const groupMemoryMigration = fs.readFileSync('supabase/migrations/20261116120000_group_memory_summaries.sql', 'utf8');
+const chatReadMigration = fs.readFileSync('supabase/migrations/20261116130000_mark_chat_session_read_and_story_chat_paging.sql', 'utf8');
+assert.match(groupMemoryMigration,/chat_group_memory_summaries/);
+assert.match(groupMemoryMigration,/get_group_memory_summaries/);
+assert.match(chatReadMigration,/get_story_chat_sessions_page/);
+assert.match(chatReadMigration,/DISTINCT ON \(character_key\)/);
+assert.match(chatReadMigration,/mark_chat_session_read/);
+
 const groupPhoneFunction = fs.readFileSync('supabase/functions/group-chat-turn/index.ts', 'utf8');
 const groupPhoneParser = fs.readFileSync('supabase/functions/_shared/group-turn-envelope.ts', 'utf8');
 const groupPhoneUI = fs.readFileSync('index.html', 'utf8');
@@ -506,10 +523,10 @@ assert.match(groupPhoneFunction, /phone_updates: parsed\.phoneUpdates/);
 assert.match(groupPhoneParser, /phoneById\.size !== speakers\.length/);
 assert.match(groupPhoneUI, /noticeSources=isGroup[\s\S]*?character\.phoneNotifications[\s\S]*?group\.phoneNotificationsByCharacter/);
 assert.match(groupPhoneUI, /phone-device-head--group/);
-assert.doesNotMatch(groupPhoneUI, /\.select\([^)]*phone_notifications/,
-  "group UI must not require the optional phone_notifications database column to open a conversation");
-assert.match(groupPhoneUI, /phoneNotifications:Array\.isArray\(snapshot\.phoneNotifications\)/,
-  "group UI must retain snapshot-provided phone notifications when the optional database column is unavailable");
+assert.match(groupPhoneUI,/loadGroupMembersWithPhoneNotifications/,
+  "group UI must read persisted phone notifications through a schema-cache-safe loader");
+assert.match(groupPhoneUI,/phoneNotifications:Array\.isArray\(m\.phone_notifications\)/,
+  "group UI must prefer persisted member notifications and retain the old snapshot fallback");
 assert.match(groupPhoneUI, /initialStoryTime=Number\(isGroup\?/);
 assert.match(groupPhoneUI, /phoneHeader\+/);
 assert.match(groupPhoneStyles, /phone-device-head--group \.phone-member-switch/);
@@ -612,7 +629,7 @@ assert.match(ownerListSource,/\.range\(g\.groupPinnedOffset,g\.groupPinnedOffset
 
 assert.match(groupOpen,/\.limit\(window\.PoyozzListPagination\.pageSize\('messages'\)\)/,"group initial history must use the shared five-message page size");
 assert.match(groupHistory,/\.limit\(window\.PoyozzListPagination\.pageSize\('messages'\)\)/,"group older history must use the shared five-message page size");
-assert.ok(html.includes("pinnedOffset+pageSize"),"single pinned chats must use one-row lookahead while keeping ten visible rows");
+assert.match(cloudSessions,/p_pinned:pinned,p_offset:offset,p_limit:pageSize\+1/,"single pinned chats must use the same one-row-lookahead RPC as regular chats");
 assert.ok(html.includes("groupPinnedOffset+pageSize"),"group pinned chats must use one-row lookahead while keeping ten visible rows");
 assert.match(html,/chat_memory_photos[\s\S]{0,500}\.limit\(window\.PoyozzListPagination\.pageSize\('memoryPhotos'\)/,"group background photo picker must use the shared ten-photo page size");
 
@@ -747,9 +764,10 @@ assert.match(html,/if\(route\?\.overlay\)[\s\S]*?delete next\.overlay;[\s\S]*?go
 assert.match(html,/已經滑到底了/);
 assert.ok(html.includes("root:scrollRoot||null,rootMargin:'0px'"),"chat-list pagination must use its actual scroll container and trigger only at the end");
 assert.match(paginationSource,/function observeEnd[\s\S]*?for\(let p=node\.parentElement/);
-assert.match(html,/completedBatches=new Set\(memories\.filter\(m=>m\.autoGenerated&&Number\(m\.sourceUserCount\)>0\)/);
-assert.match(html,/if\(memory\.autoGenerated\)\{memory\.deleted=true;memory\.text='';\}/);
-assert.match(html,/visibleMemories=memories\.filter\(m=>!m\.deleted\)/);
+assert.match(html,/get_group_memory_summaries/);
+assert.match(html,/processDueGroupMemorySummary/);
+assert.match(html,/return loadGroupDiaryMemories\(group\.id\)\.filter\(memory=>!memory\.deleted&&\(!memory\.autoGenerated\|\|memory\.important\)\)/);
+assert.doesNotMatch(html,/每 5 次玩家發言建立一則群組日記摘錄/);
 
 assert.match(html,/for\(let attempt=0;attempt<2;attempt\+\+\)/,'chat pin sync retries once after an optimistic conflict while re-reading session_data');
 assert.match(html,/data-chat-list-pin="single"/,'single-chat pin action must be isolated from the delete/menu router');

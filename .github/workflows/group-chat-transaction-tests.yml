@@ -12,6 +12,9 @@ on:
       - "scripts/test-group-chat-transaction-concurrency.sh"
       - "scripts/test-group-chat-migration-rollback.sh"
       - "scripts/test-runtime-egress-optimizations.mjs"
+      - "scripts/test-group-memory-summary.mjs"
+      - "supabase/tests/group-memory-summary-scenarios.sql"
+
       - ".github/workflows/group-chat-transaction-tests.yml"
   pull_request:
     paths:
@@ -21,6 +24,9 @@ on:
       - "supabase/functions/_shared/**"
       - "scripts/test-group-chat-transaction-concurrency.sh"
       - "scripts/test-runtime-egress-optimizations.mjs"
+      - "scripts/test-group-memory-summary.mjs"
+      - "supabase/tests/group-memory-summary-scenarios.sql"
+
       - ".github/workflows/group-chat-transaction-tests.yml"
   workflow_dispatch:
 
@@ -80,6 +86,12 @@ jobs:
 
       - name: Apply group AI transaction migration
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261114180000_group_ai_single_orchestrator.sql
+
+      - name: Apply group AI memory summary schema
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261116120000_group_memory_summaries.sql
+
+      - name: Verify group AI memory summary ownership and editing
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/group-memory-summary-scenarios.sql && node scripts/test-group-memory-summary.mjs
 
       - name: Verify migration contracts and transaction outcomes
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/group-chat-transaction-scenarios.sql

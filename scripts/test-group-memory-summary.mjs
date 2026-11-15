@@ -4,7 +4,8 @@ import fs from 'node:fs';
 const html=fs.readFileSync('index.html','utf8');
 const edge=fs.readFileSync('supabase/functions/group-chat-turn/index.ts','utf8');
 const helper=fs.readFileSync('supabase/functions/_shared/story-memory-summary.ts','utf8');
-const migration=fs.readFileSync('supabase/migrations/20261116120000_group_memory_summary_and_chat_read_state.sql','utf8');
+const migration=fs.readFileSync('supabase/migrations/20261116120000_group_memory_summaries.sql','utf8');
+const pagingMigration=fs.readFileSync('supabase/migrations/20261116130000_mark_chat_session_read_and_story_chat_paging.sql','utf8');
 const groupAiMigration=fs.readFileSync('supabase/migrations/20261114180000_group_ai_single_orchestrator.sql','utf8');
 
 assert.match(groupAiMigration,/ADD COLUMN IF NOT EXISTS phone_notifications jsonb NOT NULL DEFAULT '\[\]'::jsonb/);
@@ -22,7 +23,9 @@ assert.match(migration,/CREATE TABLE IF NOT EXISTS public\.chat_group_memory_sum
 assert.match(migration,/CREATE OR REPLACE FUNCTION public\.get_group_memory_summaries/);
 assert.match(migration,/CREATE OR REPLACE FUNCTION public\.set_group_memory_summary_important/);
 assert.match(migration,/CREATE OR REPLACE FUNCTION public\.update_group_memory_summary/);
-assert.match(migration,/CREATE OR REPLACE FUNCTION public\.mark_chat_session_read/);
+assert.match(pagingMigration,/CREATE OR REPLACE FUNCTION public\.mark_chat_session_read/);
+assert.match(pagingMigration,/CREATE OR REPLACE FUNCTION public\.get_story_chat_sessions_page/);
+assert.match(pagingMigration,/DISTINCT ON \(character_key\)/);
 assert.match(html,/get_group_memory_summaries/);
 assert.match(html,/set_group_memory_summary_important/);
 assert.match(html,/update_group_memory_summary/);

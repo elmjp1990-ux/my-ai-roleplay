@@ -3855,27 +3855,35 @@ async function loadCloudChatSessions(user, options = {}) {
     let rows=[];
     if(pagedList){
       const pageSize=window.PoyozzListPagination.pageSize('chatSessions');
-      let pinnedRows=[];
-      if(pager.pinnedHasMore!==false){
-        const {data:pinnedData,error:pinnedError}=await client.from('chat_sessions')
-          .select(sessionSelect).eq('user_id',user.id).is('deleted_at',null)
-          .eq('chat_mode','story').eq('status','active')
-          .eq('session_data->>pinned','true')
-          .order('updated_at',{ascending:false}).order('id',{ascending:false})
-          .range(pager.pinnedOffset,pager.pinnedOffset+pageSize);
-        if(pinnedError)throw new Error(pinnedError.message);
-        const pinnedRowsRaw=pinnedData||[];
-        pager.pinnedHasMore=pinnedRowsRaw.length>pageSize;
-        pinnedRows=pinnedRowsRaw.slice(0,pageSize);
-      }
-      const {data:pageRows,error:pageError}=await client.from('chat_sessions')
-        .select(sessionSelect).eq('user_id',user.id).is('deleted_at',null)
-        .eq('chat_mode','story').eq('status','active')
-        .or('session_data->>pinned.eq.false,session_data->>pinned.is.null')
-        .order('updated_at',{ascending:false}).order('id',{ascending:false})
-        .range(pager.offset,pager.offset+pageSize);
-      if(pageError)throw new Error(pageError.message);
-      const pageRowsRaw=pageRows||[];
+      const fetchStoryPage=async(pinned,offset)=>{
+        const rpcResult=await client.rpc('get_story_chat_sessions_page',{
+          p_pinned:pinned,p_offset:offset,p_limit:pageSize+1
+        });
+        if(!rpcResult.error)return rpcResult;
+        const rpcMessage=String(rpcResult.error.message||'');
+        const missingRpc=rpcResult.error.code==='PGRST202'||/get_story_chat_sessions_page|schema cache|could not find the function/i.test(rpcMessage);
+        if(!missingRpc)return rpcResult;
+        // Older Preview deployments can still load rows safely; the migration adds
+        // server-side DISTINCT ON pagination so duplicate sessions do not keep a false sentinel.
+        let query=client.from('chat_sessions').select(sessionSelect)
+          .eq('user_id',user.id).is('deleted_at',null)
+          .eq('chat_mode','story').eq('status','active');
+        query=pinned
+          ?query.eq('session_data->>pinned','true')
+          :query.or('session_data->>pinned.eq.false,session_data->>pinned.is.null');
+        return query.order('updated_at',{ascending:false}).order('id',{ascending:false})
+          .range(offset,offset+pageSize);
+      };
+      const [pinnedPage,pagePage]=await Promise.all([
+        pager.pinnedHasMore!==false?fetchStoryPage(true,pager.pinnedOffset):Promise.resolve({data:[],error:null}),
+        fetchStoryPage(false,pager.offset)
+      ]);
+      if(pinnedPage.error)throw new Error(pinnedPage.error.message);
+      if(pagePage.error)throw new Error(pagePage.error.message);
+      const pinnedRowsRaw=pinnedPage.data||[];
+      pager.pinnedHasMore=pinnedRowsRaw.length>pageSize;
+      const pinnedRows=pinnedRowsRaw.slice(0,pageSize);
+      const pageRowsRaw=pagePage.data||[];
       const visiblePageRows=pageRowsRaw.slice(0,pageSize);
       rows=[...pinnedRows,...visiblePageRows];
       pager.offset+=visiblePageRows.length;
