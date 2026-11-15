@@ -7848,6 +7848,7 @@ function groupReadStep() {
     g.draft.playerName=$('groupPlayerName')?.value.trim()||'';
     g.draft.playerPersona=$('groupPlayerPersona')?.value||'';
     g.draft.worldCharacterId=$('view').querySelector('input[name="groupWorldCharacter"]:checked')?.value||members[0]?.id||'';
+    const worldCharacter=members.find(c=>c.id===g.draft.worldCharacterId);
     g.draft.world=String($('groupWorldBackground')?.value||'').slice(0,3000);
     g.draft.scenes=[{name:$('groupSceneName0')?.value.trim()||'初始相遇',description:$('groupSceneDesc0')?.value||''}];
     if(!g.draft.name||g.draft.name.length>25) return '群組名稱需為 1–25 字。';
@@ -9913,7 +9914,7 @@ function refreshExploreTagPicker() {
 function updateCharacterCounters(root=document) {
   root.querySelectorAll('.char-counter[data-count-for]').forEach(counter => {
     const name=counter.dataset.countFor;
-    const field=(name==='groupSceneDesc0'||name==='groupCustomWorldBackground') ? root.querySelector('#'+name) : root.querySelector('[name="'+name+'"]');
+    const field=(name==='groupSceneDesc0'||name==='groupWorldBackground') ? root.querySelector('#'+name) : root.querySelector('[name="'+name+'"]');
     if(!field) return;
     const max=field.maxLength > 0 ? field.maxLength : 3000;
     const actualCount=typeof Intl!=='undefined'&&Intl.Segmenter?[...new Intl.Segmenter('zh-Hant',{granularity:'grapheme'}).segment(field.value)].length:Array.from(field.value).length;
@@ -9992,7 +9993,7 @@ document.addEventListener('click',async event => {
         const userName=String($('groupPlayerName')?.value||g.draft.playerName||state.account?.nickname||'玩家').trim()||'玩家';
         const names=[members[0]?.name||'一位主角',members[1]?.name||'一位神祕的轉學生',members[2]?.name||'一名來歷不明的陌生人'];
         const replacements={CHAR1:names[0],CHAR2:names[1],CHAR3:names[2],USER:userName,VILLAIN:'神祕的反派',NPC:'一位路人'};
-        const text=String(preset.text||'').replace(/\\{(CHAR1|CHAR2|CHAR3|USER|VILLAIN|NPC)\\}/g,(_,key)=>replacements[key]||'');
+        const text=String(preset.text||'').replace(/\{(CHAR1|CHAR2|CHAR3|USER|VILLAIN|NPC)\}/g,(_,key)=>replacements[key]||'');
         const scene=$('groupSceneDesc0');
         if(scene){scene.value=text.slice(0,3000);scene.dispatchEvent(new Event('input',{bubbles:true}));}
         break;
