@@ -506,7 +506,10 @@ assert.match(groupPhoneFunction, /phone_updates: parsed\.phoneUpdates/);
 assert.match(groupPhoneParser, /phoneById\.size !== speakers\.length/);
 assert.match(groupPhoneUI, /character\.phoneNotifications\|\|group\.phoneNotificationsByCharacter/);
 assert.match(groupPhoneUI, /phone-device-head--group/);
-assert.match(groupPhoneUI, /phone_notifications/);
+assert.doesNotMatch(groupPhoneUI, /\.select\([^)]*phone_notifications/,
+  "group UI must not require the optional phone_notifications database column to open a conversation");
+assert.match(groupPhoneUI, /phoneNotifications:Array\.isArray\(snapshot\.phoneNotifications\)/,
+  "group UI must retain snapshot-provided phone notifications when the optional database column is unavailable");
 assert.match(groupPhoneUI, /initialStoryTime=Number\(isGroup\?/);
 assert.match(groupPhoneUI, /phoneHeader\+/);
 assert.match(groupPhoneStyles, /phone-device-head--group \.phone-member-switch/);
