@@ -106,8 +106,20 @@ export async function processDueStoryMemorySummary(
   let existingBatch: DbRow | null = null;
   for (let candidate = 1; candidate <= eligibleBatchCount; candidate++) {
     const found = rows.find((item: DbRow) => Number(item.batch_number) === candidate) || null;
-    if (found?.status === "completed") continue;
-    if (found?.status === "processing") {
+    if (found?.status === "completed") {
+      if (normalizeStoryMemorySummaryText(found.summary)) continue;
+      // Older workers could mark an empty summary completed. Reclaim only that
+      // exact empty row so the five-turn batch can be regenerated safely.
+      const { data: released, error: releaseError } = await admin
+        .from("ai_model_usage")
+        .update({ status: "failed", processed_at: new Date().toISOString() })
+        .eq("id", str(found.id))
+        .eq("status", "completed")
+        .select("id")
+        .maybeSingle();
+      if (releaseError || !released) return;
+      existingBatch = { ...found, status: "failed" };
+    } else if (found?.status === "processing") {
       const createdAt = Date.parse(str(found.created_at));
       if (!Number.isFinite(createdAt) || Date.now() - createdAt < 120_000) return;
       const { data: released, error: releaseError } = await admin

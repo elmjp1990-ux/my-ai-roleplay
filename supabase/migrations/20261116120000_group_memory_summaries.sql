@@ -1,5 +1,24 @@
 -- Group Story AI summaries share the single-chat five-turn cadence and model.
--- Backfill legacy group phone notices before the new column becomes authoritative.
+-- Ensure group phone notices are durable before backfilling member snapshots.
+ALTER TABLE public.chat_group_members
+  ADD COLUMN IF NOT EXISTS phone_notifications jsonb NOT NULL DEFAULT '[]'::jsonb;
+
+ALTER TABLE public.chat_group_members
+  DROP CONSTRAINT IF EXISTS chat_group_members_phone_notifications_array;
+ALTER TABLE public.chat_group_members
+  ADD CONSTRAINT chat_group_members_phone_notifications_array
+  CHECK (jsonb_typeof(phone_notifications) = 'array');
+
+-- Previous single-chat workers could mark an empty result as completed.
+-- Make only those invalid batches retryable by the corrected worker.
+UPDATE public.ai_model_usage
+SET status = 'failed',
+    processed_at = now()
+WHERE generation_type = 'memory_summary'
+  AND status = 'completed'
+  AND NULLIF(btrim(summary), '') IS NULL;
+
+-- Backfill legacy group phone notices; preserve non-empty member values.
 -- Only copy non-empty arrays; leave empty/default rows untouched.
 UPDATE public.chat_group_members
 SET phone_notifications = COALESCE(character_snapshot->'phoneNotifications', character_snapshot->'phone_notifications')
