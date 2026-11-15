@@ -113,14 +113,14 @@ assert.match(illustrations,/insertedGallery\.includes\(item\.id\)\|\|\(previous&
 assert.match(illustrations,/expectedGalleryNames=new Map/,
   "persisted gallery labels must still be verified after synchronization");
 
-const authCoalescer=between("const verifiedAuthUserInflight = new Map()","async function loadSupabaseCharacters(user,{loadMore=false}={})");
+const authCoalescer=between("const verifiedAuthUserInflight = new Map()","async function loadSupabaseCharacters(user,options={})");
 assert.match(authCoalescer,/client\.auth\.getUser\(\)/,
   "concurrent login hydration must still verify the current user with Supabase");
 assert.match(authCoalescer,/verifiedAuthUserInflight\.get\(expectedUid\)/,
   "concurrent auth verification for the same UID must share the in-flight request");
 assert.match(authCoalescer,/verifiedAuthUserInflight\.delete\(expectedUid\)/,
   "auth verification must not be cached after the request settles");
-const ownerLoader=between("async function loadSupabaseCharacters(user,{loadMore=false}={})","async function getCharacterIllustrationSignedUrl");
+const ownerLoader=between("async function loadSupabaseCharacters(user,options={})","async function getCharacterIllustrationSignedUrl");
 assert.match(ownerLoader,/getVerifiedAuthUser\(user\.id\)/,
   "owner character hydration must use the shared verified-auth request");
 const cloudSessions=between("async function loadCloudChatSessions(user, options = {})","async function ");
@@ -631,7 +631,7 @@ assert.ok(!primaryIllustrationLoader.includes("for(const row of rows)"));
 const galleryIllustrationLoader=between("async function loadCharacterIllustrationAssets","// Encounter scenes fetch");
 assert.ok(galleryIllustrationLoader.includes("characterIllustrationSignedUrlManager.getMany"));
 assert.ok(!galleryIllustrationLoader.includes("for(const row of rows)"));
-const ownedCharacterLoader=between("async function loadSupabaseCharacters(user,{loadMore=false}={})","function ");
+const ownedCharacterLoader=between("async function loadSupabaseCharacters(user,options={})","function ");
 assert.ok(ownedCharacterLoader.includes("get_latest_owned_character_stories"));
 assert.ok(!ownedCharacterLoader.includes(".from('character_stories')"));
 
@@ -654,7 +654,25 @@ const startChatQuery=between("async function startChat(characterId)","function v
 assert.ok(startChatQuery.includes("find_existing_story_chat_session"));
 assert.ok(!startChatQuery.includes(".from('chat_sessions')"));
 assert.ok(!startChatQuery.includes(".from('chat_messages')"));
-assert.ok(html.includes("options.verifiedUser?.id===user.id"));
+assert.ok(html.includes("options?.verifiedUser?.id===user.id"));
+assert.match(ownerLoader,/const loadMore=options\?\.loadMore===true/,
+  "owner hydration must read loadMore and verifiedUser from the same options object");
+assert.match(ownerLoader,/options\?\.verifiedUser\?\.id===user\.id/,
+  "owner hydration must not reference an undeclared options variable");
+assert.match(html,/const recentCharacterIds=\[\.\.\.new Set\(recentSessionCharacters\.map\(session=>session\.id\)\)\]\.slice\(0,10\)/,
+  "group picker must hydrate a bounded set of recent-chat character IDs independently of the visible page");
+assert.match(html,/\.in\('id',missingRecentIds\)\.eq\('visibility','public'\)/,
+  "recent-chat group candidates must still be verified as public cloud characters");
+assert.match(html,/id="groupWorldBackground" maxlength="3000"/,
+  "group world background must use one editable 3000-character field");
+assert.doesNotMatch(html,/groupCustomWorldBackground/,
+  "group creation must not render or read a second custom-background textarea");
+assert.match(html,/data-action="group-inspiration">✨ AI靈感/,
+  "group opening inspiration control must be labeled AI inspiration");
+assert.match(html,/replace\(\/\\\{\(CHAR1\|CHAR2\|CHAR3\|USER\|VILLAIN\|NPC\)\\\}\/g/,
+  "AI inspiration templates must replace character, player and NPC placeholders");
+assert.match(html,/usedInspirationIds/,
+  "AI inspiration must avoid repeating templates within one group creation draft");
 assert.ok(html.includes("options.verifiedUser?.id===userId"));
 
 const boundedCommentMigration=fs.readFileSync('supabase/migrations/20261114130000_add_bounded_character_comment_reads.sql','utf8');
