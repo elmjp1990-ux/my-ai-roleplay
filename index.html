@@ -7115,7 +7115,7 @@ function renderGroupConversation() {
   }));
   const initialScene=(group.scenes||[]).find(x=>Number(x.position||1)===1)||(group.scenes||[])[0];
   const initialOpening=String(initialScene?.description||'').trim();
-  const initialOpeningRow=initialOpening
+  const initialOpeningRow=initialOpening && !g.historyHasMore
     ? '<div class="message group-opening-message"><span class="avatar avatar-fallback">序</span><div class="message-content"><div class="message-name">初始開場情境</div><div class="bubble">'+e(initialOpening).replace(/\n/g,'<br>')+'</div></div></div>'
     : '';
   const messageRows=initialOpeningRow+g.messages.map(m=>{
