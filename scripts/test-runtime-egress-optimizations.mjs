@@ -674,7 +674,7 @@ assert.match(html,/replace\(\/\\\{\(CHAR1\|CHAR2\|CHAR3\|USER\|VILLAIN\|NPC\)\\\
 assert.match(html,/usedInspirationIds/,
   "AI inspiration must avoid repeating templates within one group creation draft");
 const groupOpeningPresetsSource=fs.readFileSync('group-opening-presets.js','utf8');
-assert.equal((groupOpeningPresetsSource.match(/\\['[^']+','/g)||[]).length,100,
+assert.equal((groupOpeningPresetsSource.match(/\['[^']+','/g)||[]).length,100,
   "the static group inspiration library must retain exactly 100 scenario templates");
 assert.match(html,/const roleIntro=members\.length===1[\s\S]*members\.length===2[\s\S]*names\[2\]/,
   "random group inspiration must adapt the opening sentence to one, two, or three selected characters");
