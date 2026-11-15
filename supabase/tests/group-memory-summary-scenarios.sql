@@ -1,12 +1,16 @@
 
 -- Group Story AI summaries are owner-scoped, editable, and retained as 50–150 characters.
+INSERT INTO auth.users(id) VALUES
+ ('10000000-0000-4000-8000-000000000009'),
+ ('10000000-0000-4000-8000-000000000010')
+ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.chat_groups(id,owner_id,name) VALUES
- ('20000000-0000-4000-8000-000000000009','10000000-0000-4000-8000-000000000001','memory-summary');
+ ('20000000-0000-4000-8000-000000000009','10000000-0000-4000-8000-000000000009','memory-summary');
 INSERT INTO public.chat_group_turns(id,group_id,user_id,request_key,request_content,status,created_at)
 SELECT
  ('51000000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid,
  '20000000-0000-4000-8000-000000000009',
- '10000000-0000-4000-8000-000000000001',
+ '10000000-0000-4000-8000-000000000009',
  ('52000000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid,
  'group summary test turn '||n,
  'completed',
@@ -32,16 +36,17 @@ INSERT INTO public.chat_group_memory_summaries(
 )
 SELECT
  '20000000-0000-4000-8000-000000000009',
- '10000000-0000-4000-8000-000000000001',
+ '10000000-0000-4000-8000-000000000009',
  1,array_agg(id ORDER BY created_at),
  '玩家與角色A共同完成首次調查，確認彼此的分工與信任，並約定隔天前往車站追查失竊物品的線索，同時保留尚未解開的疑點與後續待辦。',
  'completed','openai/gpt-oss-20b',now()
 FROM public.chat_group_turns
 WHERE group_id='20000000-0000-4000-8000-000000000009';
 RESET ROLE;
+RESET request.jwt.claim.sub;
 
 SET ROLE authenticated;
-SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',false);
+SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000009',false);
 DO $$
 DECLARE v_count integer; v_important boolean; v_edited boolean;
 BEGIN
@@ -62,7 +67,7 @@ BEGIN
   IF NOT v_important OR NOT v_edited THEN RAISE EXCEPTION 'group summary edits were not persisted'; END IF;
 END $$;
 
-SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000002',false);
+SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000010',false);
 DO $$
 DECLARE v_count integer;
 BEGIN

@@ -1,5 +1,14 @@
 -- Group Story AI summaries share the single-chat five-turn cadence and model.
--- Also isolate read-watermark writes from the optimistic chat-session version token.
+-- Backfill legacy group phone notices before the new column becomes authoritative.
+-- Only copy non-empty arrays; leave empty/default rows untouched.
+UPDATE public.chat_group_members
+SET phone_notifications = COALESCE(character_snapshot->'phoneNotifications', character_snapshot->'phone_notifications')
+WHERE phone_notifications = '[]'::jsonb
+  AND CASE
+    WHEN jsonb_typeof(COALESCE(character_snapshot->'phoneNotifications', character_snapshot->'phone_notifications')) = 'array'
+      THEN jsonb_array_length(COALESCE(character_snapshot->'phoneNotifications', character_snapshot->'phone_notifications')) > 0
+    ELSE false
+  END;
 
 CREATE TABLE IF NOT EXISTS public.chat_group_memory_summaries (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

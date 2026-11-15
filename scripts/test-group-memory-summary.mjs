@@ -20,6 +20,7 @@ assert.match(helper,/normalizeStoryMemorySummaryText\(parsed\.summary\)/);
 assert.match(helper,/const SUMMARY_INTERVAL = 5/);
 assert.match(helper,/const SUMMARY_MODEL = "openai\/gpt-oss-20b"/);
 assert.match(migration,/CREATE TABLE IF NOT EXISTS public\.chat_group_memory_summaries/);
+assert.match(migration,/UPDATE public\.chat_group_members[\s\S]*phone_notifications/);
 assert.match(migration,/CREATE OR REPLACE FUNCTION public\.get_group_memory_summaries/);
 assert.match(migration,/CREATE OR REPLACE FUNCTION public\.set_group_memory_summary_important/);
 assert.match(migration,/CREATE OR REPLACE FUNCTION public\.update_group_memory_summary/);

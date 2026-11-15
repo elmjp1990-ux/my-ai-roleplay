@@ -29,7 +29,7 @@ assert.match(groupOpen,/if\(group\.archived_at\)/,
   "opening an archived group must not reinsert it into the visible list");
 assert.match(groupOpen,/loadGroupMembersWithPhoneNotifications/,
   "group hydration must use the optional phone_notifications column through a schema-cache-safe loader");
-assert.match(groupOpen,/phoneNotifications:Array\.isArray\(m\.phone_notifications\)/,
+assert.match(groupOpen,/const phoneNotifications=Array\.isArray\(m\.phone_notifications\)/,
   "group phone notifications must prefer the persisted member column and retain snapshot fallback");
 const groupMemberPhoneLoader=between("async function loadGroupMembersWithPhoneNotifications","async function groupOpen");
 assert.match(groupMemberPhoneLoader,/phone_notifications/);
@@ -503,6 +503,8 @@ const groupPhoneMigration = fs.readFileSync('supabase/migrations/20261114180000_
 const groupMemoryMigration = fs.readFileSync('supabase/migrations/20261116120000_group_memory_summaries.sql', 'utf8');
 const chatReadMigration = fs.readFileSync('supabase/migrations/20261116130000_mark_chat_session_read_and_story_chat_paging.sql', 'utf8');
 assert.match(groupMemoryMigration,/chat_group_memory_summaries/);
+assert.match(groupMemoryMigration,/UPDATE public\.chat_group_members[\s\S]*phone_notifications/,
+  "the phone migration must backfill legacy group notification snapshots into the durable member column");
 assert.match(groupMemoryMigration,/get_group_memory_summaries/);
 assert.match(chatReadMigration,/get_story_chat_sessions_page/);
 assert.match(chatReadMigration,/DISTINCT ON \(character_key\)/);
@@ -525,7 +527,7 @@ assert.match(groupPhoneUI, /noticeSources=isGroup[\s\S]*?character\.phoneNotific
 assert.match(groupPhoneUI, /phone-device-head--group/);
 assert.match(groupPhoneUI,/loadGroupMembersWithPhoneNotifications/,
   "group UI must read persisted phone notifications through a schema-cache-safe loader");
-assert.match(groupPhoneUI,/phoneNotifications:Array\.isArray\(m\.phone_notifications\)/,
+assert.match(groupPhoneUI,/const phoneNotifications=Array\.isArray\(m\.phone_notifications\)/,
   "group UI must prefer persisted member notifications and retain the old snapshot fallback");
 assert.match(groupPhoneUI, /initialStoryTime=Number\(isGroup\?/);
 assert.match(groupPhoneUI, /phoneHeader\+/);
