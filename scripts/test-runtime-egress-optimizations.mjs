@@ -136,7 +136,7 @@ assert.match(cloudSessions,/\.eq\('session_data->>pinned','true'\)/,
   "pinned single chats must load independently from the unpinned page");
 assert.match(cloudSessions,/session_data->>pinned\.eq\.false,session_data->>pinned\.is\.null/,
   "the single chat page query must exclude pinned sessions");
-assert.match(cloudSessions,/\.range\(pager\.offset,pager\.offset\+pageSize-1\)/,
+assert.match(cloudSessions,/\.range\(pager\.offset,pager\.offset\+pageSize\)/,
   "single chat list continuation must use bounded backend pages");
 assert.match(cloudSessions,/if \(!onlySessionId && !pagedList\)/,
   "loading another single-chat page must not evict sessions already loaded from prior pages");
@@ -235,11 +235,11 @@ assert.match(groupList,/\.eq\('pinned',true\)/,
   "pinned groups must load independently from the unpinned ten-row page");
 assert.match(groupList,/pinned\.eq\.false,pinned\.is\.null/,
   "the paginated group query must exclude pinned rows");
-assert.match(groupList,/\.range\(g\.groupListOffset,g\.groupListOffset\+pageSize-1\)/,
+assert.match(groupList,/\.range\(g\.groupListOffset,g\.groupListOffset\+pageSize\)/,
   "group list pages must be fetched by the backend in bounded ranges");
 assert.match(groupList,/groupHydrateListRows\(newRows\)/,
   "member, avatar and preview hydration must be restricted to newly loaded groups");
-assert.match(groupList,/g\.groupListHasMore=currentPage\.length===pageSize/,
+assert.match(groupList,/g\.groupListHasMore=rawCurrentPage\.length>pageSize/,
   "group list continuation must stop when the backend returns a short page");
 assert.match(groupList,/mergeUnique\(g\.groups,newRows,group=>group\.id\)/,
   "group list continuation must append without duplicating already loaded groups");
@@ -607,12 +607,12 @@ assert.match(commentPageMigration,/LIMIT GREATEST\(1, LEAST\(COALESCE\(p_limit, 
 assert.match(ownerListSource,/rpc\('get_character_comments_safe_page'/);
 assert.match(ownerListSource,/data-action="comments-load-more"/);
 assert.match(ownerListSource,/pageSize\('characterComments'\)/);
-assert.match(ownerListSource,/\.range\(g\.groupPinnedOffset,g\.groupPinnedOffset\+pageSize-1\)/,
+assert.match(ownerListSource,/\.range\(g\.groupPinnedOffset,g\.groupPinnedOffset\+pageSize\)/,
   'pinned group chats must be bounded and paged in ten-row batches');
 
 assert.match(groupOpen,/\.limit\(window\.PoyozzListPagination\.pageSize\('messages'\)\)/,"group initial history must use the shared five-message page size");
 assert.match(groupHistory,/\.limit\(window\.PoyozzListPagination\.pageSize\('messages'\)\)/,"group older history must use the shared five-message page size");
-assert.match(html,/pinnedOffset\+pageSize-1/,"single pinned chats must be paginated in ten-row batches");
+assert.match(html,/pinnedOffset\+pageSize/,"single pinned chats must be paginated in ten-row batches");
 assert.match(html,/groupPinnedOffset\+pageSize-1/,"group pinned chats must be paginated in ten-row batches");
 assert.match(html,/chat_memory_photos[\s\S]{0,500}\.limit\(window\.PoyozzListPagination\.pageSize\('memoryPhotos'\)/,"group background photo picker must use the shared ten-photo page size");
 
