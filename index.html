@@ -10005,7 +10005,7 @@ document.addEventListener('click',async event => {
         const roleIntro=members.length===1
           ? names[0]+'在路上遇見'+userName+'，兩人決定一起展開旅程。途中可能遇見一位身分不明的神祕人物，以及一名看似友善的陌生人。'
           : members.length===2
-            ? names[0]+'與'+names[1]+'在路上遇見'+userName，三人決定一起展開旅程。途中可能遇見一位是敵是友的神祕人物。'
+            ? names[0]+'與'+names[1]+'在路上遇見'+userName+'，三人決定一起展開旅程。途中可能遇見一位是敵是友的神祕人物。'
             : names[0]+'、'+names[1]+'與'+names[2]+'在路上遇見'+userName+'，四人決定一起展開旅程。';
         const hasRolePlaceholders=/\{(CHAR1|CHAR2|CHAR3|USER)\}/.test(String(preset.text||''));
         const text=(hasRolePlaceholders?templateText:roleIntro+'\n\n'+templateText);
