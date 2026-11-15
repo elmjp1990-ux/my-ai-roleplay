@@ -35,7 +35,9 @@ assert.match(phoneBlock, /configuredPhonePrompts\.slice\(0,8\)\.map/,'Single/gro
 assert.match(phoneBlock, /body:'目前尚未有更新'/,'Creator instructions must never be displayed as notification body text');
 assert.match(phoneBlock, /phoneReadErrors/, 'a failed optional phone RPC must not clear successful phone sections');
 assert.match(phoneBlock, /cached\.phoneReadError/, 'per-section phone read errors must survive the short-lived cache');
-assert.match(phoneBlock, /\.catch\(error=>\(\{data:null,error\}\)\)/, 'one rejected phone RPC must be isolated from the other reads');
+assert.match(phoneBlock, /const safePhoneRpc=async\(name,args\)/, 'phone RPCs must be awaited through a rejection-safe helper because Supabase builders are thenables');
+assert.match(phoneBlock, /catch\(error\)\{return \{data:null,error\};\}/, 'one rejected phone RPC must be isolated from the other reads');
+assert.doesNotMatch(phoneBlock, /client\.rpc\([^\n]+\)\.catch\(/, 'do not call catch directly on Supabase thenable query builders');
 assert.doesNotMatch(phoneBlock, /body:String\(row\)|body:row/,'Raw creator instructions must never be rendered as player-facing notification bodies');
 
 assert.ok(html.includes('session.storyWorldState'), 'Phone must read the latest saved story-world state');

@@ -6708,7 +6708,8 @@ function groupRenderSteps() {
 }
 function groupOpeningRoleIntro(members,userName){
   const names=members.map(member=>member.name);
-  const player=String(userName||'玩家').trim()||'你';
+  const rawPlayer=String(userName||'').trim();
+  const player=!rawPlayer||rawPlayer==='玩家'?'你':rawPlayer;
   const oneRoleOpeners=[
     player+'本來只是想把今天的事處理完，'+names[0]+'卻在最意外的時刻出現在眼前。對方似乎有話想說，卻先被眼前的狀況打斷。',
     names[0]+'注意到'+player+'停下腳步，沒有急著追問，只是走近了一點：「需要幫忙嗎？」',
@@ -6787,14 +6788,18 @@ async function groupLoadCharacterPickerPage({reset=false}={}){
     }
     const missingImageItems=items.filter(character=>!safeImage(character.image||character.avatar_url));
     if(missingImageItems.length){
-      const primaryAssets=await loadCharacterPrimaryIllustrationAssets(missingImageItems.map(character=>character.id));
-      if(currentUser()?.uid!==user.uid||groupCharacterPickerPager!==pager||pager.request!==request)return;
-      for(const character of missingImageItems){
-        const primary=primaryAssets.get(character.id)?.primary;
-        if(primary?.src){
-          character.image=primary.src;
-          character.primaryIllustrationPath=primary.path;
+      try{
+        const primaryAssets=await loadCharacterPrimaryIllustrationAssets(missingImageItems.map(character=>character.id));
+        if(currentUser()?.uid!==user.uid||groupCharacterPickerPager!==pager||pager.request!==request)return;
+        for(const character of missingImageItems){
+          const primary=primaryAssets.get(character.id)?.primary;
+          if(primary?.src){
+            character.image=primary.src;
+            character.primaryIllustrationPath=primary.path;
+          }
         }
+      }catch(imageError){
+        console.warn('群組選角立繪載入失敗，改用角色名稱圖示。',imageError);
       }
     }
     pager.items=window.PoyozzListPagination.mergeUnique(pager.items,items,character=>character.id);
@@ -8949,11 +8954,15 @@ async function renderPhoneModal() {
         storyPhoneEventsError=String(cached.phoneReadError||'');
         if(cached.worldState&&typeof cached.worldState==='object')storyWorldState=cached.worldState;
       }else{
+        const safePhoneRpc=async(name,args)=>{
+          try{return await client.rpc(name,args);}
+          catch(error){return {data:null,error};}
+        };
         const [eventsResult,stateResult,worldStateResult,summaryResult]=await Promise.all([
-          client.rpc('get_story_phone_events',{p_session_id:session.id}).catch(error=>({data:null,error})),
-          client.rpc('get_story_phone_state',{p_session_id:session.id}).catch(error=>({data:null,error})),
-          client.rpc('get_story_world_state',{p_session_id:session.id}).catch(error=>({data:null,error})),
-          client.rpc('get_story_memory_summaries',{p_session_id:session.id}).catch(error=>({data:null,error}))
+          safePhoneRpc('get_story_phone_events',{p_session_id:session.id}),
+          safePhoneRpc('get_story_phone_state',{p_session_id:session.id}),
+          safePhoneRpc('get_story_world_state',{p_session_id:session.id}),
+          safePhoneRpc('get_story_memory_summaries',{p_session_id:session.id})
         ]);
         // Each phone section is independent: a missing world-state RPC must not hide valid notifications or snapshots.
         storyMemorySummaryError=summaryResult.error?String(summaryResult.error.message||'讀取 AI 回憶摘要失敗'):'';

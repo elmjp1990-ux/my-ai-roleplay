@@ -670,6 +670,8 @@ assert.match(groupPickerLoader,/missingImageItems=items\.filter\(character=>!saf
   "group picker must only request portrait metadata for cards without a usable image URL");
 assert.match(groupPickerLoader,/loadCharacterPrimaryIllustrationAssets\(missingImageItems\.map\(character=>character\.id\)\)/,
   "group picker image hydration must be bounded to the current page");
+assert.match(groupPickerLoader,/catch\(imageError\)/,
+  "an optional image metadata failure must not block the group character list");
 assert.match(html,/id="groupWorldBackground" maxlength="3000"/,
   "group world background must use one editable 3000-character field");
 assert.doesNotMatch(html,/groupCustomWorldBackground/,
