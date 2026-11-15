@@ -18,6 +18,28 @@ assert.match(html, /不會呼叫 AI，也不會扣款/, 'preset picker must expl
 assert.doesNotMatch(presetSource, /fetch\s*\(|createSignedUrl|supabase|openrouter/i, 'preset asset must not make network or AI requests');
 
 assert.match(pagination, /groupCharacterPicker:10/, 'group character picker page size must remain ten');
+
+const ownedCharacterLoaderStart = html.indexOf('async function loadSupabaseCharacters(user,{loadMore=false}={})');
+const ownedCharacterLoaderEnd = html.indexOf('const characterIllustrationSignedUrlManager', ownedCharacterLoaderStart);
+assert.notEqual(ownedCharacterLoaderStart, -1, 'owned-character loader must remain present');
+assert.notEqual(ownedCharacterLoaderEnd, -1, 'owned-character loader boundary must remain present');
+const ownedCharacterLoader = html.slice(ownedCharacterLoaderStart, ownedCharacterLoaderEnd);
+assert.match(ownedCharacterLoader, /get_latest_owned_character_stories/);
+assert.match(ownedCharacterLoader, /missingStoryRpc/,
+  'a missing batched story RPC must not abort cloud character hydration');
+assert.doesNotMatch(ownedCharacterLoader, /saveSupabaseCharacter\(character,user\.id\)/,
+  'login hydration must never write stale local character snapshots to Supabase');
+assert.match(ownedCharacterLoader, /登入階段只讀取雲端角色/,
+  'local-only legacy characters must remain local until the author explicitly saves');
+
+const groupPreviewStart = html.indexOf('async function groupHydrateListRows(groups)');
+const groupPreviewEnd = html.indexOf('async function groupLoadList', groupPreviewStart);
+assert.notEqual(groupPreviewStart, -1, 'group list hydration must remain present');
+const groupPreviewHydration = html.slice(groupPreviewStart, groupPreviewEnd);
+assert.match(groupPreviewHydration, /get_my_group_list_previews/);
+assert.match(groupPreviewHydration, /missingPreviewRpc/,
+  'a missing preview RPC must not prevent the group list itself from loading');
+
 assert.match(html, /載入更多公開角色（每次 10 位）/, 'group picker must disclose its ten-item page size');
 
 assert.match(html, /let groupCharacterIntroExpandedId = null/, 'character introductions must start collapsed');
