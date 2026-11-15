@@ -11939,7 +11939,7 @@ document.addEventListener('input',event => {
   const target=event.target;
   if (target.closest('form[data-form="character"]')) saveEditorDraft();
   if (target.id==='searchInput') {search=target.value;limit=20;renderGrid();}
-  if(target.id==='groupCustomWorldBackground')groupPrototype.draft.world=target.value;
+  if(target.id==='groupWorldBackground')groupPrototype.draft.world=target.value;
   if (target.id==='chatSearch') {
     chatSearch=target.value;
     refreshChatEntryList();
