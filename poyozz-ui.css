@@ -489,17 +489,27 @@ body.encounter-mode-active .chat-main.encounter-scene > .composer {
 
 /* Refined chat-list rows: soften card edges without changing widths or hit areas. */
 .chat-list .chat-entry {
-  border-color:rgba(255,255,255,.045);
+  width:min(100%,560px);
+  min-height:68px;
+  gap:10px;
+  padding:9px 9px;
+  margin:4px auto 0;
+  border:0;
+  border-bottom:1px solid rgba(255,255,255,.055);
+  border-radius:12px;
   background:transparent;
   box-shadow:none;
 }
 .chat-list .chat-entry:hover,
 .chat-list .chat-entry.active {
-  border-color:rgba(255,255,255,.10);
+  border-color:rgba(255,255,255,.075);
   background:rgba(255,255,255,.035);
   box-shadow:none;
 }
 .chat-list .chat-entry.active { box-shadow:inset 2px 0 rgba(203,194,222,.58); }
+.chat-list .chat-entry .avatar { width:42px; height:42px; flex:0 0 42px; }
+.chat-list .chat-entry .select-chat,
+.chat-list .chat-entry .group-chat-open { min-width:0; }
 
 /* Story Phone: graphite iPhone glass, neutral silver controls and readable light text. */
 .phone-device.phone-device--ios { color:#e5e7eb; border-color:#747b85; background:linear-gradient(145deg,#737b85 0%,#242930 18%,#090b0e 55%,#555d67 100%); }
@@ -524,3 +534,17 @@ body.encounter-mode-active .chat-main.encounter-scene > .composer {
 .phone-app-icon { background:linear-gradient(145deg,#737b86,#424953); color:#f4f5f7; }
 .phone-memory-warning { border-color:rgba(195,201,210,.18); background:rgba(137,145,155,.14); color:#e0e4e9; }
 .phone-home-indicator { background:rgba(226,230,235,.76); box-shadow:none; }
+
+
+/* Character visibility: unmistakable lavender selection outline. */
+.character-visibility-field{min-width:0;margin:0;padding:0;border:0;}
+.character-visibility-field legend{padding:0 0 9px;color:var(--text);font-weight:650;}
+.character-visibility-choice{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.character-visibility-option{display:flex;align-items:center;gap:10px;min-width:0;min-height:62px;padding:10px 12px;border:1px solid rgba(155,123,208,.34);border-radius:13px;background:rgba(155,123,208,.055);cursor:pointer;transition:border-color .16s,background .16s,box-shadow .16s;}
+.character-visibility-option input{flex:0 0 auto;width:17px;height:17px;margin:0;accent-color:#ad8be4;}
+.character-visibility-option span{display:grid;gap:3px;min-width:0;}
+.character-visibility-option strong{font-size:13px;color:var(--text);}
+.character-visibility-option small{font-size:11px;line-height:1.4;color:var(--muted);}
+.character-visibility-option:has(input:checked){border:1.5px solid #b99ae9;background:rgba(155,123,208,.16);box-shadow:0 0 0 2px rgba(155,123,208,.18),inset 0 0 0 1px rgba(185,154,233,.16);}
+.character-visibility-option:focus-within{outline:2px solid rgba(185,154,233,.42);outline-offset:2px;}
+@media(max-width:380px){.character-visibility-choice{gap:7px}.character-visibility-option{padding:9px 8px;gap:7px}}

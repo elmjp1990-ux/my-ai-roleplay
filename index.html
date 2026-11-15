@@ -3853,21 +3853,24 @@ async function loadCloudChatSessions(user, options = {}) {
           .select(sessionSelect).eq('user_id',user.id).is('deleted_at',null)
           .eq('session_data->>pinned','true')
           .order('updated_at',{ascending:false}).order('id',{ascending:false})
-          .range(pager.pinnedOffset,pager.pinnedOffset+pageSize-1);
+          .range(pager.pinnedOffset,pager.pinnedOffset+pageSize);
         if(pinnedError)throw new Error(pinnedError.message);
-        pinnedRows=pinnedData||[];
-        pager.pinnedHasMore=pinnedRows.length===pageSize;
+        const pinnedRowsRaw=pinnedData||[];
+        pager.pinnedHasMore=pinnedRowsRaw.length>pageSize;
+        pinnedRows=pinnedRowsRaw.slice(0,pageSize);
       }
       const {data:pageRows,error:pageError}=await client.from('chat_sessions')
         .select(sessionSelect).eq('user_id',user.id).is('deleted_at',null)
         .or('session_data->>pinned.eq.false,session_data->>pinned.is.null')
         .order('updated_at',{ascending:false}).order('id',{ascending:false})
-        .range(pager.offset,pager.offset+pageSize-1);
+        .range(pager.offset,pager.offset+pageSize);
       if(pageError)throw new Error(pageError.message);
-      rows=[...pinnedRows,...(pageRows||[])];
-      pager.offset+=(pageRows||[]).length;
+      const pageRowsRaw=pageRows||[];
+      const visiblePageRows=pageRowsRaw.slice(0,pageSize);
+      rows=[...pinnedRows,...visiblePageRows];
+      pager.offset+=visiblePageRows.length;
       pager.pinnedOffset+=pinnedRows.length;
-      pager.hasMore=(pageRows||[]).length===pageSize||pager.pinnedHasMore===true;
+      pager.hasMore=pageRowsRaw.length>pageSize||pager.pinnedHasMore===true;
       pager.pinnedLoaded=true;
       pager.initialLoaded=true;
       pager.loading=false;
@@ -3880,6 +3883,20 @@ async function loadCloudChatSessions(user, options = {}) {
       rows=allRows||[];
     }
     if (state.account?.uid !== user.id) return;
+    const falseMarkerSessionIds=(rows||[])
+      .filter(row=>row.session_has_user_message===false||row.session_has_user_message==='false')
+      .map(row=>row.id).filter(Boolean);
+    const confirmedUserMessageSessionIds=new Set();
+    if(falseMarkerSessionIds.length){
+      const {data:messageRefs,error:messageRefsError}=await client.from('chat_messages')
+        .select('session_id').in('session_id',falseMarkerSessionIds)
+        .eq('role','user').is('deleted_at',null).limit(500);
+      if(messageRefsError){
+        console.warn('聊天列表舊訊息標記核對失敗；保留原有標記，不擴大讀取範圍。',messageRefsError);
+      }else{
+        for(const row of messageRefs||[])if(row.session_id)confirmedUserMessageSessionIds.add(row.session_id);
+      }
+    }
     let sessions = (rows || []).filter(row => !readDeletedChatTombstones(user.id).sessions[row.id]);
     const activeSessionIds = new Set(sessions.map(row => row.id));
     let changed = false;
@@ -3928,9 +3945,11 @@ async function loadCloudChatSessions(user, options = {}) {
       const existingHasPlayerMessage=(existing?.messages||[]).some(message=>
         message.role==='user'&&String(message.text||'').trim()
       );
-      const cloudHasUserMessage = marker === null || marker === undefined
-        ? (existing?.cloudHasUserMessage===true||existingHasPlayerMessage ? true : null)
-        : (parseBool(marker)||existingHasPlayerMessage);
+      const cloudHasUserMessage = confirmedUserMessageSessionIds.has(row.id)||(
+        marker === null || marker === undefined
+          ? (existing?.cloudHasUserMessage===true||existingHasPlayerMessage ? true : null)
+          : (parseBool(marker)||existingHasPlayerMessage)
+      );
       state.sessions[row.id] = {
         ...(existing || {}), id:row.id, characterId:row.character_id,
         characterName:row.character_name || snapshot.name || '角色', name:row.session_name || existing?.name || '',
@@ -6109,10 +6128,12 @@ function renderEditor() {
           </label>
           <div id="characterIllustrationGallery" class="character-illustration-gallery">${renderCharacterIllustrationGallery(draftIllustrations, draftImage)}</div>
         </section>
-        <label class="field"><span>權限</span><select name="visibility">
-          <option value="private" ${c.visibility !== 'public' ? 'selected' : ''}>私密</option>
-          <option value="public" ${c.visibility === 'public' ? 'selected' : ''}>公開</option>
-        </select></label>
+        <fieldset class="field character-visibility-field"><legend>角色權限</legend>
+          <div class="character-visibility-choice" role="radiogroup" aria-label="選擇角色公開或私密狀態">
+            <label class="character-visibility-option"><input type="radio" name="visibility" value="private" ${c.visibility !== 'public' ? 'checked' : ''}><span><strong>私密</strong><small>僅自己可見</small></span></label>
+            <label class="character-visibility-option"><input type="radio" name="visibility" value="public" ${c.visibility === 'public' ? 'checked' : ''}><span><strong>公開</strong><small>符合條件後可供其他玩家瀏覽</small></span></label>
+          </div>
+        </fieldset>
         <div class="field"><span>標籤，最多5個</span>
           <button type="button" data-action="tags" data-mode="character">添加標籤</button>
           <div id="formTags" class="row wrap" style="margin-top:10px">${draftTags.map(draftTagButton).join('')}</div>
@@ -6488,6 +6509,42 @@ async function createStorySession(characterId, originMode, sourceEncounterSessio
   toast(originMode==='encounter_snapshot'?'已承接上次相遇，並建立獨立的新故事。':'已建立全新故事；原本聊天室不會被覆蓋。');
 }
 
+async function findExistingStoryChatSessionFallback(client,userId,characterId) {
+  const {data:sessionRows,error:sessionError}=await client.from('chat_sessions')
+    .select('id,updated_at,chat_mode,session_data')
+    .eq('user_id',userId).eq('character_id',characterId).is('deleted_at',null)
+    .order('updated_at',{ascending:false}).order('id',{ascending:false}).limit(10);
+  if(sessionError)throw sessionError;
+  const candidates=(sessionRows||[]).filter(row=>{
+    const data=row.session_data&&typeof row.session_data==='object'&&!Array.isArray(row.session_data)?row.session_data:{};
+    return row.chat_mode!=='encounter'&&
+      !(data.encounter&&typeof data.encounter==='object'&&!Array.isArray(data.encounter))&&
+      data.encounterMode!==true&&data.encounterMode!=='true'&&
+      !String(data.encounterPlace||'').trim();
+  });
+  if(!candidates.length)return null;
+  const candidateIds=candidates.map(row=>row.id);
+  const {data:messageRows,error:messageError}=await client.from('chat_messages')
+    .select('session_id,created_at,id').in('session_id',candidateIds)
+    .eq('role','user').is('deleted_at',null)
+    .order('created_at',{ascending:false}).order('id',{ascending:false}).limit(500);
+  if(messageError)throw messageError;
+  const latestUserAt=new Map();
+  for(const message of messageRows||[]){
+    if(!latestUserAt.has(message.session_id))latestUserAt.set(message.session_id,Date.parse(message.created_at)||0);
+  }
+  candidates.sort((a,b)=>
+    (latestUserAt.get(b.id)||0)-(latestUserAt.get(a.id)||0)||
+    (Date.parse(b.updated_at)||0)-(Date.parse(a.updated_at)||0)||
+    String(b.id).localeCompare(String(a.id))
+  );
+  return candidates[0]?.id||null;
+}
+function isMissingRpcSchemaCacheError(error,functionName) {
+  const message=String(error?.message||'');
+  return error?.code==='PGRST202'||(/schema cache/i.test(message)&&message.includes(functionName));
+}
+
 async function startChat(characterId) {
   const character = state.characters.find(item => item.id === characterId);
   if (!accessible(character)) return toast('此角色已被作者調整為私密或刪除狀態，不支持開啟新對話');
@@ -6498,11 +6555,15 @@ async function startChat(characterId) {
   const verifiedUser = await getVerifiedAuthUser(userId);
   if (!verifiedUser) return toast('登入狀態尚未確認，請重新登入後再試。');
   try {
-    // One owner-scoped RPC replaces the separate session-list and user-message lookups.
-    const {data:existingRows,error:existingError}=await client.rpc('find_existing_story_chat_session',{
-      p_character_id:characterId
-    });
-    if(existingError)throw existingError;
+    // Prefer the owner-scoped RPC; only a schema-cache miss uses bounded reads protected by RLS.
+    const existingResult=await client.rpc('find_existing_story_chat_session',{p_character_id:characterId});
+    let existingRows=existingResult.data;
+    if(existingResult.error){
+      if(!isMissingRpcSchemaCacheError(existingResult.error,'find_existing_story_chat_session'))throw existingResult.error;
+      console.warn('find_existing_story_chat_session 尚未部署，改用 owner-scoped bounded lookup。',existingResult.error);
+      const fallbackSessionId=await findExistingStoryChatSessionFallback(client,userId,characterId);
+      existingRows=fallbackSessionId?[{session_id:fallbackSessionId}]:[];
+    }
     const existingSessionId=Array.isArray(existingRows)?existingRows[0]?.session_id:null;
     if(existingSessionId){
       await loadCloudChatSessions({id:userId},{onlySessionId:existingSessionId,verifiedUser});
@@ -6894,7 +6955,7 @@ function refreshChatEntryList() {
     sentinel.dataset.chatListSentinel='true';
     sentinel.className='small muted';
     sentinel.style.cssText='padding:12px;text-align:center';
-    sentinel.textContent='繼續往下滑動，載入更多對話…';
+    sentinel.textContent='滑至列表底部載入更多對話…';
     entries.appendChild(sentinel);
     const scrollRoot=entries.closest('.chat-list');
     chatListPaginationObserver=window.PoyozzListPagination.observeEnd(sentinel,async()=>{
@@ -6904,7 +6965,7 @@ function refreshChatEntryList() {
       if(groupPrototype.groupsLoaded&&groupPrototype.groupListHasMore){
         await groupLoadList(false,true);
       }
-    },{root:scrollRoot&&scrollRoot.scrollHeight>scrollRoot.clientHeight?scrollRoot:null,rootMargin:'40px 0px'});
+    },{root:scrollRoot||null,rootMargin:'0px'});
   }else if(chatSessionListPager.initialLoaded&&groupPrototype.groupsLoaded){
     const end=document.createElement('div');
     end.className='small muted';
@@ -7019,20 +7080,22 @@ async function groupLoadList(force=false,loadMore=false) {
         .select('id,name,world_background,scene_mode,created_at,updated_at,pinned')
         .eq('pinned',true).is('archived_at',null)
         .order('updated_at',{ascending:false}).order('id',{ascending:false})
-        .range(g.groupPinnedOffset,g.groupPinnedOffset+pageSize-1);
+        .range(g.groupPinnedOffset,g.groupPinnedOffset+pageSize);
       if(pinnedError)throw pinnedError;
-      pinnedRows=pinnedPage||[];
-      g.groupPinnedHasMore=pinnedRows.length===pageSize;
+      const pinnedPageRows=pinnedPage||[];
+      g.groupPinnedHasMore=pinnedPageRows.length>pageSize;
+      pinnedRows=pinnedPageRows.slice(0,pageSize);
     }
     const {data:pageRows,error:pageError}=await client.from('chat_groups')
       .select('id,name,world_background,scene_mode,created_at,updated_at,pinned')
       .or('pinned.eq.false,pinned.is.null').is('archived_at',null)
       .order('updated_at',{ascending:false}).order('id',{ascending:false})
-      .range(g.groupListOffset,g.groupListOffset+pageSize-1);
+      .range(g.groupListOffset,g.groupListOffset+pageSize);
     if(pageError)throw pageError;
     if(user.id!==currentUser()?.uid){groupResetForAccount(currentUser()?.uid||null);return;}
     const deletedGroupIds=readDeletedChatTombstones(user.id).groups;
-    const currentPage=pageRows||[];
+    const rawCurrentPage=pageRows||[];
+    const currentPage=rawCurrentPage.slice(0,pageSize);
     const existingIds=new Set((g.groups||[]).map(group=>group.id));
     const newRows=[...pinnedRows,...currentPage].filter(group=>!deletedGroupIds[group.id]&&!existingIds.has(group.id));
     if(newRows.length){
@@ -7043,7 +7106,7 @@ async function groupLoadList(force=false,loadMore=false) {
     g.groupPinnedLoaded=true;
     g.groupPinnedOffset+=pinnedRows.length;
     g.groupListOffset+=currentPage.length;
-    g.groupListHasMore=currentPage.length===pageSize||g.groupPinnedHasMore===true;
+    g.groupListHasMore=rawCurrentPage.length>pageSize||g.groupPinnedHasMore===true;
     const latestDeletedGroups=readDeletedChatTombstones(user.id).groups;
     g.groups=g.groups.filter(group=>!latestDeletedGroups[group.id]);
     const retainedIds=new Set(g.groups.map(group=>group.id));
@@ -7314,7 +7377,7 @@ function renderGroupConversation() {
         </div>
         <div class="group-history-pagination" style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding:8px 0 2px">
           ${g.searchJump?'<button type="button" class="ghost small" data-chat-search-return-latest="group">返回最新訊息</button>':''}
-          ${g.historyHasMore?'<button type="button" class="ghost small" data-action="group-history-load-older" '+(g.historyLoading?'disabled':'')+'>'+(g.historyLoading?'正在載入較早訊息…':'載入更早的訊息')+'</button>':''}
+          ${g.historyHasMore?'<button type="button" class="ghost small" data-history-top-control hidden data-action="group-history-load-older" '+(g.historyLoading?'disabled':'')+'>'+(g.historyLoading?'正在載入較早訊息…':'載入更早的訊息')+'</button>':''}
           ${g.historyError?'<span class="small muted" role="status">'+e(g.historyError)+'</span>':''}
         </div>
         <div class="messages" id="groupMessages">${messageRows}</div>
@@ -7372,6 +7435,7 @@ ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
   // Keep the newest group messages in view when opening or re-rendering the chat.
   const groupMessages=$('groupMessages');
   if(groupMessages) {
+    bindHistoryTopControl(groupMessages,()=>document.querySelector('.group-history-pagination [data-history-top-control]'));
     const anchor=g.historyScrollAnchor;
     g.historyScrollAnchor=null;
     if(anchor){
@@ -7383,8 +7447,8 @@ ${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
           groupMessages.scrollTop=groupMessages.scrollHeight;
         }
       };
-      requestAnimationFrame(()=>{scrollToLatest();requestAnimationFrame(scrollToLatest);});
-      setTimeout(scrollToLatest,80);
+      requestAnimationFrame(()=>{scrollToLatest();syncHistoryTopControl(groupMessages,document.querySelector('.group-history-pagination [data-history-top-control]'));requestAnimationFrame(scrollToLatest);});
+      setTimeout(()=>{scrollToLatest();syncHistoryTopControl(groupMessages,document.querySelector('.group-history-pagination [data-history-top-control]'));},80);
     }
   }
 }
@@ -8472,6 +8536,7 @@ function renderConversation() {
   panel.style.setProperty('--chat-photo',
     s.background === 'none' ? 'none' : `url(${JSON.stringify(safeImage(c.image))})`);
   const messagesNode=$('messages');
+  bindHistoryTopControl(messagesNode);
   if(messagesNode)messagesNode.addEventListener('click',event=>{
     const button=event.target.closest('[data-chat-history-action]');
     if(!button)return;
@@ -8657,6 +8722,17 @@ function parsePlatformCommand(raw) {
   const match = String(raw || '').trim().match(/^\/([a-zA-Z][\w-]*)(?:\s+([\s\S]*))?$/u);
   return match ? {type:'platform',name:match[1].toLowerCase(),args:match[2] || ''} : {type:'none'};
 }
+function syncHistoryTopControl(messagesNode,controlNode=messagesNode?.querySelector('[data-history-top-control]')) {
+  if(!messagesNode||!controlNode)return;
+  const hasOverflow=messagesNode.scrollHeight>messagesNode.clientHeight+8;
+  controlNode.hidden=hasOverflow&&messagesNode.scrollTop>24;
+}
+function bindHistoryTopControl(messagesNode,controlGetter=()=>messagesNode?.querySelector('[data-history-top-control]')) {
+  if(!messagesNode||messagesNode.dataset.historyTopControlBound==='true')return;
+  messagesNode.dataset.historyTopControlBound='true';
+  messagesNode.addEventListener('scroll',()=>syncHistoryTopControl(messagesNode,controlGetter()),{passive:true});
+  syncHistoryTopControl(messagesNode,controlGetter());
+}
 function renderMessages(scroll = true) {
   if (!$('messages')) return;
   const s = currentSession();
@@ -8666,7 +8742,7 @@ function renderMessages(scroll = true) {
   const historyControl=s.cloudOwned
     ?((s.cloudSearchJump?'<div class="small muted" style="text-align:center;padding:6px">已定位到搜尋結果附近　<button type="button" class="ghost small" data-chat-search-return-latest="single">返回最新訊息</button></div>':'')+(s.cloudMessagesLoading?'<div class="small muted" style="text-align:center;padding:10px">正在載入聊天紀錄…</div>'
       :s.cloudMessagesError?'<div class="small muted" style="text-align:center;padding:10px"><span>'+e(s.cloudMessagesError)+'</span> <button type="button" data-chat-history-action="'+(s.cloudMessagesErrorOlder?'older':'retry')+'">'+(s.cloudMessagesErrorOlder?'重試載入較早訊息':'重新載入')+'</button></div>'
-      :s.cloudHasMoreMessages?'<div style="text-align:center;padding:10px"><button type="button" data-chat-history-action="older">載入更早的訊息</button></div>':''))
+      :s.cloudHasMoreMessages?'<div data-history-top-control hidden style="text-align:center;padding:10px"><button type="button" data-chat-history-action="older">載入更早的訊息</button></div>':''))
     :'';
   $('messages').innerHTML = historyControl + s.messages.filter(m => !(m.role === 'user' && String(m.text||'').trim() === GROUP_CONTINUE_SENTINEL)).map(m => {
     const user = m.role === 'user';
@@ -8715,6 +8791,7 @@ function renderMessages(scroll = true) {
   }).join('');
   if(s.activeTurnInFlight){const characterName=sessionCharacter(s)?.name||'角色';$('messages').insertAdjacentHTML('beforeend','<article class="message assistant-typing" role="status" aria-live="polite"><div class="message-content"><div class="message-name">'+e(characterName)+'</div><div class="typing-indicator"><span>'+e(characterName)+'正在回覆</span><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span></div></div></article>');}
   $('messages').scrollTop = scroll ? $('messages').scrollHeight : oldScroll;
+  syncHistoryTopControl($('messages'));
   const loadingHistory=!!(s.cloudOwned&&!s.cloudMessagesLoaded);
   const sendButton=$('view')?.querySelector('.chat-main .composer-send');
   if(sendButton){
