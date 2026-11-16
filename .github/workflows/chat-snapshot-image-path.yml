@@ -56,9 +56,14 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261116170000_preserve_group_character_avatar_snapshots.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261116171000_allow_existing_chat_portrait_access.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/chat-snapshot-avatar-scenarios.sql
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Check Edge Function types
+        run: deno check supabase/functions/story-session/index.ts supabase/functions/encounter-session/index.ts
       - name: Check Edge Function syntax
         run: |
           node --check supabase/functions/story-session/index.ts
