@@ -28,6 +28,19 @@ Deno.test("separate-scene groups never receive a group-wide memory summary", () 
   assertEquals(getGroupHistoryLimit("separate", true, false), 40);
 });
 
+Deno.test("curated group memories are capped to the eight newest valid batches", () => {
+  const rows = Array.from({ length: 10 }, (_, index) => ({
+    batch_number: 10 - index,
+    summary: "珍藏摘要 " + (10 - index),
+    important: true,
+  }));
+  const context = buildGroupMemoryContext("shared", null, rows);
+  assertStringIncludes(context, "珍藏摘要 10");
+  assertStringIncludes(context, "珍藏摘要 3");
+  assertEquals(context.includes("珍藏摘要 2"), false);
+  assertEquals(context.includes("珍藏摘要 1"), false);
+});
+
 Deno.test("shared-scene history is reduced only when the summary lookup is healthy and a cumulative summary exists", () => {
   assertEquals(getGroupHistoryLimit("shared", true, false), 24);
   assertEquals(getGroupHistoryLimit("shared", false, false), 40);
