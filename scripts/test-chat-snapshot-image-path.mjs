@@ -38,3 +38,22 @@ assert.match(html,/characterIllustrationSignedUrlManager\.getMany\(unique\.map\(
   'group snapshot portrait paths should be signed in a single batch');
 assert.match(html,/snapshot\.imagePath\|\|snapshot\.primaryIllustrationPath/,
   'group list and group-open hydration must read the snapshotted image path');
+
+const retainedPortraitPolicy = fs.readFileSync(
+  'supabase/migrations/20261116171000_allow_existing_chat_portrait_access.sql',
+  'utf8',
+);
+assert.match(retainedPortraitPolicy,/cs\.user_id = \(SELECT auth\.uid\(\)\)/,
+  'single-chat portrait access must be scoped to the authenticated chat owner');
+assert.match(retainedPortraitPolicy,/cs\.deleted_at IS NULL/,
+  'deleted single-chat sessions must not retain Storage access');
+assert.match(retainedPortraitPolicy,/cs\.character_snapshot->>'imagePath' = objects\.name/,
+  'single-chat access must be limited to the exact path in its trusted snapshot');
+assert.match(retainedPortraitPolicy,/g\.owner_id = \(SELECT auth\.uid\(\)\)/,
+  'group portrait access must be scoped to the authenticated group owner');
+assert.match(retainedPortraitPolicy,/g\.deleted_at IS NULL/,
+  'deleted groups must not retain Storage access');
+assert.match(retainedPortraitPolicy,/gm\.character_snapshot->>'imagePath' = objects\.name/,
+  'group access must be limited to the exact path in its member snapshot');
+assert.match(retainedPortraitPolicy,/public\.account_is_active\(\)/,
+  'existing-chat portrait reads must require an active authenticated account');
