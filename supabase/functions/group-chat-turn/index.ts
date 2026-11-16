@@ -238,7 +238,7 @@ Deno.serve(async (request) => {
   const characterIds = members.map(m => m.character_id).filter(isUuid);
   const [historyResult, charactersResult, privateRowsResult] = await Promise.all([
     admin.from("chat_group_messages")
-      .select("turn_id,scene_id,speaker_type,character_id,speaker_snapshot,content,created_at,sequence_no")
+      .select("turn_id,scene_id,speaker_type,speaker_snapshot,content")
       .eq("group_id", groupId).is("deleted_at", null)
       .order("created_at", { ascending: false }).order("sequence_no", { ascending: false }).order("id", { ascending: false }).limit(groupHistoryLimit),
     characterIds.length ? admin.from("characters")
