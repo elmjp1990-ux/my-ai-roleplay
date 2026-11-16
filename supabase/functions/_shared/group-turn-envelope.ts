@@ -103,8 +103,11 @@ export function parseGroupTurnEnvelopeDetailed(output: unknown, speakers: GroupT
       const notifications: GroupPhoneNotification[] = [];
       for (const rawNotice of row.notifications) {
         const notice = asObject(rawNotice), title = asText(notice.title), body = asText(notice.body);
-        if (!title || !body || title.length > 80 || body.length > 500) {
-          if (configuredPrompts(speaker).length > 0) {
+        const hasConfiguredTitle = configuredPrompts(speaker).length > 0;
+        // Configured titles are authoritative server-side labels. The model may
+        // omit the redundant title; only the notification body is generated.
+        if ((!title && !hasConfiguredTitle) || !body || title.length > 80 || body.length > 500) {
+          if (hasConfiguredTitle) {
             return { envelope: null, errorCode: "invalid_required_phone_notification", warningCount };
           }
           warningCount += 1;
