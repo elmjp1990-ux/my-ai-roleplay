@@ -93,8 +93,17 @@ assert.match(retainedPortraitPolicy,/public\.account_is_active\(\)/,
   'existing-chat portrait reads must require an active authenticated account');
 
 const softDeleteFunction = groupCreationMigration.match(
-  /CREATE OR REPLACE FUNCTION public\\.soft_delete_character\\([\\s\\S]*?\\$function\\$;/,
+  /CREATE OR REPLACE FUNCTION public\.soft_delete_character\([\s\S]*?\$function\$;/,
 )?.[0] || '';
 assert.ok(softDeleteFunction, 'the migration must preserve and update the existing soft-delete RPC');
-assert.doesNotMatch(softDeleteFunction,/updated_at\\s*=\\s*now\\(\\)/i,
+assert.doesNotMatch(softDeleteFunction,/updated_at\s*=\s*now\(\)/i,
   'soft_delete_character must not bump the chat session sync version');
+
+const snapshotScenarios = fs.readFileSync(
+  'supabase/tests/chat-snapshot-avatar-scenarios.sql',
+  'utf8',
+);
+assert.match(snapshotScenarios,/DELETE FROM public\.character_illustrations WHERE character_id = v_character/,
+  'group snapshot-only access must be tested without a matching illustration metadata row');
+assert.match(snapshotScenarios,/anonymous viewers unexpectedly received access to an NSFW portrait/,
+  'the original public Storage policy must retain its NSFW gate');
