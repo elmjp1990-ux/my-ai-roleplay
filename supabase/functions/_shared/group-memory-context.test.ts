@@ -37,9 +37,9 @@ Deno.test("curated group memories are capped to the eight newest valid batches",
   const context = buildGroupMemoryContext("shared", null, rows);
   assertStringIncludes(context, "珍藏摘要 10");
   assertStringIncludes(context, "珍藏摘要 3");
-  assertEquals(context.split("\\n").includes("第 2 批：珍藏摘要 2"), false);
-  assertEquals(context.split("\\n").includes("第 1 批：珍藏摘要 1"), false);
-  assertEquals(context.split("\\n").filter((line) => line.startsWith("第 ")).length, 8);
+  assertEquals(context.split(/\n/).includes("第 2 批：珍藏摘要 2"), false);
+  assertEquals(context.split(/\n/).includes("第 1 批：珍藏摘要 1"), false);
+  assertEquals(context.split(/\n/).filter((line) => line.startsWith("第 ")).length, 8);
 });
 
 Deno.test("shared-scene history is reduced only when the summary lookup is healthy and a cumulative summary exists", () => {
