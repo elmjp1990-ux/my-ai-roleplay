@@ -74,7 +74,33 @@ Deno.test("accepts omitted model titles for configured fields and rejects missin
       { character_id: "b", notifications: [{ title: "公司訊息", body: "正常" }] },
     ],
   }), roster);
-  assertEquals(missingBody.errorCode, "invalid_required_phone_notification");
+  assertEquals(missingBody.errorCode, null);
+  assertEquals(missingBody.envelope?.phoneUpdates, [
+    { characterId: "a", notifications: [{ title: "👔夜辰衣著/姿勢", body: "保留既有狀態" }] },
+    { characterId: "b", notifications: [{ title: "💼公司訊息", body: "目前沒有足夠資訊。" }] },
+  ]);
+
+  const overlongDuplicateTitle = parseGroupTurnEnvelopeDetailed(JSON.stringify({
+    speeches: [{ speaker_id: "a", content: "有效角色發言" }],
+    phone_updates: [
+      { character_id: "a", notifications: [{ title: "模型重複輸出的標題".repeat(20), body: "狀態正常" }] },
+      { character_id: "b", notifications: [{ title: "", body: "公司行程正常" }] },
+    ],
+  }), roster);
+  assertEquals(overlongDuplicateTitle.errorCode, null);
+  assertEquals(overlongDuplicateTitle.envelope?.phoneUpdates[0].notifications[0].title, "👔夜辰衣著/姿勢");
+  assertEquals(overlongDuplicateTitle.envelope?.phoneUpdates[0].notifications[0].body, "狀態正常");
+
+  const overlongBody = "狀態".repeat(300);
+  const truncatedBody = parseGroupTurnEnvelopeDetailed(JSON.stringify({
+    speeches: [{ speaker_id: "a", content: "有效角色發言" }],
+    phone_updates: [
+      { character_id: "a", notifications: [{ title: "", body: overlongBody }] },
+      { character_id: "b", notifications: [{ title: "", body: "公司行程正常" }] },
+    ],
+  }), roster);
+  assertEquals(truncatedBody.errorCode, null);
+  assertEquals(truncatedBody.envelope?.phoneUpdates[0].notifications[0].body.length, 500);
 });
 
 Deno.test("keeps prior phone state only for characters without configured fields", () => {
