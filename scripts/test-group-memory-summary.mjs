@@ -15,6 +15,10 @@ assert.match(groupAiMigration,/SET phone_notifications = v_phone_notifications/)
 assert.match(edge,/processDueGroupMemorySummary/);
 assert.match(edge,/buildGroupMemoryContext/);
 assert.match(edge,/getGroupHistoryLimit/);
+assert.match(edge,/isCurrentGroupMemorySummary/);
+assert.ok(edge.includes('select("id", { count: "exact", head: true })'));
+assert.ok(memoryContext.includes("GROUP_MEMORY_SUMMARY_INTERVAL = 5"));
+assert.ok(memoryContext.includes("Math.floor(completedTurnCount / GROUP_MEMORY_SUMMARY_INTERVAL) === batch"));
 assert.ok(edge.includes('from("chat_group_memory_summaries")'));
 assert.ok(edge.includes('asText(group.scene_mode) === "shared"'));
 assert.ok(edge.includes("limit(groupHistoryLimit)"));
