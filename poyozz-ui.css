@@ -554,3 +554,16 @@ body.encounter-mode-active .chat-main.encounter-scene > .composer {
 
 .character-visibility-option:focus-within{outline:2px solid rgba(185,154,233,.42);outline-offset:2px;}
 @media(max-width:380px){.character-visibility-choice{gap:7px}.character-visibility-option{padding:9px 8px;gap:7px}}
+
+
+/* Composer placeholder contrast and 25-character narration target. */
+body.conversation .composer-input-row textarea,
+body.group-chat-page .composer-input-row textarea { color:var(--text); background-color:rgba(255,255,255,.045); }
+body.conversation .composer-input-row textarea::placeholder,
+body.group-chat-page .composer-input-row textarea::placeholder { color:rgba(238,240,244,.82); opacity:1; background:transparent; text-shadow:none; }
+body.day.conversation .composer-input-row textarea::placeholder,
+body.day.group-chat-page .composer-input-row textarea::placeholder { color:rgba(48,51,57,.78); }
+@media(max-width:600px) {
+  body.conversation .messages, body.group-chat-page .messages { padding-inline:6px; }
+  body.conversation .roleplay-segment.is-action .narration, body.group-chat-page .roleplay-segment.is-action .narration { max-width:min(25em,100%); font-size:clamp(12px,3.65vw,15px); }
+}

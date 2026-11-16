@@ -36,9 +36,9 @@ async function refund(admin: any, userId: string, turnId: string, code: string) 
 
 
 function extractGroupSuggestedReplies(output: string): string[] {
-  let text = asText(output).replace(/^\\uFEFF/, "");
+  let text = asText(output).trim();
   if (text.startsWith("```")) {
-    const firstLine = text.indexOf("\\n");
+    const firstLine = text.indexOf("\n");
     const lastFence = text.lastIndexOf("```");
     if (firstLine >= 0 && lastFence > firstLine) text = text.slice(firstLine + 1, lastFence).trim();
   }

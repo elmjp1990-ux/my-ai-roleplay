@@ -220,3 +220,6 @@ assert.match(html,/get_group_memory_summaries/,'Group Sweet Diary must read pers
 assert.match(groupTurnSource,/processDueGroupMemorySummary/,'Group turns must invoke the shared five-turn AI summary pipeline');
 assert.match(memorySummaryWorker,/export async function processDueGroupMemorySummary/,'The shared worker must implement group summaries');
 assert.match(html,/每 5 個已完成的群組回合，由 AI 整理一則 50–150 字摘要/,'Group diary must state the same 50–150 character summary contract as single Story');
+assert.match(html,/function phoneNoticeIconPresentation\\(value\\)/,'configured phone notice title prefixes must select their own icon');
+assert.match(html,/const icon=match\\?\\.\\[0\\]\\|\\|'🔔'/,'missing author icon must fall back to the bell');
+assert.match(html,/storyPhoneRuntimeCache\\.delete\\(String\\(user\\.uid\\)/,'Story summary edit must use the scoped user id and refresh immediately');

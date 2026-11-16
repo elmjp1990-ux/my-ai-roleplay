@@ -4,6 +4,7 @@ import fs from 'node:fs';
 const html=fs.readFileSync('index.html','utf8');
 const pager=fs.readFileSync('list-pagination.js','utf8');
 const css=fs.readFileSync('poyozz-ui.css','utf8');
+const groupEdge=fs.readFileSync('supabase/functions/group-chat-turn/index.ts','utf8');
 
 const conversation=html;
 assert.match(conversation,/loadCloudChatSessions\(owner,\{onlySessionId:sessionId,listPage:false\}\)/,
@@ -54,4 +55,18 @@ assert.match(html,/for\(let attempt=0;attempt<2;attempt\+\+\)/,'pin sync retries
 assert.match(css,/\.chat-list #chatEntries > \.chat-entry\s*\{[^}]*min-height:68px/);
 assert.match(css,/\.character-visibility-option:has\(input:checked\)/);
 assert.match(html,/max-width:min\(20em,100%\)/,'dialogue bubbles must target 18 full-width Chinese characters');
-assert.match(html,/max-width:min\(24em,100%\)/,'star-wrapped narration must target 22–24 full-width Chinese characters');
+assert.match(html,/max-width:min\(25em,100%\)/,'star-wrapped narration must target 25 full-width Chinese characters');
+assert.match(html,/function conversationSuggestionsHTML\\(s\\)/,'single and group chat must share one suggestion renderer');
+assert.match(html,/本回合暫時沒有可用的建議回覆。/,'empty suggestion state must be explicit before the first AI reply');
+assert.match(html,/conversationSuggestionsHTML\\(\\{[\\s\\S]{0,260}suggestedReplies:group\\.suggestedReplies/,'group chat must use the shared single-chat suggestion UI and state');
+assert.doesNotMatch(html,/① 溫柔關心|② 活潑互動|③ 溫柔陪伴/,'group chat must not contain hard-coded sample suggestions');
+assert.match(html,/const typingHTML=typingMember\\?[\\s\\S]{0,500}正在回覆/,'group chat must display a character typing indicator while the AI request is active');
+assert.match(html,/g\\.typingSpeakerId=typingMember\\?String/,'group typing indicator must select one of the actual group characters');
+assert.match(html,/storyPhoneRuntimeCache\\.delete\\(String\\(user\\.uid\\)/,'Story summary edit must invalidate cache with the authenticated user id');
+assert.match(html,/function phoneNoticeIconPresentation\\(value\\)/,'configured phone notice prefixes must be parsed into their own app icon');
+assert.match(html,/const \\{icon,title\\}=phoneNoticeIconPresentation\\(rawTitle\\)/,'phone notice rows must use the author-specified leading icon');
+assert.match(groupEdge,/Promise\\.all\\(members\\.map/,'group derived profile RPCs must run concurrently instead of serially');
+assert.match(groupEdge,/CLEANUP_RESERVE_MS = 12_000/,'group AI deadline must reserve time for the atomic refund path');
+assert.match(groupEdge,/errorName === "AbortError"/,'group AI timeout must recognize cross-realm abort errors');
+assert.match(groupEdge,/function extractGroupSuggestedReplies/,'group AI must parse suggestions from the same model response');
+assert.match(groupEdge,/suggested_replies: suggestedReplies/,'group AI suggestions must be returned to the shared chat UI');
