@@ -181,7 +181,8 @@ const groupEdge=fs.readFileSync("supabase/functions/group-chat-turn/index.ts","u
 const groupMigration=fs.readFileSync("supabase/migrations/20261114180000_group_ai_single_orchestrator.sql","utf8");
 const sharedOpenRouter=fs.readFileSync("supabase/functions/_shared/openrouter-chat-completions.ts","utf8");
 assert.match(sharedOpenRouter,/deepseek\/deepseek-v4-flash-20260423/,"single and group chat must share the approved DeepSeek V4 Flash model");
-assert.match(groupEdge,/parseGroupTurnEnvelope\(provider\.result\.text, speakers\)/,"the single model response must validate speaker IDs and per-character phone states");
+assert.match(groupEdge,/parseGroupTurnEnvelopeDetailed\(provider\.result\.text, speakers\)/,"the single model response must validate speaker IDs and recover optional metadata");
+assert.match(groupEdge,/group_chat_turn_optional_metadata_recovered/,"optional group phone metadata must not discard valid character speeches");
 assert.match(groupEdge,/requestOpenRouterChatCompletion\(/,"group chat must reuse the shared OpenRouter client");
 assert.match(sharedOpenRouter,/buildOpenRouterProviderOptions\(\)/,"all chat modes must share the approved no-data-collection provider restriction");
 assert.match(sharedOpenRouter,/AbortController/,"the shared provider request must retain a bounded timeout");
