@@ -64,8 +64,14 @@ export async function recordChatModelUsage(
   if (error) console.error("AI usage record write failed:", error.code || "database_error");
 }
 
-async function requestMemorySummary(messages: Array<{ role: "system" | "user"; content: string }>, apiKey: string) {
-  return requestOpenRouterChatCompletion({
+type MemorySummaryUsage = ReturnType<typeof usageSnapshot>;
+
+async function generateMemorySummary(
+  messages: Array<{ role: "system" | "user"; content: string }>,
+  apiKey: string,
+  previousBatch: DbRow | null,
+) {
+  const response = await requestOpenRouterChatCompletion({
     messages,
     apiKey,
     model: SUMMARY_MODEL,
@@ -73,6 +79,49 @@ async function requestMemorySummary(messages: Array<{ role: "system" | "user"; c
     temperature: 0.2,
     responseFormat: { type: "json_object" },
   });
+  const usage = usageSnapshot(response.usage);
+  const priorUsage = usageSnapshot({
+    prompt_tokens: previousBatch?.prompt_tokens,
+    completion_tokens: previousBatch?.completion_tokens,
+    total_tokens: previousBatch?.total_tokens,
+    cost: previousBatch?.cost_usd,
+  });
+  const accumulatedUsage: MemorySummaryUsage = {
+    prompt_tokens: priorUsage.prompt_tokens === null && usage.prompt_tokens === null ? null : (priorUsage.prompt_tokens || 0) + (usage.prompt_tokens || 0),
+    completion_tokens: priorUsage.completion_tokens === null && usage.completion_tokens === null ? null : (priorUsage.completion_tokens || 0) + (usage.completion_tokens || 0),
+    total_tokens: priorUsage.total_tokens === null && usage.total_tokens === null ? null : (priorUsage.total_tokens || 0) + (usage.total_tokens || 0),
+    cost_usd: priorUsage.cost_usd === null && usage.cost_usd === null ? null : (priorUsage.cost_usd || 0) + (usage.cost_usd || 0),
+  };
+  const requestId = /^[A-Za-z0-9._:-]{1,128}$/.test(response.requestId) ? response.requestId : null;
+  const rawOutput = response.result.kind === "generated" ? response.result.text.trim() : "";
+  let summary = "";
+  let affinityCorrection = 0;
+  let affinityReason = "";
+  try {
+    const parsed = JSON.parse(rawOutput) as Record<string, unknown>;
+    summary = normalizeStoryMemorySummaryText(parsed.summary);
+    const correction = parsed.affinity_correction;
+    if (typeof correction === "number" && Number.isInteger(correction) && correction >= -5 && correction <= 5) {
+      affinityCorrection = correction;
+    }
+    affinityReason = typeof parsed.affinity_reason === "string" ? parsed.affinity_reason.trim().slice(0, 280) : "";
+  } catch {
+    // Legacy plain-text summaries remain usable, but cannot adjust affinity.
+    summary = normalizeStoryMemorySummaryText(rawOutput);
+  }
+  return { response, summary, affinityCorrection, affinityReason, requestId, usage: accumulatedUsage };
+}
+
+function summaryUsageMetadata(generation: Awaited<ReturnType<typeof generateMemorySummary>>) {
+  return {
+    model: generation.response.model,
+    provider: generation.response.provider,
+    gateway_request_id: generation.requestId,
+    prompt_tokens: generation.usage.prompt_tokens,
+    completion_tokens: generation.usage.completion_tokens,
+    total_tokens: generation.usage.total_tokens,
+    cost_usd: generation.usage.cost_usd,
+  };
 }
 
 export async function processDueStoryMemorySummary(
@@ -234,9 +283,9 @@ export async function processDueStoryMemorySummary(
     throw new Error("story_relationship_state_unavailable");
   }
 
-  let response;
+  let generated;
   try {
-    response = await requestMemorySummary([
+    generated = await generateMemorySummary([
       {
         role: "system",
         content: [
@@ -256,7 +305,7 @@ export async function processDueStoryMemorySummary(
           "\n\n【本次新增的五回合對話】\n" + transcript +
           "\n\n請依指定 JSON 格式輸出更新後的完整累積摘要與必要的好感度小幅校正。",
       },
-    ], apiKey);
+    ], apiKey, existingBatch);
   } catch {
     await admin.from("ai_model_usage").update({
       status: "failed", processed_at: new Date().toISOString(),
@@ -264,47 +313,12 @@ export async function processDueStoryMemorySummary(
     throw new Error("memory_summary_provider_request_failed");
   }
 
-  const usage = usageSnapshot(response.usage);
-  const priorUsage = usageSnapshot({
-    prompt_tokens: existingBatch?.prompt_tokens,
-    completion_tokens: existingBatch?.completion_tokens,
-    total_tokens: existingBatch?.total_tokens,
-    cost: existingBatch?.cost_usd,
-  });
-  const accumulatedUsage = {
-    prompt_tokens: priorUsage.prompt_tokens === null && usage.prompt_tokens === null ? null : (priorUsage.prompt_tokens || 0) + (usage.prompt_tokens || 0),
-    completion_tokens: priorUsage.completion_tokens === null && usage.completion_tokens === null ? null : (priorUsage.completion_tokens || 0) + (usage.completion_tokens || 0),
-    total_tokens: priorUsage.total_tokens === null && usage.total_tokens === null ? null : (priorUsage.total_tokens || 0) + (usage.total_tokens || 0),
-    cost_usd: priorUsage.cost_usd === null && usage.cost_usd === null ? null : (priorUsage.cost_usd || 0) + (usage.cost_usd || 0),
-  };
-  const requestId = /^[A-Za-z0-9._:-]{1,128}$/.test(response.requestId) ? response.requestId : null;
-  const rawOutput = response.result.kind === "generated" ? response.result.text.trim() : "";
-  let summary = "";
-  let affinityCorrection = 0;
-  let affinityReason = "";
-  try {
-    const parsed = JSON.parse(rawOutput) as Record<string, unknown>;
-    summary = normalizeStoryMemorySummaryText(parsed.summary);
-    const correction = parsed.affinity_correction;
-    if (typeof correction === "number" && Number.isInteger(correction) && correction >= -5 && correction <= 5) {
-      affinityCorrection = correction;
-    }
-    affinityReason = typeof parsed.affinity_reason === "string" ? parsed.affinity_reason.trim().slice(0, 280) : "";
-  } catch {
-    // A legacy plain-text summary remains usable, but cannot adjust affinity.
-    summary = normalizeStoryMemorySummaryText(rawOutput);
-    affinityCorrection = 0;
-  }
+  const { summary, affinityCorrection, affinityReason } = generated;
+  const response = generated.response;
   if (response.httpStatus < 200 || response.httpStatus >= 300 || !summary) {
     await admin.from("ai_model_usage").update({
       status: "failed",
-      model: response.model,
-      provider: response.provider,
-      gateway_request_id: requestId,
-      prompt_tokens: accumulatedUsage.prompt_tokens,
-      completion_tokens: accumulatedUsage.completion_tokens,
-      total_tokens: accumulatedUsage.total_tokens,
-      cost_usd: accumulatedUsage.cost_usd,
+      ...summaryUsageMetadata(generated),
       processed_at: new Date().toISOString(),
     }).eq("id", batchRowId).eq("status", "processing");
     return;
@@ -329,13 +343,7 @@ export async function processDueStoryMemorySummary(
   const { error: completeError } = await admin.from("ai_model_usage").update({
     status: "completed",
     summary,
-    model: response.model,
-    provider: response.provider,
-    gateway_request_id: requestId,
-    prompt_tokens: accumulatedUsage.prompt_tokens,
-    completion_tokens: accumulatedUsage.completion_tokens,
-    total_tokens: accumulatedUsage.total_tokens,
-    cost_usd: accumulatedUsage.cost_usd,
+    ...summaryUsageMetadata(generated),
     processed_at: new Date().toISOString(),
   }).eq("id", batchRowId).eq("status", "processing");
   if (completeError) throw new Error("memory_summary_result_persist_failed");
@@ -485,9 +493,9 @@ export async function processDueGroupMemorySummary(
     return speaker + "：" + content;
   }).filter((line: string) => line.length > 1).join("\n");
 
-  let response;
+  let generated;
   try {
-    response = await requestMemorySummary([
+    generated = await generateMemorySummary([
       {
         role: "system",
         content: [
@@ -505,7 +513,7 @@ export async function processDueGroupMemorySummary(
           "\n\n【本次新增的五個群組回合】\n" + transcript +
           "\n\n請輸出更新後的完整累積摘要。",
       },
-    ], apiKey);
+    ], apiKey, existingBatch);
   } catch {
     await admin.from("chat_group_memory_summaries").update({
       status: "failed", processed_at: new Date().toISOString(),
@@ -513,39 +521,12 @@ export async function processDueGroupMemorySummary(
     throw new Error("group_memory_summary_provider_request_failed");
   }
 
-  const usage = usageSnapshot(response.usage);
-  const priorUsage = usageSnapshot({
-    prompt_tokens: existingBatch?.prompt_tokens,
-    completion_tokens: existingBatch?.completion_tokens,
-    total_tokens: existingBatch?.total_tokens,
-    cost: existingBatch?.cost_usd,
-  });
-  const accumulatedUsage = {
-    prompt_tokens: priorUsage.prompt_tokens === null && usage.prompt_tokens === null ? null : (priorUsage.prompt_tokens || 0) + (usage.prompt_tokens || 0),
-    completion_tokens: priorUsage.completion_tokens === null && usage.completion_tokens === null ? null : (priorUsage.completion_tokens || 0) + (usage.completion_tokens || 0),
-    total_tokens: priorUsage.total_tokens === null && usage.total_tokens === null ? null : (priorUsage.total_tokens || 0) + (usage.total_tokens || 0),
-    cost_usd: priorUsage.cost_usd === null && usage.cost_usd === null ? null : (priorUsage.cost_usd || 0) + (usage.cost_usd || 0),
-  };
-  const requestId = /^[A-Za-z0-9._:-]{1,128}$/.test(response.requestId) ? response.requestId : null;
-  const rawOutput = response.result.kind === "generated" ? response.result.text.trim() : "";
-  let summary = "";
-  try {
-    const parsed = JSON.parse(rawOutput) as Record<string, unknown>;
-    summary = normalizeStoryMemorySummaryText(parsed.summary);
-  } catch {
-    summary = normalizeStoryMemorySummaryText(rawOutput);
-  }
-
+  const { summary } = generated;
+  const response = generated.response;
   if (response.httpStatus < 200 || response.httpStatus >= 300 || !summary) {
     await admin.from("chat_group_memory_summaries").update({
       status: "failed",
-      model: response.model,
-      provider: response.provider,
-      gateway_request_id: requestId,
-      prompt_tokens: accumulatedUsage.prompt_tokens,
-      completion_tokens: accumulatedUsage.completion_tokens,
-      total_tokens: accumulatedUsage.total_tokens,
-      cost_usd: accumulatedUsage.cost_usd,
+      ...summaryUsageMetadata(generated),
       processed_at: new Date().toISOString(),
     }).eq("id", batchRowId).eq("status", "processing");
     return;
@@ -554,13 +535,7 @@ export async function processDueGroupMemorySummary(
   const { data: completed, error: completeError } = await admin.from("chat_group_memory_summaries").update({
     status: "completed",
     summary,
-    model: response.model,
-    provider: response.provider,
-    gateway_request_id: requestId,
-    prompt_tokens: accumulatedUsage.prompt_tokens,
-    completion_tokens: accumulatedUsage.completion_tokens,
-    total_tokens: accumulatedUsage.total_tokens,
-    cost_usd: accumulatedUsage.cost_usd,
+    ...summaryUsageMetadata(generated),
     processed_at: new Date().toISOString(),
   }).eq("id", batchRowId).eq("status", "processing").select("id").maybeSingle();
   if (completeError || !completed) throw new Error("group_memory_summary_result_persist_failed");
