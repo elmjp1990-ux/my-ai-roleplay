@@ -7,14 +7,14 @@ const roster = [
 ];
 
 Deno.test("parses every member phone field even when only one character speaks", () => {
-  const result = parseGroupTurnEnvelope(JSON.stringify({
+  const result = parseGroupTurnEnvelopeDetailed(JSON.stringify({
     speeches: [{ speaker_id: "a", content: "*抬眼*妳回來了。*他將桌上的文件收好，替妳留出座位。*今天的事我已經安排好了，我們可以慢慢談。" }],
     phone_updates: [
       { character_id: "a", notifications: [{ title: "model title ignored", body: "目前穿著深色襯衫，站在客廳窗邊。" }] },
       { character_id: "b", notifications: [{ title: "model title ignored", body: "下午會議改到三點，助理已更新行程。" }] },
     ],
     story_world_state: { story_time: "2026-11-16 19:30", story_location: "蘇清雅的辦公室" },
-  }), roster, "Una Kao");
+  }), roster, "Una Kao").envelope;
   assertEquals(result?.speeches.length, 1);
   assertEquals(result?.phoneUpdates, [
     { characterId: "a", notifications: [{ title: "👔夜辰衣著/姿勢", body: "目前穿著深色襯衫，站在客廳窗邊。" }] },

@@ -8,6 +8,7 @@ import { processDueStoryMemorySummary, recordChatModelUsage } from "../_shared/s
 import { parseStoryTurnEnvelope } from "../_shared/story-turn-envelope.ts";
 import { collectDerivedPrivateProfileValues, formatCharacterAiProfilePrompt } from "../_shared/character-ai-profile-prompt.ts";
 import { requestOpenRouterChatCompletion, POYOZZ_DEFAULT_CHAT_MODEL } from "../_shared/openrouter-chat-completions.ts";
+import { buildRoleplayResponseGuidelines } from "../_shared/roleplay-response-guidelines.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
