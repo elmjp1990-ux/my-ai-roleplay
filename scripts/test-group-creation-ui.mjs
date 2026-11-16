@@ -27,6 +27,8 @@ assert.match(pagination, /groupCharacterPicker:10/, 'group character picker page
 assert.match(html, /載入更多公開角色（每次 10 位）/, 'group picker must disclose its ten-item page size');
 assert.match(html, /function groupCharacterPickerAvatar\(character\)/, 'group picker must render a safe initial fallback when an avatar URL is missing');
 assert.match(html, /loadCharacterPrimaryIllustrationAssets\(missingImageItems\.map\(character=>character\.id\)\)/, 'group picker must hydrate only missing primary portraits with signed URLs');
+assert.match(html, /data-character-id="'\+e\(characterId\)\+'/,'Group picker images must retain character IDs for failed-image recovery');
+assert.match(html, /image\.dataset\.primaryRetried!=='1'[\s\S]*?loadCharacterPrimaryIllustrationAssets\(\[image\.dataset\.characterId\]\)/,'A broken group-picker URL must retry the canonical signed primary illustration before showing initials');
 
 assert.match(html, /let groupCharacterIntroExpandedId = null/, 'character introductions must start collapsed');
 assert.match(html, /data-action="group-toggle-character-intro"/, 'character name must expose an intro toggle');
@@ -42,6 +44,11 @@ assert.match(html, /if\(g\.draft\.world\.length>3000\)return '群組背景最多
 
 assert.match(html, /data-chat-list-pin="single"/, 'single-chat pin must have a dedicated isolated target');
 assert.match(html, /data-chat-list-pin="group"/, 'group-chat pin must have a dedicated isolated target');
+assert.match(html, /function chatHasUnreadAssistantMessage\(lastAssistantAt,lastReadAt\)/,'Single and group chat lists must share one unread predicate');
+assert.match(html, /const hasUnread=chatHasUnreadAssistantMessage\(s\.lastAssistantMessageAt,s\.lastReadAt\)/,'Single chat must use the shared unread predicate');
+assert.match(html, /chatHasUnreadAssistantMessage\(groupPreviewLastAssistantAt\(item\.preview\),groupChatReadAt\(currentUser\(\)\?\.uid,group\.id\)\)/,'Group chat must use the same unread predicate with its read watermark');
+assert.match(html, /markGroupChatRead\(group\.id\)/,'Opening a group must mark its current history as read');
+assert.match(html, /chat-unread-pill">新訊息/,'Group unread state must use the same visual badge as single chat');
 assert.match(html, /\[data-chat-list-pin\][\s\S]{0,420}stopImmediatePropagation\(\)/, 'both pin clicks must be isolated before delete/menu delegation');
 const pinHelper = html.slice(html.indexOf('async function toggleChatSessionPin'), html.indexOf('/* Isolate chat-list pin clicks'));
 assert.ok(pinHelper.includes('item.pinned=!previousPinned'), 'pin helper must toggle the pinned state');
@@ -64,6 +71,9 @@ assert.match(html,/characterIllustrationSignedUrlManager\.get\(row\.storage_path
 assert.match(html,/maxlength="2000" data-max-count="1000"/,'group initial opening textarea must enforce a 1000-codepoint maximum while allowing surrogate pairs');
 assert.ok(html.includes('const messageRows=initialOpeningRow+g.messages.map'), 'opening display must be prepended without inserting a duplicate chat message');
 assert.ok(html.includes("if(!typedContent && !(g.messages||[]).length)"), 'empty first send must not start a paid AI turn');
+assert.match(html, /const turnId=turnResult\.turnId;[\s\S]{0,300}g\.pendingRequest=null;/,'A server-confirmed completed turn must clear the composer before secondary reads');
+assert.match(html, /latestGroupTurn\?\.status==='completed'[\s\S]{0,220}g\.pendingRequest=null/,'Reopening a group must reconcile a pending request already completed by the server');
+assert.match(html, /latestAssistantMessage=\[\.\.\.newMessages\]\.reverse\(\)\.find\(message=>message\.type==='character'\)/,'A completed group AI reply must refresh the same chat-list preview used for unread state');
 assert.ok(html.includes("💎 本群組每次對話 '+(groupPrototype.draft.memberIds.length*3)+' 鑽石（每加一位角色3鑽石）。"), 'group picker must show the requested per-turn cost wording');
 assert.ok(html.includes('padding:17px 12px')&&html.includes('min-height:88px'), 'chat-list cards must be visibly enlarged, not only slightly spaced');
 assert.ok(html.includes('grid-template-columns:280px minmax(0,1fr)'), 'desktop chat list column must be widened');

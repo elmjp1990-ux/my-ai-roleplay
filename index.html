@@ -6743,6 +6743,28 @@ function latestAssistantPreview(session) {
   if(latest)return firstSpokenDialoguePreview(latest.text);
   return session?.cloudMessagesLoaded===false?'點擊載入最近訊息':'你有新訊息';
 }
+const GROUP_CHAT_READ_AT_KEY_PREFIX='poyozz:group-chat-read-at:v1:';
+function chatHasUnreadAssistantMessage(lastAssistantAt,lastReadAt) {
+  const receivedAt=Number(lastAssistantAt)||0,readAt=Number(lastReadAt)||0;
+  return receivedAt>0&&receivedAt>readAt;
+}
+function groupChatReadAt(uid,groupId) {
+  if(!uid||!groupId)return 0;
+  try{return Math.max(0,Number(localStorage.getItem(GROUP_CHAT_READ_AT_KEY_PREFIX+uid+':'+groupId))||0);}
+  catch(_){return 0;}
+}
+function markGroupChatRead(groupId,readAt=Date.now(),uid=currentUser()?.uid) {
+  if(!uid||!groupId)return 0;
+  const next=Math.max(groupChatReadAt(uid,groupId),Number(readAt)||Date.now());
+  try{localStorage.setItem(GROUP_CHAT_READ_AT_KEY_PREFIX+uid+':'+groupId,String(next));}
+  catch(error){console.warn('群組已讀時間暫存失敗：',error?.message||error);}
+  return next;
+}
+function groupPreviewLastAssistantAt(preview) {
+  if(!preview||preview.speaker_type==='user'||preview.speaker_type==='system')return 0;
+  const parsed=Date.parse(preview.created_at||'');
+  return Number.isFinite(parsed)?parsed:0;
+}
 function chatEntries() {
   const q=chatSearch.trim().toLocaleLowerCase();
   const items=visibleSessions().map(s=>({kind:'session',value:s,sortAt:Number(s.lastMessageAt||s.updatedAt||s.messages?.at(-1)?.at||s.startedAt||0),pinned:!!s.pinned}));
@@ -6760,6 +6782,7 @@ function chatEntries() {
       const group=item.value,lastText=item.preview?.content?firstSpokenDialoguePreview(item.preview.content):'尚未開始對話';
       const lastAt=Date.parse(item.preview?.created_at||group.updated_at||group.created_at||'')||Date.now();
       const active=route.page==='group'&&groupPrototype.active?.id===group.id;
+      const hasUnread=chatHasUnreadAssistantMessage(groupPreviewLastAssistantAt(item.preview),groupChatReadAt(currentUser()?.uid,group.id));
       const memberList=groupPrototype.groupMembers?.[group.id]||[];
       const avatarMarkup=memberList.slice(0,3).map(member=>{
         const image=safeImage(member.avatar_url||member.image||member.character_snapshot?.avatar_url||member.character_snapshot?.image);
@@ -6769,7 +6792,7 @@ function chatEntries() {
       return `<div class="chat-entry group-chat-entry ${active?'active':''}">
         <button type="button" class="pin group-pin ${item.pinned?'on':''}" data-chat-list-pin="group" data-action="group-pin" data-id="${e(group.id)}" aria-label="${item.pinned?'取消群組置頂':'置頂群組'}" title="${item.pinned?'取消置頂':'置頂'}">${ICON.pin}</button>
         <button type="button" class="group-chat-open" data-action="group-open" data-id="${e(group.id)}" aria-label="開啟群組 ${e(group.name)}">${groupAvatar}
-          <span class="group-chat-copy"><span class="group-chat-title-row"><strong class="group-chat-title">${e(group.name||'未命名群組')} <span class="small muted">· 群組</span></strong>
+          <span class="group-chat-copy"><span class="group-chat-title-row"><strong class="group-chat-title">${e(group.name||'未命名群組')} <span class="small muted">· 群組</span></strong>${hasUnread?'<span class="chat-unread-pill">新訊息</span>':''}
           <span class="small muted group-chat-date">${chatListDate(lastAt)}</span></span><span class="small muted group-chat-preview" title="${e(lastText)}">${e(lastText)}</span></span>
         </button><button type="button" class="entry-menu group-entry-menu" data-action="group-entry-menu" data-id="${e(group.id)}" aria-label="刪除這段對話與回憶" title="刪除這段對話與回憶">⋯</button></div>`;
     }
@@ -6777,7 +6800,7 @@ function chatEntries() {
     if(s.cloudOwned)void hydrateCloudSessionCharacterImage(s);
     const preview=latestAssistantPreview(s);
     const lastAt=s.lastMessageAt||s.updatedAt||s.messages?.at(-1)?.at||s.startedAt;
-    const hasUnread=Number(s.lastAssistantMessageAt||0)>Number(s.lastReadAt||0);
+    const hasUnread=chatHasUnreadAssistantMessage(s.lastAssistantMessageAt,s.lastReadAt);
     return `<div class="chat-entry ${route.page==='conversation'&&route.id===s.id?'active':''}">
       <button type="button" class="pin ${s.pinned?'on':''}" data-chat-list-pin="single" data-action="pin" data-id="${e(s.id)}" aria-label="切換置頂">${ICON.pin}</button>
       <button class="ghost" style="padding:0" data-action="session-detail" data-id="${e(s.id)}" aria-label="查看${e(c.name)}角色簡介">
@@ -6996,12 +7019,21 @@ async function groupLoadCharacterPickerPage({reset=false}={}){
 function groupCharacterPickerAvatar(character){
   const image=safeImage(character?.image||character?.avatar_url);
   const initial=String(character?.name||'角').trim().slice(0,1)||'角';
-  if(image)return '<img class="avatar group-picker-avatar" src="'+e(image)+'" alt="" loading="lazy" decoding="async" data-avatar-fallback="'+e(initial)+'" style="width:46px;height:46px">';
+  const characterId=String(character?.id||'');
+  if(image)return '<img class="avatar group-picker-avatar" src="'+e(image)+'" alt="" loading="lazy" decoding="async" data-character-id="'+e(characterId)+'" data-avatar-fallback="'+e(initial)+'" style="width:46px;height:46px">';
   return '<span class="avatar avatar-fallback" aria-hidden="true" style="width:46px;height:46px">'+e(initial)+'</span>';
 }
-document.addEventListener('error',event=>{
+document.addEventListener('error',async event=>{
   const image=event.target;
   if(!(image instanceof HTMLImageElement)||!image.matches('.group-picker-avatar'))return;
+  if(image.dataset.primaryRetried!=='1'&&isUuid(image.dataset.characterId||'')){
+    image.dataset.primaryRetried='1';
+    try{
+      const assets=await loadCharacterPrimaryIllustrationAssets([image.dataset.characterId]);
+      const primary=assets.get(image.dataset.characterId)?.primary?.src||'';
+      if(primary&&primary!==image.src){image.src=primary;return;}
+    }catch(error){console.warn('群組選角頭像補載失敗：',error?.message||error);}
+  }
   const fallback=document.createElement('span');
   fallback.className='avatar avatar-fallback';
   fallback.setAttribute('aria-hidden','true');
@@ -7327,6 +7359,7 @@ async function groupOpen(groupId) {
     });
     const membersNeedingPortraits=members.filter(member=>!member.avatar_url&&member.primaryIllustrationPath);
     g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,storyWorldState:{storyTime:group.story_time||'',storyLocation:group.story_location||''},memoryPhotos:[],scenes,members,suggestedReplies:suggestionRes.data?.status==='completed'&&Array.isArray(suggestionRes.data?.suggested_replies)?suggestionRes.data.suggested_replies.slice(0,3):[]};
+    markGroupChatRead(group.id);
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;
     if(groupListWasLoaded){
       const existingIndex=g.groups.findIndex(item=>item.id===group.id);
@@ -7347,6 +7380,8 @@ async function groupOpen(groupId) {
     }
     ensureGroupDiaryMemories();
     const latestGroupTurn=suggestionRes.data||null;
+    if(g.pendingRequest?.groupId===group.id&&latestGroupTurn?.status==='completed'&&
+      String(latestGroupTurn.request_content||'')===String(g.pendingRequest.content||''))g.pendingRequest=null;
     if(latestGroupTurn?.status==='failed'){
       const failureText=groupTurnFailureMessage({status:'refunded',error:latestGroupTurn.failure_code});
       const failedContent=String(latestGroupTurn.request_content||'').trim();
@@ -8353,6 +8388,7 @@ async function groupSendTurn() {
       throw new Error('群組 AI 回合尚未確認完成，為避免重複扣款，請稍後重新開啟群組確認狀態。');
     }
     const turnId=turnResult.turnId;
+    g.pendingRequest=null;
     // Refresh the visible wallet after the server confirms settlement.
     await refreshWalletBalance();
     if(currentUser()?.uid!==requestUid) return;
@@ -8399,7 +8435,12 @@ async function groupSendTurn() {
     const existingMessageIds=new Set((g.messages||[]).map(message=>message.id));
     g.messages=[...(g.messages||[]),...newMessages.filter(message=>!existingMessageIds.has(message.id))];
     g.turn=g.messages.filter(m=>m.type==='user').length;
-    g.pendingRequest=null;
+    const latestAssistantMessage=[...newMessages].reverse().find(message=>message.type==='character');
+    if(latestAssistantMessage){
+      g.groupPreviews ||= {};
+      g.groupPreviews[activeGroupId]={group_id:activeGroupId,content:latestAssistantMessage.content||'',
+        created_at:latestAssistantMessage.createdAt||'',speaker_type:'character'};
+    }
     // Refresh cumulative character-card counts after a group turn has been saved.
     // The database RPC already includes group messages; invalidate the stale frontend cache.
     void loadCharacterTurnCounts(members.map(member=>member.characterId||member.id), true);

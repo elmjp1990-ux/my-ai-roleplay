@@ -12,6 +12,8 @@ on:
       - "scripts/test-group-chat-transaction-concurrency.sh"
       - "scripts/test-group-chat-migration-rollback.sh"
       - "scripts/test-runtime-egress-optimizations.mjs"
+      - "scripts/test-group-creation-ui.mjs"
+      - "index.html"
       - "scripts/test-group-memory-summary.mjs"
       - "supabase/tests/group-memory-summary-scenarios.sql"
 
