@@ -650,7 +650,11 @@ assert.match(notificationsModuleSource,/pageSize\('notifications'\)/);
 
 const primaryIllustrationLoader=between("async function loadCharacterPrimaryIllustrationAssets","async function loadCharacterIllustrationAssets");
 assert.ok(primaryIllustrationLoader.includes("characterIllustrationSignedUrlManager.getMany"));
-assert.ok(!primaryIllustrationLoader.includes("for(const row of rows)"));
+assert.ok(primaryIllustrationLoader.includes("await Promise.all(missingRows.map(async row=>")),
+  "missing primary portraits must retry concurrently after the batch signer fails");
+const primaryRowsMapping=primaryIllustrationLoader.slice(primaryIllustrationLoader.indexOf("for(const row of rows)"));
+assert.ok(!primaryRowsMapping.includes("await characterIllustrationSignedUrlManager.get("),
+  "primary portrait result mapping must not sign Storage objects sequentially");
 const galleryIllustrationLoader=between("async function loadCharacterIllustrationAssets","// Encounter scenes fetch");
 assert.ok(galleryIllustrationLoader.includes("characterIllustrationSignedUrlManager.getMany"));
 assert.ok(!galleryIllustrationLoader.includes("for(const row of rows)"));
