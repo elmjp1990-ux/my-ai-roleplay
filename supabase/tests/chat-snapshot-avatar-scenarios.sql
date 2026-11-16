@@ -75,8 +75,12 @@ BEGIN
     v_updated_at
   );
 
+  -- The character author performs the soft delete; the existing chats belong to another user.
+  PERFORM set_config('request.jwt.claim.sub', v_author::text, true);
   PERFORM public.soft_delete_character(v_character);
   PERFORM public.soft_delete_character(v_single_character);
+  -- Restore the chat owner's identity for the Storage-policy assertions below.
+  PERFORM set_config('request.jwt.claim.sub', v_owner::text, true);
 
   SELECT character_snapshot INTO v_snapshot
   FROM public.chat_group_members
