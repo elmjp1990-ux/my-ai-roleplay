@@ -72,6 +72,14 @@ assert.match(html,/character-status-dot.*離線／已下架/,
   'group avatars must expose an offline indicator when the snapshot is marked deleted');
 assert.doesNotMatch(html,/\.character-avatar-status\.is-offline \.avatar,/,
   'offline status must not dim or hide the preserved character portrait');
+assert.match(html,/\.group-avatar-stack > \.character-avatar-status\{position:absolute;display:block;width:25px;height:25px/,
+  'group avatar status wrappers must retain a fixed portrait box');
+assert.match(html,/\.group-avatar-stack > \.character-avatar-status:nth-child\(1\)\{left:0;top:0\}/,
+  'the first group avatar wrapper must be positioned in the stack');
+assert.match(html,/\.group-avatar-stack \.group-avatar-image\{position:absolute;left:0;top:0;width:100%;height:100%/,
+  'group portrait images must fill their positioned status wrappers');
+assert.match(html,/\.group-avatar-stack \.group-avatar-fallback\{position:absolute;left:0;top:0;width:100%;height:100%/,
+  'group portrait fallbacks must fill their positioned status wrappers');
 
 const retainedPortraitPolicy = fs.readFileSync(
   'supabase/migrations/20261116171000_allow_existing_chat_portrait_access.sql',
