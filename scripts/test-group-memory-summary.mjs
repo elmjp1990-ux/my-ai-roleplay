@@ -25,7 +25,7 @@ assert.ok(edge.includes("limit(groupHistoryLimit)"));
 assert.ok(edge.includes('.select("turn_id,scene_id,speaker_type,speaker_snapshot,content")'));
 assert.ok(edge.includes("...(groupMemoryContext ? [groupMemoryContext] : [])"));
 assert.ok(memoryContext.includes('if (sceneMode !== "shared") return "";'));
-assert.ok(memoryContext.includes("return sceneMode === \"shared\" && hasLatestSummary && !lookupFailed ? 24 : 40;"));
+assert.ok(memoryContext.includes("return sceneMode === \"shared\" && hasCurrentSummary && !lookupFailed ? 24 : 40;"));
 assert.match(edge,/admin\.rpc\("complete_group_chat_turn"/);
 assert.match(helper,/export async function processDueGroupMemorySummary/);
 assert.match(helper,/\.from\("chat_group_turns"\)/);
