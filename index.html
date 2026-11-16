@@ -8759,7 +8759,11 @@ function formatMessage(text) {
 }
 function renderGroupOpeningContent(raw,roles=[]) {
   const segments=parseRoleplaySegments(String(raw||''),roles);
-  return '<div class="group-opening-content">'+segments.map(segment=>formatMessage(segment.text)).join('')+'</div>';
+  const content=segments.map(segment=>segment.kind==='user'
+    ?formatMessage(segment.text)
+    :roleplaySegmentHTML(segment)
+  ).join('');
+  return '<div class="group-opening-content">'+content+'</div>';
 }
 function conversationTypingIndicatorHTML() {
   return '<article class="message assistant-typing" role="status" aria-live="polite"><div class="message-content"><div class="typing-indicator"><span>對方正在回覆</span><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span></div></div></article>';
@@ -9358,7 +9362,7 @@ async function renderPhoneModal() {
     :isGroup?(groupMemorySummaryErrors.has(group.id)?null:groupSummaryChars)
     :(Array.isArray(diaryList)?memorySize(diaryList):0);
   const capacity=10000,battery=diaryChars===null?null:Math.max(0,Math.min(100,Math.round((1-Math.min(diaryChars,capacity)/capacity)*100))),warning=battery!==null&&battery<=20,batteryColor=battery===null?'#9ca3af':warning?'#8d9299':'#c1c5cb';
-  const initialStoryTime=isGroup?0:(Number(session?.startedAt||session?.initialOpeningMessage?.at)||Date.now());
+  const initialStoryTime=Date.now();
   const initialDate=initialStoryTime?new Date(initialStoryTime):null;
   const initialStoryTimeText=initialDate?initialDate.getFullYear()+'-'+String(initialDate.getMonth()+1).padStart(2,'0')+'-'+String(initialDate.getDate()).padStart(2,'0')+'T'+String(initialDate.getHours()).padStart(2,'0')+':'+String(initialDate.getMinutes()).padStart(2,'0'):'';
   const storyTimeLabel=formatStoryWorldTime(storyWorldState.storyTime||storyWorldState.story_time||(!isGroup?initialStoryTimeText:''));

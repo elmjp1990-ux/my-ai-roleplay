@@ -96,7 +96,7 @@ jobs:
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261116150000_group_turn_suggested_replies.sql
 
       - name: Apply group game-world clock and opening limit
-        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261116170000_group_story_world_state_and_opening_limit.sql
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261116064526_group_story_world_state_and_opening_limit.sql
 
       - name: Verify migration contracts and transaction outcomes
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/group-chat-transaction-scenarios.sql

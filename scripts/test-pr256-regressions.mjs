@@ -57,11 +57,16 @@ assert.match(css,/\.character-visibility-option:has\(input:checked\)/);
 assert.match(html,/max-width:min\(20em,100%\)/,'dialogue bubbles must target 18 full-width Chinese characters');
 assert.match(html,/max-width:min\(25em,100%\)/,'star-wrapped narration must target 25 full-width Chinese characters');
 assert.ok(html.includes('function conversationSuggestionsHTML(s)'), 'single and group chat must share one suggestion renderer');
+assert.match(html,/function renderGroupOpeningContent\\(raw,roles=\\[\\]\\)\\{[\\s\\S]*?segments\\.map\\(segment=>segment\\.kind==='user'\\?formatMessage\\(segment\\.text\\):roleplaySegmentHTML\\(segment\\)\\)/,
+  'group opening must reuse the shared roleplay parser and character avatar renderer');
+assert.match(html,/const initialStoryTime=Date\\.now\\(\\)/,
+  'single and group phones must initially fall back to the current real-world time');
+assert.match(html,/formatStoryWorldTime\\(storyWorldState\\.storyTime\\|\\|storyWorldState\\.story_time\\|\\|initialStoryTimeText\\)/,
+  'an AI-provided in-world time must override the temporary real-time fallback');
 assert.ok(html.includes('本回合暫時沒有可用的建議回覆。'), 'empty suggestion state must be explicit before the first AI reply');
 assert.ok(html.includes('conversationSuggestionsHTML({') && html.includes('suggestedReplies:group.suggestedReplies'), 'group chat must use the shared single-chat suggestion UI and state');
 assert.ok(!html.includes('① 溫柔關心') && !html.includes('② 活潑互動') && !html.includes('③ 溫柔陪伴'), 'group chat must not contain hard-coded sample suggestions');
-assert.ok(html.includes('const typingHTML=typingMember?') && html.includes('正在回覆'), 'group chat must display a character typing indicator while the AI request is active');
-assert.ok(html.includes('g.typingSpeakerId=typingMember?String'), 'group typing indicator must select one of the actual group characters');
+assert.ok(html.includes('function conversationTypingIndicatorHTML()') && html.includes('const typingHTML=g.sending?conversationTypingIndicatorHTML():') && html.includes('對方正在回覆'), 'single and group chat must share the same neutral typing indicator');
 assert.ok(html.includes('storyPhoneRuntimeCache.delete(String(user.uid)'), 'Story summary edit must invalidate cache with the authenticated user id');
 assert.ok(html.includes('function phoneNoticeIconPresentation(value)') && html.includes("const icon=match?.[0]||'🔔'"), 'configured phone notice prefixes must select their own icon and default to a bell');
 assert.ok(groupEdge.includes('Promise.all(members.map'), 'group derived profile RPCs must run concurrently instead of serially');
