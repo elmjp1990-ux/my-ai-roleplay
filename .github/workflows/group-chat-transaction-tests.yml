@@ -92,6 +92,8 @@ jobs:
 
       - name: Verify group AI memory summary ownership and editing
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/group-memory-summary-scenarios.sql && node scripts/test-group-memory-summary.mjs
+      - name: Apply group-turn suggestion persistence
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261116150000_group_turn_suggested_replies.sql
 
       - name: Verify migration contracts and transaction outcomes
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/group-chat-transaction-scenarios.sql
