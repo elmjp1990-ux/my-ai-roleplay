@@ -7098,6 +7098,14 @@ function groupWithTimeout(promise, milliseconds, message) {
     new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(message)),milliseconds)})
   ]).finally(()=>clearTimeout(timer));
 }
+function groupTurnFailureMessage(result) {
+  const code=String(result?.error||'');
+  if(code==='invalid_group_turn_envelope') return 'AI 已完成生成，但回覆格式未通過檢查；本回合費用已退還，你可以重新送出。';
+  if(code==='provider_timeout'||code==='provider_timeout_watchdog') return '本次 AI 請求逾時，費用已全額退還，沒有扣款。請稍後重試。';
+  if(code==='content_rejected'||code==='private_context_output_blocked') return '這次 AI 回覆未能完成，費用已退還，請調整內容後重試。';
+  if(code==='group_reply_persistence_failed') return 'AI 回覆未能成功保存，費用已退還。請重新送出。';
+  return '這次 AI 服務未能完成，費用已退還，請重新送出。';
+}
 function groupFriendlyError(error) {
   const message=String(typeof error==='string'?error:(error?.message||''));
   if(message.includes('character_not_public_and_approved') || message.includes('character_not_public_or_unavailable')) return '群組只能加入已公開且未下架的角色，請重新選擇。';
@@ -7263,7 +7271,7 @@ async function groupOpen(groupId) {
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
       loadGroupMembersWithPhoneNotifications(window.mySupabase,groupId),
       window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(window.PoyozzListPagination.pageSize('messages')),
-      window.mySupabase.from('chat_group_turns').select('suggested_replies').eq('group_id',groupId).eq('status','completed').order('completed_at',{ascending:false}).limit(1).maybeSingle()
+      window.mySupabase.from('chat_group_turns').select('id,status,failure_code,request_content,suggested_replies,created_at').eq('group_id',groupId).order('created_at',{ascending:false}).limit(1).maybeSingle()
     ]),15000,'群組資料讀取逾時，請檢查網路後重試。')
     if(requestId!==g.openRequestId) return;
     // The Preview can be opened before the additive game-clock migration is deployed.
@@ -7318,7 +7326,7 @@ async function groupOpen(groupId) {
       return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user' && m.content===GROUP_CONTINUE_SENTINEL ? '' : m.content,createdAt:m.created_at};
     });
     const membersNeedingPortraits=members.filter(member=>!member.avatar_url&&member.primaryIllustrationPath);
-    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,storyWorldState:{storyTime:group.story_time||'',storyLocation:group.story_location||''},memoryPhotos:[],scenes,members,suggestedReplies:Array.isArray(suggestionRes.data?.suggested_replies)?suggestionRes.data.suggested_replies.slice(0,3):[]};
+    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,storyWorldState:{storyTime:group.story_time||'',storyLocation:group.story_location||''},memoryPhotos:[],scenes,members,suggestedReplies:suggestionRes.data?.status==='completed'&&Array.isArray(suggestionRes.data?.suggested_replies)?suggestionRes.data.suggested_replies.slice(0,3):[]};
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;
     if(groupListWasLoaded){
       const existingIndex=g.groups.findIndex(item=>item.id===group.id);
@@ -7337,7 +7345,18 @@ async function groupOpen(groupId) {
         else delete g.groupPreviews[group.id];
       }
     }
-    ensureGroupDiaryMemories();g.formError='';
+    ensureGroupDiaryMemories();
+    const latestGroupTurn=suggestionRes.data||null;
+    if(latestGroupTurn?.status==='failed'){
+      const failureText=groupTurnFailureMessage({status:'refunded',error:latestGroupTurn.failure_code});
+      const failedContent=String(latestGroupTurn.request_content||'').trim();
+      g.formError=failureText+(failedContent?' 上次未完成的訊息：「'+failedContent.slice(0,120)+(failedContent.length>120?'…':'')+'」':'');
+    }else if(latestGroupTurn?.status==='processing'){
+      g.formError='上一個群組回合仍在處理中，請稍後重新開啟確認；暫時不要重複送出相同訊息。';
+    }else{
+      g.formError='';
+    }
+    g.sending=false;
     g.loading=false;g.openError='';g.failedGroupId=null;
     // Paint the conversation as soon as its essential group, member, scene and message data is ready.
     // Diary synchronization is non-blocking and remains account/group guarded.
@@ -8321,7 +8340,7 @@ async function groupSendTurn() {
     if(turnResult?.status==='refunded'||turnResult?.status==='content_rejected'||turnResult?.status==='timed_out') {
       await refreshWalletBalance();
       g.sending=false;g.pendingRequest=null;
-      g.formError=turnResult.status==='timed_out'?'本次 AI 請求逾時，費用已全額退還，沒有扣款。請稍後重試。':turnResult.status==='content_rejected'?'這次 AI 回覆未能完成，費用已退還，請調整內容後重試。':'這次 AI 服務未能完成，費用已退還，請重新送出。';
+      g.formError=groupTurnFailureMessage(turnResult);
       renderGroupConversation();
       return;
     }
@@ -8398,7 +8417,7 @@ async function groupSendTurn() {
     if(responseBody?.status==='refunded'||responseBody?.status==='content_rejected'||responseBody?.status==='timed_out'||responseBody?.error==='turn_already_refunded') {
       try { await refreshWalletBalance(); } catch (_) {}
       g.pendingRequest=null;
-      g.formError=responseBody?.status==='timed_out'?'本次 AI 請求逾時，費用已全額退還，沒有扣款。請稍後重試。':responseBody?.status==='content_rejected'?'這次 AI 回覆未能完成，費用已退還，請調整內容後重試。':'這次 AI 服務未能完成，費用已退還，請重新送出。';
+      g.formError=groupTurnFailureMessage(responseBody);
       renderGroupConversation();
       return;
     }

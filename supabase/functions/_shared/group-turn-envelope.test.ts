@@ -1,9 +1,9 @@
 import { assertEquals } from "jsr:@std/assert";
-import { parseGroupTurnEnvelope, serializeGroupPhoneUpdatesForRpc } from "./group-turn-envelope.ts";
+import { parseGroupTurnEnvelope, parseGroupTurnEnvelopeDetailed, serializeGroupPhoneUpdatesForRpc } from "./group-turn-envelope.ts";
 
 const roster = [
-  { id: "a", name: "夜辰", sceneId: "scene-1", sceneName: "客廳" },
-  { id: "b", name: "黎音", sceneId: "scene-2", sceneName: "公司" },
+  { id: "a", name: "夜辰", sceneId: "scene-1", sceneName: "客廳", phoneNotifications: [{ title: "舊訊息", body: "保留既有狀態" }] },
+  { id: "b", name: "黎音", sceneId: "scene-2", sceneName: "公司", phoneNotifications: [] },
 ];
 
 Deno.test("parses per-character group speeches and phone notifications", () => {
@@ -24,12 +24,41 @@ Deno.test("parses per-character group speeches and phone notifications", () => {
   ]);
 });
 
-Deno.test("rejects unknown speakers, unknown phone owners, missing character phone state and invalid rows", () => {
-  const base = { speeches: [{ speaker_id: "a", content: "你好" }], phone_updates: [
-    { character_id: "a", notifications: [] }, { character_id: "b", notifications: [] },
-  ] };
-  assertEquals(parseGroupTurnEnvelope(JSON.stringify({ ...base, speeches: [{ speaker_id: "outside", content: "不屬於群組的發言" }] }), roster), null);
-  assertEquals(parseGroupTurnEnvelope(JSON.stringify({ ...base, phone_updates: [{ character_id: "outside", notifications: [] }] }), roster), null);
-  assertEquals(parseGroupTurnEnvelope(JSON.stringify({ ...base, phone_updates: [{ character_id: "a", notifications: [] }] }), roster), null);
-  assertEquals(parseGroupTurnEnvelope(JSON.stringify({ ...base, phone_updates: [{ character_id: "a", notifications: [{ title: "", body: "內容" }] }, { character_id: "b", notifications: [] }] }), roster), null);
+Deno.test("accepts wrapped JSON and preserves phone state omitted by the model", () => {
+  const result = parseGroupTurnEnvelopeDetailed(
+    '<think>先整理角色狀態，再輸出 JSON。</think>\n\x60\x60\x60json\n{"speeches":[{"speaker_id":"a","content":"*點頭*我知道了。"}]}\n\x60\x60\x60',
+    roster,
+  );
+  assertEquals(result.errorCode, null);
+  assertEquals(result.envelope?.phoneUpdates, [
+    { characterId: "a", notifications: [{ title: "舊訊息", body: "保留既有狀態" }] },
+    { characterId: "b", notifications: [] },
+  ]);
+});
+
+Deno.test("accepts partial phone updates without discarding another character's saved state", () => {
+  const result = parseGroupTurnEnvelope(JSON.stringify({
+    speeches: [{ speaker_id: "a", content: "你好" }],
+    phone_updates: [{ character_id: "b", notifications: [{ title: "工作", body: "會議延後" }] }],
+  }), roster);
+  assertEquals(result?.phoneUpdates, [
+    { characterId: "a", notifications: [{ title: "舊訊息", body: "保留既有狀態" }] },
+    { characterId: "b", notifications: [{ title: "工作", body: "會議延後" }] },
+  ]);
+});
+
+Deno.test("recovers from malformed optional phone metadata but rejects invalid speeches", () => {
+  const result = parseGroupTurnEnvelopeDetailed(JSON.stringify({
+    speeches: [{ speaker_id: "a", content: "你好" }],
+    phone_updates: [{ character_id: "b", notifications: [{ title: "", body: "不完整" }] }],
+  }), roster);
+  assertEquals(result.errorCode, null);
+  assertEquals(result.warningCount, 1);
+  assertEquals(result.envelope?.phoneUpdates[1].notifications, []);
+
+  assertEquals(parseGroupTurnEnvelope(JSON.stringify({
+    speeches: [{ speaker_id: "outside", content: "不屬於群組的發言" }],
+  }), roster), null);
+  assertEquals(parseGroupTurnEnvelope("{not-json}", roster), null);
+  assertEquals(parseGroupTurnEnvelope(JSON.stringify({ phone_updates: [] }), roster), null);
 });
