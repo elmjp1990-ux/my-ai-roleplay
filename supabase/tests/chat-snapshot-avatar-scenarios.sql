@@ -202,8 +202,9 @@ VALUES
   ('character-illustrations', '22222222-2222-4222-8222-222222222222/77777777-7777-4777-8777-777777777777/public.webp'),
   ('character-illustrations', '22222222-2222-4222-8222-222222222222/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/nsfw.webp');
 
+SELECT set_config('request.jwt.claim.sub', '', false);
 SET ROLE anon;
-DO $$
+DO $
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM storage.objects
