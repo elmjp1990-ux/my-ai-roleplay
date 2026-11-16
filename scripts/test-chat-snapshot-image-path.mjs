@@ -11,6 +11,12 @@ for (const [name,source] of [['story',story],['encounter',encounter]]) {
   assert.match(source,/image: primaryIllustration\?\.storage_path \? "" : \(character\.avatar_url \|\| ""\)/,name+' must preserve legacy fallback while avoiding embedded images when Storage exists');
   assert.match(source,/imagePath: primaryIllustration\?\.storage_path \|\| ""/,name+' must persist stable path metadata');
 }
+assert.match(story,/character\.author_id === user\.id[\s\S]*storyQuery\.eq\("visibility", "public"\)/,
+  'Story snapshots must not expose private opening messages to non-authors');
+assert.match(encounter,/from\("character_stories"\)[\s\S]*\.eq\("visibility", "public"\)/,
+  'Encounter snapshots must read only public opening messages');
+assert.match(encounter,/opening: openingMessage/,
+  'Encounter snapshots must preserve the public character opening');
 assert.match(html,/async function hydrateCloudSessionCharacterImage\(s\)/);
 assert.match(html,/getCharacterIllustrationSignedUrl\(path,\{forceRefresh:!!cached\}\)/);
 assert.match(html,/cloudSessionImageUrlCache\.set\(key,\{url,expiresAt:Date\.now\(\)\+55\*60\*1000\}\)/);
@@ -40,6 +46,8 @@ assert.match(groupCreationMigration,/account_deletion_pending/,
   'group creation must continue rejecting accounts with pending deletion requests');
 assert.match(groupCreationMigration,/cs\.visibility = 'public'/,
   'group opening snapshots must preserve the public-story visibility rule');
+assert.match(groupCreationMigration,/ORDER BY cs\.created_at DESC/,
+  'group snapshots must use the latest public opening message');
 assert.match(groupCreationMigration,/CREATE TRIGGER characters_mark_existing_chat_snapshots_offline/,
   'soft-deleting a character must mark existing chat snapshots offline');
 assert.match(groupCreationMigration,/UPDATE public\.chat_sessions cs[\s\S]*?\{deletedAt\}/,
