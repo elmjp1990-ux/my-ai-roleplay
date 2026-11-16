@@ -520,7 +520,8 @@ assert.match(groupPhoneMigration, /SET phone_notifications = v_phone_notificatio
 assert.match(groupPhoneMigration, /GRANT EXECUTE ON FUNCTION public\.complete_group_chat_turn\(uuid, uuid, jsonb, jsonb\) TO service_role/);
 assert.match(groupPhoneFunction, /parseGroupTurnEnvelope/);
 assert.match(groupPhoneFunction, /phone_settings/);
-assert.match(groupPhoneFunction, /p_phone_updates: parsed\.phoneUpdates/);
+assert.match(groupPhoneFunction, /serializeGroupPhoneUpdatesForRpc\(parsed\.phoneUpdates\)/);
+assert.match(groupPhoneFunction, /p_phone_updates: phoneUpdatesForRpc/);
 assert.match(groupPhoneFunction, /phone_updates: parsed\.phoneUpdates/);
 assert.match(groupPhoneParser, /phoneById\.size !== speakers\.length/);
 assert.match(groupPhoneUI, /noticeSources=isGroup[\s\S]*?character\.phoneNotifications[\s\S]*?group\.phoneNotificationsByCharacter/);
