@@ -5,7 +5,8 @@ const source = readFileSync("supabase/functions/chat-turn/index.ts", "utf8");
 const start = source.indexOf("const systemTemplate = [");
 const end = source.indexOf("].join(\"\\n\");", start);
 assert.ok(start >= 0 && end > start, "Story system prompt must exist");
-const prompt = source.slice(start, end);
+const sharedGuidelines = readFileSync("supabase/functions/_shared/roleplay-response-guidelines.ts", "utf8");
+const prompt = source.slice(start, end) + "\\n" + sharedGuidelines;
 
 const requiredRules = [
   ["vary paragraph and sentence structures", "連續段落不得沿用相同的句子骨架"],
