@@ -526,7 +526,7 @@ assert.match(groupPhoneFunction, /phone_settings/);
 assert.match(groupPhoneFunction, /serializeGroupPhoneUpdatesForRpc\(parsed\.phoneUpdates\)/);
 assert.match(groupPhoneFunction, /p_phone_updates: phoneUpdatesForRpc/);
 assert.match(groupPhoneFunction, /phone_updates: parsed\.phoneUpdates/);
-assert.match(groupPhoneParser, /phoneById\.size !== speakers\.length/);
+assert.match(groupPhoneParser, /phoneById\.has\(speaker\.id\)[\s\S]*speaker\.phoneNotifications/);
 assert.match(groupPhoneUI, /noticeSources=isGroup[\s\S]*?character\.phoneNotifications[\s\S]*?group\.phoneNotificationsByCharacter/);
 assert.match(groupPhoneUI, /phone-device-head--group/);
 assert.match(groupPhoneUI,/loadGroupMembersWithPhoneNotifications/,
