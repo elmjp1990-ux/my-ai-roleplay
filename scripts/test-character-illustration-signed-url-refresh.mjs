@@ -117,7 +117,7 @@ const groupListAvatarLoaderEnd=html.indexOf('async function groupLoadList',group
 const groupListAvatarLoader=html.slice(groupListAvatarLoaderStart,groupListAvatarLoaderEnd);
 assert.match(groupListAvatarLoader,/loadCharacterPrimaryIllustrationAssets\(missingAvatarIds\)/,
   'group list must batch-resolve missing legacy avatar_url values from primary illustrations');
-assert.match(groupListAvatarLoader,/primaryIllustrationPath:primaryAvatarById\[row\.character_id\]\?\.path/,
+assert.match(groupListAvatarLoader,/primaryIllustrationPath:snapshot\.imagePath\|\|snapshot\.primaryIllustrationPath[\s\S]*?primaryAvatarById\[row\.character_id\]\?\.path/,
   'group list avatar cache must retain the primary Storage path for future signed-URL refresh');
 
 const groupSnapshotMigration = readFileSync(
