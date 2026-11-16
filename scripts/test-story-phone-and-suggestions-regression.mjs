@@ -129,3 +129,22 @@ assert.match(memoryImportanceMigration, /GRANT EXECUTE ON FUNCTION public\.set_s
 assert.match((await readFileSync("supabase/functions/_shared/story-memory-summary.ts", "utf8")), /Boolean\(str\(item\.summary\)\)/);
 assert.match((await readFileSync("supabase/functions/_shared/story-memory-summary.ts", "utf8")), /rows\.length === 0 \? str\(sessionData\.summary\) : ""/);
 console.log("Story phone, world-state, affinity, suggestions, and editable AI-summary memory checks passed.");
+
+
+const groupPersonaReadStart=html.indexOf('function groupReadStep()');
+const groupPersonaReadEnd=html.indexOf('async function groupNext()',groupPersonaReadStart);
+assert.ok(groupPersonaReadStart>=0&&groupPersonaReadEnd>groupPersonaReadStart,'Group creation persona read path must remain identifiable');
+const groupPersonaRead=html.slice(groupPersonaReadStart,groupPersonaReadEnd);
+assert.match(groupPersonaRead,/g\.draft\.playerPersona=\$\('groupPlayerPersona'\)\?\.value\|\|''/,'Group creation must preserve the exact manually entered persona');
+assert.doesNotMatch(groupPersonaRead,/if\(!g\.draft\.playerPersona\)\s*g\.draft\.playerPersona=state\.account\?\.bio/,'Group creation must not silently replace an empty group persona with account bio');
+assert.match(html,/id="groupPlayerPersona"[^>]*>[\s\S]*?<\/textarea>/,'Group creation must retain a dedicated editable group-persona field');
+assert.match(html,/e\(g\.draft\.playerPersona\|\|''\)/,'Group creation must not implicitly hydrate an account-level persona into the group field');
+assert.doesNotMatch(html,/e\(g\.draft\.playerPersona\|\|state\.account\?\.bio\|\|''\)/,'Saved account personas must not be applied implicitly during group creation');
+const groupCreateStart=html.indexOf('async function groupCreate()');
+const groupCreateEnd=html.indexOf('function groupBack()',groupCreateStart);
+const groupCreateSource=html.slice(groupCreateStart,groupCreateEnd);
+assert.match(groupCreateSource,/player_persona:g\.draft\.playerPersona/,'Group creation must persist the exact draft persona');
+assert.match(groupCreateSource,/updated\.player_persona!==g\.draft\.playerPersona/,'Group creation must read back and verify the exact saved persona');
+assert.match(html,/const selected=presets\.find\(item=>String\(item\.id\)===String\(groupPersonaPickerSelection\)\)/,'A saved persona may only be applied after an explicit picker selection');
+assert.match(html,/if\(!selected\)\{toast\('請先選擇一組人設。'\)/,'The saved-persona picker must not auto-select the default preset');
+console.log('Group persona creation preserves manual text; saved presets require explicit selection and Apply.');
