@@ -64,6 +64,8 @@ CREATE TABLE public.characters (
   visibility text NOT NULL DEFAULT 'private',
   review_status text NOT NULL DEFAULT 'draft',
   is_nsfw boolean,
+  first_published_at timestamptz,
+  deletion_reason text,
   deleted_at timestamptz
 );
 
@@ -108,6 +110,13 @@ CREATE TABLE public.chat_group_members (
   position smallint NOT NULL,
   scene_id uuid REFERENCES public.chat_group_scenes(id),
   character_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb
+);
+
+CREATE TABLE public.chat_group_messages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id uuid NOT NULL REFERENCES public.chat_groups(id),
+  character_id uuid,
+  speaker_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb
 );
 
 CREATE TABLE public.chat_sessions (
