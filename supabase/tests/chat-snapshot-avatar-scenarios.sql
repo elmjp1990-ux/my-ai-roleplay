@@ -7,7 +7,7 @@ DECLARE
   v_snapshot jsonb;
   v_session uuid := '44444444-4444-4444-8444-444444444444';
   v_updated_at timestamptz := '2026-11-16 12:00:00+00';
-  v_deleted_at timestamptz := '2026-11-16 13:00:00+00';
+  v_deleted_at timestamptz := now();
   v_private_character uuid := '55555555-5555-4555-8555-555555555555';
   v_active_character uuid := '66666666-6666-4666-8666-666666666666';
   v_single_character uuid := '88888888-8888-4888-8888-888888888888';
@@ -72,7 +72,8 @@ BEGIN
     v_updated_at
   );
 
-  UPDATE public.characters SET deleted_at = v_deleted_at WHERE id IN (v_character, v_single_character);
+  PERFORM public.soft_delete_character(v_character);
+  PERFORM public.soft_delete_character(v_single_character);
 
   SELECT character_snapshot INTO v_snapshot
   FROM public.chat_group_members
@@ -98,7 +99,7 @@ BEGIN
   END IF;
   IF (SELECT updated_at FROM public.chat_sessions WHERE id = v_session) IS DISTINCT FROM v_updated_at
      OR (SELECT updated_at FROM public.chat_sessions WHERE id = v_single_session) IS DISTINCT FROM v_updated_at THEN
-    RAISE EXCEPTION 'soft-delete metadata update changed the chat sync version';
+    RAISE EXCEPTION 'soft_delete_character changed the chat sync version';
   END IF;
 
   BEGIN
