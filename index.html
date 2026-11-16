@@ -7203,11 +7203,15 @@ async function groupOpen(groupId) {
     const group=groupRes.data, scenes=sceneRes.data||[], memberRows=memberRes.data||[];
     if(!group) throw new Error('找不到這個群組，或目前帳號沒有存取權限。');
     if(memberRows.length<1||memberRows.length>3) throw new Error('群組成員資料不完整，請重新整理或重新建立群組。');
-    let characterById={};
+    let characterById={},primaryIllustrationPathById={};
     const characterIds=memberRows.map(m=>m.character_id).filter(isUuid);
     if(characterIds.length) {
-      const characterRes=await window.mySupabase.from('characters').select('id,avatar_url,phone_settings,primary_illustration_path').in('id',characterIds);
+      const [characterRes,illustrationRes]=await Promise.all([
+        window.mySupabase.from('characters').select('id,avatar_url,phone_settings').in('id',characterIds),
+        window.mySupabase.from('character_illustrations').select('character_id,storage_path').in('character_id',characterIds).eq('asset_type','primary').eq('sort_order',0)
+      ]);
       if(!characterRes.error) characterById=Object.fromEntries((characterRes.data||[]).map(x=>[x.id,x]));
+      if(!illustrationRes.error) primaryIllustrationPathById=Object.fromEntries((illustrationRes.data||[]).map(x=>[x.character_id,x.storage_path]));
     }
     const members=memberRows.map(m=>{
       const snapshot=m.character_snapshot||{},characterId=m.character_id||null;
@@ -7218,7 +7222,7 @@ async function groupOpen(groupId) {
         Array.isArray(snapshot.phoneNotifications)?snapshot.phoneNotifications:[];
       return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,
         avatar_url:characterRow.avatar_url||snapshot.avatar_url||snapshot.avatarUrl||snapshot.image||snapshot.image_url||'',
-        primaryIllustrationPath:characterRow.primary_illustration_path||snapshot.primaryIllustrationPath||snapshot.primary_illustration_path||snapshot.imagePath||snapshot.image_path||'',
+        primaryIllustrationPath:primaryIllustrationPathById[characterId]||snapshot.primaryIllustrationPath||snapshot.primary_illustration_path||snapshot.imagePath||snapshot.image_path||'',
         phoneNotifications,phoneSettings,position:m.position,sceneId:m.scene_id,
         sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};
     });
