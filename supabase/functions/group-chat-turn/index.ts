@@ -164,8 +164,8 @@ Deno.serve(async (request) => {
     return json({ status: "needs_reconciliation", error: "turn_already_processing", retryAllowed: false }, 409);
   }
 
-  // The DB deadline starts at reservation. Leave a one-second safety margin
-  // for the small RPC/clock skew between Postgres and this Edge Function.
+  // The DB deadline starts at reservation. Reserve twelve seconds for provider
+  // cancellation, the atomic refund RPC, and the response before the 55-second watchdog.
   const processingDeadlineAt = Date.now() + TIMEOUT_MS - CLEANUP_RESERVE_MS;
 
   const { data: group, error: groupError } = await admin.from("chat_groups")
