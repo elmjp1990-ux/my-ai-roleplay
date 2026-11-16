@@ -2515,7 +2515,7 @@ function isCharacterVideoMeaningfullyVisible(video){
   return (width*height)/totalArea>=0.35;
 }
 function scheduleCharacterVideoLoad(video){
-  if(!video||characterVideoVisibilityTimers.has(video))return;
+  if(!video||video.dataset.videoHydrated==='true'||video.dataset.videoHydrated==='loading'||characterVideoVisibilityTimers.has(video))return;
   video.dataset.videoVisibilityEligible='true';
   const timer=setTimeout(()=>{
     characterVideoVisibilityTimers.delete(video);
@@ -2578,11 +2578,10 @@ function hydrateCharacterVideo(video){
     video.dataset.videoHydrated='loading';
     try{
       const signedUrl=await getCharacterVideoSignedUrl(path);
-      const rect=video.getBoundingClientRect();
-      const inViewport=rect.bottom>0&&rect.top<window.innerHeight&&rect.right>0&&rect.left<window.innerWidth;
-      // A slow signing request must not attach a media URL after the user has scrolled away
-      // or switched tabs while it was pending.
-      if(!video.isConnected||document.hidden||!inViewport){
+      // A slow signing request must not attach a media URL after the user has left
+      // the 35% visibility threshold or switched tabs while it was pending.
+      if(!video.isConnected||document.hidden||video.dataset.videoVisibilityEligible!=='true'
+        ||!isCharacterVideoMeaningfullyVisible(video)){
         video.dataset.videoHydrated='false';
         return;
       }
