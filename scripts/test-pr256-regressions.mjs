@@ -68,3 +68,5 @@ assert.ok(groupEdge.includes('Promise.all(members.map'), 'group derived profile 
 assert.ok(groupEdge.includes('CLEANUP_RESERVE_MS = 12_000'), 'group AI deadline must reserve time for the atomic refund path');
 assert.ok(groupEdge.includes('errorName === "AbortError"'), 'group AI timeout must recognize cross-realm abort errors');
 assert.ok(groupEdge.includes('function extractGroupSuggestedReplies') && groupEdge.includes('suggested_replies: suggestedReplies'), 'group AI must parse and return suggestions from the same model response');
+
+assert.ok(html.includes('replaceRoleplayVariables(rawTitle,group?.playerName||session?.playerName||\'你\',character.name||\'角色\')'), 'configured phone notification titles must resolve {CHAR} and {USER} placeholders before extracting the icon');

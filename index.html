@@ -9302,7 +9302,8 @@ async function renderPhoneModal() {
   }
   const configuredNoticeHTML=notices.map(item=>{
     const rawTitle=typeof item==='string'?(character.name||'角色通知'):String(item?.title||character.name||'角色通知');
-    const {icon,title}=phoneNoticeIconPresentation(rawTitle);
+    const resolvedTitle=replaceRoleplayVariables(rawTitle,group?.playerName||session?.playerName||'你',character.name||'角色');
+    const {icon,title}=phoneNoticeIconPresentation(resolvedTitle);
     const body=typeof item==='string'?item:String(item?.body||'');
     return '<article class="phone-notification-card"><span class="phone-app-icon">'+e(icon)+'</span><div class="phone-notification-copy"><div class="phone-notification-meta"><span>'+e(title)+'</span><span>通知</span></div><p>'+e(body)+'</p></div></article>';
   }).join('');
