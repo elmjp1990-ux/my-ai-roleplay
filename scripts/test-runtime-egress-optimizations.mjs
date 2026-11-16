@@ -209,7 +209,9 @@ assert.match(groupEdge,/const TIMEOUT_MS = 55_000/,
   "group AI generation must have a fixed 55-second server-side deadline");
 assert.match(groupEdge,/errorName === "AbortError"[\s\S]*refund\(admin, user\.id, turnId, "provider_timeout"\)[\s\S]*status: refunded\.confirmed \? "timed_out" : "needs_reconciliation"/,
   "a confirmed server-side AI timeout must refund the reserved player charge");
-assert.match(groupSend,/status==='timed_out'[\s\S]*費用已全額退還，沒有扣款/,
+assert.match(groupSend,/groupTurnFailureMessage\(turnResult\)/,
+  "group send must route every confirmed failure through the shared user-facing message mapper");
+assert.match(html,/function groupTurnFailureMessage\(result\)[\s\S]*provider_timeout_watchdog[\s\S]*費用已全額退還，沒有扣款/,
   "players must be told clearly that a timed-out group request was refunded");
 assert.match(groupMigration,/v_cost := v_member_count \* 3/,
   "group price must remain 3 credits per character");
