@@ -58,7 +58,7 @@ assert.match(html,/renderGroupOpeningContent\(initialOpening,roleplayRoles\)/,'o
 const groupConversation=html.slice(html.indexOf('function renderGroupConversation()'),html.indexOf('async function groupOpen('));
 assert.doesNotMatch(groupConversation,/avatar-fallback">序|message-name">初始開場情境/,'group initial opening must not render an avatar or title/name frame');
 assert.match(html,/function conversationTypingIndicatorHTML\(\)/,'group and single chat must share the same reply animation');
-assert.match(html,/loadCharacterPrimaryIllustrationAssets\(missingImageItems\)/,'group picker must hydrate missing character portraits from their primary illustration');
+assert.match(html,/loadCharacterPrimaryIllustrationAssets\(missingImageItems\.map\(character=>character\.id\)\)/,'group picker must pass only missing character IDs to the shared primary-illustration batch loader');
 assert.match(html,/characterIllustrationSignedUrlManager\.get\(row\.storage_path\)/,'a failed batch of portrait URLs must fall back to each individual character image');
 assert.match(html,/maxlength="2000" data-max-count="1000"/,'group initial opening textarea must enforce a 1000-codepoint maximum while allowing surrogate pairs');
 assert.ok(html.includes('const messageRows=initialOpeningRow+g.messages.map'), 'opening display must be prepended without inserting a duplicate chat message');
