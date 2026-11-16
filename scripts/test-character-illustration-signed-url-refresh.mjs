@@ -89,3 +89,33 @@ assert.match(refreshHandler, /if\(image\.isConnected&&url\)image\.src=url;/);
 assert.match(refreshHandler, /image\.dataset\.signedUrlRefreshAttempted='false';/);
 assert.match(refreshHandler, /document\.addEventListener\('load',[\s\S]*?image\.dataset\.signedUrlRefreshAttempted='false';/);
 console.log('Passed: signed URL adapter settings, forced refresh delegation, and existing image retry guards.');
+
+
+const avatarRendererStart=html.indexOf('function characterAvatarMarkup(character,options={})');
+const avatarRendererEnd=html.indexOf('function normalizeCharacterTag(value)',avatarRendererStart);
+assert.notEqual(avatarRendererStart,-1,'single and group character portraits must share one renderer');
+assert.ok(avatarRendererEnd>avatarRendererStart);
+const avatarRenderer=html.slice(avatarRendererStart,avatarRendererEnd);
+assert.match(avatarRenderer,/data-character-avatar-id/);
+assert.match(avatarRenderer,/data-character-avatar-path/);
+assert.match(avatarRenderer,/data-character-avatar-fallback-class/);
+const avatarRecoveryStart=html.indexOf('async function recoverCharacterAvatarImage(image)');
+const avatarRecoveryEnd=html.indexOf('async function loadCityCharacterPage',avatarRecoveryStart);
+assert.notEqual(avatarRecoveryStart,-1,'all role avatar failures must use the shared recovery handler');
+assert.ok(avatarRecoveryEnd>avatarRecoveryStart);
+const avatarRecovery=html.slice(avatarRecoveryStart,avatarRecoveryEnd);
+assert.match(avatarRecovery,/refreshCharacterIllustrationSignedUrl\(storagePath\)/,
+  'an avatar with a known primary path must force-refresh the signed URL before falling back');
+assert.match(avatarRecovery,/loadCharacterPrimaryIllustrationAssets\(\[image\.dataset\.characterAvatarId\]\)/,
+  'an avatar without a known path must resolve its primary illustration by character ID');
+assert.match(avatarRecovery,/image\.replaceWith\(fallback\)/,
+  'a broken avatar must be replaced with the shared name fallback');
+assert.match(avatarRecovery,/image\.dataset\.characterAvatarId\|\|image\.dataset\.characterPrimaryIllustration/,
+  'the generic opacity handler must not leave broken character avatars darkened');
+const groupListAvatarLoaderStart=html.indexOf('async function groupHydrateListRows(groups)');
+const groupListAvatarLoaderEnd=html.indexOf('async function groupLoadList',groupListAvatarLoaderStart);
+const groupListAvatarLoader=html.slice(groupListAvatarLoaderStart,groupListAvatarLoaderEnd);
+assert.match(groupListAvatarLoader,/loadCharacterPrimaryIllustrationAssets\(missingAvatarIds\)/,
+  'group list must batch-resolve missing legacy avatar_url values from primary illustrations');
+assert.match(groupListAvatarLoader,/primaryIllustrationPath:primaryAvatarById\[row\.character_id\]\?\.path/,
+  'group list avatar cache must retain the primary Storage path for future signed-URL refresh');
