@@ -18,6 +18,12 @@ if (!source.includes('clearCharacterVideoVisibilityTimer(target)')) {
 if (!source.includes("video.dataset.videoVisibilityEligible!=='true'")) {
   throw new Error('A delayed video load must re-check current visibility eligibility.');
 }
+if (!source.includes('isCharacterVideoMeaningfullyVisible(video)')) {
+  throw new Error('Delayed loads and the no-IntersectionObserver fallback must re-check the 35% visible-area threshold.');
+}
+if (!source.includes('(width*height)/totalArea>=0.35')) {
+  throw new Error('The fallback visibility calculation must preserve the 35% threshold.');
+}
 if (!source.includes("threshold:[0,0.15,0.35]")) {
   throw new Error('Video observer must use graduated visibility thresholds.');
 }
