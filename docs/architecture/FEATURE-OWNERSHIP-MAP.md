@@ -46,6 +46,7 @@
 | `signed-url-manager.js` | Signed URL cache, expiry buffer, in-flight dedupe and invalidation | Bucket policy, access decisions, object deletion |
 | `city-map.js` | City map presentation using injected dependencies | Persistence, authentication, chat/encounter creation rules |
 | `followed-authors.js` | Followed-author presentation | Follow mutations or RLS |
+| `author-data.js` | Read-only public author character page and bounded latest-preview RPC adapters | Rendering, local state merging, follow mutations or authorization policy; RLS/RPC remain authoritative |
 | `author-profile.js` | Author profile presentation | Follow mutations or profile authorization |
 | `comment-renderer.js` | Comment presentation | Comment fetch/mutations or privacy filtering |
 | `custom-tag-picker.js` | Custom tag picker rendering and local event binding | Tag persistence or character save |
@@ -59,7 +60,7 @@
 | Concern | Current location(s) | Ownership rule |
 |---|---|---|
 | Story AI turn orchestration | `supabase/functions/chat-turn/index.ts`; `supabase/functions/group-chat-turn/index.ts` | Authentication, ownership, prompt assembly, one-call provider orchestration, turn state, and downstream coordination stay server-authoritative. Group AI selects 1–3 speakers from the roster in one model call. |
-| Shared AI prompt/context | `supabase/functions/_shared/prompt-context.ts`, `prompt-variables.ts`, `character-ai-profile-prompt.ts`, `group-turn-envelope.ts`, `openrouter-chat-completions.ts`, `openrouter-provider-policy.ts`, `story-memory-summary.ts` and related shared files | Single/group chat and memory summaries reuse one OpenRouter transport and approved provider allowlist; group output is parsed into explicit speaker IDs. Character-profile worker keeps bounded streaming/response validation but reuses the same provider allowlist. Keep model/prompt behavior separate from generic frontend refactors. |
+| Shared AI prompt/context and provider runtime | `supabase/functions/_shared/prompt-context.ts`, `prompt-variables.ts`, `character-ai-profile-prompt.ts`, `group-turn-envelope.ts`, `openrouter-chat-completions.ts`, `openrouter-provider-policy.ts`, `ai-provider-result.ts`, `ai-value-utils.ts`, `provider-failure-policy.ts`, `story-memory-summary.ts` and related shared files | Single/group chat and memory summaries reuse one OpenRouter transport and approved provider allowlist; group output is parsed into explicit speaker IDs. Side-effect-free record/string/UUID guards are shared; Story and Group billing/failure transitions remain mode-specific. Character-profile worker keeps bounded streaming/response validation but reuses the same provider allowlist. |
 | Encounter session and turns | `supabase/functions/encounter-session/`, `encounter-session-state/`, `encounter-turn/`, plus encounter shared helpers | Server validates session ownership, current lifecycle, schedule and turn eligibility. |
 | Character AI profile organization | `supabase/functions/character-profile-organization-worker/`, `supabase/functions/_shared/character-profile-organization.ts` | Background derived-data workflow; distinct from user-facing character form persistence. |
 | Chat retention/purge | `supabase/functions/purge-chat-deletions/`, `supabase/functions/_shared/chat-deletion-worker.ts` | Retention, tombstones and purge are backend-owned; do not replace with frontend deletion. |
@@ -154,3 +155,10 @@
 ## Known current-state caveat
 
 This is a source-navigation map, not yet a complete dependency graph. `index.html` still owns many cross-feature functions and direct Supabase calls. Before moving any feature, trace the exact call graph, shared state, event listeners, data queries and tests for that feature. The proposed `src/` directory layout is a destination model, not a claim that these folders already exist.
+
+
+## Refactor batch 3–5 progress (2026-11-15)
+
+- **Batch 3:** PR #252 already routes memory summaries through the shared OpenRouter transport and central provider policy. This follow-up adds ai-value-utils.ts for side-effect-free record, trimmed-string and UUID guards shared by Story, Group and memory-summary Edge Functions. Do not unify Story/Group billing failure transitions: their retry/refund/reconciliation semantics differ.
+- **Batch 4:** PR #252 already extracted notifications-screen.js as a presentation module. This follow-up extracts the read-only author page and followed-author latest-preview queries to author-data.js; rendering, character mapping and app-state merging remain in index.html. No new request is introduced; the same paged select and bounded RPC are used.
+- **Batch 5:** Added a repository-side source-to-regression map for the five PR #252 migrations; this does not inspect the hosted migration ledger or apply SQL. The first-pass draft classification is recorded in supabase/drafts/README.md; unlisted files remain retain/unclassified. CSS review found repeated responsive conditions across separate inline style sections and iOS/mobile override selectors; they are not safe duplicates to merge without preserving cascade order, so no visual rules were deleted. Existing SQL migrations remain append-only.

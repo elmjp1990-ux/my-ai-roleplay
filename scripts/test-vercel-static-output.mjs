@@ -17,6 +17,7 @@ const fileBudgets = {
   'core-utils.js': 4_000,
   'city-map.js': 52_000,
   'followed-authors.js': 9_000,
+  'author-data.js': 5_000,
   'list-pagination.js': 2_000,
   'notifications-screen.js': 5_000,
   'author-profile.js': 6_000,
