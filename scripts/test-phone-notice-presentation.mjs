@@ -30,13 +30,13 @@ assert.match(phoneBlock, /const stateByIndex=new Map\(storyPhoneStates\.map/,
   'AI-generated phone state must be joined to the configured field by field_index');
 assert.match(phoneBlock, /const resolvePhoneFieldTitle=value=>replaceRoleplayVariables/,
   'configured {CHAR}/{USER} placeholders must be resolved before matching generated group phone titles');
-assert.match(phoneBlock, /const generatedNotice=noticeByTitle\\.get\\(titleKey\\)/,
+assert.match(phoneBlock, /const generatedNotice=noticeByTitle\.get\(titleKey\)/,
   'configured phone rows must join generated notifications by canonical title');
-assert.match(phoneBlock, /const configuredTitles=new Set\\(configuredRows\\.map\\(item=>phoneTitleKey\\(item\\.title\\)\\)\\)/,
+assert.match(phoneBlock, /const configuredTitles=new Set\(configuredRows\.map\(item=>phoneTitleKey\(item\.title\)\)\)/,
   'configured title deduplication must use the same canonical key as generated notifications');
-assert.match(phoneBlock, /!configuredTitles\\.has\\(phoneTitleKey\\(resolvePhoneFieldTitle\\(item\\?\\.title\\|\\|''\\)\\)\\)/,
+assert.match(phoneBlock, /!configuredTitles\.has\(phoneTitleKey\(resolvePhoneFieldTitle\(item\?\.title\|\|''\)\)\)/,
   'generated notifications already represented by configured fields must not render twice');
-assert.match(phoneBlock, /generatedNotice\\?\\.body\\|\\|state\\?\\.body\\|\\|'目前尚未有更新'/,
+assert.match(phoneBlock, /generatedNotice\?\.body\|\|state\?\.body\|\|'目前尚未有更新'/,
   'configured rows must show generated content when available and a safe empty state otherwise');
 assert.match(phoneBlock, /const savedNotices=\[\.\.\.noticeByTitle\.values\(\)\]/);
 assert.match(phoneBlock, /const noticeLines=notices\.map/);
