@@ -15,12 +15,12 @@ assert.match(groupAiMigration,/SET phone_notifications = v_phone_notifications/)
 assert.match(edge,/processDueGroupMemorySummary/);
 assert.match(edge,/buildGroupMemoryContext/);
 assert.match(edge,/getGroupHistoryLimit/);
-assert.match(edge,/from\\("chat_group_memory_summaries"\\)/);
-assert.match(edge,/group\\.scene_mode\\) === "shared"/);
-assert.match(edge,/limit\\(groupHistoryLimit\\)/);
-assert.match(edge,/groupMemoryContext \\? \\[groupMemoryContext\\] : \\[\\]/);
-assert.match(memoryContext,/if \\(sceneMode !== "shared"\\) return ""/);
-assert.match(memoryContext,/return sceneMode === "shared" && hasLatestSummary && !lookupFailed \\? 24 : 40/);
+assert.ok(edge.includes('from("chat_group_memory_summaries")'));
+assert.ok(edge.includes('asText(group.scene_mode) === "shared"'));
+assert.ok(edge.includes("limit(groupHistoryLimit)"));
+assert.ok(edge.includes("...(groupMemoryContext ? [groupMemoryContext] : [])"));
+assert.ok(memoryContext.includes('if (sceneMode !== "shared") return "";'));
+assert.ok(memoryContext.includes("return sceneMode === \"shared\" && hasLatestSummary && !lookupFailed ? 24 : 40;"));
 assert.match(edge,/admin\.rpc\("complete_group_chat_turn"/);
 assert.match(helper,/export async function processDueGroupMemorySummary/);
 assert.match(helper,/\.from\("chat_group_turns"\)/);
