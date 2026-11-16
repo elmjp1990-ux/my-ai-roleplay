@@ -2005,6 +2005,46 @@ async function loadCharacterPrimaryIllustrationAssets(characterIds, scopeUserId=
   return result;
 }
 
+async function hydrateCharacterAvatarFallbacks(root=$('view')) {
+  if(!root?.querySelectorAll)return;
+  const fallbacks=[...root.querySelectorAll('span[data-character-avatar-id]:not([data-character-avatar-hydration])')];
+  if(!fallbacks.length)return;
+  const byId=new Map();
+  for(const fallback of fallbacks){
+    const id=fallback.dataset.characterAvatarId;
+    if(!isUuid(id))continue;
+    fallback.dataset.characterAvatarHydration='pending';
+    const rows=byId.get(id)||[];
+    rows.push(fallback);byId.set(id,rows);
+  }
+  if(!byId.size)return;
+  try{
+    const assets=await loadCharacterPrimaryIllustrationAssets([...byId.keys()]);
+    for(const [id,nodes] of byId){
+      const primary=assets.get(id)?.primary;
+      for(const fallback of nodes){
+        if(!fallback.isConnected)continue;
+        if(!primary?.src){fallback.dataset.characterAvatarHydration='unavailable';continue;}
+        const image=document.createElement('img');
+        image.className=fallback.dataset.characterAvatarImageClass||'avatar';
+        image.src=primary.src;image.alt='';image.loading='lazy';image.decoding='async';
+        image.dataset.characterAvatarId=id;
+        image.dataset.characterAvatarPath=primary.path||fallback.dataset.characterAvatarPath||'';
+        image.dataset.characterAvatarFallback=fallback.dataset.characterAvatarFallback||'角';
+        image.dataset.characterAvatarFallbackClass=fallback.dataset.characterAvatarFallbackClass||'avatar avatar-fallback';
+        image.dataset.characterAvatarFallbackStyle=fallback.dataset.characterAvatarFallbackStyle||'';
+        image.dataset.characterAvatarImageClass=image.className;
+        fallback.replaceWith(image);
+      }
+    }
+  }catch(error){
+    for(const nodes of byId.values())for(const fallback of nodes){
+      if(fallback.isConnected)fallback.dataset.characterAvatarHydration='unavailable';
+    }
+    console.warn('角色頭像補載失敗，保留名稱圖示：',error?.message||error);
+  }
+}
+
 async function loadCharacterIllustrationAssets(characterIds, cleanupUserId=null) {
   const client=window.mySupabase;
   const ids=[...new Set((characterIds||[]).filter(Boolean))].sort();
@@ -4725,14 +4765,21 @@ function characterAvatarMarkup(character,options={}) {
   const characterId=String(character?.characterId||character?.id||'');
   const name=String(character?.name||character?.character_snapshot?.name||character?.characterSnapshot?.name||'角').trim();
   const initial=Array.from(name)[0]||'角';
-  const image=safeImage(character?.image||character?.avatar_url||character?.avatarUrl||
-    character?.character_snapshot?.avatar_url||character?.character_snapshot?.image||
-    character?.characterSnapshot?.avatar_url||character?.characterSnapshot?.image);
+  const imageCandidates=[
+    character?.avatar_url,character?.avatarUrl,
+    character?.character_snapshot?.avatar_url,character?.characterSnapshot?.avatar_url,
+    character?.image,character?.character_snapshot?.image,character?.characterSnapshot?.image
+  ];
+  const image=imageCandidates.map(safeImage).find(Boolean)||'';
   const identity=isUuid(characterId)?' data-character-avatar-id="'+e(characterId)+'"':'';
-  const portraitPath=String(character?.primaryIllustrationPath||character?.primary_illustration_path||character?.imagePath||'');
+  const portraitPath=String(character?.primaryIllustrationPath||character?.primary_illustration_path||character?.imagePath||
+    character?.character_snapshot?.primaryIllustrationPath||character?.character_snapshot?.primary_illustration_path||
+    character?.characterSnapshot?.primaryIllustrationPath||character?.characterSnapshot?.primary_illustration_path||'');
   const pathAttr=portraitPath?' data-character-avatar-path="'+e(portraitPath)+'"':'';
-  const fallbackAttrs=' data-character-avatar-fallback="'+e(initial)+'" data-character-avatar-fallback-class="'+e(fallbackClass)+'" data-character-avatar-fallback-style="'+e(style)+'"';
-  if(!image)return '<span class="'+e(fallbackClass)+'" aria-hidden="true"'+(style?' style="'+e(style)+'"':'')+'>'+e(initial)+'</span>';
+  const fallbackAttrs=' data-character-avatar-fallback="'+e(initial)+'" data-character-avatar-fallback-class="'+e(fallbackClass)+
+    '" data-character-avatar-fallback-style="'+e(style)+'" data-character-avatar-image-class="'+e(imageClass)+'"';
+  if(!image)return '<span class="'+e(fallbackClass)+'" aria-hidden="true"'+(style?' style="'+e(style)+'"':'')+
+    identity+pathAttr+fallbackAttrs+'>'+e(initial)+'</span>';
   return '<img class="'+e(imageClass)+'" src="'+e(image)+'" alt="" loading="lazy" decoding="async"'+identity+pathAttr+fallbackAttrs+'>';
 }
 function normalizeCharacterTag(value) {
@@ -5107,6 +5154,7 @@ function render() {
     case 'album':renderChatAlbumPage();break;
   }
   restoreCharacterCardVideos($('view'),previousCardVideos);
+  void hydrateCharacterAvatarFallbacks($('view'));
   observePublicCharacterIllustrationCards($('view'));
   if (route.overlay) renderModal(route.overlay);
   updateCharacterCounters($('view'));
@@ -7115,6 +7163,7 @@ function refreshChatEntryList() {
   chatListPaginationObserver?.disconnect();
   groupPrototype.groupListObserver?.disconnect();
   entries.innerHTML=chatEntries();
+  void hydrateCharacterAvatarFallbacks(entries);
   const canLoadSessions=chatSessionListPager.initialLoaded&&chatSessionListPager.hasMore;
   const canLoadGroups=groupPrototype.groupsLoaded&&groupPrototype.groupListHasMore;
   if((canLoadSessions||canLoadGroups)&&!groupPrototype.loadingGroups&&!chatSessionListPager.loading){
