@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert";
-import { parseGroupTurnEnvelope } from "./group-turn-envelope.ts";
+import { parseGroupTurnEnvelope, serializeGroupPhoneUpdatesForRpc } from "./group-turn-envelope.ts";
 
 const roster = [
   { id: "a", name: "夜辰", sceneId: "scene-1", sceneName: "客廳" },
@@ -13,9 +13,15 @@ Deno.test("parses per-character group speeches and phone notifications", () => {
       { character_id: "a", notifications: [{ title: "最近訊息", body: "客戶確認明天下午會議。" }] },
       { character_id: "b", notifications: [{ title: "待辦事項", body: "目前沒有待辦事項" }] },
     ],
+    story_world_state: { story_time: "2026-11-16 19:30", story_location: "蘇清雅的辦公室" },
   }), roster);
   assertEquals(result?.speeches.map(row => [row.speakerId, row.content]), [["a", "*抬眼*妳回來了。"]]);
   assertEquals(result?.phoneUpdates.map(row => [row.characterId, row.notifications.length]), [["a", 1], ["b", 1]]);
+  assertEquals(result?.storyWorldState, { storyTime: "2026-11-16 19:30", storyLocation: "蘇清雅的辦公室" });
+  assertEquals(serializeGroupPhoneUpdatesForRpc(result!.phoneUpdates), [
+    { character_id: "a", notifications: [{ title: "最近訊息", body: "客戶確認明天下午會議。" }] },
+    { character_id: "b", notifications: [{ title: "待辦事項", body: "目前沒有待辦事項" }] },
+  ]);
 });
 
 Deno.test("rejects unknown speakers, unknown phone owners, missing character phone state and invalid rows", () => {

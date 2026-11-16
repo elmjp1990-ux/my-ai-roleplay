@@ -565,5 +565,30 @@ body.day.conversation .composer-input-row textarea::placeholder,
 body.day.group-chat-page .composer-input-row textarea::placeholder { color:rgba(48,51,57,.78); }
 @media(max-width:600px) {
   body.conversation .messages, body.group-chat-page .messages { padding-inline:6px; }
-  body.conversation .roleplay-segment.is-action .narration, body.group-chat-page .roleplay-segment.is-action .narration { max-width:min(25em,100%); font-size:clamp(12px,3.65vw,15px); }
+  body.conversation .messages .message:has(.roleplay-segment.is-action),
+  body.group-chat-page .messages .message:has(.roleplay-segment.is-action) { width:calc(100% + 10px); margin-inline:-5px; }
+  body.conversation .message:has(.roleplay-segment.is-action) > .message-content,
+  body.group-chat-page .message:has(.roleplay-segment.is-action) > .message-content { flex:1 1 100%; width:100%; max-width:none; min-width:0; }
+  body.conversation .message:has(.roleplay-segment.is-action) .roleplay-segments,
+  body.group-chat-page .message:has(.roleplay-segment.is-action) .roleplay-segments { width:100%; max-width:none; }
+  body.conversation .roleplay-segment.is-action,
+  body.group-chat-page .roleplay-segment.is-action { width:100%; max-width:none; justify-self:stretch; }
+  body.conversation .roleplay-segment.is-action .narration,
+  body.group-chat-page .roleplay-segment.is-action .narration {
+    width:calc(100% - 2px); max-width:none; box-sizing:border-box; margin-inline:1px;
+    font-size:clamp(12px,3.65vw,15px);
+  }
+}
+.group-opening-message { width:100%; }
+.group-opening-message > .message-content { flex:1 1 100%; width:100%; max-width:none; }
+.group-opening-content { display:grid; gap:5px; width:100%; max-width:none; }
+.group-opening-content .narration { width:100%; max-width:none; margin-inline:1px; }
+.group-opening-content .bubble { max-width:min(20em,100%); }
+:root { --px-creator-visibility-border:rgba(197,166,244,.96); }
+body.day { --px-creator-visibility-border:rgba(132,91,180,.96); }
+.owner-actions button[data-action="visibility"] { border:1px solid var(--px-glass-border); color:var(--text); }
+.owner-actions button[data-action="visibility"].is-selected {
+  border:2px solid var(--px-creator-visibility-border)!important;
+  background:var(--px-glass-selected)!important; color:var(--text)!important; font-weight:700;
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--px-creator-visibility-border) 32%,transparent),inset 0 1px 0 var(--px-glass-highlight)!important;
 }

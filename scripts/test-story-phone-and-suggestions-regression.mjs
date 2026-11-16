@@ -23,7 +23,10 @@ assert.match(html, /phoneReadErrors\.join\('；'\)/,
 assert.match(html, /\.roleplay-segment\.is-character \{ max-width:min\(20em,100%\); \}/,
   'spoken dialogue containers must allow 18 full-width Chinese characters after bubble padding');
 assert.doesNotMatch(html, /\.roleplay-segment\.is-character,\.roleplay-segment\.is-action \{ width:100%; max-width:100%; \}/,
-  'mobile single/group narration and dialogue widths must remain unchanged');
+  'dialogue and narration must not be collapsed into one shared width rule');
+assert.match(uiStyles,/\.message:has\(\.roleplay-segment\.is-action\)/,
+  'mobile narration alone must expand to the full chat panel');
+assert.match(uiStyles,/\.roleplay-segment\.is-character/,'ordinary character dialogue must retain its independent bubble width');
 assert.match(html,/LOCKED FINAL CHAT FORMAT[\s\S]{0,180}25 full-width CJK chars per line/);
 assert.match(html,/max-width:min\(25em,100%\)/,'star-wrapped narration must retain its independent 25 CJK character line width');
 assert.match(html,/max-width:min\(20em,100%\)/,'dialogue bubbles must wrap at about 18 full-width Chinese characters');

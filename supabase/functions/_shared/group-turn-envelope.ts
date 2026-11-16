@@ -3,11 +3,19 @@ export type GroupPhoneNotification = { title: string; body: string };
 export type GroupTurnEnvelope = {
   speeches: Array<{ speakerId: string; speakerName: string; content: string; sceneId: string | null; sceneName: string }>;
   phoneUpdates: Array<{ characterId: string; notifications: GroupPhoneNotification[] }>;
+  storyWorldState: { storyTime: string; storyLocation: string } | null;
 };
 
 const asObject = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const asText = (value: unknown): string => typeof value === "string" ? value.trim() : "";
+
+export function serializeGroupPhoneUpdatesForRpc(updates: GroupTurnEnvelope["phoneUpdates"]) {
+  return updates.map(({ characterId, notifications }) => ({
+    character_id: characterId,
+    notifications,
+  }));
+}
 
 /** Parse and validate one JSON response containing group speeches and per-character phone state. */
 export function parseGroupTurnEnvelope(output: unknown, speakers: GroupTurnSpeaker[]): GroupTurnEnvelope | null {
@@ -49,11 +57,15 @@ export function parseGroupTurnEnvelope(output: unknown, speakers: GroupTurnSpeak
     phoneById.set(characterId, notifications);
   }
   if (phoneById.size !== speakers.length) return null;
+  const rawWorldState=asObject(root.story_world_state);
+  const storyTime=asText(rawWorldState.story_time).slice(0,80);
+  const storyLocation=asText(rawWorldState.story_location).slice(0,120);
   return {
     speeches,
     phoneUpdates: speakers.map(speaker => ({
       characterId: speaker.id,
       notifications: phoneById.get(speaker.id) || [],
     })),
+    storyWorldState:storyTime||storyLocation?{storyTime,storyLocation}:null,
   };
 }

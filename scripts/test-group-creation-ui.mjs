@@ -50,6 +50,17 @@ assert.doesNotMatch(pinHelper, /cloudRow\.updated_at!==expectedUpdatedAt/, 'pin 
 const groupTurn = fs.readFileSync(new URL('../supabase/functions/group-chat-turn/index.ts', import.meta.url), 'utf8');
 assert.ok(html.includes("const initialOpening=String(initialScene?.description||'').trim()"), 'group chat must read the saved initial scene description');
 assert.ok(html.includes('const initialOpeningRow=initialOpening && !g.historyHasMore'), 'group chat must render the original opening before the earliest loaded messages, not above a recent partial page');
+assert.match(html,/function groupOpeningDraftKey\(/,'group opening draft must have an account-scoped recovery key');
+assert.match(html,/localStorage\.setItem\(key,JSON\.stringify\(\{text,savedAt:Date\.now\(\)\}\)\)/,'group opening draft must be persisted while typing and survive app switching');
+assert.match(html,/document\.addEventListener\('visibilitychange'/,'group opening draft must be synchronized when the app is backgrounded');
+assert.match(html,/初始開場情境最多 1000 字/,'group opening scene must be limited to 1000 characters');
+assert.match(html,/renderGroupOpeningContent\(initialOpening,roleplayRoles\)/,'opening text must parse star narration and speaker prefixes');
+const groupConversation=html.slice(html.indexOf('function renderGroupConversation()'),html.indexOf('async function groupOpen('));
+assert.doesNotMatch(groupConversation,/avatar-fallback">序|message-name">初始開場情境/,'group initial opening must not render an avatar or title/name frame');
+assert.match(html,/function conversationTypingIndicatorHTML\(\)/,'group and single chat must share the same reply animation');
+assert.match(html,/loadCharacterPrimaryIllustrationAssets\(missingImageItems\)/,'group picker must hydrate missing character portraits from their primary illustration');
+assert.match(html,/characterIllustrationSignedUrlManager\.get\(row\.storage_path\)/,'a failed batch of portrait URLs must fall back to each individual character image');
+assert.match(html,/maxlength="2000" data-max-count="1000"/,'group initial opening textarea must enforce a 1000-codepoint maximum while allowing surrogate pairs');
 assert.ok(html.includes('const messageRows=initialOpeningRow+g.messages.map'), 'opening display must be prepended without inserting a duplicate chat message');
 assert.ok(html.includes("if(!typedContent && !(g.messages||[]).length)"), 'empty first send must not start a paid AI turn');
 assert.ok(html.includes("💎 本群組每次對話 '+(groupPrototype.draft.memberIds.length*3)+' 鑽石（每加一位角色3鑽石）。"), 'group picker must show the requested per-turn cost wording');
@@ -62,6 +73,11 @@ for (const forbidden of ['functions.invoke', 'group-chat-turn', 'walletPreflight
   assert.ok(!groupCreateSource.includes(forbidden), 'group creation must not call AI or reserve wallet funds: ' + forbidden);
 }
 assert.ok(groupTurn.includes('const initialOpeningContext = (sceneResult.data || []).map'), 'group AI must load original scene descriptions');
+assert.ok(groupTurn.includes('serializeGroupPhoneUpdatesForRpc') && groupTurn.includes('story_world_state'), 'group AI must persist phone data using the RPC contract and return game world state');
+assert.ok(groupTurn.includes('不可讀取、推測或使用系統現在時間'), 'group AI game time must never be derived from real device time');
+const groupMigration=fs.readFileSync(new URL('../supabase/migrations/20261116170000_group_story_world_state_and_opening_limit.sql',import.meta.url),'utf8');
+assert.match(groupMigration,/char_length\(COALESCE\(v_scene->>'description',''\)\) > 1000/,'database group creation RPC must enforce the 1000-character opening limit');
+assert.match(groupMigration,/CREATE OR REPLACE FUNCTION public\.get_active_character_tags/,'unused tags must be checked against authoritative active-character usage');
 assert.ok(groupTurn.includes('【玩家設定的初始開場情境】'), 'group AI system prompt must include the original opening context');
 assert.ok(groupTurn.includes('AI 只在玩家送出第一則訊息後才回覆'), 'group AI prompt must only respond after the player sends a message');
 
