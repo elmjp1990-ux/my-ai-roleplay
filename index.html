@@ -4729,9 +4729,11 @@ function characterAvatarMarkup(character,options={}) {
     character?.character_snapshot?.avatar_url||character?.character_snapshot?.image||
     character?.characterSnapshot?.avatar_url||character?.characterSnapshot?.image);
   const identity=isUuid(characterId)?' data-character-avatar-id="'+e(characterId)+'"':'';
+  const portraitPath=String(character?.primaryIllustrationPath||character?.primary_illustration_path||character?.imagePath||'');
+  const pathAttr=portraitPath?' data-character-avatar-path="'+e(portraitPath)+'"':'';
   const fallbackAttrs=' data-character-avatar-fallback="'+e(initial)+'" data-character-avatar-fallback-class="'+e(fallbackClass)+'" data-character-avatar-fallback-style="'+e(style)+'"';
   if(!image)return '<span class="'+e(fallbackClass)+'" aria-hidden="true"'+(style?' style="'+e(style)+'"':'')+'>'+e(initial)+'</span>';
-  return '<img class="'+e(imageClass)+'" src="'+e(image)+'" alt="" loading="lazy" decoding="async"'+identity+fallbackAttrs+'>';
+  return '<img class="'+e(imageClass)+'" src="'+e(image)+'" alt="" loading="lazy" decoding="async"'+identity+pathAttr+fallbackAttrs+'>';
 }
 function normalizeCharacterTag(value) {
   // UI 會自動加上 #，因此不把作者輸入的前綴存入資料庫。
@@ -7199,7 +7201,7 @@ async function groupHydrateListRows(groups){
   if(missingAvatarIds.length){
     try{
       const primaryAssets=await loadCharacterPrimaryIllustrationAssets(missingAvatarIds);
-      for(const [characterId,assets] of primaryAssets)if(assets?.primary?.src)primaryAvatarById[characterId]=assets.primary.src;
+      for(const [characterId,assets] of primaryAssets)if(assets?.primary?.src)primaryAvatarById[characterId]=assets.primary;
     }catch(error){console.warn('群組列表主立繪批次載入失敗：',error?.message||error);}
   }
   for(const row of memberRows||[]){
@@ -7208,7 +7210,8 @@ async function groupHydrateListRows(groups){
       members.push({
         characterId:row.character_id||row.character_snapshot?.id||'',
         name:row.character_snapshot?.name||'角色',
-        avatar_url:avatars[row.character_id]||primaryAvatarById[row.character_id]||row.character_snapshot?.avatar_url||row.character_snapshot?.image||'',
+        avatar_url:avatars[row.character_id]||primaryAvatarById[row.character_id]?.src||row.character_snapshot?.avatar_url||row.character_snapshot?.image||'',
+        primaryIllustrationPath:primaryAvatarById[row.character_id]?.path||row.character_snapshot?.primaryIllustrationPath||row.character_snapshot?.primary_illustration_path||'',
         character_snapshot:row.character_snapshot||{}
       });
     }
@@ -7404,7 +7407,7 @@ async function groupOpen(groupId) {
         if(existingIndex>=0)g.groups[existingIndex]=listRow;else g.groups.unshift(listRow);
         g.groupMembers ||= {};
         g.groupPreviews ||= {};
-        g.groupMembers[group.id]=members.map(member=>({characterId:member.characterId,name:member.name,avatar_url:member.avatar_url||member.image||'',character_snapshot:{id:member.characterId,name:member.name,avatar_url:member.avatar_url||member.image||''}}));
+        g.groupMembers[group.id]=members.map(member=>({characterId:member.characterId,name:member.name,avatar_url:member.avatar_url||member.image||'',primaryIllustrationPath:member.primaryIllustrationPath||'',character_snapshot:{id:member.characterId,name:member.name,avatar_url:member.avatar_url||member.image||'',primaryIllustrationPath:member.primaryIllustrationPath||''}}));
         const latestMessage=messages.at(-1);
         if(latestMessage)g.groupPreviews[group.id]={group_id:group.id,content:latestMessage.content||'',created_at:latestMessage.createdAt||'',speaker_type:latestMessage.type==='user'?'user':'character'};
         else delete g.groupPreviews[group.id];
@@ -7438,7 +7441,7 @@ async function groupOpen(groupId) {
           const primary=assets.get(member.characterId)?.primary;
           if(primary?.src){member.avatar_url=primary.src;member.image=primary.src;member.primaryIllustrationPath=primary.path;}
         }
-        if(g.groupMembers)g.groupMembers[group.id]=members.map(member=>({characterId:member.characterId,name:member.name,avatar_url:member.avatar_url||member.image||'',character_snapshot:member.characterSnapshot||{}}));
+        if(g.groupMembers)g.groupMembers[group.id]=members.map(member=>({characterId:member.characterId,name:member.name,avatar_url:member.avatar_url||member.image||'',primaryIllustrationPath:member.primaryIllustrationPath||'',character_snapshot:member.characterSnapshot||{}}));
         if(route.page==='group'&&route.id===group.id){
           const input=$('groupMessageInput'),draft=input?.value||'',hadFocus=!!input&&document.activeElement===input;
           renderGroupConversation();
