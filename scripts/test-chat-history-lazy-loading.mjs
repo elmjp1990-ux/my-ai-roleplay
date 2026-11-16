@@ -171,7 +171,7 @@ assert.doesNotMatch(groupOpen, /syncGroupDiaryCloud|ensureGroupDiaryCloudSynced/
   "opening a group chat must not download the full legacy diary payload");
 assert.match(groupOpen, /groupDiaryCloudReady\.delete\(groupId\)/,
   "reopening a group should refresh the diary on its next explicit open");
-const groupDiaryOverlay = between("function renderGroupChatOverlay(kind)", "function renderGroupConversation()");
+const groupDiaryOverlay = between("function renderGroupChatOverlay(kind)", "function renderGroupStatusShell(");
 assert.match(groupDiaryOverlay, /ensureGroupDiaryCloudSynced\(group\.id\)/,
   "the legacy group diary should synchronize only when its overlay is opened");
 assert.match(groupDiaryOverlay, /groupDiaryCloudReady\.get\(group\.id\)/,
