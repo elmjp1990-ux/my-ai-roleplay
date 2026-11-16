@@ -71,7 +71,7 @@ Deno.test("accepts omitted model titles for configured fields and rejects missin
     speeches: [{ speaker_id: "a", content: "有效角色發言" }],
     phone_updates: [
       { character_id: "a", notifications: [{ title: "欄位", body: "" }] },
-      { character_id: "b", notifications: [{ title: "公司訊息", body: "正常" }] },
+      { character_id: "b", notifications: [{ title: "公司訊息", body: "" }] },
     ],
   }), roster);
   assertEquals(missingBody.errorCode, null);
