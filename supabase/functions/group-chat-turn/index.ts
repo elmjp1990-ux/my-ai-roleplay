@@ -215,6 +215,7 @@ Deno.serve(async (request) => {
   const speakers: Speaker[] = [];
   const protectedContext: string[] = [];
   const profileSections: string[] = [];
+  const profileContextStartedAt = Date.now();
   const derivedProfileRows = await Promise.all(members.map(async (member: any) => {
     const snapshot = asRow(member.character_snapshot);
     const characterId = asText(member.character_id) || asText(snapshot.id);
@@ -226,6 +227,7 @@ Deno.serve(async (request) => {
     return [characterId, !error && data ? data : null] as const;
   }));
   const derivedProfiles = new Map(derivedProfileRows);
+  console.info("group_chat_turn_profile_context_ready", { elapsedMs: Date.now() - profileContextStartedAt, memberCount: derivedProfiles.size });
 
   for (const member of members) {
     const snapshot = asRow(member.character_snapshot);

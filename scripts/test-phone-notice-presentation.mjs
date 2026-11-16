@@ -74,7 +74,7 @@ assert.match(html, /if\(event\.target===modal\)return/,
   'tapping the backdrop must not dismiss the phone panel');
 assert.ok(!html.includes('.phone-notice-list{max-height:'), 'Phone must not trap scrolling in a nested notice list');
 assert.ok(html.includes('function firstSpokenDialoguePreview('), 'Chat preview must parse spoken dialogue separately from narration');
-assert.match(html, /storyPhoneRuntimeCache\.delete\(String\(uid\)\+'\:'\+session\.id\);[\s\S]*?await loadStoryMemorySummary\(session\);[\s\S]*?await renderPhoneModal\(\)/,
+assert.match(html, /storyPhoneRuntimeCache\.delete\(String\(user\.uid\)\+'\:'\+session\.id\);[\s\S]*?await loadStoryMemorySummary\(session\);[\s\S]*?await renderPhoneModal\(\)/,
   'deleting/editing a Story diary entry must invalidate cached phone memory and refresh an open phone panel');
 assert.ok(html.includes('角色暫時沒有對白'), 'Narration-only replies must use the no-dialogue fallback');
 assert.ok(html.includes('function latestAssistantPreview('), 'Chat preview must select the latest assistant message');
