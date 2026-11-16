@@ -36,8 +36,12 @@ assert.match(html,/max-width:min\(20em,100%\)/,'dialogue bubbles must wrap at ab
 assert.match(html, /select\('id,session_id,role,content,created_at,suggested_replies'\)/);
 assert.match(html, /message\.suggested_replies/);
 assert.match(html, /result\.suggestedReplies\).*result\.suggested_replies/s);
-assert.match(html, /function conversationSuggestionsHTML\(s\)/);
-assert.match(html, /\[\.\.\.\(s\.messages\|\|\[\]\)\]\.reverse\(\)\.find/);
+assert.match(html, /function conversationSuggestionsHTML\\(s\\)/);
+assert.match(html, /const hasPlayerMessage=typeof s\\?\\.hasUserMessageOverride==='boolean'\\?s\\.hasUserMessageOverride:hasUserMessage\\(s\\)/,
+  'shared suggestion renderer must accept the authoritative group player-turn state');
+assert.match(html, /hasUserMessageOverride:g\\.turn>0/,
+  'group chat must pass its real player-turn count instead of placeholder messages');
+assert.match(html, /\\[\\.\\.\\.\\(s\\.messages\\|\\|\\[\\]\\)\\]\\.reverse\\(\\)\\.find/);
 assert.match(html, /suggestionHost\.innerHTML=conversationSuggestionsHTML\(session\)/);
 assert.match(html, /id="conversationSuggestions"/);
 assert.doesNotMatch(html, /SWEET DIARY · LONG-TERM MEMORY/);
