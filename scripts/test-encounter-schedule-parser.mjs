@@ -115,7 +115,10 @@ assert.ok(videoLoadBlock.indexOf("video.preload='metadata';") < videoLoadBlock.i
 assert.ok(!videoLoadBlock.includes("video.load();"));
 
 assert.ok(html.includes("pauseCharacterVideo(target);"));
-assert.ok(html.includes("videos.forEach(pauseCharacterVideo);"));
+assert.ok(html.includes("videos.forEach(video=>{"));
+assert.ok(html.includes("video.dataset.videoVisibilityEligible='false';"));
+assert.ok(html.includes("clearCharacterVideoVisibilityTimer(video);"));
+assert.ok(html.includes("pauseCharacterVideo(video);"));
 // Only a real pagehide releases the media source.
 assert.ok(html.includes("document.querySelectorAll('video[data-character-video]').forEach(releaseCharacterVideo);"));
 assert.ok(!html.includes("function stopCharacterVideo(video){"));
