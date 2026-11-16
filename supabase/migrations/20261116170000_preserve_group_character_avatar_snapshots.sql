@@ -130,7 +130,7 @@ BEGIN
           FROM public.character_stories cs
           WHERE cs.character_id = v_character.id
             AND cs.visibility = 'public'
-          ORDER BY cs.created_at ASC
+          ORDER BY cs.created_at DESC
           LIMIT 1
         ), ''),
         'race', v_character.race,
