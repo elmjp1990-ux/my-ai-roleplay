@@ -57,24 +57,24 @@ const summaryStart = summary.indexOf("async function generateMemorySummary");
 const summaryEnd = summary.indexOf("export async function processDueStoryMemorySummary", summaryStart);
 assert.ok(summaryStart >= 0 && summaryEnd > summaryStart, "shared summary generation core must exist");
 const summaryRequest = summary.slice(summaryStart, summaryEnd);
-assert.doesNotMatch(summaryRequest, /max_tokens\\s*:/, "summary request must not set a client-side token cap");
+assert.doesNotMatch(summaryRequest, /max_tokens\s*:/, "summary request must not set a client-side token cap");
 assert.match(summaryRequest, /model: SUMMARY_MODEL/);
 assert.match(summaryRequest, /timeoutMs: 45_000/);
-assert.match(summaryRequest, /temperature: 0\\.2/);
-assert.match(summaryRequest, /responseFormat: \\{ type: "json_object" \\}/);
+assert.match(summaryRequest, /temperature: 0\.2/);
+assert.match(summaryRequest, /responseFormat: \{ type: "json_object" \}/);
 assert.match(summaryRequest, /normalizeStoryMemorySummaryText/);
 assert.match(summaryRequest, /affinity_correction/);
-assert.doesNotMatch(summaryRequest, /fetch\\(|new AbortController|normalizeAiProviderResult/,
+assert.doesNotMatch(summaryRequest, /fetch\(|new AbortController|normalizeAiProviderResult/,
   "memory summary must reuse the shared transport rather than duplicating request and response handling");
-assert.equal((summary.match(/generateMemorySummary\\(\\[/g) || []).length, 2,
+assert.equal((summary.match(/generateMemorySummary\(\[/g) || []).length, 2,
   "single and group memory must both call the same summary generation core");
-assert.equal((summary.match(/const usage = usageSnapshot\\(response\\.usage\\)/g) || []).length, 1,
+assert.equal((summary.match(/const usage = usageSnapshot\(response\.usage\)/g) || []).length, 1,
   "provider usage normalization must live in the shared summary core");
 assert.equal((summary.match(/const priorUsage = usageSnapshot/g) || []).length, 1,
   "retry usage accumulation must live in the shared summary core");
-assert.equal((summary.match(/summaryUsageMetadata\\(generated\\)/g) || []).length, 4,
+assert.equal((summary.match(/summaryUsageMetadata\(generated\)/g) || []).length, 4,
   "single and group success/failure rows must share usage metadata mapping");
-assert.match(openRouterShared, /provider: buildOpenRouterProviderOptions\\(\\)/,
+assert.match(openRouterShared, /provider: buildOpenRouterProviderOptions\(\)/,
   "all chat and summary requests must use the shared approved provider allowlist");
 
 console.log("Dual-model Story chat and five-turn memory-summary contract passed.");
