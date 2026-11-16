@@ -575,7 +575,7 @@ body.group-chat-page:has(.group-wizard) #view {
 .message { display:flex; gap:8px; margin-bottom:19px; position:relative; }
 .message.user { flex-direction:row-reverse; }
 .message .avatar { width:30px; height:30px; }
-.message-content { flex:0 1 auto; width:fit-content; max-width:min(24em,100%); min-width:0; }
+.message-content { flex:0 1 auto; width:fit-content; max-width:min(25em,100%); min-width:0; }
 .message:not(.user) > .message-content { margin-right:auto; }
 .message.user > .message-content { margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; }
 .message-name { color:var(--muted); font-size:10px; margin-bottom:5px; }
@@ -610,8 +610,8 @@ body.group-chat-page:has(.group-wizard) #view {
 /* LOCKED FINAL CHAT FORMAT: *narration/action* = 22–24 full-width CJK chars per line;
    spoken dialogue bubbles = 18 full-width CJK chars per line. Keep these widths separate. */
 .roleplay-segment.is-character { max-width:min(20em,100%); }
-.roleplay-segment.is-action { width:fit-content; max-width:min(24em,100%); }
-.roleplay-segment.is-action .narration { max-width:min(24em,100%); }
+.roleplay-segment.is-action { width:fit-content; max-width:min(25em,100%); }
+.roleplay-segment.is-action .narration { max-width:min(25em,100%); }
 .user .bubble { background:var(--user-bubble); color:var(--text); border-color:var(--border); }
 .narration {
   display:block;
@@ -7190,11 +7190,12 @@ async function groupOpen(groupId) {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('請重新登入後再開啟群組。');
     g.ownerUid=user.id;
-    const [groupRes,sceneRes,memberRes,messageRes]=await groupWithTimeout(Promise.all([
+    const [groupRes,sceneRes,memberRes,messageRes,suggestionRes]=await groupWithTimeout(Promise.all([
       window.mySupabase.from('chat_groups').select('id,name,world_background,scene_mode,player_name,player_persona,world_character_id,background_mode,background_memory_photo_id,created_at,updated_at,archived_at').eq('id',groupId).single(),
       window.mySupabase.from('chat_group_scenes').select('id,group_id,name,description,position').eq('group_id',groupId).order('position'),
       loadGroupMembersWithPhoneNotifications(window.mySupabase,groupId),
-      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(window.PoyozzListPagination.pageSize('messages'))
+      window.mySupabase.from('chat_group_messages').select('id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at').eq('group_id',groupId).is('deleted_at',null).order('created_at',{ascending:false}).order('sequence_no',{ascending:false}).order('id',{ascending:false}).limit(window.PoyozzListPagination.pageSize('messages')),
+      window.mySupabase.from('chat_group_turns').select('suggested_replies').eq('group_id',groupId).eq('status','completed').order('completed_at',{ascending:false}).limit(1).maybeSingle()
     ]),15000,'群組資料讀取逾時，請檢查網路後重試。')
     if(requestId!==g.openRequestId) return;
     const error=groupRes.error||sceneRes.error||memberRes.error||messageRes.error;
@@ -7242,7 +7243,7 @@ async function groupOpen(groupId) {
       return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user' && m.content===GROUP_CONTINUE_SENTINEL ? '' : m.content,createdAt:m.created_at};
     });
     const membersNeedingPortraits=members.filter(member=>!member.avatar_url&&member.primaryIllustrationPath);
-    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,memoryPhotos:[],scenes,members};
+    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,memoryPhotos:[],scenes,members,suggestedReplies:Array.isArray(suggestionRes.data?.suggested_replies)?suggestionRes.data.suggested_replies.slice(0,3):[]};
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;
     if(groupListWasLoaded){
       const existingIndex=g.groups.findIndex(item=>item.id===group.id);
@@ -7445,6 +7446,8 @@ function renderGroupConversation() {
     return '<div class="message '+(isUser?'user':'')+(hasSpeaker?' roleplay-prefixed-message':'')+'" data-message="'+e(m.id)+'">'+outerAvatar+
       '<div class="message-content">'+bodyHTML+actionButtons+'</div></div>';
   }).join('') || '<div class="empty">這段群組對話還沒有訊息，輸入第一句話開始故事。</div>';
+  const typingMember=g.sending?(group.members||[]).find(member=>String(member.characterId||member.id)===String(g.typingSpeakerId))||group.members[0]:null;
+  const typingHTML=typingMember?'<article class="message assistant-typing" role="status" aria-live="polite"><div class="message-content"><div class="message-name">'+e(typingMember.name||'角色')+'</div><div class="typing-indicator"><span>'+e(typingMember.name||'角色')+'正在回覆</span><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span></div></div></article>':'';
   const sceneNames=(group.scenes||[]).map(x=>x.name).filter(Boolean).join('、');
   $('view').innerHTML=`
     <div class="chat-layout ${hideList?'hide-list':''}">
@@ -7470,33 +7473,13 @@ function renderGroupConversation() {
           ${g.historyHasMore?'<button type="button" class="ghost small" data-history-top-control hidden data-action="group-history-load-older" '+(g.historyLoading?'disabled':'')+'>'+(g.historyLoading?'正在載入較早訊息…':'載入更早的訊息')+'</button>':''}
           ${g.historyError?'<span class="small muted" role="status">'+e(g.historyError)+'</span>':''}
         </div>
-        <div class="messages" id="groupMessages">${messageRows}</div>
+        <div class="messages" id="groupMessages">${messageRows}${typingHTML}</div>
         <form class="composer" data-form="group-message">
-${groupPrototype.active?.suggestions !== false ? `<div class="suggestions">
-            <details class="suggestions-panel" open>
-              <summary>建議回覆 <span class="suggestions-count" data-collapsed="點擊可展開" data-expanded="滑動或點選燈號可切換">滑動或點選燈號可切換</span></summary>
-              ${g.turn===0 ? '<p class="suggestion-first-message-hint">請先自由的輸入第一句話，享受與角色對話的美好時光吧</p>' : `<div class="suggestion-options" aria-label="選擇建議回覆">
-                <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="0" aria-label="第 1 則建議" aria-pressed="true"></button>
-                <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="1" aria-label="第 2 則建議" aria-pressed="false"></button>
-                <button type="button" class="suggestion-light" data-action="suggestion-select" data-index="2" aria-label="第 3 則建議" aria-pressed="false"></button>
-              </div>`}
-              <button type="button" class="suggestion-card active" data-action="suggestion" data-index="0" data-text="${e('我先是微微一怔，隨後放下手邊的事情，仔細端詳你的神情，像是想從你的表情裡猜出真正的心思。\n\n「今天大家看起來都有話想說，不如慢慢來，我們一個一個聽。」')}">
-                <span class="suggestion-card-title">① 溫柔關心</span>
-                <span class="suggestion-card-action">我先是微微一怔，隨後放下手邊的事情，仔細端詳你的神情，像是想從你的表情裡猜出真正的心思。</span>
-                <span class="suggestion-card-dialogue">「今天大家看起來都有話想說，不如慢慢來，我們一個一個聽。」</span>
-              </button>
-              <button type="button" class="suggestion-card" data-action="suggestion" data-index="1" data-text="${e('我挑了挑眉，看看在場的每個人，嘴角揚起一抹藏不住的笑。\n\n「怎麼，今天是打算一起來考驗我嗎？」')}">
-                <span class="suggestion-card-title">② 活潑互動</span>
-                <span class="suggestion-card-action">我挑了挑眉，看看在場的每個人，嘴角揚起一抹藏不住的笑。</span>
-                <span class="suggestion-card-dialogue">「怎麼，今天是打算一起來考驗我嗎？」</span>
-              </button>
-              <button type="button" class="suggestion-card" data-action="suggestion" data-index="2" data-text="${e('我安靜地看著大家，放柔聲音開口。\n\n「不用急著回答，可以一個一個慢慢說，我會好好聽。」')}">
-                <span class="suggestion-card-title">③ 溫柔陪伴</span>
-                <span class="suggestion-card-action">我安靜地看著大家，放柔聲音開口。</span>
-                <span class="suggestion-card-dialogue">「不用急著回答，可以一個一個慢慢說，我會好好聽。」</span>
-              </button>
-            </details>
-          </div>` : ''}
+          ${conversationSuggestionsHTML({
+            suggestions:groupPrototype.active?.suggestions!==false,
+            messages:g.turn>0?[{role:'user'},{role:'assistant',suggestedReplies:group.suggestedReplies||[]}]:[],
+            suggestedReplies:group.suggestedReplies||[]
+          })}
           <div class="composer-input-row">
             <textarea id="groupMessageInput" name="text" maxlength="1000" rows="1" placeholder="留空發送，角色會繼續說下去" aria-label="輸入群組訊息" ${g.sending?'disabled':''}>${e(g.pendingRequest?.groupId===group.id && g.pendingRequest.content!==GROUP_CONTINUE_SENTINEL?g.pendingRequest.content:'')}</textarea>
           </div>
@@ -8242,6 +8225,9 @@ async function groupSendTurn() {
     g.pendingRequest={groupId:activeGroupId,content,requestKey:window.crypto.randomUUID()};
   }
   const requestKey=g.pendingRequest.requestKey;
+  const typingMembers=activeGroup.members||[];
+  const typingMember=typingMembers.length?typingMembers[Math.floor(Math.random()*typingMembers.length)]:null;
+  g.typingSpeakerId=typingMember?String(typingMember.characterId||typingMember.id):null;
   g.sending=true;g.formError='';render();
   try {
     const {data:{user},error:authError}=await window.mySupabase.auth.getUser();
@@ -8253,13 +8239,13 @@ async function groupSendTurn() {
     if(turnResult?.status==='insufficient_funds') {
       await refreshWalletBalance();
       openInsufficientFundsDialog('group');
-      g.sending=false;g.pendingRequest=null;g.formError='';
+      g.sending=false;g.typingSpeakerId=null;g.pendingRequest=null;g.formError='';
       renderGroupConversation();
       return;
     }
     if(turnResult?.status==='refunded'||turnResult?.status==='content_rejected'||turnResult?.status==='timed_out') {
       await refreshWalletBalance();
-      g.sending=false;g.pendingRequest=null;
+      g.sending=false;g.typingSpeakerId=null;g.pendingRequest=null;
       g.formError=turnResult.status==='timed_out'?'本次 AI 請求逾時，費用已全額退還，沒有扣款。請稍後重試。':turnResult.status==='content_rejected'?'這次 AI 回覆未能完成，費用已退還，請調整內容後重試。':'這次 AI 服務未能完成，費用已退還，請重新送出。';
       renderGroupConversation();
       return;
@@ -8285,6 +8271,7 @@ async function groupSendTurn() {
     if(g.active!==activeGroup||g.active?.id!==activeGroupId||g.ownerUid!==requestUid||currentUser()?.uid!==requestUid) return;
     if(!rows?.length) throw new Error('群組回合已保存，但暫時讀取不到訊息。請稍後重新開啟群組確認。');
     const members=g.active.members||[], scenes=g.active.scenes||[];
+    g.active.suggestedReplies=Array.isArray(turnResult.suggested_replies)?turnResult.suggested_replies.slice(0,3):[];
     if(Array.isArray(turnResult.phone_updates)){
       g.active.phoneNotificationsByCharacter=g.active.phoneNotificationsByCharacter||{};
       for(const update of turnResult.phone_updates){
@@ -8311,7 +8298,7 @@ async function groupSendTurn() {
     // The database RPC already includes group messages; invalidate the stale frontend cache.
     void loadCharacterTurnCounts(members.map(member=>member.characterId||member.id), true);
     ensureGroupDiaryMemories();
-    g.sending=false;g.formError='';
+    g.sending=false;g.typingSpeakerId=null;g.formError='';
     renderGroupConversation();
     const sendButton=$('view')?.querySelector('[data-action="group-send"]');if(sendButton){sendButton.disabled=false;sendButton.innerHTML=ICON.send;sendButton.setAttribute('aria-label','送出群組訊息');sendButton.title='送出訊息';}
     const messagePane=$('groupMessages');
@@ -8322,7 +8309,7 @@ async function groupSendTurn() {
     });
   } catch(error) {
     if(g.active!==activeGroup||g.active?.id!==activeGroupId||g.ownerUid!==requestUid||currentUser()?.uid!==requestUid)return;
-    g.sending=false;
+    g.sending=false;g.typingSpeakerId=null;
     let responseBody=null;
     try { if(error?.context?.clone) responseBody=await error.context.clone().json(); } catch (_) {}
     const rawError=String(error?.message||error||'');
@@ -8562,14 +8549,12 @@ function conversationSuggestionsHTML(s) {
   return `<div class="suggestions">
     <details class="suggestions-panel" open>
       <summary>建議回覆 <span class="suggestions-count" data-collapsed="點擊可展開" data-expanded="滑動或點選燈號可切換">滑動或點選燈號可切換</span></summary>
-      ${!hasUserMessage(s)
-        ? '<p class="suggestion-first-message-hint">請先自由的輸入第一句話，享受與角色對話的美好時光吧</p>'
-        : (replies.length>0
-          ? `<div class="suggestion-options" aria-label="選擇建議回覆">
-              ${replies.map((_,index)=>`<button type="button" class="suggestion-light" data-action="suggestion-select" data-index="${index}" aria-label="第 ${index+1} 則建議" aria-pressed="${index===0?'true':'false'}"></button>`).join('')}
-            </div>
-            ${replies.map((reply,index)=>`<button type="button" class="suggestion-card${index===0?' active':''}" data-action="suggestion" data-index="${index}" data-text="${e(reply)}"><span class="suggestion-card-action">${e(reply)}</span></button>`).join('')}`
-          : '<p class="suggestion-first-message-hint">本回合暫時沒有可用的建議回覆。</p>')}
+      ${!hasUserMessage(s)||replies.length===0
+        ? '<p class="suggestion-first-message-hint">本回合暫時沒有可用的建議回覆。</p>'
+        : `<div class="suggestion-options" aria-label="選擇建議回覆">
+            ${replies.map((_,index)=>`<button type="button" class="suggestion-light" data-action="suggestion-select" data-index="${index}" aria-label="第 ${index+1} 則建議" aria-pressed="${index===0?'true':'false'}"></button>`).join('')}
+          </div>
+          ${replies.map((reply,index)=>`<button type="button" class="suggestion-card${index===0?' active':''}" data-action="suggestion" data-index="${index}" data-text="${e(reply)}"><span class="suggestion-card-action">${e(reply)}</span></button>`).join('')}`}
     </details>
   </div>`;
 }
@@ -9308,10 +9293,18 @@ async function renderPhoneModal() {
   const extraStoryStates=storyPhoneStates.filter(item=>!configuredFieldIndexes.has(Number(item.field_index))).slice(0,remainingAfterNotices);
   const remainingAfterStates=Math.max(0,remainingAfterNotices-extraStoryStates.length);
   const storyEventsToShow=storyPhoneEvents.slice(0,remainingAfterStates);
+  function phoneNoticeIconPresentation(value) {
+    const raw=String(value||'').trim();
+    const match=raw.match(/^(?:\p{Extended_Pictographic}|\p{Regional_Indicator})(?:\uFE0F|\uFE0E|\u200D|\p{Extended_Pictographic}|\p{Regional_Indicator}|\p{Emoji_Modifier})*/u);
+    const icon=match?.[0]||'🔔';
+    const title=match?raw.slice(match[0].length).trim():raw;
+    return {icon,title:title||raw};
+  }
   const configuredNoticeHTML=notices.map(item=>{
-    const title=typeof item==='string'?(character.name||'角色通知'):String(item?.title||character.name||'角色通知');
+    const rawTitle=typeof item==='string'?(character.name||'角色通知'):String(item?.title||character.name||'角色通知');
+    const {icon,title}=phoneNoticeIconPresentation(rawTitle);
     const body=typeof item==='string'?item:String(item?.body||'');
-    return '<article class="phone-notification-card"><span class="phone-app-icon">🔔</span><div class="phone-notification-copy"><div class="phone-notification-meta"><span>'+e(title)+'</span><span>通知</span></div><p>'+e(body)+'</p></div></article>';
+    return '<article class="phone-notification-card"><span class="phone-app-icon">'+e(icon)+'</span><div class="phone-notification-copy"><div class="phone-notification-meta"><span>'+e(title)+'</span><span>通知</span></div><p>'+e(body)+'</p></div></article>';
   }).join('');
   const storyStateHTML=extraStoryStates.map(item=>
     '<article class="phone-notification-card"><span class="phone-app-icon">📱</span><div class="phone-notification-copy"><div class="phone-notification-meta"><span>手機狀態</span><span>剛剛</span></div><strong>'+e(item.title||'')+'</strong><p>'+e(item.body||'')+'</p></div></article>'
@@ -12214,11 +12207,13 @@ const {
         if(error||data!==true)throw error||new Error('資料庫未確認更新，可能超過日記容量上限。');
         const card=document.querySelector('[data-story-memory-card="'+batch+'"]');
         if(card){
+          const textNode=card.querySelector('.diary-memory-text');
+          if(textNode)textNode.textContent=summaryText;
           card.querySelector('.diary-memory-edit-form')?.classList.add('hidden');
           card.querySelector('.diary-memory-text')?.classList.remove('hidden');
           card.querySelector('.diary-edit-icon')?.classList.remove('hidden');
         }
-        storyPhoneRuntimeCache.delete(String(uid)+':'+session.id);
+        storyPhoneRuntimeCache.delete(String(user.uid)+':'+session.id);
         await loadStoryMemorySummary(session);
         if(document.querySelector('.phone-modal-backdrop')&&route.page==='conversation'&&route.id===session.id)await renderPhoneModal();
         toast(summaryText?'回憶已儲存。':'已刪除這則回憶。');
