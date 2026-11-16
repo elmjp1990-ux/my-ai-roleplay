@@ -7276,7 +7276,12 @@ async function groupOpen(groupId) {
       })).then(()=>{
         if(requestId!==g.openRequestId||currentUser()?.uid!==user.id||g.active?.id!==group.id)return;
         if(g.groupMembers)g.groupMembers[group.id]=members.map(member=>({name:member.name,avatar_url:member.avatar_url||member.image||'',character_snapshot:member.characterSnapshot||{}}));
-        if(route.page==='group'&&route.id===group.id)renderGroupConversation();
+        if(route.page==='group'&&route.id===group.id){
+          const input=$('groupMessageInput'),draft=input?.value||'',hadFocus=!!input&&document.activeElement===input;
+          renderGroupConversation();
+          const nextInput=$('groupMessageInput');
+          if(nextInput){nextInput.value=draft;nextInput.style.height='auto';nextInput.style.height=Math.min(nextInput.scrollHeight,144)+'px';if(hadFocus)nextInput.focus();}
+        }
       });
     }
     void syncGroupDiaryCloud(group.id).then(()=>{
