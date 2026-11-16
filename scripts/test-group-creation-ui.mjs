@@ -76,7 +76,7 @@ assert.ok(groupTurn.includes('const initialOpeningContext = (sceneResult.data ||
 assert.ok(groupTurn.includes('serializeGroupPhoneUpdatesForRpc') && groupTurn.includes('story_world_state'), 'group AI must persist phone data using the RPC contract and return game world state');
 assert.ok(groupTurn.includes('不可讀取、推測或使用系統現在時間'), 'group AI game time must never be derived from real device time');
 const groupMigration=fs.readFileSync(new URL('../supabase/migrations/20261116170000_group_story_world_state_and_opening_limit.sql',import.meta.url),'utf8');
-assert.match(groupMigration,/char_length\(COALESCE\(v_scene->>'description',''\)\) > 1000/,'database group creation RPC must enforce the 1000-character opening limit');
+assert.match(groupMigration,/chat_group_scenes_description_max_1000/,'database group scene constraint must enforce the 1000-character opening limit');
 assert.match(groupMigration,/CREATE OR REPLACE FUNCTION public\.get_active_character_tags/,'unused tags must be checked against authoritative active-character usage');
 assert.ok(groupTurn.includes('【玩家設定的初始開場情境】'), 'group AI system prompt must include the original opening context');
 assert.ok(groupTurn.includes('AI 只在玩家送出第一則訊息後才回覆'), 'group AI prompt must only respond after the player sends a message');

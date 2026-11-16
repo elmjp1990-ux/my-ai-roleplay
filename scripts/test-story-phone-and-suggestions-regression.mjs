@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 
 const html = readFileSync("index.html", "utf8");
+const css = readFileSync("poyozz-ui.css", "utf8");
 const edge = readFileSync("supabase/functions/chat-turn/index.ts", "utf8");
 const phoneMigration = readFileSync("supabase/migrations/20261110120000_story_phone_state_and_memory_summary_read.sql", "utf8");
 const worldMigration = readFileSync("supabase/migrations/20261110235500_story_world_state_contextual_time_location.sql", "utf8");
@@ -24,9 +25,9 @@ assert.match(html, /\.roleplay-segment\.is-character \{ max-width:min\(20em,100%
   'spoken dialogue containers must allow 18 full-width Chinese characters after bubble padding');
 assert.doesNotMatch(html, /\.roleplay-segment\.is-character,\.roleplay-segment\.is-action \{ width:100%; max-width:100%; \}/,
   'dialogue and narration must not be collapsed into one shared width rule');
-assert.match(uiStyles,/\.message:has\(\.roleplay-segment\.is-action\)/,
+assert.match(css,/\.message:has\(\.roleplay-segment\.is-action\)/,
   'mobile narration alone must expand to the full chat panel');
-assert.match(uiStyles,/\.roleplay-segment\.is-character/,'ordinary character dialogue must retain its independent bubble width');
+assert.match(css,/\.roleplay-segment\.is-character/,'ordinary character dialogue must retain its independent bubble width');
 assert.match(html,/LOCKED FINAL CHAT FORMAT[\s\S]{0,180}25 full-width CJK chars per line/);
 assert.match(html,/max-width:min\(25em,100%\)/,'star-wrapped narration must retain its independent 25 CJK character line width');
 assert.match(html,/max-width:min\(20em,100%\)/,'dialogue bubbles must wrap at about 18 full-width Chinese characters');

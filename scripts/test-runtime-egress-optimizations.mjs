@@ -530,7 +530,7 @@ assert.match(groupPhoneUI,/loadGroupMembersWithPhoneNotifications/,
   "group UI must read persisted phone notifications through a schema-cache-safe loader");
 assert.match(groupPhoneUI,/const phoneNotifications=Array\.isArray\(m\.phone_notifications\)/,
   "group UI must prefer persisted member notifications and retain the old snapshot fallback");
-assert.match(groupPhoneUI, /initialStoryTime=Number\(isGroup\?/);
+assert.match(groupPhoneUI, /initialStoryTime=isGroup\?0/);
 assert.match(groupPhoneUI, /phoneHeader\+/);
 assert.match(groupPhoneStyles, /phone-device-head--group \.phone-member-switch/);
 

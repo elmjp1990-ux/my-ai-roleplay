@@ -41,28 +41,6 @@ CREATE TABLE public.chat_groups (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE public.characters (
-  id uuid PRIMARY KEY,
-  author_id uuid,
-  name text NOT NULL,
-  gender text,
-  age text,
-  intro text,
-  race text,
-  style text,
-  tags jsonb,
-  visibility text NOT NULL DEFAULT 'private',
-  deleted_at timestamptz
-);
-
-CREATE TABLE public.character_stories (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  character_id uuid NOT NULL REFERENCES public.characters(id),
-  opening_message text,
-  visibility text,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-
 CREATE TABLE public.chat_group_scenes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   group_id uuid NOT NULL REFERENCES public.chat_groups(id) ON DELETE CASCADE,

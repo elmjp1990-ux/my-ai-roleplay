@@ -193,49 +193,32 @@ END
 $$;
 RESET ROLE;
 
--- The shared group-opening RPC enforces the same 1000-character limit as the UI.
-INSERT INTO public.characters(id,author_id,name,tags,visibility,deleted_at) VALUES
- ('30000000-0000-4000-8000-000000000100','10000000-0000-4000-8000-000000000001','Opening limit test',jsonb_build_array('只在本卡','共用標籤'),'public',NULL),
- ('30000000-0000-4000-8000-000000000101','10000000-0000-4000-8000-000000000002','Other public role',jsonb_build_array('共用標籤'),'public',NULL),
- ('30000000-0000-4000-8000-000000000102','10000000-0000-4000-8000-000000000002','Other private role',jsonb_build_array('他人私密'),'private',NULL),
- ('30000000-0000-4000-8000-000000000103','10000000-0000-4000-8000-000000000002','Deleted public role',jsonb_build_array('已刪除標籤'),'public',now());
+-- The group opening limit is enforced by the chat_group_scenes data constraint.
 SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',false);
 SET ROLE authenticated;
 DO $$
 DECLARE v_group uuid;
 BEGIN
+  INSERT INTO public.chat_groups(owner_id,name)
+  VALUES ('10000000-0000-4000-8000-000000000001','opening-limit-test')
+  RETURNING id INTO v_group;
   BEGIN
-    PERFORM public.create_chat_group(
-      'opening-too-long','test world','shared',
-      jsonb_build_array(jsonb_build_object('name','初始相遇','description',repeat('x',1001))),
-      jsonb_build_array(jsonb_build_object('character_id','30000000-0000-4000-8000-000000000100'))
-    );
+    INSERT INTO public.chat_group_scenes(group_id,name,description,position)
+    VALUES (v_group,'初始相遇',repeat('x',1001),1);
     RAISE EXCEPTION 'group opening over 1000 characters was accepted';
-  EXCEPTION WHEN SQLSTATE '22023' THEN
-    IF SQLERRM NOT LIKE 'invalid_scene_payload%' THEN RAISE; END IF;
+  EXCEPTION WHEN check_violation THEN
+    NULL;
   END;
-  v_group:=public.create_chat_group(
-    'opening-at-limit','test world','shared',
-    jsonb_build_array(jsonb_build_object('name','初始相遇','description',repeat('x',1000))),
-    jsonb_build_array(jsonb_build_object('character_id','30000000-0000-4000-8000-000000000100'))
-  );
-  IF v_group IS NULL OR NOT EXISTS (
-    SELECT 1 FROM public.chat_group_scenes WHERE group_id=v_group AND char_length(description)=1000
+  INSERT INTO public.chat_group_scenes(group_id,name,description,position)
+  VALUES (v_group,'初始相遇',repeat('x',1000),1);
+  IF NOT EXISTS (
+    SELECT 1 FROM public.chat_group_scenes
+    WHERE group_id=v_group AND char_length(description)=1000
   ) THEN RAISE EXCEPTION '1000-character group opening was not accepted'; END IF;
-  IF NOT ('共用標籤'=ANY(public.get_active_character_tags('30000000-0000-4000-8000-000000000100'))) THEN
-    RAISE EXCEPTION 'tag used by another active public card must remain available';
-  END IF;
-  IF '只在本卡'=ANY(public.get_active_character_tags('30000000-0000-4000-8000-000000000100')) THEN
-    RAISE EXCEPTION 'tag used only by the edited card must be pruned after removal';
-  END IF;
-  IF '他人私密'=ANY(public.get_active_character_tags('30000000-0000-4000-8000-000000000100'))
-     OR '已刪除標籤'=ANY(public.get_active_character_tags('30000000-0000-4000-8000-000000000100')) THEN
-    RAISE EXCEPTION 'private tags from other users or deleted-card tags must not be exposed';
-  END IF;
 END
 $$;
 RESET ROLE;
-RESET request.jwt.claim.sub;
+
 
 -- Scheduler must be installed exactly once by the migration
 DO $$

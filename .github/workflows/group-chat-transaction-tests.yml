@@ -110,6 +110,9 @@ jobs:
       - name: Bootstrap followed-author preview fixture
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/fixtures/followed-author-batch-base.sql
 
+      - name: Verify active-character tag usage RPC
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/character-tag-usage-scenarios.sql
+
       - name: Apply followed-author preview RPC
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261115090000_batch_followed_author_latest_characters.sql
 
