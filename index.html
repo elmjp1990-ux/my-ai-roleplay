@@ -4718,6 +4718,21 @@ function safeImage(value) {
   } catch (_) {}
   return '';
 }
+function characterAvatarMarkup(character,options={}) {
+  const imageClass=options.imageClass||'avatar';
+  const fallbackClass=options.fallbackClass||'avatar avatar-fallback';
+  const style=options.style||'';
+  const characterId=String(character?.characterId||character?.id||'');
+  const name=String(character?.name||character?.character_snapshot?.name||character?.characterSnapshot?.name||'角').trim();
+  const initial=Array.from(name)[0]||'角';
+  const image=safeImage(character?.image||character?.avatar_url||character?.avatarUrl||
+    character?.character_snapshot?.avatar_url||character?.character_snapshot?.image||
+    character?.characterSnapshot?.avatar_url||character?.characterSnapshot?.image);
+  const identity=isUuid(characterId)?' data-character-avatar-id="'+e(characterId)+'"':'';
+  const fallbackAttrs=' data-character-avatar-fallback="'+e(initial)+'" data-character-avatar-fallback-class="'+e(fallbackClass)+'" data-character-avatar-fallback-style="'+e(style)+'"';
+  if(!image)return '<span class="'+e(fallbackClass)+'" aria-hidden="true"'+(style?' style="'+e(style)+'"':'')+'>'+e(initial)+'</span>';
+  return '<img class="'+e(imageClass)+'" src="'+e(image)+'" alt="" loading="lazy" decoding="async"'+identity+fallbackAttrs+'>';
+}
 function normalizeCharacterTag(value) {
   // UI 會自動加上 #，因此不把作者輸入的前綴存入資料庫。
   return String(value ?? '').trim().replace(/^#+/u,'').trim();
@@ -6819,10 +6834,9 @@ function chatEntries() {
       const active=route.page==='group'&&groupPrototype.active?.id===group.id;
       const hasUnread=chatHasUnreadAssistantMessage(groupPreviewLastAssistantAt(item.preview),groupChatReadAt(currentUser()?.uid,group.id));
       const memberList=groupPrototype.groupMembers?.[group.id]||[];
-      const avatarMarkup=memberList.slice(0,3).map(member=>{
-        const image=safeImage(member.avatar_url||member.image||member.character_snapshot?.avatar_url||member.character_snapshot?.image);
-        return image?'<img class="group-avatar-image" src="'+e(image)+'" alt="">':'<span class="group-avatar-fallback" aria-hidden="true">'+e(String(member.name||member.character_snapshot?.name||'角').trim().slice(0,1)||'角')+'</span>';
-      }).join('');
+      const avatarMarkup=memberList.slice(0,3).map(member=>
+        characterAvatarMarkup(member,{imageClass:'group-avatar-image',fallbackClass:'group-avatar-fallback'})
+      ).join('');
       const groupAvatar=avatarMarkup?'<span class="group-avatar-stack" aria-hidden="true">'+avatarMarkup+'</span>':'<span class="group-list-avatar" aria-hidden="true">群</span>';
       return `<div class="chat-entry group-chat-entry ${active?'active':''}">
         <button type="button" class="pin group-pin ${item.pinned?'on':''}" data-chat-list-pin="group" data-action="group-pin" data-id="${e(group.id)}" aria-label="${item.pinned?'取消群組置頂':'置頂群組'}" title="${item.pinned?'取消置頂':'置頂'}">${ICON.pin}</button>
@@ -6839,7 +6853,7 @@ function chatEntries() {
     return `<div class="chat-entry ${route.page==='conversation'&&route.id===s.id?'active':''}">
       <button type="button" class="pin ${s.pinned?'on':''}" data-chat-list-pin="single" data-action="pin" data-id="${e(s.id)}" aria-label="切換置頂">${ICON.pin}</button>
       <button class="ghost" style="padding:0" data-action="session-detail" data-id="${e(s.id)}" aria-label="查看${e(c.name)}角色簡介">
-        <span class="character-avatar-status ${characterIsOffline(c)?'is-offline':''}"><img class="avatar" src="${e(safeImage(c.image||c.avatar_url))}" alt="${e(c.name)}">
+        <span class="character-avatar-status ${characterIsOffline(c)?'is-offline':''}">${characterAvatarMarkup(c)}
         <span class="character-status-dot" title="${characterIsOffline(c)?'角色離線／已下架':'角色公開中'}"></span></span>
       </button>
       <button class="select-chat" data-action="select-chat" data-id="${e(s.id)}">
@@ -7052,30 +7066,8 @@ async function groupLoadCharacterPickerPage({reset=false}={}){
   }
 }
 function groupCharacterPickerAvatar(character){
-  const image=safeImage(character?.image||character?.avatar_url);
-  const initial=String(character?.name||'角').trim().slice(0,1)||'角';
-  const characterId=String(character?.id||'');
-  if(image)return '<img class="avatar group-picker-avatar" src="'+e(image)+'" alt="" loading="lazy" decoding="async" data-character-id="'+e(characterId)+'" data-avatar-fallback="'+e(initial)+'" style="width:46px;height:46px">';
-  return '<span class="avatar avatar-fallback" aria-hidden="true" style="width:46px;height:46px">'+e(initial)+'</span>';
+  return characterAvatarMarkup(character,{imageClass:'avatar group-picker-avatar',fallbackClass:'avatar avatar-fallback',style:'width:46px;height:46px'});
 }
-document.addEventListener('error',async event=>{
-  const image=event.target;
-  if(!(image instanceof HTMLImageElement)||!image.matches('.group-picker-avatar'))return;
-  if(image.dataset.primaryRetried!=='1'&&isUuid(image.dataset.characterId||'')){
-    image.dataset.primaryRetried='1';
-    try{
-      const assets=await loadCharacterPrimaryIllustrationAssets([image.dataset.characterId]);
-      const primary=assets.get(image.dataset.characterId)?.primary?.src||'';
-      if(primary&&primary!==image.src){image.src=primary;return;}
-    }catch(error){console.warn('群組選角頭像補載失敗：',error?.message||error);}
-  }
-  const fallback=document.createElement('span');
-  fallback.className='avatar avatar-fallback';
-  fallback.setAttribute('aria-hidden','true');
-  fallback.style.cssText='width:46px;height:46px';
-  fallback.textContent=image.dataset.avatarFallback||'角';
-  image.replaceWith(fallback);
-},true);
 function groupRenderCharacterResults() {
   const pager=groupCharacterPickerPager;
   const all=pager.uid===currentUser()?.uid?pager.items:[];
@@ -7202,12 +7194,21 @@ async function groupHydrateListRows(groups){
     if(avatarError)console.warn('讀取群組列表角色頭像失敗：',avatarError.message);
     else avatars=Object.fromEntries((characterRows||[]).map(row=>[row.id,row.avatar_url||'']));
   }
+  const missingAvatarIds=characterIds.filter(id=>!safeImage(avatars[id]));
+  const primaryAvatarById={};
+  if(missingAvatarIds.length){
+    try{
+      const primaryAssets=await loadCharacterPrimaryIllustrationAssets(missingAvatarIds);
+      for(const [characterId,assets] of primaryAssets)if(assets?.primary?.src)primaryAvatarById[characterId]=assets.primary.src;
+    }catch(error){console.warn('群組列表主立繪批次載入失敗：',error?.message||error);}
+  }
   for(const row of memberRows||[]){
     const members=g.groupMembers[row.group_id]||=[];
-    if(!members.some(member=>member.character_snapshot?.id===row.character_snapshot?.id&&member.name===(row.character_snapshot?.name||'角色'))){
+    if(!members.some(member=>member.characterId===row.character_id)){
       members.push({
+        characterId:row.character_id||row.character_snapshot?.id||'',
         name:row.character_snapshot?.name||'角色',
-        avatar_url:avatars[row.character_id]||row.character_snapshot?.avatar_url||'',
+        avatar_url:avatars[row.character_id]||primaryAvatarById[row.character_id]||row.character_snapshot?.avatar_url||row.character_snapshot?.image||'',
         character_snapshot:row.character_snapshot||{}
       });
     }
@@ -7354,15 +7355,11 @@ async function groupOpen(groupId) {
     const group=groupRes.data, scenes=sceneRes.data||[], memberRows=memberRes.data||[];
     if(!group) throw new Error('找不到這個群組，或目前帳號沒有存取權限。');
     if(memberRows.length<1||memberRows.length>3) throw new Error('群組成員資料不完整，請重新整理或重新建立群組。');
-    let characterById={},primaryIllustrationPathById={};
+    let characterById={};
     const characterIds=memberRows.map(m=>m.character_id).filter(isUuid);
     if(characterIds.length) {
-      const [characterRes,illustrationRes]=await Promise.all([
-        window.mySupabase.from('characters').select('id,avatar_url,phone_settings').in('id',characterIds),
-        window.mySupabase.from('character_illustrations').select('character_id,storage_path').in('character_id',characterIds).eq('asset_type','primary').eq('sort_order',0)
-      ]);
+      const characterRes=await window.mySupabase.from('characters').select('id,avatar_url,phone_settings').in('id',characterIds);
       if(!characterRes.error) characterById=Object.fromEntries((characterRes.data||[]).map(x=>[x.id,x]));
-      if(!illustrationRes.error) primaryIllustrationPathById=Object.fromEntries((illustrationRes.data||[]).map(x=>[x.character_id,x.storage_path]));
     }
     const members=memberRows.map(m=>{
       const snapshot=m.character_snapshot||{},characterId=m.character_id||null;
@@ -7373,7 +7370,7 @@ async function groupOpen(groupId) {
         Array.isArray(snapshot.phoneNotifications)?snapshot.phoneNotifications:[];
       return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,
         avatar_url:characterRow.avatar_url||snapshot.avatar_url||snapshot.avatarUrl||snapshot.image||snapshot.image_url||'',
-        primaryIllustrationPath:primaryIllustrationPathById[characterId]||snapshot.primaryIllustrationPath||snapshot.primary_illustration_path||snapshot.imagePath||snapshot.image_path||'',
+        primaryIllustrationPath:snapshot.primaryIllustrationPath||snapshot.primary_illustration_path||snapshot.imagePath||snapshot.image_path||'',
         phoneNotifications,phoneSettings,position:m.position,sceneId:m.scene_id,
         sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};
     });
@@ -7392,7 +7389,7 @@ async function groupOpen(groupId) {
       const speaker=type==='user'?'你':type==='system'?'系統':(speakerSnapshot.name||member?.name||'角色')+(scene?' · '+scene.name:'');
       return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user' && m.content===GROUP_CONTINUE_SENTINEL ? '' : m.content,createdAt:m.created_at};
     });
-    const membersNeedingPortraits=members.filter(member=>!member.avatar_url&&member.primaryIllustrationPath);
+    const membersNeedingPortraits=members.filter(member=>!safeImage(member.avatar_url)&&isUuid(member.characterId));
     g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,storyWorldState:{storyTime:group.story_time||'',storyLocation:group.story_location||''},memoryPhotos:[],scenes,members,suggestedReplies:suggestionRes.data?.status==='completed'&&Array.isArray(suggestionRes.data?.suggested_replies)?suggestionRes.data.suggested_replies.slice(0,3):[]};
     markGroupChatRead(group.id);
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;
@@ -7435,19 +7432,20 @@ async function groupOpen(groupId) {
     // Private primary portraits are signed after the first paint; do not hold the chat
     // open spinner for one to three independent Storage URL requests.
     if(membersNeedingPortraits.length){
-      void Promise.all(membersNeedingPortraits.map(async member=>{
-        try{member.avatar_url=await getCharacterIllustrationSignedUrl(member.primaryIllustrationPath);member.image=member.avatar_url;}
-        catch(error){console.warn('群組角色頭像載入失敗：',member.name,error?.message||error);}
-      })).then(()=>{
+      void loadCharacterPrimaryIllustrationAssets(membersNeedingPortraits.map(member=>member.characterId)).then(assets=>{
         if(requestId!==g.openRequestId||currentUser()?.uid!==user.id||g.active?.id!==group.id)return;
-        if(g.groupMembers)g.groupMembers[group.id]=members.map(member=>({name:member.name,avatar_url:member.avatar_url||member.image||'',character_snapshot:member.characterSnapshot||{}}));
+        for(const member of membersNeedingPortraits){
+          const primary=assets.get(member.characterId)?.primary;
+          if(primary?.src){member.avatar_url=primary.src;member.image=primary.src;member.primaryIllustrationPath=primary.path;}
+        }
+        if(g.groupMembers)g.groupMembers[group.id]=members.map(member=>({characterId:member.characterId,name:member.name,avatar_url:member.avatar_url||member.image||'',character_snapshot:member.characterSnapshot||{}}));
         if(route.page==='group'&&route.id===group.id){
           const input=$('groupMessageInput'),draft=input?.value||'',hadFocus=!!input&&document.activeElement===input;
           renderGroupConversation();
           const nextInput=$('groupMessageInput');
           if(nextInput){nextInput.value=draft;nextInput.style.height='auto';nextInput.style.height=Math.min(nextInput.scrollHeight,144)+'px';if(hadFocus)nextInput.focus();}
         }
-      });
+      }).catch(error=>console.warn('群組角色頭像批次載入失敗：',error?.message||error));
     }
     void syncGroupDiaryCloud(group.id).then(()=>{
       if(requestId!==g.openRequestId||currentUser()?.uid!==user.id||g.active?.id!==group.id)return;
@@ -7556,11 +7554,10 @@ function renderGroupConversation() {
   if(!group) return;
   const avatarURL=value=>{const url=String(value||'').trim();return (/^https?:\/\//i.test(url)||/^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(url))?url:'';};
   const memberAvatars=group.members.map(m=>{
-    const avatar=avatarURL(m.avatar_url||m.image||m.characterSnapshot?.avatar_url||m.characterSnapshot?.image);
     const characterId=String(m.characterId||m.id||'');
     const canLink=isUuid(characterId)&&!characterId.startsWith('seed-');
     const portrait='<span class="character-avatar-status" title="'+e(m.name||'角色')+'">'+
-      (avatar?'<img class="avatar" src="'+e(avatar)+'" alt="">':'<span class="group-list-avatar">'+e(String(m.name||'角').trim().slice(0,1)||'角')+'</span>')+
+      characterAvatarMarkup(m)+
       '</span>';
     return canLink
       ? '<button type="button" class="group-member-avatar-link" data-action="group-member-detail" data-id="'+e(characterId)+'" aria-label="查看角色 '+e(m.name||'角色')+' 的角色卡" title="查看 '+e(m.name||'角色')+' 的角色卡">'+portrait+'</button>'
@@ -8788,7 +8785,7 @@ function renderConversation() {
               <button class="ghost" data-action="session-detail" data-id="${e(s.id)}" style="padding:0"
                       aria-label="查看角色簡介">
                 <span class="character-avatar-status ${characterIsOffline(c) ? 'is-offline' : ''}">
-                  <img class="avatar" src="${e(safeImage(c.image||c.avatar_url))}" ${c.imagePath||c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.imagePath||c.primaryIllustrationPath)+'"' : ''} alt="">
+                  ${characterAvatarMarkup(c)}
                   <span class="character-status-dot" title="${characterIsOffline(c) ? '角色離線／已下架' : '角色公開中'}"></span>
                 </span>
               </button>
@@ -12994,13 +12991,50 @@ async function importCharacter(file) {
   }
 }
 
-/* Image errors do not inject HTML. */
-/* Keep role portraits visible while their signed Storage URL is being hydrated/refreshed,
-   and restore opacity after a later successful load. */
+/* Character avatars share one recovery path across single chats, group chats and pickers. */
+async function recoverCharacterAvatarImage(image){
+  if(!image?.isConnected)return;
+  if(image.dataset.characterAvatarRetried==='true'){
+    const fallback=document.createElement('span');
+    fallback.className=image.dataset.characterAvatarFallbackClass||'avatar avatar-fallback';
+    fallback.setAttribute('aria-hidden','true');
+    fallback.style.cssText=image.dataset.characterAvatarFallbackStyle||'';
+    fallback.textContent=image.dataset.characterAvatarFallback||'角';
+    image.replaceWith(fallback);
+    return;
+  }
+  image.dataset.characterAvatarRetried='true';
+  let url='';
+  const storagePath=image.dataset.characterAvatarPath||'';
+  if(storagePath){
+    try{url=await refreshCharacterIllustrationSignedUrl(storagePath)||'';}
+    catch(error){console.warn('角色頭像網址更新失敗：',error?.message||error);}
+  }
+  if(!url&&isUuid(image.dataset.characterAvatarId||'')){
+    try{
+      const assets=await loadCharacterPrimaryIllustrationAssets([image.dataset.characterAvatarId]);
+      url=assets.get(image.dataset.characterAvatarId)?.primary?.src||'';
+    }catch(error){console.warn('角色主立繪備援載入失敗：',error?.message||error);}
+  }
+  if(image.isConnected&&url&&url!==image.src){image.src=url;return;}
+  if(image.isConnected){
+    const fallback=document.createElement('span');
+    fallback.className=image.dataset.characterAvatarFallbackClass||'avatar avatar-fallback';
+    fallback.setAttribute('aria-hidden','true');
+    fallback.style.cssText=image.dataset.characterAvatarFallbackStyle||'';
+    fallback.textContent=image.dataset.characterAvatarFallback||'角';
+    image.replaceWith(fallback);
+  }
+}
+document.addEventListener('error',event=>{
+  const image=event.target;
+  if(image instanceof HTMLImageElement&&image.dataset.characterAvatarId)void recoverCharacterAvatarImage(image);
+},true);
+/* Other non-avatar image failures retain the existing low-opacity loading treatment. */
 document.addEventListener('error',event => {
   const image=event.target;
   if (!(image instanceof HTMLImageElement)) return;
-  if (image.dataset.characterPrimaryIllustration || image.dataset.characterIllustrationPath) return;
+  if (image.dataset.characterAvatarId||image.dataset.characterPrimaryIllustration||image.dataset.characterIllustrationPath) return;
   image.style.opacity='.15';
 },true);
 document.addEventListener('load',event => {
