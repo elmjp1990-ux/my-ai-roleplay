@@ -35,4 +35,21 @@ const pinHelper = html.slice(html.indexOf('async function toggleChatSessionPin')
 assert.ok(pinHelper.includes('item.pinned=!previousPinned'), 'pin helper must toggle the pinned state');
 assert.ok(!pinHelper.includes('confirmChatMessageDeletion'), 'pin helper must never request message deletion confirmation');
 
-console.log('Group creation UI, 10-item pagination, static inspiration, and chat-list pin isolation checks passed.');
+const groupTurn = fs.readFileSync(new URL('../supabase/functions/group-chat-turn/index.ts', import.meta.url), 'utf8');
+assert.ok(html.includes("const initialOpening=String(initialScene?.description||'').trim()"), 'group chat must read the saved initial scene description');
+assert.ok(html.includes('const initialOpeningRow=initialOpening && !g.historyHasMore'), 'group chat must render the original opening before the earliest loaded messages, not above a recent partial page');
+assert.ok(html.includes('const messageRows=initialOpeningRow+g.messages.map'), 'opening display must be prepended without inserting a duplicate chat message');
+assert.ok(html.includes("if(!typedContent && !(g.messages||[]).length)"), 'empty first send must not start a paid AI turn');
+assert.ok(html.includes("💎 本群組每次對話 '+(groupPrototype.draft.memberIds.length*3)+' 鑽石（每加一位角色3鑽石）。"), 'group picker must show the requested per-turn cost wording');
+assert.ok(html.includes('padding:13px 9px'), 'chat list rows must have the updated larger spacing');
+const groupCreateStart = html.indexOf('async function groupCreate()');
+const groupCreateEnd = html.indexOf('\nfunction groupBack()', groupCreateStart);
+const groupCreateSource = html.slice(groupCreateStart, groupCreateEnd);
+for (const forbidden of ['functions.invoke', 'group-chat-turn', 'walletPreflight', 'reserve_group_chat_turn']) {
+  assert.ok(!groupCreateSource.includes(forbidden), 'group creation must not call AI or reserve wallet funds: ' + forbidden);
+}
+assert.ok(groupTurn.includes('const initialOpeningContext = (sceneResult.data || []).map'), 'group AI must load original scene descriptions');
+assert.ok(groupTurn.includes('【玩家設定的初始開場情境】'), 'group AI system prompt must include the original opening context');
+assert.ok(groupTurn.includes('AI 只在玩家送出第一則訊息後才回覆'), 'group AI prompt must only respond after the player sends a message');
+
+console.log('Group creation UI, 10-item pagination, static inspiration, chat-list pin isolation, and free initial group opening checks passed.');

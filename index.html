@@ -529,9 +529,9 @@ body.group-chat-page:has(.group-wizard) #view {
 .chat-announcement-copy strong { font-size:13px; }
 .chat-announcement-copy span { color:var(--muted); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .chat-list-section { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:17px 2px 8px; color:var(--muted); font-size:12px; font-weight:700; letter-spacing:.04em; }
-.chat-entry { display:flex; gap:10px; align-items:center; padding:10px 8px; margin-top:5px; border:1px solid transparent; border-radius:15px; transition:background .16s,border-color .16s; }
-.chat-entry:hover { background:var(--panel2); }
-.chat-entry.active { background:var(--soft); border-color:color-mix(in srgb,var(--primary) 32%,transparent); }
+.chat-entry { display:flex; gap:12px; align-items:center; padding:13px 9px; margin-top:7px; border:1px solid transparent; border-radius:17px; transition:background .18s,border-color .18s,box-shadow .18s; }
+.chat-entry:hover { background:color-mix(in srgb,var(--panel2) 78%,transparent); }
+.chat-entry.active { background:color-mix(in srgb,var(--soft) 82%,var(--panel)); border-color:transparent; box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--primary) 16%,transparent); }
 .select-chat { flex:1; min-width:0; border:0; background:transparent; text-align:left; padding:2px; }
 .pin { padding:3px; border:0; background:transparent; color:var(--muted); }
 .pin.on { color:#fb7185; }
@@ -6747,7 +6747,7 @@ function groupRenderCharacterResults() {
   const section=(title,rows)=>rows.length?'<h3 class="group-character-section-title">'+e(title)+' ('+rows.length+')</h3><div class="group-character-grid">'+renderRows(rows)+'</div>':'';
   const empty=ordered.length?'':(pager.error?'<div class="group-alert">'+e(pager.error)+'</div>':pager.loading?'<div class="group-alert">正在載入公開角色…</div>':'<div class="group-alert">'+(q?'目前載入的角色中沒有符合搜尋條件的結果。可以載入更多搜尋結果。':'正在等待公開角色資料。')+'</div>');
   const more=pager.hasMore?'<button type="button" class="ghost" data-action="group-character-load-more" '+(pager.loading?'disabled':'')+'>'+(pager.loading?'載入中…':'載入更多公開角色（每次 10 位）')+'</button>':'';
-  return '<div class="group-alert"><strong>已選 '+groupPrototype.draft.memberIds.length+' / 3 位角色</strong><br>💎 預估每次對話 '+(groupPrototype.draft.memberIds.length*3)+' 鑽石（預估費用，不會實際扣款）。</div>'+empty+section('最近聊天',byRecent)+section('喜愛角色',byFavorite)+section('公開角色',byPublic)+more+'<p class="muted small">只能選擇公開的角色；每次載入 10 位，搜尋會比對已載入的角色。</p>';
+  return '<div class="group-alert"><strong>已選 '+groupPrototype.draft.memberIds.length+' / 3 位角色</strong><br>💎 本群組每次對話 '+(groupPrototype.draft.memberIds.length*3)+' 鑽石（每加一位角色3鑽石）。</div>'+empty+section('最近聊天',byRecent)+section('喜愛角色',byFavorite)+section('公開角色',byPublic)+more+'<p class="muted small">只能選擇公開的角色；每次載入 10 位，搜尋會比對已載入的角色。</p>';
 }
 
 function groupRenderCharacters() {
@@ -7113,7 +7113,12 @@ function renderGroupConversation() {
     name:member.name,
     image:member.avatar_url || member.image || ''
   }));
-  const messageRows=g.messages.map(m=>{
+  const initialScene=(group.scenes||[]).find(x=>Number(x.position||1)===1)||(group.scenes||[])[0];
+  const initialOpening=String(initialScene?.description||'').trim();
+  const initialOpeningRow=initialOpening && !g.historyHasMore
+    ? '<div class="message group-opening-message"><span class="avatar avatar-fallback">序</span><div class="message-content"><div class="message-name">初始開場情境</div><div class="bubble">'+e(initialOpening).replace(/\n/g,'<br>')+'</div></div></div>'
+    : '';
+  const messageRows=initialOpeningRow+g.messages.map(m=>{
     const member=group.members.find(x=>m.characterId&&x.characterId===m.characterId) ||
       group.members.find(x=>m.speaker===x.name || String(m.speaker||'').startsWith((x.name||'')+' · '));
     const avatar=avatarURL(member?.avatar_url || member?.image);
@@ -7148,7 +7153,6 @@ function renderGroupConversation() {
       '<div class="message-content">'+bodyHTML+actionButtons+'</div></div>';
   }).join('') || '<div class="empty">這段群組對話還沒有訊息，輸入第一句話開始故事。</div>';
   const sceneNames=(group.scenes||[]).map(x=>x.name).filter(Boolean).join('、');
-  const initialScene=(group.scenes||[]).find(x=>Number(x.position||1)===1)||(group.scenes||[])[0];
   $('view').innerHTML=`
     <div class="chat-layout ${hideList?'hide-list':''}">
       ${chatListHTML()}
@@ -7879,6 +7883,11 @@ async function groupSendTurn() {
   const content=typedContent || GROUP_CONTINUE_SENTINEL;
   const g=groupPrototype;
   if(g.sending) return;
+  if(!typedContent && !(g.messages||[]).length) {
+    g.formError='請先輸入第一句訊息，再開始群組 AI 對話。';
+    render();
+    return;
+  }
   if(!walletPreflight('group')) return;
   if(!window.mySupabase) { g.formError='Supabase 用戶端尚未載入。';render();return; }
   if(!isContinueRequest) {
