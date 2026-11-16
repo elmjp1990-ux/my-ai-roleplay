@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { findPrivateContextLeak, preparePrivateContext } from "../_shared/private-context-guard.ts";
 import { collectDerivedPrivateProfileValues, formatCharacterAiProfilePrompt } from "../_shared/character-ai-profile-prompt.ts";
 import { parseGroupTurnEnvelopeDetailed, serializeGroupPhoneUpdatesForRpc } from "../_shared/group-turn-envelope.ts";
-import { buildGroupMemoryContext, getGroupHistoryLimit } from "../_shared/group-memory-context.ts";
+import { buildGroupMemoryContext, getGroupHistoryLimit, isCurrentGroupMemorySummary } from "../_shared/group-memory-context.ts";
 import { requestOpenRouterChatCompletion, POYOZZ_DEFAULT_CHAT_MODEL } from "../_shared/openrouter-chat-completions.ts";
 import { buildRoleplayResponseGuidelines } from "../_shared/roleplay-response-guidelines.ts";
 import { processDueGroupMemorySummary } from "../_shared/story-memory-summary.ts";
@@ -184,7 +184,7 @@ Deno.serve(async (request) => {
   }
 
   const useSharedGroupMemory = asText(group.scene_mode) === "shared";
-  const [memberResult, sceneResult, playerResult, latestGroupMemoryResult, curatedGroupMemoryResult] = await Promise.all([
+  const [memberResult, sceneResult, playerResult, latestGroupMemoryResult, curatedGroupMemoryResult, completedGroupTurnCountResult] = await Promise.all([
     admin.from("chat_group_members")
       .select("id,group_id,character_id,position,scene_id,character_snapshot,phone_notifications")
       .eq("group_id", groupId).order("position", { ascending: true }),
@@ -206,11 +206,16 @@ Deno.serve(async (request) => {
         .not("summary", "is", null)
         .order("batch_number", { ascending: false }).limit(8)
       : Promise.resolve({ data: [], error: null }),
+    useSharedGroupMemory
+      ? admin.from("chat_group_turns")
+        .select("id", { count: "exact", head: true })
+        .eq("group_id", groupId).eq("user_id", user.id).eq("status", "completed")
+      : Promise.resolve({ count: null, error: null }),
   ]);
-  const groupMemoryLookupFailed = Boolean(latestGroupMemoryResult.error || curatedGroupMemoryResult.error);
+  const groupMemoryLookupFailed = Boolean(latestGroupMemoryResult.error || curatedGroupMemoryResult.error || completedGroupTurnCountResult.error);
   if (groupMemoryLookupFailed) {
     console.warn("group_chat_turn_memory_summary_lookup_failed", {
-      code: latestGroupMemoryResult.error?.code || curatedGroupMemoryResult.error?.code || "unknown",
+      code: latestGroupMemoryResult.error?.code || curatedGroupMemoryResult.error?.code || completedGroupTurnCountResult.error?.code || "unknown",
     });
   }
   const latestGroupMemory = latestGroupMemoryResult.error ? null : asRow(latestGroupMemoryResult.data);
@@ -222,9 +227,13 @@ Deno.serve(async (request) => {
     latestGroupMemory,
     curatedGroupMemories,
   );
+  const hasCurrentGroupMemorySummary = isCurrentGroupMemorySummary(
+    latestGroupMemory,
+    Number(completedGroupTurnCountResult.count || 0),
+  );
   const groupHistoryLimit = getGroupHistoryLimit(
     asText(group.scene_mode),
-    Boolean(asText(latestGroupMemory.summary)),
+    hasCurrentGroupMemorySummary,
     groupMemoryLookupFailed,
   );
   if (memberResult.error || sceneResult.error || playerResult.error ||
