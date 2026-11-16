@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { findPrivateContextLeak, preparePrivateContext } from "../_shared/private-context-guard.ts";
 import { collectDerivedPrivateProfileValues, formatCharacterAiProfilePrompt } from "../_shared/character-ai-profile-prompt.ts";
 import { parseGroupTurnEnvelopeDetailed, serializeGroupPhoneUpdatesForRpc } from "../_shared/group-turn-envelope.ts";
+import { buildGroupMemoryContext, getGroupHistoryLimit } from "../_shared/group-memory-context.ts";
 import { requestOpenRouterChatCompletion, POYOZZ_DEFAULT_CHAT_MODEL } from "../_shared/openrouter-chat-completions.ts";
 import { buildRoleplayResponseGuidelines } from "../_shared/roleplay-response-guidelines.ts";
 import { processDueGroupMemorySummary } from "../_shared/story-memory-summary.ts";
@@ -182,19 +183,51 @@ Deno.serve(async (request) => {
     return json({ status: refunded.confirmed ? "refunded" : "needs_reconciliation", error: "group_context_unavailable", balance: refunded.balance, retryAllowed: false }, refunded.confirmed ? 200 : 503);
   }
 
-  const [memberResult, sceneResult, historyResult, playerResult] = await Promise.all([
+  const useSharedGroupMemory = asText(group.scene_mode) === "shared";
+  const [memberResult, sceneResult, playerResult, latestGroupMemoryResult, curatedGroupMemoryResult] = await Promise.all([
     admin.from("chat_group_members")
       .select("id,group_id,character_id,position,scene_id,character_snapshot,phone_notifications")
       .eq("group_id", groupId).order("position", { ascending: true }),
     admin.from("chat_group_scenes")
       .select("id,name,description,position").eq("group_id", groupId).order("position", { ascending: true }),
-    admin.from("chat_group_messages")
-      .select("turn_id,scene_id,speaker_type,character_id,speaker_snapshot,content,created_at,sequence_no")
-      .eq("group_id", groupId).is("deleted_at", null)
-      .order("created_at", { ascending: false }).order("sequence_no", { ascending: false }).order("id", { ascending: false }).limit(40),
     admin.from("profiles").select("id,nickname,persona_presets").eq("id", user.id).maybeSingle(),
+    useSharedGroupMemory
+      ? admin.from("chat_group_memory_summaries")
+        .select("batch_number,summary,important,user_edited,processed_at")
+        .eq("group_id", groupId).eq("user_id", user.id).eq("status", "completed")
+        .not("summary", "is", null)
+        .order("batch_number", { ascending: false }).limit(1).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    useSharedGroupMemory
+      ? admin.from("chat_group_memory_summaries")
+        .select("batch_number,summary,important,user_edited,processed_at")
+        .eq("group_id", groupId).eq("user_id", user.id).eq("status", "completed")
+        .or("important.eq.true,user_edited.eq.true")
+        .not("summary", "is", null)
+        .order("batch_number", { ascending: false }).limit(8)
+      : Promise.resolve({ data: [], error: null }),
   ]);
-  if (memberResult.error || sceneResult.error || historyResult.error || playerResult.error ||
+  const groupMemoryLookupFailed = Boolean(latestGroupMemoryResult.error || curatedGroupMemoryResult.error);
+  if (groupMemoryLookupFailed) {
+    console.warn("group_chat_turn_memory_summary_lookup_failed", {
+      code: latestGroupMemoryResult.error?.code || curatedGroupMemoryResult.error?.code || "unknown",
+    });
+  }
+  const latestGroupMemory = latestGroupMemoryResult.error ? null : asRow(latestGroupMemoryResult.data);
+  const curatedGroupMemories = !curatedGroupMemoryResult.error && Array.isArray(curatedGroupMemoryResult.data)
+    ? curatedGroupMemoryResult.data
+    : [];
+  const groupMemoryContext = buildGroupMemoryContext(
+    asText(group.scene_mode),
+    latestGroupMemory,
+    curatedGroupMemories,
+  );
+  const groupHistoryLimit = getGroupHistoryLimit(
+    asText(group.scene_mode),
+    Boolean(asText(latestGroupMemory.summary)),
+    groupMemoryLookupFailed,
+  );
+  if (memberResult.error || sceneResult.error || playerResult.error ||
       !Array.isArray(memberResult.data) || memberResult.data.length < 1 || memberResult.data.length > 3) {
     const refunded = await refund(admin, user.id, turnId, "group_context_lookup_failed");
     return json({ status: refunded.confirmed ? "refunded" : "needs_reconciliation", error: "group_context_unavailable", balance: refunded.balance, retryAllowed: false }, refunded.confirmed ? 200 : 503);
@@ -203,7 +236,11 @@ Deno.serve(async (request) => {
   const scenes = new Map((sceneResult.data || []).map((scene: any) => [scene.id, scene]));
   const members = memberResult.data as any[];
   const characterIds = members.map(m => m.character_id).filter(isUuid);
-  const [charactersResult, privateRowsResult] = await Promise.all([
+  const [historyResult, charactersResult, privateRowsResult] = await Promise.all([
+    admin.from("chat_group_messages")
+      .select("turn_id,scene_id,speaker_type,character_id,speaker_snapshot,content,created_at,sequence_no")
+      .eq("group_id", groupId).is("deleted_at", null)
+      .order("created_at", { ascending: false }).order("sequence_no", { ascending: false }).order("id", { ascending: false }).limit(groupHistoryLimit),
     characterIds.length ? admin.from("characters")
       .select("id,author_id,name,intro,style,gender,age,race,tags,phone_settings,deleted_at")
       .in("id", characterIds) : Promise.resolve({ data: [], error: null }),
@@ -211,7 +248,7 @@ Deno.serve(async (request) => {
       .select("character_id,author_id,private_info,personality_profile")
       .in("character_id", characterIds) : Promise.resolve({ data: [], error: null }),
   ]);
-  if (charactersResult.error || privateRowsResult.error) {
+  if (historyResult.error || charactersResult.error || privateRowsResult.error) {
     const refunded = await refund(admin, user.id, turnId, "character_context_lookup_failed");
     return json({ status: refunded.confirmed ? "refunded" : "needs_reconciliation", error: "character_context_unavailable", balance: refunded.balance, retryAllowed: false }, refunded.confirmed ? 200 : 503);
   }
@@ -308,6 +345,7 @@ Deno.serve(async (request) => {
     "【群組場景模式】" + asText(group.scene_mode) + "。shared 代表角色處於同一共同場景；separate 代表每位角色只知道自己所屬場景。近期對話每行都有場景 ID；separate 模式下，角色只能依自己所屬場景的訊息回應，除非對話已合理建立資訊傳遞，否則不可引用其他場景的即時事件。",
     "【遊戲時間與地點】目前故事時間：" + (asText(group.story_time) || "尚未確認") + "；目前故事地點：" + (asText(group.story_location) || "尚未確認") + "。這是劇情內的世界狀態，不是現實時間或手機裝置時間；只能依故事事件推進，不可讀取、推測或使用系統現在時間。若尚未有足夠線索，保留空字串，不可用現實時間補值。",
     "【玩家設定的初始開場情境】\n" + (initialOpeningContext || "（玩家未提供初始開場情境）") + "。這是玩家建立群組時提供的原始開場內容，必須視為故事已成立的共同上下文；不得重新生成、改寫或摘要開場。AI 只在玩家送出第一則訊息後才回覆，並須同時依據這段開場與本輪玩家訊息自然承接劇情。",
+    ...(groupMemoryContext ? [groupMemoryContext] : []),
     "【近期群組對話】\n" + history.slice(-14000),
     "【本輪玩家訊息】\n" + currentMessage,
     "【本輪角色選擇與發言規則】每輪由你自行判斷 1～3 名最適合回應的角色，不要求每個角色輪流發言，也不可為了湊人數讓所有人都說話。可以由一位角色回應，也可以讓角色之間自然互動。若玩家明確以 @角色名稱 指定對象，優先由該角色回應，但仍可在劇情確有必要時讓另一角色補充。未被選中的角色保持安靜，不要輸出空白發言。",
