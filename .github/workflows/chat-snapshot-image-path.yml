@@ -6,6 +6,7 @@ on:
       - 'index.html'
       - 'supabase/functions/story-session/**'
       - 'supabase/functions/encounter-session/**'
+      - 'supabase/migrations/20261116170000_preserve_group_character_avatar_snapshots.sql'
       - 'scripts/test-chat-snapshot-image-path.mjs'
       - '.github/workflows/chat-snapshot-image-path.yml'
   push:
