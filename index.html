@@ -8196,7 +8196,7 @@ function renderGroupPrototype() {
       '<div class="group-panel" style="padding:12px;margin-bottom:16px"><div class="row" style="gap:8px;align-items:center">'+avatarPieces+'</div><p class="muted small" style="margin:8px 0 0">群組頭像依照已選角色組合顯示，現階段不可自行更換。</p></div>'+
       '<label class="group-field"><span>群組名稱（最多 25 字）</span><input id="groupNameInput" maxlength="25" value="'+e(nameValue)+'" placeholder="輸入群組名稱"></label>'+
       '<label class="group-field"><span>玩家角色名稱（提供給 AI）</span><input id="groupPlayerName" maxlength="80" value="'+e(g.draft.playerName||state.account?.nickname||"玩家")+'" placeholder="你的角色名稱"></label>'+
-      '<div class="group-field"><span>玩家角色與人設</span><button type="button" data-action="group-persona-choose" style="width:100%;text-align:left;margin-bottom:8px">'+e(g.draft.personaPresetName||'從聊天室「人設管理」選擇人設')+'</button><textarea id="groupPlayerPersona" maxlength="3000" placeholder="描述你在這個故事中的身分、個性、背景與說話方式。">'+e(g.draft.playerPersona||state.account?.bio||'')+'</textarea><small class="muted">選擇後會帶入人設內容，仍可在此編輯；不會修改原本人設。</small></div>'+
+      '<div class="group-field"><span>玩家角色與人設</span><button type="button" data-action="group-persona-choose" style="width:100%;text-align:left;margin-bottom:8px">'+e(g.draft.personaPresetName||'從聊天室「人設管理」選擇人設')+'</button><textarea id="groupPlayerPersona" maxlength="3000" placeholder="描述你在這個故事中的身分、個性、背景與說話方式。">'+e(g.draft.playerPersona||'')+'</textarea><small class="muted">選擇後會帶入人設內容，仍可在此編輯；不會修改原本人設。</small></div>'+
       '<div class="group-field"><span>背景選擇</span><div class="group-character-grid">'+worldChoices+'</div><textarea id="groupWorldBackground" maxlength="3000" data-count-for="groupWorldBackground" placeholder="選擇角色會帶入角色背景；也可以選擇玩家自設後自行輸入。">'+e(initialWorldText.slice(0,3000))+'</textarea><small class="char-counter" data-count-for="groupWorldBackground">'+Array.from(initialWorldText.slice(0,3000)).length+'/3000</small></div>'+
       groupRenderScenes()+
       '<div class="group-field"><span>確認群組成員</span><div class="group-member-confirm-row">'+members.map(c=>'<button type="button" class="group-member-confirm-avatar" data-action="group-member-detail" data-id="'+e(c.id)+'" aria-label="查看 '+e(c.name)+' 的角色卡" title="'+e(c.name)+'"><img class="avatar" src="'+e(safeImage(c.image||c.avatar_url))+'" alt=""></button>').join('')+'</div></div>';
@@ -8214,7 +8214,6 @@ function groupReadStep() {
     if(members.length!==g.draft.memberIds.length) return '角色清單已變更，請重新選擇角色。';
     if(!g.draft.name) g.draft.name=members.map(c=>c.name).join('、').slice(0,25);
     if(!g.draft.playerName) g.draft.playerName=state.account?.nickname||'玩家';
-    if(!g.draft.playerPersona) g.draft.playerPersona=state.account?.bio||'';
     if(!g.draft.worldCharacterId||!members.some(c=>c.id===g.draft.worldCharacterId)) g.draft.worldCharacterId=members[0].id;
   } else if(g.step===2) {
     const members=groupSelectedCharacters();
@@ -9415,9 +9414,33 @@ async function renderPhoneModal() {
   const noticeLines=notices.map(item=>typeof item==='string'?item.trim():String(item?.body||'').trim()).filter(Boolean);
   const configuredFieldIndexes=new Set(configuredPhonePrompts.slice(0,8).map((row,index)=>String(row||'').split('|')[0].trim()?index:null).filter(index=>index!==null));
   const remainingAfterNotices=Math.max(0,8-notices.length);
-  const extraStoryStates=storyPhoneStates.filter(item=>!configuredFieldIndexes.has(Number(item.field_index))).slice(0,remainingAfterNotices);
+  // Avoid showing the same information twice when a configured notice, a phone-state
+  // snapshot, and an event row describe the same title/body. Keep repeated historical
+  // events within the event stream, but suppress cross-source duplicates.
+  const phoneContentKey=(title,body)=>{
+    const normalizedTitle=phoneTitleKey(title);
+    const normalizedBody=String(body||'').normalize('NFKC').replace(/\\s+/g,' ').trim().toLocaleLowerCase();
+    return normalizedTitle||normalizedBody?normalizedTitle+'|'+normalizedBody:'';
+  };
+  const renderedPhoneContentKeys=new Set();
+  const rememberPhoneContent=(title,body)=>{
+    const key=phoneContentKey(title,body);
+    if(key)renderedPhoneContentKeys.add(key);
+  };
+  notices.forEach(item=>rememberPhoneContent(typeof item==='string'?character.name:item?.title,typeof item==='string'?item:item?.body));
+  const extraStoryStates=storyPhoneStates.filter(item=>!configuredFieldIndexes.has(Number(item.field_index))).filter(item=>{
+    const key=phoneContentKey(item.title,item.body);
+    if(!key||renderedPhoneContentKeys.has(key))return false;
+    renderedPhoneContentKeys.add(key);
+    return true;
+  }).slice(0,remainingAfterNotices);
   const remainingAfterStates=Math.max(0,remainingAfterNotices-extraStoryStates.length);
-  const storyEventsToShow=storyPhoneEvents.slice(0,remainingAfterStates);
+  const storyEventsToShow=storyPhoneEvents.filter(item=>{
+    const key=phoneContentKey(item.title||'新通知',item.body);
+    if(!key||renderedPhoneContentKeys.has(key))return false;
+    renderedPhoneContentKeys.add(key);
+    return true;
+  }).slice(0,remainingAfterStates);
   function phoneNoticeIconPresentation(value) {
     const raw=String(value||'').trim();
     const match=raw.match(/^(?:\p{Extended_Pictographic}|\p{Regional_Indicator})(?:\uFE0F|\uFE0E|\u200D|\p{Extended_Pictographic}|\p{Regional_Indicator}|\p{Emoji_Modifier})*/u);
