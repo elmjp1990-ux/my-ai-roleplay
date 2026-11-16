@@ -7241,9 +7241,7 @@ async function groupOpen(groupId) {
       const speaker=type==='user'?'你':type==='system'?'系統':(speakerSnapshot.name||member?.name||'角色')+(scene?' · '+scene.name:'');
       return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user' && m.content===GROUP_CONTINUE_SENTINEL ? '' : m.content,createdAt:m.created_at};
     });
-    await Promise.all(members.filter(member=>!member.avatar_url&&member.primaryIllustrationPath).map(async member=>{
-      try{member.avatar_url=await getCharacterIllustrationSignedUrl(member.primaryIllustrationPath);member.image=member.avatar_url;}catch(error){console.warn('群組角色頭像載入失敗：',member.name,error?.message||error);}
-    }));
+    const membersNeedingPortraits=members.filter(member=>!member.avatar_url&&member.primaryIllustrationPath);
     g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,memoryPhotos:[],scenes,members};
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;
     if(groupListWasLoaded){
@@ -7269,6 +7267,18 @@ async function groupOpen(groupId) {
     // Diary synchronization is non-blocking and remains account/group guarded.
     if(!groupListWasLoaded)g.groupsLoaded=false;
     render();
+    // Private primary portraits are signed after the first paint; do not hold the chat
+    // open spinner for one to three independent Storage URL requests.
+    if(membersNeedingPortraits.length){
+      void Promise.all(membersNeedingPortraits.map(async member=>{
+        try{member.avatar_url=await getCharacterIllustrationSignedUrl(member.primaryIllustrationPath);member.image=member.avatar_url;}
+        catch(error){console.warn('群組角色頭像載入失敗：',member.name,error?.message||error);}
+      })).then(()=>{
+        if(requestId!==g.openRequestId||currentUser()?.uid!==user.id||g.active?.id!==group.id)return;
+        if(g.groupMembers)g.groupMembers[group.id]=members.map(member=>({name:member.name,avatar_url:member.avatar_url||member.image||'',character_snapshot:member.characterSnapshot||{}}));
+        if(route.page==='group'&&route.id===group.id)renderGroupConversation();
+      });
+    }
     void syncGroupDiaryCloud(group.id).then(()=>{
       if(requestId!==g.openRequestId||currentUser()?.uid!==user.id||g.active?.id!==group.id)return;
       ensureGroupDiaryMemories();
