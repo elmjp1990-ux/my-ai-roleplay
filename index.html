@@ -7404,7 +7404,7 @@ async function groupOpen(groupId) {
         if(existingIndex>=0)g.groups[existingIndex]=listRow;else g.groups.unshift(listRow);
         g.groupMembers ||= {};
         g.groupPreviews ||= {};
-        g.groupMembers[group.id]=members.map(member=>({name:member.name,avatar_url:member.avatar_url||member.image||'',character_snapshot:member.characterSnapshot||{}}));
+        g.groupMembers[group.id]=members.map(member=>({characterId:member.characterId,name:member.name,avatar_url:member.avatar_url||member.image||'',character_snapshot:{id:member.characterId,name:member.name,avatar_url:member.avatar_url||member.image||''}}));
         const latestMessage=messages.at(-1);
         if(latestMessage)g.groupPreviews[group.id]={group_id:group.id,content:latestMessage.content||'',created_at:latestMessage.createdAt||'',speaker_type:latestMessage.type==='user'?'user':'character'};
         else delete g.groupPreviews[group.id];
