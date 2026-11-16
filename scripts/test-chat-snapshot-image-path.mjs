@@ -21,3 +21,20 @@ assert.match(html,/hydrateCloudSessionCharacterImage\(session\)/);
 assert.match(html,/hydrateCloudSessionCharacterImage\(s\)/);
 assert.match(html,/portraitPath&&uid&&s\.id/);
 console.log('Chat snapshot image-path contract passed.');
+
+const groupCreationMigration = fs.readFileSync(
+  'supabase/migrations/20261116170000_preserve_group_character_avatar_snapshots.sql',
+  'utf8',
+);
+assert.match(groupCreationMigration,/imagePath', COALESCE\(v_primary_illustration_path, ''\)/,
+  'new group member snapshots must keep the primary illustration Storage path');
+assert.match(groupCreationMigration,/image', CASE WHEN v_primary_illustration_path IS NOT NULL THEN '' ELSE COALESCE\(v_character\.avatar_url, ''\) END/,
+  'new group member snapshots must keep the avatar URL when no primary illustration exists');
+assert.match(groupCreationMigration,/c\.deleted_at IS NULL/,
+  'the group creation eligibility check must continue rejecting soft-deleted characters');
+assert.match(html,/async function signCharacterSnapshotPortraits\(members\)/,
+  'group chats must be able to sign stable portrait paths from member snapshots');
+assert.match(html,/characterIllustrationSignedUrlManager\.getMany\(unique\.map\(entry=>entry\.path\)\)/,
+  'group snapshot portrait paths should be signed in a single batch');
+assert.match(html,/snapshot\.imagePath\|\|snapshot\.primaryIllustrationPath/,
+  'group list and group-open hydration must read the snapshotted image path');
