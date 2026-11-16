@@ -497,7 +497,7 @@ Deno.serve(async (request) => {
     return json({ error: "story_context_unavailable", retryAllowed: true }, 503);
   }
 
-  let providerResponse: Awaited<ReturnType<typeof requestStoryGeneration>>;
+  let providerResponse: Awaited<ReturnType<typeof requestOpenRouterChatCompletion>>;
   try {
     providerResponse = await requestOpenRouterChatCompletion({
       messages,
