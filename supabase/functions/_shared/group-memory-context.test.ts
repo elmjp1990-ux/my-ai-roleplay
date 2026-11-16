@@ -1,5 +1,5 @@
 import { assertEquals, assertStringIncludes } from "jsr:@std/assert";
-import { buildGroupMemoryContext, getGroupHistoryLimit } from "./group-memory-context.ts";
+import { buildGroupMemoryContext, getGroupHistoryLimit, isCurrentGroupMemorySummary } from "./group-memory-context.ts";
 
 Deno.test("shared-scene context includes the cumulative summary and curated memories", () => {
   const context = buildGroupMemoryContext("shared",
@@ -40,6 +40,17 @@ Deno.test("curated group memories are capped to the eight newest valid batches",
   assertEquals(context.split(/\n/).includes("第 2 批：珍藏摘要 2"), false);
   assertEquals(context.split(/\n/).includes("第 1 批：珍藏摘要 1"), false);
   assertEquals(context.split(/\n/).filter((line) => line.startsWith("第 ")).length, 8);
+});
+
+Deno.test("a stale cumulative summary cannot reduce history while a newer five-turn batch is pending", () => {
+  const batchOne = { batch_number: 1, summary: "第一批累積摘要" };
+  const batchTwo = { batch_number: 2, summary: "第二批累積摘要" };
+  assertEquals(isCurrentGroupMemorySummary(batchOne, 9), true);
+  assertEquals(isCurrentGroupMemorySummary(batchOne, 10), false);
+  assertEquals(isCurrentGroupMemorySummary(batchTwo, 10), true);
+  assertEquals(isCurrentGroupMemorySummary(batchTwo, 14), true);
+  assertEquals(isCurrentGroupMemorySummary(batchTwo, 15), false);
+  assertEquals(isCurrentGroupMemorySummary(null, 15), false);
 });
 
 Deno.test("shared-scene history is reduced only when the summary lookup is healthy and a cumulative summary exists", () => {
