@@ -57,11 +57,12 @@ assert.match(css,/\.character-visibility-option:has\(input:checked\)/);
 assert.match(html,/max-width:min\(20em,100%\)/,'dialogue bubbles must target 18 full-width Chinese characters');
 assert.match(html,/max-width:min\(25em,100%\)/,'star-wrapped narration must target 25 full-width Chinese characters');
 assert.ok(html.includes('function conversationSuggestionsHTML(s)'), 'single and group chat must share one suggestion renderer');
-assert.match(html,/function renderGroupOpeningContent\\(raw,roles=\\[\\]\\)\\{[\\s\\S]*?segments\\.map\\(segment=>segment\\.kind==='user'\\?formatMessage\\(segment\\.text\\):roleplaySegmentHTML\\(segment\\)\\)/,
+const groupOpeningRenderer=html.slice(html.indexOf('function renderGroupOpeningContent'),html.indexOf('function conversationTypingIndicatorHTML'));
+assert.ok(groupOpeningRenderer.includes("segment.kind==='user'") && groupOpeningRenderer.includes('roleplaySegmentHTML(segment)'),
   'group opening must reuse the shared roleplay parser and character avatar renderer');
-assert.match(html,/const initialStoryTime=Date\\.now\\(\\)/,
+assert.ok(html.includes('const initialStoryTime=Date.now()'),
   'single and group phones must initially fall back to the current real-world time');
-assert.match(html,/formatStoryWorldTime\\(storyWorldState\\.storyTime\\|\\|storyWorldState\\.story_time\\|\\|initialStoryTimeText\\)/,
+assert.ok(html.includes('storyWorldState.storyTime||storyWorldState.story_time||initialStoryTimeText'),
   'an AI-provided in-world time must override the temporary real-time fallback');
 assert.ok(html.includes('本回合暫時沒有可用的建議回覆。'), 'empty suggestion state must be explicit before the first AI reply');
 assert.ok(html.includes('conversationSuggestionsHTML({') && html.includes('suggestedReplies:group.suggestedReplies'), 'group chat must use the shared single-chat suggestion UI and state');

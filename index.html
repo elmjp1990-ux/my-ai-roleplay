@@ -9365,7 +9365,7 @@ async function renderPhoneModal() {
   const initialStoryTime=Date.now();
   const initialDate=initialStoryTime?new Date(initialStoryTime):null;
   const initialStoryTimeText=initialDate?initialDate.getFullYear()+'-'+String(initialDate.getMonth()+1).padStart(2,'0')+'-'+String(initialDate.getDate()).padStart(2,'0')+'T'+String(initialDate.getHours()).padStart(2,'0')+':'+String(initialDate.getMinutes()).padStart(2,'0'):'';
-  const storyTimeLabel=formatStoryWorldTime(storyWorldState.storyTime||storyWorldState.story_time||(!isGroup?initialStoryTimeText:''));
+  const storyTimeLabel=formatStoryWorldTime(storyWorldState.storyTime||storyWorldState.story_time||initialStoryTimeText);
   const initialGroupScene=(group?.scenes||[]).find(item=>Number(item.position||1)===1)||(group?.scenes||[])[0];
   const openingContext=[isGroup?initialGroupScene?.description:'',!isGroup?session?.initialOpeningMessage?.text:'',character.opening,character.intro,character.style].filter(Boolean).join(' ');
   const openingLocationMatch=openingContext.match(/(?:目前在|此刻在|位於|來到|身處|地點[：:是]?|場景[：:是]?)([^，。！？；;\\n]{2,40})/);
