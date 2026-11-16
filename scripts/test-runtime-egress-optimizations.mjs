@@ -803,18 +803,18 @@ const avatarMarkup=between("function characterAvatarMarkup(character,options={})
 assert.match(avatarMarkup,/data-character-avatar-id/);
 assert.match(avatarMarkup,/data-character-avatar-fallback-class/);
 const groupListHydration=between("async function groupHydrateListRows(groups)","async function groupLoadList");
-assert.match(groupListHydration,/loadCharacterPrimaryIllustrationAssets\\(missingAvatarIds\\)/,
+assert.match(groupListHydration,/loadCharacterPrimaryIllustrationAssets\(missingAvatarIds\)/,
   "group list avatars with no legacy avatar_url must use the shared batched primary-illustration loader");
-assert.match(groupListHydration,/characterId:row\\.character_id/);
+assert.match(groupListHydration,/characterId:row\.character_id/);
 const chatEntries=between("function chatEntries()","function chatListHTML()");
-assert.match(chatEntries,/characterAvatarMarkup\\(member/,
+assert.match(chatEntries,/characterAvatarMarkup\(member/,
   "group chat list must render avatars through the shared character avatar renderer");
-assert.match(chatEntries,/characterAvatarMarkup\\(c\\)/,
+assert.match(chatEntries,/characterAvatarMarkup\(c\)/,
   "single chat list must render avatars through the shared character avatar renderer");
 const avatarRecovery=between("async function recoverCharacterAvatarImage(image)","async function loadCityCharacterPage");
-assert.match(avatarRecovery,/loadCharacterPrimaryIllustrationAssets\\(\\[image\\.dataset\\.characterAvatarId\\]\\)/,
+assert.match(avatarRecovery,/loadCharacterPrimaryIllustrationAssets\(\[image\.dataset\.characterAvatarId\]\)/,
   "failed role portraits must retry the primary illustration through the shared batch loader");
-assert.match(avatarRecovery,/image\\.replaceWith\\(fallback\\)/,
+assert.match(avatarRecovery,/image\.replaceWith\(fallback\)/,
   "a failed role portrait must become a stable name fallback instead of remaining a dark broken image");
-assert.match(avatarRecovery,/image\\.dataset\\.characterAvatarId\\|\\|image\\.dataset\\.characterPrimaryIllustration/,
+assert.match(avatarRecovery,/image\.dataset\.characterAvatarId\|\|image\.dataset\.characterPrimaryIllustration/,
   "the generic low-opacity image handler must not dim failed character avatars");
