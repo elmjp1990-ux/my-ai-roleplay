@@ -802,10 +802,10 @@ assert.match(html,/data-chat-list-pin="single"/,'single-chat pin action must be 
 const avatarMarkup=between("function characterAvatarMarkup(character,options={})","function normalizeCharacterTag(value)");
 assert.match(avatarMarkup,/data-character-avatar-id/);
 assert.match(avatarMarkup,/data-character-avatar-fallback-class/);
-const groupListHydration=between("async function groupHydrateListRows(groups)","async function groupLoadList");
-assert.match(groupListHydration,/loadCharacterPrimaryIllustrationAssets\(missingAvatarIds\)/,
+const groupListAvatarHydration=between("async function groupHydrateListRows(groups)","async function groupLoadList");
+assert.match(groupListAvatarHydration,/loadCharacterPrimaryIllustrationAssets\(missingAvatarIds\)/,
   "group list avatars with no legacy avatar_url must use the shared batched primary-illustration loader");
-assert.match(groupListHydration,/characterId:row\.character_id/);
+assert.match(groupListAvatarHydration,/characterId:row\.character_id/);
 const chatEntries=between("function chatEntries()","function chatListHTML()");
 assert.match(chatEntries,/characterAvatarMarkup\(member/,
   "group chat list must render avatars through the shared character avatar renderer");
