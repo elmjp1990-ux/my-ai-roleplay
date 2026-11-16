@@ -16,8 +16,8 @@ const phoneBlock = html.slice(generatedStart, generatedEnd);
 
 assert.match(phoneBlock, /const noticeSources=isGroup/);
 assert.match(phoneBlock,/let storyWorldState=isGroup/,'group and single phone must read the same in-world state shape');
-assert.match(phoneBlock,/const initialStoryTime=Date\\.now\\(\\)/,'single and group phones must initially show the current real-world time when AI time is absent');
-assert.match(phoneBlock,/storyWorldState\\.storyTime\\|\\|storyWorldState\\.story_time\\|\\|initialStoryTimeText/,'AI-provided in-world time must take precedence over the temporary real-time fallback');
+assert.ok(phoneBlock.includes('const initialStoryTime=Date.now()'),'single and group phones must initially show the current real-world time when AI time is absent');
+assert.ok(phoneBlock.includes('storyWorldState.storyTime||storyWorldState.story_time||initialStoryTimeText'),'AI-provided in-world time must take precedence over the temporary real-time fallback');
 assert.doesNotMatch(phoneBlock,/timeText\(item\.created_at/,'phone notifications must not render real database timestamps');
 assert.match(groupTurnSource,/serializeGroupPhoneUpdatesForRpc/,'group phone updates must be serialized to SQL RPC snake_case field names');
 assert.match(groupTurnSource,/story_world_state/,'group director must persist shared in-world time and location');
@@ -211,7 +211,7 @@ console.log('Character save performs deterministic AI-impact diffing without inv
 
 assert.match(phoneBlock, /get_story_world_state/, 'Story phone must read the persisted contextual time and location');
 assert.match(phoneBlock, /依開場情境推定中/, 'Story phone must show a contextual initial location fallback');
-assert.match(phoneBlock, /initialStoryTimeText/, 'Story phone must show the session start time before the first AI turn');
+assert.match(phoneBlock, /initialStoryTimeText/, 'Story phone must show the temporary current-time fallback before the first AI turn');
 
 
 // PR #256 regression coverage: preserve runtime state and use a neutral graphite phone surface.

@@ -530,9 +530,9 @@ assert.match(groupPhoneUI,/loadGroupMembersWithPhoneNotifications/,
   "group UI must read persisted phone notifications through a schema-cache-safe loader");
 assert.match(groupPhoneUI,/const phoneNotifications=Array\.isArray\(m\.phone_notifications\)/,
   "group UI must prefer persisted member notifications and retain the old snapshot fallback");
-assert.match(groupPhoneUI, /const initialStoryTime=Date\\.now\\(\\)/,
+assert.ok(groupPhoneUI.includes('const initialStoryTime=Date.now()'),
   'single and group phones must use current real-world time only as a temporary fallback');
-assert.match(groupPhoneUI, /storyWorldState\\.storyTime\\|\\|storyWorldState\\.story_time\\|\\|initialStoryTimeText/,
+assert.ok(groupPhoneUI.includes('storyWorldState.storyTime||storyWorldState.story_time||initialStoryTimeText'),
   'AI-provided in-world time must replace the temporary real-time fallback');
 assert.match(groupPhoneUI, /phoneHeader\+/);
 assert.match(groupPhoneStyles, /phone-device-head--group \.phone-member-switch/);
