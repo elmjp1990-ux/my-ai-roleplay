@@ -2506,15 +2506,21 @@ function clearCharacterVideoVisibilityTimer(video){
     characterVideoVisibilityTimers.delete(video);
   }
 }
+function isCharacterVideoMeaningfullyVisible(video){
+  if(!video)return false;
+  const rect=video.getBoundingClientRect();
+  const width=Math.max(0,Math.min(rect.right,window.innerWidth)-Math.max(rect.left,0));
+  const height=Math.max(0,Math.min(rect.bottom,window.innerHeight)-Math.max(rect.top,0));
+  const totalArea=Math.max(1,rect.width*rect.height);
+  return (width*height)/totalArea>=0.35;
+}
 function scheduleCharacterVideoLoad(video){
   if(!video||characterVideoVisibilityTimers.has(video))return;
   video.dataset.videoVisibilityEligible='true';
   const timer=setTimeout(()=>{
     characterVideoVisibilityTimers.delete(video);
-    if(!video.isConnected||document.hidden||video.dataset.videoVisibilityEligible!=='true')return;
-    const rect=video.getBoundingClientRect();
-    const inViewport=rect.bottom>0&&rect.top<window.innerHeight&&rect.right>0&&rect.left<window.innerWidth;
-    if(!inViewport)return;
+    if(!video.isConnected||document.hidden||video.dataset.videoVisibilityEligible!=='true'
+      ||!isCharacterVideoMeaningfullyVisible(video))return;
     const load=characterVideoLoaders.get(video);
     if(load)void load();
   },CHARACTER_VIDEO_VISIBILITY_DELAY_MS);
@@ -2615,11 +2621,8 @@ function hydrateCharacterVideo(video){
     },{rootMargin:'0px',threshold:[0,0.15,0.35]});
     video.dataset.videoObservePending='true';
     characterVideoObserver.observe(video);
-  }else{
-    const rect=video.getBoundingClientRect();
-    if(!document.hidden&&rect.bottom>0&&rect.top<window.innerHeight&&rect.right>0&&rect.left<window.innerWidth){
-      scheduleCharacterVideoLoad(video);
-    }
+  }else if(!document.hidden&&isCharacterVideoMeaningfullyVisible(video)){
+    scheduleCharacterVideoLoad(video);
   }
 }
 // Stop all character media when the tab is backgrounded. Re-observe on return so
