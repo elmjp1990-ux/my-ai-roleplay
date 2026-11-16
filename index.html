@@ -7411,6 +7411,7 @@ async function groupOpen(groupId) {
   // Keep the group ID in the URL so rerenders, auth refreshes, and post-send reloads
   // can recover the same group instead of silently falling back to the creation wizard.
   const requestId=g.openRequestId=(g.openRequestId||0)+1;
+  groupDiaryCloudReady.delete(groupId);
   g.loading=true;g.formError='';g.openError='';g.failedGroupId=groupId;g.active=null;g.searchJump=false;
   if(route.page!=='group'||route.id!==groupId||route.overlay) go({page:'group',id:groupId});
   else render();
