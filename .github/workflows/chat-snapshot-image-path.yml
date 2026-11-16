@@ -9,6 +9,8 @@ on:
       - 'supabase/migrations/20261116170000_preserve_group_character_avatar_snapshots.sql'
       - 'supabase/migrations/20261116171000_allow_existing_chat_portrait_access.sql'
       - 'scripts/test-chat-snapshot-image-path.mjs'
+      - 'supabase/tests/fixtures/chat-snapshot-avatar-base.sql'
+      - 'supabase/tests/chat-snapshot-avatar-scenarios.sql'
       - '.github/workflows/chat-snapshot-image-path.yml'
   push:
     branches:
@@ -26,8 +28,34 @@ permissions:
 jobs:
   snapshot-image-path-contract:
     runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v7.0.1
+      - name: Replay avatar snapshot migrations in isolated PostgreSQL
+        run: |
+          for attempt in {1..30}; do
+            if pg_isready -h localhost -U postgres -d postgres; then break; fi
+            sleep 2
+          done
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/fixtures/chat-snapshot-avatar-base.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261116170000_preserve_group_character_avatar_snapshots.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261116171000_allow_existing_chat_portrait_access.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/chat-snapshot-avatar-scenarios.sql
       - uses: actions/setup-node@v4
         with:
           node-version: 22
