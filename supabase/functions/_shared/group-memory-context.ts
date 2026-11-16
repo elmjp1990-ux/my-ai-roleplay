@@ -24,7 +24,7 @@ export function buildGroupMemoryContext(
   const latestBatch = latestSummary ? batchNumber(latestSummary) : Number.NaN;
   const curated = curatedSummaries
     .filter((item) => item.important === true || item.user_edited === true)
-    .filter((item) => Number.isFinite(batchNumber(item)) && batchNumber(item) !== latestBatch)
+    .filter((item) => Number.isInteger(batchNumber(item)) && batchNumber(item) > 0 && batchNumber(item) !== latestBatch)
     .filter((item) => summaryText(item))
     .slice(0, 8);
 
