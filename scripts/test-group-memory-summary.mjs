@@ -18,6 +18,7 @@ assert.match(edge,/getGroupHistoryLimit/);
 assert.ok(edge.includes('from("chat_group_memory_summaries")'));
 assert.ok(edge.includes('asText(group.scene_mode) === "shared"'));
 assert.ok(edge.includes("limit(groupHistoryLimit)"));
+assert.ok(edge.includes('.select("turn_id,scene_id,speaker_type,speaker_snapshot,content")'));
 assert.ok(edge.includes("...(groupMemoryContext ? [groupMemoryContext] : [])"));
 assert.ok(memoryContext.includes('if (sceneMode !== "shared") return "";'));
 assert.ok(memoryContext.includes("return sceneMode === \"shared\" && hasLatestSummary && !lookupFailed ? 24 : 40;"));
