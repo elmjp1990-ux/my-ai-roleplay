@@ -57,10 +57,10 @@ export function isCurrentGroupMemorySummary(
 
 export function getGroupHistoryLimit(
   sceneMode: string,
-  hasLatestSummary: boolean,
+  hasCurrentSummary: boolean,
   lookupFailed: boolean,
 ): number {
   // Five group turns can contain up to twenty messages (one player message
   // plus up to three character speeches per turn). Keep a small safety margin.
-  return sceneMode === "shared" && hasLatestSummary && !lookupFailed ? 24 : 40;
+  return sceneMode === "shared" && hasCurrentSummary && !lookupFailed ? 24 : 40;
 }
