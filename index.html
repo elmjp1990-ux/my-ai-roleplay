@@ -7230,6 +7230,20 @@ function groupFriendlyError(error) {
   if(message.includes('authentication_required')||message.includes('JWT')||message.includes('登入狀態')) return '登入狀態已失效，請重新登入後再試。';
   return message||'操作失敗，請稍後再試。';
 }
+async function signCharacterSnapshotPortraits(members){
+  const entries=(members||[]).map(member=>({
+    id:member.characterId||member.character_id||'',
+    path:member.primaryIllustrationPath||member.imagePath||member.primary_illustration_path||member.image_path||''
+  })).filter(entry=>isUuid(entry.id)&&entry.path);
+  const unique=[...new Map(entries.map(entry=>[entry.path,entry])).values()];
+  if(!unique.length)return new Map();
+  const urls=await characterIllustrationSignedUrlManager.getMany(unique.map(entry=>entry.path));
+  const result=new Map();
+  unique.forEach((entry,index)=>{
+    if(urls[index])result.set(entry.id,{src:urls[index],path:entry.path});
+  });
+  return result;
+}
 async function groupHydrateListRows(groups){
   const g=groupPrototype,client=window.mySupabase;
   if(!groups.length)return;
@@ -7238,6 +7252,14 @@ async function groupHydrateListRows(groups){
     .select('group_id,character_id,position,character_snapshot').in('group_id',groupIds).order('position');
   if(memberError)throw memberError;
   const characterIds=[...new Set((memberRows||[]).map(row=>row.character_id).filter(isUuid))];
+  const snapshotMembers=(memberRows||[]).map(row=>({
+    characterId:row.character_id||row.character_snapshot?.id||'',
+    primaryIllustrationPath:row.character_snapshot?.imagePath||row.character_snapshot?.primaryIllustrationPath||
+      row.character_snapshot?.primary_illustration_path||row.character_snapshot?.image_path||''
+  }));
+  let snapshotPortraits=new Map();
+  try{snapshotPortraits=await signCharacterSnapshotPortraits(snapshotMembers);}
+  catch(error){console.warn('群組快照主立繪簽名網址載入失敗：',error?.message||error);}
   let avatars={};
   if(characterIds.length){
     const {data:characterRows,error:avatarError}=await client.from('characters')
@@ -7245,7 +7267,9 @@ async function groupHydrateListRows(groups){
     if(avatarError)console.warn('讀取群組列表角色頭像失敗：',avatarError.message);
     else avatars=Object.fromEntries((characterRows||[]).map(row=>[row.id,row.avatar_url||'']));
   }
-  const missingAvatarIds=characterIds.filter(id=>!safeImage(avatars[id]));
+  const missingAvatarIds=characterIds.filter(id=>!safeImage(avatars[id])&&
+    !safeImage((memberRows||[]).find(row=>row.character_id===id)?.character_snapshot?.image)&&
+    !safeImage(snapshotPortraits.get(id)?.src));
   const primaryAvatarById={};
   if(missingAvatarIds.length){
     try{
@@ -7256,12 +7280,16 @@ async function groupHydrateListRows(groups){
   for(const row of memberRows||[]){
     const members=g.groupMembers[row.group_id]||=[];
     if(!members.some(member=>member.characterId===row.character_id)){
+      const snapshot=row.character_snapshot||{};
+      const snapshotPortrait=snapshotPortraits.get(row.character_id);
       members.push({
-        characterId:row.character_id||row.character_snapshot?.id||'',
-        name:row.character_snapshot?.name||'角色',
-        avatar_url:avatars[row.character_id]||primaryAvatarById[row.character_id]?.src||row.character_snapshot?.avatar_url||row.character_snapshot?.image||'',
-        primaryIllustrationPath:primaryAvatarById[row.character_id]?.path||row.character_snapshot?.primaryIllustrationPath||row.character_snapshot?.primary_illustration_path||'',
-        character_snapshot:row.character_snapshot||{}
+        characterId:row.character_id||snapshot.id||'',
+        name:snapshot.name||'角色',
+        avatar_url:snapshot.image||snapshot.avatar_url||snapshot.avatarUrl||snapshotPortrait?.src||
+          avatars[row.character_id]||primaryAvatarById[row.character_id]?.src||'',
+        primaryIllustrationPath:snapshot.imagePath||snapshot.primaryIllustrationPath||
+          snapshot.primary_illustration_path||snapshotPortrait?.path||primaryAvatarById[row.character_id]?.path||'',
+        character_snapshot:snapshot
       });
     }
     g.groupMembers[row.group_id]=members;
@@ -7421,8 +7449,8 @@ async function groupOpen(groupId) {
       const phoneNotifications=Array.isArray(m.phone_notifications)?m.phone_notifications:
         Array.isArray(snapshot.phoneNotifications)?snapshot.phoneNotifications:[];
       return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,
-        avatar_url:characterRow.avatar_url||snapshot.avatar_url||snapshot.avatarUrl||snapshot.image||snapshot.image_url||'',
-        primaryIllustrationPath:snapshot.primaryIllustrationPath||snapshot.primary_illustration_path||snapshot.imagePath||snapshot.image_path||'',
+        avatar_url:snapshot.image||snapshot.avatar_url||snapshot.avatarUrl||snapshot.image_url||characterRow.avatar_url||'',
+        primaryIllustrationPath:snapshot.imagePath||snapshot.primaryIllustrationPath||snapshot.primary_illustration_path||snapshot.image_path||'',
         phoneNotifications,phoneSettings,position:m.position,sceneId:m.scene_id,
         sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};
     });
@@ -7484,10 +7512,16 @@ async function groupOpen(groupId) {
     // Private primary portraits are signed after the first paint; do not hold the chat
     // open spinner for one to three independent Storage URL requests.
     if(membersNeedingPortraits.length){
-      void loadCharacterPrimaryIllustrationAssets(membersNeedingPortraits.map(member=>member.characterId)).then(assets=>{
+      void (async()=>{
+        const snapshotPortraits=await signCharacterSnapshotPortraits(membersNeedingPortraits);
+        const unresolved=membersNeedingPortraits.filter(member=>!snapshotPortraits.has(member.characterId));
+        const assets=unresolved.length
+          ? await loadCharacterPrimaryIllustrationAssets(unresolved.map(member=>member.characterId))
+          : new Map();
         if(requestId!==g.openRequestId||currentUser()?.uid!==user.id||g.active?.id!==group.id)return;
         for(const member of membersNeedingPortraits){
-          const primary=assets.get(member.characterId)?.primary;
+          const snapshotPortrait=snapshotPortraits.get(member.characterId);
+          const primary=snapshotPortrait||assets.get(member.characterId)?.primary;
           if(primary?.src){member.avatar_url=primary.src;member.image=primary.src;member.primaryIllustrationPath=primary.path;}
         }
         if(g.groupMembers)g.groupMembers[group.id]=members.map(member=>({characterId:member.characterId,name:member.name,avatar_url:member.avatar_url||member.image||'',primaryIllustrationPath:member.primaryIllustrationPath||'',character_snapshot:member.characterSnapshot||{}}));
@@ -7497,7 +7531,7 @@ async function groupOpen(groupId) {
           const nextInput=$('groupMessageInput');
           if(nextInput){nextInput.value=draft;nextInput.style.height='auto';nextInput.style.height=Math.min(nextInput.scrollHeight,144)+'px';if(hadFocus)nextInput.focus();}
         }
-      }).catch(error=>console.warn('群組角色頭像批次載入失敗：',error?.message||error));
+      })().catch(error=>console.warn('群組角色頭像批次載入失敗：',error?.message||error));
     }
     void syncGroupDiaryCloud(group.id).then(()=>{
       if(requestId!==g.openRequestId||currentUser()?.uid!==user.id||g.active?.id!==group.id)return;
