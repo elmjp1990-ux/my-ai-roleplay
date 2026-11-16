@@ -11397,7 +11397,7 @@ document.addEventListener('click',async event => {
         state.account.silver=Number(result.silver_balance ?? state.account.silver ?? 0);
         const checkinUid=state.account.uid;
         const previousCheckin=window.dailyCheckinStatusCache?.uid===checkinUid?window.dailyCheckinStatusCache.data:{};
-        const nextCheckin={...previousCheckin,cycle_day:Number(result.cycle_day)||previousCheckin.cycle_day||1,claimed_today:true,reward:Number(result.reward)||previousCheckin.reward||10,enabled:true,silver_balance:state.account.silver};
+        const nextCheckin={...previousCheckin,today:result.today||previousCheckin.today,cycle_day:Number(result.cycle_day)||previousCheckin.cycle_day||1,claimed_today:true,reward:Number(result.reward)||previousCheckin.reward||10,enabled:true,silver_balance:state.account.silver};
         saveDailyCheckinStatusCache(checkinUid,nextCheckin);
         persist();
         render();
