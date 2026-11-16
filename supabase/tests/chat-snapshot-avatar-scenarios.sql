@@ -186,7 +186,7 @@ BEGIN
     RAISE EXCEPTION 'single-chat owner received access to a non-snapshotted sibling object';
   END IF;
 END;
-$$;
+$anon_block$;
 RESET ROLE;
 
 INSERT INTO public.characters(id, author_id, name, visibility, is_nsfw)
@@ -204,7 +204,7 @@ VALUES
 
 SELECT set_config('request.jwt.claim.sub', '', false);
 SET ROLE anon;
-DO $
+DO $anon_block$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM storage.objects
