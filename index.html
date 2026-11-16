@@ -9281,7 +9281,7 @@ async function renderPhoneModal() {
   // Resolve {CHAR}/{USER} before matching so the configured row and its AI snapshot
   // share one canonical title instead of rendering an empty row plus a duplicate.
   const phonePlayerName=group?.playerName||session?.playerName||'你';
-  const resolvePhoneFieldTitle=value=>replaceRoleplayVariables(String(value||'').split('|')[0].trim(),phonePlayerName,character.name||'角色').replace(/\\s+/g,' ').trim();
+  const resolvePhoneFieldTitle=value=>replaceRoleplayVariables(String(value||'').split('|')[0].trim(),phonePlayerName,character.name||'角色').replace(/\s+/g,' ').trim();
   const phoneTitleKey=value=>String(value||'').normalize('NFKC').replace(/\\s+/g,' ').trim().toLocaleLowerCase();
   const noticeSources=isGroup
     ?[character.phoneNotifications,group.phoneNotificationsByCharacter?.[String(character.id)]]
