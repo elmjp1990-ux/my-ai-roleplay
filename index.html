@@ -7570,6 +7570,7 @@ function renderGroupConversation() {
         <form class="composer" data-form="group-message">
           ${conversationSuggestionsHTML({
             suggestions:groupPrototype.active?.suggestions!==false,
+            hasUserMessageOverride:g.turn>0,
             messages:g.turn>0?[{role:'user'},{role:'assistant',suggestedReplies:group.suggestedReplies||[]}]:[],
             suggestedReplies:group.suggestedReplies||[]
           })}
@@ -8642,6 +8643,7 @@ async function loadStoryRelationshipState(session) {
 
 function conversationSuggestionsHTML(s) {
   if(!s?.suggestions)return '';
+  const hasPlayerMessage=typeof s?.hasUserMessageOverride==='boolean'?s.hasUserMessageOverride:hasUserMessage(s);
   const latestAssistantSuggestions=[...(s.messages||[])].reverse().find(message=>
     message.role==='assistant'&&Array.isArray(message.suggestedReplies)&&message.suggestedReplies.length>0
   )?.suggestedReplies;
@@ -8650,7 +8652,7 @@ function conversationSuggestionsHTML(s) {
   return `<div class="suggestions">
     <details class="suggestions-panel" open>
       <summary>建議回覆 <span class="suggestions-count" data-collapsed="點擊可展開" data-expanded="滑動或點選燈號可切換">滑動或點選燈號可切換</span></summary>
-      ${!hasUserMessage(s)||replies.length===0
+      ${!hasPlayerMessage||replies.length===0
         ? '<p class="suggestion-first-message-hint">本回合暫時沒有可用的建議回覆。</p>'
         : `<div class="suggestion-options" aria-label="選擇建議回覆">
             ${replies.map((_,index)=>`<button type="button" class="suggestion-light" data-action="suggestion-select" data-index="${index}" aria-label="第 ${index+1} 則建議" aria-pressed="${index===0?'true':'false'}"></button>`).join('')}
@@ -9277,13 +9279,18 @@ async function renderPhoneModal() {
     character={...savedRole,...sessionRole,phoneSettings:savedRole?.phoneSettings||savedRole?.phone_settings||sessionRole.phoneSettings||sessionRole.phone_settings||{}};
   }
   // Creator notice prompts guide AI generation only; never render raw instructions to players.
+  // Resolve {CHAR}/{USER} before matching so the configured row and its AI snapshot
+  // share one canonical title instead of rendering an empty row plus a duplicate.
+  const phonePlayerName=group?.playerName||session?.playerName||'你';
+  const resolvePhoneFieldTitle=value=>replaceRoleplayVariables(String(value||'').split('|')[0].trim(),phonePlayerName,character.name||'角色').replace(/\\s+/g,' ').trim();
+  const phoneTitleKey=value=>String(value||'').normalize('NFKC').replace(/\\s+/g,' ').trim().toLocaleLowerCase();
   const noticeSources=isGroup
-    ?[character.phoneNotifications,group.phoneNotificationsByCharacter?.[String(character.id)],group.phoneNotifications]
+    ?[character.phoneNotifications,group.phoneNotificationsByCharacter?.[String(character.id)]]
     :[session.phoneNotifications,character.phoneNotifications,session.phoneNotificationsByCharacter?.[String(character.id)]];
   const noticeByTitle=new Map();
   noticeSources.filter(Array.isArray).flat().filter(Boolean).forEach((item,index)=>{
-    const title=typeof item==='string'?'':String(item?.title||'').trim();
-    const key=title||('notice-'+index+'-'+String(typeof item==='string'?item:item?.body||''));
+    const title=typeof item==='string'?'':resolvePhoneFieldTitle(item?.title);
+    const key=title?phoneTitleKey(title):('notice-'+index+'-'+String(typeof item==='string'?item:item?.body||''));
     if(!noticeByTitle.has(key))noticeByTitle.set(key,item);
     else if(title&&typeof item==='object'&&String(item.body||'').trim()){
       const previous=noticeByTitle.get(key);
@@ -9392,15 +9399,18 @@ async function renderPhoneModal() {
   const storyLocationLabel=String(storyWorldState.storyLocation||storyWorldState.story_location||(!isGroup?session?.encounterPlace:'')||inferredOpeningLocation).trim().slice(0,120)||'依開場情境推定中';
   const title=(character.name||group?.name||'角色')+' 的手機';
   const stateByIndex=new Map(storyPhoneStates.map(item=>[Number(item.field_index),item]));
+  const configuredTitleKeys=new Set();
   const configuredRows=configuredPhonePrompts.slice(0,8).map((row,index)=>{
-    const title=String(row||'').split('|')[0].trim();
-    if(!title)return null;
+    const title=resolvePhoneFieldTitle(row);
+    const titleKey=phoneTitleKey(title);
+    if(!title||configuredTitleKeys.has(titleKey))return null;
+    configuredTitleKeys.add(titleKey);
     const state=stateByIndex.get(index);
-    const generatedNotice=savedNotices.find(item=>String(item?.title||'')===title);
+    const generatedNotice=noticeByTitle.get(titleKey);
     return {title,body:String(generatedNotice?.body||state?.body||'目前尚未有更新')};
   }).filter(Boolean);
-  const configuredTitles=new Set(configuredRows.map(item=>item.title));
-  const extraGeneratedNotices=savedNotices.filter(item=>typeof item==='string'||!configuredTitles.has(String(item?.title||'')));
+  const configuredTitles=new Set(configuredRows.map(item=>phoneTitleKey(item.title)));
+  const extraGeneratedNotices=savedNotices.filter(item=>typeof item==='string'||!configuredTitles.has(phoneTitleKey(resolvePhoneFieldTitle(item?.title||''))));
   const notices=[...configuredRows,...extraGeneratedNotices].slice(0,8);
   const noticeLines=notices.map(item=>typeof item==='string'?item.trim():String(item?.body||'').trim()).filter(Boolean);
   const configuredFieldIndexes=new Set(configuredPhonePrompts.slice(0,8).map((row,index)=>String(row||'').split('|')[0].trim()?index:null).filter(index=>index!==null));
