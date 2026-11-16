@@ -21,6 +21,7 @@ const isUuid = (value: unknown): value is string =>
   typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 const MODEL = POYOZZ_DEFAULT_CHAT_MODEL;
 const TIMEOUT_MS = 55_000;
+const CLEANUP_RESERVE_MS = 12_000;
 
 type Speaker = { id: string; name: string; sceneId: string | null; sceneName: string; snapshot: Record<string, unknown>; phoneSettings: Record<string, unknown>; phoneNotifications: Array<{ title: string; body: string }> };
 
@@ -34,6 +35,21 @@ async function refund(admin: any, userId: string, turnId: string, code: string) 
 }
 
 
+function extractGroupSuggestedReplies(output: string): string[] {
+  let text = asText(output).replace(/^\\uFEFF/, "");
+  if (text.startsWith("```")) {
+    const firstLine = text.indexOf("\\n");
+    const lastFence = text.lastIndexOf("```");
+    if (firstLine >= 0 && lastFence > firstLine) text = text.slice(firstLine + 1, lastFence).trim();
+  }
+  try {
+    const root = asRow(JSON.parse(text));
+    const raw = Array.isArray(root.suggested_replies) ? root.suggested_replies : [];
+    if (raw.length !== 3) return [];
+    const replies = raw.map((item: unknown) => asText(item));
+    return replies.every((reply: string) => Array.from(reply).length >= 30 && Array.from(reply).length <= 90 && reply.split("*").length >= 3) ? replies : [];
+  } catch { return []; }
+}
 function scheduleGroupMemorySummary(admin: any, groupId: string, userId: string, apiKey: string) {
   const task = processDueGroupMemorySummary(admin, groupId, userId, apiKey).catch((error) => {
     console.error("Group memory summary background task failed:", error instanceof Error ? error.message : "unknown_error");
@@ -100,16 +116,18 @@ Deno.serve(async (request) => {
   const turnId = String(reservation.turn_id);
   if (reservation.turn_status === "completed" && reservation.charge_status === "settled") {
     scheduleGroupMemorySummary(admin, groupId, user.id, apiKey);
-    const [{ data: saved, error: savedError }, { data: phoneRows, error: phoneError }] = await Promise.all([
+    const [{ data: saved, error: savedError }, { data: phoneRows, error: phoneError }, { data: suggestionRow }] = await Promise.all([
       admin.from("chat_group_messages")
         .select("id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at")
         .eq("group_id", groupId).eq("turn_id", turnId).is("deleted_at", null)
         .order("sequence_no", { ascending: true }),
       admin.from("chat_group_members").select("character_id,phone_notifications").eq("group_id", groupId),
+      admin.from("chat_group_turns").select("suggested_replies").eq("id", turnId).eq("user_id", user.id).maybeSingle(),
     ]);
     if (savedError || phoneError) return json({ status: "needs_reconciliation", error: "completed_turn_read_failed", retryAllowed: false }, 503);
     return json({
       status: "completed", turnId, messages: saved || [], idempotent: true,
+      suggested_replies: Array.isArray(suggestionRow?.suggested_replies) ? suggestionRow.suggested_replies : [],
       phone_updates: (phoneRows || []).map((row: any) => ({
         characterId: row.character_id,
         notifications: Array.isArray(row.phone_notifications) ? row.phone_notifications : [],
@@ -148,7 +166,7 @@ Deno.serve(async (request) => {
 
   // The DB deadline starts at reservation. Leave a one-second safety margin
   // for the small RPC/clock skew between Postgres and this Edge Function.
-  const processingDeadlineAt = Date.now() + TIMEOUT_MS - 1000;
+  const processingDeadlineAt = Date.now() + TIMEOUT_MS - CLEANUP_RESERVE_MS;
 
   const { data: group, error: groupError } = await admin.from("chat_groups")
     .select("id,owner_id,name,world_background,scene_mode,player_name,player_persona,world_character_id,deleted_at")
@@ -197,6 +215,17 @@ Deno.serve(async (request) => {
   const speakers: Speaker[] = [];
   const protectedContext: string[] = [];
   const profileSections: string[] = [];
+  const derivedProfileRows = await Promise.all(members.map(async (member: any) => {
+    const snapshot = asRow(member.character_snapshot);
+    const characterId = asText(member.character_id) || asText(snapshot.id);
+    const character = characters.get(characterId) || {};
+    if (!isUuid(characterId) || !asText(character.author_id)) return [characterId, null] as const;
+    const { data, error } = await admin.rpc("get_character_ai_profile_for_chat", {
+      p_character_id: characterId, p_author_id: character.author_id,
+    });
+    return [characterId, !error && data ? data : null] as const;
+  }));
+  const derivedProfiles = new Map(derivedProfileRows);
 
   for (const member of members) {
     const snapshot = asRow(member.character_snapshot);
@@ -208,14 +237,10 @@ Deno.serve(async (request) => {
     if (!isUuid(characterId) || !name) continue;
 
     let derivedProfilePrompt = "";
-    if (asText(character.author_id)) {
-      const { data: derived, error: derivedError } = await admin.rpc("get_character_ai_profile_for_chat", {
-        p_character_id: characterId, p_author_id: character.author_id,
-      });
-      if (!derivedError && derived) {
-        derivedProfilePrompt = formatCharacterAiProfilePrompt(derived);
-        protectedContext.push(...collectDerivedPrivateProfileValues(derived));
-      }
+    const derived = derivedProfiles.get(characterId);
+    if (derived) {
+      derivedProfilePrompt = formatCharacterAiProfilePrompt(derived);
+      protectedContext.push(...collectDerivedPrivateProfileValues(derived));
     }
     const rawPrivate = preparePrivateContext(asText(privateInfo.private_info), privateInfo.personality_profile);
     protectedContext.push(...rawPrivate.protectedValues);
@@ -278,11 +303,14 @@ Deno.serve(async (request) => {
     "【本輪玩家訊息】\n" + currentMessage,
     "【本輪角色選擇與發言規則】每輪由你自行判斷 1～3 名最適合回應的角色，不要求每個角色輪流發言，也不可為了湊人數讓所有人都說話。可以由一位角色回應，也可以讓角色之間自然互動。若玩家明確以 @角色名稱 指定對象，優先由該角色回應，但仍可在劇情確有必要時讓另一角色補充。未被選中的角色保持安靜，不要輸出空白發言。",
     "【角色卡遵循】每位角色只能以自己的角色卡、已知記憶、可觀察資訊和合理推論行動。不得混用人格、口吻或背景；不得擅自替另一角色決定內心或行為。角色可對玩家說話，也可彼此對話。分開場景的角色不得跨場景瞬間出現。",
-    "【輸出格式】只輸出一個 JSON object，不要 Markdown code fence 或額外說明。格式：{\"speeches\":[{\"speaker_id\":\"群組內角色 ID\",\"content\":\"角色完整發言\"}],\"phone_updates\":[{\"character_id\":\"群組內角色 ID\",\"notifications\":[{\"title\":\"手機欄位顯示名稱\",\"body\":\"最新狀態\"}]}]}。speeches 必須輸出 1～3 段，speaker_id 只能使用上方角色卡提供的精確 UUID，絕不可輸出群組外人物作為發言者；NPC 可以在角色對白、手機通知內容中自然出現，但不得成為群組 AI 發言標籤。phone_updates 必須為群組內每位角色各輸出一筆，character_id 必須使用角色卡提供的精確 UUID，不得漏掉任何一位。每位角色 notifications 最多 8 筆；若角色手機欄位設定含 noticePrompts，必須依設定順序逐欄輸出，title 使用「|」前的顯示名稱，body 遵守「|」後的作者指示；每個欄位一筆，不可漏欄、合併或多產生。若沒有設定欄位，可依角色職業、人物關係、時間與目前劇情產生 0～8 筆合理通知。手機內容只記錄該角色自己的生活、訊息、工作與可知狀態，不可把玩家在聊天室說的話當成已傳送的簡訊；玩家只有明確描述拿起手機傳訊息／打電話時才可成為手機事件來源。未知資訊不得編造；無新資訊時沿用最近手機狀態，不得為了更新而改寫。每個通知 title 1～80 字、body 1～500 字，必須是可顯示給玩家的一行簡短內容。speeches 中角色動作與敘述使用單星號包覆，對白直接書寫；絕不可替玩家補寫台詞、思想、感受或行動。",
+    "【群組建議回覆】每回合產生恰好三則繁體中文建議回覆，每則 30～80 字；每則都必須同時包含單星號旁白／動作（*...*）與玩家自然對白，旁白只能描述玩家此刻可以選擇採取的行動，不得替玩家捏造已發生的事或內心想法。三則回覆方向必須不同，依最新群組對話與角色互動生成，不可使用標題、數字、固定模板或操作說明。",
+    "【輸出格式】只輸出一個 JSON object，不要 Markdown code fence 或額外說明。格式：{\"speeches\":[{\"speaker_id\":\"群組內角色 ID\",\"content\":\"角色完整發言\"}],\"phone_updates\":[{\"character_id\":\"群組內角色 ID\",\"notifications\":[{\"title\":\"手機欄位顯示名稱\",\"body\":\"最新狀態\"}]}],\"suggested_replies\":[\"玩家可直接送出的完整回覆 1\",\"玩家可直接送出的完整回覆 2\",\"玩家可直接送出的完整回覆 3\"]}。speeches 必須輸出 1～3 段，speaker_id 只能使用上方角色卡提供的精確 UUID，絕不可輸出群組外人物作為發言者；NPC 可以在角色對白、手機通知內容中自然出現，但不得成為群組 AI 發言標籤。phone_updates 必須為群組內每位角色各輸出一筆，character_id 必須使用角色卡提供的精確 UUID，不得漏掉任何一位。每位角色 notifications 最多 8 筆；若角色手機欄位設定含 noticePrompts，必須依設定順序逐欄輸出，title 使用「|」前的顯示名稱，body 遵守「|」後的作者指示；每個欄位一筆，不可漏欄、合併或多產生。若沒有設定欄位，可依角色職業、人物關係、時間與目前劇情產生 0～8 筆合理通知。手機內容只記錄該角色自己的生活、訊息、工作與可知狀態，不可把玩家在聊天室說的話當成已傳送的簡訊；玩家只有明確描述拿起手機傳訊息／打電話時才可成為手機事件來源。未知資訊不得編造；無新資訊時沿用最近手機狀態，不得為了更新而改寫。每個通知 title 1～80 字、body 1～500 字，必須是可顯示給玩家的一行簡短內容。speeches 中角色動作與敘述使用單星號包覆，對白直接書寫；絕不可替玩家補寫台詞、思想、感受或行動。",
   ].join("\n\n");
 
   let provider;
+  const providerStartedAt = Date.now();
   const providerTimeoutMs = processingDeadlineAt - Date.now();
+  console.info("group_chat_turn_provider_start", { memberCount: speakers.length, promptChars: systemPrompt.length, providerTimeoutMs });
   if (providerTimeoutMs <= 0) {
     const refunded = await refund(admin, user.id, turnId, "provider_timeout");
     return json({
@@ -307,7 +335,10 @@ Deno.serve(async (request) => {
     // fires, this turn did not produce a usable reply for the player: refund the
     // reserved in-app charge and report a timeout. Provider-side usage may still
     // have occurred, but it must never be passed on to the player for this turn.
-    if (error instanceof Error && error.name === "AbortError") {
+    const errorName = String((error as { name?: unknown } | null)?.name || "");
+    const errorCode = String((error as { code?: unknown } | null)?.code || "");
+    console.warn("group_chat_turn_provider_failed", { elapsedMs: Date.now() - providerStartedAt, errorName, errorCode });
+    if (errorName === "AbortError" || errorCode === "ABORT_ERR") {
       const refunded = await refund(admin, user.id, turnId, "provider_timeout");
       return json({
         status: refunded.confirmed ? "timed_out" : "needs_reconciliation",
@@ -321,6 +352,7 @@ Deno.serve(async (request) => {
     return json({ status: "needs_reconciliation", error: "provider_outcome_unknown", retryAllowed: false }, 503);
   }
 
+  console.info("group_chat_turn_provider_finished", { elapsedMs: Date.now() - providerStartedAt, resultKind: provider.result.kind, httpStatus: provider.httpStatus });
   const safeRequestId = /^[A-Za-z0-9._:-]{1,128}$/.test(provider.requestId) ? provider.requestId : null;
   await admin.from("chat_group_ai_usage").upsert({
     group_id: groupId,
@@ -358,6 +390,7 @@ Deno.serve(async (request) => {
   }
 
   const parsed = parseGroupTurnEnvelope(provider.result.text, speakers);
+  const suggestedReplies = extractGroupSuggestedReplies(provider.result.text);
   if (!parsed) {
     const refunded = await refund(admin, user.id, turnId, "invalid_group_turn_envelope");
     return json({ status: refunded.confirmed ? "refunded" : "needs_reconciliation", error: "invalid_group_turn_envelope", balance: refunded.balance, retryAllowed: false }, refunded.confirmed ? 200 : 503);
@@ -395,6 +428,11 @@ Deno.serve(async (request) => {
     return json({ status: "needs_reconciliation", error: "group_reply_persistence_unknown", retryAllowed: false }, 503);
   }
 
+  const { error: suggestionSaveError } = await admin.from("chat_group_turns")
+    .update({ suggested_replies: suggestedReplies })
+    .eq("id", turnId).eq("user_id", user.id);
+  if (suggestionSaveError) console.warn("group_chat_turn_suggestions_persist_failed", { code: suggestionSaveError.code || "unknown" });
+
   const { data: saved, error: savedError } = await admin.from("chat_group_messages")
     .select("id,group_id,scene_id,turn_id,sequence_no,speaker_type,character_id,speaker_snapshot,content,created_at")
     .eq("group_id", groupId).eq("turn_id", turnId).is("deleted_at", null)
@@ -406,6 +444,7 @@ Deno.serve(async (request) => {
     status: "completed",
     turnId,
     messages: saved,
+    suggested_replies: suggestedReplies,
     phone_updates: parsed.phoneUpdates,
     billing: { cost: reservation.cost, silver_charged: reservation.silver_charged, diamonds_charged: reservation.diamonds_charged },
     provider: {
