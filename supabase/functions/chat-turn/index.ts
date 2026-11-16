@@ -274,20 +274,6 @@ async function buildStoryMessages(
   };
 }
 
-async function requestStoryGeneration(
-  messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
-  apiKey: string,
-  model: string,
-) {
-  return requestOpenRouterChatCompletion({
-    messages,
-    apiKey,
-    model,
-    timeoutMs: GENERATION_TIMEOUT_MS,
-    responseFormat: { type: "json_object" },
-  });
-}
-
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -513,7 +499,13 @@ Deno.serve(async (request) => {
 
   let providerResponse: Awaited<ReturnType<typeof requestStoryGeneration>>;
   try {
-    providerResponse = await requestStoryGeneration(messages, openRouterKey, model);
+    providerResponse = await requestOpenRouterChatCompletion({
+      messages,
+      apiKey: openRouterKey,
+      model,
+      timeoutMs: GENERATION_TIMEOUT_MS,
+      responseFormat: { type: "json_object" },
+    });
   } catch (error) {
     const code = error instanceof Error && error.name === "AbortError"
       ? "provider_request_timeout"
