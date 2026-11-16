@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const source = readFileSync("supabase/functions/chat-turn/index.ts", "utf8");
+const groupSource = readFileSync("supabase/functions/group-chat-turn/index.ts", "utf8");
 const openRouterShared = readFileSync("supabase/functions/_shared/openrouter-chat-completions.ts", "utf8");
 const summary = readFileSync("supabase/functions/_shared/story-memory-summary.ts", "utf8");
 const migration = readFileSync("supabase/migrations/20261105223613_ai_model_usage_and_memory_summaries.sql", "utf8");
@@ -74,6 +75,12 @@ assert.equal((summary.match(/const priorUsage = usageSnapshot/g) || []).length, 
   "retry usage accumulation must live in the shared summary core");
 assert.equal((summary.match(/summaryUsageMetadata\(generated\)/g) || []).length, 4,
   "single and group success/failure rows must share usage metadata mapping");
+assert.match(source, /requestOpenRouterChatCompletion\(/);
+assert.match(groupSource, /requestOpenRouterChatCompletion\(/);
+assert.doesNotMatch(source, /requestStoryGeneration/,
+  "single Story must not keep a private provider wrapper beside the shared transport");
+assert.doesNotMatch(groupSource, /fetch\(/,
+  "group Story must use the shared provider transport, not its own HTTP request");
 assert.match(openRouterShared, /provider: buildOpenRouterProviderOptions\(\)/,
   "all chat and summary requests must use the shared approved provider allowlist");
 
