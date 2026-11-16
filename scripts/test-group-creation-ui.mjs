@@ -75,7 +75,7 @@ for (const forbidden of ['functions.invoke', 'group-chat-turn', 'walletPreflight
 assert.ok(groupTurn.includes('const initialOpeningContext = (sceneResult.data || []).map'), 'group AI must load original scene descriptions');
 assert.ok(groupTurn.includes('serializeGroupPhoneUpdatesForRpc') && groupTurn.includes('story_world_state'), 'group AI must persist phone data using the RPC contract and return game world state');
 assert.ok(groupTurn.includes('不可讀取、推測或使用系統現在時間'), 'group AI game time must never be derived from real device time');
-const groupMigration=fs.readFileSync(new URL('../supabase/migrations/20261116170000_group_story_world_state_and_opening_limit.sql',import.meta.url),'utf8');
+const groupMigration=fs.readFileSync(new URL('../supabase/migrations/20261116064526_group_story_world_state_and_opening_limit.sql',import.meta.url),'utf8');
 assert.match(groupMigration,/chat_group_scenes_description_max_1000/,'database group scene constraint must enforce the 1000-character opening limit');
 assert.match(groupMigration,/CREATE OR REPLACE FUNCTION public\.get_active_character_tags/,'unused tags must be checked against authoritative active-character usage');
 assert.ok(groupTurn.includes('【玩家設定的初始開場情境】'), 'group AI system prompt must include the original opening context');
