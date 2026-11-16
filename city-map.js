@@ -604,14 +604,10 @@
     fallback.textContent=image.alt?.slice(0,1)||'角';
     image.replaceWith(fallback);
   },true);
-  // Bind activation directly to each SVG marker. Some mobile SVG click paths do not
-  // reliably reach the stage-level delegated handler, so each landmark owns its click.
+  // Keyboard activation stays on each SVG marker. Pointer/click activation is
+  // handled once by the stage capture listener below so mobile SVG retargeting
+  // cannot swallow the synthesized click or dispatch duplicate location opens.
   stage.querySelectorAll('[data-action="city-landmark"]').forEach(marker=>{
-    marker.addEventListener('click',event=>{
-      event.preventDefault();
-      event.stopPropagation();
-      openCityLocation(marker);
-    });
     marker.addEventListener('keydown',event=>{
       if(event.key==='Enter'||event.key===' '){
         event.preventDefault();
@@ -627,14 +623,17 @@
   });
   stage.addEventListener('click',event=>{
     const button=event.target instanceof Element ? event.target.closest('[data-action]') : null;
-    // Landmark SVG groups have their own activation listener above. Never resolve
-    // nearby coordinates here: that duplicated async open and caused a first-tap flash.
-    if(button?.dataset.action==='city-landmark')return;
     if(!button)return;
+    if(button.dataset.action==='city-landmark'){
+      event.preventDefault();
+      event.stopPropagation();
+      void openCityLocation(button);
+      return;
+    }
     if(button.dataset.action==='city-zoom-in'){event.preventDefault();event.stopPropagation();zoomBy(1.18);return;}
     if(button.dataset.action==='city-zoom-out'){event.preventDefault();event.stopPropagation();zoomBy(.85);return;}
     if(button.dataset.action==='city-traditional'){event.preventDefault();event.stopPropagation();go({page:'home'});}
-  });
+  },true);
   resizeHandler=()=>{sizeWorld();clamp();};
   window.addEventListener('resize',resizeHandler,{passive:true});
     }

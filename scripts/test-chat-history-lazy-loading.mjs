@@ -33,13 +33,17 @@ assert.match(upgradeMigration, /state\.sessions=compactSessionsForLocalStorage/)
 assert.match(persistWriter, /compactLocalStateForQuota\(baseSnapshot\)/);
 
 const sessionSync = between("async function loadCloudChatSessions(user, options = {})", "async function loadCloudSessionMessages");
-assert.doesNotMatch(sessionSync, /from\(['"]chat_messages['"]\)/,
-  "login/session-list hydration must never download chat message rows");
+assert.match(sessionSync, /from\(['"]chat_messages['"]\)/,
+  "only legacy false markers are checked with a bounded owner-RLS query returning session IDs, not message content");
+assert.match(sessionSync, /falseMarkerSessionIds/);
+assert.match(sessionSync, /\.select\('session_id'\)/);
+assert.match(sessionSync, /\.limit\(500\)/);
 assert.match(sessionSync, /session_name:session_data->>name/);
 assert.match(sessionSync, /session_last_message_preview:session_data->>lastMessagePreview/);
 assert.match(sessionSync, /session_has_user_message:session_data->>hasUserMessage/);
 assert.match(sessionSync, /existingHasPlayerMessage/);
 assert.match(sessionSync, /parseBool\(marker\)\|\|existingHasPlayerMessage/);
+assert.match(sessionSync, /confirmedUserMessageSessionIds\.has\(row\.id\)/);
 assert.match(sessionSync, /session_pending_turn:session_data->pendingTurn/);
 assert.doesNotMatch(sessionSync, /existing\?\.pendingTurn/);
 assert.match(sessionSync, /session_archived_at:session_data->>archivedAt/);
@@ -163,3 +167,11 @@ assert.match(renderMessages, /messageInput\.disabled=true/);
 assert.match(renderMessages, /sendButton\.disabled=sending\|\|loadingHistory/);
 
 console.log("Chat lazy hydration, single-session loading, pagination, and legacy safety checks passed.");
+
+const storyStart = between("async function findExistingStoryChatSessionFallback", "function visibleSessions");
+assert.match(storyStart,/\.eq\('user_id',userId\)/);
+assert.match(storyStart,/\.eq\('character_id',characterId\)/);
+assert.match(storyStart,/\.is\('deleted_at',null\)/);
+assert.match(storyStart,/\.limit\(10\)/);
+assert.match(storyStart,/\.limit\(500\)/);
+assert.match(storyStart,/function isMissingRpcSchemaCacheError/);

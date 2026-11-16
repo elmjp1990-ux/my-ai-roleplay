@@ -29,6 +29,13 @@ CREATE TABLE public.chat_groups (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id uuid NOT NULL REFERENCES auth.users(id),
   name text NOT NULL DEFAULT 'Test group',
+  world_background text NOT NULL DEFAULT '',
+  scene_mode text NOT NULL DEFAULT 'shared',
+  player_name text,
+  player_persona text,
+  world_character_id uuid,
+  background_mode text,
+  background_memory_photo_id uuid,
   archived_at timestamptz,
   deleted_at timestamptz,
   updated_at timestamptz NOT NULL DEFAULT now()
@@ -37,7 +44,9 @@ CREATE TABLE public.chat_groups (
 CREATE TABLE public.chat_group_scenes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   group_id uuid NOT NULL REFERENCES public.chat_groups(id) ON DELETE CASCADE,
-  name text NOT NULL DEFAULT 'Test scene'
+  name text NOT NULL DEFAULT 'Test scene',
+  description text NOT NULL DEFAULT '',
+  position smallint NOT NULL DEFAULT 1
 );
 
 CREATE TABLE public.chat_group_members (

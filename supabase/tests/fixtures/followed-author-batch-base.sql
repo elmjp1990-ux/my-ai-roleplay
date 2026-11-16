@@ -49,3 +49,19 @@ VALUES
   ('20000000-0000-0000-0000-000000000001', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'A-private', 'private', now(), NULL),
   ('30000000-0000-0000-0000-000000000001', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'A-deleted', 'public', now(), now()),
   ('40000000-0000-0000-0000-000000000001', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'C-private', 'private', now(), NULL);
+
+
+-- Tag-usage RPC cases: current private card, shared public tag, another user's
+-- private tag, and a deleted public card.
+UPDATE public.characters
+SET tags=ARRAY['只在本卡','共用標籤']
+WHERE id='20000000-0000-0000-0000-000000000001';
+UPDATE public.characters
+SET tags=ARRAY['共用標籤']
+WHERE id='10000000-0000-0000-0000-000000000001';
+UPDATE public.characters
+SET tags=ARRAY['他人私密']
+WHERE id='40000000-0000-0000-0000-000000000001';
+UPDATE public.characters
+SET tags=ARRAY['已刪除標籤']
+WHERE id='30000000-0000-0000-0000-000000000001';

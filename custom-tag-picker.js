@@ -6,8 +6,9 @@
   'use strict';
 
   let bound = false;
+  let currentDependencies = null;
 
-  function render(dependencies) {
+  function render(dependencies = currentDependencies) {
     const { $, e, validCharacterTag } = dependencies;
     
       const modal=$('modal');
@@ -18,7 +19,10 @@
       const count=modal?.querySelector('#customTagCount');
       if(!input||!options||!results||!selectedArea||!count)return;
       const query=String(input.value||'').trim().toLocaleLowerCase('zh-Hant');
-      const checkboxes=[...options.querySelectorAll('input[name="tag"]')];
+      const isTagInUse=typeof dependencies.isTagInUse==='function'?dependencies.isTagInUse:()=>true;
+      let checkboxes=[...options.querySelectorAll('input[name="tag"]')];
+      checkboxes.forEach(item=>{if(!item.checked&&!isTagInUse(item.value))item.remove();});
+      checkboxes=[...options.querySelectorAll('input[name="tag"]')];
       const matches=checkboxes.filter(item=>!query||item.value.toLocaleLowerCase('zh-Hant').includes(query));
       results.innerHTML=matches.map(item=>`<button type="button" class="tag-picker-chip ${item.checked?'selected':''}" data-action="toggle-custom-tag" data-tag="${e(item.value)}" aria-pressed="${item.checked}">${e(item.value)}${item.checked?' ✓':''}</button>`).join('');
       if(!matches.length && !query) {
@@ -38,12 +42,13 @@
   }
 
   function bind(dependencies) {
+    currentDependencies = dependencies;
     if (bound) return;
     bound = true;
     const { $, toast } = dependencies;
     document.addEventListener('input', event => {
       const input=event.target;
-      if(input instanceof HTMLInputElement && input.name==='tagSearch' && input.closest('.tag-picker')) render(dependencies);
+      if(input instanceof HTMLInputElement && input.name==='tagSearch' && input.closest('.tag-picker')) render(currentDependencies);
     });
     document.addEventListener('click', event => {
       const button=event.target.closest('[data-action="toggle-custom-tag"]');
@@ -54,14 +59,14 @@
       const checked=[...options.querySelectorAll('input[name="tag"]:checked')];
       if(!input.checked&&checked.length>=5){toast('角色最多選擇5個標籤。');return;}
       input.checked=!input.checked;
-      render(dependencies);
+      render(currentDependencies);
     });
     document.addEventListener('change', event => {
       const input=event.target;
       if(!(input instanceof HTMLInputElement)||input.name!=='tag'||!input.closest('#customTagList'))return;
       const checked=[...document.querySelectorAll('#customTagList input[name="tag"]:checked')];
       if(checked.length>5){input.checked=false;toast('角色最多選擇5個標籤。');}
-      render(dependencies);
+      render(currentDependencies);
     });
   }
 

@@ -27,6 +27,13 @@ assert.match(groupOpen,/g\.groupMembers\[group\.id\]/);
 assert.match(groupOpen,/archived_at/);
 assert.match(groupOpen,/if\(group\.archived_at\)/,
   "opening an archived group must not reinsert it into the visible list");
+assert.match(groupOpen,/loadGroupMembersWithPhoneNotifications/,
+  "group hydration must use the optional phone_notifications column through a schema-cache-safe loader");
+assert.match(groupOpen,/const phoneNotifications=Array\.isArray\(m\.phone_notifications\)/,
+  "group phone notifications must prefer the persisted member column and retain snapshot fallback");
+const groupMemberPhoneLoader=between("async function loadGroupMembersWithPhoneNotifications","async function groupOpen");
+assert.match(groupMemberPhoneLoader,/phone_notifications/);
+assert.match(groupMemberPhoneLoader,/PGRST204|42703/);
 assert.doesNotMatch(groupOpen,/void groupLoadList\(true\)/,
   "opening a group must not force a full group-list/member/preview reload");
 
@@ -109,14 +116,14 @@ assert.match(illustrations,/insertedGallery\.includes\(item\.id\)\|\|\(previous&
 assert.match(illustrations,/expectedGalleryNames=new Map/,
   "persisted gallery labels must still be verified after synchronization");
 
-const authCoalescer=between("const verifiedAuthUserInflight = new Map()","async function loadSupabaseCharacters(user,{loadMore=false}={})");
+const authCoalescer=between("const verifiedAuthUserInflight = new Map()","async function loadSupabaseCharacters(user,options={})");
 assert.match(authCoalescer,/client\.auth\.getUser\(\)/,
   "concurrent login hydration must still verify the current user with Supabase");
 assert.match(authCoalescer,/verifiedAuthUserInflight\.get\(expectedUid\)/,
   "concurrent auth verification for the same UID must share the in-flight request");
 assert.match(authCoalescer,/verifiedAuthUserInflight\.delete\(expectedUid\)/,
   "auth verification must not be cached after the request settles");
-const ownerLoader=between("async function loadSupabaseCharacters(user,{loadMore=false}={})","async function getCharacterIllustrationSignedUrl");
+const ownerLoader=between("async function loadSupabaseCharacters(user,options={})","async function getCharacterIllustrationSignedUrl");
 assert.match(ownerLoader,/getVerifiedAuthUser\(user\.id\)/,
   "owner character hydration must use the shared verified-auth request");
 const cloudSessions=between("async function loadCloudChatSessions(user, options = {})","async function ");
@@ -129,11 +136,17 @@ assert.doesNotMatch(cloudSessions,/client\.auth\.getUser\(\)/,
 assert.match(cloudSessions,/pageSize\('chatSessions'\)/,
   "single chat list pages must use the shared ten-row page size");
 assert.match(cloudSessions,/\.eq\('session_data->>pinned','true'\)/,
-  "pinned single chats must load independently from the unpinned page");
+  "the missing-RPC fallback must retain pinned-only single-chat filtering");
+assert.match(cloudSessions,/rpc\('get_story_chat_sessions_page'/,
+  "normal operation must deduplicate the latest active Story session per character on the server");
 assert.match(cloudSessions,/session_data->>pinned\.eq\.false,session_data->>pinned\.is\.null/,
   "the single chat page query must exclude pinned sessions");
-assert.match(cloudSessions,/\.range\(pager\.offset,pager\.offset\+pageSize-1\)/,
-  "single chat list continuation must use bounded backend pages");
+assert.match(cloudSessions,/rpc\('get_story_chat_sessions_page'/,
+  "single chat list pages must use server-side latest-session-per-character pagination");
+assert.match(cloudSessions,/p_pinned:pinned,p_offset:offset,p_limit:pageSize\+1/,
+  "story chat pagination must use bounded one-row-lookahead RPC requests");
+assert.match(cloudSessions,/\.range\(offset,offset\+pageSize\)/,
+  "the missing-RPC compatibility fallback must remain bounded");
 assert.match(cloudSessions,/if \(!onlySessionId && !pagedList\)/,
   "loading another single-chat page must not evict sessions already loaded from prior pages");
 assert.match(html,/loadCloudChatSessions\(currentUser\(\),\{loadMore:true\}\)/,
@@ -167,8 +180,18 @@ assert.match(chatAuthorProfiles,/publicAuthorProfileLoaded\.add\(profile\.id\)/,
 const groupEdge=fs.readFileSync("supabase/functions/group-chat-turn/index.ts","utf8");
 const groupMigration=fs.readFileSync("supabase/migrations/20261114180000_group_ai_single_orchestrator.sql","utf8");
 const sharedOpenRouter=fs.readFileSync("supabase/functions/_shared/openrouter-chat-completions.ts","utf8");
+const singleEdge=fs.readFileSync("supabase/functions/chat-turn/index.ts","utf8");
+const sharedRoleplayGuidelines=fs.readFileSync("supabase/functions/_shared/roleplay-response-guidelines.ts","utf8");
+const groupEnvelope=fs.readFileSync("supabase/functions/_shared/group-turn-envelope.ts","utf8");
 assert.match(sharedOpenRouter,/deepseek\/deepseek-v4-flash-20260423/,"single and group chat must share the approved DeepSeek V4 Flash model");
-assert.match(groupEdge,/parseGroupTurnEnvelope\(provider\.result\.text, speakers\)/,"the single model response must validate speaker IDs and per-character phone states");
+assert.match(groupEdge,/parseGroupTurnEnvelopeDetailed\(provider\.result\.text, speakers, asText\(group\.player_name\)/,"group output parsing must use the actual player name for configured phone-field titles");
+assert.match(groupEdge,/phone_updates 必須為群組內每一位角色各輸出且只輸出一筆/,"every group member must produce a phone state even when not selected to speak");
+assert.match(groupEnvelope,/incomplete_phone_updates/,"missing member phone updates must be rejected instead of persisted as empty arrays");
+assert.match(groupEnvelope,/phone_notification_count_mismatch/,"configured phone fields must be complete and ordered");
+assert.match(singleEdge,/buildRoleplayResponseGuidelines\("single"\)/,"single chat must use the canonical shared roleplay response contract");
+assert.match(groupEdge,/buildRoleplayResponseGuidelines\("group"\)/,"group chat must use the same canonical roleplay response contract");
+assert.match(sharedRoleplayGuidelines,/300～600 字元/,"the shared long-reply target must remain 300–600 characters");
+assert.match(sharedRoleplayGuidelines,/主動敘事與事件推進/,"the shared response contract must include proactive story progression");
 assert.match(groupEdge,/requestOpenRouterChatCompletion\(/,"group chat must reuse the shared OpenRouter client");
 assert.match(sharedOpenRouter,/buildOpenRouterProviderOptions\(\)/,"all chat modes must share the approved no-data-collection provider restriction");
 assert.match(sharedOpenRouter,/AbortController/,"the shared provider request must retain a bounded timeout");
@@ -193,9 +216,11 @@ assert.match(groupMigration,/wallet_transactions_group_turn_idempotency_uidx/,
   "group charge/refund ledger entries must have a unique per-turn operation/currency guard");
 assert.match(groupEdge,/const TIMEOUT_MS = 55_000/,
   "group AI generation must have a fixed 55-second server-side deadline");
-assert.match(groupEdge,/error\.name === "AbortError"[\s\S]*refund\(admin, user\.id, turnId, "provider_timeout"\)[\s\S]*status: refunded\.confirmed \? "timed_out" : "needs_reconciliation"/,
+assert.match(groupEdge,/errorName === "AbortError"[\s\S]*refund\(admin, user\.id, turnId, "provider_timeout"\)[\s\S]*status: refunded\.confirmed \? "timed_out" : "needs_reconciliation"/,
   "a confirmed server-side AI timeout must refund the reserved player charge");
-assert.match(groupSend,/status==='timed_out'[\s\S]*費用已全額退還，沒有扣款/,
+assert.match(groupSend,/groupTurnFailureMessage\(turnResult\)/,
+  "group send must route every confirmed failure through the shared user-facing message mapper");
+assert.match(html,/function groupTurnFailureMessage\(result\)[\s\S]*provider_timeout_watchdog[\s\S]*費用已全額退還，沒有扣款/,
   "players must be told clearly that a timed-out group request was refunded");
 assert.match(groupMigration,/v_cost := v_member_count \* 3/,
   "group price must remain 3 credits per character");
@@ -231,11 +256,11 @@ assert.match(groupList,/\.eq\('pinned',true\)/,
   "pinned groups must load independently from the unpinned ten-row page");
 assert.match(groupList,/pinned\.eq\.false,pinned\.is\.null/,
   "the paginated group query must exclude pinned rows");
-assert.match(groupList,/\.range\(g\.groupListOffset,g\.groupListOffset\+pageSize-1\)/,
+assert.match(groupList,/\.range\(g\.groupListOffset,g\.groupListOffset\+pageSize\)/,
   "group list pages must be fetched by the backend in bounded ranges");
 assert.match(groupList,/groupHydrateListRows\(newRows\)/,
   "member, avatar and preview hydration must be restricted to newly loaded groups");
-assert.match(groupList,/g\.groupListHasMore=currentPage\.length===pageSize/,
+assert.match(groupList,/g\.groupListHasMore=rawCurrentPage\.length>pageSize/,
   "group list continuation must stop when the backend returns a short page");
 assert.match(groupList,/mergeUnique\(g\.groups,newRows,group=>group\.id\)/,
   "group list continuation must append without duplicating already loaded groups");
@@ -471,8 +496,8 @@ assert.match(groupEdge,/admin\.rpc\("expire_group_chat_turn"/,
   "same-key retries must proactively recover an expired processing turn without waiting for cron");
 assert.match(groupEdge,/provider_timeout_watchdog/,
   "idempotent retries must preserve the watchdog timeout outcome");
-assert.match(groupEdge,/const processingDeadlineAt = Date\.now\(\) \+ TIMEOUT_MS - 1000/,
-  "context loading must consume the same absolute request deadline with a one-second safety margin");
+assert.ok(groupEdge.includes('const CLEANUP_RESERVE_MS = 12_000') && groupEdge.includes('const processingDeadlineAt = Date.now() + TIMEOUT_MS - CLEANUP_RESERVE_MS'),
+  "context loading must reserve time for the atomic refund path before the 55-second watchdog");
 assert.match(groupEdge,/const providerTimeoutMs = processingDeadlineAt - Date\.now\(\)[\s\S]*timeoutMs: providerTimeoutMs/,
   "provider timeout must use only the remaining turn budget rather than restarting a fresh 55 seconds");
 assert.match(groupMigration,/poyozz-group-watchdog-cron-history-cleanup[\s\S]*interval '7 days'/,
@@ -487,6 +512,16 @@ console.log('Group watchdog, deadline race, abandoned-request recovery, idempote
 console.log('Group history fixture passed: 1,000 rows, 200 pages of five, timestamp/sequence ties, UUID cursor tie-break, no gaps or duplicates, overlapping-page dedupe, group-switch guards, and scroll anchoring.');
 
 const groupPhoneMigration = fs.readFileSync('supabase/migrations/20261114180000_group_ai_single_orchestrator.sql', 'utf8');
+const groupMemoryMigration = fs.readFileSync('supabase/migrations/20261116120000_group_memory_summaries.sql', 'utf8');
+const chatReadMigration = fs.readFileSync('supabase/migrations/20261116130000_mark_chat_session_read_and_story_chat_paging.sql', 'utf8');
+assert.match(groupMemoryMigration,/chat_group_memory_summaries/);
+assert.match(groupMemoryMigration,/UPDATE public\.chat_group_members[\s\S]*phone_notifications/,
+  "the phone migration must backfill legacy group notification snapshots into the durable member column");
+assert.match(groupMemoryMigration,/get_group_memory_summaries/);
+assert.match(chatReadMigration,/get_story_chat_sessions_page/);
+assert.match(chatReadMigration,/DISTINCT ON \(character_key\)/);
+assert.match(chatReadMigration,/mark_chat_session_read/);
+
 const groupPhoneFunction = fs.readFileSync('supabase/functions/group-chat-turn/index.ts', 'utf8');
 const groupPhoneParser = fs.readFileSync('supabase/functions/_shared/group-turn-envelope.ts', 'utf8');
 const groupPhoneUI = fs.readFileSync('index.html', 'utf8');
@@ -497,13 +532,20 @@ assert.match(groupPhoneMigration, /SET phone_notifications = v_phone_notificatio
 assert.match(groupPhoneMigration, /GRANT EXECUTE ON FUNCTION public\.complete_group_chat_turn\(uuid, uuid, jsonb, jsonb\) TO service_role/);
 assert.match(groupPhoneFunction, /parseGroupTurnEnvelope/);
 assert.match(groupPhoneFunction, /phone_settings/);
-assert.match(groupPhoneFunction, /p_phone_updates: parsed\.phoneUpdates/);
+assert.match(groupPhoneFunction, /serializeGroupPhoneUpdatesForRpc\(parsed\.phoneUpdates\)/);
+assert.match(groupPhoneFunction, /p_phone_updates: phoneUpdatesForRpc/);
 assert.match(groupPhoneFunction, /phone_updates: parsed\.phoneUpdates/);
-assert.match(groupPhoneParser, /phoneById\.size !== speakers\.length/);
-assert.match(groupPhoneUI, /character\.phoneNotifications\|\|group\.phoneNotificationsByCharacter/);
+assert.match(groupPhoneParser, /incomplete_phone_updates[\s\S]*phone_notification_count_mismatch[\s\S]*speaker\.phoneNotifications/);
+assert.match(groupPhoneUI, /noticeSources=isGroup[\s\S]*?character\.phoneNotifications[\s\S]*?group\.phoneNotificationsByCharacter/);
 assert.match(groupPhoneUI, /phone-device-head--group/);
-assert.match(groupPhoneUI, /phone_notifications/);
-assert.match(groupPhoneUI, /initialStoryTime=Number\(isGroup\?/);
+assert.match(groupPhoneUI,/loadGroupMembersWithPhoneNotifications/,
+  "group UI must read persisted phone notifications through a schema-cache-safe loader");
+assert.match(groupPhoneUI,/const phoneNotifications=Array\.isArray\(m\.phone_notifications\)/,
+  "group UI must prefer persisted member notifications and retain the old snapshot fallback");
+assert.ok(groupPhoneUI.includes('const initialStoryTime=Date.now()'),
+  'single and group phones must use current real-world time only as a temporary fallback');
+assert.ok(groupPhoneUI.includes('storyWorldState.storyTime||storyWorldState.story_time||initialStoryTimeText'),
+  'AI-provided in-world time must replace the temporary real-time fallback');
 assert.match(groupPhoneUI, /phoneHeader\+/);
 assert.match(groupPhoneStyles, /phone-device-head--group \.phone-member-switch/);
 
@@ -544,6 +586,18 @@ assert.match(ownedCharacterPageLoaderSource,/\.range\(pager\.offset,pager\.offse
   'owned character details must be fetched in bounded server-side pages');
 assert.match(ownedCharacterPageLoaderSource,/\.in\('id',batch\)/,
   'owned-character migration reconciliation must compare only local IDs in bounded batches');
+
+assert.doesNotMatch(ownedCharacterPageLoaderSource,/saveSupabaseCharacter\(character,user\.id\)/,
+  'login hydration must never upsert a stale local character snapshot into Supabase');
+assert.match(ownedCharacterPageLoaderSource,/missingStoryRpc/,
+  'a missing latest-owned-story RPC must not abort cloud character hydration');
+const groupPreviewStart=ownerListSource.indexOf('async function groupHydrateListRows(groups)');
+const groupPreviewEnd=ownerListSource.indexOf('async function groupLoadList',groupPreviewStart);
+assert.ok(groupPreviewStart>=0&&groupPreviewEnd>groupPreviewStart,'group list hydration must remain identifiable');
+const groupPreviewSource=ownerListSource.slice(groupPreviewStart,groupPreviewEnd);
+assert.match(groupPreviewSource,/missingPreviewRpc/,
+  'a missing group preview RPC must not prevent group rows from loading');
+
 assert.doesNotMatch(ownedCharacterPageLoaderSource,/\.select\('id'\)\.eq\('author_id',user\.id\);/,
   'owned-character migration must not scan every cloud character ID');
 assert.match(ownedCharacterPageLoaderSource,/loadMore\s*&&\s*!pager\.hasMore/,
@@ -588,13 +642,13 @@ assert.match(commentPageMigration,/LIMIT GREATEST\(1, LEAST\(COALESCE\(p_limit, 
 assert.match(ownerListSource,/rpc\('get_character_comments_safe_page'/);
 assert.match(ownerListSource,/data-action="comments-load-more"/);
 assert.match(ownerListSource,/pageSize\('characterComments'\)/);
-assert.match(ownerListSource,/\.range\(g\.groupPinnedOffset,g\.groupPinnedOffset\+pageSize-1\)/,
+assert.match(ownerListSource,/\.range\(g\.groupPinnedOffset,g\.groupPinnedOffset\+pageSize\)/,
   'pinned group chats must be bounded and paged in ten-row batches');
 
 assert.match(groupOpen,/\.limit\(window\.PoyozzListPagination\.pageSize\('messages'\)\)/,"group initial history must use the shared five-message page size");
 assert.match(groupHistory,/\.limit\(window\.PoyozzListPagination\.pageSize\('messages'\)\)/,"group older history must use the shared five-message page size");
-assert.match(html,/pinnedOffset\+pageSize-1/,"single pinned chats must be paginated in ten-row batches");
-assert.match(html,/groupPinnedOffset\+pageSize-1/,"group pinned chats must be paginated in ten-row batches");
+assert.match(cloudSessions,/p_pinned:pinned,p_offset:offset,p_limit:pageSize\+1/,"single pinned chats must use the same one-row-lookahead RPC as regular chats");
+assert.ok(html.includes("groupPinnedOffset+pageSize"),"group pinned chats must use one-row lookahead while keeping ten visible rows");
 assert.match(html,/chat_memory_photos[\s\S]{0,500}\.limit\(window\.PoyozzListPagination\.pageSize\('memoryPhotos'\)/,"group background photo picker must use the shared ten-photo page size");
 
 const favoritesLoader=ownerListSource.slice(ownerListSource.indexOf('async function renderFavorites({loadMore=false}={})'),ownerListSource.indexOf('/* Characters */',ownerListSource.indexOf('async function renderFavorites({loadMore=false}={})')));
@@ -608,13 +662,19 @@ assert.match(notificationsModuleSource,/pageSize\('notifications'\)/);
 
 const primaryIllustrationLoader=between("async function loadCharacterPrimaryIllustrationAssets","async function loadCharacterIllustrationAssets");
 assert.ok(primaryIllustrationLoader.includes("characterIllustrationSignedUrlManager.getMany"));
-assert.ok(!primaryIllustrationLoader.includes("for(const row of rows)"));
+assert.ok(primaryIllustrationLoader.includes("await Promise.all(missingRows.map(async row=>"),
+  "missing primary portraits must retry concurrently after the batch signer fails");
+const primaryRowsMapping=primaryIllustrationLoader.slice(primaryIllustrationLoader.indexOf("for(const row of rows)"));
+assert.ok(!primaryRowsMapping.includes("await characterIllustrationSignedUrlManager.get("),
+  "primary portrait result mapping must not sign Storage objects sequentially");
 const galleryIllustrationLoader=between("async function loadCharacterIllustrationAssets","// Encounter scenes fetch");
 assert.ok(galleryIllustrationLoader.includes("characterIllustrationSignedUrlManager.getMany"));
 assert.ok(!galleryIllustrationLoader.includes("for(const row of rows)"));
-const ownedCharacterLoader=between("async function loadSupabaseCharacters(user,{loadMore=false}={})","function ");
+const ownedCharacterLoader=between("async function loadSupabaseCharacters(user,options={})","function ");
 assert.ok(ownedCharacterLoader.includes("get_latest_owned_character_stories"));
-assert.ok(!ownedCharacterLoader.includes(".from('character_stories')"));
+assert.ok(ownedCharacterLoader.includes(".from('character_stories')"), 'missing batch RPC must fall back to the owner-visible story table');
+assert.match(ownedCharacterLoader,/limit\(fallbackLimit\)/, 'story fallback must remain row-bounded');
+assert.match(ownedCharacterLoader,/fallbackLimit=Math\.min\(50,Math\.max\(10,ids\.length\*3\)\)/, 'story fallback must cap rows for a ten-character page');
 
 assert.ok(!authorLatestLoader.includes("count:'exact'"));
 assert.ok(authorLatestLoader.includes("get_public_author_latest_characters"));
@@ -635,7 +695,40 @@ const startChatQuery=between("async function startChat(characterId)","function v
 assert.ok(startChatQuery.includes("find_existing_story_chat_session"));
 assert.ok(!startChatQuery.includes(".from('chat_sessions')"));
 assert.ok(!startChatQuery.includes(".from('chat_messages')"));
-assert.ok(html.includes("options.verifiedUser?.id===user.id"));
+assert.ok(html.includes("options?.verifiedUser?.id===user.id"));
+assert.match(ownerLoader,/const loadMore=options\?\.loadMore===true/,
+  "owner hydration must read loadMore and verifiedUser from the same options object");
+assert.match(ownerLoader,/options\?\.verifiedUser\?\.id===user\.id/,
+  "owner hydration must not reference an undeclared options variable");
+assert.match(html,/const recentCharacterIds=\[\.\.\.new Set\(recentSessionCharacters\.map\(session=>session\.id\)\)\]\.slice\(0,10\)/,
+  "group picker must hydrate a bounded set of recent-chat character IDs independently of the visible page");
+assert.match(html,/\.in\('id',missingRecentIds\)\.eq\('visibility','public'\)/,
+  "recent-chat group candidates must still be verified as public cloud characters");
+const groupPickerLoader=between("async function groupLoadCharacterPickerPage","function groupCharacterPickerAvatar");
+assert.match(groupPickerLoader,/missingImageItems=items\.filter\(character=>!safeImage\(character\.image\|\|character\.avatar_url\)\)/,
+  "group picker must only request portrait metadata for cards without a usable image URL");
+assert.match(groupPickerLoader,/loadCharacterPrimaryIllustrationAssets\(missingImageItems\.map\(character=>character\.id\)\)/,
+  "group picker image hydration must be bounded to the current page");
+assert.match(groupPickerLoader,/catch\(imageError\)/,
+  "an optional image metadata failure must not block the group character list");
+assert.match(html,/id="groupWorldBackground" maxlength="3000"/,
+  "group world background must use one editable 3000-character field");
+assert.doesNotMatch(html,/groupCustomWorldBackground/,
+  "group creation must not render or read a second custom-background textarea");
+assert.match(html,/data-action="group-inspiration">✨ AI靈感/,
+  "group opening inspiration control must be labeled AI inspiration");
+assert.match(html,/replace\(\/\\\{\(CHAR1\|CHAR2\|CHAR3\|USER\|VILLAIN\|NPC\)\\\}\/g/,
+  "AI inspiration templates must replace character, player and NPC placeholders");
+assert.match(html,/usedInspirationIds/,
+  "AI inspiration must avoid repeating templates within one group creation draft");
+const groupOpeningPresetsSource=fs.readFileSync('group-opening-presets.js','utf8');
+assert.equal((groupOpeningPresetsSource.match(/\['[^']+','/g)||[]).length,100,
+  "the static group inspiration library must retain exactly 100 scenario templates");
+assert.match(html,/function groupOpeningRoleIntro\(members,userName\)/,
+  "random group inspiration must use a natural, role-count-aware opening helper");
+assert.match(html,/oneRoleOpeners=\[/);
+assert.match(html,/twoRoleOpeners=\[/);
+assert.match(html,/threeRoleOpeners=\[/);
 assert.ok(html.includes("options.verifiedUser?.id===userId"));
 
 const boundedCommentMigration=fs.readFileSync('supabase/migrations/20261114130000_add_bounded_character_comment_reads.sql','utf8');
@@ -684,3 +777,23 @@ assert.match(appIndexSource,/groupCharacterPickerPager=window\.PoyozzListPaginat
 assert.match(appIndexSource,/favoriteListPager=window\.PoyozzListPagination\.createState\('favorites'/,'favorite pager resets must use shared pagination state');
 assert.match(appIndexSource,/ownedCharacterPager=window\.PoyozzListPagination\.createState\('ownedCharacters'/,'owned-character pager resets must use shared pagination state');
 assert.match(appIndexSource,/encounterMemoryDetailPager=window\.PoyozzListPagination\.createState\('messages'/,'Encounter transcript must reuse shared five-message pager state');
+
+
+// PR #256: pagination must observe the actual scrollable ancestor and preserve chat-list end state.
+const paginationSource=fs.readFileSync("list-pagination.js","utf8");
+assert.match(html,/loadCloudChatSessions\(owner,\{onlySessionId:sessionId,listPage:false\}\)/);
+assert.match(html,/if\(route\?\.overlay\)[\s\S]*?delete next\.overlay;[\s\S]*?go\(next,true\)/);
+assert.match(html,/已經滑到底了/);
+assert.ok(html.includes("root:scrollRoot||null,rootMargin:'0px'"),"chat-list pagination must use its actual scroll container and trigger only at the end");
+assert.match(paginationSource,/function observeEnd[\s\S]*?for\(let p=node\.parentElement/);
+const groupTurnSource=fs.readFileSync("supabase/functions/group-chat-turn/index.ts","utf8");
+const memorySummaryWorker=fs.readFileSync("supabase/functions/_shared/story-memory-summary.ts","utf8");
+assert.match(html,/get_group_memory_summaries/);
+assert.match(groupTurnSource,/processDueGroupMemorySummary/);
+assert.match(memorySummaryWorker,/export async function processDueGroupMemorySummary/);
+assert.match(memorySummaryWorker,/SUMMARY_INTERVAL = 5/);
+assert.match(html,/return loadGroupDiaryMemories\(group\.id\)\.filter\(memory=>!memory\.deleted&&\(!memory\.autoGenerated\|\|memory\.important\)\)/);
+assert.doesNotMatch(html,/每 5 次玩家發言建立一則群組日記摘錄/);
+
+assert.match(html,/for\(let attempt=0;attempt<2;attempt\+\+\)/,'chat pin sync retries once after an optimistic conflict while re-reading session_data');
+assert.match(html,/data-chat-list-pin="single"/,'single-chat pin action must be isolated from the delete/menu router');

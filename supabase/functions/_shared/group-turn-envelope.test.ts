@@ -1,29 +1,126 @@
 import { assertEquals } from "jsr:@std/assert";
-import { parseGroupTurnEnvelope } from "./group-turn-envelope.ts";
+import { parseGroupTurnEnvelope, parseGroupTurnEnvelopeDetailed, serializeGroupPhoneUpdatesForRpc } from "./group-turn-envelope.ts";
 
 const roster = [
-  { id: "a", name: "夜辰", sceneId: "scene-1", sceneName: "客廳" },
-  { id: "b", name: "黎音", sceneId: "scene-2", sceneName: "公司" },
+  { id: "a", name: "夜辰", sceneId: "scene-1", sceneName: "客廳", phoneSettings: { noticePrompts: ["👔{CHAR}衣著/姿勢 | 角色目前狀態"] }, phoneNotifications: [{ title: "舊訊息", body: "保留既有狀態" }] },
+  { id: "b", name: "黎音", sceneId: "scene-2", sceneName: "公司", phoneSettings: { noticePrompts: ["💼公司訊息 | 公司通知"] }, phoneNotifications: [] },
 ];
 
-Deno.test("parses per-character group speeches and phone notifications", () => {
-  const result = parseGroupTurnEnvelope(JSON.stringify({
-    speeches: [{ speaker_id: "a", content: "*抬眼*妳回來了。" }],
+Deno.test("parses every member phone field even when only one character speaks", () => {
+  const result = parseGroupTurnEnvelopeDetailed(JSON.stringify({
+    speeches: [{ speaker_id: "a", content: "*抬眼*妳回來了。*他將桌上的文件收好，替妳留出座位。*今天的事我已經安排好了，我們可以慢慢談。" }],
     phone_updates: [
-      { character_id: "a", notifications: [{ title: "最近訊息", body: "客戶確認明天下午會議。" }] },
-      { character_id: "b", notifications: [{ title: "待辦事項", body: "目前沒有待辦事項" }] },
+      { character_id: "a", notifications: [{ title: "model title ignored", body: "目前穿著深色襯衫，站在客廳窗邊。" }] },
+      { character_id: "b", notifications: [{ title: "model title ignored", body: "下午會議改到三點，助理已更新行程。" }] },
     ],
-  }), roster);
-  assertEquals(result?.speeches.map(row => [row.speakerId, row.content]), [["a", "*抬眼*妳回來了。"]]);
-  assertEquals(result?.phoneUpdates.map(row => [row.characterId, row.notifications.length]), [["a", 1], ["b", 1]]);
+    story_world_state: { story_time: "2026-11-16 19:30", story_location: "蘇清雅的辦公室" },
+  }), roster, "Una Kao").envelope;
+  assertEquals(result?.speeches.length, 1);
+  assertEquals(result?.phoneUpdates, [
+    { characterId: "a", notifications: [{ title: "👔夜辰衣著/姿勢", body: "目前穿著深色襯衫，站在客廳窗邊。" }] },
+    { characterId: "b", notifications: [{ title: "💼公司訊息", body: "下午會議改到三點，助理已更新行程。" }] },
+  ]);
+  assertEquals(result?.storyWorldState, { storyTime: "2026-11-16 19:30", storyLocation: "蘇清雅的辦公室" });
+  assertEquals(serializeGroupPhoneUpdatesForRpc(result!.phoneUpdates), [
+    { character_id: "a", notifications: [{ title: "👔夜辰衣著/姿勢", body: "目前穿著深色襯衫，站在客廳窗邊。" }] },
+    { character_id: "b", notifications: [{ title: "💼公司訊息", body: "下午會議改到三點，助理已更新行程。" }] },
+  ]);
 });
 
-Deno.test("rejects unknown speakers, unknown phone owners, missing character phone state and invalid rows", () => {
-  const base = { speeches: [{ speaker_id: "a", content: "你好" }], phone_updates: [
-    { character_id: "a", notifications: [] }, { character_id: "b", notifications: [] },
-  ] };
-  assertEquals(parseGroupTurnEnvelope(JSON.stringify({ ...base, speeches: [{ speaker_id: "outside", content: "不屬於群組的發言" }] }), roster), null);
-  assertEquals(parseGroupTurnEnvelope(JSON.stringify({ ...base, phone_updates: [{ character_id: "outside", notifications: [] }] }), roster), null);
-  assertEquals(parseGroupTurnEnvelope(JSON.stringify({ ...base, phone_updates: [{ character_id: "a", notifications: [] }] }), roster), null);
-  assertEquals(parseGroupTurnEnvelope(JSON.stringify({ ...base, phone_updates: [{ character_id: "a", notifications: [{ title: "", body: "內容" }] }, { character_id: "b", notifications: [] }] }), roster), null);
+Deno.test("rejects omitted phone updates when characters have configured fields", () => {
+  const result = parseGroupTurnEnvelopeDetailed(JSON.stringify({
+    speeches: [{ speaker_id: "a", content: "有效角色發言" }],
+  }), roster);
+  assertEquals(result.envelope, null);
+  assertEquals(result.errorCode, "missing_phone_updates");
+});
+
+Deno.test("rejects partial phone updates instead of silently completing with empty states", () => {
+  const result = parseGroupTurnEnvelopeDetailed(JSON.stringify({
+    speeches: [{ speaker_id: "a", content: "有效角色發言" }],
+    phone_updates: [{ character_id: "b", notifications: [{ title: "工作", body: "會議延後" }] }],
+  }), roster);
+  assertEquals(result.envelope, null);
+  assertEquals(result.errorCode, "incomplete_phone_updates");
+});
+
+Deno.test("accepts omitted model titles for configured fields and rejects missing bodies", () => {
+  const mismatch = parseGroupTurnEnvelopeDetailed(JSON.stringify({
+    speeches: [{ speaker_id: "a", content: "有效角色發言" }],
+    phone_updates: [
+      { character_id: "a", notifications: [] },
+      { character_id: "b", notifications: [{ title: "公司訊息", body: "正常" }] },
+    ],
+  }), roster);
+  assertEquals(mismatch.errorCode, "phone_notification_count_mismatch");
+
+  const missingModelTitle = parseGroupTurnEnvelopeDetailed(JSON.stringify({
+    speeches: [{ speaker_id: "a", content: "有效角色發言" }],
+    phone_updates: [
+      { character_id: "a", notifications: [{ title: "", body: "目前穿著深色西裝，站在辦公室。" }] },
+      { character_id: "b", notifications: [{ title: "", body: "會議已延後。" }] },
+    ],
+  }), roster);
+  assertEquals(missingModelTitle.errorCode, null);
+  assertEquals(missingModelTitle.envelope?.phoneUpdates, [
+    { characterId: "a", notifications: [{ title: "👔夜辰衣著/姿勢", body: "目前穿著深色西裝，站在辦公室。" }] },
+    { characterId: "b", notifications: [{ title: "💼公司訊息", body: "會議已延後。" }] },
+  ]);
+
+  const missingBody = parseGroupTurnEnvelopeDetailed(JSON.stringify({
+    speeches: [{ speaker_id: "a", content: "有效角色發言" }],
+    phone_updates: [
+      { character_id: "a", notifications: [{ title: "欄位", body: "" }] },
+      { character_id: "b", notifications: [{ title: "公司訊息", body: "" }] },
+    ],
+  }), roster);
+  assertEquals(missingBody.errorCode, null);
+  assertEquals(missingBody.envelope?.phoneUpdates, [
+    { characterId: "a", notifications: [{ title: "👔夜辰衣著/姿勢", body: "保留既有狀態" }] },
+    { characterId: "b", notifications: [{ title: "💼公司訊息", body: "目前沒有足夠資訊。" }] },
+  ]);
+
+  const overlongDuplicateTitle = parseGroupTurnEnvelopeDetailed(JSON.stringify({
+    speeches: [{ speaker_id: "a", content: "有效角色發言" }],
+    phone_updates: [
+      { character_id: "a", notifications: [{ title: "模型重複輸出的標題".repeat(20), body: "狀態正常" }] },
+      { character_id: "b", notifications: [{ title: "", body: "公司行程正常" }] },
+    ],
+  }), roster);
+  assertEquals(overlongDuplicateTitle.errorCode, null);
+  assertEquals(overlongDuplicateTitle.envelope?.phoneUpdates[0].notifications[0].title, "👔夜辰衣著/姿勢");
+  assertEquals(overlongDuplicateTitle.envelope?.phoneUpdates[0].notifications[0].body, "狀態正常");
+
+  const overlongBody = "狀態".repeat(300);
+  const truncatedBody = parseGroupTurnEnvelopeDetailed(JSON.stringify({
+    speeches: [{ speaker_id: "a", content: "有效角色發言" }],
+    phone_updates: [
+      { character_id: "a", notifications: [{ title: "", body: overlongBody }] },
+      { character_id: "b", notifications: [{ title: "", body: "公司行程正常" }] },
+    ],
+  }), roster);
+  assertEquals(truncatedBody.errorCode, null);
+  assertEquals(truncatedBody.envelope?.phoneUpdates[0].notifications[0].body.length, 500);
+});
+
+Deno.test("keeps prior phone state only for characters without configured fields", () => {
+  const unconfigured = [{ id: "a", name: "夜辰", phoneNotifications: [{ title: "舊訊息", body: "保留既有狀態" }] }];
+  const result = parseGroupTurnEnvelopeDetailed(JSON.stringify({
+    speeches: [{ speaker_id: "a", content: "你好" }],
+  }), unconfigured);
+  assertEquals(result.errorCode, null);
+  assertEquals(result.envelope?.phoneUpdates, [
+    { characterId: "a", notifications: [{ title: "舊訊息", body: "保留既有狀態" }] },
+  ]);
+});
+
+Deno.test("rejects invalid speaker identities and malformed JSON", () => {
+  assertEquals(parseGroupTurnEnvelope(JSON.stringify({
+    speeches: [{ speaker_id: "outside", content: "不屬於群組的發言" }],
+    phone_updates: [
+      { character_id: "a", notifications: [{ title: "欄位", body: "狀態" }] },
+      { character_id: "b", notifications: [{ title: "欄位", body: "狀態" }] },
+    ],
+  }), roster), null);
+  assertEquals(parseGroupTurnEnvelope("{not-json}", roster), null);
 });

@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const html=fs.readFileSync('index.html','utf8');
+const edge=fs.readFileSync('supabase/functions/group-chat-turn/index.ts','utf8');
+const helper=fs.readFileSync('supabase/functions/_shared/story-memory-summary.ts','utf8');
+const migration=fs.readFileSync('supabase/migrations/20261116120000_group_memory_summaries.sql','utf8');
+const pagingMigration=fs.readFileSync('supabase/migrations/20261116130000_mark_chat_session_read_and_story_chat_paging.sql','utf8');
+const groupAiMigration=fs.readFileSync('supabase/migrations/20261114180000_group_ai_single_orchestrator.sql','utf8');
+
+assert.match(groupAiMigration,/ADD COLUMN IF NOT EXISTS phone_notifications jsonb NOT NULL DEFAULT '\[\]'::jsonb/);
+assert.match(groupAiMigration,/CREATE OR REPLACE FUNCTION public\.complete_group_chat_turn/);
+assert.match(groupAiMigration,/SET phone_notifications = v_phone_notifications/);
+assert.match(edge,/processDueGroupMemorySummary/);
+assert.match(edge,/admin\.rpc\("complete_group_chat_turn"/);
+assert.match(helper,/export async function processDueGroupMemorySummary/);
+assert.match(helper,/\.from\("chat_group_turns"\)/);
+assert.match(helper,/\.eq\("status", "completed"\)/);
+assert.match(helper,/normalizeStoryMemorySummaryText\(parsed\.summary\)/);
+assert.match(helper,/const SUMMARY_INTERVAL = 5/);
+assert.match(helper,/const SUMMARY_MODEL = "openai\/gpt-oss-20b"/);
+assert.match(migration,/CREATE TABLE IF NOT EXISTS public\.chat_group_memory_summaries/);
+assert.match(migration,/UPDATE public\.chat_group_members[\s\S]*phone_notifications/);
+assert.match(migration,/CREATE OR REPLACE FUNCTION public\.get_group_memory_summaries/);
+assert.match(migration,/CREATE OR REPLACE FUNCTION public\.set_group_memory_summary_important/);
+assert.match(migration,/CREATE OR REPLACE FUNCTION public\.update_group_memory_summary/);
+assert.match(pagingMigration,/CREATE OR REPLACE FUNCTION public\.mark_chat_session_read/);
+assert.match(pagingMigration,/CREATE OR REPLACE FUNCTION public\.get_story_chat_sessions_page/);
+assert.match(pagingMigration,/DISTINCT ON \(character_key\)/);
+assert.match(html,/get_group_memory_summaries/);
+assert.match(html,/set_group_memory_summary_important/);
+assert.match(html,/update_group_memory_summary/);
+assert.match(html,/每 5 個已完成的群組回合，由 AI 整理一則 50–150 字摘要/);
+assert.doesNotMatch(html,/每 5 次玩家發言建立一則群組日記摘錄/);
+assert.match(html,/data-group-ai-memory-batch/);
+assert.match(html,/groupMemorySummaryCache/);
+console.log('Group AI memory summaries, group phone persistence, and atomic chat read-state contracts passed.');

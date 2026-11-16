@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const source = readFileSync("supabase/functions/chat-turn/index.ts", "utf8");
+const groupSource = readFileSync("supabase/functions/group-chat-turn/index.ts", "utf8");
 const openRouterShared = readFileSync("supabase/functions/_shared/openrouter-chat-completions.ts", "utf8");
 const summary = readFileSync("supabase/functions/_shared/story-memory-summary.ts", "utf8");
 const migration = readFileSync("supabase/migrations/20261105223613_ai_model_usage_and_memory_summaries.sql", "utf8");
@@ -17,6 +18,10 @@ assert.match(source, /storedSummary/);
 assert.match(source, /edgeRuntime\?\.waitUntil/);
 assert.match(summary, /const SUMMARY_MODEL = "openai\/gpt-oss-20b"/);
 assert.match(summary, /const SUMMARY_INTERVAL = 5/);
+assert.match(summary, /function normalizeStoryMemorySummaryText/);
+assert.match(summary, /chars\.length < 50/);
+assert.match(summary, /chars\.slice\(0, 150\)/);
+assert.match(summary, /summary = normalizeStoryMemorySummaryText\(parsed\.summary\)/);
 assert.match(summary, /generation_type: "memory_summary"/);
 assert.match(summary, /generation_type: "chat_response"/);
 assert.match(summary, /prompt_tokens/);
@@ -49,17 +54,33 @@ assert.doesNotMatch(migration, /generation_type = 'chat_response' and turn_id is
   "chat usage rows must allow null assistant IDs for failed or blocked generations");
 assert.match(openRouterShared, /buildOpenRouterProviderOptions/);
 
-const summaryStart = summary.indexOf("async function requestMemorySummary");
+const summaryStart = summary.indexOf("async function generateMemorySummary");
 const summaryEnd = summary.indexOf("export async function processDueStoryMemorySummary", summaryStart);
-assert.ok(summaryStart >= 0 && summaryEnd > summaryStart, "summary request helper must exist");
+assert.ok(summaryStart >= 0 && summaryEnd > summaryStart, "shared summary generation core must exist");
 const summaryRequest = summary.slice(summaryStart, summaryEnd);
 assert.doesNotMatch(summaryRequest, /max_tokens\s*:/, "summary request must not set a client-side token cap");
 assert.match(summaryRequest, /model: SUMMARY_MODEL/);
 assert.match(summaryRequest, /timeoutMs: 45_000/);
 assert.match(summaryRequest, /temperature: 0\.2/);
 assert.match(summaryRequest, /responseFormat: \{ type: "json_object" \}/);
+assert.match(summaryRequest, /normalizeStoryMemorySummaryText/);
+assert.match(summaryRequest, /affinity_correction/);
 assert.doesNotMatch(summaryRequest, /fetch\(|new AbortController|normalizeAiProviderResult/,
   "memory summary must reuse the shared transport rather than duplicating request and response handling");
+assert.equal((summary.match(/generateMemorySummary\(\[/g) || []).length, 2,
+  "single and group memory must both call the same summary generation core");
+assert.equal((summary.match(/const usage = usageSnapshot\(response\.usage\)/g) || []).length, 1,
+  "provider usage normalization must live in the shared summary core");
+assert.equal((summary.match(/const priorUsage = usageSnapshot/g) || []).length, 1,
+  "retry usage accumulation must live in the shared summary core");
+assert.equal((summary.match(/summaryUsageMetadata\(generated\)/g) || []).length, 4,
+  "single and group success/failure rows must share usage metadata mapping");
+assert.match(source, /requestOpenRouterChatCompletion\(/);
+assert.match(groupSource, /requestOpenRouterChatCompletion\(/);
+assert.doesNotMatch(source, /requestStoryGeneration/,
+  "single Story must not keep a private provider wrapper beside the shared transport");
+assert.doesNotMatch(groupSource, /fetch\(/,
+  "group Story must use the shared provider transport, not its own HTTP request");
 assert.match(openRouterShared, /provider: buildOpenRouterProviderOptions\(\)/,
   "all chat and summary requests must use the shared approved provider allowlist");
 

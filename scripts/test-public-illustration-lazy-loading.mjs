@@ -11,7 +11,7 @@ const between = (start, end) => {
   return html.slice(from, to);
 };
 const publicLoaderStart = html.indexOf("function mapPublicCharacterRow(row)");
-const publicLoaderEnd = html.indexOf("async function loadSupabaseCharacters(user,{loadMore=false}={})", publicLoaderStart);
+const publicLoaderEnd = html.indexOf("async function loadSupabaseCharacters(user,options={})", publicLoaderStart);
 assert.ok(publicLoaderStart >= 0 && publicLoaderEnd > publicLoaderStart, "public character loader boundaries must exist");
 const publicLoader = html.slice(publicLoaderStart, publicLoaderEnd);
 

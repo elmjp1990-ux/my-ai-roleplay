@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 
 const html = readFileSync("index.html", "utf8");
+const chatFormatSpec = readFileSync("docs/CHAT_FORMATTING_SPEC.md", "utf8");
+const css = readFileSync("poyozz-ui.css", "utf8");
 const edge = readFileSync("supabase/functions/chat-turn/index.ts", "utf8");
 const phoneMigration = readFileSync("supabase/migrations/20261110120000_story_phone_state_and_memory_summary_read.sql", "utf8");
 const worldMigration = readFileSync("supabase/migrations/20261110235500_story_world_state_contextual_time_location.sql", "utf8");
@@ -14,10 +16,31 @@ const memoryBlankMigration = readFileSync("supabase/migrations/20261111144500_st
 
 assert.ok(html.includes("const [eventsResult,stateResult,worldStateResult,summaryResult]=await Promise.all(["));
 assert.match(html, /get_story_world_state/);
+assert.match(html, /if\(eventsResult\.error\)[\s\S]*?else storyPhoneEvents=/,
+  'phone events must be kept when another independent phone RPC fails');
+assert.match(html, /if\(stateResult\.error\)[\s\S]*?else storyPhoneStates=/,
+  'phone state snapshots must be kept when the world-state RPC fails');
+assert.match(html, /phoneReadErrors\.join\('；'\)/,
+  'phone section failures must be reported independently instead of discarding all data');
+assert.match(html, /\.roleplay-segment\.is-character \{ max-width:min\(20em,100%\); \}/,
+  'spoken dialogue containers must allow 18 full-width Chinese characters after bubble padding');
+assert.doesNotMatch(html, /\.roleplay-segment\.is-character,\.roleplay-segment\.is-action \{ width:100%; max-width:100%; \}/,
+  'dialogue and narration must not be collapsed into one shared width rule');
+assert.match(css,/\.message:has\(\.roleplay-segment\.is-action\)/,
+  'mobile narration alone must expand to the full chat panel');
+assert.match(css,/\.roleplay-segment\.is-character/,'ordinary character dialogue must retain its independent bubble width');
+assert.match(chatFormatSpec,/手機版不再固定字數或 25em[\s\S]{0,80}自適應聊天室面板可用寬度/,
+  'locked chat format spec must preserve adaptive full-width mobile narration rather than a fixed character count');
+assert.match(html,/max-width:min\(25em,100%\)/,'star-wrapped narration must retain its independent 25 CJK character line width');
+assert.match(html,/max-width:min\(20em,100%\)/,'dialogue bubbles must wrap at about 18 full-width Chinese characters');
 assert.match(html, /select\('id,session_id,role,content,created_at,suggested_replies'\)/);
 assert.match(html, /message\.suggested_replies/);
 assert.match(html, /result\.suggestedReplies\).*result\.suggested_replies/s);
 assert.match(html, /function conversationSuggestionsHTML\(s\)/);
+assert.match(html, /const hasPlayerMessage=typeof s\?\.hasUserMessageOverride==='boolean'\?s\.hasUserMessageOverride:hasUserMessage\(s\)/,
+  'shared suggestion renderer must accept the authoritative group player-turn state');
+assert.match(html, /hasUserMessageOverride:g\.turn>0/,
+  'group chat must pass its real player-turn count instead of placeholder messages');
 assert.match(html, /\[\.\.\.\(s\.messages\|\|\[\]\)\]\.reverse\(\)\.find/);
 assert.match(html, /suggestionHost\.innerHTML=conversationSuggestionsHTML\(session\)/);
 assert.match(html, /id="conversationSuggestions"/);
@@ -28,9 +51,11 @@ assert.doesNotMatch(html, /勾選「重大記憶」即可珍藏這段回憶/);
 
 // Author-configured phone fields and genuine event history render inside one list,
 // with the configured fields first and no more than eight combined rows.
-assert.match(html, /storyPhoneStates\.slice\(0,8\)/);
-assert.match(html, /storyPhoneEvents\.slice\(0,Math\.max\(0,8-storyPhoneStates\.length\)\)/);
-assert.match(html, /const noticeContentHTML=\[\s*storyStateHTML,\s*storyEventHTML/s);
+assert.match(html, /const extraStoryStates=storyPhoneStates\.filter/);
+assert.ok(html.includes('const storyEventsToShow=storyPhoneEvents.filter(item=>{')&&html.includes("if(hasRenderedPhoneContent(item.title||'新通知',item.body))return false;")&&html.includes('rememberPhoneContent(item.title||\'新通知\',item.body);'),'Phone events must be deduplicated before applying the remaining row limit');
+assert.match(html, /const noticeContentHTML=\[configuredNoticeHTML,storyStateHTML,storyEventHTML\]/,
+  'configured phone rows must be first, followed by extra states and historical events');
+assert.match(html, /const configuredFieldIndexes=new Set\(configuredPhonePrompts\.slice\(0,8\)/);
 
 // Per-message persisted suggestions override stale session metadata on reload.
 assert.match(html, /Object\.assign\(normalized,metadata\);[\s\S]{0,260}if\(persistedSuggestions\.length===3\)normalized\.suggestedReplies=persistedSuggestions/);
@@ -104,3 +129,23 @@ assert.match(memoryImportanceMigration, /GRANT EXECUTE ON FUNCTION public\.set_s
 assert.match((await readFileSync("supabase/functions/_shared/story-memory-summary.ts", "utf8")), /Boolean\(str\(item\.summary\)\)/);
 assert.match((await readFileSync("supabase/functions/_shared/story-memory-summary.ts", "utf8")), /rows\.length === 0 \? str\(sessionData\.summary\) : ""/);
 console.log("Story phone, world-state, affinity, suggestions, and editable AI-summary memory checks passed.");
+
+
+const groupPersonaReadStart=html.indexOf('function groupReadStep()');
+const groupPersonaReadEnd=html.indexOf('async function groupNext()',groupPersonaReadStart);
+assert.ok(groupPersonaReadStart>=0&&groupPersonaReadEnd>groupPersonaReadStart,'Group creation persona read path must remain identifiable');
+const groupPersonaRead=html.slice(groupPersonaReadStart,groupPersonaReadEnd);
+assert.match(groupPersonaRead,/g\.draft\.playerPersona=\$\('groupPlayerPersona'\)\?\.value\|\|''/,'Group creation must preserve the exact manually entered persona');
+assert.doesNotMatch(groupPersonaRead,/if\(!g\.draft\.playerPersona\)\s*g\.draft\.playerPersona=state\.account\?\.bio/,'Group creation must not silently replace an empty group persona with account bio');
+assert.match(html,/id="groupPlayerPersona"[^>]*>[\s\S]*?<\/textarea>/,'Group creation must retain a dedicated editable group-persona field');
+assert.match(html,/e\(g\.draft\.playerPersona\|\|''\)/,'Group creation must not implicitly hydrate an account-level persona into the group field');
+assert.doesNotMatch(html,/e\(g\.draft\.playerPersona\|\|state\.account\?\.bio\|\|''\)/,'Saved account personas must not be applied implicitly during group creation');
+const groupCreateStart=html.indexOf('async function groupCreate()');
+const groupCreateEnd=html.indexOf('function groupBack()',groupCreateStart);
+const groupCreateSource=html.slice(groupCreateStart,groupCreateEnd);
+assert.match(groupCreateSource,/playerPersonaForSave=String\(g\.draft\.playerPersona\?\?''\)/,'Group creation must freeze the exact manually entered persona before asynchronous creation');
+assert.match(groupCreateSource,/player_persona:playerPersonaForSave/,'Group creation must persist the frozen persona value');
+assert.match(groupCreateSource,/updated\.player_persona!==playerPersonaForSave/,'Group creation must read back and verify the exact frozen persona');
+assert.match(html,/const selected=presets\.find\(item=>String\(item\.id\)===String\(groupPersonaPickerSelection\)\)/,'A saved persona may only be applied after an explicit picker selection');
+assert.match(html,/if\(!selected\)\{toast\('請先選擇一組人設。'\)/,'The saved-persona picker must not auto-select the default preset');
+console.log('Group persona creation preserves manual text; saved presets require explicit selection and Apply.');

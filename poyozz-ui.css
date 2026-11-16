@@ -333,7 +333,7 @@ body.day .story-relationship-icon { color:#c27cae; filter:none; }
 }
 
 
-.phone-modal-backdrop{position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(7,10,16,.68);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.phone-modal-backdrop{position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(7,10,16,.68);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);overscroll-behavior:contain;touch-action:pan-y}
 .phone-device{width:min(360px,100%);height:min(500px,90dvh);min-height:min(440px,90dvh);display:flex;flex-direction:column;overflow:hidden;padding:17px;border:1px solid var(--px-phone-border);border-radius:30px;border-top:3px solid var(--px-phone-border);background:linear-gradient(155deg,var(--px-phone-surface),var(--px-phone-surface-soft));color:var(--px-phone-text);box-shadow:0 24px 90px #0008,inset 0 1px 0 rgba(255,255,255,.14);-webkit-backdrop-filter:blur(22px) saturate(115%);backdrop-filter:blur(22px) saturate(115%)}
 .phone-device-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-shrink:0;font-size:12px;font-weight:650;letter-spacing:.01em;color:var(--px-phone-text)}
 .phone-device-head--group .phone-member-switch{justify-content:flex-start;gap:5px;margin:0;min-width:0;flex:1}
@@ -484,4 +484,111 @@ body.encounter-mode-active .chat-main.encounter-scene > .chat-heading {
 body.encounter-mode-active .chat-main.encounter-scene > .composer {
   padding-left:max(12px,env(safe-area-inset-left));
   padding-right:max(12px,env(safe-area-inset-right));
+}
+
+
+/* Chat list: plain aligned rows with only a faint separator between adjacent chats. */
+.chat-list #chatEntries > .chat-entry {
+  width:100% !important;
+  min-height:68px;
+  gap:10px;
+  padding:10px 8px;
+  margin:0 !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent;
+  box-shadow:none !important;
+}
+.chat-list #chatEntries > .chat-entry + .chat-entry {
+  border-top:1px solid rgba(255,255,255,.055) !important;
+}
+.chat-list #chatEntries > .chat-entry:hover,
+.chat-list #chatEntries > .chat-entry.active {
+  border-right:0 !important;
+  border-bottom:0 !important;
+  border-left:0 !important;
+  background:rgba(255,255,255,.035);
+  box-shadow:none !important;
+}
+.chat-list .chat-entry .avatar { width:42px; height:42px; flex:0 0 42px; }
+.chat-list .chat-entry .select-chat,
+.chat-list .chat-entry .group-chat-open { min-width:0; }
+
+/* Story Phone: graphite iPhone glass, neutral silver controls and readable light text. */
+.phone-device.phone-device--ios { color:#e5e7eb; border-color:#747b85; background:linear-gradient(145deg,#737b85 0%,#242930 18%,#090b0e 55%,#555d67 100%); }
+.phone-device.phone-device--ios::after { background:radial-gradient(circle at 35% 35%,#777f89 0 18%,#252a31 42%,#050607 75%); box-shadow:0 0 0 1px rgba(190,196,204,.2); }
+.phone-screen { border-color:rgba(210,215,222,.24); background:
+  radial-gradient(ellipse 88% 70% at 80% 6%,rgba(103,111,122,.24) 0%,rgba(103,111,122,0) 72%),
+  radial-gradient(ellipse 90% 70% at 10% 95%,rgba(73,79,88,.22) 0%,rgba(73,79,88,0) 74%),
+  linear-gradient(155deg,#252a31 0%,#15191e 54%,#0c0f13 100%); color:#edf0f3; }
+.phone-screen::before { background:linear-gradient(125deg,transparent 20%,rgba(255,255,255,.045) 42%,transparent 66%); }
+.phone-statusbar,.phone-device--ios .phone-device-head,.phone-device-caption,
+.phone-device--ios .phone-battery,.phone-device--ios .phone-member-name,
+.phone-device--ios .phone-content { color:#d8dce2!important; }
+.phone-device--ios .phone-member-switch button,
+.phone-device--ios .phone-close-row button { border-color:rgba(190,196,205,.28); background:rgba(125,132,142,.18); color:#e3e6ea; }
+.phone-lockscreen-date,.phone-lockscreen-clock { color:#f0f2f5; text-shadow:0 2px 14px rgba(0,0,0,.42); }
+.phone-lockscreen-location { border-color:rgba(205,210,218,.24); background:rgba(140,147,157,.15); color:#e1e4e8; text-shadow:none; }
+.phone-device--ios .phone-notices { border-color:rgba(195,201,210,.20); background:rgba(108,115,125,.16); box-shadow:0 8px 26px rgba(0,0,0,.20),inset 0 1px 0 rgba(255,255,255,.055); }
+.phone-notice-heading strong,.phone-notification-copy strong,.phone-notification-copy { color:#e8ebef; }
+.phone-notice-heading span,.phone-notification-meta,.phone-notification-empty,.phone-memory-caption { color:rgba(215,220,227,.62); }
+.phone-notification-card { border-color:rgba(205,211,219,.14); background:rgba(155,162,172,.12); box-shadow:inset 0 1px 0 rgba(255,255,255,.045); color:#e7eaee; }
+.phone-notification-copy p { color:rgba(225,229,234,.78); }
+.phone-app-icon { background:linear-gradient(145deg,#737b86,#424953); color:#f4f5f7; }
+.phone-memory-warning { border-color:rgba(195,201,210,.18); background:rgba(137,145,155,.14); color:#e0e4e9; }
+.phone-home-indicator { background:rgba(226,230,235,.76); box-shadow:none; }
+
+
+/* Character visibility: unmistakable lavender selection outline. */
+.character-visibility-field{min-width:0;margin:0;padding:0;border:0;}
+.character-visibility-field legend{padding:0 0 9px;color:var(--text);font-weight:650;}
+.character-visibility-choice{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.character-visibility-option{display:flex;align-items:center;gap:10px;min-width:0;min-height:62px;padding:10px 12px;border:1px solid rgba(155,123,208,.34);border-radius:13px;background:rgba(155,123,208,.055);cursor:pointer;transition:border-color .16s,background .16s,box-shadow .16s;}
+.character-visibility-option input{flex:0 0 auto;width:17px;height:17px;margin:0;accent-color:#ad8be4;}
+.character-visibility-option span{display:grid;gap:3px;min-width:0;}
+.character-visibility-option strong{font-size:13px;color:var(--text);}
+.character-visibility-option small{font-size:11px;line-height:1.4;color:var(--muted);}
+.character-visibility-option:has(input:checked),.character-visibility-option.is-selected{border:2px solid var(--px-glass-selected-border)!important;color:var(--text);background:var(--px-glass-selected)!important;box-shadow:inset 0 1px 0 var(--px-glass-highlight),0 0 0 1px var(--px-glass-selected-border)!important;}
+.character-visibility-option.is-selected strong,.character-visibility-option:has(input:checked) strong{color:var(--text);}
+.character-visibility-option.is-selected small,.character-visibility-option:has(input:checked) small{color:var(--text);}
+
+.character-visibility-option:focus-within{outline:2px solid rgba(185,154,233,.42);outline-offset:2px;}
+@media(max-width:380px){.character-visibility-choice{gap:7px}.character-visibility-option{padding:9px 8px;gap:7px}}
+
+
+/* Composer placeholder contrast and 25-character narration target. */
+body.conversation .composer-input-row textarea,
+body.group-chat-page .composer-input-row textarea { color:var(--text); background-color:rgba(255,255,255,.045); }
+body.conversation .composer-input-row textarea::placeholder,
+body.group-chat-page .composer-input-row textarea::placeholder { color:rgba(238,240,244,.82); opacity:1; background:transparent; text-shadow:none; }
+body.day.conversation .composer-input-row textarea::placeholder,
+body.day.group-chat-page .composer-input-row textarea::placeholder { color:rgba(48,51,57,.78); }
+@media(max-width:600px) {
+  body.conversation .messages, body.group-chat-page .messages { padding-inline:6px; }
+  body.conversation .messages .message:has(.roleplay-segment.is-action),
+  body.group-chat-page .messages .message:has(.roleplay-segment.is-action) { width:calc(100% + 10px); margin-inline:-5px; }
+  body.conversation .message:has(.roleplay-segment.is-action) > .message-content,
+  body.group-chat-page .message:has(.roleplay-segment.is-action) > .message-content { flex:1 1 100%; width:100%; max-width:none; min-width:0; }
+  body.conversation .message:has(.roleplay-segment.is-action) .roleplay-segments,
+  body.group-chat-page .message:has(.roleplay-segment.is-action) .roleplay-segments { width:100%; max-width:none; }
+  body.conversation .roleplay-segment.is-action,
+  body.group-chat-page .roleplay-segment.is-action { width:100%; max-width:none; justify-self:stretch; }
+  body.conversation .roleplay-segment.is-action .narration,
+  body.group-chat-page .roleplay-segment.is-action .narration {
+    width:calc(100% - 2px); max-width:none; box-sizing:border-box; margin-inline:1px;
+    font-size:clamp(12px,3.65vw,15px);
+  }
+}
+.group-opening-message { width:100%; }
+.group-opening-message > .message-content { flex:1 1 100%; width:100%; max-width:none; }
+.group-opening-content { display:grid; gap:5px; width:100%; max-width:none; }
+.group-opening-content .narration { width:100%; max-width:none; margin-inline:1px; }
+.group-opening-content .bubble { max-width:min(20em,100%); }
+:root { --px-creator-visibility-border:rgba(197,166,244,.96); }
+body.day { --px-creator-visibility-border:rgba(132,91,180,.96); }
+.owner-actions button[data-action="visibility"] { border:1px solid var(--px-glass-border); color:var(--text); }
+.owner-actions button[data-action="visibility"].is-selected {
+  border:2px solid var(--px-creator-visibility-border)!important;
+  background:var(--px-glass-selected)!important; color:var(--text)!important; font-weight:700;
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--px-creator-visibility-border) 32%,transparent),inset 0 1px 0 var(--px-glass-highlight)!important;
 }

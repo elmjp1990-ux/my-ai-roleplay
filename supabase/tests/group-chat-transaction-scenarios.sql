@@ -78,6 +78,12 @@ BEGIN
   IF v_phone->0->>'title' <> '最新訊息' OR v_phone->0->>'body' <> '客戶確認會議時間。' THEN
     RAISE EXCEPTION 'group character phone state was not saved with the turn: %', v_phone;
   END IF;
+  UPDATE public.chat_groups SET story_time='2026-11-16 19:30',story_location='蘇清雅的辦公室'
+  WHERE id='20000000-0000-4000-8000-000000000001';
+  IF NOT EXISTS (SELECT 1 FROM public.chat_groups WHERE id='20000000-0000-4000-8000-000000000001'
+    AND story_time='2026-11-16 19:30' AND story_location='蘇清雅的辦公室') THEN
+    RAISE EXCEPTION 'group story-world time/location did not persist';
+  END IF;
   BEGIN
     PERFORM * FROM public.refund_group_chat_turn(
       '10000000-0000-4000-8000-000000000001',v_turn,'should_not_refund'
@@ -187,7 +193,34 @@ END
 $$;
 RESET ROLE;
 
--- Scheduler must be installed exactly once by the migration.
+-- The group opening limit is enforced by the chat_group_scenes data constraint.
+SELECT set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',false);
+SET ROLE authenticated;
+DO $$
+DECLARE v_group uuid;
+BEGIN
+  INSERT INTO public.chat_groups(owner_id,name)
+  VALUES ('10000000-0000-4000-8000-000000000001','opening-limit-test')
+  RETURNING id INTO v_group;
+  BEGIN
+    INSERT INTO public.chat_group_scenes(group_id,name,description,position)
+    VALUES (v_group,'初始相遇',repeat('x',1001),1);
+    RAISE EXCEPTION 'group opening over 1000 characters was accepted';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+  INSERT INTO public.chat_group_scenes(group_id,name,description,position)
+  VALUES (v_group,'初始相遇',repeat('x',1000),1);
+  IF NOT EXISTS (
+    SELECT 1 FROM public.chat_group_scenes
+    WHERE group_id=v_group AND char_length(description)=1000
+  ) THEN RAISE EXCEPTION '1000-character group opening was not accepted'; END IF;
+END
+$$;
+RESET ROLE;
+
+
+-- Scheduler must be installed exactly once by the migration
 DO $$
 DECLARE n integer;
 BEGIN

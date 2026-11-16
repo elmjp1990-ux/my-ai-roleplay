@@ -5,14 +5,40 @@ const html = fs.readFileSync('index.html', 'utf8');
 const uiStyles = fs.readFileSync('poyozz-ui.css', 'utf8');
 const phoneStateMigration = fs.readFileSync('supabase/migrations/20261110120000_story_phone_state_and_memory_summary_read.sql', 'utf8');
 const storyPrompt = fs.readFileSync('supabase/functions/chat-turn/index.ts', 'utf8');
+const groupTurnSource = fs.readFileSync('supabase/functions/group-chat-turn/index.ts', 'utf8');
+const memorySummaryWorker = fs.readFileSync('supabase/functions/_shared/story-memory-summary.ts', 'utf8');
+const chatReadMigration = fs.readFileSync('supabase/migrations/20261116130000_mark_chat_session_read_and_story_chat_paging.sql', 'utf8');
 const generatedStart = html.indexOf('  // Creator notice prompts guide AI generation only; never render raw instructions to players.');
 const generatedEnd = html.indexOf('  const phoneHeader=', generatedStart);
 
 assert.ok(generatedStart >= 0 && generatedEnd > generatedStart, 'Phone notification rendering block must exist');
 const phoneBlock = html.slice(generatedStart, generatedEnd);
 
-assert.match(phoneBlock, /const generated=isGroup\?/);
-assert.match(phoneBlock, /const savedNotices=Array.isArray\(generated\)/);
+assert.match(phoneBlock, /const noticeSources=isGroup/);
+assert.match(phoneBlock,/let storyWorldState=isGroup/,'group and single phone must read the same in-world state shape');
+assert.ok(phoneBlock.includes('const initialStoryTime=Date.now()'),'single and group phones must initially show the current real-world time when AI time is absent');
+assert.ok(phoneBlock.includes('storyWorldState.storyTime||storyWorldState.story_time||initialStoryTimeText'),'AI-provided in-world time must take precedence over the temporary real-time fallback');
+assert.doesNotMatch(phoneBlock,/timeText\(item\.created_at/,'phone notifications must not render real database timestamps');
+assert.match(groupTurnSource,/serializeGroupPhoneUpdatesForRpc/,'group phone updates must be serialized to SQL RPC snake_case field names');
+assert.match(groupTurnSource,/story_world_state/,'group director must persist shared in-world time and location');
+assert.match(groupTurnSource,/不可讀取、推測或使用系統現在時間/,'group director must never substitute current device/system time');
+assert.doesNotMatch(phoneBlock, /const notices=savedNotices;/,
+  'phone rows must be composed only after configured labels and AI snapshots are joined');
+assert.match(phoneBlock, /const configuredRows=configuredPhonePrompts\.slice\(0,8\)\.map/,
+  'configured phone labels must always render as primary rows in single and group phones');
+assert.match(phoneBlock, /const stateByIndex=new Map\(storyPhoneStates\.map/,
+  'AI-generated phone state must be joined to the configured field by field_index');
+assert.match(phoneBlock, /const resolvePhoneFieldTitle=value=>replaceRoleplayVariables/,
+  'configured {CHAR}/{USER} placeholders must be resolved before matching generated group phone titles');
+assert.match(phoneBlock, /const generatedNotice=noticeByTitle\.get\(titleKey\)/,
+  'configured phone rows must join generated notifications by canonical title');
+assert.match(phoneBlock, /const configuredTitles=new Set\(configuredRows\.map\(item=>phoneTitleKey\(item\.title\)\)\)/,
+  'configured title deduplication must use the same canonical key as generated notifications');
+assert.match(phoneBlock, /!configuredTitles\.has\(phoneTitleKey\(resolvePhoneFieldTitle\(item\?\.title\|\|''\)\)\)/,
+  'generated notifications already represented by configured fields must not render twice');
+assert.match(phoneBlock, /generatedNotice\?\.body\|\|state\?\.body\|\|'目前尚未有更新'/,
+  'configured rows must show generated content when available and a safe empty state otherwise');
+assert.match(phoneBlock, /const savedNotices=\[\.\.\.noticeByTitle\.values\(\)\]/);
 assert.match(phoneBlock, /const noticeLines=notices\.map/);
 assert.match(phoneBlock, /get_story_phone_state/, 'Story phone must load current configured field state separately');
 assert.match(phoneBlock, /get_story_phone_events/, 'Story phone must load genuine event history separately');
@@ -29,8 +55,15 @@ assert.match(phoneStateMigration, /e\.event_type <> 'notification'/,
 assert.match(storyPrompt, /每個手機欄位的 body 必須以簡短的一行為主/);
 assert.match(storyPrompt, /沒有新資訊或劇情變化時，原樣延續最近狀態/);
 assert.match(phoneBlock, /目前還沒有新的通知/);
-assert.match(phoneBlock, /configuredPhonePrompts\.slice\(0,8\)\.map/,'Group phone may use configured notice labels only as display titles when no generated notice exists');
-assert.match(phoneBlock, /body:'目前尚未有更新'/,'Creator instructions must never be displayed as notification body text');
+assert.match(phoneBlock, /configuredPhonePrompts\.slice\(0,8\)\.map/,'Single/group phone must always include configured display labels without exposing AI instructions');
+assert.match(phoneBlock, /目前尚未有更新/,'Creator instructions must never be displayed as notification body text');
+assert.match(phoneBlock, /const noticeContentHTML=\[configuredNoticeHTML,storyStateHTML,storyEventHTML\]/,
+  'configured rows must appear before state snapshots and historical events');
+assert.match(phoneBlock, /phoneReadErrors/, 'a failed optional phone RPC must not clear successful phone sections');
+assert.match(phoneBlock, /cached\.phoneReadError/, 'per-section phone read errors must survive the short-lived cache');
+assert.match(phoneBlock, /const safePhoneRpc=async\(name,args\)/, 'phone RPCs must be awaited through a rejection-safe helper because Supabase builders are thenables');
+assert.match(phoneBlock, /catch\(error\)\{return \{data:null,error\};\}/, 'one rejected phone RPC must be isolated from the other reads');
+assert.doesNotMatch(phoneBlock, /client\.rpc\([^\n]+\)\.catch\(/, 'do not call catch directly on Supabase thenable query builders');
 assert.doesNotMatch(phoneBlock, /body:String\(row\)|body:row/,'Raw creator instructions must never be rendered as player-facing notification bodies');
 
 assert.ok(html.includes('session.storyWorldState'), 'Phone must read the latest saved story-world state');
@@ -42,8 +75,22 @@ assert.match(uiStyles, /\.phone-member-switch\{[^}]*flex-shrink:0/);
 assert.match(uiStyles, /\.phone-bar\{[^}]*flex-shrink:0/);
 assert.match(uiStyles, /\.phone-close-row\{[^}]*flex-shrink:0/,
   'Phone header, member switch, bar, and close control must remain fixed');
+assert.match(uiStyles, /\.phone-modal-backdrop\{[^}]*overscroll-behavior:contain/,
+  'phone surface must contain touch overscroll');
+assert.match(html, /data-phone-action="close">關閉<\/button>/,
+  'phone close control must be labeled 關閉 rather than 完成');
+assert.match(html, /function ensurePhoneModalHistoryGuard\(\)/,
+  'opening the phone must add a history guard against browser-back gestures');
+assert.match(html, /function closePhoneModalWithButton\(modal\)/,
+  'the phone must release its history guard only through the explicit close control');
+assert.match(html, /if\(document\.querySelector\('\.phone-modal-backdrop'\)\)/,
+  'popstate must keep the chat route while the phone panel remains open');
+assert.match(html, /if\(event\.target===modal\)return/,
+  'tapping the backdrop must not dismiss the phone panel');
 assert.ok(!html.includes('.phone-notice-list{max-height:'), 'Phone must not trap scrolling in a nested notice list');
 assert.ok(html.includes('function firstSpokenDialoguePreview('), 'Chat preview must parse spoken dialogue separately from narration');
+assert.match(html, /storyPhoneRuntimeCache\.delete\(String\(user\.uid\)\+'\:'\+session\.id\);[\s\S]*?await loadStoryMemorySummary\(session\);[\s\S]*?await renderPhoneModal\(\)/,
+  'deleting/editing a Story diary entry must invalidate cached phone memory and refresh an open phone panel');
 assert.ok(html.includes('角色暫時沒有對白'), 'Narration-only replies must use the no-dialogue fallback');
 assert.ok(html.includes('function latestAssistantPreview('), 'Chat preview must select the latest assistant message');
 assert.match(html, /latestAssistantSuggestionMessage/,
@@ -65,7 +112,9 @@ assert.ok(html.includes("return session?.cloudMessagesLoaded===false?'點擊載�
   'Missing spoken dialogue must never fall back to narration');
 assert.ok(html.includes('lastAssistantMessageAt') && html.includes('lastReadAt'), 'Unread state must track assistant messages and read watermark');
 assert.ok(html.includes('chat-unread-pill') && html.includes('新訊息'), 'Unread sessions must show the compact new-message pill');
-assert.ok(html.includes('if(isConversationEntry)') && html.includes('saveChatSessionSafely(s)'), 'Opening a conversation must mark it read and sync its watermark');
+assert.match(html,/await markCloudChatSessionRead\(latest\)/,'Opening a conversation must use the narrow read-watermark RPC rather than a full optimistic session save');
+assert.match(chatReadMigration,/CREATE OR REPLACE FUNCTION public\.mark_chat_session_read/);
+assert.doesNotMatch(chatReadMigration,/SET updated_at\s*=/,'Read watermarks must not change the chat-session version timestamp');
 assert.ok(html.includes("if(route.page==='conversation'&&route.id===s.id)s.lastReadAt=assistantAt"),
   'Assistant replies received while their conversation is open must be marked read');
 
@@ -170,4 +219,35 @@ console.log('Character save performs deterministic AI-impact diffing without inv
 
 assert.match(phoneBlock, /get_story_world_state/, 'Story phone must read the persisted contextual time and location');
 assert.match(phoneBlock, /依開場情境推定中/, 'Story phone must show a contextual initial location fallback');
-assert.match(phoneBlock, /initialStoryTimeText/, 'Story phone must show the session start time before the first AI turn');
+assert.match(phoneBlock, /initialStoryTimeText/, 'Story phone must show the temporary current-time fallback before the first AI turn');
+
+
+// PR #256 regression coverage: preserve runtime state and use a neutral graphite phone surface.
+assert.match(phoneBlock, /noticeSources=isGroup/);
+assert.match(phoneBlock, /noticeByTitle/);
+assert.match(phoneBlock, /Object\.values\(worldStateResult\.data\)\.some/);
+assert.match(uiStyles, /\.phone-screen \{[\s\S]*?linear-gradient\(155deg,#252a31 0%,#15191e 54%,#0c0f13 100%\)/);
+assert.match(uiStyles, /phone-notification-card \{[^}]*background:rgba\(155,162,172/);
+console.log('PR #256 phone state preservation and graphite iPhone styling checks passed.');
+
+assert.match(phoneBlock,/const savedNotices=\[\.\.\.noticeByTitle\.values\(\)\]/);
+assert.match(html,/get_group_memory_summaries/,'Group Sweet Diary must read persisted AI summaries');
+assert.match(groupTurnSource,/processDueGroupMemorySummary/,'Group turns must invoke the shared five-turn AI summary pipeline');
+assert.match(memorySummaryWorker,/export async function processDueGroupMemorySummary/,'The shared worker must implement group summaries');
+assert.match(html,/每 5 個已完成的群組回合，由 AI 整理一則 50–150 字摘要/,'Group diary must state the same 50–150 character summary contract as single Story');
+assert.ok(html.includes('function phoneNoticeIconPresentation(value)'), 'configured phone notice title prefixes must select their own icon');
+assert.ok(html.includes("const icon=match?.[0]||'🔔'"), 'missing author icon must fall back to the bell');
+assert.ok(html.includes('storyPhoneRuntimeCache.delete(String(user.uid)'), 'Story summary edit must use the scoped user id and refresh immediately');
+
+
+const phoneDedupStart=html.indexOf('const phoneContentKeys=');
+const phoneDedupEnd=html.indexOf('function phoneNoticeIconPresentation',phoneDedupStart);
+assert.ok(phoneDedupStart>=0&&phoneDedupEnd>phoneDedupStart,'Phone content deduplication must be part of the phone rendering path');
+const phoneDedup=html.slice(phoneDedupStart,phoneDedupEnd);
+assert.match(phoneDedup,/normalize\('NFKC'\)/,'Phone content identity must normalize Unicode variants');
+assert.ok(phoneDedup.includes("replace(/\\s+/g,' ')"),'Phone content identity must collapse actual whitespace');
+assert.match(phoneDedup,/keys\.push\('body:'\+normalizedBody\)/,'Phone rows with alternate titles must still deduplicate identical meaningful bodies');
+assert.match(phoneDedup,/const hasRenderedPhoneContent=/,'Phone rows must use one shared cross-source deduplication helper');
+assert.match(phoneDedup,/extraStoryStates=storyPhoneStates[\s\S]*?hasRenderedPhoneContent/,'Phone state snapshots must not repeat configured notification content');
+assert.match(phoneDedup,/storyEventsToShow=storyPhoneEvents\.filter[\s\S]*?hasRenderedPhoneContent/,'Phone event rows must not repeat content already shown in configured notices or state snapshots');
+console.log('Phone notice/state/event cross-source duplicate-content regression checks passed.');
