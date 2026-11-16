@@ -46,8 +46,8 @@ assert.match(groupCreationMigration,/account_deletion_pending/,
   'group creation must continue rejecting accounts with pending deletion requests');
 assert.match(groupCreationMigration,/cs\.visibility = 'public'/,
   'group opening snapshots must preserve the public-story visibility rule');
-assert.match(groupCreationMigration,/ORDER BY cs\.created_at DESC/,
-  'group snapshots must use the latest public opening message');
+assert.match(groupCreationMigration,/ORDER BY cs\.created_at ASC/,
+  'group snapshots must preserve the existing earliest public opening message behavior');
 assert.match(groupCreationMigration,/CREATE TRIGGER characters_mark_existing_chat_snapshots_offline/,
   'soft-deleting a character must mark existing chat snapshots offline');
 assert.match(groupCreationMigration,/UPDATE public\.chat_sessions cs[\s\S]*?\{deletedAt\}/,
@@ -91,3 +91,10 @@ assert.match(retainedPortraitPolicy,/gm\.character_snapshot->>'imagePath' = obje
   'group access must be limited to the exact path in its member snapshot');
 assert.match(retainedPortraitPolicy,/public\.account_is_active\(\)/,
   'existing-chat portrait reads must require an active authenticated account');
+
+const softDeleteFunction = groupCreationMigration.match(
+  /CREATE OR REPLACE FUNCTION public\\.soft_delete_character\\([\\s\\S]*?\\$function\\$;/,
+)?.[0] || '';
+assert.ok(softDeleteFunction, 'the migration must preserve and update the existing soft-delete RPC');
+assert.doesNotMatch(softDeleteFunction,/updated_at\\s*=\\s*now\\(\\)/i,
+  'soft_delete_character must not bump the chat session sync version');
