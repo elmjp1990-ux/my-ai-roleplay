@@ -32,12 +32,38 @@ assert.match(groupCreationMigration,/image', CASE WHEN v_primary_illustration_pa
   'new group member snapshots must keep the avatar URL when no primary illustration exists');
 assert.match(groupCreationMigration,/c\.deleted_at IS NULL/,
   'the group creation eligibility check must continue rejecting soft-deleted characters');
+assert.match(groupCreationMigration,/p_scene_mode IS DISTINCT FROM 'shared'/,
+  'group creation must preserve the currently deployed shared-scene-only rule');
+assert.match(groupCreationMigration,/c\.visibility = 'public'/,
+  'group creation must preserve the currently deployed public-character-only rule');
+assert.match(groupCreationMigration,/account_deletion_pending/,
+  'group creation must continue rejecting accounts with pending deletion requests');
+assert.match(groupCreationMigration,/cs\.visibility = 'public'/,
+  'group opening snapshots must preserve the public-story visibility rule');
+assert.match(groupCreationMigration,/CREATE TRIGGER characters_mark_existing_chat_snapshots_offline/,
+  'soft-deleting a character must mark existing chat snapshots offline');
+assert.match(groupCreationMigration,/UPDATE public\.chat_sessions cs[\s\S]*?\{deletedAt\}/,
+  'single-chat snapshots must receive only offline metadata on soft delete');
+assert.match(groupCreationMigration,/UPDATE public\.chat_group_members gm[\s\S]*?\{deletedAt\}/,
+  'group-member snapshots must receive only offline metadata on soft delete');
+assert.match(groupCreationMigration,/chat_sessions\.updated_at stable/,
+  'the soft-delete trigger must not invalidate optimistic chat-sync versions');
 assert.match(html,/async function signCharacterSnapshotPortraits\(members\)/,
   'group chats must be able to sign stable portrait paths from member snapshots');
 assert.match(html,/characterIllustrationSignedUrlManager\.getMany\(unique\.map\(entry=>entry\.path\)\)/,
   'group snapshot portrait paths should be signed in a single batch');
 assert.match(html,/snapshot\.imagePath\|\|snapshot\.primaryIllustrationPath/,
   'group list and group-open hydration must read the snapshotted image path');
+assert.match(html,/const deletedAt=snap\?\.deletedAt\|\|found\.deletedAt\|\|null/,
+  'single chat status must prefer the server-marked soft-delete state over a stale local character row');
+assert.match(html,/m\.characterSnapshot\?\.deletedAt\|\|m\.character_snapshot\?\.deletedAt/,
+  'group chat avatars must derive offline status from the immutable member snapshot');
+assert.match(html,/member\.character_snapshot\?\.deletedAt\|\|member\.characterSnapshot\?\.deletedAt/,
+  'group-list avatars must derive offline status from the immutable member snapshot');
+assert.match(html,/character-status-dot.*離線／已下架/,
+  'group avatars must expose an offline indicator when the snapshot is marked deleted');
+assert.doesNotMatch(html,/\.character-avatar-status\.is-offline \.avatar,/,
+  'offline status must not dim or hide the preserved character portrait');
 
 const retainedPortraitPolicy = fs.readFileSync(
   'supabase/migrations/20261116171000_allow_existing_chat_portrait_access.sql',
