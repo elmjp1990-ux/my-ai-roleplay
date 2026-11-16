@@ -105,11 +105,15 @@ export function parseGroupTurnEnvelopeDetailed(output: unknown, speakers: GroupT
         const notice = asObject(rawNotice), title = asText(notice.title), body = asText(notice.body);
         const hasConfiguredTitle = configuredPrompts(speaker).length > 0;
         // Configured titles are authoritative server-side labels. The model may
-        // omit the redundant title; only the notification body is generated.
-        if ((!title && !hasConfiguredTitle) || !body || title.length > 80 || body.length > 500) {
-          if (hasConfiguredTitle) {
-            return { envelope: null, errorCode: "invalid_required_phone_notification", warningCount };
-          }
+        // omit them or return an overlong duplicate; neither should invalidate a
+        // generated group turn. Likewise, incomplete/overlong phone text is
+        // normalized below instead of rejecting otherwise valid character speech.
+        if (hasConfiguredTitle) {
+          if (!body || body.length > 500 || title.length > 80) warningCount += 1;
+          notifications.push({ title: "", body: body.slice(0, 500) });
+          continue;
+        }
+        if (!title || !body || title.length > 80 || body.length > 500) {
           warningCount += 1;
           notifications.length = 0;
           break;
@@ -139,7 +143,9 @@ export function parseGroupTurnEnvelopeDetailed(output: unknown, speakers: GroupT
             .replace(/\{USER\}/g, asText(playerName) || "玩家")
             .slice(0, 80)
           : notice.title;
-        return { title: title || notice.title, body: notice.body };
+        const previousBody = asText(speaker.phoneNotifications?.[index]?.body);
+        const body = asText(notice.body).slice(0, 500) || previousBody || "目前沒有足夠資訊。";
+        return { title: title || notice.title || `手機資訊${index + 1}`, body };
       })
       : (Array.isArray(speaker.phoneNotifications) ? speaker.phoneNotifications.slice(0, 8) : []);
     phoneUpdates.push({ characterId: speaker.id, notifications });
