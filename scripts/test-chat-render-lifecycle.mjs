@@ -148,3 +148,81 @@ test('encounter mode no longer wraps or replaces base render functions', () => {
   assert.doesNotMatch(appHtml, /renderConversation\s*=\s*wrappedRenderConversation/);
   assert.doesNotMatch(appHtml, /renderMessages\s*=\s*wrappedRenderMessages/);
 });
+
+
+const cityMap = fs.readFileSync(new URL('../city-map.js', import.meta.url), 'utf8');
+
+test('city map exposes teardown and releases its timer, listeners and videos', () => {
+  assert.match(cityMap, /destroy:\s*destroyActiveMap/);
+  assert.match(cityMap, /clearInterval\(cityMapClock\)/);
+  assert.match(cityMap, /removeEventListener\('visibilitychange',\s*onVisibilityChange\)/);
+  assert.match(cityMap, /removeEventListener\('resize',\s*resizeHandler\)/);
+  assert.match(cityMap, /characterVideoObserver\?\.unobserve\(video\)/);
+  assert.match(cityMap, /releaseCharacterVideo\(video\)/);
+  assert.match(cityMap, /locationModal\?\.remove\(\)/);
+  assert.match(cityMap, /stage\.remove\(\)/);
+  assert.match(appHtml, /const previousCardVideos[\s\S]*?window\.PoyozzCityMap\?\.destroy\?\.\(\);/);
+});
+
+test('memory album photo metadata is weakly held by mounted rows', () => {
+  assert.match(memoryAlbum, /const urlCache\s*=\s*new WeakMap\(\)/);
+  assert.match(memoryAlbum, /cards\.forEach\(\(card,index\)=>urlCache\.set\(renderedRows\[/);
+  assert.match(memoryAlbum, /urlCache\.get\(row\)/);
+  assert.doesNotMatch(memoryAlbum, /urlCache\.(?:set|get|delete)\(photo\.id/);
+});
+
+test('memory album pagination state uses a bounded LRU', () => {
+  assert.match(memoryAlbum, /MAX_ALBUM_PAGE_STATES\s*=\s*8/);
+  assert.match(memoryAlbum, /function getAlbumPageState\(key\)/);
+  assert.match(memoryAlbum, /function rememberAlbumPageState\(key,pager\)/);
+  assert.match(memoryAlbum, /while\(albumPageStates\.size>MAX_ALBUM_PAGE_STATES\)/);
+  assert.match(memoryAlbum, /let pager=getAlbumPageState\(key\)/);
+  assert.match(memoryAlbum, /rememberAlbumPageState\(key,pager\)/);
+});
+
+
+const paginationSource = fs.readFileSync(new URL('../list-pagination.js', import.meta.url), 'utf8');
+test('pagination scope changes invalidate in-flight requests and disconnect observers', () => {
+  const observers = [];
+  class FakeIntersectionObserver {
+    constructor(callback) { this.callback = callback; this.disconnected = false; observers.push(this); }
+    observe() {}
+    disconnect() { this.disconnected = true; }
+  }
+  const window = {};
+  vm.runInNewContext(paginationSource, { window, Map, Set, Object, Number, String, IntersectionObserver: FakeIntersectionObserver });
+  const pagination = window.PoyozzListPagination;
+  const state = pagination.createState('authorCharacters');
+  const requestId = state.beginRequest();
+  const observer = pagination.observeEnd({}, () => {});
+  assert.equal(state.loading, true);
+  assert.equal(state.isRequestCurrent(requestId), true);
+  assert.equal(pagination.beginScope('author:one:user-a'), true);
+  assert.equal(state.isRequestCurrent(requestId), false);
+  assert.equal(state.loading, false);
+  assert.equal(observer.disconnected, true);
+  const disposable = pagination.createState('memoryPhotos');
+  const disposableRequest = disposable.beginRequest();
+  disposable.dispose();
+  assert.equal(disposable.isRequestCurrent(disposableRequest), false);
+  assert.equal(pagination.beginScope('author:one:user-a'), false);
+  assert.equal(pagination.beginScope('author:two:user-a'), true);
+});
+
+test('author profile pagination cache is bounded and stale requests cannot append rows', () => {
+  const authorProfile = fs.readFileSync(new URL('../author-profile.js', import.meta.url), 'utf8');
+  assert.match(authorProfile, /MAX_AUTHOR_PAGES\s*=\s*8/);
+  assert.match(authorProfile, /page\.beginRequest\(\)/);
+  assert.match(authorProfile, /if \(!page\.isRequestCurrent\(requestId\)\) return/);
+  assert.match(authorProfile, /authorPages\.get\(oldestId\)\?\.dispose\(\)/);
+  assert.match(appHtml, /PoyozzListPagination\?\.beginScope\?\.\(route\.page\+':'/);
+});
+
+test('followed authors and memory albums guard every awaited page against route-scope invalidation', () => {
+  const followedAuthors = fs.readFileSync(new URL('../followed-authors.js', import.meta.url), 'utf8');
+  assert.match(followedAuthors, /current\.beginRequest\(\)/);
+  assert.match(followedAuthors, /current\.isRequestCurrent\(requestId\)/);
+  assert.match(memoryAlbum, /pager\.beginRequest\(\)/);
+  assert.match(memoryAlbum, /pager\.isRequestCurrent\(requestId\)/);
+  assert.match(memoryAlbum, /albumPageStates\.get\(oldest\)\?\.dispose\(\)/);
+});

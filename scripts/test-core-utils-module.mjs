@@ -6,8 +6,9 @@ const html = fs.readFileSync('index.html', 'utf8');
 const source = fs.readFileSync('core-utils.js', 'utf8');
 const moduleTag = '<script src="./core-utils.js"></script>';
 assert.ok(html.includes(moduleTag), 'Shared core utilities must be loaded.');
-assert.ok(html.indexOf(moduleTag) < html.indexOf('<script>'),
-  'Shared core utilities must load before the main application script.');
+const appAdapter = html.indexOf('const { countChars, clone, isUuid } = window.PoyozzCoreUtils;');
+assert.ok(appAdapter >= 0 && html.indexOf(moduleTag) < appAdapter,
+  'Shared core utilities must load before the main application adapter uses them.');
 assert.match(html, /const \{ countChars, clone, isUuid \} = window\.PoyozzCoreUtils;/,
   'The main application must retain the existing helper names through a thin adapter.');
 assert.doesNotMatch(html, /function isUuid\(value\)/,

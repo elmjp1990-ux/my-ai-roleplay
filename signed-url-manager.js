@@ -3,6 +3,7 @@
 
   function create(options = {}) {
     const createSignedUrl = options.createSignedUrl;
+    const createSignedUrls = options.createSignedUrls;
     if (typeof createSignedUrl !== 'function') {
       throw new TypeError('createSignedUrl must be a function');
     }
@@ -56,6 +57,51 @@
       }
     }
 
+    async function getMany(keys, requestOptions = {}) {
+      const requested = Array.isArray(keys) ? keys.filter(key => key != null && key !== '') : [];
+      if (!createSignedUrls) return Promise.all(requested.map(key => get(key, requestOptions)));
+      const unique = [...new Set(requested)];
+      const requests = new Map();
+      const missing = [];
+      const forceRefresh = requestOptions.forceRefresh === true;
+      const context = requestOptions.context;
+      for (const key of unique) {
+        if (forceRefresh) {
+          const forced = forcedInflight.get(key);
+          if (forced) { requests.set(key, forced); continue; }
+          cache.delete(key);
+          inflight.delete(key);
+        } else {
+          const cached = cache.get(key);
+          if (cached && cached.expiresAt > Date.now() + refreshSkewMs) {
+            requests.set(key, Promise.resolve(cached.url));
+            continue;
+          }
+          if (inflight.has(key)) { requests.set(key, inflight.get(key)); continue; }
+        }
+        missing.push(key);
+      }
+      if (missing.length) {
+        const batch = Promise.resolve().then(() => createSignedUrls(missing, context));
+        for (const key of missing) {
+          let request;
+          request = batch.then(result => {
+            const url = result instanceof Map ? result.get(key) : result?.[key];
+            if (!isCurrent(context)) return null;
+            if (inflight.get(key) === request) remember(key, url);
+            return url || null;
+          }).finally(() => {
+            if (inflight.get(key) === request) inflight.delete(key);
+            if (forcedInflight.get(key) === request) forcedInflight.delete(key);
+          });
+          inflight.set(key, request);
+          if (forceRefresh) forcedInflight.set(key, request);
+          requests.set(key, request);
+        }
+      }
+      return Promise.all(requested.map(key => requests.get(key) || null));
+    }
+
     function invalidate(key) {
       if (key != null && key !== '') cache.delete(key);
     }
@@ -64,7 +110,7 @@
       cache.clear();
     }
 
-    return Object.freeze({ get, invalidate, clear });
+    return Object.freeze({ get, getMany, invalidate, clear });
   }
 
   global.PoyozzSignedUrlManager = Object.freeze({ create });

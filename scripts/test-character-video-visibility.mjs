@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 
 const html = fs.readFileSync('index.html', 'utf8');
-const start = html.indexOf('const characterVideoSignedUrlCache');
+const start = html.indexOf('const characterVideoSignedUrlManager');
 const end = html.indexOf('function normalizePersonalityProfile', start);
 if (start < 0 || end < 0) throw new Error('Character video loader block not found.');
 const source = html.slice(start, end);

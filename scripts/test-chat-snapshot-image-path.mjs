@@ -19,5 +19,5 @@ assert.match(html,/data-character-illustration-path=.*c\.imagePath/);
 assert.match(html,/priorSnapshot\.imagePath \? '' : \(character\?\.image \|\| priorSnapshot\.image \|\| ''\)/);
 assert.match(html,/hydrateCloudSessionCharacterImage\(session\)/);
 assert.match(html,/hydrateCloudSessionCharacterImage\(s\)/);
-assert.match(html,/snap\.imagePath&&uid&&s\.id/);
+assert.match(html,/portraitPath&&uid&&s\.id/);
 console.log('Chat snapshot image-path contract passed.');

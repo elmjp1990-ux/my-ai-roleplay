@@ -17,7 +17,7 @@ assert.ok(refreshEnd > refreshStart);
 const adapters = html.slice(helperStart, helperEnd);
 assert.match(adapters, /cacheTtlMs:3300000/);
 assert.match(adapters, /refreshSkewMs:60000/);
-assert.match(adapters, /from\('character-illustrations'\)\.createSignedUrl\(storagePath,3600\)/);
+assert.match(adapters, /from\('character-illustrations'\)\.createSignedUrl\(path,3600\)/);
 assert.match(adapters, /characterIllustrationSignedUrlManager\.get\(storagePath,\{forceRefresh:options\?\.forceRefresh===true\}\)/);
 assert.match(html.slice(refreshStart, refreshEnd), /getCharacterIllustrationSignedUrl\(storagePath,\{forceRefresh:true\}\)/,
   'an image load error must bypass the possibly expired signed URL cache');
@@ -47,15 +47,18 @@ vm.runInNewContext(adapters+'\nglobalThis.testApi={getCharacterIllustrationSigne
 assert.equal(managers.length,2);
 assert.equal(managers[0].cacheTtlMs,3300000);
 assert.equal(managers[0].refreshSkewMs,60000);
+assert.equal(managers[0].maxEntries,500);
+assert.equal(typeof managers[0].createSignedUrls,'function');
 assert.equal(managers[1].cacheTtlMs,240000);
 assert.equal(managers[1].refreshSkewMs,15000);
 assert.equal(managers[1].maxEntries,250);
+assert.equal(typeof managers[1].createSignedUrls,'function');
 assert.equal(await sandbox.testApi.getCharacterIllustrationSignedUrl('owner/role.webp',{forceRefresh:true}),
   'https://storage.example/owner/role.webp');
 assert.equal(JSON.stringify(pending[0]),JSON.stringify({key:'owner/role.webp',requestOptions:{forceRefresh:true}}));
 assert.equal(await sandbox.testApi.getMemoryPhotoSignedUrl('owner/memory.webp'),
   'https://storage.example/user-a:owner/memory.webp');
-assert.equal(JSON.stringify(pending[1]),JSON.stringify({key:'user-a:owner/memory.webp',requestOptions:{context:{uid:'user-a',storagePath:'owner/memory.webp'}}}));
+assert.equal(JSON.stringify(pending[1]),JSON.stringify({key:'user-a:owner/memory.webp',requestOptions:{context:{uid:'user-a'}}}));
 sandbox.testApi.invalidateMemoryPhotoSignedUrl('owner/memory.webp','user-a');
 assert.equal(JSON.stringify(pending[2]),JSON.stringify({invalidate:'user-a:owner/memory.webp'}));
 

@@ -600,7 +600,7 @@ const restoreSessionsSource = chatIndex.slice(restoreSessionsStart, isolateSessi
 assert.ok(restoreSessionsStart >= 0 && isolateSessionsStart > restoreSessionsStart);
 assert.ok(restoreSessionsSource.includes("filterDeletedChatSessions(uid, saved)"),
   "cached single chats must be filtered by permanent local deletion tombstones");
-const groupLoaderStart = chatIndex.indexOf("async function groupLoadList(force=false) {");
+const groupLoaderStart = chatIndex.indexOf("async function groupLoadList(force=false,loadMore=false) {");
 const groupLoaderEnd = chatIndex.indexOf("function groupRenderList()", groupLoaderStart);
 const groupLoader = chatIndex.slice(groupLoaderStart, groupLoaderEnd);
 assert.ok(groupLoader.includes("readDeletedChatTombstones(user.id).groups"),

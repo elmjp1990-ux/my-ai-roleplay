@@ -51,7 +51,7 @@ assert.match(videoCompressor,/captureStream\(24\)/);
 assert.match(videoCompressor,/blob\.size>2\*1024\*1024/);
 assert.match(videoCompressor,/new File\(\[blob\]/);
 assert.match(videoCompressor,/stream\.getTracks\(\)\.forEach/);
-const videoUploader=block("async function uploadCharacterAvatarVideo","// Signed URL 依 storage path");
+const videoUploader=block("async function uploadCharacterAvatarVideo","// Visible character videos share");
 assert.match(videoUploader,/const optimized=await compressCharacterAvatarVideo\(file\)/);
 assert.match(videoUploader,/upload\(path,optimized/);
 assert.doesNotMatch(videoUploader,/upload\(path,file/);
@@ -85,8 +85,8 @@ assert.doesNotMatch(groupOpen,/from\('chat_memory_photos'\)/,
 assert.match(groupOpen,/memoryPhotos:\[\]/);
 const groupBackgroundSettings=block("async function openGroupBackgroundSettings","function ");
 assert.match(groupBackgroundSettings,/from\('chat_memory_photos'\)/);
-assert.match(groupBackgroundSettings,/getMemoryPhotoSignedUrl\(photo\.storage_path\)/);
-assert.match(html,/getMemoryPhotoSignedUrl\(p\.storage_path\)/);
+assert.match(groupBackgroundSettings,/memoryPhotoSignedUrlManager\.getMany/);
+assert.match(html,/memoryPhotoSignedUrlManager\.getMany/);
 assert.doesNotMatch(html,/createSignedUrl\([^)]*\.storage_path/,
   "all memory-photo signed URL callsites must use the shared UID/path cache");
 
@@ -96,13 +96,19 @@ assert.match(html,/src="\.\/LOGO_WEBICON\.webp"/);
 assert.doesNotMatch(html,/raw\.githubusercontent\.com\/elmjp1990-ux\/my-ai-roleplay\/main\/LOGO_WEB/);
 
 
+assert.match(html,/characterVideoSignedUrlManager=window\.PoyozzSignedUrlManager\.create/);
+assert.match(html,/cacheTtlMs:270000,refreshSkewMs:30000,maxEntries:100/);
+assert.match(html,/getCharacterVideoSignedUrl\(draftVideoPath\)/);
+assert.doesNotMatch(html,/characterVideoSignedUrlCache|characterVideoSignedUrlInflight/);
+
 const memoryUrlAdapter=block("const memoryPhotoSignedUrlManager","const characterIllustrationMetadataInflight");
 assert.ok(memoryUrlAdapter.includes("window.PoyozzSignedUrlManager.create"));
 assert.ok(memoryUrlAdapter.includes("cacheTtlMs:240000"));
 assert.ok(memoryUrlAdapter.includes("refreshSkewMs:15000"));
 assert.ok(memoryUrlAdapter.includes("maxEntries:250"));
 assert.ok(memoryUrlAdapter.includes("isCurrent:context=>(currentUser()?.uid||null)===(context?.uid||null)"));
-assert.ok(memoryUrlAdapter.includes("from('personax-memory-photos').createSignedUrl(context.storagePath,300)"));
+assert.ok(memoryUrlAdapter.includes("from('personax-memory-photos').createSignedUrl(path,300)"));
+assert.ok(memoryUrlAdapter.includes("from('personax-memory-photos').createSignedUrls(paths,300)"));
 assert.ok(memoryUrlAdapter.includes("uid+':'+storagePath"));
 assert.ok(memoryUrlAdapter.includes("memoryPhotoSignedUrlManager.invalidate(uid+':'+storagePath)"));
 
@@ -111,8 +117,8 @@ function albumBlock(start,end){
   assert.ok(a>=0&&b>a,"missing memory album source block: "+start);
   return memoryAlbum.slice(a,b);
 }
-const albumLoader=albumBlock("async function loadAlbum(type,chatId)","async function compressMemoryImage");
-assert.ok(albumLoader.includes("getMemoryPhotoSignedUrl(photo.storage_path)"));
+const albumLoader=albumBlock("async function loadAlbum(type,chatId,options={})","async function compressMemoryImage");
+assert.ok(albumLoader.includes("memoryPhotoSignedUrlManager.getMany"));
 assert.doesNotMatch(albumLoader,/if\(!imageUrl\)[^\n]*signedError/);
 const photoDelete=albumBlock("if(button.dataset.action==='memory-photo-delete')","if(button.dataset.action==='memory-photo-background')");
 assert.ok(photoDelete.includes("invalidateMemoryPhotoSignedUrl(photo.storage_path,uid)"));

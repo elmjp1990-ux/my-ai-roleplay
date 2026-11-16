@@ -74,5 +74,9 @@ jobs:
         run: node scripts/test-followed-authors-module.mjs
       - name: Verify extracted city map module contract
         run: node scripts/test-city-map-module.mjs
+      - name: Parse extracted notifications screen module
+        run: node --check notifications-screen.js
+      - name: Verify extracted notifications screen contract
+        run: node scripts/test-notifications-screen.mjs
       - name: Verify chat render lifecycle contract
         run: node --test scripts/test-chat-render-lifecycle.mjs

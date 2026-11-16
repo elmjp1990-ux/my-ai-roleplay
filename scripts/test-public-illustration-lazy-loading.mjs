@@ -10,8 +10,8 @@ const between = (start, end) => {
   assert.ok(from >= 0 && to > from, "missing source block: " + start);
   return html.slice(from, to);
 };
-const publicLoaderStart = html.indexOf("async function loadPublicSupabaseCharactersImpl()");
-const publicLoaderEnd = html.indexOf("async function loadSupabaseCharacters(user)", publicLoaderStart);
+const publicLoaderStart = html.indexOf("function mapPublicCharacterRow(row)");
+const publicLoaderEnd = html.indexOf("async function loadSupabaseCharacters(user,{loadMore=false}={})", publicLoaderStart);
 assert.ok(publicLoaderStart >= 0 && publicLoaderEnd > publicLoaderStart, "public character loader boundaries must exist");
 const publicLoader = html.slice(publicLoaderStart, publicLoaderEnd);
 
@@ -19,21 +19,21 @@ const publicLoader = html.slice(publicLoaderStart, publicLoaderEnd);
 // while avoiding bulk profile/story/illustration reads for the entire catalogue.
 assert.doesNotMatch(publicLoader, /loadCharacterIllustrationAssets|character_illustrations|createSignedUrl|public_profiles|character_stories/);
 assert.doesNotMatch(publicLoader, /phone_settings|nsfw_workplace_warning/);
-assert.match(publicLoader, /Object\.prototype\.hasOwnProperty\.call\(ownerLocal,'phoneSettings'\)/);
-assert.match(publicLoader, /Object\.prototype\.hasOwnProperty\.call\(cachedPublic,'phoneSettings'\)/);
-assert.match(publicLoader, /image: ownerLocal\?\.image \|\| cachedPublic\?\.image \|\| row\.avatar_url/);
-assert.match(publicLoader, /primaryIllustrationPath:ownerLocal\?\.primaryIllustrationPath \|\| cachedPublic\?\.primaryIllustrationPath/);
-assert.match(publicLoader, /galleryIllustrations:ownerLocal\?\.galleryIllustrations \|\| cachedPublic\?\.galleryIllustrations \|\| \[\]/);
-assert.match(publicLoader, /publicIllustrationsLoaded:ownerLocal\?\.publicIllustrationsLoaded === true \|\| cachedPublic\?\.publicIllustrationsLoaded === true/);
-assert.match(publicLoader, /opening: ownerLocal\?\.opening \|\| cachedPublic\?\.opening \|\| ''/);
+assert.match(publicLoader, /ownerLocal&&Object\.prototype\.hasOwnProperty\.call\(ownerLocal,'phoneSettings'\)/);
+assert.match(publicLoader, /cachedPublic&&Object\.prototype\.hasOwnProperty\.call\(cachedPublic,'phoneSettings'\)/);
+assert.match(publicLoader, /image:ownerLocal\?\.image\|\|cachedPublic\?\.image\|\|row\.avatar_url/);
+assert.match(publicLoader, /primaryIllustrationPath:ownerLocal\?\.primaryIllustrationPath\|\|cachedPublic\?\.primaryIllustrationPath/);
+assert.match(publicLoader, /galleryIllustrations:ownerLocal\?\.galleryIllustrations\|\|cachedPublic\?\.galleryIllustrations\|\|\[\]/);
+assert.match(publicLoader, /publicIllustrationsLoaded:ownerLocal\?\.publicIllustrationsLoaded===true\|\|cachedPublic\?\.publicIllustrationsLoaded===true/);
+assert.match(publicLoader, /opening:ownerLocal\?\.opening\|\|cachedPublic\?\.opening\|\|''/);
 
 // Public catalogue rows are cached briefly and invalidated after this account changes a character.
-const publicRowsCache = between("let publicCharacterRowsCache = null;", "async function loadPublicSupabaseCharactersImpl");
-assert.match(publicRowsCache, /now - publicCharacterRowsCacheAt < 30000/);
+const publicRowsCache = between("let publicCharacterRowsCache = new Map();", "async function loadPublicSupabaseCharactersImpl({loadMore=false,characterId=null}={})");
+assert.match(publicRowsCache, /Date\.now\(\)-publicCharacterRowsCacheAt<30000/);
 assert.match(publicRowsCache, /publicCharacterRowsInflight/);
 assert.match(publicRowsCache, /publicCharacterRowsCacheVersion/);
-assert.match(publicLoader, /const rowsVersion = publicCharacterRowsCacheVersion/);
-assert.match(publicLoader, /if \(rowsVersion !== publicCharacterRowsCacheVersion\) return loadPublicSupabaseCharactersImpl\(\)/);
+assert.match(publicLoader, /const rowsVersion=publicCharacterRowsCacheVersion/);
+assert.match(publicLoader, /if\(!characterId&&rowsVersion!==publicCharacterRowsCacheVersion\)[\s\S]*?loadPublicSupabaseCharactersImpl\(\{loadMore:false\}\)/);
 assert.match(html, /upsert\(row, \{ onConflict: 'id' \}\);[\s\S]{0,180}invalidatePublicCharacterRowsCache\(\);/);
 assert.match(html, /rpc\('soft_delete_character',[\s\S]{0,300}invalidatePublicCharacterRowsCache\(\);/);
 
@@ -42,7 +42,7 @@ assert.match(html, /async function hydratePublicCharacterDetailMetadata\(charact
 assert.match(html, /publicCharacterStoryOpeningLoaded\.has\(characterId\)/);
 assert.match(html, /async function hydratePublicAuthorProfile\(authorId\)/);
 assert.match(html, /publicAuthorProfileLoaded\.has\(authorId\)/);
-assert.match(authorProfile, /publicAuthorProfileLoaded\.has\(route\.id\)/);
+assert.match(authorProfile, /publicAuthorProfileLoaded\.has\(authorId\)/);
 assert.match(html, /if\(c\.authorId\)void hydratePublicAuthorProfile\(c\.authorId\)/);
 assert.match(html, /\.select\('opening_message'\)/);
 const detailMetadata = between("async function hydratePublicCharacterDetailMetadata", "async function hydratePublicCharacterIllustrations");

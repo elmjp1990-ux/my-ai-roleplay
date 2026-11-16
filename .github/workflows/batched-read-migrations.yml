@@ -1,0 +1,65 @@
+name: Batched read migration tests
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/20261114130000_add_bounded_character_comment_reads.sql"
+      - "supabase/migrations/20261114200000_batch_character_story_and_encounter_schedule_reads.sql"
+      - "supabase/tests/fixtures/batched-read-migrations-base.sql"
+      - "supabase/tests/batched-read-migrations-scenarios.sql"
+      - ".github/workflows/batched-read-migrations.yml"
+  push:
+    branches:
+      - main
+      - feat/group-ai-single-orchestrator
+    paths:
+      - "supabase/migrations/20261114130000_add_bounded_character_comment_reads.sql"
+      - "supabase/migrations/20261114200000_batch_character_story_and_encounter_schedule_reads.sql"
+      - "supabase/tests/fixtures/batched-read-migrations-base.sql"
+      - "supabase/tests/batched-read-migrations-scenarios.sql"
+      - ".github/workflows/batched-read-migrations.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  batched-read-migrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: supabase/postgres:17.11.0.019
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U supabase_admin -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://supabase_admin:postgres@localhost:5432/postgres
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      - name: Wait for disposable PostgreSQL
+        run: |
+          for attempt in {1..30}; do
+            if pg_isready -h localhost -U supabase_admin -d postgres; then break; fi
+            sleep 2
+          done
+          pg_isready -h localhost -U supabase_admin -d postgres
+      - name: Bootstrap disposable read-RPC fixture
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/fixtures/batched-read-migrations-base.sql
+      - name: Apply bounded comment read migration
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261114130000_add_bounded_character_comment_reads.sql
+      - name: Apply batched story, schedule and session read migration
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261114200000_batch_character_story_and_encounter_schedule_reads.sql
+      - name: Verify batched read RPC behavior, ACL and privacy gates
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/batched-read-migrations-scenarios.sql

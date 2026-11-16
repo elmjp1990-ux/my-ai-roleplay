@@ -1,4 +1,5 @@
 import { withSupabase } from "npm:@supabase/server@1";
+import { buildOpenRouterProviderOptions } from "../_shared/openrouter-provider-policy.ts";
 import {
   buildCharacterProfileMessages,
   CHARACTER_PROFILE_MODEL,
@@ -137,11 +138,7 @@ async function generateProfile(
           temperature: 0.2,
           // Match POYOZZ's selected OpenRouter privacy policy: no fallback route
           // and no provider-side data collection for author-only character sources.
-          provider: {
-            only: ["deepinfra"],
-            allow_fallbacks: false,
-            data_collection: "deny",
-          },
+          provider: buildOpenRouterProviderOptions(),
         }),
       });
     } catch (error) {

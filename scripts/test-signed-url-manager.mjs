@@ -117,3 +117,46 @@ test('invalidates cache entries and enforces an optional oldest-first size limit
   await manager.get('b');
   assert.equal(await manager.get('a'), 'https://storage.example/a');
 });
+
+
+test('batches missing keys, preserves input order, and reuses the shared cache', async () => {
+  let batchCalls = 0;
+  const manager = createManager({
+    cacheTtlMs: 10000,
+    createSignedUrl: async key => 'https://storage.example/' + key,
+    createSignedUrls: async keys => {
+      batchCalls++;
+      return Object.fromEntries(keys.map(key => [key, 'https://storage.example/' + key]));
+    }
+  });
+  assert.deepEqual(Array.from(await manager.getMany(['a', 'b', 'a'])), [
+    'https://storage.example/a', 'https://storage.example/b', 'https://storage.example/a'
+  ]);
+  assert.equal(batchCalls, 1);
+  assert.equal(await manager.get('a'), 'https://storage.example/a');
+  assert.equal(batchCalls, 1);
+});
+
+test('batched signed URLs are not cached after the identity scope changes', async () => {
+  let currentUid = 'user-a';
+  let calls = 0;
+  const pending = deferred();
+  const manager = createManager({
+    cacheTtlMs: 10000,
+    isCurrent: context => currentUid === context.uid,
+    createSignedUrl: async key => 'https://storage.example/' + key,
+    createSignedUrls: async () => { calls++; return pending.promise; }
+  });
+  const request = manager.getMany(['user-a:path/a', 'user-a:path/b'], { context: { uid: 'user-a' } });
+  currentUid = 'user-b';
+  pending.resolve({
+    'user-a:path/a': 'https://storage.example/a',
+    'user-a:path/b': 'https://storage.example/b'
+  });
+  assert.deepEqual(Array.from(await request), [null, null]);
+  currentUid = 'user-a';
+  assert.deepEqual(Array.from(await manager.getMany(['user-a:path/a', 'user-a:path/b'], {
+    context: { uid: 'user-a' }
+  })), ['https://storage.example/a', 'https://storage.example/b']);
+  assert.equal(calls, 2);
+});

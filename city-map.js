@@ -5,13 +5,23 @@
 (function (global) {
   'use strict';
 
+  let activeMapCleanup = null;
+  const destroyActiveMap = () => {
+    if (!activeMapCleanup) return;
+    const cleanup = activeMapCleanup;
+    activeMapCleanup = null;
+    cleanup();
+  };
+
   global.PoyozzCityMap = Object.freeze({
+    destroy: destroyActiveMap,
     render(dependencies) {
+      destroyActiveMap();
       const {
         $, state, accessible, escapeHTML, safeImage, currentUser, toast, go, requireLogin,
         persist, hydratePublicCharacterIllustrations, characterVideoObserver,
         releaseCharacterVideo, hydrateCharacterVideo, findResumableEncounterSession,
-        setEncounterLifecycleState, saveChatSessionSafely, createEncounterSession
+        setEncounterLifecycleState, saveChatSessionSafely, createEncounterSession, loadCityCharacterPage, loadCityCharacterSchedules
       } = dependencies;
 
   // A previous city-map render moves its dialog to <body>. Remove stale dialogs first;
@@ -160,10 +170,26 @@
   };
   taipeiTime();
   const cityMapClock=setInterval(taipeiTime,30000);
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)taipeiTime();});
+  const onVisibilityChange=()=>{if(!document.hidden)taipeiTime();};
+  document.addEventListener('visibilitychange',onVisibilityChange);
+  let locationModal=null;
+  let resizeHandler=null;
+  activeMapCleanup=()=>{
+    clearInterval(cityMapClock);
+    document.removeEventListener('visibilitychange',onVisibilityChange);
+    if(resizeHandler)window.removeEventListener('resize',resizeHandler);
+    const mapVideos=[...stage.querySelectorAll('video'),...(locationModal?.querySelectorAll('video')||[])];
+    mapVideos.forEach(video=>{
+      characterVideoObserver?.unobserve(video);
+      releaseCharacterVideo(video);
+    });
+    locationModal?.remove();
+    stage.remove();
+    document.body.classList.remove('city-location-active','city-map-mode','city-map-mode-immersive');
+  };
 
   // Keep the location dialog outside the transformed map stage to isolate it from map gestures.
-  const locationModal=$('cityMapPeople');
+  locationModal=$('cityMapPeople');
   if(locationModal && locationModal.parentElement!==document.body) document.body.appendChild(locationModal);
   const cityPlaceNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園'};
   // These are authored scene descriptions, not live opening hours, character presence, or dynamically generated events.
@@ -189,41 +215,14 @@
   // Public schedules live in character_schedules, not in the character row.
   // Always re-check through the server RPC when opening a city location. A cached
   // public schedule can outlive a public -> private change, so never reuse it.
-  const hydrateCitySchedule=async(character)=>{
-    if(!character?.id)return '';
-    if(character.visibility!=='public'||character.deletedAt){
-      character.encounterSchedules='';
-      return '';
-    }
-    try{
-      const client=window.mySupabase;
-      if(!client)throw new Error('城市日程雲端連線不可用');
-      const {data,error}=await client.rpc('get_encounter_character_schedule',{p_character_id:character.id});
-      if(error)throw error;
-      // The RPC independently enforces public/approved/not-deleted/rights-confirmed.
-      // An empty result is authoritative; do not fall back to local author-only schedules.
-      character.encounterSchedules=(data||[]).map(row=>[
-        row.weekday==null?'*':row.weekday,
-        String(row.start_time||'').slice(0,5),
-        String(row.end_time||'').slice(0,5),
-        row.location_key,
-        row.activity
-      ].join('|')).join('\n');
-      return character.encounterSchedules;
-    }catch(error){
-      character.encounterSchedules='';
-      console.warn('城市角色日程載入失敗：',character.id,error?.message||error);
-      return '';
-    }
-  };
   const isCurrentCityCharacterEligible=(person)=>{
     const live=(Array.isArray(state.characters)?state.characters:[]).find(item=>item?.id===person?.id);
     return !!live&&live.visibility==='public'&&!live.deletedAt&&live.cloudPublic!==false&&live.localOnly!==true&&!String(live.id||'').startsWith('seed-')&&accessible(live);
   };
-  const getCityPresence=(place)=>{
+  const getCityPresence=(place,sourceCharacters=state.characters)=>{
     const clock=getTaipeiClock();
     const aliases=cityPlaceAliases[place]||[place];
-    return (Array.isArray(state.characters)?state.characters:[]).filter(character=>{
+    return (Array.isArray(sourceCharacters)?sourceCharacters:[]).filter(character=>{
       // Author access to a private character is for management only. It must
       // never make that character a participant in the public city encounter.
       // Do not use accessible() here: it intentionally permits the owner to
@@ -255,6 +254,53 @@
     });
   };
   const cityPresenceByPlace={};
+  const cityScenePageStates=new Map();
+  const renderCityPeopleStrip=(place)=>{
+    const pager=cityScenePageStates.get(place);
+    const people=pager?.people||[];
+    const strip=$('cityMapAvatarStrip');
+    if(!strip)return;
+    strip.innerHTML=people.length
+      ? people.map((person,index)=>{
+          const characterName=String(person.name||'角色');
+          const image=safeImage(person.image||person.avatar_url||person.avatar);
+          const portrait=image
+            ? '<img class="city-location-person-image" src="'+escapeHTML(image)+'" alt="" loading="lazy" referrerpolicy="no-referrer">'
+            : '<span class="city-location-avatar-fallback">'+escapeHTML(characterName.slice(0,1))+'</span>';
+          return '<button type="button" class="city-location-avatar city-location-person" data-action="city-person" data-person-index="'+index+'" aria-label="查看 '+escapeHTML(characterName)+' 的角色資訊">'+portrait+'<span class="city-location-person-name">'+escapeHTML(characterName)+'</span></button>';
+        }).join('')
+      : '<p class="city-location-empty">'+(pager?.loading?'正在讀取這個場景的角色…':'目前沒有角色排定在這個地點。')+'</p>';
+    if(pager?.hasMore){
+      strip.insertAdjacentHTML('beforeend','<button type="button" class="city-location-load-more" data-action="city-people-load-more" '+(pager.loading?'disabled':'')+'>載入更多角色（每次 10 位）</button>');
+    }
+    $('cityMapPeopleCount').textContent=people.length
+      ? people.length+' 位角色符合目前時段'+(pager?.hasMore?' · 可載入更多':'')
+      : (pager?.loading?'正在讀取…':'目前沒有符合時段的角色');
+  };
+  const loadCityPeoplePage=async(place)=>{
+    const pager=cityScenePageStates.get(place);
+    if(!pager||pager.loading||!pager.hasMore||typeof loadCityCharacterPage!=='function')return;
+    pager.loading=true;
+    renderCityPeopleStrip(place);
+    try{
+      const result=await loadCityCharacterPage(pager.offset);
+      const items=Array.isArray(result?.items)?result.items:[];
+      pager.offset+=items.length;
+      pager.hasMore=result?.hasMore===true;
+      pager.candidates=[...pager.candidates,...items];
+      const schedules=await loadCityCharacterSchedules(items.map(person=>person.id));
+      for(const person of items)person.encounterSchedules=schedules.get(person.id)||'';
+      pager.people=getCityPresence(place,pager.candidates);
+      cityPresenceByPlace[place]=pager.people;
+    }catch(error){
+      pager.error=error;
+      console.error('讀取城市角色排程失敗：',error);
+      toast('場景角色載入失敗，請稍後重試。');
+    }finally{
+      pager.loading=false;
+      renderCityPeopleStrip(place);
+    }
+  };
   const openCityLocation=async(marker)=>{
     const place=marker?.dataset?.place;
     if(!place||!locationModal)return;
@@ -294,27 +340,10 @@
       if(target)target.innerHTML='<h3 id="cityMapVenueHeading">'+escapeHTML(scene.heading)+'</h3><p id="cityMapVenueDescription">'+escapeHTML(scene.description)+'</p><div class="city-location-news"><span class="city-location-event-label">'+escapeHTML(notice.label)+'</span><div class="city-location-news-items">'+eventMarkup+'</div></div>'+flightMarkup;
     };
     renderVenue();
-    let people=[];
-    try{
-      await Promise.all((Array.isArray(state.characters)?state.characters:[])
-        .filter(character=>character?.visibility==='public'&&!character.deletedAt)
-        .map(hydrateCitySchedule));
-      people=getCityPresence(place);
-      if(!Array.isArray(people))people=[];
-    }catch(error){console.error('讀取城市角色排程失敗：',error);}
-    cityPresenceByPlace[place]=people;
-    $('cityMapPeopleCount').textContent=people.length?people.length+' 位角色符合目前時段':'目前沒有符合時段的角色';
-    const strip=$('cityMapAvatarStrip');
-    strip.innerHTML=people.length
-      ? people.map((person,index)=>{
-          const characterName=String(person.name||'角色');
-          const image=safeImage(person.image||person.avatar_url||person.avatar);
-          const portrait=image
-            ? '<img class="city-location-person-image" src="'+escapeHTML(image)+'" alt="" loading="lazy" referrerpolicy="no-referrer">'
-            : '<span class="city-location-avatar-fallback">'+escapeHTML(characterName.slice(0,1))+'</span>';
-          return '<button type="button" class="city-location-avatar city-location-person" data-action="city-person" data-person-index="'+index+'" aria-label="查看 '+escapeHTML(characterName)+' 的角色資訊">'+portrait+'<span class="city-location-person-name">'+escapeHTML(characterName)+'</span></button>';
-        }).join('')
-      : '<p class="city-location-empty">目前沒有角色排定在這個地點。角色日程符合台灣時間時，才會顯示在這裡。</p>';
+    const pageState={offset:0,hasMore:true,loading:false,candidates:[],people:[],error:null};
+    cityScenePageStates.set(place,pageState);
+    renderCityPeopleStrip(place);
+    await loadCityPeoplePage(place);
     renderVenue();
     locationModal.hidden=false;
     document.body.classList.add('city-location-active');
@@ -462,6 +491,12 @@
     pageButtons.forEach(button=>button.disabled=mode!=='status');
   };
   locationModal?.addEventListener('click',async event=>{
+    const loadMoreButton=event.target.closest('[data-action="city-people-load-more"]');
+    if(loadMoreButton){
+      event.preventDefault();event.stopPropagation();
+      void loadCityPeoplePage(locationModal.dataset.place);
+      return;
+    }
     const personButton=event.target.closest('[data-action="city-person"]');
     if(personButton){
       event.preventDefault();event.stopPropagation();
@@ -600,7 +635,8 @@
     if(button.dataset.action==='city-zoom-out'){event.preventDefault();event.stopPropagation();zoomBy(.85);return;}
     if(button.dataset.action==='city-traditional'){event.preventDefault();event.stopPropagation();go({page:'home'});}
   });
-  window.addEventListener('resize',()=>{sizeWorld();clamp();},{passive:true});
+  resizeHandler=()=>{sizeWorld();clamp();};
+  window.addEventListener('resize',resizeHandler,{passive:true});
     }
   });
 })(window);
