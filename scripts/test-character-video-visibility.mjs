@@ -24,6 +24,12 @@ if (!source.includes('isCharacterVideoMeaningfullyVisible(video)')) {
 if (!source.includes('(width*height)/totalArea>=0.35')) {
   throw new Error('The fallback visibility calculation must preserve the 35% threshold.');
 }
+if (!source.includes("video.dataset.videoHydrated==='loading'")) {
+  throw new Error('The dwell scheduler must not enqueue another load while a video is already signing or hydrating.');
+}
+if (!source.includes("video.dataset.videoVisibilityEligible!=='true'\n        ||!isCharacterVideoMeaningfullyVisible(video)")) {
+  throw new Error('An in-flight signed URL must be discarded if the video leaves the 35% visibility threshold before attaching src.');
+}
 if (!source.includes("threshold:[0,0.15,0.35]")) {
   throw new Error('Video observer must use graduated visibility thresholds.');
 }
