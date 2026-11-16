@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 
 const html = readFileSync("index.html", "utf8");
+const chatFormatSpec = readFileSync("docs/CHAT_FORMATTING_SPEC.md", "utf8");
 const css = readFileSync("poyozz-ui.css", "utf8");
 const edge = readFileSync("supabase/functions/chat-turn/index.ts", "utf8");
 const phoneMigration = readFileSync("supabase/migrations/20261110120000_story_phone_state_and_memory_summary_read.sql", "utf8");
@@ -28,7 +29,8 @@ assert.doesNotMatch(html, /\.roleplay-segment\.is-character,\.roleplay-segment\.
 assert.match(css,/\.message:has\(\.roleplay-segment\.is-action\)/,
   'mobile narration alone must expand to the full chat panel');
 assert.match(css,/\.roleplay-segment\.is-character/,'ordinary character dialogue must retain its independent bubble width');
-assert.match(html,/LOCKED FINAL CHAT FORMAT[\s\S]{0,180}25 full-width CJK chars per line/);
+assert.match(chatFormatSpec,/手機版不再固定字數或 25em[\s\S]{0,80}自適應聊天室面板可用寬度/,
+  'locked chat format spec must preserve adaptive full-width mobile narration rather than a fixed character count');
 assert.match(html,/max-width:min\(25em,100%\)/,'star-wrapped narration must retain its independent 25 CJK character line width');
 assert.match(html,/max-width:min\(20em,100%\)/,'dialogue bubbles must wrap at about 18 full-width Chinese characters');
 assert.match(html, /select\('id,session_id,role,content,created_at,suggested_replies'\)/);
