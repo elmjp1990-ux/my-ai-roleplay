@@ -5,6 +5,8 @@ export type GroupMemorySummaryRow = {
   user_edited?: unknown;
 };
 
+export const GROUP_MEMORY_SUMMARY_INTERVAL = 5;
+
 const summaryText = (row: GroupMemorySummaryRow | null | undefined): string =>
   typeof row?.summary === "string" ? row.summary.trim() : "";
 
@@ -39,6 +41,18 @@ export function buildGroupMemoryContext(
     );
   }
   return sections.join("\n\n");
+}
+
+export function isCurrentGroupMemorySummary(
+  latestSummary: GroupMemorySummaryRow | null,
+  completedTurnCount: number,
+): boolean {
+  const batch = latestSummary ? batchNumber(latestSummary) : Number.NaN;
+  return Boolean(summaryText(latestSummary)) &&
+    Number.isInteger(batch) &&
+    batch > 0 &&
+    Number.isFinite(completedTurnCount) &&
+    Math.floor(completedTurnCount / GROUP_MEMORY_SUMMARY_INTERVAL) === batch;
 }
 
 export function getGroupHistoryLimit(
