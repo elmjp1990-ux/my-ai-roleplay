@@ -91,11 +91,12 @@ assert.doesNotMatch(html, /const cardPortrait=safeImage\(character\?\.image/);
 assert.match(html, /相遇模式立繪（最多 5 張）/);
 assert.match(html, /主要角色圖預覽/);
 
-// Lazy video observer must dispatch to each observed element, not capture the first card's loader.
+// Lazy video observer must dispatch to each observed element through the dwell gate.
 assert.ok(html.includes("const characterVideoLoaders = new WeakMap()"));
 assert.ok(html.includes("characterVideoLoaders.set(video,load)"));
 assert.doesNotMatch(html, /characterVideoDebugSequence|videoDebugId|\[character-video\]/, "Temporary media diagnostics must not ship in production UI code");
-assert.ok(html.includes("characterVideoLoaders.get(target)"));
+assert.ok(html.includes("scheduleCharacterVideoLoad(target)"));
+assert.ok(html.includes("const load=characterVideoLoaders.get(video)"));
 // Scrolling away or backgrounding pauses playback but preserves src and preload state;
 // changing preload while attached can restart the same full MP4 request.
 const pauseFnStart=html.indexOf("function pauseCharacterVideo(video){");
@@ -114,7 +115,10 @@ assert.ok(videoLoadBlock.indexOf("video.preload='metadata';") < videoLoadBlock.i
 assert.ok(!videoLoadBlock.includes("video.load();"));
 
 assert.ok(html.includes("pauseCharacterVideo(target);"));
-assert.ok(html.includes("videos.forEach(pauseCharacterVideo);"));
+assert.ok(html.includes("videos.forEach(video=>{"));
+assert.ok(html.includes("video.dataset.videoVisibilityEligible='false';"));
+assert.ok(html.includes("clearCharacterVideoVisibilityTimer(video);"));
+assert.ok(html.includes("pauseCharacterVideo(video);"));
 // Only a real pagehide releases the media source.
 assert.ok(html.includes("document.querySelectorAll('video[data-character-video]').forEach(releaseCharacterVideo);"));
 assert.ok(!html.includes("function stopCharacterVideo(video){"));
