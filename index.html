@@ -7537,14 +7537,7 @@ async function groupOpen(groupId) {
         }
       })().catch(error=>console.warn('群組角色頭像批次載入失敗：',error?.message||error));
     }
-    void syncGroupDiaryCloud(group.id).then(()=>{
-      if(requestId!==g.openRequestId||currentUser()?.uid!==user.id||g.active?.id!==group.id)return;
-      ensureGroupDiaryMemories();
-      if(route.page==='group'&&route.id===group.id&&route.chatOverlay==='diary')renderGroupMemorySummaries(group.id,true);
-    }).catch(syncError=>{
-      console.error('群組甜蜜日記雲端同步載入失敗：',syncError);
-      if(g.active?.id===group.id&&currentUser()?.uid===user.id)toast('群組日記雲端同步暫時失敗，已保留本機資料；請檢查網路後重試。');
-    });
+    // Legacy diary data is local-first and syncs only when the player opens the diary or edits it.
   } catch(error) {
     if(requestId!==g.openRequestId) return;
     g.loading=false;g.active=null;g.openError=groupFriendlyError(error)||'開啟群組失敗。';g.failedGroupId=groupId;
@@ -8152,6 +8145,7 @@ async function renderGroupMemorySummaries(groupId,force=false) {
 }
 
 const groupDiaryCloudReady=new Map();
+const groupDiaryCloudSyncs=new Map();
 const groupDiaryCloudSaveTimers=new Map();
 const groupDiaryCloudSaveChains=new Map();
 function clearGroupDiaryLocalData(groupId,uid=currentUser()?.uid) {
@@ -8159,6 +8153,7 @@ function clearGroupDiaryLocalData(groupId,uid=currentUser()?.uid) {
   try { localStorage.removeItem('personax-group-diary-v1:'+uid+':'+groupId); }
   catch(error) { console.warn('群組日記本機快取清除失敗：',error); }
   groupDiaryCloudReady.delete(groupId);
+  groupDiaryCloudSyncs.delete(groupId);
   const timer=groupDiaryCloudSaveTimers.get(groupId);
   if(timer)clearTimeout(timer);
   groupDiaryCloudSaveTimers.delete(groupId);
@@ -8194,6 +8189,16 @@ async function syncGroupDiaryCloud(groupId) {
   groupDiaryCloudReady.set(groupId,true);
   return loadGroupDiaryMemories(groupId);
 }
+function ensureGroupDiaryCloudSynced(groupId) {
+  if(groupDiaryCloudReady.get(groupId))return Promise.resolve(loadGroupDiaryMemories(groupId));
+  const pending=groupDiaryCloudSyncs.get(groupId);
+  if(pending)return pending;
+  const task=syncGroupDiaryCloud(groupId).finally(()=>{
+    if(groupDiaryCloudSyncs.get(groupId)===task)groupDiaryCloudSyncs.delete(groupId);
+  });
+  groupDiaryCloudSyncs.set(groupId,task);
+  return task;
+}
 async function saveGroupDiaryCloudNow(groupId,memories,updatedAt,uid=currentUser()?.uid) {
   const client=window.mySupabase;
   if(!client||!uid)throw new Error('登入後才能同步群組甜蜜日記。');
@@ -8217,7 +8222,7 @@ function queueGroupDiaryCloudSave(groupId) {
       const uid=currentUser()?.uid;
       if(!uid||!window.mySupabase)throw new Error('登入後才能同步群組甜蜜日記。');
       if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return;}
-      if(!groupDiaryCloudReady.get(groupId))await syncGroupDiaryCloud(groupId);
+      if(!groupDiaryCloudReady.get(groupId))await ensureGroupDiaryCloudSynced(groupId);
       if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return;}
       const local=readGroupDiaryLocalRecord(groupId);
       await saveGroupDiaryCloudNow(groupId,local.memories,local.updatedAt,uid);
@@ -8277,10 +8282,19 @@ function renderGroupChatOverlay(kind) {
     return;
   }
   if(kind==='diary'){
-    const visibleMemories=ensureGroupDiaryMemories();
-    const rows=visibleMemories.map(m=>'<article class="memory-item diary-memory-card '+(m.important?'is-important':'')+'"><div class="diary-memory-head"><label class="diary-check"><input type="checkbox" data-group-memory="'+e(m.id)+'" '+(m.important?'checked':'')+'><span class="diary-heart">'+(m.important?'♥':'♡')+'</span><span>舊版珍藏回憶</span></label><span class="diary-memory-date">'+e(timeText(m.at))+'</span></div><p class="prose diary-memory-text">'+e(m.text)+'</p><p class="small diary-lock-note">♥ 已珍藏的舊版回憶</p></article>').join('');
+    const renderLegacyRows=()=>ensureGroupDiaryMemories().map(m=>'<article class="memory-item diary-memory-card '+(m.important?'is-important':'')+'"><div class="diary-memory-head"><label class="diary-check"><input type="checkbox" data-group-memory="'+e(m.id)+'" '+(m.important?'checked':'')+'><span class="diary-heart">'+(m.important?'♥':'♡')+'</span><span>舊版珍藏回憶</span></label><span class="diary-memory-date">'+e(timeText(m.at))+'</span></div><p class="prose diary-memory-text">'+e(m.text)+'</p><p class="small diary-lock-note">♥ 已珍藏的舊版回憶</p></article>').join('');
     const summary='<section class="diary-summary"><div class="diary-summary-head"><div><p class="small muted diary-eyebrow">SWEET DIARY · GROUP STORY</p><h3>把你們共同的故事，好好收藏</h3><p class="small muted">每 5 個已完成的群組回合，由 AI 整理一則 50–150 字摘要；摘要可編輯，也可設為重大記憶。</p></div><div class="diary-count"><strong id="groupMemoryCount">0</strong><span>/ 10,000 字</span></div></div><div class="diary-meter"><span id="groupMemoryMeter" style="width:0%"></span></div><p class="small muted diary-hint">群組摘要與單人故事使用相同的五回合整理節奏。舊版珍藏內容會保留，不再以完整聊天摘錄充當新摘要。</p></section><div id="groupMemorySummary" class="stack" style="gap:10px"><p class="small muted">正在載入群組 AI 回憶摘要…</p></div>';
-    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="甜蜜日記"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h2>甜蜜日記</h2></div>'+summary+(rows||'')+'</section>');
+    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="甜蜜日記"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h2>甜蜜日記</h2></div>'+summary+'<div id="groupLegacyDiary">'+(renderLegacyRows()||'')+'</div></section>');
+    if(!groupDiaryCloudReady.get(group.id)){
+      void ensureGroupDiaryCloudSynced(group.id).then(()=>{
+        if(groupPrototype.active?.id!==group.id||route.chatOverlay!=='diary')return;
+        const legacyTarget=document.getElementById('groupLegacyDiary');
+        if(legacyTarget)legacyTarget.innerHTML=renderLegacyRows();
+      }).catch(syncError=>{
+        console.error('群組甜蜜日記雲端同步載入失敗：',syncError);
+        if(groupPrototype.active?.id===group.id&&route.chatOverlay==='diary')toast('日記同步暫時失敗，已保留本機資料；請稍後重試。');
+      });
+    }
     void renderGroupMemorySummaries(group.id,true);
     return;
   }
