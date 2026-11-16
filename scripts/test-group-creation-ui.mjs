@@ -36,7 +36,8 @@ assert.match(html, /value="__player_custom__"/, 'group world choices must includ
 assert.match(html, /id="groupWorldBackground" maxlength="3000" data-count-for="groupWorldBackground"/, 'the single group background field must be limited to 3000 characters and counted');
 assert.doesNotMatch(html, /groupCustomWorldBackground/, 'group background must not render a second custom textarea');
 assert.match(html, /清空下方背景框/, 'custom world option must clear the shared background field');
-assert.match(html, /world_character_id:g\.draft\.worldCharacterId==='__player_custom__'\?null:g\.draft\.worldCharacterId/, 'custom world must save without a character foreign-key reference');
+assert.match(html, /worldCharacterIdForSave=g\.draft\.worldCharacterId==='__player_custom__'\?null:g\.draft\.worldCharacterId/, 'custom world must be normalized before the asynchronous group create flow');
+assert.match(html, /world_character_id:worldCharacterIdForSave/, 'custom world must save without a character foreign-key reference');
 assert.match(html, /if\(g\.draft\.world\.length>3000\)return '群組背景最多 3000 字。'/, 'all group background text must be validated at 3000 characters');
 
 assert.match(html, /data-chat-list-pin="single"/, 'single-chat pin must have a dedicated isolated target');

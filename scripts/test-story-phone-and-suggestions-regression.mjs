@@ -52,7 +52,7 @@ assert.doesNotMatch(html, /勾選「重大記憶」即可珍藏這段回憶/);
 // Author-configured phone fields and genuine event history render inside one list,
 // with the configured fields first and no more than eight combined rows.
 assert.match(html, /const extraStoryStates=storyPhoneStates\.filter/);
-assert.match(html, /const storyEventsToShow=storyPhoneEvents\.filter[\s\S]*?renderedPhoneContentKeys\.has\(key\)[\s\S]*?\.slice\(0,remainingAfterStates\)/);
+assert.ok(html.includes('const storyEventsToShow=storyPhoneEvents.filter(item=>{')&&html.includes("if(hasRenderedPhoneContent(item.title||'新通知',item.body))return false;")&&html.includes('rememberPhoneContent(item.title||\'新通知\',item.body);'),'Phone events must be deduplicated before applying the remaining row limit');
 assert.match(html, /const noticeContentHTML=\[configuredNoticeHTML,storyStateHTML,storyEventHTML\]/,
   'configured phone rows must be first, followed by extra states and historical events');
 assert.match(html, /const configuredFieldIndexes=new Set\(configuredPhonePrompts\.slice\(0,8\)/);
@@ -143,8 +143,9 @@ assert.doesNotMatch(html,/e\(g\.draft\.playerPersona\|\|state\.account\?\.bio\|\
 const groupCreateStart=html.indexOf('async function groupCreate()');
 const groupCreateEnd=html.indexOf('function groupBack()',groupCreateStart);
 const groupCreateSource=html.slice(groupCreateStart,groupCreateEnd);
-assert.match(groupCreateSource,/player_persona:g\.draft\.playerPersona/,'Group creation must persist the exact draft persona');
-assert.match(groupCreateSource,/updated\.player_persona!==g\.draft\.playerPersona/,'Group creation must read back and verify the exact saved persona');
+assert.match(groupCreateSource,/playerPersonaForSave=String\(g\.draft\.playerPersona\?\?''\)/,'Group creation must freeze the exact manually entered persona before asynchronous creation');
+assert.match(groupCreateSource,/player_persona:playerPersonaForSave/,'Group creation must persist the frozen persona value');
+assert.match(groupCreateSource,/updated\.player_persona!==playerPersonaForSave/,'Group creation must read back and verify the exact frozen persona');
 assert.match(html,/const selected=presets\.find\(item=>String\(item\.id\)===String\(groupPersonaPickerSelection\)\)/,'A saved persona may only be applied after an explicit picker selection');
 assert.match(html,/if\(!selected\)\{toast\('請先選擇一組人設。'\)/,'The saved-persona picker must not auto-select the default preset');
 console.log('Group persona creation preserves manual text; saved presets require explicit selection and Apply.');

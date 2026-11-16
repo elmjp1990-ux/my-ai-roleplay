@@ -240,12 +240,14 @@ assert.ok(html.includes("const icon=match?.[0]||'🔔'"), 'missing author icon m
 assert.ok(html.includes('storyPhoneRuntimeCache.delete(String(user.uid)'), 'Story summary edit must use the scoped user id and refresh immediately');
 
 
-const phoneDedupStart=html.indexOf('const phoneContentKey=');
+const phoneDedupStart=html.indexOf('const phoneContentKeys=');
 const phoneDedupEnd=html.indexOf('function phoneNoticeIconPresentation',phoneDedupStart);
 assert.ok(phoneDedupStart>=0&&phoneDedupEnd>phoneDedupStart,'Phone content deduplication must be part of the phone rendering path');
 const phoneDedup=html.slice(phoneDedupStart,phoneDedupEnd);
 assert.match(phoneDedup,/normalize\('NFKC'\)/,'Phone content identity must normalize Unicode variants');
-assert.match(phoneDedup,/renderedPhoneContentKeys/,'Phone rows must track already-rendered cross-source content');
-assert.match(phoneDedup,/extraStoryStates=storyPhoneStates[\s\S]*?renderedPhoneContentKeys\.has\(key\)/,'Phone state snapshots must not repeat configured notification content');
-assert.match(phoneDedup,/storyEventsToShow=storyPhoneEvents\.filter[\s\S]*?renderedPhoneContentKeys\.has\(key\)/,'Phone event rows must not repeat content already shown in configured notices or state snapshots');
+assert.ok(phoneDedup.includes("replace(/\\s+/g,' ')"),'Phone content identity must collapse actual whitespace');
+assert.match(phoneDedup,/keys\.push\('body:'\+normalizedBody\)/,'Phone rows with alternate titles must still deduplicate identical meaningful bodies');
+assert.match(phoneDedup,/const hasRenderedPhoneContent=/,'Phone rows must use one shared cross-source deduplication helper');
+assert.match(phoneDedup,/extraStoryStates=storyPhoneStates[\s\S]*?hasRenderedPhoneContent/,'Phone state snapshots must not repeat configured notification content');
+assert.match(phoneDedup,/storyEventsToShow=storyPhoneEvents\.filter[\s\S]*?hasRenderedPhoneContent/,'Phone event rows must not repeat content already shown in configured notices or state snapshots');
 console.log('Phone notice/state/event cross-source duplicate-content regression checks passed.');

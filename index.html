@@ -8257,6 +8257,11 @@ async function groupCreate() {
     if(authError||!user||user.id!==currentUser()?.uid) throw new Error('請使用已連結 Supabase 的帳號登入，才能建立雲端群組。');
     g.ownerUid=user.id;
     const members=groupSelectedCharacters();
+    // Freeze the player identity exactly as entered in the wizard before async work begins.
+    // Account-level presets are only copied into this field by an explicit picker Apply.
+    const playerNameForSave=String(g.draft.playerName||'');
+    const playerPersonaForSave=String(g.draft.playerPersona??'');
+    const worldCharacterIdForSave=g.draft.worldCharacterId==='__player_custom__'?null:g.draft.worldCharacterId;
     const scenes=[{name:g.draft.scenes[0].name.trim(),description:truncateGroupOpeningText(g.draft.scenes[0].description||'',1000)}];
     const pMembers=members.map(m=>({character_id:m.id,scene_position:1}));
     const {data:groupId,error}=await groupWithTimeout(window.mySupabase.rpc('create_chat_group',{
@@ -8264,9 +8269,9 @@ async function groupCreate() {
     }),15000,'建立群組逾時，請重新載入群組清單確認是否已建立，避免重複建立。');
     if(error) throw error;
     const {data:updated,error:updateError}=await window.mySupabase.from('chat_groups')
-      .update({player_name:g.draft.playerName,player_persona:g.draft.playerPersona,world_character_id:g.draft.worldCharacterId==='__player_custom__'?null:g.draft.worldCharacterId,updated_at:new Date().toISOString()})
+      .update({player_name:playerNameForSave,player_persona:playerPersonaForSave,world_character_id:worldCharacterIdForSave,updated_at:new Date().toISOString()})
       .eq('id',groupId).eq('owner_id',user.id).select('id,player_name,player_persona,world_character_id').maybeSingle();
-    if(updateError||!updated||updated.player_name!==g.draft.playerName||updated.player_persona!==g.draft.playerPersona||updated.world_character_id!==(g.draft.worldCharacterId==='__player_custom__'?null:g.draft.worldCharacterId)) throw new Error('群組已建立，但雲端未能確認玩家人設與世界觀選擇完整保存。請重新開啟群組確認，勿重複建立。');
+    if(updateError||!updated||updated.player_name!==playerNameForSave||updated.player_persona!==playerPersonaForSave||updated.world_character_id!==worldCharacterIdForSave) throw new Error('群組已建立，但雲端未能確認玩家人設與世界觀選擇完整保存。請重新開啟群組確認，勿重複建立。');
     g.loading=false;
     clearGroupOpeningDraft();
     await groupOpen(groupId);
@@ -9410,35 +9415,42 @@ async function renderPhoneModal() {
   }).filter(Boolean);
   const configuredTitles=new Set(configuredRows.map(item=>phoneTitleKey(item.title)));
   const extraGeneratedNotices=savedNotices.filter(item=>typeof item==='string'||!configuredTitles.has(phoneTitleKey(resolvePhoneFieldTitle(item?.title||''))));
-  const notices=[...configuredRows,...extraGeneratedNotices].slice(0,8);
-  const noticeLines=notices.map(item=>typeof item==='string'?item.trim():String(item?.body||'').trim()).filter(Boolean);
   const configuredFieldIndexes=new Set(configuredPhonePrompts.slice(0,8).map((row,index)=>String(row||'').split('|')[0].trim()?index:null).filter(index=>index!==null));
-  const remainingAfterNotices=Math.max(0,8-notices.length);
-  // Avoid showing the same information twice when a configured notice, a phone-state
-  // snapshot, and an event row describe the same title/body. Keep repeated historical
-  // events within the event stream, but suppress cross-source duplicates.
-  const phoneContentKey=(title,body)=>{
+  // Normalize once and suppress duplicate information across configured notices,
+  // generated notices, state snapshots, and event history. Generic empty-state text
+  // is keyed with its title so unrelated fields remain visible.
+  const phoneContentKeys=(title,body)=>{
     const normalizedTitle=phoneTitleKey(title);
-    const normalizedBody=String(body||'').normalize('NFKC').replace(/\\s+/g,' ').trim().toLocaleLowerCase();
-    return normalizedTitle||normalizedBody?normalizedTitle+'|'+normalizedBody:'';
+    const normalizedBody=String(body||'').normalize('NFKC').replace(/\s+/g,' ').trim().toLocaleLowerCase();
+    if(!normalizedTitle&&!normalizedBody)return [];
+    const keys=[normalizedTitle+'|'+normalizedBody];
+    if(normalizedBody&&!['目前尚未有更新','目前沒有更新','尚無更新'].includes(normalizedBody))keys.push('body:'+normalizedBody);
+    return keys;
   };
   const renderedPhoneContentKeys=new Set();
-  const rememberPhoneContent=(title,body)=>{
-    const key=phoneContentKey(title,body);
-    if(key)renderedPhoneContentKeys.add(key);
-  };
-  notices.forEach(item=>rememberPhoneContent(typeof item==='string'?character.name:item?.title,typeof item==='string'?item:item?.body));
+  const hasRenderedPhoneContent=(title,body)=>phoneContentKeys(title,body).some(key=>renderedPhoneContentKeys.has(key));
+  const rememberPhoneContent=(title,body)=>phoneContentKeys(title,body).forEach(key=>renderedPhoneContentKeys.add(key));
+  const notices=[];
+  for(const item of [...configuredRows,...extraGeneratedNotices]){
+    const title=typeof item==='string'?character.name:item?.title;
+    const body=typeof item==='string'?item:item?.body;
+    const titleKey=phoneTitleKey(title);
+    if((titleKey&&notices.some(existing=>phoneTitleKey(typeof existing==='string'?character.name:existing?.title)===titleKey))||hasRenderedPhoneContent(title,body))continue;
+    notices.push(item);
+    rememberPhoneContent(title,body);
+    if(notices.length>=8)break;
+  }
+  const noticeLines=notices.map(item=>typeof item==='string'?item.trim():String(item?.body||'').trim()).filter(Boolean);
+  const remainingAfterNotices=Math.max(0,8-notices.length);
   const extraStoryStates=storyPhoneStates.filter(item=>!configuredFieldIndexes.has(Number(item.field_index))).filter(item=>{
-    const key=phoneContentKey(item.title,item.body);
-    if(!key||renderedPhoneContentKeys.has(key))return false;
-    renderedPhoneContentKeys.add(key);
+    if(hasRenderedPhoneContent(item.title,item.body))return false;
+    rememberPhoneContent(item.title,item.body);
     return true;
   }).slice(0,remainingAfterNotices);
   const remainingAfterStates=Math.max(0,remainingAfterNotices-extraStoryStates.length);
   const storyEventsToShow=storyPhoneEvents.filter(item=>{
-    const key=phoneContentKey(item.title||'新通知',item.body);
-    if(!key||renderedPhoneContentKeys.has(key))return false;
-    renderedPhoneContentKeys.add(key);
+    if(hasRenderedPhoneContent(item.title||'新通知',item.body))return false;
+    rememberPhoneContent(item.title||'新通知',item.body);
     return true;
   }).slice(0,remainingAfterStates);
   function phoneNoticeIconPresentation(value) {
