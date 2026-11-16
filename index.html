@@ -232,7 +232,6 @@ body.day .tag { color:#4f46b8; }
 .character-avatar-status .avatar {
   display:block;
 }
-.character-avatar-status.is-offline .avatar,
 .detail-image.character-offline-image {
   filter:grayscale(1);
   opacity:.68;
@@ -3457,7 +3456,8 @@ function sessionCharacter(s) {
     const cached=portraitPath&&uid&&s.id?cloudSessionImageUrlCache.get(uid+':'+s.id+':'+portraitPath):null;
     const cachedImage=cached&&cached.expiresAt>Date.now()?cached.url:'';
     const image=cachedImage||safeImage(found.image)||safeImage(found.avatar_url)||'';
-    return image===found.image?found:{...found,image};
+    const deletedAt=snap?.deletedAt||found.deletedAt||null;
+    return image===found.image&&found.deletedAt===deletedAt?found:{...found,image,deletedAt};
   }
   const snap = s.cloudCharacterSnapshot;
   if (!snap || snap.id !== s.characterId) return null;
@@ -6884,9 +6884,12 @@ function chatEntries() {
       const active=route.page==='group'&&groupPrototype.active?.id===group.id;
       const hasUnread=chatHasUnreadAssistantMessage(groupPreviewLastAssistantAt(item.preview),groupChatReadAt(currentUser()?.uid,group.id));
       const memberList=groupPrototype.groupMembers?.[group.id]||[];
-      const avatarMarkup=memberList.slice(0,3).map(member=>
-        characterAvatarMarkup(member,{imageClass:'group-avatar-image',fallbackClass:'group-avatar-fallback'})
-      ).join('');
+      const avatarMarkup=memberList.slice(0,3).map(member=>{
+        const offline=Boolean(member.deletedAt||member.deleted_at||member.character_snapshot?.deletedAt||member.characterSnapshot?.deletedAt);
+        return '<span class="character-avatar-status '+(offline?'is-offline':'')+'" title="'+e((member.name||'角色')+(offline?'｜離線／已下架':'｜公開中'))+'">'+
+          characterAvatarMarkup(member,{imageClass:'group-avatar-image',fallbackClass:'group-avatar-fallback'})+
+          '<span class="character-status-dot" title="'+(offline?'離線／已下架':'公開中')+'"></span></span>';
+      }).join('');
       const groupAvatar=avatarMarkup?'<span class="group-avatar-stack" aria-hidden="true">'+avatarMarkup+'</span>':'<span class="group-list-avatar" aria-hidden="true">群</span>';
       return `<div class="chat-entry group-chat-entry ${active?'active':''}">
         <button type="button" class="pin group-pin ${item.pinned?'on':''}" data-chat-list-pin="group" data-action="group-pin" data-id="${e(group.id)}" aria-label="${item.pinned?'取消群組置頂':'置頂群組'}" title="${item.pinned?'取消置頂':'置頂'}">${ICON.pin}</button>
@@ -7448,7 +7451,7 @@ async function groupOpen(groupId) {
       const phoneSettings=characterRow.phone_settings||snapshot.phoneSettings||snapshot.phone_settings||{};
       const phoneNotifications=Array.isArray(m.phone_notifications)?m.phone_notifications:
         Array.isArray(snapshot.phoneNotifications)?snapshot.phoneNotifications:[];
-      return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,
+      return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,characterSnapshot:snapshot,displayId,
         avatar_url:snapshot.image||snapshot.avatar_url||snapshot.avatarUrl||snapshot.image_url||characterRow.avatar_url||'',
         primaryIllustrationPath:snapshot.imagePath||snapshot.primaryIllustrationPath||snapshot.primary_illustration_path||snapshot.image_path||'',
         phoneNotifications,phoneSettings,position:m.position,sceneId:m.scene_id,
@@ -7484,7 +7487,7 @@ async function groupOpen(groupId) {
         if(existingIndex>=0)g.groups[existingIndex]=listRow;else g.groups.unshift(listRow);
         g.groupMembers ||= {};
         g.groupPreviews ||= {};
-        g.groupMembers[group.id]=members.map(member=>({characterId:member.characterId,name:member.name,avatar_url:member.avatar_url||member.image||'',primaryIllustrationPath:member.primaryIllustrationPath||'',character_snapshot:{id:member.characterId,name:member.name,avatar_url:member.avatar_url||member.image||'',primaryIllustrationPath:member.primaryIllustrationPath||''}}));
+        g.groupMembers[group.id]=members.map(member=>({characterId:member.characterId,name:member.name,avatar_url:member.avatar_url||member.image||'',primaryIllustrationPath:member.primaryIllustrationPath||'',deletedAt:member.deletedAt||null,character_snapshot:{id:member.characterId,name:member.name,avatar_url:member.avatar_url||member.image||'',primaryIllustrationPath:member.primaryIllustrationPath||'',deletedAt:member.deletedAt||null}}));
         const latestMessage=messages.at(-1);
         if(latestMessage)g.groupPreviews[group.id]={group_id:group.id,content:latestMessage.content||'',created_at:latestMessage.createdAt||'',speaker_type:latestMessage.type==='user'?'user':'character'};
         else delete g.groupPreviews[group.id];
@@ -7642,9 +7645,10 @@ function renderGroupConversation() {
   const memberAvatars=group.members.map(m=>{
     const characterId=String(m.characterId||m.id||'');
     const canLink=isUuid(characterId)&&!characterId.startsWith('seed-');
-    const portrait='<span class="character-avatar-status" title="'+e(m.name||'角色')+'">'+
+    const offline=Boolean(m.deletedAt||m.deleted_at||m.characterSnapshot?.deletedAt||m.character_snapshot?.deletedAt);
+    const portrait='<span class="character-avatar-status '+(offline?'is-offline':'')+'" title="'+e((m.name||'角色')+(offline?'｜離線／已下架':'｜公開中'))+'">'+
       characterAvatarMarkup(m)+
-      '</span>';
+      '<span class="character-status-dot" title="'+(offline?'離線／已下架':'公開中')+'"></span></span>';
     return canLink
       ? '<button type="button" class="group-member-avatar-link" data-action="group-member-detail" data-id="'+e(characterId)+'" aria-label="查看角色 '+e(m.name||'角色')+' 的角色卡" title="查看 '+e(m.name||'角色')+' 的角色卡">'+portrait+'</button>'
       : portrait;
