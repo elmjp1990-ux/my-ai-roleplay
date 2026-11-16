@@ -6,6 +6,18 @@ const end = html.indexOf('function normalizePersonalityProfile', start);
 if (start < 0 || end < 0) throw new Error('Character video loader block not found.');
 const source = html.slice(start, end);
 
+if (!source.includes("CHARACTER_VIDEO_VISIBILITY_DELAY_MS = 500")) {
+  throw new Error('Video must wait 500ms after becoming meaningfully visible before signing or loading.');
+}
+if (!source.includes('scheduleCharacterVideoLoad(target)')) {
+  throw new Error('Visible video loading must pass through the dwell-time gate.');
+}
+if (!source.includes('clearCharacterVideoVisibilityTimer(target)')) {
+  throw new Error('Leaving the visibility threshold must cancel a pending video load.');
+}
+if (!source.includes("video.dataset.videoVisibilityEligible!=='true'")) {
+  throw new Error('A delayed video load must re-check current visibility eligibility.');
+}
 if (!source.includes("threshold:[0,0.15,0.35]")) {
   throw new Error('Video observer must use graduated visibility thresholds.');
 }
