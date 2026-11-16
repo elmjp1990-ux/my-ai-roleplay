@@ -116,6 +116,21 @@ Deno.serve(async (request: Request) => {
     .maybeSingle();
   if (illustrationError) return json({ error: "character_illustration_lookup_failed" }, 503);
 
+  // Encounter snapshots keep the public opening so an existing encounter can
+  // still show the character's original profile after a later soft delete.
+  const { data: characterStory, error: storyError } = await admin
+    .from("character_stories")
+    .select("opening_message")
+    .eq("character_id", character.id)
+    .eq("visibility", "public")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (storyError) return json({ error: "character_story_lookup_failed" }, 503);
+  const openingMessage = typeof characterStory?.opening_message === "string"
+    ? characterStory.opening_message
+    : "";
+
   // All snapshot identity fields are built from the database, never the request body.
   const snapshot = {
     id: character.id,
@@ -126,7 +141,7 @@ Deno.serve(async (request: Request) => {
     image: primaryIllustration?.storage_path ? "" : (character.avatar_url || ""),
     imagePath: primaryIllustration?.storage_path || "",
     intro: character.intro || "",
-    opening: "",
+    opening: openingMessage,
     race: character.race || "",
     style: character.style || "",
     phoneSettings: character.phone_settings || {},
