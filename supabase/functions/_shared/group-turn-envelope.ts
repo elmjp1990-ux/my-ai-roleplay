@@ -1,4 +1,4 @@
-export type GroupTurnSpeaker = { id: string; name: string; sceneId?: string | null; sceneName?: string; phoneNotifications?: GroupPhoneNotification[] };
+export type GroupTurnSpeaker = { id: string; name: string; sceneId?: string | null; sceneName?: string; phoneSettings?: Record<string, unknown>; phoneNotifications?: GroupPhoneNotification[] };
 export type GroupPhoneNotification = { title: string; body: string };
 export type GroupTurnEnvelope = {
   speeches: Array<{ speakerId: string; speakerName: string; content: string; sceneId: string | null; sceneName: string }>;
@@ -41,7 +41,7 @@ export type GroupTurnEnvelopeParseResult = {
   warningCount: number;
 };
 
-export function parseGroupTurnEnvelopeDetailed(output: unknown, speakers: GroupTurnSpeaker[]): GroupTurnEnvelopeParseResult {
+export function parseGroupTurnEnvelopeDetailed(output: unknown, speakers: GroupTurnSpeaker[], playerName = "玩家"): GroupTurnEnvelopeParseResult {
   let text = typeof output === "string" ? output.trim() : "";
   if (!text || !Array.isArray(speakers) || speakers.length < 1 || speakers.length > 3) {
     return { envelope: null, errorCode: "empty_output_or_roster", warningCount: 0 };
@@ -78,31 +78,69 @@ export function parseGroupTurnEnvelopeDetailed(output: unknown, speakers: GroupT
   if (speeches.length < 1) return { envelope: null, errorCode: "no_valid_speeches", warningCount };
 
   const phoneById = new Map<string, GroupPhoneNotification[]>();
-  if (Array.isArray(root.phone_updates)) {
+  const configuredPrompts = (speaker: GroupTurnSpeaker): string[] => {
+    const settings = asObject(speaker.phoneSettings);
+    const raw = Array.isArray(settings.noticePrompts) ? settings.noticePrompts
+      : Array.isArray(settings.notices) ? settings.notices : [];
+    return raw.map(asText).filter(Boolean).slice(0, 8);
+  };
+  if (!Array.isArray(root.phone_updates)) {
+    if (speakers.some(speaker => configuredPrompts(speaker).length > 0)) {
+      return { envelope: null, errorCode: "missing_phone_updates", warningCount };
+    }
+    warningCount += 1;
+  } else {
     for (const item of root.phone_updates) {
       const row = asObject(item), characterId = asText(row.character_id);
       const speaker = byId.get(characterId);
       if (!speaker || phoneById.has(characterId) || !Array.isArray(row.notifications) || row.notifications.length > 8) {
-        warningCount += 1; continue;
+        if (speaker && configuredPrompts(speaker).length > 0) {
+          return { envelope: null, errorCode: "invalid_required_phone_update", warningCount };
+        }
+        warningCount += 1;
+        continue;
       }
       const notifications: GroupPhoneNotification[] = [];
-      let valid = true;
       for (const rawNotice of row.notifications) {
         const notice = asObject(rawNotice), title = asText(notice.title), body = asText(notice.body);
-        if (!title || !body || title.length > 80 || body.length > 500) { valid = false; break; }
+        if (!title || !body || title.length > 80 || body.length > 500) {
+          if (configuredPrompts(speaker).length > 0) {
+            return { envelope: null, errorCode: "invalid_required_phone_notification", warningCount };
+          }
+          warningCount += 1;
+          notifications.length = 0;
+          break;
+        }
         notifications.push({ title, body });
       }
-      if (!valid) { warningCount += 1; continue; }
       phoneById.set(characterId, notifications);
     }
-  } else warningCount += 1;
+  }
 
-  const phoneUpdates = speakers.map(speaker => ({
-    characterId: speaker.id,
-    notifications: phoneById.has(speaker.id)
-      ? phoneById.get(speaker.id)!
-      : (Array.isArray(speaker.phoneNotifications) ? speaker.phoneNotifications.slice(0, 8) : []),
-  }));
+  const phoneUpdates: GroupTurnEnvelope["phoneUpdates"] = [];
+  for (const speaker of speakers) {
+    const prompts = configuredPrompts(speaker);
+    const supplied = phoneById.get(speaker.id);
+    if (prompts.length > 0 && !supplied) {
+      return { envelope: null, errorCode: "incomplete_phone_updates", warningCount };
+    }
+    if (prompts.length > 0 && supplied!.length !== prompts.length) {
+      return { envelope: null, errorCode: "phone_notification_count_mismatch", warningCount };
+    }
+    const notifications = supplied
+      ? supplied.map((notice, index) => {
+        const prompt = prompts[index];
+        const title = prompt
+          ? (prompt.split("|", 1)[0] || "").trim()
+            .replace(/\{CHAR\}/g, speaker.name)
+            .replace(/\{USER\}/g, asText(playerName) || "玩家")
+            .slice(0, 80)
+          : notice.title;
+        return { title: title || notice.title, body: notice.body };
+      })
+      : (Array.isArray(speaker.phoneNotifications) ? speaker.phoneNotifications.slice(0, 8) : []);
+    phoneUpdates.push({ characterId: speaker.id, notifications });
+  }
   const rawWorldState = asObject(root.story_world_state);
   const storyTime = asText(rawWorldState.story_time).slice(0, 80);
   const storyLocation = asText(rawWorldState.story_location).slice(0, 120);
