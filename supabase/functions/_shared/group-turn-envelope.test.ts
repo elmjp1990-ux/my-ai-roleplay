@@ -44,7 +44,7 @@ Deno.test("rejects partial phone updates instead of silently completing with emp
   assertEquals(result.errorCode, "incomplete_phone_updates");
 });
 
-Deno.test("rejects configured phone field count mismatches and malformed values", () => {
+Deno.test("accepts omitted model titles for configured fields and rejects missing bodies", () => {
   const mismatch = parseGroupTurnEnvelopeDetailed(JSON.stringify({
     speeches: [{ speaker_id: "a", content: "有效角色發言" }],
     phone_updates: [
@@ -54,14 +54,27 @@ Deno.test("rejects configured phone field count mismatches and malformed values"
   }), roster);
   assertEquals(mismatch.errorCode, "phone_notification_count_mismatch");
 
-  const malformed = parseGroupTurnEnvelopeDetailed(JSON.stringify({
+  const missingModelTitle = parseGroupTurnEnvelopeDetailed(JSON.stringify({
     speeches: [{ speaker_id: "a", content: "有效角色發言" }],
     phone_updates: [
-      { character_id: "a", notifications: [{ title: "", body: "不完整" }] },
+      { character_id: "a", notifications: [{ title: "", body: "目前穿著深色西裝，站在辦公室。" }] },
+      { character_id: "b", notifications: [{ title: "", body: "會議已延後。" }] },
+    ],
+  }), roster);
+  assertEquals(missingModelTitle.errorCode, null);
+  assertEquals(missingModelTitle.envelope?.phoneUpdates, [
+    { characterId: "a", notifications: [{ title: "👔夜辰衣著/姿勢", body: "目前穿著深色西裝，站在辦公室。" }] },
+    { characterId: "b", notifications: [{ title: "💼公司訊息", body: "會議已延後。" }] },
+  ]);
+
+  const missingBody = parseGroupTurnEnvelopeDetailed(JSON.stringify({
+    speeches: [{ speaker_id: "a", content: "有效角色發言" }],
+    phone_updates: [
+      { character_id: "a", notifications: [{ title: "欄位", body: "" }] },
       { character_id: "b", notifications: [{ title: "公司訊息", body: "正常" }] },
     ],
   }), roster);
-  assertEquals(malformed.errorCode, "invalid_required_phone_notification");
+  assertEquals(missingBody.errorCode, "invalid_required_phone_notification");
 });
 
 Deno.test("keeps prior phone state only for characters without configured fields", () => {
