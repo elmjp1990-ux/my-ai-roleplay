@@ -48,6 +48,9 @@ BEGIN
     RAISE EXCEPTION 'group snapshot did not preserve the opening and intro';
   END IF;
 
+  -- Exercise the snapshot-only group Storage policy path, not the metadata-table path.
+  DELETE FROM public.character_illustrations WHERE character_id = v_character;
+
   INSERT INTO public.chat_sessions(id, user_id, character_id, character_snapshot, updated_at)
   VALUES (
     v_session, v_owner, v_character,
@@ -183,11 +186,17 @@ $$;
 RESET ROLE;
 
 INSERT INTO public.characters(id, author_id, name, visibility, is_nsfw)
-VALUES ('77777777-7777-4777-8777-777777777777', '22222222-2222-4222-8222-222222222222', 'Public asset', 'public', false);
+VALUES
+  ('77777777-7777-4777-8777-777777777777', '22222222-2222-4222-8222-222222222222', 'Public asset', 'public', false),
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '22222222-2222-4222-8222-222222222222', 'NSFW public asset', 'public', true);
 INSERT INTO public.character_illustrations(character_id, asset_type, storage_path)
-VALUES ('77777777-7777-4777-8777-777777777777', 'primary', '22222222-2222-4222-8222-222222222222/77777777-7777-4777-8777-777777777777/public.webp');
+VALUES
+  ('77777777-7777-4777-8777-777777777777', 'primary', '22222222-2222-4222-8222-222222222222/77777777-7777-4777-8777-777777777777/public.webp'),
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'primary', '22222222-2222-4222-8222-222222222222/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/nsfw.webp');
 INSERT INTO storage.objects(bucket_id, name)
-VALUES ('character-illustrations', '22222222-2222-4222-8222-222222222222/77777777-7777-4777-8777-777777777777/public.webp');
+VALUES
+  ('character-illustrations', '22222222-2222-4222-8222-222222222222/77777777-7777-4777-8777-777777777777/public.webp'),
+  ('character-illustrations', '22222222-2222-4222-8222-222222222222/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/nsfw.webp');
 
 SET ROLE anon;
 DO $$
@@ -197,6 +206,12 @@ BEGIN
     WHERE name = '22222222-2222-4222-8222-222222222222/77777777-7777-4777-8777-777777777777/public.webp'
   ) THEN
     RAISE EXCEPTION 'original public non-NSFW illustration access was not preserved';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM storage.objects
+    WHERE name = '22222222-2222-4222-8222-222222222222/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/nsfw.webp'
+  ) THEN
+    RAISE EXCEPTION 'anonymous viewers unexpectedly received access to an NSFW portrait';
   END IF;
 END;
 $$;
