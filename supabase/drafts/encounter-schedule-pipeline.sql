@@ -1283,9 +1283,11 @@ AS $encounter_city_weather$
   SELECT
     COALESCE(
       live.weather_text,
-      CASE WHEN baseline.rain_probability >= 0.5
-        THEN '2025 歷史降雨參考' ELSE '2025 歷史天氣參考' END,
-      '天氣資料待更新'
+      CASE
+        WHEN baseline.month IS NULL THEN '天氣資料待更新'
+        WHEN baseline.rain_probability >= 0.5 THEN '2025 歷史降雨參考'
+        ELSE '2025 歷史天氣參考'
+      END
     ),
     COALESCE(live.temperature_c, baseline.average_temperature_c),
     COALESCE(
