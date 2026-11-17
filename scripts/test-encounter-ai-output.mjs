@@ -3,17 +3,23 @@ import fs from "node:fs";
 import { parseEncounterTurnOutput } from "../supabase/functions/_shared/encounter-turn-output.mjs";
 
 const text = "相遇內容。".repeat(30);
+const illustrationId = "11111111-1111-4111-8111-111111111111";
+const sceneBackgroundId = "22222222-2222-4222-8222-222222222222";
 assert.equal(Array.from(text).length, 150);
-assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text })), text);
+assert.deepEqual(
+  parseEncounterTurnOutput(JSON.stringify({ reply: text, illustration_id: illustrationId, scene_background_id: sceneBackgroundId })),
+  { reply: text, illustrationId, sceneBackgroundId },
+);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "太短了" })), null);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "相遇內容".repeat(76) })), null);
 assert.equal(parseEncounterTurnOutput("not-json"), null);
 assert.equal(parseEncounterTurnOutput(JSON.stringify(["not", "an", "object"])), null);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: 123 })), null);
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, illustration_id: "invented-id" })).illustrationId, null);
 
 const max = "相遇內容".repeat(75);
 assert.equal(Array.from(max).length, 300);
-assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: max })), max);
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: max })).reply, max);
 
 const endpoint = fs.readFileSync("supabase/functions/encounter-turn/index.ts", "utf8");
 const guidelines = fs.readFileSync("supabase/functions/_shared/encounter-response-guidelines.ts", "utf8");
@@ -52,6 +58,15 @@ assert.match(endpoint, /encounterSchedule/);
 assert.doesNotMatch(endpoint, /from\(["']encounter_session_lifecycle["']\)/);
 assert.match(sessionCreator, /snapshot\.encounterSchedule = scheduleSnapshot/);
 assert.match(sessionCreator, /snapshot\.encounterGreeting/);
+assert.match(sessionCreator, /availableIllustrations/);
+assert.match(sessionCreator, /availableSceneBackgrounds/);
+assert.match(endpoint, /resolveEncounterVisuals/);
+assert.match(endpoint, /encounter_turn_visuals/);
+assert.match(endpoint, /sceneBackgroundPath/);
+assert.match(endpoint, /illustration_id/);
+assert.match(endpoint, /scene_background_id/);
+assert.match(scene, /session\?\.encounterVisuals/);
+assert.match(scene, /hydrateEncounterGalleryIllustration\(character\.id, selectedIllustrationId\)/);
 const openingHandlerStart = frontend.indexOf("window.addEventListener('poyozz-encounter-opening-choice'");
 const openingHandlerEnd = frontend.indexOf("async function markCloudChatSessionRead", openingHandlerStart);
 assert.ok(openingHandlerStart >= 0 && openingHandlerEnd > openingHandlerStart, "Opening-choice persistence handler must exist");
