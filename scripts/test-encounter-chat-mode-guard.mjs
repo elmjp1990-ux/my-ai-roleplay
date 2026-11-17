@@ -236,7 +236,7 @@ assert.match(frontend, /if \(!hasUserMessage && !canSavePrecreatedSession\) retu
 assert.match(frontend, /from\(["']encounter_diary["']\)/);
 assert.match(frontend, /async function openEncounterMemoryDetail\(button\)/);
 assert.match(frontend, /data-action="encounter-memory-open"/);
-assert.match(frontend, /相遇回憶/);
+assert.match(frontend, /相遇日記/);
 assert.match(frontend, /故事模式記憶混合/);
 assert.match(frontend, /chatOverlay:\'encounter-dialogues\'/);
 assert.match(frontend, /aria-label="本次對話紀錄"/);
