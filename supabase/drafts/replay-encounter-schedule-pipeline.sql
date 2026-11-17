@@ -27,13 +27,22 @@ INSERT INTO public.character_schedules (
   priority, is_active, source_type, variant_key, variant_weight,
   encounter_greeting, is_outdoor,
   rain_fallback_location_key, rain_fallback_activity, rain_fallback_greeting
-) VALUES (
+) VALUES
+(
   '00000000-0000-4000-8000-000000000012'::uuid,
   '00000000-0000-4000-8000-000000000010'::uuid,
-  'weekday', '09:00', '17:00', 'park', '在公園散步',
+  'weekday', '09:00', '12:00', 'park', '在公園散步',
   0, true, 'manual', 'primary', 100,
   '', true, 'cafe', '改到咖啡廳避雨',
   pg_catalog.repeat('雨勢漸大，你們改到附近咖啡廳坐下休息，窗外雨聲逐漸變得平穩。', 6)
+),
+(
+  '00000000-0000-4000-8000-000000000013'::uuid,
+  '00000000-0000-4000-8000-000000000010'::uuid,
+  'weekday', '12:00', '14:00', 'park', '下一段公園行程',
+  0, true, 'manual', 'primary', 100,
+  '', true, 'cafe', '改到咖啡廳避雨',
+  pg_catalog.repeat('下雨時改到咖啡廳等待雨勢變小。', 8)
 );
 SET LOCAL session_replication_role = origin;
 
@@ -195,6 +204,7 @@ BEGIN
     RAISE EXCEPTION 'rainy outdoor schedule must not remain at its original outdoor location';
   END IF;
 
+  -- Rain stops mid-slot: the original slot remains in the cafe until 12:00.
   UPDATE public.encounter_city_weather
   SET weather_text = '晴朗',
       is_raining = false,
@@ -206,14 +216,32 @@ BEGIN
   FROM public.resolve_encounter_character_schedule(
     '00000000-0000-4000-8000-000000000010'::uuid,
     NULL,
-    'park',
-    '2026-11-17T10:00:00+08:00'::timestamptz
+    'cafe',
+    '2026-11-17T11:00:00+08:00'::timestamptz
   );
   IF NOT FOUND
+     OR v_result.schedule_id <> '00000000-0000-4000-8000-000000000012'::uuid
+     OR v_result.location_key <> 'cafe'
+     OR v_result.activity <> '改到咖啡廳避雨'
+     OR v_result.is_outdoor IS NOT FALSE THEN
+    RAISE EXCEPTION 'rain stop must not move an active slot back to its original outdoor location';
+  END IF;
+
+  -- A new schedule slot makes a fresh weather decision; the dry next slot
+  -- can return to the original outdoor location without changing the old slot.
+  SELECT * INTO v_result
+  FROM public.resolve_encounter_character_schedule(
+    '00000000-0000-4000-8000-000000000010'::uuid,
+    NULL,
+    'park',
+    '2026-11-17T12:00:00+08:00'::timestamptz
+  );
+  IF NOT FOUND
+     OR v_result.schedule_id <> '00000000-0000-4000-8000-000000000013'::uuid
      OR v_result.location_key <> 'park'
-     OR v_result.activity <> '在公園散步'
+     OR v_result.activity <> '下一段公園行程'
      OR v_result.is_outdoor IS NOT TRUE THEN
-    RAISE EXCEPTION 'dry outdoor schedule did not resolve to its original location';
+    RAISE EXCEPTION 'the next schedule must make a fresh weather decision';
   END IF;
 END;
 $rainy_schedule_resolution_smoke$;
