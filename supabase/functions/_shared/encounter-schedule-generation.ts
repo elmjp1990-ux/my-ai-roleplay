@@ -394,7 +394,7 @@ export function buildEncounterScheduleBatchMessages(sources: EncounterScheduleSo
     "每天以整點為單位規劃。連續多小時在同一地點從事同一活動，合併為一個 start_time/end_time 區間；例如 09:00–17:00 的 8 小時工作必須留在同一地點。每個變體最多 4 個時段，可保留合理空檔。",
     "holiday 依台灣政府正式辦公日曆判斷，包含國定假日與補班日；不可單純把週末都視為假日。每個 weekday 變體權重固定 primary=80、alternative=20；每個 holiday 變體權重固定 primary=60、alternative=40。每個日型都必須提供 primary 與 alternative 兩套完整 24 小時行程，從 00:00 開始至次日 00:00 結束，時段必須連續無空檔、不可重疊；允許合併連續相同地點／活動的時段，但不得遺漏任何小時。",
     "special_events 可選擇輸出 0–4 個條件式節日行程，只能使用 event_key: taiwan_public_holiday、lunar_new_year、valentines_day、christmas。taiwan_public_holiday 代表台灣政府正式放假日；lunar_new_year 代表農曆除夕與春節假期；valentines_day 為每年 02-14；christmas 為每年 12-25。只有角色背景、關係或職業確實適合節日變化時才輸出，不要為每個角色硬加節日活動；若 placement=no_matching_location，special_events 必須是空陣列。每個特殊節日包含 event_key、event_name、slots；slots 同樣必須完整覆蓋 24 小時、2–4 個時段，並遵守一般時段的場景、招呼與雨備規範。角色生日目前沒有結構化日期來源，不可自行推算或輸出 birthday.",
-    "戶外時段必須提供雨天室內替代地點、活動與一段 150–300 字元的 rain_fallback_greeting；室內時段所有 rain_fallback 欄位必須為 null。park 與 shopping-street 為戶外；其餘提供的地點為室內。",
+    "戶外時段必須提供雨天室內替代地點、活動與一段 150–300 字元的 rain_fallback_greeting；室內時段所有 rain_fallback 欄位必須為 null。park、shopping-street 與 night-market 為戶外；其餘提供的地點為室內。",
     "作者行程說明只供內部規劃，輸出活動必須使用公開可見、簡短自然的描述，不得逐字複製整段說明或揭露私人情節。每個時段都要產生一段與該角色、地點、活動吻合的預生成招呼 encounter_greeting，長度 150–300 字元；不得直接揭露作者私密設定或照抄私密內容。",
     "每個 modern_map 角色還必須額外產生 relationship_greetings：依 hostile、dislike、wary、first_meeting、acquaintance、close、intimate、special 八種關係階段，各提供 3–5 段不同的繁體中文開場招呼，預設恰好 3 段（只有角色差異確實需要時才增加到 4–5 段），每段以 150–180 字元為目標且不得少於 150、不得超過 300 字元。每段要符合角色個性，但不要寫死地點、日期或時間，因為實際場景由玩家遇見時的排程決定；同一階段內不得重複。階段語氣要有明顯差異：hostile 敵意、dislike 冷淡、wary 戒備、first_meeting 初識、acquaintance 熟悉、close 信任親近、intimate 深厚親密（不預設一定是戀愛）、special 特別且高度個人化。不可因關係階段而捏造玩家曾做過的事。",
 
