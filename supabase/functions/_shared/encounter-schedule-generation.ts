@@ -45,7 +45,7 @@ const SCENE_ALIASES: Record<string, string> = {
   公寓: "apartment", 住宅: "apartment", apartment: "apartment",
   livehouse: "live-house", "live house": "live-house", 現場音樂: "live-house", 音樂展演: "live-house",
   購物街: "shopping-street", 商店街: "shopping-street", 逛街商圈: "shopping-street",
-  夜市: "night-market", 夜間市集: "night-market",
+  夜市: "night-market", 夜間市集: "night-market", "night market": "night-market",
   餐廳: "restaurant", 飯店餐廳: "restaurant", 餐館: "restaurant",
   大學: "university", 學校: "university", 校園: "university",
   醫院: "hospital", 診所: "hospital",
@@ -53,14 +53,14 @@ const SCENE_ALIASES: Record<string, string> = {
   電影院: "cinema", 影城: "cinema",
   博物館: "museum", 美術館: "museum", 展覽館: "museum",
   飯店: "hotel", 旅館: "hotel",
-  車站: "train-station", 火車站: "train-station", 捷運站: "train-station", 高鐵站: "train-station",
+  車站: "train-station", 火車站: "train-station", 捷運站: "train-station", 高鐵站: "train-station", "train station": "train-station",
   圖書館: "library",
   劇院: "theater", 劇場: "theater",
-  藝廊: "art-gallery", 畫廊: "art-gallery",
-  社區中心: "community-center", 活動中心: "community-center",
-  音樂工作室: "music-studio", 錄音室: "music-studio",
+  藝廊: "art-gallery", 畫廊: "art-gallery", "art gallery": "art-gallery",
+  社區中心: "community-center", 活動中心: "community-center", "community center": "community-center",
+  音樂工作室: "music-studio", 錄音室: "music-studio", "music studio": "music-studio",
   麵包店: "bakery", 烘焙坊: "bakery",
-  共享辦公室: "coworking-space", 共同工作空間: "coworking-space",
+  共享辦公室: "coworking-space", 共同工作空間: "coworking-space", "co-working space": "coworking-space", "coworking space": "coworking-space",
 };
 
 type RecordValue = Record<string, unknown>;
