@@ -237,7 +237,7 @@
     layer.setAttribute('id','cityDynamicSceneMarkers');
     const existing=[];
     svg.querySelectorAll('.city-place-marker[data-place]').forEach(marker=>{
-      const match=String(marker.getAttribute('transform')||'').match(/translate\\(\\s*(-?[\\d.]+)[ ,]+(-?[\\d.]+)\\s*\\)/);
+      const match=String(marker.getAttribute('transform')||'').match(/translate\(\s*(-?[\d.]+)[ ,]+(-?[\d.]+)\s*\)/);
       if(match)existing.push({x:Number(match[1]),y:Number(match[2])});
     });
     let added=0;
