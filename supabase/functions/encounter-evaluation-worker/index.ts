@@ -56,12 +56,13 @@ function buildTranscript(
   }
 
   let lines = allLines;
+  let omittedTurns = 0;
   let transcript = lines.join("\n\n");
   if (transcript.length > MAX_TRANSCRIPT_CHARS && lines.length > 20) {
     const first = lines.slice(0, 10);
     const last = lines.slice(-50);
-    const omitted = lines.length - first.length - last.length;
-    lines = [...first, "（中間省略 " + omitted + " 段較早對話；請勿推測未提供的事件。）", ...last];
+    omittedTurns = Math.max(0, pairs.length - 60);
+    lines = [...first, "（中間省略 " + omittedTurns + " 段較早對話；請勿推測未提供的事件。）", ...last];
     transcript = lines.join("\n\n");
   }
   if (transcript.length > MAX_TRANSCRIPT_CHARS) {
@@ -70,7 +71,7 @@ function buildTranscript(
   return {
     transcript,
     includedTurns: pairs.length,
-    omittedTurns: Math.max(0, pairs.length - 60),
+    omittedTurns,
   };
 }
 
