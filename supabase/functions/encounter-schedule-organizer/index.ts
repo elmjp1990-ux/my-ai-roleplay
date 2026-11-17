@@ -83,7 +83,7 @@ Deno.serve(async (request) => {
         .eq("status", "completed").not("completed_at", "is", null)
         .order("completed_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
-    if (pendingResult.error || lastRunResult.error) return json({ enabled: true, status_available: false });
+    if (pendingResult.error || lastRunResult.error) return json({ enabled: true, test_mode: true, status_available: false });
     return json({
       enabled: true,
       test_mode: true,
