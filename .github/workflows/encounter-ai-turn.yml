@@ -7,10 +7,12 @@ on:
       - "encounter-scene.js"
       - "supabase/functions/encounter-turn/**"
       - "supabase/functions/encounter-session/**"
+      - "supabase/functions/encounter-schedule-organizer/**"
       - "supabase/functions/_shared/encounter-schedule.mjs"
       - "supabase/functions/_shared/encounter-turn-output.mjs"
       - "supabase/functions/_shared/encounter-schedule-generation.ts"
       - "supabase/functions/_shared/encounter-schedule-generation.test.ts"
+      - "scripts/test-encounter-schedule-worker.mjs"
       - "supabase/functions/_shared/encounter-response-guidelines.ts"
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/private-context-guard.ts"
@@ -31,10 +33,14 @@ jobs:
           node-version: "22"
       - name: Test Encounter response schema and length boundaries
         run: node scripts/test-encounter-ai-output.mjs
+      - name: Test schedule worker security and wallet isolation
+        run: node scripts/test-encounter-schedule-worker.mjs
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
       - name: Test AI schedule batch validation and compatibility
         run: deno test supabase/functions/_shared/encounter-schedule-generation.test.ts
-      - name: Type-check Encounter Edge Function and shared modules
-        run: deno check supabase/functions/encounter-turn/index.ts
+      - name: Test AI schedule batch validation and compatibility
+        run: deno test supabase/functions/_shared/encounter-schedule-generation.test.ts
+      - name: Type-check Encounter Edge Functions and shared modules
+        run: deno check supabase/functions/encounter-turn/index.ts supabase/functions/encounter-session/index.ts supabase/functions/encounter-schedule-organizer/index.ts
