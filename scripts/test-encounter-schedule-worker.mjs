@@ -49,10 +49,10 @@ assert.match(pipeline, /v_oldest > v_now - interval '23 hours 45 minutes'/);
 assert.match(pipeline, /v_daily_count >= 4/);
 assert.match(pipeline, /v_last_started > v_now - interval '6 hours'/);
 assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_city_weather/);
-assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_weather_baseline_2025/);
+assert.doesNotMatch(pipeline, /encounter_weather_baseline_2025/, "Illustrative weather must not depend on historical weather imports");
 assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.get_encounter_city_weather\(\)/);
 assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.schedule_encounter_weather_sync\(/);
-assert.match(pipeline, /'0 \* \* \* \*'/);
+assert.match(pipeline, /'0 \*\/6 \* \* \*'/);
 assert.match(pipeline, /FROM public\.get_encounter_city_weather\(\) AS weather/);
 assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_scene_registry/);
 assert.match(pipeline, /location_key IN \('shopping-street'\)/);
@@ -71,13 +71,14 @@ assert.match(pipeline, /schedule_variant_24_hour_coverage_incomplete/);
 assert.match(pipeline, /jsonb_array_length\(v_variant->'slots'\) NOT BETWEEN 2 AND 4/);
 assert.match(generator, /_24_hour_coverage_incomplete/);
 assert.match(generator, /完整 24 小時行程/);
-assert.match(weatherWorker, /O-A0001-001/);
-assert.match(weatherWorker, /O-A0002-001/);
-assert.match(weatherWorker, /StationId", "466920"/);
-assert.match(weatherWorker, /CWA_OPEN_DATA_API_KEY/);
+assert.match(weatherWorker, /createEncounterWeather/);
+assert.match(weatherWorker, /encounter_city_weather/);
+assert.doesNotMatch(weatherWorker, /O-A0001-001|O-A0002-001|CWA_OPEN_DATA_API_KEY|fetch\(/);
 assert.doesNotMatch(weatherWorker, /reserve_chat_turn|settle_chat_turn/);
-assert.match(weatherParser, /Past1hr/);
+assert.match(weatherParser, /Asia\/Taipei/);
+assert.match(weatherParser, /poyozz_fictional_seasonal/);
 assert.match(weatherParser, /isRainWeatherText/);
+assert.doesNotMatch(weatherParser, /Past1hr|CWA_OPEN_DATA_API_KEY/);
 assert.doesNotMatch(pipeline, /SELECT public\.schedule_encounter_schedule_organizer\(true\)/,
   "Migration draft must not activate the hosted cron job automatically");
 
@@ -86,4 +87,4 @@ assert.match(html, /functions\.invoke\('encounter-schedule-organizer',\{body:\{m
 assert.match(html, /functions\.invoke\('encounter-schedule-organizer',\{body:\{mode:'manual'\}\}\)/);
 assert.match(html, /if\(kind==='album'&&CHAT_DATA_TEST_MODE\)void loadEncounterScheduleTestTools\(\)/);
 
-console.log("Encounter schedule worker, dynamic scenes, CWA weather, queue triggers, throttling, and 24-hour coverage contracts passed.");
+console.log("Encounter schedule worker, dynamic scenes, simulated Taipei weather, queue triggers, throttling, and 24-hour coverage contracts passed.");
