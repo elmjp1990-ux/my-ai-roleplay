@@ -83,7 +83,7 @@ assert.match(fs.readFileSync("city-map.js", "utf8"), /MAX_DYNAMIC_SCENE_MARKERS=
 assert.match(fs.readFileSync("city-map.js", "utf8"), /Math\.hypot\(point\.x-x,point\.y-y\)<120/);
 assert.match(pipeline, /marker_x BETWEEN 40 AND 1622/);
 assert.match(pipeline, /marker_y BETWEEN 40 AND 892/);
-assert.match(generator, /Preserve a candidate scene even when only one character is in this AI batch/);
+assert.match(generator, /本批次只有 1 位角色使用也可以提出候選/);
 assert.doesNotMatch(generator, /shoppingStreetUsers/);
 assert.match(pipeline, /schedule_variant_24_hour_coverage_incomplete/);
 assert.match(pipeline, /jsonb_array_length\(v_variant->'slots'\) NOT BETWEEN 2 AND 4/);
