@@ -46,7 +46,7 @@ assert.ok(sceneLoaderDeclaration >= 0 && sceneLoaderInvocation > sceneLoaderDecl
 assert.ok(weatherLoaderDeclaration >= 0 && weatherLoaderInvocation > weatherLoaderDeclaration,
   'Weather loader must be initialized before invocation.');
 
-assert.match(cityMap, /get_encounter_scene_registry/);
+assert.match(cityMap, /get_encounter_scene_catalog/);
 assert.match(cityMap, /get_encounter_city_weather/);
 assert.match(cityMap, /stage.classList.toggle\('is-raining',weather.is_raining===true\)/);
 assert.match(cityMap, /MAX_DYNAMIC_SCENE_MARKERS=3/);
@@ -54,6 +54,10 @@ assert.match(cityMap, /Math\.hypot\(point\.x-x,point\.y-y\)<120/);
 assert.match(cityMap, /data-dynamic-scene/);
 assert.match(cityMap, /cityPlaceAliases\[key\]=\[key\]/);
 assert.match(cityMap, /scene\.eventLabel/);
+assert.match(cityMap, /row\.is_dynamic!==true/);
+assert.match(cityMap, /cityPlaceNames\[key\]=name;\s*cityVenueScenes\[key\]=scene;\s*continue;/);
+assert.match(cityMap, /eventTitle,scene\.eventDescription/);
+
 assert.match(html, /city-map-stage\.is-raining \.city-map-world/);
 assert.match(html, /poyozz-city-rain/);
 assert.match(html, /prefers-reduced-motion:reduce\)\{\.city-map-stage\.is-raining:after/);
