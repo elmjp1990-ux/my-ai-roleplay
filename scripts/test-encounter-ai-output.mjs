@@ -27,6 +27,7 @@ const frontend = fs.readFileSync("index.html", "utf8");
 const scene = fs.readFileSync("encounter-scene.js", "utf8");
 const sessionCreator = fs.readFileSync("supabase/functions/encounter-session/index.ts", "utf8");
 const pipeline = fs.readFileSync("supabase/drafts/encounter-schedule-pipeline.sql", "utf8");
+const replay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-pipeline.sql", "utf8");
 const weatherSync = fs.readFileSync("supabase/functions/encounter-weather-sync/index.ts", "utf8");
 const weatherModule = fs.readFileSync("supabase/functions/_shared/encounter-weather.mjs", "utf8");
 const cityMap = fs.readFileSync("city-map.js", "utf8");
@@ -89,6 +90,10 @@ assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_scene_backg
 assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_turn_visuals/);
 assert.match(pipeline, /v_schedule_day::smallint,\s*v_day_type/);
 assert.match(pipeline, /CASE WHEN v_is_raining IS TRUE AND v_row\.is_outdoor IS TRUE\s*THEN v_row\.rain_fallback_location_key ELSE v_row\.location_key END/);
+assert.match(replay, /DO \$rainy_schedule_resolution_smoke\$/);
+assert.match(replay, /rainy outdoor schedule did not resolve to its indoor fallback/);
+assert.match(replay, /dry outdoor schedule did not resolve to its original location/);
+assert.match(replay, /must not remain at its original outdoor location/);
 assert.match(pipeline, /encounter-default-scene\.webp/);
 assert.match(pipeline, /REFERENCES public\.character_illustrations\(id\)/);
 assert.match(endpoint, /illustration_id/);
