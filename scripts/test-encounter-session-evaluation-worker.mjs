@@ -59,6 +59,9 @@ const config = fs.readFileSync("supabase/config.toml", "utf8");
 assert.match(config, /\[functions\.encounter-evaluation-worker\][\s\S]*?verify_jwt = false/);
 
 const scheduleDraft = fs.readFileSync("supabase/drafts/schedule-encounter-evaluation-worker.sql", "utf8");
+const manualEndDraft = fs.readFileSync("supabase/drafts/encounter-session-manual-end.sql", "utf8");
+const sessionStateEdge = fs.readFileSync("supabase/functions/encounter-session-state/index.ts", "utf8");
+const frontend = fs.readFileSync("index.html", "utf8");
 assert.match(scheduleDraft, /schedule_encounter_evaluation_worker\([\s\S]*?p_enabled boolean DEFAULT false/);
 assert.match(scheduleDraft, /IF p_enabled IS NOT TRUE/);
 assert.match(scheduleDraft, /vault\.decrypted_secrets/);
@@ -74,5 +77,11 @@ assert.doesNotMatch(command, /cron\.schedule/,
 assert.match(scheduleDraft, /IF p_enabled IS NOT TRUE[\s\S]*?RETURN 'disabled'/);
 assert.match(scheduleDraft, /PERFORM cron\.schedule\(/,
   "Only the explicit enabled path may register the recurring cron job");
+assert.match(manualEndDraft, /p_action NOT IN \('pause','resume','end'\)/);
+assert.match(manualEndDraft, /status='ready_to_settle'[\s\S]*?scheduled_end_at=v_effective_end/);
+assert.match(manualEndDraft, /schedule_snapshot/);
+assert.match(sessionStateEdge, /\["pause", "resume", "end"\]/);
+assert.match(frontend, /setEncounterLifecycleState\(session\.id,'end'\)/,
+  "The explicit end action must request server-side settlement rather than only archiving the local chat");
 
-console.log("Encounter session evaluator parser, lifecycle gates, wallet isolation, and opt-in worker schedule contracts passed.");
+console.log("Encounter session evaluator parser, lifecycle gates, manual end, wallet isolation, and opt-in worker schedule contracts passed.");
