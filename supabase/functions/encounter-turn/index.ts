@@ -83,6 +83,11 @@ async function buildEncounterMessages(
     .slice().reverse().map((row: DbRow) => ({
       id: asText(row.id), role: asText(row.role), content: asText(row.content),
     })).filter((row: DbRow) => row.content);
+  const openingMessage = asRow(asRow(session.session_data).openingMessage);
+  const openingText = asText(openingMessage.text);
+  if (openingText && !historyRows.some((row: DbRow) => row.role === "assistant" && row.content === openingText)) {
+    historyRows.unshift({ id: "opening-" + asText(session.id), role: "assistant", content: openingText });
+  }
   if (!historyRows.some((row: DbRow) => row.id === userMessageId)) {
     historyRows.push({ id: userMessageId, role: "user", content: asText(currentUserMessage.content) });
   }
