@@ -333,7 +333,7 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
   SELECT pg_catalog.jsonb_build_object(
-    'schedule_schema_version', 'poyozz-encounter-schedule-v2-special-events-2026-11-17',
+    'schedule_schema_version', 'poyozz-encounter-schedule-v3-relationship-greetings-2026-11-17',
     'character_id', c.id::text,
     'author_id', c.author_id::text,
     'visibility', c.visibility,
@@ -931,8 +931,10 @@ BEGIN
     END IF;
 
     v_greeting_pool := v_item->'relationship_greetings';
-    IF jsonb_typeof(v_greeting_pool) IS DISTINCT FROM 'object'
-       OR (SELECT count(*) FROM jsonb_object_keys(v_greeting_pool)) <> 8
+    IF jsonb_typeof(v_greeting_pool) IS DISTINCT FROM 'object' THEN
+      RAISE EXCEPTION 'schedule_relationship_greeting_pools_invalid' USING ERRCODE = '22023';
+    END IF;
+    IF (SELECT count(*) FROM jsonb_object_keys(v_greeting_pool)) <> 8
        OR EXISTS (
          SELECT 1
          FROM jsonb_each(v_greeting_pool) AS pool(stage, greetings)
@@ -2332,7 +2334,7 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
   SELECT pg_catalog.jsonb_build_object(
-    'schedule_schema_version', 'poyozz-encounter-schedule-v2-special-events-2026-11-17',
+    'schedule_schema_version', 'poyozz-encounter-schedule-v3-relationship-greetings-2026-11-17',
     'character_id', c.id::text,
     'author_id', c.author_id::text,
     'visibility', c.visibility,
