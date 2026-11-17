@@ -322,31 +322,10 @@ export function parseEncounterScheduleBatchOutput(
     }
   }
 
-  // A new shared shopping-street marker is only justified when at least two
-  // different public characters use it in this batch. Otherwise normalize to
-  // the existing department-store scene to avoid map clutter.
-  const shoppingStreetUsers = new Set<string>();
-  for (const character of characters) {
-    for (const variant of [...character.variants.weekday, ...character.variants.holiday]) {
-      for (const slot of variant.slots) if (slot.location_key === "shopping-street") shoppingStreetUsers.add(character.character_id);
-    }
-  }
-  if (shoppingStreetUsers.size < 2) {
-    for (const character of characters) {
-      for (const variant of [...character.variants.weekday, ...character.variants.holiday]) {
-        for (const slot of variant.slots) {
-          if (slot.location_key === "shopping-street") {
-            slot.location_key = "department-store";
-            slot.is_outdoor = false;
-            slot.rain_fallback_location_key = null;
-            slot.rain_fallback_activity = null;
-            slot.rain_fallback_greeting = null;
-          }
-          if (slot.rain_fallback_location_key === "shopping-street") slot.rain_fallback_location_key = "department-store";
-        }
-      }
-    }
-  }
+  // Preserve a candidate scene even when only one character is in this AI batch.
+  // The database scene registry decides whether the marker is publicly visible by
+  // counting distinct eligible characters across all published schedules, including
+  // characters published by earlier batches. The model never supplies coordinates.
 
   if (seen.size !== sources.length) errors.push("character_coverage_incomplete");
   return { ok: errors.length === 0, characters: errors.length === 0 ? characters : [], errors: [...new Set(errors)] };
