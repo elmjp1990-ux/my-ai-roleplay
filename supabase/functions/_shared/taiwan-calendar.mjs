@@ -29,10 +29,9 @@ export function parseTaiwanCalendarRows(payload, source = "data.gov.tw:123662") 
     if (holiday === null) continue;
     const rawName = String(row.name ?? "").trim();
     const rawDescription = String(row.description ?? "").trim();
-    const weekendLabel = /^(?:週末假期|周末假期|星期六|星期日|週六|週日)$/i;
-    const holidayName = weekendLabel.test(rawName)
-      ? (rawDescription && !weekendLabel.test(rawDescription) ? rawDescription : "")
-      : (rawName || rawDescription);
+    const genericHolidayLabel = /^(?:週末假期|周末假期|星期六|星期日|週六|週日|放假|假日|例假日)$/i;
+    const holidayName = [rawName, rawDescription]
+      .find((value) => value && !genericHolidayLabel.test(value)) || "";
     output.push({
       calendar_date: year + "-" + String(month).padStart(2, "0") + "-" + String(day).padStart(2, "0"),
       day_type: holiday ? "holiday" : "workday",
