@@ -622,7 +622,7 @@ DECLARE
   v_ids uuid[];
   v_characters jsonb;
 BEGIN
-  IF auth.role() <> 'service_role' THEN
+  IF COALESCE(auth.role(), '') <> 'service_role' THEN
     RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
   END IF;
 
@@ -771,7 +771,7 @@ AS $$
 DECLARE
   v_batch public.encounter_schedule_batch_runs%ROWTYPE;
 BEGIN
-  IF auth.role() <> 'service_role' THEN
+  IF COALESCE(auth.role(), '') <> 'service_role' THEN
     RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
   END IF;
 
@@ -851,7 +851,7 @@ DECLARE
   v_skipped integer := 0;
   v_output_count integer := 0;
 BEGIN
-  IF auth.role() <> 'service_role' THEN
+  IF COALESCE(auth.role(), '') <> 'service_role' THEN
     RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
   END IF;
   IF jsonb_typeof(p_characters) <> 'array' THEN
@@ -1857,7 +1857,7 @@ DECLARE
   v_job_id bigint;
   v_command text;
 BEGIN
-  IF auth.role() <> 'service_role' THEN
+  IF COALESCE(auth.role(), '') <> 'service_role' THEN
     RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
   END IF;
 
