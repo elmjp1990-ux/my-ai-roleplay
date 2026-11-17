@@ -1246,7 +1246,7 @@ GRANT EXECUTE ON FUNCTION public.get_encounter_character_schedules(uuid[]) TO an
 
 -- The city map needs exactly one schedule per character: the variant valid now in Taiwan,
 -- already resolved for weekday/holiday, primary/alternative, and rain fallback.
--- Keep the existing eight-column RPC contract consumed by loadCityCharacterSchedules().
+-- Preserve the existing 16-column RPC return contract; current map UI consumes its first eight fields.
 CREATE OR REPLACE FUNCTION public.get_encounter_character_schedules(p_character_ids uuid[])
 RETURNS TABLE (
   character_id uuid,
@@ -1256,13 +1256,21 @@ RETURNS TABLE (
   end_time time,
   location_key text,
   activity text,
-  priority smallint
+  priority smallint,
+  encounter_greeting text,
+  is_outdoor boolean,
+  rain_fallback_location_key text,
+  rain_fallback_activity text,
+  rain_fallback_greeting text,
+  source_type text,
+  variant_key text,
+  variant_weight smallint
 )
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
   SELECT
     c.id,
     resolved.weekday,
@@ -1271,7 +1279,15 @@ AS $
     resolved.end_time,
     resolved.location_key,
     resolved.activity,
-    resolved.priority
+    resolved.priority,
+    resolved.encounter_greeting,
+    resolved.is_outdoor,
+    resolved.rain_fallback_location_key,
+    resolved.rain_fallback_activity,
+    resolved.rain_fallback_greeting,
+    resolved.source_type,
+    resolved.variant_key,
+    resolved.variant_weight
   FROM (
     SELECT DISTINCT requested.character_id
     FROM pg_catalog.unnest(p_character_ids) AS requested(character_id)
@@ -1291,13 +1307,13 @@ AS $
     AND c.rights_confirmed IS TRUE
     AND c.deleted_at IS NULL
   ORDER BY c.id, resolved.priority DESC, resolved.start_time;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.get_encounter_character_schedules(uuid[]) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_encounter_character_schedules(uuid[]) TO anon, authenticated;
 
 COMMENT ON FUNCTION public.get_encounter_character_schedules(uuid[]) IS
-  'Returns at most one currently valid Taiwan-time schedule per supplied public character, using the shared resolver for weekday/holiday variant selection and rain fallback. Preserves the eight-column city-map RPC contract and 10-ID batch limit.';
+  'Returns at most one currently valid Taiwan-time schedule per supplied public character, using the shared resolver for weekday/holiday variant selection and rain fallback. Preserves the original 16-column RPC contract and 10-ID batch limit.';
 
 CREATE OR REPLACE FUNCTION public.save_character_schedules(
   p_character_id uuid,
