@@ -133,6 +133,87 @@ async function buildEncounterMessages(
   };
 }
 
+async function resolveEncounterVisuals(admin: any, session: DbRow, parsedOutput: DbRow): Promise<DbRow> {
+  const snapshot = asRow(session.character_snapshot);
+  const characterId = asText(session.character_id);
+  const locationKey = asText(session.location_key);
+  const allowedIllustrations = Array.isArray(snapshot.availableIllustrations)
+    ? snapshot.availableIllustrations.map((item: unknown) => asRow(item)).filter((item: DbRow) => isUuid(item.id))
+    : [];
+  const allowedBackgrounds = Array.isArray(snapshot.availableSceneBackgrounds)
+    ? snapshot.availableSceneBackgrounds.map((item: unknown) => asRow(item)).filter((item: DbRow) => isUuid(item.id))
+    : [];
+
+  const preferredIllustration = allowedIllustrations.find((item: DbRow) => item.id === parsedOutput.illustrationId)
+    || allowedIllustrations[0]
+    || null;
+  let illustration: DbRow | null = null;
+  if (preferredIllustration) {
+    const { data } = await admin.from("character_illustrations")
+      .select("id,display_name,asset_type")
+      .eq("id", preferredIllustration.id)
+      .eq("character_id", characterId)
+      .eq("asset_type", "gallery")
+      .maybeSingle();
+    illustration = data ? asRow(data) : null;
+  }
+
+  const preferredBackground = allowedBackgrounds.find((item: DbRow) => item.id === parsedOutput.sceneBackgroundId)
+    || allowedBackgrounds[0]
+    || null;
+  let background: DbRow | null = null;
+  if (preferredBackground) {
+    const { data } = await admin.from("encounter_scene_backgrounds")
+      .select("id,location_key,display_name,asset_path")
+      .eq("id", preferredBackground.id)
+      .eq("is_active", true)
+      .maybeSingle();
+    const row = data ? asRow(data) : null;
+    if (row && (asText(row.location_key) === locationKey || asText(row.location_key) === "*")) {
+      const path = asText(row.asset_path);
+      if (/^(\.\/|\/)[A-Za-z0-9_./-]+$/.test(path) && !/(^|\/)\.\.(\/|$)/.test(path)) {
+        background = row;
+      }
+    }
+  }
+
+  return {
+    illustrationId: illustration ? asText(illustration.id) : null,
+    illustrationName: illustration ? asText(illustration.display_name) : null,
+    sceneBackgroundId: background ? asText(background.id) : null,
+    sceneBackgroundName: background ? asText(background.display_name) : null,
+    sceneBackgroundPath: background ? asText(background.asset_path) : "./encounter-default-scene.webp",
+  };
+}
+
+async function loadEncounterVisuals(admin: any, messageId: string): Promise<DbRow | null> {
+  const { data: visualRow, error } = await admin.from("encounter_turn_visuals")
+    .select("illustration_id,scene_background_id")
+    .eq("message_id", messageId)
+    .maybeSingle();
+  if (error || !visualRow) return null;
+  const row = asRow(visualRow);
+  const [illustrationResult, backgroundResult] = await Promise.all([
+    row.illustration_id
+      ? admin.from("character_illustrations").select("id,display_name")
+        .eq("id", row.illustration_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    row.scene_background_id
+      ? admin.from("encounter_scene_backgrounds").select("id,display_name,asset_path")
+        .eq("id", row.scene_background_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const illustration = asRow(illustrationResult.data);
+  const background = asRow(backgroundResult.data);
+  return {
+    illustrationId: asText(row.illustration_id) || null,
+    illustrationName: asText(illustration.display_name) || null,
+    sceneBackgroundId: asText(row.scene_background_id) || null,
+    sceneBackgroundName: asText(background.display_name) || null,
+    sceneBackgroundPath: asText(background.asset_path) || "./encounter-default-scene.webp",
+  };
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
