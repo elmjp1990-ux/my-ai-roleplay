@@ -7,6 +7,7 @@
 
   let activeMapCleanup = null;
   let activeSceneRefresh = null;
+  let activeScheduleRefresh = null;
   const CITY_MAP_WEATHER_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
   const CITY_MAP_SCENES_CACHE_TTL_MS = 30 * 60 * 1000;
   const cityMapMemoryCache = new Map();
@@ -35,6 +36,7 @@
     const cleanup = activeMapCleanup;
     activeMapCleanup = null;
     activeSceneRefresh = null;
+    activeScheduleRefresh = null;
     cleanup();
   };
 
@@ -42,6 +44,9 @@
     destroy: destroyActiveMap,
     refreshScenes() {
       return activeSceneRefresh ? activeSceneRefresh() : Promise.resolve();
+    },
+    refreshSchedules() {
+      return activeScheduleRefresh ? activeScheduleRefresh() : Promise.resolve();
     },
     render(dependencies) {
       destroyActiveMap();
@@ -473,6 +478,16 @@
       pager.loading=false;
       renderCityPeopleStrip(place);
     }
+  };
+  activeScheduleRefresh=async()=>{
+    const activePlace=locationModal&&!locationModal.hidden?locationModal.dataset.place:null;
+    cityScenePageStates.clear();
+    Object.keys(cityPresenceByPlace).forEach(place=>delete cityPresenceByPlace[place]);
+    if(!activePlace)return;
+    const pageState={offset:0,hasMore:true,loading:false,candidates:[],people:[],error:null};
+    cityScenePageStates.set(activePlace,pageState);
+    renderCityPeopleStrip(activePlace);
+    await loadCityPeoplePage(activePlace);
   };
   const openCityLocation=async(marker)=>{
     const place=marker?.dataset?.place;
