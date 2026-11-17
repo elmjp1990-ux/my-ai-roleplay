@@ -56,38 +56,47 @@ BEGIN
   -- The persistent cron command contains secret names only. Values are resolved
   -- from Vault at execution time and are never written into cron.job.command.
   v_command := $command$
-    SELECT net.http_post(
-      url := regexp_replace(
-        (SELECT decrypted_secret FROM vault.decrypted_secrets
-         WHERE name = 'poyozz_supabase_url' LIMIT 1),
-        '/+$', ''
-      ) || '/functions/v1/encounter-evaluation-worker',
-      headers := jsonb_build_object(
-        'Authorization', 'Bearer ' || (
-          SELECT decrypted_secret FROM vault.decrypted_secrets
-          WHERE name = 'poyozz_service_role_key' LIMIT 1
-        ),
-        'Content-Type', 'application/json'
-      ),
-      body := '{"limit":1}'::jsonb,
-      timeout_milliseconds := 120000
-    )
-    WHERE EXISTS (
-      SELECT 1
-      FROM public.encounter_session_evaluation_jobs AS job
-      JOIN public.encounter_session_lifecycle AS lifecycle
-        ON lifecycle.session_id = job.session_id
-      WHERE lifecycle.status = 'ready_to_settle'
-        AND lifecycle.scheduled_end_at <= clock_timestamp()
-        AND job.attempt_count < 5
-        AND (
-          job.status = 'pending'
-          OR (job.status = 'failed'
-              AND job.updated_at <= clock_timestamp() - interval '5 minutes')
-          OR (job.status = 'processing'
-              AND job.claimed_at < clock_timestamp() - interval '10 minutes')
-        )
-    );
+    DO $dispatch$
+    BEGIN
+      -- First move every eligible expired Encounter into the evaluation queue.
+      -- This is the missing bridge between scene expiry and the AI worker.
+      PERFORM public.enqueue_due_encounter_evaluations(50);
+
+      IF EXISTS (
+        SELECT 1
+        FROM public.encounter_session_evaluation_jobs AS job
+        JOIN public.encounter_session_lifecycle AS lifecycle
+          ON lifecycle.session_id = job.session_id
+        WHERE lifecycle.status = 'ready_to_settle'
+          AND lifecycle.scheduled_end_at <= clock_timestamp()
+          AND job.attempt_count < 5
+          AND (
+            job.status = 'pending'
+            OR (job.status = 'failed'
+                AND job.updated_at <= clock_timestamp() - interval '5 minutes')
+            OR (job.status = 'processing'
+                AND job.claimed_at < clock_timestamp() - interval '10 minutes')
+          )
+      ) THEN
+        PERFORM net.http_post(
+          url := regexp_replace(
+            (SELECT decrypted_secret FROM vault.decrypted_secrets
+             WHERE name = 'poyozz_supabase_url' LIMIT 1),
+            '/+$', ''
+          ) || '/functions/v1/encounter-evaluation-worker',
+          headers := jsonb_build_object(
+            'Authorization', 'Bearer ' || (
+              SELECT decrypted_secret FROM vault.decrypted_secrets
+              WHERE name = 'poyozz_service_role_key' LIMIT 1
+            ),
+            'Content-Type', 'application/json'
+          ),
+          body := '{"limit":1}'::jsonb,
+          timeout_milliseconds := 120000
+        );
+      END IF;
+    END;
+    $dispatch$;
   $command$;
 
   FOR v_job_id IN
