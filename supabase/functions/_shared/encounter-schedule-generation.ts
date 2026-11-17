@@ -40,6 +40,7 @@ type ScheduleSlot = {
   is_outdoor: boolean;
   rain_fallback_location_key: string | null;
   rain_fallback_activity: string | null;
+  rain_fallback_greeting: string | null;
   encounter_greeting: string;
 };
 type ScheduleVariant = {
@@ -101,7 +102,7 @@ function intervalsOverlap(a: { start: number; end: number }, b: { start: number;
 function validateSlot(value: unknown, errors: string[], label: string): ScheduleSlot | null {
   const keys = [
     "start_time", "end_time", "location_key", "activity", "is_outdoor",
-    "rain_fallback_location_key", "rain_fallback_activity", "encounter_greeting",
+    "rain_fallback_location_key", "rain_fallback_activity", "rain_fallback_greeting", "encounter_greeting",
   ];
   if (!hasExactKeys(value, keys)) {
     errors.push(label + "_slot_keys_invalid");
@@ -119,13 +120,16 @@ function validateSlot(value: unknown, errors: string[], label: string): Schedule
 
   let rainLocation: string | null = null;
   let rainActivity: string | null = null;
+  let rainGreeting: string | null = null;
   if (value.is_outdoor === true) {
     rainLocation = normalizeEncounterSceneKey(value.rain_fallback_location_key);
     rainActivity = text(value.rain_fallback_activity);
-    if (!rainLocation || !INDOOR_SCENE_KEYS.has(rainLocation) || !rainActivity || rainActivity.length > 200) {
+    rainGreeting = text(value.rain_fallback_greeting);
+    if (!rainLocation || !INDOOR_SCENE_KEYS.has(rainLocation) || !rainActivity || rainActivity.length > 200 ||
+      Array.from(rainGreeting).length < 150 || Array.from(rainGreeting).length > 300) {
       errors.push(label + "_rain_fallback_invalid");
     }
-  } else if (value.rain_fallback_location_key !== null || value.rain_fallback_activity !== null) {
+  } else if (value.rain_fallback_location_key !== null || value.rain_fallback_activity !== null || value.rain_fallback_greeting !== null) {
     errors.push(label + "_unexpected_rain_fallback");
   }
   if (location && value.is_outdoor === true && !OUTDOOR_SCENE_KEYS.has(location)) {
@@ -146,6 +150,7 @@ function validateSlot(value: unknown, errors: string[], label: string): Schedule
     is_outdoor: value.is_outdoor === true,
     rain_fallback_location_key: rainLocation,
     rain_fallback_activity: rainActivity,
+    rain_fallback_greeting: rainGreeting,
     encounter_greeting: greeting,
   };
 }
@@ -237,10 +242,10 @@ export function buildEncounterScheduleBatchMessages(sources: EncounterScheduleSo
     "可提出 shopping-street 作為新場景候選，但只有當本批至少兩個不同角色共用它時才保留；若只有一個角色使用，請改用最接近的既有地點。不可輸出座標、圖片 URL、Storage path 或自行發明地標 ID。",
     "每天以整點為單位規劃。連續多小時在同一地點從事同一活動，合併為一個 start_time/end_time 區間；例如 09:00–17:00 的 8 小時工作必須留在同一地點。每個變體最多 4 個時段，可保留合理空檔。",
     "每個 weekday 變體權重固定 primary=80、alternative=20；每個 holiday 變體權重固定 primary=60、alternative=40。每個日型都必須提供 primary 與 alternative 兩套完整行程。",
-    "戶外時段必須提供雨天室內替代地點與活動；室內時段 rain_fallback_location_key 與 rain_fallback_activity 必須為 null。park 與 shopping-street 為戶外；其餘提供的地點為室內。",
+    "戶外時段必須提供雨天室內替代地點、活動與一段 150–300 字元的 rain_fallback_greeting；室內時段所有 rain_fallback 欄位必須為 null。park 與 shopping-street 為戶外；其餘提供的地點為室內。",
     "作者行程說明只供內部規劃，輸出活動必須使用公開可見、簡短自然的描述，不得逐字複製整段說明或揭露私人情節。每個時段都要產生一段與該角色、地點、活動吻合的預生成招呼 encounter_greeting，長度 150–300 字元；不得直接揭露作者私密設定或照抄私密內容。",
     "只可使用 location_key: airport, commercial, night-bar, live-house, apartment, department-store, bookstore, cafe, park, shopping-street。場景類別不明或角色無現代地圖相容地點時，使用 no_matching_location 並回傳空 variants。",
-    "輸出必須是嚴格 JSON object，唯一根欄位 characters。每個角色欄位為 character_id, placement, variants。variants 只包含 weekday 與 holiday；各自為兩個 variant 物件。variant 物件欄位為 variant_key, weight, slots。slot 欄位為 start_time, end_time, location_key, activity, is_outdoor, rain_fallback_location_key, rain_fallback_activity, encounter_greeting。不可輸出額外欄位或 Markdown。",
+    "輸出必須是嚴格 JSON object，唯一根欄位 characters。每個角色欄位為 character_id, placement, variants。variants 只包含 weekday 與 holiday；各自為兩個 variant 物件。variant 物件欄位為 variant_key, weight, slots。slot 欄位為 start_time, end_time, location_key, activity, is_outdoor, rain_fallback_location_key, rain_fallback_activity, rain_fallback_greeting, encounter_greeting。不可輸出額外欄位或 Markdown。",
   ].join("\n");
   return {
     messages: [
@@ -330,6 +335,7 @@ export function parseEncounterScheduleBatchOutput(
             slot.is_outdoor = false;
             slot.rain_fallback_location_key = null;
             slot.rain_fallback_activity = null;
+            slot.rain_fallback_greeting = null;
           }
           if (slot.rain_fallback_location_key === "shopping-street") slot.rain_fallback_location_key = "department-store";
         }
