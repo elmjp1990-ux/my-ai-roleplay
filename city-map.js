@@ -117,8 +117,6 @@
       </div>
     </section>
     </section>`;
-  void loadCityDynamicScenes();
-  void loadCityWeather();
   document.body.classList.remove('city-map-mode-immersive');
   const stage=$('cityMapStage'),world=$('cityMapWorld');
   stage.classList.add('is-loading');
@@ -339,6 +337,9 @@
       if(!cached)console.warn('城市天氣資料載入失敗：',error?.message||error);
     }
   };
+  // Start dynamic scene and weather requests only after their const-bound loaders are initialized.
+  void loadCityDynamicScenes();
+  void loadCityWeather();
   // Use only published characters whose own schedule data is already available to this client.
   // Never invent a character or query private schedule rows from the browser.
   const cityPlaceAliases={airport:['airport'],commercial:['commercial','office'], 'night-bar':['night-bar','bar'], 'live-house':['live-house','livehouse'], apartment:['apartment'], 'department-store':['department-store','department_store'], bookstore:['bookstore','book-store'], cafe:['cafe','coffee-shop'], park:['park']};
