@@ -98,9 +98,14 @@ assert.match(encounterTurn, /affinityPendingUntilSceneEnd/);
 assert.match(encounterTurn, /assistant_message_id_collision/);
 assert.match(encounterTurn, /reserve_encounter_chat_turn/);
 assert.doesNotMatch(encounterTurn, /from\(["']encounter_session_lifecycle["']\)/);
-assert.match(encounterTurn, /Retry recovery: reuse only the exact expected deterministic reply/);
-assert.match(encounterTurn, /charge\.status !== "reserved" && charge\.status !== "needs_reconciliation"/);
-assert.match(encounterTurn, /existing && String\(existing\.content \|\| ""\)\.trim\(\) !== demoReply/);
+assert.match(encounterTurn, /charge\.status === "settled" \|\| charge\.status === "needs_reconciliation"/);
+assert.match(encounterTurn, /provider_generation_outcome_unknown/);
+assert.match(encounterTurn, /generation_already_claimed/);
+assert.match(encounterTurn, /refundEncounterTurn/);
+assert.doesNotMatch(encounterTurn, /demoReply/);
+assert.match(encounterTurn, /encounterSchedule/);
+assert.doesNotMatch(encounterTurn, /from\(["']encounter_session_lifecycle["']\)/);
+assert.match(encounterSession, /snapshot\.encounterSchedule = scheduleSnapshot/);
 
 const atomicReservationMigration = fs.readFileSync(
   "supabase/migrations/20261031170000_atomic_encounter_turn_reservation.sql",
