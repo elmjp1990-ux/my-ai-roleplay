@@ -38,6 +38,32 @@ Deno.test("weather uses Taipei local month and the supported simple vocabulary",
   assertEquals(taipeiMonthBoundary.slot.startsWith("2026-05-31-"), true);
 });
 
+Deno.test("weather temperature follows broad Taipei seasonal ranges", () => {
+  const cases = [
+    { month: 1, min: 14, max: 20 },
+    { month: 4, min: 20, max: 26 },
+    { month: 7, min: 26, max: 32 },
+    { month: 10, min: 20, max: 26 },
+    { month: 12, min: 14, max: 20 },
+  ];
+  for (const item of cases) {
+    for (let day = 1; day <= 28; day += 1) {
+      const weather = createEncounterWeather(new Date(Date.UTC(2026, item.month - 1, day, 4)));
+      if (weather.temperatureC < item.min || weather.temperatureC > item.max) {
+        throw new Error(`Unexpected temperature for month ${item.month}: ${weather.temperatureC}`);
+      }
+    }
+  }
+});
+
+Deno.test("weather is deterministic for the same instant across timezone representations", () => {
+  const utc = createEncounterWeather(new Date("2026-07-20T04:00:00.000Z"));
+  const taipei = createEncounterWeather(new Date("2026-07-20T12:00:00.000+08:00"));
+  assertEquals(utc.slot, taipei.slot);
+  assertEquals(utc.weatherText, taipei.weatherText);
+  assertEquals(utc.temperatureC, taipei.temperatureC);
+});
+
 Deno.test("weather may naturally persist across adjacent slots", () => {
   let previous = "";
   let repeated = false;
