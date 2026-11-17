@@ -43,7 +43,7 @@ function seasonWeights(month) {
 }
 
 /** Generates one lightweight fictional Taipei weather state per local six-hour slot. */
-export function createEncounterWeather(now = new Date(), previousWeatherText = "") {
+export function createEncounterWeather(now = new Date()) {
   const date = now instanceof Date ? now : new Date(now);
   if (!Number.isFinite(date.getTime())) throw new Error("invalid_weather_time");
 
@@ -68,19 +68,6 @@ export function createEncounterWeather(now = new Date(), previousWeatherText = "
     if (cursor < 0) {
       selected = state;
       break;
-    }
-  }
-
-  if (selected.text === previousWeatherText) {
-    const alternatives = weighted.filter((state) => state.text !== previousWeatherText);
-    const alternateTotal = alternatives.reduce((sum, state) => sum + state.weight, 0);
-    let alternateCursor = (hash32("poyozz-taipei-weather-change-" + slotKey) % Math.floor(alternateTotal * 1000)) / 1000;
-    for (const state of alternatives) {
-      alternateCursor -= state.weight;
-      if (alternateCursor < 0) {
-        selected = state;
-        break;
-      }
     }
   }
 
