@@ -51,7 +51,7 @@ assert.match(batchSemantics, /v_last_completed > v_now - interval '6 hours'/);
 assert.doesNotMatch(batchSemantics, /v_daily_count|daily_limit|four batches per/i);
 assert.match(batchSemantics, /schedule_batch_character_count_invalid/);
 assert.match(batchSemantics, /remaining_character_count/);
-assert.match(worker, /p_characters: \\[item\\.character\\]/);
+assert.match(worker, /p_characters: \[item\.character\]/);
 assert.doesNotMatch(worker, /sources\\.length > 10/);
 assert.match(pipeline, /WHEN public\.encounter_schedule_generation_jobs\.status IN[\s\S]*?'pending', 'processing', 'failed', 'needs_reconciliation'[\s\S]*?THEN public\.encounter_schedule_generation_jobs\.queued_at/);
 assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_city_weather/);
