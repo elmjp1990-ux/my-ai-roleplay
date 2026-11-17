@@ -9,6 +9,8 @@ on:
       - "supabase/functions/encounter-session/**"
       - "supabase/functions/_shared/encounter-schedule.mjs"
       - "supabase/functions/_shared/encounter-turn-output.mjs"
+      - "supabase/functions/_shared/encounter-schedule-generation.ts"
+      - "supabase/functions/_shared/encounter-schedule-generation.test.ts"
       - "supabase/functions/_shared/encounter-response-guidelines.ts"
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/private-context-guard.ts"
@@ -32,5 +34,7 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - name: Test AI schedule batch validation and compatibility
+        run: deno test supabase/functions/_shared/encounter-schedule-generation.test.ts
       - name: Type-check Encounter Edge Function and shared modules
         run: deno check supabase/functions/encounter-turn/index.ts
