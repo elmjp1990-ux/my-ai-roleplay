@@ -102,6 +102,74 @@ INSERT INTO public.encounter_scene_registry (
    '最新消息', '公園活動公告', '傍晚時段適合散步，中央步道照明已開啟。', false, 1, 9, true)
 ON CONFLICT (location_key) DO NOTHING;
 
+-- Manual Preview testing first enqueues eligible public characters. The Edge Function
+-- calls this only after its test-mode and account-allowlist checks; no Cron is enabled.
+CREATE OR REPLACE FUNCTION public.enqueue_encounter_schedule_generation_test_batch(
+  p_limit integer DEFAULT 500
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+DECLARE
+  v_character record;
+  v_result jsonb;
+  v_limit integer := pg_catalog.greatest(1, pg_catalog.least(COALESCE(p_limit, 500), 500));
+  v_scanned integer := 0;
+  v_pending integer := 0;
+  v_unchanged integer := 0;
+  v_not_eligible integer := 0;
+BEGIN
+  IF COALESCE(auth.role(), '') <> 'service_role' THEN
+    RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
+  END IF;
+
+  FOR v_character IN
+    SELECT c.id
+    FROM public.characters c
+    WHERE c.visibility = 'public'
+      AND c.review_status = 'approved'
+      AND c.rights_confirmed IS TRUE
+      AND c.deleted_at IS NULL
+      AND c.is_nsfw IS FALSE
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.encounter_schedule_generation_jobs j
+        WHERE j.character_id = c.id
+          AND j.status = 'processing'
+          AND j.lease_expires_at > pg_catalog.clock_timestamp()
+      )
+    ORDER BY c.first_published_at NULLS LAST, c.id
+    LIMIT v_limit
+  LOOP
+    v_scanned := v_scanned + 1;
+    v_result := public.enqueue_encounter_schedule_generation_internal(v_character.id);
+    CASE COALESCE(v_result->>'status', '')
+      WHEN 'pending' THEN v_pending := v_pending + 1;
+      WHEN 'not_eligible' THEN v_not_eligible := v_not_eligible + 1;
+      ELSE v_unchanged := v_unchanged + 1;
+    END CASE;
+  END LOOP;
+
+  RETURN pg_catalog.jsonb_build_object(
+    'scanned_character_count', v_scanned,
+    'pending_character_count', v_pending,
+    'unchanged_character_count', v_unchanged,
+    'not_eligible_character_count', v_not_eligible,
+    'limit', v_limit
+  );
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.enqueue_encounter_schedule_generation_test_batch(integer)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.enqueue_encounter_schedule_generation_test_batch(integer)
+  TO service_role;
+
+COMMENT ON FUNCTION public.enqueue_encounter_schedule_generation_test_batch(integer) IS
+  'Preview/manual-only enqueue helper. Edge Function must enforce ENCOUNTER_SCHEDULE_TEST_MODE and account allowlist before calling. It only queues eligible public non-NSFW characters; it never invokes AI or workers.';
+
 -- New dynamic locations use fixed, reviewed coordinates. AI cannot write coordinates.
 CREATE OR REPLACE FUNCTION public.publish_encounter_scene_metadata(p_scenes jsonb)
 RETURNS jsonb
