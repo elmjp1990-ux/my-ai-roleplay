@@ -196,7 +196,6 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.encounter_schedule_batch_ru
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.encounter_schedule_generation_usage TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.taiwan_calendar_days TO service_role;
 
-GRANT SELECT ON TABLE public.taiwan_calendar_days TO anon, authenticated;
 
 CREATE OR REPLACE FUNCTION public.encounter_schedule_source_payload(p_character_id uuid)
 RETURNS jsonb
