@@ -5,6 +5,7 @@ import {
   buildEncounterScheduleBatchMessages,
   parseEncounterScheduleBatchOutput,
   type EncounterScheduleSource,
+  type EncounterSceneCatalogEntry,
 } from "../_shared/encounter-schedule-generation.ts";
 
 const corsHeaders = {
@@ -154,9 +155,16 @@ Deno.serve(async (request) => {
     return json({ error: "claimed_batch_payload_invalid" }, 503);
   }
 
+  const { data: sceneCatalogData, error: sceneCatalogError } = await admin.rpc("get_encounter_scene_catalog");
+  if (sceneCatalogError) {
+    await failBatch(admin, batchId, leaseToken, "scene_catalog_load_failed", false);
+    return json({ error: "scene_catalog_unavailable" }, 503);
+  }
+  const sceneCatalog = (Array.isArray(sceneCatalogData) ? sceneCatalogData : []) as EncounterSceneCatalogEntry[];
+
   let prompt;
   try {
-    prompt = buildEncounterScheduleBatchMessages(sources);
+    prompt = buildEncounterScheduleBatchMessages(sources, sceneCatalog);
   } catch (error) {
     const code = asText(error instanceof Error ? error.message : "schedule_prompt_invalid");
     await failBatch(admin, batchId, leaseToken, code, false);
@@ -190,7 +198,7 @@ Deno.serve(async (request) => {
     return json({ status: failed ? "generation_failed" : "batch_failure_unconfirmed", error: failureCode }, 503);
   }
 
-  const parsed = parseEncounterScheduleBatchOutput(providerResponse.result.text, sources);
+  const parsed = parseEncounterScheduleBatchOutput(providerResponse.result.text, sources, sceneCatalog);
   if (!parsed.ok) {
     await recordBatchUsage(admin, batchId, providerResponse, "failed", "schedule_output_validation_failed");
     const failed = await failBatch(admin, batchId, leaseToken, "schedule_output_validation_failed", true, false);
