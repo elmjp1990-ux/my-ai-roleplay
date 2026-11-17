@@ -23,14 +23,20 @@ const slot = (extra = {}) => ({
   rain_fallback_location_key: null, rain_fallback_activity: null, rain_fallback_greeting: null,
   encounter_greeting: greeting, ...extra,
 });
-const variants = (slots = [slot()]) => ({
+const fullDaySlots = (workSlot = {}) => [
+  slot({ start_time: "00:00", end_time: "08:00", location_key: "apartment", activity: "在家休息" }),
+  slot({ start_time: "08:00", end_time: "16:00", ...workSlot }),
+  slot({ start_time: "16:00", end_time: "22:00", location_key: "cafe", activity: "在咖啡廳休息" }),
+  slot({ start_time: "22:00", end_time: "00:00", location_key: "apartment", activity: "回家休息" }),
+];
+const variants = (slots = fullDaySlots()) => ({
   weekday: [
     { variant_key: "primary", weight: 80, slots },
-    { variant_key: "alternative", weight: 20, slots: [slot({ start_time: "10:00", end_time: "18:00" })] },
+    { variant_key: "alternative", weight: 20, slots: fullDaySlots({ location_key: "bookstore", activity: "在書店工作" }) },
   ],
   holiday: [
-    { variant_key: "primary", weight: 60, slots: [slot({ start_time: "11:00", end_time: "19:00" })] },
-    { variant_key: "alternative", weight: 40, slots: [slot({ start_time: "12:00", end_time: "20:00" })] },
+    { variant_key: "primary", weight: 60, slots: fullDaySlots({ start_time: "08:00", end_time: "16:00", location_key: "park", activity: "在公園散步" }) },
+    { variant_key: "alternative", weight: 40, slots: fullDaySlots({ start_time: "08:00", end_time: "16:00", location_key: "department-store", activity: "逛百貨公司" }) },
   ],
 });
 const result = (characters) => parseEncounterScheduleBatchOutput(JSON.stringify({ characters }), characters.map((c) => source(c.character_id)));
@@ -40,30 +46,39 @@ Deno.test("accepts hourly schedules with exact weekday/holiday weights and 8-hou
     characters: [{ character_id: id1, placement: "modern_map", variants: variants() }],
   }), [source()]);
   if (!parsed.ok) throw new Error(parsed.errors.join(","));
-  if (parsed.characters[0].variants.weekday[0].slots[0].end_time !== "17:00") throw new Error("8-hour slot changed");
+  if (parsed.characters[0].variants.weekday[0].slots[1].end_time !== "16:00") throw new Error("8-hour slot changed");
 });
 
 Deno.test("requires 150-300 character scene-aware greeting per schedule slot", () => {
-  const parsed = result([{ character_id: id1, placement: "modern_map", variants: variants([slot({ encounter_greeting: "太短" })]) }]);
+  const parsed = result([{ character_id: id1, placement: "modern_map", variants: variants(fullDaySlots({ encounter_greeting: "太短" })) }]);
   if (parsed.ok || !parsed.errors.some((error) => error.includes("greeting_length_invalid"))) throw new Error("short greeting accepted");
 });
 
 Deno.test("rejects overlapping or non-hourly schedule intervals", () => {
   const overlap = result([{
     character_id: id1, placement: "modern_map",
-    variants: variants([slot(), slot({ start_time: "12:00", end_time: "13:00" })]),
+    variants: variants(fullDaySlots({ start_time: "07:00", end_time: "16:00" })),
   }]);
   if (overlap.ok || !overlap.errors.some((error) => error.includes("slots_overlap"))) throw new Error("overlap accepted");
   const nonHourly = result([{
     character_id: id1, placement: "modern_map",
-    variants: variants([slot({ start_time: "09:30" })]),
+    variants: variants(fullDaySlots({ start_time: "08:30" })),
   }]);
   if (nonHourly.ok || !nonHourly.errors.some((error) => error.includes("time_or_location_invalid"))) throw new Error("non-hour interval accepted");
   const adjacent = result([{
     character_id: id1, placement: "modern_map",
-    variants: variants([slot({ end_time: "12:00" }), slot({ start_time: "12:00", end_time: "17:00" })]),
+    variants: variants([slot({ start_time: "00:00", end_time: "08:00", location_key: "apartment", activity: "在家休息" }), slot({ start_time: "08:00", end_time: "12:00", location_key: "commercial", activity: "在公司處理工作" }), slot({ start_time: "12:00", end_time: "16:00", location_key: "commercial", activity: "在公司處理工作" }), slot({ start_time: "16:00", end_time: "00:00", location_key: "apartment", activity: "回家休息" })]),
   }]);
   if (adjacent.ok || !adjacent.errors.some((error) => error.includes("should_merge"))) throw new Error("contiguous identical work blocks were not required to merge");
+});
+
+Deno.test("rejects gaps in the 24-hour daily schedule", () => {
+  const incomplete = fullDaySlots();
+  incomplete[1] = slot({ start_time: "09:00", end_time: "16:00" });
+  const parsed = result([{ character_id: id1, placement: "modern_map", variants: variants(incomplete) }]);
+  if (parsed.ok || !parsed.errors.some((error) => error.includes("24_hour_coverage_incomplete"))) {
+    throw new Error("daily schedule gap accepted");
+  }
 });
 
 Deno.test("requires indoor fallback for outdoor schedules", () => {
@@ -115,7 +130,7 @@ Deno.test("normalizes similar scene labels to canonical shared locations", () =>
 Deno.test("only retains a new shopping-street scene when multiple characters share it", () => {
   const single = result([{
     character_id: id1, placement: "modern_map",
-    variants: variants([slot({ location_key: "shopping-street", is_outdoor: true,
+    variants: variants(fullDaySlots({ location_key: "shopping-street", is_outdoor: true,
       rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳", rain_fallback_greeting: greeting })]),
   }]);
   if (!single.ok || single.characters[0].variants.weekday[0].slots[0].location_key !== "department-store") {
@@ -127,7 +142,7 @@ Deno.test("only retains a new shopping-street scene when multiple characters sha
   }
   const two = parseEncounterScheduleBatchOutput(JSON.stringify({
     characters: [
-      { character_id: id1, placement: "modern_map", variants: variants([slot({ location_key: "shopping-street", is_outdoor: true,
+      { character_id: id1, placement: "modern_map", variants: variants(fullDaySlots({ location_key: "shopping-street", is_outdoor: true,
         rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳", rain_fallback_greeting: greeting })]) },
       { character_id: id2, placement: "modern_map", variants: variants([slot({ location_key: "shopping-street", is_outdoor: true,
         rain_fallback_location_key: "bookstore", rain_fallback_activity: "改在書店", rain_fallback_greeting: greeting })]) },
