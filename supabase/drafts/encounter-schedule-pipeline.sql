@@ -263,6 +263,7 @@ AS $$
     'rights_confirmed', c.rights_confirmed,
     'deleted_at', c.deleted_at,
     'name', c.name,
+    'title', COALESCE(c.title, ''),
     'intro', COALESCE(c.intro, ''),
     'race', COALESCE(c.race, ''),
     'style', COALESCE(c.style, ''),
