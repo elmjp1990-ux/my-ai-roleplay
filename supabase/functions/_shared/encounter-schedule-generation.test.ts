@@ -128,7 +128,7 @@ Deno.test("only retains a new shopping-street scene when multiple characters sha
   const two = parseEncounterScheduleBatchOutput(JSON.stringify({
     characters: [
       { character_id: id1, placement: "modern_map", variants: variants([slot({ location_key: "shopping-street", is_outdoor: true,
-        rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳" })]) },
+        rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳", rain_fallback_greeting: greeting })]) },
       { character_id: id2, placement: "modern_map", variants: variants([slot({ location_key: "shopping-street", is_outdoor: true,
         rain_fallback_location_key: "bookstore", rain_fallback_activity: "改在書店", rain_fallback_greeting: greeting })]) },
     ],
