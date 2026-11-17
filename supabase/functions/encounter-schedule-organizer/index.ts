@@ -21,6 +21,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 const asRow = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const asText = (value: unknown): string => typeof value === "string" ? value.trim() : "";
+const ENCOUNTER_SCHEDULE_BATCH_SIZE = 5;
 
 async function recordBatchUsage(admin: any, batchId: string, providerResponse: any, status: string, failureCode: string | null = null) {
   const { error } = await admin.from("encounter_schedule_generation_usage").insert({
@@ -128,7 +129,7 @@ Deno.serve(async (request) => {
   }
 
   const { data: claimData, error: claimError } = await admin.rpc("claim_encounter_schedule_batch", {
-    p_limit: 2147483647,
+    p_limit: ENCOUNTER_SCHEDULE_BATCH_SIZE,
     p_force: mode === "manual",
     p_actor_user_id: actorUserId,
   });
