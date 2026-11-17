@@ -35,7 +35,7 @@ ALTER TABLE public.encounter_scene_registry
   );
 
 -- Expand allowed background location keys only; no image assets are added by this migration.
-DO $
+DO $$
 DECLARE
   v_constraint record;
 BEGIN
@@ -53,7 +53,7 @@ BEGIN
     );
   END LOOP;
 END;
-$;
+$$;
 
 ALTER TABLE public.encounter_scene_backgrounds
   ADD CONSTRAINT encounter_scene_backgrounds_location_key_check
@@ -108,7 +108,7 @@ LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
   SELECT pg_catalog.jsonb_build_object(
     'schedule_schema_version', 'poyozz-encounter-schedule-v4-scene-catalog-2026-11-17',
     'character_id', c.id::text,
@@ -164,7 +164,7 @@ AS $
     AND c.review_status = 'approved'
     AND c.rights_confirmed IS TRUE
     AND c.deleted_at IS NULL
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.encounter_schedule_source_payload(uuid)
   FROM PUBLIC, anon, authenticated;
@@ -180,7 +180,7 @@ RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_character record;
   v_result jsonb;
@@ -209,7 +209,7 @@ BEGIN
         pg_catalog.concat_ws(' ', c.intro, c.race, c.style)
           ~* '(ancient|historical|medieval|antiquity|fantasy|mythic|fictional|古代|歷史|中世紀|中古|奇幻|架空|封建|戰國|春秋|秦漢|唐代|宋代|明代|清代|古羅馬|古希臘)'
         AND COALESCE((src.payload->>'modern_setting_compatible')::boolean, false) IS NOT TRUE
-        AND COALESCE((source.payload->>'time_travel_explicit')::boolean, false) IS NOT TRUE
+        AND COALESCE((src.payload->>'time_travel_explicit')::boolean, false) IS NOT TRUE
       )
       AND NOT EXISTS (
         SELECT 1
@@ -240,7 +240,7 @@ BEGIN
     'limit', v_limit
   );
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.enqueue_encounter_schedule_generation_test_batch(integer)
   FROM PUBLIC, anon, authenticated;
