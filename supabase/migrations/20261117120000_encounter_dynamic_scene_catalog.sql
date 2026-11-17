@@ -102,6 +102,75 @@ INSERT INTO public.encounter_scene_registry (
    '最新消息', '公園活動公告', '傍晚時段適合散步，中央步道照明已開啟。', false, 1, 9, true)
 ON CONFLICT (location_key) DO NOTHING;
 
+CREATE OR REPLACE FUNCTION public.encounter_schedule_source_payload(p_character_id uuid)
+RETURNS jsonb
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $
+  SELECT pg_catalog.jsonb_build_object(
+    'schedule_schema_version', 'poyozz-encounter-schedule-v4-scene-catalog-2026-11-17',
+    'character_id', c.id::text,
+    'author_id', c.author_id::text,
+    'visibility', c.visibility,
+    'review_status', c.review_status,
+    'rights_confirmed', c.rights_confirmed,
+    'deleted_at', c.deleted_at,
+    'name', c.name,
+    'title', COALESCE(c.title, ''),
+    'intro', COALESCE(c.intro, ''),
+    'race', COALESCE(c.race, ''),
+    'style', COALESCE(c.style, ''),
+    'gender', COALESCE(c.gender, ''),
+    'age', COALESCE(c.age::text, ''),
+    'tags', COALESCE(pg_catalog.to_jsonb(c.tags), '[]'::jsonb),
+    'occupation', COALESCE(c.personality_profile ->> 'occupation', ''),
+    'world_era', pg_catalog.concat_ws(' ', c.intro, c.race, c.style),
+    'modern_setting_compatible',
+      pg_catalog.concat_ws(' ', c.intro, COALESCE(d.description, ''), p.private_info, c.personality_profile::text)
+      ~ '(現代世界|現代背景|現代都市|現代社會|現代生活|當代)',
+    'time_travel_explicit',
+      pg_catalog.concat_ws(' ', c.intro, COALESCE(d.description, ''), p.private_info, c.personality_profile::text)
+      ~ '(穿越到現代|穿越至現代|來到現代|時空旅行到現代|穿越現代)',
+    'schedule_description', COALESCE(d.description, ''),
+    'existing_author_schedules', COALESCE((
+      SELECT pg_catalog.jsonb_agg(
+        pg_catalog.jsonb_build_object(
+          'weekday', s.weekday,
+          'day_type', s.day_type,
+          'start_time', pg_catalog.to_char(s.start_time, 'HH24:MI'),
+          'end_time', pg_catalog.to_char(s.end_time, 'HH24:MI'),
+          'location_key', s.location_key,
+          'activity', s.activity
+        )
+        ORDER BY s.priority DESC, s.start_time
+      )
+      FROM public.character_schedules s
+      WHERE s.character_id = c.id
+        AND s.source_type = 'manual'
+        AND s.is_active IS TRUE
+    ), '[]'::jsonb),
+    'private_info', COALESCE(p.private_info, ''),
+    'personality_profile', COALESCE(c.personality_profile, '{}'::jsonb)
+  )
+  FROM public.characters c
+  LEFT JOIN public.character_schedule_descriptions d
+    ON d.character_id = c.id AND d.author_id = c.author_id
+  LEFT JOIN public.character_private_info p
+    ON p.character_id = c.id AND p.author_id = c.author_id
+  WHERE c.id = p_character_id
+    AND c.visibility = 'public'
+    AND c.review_status = 'approved'
+    AND c.rights_confirmed IS TRUE
+    AND c.deleted_at IS NULL
+$;
+
+REVOKE ALL ON FUNCTION public.encounter_schedule_source_payload(uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.encounter_schedule_source_payload(uuid)
+  TO service_role;
+
 -- Manual Preview testing first enqueues eligible public characters. The Edge Function
 -- calls this only after its test-mode and account-allowlist checks; no Cron is enabled.
 CREATE OR REPLACE FUNCTION public.enqueue_encounter_schedule_generation_test_batch(
