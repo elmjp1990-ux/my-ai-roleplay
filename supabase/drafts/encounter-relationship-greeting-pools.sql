@@ -57,7 +57,7 @@ BEGIN
         SELECT 1 FROM public.character_schedules AS schedule
         WHERE schedule.character_id = c.id
           AND schedule.is_active IS TRUE
-          AND schedule.source_type IN ('ai', 'legacy')
+          AND schedule.source_type IN ('ai', 'legacy', 'manual')
       )
       AND NOT EXISTS (
         SELECT 1 FROM public.encounter_character_greeting_pools AS pool
