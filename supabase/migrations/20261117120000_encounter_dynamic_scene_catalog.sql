@@ -156,6 +156,8 @@ BEGIN
     v_result := public.enqueue_encounter_schedule_generation_internal(v_character.id);
     CASE COALESCE(v_result->>'status', '')
       WHEN 'pending' THEN v_pending := v_pending + 1;
+      WHEN 'failed' THEN v_pending := v_pending + 1;
+      WHEN 'needs_reconciliation' THEN v_pending := v_pending + 1;
       WHEN 'not_eligible' THEN v_not_eligible := v_not_eligible + 1;
       ELSE v_unchanged := v_unchanged + 1;
     END CASE;
