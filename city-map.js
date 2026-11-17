@@ -94,6 +94,8 @@
       </div>
     </section>
     </section>`;
+  void loadCityDynamicScenes();
+  void loadCityWeather();
   document.body.classList.remove('city-map-mode-immersive');
   const stage=$('cityMapStage'),world=$('cityMapWorld');
   stage.classList.add('is-loading');
@@ -273,10 +275,36 @@
       console.warn('城市動態場景載入失敗：',error?.message||error);
     }
   };
+  const loadCityWeather=async()=>{
+    const client=window.mySupabase;
+    const stage=$('cityMapStage');
+    if(!client||!stage)return;
+    try{
+      const {data,error}=await client.rpc('get_encounter_city_weather');
+      if(error)throw error;
+      const weather=Array.isArray(data)?data[0]:data;
+      const weatherLabel=$('cityMapWeather');
+      const temperatureLabel=$('cityMapTemp');
+      if(!weather){
+        if(weatherLabel)weatherLabel.textContent='天氣資料待更新';
+        if(temperatureLabel)temperatureLabel.textContent='溫度資料待更新';
+        stage.classList.remove('is-raining');
+        return;
+      }
+      if(weatherLabel)weatherLabel.textContent=String(weather.weather_text||'天氣資料待更新');
+      const temperature=Number(weather.temperature_c);
+      if(temperatureLabel)temperatureLabel.textContent=Number.isFinite(temperature)?temperature.toFixed(1)+'°C':'溫度資料待更新';
+      stage.classList.toggle('is-raining',weather.is_raining===true);
+      const cores=Number(navigator.hardwareConcurrency||8);
+      const memory=Number(navigator.deviceMemory||8);
+      stage.classList.toggle('low-performance',cores<=4||memory<=4);
+    }catch(error){
+      console.warn('城市天氣資料載入失敗：',error?.message||error);
+    }
+  };
   // Use only published characters whose own schedule data is already available to this client.
   // Never invent a character or query private schedule rows from the browser.
   const cityPlaceAliases={airport:['airport'],commercial:['commercial','office'], 'night-bar':['night-bar','bar'], 'live-house':['live-house','livehouse'], apartment:['apartment'], 'department-store':['department-store','department_store'], bookstore:['bookstore','book-store'], cafe:['cafe','coffee-shop'], park:['park']};
-  void loadCityDynamicScenes();
   const getTaipeiClock=()=>{
     const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
     const values=Object.fromEntries(parts.map(part=>[part.type,part.value]));
