@@ -91,6 +91,7 @@ assert.match(cityMap, /while\(pager\.hasMore&&pager\.people\.length<targetCount/
 assert.match(html, /button.dataset\.aiEnabled='false'/);
 assert.match(html, /button.dataset\.aiEnabled=blocked\?'false':'true'/);
 assert.match(html, /button\.disabled=blocked/);
+assert.match(html, /processing_character_count/);
 assert.match(html, /failed_character_count/);
 assert.match(html, /needs_reconciliation_count/);
 assert.match(html, /button.dataset\.aiEnabled!=='true'\|\|button\.disabled/);
@@ -117,6 +118,7 @@ assert.doesNotMatch(scheduleOrganizer, /ENCOUNTER_SCHEDULE_TEST_USER_IDS/);
 assert.doesNotMatch(scheduleOrganizer, /account_is_active/);
 assert.match(scheduleOrganizer, /manual_schedule_trigger_disabled/);
 assert.match(scheduleOrganizer, /blocked_unresolved_failures/);
+assert.match(scheduleOrganizer, /processing_character_count/);
 assert.match(scheduleOrganizer, /failed_character_count/);
 assert.match(scheduleOrganizer, /needs_reconciliation_count/);
 assert.match(scheduleOrganizer, /Promise\.all\(sources\.map\(async \(source\)/);
