@@ -159,59 +159,84 @@ Deno.serve(async (request) => {
   }
   const sceneCatalog = (Array.isArray(sceneCatalogData) ? sceneCatalogData : []) as EncounterSceneCatalogEntry[];
 
-  let prompt;
-  try {
-    prompt = buildEncounterScheduleBatchMessages(sources, sceneCatalog);
-  } catch (error) {
-    const code = asText(error instanceof Error ? error.message : "schedule_prompt_invalid");
-    await failBatch(admin, batchId, leaseToken, code, false);
-    return json({ error: "schedule_source_validation_failed" }, 422);
-  }
+  const protectedContextByCharacter: Record<string, string[]> = {};
+  const rawCharacters: unknown[] = [];
+  const rawScenesByKey = new Map<string, unknown>();
+  const providerResponses: Array<{ providerResponse: Awaited<ReturnType<typeof requestOpenRouterChatCompletion>> }> = [];
+  const failedCharacterIds = new Set<string>();
+  const validationErrors: string[] = [];
+  let retryableProviderFailure = false;
+  let ambiguousProviderFailure = false;
 
-  let providerResponse: Awaited<ReturnType<typeof requestOpenRouterChatCompletion>>;
-  try {
-    providerResponse = await requestOpenRouterChatCompletion({
-      messages: prompt.messages,
-      apiKey: openRouterKey,
-      model: POYOZZ_DEFAULT_CHAT_MODEL,
-      timeoutMs: 55_000,
-      temperature: 0.35,
-      responseFormat: { type: "json_object" },
-    });
-  } catch (error) {
-    const code = error instanceof Error && error.name === "AbortError"
-      ? "schedule_provider_timeout" : "schedule_provider_outcome_unknown";
-    const failed = await failBatch(admin, batchId, leaseToken, code, false, true);
-    return json({ status: failed ? "needs_reconciliation" : "batch_failure_unconfirmed", error: code }, 503);
+  // One character per response keeps the database batch capped at five while
+  // preventing a single truncated multi-character JSON response from losing all results.
+  const generationResults = await Promise.all(sources.map(async (source) => {
+    let characterPrompt;
+    try {
+      characterPrompt = buildEncounterScheduleBatchMessages([source], sceneCatalog);
+      protectedContextByCharacter[source.character_id] =
+        characterPrompt.protectedContextByCharacter[source.character_id] || [];
+    } catch (error) {
+      return { sourceId: source.character_id, failureCode: asText(error instanceof Error ? error.message : "schedule_prompt_invalid"), retryable: false, ambiguous: false };
+    }
+    try {
+      const providerResponse = await requestOpenRouterChatCompletion({
+        messages: characterPrompt.messages, apiKey: openRouterKey, model: POYOZZ_DEFAULT_CHAT_MODEL,
+        timeoutMs: 42_000, temperature: 0.35, responseFormat: { type: "json_object" },
+      });
+      if (providerResponse.result.kind !== "generated") {
+        const result = providerResponse.result;
+        const failureCode = result.kind === "provider_error" ? result.code :
+          result.kind === "content_rejected" ? "schedule_content_rejected" : "schedule_empty_output";
+        await recordBatchUsage(admin, batchId, providerResponse, "failed", failureCode);
+        return { sourceId: source.character_id, failureCode,
+          retryable: result.kind === "provider_error" ? result.retryable : false, ambiguous: false };
+      }
+      let decoded: Record<string, unknown>;
+      try { decoded = asRow(JSON.parse(providerResponse.result.text)); }
+      catch {
+        await recordBatchUsage(admin, batchId, providerResponse, "failed", "schedule_output_json_invalid");
+        return { sourceId: source.character_id, failureCode: "schedule_output_json_invalid", retryable: false, ambiguous: false };
+      }
+      const characters = decoded.characters;
+      const scenes = decoded.scenes === undefined ? [] : decoded.scenes;
+      if (!Array.isArray(characters) || characters.length !== 1 || !Array.isArray(scenes) ||
+          Object.keys(decoded).some((key) => !["characters", "scenes"].includes(key))) {
+        await recordBatchUsage(admin, batchId, providerResponse, "failed", "schedule_single_character_shape_invalid");
+        return { sourceId: source.character_id, failureCode: "schedule_single_character_shape_invalid", retryable: false, ambiguous: false };
+      }
+      const character = asRow(characters[0]);
+      if (asText(character.character_id) !== source.character_id) {
+        await recordBatchUsage(admin, batchId, providerResponse, "failed", "schedule_character_identity_mismatch");
+        return { sourceId: source.character_id, failureCode: "schedule_character_identity_mismatch", retryable: false, ambiguous: false };
+      }
+      return { sourceId: source.character_id, providerResponse, character, scenes };
+    } catch (error) {
+      const failureCode = error instanceof Error && error.name === "AbortError"
+        ? "schedule_provider_timeout" : "schedule_provider_outcome_unknown";
+      await recordBatchUsage(admin, batchId, {
+        provider: "openrouter", requestId: "", usage: {}, httpStatus: 0,
+        responseContentType: "", responseBodyLength: 0, responseParsed: false,
+      }, "failed", failureCode);
+      return { sourceId: source.character_id, failureCode, retryable: false, ambiguous: true };
+    }
+  }));
+  for (const result of generationResults) {
+    if ("failureCode" in result) {
+      failedCharacterIds.add(result.sourceId);
+      validationErrors.push(result.sourceId + ":" + result.failureCode);
+      retryableProviderFailure ||= result.retryable;
+      ambiguousProviderFailure ||= result.ambiguous;
+      continue;
+    }
+    providerResponses.push({ providerResponse: result.providerResponse });
+    rawCharacters.push(result.character);
+    for (const scene of result.scenes) {
+      const key = normalizeEncounterSceneKey(asRow(scene).location_key);
+      if (key && !rawScenesByKey.has(key)) rawScenesByKey.set(key, scene);
+    }
   }
-
-  if (providerResponse.result.kind !== "generated") {
-    const result = providerResponse.result;
-    const failureCode = result.kind === "provider_error" ? result.code :
-      result.kind === "content_rejected" ? "schedule_content_rejected" : "schedule_empty_output";
-    await recordBatchUsage(admin, batchId, providerResponse, "failed", failureCode);
-    const retryable = result.kind === "provider_error" ? result.retryable : false;
-    const failed = await failBatch(admin, batchId, leaseToken, failureCode, retryable, false);
-    return json({ status: failed ? "generation_failed" : "batch_failure_unconfirmed", error: failureCode }, 503);
-  }
-
-  let decodedOutput: Record<string, unknown>;
-  try {
-    decodedOutput = asRow(JSON.parse(providerResponse.result.text));
-  } catch {
-    await recordBatchUsage(admin, batchId, providerResponse, "failed", "schedule_output_json_invalid");
-    const failed = await failBatch(admin, batchId, leaseToken, "schedule_output_json_invalid", true, false);
-    return json({ status: failed ? "generation_invalid" : "batch_failure_unconfirmed" }, 422);
-  }
-  if (!Array.isArray(decodedOutput.characters) ||
-      Object.keys(decodedOutput).some((key) => !["characters", "scenes"].includes(key))) {
-    await recordBatchUsage(admin, batchId, providerResponse, "failed", "schedule_output_root_invalid");
-    const failed = await failBatch(admin, batchId, leaseToken, "schedule_output_root_invalid", true, false);
-    return json({ status: failed ? "generation_invalid" : "batch_failure_unconfirmed" }, 422);
-  }
-
-  const rawCharacters = decodedOutput.characters as unknown[];
-  const rawScenes = Array.isArray(decodedOutput.scenes) ? decodedOutput.scenes : [];
+  const rawScenes = [...rawScenesByKey.values()];
   const sourceIds = new Set(sources.map((source) => source.character_id));
   const { data: dynamicUsageData, error: dynamicUsageError } = await admin.rpc("get_encounter_dynamic_scene_usage");
   if (dynamicUsageError) {
@@ -290,14 +315,13 @@ Deno.serve(async (request) => {
     dynamicCandidates.slice(0, availableDynamicSlots).map(([key]) => key),
   );
 
-  const failedCharacterIds = new Set<string>();
-  const validationErrors: string[] = [];
   const validCharacters: Array<{
     sourceId: string;
     character: Record<string, unknown>;
     scenes: Array<Record<string, unknown>>;
   }> = [];
   for (const source of sources) {
+    if (failedCharacterIds.has(source.character_id)) continue;
     const matches = rawCharacters.filter((item) => asText(asRow(item).character_id) === source.character_id);
     if (matches.length !== 1) {
       failedCharacterIds.add(source.character_id);
@@ -343,7 +367,7 @@ Deno.serve(async (request) => {
       continue;
     }
 
-    const protectedValues = prompt.protectedContextByCharacter[source.character_id] || [];
+    const protectedValues = protectedContextByCharacter[source.character_id] || [];
     if (findPrivateContextLeak(JSON.stringify(parsed.characters[0]), protectedValues, [])) {
       failedCharacterIds.add(source.character_id);
       validationErrors.push(source.character_id + "_private_context_output_blocked");
@@ -444,19 +468,24 @@ Deno.serve(async (request) => {
       admin,
       batchId,
       leaseToken,
-      "schedule_partial_character_failure",
-      true,
-      ambiguousPublishFailure,
+      ambiguousProviderFailure ? "schedule_provider_outcome_unknown" :
+        retryableProviderFailure ? "schedule_provider_retryable_failure" : "schedule_partial_character_failure",
+      retryableProviderFailure,
+      ambiguousPublishFailure || ambiguousProviderFailure,
     );
     if (!failed) {
-      await recordBatchUsage(admin, batchId, providerResponse, "failed", "schedule_partial_failure_unconfirmed");
+      for (const item of providerResponses) {
+        await recordBatchUsage(admin, batchId, item.providerResponse, "failed", "schedule_partial_failure_unconfirmed");
+      }
       return json({ status: "batch_failure_unconfirmed", error: "schedule_partial_character_failure" }, 503);
     }
   }
 
   const partial = remaining > 0 || ambiguousPublishFailure || failedCharacterIds.size > 0;
-  await recordBatchUsage(admin, batchId, providerResponse, partial ? "partial" : "completed",
-    partial ? "schedule_partial_character_failure" : null);
+  for (const item of providerResponses) {
+    await recordBatchUsage(admin, batchId, item.providerResponse, partial ? "partial" : "completed",
+      partial ? "schedule_partial_character_failure" : null);
+  }
   return json({
     status: partial ? "partial" : "completed",
     batch_id: batchId,
