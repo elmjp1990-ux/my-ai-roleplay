@@ -48,7 +48,7 @@ Deno.serve(async (request) => {
       });
       if (!response.ok) throw new Error("calendar_http_" + response.status);
       const payload = await response.json();
-      const parsedRows = parseTaiwanCalendarRows(payload);
+      const parsedRows = parseTaiwanCalendarRows(payload, "data.gov.tw:123662 via data.ntpc.gov.tw:308dcd75");
       if (!parsedRows.length) {
         if (page === 0) throw new Error("calendar_dataset_empty_or_schema_changed");
         break;
