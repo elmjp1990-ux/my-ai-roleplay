@@ -257,6 +257,13 @@
         if(Object.prototype.hasOwnProperty.call(cityPlaceNames,key)){
           cityPlaceNames[key]=name;
           cityVenueScenes[key]=scene;
+          const builtInMarker=Array.from(svg.querySelectorAll('.city-place-marker[data-place]'))
+            .find(marker=>marker.getAttribute('data-place')===key);
+          if(builtInMarker){
+            builtInMarker.setAttribute('aria-label',name);
+            const glyph=builtInMarker.querySelector('.city-marker-emoji');
+            if(glyph)glyph.textContent=scene.icon;
+          }
         }
         continue;
       }
