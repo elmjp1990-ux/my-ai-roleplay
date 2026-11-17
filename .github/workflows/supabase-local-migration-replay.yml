@@ -203,6 +203,12 @@ jobs:
           set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117082906_encounter_evaluation_evidence_gates.sql
 
+      - name: Apply Encounter relationship greeting selection draft
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117082908_encounter_relationship_greeting_pools.sql
+
       - name: Apply Encounter manual-end lifecycle draft
         shell: bash
         run: |
@@ -223,12 +229,6 @@ jobs:
           # Only creates the disabled-by-default function; no cron job is enabled.
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117082912_schedule_encounter_evaluation_worker.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-schedule-encounter-evaluation-worker.sql
-
-      - name: Apply Encounter relationship greeting selection draft
-        shell: bash
-        run: |
-          set -euo pipefail
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117082908_encounter_relationship_greeting_pools.sql
 
       - name: Replay Encounter relationship greeting selection smoke test
         shell: bash
