@@ -227,7 +227,7 @@ Deno.serve(async (request: Request) => {
 
   const url = Deno.env.get("SUPABASE_URL")?.trim();
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
-  const openRouterKey = Deno.env.get("OPENROUTER_API_KEY")?.trim();
+  const openRouterKey = Deno.env.get("OPENROUTER_API_KEY")?.trim() || "";
   if (!url || !serviceRoleKey) return json({ error: "server_not_configured" }, 503);
   if (request.headers.get("Authorization") !== "Bearer " + serviceRoleKey) {
     return json({ error: "service_role_required" }, 401);
