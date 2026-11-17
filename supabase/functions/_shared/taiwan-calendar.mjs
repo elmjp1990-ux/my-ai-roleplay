@@ -27,10 +27,18 @@ export function parseTaiwanCalendarRows(payload, source = "data.gov.tw:123662") 
     if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) continue;
     const holiday = isHolidayValue(row.isholiday ?? row.isHoliday ?? row.IsHoliday ?? row.是否放假);
     if (holiday === null) continue;
+    const rawName = String(row.name ?? "").trim();
+    const rawDescription = String(row.description ?? "").trim();
+    const weekendLabel = /^(?:週末假期|周末假期|星期六|星期日|週六|週日)$/i;
+    const holidayName = weekendLabel.test(rawName)
+      ? (rawDescription && !weekendLabel.test(rawDescription) ? rawDescription : "")
+      : (rawName || rawDescription);
     output.push({
       calendar_date: year + "-" + String(month).padStart(2, "0") + "-" + String(day).padStart(2, "0"),
       day_type: holiday ? "holiday" : "workday",
-      holiday_name: String(row.name ?? row.holidaycategory ?? row.description ?? "").trim().slice(0, 120) || null,
+      // holidaycategory describes the category (often a weekend), not a named event.
+      // Only an actual name/description can trigger a special-holiday schedule.
+      holiday_name: holidayName.slice(0, 120) || null,
       source,
     });
   }
