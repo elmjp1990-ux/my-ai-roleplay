@@ -40,7 +40,7 @@ assert.ok(frontend.includes("c.authorId ? `<button class=\"author-link\""));
 assert.doesNotMatch(frontend, /const cityScheduleCache=new Map\(\)/);
 assert.match(frontend, /async function loadCityCharacterSchedules/);
 assert.match(frontend, /get_encounter_character_schedules/);
-assert.match(frontend, /城市角色排程批次載入失敗/);
+assert.match(frontend, /if\\(error\\)throw new Error\\('讀取角色行程失敗：'\\+error\\.message\\)/);
 assert.match(cityMap, /person\.encounterSchedules=schedules\.get\(person\.id\)\|\|''/);
 assert.doesNotMatch(cityMap, /hydrateCitySchedule/);
 assert.match(cityMap, /const isCurrentCityCharacterEligible=\(person\)=>/);
