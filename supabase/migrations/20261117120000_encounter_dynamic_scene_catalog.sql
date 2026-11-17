@@ -516,6 +516,7 @@ AS $$
      AND c.review_status = 'approved'
      AND c.rights_confirmed IS TRUE
      AND c.deleted_at IS NULL
+     AND c.is_nsfw IS FALSE
     WHERE r.is_active IS TRUE
     GROUP BY
       r.location_key, r.display_name, r.icon, r.marker_x, r.marker_y,
