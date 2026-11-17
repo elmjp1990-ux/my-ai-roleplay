@@ -143,6 +143,17 @@ CREATE TABLE IF NOT EXISTS public.taiwan_calendar_days (
   updated_at timestamptz NOT NULL DEFAULT pg_catalog.now()
 );
 
+ALTER TABLE public.taiwan_calendar_days
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT pg_catalog.now();
+
+-- Older sync versions copied holidaycategory (e.g. "週末假期") into holiday_name.
+-- Clear those generic labels so weekends never trigger special-event schedules.
+UPDATE public.taiwan_calendar_days
+SET holiday_name = NULL,
+    updated_at = pg_catalog.now()
+WHERE pg_catalog.btrim(COALESCE(holiday_name, '')) ~
+  '^(週末假期|周末假期|週末假期等|周末假期等|星期六|星期日|週六|週日|放假|假日|例假日)$';
+
 CREATE TABLE IF NOT EXISTS public.encounter_city_weather (
   city_key text PRIMARY KEY CHECK (city_key = 'taipei'),
   weather_text text NOT NULL DEFAULT '天氣資料待更新',
