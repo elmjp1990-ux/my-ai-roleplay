@@ -181,7 +181,7 @@
     if(!messages)return;
     const allMessages=Array.isArray(session?.messages)?session.messages:[];
     const hasPlayerMessage=allMessages.some(m=>m&&m.role==='user'&&String(m.text??m.content??'').trim())||session?.cloudHasUserMessage===true;
-    const greeting=String(session?.encounterGreeting||session?.cloudCharacterSnapshot?.encounterGreeting||session?.cloudCharacterSnapshot?.opening||'').trim();
+    const greeting=String(session?.encounterGreeting||session?.cloudCharacterSnapshot?.encounterGreeting||'').trim();
     const openingText=String(session?.initialOpeningMessage?.text||'').trim();
     const latestReply=[...allMessages].reverse().find(m=>m&&m.role!=='user'&&String(m.text??m.content??'').trim())||
       (openingText?{id:'opening-'+session.id,content:openingText}:null);
@@ -376,7 +376,7 @@
       const session=currentSession();
       if(!session?.encounterMode)return;
       const choice=openingChoice.dataset.choice;
-      if(choice==='wait'&&!String(session.encounterGreeting||session.cloudCharacterSnapshot?.encounterGreeting||session.cloudCharacterSnapshot?.opening||'').trim())return;
+      if(choice==='wait'&&!String(session.encounterGreeting||session.cloudCharacterSnapshot?.encounterGreeting||'').trim())return;
       window.dispatchEvent(new CustomEvent('poyozz-encounter-opening-choice',{
         detail:{sessionId:session.id,choice}
       }));
