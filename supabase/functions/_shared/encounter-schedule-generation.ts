@@ -378,7 +378,7 @@ export function parseEncounterScheduleBatchOutput(
   for (const item of parsed.characters) {
     if (!isRecord(item) ||
       !["character_id", "placement", "variants"].every((key) => Object.prototype.hasOwnProperty.call(item, key)) ||
-      Object.keys(item).some((key) => !["character_id", "placement", "variants", "special_events"].includes(key)) ||
+      Object.keys(item).some((key) => !["character_id", "placement", "variants", "special_events", "relationship_greetings"].includes(key)) ||
       !isUuid(item.character_id)) {
       errors.push("character_item_invalid");
       continue;
