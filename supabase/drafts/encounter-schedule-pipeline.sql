@@ -704,7 +704,7 @@ BEGIN
 
         IF v_variant->>'variant_key' NOT IN ('primary', 'alternative')
            OR jsonb_typeof(v_variant->'slots') <> 'array'
-           OR jsonb_array_length(v_variant->'slots') NOT BETWEEN 1 AND 4 THEN
+           OR jsonb_array_length(v_variant->'slots') NOT BETWEEN 2 AND 4 THEN
           RAISE EXCEPTION 'schedule_variant_shape_invalid' USING ERRCODE = '22023';
         END IF;
 
@@ -737,6 +737,38 @@ BEGIN
                OR v_slot->>'rain_fallback_greeting' IS NOT NULL THEN
               RAISE EXCEPTION 'schedule_unexpected_rain_fallback' USING ERRCODE = '22023';
             END IF;
+          END IF;
+
+          -- Every daily variant must cover 00:00 through the next 00:00
+          -- without gaps. A final 22:00-00:00 slot is represented as a wrap to midnight.
+          IF EXISTS (
+            WITH intervals AS (
+              SELECT
+                (EXTRACT(HOUR FROM (slot->>'start_time')::time)::integer * 60) AS start_minute,
+                (EXTRACT(HOUR FROM (slot->>'end_time')::time)::integer * 60)
+                  + CASE
+                      WHEN (slot->>'end_time')::time <= (slot->>'start_time')::time THEN 1440
+                      ELSE 0
+                    END AS end_minute
+              FROM jsonb_array_elements(v_variant->'slots') AS slots(slot)
+            ),
+            ordered AS (
+              SELECT start_minute, end_minute,
+                pg_catalog.lag(end_minute) OVER (ORDER BY start_minute) AS previous_end
+              FROM intervals
+            ),
+            coverage AS (
+              SELECT
+                pg_catalog.count(*) AS slot_count,
+                pg_catalog.min(start_minute) AS first_start,
+                pg_catalog.max(end_minute) AS final_end,
+                pg_catalog.bool_or(previous_end IS NOT NULL AND previous_end <> start_minute) AS has_gap
+              FROM ordered
+            )
+            SELECT 1 FROM coverage
+            WHERE slot_count < 2 OR first_start <> 0 OR final_end <> 1440 OR COALESCE(has_gap, true)
+          ) THEN
+            RAISE EXCEPTION 'schedule_variant_24_hour_coverage_incomplete' USING ERRCODE = '22023';
           END IF;
 
           INSERT INTO public.character_schedules (
@@ -1196,7 +1228,7 @@ REVOKE ALL ON FUNCTION public.schedule_encounter_schedule_organizer(boolean)
 GRANT EXECUTE ON FUNCTION public.schedule_encounter_schedule_organizer(boolean) TO service_role;
 
 COMMENT ON TABLE public.encounter_schedule_generation_jobs IS
-  'Service-role-only unique-per-character queue. Threshold counts distinct public approved characters; a 23h45m fallback trigger plus 15-minute cron interval keeps the nominal maximum under 24 hours before global rate limits.';
+  'Service-role-only unique-per-character queue. Enqueue triggers run on author schedule-description changes and public eligibility changes. Threshold counts distinct public approved characters; a 23h45m fallback trigger plus 15-minute cron interval keeps the nominal maximum under 24 hours before global rate limits.';
 COMMENT ON TABLE public.encounter_schedule_batch_runs IS
   'Global schedule AI batch ledger enforcing six-hour cooldown and four batches per Taipei calendar day.';
 COMMENT ON TABLE public.taiwan_calendar_days IS
