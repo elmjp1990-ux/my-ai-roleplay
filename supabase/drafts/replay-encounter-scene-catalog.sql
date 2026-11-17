@@ -1,4 +1,5 @@
 -- Disposable local-only replay for generalized Encounter scene metadata and legacy placeholders.
+-- Latest PR #262 coverage: v4 scene hash, manual enqueue, dynamic marker cap, and fallback-only background metadata.
 -- All synthetic rows and registry writes are rolled back. Never run against Hosted Supabase.
 
 BEGIN;
