@@ -15,6 +15,14 @@ assert.doesNotMatch(html, /name="clearEncounterSchedules"/);
 assert.doesNotMatch(html, /function parseEncounterScheduleText\(raw\)/);
 assert.doesNotMatch(html, /星期\(0=日、1=一/);
 
+// City weather and dynamic scenes are session-cached to avoid repeat RPC egress on map re-entry.
+assert.match(cityMap, /CITY_MAP_WEATHER_CACHE_TTL_MS = 6 \* 60 \* 60 \* 1000/);
+assert.match(cityMap, /CITY_MAP_SCENES_CACHE_TTL_MS = 30 \* 60 \* 1000/);
+assert.match(cityMap, /sessionStorage\.getItem\('poyozz-city-map-/);
+assert.match(cityMap, /readCityMapCache\('weather'/);
+assert.match(cityMap, /readCityMapCache\('scenes'/);
+assert.match(cityMap, /if\(cached\?\.fresh\)return/);
+
 // Save/load must use the separate author-only description table.
 assert.match(html, /async function saveEncounterScheduleDescription\(/);
 assert.match(html, /async function loadEncounterScheduleDescriptionIntoEditor\(/);
