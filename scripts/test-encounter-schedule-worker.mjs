@@ -106,6 +106,7 @@ assert.doesNotMatch(pipeline, /SELECT public\.schedule_encounter_schedule_organi
 assert.match(html, /id="encounterScheduleTestTools"/);
 assert.match(html, /functions\.invoke\('encounter-schedule-organizer',\{body:\{mode:'status'\}\}\)/);
 assert.match(html, /functions\.invoke\('encounter-schedule-organizer',\{body:\{mode:'manual'\}\}\)/);
-assert.match(html, /if\(kind==='album'&&CHAT_DATA_TEST_MODE\)void loadEncounterScheduleTestTools\(\)/);
+assert.match(html, /case 'environment':[\s\S]*?void loadEncounterScheduleTestTools\(\)/);
+assert.doesNotMatch(html, /kind==='album'&&CHAT_DATA_TEST_MODE/);
 
 console.log("Encounter schedule worker, conditional holidays, dynamic scenes, simulated Taipei weather, queue triggers, throttling, and 24-hour coverage contracts passed.");
