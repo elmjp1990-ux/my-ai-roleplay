@@ -35,7 +35,7 @@ RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_limit integer := LEAST(GREATEST(COALESCE(p_limit, 1000), 1), 1000);
   v_character_id uuid;
