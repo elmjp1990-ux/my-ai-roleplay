@@ -26,6 +26,70 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.encounter_character_greetin
 COMMENT ON TABLE public.encounter_character_greeting_history IS
   'Service-only per-player/per-character last greeting hash. Used to avoid repeating the immediately previous Encounter opening across sessions.';
 
+-- One-time, explicitly invoked backfill for already-published characters.
+-- The queue retains its existing global batch cooldown and daily rate limits.
+CREATE OR REPLACE FUNCTION public.queue_encounter_greeting_pool_backfill(
+  p_limit integer DEFAULT 1000
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+DECLARE
+  v_limit integer := LEAST(GREATEST(COALESCE(p_limit, 1000), 1), 1000);
+  v_character_id uuid;
+  v_result jsonb;
+  v_queued integer := 0;
+BEGIN
+  IF COALESCE(auth.role(), '') <> 'service_role' THEN
+    RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
+  END IF;
+
+  FOR v_character_id IN
+    SELECT c.id
+    FROM public.characters AS c
+    CROSS JOIN LATERAL (
+      SELECT public.encounter_schedule_source_payload(c.id) AS payload
+    ) AS source
+    WHERE source.payload IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM public.character_schedules AS schedule
+        WHERE schedule.character_id = c.id
+          AND schedule.is_active IS TRUE
+          AND schedule.source_type IN ('ai', 'legacy')
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM public.encounter_character_greeting_pools AS pool
+        WHERE pool.character_id = c.id
+          AND pool.source_hash = pg_catalog.md5(source.payload::text)
+      )
+    ORDER BY c.created_at, c.id
+    FOR UPDATE OF c SKIP LOCKED
+    LIMIT v_limit
+  LOOP
+    v_result := public.enqueue_encounter_schedule_generation_internal(v_character_id);
+    IF v_result->>'status' = 'pending' THEN
+      v_queued := v_queued + 1;
+    END IF;
+  END LOOP;
+
+  RETURN pg_catalog.jsonb_build_object(
+    'queued_count', v_queued,
+    'limit', v_limit,
+    'scheduler', 'existing_global_rate_limits'
+  );
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.queue_encounter_greeting_pool_backfill(integer)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.queue_encounter_greeting_pool_backfill(integer)
+  TO service_role;
+
+COMMENT ON FUNCTION public.queue_encounter_greeting_pool_backfill(integer) IS
+  'Explicit one-time backfill for already-published characters with active schedules but no current relationship-stage greeting pool. Never runs automatically; the existing global schedule batch cooldown and daily limits remain in force.';
+
 CREATE OR REPLACE FUNCTION public.create_encounter_session_with_lifecycle(
   p_session_id uuid,
   p_user_id uuid,
