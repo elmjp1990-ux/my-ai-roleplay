@@ -10012,14 +10012,21 @@ async function loadEncounterScheduleTestTools(){
   const button=section.querySelector('[data-action="organize-encounter-schedules"]');
   if(button){button.disabled=true;button.dataset.aiEnabled='false';}
   const client=window.mySupabase;
-  if(!client||!currentUser()?.uid){
-    if(status)status.textContent='請先登入測試帳號；目前不會發出 AI 呼叫。';
+  if(!client){
+    if(status)status.textContent='目前無法連線至測試服務。';
     return;
   }
   try{
     const {data,error}=await client.functions.invoke('encounter-schedule-organizer',{body:{mode:'status'}});
+    if(!error&&data?.test_mode!==true){
+      section.hidden=true;
+      return;
+    }
+    section.hidden=false;
     if(error||data?.enabled!==true){
-      if(status)status.textContent='伺服器尚未啟用測試模式；AI 生成暫時停用。請確認測試環境設定。';
+      if(status)status.textContent=currentUser()?.uid
+        ?'測試模式已啟用，但目前無法確認帳號登入狀態；請重新登入後重試。'
+        :'請先登入測試帳號；目前不會發出 AI 呼叫。';
       return;
     }
     const pending=Number(data.pending_character_count||0);
