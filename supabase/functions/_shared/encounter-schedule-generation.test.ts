@@ -127,29 +127,25 @@ Deno.test("normalizes similar scene labels to canonical shared locations", () =>
   if (normalizeEncounterSceneKey("咖啡廳") !== "cafe") throw new Error("cafe alias failed");
 });
 
-Deno.test("only retains a new shopping-street scene when multiple characters share it", () => {
+Deno.test("preserves shared-scene candidates across separate AI batches", () => {
   const single = result([{
     character_id: id1, placement: "modern_map",
     variants: variants(fullDaySlots({ location_key: "shopping-street", is_outdoor: true,
-      rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳", rain_fallback_greeting: greeting })]),
+      rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳", rain_fallback_greeting: greeting })),
   }]);
-  if (!single.ok || single.characters[0].variants.weekday[0].slots[1].location_key !== "department-store") {
-    throw new Error("unshared scene should collapse into an existing marker");
-  }
-  if (single.characters[0].variants.weekday[0].slots[1].is_outdoor ||
-    single.characters[0].variants.weekday[0].slots[1].rain_fallback_location_key !== null) {
-    throw new Error("collapsed scene should use indoor semantics");
+  if (!single.ok || single.characters[0].variants.weekday[0].slots[1].location_key !== "shopping-street") {
+    throw new Error("single-batch candidate should be preserved for cross-batch aggregation");
   }
   const two = parseEncounterScheduleBatchOutput(JSON.stringify({
     characters: [
       { character_id: id1, placement: "modern_map", variants: variants(fullDaySlots({ location_key: "shopping-street", is_outdoor: true,
-        rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳", rain_fallback_greeting: greeting })]) },
+        rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳", rain_fallback_greeting: greeting })) },
       { character_id: id2, placement: "modern_map", variants: variants(fullDaySlots({ location_key: "shopping-street", is_outdoor: true,
-        rain_fallback_location_key: "bookstore", rain_fallback_activity: "改在書店", rain_fallback_greeting: greeting })]) },
+        rain_fallback_location_key: "bookstore", rain_fallback_activity: "改在書店", rain_fallback_greeting: greeting })) },
     ],
   }), [source(id1), source(id2)]);
   if (!two.ok || two.characters[0].variants.weekday[0].slots[1].location_key !== "shopping-street") {
-    throw new Error("shared new scene candidate was not retained");
+    throw new Error("shared scene candidate was not retained for registry publication");
   }
 });
 
