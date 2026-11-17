@@ -59,6 +59,11 @@ Deno.test("rejects overlapping or non-hourly schedule intervals", () => {
     variants: variants([slot({ start_time: "09:30" })]),
   }]);
   if (nonHourly.ok || !nonHourly.errors.some((error) => error.includes("time_or_location_invalid"))) throw new Error("non-hour interval accepted");
+  const adjacent = result([{
+    character_id: id1, placement: "modern_map",
+    variants: variants([slot({ end_time: "12:00" }), slot({ start_time: "12:00", end_time: "17:00" })]),
+  }]);
+  if (adjacent.ok || !adjacent.errors.some((error) => error.includes("should_merge"))) throw new Error("contiguous identical work blocks were not required to merge");
 });
 
 Deno.test("requires indoor fallback for outdoor schedules", () => {
