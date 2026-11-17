@@ -155,17 +155,17 @@ AS $$
     'gender', COALESCE(c.gender, ''),
     'age', COALESCE(c.age::text, ''),
     'tags', COALESCE(pg_catalog.to_jsonb(c.tags), '[]'::jsonb),
-    'occupation', COALESCE(p.personality_profile ->> 'occupation', ''),
+    'occupation', COALESCE(c.personality_profile ->> 'occupation', ''),
     'world_era', pg_catalog.concat_ws(' ', c.intro, c.race, c.style),
     'modern_setting_compatible',
-      pg_catalog.concat_ws(' ', c.intro, d.description, p.private_info, p.personality_profile::text)
+      pg_catalog.concat_ws(' ', c.intro, d.description, p.private_info, c.personality_profile::text)
       ~ '(現代世界|現代背景|現代都市|現代社會|現代生活|當代)',
     'time_travel_explicit',
-      pg_catalog.concat_ws(' ', c.intro, d.description, p.private_info, p.personality_profile::text)
+      pg_catalog.concat_ws(' ', c.intro, d.description, p.private_info, c.personality_profile::text)
       ~ '(穿越到現代|穿越至現代|來到現代|時空旅行到現代|穿越現代)',
     'schedule_description', d.description,
     'private_info', COALESCE(p.private_info, ''),
-    'personality_profile', COALESCE(p.personality_profile, '{}'::jsonb)
+    'personality_profile', COALESCE(c.personality_profile, '{}'::jsonb)
   )
   FROM public.characters c
   JOIN public.character_schedule_descriptions d
