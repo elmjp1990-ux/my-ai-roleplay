@@ -1378,6 +1378,291 @@ GRANT EXECUTE ON FUNCTION public.get_encounter_scene_registry() TO anon, authent
 COMMENT ON FUNCTION public.get_encounter_scene_registry() IS
   'Returns only allowlisted dynamic city-scene markers whose published schedules are shared by the configured minimum number of eligible public characters. Coordinates and scene metadata come only from the server-owned registry.';
 
+CREATE OR REPLACE FUNCTION public.schedule_encounter_weather_sync(
+  p_enabled boolean DEFAULT false
+)
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $encounter_weather_scheduler$
+DECLARE
+  v_project_url text;
+  v_service_key text;
+  v_job_id bigint;
+  v_command text;
+BEGIN
+  IF auth.role() <> 'service_role' THEN
+    RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
+  END IF;
+
+  IF to_regclass('cron.job') IS NULL
+     OR to_regclass('vault.decrypted_secrets') IS NULL
+     OR to_regprocedure('cron.schedule(text,text,text)') IS NULL
+     OR to_regprocedure('cron.unschedule(bigint)') IS NULL
+     OR to_regprocedure('net.http_post(text,jsonb,jsonb,jsonb,integer)') IS NULL THEN
+    RETURN 'scheduler_extensions_missing';
+  END IF;
+
+  IF p_enabled IS NOT TRUE THEN
+    FOR v_job_id IN
+      SELECT jobid FROM cron.job
+      WHERE jobname = 'poyozz-encounter-weather-sync'
+    LOOP
+      PERFORM cron.unschedule(v_job_id);
+    END LOOP;
+    RETURN 'disabled';
+  END IF;
+
+  SELECT decrypted_secret INTO v_project_url
+  FROM vault.decrypted_secrets WHERE name = 'poyozz_supabase_url' LIMIT 1;
+  SELECT decrypted_secret INTO v_service_key
+  FROM vault.decrypted_secrets WHERE name = 'poyozz_service_role_key' LIMIT 1;
+
+  IF COALESCE(v_project_url, '') !~ '^https://[a-zA-Z0-9-]+[.]supabase[.]co/?
+  p_enabled boolean DEFAULT false
+)
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_project_url text;
+  v_service_key text;
+  v_job_id bigint;
+  v_command text;
+BEGIN
+  IF auth.role() <> 'service_role' THEN
+    RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
+  END IF;
+
+  IF to_regclass('cron.job') IS NULL
+     OR to_regclass('vault.decrypted_secrets') IS NULL
+     OR to_regprocedure('cron.schedule(text,text,text)') IS NULL
+     OR to_regprocedure('cron.unschedule(bigint)') IS NULL
+     OR to_regprocedure('net.http_post(text,jsonb,jsonb,jsonb,integer)') IS NULL THEN
+    RETURN 'scheduler_extensions_missing';
+  END IF;
+
+  IF p_enabled IS NOT TRUE THEN
+    FOR v_job_id IN
+      SELECT jobid FROM cron.job
+      WHERE jobname = 'poyozz-encounter-schedule-organizer'
+    LOOP
+      PERFORM cron.unschedule(v_job_id);
+    END LOOP;
+    RETURN 'disabled';
+  END IF;
+
+  SELECT decrypted_secret INTO v_project_url
+  FROM vault.decrypted_secrets WHERE name = 'poyozz_supabase_url' LIMIT 1;
+  SELECT decrypted_secret INTO v_service_key
+  FROM vault.decrypted_secrets WHERE name = 'poyozz_service_role_key' LIMIT 1;
+
+  IF COALESCE(v_project_url, '') !~ '^https://[a-zA-Z0-9-]+[.]supabase[.]co/?$'
+     OR COALESCE(v_service_key, '') = '' THEN
+    RETURN 'vault_secrets_missing';
+  END IF;
+
+  v_command := $command$
+    SELECT net.http_post(
+      url := regexp_replace(
+        (SELECT decrypted_secret FROM vault.decrypted_secrets
+         WHERE name = 'poyozz_supabase_url' LIMIT 1),
+        '/+$', ''
+      ) || '/functions/v1/encounter-schedule-organizer',
+      headers := jsonb_build_object(
+        'Authorization', 'Bearer ' || (
+          SELECT decrypted_secret FROM vault.decrypted_secrets
+          WHERE name = 'poyozz_service_role_key' LIMIT 1
+        ),
+        'Content-Type', 'application/json'
+      ),
+      body := '{"mode":"scheduled"}'::jsonb,
+      timeout_milliseconds := 120000
+    );
+  $command$;
+
+  FOR v_job_id IN
+    SELECT jobid FROM cron.job
+    WHERE jobname = 'poyozz-encounter-schedule-organizer'
+  LOOP
+    PERFORM cron.unschedule(v_job_id);
+  END LOOP;
+
+  PERFORM cron.schedule(
+    'poyozz-encounter-schedule-organizer',
+    '*/15 * * * *',
+    v_command
+  );
+
+  RETURN 'scheduled';
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.schedule_encounter_schedule_organizer(boolean)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schedule_encounter_schedule_organizer(boolean) TO service_role;
+
+COMMENT ON TABLE public.encounter_schedule_generation_jobs IS
+  'Service-role-only unique-per-character queue. Enqueue triggers run on author schedule-description changes and public eligibility changes. Threshold counts distinct public approved characters; a 23h45m fallback trigger plus 15-minute cron interval keeps the nominal maximum under 24 hours before global rate limits.';
+COMMENT ON TABLE public.encounter_schedule_batch_runs IS
+  'Global schedule AI batch ledger enforcing six-hour cooldown and four batches per Taipei calendar day.';
+COMMENT ON TABLE public.encounter_scene_registry IS
+  'Server-owned allowlist for city-map scene markers. V1 exposes only the shared shopping-street scene after at least two eligible public characters use it; AI never supplies coordinates.';
+COMMENT ON TABLE public.taiwan_calendar_days IS
+  'Taiwan official workday/holiday overrides, including make-up workdays. Empty table falls back to weekend/weekday until official calendar data is seeded.';
+COMMENT ON FUNCTION public.schedule_encounter_schedule_organizer(boolean) IS
+  'Opt-in pg_cron scheduler. Migration does not activate it; a service-role operator must explicitly enable it after Edge Function and Vault secrets are verified.';
+
+COMMIT;
+
+     OR COALESCE(v_service_key, '') = '' THEN
+    RETURN 'vault_secrets_missing';
+  END IF;
+
+  v_command := $weather_command$
+    SELECT net.http_post(
+      url := regexp_replace(
+        (SELECT decrypted_secret FROM vault.decrypted_secrets
+         WHERE name = 'poyozz_supabase_url' LIMIT 1),
+        '/+
+  p_enabled boolean DEFAULT false
+)
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_project_url text;
+  v_service_key text;
+  v_job_id bigint;
+  v_command text;
+BEGIN
+  IF auth.role() <> 'service_role' THEN
+    RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
+  END IF;
+
+  IF to_regclass('cron.job') IS NULL
+     OR to_regclass('vault.decrypted_secrets') IS NULL
+     OR to_regprocedure('cron.schedule(text,text,text)') IS NULL
+     OR to_regprocedure('cron.unschedule(bigint)') IS NULL
+     OR to_regprocedure('net.http_post(text,jsonb,jsonb,jsonb,integer)') IS NULL THEN
+    RETURN 'scheduler_extensions_missing';
+  END IF;
+
+  IF p_enabled IS NOT TRUE THEN
+    FOR v_job_id IN
+      SELECT jobid FROM cron.job
+      WHERE jobname = 'poyozz-encounter-schedule-organizer'
+    LOOP
+      PERFORM cron.unschedule(v_job_id);
+    END LOOP;
+    RETURN 'disabled';
+  END IF;
+
+  SELECT decrypted_secret INTO v_project_url
+  FROM vault.decrypted_secrets WHERE name = 'poyozz_supabase_url' LIMIT 1;
+  SELECT decrypted_secret INTO v_service_key
+  FROM vault.decrypted_secrets WHERE name = 'poyozz_service_role_key' LIMIT 1;
+
+  IF COALESCE(v_project_url, '') !~ '^https://[a-zA-Z0-9-]+[.]supabase[.]co/?$'
+     OR COALESCE(v_service_key, '') = '' THEN
+    RETURN 'vault_secrets_missing';
+  END IF;
+
+  v_command := $command$
+    SELECT net.http_post(
+      url := regexp_replace(
+        (SELECT decrypted_secret FROM vault.decrypted_secrets
+         WHERE name = 'poyozz_supabase_url' LIMIT 1),
+        '/+$', ''
+      ) || '/functions/v1/encounter-schedule-organizer',
+      headers := jsonb_build_object(
+        'Authorization', 'Bearer ' || (
+          SELECT decrypted_secret FROM vault.decrypted_secrets
+          WHERE name = 'poyozz_service_role_key' LIMIT 1
+        ),
+        'Content-Type', 'application/json'
+      ),
+      body := '{"mode":"scheduled"}'::jsonb,
+      timeout_milliseconds := 120000
+    );
+  $command$;
+
+  FOR v_job_id IN
+    SELECT jobid FROM cron.job
+    WHERE jobname = 'poyozz-encounter-schedule-organizer'
+  LOOP
+    PERFORM cron.unschedule(v_job_id);
+  END LOOP;
+
+  PERFORM cron.schedule(
+    'poyozz-encounter-schedule-organizer',
+    '*/15 * * * *',
+    v_command
+  );
+
+  RETURN 'scheduled';
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.schedule_encounter_schedule_organizer(boolean)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schedule_encounter_schedule_organizer(boolean) TO service_role;
+
+COMMENT ON TABLE public.encounter_schedule_generation_jobs IS
+  'Service-role-only unique-per-character queue. Enqueue triggers run on author schedule-description changes and public eligibility changes. Threshold counts distinct public approved characters; a 23h45m fallback trigger plus 15-minute cron interval keeps the nominal maximum under 24 hours before global rate limits.';
+COMMENT ON TABLE public.encounter_schedule_batch_runs IS
+  'Global schedule AI batch ledger enforcing six-hour cooldown and four batches per Taipei calendar day.';
+COMMENT ON TABLE public.encounter_scene_registry IS
+  'Server-owned allowlist for city-map scene markers. V1 exposes only the shared shopping-street scene after at least two eligible public characters use it; AI never supplies coordinates.';
+COMMENT ON TABLE public.taiwan_calendar_days IS
+  'Taiwan official workday/holiday overrides, including make-up workdays. Empty table falls back to weekend/weekday until official calendar data is seeded.';
+COMMENT ON FUNCTION public.schedule_encounter_schedule_organizer(boolean) IS
+  'Opt-in pg_cron scheduler. Migration does not activate it; a service-role operator must explicitly enable it after Edge Function and Vault secrets are verified.';
+
+COMMIT;
+, ''
+      ) || '/functions/v1/encounter-weather-sync',
+      headers := jsonb_build_object(
+        'Authorization', 'Bearer ' || (
+          SELECT decrypted_secret FROM vault.decrypted_secrets
+          WHERE name = 'poyozz_service_role_key' LIMIT 1
+        ),
+        'Content-Type', 'application/json'
+      ),
+      body := '{"mode":"scheduled"}'::jsonb,
+      timeout_milliseconds := 30000
+    );
+  $weather_command$;
+
+  FOR v_job_id IN
+    SELECT jobid FROM cron.job
+    WHERE jobname = 'poyozz-encounter-weather-sync'
+  LOOP
+    PERFORM cron.unschedule(v_job_id);
+  END LOOP;
+
+  PERFORM cron.schedule(
+    'poyozz-encounter-weather-sync',
+    '0 * * * *',
+    v_command
+  );
+
+  RETURN 'scheduled_hourly';
+END;
+$encounter_weather_scheduler$;
+
+REVOKE ALL ON FUNCTION public.schedule_encounter_weather_sync(boolean)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schedule_encounter_weather_sync(boolean) TO service_role;
+
+COMMENT ON FUNCTION public.schedule_encounter_weather_sync(boolean) IS
+  'Opt-in hourly CWA weather cache refresh. Migration does not activate it; a service-role operator must explicitly enable it after CWA_OPEN_DATA_API_KEY and Vault secrets are verified.';
+
 CREATE OR REPLACE FUNCTION public.schedule_encounter_schedule_organizer(
   p_enabled boolean DEFAULT false
 )
