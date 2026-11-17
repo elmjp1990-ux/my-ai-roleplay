@@ -65,6 +65,8 @@ export function resolveEncounterSchedule(rows, locationKey, now = new Date()) {
   return { scheduledStartAt, scheduledEndAt, scheduleSnapshot: {
     schedule_id: selected.row.id ?? null, weekday: selected.row.weekday ?? null, day_type: selected.row.day_type ?? "any",
     start_time: selected.row.start_time, end_time: selected.row.end_time, location_key: locationKey,
-    activity: selected.row.activity ?? "", priority: selected.row.priority ?? 0, timezone: TAIPEI_TIME_ZONE, verified_at: now.toISOString(),
+    activity: selected.row.activity ?? "", priority: selected.row.priority ?? 0,
+    encounter_greeting: typeof selected.row.encounter_greeting === "string" ? selected.row.encounter_greeting : "",
+    timezone: TAIPEI_TIME_ZONE, verified_at: now.toISOString(),
   } };
 }
