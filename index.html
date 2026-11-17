@@ -4724,6 +4724,10 @@ async function executePendingChatTurn(s) {
       sceneBackgroundPath:typeof visual.sceneBackgroundPath==='string'&&/^(\.\/|\/)[A-Za-z0-9_./-]+$/.test(visual.sceneBackgroundPath)&&!visual.sceneBackgroundPath.includes('..')
         ?visual.sceneBackgroundPath:'./encounter-default-scene.webp'
     };
+    if(s.encounterVisuals.illustrationId){
+      try{await hydrateEncounterGalleryIllustration(s.characterId,s.encounterVisuals.illustrationId);}
+      catch(error){console.warn('AI 選定立繪同步失敗：',error?.message||error);}
+    }
   }
   const replyWasAdded = !s.messages.some(message => message.id === reply.id);
   const responseSuggestions=Array.isArray(result.suggestedReplies)?result.suggestedReplies:Array.isArray(result.suggested_replies)?result.suggested_replies:[];
