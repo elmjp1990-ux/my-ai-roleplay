@@ -17,6 +17,8 @@ assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: max })), max);
 
 const endpoint = fs.readFileSync("supabase/functions/encounter-turn/index.ts", "utf8");
 const guidelines = fs.readFileSync("supabase/functions/_shared/encounter-response-guidelines.ts", "utf8");
+const frontend = fs.readFileSync("index.html", "utf8");
+const scene = fs.readFileSync("encounter-scene.js", "utf8");
 assert.match(endpoint, /requestOpenRouterChatCompletion/);
 assert.match(endpoint, /POYOZZ_DEFAULT_CHAT_MODEL/);
 assert.match(endpoint, /reserve_encounter_chat_turn/);
@@ -37,5 +39,17 @@ assert.doesNotMatch(endpoint, /classifyProviderFailure/);
 assert.match(endpoint, /generation_already_claimed/);
 assert.match(guidelines, /150～300 字元/);
 assert.match(guidelines, /buildRoleplayResponseGuidelines\(["']single["']\)/);
+assert.match(frontend, /poyozz-encounter-opening-choice/);
+assert.match(frontend, /initialOpeningMessage = \{ text: greeting, at: Date\.now\(\) \}/);
+assert.match(scene, /data-action="encounter-opening-choice"/);
+assert.match(scene, /data-choice="greet"/);
+assert.match(scene, /data-choice="wait"/);
+assert.match(endpoint, /openingMessage = asRow\(asRow\(session\.session_data\)\.openingMessage\)/);
+const openingHandlerStart = frontend.indexOf("window.addEventListener('poyozz-encounter-opening-choice'");
+const openingHandlerEnd = frontend.indexOf("async function markCloudChatSessionRead", openingHandlerStart);
+assert.ok(openingHandlerStart >= 0 && openingHandlerEnd > openingHandlerStart, "Opening-choice persistence handler must exist");
+const openingHandler = frontend.slice(openingHandlerStart, openingHandlerEnd);
+assert.doesNotMatch(openingHandler, /executePendingChatTurn|reserve_encounter_chat_turn/,
+  "Free opening choice must not call AI or reserve wallet funds");
 
-console.log("Encounter AI output, billing safety, and integration contract tests passed.");
+console.log("Encounter AI output, billing safety, and opening-choice contract tests passed.");
