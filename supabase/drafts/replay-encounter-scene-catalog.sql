@@ -40,10 +40,22 @@ INSERT INTO public.character_schedules (
    '00000000-0000-4000-8000-000000000024'::uuid,
    'any', '09:00', '17:00', 'restaurant', '在餐廳準備餐點與服務',
    100, true, 'manual', 'primary', 100, '', false);
-SET LOCAL session_replication_role = origin;
+-- Keep replica mode for the synthetic author IDs and their job rows; the whole test rolls back.
 
 SET LOCAL ROLE service_role;
 SET LOCAL request.jwt.claim.role = 'service_role';
+
+DO $manual_enqueue$
+DECLARE
+  v_result jsonb;
+BEGIN
+  v_result := public.enqueue_encounter_schedule_generation_test_batch(10);
+  IF COALESCE((v_result->>'scanned_character_count')::integer, 0) <> 3
+     OR COALESCE((v_result->>'pending_character_count')::integer, 0) <> 3 THEN
+    RAISE EXCEPTION 'manual Preview enqueue should queue all three eligible synthetic public roles: %', v_result;
+  END IF;
+END;
+$manual_enqueue$;
 
 DO $legacy_placeholder_filter$
 DECLARE
