@@ -183,3 +183,21 @@ Deno.test("builds one batch prompt and retains private-context screening values 
   }
   if (!Array.isArray(built.protectedContextByCharacter[id1])) throw new Error("private context guard values missing");
 });
+
+Deno.test("infers a complete schedule from the character profile when the author provides no schedule text", () => {
+  const built = buildEncounterScheduleBatchMessages([source(id1, {
+    title: "夜間急診醫師",
+    schedule_description: "",
+    tags: ["醫師", "夜班"],
+    personality_profile: { occupation: "急診醫師", personality: "冷靜細心", interests: ["夜間攝影"] },
+  })]);
+  const payload = JSON.parse(built.messages[1].content).characters[0];
+  if (payload.author_schedule_brief !== "") throw new Error("empty author schedule was not preserved as empty");
+  if (payload.title !== "夜間急診醫師" || payload.occupation !== "急診醫師") throw new Error("character identity fields missing");
+  if (!payload.tags.includes("夜班") || payload.author_character_profile.interests[0] !== "夜間攝影") {
+    throw new Error("author character profile context missing");
+  }
+  if (!built.messages[0].content.includes("若 author_schedule_brief 為空")) {
+    throw new Error("prompt does not instruct inference when schedule text is absent");
+  }
+});
