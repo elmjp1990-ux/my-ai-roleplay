@@ -11,6 +11,9 @@ DECLARE
   v_publish text := pg_catalog.pg_get_functiondef(
     'public.publish_encounter_schedule_batch(uuid,uuid,jsonb)'::regprocedure
   );
+  v_usage text := pg_catalog.pg_get_functiondef(
+    'public.get_encounter_dynamic_scene_usage()'::regprocedure
+  );
 BEGIN
   IF pg_catalog.strpos(v_claim, 'interval ''24 hours''') = 0 THEN
     RAISE EXCEPTION 'schedule queue must trigger when the oldest pending job reaches 24 hours';
@@ -31,6 +34,11 @@ BEGIN
      OR pg_catalog.strpos(v_publish, 'remaining_character_count') = 0
      OR pg_catalog.strpos(v_publish, 'status'', CASE WHEN v_remaining_count = 0 THEN ''completed'' ELSE ''partial'' END') = 0 THEN
     RAISE EXCEPTION 'schedule publish function must support per-character partial commits';
+  END IF;
+  IF pg_catalog.strpos(v_usage, 'source_type') = 0
+     OR pg_catalog.strpos(v_usage, 'is_nsfw') = 0
+     OR pg_catalog.strpos(v_usage, 'rights_confirmed') = 0 THEN
+    RAISE EXCEPTION 'dynamic scene usage must be based on eligible public characters';
   END IF;
 END;
 $schedule_batch_semantics$;
