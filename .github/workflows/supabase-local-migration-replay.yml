@@ -187,7 +187,7 @@ jobs:
           # Encounter schedule SQL and its smoke test run only in this disposable local DB.
           # This never links to or authenticates against the hosted Supabase project.
           LOG_FILE="$RUNNER_TEMP/encounter-schedule-replay.log"
-          if ! psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117082904_encounter_schedule_pipeline.sql >"$LOG_FILE" 2>&1; then
+          if ! psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117095320_encounter_schedule_pipeline.sql >"$LOG_FILE" 2>&1; then
             cat "$LOG_FILE"
             exit 1
           fi
@@ -201,19 +201,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117082906_encounter_evaluation_evidence_gates.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117095344_encounter_evaluation_evidence_gates.sql
 
       - name: Apply formal Encounter relationship greeting migration
         shell: bash
         run: |
           set -euo pipefail
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117082908_encounter_relationship_greeting_pools.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117095358_encounter_relationship_greeting_pools.sql
 
       - name: Apply formal Encounter manual-end migration
         shell: bash
         run: |
           set -euo pipefail
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117082910_encounter_session_manual_end.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117095408_encounter_session_manual_end.sql
 
       - name: Replay Encounter evaluation queue and settlement smoke test
         shell: bash
@@ -227,7 +227,7 @@ jobs:
         run: |
           set -euo pipefail
           # Only creates the disabled-by-default function; no cron job is enabled.
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117082912_schedule_encounter_evaluation_worker.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117095414_schedule_encounter_evaluation_worker.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-schedule-encounter-evaluation-worker.sql
 
       - name: Apply Encounter weather decision RLS hardening
