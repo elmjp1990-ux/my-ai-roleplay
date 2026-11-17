@@ -209,6 +209,24 @@ Deno.serve(async (request) => {
     return json({ status: failed ? "needs_reconciliation" : "batch_failure_unconfirmed" }, 503);
   }
 
+  // Scene metadata is published only after schedule rows are committed, so the
+  // database can verify cross-batch character counts before creating a marker.
+  let scenePublishStatus = "no_scene_metadata";
+  let publishedSceneCount = 0;
+  if (parsed.scenes.length > 0) {
+    const { data: sceneResult, error: sceneError } = await admin.rpc("publish_encounter_scene_metadata", {
+      p_scenes: parsed.scenes,
+    });
+    if (sceneError) {
+      scenePublishStatus = "failed";
+      console.warn("Encounter scene metadata publish failed:", sceneError.message);
+    } else {
+      const sceneRow = Array.isArray(sceneResult) ? sceneResult[0] : sceneResult;
+      scenePublishStatus = "completed";
+      publishedSceneCount = Number(sceneRow?.published_scene_count || 0);
+    }
+  }
+
   await recordBatchUsage(admin, batchId, providerResponse, "completed");
   const result = Array.isArray(published) ? published[0] : published;
   return json({
@@ -217,5 +235,7 @@ Deno.serve(async (request) => {
     published_character_count: Number(result?.published_character_count || 0),
     unplaced_character_count: Number(result?.unplaced_character_count || 0),
     skipped_private_character_count: Number(result?.skipped_private_character_count || 0),
+    scene_publish_status: scenePublishStatus,
+    published_scene_count: publishedSceneCount,
   });
 });
