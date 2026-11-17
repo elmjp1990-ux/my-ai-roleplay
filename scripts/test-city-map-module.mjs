@@ -62,7 +62,7 @@ assert.match(cityMap, /cityPlaceAliases\[key\]=\[key\]/);
 assert.match(cityMap, /scene\.eventLabel/);
 assert.match(cityMap, /row\.is_dynamic!==true/);
 assert.match(cityMap, /builtInMarker\.setAttribute\('aria-label',name\)/);
-assert.match(cityMap, /if\(glyph\)glyph\.textContent=scene\.icon/);
+assert.match(cityMap, /glyph\.replaceWith\(textGlyph\)/);
 
 assert.match(cityMap, /cityPlaceNames\[key\]=name;\s*cityVenueScenes\[key\]=scene;\s*continue;/);
 assert.match(cityMap, /eventTitle,scene\.eventDescription/);
