@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS public.encounter_character_greeting_pools (
   source_hash text NOT NULL CHECK (char_length(source_hash) = 32 AND source_hash ~ '^[0-9a-f]+$'),
   greeting_pools jsonb NOT NULL CHECK (
     jsonb_typeof(greeting_pools) = 'object'
-    AND pg_column_size(greeting_pools) <= 24000
+    AND pg_column_size(greeting_pools) <= 64000
   ),
   generated_at timestamptz NOT NULL DEFAULT pg_catalog.now(),
   updated_at timestamptz NOT NULL DEFAULT pg_catalog.now()
