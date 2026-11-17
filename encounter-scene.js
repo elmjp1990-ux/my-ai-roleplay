@@ -234,15 +234,22 @@
       if(!session?.encounterMode||!panel)return;
       panel.classList.add('encounter-scene');
       const character=sessionCharacter(session);
-      const sceneImage=safeImage(character?.encounterSceneImage||session?.encounterSceneImage||character?.sceneImage||'');
+      const selectedBackgroundPath=safeImage(session?.encounterVisuals?.sceneBackgroundPath||'');
+      const sceneImage=safeImage(selectedBackgroundPath||character?.encounterSceneImage||session?.encounterSceneImage||character?.sceneImage||'');
       const defaultSceneImage='./encounter-default-scene.webp';
       panel.style.setProperty('--encounter-scene-photo','url('+JSON.stringify(sceneImage||defaultSceneImage)+')');
       panel.dataset.encounterPlace=session.encounterPlace||'';
       // Encounter scenes use dedicated encounter art or the author's scene-illustration gallery.
       // The character-card primary image is intentionally never reused as a scene sprite.
+      const selectedIllustrationId=typeof session?.encounterVisuals?.illustrationId==='string'?session.encounterVisuals.illustrationId:'';
+      const selectedGalleryAsset=selectedIllustrationId
+        ? (character?.galleryIllustrations||[]).find(asset=>asset?.id===selectedIllustrationId)
+        : null;
+      const selectedGalleryImage=safeImage(selectedGalleryAsset?.src||'');
       const dedicatedSprite=safeImage(character?.encounterPortraitImage||character?.halfBodyImage||character?.transparentPortrait||character?.encounterSprite||'');
-      const sceneIllustration=safeImage(character?.galleryIllustrations?.[0]?.src||'');
-      const halfBodyImage=dedicatedSprite||sceneIllustration;
+      const sceneIllustration=safeImage(selectedGalleryImage||character?.galleryIllustrations?.[0]?.src||'');
+      const halfBodyImage=selectedGalleryImage||dedicatedSprite||sceneIllustration;
+      const useGallerySprite=!!selectedIllustrationId||!dedicatedSprite;
       let existingSprite=panel.querySelector('.encounter-character-sprite');
       const missingArt=panel.querySelector('.encounter-missing-art');
       if(halfBodyImage){
@@ -250,20 +257,23 @@
         if(!existingSprite){
           existingSprite=document.createElement('img');
           existingSprite.className='encounter-character-sprite';
+          existingSprite.dataset.encounterCharacterImage='true';
           existingSprite.alt='';
           existingSprite.setAttribute('aria-hidden','true');
           existingSprite.loading='eager';
           panel.insertBefore(existingSprite,panel.firstChild);
         }
-        existingSprite.classList.toggle('encounter-card-portrait-fallback',!dedicatedSprite);
+        existingSprite.dataset.encounterCharacterImage='true';
+        existingSprite.classList.toggle('encounter-card-portrait-fallback',useGallerySprite);
         if(existingSprite.dataset.encounterSource!==halfBodyImage){
           existingSprite.dataset.encounterSource=halfBodyImage;
           existingSprite.dataset.encounterProcessed='';
           existingSprite.classList.remove('encounter-auto-bg-fallback');
-          if(!dedicatedSprite){
+          if(useGallerySprite){
             existingSprite.crossOrigin='anonymous';
             existingSprite.onload=()=>{
-              if(existingSprite.dataset.encounterSource!==halfBodyImage||existingSprite.dataset.encounterProcessed===halfBodyImage)return;
+              const activeSource=existingSprite.dataset.encounterSource||'';
+              if(!activeSource||existingSprite.dataset.encounterProcessed===activeSource)return;
               try{
                 const sourceImage=existingSprite;
                 const canvas=document.createElement('canvas');
@@ -296,18 +306,31 @@
                 }
                 ctx.putImageData(frame,0,0);
                 const transparentImage=canvas.toDataURL('image/png');
-                existingSprite.dataset.encounterProcessed=halfBodyImage;
+                existingSprite.dataset.encounterProcessed=activeSource;
                 existingSprite.onload=null;
                 existingSprite.src=transparentImage;
               }catch(error){
                 // If the image host disallows canvas access, use a visual blend fallback.
-                existingSprite.dataset.encounterProcessed=halfBodyImage;
+                existingSprite.dataset.encounterProcessed=activeSource;
                 existingSprite.classList.add('encounter-auto-bg-fallback');
               }
             };
           }
           existingSprite.src=halfBodyImage;
         }
+      if(selectedIllustrationId&&character?.id&&typeof hydrateEncounterGalleryIllustration==='function'){
+        const encounterSessionId=session.id;
+        void hydrateEncounterGalleryIllustration(character.id,selectedIllustrationId).then(asset=>{
+          if(!asset?.src||!panel.isConnected||currentSession()?.id!==encounterSessionId)return;
+          const sprite=panel.querySelector('.encounter-character-sprite');
+          if(!sprite||sprite.dataset.encounterSource===asset.src)return;
+          sprite.dataset.encounterCharacterImage='true';
+          sprite.dataset.encounterSource=asset.src;
+          sprite.dataset.encounterProcessed='';
+          sprite.classList.remove('encounter-auto-bg-fallback');
+          sprite.src=asset.src;
+        }).catch(error=>console.warn('AI 選定立繪載入失敗：',error?.message||error));
+      }
       }else{
         if(existingSprite)existingSprite.remove();
         let artNote=missingArt;
@@ -320,12 +343,13 @@
         }
         if(character?.id){
           const encounterSessionId=session.id;
-          void hydrateEncounterGalleryIllustration(character.id).then(asset=>{
+          void hydrateEncounterGalleryIllustration(character.id,selectedIllustrationId||null).then(asset=>{
             if(!panel.isConnected||currentSession()?.id!==encounterSessionId)return;
             if(asset?.src){
               if(panel.querySelector('.encounter-character-sprite'))return;
               const sprite=document.createElement('img');
               sprite.className='encounter-character-sprite encounter-card-portrait-fallback';
+              sprite.dataset.encounterCharacterImage='true';
               sprite.alt='';
               sprite.setAttribute('aria-hidden','true');
               sprite.loading='eager';
