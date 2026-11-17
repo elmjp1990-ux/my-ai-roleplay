@@ -567,9 +567,10 @@ export function parseEncounterScheduleBatchOutput(
     }
   }
   for (const key of usedSceneKeys) {
-    if ((ENCOUNTER_DYNAMIC_SCENE_KEYS as readonly string[]).includes(key) &&
-      !scenes.some((scene) => scene.location_key === key)) {
-      errors.push("dynamic_scene_metadata_missing_" + key);
+    if (!scenes.some((scene) => scene.location_key === key)) {
+      errors.push((ENCOUNTER_DYNAMIC_SCENE_KEYS as readonly string[]).includes(key)
+        ? "dynamic_scene_metadata_missing_" + key
+        : "scene_metadata_missing_" + key);
     }
   }
 
