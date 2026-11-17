@@ -17,7 +17,7 @@ const INDOOR_SCENE_KEYS = new Set([
   "department-store", "bookstore", "cafe",
 ]);
 const OUTDOOR_SCENE_KEYS = new Set(["park", "shopping-street"]);
-const HISTORICAL_ERA_PATTERN = /ancient|historical|medieval|antiquity|古代|歷史|中世紀|中古|戰國|春秋|秦漢|唐代|宋代|明代|清代|古羅馬|古希臘/i;
+const NON_MODERN_ERA_PATTERN = /ancient|historical|medieval|antiquity|fantasy|mythic|fictional|古代|歷史|中世紀|中古|奇幻|架空|封建|戰國|春秋|秦漢|唐代|宋代|明代|清代|古羅馬|古希臘/i;
 const SCENE_ALIASES: Record<string, string> = {
   bar: "night-bar", pub: "night-bar", 酒吧: "night-bar", 酒館: "night-bar", 夜店: "night-bar",
   公司: "commercial", 商辦: "commercial", 辦公大樓: "commercial", 辦公室: "commercial", 企業大樓: "commercial",
@@ -77,8 +77,8 @@ export function normalizeEncounterSceneKey(value: unknown): string | null {
 
 export function isEncounterModernMapCompatible(source: EncounterScheduleSource): boolean {
   const era = [text(source.world_era), text(source.setting_era), text(source.intro)].filter(Boolean).join(" ");
-  const historical = HISTORICAL_ERA_PATTERN.test(era);
-  return !historical || source.modern_setting_compatible === true || source.time_travel_explicit === true;
+  const nonModern = NON_MODERN_ERA_PATTERN.test(era);
+  return !nonModern || source.modern_setting_compatible === true || source.time_travel_explicit === true;
 }
 
 function parseHour(value: unknown): number | null {
@@ -266,7 +266,6 @@ export function parseEncounterScheduleBatchOutput(
         !Array.isArray(item.variants.holiday) || item.variants.holiday.length !== 0) {
         errors.push(id + "_no_location_variants_must_be_empty");
       }
-      if (isEncounterModernMapCompatible(source)) errors.push(id + "_unexpected_no_location");
       characters.push({ character_id: id, placement: "no_matching_location", variants: { weekday: [], holiday: [] } });
       continue;
     }
