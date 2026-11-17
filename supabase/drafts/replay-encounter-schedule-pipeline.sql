@@ -56,6 +56,18 @@ INSERT INTO public.character_schedules (
   pg_catalog.repeat('今天是假日限定活動日，你們在書店安排了特別的展覽與交流，氣氛比平常更熱鬧。', 5),
   false
 );
+INSERT INTO public.character_schedules (
+  id, character_id, day_type, start_time, end_time, location_key, activity,
+  priority, is_active, source_type, variant_key, variant_weight, special_event_key,
+  encounter_greeting, is_outdoor
+) VALUES (
+  '00000000-0000-4000-8000-000000000016'::uuid,
+  '00000000-0000-4000-8000-000000000010'::uuid,
+  'any', '09:00', '17:00', 'department-store', '一般假日活動',
+  0, true, 'manual', 'special', 100, 'taiwan_public_holiday',
+  pg_catalog.repeat('今天是政府公告的放假日，商場安排了特別活動，你們可以一起逛逛並享受假期。', 5),
+  false
+);
 SET LOCAL session_replication_role = origin;
 
 SET LOCAL ROLE service_role;
@@ -298,6 +310,45 @@ BEGIN
      OR v_result.activity <> '參加節日限定活動'
      OR v_result.variant_key <> 'special' THEN
     RAISE EXCEPTION 'official holiday special schedule was not selected';
+  END IF;
+
+  SELECT * INTO v_result
+  FROM public.resolve_encounter_character_schedule(
+    '00000000-0000-4000-8000-000000000010'::uuid,
+    NULL,
+    'bookstore',
+    '2026-11-18T10:00:00+08:00'::timestamptz
+  );
+  IF NOT FOUND
+     OR v_result.location_key <> 'bookstore'
+     OR v_result.activity <> '參加節日限定活動'
+     OR v_result.variant_key <> 'special' THEN
+    RAISE EXCEPTION 'Lunar New Year specific schedule must win over the generic holiday schedule';
+  END IF;
+
+  SELECT * INTO v_result
+  FROM public.resolve_encounter_character_schedule(
+    '00000000-0000-4000-8000-000000000010'::uuid,
+    NULL,
+    'department-store',
+    '2026-11-17T10:00:00+08:00'::timestamptz
+  );
+  IF NOT FOUND
+     OR v_result.activity <> '一般假日活動'
+     OR v_result.variant_key <> 'special' THEN
+    RAISE EXCEPTION 'generic public holiday schedule should be a fallback on Lunar New Year';
+  END IF;
+
+  SELECT * INTO v_result
+  FROM public.resolve_encounter_character_schedule(
+    '00000000-0000-4000-8000-000000000010'::uuid,
+    NULL,
+    'department-store',
+    '2026-11-19T10:00:00+08:00'::timestamptz
+  );
+  IF NOT FOUND
+     OR v_result.activity <> '一般假日活動' THEN
+    RAISE EXCEPTION 'generic public holiday schedule was not selected for a named holiday';
   END IF;
 
   SELECT * INTO v_result
