@@ -57,7 +57,16 @@ assert.match(scheduleDraft, /schedule_encounter_evaluation_worker\([\s\S]*?p_ena
 assert.match(scheduleDraft, /IF p_enabled IS NOT TRUE/);
 assert.match(scheduleDraft, /vault\.decrypted_secrets/);
 assert.match(scheduleDraft, /encounter-evaluation-worker/);
-assert.doesNotMatch(scheduleDraft, /DO \$[^$]+\$[\s\S]*?schedule\(/,
-  "Worker cron must remain opt-in and must not be activated by applying the draft");
+assert.match(scheduleDraft, /COALESCE\(auth\.role\(\), ''\) <> 'service_role'/,
+  "Only an authenticated service-role caller may configure the scheduler");
+const command = scheduleDraft.match(/v_command := \$command\$([\s\S]*?)\$command\$;/)?.[1] ?? "";
+assert.match(command, /PERFORM public\.enqueue_due_encounter_evaluations\(50\)/,
+  "Cron must enqueue expired scenes before dispatching the worker");
+assert.match(command, /PERFORM net\.http_post/);
+assert.doesNotMatch(command, /cron\.schedule/,
+  "The recurring cron command must not create or reconfigure cron jobs");
+assert.match(scheduleDraft, /IF p_enabled IS NOT TRUE[\s\S]*?RETURN 'disabled'/);
+assert.match(scheduleDraft, /PERFORM cron\.schedule\(/,
+  "Only the explicit enabled path may register the recurring cron job");
 
 console.log("Encounter session evaluator parser, lifecycle gates, wallet isolation, and opt-in worker schedule contracts passed.");
