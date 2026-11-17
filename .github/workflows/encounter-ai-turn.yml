@@ -10,7 +10,6 @@ on:
       - "supabase/functions/encounter-turn/**"
       - "supabase/functions/encounter-session/**"
       - "supabase/functions/encounter-schedule-organizer/**"
-      - "supabase/functions/_shared/encounter-schedule.mjs"
       - "supabase/functions/_shared/encounter-turn-output.mjs"
       - "supabase/functions/_shared/encounter-schedule-generation.ts"
       - "supabase/functions/_shared/encounter-schedule-generation.test.ts"
