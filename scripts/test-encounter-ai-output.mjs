@@ -30,6 +30,65 @@ const pipeline = fs.readFileSync("supabase/drafts/encounter-schedule-pipeline.sq
 assert.equal((pipeline.match(/^BEGIN;$/gm) || []).length, 1, "Encounter SQL draft must contain one transaction start");
 assert.equal((pipeline.match(/^COMMIT;$/gm) || []).length, 1, "Encounter SQL draft must contain one transaction end");
 assert.doesNotMatch(pipeline, /encounter_weather_baseline_2025|O-A0001-001|O-A0002-001|CWA_OPEN_DATA_API_KEY/);
+assert.ok(pipeline.includes(String.raw`CHECK (asset_path ~ '^([.]/|/)[A-Za-z0-9_./-]+
+assert.match(pipeline, /ALTER TABLE public\.encounter_city_weather ALTER COLUMN source SET DEFAULT 'poyozz_fictional_seasonal'/);
+
+assert.match(endpoint, /requestOpenRouterChatCompletion/);
+assert.match(endpoint, /POYOZZ_DEFAULT_CHAT_MODEL/);
+assert.match(endpoint, /reserve_encounter_chat_turn/);
+assert.match(endpoint, /releaseGenerationClaim/);
+assert.match(endpoint, /refundEncounterTurn/);
+assert.equal((endpoint.match(/admin\.rpc\(["\']refund_chat_turn["\']/g) || []).length, 1, "Refund logic must be centralized");
+assert.match(endpoint, /findPrivateContextLeak/);
+assert.match(endpoint, /record_encounter_session_turn_evidence/);
+assert.match(endpoint, /settle_chat_turn/);
+assert.doesNotMatch(endpoint, /demoReply/);
+assert.ok(
+  endpoint.indexOf('if (!openRouterKey)') < endpoint.indexOf('reserve_encounter_chat_turn'),
+  "Missing OpenRouter credentials must fail before wallet reservation",
+);
+assert.match(endpoint, /provider_generation_outcome_unknown/);
+assert.match(endpoint, /provider_request_refund/);
+assert.doesNotMatch(endpoint, /classifyProviderFailure/);
+assert.match(endpoint, /generation_already_claimed/);
+assert.match(guidelines, /150～300 字元/);
+assert.match(guidelines, /buildRoleplayResponseGuidelines\(["']single["']\)/);
+assert.match(frontend, /poyozz-encounter-opening-choice/);
+assert.match(frontend, /initialOpeningMessage = \{ text: greeting, at: Date\.now\(\) \}/);
+assert.match(frontend, /encounterOpeningChoice:\['greet','wait'\]/);
+assert.match(frontend, /session\.encounterIntroChoice=\['greet','wait'\]/);
+assert.match(scene, /data-action="encounter-opening-choice"/);
+assert.match(scene, /data-choice="greet"/);
+assert.match(scene, /data-choice="wait"/);
+assert.match(endpoint, /openingMessage = asRow\(asRow\(session\.session_data\)\.openingMessage\)/);
+assert.match(endpoint, /encounterSchedule/);
+assert.doesNotMatch(endpoint, /from\(["']encounter_session_lifecycle["']\)/);
+assert.match(sessionCreator, /snapshot\.encounterSchedule = scheduleSnapshot/);
+assert.match(sessionCreator, /snapshot\.encounterGreeting/);
+assert.match(sessionCreator, /availableIllustrations/);
+assert.match(sessionCreator, /availableSceneBackgrounds/);
+assert.match(endpoint, /resolveEncounterVisuals/);
+assert.match(endpoint, /encounter_turn_visuals/);
+assert.match(endpoint, /sceneBackgroundPath/);
+assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_scene_backgrounds/);
+assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_turn_visuals/);
+assert.match(pipeline, /v_schedule_day::smallint,\s*v_day_type/);
+assert.match(pipeline, /CASE WHEN v_is_raining IS TRUE AND v_row\.is_outdoor IS TRUE\s*THEN v_row\.rain_fallback_location_key ELSE v_row\.location_key END/);
+assert.match(pipeline, /encounter-default-scene\.webp/);
+assert.match(pipeline, /REFERENCES public\.character_illustrations\(id\)/);
+assert.match(endpoint, /illustration_id/);
+assert.match(endpoint, /scene_background_id/);
+assert.match(scene, /session\?\.encounterVisuals/);
+assert.match(scene, /hydrateEncounterGalleryIllustration\(character\.id,selectedIllustrationId\)/);
+const openingHandlerStart = frontend.indexOf("window.addEventListener('poyozz-encounter-opening-choice'");
+const openingHandlerEnd = frontend.indexOf("async function markCloudChatSessionRead", openingHandlerStart);
+assert.ok(openingHandlerStart >= 0 && openingHandlerEnd > openingHandlerStart, "Opening-choice persistence handler must exist");
+const openingHandler = frontend.slice(openingHandlerStart, openingHandlerEnd);
+assert.doesNotMatch(openingHandler, /executePendingChatTurn|reserve_encounter_chat_turn/,
+  "Free opening choice must not call AI or reserve wallet funds");
+
+console.log("Encounter AI output, billing safety, and opening-choice contract tests passed.");
+)`));
 assert.match(pipeline, /ALTER TABLE public\.encounter_city_weather ALTER COLUMN source SET DEFAULT 'poyozz_fictional_seasonal'/);
 
 assert.match(endpoint, /requestOpenRouterChatCompletion/);
