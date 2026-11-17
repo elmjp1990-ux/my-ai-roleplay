@@ -3655,6 +3655,11 @@ function chatSessionData(s) {
     openingMessage:initialOpening && String(initialOpening.text || '').trim()
       ? {text:String(initialOpening.text),at:Number(initialOpening.at) || Date.now()} : null,
     encounterOpeningChoice:['greet','wait'].includes(s.encounterIntroChoice)?s.encounterIntroChoice:null,
+    encounterVisuals:s.encounterVisuals&&typeof s.encounterVisuals==='object'?{
+      illustrationId:isUuid(s.encounterVisuals.illustrationId)?s.encounterVisuals.illustrationId:null,
+      sceneBackgroundId:isUuid(s.encounterVisuals.sceneBackgroundId)?s.encounterVisuals.sceneBackgroundId:null,
+      sceneBackgroundPath:typeof s.encounterVisuals.sceneBackgroundPath==='string'&&/^(\\.\\/|\\/)[A-Za-z0-9_./-]+$/.test(s.encounterVisuals.sceneBackgroundPath)&&!s.encounterVisuals.sceneBackgroundPath.includes('..')?s.encounterVisuals.sceneBackgroundPath:'./encounter-default-scene.webp'
+    }:null,
     pinned:!!s.pinned, persona:s.persona || '', personaCustom:s.personaCustom === true || (s.personaCustom !== false && !!s.persona),
     suggestions:s.suggestions !== false,
     suggestedReplies:Array.isArray(s.suggestedReplies) ? s.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=80) : [],
@@ -3820,6 +3825,7 @@ async function saveChatSessionToCloud(s, options = {}) {
       if(!s.name&&existingData.name)s.name=existingData.name;
       if(!s.persona&&existingData.persona)s.persona=existingData.persona;
       if(!s.encounterPlace&&existingData.encounterPlace)s.encounterPlace=existingData.encounterPlace;
+      if(!s.encounterVisuals&&existingData.encounterVisuals)s.encounterVisuals=existingData.encounterVisuals;
       if(!s.encounterDay&&existingData.encounterDay)s.encounterDay=existingData.encounterDay;
       if(typeof existingData.hasUserMessage==='boolean')s.cloudHasUserMessage=existingData.hasUserMessage;
       s.pendingTurn=existingData.pendingTurn&&isUuid(existingData.pendingTurn.turnId)&&isUuid(existingData.pendingTurn.userMessageId)&&isUuid(existingData.pendingTurn.assistantMessageId)
@@ -3960,7 +3966,7 @@ async function loadCloudChatSessions(user, options = {}) {
       'session_hidden:session_data->>hidden','session_pinned:session_data->>pinned',
       'session_archived_at:session_data->>archivedAt',
       'session_started_at:session_data->>startedAt','session_encounter_mode:session_data->>encounterMode',
-      'session_encounter_metadata:session_data->encounter',
+      'session_encounter_metadata:session_data->encounter','session_encounter_visuals:session_data->encounterVisuals',
       'session_story_mode:session_data->>storyMode','session_encounter_place:session_data->>encounterPlace',
       'session_encounter_day:session_data->>encounterDay','session_persona:session_data->>persona',
       'session_persona_custom:session_data->>personaCustom','session_suggestions:session_data->>suggestions',
@@ -4114,6 +4120,7 @@ async function loadCloudChatSessions(user, options = {}) {
           : parseBool(row.session_story_mode)||existing?.storyMode===true,
         storyWorldState:row.session_story_world_state&&typeof row.session_story_world_state==='object'?row.session_story_world_state:existing?.storyWorldState||null,
         encounterPlace:row.session_encounter_place || existing?.encounterPlace || null,
+        encounterVisuals:row.session_encounter_visuals&&typeof row.session_encounter_visuals==='object'?row.session_encounter_visuals:existing?.encounterVisuals||null,
         encounterDay:row.session_encounter_day || existing?.encounterDay || null,
         hidden:parseBool(row.session_hidden), pinned:parseBool(row.session_pinned),
         startedAt:Number(row.session_started_at) || (existing?.startedAt || (row.created_at ? new Date(row.created_at).getTime() : Date.now())),
@@ -4703,6 +4710,15 @@ async function executePendingChatTurn(s) {
     return;
   }
 
+  if(result.encounter?.visuals&&s.encounterMode===true){
+    const visual=result.encounter.visuals;
+    s.encounterVisuals={
+      illustrationId:isUuid(visual.illustrationId)?visual.illustrationId:null,
+      sceneBackgroundId:isUuid(visual.sceneBackgroundId)?visual.sceneBackgroundId:null,
+      sceneBackgroundPath:typeof visual.sceneBackgroundPath==='string'&&/^(\\.\\/|\\/)[A-Za-z0-9_./-]+$/.test(visual.sceneBackgroundPath)&&!visual.sceneBackgroundPath.includes('..')
+        ?visual.sceneBackgroundPath:'./encounter-default-scene.webp'
+    };
+  }
   const replyWasAdded = !s.messages.some(message => message.id === reply.id);
   const responseSuggestions=Array.isArray(result.suggestedReplies)?result.suggestedReplies:Array.isArray(result.suggested_replies)?result.suggested_replies:[];
   const validResponseSuggestions=responseSuggestions.map(value=>String(value||'').trim()).filter(value=>value.length>0).slice(0,3);
@@ -6582,6 +6598,7 @@ async function createEncounterSession(character) {
     encounterPlace: typeof encounterPlace === 'string' ? encounterPlace : null,
     encounterDay: new Date().toLocaleDateString('en-CA'),
     encounterGreeting: String(data.session.character_snapshot?.encounterGreeting || '').trim(),
+    encounterVisuals: data.session.character_snapshot?.defaultVisuals || null,
     encounterIntroChoice: null,
     messages: [],
     memories: [],
