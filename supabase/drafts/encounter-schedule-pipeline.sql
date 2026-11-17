@@ -1225,6 +1225,61 @@ $$;
 REVOKE ALL ON FUNCTION public.get_encounter_character_schedules(uuid[]) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_encounter_character_schedules(uuid[]) TO anon, authenticated;
 
+-- The city map needs exactly one schedule per character: the variant valid now in Taiwan,
+-- already resolved for weekday/holiday, primary/alternative, and rain fallback.
+-- Keep the existing eight-column RPC contract consumed by loadCityCharacterSchedules().
+CREATE OR REPLACE FUNCTION public.get_encounter_character_schedules(p_character_ids uuid[])
+RETURNS TABLE (
+  character_id uuid,
+  weekday smallint,
+  day_type text,
+  start_time time,
+  end_time time,
+  location_key text,
+  activity text,
+  priority smallint
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $
+  SELECT
+    c.id,
+    resolved.weekday,
+    resolved.day_type,
+    resolved.start_time,
+    resolved.end_time,
+    resolved.location_key,
+    resolved.activity,
+    resolved.priority
+  FROM (
+    SELECT DISTINCT requested.character_id
+    FROM pg_catalog.unnest(p_character_ids) AS requested(character_id)
+    WHERE requested.character_id IS NOT NULL
+  ) AS requested
+  JOIN public.characters c ON c.id = requested.character_id
+  CROSS JOIN LATERAL public.resolve_encounter_character_schedule(
+    c.id,
+    (SELECT auth.uid()),
+    NULL,
+    pg_catalog.clock_timestamp()
+  ) AS resolved
+  WHERE p_character_ids IS NOT NULL
+    AND pg_catalog.cardinality(p_character_ids) BETWEEN 1 AND 10
+    AND c.visibility = 'public'
+    AND c.review_status = 'approved'
+    AND c.rights_confirmed IS TRUE
+    AND c.deleted_at IS NULL
+  ORDER BY c.id, resolved.priority DESC, resolved.start_time;
+$;
+
+REVOKE ALL ON FUNCTION public.get_encounter_character_schedules(uuid[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_encounter_character_schedules(uuid[]) TO anon, authenticated;
+
+COMMENT ON FUNCTION public.get_encounter_character_schedules(uuid[]) IS
+  'Returns at most one currently valid Taiwan-time schedule per supplied public character, using the shared resolver for weekday/holiday variant selection and rain fallback. Preserves the eight-column city-map RPC contract and 10-ID batch limit.';
+
 CREATE OR REPLACE FUNCTION public.save_character_schedules(
   p_character_id uuid,
   p_schedules jsonb
