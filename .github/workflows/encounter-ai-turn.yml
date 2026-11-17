@@ -16,6 +16,11 @@ on:
       - "supabase/functions/_shared/encounter-schedule-generation.test.ts"
       - "scripts/test-encounter-schedule-worker.mjs"
       - "supabase/drafts/encounter-schedule-pipeline.sql"
+      - "supabase/drafts/replay-encounter-schedule-pipeline.sql"
+      - "supabase/functions/encounter-weather-sync/**"
+      - "supabase/functions/_shared/encounter-weather.mjs"
+      - "supabase/functions/_shared/encounter-weather.test.ts"
+      - "supabase/config.toml"
       - "supabase/functions/_shared/encounter-response-guidelines.ts"
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/private-context-guard.ts"
@@ -45,5 +50,7 @@ jobs:
           deno-version: v2.x
       - name: Test AI schedule batch validation and compatibility
         run: deno test supabase/functions/_shared/encounter-schedule-generation.test.ts
+      - name: Test CWA Taipei weather parser
+        run: deno test supabase/functions/_shared/encounter-weather.test.ts
       - name: Type-check Encounter Edge Functions and shared modules
         run: deno check supabase/functions/encounter-turn/index.ts supabase/functions/encounter-session/index.ts supabase/functions/encounter-schedule-organizer/index.ts
