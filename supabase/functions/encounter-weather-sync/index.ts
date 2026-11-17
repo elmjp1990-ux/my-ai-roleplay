@@ -63,8 +63,10 @@ Deno.serve(async (request) => {
     const weather = parseCwaWeatherObservation(weatherPayload, "466920");
     if (!weather) return json({ error: "taipei_weather_station_not_found" }, 502);
     const rainfall = parseCwaRainfallObservation(rainfallPayload, "466920");
-    const weatherText = weather.weatherText || (rainfall?.isRaining ? "降雨中" : "天氣資料暫缺");
-    const isRaining = Boolean(rainfall?.isRaining || isRainWeatherText(weatherText));
+    const isRaining = Boolean(rainfall?.isRaining || isRainWeatherText(weather.weatherText));
+    const weatherText = isRaining
+      ? (isRainWeatherText(weather.weatherText) ? weather.weatherText : "降雨中")
+      : (weather.weatherText || "天氣資料暫缺");
     const precipitation1h = rainfall?.precipitation1hMm ?? null;
 
     if (weather.temperatureC === null && !weather.observedAt) {
