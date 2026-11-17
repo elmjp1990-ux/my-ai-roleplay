@@ -49,7 +49,7 @@ INSERT INTO public.character_schedules (
   priority, is_active, source_type, variant_key, variant_weight, special_event_key,
   encounter_greeting, is_outdoor
 ) VALUES (
-  '00000000-0000-4000-8000-000000000013'::uuid,
+  '00000000-0000-4000-8000-000000000015'::uuid,
   '00000000-0000-4000-8000-000000000010'::uuid,
   'any', '09:00', '17:00', 'bookstore', '參加節日限定活動',
   0, true, 'manual', 'special', 100, 'taiwan_public_holiday',
