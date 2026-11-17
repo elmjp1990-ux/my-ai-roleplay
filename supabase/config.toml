@@ -19,3 +19,7 @@ verify_jwt = false
 [functions.encounter-taiwan-calendar-sync]
 # The handler validates the service-role key before importing official workdays.
 verify_jwt = false
+
+[functions.encounter-evaluation-worker]
+# The worker verifies the exact service-role bearer token before claiming due jobs.
+verify_jwt = false
