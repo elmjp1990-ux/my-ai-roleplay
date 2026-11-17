@@ -6,6 +6,8 @@ on:
       - "index.html"
       - "encounter-scene.js"
       - "supabase/functions/encounter-turn/**"
+      - "supabase/functions/encounter-session/**"
+      - "supabase/functions/_shared/encounter-schedule.mjs"
       - "supabase/functions/_shared/encounter-turn-output.mjs"
       - "supabase/functions/_shared/encounter-response-guidelines.ts"
       - "supabase/functions/_shared/prompt-context.ts"
