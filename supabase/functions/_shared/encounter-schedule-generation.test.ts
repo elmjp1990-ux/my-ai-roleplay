@@ -84,7 +84,7 @@ Deno.test("rejects gaps in the 24-hour daily schedule", () => {
 Deno.test("requires indoor fallback for outdoor schedules", () => {
   const valid = result([{
     character_id: id1, placement: "modern_map",
-    variants: variants([slot({
+    variants: variants(fullDaySlots({
       location_key: "park", is_outdoor: true,
       rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳休息", rain_fallback_greeting: greeting,
     })]),
@@ -133,11 +133,11 @@ Deno.test("only retains a new shopping-street scene when multiple characters sha
     variants: variants(fullDaySlots({ location_key: "shopping-street", is_outdoor: true,
       rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳", rain_fallback_greeting: greeting })]),
   }]);
-  if (!single.ok || single.characters[0].variants.weekday[0].slots[0].location_key !== "department-store") {
+  if (!single.ok || single.characters[0].variants.weekday[0].slots[1].location_key !== "department-store") {
     throw new Error("unshared scene should collapse into an existing marker");
   }
-  if (single.characters[0].variants.weekday[0].slots[0].is_outdoor ||
-    single.characters[0].variants.weekday[0].slots[0].rain_fallback_location_key !== null) {
+  if (single.characters[0].variants.weekday[0].slots[1].is_outdoor ||
+    single.characters[0].variants.weekday[0].slots[1].rain_fallback_location_key !== null) {
     throw new Error("collapsed scene should use indoor semantics");
   }
   const two = parseEncounterScheduleBatchOutput(JSON.stringify({
@@ -148,7 +148,7 @@ Deno.test("only retains a new shopping-street scene when multiple characters sha
         rain_fallback_location_key: "bookstore", rain_fallback_activity: "改在書店", rain_fallback_greeting: greeting })]) },
     ],
   }), [source(id1), source(id2)]);
-  if (!two.ok || two.characters[0].variants.weekday[0].slots[0].location_key !== "shopping-street") {
+  if (!two.ok || two.characters[0].variants.weekday[0].slots[1].location_key !== "shopping-street") {
     throw new Error("shared new scene candidate was not retained");
   }
 });
