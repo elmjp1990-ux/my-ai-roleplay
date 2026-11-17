@@ -200,7 +200,8 @@ BEGIN
     CROSS JOIN LATERAL (
       SELECT public.encounter_schedule_source_payload(c.id) AS payload
     ) src
-    WHERE c.visibility = 'public'
+    WHERE c.author_id IS NOT NULL
+      AND c.visibility = 'public'
       AND c.review_status = 'approved'
       AND c.rights_confirmed IS TRUE
       AND c.deleted_at IS NULL
