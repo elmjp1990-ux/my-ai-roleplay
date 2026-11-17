@@ -64,6 +64,7 @@ ALTER TABLE public.character_schedules
   ADD COLUMN IF NOT EXISTS source_type text NOT NULL DEFAULT 'legacy',
   ADD COLUMN IF NOT EXISTS variant_key text NOT NULL DEFAULT 'primary',
   ADD COLUMN IF NOT EXISTS variant_weight smallint NOT NULL DEFAULT 100,
+  ADD COLUMN IF NOT EXISTS special_event_key text,
   ADD COLUMN IF NOT EXISTS encounter_greeting text NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS is_outdoor boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS rain_fallback_location_key text,
@@ -87,7 +88,15 @@ ALTER TABLE public.character_schedules
   DROP CONSTRAINT IF EXISTS character_schedules_variant_key_check;
 ALTER TABLE public.character_schedules
   ADD CONSTRAINT character_schedules_variant_key_check
-  CHECK (variant_key IN ('primary', 'alternative'));
+  CHECK (variant_key IN ('primary', 'alternative', 'special'));
+ALTER TABLE public.character_schedules
+  DROP CONSTRAINT IF EXISTS character_schedules_special_event_check;
+ALTER TABLE public.character_schedules
+  ADD CONSTRAINT character_schedules_special_event_check
+  CHECK (
+    (variant_key = 'special' AND special_event_key IN ('taiwan_public_holiday', 'valentines_day', 'christmas'))
+    OR (variant_key IN ('primary', 'alternative') AND special_event_key IS NULL)
+  );
 ALTER TABLE public.character_schedules
   DROP CONSTRAINT IF EXISTS character_schedules_variant_weight_check;
 ALTER TABLE public.character_schedules
@@ -118,6 +127,10 @@ ALTER TABLE public.character_schedules
 CREATE INDEX IF NOT EXISTS character_schedules_current_variant_idx
   ON public.character_schedules (character_id, is_active, day_type, variant_key, start_time)
   WHERE is_active IS TRUE;
+
+CREATE INDEX IF NOT EXISTS character_schedules_special_event_idx
+  ON public.character_schedules (character_id, special_event_key, start_time)
+  WHERE is_active IS TRUE AND special_event_key IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS public.taiwan_calendar_days (
   calendar_date date PRIMARY KEY,
