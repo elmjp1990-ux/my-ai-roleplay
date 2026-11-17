@@ -1464,7 +1464,7 @@ GRANT EXECUTE ON FUNCTION public.get_encounter_city_weather() TO anon, authentic
 COMMENT ON TABLE public.encounter_weather_baseline_2025 IS
   'Hourly Taipei 2025 historical baseline imported from CWA CODiS station 466920; used only when live weather is stale or unavailable.';
 COMMENT ON TABLE public.encounter_city_weather IS
-  'Single cached Taipei current-weather row refreshed by the scheduled CWA weather sync; client reads are served through get_encounter_city_weather().';
+  'Single cached Taipei illustrative seasonal-weather row refreshed every six hours; no external weather API or forecast dependency.';
 
 CREATE OR REPLACE FUNCTION public.get_encounter_scene_registry()
 RETURNS TABLE (
@@ -1556,7 +1556,7 @@ BEGIN
       v_timeout := 120000;
     WHEN 'weather_sync' THEN
       v_job_name := 'poyozz-encounter-weather-sync';
-      v_cron_schedule := '0 * * * *';
+      v_cron_schedule := '0 */6 * * *';
       v_endpoint := 'encounter-weather-sync';
       v_timeout := 30000;
     WHEN 'taiwan_calendar_sync' THEN
@@ -1693,7 +1693,7 @@ COMMENT ON FUNCTION public.schedule_encounter_worker(text, boolean) IS
 COMMENT ON FUNCTION public.schedule_encounter_schedule_organizer(boolean) IS
   'Opt-in 15-minute schedule organizer cron wrapper; manual test trigger is separate.';
 COMMENT ON FUNCTION public.schedule_encounter_weather_sync(boolean) IS
-  'Opt-in hourly CWA weather cache refresh wrapper.';
+  'Opt-in six-hour lightweight seasonal Taipei weather cache refresh; no external weather API.';
 COMMENT ON FUNCTION public.schedule_encounter_taiwan_calendar_sync(boolean) IS
   'Opt-in monthly Taiwan official calendar refresh wrapper. Runs at 03:00 Asia/Taipei on the first day of each month.';
 
