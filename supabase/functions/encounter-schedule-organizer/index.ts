@@ -75,12 +75,6 @@ Deno.serve(async (request) => {
     const { data: authData, error: authError } = await userClient.auth.getUser();
     if (authError || !authData?.user) return json({ enabled: false });
     actorUserId = authData.user.id;
-    const allowed = (Deno.env.get("ENCOUNTER_SCHEDULE_TEST_USER_IDS") || "")
-      .split(",").map((value) => value.trim()).filter(Boolean);
-    if (!allowed.includes(actorUserId)) return json({ enabled: false });
-    const { data: active, error: activeError } = await userClient.rpc("account_is_active");
-    if (activeError || active !== true) return json({ enabled: false });
-
     const [pendingResult, lastRunResult] = await Promise.all([
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
         .in("status", ["pending", "failed", "needs_reconciliation"]),
@@ -100,7 +94,9 @@ Deno.serve(async (request) => {
   if (!openRouterKey) return json({ error: "openrouter_not_configured" }, 503);
 
   if (mode === "manual") {
-    // Manual bypass exists only in the test project and only for explicitly allowlisted users.
+    // The test-only UI is absent from production builds. Keep a server-side
+    // project-mode guard and require a real signed-in user, without a per-user
+    // allowlist or unrelated account-state gate in the test environment.
     if (Deno.env.get("ENCOUNTER_SCHEDULE_TEST_MODE") !== "true" || isServiceRoleRequest) {
       return json({ error: "manual_schedule_trigger_disabled" }, 403);
     }
@@ -111,11 +107,6 @@ Deno.serve(async (request) => {
     const { data: authData, error: authError } = await userClient.auth.getUser();
     if (authError || !authData?.user) return json({ error: "unauthorized" }, 401);
     actorUserId = authData.user.id;
-    const allowed = (Deno.env.get("ENCOUNTER_SCHEDULE_TEST_USER_IDS") || "")
-      .split(",").map((value) => value.trim()).filter(Boolean);
-    if (!allowed.includes(actorUserId)) return json({ error: "manual_schedule_trigger_forbidden" }, 403);
-    const { data: active, error: activeError } = await userClient.rpc("account_is_active");
-    if (activeError || active !== true) return json({ error: "account_not_active" }, 403);
   } else if (!isServiceRoleRequest) {
     return json({ error: "scheduled_trigger_requires_service_role" }, 401);
   }
