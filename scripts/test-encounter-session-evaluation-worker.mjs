@@ -53,7 +53,7 @@ const config = fs.readFileSync("supabase/config.toml", "utf8");
 assert.match(config, /\[functions\.encounter-evaluation-worker\][\s\S]*?verify_jwt = false/);
 
 const scheduleDraft = fs.readFileSync("supabase/drafts/schedule-encounter-evaluation-worker.sql", "utf8");
-assert.match(scheduleDraft, /schedule_encounter_evaluation_worker\(p_enabled boolean DEFAULT false\)/);
+assert.match(scheduleDraft, /schedule_encounter_evaluation_worker\([\s\S]*?p_enabled boolean DEFAULT false/);
 assert.match(scheduleDraft, /IF p_enabled IS NOT TRUE/);
 assert.match(scheduleDraft, /vault\.decrypted_secrets/);
 assert.match(scheduleDraft, /encounter-evaluation-worker/);
