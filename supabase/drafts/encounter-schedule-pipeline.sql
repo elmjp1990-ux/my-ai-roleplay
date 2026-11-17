@@ -202,7 +202,6 @@ AS $$
 DECLARE
   v_source jsonb;
   v_hash text;
-  v_previous_status text;
   v_status text;
   v_now timestamptz := pg_catalog.clock_timestamp();
 BEGIN
@@ -223,10 +222,6 @@ BEGIN
   END IF;
 
   v_hash := pg_catalog.md5(v_source::text);
-  SELECT status INTO v_previous_status
-  FROM public.encounter_schedule_generation_jobs
-  WHERE character_id = p_character_id;
-
   INSERT INTO public.encounter_schedule_generation_jobs (
     character_id, author_id, source_hash, status, queued_at, available_at,
     attempt_count, lease_token, lease_expires_at, lease_generation,
@@ -308,7 +303,8 @@ DECLARE
 BEGIN
   v_character_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.character_id ELSE NEW.character_id END;
   PERFORM public.enqueue_encounter_schedule_generation_internal(v_character_id);
-  RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+  IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
 END;
 $$;
 
