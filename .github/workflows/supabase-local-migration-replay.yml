@@ -230,6 +230,12 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117082912_schedule_encounter_evaluation_worker.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-schedule-encounter-evaluation-worker.sql
 
+      - name: Apply Encounter weather decision RLS hardening
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117095420_encounter_schedule_weather_decisions_rls.sql
+
       - name: Replay Encounter relationship greeting selection smoke test
         shell: bash
         run: |
