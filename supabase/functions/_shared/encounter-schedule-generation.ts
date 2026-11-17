@@ -169,6 +169,19 @@ function validateVariant(
   const slots = value.slots.slice(0, ENCOUNTER_SCHEDULE_MAX_SLOTS_PER_VARIANT)
     .map((slot, index) => validateSlot(slot, errors, label + "_slot_" + index))
     .filter((slot): slot is ScheduleSlot => slot !== null);
+  const orderedSlots = slots.slice().sort((a, b) => (parseHour(a.start_time) ?? 0) - (parseHour(b.start_time) ?? 0));
+  for (let i = 1; i < orderedSlots.length; i++) {
+    const previous = orderedSlots[i - 1];
+    const current = orderedSlots[i];
+    if (previous.end_time === current.start_time &&
+      previous.location_key === current.location_key &&
+      previous.activity === current.activity &&
+      previous.is_outdoor === current.is_outdoor &&
+      previous.rain_fallback_location_key === current.rain_fallback_location_key &&
+      previous.rain_fallback_activity === current.rain_fallback_activity) {
+      errors.push(label + "_adjacent_same_activity_slots_should_merge");
+    }
+  }
   const intervals = slots.map((slot) => {
     const start = parseHour(slot.start_time) ?? 0;
     const end = parseHour(slot.end_time) ?? 0;
