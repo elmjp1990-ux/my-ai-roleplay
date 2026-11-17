@@ -5160,7 +5160,7 @@ function showDialog(title,content) {
   const pendingDeletionDialog = route?.overlay?.name === 'account-deletion-pending' && title === '帳號正在等待刪除';
   const deleteConfirmDialog = title === '刪除';
   const encounterLeaveDialog = title === '離開相遇';
-  const encounterMemoryDialog = title === '相遇回憶';
+  const encounterMemoryDialog = title === '相遇日記';
   const walletDialog = title === '我的資源' || title === '銀幣或鑽石不足' || title === '廣告功能尚未串接';
   const storyStartDialog = title === '選擇故事開始方式';
   modal.dataset.walletDialog = walletDialog ? 'true' : 'false';
@@ -6784,7 +6784,7 @@ function showEncounterLeaveDialog(session) {
     '<p class="small muted">你想暫時離開，還是結束這次相遇？</p>'+ 
     '<div class="stack" style="gap:10px;margin-top:14px">'+
     '<button type="button" class="profile-setting" data-action="encounter-temporary-leave" data-id="'+e(session.id)+'"><span><strong>暫時離開</strong><small>這次對話會保留；今天同一地標仍能遇見他時，可以接著聊。</small></span><span>›</span></button>'+
-    '<button type="button" class="profile-setting" data-action="encounter-end-confirm" data-id="'+e(session.id)+'"><span><strong>結束相遇</strong><small>將這次相遇整理並保存到相遇回憶，之後不再接續本次對話。</small></span><span>›</span></button>'+
+    '<button type="button" class="profile-setting" data-action="encounter-end-confirm" data-id="'+e(session.id)+'"><span><strong>結束相遇</strong><small>將這次相遇整理並保存到相遇日記，之後不再接續本次對話。</small></span><span>›</span></button>'+
     '</div>');
 }
 
@@ -6799,7 +6799,7 @@ async function openNewStoryDialog(characterId, latest = null) {
     '<p class="small muted">你曾與這個角色相遇。可以延續當時累積的關係，或重新展開一段故事；兩者都會建立獨立聊天室，不會覆蓋相遇紀錄。</p>'+
     '<div class="stack" style="gap:10px;margin-top:14px">'+
     (latest?.session_id
-      ? '<button type="button" class="profile-setting" data-action="story-start-mode" data-id="'+e(characterId)+'" data-value="encounter_snapshot" data-source-encounter-session-id="'+e(latest.session_id)+'"><span><strong>代入相遇好感度</strong><small>承接最近一次相遇：'+e(stageLabels[latest.relationship_stage]||'相遇回憶')+'，並帶入已保存的關係記憶。</small></span><span>›</span></button>'
+      ? '<button type="button" class="profile-setting" data-action="story-start-mode" data-id="'+e(characterId)+'" data-value="encounter_snapshot" data-source-encounter-session-id="'+e(latest.session_id)+'"><span><strong>代入相遇好感度</strong><small>承接最近一次相遇：'+e(stageLabels[latest.relationship_stage]||'相遇日記')+'，並帶入已保存的關係記憶。</small></span><span>›</span></button>'
       : '<div class="profile-setting" aria-disabled="true" style="opacity:.55;cursor:not-allowed"><span><strong>代入相遇好感度</strong><small>目前沒有已結算的相遇紀錄，暫時無法代入。</small></span><span>—</span></div>')+
     '<button type="button" class="profile-setting" data-action="story-start-mode" data-id="'+e(characterId)+'" data-value="fresh_story"><span><strong>開啟全新故事</strong><small>從初次見面開始，好感度為 0。</small></span><span>›</span></button>'+
     '</div>');
@@ -8000,7 +8000,7 @@ function loadEncounterMemoryList(panel,session){
   if(!list||!session?.encounterMode)return;
   const client=window.mySupabase;
   const uid=currentUser()?.uid;
-  if(!client||!uid){list.innerHTML='<div class="empty">請先登入，才能查看你的相遇回憶。</div>';return;}
+  if(!client||!uid){list.innerHTML='<div class="empty">請先登入，才能查看你的相遇日記。</div>';return;}
   const pager=window.PoyozzListPagination.createState('encounterMemories');
   list._encounterPager=pager;
   if(!list.dataset.paginationBound){
@@ -8010,7 +8010,7 @@ function loadEncounterMemoryList(panel,session){
       if(retry&&list._encounterPager)void loadEncounterMemoryPage(list,session,list._encounterPager);
     });
   }
-  list.innerHTML='<div class="empty">正在整理你們的相遇回憶…</div>';
+  list.innerHTML='<div class="empty">正在整理你們的相遇日記…</div>';
   void loadEncounterMemoryPage(list,session,pager);
 }
 async function loadEncounterMemoryPage(list,session,pager){
@@ -8020,7 +8020,7 @@ async function loadEncounterMemoryPage(list,session,pager){
   pager.loading=true;
   try{
     const {data:{user},error:authError}=await client.auth.getUser();
-    if(authError||!user||user.id!==uid||currentUser()?.uid!==uid)throw new Error('登入狀態已失效，請重新登入後查看相遇回憶。');
+    if(authError||!user||user.id!==uid||currentUser()?.uid!==uid)throw new Error('登入狀態已失效，請重新登入後查看相遇日記。');
     const pageSize=window.PoyozzListPagination.pageSize('encounterMemories');
     const pageStart=pager.offset;
     let sessionQuery=client.from('chat_sessions')
@@ -8106,10 +8106,10 @@ async function loadEncounterMemoryPage(list,session,pager){
       list.innerHTML='<div class="empty"><strong>你們的相遇，正等待被收藏</strong><p>完成相遇對話後，系統會自動保存回憶摘要。每段相遇都會獨立整理，不會混入故事模式。</p></div>';
     }
   }catch(error){
-    console.error('載入相遇回憶失敗：',error);
+    console.error('載入相遇日記失敗：',error);
     if(list.isConnected){
       list.querySelector('[data-encounter-memory-sentinel]')?.remove();
-      list.insertAdjacentHTML('beforeend','<div class="empty">'+e(error?.message||'相遇回憶載入失敗，請稍後重試。')+'<div style="margin-top:10px"><button type="button" data-action="encounter-memory-retry">重試</button></div></div>');
+      list.insertAdjacentHTML('beforeend','<div class="empty">'+e(error?.message||'相遇日記載入失敗，請稍後重試。')+'<div style="margin-top:10px"><button type="button" data-action="encounter-memory-retry">重試</button></div></div>');
     }
   }finally{
     pager.loading=false;
@@ -8127,7 +8127,7 @@ function renderEncounterMemoryDetailDialog(){
   const loadMore=pager.hasMore
     ?'<button type="button" class="ghost" data-action="encounter-memory-load-older" '+(pager.loading?'disabled':'')+'>'+ (pager.loading?'正在載入…':'載入更早的 5 則訊息')+'</button>'
     :'';
-  showDialog('相遇回憶','<div class="small muted encounter-memory-detail-place">📍 相遇地點：'+e(pager.placeLabel)+'</div>'+loadMore+'<div class="encounter-memory-detail">'+(body||'<p class="muted">目前沒有可顯示的詳細對話內容。</p>')+'</div>'+loadMore);
+  showDialog('相遇日記','<div class="small muted encounter-memory-detail-place">📍 相遇地點：'+e(pager.placeLabel)+'</div>'+loadMore+'<div class="encounter-memory-detail">'+(body||'<p class="muted">目前沒有可顯示的詳細對話內容。</p>')+'</div>'+loadMore);
 }
 async function loadEncounterMemoryDetailOlder(){
   const pager=encounterMemoryDetailPager;
@@ -8142,7 +8142,7 @@ async function loadEncounterMemoryDetailOlder(){
       .eq('user_id',uid).eq('character_id',pager.characterId)
       .eq('chat_mode','encounter').maybeSingle();
     if(sessionError)throw sessionError;
-    if(!ownedSession)throw new Error('無法讀取這段相遇回憶。');
+    if(!ownedSession)throw new Error('無法讀取這段相遇日記。');
     const pageSize=window.PoyozzListPagination?.pageSize('messages')||5;
     const cursor=pager.cursor;
     const {data:rows,error}=await client.from('chat_messages')
@@ -8158,8 +8158,8 @@ async function loadEncounterMemoryDetailOlder(){
     pager.cursor=descendingRows.length?descendingRows[descendingRows.length-1]:pager.cursor;
     pager.hasMore=descendingRows.length===pageSize;
   }catch(error){
-    console.error('載入更早的相遇回憶失敗：',error);
-    toast(error?.message||'載入更早的相遇回憶失敗，請稍後重試。');
+    console.error('載入更早的相遇日記失敗：',error);
+    toast(error?.message||'載入更早的相遇日記失敗，請稍後重試。');
   }finally{
     pager.loading=false;
     if(encounterMemoryDetailPager===pager&&currentSession()?.id===pager.sessionId)renderEncounterMemoryDetailDialog();
@@ -8214,10 +8214,10 @@ async function openEncounterMemoryDetail(button){
     if(diaryError)throw diaryError;
     const body=(diaries||[]).map(row=>'<article class="encounter-memory-message"><div class="small muted">'+e(new Date(row.occurred_at||Date.now()).toLocaleString('zh-TW'))+'</div><p>'+e(row.summary||'')+'</p></article>').join('');
     encounterMemoryDetailPager=null;
-    showDialog('相遇回憶','<div class="small muted encounter-memory-detail-place">📍 相遇地點：'+e(placeLabel)+'</div><div class="encounter-memory-detail">'+(body||'<p class="muted">目前沒有可顯示的詳細對話內容。</p>')+'</div>');
+    showDialog('相遇日記','<div class="small muted encounter-memory-detail-place">📍 相遇地點：'+e(placeLabel)+'</div><div class="encounter-memory-detail">'+(body||'<p class="muted">目前沒有可顯示的詳細對話內容。</p>')+'</div>');
   }catch(error){
-    console.error('讀取相遇回憶詳細內容失敗：',error);
-    toast(error?.message||'相遇回憶詳細內容載入失敗，請稍後重試。');
+    console.error('讀取相遇日記詳細內容失敗：',error);
+    toast(error?.message||'相遇日記詳細內容載入失敗，請稍後重試。');
   }
 }
 function renderChatSettingsOverlay(panel,isGroup,kind){
@@ -8230,7 +8230,7 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
     if(ctx.isGroup)return;
     const isEncounter=!!ctx.session.encounterMode;
     if(isEncounter){
-      panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="相遇回憶"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回聊天功能" title="返回聊天功能">'+ICON.back+'</button><h2>相遇回憶</h2></div><p class="small muted">這裡收藏你與 '+e(sessionCharacter(ctx.session)?.name||'角色')+' 的過往相遇。每段相遇依時間整理，點選摘要即可閱讀完整對話；內容只屬於你，不會與故事模式記憶混合。</p><div id="encounterMemoryList" class="stack encounter-memory-list"><div class="empty">正在整理你們的相遇回憶…</div></div></section>');
+      panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="相遇日記"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回聊天功能" title="返回聊天功能">'+ICON.back+'</button><h2>相遇日記</h2></div><p class="small muted">這裡收藏你與 '+e(sessionCharacter(ctx.session)?.name||'角色')+' 的過往相遇。每段相遇依時間整理，點選摘要即可閱讀完整對話；內容只屬於你，不會與故事模式記憶混合。</p><div id="encounterMemoryList" class="stack encounter-memory-list"><div class="empty">正在整理你們的相遇日記…</div></div></section>');
       void loadEncounterMemoryList(panel,ctx.session);
       return;
     }
@@ -8245,7 +8245,7 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
   if(kind==='settings'){
     const encounterMode=!isGroup&&!!ctx.session.encounterMode;
     const items=encounterMode
-      ?[['encounter-record','相遇回憶','查看這個角色過往的相遇摘要，點選即可閱讀完整內容'],['persona','人設管理','設定此角色所有相遇共用的人設'],['encounter-dialogues','本次對話','查看目前這次相遇的完整對話'],['encounter-end','結束相遇','結束本次相遇，期待下次與您相遇']]
+      ?[['encounter-record','相遇日記','查看這個角色過往的相遇摘要，點選即可閱讀完整內容'],['persona','人設管理','設定此角色所有相遇共用的人設'],['encounter-dialogues','本次對話','查看目前這次相遇的完整對話'],['encounter-end','結束相遇','結束本次相遇，期待下次與您相遇']]
       :[...(isGroup?[['group-info','群組資訊','群組成員、世界背景與場景']]:[]),['diary','甜蜜日記','回憶摘要與長期保存'],['background','聊天背景','無背景、角色圖片或回憶相片'],[isGroup?'group-persona':'persona','人設管理',isGroup?'管理並套用這個群組的玩家人設':'管理目前聊天使用的人設'],...(!isGroup?[['manage-conversation','管理對話','開始新對話或切換舊的回憶']]:[]),['delete','刪除對話','刪除這段對話與回憶']];
     panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="聊天功能選單"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-close" aria-label="返回聊天" title="返回聊天">'+ICON.back+'</button><h2>聊天功能</h2></div><div class="stack chat-settings-options">'+items.map(([action,title,desc])=>'<button type="button" class="profile-setting" data-action="chat-settings-option" data-option="'+e(action)+'"><span><strong>'+e(title)+'</strong><small>'+e(desc)+'</small></span><span>›</span></button>').join('')+'</div></section>');
     return;
@@ -11121,7 +11121,7 @@ document.addEventListener('click',async event => {
           session.archived=previous.archived;session.archivedAt=previous.archivedAt;session.encounterEndedAt=previous.endedAt;
           session.encounterTemporarilyLeftAt=previous.temporarilyLeftAt;session.name=previous.name;session.encounterSummary=previous.summary;
           persist();
-          toast('相遇回憶尚未成功保存到雲端，請稍後再試。');break;
+          toast('相遇日記尚未成功保存到雲端，請稍後再試。');break;
         }
 
         let settlementQueued=false;
