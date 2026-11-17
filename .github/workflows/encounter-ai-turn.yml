@@ -53,7 +53,7 @@ jobs:
           deno-version: v2.x
       - name: Test AI schedule batch validation and compatibility
         run: deno test supabase/functions/_shared/encounter-schedule-generation.test.ts
-      - name: Test CWA Taipei weather parser
+      - name: Test lightweight seasonal Taipei weather simulation
         run: deno test supabase/functions/_shared/encounter-weather.test.ts
       - name: Test Taiwan holiday and make-up workday parser
         run: deno test supabase/functions/_shared/taiwan-calendar.test.ts
