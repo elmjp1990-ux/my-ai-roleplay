@@ -64,7 +64,7 @@ assert.match(cityMap, /MAX_DYNAMIC_SCENE_MARKERS=3/);
 assert.match(cityMap, /Math\.hypot\(point\.x-x,point\.y-y\)<120/);
 assert.match(cityMap, /data-dynamic-scene/);
 assert.match(cityMap, /cityPlaceAliases\[key\]=\[key\]/);
-assert.match(cityMap, /scene\.eventLabel/);
+assert.match(cityMap, /row\.event_label/);
 assert.match(cityMap, /row\.is_dynamic!==true/);
 assert.match(cityMap, /builtInMarker\.setAttribute\('aria-label',name\)/);
 assert.match(cityMap, /glyph\.replaceWith\(textGlyph\)/);
