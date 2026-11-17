@@ -26,6 +26,9 @@ BEGIN
     clock_timestamp(), clock_timestamp()
   );
 
+  INSERT INTO public.profiles (id, handle, nickname)
+  VALUES (v_user_id, 'encounter-eval-smoke', 'Encounter 評估測試');
+
   INSERT INTO public.characters (
     id, author_id, name, visibility, review_status, rights_confirmed
   ) VALUES (
