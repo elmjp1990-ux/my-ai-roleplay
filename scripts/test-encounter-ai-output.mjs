@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { parseEncounterTurnOutput } from "../supabase/functions/_shared/encounter-turn-output.mjs";
 
-const text = "這是一段相遇模式回覆。".repeat(15);
+const text = "相遇內容。".repeat(30);
 assert.equal(Array.from(text).length, 150);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text })), text);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "太短了" })), null);
