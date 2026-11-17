@@ -148,6 +148,8 @@ assert.match(scheduleGeneration, /greeting_pool_count_invalid/);
 assert.match(greetingPools, /AS \$\$\s+DECLARE/);
 assert.match(greetingPools, /FOR UPDATE/);
 assert.match(greetingPools, /last_greeting_hash/);
+assert.match(greetingPools, /schedule\.source_type IN \('ai', 'legacy', 'manual'\)/,
+  "Existing manual schedules must also receive relationship greeting pools");
 assert.match(greetingPools, /encounterGreetingId/);
 assert.match(greetingPools, /relationshipStage/);
 assert.match(evaluationWorker, /POYOZZ_DEFAULT_CHAT_MODEL/);
