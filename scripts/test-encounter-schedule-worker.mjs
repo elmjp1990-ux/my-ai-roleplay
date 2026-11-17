@@ -72,6 +72,7 @@ assert.match(pipeline, /jsonb_array_length\(v_variant->'slots'\) NOT BETWEEN 2 A
 assert.match(generator, /_24_hour_coverage_incomplete/);
 assert.match(generator, /完整 24 小時行程/);
 assert.match(weatherWorker, /createEncounterWeather/);
+assert.match(weatherWorker, /previousSlot === weather\.slot/);
 assert.match(weatherWorker, /encounter_city_weather/);
 assert.doesNotMatch(weatherWorker, /O-A0001-001|O-A0002-001|CWA_OPEN_DATA_API_KEY|fetch\(/);
 assert.doesNotMatch(weatherWorker, /reserve_chat_turn|settle_chat_turn/);
