@@ -1,5 +1,4 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
-import { resolveEncounterSchedule } from "../_shared/encounter-schedule.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -152,17 +151,42 @@ Deno.serve(async (request: Request) => {
     deletedAt: character.deleted_at,
   };
 
-  // Resolve the active schedule on the server using Taiwan local time.
-  const { data: schedules, error: scheduleError } = await admin
-    .from("character_schedules")
-    .select("id,weekday,day_type,start_time,end_time,location_key,activity,priority,is_active")
-    .eq("character_id", characterId)
-    .eq("is_active", true)
-    .eq("location_key", locationKey);
+  // Use the same database resolver as the public city map. It selects the
+  // date-specific variant and validates the character's current location once.
+  const { data: resolvedSchedule, error: scheduleError } = await admin.rpc(
+    "resolve_encounter_character_schedule",
+    {
+      p_character_id: characterId,
+      p_user_id: user.id,
+      p_location_key: locationKey,
+      p_at: new Date().toISOString(),
+    },
+  );
   if (scheduleError) return json({ error: "encounter_schedule_lookup_failed" }, 503);
-  const scheduleResolution = resolveEncounterSchedule(schedules || [], locationKey, new Date());
-  if (!scheduleResolution) return json({ error: "character_not_at_this_location_now" }, 409);
-  const { scheduleSnapshot, scheduledStartAt, scheduledEndAt } = scheduleResolution;
+  const scheduleRow = Array.isArray(resolvedSchedule) ? resolvedSchedule[0] : resolvedSchedule;
+  if (!scheduleRow?.schedule_id) return json({ error: "character_not_at_this_location_now" }, 409);
+  const scheduleSnapshot = {
+    id: scheduleRow.schedule_id,
+    weekday: scheduleRow.weekday,
+    day_type: scheduleRow.day_type,
+    start_time: scheduleRow.start_time,
+    end_time: scheduleRow.end_time,
+    location_key: scheduleRow.location_key,
+    activity: scheduleRow.activity,
+    priority: scheduleRow.priority,
+    source_type: scheduleRow.source_type,
+    variant_key: scheduleRow.variant_key,
+    variant_weight: scheduleRow.variant_weight,
+    encounter_greeting: scheduleRow.encounter_greeting || "",
+    is_outdoor: scheduleRow.is_outdoor === true,
+    rain_fallback_location_key: scheduleRow.rain_fallback_location_key || null,
+    rain_fallback_activity: scheduleRow.rain_fallback_activity || null,
+    rain_fallback_greeting: scheduleRow.rain_fallback_greeting || null,
+    scheduled_start_at: scheduleRow.scheduled_start_at,
+    scheduled_end_at: scheduleRow.scheduled_end_at,
+  };
+  const scheduledStartAt = scheduleRow.scheduled_start_at;
+  const scheduledEndAt = scheduleRow.scheduled_end_at;
   // Freeze the validated location/activity context into the character snapshot so
   // Encounter turns do not need a second lifecycle-table read.
   snapshot.encounterSchedule = scheduleSnapshot;
