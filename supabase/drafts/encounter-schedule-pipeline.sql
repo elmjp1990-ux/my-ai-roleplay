@@ -951,6 +951,9 @@ BEGIN
   v_local := p_at AT TIME ZONE 'Asia/Taipei';
   v_local_date := v_local::date;
   v_local_time := v_local::time;
+  SELECT weather.is_raining INTO v_is_raining
+  FROM public.get_encounter_city_weather() AS weather;
+  v_is_raining := COALESCE(v_is_raining, false);
 
   FOR v_row IN
     SELECT s.*
@@ -973,8 +976,15 @@ BEGIN
       AND s.is_active IS TRUE
       AND (
         p_location_key IS NULL
-        OR s.location_key = p_location_key
-        OR (v_is_raining IS TRUE AND s.is_outdoor IS TRUE AND s.rain_fallback_location_key = p_location_key)
+        OR (
+          v_is_raining IS TRUE
+          AND s.is_outdoor IS TRUE
+          AND s.rain_fallback_location_key = p_location_key
+        )
+        OR (
+          NOT (v_is_raining IS TRUE AND s.is_outdoor IS TRUE)
+          AND s.location_key = p_location_key
+        )
       )
       AND (
         (s.start_time < s.end_time AND v_local_time >= s.start_time AND v_local_time < s.end_time)
@@ -1031,8 +1041,17 @@ BEGIN
     END IF;
 
     IF p_location_key IS NOT NULL
-       AND v_row.location_key <> p_location_key
-       AND NOT (v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE AND v_row.rain_fallback_location_key = p_location_key) THEN
+       AND NOT (
+         (
+           v_is_raining IS TRUE
+           AND v_row.is_outdoor IS TRUE
+           AND v_row.rain_fallback_location_key = p_location_key
+         )
+         OR (
+           NOT (v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE)
+           AND v_row.location_key = p_location_key
+         )
+       ) THEN
       CONTINUE;
     END IF;
 
@@ -1046,17 +1065,18 @@ BEGIN
       v_row.day_type,
       v_row.start_time,
       v_row.end_time,
-      CASE WHEN v_is_raining IS TRUE AND p_location_key = v_row.rain_fallback_location_key
+      CASE WHEN v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE
         THEN v_row.rain_fallback_location_key ELSE v_row.location_key END,
-      CASE WHEN v_is_raining IS TRUE AND p_location_key = v_row.rain_fallback_location_key
+      CASE WHEN v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE
         THEN v_row.rain_fallback_activity ELSE v_row.activity END,
       v_row.priority,
       v_row.source_type,
       v_row.variant_key,
       v_row.variant_weight,
-      CASE WHEN v_is_raining IS TRUE AND p_location_key = v_row.rain_fallback_location_key
+      CASE WHEN v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE
         THEN v_row.rain_fallback_greeting ELSE v_row.encounter_greeting END,
-      v_row.is_outdoor,
+      CASE WHEN v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE
+        THEN false ELSE v_row.is_outdoor END,
       v_row.rain_fallback_location_key,
       v_row.rain_fallback_activity,
       v_row.rain_fallback_greeting,
