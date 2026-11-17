@@ -10034,6 +10034,7 @@ document.addEventListener('click',async event=>{
     if(error)throw error;
     const state=String(data?.status||'unknown');
     if(state==='completed'){
+      window.PoyozzCityMap?.refreshScenes?.();
       const sceneStatus=data.scene_publish_status==='failed'?'；但場景文案更新失敗，請檢查後端記錄':'；場景資料更新 '+Number(data.published_scene_count||0)+' 個';
       toast('行程整理完成：成功 '+Number(data.published_character_count||0)+' 位，無匹配地點 '+Number(data.unplaced_character_count||0)+' 位'+sceneStatus+'。');
     }
