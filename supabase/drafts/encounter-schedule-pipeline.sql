@@ -1007,7 +1007,7 @@ BEGIN
     IF jsonb_typeof(v_item->'special_events') IS DISTINCT FROM 'array' THEN
       RAISE EXCEPTION 'schedule_special_events_invalid' USING ERRCODE = '22023';
     END IF;
-    IF jsonb_array_length(v_item->'special_events') > 3 THEN
+    IF jsonb_array_length(v_item->'special_events') > 4 THEN
       RAISE EXCEPTION 'schedule_special_events_invalid' USING ERRCODE = '22023';
     END IF;
 
