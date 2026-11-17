@@ -3648,6 +3648,7 @@ function chatSessionData(s) {
     encounterDay:s.encounterDay || (s.startedAt ? new Date(s.startedAt).toLocaleDateString('en-CA') : null),
     openingMessage:initialOpening && String(initialOpening.text || '').trim()
       ? {text:String(initialOpening.text),at:Number(initialOpening.at) || Date.now()} : null,
+    encounterOpeningChoice:['greet','wait'].includes(s.encounterIntroChoice)?s.encounterIntroChoice:null,
     pinned:!!s.pinned, persona:s.persona || '', personaCustom:s.personaCustom === true || (s.personaCustom !== false && !!s.persona),
     suggestions:s.suggestions !== false,
     suggestedReplies:Array.isArray(s.suggestedReplies) ? s.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=80) : [],
@@ -4251,6 +4252,8 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
         : null;
       session.initialOpeningMessage=data.openingMessage&&String(data.openingMessage.text||'').trim()
         ? {text:String(data.openingMessage.text),at:Number(data.openingMessage.at)||Date.now()} : session.initialOpeningMessage||null;
+      session.encounterIntroChoice=['greet','wait'].includes(data.encounterOpeningChoice)
+        ? data.encounterOpeningChoice : session.encounterIntroChoice||null;
       session.cloudRoleplayMeta=data.roleplayMeta&&typeof data.roleplayMeta==='object'?data.roleplayMeta:{};
       session.cloudSessionDataLoaded=true;
       if(session.cloudHasUserMessage==null&&typeof data.hasUserMessage==='boolean')session.cloudHasUserMessage=data.hasUserMessage;
