@@ -10,6 +10,33 @@ SELECT count(*) FROM public.get_encounter_city_weather();
 SELECT count(*) FROM public.get_encounter_character_schedules(ARRAY[]::uuid[]);
 
 RESET ROLE;
+
+-- Seed one synthetic public character and an outdoor schedule in this disposable
+-- transaction only. Disable FK/user triggers for these deliberately isolated IDs;
+-- CHECK constraints remain active. The final ROLLBACK removes every row.
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.characters (
+  id, author_id, name, visibility, review_status, rights_confirmed, is_nsfw
+) VALUES (
+  '00000000-0000-4000-8000-000000000010'::uuid,
+  '00000000-0000-4000-8000-000000000011'::uuid,
+  'Encounter Rain Smoke', 'public', 'approved', true, false
+);
+INSERT INTO public.character_schedules (
+  id, character_id, day_type, start_time, end_time, location_key, activity,
+  priority, is_active, source_type, variant_key, variant_weight,
+  encounter_greeting, is_outdoor,
+  rain_fallback_location_key, rain_fallback_activity, rain_fallback_greeting
+) VALUES (
+  '00000000-0000-4000-8000-000000000012'::uuid,
+  '00000000-0000-4000-8000-000000000010'::uuid,
+  'weekday', '09:00', '17:00', 'park', '在公園散步',
+  0, true, 'manual', 'primary', 100,
+  '', true, 'cafe', '改到咖啡廳避雨',
+  pg_catalog.repeat('雨勢漸大，你們改到附近咖啡廳坐下休息，窗外雨聲逐漸變得平穩。', 6)
+);
+SET LOCAL session_replication_role = origin;
+
 SET LOCAL ROLE service_role;
 SET LOCAL request.jwt.claim.role = 'service_role';
 
@@ -123,5 +150,67 @@ BEGIN
   END IF;
 END;
 $encounter_schedule_smoke$;
+
+DO $rainy_schedule_resolution_smoke$
+DECLARE
+  v_result record;
+BEGIN
+  UPDATE public.encounter_city_weather
+  SET weather_text = '短暫陣雨',
+      temperature_c = 25,
+      is_raining = true,
+      source = 'poyozz_fictional_seasonal',
+      fetched_at = pg_catalog.now(),
+      updated_at = pg_catalog.now()
+  WHERE city_key = 'taipei';
+
+  SELECT * INTO v_result
+  FROM public.resolve_encounter_character_schedule(
+    '00000000-0000-4000-8000-000000000010'::uuid,
+    NULL,
+    'cafe',
+    '2026-11-17T10:00:00+08:00'::timestamptz
+  );
+  IF NOT FOUND
+     OR v_result.location_key <> 'cafe'
+     OR v_result.activity <> '改到咖啡廳避雨'
+     OR v_result.is_outdoor IS NOT FALSE
+     OR pg_catalog.char_length(v_result.encounter_greeting) NOT BETWEEN 150 AND 300 THEN
+    RAISE EXCEPTION 'rainy outdoor schedule did not resolve to its indoor fallback';
+  END IF;
+
+  SELECT * INTO v_result
+  FROM public.resolve_encounter_character_schedule(
+    '00000000-0000-4000-8000-000000000010'::uuid,
+    NULL,
+    'park',
+    '2026-11-17T10:00:00+08:00'::timestamptz
+  );
+  IF FOUND THEN
+    RAISE EXCEPTION 'rainy outdoor schedule must not remain at its original outdoor location';
+  END IF;
+
+  UPDATE public.encounter_city_weather
+  SET weather_text = '晴朗',
+      is_raining = false,
+      fetched_at = pg_catalog.now(),
+      updated_at = pg_catalog.now()
+  WHERE city_key = 'taipei';
+
+  SELECT * INTO v_result
+  FROM public.resolve_encounter_character_schedule(
+    '00000000-0000-4000-8000-000000000010'::uuid,
+    NULL,
+    'park',
+    '2026-11-17T10:00:00+08:00'::timestamptz
+  );
+  IF NOT FOUND
+     OR v_result.location_key <> 'park'
+     OR v_result.activity <> '在公園散步'
+     OR v_result.is_outdoor IS NOT TRUE THEN
+    RAISE EXCEPTION 'dry outdoor schedule did not resolve to its original location';
+  END IF;
+END;
+$rainy_schedule_resolution_smoke$;
 
 ROLLBACK;
