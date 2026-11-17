@@ -102,11 +102,21 @@ BEGIN
   IF jsonb_array_length(p_scenes) > 26 THEN
     RAISE EXCEPTION 'scene_metadata_array_invalid' USING ERRCODE = '22023';
   END IF;
+  IF (
+    SELECT pg_catalog.count(*) FROM jsonb_array_elements(p_scenes)
+  ) <> (
+    SELECT pg_catalog.count(DISTINCT value->>'location_key')
+    FROM jsonb_array_elements(p_scenes)
+  ) THEN
+    RAISE EXCEPTION 'scene_metadata_duplicate_location_key' USING ERRCODE = '22023';
+  END IF;
 
   FOR v_scene IN SELECT value FROM jsonb_array_elements(p_scenes)
   LOOP
-    IF jsonb_typeof(v_scene) IS DISTINCT FROM 'object'
-       OR (SELECT count(*) FROM jsonb_object_keys(v_scene)) <> 8 THEN
+    IF jsonb_typeof(v_scene) IS DISTINCT FROM 'object' THEN
+      RAISE EXCEPTION 'scene_metadata_shape_invalid' USING ERRCODE = '22023';
+    END IF;
+    IF (SELECT count(*) FROM jsonb_object_keys(v_scene)) <> 8 THEN
       RAISE EXCEPTION 'scene_metadata_shape_invalid' USING ERRCODE = '22023';
     END IF;
 
@@ -119,7 +129,7 @@ BEGIN
     v_event_title := pg_catalog.btrim(COALESCE(v_scene->>'event_title', ''));
     v_event_description := pg_catalog.btrim(COALESCE(v_scene->>'event_description', ''));
 
-    IF v_key NOT IN (
+    IF COALESCE(v_key, '') NOT IN (
       'airport', 'commercial', 'night-bar', 'live-house', 'apartment',
       'department-store', 'bookstore', 'cafe', 'park', 'shopping-street',
       'night-market', 'restaurant', 'university', 'hospital', 'gym', 'cinema',
