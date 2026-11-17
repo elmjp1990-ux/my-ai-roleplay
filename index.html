@@ -10007,24 +10007,35 @@ function renderChatOverlay(kind) {
 async function loadEncounterScheduleTestTools(){
   const section=document.getElementById('encounterScheduleTestTools');
   if(!section)return;
+  section.hidden=false;
+  const status=section.querySelector('#encounterScheduleTestStatus');
+  const button=section.querySelector('[data-action="organize-encounter-schedules"]');
+  if(button){button.disabled=true;button.dataset.aiEnabled='false';}
   const client=window.mySupabase;
-  if(!client||!currentUser()?.uid){section.remove();return;}
+  if(!client||!currentUser()?.uid){
+    if(status)status.textContent='請先登入已獲授權的測試帳號；目前不會發出 AI 呼叫。';
+    return;
+  }
   try{
     const {data,error}=await client.functions.invoke('encounter-schedule-organizer',{body:{mode:'status'}});
-    if(error||data?.enabled!==true){section.remove();return;}
-    section.hidden=false;
-    const status=section.querySelector('#encounterScheduleTestStatus');
-    const button=section.querySelector('[data-action="organize-encounter-schedules"]');
+    if(error||data?.enabled!==true){
+      if(status)status.textContent='目前環境或帳號尚未通過伺服器測試授權；AI 生成暫時停用。請確認測試模式與測試帳號名單。';
+      return;
+    }
     const pending=Number(data.pending_character_count||0);
     const lastRun=data.last_batch_completed_at?new Date(data.last_batch_completed_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):'尚未執行';
-    if(status)status.textContent=data.status_available===false?'測試環境已確認；目前無法讀取佇列狀態。':'佇列待處理：'+pending+' 位｜按下後會先檢查符合資格的公開角色，本次整理全部待處理角色｜上次成功完成：'+lastRun+(data.last_batch_status?'（'+data.last_batch_status+'）':'');
-    if(button)button.disabled=false;
-  }catch{section.remove();}
+    if(status)status.textContent=data.status_available===false?'測試環境已確認；目前無法讀取佇列狀態。':'佇列待處理：'+pending+' 位｜按下後會檢查所有符合資格的公開角色（包含受年齡限制的角色），並生成角色行程與場景｜上次成功完成：'+lastRun+(data.last_batch_status?'（'+data.last_batch_status+'）':'');
+    if(button){button.dataset.aiEnabled='true';button.disabled=false;}
+  }catch(error){
+    if(status)status.textContent='無法確認伺服器測試授權，為安全起見暫停 AI 呼叫；請稍後重試。';
+    console.warn('Encounter schedule test status failed:',error?.message||error);
+  }
 }
 
 document.addEventListener('click',async event=>{
   const button=event.target.closest('[data-action="organize-encounter-schedules"]');
   if(!button)return;
+  if(button.dataset.aiEnabled!=='true'||button.disabled)return;
   event.preventDefault();
   button.disabled=true;
   const status=document.getElementById('encounterScheduleTestStatus');
@@ -10049,7 +10060,7 @@ document.addEventListener('click',async event=>{
     console.warn('Encounter schedule test trigger failed:',error);
   }finally{
     const current=document.querySelector('#encounterScheduleTestTools [data-action="organize-encounter-schedules"]');
-    if(current)current.disabled=false;
+    if(current)current.disabled=current.dataset.aiEnabled!=='true';
   }
 });
 
@@ -10294,7 +10305,7 @@ function renderModal(o) {
           <strong>相遇模式｜AI 行程與場景整理</strong>
           <p class="small muted">整理目前所有符合資格的公開角色行程，並建立／更新共同行程場景。</p>
           <p class="small muted" id="encounterScheduleTestStatus">正在確認是否為允許的測試環境…</p>
-          <div class="row wrap"><button type="button" data-action="organize-encounter-schedules" disabled>AI 整理角色行程與場景</button></div>
+          <div class="row wrap"><button type="button" data-action="organize-encounter-schedules" disabled>AI 生成角色行程與場景</button></div>
           <p class="small muted">僅限伺服器核准的測試帳號。會產生一次 AI 服務呼叫成本，但不扣玩家銀幣或鑽石；不會觸發相遇對話。</p>
         </section>`);
       void loadEncounterScheduleTestTools();
