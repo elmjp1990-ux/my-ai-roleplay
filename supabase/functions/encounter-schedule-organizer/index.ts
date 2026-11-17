@@ -423,7 +423,7 @@ Deno.serve(async (request) => {
     .eq("status", "processing");
   if (remainingError) ambiguousPublishFailure = true;
   const remaining = Number(remainingCount || 0);
-  if (remaining > 0 || ambiguousPublishFailure) {
+  if (remaining > 0 || ambiguousPublishFailure || failedCharacterIds.size > 0) {
     const failed = await failBatch(
       admin,
       batchId,
@@ -438,7 +438,7 @@ Deno.serve(async (request) => {
     }
   }
 
-  const partial = remaining > 0 || ambiguousPublishFailure;
+  const partial = remaining > 0 || ambiguousPublishFailure || failedCharacterIds.size > 0;
   await recordBatchUsage(admin, batchId, providerResponse, partial ? "partial" : "completed",
     partial ? "schedule_partial_character_failure" : null);
   return json({
