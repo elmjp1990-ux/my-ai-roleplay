@@ -7,6 +7,7 @@ on:
       - "supabase/migrations/*.sql"
       - "supabase/drafts/encounter-schedule-pipeline.sql"
       - "supabase/drafts/replay-encounter-schedule-pipeline.sql"
+      - "supabase/drafts/replay-encounter-scene-catalog.sql"
       - "supabase/drafts/replay-encounter-session-evaluation-worker.sql"
       - "supabase/drafts/encounter-relationship-greeting-pools.sql"
       - "supabase/drafts/replay-encounter-relationship-greeting-pools.sql"
@@ -235,6 +236,19 @@ jobs:
         run: |
           set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117095918_encounter_schedule_weather_decisions_rls.sql
+
+      - name: Apply generalized Encounter dynamic scene catalog migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117120000_encounter_dynamic_scene_catalog.sql
+
+      - name: Replay dynamic scene catalog and legacy schedule filters
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Disposable local database only; all synthetic rows are rolled back.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-scene-catalog.sql
 
       - name: Replay Encounter relationship greeting selection smoke test
         shell: bash
