@@ -189,9 +189,13 @@ export function buildEncounterScheduleBatchMessages(sources: EncounterScheduleSo
   if (!Array.isArray(sources) || sources.length < 1 || sources.length > ENCOUNTER_SCHEDULE_BATCH_LIMIT) {
     throw new Error("encounter_schedule_batch_size_invalid");
   }
+  if (new Set(sources.map((source) => source.character_id)).size !== sources.length) {
+    throw new Error("encounter_schedule_character_ids_not_unique");
+  }
   const protectedContextByCharacter: Record<string, string[]> = {};
   const promptSources = sources.map((source) => {
     if (!isUuid(source.character_id) || !isUuid(source.author_id)) throw new Error("encounter_schedule_source_identity_invalid");
+    if (source.visibility !== "public" || source.deleted_at != null) throw new Error("encounter_schedule_source_not_public");
     const privateContext = preparePrivateContext(
       [text(source.private_info), text(source.schedule_description)].filter(Boolean).join("\n"),
       isRecord(source.personality_profile) ? source.personality_profile : {},
@@ -244,6 +248,9 @@ export function parseEncounterScheduleBatchOutput(
   if (!hasExactKeys(parsed, ["characters"]) || !Array.isArray(parsed.characters)) {
     return { ok: false, characters: [], errors: ["output_root_invalid"] };
   }
+  if (new Set(sources.map((source) => source.character_id)).size !== sources.length) {
+    return { ok: false, characters: [], errors: ["source_character_ids_not_unique"] };
+  }
   const sourceById = new Map(sources.map((source) => [source.character_id, source]));
   if (parsed.characters.length !== sources.length) errors.push("character_count_mismatch");
   const seen = new Set<string>();
@@ -255,7 +262,7 @@ export function parseEncounterScheduleBatchOutput(
     }
     const id = item.character_id;
     const source = sourceById.get(id);
-    if (!source || seen.has(id)) {
+    if (!source || source.visibility !== "public" || source.deleted_at != null || seen.has(id)) {
       errors.push("character_identity_duplicate_or_unknown");
       continue;
     }
