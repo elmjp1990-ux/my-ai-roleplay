@@ -1017,6 +1017,35 @@ $$;
 REVOKE ALL ON FUNCTION public.publish_encounter_schedule_batch(uuid, uuid, jsonb) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.publish_encounter_schedule_batch(uuid, uuid, jsonb) TO service_role;
 
+CREATE OR REPLACE FUNCTION public.resolve_encounter_special_event_key(p_date date)
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $encounter_special_event$
+  SELECT CASE
+    WHEN pg_catalog.to_char(p_date, 'MM-DD') = '02-14' THEN 'valentines_day'
+    WHEN pg_catalog.to_char(p_date, 'MM-DD') = '12-25' THEN 'christmas'
+    WHEN EXISTS (
+      SELECT 1
+      FROM public.taiwan_calendar_days d
+      WHERE d.calendar_date = p_date
+        AND d.day_type = 'holiday'
+        AND NULLIF(pg_catalog.btrim(d.holiday_name), '') IS NOT NULL
+    ) THEN 'taiwan_public_holiday'
+    ELSE NULL
+  END;
+$encounter_special_event$;
+
+REVOKE ALL ON FUNCTION public.resolve_encounter_special_event_key(date)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.resolve_encounter_special_event_key(date)
+  TO service_role;
+
+COMMENT ON FUNCTION public.resolve_encounter_special_event_key(date) IS
+  'Resolves only supported conditional schedule keys: Taiwan official named holidays, Valentine day, and Christmas. Character birthdays remain unsupported until a structured character birthday field exists.';
+
 CREATE OR REPLACE FUNCTION public.resolve_encounter_character_schedule(
   p_character_id uuid,
   p_user_id uuid DEFAULT auth.uid(),
@@ -1055,6 +1084,7 @@ DECLARE
   v_schedule_date date;
   v_schedule_day integer;
   v_day_type text;
+  v_special_event_key text;
   v_variant_roll integer;
   v_primary_weight integer;
   v_variant_key text;
@@ -1108,6 +1138,7 @@ BEGIN
       )
     ORDER BY
       CASE s.source_type WHEN 'manual' THEN 3 WHEN 'ai' THEN 2 ELSE 1 END DESC,
+      CASE WHEN s.special_event_key IS NOT NULL THEN 1 ELSE 0 END DESC,
       s.priority DESC,
       s.start_time
   LOOP
@@ -1127,7 +1158,10 @@ BEGIN
     FROM (SELECT v_schedule_date AS calendar_date) current_day
     LEFT JOIN public.taiwan_calendar_days d ON d.calendar_date = current_day.calendar_date;
 
-    IF v_row.source_type = 'ai' THEN
+    v_special_event_key := public.resolve_encounter_special_event_key(v_schedule_date);
+    IF v_row.special_event_key IS NOT NULL THEN
+      IF v_row.special_event_key IS DISTINCT FROM v_special_event_key THEN CONTINUE; END IF;
+    ELSIF v_row.source_type = 'ai' THEN
       IF v_row.day_type <> v_day_type THEN CONTINUE; END IF;
       SELECT s.variant_weight INTO v_primary_weight
       FROM public.character_schedules s
@@ -1136,6 +1170,7 @@ BEGIN
         AND s.is_active IS TRUE
         AND s.day_type = v_day_type
         AND s.variant_key = 'primary'
+        AND s.special_event_key IS NULL
       ORDER BY s.priority DESC, s.start_time
       LIMIT 1;
       v_primary_weight := COALESCE(v_primary_weight, CASE WHEN v_day_type = 'weekday' THEN 80 ELSE 60 END);
