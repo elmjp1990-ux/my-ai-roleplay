@@ -29,7 +29,15 @@ async function recordBatchUsage(admin: any, batchId: string, providerResponse: a
     requested_model: POYOZZ_DEFAULT_CHAT_MODEL,
     provider: asText(providerResponse?.provider) || "openrouter",
     status,
-    usage: providerResponse?.usage && typeof providerResponse.usage === "object" ? providerResponse.usage : {},
+    usage: {
+      ...(providerResponse?.usage && typeof providerResponse.usage === "object" ? providerResponse.usage : {}),
+      _poyozz_diagnostics: {
+        http_status: Number(providerResponse?.httpStatus || 0),
+        response_content_type: asText(providerResponse?.responseContentType),
+        response_body_length: Number(providerResponse?.responseBodyLength || 0),
+        response_json_parsed: providerResponse?.responseParsed !== false,
+      },
+    },
     gateway_request_id: /^[A-Za-z0-9._:-]{1,128}$/.test(asText(providerResponse?.requestId)) ? providerResponse.requestId : null,
     failure_code: failureCode,
   });
@@ -217,8 +225,11 @@ Deno.serve(async (request) => {
         const failureCode = result.kind === "provider_error" ? result.code :
           result.kind === "content_rejected" ? "schedule_content_rejected" : "schedule_empty_output";
         await recordBatchUsage(admin, batchId, providerResponse, "failed", failureCode);
+        const ambiguous = providerResponse.responseParsed === false ||
+          providerResponse.httpStatus === 408 || providerResponse.httpStatus >= 500;
         return { sourceId: source.character_id, failureCode,
-          retryable: result.kind === "provider_error" ? result.retryable : false, ambiguous: false };
+          retryable: !ambiguous && result.kind === "provider_error" ? result.retryable : false,
+          ambiguous };
       }
       let decoded: Record<string, unknown>;
       try { decoded = asRow(JSON.parse(providerResponse.result.text)); }
