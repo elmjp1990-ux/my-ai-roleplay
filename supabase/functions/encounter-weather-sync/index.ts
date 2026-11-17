@@ -44,16 +44,15 @@ Deno.serve(async (request) => {
     if (readError) return json({ error: "weather_cache_read_failed" }, 503);
 
     const now = new Date();
-    const currentSlot = Math.floor(now.getTime() / (6 * 60 * 60 * 1000));
     const previousFetchedAt = previous?.fetched_at ? new Date(previous.fetched_at) : null;
+    const weather = createEncounterWeather(now);
     const previousSlot = previousFetchedAt && Number.isFinite(previousFetchedAt.getTime())
-      ? Math.floor(previousFetchedAt.getTime() / (6 * 60 * 60 * 1000)) : null;
-    if (previous && previousSlot === currentSlot) {
+      ? createEncounterWeather(previousFetchedAt).slot : null;
+    if (previous && previousSlot === weather.slot) {
       return json({ status: "unchanged", city: "taipei", weather_text: previous.weather_text,
         temperature_c: previous.temperature_c, is_raining: previous.is_raining,
         fetched_at: previous.fetched_at, source: "poyozz_fictional_seasonal" });
     }
-    const weather = createEncounterWeather(now, previous?.weather_text || "");
     if (previous?.weather_text === weather.weatherText && previous?.temperature_c !== null) {
       weather.temperatureC = Number(previous.temperature_c);
     }
