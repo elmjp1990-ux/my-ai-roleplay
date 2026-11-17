@@ -51,6 +51,8 @@ assert.match(cityMap, /refreshScenes\(\)/);
 assert.match(cityMap, /refreshSchedules\(\)/);
 assert.match(cityMap, /activeScheduleRefresh=async\(\)=>/);
 assert.match(cityMap, /await loadCityPeoplePage\(activePlace\)/);
+assert.match(cityMap, /activeVenueRefresh=renderVenue/);
+assert.match(cityMap, /const latestScene=cityVenueScenes\[place\]\|\|scene/);
 assert.match(cityMap, /poyozz-city-map-scenes-v2-v1/);
 
 assert.ok(cityMap.indexOf("void loadCityDynamicScenes();") > cityMap.indexOf("const cityPlaceAliases"),
