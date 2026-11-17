@@ -71,7 +71,7 @@ assert.match(cityMap, /glyph\.replaceWith\(textGlyph\)/);
 
 assert.match(cityMap, /cityPlaceNames\[key\]=name;\s*cityVenueScenes\[key\]=scene;/);
 assert.match(cityMap, /if\(row\.is_dynamic!==true\)[\s\S]*?continue;/);
-assert.match(cityMap, /latestScene\\.eventTitle,latestScene\\.eventDescription/);
+assert.match(cityMap, /latestScene\.eventTitle,latestScene\.eventDescription/);
 
 assert.match(html, /city-map-stage\.is-raining \.city-map-world/);
 assert.match(html, /poyozz-city-rain/);
