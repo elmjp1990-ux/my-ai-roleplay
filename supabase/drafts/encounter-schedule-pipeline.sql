@@ -127,6 +127,32 @@ CREATE TABLE IF NOT EXISTS public.taiwan_calendar_days (
   updated_at timestamptz NOT NULL DEFAULT pg_catalog.now()
 );
 
+CREATE TABLE IF NOT EXISTS public.encounter_city_weather (
+  city_key text PRIMARY KEY CHECK (city_key = 'taipei'),
+  weather_text text NOT NULL DEFAULT '天氣資料待更新',
+  temperature_c numeric(4,1),
+  precipitation_1h_mm numeric(6,1),
+  is_raining boolean NOT NULL DEFAULT false,
+  observed_at timestamptz,
+  fetched_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),
+  source text NOT NULL DEFAULT 'cwa',
+  updated_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp()
+);
+
+CREATE TABLE IF NOT EXISTS public.encounter_weather_baseline_2025 (
+  month smallint NOT NULL CHECK (month BETWEEN 1 AND 12),
+  hour smallint NOT NULL CHECK (hour BETWEEN 0 AND 23),
+  average_temperature_c numeric(4,1) NOT NULL,
+  rain_probability numeric(5,4) NOT NULL CHECK (rain_probability BETWEEN 0 AND 1),
+  sample_count integer NOT NULL CHECK (sample_count >= 0),
+  source text NOT NULL DEFAULT 'CWA CODiS Taipei station 466920, 2025',
+  updated_at timestamptz NOT NULL DEFAULT pg_catalog.now(),
+  PRIMARY KEY (month, hour)
+);
+
+CREATE INDEX IF NOT EXISTS encounter_city_weather_fetched_idx
+  ON public.encounter_city_weather (fetched_at DESC);
+
 CREATE TABLE IF NOT EXISTS public.encounter_scene_registry (
   location_key text PRIMARY KEY,
   display_name text NOT NULL,
@@ -183,17 +209,23 @@ ALTER TABLE public.encounter_schedule_generation_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.encounter_schedule_batch_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.encounter_schedule_generation_usage ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.taiwan_calendar_days ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.encounter_city_weather ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.encounter_weather_baseline_2025 ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.encounter_scene_registry ENABLE ROW LEVEL SECURITY;
 
 REVOKE ALL ON TABLE public.encounter_schedule_generation_jobs FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.encounter_schedule_batch_runs FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.encounter_schedule_generation_usage FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.taiwan_calendar_days FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.encounter_city_weather FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.encounter_weather_baseline_2025 FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.encounter_scene_registry FROM PUBLIC, anon, authenticated;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.encounter_schedule_generation_jobs TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.encounter_schedule_batch_runs TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.encounter_schedule_generation_usage TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.encounter_city_weather TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.encounter_weather_baseline_2025 TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.taiwan_calendar_days TO service_role;
 
 
@@ -1193,6 +1225,77 @@ $$;
 
 REVOKE ALL ON FUNCTION public.save_character_schedules(uuid, jsonb) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.save_character_schedules(uuid, jsonb) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.get_encounter_city_weather()
+RETURNS TABLE (
+  weather_text text,
+  temperature_c numeric,
+  is_raining boolean,
+  precipitation_1h_mm numeric,
+  observed_at timestamptz,
+  weather_source text
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $encounter_city_weather$
+  WITH local_clock AS (
+    SELECT
+      pg_catalog.now() AS current_at,
+      pg_catalog.now() AT TIME ZONE 'Asia/Taipei' AS local_at
+  ),
+  live AS (
+    SELECT w.*
+    FROM public.encounter_city_weather w, local_clock c
+    WHERE w.city_key = 'taipei'
+      AND w.fetched_at >= c.current_at - interval '3 hours'
+    ORDER BY w.fetched_at DESC
+    LIMIT 1
+  ),
+  baseline AS (
+    SELECT b.*
+    FROM public.encounter_weather_baseline_2025 b, local_clock c
+    WHERE b.month = EXTRACT(MONTH FROM c.local_at)::smallint
+      AND b.hour = EXTRACT(HOUR FROM c.local_at)::smallint
+    LIMIT 1
+  )
+  SELECT
+    COALESCE(
+      live.weather_text,
+      CASE WHEN baseline.rain_probability >= 0.5
+        THEN '2025 歷史降雨參考' ELSE '2025 歷史天氣參考' END,
+      '天氣資料待更新'
+    ),
+    COALESCE(live.temperature_c, baseline.average_temperature_c),
+    COALESCE(
+      live.is_raining,
+      (
+        pg_catalog.mod(
+          pg_catalog.abs(pg_catalog.hashtext(
+            pg_catalog.to_char(local_clock.local_at, 'YYYY-MM-DD-HH24')
+          )::bigint),
+          100
+        ) < pg_catalog.round(COALESCE(baseline.rain_probability, 0) * 100)::bigint
+      )
+    ),
+    live.precipitation_1h_mm,
+    live.observed_at,
+    CASE WHEN live.city_key IS NOT NULL THEN 'cwa_live'
+      WHEN baseline.month IS NOT NULL THEN 'cwa_2025_baseline'
+      ELSE 'unavailable' END
+  FROM local_clock
+  LEFT JOIN live ON true
+  LEFT JOIN baseline ON true;
+$encounter_city_weather$;
+
+REVOKE ALL ON FUNCTION public.get_encounter_city_weather() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_encounter_city_weather() TO anon, authenticated, service_role;
+
+COMMENT ON TABLE public.encounter_weather_baseline_2025 IS
+  'Hourly Taipei 2025 historical baseline imported from CWA CODiS station 466920; used only when live weather is stale or unavailable.';
+COMMENT ON TABLE public.encounter_city_weather IS
+  'Single cached Taipei current-weather row refreshed by the scheduled CWA weather sync; client reads are served through get_encounter_city_weather().';
 
 CREATE OR REPLACE FUNCTION public.get_encounter_scene_registry()
 RETURNS TABLE (
