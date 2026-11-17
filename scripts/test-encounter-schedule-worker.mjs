@@ -63,6 +63,9 @@ assert.match(pipeline, /encounter_greeting text,[\s\S]*?is_outdoor boolean,[\s\S
 assert.match(pipeline, /cardinality\(p_character_ids\) BETWEEN 1 AND 10/);
 assert.match(pipeline, /count\(DISTINCT c\.id\)/);
 assert.match(pipeline, /HAVING pg_catalog\.count\(DISTINCT c\.id\) >= r\.minimum_character_count/);
+assert.match(pipeline, /ORDER BY r\.display_order, r\.location_key\s+LIMIT 3/);
+assert.match(fs.readFileSync("city-map.js", "utf8"), /MAX_DYNAMIC_SCENE_MARKERS=3/);
+assert.match(fs.readFileSync("city-map.js", "utf8"), /Math\.hypot\(point\.x-x,point\.y-y\)<120/);
 assert.match(pipeline, /marker_x BETWEEN 40 AND 1622/);
 assert.match(pipeline, /marker_y BETWEEN 40 AND 892/);
 assert.match(generator, /Preserve a candidate scene even when only one character is in this AI batch/);
