@@ -41,6 +41,8 @@ assert.match(guidelines, /150～300 字元/);
 assert.match(guidelines, /buildRoleplayResponseGuidelines\(["']single["']\)/);
 assert.match(frontend, /poyozz-encounter-opening-choice/);
 assert.match(frontend, /initialOpeningMessage = \{ text: greeting, at: Date\.now\(\) \}/);
+assert.match(frontend, /encounterOpeningChoice:\['greet','wait'\]/);
+assert.match(frontend, /session\.encounterIntroChoice=\['greet','wait'\]/);
 assert.match(scene, /data-action="encounter-opening-choice"/);
 assert.match(scene, /data-choice="greet"/);
 assert.match(scene, /data-choice="wait"/);
