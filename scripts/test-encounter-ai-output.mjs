@@ -50,6 +50,8 @@ assert.match(cityMap, /CITY_MAP_WEATHER_CACHE_TTL_MS = 6 \* 60 \* 60 \* 1000/);
 assert.match(cityMap, /CITY_MAP_SCENES_CACHE_TTL_MS = 30 \* 60 \* 1000/);
 assert.match(pipeline, /ORDER BY r\.display_order, r\.location_key\s+LIMIT 3/);
 assert.match(pipeline, /ADD COLUMN IF NOT EXISTS special_event_key text/);
+assert.match(pipeline, /schedule_schema_version.*poyozz-encounter-schedule-v2-special-events-2026-11-17/);
+assert.match(replay, /schedule_source_version_smoke/);
 assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.resolve_encounter_special_event_key/);
 assert.match(pipeline, /variant_key = 'special' AND special_event_key IN/);
 assert.match(pipeline, /AND s\.special_event_key IS NULL/);
