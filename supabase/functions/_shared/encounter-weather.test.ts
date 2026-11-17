@@ -38,11 +38,15 @@ Deno.test("weather uses Taipei local month and the supported simple vocabulary",
   assertEquals(taipeiMonthBoundary.slot.startsWith("2026-05-31-"), true);
 });
 
-Deno.test("weather may naturally persist across slots without forced changes", () => {
-  const first = createEncounterWeather(new Date("2026-07-20T06:00:00+08:00"));
-  const second = createEncounterWeather(new Date("2026-07-20T06:00:00+08:00"));
-  assertEquals(first.weatherText, second.weatherText);
-  assertEquals(first.slot, second.slot);
+Deno.test("weather may naturally persist across adjacent slots", () => {
+  let previous = "";
+  let repeated = false;
+  for (let slot = 0; slot < 180; slot += 1) {
+    const weather = createEncounterWeather(new Date(Date.UTC(2026, 6, 1, slot * 6)));
+    if (weather.weatherText === previous) repeated = true;
+    previous = weather.weatherText;
+  }
+  assertEquals(repeated, true);
 });
 
 Deno.test("invalid dates are rejected", () => {
