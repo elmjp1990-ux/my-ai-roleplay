@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { resolveEncounterSchedule } from "../supabase/functions/_shared/encounter-schedule.mjs";
 
 const chatTurn = fs.readFileSync("supabase/functions/chat-turn/index.ts", "utf8");
 const modeMigration = fs.readFileSync("supabase/migrations/20261028170000_trusted_chat_mode_marker.sql", "utf8");
@@ -67,8 +66,10 @@ assert.match(encounterSession, /rpc\(["']account_is_active["']\)/);
 assert.match(encounterSession, /can_open_encounter_session/);
 assert.match(encounterSession, /session_id_conflict/);
 assert.match(encounterSession, /locationKey/);
-assert.match(encounterSession, /resolveEncounterSchedule/);
-assert.match(encounterSession, /character_schedules/);
+assert.match(encounterSession, /rpc\(["']resolve_encounter_character_schedule["']/);
+assert.match(encounterSession, /p_location_key: locationKey/);
+assert.match(encounterSession, /scheduleSnapshot = \{/);
+assert.doesNotMatch(encounterSession, /\.from\(["']character_schedules["']\)/);
 assert.match(encounterSession, /character_not_at_this_location_now/);
 const encounterSchedule = fs.readFileSync("supabase/functions/_shared/encounter-schedule.mjs", "utf8");
 assert.match(encounterSchedule, /Asia\/Taipei/);
@@ -351,56 +352,14 @@ assert.match(settlementMigration, /encounter_session_turns t WHERE t\.session_id
 assert.match(settlementMigration, /REVOKE ALL ON FUNCTION public\.settle_encounter_session/);
 assert.match(settlementMigration, /GRANT EXECUTE ON FUNCTION public\.settle_encounter_session[^;]*TO service_role/s);
 
-const schedule = (overrides = {}) => ({
-  id: "schedule-1", weekday: null, day_type: "any",
-  start_time: "09:00:00", end_time: "18:00:00",
-  location_key: "cafe", activity: "工作", priority: 1, is_active: true,
-  ...overrides,
-});
-const at = (iso, rows = [schedule()], place = "cafe") =>
-  resolveEncounterSchedule(rows, place, new Date(iso));
-
-// Weekday matching, inclusive start, exclusive end, and saved Taiwan offset.
-const fridayStart = at("2026-10-30T01:00:00.000Z", [schedule({ weekday: 5, day_type: "weekday" })]);
-assert.ok(fridayStart, "weekday schedule should match at its start boundary");
-assert.equal(fridayStart.scheduleSnapshot.timezone, "Asia/Taipei");
-assert.equal(fridayStart.scheduledStartAt, "2026-10-30T01:00:00.000Z");
-assert.equal(at("2026-10-30T10:00:00.000Z"), null, "end boundary must be exclusive");
-
-// Weekend/weekday day_type filters apply to the schedule start date.
-assert.ok(at("2026-10-31T01:00:00.000Z", [schedule({ day_type: "weekend" })]));
-assert.equal(at("2026-10-31T01:00:00.000Z", [schedule({ day_type: "weekday" })]), null);
-assert.equal(at("2026-10-30T01:00:00.000Z", [schedule({ day_type: "weekend" })]), null);
-
-// Overnight schedules retain the previous day's weekday/day_type after midnight.
-const overnight = at("2026-10-30T17:00:00.000Z", [
-  schedule({ weekday: 5, day_type: "weekday", start_time: "22:00:00", end_time: "02:00:00" }),
-]);
-assert.ok(overnight, "Friday overnight schedule should match Saturday 01:00 Taiwan time");
-assert.equal(overnight.scheduledStartAt, "2026-10-30T14:00:00.000Z");
-assert.equal(overnight.scheduledEndAt, "2026-10-30T18:00:00.000Z");
-assert.equal(at("2026-10-30T18:00:00.000Z", [
-  schedule({ weekday: 5, start_time: "22:00", end_time: "02:00" }),
-]), null, "overnight end boundary must be exclusive");
-
-// Higher priority wins; weekday-specific wins only when priorities tie.
-const prioritized = at("2026-10-30T02:00:00.000Z", [
-  schedule({ id: "generic", priority: 8 }),
-  schedule({ id: "weekday", weekday: 5, day_type: "weekday", priority: 3 }),
-]);
-assert.equal(prioritized.scheduleSnapshot.schedule_id, "generic");
-const specificityTie = at("2026-10-30T02:00:00.000Z", [
-  schedule({ id: "generic", priority: 8 }),
-  schedule({ id: "weekday", weekday: 5, day_type: "weekday", priority: 8 }),
-]);
-assert.equal(specificityTie.scheduleSnapshot.schedule_id, "weekday");
-
-// Reject wrong location, inactive rows, invalid clocks, zero-length and invalid day types.
-assert.equal(at("2026-10-30T02:00:00.000Z", [schedule()], "park"), null);
-assert.equal(at("2026-10-30T02:00:00.000Z", [schedule({ is_active: false })]), null);
-assert.equal(at("2026-10-30T02:00:00.000Z", [schedule({ start_time: "25:00", end_time: "26:00" })]), null);
-assert.equal(at("2026-10-30T02:00:00.000Z", [schedule({ start_time: "09:00", end_time: "09:00" })]), null);
-assert.equal(at("2026-10-30T02:00:00.000Z", [schedule({ day_type: "holiday" })]), null);
+const schedulePipeline = fs.readFileSync("supabase/drafts/encounter-schedule-pipeline.sql", "utf8");
+assert.match(schedulePipeline, /FUNCTION public\.resolve_encounter_character_schedule/);
+assert.match(schedulePipeline, /AT TIME ZONE ['"]Asia\/Taipei['"]/);
+assert.match(schedulePipeline, /s\.start_time > s\.end_time/);
+assert.match(schedulePipeline, /v_schedule_date := CASE/);
+assert.match(schedulePipeline, /day_type = 'holiday'/);
+assert.match(schedulePipeline, /get_encounter_city_weather\(\)/);
+assert.match(schedulePipeline, /rain_fallback_location_key/);
 
 console.log("Encounter chat-mode, affinity schema, and Story session guard tests passed.");
 
