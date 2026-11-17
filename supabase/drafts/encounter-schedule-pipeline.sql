@@ -1213,7 +1213,7 @@ LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $encounter_scene_registry$
   SELECT
     r.location_key,
     r.display_name,
@@ -1246,7 +1246,7 @@ AS $
     r.event_description, r.minimum_character_count, r.display_order
   HAVING pg_catalog.count(DISTINCT c.id) >= r.minimum_character_count
   ORDER BY r.display_order, r.location_key;
-$;
+$encounter_scene_registry$;
 
 REVOKE ALL ON FUNCTION public.get_encounter_scene_registry() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_encounter_scene_registry() TO anon, authenticated;
