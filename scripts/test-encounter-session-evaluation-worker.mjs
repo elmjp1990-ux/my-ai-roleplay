@@ -40,7 +40,7 @@ assert.match(worker, /Authorization.*Bearer.*serviceRoleKey/);
 assert.match(worker, /claim_encounter_evaluation_jobs/);
 assert.match(worker, /settle_encounter_session/);
 assert.match(worker, /fail_encounter_evaluation_job/);
-assert.match(worker, /record.*encounter.*session.*turn/i);
+assert.match(worker, /encounter_session_turns/);
 assert.match(worker, /POYOZZ_DEFAULT_CHAT_MODEL/);
 assert.match(worker, /MAX_TRANSCRIPT_CHARS/);
 assert.match(worker, /scheduled_end_at/);
