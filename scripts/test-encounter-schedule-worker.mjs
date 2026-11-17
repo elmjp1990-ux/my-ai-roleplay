@@ -5,6 +5,8 @@ const worker = fs.readFileSync("supabase/functions/encounter-schedule-organizer/
 const pipeline = fs.readFileSync("supabase/drafts/encounter-schedule-pipeline.sql", "utf8");
 const html = fs.readFileSync("index.html", "utf8");
 const generator = fs.readFileSync("supabase/functions/_shared/encounter-schedule-generation.ts", "utf8");
+const weatherWorker = fs.readFileSync("supabase/functions/encounter-weather-sync/index.ts", "utf8");
+const weatherParser = fs.readFileSync("supabase/functions/_shared/encounter-weather.mjs", "utf8");
 
 assert.match(worker, /requestOpenRouterChatCompletion/);
 assert.match(worker, /POYOZZ_DEFAULT_CHAT_MODEL/);
@@ -54,6 +56,13 @@ assert.match(pipeline, /schedule_variant_24_hour_coverage_incomplete/);
 assert.match(pipeline, /jsonb_array_length\(v_variant->'slots'\) NOT BETWEEN 2 AND 4/);
 assert.match(generator, /_24_hour_coverage_incomplete/);
 assert.match(generator, /完整 24 小時行程/);
+assert.match(weatherWorker, /O-A0001-001/);
+assert.match(weatherWorker, /O-A0002-001/);
+assert.match(weatherWorker, /StationId", "466920"/);
+assert.match(weatherWorker, /CWA_OPEN_DATA_API_KEY/);
+assert.doesNotMatch(weatherWorker, /reserve_chat_turn|settle_chat_turn/);
+assert.match(weatherParser, /Past1hr/);
+assert.match(weatherParser, /isRainWeatherText/);
 assert.doesNotMatch(pipeline, /SELECT public\.schedule_encounter_schedule_organizer\(true\)/,
   "Migration draft must not activate the hosted cron job automatically");
 
