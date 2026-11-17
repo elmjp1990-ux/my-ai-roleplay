@@ -38,7 +38,7 @@ Deno.serve(async (request) => {
     });
     const { data: previous, error: readError } = await admin
       .from("encounter_city_weather")
-      .select("weather_text, temperature_c, is_raining, fetched_at")
+      .select("weather_text, temperature_c, is_raining, fetched_at, source")
       .eq("city_key", "taipei")
       .maybeSingle();
     if (readError) return json({ error: "weather_cache_read_failed" }, 503);
@@ -48,7 +48,7 @@ Deno.serve(async (request) => {
     const weather = createEncounterWeather(now);
     const previousSlot = previousFetchedAt && Number.isFinite(previousFetchedAt.getTime())
       ? createEncounterWeather(previousFetchedAt).slot : null;
-    if (previous && previousSlot === weather.slot) {
+    if (previous && previousSlot === weather.slot && previous.source === weather.source) {
       return json({ status: "unchanged", city: "taipei", weather_text: previous.weather_text,
         temperature_c: previous.temperature_c, is_raining: previous.is_raining,
         fetched_at: previous.fetched_at, source: "poyozz_fictional_seasonal" });
@@ -58,7 +58,8 @@ Deno.serve(async (request) => {
     }
     const unchanged = previous?.weather_text === weather.weatherText
       && Number(previous?.temperature_c) === weather.temperatureC
-      && previous?.is_raining === weather.isRaining;
+      && previous?.is_raining === weather.isRaining
+      && previous?.source === weather.source;
 
     if (!unchanged) {
       const { error: writeError } = await admin
