@@ -3,6 +3,7 @@ import fs from "node:fs";
 
 const worker = fs.readFileSync("supabase/functions/encounter-schedule-organizer/index.ts", "utf8");
 const pipeline = fs.readFileSync("supabase/drafts/encounter-schedule-pipeline.sql", "utf8");
+const batchSemantics = fs.readFileSync("supabase/migrations/20261117130000_encounter_schedule_batch_semantics.sql", "utf8");
 const html = fs.readFileSync("index.html", "utf8");
 const generator = fs.readFileSync("supabase/functions/_shared/encounter-schedule-generation.ts", "utf8");
 const weatherWorker = fs.readFileSync("supabase/functions/encounter-weather-sync/index.ts", "utf8");
@@ -15,7 +16,7 @@ assert.match(worker, /publish_encounter_schedule_batch/);
 assert.match(worker, /fail_encounter_schedule_batch/);
 assert.match(worker, /parseEncounterScheduleBatchOutput/);
 assert.match(worker, /findPrivateContextLeak/);
-assert.match(worker, /p_limit: 10/);
+assert.match(worker, /p_limit: 2147483647/);
 assert.match(worker, /p_force: mode === "manual"/);
 assert.match(worker, /ENCOUNTER_SCHEDULE_TEST_MODE/);
 assert.match(worker, /ENCOUNTER_SCHEDULE_TEST_USER_IDS/);
