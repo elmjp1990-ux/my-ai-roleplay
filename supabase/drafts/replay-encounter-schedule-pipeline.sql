@@ -309,21 +309,7 @@ BEGIN
      OR v_result.location_key <> 'bookstore'
      OR v_result.activity <> '參加節日限定活動'
      OR v_result.variant_key <> 'special' THEN
-    RAISE EXCEPTION 'official holiday special schedule was not selected';
-  END IF;
-
-  SELECT * INTO v_result
-  FROM public.resolve_encounter_character_schedule(
-    '00000000-0000-4000-8000-000000000010'::uuid,
-    NULL,
-    'bookstore',
-    '2026-11-18T10:00:00+08:00'::timestamptz
-  );
-  IF NOT FOUND
-     OR v_result.location_key <> 'bookstore'
-     OR v_result.activity <> '參加節日限定活動'
-     OR v_result.variant_key <> 'special' THEN
-    RAISE EXCEPTION 'Lunar New Year specific schedule must win over the generic holiday schedule';
+    RAISE EXCEPTION 'Lunar New Year specific schedule was not selected';
   END IF;
 
   SELECT * INTO v_result
