@@ -152,6 +152,18 @@ Deno.test("rejects arbitrary model coordinates and invalid variant weights", () 
   }
 });
 
+Deno.test("accepts only distinct, approved, rights-confirmed public characters", () => {
+  let duplicateRejected = false;
+  try { buildEncounterScheduleBatchMessages([source(id1), source(id1)]); } catch { duplicateRejected = true; }
+  if (!duplicateRejected) throw new Error("duplicate character ids accepted");
+  let privateRejected = false;
+  try { buildEncounterScheduleBatchMessages([source(id1, { visibility: "private" })]); } catch { privateRejected = true; }
+  if (!privateRejected) throw new Error("private character accepted");
+  let unapprovedRejected = false;
+  try { buildEncounterScheduleBatchMessages([source(id1, { review_status: "pending" })]); } catch { unapprovedRejected = true; }
+  if (!unapprovedRejected) throw new Error("unapproved character accepted");
+});
+
 Deno.test("builds one batch prompt and retains private-context screening values per character", () => {
   const built = buildEncounterScheduleBatchMessages([source()]);
   if (built.messages.length !== 2 || built.messages[0].role !== "system") throw new Error("batch messages malformed");
