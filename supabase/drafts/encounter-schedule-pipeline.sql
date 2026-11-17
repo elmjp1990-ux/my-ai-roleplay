@@ -865,8 +865,10 @@ BEGIN
 
     v_placement := v_item->>'placement';
     IF v_placement = 'no_matching_location' THEN
-      IF jsonb_typeof(v_item->'special_events') <> 'array'
-         OR jsonb_array_length(v_item->'special_events') <> 0 THEN
+      IF jsonb_typeof(v_item->'special_events') IS DISTINCT FROM 'array' THEN
+        RAISE EXCEPTION 'unplaced_character_special_events_must_be_empty' USING ERRCODE = '22023';
+      END IF;
+      IF jsonb_array_length(v_item->'special_events') <> 0 THEN
         RAISE EXCEPTION 'unplaced_character_special_events_must_be_empty' USING ERRCODE = '22023';
       END IF;
       UPDATE public.character_schedules
@@ -999,8 +1001,10 @@ BEGIN
       END LOOP;
     END LOOP;
 
-    IF jsonb_typeof(v_item->'special_events') <> 'array'
-       OR jsonb_array_length(v_item->'special_events') > 3 THEN
+    IF jsonb_typeof(v_item->'special_events') IS DISTINCT FROM 'array' THEN
+      RAISE EXCEPTION 'schedule_special_events_invalid' USING ERRCODE = '22023';
+    END IF;
+    IF jsonb_array_length(v_item->'special_events') > 3 THEN
       RAISE EXCEPTION 'schedule_special_events_invalid' USING ERRCODE = '22023';
     END IF;
 
@@ -1016,10 +1020,12 @@ BEGIN
     LOOP
       v_special_event_key := v_special_event->>'event_key';
       v_special_event_name := pg_catalog.btrim(COALESCE(v_special_event->>'event_name', ''));
-      IF v_special_event_key NOT IN ('taiwan_public_holiday', 'valentines_day', 'christmas')
+      IF COALESCE(v_special_event_key, '') NOT IN ('taiwan_public_holiday', 'valentines_day', 'christmas')
          OR pg_catalog.char_length(v_special_event_name) NOT BETWEEN 1 AND 40
-         OR jsonb_typeof(v_special_event->'slots') <> 'array'
-         OR jsonb_array_length(v_special_event->'slots') NOT BETWEEN 2 AND 4 THEN
+         OR jsonb_typeof(v_special_event->'slots') IS DISTINCT FROM 'array' THEN
+        RAISE EXCEPTION 'schedule_special_event_shape_invalid' USING ERRCODE = '22023';
+      END IF;
+      IF jsonb_array_length(v_special_event->'slots') NOT BETWEEN 2 AND 4 THEN
         RAISE EXCEPTION 'schedule_special_event_shape_invalid' USING ERRCODE = '22023';
       END IF;
 
@@ -1035,7 +1041,7 @@ BEGIN
            )
            OR pg_catalog.char_length(COALESCE(v_special_slot->>'activity', '')) NOT BETWEEN 1 AND 200
            OR pg_catalog.char_length(COALESCE(v_special_slot->>'encounter_greeting', '')) NOT BETWEEN 150 AND 300
-           OR jsonb_typeof(v_special_slot->'is_outdoor') <> 'boolean' THEN
+           OR jsonb_typeof(v_special_slot->'is_outdoor') IS DISTINCT FROM 'boolean' THEN
           RAISE EXCEPTION 'schedule_special_event_slot_invalid' USING ERRCODE = '22023';
         END IF;
 
@@ -1652,7 +1658,9 @@ AS $encounter_scene_registry$
     pg_catalog.count(DISTINCT c.id) AS character_count
   FROM public.encounter_scene_registry r
   JOIN public.character_schedules s
-    ON s.location_key = r.location_key AND s.is_active IS TRUE
+    ON s.location_key = r.location_key
+   AND s.is_active IS TRUE
+   AND s.special_event_key IS NULL
   JOIN public.characters c ON c.id = s.character_id
   WHERE r.is_dynamic IS TRUE
     AND r.is_active IS TRUE
