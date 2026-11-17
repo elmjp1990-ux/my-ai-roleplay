@@ -21,7 +21,8 @@ assert.match(endpoint, /requestOpenRouterChatCompletion/);
 assert.match(endpoint, /POYOZZ_DEFAULT_CHAT_MODEL/);
 assert.match(endpoint, /reserve_encounter_chat_turn/);
 assert.match(endpoint, /releaseGenerationClaim/);
-assert.match(endpoint, /refund_chat_turn/);
+assert.match(endpoint, /refundEncounterTurn/);
+assert.equal((endpoint.match(/admin\\.rpc\\(["\']refund_chat_turn["\']/g) || []).length, 1, "Refund logic must be centralized");
 assert.match(endpoint, /findPrivateContextLeak/);
 assert.match(endpoint, /record_encounter_session_turn_evidence/);
 assert.match(endpoint, /settle_chat_turn/);
@@ -31,6 +32,8 @@ assert.ok(
   "Missing OpenRouter credentials must fail before wallet reservation",
 );
 assert.match(endpoint, /provider_generation_outcome_unknown/);
+assert.match(endpoint, /provider_request_refund/);
+assert.doesNotMatch(endpoint, /classifyProviderFailure/);
 assert.match(endpoint, /generation_already_claimed/);
 assert.match(guidelines, /150～300 字元/);
 assert.match(guidelines, /buildRoleplayResponseGuidelines\(["']single["']\)/);
