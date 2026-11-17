@@ -3,6 +3,7 @@ import fs from "node:fs";
 
 const worker = fs.readFileSync("supabase/functions/encounter-schedule-organizer/index.ts", "utf8");
 const pipeline = fs.readFileSync("supabase/drafts/encounter-schedule-pipeline.sql", "utf8");
+const html = fs.readFileSync("index.html", "utf8");
 const generator = fs.readFileSync("supabase/functions/_shared/encounter-schedule-generation.ts", "utf8");
 assert.match(worker, /requestOpenRouterChatCompletion/);
 assert.match(worker, /POYOZZ_DEFAULT_CHAT_MODEL/);
@@ -15,6 +16,8 @@ assert.match(worker, /p_limit: 10/);
 assert.match(worker, /p_force: mode === "manual"/);
 assert.match(worker, /ENCOUNTER_SCHEDULE_TEST_MODE/);
 assert.match(worker, /ENCOUNTER_SCHEDULE_TEST_USER_IDS/);
+assert.match(worker, /mode === "status"/);
+assert.match(worker, /status_available/);
 assert.match(worker, /scheduled_trigger_requires_service_role/);
 assert.match(worker, /provider_request_outcome_unknown|schedule_provider_outcome_unknown/);
 assert.doesNotMatch(worker, /reserve_chat_turn|settle_chat_turn/,
@@ -37,6 +40,10 @@ assert.match(pipeline, /v_oldest > v_now - interval '23 hours 45 minutes'/);
 assert.match(pipeline, /v_daily_count >= 4/);
 assert.match(pipeline, /v_last_started > v_now - interval '6 hours'/);
 assert.match(pipeline, /schedule_variant_24_hour_coverage_incomplete/);
+assert.match(html, /id="encounterScheduleTestTools"/);
+assert.match(html, /functions\.invoke\(\x27encounter-schedule-organizer\x27,\{body:\{mode:\x27status\x27\}\}\)/);
+assert.match(html, /functions\.invoke\(\x27encounter-schedule-organizer\x27,\{body:\{mode:\x27manual\x27\}\}\)/);
+assert.match(html, /if\(kind===\x27album\x27&&CHAT_DATA_TEST_MODE\)void loadEncounterScheduleTestTools\(\)/);
 assert.match(pipeline, /jsonb_array_length\\(v_variant->'slots'\\) NOT BETWEEN 2 AND 4/);
 assert.match(generator, /_24_hour_coverage_incomplete/);
 assert.match(generator, /完整 24 小時行程/);
