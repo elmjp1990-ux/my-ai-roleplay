@@ -163,7 +163,11 @@ Deno.serve(async (request: Request) => {
   const scheduleResolution = resolveEncounterSchedule(schedules || [], locationKey, new Date());
   if (!scheduleResolution) return json({ error: "character_not_at_this_location_now" }, 409);
   const { scheduleSnapshot, scheduledStartAt, scheduledEndAt } = scheduleResolution;
-
+  // Freeze the validated location/activity context into the character snapshot so
+  // Encounter turns do not need a second lifecycle-table read.
+  snapshot.encounterSchedule = scheduleSnapshot;
+  snapshot.encounterGreeting = typeof scheduleSnapshot.encounter_greeting === "string"
+    ? scheduleSnapshot.encounter_greeting.trim() : "";
 
   const { data: session, error: insertError } = await admin.rpc(
     "create_encounter_session_with_lifecycle",
