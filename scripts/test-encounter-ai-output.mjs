@@ -22,7 +22,7 @@ assert.match(endpoint, /POYOZZ_DEFAULT_CHAT_MODEL/);
 assert.match(endpoint, /reserve_encounter_chat_turn/);
 assert.match(endpoint, /releaseGenerationClaim/);
 assert.match(endpoint, /refundEncounterTurn/);
-assert.equal((endpoint.match(/admin\\.rpc\\(["\']refund_chat_turn["\']/g) || []).length, 1, "Refund logic must be centralized");
+assert.equal((endpoint.match(/admin\.rpc\(["\']refund_chat_turn["\']/g) || []).length, 1, "Refund logic must be centralized");
 assert.match(endpoint, /findPrivateContextLeak/);
 assert.match(endpoint, /record_encounter_session_turn_evidence/);
 assert.match(endpoint, /settle_chat_turn/);
