@@ -141,6 +141,13 @@ BEGIN
     v_affinity := 0;
     v_relationship_stage := 'first_meeting';
   END IF;
+  v_affinity := COALESCE(v_affinity, 0);
+  IF COALESCE(v_relationship_stage, '') NOT IN (
+    'hostile', 'dislike', 'wary', 'first_meeting',
+    'acquaintance', 'close', 'intimate', 'special'
+  ) THEN
+    v_relationship_stage := 'first_meeting';
+  END IF;
 
   SELECT pools.greeting_pools -> v_relationship_stage
   INTO v_stage_pool
