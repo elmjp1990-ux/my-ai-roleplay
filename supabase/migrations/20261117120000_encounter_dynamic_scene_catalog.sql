@@ -293,6 +293,10 @@ BEGIN
     RAISE EXCEPTION 'scene_metadata_duplicate_location_key' USING ERRCODE = '22023';
   END IF;
 
+  PERFORM pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('poyozz-encounter-scene-catalog', 0)
+  );
+
   FOR v_scene IN SELECT value FROM jsonb_array_elements(p_scenes)
   LOOP
     IF jsonb_typeof(v_scene) IS DISTINCT FROM 'object' THEN
