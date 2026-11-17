@@ -116,6 +116,20 @@ Deno.serve(async (request) => {
     return json({ error: "scheduled_trigger_requires_service_role" }, 401);
   }
 
+  let queuedCharacterCount = 0;
+  if (mode === "manual") {
+    const { data: enqueueData, error: enqueueError } = await admin.rpc(
+      "enqueue_encounter_schedule_generation_test_batch",
+      { p_limit: 500 },
+    );
+    if (enqueueError) {
+      console.error("Encounter manual enqueue failed:", enqueueError.message);
+      return json({ error: "schedule_manual_enqueue_failed" }, 503);
+    }
+    const enqueueRow = Array.isArray(enqueueData) ? enqueueData[0] : enqueueData;
+    queuedCharacterCount = Number(enqueueRow?.pending_character_count || 0);
+  }
+
   const { data: claimData, error: claimError } = await admin.rpc("claim_encounter_schedule_batch", {
     p_limit: 10,
     p_force: mode === "manual",
@@ -127,6 +141,7 @@ Deno.serve(async (request) => {
     return json({
       status: asText(claim?.status) || "not_ready",
       pending_character_count: Number(claim?.pending_character_count || 0),
+      queued_character_count: queuedCharacterCount,
       next_eligible_at: claim?.next_eligible_at || null,
     });
   }
@@ -232,6 +247,7 @@ Deno.serve(async (request) => {
   return json({
     status: "completed",
     batch_id: batchId,
+    queued_character_count: queuedCharacterCount,
     published_character_count: Number(result?.published_character_count || 0),
     unplaced_character_count: Number(result?.unplaced_character_count || 0),
     skipped_private_character_count: Number(result?.skipped_private_character_count || 0),
