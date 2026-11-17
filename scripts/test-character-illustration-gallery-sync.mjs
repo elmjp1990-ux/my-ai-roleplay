@@ -12,6 +12,7 @@ const helperEnd = html.indexOf('\nasync function syncCharacterIllustrations', he
 assert.notEqual(helperStart, -1, 'gallery planner must exist');
 assert.ok(helperEnd > helperStart, 'gallery planner boundary must exist');
 const helperSource = html.slice(helperStart, helperEnd);
+assert.doesNotThrow(() => new Function(helperSource), 'gallery planner must parse as JavaScript');
 const sandbox = { Set, Map, Error };
 vm.runInNewContext(
   helperSource + '\nglobalThis.plan = planCharacterIllustrationGallerySync;',
@@ -85,6 +86,7 @@ const syncEnd = html.indexOf('\nasync function compressCharacterAvatarVideo', sy
 assert.notEqual(syncStart, -1);
 assert.ok(syncEnd > syncStart);
 const syncSource = html.slice(syncStart, syncEnd);
+assert.doesNotThrow(() => new Function(syncSource), 'gallery sync function must parse as JavaScript');
 const uploadLoop = syncSource.indexOf('for(const addition of galleryPlan.additions){\n      addition.path=await uploadCharacterIllustrationDataUrl');
 const metadataLoop = syncSource.indexOf('for(const addition of galleryPlan.additions){\n      if(addition.reusableRow)');
 const verifyBlock = syncSource.indexOf('const expectedGalleryNames=new Map');
@@ -98,7 +100,9 @@ assert.match(syncSource, /reusableRow\.id/,
   'an obsolete row in the target slot must be reused instead of colliding with the unique index');
 assert.match(syncSource, /rollbackGalleryChanges/,
   'partial metadata changes must have a rollback path');
-assert.match(migration, /create unique index character_illustrations_gallery_position_uidx[\s\S]*?on public\.character_illustrations \(character_id, sort_order\) where asset_type = 'gallery'/,
+assert.ok(migration.includes('create unique index character_illustrations_gallery_position_uidx'),
   'the database uniqueness guard must remain enabled');
+assert.ok(migration.includes("on public.character_illustrations (character_id, sort_order) where asset_type = 'gallery';"),
+  'the database uniqueness guard must still cover each gallery position');
 
 console.log('Passed: gallery replacement planning, slot reuse, name-only edits, five-image cap, upload ordering, and rollback guards.');
