@@ -11,3 +11,7 @@ verify_jwt = false
 [functions.purge-character-assets]
 # The handler validates the named Supabase Secret Key via @supabase/server.
 verify_jwt = false
+
+[functions.encounter-weather-sync]
+# The handler validates the service-role key and CWA key explicitly.
+verify_jwt = false
