@@ -60,7 +60,7 @@ BEGIN
   ) VALUES
   (
     v_session_id, v_user_id, v_character_id, 'cafe', '{"activity":"測試結束場景"}'::jsonb,
-    clock_timestamp() - interval '2 hours', clock_timestamp() - interval '1 minute',
+    clock_timestamp() - interval '2 hours', clock_timestamp() + interval '2 hours',
     'active', 0
   ),
   (
@@ -68,6 +68,20 @@ BEGIN
     clock_timestamp() - interval '2 hours', clock_timestamp() - interval '1 minute',
     'active', 1
   );
+
+  -- Explicit player end shortens the effective deadline but keeps the original schedule snapshot.
+  PERFORM public.set_encounter_session_lifecycle_state(
+    v_session_id, v_user_id, 'end'
+  );
+  IF NOT EXISTS (
+    SELECT 1 FROM public.encounter_session_lifecycle
+    WHERE session_id = v_session_id
+      AND status = 'ready_to_settle'
+      AND scheduled_end_at <= clock_timestamp()
+      AND schedule_snapshot->>'scheduled_end_at' IS NULL
+  ) THEN
+    RAISE EXCEPTION 'manual Encounter end did not move the lifecycle into the due settlement state';
+  END IF;
 
   -- Due, zero-turn sessions may settle neutrally; missing turn evidence must never enqueue.
   v_enqueued := public.enqueue_due_encounter_evaluations(50);
