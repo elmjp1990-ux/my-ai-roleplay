@@ -9979,12 +9979,7 @@ function renderChatOverlay(kind) {
         </div>
         <p class="small muted">測試模式：不呼叫 AI、不生圖、不扣鑽石或銀幣。這些按鈕只測試同步，不是下方相機圖示的產圖功能。</p>
       </section>
-      <section class="panel stack" id="encounterScheduleTestTools" style="margin:10px 0;padding:12px" hidden>
-        <strong>相遇模式｜行程整理測試</strong>
-        <p class="small muted" id="encounterScheduleTestStatus">正在確認是否為允許的測試環境…</p>
-        <div class="row wrap"><button type="button" data-action="organize-encounter-schedules" disabled>人工整理公開角色行程</button></div>
-        <p class="small muted">只會整理符合資格的公開角色；此按鈕只在伺服器確認為測試環境且帳號在測試名單時顯示。會呼叫一次批次 AI，不會扣玩家錢包。</p>
-      </section>`
+`
     : '';
   const content = kind === 'search'
     ? `<label class="field"><span>搜尋目前聊天室的訊息</span><input id="chatMessageSearchInput" type="search" placeholder="輸入訊息關鍵字（至少 2 字）…" autocomplete="off"></label>
@@ -10007,7 +10002,6 @@ function renderChatOverlay(kind) {
       </div>${kind === 'album' ? '<div class="row wrap" style="margin-bottom:12px"><button type="button" data-action="persona">專屬人設設定</button><button type="button" data-action="chat-overlay" data-kind="diary">甜蜜日記</button></div>' : ''}${content}
     </section>`);
   if(kind==='diary'&&s.storyMode)void loadStoryMemorySummary(s);
-  if(kind==='album'&&CHAT_DATA_TEST_MODE)void loadEncounterScheduleTestTools();
 }
 
 async function loadEncounterScheduleTestTools(){
@@ -10032,7 +10026,6 @@ document.addEventListener('click',async event=>{
   const button=event.target.closest('[data-action="organize-encounter-schedules"]');
   if(!button)return;
   event.preventDefault();
-  if(!CHAT_DATA_TEST_MODE)return;
   button.disabled=true;
   const status=document.getElementById('encounterScheduleTestStatus');
   if(status)status.textContent='正在整理公開角色行程，請稍候…';
@@ -10040,7 +10033,10 @@ document.addEventListener('click',async event=>{
     const {data,error}=await window.mySupabase.functions.invoke('encounter-schedule-organizer',{body:{mode:'manual'}});
     if(error)throw error;
     const state=String(data?.status||'unknown');
-    if(state==='completed')toast('行程整理完成：成功 '+Number(data.published_character_count||0)+' 位，無匹配地點 '+Number(data.unplaced_character_count||0)+' 位。');
+    if(state==='completed'){
+      const sceneStatus=data.scene_publish_status==='failed'?'；但場景文案更新失敗，請檢查後端記錄':'；場景資料更新 '+Number(data.published_scene_count||0)+' 個';
+      toast('行程整理完成：成功 '+Number(data.published_character_count||0)+' 位，無匹配地點 '+Number(data.unplaced_character_count||0)+' 位'+sceneStatus+'。');
+    }
     else if(state==='no_pending_jobs')toast('目前沒有待整理的公開角色行程。');
     else if(state==='waiting_threshold'||state==='cooldown'||state==='daily_limit')toast('目前無法執行整理：'+state);
     else toast('行程整理結果：'+state);
@@ -10289,10 +10285,16 @@ function renderModal(o) {
   switch(o.name) {
     case 'environment':
       showDialog('測試環境，非正式網頁',`
-        <p>此網站目前使用本機帳號、固定聊天回覆與本機日記摘錄。</p>
-        <p>AI、Google／Email登入、圖片生成、付款、廣告獎勵與檢舉傳送尚未串接。</p>
-        <p class="muted">鑽石與銀幣為本機測試資料，不代表付費資產。
-          清除瀏覽器資料會失去角色、聊天與回憶。請勿輸入真正機密。</p>`);
+        <p>此網站目前使用測試環境資料，請勿輸入真正機密或真實付款資訊。</p>
+        <p class="muted">鑽石與銀幣為測試資料，不代表正式付費資產。</p>
+        <section class="panel stack" id="encounterScheduleTestTools" style="margin:10px 0;padding:12px" hidden>
+          <strong>相遇模式｜AI 行程與場景整理</strong>
+          <p class="small muted">人工觸發一次 AI 批次，整理符合資格的公開角色行程，並建立／更新共同行程場景。</p>
+          <p class="small muted" id="encounterScheduleTestStatus">正在確認是否為允許的測試環境…</p>
+          <div class="row wrap"><button type="button" data-action="organize-encounter-schedules" disabled>AI 整理角色行程與場景</button></div>
+          <p class="small muted">僅限伺服器核准的測試帳號。會產生一次 AI 服務呼叫成本，但不扣玩家銀幣或鑽石；不會觸發相遇對話。</p>
+        </section>`);
+      void loadEncounterScheduleTestTools();
       break;
     case 'wallet-insufficient':
       openInsufficientFundsDialog('single');
