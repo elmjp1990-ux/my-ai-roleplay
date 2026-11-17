@@ -74,6 +74,11 @@ BEGIN
   IF v_scheduler_status IS NULL THEN
     RAISE EXCEPTION 'weather scheduler disable check returned NULL';
   END IF;
+
+  v_scheduler_status := public.schedule_encounter_taiwan_calendar_sync(false);
+  IF v_scheduler_status IS NULL THEN
+    RAISE EXCEPTION 'Taiwan calendar scheduler disable check returned NULL';
+  END IF;
 END;
 $encounter_schedule_smoke$;
 
