@@ -104,3 +104,15 @@ assert.match(cityMap, /角色行程載入失敗，請重試。/);
 assert.match(cityMap, /data-action="city-people-retry"/);
 assert.match(cityMap, /const retryButton=event\.target\.closest\('\[data-action="city-people-retry"\]'\)/);
 assert.match(cityMap, /pager\.error=null;void loadCityPeoplePage\(locationModal\.dataset\.place\)/);
+
+const scheduleOrganizer = fs.readFileSync('supabase/functions/encounter-schedule-organizer/index.ts', 'utf8');
+assert.match(scheduleOrganizer, /ENCOUNTER_SCHEDULE_TEST_MODE["']\) !== ["']true/);
+assert.match(scheduleOrganizer, /test_mode: false/);
+assert.match(scheduleOrganizer, /test_mode: true/);
+assert.match(scheduleOrganizer, /auth\.getUser\(\)/);
+assert.doesNotMatch(scheduleOrganizer, /ENCOUNTER_SCHEDULE_TEST_USER_IDS/);
+assert.doesNotMatch(scheduleOrganizer, /account_is_active/);
+assert.match(scheduleOrganizer, /manual_schedule_trigger_disabled/);
+assert.match(html, /if\(!error&&data\?\.test_mode!==true\)\s*\{\s*section\.hidden=true/);
+assert.match(html, /測試環境登入帳號皆可使用/);
+assert.match(html, /正式環境不提供此按鈕/);
