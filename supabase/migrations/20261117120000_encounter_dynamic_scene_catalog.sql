@@ -128,11 +128,20 @@ BEGIN
   FOR v_character IN
     SELECT c.id
     FROM public.characters c
+    CROSS JOIN LATERAL (
+      SELECT public.encounter_schedule_source_payload(c.id) AS payload
+    ) source
     WHERE c.visibility = 'public'
       AND c.review_status = 'approved'
       AND c.rights_confirmed IS TRUE
       AND c.deleted_at IS NULL
       AND c.is_nsfw IS FALSE
+      AND NOT (
+        pg_catalog.concat_ws(' ', c.intro, c.race, c.style)
+          ~ '(ancient|historical|medieval|antiquity|fantasy|mythic|fictional|古代|歷史|中世紀|中古|奇幻|架空|封建|戰國|春秋|秦漢|唐代|宋代|明代|清代|古羅馬|古希臘)'
+        AND COALESCE((source.payload->>'modern_setting_compatible')::boolean, false) IS NOT TRUE
+        AND COALESCE((source.payload->>'time_travel_explicit')::boolean, false) IS NOT TRUE
+      )
       AND NOT EXISTS (
         SELECT 1
         FROM public.encounter_schedule_generation_jobs j
