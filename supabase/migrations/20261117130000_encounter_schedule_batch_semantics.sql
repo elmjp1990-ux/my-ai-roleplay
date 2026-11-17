@@ -146,6 +146,35 @@ REVOKE ALL ON FUNCTION public.claim_encounter_schedule_batch(integer, boolean, u
 GRANT EXECUTE ON FUNCTION public.claim_encounter_schedule_batch(integer, boolean, uuid) TO service_role;
 
 
+CREATE OR REPLACE FUNCTION public.get_encounter_dynamic_scene_usage()
+RETURNS TABLE(location_key text, character_id uuid, source_type text)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT s.location_key, c.id, s.source_type
+  FROM public.character_schedules s
+  JOIN public.characters c ON c.id = s.character_id
+  WHERE s.location_key = ANY(ARRAY[
+    'shopping-street', 'night-market', 'restaurant', 'university', 'hospital',
+    'gym', 'cinema', 'museum', 'hotel', 'train-station', 'library', 'theater',
+    'art-gallery', 'community-center', 'music-studio', 'bakery', 'coworking-space'
+  ]::text[])
+    AND s.is_active IS TRUE
+    AND s.source_type IN ('manual', 'ai')
+    AND s.special_event_key IS NULL
+    AND c.visibility = 'public'
+    AND c.review_status = 'approved'
+    AND c.rights_confirmed IS TRUE
+    AND c.deleted_at IS NULL
+    AND c.is_nsfw IS FALSE;
+$$;
+
+REVOKE ALL ON FUNCTION public.get_encounter_dynamic_scene_usage() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_encounter_dynamic_scene_usage() TO service_role;
+
+
 CREATE OR REPLACE FUNCTION public.publish_encounter_schedule_batch(
   p_batch_id uuid,
   p_lease_token uuid,
