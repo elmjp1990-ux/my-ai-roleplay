@@ -24,7 +24,9 @@ INSERT INTO public.characters (
   ('00000000-0000-4000-8000-000000000024'::uuid, '00000000-0000-4000-8000-000000000025'::uuid,
    'Dynamic Scene Smoke B', '現代都市角色', 'public', 'approved', true, false),
   ('00000000-0000-4000-8000-000000000029'::uuid, '00000000-0000-4000-8000-000000000030'::uuid,
-   'Ancient Character Smoke', '古代架空王朝', 'public', 'approved', true, false);
+   'Ancient Character Smoke', '古代架空王朝', 'public', 'approved', true, false),
+  ('00000000-0000-4000-8000-000000000031'::uuid, '00000000-0000-4000-8000-000000000032'::uuid,
+   'Public NSFW Smoke', '現代都市成人角色', 'public', 'approved', true, true);
 
 INSERT INTO public.character_schedules (
   id, character_id, day_type, start_time, end_time, location_key, activity,
@@ -42,6 +44,10 @@ INSERT INTO public.character_schedules (
   ('00000000-0000-4000-8000-000000000028'::uuid,
    '00000000-0000-4000-8000-000000000024'::uuid,
    'any', '09:00', '17:00', 'restaurant', '在餐廳準備餐點與服務',
+   100, true, 'manual', 'primary', 100, '', false),
+  ('00000000-0000-4000-8000-000000000033'::uuid,
+   '00000000-0000-4000-8000-000000000031'::uuid,
+   'any', '09:00', '17:00', 'restaurant', '在餐廳工作與接待客人',
    100, true, 'manual', 'primary', 100, '', false);
 -- Keep replica mode for the synthetic author IDs and their job rows; the whole test rolls back.
 
@@ -60,17 +66,18 @@ BEGIN
     RAISE EXCEPTION 'manual scene catalog migration must bump schedule source version';
   END IF;
   v_result := public.enqueue_encounter_schedule_generation_test_batch(2147483647);
-  IF COALESCE((v_result->>'scanned_character_count')::integer, 0) < 3
-     OR COALESCE((v_result->>'pending_character_count')::integer, 0)
-        <> COALESCE((v_result->>'scanned_character_count')::integer, 0)
+  IF COALESCE((v_result->>'scanned_character_count')::integer, 0) <> 5
+     OR COALESCE((v_result->>'pending_character_count')::integer, 0) <> 5
      OR (SELECT pg_catalog.count(*) FROM public.encounter_schedule_generation_jobs
          WHERE character_id = ANY(ARRAY[
            '00000000-0000-4000-8000-000000000020'::uuid,
            '00000000-0000-4000-8000-000000000022'::uuid,
-           '00000000-0000-4000-8000-000000000024'::uuid
+           '00000000-0000-4000-8000-000000000024'::uuid,
+           '00000000-0000-4000-8000-000000000029'::uuid,
+           '00000000-0000-4000-8000-000000000031'::uuid
          ])
-           AND status = 'pending') <> 3 THEN
-    RAISE EXCEPTION 'manual Preview enqueue should queue every eligible public role, including all three synthetic roles: %', v_result;
+           AND status = 'pending') <> 5 THEN
+    RAISE EXCEPTION 'manual Preview enqueue should queue every approved public role, including NSFW and historical-setting roles: %', v_result;
   END IF;
 END;
 $manual_enqueue$;
@@ -130,7 +137,7 @@ BEGIN
   WHERE location_key = 'restaurant';
   IF NOT FOUND
      OR v_catalog.is_dynamic IS NOT TRUE
-     OR v_catalog.character_count <> 2
+     OR v_catalog.character_count <> 3
      OR v_catalog.display_name <> '城市餐廳'
      OR v_catalog.event_title <> '本週季節菜單已更新' THEN
     RAISE EXCEPTION 'published dynamic scene metadata was not returned by the scene catalog';
@@ -147,5 +154,38 @@ BEGIN
   END IF;
 END;
 $dynamic_scene_publish$;
+
+-- Anonymous/minor callers must not receive NSFW-backed scene counts or schedules.
+SET LOCAL ROLE anon;
+SET LOCAL request.jwt.claim.role = 'anon';
+DO $nsfw_viewer_gate$
+DECLARE
+  v_catalog record;
+  v_schedule_count integer;
+BEGIN
+  SELECT * INTO v_catalog FROM public.get_encounter_scene_catalog() WHERE location_key = 'restaurant';
+  IF NOT FOUND OR v_catalog.character_count <> 2 THEN
+    RAISE EXCEPTION 'non-adult viewer must not see NSFW character scene counts';
+  END IF;
+  SELECT pg_catalog.count(*) INTO v_schedule_count
+  FROM public.get_encounter_character_schedules(ARRAY['00000000-0000-4000-8000-000000000031'::uuid]);
+  IF v_schedule_count <> 0 THEN
+    RAISE EXCEPTION 'non-adult viewer must not receive NSFW character schedules';
+  END IF;
+END;
+$nsfw_viewer_gate$;
+
+SET LOCAL ROLE service_role;
+SET LOCAL request.jwt.claim.role = 'service_role';
+DO $internal_schedule_view$
+DECLARE
+  v_catalog record;
+BEGIN
+  SELECT * INTO v_catalog FROM public.get_encounter_scene_catalog() WHERE location_key = 'restaurant';
+  IF NOT FOUND OR v_catalog.character_count <> 3 THEN
+    RAISE EXCEPTION 'internal schedule generation must include NSFW-backed public scenes';
+  END IF;
+END;
+$internal_schedule_view$;
 
 ROLLBACK;
