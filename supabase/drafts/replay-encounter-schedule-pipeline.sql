@@ -6,6 +6,7 @@ BEGIN;
 SET LOCAL ROLE authenticated;
 SET LOCAL request.jwt.claim.role = 'authenticated';
 SELECT count(*) FROM public.get_encounter_scene_registry();
+SELECT count(*) FROM public.get_encounter_city_weather();
 SELECT count(*) FROM public.get_encounter_character_schedules(ARRAY[]::uuid[]);
 
 RESET ROLE;
@@ -67,6 +68,11 @@ BEGIN
   v_scheduler_status := public.schedule_encounter_schedule_organizer(false);
   IF v_scheduler_status IS NULL THEN
     RAISE EXCEPTION 'scheduler disable check returned NULL';
+  END IF;
+
+  v_scheduler_status := public.schedule_encounter_weather_sync(false);
+  IF v_scheduler_status IS NULL THEN
+    RAISE EXCEPTION 'weather scheduler disable check returned NULL';
   END IF;
 END;
 $encounter_schedule_smoke$;
