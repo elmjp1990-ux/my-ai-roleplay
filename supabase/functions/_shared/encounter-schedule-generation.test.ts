@@ -40,6 +40,10 @@ const variants = (slots = fullDaySlots()) => ({
   ],
 });
 const result = (characters: Array<{ character_id: string; [key: string]: unknown }>) => parseEncounterScheduleBatchOutput(JSON.stringify({ characters }), characters.map((c) => source(c.character_id)));
+const specialEvent = (event_key = "christmas", slots = fullDaySlots()) => ({
+  event_key, event_name: event_key === "christmas" ? "聖誕節" : "情人節", slots,
+});
+
 
 Deno.test("accepts hourly schedules with exact weekday/holiday weights and 8-hour continuous work", () => {
   const parsed = parseEncounterScheduleBatchOutput(JSON.stringify({
@@ -98,6 +102,61 @@ Deno.test("requires indoor fallback for outdoor schedules", () => {
     })),
   }]);
   if (invalid.ok || !invalid.errors.some((error) => error.includes("rain_fallback_invalid"))) throw new Error("outdoor fallback accepted");
+});
+
+Deno.test("accepts optional special holiday schedules with a complete day", () => {
+  const parsed = result([{
+    character_id: id1, placement: "modern_map", variants: variants(),
+    special_events: [specialEvent("christmas"), specialEvent("valentines_day")],
+  }]);
+  if (!parsed.ok) throw new Error(parsed.errors.join(","));
+  if (parsed.characters[0].special_events.length !== 2) throw new Error("special event schedules were dropped");
+  const noEvent = result([{ character_id: id1, placement: "modern_map", variants: variants() }]);
+  if (!noEvent.ok || noEvent.characters[0].special_events.length !== 0) {
+    throw new Error("special events should remain optional");
+  }
+});
+
+Deno.test("rejects unknown, duplicate, or incomplete special event schedules", () => {
+  const unknown = result([{
+    character_id: id1, placement: "modern_map", variants: variants(),
+    special_events: [specialEvent("birthday")],
+  }]);
+  if (unknown.ok || !unknown.errors.some((error) => error.includes("special_event_shape_invalid"))) {
+    throw new Error("unknown special event accepted");
+  }
+  const duplicate = result([{
+    character_id: id1, placement: "modern_map", variants: variants(),
+    special_events: [specialEvent("christmas"), specialEvent("christmas")],
+  }]);
+  if (duplicate.ok || !duplicate.errors.some((error) => error.includes("special_event_duplicate"))) {
+    throw new Error("duplicate special event accepted");
+  }
+  const incomplete = fullDaySlots();
+  incomplete[1] = slot({ start_time: "09:00", end_time: "16:00" });
+  const gap = result([{
+    character_id: id1, placement: "modern_map", variants: variants(),
+    special_events: [specialEvent("christmas", incomplete)],
+  }]);
+  if (gap.ok || !gap.errors.some((error) => error.includes("24_hour_coverage_incomplete"))) {
+    throw new Error("special event schedule gap accepted");
+  }
+});
+
+Deno.test("does not invent birthdays or special events for unplaced characters", () => {
+  const built = buildEncounterScheduleBatchMessages([source()]);
+  if (!built.messages[0].content.includes("角色生日目前沒有結構化日期來源")) {
+    throw new Error("prompt must not infer character birthdays");
+  }
+  const unplaced = parseEncounterScheduleBatchOutput(JSON.stringify({
+    characters: [{
+      character_id: id1, placement: "no_matching_location",
+      variants: { weekday: [], holiday: [] }, special_events: [specialEvent("christmas")],
+    }],
+  }), [source()]);
+  if (unplaced.ok || !unplaced.errors.some((error) => error.includes("no_location_variants_must_be_empty"))) {
+    throw new Error("unplaced character special events accepted");
+  }
 });
 
 Deno.test("does not place historical or incompatible fantasy characters on the modern map", () => {
