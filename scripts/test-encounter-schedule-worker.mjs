@@ -58,6 +58,13 @@ assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_scene_regis
 assert.match(pipeline, /location_key IN \('shopping-street'\)/);
 assert.match(pipeline, /minimum_character_count smallint NOT NULL DEFAULT 1/);
 assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.get_encounter_scene_registry\(\)/);
+assert.match(pipeline, /ADD COLUMN IF NOT EXISTS special_event_key text/);
+assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.resolve_encounter_special_event_key/);
+assert.match(pipeline, /special_event_key IS NULL/);
+assert.match(generator, /special_events/);
+assert.match(generator, /valentines_day/);
+assert.match(generator, /christmas/);
+assert.match(generator, /角色生日目前沒有結構化日期來源/);
 assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.get_encounter_character_schedules\(p_character_ids uuid\[\]\)[\s\S]*?CROSS JOIN LATERAL public\.resolve_encounter_character_schedule/);
 assert.match(pipeline, /encounter_greeting text,[\s\S]*?is_outdoor boolean,[\s\S]*?rain_fallback_greeting text,[\s\S]*?variant_weight smallint/);
 assert.match(pipeline, /cardinality\(p_character_ids\) BETWEEN 1 AND 10/);
@@ -93,4 +100,4 @@ assert.match(html, /functions\.invoke\('encounter-schedule-organizer',\{body:\{m
 assert.match(html, /functions\.invoke\('encounter-schedule-organizer',\{body:\{mode:'manual'\}\}\)/);
 assert.match(html, /if\(kind==='album'&&CHAT_DATA_TEST_MODE\)void loadEncounterScheduleTestTools\(\)/);
 
-console.log("Encounter schedule worker, dynamic scenes, simulated Taipei weather, queue triggers, throttling, and 24-hour coverage contracts passed.");
+console.log("Encounter schedule worker, conditional holidays, dynamic scenes, simulated Taipei weather, queue triggers, throttling, and 24-hour coverage contracts passed.");
