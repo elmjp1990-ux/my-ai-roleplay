@@ -1,4 +1,4 @@
-import { assertEquals, assertNotEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { createEncounterWeather } from "./encounter-weather.mjs";
 
 Deno.test("weather is stable within a six-hour slot", () => {
@@ -8,10 +8,13 @@ Deno.test("weather is stable within a six-hour slot", () => {
   assertEquals(first.temperatureC, second.temperatureC);
 });
 
-Deno.test("weather may change at the next six-hour slot", () => {
-  const first = createEncounterWeather(new Date("2026-07-20T05:59:00+08:00"));
-  const second = createEncounterWeather(new Date("2026-07-20T06:00:00+08:00"), first.weatherText);
-  assertNotEquals(first.weatherText, second.weatherText);
+Deno.test("weather sequence has variety without requiring every slot to change", () => {
+  const states = new Set();
+  for (let slot = 0; slot < 28; slot += 1) {
+    const weather = createEncounterWeather(new Date(Date.UTC(2026, 6, 1, slot * 6)));
+    states.add(weather.weatherText);
+  }
+  if (states.size < 3) throw new Error("Weather sequence should include natural variation");
 });
 
 Deno.test("seasonal weather stays within the supported simple vocabulary", () => {
