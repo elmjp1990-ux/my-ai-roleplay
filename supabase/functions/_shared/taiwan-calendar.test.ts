@@ -17,6 +17,18 @@ Deno.test("keeps weekend make-up workdays as workdays", () => {
   assertEquals(rows[0]?.day_type, "workday");
 });
 
+Deno.test("does not treat a generic weekend category as a named special event", () => {
+  const rows = parseTaiwanCalendarRows([
+    { date: "2026-11-21", isholiday: true, name: "", holidaycategory: "週末假期", description: "" },
+    { date: "2026-11-22", isholiday: true, name: "星期日", holidaycategory: "週末假期", description: "" },
+    { date: "2026-11-23", isholiday: true, name: "", holidaycategory: "國定假日", description: "補假" },
+  ]);
+  assertEquals(rows[0]?.day_type, "holiday");
+  assertEquals(rows[0]?.holiday_name, null);
+  assertEquals(rows[1]?.holiday_name, null);
+  assertEquals(rows[2]?.holiday_name, "補假");
+});
+
 Deno.test("accepts alternate payload wrappers and ignores invalid dates", () => {
   const rows = parseTaiwanCalendarRows({
     data: [
