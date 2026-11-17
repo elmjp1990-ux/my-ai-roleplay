@@ -26,6 +26,7 @@ const guidelines = fs.readFileSync("supabase/functions/_shared/encounter-respons
 const frontend = fs.readFileSync("index.html", "utf8");
 const scene = fs.readFileSync("encounter-scene.js", "utf8");
 const sessionCreator = fs.readFileSync("supabase/functions/encounter-session/index.ts", "utf8");
+const pipeline = fs.readFileSync("supabase/drafts/encounter-schedule-pipeline.sql", "utf8");
 assert.match(endpoint, /requestOpenRouterChatCompletion/);
 assert.match(endpoint, /POYOZZ_DEFAULT_CHAT_MODEL/);
 assert.match(endpoint, /reserve_encounter_chat_turn/);
@@ -63,6 +64,10 @@ assert.match(sessionCreator, /availableSceneBackgrounds/);
 assert.match(endpoint, /resolveEncounterVisuals/);
 assert.match(endpoint, /encounter_turn_visuals/);
 assert.match(endpoint, /sceneBackgroundPath/);
+assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_scene_backgrounds/);
+assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_turn_visuals/);
+assert.match(pipeline, /encounter-default-scene\.webp/);
+assert.match(pipeline, /REFERENCES public\.character_illustrations\(id\)/);
 assert.match(endpoint, /illustration_id/);
 assert.match(endpoint, /scene_background_id/);
 assert.match(scene, /session\?\.encounterVisuals/);
