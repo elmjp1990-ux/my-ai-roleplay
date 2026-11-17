@@ -30,7 +30,7 @@ export function parseTaiwanCalendarRows(payload, source = "data.gov.tw:123662") 
     const rawName = String(row.name ?? "").trim();
     const rawDescription = String(row.description ?? "").trim();
     const rawCategory = String(row.holidaycategory ?? "").trim();
-    const genericWeekendLabel = /^(?:週末假期|周末假期|星期六|星期日|週六|週日|放假|假日|例假日)$/i;
+    const genericWeekendLabel = /^(?:週末假期|周末假期|星期六|星期日|週六|週日|放假|放假日|休假日|假日|例假日)$/i;
     const holidayName = [rawName, rawDescription]
       .find((value) => value && !genericWeekendLabel.test(value)) ||
       (rawCategory && !genericWeekendLabel.test(rawCategory) ? rawCategory : "");
