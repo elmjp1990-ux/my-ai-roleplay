@@ -195,7 +195,7 @@ export function buildEncounterScheduleBatchMessages(sources: EncounterScheduleSo
   const protectedContextByCharacter: Record<string, string[]> = {};
   const promptSources = sources.map((source) => {
     if (!isUuid(source.character_id) || !isUuid(source.author_id)) throw new Error("encounter_schedule_source_identity_invalid");
-    if (source.visibility !== "public" || source.deleted_at != null) throw new Error("encounter_schedule_source_not_public");
+    if (source.visibility !== "public" || source.review_status !== "approved" || source.rights_confirmed !== true || source.deleted_at != null) throw new Error("encounter_schedule_source_not_public");
     const privateContext = preparePrivateContext(
       text(source.private_info),
       isRecord(source.personality_profile) ? source.personality_profile : {},
