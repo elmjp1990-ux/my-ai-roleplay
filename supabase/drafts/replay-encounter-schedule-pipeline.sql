@@ -52,7 +52,7 @@ INSERT INTO public.character_schedules (
   '00000000-0000-4000-8000-000000000015'::uuid,
   '00000000-0000-4000-8000-000000000010'::uuid,
   'any', '09:00', '17:00', 'bookstore', '參加節日限定活動',
-  0, true, 'manual', 'special', 100, 'taiwan_public_holiday',
+  0, true, 'manual', 'special', 100, 'lunar_new_year',
   pg_catalog.repeat('今天是假日限定活動日，你們在書店安排了特別的展覽與交流，氣氛比平常更熱鬧。', 5),
   false
 );
@@ -263,14 +263,23 @@ DECLARE
   v_result record;
 BEGIN
   INSERT INTO public.taiwan_calendar_days (calendar_date, day_type, holiday_name, source)
-  VALUES ('2026-11-17'::date, 'holiday', '測試國定假日', 'disposable_smoke_test')
+  VALUES ('2026-11-17'::date, 'holiday', '農曆春節', 'disposable_smoke_test')
   ON CONFLICT (calendar_date) DO UPDATE
   SET day_type = EXCLUDED.day_type,
       holiday_name = EXCLUDED.holiday_name,
       source = EXCLUDED.source,
       updated_at = pg_catalog.now();
 
-  IF public.resolve_encounter_special_event_key('2026-11-17'::date) <> 'taiwan_public_holiday'
+  INSERT INTO public.taiwan_calendar_days (calendar_date, day_type, holiday_name, source)
+  VALUES ('2026-11-19'::date, 'holiday', '國定假日', 'disposable_smoke_test')
+  ON CONFLICT (calendar_date) DO UPDATE
+  SET day_type = EXCLUDED.day_type,
+      holiday_name = EXCLUDED.holiday_name,
+      source = EXCLUDED.source,
+      updated_at = pg_catalog.now();
+
+  IF public.resolve_encounter_special_event_key('2026-11-17'::date) <> 'lunar_new_year'
+     OR public.resolve_encounter_special_event_key('2026-11-19'::date) <> 'taiwan_public_holiday'
      OR public.resolve_encounter_special_event_key('2026-02-14'::date) <> 'valentines_day'
      OR public.resolve_encounter_special_event_key('2026-12-25'::date) <> 'christmas'
      OR public.resolve_encounter_special_event_key('2026-11-18'::date) IS NOT NULL THEN
