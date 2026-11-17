@@ -75,6 +75,22 @@ BEGIN
     RAISE EXCEPTION 'weather scheduler disable check returned NULL';
   END IF;
 
+  IF pg_catalog.position(
+    '0 */6 * * *' IN pg_catalog.pg_get_functiondef(
+      'public.schedule_encounter_worker(text,boolean)'::regprocedure
+    )
+  ) = 0 THEN
+    RAISE EXCEPTION 'weather scheduler must use a six-hour interval';
+  END IF;
+
+  IF pg_catalog.position(
+    'encounter-weather-sync' IN pg_catalog.pg_get_functiondef(
+      'public.schedule_encounter_worker(text,boolean)'::regprocedure
+    )
+  ) = 0 THEN
+    RAISE EXCEPTION 'weather scheduler endpoint is missing';
+  END IF;
+
   v_scheduler_status := public.schedule_encounter_taiwan_calendar_sync(false);
   IF v_scheduler_status IS NULL THEN
     RAISE EXCEPTION 'Taiwan calendar scheduler disable check returned NULL';
