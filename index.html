@@ -10030,14 +10030,15 @@ async function loadEncounterScheduleTestTools(){
       return;
     }
     const pending=Number(data.pending_character_count||0);
+    const processing=Number(data.processing_character_count||0);
     const failed=Number(data.failed_character_count||0);
     const reconciliation=Number(data.needs_reconciliation_count||0);
-    const blocked=failed>0||reconciliation>0;
+    const blocked=processing>0||failed>0||reconciliation>0;
     const lastRun=data.last_batch_completed_at?new Date(data.last_batch_completed_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):'尚未執行';
     if(status)status.textContent=data.status_available===false
       ?'測試環境已確認；目前無法讀取佇列狀態。'
-      :'待處理：'+pending+' 位｜失敗：'+failed+' 位｜待核對：'+reconciliation+' 位｜'+
-        (blocked?'目前暫停生成，請先處理失敗／待核對結果，避免重複 AI 成本。':'按下後最多處理 5 位角色；')+
+      :'待處理：'+pending+' 位｜處理中：'+processing+' 位｜失敗：'+failed+' 位｜待核對：'+reconciliation+' 位｜'+
+        (blocked?'目前暫停生成，請先等待處理中工作完成，並核對失敗結果，避免重複 AI 成本。':'按下後最多處理 5 位角色；')+
         '｜上次成功完成：'+lastRun+(data.last_batch_status?'（'+data.last_batch_status+'）':'');
     if(button){button.dataset.aiEnabled=blocked?'false':'true';button.disabled=blocked;}
   }catch(error){
