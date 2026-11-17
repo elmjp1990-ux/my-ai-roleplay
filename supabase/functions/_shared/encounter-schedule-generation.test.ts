@@ -87,15 +87,15 @@ Deno.test("requires indoor fallback for outdoor schedules", () => {
     variants: variants(fullDaySlots({
       location_key: "park", is_outdoor: true,
       rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳休息", rain_fallback_greeting: greeting,
-    })]),
+    })),
   }]);
   if (!valid.ok) throw new Error(valid.errors.join(","));
   const invalid = result([{
     character_id: id1, placement: "modern_map",
-    variants: variants([slot({
+    variants: variants(fullDaySlots({
       location_key: "park", is_outdoor: true,
       rain_fallback_location_key: "park", rain_fallback_activity: "繼續待在公園", rain_fallback_greeting: greeting,
-    })]),
+    })),
   }]);
   if (invalid.ok || !invalid.errors.some((error) => error.includes("rain_fallback_invalid"))) throw new Error("outdoor fallback accepted");
 });
