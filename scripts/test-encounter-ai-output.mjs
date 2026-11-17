@@ -38,6 +38,8 @@ const evaluationScheduler = fs.readFileSync("supabase/drafts/schedule-encounter-
 
 assert.equal((pipeline.match(/^BEGIN;$/gm) || []).length, 1, "Encounter SQL draft must contain one transaction start");
 assert.equal((pipeline.match(/^COMMIT;$/gm) || []).length, 1, "Encounter SQL draft must contain one transaction end");
+assert.doesNotMatch(pipeline, /IF auth\.role\(\) <> 'service_role'/,
+  "Encounter schedule SECURITY DEFINER RPCs must reject missing JWT role claims");
 assert.doesNotMatch(pipeline, /encounter_weather_baseline_2025|O-A0001-001|O-A0002-001|CWA_OPEN_DATA_API_KEY/);
 assert.ok(pipeline.includes("CHECK (asset_path ~ '^([.]/|/)[A-Za-z0-9_./-]+$')"));
 assert.match(pipeline, /ALTER TABLE public\.encounter_city_weather ALTER COLUMN source SET DEFAULT 'poyozz_fictional_seasonal'/);
