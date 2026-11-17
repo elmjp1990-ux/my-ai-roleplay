@@ -273,10 +273,10 @@
       console.warn('城市動態場景載入失敗：',error?.message||error);
     }
   };
-  void loadCityDynamicScenes();
   // Use only published characters whose own schedule data is already available to this client.
   // Never invent a character or query private schedule rows from the browser.
   const cityPlaceAliases={airport:['airport'],commercial:['commercial','office'], 'night-bar':['night-bar','bar'], 'live-house':['live-house','livehouse'], apartment:['apartment'], 'department-store':['department-store','department_store'], bookstore:['bookstore','book-store'], cafe:['cafe','coffee-shop'], park:['park']};
+  void loadCityDynamicScenes();
   const getTaipeiClock=()=>{
     const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
     const values=Object.fromEntries(parts.map(part=>[part.type,part.value]));
