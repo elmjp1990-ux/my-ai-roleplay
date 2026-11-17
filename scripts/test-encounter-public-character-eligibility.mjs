@@ -16,8 +16,8 @@ assert.doesNotMatch(publishScenes, /is_nsfw/,
   'Scene metadata generation must count all public characters, including NSFW characters.');
 assert.doesNotMatch(usage, /is_nsfw/,
   'Dynamic scene usage must include all public characters, including NSFW characters.');
-assert.match(catalog, /auth\\.role\\(\\) = 'service_role' OR \(auth\\.uid\\(\\) IS NOT NULL AND private\\.current_user_is_adult\\(\\)\)/,
-  'Scene catalog counts must include NSFW characters only for an authenticated adult viewer.');
+assert.match(catalog, /auth\.role\(\) = 'service_role' OR \(auth\.uid\(\) IS NOT NULL AND private\.current_user_is_adult\(\)\)/,
+  'Internal schedule generation can see all roles; public viewers still need verified adult status for NSFW roles.');
 assert.match(existingReadRpc, /private\.current_user_is_adult\(\)/,
   'The public scene roster must continue to enforce the existing server-side adult gate.');
 assert.match(existingReadRpc, /c\.visibility = 'public'[\s\S]*?c\.is_nsfw IS NOT TRUE[\s\S]*?private\.current_user_is_adult\(\)/,
