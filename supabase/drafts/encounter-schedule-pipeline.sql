@@ -139,6 +139,10 @@ CREATE TABLE IF NOT EXISTS public.encounter_city_weather (
   updated_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp()
 );
 
+ALTER TABLE public.encounter_city_weather ALTER COLUMN source SET DEFAULT 'poyozz_fictional_seasonal';
+
+
+
 CREATE INDEX IF NOT EXISTS encounter_city_weather_fetched_idx
   ON public.encounter_city_weather (fetched_at DESC);
 
