@@ -9,6 +9,8 @@ on:
       - "supabase/drafts/replay-encounter-session-evaluation-worker.sql"
       - "supabase/drafts/encounter-relationship-greeting-pools.sql"
       - "supabase/drafts/replay-encounter-relationship-greeting-pools.sql"
+      - "supabase/drafts/schedule-encounter-evaluation-worker.sql"
+      - "supabase/drafts/replay-schedule-encounter-evaluation-worker.sql"
       - "supabase/drafts/current-state-structure.json"
       - "scripts/build-disposable-schema-fixture.mjs"
       - ".github/workflows/supabase-local-migration-replay.yml"
@@ -198,6 +200,14 @@ jobs:
           set -euo pipefail
           # Exercises only the disposable current-state fixture; no OpenRouter or Hosted Supabase access.
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-session-evaluation-worker.sql
+
+      - name: Apply Encounter evaluation scheduler draft (disabled)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Only creates the disabled-by-default function; no cron job is enabled.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/schedule-encounter-evaluation-worker.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-schedule-encounter-evaluation-worker.sql
 
       - name: Apply Encounter relationship greeting selection draft
         shell: bash
