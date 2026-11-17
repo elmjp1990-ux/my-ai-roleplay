@@ -233,9 +233,10 @@ Deno.serve(async (request) => {
   }
 
   // Scene metadata is published only after schedule rows are committed, so the
-  // database can verify cross-batch character counts before creating a marker.
+  // database can verify shared-character counts and available marker slots.
   let scenePublishStatus = "no_scene_metadata";
   let publishedSceneCount = 0;
+  let skippedSceneCount = 0;
   if (parsed.scenes.length > 0) {
     const { data: sceneResult, error: sceneError } = await admin.rpc("publish_encounter_scene_metadata", {
       p_scenes: parsed.scenes,
@@ -245,8 +246,9 @@ Deno.serve(async (request) => {
       console.warn("Encounter scene metadata publish failed:", sceneError.message);
     } else {
       const sceneRow = Array.isArray(sceneResult) ? sceneResult[0] : sceneResult;
-      scenePublishStatus = "completed";
       publishedSceneCount = Number(sceneRow?.published_scene_count || 0);
+      skippedSceneCount = Number(sceneRow?.skipped_scene_count || 0);
+      scenePublishStatus = skippedSceneCount > 0 ? "partial" : "completed";
     }
   }
 
@@ -261,5 +263,6 @@ Deno.serve(async (request) => {
     skipped_private_character_count: Number(result?.skipped_private_character_count || 0),
     scene_publish_status: scenePublishStatus,
     published_scene_count: publishedSceneCount,
+    skipped_scene_count: skippedSceneCount,
   });
 });
