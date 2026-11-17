@@ -937,6 +937,12 @@ body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
 .city-map-stage.is-loading .city-map-world{visibility:hidden}
 .city-map-world{position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:center;will-change:transform;background-image:none;background-position:center;background-size:100% 100%;background-repeat:no-repeat;overflow:visible}
 .city-map-world:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#18253e12,transparent 30%,#18253e18);pointer-events:none}
+.city-map-stage.is-raining .city-map-world{filter:grayscale(.58) brightness(.76) saturate(.72)}
+.city-map-stage.is-raining:before{content:"";position:absolute;inset:0;z-index:4;background:rgba(15,22,38,.13);pointer-events:none}
+.city-map-stage.is-raining:after{content:"";position:absolute;inset:-8%;z-index:4;opacity:.38;pointer-events:none;background-image:repeating-linear-gradient(105deg,transparent 0 15px,rgba(236,243,255,.22) 16px,transparent 18px 31px);animation:poyozz-city-rain .8s linear infinite}
+.city-map-stage.is-raining.low-performance:after{animation:none;opacity:.18}
+@keyframes poyozz-city-rain{from{background-position:0 -34px}to{background-position:0 34px}}
+@media(prefers-reduced-motion:reduce){.city-map-stage.is-raining:after{animation:none;opacity:.18}}
 .city-map-river{display:none!important;position:absolute;left:-5%;top:28%;width:112%;height:18%;background:#8fc8df;border:12px solid #d6e6d7;border-radius:50%;transform:rotate(-12deg);box-shadow:0 0 0 8px #b4d8bf}
 .city-map-road{display:none!important;position:absolute;background:#f3e8cf;border:5px solid #fff8e8;border-radius:30px;box-shadow:0 2px 0 #8ba994}
 .city-map-road.r1{left:-8%;top:50%;width:120%;height:8%;transform:rotate(15deg)}
