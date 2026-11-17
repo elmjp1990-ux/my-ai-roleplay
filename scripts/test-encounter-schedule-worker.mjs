@@ -40,6 +40,16 @@ assert.match(pipeline, /WHEN public\.encounter_schedule_generation_jobs\.status 
 assert.match(pipeline, /v_oldest > v_now - interval '23 hours 45 minutes'/);
 assert.match(pipeline, /v_daily_count >= 4/);
 assert.match(pipeline, /v_last_started > v_now - interval '6 hours'/);
+assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_scene_registry/);
+assert.match(pipeline, /location_key IN \('shopping-street'\)/);
+assert.match(pipeline, /minimum_character_count smallint NOT NULL DEFAULT 1/);
+assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.get_encounter_scene_registry\(\)/);
+assert.match(pipeline, /count\(DISTINCT c\.id\)/);
+assert.match(pipeline, /HAVING pg_catalog\.count\(DISTINCT c\.id\) >= r\.minimum_character_count/);
+assert.match(pipeline, /marker_x BETWEEN 40 AND 1622/);
+assert.match(pipeline, /marker_y BETWEEN 40 AND 892/);
+assert.match(generator, /Preserve a candidate scene even when only one character is in this AI batch/);
+assert.doesNotMatch(generator, /shoppingStreetUsers/);
 assert.match(pipeline, /schedule_variant_24_hour_coverage_incomplete/);
 assert.match(pipeline, /jsonb_array_length\(v_variant->'slots'\) NOT BETWEEN 2 AND 4/);
 assert.match(generator, /_24_hour_coverage_incomplete/);
