@@ -1,6 +1,6 @@
 import { preparePrivateContext } from "./private-context-guard.ts";
 
-export const ENCOUNTER_SCHEDULE_BATCH_LIMIT = 10;
+export const ENCOUNTER_SCHEDULE_BATCH_LIMIT = 2147483647;
 export const ENCOUNTER_SCHEDULE_VARIANT_WEIGHTS = {
   weekday: { primary: 80, alternative: 20 },
   holiday: { primary: 60, alternative: 40 },
@@ -401,7 +401,7 @@ export function buildEncounterScheduleBatchMessages(
   const existingDynamicKeys = new Set(existingDynamicScenes.map((scene) => scene.location_key));
   const remainingDynamicSceneSlots = Math.max(0, 3 - existingDynamicKeys.size);
   const system = [
-    "你是 POYOZZ 的角色行程規劃器。一次為提供的 1 至 10 個公開角色整理可驗證的城市地圖行程。",
+    "你是 POYOZZ 的角色行程規劃器。一次為佇列提供的所有公開角色整理可驗證的城市地圖行程；不得自行省略任何角色。",
     "必須讀取角色名稱、稱號、職業、身分、世界觀、種族、性格、興趣、標籤、作者行程說明及 existing_author_schedules。existing_author_schedules 是作者已保存的固定時段與地點，必須原樣保留並視為優先限制，不得改寫或覆蓋；AI 只負責推演其餘空白時段。若 author_schedule_brief 為空，必須依角色卡設定推演合理日常，不可因此留白或標記無行程；若作者只提供部分時段，保留明確時段與限制，只補足空白，不得覆蓋作者設定。只使用輸入角色的設定與作者提供的行程方向，不可替角色創造與背景衝突的現代身分。歷史／古代角色若沒有作者明確設定現代相容或明確穿越，必須 placement=no_matching_location，不可放進現代城市地圖。奇幻種族只要背景明確相容現代世界，就可以正常安排。",
     "相似職業或場景必須共用 canonical location_key：酒吧老闆／酒保／酒吧員工共用 night-bar；企業主／主管／秘書共用 commercial；咖啡相關共用 cafe；音樂演出者與樂迷可共用 live-house；一般交通轉乘優先使用 train-station。不可為每個角色各造一個相似地點。",
     "場景類型可依角色群體需求使用 shopping-street、night-market、restaurant、university、hospital、gym、cinema、museum、hotel、train-station、library、theater、art-gallery、community-center、music-studio、bakery、coworking-space。新增動態場景必須是多人有共同需求的合理公共場所；university 只適用學生／教職員或明確校園活動，hospital 只適用醫療工作／就診／探病，gym 需有運動或健身理由，museum／cinema／theater 等需符合角色興趣或明確活動；不得為了增加地標而硬塞角色。最多同時顯示 3 個動態地標；只有至少 2 位不同角色在本批次的主要行程共用同一個新動態場景，且尚有空位時，才能新增該場景。若沒有空位或本批次只有 1 位角色使用新場景，必須改用已存在且合理的靜態／動態地點；若沒有合適地點，使用 placement=no_matching_location，不可硬塞不相關場景或讓角色排入不會顯示的地點。雨天備案只能使用既有室內固定場景 key：airport、commercial、night-bar、live-house、apartment、department-store、bookstore、cafe。不可輸出座標、圖片 URL、Storage path 或自行發明地標 ID。",
