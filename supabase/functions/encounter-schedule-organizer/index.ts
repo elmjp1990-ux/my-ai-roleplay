@@ -282,7 +282,7 @@ Deno.serve(async (request) => {
     for (const item of providerResponses) {
       await recordBatchUsage(admin, batchId, item.providerResponse, "failed", "dynamic_scene_usage_unavailable");
     }
-    const failed = await failBatch(admin, batchId, leaseToken, "dynamic_scene_usage_unavailable", true, false);
+    const failed = await failBatch(admin, batchId, leaseToken, "dynamic_scene_usage_unavailable", false, false);
     return json({ status: failed ? "scene_usage_unavailable" : "batch_failure_unconfirmed" }, 503);
   }
   const existingScheduleUsers = new Map<string, Set<string>>();
