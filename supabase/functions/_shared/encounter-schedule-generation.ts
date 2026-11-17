@@ -242,12 +242,25 @@ export function buildEncounterScheduleBatchMessages(sources: EncounterScheduleSo
       modern_setting_compatible: source.modern_setting_compatible === true,
       time_travel_explicit: source.time_travel_explicit === true,
       author_schedule_brief: text(source.schedule_description),
+      existing_author_schedules: Array.isArray(source.existing_author_schedules)
+        ? source.existing_author_schedules.slice(0, 50).map((value) => {
+          const row = isRecord(value) ? value : {};
+          return {
+            weekday: row.weekday ?? null,
+            day_type: text(row.day_type),
+            start_time: text(row.start_time),
+            end_time: text(row.end_time),
+            location_key: text(row.location_key),
+            activity: text(row.activity),
+          };
+        })
+        : [],
       author_private_context: privateContext.promptText,
     };
   });
   const system = [
     "你是 POYOZZ 的角色行程規劃器。一次為提供的 1 至 10 個公開角色整理可驗證的城市地圖行程。",
-    "必須讀取角色名稱、稱號、職業、身分、世界觀、種族、性格、興趣、標籤與作者行程說明。若 author_schedule_brief 為空，必須依角色卡設定推演合理日常，不可因此留白或標記無行程；若作者只提供部分時段，保留明確時段與限制，只補足空白，不得覆蓋作者設定。只使用輸入角色的設定與作者提供的行程方向，不可替角色創造與背景衝突的現代身分。歷史／古代角色若沒有作者明確設定現代相容或明確穿越，必須 placement=no_matching_location，不可放進現代城市地圖。奇幻種族只要背景明確相容現代世界，就可以正常安排。",
+    "必須讀取角色名稱、稱號、職業、身分、世界觀、種族、性格、興趣、標籤、作者行程說明及 existing_author_schedules。existing_author_schedules 是作者已保存的固定時段與地點，必須原樣保留並視為優先限制，不得改寫或覆蓋；AI 只負責推演其餘空白時段。若 author_schedule_brief 為空，必須依角色卡設定推演合理日常，不可因此留白或標記無行程；若作者只提供部分時段，保留明確時段與限制，只補足空白，不得覆蓋作者設定。只使用輸入角色的設定與作者提供的行程方向，不可替角色創造與背景衝突的現代身分。歷史／古代角色若沒有作者明確設定現代相容或明確穿越，必須 placement=no_matching_location，不可放進現代城市地圖。奇幻種族只要背景明確相容現代世界，就可以正常安排。",
     "相似職業或場景必須共用 canonical location_key：酒吧老闆／酒保／酒吧員工共用 night-bar；企業主／主管／秘書共用 commercial；咖啡相關共用 cafe。不可為每個角色各造一個相似地點。",
     "可提出 shopping-street 作為新場景候選；即使本批只有一個角色也可保留，後端會跨批次統計公開角色數，達兩個不同角色才顯示新地標。相似場景需共用同一候選，不可輸出座標、圖片 URL、Storage path 或自行發明地標 ID。",
     "每天以整點為單位規劃。連續多小時在同一地點從事同一活動，合併為一個 start_time/end_time 區間；例如 09:00–17:00 的 8 小時工作必須留在同一地點。每個變體最多 4 個時段，可保留合理空檔。",
