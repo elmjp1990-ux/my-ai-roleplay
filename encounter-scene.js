@@ -4,6 +4,14 @@
   const style=document.createElement('style');
   style.textContent=`
     .encounter-start-button{background:linear-gradient(135deg,#7969a8,#b17f9d)!important;color:#fff!important;border:1px solid #d8c8ef!important}
+    .encounter-awaiting-opening-choice .composer-input-row,.encounter-awaiting-opening-choice .composer-bottom-row{display:none!important}
+    .encounter-intro-card{display:flex;flex-direction:column;gap:12px;width:min(100%,560px);margin:0 auto;padding:16px;border:1px solid rgba(255,255,255,.22);border-radius:18px;background:linear-gradient(135deg,rgba(28,24,37,.66),rgba(68,53,73,.48));box-shadow:0 12px 32px rgba(0,0,0,.18);backdrop-filter:blur(15px);color:#fff;text-align:center}
+    .encounter-intro-card p{margin:0;color:rgba(255,250,247,.88);font-size:13px;line-height:1.7}
+    .encounter-intro-actions{display:grid;grid-template-columns:1fr;gap:9px}
+    .encounter-intro-choice{width:100%;min-height:44px;padding:11px 14px;border:1px solid rgba(255,255,255,.28);border-radius:12px;background:linear-gradient(135deg,rgba(197,170,213,.30),rgba(231,193,202,.22));color:#fff;font-size:14px;font-weight:650;cursor:pointer}
+    .encounter-intro-choice.primary{background:linear-gradient(135deg,rgba(129,108,169,.88),rgba(178,128,157,.86));border-color:rgba(255,255,255,.42)}
+    .encounter-intro-choice:disabled{opacity:.48;cursor:not-allowed}
+    .encounter-intro-note{font-size:10px!important;color:rgba(255,255,255,.62)!important}
     .chat-main.encounter-scene{position:relative;isolation:isolate;overflow:hidden;height:100dvh!important;min-height:0!important;border:0!important;border-radius:0!important;background:#15141b!important}
     .chat-main.encounter-scene:before{content:"";position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,rgba(10,9,17,.26),rgba(10,9,17,.08) 34%,rgba(10,9,17,.36) 57%,rgba(10,9,17,.88) 100%),var(--encounter-scene-photo,none) center/cover no-repeat,radial-gradient(ellipse at 70% 22%,#6a5a65 0%,#322b36 48%,#17141b 100%);filter:saturate(.9);transform:scale(1.025);pointer-events:none}
     .encounter-scene .chat-layout{height:100dvh!important;min-height:0!important}
@@ -172,8 +180,34 @@
     const messages=panel?.querySelector('.messages');
     if(!messages)return;
     const allMessages=Array.isArray(session?.messages)?session.messages:[];
-    const latestReply=[...allMessages].reverse().find(m=>m&&m.role!=='user'&&String(m.text??m.content??'').trim());
+    const hasPlayerMessage=allMessages.some(m=>m&&m.role==='user'&&String(m.text??m.content??'').trim())||session?.cloudHasUserMessage===true;
+    const greeting=String(session?.encounterGreeting||session?.cloudCharacterSnapshot?.encounterGreeting||session?.cloudCharacterSnapshot?.opening||'').trim();
+    const openingText=String(session?.initialOpeningMessage?.text||'').trim();
+    const latestReply=[...allMessages].reverse().find(m=>m&&m.role!=='user'&&String(m.text??m.content??'').trim())||
+      (openingText?{id:'opening-'+session.id,content:openingText}:null);
     const raw=String(latestReply?.text??latestReply?.content??'').trim();
+    const composer=panel.querySelector('.composer');
+    if(!hasPlayerMessage&&!raw&&session?.encounterIntroChoice!=='greet'){
+      const speakerName=String(sessionCharacter(session)?.name||session?.cloudCharacterSnapshot?.name||'角色').trim();
+      messages.innerHTML='<section class="encounter-intro-card"><p>你看見 '+e(speakerName)+' 正在眼前的場景中活動。想怎麼開始這次相遇？</p><div class="encounter-intro-actions"><button type="button" class="encounter-intro-choice primary" data-action="encounter-opening-choice" data-choice="greet">先跟 '+e(speakerName)+' 打招呼</button><button type="button" class="encounter-intro-choice" data-action="encounter-opening-choice" data-choice="wait"'+(greeting?'':' disabled')+'>等 '+e(speakerName)+' 看到你</button></div>'+(greeting?'':'<p class="encounter-intro-note">角色的場景招呼資料尚未準備好，目前可以先主動打招呼</p>')+'</section>';
+      messages.classList.remove('encounter-dialogue-ready');
+      if(composer){
+        composer.classList.add('encounter-awaiting-opening-choice');
+        composer.classList.remove('encounter-awaiting-beat');
+        const suggestions=composer.querySelector('.suggestions');
+        if(suggestions)suggestions.hidden=true;
+      }
+      messages.dataset.encounterBeatKey='opening-choice:'+session.id;
+      messages.dataset.encounterBeatIndex='0';
+      return;
+    }
+    if(composer){
+      composer.classList.remove('encounter-awaiting-opening-choice');
+      if(!hasPlayerMessage){
+        const suggestions=composer.querySelector('.suggestions');
+        if(suggestions)suggestions.hidden=true;
+      }
+    }
     const beats=raw?splitEncounterBeats(raw):[];
     const beatKey=String(latestReply?.id||latestReply?.createdAt||latestReply?.timestamp||raw.slice(0,48))+':'+raw.length+':'+beats.length;
     if(session.encounterBeatKey!==beatKey){session.encounterBeatKey=beatKey;session.encounterBeatIndex=0;}
@@ -184,10 +218,9 @@
       ? '<button type="button" class="encounter-dialogue-beat" data-action="encounter-next-beat" aria-label="點擊繼續劇情"><span class="encounter-speaker-label">'+e(speakerName)+'</span><span class="encounter-dialogue-text">'+e(beats[idx])+'</span><span class="encounter-dialogue-hint">'+(idx<beats.length-1?'點擊繼續　⌄':'劇情已讀完')+'</span></button>'
       : '<div class="encounter-dialogue-empty" aria-hidden="true"></div>';
     messages.classList.toggle('encounter-dialogue-ready',beats.length>0);
-    const composer=panel.querySelector('.composer');
     if(composer){
       const suggestions=composer.querySelector('.suggestions');
-      if(suggestions)suggestions.hidden=beats.length>0&&idx<beats.length-1;
+      if(suggestions)suggestions.hidden=!hasPlayerMessage||(beats.length>0&&idx<beats.length-1);
       composer.classList.toggle('encounter-awaiting-beat',beats.length>0&&idx<beats.length-1);
     }
     messages.dataset.encounterBeatKey=beatKey;
@@ -337,6 +370,18 @@
     });
   }
   document.addEventListener('click',event=>{
+    const openingChoice=event.target.closest('[data-action="encounter-opening-choice"]');
+    if(openingChoice){
+      event.preventDefault();
+      const session=currentSession();
+      if(!session?.encounterMode)return;
+      const choice=openingChoice.dataset.choice;
+      if(choice==='wait'&&!String(session.encounterGreeting||session.cloudCharacterSnapshot?.encounterGreeting||session.cloudCharacterSnapshot?.opening||'').trim())return;
+      window.dispatchEvent(new CustomEvent('poyozz-encounter-opening-choice',{
+        detail:{sessionId:session.id,choice}
+      }));
+      return;
+    }
     const target=event.target.closest('[data-action="encounter-next-beat"]');
     if(!target)return;
     const session=currentSession();
