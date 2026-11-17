@@ -2095,42 +2095,48 @@ async function loadCharacterIllustrationAssets(characterIds, cleanupUserId=null)
 // Do not sign the primary image or every unused gallery item just to render one sprite.
 const encounterGalleryIllustrationCache = new Map();
 const encounterGalleryIllustrationInflight = new Map();
-function applyEncounterGalleryIllustration(characterId,asset) {
+function applyEncounterGalleryIllustration(characterId,asset,replaceSelected=false) {
   if(!asset)return;
   let changed=false;
+  const apply=target=>{
+    if(!target)return;
+    const current=Array.isArray(target.galleryIllustrations)?target.galleryIllustrations:[];
+    const exists=current.some(item=>item?.id===asset.id);
+    if(replaceSelected){
+      if(current.length!==1||current[0]?.id!==asset.id){target.galleryIllustrations=[asset];changed=true;}
+    }else if(!exists&&!current.length){
+      target.galleryIllustrations=[asset];changed=true;
+    }
+  };
   const current=state.characters.find(character=>character.id===characterId);
-  if(current&&(!Array.isArray(current.galleryIllustrations)||!current.galleryIllustrations.length)){
-    current.galleryIllustrations=[asset];changed=true;
-  }
+  apply(current);
   const session=currentSession();
-  if(session?.characterId===characterId&&session.cloudCharacterSnapshot&&
-     (!Array.isArray(session.cloudCharacterSnapshot.galleryIllustrations)||!session.cloudCharacterSnapshot.galleryIllustrations.length)){
-    session.cloudCharacterSnapshot.galleryIllustrations=[asset];changed=true;
-  }
+  if(session?.characterId===characterId)apply(session.cloudCharacterSnapshot);
   if(changed)persist();
 }
-async function hydrateEncounterGalleryIllustration(characterId) {
+async function hydrateEncounterGalleryIllustration(characterId,illustrationId=null) {
   const client=window.mySupabase;
   if(!client||!characterId)return null;
   const requestUid=currentUser()?.uid||null;
-  const key=(requestUid||'public')+':'+characterId;
+  const selectedId=isUuid(illustrationId)?illustrationId:null;
+  const key=(requestUid||'public')+':'+characterId+':'+(selectedId||'first');
   const cached=encounterGalleryIllustrationCache.get(key);
   if(cached?.asset){
     const src=await getCharacterIllustrationSignedUrl(cached.asset.path);
     const asset={...cached.asset,src};
-    applyEncounterGalleryIllustration(characterId,asset);
+    applyEncounterGalleryIllustration(characterId,asset,!!selectedId);
     return asset;
   }
   if(cached&&!cached.asset&&cached.checkedAt>Date.now()-30000)return null;
   if(encounterGalleryIllustrationInflight.has(key))return encounterGalleryIllustrationInflight.get(key);
   const request=(async()=>{
-    const {data:row,error}=await client.from('character_illustrations')
+    let query=client.from('character_illustrations')
       .select('id,character_id,storage_path,sort_order,display_name')
       .eq('character_id',characterId)
-      .eq('asset_type','gallery')
-      .order('sort_order',{ascending:true})
-      .limit(1)
-      .maybeSingle();
+      .eq('asset_type','gallery');
+    if(selectedId)query=query.eq('id',selectedId);
+    else query=query.order('sort_order',{ascending:true});
+    const {data:row,error}=await query.limit(1).maybeSingle();
     if(error)throw new Error('讀取相遇立繪資料失敗：'+error.message);
     if((currentUser()?.uid||null)!==requestUid)return null;
     if(!row){
@@ -2141,7 +2147,7 @@ async function hydrateEncounterGalleryIllustration(characterId) {
     if((currentUser()?.uid||null)!==requestUid)return null;
     const asset={id:row.id,path:row.storage_path,src,sortOrder:row.sort_order,name:row.display_name||''};
     encounterGalleryIllustrationCache.set(key,{asset:{...asset,src:''},checkedAt:Date.now()});
-    applyEncounterGalleryIllustration(characterId,asset);
+    applyEncounterGalleryIllustration(characterId,asset,!!selectedId);
     return asset;
   })();
   encounterGalleryIllustrationInflight.set(key,request);
