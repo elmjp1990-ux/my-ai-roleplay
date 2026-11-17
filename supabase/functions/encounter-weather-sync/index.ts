@@ -38,12 +38,21 @@ Deno.serve(async (request) => {
     });
     const { data: previous, error: readError } = await admin
       .from("encounter_city_weather")
-      .select("weather_text, temperature_c, is_raining")
+      .select("weather_text, temperature_c, is_raining, fetched_at")
       .eq("city_key", "taipei")
       .maybeSingle();
     if (readError) return json({ error: "weather_cache_read_failed" }, 503);
 
     const now = new Date();
+    const currentSlot = Math.floor(now.getTime() / (6 * 60 * 60 * 1000));
+    const previousFetchedAt = previous?.fetched_at ? new Date(previous.fetched_at) : null;
+    const previousSlot = previousFetchedAt && Number.isFinite(previousFetchedAt.getTime())
+      ? Math.floor(previousFetchedAt.getTime() / (6 * 60 * 60 * 1000)) : null;
+    if (previous && previousSlot === currentSlot) {
+      return json({ status: "unchanged", city: "taipei", weather_text: previous.weather_text,
+        temperature_c: previous.temperature_c, is_raining: previous.is_raining,
+        fetched_at: previous.fetched_at, source: "poyozz_fictional_seasonal" });
+    }
     const weather = createEncounterWeather(now, previous?.weather_text || "");
     const unchanged = previous?.weather_text === weather.weatherText
       && Number(previous?.temperature_c) === weather.temperatureC
