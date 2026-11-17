@@ -15,3 +15,7 @@ verify_jwt = false
 [functions.encounter-weather-sync]
 # The handler validates the service-role key and CWA key explicitly.
 verify_jwt = false
+
+[functions.encounter-taiwan-calendar-sync]
+# The handler validates the service-role key before importing official workdays.
+verify_jwt = false
