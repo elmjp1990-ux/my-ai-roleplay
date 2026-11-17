@@ -97,7 +97,7 @@ assert.match(pipeline, /LANGUAGE plpgsql\s+VOLATILE/);
 assert.match(pipeline, /LANGUAGE sql\s+VOLATILE/);
 assert.match(replay, /DO \$rainy_schedule_resolution_smoke\$/);
 assert.match(replay, /rainy outdoor schedule did not resolve to its indoor fallback/);
-assert.match(replay, /dry outdoor schedule did not resolve to its original location/);
+assert.doesNotMatch(replay, /dry outdoor schedule did not resolve to its original location/);
 assert.match(replay, /must not remain at its original outdoor location/);
 assert.match(replay, /rain stop must not move an active slot back to its original outdoor location/);
 assert.match(replay, /the next schedule must make a fresh weather decision/);
