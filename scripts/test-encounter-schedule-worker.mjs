@@ -45,10 +45,15 @@ assert.match(pipeline, /LEFT JOIN public\.character_schedule_descriptions d/);
 assert.doesNotMatch(pipeline, /btrim\(COALESCE\(d\.description, ''\)\) <> ''/,
   "AI schedule generation must support public characters with no author-entered schedule");
 assert.match(pipeline, /enqueue_encounter_schedule_generation_internal/);
+assert.match(batchSemantics, /v_oldest > v_now - interval '24 hours'/);
+assert.match(batchSemantics, /MAX\\(b\\.completed_at\\)/);
+assert.match(batchSemantics, /v_last_completed > v_now - interval '6 hours'/);
+assert.doesNotMatch(batchSemantics, /v_daily_count|daily_limit|four batches per/i);
+assert.match(batchSemantics, /schedule_batch_character_count_invalid/);
+assert.match(batchSemantics, /remaining_character_count/);
+assert.match(worker, /p_characters: \\[item\\.character\\]/);
+assert.doesNotMatch(worker, /sources\\.length > 10/);
 assert.match(pipeline, /WHEN public\.encounter_schedule_generation_jobs\.status IN[\s\S]*?'pending', 'processing', 'failed', 'needs_reconciliation'[\s\S]*?THEN public\.encounter_schedule_generation_jobs\.queued_at/);
-assert.match(pipeline, /v_oldest > v_now - interval '23 hours 45 minutes'/);
-assert.match(pipeline, /v_daily_count >= 4/);
-assert.match(pipeline, /v_last_started > v_now - interval '6 hours'/);
 assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_city_weather/);
 assert.doesNotMatch(pipeline, /encounter_weather_baseline_2025/, "Illustrative weather must not depend on historical weather imports");
 assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.get_encounter_city_weather\(\)/);
