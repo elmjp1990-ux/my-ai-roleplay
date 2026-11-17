@@ -5,6 +5,8 @@ on:
     paths:
       - "index.html"
       - "encounter-scene.js"
+      - "city-map.js"
+      - "scripts/test-city-map-module.mjs"
       - "supabase/functions/encounter-turn/**"
       - "supabase/functions/encounter-session/**"
       - "supabase/functions/encounter-schedule-organizer/**"
@@ -34,6 +36,8 @@ jobs:
           node-version: "22"
       - name: Test Encounter response schema and length boundaries
         run: node scripts/test-encounter-ai-output.mjs
+      - name: Test city map dynamic scene registry contract
+        run: node scripts/test-city-map-module.mjs
       - name: Test schedule worker security and wallet isolation
         run: node scripts/test-encounter-schedule-worker.mjs
       - uses: denoland/setup-deno@v2
