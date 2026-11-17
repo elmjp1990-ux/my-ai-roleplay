@@ -115,3 +115,31 @@ assert.match(snapshotScenarios,/DELETE FROM public\.character_illustrations WHER
   'group snapshot-only access must be tested without a matching illustration metadata row');
 assert.match(snapshotScenarios,/anonymous viewers unexpectedly received access to an NSFW portrait/,
   'the original public Storage policy must retain its NSFW gate');
+
+const backfillMigration = fs.readFileSync(
+  'supabase/migrations/20261116172000_backfill_existing_chat_snapshot_image_paths.sql',
+  'utf8',
+);
+assert.match(backfillMigration,/UPDATE public\.chat_sessions AS cs[\s\S]*?\{imagePath\}/,
+  'existing single-chat snapshots must receive imagePath');
+assert.match(backfillMigration,/UPDATE public\.chat_group_members AS gm[\s\S]*?\{imagePath\}/,
+  'existing group-member snapshots must receive imagePath');
+assert.match(backfillMigration,/ci\.asset_type = 'primary'/,
+  'backfill must use primary illustration metadata only');
+assert.match(backfillMigration,/ORDER BY ci\.sort_order ASC, ci\.created_at ASC, ci\.id ASC/,
+  'backfill must select a deterministic primary illustration');
+assert.match(backfillMigration,/COALESCE\(cs\.character_snapshot->>'imagePath', ''\) = ''/,
+  'single-chat backfill must never overwrite a populated imagePath');
+assert.match(backfillMigration,/COALESCE\(gm\.character_snapshot->>'imagePath', ''\) = ''/,
+  'group backfill must never overwrite a populated imagePath');
+assert.match(backfillMigration,/cs\.deleted_at IS NULL/,
+  'deleted single-chat sessions must remain excluded');
+assert.match(backfillMigration,/g\.deleted_at IS NULL/,
+  'deleted groups must remain excluded');
+assert.match(backfillMigration,/NULLIF\(btrim\(ci\.storage_path\), ''\) IS NOT NULL/,
+  'empty Storage paths must not be backfill');
+assert.doesNotMatch(backfillMigration,/updated_at\s*=/i,
+  'backfill must not change chat updated_at');
+assert.doesNotMatch(backfillMigration,/DELETE\s+FROM|TRUNCATE\s+TABLE|DROP\s+/i,
+  'backfill must not delete or drop user data');
+console.log('Existing chat snapshot imagePath backfill contract passed.');
