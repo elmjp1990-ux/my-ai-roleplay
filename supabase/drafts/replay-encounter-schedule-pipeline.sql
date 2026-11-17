@@ -44,6 +44,18 @@ INSERT INTO public.character_schedules (
   '', true, 'cafe', '改到咖啡廳避雨',
   pg_catalog.repeat('下雨時改到咖啡廳等待雨勢變小。', 12)
 );
+INSERT INTO public.character_schedules (
+  id, character_id, day_type, start_time, end_time, location_key, activity,
+  priority, is_active, source_type, variant_key, variant_weight, special_event_key,
+  encounter_greeting, is_outdoor
+) VALUES (
+  '00000000-0000-4000-8000-000000000013'::uuid,
+  '00000000-0000-4000-8000-000000000010'::uuid,
+  'any', '09:00', '17:00', 'bookstore', '參加節日限定活動',
+  0, true, 'manual', 'special', 100, 'taiwan_public_holiday',
+  pg_catalog.repeat('今天是假日限定活動日，你們在書店安排了特別的展覽與交流，氣氛比平常更熱鬧。', 5),
+  false
+);
 SET LOCAL session_replication_role = origin;
 
 SET LOCAL ROLE service_role;
@@ -245,5 +257,51 @@ BEGIN
   END IF;
 END;
 $rainy_schedule_resolution_smoke$;
+
+DO $special_event_schedule_smoke$
+DECLARE
+  v_result record;
+BEGIN
+  INSERT INTO public.taiwan_calendar_days (calendar_date, day_type, holiday_name, source)
+  VALUES ('2026-11-17'::date, 'holiday', '測試國定假日', 'disposable_smoke_test')
+  ON CONFLICT (calendar_date) DO UPDATE
+  SET day_type = EXCLUDED.day_type,
+      holiday_name = EXCLUDED.holiday_name,
+      source = EXCLUDED.source,
+      updated_at = pg_catalog.now();
+
+  IF public.resolve_encounter_special_event_key('2026-11-17'::date) <> 'taiwan_public_holiday'
+     OR public.resolve_encounter_special_event_key('2026-02-14'::date) <> 'valentines_day'
+     OR public.resolve_encounter_special_event_key('2026-12-25'::date) <> 'christmas'
+     OR public.resolve_encounter_special_event_key('2026-11-18'::date) IS NOT NULL THEN
+    RAISE EXCEPTION 'special event date resolver returned an unexpected key';
+  END IF;
+
+  SELECT * INTO v_result
+  FROM public.resolve_encounter_character_schedule(
+    '00000000-0000-4000-8000-000000000010'::uuid,
+    NULL,
+    'bookstore',
+    '2026-11-17T10:00:00+08:00'::timestamptz
+  );
+  IF NOT FOUND
+     OR v_result.location_key <> 'bookstore'
+     OR v_result.activity <> '參加節日限定活動'
+     OR v_result.variant_key <> 'special' THEN
+    RAISE EXCEPTION 'official holiday special schedule was not selected';
+  END IF;
+
+  SELECT * INTO v_result
+  FROM public.resolve_encounter_character_schedule(
+    '00000000-0000-4000-8000-000000000010'::uuid,
+    NULL,
+    'bookstore',
+    '2026-11-18T10:00:00+08:00'::timestamptz
+  );
+  IF FOUND THEN
+    RAISE EXCEPTION 'special holiday schedule must not leak into an ordinary day';
+  END IF;
+END;
+$special_event_schedule_smoke$;
 
 ROLLBACK;
