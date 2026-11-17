@@ -19,6 +19,7 @@ const endpoint = fs.readFileSync("supabase/functions/encounter-turn/index.ts", "
 const guidelines = fs.readFileSync("supabase/functions/_shared/encounter-response-guidelines.ts", "utf8");
 const frontend = fs.readFileSync("index.html", "utf8");
 const scene = fs.readFileSync("encounter-scene.js", "utf8");
+const sessionCreator = fs.readFileSync("supabase/functions/encounter-session/index.ts", "utf8");
 assert.match(endpoint, /requestOpenRouterChatCompletion/);
 assert.match(endpoint, /POYOZZ_DEFAULT_CHAT_MODEL/);
 assert.match(endpoint, /reserve_encounter_chat_turn/);
@@ -47,6 +48,10 @@ assert.match(scene, /data-action="encounter-opening-choice"/);
 assert.match(scene, /data-choice="greet"/);
 assert.match(scene, /data-choice="wait"/);
 assert.match(endpoint, /openingMessage = asRow\(asRow\(session\.session_data\)\.openingMessage\)/);
+assert.match(endpoint, /encounterSchedule/);
+assert.doesNotMatch(endpoint, /from\(["']encounter_session_lifecycle["']\)/);
+assert.match(sessionCreator, /snapshot\.encounterSchedule = scheduleSnapshot/);
+assert.match(sessionCreator, /snapshot\.encounterGreeting/);
 const openingHandlerStart = frontend.indexOf("window.addEventListener('poyozz-encounter-opening-choice'");
 const openingHandlerEnd = frontend.indexOf("async function markCloudChatSessionRead", openingHandlerStart);
 assert.ok(openingHandlerStart >= 0 && openingHandlerEnd > openingHandlerStart, "Opening-choice persistence handler must exist");
