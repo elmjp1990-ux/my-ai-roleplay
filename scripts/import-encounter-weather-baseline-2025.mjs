@@ -33,10 +33,10 @@ const header = headers[0].map((value) => String(value).trim());
 const find = (patterns) => header.findIndex((value) => patterns.some((pattern) => normalize(value).includes(pattern)));
 const dateIndex = find(["datetime", "觀測時間", "年月日時", "日期時間"]);
 const temperatureIndex = find(["airtemperature", "氣溫", "溫度"]);
-const rainfallIndex = find(["precipitation", "降水量", "雨量"]);
+const rainfallIndex = find(["past1hr", "過去1小時", "時雨量", "一小時降水量", "hourlyprecipitation"]);
 const stationIndex = find(["stationid", "測站代碼", "測站編號"]);
 if (dateIndex < 0 || temperatureIndex < 0 || rainfallIndex < 0) {
-  throw new Error("CSV must include observation time, air temperature, and precipitation columns");
+  throw new Error("CSV must include observation time, air temperature, and hourly rainfall (Past1hr / 過去1小時 / 時雨量). Daily accumulated precipitation is not valid for hourly rain probability");
 }
 
 const buckets = new Map();
