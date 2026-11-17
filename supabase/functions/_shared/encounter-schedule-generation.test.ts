@@ -144,7 +144,7 @@ Deno.test("only retains a new shopping-street scene when multiple characters sha
     characters: [
       { character_id: id1, placement: "modern_map", variants: variants(fullDaySlots({ location_key: "shopping-street", is_outdoor: true,
         rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳", rain_fallback_greeting: greeting })]) },
-      { character_id: id2, placement: "modern_map", variants: variants([slot({ location_key: "shopping-street", is_outdoor: true,
+      { character_id: id2, placement: "modern_map", variants: variants(fullDaySlots({ location_key: "shopping-street", is_outdoor: true,
         rain_fallback_location_key: "bookstore", rain_fallback_activity: "改在書店", rain_fallback_greeting: greeting })]) },
     ],
   }), [source(id1), source(id2)]);
@@ -156,7 +156,7 @@ Deno.test("only retains a new shopping-street scene when multiple characters sha
 Deno.test("rejects arbitrary model coordinates and invalid variant weights", () => {
   const extraField = result([{
     character_id: id1, placement: "modern_map",
-    variants: variants([slot({ x: 500 })]),
+    variants: variants(fullDaySlots({ x: 500 })),
   }]);
   if (extraField.ok) throw new Error("arbitrary coordinates accepted");
   const wrongWeight = variants();
