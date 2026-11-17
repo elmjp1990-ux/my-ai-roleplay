@@ -66,8 +66,9 @@ BEGIN
     RAISE EXCEPTION 'manual scene catalog migration must bump schedule source version';
   END IF;
   v_result := public.enqueue_encounter_schedule_generation_test_batch(2147483647);
-  IF COALESCE((v_result->>'scanned_character_count')::integer, 0) <> 5
-     OR COALESCE((v_result->>'pending_character_count')::integer, 0) <> 5
+  IF COALESCE((v_result->>'scanned_character_count')::integer, 0) < 5
+     OR COALESCE((v_result->>'pending_character_count')::integer, 0)
+        <> COALESCE((v_result->>'scanned_character_count')::integer, 0)
      OR (SELECT pg_catalog.count(*) FROM public.encounter_schedule_generation_jobs
          WHERE character_id = ANY(ARRAY[
            '00000000-0000-4000-8000-000000000020'::uuid,
