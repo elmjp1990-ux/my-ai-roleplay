@@ -3,6 +3,15 @@
 
 BEGIN;
 
+-- A new scene key can be associated with the currently existing fallback image path;
+-- this is metadata-only and does not add or upload an image asset.
+INSERT INTO public.encounter_scene_backgrounds (
+  location_key, display_name, asset_path, is_active, sort_order
+) VALUES (
+  'restaurant', 'Replay-only restaurant background metadata',
+  './encounter-default-scene.webp', true, 999
+);
+
 SET LOCAL session_replication_role = replica;
 INSERT INTO public.characters (
   id, author_id, name, visibility, review_status, rights_confirmed, is_nsfw
