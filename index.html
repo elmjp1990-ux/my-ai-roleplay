@@ -10035,6 +10035,7 @@ document.addEventListener('click',async event=>{
     const state=String(data?.status||'unknown');
     if(state==='completed'){
       window.PoyozzCityMap?.refreshScenes?.();
+      window.PoyozzCityMap?.refreshSchedules?.();
       const sceneStatus=data.scene_publish_status==='failed'?'；場景文案更新失敗，請檢查後端記錄':data.scene_publish_status==='partial'?'；有 '+Number(data.skipped_scene_count||0)+' 個場景因資格或地圖名額限制未發布':'；場景資料更新 '+Number(data.published_scene_count||0)+' 個';
       toast('本次待整理 '+Number(data.queued_character_count||0)+' 位；已完成 '+Number(data.published_character_count||0)+' 位，無匹配地點 '+Number(data.unplaced_character_count||0)+' 位'+sceneStatus+'。');
     }
