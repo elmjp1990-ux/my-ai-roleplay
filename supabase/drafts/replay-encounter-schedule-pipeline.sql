@@ -155,14 +155,19 @@ DO $rainy_schedule_resolution_smoke$
 DECLARE
   v_result record;
 BEGIN
-  UPDATE public.encounter_city_weather
-  SET weather_text = '短暫陣雨',
-      temperature_c = 25,
-      is_raining = true,
-      source = 'poyozz_fictional_seasonal',
-      fetched_at = pg_catalog.now(),
-      updated_at = pg_catalog.now()
-  WHERE city_key = 'taipei';
+  INSERT INTO public.encounter_city_weather (
+    city_key, weather_text, temperature_c, is_raining, source, fetched_at, updated_at
+  ) VALUES (
+    'taipei', '短暫陣雨', 25, true, 'poyozz_fictional_seasonal',
+    pg_catalog.now(), pg_catalog.now()
+  )
+  ON CONFLICT (city_key) DO UPDATE
+  SET weather_text = EXCLUDED.weather_text,
+      temperature_c = EXCLUDED.temperature_c,
+      is_raining = EXCLUDED.is_raining,
+      source = EXCLUDED.source,
+      fetched_at = EXCLUDED.fetched_at,
+      updated_at = EXCLUDED.updated_at;
 
   SELECT * INTO v_result
   FROM public.resolve_encounter_character_schedule(
