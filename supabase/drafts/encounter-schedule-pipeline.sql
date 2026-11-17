@@ -211,7 +211,7 @@ CREATE TABLE IF NOT EXISTS public.encounter_scene_backgrounds (
     'airport', 'commercial', 'night-bar', 'live-house', 'apartment',
     'department-store', 'bookstore', 'cafe', 'park', 'shopping-street'
   )),
-  CHECK (asset_path ~ '^([.]/|/)[A-Za-z0-9_./-]+
+  CHECK (asset_path ~ '^([.]/|/)[A-Za-z0-9_./-]+$')
 );
 
 INSERT INTO public.encounter_scene_backgrounds (location_key, display_name, asset_path, is_active, sort_order)
