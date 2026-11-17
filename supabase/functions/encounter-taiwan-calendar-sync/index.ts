@@ -7,8 +7,8 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json",
 };
-const DATASET_URL = "https://data.ntpc.gov.tw/api/v1/openapi/units/1190000";
-const PAGE_SIZE = 5000;
+const DATASET_URL = "https://data.ntpc.gov.tw/api/datasets/308dcd75-6434-45bc-a95f-584da4fed251/json";
+const PAGE_SIZE = 1000;
 
 function json(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: CORS });
@@ -36,12 +36,12 @@ Deno.serve(async (request) => {
 
   try {
     const allRows: ReturnType<typeof parseTaiwanCalendarRows> = [];
-    let offset = 0;
+    let page = 0;
     const seenPages = new Set<string>();
     for (let pageIndex = 0; pageIndex < 10; pageIndex++) {
       const datasetUrl = new URL(DATASET_URL);
-      datasetUrl.searchParams.set("offset", String(offset));
-      datasetUrl.searchParams.set("limit", String(PAGE_SIZE));
+      datasetUrl.searchParams.set("page", String(page));
+      datasetUrl.searchParams.set("size", String(PAGE_SIZE));
       const response = await fetch(datasetUrl, {
         headers: { Accept: "application/json" },
         signal: AbortSignal.timeout(15000),
@@ -50,7 +50,7 @@ Deno.serve(async (request) => {
       const payload = await response.json();
       const parsedRows = parseTaiwanCalendarRows(payload);
       if (!parsedRows.length) {
-        if (offset === 0) throw new Error("calendar_dataset_empty_or_schema_changed");
+        if (page === 0) throw new Error("calendar_dataset_empty_or_schema_changed");
         break;
       }
       const pageSignature = parsedRows[0].calendar_date + ":" + parsedRows[parsedRows.length - 1].calendar_date;
@@ -58,7 +58,7 @@ Deno.serve(async (request) => {
       seenPages.add(pageSignature);
       allRows.push(...parsedRows);
       if (parsedRows.length < PAGE_SIZE) break;
-      offset += parsedRows.length;
+      page += 1;
     }
 
     const deduped = [...new Map(allRows.map((row) => [row.calendar_date, row])).values()];
@@ -79,7 +79,7 @@ Deno.serve(async (request) => {
 
     return json({
       status: "updated",
-      source: "data.gov.tw:123662 / data.ntpc.gov.tw:1190000",
+      source: "data.gov.tw:123662 / data.ntpc.gov.tw:308dcd75-6434-45bc-a95f-584da4fed251",
       upserted_count: upserted,
       date_from: deduped[0].calendar_date,
       date_to: deduped[deduped.length - 1].calendar_date,
