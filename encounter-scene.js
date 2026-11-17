@@ -249,7 +249,7 @@
       const dedicatedSprite=safeImage(character?.encounterPortraitImage||character?.halfBodyImage||character?.transparentPortrait||character?.encounterSprite||'');
       const sceneIllustration=safeImage(selectedGalleryImage||character?.galleryIllustrations?.[0]?.src||'');
       const halfBodyImage=selectedGalleryImage||dedicatedSprite||sceneIllustration;
-      const useGallerySprite=!!selectedIllustrationId||!dedicatedSprite;
+      const useGallerySprite=!!selectedGalleryImage||!dedicatedSprite;
       let existingSprite=panel.querySelector('.encounter-character-sprite');
       const missingArt=panel.querySelector('.encounter-missing-art');
       if(halfBodyImage){
