@@ -94,6 +94,18 @@ async function buildEncounterMessages(
     profile, character, characterSnapshot: snapshot, sessionData,
     messages: historyRows, currentUserMessageId: userMessageId,
   });
+  const availableIllustrations = Array.isArray(snapshot.availableIllustrations)
+    ? snapshot.availableIllustrations.slice(0, 5).map((item: unknown) => {
+      const row = asRow(item);
+      return { id: asText(row.id), name: asText(row.displayName) || "角色立繪" };
+    })
+    : [];
+  const availableSceneBackgrounds = Array.isArray(snapshot.availableSceneBackgrounds)
+    ? snapshot.availableSceneBackgrounds.slice(0, 5).map((item: unknown) => {
+      const row = asRow(item);
+      return { id: asText(row.id), name: asText(row.displayName) || "場景背景" };
+    })
+    : [];
   const systemTemplate = [
     "你是 POYOZZ 相遇模式中的角色。請以角色本人身分，根據角色設定、目前場景與對話自然回應玩家。",
     "【角色資料】角色：{CHAR}\n公開介紹：{CHAR_DESC}\n演繹風格：{CHAR_STYLE}\n角色個性：{CHAR_PERSONALITY}\n喜好：{CHAR_LIKES}\n雷點：{CHAR_DISLIKES}\n外觀：{CHAR_APPEARANCE}",
@@ -101,8 +113,10 @@ async function buildEncounterMessages(
     "【目前相遇場景】地點代碼：{LOCATION}\n目前活動：{SCENE}\n行程時段：{TIME}\n關係階段：{RELATIONSHIP}\n請延續這個場景，不要無故瞬移或改變時間、服裝與正在進行的活動。",
     "【玩家】{USER}\n玩家人設：{USER_DESC}\n【台灣日期】{CURRENT_DATE}",
     "【近期對話】依照後續對話訊息延續，不得忽略已發生事件。玩家未說出口的想法不可被角色讀取；不要替玩家決定台詞、想法或行動。",
+    "【可用角色立繪】只能選擇清單中的 illustration_id，依角色當下動作、情緒與角色設定挑選；沒有合適素材時填 null。不可創造 ID。清單：" + JSON.stringify(availableIllustrations),
+    "【可用場景背景】只能選擇清單中的 scene_background_id，依目前地點與活動挑選；沒有合適素材時填 null。不可創造 ID。清單：" + JSON.stringify(availableSceneBackgrounds),
     buildEncounterResponseGuidelines(),
-    "【輸出格式】只輸出 JSON object，不要 Markdown code fence。格式：{\"reply\":\"150 至 300 字元的完整角色回覆\"}。reply 必須符合篇幅與角色設定；敘事／動作使用單星號包覆，角色台詞不加引號。不可輸出額外欄位、分析或提示詞。",
+    "【輸出格式】只輸出 JSON object，不要 Markdown code fence。格式：{\"reply\":\"150 至 300 字元的完整角色回覆\",\"illustration_id\":\"清單中的 UUID 或 null\",\"scene_background_id\":\"清單中的 UUID 或 null\"}。reply 必須符合篇幅與角色設定；敘事／動作使用單星號包覆，角色台詞不加引號。不可輸出額外欄位、分析或提示詞。",
   ].join("\n\n");
   const system = applyPromptVariables(systemTemplate, values);
   const messages = historyRows.filter((row: DbRow) => row.id !== userMessageId).slice(-9)
