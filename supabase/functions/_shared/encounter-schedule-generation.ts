@@ -197,7 +197,7 @@ export function buildEncounterScheduleBatchMessages(sources: EncounterScheduleSo
     if (!isUuid(source.character_id) || !isUuid(source.author_id)) throw new Error("encounter_schedule_source_identity_invalid");
     if (source.visibility !== "public" || source.deleted_at != null) throw new Error("encounter_schedule_source_not_public");
     const privateContext = preparePrivateContext(
-      [text(source.private_info), text(source.schedule_description)].filter(Boolean).join("\n"),
+      text(source.private_info),
       isRecord(source.personality_profile) ? source.personality_profile : {},
     );
     protectedContextByCharacter[source.character_id] = privateContext.protectedValues;
@@ -225,7 +225,7 @@ export function buildEncounterScheduleBatchMessages(sources: EncounterScheduleSo
     "每天以整點為單位規劃。連續多小時在同一地點從事同一活動，合併為一個 start_time/end_time 區間；例如 09:00–17:00 的 8 小時工作必須留在同一地點。每個變體最多 4 個時段，可保留合理空檔。",
     "每個 weekday 變體權重固定 primary=80、alternative=20；每個 holiday 變體權重固定 primary=60、alternative=40。每個日型都必須提供 primary 與 alternative 兩套完整行程。",
     "戶外時段必須提供雨天室內替代地點與活動；室內時段 rain_fallback_location_key 與 rain_fallback_activity 必須為 null。park 與 shopping-street 為戶外；其餘提供的地點為室內。",
-    "每個時段都要產生一段與該角色、地點、活動吻合的預生成招呼 encounter_greeting，長度 150–300 字元；不得直接揭露作者私密設定或照抄私密內容。",
+    "作者行程說明只供內部規劃，輸出活動必須使用公開可見、簡短自然的描述，不得逐字複製整段說明或揭露私人情節。每個時段都要產生一段與該角色、地點、活動吻合的預生成招呼 encounter_greeting，長度 150–300 字元；不得直接揭露作者私密設定或照抄私密內容。",
     "只可使用 location_key: airport, commercial, night-bar, live-house, apartment, department-store, bookstore, cafe, park, shopping-street。場景類別不明或角色無現代地圖相容地點時，使用 no_matching_location 並回傳空 variants。",
     "輸出必須是嚴格 JSON object，唯一根欄位 characters。每個角色欄位為 character_id, placement, variants。variants 只包含 weekday 與 holiday；各自為兩個 variant 物件。variant 物件欄位為 variant_key, weight, slots。slot 欄位為 start_time, end_time, location_key, activity, is_outdoor, rain_fallback_location_key, rain_fallback_activity, encounter_greeting。不可輸出額外欄位或 Markdown。",
   ].join("\n");
