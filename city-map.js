@@ -237,25 +237,31 @@
     layer.setAttribute('id','cityDynamicSceneMarkers');
     const existing=[];
     svg.querySelectorAll('.city-place-marker[data-place]').forEach(marker=>{
-      const match=String(marker.getAttribute('transform')||'').match(/translate\(\s*(-?[\d.]+)[ ,]+(-?[\d.]+)\s*\)/);
+      const match=String(marker.getAttribute('transform')||'').match(/translate\\(\\s*(-?[\\d.]+)[ ,]+(-?[\\d.]+)\\s*\\)/);
       if(match)existing.push({x:Number(match[1]),y:Number(match[2])});
     });
     let added=0;
     for(const row of (Array.isArray(rows)?rows:[])){
-      if(added>=MAX_DYNAMIC_SCENE_MARKERS)break;
       const key=String(row?.location_key||'').trim();
       const name=String(row?.display_name||'').trim();
-      const x=Number(row?.marker_x),y=Number(row?.marker_y);
-      if(!/^[a-z0-9-]{1,48}$/.test(key)||!name||Object.prototype.hasOwnProperty.call(cityPlaceNames,key)||
-        !Number.isFinite(x)||!Number.isFinite(y)||x<40||x>1622||y<40||y>892)continue;
-      if(existing.some(point=>Math.hypot(point.x-x,point.y-y)<120))continue;
+      if(!/^[a-z0-9-]{1,48}$/.test(key)||!name)continue;
       const scene={
         icon:String(row.icon||'📍'),heading:String(row.heading||name),
         description:String(row.description||'這個場景由多位公開角色的共同行程建立。'),
-        eventLabel:String(row.event_label||'場景亮點'),
-        eventTitle:String(row.event_title||'街角的相遇'),
-        eventDescription:String(row.event_description||'在這個共同場景中遇見城市裡的人。')
+        eventLabel:String(row.event_label||'最新消息'),
+        eventTitle:String(row.event_title||'場景消息已更新'),
+        eventDescription:String(row.event_description||'這裡有符合場景定位的日常活動與消息。')
       };
+      // Built-in markers keep their original geometry; AI may update their title and copy.
+      if(Object.prototype.hasOwnProperty.call(cityPlaceNames,key)){
+        cityPlaceNames[key]=name;
+        cityVenueScenes[key]=scene;
+        continue;
+      }
+      if(row.is_dynamic!==true||added>=MAX_DYNAMIC_SCENE_MARKERS)continue;
+      const x=Number(row?.marker_x),y=Number(row?.marker_y);
+      if(!Number.isFinite(x)||!Number.isFinite(y)||x<40||x>1622||y<40||y>892)continue;
+      if(existing.some(point=>Math.hypot(point.x-x,point.y-y)<120))continue;
       cityPlaceNames[key]=name;
       cityVenueScenes[key]=scene;
       cityPlaceAliases[key]=[key];
@@ -277,7 +283,8 @@
       glyph.setAttribute('class','city-marker-glyph city-marker-emoji');
       glyph.setAttribute('x','0');glyph.setAttribute('y','1');
       glyph.setAttribute('text-anchor','middle');glyph.setAttribute('dominant-baseline','central');
-      glyph.setAttribute('font-size','18');glyph.setAttribute('font-family','system-ui, sans-serif');glyph.setAttribute('fill','#fff');glyph.setAttribute('pointer-events','none');
+      glyph.setAttribute('font-size','18');glyph.setAttribute('font-family','system-ui, sans-serif');
+      glyph.setAttribute('fill','#fff');glyph.setAttribute('pointer-events','none');
       glyph.textContent=scene.icon;
       marker.append(hit,glass,glyph);
       layer.appendChild(marker);
@@ -292,13 +299,13 @@
     if(cached)renderCityDynamicScenes(cached.data);
     if(cached?.fresh)return;
     try{
-      const {data,error}=await client.rpc('get_encounter_scene_registry');
+      const {data,error}=await client.rpc('get_encounter_scene_catalog');
       if(error)throw error;
       const rows=Array.isArray(data)?data:[];
       writeCityMapCache('scenes',rows);
       renderCityDynamicScenes(rows);
     }catch(error){
-      if(!cached)console.warn('城市動態場景載入失敗：',error?.message||error);
+      if(!cached)console.warn('城市場景目錄載入失敗：',error?.message||error);
     }
   };
   const applyCityWeather=weather=>{
@@ -443,19 +450,11 @@
     const name=cityPlaceNames[place]||'地點';
     const scene=cityVenueScenes[place];
     if(!scene){console.error('城市地標缺少專屬場景設定：',place);toast('這個地點的場景資料尚未完成，請稍後再試。');return;}
-    const venueNotices={
-      bookstore:{label:'最新消息',items:['本週暢銷書排行已經更新。','本週六下午兩點將舉辦作家簽售會。']},
-      cafe:{label:'最新消息',items:['本日限定甜點已上架，適合搭配店內手沖咖啡。','本週末推出季節限定飲品。']},
-      park:{label:'最新消息',items:['本週末草地旁將舉辦小型手作市集。','傍晚時段適合散步，中央步道照明已開啟。']},
-      'department-store':{label:'最新消息',items:['10 樓櫃位調整中，造成不便敬請見諒。','地下美食街有多樣美食，用餐期間歡迎前往用餐。','本週末中庭將舉辦季節主題展。']},
-      airport:{label:'最新消息',items:['大廳服務櫃檯今日提供旅遊諮詢。','候機區新增安靜休息座位指引。']},
-      commercial:{label:'管理室公告',items:['如有裝潢需求，請向管理處提出申請。','各辦公室包裹請寄件人填寫好收件單位。','廁所內的公用物品請愛惜使用。']},
-      'night-bar':{label:'最新消息',items:['今晚有現場 DJ 音樂時段。','本週末吧台區安排主題音樂夜。']},
-      'live-house':{label:'最新消息',items:['本週演出時刻表已更新。','週六晚間將舉辦新團專場演出。']},
-      apartment:{label:'管委會公告',items:['公寓公共交誼區本週進行佈置更新。','公共區域請保持整潔，訪客請由住戶陪同進出。','本週六下午將舉辦住戶交換市集。']}
+    const notice={
+      label:scene.eventLabel||'最新消息',
+      items:[scene.eventTitle,scene.eventDescription].map(value=>String(value||'').trim()).filter(Boolean).slice(0,3)
     };
-    const notice=venueNotices[place]||{label:scene.eventLabel||'場景亮點',items:[(scene.eventTitle||'街角的偶遇')+'。 '+(scene.eventDescription||'這個場景有新的城市消息。')]};
-    const eventMarkup=notice.items.slice(0,3).map(item=>'<p>📣 '+escapeHTML(item)+'</p>').join('');
+    const eventMarkup=notice.items.map(item=>'<p>📣 '+escapeHTML(item)+'</p>').join('');
     const flightMarkup=place==='airport'
       ? '<div class="city-location-news city-flight-section"><span class="city-location-event-label">今日航班</span><p class="small">模擬航班時刻表</p><table class="city-flight-table"><thead><tr><th>時間</th><th>航班</th><th>目的地</th><th>狀態</th></tr></thead><tbody><tr><td>09:20</td><td>PZ102</td><td>東京</td><td>準時</td></tr><tr><td>13:45</td><td>PZ238</td><td>首爾</td><td>登機中</td></tr><tr><td>18:10</td><td>PZ516</td><td>台北</td><td>預計抵達</td></tr></tbody></table><p class="city-flight-note">以上為虛構示意資料，非真實航班資訊。</p></div>'
       : '';
