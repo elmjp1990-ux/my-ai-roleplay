@@ -110,7 +110,7 @@ assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_scene_backg
 assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_turn_visuals/);
 assert.match(pipeline, /v_schedule_day::smallint,\s*v_day_type/);
 assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_schedule_weather_decisions/);
-assert.match(pipeline, /ON CONFLICT \(schedule_id, scheduled_start_at\) DO NOTHING/);
+assert.match(pipeline, /ON CONFLICT ON CONSTRAINT encounter_schedule_weather_decisions_pkey DO NOTHING/);
 assert.match(pipeline, /SELECT \* INTO v_decision[\s\S]*?FROM public\.encounter_schedule_weather_decisions/);
 assert.match(pipeline, /v_decision\.location_key/);
 assert.match(pipeline, /v_decision\.activity/);
