@@ -2,7 +2,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3
 
 function optionalUuid(value) {
   if (value === null || value === undefined || value === "") return null;
-  return typeof value === "string" && UUID_PATTERN.test(value) ? value : undefined;
+  return typeof value === "string" && UUID_PATTERN.test(value) ? value : null;
 }
 
 export function parseEncounterTurnOutput(raw) {
@@ -19,7 +19,7 @@ export function parseEncounterTurnOutput(raw) {
 
   const illustrationId = optionalUuid(value.illustration_id ?? value.illustrationId);
   const sceneBackgroundId = optionalUuid(value.scene_background_id ?? value.sceneBackgroundId);
-  if (illustrationId === undefined || sceneBackgroundId === undefined) return null;
+  
 
   return { reply, illustrationId, sceneBackgroundId };
 }
