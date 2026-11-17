@@ -18,6 +18,7 @@ vm.runInNewContext(
   sandbox
 );
 const plan = sandbox.plan;
+const plain = value => JSON.parse(JSON.stringify(value));
 const oldRows = Array.from({ length: 5 }, (_, index) => ({
   id: 'old-' + (index + 1),
   storage_path: 'old/' + (index + 1) + '.webp',
@@ -34,14 +35,8 @@ const data = index => ({
 {
   const result = plan(oldRows, Array.from({ length: 5 }, (_, index) => data(index + 1)));
   assert.equal(result.additions.length, 5);
-  assert.deepEqual(
-    result.additions.map(item => item.sortOrder),
-    [1, 2, 3, 4, 5]
-  );
-  assert.deepEqual(
-    result.additions.map(item => item.reusableRow?.id),
-    ['old-1', 'old-2', 'old-3', 'old-4', 'old-5']
-  );
+  assert.deepEqual(plain(result.additions.map(item => item.sortOrder)), [1, 2, 3, 4, 5]);
+  assert.deepEqual(plain(result.additions.map(item => item.reusableRow?.id)), ['old-1', 'old-2', 'old-3', 'old-4', 'old-5']);
   assert.equal(result.obsoleteRows.length, 5);
 }
 
@@ -51,7 +46,7 @@ const data = index => ({
   assert.equal(result.additions.length, 1);
   assert.equal(result.additions[0].sortOrder, 1);
   assert.equal(result.additions[0].reusableRow?.id, 'old-1');
-  assert.deepEqual(result.obsoleteRows.map(row => row.id), ['old-1', 'old-2', 'old-3', 'old-4', 'old-5']);
+  assert.deepEqual(plain(result.obsoleteRows.map(row => row.id)), ['old-1', 'old-2', 'old-3', 'old-4', 'old-5']);
 }
 
 // Keep two and replace three: retained slots remain reserved; obsolete rows are reused.
@@ -61,9 +56,9 @@ const data = index => ({
     { id: 'old-4', path: oldRows[3].storage_path, sortOrder: 4, name: '保留四' }
   ];
   const result = plan(oldRows, [...retained, data(1), data(2), data(3)]);
-  assert.deepEqual(result.additions.map(item => item.sortOrder), [1, 3, 5]);
-  assert.deepEqual(result.additions.map(item => item.reusableRow?.id), ['old-1', 'old-3', 'old-5']);
-  assert.deepEqual(result.retainedRows.map(row => row.id), ['old-2', 'old-4']);
+  assert.deepEqual(plain(result.additions.map(item => item.sortOrder)), [1, 3, 5]);
+  assert.deepEqual(plain(result.additions.map(item => item.reusableRow?.id)), ['old-1', 'old-3', 'old-5']);
+  assert.deepEqual(plain(result.retainedRows.map(row => row.id)), ['old-2', 'old-4']);
 }
 
 // Name-only edits must not allocate new slots or mark existing rows obsolete.
@@ -74,7 +69,7 @@ const data = index => ({
   const result = plan(oldRows, retained);
   assert.equal(result.additions.length, 0);
   assert.equal(result.obsoleteRows.length, 3);
-  assert.deepEqual(result.retainedItems.map(item => item.name), ['改名0', '改名1']);
+  assert.deepEqual(plain(result.retainedItems.map(item => item.name)), ['改名0', '改名1']);
 }
 
 // The five-image cap remains enforced even when all old rows are present.
