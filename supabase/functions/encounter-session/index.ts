@@ -174,7 +174,7 @@ Deno.serve(async (request: Request) => {
     : "";
 
   // All snapshot identity fields are built from the database, never the request body.
-  const snapshot = {
+  const snapshot: Record<string, unknown> = {
     id: character.id,
     name: character.name,
     title: character.title || "",
