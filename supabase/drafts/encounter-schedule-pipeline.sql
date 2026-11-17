@@ -326,7 +326,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.taiwan_calendar_days TO ser
 CREATE OR REPLACE FUNCTION public.encounter_schedule_source_payload(p_character_id uuid)
 RETURNS jsonb
 LANGUAGE sql
-VOLATILE
+STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -1174,7 +1174,7 @@ GRANT EXECUTE ON FUNCTION public.publish_encounter_schedule_batch(uuid, uuid, js
 CREATE OR REPLACE FUNCTION public.resolve_encounter_special_event_key(p_date date)
 RETURNS text
 LANGUAGE sql
-VOLATILE
+STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $encounter_special_event$
@@ -1684,7 +1684,7 @@ RETURNS TABLE (
   weather_source text
 )
 LANGUAGE sql
-VOLATILE
+STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $encounter_city_weather$
@@ -1727,7 +1727,7 @@ RETURNS TABLE (
   character_count bigint
 )
 LANGUAGE sql
-VOLATILE
+STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $encounter_scene_registry$
