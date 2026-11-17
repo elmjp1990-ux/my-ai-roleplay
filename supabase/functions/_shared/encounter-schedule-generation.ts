@@ -25,13 +25,7 @@ export const ENCOUNTER_DYNAMIC_SCENE_KEYS = [
   "art-gallery", "community-center", "music-studio", "bakery", "coworking-space",
 ] as const;
 
-const INDOOR_SCENE_KEYS = new Set([
-  "airport", "commercial", "night-bar", "live-house", "apartment",
-  "department-store", "bookstore", "cafe", "restaurant", "university",
-  "hospital", "gym", "cinema", "museum", "hotel", "train-station",
-  "library", "theater", "art-gallery", "community-center", "music-studio",
-  "bakery", "coworking-space",
-]);
+
 const OUTDOOR_SCENE_KEYS = new Set(["park", "shopping-street", "night-market"]);
 const RAIN_FALLBACK_SCENE_KEYS = new Set([
   "airport", "commercial", "night-bar", "live-house", "apartment",
