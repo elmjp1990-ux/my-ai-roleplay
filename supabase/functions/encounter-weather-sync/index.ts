@@ -54,6 +54,9 @@ Deno.serve(async (request) => {
         fetched_at: previous.fetched_at, source: "poyozz_fictional_seasonal" });
     }
     const weather = createEncounterWeather(now, previous?.weather_text || "");
+    if (previous?.weather_text === weather.weatherText && previous?.temperature_c !== null) {
+      weather.temperatureC = Number(previous.temperature_c);
+    }
     const unchanged = previous?.weather_text === weather.weatherText
       && Number(previous?.temperature_c) === weather.temperatureC
       && previous?.is_raining === weather.isRaining;
