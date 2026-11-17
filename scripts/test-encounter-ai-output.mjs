@@ -56,6 +56,13 @@ assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.resolve_encounter_spe
 assert.match(pipeline, /UPDATE public\.taiwan_calendar_days[\s\S]*?holiday_name = NULL[\s\S]*?週末假期/);
 assert.match(pipeline, /variant_key = 'special'\s+AND special_event_key IN/);
 assert.match(pipeline, /AND s\.special_event_key IS NULL/);
+assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_schedule_weather_decisions/);
+assert.match(pipeline, /scheduled_end_at timestamptz NOT NULL/);
+assert.match(pipeline, /DELETE FROM public\.encounter_schedule_weather_decisions[\s\S]*?scheduled_end_at < \(p_at - interval '2 days'\)/);
+assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.resolve_encounter_character_schedule[\s\S]*?LANGUAGE plpgsql\s+VOLATILE/);
+assert.match(pipeline, /CREATE FUNCTION public\.get_encounter_character_schedule[\s\S]*?LANGUAGE sql\s+VOLATILE/);
+assert.match(pipeline, /CREATE FUNCTION public\.get_encounter_character_schedules[\s\S]*?LANGUAGE sql\s+VOLATILE/);
+assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.get_encounter_character_schedules[\s\S]*?LANGUAGE sql\s+VOLATILE/);
 assert.match(replay, /DO \$special_event_schedule_smoke\$/);
 assert.match(replay, /official holiday special schedule was not selected/);
 assert.match(scheduleGeneration, /special_events/);
