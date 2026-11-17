@@ -200,17 +200,22 @@ async function loadEncounterVisuals(admin: any, messageId: string): Promise<DbRo
       : Promise.resolve({ data: null }),
     row.scene_background_id
       ? admin.from("encounter_scene_backgrounds").select("id,display_name,asset_path")
-        .eq("id", row.scene_background_id).maybeSingle()
+        .eq("id", row.scene_background_id).eq("is_active", true).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
   const illustration = asRow(illustrationResult.data);
   const background = asRow(backgroundResult.data);
+  const backgroundPath = asText(background.asset_path);
+  const safeBackgroundPath = /^(\.\/|\/)[A-Za-z0-9_./-]+$/.test(backgroundPath)
+    && !/(^|\/)\.\.(\/|$)/.test(backgroundPath)
+    ? backgroundPath
+    : "./encounter-default-scene.webp";
   return {
     illustrationId: asText(row.illustration_id) || null,
     illustrationName: asText(illustration.display_name) || null,
-    sceneBackgroundId: asText(row.scene_background_id) || null,
+    sceneBackgroundId: background.id ? asText(background.id) : null,
     sceneBackgroundName: asText(background.display_name) || null,
-    sceneBackgroundPath: asText(background.asset_path) || "./encounter-default-scene.webp",
+    sceneBackgroundPath: safeBackgroundPath,
   };
 }
 
