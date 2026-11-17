@@ -10017,7 +10017,7 @@ async function loadEncounterScheduleTestTools(){
     const button=section.querySelector('[data-action="organize-encounter-schedules"]');
     const pending=Number(data.pending_character_count||0);
     const lastRun=data.last_batch_started_at?new Date(data.last_batch_started_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):'尚未執行';
-    if(status)status.textContent=data.status_available===false?'測試環境已確認；目前無法讀取佇列狀態。':'待整理公開角色：'+pending+' 位｜上次整理：'+lastRun+(data.last_batch_status?'（'+data.last_batch_status+'）':'');
+    if(status)status.textContent=data.status_available===false?'測試環境已確認；目前無法讀取佇列狀態。':'佇列待處理：'+pending+' 位｜按下後會先檢查符合資格的公開角色，每次最多整理 10 位｜上次整理：'+lastRun+(data.last_batch_status?'（'+data.last_batch_status+'）':'');
     if(button)button.disabled=false;
   }catch{section.remove();}
 }
