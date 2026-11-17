@@ -20,7 +20,7 @@ const source = (character_id = id1, extra = {}) => ({
 const slot = (extra = {}) => ({
   start_time: "09:00", end_time: "17:00", location_key: "commercial",
   activity: "在公司處理工作", is_outdoor: false,
-  rain_fallback_location_key: null, rain_fallback_activity: null,
+  rain_fallback_location_key: null, rain_fallback_activity: null, rain_fallback_greeting: null,
   encounter_greeting: greeting, ...extra,
 });
 const variants = (slots = [slot()]) => ({
@@ -71,7 +71,7 @@ Deno.test("requires indoor fallback for outdoor schedules", () => {
     character_id: id1, placement: "modern_map",
     variants: variants([slot({
       location_key: "park", is_outdoor: true,
-      rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳休息",
+      rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳休息", rain_fallback_greeting: greeting,
     })]),
   }]);
   if (!valid.ok) throw new Error(valid.errors.join(","));
@@ -79,7 +79,7 @@ Deno.test("requires indoor fallback for outdoor schedules", () => {
     character_id: id1, placement: "modern_map",
     variants: variants([slot({
       location_key: "park", is_outdoor: true,
-      rain_fallback_location_key: "park", rain_fallback_activity: "繼續待在公園",
+      rain_fallback_location_key: "park", rain_fallback_activity: "繼續待在公園", rain_fallback_greeting: greeting,
     })]),
   }]);
   if (invalid.ok || !invalid.errors.some((error) => error.includes("rain_fallback_invalid"))) throw new Error("outdoor fallback accepted");
@@ -116,7 +116,7 @@ Deno.test("only retains a new shopping-street scene when multiple characters sha
   const single = result([{
     character_id: id1, placement: "modern_map",
     variants: variants([slot({ location_key: "shopping-street", is_outdoor: true,
-      rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳" })]),
+      rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳", rain_fallback_greeting: greeting })]),
   }]);
   if (!single.ok || single.characters[0].variants.weekday[0].slots[0].location_key !== "department-store") {
     throw new Error("unshared scene should collapse into an existing marker");
@@ -130,7 +130,7 @@ Deno.test("only retains a new shopping-street scene when multiple characters sha
       { character_id: id1, placement: "modern_map", variants: variants([slot({ location_key: "shopping-street", is_outdoor: true,
         rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳" })]) },
       { character_id: id2, placement: "modern_map", variants: variants([slot({ location_key: "shopping-street", is_outdoor: true,
-        rain_fallback_location_key: "bookstore", rain_fallback_activity: "改在書店" })]) },
+        rain_fallback_location_key: "bookstore", rain_fallback_activity: "改在書店", rain_fallback_greeting: greeting })]) },
     ],
   }), [source(id1), source(id2)]);
   if (!two.ok || two.characters[0].variants.weekday[0].slots[0].location_key !== "shopping-street") {
