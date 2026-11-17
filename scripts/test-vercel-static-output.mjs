@@ -57,6 +57,30 @@ for (const [file, maxBytes] of Object.entries(fileBudgets)) {
 assert.ok(totalBytes <= 1_500_000, 'Vercel static output exceeds the 1.5 MB deployment budget: ' + totalBytes + ' bytes.');
 
 const html = fs.readFileSync(path.join(outputDir, 'index.html'), 'utf8');
+
+// Feature-only scripts stay in the static output but are fetched only on first use.
+const lazyRuntimeModules = ['custom-tag-picker.js', 'group-opening-presets.js'];
+for (const module of lazyRuntimeModules) {
+  assert.ok(expectedFiles.includes(module), 'Lazy runtime module must remain in the deployment allowlist: ' + module);
+  assert.doesNotMatch(html, new RegExp(`<script\\b[^>]*\\bsrc="./${module}"`, 'i'),
+    'Feature-only module must not be eagerly loaded by index.html: ' + module);
+  assert.ok(html.includes(module), 'Feature-only module must have an on-demand loader call: ' + module);
+}
+assert.match(html, /function loadRuntimeModule\(src\)/,
+  'Runtime module loader must be present in the main app script.');
+assert.match(html, /runtimeModuleLoadPromises\.has\(src\)/,
+  'Concurrent requests for the same feature module must share one load promise.');
+assert.match(html, /runtimeModuleLoadPromises\.delete\(src\)/,
+  'A failed feature-module load must be retryable.');
+assert.match(html, /script\.onload\s*=\s*resolve/,
+  'Feature-module loading must resolve only after the script loads.');
+assert.match(html, /script\.onerror\s*=/,
+  'Feature-module loading must expose a recoverable failure path.');
+assert.match(html, /await loadRuntimeModule\(['"]\.\/custom-tag-picker\.js['"]\)/,
+  'Custom tag picker must load when its UI is opened.');
+assert.match(html, /await loadRuntimeModule\(['"]\.\/group-opening-presets\.js['"]\)/,
+  'Group opening presets must load only when the group inspiration action is used.');
+
 const references = new Set();
 const addReference = (value) => {
   if (!value || value.startsWith('data:') || value.startsWith('blob:') || value.startsWith('http:') || value.startsWith('https:')) return;

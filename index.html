@@ -1163,7 +1163,6 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 <script src="./followed-authors.js"></script>
 <script src="./author-profile.js"></script>
 <script src="./comment-renderer.js"></script>
-<script src="./custom-tag-picker.js"></script>
 <script src="./list-pagination.js"></script>
 <script src="./notifications-screen.js"></script>
 <script>
@@ -3149,6 +3148,27 @@ const id = () => {
     hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20);
 };
 const { countChars, clone, isUuid } = window.PoyozzCoreUtils;
+
+// Feature-only scripts are loaded on first use and shared across concurrent callers.
+const runtimeModuleLoadPromises = new Map();
+function loadRuntimeModule(src) {
+  if (runtimeModuleLoadPromises.has(src)) return runtimeModuleLoadPromises.get(src);
+  const promise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.dataset.poyozzRuntimeModule = src;
+    script.onload = resolve;
+    script.onerror = () => {
+      script.remove();
+      runtimeModuleLoadPromises.delete(src);
+      reject(new Error('載入功能模組失敗：' + src));
+    };
+    document.head.appendChild(script);
+  });
+  runtimeModuleLoadPromises.set(src, promise);
+  return promise;
+}
 const timeText = value => new Date(value).toLocaleString('zh-TW');
 
 function currentUserCanViewNsfw() {
@@ -10710,6 +10730,13 @@ document.addEventListener('click', event => {
 
 /* Shared character-tag picker adapter. */
 async function refreshCustomTagPicker() {
+  try {
+    await loadRuntimeModule('./custom-tag-picker.js');
+  } catch (error) {
+    console.error('載入角色標籤選擇器失敗：', error);
+    toast('角色標籤選擇器載入失敗，請稍後再試。');
+    return;
+  }
   const picker = window.PoyozzCustomTagPicker;
   if (typeof picker?.render !== 'function' || typeof picker?.bind !== 'function') {
     console.error('POYOZZ custom-tag-picker module is unavailable.');
@@ -10765,6 +10792,18 @@ document.addEventListener('click',async event => {
       case 'phone-close':closePhoneModalWithButton(document.querySelector('.phone-modal-backdrop'));break;
       case 'group-next':groupNext();break;
       case 'group-inspiration': {
+        if (!window.PoyozzGroupOpeningPresets) {
+          button.disabled = true;
+          try {
+            await loadRuntimeModule('./group-opening-presets.js');
+          } catch (error) {
+            console.error('載入群組靈感範本失敗：', error);
+            toast('AI 靈感範本載入失敗，請稍後再試。');
+            break;
+          } finally {
+            if (button.isConnected) button.disabled = false;
+          }
+        }
         const presets=window.PoyozzGroupOpeningPresets||[];
         if(!presets.length){toast('AI靈感範本尚未載入，請重新整理後再試。');break;}
         const g=groupPrototype,members=groupSelectedCharacters();
@@ -11046,6 +11085,15 @@ document.addEventListener('click',async event => {
         render();
         break;
       case 'group-opening-preset': {
+        if (!window.PoyozzGroupOpeningPresets) {
+          try {
+            await loadRuntimeModule('./group-opening-presets.js');
+          } catch (error) {
+            console.error('載入群組開場範本失敗：', error);
+            toast('群組開場範本載入失敗，請稍後再試。');
+            break;
+          }
+        }
         const preset=(window.PoyozzGroupOpeningPresets||[]).find(item=>String(item.id)===String(key));
         if(!preset){toast('找不到這組開場模式，請重新開啟靈感選單。');break;}
         const scene=$('groupSceneDesc0');
@@ -13445,7 +13493,6 @@ document.addEventListener('submit',function(event){
 // Group persona selection uses the same saved-persona list as the chat's persona management UI.
 </script>
 
-<script src="./group-opening-presets.js"></script>
 <script src="./encounter-scene.js"></script>
 <style id="poyozz-city-location-panel">
 .city-location-modal[hidden]{display:none!important}
