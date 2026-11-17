@@ -141,6 +141,18 @@ CREATE TABLE IF NOT EXISTS public.encounter_city_weather (
 
 ALTER TABLE public.encounter_city_weather ALTER COLUMN source SET DEFAULT 'poyozz_fictional_seasonal';
 
+UPDATE public.encounter_city_weather
+SET weather_text = '多雲',
+    temperature_c = 24,
+    precipitation_1h_mm = NULL,
+    is_raining = false,
+    observed_at = pg_catalog.now(),
+    fetched_at = pg_catalog.now(),
+    source = 'poyozz_fallback',
+    updated_at = pg_catalog.now()
+WHERE source IS DISTINCT FROM 'poyozz_fictional_seasonal'
+  AND source IS DISTINCT FROM 'poyozz_fallback';
+
 
 
 CREATE INDEX IF NOT EXISTS encounter_city_weather_fetched_idx
