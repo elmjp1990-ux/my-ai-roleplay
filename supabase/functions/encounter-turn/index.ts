@@ -299,7 +299,7 @@ Deno.serve(async (request) => {
     p_assistant_message_id: assistantMessageId,
     p_evaluation: { source: "encounter_turn_handler", evaluator: "pending" },
   });
-  const settleAndRespond = async (reply: DbRow, idempotent = false) => {
+  const settleAndRespond = async (reply: DbRow, idempotent = false, visualOverride: DbRow | null = null) => {
     const { data: settled, error: settleError } = await admin.rpc("settle_chat_turn", {
       p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
     });
@@ -308,10 +308,11 @@ Deno.serve(async (request) => {
     if (evidenceError || !evidence) {
       return json({ status: "needs_reconciliation", error: "encounter_evidence_persistence_failed", retryAllowed: true }, 503);
     }
+    const visuals = visualOverride || await loadEncounterVisuals(admin, asText(reply.id));
     return json({
       status: settled, assistantMessage: { id: reply.id, content: reply.content, role: "assistant" },
       ...(idempotent ? { idempotent: true } : {}),
-      encounter: { evidence, affinityPendingUntilSceneEnd: true },
+      encounter: { evidence, affinityPendingUntilSceneEnd: true, ...(visuals ? { visuals } : {}) },
     });
   };
   const findSavedReply = async () => await admin.from("chat_messages").select("id,content,role")
@@ -404,8 +405,9 @@ Deno.serve(async (request) => {
     });
   }
 
-  const replyText = parseEncounterTurnOutput(providerResult.text);
-  if (!replyText || findPrivateContextLeak(providerResult.text, context.protectedContext, context.priorAssistantOutputs)) {
+  const parsedOutput = parseEncounterTurnOutput(providerResult.text);
+  const replyText = parsedOutput?.reply || "";
+  if (!parsedOutput || !replyText || findPrivateContextLeak(providerResult.text, context.protectedContext, context.priorAssistantOutputs)) {
     await recordUsage(null, "failed");
     const failureCode = replyText ? "private_context_output_blocked" : "invalid_encounter_ai_output";
     await admin.from("chat_turn_events").insert({
@@ -442,5 +444,19 @@ Deno.serve(async (request) => {
   }
 
   await recordUsage(assistantMessageId, "completed");
-  return await settleAndRespond(reply);
+  const visuals = await resolveEncounterVisuals(admin, session, parsedOutput);
+  const { error: visualPersistError } = await admin.from("encounter_turn_visuals").upsert({
+    message_id: assistantMessageId,
+    session_id: sessionId,
+    character_id: session.character_id,
+    illustration_id: visuals.illustrationId,
+    scene_background_id: visuals.sceneBackgroundId,
+  }, { onConflict: "message_id" });
+  if (visualPersistError) {
+    await admin.from("chat_turn_events").insert({
+      turn_id: turnId, user_id: user.id, event_type: "encounter_visual_persistence_failed",
+      stage: "visual_persistence", error_code: "visual_metadata_write_failed",
+    });
+  }
+  return await settleAndRespond(reply, false, visuals);
 });
