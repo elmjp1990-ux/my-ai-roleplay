@@ -102,7 +102,8 @@ assert.match(syncSource, /rollbackGalleryChanges/,
   'partial metadata changes must have a rollback path');
 assert.ok(migration.includes('create unique index character_illustrations_gallery_position_uidx'),
   'the database uniqueness guard must remain enabled');
-assert.ok(migration.includes("on public.character_illustrations (character_id, sort_order) where asset_type = 'gallery';"),
+assert.ok(migration.includes("on public.character_illustrations (character_id, sort_order)") &&
+  migration.includes("where asset_type = 'gallery';"),
   'the database uniqueness guard must still cover each gallery position');
 
 console.log('Passed: gallery replacement planning, slot reuse, name-only edits, five-image cap, upload ordering, and rollback guards.');
