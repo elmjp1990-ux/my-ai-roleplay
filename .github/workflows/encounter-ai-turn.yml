@@ -7,6 +7,7 @@ on:
       - "encounter-scene.js"
       - "city-map.js"
       - "scripts/test-city-map-module.mjs"
+      - "scripts/test-encounter-public-character-eligibility.mjs"
       - "supabase/functions/encounter-turn/**"
       - "supabase/functions/encounter-evaluation-worker/**"
       - "supabase/functions/_shared/encounter-session-evaluation.mjs"
@@ -52,6 +53,8 @@ jobs:
         run: node scripts/test-encounter-session-evaluation-worker.mjs
       - name: Test city map dynamic scene registry contract
         run: node scripts/test-city-map-module.mjs
+      - name: Test public character schedule eligibility and adult visibility
+        run: node scripts/test-encounter-public-character-eligibility.mjs
       - name: Test schedule worker security and wallet isolation
         run: node scripts/test-encounter-schedule-worker.mjs
       - uses: denoland/setup-deno@v2
