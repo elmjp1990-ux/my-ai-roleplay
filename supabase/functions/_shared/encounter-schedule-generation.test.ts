@@ -65,9 +65,12 @@ const result = (characters: Array<{ character_id: string; [key: string]: unknown
   const normalized = characters.map(withGreetingPools);
   const keys = new Set<string>();
   for (const character of normalized) {
-    const variants = character.variants as { weekday?: Array<{ slots?: Array<{ location_key?: string }> }>; holiday?: Array<{ slots?: Array<{ location_key?: string }> }> } | undefined;
+    const variants = character.variants as { weekday?: Array<{ slots?: Array<{ location_key?: string; rain_fallback_location_key?: string | null }> }>; holiday?: Array<{ slots?: Array<{ location_key?: string; rain_fallback_location_key?: string | null }> }> } | undefined;
     for (const variant of [...(variants?.weekday ?? []), ...(variants?.holiday ?? [])]) {
-      for (const slot of variant.slots ?? []) if (slot.location_key) keys.add(slot.location_key);
+      for (const slot of variant.slots ?? []) {
+        if (slot.location_key) keys.add(slot.location_key);
+        if (slot.rain_fallback_location_key) keys.add(slot.rain_fallback_location_key);
+      }
     }
   }
   const scenes = [...keys].filter((key) => key === "shopping-street" ||
