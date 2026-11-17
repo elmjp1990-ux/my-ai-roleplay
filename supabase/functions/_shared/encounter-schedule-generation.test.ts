@@ -10,7 +10,8 @@ const id2 = "22222222-2222-4222-8222-222222222222";
 const author = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const greeting = "相遇內容。".repeat(30);
 const source = (character_id = id1, extra = {}) => ({
-  character_id, author_id: author, name: "測試角色", intro: "現代城市生活",
+  character_id, author_id: author, visibility: "public", deleted_at: null,
+  name: "測試角色", intro: "現代城市生活",
   world_era: "modern", modern_setting_compatible: true, time_travel_explicit: false,
   schedule_description: "白天在公司工作，晚上和朋友見面",
   private_info: "只供角色一致性使用的私密設定", personality_profile: { tone: "溫柔" },
@@ -86,6 +87,10 @@ Deno.test("does not place historical or incompatible fantasy characters on the m
     characters: [{ character_id: id1, placement: "no_matching_location", variants: { weekday: [], holiday: [] } }],
   }), [ancient]);
   if (!ancientResult.ok) throw new Error(ancientResult.errors.join(","));
+  const noSceneModern = parseEncounterScheduleBatchOutput(JSON.stringify({
+    characters: [{ character_id: id1, placement: "no_matching_location", variants: { weekday: [], holiday: [] } }],
+  }), [source()]);
+  if (!noSceneModern.ok) throw new Error("modern character without a suitable location should remain unplaced");
   const forced = parseEncounterScheduleBatchOutput(JSON.stringify({
     characters: [{ character_id: id1, placement: "modern_map", variants: variants() }],
   }), [ancient]);
