@@ -311,22 +311,22 @@
   const loadCityDynamicScenes=async()=>{
     const client=window.mySupabase;
     if(!client)return;
-    const cached=readCityMapCache('scenes',CITY_MAP_SCENES_CACHE_TTL_MS);
+    const cached=readCityMapCache('scenes-v2',CITY_MAP_SCENES_CACHE_TTL_MS);
     if(cached)renderCityDynamicScenes(cached.data);
     if(cached?.fresh)return;
     try{
       const {data,error}=await client.rpc('get_encounter_scene_catalog');
       if(error)throw error;
       const rows=Array.isArray(data)?data:[];
-      writeCityMapCache('scenes',rows);
+      writeCityMapCache('scenes-v2',rows);
       renderCityDynamicScenes(rows);
     }catch(error){
       if(!cached)console.warn('城市場景目錄載入失敗：',error?.message||error);
     }
   };
   activeSceneRefresh=()=>{
-    cityMapMemoryCache.delete('scenes');
-    try{sessionStorage.removeItem('poyozz-city-map-scenes-v1');}catch{}
+    cityMapMemoryCache.delete('scenes-v2');
+    try{sessionStorage.removeItem('poyozz-city-map-scenes-v2-v1');}catch{}
     return loadCityDynamicScenes();
   };
   const applyCityWeather=weather=>{
