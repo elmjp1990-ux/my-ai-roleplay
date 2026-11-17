@@ -59,10 +59,18 @@ BEGIN
   IF v_source->>'schedule_schema_version' <> 'poyozz-encounter-schedule-v4-scene-catalog-2026-11-17' THEN
     RAISE EXCEPTION 'manual scene catalog migration must bump schedule source version';
   END IF;
-  v_result := public.enqueue_encounter_schedule_generation_test_batch(10);
-  IF COALESCE((v_result->>'scanned_character_count')::integer, 0) <> 3
-     OR COALESCE((v_result->>'pending_character_count')::integer, 0) <> 3 THEN
-    RAISE EXCEPTION 'manual Preview enqueue should queue all three eligible synthetic public roles: %', v_result;
+  v_result := public.enqueue_encounter_schedule_generation_test_batch(2147483647);
+  IF COALESCE((v_result->>'scanned_character_count')::integer, 0) < 3
+     OR COALESCE((v_result->>'pending_character_count')::integer, 0)
+        <> COALESCE((v_result->>'scanned_character_count')::integer, 0)
+     OR (SELECT pg_catalog.count(*) FROM public.encounter_schedule_generation_jobs
+         WHERE character_id = ANY(ARRAY[
+           '00000000-0000-4000-8000-000000000020'::uuid,
+           '00000000-0000-4000-8000-000000000022'::uuid,
+           '00000000-0000-4000-8000-000000000024'::uuid
+         ])
+           AND status = 'pending') <> 3 THEN
+    RAISE EXCEPTION 'manual Preview enqueue should queue every eligible public role, including all three synthetic roles: %', v_result;
   END IF;
 END;
 $manual_enqueue$;
