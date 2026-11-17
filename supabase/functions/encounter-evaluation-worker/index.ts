@@ -129,6 +129,7 @@ async function evaluateJob(admin: any, job: ClaimedJob, apiKey: string) {
     return { sessionId: job.session_id, settled: true, noTurns: true, result: data.result };
   }
 
+  if (!apiKey) throw new Error("encounter_evaluation_provider_not_configured");
   if (Number(job.turn_count) > MAX_TURNS) throw new Error("encounter_evaluation_turn_limit_exceeded");
   const { data: turns, error: turnsError } = await admin
     .from("encounter_session_turns")
@@ -231,8 +232,6 @@ Deno.serve(async (request: Request) => {
   if (request.headers.get("Authorization") !== "Bearer " + serviceRoleKey) {
     return json({ error: "service_role_required" }, 401);
   }
-  if (!openRouterKey) return json({ error: "ai_provider_not_configured" }, 503);
-
   let requestedLimit = 1;
   try {
     const body = await request.json();
