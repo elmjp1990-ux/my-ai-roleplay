@@ -1793,6 +1793,9 @@ INSERT INTO public.encounter_scene_backgrounds (
 )
 ON CONFLICT DO NOTHING;
 
+CREATE UNIQUE INDEX IF NOT EXISTS encounter_scene_backgrounds_location_asset_uidx
+  ON public.encounter_scene_backgrounds (location_key, asset_path);
+
 CREATE TABLE IF NOT EXISTS public.encounter_turn_visuals (
   message_id uuid PRIMARY KEY REFERENCES public.chat_messages(id) ON DELETE CASCADE,
   session_id uuid NOT NULL REFERENCES public.chat_sessions(id) ON DELETE CASCADE,
