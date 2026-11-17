@@ -596,7 +596,6 @@ BEGIN
       AND c.review_status = 'approved'
       AND c.rights_confirmed IS TRUE
       AND c.deleted_at IS NULL
-      AND pg_catalog.btrim(COALESCE(d.description, '')) <> ''
     ORDER BY j.queued_at, j.character_id
     LIMIT v_limit
     FOR UPDATE OF j SKIP LOCKED
