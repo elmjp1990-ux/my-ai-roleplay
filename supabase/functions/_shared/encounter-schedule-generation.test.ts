@@ -459,3 +459,15 @@ Deno.test("requires AI-updatable description and latest news for built-in Live H
     throw new Error(accepted.errors.join(",") || "Live House scene copy was not retained");
   }
 });
+
+
+Deno.test("builds one schedule prompt for all 37 queued roles without the legacy ten-role cap", () => {
+  const sources = Array.from({ length: 37 }, (_, index) =>
+    source(`33333333-3333-4333-8333-${String(index + 1).padStart(12, "0")}`)
+  );
+  const built = buildEncounterScheduleBatchMessages(sources);
+  const payload = JSON.parse(built.messages[1].content);
+  if (payload.characters.length !== 37) {
+    throw new Error("the full 37-role queue was not included in one AI prompt");
+  }
+});
