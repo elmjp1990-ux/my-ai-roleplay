@@ -4,6 +4,8 @@
 
 BEGIN;
 
+SET LOCAL request.jwt.claim.role = 'service_role';
+
 DO $encounter_evaluation_worker_smoke$
 DECLARE
   v_user_id uuid := '00000000-0000-4000-8000-000000000020';
