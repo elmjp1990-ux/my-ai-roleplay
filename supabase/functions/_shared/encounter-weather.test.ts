@@ -1,51 +1,32 @@
-import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import {
-  isRainWeatherText,
-  parseCwaRainfallObservation,
-  parseCwaWeatherObservation,
-} from "./encounter-weather.mjs";
+import { assertEquals, assertNotEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { createEncounterWeather } from "./encounter-weather.mjs";
 
-Deno.test("parses Taipei station 466920 hourly weather", () => {
-  const result = parseCwaWeatherObservation({
-    records: { Station: [{
-      StationId: "466920",
-      StationName: "臺北",
-      ObsTime: { DateTime: "2025-08-12T14:00:00+08:00" },
-      WeatherElement: { Weather: "多雲", AirTemperature: "32.4" },
-    }] },
-  });
-  assertEquals(result?.weatherText, "多雲");
-  assertEquals(result?.temperatureC, 32.4);
-  assertEquals(result?.observedAt, "2025-08-12T06:00:00.000Z");
+Deno.test("weather is stable within a six-hour slot", () => {
+  const first = createEncounterWeather(new Date("2026-07-20T01:00:00+08:00"));
+  const second = createEncounterWeather(new Date("2026-07-20T05:59:00+08:00"));
+  assertEquals(first.weatherText, second.weatherText);
+  assertEquals(first.temperatureC, second.temperatureC);
 });
 
-Deno.test("ignores CWA missing and abnormal temperature values", () => {
-  const result = parseCwaWeatherObservation({
-    records: { Station: [{
-      StationId: "466920",
-      WeatherElement: { Weather: "-99", AirTemperature: "-99" },
-    }] },
-  });
-  assertEquals(result?.weatherText, "");
-  assertEquals(result?.temperatureC, null);
+Deno.test("weather may change at the next six-hour slot", () => {
+  const first = createEncounterWeather(new Date("2026-07-20T05:59:00+08:00"));
+  const second = createEncounterWeather(new Date("2026-07-20T06:00:00+08:00"), first.weatherText);
+  assertNotEquals(first.weatherText, second.weatherText);
 });
 
-Deno.test("uses past-hour and past-ten-minute rainfall, including trace rain", () => {
-  const result = parseCwaRainfallObservation({
-    records: { Station: [{
-      StationId: "466920",
-      RainfallElement: {
-        Past1hr: { Precipitation: "0.0" },
-        Past10Min: { Precipitation: "T" },
-      },
-    }] },
-  });
-  assertEquals(result?.precipitation1hMm, 0);
-  assertEquals(result?.precipitation10mMm, 0.1);
-  assertEquals(result?.isRaining, true);
+Deno.test("seasonal weather stays within the supported simple vocabulary", () => {
+  const allowed = new Set(["晴朗", "晴時多雲", "多雲", "陰天", "毛毛雨", "短暫陣雨", "小雨", "雷陣雨", "有風"]);
+  for (let day = 1; day <= 28; day += 1) {
+    const weather = createEncounterWeather(new Date(Date.UTC(2026, 6, day, 4)));
+    if (!allowed.has(weather.weatherText)) throw new Error("Unexpected weather: " + weather.weatherText);
+    assertEquals(weather.cityKey, "taipei");
+    assertEquals(weather.isRaining, /雨/.test(weather.weatherText));
+    if (weather.temperatureC < 14 || weather.temperatureC > 33) throw new Error("Temperature outside broad seasonal bounds");
+  }
 });
 
-Deno.test("detects rain descriptions without treating cloudy weather as rain", () => {
-  assertEquals(isRainWeatherText("短暫陣雨"), true);
-  assertEquals(isRainWeatherText("多雲時晴"), false);
+Deno.test("invalid dates are rejected", () => {
+  let thrown = false;
+  try { createEncounterWeather(new Date("invalid")); } catch { thrown = true; }
+  assertEquals(thrown, true);
 });
