@@ -279,6 +279,23 @@ AS $$
       pg_catalog.concat_ws(' ', c.intro, COALESCE(d.description, ''), p.private_info, c.personality_profile::text)
       ~ '(穿越到現代|穿越至現代|來到現代|時空旅行到現代|穿越現代)',
     'schedule_description', COALESCE(d.description, ''),
+    'existing_author_schedules', COALESCE((
+      SELECT pg_catalog.jsonb_agg(
+        pg_catalog.jsonb_build_object(
+          'weekday', s.weekday,
+          'day_type', s.day_type,
+          'start_time', pg_catalog.to_char(s.start_time, 'HH24:MI'),
+          'end_time', pg_catalog.to_char(s.end_time, 'HH24:MI'),
+          'location_key', s.location_key,
+          'activity', s.activity
+        )
+        ORDER BY s.priority DESC, s.start_time
+      )
+      FROM public.character_schedules s
+      WHERE s.character_id = c.id
+        AND s.source_type = 'manual'
+        AND s.is_active IS TRUE
+    ), '[]'::jsonb),
     'private_info', COALESCE(p.private_info, ''),
     'personality_profile', COALESCE(c.personality_profile, '{}'::jsonb)
   )
@@ -1352,6 +1369,8 @@ BEGIN
     location_key text, activity text
   );
 
+  -- Re-enqueue only through the author-facing RPC; AI publication writes are not retriggered.
+  PERFORM public.enqueue_encounter_schedule_generation_internal(p_character_id);
   RETURN v_count;
 END;
 $$;
