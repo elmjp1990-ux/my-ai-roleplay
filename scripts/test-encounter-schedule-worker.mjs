@@ -59,6 +59,7 @@ assert.match(pipeline, /location_key IN \('shopping-street'\)/);
 assert.match(pipeline, /minimum_character_count smallint NOT NULL DEFAULT 1/);
 assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.get_encounter_scene_registry\(\)/);
 assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.get_encounter_character_schedules\(p_character_ids uuid\[\]\)[\s\S]*?CROSS JOIN LATERAL public\.resolve_encounter_character_schedule/);
+assert.match(pipeline, /encounter_greeting text,[\s\S]*?is_outdoor boolean,[\s\S]*?rain_fallback_greeting text,[\s\S]*?variant_weight smallint/);
 assert.match(pipeline, /cardinality\(p_character_ids\) BETWEEN 1 AND 10/);
 assert.match(pipeline, /count\(DISTINCT c\.id\)/);
 assert.match(pipeline, /HAVING pg_catalog\.count\(DISTINCT c\.id\) >= r\.minimum_character_count/);
