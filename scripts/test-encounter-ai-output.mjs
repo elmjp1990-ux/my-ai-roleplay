@@ -153,6 +153,7 @@ assert.match(greetingPools, /relationshipStage/);
 assert.match(evaluationWorker, /POYOZZ_DEFAULT_CHAT_MODEL/);
 assert.match(evaluationWorker, /settle_encounter_session/);
 assert.match(evaluationWorker, /buildTranscript/);
+assert.match(evaluationScheduler, /COALESCE\(auth\.role\(\), ''\) <> 'service_role'/);
 assert.match(evaluationScheduler, /PERFORM public\.enqueue_due_encounter_evaluations\(50\)/,
   "The cron dispatcher must enqueue expired scenes before calling the worker");
 assert.match(evaluationScheduler, /DO \$dispatch\$/);
