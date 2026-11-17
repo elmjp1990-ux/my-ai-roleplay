@@ -47,6 +47,9 @@ assert.ok(weatherLoaderDeclaration >= 0 && weatherLoaderInvocation > weatherLoad
   'Weather loader must be initialized before invocation.');
 
 assert.match(cityMap, /get_encounter_scene_catalog/);
+assert.ok(cityMap.indexOf("void loadCityDynamicScenes();") > cityMap.indexOf("const cityPlaceAliases"),
+  "scene catalog loading must start after place aliases and names are initialized");
+
 assert.match(cityMap, /get_encounter_city_weather/);
 assert.match(cityMap, /stage.classList.toggle\('is-raining',weather.is_raining===true\)/);
 assert.match(cityMap, /MAX_DYNAMIC_SCENE_MARKERS=3/);
