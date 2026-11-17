@@ -80,7 +80,7 @@ BEGIN
     'scheduler', 'existing_global_rate_limits'
   );
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.queue_encounter_greeting_pool_backfill(integer)
   FROM PUBLIC, anon, authenticated;
