@@ -1,0 +1,37 @@
+name: Character illustration gallery sync tests
+
+on:
+  pull_request:
+    paths:
+      - "index.html"
+      - "scripts/test-character-illustration-gallery-sync.mjs"
+      - "supabase/migrations/20261031100000_character_illustration_storage.sql"
+      - ".github/workflows/character-illustration-gallery-sync-tests.yml"
+  push:
+    branches:
+      - "fix/character-illustration-gallery-replacement"
+    paths:
+      - "index.html"
+      - "scripts/test-character-illustration-gallery-sync.mjs"
+      - "supabase/migrations/20261031100000_character_illustration_storage.sql"
+      - ".github/workflows/character-illustration-gallery-sync-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gallery-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verify gallery replacement ordering and rollback
+        run: node scripts/test-character-illustration-gallery-sync.mjs
