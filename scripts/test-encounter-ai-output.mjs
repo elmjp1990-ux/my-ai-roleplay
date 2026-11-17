@@ -54,7 +54,7 @@ assert.match(pipeline, /schedule_schema_version.*poyozz-encounter-schedule-v2-sp
 assert.match(replay, /schedule_source_version_smoke/);
 assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.resolve_encounter_special_event_key/);
 assert.match(pipeline, /UPDATE public\.taiwan_calendar_days[\s\S]*?holiday_name = NULL[\s\S]*?週末假期/);
-assert.match(pipeline, /variant_key = 'special' AND special_event_key IN/);
+assert.match(pipeline, /variant_key = 'special'\\s+AND special_event_key IN/);
 assert.match(pipeline, /AND s\.special_event_key IS NULL/);
 assert.match(replay, /DO \$special_event_schedule_smoke\$/);
 assert.match(replay, /official holiday special schedule was not selected/);
