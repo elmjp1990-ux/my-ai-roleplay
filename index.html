@@ -4431,8 +4431,7 @@ window.addEventListener('poyozz-encounter-opening-choice', async event => {
   const user = currentUser();
   if (!session?.encounterMode || !user?.uid || session.cloudOwnerUid !== user.uid) return;
   if (detail.choice === 'wait') {
-    const greeting = String(session.encounterGreeting || session.cloudCharacterSnapshot?.encounterGreeting ||
-      session.cloudCharacterSnapshot?.opening || '').trim();
+    const greeting = String(session.encounterGreeting || session.cloudCharacterSnapshot?.encounterGreeting || '').trim();
     if (!greeting) return toast('這個角色目前還沒有可用的相遇招呼，請先主動打招呼。');
     session.initialOpeningMessage = { text: greeting, at: Date.now() };
     session.encounterIntroChoice = 'wait';
@@ -6573,7 +6572,7 @@ async function createEncounterSession(character) {
     encounterMode: true,
     encounterPlace: typeof encounterPlace === 'string' ? encounterPlace : null,
     encounterDay: new Date().toLocaleDateString('en-CA'),
-    encounterGreeting: String(data.session.character_snapshot?.encounterGreeting || data.session.character_snapshot?.opening || '').trim(),
+    encounterGreeting: String(data.session.character_snapshot?.encounterGreeting || '').trim(),
     encounterIntroChoice: null,
     messages: [],
     memories: [],
