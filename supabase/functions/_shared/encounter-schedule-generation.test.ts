@@ -1,4 +1,5 @@
 import {
+  type EncounterSceneCatalogEntry,
   buildEncounterScheduleBatchMessages,
   isEncounterModernMapCompatible,
   normalizeEncounterSceneKey,
@@ -64,6 +65,7 @@ const sceneMetadata = (location_key: string) => ({
 const result = (
   characters: Array<{ character_id: string; [key: string]: unknown }>,
   sourceRows?: ReturnType<typeof source>[],
+  sceneCatalog: EncounterSceneCatalogEntry[] = [],
 ) => {
   const normalized = characters.map(withGreetingPools);
   const keys = new Set<string>();
@@ -72,14 +74,12 @@ const result = (
     for (const variant of [...(variants?.weekday ?? []), ...(variants?.holiday ?? [])]) {
       for (const slot of variant.slots ?? []) {
         if (slot.location_key) keys.add(slot.location_key);
-        if (slot.rain_fallback_location_key) keys.add(slot.rain_fallback_location_key);
       }
     }
     const events = character.special_events as Array<{ slots?: Array<{ location_key?: string; rain_fallback_location_key?: string | null }> }> | undefined;
     for (const event of events ?? []) {
       for (const slot of event.slots ?? []) {
         if (slot.location_key) keys.add(slot.location_key);
-        if (slot.rain_fallback_location_key) keys.add(slot.rain_fallback_location_key);
       }
     }
   }
@@ -87,6 +87,7 @@ const result = (
   return parseEncounterScheduleBatchOutput(
     JSON.stringify({ characters: normalized, scenes }),
     sourceRows ?? characters.map((c) => source(c.character_id)),
+    sceneCatalog,
   );
 };
 const specialEvent = (event_key = "christmas", slots = fullDaySlots()) => ({
@@ -286,23 +287,23 @@ Deno.test("normalizes similar scene labels to canonical shared locations", () =>
   if (normalizeEncounterSceneKey("train station") !== "train-station") throw new Error("English train station alias failed");
 });
 
-Deno.test("preserves shared-scene candidates across separate AI batches", () => {
+Deno.test("new dynamic scenes require two characters in the same batch", () => {
   const single = result([{
     character_id: id1, placement: "modern_map",
     variants: variants(fullDaySlots({ location_key: "shopping-street", is_outdoor: true,
       rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳", rain_fallback_greeting: greeting })),
   }]);
-  if (!single.ok || single.characters[0].variants.weekday[0].slots[1].location_key !== "shopping-street") {
-    throw new Error("single-batch candidate should be preserved for cross-batch aggregation");
+  if (single.ok || !single.errors.some((error) => error.includes("dynamic_scene_requires_two_batch_characters_shopping-street"))) {
+    throw new Error("a single role should not create an invisible dynamic scene");
   }
-  const two = result([
+  const shared = result([
     { character_id: id1, placement: "modern_map", variants: variants(fullDaySlots({ location_key: "shopping-street", is_outdoor: true,
       rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳", rain_fallback_greeting: greeting })) },
     { character_id: id2, placement: "modern_map", variants: variants(fullDaySlots({ location_key: "shopping-street", is_outdoor: true,
       rain_fallback_location_key: "bookstore", rain_fallback_activity: "改在書店", rain_fallback_greeting: greeting })) },
   ]);
-  if (!two.ok || two.characters[0].variants.weekday[0].slots[1].location_key !== "shopping-street") {
-    throw new Error("shared scene candidate was not retained for registry publication");
+  if (!shared.ok || !shared.scenes?.some((scene) => scene.location_key === "shopping-street")) {
+    throw new Error(shared.errors.join(",") || "shared dynamic scene was not retained");
   }
 });
 
@@ -393,23 +394,33 @@ Deno.test("rejects airport as a generic everyday location without character trav
   if (!accepted.ok) throw new Error(accepted.errors.join(","));
 });
 
-Deno.test("requires AI metadata for newly proposed dynamic scene types", () => {
-  const character = {
+Deno.test("requires AI metadata for new dynamic scene types and permits reuse of active ones", () => {
+  const first = {
     character_id: id1, placement: "modern_map",
     variants: variants(fullDaySlots({ location_key: "night-market", is_outdoor: true,
-      rain_fallback_location_key: "restaurant", rain_fallback_activity: "改在餐廳用餐",
+      rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳用餐",
+      rain_fallback_greeting: greeting })),
+  };
+  const second = {
+    character_id: id2, placement: "modern_map",
+    variants: variants(fullDaySlots({ location_key: "night-market", is_outdoor: true,
+      rain_fallback_location_key: "bookstore", rain_fallback_activity: "改在書店休息",
       rain_fallback_greeting: greeting })),
   };
   const missing = parseEncounterScheduleBatchOutput(JSON.stringify({
-    characters: [withGreetingPools(character)],
-  }), [source()]);
+    characters: [withGreetingPools(first), withGreetingPools(second)],
+  }), [source(id1), source(id2)]);
   if (missing.ok || !missing.errors.some((error) => error.includes("dynamic_scene_metadata_missing_night-market"))) {
     throw new Error("dynamic scene without metadata accepted");
   }
-  const accepted = result([character]);
+  const accepted = result([first, second]);
   if (!accepted.ok || !accepted.scenes?.some((scene) => scene.location_key === "night-market")) {
     throw new Error(accepted.errors.join(",") || "dynamic scene metadata was not retained");
   }
+  const reused = result([first], undefined, [{
+    location_key: "night-market", display_name: "夜市", is_dynamic: true,
+  }]);
+  if (!reused.ok) throw new Error(reused.errors.join(",") || "existing dynamic scene should be reusable by one role");
 });
 
 Deno.test("requires AI-updatable description and latest news for built-in Live House scenes", () => {
