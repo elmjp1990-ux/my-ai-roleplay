@@ -1274,7 +1274,16 @@ AS $encounter_city_weather$
     LIMIT 1
   ),
   baseline AS (
-    SELECT b.*
+    SELECT
+      b.*,
+      (
+        pg_catalog.mod(
+          pg_catalog.abs(pg_catalog.hashtext(
+            pg_catalog.to_char(c.local_at, 'YYYY-MM-DD-HH24')
+          )::bigint),
+          100
+        ) < pg_catalog.round(b.rain_probability * 100)::bigint
+      ) AS baseline_is_raining
     FROM public.encounter_weather_baseline_2025 b, local_clock c
     WHERE b.month = EXTRACT(MONTH FROM c.local_at)::smallint
       AND b.hour = EXTRACT(HOUR FROM c.local_at)::smallint
@@ -1285,22 +1294,12 @@ AS $encounter_city_weather$
       live.weather_text,
       CASE
         WHEN baseline.month IS NULL THEN '天氣資料待更新'
-        WHEN baseline.rain_probability >= 0.5 THEN '2025 歷史降雨參考'
-        ELSE '2025 歷史天氣參考'
+        WHEN baseline.baseline_is_raining THEN '2025 歷史資料推估：雨'
+        ELSE '2025 歷史資料推估：多雲'
       END
     ),
     COALESCE(live.temperature_c, baseline.average_temperature_c),
-    COALESCE(
-      live.is_raining,
-      (
-        pg_catalog.mod(
-          pg_catalog.abs(pg_catalog.hashtext(
-            pg_catalog.to_char(local_clock.local_at, 'YYYY-MM-DD-HH24')
-          )::bigint),
-          100
-        ) < pg_catalog.round(COALESCE(baseline.rain_probability, 0) * 100)::bigint
-      )
-    ),
+    COALESCE(live.is_raining, baseline.baseline_is_raining, false),
     live.precipitation_1h_mm,
     live.observed_at,
     CASE WHEN live.city_key IS NOT NULL THEN 'cwa_live'
