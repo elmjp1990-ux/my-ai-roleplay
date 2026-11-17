@@ -235,7 +235,7 @@ Deno.serve(async (request) => {
     users.add(id);
     existingScheduleUsers.set(key, users);
   }
-  const collectLocationKeys = (value: unknown): Set<string> => {
+  const collectLocationKeys = (value: unknown, includeSpecialEvents = true): Set<string> => {
     const character = asRow(value);
     const keys = new Set<string>();
     const variants = asRow(character.variants);
@@ -251,7 +251,7 @@ Deno.serve(async (request) => {
         }
       }
     }
-    if (Array.isArray(character.special_events)) {
+    if (includeSpecialEvents && Array.isArray(character.special_events)) {
       for (const event of character.special_events) {
         const slots = asRow(event).slots;
         if (!Array.isArray(slots)) continue;
@@ -276,7 +276,7 @@ Deno.serve(async (request) => {
   for (const rawCharacter of rawCharacters) {
     const id = asText(asRow(rawCharacter).character_id);
     if (!sourceIds.has(id)) continue;
-    for (const key of collectLocationKeys(rawCharacter)) {
+    for (const key of collectLocationKeys(rawCharacter, false)) {
       if (!(ENCOUNTER_DYNAMIC_SCENE_KEYS as readonly string[]).includes(key) || existingDynamicKeys.has(key)) continue;
       const users = dynamicUsers.get(key) || new Set<string>();
       users.add(id);
