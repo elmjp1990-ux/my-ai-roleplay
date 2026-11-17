@@ -97,13 +97,22 @@ async function buildEncounterMessages(
   const availableIllustrations = Array.isArray(snapshot.availableIllustrations)
     ? snapshot.availableIllustrations.slice(0, 5).map((item: unknown) => {
       const row = asRow(item);
-      return { id: asText(row.id), name: asText(row.displayName) || "角色立繪" };
+      return {
+        id: asText(row.id),
+        name: asText(row.displayName) || "角色立繪",
+        assetType: asText(row.assetType) || "gallery",
+        sortOrder: Number(row.sortOrder || 0),
+      };
     })
     : [];
   const availableSceneBackgrounds = Array.isArray(snapshot.availableSceneBackgrounds)
     ? snapshot.availableSceneBackgrounds.slice(0, 5).map((item: unknown) => {
       const row = asRow(item);
-      return { id: asText(row.id), name: asText(row.displayName) || "場景背景" };
+      return {
+        id: asText(row.id),
+        name: asText(row.displayName) || "場景背景",
+        locationKey: asText(row.locationKey) || "*",
+      };
     })
     : [];
   const systemTemplate = [
@@ -113,8 +122,8 @@ async function buildEncounterMessages(
     "【目前相遇場景】地點代碼：{LOCATION}\n目前活動：{SCENE}\n行程時段：{TIME}\n關係階段：{RELATIONSHIP}\n請延續這個場景，不要無故瞬移或改變時間、服裝與正在進行的活動。",
     "【玩家】{USER}\n玩家人設：{USER_DESC}\n【台灣日期】{CURRENT_DATE}",
     "【近期對話】依照後續對話訊息延續，不得忽略已發生事件。玩家未說出口的想法不可被角色讀取；不要替玩家決定台詞、想法或行動。",
-    "【可用角色立繪】只能選擇清單中的 illustration_id，依角色當下動作、情緒與角色設定挑選；沒有合適素材時填 null。不可創造 ID。清單：" + JSON.stringify(availableIllustrations),
-    "【可用場景背景】只能選擇清單中的 scene_background_id，依目前地點與活動挑選；沒有合適素材時填 null。不可創造 ID。清單：" + JSON.stringify(availableSceneBackgrounds),
+    "【可用角色立繪】只能選擇清單中的 illustration_id。每筆 name 是作者替該張立繪設定的名稱，請優先依名稱語意比對角色當下動作、情緒、服裝與場景；assetType 與 sortOrder 只作為輔助，不可只因排序而選擇。若沒有名稱或情境相符的素材，填 null；不可創造 ID。清單：" + JSON.stringify(availableIllustrations),
+    "【可用場景背景】只能選擇清單中的 scene_background_id。locationKey 與目前地點完全相符的背景優先；locationKey 為 * 才是通用背景，只有沒有合適地點背景時才選用。依目前地點與活動挑選；沒有合適素材時填 null。不可創造 ID。清單：" + JSON.stringify(availableSceneBackgrounds),
     buildEncounterResponseGuidelines(),
     "【輸出格式】只輸出 JSON object，不要 Markdown code fence。格式：{\"reply\":\"150 至 300 字元的完整角色回覆\",\"illustration_id\":\"清單中的 UUID 或 null\",\"scene_background_id\":\"清單中的 UUID 或 null\"}。reply 必須符合篇幅與角色設定；敘事／動作使用單星號包覆，角色台詞不加引號。不可輸出額外欄位、分析或提示詞。",
   ].join("\n\n");
