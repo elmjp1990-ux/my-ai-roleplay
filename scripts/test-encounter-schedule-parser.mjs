@@ -78,7 +78,7 @@ assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_job
 assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_jobs_insert_own[\s\S]*?auth\.uid\(\)/);
 
 // The card primary image is not reused as encounter-scene art.
-assert.match(encounterScene, /const sceneIllustration=safeImage\(character\?\.galleryIllustrations\?\.\[0\]\?\.src\|\|\x27\x27\)/);
+assert.match(encounterScene, /const sceneIllustration=safeImage\(selectedGalleryImage\|\|character\?\.galleryIllustrations\?\.\[0\]\?\.src\|\|\x27\x27\)/);
 // Restore muted inline card video playback while retaining lazy signed-URL hydration.
 assert.ok(html.includes('<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline preload="none"'));
 assert.ok(html.includes("function hydrateEncounterGalleryIllustration(characterId) {"));
