@@ -117,6 +117,7 @@ DECLARE
   v_snapshot jsonb;
   v_session_data jsonb;
   v_session jsonb;
+  v_has_valid_pool boolean := false;
 BEGIN
   IF COALESCE(auth.role(), '') <> 'service_role' THEN
     RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
@@ -154,11 +155,11 @@ BEGIN
   FROM public.encounter_character_greeting_pools AS pools
   WHERE pools.character_id = p_character_id;
 
-  IF CASE
-       WHEN jsonb_typeof(v_stage_pool) = 'array'
-       THEN jsonb_array_length(v_stage_pool) BETWEEN 3 AND 5
-       ELSE false
-     END THEN
+  IF jsonb_typeof(v_stage_pool) = 'array' THEN
+    v_has_valid_pool := jsonb_array_length(v_stage_pool) BETWEEN 3 AND 5;
+  END IF;
+
+  IF v_has_valid_pool THEN
     INSERT INTO public.encounter_character_greeting_history (
       user_id, character_id
     ) VALUES (p_user_id, p_character_id)
