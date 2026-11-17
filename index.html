@@ -10030,9 +10030,16 @@ async function loadEncounterScheduleTestTools(){
       return;
     }
     const pending=Number(data.pending_character_count||0);
+    const failed=Number(data.failed_character_count||0);
+    const reconciliation=Number(data.needs_reconciliation_count||0);
+    const blocked=failed>0||reconciliation>0;
     const lastRun=data.last_batch_completed_at?new Date(data.last_batch_completed_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):'尚未執行';
-    if(status)status.textContent=data.status_available===false?'測試環境已確認；目前無法讀取佇列狀態。':'佇列待處理：'+pending+' 位｜按下後會檢查所有符合資格的公開角色（包含受年齡限制的角色），並生成角色行程與場景｜上次成功完成：'+lastRun+(data.last_batch_status?'（'+data.last_batch_status+'）':'');
-    if(button){button.dataset.aiEnabled='true';button.disabled=false;}
+    if(status)status.textContent=data.status_available===false
+      ?'測試環境已確認；目前無法讀取佇列狀態。'
+      :'待處理：'+pending+' 位｜失敗：'+failed+' 位｜待核對：'+reconciliation+' 位｜'+
+        (blocked?'目前暫停生成，請先處理失敗／待核對結果，避免重複 AI 成本。':'按下後最多處理 5 位角色；')+
+        '｜上次成功完成：'+lastRun+(data.last_batch_status?'（'+data.last_batch_status+'）':'');
+    if(button){button.dataset.aiEnabled=blocked?'false':'true';button.disabled=blocked;}
   }catch(error){
     section.hidden=true;
     if(button){button.disabled=true;button.dataset.aiEnabled='false';}
@@ -10314,7 +10321,7 @@ function renderModal(o) {
           <p class="small muted">整理目前所有符合資格的公開角色行程，並建立／更新共同行程場景。</p>
           <p class="small muted" id="encounterScheduleTestStatus">正在確認是否為允許的測試環境…</p>
           <div class="row wrap"><button type="button" data-action="organize-encounter-schedules" disabled>AI 生成角色行程與場景</button></div>
-          <p class="small muted">測試環境登入帳號皆可使用。會產生 AI 服務呼叫成本，但不扣玩家銀幣或鑽石；不會觸發相遇對話。正式環境不提供此按鈕。</p>
+          <p class="small muted">會產生 AI 服務呼叫成本，但不扣玩家銀幣或鑽石；不會觸發相遇對話。若有失敗或待核對結果，會暫停新的生成以避免重複成本。正式環境不提供此按鈕。</p>
         </section>`);
       void loadEncounterScheduleTestTools();
       break;
