@@ -11,6 +11,7 @@ on:
       - "supabase/drafts/replay-encounter-relationship-greeting-pools.sql"
       - "supabase/drafts/schedule-encounter-evaluation-worker.sql"
       - "supabase/drafts/replay-schedule-encounter-evaluation-worker.sql"
+      - "supabase/drafts/encounter-evaluation-evidence-gates.sql"
       - "supabase/drafts/encounter-session-manual-end.sql"
       - "supabase/drafts/current-state-structure.json"
       - "scripts/build-disposable-schema-fixture.mjs"
@@ -194,6 +195,12 @@ jobs:
             exit 1
           fi
           cat "$LOG_FILE"
+
+      - name: Apply Encounter evidence and settlement safety gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/encounter-evaluation-evidence-gates.sql
 
       - name: Apply Encounter manual-end lifecycle draft
         shell: bash
