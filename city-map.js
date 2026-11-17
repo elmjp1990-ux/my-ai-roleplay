@@ -266,8 +266,17 @@
             .find(marker=>marker.getAttribute('data-place')===key);
           if(builtInMarker){
             builtInMarker.setAttribute('aria-label',name);
-            const glyph=builtInMarker.querySelector('.city-marker-emoji');
-            if(glyph)glyph.textContent=scene.icon;
+            const glyph=builtInMarker.querySelector('.city-marker-glyph');
+            if(glyph){
+              const textGlyph=document.createElementNS(CITY_MAP_SVG_NS,'text');
+              textGlyph.setAttribute('class','city-marker-glyph city-marker-emoji');
+              textGlyph.setAttribute('x','0');textGlyph.setAttribute('y','1');
+              textGlyph.setAttribute('text-anchor','middle');textGlyph.setAttribute('dominant-baseline','central');
+              textGlyph.setAttribute('font-size','18');textGlyph.setAttribute('font-family','system-ui, sans-serif');
+              textGlyph.setAttribute('fill','#fff');textGlyph.setAttribute('pointer-events','none');
+              textGlyph.textContent=scene.icon;
+              glyph.replaceWith(textGlyph);
+            }
           }
         }
         continue;
