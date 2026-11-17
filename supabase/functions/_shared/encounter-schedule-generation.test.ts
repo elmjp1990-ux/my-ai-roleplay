@@ -51,11 +51,34 @@ const variants = (slots = fullDaySlots()) => ({
     { variant_key: "alternative", weight: 40, slots: fullDaySlots({ start_time: "08:00", end_time: "16:00", location_key: "department-store", activity: "逛百貨公司" }) },
   ],
 });
-const result = (characters: Array<{ character_id: string; [key: string]: unknown }>) =>
-  parseEncounterScheduleBatchOutput(
-    JSON.stringify({ characters: characters.map(withGreetingPools) }),
+const sceneMetadata = (location_key: string) => ({
+  location_key,
+  display_name: location_key === "shopping-street" ? "商店街" : location_key,
+  icon: "📍",
+  heading: "城市裡的共同場景",
+  description: "這是一個依照角色活動與城市生活需求建立的公共場景，適合自然停留、交流與偶遇。",
+  event_label: "最新消息",
+  event_title: "本週場景消息已更新",
+  event_description: "近期將有符合場景定位的主題活動與日常安排。",
+});
+const result = (characters: Array<{ character_id: string; [key: string]: unknown }>) => {
+  const normalized = characters.map(withGreetingPools);
+  const keys = new Set<string>();
+  for (const character of normalized) {
+    const variants = character.variants as { weekday?: Array<{ slots?: Array<{ location_key?: string }> }>; holiday?: Array<{ slots?: Array<{ location_key?: string }> }> } | undefined;
+    for (const variant of [...(variants?.weekday ?? []), ...(variants?.holiday ?? [])]) {
+      for (const slot of variant.slots ?? []) if (slot.location_key) keys.add(slot.location_key);
+    }
+  }
+  const scenes = [...keys].filter((key) => key === "shopping-street" ||
+    ["night-market", "restaurant", "university", "hospital", "gym", "cinema", "museum", "hotel",
+      "train-station", "library", "theater", "art-gallery", "community-center", "music-studio",
+      "bakery", "coworking-space"].includes(key)).map(sceneMetadata);
+  return parseEncounterScheduleBatchOutput(
+    JSON.stringify({ characters: normalized, scenes }),
     characters.map((c) => source(c.character_id)),
   );
+};
 const specialEvent = (event_key = "christmas", slots = fullDaySlots()) => ({
   event_key, event_name: ({
     taiwan_public_holiday: "國定假日",
@@ -246,6 +269,9 @@ Deno.test("normalizes similar scene labels to canonical shared locations", () =>
   if (normalizeEncounterSceneKey("酒吧") !== "night-bar") throw new Error("bar alias failed");
   if (normalizeEncounterSceneKey("辦公大樓") !== "commercial") throw new Error("office alias failed");
   if (normalizeEncounterSceneKey("咖啡廳") !== "cafe") throw new Error("cafe alias failed");
+  if (normalizeEncounterSceneKey("夜市") !== "night-market") throw new Error("night market alias failed");
+  if (normalizeEncounterSceneKey("醫院") !== "hospital") throw new Error("hospital alias failed");
+  if (normalizeEncounterSceneKey("圖書館") !== "library") throw new Error("library alias failed");
 });
 
 Deno.test("preserves shared-scene candidates across separate AI batches", () => {
@@ -334,5 +360,44 @@ Deno.test("infers a complete schedule from the character profile when the author
   }
   if (!built.messages[0].content.includes("若 author_schedule_brief 為空")) {
     throw new Error("prompt does not instruct inference when schedule text is absent");
+  }
+});
+
+Deno.test("rejects airport as a generic everyday location without character travel or aviation context", () => {
+  const airportSchedules = variants(fullDaySlots({
+    location_key: "airport",
+    activity: "在機場大廳等候接機，觀察來往旅客。",
+  }));
+  const parsed = result([{ character_id: id1, placement: "modern_map", variants: airportSchedules }]);
+  if (parsed.ok || !parsed.errors.some((error) => error.includes("airport_location_without_character_context"))) {
+    throw new Error("generic airport schedule accepted");
+  }
+  const aviationRole = source(id1, { occupation: "航空公司地勤人員", title: "機場地勤" });
+  const accepted = parseEncounterScheduleBatchOutput(JSON.stringify({
+    characters: [{
+      character_id: id1, placement: "modern_map", variants: variants(fullDaySlots({
+        location_key: "airport", activity: "在機場辦理航班報到與旅客服務。",
+      })),
+    }],
+  }), [aviationRole]);
+  if (!accepted.ok) throw new Error(accepted.errors.join(","));
+});
+
+Deno.test("requires AI metadata for newly proposed dynamic scene types", () => {
+  const character = {
+    character_id: id1, placement: "modern_map",
+    variants: variants(fullDaySlots({ location_key: "night-market", is_outdoor: true,
+      rain_fallback_location_key: "restaurant", rain_fallback_activity: "改在餐廳用餐",
+      rain_fallback_greeting: greeting })),
+  };
+  const missing = parseEncounterScheduleBatchOutput(JSON.stringify({
+    characters: [withGreetingPools(character)],
+  }), [source()]);
+  if (missing.ok || !missing.errors.some((error) => error.includes("dynamic_scene_metadata_missing_night-market"))) {
+    throw new Error("dynamic scene without metadata accepted");
+  }
+  const accepted = result([character]);
+  if (!accepted.ok || accepted.scenes?.[0]?.location_key !== "night-market") {
+    throw new Error(accepted.errors.join(",") || "dynamic scene metadata was not retained");
   }
 });
