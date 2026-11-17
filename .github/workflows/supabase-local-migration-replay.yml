@@ -248,6 +248,7 @@ jobs:
         run: |
           set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117130000_encounter_schedule_batch_semantics.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117140000_encounter_public_character_schedule_eligibility.sql
 
       - name: Replay schedule batch completion cooldown and partial-publish contracts
         shell: bash
