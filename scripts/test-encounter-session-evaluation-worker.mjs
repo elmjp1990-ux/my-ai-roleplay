@@ -46,6 +46,12 @@ assert.match(worker, /MAX_TRANSCRIPT_CHARS/);
 assert.match(worker, /scheduled_end_at/);
 assert.match(worker, /encounter_session_turns/);
 assert.match(worker, /chat_messages/);
+assert.ok(
+  worker.indexOf('if (Number(job.turn_count) === 0)') < worker.indexOf('if (!apiKey)'),
+  "Zero-turn scenes must settle neutrally without requiring an AI provider key",
+);
+assert.doesNotMatch(worker, /if \(!openRouterKey\) return json\(\{ error: "ai_provider_not_configured"/,
+  "Missing provider credentials must not block neutral no-turn settlement");
 assert.doesNotMatch(worker, /reserve_chat_turn|settle_chat_turn|refund_chat_turn/,
   "Scene evaluation must never touch the player wallet");
 
