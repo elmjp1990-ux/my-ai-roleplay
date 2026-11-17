@@ -61,7 +61,10 @@ const sceneMetadata = (location_key: string) => ({
   event_title: "本週場景消息已更新",
   event_description: "近期將有符合場景定位的主題活動與日常安排。",
 });
-const result = (characters: Array<{ character_id: string; [key: string]: unknown }>) => {
+const result = (
+  characters: Array<{ character_id: string; [key: string]: unknown }>,
+  sourceRows?: ReturnType<typeof source>[],
+) => {
   const normalized = characters.map(withGreetingPools);
   const keys = new Set<string>();
   for (const character of normalized) {
@@ -72,14 +75,18 @@ const result = (characters: Array<{ character_id: string; [key: string]: unknown
         if (slot.rain_fallback_location_key) keys.add(slot.rain_fallback_location_key);
       }
     }
+    const events = character.special_events as Array<{ slots?: Array<{ location_key?: string; rain_fallback_location_key?: string | null }> }> | undefined;
+    for (const event of events ?? []) {
+      for (const slot of event.slots ?? []) {
+        if (slot.location_key) keys.add(slot.location_key);
+        if (slot.rain_fallback_location_key) keys.add(slot.rain_fallback_location_key);
+      }
+    }
   }
-  const scenes = [...keys].filter((key) => key === "shopping-street" ||
-    ["night-market", "restaurant", "university", "hospital", "gym", "cinema", "museum", "hotel",
-      "train-station", "library", "theater", "art-gallery", "community-center", "music-studio",
-      "bakery", "coworking-space"].includes(key)).map(sceneMetadata);
+  const scenes = [...keys].map(sceneMetadata);
   return parseEncounterScheduleBatchOutput(
     JSON.stringify({ characters: normalized, scenes }),
-    characters.map((c) => source(c.character_id)),
+    sourceRows ?? characters.map((c) => source(c.character_id)),
   );
 };
 const specialEvent = (event_key = "christmas", slots = fullDaySlots()) => ({
@@ -376,13 +383,11 @@ Deno.test("rejects airport as a generic everyday location without character trav
     throw new Error("generic airport schedule accepted");
   }
   const aviationRole = source(id1, { occupation: "航空公司地勤人員", title: "機場地勤" });
-  const accepted = parseEncounterScheduleBatchOutput(JSON.stringify({
-    characters: [{
-      character_id: id1, placement: "modern_map", variants: variants(fullDaySlots({
-        location_key: "airport", activity: "在機場辦理航班報到與旅客服務。",
-      })),
-    }],
-  }), [aviationRole]);
+  const accepted = result([{
+    character_id: id1, placement: "modern_map", variants: variants(fullDaySlots({
+      location_key: "airport", activity: "在機場辦理航班報到與旅客服務。",
+    })),
+  }], [aviationRole]);
   if (!accepted.ok) throw new Error(accepted.errors.join(","));
 });
 
