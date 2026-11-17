@@ -299,6 +299,7 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
   SELECT pg_catalog.jsonb_build_object(
+    'schedule_schema_version', 'poyozz-encounter-schedule-v2-special-events-2026-11-17',
     'character_id', c.id::text,
     'author_id', c.author_id::text,
     'visibility', c.visibility,
