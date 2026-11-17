@@ -138,7 +138,7 @@ BEGIN
       AND c.is_nsfw IS FALSE
       AND NOT (
         pg_catalog.concat_ws(' ', c.intro, c.race, c.style)
-          ~ '(ancient|historical|medieval|antiquity|fantasy|mythic|fictional|古代|歷史|中世紀|中古|奇幻|架空|封建|戰國|春秋|秦漢|唐代|宋代|明代|清代|古羅馬|古希臘)'
+          ~* '(ancient|historical|medieval|antiquity|fantasy|mythic|fictional|古代|歷史|中世紀|中古|奇幻|架空|封建|戰國|春秋|秦漢|唐代|宋代|明代|清代|古羅馬|古希臘)'
         AND COALESCE((src.payload->>'modern_setting_compatible')::boolean, false) IS NOT TRUE
         AND COALESCE((source.payload->>'time_travel_explicit')::boolean, false) IS NOT TRUE
       )
