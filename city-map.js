@@ -254,7 +254,7 @@
       glyph.setAttribute('class','city-marker-glyph city-marker-emoji');
       glyph.setAttribute('x','0');glyph.setAttribute('y','1');
       glyph.setAttribute('text-anchor','middle');glyph.setAttribute('dominant-baseline','central');
-      glyph.setAttribute('font-size','18');glyph.setAttribute('pointer-events','none');
+      glyph.setAttribute('font-size','18');glyph.setAttribute('font-family','system-ui, sans-serif');glyph.setAttribute('fill','#fff');glyph.setAttribute('pointer-events','none');
       glyph.textContent=scene.icon;
       marker.append(hit,glass,glyph);
       layer.appendChild(marker);
