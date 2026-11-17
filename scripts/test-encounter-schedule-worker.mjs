@@ -36,7 +36,7 @@ assert.ok(
 );
 
 assert.match(pipeline, /CREATE TRIGGER character_schedule_descriptions_enqueue_ai[\s\S]*?AFTER INSERT OR UPDATE OF description, author_id OR DELETE/);
-assert.match(pipeline, /CREATE TRIGGER characters_enqueue_encounter_schedule_ai[\s\S]*?AFTER INSERT OR UPDATE OF author_id, name, intro, race, style, gender, age, tags,[\s\S]*?personality_profile, visibility, review_status, rights_confirmed, deleted_at/);
+assert.match(pipeline, /CREATE TRIGGER characters_enqueue_encounter_schedule_ai[\s\S]*?AFTER INSERT OR UPDATE OF author_id, name, title, intro, race, style, gender, age, tags,[\s\S]*?personality_profile, visibility, review_status, rights_confirmed, deleted_at/);
 assert.match(pipeline, /CREATE TRIGGER character_private_info_enqueue_encounter_schedule_ai[\s\S]*?AFTER INSERT OR UPDATE OF author_id, private_info OR DELETE/);
 assert.match(pipeline, /LEFT JOIN public\.character_schedule_descriptions d/);
 assert.doesNotMatch(pipeline, /btrim\(COALESCE\(d\.description, ''\)\) <> ''/,
