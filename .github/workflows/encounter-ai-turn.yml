@@ -1,0 +1,32 @@
+name: Encounter AI turn contract
+
+on:
+  pull_request:
+    paths:
+      - "supabase/functions/encounter-turn/**"
+      - "supabase/functions/_shared/encounter-turn-output.mjs"
+      - "supabase/functions/_shared/encounter-response-guidelines.ts"
+      - "supabase/functions/_shared/prompt-context.ts"
+      - "supabase/functions/_shared/private-context-guard.ts"
+      - "supabase/functions/_shared/openrouter-chat-completions.ts"
+      - "supabase/functions/_shared/provider-failure-policy.ts"
+      - "supabase/functions/_shared/chat-turn-claim.ts"
+      - "supabase/functions/_shared/story-memory-summary.ts"
+      - "scripts/test-encounter-ai-output.mjs"
+      - ".github/workflows/encounter-ai-turn.yml"
+
+jobs:
+  encounter-ai-turn:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Test Encounter response schema and length boundaries
+        run: node scripts/test-encounter-ai-output.mjs
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check Encounter Edge Function and shared modules
+        run: deno check supabase/functions/encounter-turn/index.ts
