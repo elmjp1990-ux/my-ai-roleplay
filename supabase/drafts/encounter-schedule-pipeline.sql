@@ -140,16 +140,21 @@ CREATE INDEX IF NOT EXISTS character_schedules_special_event_idx
 CREATE TABLE IF NOT EXISTS public.encounter_schedule_weather_decisions (
   schedule_id uuid NOT NULL REFERENCES public.character_schedules(id) ON DELETE CASCADE,
   scheduled_start_at timestamptz NOT NULL,
+  scheduled_end_at timestamptz NOT NULL,
   location_key text NOT NULL,
   activity text NOT NULL,
   encounter_greeting text NOT NULL DEFAULT '',
   is_outdoor boolean NOT NULL DEFAULT false,
+  decided_weather_text text NOT NULL DEFAULT '多雲',
   decided_is_raining boolean NOT NULL DEFAULT false,
   decided_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),
-  PRIMARY KEY (schedule_id, scheduled_start_at)
+  PRIMARY KEY (schedule_id, scheduled_start_at),
+  CHECK (scheduled_end_at > scheduled_start_at)
 );
+CREATE INDEX IF NOT EXISTS encounter_schedule_weather_decisions_end_idx
+  ON public.encounter_schedule_weather_decisions (scheduled_end_at);
 REVOKE ALL ON TABLE public.encounter_schedule_weather_decisions FROM PUBLIC, anon, authenticated;
-GRANT SELECT, INSERT ON TABLE public.encounter_schedule_weather_decisions TO service_role;
+GRANT SELECT, INSERT, DELETE ON TABLE public.encounter_schedule_weather_decisions TO service_role;
 
 CREATE TABLE IF NOT EXISTS public.taiwan_calendar_days (
   calendar_date date PRIMARY KEY,
@@ -321,7 +326,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.taiwan_calendar_days TO ser
 CREATE OR REPLACE FUNCTION public.encounter_schedule_source_payload(p_character_id uuid)
 RETURNS jsonb
 LANGUAGE sql
-STABLE
+VOLATILE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -1169,7 +1174,7 @@ GRANT EXECUTE ON FUNCTION public.publish_encounter_schedule_batch(uuid, uuid, js
 CREATE OR REPLACE FUNCTION public.resolve_encounter_special_event_key(p_date date)
 RETURNS text
 LANGUAGE sql
-STABLE
+VOLATILE
 SECURITY DEFINER
 SET search_path = ''
 AS $encounter_special_event$
@@ -1245,6 +1250,7 @@ DECLARE
   v_primary_weight integer;
   v_variant_key text;
   v_is_raining boolean := false;
+  v_weather_text text := '多雲';
   v_row public.character_schedules%ROWTYPE;
   v_decision public.encounter_schedule_weather_decisions%ROWTYPE;
   v_effective_location text;
@@ -1257,9 +1263,18 @@ BEGIN
   v_local := p_at AT TIME ZONE 'Asia/Taipei';
   v_local_date := v_local::date;
   v_local_time := v_local::time;
-  SELECT weather.is_raining INTO v_is_raining
+  SELECT weather.is_raining, weather.weather_text
+    INTO v_is_raining, v_weather_text
   FROM public.get_encounter_city_weather() AS weather;
   v_is_raining := COALESCE(v_is_raining, false);
+  v_weather_text := COALESCE(v_weather_text, '多雲');
+
+  -- Keep only recent decisions; old schedule occurrences are no longer resolvable.
+  DELETE FROM public.encounter_schedule_weather_decisions d
+  USING public.character_schedules s
+  WHERE d.schedule_id = s.id
+    AND s.character_id = p_character_id
+    AND d.scheduled_end_at < (p_at - interval '2 days');
 
   FOR v_row IN
     SELECT s.*
@@ -1384,12 +1399,13 @@ BEGIN
           THEN false ELSE v_row.is_outdoor END;
 
       INSERT INTO public.encounter_schedule_weather_decisions (
-        schedule_id, scheduled_start_at, location_key, activity,
-        encounter_greeting, is_outdoor, decided_is_raining
+        schedule_id, scheduled_start_at, scheduled_end_at, location_key, activity,
+        encounter_greeting, is_outdoor, decided_weather_text, decided_is_raining
       ) VALUES (
         v_row.id, (v_start_local AT TIME ZONE 'Asia/Taipei'),
+        (v_end_local AT TIME ZONE 'Asia/Taipei'),
         v_effective_location, v_effective_activity, v_effective_greeting,
-        v_effective_is_outdoor, v_is_raining
+        v_effective_is_outdoor, v_weather_text, v_is_raining
       ) ON CONFLICT (schedule_id, scheduled_start_at) DO NOTHING;
 
       SELECT * INTO v_decision
@@ -1451,7 +1467,7 @@ RETURNS TABLE (
   variant_weight smallint
 )
 LANGUAGE sql
-STABLE
+VOLATILE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -1486,7 +1502,7 @@ RETURNS TABLE (
   variant_weight smallint
 )
 LANGUAGE sql
-STABLE
+VOLATILE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -1531,7 +1547,7 @@ RETURNS TABLE (
   variant_weight smallint
 )
 LANGUAGE sql
-STABLE
+VOLATILE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -1668,7 +1684,7 @@ RETURNS TABLE (
   weather_source text
 )
 LANGUAGE sql
-STABLE
+VOLATILE
 SECURITY DEFINER
 SET search_path = ''
 AS $encounter_city_weather$
@@ -1711,7 +1727,7 @@ RETURNS TABLE (
   character_count bigint
 )
 LANGUAGE sql
-STABLE
+VOLATILE
 SECURITY DEFINER
 SET search_path = ''
 AS $encounter_scene_registry$
