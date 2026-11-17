@@ -135,6 +135,22 @@ CREATE INDEX IF NOT EXISTS character_schedules_special_event_idx
   ON public.character_schedules (character_id, special_event_key, start_time)
   WHERE is_active IS TRUE AND special_event_key IS NOT NULL;
 
+-- Freeze the weather fallback selected for a specific occurrence of a schedule.
+-- A weather change during the slot must not move an active encounter mid-scene.
+CREATE TABLE IF NOT EXISTS public.encounter_schedule_weather_decisions (
+  schedule_id uuid NOT NULL REFERENCES public.character_schedules(id) ON DELETE CASCADE,
+  scheduled_start_at timestamptz NOT NULL,
+  location_key text NOT NULL,
+  activity text NOT NULL,
+  encounter_greeting text NOT NULL DEFAULT '',
+  is_outdoor boolean NOT NULL DEFAULT false,
+  decided_is_raining boolean NOT NULL DEFAULT false,
+  decided_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),
+  PRIMARY KEY (schedule_id, scheduled_start_at)
+);
+REVOKE ALL ON TABLE public.encounter_schedule_weather_decisions FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT ON TABLE public.encounter_schedule_weather_decisions TO service_role;
+
 CREATE TABLE IF NOT EXISTS public.taiwan_calendar_days (
   calendar_date date PRIMARY KEY,
   day_type text NOT NULL CHECK (day_type IN ('holiday', 'workday')),
@@ -1213,10 +1229,10 @@ RETURNS TABLE (
   scheduled_end_at timestamptz
 )
 LANGUAGE plpgsql
-STABLE
+VOLATILE
 SECURITY DEFINER
 SET search_path = ''
-AS $$
+AS $
 DECLARE
   v_local timestamp;
   v_local_date date;
@@ -1230,6 +1246,11 @@ DECLARE
   v_variant_key text;
   v_is_raining boolean := false;
   v_row public.character_schedules%ROWTYPE;
+  v_decision public.encounter_schedule_weather_decisions%ROWTYPE;
+  v_effective_location text;
+  v_effective_activity text;
+  v_effective_greeting text;
+  v_effective_is_outdoor boolean;
   v_start_local timestamp;
   v_end_local timestamp;
 BEGIN
@@ -1259,18 +1280,6 @@ BEGIN
         )
       )
       AND s.is_active IS TRUE
-      AND (
-        p_location_key IS NULL
-        OR (
-          v_is_raining IS TRUE
-          AND s.is_outdoor IS TRUE
-          AND s.rain_fallback_location_key = p_location_key
-        )
-        OR (
-          NOT (v_is_raining IS TRUE AND s.is_outdoor IS TRUE)
-          AND s.location_key = p_location_key
-        )
-      )
       AND (
         (s.start_time < s.end_time AND v_local_time >= s.start_time AND v_local_time < s.end_time)
         OR
@@ -1348,24 +1357,50 @@ BEGIN
       ) THEN CONTINUE; END IF;
     END IF;
 
-    IF p_location_key IS NOT NULL
-       AND NOT (
-         (
-           v_is_raining IS TRUE
-           AND v_row.is_outdoor IS TRUE
-           AND v_row.rain_fallback_location_key = p_location_key
-         )
-         OR (
-           NOT (v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE)
-           AND v_row.location_key = p_location_key
-         )
-       ) THEN
-      CONTINUE;
-    END IF;
-
     v_start_local := v_schedule_date + v_row.start_time;
     v_end_local := v_schedule_date + v_row.end_time
       + CASE WHEN v_row.end_time <= v_row.start_time THEN interval '1 day' ELSE interval '0' END;
+
+    SELECT * INTO v_decision
+    FROM public.encounter_schedule_weather_decisions d
+    WHERE d.schedule_id = v_row.id
+      AND d.scheduled_start_at = (v_start_local AT TIME ZONE 'Asia/Taipei');
+
+    IF NOT FOUND THEN
+      v_effective_location := CASE
+        WHEN v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE
+          THEN COALESCE(v_row.rain_fallback_location_key, v_row.location_key)
+        ELSE v_row.location_key END;
+      v_effective_activity := CASE
+        WHEN v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE
+          THEN COALESCE(v_row.rain_fallback_activity, v_row.activity)
+        ELSE v_row.activity END;
+      v_effective_greeting := CASE
+        WHEN v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE
+          THEN COALESCE(v_row.rain_fallback_greeting, v_row.encounter_greeting)
+        ELSE v_row.encounter_greeting END;
+      v_effective_is_outdoor := CASE
+        WHEN v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE
+          THEN false ELSE v_row.is_outdoor END;
+
+      INSERT INTO public.encounter_schedule_weather_decisions (
+        schedule_id, scheduled_start_at, location_key, activity,
+        encounter_greeting, is_outdoor, decided_is_raining
+      ) VALUES (
+        v_row.id, (v_start_local AT TIME ZONE 'Asia/Taipei'),
+        v_effective_location, v_effective_activity, v_effective_greeting,
+        v_effective_is_outdoor, v_is_raining
+      ) ON CONFLICT (schedule_id, scheduled_start_at) DO NOTHING;
+
+      SELECT * INTO v_decision
+      FROM public.encounter_schedule_weather_decisions d
+      WHERE d.schedule_id = v_row.id
+        AND d.scheduled_start_at = (v_start_local AT TIME ZONE 'Asia/Taipei');
+    END IF;
+
+    IF p_location_key IS NOT NULL AND v_decision.location_key <> p_location_key THEN
+      CONTINUE;
+    END IF;
 
     RETURN QUERY SELECT
       v_row.id,
@@ -1373,18 +1408,14 @@ BEGIN
       v_day_type,
       v_row.start_time,
       v_row.end_time,
-      CASE WHEN v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE
-        THEN v_row.rain_fallback_location_key ELSE v_row.location_key END,
-      CASE WHEN v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE
-        THEN v_row.rain_fallback_activity ELSE v_row.activity END,
+      v_decision.location_key,
+      v_decision.activity,
       v_row.priority,
       v_row.source_type,
       v_row.variant_key,
       v_row.variant_weight,
-      CASE WHEN v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE
-        THEN v_row.rain_fallback_greeting ELSE v_row.encounter_greeting END,
-      CASE WHEN v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE
-        THEN false ELSE v_row.is_outdoor END,
+      v_decision.encounter_greeting,
+      v_decision.is_outdoor,
       v_row.rain_fallback_location_key,
       v_row.rain_fallback_activity,
       v_row.rain_fallback_greeting,
