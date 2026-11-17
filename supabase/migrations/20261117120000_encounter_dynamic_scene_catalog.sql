@@ -174,7 +174,7 @@ GRANT EXECUTE ON FUNCTION public.encounter_schedule_source_payload(uuid)
 -- Manual Preview testing first enqueues eligible public characters. The Edge Function
 -- calls this only after its test-mode and account-allowlist checks; no Cron is enabled.
 CREATE OR REPLACE FUNCTION public.enqueue_encounter_schedule_generation_test_batch(
-  p_limit integer DEFAULT 500
+  p_limit integer DEFAULT 2147483647
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -184,7 +184,7 @@ AS $$
 DECLARE
   v_character record;
   v_result jsonb;
-  v_limit integer := GREATEST(1, LEAST(COALESCE(p_limit, 500), 500));
+  v_limit integer := GREATEST(1, COALESCE(p_limit, 2147483647));
   v_scanned integer := 0;
   v_pending integer := 0;
   v_unchanged integer := 0;
