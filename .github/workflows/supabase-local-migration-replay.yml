@@ -156,6 +156,14 @@ jobs:
           set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-account-deletion-release-migration.sql
 
+      - name: Replay local security and character deletion drafts
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-local-security-drafts.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-and-test-character-deletion.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-deletion-draft-rollback.sql
+
       - name: Replay Encounter schedule schema and weather fallback
         shell: bash
         run: |
@@ -180,14 +188,6 @@ jobs:
           name: encounter-sql-replay-${{ github.run_id }}
           path: ${{ runner.temp }}/encounter-schedule-replay.log
           if-no-files-found: ignore
-
-      - name: Replay local security and character deletion drafts
-        shell: bash
-        run: |
-          set -euo pipefail
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-local-security-drafts.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-and-test-character-deletion.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-deletion-draft-rollback.sql
 
       - name: Replay deletion concurrency
         shell: bash
