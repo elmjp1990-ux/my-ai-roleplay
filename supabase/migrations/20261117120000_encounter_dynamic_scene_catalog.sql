@@ -271,6 +271,7 @@ DECLARE
   v_x integer;
   v_y integer;
   v_count integer;
+  v_visible_dynamic_count integer;
   v_published integer := 0;
   v_skipped integer := 0;
 BEGIN
@@ -347,6 +348,19 @@ BEGIN
         AND c.rights_confirmed IS TRUE
         AND c.deleted_at IS NULL;
       IF COALESCE(v_count, 0) < 2 THEN
+        v_skipped := v_skipped + 1;
+        CONTINUE;
+      END IF;
+
+      SELECT pg_catalog.count(*)::integer INTO v_visible_dynamic_count
+      FROM public.get_encounter_scene_catalog() existing_scene
+      WHERE existing_scene.is_dynamic IS TRUE;
+      IF COALESCE(v_visible_dynamic_count, 0) >= 3
+         AND NOT EXISTS (
+           SELECT 1 FROM public.get_encounter_scene_catalog() existing_scene
+           WHERE existing_scene.location_key = v_key
+             AND existing_scene.is_dynamic IS TRUE
+         ) THEN
         v_skipped := v_skipped + 1;
         CONTINUE;
       END IF;
