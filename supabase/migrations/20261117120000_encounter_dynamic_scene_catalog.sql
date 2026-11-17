@@ -184,7 +184,7 @@ AS $
 DECLARE
   v_character record;
   v_result jsonb;
-  v_limit integer := pg_catalog.greatest(1, pg_catalog.least(COALESCE(p_limit, 500), 500));
+  v_limit integer := GREATEST(1, LEAST(COALESCE(p_limit, 500), 500));
   v_scanned integer := 0;
   v_pending integer := 0;
   v_unchanged integer := 0;
