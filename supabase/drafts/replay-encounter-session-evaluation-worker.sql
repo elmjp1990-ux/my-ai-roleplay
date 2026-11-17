@@ -78,7 +78,7 @@ BEGIN
     WHERE session_id = v_session_id
       AND status = 'ready_to_settle'
       AND scheduled_end_at <= clock_timestamp()
-      AND schedule_snapshot->>'scheduled_end_at' IS NULL
+      AND schedule_snapshot->>'activity' = '測試結束場景'
   ) THEN
     RAISE EXCEPTION 'manual Encounter end did not move the lifecycle into the due settlement state';
   END IF;
