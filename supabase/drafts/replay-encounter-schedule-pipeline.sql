@@ -13,6 +13,30 @@ RESET ROLE;
 SET LOCAL ROLE service_role;
 SET LOCAL request.jwt.claim.role = 'service_role';
 
+DO $weather_fallback_smoke$
+DECLARE
+  v_weather record;
+BEGIN
+  SELECT * INTO v_weather FROM public.get_encounter_city_weather();
+  IF NOT FOUND
+     OR v_weather.weather_text <> '多雲'
+     OR v_weather.temperature_c <> 24
+     OR v_weather.is_raining IS NOT FALSE
+     OR v_weather.weather_source <> 'poyozz_fallback' THEN
+    RAISE EXCEPTION 'empty weather cache must return the lightweight Taipei fallback';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.encounter_scene_backgrounds
+    WHERE location_key = '*'
+      AND asset_path = './encounter-default-scene.webp'
+      AND is_active IS TRUE
+  ) THEN
+    RAISE EXCEPTION 'default encounter scene background is missing';
+  END IF;
+END;
+$weather_fallback_smoke$;
+
 SELECT count(*)
 FROM public.resolve_encounter_character_schedule(
   '00000000-0000-4000-8000-000000000001'::uuid,
