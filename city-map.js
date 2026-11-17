@@ -441,6 +441,18 @@
     const people=pager?.people||[];
     const strip=$('cityMapAvatarStrip');
     if(!strip)return;
+    const hasAnySchedule=(pager?.candidates||[]).some(person=>String(person.encounterSchedules||'').trim());
+    const emptyMessage=pager?.loading
+      ? '正在讀取這個場景的角色…'
+      : pager?.error
+        ? '角色行程載入失敗，請重試。'
+        : !pager?.candidates?.length&&!pager?.hasMore
+          ? '目前沒有符合資格的公開角色。'
+          : hasAnySchedule
+            ? '目前沒有角色在此地點與台灣時間活動。'
+            : !pager?.hasMore
+              ? '尚未建立角色行程；可到測試工具手動生成。'
+              : '尚未找到符合條件的角色，請載入更多。';
     strip.innerHTML=people.length
       ? people.map((person,index)=>{
           const characterName=String(person.name||'角色');
@@ -450,13 +462,15 @@
             : '<span class="city-location-avatar-fallback">'+escapeHTML(characterName.slice(0,1))+'</span>';
           return '<button type="button" class="city-location-avatar city-location-person" data-action="city-person" data-person-index="'+index+'" aria-label="查看 '+escapeHTML(characterName)+' 的角色資訊">'+portrait+'<span class="city-location-person-name">'+escapeHTML(characterName)+'</span></button>';
         }).join('')
-      : '<p class="city-location-empty">'+(pager?.loading?'正在讀取這個場景的角色…':'目前沒有角色排定在這個地點。')+'</p>';
-    if(pager?.hasMore){
+      : '<p class="city-location-empty">'+emptyMessage+'</p>';
+    if(pager?.error){
+      strip.insertAdjacentHTML('beforeend','<button type="button" class="city-location-load-more" data-action="city-people-retry">重試載入</button>');
+    }else if(pager?.hasMore){
       strip.insertAdjacentHTML('beforeend','<button type="button" class="city-location-load-more" data-action="city-people-load-more" '+(pager.loading?'disabled':'')+'>載入更多角色（每次 10 位）</button>');
     }
     $('cityMapPeopleCount').textContent=people.length
       ? people.length+' 位角色符合目前時段'+(pager?.hasMore?' · 可載入更多':'')
-      : (pager?.loading?'正在讀取…':'目前沒有符合時段的角色');
+      : (pager?.loading?'正在讀取…':pager?.error?'載入失敗':hasAnySchedule?'目前無符合時段角色':'尚無角色行程');
   };
   const loadCityPeoplePage=async(place)=>{
     const pager=cityScenePageStates.get(place);
@@ -471,13 +485,13 @@
       while(pager.hasMore&&pager.people.length<targetCount&&scannedPages<5){
         const result=await loadCityCharacterPage(pager.offset);
         const items=Array.isArray(result?.items)?result.items:[];
-        pager.offset+=items.length;
-        pager.hasMore=result?.hasMore===true;
-        pager.candidates=[...pager.candidates,...items];
         if(items.length){
           const schedules=await loadCityCharacterSchedules(items.map(person=>person.id));
           for(const person of items)person.encounterSchedules=schedules.get(person.id)||'';
         }
+        pager.offset+=items.length;
+        pager.hasMore=result?.hasMore===true;
+        pager.candidates=[...pager.candidates,...items];
         pager.people=getCityPresence(place,pager.candidates);
         cityPresenceByPlace[place]=pager.people;
         scannedPages++;
@@ -688,6 +702,13 @@
     pageButtons.forEach(button=>button.disabled=mode!=='status');
   };
   locationModal?.addEventListener('click',async event=>{
+    const retryButton=event.target.closest('[data-action="city-people-retry"]');
+    if(retryButton){
+      event.preventDefault();event.stopPropagation();
+      const pager=cityScenePageStates.get(locationModal.dataset.place);
+      if(pager){pager.error=null;void loadCityPeoplePage(locationModal.dataset.place);}
+      return;
+    }
     const loadMoreButton=event.target.closest('[data-action="city-people-load-more"]');
     if(loadMoreButton){
       event.preventDefault();event.stopPropagation();
