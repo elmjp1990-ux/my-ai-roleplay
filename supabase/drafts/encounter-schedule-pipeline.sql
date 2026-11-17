@@ -257,7 +257,7 @@ SET search_path = ''
 AS $$
   SELECT pg_catalog.jsonb_build_object(
     'character_id', c.id::text,
-    'author_id', d.author_id::text,
+    'author_id', c.author_id::text,
     'visibility', c.visibility,
     'review_status', c.review_status,
     'rights_confirmed', c.rights_confirmed,
@@ -272,17 +272,17 @@ AS $$
     'occupation', COALESCE(c.personality_profile ->> 'occupation', ''),
     'world_era', pg_catalog.concat_ws(' ', c.intro, c.race, c.style),
     'modern_setting_compatible',
-      pg_catalog.concat_ws(' ', c.intro, d.description, p.private_info, c.personality_profile::text)
+      pg_catalog.concat_ws(' ', c.intro, COALESCE(d.description, ''), p.private_info, c.personality_profile::text)
       ~ '(現代世界|現代背景|現代都市|現代社會|現代生活|當代)',
     'time_travel_explicit',
-      pg_catalog.concat_ws(' ', c.intro, d.description, p.private_info, c.personality_profile::text)
+      pg_catalog.concat_ws(' ', c.intro, COALESCE(d.description, ''), p.private_info, c.personality_profile::text)
       ~ '(穿越到現代|穿越至現代|來到現代|時空旅行到現代|穿越現代)',
-    'schedule_description', d.description,
+    'schedule_description', COALESCE(d.description, ''),
     'private_info', COALESCE(p.private_info, ''),
     'personality_profile', COALESCE(c.personality_profile, '{}'::jsonb)
   )
   FROM public.characters c
-  JOIN public.character_schedule_descriptions d
+  LEFT JOIN public.character_schedule_descriptions d
     ON d.character_id = c.id AND d.author_id = c.author_id
   LEFT JOIN public.character_private_info p
     ON p.character_id = c.id AND p.author_id = c.author_id
@@ -291,7 +291,6 @@ AS $$
     AND c.review_status = 'approved'
     AND c.rights_confirmed IS TRUE
     AND c.deleted_at IS NULL
-    AND pg_catalog.btrim(COALESCE(d.description, '')) <> '';
 $$;
 
 REVOKE ALL ON FUNCTION public.encounter_schedule_source_payload(uuid) FROM PUBLIC, anon, authenticated;
@@ -426,9 +425,23 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $$
+AS $
 BEGIN
-  IF OLD.visibility IS DISTINCT FROM NEW.visibility
+  IF TG_OP = 'INSERT' THEN
+    PERFORM public.enqueue_encounter_schedule_generation_internal(NEW.id);
+    RETURN NEW;
+  END IF;
+
+  IF OLD.author_id IS DISTINCT FROM NEW.author_id
+     OR OLD.name IS DISTINCT FROM NEW.name
+     OR OLD.intro IS DISTINCT FROM NEW.intro
+     OR OLD.race IS DISTINCT FROM NEW.race
+     OR OLD.style IS DISTINCT FROM NEW.style
+     OR OLD.gender IS DISTINCT FROM NEW.gender
+     OR OLD.age IS DISTINCT FROM NEW.age
+     OR OLD.tags IS DISTINCT FROM NEW.tags
+     OR OLD.personality_profile IS DISTINCT FROM NEW.personality_profile
+     OR OLD.visibility IS DISTINCT FROM NEW.visibility
      OR OLD.review_status IS DISTINCT FROM NEW.review_status
      OR OLD.rights_confirmed IS DISTINCT FROM NEW.rights_confirmed
      OR OLD.deleted_at IS DISTINCT FROM NEW.deleted_at THEN
@@ -436,16 +449,42 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$$;
+$;
 
 REVOKE ALL ON FUNCTION public.on_encounter_character_visibility_changed()
   FROM PUBLIC, anon, authenticated;
 
 DROP TRIGGER IF EXISTS characters_enqueue_encounter_schedule_ai ON public.characters;
 CREATE TRIGGER characters_enqueue_encounter_schedule_ai
-AFTER UPDATE OF visibility, review_status, rights_confirmed, deleted_at
+AFTER INSERT OR UPDATE OF author_id, name, intro, race, style, gender, age, tags,
+  personality_profile, visibility, review_status, rights_confirmed, deleted_at
 ON public.characters
 FOR EACH ROW EXECUTE FUNCTION public.on_encounter_character_visibility_changed();
+
+CREATE OR REPLACE FUNCTION public.on_encounter_character_private_info_changed()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+DECLARE
+  v_character_id uuid;
+BEGIN
+  v_character_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.character_id ELSE NEW.character_id END;
+  PERFORM public.enqueue_encounter_schedule_generation_internal(v_character_id);
+  IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.on_encounter_character_private_info_changed()
+  FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS character_private_info_enqueue_encounter_schedule_ai ON public.character_private_info;
+CREATE TRIGGER character_private_info_enqueue_encounter_schedule_ai
+AFTER INSERT OR UPDATE OF author_id, private_info OR DELETE
+ON public.character_private_info
+FOR EACH ROW EXECUTE FUNCTION public.on_encounter_character_private_info_changed();
 
 CREATE OR REPLACE FUNCTION public.claim_encounter_schedule_batch(
   p_limit integer DEFAULT 10,
@@ -498,7 +537,7 @@ BEGIN
   INTO v_pending_count, v_oldest
   FROM public.encounter_schedule_generation_jobs j
   JOIN public.characters c ON c.id = j.character_id
-  JOIN public.character_schedule_descriptions d
+  LEFT JOIN public.character_schedule_descriptions d
     ON d.character_id = j.character_id AND d.author_id = j.author_id
   WHERE j.status IN ('pending', 'failed', 'needs_reconciliation')
     AND (p_force IS TRUE OR j.available_at <= v_now)
@@ -506,7 +545,6 @@ BEGIN
     AND c.review_status = 'approved'
     AND c.rights_confirmed IS TRUE
     AND c.deleted_at IS NULL
-    AND pg_catalog.btrim(COALESCE(d.description, '')) <> '';
 
   IF p_force IS NOT TRUE THEN
     IF v_pending_count < 10
@@ -549,7 +587,7 @@ BEGIN
     SELECT j.character_id
     FROM public.encounter_schedule_generation_jobs j
     JOIN public.characters c ON c.id = j.character_id
-    JOIN public.character_schedule_descriptions d
+    LEFT JOIN public.character_schedule_descriptions d
       ON d.character_id = j.character_id AND d.author_id = j.author_id
     WHERE j.status IN ('pending', 'failed', 'needs_reconciliation')
       AND (p_force IS TRUE OR j.available_at <= v_now)
