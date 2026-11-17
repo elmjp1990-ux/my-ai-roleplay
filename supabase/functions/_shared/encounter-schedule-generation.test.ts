@@ -197,6 +197,12 @@ Deno.test("infers a complete schedule from the character profile when the author
   if (!payload.tags.includes("夜班") || payload.author_character_profile.interests[0] !== "夜間攝影") {
     throw new Error("author character profile context missing");
   }
+  if (!Array.isArray(payload.existing_author_schedules) || payload.existing_author_schedules.length !== 0) {
+    throw new Error("empty author schedule list missing");
+  }
+  if (!built.messages[0].content.includes("existing_author_schedules 是作者已保存的固定時段")) {
+    throw new Error("author-managed schedule priority missing");
+  }
   if (!built.messages[0].content.includes("若 author_schedule_brief 為空")) {
     throw new Error("prompt does not instruct inference when schedule text is absent");
   }
