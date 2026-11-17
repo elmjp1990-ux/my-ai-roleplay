@@ -79,17 +79,27 @@ ALTER TABLE public.character_schedules
   CHECK (day_type IN ('any', 'weekday', 'weekend', 'holiday'));
 
 ALTER TABLE public.character_schedules
+  DROP CONSTRAINT IF EXISTS character_schedules_source_type_check;
+ALTER TABLE public.character_schedules
   ADD CONSTRAINT character_schedules_source_type_check
   CHECK (source_type IN ('legacy', 'manual', 'ai'));
+ALTER TABLE public.character_schedules
+  DROP CONSTRAINT IF EXISTS character_schedules_variant_key_check;
 ALTER TABLE public.character_schedules
   ADD CONSTRAINT character_schedules_variant_key_check
   CHECK (variant_key IN ('primary', 'alternative'));
 ALTER TABLE public.character_schedules
+  DROP CONSTRAINT IF EXISTS character_schedules_variant_weight_check;
+ALTER TABLE public.character_schedules
   ADD CONSTRAINT character_schedules_variant_weight_check
   CHECK (variant_weight BETWEEN 0 AND 100);
 ALTER TABLE public.character_schedules
+  DROP CONSTRAINT IF EXISTS character_schedules_encounter_greeting_length_check;
+ALTER TABLE public.character_schedules
   ADD CONSTRAINT character_schedules_encounter_greeting_length_check
   CHECK (encounter_greeting = '' OR char_length(encounter_greeting) BETWEEN 150 AND 300);
+ALTER TABLE public.character_schedules
+  DROP CONSTRAINT IF EXISTS character_schedules_rain_fallback_consistency_check;
 ALTER TABLE public.character_schedules
   ADD CONSTRAINT character_schedules_rain_fallback_consistency_check
   CHECK (
@@ -765,6 +775,7 @@ DECLARE
   v_variant_roll integer;
   v_primary_weight integer;
   v_variant_key text;
+  v_is_raining boolean := false;
   v_row public.character_schedules%ROWTYPE;
   v_start_local timestamp;
   v_end_local timestamp;
@@ -788,14 +799,14 @@ BEGIN
           SELECT 1 FROM public.profiles p
           WHERE p.id = p_user_id
             AND p.birthdate IS NOT NULL
-            AND p.birthdate <= (pg_catalog.current_date - interval '18 years')::date
+            AND p.birthdate <= (CURRENT_DATE - interval '18 years')::date
         )
       )
       AND s.is_active IS TRUE
       AND (
         p_location_key IS NULL
         OR s.location_key = p_location_key
-        OR (s.is_outdoor IS TRUE AND s.rain_fallback_location_key = p_location_key)
+        OR (v_is_raining IS TRUE AND s.is_outdoor IS TRUE AND s.rain_fallback_location_key = p_location_key)
       )
       AND (
         (s.start_time < s.end_time AND v_local_time >= s.start_time AND v_local_time < s.end_time)
@@ -853,7 +864,7 @@ BEGIN
 
     IF p_location_key IS NOT NULL
        AND v_row.location_key <> p_location_key
-       AND NOT (v_row.is_outdoor IS TRUE AND v_row.rain_fallback_location_key = p_location_key) THEN
+       AND NOT (v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE AND v_row.rain_fallback_location_key = p_location_key) THEN
       CONTINUE;
     END IF;
 
@@ -867,15 +878,15 @@ BEGIN
       v_row.day_type,
       v_row.start_time,
       v_row.end_time,
-      CASE WHEN p_location_key = v_row.rain_fallback_location_key
+      CASE WHEN v_is_raining IS TRUE AND p_location_key = v_row.rain_fallback_location_key
         THEN v_row.rain_fallback_location_key ELSE v_row.location_key END,
-      CASE WHEN p_location_key = v_row.rain_fallback_location_key
+      CASE WHEN v_is_raining IS TRUE AND p_location_key = v_row.rain_fallback_location_key
         THEN v_row.rain_fallback_activity ELSE v_row.activity END,
       v_row.priority,
       v_row.source_type,
       v_row.variant_key,
       v_row.variant_weight,
-      CASE WHEN p_location_key = v_row.rain_fallback_location_key
+      CASE WHEN v_is_raining IS TRUE AND p_location_key = v_row.rain_fallback_location_key
         THEN v_row.rain_fallback_greeting ELSE v_row.encounter_greeting END,
       v_row.is_outdoor,
       v_row.rain_fallback_location_key,
