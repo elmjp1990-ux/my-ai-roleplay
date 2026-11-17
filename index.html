@@ -6752,7 +6752,7 @@ function findResumableEncounterSession(characterId, placeKey) {
 }
 
 async function setEncounterLifecycleState(sessionId, action) {
-  if (!isUuid(sessionId) || !['pause','resume'].includes(action)) {
+  if (!isUuid(sessionId) || !['pause','resume','end'].includes(action)) {
     throw new Error('相遇狀態資料無效，請重新整理後再試。');
   }
   const client = window.mySupabase;
@@ -11098,6 +11098,8 @@ document.addEventListener('click',async event => {
         const messages=session.messages||[];
         const lastCharacter=messages.filter(m=>m.role!=='user'&&String(m.text||m.content||'').trim()).slice(-1)[0];
         const lastUser=messages.filter(m=>m.role==='user'&&String(m.text||m.content||'').trim()).slice(-1)[0];
+        const previous={archived:session.archived,archivedAt:session.archivedAt,endedAt:session.encounterEndedAt,
+          temporarilyLeftAt:session.encounterTemporarilyLeftAt,name:session.name,summary:session.encounterSummary};
         const summaryParts=[];
         if(lastUser)summaryParts.push('你說：「'+String(lastUser.text||lastUser.content).trim().slice(0,70)+'」。');
         if(lastCharacter)summaryParts.push((sessionCharacter(session)?.name||'角色')+'回應：「'+String(lastCharacter.text||lastCharacter.content).trim().slice(0,90)+'」。');
@@ -11106,13 +11108,37 @@ document.addEventListener('click',async event => {
         session.encounterTemporarilyLeftAt=null;
         session.name='相遇紀錄 · '+timeText(session.encounterEndedAt);
         if(!persist())break;
-        try{const saved=await saveChatSessionSafely(session);if(saved!==true)throw new Error('雲端未確認儲存結果。');}catch(error){
+        try{
+          const saved=await saveChatSessionSafely(session);
+          if(saved!==true)throw new Error('雲端未確認儲存結果。');
+        }catch(error){
           console.error('結束相遇同步失敗：',error);
-          session.archived=false;session.archivedAt=null;session.encounterEndedAt=null;persist();
+          session.archived=previous.archived;session.archivedAt=previous.archivedAt;session.encounterEndedAt=previous.endedAt;
+          session.encounterTemporarilyLeftAt=previous.temporarilyLeftAt;session.name=previous.name;session.encounterSummary=previous.summary;
+          persist();
           toast('相遇回憶尚未成功保存到雲端，請稍後再試。');break;
         }
+
+        let settlementQueued=false;
+        let settlementError=null;
+        try{
+          await setEncounterLifecycleState(session.id,'end');
+          settlementQueued=true;
+        }catch(error){
+          if(error?.code==='encounter_scene_expired_or_closed')settlementQueued=true;
+          else{
+            settlementError=error;
+            // A lost response may hide a successful state transition; retrying is safe and idempotent.
+            try{await setEncounterLifecycleState(session.id,'end');settlementQueued=true;settlementError=null;}
+            catch(retryError){settlementError=retryError;}
+          }
+        }
+        if(settlementError)console.warn('相遇已保存，但提早結算排程尚未確認；原排程到期時仍會再次入列：',settlementError);
         $('modal')?.close();hideList=false;go({page:'citymap'});
-        toast('本次相遇已結束並保存到相遇回憶。');break;
+        toast(settlementQueued
+          ? '本次相遇已結束並保存，正在整理好感度與關係回憶。'
+          : '本次相遇已結束並保存；結算排程暫時未確認，系統會於原定場景結束時再次處理。');
+        break;
       }
       case 'chat-settings-back': {
         const next={...route,chatOverlay:'settings'};delete next.overlay;
