@@ -94,7 +94,10 @@ ALTER TABLE public.character_schedules
 ALTER TABLE public.character_schedules
   ADD CONSTRAINT character_schedules_special_event_check
   CHECK (
-    (variant_key = 'special' AND special_event_key IN ('taiwan_public_holiday', 'valentines_day', 'christmas'))
+    (variant_key = 'special'
+      AND special_event_key IN ('taiwan_public_holiday', 'valentines_day', 'christmas')
+      AND day_type = 'any'
+      AND variant_weight = 100)
     OR (variant_key IN ('primary', 'alternative') AND special_event_key IS NULL)
   );
 ALTER TABLE public.character_schedules
