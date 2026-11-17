@@ -409,3 +409,24 @@ Deno.test("requires AI metadata for newly proposed dynamic scene types", () => {
     throw new Error(accepted.errors.join(",") || "dynamic scene metadata was not retained");
   }
 });
+
+Deno.test("requires AI-updatable description and latest news for built-in Live House scenes", () => {
+  const character = {
+    character_id: id1, placement: "modern_map",
+    variants: variants(fullDaySlots({
+      location_key: "live-house",
+      activity: "在 Live House 參與樂團演出與彩排。",
+    })),
+  };
+  const missing = parseEncounterScheduleBatchOutput(JSON.stringify({
+    characters: [withGreetingPools(character)],
+  }), [source()]);
+  if (missing.ok || !missing.errors.some((error) => error.includes("scene_metadata_missing_live-house"))) {
+    throw new Error("built-in Live House scene metadata was not required");
+  }
+  const accepted = result([character]);
+  const liveHouse = accepted.scenes?.find((scene) => scene.location_key === "live-house");
+  if (!accepted.ok || !liveHouse || liveHouse.event_label !== "最新消息") {
+    throw new Error(accepted.errors.join(",") || "Live House scene copy was not retained");
+  }
+});
