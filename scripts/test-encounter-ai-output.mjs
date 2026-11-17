@@ -39,7 +39,7 @@ assert.match(pipeline, /ALTER TABLE public\.encounter_city_weather ALTER COLUMN 
 assert.match(pipeline, /UPDATE public\.encounter_city_weather[\s\S]*?source = 'poyozz_fallback'[\s\S]*?WHERE source IS DISTINCT FROM 'poyozz_fictional_seasonal'/);
 assert.match(pipeline, /AND c\.deleted_at IS NULL;\s*IF p_force IS NOT TRUE/);
 assert.doesNotMatch(weatherSync, /\bfetch\s*\(/, "Taipei simulation must not call external weather APIs");
-assert.doesNotMatch(weatherSync, /\bfetch\s*\(/, "Taipei simulation must not call external weather APIs");
+assert.doesNotMatch(weatherSync, /CWA|OPEN_DATA_API_KEY|forecast/i);
 assert.match(weatherSync, /previousSlot === weather\.slot/);
 assert.match(weatherSync, /status: "unchanged"/);
 assert.match(weatherModule, /Asia\/Taipei/);
