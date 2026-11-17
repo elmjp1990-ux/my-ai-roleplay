@@ -36,9 +36,9 @@ BEGIN
     RAISE EXCEPTION 'schedule publish function must support per-character partial commits';
   END IF;
   IF pg_catalog.strpos(v_usage, 'source_type') = 0
-     OR pg_catalog.strpos(v_usage, 'is_nsfw') = 0
+     OR pg_catalog.strpos(v_usage, 'is_nsfw') > 0
      OR pg_catalog.strpos(v_usage, 'rights_confirmed') = 0 THEN
-    RAISE EXCEPTION 'dynamic scene usage must be based on eligible public characters';
+    RAISE EXCEPTION 'dynamic scene usage must include every approved public character, including NSFW characters';
   END IF;
 END;
 $schedule_batch_semantics$;
