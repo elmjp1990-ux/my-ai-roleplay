@@ -5,15 +5,15 @@ const html = fs.readFileSync('index.html', 'utf8');
 const moduleSource = fs.readFileSync('custom-tag-picker.js', 'utf8');
 
 const moduleTag = '<script src="./custom-tag-picker.js"></script>';
-assert.ok(html.includes(moduleTag), 'Custom tag picker module must be loaded.');
-assert.ok(html.indexOf(moduleTag) < html.indexOf('function refreshCustomTagPicker()'),
-  'Custom tag picker must load before its app adapter.');
+assert.ok(!html.includes(moduleTag), 'Custom tag picker must not be loaded during initial page parsing.');
 
 const start = html.indexOf('function refreshCustomTagPicker()');
 const end = html.indexOf('/* Delegated click actions */', start);
 assert.ok(start >= 0 && end > start && end - start < 1500,
   'index.html must retain only a thin custom-tag-picker adapter.');
 const adapter = html.slice(start, end);
+assert.match(adapter, /await loadRuntimeModule\(['"]\.\/custom-tag-picker\.js['"]\)/,
+  'Custom tag picker must load on first editor use.');
 assert.match(adapter, /window\.PoyozzCustomTagPicker/);
 assert.match(adapter, /picker\.bind\(dependencies\)/);
 assert.match(adapter, /picker\.render\(dependencies\)/);
