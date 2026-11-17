@@ -7,6 +7,7 @@ Deno.test("uses official holiday flag for a weekday holiday", () => {
   ]);
   assertEquals(rows[0]?.day_type, "holiday");
   assertEquals(rows[0]?.holiday_name, "和平紀念日補假");
+  assertEquals(rows[0]?.source, "data.gov.tw:123662");
 });
 
 Deno.test("keeps weekend make-up workdays as workdays", () => {
