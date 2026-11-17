@@ -1147,8 +1147,8 @@ BEGIN
 
     RETURN QUERY SELECT
       v_row.id,
-      NULL::smallint,
-      v_row.day_type,
+      v_schedule_day::smallint,
+      v_day_type,
       v_row.start_time,
       v_row.end_time,
       CASE WHEN v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE
