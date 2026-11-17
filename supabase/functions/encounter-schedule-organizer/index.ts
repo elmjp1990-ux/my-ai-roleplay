@@ -219,6 +219,22 @@ Deno.serve(async (request) => {
   const rawCharacters = decodedOutput.characters as unknown[];
   const rawScenes = Array.isArray(decodedOutput.scenes) ? decodedOutput.scenes : [];
   const sourceIds = new Set(sources.map((source) => source.character_id));
+  const { data: dynamicUsageData, error: dynamicUsageError } = await admin.rpc("get_encounter_dynamic_scene_usage");
+  if (dynamicUsageError) {
+    await recordBatchUsage(admin, batchId, providerResponse, "failed", "dynamic_scene_usage_unavailable");
+    const failed = await failBatch(admin, batchId, leaseToken, "dynamic_scene_usage_unavailable", true, false);
+    return json({ status: failed ? "scene_usage_unavailable" : "batch_failure_unconfirmed" }, 503);
+  }
+  const existingScheduleUsers = new Map<string, Set<string>>();
+  for (const row of Array.isArray(dynamicUsageData) ? dynamicUsageData : []) {
+    const key = normalizeEncounterSceneKey(asRow(row).location_key);
+    const id = asText(asRow(row).character_id);
+    const sourceType = asText(asRow(row).source_type);
+    if (!key || !id || (sourceIds.has(id) && sourceType !== "manual")) continue;
+    const users = existingScheduleUsers.get(key) || new Set<string>();
+    users.add(id);
+    existingScheduleUsers.set(key, users);
+  }
   const collectLocationKeys = (value: unknown): Set<string> => {
     const character = asRow(value);
     const keys = new Set<string>();
@@ -267,9 +283,14 @@ Deno.serve(async (request) => {
       dynamicUsers.set(key, users);
     }
   }
+  const totalDynamicUsers = (key: string, batchUsers: Set<string>) =>
+    new Set([...(existingScheduleUsers.get(key) || []), ...batchUsers]);
   const dynamicCandidates = [...dynamicUsers.entries()]
-    .filter(([, users]) => users.size >= 1)
-    .sort((a, b) => b[1].size - a[1].size || a[0].localeCompare(b[0]));
+    .filter(([key, users]) => totalDynamicUsers(key, users).size >= 2)
+    .sort((a, b) =>
+      totalDynamicUsers(b[0], b[1]).size - totalDynamicUsers(a[0], a[1]).size ||
+      a[0].localeCompare(b[0])
+    );
   const availableDynamicSlots = Math.max(0, 3 - existingDynamicKeys.size);
   const selectedNewDynamicKeys = new Set(
     dynamicCandidates.slice(0, availableDynamicSlots).map(([key]) => key),
