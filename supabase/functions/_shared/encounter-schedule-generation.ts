@@ -219,10 +219,10 @@ export function buildEncounterScheduleBatchMessages(sources: EncounterScheduleSo
   const promptSources = sources.map((source) => {
     if (!isUuid(source.character_id) || !isUuid(source.author_id)) throw new Error("encounter_schedule_source_identity_invalid");
     if (source.visibility !== "public" || source.review_status !== "approved" || source.rights_confirmed !== true || source.deleted_at != null) throw new Error("encounter_schedule_source_not_public");
-    const privateContext = preparePrivateContext(
-      text(source.private_info),
-      isRecord(source.personality_profile) ? source.personality_profile : {},
-    );
+    const characterProfile = isRecord(source.personality_profile) ? source.personality_profile : {};
+    const occupation = text(source.occupation) || text(characterProfile.occupation)
+      || text(characterProfile.job) || text(characterProfile.profession);
+    const privateContext = preparePrivateContext(text(source.private_info), characterProfile);
     protectedContextByCharacter[source.character_id] = privateContext.protectedValues;
     return {
       character_id: source.character_id,
@@ -236,8 +236,8 @@ export function buildEncounterScheduleBatchMessages(sources: EncounterScheduleSo
       tags: Array.isArray(source.tags)
         ? source.tags.filter((value): value is string => typeof value === "string").map((value) => value.trim()).filter(Boolean).slice(0, 30)
         : [],
-      occupation: text(source.occupation),
-      author_character_profile: isRecord(source.personality_profile) ? source.personality_profile : {},
+      occupation,
+      author_character_profile: characterProfile,
       world_era: text(source.world_era),
       modern_setting_compatible: source.modern_setting_compatible === true,
       time_travel_explicit: source.time_travel_explicit === true,
