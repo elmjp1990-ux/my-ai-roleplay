@@ -1493,7 +1493,8 @@ AS $encounter_scene_registry$
     r.heading, r.description, r.event_label, r.event_title,
     r.event_description, r.minimum_character_count, r.display_order
   HAVING pg_catalog.count(DISTINCT c.id) >= r.minimum_character_count
-  ORDER BY r.display_order, r.location_key;
+  ORDER BY r.display_order, r.location_key
+  LIMIT 3;
 $encounter_scene_registry$;
 
 REVOKE ALL ON FUNCTION public.get_encounter_scene_registry() FROM PUBLIC;
