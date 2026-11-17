@@ -66,6 +66,10 @@ DECLARE
   v_first_text text;
   v_second_text text;
   v_special_text text;
+  v_stage text;
+  v_expected_prefix text;
+  v_stage_session jsonb;
+  v_stage_text text;
 BEGIN
   v_first := public.create_encounter_session_with_lifecycle(
     '00000000-0000-4000-8000-000000000032',
@@ -131,6 +135,46 @@ BEGIN
      OR v_special_text NOT LIKE 'S%' THEN
     RAISE EXCEPTION 'special relationship did not select from the special greeting pool';
   END IF;
+
+  -- Verify every supported relationship stage reads only its own pool.
+  FOREACH v_stage IN ARRAY ARRAY[
+    'hostile','dislike','wary','first_meeting',
+    'acquaintance','close','intimate','special'
+  ] LOOP
+    UPDATE public.encounter_character_state
+    SET relationship_stage = v_stage
+    WHERE user_id = '00000000-0000-4000-8000-000000000030'
+      AND character_id = '00000000-0000-4000-8000-000000000031';
+
+    SELECT CASE v_stage
+      WHEN 'hostile' THEN 'H'
+      WHEN 'dislike' THEN 'D'
+      WHEN 'wary' THEN 'W'
+      WHEN 'first_meeting' THEN 'F'
+      WHEN 'acquaintance' THEN 'A'
+      WHEN 'close' THEN 'C'
+      WHEN 'intimate' THEN 'I'
+      WHEN 'special' THEN 'S'
+    END INTO v_expected_prefix;
+
+    v_stage_session := public.create_encounter_session_with_lifecycle(
+      gen_random_uuid(),
+      '00000000-0000-4000-8000-000000000030',
+      '00000000-0000-4000-8000-000000000031',
+      'Encounter greeting 測試角色',
+      jsonb_build_object('name','Encounter greeting 測試角色','encounterGreeting',repeat('L',150)),
+      '{"activity":"階段池測試"}'::jsonb,
+      'cafe',
+      clock_timestamp(),
+      clock_timestamp() + interval '1 hour'
+    );
+    v_stage_text := v_stage_session->'character_snapshot'->>'encounterGreeting';
+
+    IF v_stage_session->'session_data'->'encounter'->>'relationshipStage' <> v_stage
+       OR left(v_stage_text,1) <> v_expected_prefix THEN
+      RAISE EXCEPTION 'relationship stage % selected the wrong greeting pool', v_stage;
+    END IF;
+  END LOOP;
 END;
 $relationship_greeting_selection_smoke$;
 
