@@ -15,6 +15,7 @@ on:
       - "supabase/functions/_shared/encounter-schedule-generation.ts"
       - "supabase/functions/_shared/encounter-schedule-generation.test.ts"
       - "scripts/test-encounter-schedule-worker.mjs"
+      - "scripts/import-encounter-weather-baseline-2025.mjs"
       - "supabase/drafts/encounter-schedule-pipeline.sql"
       - "supabase/drafts/replay-encounter-schedule-pipeline.sql"
       - "supabase/functions/encounter-weather-sync/**"
@@ -53,4 +54,4 @@ jobs:
       - name: Test CWA Taipei weather parser
         run: deno test supabase/functions/_shared/encounter-weather.test.ts
       - name: Type-check Encounter Edge Functions and shared modules
-        run: deno check supabase/functions/encounter-turn/index.ts supabase/functions/encounter-session/index.ts supabase/functions/encounter-schedule-organizer/index.ts
+        run: deno check supabase/functions/encounter-turn/index.ts supabase/functions/encounter-session/index.ts supabase/functions/encounter-schedule-organizer/index.ts supabase/functions/encounter-weather-sync/index.ts
