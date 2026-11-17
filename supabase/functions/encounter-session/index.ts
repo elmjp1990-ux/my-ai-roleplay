@@ -115,6 +115,49 @@ Deno.serve(async (request: Request) => {
     .maybeSingle();
   if (illustrationError) return json({ error: "character_illustration_lookup_failed" }, 503);
 
+  const { data: availableIllustrations } = await admin
+    .from("character_illustrations")
+    .select("id,display_name,asset_type,sort_order")
+    .eq("character_id", character.id)
+    .eq("asset_type", "gallery")
+    .order("sort_order", { ascending: true })
+    .limit(5);
+
+  const [{ data: locationBackgrounds }, { data: defaultBackgrounds }] = await Promise.all([
+    admin.from("encounter_scene_backgrounds")
+      .select("id,location_key,display_name,asset_path,sort_order")
+      .eq("location_key", locationKey)
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .limit(5),
+    admin.from("encounter_scene_backgrounds")
+      .select("id,location_key,display_name,asset_path,sort_order")
+      .eq("location_key", "*")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .limit(5),
+  ]);
+  const availableSceneBackgrounds = [
+    ...(locationBackgrounds || []),
+    ...(defaultBackgrounds || []),
+  ].filter((row, index, rows) => rows.findIndex((item) => item.id === row.id) === index).slice(0, 5)
+    .map((row) => ({
+      id: row.id,
+      locationKey: row.location_key,
+      displayName: row.display_name,
+      assetPath: row.asset_path,
+    }));
+  const illustrationChoices = (availableIllustrations || []).map((row) => ({
+    id: row.id,
+    displayName: row.display_name || "角色立繪",
+    assetType: row.asset_type,
+  }));
+  const defaultVisuals = {
+    illustrationId: illustrationChoices[0]?.id || null,
+    sceneBackgroundId: availableSceneBackgrounds[0]?.id || null,
+    sceneBackgroundPath: availableSceneBackgrounds[0]?.assetPath || "./encounter-default-scene.webp",
+  };
+
   // Encounter snapshots keep the public opening so an existing encounter can
   // still show the character's original profile after a later soft delete.
   const { data: characterStory, error: storyError } = await admin
@@ -149,6 +192,9 @@ Deno.serve(async (request: Request) => {
     visibility: character.visibility,
     firstPublishedAt: character.first_published_at,
     deletedAt: character.deleted_at,
+    availableIllustrations: illustrationChoices,
+    availableSceneBackgrounds,
+    defaultVisuals,
   };
 
   // Use the same database resolver as the public city map. It selects the
