@@ -204,6 +204,76 @@
     cafe:{icon:'☕',heading:'在城市裡，找個地方歇歇腳',description:'咖啡香從吧台飄向窗邊座位，甜點櫃裡擺著當季蛋糕。這裡適合短暫休息、工作、約會，也適合和某個人慢慢聊起近況。',eventLabel:'場景亮點',eventTitle:'今日甜點的話題',eventDescription:'甜點櫃可作為聊天與約會的情境；實際品項、庫存與活動尚未連接動態資料。'},
     park:{icon:'🌳',heading:'城市裡的一片綠意',description:'步道穿過樹蔭與草地，長椅、噴水池和開闊的天空讓人暫時遠離喧鬧。清晨散步、午後閒聊或傍晚慢跑，都有不同的城市風景。',eventLabel:'場景亮點',eventTitle:'樹蔭下的片刻寧靜',eventDescription:'適合散步、慢跑、野餐、偶遇或在戶外談一場不急著結束的對話。'}
   };
+  const CITY_MAP_SVG_NS='http://www.w3.org/2000/svg';
+  const MAX_DYNAMIC_SCENE_MARKERS=3;
+  const renderCityDynamicScenes=(rows)=>{
+    const svg=$('cityBuildingLayer');
+    if(!svg)return;
+    svg.querySelector('#cityDynamicSceneMarkers')?.remove();
+    const layer=document.createElementNS(CITY_MAP_SVG_NS,'g');
+    layer.setAttribute('id','cityDynamicSceneMarkers');
+    const existing=[];
+    svg.querySelectorAll('.city-place-marker[data-place]').forEach(marker=>{
+      const match=String(marker.getAttribute('transform')||'').match(/translate\(\s*(-?[\d.]+)[ ,]+(-?[\d.]+)\s*\)/);
+      if(match)existing.push({x:Number(match[1]),y:Number(match[2])});
+    });
+    let added=0;
+    for(const row of (Array.isArray(rows)?rows:[])){
+      if(added>=MAX_DYNAMIC_SCENE_MARKERS)break;
+      const key=String(row?.location_key||'').trim();
+      const name=String(row?.display_name||'').trim();
+      const x=Number(row?.marker_x),y=Number(row?.marker_y);
+      if(!/^[a-z0-9-]{1,48}$/.test(key)||!name||Object.prototype.hasOwnProperty.call(cityPlaceNames,key)||
+        !Number.isFinite(x)||!Number.isFinite(y)||x<40||x>1622||y<40||y>892)continue;
+      if(existing.some(point=>Math.hypot(point.x-x,point.y-y)<120))continue;
+      const scene={
+        icon:String(row.icon||'📍'),heading:String(row.heading||name),
+        description:String(row.description||'這個場景由多位公開角色的共同行程建立。'),
+        eventLabel:String(row.event_label||'場景亮點'),
+        eventTitle:String(row.event_title||'街角的相遇'),
+        eventDescription:String(row.event_description||'在這個共同場景中遇見城市裡的人。')
+      };
+      cityPlaceNames[key]=name;
+      cityVenueScenes[key]=scene;
+      cityPlaceAliases[key]=[key];
+      const marker=document.createElementNS(CITY_MAP_SVG_NS,'g');
+      marker.setAttribute('class','city-place-marker is-available is-dynamic');
+      marker.setAttribute('data-action','city-landmark');
+      marker.setAttribute('data-place',key);
+      marker.setAttribute('data-dynamic-scene','true');
+      marker.setAttribute('transform','translate('+x+' '+y+')');
+      marker.setAttribute('tabindex','0');
+      marker.setAttribute('role','button');
+      marker.setAttribute('aria-label',name);
+      const hit=document.createElementNS(CITY_MAP_SVG_NS,'circle');
+      hit.setAttribute('class','city-marker-hit-area');hit.setAttribute('r','38');
+      hit.setAttribute('fill','transparent');hit.setAttribute('pointer-events','all');
+      const glass=document.createElementNS(CITY_MAP_SVG_NS,'circle');
+      glass.setAttribute('class','city-marker-glass');glass.setAttribute('r','23');
+      const glyph=document.createElementNS(CITY_MAP_SVG_NS,'text');
+      glyph.setAttribute('class','city-marker-glyph city-marker-emoji');
+      glyph.setAttribute('x','0');glyph.setAttribute('y','1');
+      glyph.setAttribute('text-anchor','middle');glyph.setAttribute('dominant-baseline','central');
+      glyph.setAttribute('font-size','18');glyph.setAttribute('pointer-events','none');
+      glyph.textContent=scene.icon;
+      marker.append(hit,glass,glyph);
+      layer.appendChild(marker);
+      existing.push({x,y});added++;
+    }
+    if(added)svg.appendChild(layer);
+  };
+  const loadCityDynamicScenes=async()=>{
+    const client=window.mySupabase;
+    if(!client)return;
+    try{
+      const {data,error}=await client.rpc('get_encounter_scene_registry');
+      if(error)throw error;
+      renderCityDynamicScenes(data||[]);
+    }catch(error){
+      console.warn('城市動態場景載入失敗：',error?.message||error);
+    }
+  };
+  void loadCityDynamicScenes();
   // Use only published characters whose own schedule data is already available to this client.
   // Never invent a character or query private schedule rows from the browser.
   const cityPlaceAliases={airport:['airport'],commercial:['commercial','office'], 'night-bar':['night-bar','bar'], 'live-house':['live-house','livehouse'], apartment:['apartment'], 'department-store':['department-store','department_store'], bookstore:['bookstore','book-store'], cafe:['cafe','coffee-shop'], park:['park']};
@@ -318,7 +388,7 @@
       'live-house':{label:'最新消息',items:['本週演出時刻表已更新。','週六晚間將舉辦新團專場演出。']},
       apartment:{label:'管委會公告',items:['公寓公共交誼區本週進行佈置更新。','公共區域請保持整潔，訪客請由住戶陪同進出。','本週六下午將舉辦住戶交換市集。']}
     };
-    const notice=venueNotices[place]||{label:'最新消息',items:['這個場景有新的城市消息。']};
+    const notice=venueNotices[place]||{label:scene.eventLabel||'場景亮點',items:[(scene.eventTitle||'街角的偶遇')+'。 '+(scene.eventDescription||'這個場景有新的城市消息。')]};
     const eventMarkup=notice.items.slice(0,3).map(item=>'<p>📣 '+escapeHTML(item)+'</p>').join('');
     const flightMarkup=place==='airport'
       ? '<div class="city-location-news city-flight-section"><span class="city-location-event-label">今日航班</span><p class="small">模擬航班時刻表</p><table class="city-flight-table"><thead><tr><th>時間</th><th>航班</th><th>目的地</th><th>狀態</th></tr></thead><tbody><tr><td>09:20</td><td>PZ102</td><td>東京</td><td>準時</td></tr><tr><td>13:45</td><td>PZ238</td><td>首爾</td><td>登機中</td></tr><tr><td>18:10</td><td>PZ516</td><td>台北</td><td>預計抵達</td></tr></tbody></table><p class="city-flight-note">以上為虛構示意資料，非真實航班資訊。</p></div>'
