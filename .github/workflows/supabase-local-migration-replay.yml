@@ -138,7 +138,7 @@ jobs:
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
-      - name: Load synthetic current-state schema and replay deletion security drafts
+      - name: Load synthetic current-state schema
         shell: bash
         run: |
           set -euo pipefail
@@ -149,20 +149,34 @@ jobs:
           # profiles/characters foundation is unavailable. Do not replay old migrations.
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-current-state-schema-fixture.sql
-          # Encounter schedule schema is replayed only in this disposable local DB.
+
+      - name: Replay Encounter schedule schema and weather fallback
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Encounter schedule SQL and its smoke test run only in this disposable local DB.
           # This never links to or authenticates against the hosted Supabase project.
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/encounter-schedule-pipeline.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-schedule-pipeline.sql
-          # Exercise the CLI-generated incremental migration itself, not only
-          # its source drafts. The script rolls back all DDL and synthetic rows.
+
+      - name: Replay account deletion release migration
+        shell: bash
+        run: |
+          set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-account-deletion-release-migration.sql
 
-          # Encounter/chat structural audits and character/account DML all run inside
-          # disposable transactions and are rolled back.
+      - name: Replay local security and character deletion drafts
+        shell: bash
+        run: |
+          set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-local-security-drafts.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-and-test-character-deletion.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-deletion-draft-rollback.sql
 
+      - name: Replay deletion concurrency
+        shell: bash
+        run: |
+          set -euo pipefail
           # True independent-connection races use only this disposable local database.
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-deletion-concurrency-setup.sql
           DATABASE_URL="$DATABASE_URL" bash scripts/test-deletion-concurrency.sh
