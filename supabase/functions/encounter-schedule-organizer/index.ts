@@ -228,7 +228,7 @@ Deno.serve(async (request) => {
         const ambiguous = providerResponse.responseParsed === false ||
           providerResponse.httpStatus === 408 || providerResponse.httpStatus >= 500;
         return { sourceId: source.character_id, failureCode,
-          retryable: !ambiguous && result.kind === "provider_error" ? result.retryable : false,
+          retryable: !ambiguous && result.kind === "provider_error" ? result.retryable === true : false,
           ambiguous };
       }
       let decoded: Record<string, unknown>;
@@ -264,8 +264,8 @@ Deno.serve(async (request) => {
     if ("failureCode" in result) {
       failedCharacterIds.add(result.sourceId);
       validationErrors.push(result.sourceId + ":" + result.failureCode);
-      retryableProviderFailure ||= result.retryable;
-      ambiguousProviderFailure ||= result.ambiguous;
+      retryableProviderFailure ||= result.retryable === true;
+      ambiguousProviderFailure ||= result.ambiguous === true;
       continue;
     }
     providerResponses.push({ providerResponse: result.providerResponse });
@@ -279,7 +279,9 @@ Deno.serve(async (request) => {
   const sourceIds = new Set(sources.map((source) => source.character_id));
   const { data: dynamicUsageData, error: dynamicUsageError } = await admin.rpc("get_encounter_dynamic_scene_usage");
   if (dynamicUsageError) {
-    await recordBatchUsage(admin, batchId, providerResponse, "failed", "dynamic_scene_usage_unavailable");
+    for (const item of providerResponses) {
+      await recordBatchUsage(admin, batchId, item.providerResponse, "failed", "dynamic_scene_usage_unavailable");
+    }
     const failed = await failBatch(admin, batchId, leaseToken, "dynamic_scene_usage_unavailable", true, false);
     return json({ status: failed ? "scene_usage_unavailable" : "batch_failure_unconfirmed" }, 503);
   }
