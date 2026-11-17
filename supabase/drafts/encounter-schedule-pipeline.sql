@@ -152,6 +152,23 @@ CREATE TABLE IF NOT EXISTS public.encounter_city_weather (
   updated_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp()
 );
 
+-- Persist the weather choice for the full schedule slot. A weather change during
+-- the slot must never move a character again until the next schedule starts.
+CREATE TABLE IF NOT EXISTS public.encounter_schedule_weather_decisions (
+  character_id uuid NOT NULL REFERENCES public.characters(id) ON DELETE CASCADE,
+  schedule_id uuid NOT NULL REFERENCES public.character_schedules(id) ON DELETE CASCADE,
+  scheduled_start_at timestamptz NOT NULL,
+  scheduled_end_at timestamptz NOT NULL,
+  use_rain_fallback boolean NOT NULL,
+  weather_text_at_start text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT pg_catalog.now(),
+  PRIMARY KEY (schedule_id, scheduled_start_at),
+  CHECK (scheduled_end_at > scheduled_start_at)
+);
+CREATE INDEX IF NOT EXISTS encounter_schedule_weather_decisions_expiry_idx
+  ON public.encounter_schedule_weather_decisions (character_id, scheduled_end_at);
+
+
 ALTER TABLE public.encounter_city_weather ALTER COLUMN source SET DEFAULT 'poyozz_fictional_seasonal';
 
 UPDATE public.encounter_city_weather
@@ -275,6 +292,7 @@ REVOKE ALL ON TABLE public.encounter_schedule_batch_runs FROM PUBLIC, anon, auth
 REVOKE ALL ON TABLE public.encounter_schedule_generation_usage FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.taiwan_calendar_days FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.encounter_city_weather FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.encounter_schedule_weather_decisions FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.encounter_scene_registry FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.encounter_scene_backgrounds FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.encounter_turn_visuals FROM PUBLIC, anon, authenticated;
@@ -1107,7 +1125,7 @@ RETURNS TABLE (
   scheduled_end_at timestamptz
 )
 LANGUAGE plpgsql
-STABLE
+VOLATILE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -1123,6 +1141,8 @@ DECLARE
   v_primary_weight integer;
   v_variant_key text;
   v_is_raining boolean := false;
+  v_use_rain_fallback boolean := false;
+  v_weather_text text := '多雲';
   v_row public.character_schedules%ROWTYPE;
   v_start_local timestamp;
   v_end_local timestamp;
@@ -1130,9 +1150,11 @@ BEGIN
   v_local := p_at AT TIME ZONE 'Asia/Taipei';
   v_local_date := v_local::date;
   v_local_time := v_local::time;
-  SELECT weather.is_raining INTO v_is_raining
+  SELECT weather.is_raining, weather.weather_text
+    INTO v_is_raining, v_weather_text
   FROM public.get_encounter_city_weather() AS weather;
   v_is_raining := COALESCE(v_is_raining, false);
+  v_weather_text := COALESCE(v_weather_text, '多雲');
 
   FOR v_row IN
     SELECT s.*
@@ -1153,18 +1175,6 @@ BEGIN
         )
       )
       AND s.is_active IS TRUE
-      AND (
-        p_location_key IS NULL
-        OR (
-          v_is_raining IS TRUE
-          AND s.is_outdoor IS TRUE
-          AND s.rain_fallback_location_key = p_location_key
-        )
-        OR (
-          NOT (v_is_raining IS TRUE AND s.is_outdoor IS TRUE)
-          AND s.location_key = p_location_key
-        )
-      )
       AND (
         (s.start_time < s.end_time AND v_local_time >= s.start_time AND v_local_time < s.end_time)
         OR
@@ -1243,23 +1253,59 @@ BEGIN
     v_end_local := v_schedule_date + v_row.end_time
       + CASE WHEN v_row.end_time <= v_row.start_time THEN interval '1 day' ELSE interval '0' END;
 
+    -- Keep only the current and recent decisions for this character; this is
+    -- bounded cleanup and avoids accumulating one row for every past slot.
+    DELETE FROM public.encounter_schedule_weather_decisions
+    WHERE character_id = p_character_id
+      AND scheduled_end_at < p_at - interval '2 days';
+
+    INSERT INTO public.encounter_schedule_weather_decisions (
+      character_id, schedule_id, scheduled_start_at, scheduled_end_at,
+      use_rain_fallback, weather_text_at_start
+    ) VALUES (
+      p_character_id, v_row.id,
+      v_start_local AT TIME ZONE 'Asia/Taipei',
+      v_end_local AT TIME ZONE 'Asia/Taipei',
+      (v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE
+        AND v_row.rain_fallback_location_key IS NOT NULL),
+      v_weather_text
+    )
+    ON CONFLICT (schedule_id, scheduled_start_at) DO NOTHING;
+
+    SELECT decision.use_rain_fallback
+      INTO v_use_rain_fallback
+    FROM public.encounter_schedule_weather_decisions AS decision
+    WHERE decision.schedule_id = v_row.id
+      AND decision.scheduled_start_at = (v_start_local AT TIME ZONE 'Asia/Taipei');
+
+    -- Location filtering happens after loading the persisted slot decision,
+    -- never directly against the changing live weather cache.
+    IF p_location_key IS NOT NULL
+       AND p_location_key IS DISTINCT FROM CASE
+         WHEN v_use_rain_fallback IS TRUE
+           THEN v_row.rain_fallback_location_key
+         ELSE v_row.location_key
+       END THEN
+      CONTINUE;
+    END IF;
+
     RETURN QUERY SELECT
       v_row.id,
       v_schedule_day::smallint,
       v_day_type,
       v_row.start_time,
       v_row.end_time,
-      CASE WHEN v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE
+      CASE WHEN v_use_rain_fallback IS TRUE
         THEN v_row.rain_fallback_location_key ELSE v_row.location_key END,
-      CASE WHEN v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE
+      CASE WHEN v_use_rain_fallback IS TRUE
         THEN v_row.rain_fallback_activity ELSE v_row.activity END,
       v_row.priority,
       v_row.source_type,
       v_row.variant_key,
       v_row.variant_weight,
-      CASE WHEN v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE
+      CASE WHEN v_use_rain_fallback IS TRUE
         THEN v_row.rain_fallback_greeting ELSE v_row.encounter_greeting END,
-      CASE WHEN v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE
+      CASE WHEN v_use_rain_fallback IS TRUE
         THEN false ELSE v_row.is_outdoor END,
       v_row.rain_fallback_location_key,
       v_row.rain_fallback_activity,
@@ -1376,7 +1422,7 @@ RETURNS TABLE (
   variant_weight smallint
 )
 LANGUAGE sql
-STABLE
+VOLATILE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
