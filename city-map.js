@@ -6,6 +6,7 @@
   'use strict';
 
   let activeMapCleanup = null;
+  let activeSceneRefresh = null;
   const CITY_MAP_WEATHER_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
   const CITY_MAP_SCENES_CACHE_TTL_MS = 30 * 60 * 1000;
   const cityMapMemoryCache = new Map();
@@ -33,11 +34,15 @@
     if (!activeMapCleanup) return;
     const cleanup = activeMapCleanup;
     activeMapCleanup = null;
+    activeSceneRefresh = null;
     cleanup();
   };
 
   global.PoyozzCityMap = Object.freeze({
     destroy: destroyActiveMap,
+    refreshScenes() {
+      return activeSceneRefresh ? activeSceneRefresh() : Promise.resolve();
+    },
     render(dependencies) {
       destroyActiveMap();
       const {
@@ -318,6 +323,11 @@
     }catch(error){
       if(!cached)console.warn('城市場景目錄載入失敗：',error?.message||error);
     }
+  };
+  activeSceneRefresh=()=>{
+    cityMapMemoryCache.delete('scenes');
+    try{sessionStorage.removeItem('poyozz-city-map-scenes-v1');}catch{}
+    return loadCityDynamicScenes();
   };
   const applyCityWeather=weather=>{
     const stage=$('cityMapStage');
