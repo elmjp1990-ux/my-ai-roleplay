@@ -69,7 +69,7 @@ jobs:
 
       - name: Test group AI output parsers
         run: |
-          deno test supabase/functions/_shared/group-turn-envelope.test.ts
+          deno test supabase/functions/_shared/group-turn-envelope.test.ts supabase/functions/_shared/group-memory-context.test.ts
           deno check supabase/functions/group-chat-turn/index.ts
 
       - name: Verify PostgreSQL and pg_cron

@@ -797,3 +797,24 @@ assert.doesNotMatch(html,/每 5 次玩家發言建立一則群組日記摘錄/);
 
 assert.match(html,/for\(let attempt=0;attempt<2;attempt\+\+\)/,'chat pin sync retries once after an optimistic conflict while re-reading session_data');
 assert.match(html,/data-chat-list-pin="single"/,'single-chat pin action must be isolated from the delete/menu router');
+
+ 
+const avatarMarkup=between("function characterAvatarMarkup(character,options={})","function normalizeCharacterTag(value)");
+assert.match(avatarMarkup,/data-character-avatar-id/);
+assert.match(avatarMarkup,/data-character-avatar-fallback-class/);
+const groupListAvatarHydration=between("async function groupHydrateListRows(groups)","async function groupLoadList");
+assert.match(groupListAvatarHydration,/loadCharacterPrimaryIllustrationAssets\(missingAvatarIds\)/,
+  "group list avatars with no legacy avatar_url must use the shared batched primary-illustration loader");
+assert.match(groupListAvatarHydration,/characterId:row\.character_id/);
+const chatEntries=between("function chatEntries()","function chatListHTML()");
+assert.match(chatEntries,/characterAvatarMarkup\(member/,
+  "group chat list must render avatars through the shared character avatar renderer");
+assert.match(chatEntries,/characterAvatarMarkup\(c\)/,
+  "single chat list must render avatars through the shared character avatar renderer");
+const avatarRecovery=between("async function recoverCharacterAvatarImage(image)","async function loadCityCharacterPage");
+assert.match(avatarRecovery,/loadCharacterPrimaryIllustrationAssets\(\[image\.dataset\.characterAvatarId\]\)/,
+  "failed role portraits must retry the primary illustration through the shared batch loader");
+assert.match(avatarRecovery,/image\.replaceWith\(fallback\)/,
+  "a failed role portrait must become a stable name fallback instead of remaining a dark broken image");
+assert.match(avatarRecovery,/image\.dataset\.characterAvatarId\|\|image\.dataset\.characterPrimaryIllustration/,
+  "the generic low-opacity image handler must not dim failed character avatars");

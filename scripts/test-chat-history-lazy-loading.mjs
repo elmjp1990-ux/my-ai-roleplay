@@ -166,6 +166,20 @@ assert.match(renderMessages, /重新載入/);
 assert.match(renderMessages, /messageInput\.disabled=true/);
 assert.match(renderMessages, /sendButton\.disabled=sending\|\|loadingHistory/);
 
+const groupOpen = between("async function groupOpen(groupId)", "async function groupLoadOlderMessages");
+assert.doesNotMatch(groupOpen, /syncGroupDiaryCloud|ensureGroupDiaryCloudSynced/,
+  "opening a group chat must not download the full legacy diary payload");
+assert.match(groupOpen, /groupDiaryCloudReady\.delete\(groupId\)/,
+  "reopening a group should refresh the diary on its next explicit open");
+const groupDiaryOverlay = between("function renderGroupChatOverlay(kind)", "function renderGroupStatusShell(");
+assert.match(groupDiaryOverlay, /ensureGroupDiaryCloudSynced\(group\.id\)/,
+  "the legacy group diary should synchronize only when its overlay is opened");
+assert.match(groupDiaryOverlay, /groupDiaryCloudReady\.get\(group\.id\)/,
+  "a synchronized group diary must not be downloaded again on repeated overlay renders");
+const groupDiarySync = between("async function syncGroupDiaryCloud(groupId)", "function ensureGroupDiaryCloudSynced");
+assert.match(groupDiarySync, /select\('group_id,owner_id,memories,updated_at'\)/,
+  "the full diary payload remains available for the diary's explicit sync path");
+
 console.log("Chat lazy hydration, single-session loading, pagination, and legacy safety checks passed.");
 
 const storyStart = between("async function findExistingStoryChatSessionFallback", "function visibleSessions");

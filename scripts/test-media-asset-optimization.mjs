@@ -56,7 +56,8 @@ assert.match(videoUploader,/const optimized=await compressCharacterAvatarVideo\(
 assert.match(videoUploader,/upload\(path,optimized/);
 assert.doesNotMatch(videoUploader,/upload\(path,file/);
 
-const importFlow=block("async function importCharacter(file)","/* Image errors do not inject HTML. */");
+// Bound the import contract by the next stable event-listener block; comments may move during UI refactors.
+const importFlow=block("async function importCharacter(file)","document.addEventListener('error',event=>{");
 assert.match(importFlow,/compressUploadImage\(importedFile/);
 assert.match(importFlow,/syncCharacterIllustrations\(character,user\.uid\)/);
 

@@ -125,10 +125,15 @@ Deno.serve(async (request: Request) => {
   // The opening line lives in character_stories, not characters. Read it on the
   // trusted server so a newly-created Story snapshot never depends on stale client
   // hydration (and so the opening can be persisted with the Story session).
-  const { data: characterStory, error: storyError } = await admin
-    .from("character_stories")
+  const storyQuery = admin.from("character_stories")
     .select("opening_message")
-    .eq("character_id", characterId)
+    .eq("character_id", characterId);
+  // Only the author may snapshot a private story opening; other players receive
+  // the latest public opening for this public character.
+  const scopedStoryQuery = character.author_id === user.id
+    ? storyQuery
+    : storyQuery.eq("visibility", "public");
+  const { data: characterStory, error: storyError } = await scopedStoryQuery
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

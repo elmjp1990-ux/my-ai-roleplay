@@ -207,14 +207,13 @@ body.day .tag { color:#4f46b8; }
 .avatar-fallback { display:grid; place-items:center; color:#ddd6fe; font-weight:bold; }
 .group-list-avatar { width:36px; height:36px; display:grid; place-items:center; border-radius:50%; flex-shrink:0; color:#e0e7ff; background:linear-gradient(135deg,#6366f1,#8b5cf6); font-weight:700; font-size:13px; }
 .group-avatar-stack{width:36px;height:36px;flex:0 0 36px;position:relative;display:block}
-.group-avatar-stack .group-avatar-image{position:absolute;width:25px;height:25px;border-radius:50%;object-fit:cover;border:2px solid var(--panel);background:var(--panel2)}
-.group-avatar-stack .group-avatar-image:nth-child(1){left:0;top:0}
-.group-avatar-stack .group-avatar-image:nth-child(2){right:0;top:0}
-.group-avatar-stack .group-avatar-image:nth-child(3){left:7px;bottom:0}
-.group-avatar-stack .group-avatar-fallback{position:absolute;width:25px;height:25px;border-radius:50%;display:grid;place-items:center;font-size:10px;border:2px solid var(--panel);background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#e0e7ff}
-.group-avatar-stack .group-avatar-fallback:nth-child(1){left:0;top:0}
-.group-avatar-stack .group-avatar-fallback:nth-child(2){right:0;top:0}
-.group-avatar-stack .group-avatar-fallback:nth-child(3){left:7px;bottom:0}
+/* Each portrait now has a status wrapper; size and position the wrapper, not only its nested image. */
+.group-avatar-stack > .character-avatar-status{position:absolute;display:block;width:25px;height:25px;flex:0 0 25px;box-sizing:border-box;border:2px solid var(--panel);border-radius:50%}
+.group-avatar-stack > .character-avatar-status:nth-child(1){left:0;top:0}
+.group-avatar-stack > .character-avatar-status:nth-child(2){right:0;top:0}
+.group-avatar-stack > .character-avatar-status:nth-child(3){left:7px;bottom:0}
+.group-avatar-stack .group-avatar-image{position:absolute;left:0;top:0;width:100%;height:100%;border:0;border-radius:50%;object-fit:cover;background:var(--panel2)}
+.group-avatar-stack .group-avatar-fallback{position:absolute;left:0;top:0;width:100%;height:100%;border:0;border-radius:50%;display:grid;place-items:center;font-size:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#e0e7ff}
 .group-pin{flex:0 0 auto}
 .group-chat-entry .group-chat-open{display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-align:left;border:0;background:transparent;color:inherit;font:inherit;padding:2px;cursor:pointer}
 .group-chat-entry .group-chat-copy{display:block;flex:1;min-width:0;overflow:hidden}
@@ -232,7 +231,7 @@ body.day .tag { color:#4f46b8; }
 .character-avatar-status .avatar {
   display:block;
 }
-.character-avatar-status.is-offline .avatar,
+/* Offline is communicated by the status dot; keep the saved portrait visually intact. */
 .detail-image.character-offline-image {
   filter:grayscale(1);
   opacity:.68;
@@ -2005,6 +2004,46 @@ async function loadCharacterPrimaryIllustrationAssets(characterIds, scopeUserId=
   return result;
 }
 
+async function hydrateCharacterAvatarFallbacks(root=$('view')) {
+  if(!root?.querySelectorAll)return;
+  const fallbacks=[...root.querySelectorAll('span[data-character-avatar-id]:not([data-character-avatar-hydration])')];
+  if(!fallbacks.length)return;
+  const byId=new Map();
+  for(const fallback of fallbacks){
+    const id=fallback.dataset.characterAvatarId;
+    if(!isUuid(id))continue;
+    fallback.dataset.characterAvatarHydration='pending';
+    const rows=byId.get(id)||[];
+    rows.push(fallback);byId.set(id,rows);
+  }
+  if(!byId.size)return;
+  try{
+    const assets=await loadCharacterPrimaryIllustrationAssets([...byId.keys()]);
+    for(const [id,nodes] of byId){
+      const primary=assets.get(id)?.primary;
+      for(const fallback of nodes){
+        if(!fallback.isConnected)continue;
+        if(!primary?.src){fallback.dataset.characterAvatarHydration='unavailable';continue;}
+        const image=document.createElement('img');
+        image.className=fallback.dataset.characterAvatarImageClass||'avatar';
+        image.src=primary.src;image.alt='';image.loading='lazy';image.decoding='async';
+        image.dataset.characterAvatarId=id;
+        image.dataset.characterAvatarPath=primary.path||fallback.dataset.characterAvatarPath||'';
+        image.dataset.characterAvatarFallback=fallback.dataset.characterAvatarFallback||'角';
+        image.dataset.characterAvatarFallbackClass=fallback.dataset.characterAvatarFallbackClass||'avatar avatar-fallback';
+        image.dataset.characterAvatarFallbackStyle=fallback.dataset.characterAvatarFallbackStyle||'';
+        image.dataset.characterAvatarImageClass=image.className;
+        fallback.replaceWith(image);
+      }
+    }
+  }catch(error){
+    for(const nodes of byId.values())for(const fallback of nodes){
+      if(fallback.isConnected)fallback.dataset.characterAvatarHydration='unavailable';
+    }
+    console.warn('角色頭像補載失敗，保留名稱圖示：',error?.message||error);
+  }
+}
+
 async function loadCharacterIllustrationAssets(characterIds, cleanupUserId=null) {
   const client=window.mySupabase;
   const ids=[...new Set((characterIds||[]).filter(Boolean))].sort();
@@ -3417,7 +3456,8 @@ function sessionCharacter(s) {
     const cached=portraitPath&&uid&&s.id?cloudSessionImageUrlCache.get(uid+':'+s.id+':'+portraitPath):null;
     const cachedImage=cached&&cached.expiresAt>Date.now()?cached.url:'';
     const image=cachedImage||safeImage(found.image)||safeImage(found.avatar_url)||'';
-    return image===found.image?found:{...found,image};
+    const deletedAt=snap?.deletedAt||found.deletedAt||null;
+    return image===found.image&&found.deletedAt===deletedAt?found:{...found,image,deletedAt};
   }
   const snap = s.cloudCharacterSnapshot;
   if (!snap || snap.id !== s.characterId) return null;
@@ -4718,6 +4758,30 @@ function safeImage(value) {
   } catch (_) {}
   return '';
 }
+function characterAvatarMarkup(character,options={}) {
+  const imageClass=options.imageClass||'avatar';
+  const fallbackClass=options.fallbackClass||'avatar avatar-fallback';
+  const style=options.style||'';
+  const characterId=String(character?.characterId||character?.id||'');
+  const name=String(character?.name||character?.character_snapshot?.name||character?.characterSnapshot?.name||'角').trim();
+  const initial=Array.from(name)[0]||'角';
+  const imageCandidates=[
+    character?.avatar_url,character?.avatarUrl,
+    character?.character_snapshot?.avatar_url,character?.characterSnapshot?.avatar_url,
+    character?.image,character?.character_snapshot?.image,character?.characterSnapshot?.image
+  ];
+  const image=imageCandidates.map(safeImage).find(Boolean)||'';
+  const identity=isUuid(characterId)?' data-character-avatar-id="'+e(characterId)+'"':'';
+  const portraitPath=String(character?.primaryIllustrationPath||character?.primary_illustration_path||character?.imagePath||
+    character?.character_snapshot?.primaryIllustrationPath||character?.character_snapshot?.primary_illustration_path||
+    character?.characterSnapshot?.primaryIllustrationPath||character?.characterSnapshot?.primary_illustration_path||'');
+  const pathAttr=portraitPath?' data-character-avatar-path="'+e(portraitPath)+'"':'';
+  const fallbackAttrs=' data-character-avatar-fallback="'+e(initial)+'" data-character-avatar-fallback-class="'+e(fallbackClass)+
+    '" data-character-avatar-fallback-style="'+e(style)+'" data-character-avatar-image-class="'+e(imageClass)+'"';
+  if(!image)return '<span class="'+e(fallbackClass)+'" aria-hidden="true"'+(style?' style="'+e(style)+'"':'')+
+    identity+pathAttr+fallbackAttrs+'>'+e(initial)+'</span>';
+  return '<img class="'+e(imageClass)+'" src="'+e(image)+'" alt="" loading="lazy" decoding="async"'+identity+pathAttr+fallbackAttrs+'>';
+}
 function normalizeCharacterTag(value) {
   // UI 會自動加上 #，因此不把作者輸入的前綴存入資料庫。
   return String(value ?? '').trim().replace(/^#+/u,'').trim();
@@ -5090,6 +5154,7 @@ function render() {
     case 'album':renderChatAlbumPage();break;
   }
   restoreCharacterCardVideos($('view'),previousCardVideos);
+  void hydrateCharacterAvatarFallbacks($('view'));
   observePublicCharacterIllustrationCards($('view'));
   if (route.overlay) renderModal(route.overlay);
   updateCharacterCounters($('view'));
@@ -6820,8 +6885,10 @@ function chatEntries() {
       const hasUnread=chatHasUnreadAssistantMessage(groupPreviewLastAssistantAt(item.preview),groupChatReadAt(currentUser()?.uid,group.id));
       const memberList=groupPrototype.groupMembers?.[group.id]||[];
       const avatarMarkup=memberList.slice(0,3).map(member=>{
-        const image=safeImage(member.avatar_url||member.image||member.character_snapshot?.avatar_url||member.character_snapshot?.image);
-        return image?'<img class="group-avatar-image" src="'+e(image)+'" alt="">':'<span class="group-avatar-fallback" aria-hidden="true">'+e(String(member.name||member.character_snapshot?.name||'角').trim().slice(0,1)||'角')+'</span>';
+        const offline=Boolean(member.deletedAt||member.deleted_at||member.character_snapshot?.deletedAt||member.characterSnapshot?.deletedAt);
+        return '<span class="character-avatar-status '+(offline?'is-offline':'')+'" title="'+e((member.name||'角色')+(offline?'｜離線／已下架':'｜公開中'))+'">'+
+          characterAvatarMarkup(member,{imageClass:'group-avatar-image',fallbackClass:'group-avatar-fallback'})+
+          '<span class="character-status-dot" title="'+(offline?'離線／已下架':'公開中')+'"></span></span>';
       }).join('');
       const groupAvatar=avatarMarkup?'<span class="group-avatar-stack" aria-hidden="true">'+avatarMarkup+'</span>':'<span class="group-list-avatar" aria-hidden="true">群</span>';
       return `<div class="chat-entry group-chat-entry ${active?'active':''}">
@@ -6839,7 +6906,7 @@ function chatEntries() {
     return `<div class="chat-entry ${route.page==='conversation'&&route.id===s.id?'active':''}">
       <button type="button" class="pin ${s.pinned?'on':''}" data-chat-list-pin="single" data-action="pin" data-id="${e(s.id)}" aria-label="切換置頂">${ICON.pin}</button>
       <button class="ghost" style="padding:0" data-action="session-detail" data-id="${e(s.id)}" aria-label="查看${e(c.name)}角色簡介">
-        <span class="character-avatar-status ${characterIsOffline(c)?'is-offline':''}"><img class="avatar" src="${e(safeImage(c.image||c.avatar_url))}" alt="${e(c.name)}">
+        <span class="character-avatar-status ${characterIsOffline(c)?'is-offline':''}">${characterAvatarMarkup(c)}
         <span class="character-status-dot" title="${characterIsOffline(c)?'角色離線／已下架':'角色公開中'}"></span></span>
       </button>
       <button class="select-chat" data-action="select-chat" data-id="${e(s.id)}">
@@ -7052,30 +7119,8 @@ async function groupLoadCharacterPickerPage({reset=false}={}){
   }
 }
 function groupCharacterPickerAvatar(character){
-  const image=safeImage(character?.image||character?.avatar_url);
-  const initial=String(character?.name||'角').trim().slice(0,1)||'角';
-  const characterId=String(character?.id||'');
-  if(image)return '<img class="avatar group-picker-avatar" src="'+e(image)+'" alt="" loading="lazy" decoding="async" data-character-id="'+e(characterId)+'" data-avatar-fallback="'+e(initial)+'" style="width:46px;height:46px">';
-  return '<span class="avatar avatar-fallback" aria-hidden="true" style="width:46px;height:46px">'+e(initial)+'</span>';
+  return characterAvatarMarkup(character,{imageClass:'avatar group-picker-avatar',fallbackClass:'avatar avatar-fallback',style:'width:46px;height:46px'});
 }
-document.addEventListener('error',async event=>{
-  const image=event.target;
-  if(!(image instanceof HTMLImageElement)||!image.matches('.group-picker-avatar'))return;
-  if(image.dataset.primaryRetried!=='1'&&isUuid(image.dataset.characterId||'')){
-    image.dataset.primaryRetried='1';
-    try{
-      const assets=await loadCharacterPrimaryIllustrationAssets([image.dataset.characterId]);
-      const primary=assets.get(image.dataset.characterId)?.primary?.src||'';
-      if(primary&&primary!==image.src){image.src=primary;return;}
-    }catch(error){console.warn('群組選角頭像補載失敗：',error?.message||error);}
-  }
-  const fallback=document.createElement('span');
-  fallback.className='avatar avatar-fallback';
-  fallback.setAttribute('aria-hidden','true');
-  fallback.style.cssText='width:46px;height:46px';
-  fallback.textContent=image.dataset.avatarFallback||'角';
-  image.replaceWith(fallback);
-},true);
 function groupRenderCharacterResults() {
   const pager=groupCharacterPickerPager;
   const all=pager.uid===currentUser()?.uid?pager.items:[];
@@ -7121,6 +7166,7 @@ function refreshChatEntryList() {
   chatListPaginationObserver?.disconnect();
   groupPrototype.groupListObserver?.disconnect();
   entries.innerHTML=chatEntries();
+  void hydrateCharacterAvatarFallbacks(entries);
   const canLoadSessions=chatSessionListPager.initialLoaded&&chatSessionListPager.hasMore;
   const canLoadGroups=groupPrototype.groupsLoaded&&groupPrototype.groupListHasMore;
   if((canLoadSessions||canLoadGroups)&&!groupPrototype.loadingGroups&&!chatSessionListPager.loading){
@@ -7187,6 +7233,20 @@ function groupFriendlyError(error) {
   if(message.includes('authentication_required')||message.includes('JWT')||message.includes('登入狀態')) return '登入狀態已失效，請重新登入後再試。';
   return message||'操作失敗，請稍後再試。';
 }
+async function signCharacterSnapshotPortraits(members){
+  const entries=(members||[]).map(member=>({
+    id:member.characterId||member.character_id||'',
+    path:member.primaryIllustrationPath||member.imagePath||member.primary_illustration_path||member.image_path||''
+  })).filter(entry=>isUuid(entry.id)&&entry.path);
+  const unique=[...new Map(entries.map(entry=>[entry.path,entry])).values()];
+  if(!unique.length)return new Map();
+  const urls=await characterIllustrationSignedUrlManager.getMany(unique.map(entry=>entry.path));
+  const result=new Map();
+  unique.forEach((entry,index)=>{
+    if(urls[index])result.set(entry.id,{src:urls[index],path:entry.path});
+  });
+  return result;
+}
 async function groupHydrateListRows(groups){
   const g=groupPrototype,client=window.mySupabase;
   if(!groups.length)return;
@@ -7195,6 +7255,14 @@ async function groupHydrateListRows(groups){
     .select('group_id,character_id,position,character_snapshot').in('group_id',groupIds).order('position');
   if(memberError)throw memberError;
   const characterIds=[...new Set((memberRows||[]).map(row=>row.character_id).filter(isUuid))];
+  const snapshotMembers=(memberRows||[]).map(row=>({
+    characterId:row.character_id||row.character_snapshot?.id||'',
+    primaryIllustrationPath:row.character_snapshot?.imagePath||row.character_snapshot?.primaryIllustrationPath||
+      row.character_snapshot?.primary_illustration_path||row.character_snapshot?.image_path||''
+  }));
+  let snapshotPortraits=new Map();
+  try{snapshotPortraits=await signCharacterSnapshotPortraits(snapshotMembers);}
+  catch(error){console.warn('群組快照主立繪簽名網址載入失敗：',error?.message||error);}
   let avatars={};
   if(characterIds.length){
     const {data:characterRows,error:avatarError}=await client.from('characters')
@@ -7202,13 +7270,29 @@ async function groupHydrateListRows(groups){
     if(avatarError)console.warn('讀取群組列表角色頭像失敗：',avatarError.message);
     else avatars=Object.fromEntries((characterRows||[]).map(row=>[row.id,row.avatar_url||'']));
   }
+  const missingAvatarIds=characterIds.filter(id=>!safeImage(avatars[id])&&
+    !safeImage((memberRows||[]).find(row=>row.character_id===id)?.character_snapshot?.image)&&
+    !safeImage(snapshotPortraits.get(id)?.src));
+  const primaryAvatarById={};
+  if(missingAvatarIds.length){
+    try{
+      const primaryAssets=await loadCharacterPrimaryIllustrationAssets(missingAvatarIds);
+      for(const [characterId,assets] of primaryAssets)if(assets?.primary?.src)primaryAvatarById[characterId]=assets.primary;
+    }catch(error){console.warn('群組列表主立繪批次載入失敗：',error?.message||error);}
+  }
   for(const row of memberRows||[]){
     const members=g.groupMembers[row.group_id]||=[];
-    if(!members.some(member=>member.character_snapshot?.id===row.character_snapshot?.id&&member.name===(row.character_snapshot?.name||'角色'))){
+    if(!members.some(member=>member.characterId===row.character_id)){
+      const snapshot=row.character_snapshot||{};
+      const snapshotPortrait=snapshotPortraits.get(row.character_id);
       members.push({
-        name:row.character_snapshot?.name||'角色',
-        avatar_url:avatars[row.character_id]||row.character_snapshot?.avatar_url||'',
-        character_snapshot:row.character_snapshot||{}
+        characterId:row.character_id||snapshot.id||'',
+        name:snapshot.name||'角色',
+        avatar_url:snapshot.image||snapshot.avatar_url||snapshot.avatarUrl||snapshotPortrait?.src||
+          avatars[row.character_id]||primaryAvatarById[row.character_id]?.src||'',
+        primaryIllustrationPath:snapshot.imagePath||snapshot.primaryIllustrationPath||
+          snapshot.primary_illustration_path||snapshotPortrait?.path||primaryAvatarById[row.character_id]?.path||'',
+        character_snapshot:snapshot
       });
     }
     g.groupMembers[row.group_id]=members;
@@ -7326,6 +7410,7 @@ async function groupOpen(groupId) {
   // Keep the group ID in the URL so rerenders, auth refreshes, and post-send reloads
   // can recover the same group instead of silently falling back to the creation wizard.
   const requestId=g.openRequestId=(g.openRequestId||0)+1;
+  groupDiaryCloudReady.delete(groupId);
   g.loading=true;g.formError='';g.openError='';g.failedGroupId=groupId;g.active=null;g.searchJump=false;
   if(route.page!=='group'||route.id!==groupId||route.overlay) go({page:'group',id:groupId});
   else render();
@@ -7354,15 +7439,11 @@ async function groupOpen(groupId) {
     const group=groupRes.data, scenes=sceneRes.data||[], memberRows=memberRes.data||[];
     if(!group) throw new Error('找不到這個群組，或目前帳號沒有存取權限。');
     if(memberRows.length<1||memberRows.length>3) throw new Error('群組成員資料不完整，請重新整理或重新建立群組。');
-    let characterById={},primaryIllustrationPathById={};
+    let characterById={};
     const characterIds=memberRows.map(m=>m.character_id).filter(isUuid);
     if(characterIds.length) {
-      const [characterRes,illustrationRes]=await Promise.all([
-        window.mySupabase.from('characters').select('id,avatar_url,phone_settings').in('id',characterIds),
-        window.mySupabase.from('character_illustrations').select('character_id,storage_path').in('character_id',characterIds).eq('asset_type','primary').eq('sort_order',0)
-      ]);
+      const characterRes=await window.mySupabase.from('characters').select('id,avatar_url,phone_settings').in('id',characterIds);
       if(!characterRes.error) characterById=Object.fromEntries((characterRes.data||[]).map(x=>[x.id,x]));
-      if(!illustrationRes.error) primaryIllustrationPathById=Object.fromEntries((illustrationRes.data||[]).map(x=>[x.character_id,x.storage_path]));
     }
     const members=memberRows.map(m=>{
       const snapshot=m.character_snapshot||{},characterId=m.character_id||null;
@@ -7371,9 +7452,9 @@ async function groupOpen(groupId) {
       const phoneSettings=characterRow.phone_settings||snapshot.phoneSettings||snapshot.phone_settings||{};
       const phoneNotifications=Array.isArray(m.phone_notifications)?m.phone_notifications:
         Array.isArray(snapshot.phoneNotifications)?snapshot.phoneNotifications:[];
-      return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,displayId,
-        avatar_url:characterRow.avatar_url||snapshot.avatar_url||snapshot.avatarUrl||snapshot.image||snapshot.image_url||'',
-        primaryIllustrationPath:primaryIllustrationPathById[characterId]||snapshot.primaryIllustrationPath||snapshot.primary_illustration_path||snapshot.imagePath||snapshot.image_path||'',
+      return {...snapshot,id:displayId,characterId,characterSnapshotId:snapshotId,characterSnapshot:snapshot,displayId,
+        avatar_url:snapshot.image||snapshot.avatar_url||snapshot.avatarUrl||snapshot.image_url||characterRow.avatar_url||'',
+        primaryIllustrationPath:snapshot.imagePath||snapshot.primaryIllustrationPath||snapshot.primary_illustration_path||snapshot.image_path||'',
         phoneNotifications,phoneSettings,position:m.position,sceneId:m.scene_id,
         sceneName:scenes.find(s=>s.id===m.scene_id)?.name||'目前場景'};
     });
@@ -7392,7 +7473,7 @@ async function groupOpen(groupId) {
       const speaker=type==='user'?'你':type==='system'?'系統':(speakerSnapshot.name||member?.name||'角色')+(scene?' · '+scene.name:'');
       return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user' && m.content===GROUP_CONTINUE_SENTINEL ? '' : m.content,createdAt:m.created_at};
     });
-    const membersNeedingPortraits=members.filter(member=>!member.avatar_url&&member.primaryIllustrationPath);
+    const membersNeedingPortraits=members.filter(member=>!safeImage(member.avatar_url)&&isUuid(member.characterId));
     g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,storyWorldState:{storyTime:group.story_time||'',storyLocation:group.story_location||''},memoryPhotos:[],scenes,members,suggestedReplies:suggestionRes.data?.status==='completed'&&Array.isArray(suggestionRes.data?.suggested_replies)?suggestionRes.data.suggested_replies.slice(0,3):[]};
     markGroupChatRead(group.id);
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;
@@ -7407,7 +7488,7 @@ async function groupOpen(groupId) {
         if(existingIndex>=0)g.groups[existingIndex]=listRow;else g.groups.unshift(listRow);
         g.groupMembers ||= {};
         g.groupPreviews ||= {};
-        g.groupMembers[group.id]=members.map(member=>({name:member.name,avatar_url:member.avatar_url||member.image||'',character_snapshot:member.characterSnapshot||{}}));
+        g.groupMembers[group.id]=members.map(member=>({characterId:member.characterId,name:member.name,avatar_url:member.avatar_url||member.image||'',primaryIllustrationPath:member.primaryIllustrationPath||'',deletedAt:member.deletedAt||null,character_snapshot:{id:member.characterId,name:member.name,avatar_url:member.avatar_url||member.image||'',primaryIllustrationPath:member.primaryIllustrationPath||'',deletedAt:member.deletedAt||null}}));
         const latestMessage=messages.at(-1);
         if(latestMessage)g.groupPreviews[group.id]={group_id:group.id,content:latestMessage.content||'',created_at:latestMessage.createdAt||'',speaker_type:latestMessage.type==='user'?'user':'character'};
         else delete g.groupPreviews[group.id];
@@ -7435,28 +7516,28 @@ async function groupOpen(groupId) {
     // Private primary portraits are signed after the first paint; do not hold the chat
     // open spinner for one to three independent Storage URL requests.
     if(membersNeedingPortraits.length){
-      void Promise.all(membersNeedingPortraits.map(async member=>{
-        try{member.avatar_url=await getCharacterIllustrationSignedUrl(member.primaryIllustrationPath);member.image=member.avatar_url;}
-        catch(error){console.warn('群組角色頭像載入失敗：',member.name,error?.message||error);}
-      })).then(()=>{
+      void (async()=>{
+        const snapshotPortraits=await signCharacterSnapshotPortraits(membersNeedingPortraits);
+        const unresolved=membersNeedingPortraits.filter(member=>!snapshotPortraits.has(member.characterId));
+        const assets=unresolved.length
+          ? await loadCharacterPrimaryIllustrationAssets(unresolved.map(member=>member.characterId))
+          : new Map();
         if(requestId!==g.openRequestId||currentUser()?.uid!==user.id||g.active?.id!==group.id)return;
-        if(g.groupMembers)g.groupMembers[group.id]=members.map(member=>({name:member.name,avatar_url:member.avatar_url||member.image||'',character_snapshot:member.characterSnapshot||{}}));
+        for(const member of membersNeedingPortraits){
+          const snapshotPortrait=snapshotPortraits.get(member.characterId);
+          const primary=snapshotPortrait||assets.get(member.characterId)?.primary;
+          if(primary?.src){member.avatar_url=primary.src;member.image=primary.src;member.primaryIllustrationPath=primary.path;}
+        }
+        if(g.groupMembers)g.groupMembers[group.id]=members.map(member=>({characterId:member.characterId,name:member.name,avatar_url:member.avatar_url||member.image||'',primaryIllustrationPath:member.primaryIllustrationPath||'',character_snapshot:member.characterSnapshot||{}}));
         if(route.page==='group'&&route.id===group.id){
           const input=$('groupMessageInput'),draft=input?.value||'',hadFocus=!!input&&document.activeElement===input;
           renderGroupConversation();
           const nextInput=$('groupMessageInput');
           if(nextInput){nextInput.value=draft;nextInput.style.height='auto';nextInput.style.height=Math.min(nextInput.scrollHeight,144)+'px';if(hadFocus)nextInput.focus();}
         }
-      });
+      })().catch(error=>console.warn('群組角色頭像批次載入失敗：',error?.message||error));
     }
-    void syncGroupDiaryCloud(group.id).then(()=>{
-      if(requestId!==g.openRequestId||currentUser()?.uid!==user.id||g.active?.id!==group.id)return;
-      ensureGroupDiaryMemories();
-      if(route.page==='group'&&route.id===group.id&&route.chatOverlay==='diary')renderGroupMemorySummaries(group.id,true);
-    }).catch(syncError=>{
-      console.error('群組甜蜜日記雲端同步載入失敗：',syncError);
-      if(g.active?.id===group.id&&currentUser()?.uid===user.id)toast('群組日記雲端同步暫時失敗，已保留本機資料；請檢查網路後重試。');
-    });
+    // Legacy diary data is local-first and syncs only when the player opens the diary or edits it.
   } catch(error) {
     if(requestId!==g.openRequestId) return;
     g.loading=false;g.active=null;g.openError=groupFriendlyError(error)||'開啟群組失敗。';g.failedGroupId=groupId;
@@ -7556,12 +7637,12 @@ function renderGroupConversation() {
   if(!group) return;
   const avatarURL=value=>{const url=String(value||'').trim();return (/^https?:\/\//i.test(url)||/^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(url))?url:'';};
   const memberAvatars=group.members.map(m=>{
-    const avatar=avatarURL(m.avatar_url||m.image||m.characterSnapshot?.avatar_url||m.characterSnapshot?.image);
     const characterId=String(m.characterId||m.id||'');
     const canLink=isUuid(characterId)&&!characterId.startsWith('seed-');
-    const portrait='<span class="character-avatar-status" title="'+e(m.name||'角色')+'">'+
-      (avatar?'<img class="avatar" src="'+e(avatar)+'" alt="">':'<span class="group-list-avatar">'+e(String(m.name||'角').trim().slice(0,1)||'角')+'</span>')+
-      '</span>';
+    const offline=Boolean(m.deletedAt||m.deleted_at||m.characterSnapshot?.deletedAt||m.character_snapshot?.deletedAt);
+    const portrait='<span class="character-avatar-status '+(offline?'is-offline':'')+'" title="'+e((m.name||'角色')+(offline?'｜離線／已下架':'｜公開中'))+'">'+
+      characterAvatarMarkup(m)+
+      '<span class="character-status-dot" title="'+(offline?'離線／已下架':'公開中')+'"></span></span>';
     return canLink
       ? '<button type="button" class="group-member-avatar-link" data-action="group-member-detail" data-id="'+e(characterId)+'" aria-label="查看角色 '+e(m.name||'角色')+' 的角色卡" title="查看 '+e(m.name||'角色')+' 的角色卡">'+portrait+'</button>'
       : portrait;
@@ -8064,6 +8145,7 @@ async function renderGroupMemorySummaries(groupId,force=false) {
 }
 
 const groupDiaryCloudReady=new Map();
+const groupDiaryCloudSyncs=new Map();
 const groupDiaryCloudSaveTimers=new Map();
 const groupDiaryCloudSaveChains=new Map();
 function clearGroupDiaryLocalData(groupId,uid=currentUser()?.uid) {
@@ -8071,6 +8153,7 @@ function clearGroupDiaryLocalData(groupId,uid=currentUser()?.uid) {
   try { localStorage.removeItem('personax-group-diary-v1:'+uid+':'+groupId); }
   catch(error) { console.warn('群組日記本機快取清除失敗：',error); }
   groupDiaryCloudReady.delete(groupId);
+  groupDiaryCloudSyncs.delete(groupId);
   const timer=groupDiaryCloudSaveTimers.get(groupId);
   if(timer)clearTimeout(timer);
   groupDiaryCloudSaveTimers.delete(groupId);
@@ -8106,6 +8189,16 @@ async function syncGroupDiaryCloud(groupId) {
   groupDiaryCloudReady.set(groupId,true);
   return loadGroupDiaryMemories(groupId);
 }
+function ensureGroupDiaryCloudSynced(groupId) {
+  if(groupDiaryCloudReady.get(groupId))return Promise.resolve(loadGroupDiaryMemories(groupId));
+  const pending=groupDiaryCloudSyncs.get(groupId);
+  if(pending)return pending;
+  const task=syncGroupDiaryCloud(groupId).finally(()=>{
+    if(groupDiaryCloudSyncs.get(groupId)===task)groupDiaryCloudSyncs.delete(groupId);
+  });
+  groupDiaryCloudSyncs.set(groupId,task);
+  return task;
+}
 async function saveGroupDiaryCloudNow(groupId,memories,updatedAt,uid=currentUser()?.uid) {
   const client=window.mySupabase;
   if(!client||!uid)throw new Error('登入後才能同步群組甜蜜日記。');
@@ -8129,7 +8222,7 @@ function queueGroupDiaryCloudSave(groupId) {
       const uid=currentUser()?.uid;
       if(!uid||!window.mySupabase)throw new Error('登入後才能同步群組甜蜜日記。');
       if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return;}
-      if(!groupDiaryCloudReady.get(groupId))await syncGroupDiaryCloud(groupId);
+      if(!groupDiaryCloudReady.get(groupId))await ensureGroupDiaryCloudSynced(groupId);
       if(readDeletedChatTombstones(uid).groups[groupId]) {clearGroupDiaryLocalData(groupId,uid);return;}
       const local=readGroupDiaryLocalRecord(groupId);
       await saveGroupDiaryCloudNow(groupId,local.memories,local.updatedAt,uid);
@@ -8189,10 +8282,19 @@ function renderGroupChatOverlay(kind) {
     return;
   }
   if(kind==='diary'){
-    const visibleMemories=ensureGroupDiaryMemories();
-    const rows=visibleMemories.map(m=>'<article class="memory-item diary-memory-card '+(m.important?'is-important':'')+'"><div class="diary-memory-head"><label class="diary-check"><input type="checkbox" data-group-memory="'+e(m.id)+'" '+(m.important?'checked':'')+'><span class="diary-heart">'+(m.important?'♥':'♡')+'</span><span>舊版珍藏回憶</span></label><span class="diary-memory-date">'+e(timeText(m.at))+'</span></div><p class="prose diary-memory-text">'+e(m.text)+'</p><p class="small diary-lock-note">♥ 已珍藏的舊版回憶</p></article>').join('');
+    const renderLegacyRows=()=>ensureGroupDiaryMemories().map(m=>'<article class="memory-item diary-memory-card '+(m.important?'is-important':'')+'"><div class="diary-memory-head"><label class="diary-check"><input type="checkbox" data-group-memory="'+e(m.id)+'" '+(m.important?'checked':'')+'><span class="diary-heart">'+(m.important?'♥':'♡')+'</span><span>舊版珍藏回憶</span></label><span class="diary-memory-date">'+e(timeText(m.at))+'</span></div><p class="prose diary-memory-text">'+e(m.text)+'</p><p class="small diary-lock-note">♥ 已珍藏的舊版回憶</p></article>').join('');
     const summary='<section class="diary-summary"><div class="diary-summary-head"><div><p class="small muted diary-eyebrow">SWEET DIARY · GROUP STORY</p><h3>把你們共同的故事，好好收藏</h3><p class="small muted">每 5 個已完成的群組回合，由 AI 整理一則 50–150 字摘要；摘要可編輯，也可設為重大記憶。</p></div><div class="diary-count"><strong id="groupMemoryCount">0</strong><span>/ 10,000 字</span></div></div><div class="diary-meter"><span id="groupMemoryMeter" style="width:0%"></span></div><p class="small muted diary-hint">群組摘要與單人故事使用相同的五回合整理節奏。舊版珍藏內容會保留，不再以完整聊天摘錄充當新摘要。</p></section><div id="groupMemorySummary" class="stack" style="gap:10px"><p class="small muted">正在載入群組 AI 回憶摘要…</p></div>';
-    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="甜蜜日記"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h2>甜蜜日記</h2></div>'+summary+(rows||'')+'</section>');
+    panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="甜蜜日記"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h2>甜蜜日記</h2></div>'+summary+'<div id="groupLegacyDiary">'+(renderLegacyRows()||'')+'</div></section>');
+    if(!groupDiaryCloudReady.get(group.id)){
+      void ensureGroupDiaryCloudSynced(group.id).then(()=>{
+        if(groupPrototype.active?.id!==group.id||route.chatOverlay!=='diary')return;
+        const legacyTarget=document.getElementById('groupLegacyDiary');
+        if(legacyTarget)legacyTarget.innerHTML=renderLegacyRows();
+      }).catch(syncError=>{
+        console.error('群組甜蜜日記雲端同步載入失敗：',syncError);
+        if(groupPrototype.active?.id===group.id&&route.chatOverlay==='diary')toast('日記同步暫時失敗，已保留本機資料；請稍後重試。');
+      });
+    }
     void renderGroupMemorySummaries(group.id,true);
     return;
   }
@@ -8788,7 +8890,7 @@ function renderConversation() {
               <button class="ghost" data-action="session-detail" data-id="${e(s.id)}" style="padding:0"
                       aria-label="查看角色簡介">
                 <span class="character-avatar-status ${characterIsOffline(c) ? 'is-offline' : ''}">
-                  <img class="avatar" src="${e(safeImage(c.image||c.avatar_url))}" ${c.imagePath||c.primaryIllustrationPath ? 'data-character-illustration-path="'+e(c.imagePath||c.primaryIllustrationPath)+'"' : ''} alt="">
+                  ${characterAvatarMarkup(c)}
                   <span class="character-status-dot" title="${characterIsOffline(c) ? '角色離線／已下架' : '角色公開中'}"></span>
                 </span>
               </button>
@@ -12994,13 +13096,50 @@ async function importCharacter(file) {
   }
 }
 
-/* Image errors do not inject HTML. */
-/* Keep role portraits visible while their signed Storage URL is being hydrated/refreshed,
-   and restore opacity after a later successful load. */
+/* Character avatars share one recovery path across single chats, group chats and pickers. */
+async function recoverCharacterAvatarImage(image){
+  if(!image?.isConnected)return;
+  if(image.dataset.characterAvatarRetried==='true'){
+    const fallback=document.createElement('span');
+    fallback.className=image.dataset.characterAvatarFallbackClass||'avatar avatar-fallback';
+    fallback.setAttribute('aria-hidden','true');
+    fallback.style.cssText=image.dataset.characterAvatarFallbackStyle||'';
+    fallback.textContent=image.dataset.characterAvatarFallback||'角';
+    image.replaceWith(fallback);
+    return;
+  }
+  image.dataset.characterAvatarRetried='true';
+  let url='';
+  const storagePath=image.dataset.characterAvatarPath||'';
+  if(storagePath){
+    try{url=await refreshCharacterIllustrationSignedUrl(storagePath)||'';}
+    catch(error){console.warn('角色頭像網址更新失敗：',error?.message||error);}
+  }
+  if(!url&&isUuid(image.dataset.characterAvatarId||'')){
+    try{
+      const assets=await loadCharacterPrimaryIllustrationAssets([image.dataset.characterAvatarId]);
+      url=assets.get(image.dataset.characterAvatarId)?.primary?.src||'';
+    }catch(error){console.warn('角色主立繪備援載入失敗：',error?.message||error);}
+  }
+  if(image.isConnected&&url&&url!==image.src){image.src=url;return;}
+  if(image.isConnected){
+    const fallback=document.createElement('span');
+    fallback.className=image.dataset.characterAvatarFallbackClass||'avatar avatar-fallback';
+    fallback.setAttribute('aria-hidden','true');
+    fallback.style.cssText=image.dataset.characterAvatarFallbackStyle||'';
+    fallback.textContent=image.dataset.characterAvatarFallback||'角';
+    image.replaceWith(fallback);
+  }
+}
+document.addEventListener('error',event=>{
+  const image=event.target;
+  if(image instanceof HTMLImageElement&&image.dataset.characterAvatarId)void recoverCharacterAvatarImage(image);
+},true);
+/* Other non-avatar image failures retain the existing low-opacity loading treatment. */
 document.addEventListener('error',event => {
   const image=event.target;
   if (!(image instanceof HTMLImageElement)) return;
-  if (image.dataset.characterPrimaryIllustration || image.dataset.characterIllustrationPath) return;
+  if (image.dataset.characterAvatarId||image.dataset.characterPrimaryIllustration||image.dataset.characterIllustrationPath) return;
   image.style.opacity='.15';
 },true);
 document.addEventListener('load',event => {

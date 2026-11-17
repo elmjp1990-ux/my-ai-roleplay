@@ -27,8 +27,18 @@ assert.match(pagination, /groupCharacterPicker:10/, 'group character picker page
 assert.match(html, /載入更多公開角色（每次 10 位）/, 'group picker must disclose its ten-item page size');
 assert.match(html, /function groupCharacterPickerAvatar\(character\)/, 'group picker must render a safe initial fallback when an avatar URL is missing');
 assert.match(html, /loadCharacterPrimaryIllustrationAssets\(missingImageItems\.map\(character=>character\.id\)\)/, 'group picker must hydrate only missing primary portraits with signed URLs');
-assert.match(html, /data-character-id="'\+e\(characterId\)\+'/,'Group picker images must retain character IDs for failed-image recovery');
-assert.match(html, /image\.dataset\.primaryRetried!=='1'[\s\S]*?loadCharacterPrimaryIllustrationAssets\(\[image\.dataset\.characterId\]\)/,'A broken group-picker URL must retry the canonical signed primary illustration before showing initials');
+const pickerAvatarStart=html.indexOf('function groupCharacterPickerAvatar(character)');
+const pickerAvatarEnd=html.indexOf('function groupRenderCharacterResults()',pickerAvatarStart);
+assert.notEqual(pickerAvatarStart,-1,'group picker avatar renderer must exist');
+assert.ok(pickerAvatarEnd>pickerAvatarStart);
+assert.match(html.slice(pickerAvatarStart,pickerAvatarEnd),/characterAvatarMarkup\(character/,
+  'group picker must use the shared character avatar renderer with stable character identity');
+assert.match(html,/data-character-avatar-id=.*e\(characterId\)/,
+  'shared avatar markup must retain character IDs for failed-image recovery');
+assert.match(html,/image\.dataset\.characterAvatarId\)void recoverCharacterAvatarImage\(image\)/,
+  'broken group-picker images must use the shared signed-URL recovery handler');
+assert.match(html,/loadCharacterPrimaryIllustrationAssets\(\[image\.dataset\.characterAvatarId\]\)/,
+  'shared avatar recovery must retry the canonical signed primary illustration before showing initials');
 
 assert.match(html, /let groupCharacterIntroExpandedId = null/, 'character introductions must start collapsed');
 assert.match(html, /data-action="group-toggle-character-intro"/, 'character name must expose an intro toggle');
