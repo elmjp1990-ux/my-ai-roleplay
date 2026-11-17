@@ -59,12 +59,9 @@
         setEncounterLifecycleState, saveChatSessionSafely, createEncounterSession, loadCityCharacterPage, loadCityCharacterSchedules
       } = dependencies;
 
-  // A previous city-map render moves its dialog to <body>. Remove stale dialogs first;
-  // otherwise duplicate IDs make later landmark clicks update an old, detached-from-view panel.
   document.querySelectorAll('#cityMapPeople').forEach(modal=>modal.remove());
   document.body.classList.remove('city-location-active');
   document.body.classList.add('city-map-mode');
-  // Keep the early boot cover until the time-appropriate map asset is ready.
   const view=$('view');
   view.innerHTML=`
     <section class="city-map-stage" id="cityMapStage" aria-label="POYOZZ 城市地圖">
@@ -159,8 +156,6 @@
   stage.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2&&start?.kind==='pinch'){const a=[...pointers.values()];const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);scale=start.scale*d/Math.max(1,start.distance);clamp();moved=true;}else if(pointers.size===1&&start&&!start.kind){const dx=e.clientX-start.x,dy=e.clientY-start.y;if(Math.abs(dx)+Math.abs(dy)>5)moved=true;tx=start.tx+dx;ty=start.ty+dy;clamp();}});
   const endPointer=e=>{pointers.delete(e.pointerId);if(pointers.size===0){if(start&&!moved&&Date.now()-start.time<280){const now=Date.now(),dx=e.clientX-lastTapX,dy=e.clientY-lastTapY;if(now-lastTap<320&&Math.hypot(dx,dy)<24){document.body.classList.toggle('city-map-mode-immersive');lastTap=0;}else{lastTap=now;lastTapX=e.clientX;lastTapY=e.clientY;}}start=null;}else if(pointers.size===1){const p=[...pointers.values()][0];start={x:p.x,y:p.y,tx,ty,time:Date.now()};}};
   stage.addEventListener('pointerup',endPointer);stage.addEventListener('pointercancel',endPointer);stage.addEventListener('dblclick',e=>e.preventDefault());stage.addEventListener('contextmenu',e=>e.preventDefault());
-  // 2025 Taipei solar-time reference profile. Calculate the 2025 reference day locally;
-  // no sunrise/sunset API or daily network request is needed.
   const taipeiSunTimes2025=(month,day)=>{
     const date=new Date(Date.UTC(2025,month-1,day));
     const n=Math.floor((date-Date.UTC(2025,0,0))/86400000);
@@ -223,11 +218,9 @@
     document.body.classList.remove('city-location-active','city-map-mode','city-map-mode-immersive');
   };
 
-  // Keep the location dialog outside the transformed map stage to isolate it from map gestures.
   locationModal=$('cityMapPeople');
   if(locationModal && locationModal.parentElement!==document.body) document.body.appendChild(locationModal);
   const cityPlaceNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園'};
-  // These are authored scene descriptions, not live opening hours, character presence, or dynamically generated events.
   const cityVenueScenes={
     airport:{icon:'✈️',heading:'城市的起點與交會處',description:'航班資訊在大廳螢幕上流動，旅人拖著行李匆匆經過。候機座位、接機大廳與深夜航班，總有新的相遇可能。',eventLabel:'場景亮點',eventTitle:'抵達大廳的偶遇',eventDescription:'適合安排接機、送別、轉機途中或旅程開始前的故事。'},
     commercial:{icon:'🏢',heading:'玻璃帷幕下的繁忙日常',description:'電梯穿梭於不同樓層，會議室、辦公座位與窗邊休息區構成城市工作的節奏。白天忙碌，傍晚後則逐漸安靜。',eventLabel:'場景亮點',eventTitle:'下班後的窗邊時光',eventDescription:'適合商業談判、同事互動、秘密會面或忙碌一天後的短暫休息。'},
@@ -264,7 +257,6 @@
         eventTitle:String(row.event_title||'場景消息已更新'),
         eventDescription:String(row.event_description||'這裡有符合場景定位的日常活動與消息。')
       };
-      // Built-in markers keep their original geometry; AI may update their title and copy.
       if(row.is_dynamic!==true){
         if(Object.prototype.hasOwnProperty.call(cityPlaceNames,key)){
           cityPlaceNames[key]=name;
@@ -288,8 +280,6 @@
         }
         continue;
       }
-      // Dynamic markers are rebuilt on every cache refresh; their names remain in
-      // cityPlaceNames after the previous SVG marker layer has been replaced.
       if(added>=MAX_DYNAMIC_SCENE_MARKERS)continue;
       const x=Number(row?.marker_x),y=Number(row?.marker_y);
       if(!Number.isFinite(x)||!Number.isFinite(y)||x<40||x>1622||y<40||y>892)continue;
@@ -432,7 +422,6 @@
     });
   };
   const cityPresenceByPlace={};
-  // Start requests only after scene names, aliases and renderers are initialized.
   void loadCityDynamicScenes();
   void loadCityWeather();
   const cityScenePageStates=new Map();
@@ -624,7 +613,6 @@
         }
       });
     }
-    // Uploaded character videos are private Storage objects, so hydrate their signed URL.
     const videoPath=String(person.avatarVideoPath||person.avatar_video_path||person.characterVideoPath||'').trim();
     const videoRaw=String(person.videoUrl||person.video_url||person.introVideoUrl||person.intro_video_url||'').trim();
     const videoUrl=/^https:\/\//i.test(videoRaw)?videoRaw:'';
@@ -822,9 +810,6 @@
     fallback.textContent=image.alt?.slice(0,1)||'角';
     image.replaceWith(fallback);
   },true);
-  // Keyboard activation stays on each SVG marker. Pointer/click activation is
-  // handled once by the stage capture listener below so mobile SVG retargeting
-  // cannot swallow the synthesized click or dispatch duplicate location opens.
   stage.querySelectorAll('[data-action="city-landmark"]').forEach(marker=>{
     marker.addEventListener('keydown',event=>{
       if(event.key==='Enter'||event.key===' '){
