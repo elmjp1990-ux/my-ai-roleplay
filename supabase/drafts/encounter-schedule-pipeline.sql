@@ -1263,7 +1263,7 @@ AS $
     c.id,
     (SELECT auth.uid()),
     NULL,
-    pg_catalog.clock_timestamp()
+    pg_catalog.now()
   ) AS resolved
   WHERE p_character_ids IS NOT NULL
     AND pg_catalog.cardinality(p_character_ids) BETWEEN 1 AND 10
