@@ -89,7 +89,7 @@ assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_job
 assert.match(encounterScene, /const sceneIllustration=safeImage\(selectedGalleryImage\|\|character\?\.galleryIllustrations\?\.\[0\]\?\.src\|\|\x27\x27\)/);
 // Restore muted inline card video playback while retaining lazy signed-URL hydration.
 assert.ok(html.includes('<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline preload="none"'));
-assert.ok(html.includes("function hydrateEncounterGalleryIllustration(characterId) {"));
+assert.ok(html.includes("function hydrateEncounterGalleryIllustration(characterId,illustrationId=null) {"));
 assert.ok(encounterScene.includes("正在載入角色立繪…"));
 assert.ok(encounterScene.includes("角色半立繪素材待補"));
 assert.ok(html.includes("const ownerLocal=state.characters.find(character=>"));
