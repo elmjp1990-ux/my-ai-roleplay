@@ -111,8 +111,11 @@ assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_turn_visual
 assert.match(pipeline, /v_schedule_day::smallint,\s*v_day_type/);
 assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_schedule_weather_decisions/);
 assert.match(pipeline, /ON CONFLICT \(schedule_id, scheduled_start_at\) DO NOTHING/);
-assert.match(pipeline, /SELECT decision\.use_rain_fallback/);
-assert.match(pipeline, /CASE WHEN v_use_rain_fallback IS TRUE\s*THEN v_row\.rain_fallback_location_key ELSE v_row\.location_key END/);
+assert.match(pipeline, /SELECT \* INTO v_decision[\s\S]*?FROM public\.encounter_schedule_weather_decisions/);
+assert.match(pipeline, /v_decision\.location_key/);
+assert.match(pipeline, /v_decision\.activity/);
+assert.match(pipeline, /v_decision\.encounter_greeting/);
+assert.match(pipeline, /v_decision\.is_outdoor/);
 assert.match(pipeline, /LANGUAGE plpgsql\s+VOLATILE/);
 assert.match(pipeline, /LANGUAGE sql\s+VOLATILE/);
 assert.match(replay, /DO \$rainy_schedule_resolution_smoke\$/);
