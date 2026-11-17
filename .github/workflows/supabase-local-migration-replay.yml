@@ -7,6 +7,8 @@ on:
       - "supabase/drafts/encounter-schedule-pipeline.sql"
       - "supabase/drafts/replay-encounter-schedule-pipeline.sql"
       - "supabase/drafts/replay-encounter-session-evaluation-worker.sql"
+      - "supabase/drafts/encounter-relationship-greeting-pools.sql"
+      - "supabase/drafts/replay-encounter-relationship-greeting-pools.sql"
       - "supabase/drafts/current-state-structure.json"
       - "scripts/build-disposable-schema-fixture.mjs"
       - ".github/workflows/supabase-local-migration-replay.yml"
@@ -196,6 +198,18 @@ jobs:
           set -euo pipefail
           # Exercises only the disposable current-state fixture; no OpenRouter or Hosted Supabase access.
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-session-evaluation-worker.sql
+
+      - name: Apply Encounter relationship greeting selection draft
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/encounter-relationship-greeting-pools.sql
+
+      - name: Replay Encounter relationship greeting selection smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-relationship-greeting-pools.sql
 
       - name: Upload Encounter SQL replay diagnostics
         if: always()
