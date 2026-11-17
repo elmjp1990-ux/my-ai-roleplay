@@ -32,6 +32,9 @@ const replay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-pipeli
 const weatherSync = fs.readFileSync("supabase/functions/encounter-weather-sync/index.ts", "utf8");
 const weatherModule = fs.readFileSync("supabase/functions/_shared/encounter-weather.mjs", "utf8");
 const cityMap = fs.readFileSync("city-map.js", "utf8");
+const greetingPools = fs.readFileSync("supabase/drafts/encounter-relationship-greeting-pools.sql", "utf8");
+const evaluationWorker = fs.readFileSync("supabase/functions/encounter-evaluation-worker/index.ts", "utf8");
+const evaluationScheduler = fs.readFileSync("supabase/drafts/schedule-encounter-evaluation-worker.sql", "utf8");
 
 assert.equal((pipeline.match(/^BEGIN;$/gm) || []).length, 1, "Encounter SQL draft must contain one transaction start");
 assert.equal((pipeline.match(/^COMMIT;$/gm) || []).length, 1, "Encounter SQL draft must contain one transaction end");
@@ -137,4 +140,22 @@ const openingHandler = frontend.slice(openingHandlerStart, openingHandlerEnd);
 assert.doesNotMatch(openingHandler, /executePendingChatTurn|reserve_encounter_chat_turn/,
   "Free opening choice must not call AI or reserve wallet funds");
 
-console.log("Encounter AI output, billing safety, and opening-choice contract tests passed.");
+// Relationship-stage greeting pools are generated, strictly validated, and selected
+// server-side with a per-player anti-repeat lock before the Encounter session opens.
+assert.match(scheduleGeneration, /relationship_greetings/);
+assert.match(scheduleGeneration, /hostile.*dislike.*wary.*first_meeting/s);
+assert.match(scheduleGeneration, /greeting_pool_count_invalid/);
+assert.match(greetingPools, /AS \$\$\s+DECLARE/);
+assert.match(greetingPools, /FOR UPDATE/);
+assert.match(greetingPools, /last_greeting_hash/);
+assert.match(greetingPools, /encounterGreetingId/);
+assert.match(greetingPools, /relationshipStage/);
+assert.match(evaluationWorker, /POYOZZ_DEFAULT_CHAT_MODEL/);
+assert.match(evaluationWorker, /settle_encounter_session/);
+assert.match(evaluationWorker, /buildTranscript/);
+assert.match(evaluationScheduler, /PERFORM public\.enqueue_due_encounter_evaluations\(50\)/,
+  "The cron dispatcher must enqueue expired scenes before calling the worker");
+assert.match(evaluationScheduler, /DO \$dispatch\$/);
+assert.match(evaluationScheduler, /poyozz-encounter-evaluation-worker/);
+
+console.log("Encounter AI output, billing safety, opening-choice, relationship greeting, and scene-settlement contract tests passed.");
