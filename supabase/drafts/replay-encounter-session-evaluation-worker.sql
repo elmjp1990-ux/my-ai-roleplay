@@ -12,6 +12,8 @@ DECLARE
   v_character_id uuid := '00000000-0000-4000-8000-000000000021';
   v_session_id uuid := '00000000-0000-4000-8000-000000000022';
   v_incomplete_session_id uuid := '00000000-0000-4000-8000-000000000023';
+  v_pending_charge_session_id uuid := '00000000-0000-4000-8000-000000000024';
+  v_settled_missing_evidence_session_id uuid := '00000000-0000-4000-8000-000000000025';
   v_enqueued integer;
   v_claimed record;
   v_settlement jsonb;
@@ -52,6 +54,18 @@ BEGIN
     jsonb_build_object('id', v_character_id, 'name', 'Encounter 評估測試角色'),
     jsonb_build_object('encounter', jsonb_build_object('affinity', 0, 'relationshipStage', 'first_meeting')),
     'encounter'
+  ),
+  (
+    v_pending_charge_session_id, v_user_id, v_character_id, 'Encounter 評估測試角色', 'active',
+    jsonb_build_object('id', v_character_id, 'name', 'Encounter 評估測試角色'),
+    jsonb_build_object('encounter', jsonb_build_object('affinity', 0, 'relationshipStage', 'first_meeting')),
+    'encounter'
+  ),
+  (
+    v_settled_missing_evidence_session_id, v_user_id, v_character_id, 'Encounter 評估測試角色', 'active',
+    jsonb_build_object('id', v_character_id, 'name', 'Encounter 評估測試角色'),
+    jsonb_build_object('encounter', jsonb_build_object('affinity', 0, 'relationshipStage', 'first_meeting')),
+    'encounter'
   );
 
   INSERT INTO public.encounter_session_lifecycle (
@@ -67,6 +81,16 @@ BEGIN
     v_incomplete_session_id, v_user_id, v_character_id, 'park', '{"activity":"缺少回合證據"}'::jsonb,
     clock_timestamp() - interval '2 hours', clock_timestamp() - interval '1 minute',
     'active', 1
+  ),
+  (
+    v_pending_charge_session_id, v_user_id, v_character_id, 'station', '{"activity":"扣款仍在處理"}'::jsonb,
+    clock_timestamp() - interval '2 hours', clock_timestamp() - interval '1 minute',
+    'active', 0
+  ),
+  (
+    v_settled_missing_evidence_session_id, v_user_id, v_character_id, 'library', '{"activity":"扣款完成但證據未寫入"}'::jsonb,
+    clock_timestamp() - interval '2 hours', clock_timestamp() - interval '1 minute',
+    'active', 0
   );
 
   -- Explicit player end shortens the effective deadline but keeps the original schedule snapshot.
@@ -83,7 +107,30 @@ BEGIN
     RAISE EXCEPTION 'manual Encounter end did not move the lifecycle into the due settlement state';
   END IF;
 
-  -- Due, zero-turn sessions may settle neutrally; missing turn evidence must never enqueue.
+  -- Model a reserved charge still in flight and a settled charge whose turn evidence
+  -- has not yet been written. Neither session may be treated as a zero-turn scene.
+  INSERT INTO public.chat_messages (id, session_id, role, content)
+  VALUES
+    ('00000000-0000-4000-8000-000000000026', v_pending_charge_session_id, 'user', '待處理扣款'),
+    ('00000000-0000-4000-8000-000000000027', v_settled_missing_evidence_session_id, 'user', '已扣款但證據待寫入');
+
+  INSERT INTO public.chat_turn_charges (
+    turn_id,user_id,session_id,user_message_id,expected_assistant_message_id,
+    cost,silver_reserved,diamonds_reserved,status,reserved_at,settled_at
+  ) VALUES
+    (
+      '00000000-0000-4000-8000-000000000028',v_user_id,v_pending_charge_session_id,
+      '00000000-0000-4000-8000-000000000026','00000000-0000-4000-8000-000000000029',
+      2,2,0,'reserved',clock_timestamp(),NULL
+    ),
+    (
+      '00000000-0000-4000-8000-000000000030',v_user_id,v_settled_missing_evidence_session_id,
+      '00000000-0000-4000-8000-000000000027','00000000-0000-4000-8000-000000000031',
+      2,2,0,'settled',clock_timestamp(),clock_timestamp()
+    );
+
+  -- Due, zero-turn sessions may settle neutrally; unsettled charges, missing evidence,
+  -- and mismatched lifecycle turn counts must never enqueue.
   v_enqueued := public.enqueue_due_encounter_evaluations(50);
   IF v_enqueued <> 1 THEN
     RAISE EXCEPTION 'expected exactly one due complete Encounter job, got %', v_enqueued;
@@ -91,9 +138,13 @@ BEGIN
 
   IF EXISTS (
     SELECT 1 FROM public.encounter_session_evaluation_jobs
-    WHERE session_id = v_incomplete_session_id
+    WHERE session_id IN (
+      v_incomplete_session_id,
+      v_pending_charge_session_id,
+      v_settled_missing_evidence_session_id
+    )
   ) THEN
-    RAISE EXCEPTION 'session with incomplete turn evidence was enqueued';
+    RAISE EXCEPTION 'session with incomplete evidence or in-flight charge was enqueued';
   END IF;
 
   SELECT * INTO v_claimed
