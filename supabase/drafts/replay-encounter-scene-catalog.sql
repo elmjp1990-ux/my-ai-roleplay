@@ -14,14 +14,16 @@ INSERT INTO public.encounter_scene_backgrounds (
 
 SET LOCAL session_replication_role = replica;
 INSERT INTO public.characters (
-  id, author_id, name, visibility, review_status, rights_confirmed, is_nsfw
+  id, author_id, name, intro, visibility, review_status, rights_confirmed, is_nsfw
 ) VALUES
   ('00000000-0000-4000-8000-000000000020'::uuid, '00000000-0000-4000-8000-000000000021'::uuid,
-   'Legacy Placeholder Smoke', 'public', 'approved', true, false),
+   'Legacy Placeholder Smoke', '現代都市角色', 'public', 'approved', true, false),
   ('00000000-0000-4000-8000-000000000022'::uuid, '00000000-0000-4000-8000-000000000023'::uuid,
-   'Dynamic Scene Smoke A', 'public', 'approved', true, false),
+   'Dynamic Scene Smoke A', '現代都市角色', 'public', 'approved', true, false),
   ('00000000-0000-4000-8000-000000000024'::uuid, '00000000-0000-4000-8000-000000000025'::uuid,
-   'Dynamic Scene Smoke B', 'public', 'approved', true, false);
+   'Dynamic Scene Smoke B', '現代都市角色', 'public', 'approved', true, false),
+  ('00000000-0000-4000-8000-000000000029'::uuid, '00000000-0000-4000-8000-000000000030'::uuid,
+   'Ancient Character Smoke', '古代架空王朝', 'public', 'approved', true, false);
 
 INSERT INTO public.character_schedules (
   id, character_id, day_type, start_time, end_time, location_key, activity,
