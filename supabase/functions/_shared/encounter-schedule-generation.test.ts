@@ -423,6 +423,22 @@ Deno.test("requires AI metadata for new dynamic scene types and permits reuse of
   if (!reused.ok) throw new Error(reused.errors.join(",") || "existing dynamic scene should be reusable by one role");
 });
 
+Deno.test("does not allow a fourth visible dynamic map marker", () => {
+  const characters = [
+    { character_id: id1, placement: "modern_map", variants: variants(fullDaySlots({ location_key: "university", activity: "在大學授課與參與校園活動。" })) },
+    { character_id: id2, placement: "modern_map", variants: variants(fullDaySlots({ location_key: "university", activity: "在大學上課與參與社團活動。" })) },
+  ];
+  const fullCatalog: EncounterSceneCatalogEntry[] = [
+    { location_key: "shopping-street", display_name: "商店街", is_dynamic: true },
+    { location_key: "night-market", display_name: "夜市", is_dynamic: true },
+    { location_key: "restaurant", display_name: "餐廳", is_dynamic: true },
+  ];
+  const parsed = result(characters, undefined, fullCatalog);
+  if (parsed.ok || !parsed.errors.includes("dynamic_scene_marker_limit_exceeded")) {
+    throw new Error("fourth dynamic scene marker should be rejected");
+  }
+});
+
 Deno.test("requires AI-updatable description and latest news for built-in Live House scenes", () => {
   const character = {
     character_id: id1, placement: "modern_map",
