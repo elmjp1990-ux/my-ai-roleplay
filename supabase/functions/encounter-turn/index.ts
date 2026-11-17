@@ -36,7 +36,6 @@ async function refundEncounterTurn(admin: any, userId: string, turnId: string, a
 async function buildEncounterMessages(
   admin: any,
   session: DbRow,
-  lifecycle: DbRow,
   userId: string,
   userMessageId: string,
   currentUserMessage: DbRow,
@@ -69,12 +68,12 @@ async function buildEncounterMessages(
     style: asText(snapshot.style),
     personality_profile: personalityProfile,
   };
-  const scheduleSnapshot = asRow(lifecycle.schedule_snapshot);
+  const scheduleSnapshot = asRow(asRow(session.character_snapshot).encounterSchedule);
   const encounterState = asRow(asRow(session.session_data).encounter);
   const sessionData = {
     ...asRow(session.session_data),
     scene: asText(scheduleSnapshot.activity) || asText(scheduleSnapshot.scene),
-    location: asText(lifecycle.location_key),
+    location: asText(scheduleSnapshot.location_key),
     time: [asText(scheduleSnapshot.start_time), asText(scheduleSnapshot.end_time)].filter(Boolean).join("–"),
     relationship: asText(encounterState.relationshipStage) || "初次相遇",
   };
@@ -247,11 +246,9 @@ Deno.serve(async (request) => {
 
   let context: Awaited<ReturnType<typeof buildEncounterMessages>>;
   try {
-    const { data: lifecycle, error: lifecycleError } = await admin.from("encounter_session_lifecycle")
-      .select("location_key,schedule_snapshot,scheduled_start_at,scheduled_end_at,status")
-      .eq("session_id", sessionId).eq("user_id", user.id).maybeSingle();
-    if (lifecycleError || !lifecycle) throw new Error("encounter_lifecycle_context_unavailable");
-    context = await buildEncounterMessages(admin, session, lifecycle, user.id, userMessageId, userMessage);
+    // The Encounter session snapshot was created server-side from the validated
+    // schedule resolver. Reuse it instead of issuing a second lifecycle-table read.
+    context = await buildEncounterMessages(admin, session, user.id, userMessageId, userMessage);
   } catch (error) {
     const code = String(error instanceof Error ? error.message : "encounter_context_failed").slice(0, 80);
     const released = await releaseGenerationClaim(admin, turnId, user.id);
