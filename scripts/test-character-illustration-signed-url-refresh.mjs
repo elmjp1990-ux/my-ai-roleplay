@@ -72,7 +72,7 @@ assert.match(encounterRender, /existingSprite\.src=halfBodyImage;/);
 assert.match(encounterRender, /existingSprite\.dataset\.encounterSource=halfBodyImage;/);
 assert.match(html, /\.upload\(path,blob,\{upsert:false,contentType:blob\.type,cacheControl:'3600'\}\)/);
 
-const galleryHydrationStart = html.indexOf('async function hydrateEncounterGalleryIllustration(characterId) {');
+const galleryHydrationStart = html.indexOf('async function hydrateEncounterGalleryIllustration(');
 const galleryHydrationEnd = html.indexOf('\nasync function refreshCharacterIllustrationSignedUrl', galleryHydrationStart);
 assert.notEqual(galleryHydrationStart, -1);
 assert.ok(galleryHydrationEnd > galleryHydrationStart);
