@@ -41,7 +41,7 @@ const variants = (slots = fullDaySlots()) => ({
 });
 const result = (characters: Array<{ character_id: string; [key: string]: unknown }>) => parseEncounterScheduleBatchOutput(JSON.stringify({ characters }), characters.map((c) => source(c.character_id)));
 const specialEvent = (event_key = "christmas", slots = fullDaySlots()) => ({
-  event_key, event_name: event_key === "christmas" ? "聖誕節" : "情人節", slots,
+  event_key, event_name: event_key === "christmas" ? "聖誕節" : event_key === "lunar_new_year" ? "春節" : "情人節", slots,
 });
 
 
@@ -107,10 +107,10 @@ Deno.test("requires indoor fallback for outdoor schedules", () => {
 Deno.test("accepts optional special holiday schedules with a complete day", () => {
   const parsed = result([{
     character_id: id1, placement: "modern_map", variants: variants(),
-    special_events: [specialEvent("christmas"), specialEvent("valentines_day")],
+    special_events: [specialEvent("christmas"), specialEvent("valentines_day"), specialEvent("lunar_new_year")],
   }]);
   if (!parsed.ok) throw new Error(parsed.errors.join(","));
-  if (parsed.characters[0].special_events.length !== 2) throw new Error("special event schedules were dropped");
+  if (parsed.characters[0].special_events.length !== 3) throw new Error("special event schedules were dropped");
   const noEvent = result([{ character_id: id1, placement: "modern_map", variants: variants() }]);
   if (!noEvent.ok || noEvent.characters[0].special_events.length !== 0) {
     throw new Error("special events should remain optional");
@@ -145,6 +145,9 @@ Deno.test("rejects unknown, duplicate, or incomplete special event schedules", (
 
 Deno.test("does not invent birthdays or special events for unplaced characters", () => {
   const built = buildEncounterScheduleBatchMessages([source()]);
+  if (!built.messages[0].content.includes("lunar_new_year")) {
+    throw new Error("prompt must describe Lunar New Year schedules");
+  }
   if (!built.messages[0].content.includes("角色生日目前沒有結構化日期來源")) {
     throw new Error("prompt must not infer character birthdays");
   }
