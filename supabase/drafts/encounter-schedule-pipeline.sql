@@ -1500,7 +1500,7 @@ REVOKE ALL ON FUNCTION public.get_encounter_character_schedules(uuid[]) FROM PUB
 GRANT EXECUTE ON FUNCTION public.get_encounter_character_schedules(uuid[]) TO anon, authenticated;
 
 COMMENT ON FUNCTION public.get_encounter_character_schedules(uuid[]) IS
-  'Returns at most one currently valid Taiwan-time schedule per supplied public character, using the shared resolver for weekday/holiday variant selection and rain fallback. Preserves the original 16-column RPC contract and 10-ID batch limit.';
+  'Returns current Taiwan-time schedules for supplied public characters. Rain fallback is decided once per schedule slot and persisted until that slot ends, so later weather changes never move a character mid-slot. Preserves the original 16-column RPC contract and 10-ID batch limit.';
 
 CREATE OR REPLACE FUNCTION public.save_character_schedules(
   p_character_id uuid,
