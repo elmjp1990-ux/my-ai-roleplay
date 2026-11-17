@@ -34,6 +34,39 @@ ALTER TABLE public.encounter_scene_registry
     )
   );
 
+-- Expand allowed background location keys only; no image assets are added by this migration.
+DO $
+DECLARE
+  v_constraint record;
+BEGIN
+  FOR v_constraint IN
+    SELECT conname
+    FROM pg_catalog.pg_constraint
+    WHERE conrelid = 'public.encounter_scene_backgrounds'::regclass
+      AND contype = 'c'
+      AND pg_catalog.pg_get_constraintdef(oid) ILIKE '%location_key%'
+      AND pg_catalog.pg_get_constraintdef(oid) ILIKE '%shopping-street%'
+  LOOP
+    EXECUTE pg_catalog.format(
+      'ALTER TABLE public.encounter_scene_backgrounds DROP CONSTRAINT %I',
+      v_constraint.conname
+    );
+  END LOOP;
+END;
+$;
+
+ALTER TABLE public.encounter_scene_backgrounds
+  ADD CONSTRAINT encounter_scene_backgrounds_location_key_check
+  CHECK (
+    location_key = '*' OR location_key IN (
+      'airport', 'commercial', 'night-bar', 'live-house', 'apartment',
+      'department-store', 'bookstore', 'cafe', 'park', 'shopping-street',
+      'night-market', 'restaurant', 'university', 'hospital', 'gym', 'cinema',
+      'museum', 'hotel', 'train-station', 'library', 'theater', 'art-gallery',
+      'community-center', 'music-studio', 'bakery', 'coworking-space'
+    )
+  );
+
 -- Seed metadata rows for the existing static map locations. Existing user data is preserved.
 INSERT INTO public.encounter_scene_registry (
   location_key, display_name, icon, marker_x, marker_y, heading, description,
