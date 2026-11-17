@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - "supabase/drafts/encounter-schedule-pipeline.sql"
+      - "supabase/drafts/replay-encounter-schedule-pipeline.sql"
       - "supabase/drafts/current-state-structure.json"
       - "scripts/build-disposable-schema-fixture.mjs"
       - ".github/workflows/supabase-local-migration-replay.yml"
@@ -151,6 +152,7 @@ jobs:
           # Encounter schedule schema is replayed only in this disposable local DB.
           # This never links to or authenticates against the hosted Supabase project.
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/encounter-schedule-pipeline.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-schedule-pipeline.sql
           # Exercise the CLI-generated incremental migration itself, not only
           # its source drafts. The script rolls back all DDL and synthetic rows.
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-account-deletion-release-migration.sql
