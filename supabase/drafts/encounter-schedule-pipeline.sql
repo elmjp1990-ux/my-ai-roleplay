@@ -1266,7 +1266,13 @@ BEGIN
       )
     ORDER BY
       CASE s.source_type WHEN 'manual' THEN 3 WHEN 'ai' THEN 2 ELSE 1 END DESC,
-      CASE WHEN s.special_event_key IS NOT NULL THEN 1 ELSE 0 END DESC,
+      CASE s.special_event_key
+        WHEN 'lunar_new_year' THEN 4
+        WHEN 'valentines_day' THEN 4
+        WHEN 'christmas' THEN 4
+        WHEN 'taiwan_public_holiday' THEN 3
+        ELSE 0
+      END DESC,
       s.priority DESC,
       s.start_time
   LOOP
@@ -1288,7 +1294,19 @@ BEGIN
 
     v_special_event_key := public.resolve_encounter_special_event_key(v_schedule_date);
     IF v_row.special_event_key IS NOT NULL THEN
-      IF v_row.special_event_key IS DISTINCT FROM v_special_event_key THEN CONTINUE; END IF;
+      IF v_row.special_event_key IS DISTINCT FROM v_special_event_key
+         AND NOT (
+           v_row.special_event_key = 'taiwan_public_holiday'
+           AND EXISTS (
+             SELECT 1
+             FROM public.taiwan_calendar_days d
+             WHERE d.calendar_date = v_schedule_date
+               AND d.day_type = 'holiday'
+               AND NULLIF(pg_catalog.btrim(d.holiday_name), '') IS NOT NULL
+           )
+         ) THEN
+        CONTINUE;
+      END IF;
     ELSIF v_row.source_type = 'ai' THEN
       IF v_row.day_type <> v_day_type THEN CONTINUE; END IF;
       SELECT s.variant_weight INTO v_primary_weight
