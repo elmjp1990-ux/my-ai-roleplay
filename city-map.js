@@ -6,6 +6,29 @@
   'use strict';
 
   let activeMapCleanup = null;
+  const CITY_MAP_WEATHER_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+  const CITY_MAP_SCENES_CACHE_TTL_MS = 30 * 60 * 1000;
+  const cityMapMemoryCache = new Map();
+  const readCityMapCache = (key, ttlMs) => {
+    const now = Date.now();
+    let entry = cityMapMemoryCache.get(key) || null;
+    if (!entry) {
+      try {
+        const raw = sessionStorage.getItem('poyozz-city-map-' + key + '-v1');
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (parsed && Number.isFinite(parsed.cachedAt) && Object.prototype.hasOwnProperty.call(parsed, 'data')) {
+          entry = parsed;
+          cityMapMemoryCache.set(key, entry);
+        }
+      } catch { /* Storage can be unavailable in private or restricted contexts. */ }
+    }
+    return entry ? { data: entry.data, fresh: now - entry.cachedAt < ttlMs } : null;
+  };
+  const writeCityMapCache = (key, data) => {
+    const entry = { cachedAt: Date.now(), data };
+    cityMapMemoryCache.set(key, entry);
+    try { sessionStorage.setItem('poyozz-city-map-' + key + '-v1', JSON.stringify(entry)); } catch { /* In-memory cache remains available. */ }
+  };
   const destroyActiveMap = () => {
     if (!activeMapCleanup) return;
     const cleanup = activeMapCleanup;
@@ -267,39 +290,53 @@
   const loadCityDynamicScenes=async()=>{
     const client=window.mySupabase;
     if(!client)return;
+    const cached=readCityMapCache('scenes',CITY_MAP_SCENES_CACHE_TTL_MS);
+    if(cached)renderCityDynamicScenes(cached.data);
+    if(cached?.fresh)return;
     try{
       const {data,error}=await client.rpc('get_encounter_scene_registry');
       if(error)throw error;
-      renderCityDynamicScenes(data||[]);
+      const rows=Array.isArray(data)?data:[];
+      writeCityMapCache('scenes',rows);
+      renderCityDynamicScenes(rows);
     }catch(error){
-      console.warn('城市動態場景載入失敗：',error?.message||error);
+      if(!cached)console.warn('城市動態場景載入失敗：',error?.message||error);
     }
+  };
+  const applyCityWeather=weather=>{
+    const stage=$('cityMapStage');
+    if(!stage)return;
+    const weatherLabel=$('cityMapWeather');
+    const temperatureLabel=$('cityMapTemp');
+    if(!weather){
+      if(weatherLabel)weatherLabel.textContent='多雲';
+      if(temperatureLabel)temperatureLabel.textContent='24.0°C';
+      stage.classList.remove('is-raining');
+      return;
+    }
+    if(weatherLabel)weatherLabel.textContent=String(weather.weather_text||'多雲');
+    const temperature=Number(weather.temperature_c);
+    if(temperatureLabel)temperatureLabel.textContent=Number.isFinite(temperature)?temperature.toFixed(1)+'°C':'24.0°C';
+    stage.classList.toggle('is-raining',weather.is_raining===true);
+    const cores=Number(navigator.hardwareConcurrency||8);
+    const memory=Number(navigator.deviceMemory||8);
+    stage.classList.toggle('low-performance',cores<=4||memory<=4);
   };
   const loadCityWeather=async()=>{
     const client=window.mySupabase;
     const stage=$('cityMapStage');
     if(!client||!stage)return;
+    const cached=readCityMapCache('weather',CITY_MAP_WEATHER_CACHE_TTL_MS);
+    if(cached)applyCityWeather(cached.data);
+    if(cached?.fresh)return;
     try{
       const {data,error}=await client.rpc('get_encounter_city_weather');
       if(error)throw error;
       const weather=Array.isArray(data)?data[0]:data;
-      const weatherLabel=$('cityMapWeather');
-      const temperatureLabel=$('cityMapTemp');
-      if(!weather){
-        if(weatherLabel)weatherLabel.textContent='天氣資料待更新';
-        if(temperatureLabel)temperatureLabel.textContent='溫度資料待更新';
-        stage.classList.remove('is-raining');
-        return;
-      }
-      if(weatherLabel)weatherLabel.textContent=String(weather.weather_text||'天氣資料待更新');
-      const temperature=Number(weather.temperature_c);
-      if(temperatureLabel)temperatureLabel.textContent=Number.isFinite(temperature)?temperature.toFixed(1)+'°C':'溫度資料待更新';
-      stage.classList.toggle('is-raining',weather.is_raining===true);
-      const cores=Number(navigator.hardwareConcurrency||8);
-      const memory=Number(navigator.deviceMemory||8);
-      stage.classList.toggle('low-performance',cores<=4||memory<=4);
+      if(weather)writeCityMapCache('weather',weather);
+      applyCityWeather(weather);
     }catch(error){
-      console.warn('城市天氣資料載入失敗：',error?.message||error);
+      if(!cached)console.warn('城市天氣資料載入失敗：',error?.message||error);
     }
   };
   // Use only published characters whose own schedule data is already available to this client.
