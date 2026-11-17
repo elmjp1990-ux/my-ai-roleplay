@@ -135,19 +135,8 @@ CREATE TABLE IF NOT EXISTS public.encounter_city_weather (
   is_raining boolean NOT NULL DEFAULT false,
   observed_at timestamptz,
   fetched_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),
-  source text NOT NULL DEFAULT 'cwa',
+  source text NOT NULL DEFAULT 'poyozz_fictional_seasonal',
   updated_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp()
-);
-
-CREATE TABLE IF NOT EXISTS public.encounter_weather_baseline_2025 (
-  month smallint NOT NULL CHECK (month BETWEEN 1 AND 12),
-  hour smallint NOT NULL CHECK (hour BETWEEN 0 AND 23),
-  average_temperature_c numeric(4,1) NOT NULL,
-  rain_probability numeric(5,4) NOT NULL CHECK (rain_probability BETWEEN 0 AND 1),
-  sample_count integer NOT NULL CHECK (sample_count >= 0),
-  source text NOT NULL DEFAULT 'CWA CODiS Taipei station 466920, 2025',
-  updated_at timestamptz NOT NULL DEFAULT pg_catalog.now(),
-  PRIMARY KEY (month, hour)
 );
 
 CREATE INDEX IF NOT EXISTS encounter_city_weather_fetched_idx
@@ -221,6 +210,13 @@ CREATE TABLE IF NOT EXISTS public.encounter_scene_backgrounds (
   CHECK (asset_path ~ '^(\\./|/)[A-Za-z0-9_./-]+$')
 );
 
+INSERT INTO public.encounter_scene_backgrounds (location_key, display_name, asset_path, is_active, sort_order)
+SELECT '*', '城市預設場景', './encounter-default-scene.webp', true, 0
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.encounter_scene_backgrounds
+  WHERE location_key = '*' AND asset_path = './encounter-default-scene.webp'
+);
+
 CREATE TABLE IF NOT EXISTS public.encounter_turn_visuals (
   message_id uuid PRIMARY KEY REFERENCES public.chat_messages(id) ON DELETE CASCADE,
   session_id uuid NOT NULL REFERENCES public.chat_sessions(id) ON DELETE CASCADE,
@@ -241,7 +237,6 @@ ALTER TABLE public.encounter_schedule_batch_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.encounter_schedule_generation_usage ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.taiwan_calendar_days ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.encounter_city_weather ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.encounter_weather_baseline_2025 ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.encounter_scene_registry ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.encounter_scene_backgrounds ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.encounter_turn_visuals ENABLE ROW LEVEL SECURITY;
@@ -251,7 +246,6 @@ REVOKE ALL ON TABLE public.encounter_schedule_batch_runs FROM PUBLIC, anon, auth
 REVOKE ALL ON TABLE public.encounter_schedule_generation_usage FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.taiwan_calendar_days FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.encounter_city_weather FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON TABLE public.encounter_weather_baseline_2025 FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.encounter_scene_registry FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.encounter_scene_backgrounds FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.encounter_turn_visuals FROM PUBLIC, anon, authenticated;
@@ -260,7 +254,6 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.encounter_schedule_generati
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.encounter_schedule_batch_runs TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.encounter_schedule_generation_usage TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.encounter_city_weather TO service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.encounter_weather_baseline_2025 TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.encounter_scene_backgrounds TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.encounter_turn_visuals TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.taiwan_calendar_days TO service_role;
@@ -461,7 +454,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
     PERFORM public.enqueue_encounter_schedule_generation_internal(NEW.id);
@@ -486,7 +479,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.on_encounter_character_visibility_changed()
   FROM PUBLIC, anon, authenticated;
@@ -503,7 +496,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_character_id uuid;
 BEGIN
@@ -512,7 +505,7 @@ BEGIN
   IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.on_encounter_character_private_info_changed()
   FROM PUBLIC, anon, authenticated;
@@ -1426,63 +1419,29 @@ STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $encounter_city_weather$
-  WITH local_clock AS (
-    SELECT
-      pg_catalog.now() AS current_at,
-      pg_catalog.now() AT TIME ZONE 'Asia/Taipei' AS local_at
-  ),
-  live AS (
+  WITH latest AS (
     SELECT w.*
-    FROM public.encounter_city_weather w, local_clock c
+    FROM public.encounter_city_weather w
     WHERE w.city_key = 'taipei'
-      AND w.fetched_at >= c.current_at - interval '3 hours'
     ORDER BY w.fetched_at DESC
-    LIMIT 1
-  ),
-  baseline AS (
-    SELECT
-      b.*,
-      (
-        pg_catalog.mod(
-          pg_catalog.abs(pg_catalog.hashtext(
-            pg_catalog.to_char(c.local_at, 'YYYY-MM-DD-HH24')
-          )::bigint),
-          100
-        ) < pg_catalog.round(b.rain_probability * 100)::bigint
-      ) AS baseline_is_raining
-    FROM public.encounter_weather_baseline_2025 b, local_clock c
-    WHERE b.month = EXTRACT(MONTH FROM c.local_at)::smallint
-      AND b.hour = EXTRACT(HOUR FROM c.local_at)::smallint
     LIMIT 1
   )
   SELECT
-    COALESCE(
-      live.weather_text,
-      CASE
-        WHEN baseline.month IS NULL THEN '天氣資料待更新'
-        WHEN baseline.baseline_is_raining THEN '2025 歷史資料推估：雨'
-        ELSE '2025 歷史資料推估：多雲'
-      END
-    ),
-    COALESCE(live.temperature_c, baseline.average_temperature_c),
-    COALESCE(live.is_raining, baseline.baseline_is_raining, false),
-    live.precipitation_1h_mm,
-    live.observed_at,
-    CASE WHEN live.city_key IS NOT NULL THEN 'cwa_live'
-      WHEN baseline.month IS NOT NULL THEN 'cwa_2025_baseline'
-      ELSE 'unavailable' END
-  FROM local_clock
-  LEFT JOIN live ON true
-  LEFT JOIN baseline ON true;
+    COALESCE(latest.weather_text, '多雲'),
+    COALESCE(latest.temperature_c, 24::numeric),
+    COALESCE(latest.is_raining, false),
+    latest.precipitation_1h_mm,
+    COALESCE(latest.observed_at, latest.fetched_at),
+    COALESCE(latest.source, 'poyozz_fallback')
+  FROM (SELECT 1) AS seed
+  LEFT JOIN latest ON true;
 $encounter_city_weather$;
 
 REVOKE ALL ON FUNCTION public.get_encounter_city_weather() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_encounter_city_weather() TO anon, authenticated, service_role;
 
-COMMENT ON TABLE public.encounter_weather_baseline_2025 IS
-  'Hourly Taipei 2025 historical baseline imported from CWA CODiS station 466920; used only when live weather is stale or unavailable.';
 COMMENT ON TABLE public.encounter_city_weather IS
-  'Single cached Taipei illustrative seasonal-weather row refreshed every six hours; no external weather API or forecast dependency.';
+  'One cached fictional Taipei weather state generated every six hours; no external weather API, forecast, or historical baseline dependency.';
 
 CREATE OR REPLACE FUNCTION public.get_encounter_scene_registry()
 RETURNS TABLE (
@@ -1702,8 +1661,6 @@ COMMENT ON TABLE public.encounter_scene_registry IS
   'Server-owned allowlist for city-map scene markers. V1 exposes the shared shopping-street scene only after at least two eligible public characters use it; AI never supplies coordinates.';
 COMMENT ON TABLE public.taiwan_calendar_days IS
   'Taiwan government office calendar dates, including official holidays and make-up workdays. Synced from the published government calendar dataset.';
-COMMENT ON TABLE public.encounter_weather_baseline_2025 IS
-  'Hourly Taipei 2025 historical baseline imported from CWA CODiS station 466920; used only when live weather is stale or unavailable.';
 COMMENT ON TABLE public.encounter_city_weather IS
   'Single cached Taipei current-weather row refreshed by the scheduled CWA weather sync; client reads are served through get_encounter_city_weather().';
 COMMENT ON FUNCTION public.schedule_encounter_worker(text, boolean) IS
@@ -1711,7 +1668,7 @@ COMMENT ON FUNCTION public.schedule_encounter_worker(text, boolean) IS
 COMMENT ON FUNCTION public.schedule_encounter_schedule_organizer(boolean) IS
   'Opt-in 15-minute schedule organizer cron wrapper; manual test trigger is separate.';
 COMMENT ON FUNCTION public.schedule_encounter_weather_sync(boolean) IS
-  'Opt-in six-hour lightweight seasonal Taipei weather cache refresh; no external weather API.';
+  'Opt-in six-hour deterministic seasonal Taipei weather simulation; no external weather API or historical baseline.';
 COMMENT ON FUNCTION public.schedule_encounter_taiwan_calendar_sync(boolean) IS
   'Opt-in monthly Taiwan official calendar refresh wrapper. Runs at 03:00 Asia/Taipei on the first day of each month.';
 
