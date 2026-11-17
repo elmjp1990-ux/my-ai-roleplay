@@ -1237,7 +1237,7 @@ LANGUAGE plpgsql
 VOLATILE
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_local timestamp;
   v_local_date date;
