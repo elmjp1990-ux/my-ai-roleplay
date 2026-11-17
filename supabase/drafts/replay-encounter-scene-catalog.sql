@@ -59,19 +59,31 @@ DECLARE
   v_catalog record;
 BEGIN
   v_result := public.publish_encounter_scene_metadata(
-    jsonb_build_array(jsonb_build_object(
-      'location_key', 'restaurant',
-      'display_name', '城市餐廳',
-      'icon', '🍽️',
-      'heading', '讓香氣與交談交織的日常',
-      'description', '開放式廚房傳來食材與鍋具的聲響，靠窗座位適合慢慢用餐，吧台則能看見廚師準備每一道料理。工作、聚餐與偶然相遇都能自然發生。',
-      'event_label', '最新消息',
-      'event_title', '本週季節菜單已更新',
-      'event_description', '週末晚間將推出主廚限定套餐與小型料理分享。'
-    ))
+    jsonb_build_array(
+      jsonb_build_object(
+        'location_key', 'restaurant',
+        'display_name', '城市餐廳',
+        'icon', '🍽️',
+        'heading', '讓香氣與交談交織的日常',
+        'description', '開放式廚房傳來食材與鍋具的聲響，靠窗座位適合慢慢用餐，吧台則能看見廚師準備每一道料理。工作、聚餐與偶然相遇都能自然發生。',
+        'event_label', '最新消息',
+        'event_title', '本週季節菜單已更新',
+        'event_description', '週末晚間將推出主廚限定套餐與小型料理分享。'
+      ),
+      jsonb_build_object(
+        'location_key', 'live-house',
+        'display_name', 'Live House／音樂酒吧',
+        'icon', '🎸',
+        'heading', '讓音樂填滿整個夜晚',
+        'description', '舞台燈光、音箱震動與觀眾的歡呼交織成現場氛圍。演出前後的走廊與吧台，也可能發生比舞台更難忘的對話。',
+        'event_label', '最新消息',
+        'event_title', '本週演出時刻表已更新',
+        'event_description', '週六晚間將舉辦新團專場演出。'
+      )
+    )
   );
-  IF COALESCE((v_result->>'published_scene_count')::integer, 0) <> 1 THEN
-    RAISE EXCEPTION 'shared dynamic scene should publish after two distinct characters are scheduled there';
+  IF COALESCE((v_result->>'published_scene_count')::integer, 0) <> 2 THEN
+    RAISE EXCEPTION 'shared dynamic scene and built-in Live House copy should both publish';
   END IF;
 
   SELECT * INTO v_catalog
@@ -83,6 +95,16 @@ BEGIN
      OR v_catalog.display_name <> '城市餐廳'
      OR v_catalog.event_title <> '本週季節菜單已更新' THEN
     RAISE EXCEPTION 'published dynamic scene metadata was not returned by the scene catalog';
+  END IF;
+
+  SELECT * INTO v_catalog
+  FROM public.get_encounter_scene_catalog()
+  WHERE location_key = 'live-house';
+  IF NOT FOUND
+     OR v_catalog.is_dynamic IS NOT FALSE
+     OR v_catalog.display_name <> 'Live House／音樂酒吧'
+     OR v_catalog.event_title <> '本週演出時刻表已更新' THEN
+    RAISE EXCEPTION 'AI-updated built-in Live House scene copy was not returned by the scene catalog';
   END IF;
 END;
 $dynamic_scene_publish$;
