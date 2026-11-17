@@ -37,7 +37,14 @@ for (const contract of [
   assert.ok(cityMap.includes(contract), 'Extracted city-map behavior is missing: ' + contract);
 }
 
-console.log('City map module extraction and dependency contract passed.');
+assert.match(cityMap, /get_encounter_scene_registry/);
+assert.match(cityMap, /MAX_DYNAMIC_SCENE_MARKERS=3/);
+assert.match(cityMap, /Math\.hypot\(point\.x-x,point\.y-y\)<120/);
+assert.match(cityMap, /data-dynamic-scene/);
+assert.match(cityMap, /cityPlaceAliases\[key\]=\[key\]/);
+assert.match(cityMap, /scene\.eventLabel/);
+
+console.log('City map module extraction, dynamic scene registry, and dependency contract passed.');
 
 assert.match(html,/get_encounter_character_schedules/);
 assert.doesNotMatch(cityMap,/hydrateCitySchedule/);
