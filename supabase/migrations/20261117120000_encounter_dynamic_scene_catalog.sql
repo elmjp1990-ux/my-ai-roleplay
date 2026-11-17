@@ -357,13 +357,29 @@ BEGIN
       END IF;
 
       SELECT pg_catalog.count(*)::integer INTO v_visible_dynamic_count
-      FROM public.get_encounter_scene_catalog() existing_scene
-      WHERE existing_scene.is_dynamic IS TRUE;
+      FROM public.encounter_scene_registry r
+      WHERE r.is_dynamic IS TRUE
+        AND r.is_active IS TRUE
+        AND (
+          SELECT pg_catalog.count(DISTINCT c.id)
+          FROM public.character_schedules s
+          JOIN public.characters c ON c.id = s.character_id
+          WHERE s.location_key = r.location_key
+            AND s.is_active IS TRUE
+            AND s.source_type IN ('manual', 'ai')
+            AND s.special_event_key IS NULL
+            AND c.visibility = 'public'
+            AND c.review_status = 'approved'
+            AND c.rights_confirmed IS TRUE
+            AND c.deleted_at IS NULL
+            AND c.is_nsfw IS FALSE
+        ) >= r.minimum_character_count;
       IF COALESCE(v_visible_dynamic_count, 0) >= 3
          AND NOT EXISTS (
-           SELECT 1 FROM public.get_encounter_scene_catalog() existing_scene
+           SELECT 1 FROM public.encounter_scene_registry existing_scene
            WHERE existing_scene.location_key = v_key
              AND existing_scene.is_dynamic IS TRUE
+             AND existing_scene.is_active IS TRUE
          ) THEN
         v_skipped := v_skipped + 1;
         CONTINUE;
