@@ -65,15 +65,16 @@ Deno.serve(async (request) => {
   let actorUserId: string | null = null;
 
   if (mode === "status") {
-    if (Deno.env.get("ENCOUNTER_SCHEDULE_TEST_MODE") !== "true" || isServiceRoleRequest) {
-      return json({ enabled: false });
+    if (Deno.env.get("ENCOUNTER_SCHEDULE_TEST_MODE") !== "true") {
+      return json({ enabled: false, test_mode: false });
     }
+    if (isServiceRoleRequest) return json({ enabled: false, test_mode: true });
     const userClient = createClient(url, anon, {
       global: { headers: { Authorization: authorization } },
       auth: { persistSession: false, autoRefreshToken: false },
     });
     const { data: authData, error: authError } = await userClient.auth.getUser();
-    if (authError || !authData?.user) return json({ enabled: false });
+    if (authError || !authData?.user) return json({ enabled: false, test_mode: true });
     actorUserId = authData.user.id;
     const [pendingResult, lastRunResult] = await Promise.all([
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
@@ -85,6 +86,7 @@ Deno.serve(async (request) => {
     if (pendingResult.error || lastRunResult.error) return json({ enabled: true, status_available: false });
     return json({
       enabled: true,
+      test_mode: true,
       pending_character_count: Number(pendingResult.count || 0),
       last_batch_completed_at: lastRunResult.data?.completed_at || null,
       last_batch_status: lastRunResult.data?.status || null,
