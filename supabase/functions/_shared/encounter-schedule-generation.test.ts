@@ -39,7 +39,7 @@ const variants = (slots = fullDaySlots()) => ({
     { variant_key: "alternative", weight: 40, slots: fullDaySlots({ start_time: "08:00", end_time: "16:00", location_key: "department-store", activity: "逛百貨公司" }) },
   ],
 });
-const result = (characters) => parseEncounterScheduleBatchOutput(JSON.stringify({ characters }), characters.map((c) => source(c.character_id)));
+const result = (characters: Array<{ character_id: string; [key: string]: unknown }>) => parseEncounterScheduleBatchOutput(JSON.stringify({ characters }), characters.map((c) => source(c.character_id)));
 
 Deno.test("accepts hourly schedules with exact weekday/holiday weights and 8-hour continuous work", () => {
   const parsed = parseEncounterScheduleBatchOutput(JSON.stringify({
