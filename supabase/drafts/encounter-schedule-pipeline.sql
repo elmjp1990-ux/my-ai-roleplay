@@ -95,7 +95,7 @@ ALTER TABLE public.character_schedules
   ADD CONSTRAINT character_schedules_special_event_check
   CHECK (
     (variant_key = 'special'
-      AND special_event_key IN ('taiwan_public_holiday', 'valentines_day', 'christmas')
+      AND special_event_key IN ('taiwan_public_holiday', 'lunar_new_year', 'valentines_day', 'christmas')
       AND day_type = 'any'
       AND variant_weight = 100)
     OR (variant_key IN ('primary', 'alternative') AND special_event_key IS NULL)
@@ -1023,7 +1023,7 @@ BEGIN
     LOOP
       v_special_event_key := v_special_event->>'event_key';
       v_special_event_name := pg_catalog.btrim(COALESCE(v_special_event->>'event_name', ''));
-      IF COALESCE(v_special_event_key, '') NOT IN ('taiwan_public_holiday', 'valentines_day', 'christmas')
+      IF COALESCE(v_special_event_key, '') NOT IN ('taiwan_public_holiday', 'lunar_new_year', 'valentines_day', 'christmas')
          OR pg_catalog.char_length(v_special_event_name) NOT BETWEEN 1 AND 40
          OR jsonb_typeof(v_special_event->'slots') IS DISTINCT FROM 'array' THEN
         RAISE EXCEPTION 'schedule_special_event_shape_invalid' USING ERRCODE = '22023';
@@ -1148,6 +1148,13 @@ AS $encounter_special_event$
   SELECT CASE
     WHEN pg_catalog.to_char(p_date, 'MM-DD') = '02-14' THEN 'valentines_day'
     WHEN pg_catalog.to_char(p_date, 'MM-DD') = '12-25' THEN 'christmas'
+    WHEN EXISTS (
+      SELECT 1
+      FROM public.taiwan_calendar_days d
+      WHERE d.calendar_date = p_date
+        AND d.day_type = 'holiday'
+        AND d.holiday_name ~ '(春節|農曆新年|農曆除夕|除夕)'
+    ) THEN 'lunar_new_year'
     WHEN EXISTS (
       SELECT 1
       FROM public.taiwan_calendar_days d
