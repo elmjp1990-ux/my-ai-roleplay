@@ -763,18 +763,14 @@ BEGIN
           IF COALESCE(v_slot->>'start_time', '') !~ '^([01][0-9]|2[0-3]):00$'
              OR COALESCE(v_slot->>'end_time', '') !~ '^([01][0-9]|2[0-3]):00$'
              OR v_slot->>'start_time' = v_slot->>'end_time'
-             OR COALESCE(v_slot->>'location_key', '') NOT IN (
-               'airport', 'commercial', 'night-bar', 'live-house', 'apartment', 'department-store', 'bookstore', 'cafe', 'restaurant', 'university', 'hospital', 'gym', 'cinema', 'museum', 'hotel', 'train-station', 'library', 'theater', 'art-gallery', 'community-center', 'music-studio', 'bakery', 'coworking-space', 'park', 'shopping-street', 'night-market', 'restaurant', 'university', 'hospital', 'gym', 'cinema', 'museum', 'hotel', 'train-station', 'library', 'theater', 'art-gallery', 'community-center', 'music-studio', 'bakery', 'coworking-space'
-             )
+             OR COALESCE(v_slot->>'location_key', '') NOT IN ('airport', 'commercial', 'night-bar', 'live-house', 'apartment', 'department-store', 'bookstore', 'cafe', 'park', 'shopping-street', 'night-market', 'restaurant', 'university', 'hospital', 'gym', 'cinema', 'museum', 'hotel', 'train-station', 'library', 'theater', 'art-gallery', 'community-center', 'music-studio', 'bakery', 'coworking-space')
              OR char_length(COALESCE(v_slot->>'activity', '')) NOT BETWEEN 1 AND 200
              OR char_length(COALESCE(v_slot->>'encounter_greeting', '')) NOT BETWEEN 150 AND 300 THEN
             RAISE EXCEPTION 'schedule_slot_invalid' USING ERRCODE = '22023';
           END IF;
 
           IF COALESCE((v_slot->>'is_outdoor')::boolean, false) IS TRUE THEN
-            IF COALESCE(v_slot->>'rain_fallback_location_key', '') NOT IN (
-              'airport', 'commercial', 'night-bar', 'live-house', 'apartment', 'department-store', 'bookstore', 'cafe', 'restaurant', 'university', 'hospital', 'gym', 'cinema', 'museum', 'hotel', 'train-station', 'library', 'theater', 'art-gallery', 'community-center', 'music-studio', 'bakery', 'coworking-space'
-            )
+            IF COALESCE(v_slot->>'rain_fallback_location_key', '') NOT IN ('airport', 'commercial', 'night-bar', 'live-house', 'apartment', 'department-store', 'bookstore', 'cafe', 'restaurant', 'university', 'hospital', 'gym', 'cinema', 'museum', 'hotel', 'train-station', 'library', 'theater', 'art-gallery', 'community-center', 'music-studio', 'bakery', 'coworking-space')
                OR char_length(COALESCE(v_slot->>'rain_fallback_activity', '')) NOT BETWEEN 1 AND 200
                OR char_length(COALESCE(v_slot->>'rain_fallback_greeting', '')) NOT BETWEEN 150 AND 300 THEN
               RAISE EXCEPTION 'schedule_rain_fallback_invalid' USING ERRCODE = '22023';
@@ -873,9 +869,7 @@ BEGIN
         IF COALESCE(v_special_slot->>'start_time', '') !~ '^([01][0-9]|2[0-3]):00$'
            OR COALESCE(v_special_slot->>'end_time', '') !~ '^([01][0-9]|2[0-3]):00$'
            OR v_special_slot->>'start_time' = v_special_slot->>'end_time'
-           OR COALESCE(v_special_slot->>'location_key', '') NOT IN (
-             'airport', 'commercial', 'night-bar', 'live-house', 'apartment', 'department-store', 'bookstore', 'cafe', 'restaurant', 'university', 'hospital', 'gym', 'cinema', 'museum', 'hotel', 'train-station', 'library', 'theater', 'art-gallery', 'community-center', 'music-studio', 'bakery', 'coworking-space', 'park', 'shopping-street', 'night-market', 'restaurant', 'university', 'hospital', 'gym', 'cinema', 'museum', 'hotel', 'train-station', 'library', 'theater', 'art-gallery', 'community-center', 'music-studio', 'bakery', 'coworking-space'
-           )
+           OR COALESCE(v_special_slot->>'location_key', '') NOT IN ('airport', 'commercial', 'night-bar', 'live-house', 'apartment', 'department-store', 'bookstore', 'cafe', 'park', 'shopping-street', 'night-market', 'restaurant', 'university', 'hospital', 'gym', 'cinema', 'museum', 'hotel', 'train-station', 'library', 'theater', 'art-gallery', 'community-center', 'music-studio', 'bakery', 'coworking-space')
            OR pg_catalog.char_length(COALESCE(v_special_slot->>'activity', '')) NOT BETWEEN 1 AND 200
            OR pg_catalog.char_length(COALESCE(v_special_slot->>'encounter_greeting', '')) NOT BETWEEN 150 AND 300
            OR jsonb_typeof(v_special_slot->'is_outdoor') IS DISTINCT FROM 'boolean' THEN
@@ -883,9 +877,7 @@ BEGIN
         END IF;
 
         IF (v_special_slot->>'is_outdoor')::boolean IS TRUE THEN
-          IF COALESCE(v_special_slot->>'rain_fallback_location_key', '') NOT IN (
-            'airport', 'commercial', 'night-bar', 'live-house', 'apartment', 'department-store', 'bookstore', 'cafe', 'restaurant', 'university', 'hospital', 'gym', 'cinema', 'museum', 'hotel', 'train-station', 'library', 'theater', 'art-gallery', 'community-center', 'music-studio', 'bakery', 'coworking-space'
-          )
+          IF COALESCE(v_special_slot->>'rain_fallback_location_key', '') NOT IN ('airport', 'commercial', 'night-bar', 'live-house', 'apartment', 'department-store', 'bookstore', 'cafe', 'restaurant', 'university', 'hospital', 'gym', 'cinema', 'museum', 'hotel', 'train-station', 'library', 'theater', 'art-gallery', 'community-center', 'music-studio', 'bakery', 'coworking-space')
              OR pg_catalog.char_length(COALESCE(v_special_slot->>'rain_fallback_activity', '')) NOT BETWEEN 1 AND 200
              OR pg_catalog.char_length(COALESCE(v_special_slot->>'rain_fallback_greeting', '')) NOT BETWEEN 150 AND 300 THEN
             RAISE EXCEPTION 'schedule_special_event_rain_fallback_invalid' USING ERRCODE = '22023';
