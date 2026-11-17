@@ -93,3 +93,14 @@ assert.match(html, /button.dataset\.aiEnabled='true'/);
 assert.match(html, /button.dataset\.aiEnabled!=='true'\|\|button\.disabled/);
 assert.match(html, /AI 生成角色行程與場景/);
 assert.doesNotMatch(html, /if\(error\|\|data\?\.enabled!==true\)\{section\.remove\(\);return;\}/);
+
+assert.match(html, /if\(!client\)throw new Error\('城市角色行程服務尚未連線。'\)/);
+assert.match(html, /if\(error\)throw new Error\('讀取角色行程失敗：'\+error\.message\)/);
+assert.doesNotMatch(html, /城市角色排程批次載入失敗[\s\S]{0,180}return schedules/);
+assert.match(cityMap, /const hasAnySchedule=\(pager\?\.candidates\|\|\[\]\)\.some\(person=>String\(person\.encounterSchedules\|\|''\)\.trim\(\)\)/);
+assert.match(cityMap, /尚未建立角色行程；可到測試工具手動生成。/);
+assert.match(cityMap, /目前沒有角色在此地點與台灣時間活動。/);
+assert.match(cityMap, /角色行程載入失敗，請重試。/);
+assert.match(cityMap, /data-action="city-people-retry"/);
+assert.match(cityMap, /const retryButton=event\.target\.closest\('\[data-action="city-people-retry"\]'\)/);
+assert.match(cityMap, /pager\.error=null;void loadCityPeoplePage\(locationModal\.dataset\.place\)/);
