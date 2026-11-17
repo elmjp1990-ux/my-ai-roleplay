@@ -3658,7 +3658,7 @@ function chatSessionData(s) {
     encounterVisuals:s.encounterVisuals&&typeof s.encounterVisuals==='object'?{
       illustrationId:isUuid(s.encounterVisuals.illustrationId)?s.encounterVisuals.illustrationId:null,
       sceneBackgroundId:isUuid(s.encounterVisuals.sceneBackgroundId)?s.encounterVisuals.sceneBackgroundId:null,
-      sceneBackgroundPath:typeof s.encounterVisuals.sceneBackgroundPath==='string'&&/^(\\.\\/|\\/)[A-Za-z0-9_./-]+$/.test(s.encounterVisuals.sceneBackgroundPath)&&!s.encounterVisuals.sceneBackgroundPath.includes('..')?s.encounterVisuals.sceneBackgroundPath:'./encounter-default-scene.webp'
+      sceneBackgroundPath:typeof s.encounterVisuals.sceneBackgroundPath==='string'&&/^(\.\/|\/)[A-Za-z0-9_./-]+$/.test(s.encounterVisuals.sceneBackgroundPath)&&!s.encounterVisuals.sceneBackgroundPath.includes('..')?s.encounterVisuals.sceneBackgroundPath:'./encounter-default-scene.webp'
     }:null,
     pinned:!!s.pinned, persona:s.persona || '', personaCustom:s.personaCustom === true || (s.personaCustom !== false && !!s.persona),
     suggestions:s.suggestions !== false,
@@ -4715,7 +4715,7 @@ async function executePendingChatTurn(s) {
     s.encounterVisuals={
       illustrationId:isUuid(visual.illustrationId)?visual.illustrationId:null,
       sceneBackgroundId:isUuid(visual.sceneBackgroundId)?visual.sceneBackgroundId:null,
-      sceneBackgroundPath:typeof visual.sceneBackgroundPath==='string'&&/^(\\.\\/|\\/)[A-Za-z0-9_./-]+$/.test(visual.sceneBackgroundPath)&&!visual.sceneBackgroundPath.includes('..')
+      sceneBackgroundPath:typeof visual.sceneBackgroundPath==='string'&&/^(\.\/|\/)[A-Za-z0-9_./-]+$/.test(visual.sceneBackgroundPath)&&!visual.sceneBackgroundPath.includes('..')
         ?visual.sceneBackgroundPath:'./encounter-default-scene.webp'
     };
   }
