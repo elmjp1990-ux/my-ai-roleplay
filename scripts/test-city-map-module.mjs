@@ -125,6 +125,8 @@ assert.match(scheduleOrganizer, /Promise\.all\(sources\.map\(async \(source\)/);
 assert.match(scheduleOrganizer, /buildEncounterScheduleBatchMessages\(\[source\], sceneCatalog\)/);
 assert.match(scheduleOrganizer, /timeoutMs: 42_000/);
 assert.match(scheduleOrganizer, /_poyozz_diagnostics/);
+assert.match(scheduleOrganizer, /character_id: characterId/);
+assert.match(scheduleOrganizer, /sourceId: result.sourceId, providerResponse: result.providerResponse/);
 const openRouterHelper = fs.readFileSync('supabase/functions/_shared/openrouter-chat-completions.ts', 'utf8');
 assert.match(openRouterHelper, /const responseText = await response\.text\(\)/);
 assert.match(openRouterHelper, /responseContentType/);
