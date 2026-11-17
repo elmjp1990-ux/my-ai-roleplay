@@ -85,9 +85,11 @@ Deno.serve(async (request) => {
     const { data: authData, error: authError } = await userClient.auth.getUser();
     if (authError || !authData?.user) return json({ enabled: false, test_mode: true });
     actorUserId = authData.user.id;
-    const [pendingResult, failedResult, reconciliationResult, lastRunResult] = await Promise.all([
+    const [pendingResult, processingResult, failedResult, reconciliationResult, lastRunResult] = await Promise.all([
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
         .eq("status", "pending"),
+      admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
+        .eq("status", "processing"),
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
         .eq("status", "failed"),
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
@@ -96,13 +98,14 @@ Deno.serve(async (request) => {
         .eq("status", "completed").not("completed_at", "is", null)
         .order("completed_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
-    if (pendingResult.error || failedResult.error || reconciliationResult.error || lastRunResult.error) {
+    if (pendingResult.error || processingResult.error || failedResult.error || reconciliationResult.error || lastRunResult.error) {
       return json({ enabled: true, test_mode: true, status_available: false });
     }
     return json({
       enabled: true,
       test_mode: true,
       pending_character_count: Number(pendingResult.count || 0),
+      processing_character_count: Number(processingResult.count || 0),
       failed_character_count: Number(failedResult.count || 0),
       needs_reconciliation_count: Number(reconciliationResult.count || 0),
       last_batch_completed_at: lastRunResult.data?.completed_at || null,
@@ -134,20 +137,24 @@ Deno.serve(async (request) => {
   if (mode === "manual") {
     // Never let the broad manual enqueue + p_force claim silently retry a
     // failed or ambiguous provider result. Those jobs need explicit review.
-    const [failedResult, reconciliationResult] = await Promise.all([
+    const [processingResult, failedResult, reconciliationResult] = await Promise.all([
+      admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
+        .eq("status", "processing"),
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
         .eq("status", "failed"),
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
         .eq("status", "needs_reconciliation"),
     ]);
-    if (failedResult.error || reconciliationResult.error) {
+    if (processingResult.error || failedResult.error || reconciliationResult.error) {
       return json({ error: "schedule_failure_state_unavailable" }, 503);
     }
+    const processingCharacterCount = Number(processingResult.count || 0);
     const failedCharacterCount = Number(failedResult.count || 0);
     const needsReconciliationCount = Number(reconciliationResult.count || 0);
-    if (failedCharacterCount > 0 || needsReconciliationCount > 0) {
+    if (processingCharacterCount > 0 || failedCharacterCount > 0 || needsReconciliationCount > 0) {
       return json({
         status: "blocked_unresolved_failures",
+        processing_character_count: processingCharacterCount,
         failed_character_count: failedCharacterCount,
         needs_reconciliation_count: needsReconciliationCount,
       }, 409);
