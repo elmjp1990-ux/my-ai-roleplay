@@ -6,6 +6,7 @@ on:
     paths:
       - "supabase/drafts/encounter-schedule-pipeline.sql"
       - "supabase/drafts/replay-encounter-schedule-pipeline.sql"
+      - "supabase/drafts/replay-encounter-session-evaluation-worker.sql"
       - "supabase/drafts/current-state-structure.json"
       - "scripts/build-disposable-schema-fixture.mjs"
       - ".github/workflows/supabase-local-migration-replay.yml"
@@ -188,6 +189,13 @@ jobs:
             exit 1
           fi
           cat "$LOG_FILE"
+
+      - name: Replay Encounter evaluation queue and settlement smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Exercises only the disposable current-state fixture; no OpenRouter or Hosted Supabase access.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-session-evaluation-worker.sql
 
       - name: Upload Encounter SQL replay diagnostics
         if: always()
