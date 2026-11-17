@@ -10034,7 +10034,8 @@ async function loadEncounterScheduleTestTools(){
     if(status)status.textContent=data.status_available===false?'測試環境已確認；目前無法讀取佇列狀態。':'佇列待處理：'+pending+' 位｜按下後會檢查所有符合資格的公開角色（包含受年齡限制的角色），並生成角色行程與場景｜上次成功完成：'+lastRun+(data.last_batch_status?'（'+data.last_batch_status+'）':'');
     if(button){button.dataset.aiEnabled='true';button.disabled=false;}
   }catch(error){
-    if(status)status.textContent='無法確認伺服器測試授權，為安全起見暫停 AI 呼叫；請稍後重試。';
+    section.hidden=true;
+    if(button){button.disabled=true;button.dataset.aiEnabled='false';}
     console.warn('Encounter schedule test status failed:',error?.message||error);
   }
 }
