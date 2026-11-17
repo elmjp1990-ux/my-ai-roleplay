@@ -56,7 +56,10 @@ assert.match(html, /galleryIllustrations:local\.galleryIllustrations \|\| \[\]/)
 
 // Gallery sync must keep nextGallery in function scope for post-upload persistence and cleanup.
 assert.ok(html.includes("function retryCharacterIllustrationCleanup(userId) {"));
-assert.doesNotMatch(html, /const usedSlots=new Set\([\s\S]*?\n\s*const nextGallery=\[\];/);
+assert.match(html, /function planCharacterIllustrationGallerySync\(oldGallery,draftItems\)/);
+assert.match(html, /const galleryPlan=planCharacterIllustrationGallerySync\(oldGallery,draftIllustrations\)/);
+assert.match(html, /const usedSlots=new Set\(retainedRows\.map\(row=>Number\(row\.sort_order\)\)\)/);
+assert.match(html, /reusableRow:obsoleteBySlot\.get\(freeSlot\)\|\|null/);
 
 // Editing an existing character must finish illustration hydration before save.
 // A failed load blocks save so an empty draft cannot be mistaken for intentional image removal.
