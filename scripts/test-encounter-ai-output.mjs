@@ -27,6 +27,9 @@ const frontend = fs.readFileSync("index.html", "utf8");
 const scene = fs.readFileSync("encounter-scene.js", "utf8");
 const sessionCreator = fs.readFileSync("supabase/functions/encounter-session/index.ts", "utf8");
 const pipeline = fs.readFileSync("supabase/drafts/encounter-schedule-pipeline.sql", "utf8");
+const weatherSync = fs.readFileSync("supabase/functions/encounter-weather-sync/index.ts", "utf8");
+const weatherModule = fs.readFileSync("supabase/functions/_shared/encounter-weather.mjs", "utf8");
+const cityMap = fs.readFileSync("city-map.js", "utf8");
 
 assert.equal((pipeline.match(/^BEGIN;$/gm) || []).length, 1, "Encounter SQL draft must contain one transaction start");
 assert.equal((pipeline.match(/^COMMIT;$/gm) || []).length, 1, "Encounter SQL draft must contain one transaction end");
@@ -35,6 +38,14 @@ assert.ok(pipeline.includes("CHECK (asset_path ~ '^([.]/|/)[A-Za-z0-9_./-]+$')")
 assert.match(pipeline, /ALTER TABLE public\.encounter_city_weather ALTER COLUMN source SET DEFAULT 'poyozz_fictional_seasonal'/);
 assert.match(pipeline, /UPDATE public\.encounter_city_weather[\s\S]*?source = 'poyozz_fallback'[\s\S]*?WHERE source IS DISTINCT FROM 'poyozz_fictional_seasonal'/);
 assert.match(pipeline, /AND c\.deleted_at IS NULL;\s*IF p_force IS NOT TRUE/);
+assert.doesNotMatch(weatherSync, /\\bfetch\\s*\\(/, "Taipei simulation must not call external weather APIs");
+assert.doesNotMatch(weatherSync, /CWA|OPEN_DATA_API_KEY|forecast/i);
+assert.match(weatherSync, /previousSlot === weather\.slot/);
+assert.match(weatherSync, /status: "unchanged"/);
+assert.match(weatherModule, /Asia\\/Taipei/);
+assert.match(weatherModule, /poyozz_fictional_seasonal/);
+assert.match(cityMap, /CITY_MAP_WEATHER_CACHE_TTL_MS = 6 \\* 60 \\* 60 \\* 1000/);
+assert.match(cityMap, /CITY_MAP_SCENES_CACHE_TTL_MS = 30 \\* 60 \\* 1000/);
 assert.match(pipeline, /ORDER BY r\.display_order, r\.location_key\s+LIMIT 3/);
 
 assert.match(endpoint, /requestOpenRouterChatCompletion/);
