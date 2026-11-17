@@ -33,6 +33,10 @@ const INDOOR_SCENE_KEYS = new Set([
   "bakery", "coworking-space",
 ]);
 const OUTDOOR_SCENE_KEYS = new Set(["park", "shopping-street", "night-market"]);
+const RAIN_FALLBACK_SCENE_KEYS = new Set([
+  "airport", "commercial", "night-bar", "live-house", "apartment",
+  "department-store", "bookstore", "cafe",
+]);
 const NON_MODERN_ERA_PATTERN = /ancient|historical|medieval|antiquity|fantasy|mythic|fictional|古代|歷史|中世紀|中古|奇幻|架空|封建|戰國|春秋|秦漢|唐代|宋代|明代|清代|古羅馬|古希臘/i;
 const SCENE_ALIASES: Record<string, string> = {
   bar: "night-bar", pub: "night-bar", 酒吧: "night-bar", 酒館: "night-bar", 夜店: "night-bar",
@@ -100,6 +104,12 @@ export type GeneratedSceneMetadata = {
   event_label: string;
   event_title: string;
   event_description: string;
+};
+
+export type EncounterSceneCatalogEntry = {
+  location_key: string;
+  display_name?: string;
+  is_dynamic?: boolean;
 };
 
 export type GeneratedCharacterSchedule = {
@@ -193,7 +203,7 @@ function validateSlot(value: unknown, errors: string[], label: string): Schedule
     rainLocation = normalizeEncounterSceneKey(value.rain_fallback_location_key);
     rainActivity = text(value.rain_fallback_activity);
     rainGreeting = text(value.rain_fallback_greeting);
-    if (!rainLocation || !INDOOR_SCENE_KEYS.has(rainLocation) || !rainActivity || rainActivity.length > 200 ||
+    if (!rainLocation || !RAIN_FALLBACK_SCENE_KEYS.has(rainLocation) || !rainActivity || rainActivity.length > 200 ||
       Array.from(rainGreeting).length < 150 || Array.from(rainGreeting).length > 300) {
       errors.push(label + "_rain_fallback_invalid");
     }
@@ -332,7 +342,10 @@ function validateSpecialEvent(value: unknown, errors: string[], label: string): 
   };
 }
 
-export function buildEncounterScheduleBatchMessages(sources: EncounterScheduleSource[]): {
+export function buildEncounterScheduleBatchMessages(
+  sources: EncounterScheduleSource[],
+  sceneCatalog: EncounterSceneCatalogEntry[] = [],
+): {
   messages: Array<{ role: "system" | "user"; content: string }>;
   protectedContextByCharacter: Record<string, string[]>;
 } {
@@ -385,11 +398,20 @@ export function buildEncounterScheduleBatchMessages(sources: EncounterScheduleSo
       author_private_context: privateContext.promptText,
     };
   });
+  const existingDynamicScenes = sceneCatalog
+    .filter((scene) => scene?.is_dynamic === true && normalizeEncounterSceneKey(scene.location_key))
+    .map((scene) => ({
+      location_key: normalizeEncounterSceneKey(scene.location_key),
+      display_name: text(scene.display_name),
+    }));
+  const existingDynamicKeys = new Set(existingDynamicScenes.map((scene) => scene.location_key));
+  const remainingDynamicSceneSlots = Math.max(0, 3 - existingDynamicKeys.size);
   const system = [
     "你是 POYOZZ 的角色行程規劃器。一次為提供的 1 至 10 個公開角色整理可驗證的城市地圖行程。",
     "必須讀取角色名稱、稱號、職業、身分、世界觀、種族、性格、興趣、標籤、作者行程說明及 existing_author_schedules。existing_author_schedules 是作者已保存的固定時段與地點，必須原樣保留並視為優先限制，不得改寫或覆蓋；AI 只負責推演其餘空白時段。若 author_schedule_brief 為空，必須依角色卡設定推演合理日常，不可因此留白或標記無行程；若作者只提供部分時段，保留明確時段與限制，只補足空白，不得覆蓋作者設定。只使用輸入角色的設定與作者提供的行程方向，不可替角色創造與背景衝突的現代身分。歷史／古代角色若沒有作者明確設定現代相容或明確穿越，必須 placement=no_matching_location，不可放進現代城市地圖。奇幻種族只要背景明確相容現代世界，就可以正常安排。",
     "相似職業或場景必須共用 canonical location_key：酒吧老闆／酒保／酒吧員工共用 night-bar；企業主／主管／秘書共用 commercial；咖啡相關共用 cafe；音樂演出者與樂迷可共用 live-house；一般交通轉乘優先使用 train-station。不可為每個角色各造一個相似地點。",
-    "場景類型可依角色群體需求使用 shopping-street、night-market、restaurant、university、hospital、gym、cinema、museum、hotel、train-station、library、theater、art-gallery、community-center、music-studio、bakery、coworking-space。新增動態場景必須是多人有共同需求的合理公共場所；後端會跨批次統計，至少兩位不同公開角色排入同一場景才顯示新地標。university 只適用學生／教職員或明確校園活動，hospital 只適用醫療工作／就診／探病，gym 需有運動或健身理由，museum／cinema／theater 等需符合角色興趣或明確活動；不得為了增加地標而硬塞角色。不可輸出座標、圖片 URL、Storage path 或自行發明地標 ID。",
+    "場景類型可依角色群體需求使用 shopping-street、night-market、restaurant、university、hospital、gym、cinema、museum、hotel、train-station、library、theater、art-gallery、community-center、music-studio、bakery、coworking-space。新增動態場景必須是多人有共同需求的合理公共場所；university 只適用學生／教職員或明確校園活動，hospital 只適用醫療工作／就診／探病，gym 需有運動或健身理由，museum／cinema／theater 等需符合角色興趣或明確活動；不得為了增加地標而硬塞角色。最多同時顯示 3 個動態地標；只有至少 2 位不同角色在本批次的主要行程共用同一個新動態場景，且尚有空位時，才能新增該場景。若沒有空位或本批次只有 1 位角色使用新場景，必須改用已存在的靜態／動態地點，不可讓角色排入不會顯示的地點。雨天備案只能使用既有室內固定場景 key：airport、commercial、night-bar、live-house、apartment、department-store、bookstore、cafe。不可輸出座標、圖片 URL、Storage path 或自行發明地標 ID。",
+    `目前已啟用的動態場景：${existingDynamicScenes.length ? JSON.stringify(existingDynamicScenes) : "目前沒有"}；本批次最多還能新增 ${remainingDynamicSceneSlots} 個動態地標。`,
     "airport 是特殊地點：只有角色本身職業／設定與航空機場有明確關聯，或作者設定有具體搭機、接送、轉機、出入境行程時才能使用。不得把機場當一般休閒、辦公或隨機偶遇地點；沒有明確理由時使用更合理的車站、商業大樓或其他場景。",
     "每天以整點為單位規劃。連續多小時在同一地點從事同一活動，合併為一個 start_time/end_time 區間；例如 09:00–17:00 的 8 小時工作必須留在同一地點。每個變體最多 4 個時段，可保留合理空檔。",
     "holiday 依台灣政府正式辦公日曆判斷，包含國定假日與補班日；不可單純把週末都視為假日。每個 weekday 變體權重固定 primary=80、alternative=20；每個 holiday 變體權重固定 primary=60、alternative=40。每個日型都必須提供 primary 與 alternative 兩套完整 24 小時行程，從 00:00 開始至次日 00:00 結束，時段必須連續無空檔、不可重疊；允許合併連續相同地點／活動的時段，但不得遺漏任何小時。",
@@ -405,7 +427,14 @@ export function buildEncounterScheduleBatchMessages(sources: EncounterScheduleSo
   return {
     messages: [
       { role: "system", content: system },
-      { role: "user", content: JSON.stringify({ characters: promptSources }) },
+      { role: "user", content: JSON.stringify({
+        characters: promptSources,
+        scene_catalog: sceneCatalog.map((scene) => ({
+          location_key: normalizeEncounterSceneKey(scene.location_key),
+          display_name: text(scene.display_name),
+          is_dynamic: scene.is_dynamic === true,
+        })),
+      }) },
     ],
     protectedContextByCharacter,
   };
@@ -414,6 +443,7 @@ export function buildEncounterScheduleBatchMessages(sources: EncounterScheduleSo
 export function parseEncounterScheduleBatchOutput(
   raw: string,
   sources: EncounterScheduleSource[],
+  sceneCatalog: EncounterSceneCatalogEntry[] = [],
 ): { ok: boolean; characters: GeneratedCharacterSchedule[]; scenes: GeneratedSceneMetadata[]; errors: string[] } {
   const errors: string[] = [];
   let parsed: unknown;
@@ -507,24 +537,46 @@ export function parseEncounterScheduleBatchOutput(
     }
   }
 
-  // The AI may propose metadata for built-in and new canonical scenes, but it never
-  // supplies coordinates. The database publishes dynamic markers only after at least
-  // two distinct eligible characters share the location across all batches.
+  // New dynamic locations must be shared by at least two characters in this batch.
+  // The scene catalog tells the model which dynamic markers already exist and how
+  // many of the three server-controlled marker slots remain.
   const usedSceneKeys = new Set<string>();
+  const primarySceneCharacters = new Map<string, Set<string>>();
   for (const character of characters) {
     for (const variant of [...character.variants.weekday, ...character.variants.holiday]) {
       for (const slot of variant.slots) {
         usedSceneKeys.add(slot.location_key);
-        if (slot.rain_fallback_location_key) usedSceneKeys.add(slot.rain_fallback_location_key);
+        const ids = primarySceneCharacters.get(slot.location_key) || new Set<string>();
+        ids.add(character.character_id);
+        primarySceneCharacters.set(slot.location_key, ids);
       }
     }
     for (const event of character.special_events) {
       for (const slot of event.slots) {
         usedSceneKeys.add(slot.location_key);
-        if (slot.rain_fallback_location_key) usedSceneKeys.add(slot.rain_fallback_location_key);
+        const ids = primarySceneCharacters.get(slot.location_key) || new Set<string>();
+        ids.add(character.character_id);
+        primarySceneCharacters.set(slot.location_key, ids);
       }
     }
   }
+  const existingDynamicKeys = new Set(
+    sceneCatalog.filter((scene) => scene?.is_dynamic === true)
+      .map((scene) => normalizeEncounterSceneKey(scene.location_key))
+      .filter((key): key is string => key !== null),
+  );
+  const newDynamicKeys = [...primarySceneCharacters.keys()].filter((key) =>
+    (ENCOUNTER_DYNAMIC_SCENE_KEYS as readonly string[]).includes(key) && !existingDynamicKeys.has(key)
+  );
+  for (const key of newDynamicKeys) {
+    if ((primarySceneCharacters.get(key)?.size || 0) < 2) {
+      errors.push("dynamic_scene_requires_two_batch_characters_" + key);
+    }
+  }
+  if (existingDynamicKeys.size + newDynamicKeys.length > 3) {
+    errors.push("dynamic_scene_marker_limit_exceeded");
+  }
+
   const rawScenes = parsed.scenes === undefined ? [] : parsed.scenes;
   const scenes: GeneratedSceneMetadata[] = [];
   if (!Array.isArray(rawScenes) || rawScenes.length > ENCOUNTER_SCENE_KEYS.length) {
