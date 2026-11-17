@@ -151,6 +151,7 @@ Deno.serve(async (request: Request) => {
     id: row.id,
     displayName: row.display_name || "角色立繪",
     assetType: row.asset_type,
+    sortOrder: row.sort_order,
   }));
   const defaultVisuals = {
     illustrationId: illustrationChoices[0]?.id || null,
