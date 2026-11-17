@@ -37,6 +37,15 @@ for (const contract of [
   assert.ok(cityMap.includes(contract), 'Extracted city-map behavior is missing: ' + contract);
 }
 
+const sceneLoaderDeclaration = cityMap.indexOf('const loadCityDynamicScenes=async()=>');
+const weatherLoaderDeclaration = cityMap.indexOf('const loadCityWeather=async()=>');
+const sceneLoaderInvocation = cityMap.indexOf('void loadCityDynamicScenes();');
+const weatherLoaderInvocation = cityMap.indexOf('void loadCityWeather();');
+assert.ok(sceneLoaderDeclaration >= 0 && sceneLoaderInvocation > sceneLoaderDeclaration,
+  'Dynamic scene loader must be initialized before invocation.');
+assert.ok(weatherLoaderDeclaration >= 0 && weatherLoaderInvocation > weatherLoaderDeclaration,
+  'Weather loader must be initialized before invocation.');
+
 assert.match(cityMap, /get_encounter_scene_registry/);
 assert.match(cityMap, /get_encounter_city_weather/);
 assert.match(cityMap, /stage.classList.toggle\('is-raining',weather.is_raining===true\)/);
