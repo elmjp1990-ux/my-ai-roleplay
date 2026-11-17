@@ -48,7 +48,7 @@ assert.ok(weatherLoaderDeclaration >= 0 && weatherLoaderInvocation > weatherLoad
 
 assert.match(cityMap, /get_encounter_scene_catalog/);
 assert.match(cityMap, /refreshScenes\(\)/);
-assert.match(cityMap, /poyozz-city-map-scenes-v1/);
+assert.match(cityMap, /poyozz-city-map-scenes-v2-v1/);
 
 assert.ok(cityMap.indexOf("void loadCityDynamicScenes();") > cityMap.indexOf("const cityPlaceAliases"),
   "scene catalog loading must start after place aliases and names are initialized");
