@@ -243,6 +243,18 @@ jobs:
           set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117120000_encounter_dynamic_scene_catalog.sql
 
+      - name: Apply schedule batch completion cooldown and partial-publish migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117130000_encounter_schedule_batch_semantics.sql
+
+      - name: Replay schedule batch completion cooldown and partial-publish contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-schedule-batch-semantics.sql
+
       - name: Replay dynamic scene catalog and legacy schedule filters
         shell: bash
         run: |
