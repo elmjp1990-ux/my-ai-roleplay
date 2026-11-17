@@ -4,7 +4,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildPromptVariableValues, applyPromptVariables } from "../_shared/prompt-context.ts";
 import { preparePrivateContext, findPrivateContextLeak } from "../_shared/private-context-guard.ts";
 import { releaseGenerationClaim } from "../_shared/chat-turn-claim.ts";
-import { classifyProviderFailure } from "../_shared/provider-failure-policy.ts";
 import { recordChatModelUsage } from "../_shared/story-memory-summary.ts";
 import { requestOpenRouterChatCompletion, POYOZZ_DEFAULT_CHAT_MODEL } from "../_shared/openrouter-chat-completions.ts";
 import { buildEncounterResponseGuidelines } from "../_shared/encounter-response-guidelines.ts";
@@ -24,6 +23,15 @@ type DbRow = Record<string, unknown>;
 const asRow = (value: unknown): DbRow =>
   value && typeof value === "object" && !Array.isArray(value) ? value as DbRow : {};
 const asText = (value: unknown): string => typeof value === "string" ? value.trim() : "";
+
+async function refundEncounterTurn(admin: any, userId: string, turnId: string, assistantMessageId: string, failureCode: string): Promise<DbRow | null> {
+  const { data, error } = await admin.rpc("refund_chat_turn", {
+    p_user_id: userId, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
+    p_failure_code: failureCode,
+  });
+  const result = Array.isArray(data) ? data[0] : data;
+  return !error && result?.status === "refunded" ? asRow(result) : null;
+}
 
 async function buildEncounterMessages(
   admin: any,
@@ -257,11 +265,17 @@ Deno.serve(async (request) => {
     });
   } catch (error) {
     const code = error instanceof Error && error.name === "AbortError"
-      ? "provider_request_timeout" : "provider_request_outcome_unknown";
-    await admin.from("chat_turn_events").insert({
-      turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation", stage: "provider_request", error_code: code,
-    });
-    return json({ status: "needs_reconciliation", error: code, retryAllowed: false }, 503);
+      ? "provider_request_timeout" : "provider_request_failed";
+    const refunded = await refundEncounterTurn(admin, user.id, turnId, assistantMessageId, code);
+    if (!refunded) {
+      await admin.from("chat_turn_events").insert({
+        turn_id: turnId, user_id: user.id, event_type: "needs_reconciliation", stage: "provider_request_refund", error_code: "refund_outcome_unknown",
+      });
+      return json({ status: "needs_reconciliation", error: "refund_outcome_unknown", retryAllowed: false }, 503);
+    }
+    return json({ status: "refunded", error: code, balance: {
+      silver_coins: refunded.balance_silver, diamonds: refunded.balance_diamonds,
+    } });
   }
 
   const recordUsage = (messageId: string | null, requestStatus: "completed" | "failed") =>
@@ -272,45 +286,25 @@ Deno.serve(async (request) => {
   const providerResult = providerResponse.result;
   if (providerResult.kind !== "generated") {
     await recordUsage(null, "failed");
+    const failureCode = providerResult.kind === "provider_error" ? providerResult.code :
+      providerResult.kind === "content_rejected" ? "provider_content_rejected" : "empty_output";
     await admin.from("chat_turn_events").insert({
       turn_id: turnId, user_id: user.id, event_type: "provider_response_diagnostic",
-      stage: "provider_response",
-      error_code: providerResult.kind === "provider_error" ? providerResult.code :
-        providerResult.kind === "content_rejected" ? "provider_content_rejected" : "empty_output",
+      stage: "provider_response", error_code: failureCode,
       retryable: providerResult.kind === "provider_error" ? providerResult.retryable : false,
       http_status: providerResponse.httpStatus,
       gateway_request_id: /^[A-Za-z0-9._:-]{1,128}$/.test(providerResponse.requestId) ? providerResponse.requestId : null,
     });
-    if (providerResult.kind === "content_rejected") {
-      const { data: refunded, error: refundError } = await admin.rpc("refund_chat_turn", {
-        p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
-        p_failure_code: "provider_content_rejected",
-      });
-      const result = Array.isArray(refunded) ? refunded[0] : refunded;
-      if (refundError || result?.status !== "refunded") {
-        return json({ status: "needs_reconciliation", error: "refund_outcome_unknown", retryAllowed: false }, 503);
-      }
-      return json({ status: "content_rejected", balance: { silver_coins: result.balance_silver, diamonds: result.balance_diamonds } });
+    // Encounter promises no user charge whenever no valid character reply is delivered.
+    const refunded = await refundEncounterTurn(admin, user.id, turnId, assistantMessageId, failureCode);
+    if (!refunded) {
+      return json({ status: "needs_reconciliation", error: "refund_outcome_unknown", retryAllowed: false }, 503);
     }
-    const failureAction = classifyProviderFailure(providerResult, providerResponse.httpStatus);
-    if (failureAction === "retry_same_turn") {
-      const released = await releaseGenerationClaim(admin, turnId, user.id);
-      if (!released) return json({ status: "needs_reconciliation", error: "generation_claim_release_unconfirmed", retryAllowed: false }, 503);
-      return json({ status: "provider_error", error: providerResult.kind === "provider_error" ? providerResult.code : "provider_error", retryAllowed: true }, 503);
-    }
-    if (failureAction === "refund") {
-      const { data: refunded, error: refundError } = await admin.rpc("refund_chat_turn", {
-        p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
-        p_failure_code: "provider_request_rejected",
-      });
-      const result = Array.isArray(refunded) ? refunded[0] : refunded;
-      if (!refundError && result?.status === "refunded") {
-        return json({ status: "provider_error_refunded", error: providerResult.kind === "provider_error" ? providerResult.code : "empty_output",
-          balance: { silver_coins: result.balance_silver, diamonds: result.balance_diamonds } });
-      }
-      return json({ status: "needs_reconciliation", error: "provider_error_refund_unknown", retryAllowed: false }, 503);
-    }
-    return json({ status: "needs_reconciliation", error: providerResult.kind === "provider_error" ? providerResult.code : "empty_output", retryAllowed: false }, 503);
+    return json({
+      status: providerResult.kind === "content_rejected" ? "content_rejected" : "provider_error_refunded",
+      error: failureCode,
+      balance: { silver_coins: refunded.balance_silver, diamonds: refunded.balance_diamonds },
+    });
   }
 
   const replyText = parseEncounterTurnOutput(providerResult.text);
@@ -320,14 +314,11 @@ Deno.serve(async (request) => {
     await admin.from("chat_turn_events").insert({
       turn_id: turnId, user_id: user.id, event_type: "encounter_output_rejected", stage: "output_screening", error_code: failureCode,
     });
-    const { data: refunded, error: refundError } = await admin.rpc("refund_chat_turn", {
-      p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId, p_failure_code: failureCode,
-    });
-    const result = Array.isArray(refunded) ? refunded[0] : refunded;
-    if (refundError || result?.status !== "refunded") {
-      return json({ status: "needs_reconciliation", error: "refund_outcome_unknown", retryAllowed: false }, 503);
-    }
-    return json({ status: "refunded", error: failureCode, balance: { silver_coins: result.balance_silver, diamonds: result.balance_diamonds } });
+    const refunded = await refundEncounterTurn(admin, user.id, turnId, assistantMessageId, failureCode);
+    if (!refunded) return json({ status: "needs_reconciliation", error: "refund_outcome_unknown", retryAllowed: false }, 503);
+    return json({ status: "refunded", error: failureCode, balance: {
+      silver_coins: refunded.balance_silver, diamonds: refunded.balance_diamonds,
+    } });
   }
 
   const assistantRow = {
@@ -341,14 +332,10 @@ Deno.serve(async (request) => {
     if (verifyError) return json({ status: "needs_reconciliation", error: "reply_write_outcome_unknown", retryAllowed: false }, 503);
     if (!existing || !asText(existing.content)) {
       await recordUsage(null, "failed");
-      const { data: refunded, error: refundError } = await admin.rpc("refund_chat_turn", {
-        p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
-        p_failure_code: "assistant_persistence_failed",
-      });
-      const result = Array.isArray(refunded) ? refunded[0] : refunded;
-      if (!refundError && result?.status === "refunded") {
-        return json({ status: "refunded", balance: { silver_coins: result.balance_silver, diamonds: result.balance_diamonds } });
-      }
+      const refunded = await refundEncounterTurn(admin, user.id, turnId, assistantMessageId, "assistant_persistence_failed");
+      if (refunded) return json({ status: "refunded", balance: {
+        silver_coins: refunded.balance_silver, diamonds: refunded.balance_diamonds,
+      } });
       return json({ status: "needs_reconciliation", error: "assistant_persistence_refund_unknown", retryAllowed: false }, 503);
     }
     if (asText(existing.content) !== replyText) {
