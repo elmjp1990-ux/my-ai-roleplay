@@ -218,7 +218,25 @@ CREATE TABLE IF NOT EXISTS public.encounter_scene_backgrounds (
     'airport', 'commercial', 'night-bar', 'live-house', 'apartment',
     'department-store', 'bookstore', 'cafe', 'park', 'shopping-street'
   )),
-  CHECK (asset_path ~ '^(\./|/)[A-Za-z0-9_./-]+ALTER TABLE public.encounter_schedule_generation_jobs ENABLE ROW LEVEL SECURITY;
+  CHECK (asset_path ~ '^(\\./|/)[A-Za-z0-9_./-]+$')
+);
+
+CREATE TABLE IF NOT EXISTS public.encounter_turn_visuals (
+  message_id uuid PRIMARY KEY REFERENCES public.chat_messages(id) ON DELETE CASCADE,
+  session_id uuid NOT NULL REFERENCES public.chat_sessions(id) ON DELETE CASCADE,
+  character_id uuid NOT NULL REFERENCES public.characters(id) ON DELETE CASCADE,
+  illustration_id uuid REFERENCES public.character_illustrations(id) ON DELETE SET NULL,
+  scene_background_id uuid REFERENCES public.encounter_scene_backgrounds(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT pg_catalog.now(),
+  updated_at timestamptz NOT NULL DEFAULT pg_catalog.now()
+);
+
+CREATE INDEX IF NOT EXISTS encounter_turn_visuals_session_idx
+  ON public.encounter_turn_visuals (session_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS encounter_turn_visuals_character_idx
+  ON public.encounter_turn_visuals (character_id, created_at DESC);
+
+ALTER TABLE public.encounter_schedule_generation_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.encounter_schedule_batch_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.encounter_schedule_generation_usage ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.taiwan_calendar_days ENABLE ROW LEVEL SECURITY;
