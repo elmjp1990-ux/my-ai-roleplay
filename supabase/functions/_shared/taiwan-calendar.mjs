@@ -29,14 +29,15 @@ export function parseTaiwanCalendarRows(payload, source = "data.gov.tw:123662") 
     if (holiday === null) continue;
     const rawName = String(row.name ?? "").trim();
     const rawDescription = String(row.description ?? "").trim();
-    const genericHolidayLabel = /^(?:週末假期|周末假期|星期六|星期日|週六|週日|放假|假日|例假日)$/i;
+    const rawCategory = String(row.holidaycategory ?? "").trim();
+    const genericWeekendLabel = /^(?:週末假期|周末假期|星期六|星期日|週六|週日|放假|假日|例假日)$/i;
     const holidayName = [rawName, rawDescription]
-      .find((value) => value && !genericHolidayLabel.test(value)) || "";
+      .find((value) => value && !genericWeekendLabel.test(value)) ||
+      (rawCategory && !genericWeekendLabel.test(rawCategory) ? rawCategory : "");
     output.push({
       calendar_date: year + "-" + String(month).padStart(2, "0") + "-" + String(day).padStart(2, "0"),
       day_type: holiday ? "holiday" : "workday",
-      // holidaycategory describes the category (often a weekend), not a named event.
-      // Only an actual name/description can trigger a special-holiday schedule.
+      // holidaycategory is only a fallback when it is not a generic weekend label.
       holiday_name: holidayName.slice(0, 120) || null,
       source,
     });
