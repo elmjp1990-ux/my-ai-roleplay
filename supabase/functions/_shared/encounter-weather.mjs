@@ -57,12 +57,7 @@ export function createEncounterWeather(now = new Date(), previousWeatherText = "
     if (cursor < 0) { selected = state; break; }
   }
 
-  // Avoid an implausible endless identical run while keeping every slot deterministic.
-  if (selected.text === previousWeatherText) {
-    const alternatives = weighted.filter((state) => state.text !== previousWeatherText);
-    const alternateIndex = hash32("poyozz-weather-change-" + slot) % alternatives.length;
-    selected = alternatives[alternateIndex];
-  }
+  // Repeated states are allowed; the weighted seasonal sequence creates natural variation.
 
   const seasonalTemperature = month >= 6 && month <= 9 ? 29
     : [12, 1, 2].includes(month) ? 17 : 23;
