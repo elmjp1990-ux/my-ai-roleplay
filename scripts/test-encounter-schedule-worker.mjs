@@ -63,6 +63,7 @@ assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.resolve_encounter_spe
 assert.match(pipeline, /special_event_key IS NULL/);
 assert.match(generator, /special_events/);
 assert.match(generator, /valentines_day/);
+assert.match(generator, /lunar_new_year/);
 assert.match(generator, /christmas/);
 assert.match(generator, /角色生日目前沒有結構化日期來源/);
 assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.get_encounter_character_schedules\(p_character_ids uuid\[\]\)[\s\S]*?CROSS JOIN LATERAL public\.resolve_encounter_character_schedule/);
