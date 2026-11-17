@@ -435,6 +435,7 @@ BEGIN
 
   IF OLD.author_id IS DISTINCT FROM NEW.author_id
      OR OLD.name IS DISTINCT FROM NEW.name
+     OR OLD.title IS DISTINCT FROM NEW.title
      OR OLD.intro IS DISTINCT FROM NEW.intro
      OR OLD.race IS DISTINCT FROM NEW.race
      OR OLD.style IS DISTINCT FROM NEW.style
@@ -457,7 +458,7 @@ REVOKE ALL ON FUNCTION public.on_encounter_character_visibility_changed()
 
 DROP TRIGGER IF EXISTS characters_enqueue_encounter_schedule_ai ON public.characters;
 CREATE TRIGGER characters_enqueue_encounter_schedule_ai
-AFTER INSERT OR UPDATE OF author_id, name, intro, race, style, gender, age, tags,
+AFTER INSERT OR UPDATE OF author_id, name, title, intro, race, style, gender, age, tags,
   personality_profile, visibility, review_status, rights_confirmed, deleted_at
 ON public.characters
 FOR EACH ROW EXECUTE FUNCTION public.on_encounter_character_visibility_changed();
