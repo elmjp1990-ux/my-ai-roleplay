@@ -10016,8 +10016,8 @@ async function loadEncounterScheduleTestTools(){
     const status=section.querySelector('#encounterScheduleTestStatus');
     const button=section.querySelector('[data-action="organize-encounter-schedules"]');
     const pending=Number(data.pending_character_count||0);
-    const lastRun=data.last_batch_started_at?new Date(data.last_batch_started_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):'尚未執行';
-    if(status)status.textContent=data.status_available===false?'測試環境已確認；目前無法讀取佇列狀態。':'佇列待處理：'+pending+' 位｜按下後會先檢查符合資格的公開角色，每次最多整理 10 位｜上次整理：'+lastRun+(data.last_batch_status?'（'+data.last_batch_status+'）':'');
+    const lastRun=data.last_batch_completed_at?new Date(data.last_batch_completed_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):'尚未執行';
+    if(status)status.textContent=data.status_available===false?'測試環境已確認；目前無法讀取佇列狀態。':'佇列待處理：'+pending+' 位｜按下後會先檢查符合資格的公開角色，本次整理全部待處理角色｜上次成功完成：'+lastRun+(data.last_batch_status?'（'+data.last_batch_status+'）':'');
     if(button)button.disabled=false;
   }catch{section.remove();}
 }
@@ -10291,7 +10291,7 @@ function renderModal(o) {
         <p class="muted">鑽石與銀幣為測試資料，不代表正式付費資產。</p>
         <section class="panel stack" id="encounterScheduleTestTools" style="margin:10px 0;padding:12px" hidden>
           <strong>相遇模式｜AI 行程與場景整理</strong>
-          <p class="small muted">每次最多整理 10 位符合資格的公開角色，並建立／更新共同行程場景；若仍有待整理角色，可再次按下。</p>
+          <p class="small muted">整理目前所有符合資格的公開角色行程，並建立／更新共同行程場景。</p>
           <p class="small muted" id="encounterScheduleTestStatus">正在確認是否為允許的測試環境…</p>
           <div class="row wrap"><button type="button" data-action="organize-encounter-schedules" disabled>AI 整理角色行程與場景</button></div>
           <p class="small muted">僅限伺服器核准的測試帳號。會產生一次 AI 服務呼叫成本，但不扣玩家銀幣或鑽石；不會觸發相遇對話。</p>
