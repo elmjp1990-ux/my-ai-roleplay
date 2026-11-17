@@ -10013,13 +10013,13 @@ async function loadEncounterScheduleTestTools(){
   if(button){button.disabled=true;button.dataset.aiEnabled='false';}
   const client=window.mySupabase;
   if(!client||!currentUser()?.uid){
-    if(status)status.textContent='請先登入已獲授權的測試帳號；目前不會發出 AI 呼叫。';
+    if(status)status.textContent='請先登入測試帳號；目前不會發出 AI 呼叫。';
     return;
   }
   try{
     const {data,error}=await client.functions.invoke('encounter-schedule-organizer',{body:{mode:'status'}});
     if(error||data?.enabled!==true){
-      if(status)status.textContent='目前環境或帳號尚未通過伺服器測試授權；AI 生成暫時停用。請確認測試模式與測試帳號名單。';
+      if(status)status.textContent='伺服器尚未啟用測試模式；AI 生成暫時停用。請確認測試環境設定。';
       return;
     }
     const pending=Number(data.pending_character_count||0);
@@ -10306,7 +10306,7 @@ function renderModal(o) {
           <p class="small muted">整理目前所有符合資格的公開角色行程，並建立／更新共同行程場景。</p>
           <p class="small muted" id="encounterScheduleTestStatus">正在確認是否為允許的測試環境…</p>
           <div class="row wrap"><button type="button" data-action="organize-encounter-schedules" disabled>AI 生成角色行程與場景</button></div>
-          <p class="small muted">僅限伺服器核准的測試帳號。會產生一次 AI 服務呼叫成本，但不扣玩家銀幣或鑽石；不會觸發相遇對話。</p>
+          <p class="small muted">測試環境登入帳號皆可使用。會產生 AI 服務呼叫成本，但不扣玩家銀幣或鑽石；不會觸發相遇對話。正式環境不提供此按鈕。</p>
         </section>`);
       void loadEncounterScheduleTestTools();
       break;
