@@ -83,8 +83,11 @@ BEGIN
   FROM public.encounter_character_greeting_pools AS pools
   WHERE pools.character_id = p_character_id;
 
-  IF jsonb_typeof(v_stage_pool) = 'array'
-     AND jsonb_array_length(v_stage_pool) BETWEEN 3 AND 5 THEN
+  IF CASE
+       WHEN jsonb_typeof(v_stage_pool) = 'array'
+       THEN jsonb_array_length(v_stage_pool) BETWEEN 3 AND 5
+       ELSE false
+     END THEN
     INSERT INTO public.encounter_character_greeting_history (
       user_id, character_id
     ) VALUES (p_user_id, p_character_id)
@@ -121,13 +124,6 @@ BEGIN
     v_greeting_hash := pg_catalog.md5(v_greeting);
     v_greeting_id := v_relationship_stage || ':' || v_greeting_hash;
 
-    UPDATE public.encounter_character_greeting_history
-    SET last_greeting_hash = v_greeting_hash,
-        last_relationship_stage = v_relationship_stage,
-        last_session_id = p_session_id,
-        updated_at = pg_catalog.clock_timestamp()
-    WHERE user_id = p_user_id
-      AND character_id = p_character_id;
   ELSE
     -- Legacy schedules remain usable until their character's new greeting pools publish.
     v_greeting := COALESCE(p_character_snapshot->>'encounterGreeting', '');
@@ -157,6 +153,16 @@ BEGIN
     p_session_id, p_user_id, p_character_id, p_character_name, 'active',
     v_snapshot, v_session_data, 'encounter'
   );
+
+  IF v_greeting_hash IS NOT NULL THEN
+    UPDATE public.encounter_character_greeting_history
+    SET last_greeting_hash = v_greeting_hash,
+        last_relationship_stage = v_relationship_stage,
+        last_session_id = p_session_id,
+        updated_at = pg_catalog.clock_timestamp()
+    WHERE user_id = p_user_id
+      AND character_id = p_character_id;
+  END IF;
 
   INSERT INTO public.encounter_session_lifecycle (
     session_id, user_id, character_id, location_key, schedule_snapshot,
