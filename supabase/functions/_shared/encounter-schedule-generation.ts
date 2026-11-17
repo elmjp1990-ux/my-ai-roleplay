@@ -8,7 +8,7 @@ export const ENCOUNTER_SCHEDULE_VARIANT_WEIGHTS = {
 export const ENCOUNTER_SCHEDULE_MAX_SLOTS_PER_VARIANT = 4;
 
 export const ENCOUNTER_SPECIAL_EVENT_KEYS = [
-  "taiwan_public_holiday", "valentines_day", "christmas",
+  "taiwan_public_holiday", "lunar_new_year", "valentines_day", "christmas",
 ] as const;
 
 export const ENCOUNTER_SCENE_KEYS = [
@@ -304,7 +304,7 @@ export function buildEncounterScheduleBatchMessages(sources: EncounterScheduleSo
     "可提出 shopping-street 作為新場景候選；即使本批只有一個角色也可保留，後端會跨批次統計公開角色數，達兩個不同角色才顯示新地標。相似場景需共用同一候選，不可輸出座標、圖片 URL、Storage path 或自行發明地標 ID。",
     "每天以整點為單位規劃。連續多小時在同一地點從事同一活動，合併為一個 start_time/end_time 區間；例如 09:00–17:00 的 8 小時工作必須留在同一地點。每個變體最多 4 個時段，可保留合理空檔。",
     "holiday 依台灣政府正式辦公日曆判斷，包含國定假日與補班日；不可單純把週末都視為假日。每個 weekday 變體權重固定 primary=80、alternative=20；每個 holiday 變體權重固定 primary=60、alternative=40。每個日型都必須提供 primary 與 alternative 兩套完整 24 小時行程，從 00:00 開始至次日 00:00 結束，時段必須連續無空檔、不可重疊；允許合併連續相同地點／活動的時段，但不得遺漏任何小時。",
-    "special_events 可選擇輸出 0–3 個條件式節日行程，只能使用 event_key: taiwan_public_holiday、valentines_day、christmas。taiwan_public_holiday 代表台灣政府正式放假日；valentines_day 為每年 02-14；christmas 為每年 12-25。只有角色背景、關係或職業確實適合節日變化時才輸出，不要為每個角色硬加節日活動；若 placement=no_matching_location，special_events 必須是空陣列。每個特殊節日包含 event_key、event_name、slots；slots 同樣必須完整覆蓋 24 小時、2–4 個時段，並遵守一般時段的場景、招呼與雨備規範。角色生日目前沒有結構化日期來源，不可自行推算或輸出 birthday.",
+    "special_events 可選擇輸出 0–3 個條件式節日行程，只能使用 event_key: taiwan_public_holiday、lunar_new_year、valentines_day、christmas。taiwan_public_holiday 代表台灣政府正式放假日；lunar_new_year 代表農曆除夕與春節假期；valentines_day 為每年 02-14；christmas 為每年 12-25。只有角色背景、關係或職業確實適合節日變化時才輸出，不要為每個角色硬加節日活動；若 placement=no_matching_location，special_events 必須是空陣列。每個特殊節日包含 event_key、event_name、slots；slots 同樣必須完整覆蓋 24 小時、2–4 個時段，並遵守一般時段的場景、招呼與雨備規範。角色生日目前沒有結構化日期來源，不可自行推算或輸出 birthday.",
     "戶外時段必須提供雨天室內替代地點、活動與一段 150–300 字元的 rain_fallback_greeting；室內時段所有 rain_fallback 欄位必須為 null。park 與 shopping-street 為戶外；其餘提供的地點為室內。",
     "作者行程說明只供內部規劃，輸出活動必須使用公開可見、簡短自然的描述，不得逐字複製整段說明或揭露私人情節。每個時段都要產生一段與該角色、地點、活動吻合的預生成招呼 encounter_greeting，長度 150–300 字元；不得直接揭露作者私密設定或照抄私密內容。",
     "只可使用 location_key: airport, commercial, night-bar, live-house, apartment, department-store, bookstore, cafe, park, shopping-street。場景類別不明或角色無現代地圖相容地點時，使用 no_matching_location 並回傳空 variants。",
