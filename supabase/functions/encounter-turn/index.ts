@@ -123,7 +123,10 @@ Deno.serve(async (request) => {
 
   let body: Record<string, unknown>;
   try { body = await request.json(); } catch { return json({ error: "invalid_json" }, 400); }
-  const { turnId, sessionId, userMessageId, assistantMessageId } = body;
+  const turnId = typeof body.turnId === "string" ? body.turnId : "";
+  const sessionId = typeof body.sessionId === "string" ? body.sessionId : "";
+  const userMessageId = typeof body.userMessageId === "string" ? body.userMessageId : "";
+  const assistantMessageId = typeof body.assistantMessageId === "string" ? body.assistantMessageId : "";
   if (![turnId, sessionId, userMessageId, assistantMessageId].every(isUuid)) {
     return json({ error: "invalid_turn_identifiers" }, 400);
   }
