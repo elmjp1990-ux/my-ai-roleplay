@@ -464,15 +464,25 @@
     pager.loading=true;
     renderCityPeopleStrip(place);
     try{
-      const result=await loadCityCharacterPage(pager.offset);
-      const items=Array.isArray(result?.items)?result.items:[];
-      pager.offset+=items.length;
-      pager.hasMore=result?.hasMore===true;
-      pager.candidates=[...pager.candidates,...items];
-      const schedules=await loadCityCharacterSchedules(items.map(person=>person.id));
-      for(const person of items)person.encounterSchedules=schedules.get(person.id)||'';
-      pager.people=getCityPresence(place,pager.candidates);
-      cityPresenceByPlace[place]=pager.people;
+      // Scan up to five lightweight pages per request so an empty first page
+      // cannot hide characters whose schedules appear later in the public list.
+      const targetCount=pager.people.length+10;
+      let scannedPages=0;
+      while(pager.hasMore&&pager.people.length<targetCount&&scannedPages<5){
+        const result=await loadCityCharacterPage(pager.offset);
+        const items=Array.isArray(result?.items)?result.items:[];
+        pager.offset+=items.length;
+        pager.hasMore=result?.hasMore===true;
+        pager.candidates=[...pager.candidates,...items];
+        if(items.length){
+          const schedules=await loadCityCharacterSchedules(items.map(person=>person.id));
+          for(const person of items)person.encounterSchedules=schedules.get(person.id)||'';
+        }
+        pager.people=getCityPresence(place,pager.candidates);
+        cityPresenceByPlace[place]=pager.people;
+        scannedPages++;
+        if(items.length===0)break;
+      }
     }catch(error){
       pager.error=error;
       console.error('讀取城市角色排程失敗：',error);
