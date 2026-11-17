@@ -14,13 +14,25 @@ export const ENCOUNTER_SPECIAL_EVENT_KEYS = [
 export const ENCOUNTER_SCENE_KEYS = [
   "airport", "commercial", "night-bar", "live-house", "apartment",
   "department-store", "bookstore", "cafe", "park", "shopping-street",
+  "night-market", "restaurant", "university", "hospital", "gym", "cinema",
+  "museum", "hotel", "train-station", "library", "theater", "art-gallery",
+  "community-center", "music-studio", "bakery", "coworking-space",
+] as const;
+
+export const ENCOUNTER_DYNAMIC_SCENE_KEYS = [
+  "shopping-street", "night-market", "restaurant", "university", "hospital",
+  "gym", "cinema", "museum", "hotel", "train-station", "library", "theater",
+  "art-gallery", "community-center", "music-studio", "bakery", "coworking-space",
 ] as const;
 
 const INDOOR_SCENE_KEYS = new Set([
   "airport", "commercial", "night-bar", "live-house", "apartment",
-  "department-store", "bookstore", "cafe",
+  "department-store", "bookstore", "cafe", "restaurant", "university",
+  "hospital", "gym", "cinema", "museum", "hotel", "train-station",
+  "library", "theater", "art-gallery", "community-center", "music-studio",
+  "bakery", "coworking-space",
 ]);
-const OUTDOOR_SCENE_KEYS = new Set(["park", "shopping-street"]);
+const OUTDOOR_SCENE_KEYS = new Set(["park", "shopping-street", "night-market"]);
 const NON_MODERN_ERA_PATTERN = /ancient|historical|medieval|antiquity|fantasy|mythic|fictional|古代|歷史|中世紀|中古|奇幻|架空|封建|戰國|春秋|秦漢|唐代|宋代|明代|清代|古羅馬|古希臘/i;
 const SCENE_ALIASES: Record<string, string> = {
   bar: "night-bar", pub: "night-bar", 酒吧: "night-bar", 酒館: "night-bar", 夜店: "night-bar",
@@ -33,6 +45,22 @@ const SCENE_ALIASES: Record<string, string> = {
   公寓: "apartment", 住宅: "apartment", apartment: "apartment",
   livehouse: "live-house", "live house": "live-house", 現場音樂: "live-house", 音樂展演: "live-house",
   購物街: "shopping-street", 商店街: "shopping-street", 逛街商圈: "shopping-street",
+  夜市: "night-market", 夜間市集: "night-market",
+  餐廳: "restaurant", 飯店餐廳: "restaurant", 餐館: "restaurant",
+  大學: "university", 學校: "university", 校園: "university",
+  醫院: "hospital", 診所: "hospital",
+  健身房: "gym", 健身中心: "gym",
+  電影院: "cinema", 影城: "cinema",
+  博物館: "museum", 美術館: "museum", 展覽館: "museum",
+  飯店: "hotel", 旅館: "hotel",
+  車站: "train-station", 火車站: "train-station", 捷運站: "train-station", 高鐵站: "train-station",
+  圖書館: "library",
+  劇院: "theater", 劇場: "theater",
+  藝廊: "art-gallery", 畫廊: "art-gallery",
+  社區中心: "community-center", 活動中心: "community-center",
+  音樂工作室: "music-studio", 錄音室: "music-studio",
+  麵包店: "bakery", 烘焙坊: "bakery",
+  共享辦公室: "coworking-space", 共同工作空間: "coworking-space",
 };
 
 type RecordValue = Record<string, unknown>;
@@ -63,6 +91,17 @@ export const ENCOUNTER_RELATIONSHIP_STAGES = [
 ] as const;
 export type EncounterRelationshipStage = typeof ENCOUNTER_RELATIONSHIP_STAGES[number];
 export type EncounterRelationshipGreetingPools = Record<EncounterRelationshipStage, string[]>;
+export type GeneratedSceneMetadata = {
+  location_key: typeof ENCOUNTER_SCENE_KEYS[number];
+  display_name: string;
+  icon: string;
+  heading: string;
+  description: string;
+  event_label: string;
+  event_title: string;
+  event_description: string;
+};
+
 export type GeneratedCharacterSchedule = {
   character_id: string;
   placement: "modern_map" | "no_matching_location";
@@ -97,6 +136,18 @@ export function isEncounterModernMapCompatible(source: EncounterScheduleSource):
   const era = [text(source.world_era), text(source.setting_era), text(source.intro)].filter(Boolean).join(" ");
   const nonModern = NON_MODERN_ERA_PATTERN.test(era);
   return !nonModern || source.modern_setting_compatible === true || source.time_travel_explicit === true;
+}
+
+function isAirportUseReasonable(source: EncounterScheduleSource, activity: string): boolean {
+  const profile = isRecord(source.personality_profile) ? source.personality_profile : {};
+  const context = [
+    text(source.name), text(source.title), text(source.occupation), text(source.intro),
+    text(source.schedule_description), text(source.race), JSON.stringify(profile),
+  ].join(" ");
+  const airportRole = /機場|航空|機師|飛行員|空服|地勤|航務|機組|航空公司|airport|airline|pilot|flight attendant/i.test(context);
+  const explicitTravel = /出差|出國|旅遊|旅行|搭機|飛機|機票|航班|接機|送機|轉機|候機|登機|出境|入境|travel|flight|boarding/i.test(context);
+  const activityReason = /搭機|接機|送機|轉機|候機|航班|飛行|登機|出入境|機場勤務|航空|flight|boarding|departure|arrival/i.test(activity);
+  return airportRole || (explicitTravel && activityReason);
 }
 
 function parseHour(value: unknown): number | null {
@@ -337,8 +388,9 @@ export function buildEncounterScheduleBatchMessages(sources: EncounterScheduleSo
   const system = [
     "你是 POYOZZ 的角色行程規劃器。一次為提供的 1 至 10 個公開角色整理可驗證的城市地圖行程。",
     "必須讀取角色名稱、稱號、職業、身分、世界觀、種族、性格、興趣、標籤、作者行程說明及 existing_author_schedules。existing_author_schedules 是作者已保存的固定時段與地點，必須原樣保留並視為優先限制，不得改寫或覆蓋；AI 只負責推演其餘空白時段。若 author_schedule_brief 為空，必須依角色卡設定推演合理日常，不可因此留白或標記無行程；若作者只提供部分時段，保留明確時段與限制，只補足空白，不得覆蓋作者設定。只使用輸入角色的設定與作者提供的行程方向，不可替角色創造與背景衝突的現代身分。歷史／古代角色若沒有作者明確設定現代相容或明確穿越，必須 placement=no_matching_location，不可放進現代城市地圖。奇幻種族只要背景明確相容現代世界，就可以正常安排。",
-    "相似職業或場景必須共用 canonical location_key：酒吧老闆／酒保／酒吧員工共用 night-bar；企業主／主管／秘書共用 commercial；咖啡相關共用 cafe。不可為每個角色各造一個相似地點。",
-    "可提出 shopping-street 作為新場景候選；即使本批只有一個角色也可保留，後端會跨批次統計公開角色數，達兩個不同角色才顯示新地標。相似場景需共用同一候選，不可輸出座標、圖片 URL、Storage path 或自行發明地標 ID。",
+    "相似職業或場景必須共用 canonical location_key：酒吧老闆／酒保／酒吧員工共用 night-bar；企業主／主管／秘書共用 commercial；咖啡相關共用 cafe；音樂演出者與樂迷可共用 live-house；一般交通轉乘優先使用 train-station。不可為每個角色各造一個相似地點。",
+    "場景類型可依角色群體需求使用 shopping-street、night-market、restaurant、university、hospital、gym、cinema、museum、hotel、train-station、library、theater、art-gallery、community-center、music-studio、bakery、coworking-space。新增動態場景必須是多人有共同需求的合理公共場所；後端會跨批次統計，至少兩位不同公開角色排入同一場景才顯示新地標。不可輸出座標、圖片 URL、Storage path 或自行發明地標 ID。",
+    "airport 是特殊地點：只有角色本身職業／設定與航空機場有明確關聯，或作者設定有具體搭機、接送、轉機、出入境行程時才能使用。不得把機場當一般休閒、辦公或隨機偶遇地點；沒有明確理由時使用更合理的車站、商業大樓或其他場景。",
     "每天以整點為單位規劃。連續多小時在同一地點從事同一活動，合併為一個 start_time/end_time 區間；例如 09:00–17:00 的 8 小時工作必須留在同一地點。每個變體最多 4 個時段，可保留合理空檔。",
     "holiday 依台灣政府正式辦公日曆判斷，包含國定假日與補班日；不可單純把週末都視為假日。每個 weekday 變體權重固定 primary=80、alternative=20；每個 holiday 變體權重固定 primary=60、alternative=40。每個日型都必須提供 primary 與 alternative 兩套完整 24 小時行程，從 00:00 開始至次日 00:00 結束，時段必須連續無空檔、不可重疊；允許合併連續相同地點／活動的時段，但不得遺漏任何小時。",
     "special_events 可選擇輸出 0–4 個條件式節日行程，只能使用 event_key: taiwan_public_holiday、lunar_new_year、valentines_day、christmas。taiwan_public_holiday 代表台灣政府正式放假日；lunar_new_year 代表農曆除夕與春節假期；valentines_day 為每年 02-14；christmas 為每年 12-25。只有角色背景、關係或職業確實適合節日變化時才輸出，不要為每個角色硬加節日活動；若 placement=no_matching_location，special_events 必須是空陣列。每個特殊節日包含 event_key、event_name、slots；slots 同樣必須完整覆蓋 24 小時、2–4 個時段，並遵守一般時段的場景、招呼與雨備規範。角色生日目前沒有結構化日期來源，不可自行推算或輸出 birthday.",
@@ -346,8 +398,9 @@ export function buildEncounterScheduleBatchMessages(sources: EncounterScheduleSo
     "作者行程說明只供內部規劃，輸出活動必須使用公開可見、簡短自然的描述，不得逐字複製整段說明或揭露私人情節。每個時段都要產生一段與該角色、地點、活動吻合的預生成招呼 encounter_greeting，長度 150–300 字元；不得直接揭露作者私密設定或照抄私密內容。",
     "每個 modern_map 角色還必須額外產生 relationship_greetings：依 hostile、dislike、wary、first_meeting、acquaintance、close、intimate、special 八種關係階段，各提供 3–5 段不同的繁體中文開場招呼，預設恰好 3 段（只有角色差異確實需要時才增加到 4–5 段），每段以 150–180 字元為目標且不得少於 150、不得超過 300 字元。每段要符合角色個性，但不要寫死地點、日期或時間，因為實際場景由玩家遇見時的排程決定；同一階段內不得重複。階段語氣要有明顯差異：hostile 敵意、dislike 冷淡、wary 戒備、first_meeting 初識、acquaintance 熟悉、close 信任親近、intimate 深厚親密（不預設一定是戀愛）、special 特別且高度個人化。不可因關係階段而捏造玩家曾做過的事。",
 
-    "只可使用 location_key: airport, commercial, night-bar, live-house, apartment, department-store, bookstore, cafe, park, shopping-street。場景類別不明或角色無現代地圖相容地點時，使用 no_matching_location 並回傳空 variants。",
-    "輸出必須是嚴格 JSON object，唯一根欄位 characters。每個角色欄位為 character_id, placement, variants, special_events；modern_map 角色必須包含 relationship_greetings，no_matching_location 角色可省略。relationship_greetings 必須且只能包含八個 stage key，每個 key 對應 3–5 段 150–300 字元的字串陣列。variants 只包含 weekday 與 holiday；各自為兩個 variant 物件。variant 物件欄位為 variant_key, weight, slots。special_events 為 0–4 個 event_key, event_name, slots 物件的陣列；無適合節日時輸出空陣列。slot 欄位為 start_time, end_time, location_key, activity, is_outdoor, rain_fallback_location_key, rain_fallback_activity, rain_fallback_greeting, encounter_greeting。不可輸出額外欄位或 Markdown。",
+    "只可使用 location_key: airport, commercial, night-bar, live-house, apartment, department-store, bookstore, cafe, park, shopping-street, night-market, restaurant, university, hospital, gym, cinema, museum, hotel, train-station, library, theater, art-gallery, community-center, music-studio, bakery, coworking-space。場景類別不明或角色無現代地圖相容地點時，使用 no_matching_location 並回傳空 variants。",
+    "scenes 必須為陣列，針對本批行程實際使用的每一個 location_key 各產生一筆場景資料，包含 location_key, display_name, icon, heading, description, event_label, event_title, event_description。description 應為約 40–220 字的具體場景簡介；event_label 使用「最新消息」或合適公告分類；event_title 與 event_description 分別提供兩則簡短、符合角色世界觀的虛構場景消息，不得冒充真實活動或真實營業資訊。不要把「目前沒有角色」寫進簡介，角色數量由系統即時顯示。",
+    "輸出必須是嚴格 JSON object，根欄位 characters 與 scenes。每個角色欄位為 character_id, placement, variants, special_events；modern_map 角色必須包含 relationship_greetings，no_matching_location 角色可省略。relationship_greetings 必須且只能包含八個 stage key，每個 key 對應 3–5 段 150–300 字元的字串陣列。variants 只包含 weekday 與 holiday；各自為兩個 variant 物件。variant 物件欄位為 variant_key, weight, slots。special_events 為 0–4 個 event_key, event_name, slots 物件的陣列；無適合節日時輸出空陣列。slot 欄位為 start_time, end_time, location_key, activity, is_outdoor, rain_fallback_location_key, rain_fallback_activity, rain_fallback_greeting, encounter_greeting。scenes 只包含上述八個欄位。不可輸出額外欄位或 Markdown。",
   ].join("\n");
   return {
     messages: [
@@ -361,15 +414,16 @@ export function buildEncounterScheduleBatchMessages(sources: EncounterScheduleSo
 export function parseEncounterScheduleBatchOutput(
   raw: string,
   sources: EncounterScheduleSource[],
-): { ok: boolean; characters: GeneratedCharacterSchedule[]; errors: string[] } {
+): { ok: boolean; characters: GeneratedCharacterSchedule[]; scenes: GeneratedSceneMetadata[]; errors: string[] } {
   const errors: string[] = [];
   let parsed: unknown;
-  try { parsed = JSON.parse(String(raw ?? "")); } catch { return { ok: false, characters: [], errors: ["output_json_invalid"] }; }
-  if (!hasExactKeys(parsed, ["characters"]) || !Array.isArray(parsed.characters)) {
-    return { ok: false, characters: [], errors: ["output_root_invalid"] };
+  try { parsed = JSON.parse(String(raw ?? "")); } catch { return { ok: false, characters: [], scenes: [], errors: ["output_json_invalid"] }; }
+  if (!isRecord(parsed) || !Array.isArray(parsed.characters) ||
+    Object.keys(parsed).some((key) => !["characters", "scenes"].includes(key))) {
+    return { ok: false, characters: [], scenes: [], errors: ["output_root_invalid"] };
   }
   if (new Set(sources.map((source) => source.character_id)).size !== sources.length) {
-    return { ok: false, characters: [], errors: ["source_character_ids_not_unique"] };
+    return { ok: false, characters: [], scenes: [], errors: ["source_character_ids_not_unique"] };
   }
   const sourceById = new Map(sources.map((source) => [source.character_id, source]));
   if (parsed.characters.length !== sources.length) errors.push("character_count_mismatch");
@@ -438,6 +492,13 @@ export function parseEncounterScheduleBatchOutput(
       validateVariant(item.variants.holiday[0], "holiday", "primary", 60, errors, id + "_holiday_primary"),
       validateVariant(item.variants.holiday[1], "holiday", "alternative", 40, errors, id + "_holiday_alternative"),
     ].filter((value): value is ScheduleVariant => value !== null);
+    const scheduleSlots = [...weekday, ...holiday].flatMap((variant) => variant.slots)
+      .concat(specialEvents.flatMap((event) => event.slots));
+    if (scheduleSlots.some((slot) =>
+      (slot.location_key === "airport" || slot.rain_fallback_location_key === "airport") &&
+      !isAirportUseReasonable(source, slot.activity))) {
+      errors.push(id + "_airport_location_without_character_context");
+    }
     if (weekday.length === 2 && holiday.length === 2) {
       characters.push({
         character_id: id, placement: "modern_map", variants: { weekday, holiday },
@@ -446,11 +507,77 @@ export function parseEncounterScheduleBatchOutput(
     }
   }
 
-  // Preserve a candidate scene even when only one character is in this AI batch.
-  // The database scene registry decides whether the marker is publicly visible by
-  // counting distinct eligible characters across all published schedules, including
-  // characters published by earlier batches. The model never supplies coordinates.
+  // The AI may propose metadata for built-in and new canonical scenes, but it never
+  // supplies coordinates. The database publishes dynamic markers only after at least
+  // two distinct eligible characters share the location across all batches.
+  const usedSceneKeys = new Set<string>();
+  for (const character of characters) {
+    for (const variant of [...character.variants.weekday, ...character.variants.holiday]) {
+      for (const slot of variant.slots) {
+        usedSceneKeys.add(slot.location_key);
+        if (slot.rain_fallback_location_key) usedSceneKeys.add(slot.rain_fallback_location_key);
+      }
+    }
+    for (const event of character.special_events) {
+      for (const slot of event.slots) {
+        usedSceneKeys.add(slot.location_key);
+        if (slot.rain_fallback_location_key) usedSceneKeys.add(slot.rain_fallback_location_key);
+      }
+    }
+  }
+  const rawScenes = parsed.scenes === undefined ? [] : parsed.scenes;
+  const scenes: GeneratedSceneMetadata[] = [];
+  if (!Array.isArray(rawScenes) || rawScenes.length > ENCOUNTER_SCENE_KEYS.length) {
+    errors.push("scene_metadata_array_invalid");
+  } else {
+    const seenScenes = new Set<string>();
+    for (const rawScene of rawScenes) {
+      if (!hasExactKeys(rawScene, [
+        "location_key", "display_name", "icon", "heading", "description",
+        "event_label", "event_title", "event_description",
+      ])) {
+        errors.push("scene_metadata_shape_invalid");
+        continue;
+      }
+      const locationKey = normalizeEncounterSceneKey(rawScene.location_key);
+      const displayName = text(rawScene.display_name);
+      const icon = text(rawScene.icon);
+      const heading = text(rawScene.heading);
+      const description = text(rawScene.description);
+      const eventLabel = text(rawScene.event_label);
+      const eventTitle = text(rawScene.event_title);
+      const eventDescription = text(rawScene.event_description);
+      if (!locationKey || !usedSceneKeys.has(locationKey) || seenScenes.has(locationKey) ||
+        Array.from(displayName).length < 1 || Array.from(displayName).length > 32 ||
+        Array.from(icon).length < 1 || Array.from(icon).length > 4 || /[<>]/.test(icon) ||
+        Array.from(heading).length < 2 || Array.from(heading).length > 50 ||
+        Array.from(description).length < 30 || Array.from(description).length > 500 ||
+        Array.from(eventLabel).length < 2 || Array.from(eventLabel).length > 20 ||
+        Array.from(eventTitle).length < 2 || Array.from(eventTitle).length > 80 ||
+        Array.from(eventDescription).length < 2 || Array.from(eventDescription).length > 160) {
+        errors.push("scene_metadata_value_invalid");
+        continue;
+      }
+      seenScenes.add(locationKey);
+      scenes.push({
+        location_key: locationKey as GeneratedSceneMetadata["location_key"],
+        display_name: displayName, icon, heading, description,
+        event_label: eventLabel, event_title: eventTitle, event_description: eventDescription,
+      });
+    }
+  }
+  for (const key of usedSceneKeys) {
+    if ((ENCOUNTER_DYNAMIC_SCENE_KEYS as readonly string[]).includes(key) &&
+      !scenes.some((scene) => scene.location_key === key)) {
+      errors.push("dynamic_scene_metadata_missing_" + key);
+    }
+  }
 
   if (seen.size !== sources.length) errors.push("character_coverage_incomplete");
-  return { ok: errors.length === 0, characters: errors.length === 0 ? characters : [], errors: [...new Set(errors)] };
+  return {
+    ok: errors.length === 0,
+    characters: errors.length === 0 ? characters : [],
+    scenes: errors.length === 0 ? scenes : [],
+    errors: [...new Set(errors)],
+  };
 }
