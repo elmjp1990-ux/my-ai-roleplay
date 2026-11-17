@@ -66,7 +66,7 @@ assert.match(endpoint, /sceneBackgroundPath/);
 assert.match(endpoint, /illustration_id/);
 assert.match(endpoint, /scene_background_id/);
 assert.match(scene, /session\?\.encounterVisuals/);
-assert.match(scene, /hydrateEncounterGalleryIllustration\(character\.id, selectedIllustrationId\)/);
+assert.match(scene, /hydrateEncounterGalleryIllustration\\(character\\.id,selectedIllustrationId\\)/);
 const openingHandlerStart = frontend.indexOf("window.addEventListener('poyozz-encounter-opening-choice'");
 const openingHandlerEnd = frontend.indexOf("async function markCloudChatSessionRead", openingHandlerStart);
 assert.ok(openingHandlerStart >= 0 && openingHandlerEnd > openingHandlerStart, "Opening-choice persistence handler must exist");
