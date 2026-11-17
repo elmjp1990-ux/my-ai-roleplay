@@ -84,3 +84,12 @@ assert.match(html,/get_encounter_character_schedules/);
 assert.doesNotMatch(cityMap,/hydrateCitySchedule/);
 assert.ok(cityMap.includes("const schedules=await loadCityCharacterSchedules(items.map(person=>person.id))"));
 assert.ok(!cityMap.includes("Promise.all(items.map(hydrateCitySchedule)"));
+
+assert.match(cityMap, /const targetCount=pager\.people\.length\+10/);
+assert.match(cityMap, /scannedPages<5/);
+assert.match(cityMap, /while\(pager\.hasMore&&pager\.people\.length<targetCount/);
+assert.match(h, /button\.dataset\.aiEnabled='false'/);
+assert.match(h, /button\.dataset\.aiEnabled='true'/);
+assert.match(h, /button\.dataset\.aiEnabled!=='true'\|\|button\.disabled/);
+assert.match(h, /AI 生成角色行程與場景/);
+assert.doesNotMatch(h, /if\(error\|\|data\?\.enabled!==true\)\{section\.remove\(\);return;\}/);
