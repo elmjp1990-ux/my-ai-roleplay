@@ -200,6 +200,16 @@ Deno.test("infers a complete schedule from the character profile when the author
   if (!Array.isArray(payload.existing_author_schedules) || payload.existing_author_schedules.length !== 0) {
     throw new Error("empty author schedule list missing");
   }
+  const withManualSchedule = buildEncounterScheduleBatchMessages([source(id1, {
+    existing_author_schedules: [{
+      weekday: 1, day_type: "weekday", start_time: "09:00", end_time: "17:00",
+      location_key: "commercial", activity: "作者指定的固定工作時段",
+    }],
+  })]);
+  const manual = JSON.parse(withManualSchedule.messages[1].content).characters[0].existing_author_schedules[0];
+  if (manual.location_key !== "commercial" || manual.activity !== "作者指定的固定工作時段") {
+    throw new Error("saved author schedule was not included in generation context");
+  }
   if (!built.messages[0].content.includes("existing_author_schedules 是作者已保存的固定時段")) {
     throw new Error("author-managed schedule priority missing");
   }
