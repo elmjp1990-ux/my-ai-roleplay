@@ -64,7 +64,7 @@ assert.match(pipeline, /CREATE FUNCTION public\.get_encounter_character_schedule
 assert.match(pipeline, /CREATE FUNCTION public\.get_encounter_character_schedules[\s\S]*?LANGUAGE sql\s+VOLATILE/);
 assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.get_encounter_character_schedules[\s\S]*?LANGUAGE sql\s+VOLATILE/);
 assert.match(replay, /DO \$special_event_schedule_smoke\$/);
-assert.match(replay, /official holiday special schedule was not selected/);
+assert.match(replay, /generic public holiday schedule was not selected for a named holiday/);
 assert.match(scheduleGeneration, /special_events/);
 assert.match(scheduleGeneration, /lunar_new_year/);
 assert.match(scheduleGeneration, /角色生日目前沒有結構化日期來源/);
