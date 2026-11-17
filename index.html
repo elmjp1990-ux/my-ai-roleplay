@@ -4424,6 +4424,32 @@ async function saveChatSessionSafely(s) {
   return chatSessionSaveQueue(key, performSave);
 }
 
+// Encounter opening choices reuse the existing session_data.openingMessage persistence field.
+window.addEventListener('poyozz-encounter-opening-choice', async event => {
+  const detail = event.detail || {};
+  const session = state.sessions?.[detail.sessionId];
+  const user = currentUser();
+  if (!session?.encounterMode || !user?.uid || session.cloudOwnerUid !== user.uid) return;
+  if (detail.choice === 'wait') {
+    const greeting = String(session.encounterGreeting || session.cloudCharacterSnapshot?.encounterGreeting ||
+      session.cloudCharacterSnapshot?.opening || '').trim();
+    if (!greeting) return toast('這個角色目前還沒有可用的相遇招呼，請先主動打招呼。');
+    session.initialOpeningMessage = { text: greeting, at: Date.now() };
+    session.encounterIntroChoice = 'wait';
+  } else if (detail.choice === 'greet') {
+    session.encounterIntroChoice = 'greet';
+  } else {
+    return;
+  }
+  persist();
+  const saved = await saveChatSessionSafely(session);
+  if (!saved) console.warn('相遇初始選擇尚未取得雲端保存確認；首次送出訊息時會再次同步。');
+  renderConversation();
+  if (detail.choice === 'greet') {
+    requestAnimationFrame(() => document.getElementById('messageInput')?.focus());
+  }
+});
+
 async function markCloudChatSessionRead(session) {
   const user=currentUser(),client=window.mySupabase;
   if(!session?.cloudOwned||!user?.uid||session.cloudOwnerUid!==user.uid||!client||!isUuid(session.id))return false;
@@ -6547,6 +6573,8 @@ async function createEncounterSession(character) {
     encounterMode: true,
     encounterPlace: typeof encounterPlace === 'string' ? encounterPlace : null,
     encounterDay: new Date().toLocaleDateString('en-CA'),
+    encounterGreeting: String(data.session.character_snapshot?.encounterGreeting || data.session.character_snapshot?.opening || '').trim(),
+    encounterIntroChoice: null,
     messages: [],
     memories: [],
     album: [],
