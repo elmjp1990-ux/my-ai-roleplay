@@ -8,6 +8,7 @@
   let activeMapCleanup = null;
   let activeSceneRefresh = null;
   let activeScheduleRefresh = null;
+  let activeVenueRefresh = null;
   const CITY_MAP_WEATHER_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
   const CITY_MAP_SCENES_CACHE_TTL_MS = 30 * 60 * 1000;
   const cityMapMemoryCache = new Map();
@@ -37,6 +38,7 @@
     activeMapCleanup = null;
     activeSceneRefresh = null;
     activeScheduleRefresh = null;
+    activeVenueRefresh = null;
     cleanup();
   };
 
@@ -338,10 +340,11 @@
       if(!cached)console.warn('城市場景目錄載入失敗：',error?.message||error);
     }
   };
-  activeSceneRefresh=()=>{
+  activeSceneRefresh=async()=>{
     cityMapMemoryCache.delete('scenes-v2');
     try{sessionStorage.removeItem('poyozz-city-map-scenes-v2-v1');}catch{}
-    return loadCityDynamicScenes();
+    await loadCityDynamicScenes();
+    if(locationModal&&!locationModal.hidden)activeVenueRefresh?.();
   };
   const applyCityWeather=weather=>{
     const stage=$('cityMapStage');
@@ -495,11 +498,6 @@
     const name=cityPlaceNames[place]||'地點';
     const scene=cityVenueScenes[place];
     if(!scene){console.error('城市地標缺少專屬場景設定：',place);toast('這個地點的場景資料尚未完成，請稍後再試。');return;}
-    const notice={
-      label:scene.eventLabel||'最新消息',
-      items:[scene.eventTitle,scene.eventDescription].map(value=>String(value||'').trim()).filter(Boolean).slice(0,3)
-    };
-    const eventMarkup=notice.items.map(item=>'<p>📣 '+escapeHTML(item)+'</p>').join('');
     const flightMarkup=place==='airport'
       ? '<div class="city-location-news city-flight-section"><span class="city-location-event-label">今日航班</span><p class="small">模擬航班時刻表</p><table class="city-flight-table"><thead><tr><th>時間</th><th>航班</th><th>目的地</th><th>狀態</th></tr></thead><tbody><tr><td>09:20</td><td>PZ102</td><td>東京</td><td>準時</td></tr><tr><td>13:45</td><td>PZ238</td><td>首爾</td><td>登機中</td></tr><tr><td>18:10</td><td>PZ516</td><td>台北</td><td>預計抵達</td></tr></tbody></table><p class="city-flight-note">以上為虛構示意資料，非真實航班資訊。</p></div>'
       : '';
@@ -516,9 +514,18 @@
     const placeIcon=$('cityMapPlaceIcon');
     if(placeIcon)placeIcon.textContent=scene.icon;
     const renderVenue=()=>{
+      const latestScene=cityVenueScenes[place]||scene;
+      const latestNotice={
+        label:latestScene.eventLabel||'最新消息',
+        items:[latestScene.eventTitle,latestScene.eventDescription].map(value=>String(value||'').trim()).filter(Boolean).slice(0,3)
+      };
+      const latestEventMarkup=latestNotice.items.map(item=>'<p>📣 '+escapeHTML(item)+'</p>').join('');
+      if(title){title.textContent=cityPlaceNames[place]||name;title.style.display='block';title.style.visibility='visible';}
+      if(placeIcon)placeIcon.textContent=latestScene.icon;
       const target=$('cityMapPresenceList');
-      if(target)target.innerHTML='<h3 id="cityMapVenueHeading">'+escapeHTML(scene.heading)+'</h3><p id="cityMapVenueDescription">'+escapeHTML(scene.description)+'</p><div class="city-location-news"><span class="city-location-event-label">'+escapeHTML(notice.label)+'</span><div class="city-location-news-items">'+eventMarkup+'</div></div>'+flightMarkup;
+      if(target)target.innerHTML='<h3 id="cityMapVenueHeading">'+escapeHTML(latestScene.heading)+'</h3><p id="cityMapVenueDescription">'+escapeHTML(latestScene.description)+'</p><div class="city-location-news"><span class="city-location-event-label">'+escapeHTML(latestNotice.label)+'</span><div class="city-location-news-items">'+latestEventMarkup+'</div></div>'+flightMarkup;
     };
+    activeVenueRefresh=renderVenue;
     renderVenue();
     const pageState={offset:0,hasMore:true,loading:false,candidates:[],people:[],error:null};
     cityScenePageStates.set(place,pageState);
