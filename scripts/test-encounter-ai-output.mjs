@@ -56,6 +56,7 @@ assert.match(pipeline, /AND s\.special_event_key IS NULL/);
 assert.match(replay, /DO \$special_event_schedule_smoke\$/);
 assert.match(replay, /official holiday special schedule was not selected/);
 assert.match(scheduleGeneration, /special_events/);
+assert.match(scheduleGeneration, /lunar_new_year/);
 assert.match(scheduleGeneration, /角色生日目前沒有結構化日期來源/);
 
 assert.match(endpoint, /requestOpenRouterChatCompletion/);
