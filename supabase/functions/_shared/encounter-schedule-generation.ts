@@ -305,7 +305,12 @@ export function parseEncounterScheduleBatchOutput(
     for (const character of characters) {
       for (const variant of [...character.variants.weekday, ...character.variants.holiday]) {
         for (const slot of variant.slots) {
-          if (slot.location_key === "shopping-street") slot.location_key = "department-store";
+          if (slot.location_key === "shopping-street") {
+            slot.location_key = "department-store";
+            slot.is_outdoor = false;
+            slot.rain_fallback_location_key = null;
+            slot.rain_fallback_activity = null;
+          }
           if (slot.rain_fallback_location_key === "shopping-street") slot.rain_fallback_location_key = "department-store";
         }
       }
