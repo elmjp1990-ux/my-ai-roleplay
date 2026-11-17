@@ -3,6 +3,8 @@ name: Encounter AI turn contract
 on:
   pull_request:
     paths:
+      - "index.html"
+      - "encounter-scene.js"
       - "supabase/functions/encounter-turn/**"
       - "supabase/functions/_shared/encounter-turn-output.mjs"
       - "supabase/functions/_shared/encounter-response-guidelines.ts"
