@@ -77,18 +77,26 @@ Deno.serve(async (request) => {
     const { data: authData, error: authError } = await userClient.auth.getUser();
     if (authError || !authData?.user) return json({ enabled: false, test_mode: true });
     actorUserId = authData.user.id;
-    const [pendingResult, lastRunResult] = await Promise.all([
+    const [pendingResult, failedResult, reconciliationResult, lastRunResult] = await Promise.all([
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
-        .in("status", ["pending", "failed", "needs_reconciliation"]),
+        .eq("status", "pending"),
+      admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
+        .eq("status", "failed"),
+      admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
+        .eq("status", "needs_reconciliation"),
       admin.from("encounter_schedule_batch_runs").select("completed_at,status")
         .eq("status", "completed").not("completed_at", "is", null)
         .order("completed_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
-    if (pendingResult.error || lastRunResult.error) return json({ enabled: true, test_mode: true, status_available: false });
+    if (pendingResult.error || failedResult.error || reconciliationResult.error || lastRunResult.error) {
+      return json({ enabled: true, test_mode: true, status_available: false });
+    }
     return json({
       enabled: true,
       test_mode: true,
       pending_character_count: Number(pendingResult.count || 0),
+      failed_character_count: Number(failedResult.count || 0),
+      needs_reconciliation_count: Number(reconciliationResult.count || 0),
       last_batch_completed_at: lastRunResult.data?.completed_at || null,
       last_batch_status: lastRunResult.data?.status || null,
     });
@@ -116,6 +124,26 @@ Deno.serve(async (request) => {
 
   let queuedCharacterCount = 0;
   if (mode === "manual") {
+    // Never let the broad manual enqueue + p_force claim silently retry a
+    // failed or ambiguous provider result. Those jobs need explicit review.
+    const [failedResult, reconciliationResult] = await Promise.all([
+      admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
+        .eq("status", "failed"),
+      admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
+        .eq("status", "needs_reconciliation"),
+    ]);
+    if (failedResult.error || reconciliationResult.error) {
+      return json({ error: "schedule_failure_state_unavailable" }, 503);
+    }
+    const failedCharacterCount = Number(failedResult.count || 0);
+    const needsReconciliationCount = Number(reconciliationResult.count || 0);
+    if (failedCharacterCount > 0 || needsReconciliationCount > 0) {
+      return json({
+        status: "blocked_unresolved_failures",
+        failed_character_count: failedCharacterCount,
+        needs_reconciliation_count: needsReconciliationCount,
+      }, 409);
+    }
     const { data: enqueueData, error: enqueueError } = await admin.rpc(
       "enqueue_encounter_schedule_generation_test_batch",
       { p_limit: 2147483647 },
@@ -481,7 +509,7 @@ Deno.serve(async (request) => {
     }
   }
 
-  const partial = remaining > 0 || ambiguousPublishFailure || failedCharacterIds.size > 0;
+  const partial = remaining > 0 || ambiguousPublishFailure || ambiguousProviderFailure || failedCharacterIds.size > 0;
   for (const item of providerResponses) {
     await recordBatchUsage(admin, batchId, item.providerResponse, partial ? "partial" : "completed",
       partial ? "schedule_partial_character_failure" : null);
