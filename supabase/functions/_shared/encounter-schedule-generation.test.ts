@@ -111,6 +111,10 @@ Deno.test("only retains a new shopping-street scene when multiple characters sha
   if (!single.ok || single.characters[0].variants.weekday[0].slots[0].location_key !== "department-store") {
     throw new Error("unshared scene should collapse into an existing marker");
   }
+  if (single.characters[0].variants.weekday[0].slots[0].is_outdoor ||
+    single.characters[0].variants.weekday[0].slots[0].rain_fallback_location_key !== null) {
+    throw new Error("collapsed scene should use indoor semantics");
+  }
   const two = parseEncounterScheduleBatchOutput(JSON.stringify({
     characters: [
       { character_id: id1, placement: "modern_map", variants: variants([slot({ location_key: "shopping-street", is_outdoor: true,
