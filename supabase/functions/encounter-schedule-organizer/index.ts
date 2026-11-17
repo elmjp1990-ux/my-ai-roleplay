@@ -248,8 +248,9 @@ Deno.serve(async (request) => {
     return keys;
   };
 
-  // A new dynamic landmark is eligible only when at least two distinct claimed
-  // characters use it. Reserve no more than the three server-owned map slots.
+  // Keep candidate dynamic landmarks even when only one claimed role uses them;
+  // SQL checks the total shared schedule count after all per-role writes. Reserve
+  // no more than the three server-owned map slots.
   const existingDynamicKeys = new Set(
     sceneCatalog.filter((scene) => scene?.is_dynamic === true)
       .map((scene) => normalizeEncounterSceneKey(scene.location_key))
@@ -267,7 +268,7 @@ Deno.serve(async (request) => {
     }
   }
   const dynamicCandidates = [...dynamicUsers.entries()]
-    .filter(([, users]) => users.size >= 2)
+    .filter(([, users]) => users.size >= 1)
     .sort((a, b) => b[1].size - a[1].size || a[0].localeCompare(b[0]));
   const availableDynamicSlots = Math.max(0, 3 - existingDynamicKeys.size);
   const selectedNewDynamicKeys = new Set(
