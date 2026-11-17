@@ -1406,7 +1406,7 @@ BEGIN
         (v_end_local AT TIME ZONE 'Asia/Taipei'),
         v_effective_location, v_effective_activity, v_effective_greeting,
         v_effective_is_outdoor, v_weather_text, v_is_raining
-      ) ON CONFLICT (schedule_id, scheduled_start_at) DO NOTHING;
+      ) ON CONFLICT ON CONSTRAINT encounter_schedule_weather_decisions_pkey DO NOTHING;
 
       SELECT * INTO v_decision
       FROM public.encounter_schedule_weather_decisions d
