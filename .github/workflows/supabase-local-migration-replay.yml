@@ -180,7 +180,7 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-deletion-concurrency-setup.sql
           DATABASE_URL="$DATABASE_URL" bash scripts/test-deletion-concurrency.sh
 
-      - name: Replay Encounter schedule schema and weather fallback
+      - name: Replay formal Encounter schedule migration and weather fallback
         shell: bash
         run: |
           set -euo pipefail
@@ -197,19 +197,19 @@ jobs:
           fi
           cat "$LOG_FILE"
 
-      - name: Apply Encounter evidence and settlement safety gates
+      - name: Apply formal Encounter evidence and settlement migration
         shell: bash
         run: |
           set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117082906_encounter_evaluation_evidence_gates.sql
 
-      - name: Apply Encounter relationship greeting selection draft
+      - name: Apply formal Encounter relationship greeting migration
         shell: bash
         run: |
           set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117082908_encounter_relationship_greeting_pools.sql
 
-      - name: Apply Encounter manual-end lifecycle draft
+      - name: Apply formal Encounter manual-end migration
         shell: bash
         run: |
           set -euo pipefail
@@ -222,7 +222,7 @@ jobs:
           # Exercises only the disposable current-state fixture; no OpenRouter or Hosted Supabase access.
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-session-evaluation-worker.sql
 
-      - name: Apply Encounter evaluation scheduler draft (disabled)
+      - name: Apply formal Encounter evaluation scheduler migration (disabled)
         shell: bash
         run: |
           set -euo pipefail
