@@ -193,88 +193,66 @@ $$;
 REVOKE ALL ON FUNCTION public.encounter_schedule_source_payload(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.encounter_schedule_source_payload(uuid) TO service_role;
 
-CREATE OR REPLACE FUNCTION public.enqueue_encounter_schedule_generation(p_character_id uuid)
+CREATE OR REPLACE FUNCTION public.enqueue_encounter_schedule_generation_internal(p_character_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  v_uid uuid := auth.uid();
-  v_character public.characters%ROWTYPE;
-  v_description text;
   v_source jsonb;
   v_hash text;
+  v_previous_status text;
   v_status text;
+  v_now timestamptz := pg_catalog.clock_timestamp();
 BEGIN
-  IF v_uid IS NULL OR public.account_is_active() IS NOT TRUE THEN
-    RAISE EXCEPTION 'active_authentication_required' USING ERRCODE = '42501';
-  END IF;
-
-  SELECT * INTO v_character
-  FROM public.characters c
-  WHERE c.id = p_character_id
-    AND c.author_id = v_uid
-    AND c.deleted_at IS NULL
-  FOR UPDATE;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'character_not_found_or_not_owned' USING ERRCODE = '42501';
-  END IF;
-
-  SELECT d.description INTO v_description
-  FROM public.character_schedule_descriptions d
-  WHERE d.character_id = p_character_id
-    AND d.author_id = v_uid;
-
-  IF v_character.visibility <> 'public'
-     OR v_character.review_status <> 'approved'
-     OR v_character.rights_confirmed IS NOT TRUE THEN
-    UPDATE public.encounter_schedule_generation_jobs
-    SET status = 'cancelled', lease_token = NULL, lease_expires_at = NULL,
-        last_error_code = 'character_not_public', updated_at = pg_catalog.clock_timestamp()
-    WHERE character_id = p_character_id;
-    RETURN pg_catalog.jsonb_build_object('status', 'not_public');
-  END IF;
-
-  IF pg_catalog.btrim(COALESCE(v_description, '')) = '' THEN
-    UPDATE public.encounter_schedule_generation_jobs
-    SET status = 'cancelled', lease_token = NULL, lease_expires_at = NULL,
-        last_error_code = 'schedule_description_missing', updated_at = pg_catalog.clock_timestamp()
-    WHERE character_id = p_character_id;
-    UPDATE public.character_schedules
-    SET is_active = false, updated_at = pg_catalog.clock_timestamp()
-    WHERE character_id = p_character_id AND source_type = 'ai' AND is_active IS TRUE;
-    RETURN pg_catalog.jsonb_build_object('status', 'description_missing');
-  END IF;
-
   v_source := public.encounter_schedule_source_payload(p_character_id);
+
   IF v_source IS NULL THEN
-    RETURN pg_catalog.jsonb_build_object('status', 'source_not_eligible');
+    UPDATE public.encounter_schedule_generation_jobs
+    SET status = 'cancelled', lease_token = NULL, lease_expires_at = NULL,
+        last_error_code = 'character_not_public_or_schedule_missing',
+        updated_at = v_now
+    WHERE character_id = p_character_id;
+
+    UPDATE public.character_schedules
+    SET is_active = false, updated_at = v_now
+    WHERE character_id = p_character_id AND source_type = 'ai' AND is_active IS TRUE;
+
+    RETURN pg_catalog.jsonb_build_object('status', 'not_eligible');
   END IF;
+
   v_hash := pg_catalog.md5(v_source::text);
+  SELECT status INTO v_previous_status
+  FROM public.encounter_schedule_generation_jobs
+  WHERE character_id = p_character_id;
 
   INSERT INTO public.encounter_schedule_generation_jobs (
     character_id, author_id, source_hash, status, queued_at, available_at,
     attempt_count, lease_token, lease_expires_at, lease_generation,
     last_error_code, completed_at, updated_at
   ) VALUES (
-    p_character_id, v_uid, v_hash, 'pending', pg_catalog.clock_timestamp(),
-    pg_catalog.clock_timestamp(), 0, NULL, NULL, 1, NULL, NULL, pg_catalog.clock_timestamp()
+    p_character_id, (v_source->>'author_id')::uuid, v_hash, 'pending',
+    v_now, v_now, 0, NULL, NULL, 1, NULL, NULL, v_now
   )
   ON CONFLICT (character_id) DO UPDATE
   SET author_id = EXCLUDED.author_id,
       source_hash = EXCLUDED.source_hash,
       status = 'pending',
-      queued_at = pg_catalog.clock_timestamp(),
-      available_at = pg_catalog.clock_timestamp(),
+      queued_at = CASE
+        WHEN public.encounter_schedule_generation_jobs.status IN
+          ('pending', 'processing', 'failed', 'needs_reconciliation')
+          THEN public.encounter_schedule_generation_jobs.queued_at
+        ELSE v_now
+      END,
+      available_at = v_now,
       attempt_count = 0,
       lease_token = NULL,
       lease_expires_at = NULL,
       lease_generation = public.encounter_schedule_generation_jobs.lease_generation + 1,
       last_error_code = NULL,
       completed_at = NULL,
-      updated_at = pg_catalog.clock_timestamp()
+      updated_at = v_now
   WHERE public.encounter_schedule_generation_jobs.source_hash IS DISTINCT FROM EXCLUDED.source_hash
      OR public.encounter_schedule_generation_jobs.status = 'cancelled'
   RETURNING status INTO v_status;
@@ -289,8 +267,85 @@ BEGIN
 END;
 $$;
 
+REVOKE ALL ON FUNCTION public.enqueue_encounter_schedule_generation_internal(uuid)
+  FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.enqueue_encounter_schedule_generation(p_character_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_uid uuid := auth.uid();
+BEGIN
+  IF v_uid IS NULL OR public.account_is_active() IS NOT TRUE THEN
+    RAISE EXCEPTION 'active_authentication_required' USING ERRCODE = '42501';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.characters c
+    WHERE c.id = p_character_id AND c.author_id = v_uid AND c.deleted_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'character_not_found_or_not_owned' USING ERRCODE = '42501';
+  END IF;
+
+  RETURN public.enqueue_encounter_schedule_generation_internal(p_character_id);
+END;
+$$;
+
 REVOKE ALL ON FUNCTION public.enqueue_encounter_schedule_generation(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.enqueue_encounter_schedule_generation(uuid) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.on_encounter_schedule_description_changed()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_character_id uuid;
+BEGIN
+  v_character_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.character_id ELSE NEW.character_id END;
+  PERFORM public.enqueue_encounter_schedule_generation_internal(v_character_id);
+  RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.on_encounter_schedule_description_changed()
+  FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS character_schedule_descriptions_enqueue_ai ON public.character_schedule_descriptions;
+CREATE TRIGGER character_schedule_descriptions_enqueue_ai
+AFTER INSERT OR UPDATE OF description, author_id OR DELETE
+ON public.character_schedule_descriptions
+FOR EACH ROW EXECUTE FUNCTION public.on_encounter_schedule_description_changed();
+
+CREATE OR REPLACE FUNCTION public.on_encounter_character_visibility_changed()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF OLD.visibility IS DISTINCT FROM NEW.visibility
+     OR OLD.review_status IS DISTINCT FROM NEW.review_status
+     OR OLD.rights_confirmed IS DISTINCT FROM NEW.rights_confirmed
+     OR OLD.deleted_at IS DISTINCT FROM NEW.deleted_at THEN
+    PERFORM public.enqueue_encounter_schedule_generation_internal(NEW.id);
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.on_encounter_character_visibility_changed()
+  FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS characters_enqueue_encounter_schedule_ai ON public.characters;
+CREATE TRIGGER characters_enqueue_encounter_schedule_ai
+AFTER UPDATE OF visibility, review_status, rights_confirmed, deleted_at
+ON public.characters
+FOR EACH ROW EXECUTE FUNCTION public.on_encounter_character_visibility_changed();
 
 CREATE OR REPLACE FUNCTION public.claim_encounter_schedule_batch(
   p_limit integer DEFAULT 10,
