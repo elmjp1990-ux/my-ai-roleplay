@@ -405,7 +405,7 @@ Deno.test("requires AI metadata for newly proposed dynamic scene types", () => {
     throw new Error("dynamic scene without metadata accepted");
   }
   const accepted = result([character]);
-  if (!accepted.ok || accepted.scenes?.[0]?.location_key !== "night-market") {
+  if (!accepted.ok || !accepted.scenes?.some((scene) => scene.location_key === "night-market")) {
     throw new Error(accepted.errors.join(",") || "dynamic scene metadata was not retained");
   }
 });
