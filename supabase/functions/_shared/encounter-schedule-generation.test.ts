@@ -282,6 +282,8 @@ Deno.test("normalizes similar scene labels to canonical shared locations", () =>
   if (normalizeEncounterSceneKey("夜市") !== "night-market") throw new Error("night market alias failed");
   if (normalizeEncounterSceneKey("醫院") !== "hospital") throw new Error("hospital alias failed");
   if (normalizeEncounterSceneKey("圖書館") !== "library") throw new Error("library alias failed");
+  if (normalizeEncounterSceneKey("night market") !== "night-market") throw new Error("English night market alias failed");
+  if (normalizeEncounterSceneKey("train station") !== "train-station") throw new Error("English train station alias failed");
 });
 
 Deno.test("preserves shared-scene candidates across separate AI batches", () => {
