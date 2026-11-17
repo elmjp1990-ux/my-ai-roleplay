@@ -35,7 +35,7 @@ const variants = (slots = fullDaySlots()) => ({
     { variant_key: "alternative", weight: 20, slots: fullDaySlots({ location_key: "bookstore", activity: "在書店工作" }) },
   ],
   holiday: [
-    { variant_key: "primary", weight: 60, slots: fullDaySlots({ start_time: "08:00", end_time: "16:00", location_key: "park", activity: "在公園散步" }) },
+    { variant_key: "primary", weight: 60, slots: fullDaySlots({ start_time: "08:00", end_time: "16:00", location_key: "park", activity: "在公園散步", is_outdoor: true, rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳休息", rain_fallback_greeting: greeting }) },
     { variant_key: "alternative", weight: 40, slots: fullDaySlots({ start_time: "08:00", end_time: "16:00", location_key: "department-store", activity: "逛百貨公司" }) },
   ],
 });
