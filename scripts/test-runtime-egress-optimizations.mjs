@@ -111,7 +111,7 @@ assert.doesNotMatch(personaSave,/\.rpc\(/,
 const illustrations=between("async function syncCharacterIllustrations(character,userId)","async function ");
 assert.match(illustrations,/oldGalleryById=new Map\(oldGallery\.map\(row=>\[row\.id,row\]\)\)/,
   "illustration sync must reuse the already-loaded gallery metadata for change detection");
-assert.match(illustrations,/insertedGallery\\.includes\\(item\\.id\\)\\|\\|replacedGallery\\.some\\(change=>change\\.row\\.id===item\\.id\\)\\s*\\|\\|\\(previous&&String\\(previous\\.display_name\\|\\|''\\)===expectedName\\)/,
+assert.match(illustrations,/insertedGallery\.includes\(item\.id\)\|\|replacedGallery\.some\(change=>change\.row\.id===item\.id\)\s*\|\|\(previous&&String\(previous\.display_name\|\|''\)===expectedName\)/,
   "new rows and unchanged labels must not trigger redundant UPDATE requests");
 assert.match(illustrations,/expectedGalleryNames=new Map/,
   "persisted gallery labels must still be verified after synchronization");
