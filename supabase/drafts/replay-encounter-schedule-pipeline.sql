@@ -42,7 +42,7 @@ INSERT INTO public.character_schedules (
   'weekday', '12:00', '14:00', 'park', '下一段公園行程',
   0, true, 'manual', 'primary', 100,
   '', true, 'cafe', '改到咖啡廳避雨',
-  pg_catalog.repeat('下雨時改到咖啡廳等待雨勢變小。', 8)
+  pg_catalog.repeat('下雨時改到咖啡廳等待雨勢變小。', 12)
 );
 SET LOCAL session_replication_role = origin;
 
