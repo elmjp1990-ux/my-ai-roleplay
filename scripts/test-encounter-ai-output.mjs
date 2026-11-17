@@ -32,6 +32,7 @@ assert.equal((pipeline.match(/^COMMIT;$/gm) || []).length, 1, "Encounter SQL dra
 assert.doesNotMatch(pipeline, /encounter_weather_baseline_2025|O-A0001-001|O-A0002-001|CWA_OPEN_DATA_API_KEY/);
 assert.ok(pipeline.includes(String.raw`CHECK (asset_path ~ '^([.]/|/)[A-Za-z0-9_./-]+
 assert.match(pipeline, /ALTER TABLE public\.encounter_city_weather ALTER COLUMN source SET DEFAULT 'poyozz_fictional_seasonal'/);
+assert.match(pipeline, /UPDATE public\.encounter_city_weather[\\s\\S]*?source = 'poyozz_fallback'[\\s\\S]*?WHERE source IS DISTINCT FROM 'poyozz_fictional_seasonal'/);
 
 assert.match(endpoint, /requestOpenRouterChatCompletion/);
 assert.match(endpoint, /POYOZZ_DEFAULT_CHAT_MODEL/);
