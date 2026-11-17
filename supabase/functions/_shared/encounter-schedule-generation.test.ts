@@ -9,6 +9,18 @@ const id1 = "11111111-1111-4111-8111-111111111111";
 const id2 = "22222222-2222-4222-8222-222222222222";
 const author = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const greeting = "相遇內容。".repeat(30);
+const relationshipStages = [
+  "hostile", "dislike", "wary", "first_meeting",
+  "acquaintance", "close", "intimate", "special",
+];
+const relationshipGreetings = () => Object.fromEntries(relationshipStages.map((stage) => [
+  stage,
+  [greeting + stage + "第一版", greeting + stage + "第二版", greeting + stage + "第三版"],
+]));
+const withGreetingPools = (character: { placement?: string; [key: string]: unknown }) =>
+  character.placement === "modern_map" && !("relationship_greetings" in character)
+    ? { ...character, relationship_greetings: relationshipGreetings() }
+    : character;
 const source = (character_id = id1, extra = {}) => ({
   character_id, author_id: author, visibility: "public", review_status: "approved", rights_confirmed: true, deleted_at: null,
   name: "測試角色", intro: "現代城市生活",
@@ -39,7 +51,11 @@ const variants = (slots = fullDaySlots()) => ({
     { variant_key: "alternative", weight: 40, slots: fullDaySlots({ start_time: "08:00", end_time: "16:00", location_key: "department-store", activity: "逛百貨公司" }) },
   ],
 });
-const result = (characters: Array<{ character_id: string; [key: string]: unknown }>) => parseEncounterScheduleBatchOutput(JSON.stringify({ characters }), characters.map((c) => source(c.character_id)));
+const result = (characters: Array<{ character_id: string; [key: string]: unknown }>) =>
+  parseEncounterScheduleBatchOutput(
+    JSON.stringify({ characters: characters.map(withGreetingPools) }),
+    characters.map((c) => source(c.character_id)),
+  );
 const specialEvent = (event_key = "christmas", slots = fullDaySlots()) => ({
   event_key, event_name: ({
     taiwan_public_holiday: "國定假日",
@@ -51,11 +67,49 @@ const specialEvent = (event_key = "christmas", slots = fullDaySlots()) => ({
 
 
 Deno.test("accepts hourly schedules with exact weekday/holiday weights and 8-hour continuous work", () => {
-  const parsed = parseEncounterScheduleBatchOutput(JSON.stringify({
-    characters: [{ character_id: id1, placement: "modern_map", variants: variants() }],
-  }), [source()]);
+  const parsed = result([{ character_id: id1, placement: "modern_map", variants: variants() }]);
   if (!parsed.ok) throw new Error(parsed.errors.join(","));
   if (parsed.characters[0].variants.weekday[0].slots[1].end_time !== "16:00") throw new Error("8-hour slot changed");
+});
+
+Deno.test("requires 3-5 distinct greetings for all eight relationship stages", () => {
+  const accepted = result([{ character_id: id1, placement: "modern_map", variants: variants() }]);
+  if (!accepted.ok) throw new Error(accepted.errors.join(","));
+  if (Object.keys(accepted.characters[0].relationship_greetings ?? {}).length !== 8) {
+    throw new Error("eight relationship-stage greeting pools were not retained");
+  }
+  const missingStage = relationshipGreetings();
+  delete (missingStage as Record<string, unknown>).special;
+  const missing = result([{
+    character_id: id1, placement: "modern_map", variants: variants(), relationship_greetings: missingStage,
+  }]);
+  if (missing.ok || !missing.errors.some((error) => error.includes("relationship_greeting_stages_invalid"))) {
+    throw new Error("missing relationship stage accepted");
+  }
+  const tooFew = relationshipGreetings();
+  tooFew.close = [greeting, greeting + "第二版"];
+  const shortPool = result([{
+    character_id: id1, placement: "modern_map", variants: variants(), relationship_greetings: tooFew,
+  }]);
+  if (shortPool.ok || !shortPool.errors.some((error) => error.includes("greeting_pool_count_invalid"))) {
+    throw new Error("two-greeting pool accepted");
+  }
+  const duplicate = relationshipGreetings();
+  duplicate.intimate = [greeting, greeting, greeting + "第三版"];
+  const duplicates = result([{
+    character_id: id1, placement: "modern_map", variants: variants(), relationship_greetings: duplicate,
+  }]);
+  if (duplicates.ok || !duplicates.errors.some((error) => error.includes("greeting_pool_duplicate"))) {
+    throw new Error("duplicate greeting accepted");
+  }
+  const short = relationshipGreetings();
+  short.hostile = ["太短", greeting + "第二版", greeting + "第三版"];
+  const shortGreeting = result([{
+    character_id: id1, placement: "modern_map", variants: variants(), relationship_greetings: short,
+  }]);
+  if (shortGreeting.ok || !shortGreeting.errors.some((error) => error.includes("greeting_pool_length_invalid"))) {
+    throw new Error("short relationship greeting accepted");
+  }
 });
 
 Deno.test("requires 150-300 character scene-aware greeting per schedule slot", () => {
@@ -203,14 +257,12 @@ Deno.test("preserves shared-scene candidates across separate AI batches", () => 
   if (!single.ok || single.characters[0].variants.weekday[0].slots[1].location_key !== "shopping-street") {
     throw new Error("single-batch candidate should be preserved for cross-batch aggregation");
   }
-  const two = parseEncounterScheduleBatchOutput(JSON.stringify({
-    characters: [
-      { character_id: id1, placement: "modern_map", variants: variants(fullDaySlots({ location_key: "shopping-street", is_outdoor: true,
-        rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳", rain_fallback_greeting: greeting })) },
-      { character_id: id2, placement: "modern_map", variants: variants(fullDaySlots({ location_key: "shopping-street", is_outdoor: true,
-        rain_fallback_location_key: "bookstore", rain_fallback_activity: "改在書店", rain_fallback_greeting: greeting })) },
-    ],
-  }), [source(id1), source(id2)]);
+  const two = result([
+    { character_id: id1, placement: "modern_map", variants: variants(fullDaySlots({ location_key: "shopping-street", is_outdoor: true,
+      rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳", rain_fallback_greeting: greeting })) },
+    { character_id: id2, placement: "modern_map", variants: variants(fullDaySlots({ location_key: "shopping-street", is_outdoor: true,
+      rain_fallback_location_key: "bookstore", rain_fallback_activity: "改在書店", rain_fallback_greeting: greeting })) },
+  ]);
   if (!two.ok || two.characters[0].variants.weekday[0].slots[1].location_key !== "shopping-street") {
     throw new Error("shared scene candidate was not retained for registry publication");
   }
