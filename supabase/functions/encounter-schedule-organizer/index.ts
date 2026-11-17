@@ -53,14 +53,47 @@ Deno.serve(async (request) => {
   const openRouterKey = Deno.env.get("OPENROUTER_API_KEY")?.trim();
   const authorization = request.headers.get("Authorization") || "";
   if (!url || !anon || !service) return json({ error: "server_not_configured" }, 503);
-  if (!openRouterKey) return json({ error: "openrouter_not_configured" }, 503);
 
   let body: Record<string, unknown> = {};
   try { body = asRow(await request.json()); } catch { return json({ error: "invalid_json" }, 400); }
-  const mode = body.mode === "manual" ? "manual" : "scheduled";
+  const mode = body.mode === "manual" ? "manual" : body.mode === "status" ? "status" : "scheduled";
   const isServiceRoleRequest = authorization === "Bearer " + service;
   const admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
   let actorUserId: string | null = null;
+
+  if (mode === "status") {
+    if (Deno.env.get("ENCOUNTER_SCHEDULE_TEST_MODE") !== "true" || isServiceRoleRequest) {
+      return json({ enabled: false });
+    }
+    const userClient = createClient(url, anon, {
+      global: { headers: { Authorization: authorization } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: authData, error: authError } = await userClient.auth.getUser();
+    if (authError || !authData?.user) return json({ enabled: false });
+    actorUserId = authData.user.id;
+    const allowed = (Deno.env.get("ENCOUNTER_SCHEDULE_TEST_USER_IDS") || "")
+      .split(",").map((value) => value.trim()).filter(Boolean);
+    if (!allowed.includes(actorUserId)) return json({ enabled: false });
+    const { data: active, error: activeError } = await userClient.rpc("account_is_active");
+    if (activeError || active !== true) return json({ enabled: false });
+
+    const [pendingResult, lastRunResult] = await Promise.all([
+      admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
+        .in("status", ["pending", "failed", "needs_reconciliation"]),
+      admin.from("encounter_schedule_batch_runs").select("started_at,status")
+        .order("started_at", { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    if (pendingResult.error || lastRunResult.error) return json({ enabled: true, status_available: false });
+    return json({
+      enabled: true,
+      pending_character_count: Number(pendingResult.count || 0),
+      last_batch_started_at: lastRunResult.data?.started_at || null,
+      last_batch_status: lastRunResult.data?.status || null,
+    });
+  }
+
+  if (!openRouterKey) return json({ error: "openrouter_not_configured" }, 503);
 
   if (mode === "manual") {
     // Manual bypass exists only in the test project and only for explicitly allowlisted users.
