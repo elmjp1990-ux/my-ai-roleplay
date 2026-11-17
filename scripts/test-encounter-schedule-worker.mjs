@@ -42,6 +42,12 @@ assert.match(pipeline, /WHEN public\.encounter_schedule_generation_jobs\.status 
 assert.match(pipeline, /v_oldest > v_now - interval '23 hours 45 minutes'/);
 assert.match(pipeline, /v_daily_count >= 4/);
 assert.match(pipeline, /v_last_started > v_now - interval '6 hours'/);
+assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_city_weather/);
+assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_weather_baseline_2025/);
+assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.get_encounter_city_weather\(\)/);
+assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.schedule_encounter_weather_sync\(/);
+assert.match(pipeline, /'0 \* \* \* \*'/);
+assert.match(pipeline, /FROM public\.get_encounter_city_weather\(\) AS weather/);
 assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_scene_registry/);
 assert.match(pipeline, /location_key IN \('shopping-street'\)/);
 assert.match(pipeline, /minimum_character_count smallint NOT NULL DEFAULT 1/);
@@ -71,4 +77,4 @@ assert.match(html, /functions\.invoke\('encounter-schedule-organizer',\{body:\{m
 assert.match(html, /functions\.invoke\('encounter-schedule-organizer',\{body:\{mode:'manual'\}\}\)/);
 assert.match(html, /if\(kind==='album'&&CHAT_DATA_TEST_MODE\)void loadEncounterScheduleTestTools\(\)/);
 
-console.log("Encounter schedule worker, queue triggers, throttling, and 24-hour coverage contracts passed.");
+console.log("Encounter schedule worker, dynamic scenes, CWA weather, queue triggers, throttling, and 24-hour coverage contracts passed.");
