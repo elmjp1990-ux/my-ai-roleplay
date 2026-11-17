@@ -38,13 +38,19 @@ for (const contract of [
 }
 
 assert.match(cityMap, /get_encounter_scene_registry/);
+assert.match(cityMap, /get_encounter_city_weather/);
+assert.match(cityMap, /stage.classList.toggle\('is-raining',weather.is_raining===true\)/);
 assert.match(cityMap, /MAX_DYNAMIC_SCENE_MARKERS=3/);
 assert.match(cityMap, /Math\.hypot\(point\.x-x,point\.y-y\)<120/);
 assert.match(cityMap, /data-dynamic-scene/);
 assert.match(cityMap, /cityPlaceAliases\[key\]=\[key\]/);
 assert.match(cityMap, /scene\.eventLabel/);
+assert.match(html, /city-map-stage\.is-raining \.city-map-world/);
+assert.match(html, /poyozz-city-rain/);
+assert.match(html, /prefers-reduced-motion:reduce\)\{\.city-map-stage\.is-raining:after/);
+assert.match(html, /city-map-stage\.is-raining\.low-performance:after/);
 
-console.log('City map module extraction, dynamic scene registry, and dependency contract passed.');
+console.log('City map module extraction, dynamic scene registry, cached weather, CSS rain fallback, and dependency contract passed.');
 
 assert.match(html,/get_encounter_character_schedules/);
 assert.doesNotMatch(cityMap,/hydrateCitySchedule/);
