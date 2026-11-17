@@ -15,6 +15,7 @@ assert.match(worker, /claim_encounter_schedule_batch/);
 assert.match(worker, /publish_encounter_schedule_batch/);
 assert.match(worker, /fail_encounter_schedule_batch/);
 assert.match(worker, /parseEncounterScheduleBatchOutput/);
+assert.match(worker, /get_encounter_dynamic_scene_usage/);
 assert.match(worker, /findPrivateContextLeak/);
 assert.match(worker, /p_limit: 2147483647/);
 assert.match(worker, /p_force: mode === "manual"/);
