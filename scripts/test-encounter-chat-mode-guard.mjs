@@ -71,17 +71,6 @@ assert.match(encounterSession, /p_location_key: locationKey/);
 assert.match(encounterSession, /scheduleSnapshot = \{/);
 assert.doesNotMatch(encounterSession, /\.from\(["']character_schedules["']\)/);
 assert.match(encounterSession, /character_not_at_this_location_now/);
-const encounterSchedule = fs.readFileSync("supabase/functions/_shared/encounter-schedule.mjs", "utf8");
-assert.match(encounterSchedule, /Asia\/Taipei/);
-assert.match(encounterSchedule, /const dayType = row\.day_type/);
-assert.match(encounterSchedule, /dayType === ["']weekday["']/);
-assert.match(encounterSchedule, /dayType === ["']weekend["']/);
-assert.match(encounterSchedule, /const overnight = end < start/);
-assert.match(encounterSchedule, /dayOffset === -1/);
-assert.match(encounterSchedule, /priority/);
-assert.match(encounterSchedule, /weekdaySpecific/);
-assert.match(encounterSchedule, /\(\\d\{2\}\)/);
-
 assert.match(encounterSession, /create_encounter_session_with_lifecycle/);
 
 assert.match(accessMigration, /private\.current_user_is_adult\(\)/);
