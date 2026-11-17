@@ -127,15 +127,69 @@ CREATE TABLE IF NOT EXISTS public.taiwan_calendar_days (
   updated_at timestamptz NOT NULL DEFAULT pg_catalog.now()
 );
 
+CREATE TABLE IF NOT EXISTS public.encounter_scene_registry (
+  location_key text PRIMARY KEY,
+  display_name text NOT NULL,
+  icon text NOT NULL,
+  marker_x integer NOT NULL,
+  marker_y integer NOT NULL,
+  heading text NOT NULL,
+  description text NOT NULL,
+  event_label text NOT NULL DEFAULT '場景亮點',
+  event_title text NOT NULL,
+  event_description text NOT NULL,
+  is_dynamic boolean NOT NULL DEFAULT false,
+  minimum_character_count smallint NOT NULL DEFAULT 1 CHECK (minimum_character_count BETWEEN 1 AND 100),
+  display_order smallint NOT NULL DEFAULT 100,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT pg_catalog.now(),
+  updated_at timestamptz NOT NULL DEFAULT pg_catalog.now(),
+  CHECK (marker_x BETWEEN 40 AND 1622),
+  CHECK (marker_y BETWEEN 40 AND 892),
+  CHECK (is_dynamic IS FALSE OR location_key IN ('shopping-street'))
+);
+
+-- V1 allows one controlled dynamic scene type. The AI can propose this key,
+-- but never supplies marker coordinates or arbitrary display metadata.
+INSERT INTO public.encounter_scene_registry (
+  location_key, display_name, icon, marker_x, marker_y,
+  heading, description, event_label, event_title, event_description,
+  is_dynamic, minimum_character_count, display_order, is_active
+) VALUES (
+  'shopping-street', '商店街', '🛍️', 1230, 620,
+  '沿著街道慢慢逛，遇見城市日常',
+  '街邊店舖、橱窗與行人交織成熱鬧的生活場景。角色可以在不同店家之間移動，也能在街角停下來與熟悉的人碰面。',
+  '場景亮點', '街角的偶遇',
+  '適合逛街、採買、散步、朋友同行或在店家之間自然相遇。',
+  true, 2, 10, true
+)
+ON CONFLICT (location_key) DO UPDATE
+SET display_name = EXCLUDED.display_name,
+    icon = EXCLUDED.icon,
+    marker_x = EXCLUDED.marker_x,
+    marker_y = EXCLUDED.marker_y,
+    heading = EXCLUDED.heading,
+    description = EXCLUDED.description,
+    event_label = EXCLUDED.event_label,
+    event_title = EXCLUDED.event_title,
+    event_description = EXCLUDED.event_description,
+    is_dynamic = EXCLUDED.is_dynamic,
+    minimum_character_count = EXCLUDED.minimum_character_count,
+    display_order = EXCLUDED.display_order,
+    is_active = EXCLUDED.is_active,
+    updated_at = pg_catalog.clock_timestamp();
+
 ALTER TABLE public.encounter_schedule_generation_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.encounter_schedule_batch_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.encounter_schedule_generation_usage ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.taiwan_calendar_days ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.encounter_scene_registry ENABLE ROW LEVEL SECURITY;
 
 REVOKE ALL ON TABLE public.encounter_schedule_generation_jobs FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.encounter_schedule_batch_runs FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.encounter_schedule_generation_usage FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.taiwan_calendar_days FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.encounter_scene_registry FROM PUBLIC, anon, authenticated;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.encounter_schedule_generation_jobs TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.encounter_schedule_batch_runs TO service_role;
@@ -1141,6 +1195,65 @@ $$;
 REVOKE ALL ON FUNCTION public.save_character_schedules(uuid, jsonb) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.save_character_schedules(uuid, jsonb) TO authenticated;
 
+CREATE OR REPLACE FUNCTION public.get_encounter_scene_registry()
+RETURNS TABLE (
+  location_key text,
+  display_name text,
+  icon text,
+  marker_x integer,
+  marker_y integer,
+  heading text,
+  description text,
+  event_label text,
+  event_title text,
+  event_description text,
+  character_count bigint
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $
+  SELECT
+    r.location_key,
+    r.display_name,
+    r.icon,
+    r.marker_x,
+    r.marker_y,
+    r.heading,
+    r.description,
+    r.event_label,
+    r.event_title,
+    r.event_description,
+    pg_catalog.count(DISTINCT c.id) AS character_count
+  FROM public.encounter_scene_registry r
+  JOIN public.character_schedules s
+    ON s.location_key = r.location_key AND s.is_active IS TRUE
+  JOIN public.characters c ON c.id = s.character_id
+  WHERE r.is_dynamic IS TRUE
+    AND r.is_active IS TRUE
+    AND c.visibility = 'public'
+    AND c.review_status = 'approved'
+    AND c.rights_confirmed IS TRUE
+    AND c.deleted_at IS NULL
+    AND (
+      c.is_nsfw IS NOT TRUE
+      OR ((SELECT auth.uid()) IS NOT NULL AND private.current_user_is_adult())
+    )
+  GROUP BY
+    r.location_key, r.display_name, r.icon, r.marker_x, r.marker_y,
+    r.heading, r.description, r.event_label, r.event_title,
+    r.event_description, r.minimum_character_count, r.display_order
+  HAVING pg_catalog.count(DISTINCT c.id) >= r.minimum_character_count
+  ORDER BY r.display_order, r.location_key;
+$;
+
+REVOKE ALL ON FUNCTION public.get_encounter_scene_registry() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_encounter_scene_registry() TO anon, authenticated;
+
+COMMENT ON FUNCTION public.get_encounter_scene_registry() IS
+  'Returns only allowlisted dynamic city-scene markers whose published schedules are shared by the configured minimum number of eligible public characters. Coordinates and scene metadata come only from the server-owned registry.';
+
 CREATE OR REPLACE FUNCTION public.schedule_encounter_schedule_organizer(
   p_enabled boolean DEFAULT false
 )
@@ -1231,6 +1344,8 @@ COMMENT ON TABLE public.encounter_schedule_generation_jobs IS
   'Service-role-only unique-per-character queue. Enqueue triggers run on author schedule-description changes and public eligibility changes. Threshold counts distinct public approved characters; a 23h45m fallback trigger plus 15-minute cron interval keeps the nominal maximum under 24 hours before global rate limits.';
 COMMENT ON TABLE public.encounter_schedule_batch_runs IS
   'Global schedule AI batch ledger enforcing six-hour cooldown and four batches per Taipei calendar day.';
+COMMENT ON TABLE public.encounter_scene_registry IS
+  'Server-owned allowlist for city-map scene markers. V1 exposes only the shared shopping-street scene after at least two eligible public characters use it; AI never supplies coordinates.';
 COMMENT ON TABLE public.taiwan_calendar_days IS
   'Taiwan official workday/holiday overrides, including make-up workdays. Empty table falls back to weekend/weekday until official calendar data is seeded.';
 COMMENT ON FUNCTION public.schedule_encounter_schedule_organizer(boolean) IS
