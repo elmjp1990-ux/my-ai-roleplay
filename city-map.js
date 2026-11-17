@@ -253,12 +253,16 @@
         eventDescription:String(row.event_description||'這裡有符合場景定位的日常活動與消息。')
       };
       // Built-in markers keep their original geometry; AI may update their title and copy.
-      if(Object.prototype.hasOwnProperty.call(cityPlaceNames,key)){
-        cityPlaceNames[key]=name;
-        cityVenueScenes[key]=scene;
+      if(row.is_dynamic!==true){
+        if(Object.prototype.hasOwnProperty.call(cityPlaceNames,key)){
+          cityPlaceNames[key]=name;
+          cityVenueScenes[key]=scene;
+        }
         continue;
       }
-      if(row.is_dynamic!==true||added>=MAX_DYNAMIC_SCENE_MARKERS)continue;
+      // Dynamic markers are rebuilt on every cache refresh; their names remain in
+      // cityPlaceNames after the previous SVG marker layer has been replaced.
+      if(added>=MAX_DYNAMIC_SCENE_MARKERS)continue;
       const x=Number(row?.marker_x),y=Number(row?.marker_y);
       if(!Number.isFinite(x)||!Number.isFinite(y)||x<40||x>1622||y<40||y>892)continue;
       if(existing.some(point=>Math.hypot(point.x-x,point.y-y)<120))continue;
@@ -344,9 +348,6 @@
       if(!cached)console.warn('城市天氣資料載入失敗：',error?.message||error);
     }
   };
-  // Start dynamic scene and weather requests only after their const-bound loaders are initialized.
-  void loadCityDynamicScenes();
-  void loadCityWeather();
   // Use only published characters whose own schedule data is already available to this client.
   // Never invent a character or query private schedule rows from the browser.
   const cityPlaceAliases={airport:['airport'],commercial:['commercial','office'], 'night-bar':['night-bar','bar'], 'live-house':['live-house','livehouse'], apartment:['apartment'], 'department-store':['department-store','department_store'], bookstore:['bookstore','book-store'], cafe:['cafe','coffee-shop'], park:['park']};
@@ -397,6 +398,9 @@
     });
   };
   const cityPresenceByPlace={};
+  // Start requests only after scene names, aliases and renderers are initialized.
+  void loadCityDynamicScenes();
+  void loadCityWeather();
   const cityScenePageStates=new Map();
   const renderCityPeopleStrip=(place)=>{
     const pager=cityScenePageStates.get(place);
