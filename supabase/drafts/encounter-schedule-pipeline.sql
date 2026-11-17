@@ -590,7 +590,7 @@ BEGIN
     AND c.visibility = 'public'
     AND c.review_status = 'approved'
     AND c.rights_confirmed IS TRUE
-    AND c.deleted_at IS NULL
+    AND c.deleted_at IS NULL;
 
   IF p_force IS NOT TRUE THEN
     IF v_pending_count < 10
