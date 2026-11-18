@@ -20,5 +20,13 @@ BEGIN
      OR pg_catalog.strpos(v_definition, '''restaurant''') = 0 THEN
     RAISE EXCEPTION 'publisher does not recognize canonical existing dynamic scene keys';
   END IF;
+
+  SELECT pg_catalog.pg_get_functiondef(
+    'public.resolve_encounter_character_schedule(uuid,uuid,text,timestamptz)'::regprocedure
+  ) INTO v_definition;
+
+  IF pg_catalog.strpos(v_definition, 'public.get_encounter_scene_catalog()') = 0 THEN
+    RAISE EXCEPTION 'unavailable scene intent is not filtered through the published scene catalog';
+  END IF;
 END;
 $sparse_schedule_contract$;
