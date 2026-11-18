@@ -570,6 +570,7 @@ Deno.serve(async (request) => {
       }
       return { sourceId: source.character_id, providerResponse, rawOutputId, character, scenes };
     } catch (error) {
+      const providerDurationMs = Date.now() - providerStartedAt;
       const failureCode = error instanceof Error && error.name === "AbortError"
         ? "schedule_provider_timeout" : "schedule_provider_outcome_unknown";
       await updateRawGenerationOutput(admin, rawOutputId, "failed", failureCode, [failureCode]);
@@ -577,7 +578,7 @@ Deno.serve(async (request) => {
         provider: "openrouter", requestId: "", usage: {}, httpStatus: 0,
         responseContentType: "", responseBodyLength: 0, responseParsed: false,
       }, "failed", failureCode, source.character_id, {
-        provider_duration_ms: Date.now() - providerStartedAt,
+        provider_duration_ms: providerDurationMs,
       });
       return { sourceId: source.character_id, failureCode, retryable: false, ambiguous: true };
     }
