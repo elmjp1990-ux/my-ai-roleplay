@@ -67,5 +67,12 @@ BEGIN
   IF v_resolved_key IS DISTINCT FROM 'commercial' THEN
     RAISE EXCEPTION 'new scene aliases do not rematch retained natural-language intent';
   END IF;
+
+  SELECT pg_catalog.pg_get_functiondef(
+    'public.publish_encounter_scene_metadata(jsonb)'::regprocedure
+  ) INTO v_definition;
+  IF pg_catalog.strpos(v_definition, 'resolve_encounter_scene_location_key') = 0 THEN
+    RAISE EXCEPTION 'dynamic scene eligibility ignores retained unmatched place intents';
+  END IF;
 END;
 $sparse_schedule_contract$;
