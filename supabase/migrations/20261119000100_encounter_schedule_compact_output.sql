@@ -94,6 +94,15 @@ BEGIN
   END IF;
   v_definition := pg_catalog.replace(v_definition, v_old, v_new);
 
+  v_old := '      v_previous_block_start := NULL;';
+  v_new := v_old || E'\\n      v_multi_option_hours := 0;';
+  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
+    / pg_catalog.length(v_old) INTO v_count;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'compact_publisher_multi_option_reset_contract_count_unexpected: %', v_count;
+  END IF;
+  v_definition := pg_catalog.replace(v_definition, v_old, v_new);
+
   v_old := '        IF jsonb_array_length(v_variant->''options'') NOT BETWEEN 1 AND 3 THEN' || E'\n' ||
     '          RAISE EXCEPTION ''schedule_hourly_options_count_invalid'' USING ERRCODE = ''22023'';' || E'\n' ||
     '        END IF;';
