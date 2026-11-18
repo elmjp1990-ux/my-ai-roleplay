@@ -110,6 +110,8 @@ assert.match(cityMap, /const retryButton=event\.target\.closest\('\[data-action=
 assert.match(cityMap, /pager\.error=null;void loadCityPeoplePage\(locationModal\.dataset\.place\)/);
 
 const scheduleOrganizer = fs.readFileSync('supabase/functions/encounter-schedule-organizer/index.ts', 'utf8');
+const schedulePipelineMigration = fs.readFileSync('supabase/migrations/20261117095320_encounter_schedule_pipeline.sql', 'utf8');
+const scheduleBatchMigration = fs.readFileSync('supabase/migrations/20261117133525_encounter_schedule_batch_semantics.sql', 'utf8');
 assert.match(scheduleOrganizer, /ENCOUNTER_SCHEDULE_TEST_MODE["']\) !== ["']true/);
 assert.match(scheduleOrganizer, /test_mode: false/);
 assert.match(scheduleOrganizer, /test_mode: true/);
@@ -126,13 +128,18 @@ assert.match(scheduleOrganizer, /characterPrompt = buildEncounterScheduleBatchMe
 assert.doesNotMatch(scheduleOrganizer, /buildEncounterScheduleBatchMessages\(\[source\], sceneCatalog\)/,
   'the AI prompt must not receive the scene catalog; the parser receives it only after generation');
 assert.match(scheduleOrganizer, /parseEncounterScheduleBatchOutput\([\s\S]*?\[source\],[\s\S]*?sceneCatalog/);
-assert.match(scheduleOrganizer, /timeoutMs: 42_000/);
+assert.match(scheduleOrganizer, /ENCOUNTER_SCHEDULE_PROVIDER_TIMEOUT_MS = 100_000/);
+assert.match(scheduleOrganizer, /timeoutMs: ENCOUNTER_SCHEDULE_PROVIDER_TIMEOUT_MS/);
+assert.match(scheduleOrganizer, /provider_duration_ms/);
+assert.match(schedulePipelineMigration, /v_timeout := 120000/);
+assert.match(scheduleBatchMigration, /lease_expires_at = v_now \+ interval '20 minutes'/);
 assert.match(scheduleOrganizer, /_poyozz_diagnostics/);
 assert.match(scheduleOrganizer, /character_id: characterId/);
 assert.match(scheduleOrganizer, /sourceId: result.sourceId, providerResponse: result.providerResponse/);
 const openRouterHelper = fs.readFileSync('supabase/functions/_shared/openrouter-chat-completions.ts', 'utf8');
 assert.match(openRouterHelper, /const responseText = await response\.text\(\)/);
 assert.match(openRouterHelper, /responseContentType/);
+assert.match(openRouterHelper, /durationMs: Date\.now\(\) - startedAt/);
 assert.match(openRouterHelper, /responseParsed/);
 assert.match(openRouterHelper, /http_\" \+ response\.status/);
 assert.match(html, /if\(!error&&data\?\.test_mode!==true\)\s*\{\s*section\.hidden=true/);

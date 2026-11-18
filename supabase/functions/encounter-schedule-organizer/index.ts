@@ -21,6 +21,8 @@ const asRow = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const asText = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 const ENCOUNTER_SCHEDULE_BATCH_SIZE = 1;
+// Stay below the 120s pg_net dispatch ceiling, leaving time for validation and persistence.
+const ENCOUNTER_SCHEDULE_PROVIDER_TIMEOUT_MS = 100_000;
 
 async function recordBatchUsage(
   admin: any,
@@ -41,6 +43,7 @@ async function recordBatchUsage(
       _poyozz_diagnostics: {
         character_id: characterId,
         http_status: Number(providerResponse?.httpStatus || 0),
+        provider_duration_ms: Number(providerResponse?.durationMs || diagnostics.provider_duration_ms || 0),
         response_content_type: asText(providerResponse?.responseContentType),
         response_body_length: Number(providerResponse?.responseBodyLength || 0),
         response_json_parsed: providerResponse?.responseParsed !== false,
@@ -497,10 +500,11 @@ Deno.serve(async (request) => {
       return { sourceId: source.character_id, failureCode: asText(error instanceof Error ? error.message : "schedule_prompt_invalid"), retryable: false, ambiguous: false };
     }
     let rawOutputId: string | null = null;
+    const providerStartedAt = Date.now();
     try {
       const providerResponse = await requestOpenRouterChatCompletion({
         messages: characterPrompt.messages, apiKey: openRouterKey, model: POYOZZ_DEFAULT_CHAT_MODEL,
-        timeoutMs: 42_000, temperature: 0.35, responseFormat: { type: "json_object" },
+        timeoutMs: ENCOUNTER_SCHEDULE_PROVIDER_TIMEOUT_MS, temperature: 0.35, responseFormat: { type: "json_object" },
       });
       rawOutputId = await recordRawGenerationOutput(
         admin, batchId, source.character_id, actorUserId, providerResponse,
@@ -572,7 +576,9 @@ Deno.serve(async (request) => {
       await recordBatchUsage(admin, batchId, {
         provider: "openrouter", requestId: "", usage: {}, httpStatus: 0,
         responseContentType: "", responseBodyLength: 0, responseParsed: false,
-      }, "failed", failureCode, source.character_id);
+      }, "failed", failureCode, source.character_id, {
+        provider_duration_ms: Date.now() - providerStartedAt,
+      });
       return { sourceId: source.character_id, failureCode, retryable: false, ambiguous: true };
     }
   }));

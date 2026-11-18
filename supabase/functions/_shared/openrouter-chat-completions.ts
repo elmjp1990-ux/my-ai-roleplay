@@ -17,6 +17,7 @@ export type OpenRouterCompletionResult = {
   usage: Record<string, unknown>;
   responseContentType: string;
   responseBodyLength: number;
+  durationMs: number;
   responseParsed: boolean;
   rawResponseBody: string;
   rawOutputText: string;
@@ -39,6 +40,7 @@ const asText = (value: unknown): string => typeof value === "string" ? value.tri
 /** Shared OpenRouter request path; provider privacy restrictions cannot drift between chat modes. */
 export async function requestOpenRouterChatCompletion(options: RequestOptions): Promise<OpenRouterCompletionResult> {
   const model = options.model || POYOZZ_DEFAULT_CHAT_MODEL;
+  const startedAt = Date.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 55_000);
   try {
@@ -101,6 +103,7 @@ export async function requestOpenRouterChatCompletion(options: RequestOptions): 
       usage: asRow(payload.usage),
       responseContentType,
       responseBodyLength: responseText.length,
+      durationMs: Date.now() - startedAt,
       responseParsed,
     };
   } finally {
