@@ -13513,7 +13513,7 @@ async function loadCityCharacterSchedules(characterIds=[]){
       String(row.end_time||'').slice(0,5),
       row.location_key,
       row.activity,
-      row.scene_description
+      encodeURIComponent(String(row.scene_description||''))
     ].join('|'));
     schedules.set(row.character_id,lines);
   }
