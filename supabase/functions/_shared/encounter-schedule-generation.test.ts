@@ -340,8 +340,9 @@ Deno.test("infers a complete schedule from the character profile when the author
     }],
   })]);
   const manual = JSON.parse(withManualSchedule.messages[1].content).characters[0].existing_author_schedules[0];
-  if (manual.location_key !== "commercial" || manual.activity !== "作者指定的固定工作時段") {
-    throw new Error("saved author schedule was not included in generation context");
+  if (manual.location !== "公司／商業大樓" || "location_key" in manual ||
+      manual.activity !== "作者指定的固定工作時段") {
+    throw new Error("author schedule context leaked a scene key or lost its natural place");
   }
   if (!built.messages[0].content.includes("existing_author_schedules 是作者已保存的固定時段")) {
     throw new Error("author-managed schedule priority missing");
@@ -404,8 +405,9 @@ Deno.test("preserves canonical scene intent even when the scene is not currently
   if ("canonical_scene_keys" in payload || "scene_catalog" in payload) {
     throw new Error("AI prompt must not receive scene IDs or scene catalog");
   }
-  if (!prompt.messages[0].content.includes("地點是否能對應地圖由系統自行判斷")) {
-    throw new Error("prompt does not assign scene matching to the system");
+  if (!prompt.messages[0].content.includes("地點是否能對應地圖由系統自行判斷") ||
+      !prompt.messages[0].content.includes("AI 不得判斷玩家是否能相遇")) {
+    throw new Error("prompt does not assign scene and encounterability decisions to the system");
   }
   if (!prompt.messages[0].content.includes("scene_description")) {
     throw new Error("prompt does not require a character-specific scene description");
