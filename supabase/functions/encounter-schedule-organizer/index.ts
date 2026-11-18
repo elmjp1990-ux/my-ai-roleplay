@@ -4,6 +4,7 @@ import { findPrivateContextLeak } from "../_shared/private-context-guard.ts";
 import {
   buildEncounterScheduleBatchMessages,
   classifyEncounterWorldview,
+  getEncounterWorldviewScheduleDisposition,
   parseEncounterScheduleBatchOutput,
   normalizeEncounterSceneKey,
   type EncounterScheduleSource,
@@ -618,14 +619,16 @@ Deno.serve(async (request) => {
   let retryableProviderFailure = false;
   let ambiguousProviderFailure = false;
 
-  // Worldview is classified locally before any provider call. Non-modern and
-  // unresolved roles are completed as not placed; they are never sent to AI.
+  // Worldview is classified locally before any provider call. Known non-modern
+  // roles are marked not applicable; unknown roles are held for manual review.
+  // Neither group is sent to AI, and review-required roles are not published as unplaced.
   const generationSources = sources.filter((source) => {
     const classification = classifyEncounterWorldview(source);
-    if (classification.modern_map_compatible) return true;
+    const disposition = getEncounterWorldviewScheduleDisposition(classification);
+    if (disposition === "generate") return true;
     rawCharacters.push({
       character_id: source.character_id,
-      placement: "no_matching_location",
+      placement: disposition === "needs_review" ? "needs_review" : "no_matching_location",
       variants: { weekday: [], holiday: [] },
       special_events: [],
     });
@@ -634,6 +637,7 @@ Deno.serve(async (request) => {
       worldview_confidence: classification.confidence,
       modern_map_compatible: false,
       ai_generation_skipped: true,
+      manual_review_required: disposition === "needs_review",
     });
     return false;
   });
