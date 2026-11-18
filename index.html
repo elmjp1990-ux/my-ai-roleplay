@@ -7647,7 +7647,7 @@ async function groupOpen(groupId) {
       return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user' && m.content===GROUP_CONTINUE_SENTINEL ? '' : m.content,createdAt:m.created_at};
     });
     const membersNeedingPortraits=members.filter(member=>!safeImage(member.avatar_url)&&isUuid(member.characterId));
-    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,storyWorldState:{storyTime:group.story_time||'',storyLocation:group.story_location||''},memoryPhotos:[],scenes,members,suggestedReplies:suggestionRes.data?.status==='completed'&&Array.isArray(suggestionRes.data?.suggested_replies)?suggestionRes.data.suggested_replies.slice(0,3):[]};
+    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,storyWorldState:{storyTime:group.story_time||'',storyLocation:group.story_location||''},memoryPhotos:[],scenes,members,suggestionTurnId:suggestionRes.data?.status==='completed'?suggestionRes.data.id||null:null,suggestedReplies:suggestionRes.data?.status==='completed'&&Array.isArray(suggestionRes.data?.suggested_replies)?suggestionRes.data.suggested_replies.slice(0,3):[]};
     markGroupChatRead(group.id);
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;
     if(groupListWasLoaded){
@@ -8716,6 +8716,7 @@ async function groupSendTurn() {
     if(g.active!==activeGroup||g.active?.id!==activeGroupId||g.ownerUid!==requestUid||currentUser()?.uid!==requestUid) return;
     if(!rows?.length) throw new Error('群組回合已保存，但暫時讀取不到訊息。請稍後重新開啟群組確認。');
     const members=g.active.members||[], scenes=g.active.scenes||[];
+    g.active.suggestionTurnId=turnId;
     g.active.suggestedReplies=Array.isArray(turnResult.suggested_replies)?turnResult.suggested_replies.slice(0,3):[];
     if(turnResult.story_world_state&&typeof turnResult.story_world_state==='object'){
       g.active.storyWorldState={
