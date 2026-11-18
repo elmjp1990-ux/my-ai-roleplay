@@ -9070,7 +9070,7 @@ function conversationSuggestionsHTML(s) {
         : `<div class="suggestion-options" aria-label="選擇建議回覆">
             ${replies.map((_,index)=>`<button type="button" class="suggestion-light" data-action="suggestion-select" data-index="${index}" aria-label="第 ${index+1} 則建議" aria-pressed="${index===0?'true':'false'}"></button>`).join('')}
           </div>
-          ${replies.map((reply,index)=>`<div class="suggestion-card-row${index===0?' active':''}" data-suggestion-row="${index}"><button type="button" class="suggestion-card ${index===0?"active":""}" data-action="suggestion" data-index="${index}" data-text="${e(reply)}"><span class="suggestion-card-action">${e(reply)}</span></button><div class="suggestion-card-tools"><button type="button" data-action="suggestion-edit" data-index="${index}" aria-label="編輯第 ${index+1} 則建議" title="編輯">✎</button><button type="button" data-action="suggestion-delete" data-index="${index}" aria-label="移除第 ${index+1} 則建議" title="移除">×</button></div></div>`).join('')}`
+          ${replies.map((reply,index)=>`<div class="suggestion-card-row${index===0?' active':''}" data-suggestion-row="${index}"><button type="button" class="suggestion-card ${index===0?"active":""}" data-action="suggestion" data-index="${index}" data-text="${e(reply)}"><span class="suggestion-card-action">${e(reply)}</span></button><div class="suggestion-card-tools"><button type="button" data-action="suggestion-edit" data-index="${index}" aria-label="編輯第 ${index+1} 則建議" title="編輯">✎</button><button type="button" data-action="suggestion-delete" data-index="${index}" aria-label="移除第 ${index+1} 則建議" title="移除">×</button></div></div>`).join('')}`}
     </details>
   </div>`;
 }
