@@ -10004,6 +10004,42 @@ function renderChatOverlay(kind) {
   if(kind==='diary'&&s.storyMode)void loadStoryMemorySummary(s);
 }
 
+
+async function loadEncounterScheduleRepairOutputs(){
+  const container=document.getElementById('encounterScheduleRepairOutputs');
+  if(!container)return;
+  container.textContent='正在讀取保留的 AI 原始回覆…';
+  try{
+    const {data,error}=await window.mySupabase.functions.invoke('encounter-schedule-organizer',{body:{mode:'repair_list'}});
+    if(error)throw error;
+    const outputs=Array.isArray(data?.outputs)?data.outputs:[];
+    if(!outputs.length){
+      container.innerHTML='<p class="small muted">目前沒有可人工補正的失敗回覆。</p>';
+      return;
+    }
+    container.innerHTML=outputs.map(item=>{
+      const outputId=e(item.id||'');
+      const raw=e(item.raw_response_text||'');
+      const errors=Array.isArray(item.validation_errors)?item.validation_errors.join('、'):'';
+      const finish=e(item.finish_reason||'未提供');
+      const model=e(item.response_model||item.requested_model||'未知模型');
+      const status=e(item.failure_code||item.status||'待檢查');
+      const created=item.created_at?new Date(item.created_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):'';
+      const truncation=item.raw_output_truncated||item.response_body_truncated?'（原始內容有截斷，請先確認內容是否完整）':'';
+      return '<article class="panel stack" style="padding:12px">'+
+        '<strong>'+e(item.character_name||'角色')+' · '+status+'</strong>'+
+        '<p class="small muted">'+model+'｜finish_reason：'+finish+'｜HTTP '+Number(item.http_status||0)+'｜'+e(created)+truncation+'</p>'+
+        (errors?'<p class="small muted">驗證問題：'+e(errors)+'</p>':'')+
+        '<textarea rows="12" maxlength="500000" data-encounter-repair-output="'+outputId+'" spellcheck="false" style="width:100%;font-family:monospace">'+raw+'</textarea>'+
+        '<div class="row wrap"><button type="button" data-action="repair-encounter-schedule-output" data-output-id="'+outputId+'">重新驗證並發布這份修正版</button></div>'+
+      '</article>';
+    }).join('');
+  }catch(error){
+    container.textContent='目前無法讀取失敗回覆；請確認測試環境資料庫 migration 已套用。';
+    console.warn('Encounter schedule repair list failed:',error?.message||error);
+  }
+}
+
 async function loadEncounterScheduleTestTools(){
   const section=document.getElementById('encounterScheduleTestTools');
   if(!section)return;
@@ -10041,6 +10077,7 @@ async function loadEncounterScheduleTestTools(){
         (blocked?'目前暫停生成，請先等待處理中工作完成，並核對失敗結果，避免重複 AI 成本。':'按下後最多處理 5 位角色；')+
         '｜上次成功完成：'+lastRun+(data.last_batch_status?'（'+data.last_batch_status+'）':'');
     if(button){button.dataset.aiEnabled=blocked?'false':'true';button.disabled=blocked;}
+    void loadEncounterScheduleRepairOutputs();
   }catch(error){
     section.hidden=true;
     if(button){button.disabled=true;button.dataset.aiEnabled='false';}
@@ -10321,8 +10358,12 @@ function renderModal(o) {
           <strong>相遇模式｜AI 行程與場景整理</strong>
           <p class="small muted">整理目前所有符合資格的公開角色行程，並建立／更新共同行程場景。</p>
           <p class="small muted" id="encounterScheduleTestStatus">正在確認是否為允許的測試環境…</p>
-          <div class="row wrap"><button type="button" data-action="organize-encounter-schedules" disabled>AI 生成角色行程與場景</button></div>
-          <p class="small muted">會產生 AI 服務呼叫成本，但不扣玩家銀幣或鑽石；不會觸發相遇對話。若有失敗或待核對結果，會暫停新的生成以避免重複成本。正式環境不提供此按鈕。</p>
+          <div class="row wrap">
+            <button type="button" data-action="organize-encounter-schedules" disabled>AI 生成角色行程與場景</button>
+            <button type="button" data-action="load-encounter-schedule-repairs">查看失敗 AI 原始回覆</button>
+          </div>
+          <div id="encounterScheduleRepairOutputs" class="stack" style="margin-top:12px"></div>
+          <p class="small muted">會產生 AI 服務呼叫成本，但不扣玩家銀幣或鑽石；不會觸發相遇對話。失敗回覆會保留 30 天供測試帳號人工補正；補正只重新驗證與發布，不會再次呼叫 AI。正式環境不提供此工具。</p>
         </section>`);
       void loadEncounterScheduleTestTools();
       break;
