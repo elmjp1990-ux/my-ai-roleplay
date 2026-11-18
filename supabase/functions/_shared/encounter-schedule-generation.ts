@@ -218,8 +218,11 @@ export function classifyEncounterWorldview(source: EncounterScheduleSource): Enc
     modern_map_compatible: true,
     confidence: "high",
   };
-  if (fantasy) return { category: "fantasy", modern_map_compatible: false, confidence: "high" };
+  // "異世界" is an alternate-world signal, not sufficient evidence of
+  // conventional fantasy by itself; explicit magic/fantasy signals still win
+  // only when no alternate-world marker is present.
   if (alternate) return { category: "alternate_world", modern_map_compatible: false, confidence: "high" };
+  if (fantasy) return { category: "fantasy", modern_map_compatible: false, confidence: "high" };
   return { category: "unknown", modern_map_compatible: false, confidence: "low" };
 }
 
