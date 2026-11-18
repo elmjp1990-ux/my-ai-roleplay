@@ -340,7 +340,7 @@ Deno.test("infers a complete schedule from the character profile when the author
     }],
   })]);
   const manual = JSON.parse(withManualSchedule.messages[1].content).characters[0].existing_author_schedules[0];
-  if (manual.location !== "公司／商業大樓" || "location_key" in manual ||
+  if (manual.location !== "公司" || "location_key" in manual ||
       manual.activity !== "作者指定的固定工作時段") {
     throw new Error("author schedule context leaked a scene key or lost its natural place");
   }
