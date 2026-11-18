@@ -353,13 +353,22 @@ Deno.serve(async (request) => {
         .limit(20);
       if (outputsError) return json({ error: "schedule_repair_list_unavailable" }, 503);
       const ids = [...new Set((outputs || []).map((item: any) => item.character_id).filter(Boolean))];
-      const { data: characters } = ids.length
-        ? await admin.from("characters").select("id,name").in("id", ids)
-        : { data: [] };
+      const [{ data: characters }, { data: jobs, error: jobsError }] = await Promise.all([
+        ids.length
+          ? admin.from("characters").select("id,name").in("id", ids)
+          : Promise.resolve({ data: [] }),
+        ids.length
+          ? admin.from("encounter_schedule_generation_jobs").select("character_id,status").in("character_id", ids)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+      if (jobsError) return json({ error: "schedule_repair_job_states_unavailable" }, 503);
+      const repairableCharacterIds = new Set((jobs || [])
+        .filter((job: any) => job.status === "failed")
+        .map((job: any) => job.character_id));
       const names = new Map((characters || []).map((item: any) => [item.id, item.name]));
       return json({
         status: "available",
-        outputs: (outputs || []).map((item: any) => ({
+        outputs: (outputs || []).filter((item: any) => repairableCharacterIds.has(item.character_id)).map((item: any) => ({
           ...item,
           character_name: names.get(item.character_id) || "角色",
           raw_response_text: item.raw_response_text || item.raw_response_body || "",
@@ -654,9 +663,11 @@ Deno.serve(async (request) => {
       }
       if (job?.status === "completed") {
         committedCharacterIds.add(item.sourceId);
+        await updateRawGenerationOutput(admin, rawOutputIdByCharacter.get(item.sourceId) || null, "completed");
         publishedCharacterCount += 1;
       } else if (job?.status === "cancelled") {
         committedCharacterIds.add(item.sourceId);
+        await updateRawGenerationOutput(admin, rawOutputIdByCharacter.get(item.sourceId) || null, "cancelled");
         skippedCharacterCount += 1;
       } else {
         failedCharacterIds.add(item.sourceId);
