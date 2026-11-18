@@ -250,6 +250,13 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117130000_encounter_schedule_batch_semantics.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117140000_encounter_public_character_schedule_eligibility.sql
 
+      - name: Apply sparse Encounter schedule windows migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261118000400_encounter_schedules_allow_unavailable_windows.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-sparse-schedule-windows.sql
+
       - name: Replay public character eligibility and NSFW viewer gate
         shell: bash
         run: |
