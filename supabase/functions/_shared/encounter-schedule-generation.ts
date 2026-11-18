@@ -32,8 +32,13 @@ const RAIN_FALLBACK_SCENE_KEYS = new Set([
   "airport", "commercial", "night-bar", "live-house", "apartment",
   "department-store", "bookstore", "cafe",
 ]);
-const NON_MODERN_ERA_PATTERN = /ancient|historical|medieval|antiquity|fantasy|mythic|fictional|古代|歷史|中世紀|中古|奇幻|架空|封建|戰國|春秋|秦漢|唐代|宋代|明代|清代|古羅馬|古希臘/i;
-const MODERN_SETTING_PATTERN = /現代世界|現代背景|現代都市|現代社會|現代生活|當代|財閥|企業集團|集團總裁|總裁夫人|企業|公司|商業盟約|慈善晚宴|時尚雜誌|名媛|豪門|媒體|智慧型手機|手機通訊|社群媒體|網路平台|科技業|捷運|地鐵|高鐵|信用卡|電子商務|藝術工作室|私人美術館/i;
+const MODERN_SETTING_PATTERN = /現代世界|現代背景|現代都市|現代社會|現代生活|當代|財閥|企業集團|集團總裁|總裁夫人|企業|公司|商業盟約|慈善晚宴|時尚雜誌|名媛|豪門|媒體|智慧型手機|手機通訊|社群媒體|網路平台|科技業|捷運|地鐵|高鐵|信用卡|電子商務|藝術工作室|私人美術館|上班族|辦公室|公司職員|大學校園|現代醫院|現代學校|手機|網路|社群|公寓|都市|城市生活/i;
+const CULTIVATION_PATTERN = /修仙|仙俠|修真|修煉|靈根|金丹|元嬰|渡劫|宗門|仙界|魔界|靈氣|劍修|丹修|道君|仙尊|cultivation|xianxia|xianxia/i;
+const HISTORICAL_PATTERN = /ancient|historical|medieval|antiquity|古代|歷史|中世紀|中古|封建|戰國|春秋|秦漢|唐代|宋代|明代|清代|古羅馬|古希臘|大正時代|維多利亞時代/i;
+const SCI_FI_PATTERN = /科幻|未來世界|未來都市|星際|太空殖民|賽博龐克|賽博|機甲|人工智慧統治|星球聯邦|science fiction|sci-fi|cyberpunk/i;
+const APOCALYPSE_PATTERN = /末日|喪屍|殭屍病毒|核戰後|廢土|災後世界|末世|post-apocalyptic|apocalypse/i;
+const FANTASY_PATTERN = /奇幻|魔法|魔法世界|精靈王國|龍族|魔物|異世界|魔王|勇者|fantasy|mythic/i;
+const ALTERNATE_PATTERN = /架空世界|架空王國|虛構王國|平行世界|異世界/i;
 const SCENE_DISPLAY_NAMES: Record<string, string> = {
   airport: "機場", commercial: "公司", "night-bar": "酒吧",
   "live-house": "Live House", apartment: "住家", "department-store": "百貨公司",
@@ -171,16 +176,54 @@ export function resolveEncounterScheduleAvailability(
   return SLEEPING_SCHEDULE_PATTERN.test(context) ? "sleeping" : "available";
 }
 
-export function isEncounterModernMapCompatible(source: EncounterScheduleSource): boolean {
+export type EncounterWorldviewCategory =
+  | "modern" | "modern_fantasy" | "historical" | "cultivation"
+  | "fantasy" | "science_fiction" | "post_apocalyptic"
+  | "alternate_world" | "unknown";
+
+export type EncounterWorldviewClassification = {
+  category: EncounterWorldviewCategory;
+  modern_map_compatible: boolean;
+  confidence: "high" | "low";
+};
+
+export function classifyEncounterWorldview(source: EncounterScheduleSource): EncounterWorldviewClassification {
+  const profile = isRecord(source.personality_profile) ? source.personality_profile : {};
   const context = [
     text(source.world_era), text(source.setting_era), text(source.intro),
-    text(source.schedule_description), text(source.private_info),
-    JSON.stringify(isRecord(source.personality_profile) ? source.personality_profile : {}),
+    text(source.title), text(source.occupation), text(source.race), text(source.style),
+    ...(Array.isArray(source.tags) ? source.tags.filter((value): value is string => typeof value === "string") : []),
+    text(source.schedule_description), text(source.private_info), JSON.stringify(profile),
   ].join(" ");
-  const explicitModernSetting = MODERN_SETTING_PATTERN.test(context);
-  const nonModern = NON_MODERN_ERA_PATTERN.test(context);
-  return source.modern_setting_compatible === true || source.time_travel_explicit === true ||
-    explicitModernSetting || !nonModern;
+  const modern = source.time_travel_explicit === true || MODERN_SETTING_PATTERN.test(context);
+  const cultivation = CULTIVATION_PATTERN.test(context);
+  const historical = HISTORICAL_PATTERN.test(context);
+  const scienceFiction = SCI_FI_PATTERN.test(context);
+  const apocalypse = APOCALYPSE_PATTERN.test(context);
+  const fantasy = FANTASY_PATTERN.test(context);
+  const alternate = ALTERNATE_PATTERN.test(context);
+
+  // Explicit contemporary context wins for modern supernatural species, but
+  // explicit historical/cultivation eras remain excluded unless time travel is stated.
+  if (source.time_travel_explicit === true) {
+    return { category: "modern_fantasy", modern_map_compatible: true, confidence: "high" };
+  }
+  if (cultivation) return { category: "cultivation", modern_map_compatible: false, confidence: "high" };
+  if (historical) return { category: "historical", modern_map_compatible: false, confidence: "high" };
+  if (scienceFiction) return { category: "science_fiction", modern_map_compatible: false, confidence: "high" };
+  if (apocalypse) return { category: "post_apocalyptic", modern_map_compatible: false, confidence: "high" };
+  if (modern) return {
+    category: fantasy ? "modern_fantasy" : "modern",
+    modern_map_compatible: true,
+    confidence: "high",
+  };
+  if (fantasy) return { category: "fantasy", modern_map_compatible: false, confidence: "high" };
+  if (alternate) return { category: "alternate_world", modern_map_compatible: false, confidence: "high" };
+  return { category: "unknown", modern_map_compatible: false, confidence: "low" };
+}
+
+export function isEncounterModernMapCompatible(source: EncounterScheduleSource): boolean {
+  return classifyEncounterWorldview(source).modern_map_compatible;
 }
 
 function isAirportUseReasonable(source: EncounterScheduleSource, activity: string): boolean {
