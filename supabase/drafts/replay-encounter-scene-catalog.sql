@@ -1,5 +1,5 @@
 -- Disposable local-only replay for generalized Encounter scene metadata and legacy placeholders.
--- Latest PR #267 coverage: v7 home mapping and sleeping availability schedule hash, manual enqueue, dynamic marker cap, and fallback-only background metadata.
+-- Latest PR #267 coverage: v8 compact 24-hour schedule source hash, manual enqueue, dynamic marker cap, and fallback-only background metadata.
 -- All synthetic rows and registry writes are rolled back. Never run against Hosted Supabase.
 
 BEGIN;
@@ -62,7 +62,7 @@ BEGIN
   v_source := public.encounter_schedule_source_payload(
     '00000000-0000-4000-8000-000000000020'::uuid
   );
-  IF v_source->>'schedule_schema_version' <> 'poyozz-encounter-schedule-v7-home-mapping-sleep-availability-2026-11-18' THEN
+  IF v_source->>'schedule_schema_version' <> 'poyozz-encounter-schedule-v8-compact-24-hour-options-2026-11-19' THEN
     RAISE EXCEPTION 'manual scene catalog migration must bump schedule source version';
   END IF;
   v_result := public.enqueue_encounter_schedule_generation_test_batch(2147483647);
