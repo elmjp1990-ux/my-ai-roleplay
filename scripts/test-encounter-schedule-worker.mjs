@@ -99,7 +99,7 @@ assert.doesNotMatch(generator, /_24_hour_coverage_incomplete/);
 assert.doesNotMatch(generator, /完整 24 小時行程/);
 assert.match(sparseScheduleMigration, /NOT BETWEEN 0 AND 4/);
 assert.match(sparseScheduleMigration, /NOT BETWEEN 1 AND 4/);
-assert.match(sparseScheduleMigration, /scene_not_in_existing_catalog/);
+assert.match(generator, /scene_not_in_existing_catalog/);
 assert.match(weatherWorker, /createEncounterWeather/);
 assert.match(weatherWorker, /previousSlot === weather\.slot/);
 assert.match(weatherWorker, /previous\.source === weather\.source/);
