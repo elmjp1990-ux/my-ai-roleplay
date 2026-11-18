@@ -196,7 +196,7 @@ export function classifyEncounterWorldview(source: EncounterScheduleSource): Enc
     ...(Array.isArray(source.tags) ? source.tags.filter((value): value is string => typeof value === "string") : []),
     text(source.schedule_description), text(source.private_info), JSON.stringify(profile),
   ].join(" ");
-  const modern = source.time_travel_explicit === true || MODERN_SETTING_PATTERN.test(context);
+  const modern = source.modern_setting_compatible === true || source.time_travel_explicit === true || MODERN_SETTING_PATTERN.test(context);
   const cultivation = CULTIVATION_PATTERN.test(context);
   const historical = HISTORICAL_PATTERN.test(context);
   const scienceFiction = SCI_FI_PATTERN.test(context);
