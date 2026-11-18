@@ -33,7 +33,7 @@ LANGUAGE sql
 VOLATILE
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $schedule$
   SELECT
     resolved.schedule_id,
     resolved.weekday,
@@ -59,7 +59,7 @@ AS $
   ) AS resolved
   JOIN public.character_schedules AS schedule
     ON schedule.id = resolved.schedule_id;
-$;
+$schedule$;
 
 REVOKE ALL ON FUNCTION public.resolve_encounter_character_schedule_with_scene(uuid,uuid,text,timestamptz)
   FROM PUBLIC, anon, authenticated;

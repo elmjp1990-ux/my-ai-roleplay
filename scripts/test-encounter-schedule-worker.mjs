@@ -245,3 +245,5 @@ assert.match(sleepingAvailabilityMigration, /JOIN public\.character_schedules s 
 assert.match(sleepingAvailabilityMigration, /UPDATE public\.character_schedules/);
 assert.match(sleepingAvailabilityMigration, /location_description/);
 assert.match(sleepingAvailabilityMigration, /poyozz-encounter-schedule-v7-home-mapping-sleep-availability-2026-11-18/);
+
+assert.match(sleepingAvailabilityMigration, /AS \$schedule\$[\s\S]*?\$schedule\$;/);
