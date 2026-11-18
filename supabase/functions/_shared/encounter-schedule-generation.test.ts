@@ -376,6 +376,7 @@ Deno.test("preserves canonical scene intent even when the scene is not currently
   if (!prompt.messages[0].content.includes("地點是否能對應地圖由系統自行判斷") ||
       !prompt.messages[0].content.includes("AI 不得判斷玩家是否能相遇")) throw new Error("prompt does not assign scene and encounterability decisions to the system");
   if (!prompt.messages[0].content.includes("scene_description")) throw new Error("prompt does not require a character-specific scene description");
+  if (!prompt.messages[0].content.includes("activity 或 scene_description 必須明確寫出熟睡、睡著、睡覺中等可辨識狀態")) throw new Error("prompt does not make sleeping states explicit for deterministic availability checks");
 });
 
 Deno.test("preserves unavailable outdoor scene intent while validating its fixed indoor rain fallback", () => {
