@@ -28,6 +28,12 @@ assert.match(worker, /recordRawGenerationOutput/);
 assert.match(worker, /handleScheduleRepair/);
 assert.match(worker, /mode === "repair_list"/);
 assert.match(worker, /claim_encounter_schedule_repair/);
+assert.match(worker, /eq\("actor_user_id", actorUserId\)/);
+assert.match(worker, /originalBatch\.is_manual !== true/);
+assert.match(worker, /job\.source_hash !== output\.source_hash/);
+assert.match(worker, /delete\(\)\.lt\("expires_at"/);
+assert.match(worker, /updateRawGenerationOutput\(admin, rawOutputId/);
+
 assert.match(worker, /original_preserved: true/);
 assert.match(worker, /ai_called: false/);
 assert.match(providerAdapter, /rawResponseBody/);
