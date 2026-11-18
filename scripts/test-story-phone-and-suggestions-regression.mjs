@@ -8,6 +8,7 @@ const edge = readFileSync("supabase/functions/chat-turn/index.ts", "utf8");
 const phoneMigration = readFileSync("supabase/migrations/20261110120000_story_phone_state_and_memory_summary_read.sql", "utf8");
 const worldMigration = readFileSync("supabase/migrations/20261110235500_story_world_state_contextual_time_location.sql", "utf8");
 const suggestionMigration = readFileSync("supabase/migrations/20261111100000_story_suggested_replies_persistence.sql", "utf8");
+const suggestionEditMigration = readFileSync("supabase/migrations/20261119000400_chat_suggested_replies_editing.sql", "utf8");
 const eightFieldMigration = readFileSync("supabase/migrations/20261106140000_expand_story_phone_events_to_five_fields.sql", "utf8");
 const affinityMigration = readFileSync("supabase/migrations/20261106090000_story_turn_affinity_and_phone_events.sql", "utf8");
 const memoryImportanceMigration = readFileSync("supabase/migrations/20261110205546_story_memory_summary_important_toggle.sql", "utf8");
@@ -58,7 +59,7 @@ assert.match(html, /const noticeContentHTML=\[configuredNoticeHTML,storyStateHTM
 assert.match(html, /const configuredFieldIndexes=new Set\(configuredPhonePrompts\.slice\(0,8\)/);
 
 // Per-message persisted suggestions override stale session metadata on reload.
-assert.match(html, /Object\.assign\(normalized,metadata\);[\s\S]{0,260}if\(persistedSuggestions\.length===3\)normalized\.suggestedReplies=persistedSuggestions/);
+assert.match(html, /Object\.assign\(normalized,metadata\);[\s\S]{0,300}if\(Array\.isArray\(message\.suggested_replies\)\)normalized\.suggestedReplies=persistedSuggestions/);
 
 // Refresh Story relationship state once through renderConversation after settlement.
 assert.match(html, /render\(\);\s*\/\/ render\(\) refreshes the Story relationship meter once through renderConversation\(\)\./);
@@ -95,6 +96,22 @@ assert.match(edge, /never feed legacy player\/character quote/);
 assert.match(edge, /select\("id,content,suggested_replies"\)/);
 assert.match(suggestionMigration, /ADD COLUMN IF NOT EXISTS suggested_replies jsonb/);
 assert.match(suggestionMigration, /jsonb_array_length\(suggested_replies\) <= 3/);
+assert.match(html, /data-action="suggestion-edit"/);
+assert.match(html, /data-action="suggestion-delete"/);
+assert.match(html, /data-action="suggestion-edit-save"/);
+assert.match(html, /suggestionTurnId:suggestionRes\.data\?\.status==='completed'/);
+assert.match(html, /g\.active\.suggestionTurnId=turnId/);
+assert.match(html, /update_chat_message_suggested_replies/);
+assert.match(html, /update_chat_group_turn_suggested_replies/);
+assert.match(html, /if\(Array\.isArray\(message\.suggested_replies\)\)normalized\.suggestedReplies=persistedSuggestions/);
+assert.match(suggestionEditMigration, /CREATE OR REPLACE FUNCTION public\.update_chat_message_suggested_replies/);
+assert.match(suggestionEditMigration, /CREATE OR REPLACE FUNCTION public\.update_chat_group_turn_suggested_replies/);
+assert.match(suggestionEditMigration, /suggestion_message_not_latest/);
+assert.match(suggestionEditMigration, /suggestion_turn_not_latest/);
+assert.match(suggestionEditMigration, /account_deletion_pending/);
+assert.match(suggestionEditMigration, /GRANT EXECUTE ON FUNCTION public\.update_chat_message_suggested_replies/);
+assert.match(suggestionEditMigration, /GRANT EXECUTE ON FUNCTION public\.update_chat_group_turn_suggested_replies/);
+
 
 // Story long-term memory shows only AI-generated summaries, with timestamps
 // and a persisted, owner-checked important-memory toggle; raw quote cards stay hidden.
