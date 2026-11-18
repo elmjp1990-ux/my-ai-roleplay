@@ -10145,6 +10145,7 @@ document.addEventListener('click',async event=>{
       window.PoyozzCityMap?.refreshScenes?.();
       window.PoyozzCityMap?.refreshSchedules?.();
       await loadEncounterScheduleRepairOutputs();
+      await loadEncounterScheduleTestTools();
     }else{
       toast('人工補正結果：'+String(data?.error||data?.status||'未知狀態'));
     }
@@ -10402,7 +10403,7 @@ function renderModal(o) {
             <button type="button" data-action="load-encounter-schedule-repairs">查看失敗 AI 原始回覆</button>
           </div>
           <div id="encounterScheduleRepairOutputs" class="stack" style="margin-top:12px"></div>
-          <p class="small muted">會產生 AI 服務呼叫成本，但不扣玩家銀幣或鑽石；不會觸發相遇對話。失敗回覆會保留 30 天供測試帳號人工補正；補正只重新驗證與發布，不會再次呼叫 AI。正式環境不提供此工具。</p>
+          <p class="small muted">會產生 AI 服務呼叫成本，但不扣玩家銀幣或鑽石；不會觸發相遇對話。失敗回覆最多保留 30 天，開啟工具時會清除已到期資料；補正只重新驗證與發布，不會再次呼叫 AI。正式環境不提供此工具。</p>
         </section>`);
       void loadEncounterScheduleTestTools();
       break;
