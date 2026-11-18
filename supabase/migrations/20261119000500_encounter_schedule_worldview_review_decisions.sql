@@ -58,6 +58,37 @@ BEGIN
 END;
 $enqueue_patch$;
 
+DO $source_invalidation_patch$
+DECLARE
+  v_enqueue text;
+  v_publish text;
+  v_old_cancel text := '    SET status = ''cancelled'', lease_token = NULL, lease_expires_at = NULL,';
+  v_new_cancel text := '    SET status = ''cancelled'', lease_token = NULL, lease_expires_at = NULL,' || E'\n' ||
+    '        worldview_review_decision = NULL, worldview_reviewed_by = NULL, worldview_reviewed_at = NULL,';
+  v_old_publish text := '      SET source_hash = v_current_hash, status = ''pending'',';
+  v_new_publish text := '      SET source_hash = v_current_hash, status = ''pending'',' || E'\n' ||
+    '          worldview_review_decision = NULL, worldview_reviewed_by = NULL, worldview_reviewed_at = NULL,';
+BEGIN
+  SELECT pg_catalog.pg_get_functiondef(
+    'public.enqueue_encounter_schedule_generation_internal(uuid)'::regprocedure
+  ) INTO v_enqueue;
+  IF pg_catalog.strpos(v_enqueue, v_old_cancel) = 0 THEN
+    RAISE EXCEPTION 'worldview_review_enqueue_cancel_anchor_missing';
+  END IF;
+  v_enqueue := pg_catalog.replace(v_enqueue, v_old_cancel, v_new_cancel);
+  EXECUTE v_enqueue;
+
+  SELECT pg_catalog.pg_get_functiondef(
+    'public.publish_encounter_schedule_batch(uuid,uuid,jsonb)'::regprocedure
+  ) INTO v_publish;
+  IF pg_catalog.strpos(v_publish, v_old_publish) = 0 THEN
+    RAISE EXCEPTION 'worldview_review_publish_source_change_anchor_missing';
+  END IF;
+  v_publish := pg_catalog.replace(v_publish, v_old_publish, v_new_publish);
+  EXECUTE v_publish;
+END;
+$source_invalidation_patch$;
+
 DO $claim_patch$
 DECLARE
   v_definition text;
