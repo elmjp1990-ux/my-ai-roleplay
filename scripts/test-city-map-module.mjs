@@ -126,7 +126,10 @@ assert.match(scheduleOrganizer, /blocked_unresolved_failures/);
 assert.match(scheduleOrganizer, /processing_character_count/);
 assert.match(scheduleOrganizer, /failed_character_count/);
 assert.match(scheduleOrganizer, /needs_reconciliation_count/);
-assert.match(scheduleOrganizer, /Promise\.all\(sources\.map\(async \(source\)/);
+assert.match(scheduleOrganizer, /const generationSources = sources\.filter\(/);
+assert.match(scheduleOrganizer, /classifyEncounterWorldview\(source\)/);
+assert.match(scheduleOrganizer, /ai_generation_skipped: true/);
+assert.match(scheduleOrganizer, /Promise\.all\(generationSources\.map\(async \(source\)/);
 assert.match(scheduleOrganizer, /characterPrompt = buildEncounterScheduleBatchMessages\(\[source\], sceneCatalog\)/,
   'the AI receives active scene display names as optional examples, never as a whitelist');
 assert.match(scheduleOrganizer, /parseEncounterScheduleBatchOutput\([\s\S]*?\[source\],[\s\S]*?sceneCatalog/);
