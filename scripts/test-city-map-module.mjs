@@ -131,6 +131,9 @@ assert.match(scheduleOrganizer, /parseEncounterScheduleBatchOutput\([\s\S]*?\[so
 assert.match(scheduleOrganizer, /ENCOUNTER_SCHEDULE_PROVIDER_TIMEOUT_MS = 100_000/);
 assert.match(scheduleOrganizer, /timeoutMs: ENCOUNTER_SCHEDULE_PROVIDER_TIMEOUT_MS/);
 assert.match(scheduleOrganizer, /provider_duration_ms/);
+assert.match(scheduleOrganizer, /let providerDurationMs = 0/);
+assert.match(scheduleOrganizer, /providerDurationMs = providerResponse\.durationMs/);
+assert.match(scheduleOrganizer, /measuredProviderDurationMs = providerDurationMs \|\| Date\.now\(\) - providerStartedAt/);
 assert.match(schedulePipelineMigration, /v_timeout := 120000/);
 assert.match(scheduleBatchMigration, /lease_expires_at = v_now \+ interval '20 minutes'/);
 assert.match(scheduleOrganizer, /_poyozz_diagnostics/);

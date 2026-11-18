@@ -500,12 +500,14 @@ Deno.serve(async (request) => {
       return { sourceId: source.character_id, failureCode: asText(error instanceof Error ? error.message : "schedule_prompt_invalid"), retryable: false, ambiguous: false };
     }
     let rawOutputId: string | null = null;
+    let providerDurationMs = 0;
     const providerStartedAt = Date.now();
     try {
       const providerResponse = await requestOpenRouterChatCompletion({
         messages: characterPrompt.messages, apiKey: openRouterKey, model: POYOZZ_DEFAULT_CHAT_MODEL,
         timeoutMs: ENCOUNTER_SCHEDULE_PROVIDER_TIMEOUT_MS, temperature: 0.35, responseFormat: { type: "json_object" },
       });
+      providerDurationMs = providerResponse.durationMs;
       rawOutputId = await recordRawGenerationOutput(
         admin, batchId, source.character_id, actorUserId, providerResponse,
       );
@@ -570,7 +572,7 @@ Deno.serve(async (request) => {
       }
       return { sourceId: source.character_id, providerResponse, rawOutputId, character, scenes };
     } catch (error) {
-      const providerDurationMs = Date.now() - providerStartedAt;
+      const measuredProviderDurationMs = providerDurationMs || Date.now() - providerStartedAt;
       const failureCode = error instanceof Error && error.name === "AbortError"
         ? "schedule_provider_timeout" : "schedule_provider_outcome_unknown";
       await updateRawGenerationOutput(admin, rawOutputId, "failed", failureCode, [failureCode]);
@@ -578,7 +580,7 @@ Deno.serve(async (request) => {
         provider: "openrouter", requestId: "", usage: {}, httpStatus: 0,
         responseContentType: "", responseBodyLength: 0, responseParsed: false,
       }, "failed", failureCode, source.character_id, {
-        provider_duration_ms: providerDurationMs,
+        provider_duration_ms: measuredProviderDurationMs,
       });
       return { sourceId: source.character_id, failureCode, retryable: false, ambiguous: true };
     }
