@@ -127,6 +127,7 @@ assert.match(scene, /encounter-first-turn-hint/);
 assert.match(scene, /先跟.*打招呼，或者留空發送/);
 assert.match(endpoint, /ENCOUNTER_DISCOVERY_SENTINEL/);
 assert.match(endpoint, /ENCOUNTER_DISCOVERY_CONTEXT/);
+assert.match(endpoint, /ENCOUNTER_CONTINUE_CONTEXT/);
 assert.match(endpoint, /openingMessage = asRow\(asRow\(session\.session_data\)\.openingMessage\)/);
 assert.match(endpoint, /encounterSchedule/);
 assert.doesNotMatch(endpoint, /from\(["']encounter_session_lifecycle["']\)/);
