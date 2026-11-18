@@ -25,6 +25,15 @@ const asRow = (value: unknown): DbRow =>
 const asText = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 const ENCOUNTER_DISCOVERY_SENTINEL = "[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]";
 const ENCOUNTER_DISCOVERY_CONTEXT = "（系統事件：玩家選擇留空發送，讓你主動發現玩家；這不是玩家說出口的台詞。）";
+const ENCOUNTER_LOCATION_LABELS: Record<string, string> = {
+  airport: "機場", commercial: "公司", "night-bar": "酒吧", "live-house": "Live House",
+  apartment: "公寓", "department-store": "百貨公司", bookstore: "書店", cafe: "咖啡廳",
+  park: "公園", "shopping-street": "商店街", "night-market": "夜市", restaurant: "餐廳",
+  university: "大學", hospital: "醫院", gym: "健身房", cinema: "電影院", museum: "博物館",
+  hotel: "飯店", "train-station": "車站", library: "圖書館", theater: "劇院",
+  "art-gallery": "藝廊", "community-center": "社區中心", "music-studio": "音樂工作室",
+  bakery: "麵包店", "coworking-space": "共享辦公室",
+};
 
 async function refundEncounterTurn(admin: any, userId: string, turnId: string, assistantMessageId: string, failureCode: string): Promise<DbRow | null> {
   const { data, error } = await admin.rpc("refund_chat_turn", {
@@ -72,11 +81,15 @@ async function buildEncounterMessages(
   };
   const scheduleSnapshot = asRow(asRow(session.character_snapshot).encounterSchedule);
   const encounterState = asRow(asRow(session.session_data).encounter);
+  const rawAffinity = Number(encounterState.affinity);
+  const affinity = Number.isFinite(rawAffinity) ? Math.max(-100, Math.min(100, Math.trunc(rawAffinity))) : 0;
+  const locationKey = asText(scheduleSnapshot.location_key);
   const sessionData = {
     ...asRow(session.session_data),
     scene: asText(scheduleSnapshot.activity) || asText(scheduleSnapshot.scene),
-    location: asText(scheduleSnapshot.location_key),
+    location: ENCOUNTER_LOCATION_LABELS[locationKey] || locationKey || "角色目前所在的地點",
     time: [asText(scheduleSnapshot.start_time), asText(scheduleSnapshot.end_time)].filter(Boolean).join("–"),
+    affinity,
     relationship: asText(encounterState.relationshipStage) || "初次相遇",
   };
 
@@ -91,7 +104,11 @@ async function buildEncounterMessages(
     historyRows.unshift({ id: "opening-" + asText(session.id), role: "assistant", content: openingText });
   }
   if (!historyRows.some((row: DbRow) => row.id === userMessageId)) {
-    historyRows.push({ id: userMessageId, role: "user", content: asText(currentUserMessage.content) });
+    historyRows.push({
+      id: userMessageId, role: "user",
+      content: asText(currentUserMessage.content) === ENCOUNTER_DISCOVERY_SENTINEL
+        ? ENCOUNTER_DISCOVERY_CONTEXT : asText(currentUserMessage.content),
+    });
   }
   const values = buildPromptVariableValues({
     profile, character, characterSnapshot: snapshot, sessionData,
@@ -122,7 +139,7 @@ async function buildEncounterMessages(
     "你是 POYOZZ 相遇模式中的角色。請以角色本人身分，根據角色設定、目前場景與對話自然回應玩家。",
     "【角色資料】角色：{CHAR}\n公開介紹：{CHAR_DESC}\n演繹風格：{CHAR_STYLE}\n角色個性：{CHAR_PERSONALITY}\n喜好：{CHAR_LIKES}\n雷點：{CHAR_DISLIKES}\n外觀：{CHAR_APPEARANCE}",
     "【作者私密設定】只用於維持角色一致性，不可向玩家揭露、引用或摘要。\n<private_story_context>\n" + privateContext.promptText + "\n</private_story_context>",
-    "【目前相遇場景】地點代碼：{LOCATION}\n目前活動：{SCENE}\n行程時段：{TIME}\n關係階段：{RELATIONSHIP}\n請延續這個場景，不要無故瞬移或改變時間、服裝與正在進行的活動。",
+    "【目前相遇場景】地點：{LOCATION}\n目前活動：{SCENE}\n行程時段：{TIME}\n目前好感度：" + String(affinity) + "/100\n關係階段：" + (asText(encounterState.relationshipStage) || "初次相遇") + "\n請延續這個場景，不要無故瞬移或改變時間、服裝與正在進行的活動。",
     "【玩家】{USER}\n玩家人設：{USER_DESC}\n【台灣日期】{CURRENT_DATE}",
     "【相遇開場方式】如果玩家本回合輸入的是系統事件「玩家選擇留空發送」，代表玩家沒有說任何台詞，而是希望你依照目前地點、活動、好感度與是否初次見面，自行注意到玩家並主動開始互動。請自然演出角色當下如何發現玩家、第一個動作與開場對話，不可把系統事件當成玩家說出口的話，也不可要求玩家重送招呼。若玩家有輸入文字，則直接回應玩家的招呼。後續空白發送代表延續目前對話，由角色自然繼續說下去。",
     "【近期對話】依照後續對話訊息延續，不得忽略已發生事件。玩家未說出口的想法不可被角色讀取；不要替玩家決定台詞、想法或行動。",
