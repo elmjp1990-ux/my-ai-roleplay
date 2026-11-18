@@ -12834,10 +12834,8 @@ const {
         }
         if (!text.trim()) {
           const encounterHasStarted = s.encounterMode && (
-            s.cloudHasUserMessage === true ||
-            (s.messages || []).some(message => message.role === 'user' && String(message.text || '').trim() &&
-              ![GROUP_CONTINUE_SENTINEL, ENCOUNTER_DISCOVERY_SENTINEL].includes(String(message.text || '').trim())) ||
-            (s.messages || []).some(message => message.role !== 'user' && String(message.text || message.content || '').trim())
+            !!s.initialOpeningMessage ||
+            (s.messages || []).some(message => message.role === 'assistant' && String(message.text || message.content || '').trim())
           );
           text = s.encounterMode && !encounterHasStarted ? ENCOUNTER_DISCOVERY_SENTINEL : GROUP_CONTINUE_SENTINEL;
         }
