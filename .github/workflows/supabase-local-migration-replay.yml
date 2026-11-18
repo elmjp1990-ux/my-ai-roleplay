@@ -255,6 +255,7 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261118000500_resolve_only_published_encounter_scenes.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261118000600_encounter_schedule_scene_descriptions.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261118000700_encounter_hourly_schedule_options.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261118000800_prioritize_pending_encounter_schedule_jobs.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-sparse-schedule-windows.sql
 
       - name: Replay hourly weighted Encounter schedules and weather fallback
