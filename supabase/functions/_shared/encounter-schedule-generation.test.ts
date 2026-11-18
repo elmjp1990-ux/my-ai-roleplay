@@ -52,42 +52,20 @@ const variants = (slots = fullDaySlots()) => ({
     { variant_key: "alternative", weight: 40, slots: fullDaySlots({ start_time: "08:00", end_time: "16:00", location_key: "department-store", activity: "逛百貨公司" }) },
   ],
 });
-const sceneMetadata = (location_key: string) => ({
-  location_key,
-  display_name: location_key === "shopping-street" ? "商店街" : location_key,
-  icon: "📍",
-  heading: "城市裡的共同場景",
-  description: "這是一個依照角色活動與城市生活需求建立的公共場景，適合自然停留、交流與偶遇。",
-  event_label: "最新消息",
-  event_title: "本週場景消息已更新",
-  event_description: "近期將有符合場景定位的主題活動與日常安排。",
-});
+const builtInSceneCatalog: EncounterSceneCatalogEntry[] = [
+  "airport", "commercial", "night-bar", "live-house", "apartment",
+  "department-store", "bookstore", "cafe", "park",
+].map((location_key) => ({ location_key, display_name: location_key, is_dynamic: false }));
 const result = (
   characters: Array<{ character_id: string; [key: string]: unknown }>,
   sourceRows?: ReturnType<typeof source>[],
-  sceneCatalog: EncounterSceneCatalogEntry[] = [],
+  sceneCatalog?: EncounterSceneCatalogEntry[],
 ) => {
   const normalized = characters.map(withGreetingPools);
-  const keys = new Set<string>();
-  for (const character of normalized) {
-    const variants = character.variants as { weekday?: Array<{ slots?: Array<{ location_key?: string; rain_fallback_location_key?: string | null }> }>; holiday?: Array<{ slots?: Array<{ location_key?: string; rain_fallback_location_key?: string | null }> }> } | undefined;
-    for (const variant of [...(variants?.weekday ?? []), ...(variants?.holiday ?? [])]) {
-      for (const slot of variant.slots ?? []) {
-        if (slot.location_key) keys.add(slot.location_key);
-      }
-    }
-    const events = character.special_events as Array<{ slots?: Array<{ location_key?: string; rain_fallback_location_key?: string | null }> }> | undefined;
-    for (const event of events ?? []) {
-      for (const slot of event.slots ?? []) {
-        if (slot.location_key) keys.add(slot.location_key);
-      }
-    }
-  }
-  const scenes = [...keys].map(sceneMetadata);
   return parseEncounterScheduleBatchOutput(
-    JSON.stringify({ characters: normalized, scenes }),
+    JSON.stringify({ characters: normalized, scenes: [] }),
     sourceRows ?? characters.map((c) => source(c.character_id)),
-    sceneCatalog,
+    [...builtInSceneCatalog, ...(sceneCatalog ?? [])],
   );
 };
 const specialEvent = (event_key = "christmas", slots = fullDaySlots()) => ({
@@ -169,12 +147,13 @@ Deno.test("rejects overlapping or non-hourly schedule intervals", () => {
   if (adjacent.ok || !adjacent.errors.some((error) => error.includes("should_merge"))) throw new Error("contiguous identical work blocks were not required to merge");
 });
 
-Deno.test("rejects gaps in the 24-hour daily schedule", () => {
-  const incomplete = fullDaySlots();
-  incomplete[1] = slot({ start_time: "09:00", end_time: "16:00" });
-  const parsed = result([{ character_id: id1, placement: "modern_map", variants: variants(incomplete) }]);
-  if (parsed.ok || !parsed.errors.some((error) => error.includes("24_hour_coverage_incomplete"))) {
-    throw new Error("daily schedule gap accepted");
+Deno.test("allows gaps because omitted periods mean the character is not encounterable", () => {
+  const partial = fullDaySlots();
+  partial[1] = slot({ start_time: "09:00", end_time: "16:00" });
+  const parsed = result([{ character_id: id1, placement: "modern_map", variants: variants(partial) }]);
+  if (!parsed.ok) throw new Error(parsed.errors.join(","));
+  if (parsed.characters[0].variants.weekday[0].slots[1].start_time !== "09:00") {
+    throw new Error("encounterable window was not preserved");
   }
 });
 
@@ -231,9 +210,8 @@ Deno.test("rejects unknown, duplicate, or incomplete special event schedules", (
     character_id: id1, placement: "modern_map", variants: variants(),
     special_events: [specialEvent("christmas", incomplete)],
   }]);
-  if (gap.ok || !gap.errors.some((error) => error.includes("24_hour_coverage_incomplete"))) {
-    throw new Error("special event schedule gap accepted");
-  }
+  if (!gap.ok) throw new Error(gap.errors.join(","));
+
 });
 
 Deno.test("does not invent birthdays or special events for unplaced characters", () => {
@@ -287,23 +265,21 @@ Deno.test("normalizes similar scene labels to canonical shared locations", () =>
   if (normalizeEncounterSceneKey("train station") !== "train-station") throw new Error("English train station alias failed");
 });
 
-Deno.test("new dynamic scenes require two characters in the same batch", () => {
-  const single = result([{
+Deno.test("only reuses dynamic scenes already present in the server catalog", () => {
+  const candidate = {
     character_id: id1, placement: "modern_map",
     variants: variants(fullDaySlots({ location_key: "shopping-street", is_outdoor: true,
       rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳", rain_fallback_greeting: greeting })),
-  }]);
-  if (single.ok || !single.errors.some((error) => error.includes("dynamic_scene_requires_two_batch_characters_shopping-street"))) {
-    throw new Error("a single role should not create an invisible dynamic scene");
+  };
+  const absent = result([candidate]);
+  if (absent.ok || !absent.errors.some((error) => error.includes("scene_not_in_existing_catalog_shopping-street"))) {
+    throw new Error("new dynamic scene was accepted without an existing catalog entry");
   }
-  const shared = result([
-    { character_id: id1, placement: "modern_map", variants: variants(fullDaySlots({ location_key: "shopping-street", is_outdoor: true,
-      rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳", rain_fallback_greeting: greeting })) },
-    { character_id: id2, placement: "modern_map", variants: variants(fullDaySlots({ location_key: "shopping-street", is_outdoor: true,
-      rain_fallback_location_key: "bookstore", rain_fallback_activity: "改在書店", rain_fallback_greeting: greeting })) },
-  ]);
-  if (!shared.ok || !shared.scenes?.some((scene) => scene.location_key === "shopping-street")) {
-    throw new Error(shared.errors.join(",") || "shared dynamic scene was not retained");
+  const existing = result([candidate], undefined, [{
+    location_key: "shopping-street", display_name: "商店街", is_dynamic: true,
+  }]);
+  if (!existing.ok || existing.scenes.length !== 0) {
+    throw new Error(existing.errors.join(",") || "existing dynamic scene should be reused without metadata changes");
   }
 });
 
@@ -394,7 +370,7 @@ Deno.test("rejects airport as a generic everyday location without character trav
   if (!accepted.ok) throw new Error(accepted.errors.join(","));
 });
 
-Deno.test("requires AI metadata for new dynamic scene types and permits reuse of active ones", () => {
+Deno.test("rejects new scene types and allows catalogued dynamic scenes without metadata", () => {
   const first = {
     character_id: id1, placement: "modern_map",
     variants: variants(fullDaySlots({ location_key: "night-market", is_outdoor: true,
@@ -410,12 +386,14 @@ Deno.test("requires AI metadata for new dynamic scene types and permits reuse of
   const missing = parseEncounterScheduleBatchOutput(JSON.stringify({
     characters: [withGreetingPools(first), withGreetingPools(second)],
   }), [source(id1), source(id2)]);
-  if (missing.ok || !missing.errors.some((error) => error.includes("dynamic_scene_metadata_missing_night-market"))) {
-    throw new Error("dynamic scene without metadata accepted");
+  if (missing.ok || !missing.errors.some((error) => error.includes("scene_not_in_existing_catalog_night-market"))) {
+    throw new Error("dynamic scene absent from catalog accepted");
   }
-  const accepted = result([first, second]);
-  if (!accepted.ok || !accepted.scenes?.some((scene) => scene.location_key === "night-market")) {
-    throw new Error(accepted.errors.join(",") || "dynamic scene metadata was not retained");
+  const accepted = result([first, second], undefined, [{
+    location_key: "night-market", display_name: "夜市", is_dynamic: true,
+  }]);
+  if (!accepted.ok || accepted.scenes.length !== 0) {
+    throw new Error(accepted.errors.join(",") || "existing dynamic scene should be reused without metadata");
   }
   const reused = result([first], undefined, [{
     location_key: "night-market", display_name: "夜市", is_dynamic: true,
@@ -434,12 +412,12 @@ Deno.test("does not allow a fourth visible dynamic map marker", () => {
     { location_key: "restaurant", display_name: "餐廳", is_dynamic: true },
   ];
   const parsed = result(characters, undefined, fullCatalog);
-  if (parsed.ok || !parsed.errors.includes("dynamic_scene_marker_limit_exceeded")) {
-    throw new Error("fourth dynamic scene marker should be rejected");
+  if (parsed.ok || !parsed.errors.some((error) => error.includes("scene_not_in_existing_catalog_university"))) {
+    throw new Error("scene not present in the server catalog should be rejected");
   }
 });
 
-Deno.test("requires AI-updatable description and latest news for built-in Live House scenes", () => {
+Deno.test("uses existing Live House scene without asking AI to update scene metadata", () => {
   const character = {
     character_id: id1, placement: "modern_map",
     variants: variants(fullDaySlots({
@@ -450,13 +428,12 @@ Deno.test("requires AI-updatable description and latest news for built-in Live H
   const missing = parseEncounterScheduleBatchOutput(JSON.stringify({
     characters: [withGreetingPools(character)],
   }), [source()]);
-  if (missing.ok || !missing.errors.some((error) => error.includes("scene_metadata_missing_live-house"))) {
-    throw new Error("built-in Live House scene metadata was not required");
+  if (missing.ok || !missing.errors.some((error) => error.includes("scene_not_in_existing_catalog_live-house"))) {
+    throw new Error("scene absent from server catalog was accepted");
   }
   const accepted = result([character]);
-  const liveHouse = accepted.scenes?.find((scene) => scene.location_key === "live-house");
-  if (!accepted.ok || !liveHouse || liveHouse.event_label !== "最新消息") {
-    throw new Error(accepted.errors.join(",") || "Live House scene copy was not retained");
+  if (!accepted.ok || accepted.scenes.length !== 0) {
+    throw new Error(accepted.errors.join(",") || "existing Live House scene should be reused without AI metadata");
   }
 });
 
