@@ -1,8 +1,14 @@
 name: Encounter AI turn contract
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
+      - ".github/workflows/encounter-ai-turn.yml"
+      - "supabase/migrations/**"
+      - "supabase/drafts/**"
+      - "scripts/test-encounter-schedule-parser.mjs"
+      - "scripts/test-encounter-chat-mode-guard.mjs"
       - "index.html"
       - "encounter-scene.js"
       - "city-map.js"
