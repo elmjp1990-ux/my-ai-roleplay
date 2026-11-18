@@ -233,7 +233,7 @@ console.log("Encounter schedule worker, conditional holidays, existing-scene-onl
 
 
 const encounterSession = fs.readFileSync("supabase/functions/encounter-session/index.ts", "utf8");
-const sleepingAvailabilityMigration = fs.readFileSync("supabase/migrations/20261118074800_encounter_schedule_home_aliases_and_sleep_guard.sql", "utf8");
+const sleepingAvailabilityMigration = fs.readFileSync("supabase/migrations/20261118141805_encounter_schedule_home_aliases_and_sleep_guard.sql", "utf8");
 assert.match(generator, /resolveEncounterScheduleAvailability/);
 assert.match(generator, /SLEEPING_SCHEDULE_PATTERN/);
 assert.match(encounterSession, /resolveEncounterScheduleAvailability\(scheduleRow\.activity, scheduleRow\.scene_description\)/);
