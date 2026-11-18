@@ -231,6 +231,14 @@ Deno.test("classifies worldviews locally and keeps species separate from era", (
   if (getEncounterWorldviewScheduleDisposition(unknownClass, "modern_map_compatible") !== "generate") {
     throw new Error("explicit author review decision should authorize modern-map generation");
   }
+  const reviewedUnknown = { ...unknown, worldview_review_decision: "modern_map_compatible" };
+  if (!isEncounterModernMapCompatible(reviewedUnknown)) {
+    throw new Error("manual modern-map approval must be reflected in the generation prompt compatibility flag");
+  }
+  const reviewedPayload = JSON.parse(buildEncounterScheduleBatchMessages([reviewedUnknown]).messages[1].content).characters[0];
+  if (reviewedPayload.modern_setting_compatible !== true) {
+    throw new Error("manual modern-map approval was not passed into the AI prompt");
+  }
   if (getEncounterWorldviewScheduleDisposition(classifyEncounterWorldview(ancientVampire)) !== "not_applicable") {
     throw new Error("known historical worldview should remain a normal non-modern exclusion");
   }
