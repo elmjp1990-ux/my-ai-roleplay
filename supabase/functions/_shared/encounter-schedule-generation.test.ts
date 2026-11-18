@@ -1,6 +1,7 @@
 import {
   type EncounterSceneCatalogEntry,
   buildEncounterScheduleBatchMessages,
+  classifyEncounterWorldview,
   isEncounterModernMapCompatible,
   normalizeEncounterSceneKey,
   resolveEncounterScheduleAvailability,
@@ -186,6 +187,39 @@ Deno.test("infers modern map compatibility from contemporary character context",
   const payload = JSON.parse(built.messages[1].content).characters[0];
   if (payload.modern_setting_compatible !== true) {
     throw new Error("derived modern compatibility was not sent to the model");
+  }
+});
+
+Deno.test("classifies worldviews locally and keeps species separate from era", () => {
+  const modernVampire = source(id1, {
+    race: "吸血鬼",
+    intro: "居住在現代台北的吸血鬼，白天經營私人畫廊，晚上出席藝術活動。",
+    world_era: "現代都市",
+  });
+  const vampireClass = classifyEncounterWorldview(modernVampire);
+  if (vampireClass.category !== "modern_fantasy" || !vampireClass.modern_map_compatible) {
+    throw new Error("modern vampire should be modern-fantasy and map compatible");
+  }
+
+  const ancientVampire = source(id1, {
+    race: "吸血鬼",
+    intro: "中世紀古堡中的吸血鬼伯爵。",
+    world_era: "medieval",
+  });
+  const ancientVampireClass = classifyEncounterWorldview(ancientVampire);
+  if (ancientVampireClass.category !== "historical" || ancientVampireClass.modern_map_compatible) {
+    throw new Error("medieval vampire should remain historical and off the modern map");
+  }
+
+  const cultivation = source(id1, { intro: "修仙宗門中的劍修，正在閉關渡劫。", world_era: "修仙世界" });
+  if (classifyEncounterWorldview(cultivation).category !== "cultivation") {
+    throw new Error("cultivation worldview was not classified");
+  }
+
+  const unknown = source(id1, { intro: "一位神秘旅人。", world_era: "", modern_setting_compatible: false });
+  const unknownClass = classifyEncounterWorldview(unknown);
+  if (unknownClass.category !== "unknown" || unknownClass.modern_map_compatible) {
+    throw new Error("unknown worldview must be held out of the modern map");
   }
 });
 
