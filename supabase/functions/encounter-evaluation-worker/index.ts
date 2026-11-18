@@ -18,6 +18,8 @@ const asRow = (value: unknown): Record<string, unknown> =>
 const asText = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 const ENCOUNTER_DISCOVERY_SENTINEL = "[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]";
 const ENCOUNTER_DISCOVERY_TRANSCRIPT = "玩家選擇留空，讓角色主動發現自己（玩家沒有說出台詞）。";
+const ENCOUNTER_CONTINUE_SENTINEL = "（請接續目前的故事。）";
+const ENCOUNTER_CONTINUE_TRANSCRIPT = "玩家留空發送，請角色自然延續目前互動（玩家沒有新增台詞）。";
 const MAX_TRANSCRIPT_CHARS = 60_000;
 const MAX_TURNS = 1_000;
 
@@ -46,7 +48,9 @@ function buildTranscript(
     return {
       turnNumber: Number(turn.turn_number),
       user: (asText(userMessage.content) === ENCOUNTER_DISCOVERY_SENTINEL
-        ? ENCOUNTER_DISCOVERY_TRANSCRIPT : asText(userMessage.content)).slice(0, 2_000),
+        ? ENCOUNTER_DISCOVERY_TRANSCRIPT
+        : asText(userMessage.content) === ENCOUNTER_CONTINUE_SENTINEL
+          ? ENCOUNTER_CONTINUE_TRANSCRIPT : asText(userMessage.content)).slice(0, 2_000),
       assistant: asText(assistantMessage.content).slice(0, 2_000),
     };
   });
