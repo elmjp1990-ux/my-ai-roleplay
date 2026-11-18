@@ -79,6 +79,41 @@ GRANT EXECUTE ON FUNCTION public.resolve_encounter_scene_location_key(text)
 
 -- Scene eligibility counts also include natural-language intents that have
 -- become matchable after a scene or alias is added.
+-- Dynamic scene publication thresholds must also count retained natural-language
+-- intents; otherwise an unmatched place could never qualify when its scene is added.
+DO $scene_metadata$
+DECLARE
+  v_definition text;
+  v_old text;
+  v_new text;
+  v_count integer;
+BEGIN
+  SELECT pg_catalog.pg_get_functiondef(
+    'public.publish_encounter_scene_metadata(jsonb)'::regprocedure
+  ) INTO v_definition;
+
+  v_old := 'WHERE s.location_key = v_key';
+  v_new := 'WHERE COALESCE(s.location_key, public.resolve_encounter_scene_location_key(s.location_description)) = v_key';
+  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
+    / pg_catalog.length(v_old) INTO v_count;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'dynamic_scene_candidate_count_contract_unexpected: %', v_count;
+  END IF;
+  v_definition := pg_catalog.replace(v_definition, v_old, v_new);
+
+  v_old := 'WHERE s.location_key = r.location_key';
+  v_new := 'WHERE COALESCE(s.location_key, public.resolve_encounter_scene_location_key(s.location_description)) = r.location_key';
+  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
+    / pg_catalog.length(v_old) INTO v_count;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'dynamic_scene_visible_count_contract_unexpected: %', v_count;
+  END IF;
+  v_definition := pg_catalog.replace(v_definition, v_old, v_new);
+
+  EXECUTE v_definition;
+END;
+$scene_metadata$;
+
 DO $catalog$
 DECLARE
   v_definition text;
