@@ -466,16 +466,16 @@ main { max-width:1500px; margin:auto; padding:25px; }
 /* Chat */
 /* 單人對話使用完整視窗高度，不顯示全站標頭（頁名／測試環境／錢包／帳號）。 */
 body.conversation .app > header { display:none !important; }
-body.conversation main { max-width:none; height:100dvh; padding:0; }
-body.conversation .chat-layout { height:100dvh; }
+body.conversation main { max-width:none; height:var(--poyozz-chat-viewport-height,100dvh); min-height:0; padding:0; }
+body.conversation .chat-layout { height:100%; min-height:0; }
 body.chat-page main { max-width:none; padding:12px; }
 body.group-chat-page .app > header,body.group-chat-page .mobile-nav { display:none !important; }
 body.group-chat-page .sidebar { display:none!important; }
 body.group-chat-page .app { margin-left:0!important; }
 body.group-chat-page:has(.group-wizard) .sidebar { display:none !important; }
 body.group-chat-page:has(.group-wizard) .app { margin-left:0; }
-body.group-chat-page main { max-width:none; height:100dvh; min-height:0; padding:0; overflow:hidden; }
-body.group-chat-page .chat-layout { height:100dvh; }
+body.group-chat-page main { max-width:none; height:var(--poyozz-chat-viewport-height,100dvh); min-height:0; padding:0; overflow:hidden; }
+body.group-chat-page .chat-layout { height:100%; min-height:0; }
 body.group-chat-page .chat-main { height:100%; border:0; border-radius:0; }
 body.group-chat-page .chat-heading { padding-top:calc(8px + env(safe-area-inset-top)); }
 body.group-chat-page .messages { padding:12px 12px; }
@@ -849,7 +849,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .chat-list { min-height:65dvh; }
   .entry-menu { opacity:1; }
   body.conversation .app > header,body.conversation .mobile-nav { display:none; }
-  body.conversation main { height:100dvh; padding:0; max-width:none; }
+  body.conversation main { height:var(--poyozz-chat-viewport-height,100dvh); min-height:0; padding:0; max-width:none; }
   body.conversation .chat-layout { height:100%; }
   body.conversation .chat-list { display:none; }
   body.conversation .chat-main { height:100%; border:0; border-radius:0; }
@@ -13889,6 +13889,119 @@ body.chat-page .chat-heading,body.conversation .chat-heading,body.group-chat-pag
 body.chat-page .composer,body.conversation .composer,body.group-chat-page .composer{box-sizing:border-box;width:100%;margin:0;border-left:0!important;border-right:0!important;border-bottom:0!important;border-radius:0!important;}
 body.chat-page .messages,body.conversation .messages,body.group-chat-page .messages{width:100%;max-width:none;}
 </style>
+
+
+<style id="poyozz-chat-keyboard-viewport">
+/* Keep single/group chat and encounter-mode composers inside the visible software-keyboard viewport. */
+body.conversation main,body.group-chat-page main{
+  height:var(--poyozz-chat-viewport-height,100dvh);
+  min-height:0;
+}
+body.conversation .chat-layout,body.group-chat-page .chat-layout{
+  height:100%;
+  min-height:0;
+}
+/* Encounter mode has its own fixed full-screen shell; resize every fixed layer with visualViewport. */
+html body.encounter-mode-active .app,
+html body.encounter-mode-active #view,
+html body.encounter-mode-active .chat-layout,
+html body.encounter-mode-active .chat-main.encounter-scene{
+  top:var(--poyozz-visual-viewport-top,0px)!important;
+  bottom:auto!important;
+  height:var(--poyozz-chat-viewport-height,100dvh)!important;
+  min-height:0!important;
+}
+html body.encounter-mode-active .app,
+html body.encounter-mode-active #view,
+html body.encounter-mode-active .chat-layout{
+  inset-inline:0!important;
+}
+html body.encounter-mode-active .chat-main.encounter-scene{
+  inset-inline:0!important;
+}
+body.encounter-mode-active.chat-keyboard-open .chat-main.encounter-scene .composer{
+  max-height:calc(var(--poyozz-chat-viewport-height,100dvh) - 72px)!important;
+}
+body.encounter-mode-active.chat-keyboard-open .chat-main.encounter-scene .messages{
+  bottom:calc(var(--poyozz-encounter-composer-height,190px) + 8px)!important;
+  max-height:calc(var(--poyozz-chat-viewport-height,100dvh) - var(--poyozz-encounter-composer-height,190px) - 100px)!important;
+}
+body.encounter-mode-active.chat-keyboard-open .encounter-character-sprite{
+  height:clamp(150px,34dvh,280px)!important;
+  opacity:.35!important;
+}
+</style>
+<script id="poyozz-chat-keyboard-viewport">
+(() => {
+  const root = document.documentElement;
+  const viewport = window.visualViewport || null;
+  let framePending = false;
+  let observedEncounterComposer = null;
+  let composerResizeObserver = null;
+
+  const updateEncounterComposerHeight = () => {
+    const composer = document.querySelector('.chat-main.encounter-scene .composer');
+    if (composer !== observedEncounterComposer) {
+      composerResizeObserver?.disconnect();
+      observedEncounterComposer = composer;
+      if (composer && typeof ResizeObserver === 'function') {
+        composerResizeObserver = new ResizeObserver(() => {
+          const height = Math.round(composer.getBoundingClientRect().height);
+          if (height > 0) root.style.setProperty('--poyozz-encounter-composer-height', height + 'px');
+        });
+        composerResizeObserver.observe(composer);
+      }
+    }
+    if (composer) {
+      const height = Math.round(composer.getBoundingClientRect().height);
+      if (height > 0) root.style.setProperty('--poyozz-encounter-composer-height', height + 'px');
+    } else {
+      root.style.removeProperty('--poyozz-encounter-composer-height');
+    }
+  };
+
+  const updateViewportHeight = () => {
+    const height = Math.round(Number(viewport?.height) || window.innerHeight || root.clientHeight);
+    const top = Math.round(Number(viewport?.offsetTop) || 0);
+    if (height > 0) root.style.setProperty('--poyozz-chat-viewport-height', height + 'px');
+    root.style.setProperty('--poyozz-visual-viewport-top', top + 'px');
+    updateEncounterComposerHeight();
+  };
+  const scheduleViewportUpdate = () => {
+    if (framePending) return;
+    framePending = true;
+    requestAnimationFrame(() => {
+      framePending = false;
+      updateViewportHeight();
+    });
+  };
+  const isChatComposer = element =>
+    !!element?.matches?.('#messageInput, #groupMessageInput');
+
+  updateViewportHeight();
+  window.addEventListener('resize', scheduleViewportUpdate, { passive: true });
+  viewport?.addEventListener('resize', scheduleViewportUpdate, { passive: true });
+  viewport?.addEventListener('scroll', scheduleViewportUpdate, { passive: true });
+
+  document.addEventListener('focusin', event => {
+    if (!isChatComposer(event.target)) return;
+    document.body.classList.add('chat-keyboard-open');
+    updateViewportHeight();
+    scheduleViewportUpdate();
+    if (document.body.classList.contains('encounter-mode-active')) {
+      requestAnimationFrame(() => event.target.scrollIntoView?.({ block:'nearest', inline:'nearest' }));
+    }
+  });
+  document.addEventListener('focusout', () => {
+    requestAnimationFrame(() => {
+      if (!isChatComposer(document.activeElement)) {
+        document.body.classList.remove('chat-keyboard-open');
+      }
+      scheduleViewportUpdate();
+    });
+  });
+})();
+</script>
 
 </body>
 </html>
