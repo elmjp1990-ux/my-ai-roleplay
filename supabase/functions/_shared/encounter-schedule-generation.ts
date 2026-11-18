@@ -145,6 +145,11 @@ export type EncounterScheduleSource = RecordValue & {
 const isRecord = (value: unknown): value is RecordValue =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 const text = (value: unknown): string => typeof value === "string" ? value.trim() : "";
+const isValidEncounterLocationLabel = (value: string): boolean => {
+  const label = value.trim().normalize("NFKC");
+  const chineseCharacterCount = Array.from(label).filter((character) => /\\p{Script=Han}/u.test(character)).length;
+  return label.length > 0 && chineseCharacterCount <= 4 && !/[或、／\\/|，,;；]/.test(label);
+};
 const isUuid = (value: unknown): value is string =>
   typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 const hasExactKeys = (value: unknown, keys: readonly string[]): value is RecordValue =>
@@ -222,7 +227,7 @@ function validateSlot(value: unknown, errors: string[], label: string): Schedule
   const activity = text(value.activity);
   const sceneDescription = text(value.scene_description);
   const greeting = text(value.encounter_greeting);
-  if (start === null || end === null || start === end || !locationDescription || locationDescription.length > 120) errors.push(label + "_slot_time_or_location_invalid");
+  if (start === null || end === null || start === end || locationDescription.length > 120 || !isValidEncounterLocationLabel(locationDescription)) errors.push(label + "_slot_time_or_location_invalid");
   if (!activity || activity.length > 200) errors.push(label + "_activity_invalid");
   if (Array.from(sceneDescription).length < 8 || Array.from(sceneDescription).length > 500) errors.push(label + "_scene_description_invalid");
   if (typeof value.is_outdoor !== "boolean") errors.push(label + "_outdoor_flag_invalid");
@@ -235,7 +240,7 @@ function validateSlot(value: unknown, errors: string[], label: string): Schedule
     rainLocation = normalizeEncounterSceneKey(value.rain_fallback_location);
     rainActivity = text(value.rain_fallback_activity);
     rainGreeting = text(value.rain_fallback_greeting);
-    if (!rainLocation || !RAIN_FALLBACK_SCENE_KEYS.has(rainLocation) || !rainActivity || rainActivity.length > 200 ||
+    if (!isValidEncounterLocationLabel(text(value.rain_fallback_location)) || !rainLocation || !RAIN_FALLBACK_SCENE_KEYS.has(rainLocation) || !rainActivity || rainActivity.length > 200 ||
       Array.from(rainGreeting).length < 150 || Array.from(rainGreeting).length > 300) {
       errors.push(label + "_rain_fallback_invalid");
     }
@@ -465,6 +470,7 @@ function validateSpecialEvent(value: unknown, errors: string[], label: string): 
 
 export function buildEncounterScheduleBatchMessages(
   sources: EncounterScheduleSource[],
+  sceneCatalog: EncounterSceneCatalogEntry[] = [],
 ): {
   messages: Array<{ role: "system" | "user"; content: string }>;
   protectedContextByCharacter: Record<string, string[]>;
@@ -518,21 +524,27 @@ export function buildEncounterScheduleBatchMessages(
       author_private_context: privateContext.promptText,
     };
   });
+  const sceneSuggestions = [...new Set(sceneCatalog
+    .map((scene) => text(scene.display_name))
+    .filter((name) => name && isValidEncounterLocationLabel(name)))].slice(0, 9);
+  const sceneSuggestionText = sceneSuggestions.length
+    ? sceneSuggestions.join("、")
+    : "目前沒有可用的地圖場景範例";
   const system = [
     "你是 POYOZZ 的角色行程規劃器。一次為佇列提供的所有公開角色整理可驗證的城市地圖行程；不得自行省略任何角色。",
-    "必須讀取角色名稱、稱號、職業、身分、世界觀、種族、性格、興趣、標籤、作者行程說明及 existing_author_schedules。existing_author_schedules 是作者已保存的固定時段與地點，必須原樣保留並視為優先限制，不得改寫或覆蓋；AI 只負責推演其餘時段。作者固定行程僅作為規劃限制，不要求 AI 判斷地圖是否有對應場景。若 author_schedule_brief 為空，依角色卡設定推演合理日常；若作者只提供部分時段，保留明確時段與限制，只補足其他時段，不得覆蓋作者設定。只使用輸入角色的設定與作者提供的行程方向，不可替角色創造與背景衝突的現代身分。歷史／古代角色若沒有作者明確設定現代相容或明確穿越，必須 placement=no_matching_location，不可放進現代城市地圖。奇幻種族只要背景明確相容現代世界，就可以正常安排。",
-    "每個時段請用自然語言寫出實際地點名稱（例如健身房、公司、咖啡廳、夜市），不可輸出 location_key、場景 ID、座標或任何系統場景分類。相似職業可以自然安排在相似地點，但不需要知道系統如何合併場景。不得因為不確定地圖是否有該地點而改寫或刪除合理行程；地點是否能對應地圖由系統自行判斷。",
+    "必須讀取角色名稱、稱號、職業、身分、世界觀、種族、性格、興趣、標籤、作者行程說明及 existing_author_schedules。existing_author_schedules 是作者已保存的固定時段與地點，必須原樣保留並視為最高優先限制，不得改寫或覆蓋；AI 只負責推演其餘時段。作者固定行程僅作為規劃限制。若 author_schedule_brief 為空，依角色卡設定推演合理日常；若作者只提供部分時段，保留明確時段與限制，只補足其他時段，不得覆蓋作者設定。只使用輸入角色的設定與作者提供的行程方向，不可替角色創造與背景衝突的現代身分。歷史／古代角色若沒有作者明確設定現代相容或明確穿越，才使用 placement=no_matching_location；這只表示不出現在現代地圖，不能因此省略角色的行程資料。奇幻種族只要背景明確相容現代世界，就可以正常安排。",
+    "目前地圖可用地點範例（只供參考，絕非白名單或限制）：" + sceneSuggestionText + "。只有角色的真實生活本來就適合時才使用；不適合就不要套用。必須依角色職業、經濟能力、個性、興趣、作息、生活圈與背景自由生成合理地點，清單以外的地點也必須照常產生。絕不可為了配合現有場景而改寫角色生活、硬塞不合理地點、拒絕生成或刪除行程。每個時段只寫一個明確地點，地點名稱最多 4 個中文字，不得用「或」、斜線、頓號等串接多個地點；一般住所寫「公寓」，富裕角色住所寫「高級公寓」，不得把高級公寓媒合到一般公寓。不得輸出 location_key、場景 ID、座標或任何系統場景分類。地點是否能對應地圖由系統自行判斷，無法媒合時仍保留原地點與行程。",
     "AI 不得接收、查詢或判斷系統場景目錄、場景 ID、合法場景清單、場景是否啟用或地圖顯示資格；不得產生場景 metadata、座標、圖片 URL、Storage path 或地標 ID。每個合理行程時段都要保留，即使地點目前沒有地圖場景也不可省略。地點映射、場景啟用狀態、座標與是否顯示全部由系統處理。",
     "airport 是特殊地點：只有角色本身職業／設定與航空機場有明確關聯，或作者設定有具體搭機、接送、轉機、出入境行程時才能使用。不得把機場當一般休閒、辦公或隨機偶遇地點；沒有明確理由時使用更合理的車站、商業大樓或其他場景。",
-    "行程以角色自身日常活動為準，AI 不得判斷玩家是否能相遇、地點是否適合公開相遇或地圖是否顯示。若角色正在睡覺，activity 或 scene_description 必須明確寫出熟睡、睡著、睡覺中等可辨識狀態，不可只寫休息或在家。weekday 與 holiday 各自輸出 0–24 個逐小時時段，每個時段必須恰好 60 分鐘、使用整點、不可重疊，允許自然空檔，不必覆蓋 24 小時。不可合併相鄰時段；即使連續多小時都在睡覺或工作，也要逐小時描述角色狀態的自然變化，避免 scene_description 每小時完全重複。每個時段需提供 1–3 個可選行為，每個選項的 weight 為 1–100 的整數，同一時段所有選項權重總和必須恰好 100；只有一種可能時就提供單一 100% 選項。不同時段獨立抽取，不可用一個全日 80/20 變體綁定整天。即使地點目前無法對應地圖場景，也必須保留自然地點描述、活動、scene_description 與招呼內容；是否可相遇及是否顯示完全由系統判斷。",
-    "weekday 與 holiday 是日曆情境，不等於角色的上班日與休假日。依台灣政府正式辦公日曆及補班日決定 day_type；AI 必須根據角色職業與作者設定，分別推演平日和假日的生活節奏，不可假設所有人週末休息。系統每天依角色、日期與時段獨立執行加權抽取，同一天同一時段結果固定，重新整理地圖不會重新抽籤；不同日期會使用不同抽取種子。",
+    "行程以角色自身日常活動為準，AI 不得判斷玩家是否能相遇、地點是否適合公開相遇或地圖是否顯示。若角色正在睡覺，activity 或 scene_description 必須明確寫出熟睡、睡著、睡覺中等可辨識狀態，不可只寫休息或在家。weekday 與 holiday 各自輸出 0–24 個逐小時時段，每個時段必須恰好 60 分鐘、使用整點、不可重疊，允許自然空檔，不必覆蓋 24 小時。不可合併相鄰時段；即使連續多小時都在睡覺或工作，也要逐小時描述角色狀態的自然變化，避免 scene_description 每小時完全重複。每個時段需提供 1–3 個可選行為，每個選項的 weight 為 1–100 的整數，同一時段所有選項權重總和必須恰好 100；只有一種可能時才用單一 100%。weight 是「該時段整組地點＋活動＋情境」實際發生的相對機率，不是品質分數，也不是各地點的全日機率。請依角色職業、固定作息、經濟能力、個性、興趣、近期生活與作者設定估計真實頻率：固定工作或固定睡眠等日常應占較高權重，偶發外出、臨時活動或低頻事件應占較低權重；不可每個選項平均分配、習慣性使用 50/50，也不可為了湊滿三個選項而虛構活動。若兩個選項幾乎同樣常見才可接近平均；若其中一個只是偶爾發生，應明顯降低其權重。每個選項必須是一組完整且彼此一致的地點、活動、scene_description、雨備與招呼，抽選時整組一起切換，絕不可把 A 地點配上 B 活動。不同時段各自依權重獨立抽選，不可用全日 80/20 變體綁定整天；但安排相鄰時段時仍須考慮交通、作息與前後活動的合理連貫，避免角色無故瞬間跨城。即使地點目前無法對應地圖場景，也必須保留自然地點描述、活動、scene_description 與招呼內容；是否可相遇及是否顯示完全由系統判斷。",
+    "weekday 與 holiday 是日曆情境，不等於角色的上班日與休假日。依台灣政府正式辦公日曆及補班日決定 day_type；AI 必須根據角色職業與作者設定，分別推演平日和假日的生活節奏，不可假設所有人週末休息。系統每天依角色、日期與時段獨立執行加權抽取，同一天同一時段結果固定，重新整理地圖不會重新抽籤；不同日期會使用不同抽取種子。機率只在同一角色、同一日期類型、同一個小時的 options 內比較，絕不可跨時段或跨平日／假日共用權重。",
     "special_events 可選擇輸出 0–4 個條件式節日行程，只能使用 event_key: taiwan_public_holiday、lunar_new_year、valentines_day、christmas。taiwan_public_holiday 代表台灣政府正式放假日；lunar_new_year 代表農曆除夕與春節假期；valentines_day 為每年 02-14；christmas 為每年 12-25。只有角色背景、關係或職業確實適合節日生活變化時才輸出，不要為每個角色硬加節日活動；只列出角色在該節日有意義的行程時段，允許空檔；若沒有合理的節日行程，special_events 必須是空陣列。角色生日目前沒有結構化日期來源，不可自行推算或輸出 birthday.",
     "戶外時段必須提供自然語言的雨天室內替代地點、替代活動與一段 150–300 字元的 rain_fallback_greeting；室內時段所有 rain_fallback 欄位必須為 null。是否戶外及雨備地點對應何種系統場景，由系統判斷。",
     "所有 AI 產生的招呼語（encounter_greeting、rain_fallback_greeting、relationship_greetings）統一遵守 POYOZZ 對話格式：旁白、心理描寫與角色動作一律以單一星號包住，例如 *他抬起眼看向你，微微一笑*；角色直接說出口的一般對話直接寫文字，不加「」或『』，也不可用雙引號包住台詞。旁白與台詞可交錯呈現，但只標記旁白／動作，不要把整段招呼全部包進星號；不得使用 Markdown 粗體的雙星號。",
     "作者行程說明只供內部規劃，輸出活動必須使用公開可見、簡短自然的描述，不得逐字複製整段說明或揭露私人情節。每個時段必須額外產生 scene_description：描述角色抵達該地點後當下的狀態、動作、環境氛圍與正在發生的情境，需融合角色個性，長度 8–500 字元；不可只把 activity 換句話說。例如 06:00–08:00 在健身房晨間訓練，情境可寫成「今天也要開始新的一天」，但應依角色個性呈現自律、懶散或興致勃勃等不同狀態；08:00–09:00 在公司與合作商會議談判，情境應呈現角色準備資料、進入會議或談判當下的神情與氛圍。每個時段也要產生一段與角色、地點、活動吻合的預生成招呼 encounter_greeting，長度 150–300 字元；不得直接揭露作者私密設定或照抄私密內容。",
     "每個 modern_map 角色還必須額外產生 relationship_greetings：依 hostile、dislike、wary、first_meeting、acquaintance、close、intimate、special 八種關係階段，各提供 3–5 段不同的繁體中文開場招呼，預設恰好 3 段（只有角色差異確實需要時才增加到 4–5 段），每段以 150–180 字元為目標且不得少於 150、不得超過 300 字元。每段要符合角色個性，但不要寫死地點、日期或時間，因為實際場景由玩家遇見時的排程決定；同一階段內不得重複。階段語氣要有明顯差異：hostile 敵意、dislike 冷淡、wary 戒備、first_meeting 初識、acquaintance 熟悉、close 信任親近、intimate 深厚親密（不預設一定是戀愛）、special 特別且高度個人化。不可因關係階段而捏造玩家曾做過的事。",
 
-    "輸出必須是嚴格 JSON object，根欄位 characters 與 scenes。每個角色欄位為 character_id, placement, variants, special_events；modern_map 角色必須包含 relationship_greetings，no_matching_location 角色可省略。relationship_greetings 必須且只能包含八個 stage key，每個 key 對應 3–5 段 150–300 字元的字串陣列。variants 只包含 weekday 與 holiday；各自為逐小時時段陣列（0–24 段）。每個時段物件欄位為 start_time, end_time, options；options 為 1–3 個選項，每個選項欄位為 weight, location（自然語言地點名稱）, activity, scene_description, is_outdoor, rain_fallback_location（自然語言雨備地點）, rain_fallback_activity, rain_fallback_greeting, encounter_greeting；同一時段 options 的 weight 總和必須為 100。不同時段的選項獨立抽取。special_events 維持 0–4 個 event_key, event_name, slots 物件的陣列；每個節日只列出角色當日有安排的節日時段，無合理行程時輸出空陣列。節日時段 slot 欄位為 start_time, end_time, location, activity, scene_description, is_outdoor, rain_fallback_location, rain_fallback_activity, rain_fallback_greeting, encounter_greeting。scenes 必須是空陣列，因為 AI 不得新增或修改場景資料。不可輸出額外欄位或 Markdown.",
+    "輸出必須是嚴格 JSON object，根欄位 characters 與 scenes。現代相容角色一律使用 placement=modern_map，即使所有地點都無法媒合也不可使用 no_matching_location；只有世界觀不相容現代地圖的角色才使用 no_matching_location，並且 variants weekday、holiday 都必須為空陣列、special_events 必須為空陣列。每個角色欄位為 character_id, placement, variants, special_events；modern_map 角色必須包含 relationship_greetings。relationship_greetings 必須且只能包含八個 stage key，每個 key 對應 3–5 段 150–300 字元的字串陣列。variants 只包含 weekday 與 holiday；各自為逐小時時段陣列（0–24 段）。每個時段物件欄位為 start_time, end_time, options；options 為 1–3 個選項，每個選項欄位為 weight, location（自然語言地點名稱）, activity, scene_description, is_outdoor, rain_fallback_location（自然語言雨備地點）, rain_fallback_activity, rain_fallback_greeting, encounter_greeting；同一時段 options 的 weight 總和必須為 100。不同時段的選項獨立抽取。special_events 維持 0–4 個 event_key, event_name, slots 物件的陣列；每個節日只列出角色當日有安排的節日時段，無合理行程時輸出空陣列。節日時段 slot 欄位為 start_time, end_time, location, activity, scene_description, is_outdoor, rain_fallback_location, rain_fallback_activity, rain_fallback_greeting, encounter_greeting。scenes 必須是空陣列，因為 AI 不得新增或修改場景資料。不可輸出額外欄位或 Markdown.",
   ].join("\n");
   return {
     messages: [
