@@ -123,8 +123,8 @@ BEGIN
   v_payload := public.encounter_schedule_source_payload(
     '00000000-0000-4000-8000-000000000010'::uuid
   );
-  IF v_payload->>'schedule_schema_version' <> 'poyozz-encounter-schedule-v8-compact-24-hour-options-2026-11-19' THEN
-    RAISE EXCEPTION 'schedule source hash version was not updated for special events';
+  IF v_payload->>'schedule_schema_version' <> 'poyozz-encounter-schedule-v9-modern-setting-inference-2026-11-19' THEN
+    RAISE EXCEPTION 'schedule source hash version was not updated for modern-setting inference';
   END IF;
 END;
 $schedule_source_version_smoke$;
