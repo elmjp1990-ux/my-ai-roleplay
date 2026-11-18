@@ -147,7 +147,7 @@ const isRecord = (value: unknown): value is RecordValue =>
 const text = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 const isValidEncounterLocationLabel = (value: string): boolean => {
   const label = value.trim().normalize("NFKC");
-  const chineseCharacterCount = Array.from(label).filter((character) => /\\p{Script=Han}/u.test(character)).length;
+  const chineseCharacterCount = Array.from(label).filter((character) => /\p{Script=Han}/u.test(character)).length;
   return label.length > 0 && chineseCharacterCount <= 4 && !/[或、／\\/|，,;；]/.test(label);
 };
 const isUuid = (value: unknown): value is string =>
