@@ -16,6 +16,8 @@ on:
       - "supabase/drafts/replay-encounter-worldview-manual-review.sql"
       - "supabase/drafts/replay-chat-suggested-replies-editing.sql"
       - "supabase/migrations/20261119000400_chat_suggested_replies_editing.sql"
+      - "index.html"
+      - "scripts/test-story-phone-and-suggestions-regression.mjs"
       - "supabase/drafts/schedule-encounter-evaluation-worker.sql"
       - "supabase/drafts/replay-schedule-encounter-evaluation-worker.sql"
       - "supabase/drafts/encounter-evaluation-evidence-gates.sql"
@@ -326,5 +328,9 @@ jobs:
         if: always()
         shell: bash
         run: |
-          cd "$RUNNER_TEMP/poyozz-local-synthetic"
-          supabase stop --no-backup
+          if [[ -d "$RUNNER_TEMP/poyozz-local-synthetic" ]]; then
+            cd "$RUNNER_TEMP/poyozz-local-synthetic"
+            supabase stop --no-backup || true
+          else
+            echo "Local Supabase was not started; nothing to stop."
+          fi
