@@ -3,7 +3,7 @@ BEGIN;
 UPDATE public.character_schedules
 SET location_key = 'apartment'
 WHERE location_key IS NULL
-  AND regexp_replace(pg_catalog.lower(pg_catalog.btrim(COALESCE(location_description, ''))), '\\s+', '', 'g')
+  AND regexp_replace(pg_catalog.lower(pg_catalog.btrim(COALESCE(location_description, ''))), '\s+', '', 'g')
     IN ('308公寓', '私人公寓', '一般公寓', '普通公寓', '公寓', '住宅', '住家', '住所', '家', '家中', '家裡', '租屋', '租屋處', '套房');
 
 DO $source_version$

@@ -168,7 +168,8 @@ export function resolveEncounterScheduleAvailability(
   activity: unknown,
   sceneDescription: unknown = "",
 ): "available" | "sleeping" {
-  const context = [text(activity), text(sceneDescription)].join(" ").normalize("NFKC");
+  const context = [text(activity), text(sceneDescription)].join(" ").normalize("NFKC")
+    .replace(/準備(?:要)?睡覺/g, "");
   return SLEEPING_SCHEDULE_PATTERN.test(context) ? "sleeping" : "available";
 }
 

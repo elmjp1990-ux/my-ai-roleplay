@@ -157,5 +157,5 @@ assert.match(html, /正式環境不提供此工具/);
 
 assert.match(cityMap, /data-place="apartment"[\s\S]*?aria-label="308公寓"/);
 assert.match(cityMap, /const isSleepingSchedule=/);
-assert.match(cityMap, /const meetControl=isSleeping[\s\S]*?目前無法相遇[\s\S]*?角色正在熟睡/);
+assert.match(cityMap, /const meetControl=isSleepingSchedule[\s\S]*?目前無法相遇（熟睡中）/);
 assert.match(cityMap, /const left=.*meetControl/);

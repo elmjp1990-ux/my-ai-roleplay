@@ -372,18 +372,13 @@
       if(!cached)console.warn('城市天氣資料載入失敗：',error?.message||error);
     }
   };
-  // Use only published characters whose own schedule data is already available to this client.
-  // Never invent a character or query private schedule rows from the browser.
   const cityPlaceAliases={airport:['airport'],commercial:['commercial','office'], 'night-bar':['night-bar','bar'], 'live-house':['live-house','livehouse'], apartment:['apartment'], 'department-store':['department-store','department_store'], bookstore:['bookstore','book-store'], cafe:['cafe','coffee-shop'], park:['park']};
-  const isSleepingSchedule=(activity,sceneDescription='')=>/(熟睡|沉睡|酣睡|安睡|睡著|睡着|睡覺|睡眠|入睡|睡去|午睡|補眠|就寢)/.test([activity,sceneDescription].filter(Boolean).join(' ').normalize('NFKC'));
+  const isSleepingSchedule=(a,s='')=>/(熟睡|沉睡|酣睡|安睡|睡著|睡着|睡覺|睡眠|入睡|睡去|午睡|補眠|就寢)/.test((a+' '+s).normalize('NFKC').replace(/準備(?:要)?睡覺/g,''));
   const getTaipeiClock=()=>{
     const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
     const values=Object.fromEntries(parts.map(part=>[part.type,part.value]));
     return {weekday:{Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[values.weekday],minutes:Number(values.hour)*60+Number(values.minute)};
   };
-  // Public schedules live in character_schedules, not in the character row.
-  // Always re-check through the server RPC when opening a city location. A cached
-  // public schedule can outlive a public -> private change, so never reuse it.
   const isCurrentCityCharacterEligible=(person)=>{
     const live=(Array.isArray(state.characters)?state.characters:[]).find(item=>item?.id===person?.id);
     return !!live&&live.visibility==='public'&&!live.deletedAt&&live.cloudPublic!==false&&live.localOnly!==true&&!String(live.id||'').startsWith('seed-')&&accessible(live);
@@ -468,8 +463,6 @@
     pager.loading=true;
     renderCityPeopleStrip(place);
     try{
-      // Scan up to five lightweight pages per request so an empty first page
-      // cannot hide characters whose schedules appear later in the public list.
       const targetCount=pager.people.length+10;
       let scannedPages=0;
       while(pager.hasMore&&pager.people.length<targetCount&&scannedPages<5){
@@ -631,14 +624,13 @@
     const timeRange=person.cityStartTime&&person.cityEndTime?escapeHTML(person.cityStartTime+'–'+person.cityEndTime):'時間未設定';
     const placeKey=locationModal.dataset.place;
     const placeName=escapeHTML(cityPlaceNames[placeKey]||'城市地點');
-    const isSleeping=isSleepingSchedule(person.cityActivity,person.citySceneDescription);
     const intro=String(person.intro||person.description||person.personalityProfile?.summary||'這位角色尚未填寫公開介紹。');
     const sessions=Object.values(state.sessions||{}).filter(session=>session?.encounterMode&&session.characterId===person.id&&!session.archived)
       .sort((a,b)=>(Number(b.startedAt)||0)-(Number(a.startedAt)||0));
     const bookmarks='<div class="city-character-bookmarks" aria-label="角色功能"><button type="button" class="city-character-bookmark '+(mode==='status'?'active':'')+'" data-action="city-character-status" aria-label="角色資料">角色資料</button><button type="button" class="city-character-bookmark '+(mode==='history'?'active':'')+'" data-action="city-character-history" aria-label="相遇紀錄">相遇紀錄</button><button type="button" class="city-character-bookmark" data-action="city-character-story" aria-label="故事模式">故事模式</button></div>';
     const affinityMarkup=mode==='status'&&page===0?'<div class="city-character-affinity" id="cityCharacterAffinity" data-character-id="'+escapeHTML(person.id)+'">正在讀取好感度…</div>':'';
-    const meetControl=isSleeping
-      ? '<div class="city-character-meet-unavailable" role="status" style="display:block;width:100%;box-sizing:border-box;padding:9px 5px;border:1px solid rgba(255,255,255,.22);border-radius:10px;background:rgba(255,255,255,.09);color:#eeeaf4;font-size:11px;line-height:1.5;text-align:center">目前無法相遇<br><small>角色正在熟睡</small></div>'
+    const meetControl=isSleepingSchedule(person.cityActivity,person.citySceneDescription)
+      ? '<span role="status">目前無法相遇（熟睡中）</span>'
       : '<button type="button" class="city-character-meet primary" data-action="city-character-meet">與他相遇</button>';
     const left='<div class="city-character-photo-column">'+portrait+affinityMarkup+meetControl+'</div>';
     let copy='';
@@ -738,8 +730,6 @@
       const index=Number(locationModal.dataset.selectedPersonIndex);
       const person=cityPresenceByPlace[locationModal.dataset.place]?.[index];
       if(!person||!isCurrentCityCharacterEligible(person)){toast('此角色已不在公開城市行程中。');await openCityLocation({dataset:{place:locationModal.dataset.place}});return;}
-      // Story mode is an entry to the normal character introduction page, not an
-      // immediate chat. Preserve the intended destination through sign-in.
       if(!currentUser()){
         requireLogin({page:'detail',id:person.id});
         return;
@@ -776,8 +766,6 @@
             if(saved!==true)throw new Error('接續相遇狀態尚未同步保存。');
           }catch(error){
             if(error?.code!=='encounter_scene_expired_or_closed')throw error;
-            // The authoritative scene clock has ended; archive the stale local resume candidate
-            // and ask the backend to create a new session only if the character is still present.
             resumedSession.archived=true;
             resumedSession.archivedAt=Date.now();
             resumedSession.encounterTemporarilyLeftAt=null;
