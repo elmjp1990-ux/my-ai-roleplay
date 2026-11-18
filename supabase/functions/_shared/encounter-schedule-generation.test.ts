@@ -140,7 +140,7 @@ Deno.test("requires an indoor rain fallback for outdoor options only", () => {
   const invalidResult = result([{ character_id: id1, placement: "modern_map", variants: variants(invalid) }]);
   if (invalidResult.ok || !invalidResult.errors.some((error) => error.includes("rain_fallback_invalid"))) {
     throw new Error("outdoor rain fallback to another outdoor scene accepted");
-  });
+  }
   const unexpected = hourlyBlocks();
   unexpected[1] = block(1, [option({ rain_fallback_location: "公寓", rain_fallback_activity: "改在家裡整理房間" })]);
   const unexpectedResult = result([{ character_id: id1, placement: "modern_map", variants: variants(unexpected) }]);
