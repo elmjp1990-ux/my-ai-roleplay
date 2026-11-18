@@ -143,6 +143,8 @@ DECLARE
   v_user_id uuid := auth.uid();
   v_character public.characters%ROWTYPE;
   v_job public.encounter_schedule_generation_jobs%ROWTYPE;
+  v_source jsonb;
+  v_current_hash text;
   v_now timestamptz := pg_catalog.clock_timestamp();
   v_status text;
 BEGIN
@@ -175,6 +177,15 @@ BEGIN
   FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'worldview_review_job_not_found_or_already_resolved' USING ERRCODE = '40001';
+  END IF;
+
+  v_source := public.encounter_schedule_source_payload(p_character_id);
+  IF v_source IS NULL THEN
+    RAISE EXCEPTION 'worldview_review_source_no_longer_eligible' USING ERRCODE = '40001';
+  END IF;
+  v_current_hash := pg_catalog.md5(v_source::text);
+  IF v_current_hash IS DISTINCT FROM v_job.source_hash THEN
+    RAISE EXCEPTION 'worldview_review_source_changed_retry' USING ERRCODE = '40001';
   END IF;
 
   IF p_decision = 'modern_map_compatible' THEN
