@@ -124,6 +124,7 @@ assert.match(frontend, /ENCOUNTER_DISCOVERY_SENTINEL/);
 assert.match(frontend, /text = s\.encounterMode && !encounterHasStarted \? ENCOUNTER_DISCOVERY_SENTINEL : GROUP_CONTINUE_SENTINEL/);
 assert.doesNotMatch(frontend, /poyozz-encounter-opening-choice/);
 assert.match(scene, /encounter-first-turn-hint/);
+assert.doesNotMatch(scene, /encounter-intro-card|encounter-intro-choice|encounter-start-button/);
 assert.match(scene, /先跟.*打招呼，或者留空發送/);
 assert.match(endpoint, /ENCOUNTER_DISCOVERY_SENTINEL/);
 assert.match(endpoint, /ENCOUNTER_DISCOVERY_CONTEXT/);
