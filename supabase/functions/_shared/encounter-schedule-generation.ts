@@ -33,10 +33,10 @@ const RAIN_FALLBACK_SCENE_KEYS = new Set([
 ]);
 const NON_MODERN_ERA_PATTERN = /ancient|historical|medieval|antiquity|fantasy|mythic|fictional|古代|歷史|中世紀|中古|奇幻|架空|封建|戰國|春秋|秦漢|唐代|宋代|明代|清代|古羅馬|古希臘/i;
 const SCENE_DISPLAY_NAMES: Record<string, string> = {
-  airport: "機場", commercial: "公司／商業大樓", "night-bar": "酒吧",
+  airport: "機場", commercial: "公司", "night-bar": "酒吧",
   "live-house": "Live House", apartment: "住家", "department-store": "百貨公司",
   bookstore: "書店", cafe: "咖啡廳", park: "公園", "shopping-street": "商店街",
-  "night-market": "夜市", restaurant: "餐廳", university: "大學／校園",
+  "night-market": "夜市", restaurant: "餐廳", university: "大學",
   hospital: "醫院", gym: "健身房", cinema: "電影院", museum: "博物館",
   hotel: "飯店", "train-station": "車站", library: "圖書館",
   theater: "劇院", "art-gallery": "藝廊", "community-center": "社區中心",
