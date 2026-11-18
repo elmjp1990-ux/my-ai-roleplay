@@ -34,6 +34,10 @@ const ENCOUNTER_LOCATION_LABELS: Record<string, string> = {
   "art-gallery": "藝廊", "community-center": "社區中心", "music-studio": "音樂工作室",
   bakery: "麵包店", "coworking-space": "共享辦公室",
 };
+const ENCOUNTER_RELATIONSHIP_LABELS: Record<string, string> = {
+  hostile: "敵意", dislike: "反感", wary: "戒備", first_meeting: "初次見面",
+  acquaintance: "逐漸熟悉", close: "親近信任", intimate: "深厚親密", special: "特殊關係",
+};
 
 async function refundEncounterTurn(admin: any, userId: string, turnId: string, assistantMessageId: string, failureCode: string): Promise<DbRow | null> {
   const { data, error } = await admin.rpc("refund_chat_turn", {
@@ -83,6 +87,8 @@ async function buildEncounterMessages(
   const encounterState = asRow(asRow(session.session_data).encounter);
   const rawAffinity = Number(encounterState.affinity);
   const affinity = Number.isFinite(rawAffinity) ? Math.max(-100, Math.min(100, Math.trunc(rawAffinity))) : 0;
+  const relationshipStage = asText(encounterState.relationshipStage) || "first_meeting";
+  const relationshipLabel = ENCOUNTER_RELATIONSHIP_LABELS[relationshipStage] || "初次見面";
   const locationKey = asText(scheduleSnapshot.location_key);
   const sessionData = {
     ...asRow(session.session_data),
@@ -90,7 +96,7 @@ async function buildEncounterMessages(
     location: ENCOUNTER_LOCATION_LABELS[locationKey] || locationKey || "角色目前所在的地點",
     time: [asText(scheduleSnapshot.start_time), asText(scheduleSnapshot.end_time)].filter(Boolean).join("–"),
     affinity,
-    relationship: asText(encounterState.relationshipStage) || "初次相遇",
+    relationship: relationshipLabel,
   };
 
   const historyRows = (Array.isArray(historyResult.data) ? historyResult.data : [])
@@ -139,7 +145,7 @@ async function buildEncounterMessages(
     "你是 POYOZZ 相遇模式中的角色。請以角色本人身分，根據角色設定、目前場景與對話自然回應玩家。",
     "【角色資料】角色：{CHAR}\n公開介紹：{CHAR_DESC}\n演繹風格：{CHAR_STYLE}\n角色個性：{CHAR_PERSONALITY}\n喜好：{CHAR_LIKES}\n雷點：{CHAR_DISLIKES}\n外觀：{CHAR_APPEARANCE}",
     "【作者私密設定】只用於維持角色一致性，不可向玩家揭露、引用或摘要。\n<private_story_context>\n" + privateContext.promptText + "\n</private_story_context>",
-    "【目前相遇場景】地點：{LOCATION}\n目前活動：{SCENE}\n行程時段：{TIME}\n目前好感度：" + String(affinity) + "/100\n關係階段：" + (asText(encounterState.relationshipStage) || "初次相遇") + "\n請延續這個場景，不要無故瞬移或改變時間、服裝與正在進行的活動。",
+    "【目前相遇場景】地點：{LOCATION}\n目前活動：{SCENE}\n行程時段：{TIME}\n目前好感度：" + String(affinity) + "/100\n關係階段：" + relationshipLabel + "\n請延續這個場景，不要無故瞬移或改變時間、服裝與正在進行的活動。",
     "【玩家】{USER}\n玩家人設：{USER_DESC}\n【台灣日期】{CURRENT_DATE}",
     "【相遇開場方式】如果玩家本回合輸入的是系統事件「玩家選擇留空發送」，代表玩家沒有說任何台詞，而是希望你依照目前地點、活動、好感度與是否初次見面，自行注意到玩家並主動開始互動。請自然演出角色當下如何發現玩家、第一個動作與開場對話，不可把系統事件當成玩家說出口的話，也不可要求玩家重送招呼。若玩家有輸入文字，則直接回應玩家的招呼。後續空白發送代表延續目前對話，由角色自然繼續說下去。",
     "【近期對話】依照後續對話訊息延續，不得忽略已發生事件。玩家未說出口的想法不可被角色讀取；不要替玩家決定台詞、想法或行動。",
