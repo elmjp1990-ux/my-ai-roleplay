@@ -29,6 +29,7 @@ const sessionCreator = fs.readFileSync("supabase/functions/encounter-session/ind
 const pipeline = fs.readFileSync("supabase/drafts/encounter-schedule-pipeline.sql", "utf8");
 const scheduleGeneration = fs.readFileSync("supabase/functions/_shared/encounter-schedule-generation.ts", "utf8");
 const sparseScheduleMigration = fs.readFileSync("supabase/migrations/20261118000400_encounter_schedules_allow_unavailable_windows.sql", "utf8");
+const publishedSceneResolverMigration = fs.readFileSync("supabase/migrations/20261118000500_resolve_only_published_encounter_scenes.sql", "utf8");
 const replay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-pipeline.sql", "utf8");
 const weatherSync = fs.readFileSync("supabase/functions/encounter-weather-sync/index.ts", "utf8");
 const weatherModule = fs.readFileSync("supabase/functions/_shared/encounter-weather.mjs", "utf8");
@@ -85,6 +86,8 @@ assert.match(sparseScheduleMigration, /NOT BETWEEN 0 AND 4/);
 assert.match(sparseScheduleMigration, /NOT BETWEEN 1 AND 4/);
 assert.match(sparseScheduleMigration, /schedule_variant_24_hour_coverage_incomplete/);
 assert.match(sparseScheduleMigration, /schedule_special_event_24_hour_coverage_incomplete/);
+assert.match(publishedSceneResolverMigration, /public\.get_encounter_scene_catalog\(\)/);
+assert.match(publishedSceneResolverMigration, /Newly enabled scenes automatically expose matching stored slots/);
 
 assert.match(endpoint, /requestOpenRouterChatCompletion/);
 assert.match(endpoint, /POYOZZ_DEFAULT_CHAT_MODEL/);
