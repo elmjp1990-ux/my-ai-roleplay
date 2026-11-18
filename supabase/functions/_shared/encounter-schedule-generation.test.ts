@@ -247,13 +247,14 @@ Deno.test("does not invent birthdays or special events for unplaced characters",
   const built = buildEncounterScheduleBatchMessages([source()]);
   if (!built.messages[0].content.includes("lunar_new_year")) throw new Error("prompt must describe Lunar New Year schedules");
   if (!built.messages[0].content.includes("角色生日目前沒有結構化日期來源")) throw new Error("prompt must not infer character birthdays");
+  const ancient = source(id1, { world_era: "ancient", modern_setting_compatible: false });
   const unplaced = parseEncounterScheduleBatchOutput(JSON.stringify({
     characters: [{
       character_id: id1, placement: "no_matching_location",
       variants: { weekday: [], holiday: [] }, special_events: [specialEvent("christmas")],
     }],
-  }), [source()]);
-  if (unplaced.ok || !unplaced.errors.some((error) => error.includes("no_location_variants_must_be_empty"))) throw new Error("unplaced character special events accepted");
+  }), [ancient]);
+  if (unplaced.ok || !unplaced.errors.some((error) => error.includes("no_location_variants_must_be_empty"))) throw new Error("incompatible character special events accepted");
 });
 
 Deno.test("does not place historical or incompatible fantasy characters on the modern map", () => {
@@ -308,11 +309,18 @@ Deno.test("accepts only distinct, approved, rights-confirmed public characters",
 });
 
 Deno.test("builds one prompt with per-hour weights and private-context screening values", () => {
-  const built = buildEncounterScheduleBatchMessages([source()]);
+  const built = buildEncounterScheduleBatchMessages([source()], [
+    { location_key: "commercial", display_name: "公司", is_dynamic: false },
+    { location_key: "cafe", display_name: "咖啡廳", is_dynamic: false },
+  ]);
   if (built.messages.length !== 2 || built.messages[0].role !== "system") throw new Error("batch messages malformed");
   if (!built.messages[0].content.includes("不同時段獨立抽取") ||
-      !built.messages[0].content.includes("同一時段所有選項權重總和必須恰好 100")) {
-    throw new Error("per-hour weighted option rules missing from prompt");
+      !built.messages[0].content.includes("同一時段所有選項權重總和必須恰好 100") ||
+      !built.messages[0].content.includes("不可每個選項平均分配") ||
+      !built.messages[0].content.includes("整組一起切換") ||
+      !built.messages[0].content.includes("公司、咖啡廳") ||
+      !built.messages[0].content.includes("絕非白名單或限制")) {
+    throw new Error("weighted probability or optional scene-reference prompt rules missing");
   }
   if (!Array.isArray(built.protectedContextByCharacter[id1])) throw new Error("private context guard values missing");
 });
@@ -354,14 +362,45 @@ Deno.test("rejects airport as a generic everyday location without character trav
 Deno.test("preserves unmatched natural-language place intent and character-specific arrival description", () => {
   const blocks = hourlyBlocks();
   blocks[3].options[0] = option({
-    weight: 80, location_key: "角色私人工作室", activity: "在自己的工作室整理新作品。",
+    weight: 80, location_key: "私人畫室", activity: "在自己的畫室整理新作品。",
     scene_description: "他推開工作室的門，將剛完成的草稿放在桌上，窗邊的午後光線落在散亂的畫具上。",
   });
   const parsed = result([{ character_id: id1, placement: "modern_map", variants: variants(blocks) }]);
   if (!parsed.ok) throw new Error(parsed.errors.join(","));
   const chosen = parsed.characters[0].variants.weekday[3].options[0];
-  if (chosen.location_key !== null || chosen.location_description !== "角色私人工作室") throw new Error("unmatched natural-language place was not retained");
+  if (chosen.location_key !== null || chosen.location_description !== "私人畫室") throw new Error("unmatched natural-language place was not retained");
   if (!chosen.scene_description.includes("午後光線") || !chosen.activity.includes("整理新作品")) throw new Error("scene description or activity was not preserved");
+});
+
+Deno.test("rejects ambiguous or overlong Chinese location labels", () => {
+  const tooLong = hourlyBlocks();
+  tooLong[0].options[0] = option({ weight: 80, location_key: "私人工作室" });
+  const longResult = result([{ character_id: id1, placement: "modern_map", variants: variants(tooLong) }]);
+  if (longResult.ok || !longResult.errors.some((error) => error.includes("slot_time_or_location_invalid"))) {
+    throw new Error("location label over four Chinese characters was accepted");
+  }
+
+  const compound = hourlyBlocks();
+  compound[0].options[0] = option({ weight: 80, location_key: "公司或咖啡廳" });
+  const compoundResult = result([{ character_id: id1, placement: "modern_map", variants: variants(compound) }]);
+  if (compoundResult.ok || !compoundResult.errors.some((error) => error.includes("slot_time_or_location_invalid"))) {
+    throw new Error("compound location label was accepted");
+  }
+});
+
+Deno.test("preserves a modern character schedule even when the model reports no matching location", () => {
+  const parsed = parseEncounterScheduleBatchOutput(JSON.stringify({
+    characters: [{
+      character_id: id1, placement: "no_matching_location", variants: variants(),
+      relationship_greetings: relationshipGreetings(), special_events: [],
+    }],
+  }), [source()]);
+  if (!parsed.ok) throw new Error(parsed.errors.join(","));
+  const character = parsed.characters[0];
+  if (character.placement !== "modern_map") throw new Error("modern role was incorrectly left unplaced");
+  if (character.variants.weekday.length !== 4 || character.variants.holiday.length !== 2) {
+    throw new Error("modern natural-language schedule was discarded");
+  }
 });
 
 Deno.test("preserves canonical scene intent even when the scene is not currently catalogued", () => {
