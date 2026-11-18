@@ -37,7 +37,6 @@ on:
       - "supabase/functions/_shared/chat-turn-claim.ts"
       - "supabase/functions/_shared/story-memory-summary.ts"
       - "scripts/test-encounter-ai-output.mjs"
-      - ".github/workflows/encounter-ai-turn.yml"
 
 jobs:
   encounter-ai-turn:
