@@ -77,7 +77,7 @@ assert.match(replay, /generic public holiday schedule was not selected for a nam
 assert.match(scheduleGeneration, /special_events/);
 assert.match(scheduleGeneration, /lunar_new_year/);
 assert.match(scheduleGeneration, /角色生日目前沒有結構化日期來源/);
-assert.match(scheduleGeneration, /只輸出適合玩家實際遇見角色的時段/);
+assert.match(scheduleGeneration, /行程以角色自身日常活動為準/);
 assert.match(scheduleGeneration, /地點是否能對應地圖由系統自行判斷/);
 assert.match(scheduleGeneration, /scene_description/);
 assert.match(scheduleGeneration, /location（自然語言地點名稱）/);
