@@ -369,6 +369,26 @@ Deno.test("rejects airport as a generic everyday location without character trav
   if (!accepted.ok) throw new Error(accepted.errors.join(","));
 });
 
+Deno.test("preserves unmatched natural-language place intent and character-specific arrival description", () => {
+  const candidate = {
+    character_id: id1, placement: "modern_map",
+    variants: variants(fullDaySlots({
+      location_key: "角色私人工作室",
+      activity: "在自己的工作室整理新作品。",
+      scene_description: "他推開工作室的門，將剛完成的草稿放在桌上，窗邊的午後光線落在散亂的畫具上。",
+    })),
+  };
+  const parsed = result([candidate]);
+  if (!parsed.ok) throw new Error(parsed.errors.join(","));
+  const slot = parsed.characters[0].variants.weekday[0].slots[1];
+  if (slot.location_key !== null || slot.location_description !== "角色私人工作室") {
+    throw new Error("unmatched natural-language place was not retained independently from the map key");
+  }
+  if (!slot.scene_description.includes("午後光線") || !slot.activity.includes("整理新作品")) {
+    throw new Error("arrival scene description or activity was not preserved");
+  }
+});
+
 Deno.test("preserves canonical scene intent even when the scene is not currently catalogued", () => {
   const candidate = {
     character_id: id1, placement: "modern_map",
