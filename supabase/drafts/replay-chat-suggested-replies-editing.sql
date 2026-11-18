@@ -35,6 +35,16 @@ BEGIN
   INTO v_group_acl
   FROM pg_catalog.pg_proc p
   WHERE p.oid = 'public.update_chat_group_turn_suggested_replies(uuid,jsonb)'::regprocedure;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_trigger t
+    WHERE t.tgrelid = 'public.chat_messages'::regclass
+      AND t.tgname = 'guard_chat_message_suggested_replies_rpc_only'
+      AND NOT t.tgisinternal
+  ) OR position('suggested_replies_rpc_required' IN
+       pg_catalog.pg_get_functiondef('public.guard_chat_message_suggested_replies_rpc_only()'::regprocedure)) = 0 THEN
+    RAISE EXCEPTION 'single_suggestion_direct_update_guard_missing';
+  END IF;
+
   IF v_single_acl <> 'jsonb' OR v_group_acl <> 'jsonb' THEN
     RAISE EXCEPTION 'suggestion_edit_rpc_return_shape_invalid';
   END IF;
