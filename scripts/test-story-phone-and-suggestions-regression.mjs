@@ -108,6 +108,8 @@ assert.match(suggestionEditMigration, /CREATE OR REPLACE FUNCTION public\.update
 assert.match(suggestionEditMigration, /CREATE OR REPLACE FUNCTION public\.update_chat_group_turn_suggested_replies/);
 assert.match(suggestionEditMigration, /suggestion_message_not_latest/);
 assert.match(suggestionEditMigration, /suggestion_turn_not_latest/);
+assert.match(suggestionEditMigration, /guard_chat_message_suggested_replies_rpc_only/);
+assert.match(suggestionEditMigration, /suggested_replies_rpc_required/);
 assert.match(suggestionEditMigration, /account_deletion_pending/);
 assert.match(suggestionEditMigration, /GRANT EXECUTE ON FUNCTION public\.update_chat_message_suggested_replies/);
 assert.match(suggestionEditMigration, /GRANT EXECUTE ON FUNCTION public\.update_chat_group_turn_suggested_replies/);
