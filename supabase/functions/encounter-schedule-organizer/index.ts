@@ -557,9 +557,9 @@ Deno.serve(async (request) => {
     // eligible below; active leases and uncertain publish outcomes stay blocked.
     const [processingResult, reconciliationResult] = await Promise.all([
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
-        .eq("status", "processing"),
+        .eq("status", "processing").eq("author_id", actorUserId),
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
-        .eq("status", "needs_reconciliation"),
+        .eq("status", "needs_reconciliation").eq("author_id", actorUserId),
     ]);
     if (processingResult.error || reconciliationResult.error) {
       return json({ error: "schedule_failure_state_unavailable" }, 503);
@@ -579,7 +579,8 @@ Deno.serve(async (request) => {
     const { count: pendingCount, error: pendingCountError } = await admin
       .from("encounter_schedule_generation_jobs")
       .select("character_id", { count: "exact", head: true })
-      .eq("status", "pending");
+      .eq("status", "pending")
+      .eq("author_id", actorUserId);
     if (pendingCountError) {
       return json({ error: "schedule_pending_state_unavailable" }, 503);
     }
