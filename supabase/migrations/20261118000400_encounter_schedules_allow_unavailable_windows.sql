@@ -19,14 +19,14 @@ BEGIN
   END IF;
 
   v_old := $old$OR jsonb_array_length(v_variant->'slots') NOT BETWEEN 2 AND 4$old$;
-  IF pg_catalog.position(v_old IN v_definition) <> 1 THEN
+  IF pg_catalog.strpos(v_old IN v_definition) <> 1 THEN
     RAISE EXCEPTION 'daily_slot_count_contract_not_found';
   END IF;
   v_definition := pg_catalog.replace(v_definition, v_old,
     $new$OR jsonb_array_length(v_variant->'slots') NOT BETWEEN 0 AND 4$new$);
 
   v_old := $old$IF jsonb_array_length(v_special_event->'slots') NOT BETWEEN 2 AND 4 THEN$new$;
-  IF pg_catalog.position(v_old IN v_definition) <> 1 THEN
+  IF pg_catalog.strpos(v_old IN v_definition) <> 1 THEN
     RAISE EXCEPTION 'special_event_slot_count_contract_not_found';
   END IF;
   v_definition := pg_catalog.replace(v_definition, v_old,
@@ -65,7 +65,7 @@ BEGIN
           END IF;
 
 $old$;
-  IF pg_catalog.position(v_old IN v_definition) <> 1 THEN
+  IF pg_catalog.strpos(v_old IN v_definition) <> 1 THEN
     RAISE EXCEPTION 'daily_coverage_contract_not_found';
   END IF;
   v_definition := pg_catalog.replace(v_definition, v_old, '');
@@ -97,7 +97,7 @@ $old$;
       END IF;
 
 $old$;
-  IF pg_catalog.position(v_old IN v_definition) <> 1 THEN
+  IF pg_catalog.strpos(v_old IN v_definition) <> 1 THEN
     RAISE EXCEPTION 'special_event_coverage_contract_not_found';
   END IF;
   v_definition := pg_catalog.replace(v_definition, v_old, '');
