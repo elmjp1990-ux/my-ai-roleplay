@@ -1,16 +1,13 @@
 BEGIN;
 
--- Preserve the AI's natural-language place and arrival scene independently
--- from the system-owned map key. Unknown places remain stored as intent.
+-- Keep AI-authored natural-language intent separate from the system-owned map key.
+-- A NULL location_key is valid: the original place remains available for later matching.
 ALTER TABLE public.character_schedules
   ADD COLUMN IF NOT EXISTS location_description text NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS scene_description text NOT NULL DEFAULT '';
 
 ALTER TABLE public.character_schedules
   ALTER COLUMN location_key DROP NOT NULL;
-
-ALTER TABLE public.encounter_schedule_weather_decisions
-  ADD COLUMN IF NOT EXISTS scene_description text NOT NULL DEFAULT '';
 
 ALTER TABLE public.encounter_scene_registry
   ADD COLUMN IF NOT EXISTS aliases text[] NOT NULL DEFAULT '{}';
@@ -80,8 +77,8 @@ REVOKE ALL ON FUNCTION public.resolve_encounter_scene_location_key(text)
 GRANT EXECUTE ON FUNCTION public.resolve_encounter_scene_location_key(text)
   TO service_role;
 
--- Count schedules by their system-resolved key, including previously unmatched
--- natural-language places when an alias is added later.
+-- Scene eligibility counts also include natural-language intents that have
+-- become matchable after a scene or alias is added.
 DO $catalog$
 DECLARE
   v_definition text;
@@ -105,8 +102,8 @@ BEGIN
 END;
 $catalog$;
 
--- The publisher keeps the original natural-language intent even when the
--- system cannot currently map it to a scene key.
+-- The publisher stores the AI's place description and scene-specific arrival
+-- copy, while allowing the system key to remain NULL until a scene is matched.
 DO $publisher$
 DECLARE
   v_definition text;
@@ -222,8 +219,8 @@ BEGIN
 END;
 $publisher$;
 
--- Extend the current schedule resolver to freeze and return the scene description
--- alongside the activity and encounter greeting.
+-- Re-resolve retained natural-language locations whenever the registry gains a
+-- matching display name or alias. Unpublished scenes remain hidden by catalog filtering.
 DO $resolver$
 DECLARE
   v_definition text;
@@ -235,32 +232,8 @@ BEGIN
     'public.resolve_encounter_character_schedule(uuid,uuid,text,timestamptz)'::regprocedure
   ) INTO v_definition;
 
-  v_old := $old$  activity text,
-  priority smallint,$old$;
-  v_new := $new$  activity text,
-  scene_description text,
-  priority smallint,$new$;
-  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
-    / pg_catalog.length(v_old) INTO v_count;
-  IF v_count <> 1 THEN
-    RAISE EXCEPTION 'resolver_return_scene_description_contract_count_unexpected: %', v_count;
-  END IF;
-  v_definition := pg_catalog.replace(v_definition, v_old, v_new);
-
-  v_old := '  v_effective_activity text;';
-  v_new := '  v_effective_activity text;' || pg_catalog.chr(10) || '  v_effective_scene_description text;';
-  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
-    / pg_catalog.length(v_old) INTO v_count;
-  IF v_count <> 1 THEN
-    RAISE EXCEPTION 'resolver_scene_description_variable_contract_count_unexpected: %', v_count;
-  END IF;
-  v_definition := pg_catalog.replace(v_definition, v_old, v_new);
-
-  v_old := $old$WHERE available_scene.location_key = s.location_key$old$;
-  v_new := $new$WHERE available_scene.location_key = COALESCE(
-          s.location_key,
-          public.resolve_encounter_scene_location_key(s.location_description)
-        )$new$;
+  v_old := 'WHERE available_scene.location_key = s.location_key';
+  v_new := 'WHERE available_scene.location_key = COALESCE(s.location_key, public.resolve_encounter_scene_location_key(s.location_description))';
   SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
     / pg_catalog.length(v_old) INTO v_count;
   IF v_count <> 1 THEN
@@ -281,97 +254,81 @@ BEGIN
   END IF;
   v_definition := pg_catalog.replace(v_definition, v_old, v_new);
 
-  v_old := $old$v_effective_activity := CASE
-        WHEN v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE
-          THEN COALESCE(v_row.rain_fallback_activity, v_row.activity)
-        ELSE v_row.activity END;$old$;
-  v_new := $new$v_effective_activity := CASE
-        WHEN v_is_raining IS TRUE AND v_row.is_outdoor IS TRUE
-          THEN COALESCE(v_row.rain_fallback_activity, v_row.activity)
-        ELSE v_row.activity END;
-      v_effective_scene_description := v_row.scene_description;$new$;
-  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
-    / pg_catalog.length(v_old) INTO v_count;
-  IF v_count <> 1 THEN
-    RAISE EXCEPTION 'resolver_scene_description_assignment_contract_count_unexpected: %', v_count;
-  END IF;
-  v_definition := pg_catalog.replace(v_definition, v_old, v_new);
-
-  v_old := $old$location_key, activity,
-        encounter_greeting, is_outdoor, decided_weather_text, decided_is_raining$old$;
-  v_new := $new$location_key, activity, scene_description,
-        encounter_greeting, is_outdoor, decided_weather_text, decided_is_raining$new$;
-  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
-    / pg_catalog.length(v_old) INTO v_count;
-  IF v_count <> 1 THEN
-    RAISE EXCEPTION 'resolver_decision_insert_columns_contract_count_unexpected: %', v_count;
-  END IF;
-  v_definition := pg_catalog.replace(v_definition, v_old, v_new);
-
-  v_old := $old$v_effective_location, v_effective_activity, v_effective_greeting,$old$;
-  v_new := $new$v_effective_location, v_effective_activity, v_effective_scene_description, v_effective_greeting,$new$;
-  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
-    / pg_catalog.length(v_old) INTO v_count;
-  IF v_count <> 1 THEN
-    RAISE EXCEPTION 'resolver_decision_insert_values_contract_count_unexpected: %', v_count;
-  END IF;
-  v_definition := pg_catalog.replace(v_definition, v_old, v_new);
-
-  v_old := $old$v_decision.activity,
-      v_row.priority,$old$;
-  v_new := $new$v_decision.activity,
-      v_decision.scene_description,
-      v_row.priority,$new$;
-  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
-    / pg_catalog.length(v_old) INTO v_count;
-  IF v_count <> 1 THEN
-    RAISE EXCEPTION 'resolver_return_scene_description_select_contract_count_unexpected: %', v_count;
-  END IF;
-  v_definition := pg_catalog.replace(v_definition, v_old, v_new);
-
   EXECUTE v_definition;
 END;
 $resolver$;
 
--- The public list RPC mirrors the resolver's new output field.
-DO $schedule_list$
-DECLARE
-  v_definition text;
-  v_old text;
-  v_new text;
-  v_count integer;
-BEGIN
-  SELECT pg_catalog.pg_get_functiondef(
-    'public.get_encounter_character_schedules(uuid[])'::regprocedure
-  ) INTO v_definition;
-
-  v_old := $old$  activity text,
-  priority smallint,$old$;
-  v_new := $new$  activity text,
+-- Return the saved scene description without changing the established resolver
+-- signature used by other clients.
+CREATE OR REPLACE FUNCTION public.get_encounter_character_schedules_with_scene(p_character_ids uuid[])
+RETURNS TABLE (
+  character_id uuid,
+  weekday smallint,
+  day_type text,
+  start_time time,
+  end_time time,
+  location_key text,
+  activity text,
   scene_description text,
-  priority smallint,$new$;
-  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
-    / pg_catalog.length(v_old) INTO v_count;
-  IF v_count <> 1 THEN
-    RAISE EXCEPTION 'schedule_list_return_scene_description_contract_count_unexpected: %', v_count;
-  END IF;
-  v_definition := pg_catalog.replace(v_definition, v_old, v_new);
+  priority smallint,
+  encounter_greeting text,
+  is_outdoor boolean,
+  rain_fallback_location_key text,
+  rain_fallback_activity text,
+  rain_fallback_greeting text,
+  source_type text,
+  variant_key text,
+  variant_weight smallint
+)
+LANGUAGE sql
+VOLATILE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT
+    c.id,
+    resolved.weekday,
+    resolved.day_type,
+    resolved.start_time,
+    resolved.end_time,
+    resolved.location_key,
+    resolved.activity,
+    s.scene_description,
+    resolved.priority,
+    resolved.encounter_greeting,
+    resolved.is_outdoor,
+    resolved.rain_fallback_location_key,
+    resolved.rain_fallback_activity,
+    resolved.rain_fallback_greeting,
+    resolved.source_type,
+    resolved.variant_key,
+    resolved.variant_weight
+  FROM (
+    SELECT DISTINCT requested.character_id
+    FROM pg_catalog.unnest(p_character_ids) AS requested(character_id)
+    WHERE requested.character_id IS NOT NULL
+  ) AS requested
+  JOIN public.characters c ON c.id = requested.character_id
+  CROSS JOIN LATERAL public.resolve_encounter_character_schedule(
+    c.id,
+    (SELECT auth.uid()),
+    NULL,
+    pg_catalog.now()
+  ) AS resolved
+  JOIN public.character_schedules s ON s.id = resolved.schedule_id
+  WHERE p_character_ids IS NOT NULL
+    AND pg_catalog.cardinality(p_character_ids) BETWEEN 1 AND 10
+    AND c.visibility = 'public'
+    AND c.review_status = 'approved'
+    AND c.rights_confirmed IS TRUE
+    AND c.deleted_at IS NULL
+  ORDER BY c.id, resolved.priority DESC, resolved.start_time;
+$$;
 
-  v_old := $old$    resolved.activity,
-    resolved.priority,$old$;
-  v_new := $new$    resolved.activity,
-    resolved.scene_description,
-    resolved.priority,$new$;
-  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
-    / pg_catalog.length(v_old) INTO v_count;
-  IF v_count <> 1 THEN
-    RAISE EXCEPTION 'schedule_list_select_scene_description_contract_count_unexpected: %', v_count;
-  END IF;
-  v_definition := pg_catalog.replace(v_definition, v_old, v_new);
-
-  EXECUTE v_definition;
-END;
-$schedule_list$;
+REVOKE ALL ON FUNCTION public.get_encounter_character_schedules_with_scene(uuid[])
+  FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_encounter_character_schedules_with_scene(uuid[])
+  TO anon, authenticated;
 
 COMMENT ON COLUMN public.character_schedules.scene_description IS
   'AI-generated character-specific description of the scene after arrival; independent from activity and encounter greeting.';
