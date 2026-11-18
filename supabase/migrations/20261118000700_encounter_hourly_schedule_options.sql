@@ -73,16 +73,20 @@ BEGIN
 
   v_new := $hourly_loop$    FOREACH v_day_type IN ARRAY ARRAY['weekday', 'holiday']::text[]
     LOOP
-      IF jsonb_typeof(v_item->'variants'->v_day_type) IS DISTINCT FROM 'array'
-         OR jsonb_array_length(v_item->'variants'->v_day_type) > 24 THEN
+      IF jsonb_typeof(v_item->'variants'->v_day_type) IS DISTINCT FROM 'array' THEN
+        RAISE EXCEPTION 'schedule_hourly_blocks_invalid' USING ERRCODE = '22023';
+      END IF;
+      IF jsonb_array_length(v_item->'variants'->v_day_type) > 24 THEN
         RAISE EXCEPTION 'schedule_hourly_blocks_invalid' USING ERRCODE = '22023';
       END IF;
 
       v_previous_block_start := NULL;
       FOR v_variant IN SELECT value FROM jsonb_array_elements(v_item->'variants'->v_day_type)
       LOOP
-        IF jsonb_typeof(v_variant) IS DISTINCT FROM 'object'
-           OR jsonb_object_length(v_variant) <> 3
+        IF jsonb_typeof(v_variant) IS DISTINCT FROM 'object' THEN
+          RAISE EXCEPTION 'schedule_hourly_block_shape_invalid' USING ERRCODE = '22023';
+        END IF;
+        IF jsonb_object_length(v_variant) <> 3
            OR COALESCE(v_variant->>'start_time', '') !~ '^([01][0-9]|2[0-3]):00$'
            OR COALESCE(v_variant->>'end_time', '') !~ '^([01][0-9]|2[0-3]):00$' THEN
           RAISE EXCEPTION 'schedule_hourly_block_shape_invalid' USING ERRCODE = '22023';
@@ -98,8 +102,10 @@ BEGIN
         END IF;
         v_previous_block_start := v_block_start;
 
-        IF jsonb_typeof(v_variant->'options') IS DISTINCT FROM 'array'
-           OR jsonb_array_length(v_variant->'options') NOT BETWEEN 1 AND 3 THEN
+        IF jsonb_typeof(v_variant->'options') IS DISTINCT FROM 'array' THEN
+          RAISE EXCEPTION 'schedule_hourly_options_count_invalid' USING ERRCODE = '22023';
+        END IF;
+        IF jsonb_array_length(v_variant->'options') NOT BETWEEN 1 AND 3 THEN
           RAISE EXCEPTION 'schedule_hourly_options_count_invalid' USING ERRCODE = '22023';
         END IF;
 
@@ -112,7 +118,7 @@ BEGIN
             RAISE EXCEPTION 'schedule_hourly_option_object_invalid' USING ERRCODE = '22023';
           END IF;
           IF jsonb_object_length(v_slot) <> 11
-             OR v_slot->>'option_key' <> ('option_' || v_option_index::text)
+             OR v_slot->>'option_key' IS DISTINCT FROM ('option_' || v_option_index::text)
              OR COALESCE(v_slot->>'weight', '') !~ '^[0-9]{1,3}$' THEN
             RAISE EXCEPTION 'schedule_hourly_option_contract_invalid' USING ERRCODE = '22023';
           END IF;
