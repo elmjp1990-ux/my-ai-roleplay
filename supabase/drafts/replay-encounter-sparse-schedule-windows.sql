@@ -55,16 +55,16 @@ BEGIN
 
   SELECT aliases INTO v_original_aliases
   FROM public.encounter_scene_registry
-  WHERE location_key = 'gym';
+  WHERE location_key = 'commercial';
   UPDATE public.encounter_scene_registry
   SET aliases = pg_catalog.array_append(aliases, '回歸測試新地點名稱')
-  WHERE location_key = 'gym';
+  WHERE location_key = 'commercial';
   SELECT public.resolve_encounter_scene_location_key('回歸測試新地點名稱')
     INTO v_resolved_key;
   UPDATE public.encounter_scene_registry
   SET aliases = v_original_aliases
-  WHERE location_key = 'gym';
-  IF v_resolved_key IS DISTINCT FROM 'gym' THEN
+  WHERE location_key = 'commercial';
+  IF v_resolved_key IS DISTINCT FROM 'commercial' THEN
     RAISE EXCEPTION 'new scene aliases do not rematch retained natural-language intent';
   END IF;
 END;
