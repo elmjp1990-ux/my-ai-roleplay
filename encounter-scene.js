@@ -4,7 +4,7 @@
   const style=document.createElement('style');
   style.textContent=`
     .encounter-start-button{background:linear-gradient(135deg,#7969a8,#b17f9d)!important;color:#fff!important;border:1px solid #d8c8ef!important}
-    .encounter-awaiting-opening-choice .composer-input-row,.encounter-awaiting-opening-choice .composer-bottom-row{display:none!important}
+    .encounter-first-turn-hint{margin:0 2px 8px;padding:9px 11px;border:1px solid rgba(255,255,255,.20);border-radius:12px;background:rgba(255,255,255,.10);color:#fff;font-size:12px;line-height:1.55;text-align:center;backdrop-filter:blur(12px)}
     .encounter-intro-card{display:flex;flex-direction:column;gap:12px;width:min(100%,560px);margin:0 auto;padding:16px;border:1px solid rgba(255,255,255,.22);border-radius:18px;background:linear-gradient(135deg,rgba(28,24,37,.66),rgba(68,53,73,.48));box-shadow:0 12px 32px rgba(0,0,0,.18);backdrop-filter:blur(15px);color:#fff;text-align:center}
     .encounter-intro-card p{margin:0;color:rgba(255,250,247,.88);font-size:13px;line-height:1.7}
     .encounter-intro-actions{display:grid;grid-template-columns:1fr;gap:9px}
@@ -180,33 +180,43 @@
     const messages=panel?.querySelector('.messages');
     if(!messages)return;
     const allMessages=Array.isArray(session?.messages)?session.messages:[];
-    const hasPlayerMessage=allMessages.some(m=>m&&m.role==='user'&&String(m.text??m.content??'').trim())||session?.cloudHasUserMessage===true;
-    const greeting=String(session?.encounterGreeting||session?.cloudCharacterSnapshot?.encounterGreeting||'').trim();
+    const isInternalEvent=value=>{
+      const text=String(value??'').trim();
+      return text==='[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]'||text==='（請接續目前的故事。）';
+    };
+    const hasPlayerMessage=allMessages.some(m=>m&&m.role==='user'&&!isInternalEvent(m.text??m.content));
     const openingText=String(session?.initialOpeningMessage?.text||'').trim();
     const latestReply=[...allMessages].reverse().find(m=>m&&m.role!=='user'&&String(m.text??m.content??'').trim())||
       (openingText?{id:'opening-'+session.id,content:openingText}:null);
     const raw=String(latestReply?.text??latestReply?.content??'').trim();
+    const hasStarted=session?.cloudHasUserMessage===true||hasPlayerMessage||!!raw;
     const composer=panel.querySelector('.composer');
-    if(!hasPlayerMessage&&!raw&&session?.encounterIntroChoice!=='greet'){
-      const speakerName=String(sessionCharacter(session)?.name||session?.cloudCharacterSnapshot?.name||'角色').trim();
-      messages.innerHTML='<section class="encounter-intro-card"><p>你看見 '+e(speakerName)+' 正在眼前的場景中活動。想怎麼開始這次相遇？</p><div class="encounter-intro-actions"><button type="button" class="encounter-intro-choice primary" data-action="encounter-opening-choice" data-choice="greet">先跟 '+e(speakerName)+' 打招呼</button><button type="button" class="encounter-intro-choice" data-action="encounter-opening-choice" data-choice="wait"'+(greeting?'':' disabled')+'>等 '+e(speakerName)+' 看到你</button></div>'+(greeting?'':'<p class="encounter-intro-note">角色的場景招呼資料尚未準備好，目前可以先主動打招呼</p>')+'</section>';
-      messages.classList.remove('encounter-dialogue-ready');
-      if(composer){
-        composer.classList.add('encounter-awaiting-opening-choice');
-        composer.classList.remove('encounter-awaiting-beat');
-        const suggestions=composer.querySelector('.suggestions');
-        if(suggestions)suggestions.hidden=true;
+    if(composer){
+      let hint=composer.querySelector('.encounter-first-turn-hint');
+      if(!hasStarted){
+        if(!hint){
+          hint=document.createElement('div');
+          hint.className='encounter-first-turn-hint';
+          const inputRow=composer.querySelector('.composer-input-row');
+          if(inputRow)composer.insertBefore(hint,inputRow);
+          else composer.prepend(hint);
+        }
+        const speakerName=String(sessionCharacter(session)?.name||session?.cloudCharacterSnapshot?.name||'角色').trim();
+        hint.textContent='先跟'+speakerName+'打招呼，或者留空發送，讓'+speakerName+'發現你';
+      }else{
+        hint?.remove();
       }
-      messages.dataset.encounterBeatKey='opening-choice:'+session.id;
+      const input=composer.querySelector('#messageInput');
+      if(input)input.placeholder=hasStarted?'留空發送，讓角色繼續說下去':'輸入你想說的話，或留空發送';
+      const suggestions=composer.querySelector('.suggestions');
+      if(suggestions)suggestions.hidden=!hasPlayerMessage;
+    }
+    if(!hasStarted){
+      messages.innerHTML='';
+      messages.classList.remove('encounter-dialogue-ready');
+      messages.dataset.encounterBeatKey='opening-input:'+session.id;
       messages.dataset.encounterBeatIndex='0';
       return;
-    }
-    if(composer){
-      composer.classList.remove('encounter-awaiting-opening-choice');
-      if(!hasPlayerMessage){
-        const suggestions=composer.querySelector('.suggestions');
-        if(suggestions)suggestions.hidden=true;
-      }
     }
     const beats=raw?splitEncounterBeats(raw):[];
     const beatKey=String(latestReply?.id||latestReply?.createdAt||latestReply?.timestamp||raw.slice(0,48))+':'+raw.length+':'+beats.length;
@@ -394,18 +404,6 @@
     });
   }
   document.addEventListener('click',event=>{
-    const openingChoice=event.target.closest('[data-action="encounter-opening-choice"]');
-    if(openingChoice){
-      event.preventDefault();
-      const session=currentSession();
-      if(!session?.encounterMode)return;
-      const choice=openingChoice.dataset.choice;
-      if(choice==='wait'&&!String(session.encounterGreeting||session.cloudCharacterSnapshot?.encounterGreeting||'').trim())return;
-      window.dispatchEvent(new CustomEvent('poyozz-encounter-opening-choice',{
-        detail:{sessionId:session.id,choice}
-      }));
-      return;
-    }
     const target=event.target.closest('[data-action="encounter-next-beat"]');
     if(!target)return;
     const session=currentSession();
