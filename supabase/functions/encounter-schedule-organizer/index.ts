@@ -175,7 +175,9 @@ async function handleScheduleRepair(admin: any, actorUserId: string, body: Recor
     [source as EncounterScheduleSource],
     sceneCatalog,
   );
-  const validationErrors = parsed.ok && parsed.characters.length === 1 ? [] : parsed.errors.slice(0, 30);
+  const validationErrors = parsed.ok && parsed.characters.length === 1
+    ? []
+    : (parsed.errors.length ? parsed.errors.slice(0, 30) : ["schedule_output_shape_invalid"]);
   if (!validationErrors.length && parsed.characters.length === 1) {
     const protectedValues = promptContext.protectedContextByCharacter[output.character_id] || [];
     if (findPrivateContextLeak(JSON.stringify(parsed.characters[0]), protectedValues, [])) {
@@ -200,7 +202,7 @@ async function handleScheduleRepair(admin: any, actorUserId: string, body: Recor
       validation_errors: validationErrors,
       original_preserved: true,
       ai_called: false,
-    }, 422);
+    });
   }
 
   const { data: claimData, error: claimError } = await admin.rpc("claim_encounter_schedule_repair", {
