@@ -192,10 +192,6 @@ jobs:
             cat "$LOG_FILE"
             exit 1
           fi
-          if ! psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-schedule-pipeline.sql >>"$LOG_FILE" 2>&1; then
-            cat "$LOG_FILE"
-            exit 1
-          fi
           cat "$LOG_FILE"
 
       - name: Apply formal Encounter evidence and settlement migration
@@ -257,7 +253,20 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261118000400_encounter_schedules_allow_unavailable_windows.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261118000500_resolve_only_published_encounter_scenes.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261118000600_encounter_schedule_scene_descriptions.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261118000700_encounter_hourly_schedule_options.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-sparse-schedule-windows.sql
+
+      - name: Replay hourly weighted Encounter schedules and weather fallback
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Runs only after natural-location and hourly-option migrations on the disposable local database.
+          LOG_FILE="$RUNNER_TEMP/encounter-schedule-replay.log"
+          if ! psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-schedule-pipeline.sql >"$LOG_FILE" 2>&1; then
+            cat "$LOG_FILE"
+            exit 1
+          fi
+          cat "$LOG_FILE"
 
       - name: Replay public character eligibility and NSFW viewer gate
         shell: bash
