@@ -228,6 +228,9 @@ Deno.test("classifies worldviews locally and keeps species separate from era", (
   if (getEncounterWorldviewScheduleDisposition(unknownClass) !== "needs_review") {
     throw new Error("unknown worldview must enter manual review instead of completed/unplaced");
   }
+  if (getEncounterWorldviewScheduleDisposition(unknownClass, "modern_map_compatible") !== "generate") {
+    throw new Error("explicit author review decision should authorize modern-map generation");
+  }
   if (getEncounterWorldviewScheduleDisposition(classifyEncounterWorldview(ancientVampire)) !== "not_applicable") {
     throw new Error("known historical worldview should remain a normal non-modern exclusion");
   }
