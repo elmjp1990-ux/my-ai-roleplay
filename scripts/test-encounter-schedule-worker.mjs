@@ -9,6 +9,7 @@ const generator = fs.readFileSync("supabase/functions/_shared/encounter-schedule
 const sparseScheduleMigration = fs.readFileSync("supabase/migrations/20261118000400_encounter_schedules_allow_unavailable_windows.sql", "utf8");
 const publishedSceneResolverMigration = fs.readFileSync("supabase/migrations/20261118000500_resolve_only_published_encounter_scenes.sql", "utf8");
 const sceneDescriptionMigration = fs.readFileSync("supabase/migrations/20261118000600_encounter_schedule_scene_descriptions.sql", "utf8");
+const hourlyScheduleMigration = fs.readFileSync("supabase/migrations/20261118000700_encounter_hourly_schedule_options.sql", "utf8");
 const weatherWorker = fs.readFileSync("supabase/functions/encounter-weather-sync/index.ts", "utf8");
 const weatherParser = fs.readFileSync("supabase/functions/_shared/encounter-weather.mjs", "utf8");
 
@@ -95,7 +96,16 @@ assert.match(generator, /location（自然語言地點名稱）/);
 assert.doesNotMatch(generator, /canonical_scene_keys/);
 assert.doesNotMatch(generator, /scene_catalog/);
 assert.match(generator, /行程以角色自身日常活動為準/);
-assert.match(generator, /slots 可為空陣列/);
+assert.match(generator, /ENCOUNTER_SCHEDULE_MAX_HOURLY_BLOCKS_PER_DAY = 24/);
+assert.match(generator, /0–24 個逐小時時段/);
+assert.match(generator, /不同時段獨立抽取/);
+assert.match(generator, /同一時段所有選項權重總和必須恰好 100/);
+assert.match(hourlyScheduleMigration, /character_schedules_ai_hourly_option_unique_idx/);
+assert.match(hourlyScheduleMigration, /schedule_hourly_option_weights_must_sum_100/);
+assert.match(hourlyScheduleMigration, /v_option_roll/);
+assert.match(hourlyScheduleMigration, /hourly-options-v1/);
+assert.match(hourlyScheduleMigration, /option_1/);
+assert.match(hourlyScheduleMigration, /poyozz-encounter-schedule-v6-hourly-independent-options-2026-11-18/);
 assert.match(generator, /scenes 必須是空陣列/);
 assert.doesNotMatch(generator, /本批次只有 1 位角色使用也可以提出候選/);
 assert.doesNotMatch(generator, /shoppingStreetUsers/);
