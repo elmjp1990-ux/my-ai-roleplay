@@ -68,7 +68,7 @@ CREATE OR REPLACE FUNCTION public.prevent_encounter_schedule_raw_output_rewrite(
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = ''
-AS $
+AS $$
 BEGIN
   IF ROW(
     NEW.batch_id, NEW.character_id, NEW.actor_user_id, NEW.source_hash,
@@ -87,13 +87,13 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.prevent_encounter_schedule_revision_rewrite()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = ''
-AS $
+AS $$
 BEGIN
   IF ROW(
     NEW.output_id, NEW.corrected_response_text, NEW.validation_errors,
@@ -106,7 +106,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.prevent_encounter_schedule_raw_output_rewrite() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.prevent_encounter_schedule_revision_rewrite() FROM PUBLIC, anon, authenticated;
