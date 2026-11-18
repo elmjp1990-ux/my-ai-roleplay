@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const migration = fs.readFileSync('supabase/migrations/20261117140000_encounter_public_character_schedule_eligibility.sql', 'utf8');
+const migration = fs.readFileSync('supabase/migrations/20261117150503_encounter_public_character_schedule_eligibility.sql', 'utf8');
 const existingReadRpc = fs.readFileSync('supabase/migrations/20261114200000_batch_character_story_and_encounter_schedule_reads.sql', 'utf8');
 
 const enqueue = migration.split('CREATE OR REPLACE FUNCTION public.enqueue_encounter_schedule_generation_test_batch(')[1]?.split('\n$$;')[0] || '';
