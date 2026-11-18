@@ -262,6 +262,13 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-schedule-output-repair.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-sparse-schedule-windows.sql
 
+      - name: Apply compact 24-hour schedule and dynamic Encounter opening migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Applies only to the disposable local database; no hosted Supabase or AI calls.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119000100_encounter_schedule_compact_output.sql
+
       - name: Replay hourly weighted Encounter schedules and weather fallback
         shell: bash
         run: |
@@ -293,7 +300,7 @@ jobs:
           # Disposable local database only; all synthetic rows are rolled back.
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-scene-catalog.sql
 
-      - name: Replay Encounter relationship greeting selection smoke test
+      - name: Replay Encounter affinity state without generated greetings
         shell: bash
         run: |
           set -euo pipefail
