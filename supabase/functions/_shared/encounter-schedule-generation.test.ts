@@ -228,6 +228,8 @@ Deno.test("classifies worldviews locally and keeps species separate from era", (
   const alternateWorld = source(id1, {
     intro: "來自異世界的旅人。",
     world_era: "",
+    modern_setting_compatible: false,
+    time_travel_explicit: false,
     schedule_description: "",
     private_info: "",
     personality_profile: {},
