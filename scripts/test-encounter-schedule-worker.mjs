@@ -241,7 +241,7 @@ assert.match(encounterSession, /character_sleeping_unavailable_for_encounter/);
 assert.match(encounterSession, /resolve_encounter_character_schedule_with_scene/);
 assert.match(sleepingAvailabilityMigration, /CREATE OR REPLACE FUNCTION public\.resolve_encounter_character_schedule_with_scene/);
 assert.match(sleepingAvailabilityMigration, /GRANT EXECUTE ON FUNCTION public\.resolve_encounter_character_schedule_with_scene[^;]*TO service_role/s);
-assert.match(sleepingAvailabilityMigration, /JOIN public\.character_schedules s ON s\.id = r\.schedule_id/);
+assert.match(sleepingAvailabilityMigration, /JOIN public\.character_schedules AS schedule\s+ON schedule\.id = resolved\.schedule_id/);
 assert.match(sleepingAvailabilityMigration, /UPDATE public\.character_schedules/);
 assert.match(sleepingAvailabilityMigration, /location_description/);
 assert.match(sleepingAvailabilityMigration, /poyozz-encounter-schedule-v7-home-mapping-sleep-availability-2026-11-18/);
