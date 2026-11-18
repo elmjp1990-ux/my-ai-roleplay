@@ -1,0 +1,207 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import { parseEncounterTurnOutput } from "../supabase/functions/_shared/encounter-turn-output.mjs";
+
+const text = "相遇內容。".repeat(30);
+const illustrationId = "11111111-1111-4111-8111-111111111111";
+const sceneBackgroundId = "22222222-2222-4222-8222-222222222222";
+assert.equal(Array.from(text).length, 150);
+assert.deepEqual(
+  parseEncounterTurnOutput(JSON.stringify({ reply: text, illustration_id: illustrationId, scene_background_id: sceneBackgroundId })),
+  { reply: text, illustrationId, sceneBackgroundId },
+);
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "太短了" })), null);
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "相遇內容".repeat(76) })), null);
+assert.equal(parseEncounterTurnOutput("not-json"), null);
+assert.equal(parseEncounterTurnOutput(JSON.stringify(["not", "an", "object"])), null);
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: 123 })), null);
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, illustration_id: "invented-id" })).illustrationId, null);
+
+const max = "相遇內容".repeat(75);
+assert.equal(Array.from(max).length, 300);
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: max })).reply, max);
+
+const endpoint = fs.readFileSync("supabase/functions/encounter-turn/index.ts", "utf8");
+const guidelines = fs.readFileSync("supabase/functions/_shared/encounter-response-guidelines.ts", "utf8");
+const frontend = fs.readFileSync("index.html", "utf8");
+const scene = fs.readFileSync("encounter-scene.js", "utf8");
+const sessionCreator = fs.readFileSync("supabase/functions/encounter-session/index.ts", "utf8");
+const pipeline = fs.readFileSync("supabase/drafts/encounter-schedule-pipeline.sql", "utf8");
+const scheduleGeneration = fs.readFileSync("supabase/functions/_shared/encounter-schedule-generation.ts", "utf8");
+const sparseScheduleMigration = fs.readFileSync("supabase/migrations/20261118000400_encounter_schedules_allow_unavailable_windows.sql", "utf8");
+const publishedSceneResolverMigration = fs.readFileSync("supabase/migrations/20261118000500_resolve_only_published_encounter_scenes.sql", "utf8");
+const sceneDescriptionMigration = fs.readFileSync("supabase/migrations/20261118000600_encounter_schedule_scene_descriptions.sql", "utf8");
+const replay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-pipeline.sql", "utf8");
+const weatherSync = fs.readFileSync("supabase/functions/encounter-weather-sync/index.ts", "utf8");
+const weatherModule = fs.readFileSync("supabase/functions/_shared/encounter-weather.mjs", "utf8");
+const cityMap = fs.readFileSync("city-map.js", "utf8");
+const greetingPools = fs.readFileSync("supabase/drafts/encounter-relationship-greeting-pools.sql", "utf8");
+const evaluationWorker = fs.readFileSync("supabase/functions/encounter-evaluation-worker/index.ts", "utf8");
+const evaluationScheduler = fs.readFileSync("supabase/drafts/schedule-encounter-evaluation-worker.sql", "utf8");
+const scheduleOrganizer = fs.readFileSync("supabase/functions/encounter-schedule-organizer/index.ts", "utf8");
+
+assert.equal((pipeline.match(/^BEGIN;$/gm) || []).length, 1, "Encounter SQL draft must contain one transaction start");
+assert.equal((pipeline.match(/^COMMIT;$/gm) || []).length, 1, "Encounter SQL draft must contain one transaction end");
+assert.doesNotMatch(pipeline, /IF auth\.role\(\) <> 'service_role'/,
+  "Encounter schedule SECURITY DEFINER RPCs must reject missing JWT role claims");
+assert.doesNotMatch(pipeline, /encounter_weather_baseline_2025|O-A0001-001|O-A0002-001|CWA_OPEN_DATA_API_KEY/);
+assert.ok(pipeline.includes("CHECK (asset_path ~ '^([.]/|/)[A-Za-z0-9_./-]+$')"));
+assert.match(pipeline, /ALTER TABLE public\.encounter_city_weather ALTER COLUMN source SET DEFAULT 'poyozz_fictional_seasonal'/);
+assert.match(pipeline, /UPDATE public\.encounter_city_weather[\s\S]*?source = 'poyozz_fallback'[\s\S]*?WHERE source IS DISTINCT FROM 'poyozz_fictional_seasonal'/);
+assert.match(pipeline, /AND c\.deleted_at IS NULL;\s*IF p_force IS NOT TRUE/);
+assert.doesNotMatch(weatherSync, /\bfetch\s*\(/, "Taipei simulation must not call external weather APIs");
+assert.doesNotMatch(weatherSync, /CWA|OPEN_DATA_API_KEY|forecast/i);
+assert.match(weatherSync, /previousSlot === weather\.slot/);
+assert.match(weatherSync, /status: "unchanged"/);
+assert.match(weatherModule, /Asia\/Taipei/);
+assert.match(weatherModule, /poyozz_fictional_seasonal/);
+assert.match(cityMap, /CITY_MAP_WEATHER_CACHE_TTL_MS = 6 \* 60 \* 60 \* 1000/);
+assert.match(cityMap, /CITY_MAP_SCENES_CACHE_TTL_MS = 30 \* 60 \* 1000/);
+assert.match(pipeline, /ORDER BY r\.display_order, r\.location_key\s+LIMIT 3/);
+assert.match(pipeline, /ADD COLUMN IF NOT EXISTS special_event_key text/);
+assert.match(pipeline, /schedule_schema_version.*poyozz-encounter-schedule-v3-relationship-greetings-2026-11-17/);
+assert.match(replay, /schedule_source_version_smoke/);
+assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.resolve_encounter_special_event_key/);
+assert.match(pipeline, /UPDATE public\.taiwan_calendar_days[\s\S]*?holiday_name = NULL[\s\S]*?週末假期/);
+assert.match(pipeline, /variant_key = 'special'\s+AND special_event_key IN/);
+assert.match(pipeline, /AND s\.special_event_key IS NULL/);
+assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_schedule_weather_decisions/);
+assert.match(pipeline, /scheduled_end_at timestamptz NOT NULL/);
+assert.match(pipeline, /DELETE FROM public\.encounter_schedule_weather_decisions[\s\S]*?scheduled_end_at < \(p_at - interval '2 days'\)/);
+assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.resolve_encounter_character_schedule[\s\S]*?LANGUAGE plpgsql\s+VOLATILE/);
+assert.match(pipeline, /CREATE FUNCTION public\.get_encounter_character_schedule[\s\S]*?LANGUAGE sql\s+VOLATILE/);
+assert.match(pipeline, /CREATE FUNCTION public\.get_encounter_character_schedules[\s\S]*?LANGUAGE sql\s+VOLATILE/);
+assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.get_encounter_character_schedules[\s\S]*?LANGUAGE sql\s+VOLATILE/);
+assert.match(replay, /DO \$special_event_schedule_smoke\$/);
+assert.match(replay, /generic public holiday schedule was not selected for a named holiday/);
+assert.match(scheduleGeneration, /special_events/);
+assert.match(scheduleGeneration, /lunar_new_year/);
+assert.match(scheduleGeneration, /角色生日目前沒有結構化日期來源/);
+assert.match(scheduleGeneration, /行程以角色自身日常活動為準/);
+assert.match(scheduleGeneration, /地點是否能對應地圖由系統自行判斷/);
+assert.match(scheduleGeneration, /scene_description/);
+assert.match(scheduleGeneration, /location（自然語言地點名稱）/);
+assert.match(scheduleGeneration, /scenes 必須是空陣列/);
+assert.doesNotMatch(scheduleGeneration, /canonical_scene_keys|scene_catalog/);
+assert.match(sceneDescriptionMigration, /location_key DROP NOT NULL/);
+assert.match(sceneDescriptionMigration, /location_description text NOT NULL DEFAULT ''/);
+assert.match(sceneDescriptionMigration, /scene_description text NOT NULL DEFAULT ''/);
+assert.match(sceneDescriptionMigration, /resolve_encounter_scene_location_key/);
+assert.match(sceneDescriptionMigration, /get_encounter_character_schedules_with_scene/);
+assert.match(frontend, /get_encounter_character_schedules_with_scene/);
+assert.match(cityMap, /citySceneDescription/);
+assert.match(cityMap, /場景情境/);
+assert.doesNotMatch(scheduleOrganizer, /dynamic_scene_limit_or_sharing_invalid|get_encounter_dynamic_scene_usage/);
+assert.match(sparseScheduleMigration, /NOT BETWEEN 0 AND 4/);
+assert.match(sparseScheduleMigration, /NOT BETWEEN 1 AND 4/);
+assert.match(sparseScheduleMigration, /schedule_variant_24_hour_coverage_incomplete/);
+assert.match(sparseScheduleMigration, /schedule_special_event_24_hour_coverage_incomplete/);
+assert.match(publishedSceneResolverMigration, /public\.get_encounter_scene_catalog\(\)/);
+assert.match(publishedSceneResolverMigration, /Newly enabled scenes automatically expose matching stored slots/);
+
+assert.match(endpoint, /requestOpenRouterChatCompletion/);
+assert.match(endpoint, /POYOZZ_DEFAULT_CHAT_MODEL/);
+assert.match(endpoint, /reserve_encounter_chat_turn/);
+assert.match(endpoint, /releaseGenerationClaim/);
+assert.match(endpoint, /refundEncounterTurn/);
+assert.equal((endpoint.match(/admin\.rpc\(["\']refund_chat_turn["\']/g) || []).length, 1, "Refund logic must be centralized");
+assert.match(endpoint, /findPrivateContextLeak/);
+assert.match(endpoint, /record_encounter_session_turn_evidence/);
+assert.match(endpoint, /settle_chat_turn/);
+assert.doesNotMatch(endpoint, /demoReply/);
+assert.ok(
+  endpoint.indexOf('if (!openRouterKey)') < endpoint.indexOf('reserve_encounter_chat_turn'),
+  "Missing OpenRouter credentials must fail before wallet reservation",
+);
+assert.match(endpoint, /provider_generation_outcome_unknown/);
+assert.match(endpoint, /provider_request_refund/);
+assert.doesNotMatch(endpoint, /classifyProviderFailure/);
+assert.match(endpoint, /generation_already_claimed/);
+assert.match(guidelines, /150～300 字元/);
+assert.match(guidelines, /buildRoleplayResponseGuidelines\(["']single["']\)/);
+assert.match(frontend, /poyozz-encounter-opening-choice/);
+assert.match(frontend, /initialOpeningMessage = \{ text: greeting, at: Date\.now\(\) \}/);
+assert.match(frontend, /encounterOpeningChoice:\['greet','wait'\]/);
+assert.match(frontend, /session\.encounterIntroChoice=\['greet','wait'\]/);
+assert.match(scene, /data-action="encounter-opening-choice"/);
+assert.match(scene, /data-choice="greet"/);
+assert.match(scene, /data-choice="wait"/);
+assert.match(endpoint, /openingMessage = asRow\(asRow\(session\.session_data\)\.openingMessage\)/);
+assert.match(endpoint, /encounterSchedule/);
+assert.doesNotMatch(endpoint, /from\(["']encounter_session_lifecycle["']\)/);
+assert.match(sessionCreator, /snapshot\.encounterSchedule = scheduleSnapshot/);
+assert.match(sessionCreator, /snapshot\.encounterGreeting/);
+assert.match(sessionCreator, /availableIllustrations/);
+assert.match(sessionCreator, /availableSceneBackgrounds/);
+assert.match(endpoint, /resolveEncounterVisuals/);
+assert.match(endpoint, /encounter_turn_visuals/);
+assert.match(endpoint, /sceneBackgroundPath/);
+assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_scene_backgrounds/);
+assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_turn_visuals/);
+assert.match(pipeline, /v_schedule_day::smallint,\s*v_day_type/);
+assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_schedule_weather_decisions/);
+assert.match(pipeline, /ON CONFLICT ON CONSTRAINT encounter_schedule_weather_decisions_pkey DO NOTHING/);
+assert.match(pipeline, /SELECT \* INTO v_decision[\s\S]*?FROM public\.encounter_schedule_weather_decisions/);
+assert.match(pipeline, /v_decision\.location_key/);
+assert.match(pipeline, /v_decision\.activity/);
+assert.match(pipeline, /v_decision\.encounter_greeting/);
+assert.match(pipeline, /v_decision\.is_outdoor/);
+assert.match(pipeline, /LANGUAGE plpgsql\s+VOLATILE/);
+assert.match(pipeline, /LANGUAGE sql\s+VOLATILE/);
+assert.match(replay, /DO \$rainy_schedule_resolution_smoke\$/);
+assert.match(replay, /rainy outdoor schedule did not resolve to its indoor fallback/);
+assert.doesNotMatch(replay, /dry outdoor schedule did not resolve to its original location/);
+assert.match(replay, /must not remain at its original outdoor location/);
+assert.match(replay, /rain stop must not move an active slot back to its original outdoor location/);
+assert.match(replay, /the next schedule must make a fresh weather decision/);
+assert.match(pipeline, /encounter-default-scene\.webp/);
+assert.match(pipeline, /REFERENCES public\.character_illustrations\(id\)/);
+assert.match(endpoint, /illustration_id/);
+assert.match(endpoint, /scene_background_id/);
+assert.match(scene, /session\?\.encounterVisuals/);
+assert.match(scene, /hydrateEncounterGalleryIllustration\(character\.id,selectedIllustrationId\)/);
+const openingHandlerStart = frontend.indexOf("window.addEventListener('poyozz-encounter-opening-choice'");
+const openingHandlerEnd = frontend.indexOf("async function markCloudChatSessionRead", openingHandlerStart);
+assert.ok(openingHandlerStart >= 0 && openingHandlerEnd > openingHandlerStart, "Opening-choice persistence handler must exist");
+const openingHandler = frontend.slice(openingHandlerStart, openingHandlerEnd);
+assert.doesNotMatch(openingHandler, /executePendingChatTurn|reserve_encounter_chat_turn/,
+  "Free opening choice must not call AI or reserve wallet funds");
+
+// Relationship-stage greeting pools are generated, strictly validated, and selected
+// server-side with a per-player anti-repeat lock before the Encounter session opens.
+assert.match(scheduleGeneration, /relationship_greetings/);
+assert.match(scheduleGeneration, /hostile.*dislike.*wary.*first_meeting/s);
+assert.match(scheduleGeneration, /greeting_pool_count_invalid/);
+assert.match(greetingPools, /AS \$\$\s+DECLARE/);
+assert.match(greetingPools, /FOR UPDATE/);
+assert.match(greetingPools, /last_greeting_hash/);
+assert.match(greetingPools, /schedule\.source_type IN \('ai', 'legacy', 'manual'\)/,
+  "Existing manual schedules must also receive relationship greeting pools");
+assert.match(greetingPools, /encounterGreetingId/);
+assert.match(greetingPools, /relationshipStage/);
+assert.match(evaluationWorker, /POYOZZ_DEFAULT_CHAT_MODEL/);
+assert.match(evaluationWorker, /settle_encounter_session/);
+assert.match(evaluationWorker, /buildTranscript/);
+assert.match(evaluationScheduler, /COALESCE\(auth\.role\(\), ''\) <> 'service_role'/);
+assert.match(evaluationScheduler, /PERFORM public\.enqueue_due_encounter_evaluations\(50\)/,
+  "The cron dispatcher must enqueue expired scenes before calling the worker");
+assert.match(evaluationScheduler, /DO \$dispatch\$/);
+assert.match(evaluationScheduler, /poyozz-encounter-evaluation-worker/);
+
+// Schedule organizer runs a single-character test batch and persists only
+// sanitized structural/validation diagnostics, never the provider response body.
+assert.match(scheduleOrganizer, /ENCOUNTER_SCHEDULE_BATCH_SIZE = 1/);
+assert.match(scheduleOrganizer, /schedule_output_root_invalid/);
+assert.match(scheduleOrganizer, /schedule_output_characters_invalid/);
+assert.match(scheduleOrganizer, /schedule_output_scenes_invalid/);
+assert.match(scheduleOrganizer, /schedule_output_unknown_root_fields/);
+assert.match(scheduleOrganizer, /output_root_keys/);
+assert.match(scheduleOrganizer, /output_unknown_root_keys/);
+assert.match(scheduleOrganizer, /validation_errors: safeErrors/);
+assert.match(scheduleOrganizer, /schedule_character_validation_failed/);
+assert.match(scheduleOrganizer, /schedule_character_publish_failed/);
+assert.match(scheduleOrganizer, /response_body_length/);
+assert.doesNotMatch(scheduleOrganizer, /providerResponse\.result\.text\s*[,}]/,
+  "Raw provider output must not be written into usage diagnostics");
+
+console.log("Encounter AI output, billing safety, opening-choice, relationship greeting, and scene-settlement contract tests passed.");
