@@ -418,7 +418,7 @@
         return Number.isFinite(from)&&Number.isFinite(to)&&(from<to?clock.minutes>=from&&clock.minutes<to:(clock.minutes>=from||clock.minutes<to));
       });
       const parts=String(line||'').trim().split('|').map(value=>value.trim());
-      return {...character,cityStartTime:parts[1]||'',cityEndTime:parts[2]||'',cityActivity:parts[4]||'',citySceneDescription:parts[5]||''};
+      return {...character,cityStartTime:parts[1]||'',cityEndTime:parts[2]||'',cityActivity:parts[4]||'',citySceneDescription:(()=>{try{return decodeURIComponent(parts[5]||'')}catch{return ''}})()};
     });
   };
   const cityPresenceByPlace={};
