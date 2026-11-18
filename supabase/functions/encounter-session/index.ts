@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { resolveEncounterScheduleAvailability } from "../_shared/encounter-schedule-generation.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -212,6 +213,17 @@ Deno.serve(async (request: Request) => {
   if (scheduleError) return json({ error: "encounter_schedule_lookup_failed" }, 503);
   const scheduleRow = Array.isArray(resolvedSchedule) ? resolvedSchedule[0] : resolvedSchedule;
   if (!scheduleRow?.schedule_id) return json({ error: "character_not_at_this_location_now" }, 409);
+
+  const { data: scheduleDetails, error: scheduleDetailsError } = await admin
+    .from("character_schedules")
+    .select("scene_description")
+    .eq("id", scheduleRow.schedule_id)
+    .maybeSingle();
+  if (scheduleDetailsError) return json({ error: "encounter_schedule_details_lookup_failed" }, 503);
+  if (resolveEncounterScheduleAvailability(scheduleRow.activity, scheduleDetails?.scene_description) === "sleeping") {
+    return json({ error: "character_sleeping_unavailable_for_encounter" }, 409);
+  }
+
   const scheduleSnapshot = {
     id: scheduleRow.schedule_id,
     weekday: scheduleRow.weekday,

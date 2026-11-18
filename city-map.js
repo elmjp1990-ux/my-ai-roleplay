@@ -375,6 +375,7 @@
   // Use only published characters whose own schedule data is already available to this client.
   // Never invent a character or query private schedule rows from the browser.
   const cityPlaceAliases={airport:['airport'],commercial:['commercial','office'], 'night-bar':['night-bar','bar'], 'live-house':['live-house','livehouse'], apartment:['apartment'], 'department-store':['department-store','department_store'], bookstore:['bookstore','book-store'], cafe:['cafe','coffee-shop'], park:['park']};
+  const isSleepingSchedule=(activity,sceneDescription='')=>/(熟睡|沉睡|酣睡|安睡|睡著|睡着|睡覺|睡眠|入睡|睡去|午睡|補眠|就寢)/.test([activity,sceneDescription].filter(Boolean).join(' ').normalize('NFKC'));
   const getTaipeiClock=()=>{
     const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
     const values=Object.fromEntries(parts.map(part=>[part.type,part.value]));
@@ -630,12 +631,16 @@
     const timeRange=person.cityStartTime&&person.cityEndTime?escapeHTML(person.cityStartTime+'–'+person.cityEndTime):'時間未設定';
     const placeKey=locationModal.dataset.place;
     const placeName=escapeHTML(cityPlaceNames[placeKey]||'城市地點');
+    const isSleeping=isSleepingSchedule(person.cityActivity,person.citySceneDescription);
     const intro=String(person.intro||person.description||person.personalityProfile?.summary||'這位角色尚未填寫公開介紹。');
     const sessions=Object.values(state.sessions||{}).filter(session=>session?.encounterMode&&session.characterId===person.id&&!session.archived)
       .sort((a,b)=>(Number(b.startedAt)||0)-(Number(a.startedAt)||0));
     const bookmarks='<div class="city-character-bookmarks" aria-label="角色功能"><button type="button" class="city-character-bookmark '+(mode==='status'?'active':'')+'" data-action="city-character-status" aria-label="角色資料">角色資料</button><button type="button" class="city-character-bookmark '+(mode==='history'?'active':'')+'" data-action="city-character-history" aria-label="相遇紀錄">相遇紀錄</button><button type="button" class="city-character-bookmark" data-action="city-character-story" aria-label="故事模式">故事模式</button></div>';
     const affinityMarkup=mode==='status'&&page===0?'<div class="city-character-affinity" id="cityCharacterAffinity" data-character-id="'+escapeHTML(person.id)+'">正在讀取好感度…</div>':'';
-    const left='<div class="city-character-photo-column">'+portrait+affinityMarkup+'<button type="button" class="city-character-meet primary" data-action="city-character-meet">與他相遇</button></div>';
+    const meetControl=isSleeping
+      ? '<div class="city-character-meet-unavailable" role="status" style="display:block;width:100%;box-sizing:border-box;padding:9px 5px;border:1px solid rgba(255,255,255,.22);border-radius:10px;background:rgba(255,255,255,.09);color:#eeeaf4;font-size:11px;line-height:1.5;text-align:center">目前無法相遇<br><small>角色正在熟睡</small></div>'
+      : '<button type="button" class="city-character-meet primary" data-action="city-character-meet">與他相遇</button>';
+    const left='<div class="city-character-photo-column">'+portrait+affinityMarkup+meetControl+'</div>';
     let copy='';
     if(mode==='history'){
       const records=sessions.length?sessions.map(session=>{

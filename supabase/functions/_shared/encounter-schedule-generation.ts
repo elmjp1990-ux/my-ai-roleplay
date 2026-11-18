@@ -153,9 +153,23 @@ const hasExactKeys = (value: unknown, keys: readonly string[]): value is RecordV
   keys.every((key) => Object.prototype.hasOwnProperty.call(value, key));
 
 export function normalizeEncounterSceneKey(value: unknown): string | null {
-  const raw = text(value).toLocaleLowerCase();
+  const original = text(value);
+  const raw = original.toLocaleLowerCase();
+  const compact = raw.replace(/\s+/g, "");
   if ((ENCOUNTER_SCENE_KEYS as readonly string[]).includes(raw)) return raw;
-  return SCENE_ALIASES[raw] || SCENE_ALIASES[text(value)] || null;
+  if (/(豪宅|別墅|莊園|豪華住宅|高級住宅|頂級住宅|豪華公寓|高級公寓|頂樓豪宅|penthouse|mansion|villa|estate)/i.test(compact)) return null;
+  if (/^(?:308公寓|私人公寓|一般公寓|普通公寓|公寓|住宅|住家|住所|家|家中|家裡|租屋|租屋處|套房)$/.test(compact)) return "apartment";
+  return SCENE_ALIASES[raw] || SCENE_ALIASES[original] || null;
+}
+
+const SLEEPING_SCHEDULE_PATTERN = /熟睡|沉睡|酣睡|安睡|睡著|睡着|睡覺|睡眠|入睡|睡去|午睡|補眠|就寢/;
+
+export function resolveEncounterScheduleAvailability(
+  activity: unknown,
+  sceneDescription: unknown = "",
+): "available" | "sleeping" {
+  const context = [text(activity), text(sceneDescription)].join(" ").normalize("NFKC");
+  return SLEEPING_SCHEDULE_PATTERN.test(context) ? "sleeping" : "available";
 }
 
 export function isEncounterModernMapCompatible(source: EncounterScheduleSource): boolean {

@@ -230,3 +230,15 @@ assert.match(html, /case 'environment':[\s\S]*?void loadEncounterScheduleTestToo
 assert.doesNotMatch(html, /kind==='album'&&CHAT_DATA_TEST_MODE/);
 
 console.log("Encounter schedule worker, conditional holidays, existing-scene-only rules, sparse encounter windows, simulated Taipei weather, queue triggers, and throttling contracts passed.");
+
+
+const encounterSession = fs.readFileSync("supabase/functions/encounter-session/index.ts", "utf8");
+const sleepingAvailabilityMigration = fs.readFileSync("supabase/migrations/20261118074800_encounter_schedule_home_aliases_and_sleep_guard.sql", "utf8");
+assert.match(generator, /resolveEncounterScheduleAvailability/);
+assert.match(generator, /SLEEPING_SCHEDULE_PATTERN/);
+assert.match(encounterSession, /resolveEncounterScheduleAvailability\(scheduleRow\.activity, scheduleDetails\?\.scene_description\)/);
+assert.match(encounterSession, /character_sleeping_unavailable_for_encounter/);
+assert.match(encounterSession, /select\("scene_description"\)/);
+assert.match(sleepingAvailabilityMigration, /UPDATE public\.character_schedules/);
+assert.match(sleepingAvailabilityMigration, /location_description/);
+assert.match(sleepingAvailabilityMigration, /poyozz-encounter-schedule-v7-home-mapping-sleep-availability-2026-11-18/);

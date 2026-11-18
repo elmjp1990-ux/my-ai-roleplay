@@ -3,6 +3,7 @@ import {
   buildEncounterScheduleBatchMessages,
   isEncounterModernMapCompatible,
   normalizeEncounterSceneKey,
+  resolveEncounterScheduleAvailability,
   parseEncounterScheduleBatchOutput,
 } from "./encounter-schedule-generation.ts";
 
@@ -403,4 +404,31 @@ Deno.test("builds one schedule prompt for all 37 queued roles without the legacy
   const built = buildEncounterScheduleBatchMessages(sources);
   const payload = JSON.parse(built.messages[1].content);
   if (payload.characters.length !== 37) throw new Error("the full 37-role queue was not included in one AI prompt");
+});
+
+
+Deno.test("maps ordinary residences to the permanent 308 Apartment but leaves luxury homes unmatched", () => {
+  for (const value of ["308公寓", "308 公寓", "私人公寓", "一般公寓", "普通公寓", "住家", "住所", "租屋處", "套房"]) {
+    if (normalizeEncounterSceneKey(value) !== "apartment") throw new Error("ordinary residence was not mapped: " + value);
+  }
+  for (const value of ["豪宅", "私人豪宅", "高級公寓", "豪華別墅", "penthouse"]) {
+    if (normalizeEncounterSceneKey(value) !== null) throw new Error("luxury residence was incorrectly mapped: " + value);
+  }
+});
+
+Deno.test("marks sleeping scenes unavailable without mistaking wakefulness or insomnia for sleep", () => {
+  for (const [activity, scene] of [
+    ["熟睡中", ""], ["睡覺", "他縮在被子裡熟睡。"],
+    ["在家休息", "他已沉沉睡去，床頭燈仍亮著。"], ["繼續睡覺", "他翻身後又沉沉睡去。"],
+  ]) {
+    if (resolveEncounterScheduleAvailability(activity, scene) !== "sleeping") throw new Error("sleeping state not detected: " + activity);
+  }
+  for (const [activity, scene] of [
+    ["睡不著", "他望著窗簾縫隙，遲遲沒有睡意。"],
+    ["剛睡醒", "他坐在床沿揉揉眼睛。"],
+    ["在家休息", "他坐在沙發上翻閱一本書。"],
+    ["準備睡覺", "他正在浴室洗漱，還沒有上床。"],
+  ]) {
+    if (resolveEncounterScheduleAvailability(activity, scene) !== "available") throw new Error("non-sleeping state incorrectly blocked: " + activity);
+  }
 });

@@ -153,3 +153,9 @@ assert.match(html, /目前暫停生成，請先確認處理中工作或待核對
 assert.match(html, /失敗紀錄保留，不會自動重試/);
 assert.doesNotMatch(html, /測試環境登入帳號皆可使用/);
 assert.match(html, /正式環境不提供此工具/);
+
+
+assert.match(cityMap, /data-place="apartment"[\s\S]*?aria-label="308公寓"/);
+assert.match(cityMap, /const isSleepingSchedule=/);
+assert.match(cityMap, /const meetControl=isSleeping[\s\S]*?目前無法相遇[\s\S]*?角色正在熟睡/);
+assert.match(cityMap, /const left=.*meetControl/);
