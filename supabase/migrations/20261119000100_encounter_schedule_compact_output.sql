@@ -3,7 +3,22 @@ BEGIN;
 -- New schedule generations no longer produce greeting paragraphs. Keep the
 -- legacy columns readable for old schedules, but allow new rows to omit them.
 ALTER TABLE public.character_schedules
-  ALTER COLUMN encounter_greeting DROP NOT NULL;
+  ALTER COLUMN encounter_greeting DROP NOT NULL,
+  DROP CONSTRAINT IF EXISTS character_schedules_rain_fallback_consistency_check,
+  ADD CONSTRAINT character_schedules_rain_fallback_consistency_check
+    CHECK (
+      (is_outdoor IS TRUE
+        AND rain_fallback_location_key IS NOT NULL
+        AND rain_fallback_activity IS NOT NULL
+        AND (
+          rain_fallback_greeting IS NULL
+          OR char_length(rain_fallback_greeting) BETWEEN 150 AND 300
+        ))
+      OR (is_outdoor IS FALSE
+        AND rain_fallback_location_key IS NULL
+        AND rain_fallback_activity IS NULL
+        AND rain_fallback_greeting IS NULL)
+    );
 
 COMMENT ON COLUMN public.character_schedules.encounter_greeting IS
   'Legacy generated greeting; new Encounter turns generate their opening response dynamically and leave this column NULL.';
