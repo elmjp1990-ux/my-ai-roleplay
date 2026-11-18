@@ -13503,7 +13503,7 @@ async function loadCityCharacterSchedules(characterIds=[]){
   const schedules=new Map();
   if(!client)throw new Error('城市角色行程服務尚未連線。');
   if(!ids.length)return schedules;
-  const {data,error}=await client.rpc('get_encounter_character_schedules',{p_character_ids:ids});
+  const {data,error}=await client.rpc('get_encounter_character_schedules_with_scene',{p_character_ids:ids});
   if(error)throw new Error('讀取角色行程失敗：'+error.message);
   for(const row of Array.isArray(data)?data:[]){
     const lines=schedules.get(row.character_id)||[];
@@ -13512,7 +13512,8 @@ async function loadCityCharacterSchedules(characterIds=[]){
       String(row.start_time||'').slice(0,5),
       String(row.end_time||'').slice(0,5),
       row.location_key,
-      row.activity
+      row.activity,
+      row.scene_description
     ].join('|'));
     schedules.set(row.character_id,lines);
   }
