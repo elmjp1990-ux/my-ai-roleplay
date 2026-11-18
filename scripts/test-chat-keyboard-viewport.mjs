@@ -3,58 +3,86 @@ import fs from "node:fs";
 import vm from "node:vm";
 
 const html = fs.readFileSync("index.html", "utf8");
-const match = html.match(/<script id="poyozz-chat-keyboard-viewport">([\\s\\S]*?)<\\/script>/);
+const style = html.match(/<style id="poyozz-chat-keyboard-viewport">([\s\S]*?)<\/style>/)?.[1] || "";
+const match = html.match(/<script id="poyozz-chat-keyboard-viewport">([\s\S]*?)<\/script>/);
+assert.ok(style, "keyboard viewport CSS must be present");
 assert.ok(match, "keyboard viewport controller must be present");
 const source = match[1];
 assert.doesNotThrow(() => new Function(source), "keyboard viewport controller must parse");
-assert.match(html, /body\\.conversation main,body\\.group-chat-page main[\\s\\S]*?--poyozz-chat-viewport-height/);
-assert.match(html, /body\\.conversation \\.chat-layout,body\\.group-chat-page \\.chat-layout[\\s\\S]*?height:100%/);
-assert.match(source, /window\\.visualViewport/);
-assert.match(source, /addEventListener\\('resize'/);
-assert.match(source, /addEventListener\\('scroll'/);
-assert.match(source, /#messageInput, #groupMessageInput/);
 
-function createHarness(withVisualViewport = true) {
+assert.match(style, /body\.conversation main/);
+assert.match(style, /body\.group-chat-page main/);
+assert.match(style, /body\.encounter-mode-active/);
+assert.match(style, /--poyozz-chat-viewport-height/);
+assert.match(style, /--poyozz-visual-viewport-top/);
+assert.match(style, /--poyozz-encounter-composer-height/);
+assert.match(style, /chat-keyboard-open/);
+assert.match(source, /window\.visualViewport/);
+assert.match(source, /addEventListener\('resize'/);
+assert.match(source, /addEventListener\('scroll'/);
+assert.match(source, /#messageInput, #groupMessageInput/);
+assert.match(source, /ResizeObserver/);
+assert.match(source, /scrollIntoView/);
+
+function createHarness({ visualViewport = true, encounter = false } = {}) {
   const listeners = {};
   const viewportListeners = {};
   const variables = {};
-  const classes = new Set();
+  const classes = new Set(encounter ? ["encounter-mode-active"] : []);
   const raf = [];
-  const visualViewport = withVisualViewport ? {
+  const composer = encounter ? { getBoundingClientRect: () => ({ height: 238 }) } : null;
+  const viewport = visualViewport ? {
     height: 720,
+    offsetTop: 0,
     addEventListener: (name, callback) => { viewportListeners[name] = callback; }
   } : null;
+  class ResizeObserver {
+    constructor(callback) { this.callback = callback; }
+    observe() {}
+    disconnect() {}
+  }
   const document = {
-    documentElement: { clientHeight: 800, style: { setProperty: (name, value) => { variables[name] = value; } } },
-    body: { classList: { add: value => classes.add(value), remove: value => classes.delete(value) } },
+    documentElement: {
+      clientHeight: 800,
+      style: {
+        setProperty: (name, value) => { variables[name] = value; },
+        removeProperty: name => { delete variables[name]; }
+      }
+    },
+    body: { classList: {
+      add: value => classes.add(value),
+      remove: value => classes.delete(value),
+      contains: value => classes.has(value)
+    } },
     activeElement: null,
+    querySelector: () => composer,
     addEventListener: (name, callback) => { listeners[name] = callback; }
   };
   const window = {
     innerHeight: 800,
-    visualViewport,
+    visualViewport: viewport,
     addEventListener: (name, callback) => { listeners["window:" + name] = callback; }
   };
   const context = {
-    window, document, Number, Math,
+    window, document, Number, Math, ResizeObserver,
     requestAnimationFrame: callback => { raf.push(callback); return raf.length; }
   };
   vm.runInNewContext(source, context);
   const flush = () => { while (raf.length) raf.shift()(); };
-  return { listeners, viewportListeners, variables, classes, document, visualViewport, flush };
+  return { listeners, viewportListeners, variables, classes, document, viewport, flush };
 }
 
 {
-  const h = createHarness(true);
+  const h = createHarness();
   assert.equal(h.variables["--poyozz-chat-viewport-height"], "720px");
-  h.visualViewport.height = 410;
+  h.viewport.height = 410;
   h.viewportListeners.resize();
   h.flush();
   assert.equal(h.variables["--poyozz-chat-viewport-height"], "410px",
-    "visualViewport resize must shrink the chat shell above the keyboard");
+    "visualViewport resize must shrink single/group chat above the keyboard");
   const input = { matches: selector => selector.includes("#messageInput") };
   h.listeners.focusin({ target: input });
-  assert.ok(h.classes.has("chat-keyboard-open"), "focusing the single-chat composer must mark keyboard state");
+  assert.ok(h.classes.has("chat-keyboard-open"), "focusing a chat composer must mark keyboard state");
   h.document.activeElement = { matches: () => false };
   h.listeners.focusout();
   h.flush();
@@ -62,9 +90,29 @@ function createHarness(withVisualViewport = true) {
 }
 
 {
-  const h = createHarness(false);
+  const h = createHarness({ encounter: true });
+  assert.equal(h.variables["--poyozz-encounter-composer-height"], "238px",
+    "encounter composer height must be measured for dialogue clearance");
+  h.viewport.height = 390;
+  h.viewport.offsetTop = 12;
+  h.viewportListeners.resize();
+  h.flush();
+  assert.equal(h.variables["--poyozz-chat-viewport-height"], "390px");
+  assert.equal(h.variables["--poyozz-visual-viewport-top"], "12px");
+  const input = {
+    matches: selector => selector.includes("#messageInput"),
+    scrollIntoView: () => { input.scrolled = true; }
+  };
+  h.listeners.focusin({ target: input });
+  h.flush();
+  assert.ok(h.classes.has("chat-keyboard-open"));
+  assert.ok(input.scrolled, "encounter input should be scrolled into the visible area on focus");
+}
+
+{
+  const h = createHarness({ visualViewport: false });
   assert.equal(h.variables["--poyozz-chat-viewport-height"], "800px",
     "browsers without visualViewport must fall back to innerHeight");
 }
 
-console.log("Passed: single/group chat viewport sizing, Android keyboard resize, focus state, and fallback viewport.");
+console.log("Passed: single, group, and encounter chat keyboard viewport behavior.");
