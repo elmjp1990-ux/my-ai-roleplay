@@ -33,7 +33,7 @@ INSERT INTO public.character_schedules (
   'weekday', '06:00', '07:00', 'apartment', '私人公寓',
   '熟睡中', '他縮在被子裡熟睡，房間安靜得只剩空調聲。',
   50, true, 'ai', 'option_1', 80,
-  pg_catalog.repeat('他仍安靜地睡著，房間裡只有窗外微弱的城市聲響。', 6), false
+  pg_catalog.repeat('他仍安靜地睡著，房間裡只有窗外微弱的城市聲響。', 8), false
 ),
 (
   '00000000-0000-4000-8000-000000000021'::uuid,
@@ -41,7 +41,7 @@ INSERT INTO public.character_schedules (
   'weekday', '06:00', '07:00', 'apartment', '私人公寓',
   '翻來覆去睡不著', '他在床上翻了幾次身，望著窗簾縫隙遲遲沒有睡意。',
   50, true, 'ai', 'option_2', 20,
-  pg_catalog.repeat('他睜著眼望向窗邊，試著讓思緒慢慢平靜下來。', 6), false
+  pg_catalog.repeat('他睜著眼望向窗邊，試著讓思緒慢慢平靜下來。', 8), false
 ),
 (
   '00000000-0000-4000-8000-000000000022'::uuid,
@@ -49,7 +49,7 @@ INSERT INTO public.character_schedules (
   'weekday', '07:00', '08:00', 'apartment', '私人公寓',
   '繼續睡覺', '鬧鐘響過一次，他只是皺眉翻身，又沉沉睡去。',
   50, true, 'ai', 'option_1', 100,
-  pg_catalog.repeat('他把鬧鐘按掉，重新縮回被子裡，暫時不想面對早晨。', 6), false
+  pg_catalog.repeat('他把鬧鐘按掉，重新縮回被子裡，暫時不想面對早晨。', 8), false
 );
 
 INSERT INTO public.character_schedules (
