@@ -181,7 +181,7 @@
     const latestReply=[...allMessages].reverse().find(m=>m&&m.role!=='user'&&String(m.text??m.content??'').trim())||
       (openingText?{id:'opening-'+session.id,content:openingText}:null);
     const raw=String(latestReply?.text??latestReply?.content??'').trim();
-    const hasStarted=session?.cloudHasUserMessage===true||hasPlayerMessage||!!raw;
+    const hasStarted=!!raw;
     const composer=panel.querySelector('.composer');
     if(composer){
       let hint=composer.querySelector('.encounter-first-turn-hint');
