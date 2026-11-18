@@ -35,7 +35,7 @@ const locationNames: Record<string, string> = {
   park: "公園", "shopping-street": "商店街", "night-market": "夜市", gym: "健身房",
   hospital: "醫院", library: "圖書館", "train-station": "火車站",
 };
-const option = (extra = {}) => {
+const option = (extra = {}): Record<string, unknown> => {
   const row = {
     weight: 100,
     location_key: "commercial",
