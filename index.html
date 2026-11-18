@@ -13892,7 +13892,7 @@ body.chat-page .messages,body.conversation .messages,body.group-chat-page .messa
 
 
 <style id="poyozz-chat-keyboard-viewport">
-/* Keep both chat composers inside the visible Android/iOS viewport when the software keyboard opens. */
+/* Keep single/group chat and encounter-mode composers inside the visible software-keyboard viewport. */
 body.conversation main,body.group-chat-page main{
   height:var(--poyozz-chat-viewport-height,100dvh);
   min-height:0;
@@ -13901,16 +13901,71 @@ body.conversation .chat-layout,body.group-chat-page .chat-layout{
   height:100%;
   min-height:0;
 }
+/* Encounter mode has its own fixed full-screen shell; resize every fixed layer with visualViewport. */
+body.encounter-mode-active .app,
+body.encounter-mode-active #view,
+body.encounter-mode-active .chat-layout,
+body.encounter-mode-active .chat-main.encounter-scene{
+  top:var(--poyozz-visual-viewport-top,0px)!important;
+  bottom:auto!important;
+  height:var(--poyozz-chat-viewport-height,100dvh)!important;
+  min-height:0!important;
+}
+body.encounter-mode-active .app,
+body.encounter-mode-active #view,
+body.encounter-mode-active .chat-layout{
+  inset-inline:0!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene{
+  inset-inline:0!important;
+}
+body.encounter-mode-active.chat-keyboard-open .chat-main.encounter-scene .composer{
+  max-height:calc(var(--poyozz-chat-viewport-height,100dvh) - 72px)!important;
+}
+body.encounter-mode-active.chat-keyboard-open .chat-main.encounter-scene .messages{
+  bottom:calc(var(--poyozz-encounter-composer-height,190px) + 8px)!important;
+  max-height:calc(var(--poyozz-chat-viewport-height,100dvh) - var(--poyozz-encounter-composer-height,190px) - 100px)!important;
+}
+body.encounter-mode-active.chat-keyboard-open .encounter-character-sprite{
+  height:clamp(150px,34dvh,280px)!important;
+  opacity:.35!important;
+}
 </style>
 <script id="poyozz-chat-keyboard-viewport">
 (() => {
   const root = document.documentElement;
   const viewport = window.visualViewport || null;
   let framePending = false;
+  let observedEncounterComposer = null;
+  let composerResizeObserver = null;
+
+  const updateEncounterComposerHeight = () => {
+    const composer = document.querySelector('.chat-main.encounter-scene .composer');
+    if (composer !== observedEncounterComposer) {
+      composerResizeObserver?.disconnect();
+      observedEncounterComposer = composer;
+      if (composer && typeof ResizeObserver === 'function') {
+        composerResizeObserver = new ResizeObserver(() => {
+          const height = Math.round(composer.getBoundingClientRect().height);
+          if (height > 0) root.style.setProperty('--poyozz-encounter-composer-height', height + 'px');
+        });
+        composerResizeObserver.observe(composer);
+      }
+    }
+    if (composer) {
+      const height = Math.round(composer.getBoundingClientRect().height);
+      if (height > 0) root.style.setProperty('--poyozz-encounter-composer-height', height + 'px');
+    } else {
+      root.style.removeProperty('--poyozz-encounter-composer-height');
+    }
+  };
 
   const updateViewportHeight = () => {
     const height = Math.round(Number(viewport?.height) || window.innerHeight || root.clientHeight);
+    const top = Math.round(Number(viewport?.offsetTop) || 0);
     if (height > 0) root.style.setProperty('--poyozz-chat-viewport-height', height + 'px');
+    root.style.setProperty('--poyozz-visual-viewport-top', top + 'px');
+    updateEncounterComposerHeight();
   };
   const scheduleViewportUpdate = () => {
     if (framePending) return;
@@ -13933,6 +13988,9 @@ body.conversation .chat-layout,body.group-chat-page .chat-layout{
     document.body.classList.add('chat-keyboard-open');
     updateViewportHeight();
     scheduleViewportUpdate();
+    if (document.body.classList.contains('encounter-mode-active')) {
+      requestAnimationFrame(() => event.target.scrollIntoView?.({ block:'nearest', inline:'nearest' }));
+    }
   });
   document.addEventListener('focusout', () => {
     requestAnimationFrame(() => {
