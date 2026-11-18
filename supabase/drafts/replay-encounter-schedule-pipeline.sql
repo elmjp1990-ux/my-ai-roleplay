@@ -153,7 +153,7 @@ BEGIN
      OR v_first.variant_key <> v_expected_key
      OR v_second.schedule_id <> v_first.schedule_id
      OR v_second.variant_key <> v_first.variant_key
-     OR v_first.variant_weight <> CASE WHEN v_expected_key = 'option_1' THEN 80 ELSE 20 END THEN
+     OR v_first.variant_weight <> (CASE WHEN v_expected_key = 'option_1' THEN 80 ELSE 20 END) THEN
     RAISE EXCEPTION 'hourly option must be weighted and stable across same-day refreshes';
   END IF;
 
