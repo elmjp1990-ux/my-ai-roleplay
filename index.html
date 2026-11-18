@@ -662,11 +662,6 @@ body.group-chat-page:has(.group-wizard) #view {
 .suggestion-options { display:flex; align-items:center; gap:5px; padding:0 8px 5px; }
 .suggestion-light { width:10px; height:10px; min-width:10px; padding:0; border:0; border-radius:50%; background:var(--border); box-shadow:inset 0 0 0 1px var(--muted); }
 .suggestion-light[aria-pressed="true"] { background:#34d399; box-shadow:0 0 6px #34d399aa; }
-.suggestion-card-row { display:none; align-items:stretch; gap:5px; min-width:0; }
-.suggestion-card-row.active { display:flex; }
-.suggestion-card-row .suggestion-card { touch-action:pan-y; -webkit-user-select:none; user-select:none; display:block; flex:1 1 auto; width:100%; min-width:0; max-height:120px; overflow:hidden; padding:6px 9px; border:1px solid var(--border); border-radius:8px; background:var(--card); color:var(--text); text-align:left; font:inherit; white-space:normal; line-height:1.35; }
-.suggestion-card-tools { display:flex; flex:0 0 auto; align-items:center; gap:2px; }
-.suggestion-card-tools button { width:30px; min-width:30px; min-height:32px; padding:4px; border:1px solid var(--border); border-radius:7px; background:var(--panel); color:var(--muted); font-size:14px; }
 .suggestion-card.active { display:block; }
 .suggestion-card:active { transform:scale(.995); }
 .suggestion-card-title { display:block; margin-bottom:3px; font-size:12px; font-weight:700; }
@@ -4432,7 +4427,7 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
       const metadata=roleplayMeta[message.id];if(metadata&&typeof metadata==='object')Object.assign(normalized,metadata);
       // The per-message database column is authoritative, including an empty array
       // after the player removes every suggestion; stale metadata must never restore them.
-      if(Array.isArray(message.suggested_replies))normalized.suggestedReplies=persistedSuggestions;
+      if(persistedSuggestions.length===3)normalized.suggestedReplies=persistedSuggestions;
       return normalized;
     });
     const pendingMessageIds=new Set([session.pendingTurn?.userMessageId,session.pendingTurn?.assistantMessageId].filter(Boolean));
@@ -7647,7 +7642,7 @@ async function groupOpen(groupId) {
       return {id:m.id,type,speaker,characterId:m.character_id||null,speakerSnapshot,sceneId:m.scene_id||null,sceneName:scene?.name||'',content:type==='user' && m.content===GROUP_CONTINUE_SENTINEL ? '' : m.content,createdAt:m.created_at};
     });
     const membersNeedingPortraits=members.filter(member=>!safeImage(member.avatar_url)&&isUuid(member.characterId));
-    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,storyWorldState:{storyTime:group.story_time||'',storyLocation:group.story_location||''},memoryPhotos:[],scenes,members,suggestionTurnId:suggestionRes.data?.status==='completed'?suggestionRes.data.id||null:null,suggestedReplies:suggestionRes.data?.status==='completed'&&Array.isArray(suggestionRes.data?.suggested_replies)?suggestionRes.data.suggested_replies.slice(0,3):[]};
+    g.active={id:group.id,name:group.name,world:group.world_background,mode:group.scene_mode,playerName:group.player_name||'',playerPersona:group.player_persona||'',worldCharacterId:group.world_character_id||'',backgroundMode:group.background_mode||'avatar',backgroundMemoryPhotoId:group.background_memory_photo_id||null,storyWorldState:{storyTime:group.story_time||'',storyLocation:group.story_location||''},memoryPhotos:[],scenes,members,suggestedReplies:suggestionRes.data?.status==='completed'&&Array.isArray(suggestionRes.data?.suggested_replies)?suggestionRes.data.suggested_replies.slice(0,3):[]};
     markGroupChatRead(group.id);
     g.messages=messages;g.turn=messages.filter(m=>m.type==='user').length;
     if(groupListWasLoaded){
@@ -8997,69 +8992,12 @@ async function loadStoryRelationshipState(session) {
   }
 }
 
-async function mutateConversationSuggestion(index, mode, editedText='') {
-  const isGroup=route.page==='group';
-  const user=currentUser(),client=window.mySupabase;
-  if(!user||!client)throw new Error('請先登入後再修改建議回覆。');
-  let replies=[],next=[],rpcName='',rpcArgs={},message=null,session=null,group=null;
-  if(isGroup){
-    group=groupPrototype.active;
-    if(!group||groupPrototype.ownerUid!==user.uid||!group.suggestionTurnId)throw new Error('找不到目前群組最新一輪的建議回覆，請重新開啟群組後再試。');
-    replies=Array.isArray(group.suggestedReplies)?group.suggestedReplies.slice(0,3):[];
-    rpcName='update_chat_group_turn_suggested_replies';
-    rpcArgs={p_turn_id:group.suggestionTurnId};
-  }else{
-    session=currentSession();
-    if(!session?.cloudOwned||session.cloudOwnerUid!==user.uid)throw new Error('目前聊天室尚未同步到雲端，無法保存建議回覆修改。');
-    message=[...(session.messages||[])].reverse().find(item=>item.role==='assistant'&&Array.isArray(item.suggestedReplies));
-    if(!message||!isUuid(message.id)||!isUuid(session.id))throw new Error('找不到最新一則 AI 建議回覆，請重新載入聊天室。');
-    replies=message.suggestedReplies.slice(0,3);
-    rpcName='update_chat_message_suggested_replies';
-    rpcArgs={p_message_id:message.id};
-  }
-  if(!Number.isInteger(index)||index<0||index>=replies.length)throw new Error('這則建議已變更，請重新整理後再操作。');
-  next=replies.slice();
-  if(mode==='edit'){
-    const value=String(editedText||'').trim();
-    if(!value)throw new Error('建議回覆不可留空。');
-    if(value.length>500)throw new Error('建議回覆最多 500 字。');
-    next[index]=value;
-  }else if(mode==='delete'){
-    next.splice(index,1);
-  }else throw new Error('不支援的建議回覆操作。');
-  rpcArgs.p_suggested_replies=next;
-  const {data,error}=await client.rpc(rpcName,rpcArgs);
-  if(error)throw new Error('建議回覆保存失敗：'+error.message);
-  const saved=Array.isArray(data)?data:next;
-  if(isGroup){
-    if(groupPrototype.active!==group||groupPrototype.ownerUid!==user.uid)return;
-    group.suggestedReplies=saved;
-    renderGroupConversation();
-  }else{
-    if(currentSession()!==session||currentUser()?.uid!==user.uid)return;
-    message.suggestedReplies=saved;
-    session.suggestedReplies=saved;
-    persist();
-    const host=$('conversationSuggestions');
-    if(host)host.innerHTML=conversationSuggestionsHTML(session);
-  }
-  toast(mode==='edit'?'建議回覆已更新。':'已移除這則建議回覆。');
-}
-function openSuggestionEditDialog(index) {
-  const isGroup=route.page==='group';
-  const replies=isGroup?(groupPrototype.active?.suggestedReplies||[]):(currentSession()?.messages||[]).slice().reverse().find(item=>item.role==='assistant'&&Array.isArray(item.suggestedReplies))?.suggestedReplies||[];
-  const value=String(replies[index]||'');
-  if(!value)return toast('找不到這則建議回覆，請重新載入後再試。');
-  showDialog('編輯建議回覆','<div class="stack"><label class="field"><span>修改內容</span><textarea id="suggestionEditText" rows="5" maxlength="500">'+e(value)+'</textarea><small class="muted">最多 500 字；保存後會同步更新雲端，不會重新呼叫 AI 或扣款。</small></label><div class="row end"><button type="button" data-action="suggestion-edit-save" data-index="'+index+'" class="primary">保存修改</button></div></div>');
-}
-
 function conversationSuggestionsHTML(s) {
   if(!s?.suggestions)return '';
   const hasPlayerMessage=typeof s?.hasUserMessageOverride==='boolean'?s.hasUserMessageOverride:hasUserMessage(s);
-  const latestAssistantMessage=[...(s.messages||[])].reverse().find(message=>
-    message.role==='assistant'&&Array.isArray(message.suggestedReplies)
-  );
-  const latestAssistantSuggestions=latestAssistantMessage?.suggestedReplies;
+  const latestAssistantSuggestions=[...(s.messages||[])].reverse().find(message=>
+    message.role==='assistant'&&Array.isArray(message.suggestedReplies)&&message.suggestedReplies.length>0
+  )?.suggestedReplies;
   const replies=Array.isArray(latestAssistantSuggestions)?latestAssistantSuggestions.slice(0,3)
     :(Array.isArray(s.suggestedReplies)?s.suggestedReplies.slice(0,3):[]);
   return `<div class="suggestions">
@@ -9070,7 +9008,7 @@ function conversationSuggestionsHTML(s) {
         : `<div class="suggestion-options" aria-label="選擇建議回覆">
             ${replies.map((_,index)=>`<button type="button" class="suggestion-light" data-action="suggestion-select" data-index="${index}" aria-label="第 ${index+1} 則建議" aria-pressed="${index===0?'true':'false'}"></button>`).join('')}
           </div>
-          ${replies.map((reply,index)=>`<div class="suggestion-card-row${index===0?' active':''}" data-suggestion-row="${index}"><button type="button" class="suggestion-card ${index===0?"active":""}" data-action="suggestion" data-index="${index}" data-text="${e(reply)}"><span class="suggestion-card-action">${e(reply)}</span></button><div class="suggestion-card-tools"><button type="button" data-action="suggestion-edit" data-index="${index}" aria-label="編輯第 ${index+1} 則建議" title="編輯">✎</button><button type="button" data-action="suggestion-delete" data-index="${index}" aria-label="移除第 ${index+1} 則建議" title="移除">×</button></div></div>`).join('')}`}
+          ${replies.map((reply,index)=>`<button type="button" class="suggestion-card${index===0?' active':''}" data-action="suggestion" data-index="${index}" data-text="${e(reply)}"><span class="suggestion-card-action">${e(reply)}</span></button>`).join('')}`}
     </details>
   </div>`;
 }
@@ -10960,7 +10898,6 @@ document.addEventListener('toggle', event => {
     const nextIndex = Math.max(0, Math.min(cards.length - 1, activeIndex + (dx < 0 ? 1 : -1)));
     if (nextIndex === activeIndex) return;
     current.panel.querySelectorAll('.suggestion-card').forEach((card, index) => card.classList.toggle('active', index === nextIndex));
-    current.panel.querySelectorAll('.suggestion-card-row').forEach((row, index) => row.classList.toggle('active', index === nextIndex));
     current.panel.querySelectorAll('.suggestion-light').forEach((light, index) => light.setAttribute('aria-pressed', String(index === nextIndex)));
     lastSwipeAt = Date.now();
     suppressClickUntil = lastSwipeAt + 500;
@@ -12037,29 +11974,11 @@ document.addEventListener('click',async event => {
         }
         break;
       }
-      case 'suggestion-edit': {
-        openSuggestionEditDialog(Number(button.dataset.index));
-        break;
-      }
-      case 'suggestion-edit-save': {
-        const index=Number(button.dataset.index),value=String($('suggestionEditText')?.value||'').trim();
-        try{await mutateConversationSuggestion(index,'edit',value);$('modal')?.close();}
-        catch(error){toast(error?.message||'建議回覆更新失敗。');}
-        break;
-      }
-      case 'suggestion-delete': {
-        const index=Number(button.dataset.index);
-        if(!confirm('確定移除這則建議回覆？移除後重新開啟聊天室也不會恢復。'))break;
-        try{await mutateConversationSuggestion(index,'delete');}
-        catch(error){toast(error?.message||'建議回覆移除失敗。');}
-        break;
-      }
       case 'suggestion-select': {
         const panel = button.closest('.suggestions-panel');
         const index = Number(button.dataset.index);
         if (!panel || !Number.isInteger(index)) break;
         panel.querySelectorAll('.suggestion-card').forEach((card, i) => card.classList.toggle('active', i === index));
-        panel.querySelectorAll('.suggestion-card-row').forEach((row, i) => row.classList.toggle('active', i === index));
         panel.querySelectorAll('.suggestion-light').forEach((light, i) => light.setAttribute('aria-pressed', String(i === index)));
         break;
       }
