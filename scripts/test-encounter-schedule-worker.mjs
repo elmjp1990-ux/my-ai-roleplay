@@ -7,6 +7,7 @@ const batchSemantics = fs.readFileSync("supabase/migrations/20261117130000_encou
 const html = fs.readFileSync("index.html", "utf8");
 const generator = fs.readFileSync("supabase/functions/_shared/encounter-schedule-generation.ts", "utf8");
 const sparseScheduleMigration = fs.readFileSync("supabase/migrations/20261118000400_encounter_schedules_allow_unavailable_windows.sql", "utf8");
+const publishedSceneResolverMigration = fs.readFileSync("supabase/migrations/20261118000500_resolve_only_published_encounter_scenes.sql", "utf8");
 const weatherWorker = fs.readFileSync("supabase/functions/encounter-weather-sync/index.ts", "utf8");
 const weatherParser = fs.readFileSync("supabase/functions/_shared/encounter-weather.mjs", "utf8");
 
@@ -16,7 +17,7 @@ assert.match(worker, /claim_encounter_schedule_batch/);
 assert.match(worker, /publish_encounter_schedule_batch/);
 assert.match(worker, /fail_encounter_schedule_batch/);
 assert.match(worker, /parseEncounterScheduleBatchOutput/);
-assert.match(worker, /get_encounter_dynamic_scene_usage/);
+assert.doesNotMatch(worker, /get_encounter_dynamic_scene_usage|dynamic_scene_limit_or_sharing_invalid/);
 assert.match(worker, /findPrivateContextLeak/);
 assert.match(worker, /p_limit: 2147483647/);
 assert.match(worker, /p_force: mode === "manual"/);
@@ -87,7 +88,9 @@ assert.match(fs.readFileSync("city-map.js", "utf8"), /MAX_DYNAMIC_SCENE_MARKERS=
 assert.match(fs.readFileSync("city-map.js", "utf8"), /Math\.hypot\(point\.x-x,point\.y-y\)<120/);
 assert.match(pipeline, /marker_x BETWEEN 40 AND 1622/);
 assert.match(pipeline, /marker_y BETWEEN 40 AND 892/);
-assert.match(generator, /場景只能使用輸入 scene_catalog/);
+assert.match(generator, /scene_catalog 只代表目前已啟用/);
+assert.match(generator, /canonical_scene_keys/);
+assert.match(generator, /待場景日後啟用再自動顯示/);
 assert.match(generator, /只輸出適合玩家實際遇見角色的時段/);
 assert.match(generator, /slots 可為空陣列/);
 assert.match(generator, /scenes 必須是空陣列/);
@@ -99,7 +102,8 @@ assert.doesNotMatch(generator, /_24_hour_coverage_incomplete/);
 assert.doesNotMatch(generator, /完整 24 小時行程/);
 assert.match(sparseScheduleMigration, /NOT BETWEEN 0 AND 4/);
 assert.match(sparseScheduleMigration, /NOT BETWEEN 1 AND 4/);
-assert.match(generator, /scene_not_in_existing_catalog/);
+assert.doesNotMatch(generator, /scene_not_in_existing_catalog/);
+assert.match(publishedSceneResolverMigration, /public\.get_encounter_scene_catalog\(\)/);
 assert.match(weatherWorker, /createEncounterWeather/);
 assert.match(weatherWorker, /previousSlot === weather\.slot/);
 assert.match(weatherWorker, /previous\.source === weather\.source/);
