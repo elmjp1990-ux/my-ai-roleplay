@@ -27,7 +27,7 @@ Deno.serve(async (request: Request) => {
   try { body = await request.json(); } catch { return json({ error: "invalid_json" }, 400); }
   const sessionId = body.sessionId;
   const action = body.action;
-  if (!isUuid(sessionId) || !["pause", "resume"].includes(String(action))) {
+  if (!isUuid(sessionId) || !["pause", "resume", "end"].includes(String(action))) {
     return json({ error: "invalid_encounter_state_request" }, 400);
   }
 
