@@ -118,7 +118,7 @@ BEGIN
   IF v_user_id IS NULL OR public.account_is_active() IS NOT TRUE THEN
     RAISE EXCEPTION 'active_authentication_required' USING ERRCODE = '42501';
   END IF;
-  IF p_character_id IS NULL OR p_decision NOT IN ('modern_map_compatible', 'not_applicable') THEN
+  IF p_character_id IS NULL OR p_decision IS NULL OR p_decision NOT IN ('modern_map_compatible', 'not_applicable') THEN
     RAISE EXCEPTION 'worldview_review_decision_invalid' USING ERRCODE = '22023';
   END IF;
 
