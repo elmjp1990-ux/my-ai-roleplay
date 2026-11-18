@@ -16,6 +16,8 @@ const json = (body: unknown, status = 200) =>
 const asRow = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const asText = (value: unknown): string => typeof value === "string" ? value.trim() : "";
+const ENCOUNTER_DISCOVERY_SENTINEL = "[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]";
+const ENCOUNTER_DISCOVERY_TRANSCRIPT = "玩家選擇留空，讓角色主動發現自己（玩家沒有說出台詞）。";
 const MAX_TRANSCRIPT_CHARS = 60_000;
 const MAX_TURNS = 1_000;
 
@@ -43,7 +45,8 @@ function buildTranscript(
     }
     return {
       turnNumber: Number(turn.turn_number),
-      user: asText(userMessage.content).slice(0, 2_000),
+      user: (asText(userMessage.content) === ENCOUNTER_DISCOVERY_SENTINEL
+        ? ENCOUNTER_DISCOVERY_TRANSCRIPT : asText(userMessage.content)).slice(0, 2_000),
       assistant: asText(assistantMessage.content).slice(0, 2_000),
     };
   });
