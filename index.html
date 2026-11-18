@@ -3775,7 +3775,6 @@ function chatSessionData(s) {
     encounterDay:s.encounterDay || (s.startedAt ? new Date(s.startedAt).toLocaleDateString('en-CA') : null),
     openingMessage:initialOpening && String(initialOpening.text || '').trim()
       ? {text:String(initialOpening.text),at:Number(initialOpening.at) || Date.now()} : null,
-    encounterOpeningChoice:['greet','wait'].includes(s.encounterIntroChoice)?s.encounterIntroChoice:null,
     encounterVisuals:s.encounterVisuals&&typeof s.encounterVisuals==='object'?{
       illustrationId:isUuid(s.encounterVisuals.illustrationId)?s.encounterVisuals.illustrationId:null,
       sceneBackgroundId:isUuid(s.encounterVisuals.sceneBackgroundId)?s.encounterVisuals.sceneBackgroundId:null,
@@ -4386,8 +4385,6 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
         : null;
       session.initialOpeningMessage=data.openingMessage&&String(data.openingMessage.text||'').trim()
         ? {text:String(data.openingMessage.text),at:Number(data.openingMessage.at)||Date.now()} : session.initialOpeningMessage||null;
-      session.encounterIntroChoice=['greet','wait'].includes(data.encounterOpeningChoice)
-        ? data.encounterOpeningChoice : session.encounterIntroChoice||null;
       session.cloudRoleplayMeta=data.roleplayMeta&&typeof data.roleplayMeta==='object'?data.roleplayMeta:{};
       session.cloudSessionDataLoaded=true;
       if(session.cloudHasUserMessage==null&&typeof data.hasUserMessage==='boolean')session.cloudHasUserMessage=data.hasUserMessage;
@@ -6695,10 +6692,10 @@ async function createEncounterSession(character) {
     suggestions: true,
     background: 'avatar',
     encounterMode: true,
+    cloudHasUserMessage: false,
     encounterPlace: typeof encounterPlace === 'string' ? encounterPlace : null,
     encounterDay: new Date().toLocaleDateString('en-CA'),
     encounterVisuals: data.session.character_snapshot?.defaultVisuals || null,
-    encounterIntroChoice: null,
     messages: [],
     memories: [],
     album: [],
