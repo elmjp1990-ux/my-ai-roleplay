@@ -16,6 +16,8 @@ const rawOutputRepairMigration = fs.readFileSync("supabase/migrations/2026111807
 const rawOutputRepairReplay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-output-repair.sql", "utf8");
 const providerAdapter = fs.readFileSync("supabase/functions/_shared/openrouter-chat-completions.ts", "utf8");
 const replayWorkflow = fs.readFileSync(".github/workflows/supabase-local-migration-replay.yml", "utf8");
+const replaySchedule = fs.readFileSync("supabase/drafts/replay-encounter-schedule-pipeline.sql", "utf8");
+const replayEncounterState = fs.readFileSync("supabase/drafts/replay-encounter-relationship-greeting-pools.sql", "utf8");
 const weatherWorker = fs.readFileSync("supabase/functions/encounter-weather-sync/index.ts", "utf8");
 const weatherParser = fs.readFileSync("supabase/functions/_shared/encounter-weather.mjs", "utf8");
 
@@ -187,6 +189,15 @@ assert.ok(pendingPriorityMigration.includes("ORDER BY CASE j.status WHEN ''pendi
 assert.ok(pendingPriorityMigration.includes("pending_schedule_job_priority_contract_count_unexpected"));
 assert.ok(replayWorkflow.includes("20261118074723_prioritize_pending_encounter_schedule_jobs.sql"));
 assert.ok(replayWorkflow.includes("20261118074727_encounter_schedule_raw_output_repair.sql"));
+assert.ok(replayWorkflow.includes("20261119000100_encounter_schedule_compact_output.sql"));
+assert.ok(replayWorkflow.indexOf("20261119000100_encounter_schedule_compact_output.sql") >
+  replayWorkflow.indexOf("20261118141805_encounter_schedule_home_aliases_and_sleep_guard.sql"));
+assert.ok(replayWorkflow.indexOf("20261119000100_encounter_schedule_compact_output.sql") <
+  replayWorkflow.indexOf("replay-encounter-schedule-pipeline.sql"));
+assert.match(replaySchedule, /poyozz-encounter-schedule-v8-compact-24-hour-options-2026-11-19/);
+assert.match(replayEncounterState, /did not inherit current affinity and relationship stage/);
+assert.match(replayEncounterState, /retained a pre-generated greeting/);
+assert.doesNotMatch(replayEncounterState, /selected from its own greeting pool/);
 assert.ok(replayWorkflow.indexOf("20261118074727_encounter_schedule_raw_output_repair.sql") >
   replayWorkflow.indexOf("20261118074723_prioritize_pending_encounter_schedule_jobs.sql"));
 assert.ok(replayWorkflow.lastIndexOf("replay-encounter-schedule-output-repair.sql") >
