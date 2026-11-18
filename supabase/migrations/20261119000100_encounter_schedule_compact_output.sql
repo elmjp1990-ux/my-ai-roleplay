@@ -95,7 +95,7 @@ BEGIN
   v_definition := pg_catalog.replace(v_definition, v_old, v_new);
 
   v_old := '      v_previous_block_start := NULL;';
-  v_new := v_old || E'\\n      v_multi_option_hours := 0;';
+  v_new := v_old || E'\n      v_multi_option_hours := 0;';
   SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
     / pg_catalog.length(v_old) INTO v_count;
   IF v_count <> 1 THEN
