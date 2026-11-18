@@ -8997,6 +8997,62 @@ async function loadStoryRelationshipState(session) {
   }
 }
 
+async function mutateConversationSuggestion(index, mode, editedText='') {
+  const isGroup=route.page==='group';
+  const user=currentUser(),client=window.mySupabase;
+  if(!user||!client)throw new Error('請先登入後再修改建議回覆。');
+  let replies=[],next=[],rpcName='',rpcArgs={},message=null,session=null,group=null;
+  if(isGroup){
+    group=groupPrototype.active;
+    if(!group||groupPrototype.ownerUid!==user.uid||!group.suggestionTurnId)throw new Error('找不到目前群組最新一輪的建議回覆，請重新開啟群組後再試。');
+    replies=Array.isArray(group.suggestedReplies)?group.suggestedReplies.slice(0,3):[];
+    rpcName='update_chat_group_turn_suggested_replies';
+    rpcArgs={p_turn_id:group.suggestionTurnId};
+  }else{
+    session=currentSession();
+    if(!session?.cloudOwned||session.cloudOwnerUid!==user.uid)throw new Error('目前聊天室尚未同步到雲端，無法保存建議回覆修改。');
+    message=[...(session.messages||[])].reverse().find(item=>item.role==='assistant'&&Array.isArray(item.suggestedReplies));
+    if(!message||!isUuid(message.id)||!isUuid(session.id))throw new Error('找不到最新一則 AI 建議回覆，請重新載入聊天室。');
+    replies=message.suggestedReplies.slice(0,3);
+    rpcName='update_chat_message_suggested_replies';
+    rpcArgs={p_message_id:message.id};
+  }
+  if(!Number.isInteger(index)||index<0||index>=replies.length)throw new Error('這則建議已變更，請重新整理後再操作。');
+  next=replies.slice();
+  if(mode==='edit'){
+    const value=String(editedText||'').trim();
+    if(!value)throw new Error('建議回覆不可留空。');
+    if(value.length>500)throw new Error('建議回覆最多 500 字。');
+    next[index]=value;
+  }else if(mode==='delete'){
+    next.splice(index,1);
+  }else throw new Error('不支援的建議回覆操作。');
+  rpcArgs.p_suggested_replies=next;
+  const {data,error}=await client.rpc(rpcName,rpcArgs);
+  if(error)throw new Error('建議回覆保存失敗：'+error.message);
+  const saved=Array.isArray(data)?data:next;
+  if(isGroup){
+    if(groupPrototype.active!==group||groupPrototype.ownerUid!==user.uid)return;
+    group.suggestedReplies=saved;
+    renderGroupConversation();
+  }else{
+    if(currentSession()!==session||currentUser()?.uid!==user.uid)return;
+    message.suggestedReplies=saved;
+    session.suggestedReplies=saved;
+    persist();
+    const host=$('conversationSuggestions');
+    if(host)host.innerHTML=conversationSuggestionsHTML(session);
+  }
+  toast(mode==='edit'?'建議回覆已更新。':'已移除這則建議回覆。');
+}
+function openSuggestionEditDialog(index) {
+  const isGroup=route.page==='group';
+  const replies=isGroup?(groupPrototype.active?.suggestedReplies||[]):(currentSession()?.messages||[]).slice().reverse().find(item=>item.role==='assistant'&&Array.isArray(item.suggestedReplies))?.suggestedReplies||[];
+  const value=String(replies[index]||'');
+  if(!value)return toast('找不到這則建議回覆，請重新載入後再試。');
+  showDialog('編輯建議回覆','<div class="stack"><label class="field"><span>修改內容</span><textarea id="suggestionEditText" rows="5" maxlength="500">'+e(value)+'</textarea><small class="muted">最多 500 字；保存後會同步更新雲端，不會重新呼叫 AI 或扣款。</small></label><div class="row end"><button type="button" data-action="suggestion-edit-save" data-index="'+index+'" class="primary">保存修改</button></div></div>');
+}
+
 function conversationSuggestionsHTML(s) {
   if(!s?.suggestions)return '';
   const hasPlayerMessage=typeof s?.hasUserMessageOverride==='boolean'?s.hasUserMessageOverride:hasUserMessage(s);
