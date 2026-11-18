@@ -188,6 +188,10 @@ assert.ok(!html.includes(".select('id, character_id, story_name, description, op
 
 // Unknown worldview review is author-scoped and decisions never invoke AI inline.
 assert.match(scheduleOrganizer, /\.eq\("status", "needs_review"\)\.eq\("author_id", actorUserId\)/);
+assert.match(scheduleOrganizer, /\.eq\("status", "pending"\)\.eq\("author_id", actorUserId\)/);
+assert.match(scheduleOrganizer, /\.eq\("status", "processing"\)\.eq\("author_id", actorUserId\)/);
+assert.match(scheduleOrganizer, /p_force IS NOT TRUE OR j\.author_id = p_actor_user_id/);
+
 assert.match(scheduleOrganizer, /getEncounterWorldviewScheduleDisposition\([\s\S]*?source\.worldview_review_decision/);
 assert.match(html, /data-action="worldview-review-decision"/);
 assert.match(html, /review_encounter_schedule_worldview/);
