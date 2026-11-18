@@ -602,10 +602,12 @@ export function parseEncounterScheduleBatchOutput(
       continue;
     }
     seen.add(id);
-    if (item.placement === "no_matching_location") {
+    const modernMapCompatible = isEncounterModernMapCompatible(source);
+    if (item.placement === "no_matching_location" && !modernMapCompatible) {
       if (!hasExactKeys(item.variants, ["weekday", "holiday"]) ||
         !Array.isArray(item.variants.weekday) || item.variants.weekday.length !== 0 ||
-        !Array.isArray(item.variants.holiday) || item.variants.holiday.length !== 0 ||        specialEvents.length !== 0) {
+        !Array.isArray(item.variants.holiday) || item.variants.holiday.length !== 0 ||
+        specialEvents.length !== 0) {
         errors.push(id + "_no_location_variants_must_be_empty");
       }
       characters.push({
@@ -614,7 +616,10 @@ export function parseEncounterScheduleBatchOutput(
       });
       continue;
     }
-    if (item.placement !== "modern_map" || !isEncounterModernMapCompatible(source)) {
+    // For modern-compatible roles, placement is a map-eligibility decision only.
+    // A model-side no_matching_location must never erase a valid natural schedule:
+    // scene matching is performed independently after parsing.
+    if (!modernMapCompatible || !["modern_map", "no_matching_location"].includes(String(item.placement))) {
       errors.push(id + "_modern_map_placement_not_allowed");
       continue;
     }
