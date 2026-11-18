@@ -218,7 +218,7 @@ BEGIN
     RAISE EXCEPTION 'compact_encounter_session_greeting_selection_boundaries_missing';
   END IF;
 
-  v_new := '  v_snapshot := COALESCE(p_character_snapshot, ''{}''::jsonb) ||' || E'\n' ||
+  v_new := '  v_snapshot := (COALESCE(p_character_snapshot, ''{}''::jsonb) - ''encounterGreeting'' - ''encounterGreetingId'') ||' || E'\n' ||
     '    jsonb_build_object(' || E'\n' ||
     '      ''encounterRelationshipStage'', v_relationship_stage' || E'\n' ||
     '    );' || E'\n' ||
