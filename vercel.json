@@ -5,7 +5,7 @@
   "git": {
     "deploymentEnabled": {
       "feat/encounter-ai-integration": false,
-      "feat/encounter-ai-integration-clean": false,
+      "feat/encounter-ai-integration-clean": true,
       "fix/mobile-chat-keyboard-viewport": false
     }
   }
