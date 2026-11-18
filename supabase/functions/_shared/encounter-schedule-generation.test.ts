@@ -2,6 +2,7 @@ import {
   type EncounterSceneCatalogEntry,
   buildEncounterScheduleBatchMessages,
   classifyEncounterWorldview,
+  getEncounterWorldviewScheduleDisposition,
   isEncounterModernMapCompatible,
   normalizeEncounterSceneKey,
   resolveEncounterScheduleAvailability,
@@ -223,6 +224,15 @@ Deno.test("classifies worldviews locally and keeps species separate from era", (
   const unknownClass = classifyEncounterWorldview(unknown);
   if (unknownClass.category !== "unknown" || unknownClass.modern_map_compatible) {
     throw new Error("unknown worldview must be held out of the modern map");
+  }
+  if (getEncounterWorldviewScheduleDisposition(unknownClass) !== "needs_review") {
+    throw new Error("unknown worldview must enter manual review instead of completed/unplaced");
+  }
+  if (getEncounterWorldviewScheduleDisposition(classifyEncounterWorldview(ancientVampire)) !== "not_applicable") {
+    throw new Error("known historical worldview should remain a normal non-modern exclusion");
+  }
+  if (getEncounterWorldviewScheduleDisposition(modernVampireClass) !== "generate") {
+    throw new Error("modern-compatible worldview should continue to AI generation");
   }
 
   const alternateWorld = source(id1, {
