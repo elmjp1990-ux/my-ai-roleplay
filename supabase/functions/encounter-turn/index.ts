@@ -25,6 +25,8 @@ const asRow = (value: unknown): DbRow =>
 const asText = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 const ENCOUNTER_DISCOVERY_SENTINEL = "[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]";
 const ENCOUNTER_DISCOVERY_CONTEXT = "（系統事件：玩家選擇留空發送，讓你主動發現玩家；這不是玩家說出口的台詞。）";
+const ENCOUNTER_CONTINUE_SENTINEL = "（請接續目前的故事。）";
+const ENCOUNTER_CONTINUE_CONTEXT = "（系統事件：玩家留空發送，請你自然延續目前互動；玩家沒有新增台詞。）";
 const ENCOUNTER_LOCATION_LABELS: Record<string, string> = {
   airport: "機場", commercial: "公司", "night-bar": "酒吧", "live-house": "Live House",
   apartment: "公寓", "department-store": "百貨公司", bookstore: "書店", cafe: "咖啡廳",
@@ -102,7 +104,10 @@ async function buildEncounterMessages(
   const historyRows = (Array.isArray(historyResult.data) ? historyResult.data : [])
     .slice().reverse().map((row: DbRow) => ({
       id: asText(row.id), role: asText(row.role),
-      content: asText(row.content) === ENCOUNTER_DISCOVERY_SENTINEL ? ENCOUNTER_DISCOVERY_CONTEXT : asText(row.content),
+      content: asText(row.content) === ENCOUNTER_DISCOVERY_SENTINEL
+        ? ENCOUNTER_DISCOVERY_CONTEXT
+        : asText(row.content) === ENCOUNTER_CONTINUE_SENTINEL
+          ? ENCOUNTER_CONTINUE_CONTEXT : asText(row.content),
     })).filter((row: DbRow) => row.content);
   const openingMessage = asRow(asRow(session.session_data).openingMessage);
   const openingText = asText(openingMessage.text);
@@ -113,7 +118,9 @@ async function buildEncounterMessages(
     historyRows.push({
       id: userMessageId, role: "user",
       content: asText(currentUserMessage.content) === ENCOUNTER_DISCOVERY_SENTINEL
-        ? ENCOUNTER_DISCOVERY_CONTEXT : asText(currentUserMessage.content),
+        ? ENCOUNTER_DISCOVERY_CONTEXT
+        : asText(currentUserMessage.content) === ENCOUNTER_CONTINUE_SENTINEL
+          ? ENCOUNTER_CONTINUE_CONTEXT : asText(currentUserMessage.content),
     });
   }
   const values = buildPromptVariableValues({
@@ -162,7 +169,8 @@ async function buildEncounterMessages(
     })).filter((row: DbRow) => row.content);
   const currentMessageContent = asText(currentUserMessage.content) === ENCOUNTER_DISCOVERY_SENTINEL
     ? ENCOUNTER_DISCOVERY_CONTEXT
-    : asText(currentUserMessage.content);
+    : asText(currentUserMessage.content) === ENCOUNTER_CONTINUE_SENTINEL
+      ? ENCOUNTER_CONTINUE_CONTEXT : asText(currentUserMessage.content);
   messages.push({ role: "user", content: currentMessageContent });
   return {
     messages: [{ role: "system", content: system }, ...messages],
