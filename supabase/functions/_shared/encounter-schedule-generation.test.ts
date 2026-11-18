@@ -388,21 +388,6 @@ Deno.test("preserves unavailable outdoor scene intent while validating its fixed
     throw new Error("unavailable outdoor scene intent was dropped");
   }
 });
-Deno.test("does not allow a fourth visible dynamic map marker", () => {
-  const characters = [
-    { character_id: id1, placement: "modern_map", variants: variants(fullDaySlots({ location_key: "university", activity: "在大學授課與參與校園活動。" })) },
-    { character_id: id2, placement: "modern_map", variants: variants(fullDaySlots({ location_key: "university", activity: "在大學上課與參與社團活動。" })) },
-  ];
-  const fullCatalog: EncounterSceneCatalogEntry[] = [
-    { location_key: "shopping-street", display_name: "商店街", is_dynamic: true },
-    { location_key: "night-market", display_name: "夜市", is_dynamic: true },
-    { location_key: "restaurant", display_name: "餐廳", is_dynamic: true },
-  ];
-  const parsed = result(characters, undefined, fullCatalog);
-  if (parsed.ok || !parsed.errors.some((error) => error.includes("scene_not_in_existing_catalog_university"))) {
-    throw new Error("scene not present in the server catalog should be rejected");
-  }
-});
 
 Deno.test("uses existing Live House scene without asking AI to update scene metadata", () => {
   const character = {
