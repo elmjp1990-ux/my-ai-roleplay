@@ -75,7 +75,7 @@ assert.match(encounterLifecycle,/register\('afterSingleConversation','encounter\
 assert.match(encounterLifecycle,/register\('afterMessages','encounter\.progressive-dialogue'/);
 assert.match(encounterLifecycle,/if\(!session\?\.encounterMode\|\|!panel\)return/);
 assert.match(encounterLifecycle,/panel\.style\.setProperty\('--encounter-scene-photo'/);
-assert.match(encounterLifecycle,/void hydrateEncounterGalleryIllustration\(character\.id\)/);
+assert.match(encounterLifecycle,/void hydrateEncounterGalleryIllustration\(character\.id,selectedIllustrationId\|\|null\)/);
 assert.match(encounterLifecycle,/existingSprite\.dataset\.encounterSource!==halfBodyImage/);
 assert.match(encounterLifecycle,/defaultSceneImage='\.\/encounter-default-scene\.webp'/);
 assert.doesNotMatch(html,/installEncounterRenderWrapper|wrappedRenderConversation|wrappedRenderMessages/);

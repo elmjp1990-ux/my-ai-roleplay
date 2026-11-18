@@ -26,7 +26,7 @@ assert.match(ownerLoader, /void retryCharacterIllustrationCleanup\(user\.id\)/);
 const editorLoader = between("async function hydrateCharacterIllustrationsIntoEditor(characterId)", "function renderCharacterIllustrationGallery");
 assert.match(editorLoader, /loadCharacterIllustrationAssets\(\[characterId\]\)/,
   "the editor must still hydrate the selected character's full gallery");
-const encounterLoader = between("async function hydrateEncounterGalleryIllustration(characterId)", "async function refreshCharacterIllustrationSignedUrl");
+const encounterLoader = between("async function hydrateEncounterGalleryIllustration(characterId,illustrationId=null)", "async function refreshCharacterIllustrationSignedUrl");
 assert.match(encounterLoader, /\.eq\('asset_type','gallery'\)/,
   "Encounter must query only gallery artwork when the encounter view needs it");
 assert.match(encounterLoader, /\.limit\(1\)/,

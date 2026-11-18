@@ -2,6 +2,23 @@ name: Supabase local synthetic schema replay (manual)
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - "supabase/migrations/*.sql"
+      - "supabase/drafts/encounter-schedule-pipeline.sql"
+      - "supabase/drafts/replay-encounter-schedule-pipeline.sql"
+      - "supabase/drafts/replay-encounter-sparse-schedule-windows.sql"
+      - "supabase/drafts/replay-encounter-scene-catalog.sql"
+      - "supabase/drafts/replay-encounter-session-evaluation-worker.sql"
+      - "supabase/drafts/encounter-relationship-greeting-pools.sql"
+      - "supabase/drafts/replay-encounter-relationship-greeting-pools.sql"
+      - "supabase/drafts/schedule-encounter-evaluation-worker.sql"
+      - "supabase/drafts/replay-schedule-encounter-evaluation-worker.sql"
+      - "supabase/drafts/encounter-evaluation-evidence-gates.sql"
+      - "supabase/drafts/encounter-session-manual-end.sql"
+      - "supabase/drafts/current-state-structure.json"
+      - "scripts/build-disposable-schema-fixture.mjs"
+      - ".github/workflows/supabase-local-migration-replay.yml"
   push:
     branches:
       - security/chat-deletion-lifecycle-reconciliation
@@ -131,7 +148,7 @@ jobs:
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
-      - name: Load synthetic current-state schema and replay deletion security drafts
+      - name: Load synthetic current-state schema
         shell: bash
         run: |
           set -euo pipefail
@@ -142,19 +159,148 @@ jobs:
           # profiles/characters foundation is unavailable. Do not replay old migrations.
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-current-state-schema-fixture.sql
-          # Exercise the CLI-generated incremental migration itself, not only
-          # its source drafts. The script rolls back all DDL and synthetic rows.
+
+      - name: Replay account deletion release migration
+        shell: bash
+        run: |
+          set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-account-deletion-release-migration.sql
 
-          # Encounter/chat structural audits and character/account DML all run inside
-          # disposable transactions and are rolled back.
+      - name: Replay local security and character deletion drafts
+        shell: bash
+        run: |
+          set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-local-security-drafts.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-and-test-character-deletion.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-deletion-draft-rollback.sql
 
+      - name: Replay deletion concurrency
+        shell: bash
+        run: |
+          set -euo pipefail
           # True independent-connection races use only this disposable local database.
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-deletion-concurrency-setup.sql
           DATABASE_URL="$DATABASE_URL" bash scripts/test-deletion-concurrency.sh
+
+      - name: Apply formal Encounter schedule pipeline migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Encounter schedule SQL and its smoke test run only in this disposable local DB.
+          # This never links to or authenticates against the hosted Supabase project.
+          LOG_FILE="$RUNNER_TEMP/encounter-schedule-replay.log"
+          if ! psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117095320_encounter_schedule_pipeline.sql >"$LOG_FILE" 2>&1; then
+            cat "$LOG_FILE"
+            exit 1
+          fi
+          cat "$LOG_FILE"
+
+      - name: Apply formal Encounter evidence and settlement migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117095344_encounter_evaluation_evidence_gates.sql
+
+      - name: Apply formal Encounter relationship greeting migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117095358_encounter_relationship_greeting_pools.sql
+
+      - name: Apply formal Encounter manual-end migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117095408_encounter_session_manual_end.sql
+
+      - name: Replay Encounter evaluation queue and settlement smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Exercises only the disposable current-state fixture; no OpenRouter or Hosted Supabase access.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-session-evaluation-worker.sql
+
+      - name: Apply formal Encounter evaluation scheduler migration (disabled)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Only creates the disabled-by-default function; no cron job is enabled.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117095414_schedule_encounter_evaluation_worker.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-schedule-encounter-evaluation-worker.sql
+
+      - name: Apply Encounter weather decision RLS hardening
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117095918_encounter_schedule_weather_decisions_rls.sql
+
+      - name: Apply generalized Encounter dynamic scene catalog migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117120000_encounter_dynamic_scene_catalog.sql
+
+      - name: Apply schedule batch completion cooldown and partial-publish migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117130000_encounter_schedule_batch_semantics.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261117140000_encounter_public_character_schedule_eligibility.sql
+
+      - name: Apply sparse Encounter schedule windows migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261118000400_encounter_schedules_allow_unavailable_windows.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261118000500_resolve_only_published_encounter_scenes.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261118000600_encounter_schedule_scene_descriptions.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261118000700_encounter_hourly_schedule_options.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-sparse-schedule-windows.sql
+
+      - name: Replay hourly weighted Encounter schedules and weather fallback
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Runs only after natural-location and hourly-option migrations on the disposable local database.
+          LOG_FILE="$RUNNER_TEMP/encounter-schedule-replay.log"
+          if ! psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-schedule-pipeline.sql >"$LOG_FILE" 2>&1; then
+            cat "$LOG_FILE"
+            exit 1
+          fi
+          cat "$LOG_FILE"
+
+      - name: Replay public character eligibility and NSFW viewer gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-scene-catalog.sql
+
+      - name: Replay schedule batch completion cooldown and partial-publish contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-schedule-batch-semantics.sql
+
+      - name: Replay dynamic scene catalog and legacy schedule filters
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Disposable local database only; all synthetic rows are rolled back.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-scene-catalog.sql
+
+      - name: Replay Encounter relationship greeting selection smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-relationship-greeting-pools.sql
+
+      - name: Upload Encounter SQL replay diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: encounter-sql-replay-${{ github.run_id }}
+          path: ${{ runner.temp }}/encounter-schedule-replay.log
+          if-no-files-found: ignore
 
       - name: Stop and discard local database
         if: always()

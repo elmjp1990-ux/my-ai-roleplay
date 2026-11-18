@@ -15,6 +15,9 @@ export type OpenRouterCompletionResult = {
   provider: string;
   model: string;
   usage: Record<string, unknown>;
+  responseContentType: string;
+  responseBodyLength: number;
+  responseParsed: boolean;
 };
 
 type RequestOptions = {
@@ -54,7 +57,22 @@ export async function requestOpenRouterChatCompletion(options: RequestOptions): 
       body: JSON.stringify(body),
       signal: controller.signal,
     });
-    let payload = asRow(await response.json().catch(() => ({ error: { code: "invalid_provider_response" } })));
+    const responseContentType = response.headers.get("content-type") || "";
+    const responseText = await response.text();
+    let payload: Record<string, unknown>;
+    let responseParsed = true;
+    try {
+      payload = asRow(JSON.parse(responseText));
+    } catch {
+      responseParsed = false;
+      // Preserve the upstream HTTP status. The previous fallback always emitted
+      // invalid_provider_response and hid useful 429/5xx diagnostics.
+      payload = {
+        error: {
+          code: response.ok ? "invalid_provider_response" : "http_" + response.status,
+        },
+      };
+    }
     payload.status = response.status;
     if (!response.ok && payload.error == null) payload.error = { code: "http_" + response.status };
     return {
@@ -64,6 +82,9 @@ export async function requestOpenRouterChatCompletion(options: RequestOptions): 
       provider: asText(payload.provider),
       model: asText(payload.model) || model,
       usage: asRow(payload.usage),
+      responseContentType,
+      responseBodyLength: responseText.length,
+      responseParsed,
     };
   } finally {
     clearTimeout(timeout);

@@ -37,9 +37,105 @@ for (const contract of [
   assert.ok(cityMap.includes(contract), 'Extracted city-map behavior is missing: ' + contract);
 }
 
-console.log('City map module extraction and dependency contract passed.');
+const sceneLoaderDeclaration = cityMap.indexOf('const loadCityDynamicScenes=async()=>');
+const weatherLoaderDeclaration = cityMap.indexOf('const loadCityWeather=async()=>');
+const sceneLoaderInvocation = cityMap.indexOf('void loadCityDynamicScenes();');
+const weatherLoaderInvocation = cityMap.indexOf('void loadCityWeather();');
+assert.ok(sceneLoaderDeclaration >= 0 && sceneLoaderInvocation > sceneLoaderDeclaration,
+  'Dynamic scene loader must be initialized before invocation.');
+assert.ok(weatherLoaderDeclaration >= 0 && weatherLoaderInvocation > weatherLoaderDeclaration,
+  'Weather loader must be initialized before invocation.');
+
+assert.match(cityMap, /get_encounter_scene_catalog/);
+assert.match(cityMap, /refreshScenes\(\)/);
+assert.match(cityMap, /refreshSchedules\(\)/);
+assert.match(cityMap, /activeScheduleRefresh=async\(\)=>/);
+assert.match(cityMap, /await loadCityPeoplePage\(activePlace\)/);
+assert.match(cityMap, /activeVenueRefresh=renderVenue/);
+assert.match(cityMap, /const latestScene=cityVenueScenes\[place\]\|\|scene/);
+assert.match(cityMap, /poyozz-city-map-scenes-v2-v1/);
+
+assert.ok(cityMap.indexOf("void loadCityDynamicScenes();") > cityMap.indexOf("const cityPlaceAliases"),
+  "scene catalog loading must start after place aliases and names are initialized");
+
+assert.match(cityMap, /get_encounter_city_weather/);
+assert.match(cityMap, /stage.classList.toggle\('is-raining',weather.is_raining===true\)/);
+assert.match(cityMap, /MAX_DYNAMIC_SCENE_MARKERS=3/);
+assert.match(cityMap, /Math\.hypot\(point\.x-x,point\.y-y\)<120/);
+assert.match(cityMap, /data-dynamic-scene/);
+assert.match(cityMap, /cityPlaceAliases\[key\]=\[key\]/);
+assert.match(cityMap, /row\.event_label/);
+assert.match(cityMap, /row\.is_dynamic!==true/);
+assert.match(cityMap, /builtInMarker\.setAttribute\('aria-label',name\)/);
+assert.match(cityMap, /glyph\.replaceWith\(textGlyph\)/);
+
+assert.match(cityMap, /cityPlaceNames\[key\]=name;\s*cityVenueScenes\[key\]=scene;/);
+assert.match(cityMap, /if\(row\.is_dynamic!==true\)[\s\S]*?continue;/);
+assert.match(cityMap, /latestScene\.eventTitle,latestScene\.eventDescription/);
+
+assert.match(html, /city-map-stage\.is-raining \.city-map-world/);
+assert.match(html, /poyozz-city-rain/);
+assert.match(html, /prefers-reduced-motion:reduce\)\{\.city-map-stage\.is-raining:after/);
+assert.match(html, /city-map-stage\.is-raining\.low-performance:after/);
+
+console.log('City map module extraction, dynamic scene registry, cached weather, CSS rain fallback, and dependency contract passed.');
 
 assert.match(html,/get_encounter_character_schedules/);
 assert.doesNotMatch(cityMap,/hydrateCitySchedule/);
 assert.ok(cityMap.includes("const schedules=await loadCityCharacterSchedules(items.map(person=>person.id))"));
 assert.ok(!cityMap.includes("Promise.all(items.map(hydrateCitySchedule)"));
+
+assert.match(cityMap, /const targetCount=pager\.people\.length\+10/);
+assert.match(cityMap, /scannedPages<5/);
+assert.match(cityMap, /while\(pager\.hasMore&&pager\.people\.length<targetCount/);
+assert.match(html, /button.dataset\.aiEnabled='false'/);
+assert.match(html, /button.dataset\.aiEnabled=blocked\?'false':'true'/);
+assert.match(html, /button\.disabled=blocked/);
+assert.match(html, /processing_character_count/);
+assert.match(html, /failed_character_count/);
+assert.match(html, /needs_reconciliation_count/);
+assert.match(html, /button.dataset\.aiEnabled!=='true'\|\|button\.disabled/);
+assert.match(html, /AI 生成角色行程與場景/);
+assert.doesNotMatch(html, /if\(error\|\|data\?\.enabled!==true\)\{section\.remove\(\);return;\}/);
+
+assert.match(html, /if\(!client\)throw new Error\('城市角色行程服務尚未連線。'\)/);
+assert.match(html, /if\(error\)throw new Error\('讀取角色行程失敗：'\+error\.message\)/);
+assert.doesNotMatch(html, /城市角色排程批次載入失敗[\s\S]{0,180}return schedules/);
+assert.match(cityMap, /const hasAnySchedule=\(pager\?\.candidates\|\|\[\]\)\.some\(person=>String\(person\.encounterSchedules\|\|''\)\.trim\(\)\)/);
+assert.match(cityMap, /尚未建立角色行程；可到測試工具手動生成。/);
+assert.match(cityMap, /目前沒有角色在此地點與台灣時間活動。/);
+assert.match(cityMap, /角色行程載入失敗，請重試。/);
+assert.match(cityMap, /data-action="city-people-retry"/);
+assert.match(cityMap, /const retryButton=event\.target\.closest\('\[data-action="city-people-retry"\]'\)/);
+assert.match(cityMap, /pager\.error=null;void loadCityPeoplePage\(locationModal\.dataset\.place\)/);
+
+const scheduleOrganizer = fs.readFileSync('supabase/functions/encounter-schedule-organizer/index.ts', 'utf8');
+assert.match(scheduleOrganizer, /ENCOUNTER_SCHEDULE_TEST_MODE["']\) !== ["']true/);
+assert.match(scheduleOrganizer, /test_mode: false/);
+assert.match(scheduleOrganizer, /test_mode: true/);
+assert.match(scheduleOrganizer, /auth\.getUser\(\)/);
+assert.doesNotMatch(scheduleOrganizer, /ENCOUNTER_SCHEDULE_TEST_USER_IDS/);
+assert.doesNotMatch(scheduleOrganizer, /account_is_active/);
+assert.match(scheduleOrganizer, /manual_schedule_trigger_disabled/);
+assert.match(scheduleOrganizer, /blocked_unresolved_failures/);
+assert.match(scheduleOrganizer, /processing_character_count/);
+assert.match(scheduleOrganizer, /failed_character_count/);
+assert.match(scheduleOrganizer, /needs_reconciliation_count/);
+assert.match(scheduleOrganizer, /Promise\.all\(sources\.map\(async \(source\)/);
+assert.match(scheduleOrganizer, /characterPrompt = buildEncounterScheduleBatchMessages\(\[source\]\)/);
+assert.doesNotMatch(scheduleOrganizer, /buildEncounterScheduleBatchMessages\(\[source\], sceneCatalog\)/,
+  'the AI prompt must not receive the scene catalog; the parser receives it only after generation');
+assert.match(scheduleOrganizer, /parseEncounterScheduleBatchOutput\([\s\S]*?\[source\],[\s\S]*?sceneCatalog/);
+assert.match(scheduleOrganizer, /timeoutMs: 42_000/);
+assert.match(scheduleOrganizer, /_poyozz_diagnostics/);
+assert.match(scheduleOrganizer, /character_id: characterId/);
+assert.match(scheduleOrganizer, /sourceId: result.sourceId, providerResponse: result.providerResponse/);
+const openRouterHelper = fs.readFileSync('supabase/functions/_shared/openrouter-chat-completions.ts', 'utf8');
+assert.match(openRouterHelper, /const responseText = await response\.text\(\)/);
+assert.match(openRouterHelper, /responseContentType/);
+assert.match(openRouterHelper, /responseParsed/);
+assert.match(openRouterHelper, /http_\" \+ response\.status/);
+assert.match(html, /if\(!error&&data\?\.test_mode!==true\)\s*\{\s*section\.hidden=true/);
+assert.match(html, /若有失敗或待核對結果，會暫停新的生成以避免重複成本/);
+assert.doesNotMatch(html, /測試環境登入帳號皆可使用/);
+assert.match(html, /正式環境不提供此按鈕/);

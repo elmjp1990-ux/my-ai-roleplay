@@ -1,4 +1,4 @@
-/* POYOZZ city-map presentation module.
+/* City map module.
  * App-owned state and actions are injected explicitly; this module does not own
  * persistence, authentication, chat, encounter, or wallet business rules.
  */
@@ -6,15 +6,50 @@
   'use strict';
 
   let activeMapCleanup = null;
+  let activeSceneRefresh = null;
+  let activeScheduleRefresh = null;
+  let activeVenueRefresh = null;
+  const CITY_MAP_WEATHER_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+  const CITY_MAP_SCENES_CACHE_TTL_MS = 30 * 60 * 1000;
+  const cityMapMemoryCache = new Map();
+  const readCityMapCache = (key, ttlMs) => {
+    const now = Date.now();
+    let entry = cityMapMemoryCache.get(key) || null;
+    if (!entry) {
+      try {
+        const raw = sessionStorage.getItem('poyozz-city-map-' + key + '-v1');
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (parsed && Number.isFinite(parsed.cachedAt) && Object.prototype.hasOwnProperty.call(parsed, 'data')) {
+          entry = parsed;
+          cityMapMemoryCache.set(key, entry);
+        }
+      } catch { /* Storage can be unavailable in private or restricted contexts. */ }
+    }
+    return entry ? { data: entry.data, fresh: now - entry.cachedAt < ttlMs } : null;
+  };
+  const writeCityMapCache = (key, data) => {
+    const entry = { cachedAt: Date.now(), data };
+    cityMapMemoryCache.set(key, entry);
+    try { sessionStorage.setItem('poyozz-city-map-' + key + '-v1', JSON.stringify(entry)); } catch { /* In-memory cache remains available. */ }
+  };
   const destroyActiveMap = () => {
     if (!activeMapCleanup) return;
     const cleanup = activeMapCleanup;
     activeMapCleanup = null;
+    activeSceneRefresh = null;
+    activeScheduleRefresh = null;
+    activeVenueRefresh = null;
     cleanup();
   };
 
   global.PoyozzCityMap = Object.freeze({
     destroy: destroyActiveMap,
+    refreshScenes() {
+      return activeSceneRefresh ? activeSceneRefresh() : Promise.resolve();
+    },
+    refreshSchedules() {
+      return activeScheduleRefresh ? activeScheduleRefresh() : Promise.resolve();
+    },
     render(dependencies) {
       destroyActiveMap();
       const {
@@ -24,12 +59,9 @@
         setEncounterLifecycleState, saveChatSessionSafely, createEncounterSession, loadCityCharacterPage, loadCityCharacterSchedules
       } = dependencies;
 
-  // A previous city-map render moves its dialog to <body>. Remove stale dialogs first;
-  // otherwise duplicate IDs make later landmark clicks update an old, detached-from-view panel.
   document.querySelectorAll('#cityMapPeople').forEach(modal=>modal.remove());
   document.body.classList.remove('city-location-active');
   document.body.classList.add('city-map-mode');
-  // Keep the early boot cover until the time-appropriate map asset is ready.
   const view=$('view');
   view.innerHTML=`
     <section class="city-map-stage" id="cityMapStage" aria-label="POYOZZ 城市地圖">
@@ -124,8 +156,6 @@
   stage.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2&&start?.kind==='pinch'){const a=[...pointers.values()];const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);scale=start.scale*d/Math.max(1,start.distance);clamp();moved=true;}else if(pointers.size===1&&start&&!start.kind){const dx=e.clientX-start.x,dy=e.clientY-start.y;if(Math.abs(dx)+Math.abs(dy)>5)moved=true;tx=start.tx+dx;ty=start.ty+dy;clamp();}});
   const endPointer=e=>{pointers.delete(e.pointerId);if(pointers.size===0){if(start&&!moved&&Date.now()-start.time<280){const now=Date.now(),dx=e.clientX-lastTapX,dy=e.clientY-lastTapY;if(now-lastTap<320&&Math.hypot(dx,dy)<24){document.body.classList.toggle('city-map-mode-immersive');lastTap=0;}else{lastTap=now;lastTapX=e.clientX;lastTapY=e.clientY;}}start=null;}else if(pointers.size===1){const p=[...pointers.values()][0];start={x:p.x,y:p.y,tx,ty,time:Date.now()};}};
   stage.addEventListener('pointerup',endPointer);stage.addEventListener('pointercancel',endPointer);stage.addEventListener('dblclick',e=>e.preventDefault());stage.addEventListener('contextmenu',e=>e.preventDefault());
-  // 2025 Taipei solar-time reference profile. Calculate the 2025 reference day locally;
-  // no sunrise/sunset API or daily network request is needed.
   const taipeiSunTimes2025=(month,day)=>{
     const date=new Date(Date.UTC(2025,month-1,day));
     const n=Math.floor((date-Date.UTC(2025,0,0))/86400000);
@@ -188,11 +218,9 @@
     document.body.classList.remove('city-location-active','city-map-mode','city-map-mode-immersive');
   };
 
-  // Keep the location dialog outside the transformed map stage to isolate it from map gestures.
   locationModal=$('cityMapPeople');
   if(locationModal && locationModal.parentElement!==document.body) document.body.appendChild(locationModal);
   const cityPlaceNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園'};
-  // These are authored scene descriptions, not live opening hours, character presence, or dynamically generated events.
   const cityVenueScenes={
     airport:{icon:'✈️',heading:'城市的起點與交會處',description:'航班資訊在大廳螢幕上流動，旅人拖著行李匆匆經過。候機座位、接機大廳與深夜航班，總有新的相遇可能。',eventLabel:'場景亮點',eventTitle:'抵達大廳的偶遇',eventDescription:'適合安排接機、送別、轉機途中或旅程開始前的故事。'},
     commercial:{icon:'🏢',heading:'玻璃帷幕下的繁忙日常',description:'電梯穿梭於不同樓層，會議室、辦公座位與窗邊休息區構成城市工作的節奏。白天忙碌，傍晚後則逐漸安靜。',eventLabel:'場景亮點',eventTitle:'下班後的窗邊時光',eventDescription:'適合商業談判、同事互動、秘密會面或忙碌一天後的短暫休息。'},
@@ -203,6 +231,146 @@
     bookstore:{icon:'📚',heading:'在書頁之間慢下腳步',description:'木質書架與紙張氣味讓時間放慢。新書展示區、靠窗閱讀座位與安靜的書架轉角，各自藏著不同的相遇方式。',eventLabel:'場景亮點',eventTitle:'同一本書的選擇',eventDescription:'適合交換閱讀心得、尋找某本書、安靜陪伴或從共同興趣開始的故事。'},
     cafe:{icon:'☕',heading:'在城市裡，找個地方歇歇腳',description:'咖啡香從吧台飄向窗邊座位，甜點櫃裡擺著當季蛋糕。這裡適合短暫休息、工作、約會，也適合和某個人慢慢聊起近況。',eventLabel:'場景亮點',eventTitle:'今日甜點的話題',eventDescription:'甜點櫃可作為聊天與約會的情境；實際品項、庫存與活動尚未連接動態資料。'},
     park:{icon:'🌳',heading:'城市裡的一片綠意',description:'步道穿過樹蔭與草地，長椅、噴水池和開闊的天空讓人暫時遠離喧鬧。清晨散步、午後閒聊或傍晚慢跑，都有不同的城市風景。',eventLabel:'場景亮點',eventTitle:'樹蔭下的片刻寧靜',eventDescription:'適合散步、慢跑、野餐、偶遇或在戶外談一場不急著結束的對話。'}
+  };
+  const CITY_MAP_SVG_NS='http://www.w3.org/2000/svg';
+  const MAX_DYNAMIC_SCENE_MARKERS=3;
+  const renderCityDynamicScenes=(rows)=>{
+    const svg=$('cityBuildingLayer');
+    if(!svg)return;
+    svg.querySelector('#cityDynamicSceneMarkers')?.remove();
+    const layer=document.createElementNS(CITY_MAP_SVG_NS,'g');
+    layer.setAttribute('id','cityDynamicSceneMarkers');
+    const existing=[];
+    svg.querySelectorAll('.city-place-marker[data-place]').forEach(marker=>{
+      const match=String(marker.getAttribute('transform')||'').match(/translate\(\s*(-?[\d.]+)[ ,]+(-?[\d.]+)\s*\)/);
+      if(match)existing.push({x:Number(match[1]),y:Number(match[2])});
+    });
+    let added=0;
+    for(const row of (Array.isArray(rows)?rows:[])){
+      const key=String(row?.location_key||'').trim();
+      const name=String(row?.display_name||'').trim();
+      if(!/^[a-z0-9-]{1,48}$/.test(key)||!name)continue;
+      const scene={
+        icon:String(row.icon||'📍'),heading:String(row.heading||name),
+        description:String(row.description||'這個場景由多位公開角色的共同行程建立。'),
+        eventLabel:String(row.event_label||'最新消息'),
+        eventTitle:String(row.event_title||'場景消息已更新'),
+        eventDescription:String(row.event_description||'這裡有符合場景定位的日常活動與消息。')
+      };
+      if(row.is_dynamic!==true){
+        if(Object.prototype.hasOwnProperty.call(cityPlaceNames,key)){
+          cityPlaceNames[key]=name;
+          cityVenueScenes[key]=scene;
+          const builtInMarker=Array.from(svg.querySelectorAll('.city-place-marker[data-place]'))
+            .find(marker=>marker.getAttribute('data-place')===key);
+          if(builtInMarker){
+            builtInMarker.setAttribute('aria-label',name);
+            const glyph=builtInMarker.querySelector('.city-marker-glyph');
+            if(glyph){
+              const textGlyph=document.createElementNS(CITY_MAP_SVG_NS,'text');
+              textGlyph.setAttribute('class','city-marker-glyph city-marker-emoji');
+              textGlyph.setAttribute('x','0');textGlyph.setAttribute('y','1');
+              textGlyph.setAttribute('text-anchor','middle');textGlyph.setAttribute('dominant-baseline','central');
+              textGlyph.setAttribute('font-size','18');textGlyph.setAttribute('font-family','system-ui, sans-serif');
+              textGlyph.setAttribute('fill','#fff');textGlyph.setAttribute('pointer-events','none');
+              textGlyph.textContent=scene.icon;
+              glyph.replaceWith(textGlyph);
+            }
+          }
+        }
+        continue;
+      }
+      if(added>=MAX_DYNAMIC_SCENE_MARKERS)continue;
+      const x=Number(row?.marker_x),y=Number(row?.marker_y);
+      if(!Number.isFinite(x)||!Number.isFinite(y)||x<40||x>1622||y<40||y>892)continue;
+      if(existing.some(point=>Math.hypot(point.x-x,point.y-y)<120))continue;
+      cityPlaceNames[key]=name;
+      cityVenueScenes[key]=scene;
+      cityPlaceAliases[key]=[key];
+      const marker=document.createElementNS(CITY_MAP_SVG_NS,'g');
+      marker.setAttribute('class','city-place-marker is-available is-dynamic');
+      marker.setAttribute('data-action','city-landmark');
+      marker.setAttribute('data-place',key);
+      marker.setAttribute('data-dynamic-scene','true');
+      marker.setAttribute('transform','translate('+x+' '+y+')');
+      marker.setAttribute('tabindex','0');
+      marker.setAttribute('role','button');
+      marker.setAttribute('aria-label',name);
+      const hit=document.createElementNS(CITY_MAP_SVG_NS,'circle');
+      hit.setAttribute('class','city-marker-hit-area');hit.setAttribute('r','38');
+      hit.setAttribute('fill','transparent');hit.setAttribute('pointer-events','all');
+      const glass=document.createElementNS(CITY_MAP_SVG_NS,'circle');
+      glass.setAttribute('class','city-marker-glass');glass.setAttribute('r','23');
+      const glyph=document.createElementNS(CITY_MAP_SVG_NS,'text');
+      glyph.setAttribute('class','city-marker-glyph city-marker-emoji');
+      glyph.setAttribute('x','0');glyph.setAttribute('y','1');
+      glyph.setAttribute('text-anchor','middle');glyph.setAttribute('dominant-baseline','central');
+      glyph.setAttribute('font-size','18');glyph.setAttribute('font-family','system-ui, sans-serif');
+      glyph.setAttribute('fill','#fff');glyph.setAttribute('pointer-events','none');
+      glyph.textContent=scene.icon;
+      marker.append(hit,glass,glyph);
+      layer.appendChild(marker);
+      existing.push({x,y});added++;
+    }
+    if(added)svg.appendChild(layer);
+  };
+  const loadCityDynamicScenes=async()=>{
+    const client=window.mySupabase;
+    if(!client)return;
+    const cached=readCityMapCache('scenes-v2',CITY_MAP_SCENES_CACHE_TTL_MS);
+    if(cached)renderCityDynamicScenes(cached.data);
+    if(cached?.fresh)return;
+    try{
+      const {data,error}=await client.rpc('get_encounter_scene_catalog');
+      if(error)throw error;
+      const rows=Array.isArray(data)?data:[];
+      writeCityMapCache('scenes-v2',rows);
+      renderCityDynamicScenes(rows);
+    }catch(error){
+      if(!cached)console.warn('城市場景目錄載入失敗：',error?.message||error);
+    }
+  };
+  activeSceneRefresh=async()=>{
+    cityMapMemoryCache.delete('scenes-v2');
+    try{sessionStorage.removeItem('poyozz-city-map-scenes-v2-v1');}catch{}
+    await loadCityDynamicScenes();
+    if(locationModal&&!locationModal.hidden)activeVenueRefresh?.();
+  };
+  const applyCityWeather=weather=>{
+    const stage=$('cityMapStage');
+    if(!stage)return;
+    const weatherLabel=$('cityMapWeather');
+    const temperatureLabel=$('cityMapTemp');
+    if(!weather){
+      if(weatherLabel)weatherLabel.textContent='多雲';
+      if(temperatureLabel)temperatureLabel.textContent='24.0°C';
+      stage.classList.remove('is-raining');
+      return;
+    }
+    if(weatherLabel)weatherLabel.textContent=String(weather.weather_text||'多雲');
+    const temperature=Number(weather.temperature_c);
+    if(temperatureLabel)temperatureLabel.textContent=Number.isFinite(temperature)?temperature.toFixed(1)+'°C':'24.0°C';
+    stage.classList.toggle('is-raining',weather.is_raining===true);
+    const cores=Number(navigator.hardwareConcurrency||8);
+    const memory=Number(navigator.deviceMemory||8);
+    stage.classList.toggle('low-performance',cores<=4||memory<=4);
+  };
+  const loadCityWeather=async()=>{
+    const client=window.mySupabase;
+    const stage=$('cityMapStage');
+    if(!client||!stage)return;
+    const cached=readCityMapCache('weather',CITY_MAP_WEATHER_CACHE_TTL_MS);
+    if(cached)applyCityWeather(cached.data);
+    if(cached?.fresh)return;
+    try{
+      const {data,error}=await client.rpc('get_encounter_city_weather');
+      if(error)throw error;
+      const weather=Array.isArray(data)?data[0]:data;
+      if(weather)writeCityMapCache('weather',weather);
+      applyCityWeather(weather);
+    }catch(error){
+      if(!cached)console.warn('城市天氣資料載入失敗：',error?.message||error);
+    }
   };
   // Use only published characters whose own schedule data is already available to this client.
   // Never invent a character or query private schedule rows from the browser.
@@ -232,7 +400,7 @@
       if(!raw) return false;
       return raw.split(/\r?\n/).some(line=>{
         const parts=line.trim().split('|').map(value=>value.trim());
-        if(parts.length!==5) return false;
+        if(parts.length!==6) return false;
         const [day,start,end,key,activity]=parts;
         if(!aliases.includes(key)||!activity) return false;
         if(day!=='*'&&Number(day)!==clock.weekday) return false;
@@ -244,22 +412,36 @@
       const raw=String(character.encounterSchedules||'');
       const line=raw.split(/\r?\n/).find(item=>{
         const parts=item.trim().split('|').map(value=>value.trim());
-        if(parts.length!==5||!(cityPlaceAliases[place]||[place]).includes(parts[3])||!parts[4]) return false;
+        if(parts.length!==6||!(cityPlaceAliases[place]||[place]).includes(parts[3])||!parts[4]) return false;
         if(parts[0]!=='*'&&Number(parts[0])!==clock.weekday) return false;
         const from=Number(parts[1]?.slice(0,2))*60+Number(parts[1]?.slice(3)),to=Number(parts[2]?.slice(0,2))*60+Number(parts[2]?.slice(3));
         return Number.isFinite(from)&&Number.isFinite(to)&&(from<to?clock.minutes>=from&&clock.minutes<to:(clock.minutes>=from||clock.minutes<to));
       });
       const parts=String(line||'').trim().split('|').map(value=>value.trim());
-      return {...character,cityStartTime:parts[1]||'',cityEndTime:parts[2]||'',cityActivity:parts[4]||''};
+      return {...character,cityStartTime:parts[1]||'',cityEndTime:parts[2]||'',cityActivity:parts[4]||'',citySceneDescription:(()=>{try{return decodeURIComponent(parts[5]||'')}catch{return ''}})()};
     });
   };
   const cityPresenceByPlace={};
+  void loadCityDynamicScenes();
+  void loadCityWeather();
   const cityScenePageStates=new Map();
   const renderCityPeopleStrip=(place)=>{
     const pager=cityScenePageStates.get(place);
     const people=pager?.people||[];
     const strip=$('cityMapAvatarStrip');
     if(!strip)return;
+    const hasAnySchedule=(pager?.candidates||[]).some(person=>String(person.encounterSchedules||'').trim());
+    const emptyMessage=pager?.loading
+      ? '正在讀取這個場景的角色…'
+      : pager?.error
+        ? '角色行程載入失敗，請重試。'
+        : !pager?.candidates?.length&&!pager?.hasMore
+          ? '目前沒有符合資格的公開角色。'
+          : hasAnySchedule
+            ? '目前沒有角色在此地點與台灣時間活動。'
+            : !pager?.hasMore
+              ? '尚未建立角色行程；可到測試工具手動生成。'
+              : '尚未找到符合條件的角色，請載入更多。';
     strip.innerHTML=people.length
       ? people.map((person,index)=>{
           const characterName=String(person.name||'角色');
@@ -269,13 +451,15 @@
             : '<span class="city-location-avatar-fallback">'+escapeHTML(characterName.slice(0,1))+'</span>';
           return '<button type="button" class="city-location-avatar city-location-person" data-action="city-person" data-person-index="'+index+'" aria-label="查看 '+escapeHTML(characterName)+' 的角色資訊">'+portrait+'<span class="city-location-person-name">'+escapeHTML(characterName)+'</span></button>';
         }).join('')
-      : '<p class="city-location-empty">'+(pager?.loading?'正在讀取這個場景的角色…':'目前沒有角色排定在這個地點。')+'</p>';
-    if(pager?.hasMore){
+      : '<p class="city-location-empty">'+emptyMessage+'</p>';
+    if(pager?.error){
+      strip.insertAdjacentHTML('beforeend','<button type="button" class="city-location-load-more" data-action="city-people-retry">重試載入</button>');
+    }else if(pager?.hasMore){
       strip.insertAdjacentHTML('beforeend','<button type="button" class="city-location-load-more" data-action="city-people-load-more" '+(pager.loading?'disabled':'')+'>載入更多角色（每次 10 位）</button>');
     }
     $('cityMapPeopleCount').textContent=people.length
       ? people.length+' 位角色符合目前時段'+(pager?.hasMore?' · 可載入更多':'')
-      : (pager?.loading?'正在讀取…':'目前沒有符合時段的角色');
+      : (pager?.loading?'正在讀取…':pager?.error?'載入失敗':hasAnySchedule?'目前無符合時段角色':'尚無角色行程');
   };
   const loadCityPeoplePage=async(place)=>{
     const pager=cityScenePageStates.get(place);
@@ -283,15 +467,25 @@
     pager.loading=true;
     renderCityPeopleStrip(place);
     try{
-      const result=await loadCityCharacterPage(pager.offset);
-      const items=Array.isArray(result?.items)?result.items:[];
-      pager.offset+=items.length;
-      pager.hasMore=result?.hasMore===true;
-      pager.candidates=[...pager.candidates,...items];
-      const schedules=await loadCityCharacterSchedules(items.map(person=>person.id));
-      for(const person of items)person.encounterSchedules=schedules.get(person.id)||'';
-      pager.people=getCityPresence(place,pager.candidates);
-      cityPresenceByPlace[place]=pager.people;
+      // Scan up to five lightweight pages per request so an empty first page
+      // cannot hide characters whose schedules appear later in the public list.
+      const targetCount=pager.people.length+10;
+      let scannedPages=0;
+      while(pager.hasMore&&pager.people.length<targetCount&&scannedPages<5){
+        const result=await loadCityCharacterPage(pager.offset);
+        const items=Array.isArray(result?.items)?result.items:[];
+        if(items.length){
+          const schedules=await loadCityCharacterSchedules(items.map(person=>person.id));
+          for(const person of items)person.encounterSchedules=schedules.get(person.id)||'';
+        }
+        pager.offset+=items.length;
+        pager.hasMore=result?.hasMore===true;
+        pager.candidates=[...pager.candidates,...items];
+        pager.people=getCityPresence(place,pager.candidates);
+        cityPresenceByPlace[place]=pager.people;
+        scannedPages++;
+        if(items.length===0)break;
+      }
     }catch(error){
       pager.error=error;
       console.error('讀取城市角色排程失敗：',error);
@@ -301,25 +495,22 @@
       renderCityPeopleStrip(place);
     }
   };
+  activeScheduleRefresh=async()=>{
+    const activePlace=locationModal&&!locationModal.hidden?locationModal.dataset.place:null;
+    cityScenePageStates.clear();
+    Object.keys(cityPresenceByPlace).forEach(place=>delete cityPresenceByPlace[place]);
+    if(!activePlace)return;
+    const pageState={offset:0,hasMore:true,loading:false,candidates:[],people:[],error:null};
+    cityScenePageStates.set(activePlace,pageState);
+    renderCityPeopleStrip(activePlace);
+    await loadCityPeoplePage(activePlace);
+  };
   const openCityLocation=async(marker)=>{
     const place=marker?.dataset?.place;
     if(!place||!locationModal)return;
     const name=cityPlaceNames[place]||'地點';
     const scene=cityVenueScenes[place];
     if(!scene){console.error('城市地標缺少專屬場景設定：',place);toast('這個地點的場景資料尚未完成，請稍後再試。');return;}
-    const venueNotices={
-      bookstore:{label:'最新消息',items:['本週暢銷書排行已經更新。','本週六下午兩點將舉辦作家簽售會。']},
-      cafe:{label:'最新消息',items:['本日限定甜點已上架，適合搭配店內手沖咖啡。','本週末推出季節限定飲品。']},
-      park:{label:'最新消息',items:['本週末草地旁將舉辦小型手作市集。','傍晚時段適合散步，中央步道照明已開啟。']},
-      'department-store':{label:'最新消息',items:['10 樓櫃位調整中，造成不便敬請見諒。','地下美食街有多樣美食，用餐期間歡迎前往用餐。','本週末中庭將舉辦季節主題展。']},
-      airport:{label:'最新消息',items:['大廳服務櫃檯今日提供旅遊諮詢。','候機區新增安靜休息座位指引。']},
-      commercial:{label:'管理室公告',items:['如有裝潢需求，請向管理處提出申請。','各辦公室包裹請寄件人填寫好收件單位。','廁所內的公用物品請愛惜使用。']},
-      'night-bar':{label:'最新消息',items:['今晚有現場 DJ 音樂時段。','本週末吧台區安排主題音樂夜。']},
-      'live-house':{label:'最新消息',items:['本週演出時刻表已更新。','週六晚間將舉辦新團專場演出。']},
-      apartment:{label:'管委會公告',items:['公寓公共交誼區本週進行佈置更新。','公共區域請保持整潔，訪客請由住戶陪同進出。','本週六下午將舉辦住戶交換市集。']}
-    };
-    const notice=venueNotices[place]||{label:'最新消息',items:['這個場景有新的城市消息。']};
-    const eventMarkup=notice.items.slice(0,3).map(item=>'<p>📣 '+escapeHTML(item)+'</p>').join('');
     const flightMarkup=place==='airport'
       ? '<div class="city-location-news city-flight-section"><span class="city-location-event-label">今日航班</span><p class="small">模擬航班時刻表</p><table class="city-flight-table"><thead><tr><th>時間</th><th>航班</th><th>目的地</th><th>狀態</th></tr></thead><tbody><tr><td>09:20</td><td>PZ102</td><td>東京</td><td>準時</td></tr><tr><td>13:45</td><td>PZ238</td><td>首爾</td><td>登機中</td></tr><tr><td>18:10</td><td>PZ516</td><td>台北</td><td>預計抵達</td></tr></tbody></table><p class="city-flight-note">以上為虛構示意資料，非真實航班資訊。</p></div>'
       : '';
@@ -336,9 +527,18 @@
     const placeIcon=$('cityMapPlaceIcon');
     if(placeIcon)placeIcon.textContent=scene.icon;
     const renderVenue=()=>{
+      const latestScene=cityVenueScenes[place]||scene;
+      const latestNotice={
+        label:latestScene.eventLabel||'最新消息',
+        items:[latestScene.eventTitle,latestScene.eventDescription].map(value=>String(value||'').trim()).filter(Boolean).slice(0,3)
+      };
+      const latestEventMarkup=latestNotice.items.map(item=>'<p>📣 '+escapeHTML(item)+'</p>').join('');
+      if(title){title.textContent=cityPlaceNames[place]||name;title.style.display='block';title.style.visibility='visible';}
+      if(placeIcon)placeIcon.textContent=latestScene.icon;
       const target=$('cityMapPresenceList');
-      if(target)target.innerHTML='<h3 id="cityMapVenueHeading">'+escapeHTML(scene.heading)+'</h3><p id="cityMapVenueDescription">'+escapeHTML(scene.description)+'</p><div class="city-location-news"><span class="city-location-event-label">'+escapeHTML(notice.label)+'</span><div class="city-location-news-items">'+eventMarkup+'</div></div>'+flightMarkup;
+      if(target)target.innerHTML='<h3 id="cityMapVenueHeading">'+escapeHTML(latestScene.heading)+'</h3><p id="cityMapVenueDescription">'+escapeHTML(latestScene.description)+'</p><div class="city-location-news"><span class="city-location-event-label">'+escapeHTML(latestNotice.label)+'</span><div class="city-location-news-items">'+latestEventMarkup+'</div></div>'+flightMarkup;
     };
+    activeVenueRefresh=renderVenue;
     renderVenue();
     const pageState={offset:0,hasMore:true,loading:false,candidates:[],people:[],error:null};
     cityScenePageStates.set(place,pageState);
@@ -413,7 +613,6 @@
         }
       });
     }
-    // Uploaded character videos are private Storage objects, so hydrate their signed URL.
     const videoPath=String(person.avatarVideoPath||person.avatar_video_path||person.characterVideoPath||'').trim();
     const videoRaw=String(person.videoUrl||person.video_url||person.introVideoUrl||person.intro_video_url||'').trim();
     const videoUrl=/^https:\/\//i.test(videoRaw)?videoRaw:'';
@@ -452,7 +651,7 @@
       copy='<div class="city-character-copy"><h3>'+name+'｜故事模式</h3><p>正在開啟傳統角色聊天……</p></div>';
       $('cityCharacterPageLabel').textContent='故事模式';
     }else if(page===0){
-      copy='<div class="city-character-copy"><h3>'+name+'</h3><div class="city-character-meta"><span>'+gender+'</span><span>'+age+'</span></div><p><strong>當前行程</strong><br>'+timeRange+'<br>'+placeName+'</p><p><strong>心情</strong><br>'+escapeHTML(person.cityMood||person.mood||'平靜')+'</p><p><strong>現在狀態</strong><br>'+activity+'</p></div>';
+      copy='<div class="city-character-copy"><h3>'+name+'</h3><div class="city-character-meta"><span>'+gender+'</span><span>'+age+'</span></div><p><strong>當前行程</strong><br>'+timeRange+'<br>'+placeName+'</p><p><strong>心情</strong><br>'+escapeHTML(person.cityMood||person.mood||'平靜')+'</p><p><strong>現在狀態</strong><br>'+activity+'</p><p><strong>場景情境</strong><br>'+escapeHTML(person.citySceneDescription||'當下情境描述尚未提供。')+'</p></div>';
       $('cityCharacterPageLabel').textContent='角色狀態 · 01 / 02';
     }else{
       copy='<div class="city-character-copy"><h3>'+name+'｜角色介紹</h3><p>'+escapeHTML(intro)+'</p></div>';
@@ -491,6 +690,13 @@
     pageButtons.forEach(button=>button.disabled=mode!=='status');
   };
   locationModal?.addEventListener('click',async event=>{
+    const retryButton=event.target.closest('[data-action="city-people-retry"]');
+    if(retryButton){
+      event.preventDefault();event.stopPropagation();
+      const pager=cityScenePageStates.get(locationModal.dataset.place);
+      if(pager){pager.error=null;void loadCityPeoplePage(locationModal.dataset.place);}
+      return;
+    }
     const loadMoreButton=event.target.closest('[data-action="city-people-load-more"]');
     if(loadMoreButton){
       event.preventDefault();event.stopPropagation();
@@ -604,9 +810,6 @@
     fallback.textContent=image.alt?.slice(0,1)||'角';
     image.replaceWith(fallback);
   },true);
-  // Keyboard activation stays on each SVG marker. Pointer/click activation is
-  // handled once by the stage capture listener below so mobile SVG retargeting
-  // cannot swallow the synthesized click or dispatch duplicate location opens.
   stage.querySelectorAll('[data-action="city-landmark"]').forEach(marker=>{
     marker.addEventListener('keydown',event=>{
       if(event.key==='Enter'||event.key===' '){

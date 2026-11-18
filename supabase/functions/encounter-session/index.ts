@@ -1,5 +1,4 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
-import { resolveEncounterSchedule } from "../_shared/encounter-schedule.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -116,6 +115,50 @@ Deno.serve(async (request: Request) => {
     .maybeSingle();
   if (illustrationError) return json({ error: "character_illustration_lookup_failed" }, 503);
 
+  const { data: availableIllustrations } = await admin
+    .from("character_illustrations")
+    .select("id,display_name,asset_type,sort_order")
+    .eq("character_id", character.id)
+    .eq("asset_type", "gallery")
+    .order("sort_order", { ascending: true })
+    .limit(5);
+
+  const [{ data: locationBackgrounds }, { data: defaultBackgrounds }] = await Promise.all([
+    admin.from("encounter_scene_backgrounds")
+      .select("id,location_key,display_name,asset_path,sort_order")
+      .eq("location_key", locationKey)
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .limit(5),
+    admin.from("encounter_scene_backgrounds")
+      .select("id,location_key,display_name,asset_path,sort_order")
+      .eq("location_key", "*")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .limit(5),
+  ]);
+  const availableSceneBackgrounds = [
+    ...(locationBackgrounds || []),
+    ...(defaultBackgrounds || []),
+  ].filter((row, index, rows) => rows.findIndex((item) => item.id === row.id) === index).slice(0, 5)
+    .map((row) => ({
+      id: row.id,
+      locationKey: row.location_key,
+      displayName: row.display_name,
+      assetPath: row.asset_path,
+    }));
+  const illustrationChoices = (availableIllustrations || []).map((row) => ({
+    id: row.id,
+    displayName: row.display_name || "角色立繪",
+    assetType: row.asset_type,
+    sortOrder: row.sort_order,
+  }));
+  const defaultVisuals = {
+    illustrationId: illustrationChoices[0]?.id || null,
+    sceneBackgroundId: availableSceneBackgrounds[0]?.id || null,
+    sceneBackgroundPath: availableSceneBackgrounds[0]?.assetPath || "./encounter-default-scene.webp",
+  };
+
   // Encounter snapshots keep the public opening so an existing encounter can
   // still show the character's original profile after a later soft delete.
   const { data: characterStory, error: storyError } = await admin
@@ -132,7 +175,7 @@ Deno.serve(async (request: Request) => {
     : "";
 
   // All snapshot identity fields are built from the database, never the request body.
-  const snapshot = {
+  const snapshot: Record<string, unknown> = {
     id: character.id,
     name: character.name,
     title: character.title || "",
@@ -150,20 +193,52 @@ Deno.serve(async (request: Request) => {
     visibility: character.visibility,
     firstPublishedAt: character.first_published_at,
     deletedAt: character.deleted_at,
+    availableIllustrations: illustrationChoices,
+    availableSceneBackgrounds,
+    defaultVisuals,
   };
 
-  // Resolve the active schedule on the server using Taiwan local time.
-  const { data: schedules, error: scheduleError } = await admin
-    .from("character_schedules")
-    .select("id,weekday,day_type,start_time,end_time,location_key,activity,priority,is_active")
-    .eq("character_id", characterId)
-    .eq("is_active", true)
-    .eq("location_key", locationKey);
+  // Use the same database resolver as the public city map. It selects the
+  // date-specific variant and validates the character's current location once.
+  const { data: resolvedSchedule, error: scheduleError } = await admin.rpc(
+    "resolve_encounter_character_schedule",
+    {
+      p_character_id: characterId,
+      p_user_id: user.id,
+      p_location_key: locationKey,
+      p_at: new Date().toISOString(),
+    },
+  );
   if (scheduleError) return json({ error: "encounter_schedule_lookup_failed" }, 503);
-  const scheduleResolution = resolveEncounterSchedule(schedules || [], locationKey, new Date());
-  if (!scheduleResolution) return json({ error: "character_not_at_this_location_now" }, 409);
-  const { scheduleSnapshot, scheduledStartAt, scheduledEndAt } = scheduleResolution;
-
+  const scheduleRow = Array.isArray(resolvedSchedule) ? resolvedSchedule[0] : resolvedSchedule;
+  if (!scheduleRow?.schedule_id) return json({ error: "character_not_at_this_location_now" }, 409);
+  const scheduleSnapshot = {
+    id: scheduleRow.schedule_id,
+    weekday: scheduleRow.weekday,
+    day_type: scheduleRow.day_type,
+    start_time: scheduleRow.start_time,
+    end_time: scheduleRow.end_time,
+    location_key: scheduleRow.location_key,
+    activity: scheduleRow.activity,
+    priority: scheduleRow.priority,
+    source_type: scheduleRow.source_type,
+    variant_key: scheduleRow.variant_key,
+    variant_weight: scheduleRow.variant_weight,
+    encounter_greeting: scheduleRow.encounter_greeting || "",
+    is_outdoor: scheduleRow.is_outdoor === true,
+    rain_fallback_location_key: scheduleRow.rain_fallback_location_key || null,
+    rain_fallback_activity: scheduleRow.rain_fallback_activity || null,
+    rain_fallback_greeting: scheduleRow.rain_fallback_greeting || null,
+    scheduled_start_at: scheduleRow.scheduled_start_at,
+    scheduled_end_at: scheduleRow.scheduled_end_at,
+  };
+  const scheduledStartAt = scheduleRow.scheduled_start_at;
+  const scheduledEndAt = scheduleRow.scheduled_end_at;
+  // Freeze the validated location/activity context into the character snapshot so
+  // Encounter turns do not need a second lifecycle-table read.
+  snapshot.encounterSchedule = scheduleSnapshot;
+  snapshot.encounterGreeting = typeof scheduleSnapshot.encounter_greeting === "string"
+    ? scheduleSnapshot.encounter_greeting.trim() : "";
 
   const { data: session, error: insertError } = await admin.rpc(
     "create_encounter_session_with_lifecycle",

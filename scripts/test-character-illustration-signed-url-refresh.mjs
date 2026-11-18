@@ -72,12 +72,14 @@ assert.match(encounterRender, /existingSprite\.src=halfBodyImage;/);
 assert.match(encounterRender, /existingSprite\.dataset\.encounterSource=halfBodyImage;/);
 assert.match(html, /\.upload\(path,blob,\{upsert:false,contentType:blob\.type,cacheControl:'3600'\}\)/);
 
-const galleryHydrationStart = html.indexOf('async function hydrateEncounterGalleryIllustration(characterId) {');
+const galleryHydrationStart = html.indexOf('async function hydrateEncounterGalleryIllustration(');
 const galleryHydrationEnd = html.indexOf('\nasync function refreshCharacterIllustrationSignedUrl', galleryHydrationStart);
 assert.notEqual(galleryHydrationStart, -1);
 assert.ok(galleryHydrationEnd > galleryHydrationStart);
 const galleryHydration = html.slice(galleryHydrationStart, galleryHydrationEnd);
-assert.match(galleryHydration, /\.order\('sort_order',\{ascending:true\}\)\s*\.limit\(1\)/);
+assert.match(galleryHydration, /query\.order\('sort_order',\{ascending:true\}\)/);
+assert.match(galleryHydration, /query\.limit\(1\)\.maybeSingle\(\)/);
+assert.match(galleryHydration, /if\(selectedId\)query=query\.eq\('id',selectedId\)/);
 
 const refreshHandlerStart = html.indexOf("if(!window.__characterIllustrationRefreshHandlerInstalled){");
 const refreshHandlerEnd = html.indexOf("\nasync function enqueueCharacterIllustrationCleanup", refreshHandlerStart);

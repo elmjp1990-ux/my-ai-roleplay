@@ -15,7 +15,7 @@ const fileBudgets = {
   'image-compression.js': 12_000,
   'signed-url-manager.js': 8_000,
   'core-utils.js': 4_000,
-  'city-map.js': 52_000,
+  'city-map.js': 60_000,
   'followed-authors.js': 9_000,
   'list-pagination.js': 2_000,
   'notifications-screen.js': 5_000,
@@ -24,7 +24,7 @@ const fileBudgets = {
   'custom-tag-picker.js': 5_000,
   'memory-album.js': 27_000,
   'poyozz-ui.css': 40_000,
-  'encounter-scene.js': 36_000,
+  'encounter-scene.js': 40_000,
   'group-opening-presets.js': 16_000,
 };
 const expectedFiles = Object.keys(fileBudgets).sort();
