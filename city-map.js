@@ -638,7 +638,7 @@
       const records=sessions.length?sessions.map(session=>{
         const when=new Date(Number(session.startedAt)||Date.now()).toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'});
         const venue=cityPlaceNames[session.encounterPlace]||'城市相遇';
-        const lastUser=(session.messages||[]).filter(message=>message.role==='user').at(-1)?.content;
+        const lastUser=(session.messages||[]).filter(message=>message.role==='user'&&!['[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]','（請接續目前的故事。）'].includes(String(message.content||'').trim())).at(-1)?.content;
         const summary=lastUser?'對話片段：'+String(lastUser).slice(0,90):'兩人在'+venue+'相遇，故事仍待續。';
         return '<article class="city-encounter-history-item"><strong>'+escapeHTML(when)+' · '+escapeHTML(venue)+'</strong><p>'+escapeHTML(summary)+'</p></article>';
       }).join(''):'<p>目前還沒有已保存的相遇紀錄。完成「與他相遇」對話後，紀錄會顯示在這裡。</p>';
