@@ -335,8 +335,8 @@ GRANT EXECUTE ON FUNCTION public.get_encounter_character_schedules_with_scene(uu
 DO $source_version$
 DECLARE
   v_definition text;
-  v_old text := 'poyozz-encounter-schedule-v3-relationship-greetings-2026-11-17';
-  v_new text := 'poyozz-encounter-schedule-v4-natural-locations-scene-descriptions-2026-11-18';
+  v_old text := 'poyozz-encounter-schedule-v4-scene-catalog-2026-11-17';
+  v_new text := 'poyozz-encounter-schedule-v5-natural-locations-scene-descriptions-2026-11-18';
   v_count integer;
 BEGIN
   SELECT pg_catalog.pg_get_functiondef(
