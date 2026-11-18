@@ -84,7 +84,7 @@ type ScheduleSlot = {
   rain_fallback_location_key: string | null;
   rain_fallback_activity: string | null;
   rain_fallback_greeting: string | null;
-  encounter_greeting: string;
+  encounter_greeting: string | null;
 };
 type ScheduleVariant = {
   variant_key: "primary" | "alternative";
@@ -211,125 +211,19 @@ function intervalsOverlap(a: { start: number; end: number }, b: { start: number;
   return false;
 }
 
-function validateSlot(value: unknown, errors: string[], label: string): ScheduleSlot | null {
-  const keys = [
-    "start_time", "end_time", "location", "activity", "scene_description", "is_outdoor",
-    "rain_fallback_location", "rain_fallback_activity", "rain_fallback_greeting", "encounter_greeting",
-  ];
-  if (!hasExactKeys(value, keys)) {
-    errors.push(label + "_slot_keys_invalid");
-    return null;
-  }
-  const start = parseHour(value.start_time);
-  const end = parseHour(value.end_time);
-  const locationDescription = text(value.location);
-  const location = normalizeEncounterSceneKey(locationDescription);
-  const activity = text(value.activity);
-  const sceneDescription = text(value.scene_description);
-  const greeting = text(value.encounter_greeting);
-  if (start === null || end === null || start === end || locationDescription.length > 120 || !isValidEncounterLocationLabel(locationDescription)) errors.push(label + "_slot_time_or_location_invalid");
-  if (!activity || activity.length > 200) errors.push(label + "_activity_invalid");
-  if (Array.from(sceneDescription).length < 8 || Array.from(sceneDescription).length > 500) errors.push(label + "_scene_description_invalid");
-  if (typeof value.is_outdoor !== "boolean") errors.push(label + "_outdoor_flag_invalid");
-  if (Array.from(greeting).length < 150 || Array.from(greeting).length > 300) errors.push(label + "_greeting_length_invalid");
-
-  let rainLocation: string | null = null;
-  let rainActivity: string | null = null;
-  let rainGreeting: string | null = null;
-  if (value.is_outdoor === true) {
-    rainLocation = normalizeEncounterSceneKey(value.rain_fallback_location);
-    rainActivity = text(value.rain_fallback_activity);
-    rainGreeting = text(value.rain_fallback_greeting);
-    if (!isValidEncounterLocationLabel(text(value.rain_fallback_location)) || !rainLocation || !RAIN_FALLBACK_SCENE_KEYS.has(rainLocation) || !rainActivity || rainActivity.length > 200 ||
-      Array.from(rainGreeting).length < 150 || Array.from(rainGreeting).length > 300) {
-      errors.push(label + "_rain_fallback_invalid");
-    }
-  } else if (value.rain_fallback_location !== null || value.rain_fallback_activity !== null || value.rain_fallback_greeting !== null) {
-    errors.push(label + "_unexpected_rain_fallback");
-  }
-  if (location && value.is_outdoor === true && !OUTDOOR_SCENE_KEYS.has(location)) {
-    errors.push(label + "_outdoor_location_mismatch");
-  }
-  if (location && value.is_outdoor === false && OUTDOOR_SCENE_KEYS.has(location)) {
-    errors.push(label + "_indoor_location_mismatch");
-  }
-  if (start !== null && end !== null && start !== end) {
-    const duration = durationMinutes(start, end);
-    if (duration < 60 || duration > 1440 || duration % 60 !== 0) errors.push(label + "_duration_invalid");
-  }
-  return {
-    start_time: text(value.start_time),
-    end_time: text(value.end_time),
-    location_key: location,
-    location_description: locationDescription,
-    activity,
-    scene_description: sceneDescription,
-    is_outdoor: value.is_outdoor === true,
-    rain_fallback_location_key: rainLocation,
-    rain_fallback_activity: rainActivity,
-    rain_fallback_greeting: rainGreeting,
-    encounter_greeting: greeting,
-  };
-}
-
-function validateVariant(
-  value: unknown,
-  dayType: "weekday" | "holiday",
-  expectedKey: "primary" | "alternative",
-  expectedWeight: number,
-  errors: string[],
-  label: string,
-): ScheduleVariant | null {
-  if (!hasExactKeys(value, ["variant_key", "weight", "slots"]) ||
-    value.variant_key !== expectedKey || value.weight !== expectedWeight || !Array.isArray(value.slots)) {
-    errors.push(label + "_variant_contract_invalid");
-    return null;
-  }
-  if (value.slots.length > ENCOUNTER_SCHEDULE_MAX_SLOTS_PER_VARIANT) {
-    errors.push(label + "_slot_count_invalid");
-  }
-  const slots = value.slots.slice(0, ENCOUNTER_SCHEDULE_MAX_SLOTS_PER_VARIANT)
-    .map((slot, index) => validateSlot(slot, errors, label + "_slot_" + index))
-    .filter((slot): slot is ScheduleSlot => slot !== null);
-  const orderedSlots = slots.slice().sort((a, b) => (parseHour(a.start_time) ?? 0) - (parseHour(b.start_time) ?? 0));
-  for (let i = 1; i < orderedSlots.length; i++) {
-    const previous = orderedSlots[i - 1];
-    const current = orderedSlots[i];
-    if (previous.end_time === current.start_time &&
-      previous.location_key === current.location_key &&
-      previous.location_description === current.location_description &&
-      previous.activity === current.activity &&
-      previous.scene_description === current.scene_description &&
-      previous.is_outdoor === current.is_outdoor &&      previous.rain_fallback_location_key === current.rain_fallback_location_key &&
-      previous.rain_fallback_activity === current.rain_fallback_activity) {
-      errors.push(label + "_adjacent_same_activity_slots_should_merge");
-    }
-  }
-  const intervals = slots.map((slot) => {
-    const start = parseHour(slot.start_time) ?? 0;
-    const end = parseHour(slot.end_time) ?? 0;
-    return { start, end: end <= start ? end + 1440 : end };
-  });
-  for (let i = 0; i < intervals.length; i++) {
-    for (let j = i + 1; j < intervals.length; j++) {
-      if (intervalsOverlap(intervals[i], intervals[j])) errors.push(label + "_slots_overlap");
-    }
-  }
-  return { variant_key: expectedKey, weight: expectedWeight, slots };
-}
-
 function validateHourlySchedule(
   value: unknown,
   errors: string[],
   label: string,
 ): ScheduleTimeBlock[] | null {
-  if (!Array.isArray(value) || value.length > ENCOUNTER_SCHEDULE_MAX_HOURLY_BLOCKS_PER_DAY) {
-    errors.push(label + "_hourly_blocks_invalid");
-    return null;
+  if (!Array.isArray(value) || value.length !== 24) {
+    errors.push(label + "_must_cover_24_hours");
+    if (!Array.isArray(value)) return null;
   }
+  const rawBlocks = Array.isArray(value) ? value : [];
   const blocks: ScheduleTimeBlock[] = [];
-  for (let index = 0; index < value.length; index++) {
-    const rawBlock = value[index];
+  for (let index = 0; index < rawBlocks.length; index++) {
+    const rawBlock = rawBlocks[index];
     const blockLabel = label + "_hour_" + index;
     if (!hasExactKeys(rawBlock, ["start_time", "end_time", "options"])) {
       errors.push(blockLabel + "_keys_invalid");
@@ -350,9 +244,8 @@ function validateHourlySchedule(
     for (let optionIndex = 0; optionIndex < rawBlock.options.length; optionIndex++) {
       const rawOption = rawBlock.options[optionIndex];
       if (!hasExactKeys(rawOption, [
-        "weight", "location", "activity", "scene_description", "is_outdoor",
-        "rain_fallback_location", "rain_fallback_activity", "rain_fallback_greeting",
-        "encounter_greeting",
+        "weight", "location", "activity", "is_outdoor",
+        "rain_fallback_location", "rain_fallback_activity",
       ])) {
         errors.push(blockLabel + "_option_" + optionIndex + "_keys_invalid");
         continue;
@@ -363,26 +256,54 @@ function validateHourlySchedule(
         continue;
       }
       weightTotal += Number(weight);
-      const slot = validateSlot({
-        start_time: rawBlock.start_time,
-        end_time: rawBlock.end_time,
-        location: rawOption.location,
-        activity: rawOption.activity,
-        scene_description: rawOption.scene_description,
-        is_outdoor: rawOption.is_outdoor,
-        rain_fallback_location: rawOption.rain_fallback_location,
-        rain_fallback_activity: rawOption.rain_fallback_activity,
-        rain_fallback_greeting: rawOption.rain_fallback_greeting,
-        encounter_greeting: rawOption.encounter_greeting,
-      }, errors, blockLabel + "_option_" + optionIndex);
-      if (slot) {
-        const { start_time: _startTime, end_time: _endTime, ...optionSlot } = slot;
-        options.push({
-          ...optionSlot,
-          option_key: ("option_" + (optionIndex + 1)) as ScheduleOption["option_key"],
-          weight: Number(weight),
-        });
+      const locationDescription = text(rawOption.location);
+      const locationKey = normalizeEncounterSceneKey(locationDescription);
+      const activity = text(rawOption.activity);
+      if (!isValidEncounterLocationLabel(locationDescription)) {
+        errors.push(blockLabel + "_option_" + optionIndex + "_location_invalid");
       }
+      if (Array.from(activity).length < 10 || Array.from(activity).length > 30) {
+        errors.push(blockLabel + "_option_" + optionIndex + "_activity_length_invalid");
+      }
+      if (typeof rawOption.is_outdoor !== "boolean") {
+        errors.push(blockLabel + "_option_" + optionIndex + "_outdoor_flag_invalid");
+      }
+
+      let rainLocationKey: string | null = null;
+      let rainActivity: string | null = null;
+      if (rawOption.is_outdoor === true) {
+        const rainLocationDescription = text(rawOption.rain_fallback_location);
+        rainLocationKey = normalizeEncounterSceneKey(rainLocationDescription);
+        rainActivity = text(rawOption.rain_fallback_activity);
+        if (!isValidEncounterLocationLabel(rainLocationDescription) ||
+          !rainLocationKey || !RAIN_FALLBACK_SCENE_KEYS.has(rainLocationKey) ||
+          Array.from(rainActivity).length < 10 || Array.from(rainActivity).length > 30) {
+          errors.push(blockLabel + "_option_" + optionIndex + "_rain_fallback_invalid");
+        }
+      } else if (rawOption.rain_fallback_location !== null || rawOption.rain_fallback_activity !== null) {
+        errors.push(blockLabel + "_option_" + optionIndex + "_unexpected_rain_fallback");
+      }
+      if (locationKey && rawOption.is_outdoor === true && !OUTDOOR_SCENE_KEYS.has(locationKey)) {
+        errors.push(blockLabel + "_option_" + optionIndex + "_outdoor_location_mismatch");
+      }
+      if (locationKey && rawOption.is_outdoor === false && OUTDOOR_SCENE_KEYS.has(locationKey)) {
+        errors.push(blockLabel + "_option_" + optionIndex + "_indoor_location_mismatch");
+      }
+      options.push({
+        option_key: ("option_" + (optionIndex + 1)) as ScheduleOption["option_key"],
+        weight: Number(weight),
+        location_key: locationKey,
+        location_description: locationDescription,
+        activity,
+        // Keep the legacy DB field populated from the concise activity. The model
+        // no longer generates a separate scene description or greeting paragraph.
+        scene_description: activity,
+        is_outdoor: rawOption.is_outdoor === true,
+        rain_fallback_location_key: rainLocationKey,
+        rain_fallback_activity: rainActivity,
+        rain_fallback_greeting: null,
+        encounter_greeting: null,
+      });
     }
     if (weightTotal !== 100) errors.push(blockLabel + "_option_weights_must_sum_100");
     if (options.length === rawBlock.options.length) {
@@ -393,13 +314,22 @@ function validateHourlySchedule(
       });
     }
   }
-  for (let index = 1; index < blocks.length; index++) {
-    const previousStart = parseHour(blocks[index - 1].start_time) ?? 0;
-    const currentStart = parseHour(blocks[index].start_time) ?? 0;
-    if (currentStart < previousStart) errors.push(label + "_hourly_blocks_must_be_sorted");
+  if (blocks.length === 24) {
+    for (let index = 0; index < 24; index++) {
+      const expectedStart = String(index).padStart(2, "0") + ":00";
+      const expectedEnd = String((index + 1) % 24).padStart(2, "0") + ":00";
+      if (blocks[index].start_time !== expectedStart || blocks[index].end_time !== expectedEnd) {
+        errors.push(label + "_must_be_contiguous_24_hour_day");
+        break;
+      }
+    }
+  }
+  if (blocks.filter((block) => block.options.length >= 2).length < 8) {
+    errors.push(label + "_too_few_multi_option_hours");
   }
   const ordered = blocks.slice().sort((a, b) => (parseHour(a.start_time) ?? 0) - (parseHour(b.start_time) ?? 0));
-  for (let index = 1; index < ordered.length; index++) {    const previousStart = parseHour(ordered[index - 1].start_time) ?? 0;
+  for (let index = 1; index < ordered.length; index++) {
+    const previousStart = parseHour(ordered[index - 1].start_time) ?? 0;
     const currentStart = parseHour(ordered[index].start_time) ?? 0;
     if (previousStart === currentStart || intervalsOverlap(
       { start: previousStart, end: previousStart + 60 },
@@ -407,65 +337,6 @@ function validateHourlySchedule(
     )) errors.push(label + "_hourly_blocks_overlap");
   }
   return blocks;
-}
-
-function validateRelationshipGreetingPools(
-  value: unknown,
-  errors: string[],
-  label: string,
-): EncounterRelationshipGreetingPools | null {
-  if (!hasExactKeys(value, ENCOUNTER_RELATIONSHIP_STAGES)) {
-    errors.push(label + "_relationship_greeting_stages_invalid");
-    return null;
-  }
-  const pools = {} as EncounterRelationshipGreetingPools;
-  for (const stage of ENCOUNTER_RELATIONSHIP_STAGES) {
-    const rawPool = value[stage];
-    if (!Array.isArray(rawPool) || rawPool.length < 3 || rawPool.length > 5) {
-      errors.push(label + "_" + stage + "_greeting_pool_count_invalid");
-      continue;
-    }
-    const greetings = rawPool.map((item) => text(item));
-    if (greetings.some((greeting) => Array.from(greeting).length < 150 || Array.from(greeting).length > 300)) {
-      errors.push(label + "_" + stage + "_greeting_pool_length_invalid");
-      continue;
-    }
-    if (new Set(greetings.map((greeting) => greeting.normalize("NFKC"))).size !== greetings.length) {
-      errors.push(label + "_" + stage + "_greeting_pool_duplicate");
-      continue;
-    }
-    pools[stage] = greetings;
-  }
-  return ENCOUNTER_RELATIONSHIP_STAGES.every((stage) => Array.isArray(pools[stage])) ? pools : null;
-}
-
-function validateSpecialEvent(value: unknown, errors: string[], label: string): SpecialEventSchedule | null {
-  if (!hasExactKeys(value, ["event_key", "event_name", "slots"])) {
-    errors.push(label + "_special_event_keys_invalid");
-    return null;
-  }
-  const eventKey = text(value.event_key);
-  const eventName = text(value.event_name);
-  if (!(ENCOUNTER_SPECIAL_EVENT_KEYS as readonly string[]).includes(eventKey) ||
-    Array.from(eventName).length < 1 || Array.from(eventName).length > 40 ||
-    !Array.isArray(value.slots) || value.slots.length < 1 || value.slots.length > ENCOUNTER_SCHEDULE_MAX_SLOTS_PER_VARIANT) {
-    errors.push(label + "_special_event_shape_invalid");
-    return null;
-  }
-  const variant = validateVariant(
-    { variant_key: "primary", weight: 100, slots: value.slots },
-    "holiday",
-    "primary",
-    100,
-    errors,
-    label,
-  );
-  if (!variant) return null;
-  return {
-    event_key: eventKey as SpecialEventSchedule["event_key"],
-    event_name: eventName,
-    slots: variant.slots,
-  };
 }
 
 export function buildEncounterScheduleBatchMessages(
@@ -536,15 +407,15 @@ export function buildEncounterScheduleBatchMessages(
     "目前地圖可用地點範例（只供參考，絕非白名單或限制）：" + sceneSuggestionText + "。只有角色的真實生活本來就適合時才使用；不適合就不要套用。必須依角色職業、經濟能力、個性、興趣、作息、生活圈與背景自由生成合理地點，清單以外的地點也必須照常產生。絕不可為了配合現有場景而改寫角色生活、硬塞不合理地點、拒絕生成或刪除行程。每個時段只寫一個明確地點，地點名稱最多 4 個中文字，不得用「或」、斜線、頓號等串接多個地點；一般住所寫「公寓」，富裕角色住所寫「高級公寓」，不得把高級公寓媒合到一般公寓。不得輸出 location_key、場景 ID、座標或任何系統場景分類。地點是否能對應地圖由系統自行判斷，無法媒合時仍保留原地點與行程。",
     "AI 只會看到少量現有場景的公開顯示名稱作為參考例子；不得接收場景 ID、完整合法清單、場景啟用狀態、座標或地圖顯示資格，也不得把參考例子當成可選白名單。不得產生場景 metadata、座標、圖片 URL、Storage path 或地標 ID。每個合理行程時段都要保留，即使地點目前沒有地圖場景也不可省略。地點映射、場景啟用狀態、座標與是否顯示全部由系統處理。",
     "airport 是特殊地點：只有角色本身職業／設定與航空機場有明確關聯，或作者設定有具體搭機、接送、轉機、出入境行程時才能使用。不得把機場當一般休閒、辦公或隨機偶遇地點；沒有明確理由時使用更合理的車站、商業大樓或其他場景。",
-    "行程以角色自身日常活動為準，AI 不得判斷玩家是否能相遇、地點是否適合公開相遇或地圖是否顯示。若角色正在睡覺，activity 或 scene_description 必須明確寫出熟睡、睡著、睡覺中等可辨識狀態，不可只寫休息或在家。weekday 與 holiday 各自輸出 0–24 個逐小時時段，每個時段必須恰好 60 分鐘、使用整點、不可重疊，允許自然空檔，不必覆蓋 24 小時。不可合併相鄰時段；即使連續多小時都在睡覺或工作，也要逐小時描述角色狀態的自然變化，避免 scene_description 每小時完全重複。每個時段需提供 1–3 個可選行為，每個選項的 weight 為 1–100 的整數，同一時段所有選項權重總和必須恰好 100；只有一種可能時才用單一 100%。weight 是「該時段整組地點＋活動＋情境」實際發生的相對機率，不是品質分數，也不是各地點的全日機率。請依角色職業、固定作息、經濟能力、個性、興趣、近期生活與作者設定估計真實頻率：固定工作或固定睡眠等日常應占較高權重，偶發外出、臨時活動或低頻事件應占較低權重；不可每個選項平均分配、習慣性使用 50/50，也不可為了湊滿三個選項而虛構活動。若兩個選項幾乎同樣常見才可接近平均；若其中一個只是偶爾發生，應明顯降低其權重。每個選項必須是一組完整且彼此一致的地點、活動、scene_description、雨備與招呼，抽選時整組一起切換，絕不可把 A 地點配上 B 活動。不同時段獨立抽取：各時段依權重獨立抽選，不可用全日 80/20 變體綁定整天；但安排相鄰時段時仍須考慮交通、作息與前後活動的合理連貫，避免角色無故瞬間跨城。即使地點目前無法對應地圖場景，也必須保留自然地點描述、活動、scene_description 與招呼內容；是否可相遇及是否顯示完全由系統判斷。",
+    "行程以角色自身日常活動為準，AI 不得判斷玩家是否能相遇、地點是否適合公開相遇或地圖是否顯示。weekday 與 holiday 各自必須完整輸出 24 個逐小時時段，從 00:00–01:00 到 23:00–00:00，不能有空檔、重疊或合併時段。每小時提供 1–3 個選項；每個選項只輸出 weight、location、activity、is_outdoor、rain_fallback_location、rain_fallback_activity 六個欄位。activity 與 rain_fallback_activity 各 10–30 個中文字，直接描述角色正在做的事；不需要 scene_description、招呼語或長篇敘事。若角色正在睡覺，activity 必須明確寫出熟睡、睡著、睡覺中等可辨識狀態。每個時段所有選項 weight 為 1–100 的整數且總和必須恰好 100；weight 是該時段整組地點與行為實際發生的相對機率。固定工作或固定睡眠等日常應占較高權重，偶發活動應占較低權重；不可習慣性平均分配或為了湊滿三個選項而虛構活動。只有一種合理可能時可用 100%，但每種日期至少 8 個時段必須有兩種以上合理選項，避免整天都只有單一機率。不同時段獨立抽取：各時段依權重獨立抽選，同一時段的地點與行為必須整組一起切換；相鄰時段仍須符合交通與作息邏輯。即使地點無法媒合地圖，也必須保留自然地點與行為描述，是否能相遇及是否顯示由系統判斷。",
     "weekday 與 holiday 是日曆情境，不等於角色的上班日與休假日。依台灣政府正式辦公日曆及補班日決定 day_type；AI 必須根據角色職業與作者設定，分別推演平日和假日的生活節奏，不可假設所有人週末休息。系統每天依角色、日期與時段獨立執行加權抽取，同一天同一時段結果固定，重新整理地圖不會重新抽籤；不同日期會使用不同抽取種子。機率只在同一角色、同一日期類型、同一個小時的 options 內比較，絕不可跨時段或跨平日／假日共用權重。",
-    "special_events 可選擇輸出 0–4 個條件式節日行程，只能使用 event_key: taiwan_public_holiday、lunar_new_year、valentines_day、christmas。taiwan_public_holiday 代表台灣政府正式放假日；lunar_new_year 代表農曆除夕與春節假期；valentines_day 為每年 02-14；christmas 為每年 12-25。只有角色背景、關係或職業確實適合節日生活變化時才輸出，不要為每個角色硬加節日活動；只列出角色在該節日有意義的行程時段，允許空檔；若沒有合理的節日行程，special_events 必須是空陣列。角色生日目前沒有結構化日期來源，不可自行推算或輸出 birthday.",
-    "戶外時段必須提供自然語言的雨天室內替代地點、替代活動與一段 150–300 字元的 rain_fallback_greeting；室內時段所有 rain_fallback 欄位必須為 null。是否戶外及雨備地點對應何種系統場景，由系統判斷。",
-    "所有 AI 產生的招呼語（encounter_greeting、rain_fallback_greeting、relationship_greetings）統一遵守 POYOZZ 對話格式：旁白、心理描寫與角色動作一律以單一星號包住，例如 *他抬起眼看向你，微微一笑*；角色直接說出口的一般對話直接寫文字，不加「」或『』，也不可用雙引號包住台詞。旁白與台詞可交錯呈現，但只標記旁白／動作，不要把整段招呼全部包進星號；不得使用 Markdown 粗體的雙星號。",
-    "作者行程說明只供內部規劃，輸出活動必須使用公開可見、簡短自然的描述，不得逐字複製整段說明或揭露私人情節。每個時段必須額外產生 scene_description：描述角色抵達該地點後當下的狀態、動作、環境氛圍與正在發生的情境，需融合角色個性，長度 8–500 字元；不可只把 activity 換句話說。例如 06:00–08:00 在健身房晨間訓練，情境可寫成「今天也要開始新的一天」，但應依角色個性呈現自律、懶散或興致勃勃等不同狀態；08:00–09:00 在公司與合作商會議談判，情境應呈現角色準備資料、進入會議或談判當下的神情與氛圍。每個時段也要產生一段與角色、地點、活動吻合的預生成招呼 encounter_greeting，長度 150–300 字元；不得直接揭露作者私密設定或照抄私密內容。",
-    "每個 modern_map 角色還必須額外產生 relationship_greetings：依 hostile、dislike、wary、first_meeting、acquaintance、close、intimate、special 八種關係階段，各提供 3–5 段不同的繁體中文開場招呼，預設恰好 3 段（只有角色差異確實需要時才增加到 4–5 段），每段以 150–180 字元為目標且不得少於 150、不得超過 300 字元。每段要符合角色個性，但不要寫死地點、日期或時間，因為實際場景由玩家遇見時的排程決定；同一階段內不得重複。階段語氣要有明顯差異：hostile 敵意、dislike 冷淡、wary 戒備、first_meeting 初識、acquaintance 熟悉、close 信任親近、intimate 深厚親密（不預設一定是戀愛）、special 特別且高度個人化。不可因關係階段而捏造玩家曾做過的事。",
+    "行程只分 weekday 與 holiday；節日、國定假日與補班日由系統依台灣日曆映射到相應日期類型，不要另外生成 special_events，也不可自行推算角色生日。",
+    "戶外時段必須提供雨天室內替代地點與替代行為，雨天行為也限制 10–30 個中文字；雨天替代地點必須是室內地點。室內時段 rain_fallback_location 與 rain_fallback_activity 必須為 null。是否戶外及地點對應何種系統場景，由系統判斷。",
 
-    "輸出必須是嚴格 JSON object，根欄位 characters 與 scenes。現代相容角色一律使用 placement=modern_map，即使所有地點都無法媒合也不可使用 no_matching_location；只有世界觀不相容現代地圖的角色才使用 no_matching_location，並且 variants weekday、holiday 都必須為空陣列、special_events 必須為空陣列。每個角色欄位為 character_id, placement, variants, special_events；modern_map 角色必須包含 relationship_greetings。relationship_greetings 必須且只能包含八個 stage key，每個 key 對應 3–5 段 150–300 字元的字串陣列。variants 只包含 weekday 與 holiday；各自為逐小時時段陣列（0–24 段）。每個時段物件欄位為 start_time, end_time, options；options 為 1–3 個選項，每個選項欄位為 weight, location（自然語言地點名稱）, activity, scene_description, is_outdoor, rain_fallback_location（自然語言雨備地點）, rain_fallback_activity, rain_fallback_greeting, encounter_greeting；同一時段 options 的 weight 總和必須為 100。不同時段的選項獨立抽取。special_events 維持 0–4 個 event_key, event_name, slots 物件的陣列；每個節日只列出角色當日有安排的節日時段，無合理行程時輸出空陣列。節日時段 slot 欄位為 start_time, end_time, location, activity, scene_description, is_outdoor, rain_fallback_location, rain_fallback_activity, rain_fallback_greeting, encounter_greeting。scenes 必須是空陣列，因為 AI 不得新增或修改場景資料。不可輸出額外欄位或 Markdown.",
+    "作者行程說明只供內部規劃；activity 必須使用公開可見、簡短自然的描述，不得逐字複製整段說明或揭露私密情節。",
+
+
+    "輸出必須是嚴格 JSON object，根欄位 characters 與 scenes。每個角色欄位為 character_id, placement, variants, special_events。現代相容角色使用 placement=modern_map，variants 只包含 weekday 與 holiday，各自必須恰好 24 個逐小時時段；每個時段物件欄位為 start_time, end_time, options。options 為 1–3 個選項，每個選項且只能有 weight, location, activity, is_outdoor, rain_fallback_location, rain_fallback_activity 六個欄位。同一時段 options 的 weight 總和必須為 100。special_events 一律輸出空陣列；scenes 必須是空陣列。世界觀不相容現代地圖的角色使用 placement=no_matching_location，weekday 與 holiday 都輸出空陣列。不可輸出招呼語、scene_description、關係招呼池、場景 ID、座標、額外欄位或 Markdown。",
   ].join("\n");
   return {
     messages: [
@@ -579,22 +450,17 @@ export function parseEncounterScheduleBatchOutput(
   for (const item of parsed.characters) {
     if (!isRecord(item) ||
       !["character_id", "placement", "variants"].every((key) => Object.prototype.hasOwnProperty.call(item, key)) ||
-      Object.keys(item).some((key) => !["character_id", "placement", "variants", "special_events", "relationship_greetings"].includes(key)) ||
+      Object.keys(item).some((key) => !["character_id", "placement", "variants", "special_events"].includes(key)) ||
       !isUuid(item.character_id)) {
       errors.push("character_item_invalid");
       continue;
     }
     const rawSpecialEvents = item.special_events === undefined ? [] : item.special_events;
-    if (!Array.isArray(rawSpecialEvents) || rawSpecialEvents.length > 4) {
-      errors.push("special_events_invalid");
+    if (!Array.isArray(rawSpecialEvents) || rawSpecialEvents.length !== 0) {
+      errors.push("special_events_must_be_empty");
       continue;
     }
-    const specialEvents = rawSpecialEvents.map((event, index) =>
-      validateSpecialEvent(event, errors, String(item.character_id) + "_special_event_" + index)
-    ).filter((event): event is SpecialEventSchedule => event !== null);
-    if (new Set(specialEvents.map((event) => event.event_key)).size !== specialEvents.length) {
-      errors.push(String(item.character_id) + "_special_event_duplicate");
-    }
+    const specialEvents: SpecialEventSchedule[] = [];
     const id = item.character_id;
     const source = sourceById.get(id);
     if (!source || source.visibility !== "public" || source.deleted_at != null || seen.has(id)) {
@@ -623,12 +489,6 @@ export function parseEncounterScheduleBatchOutput(
       errors.push(id + "_modern_map_placement_not_allowed");
       continue;
     }
-    const relationshipGreetings = validateRelationshipGreetingPools(
-      item.relationship_greetings,
-      errors,
-      id,
-    );
-    if (!relationshipGreetings) continue;
     if (!hasExactKeys(item.variants, ["weekday", "holiday"]) ||
       !Array.isArray(item.variants.weekday) || !Array.isArray(item.variants.holiday)) {
       errors.push(id + "_day_type_variants_invalid");
@@ -649,7 +509,7 @@ export function parseEncounterScheduleBatchOutput(
     if (weekday && holiday) {
       characters.push({
         character_id: id, placement: "modern_map", variants: { weekday, holiday },
-        special_events: specialEvents, relationship_greetings: relationshipGreetings,
+        special_events: specialEvents,
       });
     }
   }
