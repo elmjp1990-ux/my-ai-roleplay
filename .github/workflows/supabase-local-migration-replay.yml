@@ -14,12 +14,9 @@ on:
       - "supabase/drafts/encounter-relationship-greeting-pools.sql"
       - "supabase/drafts/replay-encounter-relationship-greeting-pools.sql"
       - "supabase/drafts/replay-encounter-worldview-manual-review.sql"
-      - "supabase/drafts/replay-chat-suggested-replies-editing.sql"
       - "supabase/drafts/replay-encounter-worldview-review-decisions.sql"
       - "supabase/migrations/20261119000500_encounter_schedule_worldview_review_decisions.sql"
-      - "supabase/migrations/20261119000400_chat_suggested_replies_editing.sql"
       - "index.html"
-      - "scripts/test-story-phone-and-suggestions-regression.mjs"
       - "supabase/drafts/schedule-encounter-evaluation-worker.sql"
       - "supabase/drafts/replay-schedule-encounter-evaluation-worker.sql"
       - "supabase/drafts/encounter-evaluation-evidence-gates.sql"
@@ -279,8 +276,6 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119000200_encounter_schedule_modern_setting_inference.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119000300_encounter_schedule_worldview_manual_review.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-worldview-manual-review.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119000400_chat_suggested_replies_editing.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-chat-suggested-replies-editing.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119000500_encounter_schedule_worldview_review_decisions.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-worldview-review-decisions.sql
 
