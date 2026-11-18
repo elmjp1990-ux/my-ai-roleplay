@@ -160,17 +160,16 @@ async function handleScheduleRepair(admin: any, actorUserId: string, body: Recor
 
   let promptContext;
   try {
-    promptContext = buildEncounterScheduleBatchMessages([source as EncounterScheduleSource]);
-  } catch (error) {
-    return json({ error: asText(error instanceof Error ? error.message : "schedule_repair_context_invalid") }, 409);
-  }
-
-  const { data: sceneCatalogData, error: sceneCatalogError } = await admin.rpc("get_encounter_scene_catalog");
+    const { data: sceneCatalogData, error: sceneCatalogError } = await admin.rpc("get_encounter_scene_catalog");
   const sceneCatalog = sceneCatalogError
     ? []
     : (Array.isArray(sceneCatalogData) ? sceneCatalogData : []) as EncounterSceneCatalogEntry[];
   if (sceneCatalogError) {
-    console.warn("Encounter repair scene catalog unavailable; validating natural locations:", sceneCatalogError.message);
+    console.warn("Encounter repair scene catalog unavailable; using free natural-language locations:", sceneCatalogError.message);
+  }
+  promptContext = buildEncounterScheduleBatchMessages([source as EncounterScheduleSource], sceneCatalog);
+  } catch (error) {
+    return json({ error: asText(error instanceof Error ? error.message : "schedule_repair_context_invalid") }, 409);
   }
 
   const parsed = parseEncounterScheduleBatchOutput(
@@ -621,7 +620,7 @@ Deno.serve(async (request) => {
   const generationResults = await Promise.all(sources.map(async (source) => {
     let characterPrompt;
     try {
-      characterPrompt = buildEncounterScheduleBatchMessages([source]);
+      characterPrompt = buildEncounterScheduleBatchMessages([source], sceneCatalog);
       protectedContextByCharacter[source.character_id] =
         characterPrompt.protectedContextByCharacter[source.character_id] || [];
     } catch (error) {
