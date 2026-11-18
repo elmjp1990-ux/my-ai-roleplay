@@ -39,6 +39,7 @@ const SCI_FI_PATTERN = /科幻|未來世界|未來都市|星際|太空殖民|賽
 const APOCALYPSE_PATTERN = /末日|喪屍|殭屍病毒|核戰後|廢土|災後世界|末世|post-apocalyptic|apocalypse/i;
 const FANTASY_PATTERN = /奇幻|魔法|魔法世界|精靈王國|龍族|魔物|異世界|魔王|勇者|fantasy|mythic/i;
 const ALTERNATE_PATTERN = /架空世界|架空王國|虛構王國|平行世界|異世界/i;
+const SUPERNATURAL_SPECIES_PATTERN = /吸血鬼|狼人|精靈|天使|惡魔|人魚|龍族|妖精|獸人|vampire|werewolf|elf|elves|angel|demon|mermaid|dragon/i;
 const SCENE_DISPLAY_NAMES: Record<string, string> = {
   airport: "機場", commercial: "公司", "night-bar": "酒吧",
   "live-house": "Live House", apartment: "住家", "department-store": "百貨公司",
@@ -213,7 +214,7 @@ export function classifyEncounterWorldview(source: EncounterScheduleSource): Enc
   if (scienceFiction) return { category: "science_fiction", modern_map_compatible: false, confidence: "high" };
   if (apocalypse) return { category: "post_apocalyptic", modern_map_compatible: false, confidence: "high" };
   if (modern) return {
-    category: fantasy ? "modern_fantasy" : "modern",
+    category: (fantasy || SUPERNATURAL_SPECIES_PATTERN.test(context)) ? "modern_fantasy" : "modern",
     modern_map_compatible: true,
     confidence: "high",
   };
@@ -446,7 +447,7 @@ export function buildEncounterScheduleBatchMessages(
     : "目前沒有可用的地圖場景範例";
   const system = [
     "你是 POYOZZ 的角色行程規劃器。一次為佇列提供的所有公開角色整理可驗證的城市地圖行程；不得自行省略任何角色。",
-    "必須讀取角色名稱、稱號、職業、身分、世界觀、種族、性格、興趣、標籤、作者行程說明及 existing_author_schedules。existing_author_schedules 是作者已保存的固定時段與地點，必須原樣保留並視為最高優先限制，不得改寫或覆蓋；AI 只負責推演其餘時段。作者固定行程僅作為規劃限制。若 author_schedule_brief 為空，依角色卡設定推演合理日常；若作者只提供部分時段，保留明確時段與限制，只補足其他時段，不得覆蓋作者設定。只使用輸入角色的設定與作者提供的行程方向，不可替角色創造與背景衝突的現代身分。歷史／古代角色若沒有作者明確設定現代相容或明確穿越，才使用 placement=no_matching_location；這只表示不出現在現代地圖，不能因此省略角色的行程資料。奇幻種族只要背景明確相容現代世界，就可以正常安排。",
+    "系統已先完成世界觀分類；本次送入的角色都已由系統判定為現代地圖相容。你不得重新判斷時代、世界觀或地圖資格，也不得輸出 no_matching_location。吸血鬼、狼人、精靈等種族不代表古代；依輸入角色的現代背景推演其日常。必須讀取角色名稱、稱號、職業、身分、世界觀、種族、性格、興趣、標籤、作者行程說明及 existing_author_schedules。existing_author_schedules 是作者已保存的固定時段與地點，必須原樣保留並視為最高優先限制，不得改寫或覆蓋；AI 只負責推演其餘時段。作者固定行程僅作為規劃限制。若 author_schedule_brief 為空，依角色卡設定推演合理日常；若作者只提供部分時段，保留明確時段與限制，只補足其他時段，不得覆蓋作者設定。只使用輸入角色的設定與作者提供的行程方向，不可替角色創造與背景衝突的現代身分。",
     "目前地圖可用地點範例（只供參考，絕非白名單或限制）：" + sceneSuggestionText + "。只有角色的真實生活本來就適合時才使用；不適合就不要套用。必須依角色職業、經濟能力、個性、興趣、作息、生活圈與背景自由生成合理地點，清單以外的地點也必須照常產生。絕不可為了配合現有場景而改寫角色生活、硬塞不合理地點、拒絕生成或刪除行程。每個時段只寫一個明確地點，地點名稱最多 4 個中文字，不得用「或」、斜線、頓號等串接多個地點；一般住所寫「公寓」，富裕角色住所寫「高級公寓」，不得把高級公寓媒合到一般公寓。不得輸出 location_key、場景 ID、座標或任何系統場景分類。地點是否能對應地圖由系統自行判斷，無法媒合時仍保留原地點與行程。",
     "AI 只會看到少量現有場景的公開顯示名稱作為參考例子；不得接收場景 ID、完整合法清單、場景啟用狀態、座標或地圖顯示資格，也不得把參考例子當成可選白名單。不得產生場景 metadata、座標、圖片 URL、Storage path 或地標 ID。每個合理行程時段都要保留，即使地點目前沒有地圖場景也不可省略。地點映射、場景啟用狀態、座標與是否顯示全部由系統處理。",
     "airport 是特殊地點：只有角色本身職業／設定與航空機場有明確關聯，或作者設定有具體搭機、接送、轉機、出入境行程時才能使用。不得把機場當一般休閒、辦公或隨機偶遇地點；沒有明確理由時使用更合理的車站、商業大樓或其他場景。",
@@ -458,7 +459,7 @@ export function buildEncounterScheduleBatchMessages(
     "作者行程說明只供內部規劃；activity 必須使用公開可見、簡短自然的描述，不得逐字複製整段說明或揭露私密情節。",
 
 
-    "輸出必須是嚴格 JSON object，唯一根欄位 characters。每個角色欄位為 character_id, placement, variants。現代相容角色使用 placement=modern_map，variants 只包含 weekday 與 holiday，各自必須恰好 24 個逐小時時段；每個時段物件欄位為 start_time, end_time, options。options 為 1–3 個選項，每個選項且只能有 weight, location, activity, is_outdoor, rain_fallback_location, rain_fallback_activity 六個欄位。同一時段 options 的 weight 總和必須為 100。世界觀不相容現代地圖的角色使用 placement=no_matching_location，weekday 與 holiday 都輸出空陣列。不輸出 special_events、scenes、招呼語、scene_description、關係招呼池、場景 ID、座標、額外欄位或 Markdown。",
+    "輸出必須是嚴格 JSON object，唯一根欄位 characters。每個角色欄位為 character_id, placement, variants。所有送入的角色一律使用 placement=modern_map，variants 只包含 weekday 與 holiday，各自必須恰好 24 個逐小時時段；每個時段物件欄位為 start_time, end_time, options。options 為 1–3 個選項，每個選項且只能有 weight, location, activity, is_outdoor, rain_fallback_location, rain_fallback_activity 六個欄位。同一時段 options 的 weight 總和必須為 100。不輸出 no_matching_location、special_events、scenes、招呼語、scene_description、關係招呼池、場景 ID、座標、額外欄位或 Markdown。",
   ].join("\n");
   return {
     messages: [
