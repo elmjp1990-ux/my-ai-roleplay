@@ -21,7 +21,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 const asRow = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const asText = (value: unknown): string => typeof value === "string" ? value.trim() : "";
-const ENCOUNTER_SCHEDULE_BATCH_SIZE = 2;
+const ENCOUNTER_SCHEDULE_BATCH_SIZE = 1;
 
 async function recordBatchUsage(
   admin: any,
@@ -30,6 +30,7 @@ async function recordBatchUsage(
   status: string,
   failureCode: string | null = null,
   characterId: string | null = null,
+  diagnostics: Record<string, unknown> = {},
 ) {
   const { error } = await admin.from("encounter_schedule_generation_usage").insert({
     batch_id: batchId,
@@ -44,6 +45,7 @@ async function recordBatchUsage(
         response_content_type: asText(providerResponse?.responseContentType),
         response_body_length: Number(providerResponse?.responseBodyLength || 0),
         response_json_parsed: providerResponse?.responseParsed !== false,
+        ...diagnostics,
       },
     },
     gateway_request_id: /^[A-Za-z0-9._:-]{1,128}$/.test(asText(providerResponse?.requestId)) ? providerResponse.requestId : null,
@@ -216,11 +218,11 @@ Deno.serve(async (request) => {
   const providerResponses: Array<{ sourceId: string; providerResponse: Awaited<ReturnType<typeof requestOpenRouterChatCompletion>> }> = [];
   const failedCharacterIds = new Set<string>();
   const validationErrors: string[] = [];
+  const characterDiagnosticsById = new Map<string, Record<string, unknown>>();
   let retryableProviderFailure = false;
   let ambiguousProviderFailure = false;
 
-  // One character per response keeps the database batch capped at five while
-  // preventing a single truncated multi-character JSON response from losing all results.
+  // One character per request isolates provider output and keeps the next test batch minimal.
   const generationResults = await Promise.all(sources.map(async (source) => {
     let characterPrompt;
     try {
@@ -246,18 +248,40 @@ Deno.serve(async (request) => {
           retryable: !ambiguous && result.kind === "provider_error" ? result.retryable === true : false,
           ambiguous };
       }
-      let decoded: Record<string, unknown>;
-      try { decoded = asRow(JSON.parse(providerResponse.result.text)); }
+      let decodedValue: unknown;
+      try { decodedValue = JSON.parse(providerResponse.result.text); }
       catch {
-        await recordBatchUsage(admin, batchId, providerResponse, "failed", "schedule_output_json_invalid", source.character_id);
+        await recordBatchUsage(admin, batchId, providerResponse, "failed", "schedule_output_json_invalid", source.character_id, {
+          output_shape_error: "invalid_json",
+        });
         return { sourceId: source.character_id, failureCode: "schedule_output_json_invalid", retryable: false, ambiguous: false };
       }
+      if (!decodedValue || typeof decodedValue !== "object" || Array.isArray(decodedValue)) {
+        await recordBatchUsage(admin, batchId, providerResponse, "failed", "schedule_output_root_invalid", source.character_id, {
+          output_root_type: Array.isArray(decodedValue) ? "array" : decodedValue === null ? "null" : typeof decodedValue,
+        });
+        return { sourceId: source.character_id, failureCode: "schedule_output_root_invalid", retryable: false, ambiguous: false };
+      }
+      const decoded = asRow(decodedValue);
       const characters = decoded.characters;
-      const scenes = decoded.scenes === undefined ? [] : decoded.scenes;
-      if (!Array.isArray(characters) || characters.length !== 1 || !Array.isArray(scenes) ||
-          Object.keys(decoded).some((key) => !["characters", "scenes"].includes(key))) {
-        await recordBatchUsage(admin, batchId, providerResponse, "failed", "schedule_single_character_shape_invalid", source.character_id);
-        return { sourceId: source.character_id, failureCode: "schedule_single_character_shape_invalid", retryable: false, ambiguous: false };
+      const scenes = decoded.scenes == null ? [] : decoded.scenes;
+      const rootKeys = Object.keys(decoded).sort();
+      const unknownRootKeys = rootKeys.filter((key) => !["characters", "scenes", "diagnostics"].includes(key));
+      const outputDiagnostics = {
+        output_root_keys: rootKeys.slice(0, 12),
+        output_characters_count: Array.isArray(characters) ? characters.length : null,
+        output_scenes_type: scenes === null ? "null" : Array.isArray(scenes) ? "array" : typeof scenes,
+        output_unknown_root_keys: unknownRootKeys.slice(0, 8),
+      };
+      if (!Array.isArray(characters) || characters.length !== 1 || !Array.isArray(scenes) || unknownRootKeys.length > 0) {
+        const failureCode = !Array.isArray(characters) ? "schedule_output_characters_invalid" :
+          characters.length !== 1 ? "schedule_single_character_count_invalid" :
+          !Array.isArray(scenes) ? "schedule_output_scenes_invalid" : "schedule_output_unknown_root_fields";
+        await recordBatchUsage(admin, batchId, providerResponse, "failed", failureCode, source.character_id, {
+          ...outputDiagnostics,
+          output_shape_error: failureCode,
+        });
+        return { sourceId: source.character_id, failureCode, retryable: false, ambiguous: false };
       }
       const character = asRow(characters[0]);
       if (asText(character.character_id) !== source.character_id) {
@@ -394,6 +418,10 @@ Deno.serve(async (request) => {
     if (blockedDynamicKeys.length) {
       failedCharacterIds.add(source.character_id);
       validationErrors.push(source.character_id + "_dynamic_scene_limit_or_sharing_invalid");
+      characterDiagnosticsById.set(source.character_id, {
+        validation_errors: ["dynamic_scene_limit_or_sharing_invalid"],
+        blocked_dynamic_scene_keys: blockedDynamicKeys.slice(0, 8),
+      });
       continue;
     }
 
@@ -419,7 +447,12 @@ Deno.serve(async (request) => {
     );
     if (!parsed.ok || parsed.characters.length !== 1) {
       failedCharacterIds.add(source.character_id);
-      validationErrors.push(...parsed.errors.slice(0, 20).map((error) => source.character_id + ":" + error));
+      const safeErrors = parsed.errors.slice(0, 20);
+      validationErrors.push(...safeErrors.map((error) => source.character_id + ":" + error));
+      characterDiagnosticsById.set(source.character_id, {
+        validation_errors: safeErrors,
+        validation_error_count: parsed.errors.length,
+      });
       continue;
     }
 
@@ -427,6 +460,9 @@ Deno.serve(async (request) => {
     if (findPrivateContextLeak(JSON.stringify(parsed.characters[0]), protectedValues, [])) {
       failedCharacterIds.add(source.character_id);
       validationErrors.push(source.character_id + "_private_context_output_blocked");
+      characterDiagnosticsById.set(source.character_id, {
+        validation_errors: ["private_context_output_blocked"],
+      });
       continue;
     }
     validCharacters.push({
@@ -468,6 +504,10 @@ Deno.serve(async (request) => {
         skippedCharacterCount += 1;
       } else {
         failedCharacterIds.add(item.sourceId);
+        characterDiagnosticsById.set(item.sourceId, {
+          publish_error: "publish_rpc_failed",
+          job_status_after_error: asText(job?.status) || "unknown",
+        });
       }
       console.warn("Encounter schedule character publish failed:", item.sourceId, publishError.message);
       continue;
@@ -475,6 +515,9 @@ Deno.serve(async (request) => {
     const publishRow = Array.isArray(published) ? published[0] : published;
     if (!publishRow || !["partial", "completed"].includes(asText(publishRow.status))) {
       failedCharacterIds.add(item.sourceId);
+      characterDiagnosticsById.set(item.sourceId, {
+        publish_status: asText(publishRow?.status) || "missing",
+      });
       continue;
     }
     committedCharacterIds.add(item.sourceId);
@@ -539,8 +582,14 @@ Deno.serve(async (request) => {
 
   const partial = remaining > 0 || ambiguousPublishFailure || ambiguousProviderFailure || failedCharacterIds.size > 0;
   for (const item of providerResponses) {
+    const characterDiagnostics = characterDiagnosticsById.get(item.sourceId) || {};
+    const characterFailureCode = typeof characterDiagnostics.validation_errors === "object"
+      ? "schedule_character_validation_failed"
+      : typeof characterDiagnostics.publish_error === "string" || typeof characterDiagnostics.publish_status === "string"
+        ? "schedule_character_publish_failed"
+        : partial ? "schedule_partial_character_failure" : null;
     await recordBatchUsage(admin, batchId, item.providerResponse, partial ? "partial" : "completed",
-      partial ? "schedule_partial_character_failure" : null, item.sourceId);
+      characterFailureCode, item.sourceId, characterDiagnostics);
   }
   return json({
     status: partial ? "partial" : "completed",
