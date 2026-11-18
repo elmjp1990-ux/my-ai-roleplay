@@ -30,12 +30,28 @@ const source = (character_id = id1, extra = {}) => ({
   private_info: "只供角色一致性使用的私密設定", personality_profile: { tone: "溫柔" },
   ...extra,
 });
-const slot = (extra = {}) => ({
-  start_time: "09:00", end_time: "17:00", location_key: "commercial",
-  activity: "在公司處理工作", is_outdoor: false,
-  rain_fallback_location_key: null, rain_fallback_activity: null, rain_fallback_greeting: null,
-  encounter_greeting: greeting, ...extra,
-});
+const locationNames: Record<string, string> = {
+  airport: "機場", commercial: "公司", "night-bar": "酒吧", "live-house": "Live House",
+  apartment: "住家", "department-store": "百貨公司", bookstore: "書店", cafe: "咖啡廳",
+  park: "公園", "night-market": "夜市", gym: "健身房", hospital: "醫院",
+  library: "圖書館", "train-station": "火車站",
+};
+const slot = (extra = {}) => {
+  const row = {
+    start_time: "09:00", end_time: "17:00", location_key: "commercial",
+    activity: "在公司處理工作", scene_description: "他站在會議室窗邊整理文件，神情專注，準備開始今天的工作。",
+    is_outdoor: false, rain_fallback_location_key: null,
+    rain_fallback_activity: null, rain_fallback_greeting: null,
+    encounter_greeting: greeting, ...extra,
+  } as Record<string, unknown>;
+  const locationKey = String(row.location_key || "");
+  const fallbackKey = row.rain_fallback_location_key == null ? null : String(row.rain_fallback_location_key);
+  delete row.location_key;
+  delete row.rain_fallback_location_key;
+  row.location = locationNames[locationKey] || locationKey;
+  row.rain_fallback_location = fallbackKey ? (locationNames[fallbackKey] || fallbackKey) : null;
+  return row;
+};
 const fullDaySlots = (workSlot = {}) => [
   slot({ start_time: "00:00", end_time: "08:00", location_key: "apartment", activity: "在家休息" }),
   slot({ start_time: "08:00", end_time: "16:00", ...workSlot }),
@@ -365,11 +381,14 @@ Deno.test("preserves canonical scene intent even when the scene is not currently
   }
   const prompt = buildEncounterScheduleBatchMessages([source()]);
   const payload = JSON.parse(prompt.messages[1].content);
-  if (!payload.canonical_scene_keys.includes("gym")) {
-    throw new Error("canonical scene key list missing from prompt payload");
+  if ("canonical_scene_keys" in payload || "scene_catalog" in payload) {
+    throw new Error("AI prompt must not receive scene IDs or scene catalog");
   }
-  if (!prompt.messages[0].content.includes("待場景日後啟用再自動顯示")) {
-    throw new Error("prompt does not preserve unavailable scene intent");
+  if (!prompt.messages[0].content.includes("地點是否能對應地圖由系統自行判斷")) {
+    throw new Error("prompt does not assign scene matching to the system");
+  }
+  if (!prompt.messages[0].content.includes("scene_description")) {
+    throw new Error("prompt does not require a character-specific scene description");
   }
 });
 
