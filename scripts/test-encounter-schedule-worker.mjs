@@ -23,16 +23,16 @@ assert.doesNotMatch(worker, /get_encounter_dynamic_scene_usage|dynamic_scene_lim
 assert.match(worker, /findPrivateContextLeak/);
 assert.match(worker, /p_limit: 2147483647/);
 assert.match(worker, /p_force: mode === "manual"/);
-assert.match(worker, /const sceneCatalog = sceneCatalogError[\\s\\S]*?\? \\[\\][\\s\\S]*?EncounterSceneCatalogEntry/);
+assert.match(worker, /const sceneCatalog = sceneCatalogError[\s\S]*?\? \[\][\s\S]*?EncounterSceneCatalogEntry/);
 assert.match(worker, /Scene metadata is only an optional exact-name hint/);
 assert.doesNotMatch(worker, /scene_catalog_unavailable/);
 const manualRetryGuard = worker.slice(
   worker.indexOf("// A deliberate test-mode manual click may retry terminal failed jobs:"),
   worker.indexOf('const { data: enqueueData', worker.indexOf("// A deliberate test-mode manual click may retry terminal failed jobs:")),
 );
-assert.match(manualRetryGuard, /\.eq\\("status", "processing"\\)/);
-assert.match(manualRetryGuard, /\.eq\\("status", "needs_reconciliation"\\)/);
-assert.doesNotMatch(manualRetryGuard, /\.eq\\("status", "failed"\\)/,
+assert.match(manualRetryGuard, /\.eq\("status", "processing"\)/);
+assert.match(manualRetryGuard, /\.eq\("status", "needs_reconciliation"\)/);
+assert.doesNotMatch(manualRetryGuard, /\.eq\("status", "failed"\)/,
   "A failed validation result must not block the next explicit test-mode retry");
 assert.match(worker, /ENCOUNTER_SCHEDULE_TEST_MODE/);
 assert.doesNotMatch(worker, /ENCOUNTER_SCHEDULE_TEST_USER_IDS/);
