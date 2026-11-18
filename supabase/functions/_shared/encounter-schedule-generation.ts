@@ -86,7 +86,7 @@ type ScheduleSlot = {
   rain_fallback_greeting: string | null;
   encounter_greeting: string;
 };
-type ScheduleOption = ScheduleSlot & {
+type ScheduleOption = Omit<ScheduleSlot, "start_time" | "end_time"> & {
   option_key: "option_1" | "option_2" | "option_3";
   weight: number;
 };
@@ -354,8 +354,9 @@ function validateHourlySchedule(
         encounter_greeting: rawOption.encounter_greeting,
       }, errors, blockLabel + "_option_" + optionIndex);
       if (slot) {
+        const { start_time: _startTime, end_time: _endTime, ...optionSlot } = slot;
         options.push({
-          ...slot,
+          ...optionSlot,
           option_key: ("option_" + (optionIndex + 1)) as ScheduleOption["option_key"],
           weight: Number(weight),
         });
