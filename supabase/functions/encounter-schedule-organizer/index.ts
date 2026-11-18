@@ -21,7 +21,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 const asRow = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const asText = (value: unknown): string => typeof value === "string" ? value.trim() : "";
-const ENCOUNTER_SCHEDULE_BATCH_SIZE = 5;
+const ENCOUNTER_SCHEDULE_BATCH_SIZE = 2;
 
 async function recordBatchUsage(
   admin: any,
