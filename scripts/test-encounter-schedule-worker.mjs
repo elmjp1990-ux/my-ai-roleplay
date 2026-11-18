@@ -6,6 +6,7 @@ const pipeline = fs.readFileSync("supabase/drafts/encounter-schedule-pipeline.sq
 const batchSemantics = fs.readFileSync("supabase/migrations/20261117130000_encounter_schedule_batch_semantics.sql", "utf8");
 const html = fs.readFileSync("index.html", "utf8");
 const generator = fs.readFileSync("supabase/functions/_shared/encounter-schedule-generation.ts", "utf8");
+const sparseScheduleMigration = fs.readFileSync("supabase/migrations/20261118000400_encounter_schedules_allow_unavailable_windows.sql", "utf8");
 const weatherWorker = fs.readFileSync("supabase/functions/encounter-weather-sync/index.ts", "utf8");
 const weatherParser = fs.readFileSync("supabase/functions/_shared/encounter-weather.mjs", "utf8");
 
@@ -86,12 +87,19 @@ assert.match(fs.readFileSync("city-map.js", "utf8"), /MAX_DYNAMIC_SCENE_MARKERS=
 assert.match(fs.readFileSync("city-map.js", "utf8"), /Math\.hypot\(point\.x-x,point\.y-y\)<120/);
 assert.match(pipeline, /marker_x BETWEEN 40 AND 1622/);
 assert.match(pipeline, /marker_y BETWEEN 40 AND 892/);
-assert.match(generator, /本批次只有 1 位角色使用也可以提出候選/);
+assert.match(generator, /場景只能使用輸入 scene_catalog/);
+assert.match(generator, /只輸出適合玩家實際遇見角色的時段/);
+assert.match(generator, /slots 可為空陣列/);
+assert.match(generator, /scenes 必須是空陣列/);
+assert.doesNotMatch(generator, /本批次只有 1 位角色使用也可以提出候選/);
 assert.doesNotMatch(generator, /shoppingStreetUsers/);
 assert.match(pipeline, /schedule_variant_24_hour_coverage_incomplete/);
 assert.match(pipeline, /jsonb_array_length\(v_variant->'slots'\) NOT BETWEEN 2 AND 4/);
-assert.match(generator, /_24_hour_coverage_incomplete/);
-assert.match(generator, /完整 24 小時行程/);
+assert.doesNotMatch(generator, /_24_hour_coverage_incomplete/);
+assert.doesNotMatch(generator, /完整 24 小時行程/);
+assert.match(sparseScheduleMigration, /NOT BETWEEN 0 AND 4/);
+assert.match(sparseScheduleMigration, /NOT BETWEEN 1 AND 4/);
+assert.match(sparseScheduleMigration, /scene_not_in_existing_catalog/);
 assert.match(weatherWorker, /createEncounterWeather/);
 assert.match(weatherWorker, /previousSlot === weather\.slot/);
 assert.match(weatherWorker, /previous\.source === weather\.source/);
@@ -112,4 +120,4 @@ assert.match(html, /functions\.invoke\('encounter-schedule-organizer',\{body:\{m
 assert.match(html, /case 'environment':[\s\S]*?void loadEncounterScheduleTestTools\(\)/);
 assert.doesNotMatch(html, /kind==='album'&&CHAT_DATA_TEST_MODE/);
 
-console.log("Encounter schedule worker, conditional holidays, dynamic scenes, simulated Taipei weather, queue triggers, throttling, and 24-hour coverage contracts passed.");
+console.log("Encounter schedule worker, conditional holidays, existing-scene-only rules, sparse encounter windows, simulated Taipei weather, queue triggers, and throttling contracts passed.");
