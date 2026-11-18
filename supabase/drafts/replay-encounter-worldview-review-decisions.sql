@@ -44,7 +44,9 @@ BEGIN
      OR position('not_applicable' IN v_review) = 0
      OR position('last_completed_source_hash = v_job.source_hash' IN v_review) = 0
      OR position('existing_schedules_preserved' IN v_review) = 0
-     OR position('ai_invoked' IN v_review) = 0 THEN
+     OR position('ai_invoked' IN v_review) = 0
+     OR position('worldview_review_source_changed_retry' IN v_review) = 0
+     OR position('md5(v_source::text)' IN v_review) = 0 THEN
     RAISE EXCEPTION 'worldview_review_rpc_owner_or_decision_contract_missing';
   END IF;
 
