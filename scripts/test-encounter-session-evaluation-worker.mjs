@@ -38,6 +38,7 @@ assert.equal(parseEncounterSessionEvaluation({ ...valid, rationale: "" }), null)
 const worker = fs.readFileSync("supabase/functions/encounter-evaluation-worker/index.ts", "utf8");
 assert.match(worker, /ENCOUNTER_DISCOVERY_SENTINEL/);
 assert.match(worker, /玩家選擇留空，讓角色主動發現自己/);
+assert.match(worker, /玩家留空發送，請角色自然延續目前互動/);
 assert.match(worker, /Authorization.*Bearer.*serviceRoleKey/);
 assert.match(worker, /claim_encounter_evaluation_jobs/);
 assert.match(worker, /settle_encounter_session/);
