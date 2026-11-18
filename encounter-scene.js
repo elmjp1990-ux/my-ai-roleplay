@@ -178,7 +178,7 @@
     };
     const hasPlayerMessage=allMessages.some(m=>m&&m.role==='user'&&!isInternalEvent(m.text??m.content));
     const openingText=String(session?.initialOpeningMessage?.text||'').trim();
-    const latestReply=[...allMessages].reverse().find(m=>m&&m.role!=='user'&&String(m.text??m.content??'').trim())||
+    const latestReply=[...allMessages].reverse().find(m=>m&&m.role==='assistant'&&String(m.text??m.content??'').trim())||
       (openingText?{id:'opening-'+session.id,content:openingText}:null);
     const raw=String(latestReply?.text??latestReply?.content??'').trim();
     const hasStarted=!!raw;
