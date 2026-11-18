@@ -3,6 +3,22 @@
 
 BEGIN;
 
+DO $priority_contract$
+DECLARE
+  v_definition text;
+BEGIN
+  SELECT pg_catalog.pg_get_functiondef(
+    'public.claim_encounter_schedule_batch(integer,boolean,uuid)'::regprocedure
+  ) INTO v_definition;
+  IF pg_catalog.strpos(
+    v_definition,
+    'ORDER BY CASE j.status WHEN ''pending'' THEN 0 WHEN ''failed'' THEN 1 ELSE 2 END, j.queued_at, j.character_id'
+  ) = 0 THEN
+    RAISE EXCEPTION 'pending_schedule_job_priority_not_installed';
+  END IF;
+END;
+$priority_contract$;
+
 SET LOCAL ROLE authenticated;
 SET LOCAL request.jwt.claim.role = 'authenticated';
 SELECT count(*) FROM public.get_encounter_scene_registry();
