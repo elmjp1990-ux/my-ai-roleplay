@@ -37,6 +37,8 @@ jobs:
           node-version: "22"
       - name: Test bounded chat hydration and pagination
         run: node scripts/test-chat-history-lazy-loading.mjs
+      - name: Test mobile chat keyboard viewport adaptation
+        run: node scripts/test-mobile-chat-keyboard-viewport.mjs
       - name: Test mobile chat keyboard viewport handling
         run: node scripts/test-chat-keyboard-viewport.mjs
       - name: Test expired character illustration URL refresh
