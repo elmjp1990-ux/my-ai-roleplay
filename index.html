@@ -10014,7 +10014,7 @@ async function loadEncounterScheduleRepairOutputs(){
     if(error)throw error;
     const outputs=Array.isArray(data?.outputs)?data.outputs:[];
     if(!outputs.length){
-      container.innerHTML='<p class="small muted">目前沒有可人工補正的失敗回覆。</p>';
+      container.innerHTML='<p class="small muted">目前沒有可人工補正的失敗回覆。若失敗發生於原始回覆留存功能上線前，系統會保留失敗與用量紀錄，略過該角色，不會自動重試。</p>';
       return;
     }
     container.innerHTML=outputs.map(item=>{
@@ -10069,14 +10069,21 @@ async function loadEncounterScheduleTestTools(){
     const processing=Number(data.processing_character_count||0);
     const failed=Number(data.failed_character_count||0);
     const reconciliation=Number(data.needs_reconciliation_count||0);
-    const blocked=processing>0||failed>0||reconciliation>0;
+    const blocked=processing>0||reconciliation>0;
+    const canRun=pending>0&&!blocked;
     const lastRun=data.last_batch_completed_at?new Date(data.last_batch_completed_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):'尚未執行';
+    const queueHint=blocked
+      ?'目前暫停生成，請先確認處理中工作或待核對結果。'
+      :pending>0
+        ?'本次只處理待處理佇列中的下一位角色，每次一位。'+(failed>0?'；另有 '+failed+' 位失敗紀錄保留，不會自動重試。':'')
+        :failed>0
+          ?'目前沒有待處理角色；'+failed+' 位失敗紀錄已保留，不會自動重試。'
+          :'目前沒有待處理角色。';
     if(status)status.textContent=data.status_available===false
       ?'測試環境已確認；目前無法讀取佇列狀態。'
       :'待處理：'+pending+' 位｜處理中：'+processing+' 位｜失敗：'+failed+' 位｜待核對：'+reconciliation+' 位｜'+
-        (blocked?'目前暫停生成，請先等待處理中工作完成，並核對失敗結果，避免重複 AI 成本。':'按下後最多處理 5 位角色；')+
-        '｜上次成功完成：'+lastRun+(data.last_batch_status?'（'+data.last_batch_status+'）':'');
-    if(button){button.dataset.aiEnabled=blocked?'false':'true';button.disabled=blocked;}
+        queueHint+'｜上次成功完成：'+lastRun+(data.last_batch_status?'（'+data.last_batch_status+'）':'');
+    if(button){button.dataset.aiEnabled=canRun?'true':'false';button.disabled=!canRun;}
     void loadEncounterScheduleRepairOutputs();
   }catch(error){
     section.hidden=true;
