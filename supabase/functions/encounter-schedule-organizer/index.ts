@@ -320,7 +320,8 @@ Deno.serve(async (request) => {
         .order("updated_at", { ascending: false })
         .limit(50),
       admin.from("encounter_schedule_batch_runs").select("completed_at,status")
-        .eq("status", "completed").not("completed_at", "is", null)
+        .eq("status", "completed").eq("actor_user_id", actorUserId).eq("is_manual", true)
+        .not("completed_at", "is", null)
         .order("completed_at", { ascending: false }).limit(1).maybeSingle(),
       admin.from("encounter_schedule_batch_runs")
         .select("id,character_ids,started_at,failure_code")
