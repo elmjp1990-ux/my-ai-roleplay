@@ -518,6 +518,25 @@ export function parseEncounterScheduleBatchOutput(
     }
   }
 
+  // System-side exact-name matching for custom registered scenes. The catalog
+  // is never included in the AI prompt; unmatched descriptions stay intact.
+  const catalogByDisplayName = new Map(
+    sceneCatalog
+      .map((scene) => [text(scene.display_name).toLocaleLowerCase(), normalizeEncounterSceneKey(scene.location_key)] as const)
+      .filter((entry): entry is readonly [string, string] => Boolean(entry[0] && entry[1])),
+  );
+  for (const character of characters) {
+    const allSlots = [
+      ...character.variants.weekday.flatMap((variant) => variant.slots),
+      ...character.variants.holiday.flatMap((variant) => variant.slots),
+      ...character.special_events.flatMap((event) => event.slots),
+    ];
+    for (const slot of allSlots) {
+      if (slot.location_key) continue;
+      slot.location_key = catalogByDisplayName.get(slot.location_description.toLocaleLowerCase()) ?? null;
+    }
+  }
+
   const scenes: GeneratedSceneMetadata[] = [];
   const rawScenes = parsed.scenes === undefined ? [] : parsed.scenes;
   if (!Array.isArray(rawScenes) || rawScenes.length !== 0) {
