@@ -10084,6 +10084,22 @@ async function loadEncounterScheduleTestTools(){
       :'待處理：'+pending+' 位｜處理中：'+processing+' 位｜失敗：'+failed+' 位｜待核對：'+reconciliation+' 位｜'+
         queueHint+'｜上次成功完成：'+lastRun+(data.last_batch_status?'（'+data.last_batch_status+'）':'');
     if(button){button.dataset.aiEnabled=canRun?'true':'false';button.disabled=!canRun;}
+    const reconciliationContainer=document.getElementById('encounterScheduleReconciliationItems');
+    if(reconciliationContainer){
+      const items=Array.isArray(data.reconciliation_jobs)?data.reconciliation_jobs:[];
+      reconciliationContainer.innerHTML=items.length?items.map(item=>{
+        const batchId=e(item.batch_id||'');
+        const characterId=e(item.character_id||'');
+        const started=item.started_at?new Date(item.started_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):'時間未提供';
+        const code=e(item.failure_code||item.job_error_code||'unknown');
+        return '<article class="panel stack" style="padding:12px">'+
+          '<strong>'+e(item.character_name||'角色')+'｜待核對</strong>'+
+          '<p class="small muted">批次時間：'+e(started)+'｜錯誤代碼：'+code+'｜已嘗試 '+Number(item.attempt_count||0)+' 次</p>'+
+          '<p class="small">AI 供應商的請求結果目前無法確認；可能已完成，也可能已產生供應商費用。此操作只會將工作標記為終止失敗，不會重試 AI，也不會刪除原批次或用量紀錄。</p>'+
+          '<div class="row wrap"><button type="button" data-action="resolve-encounter-schedule-reconciliation" data-batch-id="'+batchId+'" data-character-id="'+characterId+'">確認終止此待核對工作</button></div>'+
+        '</article>';
+      }).join(''):'<p class="small muted">目前沒有待核對工作。</p>';
+    }
     void loadEncounterScheduleRepairOutputs();
   }catch(error){
     section.hidden=true;
@@ -10093,6 +10109,30 @@ async function loadEncounterScheduleTestTools(){
 }
 
 document.addEventListener('click',async event=>{
+  const reconcileButton=event.target.closest('[data-action="resolve-encounter-schedule-reconciliation"]');
+  if(reconcileButton){
+    event.preventDefault();
+    if(!window.confirm('請確認：無法判定先前 AI 請求是否已完成或計費。確認後只會將這筆工作標記為終止失敗，不會再次呼叫 AI；原批次與用量紀錄會保留。若之後重新生成，會是新的 AI 請求並可能再次產生成本。要繼續嗎？'))return;
+    reconcileButton.disabled=true;
+    try{
+      const {data,error}=await window.mySupabase.functions.invoke('encounter-schedule-organizer',{
+        body:{mode:'reconcile_confirm',batch_id:reconcileButton.dataset.batchId,character_id:reconcileButton.dataset.characterId}
+      });
+      if(error)throw error;
+      if(data?.status==='resolved_without_retry'){
+        toast('待核對工作已標記為終止失敗；沒有重試 AI，原紀錄已保留。');
+        await loadEncounterScheduleTestTools();
+      }else{
+        toast('待核對工作尚未完成處理：'+String(data?.error||data?.status||'未知狀態'));
+      }
+    }catch(error){
+      toast('待核對工作處理失敗；原安全鎖仍會保留。');
+      console.warn('Encounter schedule reconciliation failed:',error?.message||error);
+    }finally{
+      reconcileButton.disabled=false;
+    }
+    return;
+  }
   const button=event.target.closest('[data-action="organize-encounter-schedules"]');
   if(!button)return;
   if(button.dataset.aiEnabled!=='true'||button.disabled)return;
@@ -10405,6 +10445,10 @@ function renderModal(o) {
           <strong>相遇模式｜AI 行程與場景整理</strong>
           <p class="small muted">整理目前所有符合資格的公開角色行程，並建立／更新共同行程場景。</p>
           <p class="small muted" id="encounterScheduleTestStatus">正在確認是否為允許的測試環境…</p>
+          <div class="stack" style="margin:10px 0">
+            <strong>待核對工作</strong>
+            <div id="encounterScheduleReconciliationItems" class="stack"></div>
+          </div>
           <div class="row wrap">
             <button type="button" data-action="organize-encounter-schedules" disabled>AI 生成角色行程與場景</button>
             <button type="button" data-action="load-encounter-schedule-repairs">查看失敗 AI 原始回覆</button>
