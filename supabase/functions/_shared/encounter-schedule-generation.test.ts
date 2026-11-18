@@ -224,6 +224,17 @@ Deno.test("classifies worldviews locally and keeps species separate from era", (
   if (unknownClass.category !== "unknown" || unknownClass.modern_map_compatible) {
     throw new Error("unknown worldview must be held out of the modern map");
   }
+
+  const alternateWorld = source(id1, {
+    intro: "來自異世界的旅人。",
+    world_era: "",
+    schedule_description: "",
+    private_info: "",
+    personality_profile: {},
+  });
+  if (classifyEncounterWorldview(alternateWorld).category !== "alternate_world") {
+    throw new Error("異世界 alone should be classified as alternate_world, not generic fantasy");
+  }
 });
 
 Deno.test("keeps incompatible historical characters off the modern map", () => {
