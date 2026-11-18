@@ -201,6 +201,7 @@ BEGIN
         lease_expires_at = NULL,
         lease_generation = lease_generation + 1,
         last_error_code = NULL,
+        last_completed_source_hash = NULL,
         completed_at = NULL,
         updated_at = v_now
     WHERE character_id = p_character_id
