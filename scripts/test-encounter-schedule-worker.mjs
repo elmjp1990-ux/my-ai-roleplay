@@ -146,7 +146,7 @@ assert.match(generator, /special_events/);
 assert.match(generator, /valentines_day/);
 assert.match(generator, /lunar_new_year/);
 assert.match(generator, /christmas/);
-assert.match(generator, /角色生日目前沒有結構化日期來源/);
+assert.match(generator, /special_events 一律輸出空陣列/);
 assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.get_encounter_character_schedules\(p_character_ids uuid\[\]\)[\s\S]*?CROSS JOIN LATERAL public\.resolve_encounter_character_schedule/);
 assert.match(pipeline, /encounter_greeting text,[\s\S]*?is_outdoor boolean,[\s\S]*?rain_fallback_greeting text,[\s\S]*?variant_weight smallint/);
 assert.match(pipeline, /cardinality\(p_character_ids\) BETWEEN 1 AND 10/);
