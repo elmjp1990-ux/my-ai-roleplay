@@ -370,6 +370,11 @@ function validateHourlySchedule(
       });
     }
   }
+  for (let index = 1; index < blocks.length; index++) {
+    const previousStart = parseHour(blocks[index - 1].start_time) ?? 0;
+    const currentStart = parseHour(blocks[index].start_time) ?? 0;
+    if (currentStart < previousStart) errors.push(label + "_hourly_blocks_must_be_sorted");
+  }
   const ordered = blocks.slice().sort((a, b) => (parseHour(a.start_time) ?? 0) - (parseHour(b.start_time) ?? 0));
   for (let index = 1; index < ordered.length; index++) {
     const previousStart = parseHour(ordered[index - 1].start_time) ?? 0;
