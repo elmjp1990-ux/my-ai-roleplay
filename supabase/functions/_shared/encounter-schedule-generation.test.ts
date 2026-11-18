@@ -190,7 +190,7 @@ Deno.test("infers modern map compatibility from contemporary character context",
 });
 
 Deno.test("keeps incompatible historical characters off the modern map", () => {
-  const ancient = source(id1, { world_era: "ancient", modern_setting_compatible: false });
+  const ancient = source(id1, { world_era: "ancient", intro: "秦漢時代的古代王朝", schedule_description: "", modern_setting_compatible: false });
   if (isEncounterModernMapCompatible(ancient)) throw new Error("ancient role incorrectly marked modern-compatible");
   const parsed = parseEncounterScheduleBatchOutput(JSON.stringify({
     characters: [{
