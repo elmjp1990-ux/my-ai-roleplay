@@ -1,4 +1,4 @@
-/* POYOZZ city-map presentation module.
+/* City map module.
  * App-owned state and actions are injected explicitly; this module does not own
  * persistence, authentication, chat, encounter, or wallet business rules.
  */
