@@ -111,8 +111,8 @@ BEGIN
           IF jsonb_typeof(v_slot) IS DISTINCT FROM 'object' THEN
             RAISE EXCEPTION 'schedule_hourly_option_object_invalid' USING ERRCODE = '22023';
           END IF;
-          IF jsonb_object_length(v_slot) <> 10
-             OR v_slot->>'option_key' <> 'option_' || v_option_index::text
+          IF jsonb_object_length(v_slot) <> 11
+             OR v_slot->>'option_key' <> ('option_' || v_option_index::text)
              OR COALESCE(v_slot->>'weight', '') !~ '^[0-9]{1,3}$' THEN
             RAISE EXCEPTION 'schedule_hourly_option_contract_invalid' USING ERRCODE = '22023';
           END IF;
