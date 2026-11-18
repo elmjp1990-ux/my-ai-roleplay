@@ -144,27 +144,24 @@ Deno.serve(async (request) => {
 
   let queuedCharacterCount = 0;
   if (mode === "manual") {
-    // Never let the broad manual enqueue + p_force claim silently retry a
-    // failed or ambiguous provider result. Those jobs need explicit review.
-    const [processingResult, failedResult, reconciliationResult] = await Promise.all([
+    // A deliberate test-mode manual click may retry terminal failed jobs:
+    // those jobs have no ambiguous publish outcome. Keep active leases and
+    // needs_reconciliation blocked so an uncertain write is never duplicated.
+    const [processingResult, reconciliationResult] = await Promise.all([
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
         .eq("status", "processing"),
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
-        .eq("status", "failed"),
-      admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
         .eq("status", "needs_reconciliation"),
     ]);
-    if (processingResult.error || failedResult.error || reconciliationResult.error) {
+    if (processingResult.error || reconciliationResult.error) {
       return json({ error: "schedule_failure_state_unavailable" }, 503);
     }
     const processingCharacterCount = Number(processingResult.count || 0);
-    const failedCharacterCount = Number(failedResult.count || 0);
     const needsReconciliationCount = Number(reconciliationResult.count || 0);
-    if (processingCharacterCount > 0 || failedCharacterCount > 0 || needsReconciliationCount > 0) {
+    if (processingCharacterCount > 0 || needsReconciliationCount > 0) {
       return json({
         status: "blocked_unresolved_failures",
         processing_character_count: processingCharacterCount,
-        failed_character_count: failedCharacterCount,
         needs_reconciliation_count: needsReconciliationCount,
       }, 409);
     }
@@ -205,11 +202,15 @@ Deno.serve(async (request) => {
   }
 
   const { data: sceneCatalogData, error: sceneCatalogError } = await admin.rpc("get_encounter_scene_catalog");
+  // Scene metadata is only an optional exact-name hint. A catalog read failure
+  // must not prevent the model call or discard natural-language locations:
+  // the publisher persists location_description and can resolve it later.
+  const sceneCatalog = sceneCatalogError
+    ? []
+    : (Array.isArray(sceneCatalogData) ? sceneCatalogData : []) as EncounterSceneCatalogEntry[];
   if (sceneCatalogError) {
-    await failBatch(admin, batchId, leaseToken, "scene_catalog_load_failed", false);
-    return json({ error: "scene_catalog_unavailable" }, 503);
+    console.warn("Encounter scene catalog unavailable; preserving natural locations:", sceneCatalogError.message);
   }
-  const sceneCatalog = (Array.isArray(sceneCatalogData) ? sceneCatalogData : []) as EncounterSceneCatalogEntry[];
 
   const protectedContextByCharacter: Record<string, string[]> = {};
   const rawCharacters: unknown[] = [];
