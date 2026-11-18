@@ -7,6 +7,7 @@ on:
       - "supabase/migrations/*.sql"
       - "supabase/drafts/encounter-schedule-pipeline.sql"
       - "supabase/drafts/replay-encounter-schedule-pipeline.sql"
+      - "supabase/drafts/replay-encounter-sparse-schedule-windows.sql"
       - "supabase/drafts/replay-encounter-scene-catalog.sql"
       - "supabase/drafts/replay-encounter-session-evaluation-worker.sql"
       - "supabase/drafts/encounter-relationship-greeting-pools.sql"
@@ -181,7 +182,7 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-deletion-concurrency-setup.sql
           DATABASE_URL="$DATABASE_URL" bash scripts/test-deletion-concurrency.sh
 
-      - name: Replay formal Encounter schedule migration and weather fallback
+      - name: Apply formal Encounter schedule pipeline migration
         shell: bash
         run: |
           set -euo pipefail
