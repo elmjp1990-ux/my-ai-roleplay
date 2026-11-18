@@ -97,8 +97,7 @@ type ScheduleOption = Omit<ScheduleSlot, "start_time" | "end_time"> & {
 };
 type ScheduleTimeBlock = {
   start_time: string;
-  end_time: string;
-  options: ScheduleOption[];
+  end_time: string;  options: ScheduleOption[];
 };
 type SpecialEventSchedule = {
   event_key: typeof ENCOUNTER_SPECIAL_EVENT_KEYS[number];
@@ -197,8 +196,7 @@ function parseHour(value: unknown): number | null {
 }
 
 function durationMinutes(start: number, end: number): number {
-  const adjustedEnd = end <= start ? end + 1440 : end;
-  return adjustedEnd - start;
+  const adjustedEnd = end <= start ? end + 1440 : end;  return adjustedEnd - start;
 }
 
 function intervalsOverlap(a: { start: number; end: number }, b: { start: number; end: number }): boolean {
@@ -297,8 +295,7 @@ function validateVariant(
       previous.location_description === current.location_description &&
       previous.activity === current.activity &&
       previous.scene_description === current.scene_description &&
-      previous.is_outdoor === current.is_outdoor &&
-      previous.rain_fallback_location_key === current.rain_fallback_location_key &&
+      previous.is_outdoor === current.is_outdoor &&      previous.rain_fallback_location_key === current.rain_fallback_location_key &&
       previous.rain_fallback_activity === current.rain_fallback_activity) {
       errors.push(label + "_adjacent_same_activity_slots_should_merge");
     }
@@ -397,8 +394,7 @@ function validateHourlySchedule(
     if (currentStart < previousStart) errors.push(label + "_hourly_blocks_must_be_sorted");
   }
   const ordered = blocks.slice().sort((a, b) => (parseHour(a.start_time) ?? 0) - (parseHour(b.start_time) ?? 0));
-  for (let index = 1; index < ordered.length; index++) {
-    const previousStart = parseHour(ordered[index - 1].start_time) ?? 0;
+  for (let index = 1; index < ordered.length; index++) {    const previousStart = parseHour(ordered[index - 1].start_time) ?? 0;
     const currentStart = parseHour(ordered[index].start_time) ?? 0;
     if (previousStart === currentStart || intervalsOverlap(
       { start: previousStart, end: previousStart + 60 },
@@ -497,8 +493,7 @@ export function buildEncounterScheduleBatchMessages(
       style: text(source.style),
       gender: text(source.gender),
       age: text(source.age),
-      tags: Array.isArray(source.tags)
-        ? source.tags.filter((value): value is string => typeof value === "string").map((value) => value.trim()).filter(Boolean).slice(0, 30)
+      tags: Array.isArray(source.tags)        ? source.tags.filter((value): value is string => typeof value === "string").map((value) => value.trim()).filter(Boolean).slice(0, 30)
         : [],
       occupation,
       author_character_profile: characterProfile,
@@ -539,3 +534,139 @@ export function buildEncounterScheduleBatchMessages(
 
     "輸出必須是嚴格 JSON object，根欄位 characters 與 scenes。每個角色欄位為 character_id, placement, variants, special_events；modern_map 角色必須包含 relationship_greetings，no_matching_location 角色可省略。relationship_greetings 必須且只能包含八個 stage key，每個 key 對應 3–5 段 150–300 字元的字串陣列。variants 只包含 weekday 與 holiday；各自為逐小時時段陣列（0–24 段）。每個時段物件欄位為 start_time, end_time, options；options 為 1–3 個選項，每個選項欄位為 weight, location（自然語言地點名稱）, activity, scene_description, is_outdoor, rain_fallback_location（自然語言雨備地點）, rain_fallback_activity, rain_fallback_greeting, encounter_greeting；同一時段 options 的 weight 總和必須為 100。不同時段的選項獨立抽取。special_events 維持 0–4 個 event_key, event_name, slots 物件的陣列；每個節日只列出角色當日有安排的節日時段，無合理行程時輸出空陣列。節日時段 slot 欄位為 start_time, end_time, location, activity, scene_description, is_outdoor, rain_fallback_location, rain_fallback_activity, rain_fallback_greeting, encounter_greeting。scenes 必須是空陣列，因為 AI 不得新增或修改場景資料。不可輸出額外欄位或 Markdown.",
   ].join("\n");
+  return {
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: JSON.stringify({
+        characters: promptSources,
+      }) },
+    ],
+    protectedContextByCharacter,
+  };
+}
+
+export function parseEncounterScheduleBatchOutput(
+  raw: string,
+  sources: EncounterScheduleSource[],
+  sceneCatalog: EncounterSceneCatalogEntry[] = [],
+): { ok: boolean; characters: GeneratedCharacterSchedule[]; scenes: GeneratedSceneMetadata[]; errors: string[] } {
+  const errors: string[] = [];
+  let parsed: unknown;
+  try { parsed = JSON.parse(String(raw ?? "")); } catch { return { ok: false, characters: [], scenes: [], errors: ["output_json_invalid"] }; }
+  if (!isRecord(parsed) || !Array.isArray(parsed.characters) ||
+    Object.keys(parsed).some((key) => !["characters", "scenes"].includes(key))) {
+    return { ok: false, characters: [], scenes: [], errors: ["output_root_invalid"] };
+  }
+  if (new Set(sources.map((source) => source.character_id)).size !== sources.length) {
+    return { ok: false, characters: [], scenes: [], errors: ["source_character_ids_not_unique"] };
+  }
+  const sourceById = new Map(sources.map((source) => [source.character_id, source]));
+  if (parsed.characters.length !== sources.length) errors.push("character_count_mismatch");
+  const seen = new Set<string>();
+  const characters: GeneratedCharacterSchedule[] = [];
+  for (const item of parsed.characters) {
+    if (!isRecord(item) ||
+      !["character_id", "placement", "variants"].every((key) => Object.prototype.hasOwnProperty.call(item, key)) ||
+      Object.keys(item).some((key) => !["character_id", "placement", "variants", "special_events", "relationship_greetings"].includes(key)) ||
+      !isUuid(item.character_id)) {
+      errors.push("character_item_invalid");
+      continue;
+    }
+    const rawSpecialEvents = item.special_events === undefined ? [] : item.special_events;
+    if (!Array.isArray(rawSpecialEvents) || rawSpecialEvents.length > 4) {
+      errors.push("special_events_invalid");
+      continue;
+    }
+    const specialEvents = rawSpecialEvents.map((event, index) =>
+      validateSpecialEvent(event, errors, String(item.character_id) + "_special_event_" + index)
+    ).filter((event): event is SpecialEventSchedule => event !== null);
+    if (new Set(specialEvents.map((event) => event.event_key)).size !== specialEvents.length) {
+      errors.push(String(item.character_id) + "_special_event_duplicate");
+    }
+    const id = item.character_id;
+    const source = sourceById.get(id);
+    if (!source || source.visibility !== "public" || source.deleted_at != null || seen.has(id)) {
+      errors.push("character_identity_duplicate_or_unknown");
+      continue;
+    }
+    seen.add(id);
+    if (item.placement === "no_matching_location") {
+      if (!hasExactKeys(item.variants, ["weekday", "holiday"]) ||
+        !Array.isArray(item.variants.weekday) || item.variants.weekday.length !== 0 ||
+        !Array.isArray(item.variants.holiday) || item.variants.holiday.length !== 0 ||        specialEvents.length !== 0) {
+        errors.push(id + "_no_location_variants_must_be_empty");
+      }
+      characters.push({
+        character_id: id, placement: "no_matching_location",
+        variants: { weekday: [], holiday: [] }, special_events: [],
+      });
+      continue;
+    }
+    if (item.placement !== "modern_map" || !isEncounterModernMapCompatible(source)) {
+      errors.push(id + "_modern_map_placement_not_allowed");
+      continue;
+    }
+    const relationshipGreetings = validateRelationshipGreetingPools(
+      item.relationship_greetings,
+      errors,
+      id,
+    );
+    if (!relationshipGreetings) continue;
+    if (!hasExactKeys(item.variants, ["weekday", "holiday"]) ||
+      !Array.isArray(item.variants.weekday) || !Array.isArray(item.variants.holiday)) {
+      errors.push(id + "_day_type_variants_invalid");
+      continue;
+    }
+    const weekday = validateHourlySchedule(item.variants.weekday, errors, id + "_weekday");
+    const holiday = validateHourlySchedule(item.variants.holiday, errors, id + "_holiday");
+    const scheduleSlots = [
+      ...(weekday ?? []).flatMap((block) => block.options),
+      ...(holiday ?? []).flatMap((block) => block.options),
+      ...specialEvents.flatMap((event) => event.slots),
+    ];
+    if (scheduleSlots.some((slot) =>
+      (slot.location_key === "airport" || slot.rain_fallback_location_key === "airport") &&
+      !isAirportUseReasonable(source, slot.activity))) {
+      errors.push(id + "_airport_location_without_character_context");
+    }
+    if (weekday && holiday) {
+      characters.push({
+        character_id: id, placement: "modern_map", variants: { weekday, holiday },
+        special_events: specialEvents, relationship_greetings: relationshipGreetings,
+      });
+    }
+  }
+
+  // System-side exact-name matching for custom registered scenes. The catalog
+  // is never included in the AI prompt; unmatched descriptions stay intact.
+  const catalogByDisplayName = new Map(
+    sceneCatalog
+      .map((scene) => [text(scene.display_name).toLocaleLowerCase(), normalizeEncounterSceneKey(scene.location_key)] as const)
+      .filter((entry): entry is readonly [string, string] => Boolean(entry[0] && entry[1])),
+  );
+  for (const character of characters) {
+    const allSlots = [
+      ...character.variants.weekday.flatMap((block) => block.options),
+      ...character.variants.holiday.flatMap((block) => block.options),
+      ...character.special_events.flatMap((event) => event.slots),
+    ];
+    for (const slot of allSlots) {
+      if (slot.location_key) continue;
+      slot.location_key = catalogByDisplayName.get(slot.location_description.toLocaleLowerCase()) ?? null;
+    }
+  }
+
+  const scenes: GeneratedSceneMetadata[] = [];
+  const rawScenes = parsed.scenes === undefined ? [] : parsed.scenes;
+  if (!Array.isArray(rawScenes) || rawScenes.length !== 0) {
+    errors.push("scene_metadata_must_be_empty");
+  }
+
+  if (seen.size !== sources.length) errors.push("character_coverage_incomplete");
+  return {
+    ok: errors.length === 0,
+    characters: errors.length === 0 ? characters : [],
+    scenes: errors.length === 0 ? scenes : [],
+    errors: [...new Set(errors)],
+  };
+}
