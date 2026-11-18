@@ -256,8 +256,8 @@ COMMENT ON FUNCTION public.create_encounter_session_with_lifecycle(uuid,uuid,uui
 DO $source_version$
 DECLARE
   v_definition text;
-  v_old text := 'poyozz-encounter-schedule-v6-hourly-independent-options-2026-11-18';
-  v_new text := 'poyozz-encounter-schedule-v7-compact-24-hour-options-2026-11-19';
+  v_old text := 'poyozz-encounter-schedule-v7-home-mapping-sleep-availability-2026-11-18';
+  v_new text := 'poyozz-encounter-schedule-v8-compact-24-hour-options-2026-11-19';
   v_count integer;
 BEGIN
   SELECT pg_catalog.pg_get_functiondef(
