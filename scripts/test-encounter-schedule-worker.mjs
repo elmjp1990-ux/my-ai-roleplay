@@ -168,7 +168,7 @@ assert.match(generator, /weekday 與 holiday 各自必須完整輸出 24 個逐�
 assert.match(generator, /activity 與 rain_fallback_activity 各 10–30 個中文字/);
 assert.match(generator, /每種日期至少 8 個時段/);
 assert.match(generator, /不同時段獨立抽取/);
-assert.match(generator, /同一時段所有選項權重總和必須恰好 100/);
+assert.match(generator, /每個時段所有選項 weight 為 1–100 的整數且總和必須恰好 100/);
 assert.match(hourlyScheduleMigration, /character_schedules_ai_hourly_option_unique_idx/);
 assert.match(hourlyScheduleMigration, /schedule_hourly_option_weights_must_sum_100/);
 assert.match(hourlyScheduleMigration, /v_option_roll/);
