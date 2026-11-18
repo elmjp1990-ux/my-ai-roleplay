@@ -1,0 +1,70 @@
+name: Encounter AI turn contract
+
+on:
+  pull_request:
+    paths:
+      - "index.html"
+      - "encounter-scene.js"
+      - "city-map.js"
+      - "scripts/test-city-map-module.mjs"
+      - "scripts/test-encounter-public-character-eligibility.mjs"
+      - "supabase/functions/encounter-turn/**"
+      - "supabase/functions/encounter-evaluation-worker/**"
+      - "supabase/functions/_shared/encounter-session-evaluation.mjs"
+      - "scripts/test-encounter-session-evaluation-worker.mjs"
+      - "supabase/drafts/schedule-encounter-evaluation-worker.sql"
+      - "supabase/functions/encounter-session/**"
+      - "supabase/functions/encounter-schedule-organizer/**"
+      - "supabase/functions/_shared/encounter-turn-output.mjs"
+      - "supabase/functions/_shared/encounter-schedule-generation.ts"
+      - "supabase/functions/_shared/encounter-schedule-generation.test.ts"
+      - "scripts/test-encounter-schedule-worker.mjs"
+      - "scripts/import-encounter-weather-baseline-2025.mjs"
+      - "supabase/drafts/encounter-schedule-pipeline.sql"
+      - "supabase/drafts/replay-encounter-schedule-pipeline.sql"
+      - "supabase/functions/encounter-weather-sync/**"
+      - "supabase/functions/_shared/encounter-weather.mjs"
+      - "supabase/functions/_shared/encounter-weather.test.ts"
+      - "supabase/functions/encounter-taiwan-calendar-sync/**"
+      - "supabase/functions/_shared/taiwan-calendar.mjs"
+      - "supabase/functions/_shared/taiwan-calendar.test.ts"
+      - "supabase/config.toml"
+      - "supabase/functions/_shared/encounter-response-guidelines.ts"
+      - "supabase/functions/_shared/prompt-context.ts"
+      - "supabase/functions/_shared/private-context-guard.ts"
+      - "supabase/functions/_shared/openrouter-chat-completions.ts"
+      - "supabase/functions/_shared/provider-failure-policy.ts"
+      - "supabase/functions/_shared/chat-turn-claim.ts"
+      - "supabase/functions/_shared/story-memory-summary.ts"
+      - "scripts/test-encounter-ai-output.mjs"
+      - ".github/workflows/encounter-ai-turn.yml"
+
+jobs:
+  encounter-ai-turn:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Test Encounter response schema and length boundaries
+        run: node scripts/test-encounter-ai-output.mjs
+      - name: Test Encounter session evaluation, affinity settlement and opt-in scheduler
+        run: node scripts/test-encounter-session-evaluation-worker.mjs
+      - name: Test city map dynamic scene registry contract
+        run: node scripts/test-city-map-module.mjs
+      - name: Test public character schedule eligibility and adult visibility
+        run: node scripts/test-encounter-public-character-eligibility.mjs
+      - name: Test schedule worker security and wallet isolation
+        run: node scripts/test-encounter-schedule-worker.mjs
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Test AI schedule batch validation and compatibility
+        run: deno test supabase/functions/_shared/encounter-schedule-generation.test.ts
+      - name: Test lightweight seasonal Taipei weather simulation
+        run: deno test supabase/functions/_shared/encounter-weather.test.ts
+      - name: Test Taiwan holiday and make-up workday parser
+        run: deno test supabase/functions/_shared/taiwan-calendar.test.ts
+      - name: Type-check Encounter Edge Functions and shared modules
+        run: deno check supabase/functions/encounter-turn/index.ts supabase/functions/encounter-evaluation-worker/index.ts supabase/functions/encounter-session/index.ts supabase/functions/encounter-schedule-organizer/index.ts supabase/functions/encounter-weather-sync/index.ts supabase/functions/encounter-taiwan-calendar-sync/index.ts
