@@ -32,6 +32,16 @@ const RAIN_FALLBACK_SCENE_KEYS = new Set([
   "department-store", "bookstore", "cafe",
 ]);
 const NON_MODERN_ERA_PATTERN = /ancient|historical|medieval|antiquity|fantasy|mythic|fictional|古代|歷史|中世紀|中古|奇幻|架空|封建|戰國|春秋|秦漢|唐代|宋代|明代|清代|古羅馬|古希臘/i;
+const SCENE_DISPLAY_NAMES: Record<string, string> = {
+  airport: "機場", commercial: "公司／商業大樓", "night-bar": "酒吧",
+  "live-house": "Live House", apartment: "住家", "department-store": "百貨公司",
+  bookstore: "書店", cafe: "咖啡廳", park: "公園", "shopping-street": "商店街",
+  "night-market": "夜市", restaurant: "餐廳", university: "大學／校園",
+  hospital: "醫院", gym: "健身房", cinema: "電影院", museum: "博物館",
+  hotel: "飯店", "train-station": "車站", library: "圖書館",
+  theater: "劇院", "art-gallery": "藝廊", "community-center": "社區中心",
+  "music-studio": "音樂工作室", bakery: "麵包店", "coworking-space": "共享辦公室",
+};
 const SCENE_ALIASES: Record<string, string> = {
   bar: "night-bar", pub: "night-bar", 酒吧: "night-bar", 酒館: "night-bar", 夜店: "night-bar",
   公司: "commercial", 商辦: "commercial", 辦公大樓: "commercial", 辦公室: "commercial", 企業大樓: "commercial",
@@ -387,7 +397,8 @@ export function buildEncounterScheduleBatchMessages(
             day_type: text(row.day_type),
             start_time: text(row.start_time),
             end_time: text(row.end_time),
-            location_key: text(row.location_key),
+            location: text(row.location_description) ||
+              SCENE_DISPLAY_NAMES[text(row.location_key)] || "",
             activity: text(row.activity),
           };
         })
