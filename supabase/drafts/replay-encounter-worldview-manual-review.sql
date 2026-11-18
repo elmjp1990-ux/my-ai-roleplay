@@ -38,7 +38,7 @@ BEGIN
     RAISE EXCEPTION 'worldview_manual_review_must_preserve_existing_schedule_data';
   END IF;
 
-  IF position('status IN (''pending'', ''failed'', ''needs_reconciliation'')' IN
+  IF position('j.status IN (''pending'', ''failed'', ''needs_reconciliation'')' IN
        pg_catalog.pg_get_functiondef('public.claim_encounter_schedule_batch(integer,boolean,uuid)'::regprocedure)) = 0 THEN
     RAISE EXCEPTION 'needs_review_must_not_be_automatically_reclaimed';
   END IF;
