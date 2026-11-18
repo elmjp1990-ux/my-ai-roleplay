@@ -82,7 +82,7 @@ assert.match(scheduleGeneration, /地點是否能對應地圖由系統自行判�
 assert.match(scheduleGeneration, /scene_description/);
 assert.match(scheduleGeneration, /options 為 1–3 個選項/);
 assert.match(scheduleGeneration, /唯一根欄位 characters/);
-assert.match(scheduleGeneration, /不輸出 special_events、scenes/);
+assert.match(scheduleGeneration, /不輸出 no_matching_location、special_events、scenes/);
 assert.doesNotMatch(scheduleGeneration, /canonical_scene_keys|scene_catalog/);
 assert.match(sceneDescriptionMigration, /location_key DROP NOT NULL/);
 assert.match(sceneDescriptionMigration, /location_description text NOT NULL DEFAULT ''/);
