@@ -46,7 +46,11 @@ BEGIN
      OR position('existing_schedules_preserved' IN v_review) = 0
      OR position('ai_invoked' IN v_review) = 0
      OR position('worldview_review_source_changed_retry' IN v_review) = 0
-     OR position('md5(v_source::text)' IN v_review) = 0 THEN
+     OR position('md5(v_source::text)' IN v_review) = 0
+     OR position('claim_encounter_schedule_batch' IN v_review) > 0
+     OR position('character_schedules' IN v_review) > 0
+     OR position('encounter_character_greeting_pools' IN v_review) > 0
+     OR position('openrouter' IN pg_catalog.lower(v_review)) > 0 THEN
     RAISE EXCEPTION 'worldview_review_rpc_owner_or_decision_contract_missing';
   END IF;
 
