@@ -330,6 +330,28 @@ REVOKE ALL ON FUNCTION public.get_encounter_character_schedules_with_scene(uuid[
 GRANT EXECUTE ON FUNCTION public.get_encounter_character_schedules_with_scene(uuid[])
   TO anon, authenticated;
 
+-- Version the generation source so existing schedules regenerate only on their
+-- next ordinary enqueue/edit, without an automatic mass AI run.
+DO $source_version$
+DECLARE
+  v_definition text;
+  v_old text := 'poyozz-encounter-schedule-v3-relationship-greetings-2026-11-17';
+  v_new text := 'poyozz-encounter-schedule-v4-natural-locations-scene-descriptions-2026-11-18';
+  v_count integer;
+BEGIN
+  SELECT pg_catalog.pg_get_functiondef(
+    'public.encounter_schedule_source_payload(uuid)'::regprocedure
+  ) INTO v_definition;
+  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
+    / pg_catalog.length(v_old) INTO v_count;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'encounter_schedule_source_version_contract_count_unexpected: %', v_count;
+  END IF;
+  v_definition := pg_catalog.replace(v_definition, v_old, v_new);
+  EXECUTE v_definition;
+END;
+$source_version$;
+
 COMMENT ON COLUMN public.character_schedules.scene_description IS
   'AI-generated character-specific description of the scene after arrival; independent from activity and encounter greeting.';
 COMMENT ON COLUMN public.character_schedules.location_description IS
