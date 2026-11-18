@@ -13,9 +13,11 @@ BEGIN
     RAISE EXCEPTION 'sparse encounter schedules still require full-day coverage';
   END IF;
 
-  IF pg_catalog.strpos(v_definition, 'NOT BETWEEN 0 AND 4') = 0
-     OR pg_catalog.strpos(v_definition, 'NOT BETWEEN 1 AND 4') = 0 THEN
-    RAISE EXCEPTION 'sparse encounter slot count bounds are missing';
+  IF pg_catalog.strpos(v_definition, 'jsonb_array_length(v_item->''variants''->v_day_type) > 24') = 0
+     OR pg_catalog.strpos(v_definition, 'jsonb_array_length(v_variant->''options'') NOT BETWEEN 1 AND 3') = 0
+     OR pg_catalog.strpos(v_definition, 'schedule_hourly_option_weights_must_sum_100') = 0
+     OR pg_catalog.strpos(v_definition, 'schedule_hourly_block_must_be_exactly_one_hour') = 0 THEN
+    RAISE EXCEPTION 'hourly sparse schedule bounds and option weights are missing';
   END IF;
 
   IF pg_catalog.strpos(v_definition, '''gym''') = 0
