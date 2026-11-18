@@ -171,7 +171,7 @@ BEGIN
   END IF;
   v_definition := pg_catalog.replace(v_definition, v_old, '');
 
-  v_old := '               OR char_length(COALESCE(v_slot->>''rain_fallback_activity'', '''')) NOT BETWEEN 1 AND 200' || E'\n' ||
+  v_old := '             OR char_length(COALESCE(v_slot->>''rain_fallback_activity'', '''')) NOT BETWEEN 1 AND 200' || E'\n' ||
     '               OR char_length(COALESCE(v_slot->>''rain_fallback_greeting'', '''')) NOT BETWEEN 150 AND 300 THEN';
   v_new := '               OR char_length(COALESCE(v_slot->>''rain_fallback_activity'', '''')) NOT BETWEEN 10 AND 30 THEN';
   SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
