@@ -8,6 +8,7 @@ const html = fs.readFileSync("index.html", "utf8");
 const generator = fs.readFileSync("supabase/functions/_shared/encounter-schedule-generation.ts", "utf8");
 const sparseScheduleMigration = fs.readFileSync("supabase/migrations/20261118000400_encounter_schedules_allow_unavailable_windows.sql", "utf8");
 const publishedSceneResolverMigration = fs.readFileSync("supabase/migrations/20261118000500_resolve_only_published_encounter_scenes.sql", "utf8");
+const sceneDescriptionMigration = fs.readFileSync("supabase/migrations/20261118000600_encounter_schedule_scene_descriptions.sql", "utf8");
 const weatherWorker = fs.readFileSync("supabase/functions/encounter-weather-sync/index.ts", "utf8");
 const weatherParser = fs.readFileSync("supabase/functions/_shared/encounter-weather.mjs", "utf8");
 
@@ -108,6 +109,12 @@ assert.match(sparseScheduleMigration, /daily_canonical_scene_key_contract_count_
 assert.match(sparseScheduleMigration, /special_event_canonical_scene_key_contract_count_unexpected/);
 assert.doesNotMatch(generator, /scene_not_in_existing_catalog/);
 assert.match(publishedSceneResolverMigration, /public\.get_encounter_scene_catalog\(\)/);
+assert.match(sceneDescriptionMigration, /location_description text NOT NULL DEFAULT ''/);
+assert.match(sceneDescriptionMigration, /scene_description text NOT NULL DEFAULT ''/);
+assert.match(sceneDescriptionMigration, /resolve_encounter_scene_location_key/);
+assert.match(sceneDescriptionMigration, /get_encounter_character_schedules_with_scene/);
+assert.match(fs.readFileSync("index.html", "utf8"), /get_encounter_character_schedules_with_scene/);
+assert.match(fs.readFileSync("city-map.js", "utf8"), /citySceneDescription/);
 assert.match(weatherWorker, /createEncounterWeather/);
 assert.match(weatherWorker, /previousSlot === weather\.slot/);
 assert.match(weatherWorker, /previous\.source === weather\.source/);
