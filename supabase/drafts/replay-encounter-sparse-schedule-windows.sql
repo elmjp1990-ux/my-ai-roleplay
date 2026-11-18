@@ -1,6 +1,8 @@
 DO $sparse_schedule_contract$
 DECLARE
   v_definition text;
+  v_original_aliases text[];
+  v_resolved_key text;
 BEGIN
   SELECT pg_catalog.pg_get_functiondef(
     'public.publish_encounter_schedule_batch(uuid,uuid,jsonb)'::regprocedure
@@ -49,6 +51,21 @@ BEGIN
   IF pg_catalog.strpos(v_definition, 'location_description') = 0
      OR pg_catalog.strpos(v_definition, 'scene_description') = 0 THEN
     RAISE EXCEPTION 'publisher does not persist natural place intent and arrival description';
+  END IF;
+
+  SELECT aliases INTO v_original_aliases
+  FROM public.encounter_scene_registry
+  WHERE location_key = 'gym';
+  UPDATE public.encounter_scene_registry
+  SET aliases = pg_catalog.array_append(aliases, '回歸測試新地點名稱')
+  WHERE location_key = 'gym';
+  SELECT public.resolve_encounter_scene_location_key('回歸測試新地點名稱')
+    INTO v_resolved_key;
+  UPDATE public.encounter_scene_registry
+  SET aliases = v_original_aliases
+  WHERE location_key = 'gym';
+  IF v_resolved_key IS DISTINCT FROM 'gym' THEN
+    RAISE EXCEPTION 'new scene aliases do not rematch retained natural-language intent';
   END IF;
 END;
 $sparse_schedule_contract$;
