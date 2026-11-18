@@ -13902,21 +13902,21 @@ body.conversation .chat-layout,body.group-chat-page .chat-layout{
   min-height:0;
 }
 /* Encounter mode has its own fixed full-screen shell; resize every fixed layer with visualViewport. */
-body.encounter-mode-active .app,
-body.encounter-mode-active #view,
-body.encounter-mode-active .chat-layout,
-body.encounter-mode-active .chat-main.encounter-scene{
+html body.encounter-mode-active .app,
+html body.encounter-mode-active #view,
+html body.encounter-mode-active .chat-layout,
+html body.encounter-mode-active .chat-main.encounter-scene{
   top:var(--poyozz-visual-viewport-top,0px)!important;
   bottom:auto!important;
   height:var(--poyozz-chat-viewport-height,100dvh)!important;
   min-height:0!important;
 }
-body.encounter-mode-active .app,
-body.encounter-mode-active #view,
-body.encounter-mode-active .chat-layout{
+html body.encounter-mode-active .app,
+html body.encounter-mode-active #view,
+html body.encounter-mode-active .chat-layout{
   inset-inline:0!important;
 }
-body.encounter-mode-active .chat-main.encounter-scene{
+html body.encounter-mode-active .chat-main.encounter-scene{
   inset-inline:0!important;
 }
 body.encounter-mode-active.chat-keyboard-open .chat-main.encounter-scene .composer{
