@@ -10041,6 +10041,7 @@ async function loadEncounterScheduleTestTools(){
     const processing=Number(data.processing_character_count||0);
     const failed=Number(data.failed_character_count||0);
     const reconciliation=Number(data.needs_reconciliation_count||0);
+    const needsReview=Number(data.needs_review_character_count||0);
     const blocked=processing>0||reconciliation>0;
     const canRun=pending>0&&!blocked;
     const lastRun=data.last_batch_completed_at?new Date(data.last_batch_completed_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):'尚未執行';
@@ -10053,7 +10054,7 @@ async function loadEncounterScheduleTestTools(){
           :'目前沒有待處理角色。';
     if(status)status.textContent=data.status_available===false
       ?'測試環境已確認；目前無法讀取佇列狀態。'
-      :'待處理：'+pending+' 位｜處理中：'+processing+' 位｜失敗：'+failed+' 位｜待核對：'+reconciliation+' 位｜'+
+      :'待處理：'+pending+' 位｜處理中：'+processing+' 位｜失敗：'+failed+' 位｜待核對：'+reconciliation+' 位｜待人工審核：'+needsReview+' 位｜'+
         queueHint+'｜上次成功完成：'+lastRun+(data.last_batch_status?'（'+data.last_batch_status+'）':'');
     if(button){button.dataset.aiEnabled=canRun?'true':'false';button.disabled=!canRun;}
     const reconciliationContainer=document.getElementById('encounterScheduleReconciliationItems');
@@ -10071,6 +10072,20 @@ async function loadEncounterScheduleTestTools(){
           '<div class="row wrap"><button type="button" data-action="resolve-encounter-schedule-reconciliation" data-batch-id="'+batchId+'" data-character-id="'+characterId+'">確認終止此待核對工作</button></div>'+
         '</article>';
       }).join(''):'<p class="small muted">目前沒有待核對工作。</p>';
+    }
+    const reviewContainer=document.getElementById('encounterScheduleManualReviewItems');
+    if(reviewContainer){
+      const items=Array.isArray(data.manual_review_jobs)?data.manual_review_jobs:[];
+      reviewContainer.innerHTML=items.length?items.map(item=>{
+        const name=e(item.character_name||'角色');
+        const reason=e(item.reason||'worldview_manual_review_required');
+        const updated=item.updated_at?new Date(item.updated_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):'時間未提供';
+        return '<article class="panel stack" style="padding:12px">'+
+          '<strong>'+name+'｜待人工審核</strong>'+
+          '<p class="small muted">原因：'+reason+'｜保留時間：'+e(updated)+'</p>'+
+          '<p class="small">系統無法可靠判定此角色的世界觀是否適用現代地圖，因此已暫停行程生成。這筆工作不會自動重試，也不會覆蓋既有行程或招呼池；目前僅供檢視，尚未提供人工分類或重新排程操作。</p>'+
+        '</article>';
+      }).join(''):'<p class="small muted">目前沒有待人工審核的未知世界觀角色。</p>';
     }
     void loadEncounterScheduleRepairOutputs();
   }catch(error){
@@ -10420,6 +10435,10 @@ function renderModal(o) {
           <div class="stack" style="margin:10px 0">
             <strong>待核對工作</strong>
             <div id="encounterScheduleReconciliationItems" class="stack"></div>
+          </div>
+          <div class="stack" style="margin:10px 0">
+            <strong>未知世界觀｜待人工審核</strong>
+            <div id="encounterScheduleManualReviewItems" class="stack"></div>
           </div>
           <div class="row wrap">
             <button type="button" data-action="organize-encounter-schedules" disabled>AI 生成角色行程與場景</button>
