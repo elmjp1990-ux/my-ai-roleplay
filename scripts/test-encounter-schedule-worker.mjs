@@ -180,7 +180,9 @@ assert.match(hourlyScheduleMigration, /poyozz-encounter-schedule-v6-hourly-indep
 assert.match(compactScheduleMigration, /ALTER COLUMN encounter_greeting DROP NOT NULL/);
 assert.match(compactScheduleMigration, /DROP CONSTRAINT IF EXISTS character_schedules_rain_fallback_consistency_check/);
 assert.match(compactScheduleMigration, /rain_fallback_greeting IS NULL/);
-assert.match(compactScheduleMigration, /jsonb_array_length\(v_item->'variants'->v_day_type\) <> 24/);
+assert.match(compactScheduleMigration, /v_old := '      IF jsonb_array_length\(v_item->''variants''->v_day_type\) > 24 THEN';/);
+assert.match(compactScheduleMigration, /v_new := '      IF jsonb_array_length\(v_item->''variants''->v_day_type\) <> 24 THEN';/,
+  "Compact migration must transform the previous maximum-24 rule into an exact-24 rule.");
 assert.match(compactScheduleMigration, /v_multi_option_hours < 8/);
 assert.match(compactScheduleMigration, /DROP FUNCTION IF EXISTS public\.queue_encounter_greeting_pool_backfill/);
 assert.match(compactScheduleMigration, /NOT BETWEEN 10 AND 30/);
