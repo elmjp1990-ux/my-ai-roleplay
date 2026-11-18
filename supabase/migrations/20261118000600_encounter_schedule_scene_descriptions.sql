@@ -64,8 +64,8 @@ AS $$
         pg_catalog.lower(pg_catalog.btrim(COALESCE(p_location_description, '')))
      OR EXISTS (
        SELECT 1
-       FROM pg_catalog.unnest(r.aliases) AS alias(value)
-       WHERE pg_catalog.lower(pg_catalog.btrim(alias.value)) =
+       FROM pg_catalog.unnest(r.aliases) AS scene_alias(value)
+       WHERE pg_catalog.lower(pg_catalog.btrim(scene_alias.value)) =
              pg_catalog.lower(pg_catalog.btrim(COALESCE(p_location_description, '')))
      )
   ORDER BY r.is_dynamic, r.display_order, r.location_key
