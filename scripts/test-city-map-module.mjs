@@ -122,7 +122,10 @@ assert.match(scheduleOrganizer, /processing_character_count/);
 assert.match(scheduleOrganizer, /failed_character_count/);
 assert.match(scheduleOrganizer, /needs_reconciliation_count/);
 assert.match(scheduleOrganizer, /Promise\.all\(sources\.map\(async \(source\)/);
-assert.match(scheduleOrganizer, /buildEncounterScheduleBatchMessages\(\[source\], sceneCatalog\)/);
+assert.match(scheduleOrganizer, /characterPrompt = buildEncounterScheduleBatchMessages\(\[source\]\)/);
+assert.doesNotMatch(scheduleOrganizer, /buildEncounterScheduleBatchMessages\(\[source\], sceneCatalog\)/,
+  'the AI prompt must not receive the scene catalog; the parser receives it only after generation');
+assert.match(scheduleOrganizer, /parseEncounterScheduleBatchOutput\([\s\S]*?\[source\],[\s\S]*?sceneCatalog/);
 assert.match(scheduleOrganizer, /timeoutMs: 42_000/);
 assert.match(scheduleOrganizer, /_poyozz_diagnostics/);
 assert.match(scheduleOrganizer, /character_id: characterId/);
