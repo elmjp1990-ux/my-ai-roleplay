@@ -193,7 +193,7 @@ assert.ok(replayWorkflow.includes("20261119000100_encounter_schedule_compact_out
 assert.ok(replayWorkflow.indexOf("20261119000100_encounter_schedule_compact_output.sql") >
   replayWorkflow.indexOf("20261118141805_encounter_schedule_home_aliases_and_sleep_guard.sql"));
 assert.ok(replayWorkflow.indexOf("20261119000100_encounter_schedule_compact_output.sql") <
-  replayWorkflow.indexOf("replay-encounter-schedule-pipeline.sql"));
+  replayWorkflow.lastIndexOf("replay-encounter-schedule-pipeline.sql"));
 assert.match(replaySchedule, /poyozz-encounter-schedule-v8-compact-24-hour-options-2026-11-19/);
 assert.match(replayEncounterState, /did not inherit current affinity and relationship stage/);
 assert.match(replayEncounterState, /retained a pre-generated greeting/);
