@@ -11,6 +11,8 @@ const publishedSceneResolverMigration = fs.readFileSync("supabase/migrations/202
 const sceneDescriptionMigration = fs.readFileSync("supabase/migrations/20261118000600_encounter_schedule_scene_descriptions.sql", "utf8");
 const hourlyScheduleMigration = fs.readFileSync("supabase/migrations/20261118000700_encounter_hourly_schedule_options.sql", "utf8");
 const pendingPriorityMigration = fs.readFileSync("supabase/migrations/20261118000800_prioritize_pending_encounter_schedule_jobs.sql", "utf8");
+const rawOutputRepairMigration = fs.readFileSync("supabase/migrations/20261118000900_encounter_schedule_raw_output_repair.sql", "utf8");
+const providerAdapter = fs.readFileSync("supabase/functions/_shared/openrouter-chat-completions.ts", "utf8");
 const replayWorkflow = fs.readFileSync(".github/workflows/supabase-local-migration-replay.yml", "utf8");
 const weatherWorker = fs.readFileSync("supabase/functions/encounter-weather-sync/index.ts", "utf8");
 const weatherParser = fs.readFileSync("supabase/functions/_shared/encounter-weather.mjs", "utf8");
@@ -21,6 +23,23 @@ assert.match(worker, /claim_encounter_schedule_batch/);
 assert.match(worker, /publish_encounter_schedule_batch/);
 assert.match(worker, /fail_encounter_schedule_batch/);
 assert.match(worker, /parseEncounterScheduleBatchOutput/);
+assert.match(worker, /recordRawGenerationOutput/);
+assert.match(worker, /handleScheduleRepair/);
+assert.match(worker, /mode === "repair_list"/);
+assert.match(worker, /claim_encounter_schedule_repair/);
+assert.match(worker, /original_preserved: true/);
+assert.match(worker, /ai_called: false/);
+assert.match(providerAdapter, /rawResponseBody/);
+assert.match(providerAdapter, /rawOutputText/);
+assert.match(providerAdapter, /finishReason/);
+assert.match(rawOutputRepairMigration, /CREATE TABLE IF NOT EXISTS public\.encounter_schedule_generation_outputs/);
+assert.match(rawOutputRepairMigration, /CREATE TABLE IF NOT EXISTS public\.encounter_schedule_generation_output_revisions/);
+assert.match(rawOutputRepairMigration, /ENABLE ROW LEVEL SECURITY/);
+assert.match(rawOutputRepairMigration, /REVOKE ALL ON TABLE public\.encounter_schedule_generation_outputs FROM PUBLIC, anon, authenticated/);
+assert.match(rawOutputRepairMigration, /claim_encounter_schedule_repair/);
+assert.match(rawOutputRepairMigration, /p_expected_source_hash/);
+assert.match(rawOutputRepairMigration, /expires_at timestamptz NOT NULL DEFAULT/);
+
 assert.doesNotMatch(worker, /get_encounter_dynamic_scene_usage|dynamic_scene_limit_or_sharing_invalid/);
 assert.match(worker, /findPrivateContextLeak/);
 assert.match(worker, /p_limit: 2147483647/);
@@ -122,6 +141,10 @@ assert.match(hourlyScheduleMigration, /poyozz-encounter-schedule-v6-hourly-indep
 assert.ok(pendingPriorityMigration.includes("ORDER BY CASE j.status WHEN ''pending'' THEN 0 WHEN ''failed'' THEN 1 ELSE 2 END"));
 assert.ok(pendingPriorityMigration.includes("pending_schedule_job_priority_contract_count_unexpected"));
 assert.ok(replayWorkflow.includes("20261118000800_prioritize_pending_encounter_schedule_jobs.sql"));
+assert.ok(replayWorkflow.includes("20261118000900_encounter_schedule_raw_output_repair.sql"));
+assert.ok(replayWorkflow.indexOf("20261118000900_encounter_schedule_raw_output_repair.sql") >
+  replayWorkflow.indexOf("20261118000800_prioritize_pending_encounter_schedule_jobs.sql"));
+
 assert.match(generator, /scenes 必須是空陣列/);
 assert.doesNotMatch(generator, /本批次只有 1 位角色使用也可以提出候選/);
 assert.doesNotMatch(generator, /shoppingStreetUsers/);
@@ -160,6 +183,12 @@ assert.doesNotMatch(pipeline, /SELECT public\.schedule_encounter_schedule_organi
 assert.match(html, /id="encounterScheduleTestTools"/);
 assert.match(html, /functions\.invoke\('encounter-schedule-organizer',\{body:\{mode:'status'\}\}\)/);
 assert.match(html, /functions\.invoke\('encounter-schedule-organizer',\{body:\{mode:'manual'\}\}\)/);
+assert.match(html, /loadEncounterScheduleRepairOutputs/);
+assert.match(html, /mode:'repair_list'/);
+assert.match(html, /mode:'repair'/);
+assert.match(html, /repair-encounter-schedule-output/);
+assert.match(html, /不會再次呼叫 AI/);
+
 assert.match(html, /case 'environment':[\s\S]*?void loadEncounterScheduleTestTools\(\)/);
 assert.doesNotMatch(html, /kind==='album'&&CHAT_DATA_TEST_MODE/);
 
