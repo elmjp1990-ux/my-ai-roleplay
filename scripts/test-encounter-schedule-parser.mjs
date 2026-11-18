@@ -15,6 +15,14 @@ assert.doesNotMatch(html, /name="clearEncounterSchedules"/);
 assert.doesNotMatch(html, /function parseEncounterScheduleText\(raw\)/);
 assert.doesNotMatch(html, /星期\(0=日、1=一/);
 
+// City weather and dynamic scenes are session-cached to avoid repeat RPC egress on map re-entry.
+assert.match(cityMap, /CITY_MAP_WEATHER_CACHE_TTL_MS = 6 \* 60 \* 60 \* 1000/);
+assert.match(cityMap, /CITY_MAP_SCENES_CACHE_TTL_MS = 30 \* 60 \* 1000/);
+assert.match(cityMap, /sessionStorage\.getItem\('poyozz-city-map-/);
+assert.match(cityMap, /readCityMapCache\('weather'/);
+assert.match(cityMap, /readCityMapCache\('scenes-v2'/);
+assert.match(cityMap, /if\(cached\?\.fresh\)return/);
+
 // Save/load must use the separate author-only description table.
 assert.match(html, /async function saveEncounterScheduleDescription\(/);
 assert.match(html, /async function loadEncounterScheduleDescriptionIntoEditor\(/);
@@ -81,15 +89,15 @@ assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_job
 assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_jobs_insert_own[\s\S]*?auth\.uid\(\)/);
 
 // The card primary image is not reused as encounter-scene art.
-assert.match(encounterScene, /const sceneIllustration=safeImage\(character\?\.galleryIllustrations\?\.\[0\]\?\.src\|\|\x27\x27\)/);
+assert.match(encounterScene, /const sceneIllustration=safeImage\(selectedGalleryImage\|\|character\?\.galleryIllustrations\?\.\[0\]\?\.src\|\|\x27\x27\)/);
 // Restore muted inline card video playback while retaining lazy signed-URL hydration.
 assert.ok(html.includes('<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline preload="none"'));
-assert.ok(html.includes("function hydrateEncounterGalleryIllustration(characterId) {"));
+assert.ok(html.includes("function hydrateEncounterGalleryIllustration(characterId,illustrationId=null) {"));
 assert.ok(encounterScene.includes("正在載入角色立繪…"));
 assert.ok(encounterScene.includes("角色半立繪素材待補"));
 assert.ok(html.includes("const ownerLocal=state.characters.find(character=>"));
 assert.ok(html.includes("ownerLocal?.galleryIllustrations||cachedPublic?.galleryIllustrations||[]"));
-assert.match(encounterScene, /const halfBodyImage=dedicatedSprite\|\|sceneIllustration/);
+assert.match(encounterScene, /const halfBodyImage=selectedGalleryImage\|\|dedicatedSprite\|\|sceneIllustration/);
 assert.doesNotMatch(html, /const cardPortrait=safeImage\(character\?\.image/);
 assert.match(html, /相遇模式立繪（最多 5 張）/);
 assert.match(html, /主要角色圖預覽/);
