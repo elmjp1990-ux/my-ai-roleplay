@@ -400,7 +400,7 @@
       if(!raw) return false;
       return raw.split(/\r?\n/).some(line=>{
         const parts=line.trim().split('|').map(value=>value.trim());
-        if(parts.length!==5) return false;
+        if(parts.length!==6) return false;
         const [day,start,end,key,activity]=parts;
         if(!aliases.includes(key)||!activity) return false;
         if(day!=='*'&&Number(day)!==clock.weekday) return false;
@@ -412,13 +412,13 @@
       const raw=String(character.encounterSchedules||'');
       const line=raw.split(/\r?\n/).find(item=>{
         const parts=item.trim().split('|').map(value=>value.trim());
-        if(parts.length!==5||!(cityPlaceAliases[place]||[place]).includes(parts[3])||!parts[4]) return false;
+        if(parts.length!==6||!(cityPlaceAliases[place]||[place]).includes(parts[3])||!parts[4]) return false;
         if(parts[0]!=='*'&&Number(parts[0])!==clock.weekday) return false;
         const from=Number(parts[1]?.slice(0,2))*60+Number(parts[1]?.slice(3)),to=Number(parts[2]?.slice(0,2))*60+Number(parts[2]?.slice(3));
         return Number.isFinite(from)&&Number.isFinite(to)&&(from<to?clock.minutes>=from&&clock.minutes<to:(clock.minutes>=from||clock.minutes<to));
       });
       const parts=String(line||'').trim().split('|').map(value=>value.trim());
-      return {...character,cityStartTime:parts[1]||'',cityEndTime:parts[2]||'',cityActivity:parts[4]||''};
+      return {...character,cityStartTime:parts[1]||'',cityEndTime:parts[2]||'',cityActivity:parts[4]||'',citySceneDescription:parts[5]||''};
     });
   };
   const cityPresenceByPlace={};
@@ -651,7 +651,7 @@
       copy='<div class="city-character-copy"><h3>'+name+'｜故事模式</h3><p>正在開啟傳統角色聊天……</p></div>';
       $('cityCharacterPageLabel').textContent='故事模式';
     }else if(page===0){
-      copy='<div class="city-character-copy"><h3>'+name+'</h3><div class="city-character-meta"><span>'+gender+'</span><span>'+age+'</span></div><p><strong>當前行程</strong><br>'+timeRange+'<br>'+placeName+'</p><p><strong>心情</strong><br>'+escapeHTML(person.cityMood||person.mood||'平靜')+'</p><p><strong>現在狀態</strong><br>'+activity+'</p></div>';
+      copy='<div class="city-character-copy"><h3>'+name+'</h3><div class="city-character-meta"><span>'+gender+'</span><span>'+age+'</span></div><p><strong>當前行程</strong><br>'+timeRange+'<br>'+placeName+'</p><p><strong>心情</strong><br>'+escapeHTML(person.cityMood||person.mood||'平靜')+'</p><p><strong>現在狀態</strong><br>'+activity+'</p><p><strong>場景情境</strong><br>'+escapeHTML(person.citySceneDescription||'當下情境描述尚未提供。')+'</p></div>';
       $('cityCharacterPageLabel').textContent='角色狀態 · 01 / 02';
     }else{
       copy='<div class="city-character-copy"><h3>'+name+'｜角色介紹</h3><p>'+escapeHTML(intro)+'</p></div>';
