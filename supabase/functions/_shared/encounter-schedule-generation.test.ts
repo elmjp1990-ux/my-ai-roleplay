@@ -231,7 +231,7 @@ Deno.test("classifies worldviews locally and keeps species separate from era", (
   if (getEncounterWorldviewScheduleDisposition(classifyEncounterWorldview(ancientVampire)) !== "not_applicable") {
     throw new Error("known historical worldview should remain a normal non-modern exclusion");
   }
-  if (getEncounterWorldviewScheduleDisposition(modernVampireClass) !== "generate") {
+  if (getEncounterWorldviewScheduleDisposition(vampireClass) !== "generate") {
     throw new Error("modern-compatible worldview should continue to AI generation");
   }
 
