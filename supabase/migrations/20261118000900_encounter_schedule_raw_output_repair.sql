@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.encounter_schedule_generation_outputs (
   response_model text,
   finish_reason text,
   raw_response_text text,
+  raw_output_truncated boolean NOT NULL DEFAULT false,
   raw_response_body text,
   response_body_truncated boolean NOT NULL DEFAULT false,
   http_status integer,
@@ -81,7 +82,7 @@ DECLARE
   v_lease uuid := gen_random_uuid();
   v_batch uuid;
 BEGIN
-  IF COALESCE(auth.role(), '') <> 'service_role' THEN
+  IF COALESCE(auth.jwt()->>'role', '') <> 'service_role' THEN
     RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
   END IF;
 
