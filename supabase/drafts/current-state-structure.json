@@ -6071,6 +6071,32 @@
       "not_null": true,
       "collation": null,
       "generated": ""
+    },
+    {
+      "name": "suggested_replies",
+      "type": "jsonb",
+      "table": "chat_messages",
+      "schema": "public",
+      "comment": null,
+      "default": "'[]'::jsonb",
+      "ordinal": 7,
+      "identity": "",
+      "not_null": true,
+      "collation": null,
+      "generated": ""
+    },
+    {
+      "name": "suggested_replies",
+      "type": "jsonb",
+      "table": "chat_group_turns",
+      "schema": "public",
+      "comment": "Latest AI-generated player reply suggestions for this completed group turn; rendered by the shared single/group chat suggestion UI.",
+      "default": "'[]'::jsonb",
+      "ordinal": 9,
+      "identity": "",
+      "not_null": true,
+      "collation": null,
+      "generated": ""
     }
   ],
   "constraints": [
@@ -8664,6 +8690,24 @@
       "validated": true,
       "deferrable": false,
       "definition": "FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE",
+      "initially_deferred": false
+    },
+    {
+      "name": "chat_messages_suggested_replies_valid",
+      "type": "c",
+      "table": "chat_messages",
+      "validated": true,
+      "deferrable": false,
+      "definition": "CHECK ((jsonb_typeof(suggested_replies) = 'array'::text) AND (jsonb_array_length(suggested_replies) <= 3))",
+      "initially_deferred": false
+    },
+    {
+      "name": "chat_group_turns_suggested_replies_array_check",
+      "type": "c",
+      "table": "chat_group_turns",
+      "validated": true,
+      "deferrable": false,
+      "definition": "CHECK ((jsonb_typeof(suggested_replies) = 'array'::text) AND (jsonb_array_length(suggested_replies) <= 3))",
       "initially_deferred": false
     }
   ],
