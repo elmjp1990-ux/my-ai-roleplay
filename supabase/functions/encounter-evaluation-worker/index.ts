@@ -3,7 +3,7 @@ import {
   requestOpenRouterChatCompletion,
   POYOZZ_DEFAULT_CHAT_MODEL,
 } from "../_shared/openrouter-chat-completions.ts";
-import { parseEncounterSessionEvaluation } from "../_shared/encounter-session-evaluation.mjs";
+import { buildEncounterEvaluationTranscript, parseEncounterSessionEvaluation } from "../_shared/encounter-session-evaluation.mjs";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -16,7 +16,6 @@ const json = (body: unknown, status = 200) =>
 const asRow = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const asText = (value: unknown): string => typeof value === "string" ? value.trim() : "";
-const MAX_TRANSCRIPT_CHARS = 60_000;
 const MAX_TURNS = 1_000;
 
 type ClaimedJob = {
@@ -26,54 +25,6 @@ type ClaimedJob = {
   turn_count: number;
   attempt_count: number;
 };
-
-function buildTranscript(
-  turnRows: Record<string, unknown>[],
-  messages: Record<string, unknown>[],
-  openingText: string,
-): { transcript: string; includedTurns: number; omittedTurns: number } {
-  const byId = new Map(messages.map((message) => [asText(message.id), message]));
-  const pairs = turnRows.map((turn) => {
-    const userMessage = byId.get(asText(turn.user_message_id));
-    const assistantMessage = byId.get(asText(turn.assistant_message_id));
-    if (!userMessage || !assistantMessage ||
-        userMessage.role !== "user" || assistantMessage.role !== "assistant" ||
-        !asText(userMessage.content) || !asText(assistantMessage.content)) {
-      throw new Error("encounter_evaluation_message_evidence_incomplete");
-    }
-    return {
-      turnNumber: Number(turn.turn_number),
-      user: asText(userMessage.content).slice(0, 2_000),
-      assistant: asText(assistantMessage.content).slice(0, 2_000),
-    };
-  });
-
-  const allLines = pairs.map((pair) =>
-    "第" + pair.turnNumber + "回合\n玩家：" + pair.user + "\n角色：" + pair.assistant
-  );
-  if (openingText && !pairs.some((pair) => pair.assistant === openingText)) {
-    allLines.unshift("角色開場\n角色：" + openingText.slice(0, 2_000));
-  }
-
-  let lines = allLines;
-  let omittedTurns = 0;
-  let transcript = lines.join("\n\n");
-  if (transcript.length > MAX_TRANSCRIPT_CHARS && lines.length > 20) {
-    const first = lines.slice(0, 10);
-    const last = lines.slice(-50);
-    omittedTurns = Math.max(0, pairs.length - 60);
-    lines = [...first, "（中間省略 " + omittedTurns + " 段較早對話；請勿推測未提供的事件。）", ...last];
-    transcript = lines.join("\n\n");
-  }
-  if (transcript.length > MAX_TRANSCRIPT_CHARS) {
-    transcript = transcript.slice(-MAX_TRANSCRIPT_CHARS);
-  }
-  return {
-    transcript,
-    includedTurns: pairs.length,
-    omittedTurns,
-  };
-}
 
 async function evaluateJob(admin: any, job: ClaimedJob, apiKey: string) {
   const { data: lifecycle, error: lifecycleError } = await admin
@@ -160,7 +111,7 @@ async function evaluateJob(admin: any, job: ClaimedJob, apiKey: string) {
   const openingMessage = asRow(sessionData.openingMessage);
   const openingText = asText(openingMessage.text);
   const schedule = asRow(lifecycle.schedule_snapshot);
-  const transcript = buildTranscript(turns as Record<string, unknown>[], messages, openingText);
+  const transcript = buildEncounterEvaluationTranscript(turns as Record<string, unknown>[], messages, openingText);
 
   const system = [
     "你是 POYOZZ 相遇模式的整場互動評估器，不是角色扮演者。",
