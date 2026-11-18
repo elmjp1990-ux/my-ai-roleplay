@@ -226,6 +226,15 @@ export function classifyEncounterWorldview(source: EncounterScheduleSource): Enc
   return { category: "unknown", modern_map_compatible: false, confidence: "low" };
 }
 
+export type EncounterWorldviewScheduleDisposition = "generate" | "not_applicable" | "needs_review";
+
+export function getEncounterWorldviewScheduleDisposition(
+  classification: EncounterWorldviewClassification,
+): EncounterWorldviewScheduleDisposition {
+  if (classification.modern_map_compatible) return "generate";
+  return classification.category === "unknown" ? "needs_review" : "not_applicable";
+}
+
 export function isEncounterModernMapCompatible(source: EncounterScheduleSource): boolean {
   return classifyEncounterWorldview(source).modern_map_compatible;
 }
