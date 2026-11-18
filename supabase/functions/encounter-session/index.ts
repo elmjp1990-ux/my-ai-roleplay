@@ -202,7 +202,7 @@ Deno.serve(async (request: Request) => {
   // Use the same database resolver as the public city map. It selects the
   // date-specific variant and validates the character's current location once.
   const { data: resolvedSchedule, error: scheduleError } = await admin.rpc(
-    "resolve_encounter_character_schedule",
+    "resolve_encounter_character_schedule_with_scene",
     {
       p_character_id: characterId,
       p_user_id: user.id,
@@ -214,13 +214,7 @@ Deno.serve(async (request: Request) => {
   const scheduleRow = Array.isArray(resolvedSchedule) ? resolvedSchedule[0] : resolvedSchedule;
   if (!scheduleRow?.schedule_id) return json({ error: "character_not_at_this_location_now" }, 409);
 
-  const { data: scheduleDetails, error: scheduleDetailsError } = await admin
-    .from("character_schedules")
-    .select("scene_description")
-    .eq("id", scheduleRow.schedule_id)
-    .maybeSingle();
-  if (scheduleDetailsError) return json({ error: "encounter_schedule_details_lookup_failed" }, 503);
-  if (resolveEncounterScheduleAvailability(scheduleRow.activity, scheduleDetails?.scene_description) === "sleeping") {
+  if (resolveEncounterScheduleAvailability(scheduleRow.activity, scheduleRow.scene_description) === "sleeping") {
     return json({ error: "character_sleeping_unavailable_for_encounter" }, 409);
   }
 

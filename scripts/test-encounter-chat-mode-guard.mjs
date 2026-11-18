@@ -66,7 +66,7 @@ assert.match(encounterSession, /rpc\(["']account_is_active["']\)/);
 assert.match(encounterSession, /can_open_encounter_session/);
 assert.match(encounterSession, /session_id_conflict/);
 assert.match(encounterSession, /locationKey/);
-assert.match(encounterSession, /rpc\(\s*["']resolve_encounter_character_schedule["']/);
+assert.match(encounterSession, /rpc\(\s*["']resolve_encounter_character_schedule_with_scene["']/);
 assert.match(encounterSession, /p_location_key: locationKey/);
 assert.match(encounterSession, /scheduleSnapshot = \{/);
 assert.doesNotMatch(encounterSession, /\.from\(["']character_schedules["']\)/);
