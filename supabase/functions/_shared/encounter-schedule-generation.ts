@@ -391,7 +391,7 @@ export function buildEncounterScheduleBatchMessages(
     "你是 POYOZZ 的角色行程規劃器。一次為佇列提供的所有公開角色整理可驗證的城市地圖行程；不得自行省略任何角色。",
     "必須讀取角色名稱、稱號、職業、身分、世界觀、種族、性格、興趣、標籤、作者行程說明及 existing_author_schedules。existing_author_schedules 是作者已保存的固定時段與地點，必須原樣保留並視為優先限制，不得改寫或覆蓋；AI 只負責推演其餘時段。若 author_schedule_brief 為空，依角色卡設定推演合理日常；但只輸出能使用既有場景目錄、適合玩家公開相遇的時段，沒有合適場景的時段直接留空，不可為填滿時段而硬塞地點。若作者只提供部分時段，保留明確時段與限制，只補足其他可相遇時段，不得覆蓋作者設定。只使用輸入角色的設定與作者提供的行程方向，不可替角色創造與背景衝突的現代身分。歷史／古代角色若沒有作者明確設定現代相容或明確穿越，必須 placement=no_matching_location，不可放進現代城市地圖。奇幻種族只要背景明確相容現代世界，就可以正常安排。",
     "相似職業或場景必須共用 canonical location_key：酒吧老闆／酒保／酒吧員工共用 night-bar；企業主／主管／秘書共用 commercial；咖啡相關共用 cafe；音樂演出者與樂迷可共用 live-house；一般交通轉乘優先使用 train-station。不可為每個角色各造一個相似地點。",
-場景只能使用輸入 scene_catalog 中已存在且目前啟用的 location_key；不得新增、提議、命名或建立任何場景／地標，也不得輸出場景 metadata。動態場景只有在 scene_catalog 明確列出時才能使用，未列出的 restaurant、gym、university 等即使合理也不可使用。若某個時段沒有合適的既有場景，直接省略該時段，不要把角色硬塞到不相關地點；其他有合適場景的時段仍照常輸出。只有整個角色在所有一般日型與節日變體都沒有任何可相遇時段，才可使用 placement=no_matching_location。雨天備案也只能使用 scene_catalog 中已存在的室內固定場景，且只能使用 airport、commercial、night-bar、live-house、apartment、department-store、bookstore、cafe。不可輸出座標、圖片 URL、Storage path 或自行發明地標 ID。
+    "場景只能使用輸入 scene_catalog 中已存在且目前啟用的 location_key；不得新增、提議、命名或建立任何場景／地標，也不得輸出場景 metadata。動態場景只有在 scene_catalog 明確列出時才能使用，未列出的 restaurant、gym、university 等即使合理也不可使用。若某個時段沒有合適的既有場景，直接省略該時段，不要把角色硬塞到不相關地點；其他有合適場景的時段仍照常輸出。只有整個角色在所有一般日型與節日變體都沒有任何可相遇時段，才可使用 placement=no_matching_location。雨天備案也只能使用 scene_catalog 中已存在的室內固定場景，且只能使用 airport、commercial、night-bar、live-house、apartment、department-store、bookstore、cafe。不可輸出座標、圖片 URL、Storage path 或自行發明地標 ID。",
     "airport 是特殊地點：只有角色本身職業／設定與航空機場有明確關聯，或作者設定有具體搭機、接送、轉機、出入境行程時才能使用。不得把機場當一般休閒、辦公或隨機偶遇地點；沒有明確理由時使用更合理的車站、商業大樓或其他場景。",
     "只輸出適合玩家實際遇見角色的時段，不必覆蓋 24 小時，也不必描述角色在不可相遇時段的私人活動。未輸出的時間即代表該時段地圖上找不到此角色。每個變體可輸出 0–4 個時段；時段必須使用整點、不可重疊，並按開始時間排序。連續多小時在同一地點從事同一活動時合併為一段。不可為了填滿 24 小時而新增不合適的地點或時段。",
     "holiday 依台灣政府正式辦公日曆判斷，包含國定假日與補班日；不可單純把週末都視為假日。每個 weekday 變體權重固定 primary=80、alternative=20；每個 holiday 變體權重固定 primary=60、alternative=40。每個日型仍須提供 primary 與 alternative 兩套行程，但只列出該變體真正適合公開相遇的時段；可以有空檔，空檔代表角色不出現在相遇地圖。",
@@ -515,18 +515,12 @@ export function parseEncounterScheduleBatchOutput(
     }
   }
 
-  // New dynamic locations must be shared by at least two characters in this batch.
-  // The scene catalog tells the model which dynamic markers already exist and how
-  // many of the three server-controlled marker slots remain.
+  // Only existing server-catalogued scenes can be referenced by schedule slots.
   const usedSceneKeys = new Set<string>();
-  const primarySceneCharacters = new Map<string, Set<string>>();
   for (const character of characters) {
     for (const variant of [...character.variants.weekday, ...character.variants.holiday]) {
       for (const slot of variant.slots) {
         usedSceneKeys.add(slot.location_key);
-        const ids = primarySceneCharacters.get(slot.location_key) || new Set<string>();
-        ids.add(character.character_id);
-        primarySceneCharacters.set(slot.location_key, ids);
       }
     }
     for (const event of character.special_events) {
@@ -538,6 +532,7 @@ export function parseEncounterScheduleBatchOutput(
       }
     }
   }
+  const scenes: GeneratedSceneMetadata[] = [];
   const rawScenes = parsed.scenes === undefined ? [] : parsed.scenes;
   if (!Array.isArray(rawScenes) || rawScenes.length !== 0) {
     errors.push("scene_metadata_must_be_empty");
