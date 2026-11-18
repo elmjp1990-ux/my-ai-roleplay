@@ -10117,6 +10117,45 @@ document.addEventListener('click',async event=>{
   }
 });
 
+
+document.addEventListener('click',async event=>{
+  const loadButton=event.target.closest('[data-action="load-encounter-schedule-repairs"]');
+  if(loadButton){
+    event.preventDefault();
+    await loadEncounterScheduleRepairOutputs();
+    return;
+  }
+  const repairButton=event.target.closest('[data-action="repair-encounter-schedule-output"]');
+  if(!repairButton)return;
+  event.preventDefault();
+  const outputId=repairButton.dataset.outputId||'';
+  const textarea=document.querySelector('[data-encounter-repair-output="'+outputId+'"]');
+  if(!textarea||!textarea.value.trim())return toast('請先填入完整的 JSON 修正版。');
+  if(!window.confirm('將以這份內容重新驗證並嘗試發布行程？不會呼叫 AI，也不會覆蓋原始回覆。'))return;
+  repairButton.disabled=true;
+  try{
+    const {data,error}=await window.mySupabase.functions.invoke('encounter-schedule-organizer',{
+      body:{mode:'repair',output_id:outputId,corrected_response:textarea.value}
+    });
+    if(error&&data?.status!=='validation_failed')throw error;
+    if(data?.status==='validation_failed'){
+      toast('修正版尚未通過檢查：'+(data.validation_errors||[]).join('、'));
+    }else if(data?.status==='completed'){
+      toast('人工補正已通過驗證並發布；沒有再次呼叫 AI。');
+      window.PoyozzCityMap?.refreshScenes?.();
+      window.PoyozzCityMap?.refreshSchedules?.();
+      await loadEncounterScheduleRepairOutputs();
+    }else{
+      toast('人工補正結果：'+String(data?.error||data?.status||'未知狀態'));
+    }
+  }catch(error){
+    toast('人工補正未完成；原始 AI 回覆仍會保留。');
+    console.warn('Encounter schedule manual repair failed:',error?.message||error);
+  }finally{
+    repairButton.disabled=false;
+  }
+});
+
 /* Account */
 function renderShop() {
   const u = currentUser();
