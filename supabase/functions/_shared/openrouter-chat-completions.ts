@@ -15,6 +15,13 @@ export type OpenRouterCompletionResult = {
   provider: string;
   model: string;
   usage: Record<string, unknown>;
+  responseContentType: string;
+  responseBodyLength: number;
+  durationMs: number;
+  responseParsed: boolean;
+  rawResponseBody: string;
+  rawOutputText: string;
+  finishReason: string;
 };
 
 type RequestOptions = {
@@ -33,6 +40,7 @@ const asText = (value: unknown): string => typeof value === "string" ? value.tri
 /** Shared OpenRouter request path; provider privacy restrictions cannot drift between chat modes. */
 export async function requestOpenRouterChatCompletion(options: RequestOptions): Promise<OpenRouterCompletionResult> {
   const model = options.model || POYOZZ_DEFAULT_CHAT_MODEL;
+  const startedAt = Date.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 55_000);
   try {
@@ -54,16 +62,49 @@ export async function requestOpenRouterChatCompletion(options: RequestOptions): 
       body: JSON.stringify(body),
       signal: controller.signal,
     });
-    let payload = asRow(await response.json().catch(() => ({ error: { code: "invalid_provider_response" } })));
+    const responseContentType = response.headers.get("content-type") || "";
+    const responseText = await response.text();
+    let payload: Record<string, unknown>;
+    let responseParsed = true;
+    try {
+      payload = asRow(JSON.parse(responseText));
+    } catch {
+      responseParsed = false;
+      // Preserve the upstream HTTP status. The previous fallback always emitted
+      // invalid_provider_response and hid useful 429/5xx diagnostics.
+      payload = {
+        error: {
+          code: response.ok ? "invalid_provider_response" : "http_" + response.status,
+        },
+      };
+    }
     payload.status = response.status;
     if (!response.ok && payload.error == null) payload.error = { code: "http_" + response.status };
+    const choices = Array.isArray(payload.choices) ? payload.choices : [];
+    const firstChoice = asRow(choices[0]);
+    const message = asRow(firstChoice.message);
+    const rawContent = typeof message.content === "string" ? message.content :
+      Array.isArray(message.content) ? message.content.map((part) => {
+        const item = asRow(part);
+        return typeof item.text === "string" ? item.text : "";
+      }).join("\\n") : "";
+    const rawOutputText = rawContent || (typeof payload.output_text === "string" ? payload.output_text : "");
+    const finishReason = asText(firstChoice.finish_reason || payload.finish_reason ||
+      asRow(payload.incomplete_details).reason);
     return {
       result: normalizeAiProviderResult(payload),
+      rawResponseBody: responseText.slice(0, 250000),
+      rawOutputText,
+      finishReason,
       httpStatus: response.status,
       requestId: response.headers.get("x-request-id") || asText(payload.id),
       provider: asText(payload.provider),
       model: asText(payload.model) || model,
       usage: asRow(payload.usage),
+      responseContentType,
+      responseBodyLength: responseText.length,
+      durationMs: Date.now() - startedAt,
+      responseParsed,
     };
   } finally {
     clearTimeout(timeout);
