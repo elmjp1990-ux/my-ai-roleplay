@@ -28,6 +28,7 @@ const scene = fs.readFileSync("encounter-scene.js", "utf8");
 const sessionCreator = fs.readFileSync("supabase/functions/encounter-session/index.ts", "utf8");
 const pipeline = fs.readFileSync("supabase/drafts/encounter-schedule-pipeline.sql", "utf8");
 const scheduleGeneration = fs.readFileSync("supabase/functions/_shared/encounter-schedule-generation.ts", "utf8");
+const sparseScheduleMigration = fs.readFileSync("supabase/migrations/20261118000400_encounter_schedules_allow_unavailable_windows.sql", "utf8");
 const replay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-pipeline.sql", "utf8");
 const weatherSync = fs.readFileSync("supabase/functions/encounter-weather-sync/index.ts", "utf8");
 const weatherModule = fs.readFileSync("supabase/functions/_shared/encounter-weather.mjs", "utf8");
@@ -74,6 +75,14 @@ assert.match(replay, /generic public holiday schedule was not selected for a nam
 assert.match(scheduleGeneration, /special_events/);
 assert.match(scheduleGeneration, /lunar_new_year/);
 assert.match(scheduleGeneration, /角色生日目前沒有結構化日期來源/);
+assert.match(scheduleGeneration, /只輸出適合玩家實際遇見角色的時段/);
+assert.match(scheduleGeneration, /scene_catalog 中已存在/);
+assert.match(scheduleGeneration, /scenes 必須是空陣列/);
+assert.match(scheduleGeneration, /scene_not_in_existing_catalog/);
+assert.match(sparseScheduleMigration, /NOT BETWEEN 0 AND 4/);
+assert.match(sparseScheduleMigration, /NOT BETWEEN 1 AND 4/);
+assert.match(sparseScheduleMigration, /schedule_variant_24_hour_coverage_incomplete/);
+assert.match(sparseScheduleMigration, /schedule_special_event_24_hour_coverage_incomplete/);
 
 assert.match(endpoint, /requestOpenRouterChatCompletion/);
 assert.match(endpoint, /POYOZZ_DEFAULT_CHAT_MODEL/);
