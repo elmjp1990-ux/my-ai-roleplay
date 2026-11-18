@@ -45,6 +45,7 @@ VALUES ('22222222-2222-4222-8222-222222222222');
 -- Replaying both migrations must be idempotent.
 \i supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql
 \i supabase/migrations/20261107123000_schedule_character_profile_organization_worker.sql
+\i supabase/migrations/20261118170000_character_profile_worker_timeout_observability.sql
 
 INSERT INTO public.characters (id, author_id, intro, race, style)
 VALUES (
