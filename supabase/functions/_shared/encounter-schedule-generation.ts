@@ -6,6 +6,7 @@ export const ENCOUNTER_SCHEDULE_VARIANT_WEIGHTS = {
   holiday: { primary: 60, alternative: 40 },
 } as const;
 export const ENCOUNTER_SCHEDULE_MAX_SLOTS_PER_VARIANT = 4;
+export const ENCOUNTER_SCHEDULE_MAX_HOURLY_BLOCKS_PER_DAY = 24;
 
 export const ENCOUNTER_SPECIAL_EVENT_KEYS = [
   "taiwan_public_holiday", "lunar_new_year", "valentines_day", "christmas",
@@ -85,10 +86,14 @@ type ScheduleSlot = {
   rain_fallback_greeting: string | null;
   encounter_greeting: string;
 };
-type ScheduleVariant = {
-  variant_key: "primary" | "alternative";
+type ScheduleOption = ScheduleSlot & {
+  option_key: "option_1" | "option_2" | "option_3";
   weight: number;
-  slots: ScheduleSlot[];
+};
+type ScheduleTimeBlock = {
+  start_time: string;
+  end_time: string;
+  options: ScheduleOption[];
 };
 type SpecialEventSchedule = {
   event_key: typeof ENCOUNTER_SPECIAL_EVENT_KEYS[number];
@@ -122,8 +127,8 @@ export type GeneratedCharacterSchedule = {
   character_id: string;
   placement: "modern_map" | "no_matching_location";
   variants: {
-    weekday: ScheduleVariant[];
-    holiday: ScheduleVariant[];
+    weekday: ScheduleTimeBlock[];
+    holiday: ScheduleTimeBlock[];
   };
   special_events: SpecialEventSchedule[];
   relationship_greetings?: EncounterRelationshipGreetingPools;
@@ -291,6 +296,92 @@ function validateVariant(
   return { variant_key: expectedKey, weight: expectedWeight, slots };
 }
 
+function validateHourlySchedule(
+  value: unknown,
+  errors: string[],
+  label: string,
+): ScheduleTimeBlock[] | null {
+  if (!Array.isArray(value) || value.length > ENCOUNTER_SCHEDULE_MAX_HOURLY_BLOCKS_PER_DAY) {
+    errors.push(label + "_hourly_blocks_invalid");
+    return null;
+  }
+  const blocks: ScheduleTimeBlock[] = [];
+  for (let index = 0; index < value.length; index++) {
+    const rawBlock = value[index];
+    const blockLabel = label + "_hour_" + index;
+    if (!hasExactKeys(rawBlock, ["start_time", "end_time", "options"])) {
+      errors.push(blockLabel + "_keys_invalid");
+      continue;
+    }
+    const start = parseHour(rawBlock.start_time);
+    const end = parseHour(rawBlock.end_time);
+    if (start === null || end === null || durationMinutes(start, end) !== 60) {
+      errors.push(blockLabel + "_must_be_exactly_one_hour");
+      continue;
+    }
+    if (!Array.isArray(rawBlock.options) || rawBlock.options.length < 1 || rawBlock.options.length > 3) {
+      errors.push(blockLabel + "_options_count_invalid");
+      continue;
+    }
+    let weightTotal = 0;
+    const options: ScheduleOption[] = [];
+    for (let optionIndex = 0; optionIndex < rawBlock.options.length; optionIndex++) {
+      const rawOption = rawBlock.options[optionIndex];
+      if (!hasExactKeys(rawOption, [
+        "weight", "location", "activity", "scene_description", "is_outdoor",
+        "rain_fallback_location", "rain_fallback_activity", "rain_fallback_greeting",
+        "encounter_greeting",
+      ])) {
+        errors.push(blockLabel + "_option_" + optionIndex + "_keys_invalid");
+        continue;
+      }
+      const weight = rawOption.weight;
+      if (!Number.isInteger(weight) || Number(weight) < 1 || Number(weight) > 100) {
+        errors.push(blockLabel + "_option_" + optionIndex + "_weight_invalid");
+        continue;
+      }
+      weightTotal += Number(weight);
+      const slot = validateSlot({
+        start_time: rawBlock.start_time,
+        end_time: rawBlock.end_time,
+        location: rawOption.location,
+        activity: rawOption.activity,
+        scene_description: rawOption.scene_description,
+        is_outdoor: rawOption.is_outdoor,
+        rain_fallback_location: rawOption.rain_fallback_location,
+        rain_fallback_activity: rawOption.rain_fallback_activity,
+        rain_fallback_greeting: rawOption.rain_fallback_greeting,
+        encounter_greeting: rawOption.encounter_greeting,
+      }, errors, blockLabel + "_option_" + optionIndex);
+      if (slot) {
+        options.push({
+          ...slot,
+          option_key: ("option_" + (optionIndex + 1)) as ScheduleOption["option_key"],
+          weight: Number(weight),
+        });
+      }
+    }
+    if (weightTotal !== 100) errors.push(blockLabel + "_option_weights_must_sum_100");
+    if (options.length === rawBlock.options.length) {
+      blocks.push({
+        start_time: text(rawBlock.start_time),
+        end_time: text(rawBlock.end_time),
+        options,
+      });
+    }
+  }
+  const ordered = blocks.slice().sort((a, b) => (parseHour(a.start_time) ?? 0) - (parseHour(b.start_time) ?? 0));
+  for (let index = 1; index < ordered.length; index++) {
+    const previousStart = parseHour(ordered[index - 1].start_time) ?? 0;
+    const currentStart = parseHour(ordered[index].start_time) ?? 0;
+    if (previousStart === currentStart || intervalsOverlap(
+      { start: previousStart, end: previousStart + 60 },
+      { start: currentStart, end: currentStart + 60 },
+    )) errors.push(label + "_hourly_blocks_overlap");
+  }
+  return blocks;
+}
+
 function validateRelationshipGreetingPools(
   value: unknown,
   errors: string[],
@@ -412,14 +503,14 @@ export function buildEncounterScheduleBatchMessages(
     "每個時段請用自然語言寫出實際地點名稱（例如健身房、公司、咖啡廳、夜市），不可輸出 location_key、場景 ID、座標或任何系統場景分類。相似職業可以自然安排在相似地點，但不需要知道系統如何合併場景。不得因為不確定地圖是否有該地點而改寫或刪除合理行程；地點是否能對應地圖由系統自行判斷。",
     "AI 不得接收、查詢或判斷系統場景目錄、場景 ID、合法場景清單、場景是否啟用或地圖顯示資格；不得產生場景 metadata、座標、圖片 URL、Storage path 或地標 ID。每個合理行程時段都要保留，即使地點目前沒有地圖場景也不可省略。地點映射、場景啟用狀態、座標與是否顯示全部由系統處理。",
     "airport 是特殊地點：只有角色本身職業／設定與航空機場有明確關聯，或作者設定有具體搭機、接送、轉機、出入境行程時才能使用。不得把機場當一般休閒、辦公或隨機偶遇地點；沒有明確理由時使用更合理的車站、商業大樓或其他場景。",
-    "行程以角色自身日常活動為準，AI 不得判斷玩家是否能相遇、地點是否適合公開相遇或地圖是否顯示。每個變體可輸出 0–4 個時段；時段必須使用整點、不可重疊，並按開始時間排序，允許自然空檔，不必覆蓋 24 小時。連續多小時在同一地點從事同一活動時合併為一段。即使地點目前無法對應地圖場景，也必須保留原始時段、自然地點描述、活動、scene_description 與招呼內容；是否可相遇及是否顯示完全由系統判斷。",
-    "holiday 依台灣政府正式辦公日曆判斷，包含國定假日與補班日；不可單純把週末都視為假日。每個 weekday 變體權重固定 primary=80、alternative=20；每個 holiday 變體權重固定 primary=60、alternative=40。每個日型仍須提供 primary 與 alternative 兩套行程；每套只列出角色當日實際安排的時段，允許自然空檔，是否能在地圖相遇由系統判斷。",
+    "行程以角色自身日常活動為準，AI 不得判斷玩家是否能相遇、地點是否適合公開相遇或地圖是否顯示。weekday 與 holiday 各自輸出 0–24 個逐小時時段，每個時段必須恰好 60 分鐘、使用整點、不可重疊，允許自然空檔，不必覆蓋 24 小時。不可合併相鄰時段；即使連續多小時都在睡覺或工作，也要逐小時描述角色狀態的自然變化，避免 scene_description 每小時完全重複。每個時段需提供 1–3 個可選行為，每個選項的 weight 為 1–100 的整數，同一時段所有選項權重總和必須恰好 100；只有一種可能時就提供單一 100% 選項。不同時段獨立抽取，不可用一個全日 80/20 變體綁定整天。即使地點目前無法對應地圖場景，也必須保留自然地點描述、活動、scene_description 與招呼內容；是否可相遇及是否顯示完全由系統判斷。",
+    "weekday 與 holiday 是日曆情境，不等於角色的上班日與休假日。依台灣政府正式辦公日曆及補班日決定 day_type；AI 必須根據角色職業與作者設定，分別推演平日和假日的生活節奏，不可假設所有人週末休息。系統每天依角色、日期與時段獨立執行加權抽取，同一天同一時段結果固定，重新整理地圖不會重新抽籤；不同日期會使用不同抽取種子。",
     "special_events 可選擇輸出 0–4 個條件式節日行程，只能使用 event_key: taiwan_public_holiday、lunar_new_year、valentines_day、christmas。taiwan_public_holiday 代表台灣政府正式放假日；lunar_new_year 代表農曆除夕與春節假期；valentines_day 為每年 02-14；christmas 為每年 12-25。只有角色背景、關係或職業確實適合節日生活變化時才輸出，不要為每個角色硬加節日活動；只列出角色在該節日有意義的行程時段，允許空檔；若沒有合理的節日行程，special_events 必須是空陣列。角色生日目前沒有結構化日期來源，不可自行推算或輸出 birthday.",
     "戶外時段必須提供自然語言的雨天室內替代地點、替代活動與一段 150–300 字元的 rain_fallback_greeting；室內時段所有 rain_fallback 欄位必須為 null。是否戶外及雨備地點對應何種系統場景，由系統判斷。",
     "作者行程說明只供內部規劃，輸出活動必須使用公開可見、簡短自然的描述，不得逐字複製整段說明或揭露私人情節。每個時段必須額外產生 scene_description：描述角色抵達該地點後當下的狀態、動作、環境氛圍與正在發生的情境，需融合角色個性，長度 8–500 字元；不可只把 activity 換句話說。例如 06:00–08:00 在健身房晨間訓練，情境可寫成「今天也要開始新的一天」，但應依角色個性呈現自律、懶散或興致勃勃等不同狀態；08:00–09:00 在公司與合作商會議談判，情境應呈現角色準備資料、進入會議或談判當下的神情與氛圍。每個時段也要產生一段與角色、地點、活動吻合的預生成招呼 encounter_greeting，長度 150–300 字元；不得直接揭露作者私密設定或照抄私密內容。",
     "每個 modern_map 角色還必須額外產生 relationship_greetings：依 hostile、dislike、wary、first_meeting、acquaintance、close、intimate、special 八種關係階段，各提供 3–5 段不同的繁體中文開場招呼，預設恰好 3 段（只有角色差異確實需要時才增加到 4–5 段），每段以 150–180 字元為目標且不得少於 150、不得超過 300 字元。每段要符合角色個性，但不要寫死地點、日期或時間，因為實際場景由玩家遇見時的排程決定；同一階段內不得重複。階段語氣要有明顯差異：hostile 敵意、dislike 冷淡、wary 戒備、first_meeting 初識、acquaintance 熟悉、close 信任親近、intimate 深厚親密（不預設一定是戀愛）、special 特別且高度個人化。不可因關係階段而捏造玩家曾做過的事。",
 
-    "輸出必須是嚴格 JSON object，根欄位 characters 與 scenes。每個角色欄位為 character_id, placement, variants, special_events；modern_map 角色必須包含 relationship_greetings，no_matching_location 角色可省略。relationship_greetings 必須且只能包含八個 stage key，每個 key 對應 3–5 段 150–300 字元的字串陣列。variants 只包含 weekday 與 holiday；各自為兩個 variant 物件。variant 物件欄位為 variant_key, weight, slots，slots 可為空陣列，最多 4 段，只列出角色當日實際安排的行程時段，不由 AI 判斷能否相遇。special_events 為 0–4 個 event_key, event_name, slots 物件的陣列；每個節日只列出角色當日有安排的節日時段，無合理行程時輸出空陣列。slot 欄位為 start_time, end_time, location（自然語言地點名稱）, activity, scene_description, is_outdoor, rain_fallback_location（自然語言雨備地點）, rain_fallback_activity, rain_fallback_greeting, encounter_greeting。scenes 必須是空陣列，因為 AI 不得新增或修改場景資料。不可輸出額外欄位或 Markdown.",
+    "輸出必須是嚴格 JSON object，根欄位 characters 與 scenes。每個角色欄位為 character_id, placement, variants, special_events；modern_map 角色必須包含 relationship_greetings，no_matching_location 角色可省略。relationship_greetings 必須且只能包含八個 stage key，每個 key 對應 3–5 段 150–300 字元的字串陣列。variants 只包含 weekday 與 holiday；各自為逐小時時段陣列（0–24 段）。每個時段物件欄位為 start_time, end_time, options；options 為 1–3 個選項，每個選項欄位為 weight, location（自然語言地點名稱）, activity, scene_description, is_outdoor, rain_fallback_location（自然語言雨備地點）, rain_fallback_activity, rain_fallback_greeting, encounter_greeting；同一時段 options 的 weight 總和必須為 100。不同時段的選項獨立抽取。special_events 維持 0–4 個 event_key, event_name, slots 物件的陣列；每個節日只列出角色當日有安排的節日時段，無合理行程時輸出空陣列。節日時段 slot 欄位為 start_time, end_time, location, activity, scene_description, is_outdoor, rain_fallback_location, rain_fallback_activity, rain_fallback_greeting, encounter_greeting。scenes 必須是空陣列，因為 AI 不得新增或修改場景資料。不可輸出額外欄位或 Markdown.",
   ].join("\n");
   return {
     messages: [
@@ -501,27 +592,23 @@ export function parseEncounterScheduleBatchOutput(
     );
     if (!relationshipGreetings) continue;
     if (!hasExactKeys(item.variants, ["weekday", "holiday"]) ||
-      !Array.isArray(item.variants.weekday) || !Array.isArray(item.variants.holiday) ||
-      item.variants.weekday.length !== 2 || item.variants.holiday.length !== 2) {
+      !Array.isArray(item.variants.weekday) || !Array.isArray(item.variants.holiday)) {
       errors.push(id + "_day_type_variants_invalid");
       continue;
     }
-    const weekday = [
-      validateVariant(item.variants.weekday[0], "weekday", "primary", 80, errors, id + "_weekday_primary"),
-      validateVariant(item.variants.weekday[1], "weekday", "alternative", 20, errors, id + "_weekday_alternative"),
-    ].filter((value): value is ScheduleVariant => value !== null);
-    const holiday = [
-      validateVariant(item.variants.holiday[0], "holiday", "primary", 60, errors, id + "_holiday_primary"),
-      validateVariant(item.variants.holiday[1], "holiday", "alternative", 40, errors, id + "_holiday_alternative"),
-    ].filter((value): value is ScheduleVariant => value !== null);
-    const scheduleSlots = [...weekday, ...holiday].flatMap((variant) => variant.slots)
-      .concat(specialEvents.flatMap((event) => event.slots));
+    const weekday = validateHourlySchedule(item.variants.weekday, errors, id + "_weekday");
+    const holiday = validateHourlySchedule(item.variants.holiday, errors, id + "_holiday");
+    const scheduleSlots = [
+      ...(weekday ?? []).flatMap((block) => block.options),
+      ...(holiday ?? []).flatMap((block) => block.options),
+      ...specialEvents.flatMap((event) => event.slots),
+    ];
     if (scheduleSlots.some((slot) =>
       (slot.location_key === "airport" || slot.rain_fallback_location_key === "airport") &&
       !isAirportUseReasonable(source, slot.activity))) {
       errors.push(id + "_airport_location_without_character_context");
     }
-    if (weekday.length === 2 && holiday.length === 2) {
+    if (weekday && holiday) {
       characters.push({
         character_id: id, placement: "modern_map", variants: { weekday, holiday },
         special_events: specialEvents, relationship_greetings: relationshipGreetings,
@@ -538,8 +625,8 @@ export function parseEncounterScheduleBatchOutput(
   );
   for (const character of characters) {
     const allSlots = [
-      ...character.variants.weekday.flatMap((variant) => variant.slots),
-      ...character.variants.holiday.flatMap((variant) => variant.slots),
+      ...character.variants.weekday.flatMap((block) => block.options),
+      ...character.variants.holiday.flatMap((block) => block.options),
       ...character.special_events.flatMap((event) => event.slots),
     ];
     for (const slot of allSlots) {
