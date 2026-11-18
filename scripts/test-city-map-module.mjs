@@ -50,6 +50,8 @@ assert.match(cityMap, /get_encounter_scene_catalog/);
 assert.match(cityMap, /refreshScenes\(\)/);
 assert.match(cityMap, /refreshSchedules\(\)/);
 assert.match(cityMap, /activeScheduleRefresh=async\(\)=>/);
+assert.match(cityMap, /refreshSchedules\(\)\s*\{\s*return activeScheduleRefresh \? activeScheduleRefresh\(\) : Promise\.resolve\(\);\s*\}/, 'Schedule refresh must safely no-op before the city map is rendered or after it is destroyed.');
+assert.match(cityMap, /activeScheduleRefresh = null/, 'Destroying the active city map must release its schedule refresh callback.');
 assert.match(cityMap, /await loadCityPeoplePage\(activePlace\)/);
 assert.match(cityMap, /activeVenueRefresh=renderVenue/);
 assert.match(cityMap, /const latestScene=cityVenueScenes\[place\]\|\|scene/);
