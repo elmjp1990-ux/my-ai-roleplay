@@ -251,6 +251,10 @@ $session_creator$;
 COMMENT ON FUNCTION public.create_encounter_session_with_lifecycle(uuid,uuid,uuid,text,jsonb,jsonb,text,timestamptz,timestamptz) IS
   'Creates an Encounter session with current affinity and relationship stage; the first AI response is generated dynamically after the player sends a greeting or chooses blank discovery.';
 
+-- This old manual backfill would now see every character as missing a greeting
+-- pool and could repeatedly enqueue schedule generations. It is obsolete.
+DROP FUNCTION IF EXISTS public.queue_encounter_greeting_pool_backfill(integer);
+
 -- Bump the source payload version so the next explicitly requested generation
 -- uses the compact schema. This migration does not enqueue jobs or call AI.
 DO $source_version$
