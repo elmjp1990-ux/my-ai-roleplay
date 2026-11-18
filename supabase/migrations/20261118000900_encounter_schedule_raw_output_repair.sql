@@ -61,7 +61,67 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.encounter_schedule_generati
 COMMENT ON TABLE public.encounter_schedule_generation_outputs IS
   'Private, time-bounded original Encounter schedule AI responses and provider diagnostics. Accessible only to service_role through the test-only organizer endpoint.';
 COMMENT ON TABLE public.encounter_schedule_generation_output_revisions IS
-  'Append-only human correction submissions for Encounter schedule AI outputs; the original model response is retained separately.';
+  'Append-only human correction submissions for Encounter schedule AI outputs; corrected content and validation evidence are immutable while workflow status may advance.';
+
+
+CREATE OR REPLACE FUNCTION public.prevent_encounter_schedule_raw_output_rewrite()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = ''
+AS $
+BEGIN
+  IF ROW(
+    NEW.batch_id, NEW.character_id, NEW.actor_user_id, NEW.source_hash,
+    NEW.requested_model, NEW.provider, NEW.response_model, NEW.finish_reason,
+    NEW.raw_response_text, NEW.raw_output_truncated, NEW.raw_response_body,
+    NEW.response_body_truncated, NEW.http_status, NEW.response_content_type,
+    NEW.response_parsed, NEW.usage, NEW.created_at, NEW.expires_at
+  ) IS DISTINCT FROM ROW(
+    OLD.batch_id, OLD.character_id, OLD.actor_user_id, OLD.source_hash,
+    OLD.requested_model, OLD.provider, OLD.response_model, OLD.finish_reason,
+    OLD.raw_response_text, OLD.raw_output_truncated, OLD.raw_response_body,
+    OLD.response_body_truncated, OLD.http_status, OLD.response_content_type,
+    OLD.response_parsed, OLD.usage, OLD.created_at, OLD.expires_at
+  ) THEN
+    RAISE EXCEPTION 'encounter_schedule_original_ai_response_is_immutable';
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+CREATE OR REPLACE FUNCTION public.prevent_encounter_schedule_revision_rewrite()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = ''
+AS $
+BEGIN
+  IF ROW(
+    NEW.output_id, NEW.corrected_response_text, NEW.validation_errors,
+    NEW.created_by, NEW.created_at
+  ) IS DISTINCT FROM ROW(
+    OLD.output_id, OLD.corrected_response_text, OLD.validation_errors,
+    OLD.created_by, OLD.created_at
+  ) THEN
+    RAISE EXCEPTION 'encounter_schedule_manual_revision_is_immutable';
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.prevent_encounter_schedule_raw_output_rewrite() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.prevent_encounter_schedule_revision_rewrite() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS encounter_schedule_raw_output_immutable
+  ON public.encounter_schedule_generation_outputs;
+CREATE TRIGGER encounter_schedule_raw_output_immutable
+BEFORE UPDATE ON public.encounter_schedule_generation_outputs
+FOR EACH ROW EXECUTE FUNCTION public.prevent_encounter_schedule_raw_output_rewrite();
+
+DROP TRIGGER IF EXISTS encounter_schedule_output_revision_immutable
+  ON public.encounter_schedule_generation_output_revisions;
+CREATE TRIGGER encounter_schedule_output_revision_immutable
+BEFORE UPDATE ON public.encounter_schedule_generation_output_revisions
+FOR EACH ROW EXECUTE FUNCTION public.prevent_encounter_schedule_revision_rewrite();
 
 CREATE OR REPLACE FUNCTION public.claim_encounter_schedule_repair(
   p_original_batch_id uuid,
