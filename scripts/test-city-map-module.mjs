@@ -127,9 +127,9 @@ assert.match(scheduleOrganizer, /processing_character_count/);
 assert.match(scheduleOrganizer, /failed_character_count/);
 assert.match(scheduleOrganizer, /needs_reconciliation_count/);
 assert.match(scheduleOrganizer, /Promise\.all\(sources\.map\(async \(source\)/);
-assert.match(scheduleOrganizer, /characterPrompt = buildEncounterScheduleBatchMessages\(\[source\]\)/);
-assert.doesNotMatch(scheduleOrganizer, /buildEncounterScheduleBatchMessages\(\[source\], sceneCatalog\)/,
-  'the AI prompt must not receive the scene catalog; the parser receives it only after generation');
+assert.match(scheduleOrganizer, /characterPrompt = buildEncounterScheduleBatchMessages\(\[source\], sceneCatalog\)/,
+  'the AI receives active scene display names as optional examples, never as a whitelist');
+assert.match(scheduleOrganizer, /parseEncounterScheduleBatchOutput\([\s\S]*?\[source\],[\s\S]*?sceneCatalog/);
 assert.match(scheduleOrganizer, /parseEncounterScheduleBatchOutput\([\s\S]*?\[source\],[\s\S]*?sceneCatalog/);
 assert.match(scheduleOrganizer, /ENCOUNTER_SCHEDULE_PROVIDER_TIMEOUT_MS = 100_000/);
 assert.match(scheduleOrganizer, /timeoutMs: ENCOUNTER_SCHEDULE_PROVIDER_TIMEOUT_MS/);
