@@ -25,7 +25,7 @@ BEGIN
   v_definition := pg_catalog.replace(v_definition, v_old,
     $new$OR jsonb_array_length(v_variant->'slots') NOT BETWEEN 0 AND 4$new$);
 
-  v_old := $old$IF jsonb_array_length(v_special_event->'slots') NOT BETWEEN 2 AND 4 THEN$new$;
+  v_old := $old$IF jsonb_array_length(v_special_event->'slots') NOT BETWEEN 2 AND 4 THEN$old$;
   IF pg_catalog.strpos(v_definition, v_old) = 0 THEN
     RAISE EXCEPTION 'special_event_slot_count_contract_not_found';
   END IF;
