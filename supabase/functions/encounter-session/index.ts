@@ -230,11 +230,9 @@ Deno.serve(async (request: Request) => {
     source_type: scheduleRow.source_type,
     variant_key: scheduleRow.variant_key,
     variant_weight: scheduleRow.variant_weight,
-    encounter_greeting: scheduleRow.encounter_greeting || "",
     is_outdoor: scheduleRow.is_outdoor === true,
     rain_fallback_location_key: scheduleRow.rain_fallback_location_key || null,
     rain_fallback_activity: scheduleRow.rain_fallback_activity || null,
-    rain_fallback_greeting: scheduleRow.rain_fallback_greeting || null,
     scheduled_start_at: scheduleRow.scheduled_start_at,
     scheduled_end_at: scheduleRow.scheduled_end_at,
   };
@@ -243,8 +241,6 @@ Deno.serve(async (request: Request) => {
   // Freeze the validated location/activity context into the character snapshot so
   // Encounter turns do not need a second lifecycle-table read.
   snapshot.encounterSchedule = scheduleSnapshot;
-  snapshot.encounterGreeting = typeof scheduleSnapshot.encounter_greeting === "string"
-    ? scheduleSnapshot.encounter_greeting.trim() : "";
 
   const { data: session, error: insertError } = await admin.rpc(
     "create_encounter_session_with_lifecycle",
