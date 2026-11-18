@@ -230,7 +230,9 @@ export type EncounterWorldviewScheduleDisposition = "generate" | "not_applicable
 
 export function getEncounterWorldviewScheduleDisposition(
   classification: EncounterWorldviewClassification,
+  manualDecision: unknown = null,
 ): EncounterWorldviewScheduleDisposition {
+  if (manualDecision === "modern_map_compatible") return "generate";
   if (classification.modern_map_compatible) return "generate";
   return classification.category === "unknown" ? "needs_review" : "not_applicable";
 }
