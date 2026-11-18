@@ -336,7 +336,7 @@ Deno.serve(async (request) => {
     }
     const reviewCharacterIds = [...new Set((reviewResult.data || []).map((job: any) => job.character_id).filter(Boolean))];
     const reviewCharactersResult = reviewCharacterIds.length
-      ? await admin.from("characters").select("id,name").in("id", reviewCharacterIds)
+      ? await admin.from("characters").select("id,name").in("id", reviewCharacterIds).eq("author_id", actorUserId)
       : { data: [], error: null };
     if (reviewCharactersResult.error) return json({ enabled: true, test_mode: true, status_available: false });
     const reviewNames = new Map((reviewCharactersResult.data || []).map((character: any) => [character.id, character.name]));
@@ -359,7 +359,7 @@ Deno.serve(async (request) => {
           .eq("author_id", actorUserId)
         : Promise.resolve({ data: [], error: null }),
       reconciliationCharacterIds.length
-        ? admin.from("characters").select("id,name").in("id", reconciliationCharacterIds)
+        ? admin.from("characters").select("id,name").in("id", reconciliationCharacterIds).eq("author_id", actorUserId)
         : Promise.resolve({ data: [], error: null }),
     ]);
     if (reconciliationJobsResult.error || reconciliationCharactersResult.error) {
