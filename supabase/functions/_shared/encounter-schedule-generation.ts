@@ -86,6 +86,11 @@ type ScheduleSlot = {
   rain_fallback_greeting: string | null;
   encounter_greeting: string;
 };
+type ScheduleVariant = {
+  variant_key: "primary" | "alternative";
+  weight: number;
+  slots: ScheduleSlot[];
+};
 type ScheduleOption = Omit<ScheduleSlot, "start_time" | "end_time"> & {
   option_key: "option_1" | "option_2" | "option_3";
   weight: number;
