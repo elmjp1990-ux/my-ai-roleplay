@@ -18,6 +18,9 @@ export type OpenRouterCompletionResult = {
   responseContentType: string;
   responseBodyLength: number;
   responseParsed: boolean;
+  rawResponseBody: string;
+  rawOutputText: string;
+  finishReason: string;
 };
 
 type RequestOptions = {
@@ -75,8 +78,22 @@ export async function requestOpenRouterChatCompletion(options: RequestOptions): 
     }
     payload.status = response.status;
     if (!response.ok && payload.error == null) payload.error = { code: "http_" + response.status };
+    const choices = Array.isArray(payload.choices) ? payload.choices : [];
+    const firstChoice = asRow(choices[0]);
+    const message = asRow(firstChoice.message);
+    const rawContent = typeof message.content === "string" ? message.content :
+      Array.isArray(message.content) ? message.content.map((part) => {
+        const item = asRow(part);
+        return typeof item.text === "string" ? item.text : "";
+      }).join("\\n") : "";
+    const rawOutputText = rawContent || (typeof payload.output_text === "string" ? payload.output_text : "");
+    const finishReason = asText(firstChoice.finish_reason || payload.finish_reason ||
+      asRow(payload.incomplete_details).reason);
     return {
       result: normalizeAiProviderResult(payload),
+      rawResponseBody: responseText.slice(0, 250000),
+      rawOutputText,
+      finishReason,
       httpStatus: response.status,
       requestId: response.headers.get("x-request-id") || asText(payload.id),
       provider: asText(payload.provider),
