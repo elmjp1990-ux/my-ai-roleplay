@@ -10,6 +10,8 @@ const sparseScheduleMigration = fs.readFileSync("supabase/migrations/20261118000
 const publishedSceneResolverMigration = fs.readFileSync("supabase/migrations/20261118000500_resolve_only_published_encounter_scenes.sql", "utf8");
 const sceneDescriptionMigration = fs.readFileSync("supabase/migrations/20261118000600_encounter_schedule_scene_descriptions.sql", "utf8");
 const hourlyScheduleMigration = fs.readFileSync("supabase/migrations/20261118000700_encounter_hourly_schedule_options.sql", "utf8");
+const pendingPriorityMigration = fs.readFileSync("supabase/migrations/20261118000800_prioritize_pending_encounter_schedule_jobs.sql", "utf8");
+const replayWorkflow = fs.readFileSync(".github/workflows/supabase-local-migration-replay.yml", "utf8");
 const weatherWorker = fs.readFileSync("supabase/functions/encounter-weather-sync/index.ts", "utf8");
 const weatherParser = fs.readFileSync("supabase/functions/_shared/encounter-weather.mjs", "utf8");
 
@@ -117,6 +119,9 @@ assert.match(hourlyScheduleMigration, /v_option_roll/);
 assert.match(hourlyScheduleMigration, /hourly-options-v1/);
 assert.match(hourlyScheduleMigration, /option_1/);
 assert.match(hourlyScheduleMigration, /poyozz-encounter-schedule-v6-hourly-independent-options-2026-11-18/);
+assert.ok(pendingPriorityMigration.includes("ORDER BY CASE j.status WHEN ''pending'' THEN 0 WHEN ''failed'' THEN 1 ELSE 2 END"));
+assert.ok(pendingPriorityMigration.includes("pending_schedule_job_priority_contract_count_unexpected"));
+assert.ok(replayWorkflow.includes("20261118000800_prioritize_pending_encounter_schedule_jobs.sql"));
 assert.match(generator, /scenes 必須是空陣列/);
 assert.doesNotMatch(generator, /本批次只有 1 位角色使用也可以提出候選/);
 assert.doesNotMatch(generator, /shoppingStreetUsers/);
