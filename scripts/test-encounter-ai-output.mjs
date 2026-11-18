@@ -35,6 +35,7 @@ const cityMap = fs.readFileSync("city-map.js", "utf8");
 const greetingPools = fs.readFileSync("supabase/drafts/encounter-relationship-greeting-pools.sql", "utf8");
 const evaluationWorker = fs.readFileSync("supabase/functions/encounter-evaluation-worker/index.ts", "utf8");
 const evaluationScheduler = fs.readFileSync("supabase/drafts/schedule-encounter-evaluation-worker.sql", "utf8");
+const scheduleOrganizer = fs.readFileSync("supabase/functions/encounter-schedule-organizer/index.ts", "utf8");
 
 assert.equal((pipeline.match(/^BEGIN;$/gm) || []).length, 1, "Encounter SQL draft must contain one transaction start");
 assert.equal((pipeline.match(/^COMMIT;$/gm) || []).length, 1, "Encounter SQL draft must contain one transaction end");
@@ -162,5 +163,21 @@ assert.match(evaluationScheduler, /PERFORM public\.enqueue_due_encounter_evaluat
   "The cron dispatcher must enqueue expired scenes before calling the worker");
 assert.match(evaluationScheduler, /DO \$dispatch\$/);
 assert.match(evaluationScheduler, /poyozz-encounter-evaluation-worker/);
+
+// Schedule organizer runs a single-character test batch and persists only
+// sanitized structural/validation diagnostics, never the provider response body.
+assert.match(scheduleOrganizer, /ENCOUNTER_SCHEDULE_BATCH_SIZE = 1/);
+assert.match(scheduleOrganizer, /schedule_output_root_invalid/);
+assert.match(scheduleOrganizer, /schedule_output_characters_invalid/);
+assert.match(scheduleOrganizer, /schedule_output_scenes_invalid/);
+assert.match(scheduleOrganizer, /schedule_output_unknown_root_fields/);
+assert.match(scheduleOrganizer, /output_root_keys/);
+assert.match(scheduleOrganizer, /output_unknown_root_keys/);
+assert.match(scheduleOrganizer, /validation_errors: safeErrors/);
+assert.match(scheduleOrganizer, /schedule_character_validation_failed/);
+assert.match(scheduleOrganizer, /schedule_character_publish_failed/);
+assert.match(scheduleOrganizer, /response_body_length/);
+assert.doesNotMatch(scheduleOrganizer, /providerResponse\.result\.text\s*[,}]/,
+  "Raw provider output must not be written into usage diagnostics");
 
 console.log("Encounter AI output, billing safety, opening-choice, relationship greeting, and scene-settlement contract tests passed.");
