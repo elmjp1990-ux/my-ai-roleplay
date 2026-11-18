@@ -3547,6 +3547,7 @@ let pendingDeletionWalletSyncUid =
     : null;
 let route = {page:'citymap'};
 const GROUP_CONTINUE_SENTINEL = '（請接續目前的故事。）';
+const ENCOUNTER_DISCOVERY_SENTINEL = '[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]';
 let personaPickerSelection = null;
 let groupPersonaPickerSelection = null;
 let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupMembers:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null,openRequestId:0,groupListOffset:0,groupListHasMore:false,groupPinnedLoaded:false,groupPinnedOffset:0,groupPinnedHasMore:null,groupListObserver:null,historyCursor:null,historyHasMore:false,historyLoading:false,historyError:'',historyScrollAnchor:null};
@@ -4559,31 +4560,6 @@ async function saveChatSessionSafely(s) {
   if (!key || !chatSessionSaveQueue) return performSave();
   return chatSessionSaveQueue(key, performSave);
 }
-
-// Encounter opening choices reuse the existing session_data.openingMessage persistence field.
-window.addEventListener('poyozz-encounter-opening-choice', async event => {
-  const detail = event.detail || {};
-  const session = state.sessions?.[detail.sessionId];
-  const user = currentUser();
-  if (!session?.encounterMode || !user?.uid || session.cloudOwnerUid !== user.uid) return;
-  if (detail.choice === 'wait') {
-    const greeting = String(session.encounterGreeting || session.cloudCharacterSnapshot?.encounterGreeting || '').trim();
-    if (!greeting) return toast('這個角色目前還沒有可用的相遇招呼，請先主動打招呼。');
-    session.initialOpeningMessage = { text: greeting, at: Date.now() };
-    session.encounterIntroChoice = 'wait';
-  } else if (detail.choice === 'greet') {
-    session.encounterIntroChoice = 'greet';
-  } else {
-    return;
-  }
-  persist();
-  const saved = await saveChatSessionSafely(session);
-  if (!saved) console.warn('相遇初始選擇尚未取得雲端保存確認；首次送出訊息時會再次同步。');
-  renderConversation();
-  if (detail.choice === 'greet') {
-    requestAnimationFrame(() => document.getElementById('messageInput')?.focus());
-  }
-});
 
 async function markCloudChatSessionRead(session) {
   const user=currentUser(),client=window.mySupabase;
@@ -6721,7 +6697,6 @@ async function createEncounterSession(character) {
     encounterMode: true,
     encounterPlace: typeof encounterPlace === 'string' ? encounterPlace : null,
     encounterDay: new Date().toLocaleDateString('en-CA'),
-    encounterGreeting: String(data.session.character_snapshot?.encounterGreeting || '').trim(),
     encounterVisuals: data.session.character_snapshot?.defaultVisuals || null,
     encounterIntroChoice: null,
     messages: [],
@@ -9351,7 +9326,7 @@ function renderMessages(scroll = true) {
       :s.cloudMessagesError?'<div class="small muted" style="text-align:center;padding:10px"><span>'+e(s.cloudMessagesError)+'</span> <button type="button" data-chat-history-action="'+(s.cloudMessagesErrorOlder?'older':'retry')+'">'+(s.cloudMessagesErrorOlder?'重試載入較早訊息':'重新載入')+'</button></div>'
       :s.cloudHasMoreMessages?'<div data-history-top-control hidden style="text-align:center;padding:10px"><button type="button" data-chat-history-action="older">載入更早的訊息</button></div>':''))
     :'';
-  $('messages').innerHTML = historyControl + s.messages.filter(m => !(m.role === 'user' && String(m.text||'').trim() === GROUP_CONTINUE_SENTINEL)).map(m => {
+  $('messages').innerHTML = historyControl + s.messages.filter(m => !(m.role === 'user' && [GROUP_CONTINUE_SENTINEL, ENCOUNTER_DISCOVERY_SENTINEL].includes(String(m.text||'').trim()))).map(m => {
     const user = m.role === 'user';
     const roles = [{id:c.id,name:c.name,image:c.image || c.avatar_url}];
     // Role prefixes can appear in AI replies as well as player-authored text.
@@ -12860,7 +12835,15 @@ const {
           await runPendingChatTurn(s);
           break;
         }
-        if (!text.trim()) text = GROUP_CONTINUE_SENTINEL;
+        if (!text.trim()) {
+          const encounterHasStarted = s.encounterMode && (
+            s.cloudHasUserMessage === true ||
+            (s.messages || []).some(message => message.role === 'user' && String(message.text || '').trim() &&
+              ![GROUP_CONTINUE_SENTINEL, ENCOUNTER_DISCOVERY_SENTINEL].includes(String(message.text || '').trim())) ||
+            (s.messages || []).some(message => message.role !== 'user' && String(message.text || message.content || '').trim())
+          );
+          text = s.encounterMode && !encounterHasStarted ? ENCOUNTER_DISCOVERY_SENTINEL : GROUP_CONTINUE_SENTINEL;
+        }
         const platformCommand = parsePlatformCommand(text);
         if (platformCommand.type === 'platform') {
           if (platformCommand.name === 'help') {
