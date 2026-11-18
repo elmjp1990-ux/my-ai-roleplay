@@ -216,7 +216,10 @@ Deno.test("classifies worldviews locally and keeps species separate from era", (
     throw new Error("cultivation worldview was not classified");
   }
 
-  const unknown = source(id1, { intro: "一位神秘旅人。", world_era: "", modern_setting_compatible: false });
+  const unknown = source(id1, {
+    intro: "一位神秘旅人。", world_era: "", modern_setting_compatible: false,
+    schedule_description: "", private_info: "", personality_profile: {},
+  });
   const unknownClass = classifyEncounterWorldview(unknown);
   if (unknownClass.category !== "unknown" || unknownClass.modern_map_compatible) {
     throw new Error("unknown worldview must be held out of the modern map");
