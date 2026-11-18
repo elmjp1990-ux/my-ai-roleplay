@@ -480,12 +480,13 @@ Deno.serve(async (request) => {
     } catch (error) {
       return { sourceId: source.character_id, failureCode: asText(error instanceof Error ? error.message : "schedule_prompt_invalid"), retryable: false, ambiguous: false };
     }
+    let rawOutputId: string | null = null;
     try {
       const providerResponse = await requestOpenRouterChatCompletion({
         messages: characterPrompt.messages, apiKey: openRouterKey, model: POYOZZ_DEFAULT_CHAT_MODEL,
         timeoutMs: 42_000, temperature: 0.35, responseFormat: { type: "json_object" },
       });
-      const rawOutputId = await recordRawGenerationOutput(
+      rawOutputId = await recordRawGenerationOutput(
         admin, batchId, source.character_id, actorUserId, providerResponse,
       );
       if (!rawOutputId) {
@@ -513,6 +514,7 @@ Deno.serve(async (request) => {
         return { sourceId: source.character_id, failureCode: "schedule_output_json_invalid", retryable: false, ambiguous: false };
       }
       if (!decodedValue || typeof decodedValue !== "object" || Array.isArray(decodedValue)) {
+        await updateRawGenerationOutput(admin, rawOutputId, "failed", "schedule_output_root_invalid", ["schedule_output_root_invalid"]);
         await recordBatchUsage(admin, batchId, providerResponse, "failed", "schedule_output_root_invalid", source.character_id, {
           output_root_type: Array.isArray(decodedValue) ? "array" : decodedValue === null ? "null" : typeof decodedValue,
         });
@@ -550,6 +552,7 @@ Deno.serve(async (request) => {
     } catch (error) {
       const failureCode = error instanceof Error && error.name === "AbortError"
         ? "schedule_provider_timeout" : "schedule_provider_outcome_unknown";
+      await updateRawGenerationOutput(admin, rawOutputId, "failed", failureCode, [failureCode]);
       await recordBatchUsage(admin, batchId, {
         provider: "openrouter", requestId: "", usage: {}, httpStatus: 0,
         responseContentType: "", responseBodyLength: 0, responseParsed: false,
