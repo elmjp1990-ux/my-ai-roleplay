@@ -113,6 +113,7 @@ assert.match(sceneDescriptionMigration, /location_description text NOT NULL DEFA
 assert.match(sceneDescriptionMigration, /scene_description text NOT NULL DEFAULT ''/);
 assert.match(sceneDescriptionMigration, /resolve_encounter_scene_location_key/);
 assert.match(sceneDescriptionMigration, /get_encounter_character_schedules_with_scene/);
+assert.match(sceneDescriptionMigration, /poyozz-encounter-schedule-v4-natural-locations-scene-descriptions-2026-11-18/);
 assert.match(fs.readFileSync("index.html", "utf8"), /get_encounter_character_schedules_with_scene/);
 assert.match(fs.readFileSync("city-map.js", "utf8"), /citySceneDescription/);
 assert.match(weatherWorker, /createEncounterWeather/);
