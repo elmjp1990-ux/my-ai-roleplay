@@ -408,7 +408,7 @@ export function buildEncounterScheduleBatchMessages(
     "作者行程說明只供內部規劃；activity 必須使用公開可見、簡短自然的描述，不得逐字複製整段說明或揭露私密情節。",
 
 
-    "輸出必須是嚴格 JSON object，根欄位 characters 與 scenes。每個角色欄位為 character_id, placement, variants, special_events。現代相容角色使用 placement=modern_map，variants 只包含 weekday 與 holiday，各自必須恰好 24 個逐小時時段；每個時段物件欄位為 start_time, end_time, options。options 為 1–3 個選項，每個選項且只能有 weight, location, activity, is_outdoor, rain_fallback_location, rain_fallback_activity 六個欄位。同一時段 options 的 weight 總和必須為 100。special_events 一律輸出空陣列；scenes 必須是空陣列。世界觀不相容現代地圖的角色使用 placement=no_matching_location，weekday 與 holiday 都輸出空陣列。不可輸出招呼語、scene_description、關係招呼池、場景 ID、座標、額外欄位或 Markdown。",
+    "輸出必須是嚴格 JSON object，唯一根欄位 characters。每個角色欄位為 character_id, placement, variants。現代相容角色使用 placement=modern_map，variants 只包含 weekday 與 holiday，各自必須恰好 24 個逐小時時段；每個時段物件欄位為 start_time, end_time, options。options 為 1–3 個選項，每個選項且只能有 weight, location, activity, is_outdoor, rain_fallback_location, rain_fallback_activity 六個欄位。同一時段 options 的 weight 總和必須為 100。世界觀不相容現代地圖的角色使用 placement=no_matching_location，weekday 與 holiday 都輸出空陣列。不輸出 special_events、scenes、招呼語、scene_description、關係招呼池、場景 ID、座標、額外欄位或 Markdown。",
   ].join("\n");
   return {
     messages: [
