@@ -3,15 +3,7 @@
 (function installEncounterScenePresentation(){
   const style=document.createElement('style');
   style.textContent=`
-    .encounter-start-button{background:linear-gradient(135deg,#7969a8,#b17f9d)!important;color:#fff!important;border:1px solid #d8c8ef!important}
     .encounter-first-turn-hint{margin:0 2px 8px;padding:9px 11px;border:1px solid rgba(255,255,255,.20);border-radius:12px;background:rgba(255,255,255,.10);color:#fff;font-size:12px;line-height:1.55;text-align:center;backdrop-filter:blur(12px)}
-    .encounter-intro-card{display:flex;flex-direction:column;gap:12px;width:min(100%,560px);margin:0 auto;padding:16px;border:1px solid rgba(255,255,255,.22);border-radius:18px;background:linear-gradient(135deg,rgba(28,24,37,.66),rgba(68,53,73,.48));box-shadow:0 12px 32px rgba(0,0,0,.18);backdrop-filter:blur(15px);color:#fff;text-align:center}
-    .encounter-intro-card p{margin:0;color:rgba(255,250,247,.88);font-size:13px;line-height:1.7}
-    .encounter-intro-actions{display:grid;grid-template-columns:1fr;gap:9px}
-    .encounter-intro-choice{width:100%;min-height:44px;padding:11px 14px;border:1px solid rgba(255,255,255,.28);border-radius:12px;background:linear-gradient(135deg,rgba(197,170,213,.30),rgba(231,193,202,.22));color:#fff;font-size:14px;font-weight:650;cursor:pointer}
-    .encounter-intro-choice.primary{background:linear-gradient(135deg,rgba(129,108,169,.88),rgba(178,128,157,.86));border-color:rgba(255,255,255,.42)}
-    .encounter-intro-choice:disabled{opacity:.48;cursor:not-allowed}
-    .encounter-intro-note{font-size:10px!important;color:rgba(255,255,255,.62)!important}
     .chat-main.encounter-scene{position:relative;isolation:isolate;overflow:hidden;height:100dvh!important;min-height:0!important;border:0!important;border-radius:0!important;background:#15141b!important}
     .chat-main.encounter-scene:before{content:"";position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,rgba(10,9,17,.26),rgba(10,9,17,.08) 34%,rgba(10,9,17,.36) 57%,rgba(10,9,17,.88) 100%),var(--encounter-scene-photo,none) center/cover no-repeat,radial-gradient(ellipse at 70% 22%,#6a5a65 0%,#322b36 48%,#17141b 100%);filter:saturate(.9);transform:scale(1.025);pointer-events:none}
     .encounter-scene .chat-layout{height:100dvh!important;min-height:0!important}
