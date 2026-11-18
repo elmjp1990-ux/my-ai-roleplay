@@ -400,9 +400,8 @@ Deno.serve(async (request) => {
 
   let queuedCharacterCount = 0;
   if (mode === "manual") {
-    // A deliberate test-mode manual click may retry terminal failed jobs:
-    // those jobs have no ambiguous publish outcome. Keep active leases and
-    // needs_reconciliation blocked so an uncertain write is never duplicated.
+    // Manual testing never retries terminal failures. Only pending jobs are
+    // eligible below; active leases and uncertain publish outcomes stay blocked.
     const [processingResult, reconciliationResult] = await Promise.all([
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
         .eq("status", "processing"),
@@ -421,16 +420,24 @@ Deno.serve(async (request) => {
         needs_reconciliation_count: needsReconciliationCount,
       }, 409);
     }
-    const { data: enqueueData, error: enqueueError } = await admin.rpc(
-      "enqueue_encounter_schedule_generation_test_batch",
-      { p_limit: 2147483647 },
-    );
-    if (enqueueError) {
-      console.error("Encounter manual enqueue failed:", enqueueError.message);
-      return json({ error: "schedule_manual_enqueue_failed" }, 503);
+    // Manual testing consumes only jobs already in the pending queue.
+    // Do not rescan/re-enqueue every public character: that could reset a prior
+    // failed job after its source changes and makes one-at-a-time verification unclear.
+    const { count: pendingCount, error: pendingCountError } = await admin
+      .from("encounter_schedule_generation_jobs")
+      .select("character_id", { count: "exact", head: true })
+      .eq("status", "pending");
+    if (pendingCountError) {
+      return json({ error: "schedule_pending_state_unavailable" }, 503);
     }
-    const enqueueRow = Array.isArray(enqueueData) ? enqueueData[0] : enqueueData;
-    queuedCharacterCount = Number(enqueueRow?.pending_character_count || 0);
+    queuedCharacterCount = Number(pendingCount || 0);
+    if (queuedCharacterCount < 1) {
+      return json({
+        status: "no_pending_jobs",
+        queued_character_count: 0,
+        failed_jobs_preserved: true,
+      });
+    }
   }
 
   const { data: claimData, error: claimError } = await admin.rpc("claim_encounter_schedule_batch", {
