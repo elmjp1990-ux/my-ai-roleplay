@@ -4,7 +4,6 @@ import { findPrivateContextLeak } from "../_shared/private-context-guard.ts";
 import {
   buildEncounterScheduleBatchMessages,
   parseEncounterScheduleBatchOutput,
-  ENCOUNTER_DYNAMIC_SCENE_KEYS,
   normalizeEncounterSceneKey,
   type EncounterScheduleSource,
   type EncounterSceneCatalogEntry,
@@ -315,86 +314,6 @@ Deno.serve(async (request) => {
     }
   }
   const rawScenes = [...rawScenesByKey.values()];
-  const sourceIds = new Set(sources.map((source) => source.character_id));
-  const { data: dynamicUsageData, error: dynamicUsageError } = await admin.rpc("get_encounter_dynamic_scene_usage");
-  if (dynamicUsageError) {
-    for (const item of providerResponses) {
-      await recordBatchUsage(admin, batchId, item.providerResponse, "failed", "dynamic_scene_usage_unavailable", item.sourceId);
-    }
-    const failed = await failBatch(admin, batchId, leaseToken, "dynamic_scene_usage_unavailable", false, false);
-    return json({ status: failed ? "scene_usage_unavailable" : "batch_failure_unconfirmed" }, 503);
-  }
-  const existingScheduleUsers = new Map<string, Set<string>>();
-  for (const row of Array.isArray(dynamicUsageData) ? dynamicUsageData : []) {
-    const key = normalizeEncounterSceneKey(asRow(row).location_key);
-    const id = asText(asRow(row).character_id);
-    const sourceType = asText(asRow(row).source_type);
-    if (!key || !id || (sourceIds.has(id) && sourceType !== "manual")) continue;
-    const users = existingScheduleUsers.get(key) || new Set<string>();
-    users.add(id);
-    existingScheduleUsers.set(key, users);
-  }
-  const collectLocationKeys = (value: unknown, includeSpecialEvents = true): Set<string> => {
-    const character = asRow(value);
-    const keys = new Set<string>();
-    const variants = asRow(character.variants);
-    for (const dayType of ["weekday", "holiday"]) {
-      const dayVariants = variants[dayType];
-      if (!Array.isArray(dayVariants)) continue;
-      for (const variant of dayVariants) {
-        const slots = asRow(variant).slots;
-        if (!Array.isArray(slots)) continue;
-        for (const slot of slots) {
-          const key = normalizeEncounterSceneKey(asRow(slot).location_key);
-          if (key) keys.add(key);
-        }
-      }
-    }
-    if (includeSpecialEvents && Array.isArray(character.special_events)) {
-      for (const event of character.special_events) {
-        const slots = asRow(event).slots;
-        if (!Array.isArray(slots)) continue;
-        for (const slot of slots) {
-          const key = normalizeEncounterSceneKey(asRow(slot).location_key);
-          if (key) keys.add(key);
-        }
-      }
-    }
-    return keys;
-  };
-
-  // Keep candidate dynamic landmarks even when only one claimed role uses them;
-  // SQL checks the total shared schedule count after all per-role writes. Reserve
-  // no more than the three server-owned map slots.
-  const existingDynamicKeys = new Set(
-    sceneCatalog.filter((scene) => scene?.is_dynamic === true)
-      .map((scene) => normalizeEncounterSceneKey(scene.location_key))
-      .filter((key): key is string => key !== null),
-  );
-  const dynamicUsers = new Map<string, Set<string>>();
-  for (const rawCharacter of rawCharacters) {
-    const id = asText(asRow(rawCharacter).character_id);
-    if (!sourceIds.has(id)) continue;
-    for (const key of collectLocationKeys(rawCharacter, false)) {
-      if (!(ENCOUNTER_DYNAMIC_SCENE_KEYS as readonly string[]).includes(key) || existingDynamicKeys.has(key)) continue;
-      const users = dynamicUsers.get(key) || new Set<string>();
-      users.add(id);
-      dynamicUsers.set(key, users);
-    }
-  }
-  const totalDynamicUsers = (key: string, batchUsers: Set<string>) =>
-    new Set([...(existingScheduleUsers.get(key) || []), ...batchUsers]);
-  const dynamicCandidates = [...dynamicUsers.entries()]
-    .filter(([key, users]) => totalDynamicUsers(key, users).size >= 2)
-    .sort((a, b) =>
-      totalDynamicUsers(b[0], b[1]).size - totalDynamicUsers(a[0], a[1]).size ||
-      a[0].localeCompare(b[0])
-    );
-  const availableDynamicSlots = Math.max(0, 3 - existingDynamicKeys.size);
-  const selectedNewDynamicKeys = new Set(
-    dynamicCandidates.slice(0, availableDynamicSlots).map(([key]) => key),
-  );
-
   const validCharacters: Array<{
     sourceId: string;
     character: Record<string, unknown>;
@@ -410,40 +329,10 @@ Deno.serve(async (request) => {
     }
 
     const rawCharacter = asRow(matches[0]);
-    const usedKeys = collectLocationKeys(rawCharacter);
-    const blockedDynamicKeys = [...usedKeys].filter((key) =>
-      (ENCOUNTER_DYNAMIC_SCENE_KEYS as readonly string[]).includes(key) &&
-      !existingDynamicKeys.has(key) && !selectedNewDynamicKeys.has(key)
-    );
-    if (blockedDynamicKeys.length) {
-      failedCharacterIds.add(source.character_id);
-      validationErrors.push(source.character_id + "_dynamic_scene_limit_or_sharing_invalid");
-      characterDiagnosticsById.set(source.character_id, {
-        validation_errors: ["dynamic_scene_limit_or_sharing_invalid"],
-        blocked_dynamic_scene_keys: blockedDynamicKeys.slice(0, 8),
-      });
-      continue;
-    }
-
-    const candidateScenes = rawScenes.filter((item) => {
-      const key = normalizeEncounterSceneKey(asRow(item).location_key);
-      return key !== null && usedKeys.has(key);
-    });
-    const candidateCatalog: EncounterSceneCatalogEntry[] = [
-      ...sceneCatalog,
-      ...[...usedKeys].filter((key) => selectedNewDynamicKeys.has(key) && !existingDynamicKeys.has(key))
-        .map((key) => ({
-          location_key: key,
-          display_name: asText(asRow(candidateScenes.find((item) =>
-            normalizeEncounterSceneKey(asRow(item).location_key) === key
-          )).display_name) || key,
-          is_dynamic: true,
-        })),
-    ];
     const parsed = parseEncounterScheduleBatchOutput(
-      JSON.stringify({ characters: [rawCharacter], scenes: candidateScenes }),
+      JSON.stringify({ characters: [rawCharacter], scenes: rawScenes }),
       [source],
-      candidateCatalog,
+      sceneCatalog,
     );
     if (!parsed.ok || parsed.characters.length !== 1) {
       failedCharacterIds.add(source.character_id);
