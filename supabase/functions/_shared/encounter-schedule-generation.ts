@@ -65,7 +65,7 @@ type RecordValue = Record<string, unknown>;
 type ScheduleSlot = {
   start_time: string;
   end_time: string;
-  location_key: string;
+  location_key: string | null;
   location_description: string;
   activity: string;
   scene_description: string;
@@ -189,7 +189,7 @@ function validateSlot(value: unknown, errors: string[], label: string): Schedule
   const activity = text(value.activity);
   const sceneDescription = text(value.scene_description);
   const greeting = text(value.encounter_greeting);
-  if (start === null || end === null || start === end || !location || locationDescription.length > 120) errors.push(label + "_slot_time_or_location_invalid");
+  if (start === null || end === null || start === end || !locationDescription || locationDescription.length > 120) errors.push(label + "_slot_time_or_location_invalid");
   if (!activity || activity.length > 200) errors.push(label + "_activity_invalid");
   if (Array.from(sceneDescription).length < 8 || Array.from(sceneDescription).length > 500) errors.push(label + "_scene_description_invalid");
   if (typeof value.is_outdoor !== "boolean") errors.push(label + "_outdoor_flag_invalid");
@@ -222,7 +222,7 @@ function validateSlot(value: unknown, errors: string[], label: string): Schedule
   return {
     start_time: text(value.start_time),
     end_time: text(value.end_time),
-    location_key: location || "",
+    location_key: location,
     location_description: locationDescription,
     activity,
     scene_description: sceneDescription,
