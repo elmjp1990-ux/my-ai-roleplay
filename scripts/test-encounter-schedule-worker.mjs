@@ -181,7 +181,7 @@ assert.match(compactScheduleMigration, /rain_fallback_greeting IS NULL/);
 assert.match(compactScheduleMigration, /jsonb_array_length\(v_item->'variants'->v_day_type\) <> 24/);
 assert.match(compactScheduleMigration, /v_multi_option_hours < 8/);
 assert.match(compactScheduleMigration, /NOT BETWEEN 10 AND 30/);
-assert.match(compactScheduleMigration, /poyozz-encounter-schedule-v7-compact-24-hour-options-2026-11-19/);
+assert.match(compactScheduleMigration, /poyozz-encounter-schedule-v8-compact-24-hour-options-2026-11-19/);
 assert.ok(pendingPriorityMigration.includes("ORDER BY CASE j.status WHEN ''pending'' THEN 0 WHEN ''failed'' THEN 1 ELSE 2 END"));
 assert.ok(pendingPriorityMigration.includes("pending_schedule_job_priority_contract_count_unexpected"));
 assert.ok(replayWorkflow.includes("20261118074723_prioritize_pending_encounter_schedule_jobs.sql"));
