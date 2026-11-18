@@ -12,6 +12,7 @@ const sceneDescriptionMigration = fs.readFileSync("supabase/migrations/202611180
 const hourlyScheduleMigration = fs.readFileSync("supabase/migrations/20261118000700_encounter_hourly_schedule_options.sql", "utf8");
 const pendingPriorityMigration = fs.readFileSync("supabase/migrations/20261118000800_prioritize_pending_encounter_schedule_jobs.sql", "utf8");
 const rawOutputRepairMigration = fs.readFileSync("supabase/migrations/20261118000900_encounter_schedule_raw_output_repair.sql", "utf8");
+const rawOutputRepairReplay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-output-repair.sql", "utf8");
 const providerAdapter = fs.readFileSync("supabase/functions/_shared/openrouter-chat-completions.ts", "utf8");
 const replayWorkflow = fs.readFileSync(".github/workflows/supabase-local-migration-replay.yml", "utf8");
 const weatherWorker = fs.readFileSync("supabase/functions/encounter-weather-sync/index.ts", "utf8");
@@ -39,6 +40,14 @@ assert.match(rawOutputRepairMigration, /REVOKE ALL ON TABLE public\.encounter_sc
 assert.match(rawOutputRepairMigration, /claim_encounter_schedule_repair/);
 assert.match(rawOutputRepairMigration, /p_expected_source_hash/);
 assert.match(rawOutputRepairMigration, /expires_at timestamptz NOT NULL DEFAULT/);
+assert.match(rawOutputRepairMigration, /encounter_schedule_raw_output_immutable/);
+assert.match(rawOutputRepairMigration, /encounter_schedule_output_revision_immutable/);
+assert.match(rawOutputRepairMigration, /encounter_schedule_original_ai_response_is_immutable/);
+assert.match(rawOutputRepairMigration, /encounter_schedule_manual_revision_is_immutable/);
+assert.match(rawOutputRepairReplay, /encounter_schedule_private_ai_output_exposed_to_client_roles/);
+assert.match(rawOutputRepairReplay, /encounter_schedule_repair_rpc_grants_invalid/);
+assert.match(rawOutputRepairReplay, /encounter_schedule_immutable_triggers_missing/);
+
 
 assert.doesNotMatch(worker, /get_encounter_dynamic_scene_usage|dynamic_scene_limit_or_sharing_invalid/);
 assert.match(worker, /findPrivateContextLeak/);
@@ -144,6 +153,9 @@ assert.ok(replayWorkflow.includes("20261118000800_prioritize_pending_encounter_s
 assert.ok(replayWorkflow.includes("20261118000900_encounter_schedule_raw_output_repair.sql"));
 assert.ok(replayWorkflow.indexOf("20261118000900_encounter_schedule_raw_output_repair.sql") >
   replayWorkflow.indexOf("20261118000800_prioritize_pending_encounter_schedule_jobs.sql"));
+assert.ok(replayWorkflow.indexOf("replay-encounter-schedule-output-repair.sql") >
+  replayWorkflow.indexOf("20261118000900_encounter_schedule_raw_output_repair.sql"));
+
 
 assert.match(generator, /scenes 必須是空陣列/);
 assert.doesNotMatch(generator, /本批次只有 1 位角色使用也可以提出候選/);
