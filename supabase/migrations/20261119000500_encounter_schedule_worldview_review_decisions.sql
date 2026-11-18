@@ -117,7 +117,7 @@ BEGIN
     pg_catalog.length(v_definition) -
     pg_catalog.length(pg_catalog.replace(v_definition, v_filter_old, ''))
   ) / pg_catalog.length(v_filter_old);
-  IF v_filter_count <> 2 THEN
+  IF v_filter_count <> 1 THEN
     RAISE EXCEPTION 'worldview_review_claim_filter_anchor_count_unexpected: %', v_filter_count;
   END IF;
   IF pg_catalog.strpos(v_definition, v_payload_old) = 0 THEN
