@@ -3,6 +3,7 @@ import { requestOpenRouterChatCompletion, POYOZZ_DEFAULT_CHAT_MODEL } from "../_
 import { findPrivateContextLeak } from "../_shared/private-context-guard.ts";
 import {
   buildEncounterScheduleBatchMessages,
+  classifyEncounterWorldview,
   parseEncounterScheduleBatchOutput,
   normalizeEncounterSceneKey,
   type EncounterScheduleSource,
@@ -617,8 +618,28 @@ Deno.serve(async (request) => {
   let retryableProviderFailure = false;
   let ambiguousProviderFailure = false;
 
+  // Worldview is classified locally before any provider call. Non-modern and
+  // unresolved roles are completed as not placed; they are never sent to AI.
+  const generationSources = sources.filter((source) => {
+    const classification = classifyEncounterWorldview(source);
+    if (classification.modern_map_compatible) return true;
+    rawCharacters.push({
+      character_id: source.character_id,
+      placement: "no_matching_location",
+      variants: { weekday: [], holiday: [] },
+      special_events: [],
+    });
+    characterDiagnosticsById.set(source.character_id, {
+      worldview_category: classification.category,
+      worldview_confidence: classification.confidence,
+      modern_map_compatible: false,
+      ai_generation_skipped: true,
+    });
+    return false;
+  });
+
   // One character per request isolates provider output and keeps the next test batch minimal.
-  const generationResults = await Promise.all(sources.map(async (source) => {
+  const generationResults = await Promise.all(generationSources.map(async (source) => {
     let characterPrompt;
     try {
       characterPrompt = buildEncounterScheduleBatchMessages([source], sceneCatalog);
