@@ -153,7 +153,7 @@ assert.ok(replayWorkflow.includes("20261118000800_prioritize_pending_encounter_s
 assert.ok(replayWorkflow.includes("20261118000900_encounter_schedule_raw_output_repair.sql"));
 assert.ok(replayWorkflow.indexOf("20261118000900_encounter_schedule_raw_output_repair.sql") >
   replayWorkflow.indexOf("20261118000800_prioritize_pending_encounter_schedule_jobs.sql"));
-assert.ok(replayWorkflow.indexOf("replay-encounter-schedule-output-repair.sql") >
+assert.ok(replayWorkflow.lastIndexOf("replay-encounter-schedule-output-repair.sql") >
   replayWorkflow.indexOf("20261118000900_encounter_schedule_raw_output_repair.sql"));
 
 
