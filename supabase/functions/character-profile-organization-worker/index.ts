@@ -10,7 +10,8 @@ import {
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_BATCH = 1;
-const REQUEST_TIMEOUT_MS = 90_000;
+// Stay below the 120s pg_net dispatch timeout and Supabase's 150s request idle limit.
+const REQUEST_TIMEOUT_MS = 110_000;
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
 
 type WorkItem = {
@@ -43,6 +44,7 @@ type ProfileUsageMetadata = {
   provider: string;
   requestId: string | null;
   usage: Record<string, unknown>;
+  durationMs: number | null;
 };
 
 type GeneratedProfile = ProfileUsageMetadata & {
@@ -117,6 +119,8 @@ async function generateProfile(
   item: WorkItem,
   apiKey: string,
 ): Promise<GeneratedProfile> {
+  const startedAt = Date.now();
+  const elapsedMs = () => Math.max(0, Date.now() - startedAt);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
@@ -152,6 +156,7 @@ async function generateProfile(
         provider: "deepinfra",
         requestId: null,
         usage: {},
+        durationMs: elapsedMs(),
       });
     }
     if (!response.ok) {
@@ -161,6 +166,7 @@ async function generateProfile(
           provider: "deepinfra",
           requestId: response.headers.get("x-request-id"),
           usage: {},
+          durationMs: elapsedMs(),
         });
       }
       throw new Error("openrouter_http_" + response.status);
@@ -177,6 +183,7 @@ async function generateProfile(
           provider: "deepinfra",
           requestId: response.headers.get("x-request-id"),
           usage: {},
+          durationMs: elapsedMs(),
         });
       }
       throw new ProfileGenerationError("provider_outcome_unknown", {
@@ -184,6 +191,7 @@ async function generateProfile(
         provider: "deepinfra",
         requestId: response.headers.get("x-request-id"),
         usage: {},
+        durationMs: elapsedMs(),
       });
     }
     const usage = result?.usage && typeof result.usage === "object" && !Array.isArray(result.usage)
@@ -198,6 +206,7 @@ async function generateProfile(
       requestId: typeof requestIdValue === "string" &&
         /^[A-Za-z0-9._:-]{1,128}$/.test(requestIdValue) ? requestIdValue : null,
       usage,
+      durationMs: elapsedMs(),
     };
     const content = result?.choices?.[0]?.message?.content;
     if (typeof content !== "string" || !content.trim()) {
@@ -252,6 +261,7 @@ async function recordProfileUsage(
       completion_tokens: safeUsageInteger(usage.completion_tokens),
       total_tokens: safeUsageInteger(usage.total_tokens),
       cost_usd: safeUsageCost(usage),
+      duration_ms: generated?.durationMs ?? null,
       status,
       error_code: errorCode,
       processed_at: new Date().toISOString(),
