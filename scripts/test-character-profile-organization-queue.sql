@@ -41,6 +41,7 @@ VALUES ('22222222-2222-4222-8222-222222222222');
 
 \i supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql
 \i supabase/migrations/20261107123000_schedule_character_profile_organization_worker.sql
+\i supabase/migrations/20261118170000_character_profile_worker_timeout_observability.sql
 -- Replaying both migrations must be idempotent.
 \i supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql
 \i supabase/migrations/20261107123000_schedule_character_profile_organization_worker.sql
@@ -222,7 +223,7 @@ BEGIN
   SET status = 'processing',
       lease_token = gen_random_uuid(),
       lease_generation = lease_generation + 1,
-      lease_expires_at = now() + interval '3 minutes',
+      lease_expires_at = now() + interval '10 minutes',
       lease_source_hash = source_hash
   WHERE character_id = '11111111-1111-4111-8111-111111111111'
   RETURNING * INTO v_job;
@@ -269,7 +270,7 @@ BEGIN
   SET status = 'processing',
       lease_token = gen_random_uuid(),
       lease_generation = lease_generation + 1,
-      lease_expires_at = now() + interval '3 minutes',
+      lease_expires_at = now() + interval '10 minutes',
       lease_source_hash = source_hash
   WHERE character_id = '11111111-1111-4111-8111-111111111111'
   RETURNING * INTO v_job;
@@ -292,7 +293,7 @@ BEGIN
   SET status = 'processing',
       lease_token = gen_random_uuid(),
       lease_generation = lease_generation + 1,
-      lease_expires_at = now() + interval '3 minutes',
+      lease_expires_at = now() + interval '10 minutes',
       lease_source_hash = source_hash
   WHERE character_id = '11111111-1111-4111-8111-111111111111'
   RETURNING * INTO v_job;
@@ -343,11 +344,11 @@ SELECT set_config('request.jwt.claim.role', 'service_role', false);
 
 INSERT INTO public.character_profile_organization_usage (
   character_id, author_id, source_hash, model, provider,
-  prompt_tokens, completion_tokens, total_tokens, cost_usd, status
+  prompt_tokens, completion_tokens, total_tokens, cost_usd, duration_ms, status
 )
 SELECT character_id, author_id, source_hash,
   'deepseek/deepseek-v4-flash-20260423', 'deepinfra',
-  123, 45, 168, 0.000123, 'generated'
+  123, 45, 168, 0.000123, 4567, 'generated'
 FROM claimed_data
 ORDER BY lease_generation DESC
 LIMIT 1;
@@ -359,6 +360,9 @@ BEGIN
   END IF;
   IF (SELECT cost_usd FROM public.character_profile_organization_usage LIMIT 1) <> 0.000123 THEN
     RAISE EXCEPTION 'Profile generation cost was not preserved';
+  END IF;
+  IF (SELECT duration_ms FROM public.character_profile_organization_usage LIMIT 1) <> 4567 THEN
+    RAISE EXCEPTION 'Profile provider duration was not preserved';
   END IF;
 END $$;
 
