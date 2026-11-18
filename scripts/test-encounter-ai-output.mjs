@@ -76,7 +76,7 @@ assert.match(replay, /DO \$special_event_schedule_smoke\$/);
 assert.match(replay, /generic public holiday schedule was not selected for a named holiday/);
 assert.match(scheduleGeneration, /special_events/);
 assert.match(scheduleGeneration, /lunar_new_year/);
-assert.match(scheduleGeneration, /不輸出 special_events、scenes/);
+assert.match(scheduleGeneration, /不輸出 no_matching_location、special_events、scenes/);
 assert.match(scheduleGeneration, /行程以角色自身日常活動為準/);
 assert.match(scheduleGeneration, /地點是否能對應地圖由系統自行判斷/);
 assert.match(scheduleGeneration, /scene_description/);
