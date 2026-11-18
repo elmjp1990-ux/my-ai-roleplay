@@ -5,6 +5,7 @@ const html = fs.readFileSync("index.html", "utf8");
 const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
 const cityMap = fs.readFileSync("city-map.js", "utf8");
 const cleanupMigration = fs.readFileSync("supabase/migrations/20261031211200_character_illustration_cleanup_queue.sql", "utf8");
+const scheduleOrganizer = fs.readFileSync("supabase/functions/encounter-schedule-organizer/index.ts", "utf8");
 
 // The author-facing field must accept ordinary prose, not a pipe-delimited schema.
 assert.match(html, /name="encounterScheduleDescription"/);
@@ -184,5 +185,15 @@ assert.ok(html.includes("if(cleanupUserId)await retryCharacterIllustrationCleanu
 assert.ok(html.includes("client.rpc('get_latest_owned_character_stories'"), "Owned character hydration must fetch only the latest story per character through the bounded RPC.");
 assert.ok(html.includes(".select('opening_message')"), "Public character detail must select only the opening field it displays.");
 assert.ok(!html.includes(".select('id, character_id, story_name, description, opening_message, visibility, created_at')"));
+
+// Unknown worldview review is author-scoped and decisions never invoke AI inline.
+assert.match(scheduleOrganizer, /\.eq\("status", "needs_review"\)\.eq\("author_id", actorUserId\)/);
+assert.match(scheduleOrganizer, /getEncounterWorldviewScheduleDisposition\([\s\S]*?source\.worldview_review_decision/);
+assert.match(html, /data-action="worldview-review-decision"/);
+assert.match(html, /review_encounter_schedule_worldview/);
+assert.match(html, /只會加入待生成佇列，不會立即呼叫 AI/);
+assert.match(html, /保留既有行程與招呼池/);
+assert.match(html, /modern_map_compatible/);
+assert.match(html, /not_applicable/);
 
 console.log("Author schedule and illustration signed-URL refresh contract tests passed.");
