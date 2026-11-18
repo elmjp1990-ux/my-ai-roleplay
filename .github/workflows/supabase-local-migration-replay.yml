@@ -13,6 +13,7 @@ on:
       - "supabase/drafts/replay-encounter-session-evaluation-worker.sql"
       - "supabase/drafts/encounter-relationship-greeting-pools.sql"
       - "supabase/drafts/replay-encounter-relationship-greeting-pools.sql"
+      - "supabase/drafts/replay-encounter-worldview-manual-review.sql"
       - "supabase/drafts/schedule-encounter-evaluation-worker.sql"
       - "supabase/drafts/replay-schedule-encounter-evaluation-worker.sql"
       - "supabase/drafts/encounter-evaluation-evidence-gates.sql"
@@ -269,6 +270,8 @@ jobs:
           # Applies only to the disposable local database; no hosted Supabase or AI calls.
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119000100_encounter_schedule_compact_output.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119000200_encounter_schedule_modern_setting_inference.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119000300_encounter_schedule_worldview_manual_review.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-worldview-manual-review.sql
 
       - name: Replay hourly weighted Encounter schedules and weather fallback
         shell: bash
