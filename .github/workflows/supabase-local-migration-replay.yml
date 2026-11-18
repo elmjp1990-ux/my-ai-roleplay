@@ -14,6 +14,8 @@ on:
       - "supabase/drafts/encounter-relationship-greeting-pools.sql"
       - "supabase/drafts/replay-encounter-relationship-greeting-pools.sql"
       - "supabase/drafts/replay-encounter-worldview-manual-review.sql"
+      - "supabase/drafts/replay-chat-suggested-replies-editing.sql"
+      - "supabase/migrations/20261119000400_chat_suggested_replies_editing.sql"
       - "supabase/drafts/schedule-encounter-evaluation-worker.sql"
       - "supabase/drafts/replay-schedule-encounter-evaluation-worker.sql"
       - "supabase/drafts/encounter-evaluation-evidence-gates.sql"
@@ -272,6 +274,8 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119000200_encounter_schedule_modern_setting_inference.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119000300_encounter_schedule_worldview_manual_review.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-worldview-manual-review.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119000400_chat_suggested_replies_editing.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-chat-suggested-replies-editing.sql
 
       - name: Replay hourly weighted Encounter schedules and weather fallback
         shell: bash
