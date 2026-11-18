@@ -148,7 +148,7 @@ assert.match(generator, /special_events/);
 assert.match(generator, /valentines_day/);
 assert.match(generator, /lunar_new_year/);
 assert.match(generator, /christmas/);
-assert.match(generator, /special_events 一律輸出空陣列/);
+assert.match(generator, /不輸出 special_events、scenes/);
 assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.get_encounter_character_schedules\(p_character_ids uuid\[\]\)[\s\S]*?CROSS JOIN LATERAL public\.resolve_encounter_character_schedule/);
 assert.match(pipeline, /encounter_greeting text,[\s\S]*?is_outdoor boolean,[\s\S]*?rain_fallback_greeting text,[\s\S]*?variant_weight smallint/);
 assert.match(pipeline, /cardinality\(p_character_ids\) BETWEEN 1 AND 10/);
@@ -204,7 +204,7 @@ assert.ok(replayWorkflow.lastIndexOf("replay-encounter-schedule-output-repair.sq
   replayWorkflow.indexOf("20261118074727_encounter_schedule_raw_output_repair.sql"));
 
 
-assert.match(generator, /scenes 必須是空陣列/);
+assert.match(generator, /唯一根欄位 characters/);
 assert.doesNotMatch(generator, /本批次只有 1 位角色使用也可以提出候選/);
 assert.doesNotMatch(generator, /shoppingStreetUsers/);
 assert.match(pipeline, /schedule_variant_24_hour_coverage_incomplete/);
