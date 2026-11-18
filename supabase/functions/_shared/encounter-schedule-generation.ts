@@ -33,6 +33,7 @@ const RAIN_FALLBACK_SCENE_KEYS = new Set([
   "department-store", "bookstore", "cafe",
 ]);
 const NON_MODERN_ERA_PATTERN = /ancient|historical|medieval|antiquity|fantasy|mythic|fictional|古代|歷史|中世紀|中古|奇幻|架空|封建|戰國|春秋|秦漢|唐代|宋代|明代|清代|古羅馬|古希臘/i;
+const MODERN_SETTING_PATTERN = /現代世界|現代背景|現代都市|現代社會|現代生活|當代|財閥|企業集團|集團總裁|總裁夫人|企業|公司|商業盟約|慈善晚宴|時尚雜誌|名媛|豪門|媒體|智慧型手機|手機通訊|社群媒體|網路平台|科技業|捷運|地鐵|高鐵|信用卡|電子商務|藝術工作室|私人美術館/i;
 const SCENE_DISPLAY_NAMES: Record<string, string> = {
   airport: "機場", commercial: "公司", "night-bar": "酒吧",
   "live-house": "Live House", apartment: "住家", "department-store": "百貨公司",
@@ -171,9 +172,15 @@ export function resolveEncounterScheduleAvailability(
 }
 
 export function isEncounterModernMapCompatible(source: EncounterScheduleSource): boolean {
-  const era = [text(source.world_era), text(source.setting_era), text(source.intro)].filter(Boolean).join(" ");
-  const nonModern = NON_MODERN_ERA_PATTERN.test(era);
-  return !nonModern || source.modern_setting_compatible === true || source.time_travel_explicit === true;
+  const context = [
+    text(source.world_era), text(source.setting_era), text(source.intro),
+    text(source.schedule_description), text(source.private_info),
+    JSON.stringify(isRecord(source.personality_profile) ? source.personality_profile : {}),
+  ].join(" ");
+  const explicitModernSetting = MODERN_SETTING_PATTERN.test(context);
+  const nonModern = NON_MODERN_ERA_PATTERN.test(context);
+  return source.modern_setting_compatible === true || source.time_travel_explicit === true ||
+    explicitModernSetting || !nonModern;
 }
 
 function isAirportUseReasonable(source: EncounterScheduleSource, activity: string): boolean {
@@ -368,7 +375,7 @@ export function buildEncounterScheduleBatchMessages(
       occupation,
       author_character_profile: characterProfile,
       world_era: text(source.world_era),
-      modern_setting_compatible: source.modern_setting_compatible === true,
+      modern_setting_compatible: isEncounterModernMapCompatible(source),
       time_travel_explicit: source.time_travel_explicit === true,
       author_schedule_brief: text(source.schedule_description),
       existing_author_schedules: Array.isArray(source.existing_author_schedules)
