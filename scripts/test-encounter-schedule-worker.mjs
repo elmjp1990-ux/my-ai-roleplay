@@ -236,7 +236,7 @@ const encounterSession = fs.readFileSync("supabase/functions/encounter-session/i
 const sleepingAvailabilityMigration = fs.readFileSync("supabase/migrations/20261118074800_encounter_schedule_home_aliases_and_sleep_guard.sql", "utf8");
 assert.match(generator, /resolveEncounterScheduleAvailability/);
 assert.match(generator, /SLEEPING_SCHEDULE_PATTERN/);
-assert.match(encounterSession, /resolveEncounterScheduleAvailability\(scheduleRow\.activity, scheduleDetails\?\.scene_description\)/);
+assert.match(encounterSession, /resolveEncounterScheduleAvailability\(scheduleRow\.activity, scheduleRow\.scene_description\)/);
 assert.match(encounterSession, /character_sleeping_unavailable_for_encounter/);
 assert.match(encounterSession, /resolve_encounter_character_schedule_with_scene/);
 assert.match(sleepingAvailabilityMigration, /CREATE OR REPLACE FUNCTION public\.resolve_encounter_character_schedule_with_scene/);
