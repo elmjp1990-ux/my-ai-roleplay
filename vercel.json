@@ -4,6 +4,7 @@
   "outputDirectory": "dist",
   "git": {
     "deploymentEnabled": {
+      "feat/encounter-ai-integration": false,
       "fix/mobile-chat-keyboard-viewport": false
     }
   }
