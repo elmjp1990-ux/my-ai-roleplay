@@ -88,9 +88,11 @@ assert.match(fs.readFileSync("city-map.js", "utf8"), /MAX_DYNAMIC_SCENE_MARKERS=
 assert.match(fs.readFileSync("city-map.js", "utf8"), /Math\.hypot\(point\.x-x,point\.y-y\)<120/);
 assert.match(pipeline, /marker_x BETWEEN 40 AND 1622/);
 assert.match(pipeline, /marker_y BETWEEN 40 AND 892/);
-assert.match(generator, /scene_catalog 只代表目前已啟用/);
-assert.match(generator, /canonical_scene_keys/);
-assert.match(generator, /待場景日後啟用再自動顯示/);
+assert.match(generator, /地點是否能對應地圖由系統自行判斷/);
+assert.match(generator, /scene_description/);
+assert.match(generator, /location（自然語言地點名稱）/);
+assert.doesNotMatch(generator, /canonical_scene_keys/);
+assert.doesNotMatch(generator, /scene_catalog/);
 assert.match(generator, /只輸出適合玩家實際遇見角色的時段/);
 assert.match(generator, /slots 可為空陣列/);
 assert.match(generator, /scenes 必須是空陣列/);
