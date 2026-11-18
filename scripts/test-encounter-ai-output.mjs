@@ -167,6 +167,7 @@ assert.match(compactScheduleMigration, /schedule_hourly_too_few_multi_option_hou
 assert.match(compactScheduleMigration, /create_encounter_session_with_lifecycle/);
 assert.match(compactScheduleMigration, /''affinity'', v_affinity/);
 assert.match(compactScheduleMigration, /''relationshipStage'', v_relationship_stage/);
+assert.match(compactScheduleMigration, /DROP FUNCTION IF EXISTS public\.queue_encounter_greeting_pool_backfill/);
 assert.match(endpoint, /String\(affinity\)/);
 assert.match(endpoint, /ENCOUNTER_LOCATION_LABELS/);
 assert.doesNotMatch(sessionCreator, /character_stories/);
