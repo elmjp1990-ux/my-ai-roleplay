@@ -6,6 +6,7 @@ const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
 const cityMap = fs.readFileSync("city-map.js", "utf8");
 const cleanupMigration = fs.readFileSync("supabase/migrations/20261031211200_character_illustration_cleanup_queue.sql", "utf8");
 const scheduleOrganizer = fs.readFileSync("supabase/functions/encounter-schedule-organizer/index.ts", "utf8");
+const worldviewReviewMigration = fs.readFileSync("supabase/migrations/20261119000500_encounter_schedule_worldview_review_decisions.sql", "utf8");
 
 // The author-facing field must accept ordinary prose, not a pipe-delimited schema.
 assert.match(html, /name="encounterScheduleDescription"/);
@@ -190,7 +191,7 @@ assert.ok(!html.includes(".select('id, character_id, story_name, description, op
 assert.match(scheduleOrganizer, /\.eq\("status", "needs_review"\)\.eq\("author_id", actorUserId\)/);
 assert.match(scheduleOrganizer, /\.eq\("status", "pending"\)\.eq\("author_id", actorUserId\)/);
 assert.match(scheduleOrganizer, /\.eq\("status", "processing"\)\.eq\("author_id", actorUserId\)/);
-assert.match(scheduleOrganizer, /p_force IS NOT TRUE OR j\.author_id = p_actor_user_id/);
+assert.match(worldviewReviewMigration, /p_force IS NOT TRUE OR j\.author_id = p_actor_user_id/);
 
 assert.match(scheduleOrganizer, /getEncounterWorldviewScheduleDisposition\([\s\S]*?source\.worldview_review_decision/);
 assert.match(html, /data-action="worldview-review-decision"/);
