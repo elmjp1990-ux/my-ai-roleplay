@@ -1,4 +1,28 @@
 -- Allow owners to edit or remove the latest generated reply suggestions without changing chat messages or billing.
+-- chat_messages has an existing owner UPDATE policy for message editing.
+-- Prevent that broad policy from becoming an alternate path for changing AI suggestions.
+CREATE OR REPLACE FUNCTION public.guard_chat_message_suggested_replies_rpc_only()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path TO ''
+AS $guard$
+BEGIN
+  IF current_user IN ('anon', 'authenticated') THEN
+    RAISE EXCEPTION 'suggested_replies_rpc_required' USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END;
+$guard$;
+
+REVOKE ALL ON FUNCTION public.guard_chat_message_suggested_replies_rpc_only() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.guard_chat_message_suggested_replies_rpc_only() FROM anon, authenticated;
+
+DROP TRIGGER IF EXISTS guard_chat_message_suggested_replies_rpc_only ON public.chat_messages;
+CREATE TRIGGER guard_chat_message_suggested_replies_rpc_only
+BEFORE UPDATE OF suggested_replies ON public.chat_messages
+FOR EACH ROW
+EXECUTE FUNCTION public.guard_chat_message_suggested_replies_rpc_only();
+
 CREATE OR REPLACE FUNCTION public.update_chat_message_suggested_replies(
   p_message_id uuid,
   p_suggested_replies jsonb
