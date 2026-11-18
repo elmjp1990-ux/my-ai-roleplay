@@ -94,7 +94,7 @@ assert.match(generator, /scene_description/);
 assert.match(generator, /location（自然語言地點名稱）/);
 assert.doesNotMatch(generator, /canonical_scene_keys/);
 assert.doesNotMatch(generator, /scene_catalog/);
-assert.match(generator, /只輸出適合玩家實際遇見角色的時段/);
+assert.match(generator, /行程以角色自身日常活動為準/);
 assert.match(generator, /slots 可為空陣列/);
 assert.match(generator, /scenes 必須是空陣列/);
 assert.doesNotMatch(generator, /本批次只有 1 位角色使用也可以提出候選/);
