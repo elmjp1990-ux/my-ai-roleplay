@@ -4430,9 +4430,9 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
       const normalized={id:message.id,role:message.role==='user'?'user':'assistant',text:message.content||'',at:message.created_at?new Date(message.created_at).getTime():Date.now(),cloudSynced:true};
       const persistedSuggestions=Array.isArray(message.suggested_replies)?message.suggested_replies.map(value=>String(value||'').trim()).filter(value=>value.length>0).slice(0,3):[];
       const metadata=roleplayMeta[message.id];if(metadata&&typeof metadata==='object')Object.assign(normalized,metadata);
-      // The per-message database column is authoritative; stale session metadata
-      // must never overwrite a complete persisted suggestion set during reload.
-      if(persistedSuggestions.length===3)normalized.suggestedReplies=persistedSuggestions;
+      // The per-message database column is authoritative, including an empty array
+      // after the player removes every suggestion; stale metadata must never restore them.
+      if(Array.isArray(message.suggested_replies))normalized.suggestedReplies=persistedSuggestions;
       return normalized;
     });
     const pendingMessageIds=new Set([session.pendingTurn?.userMessageId,session.pendingTurn?.assistantMessageId].filter(Boolean));
@@ -8999,9 +8999,10 @@ async function loadStoryRelationshipState(session) {
 function conversationSuggestionsHTML(s) {
   if(!s?.suggestions)return '';
   const hasPlayerMessage=typeof s?.hasUserMessageOverride==='boolean'?s.hasUserMessageOverride:hasUserMessage(s);
-  const latestAssistantSuggestions=[...(s.messages||[])].reverse().find(message=>
-    message.role==='assistant'&&Array.isArray(message.suggestedReplies)&&message.suggestedReplies.length>0
-  )?.suggestedReplies;
+  const latestAssistantMessage=[...(s.messages||[])].reverse().find(message=>
+    message.role==='assistant'&&Array.isArray(message.suggestedReplies)
+  );
+  const latestAssistantSuggestions=latestAssistantMessage?.suggestedReplies;
   const replies=Array.isArray(latestAssistantSuggestions)?latestAssistantSuggestions.slice(0,3)
     :(Array.isArray(s.suggestedReplies)?s.suggestedReplies.slice(0,3):[]);
   return `<div class="suggestions">
