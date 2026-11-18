@@ -307,16 +307,16 @@ Deno.serve(async (request) => {
     actorUserId = authData.user.id;
     const [pendingResult, processingResult, failedResult, reconciliationResult, reviewResult, lastRunResult, reconciliationBatchesResult] = await Promise.all([
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
-        .eq("status", "pending"),
+        .eq("status", "pending").eq("author_id", actorUserId),
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
-        .eq("status", "processing"),
+        .eq("status", "processing").eq("author_id", actorUserId),
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
-        .eq("status", "failed"),
+        .eq("status", "failed").eq("author_id", actorUserId),
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
-        .eq("status", "needs_reconciliation"),
+        .eq("status", "needs_reconciliation").eq("author_id", actorUserId),
       admin.from("encounter_schedule_generation_jobs")
         .select("character_id,last_error_code,updated_at")
-        .eq("status", "needs_review")
+        .eq("status", "needs_review").eq("author_id", actorUserId)
         .order("updated_at", { ascending: false })
         .limit(50),
       admin.from("encounter_schedule_batch_runs").select("completed_at,status")
@@ -356,6 +356,7 @@ Deno.serve(async (request) => {
           .select("character_id,status,last_error_code,attempt_count,updated_at")
           .in("character_id", reconciliationCharacterIds)
           .eq("status", "needs_reconciliation")
+          .eq("author_id", actorUserId)
         : Promise.resolve({ data: [], error: null }),
       reconciliationCharacterIds.length
         ? admin.from("characters").select("id,name").in("id", reconciliationCharacterIds)
@@ -643,7 +644,10 @@ Deno.serve(async (request) => {
   // Neither group is sent to AI, and review-required roles are not published as unplaced.
   const generationSources = sources.filter((source) => {
     const classification = classifyEncounterWorldview(source);
-    const disposition = getEncounterWorldviewScheduleDisposition(classification);
+    const disposition = getEncounterWorldviewScheduleDisposition(
+      classification,
+      source.worldview_review_decision,
+    );
     if (disposition === "generate") return true;
     rawCharacters.push({
       character_id: source.character_id,
@@ -657,6 +661,7 @@ Deno.serve(async (request) => {
       modern_map_compatible: false,
       ai_generation_skipped: true,
       manual_review_required: disposition === "needs_review",
+      manual_review_decision: asText(source.worldview_review_decision) || null,
     });
     return false;
   });
