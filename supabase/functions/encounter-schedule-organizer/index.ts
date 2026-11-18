@@ -225,7 +225,7 @@ Deno.serve(async (request) => {
   const generationResults = await Promise.all(sources.map(async (source) => {
     let characterPrompt;
     try {
-      characterPrompt = buildEncounterScheduleBatchMessages([source], sceneCatalog);
+      characterPrompt = buildEncounterScheduleBatchMessages([source]);
       protectedContextByCharacter[source.character_id] =
         characterPrompt.protectedContextByCharacter[source.character_id] || [];
     } catch (error) {
