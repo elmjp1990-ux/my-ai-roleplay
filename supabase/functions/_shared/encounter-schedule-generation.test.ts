@@ -171,6 +171,24 @@ Deno.test("preserves modern schedules when the model reports no matching map loc
   }
 });
 
+Deno.test("infers modern map compatibility from contemporary character context", () => {
+  const wealthyModernRole = source(id1, {
+    name: "沈若薇",
+    intro: "頂尖財閥沈氏集團的掌上明珠，也是總裁夫人，經常出席慈善晚宴與藝術展覽。",
+    world_era: "頂尖財閥沈氏集團的掌上明珠，也是總裁夫人",
+    modern_setting_compatible: false,
+    schedule_description: "平日穿梭於慈善晚宴、藝術展覽與集團社交場合。",
+  });
+  if (!isEncounterModernMapCompatible(wealthyModernRole)) {
+    throw new Error("contemporary finance and corporate setting incorrectly marked incompatible");
+  }
+  const built = buildEncounterScheduleBatchMessages([wealthyModernRole]);
+  const payload = JSON.parse(built.messages[1].content).characters[0];
+  if (payload.modern_setting_compatible !== true) {
+    throw new Error("derived modern compatibility was not sent to the model");
+  }
+});
+
 Deno.test("keeps incompatible historical characters off the modern map", () => {
   const ancient = source(id1, { world_era: "ancient", modern_setting_compatible: false });
   if (isEncounterModernMapCompatible(ancient)) throw new Error("ancient role incorrectly marked modern-compatible");
