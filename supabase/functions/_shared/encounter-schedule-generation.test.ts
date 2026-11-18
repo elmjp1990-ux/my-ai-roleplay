@@ -265,23 +265,6 @@ Deno.test("normalizes similar scene labels to canonical shared locations", () =>
   if (normalizeEncounterSceneKey("train station") !== "train-station") throw new Error("English train station alias failed");
 });
 
-Deno.test("only reuses dynamic scenes already present in the server catalog", () => {
-  const candidate = {
-    character_id: id1, placement: "modern_map",
-    variants: variants(fullDaySlots({ location_key: "shopping-street", is_outdoor: true,
-      rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳", rain_fallback_greeting: greeting })),
-  };
-  const absent = result([candidate]);
-  if (absent.ok || !absent.errors.some((error) => error.includes("scene_not_in_existing_catalog_shopping-street"))) {
-    throw new Error("new dynamic scene was accepted without an existing catalog entry");
-  }
-  const existing = result([candidate], undefined, [{
-    location_key: "shopping-street", display_name: "商店街", is_dynamic: true,
-  }]);
-  if (!existing.ok || existing.scenes.length !== 0) {
-    throw new Error(existing.errors.join(",") || "existing dynamic scene should be reused without metadata changes");
-  }
-});
 
 Deno.test("rejects arbitrary model coordinates and invalid variant weights", () => {
   const extraField = result([{
@@ -370,37 +353,41 @@ Deno.test("rejects airport as a generic everyday location without character trav
   if (!accepted.ok) throw new Error(accepted.errors.join(","));
 });
 
-Deno.test("rejects new scene types and allows catalogued dynamic scenes without metadata", () => {
-  const first = {
+Deno.test("preserves canonical scene intent even when the scene is not currently catalogued", () => {
+  const candidate = {
     character_id: id1, placement: "modern_map",
-    variants: variants(fullDaySlots({ location_key: "night-market", is_outdoor: true,
-      rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳用餐",
-      rain_fallback_greeting: greeting })),
+    variants: variants(fullDaySlots({ location_key: "gym", activity: "在健身房進行重量訓練。" })),
   };
-  const second = {
-    character_id: id2, placement: "modern_map",
-    variants: variants(fullDaySlots({ location_key: "night-market", is_outdoor: true,
-      rain_fallback_location_key: "bookstore", rain_fallback_activity: "改在書店休息",
-      rain_fallback_greeting: greeting })),
-  };
-  const missing = parseEncounterScheduleBatchOutput(JSON.stringify({
-    characters: [withGreetingPools(first), withGreetingPools(second)],
-  }), [source(id1), source(id2)]);
-  if (missing.ok || !missing.errors.some((error) => error.includes("scene_not_in_existing_catalog_night-market"))) {
-    throw new Error("dynamic scene absent from catalog accepted");
+  const parsed = result([candidate]);
+  if (!parsed.ok) throw new Error(parsed.errors.join(","));
+  if (parsed.characters[0].variants.weekday[0].slots[1].location_key !== "gym") {
+    throw new Error("unavailable gym intent was not preserved");
   }
-  const accepted = result([first, second], undefined, [{
-    location_key: "night-market", display_name: "夜市", is_dynamic: true,
-  }]);
-  if (!accepted.ok || accepted.scenes.length !== 0) {
-    throw new Error(accepted.errors.join(",") || "existing dynamic scene should be reused without metadata");
+  const prompt = buildEncounterScheduleBatchMessages([source()]);
+  const payload = JSON.parse(prompt.messages[1].content);
+  if (!payload.canonical_scene_keys.includes("gym")) {
+    throw new Error("canonical scene key list missing from prompt payload");
   }
-  const reused = result([first], undefined, [{
-    location_key: "night-market", display_name: "夜市", is_dynamic: true,
-  }]);
-  if (!reused.ok) throw new Error(reused.errors.join(",") || "existing dynamic scene should be reusable by one role");
+  if (!prompt.messages[0].content.includes("待場景日後啟用再自動顯示")) {
+    throw new Error("prompt does not preserve unavailable scene intent");
+  }
 });
 
+Deno.test("preserves unavailable outdoor scene intent while validating its fixed indoor rain fallback", () => {
+  const candidate = {
+    character_id: id1, placement: "modern_map",
+    variants: variants(fullDaySlots({
+      location_key: "night-market", is_outdoor: true,
+      rain_fallback_location_key: "cafe", rain_fallback_activity: "改在咖啡廳用餐",
+      rain_fallback_greeting: greeting,
+    })),
+  };
+  const parsed = result([candidate]);
+  if (!parsed.ok) throw new Error(parsed.errors.join(","));
+  if (parsed.characters[0].variants.weekday[0].slots[1].location_key !== "night-market") {
+    throw new Error("unavailable outdoor scene intent was dropped");
+  }
+});
 Deno.test("does not allow a fourth visible dynamic map marker", () => {
   const characters = [
     { character_id: id1, placement: "modern_map", variants: variants(fullDaySlots({ location_key: "university", activity: "在大學授課與參與校園活動。" })) },
@@ -425,12 +412,6 @@ Deno.test("uses existing Live House scene without asking AI to update scene meta
       activity: "在 Live House 參與樂團演出與彩排。",
     })),
   };
-  const missing = parseEncounterScheduleBatchOutput(JSON.stringify({
-    characters: [withGreetingPools(character)],
-  }), [source()]);
-  if (missing.ok || !missing.errors.some((error) => error.includes("scene_not_in_existing_catalog_live-house"))) {
-    throw new Error("scene absent from server catalog was accepted");
-  }
   const accepted = result([character]);
   if (!accepted.ok || accepted.scenes.length !== 0) {
     throw new Error(accepted.errors.join(",") || "existing Live House scene should be reused without AI metadata");
