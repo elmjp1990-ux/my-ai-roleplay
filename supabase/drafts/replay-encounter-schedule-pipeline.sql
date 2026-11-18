@@ -23,6 +23,36 @@ INSERT INTO public.characters (
   'Encounter Rain Smoke', 'public', 'approved', true, false
 );
 INSERT INTO public.character_schedules (
+  id, character_id, day_type, start_time, end_time, location_key, location_description,
+  activity, scene_description, priority, is_active, source_type, variant_key, variant_weight,
+  encounter_greeting, is_outdoor
+) VALUES
+(
+  '00000000-0000-4000-8000-000000000020'::uuid,
+  '00000000-0000-4000-8000-000000000010'::uuid,
+  'weekday', '06:00', '07:00', 'apartment', '私人公寓',
+  '熟睡中', '他縮在被子裡熟睡，房間安靜得只剩空調聲。',
+  50, true, 'ai', 'option_1', 80,
+  pg_catalog.repeat('他仍安靜地睡著，房間裡只有窗外微弱的城市聲響。', 6), false
+),
+(
+  '00000000-0000-4000-8000-000000000021'::uuid,
+  '00000000-0000-4000-8000-000000000010'::uuid,
+  'weekday', '06:00', '07:00', 'apartment', '私人公寓',
+  '翻來覆去睡不著', '他在床上翻了幾次身，望著窗簾縫隙遲遲沒有睡意。',
+  50, true, 'ai', 'option_2', 20,
+  pg_catalog.repeat('他睜著眼望向窗邊，試著讓思緒慢慢平靜下來。', 6), false
+),
+(
+  '00000000-0000-4000-8000-000000000022'::uuid,
+  '00000000-0000-4000-8000-000000000010'::uuid,
+  'weekday', '07:00', '08:00', 'apartment', '私人公寓',
+  '繼續睡覺', '鬧鐘響過一次，他只是皺眉翻身，又沉沉睡去。',
+  50, true, 'ai', 'option_1', 100,
+  pg_catalog.repeat('他把鬧鐘按掉，重新縮回被子裡，暫時不想面對早晨。', 6), false
+);
+
+INSERT INTO public.character_schedules (
   id, character_id, day_type, start_time, end_time, location_key, activity,
   priority, is_active, source_type, variant_key, variant_weight,
   encounter_greeting, is_outdoor,
@@ -77,7 +107,7 @@ BEGIN
   v_payload := public.encounter_schedule_source_payload(
     '00000000-0000-4000-8000-000000000010'::uuid
   );
-  IF v_payload->>'schedule_schema_version' <> 'poyozz-encounter-schedule-v3-relationship-greetings-2026-11-17' THEN
+  IF v_payload->>'schedule_schema_version' <> 'poyozz-encounter-schedule-v6-hourly-independent-options-2026-11-18' THEN
     RAISE EXCEPTION 'schedule source hash version was not updated for special events';
   END IF;
 END;
@@ -85,6 +115,60 @@ $schedule_source_version_smoke$;
 
 SET LOCAL ROLE service_role;
 SET LOCAL request.jwt.claim.role = 'service_role';
+
+DO $hourly_schedule_option_smoke$
+DECLARE
+  v_first record;
+  v_second record;
+  v_roll integer;
+  v_expected_key text;
+BEGIN
+  v_roll := pg_catalog.mod(
+    pg_catalog.abs(pg_catalog.hashtext(
+      '00000000-0000-4000-8000-000000000010'::uuid::text
+      || '2026-11-17'
+      || '06:00:00'
+      || 'hourly-options-v1'
+    )::bigint),
+    100
+  )::integer;
+  v_expected_key := CASE WHEN v_roll < 80 THEN 'option_1' ELSE 'option_2' END;
+
+  SELECT * INTO v_first
+  FROM public.resolve_encounter_character_schedule(
+    '00000000-0000-4000-8000-000000000010'::uuid,
+    NULL,
+    NULL,
+    '2026-11-17T06:30:00+08:00'::timestamptz
+  );
+  SELECT * INTO v_second
+  FROM public.resolve_encounter_character_schedule(
+    '00000000-0000-4000-8000-000000000010'::uuid,
+    NULL,
+    NULL,
+    '2026-11-17T06:30:00+08:00'::timestamptz
+  );
+
+  IF NOT FOUND
+     OR v_first.variant_key <> v_expected_key
+     OR v_second.schedule_id <> v_first.schedule_id
+     OR v_second.variant_key <> v_first.variant_key
+     OR v_first.variant_weight <> CASE WHEN v_expected_key = 'option_1' THEN 80 ELSE 20 END THEN
+    RAISE EXCEPTION 'hourly option must be weighted and stable across same-day refreshes';
+  END IF;
+
+  SELECT * INTO v_first
+  FROM public.resolve_encounter_character_schedule(
+    '00000000-0000-4000-8000-000000000010'::uuid,
+    NULL,
+    NULL,
+    '2026-11-17T07:30:00+08:00'::timestamptz
+  );
+  IF NOT FOUND OR v_first.variant_key <> 'option_1' OR v_first.variant_weight <> 100 THEN
+    RAISE EXCEPTION 'a single-option hourly block must resolve as 100 percent';
+  END IF;
+END;
+$hourly_schedule_option_smoke$;
 
 DO $weather_fallback_smoke$
 DECLARE
