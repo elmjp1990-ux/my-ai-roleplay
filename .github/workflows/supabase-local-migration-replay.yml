@@ -256,6 +256,7 @@ jobs:
           set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261118000400_encounter_schedules_allow_unavailable_windows.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261118000500_resolve_only_published_encounter_scenes.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261118000600_encounter_schedule_scene_descriptions.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-sparse-schedule-windows.sql
 
       - name: Replay public character eligibility and NSFW viewer gate
