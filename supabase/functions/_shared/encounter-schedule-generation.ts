@@ -104,12 +104,6 @@ type SpecialEventSchedule = {
   event_name: string;
   slots: ScheduleSlot[];
 };
-export const ENCOUNTER_RELATIONSHIP_STAGES = [
-  "hostile", "dislike", "wary", "first_meeting",
-  "acquaintance", "close", "intimate", "special",
-] as const;
-export type EncounterRelationshipStage = typeof ENCOUNTER_RELATIONSHIP_STAGES[number];
-export type EncounterRelationshipGreetingPools = Record<EncounterRelationshipStage, string[]>;
 export type GeneratedSceneMetadata = {
   location_key: typeof ENCOUNTER_SCENE_KEYS[number];
   display_name: string;
@@ -135,7 +129,6 @@ export type GeneratedCharacterSchedule = {
     holiday: ScheduleTimeBlock[];
   };
   special_events: SpecialEventSchedule[];
-  relationship_greetings?: EncounterRelationshipGreetingPools;
 };
 export type EncounterScheduleSource = RecordValue & {
   character_id: string;
