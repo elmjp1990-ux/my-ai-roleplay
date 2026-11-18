@@ -32,6 +32,10 @@ assert.match(worker, /eq\("actor_user_id", actorUserId\)/);
 assert.match(worker, /originalBatch\.is_manual !== true/);
 assert.match(worker, /job\.source_hash !== output\.source_hash/);
 assert.match(worker, /delete\(\)\.lt\("expires_at"/);
+assert.match(worker, /repairableCharacterIds/);
+assert.match(worker, /job\.status === "failed"/);
+assert.match(worker, /updateRawGenerationOutput\(admin, rawOutputIdByCharacter\.get\(item\.sourceId\)[\s\S]*?"completed"/);
+
 assert.match(worker, /updateRawGenerationOutput\(admin, rawOutputId/);
 
 assert.match(worker, /original_preserved: true/);
