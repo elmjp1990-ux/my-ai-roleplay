@@ -305,7 +305,7 @@ Deno.serve(async (request) => {
     const { data: authData, error: authError } = await userClient.auth.getUser();
     if (authError || !authData?.user) return json({ enabled: false, test_mode: true });
     actorUserId = authData.user.id;
-    const [pendingResult, processingResult, failedResult, reconciliationResult, lastRunResult, reconciliationBatchesResult] = await Promise.all([
+    const [pendingResult, processingResult, failedResult, reconciliationResult, reviewResult, lastRunResult, reconciliationBatchesResult] = await Promise.all([
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
         .eq("status", "pending"),
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
@@ -314,6 +314,11 @@ Deno.serve(async (request) => {
         .eq("status", "failed"),
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
         .eq("status", "needs_reconciliation"),
+      admin.from("encounter_schedule_generation_jobs")
+        .select("character_id,last_error_code,updated_at")
+        .eq("status", "needs_review")
+        .order("updated_at", { ascending: false })
+        .limit(50),
       admin.from("encounter_schedule_batch_runs").select("completed_at,status")
         .eq("status", "completed").not("completed_at", "is", null)
         .order("completed_at", { ascending: false }).limit(1).maybeSingle(),
@@ -326,9 +331,21 @@ Deno.serve(async (request) => {
         .limit(20),
     ]);
     if (pendingResult.error || processingResult.error || failedResult.error || reconciliationResult.error ||
-        lastRunResult.error || reconciliationBatchesResult.error) {
+        reviewResult.error || lastRunResult.error || reconciliationBatchesResult.error) {
       return json({ enabled: true, test_mode: true, status_available: false });
     }
+    const reviewCharacterIds = [...new Set((reviewResult.data || []).map((job: any) => job.character_id).filter(Boolean))];
+    const reviewCharactersResult = reviewCharacterIds.length
+      ? await admin.from("characters").select("id,name").in("id", reviewCharacterIds)
+      : { data: [], error: null };
+    if (reviewCharactersResult.error) return json({ enabled: true, test_mode: true, status_available: false });
+    const reviewNames = new Map((reviewCharactersResult.data || []).map((character: any) => [character.id, character.name]));
+    const manualReviewJobs = (reviewResult.data || []).map((job: any) => ({
+      character_id: job.character_id,
+      character_name: reviewNames.get(job.character_id) || "角色",
+      reason: job.last_error_code || "worldview_manual_review_required",
+      updated_at: job.updated_at || null,
+    }));
     const reconciliationBatches = reconciliationBatchesResult.data || [];
     const reconciliationCharacterIds = [...new Set(reconciliationBatches.flatMap((batch: any) =>
       Array.isArray(batch.character_ids) ? batch.character_ids : []
@@ -374,6 +391,8 @@ Deno.serve(async (request) => {
       processing_character_count: Number(processingResult.count || 0),
       failed_character_count: Number(failedResult.count || 0),
       needs_reconciliation_count: Number(reconciliationResult.count || 0),
+      needs_review_character_count: manualReviewJobs.length,
+      manual_review_jobs: manualReviewJobs,
       reconciliation_jobs: reconciliationJobs,
       last_batch_completed_at: lastRunResult.data?.completed_at || null,
       last_batch_status: lastRunResult.data?.status || null,
