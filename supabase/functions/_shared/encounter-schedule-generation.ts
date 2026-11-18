@@ -526,9 +526,6 @@ export function parseEncounterScheduleBatchOutput(
     for (const event of character.special_events) {
       for (const slot of event.slots) {
         usedSceneKeys.add(slot.location_key);
-        const ids = primarySceneCharacters.get(slot.location_key) || new Set<string>();
-        ids.add(character.character_id);
-        primarySceneCharacters.set(slot.location_key, ids);
       }
     }
   }
