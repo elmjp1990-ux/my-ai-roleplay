@@ -284,7 +284,7 @@ Deno.serve(async (request) => {
 
   let body: Record<string, unknown> = {};
   try { body = asRow(await request.json()); } catch { return json({ error: "invalid_json" }, 400); }
-  const mode = ["manual", "status", "repair_list", "repair"].includes(asText(body.mode))
+  const mode = ["manual", "status", "repair_list", "repair", "reconcile_confirm"].includes(asText(body.mode))
     ? asText(body.mode)
     : "scheduled";
   const isServiceRoleRequest = authorization === "Bearer " + service;
@@ -303,7 +303,7 @@ Deno.serve(async (request) => {
     const { data: authData, error: authError } = await userClient.auth.getUser();
     if (authError || !authData?.user) return json({ enabled: false, test_mode: true });
     actorUserId = authData.user.id;
-    const [pendingResult, processingResult, failedResult, reconciliationResult, lastRunResult] = await Promise.all([
+    const [pendingResult, processingResult, failedResult, reconciliationResult, lastRunResult, reconciliationBatchesResult] = await Promise.all([
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
         .eq("status", "pending"),
       admin.from("encounter_schedule_generation_jobs").select("character_id", { count: "exact", head: true })
@@ -315,10 +315,56 @@ Deno.serve(async (request) => {
       admin.from("encounter_schedule_batch_runs").select("completed_at,status")
         .eq("status", "completed").not("completed_at", "is", null)
         .order("completed_at", { ascending: false }).limit(1).maybeSingle(),
+      admin.from("encounter_schedule_batch_runs")
+        .select("id,character_ids,started_at,failure_code")
+        .eq("actor_user_id", actorUserId)
+        .eq("is_manual", true)
+        .eq("status", "needs_reconciliation")
+        .order("started_at", { ascending: false })
+        .limit(20),
     ]);
-    if (pendingResult.error || processingResult.error || failedResult.error || reconciliationResult.error || lastRunResult.error) {
+    if (pendingResult.error || processingResult.error || failedResult.error || reconciliationResult.error ||
+        lastRunResult.error || reconciliationBatchesResult.error) {
       return json({ enabled: true, test_mode: true, status_available: false });
     }
+    const reconciliationBatches = reconciliationBatchesResult.data || [];
+    const reconciliationCharacterIds = [...new Set(reconciliationBatches.flatMap((batch: any) =>
+      Array.isArray(batch.character_ids) ? batch.character_ids : []
+    ))];
+    const [reconciliationJobsResult, reconciliationCharactersResult] = await Promise.all([
+      reconciliationCharacterIds.length
+        ? admin.from("encounter_schedule_generation_jobs")
+          .select("character_id,status,last_error_code,attempt_count,updated_at")
+          .in("character_id", reconciliationCharacterIds)
+          .eq("status", "needs_reconciliation")
+        : Promise.resolve({ data: [], error: null }),
+      reconciliationCharacterIds.length
+        ? admin.from("characters").select("id,name").in("id", reconciliationCharacterIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (reconciliationJobsResult.error || reconciliationCharactersResult.error) {
+      return json({ enabled: true, test_mode: true, status_available: false });
+    }
+    const reconciliationNames = new Map((reconciliationCharactersResult.data || [])
+      .map((character: any) => [character.id, character.name]));
+    const reconciliationBatchByCharacter = new Map<string, any>();
+    for (const batch of reconciliationBatches) {
+      for (const characterId of Array.isArray(batch.character_ids) ? batch.character_ids : []) {
+        reconciliationBatchByCharacter.set(characterId, batch);
+      }
+    }
+    const reconciliationJobs = (reconciliationJobsResult.data || []).map((job: any) => {
+      const batch = reconciliationBatchByCharacter.get(job.character_id);
+      return {
+        batch_id: batch?.id || null,
+        character_id: job.character_id,
+        character_name: reconciliationNames.get(job.character_id) || "角色",
+        failure_code: batch?.failure_code || job.last_error_code || "unknown",
+        job_error_code: job.last_error_code || "unknown",
+        attempt_count: Number(job.attempt_count || 0),
+        started_at: batch?.started_at || job.updated_at || null,
+      };
+    });
     return json({
       enabled: true,
       test_mode: true,
@@ -326,11 +372,93 @@ Deno.serve(async (request) => {
       processing_character_count: Number(processingResult.count || 0),
       failed_character_count: Number(failedResult.count || 0),
       needs_reconciliation_count: Number(reconciliationResult.count || 0),
+      reconciliation_jobs: reconciliationJobs,
       last_batch_completed_at: lastRunResult.data?.completed_at || null,
       last_batch_status: lastRunResult.data?.status || null,
     });
   }
 
+
+  if (mode === "reconcile_confirm") {
+    if (Deno.env.get("ENCOUNTER_SCHEDULE_TEST_MODE") !== "true" || isServiceRoleRequest) {
+      return json({ error: "schedule_reconciliation_disabled" }, 403);
+    }
+    const userClient = createClient(url, anon, {
+      global: { headers: { Authorization: authorization } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: authData, error: authError } = await userClient.auth.getUser();
+    if (authError || !authData?.user) return json({ error: "unauthorized" }, 401);
+    actorUserId = authData.user.id;
+
+    const batchId = asText(body.batch_id);
+    const characterId = asText(body.character_id);
+    if (!/^[0-9a-f-]{36}$/i.test(batchId) || !/^[0-9a-f-]{36}$/i.test(characterId)) {
+      return json({ error: "schedule_reconciliation_input_invalid" }, 400);
+    }
+    const { data: batch, error: batchError } = await admin.from("encounter_schedule_batch_runs")
+      .select("id,actor_user_id,is_manual,character_ids,status,failure_code")
+      .eq("id", batchId).maybeSingle();
+    if (batchError || !batch) return json({ error: "schedule_reconciliation_batch_not_found" }, 404);
+    if (batch.actor_user_id !== actorUserId || batch.is_manual !== true ||
+        !Array.isArray(batch.character_ids) || !batch.character_ids.includes(characterId)) {
+      return json({ error: "schedule_reconciliation_not_authorized" }, 403);
+    }
+    if (batch.status !== "needs_reconciliation" || batch.failure_code !== "schedule_provider_outcome_unknown") {
+      return json({ error: "schedule_reconciliation_batch_not_eligible" }, 409);
+    }
+    const { data: job, error: jobError } = await admin.from("encounter_schedule_generation_jobs")
+      .select("status,last_error_code")
+      .eq("character_id", characterId).maybeSingle();
+    if (jobError || !job) return json({ error: "schedule_reconciliation_job_unavailable" }, 503);
+    if (job.status !== "needs_reconciliation" || job.last_error_code !== "schedule_provider_outcome_unknown") {
+      return json({ error: "schedule_reconciliation_job_not_eligible" }, 409);
+    }
+
+    const resolvedAt = new Date().toISOString();
+    const { data: updatedJob, error: updateJobError } = await admin.from("encounter_schedule_generation_jobs")
+      .update({
+        status: "failed",
+        lease_token: null,
+        lease_expires_at: null,
+        available_at: resolvedAt,
+        updated_at: resolvedAt,
+      })
+      .eq("character_id", characterId)
+      .eq("status", "needs_reconciliation")
+      .eq("last_error_code", "schedule_provider_outcome_unknown")
+      .select("character_id").maybeSingle();
+    if (updateJobError || !updatedJob) {
+      return json({ error: "schedule_reconciliation_job_update_failed" }, 503);
+    }
+
+    const { data: updatedBatch, error: updateBatchError } = await admin.from("encounter_schedule_batch_runs")
+      .update({
+        status: "failed",
+        failure_code: "schedule_provider_outcome_unknown_acknowledged",
+        completed_at: resolvedAt,
+        updated_at: resolvedAt,
+      })
+      .eq("id", batchId)
+      .eq("actor_user_id", actorUserId)
+      .eq("status", "needs_reconciliation")
+      .select("id").maybeSingle();
+    if (updateBatchError || !updatedBatch) {
+      const { error: rollbackError } = await admin.from("encounter_schedule_generation_jobs")
+        .update({ status: "needs_reconciliation", updated_at: new Date().toISOString() })
+        .eq("character_id", characterId)
+        .eq("status", "failed")
+        .eq("last_error_code", "schedule_provider_outcome_unknown");
+      if (rollbackError) console.error("Schedule reconciliation rollback failed:", rollbackError.message);
+      return json({ error: "schedule_reconciliation_batch_update_failed" }, 503);
+    }
+    return json({
+      status: "resolved_without_retry",
+      ai_called: false,
+      original_batch_preserved: true,
+      provider_outcome_confirmed: false,
+    });
+  }
 
   if (mode === "repair_list" || mode === "repair") {
     if (Deno.env.get("ENCOUNTER_SCHEDULE_TEST_MODE") !== "true" || isServiceRoleRequest) {
