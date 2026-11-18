@@ -5,6 +5,7 @@ DECLARE
   v_review text;
   v_enqueue text;
   v_claim text;
+  v_publish text;
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
@@ -31,6 +32,9 @@ BEGIN
   SELECT pg_catalog.pg_get_functiondef(
     'public.claim_encounter_schedule_batch(integer,boolean,uuid)'::regprocedure
   ) INTO v_claim;
+  SELECT pg_catalog.pg_get_functiondef(
+    'public.publish_encounter_schedule_batch(uuid,uuid,jsonb)'::regprocedure
+  ) INTO v_publish;
 
   IF position('auth.uid()' IN v_review) = 0
      OR position('account_is_active()' IN v_review) = 0
@@ -53,6 +57,12 @@ BEGIN
   IF position('p_force IS NOT TRUE OR j.author_id = p_actor_user_id' IN v_claim) = 0
      OR position('worldview_review_decision' IN v_claim) = 0 THEN
     RAISE EXCEPTION 'worldview_review_claim_author_scope_or_override_missing';
+  END IF;
+  IF position('worldview_review_decision = NULL' IN v_enqueue) = 0
+     OR position('worldview_reviewed_by = NULL' IN v_enqueue) = 0
+     OR position('worldview_reviewed_at = NULL' IN v_enqueue) = 0
+     OR position('worldview_review_decision = NULL' IN v_publish) = 0 THEN
+    RAISE EXCEPTION 'worldview_review_override_not_cleared_on_source_invalidation';
   END IF;
 
   IF NOT pg_catalog.has_function_privilege(
