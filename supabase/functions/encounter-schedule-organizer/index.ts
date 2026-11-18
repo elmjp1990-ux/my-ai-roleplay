@@ -64,6 +64,208 @@ async function failBatch(admin: any, batchId: string, leaseToken: string, failur
   return !error && !!data;
 }
 
+
+async function recordRawGenerationOutput(
+  admin: any,
+  batchId: string,
+  characterId: string,
+  actorUserId: string | null,
+  providerResponse: any,
+) {
+  const { data: job, error: jobError } = await admin.from("encounter_schedule_generation_jobs")
+    .select("source_hash").eq("character_id", characterId).maybeSingle();
+  if (jobError || !job?.source_hash) {
+    console.warn("Encounter schedule raw output source hash unavailable:", jobError?.message || characterId);
+    return null;
+  }
+  const rawText = typeof providerResponse?.rawOutputText === "string" ? providerResponse.rawOutputText : "";
+  const rawBody = typeof providerResponse?.rawResponseBody === "string" ? providerResponse.rawResponseBody : "";
+  const { data, error } = await admin.from("encounter_schedule_generation_outputs").insert({
+    batch_id: batchId,
+    character_id: characterId,
+    actor_user_id: actorUserId,
+    source_hash: job.source_hash,
+    requested_model: POYOZZ_DEFAULT_CHAT_MODEL,
+    provider: asText(providerResponse?.provider) || "openrouter",
+    response_model: asText(providerResponse?.model) || null,
+    finish_reason: asText(providerResponse?.finishReason) || null,
+    raw_response_text: rawText.slice(0, 500000) || null,
+    raw_output_truncated: rawText.length > 500000,
+    raw_response_body: rawBody.slice(0, 250000) || null,
+    response_body_truncated: rawBody.length > 250000 ||
+      Number(providerResponse?.responseBodyLength || 0) > 250000,
+    http_status: Number(providerResponse?.httpStatus || 0) || null,
+    response_content_type: asText(providerResponse?.responseContentType) || null,
+    response_parsed: providerResponse?.responseParsed !== false,
+    usage: providerResponse?.usage && typeof providerResponse.usage === "object" ? providerResponse.usage : {},
+    status: "received",
+  }).select("id").single();
+  if (error || !data?.id) {
+    console.warn("Encounter schedule raw output persistence failed:", error?.message || characterId);
+    return null;
+  }
+  return asText(data.id);
+}
+
+async function updateRawGenerationOutput(
+  admin: any,
+  outputId: string | null,
+  status: string,
+  failureCode: string | null = null,
+  validationErrors: string[] = [],
+) {
+  if (!outputId) return;
+  const { error } = await admin.from("encounter_schedule_generation_outputs")
+    .update({ status, failure_code: failureCode, validation_errors: validationErrors.slice(0, 30) })
+    .eq("id", outputId);
+  if (error) console.warn("Encounter schedule raw output status update failed:", error.message);
+}
+
+async function handleScheduleRepair(admin: any, actorUserId: string, body: Record<string, unknown>) {
+  const outputId = asText(body.output_id);
+  const correctedText = typeof body.corrected_response === "string" ? body.corrected_response : "";
+  if (!/^[0-9a-f-]{36}$/i.test(outputId) || correctedText.length < 2 || correctedText.length > 500000) {
+    return json({ error: "schedule_repair_input_invalid" }, 400);
+  }
+
+  const { data: output, error: outputError } = await admin.from("encounter_schedule_generation_outputs")
+    .select("*").eq("id", outputId).eq("actor_user_id", actorUserId)
+    .gt("expires_at", new Date().toISOString()).maybeSingle();
+  if (outputError || !output) return json({ error: "schedule_repair_output_not_found" }, 404);
+  if (!output.source_hash || !output.batch_id || !output.character_id) {
+    return json({ error: "schedule_repair_source_metadata_missing" }, 409);
+  }
+
+  const { data: originalBatch, error: batchError } = await admin.from("encounter_schedule_batch_runs")
+    .select("actor_user_id,is_manual,character_ids").eq("id", output.batch_id).maybeSingle();
+  if (batchError || !originalBatch || originalBatch.is_manual !== true ||
+      originalBatch.actor_user_id !== actorUserId ||
+      !Array.isArray(originalBatch.character_ids) || !originalBatch.character_ids.includes(output.character_id)) {
+    return json({ error: "schedule_repair_not_authorized" }, 403);
+  }
+
+  const { data: job, error: jobError } = await admin.from("encounter_schedule_generation_jobs")
+    .select("status,source_hash").eq("character_id", output.character_id).maybeSingle();
+  if (jobError || !job) return json({ error: "schedule_repair_job_unavailable" }, 503);
+  if (job.status !== "failed") return json({ error: "schedule_repair_job_not_failed", job_status: job.status }, 409);
+  if (job.source_hash !== output.source_hash) return json({ error: "schedule_repair_source_changed" }, 409);
+
+  const { data: source, error: sourceError } = await admin.rpc("encounter_schedule_source_payload", {
+    p_character_id: output.character_id,
+  });
+  if (sourceError || !source) return json({ error: "schedule_repair_source_unavailable" }, 409);
+
+  let promptContext;
+  try {
+    promptContext = buildEncounterScheduleBatchMessages([source as EncounterScheduleSource]);
+  } catch (error) {
+    return json({ error: asText(error instanceof Error ? error.message : "schedule_repair_context_invalid") }, 409);
+  }
+
+  const { data: sceneCatalogData, error: sceneCatalogError } = await admin.rpc("get_encounter_scene_catalog");
+  const sceneCatalog = sceneCatalogError
+    ? []
+    : (Array.isArray(sceneCatalogData) ? sceneCatalogData : []) as EncounterSceneCatalogEntry[];
+  if (sceneCatalogError) {
+    console.warn("Encounter repair scene catalog unavailable; validating natural locations:", sceneCatalogError.message);
+  }
+
+  const parsed = parseEncounterScheduleBatchOutput(
+    correctedText,
+    [source as EncounterScheduleSource],
+    sceneCatalog,
+  );
+  const validationErrors = parsed.ok && parsed.characters.length === 1 ? [] : parsed.errors.slice(0, 30);
+  if (!validationErrors.length && parsed.characters.length === 1) {
+    const protectedValues = promptContext.protectedContextByCharacter[output.character_id] || [];
+    if (findPrivateContextLeak(JSON.stringify(parsed.characters[0]), protectedValues, [])) {
+      validationErrors.push("private_context_output_blocked");
+    }
+  }
+
+  const { data: revision, error: revisionError } = await admin.from("encounter_schedule_generation_output_revisions")
+    .insert({
+      output_id: output.id,
+      corrected_response_text: correctedText,
+      validation_errors: validationErrors,
+      status: validationErrors.length ? "invalid" : "validated",
+      created_by: actorUserId,
+    }).select("id").single();
+  if (revisionError || !revision?.id) return json({ error: "schedule_repair_revision_save_failed" }, 503);
+
+  if (validationErrors.length) {
+    return json({
+      status: "validation_failed",
+      revision_id: revision.id,
+      validation_errors: validationErrors,
+      original_preserved: true,
+      ai_called: false,
+    }, 422);
+  }
+
+  const { data: claimData, error: claimError } = await admin.rpc("claim_encounter_schedule_repair", {
+    p_original_batch_id: output.batch_id,
+    p_character_id: output.character_id,
+    p_actor_user_id: actorUserId,
+    p_expected_source_hash: output.source_hash,
+  });
+  const claim = Array.isArray(claimData) ? claimData[0] : claimData;
+  if (claimError || claim?.status !== "claimed") {
+    return json({ error: "schedule_repair_claim_failed", revision_id: revision.id }, 409);
+  }
+
+  const repairBatchId = asText(claim.batch_id);
+  const repairLeaseToken = asText(claim.lease_token);
+  const { data: published, error: publishError } = await admin.rpc("publish_encounter_schedule_batch", {
+    p_batch_id: repairBatchId,
+    p_lease_token: repairLeaseToken,
+    p_characters: parsed.characters,
+  });
+
+  let publishRow = Array.isArray(published) ? published[0] : published;
+  if (publishError || !publishRow || !["partial", "completed"].includes(asText(publishRow.status))) {
+    const { data: currentJob, error: currentJobError } = await admin.from("encounter_schedule_generation_jobs")
+      .select("status").eq("character_id", output.character_id).maybeSingle();
+    if (currentJobError || currentJob?.status === "processing") {
+      await failBatch(admin, repairBatchId, repairLeaseToken, "schedule_manual_repair_publish_unknown", false, true);
+      await admin.from("encounter_schedule_generation_output_revisions")
+        .update({ status: "needs_reconciliation" }).eq("id", revision.id);
+      return json({ error: "schedule_repair_needs_reconciliation", revision_id: revision.id }, 503);
+    }
+    if (currentJob?.status !== "completed") {
+      await failBatch(admin, repairBatchId, repairLeaseToken, "schedule_manual_repair_publish_failed", false, false);
+      await admin.from("encounter_schedule_generation_output_revisions")
+        .update({ status: "publish_failed" }).eq("id", revision.id);
+      return json({ error: "schedule_repair_publish_failed", revision_id: revision.id }, 503);
+    }
+    publishRow = { status: "completed", published_character_count: 1, unplaced_character_count: 0 };
+  }
+
+  if (Array.isArray(parsed.scenes) && parsed.scenes.length > 0) {
+    const { error: sceneError } = await admin.rpc("publish_encounter_scene_metadata", {
+      p_scenes: parsed.scenes,
+    });
+    if (sceneError) console.warn("Encounter repaired scene metadata publish failed:", sceneError.message);
+  }
+
+  const { error: revisionUpdateError } = await admin.from("encounter_schedule_generation_output_revisions")
+    .update({ status: "published", published_at: new Date().toISOString() }).eq("id", revision.id);
+  const { error: outputUpdateError } = await admin.from("encounter_schedule_generation_outputs")
+    .update({ status: "repaired", failure_code: null, validation_errors: [] }).eq("id", output.id);
+  if (revisionUpdateError || outputUpdateError) {
+    console.warn("Encounter repair audit status update failed:", revisionUpdateError?.message || outputUpdateError?.message);
+  }
+
+  return json({
+    status: "completed",
+    revision_id: revision.id,
+    published_character_count: Number(publishRow.published_character_count || 0),
+    unplaced_character_count: Number(publishRow.unplaced_character_count || 0),
+    ai_called: false,
+    original_preserved: true,
+  });
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -77,7 +279,9 @@ Deno.serve(async (request) => {
 
   let body: Record<string, unknown> = {};
   try { body = asRow(await request.json()); } catch { return json({ error: "invalid_json" }, 400); }
-  const mode = body.mode === "manual" ? "manual" : body.mode === "status" ? "status" : "scheduled";
+  const mode = ["manual", "status", "repair_list", "repair"].includes(asText(body.mode))
+    ? asText(body.mode)
+    : "scheduled";
   const isServiceRoleRequest = authorization === "Bearer " + service;
   const admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
   let actorUserId: string | null = null;
@@ -120,6 +324,47 @@ Deno.serve(async (request) => {
       last_batch_completed_at: lastRunResult.data?.completed_at || null,
       last_batch_status: lastRunResult.data?.status || null,
     });
+  }
+
+
+  if (mode === "repair_list" || mode === "repair") {
+    if (Deno.env.get("ENCOUNTER_SCHEDULE_TEST_MODE") !== "true" || isServiceRoleRequest) {
+      return json({ error: "schedule_repair_disabled" }, 403);
+    }
+    const userClient = createClient(url, anon, {
+      global: { headers: { Authorization: authorization } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: authData, error: authError } = await userClient.auth.getUser();
+    if (authError || !authData?.user) return json({ error: "unauthorized" }, 401);
+    actorUserId = authData.user.id;
+
+    if (mode === "repair_list") {
+      await admin.from("encounter_schedule_generation_outputs")
+        .delete().lt("expires_at", new Date().toISOString());
+      const { data: outputs, error: outputsError } = await admin.from("encounter_schedule_generation_outputs")
+        .select("id,batch_id,character_id,requested_model,provider,response_model,finish_reason,raw_response_text,raw_output_truncated,raw_response_body,response_body_truncated,http_status,status,failure_code,validation_errors,created_at")
+        .eq("actor_user_id", actorUserId)
+        .in("status", ["failed", "partial", "received"])
+        .gt("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (outputsError) return json({ error: "schedule_repair_list_unavailable" }, 503);
+      const ids = [...new Set((outputs || []).map((item: any) => item.character_id).filter(Boolean))];
+      const { data: characters } = ids.length
+        ? await admin.from("characters").select("id,name").in("id", ids)
+        : { data: [] };
+      const names = new Map((characters || []).map((item: any) => [item.id, item.name]));
+      return json({
+        status: "available",
+        outputs: (outputs || []).map((item: any) => ({
+          ...item,
+          character_name: names.get(item.character_id) || "角色",
+          raw_response_text: item.raw_response_text || item.raw_response_body || "",
+        })),
+      });
+    }
+    return await handleScheduleRepair(admin, actorUserId, body);
   }
 
   if (!openRouterKey) return json({ error: "openrouter_not_configured" }, 503);
@@ -219,6 +464,7 @@ Deno.serve(async (request) => {
   const failedCharacterIds = new Set<string>();
   const validationErrors: string[] = [];
   const characterDiagnosticsById = new Map<string, Record<string, unknown>>();
+  const rawOutputIdByCharacter = new Map<string, string>();
   let retryableProviderFailure = false;
   let ambiguousProviderFailure = false;
 
@@ -237,10 +483,17 @@ Deno.serve(async (request) => {
         messages: characterPrompt.messages, apiKey: openRouterKey, model: POYOZZ_DEFAULT_CHAT_MODEL,
         timeoutMs: 42_000, temperature: 0.35, responseFormat: { type: "json_object" },
       });
+      const rawOutputId = await recordRawGenerationOutput(
+        admin, batchId, source.character_id, actorUserId, providerResponse,
+      );
+      if (!rawOutputId) {
+        return { sourceId: source.character_id, failureCode: "schedule_raw_output_persist_failed", retryable: false, ambiguous: false };
+      }
       if (providerResponse.result.kind !== "generated") {
         const result = providerResponse.result;
         const failureCode = result.kind === "provider_error" ? result.code :
           result.kind === "content_rejected" ? "schedule_content_rejected" : "schedule_empty_output";
+        await updateRawGenerationOutput(admin, rawOutputId, "failed", failureCode);
         await recordBatchUsage(admin, batchId, providerResponse, "failed", failureCode, source.character_id);
         const ambiguous = providerResponse.responseParsed === false ||
           providerResponse.httpStatus === 408 || providerResponse.httpStatus >= 500;
@@ -251,6 +504,7 @@ Deno.serve(async (request) => {
       let decodedValue: unknown;
       try { decodedValue = JSON.parse(providerResponse.result.text); }
       catch {
+        await updateRawGenerationOutput(admin, rawOutputId, "failed", "schedule_output_json_invalid", ["invalid_json"]);
         await recordBatchUsage(admin, batchId, providerResponse, "failed", "schedule_output_json_invalid", source.character_id, {
           output_shape_error: "invalid_json",
         });
@@ -277,6 +531,7 @@ Deno.serve(async (request) => {
         const failureCode = !Array.isArray(characters) ? "schedule_output_characters_invalid" :
           characters.length !== 1 ? "schedule_single_character_count_invalid" :
           !Array.isArray(scenes) ? "schedule_output_scenes_invalid" : "schedule_output_unknown_root_fields";
+        await updateRawGenerationOutput(admin, rawOutputId, "failed", failureCode, [failureCode]);
         await recordBatchUsage(admin, batchId, providerResponse, "failed", failureCode, source.character_id, {
           ...outputDiagnostics,
           output_shape_error: failureCode,
@@ -285,10 +540,11 @@ Deno.serve(async (request) => {
       }
       const character = asRow(characters[0]);
       if (asText(character.character_id) !== source.character_id) {
+        await updateRawGenerationOutput(admin, rawOutputId, "failed", "schedule_character_identity_mismatch", ["character_identity_mismatch"]);
         await recordBatchUsage(admin, batchId, providerResponse, "failed", "schedule_character_identity_mismatch", source.character_id);
         return { sourceId: source.character_id, failureCode: "schedule_character_identity_mismatch", retryable: false, ambiguous: false };
       }
-      return { sourceId: source.character_id, providerResponse, character, scenes };
+      return { sourceId: source.character_id, providerResponse, rawOutputId, character, scenes };
     } catch (error) {
       const failureCode = error instanceof Error && error.name === "AbortError"
         ? "schedule_provider_timeout" : "schedule_provider_outcome_unknown";
@@ -308,6 +564,7 @@ Deno.serve(async (request) => {
       continue;
     }
     providerResponses.push({ sourceId: result.sourceId, providerResponse: result.providerResponse });
+    rawOutputIdByCharacter.set(result.sourceId, result.rawOutputId);
     rawCharacters.push(result.character);
     for (const scene of result.scenes) {
       const key = normalizeEncounterSceneKey(asRow(scene).location_key);
@@ -343,6 +600,8 @@ Deno.serve(async (request) => {
         validation_errors: safeErrors,
         validation_error_count: parsed.errors.length,
       });
+      await updateRawGenerationOutput(admin, rawOutputIdByCharacter.get(source.character_id) || null,
+        "failed", "schedule_character_validation_failed", safeErrors);
       continue;
     }
 
@@ -353,6 +612,8 @@ Deno.serve(async (request) => {
       characterDiagnosticsById.set(source.character_id, {
         validation_errors: ["private_context_output_blocked"],
       });
+      await updateRawGenerationOutput(admin, rawOutputIdByCharacter.get(source.character_id) || null,
+        "failed", "private_context_output_blocked", ["private_context_output_blocked"]);
       continue;
     }
     validCharacters.push({
@@ -398,6 +659,8 @@ Deno.serve(async (request) => {
           publish_error: "publish_rpc_failed",
           job_status_after_error: asText(job?.status) || "unknown",
         });
+        await updateRawGenerationOutput(admin, rawOutputIdByCharacter.get(item.sourceId) || null,
+          "failed", "publish_rpc_failed");
       }
       console.warn("Encounter schedule character publish failed:", item.sourceId, publishError.message);
       continue;
@@ -408,9 +671,12 @@ Deno.serve(async (request) => {
       characterDiagnosticsById.set(item.sourceId, {
         publish_status: asText(publishRow?.status) || "missing",
       });
+      await updateRawGenerationOutput(admin, rawOutputIdByCharacter.get(item.sourceId) || null,
+        "failed", "schedule_publish_status_invalid");
       continue;
     }
     committedCharacterIds.add(item.sourceId);
+    await updateRawGenerationOutput(admin, rawOutputIdByCharacter.get(item.sourceId) || null, "completed");
     publishedCharacterCount += Number(publishRow.published_character_count || 0);
     unplacedCharacterCount += Number(publishRow.unplaced_character_count || 0);
     skippedCharacterCount += Number(publishRow.skipped_private_character_count || 0);
