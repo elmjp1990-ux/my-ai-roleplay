@@ -123,7 +123,7 @@ BEGIN
   v_payload := public.encounter_schedule_source_payload(
     '00000000-0000-4000-8000-000000000010'::uuid
   );
-  IF v_payload->>'schedule_schema_version' <> 'poyozz-encounter-schedule-v6-hourly-independent-options-2026-11-18' THEN
+  IF v_payload->>'schedule_schema_version' <> 'poyozz-encounter-schedule-v7-home-mapping-sleep-availability-2026-11-18' THEN
     RAISE EXCEPTION 'schedule source hash version was not updated for special events';
   END IF;
 END;
