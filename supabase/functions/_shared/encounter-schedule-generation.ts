@@ -238,7 +238,10 @@ export function getEncounterWorldviewScheduleDisposition(
 }
 
 export function isEncounterModernMapCompatible(source: EncounterScheduleSource): boolean {
-  return classifyEncounterWorldview(source).modern_map_compatible;
+  return getEncounterWorldviewScheduleDisposition(
+    classifyEncounterWorldview(source),
+    source.worldview_review_decision,
+  ) === "generate";
 }
 
 function isAirportUseReasonable(source: EncounterScheduleSource, activity: string): boolean {
