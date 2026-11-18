@@ -5,6 +5,7 @@ const schema = JSON.parse(fs.readFileSync("supabase/drafts/character-ai-profile-
 const registry = JSON.parse(fs.readFileSync("supabase/drafts/character-ai-profile-source-registry-v1.json", "utf8"));
 const frontend = fs.readFileSync("index.html", "utf8");
 const migration = fs.readFileSync("supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql", "utf8");
+const timeoutMigration = fs.readFileSync("supabase/migrations/20261118170000_character_profile_worker_timeout_observability.sql", "utf8");
 const schedulerMigration = fs.readFileSync("supabase/migrations/20261107123000_schedule_character_profile_organization_worker.sql", "utf8");
 const worker = fs.readFileSync("supabase/functions/character-profile-organization-worker/index.ts", "utf8");
 const providerPolicy = fs.readFileSync("supabase/functions/_shared/openrouter-provider-policy.ts", "utf8");
@@ -101,6 +102,10 @@ assert.match(migration, /REVOKE ALL ON public\.character_profile_organization[\s
   "Derived profile tables must not be directly readable by players");
 assert.match(worker, /deepseek\/deepseek-v4-flash-20260423|CHARACTER_PROFILE_MODEL/,
   "Worker must use the confirmed DeepSeek V4 Flash 0423 model");
+assert.match(worker, /REQUEST_TIMEOUT_MS = 110_000/, "Provider timeout must stay below the 120s pg_net dispatch timeout");
+assert.match(timeoutMigration, /interval '10 minutes'/, "Profile worker safety lease must be widened to ten minutes");
+assert.match(timeoutMigration, /duration_ms integer/, "Usage ledger must store provider latency");
+assert.match(worker, /duration_ms: generated\?\.durationMs/, "Worker must persist measured provider latency");
 assert.match(worker, /OPENROUTER_API_KEY/, "Worker must read the provider key only from server environment");
 assert.match(worker, /buildOpenRouterProviderOptions\(\)/, "Profile requests must use the shared OpenRouter provider policy");
 assert.match(providerPolicy, /data_collection: "deny"/, "Profile requests must enforce POYOZZ's no-provider-data-collection policy");
