@@ -102,8 +102,8 @@ $old$;
   END IF;
   v_definition := pg_catalog.replace(v_definition, v_old, '');
 
-  -- The publisher accepts all canonical keys, but the Edge Function only
-  -- passes keys present in get_encounter_scene_catalog().
+  -- The publisher has two separately formatted allowlists: one for daily
+  -- variants and one for special-event slots. Replace each exact contract once.
   v_old := $old$'airport', 'commercial', 'night-bar', 'live-house', 'apartment',
                'department-store', 'bookstore', 'cafe', 'park', 'shopping-street'$old$;
   v_new := $new$'airport', 'commercial', 'night-bar', 'live-house', 'apartment',
@@ -113,8 +113,22 @@ $old$;
                'community-center', 'music-studio', 'bakery', 'coworking-space'$new$;
   SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
     / pg_catalog.length(v_old) INTO v_count;
-  IF v_count <> 2 THEN
-    RAISE EXCEPTION 'canonical_scene_key_contract_count_unexpected: %', v_count;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'daily_canonical_scene_key_contract_count_unexpected: %', v_count;
+  END IF;
+  v_definition := pg_catalog.replace(v_definition, v_old, v_new);
+
+  v_old := $old$'airport', 'commercial', 'night-bar', 'live-house', 'apartment',
+             'department-store', 'bookstore', 'cafe', 'park', 'shopping-street'$old$;
+  v_new := $new$'airport', 'commercial', 'night-bar', 'live-house', 'apartment',
+             'department-store', 'bookstore', 'cafe', 'park', 'shopping-street',
+             'night-market', 'restaurant', 'university', 'hospital', 'gym', 'cinema',
+             'museum', 'hotel', 'train-station', 'library', 'theater', 'art-gallery',
+             'community-center', 'music-studio', 'bakery', 'coworking-space'$new$;
+  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
+    / pg_catalog.length(v_old) INTO v_count;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'special_event_canonical_scene_key_contract_count_unexpected: %', v_count;
   END IF;
   v_definition := pg_catalog.replace(v_definition, v_old, v_new);
 
