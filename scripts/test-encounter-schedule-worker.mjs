@@ -3,15 +3,15 @@ import fs from "node:fs";
 
 const worker = fs.readFileSync("supabase/functions/encounter-schedule-organizer/index.ts", "utf8");
 const pipeline = fs.readFileSync("supabase/drafts/encounter-schedule-pipeline.sql", "utf8");
-const batchSemantics = fs.readFileSync("supabase/migrations/20261117130000_encounter_schedule_batch_semantics.sql", "utf8");
+const batchSemantics = fs.readFileSync("supabase/migrations/20261117133525_encounter_schedule_batch_semantics.sql", "utf8");
 const html = fs.readFileSync("index.html", "utf8");
 const generator = fs.readFileSync("supabase/functions/_shared/encounter-schedule-generation.ts", "utf8");
-const sparseScheduleMigration = fs.readFileSync("supabase/migrations/20261118000400_encounter_schedules_allow_unavailable_windows.sql", "utf8");
-const publishedSceneResolverMigration = fs.readFileSync("supabase/migrations/20261118000500_resolve_only_published_encounter_scenes.sql", "utf8");
-const sceneDescriptionMigration = fs.readFileSync("supabase/migrations/20261118000600_encounter_schedule_scene_descriptions.sql", "utf8");
-const hourlyScheduleMigration = fs.readFileSync("supabase/migrations/20261118000700_encounter_hourly_schedule_options.sql", "utf8");
-const pendingPriorityMigration = fs.readFileSync("supabase/migrations/20261118000800_prioritize_pending_encounter_schedule_jobs.sql", "utf8");
-const rawOutputRepairMigration = fs.readFileSync("supabase/migrations/20261118000900_encounter_schedule_raw_output_repair.sql", "utf8");
+const sparseScheduleMigration = fs.readFileSync("supabase/migrations/20261118074655_encounter_schedules_allow_unavailable_windows.sql", "utf8");
+const publishedSceneResolverMigration = fs.readFileSync("supabase/migrations/20261118074708_resolve_only_published_encounter_scenes.sql", "utf8");
+const sceneDescriptionMigration = fs.readFileSync("supabase/migrations/20261118074713_encounter_schedule_scene_descriptions.sql", "utf8");
+const hourlyScheduleMigration = fs.readFileSync("supabase/migrations/20261118074718_encounter_hourly_schedule_options.sql", "utf8");
+const pendingPriorityMigration = fs.readFileSync("supabase/migrations/20261118074723_prioritize_pending_encounter_schedule_jobs.sql", "utf8");
+const rawOutputRepairMigration = fs.readFileSync("supabase/migrations/20261118074727_encounter_schedule_raw_output_repair.sql", "utf8");
 const rawOutputRepairReplay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-output-repair.sql", "utf8");
 const providerAdapter = fs.readFileSync("supabase/functions/_shared/openrouter-chat-completions.ts", "utf8");
 const replayWorkflow = fs.readFileSync(".github/workflows/supabase-local-migration-replay.yml", "utf8");
@@ -159,12 +159,12 @@ assert.match(hourlyScheduleMigration, /option_1/);
 assert.match(hourlyScheduleMigration, /poyozz-encounter-schedule-v6-hourly-independent-options-2026-11-18/);
 assert.ok(pendingPriorityMigration.includes("ORDER BY CASE j.status WHEN ''pending'' THEN 0 WHEN ''failed'' THEN 1 ELSE 2 END"));
 assert.ok(pendingPriorityMigration.includes("pending_schedule_job_priority_contract_count_unexpected"));
-assert.ok(replayWorkflow.includes("20261118000800_prioritize_pending_encounter_schedule_jobs.sql"));
-assert.ok(replayWorkflow.includes("20261118000900_encounter_schedule_raw_output_repair.sql"));
-assert.ok(replayWorkflow.indexOf("20261118000900_encounter_schedule_raw_output_repair.sql") >
-  replayWorkflow.indexOf("20261118000800_prioritize_pending_encounter_schedule_jobs.sql"));
+assert.ok(replayWorkflow.includes("20261118074723_prioritize_pending_encounter_schedule_jobs.sql"));
+assert.ok(replayWorkflow.includes("20261118074727_encounter_schedule_raw_output_repair.sql"));
+assert.ok(replayWorkflow.indexOf("20261118074727_encounter_schedule_raw_output_repair.sql") >
+  replayWorkflow.indexOf("20261118074723_prioritize_pending_encounter_schedule_jobs.sql"));
 assert.ok(replayWorkflow.lastIndexOf("replay-encounter-schedule-output-repair.sql") >
-  replayWorkflow.indexOf("20261118000900_encounter_schedule_raw_output_repair.sql"));
+  replayWorkflow.indexOf("20261118074727_encounter_schedule_raw_output_repair.sql"));
 
 
 assert.match(generator, /scenes 必須是空陣列/);
