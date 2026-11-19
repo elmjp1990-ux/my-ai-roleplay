@@ -15,6 +15,7 @@ const CHARACTER_PROFILE_SOURCE_KEYS = [
   "character_private_info.personality_profile.dislikes",
   "character_private_info.personality_profile.boundaries",
   "character_private_info.personality_profile.relationshipPacing",
+  "character_private_info.personality_profile.occupation",
 ] as const;
 
 const PROFILE_SECTIONS = [
