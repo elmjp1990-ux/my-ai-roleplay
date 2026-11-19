@@ -16,6 +16,7 @@
     "knowledge_boundaries",
     "speech_style",
     "appearance_markers",
+    "life_context",
     "author_private_context",
     "ooc_rules",
     "unknowns",
@@ -256,6 +257,43 @@
           "resolution_status": {
             "const": "needs_author_clarification"
           }
+        }
+      }
+    },
+    "life_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "work_environment",
+        "residence_environment",
+        "daily_routines",
+        "interests_and_leisure",
+        "social_circles",
+        "recurring_places",
+        "environmental_constraints"
+      ],
+      "description": "Derived role life context for schedule planning. Every item must be evidence-backed and distinguish author facts from inference.",
+      "properties": {
+        "work_environment": {
+          "$ref": "#/$defs/section"
+        },
+        "residence_environment": {
+          "$ref": "#/$defs/section"
+        },
+        "daily_routines": {
+          "$ref": "#/$defs/section"
+        },
+        "interests_and_leisure": {
+          "$ref": "#/$defs/section"
+        },
+        "social_circles": {
+          "$ref": "#/$defs/section"
+        },
+        "recurring_places": {
+          "$ref": "#/$defs/section"
+        },
+        "environmental_constraints": {
+          "$ref": "#/$defs/section"
         }
       }
     }
