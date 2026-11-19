@@ -8,10 +8,10 @@ const sceneBackgroundId = "22222222-2222-4222-8222-222222222222";
 assert.equal(Array.from(text).length, 150);
 assert.deepEqual(
   parseEncounterTurnOutput(JSON.stringify({ reply: text, illustration_id: illustrationId, scene_background_id: sceneBackgroundId })),
-  { reply: text, illustrationId, sceneBackgroundId },
+  { reply: text, suggestedReplies: [], illustrationId, sceneBackgroundId },
 );
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "太短了" })), null);
-assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "相遇內容".repeat(76) })), null);
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "相遇內容".repeat(106) })), null);
 assert.equal(parseEncounterTurnOutput("not-json"), null);
 assert.equal(parseEncounterTurnOutput(JSON.stringify(["not", "an", "object"])), null);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: 123 })), null);
@@ -20,6 +20,10 @@ assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, illustration
 const max = "相遇內容".repeat(75);
 assert.equal(Array.from(max).length, 300);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: max })).reply, max);
+const contextualSuggestions = ["我想先問問你剛才在廚房處理的是什麼狀況？", "你膝蓋上的灰塵需要我幫你拿毛巾嗎？", "浴室的濾網換好後，還有哪裡需要注意？"];
+const suggestedOutput = parseEncounterTurnOutput("\`\`\`json\n" + JSON.stringify({ reply: text, suggested_replies: contextualSuggestions, illustration_id: illustrationId }) + "\n\`\`\`");
+assert.deepEqual(suggestedOutput.suggestedReplies, contextualSuggestions);
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: ["太短", "也太短", "還是太短"] })).suggestedReplies.length, 0);
 
 const endpoint = fs.readFileSync("supabase/functions/encounter-turn/index.ts", "utf8");
 const guidelines = fs.readFileSync("supabase/functions/_shared/encounter-response-guidelines.ts", "utf8");
@@ -127,11 +131,18 @@ assert.match(guidelines, /buildRoleplayResponseGuidelines\(["']single["']\)/);
 assert.match(frontend, /ENCOUNTER_DISCOVERY_SENTINEL/);
 assert.match(frontend, /text = s\.encounterMode && !encounterHasStarted \? ENCOUNTER_DISCOVERY_SENTINEL : GROUP_CONTINUE_SENTINEL/);
 assert.doesNotMatch(frontend, /poyozz-encounter-opening-choice/);
-assert.match(scene, /encounter-first-turn-hint/);
+assert.doesNotMatch(scene, /encounter-first-turn-hint|先跟.*打招呼/);
+assert.match(scene, /留空發送，角色會繼續說下去/);
+assert.doesNotMatch(frontend, /<details class="suggestions-panel" open>/);
+assert.doesNotMatch(frontend, /我稍微停下動作，認真看向你/);
+assert.match(frontend, /async function findResumableEncounterSession/);
+assert.match(frontend, /encounter_summary:session_data->>encounterSummary/);
+assert.match(endpoint, /玩家與現場角色關係/);
+assert.match(endpoint, /suggested_replies/);
 assert.match(scene, /const hasStarted=!!raw/);
 assert.match(frontend, /const encounterHasStarted = s\.encounterMode && \(\s*!!s\.initialOpeningMessage/);
 assert.doesNotMatch(scene, /encounter-intro-card|encounter-intro-choice|encounter-start-button/);
-assert.match(scene, /先跟.*打招呼，或者留空發送/);
+assert.match(scene, /留空發送，角色會繼續說下去/);
 assert.match(endpoint, /ENCOUNTER_DISCOVERY_SENTINEL/);
 assert.match(endpoint, /ENCOUNTER_DISCOVERY_CONTEXT/);
 assert.match(endpoint, /ENCOUNTER_CONTINUE_CONTEXT/);
