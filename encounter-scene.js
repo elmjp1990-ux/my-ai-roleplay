@@ -16,7 +16,7 @@
     .encounter-scene .bubble,.encounter-scene .narration{color:#fff!important;text-shadow:0 2px 8px #000b;font-size:clamp(14px,3.7vw,18px);line-height:1.6}
     .encounter-scene .message-more{color:#fff;background:#17141b66}
     .encounter-character-sprite.encounter-card-portrait-fallback{object-fit:contain;object-position:center bottom;filter:drop-shadow(0 10px 22px rgba(0,0,0,.22))}.encounter-character-sprite.encounter-auto-bg-fallback{mix-blend-mode:multiply}
-     .encounter-character-sprite{position:absolute;z-index:1;pointer-events:none;right:-2%;bottom:0;width:min(108%,680px);height:min(78dvh,calc(var(--encounter-visual-height,100dvh)*.78));object-fit:contain;object-position:center bottom;filter:drop-shadow(0 12px 24px rgba(0,0,0,.28));opacity:.98}
+    .encounter-character-sprite{position:absolute;z-index:1;pointer-events:none;right:-2%;bottom:0;width:min(108%,680px);height:78dvh;object-fit:contain;object-position:center bottom;filter:drop-shadow(0 12px 24px rgba(0,0,0,.28));opacity:.98}
     .encounter-scene .composer{position:absolute!important;z-index:3;left:0;right:0;bottom:0;max-height:56dvh;overflow-y:auto;background:linear-gradient(180deg,rgba(17,14,24,.12),rgba(17,14,24,.92) 18%)!important;border:0!important;border-radius:24px 24px 0 0!important;padding:12px 14px calc(12px + env(safe-area-inset-bottom))!important;backdrop-filter:blur(12px)}
     .encounter-scene .suggestions{margin:0 0 8px!important}
     .encounter-scene .suggestions-panel{border:0!important;background:transparent!important;overflow:visible!important}
@@ -368,18 +368,6 @@
           tag.style.cssText='font-size:10px;letter-spacing:.04em;color:#f1f1f4;padding:3px 7px;border-radius:999px;background:rgba(225,226,232,.13);border:1px solid rgba(255,255,255,.18);white-space:nowrap';
           if(identityRow)identityRow.appendChild(tag);else title.appendChild(tag);
         }
-      }
-      const viewport=window.visualViewport;
-      panel.style.setProperty('--encounter-visual-height',(viewport?.height||window.innerHeight)+'px');
-      if(!panel.dataset.encounterViewportBound){
-        panel.dataset.encounterViewportBound='true';
-        const syncViewport=()=>{
-          const active=document.querySelector('.chat-main.encounter-scene');
-          if(active)active.style.setProperty('--encounter-visual-height',(window.visualViewport?.height||window.innerHeight)+'px');
-        };
-        window.visualViewport?.addEventListener('resize',syncViewport,{passive:true});
-        window.visualViewport?.addEventListener('scroll',syncViewport,{passive:true});
-        window.addEventListener('resize',syncViewport,{passive:true});
       }
       const composer=panel.querySelector('.composer');
       const input=composer?.querySelector('#messageInput');
