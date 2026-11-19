@@ -28,7 +28,7 @@
     compareSource('race', existingCharacter?.race || '', character.race || '');
     compareSource('style', existingCharacter?.style || '', character.style || '');
     compareSource('private_info', existingPrivateProfile?.private_info || '', String(character.privateInfo || '').slice(0, 10000));
-    const fields = ['coreTraits','values','speechStyle','behaviorRules','likes','dislikes','boundaries','relationshipPacing'];
+    const fields = ['coreTraits','values','speechStyle','behaviorRules','likes','dislikes','boundaries','relationshipPacing','occupation'];
     for (const key of fields) compare(ai, 'personality_profile.' + key, prev[key], next[key]);
     compare(nonAi, 'personality_profile.primaryIllustrationName', prev.primaryIllustrationName, next.primaryIllustrationName);
     compare(runtime, 'phone_settings', existingCharacter?.phone_settings || {}, rowPhoneSettingsForDiff(character.phoneSettings));
