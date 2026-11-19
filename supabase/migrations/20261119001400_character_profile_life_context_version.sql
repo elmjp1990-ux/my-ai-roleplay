@@ -1,12 +1,13 @@
 -- Requeue legacy Character AI Profiles once so the combined v1.1 profile
 -- (including structured life_context) is generated from the current source.
--- This migration changes only the idempotent enqueue decision; it does not
--- insert jobs, invoke AI, or activate any Worker/Cron schedule.
+-- The caller passes a deterministic source-change decision. This migration
+-- does not insert jobs, invoke AI, or activate any Worker/Cron schedule.
 
 BEGIN;
 
 CREATE OR REPLACE FUNCTION public.enqueue_character_profile_organization(
-  p_character_id uuid
+  p_character_id uuid,
+  p_source_changed boolean DEFAULT true
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -71,7 +72,8 @@ BEGIN
         END,
     completed_at = NULL,
     updated_at = now()
-  WHERE public.character_profile_organization_jobs.source_hash IS DISTINCT FROM EXCLUDED.source_hash
+  WHERE (COALESCE(p_source_changed, true) IS TRUE
+         AND public.character_profile_organization_jobs.source_hash IS DISTINCT FROM EXCLUDED.source_hash)
      OR public.character_profile_organization_jobs.author_id IS DISTINCT FROM EXCLUDED.author_id
      OR public.character_profile_organization_jobs.status = 'failed'
      OR (
@@ -103,6 +105,23 @@ BEGIN
       AND v_job.status IN ('pending', 'processing', 'completed')
   );
 END;
+$$;
+
+REVOKE ALL ON FUNCTION public.enqueue_character_profile_organization(uuid, boolean)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.enqueue_character_profile_organization(uuid, boolean)
+  TO authenticated;
+
+-- Preserve compatibility for older clients that still call the one-argument RPC.
+CREATE OR REPLACE FUNCTION public.enqueue_character_profile_organization(
+  p_character_id uuid
+)
+RETURNS jsonb
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT public.enqueue_character_profile_organization(p_character_id, true);
 $$;
 
 REVOKE ALL ON FUNCTION public.enqueue_character_profile_organization(uuid)
