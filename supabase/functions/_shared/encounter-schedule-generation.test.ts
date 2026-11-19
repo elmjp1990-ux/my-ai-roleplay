@@ -35,7 +35,10 @@ const option = (extra: Record<string, unknown> = {}) => ({
 const block = (hour: number, options?: Record<string, unknown>[]) => ({
   start_time: String(hour).padStart(2, "0") + ":00",
   end_time: String((hour + 1) % 24).padStart(2, "0") + ":00",
-  options: options ?? [option()],
+  options: options ?? [
+    option({ weight: 60 }),
+    option({ weight: 40, activity: "在辦公室檢查待辦並回覆客戶訊息" }),
+  ],
 });
 const hourlyBlocks = () => Array.from({ length: 24 }, (_, hour) => {
   if (hour < 8) return block(hour, [
@@ -99,15 +102,22 @@ Deno.test("rejects missing hours, gaps, and non-hourly blocks", () => {
   if (nonHourlyResult.ok) throw new Error("non-hour interval accepted");
 });
 
-Deno.test("requires at least eight hours with two or more plausible options", () => {
-  const blocks = hourlyBlocks().map((item) => ({ ...item, options: [option()] }));
+Deno.test("requires at least two options in every hourly block", () => {
+  const blocks = hourlyBlocks();
+  blocks[12] = block(12, [option()]);
   const parsed = result([{ character_id: id1, placement: "modern_map", variants: variants(blocks) }]);
-  if (parsed.ok || !parsed.errors.some((error) => error.includes("too_few_multi_option_hours"))) {
-    throw new Error("all-single-option day accepted");
+  if (parsed.ok || !parsed.errors.some((error) => error.includes("options_count_invalid"))) {
+    throw new Error("hourly block with only one option accepted");
   }
 });
 
-Deno.test("requires 1-3 options and exact 100 percent weight totals per hour", () => {
+Deno.test("requires 2-3 options and exact 100 percent weight totals per hour", () => {
+  const tooFew = hourlyBlocks();
+  tooFew[0] = block(0, [option()]);
+  const tooFewResult = result([{ character_id: id1, placement: "modern_map", variants: variants(tooFew) }]);
+  if (tooFewResult.ok || !tooFewResult.errors.some((error) => error.includes("options_count_invalid"))) {
+    throw new Error("one option accepted");
+  }
   const tooMany = hourlyBlocks();
   tooMany[0] = block(0, [option({ weight: 34 }), option({ weight: 33 }), option({ weight: 33 }), option()]);
   const tooManyResult = result([{ character_id: id1, placement: "modern_map", variants: variants(tooMany) }]);
@@ -301,13 +311,15 @@ Deno.test("builds concise schedule prompts without generated greetings", () => {
   if (built.messages.length !== 2 || !prompt.includes("不同時段獨立抽取") ||
       !prompt.includes("恰好 24 個逐小時時段") ||
       !prompt.includes("10–30 個中文字") ||
-      !prompt.includes("至少 8 個時段")) {
+      !prompt.includes("每個時段必須提供 2–3 個選項")) {
     throw new Error("24-hour compact schedule rules missing");
   }
   if (prompt.includes("relationship_greetings") || prompt.includes("encounter_greeting") ||
       prompt.includes("rain_fallback_greeting")) throw new Error("greeting generation remains in schedule prompt");
-  if (!prompt.includes("公司、咖啡廳") || !prompt.includes("絕非白名單或限制")) {
-    throw new Error("optional scene reference names missing");
+  if (prompt.includes("公司、咖啡廳") || prompt.includes("目前地圖可用地點範例") ||
+      prompt.includes("AI 只會看到少量現有場景") ||
+      !prompt.includes("不得向模型提供任何地圖地點建議")) {
+    throw new Error("scene suggestions were passed to the model");
   }
   if (!Array.isArray(built.protectedContextByCharacter[id1])) throw new Error("private context guard values missing");
 });
