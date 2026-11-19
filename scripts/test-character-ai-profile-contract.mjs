@@ -74,7 +74,7 @@ vm.runInNewContext(coreUtils, classifierSandbox);
 const classifyProfileChange = classifierSandbox.window.PoyozzCoreUtils.classifyCharacterProfileChanges;
 const baseCharacter = {
   name: "角色甲", intro: "一名生活在城市中的角色", race: "人類", style: "沉穩",
-  phone_settings: {}, tags: [], personalityProfile: { coreTraits: ["冷靜"], values: ["誠實"] },
+  phone_settings: {}, phoneSettings: {}, privateInfo: "住在城市", tags: [], personalityProfile: { coreTraits: ["冷靜"], values: ["誠實"] },
 };
 const basePrivate = { private_info: "住在城市", personality_profile: baseCharacter.personalityProfile };
 const classify = (characterPatch = {}, privatePatch = {}, existingPatch = {}) => classifyProfileChange({
