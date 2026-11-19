@@ -1,5 +1,9 @@
 import { normalizeAiProviderResult, type AiProviderResult } from "./ai-provider-result.ts";
-import { buildOpenRouterProviderOptions } from "./openrouter-provider-policy.ts";
+import {
+  APPROVED_OPENROUTER_PROVIDERS,
+  buildOpenRouterProviderOptions,
+  type ApprovedOpenRouterProvider,
+} from "./openrouter-provider-policy.ts";
 
 export const POYOZZ_DEFAULT_CHAT_MODEL = "deepseek/deepseek-v4-flash-20260423";
 
@@ -37,9 +41,26 @@ const asRow = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const asText = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 
-/** Shared OpenRouter request path; provider privacy restrictions cannot drift between chat modes. */
-export async function requestOpenRouterChatCompletion(options: RequestOptions): Promise<OpenRouterCompletionResult> {
-  const model = options.model || POYOZZ_DEFAULT_CHAT_MODEL;
+function isTransientProviderFailure(response: OpenRouterCompletionResult): boolean {
+  if ([408, 409, 425, 429].includes(response.httpStatus) || response.httpStatus >= 500) {
+    return true;
+  }
+  if (response.result.kind !== "provider_error") return false;
+  if (response.result.retryable) return true;
+  return [
+    "engine_overloaded",
+    "upstream_overloaded",
+    "upstream_unavailable",
+    "provider_overloaded",
+    "capacity_exceeded",
+  ].some((code) => response.result.kind === "provider_error" && response.result.code.includes(code));
+}
+
+async function requestFromProvider(
+  options: RequestOptions,
+  model: string,
+  provider: ApprovedOpenRouterProvider,
+): Promise<OpenRouterCompletionResult> {
   const startedAt = Date.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 55_000);
@@ -48,7 +69,7 @@ export async function requestOpenRouterChatCompletion(options: RequestOptions): 
       model,
       messages: options.messages,
       temperature: options.temperature ?? 0.85,
-      provider: buildOpenRouterProviderOptions(),
+      provider: buildOpenRouterProviderOptions(provider),
     };
     if (options.responseFormat) body.response_format = options.responseFormat;
 
@@ -70,8 +91,7 @@ export async function requestOpenRouterChatCompletion(options: RequestOptions): 
       payload = asRow(JSON.parse(responseText));
     } catch {
       responseParsed = false;
-      // Preserve the upstream HTTP status. The previous fallback always emitted
-      // invalid_provider_response and hid useful 429/5xx diagnostics.
+      // Preserve the upstream HTTP status so transient HTTP failures remain identifiable.
       payload = {
         error: {
           code: response.ok ? "invalid_provider_response" : "http_" + response.status,
@@ -98,7 +118,7 @@ export async function requestOpenRouterChatCompletion(options: RequestOptions): 
       finishReason,
       httpStatus: response.status,
       requestId: response.headers.get("x-request-id") || asText(payload.id),
-      provider: asText(payload.provider),
+      provider: asText(payload.provider) || provider,
       model: asText(payload.model) || model,
       usage: asRow(payload.usage),
       responseContentType,
@@ -109,4 +129,17 @@ export async function requestOpenRouterChatCompletion(options: RequestOptions): 
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * Shared OpenRouter request path. Retry once on the second approved provider
+ * only for explicit transient provider failures; safety refusals and ordinary
+ * request errors never trigger a provider switch.
+ */
+export async function requestOpenRouterChatCompletion(options: RequestOptions): Promise<OpenRouterCompletionResult> {
+  const model = options.model || POYOZZ_DEFAULT_CHAT_MODEL;
+  const [primaryProvider, fallbackProvider] = APPROVED_OPENROUTER_PROVIDERS;
+  const primary = await requestFromProvider(options, model, primaryProvider);
+  if (!isTransientProviderFailure(primary)) return primary;
+  return await requestFromProvider(options, model, fallbackProvider);
 }
