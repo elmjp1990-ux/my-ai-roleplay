@@ -94,6 +94,8 @@ assert.equal(classify({ intro: "一名生活在城市中的\\n角色" }).require
   "Any raw source-text change must refresh so the profile source hash remains current");
 assert.equal(classify({ personalityProfile: { coreTraits: ["冷靜", "有戒心"], values: ["誠實"] } }).requiresDerivedRefresh, true,
   "A substantive core personality change must trigger profile regeneration");
+assert.equal(classify({ personalityProfile: { coreTraits: ["冷靜"], values: ["誠實"], occupation: "醫師" } }).requiresDerivedRefresh, true,
+  "A saved occupation change must trigger life-context regeneration");
 assert.equal(classify({ intro: "一名不生活在城市中的角色" }).requiresDerivedRefresh, true,
   "A substantive background change must trigger profile regeneration");
 assert.equal(classify({ phoneSettings: { noticePrompts: ["新通知規則"] } }).requiresDerivedRefresh, false,
@@ -159,6 +161,8 @@ assert.match(worker, /prompt_tokens:[\s\S]*completion_tokens:[\s\S]*total_tokens
   "Profile usage ledger must capture provider token and cost fields");
 assert.match(workerCore, /validateCharacterAiProfile/, "Worker output must pass strict profile validation");
 assert.match(workerCore, /source_refs/, "Every derived statement must cite allowlisted source paths");
+assert.match(workerCore, /character_private_info\.personality_profile\.occupation/, "The worker must validate occupation as an allowlisted source key");
+assert.match(frontend, /occupation:500/, "The character form normalizer must preserve saved occupation values");
 assert.match(storyTurn, /get_character_ai_profile_for_chat/,
   "Story chat-turn must load only a source-current derived profile");
 assert.match(storyTurn, /collectDerivedPrivateProfileValues/,
