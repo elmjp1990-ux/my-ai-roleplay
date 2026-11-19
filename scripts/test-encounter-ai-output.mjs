@@ -21,7 +21,8 @@ const max = "相遇內容".repeat(75);
 assert.equal(Array.from(max).length, 300);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: max })).reply, max);
 const contextualSuggestions = ["我想先問問你剛才在廚房處理的是什麼狀況？", "你膝蓋上的灰塵需要我幫你拿毛巾嗎？", "浴室的濾網換好後，還有哪裡需要注意？"];
-const suggestedOutput = parseEncounterTurnOutput("\`\`\`json\n" + JSON.stringify({ reply: text, suggested_replies: contextualSuggestions, illustration_id: illustrationId }) + "\n\`\`\`");
+const fence = String.fromCharCode(96).repeat(3);
+const suggestedOutput = parseEncounterTurnOutput(fence + "json\n" + JSON.stringify({ reply: text, suggested_replies: contextualSuggestions, illustration_id: illustrationId }) + "\n" + fence);
 assert.deepEqual(suggestedOutput.suggestedReplies, contextualSuggestions);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: ["太短", "也太短", "還是太短"] })).suggestedReplies.length, 0);
 
