@@ -121,8 +121,7 @@ async function generateProfile(
   apiKey: string,
 ): Promise<GeneratedProfile> {
   const messages = buildCharacterProfileMessages(item.source_payload);
-  for (let attempt = 0; attempt < APPROVED_OPENROUTER_PROVIDERS.length; attempt++) {
-    const provider = APPROVED_OPENROUTER_PROVIDERS[attempt];
+  for (const provider of APPROVED_OPENROUTER_PROVIDERS) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
@@ -164,7 +163,7 @@ async function generateProfile(
       // A rate-limit response is an explicit non-generation failure and may
       // safely use the next approved provider once. Generic 5xx responses are
       // treated as ambiguous and are not retried.
-      if (response.status === 429 && attempt + 1 < APPROVED_OPENROUTER_PROVIDERS.length) {
+      if (response.status === 429 && provider === APPROVED_OPENROUTER_PROVIDERS[0]) {
         continue;
       }
       if (!response.ok) {
@@ -219,7 +218,7 @@ async function generateProfile(
         "temporarily_unavailable",
         "upstream_busy",
       ].some((code) => errorCode.includes(code));
-      if (isExplicitOverload && attempt + 1 < APPROVED_OPENROUTER_PROVIDERS.length) {
+      if (isExplicitOverload && provider === APPROVED_OPENROUTER_PROVIDERS[0]) {
         continue;
       }
       if (result?.error != null) {
