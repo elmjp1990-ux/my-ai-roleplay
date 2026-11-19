@@ -159,3 +159,33 @@ Deno.test("content refusals do not switch providers", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+
+Deno.test("ambiguous generic 5xx provider outcomes do not trigger a second billed request", async () => {
+  const originalFetch = globalThis.fetch;
+  let call = 0;
+  globalThis.fetch = async (_input, init) => {
+    call += 1;
+    const body = JSON.parse(String(init?.body));
+    assertEquals(body.provider.only, ["deepinfra"]);
+    return new Response(JSON.stringify({
+      error: { code: "http_503", message: "upstream response unavailable" },
+    }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+
+  try {
+    const result = await requestOpenRouterChatCompletion({
+      messages: [{ role: "user", content: "ambiguous 503 test" }],
+      apiKey: "test-key",
+      timeoutMs: 1_000,
+    });
+    assertEquals(call, 1);
+    assertEquals(result.httpStatus, 503);
+    assertEquals(result.result.kind, "provider_error");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
