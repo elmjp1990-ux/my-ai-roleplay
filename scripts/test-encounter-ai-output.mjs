@@ -11,14 +11,19 @@ assert.deepEqual(
   { reply: text, suggestedReplies: [], illustrationId, sceneBackgroundId },
 );
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "太短了" })), null);
-assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "相遇內容".repeat(106) })), null);
+const shortValid = "相遇內容。".repeat(15);
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: shortValid })).reply, shortValid);
+const plainTextReply = "角色自然地接續這段相遇，讓對話繼續往前發展。".repeat(2);
+assert.equal(parseEncounterTurnOutput(plainTextReply).reply, plainTextReply);
+assert.equal(parseEncounterTurnOutput("not-json"), null);
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "相遇內容".repeat(151) })), null);
 assert.equal(parseEncounterTurnOutput("not-json"), null);
 assert.equal(parseEncounterTurnOutput(JSON.stringify(["not", "an", "object"])), null);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: 123 })), null);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, illustration_id: "invented-id" })).illustrationId, null);
 
-const max = "相遇內容".repeat(75);
-assert.equal(Array.from(max).length, 300);
+const max = "相遇內容".repeat(150);
+assert.equal(Array.from(max).length, 600);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: max })).reply, max);
 const contextualSuggestions = ["我想先問問你剛才在廚房處理蟑螂的狀況，這裡還有其他地方需要一起檢查嗎？", "你膝蓋上沾了不少灰塵，需要我幫你拿毛巾，還是先讓你把手邊工作收尾？", "浴室的濾網換好之後，有沒有什麼日常清潔方式可以避免排水管再次堵塞？"];
 const fence = String.fromCharCode(96).repeat(3);
@@ -26,6 +31,7 @@ const suggestedOutput = parseEncounterTurnOutput(fence + "json\n" + JSON.stringi
 assert.deepEqual(suggestedOutput.suggestedReplies, contextualSuggestions);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: ["太短", "也太短", "還是太短"] })).suggestedReplies.length, 0);
 
+const failedUsageMigration = fs.readFileSync("supabase/migrations/20261119001300_ai_model_usage_failed_encounter_turns.sql", "utf8");
 const endpoint = fs.readFileSync("supabase/functions/encounter-turn/index.ts", "utf8");
 const guidelines = fs.readFileSync("supabase/functions/_shared/encounter-response-guidelines.ts", "utf8");
 const frontend = fs.readFileSync("index.html", "utf8");
@@ -109,6 +115,9 @@ assert.match(sparseScheduleMigration, /schedule_special_event_24_hour_coverage_i
 assert.match(publishedSceneResolverMigration, /public\.get_encounter_scene_catalog\(\)/);
 assert.match(publishedSceneResolverMigration, /Newly enabled scenes automatically expose matching stored slots/);
 
+assert.match(failedUsageMigration, /DROP CONSTRAINT IF EXISTS ai_model_usage_generation_fields_check/);
+assert.match(failedUsageMigration, /assistant_message_id IS NOT NULL OR status = 'failed'/);
+assert.match(failedUsageMigration, /generation_type = 'chat_response'/);
 assert.match(endpoint, /requestOpenRouterChatCompletion/);
 assert.match(endpoint, /POYOZZ_DEFAULT_CHAT_MODEL/);
 assert.match(endpoint, /reserve_encounter_chat_turn/);
