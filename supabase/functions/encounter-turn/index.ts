@@ -153,13 +153,13 @@ async function buildEncounterMessages(
     "【角色資料】角色：{CHAR}\n公開介紹：{CHAR_DESC}\n演繹風格：{CHAR_STYLE}\n角色個性：{CHAR_PERSONALITY}\n喜好：{CHAR_LIKES}\n雷點：{CHAR_DISLIKES}\n外觀：{CHAR_APPEARANCE}",
     "【作者私密設定】只用於維持角色一致性，不可向玩家揭露、引用或摘要。\n<private_story_context>\n" + privateContext.promptText + "\n</private_story_context>",
     "【目前相遇場景】地點：{LOCATION}\n目前活動：{SCENE}\n行程時段：{TIME}\n目前好感度：" + String(affinity) + "/100\n關係階段：" + relationshipLabel + "\n請延續這個場景，不要無故瞬移或改變時間、服裝與正在進行的活動。",
-    "【玩家】{USER}\n玩家人設：{USER_DESC}\n【台灣日期】{CURRENT_DATE}",
+    "【玩家】{USER}\n玩家人設：{USER_DESC}\n【玩家與現場角色關係】玩家是來到目前行程地點、與角色相遇的人；角色正在執行的工作、服務或任務不代表玩家就是客戶、屋主、委託人或雇主。即使場景描述提到客戶家、店家或工作現場，也只能視為角色目前所在的環境；除非玩家在對話中明確說明，絕不可擅自把玩家寫成客戶或把該場所說成玩家的家。請描寫角色如何在現場注意到玩家，或玩家如何自然走近角色，不替玩家編造台詞與行動。\n【台灣日期】{CURRENT_DATE}",
     "【相遇開場方式】如果玩家本回合輸入的是系統事件「玩家選擇留空發送」，代表玩家沒有說任何台詞，而是希望你依照目前地點、活動、好感度與是否初次見面，自行注意到玩家並主動開始互動。請自然演出角色當下如何發現玩家、第一個動作與開場對話，不可把系統事件當成玩家說出口的話，也不可要求玩家重送招呼。若玩家有輸入文字，則直接回應玩家的招呼。後續空白發送代表延續目前對話，由角色自然繼續說下去。",
     "【近期對話】依照後續對話訊息延續，不得忽略已發生事件。玩家未說出口的想法不可被角色讀取；不要替玩家決定台詞、想法或行動。",
     "【可用角色立繪】只能選擇清單中的 illustration_id。每筆 name 是作者替該張立繪設定的名稱，請優先依名稱語意比對角色當下動作、情緒、服裝與場景；assetType 與 sortOrder 只作為輔助，不可只因排序而選擇。若沒有名稱或情境相符的素材，填 null；不可創造 ID。清單：" + JSON.stringify(availableIllustrations),
     "【可用場景背景】只能選擇清單中的 scene_background_id。locationKey 與目前地點完全相符的背景優先；locationKey 為 * 才是通用背景，只有沒有合適地點背景時才選用。依目前地點與活動挑選；沒有合適素材時填 null。不可創造 ID。清單：" + JSON.stringify(availableSceneBackgrounds),
     buildEncounterResponseGuidelines(),
-    "【輸出格式】只輸出 JSON object，不要 Markdown code fence。格式：{\"reply\":\"150 至 300 字元的完整角色回覆\",\"illustration_id\":\"清單中的 UUID 或 null\",\"scene_background_id\":\"清單中的 UUID 或 null\"}。reply 必須符合篇幅與角色設定；敘事／動作使用單星號包覆，角色台詞不加引號。不可輸出額外欄位、分析或提示詞。",
+    "【建議回覆】另外提供 3 則玩家可選擇的下一步回覆，每則 30～90 字元，必須緊扣本次地點、角色剛才的動作與最新對話。三則要有明確不同方向（例如詢問、回應、採取不同互動），不可使用通用寒暄、空泛追問或預設玩家的情緒、想法與行動。用玩家第一人稱或自然對話方式撰寫。\n【輸出格式】只輸出 JSON object，不要 Markdown code fence。格式：{\"reply\":\"150 至 300 字元的完整角色回覆\",\"suggested_replies\":[\"玩家選項一\",\"玩家選項二\",\"玩家選項三\"],\"illustration_id\":\"清單中的 UUID 或 null\",\"scene_background_id\":\"清單中的 UUID 或 null\"}。reply 必須符合篇幅與角色設定；敘事／動作使用單星號包覆，角色台詞不加引號。不可輸出額外欄位、分析或提示詞。",
   ].join("\n\n");
   const system = applyPromptVariables(systemTemplate, values);
   const messages = historyRows.filter((row: DbRow) => row.id !== userMessageId).slice(-9)
@@ -351,7 +351,7 @@ Deno.serve(async (request) => {
     p_assistant_message_id: assistantMessageId,
     p_evaluation: { source: "encounter_turn_handler", evaluator: "pending" },
   });
-  const settleAndRespond = async (reply: DbRow, idempotent = false, visualOverride: DbRow | null = null) => {
+  const settleAndRespond = async (reply: DbRow, idempotent = false, visualOverride: DbRow | null = null, suggestedReplies: string[] = []) => {
     const { data: settled, error: settleError } = await admin.rpc("settle_chat_turn", {
       p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
     });
@@ -363,6 +363,7 @@ Deno.serve(async (request) => {
     const visuals = visualOverride || await loadEncounterVisuals(admin, asText(reply.id));
     return json({
       status: settled, assistantMessage: { id: reply.id, content: reply.content, role: "assistant" },
+      ...(suggestedReplies.length === 3 ? { suggestedReplies } : {}),
       ...(idempotent ? { idempotent: true } : {}),
       encounter: { evidence, affinityPendingUntilSceneEnd: true, ...(visuals ? { visuals } : {}) },
     });
@@ -510,5 +511,5 @@ Deno.serve(async (request) => {
       stage: "visual_persistence", error_code: "visual_metadata_write_failed",
     });
   }
-  return await settleAndRespond(reply, false, visuals);
+  return await settleAndRespond(reply, false, visuals, parsedOutput.suggestedReplies);
 });
