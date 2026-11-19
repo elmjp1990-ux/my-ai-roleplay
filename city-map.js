@@ -421,13 +421,7 @@
       ? '正在讀取這個場景的角色…'
       : pager?.error
         ? '角色行程載入失敗，請重試。'
-        : !pager?.candidates?.length&&!pager?.hasMore
-          ? '目前沒有符合資格的公開角色。'
-          : hasAnySchedule
-            ? '目前沒有角色在此地點與台灣時間活動。'
-            : !pager?.hasMore
-              ? '尚未建立角色行程；可到測試工具手動生成。'
-              : '尚未找到符合條件的角色，請載入更多。';
+        : '目前沒有角色出現在此場景';
     strip.innerHTML=people.length
       ? people.map((person,index)=>{
           const characterName=String(person.name||'角色');
@@ -445,7 +439,7 @@
     }
     $('cityMapPeopleCount').textContent=people.length
       ? people.length+' 位角色符合目前時段'+(pager?.hasMore?' · 可載入更多':'')
-      : (pager?.loading?'正在讀取…':pager?.error?'載入失敗':hasAnySchedule?'目前無符合時段角色':'尚無角色行程');
+      : (pager?.loading?'正在讀取…':pager?.error?'載入失敗':'目前沒有角色出現在此場景');
     for(const person of people){
       const id=String(person?.id||'');
       if(!id||person.cloudPublic!==true||safeImage(person.image||person.avatar_url||person.avatar)||person.publicIllustrationsLoaded===true||cityAvatarHydrationPending.has(id))continue;
