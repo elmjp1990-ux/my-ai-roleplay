@@ -131,6 +131,26 @@
       .encounter-scene .suggestion-card-action,.encounter-scene .suggestion-card-dialogue{font-size:12px!important;line-height:1.6!important}
       .encounter-scene .composer-bottom-row{padding-top:4px!important}
     }
+    /* Keep the scene frame and character anchored to the large viewport while the IME opens.
+       Only the composer follows the visual viewport keyboard offset. */
+    body.encounter-mode-active .app,
+    body.encounter-mode-active #view,
+    body.encounter-mode-active .chat-layout,
+    body.encounter-mode-active .chat-main.encounter-scene{height:100lvh!important;min-height:100lvh!important}
+    body.encounter-mode-active .chat-main.encounter-scene>.chat-heading{
+      position:absolute!important;top:0!important;left:0!important;right:0!important;width:100vw!important;
+      max-width:100vw!important;margin:0!important;transform:none!important;box-sizing:border-box!important;
+      padding-left:max(12px,env(safe-area-inset-left))!important;padding-right:max(12px,env(safe-area-inset-right))!important;
+    }
+    body.encounter-mode-active .chat-main.encounter-scene>.composer{
+      position:absolute!important;left:0!important;right:0!important;width:100vw!important;
+      max-width:100vw!important;margin:0!important;transform:none!important;
+      bottom:var(--encounter-keyboard-offset,0px)!important;
+      padding-left:max(12px,env(safe-area-inset-left))!important;padding-right:max(12px,env(safe-area-inset-right))!important;
+    }
+    body.encounter-mode-active .encounter-character-sprite{height:78lvh!important;bottom:0!important;background:transparent!important}
+    .encounter-character-sprite.encounter-card-portrait-fallback{background:transparent!important}
+    .encounter-character-sprite.encounter-auto-bg-fallback{mix-blend-mode:normal!important}
   `;;
   document.head.appendChild(style);
   const splitEncounterBeats=(value)=>{
@@ -216,6 +236,32 @@
     messages.dataset.encounterBeatKey=beatKey;
     messages.dataset.encounterBeatIndex=String(idx);
   };
+  let encounterViewportPanel=null,encounterViewportCleanup=null;
+  const trackEncounterKeyboard=panel=>{
+    if(encounterViewportPanel===panel)return;
+    encounterViewportCleanup?.();
+    encounterViewportPanel=panel;
+    const viewport=window.visualViewport;
+    const update=()=>{
+      if(!panel.isConnected){
+        encounterViewportCleanup?.();
+        encounterViewportCleanup=null;
+        encounterViewportPanel=null;
+        return;
+      }
+      const offset=viewport?Math.max(0,window.innerHeight-(viewport.height+viewport.offsetTop)):0;
+      panel.style.setProperty('--encounter-keyboard-offset',offset+'px');
+    };
+    viewport?.addEventListener('resize',update,{passive:true});
+    viewport?.addEventListener('scroll',update,{passive:true});
+    window.addEventListener('resize',update,{passive:true});
+    encounterViewportCleanup=()=>{
+      viewport?.removeEventListener('resize',update);
+      viewport?.removeEventListener('scroll',update);
+      window.removeEventListener('resize',update);
+    };
+    update();
+  };
   const encounterRenderLifecycle=window.PoyozzChatRenderLifecycle;
   if(encounterRenderLifecycle){
     encounterRenderLifecycle.register('afterSingleConversation','encounter.single-scene',({session:renderSession,panel:renderPanel})=>{
@@ -223,6 +269,7 @@
       const panel=renderPanel||$('view')?.querySelector('.chat-main');
       if(!session?.encounterMode||!panel)return;
       panel.classList.add('encounter-scene');
+      trackEncounterKeyboard(panel);
       const character=sessionCharacter(session);
       const selectedBackgroundPath=safeImage(session?.encounterVisuals?.sceneBackgroundPath||'');
       const sceneImage=safeImage(selectedBackgroundPath||character?.encounterSceneImage||session?.encounterSceneImage||character?.sceneImage||'');
@@ -259,7 +306,7 @@
           existingSprite.dataset.encounterSource=halfBodyImage;
           existingSprite.dataset.encounterProcessed='';
           existingSprite.classList.remove('encounter-auto-bg-fallback');
-          if(useGallerySprite){
+          if(existingSprite.dataset.encounterCharacterImage==='true'){
             existingSprite.crossOrigin='anonymous';
             existingSprite.onload=()=>{
               const activeSource=existingSprite.dataset.encounterSource||'';
@@ -276,12 +323,13 @@
                 const visited=new Uint8Array(total);
                 const stack=new Int32Array(total);
                 let top=0;
-                const nearWhite=(i)=>{
+                const neutralBackdrop=(i)=>{
                   const p=i*4,red=pixels[p],green=pixels[p+1],blue=pixels[p+2];
-                  return red>=218&&green>=218&&blue>=218&&Math.max(red,green,blue)-Math.min(red,green,blue)<= thirty;
+                  const spread=Math.max(red,green,blue)-Math.min(red,green,blue);
+                  const brightness=(red+green+blue)/3;
+                  return brightness>=158&&spread<=36;
                 };
-                const thirty=34;
-                const push=(i)=>{if(i>=0&&i<total&&!visited[i]&&nearWhite(i)){visited[i]=1;stack[top++]=i;}};
+                const push=(i)=>{if(i>=0&&i<total&&!visited[i]&&neutralBackdrop(i)){visited[i]=1;stack[top++]=i;}};
                 for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
                 for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
                 while(top){
@@ -371,7 +419,14 @@
       }
       const composer=panel.querySelector('.composer');
       const input=composer?.querySelector('#messageInput');
-      if(input)input.setAttribute('aria-label','相遇模式對話');
+      if(input){
+        input.setAttribute('aria-label','相遇模式對話');
+        const playerTurns=(session.messages||[]).filter(message=>message?.role==='user').length;
+        const characterName=String(character?.name||character?.display_name||'角色').trim();
+        input.placeholder=playerTurns===0
+          ? '先跟'+characterName+'打招呼，或者留空送出，讓'+characterName+'發現你'
+          : '留空發送，角色會繼續說下去';
+      }
       applyEncounterDialogue(panel,session);
     });
     encounterRenderLifecycle.register('afterMessages','encounter.progressive-dialogue',({session:renderSession,panel:renderPanel})=>{
