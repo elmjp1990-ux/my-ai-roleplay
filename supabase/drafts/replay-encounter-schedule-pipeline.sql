@@ -19,6 +19,21 @@ BEGIN
 END;
 $priority_contract$;
 
+DO $strict_schedule_output_contract$
+DECLARE
+  v_definition text;
+BEGIN
+  SELECT pg_catalog.pg_get_functiondef(
+    'public.publish_encounter_schedule_batch(uuid,uuid,jsonb)'::regprocedure
+  ) INTO v_definition;
+  IF pg_catalog.strpos(v_definition, 'NOT BETWEEN 2 AND 3') = 0
+     OR pg_catalog.strpos(v_definition, 'v_multi_option_hours < 8') > 0
+     OR pg_catalog.strpos(v_definition, 'NOT BETWEEN 1 AND 4') = 0 THEN
+    RAISE EXCEPTION 'strict_hourly_schedule_output_contract_not_installed';
+  END IF;
+END;
+$strict_schedule_output_contract$;
+
 SET LOCAL ROLE authenticated;
 SET LOCAL request.jwt.claim.role = 'authenticated';
 SELECT count(*) FROM public.get_encounter_scene_registry();
