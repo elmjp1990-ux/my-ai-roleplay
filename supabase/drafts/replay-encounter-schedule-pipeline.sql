@@ -201,6 +201,60 @@ BEGIN
 END;
 $hourly_schedule_option_smoke$;
 
+DO $unavailable_hourly_scene_option_smoke$
+DECLARE
+  v_result record;
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.get_encounter_scene_catalog()
+    WHERE location_key = 'restaurant'
+  ) THEN
+    RAISE EXCEPTION 'synthetic replay expects restaurant to be unavailable in the scene catalog';
+  END IF;
+
+  INSERT INTO public.character_schedules (
+    id, character_id, day_type, start_time, end_time, location_key, location_description,
+    activity, scene_description, priority, is_active, source_type, variant_key, variant_weight,
+    encounter_greeting, is_outdoor
+  ) VALUES
+  (
+    '00000000-0000-4000-8000-000000000030'::uuid,
+    '00000000-0000-4000-8000-000000000010'::uuid,
+    'weekday', '12:00', '13:00', 'restaurant', '餐廳',
+    '外出用餐', '在餐廳用餐。', 50, true, 'ai', 'option_1', 55,
+    pg_catalog.repeat('他在餐廳用餐，暫時不會出現在其他場景。', 5), false
+  ),
+  (
+    '00000000-0000-4000-8000-000000000031'::uuid,
+    '00000000-0000-4000-8000-000000000010'::uuid,
+    'weekday', '12:00', '13:00', 'commercial', '商業大樓',
+    '在辦公室處理工作', '他在辦公室整理工作資料。', 50, true, 'ai', 'option_2', 30,
+    pg_catalog.repeat('他在辦公室處理工作，桌面上放著尚未整理完的文件。', 5), false
+  ),
+  (
+    '00000000-0000-4000-8000-000000000032'::uuid,
+    '00000000-0000-4000-8000-000000000010'::uuid,
+    'weekday', '12:00', '13:00', 'apartment', '公寓',
+    '在家簡單準備午餐', '他回到公寓準備簡單午餐。', 50, true, 'ai', 'option_3', 15,
+    pg_catalog.repeat('他在家準備簡單午餐，廚房傳來輕微的餐具聲。', 5), false
+  );
+
+  SELECT * INTO v_result
+  FROM public.resolve_encounter_character_schedule(
+    '00000000-0000-4000-8000-000000000010'::uuid,
+    NULL,
+    NULL,
+    '2026-11-17T12:30:00+08:00'::timestamptz
+  );
+
+  IF NOT FOUND
+     OR v_result.location_key NOT IN ('commercial', 'apartment')
+     OR v_result.variant_key NOT IN ('option_2', 'option_3') THEN
+    RAISE EXCEPTION 'unavailable restaurant option must not hide the remaining available hourly options';
+  END IF;
+END;
+$unavailable_hourly_scene_option_smoke$;
+
 DO $weather_fallback_smoke$
 DECLARE
   v_weather record;
