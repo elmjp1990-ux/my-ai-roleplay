@@ -8007,9 +8007,7 @@ async function loadEncounterMemoryPage(list,session,pager){
         if(!diaryBySession.has(rawId))diaryBySession.set(rawId,row);
       }
     }
-    const completedSessions=rows.filter(row=>
-      !(typeof row.encounter_day==='string'&&row.encounter_archived!=='true')||diaryBySession.has(row.id)
-    );
+    const completedSessions=rows.filter(row=>row.encounter_archived==='true'||diaryBySession.has(row.id));
     const cards=[];
     const placeNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308 公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園','shopping-street':'商店街','night-market':'夜市',restaurant:'餐廳',university:'大學',hospital:'醫院',gym:'健身房',cinema:'電影院',museum:'博物館',hotel:'飯店','train-station':'車站',library:'圖書館',theater:'劇院','art-gallery':'藝廊','community-center':'社區中心','music-studio':'音樂工作室',bakery:'麵包店','coworking-space':'共享辦公室'};
     for(const sessionRow of completedSessions){
