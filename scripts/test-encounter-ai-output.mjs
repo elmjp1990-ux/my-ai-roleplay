@@ -13,7 +13,7 @@ assert.deepEqual(
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "太短了" })), null);
 const shortValid = "相遇內容。".repeat(15);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: shortValid })).reply, shortValid);
-const plainTextReply = "角色自然地接續這段相遇，讓對話繼續往前發展。".repeat(2);
+const plainTextReply = "角色自然地接續這段相遇，讓對話繼續往前發展。".repeat(3);
 assert.equal(parseEncounterTurnOutput(plainTextReply).reply, plainTextReply);
 assert.equal(parseEncounterTurnOutput("not-json"), null);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "相遇內容".repeat(151) })), null);
