@@ -2944,7 +2944,7 @@ async function saveSupabaseCharacter(character, expectedUserId) {
       JSON.stringify(stableCharacterValue(before)) !== JSON.stringify(stableCharacterValue(after));
     // Whitespace/line-wrap-only edits are presentation changes, not a new character meaning.
     // Punctuation and words are preserved: even a one-word semantic change must refresh.
-    const normalizedProfileText = value => String(value ?? '').normalize('NFKC').replace(/[\\s\\u200B-\\u200D\\uFEFF]+/gu, '');
+    const normalizedProfileText = value => String(value ?? '').normalize('NFKC').replace(/[\s\u200B-\u200D\uFEFF]+/gu, '');
     const profileSourceValueChanged = (before, after) => {
       if (typeof before === 'string' && typeof after === 'string') return normalizedProfileText(before) !== normalizedProfileText(after);
       return characterValueChanged(before, after);
