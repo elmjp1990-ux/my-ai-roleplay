@@ -117,12 +117,14 @@ CREATE OR REPLACE FUNCTION public.enqueue_character_profile_organization(
   p_character_id uuid
 )
 RETURNS jsonb
-LANGUAGE sql
+LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $$
-  SELECT public.enqueue_character_profile_organization(p_character_id, true);
-$$;
+AS $
+BEGIN
+  RETURN public.enqueue_character_profile_organization(p_character_id, true);
+END;
+$;
 
 REVOKE ALL ON FUNCTION public.enqueue_character_profile_organization(uuid)
   FROM PUBLIC, anon;
