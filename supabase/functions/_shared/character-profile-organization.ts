@@ -187,7 +187,7 @@ export function validateCharacterAiProfile(
   const errors: string[] = [];
   if (!hasExactKeys(value, ROOT_KEYS)) return { ok: false, errors: ["root_keys_mismatch"] };
   validateProfileOutputBounds(value, errors);
-  if (value.schema_version !== "1.0") errors.push("schema_version_invalid");
+  if (value.schema_version !== "1.1") errors.push("schema_version_invalid");
 
   const sourceKeys = new Set(
     Object.entries(sourcePayload)
@@ -349,7 +349,7 @@ export function buildCharacterProfileMessages(sourcePayload: CharacterProfileSou
     "source_conflicts 每項必須是 {topic,conflicting_source_refs:[至少兩個來源路徑],description,resolution_status:needs_author_clarification}。unknowns 是字串陣列。",
     "每個物件只允許 schema 明列的 key，不得新增其他欄位。",
     "life_context 必須完整包含 work_environment, residence_environment, daily_routines, interests_and_leisure, social_circles, recurring_places, environmental_constraints 七個 {status,items} 區塊。",
-    "輸出 root keys 必須完整且僅包含：schema_version, identity_background, core_personality, inner_motivations, emotional_response_patterns, relationship_dynamics, behavior_and_agency, knowledge_boundaries, speech_style, appearance_markers, life_context, author_private_context, ooc_rules, unknowns, source_conflicts。schema_version 固定 1.0。",
+    "輸出 root keys 必須完整且僅包含：schema_version, identity_background, core_personality, inner_motivations, emotional_response_patterns, relationship_dynamics, behavior_and_agency, knowledge_boundaries, speech_style, appearance_markers, life_context, author_private_context, ooc_rules, unknowns, source_conflicts。schema_version 固定 1.1。",
   ].join("\n");
   return [
     { role: "system", content: system },
