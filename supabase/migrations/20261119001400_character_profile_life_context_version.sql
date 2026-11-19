@@ -75,7 +75,8 @@ BEGIN
   WHERE (COALESCE(p_source_changed, true) IS TRUE
          AND public.character_profile_organization_jobs.source_hash IS DISTINCT FROM EXCLUDED.source_hash)
      OR public.character_profile_organization_jobs.author_id IS DISTINCT FROM EXCLUDED.author_id
-     OR public.character_profile_organization_jobs.status = 'failed'
+     OR (COALESCE(p_source_changed, true) IS TRUE
+         AND public.character_profile_organization_jobs.status = 'failed')
      OR (
        public.character_profile_organization_jobs.status = 'completed'
        AND NOT EXISTS (
