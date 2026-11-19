@@ -42,11 +42,10 @@ const asRow = (value: unknown): Record<string, unknown> =>
 const asText = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 
 function isTransientProviderFailure(response: OpenRouterCompletionResult): boolean {
-  if ([408, 409, 425, 429].includes(response.httpStatus) || response.httpStatus >= 500) {
-    return true;
-  }
+  // Retry explicit rate limits immediately. Generic 5xx/timeouts are not
+  // retried because the upstream billing outcome can be ambiguous.
+  if (response.httpStatus === 429) return true;
   if (response.result.kind !== "provider_error") return false;
-  if (response.result.retryable) return true;
   const errorCode = response.result.code;
   return [
     "engine_overloaded",
@@ -54,6 +53,9 @@ function isTransientProviderFailure(response: OpenRouterCompletionResult): boole
     "upstream_unavailable",
     "provider_overloaded",
     "capacity_exceeded",
+    "rate_limit",
+    "temporarily_unavailable",
+    "upstream_busy",
   ].some((code) => errorCode.includes(code));
 }
 
