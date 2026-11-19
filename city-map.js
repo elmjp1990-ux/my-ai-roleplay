@@ -701,7 +701,11 @@
         return;
       }
       const live=state.characters.find(item=>item.id===person.id);
-      renderCityCharacterCard(live,0);
+      // Keep the schedule-resolved fields from the city presence result.
+      // The base character cache does not contain cityStartTime/cityEndTime/
+      // cityActivity/citySceneDescription, so passing `live` alone resets the
+      // status card to its "time not set" and generic-status fallbacks.
+      renderCityCharacterCard(live?{...live,...person}:person,0);
       return;
     }
     const cardAction=event.target.closest('[data-action^="city-character-"]')?.dataset.action;
