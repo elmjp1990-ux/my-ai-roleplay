@@ -62,7 +62,8 @@ const SCENE_ALIASES: Record<string, string> = {
   livehouse: "live-house", "live house": "live-house", 現場音樂: "live-house", 音樂展演: "live-house", 展演廳: "live-house",
   購物街: "shopping-street", 商店街: "shopping-street", 逛街商圈: "shopping-street",
   夜市: "night-market", 夜間市集: "night-market", "night market": "night-market",
-  餐廳: "restaurant", 飯店餐廳: "restaurant", 餐館: "restaurant",
+  餐廳: "restaurant", 飯店餐廳: "restaurant", 餐館: "restaurant", 小吃店: "restaurant",
+  客戶家: "apartment", 街頭: "shopping-street", 街道: "shopping-street",
   大學: "university", 學校: "university", 校園: "university",
   醫院: "hospital", 診所: "hospital",
   健身房: "gym", 健身中心: "gym",
@@ -155,6 +156,36 @@ const isUuid = (value: unknown): value is string =>
 const hasExactKeys = (value: unknown, keys: readonly string[]): value is RecordValue =>
   isRecord(value) && Object.keys(value).length === keys.length &&
   keys.every((key) => Object.prototype.hasOwnProperty.call(value, key));
+
+export type EncounterActivitySpace = "indoor" | "outdoor" | "vehicle";
+
+/**
+ * Activity space is inferred independently from the display location.
+ * A vehicle is not outdoors for weather purposes, but remains distinct from
+ * an indoor room so its street-side display location is not rewritten.
+ */
+export function classifyEncounterActivitySpace(
+  activityValue: unknown,
+  locationValue: unknown = "",
+  requestedOutdoor = false,
+): EncounterActivitySpace {
+  const activity = text(activityValue).normalize("NFKC");
+  const location = text(locationValue).normalize("NFKC");
+  if (/計程車|計程車內|車內|車上|車廂|車裡|車中|搭車|乘車|駕車|開車|副駕|後座/.test(activity)) {
+    return "vehicle";
+  }
+  // Product rule: smoking on the character's apartment balcony is treated as
+  // part of the apartment's indoor scene, not as a weather-exposed activity.
+  if (/陽台/.test(activity) && /抽菸|吸菸|抽煙/.test(activity)) return "indoor";
+
+  const clearlyOutdoor = /站在騎樓下|街頭|街道|路邊|在街上|公園步道|戶外|沿著.{0,8}步道|下車後|走出車外|走出車門|下車道別|在路上散步/.test(activity);
+  if (clearlyOutdoor) return "outdoor";
+
+  const indoorLocation = /^(客戶家|客戶住處|住所|住家|公寓|餐廳|餐館|小吃店|超商|便利商店|代辦所|公司|辦公室|咖啡廳|書店|百貨公司)$/i.test(location);
+  const clearlyIndoor = /室內|家中|家裡|公寓|客戶家|客戶住處|修理電燈|組裝書架|搬家打包|除蟲|清理雜物|餐廳|包廂|晚宴|家庭聚餐|吃午餐|吃早餐|吃晚餐|用餐|超商內|貨架前|店內|結帳|選購飲料|挑選飲料|購物/.test(activity);
+  if (clearlyIndoor || indoorLocation) return "indoor";
+  return requestedOutdoor ? "outdoor" : "indoor";
+}
 
 export function normalizeEncounterSceneKey(value: unknown): string | null {
   const original = text(value);
@@ -321,6 +352,8 @@ function validateHourlySchedule(
       const locationDescription = text(rawOption.location);
       const locationKey = normalizeEncounterSceneKey(locationDescription);
       const activity = text(rawOption.activity);
+      const activitySpace = classifyEncounterActivitySpace(activity, locationDescription, rawOption.is_outdoor === true);
+      const isOutdoor = activitySpace === "outdoor";
       if (!isValidEncounterLocationLabel(locationDescription)) {
         errors.push(blockLabel + "_option_" + optionIndex + "_location_invalid");
       }
@@ -333,7 +366,7 @@ function validateHourlySchedule(
 
       let rainLocationKey: string | null = null;
       let rainActivity: string | null = null;
-      if (rawOption.is_outdoor === true) {
+      if (isOutdoor) {
         const rainLocationDescription = text(rawOption.rain_fallback_location);
         rainLocationKey = normalizeEncounterSceneKey(rainLocationDescription);
         rainActivity = text(rawOption.rain_fallback_activity);
@@ -345,12 +378,6 @@ function validateHourlySchedule(
       } else if (rawOption.rain_fallback_location !== null || rawOption.rain_fallback_activity !== null) {
         errors.push(blockLabel + "_option_" + optionIndex + "_unexpected_rain_fallback");
       }
-      if (locationKey && rawOption.is_outdoor === true && !OUTDOOR_SCENE_KEYS.has(locationKey)) {
-        errors.push(blockLabel + "_option_" + optionIndex + "_outdoor_location_mismatch");
-      }
-      if (locationKey && rawOption.is_outdoor === false && OUTDOOR_SCENE_KEYS.has(locationKey)) {
-        errors.push(blockLabel + "_option_" + optionIndex + "_indoor_location_mismatch");
-      }
       options.push({
         option_key: ("option_" + (optionIndex + 1)) as ScheduleOption["option_key"],
         weight: Number(weight),
@@ -360,7 +387,7 @@ function validateHourlySchedule(
         // Keep the legacy DB field populated from the concise activity. The model
         // no longer generates a separate scene description or greeting paragraph.
         scene_description: activity,
-        is_outdoor: rawOption.is_outdoor === true,
+        is_outdoor: isOutdoor,
         rain_fallback_location_key: rainLocationKey,
         rain_fallback_activity: rainActivity,
         rain_fallback_greeting: null,
@@ -465,6 +492,7 @@ export function buildEncounterScheduleBatchMessages(
     "weekday 與 holiday 是日曆情境，不等於角色的上班日與休假日。依台灣政府正式辦公日曆及補班日決定 day_type；AI 必須根據角色職業與作者設定，分別推演平日和假日的生活節奏，不可假設所有人週末休息。系統每天依角色、日期與時段獨立執行加權抽取，同一天同一時段結果固定，重新整理地圖不會重新抽籤；不同日期會使用不同抽取種子。機率只在同一角色、同一日期類型、同一個小時的 options 內比較，絕不可跨時段或跨平日／假日共用權重。",
     "行程只分 weekday 與 holiday；節日、國定假日與補班日由系統依台灣日曆映射到相應日期類型，不要另外生成 special_events，也不可自行推算角色生日。",
     "戶外時段必須提供雨天室內替代地點與替代行為，雨天行為也限制 10–30 個中文字；雨天替代地點必須符合角色背景且為室內場所，不可選擇戶外地點。室內時段 rain_fallback_location 與 rain_fallback_activity 必須為 null。是否戶外及地點對應何種系統場景，由系統判斷。",
+    "is_outdoor 必須依活動實際發生的空間判斷，不能只看地點名稱；地點描述與活動空間是兩個獨立欄位。客戶家維修、搬家、清潔等工作發生在室內；餐廳／小吃店用餐、超商內購物或結帳都屬室內。POYOZZ 特別規則：角色在自己公寓陽台抽菸仍判定為室內，地點使用住所。計程車內送客屬車內活動，is_outdoor=false，地點可寫「街頭」，不可錯掛在餐廳，也不可建立或要求計程車場景；角色下車後在街頭道別或步行才判定為戶外。不得因地點對應到街道或商圈就把車內／店內活動標為戶外。";
 
     "作者行程說明只供內部規劃；activity 必須使用公開可見、簡短自然的描述，不得逐字複製整段說明或揭露私密情節。",
 
