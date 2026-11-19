@@ -53,6 +53,39 @@ REVOKE ALL ON FUNCTION public.character_profile_source_payload(uuid, uuid)
 GRANT EXECUTE ON FUNCTION public.character_profile_source_payload(uuid, uuid)
   TO service_role;
 
+-- No Worker is allowed to be in-flight while source hashes are migrated.
+-- Re-hash existing queued rows against the expanded allowlist without changing
+-- their status, attempts, or availability. This prevents an avoidable paid
+-- generation followed by a stale-source rejection on the next manual run.
+DO $profile_hash_preflight$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM public.character_profile_organization_jobs
+    WHERE status = 'processing'
+  ) THEN
+    RAISE EXCEPTION 'character_profile_worker_active_retry_migration';
+  END IF;
+END;
+$profile_hash_preflight$;
+
+WITH refreshed AS (
+  SELECT
+    j.character_id,
+    encode(extensions.digest(convert_to(source_payload.payload::text, 'UTF8'), 'sha256'), 'hex') AS source_hash
+  FROM public.character_profile_organization_jobs j
+  CROSS JOIN LATERAL (
+    SELECT public.character_profile_source_payload(j.character_id, j.author_id) AS payload
+  ) source_payload
+  WHERE source_payload.payload IS NOT NULL
+)
+UPDATE public.character_profile_organization_jobs j
+SET source_hash = refreshed.source_hash,
+    updated_at = now()
+FROM refreshed
+WHERE refreshed.character_id = j.character_id
+  AND j.source_hash IS DISTINCT FROM refreshed.source_hash;
+
 CREATE OR REPLACE FUNCTION public.enqueue_character_profile_organization(
   p_character_id uuid,
   p_source_changed boolean
