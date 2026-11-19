@@ -164,9 +164,11 @@ async function generateProfile(
       // safely use the next approved provider once. Generic 5xx responses are
       // treated as ambiguous and are not retried.
       if (response.status === 429 && provider === APPROVED_OPENROUTER_PROVIDERS[0]) {
+        await response.body?.cancel();
         continue;
       }
       if (!response.ok) {
+        await response.body?.cancel();
         if (response.status >= 500) {
           throw new ProfileGenerationError("provider_outcome_unknown", {
             model: CHARACTER_PROFILE_MODEL,
