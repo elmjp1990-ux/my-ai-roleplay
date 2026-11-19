@@ -505,7 +505,7 @@ Deno.serve(async (request) => {
     });
   }
 
-  if (mode === "repair_list" || mode === "repair") {
+  if (mode === "repair_list" || mode === "repair" || mode === "repair_hide") {
     if (Deno.env.get("ENCOUNTER_SCHEDULE_TEST_MODE") !== "true" || isServiceRoleRequest) {
       return json({ error: "schedule_repair_disabled" }, 403);
     }
