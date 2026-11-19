@@ -14,7 +14,7 @@ RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $profile_source$
 DECLARE
   v_payload jsonb;
 BEGIN
@@ -46,7 +46,7 @@ BEGIN
   END IF;
   RETURN v_payload;
 END;
-$;
+$profile_source$;
 
 REVOKE ALL ON FUNCTION public.character_profile_source_payload(uuid, uuid)
   FROM PUBLIC, anon, authenticated;
@@ -170,11 +170,11 @@ RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $queue_wrapper$
 BEGIN
   RETURN public.enqueue_character_profile_organization(p_character_id, true);
 END;
-$;
+$queue_wrapper$;
 
 REVOKE ALL ON FUNCTION public.enqueue_character_profile_organization(uuid)
   FROM PUBLIC, anon;
