@@ -425,7 +425,7 @@ assert.match(cityMap, /loadCloudEncounterHistory/);
 assert.match(cityMap, /eq\(['"]chat_mode['"],['"]encounter['"]\)[\s\S]*?limit\(2\)/);
 assert.match(cityMap, /正在讀取雲端相遇紀錄/);
 assert.match(encounterPresentation, /playerTurns===0/);
-assert.match(encounterPresentation, /先跟\+characterName\+打招呼/);
+assert.match(encounterPresentation, /先跟'\+characterName\+'打招呼/);
 assert.match(encounterPresentation, /留空發送，角色會繼續說下去/);
 assert.match(encounterPresentation, /window\.visualViewport/);
 assert.match(encounterPresentation, /height:100lvh!important/);
