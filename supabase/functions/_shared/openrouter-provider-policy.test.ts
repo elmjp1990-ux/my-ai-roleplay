@@ -20,7 +20,7 @@ Deno.test("OpenRouter only routes to the approved non-training provider allowlis
 
 Deno.test("OpenRouter routing fails closed instead of using an unapproved fallback", () => {
   const policy = buildOpenRouterProviderOptions();
+  assertEquals(policy.only, ["deepinfra"]);
   assertEquals(policy.allow_fallbacks, false);
   assertEquals(policy.data_collection, "allow");
-  assertEquals(policy.only.includes("deepseek" as never), false);
 });
