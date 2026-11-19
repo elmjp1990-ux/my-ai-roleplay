@@ -2821,7 +2821,7 @@ window.addEventListener('pageshow',()=>{
 });
 function normalizePersonalityProfile(value) {
   const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
-  const limits={coreTraits:500,values:500,speechStyle:500,behaviorRules:700,likes:300,dislikes:300,boundaries:500,relationshipPacing:300};
+  const limits={coreTraits:500,values:500,speechStyle:500,behaviorRules:700,likes:300,dislikes:300,boundaries:500,relationshipPacing:300,occupation:500};
   return {...Object.fromEntries(Object.entries(limits).map(([key,max])=>[key,String(source[key]??'').trim().slice(0,max)])),primaryIllustrationName:String(source.primaryIllustrationName??'').trim().slice(0,40)};
 }
 
