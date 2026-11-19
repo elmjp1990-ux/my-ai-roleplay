@@ -6,7 +6,7 @@ const schema = JSON.parse(fs.readFileSync("supabase/drafts/character-ai-profile-
 const registry = JSON.parse(fs.readFileSync("supabase/drafts/character-ai-profile-source-registry-v1.json", "utf8"));
 const frontend = fs.readFileSync("index.html", "utf8");
 const migration = fs.readFileSync("supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql", "utf8");
-const profileVersionMigration = fs.readFileSync("supabase/migrations/20261119001400_character_profile_life_context_version.sql", "utf8");
+const profileVersionMigration = fs.readFileSync("supabase/migrations/20261119160000_character_profile_life_context_version.sql", "utf8");
 const schedulerMigration = fs.readFileSync("supabase/migrations/20261107123000_schedule_character_profile_organization_worker.sql", "utf8");
 const worker = fs.readFileSync("supabase/functions/character-profile-organization-worker/index.ts", "utf8");
 const providerPolicy = fs.readFileSync("supabase/functions/_shared/openrouter-provider-policy.ts", "utf8");
@@ -59,6 +59,7 @@ for (const path of [
   "character_private_info.personality_profile.dislikes",
   "character_private_info.personality_profile.boundaries",
   "character_private_info.personality_profile.relationshipPacing",
+  "character_private_info.personality_profile.occupation",
 ]) assert.ok(refreshPaths.has(path), `Missing AI refresh source ${path}`);
 
 for (const path of [
@@ -115,6 +116,8 @@ assert.match(coreUtils, /shouldCallModel: false/,
   "The browser must never call the model directly");
 assert.match(frontend, /p_source_changed: aiOrganizationDecision\.requiresDerivedRefresh === true/, "Save flow must pass its deterministic source-change decision to the database");
 assert.match(profileVersionMigration, /p_source_changed boolean/, "Profile queue must accept the deterministic source-change decision");
+assert.match(profileVersionMigration, /character_private_info\.personality_profile\.occupation/, "The profile source payload must include the creator occupation field");
+assert.match(profileVersionMigration, /AS \$\$[\s\S]*?RETURN public\.enqueue_character_profile_organization\(p_character_id, true\);[\s\S]*?\$\$;/, "Legacy one-argument queue RPC must retain valid dollar quoting");
 assert.match(profileVersionMigration, /p\.profile->>'schema_version' = '1\.1'/, "Legacy profile schemas must be refreshed once");
 assert.match(profileVersionMigration, /p\.profile \? 'life_context'/, "A profile is current only when structured life context exists");
 assert.match(frontend, /enqueue_character_profile_organization/,
@@ -228,5 +231,6 @@ assert.ok(worker.includes("provider_response_too_large") && worker.includes("req
 assert.match(coreUtils, /openingMessagePolicy: 'runtime_only_no_profile_refresh'/, "Opening-message edits must be runtime-only");
 assert.match(coreUtils, /const sourceChanged = changed/, "Profile source comparison must remain aligned with the exact database source hash");
 assert.match(coreUtils, /personality_or_character_context_changed/, "Meaningful personality changes must be explicitly classified for refresh");
+assert.match(coreUtils, /relationshipPacing.*occupation/, "Occupation changes must be classified as AI-relevant source changes");
 
 console.log("Character AI Profile schema, queue, Worker, scheduling, save enqueue, Story integration and privacy contracts passed.");
