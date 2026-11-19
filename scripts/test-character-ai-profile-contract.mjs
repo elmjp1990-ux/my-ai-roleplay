@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import vm from "node:vm";
 
 const schema = JSON.parse(fs.readFileSync("supabase/drafts/character-ai-profile-v1.schema.json", "utf8"));
 const registry = JSON.parse(fs.readFileSync("supabase/drafts/character-ai-profile-source-registry-v1.json", "utf8"));
@@ -66,6 +67,35 @@ for (const path of [
   assert.ok(runtimePaths.has(path), `Missing runtime-only source ${path}`);
   assert.ok(!refreshPaths.has(path), `${path} must not trigger derived profile refresh`);
 }
+
+
+const classifierSandbox = { window: {} };
+vm.runInNewContext(coreUtils, classifierSandbox);
+const classifyProfileChange = classifierSandbox.window.PoyozzCoreUtils.classifyCharacterProfileChanges;
+const baseCharacter = {
+  name: "角色甲", intro: "一名生活在城市中的角色", race: "人類", style: "沉穩",
+  phone_settings: {}, tags: [], personalityProfile: { coreTraits: ["冷靜"], values: ["誠實"] },
+};
+const basePrivate = { private_info: "住在城市", personality_profile: baseCharacter.personalityProfile };
+const classify = (characterPatch = {}, privatePatch = {}, existingPatch = {}) => classifyProfileChange({
+  existingCharacter: { ...baseCharacter, ...existingPatch },
+  existingPrivateProfile: { ...basePrivate, ...privatePatch },
+  character: { ...baseCharacter, ...characterPatch },
+  normalizePersonalityProfile: value => value || {},
+  rowPhoneSettingsForDiff: value => value || {},
+});
+assert.equal(classify({ name: "角色乙" }).requiresDerivedRefresh, false,
+  "Renaming a character must not trigger AI profile generation");
+assert.equal(classify({ opening: "優化後的開場白" }).requiresDerivedRefresh, false,
+  "Opening-message edits must not trigger AI profile generation");
+assert.equal(classify({ intro: "一名生活在城市中的\\n角色" }).requiresDerivedRefresh, false,
+  "Whitespace-only background formatting must not trigger AI profile generation");
+assert.equal(classify({ personalityProfile: { coreTraits: ["冷靜", "有戒心"], values: ["誠實"] } }).requiresDerivedRefresh, true,
+  "A substantive core personality change must trigger profile regeneration");
+assert.equal(classify({ intro: "一名不生活在城市中的角色" }).requiresDerivedRefresh, true,
+  "A substantive background change must trigger profile regeneration");
+assert.equal(classify({ phoneSettings: { noticePrompts: ["新通知規則"] } }).requiresDerivedRefresh, false,
+  "Runtime phone settings must not regenerate the durable profile");
 
 const aiProfileFields = coreUtils.slice(coreUtils.indexOf("const fields"), coreUtils.indexOf("for (const key of fields)"));
 assert.ok(aiProfileFields.length > 0, "Character save classifier must define its personality field allowlist");
