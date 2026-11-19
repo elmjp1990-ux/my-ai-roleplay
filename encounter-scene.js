@@ -249,7 +249,7 @@
         encounterViewportPanel=null;
         return;
       }
-      const offset=viewport?Math.max(0,window.innerHeight-(viewport.height+viewport.offsetTop)):0;
+      const offset=viewport?Math.max(0,panel.clientHeight-(viewport.height+viewport.offsetTop)):0;
       panel.style.setProperty('--encounter-keyboard-offset',offset+'px');
     };
     viewport?.addEventListener('resize',update,{passive:true});
