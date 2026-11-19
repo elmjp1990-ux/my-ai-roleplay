@@ -123,6 +123,9 @@ assert.match(profileVersionMigration, /AS \$queue_wrapper\$[\s\S]*?RETURN public
 assert.match(profileVersionMigration, /AS \$profile_source\$[\s\S]*?RETURN v_payload;[\s\S]*?\$profile_source\$;/, "The source payload replacement must use valid dollar quoting");
 assert.match(profileVersionMigration, /p\.profile->>'schema_version' = '1\.1'/, "Legacy profile schemas must be refreshed once");
 assert.match(profileVersionMigration, /p\.profile \? 'life_context'/, "A profile is current only when structured life context exists");
+assert.match(profileVersionMigration, /status = 'processing'[\s\S]*?RAISE EXCEPTION 'character_profile_worker_active_retry_migration'/, "Source hash migration must refuse to run while a Worker lease is active");
+assert.match(profileVersionMigration, /UPDATE public\.character_profile_organization_jobs[\s\S]*source_hash = refreshed\.source_hash/, "Existing queued jobs must be rehashed before the new source payload is claimed");
+assert.match(profileVersionMigration, /to_jsonb\(COALESCE\(pi\.personality_profile ->> 'coreTraits', ''\)\)/, "Missing personality values must hash identically to the empty strings persisted by the form");
 assert.match(frontend, /enqueue_character_profile_organization/,
   "A verified character save must enqueue a derived-profile refresh");
 assert.doesNotMatch(frontend, /if \(aiOrganizationDecision\.requiresDerivedRefresh === true\)/,
@@ -235,6 +238,7 @@ assert.ok(worker.includes("provider_response_too_large") && worker.includes("req
 
 assert.match(coreUtils, /openingMessagePolicy: 'runtime_only_no_profile_refresh'/, "Opening-message edits must be runtime-only");
 assert.match(coreUtils, /const sourceChanged = changed/, "Profile source comparison must remain aligned with the exact database source hash");
+assert.match(coreUtils, /const prev = existingPrivateProfile\?\.personality_profile/, "Profile diff must compare raw persisted values instead of hiding normalization changes");
 assert.match(coreUtils, /personality_or_character_context_changed/, "Meaningful personality changes must be explicitly classified for refresh");
 assert.match(coreUtils, /relationshipPacing.*occupation/, "Occupation changes must be classified as AI-relevant source changes");
 
