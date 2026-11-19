@@ -23,15 +23,15 @@ BEGIN
     'characters.race', COALESCE(c.race, ''),
     'characters.style', COALESCE(c.style, ''),
     'character_private_info.private_info', COALESCE(pi.private_info, ''),
-    'character_private_info.personality_profile.coreTraits', COALESCE(pi.personality_profile -> 'coreTraits', 'null'::jsonb),
-    'character_private_info.personality_profile.values', COALESCE(pi.personality_profile -> 'values', 'null'::jsonb),
-    'character_private_info.personality_profile.speechStyle', COALESCE(pi.personality_profile -> 'speechStyle', 'null'::jsonb),
-    'character_private_info.personality_profile.behaviorRules', COALESCE(pi.personality_profile -> 'behaviorRules', 'null'::jsonb),
-    'character_private_info.personality_profile.likes', COALESCE(pi.personality_profile -> 'likes', 'null'::jsonb),
-    'character_private_info.personality_profile.dislikes', COALESCE(pi.personality_profile -> 'dislikes', 'null'::jsonb),
-    'character_private_info.personality_profile.boundaries', COALESCE(pi.personality_profile -> 'boundaries', 'null'::jsonb),
-    'character_private_info.personality_profile.relationshipPacing', COALESCE(pi.personality_profile -> 'relationshipPacing', 'null'::jsonb),
-    'character_private_info.personality_profile.occupation', COALESCE(pi.personality_profile -> 'occupation', 'null'::jsonb)
+    'character_private_info.personality_profile.coreTraits', to_jsonb(COALESCE(pi.personality_profile ->> 'coreTraits', '')),
+    'character_private_info.personality_profile.values', to_jsonb(COALESCE(pi.personality_profile ->> 'values', '')),
+    'character_private_info.personality_profile.speechStyle', to_jsonb(COALESCE(pi.personality_profile ->> 'speechStyle', '')),
+    'character_private_info.personality_profile.behaviorRules', to_jsonb(COALESCE(pi.personality_profile ->> 'behaviorRules', '')),
+    'character_private_info.personality_profile.likes', to_jsonb(COALESCE(pi.personality_profile ->> 'likes', '')),
+    'character_private_info.personality_profile.dislikes', to_jsonb(COALESCE(pi.personality_profile ->> 'dislikes', '')),
+    'character_private_info.personality_profile.boundaries', to_jsonb(COALESCE(pi.personality_profile ->> 'boundaries', '')),
+    'character_private_info.personality_profile.relationshipPacing', to_jsonb(COALESCE(pi.personality_profile ->> 'relationshipPacing', '')),
+    'character_private_info.personality_profile.occupation', to_jsonb(COALESCE(pi.personality_profile ->> 'occupation', ''))
   )
   INTO v_payload
   FROM public.characters c
