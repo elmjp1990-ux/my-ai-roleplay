@@ -88,8 +88,8 @@ assert.equal(classify({ name: "角色乙" }).requiresDerivedRefresh, false,
   "Renaming a character must not trigger AI profile generation");
 assert.equal(classify({ opening: "優化後的開場白" }).requiresDerivedRefresh, false,
   "Opening-message edits must not trigger AI profile generation");
-assert.equal(classify({ intro: "一名生活在城市中的\\n角色" }).requiresDerivedRefresh, false,
-  "Whitespace-only background formatting must not trigger AI profile generation");
+assert.equal(classify({ intro: "一名生活在城市中的\\n角色" }).requiresDerivedRefresh, true,
+  "Any raw source-text change must refresh so the profile source hash remains current");
 assert.equal(classify({ personalityProfile: { coreTraits: ["冷靜", "有戒心"], values: ["誠實"] } }).requiresDerivedRefresh, true,
   "A substantive core personality change must trigger profile regeneration");
 assert.equal(classify({ intro: "一名不生活在城市中的角色" }).requiresDerivedRefresh, true,
