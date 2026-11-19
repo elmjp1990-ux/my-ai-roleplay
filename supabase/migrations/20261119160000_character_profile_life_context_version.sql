@@ -54,6 +54,7 @@ GRANT EXECUTE ON FUNCTION public.character_profile_source_payload(uuid, uuid)
   TO service_role;
 
 -- No Worker is allowed to be in-flight while source hashes are migrated.
+LOCK TABLE public.character_profile_organization_jobs IN SHARE ROW EXCLUSIVE MODE;
 -- Re-hash existing queued rows against the expanded allowlist without changing
 -- their status, attempts, or availability. This prevents an avoidable paid
 -- generation followed by a stale-source rejection on the next manual run.
