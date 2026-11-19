@@ -277,6 +277,7 @@ function validateHourlySchedule(
   errors: string[],
   label: string,
 ): ScheduleTimeBlock[] | null {
+  // Enforce weighted alternatives for every hour, not merely a daily minimum.
   if (!Array.isArray(value) || value.length !== 24) {
     errors.push(label + "_must_cover_24_hours");
     if (!Array.isArray(value)) return null;
