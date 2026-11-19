@@ -3,15 +3,6 @@
 (function(global){
   'use strict';
   const excludedMessages=new Set(['[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]','（請接續目前的故事。）']);
-  const getSessions=(person,localSessions,currentUser)=>{
-    const uid=currentUser?.()?.uid||'';
-    const local=Object.values(localSessions||{}).filter(session=>
-      session?.encounterMode&&session.characterId===person.id&&
-      (!session.cloudOwned||session.cloudOwnerUid===uid));
-    const cloud=Array.isArray(person.encounterHistoryCloud)?person.encounterHistoryCloud:[];
-    return [...new Map([...cloud,...local].map(session=>[session.id,session])).values()]
-      .sort((a,b)=>(Number(b.startedAt)||0)-(Number(a.startedAt)||0)).slice(0,2);
-  };
   const renderHistory=(person,sessions,escapeHTML,placeNames)=>{
     if(person.encounterHistoryLoading)return '<p>正在讀取雲端相遇紀錄…</p>';
     if(!sessions.length)return '<p>目前還沒有已保存的相遇紀錄。完成「與他相遇」對話後，紀錄會顯示在這裡。</p>';
@@ -58,5 +49,13 @@
       throw error;
     }finally{person.encounterHistoryLoading=false;}
   };
-  global.PoyozzEncounterHistory=Object.freeze({getSessions,renderHistory,loadCloudHistory});
+  const openHistory=(person,currentUser,client,render,isActive,onError)=>{
+    if(!person||person.encounterHistoryLoaded||person.encounterHistoryLoading)return;
+    const request=loadCloudHistory(person,currentUser,client);
+    render?.();
+    void request.then(()=>{
+      if(!isActive||isActive())render?.();
+    }).catch(error=>onError?.(error));
+  };
+  global.PoyozzEncounterHistory=Object.freeze({renderHistory,loadCloudHistory,openHistory});
 })(window);
