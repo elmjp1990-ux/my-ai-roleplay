@@ -92,7 +92,7 @@ assert.match(scheduleGeneration, /不輸出 no_matching_location、special_event
 assert.match(scheduleGeneration, /行程以角色自身日常活動為準/);
 assert.match(scheduleGeneration, /地點是否能對應地圖由系統自行判斷/);
 assert.match(scheduleGeneration, /不得向模型提供任何地圖地點建議/);
-assert.match(scheduleGeneration, /characterCount <= 4/);
+assert.match(scheduleGeneration, /characterCount <= 8/);
 assert.doesNotMatch(scheduleGeneration, /sceneSuggestionText|目前地圖可用地點範例|AI 只會看到少量現有場景/);
 assert.match(scheduleGeneration, /scene_description/);
 assert.match(scheduleGeneration, /options 為 2–3 個選項/);
