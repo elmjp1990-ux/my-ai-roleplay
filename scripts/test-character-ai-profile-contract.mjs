@@ -124,6 +124,7 @@ assert.match(profileVersionMigration, /AS \$profile_source\$[\s\S]*?RETURN v_pay
 assert.match(profileVersionMigration, /p\.profile->>'schema_version' = '1\.1'/, "Legacy profile schemas must be refreshed once");
 assert.match(profileVersionMigration, /p\.profile \? 'life_context'/, "A profile is current only when structured life context exists");
 assert.match(profileVersionMigration, /status = 'processing'[\s\S]*?RAISE EXCEPTION 'character_profile_worker_active_retry_migration'/, "Source hash migration must refuse to run while a Worker lease is active");
+assert.match(profileVersionMigration, /LOCK TABLE public\.character_profile_organization_jobs IN SHARE ROW EXCLUSIVE MODE/, "Source hash migration must block concurrent claims and writes while rehashing");
 assert.match(profileVersionMigration, /UPDATE public\.character_profile_organization_jobs[\s\S]*source_hash = refreshed\.source_hash/, "Existing queued jobs must be rehashed before the new source payload is claimed");
 assert.match(profileVersionMigration, /to_jsonb\(COALESCE\(pi\.personality_profile ->> 'coreTraits', ''\)\)/, "Missing personality values must hash identically to the empty strings persisted by the form");
 assert.match(frontend, /enqueue_character_profile_organization/,
