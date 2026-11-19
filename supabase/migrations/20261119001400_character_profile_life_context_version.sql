@@ -7,7 +7,7 @@ BEGIN;
 
 CREATE OR REPLACE FUNCTION public.enqueue_character_profile_organization(
   p_character_id uuid,
-  p_source_changed boolean DEFAULT true
+  p_source_changed boolean
 )
 RETURNS jsonb
 LANGUAGE plpgsql
