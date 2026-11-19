@@ -178,12 +178,14 @@ export function classifyEncounterActivitySpace(
   // part of the apartment's indoor scene, not as a weather-exposed activity.
   if (/陽台/.test(activity) && /抽菸|吸菸|抽煙/.test(activity)) return "indoor";
 
-  const clearlyOutdoor = /站在騎樓下|在街頭|街頭道別|街道上|站在路邊|在路邊|在街上|公園步道|戶外|沿著.{0,8}步道|下車後|走出車外|走出車門|下車道別|在路上散步/.test(activity);
+  const clearlyIndoor = /室內|家中|家裡|公寓裡|客戶家|客戶住處|修理電燈|組裝書架|搬家打包|除蟲|清理雜物|包廂|晚宴|家庭聚餐|吃午餐|吃早餐|吃晚餐|用餐|超商內|貨架前|店內|結帳|選購飲料|挑選飲料|購物/.test(activity);
+  if (clearlyIndoor) return "indoor";
+
+  const clearlyOutdoor = /站在騎樓下|餐廳門口|店外|門外|外面等車|在門口|在街頭|街頭道別|街道上|站在路邊|在路邊|在街上|公園步道|戶外|沿著.{0,8}步道|下車後|走出車外|走出車門|下車道別|在路上散步/.test(activity);
   if (clearlyOutdoor) return "outdoor";
 
   const indoorLocation = /^(客戶家|客戶住處|住所|住家|公寓|餐廳|餐館|小吃店|超商|便利商店|代辦所|公司|辦公室|咖啡廳|書店|百貨公司)$/i.test(location);
-  const clearlyIndoor = /室內|家中|家裡|公寓|客戶家|客戶住處|修理電燈|組裝書架|搬家打包|除蟲|清理雜物|餐廳|包廂|晚宴|家庭聚餐|吃午餐|吃早餐|吃晚餐|用餐|超商內|貨架前|店內|結帳|選購飲料|挑選飲料|購物/.test(activity);
-  if (clearlyIndoor || indoorLocation) return "indoor";
+  if (indoorLocation) return "indoor";
   return requestedOutdoor ? "outdoor" : "indoor";
 }
 
