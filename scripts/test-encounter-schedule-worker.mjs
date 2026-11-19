@@ -14,6 +14,8 @@ const compactScheduleMigration = fs.readFileSync("supabase/migrations/2026111900
 const pendingPriorityMigration = fs.readFileSync("supabase/migrations/20261118074723_prioritize_pending_encounter_schedule_jobs.sql", "utf8");
 const rawOutputRepairMigration = fs.readFileSync("supabase/migrations/20261118074727_encounter_schedule_raw_output_repair.sql", "utf8");
 const rawOutputRepairReplay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-output-repair.sql", "utf8");
+const rawOutputSoftHideMigration = fs.readFileSync("supabase/migrations/20261119000600_encounter_schedule_output_soft_hide.sql", "utf8");
+const rawOutputSoftHideReplay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-output-soft-hide.sql", "utf8");
 const providerAdapter = fs.readFileSync("supabase/functions/_shared/openrouter-chat-completions.ts", "utf8");
 const replayWorkflow = fs.readFileSync(".github/workflows/supabase-local-migration-replay.yml", "utf8");
 const replaySchedule = fs.readFileSync("supabase/drafts/replay-encounter-schedule-pipeline.sql", "utf8");
@@ -34,7 +36,16 @@ assert.match(worker, /claim_encounter_schedule_repair/);
 assert.match(worker, /eq\("actor_user_id", actorUserId\)/);
 assert.match(worker, /originalBatch\.is_manual !== true/);
 assert.match(worker, /job\.source_hash !== output\.source_hash/);
-assert.match(worker, /delete\(\)\.lt\("expires_at"/);
+assert.doesNotMatch(worker, /\.delete\(\)\.lt\("expires_at"/, "Expired originals must never be hard-deleted by repair_list");
+assert.match(worker, /"dismissed"/);
+assert.match(worker, /"repair_hide"/);
+assert.match(worker, /removed_at/);
+assert.match(html, /hide-encounter-schedule-output/);
+assert.match(html, /原始 AI 回覆與所有修正版本仍會保留/);
+assert.match(rawOutputSoftHideMigration, /ADD COLUMN IF NOT EXISTS removed_at timestamptz/);
+assert.match(rawOutputSoftHideMigration, /REVOKE DELETE ON TABLE public\\.encounter_schedule_generation_outputs FROM service_role/);
+assert.match(rawOutputSoftHideMigration, /REVOKE DELETE ON TABLE public\\.encounter_schedule_generation_output_revisions FROM service_role/);
+assert.match(rawOutputSoftHideReplay, /encounter_schedule_output_physical_delete_still_granted/);
 assert.match(worker, /repairableCharacterIds/);
 assert.match(worker, /job\.status === "failed"/);
 assert.match(worker, /updateRawGenerationOutput\(admin, rawOutputIdByCharacter\.get\(item\.sourceId\)[\s\S]*?"completed"/);
@@ -60,6 +71,8 @@ assert.match(rawOutputRepairMigration, /encounter_schedule_manual_revision_is_im
 assert.match(rawOutputRepairReplay, /encounter_schedule_private_ai_output_exposed_to_client_roles/);
 assert.match(rawOutputRepairReplay, /encounter_schedule_repair_rpc_grants_invalid/);
 assert.match(rawOutputRepairReplay, /encounter_schedule_immutable_triggers_missing/);
+assert.match(rawOutputSoftHideMigration, /encounter_schedule_generation_outputs_visible_actor_idx/);
+assert.match(rawOutputSoftHideReplay, /encounter_schedule_output_soft_hide_columns_missing/);
 
 
 assert.doesNotMatch(worker, /get_encounter_dynamic_scene_usage|dynamic_scene_limit_or_sharing_invalid/);

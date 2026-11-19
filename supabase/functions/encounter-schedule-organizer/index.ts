@@ -126,6 +126,28 @@ async function updateRawGenerationOutput(
   if (error) console.warn("Encounter schedule raw output status update failed:", error.message);
 }
 
+async function handleScheduleRepairHide(admin: any, actorUserId: string, body: Record<string, unknown>) {
+  const outputId = asText(body.output_id);
+  if (!/^[0-9a-f-]{36}$/i.test(outputId)) return json({ error: "schedule_repair_input_invalid" }, 400);
+  const { data: output, error: outputError } = await admin.from("encounter_schedule_generation_outputs")
+    .select("id,batch_id,character_id").eq("id", outputId).eq("actor_user_id", actorUserId)
+    .is("removed_at", null).maybeSingle();
+  if (outputError || !output) return json({ error: "schedule_repair_output_not_found" }, 404);
+  const { data: originalBatch, error: batchError } = await admin.from("encounter_schedule_batch_runs")
+    .select("actor_user_id,is_manual,character_ids").eq("id", output.batch_id).maybeSingle();
+  if (batchError || !originalBatch || originalBatch.is_manual !== true ||
+      originalBatch.actor_user_id !== actorUserId ||
+      !Array.isArray(originalBatch.character_ids) || !originalBatch.character_ids.includes(output.character_id)) {
+    return json({ error: "schedule_repair_not_authorized" }, 403);
+  }
+  const { data: hidden, error: hideError } = await admin.from("encounter_schedule_generation_outputs")
+    .update({ removed_at: new Date().toISOString(), removed_by: actorUserId })
+    .eq("id", outputId).eq("actor_user_id", actorUserId).is("removed_at", null)
+    .select("id").maybeSingle();
+  if (hideError || !hidden) return json({ error: "schedule_repair_hide_failed" }, 503);
+  return json({ status: "hidden", ai_called: false, original_preserved: true });
+}
+
 async function handleScheduleRepair(admin: any, actorUserId: string, body: Record<string, unknown>) {
   const outputId = asText(body.output_id);
   const correctedText = typeof body.corrected_response === "string" ? body.corrected_response : "";
@@ -135,7 +157,7 @@ async function handleScheduleRepair(admin: any, actorUserId: string, body: Recor
 
   const { data: output, error: outputError } = await admin.from("encounter_schedule_generation_outputs")
     .select("*").eq("id", outputId).eq("actor_user_id", actorUserId)
-    .gt("expires_at", new Date().toISOString()).maybeSingle();
+    .is("removed_at", null).gt("expires_at", new Date().toISOString()).maybeSingle();
   if (outputError || !output) return json({ error: "schedule_repair_output_not_found" }, 404);
   if (!output.source_hash || !output.batch_id || !output.character_id) {
     return json({ error: "schedule_repair_source_metadata_missing" }, 409);
@@ -286,7 +308,7 @@ Deno.serve(async (request) => {
 
   let body: Record<string, unknown> = {};
   try { body = asRow(await request.json()); } catch { return json({ error: "invalid_json" }, 400); }
-  const mode = ["manual", "status", "repair_list", "repair", "reconcile_confirm"].includes(asText(body.mode))
+  const mode = ["manual", "status", "repair_list", "repair", "repair_hide", "reconcile_confirm"].includes(asText(body.mode))
     ? asText(body.mode)
     : "scheduled";
   const isServiceRoleRequest = authorization === "Bearer " + service;
@@ -496,12 +518,12 @@ Deno.serve(async (request) => {
     actorUserId = authData.user.id;
 
     if (mode === "repair_list") {
-      await admin.from("encounter_schedule_generation_outputs")
-        .delete().lt("expires_at", new Date().toISOString());
+      // Expired originals remain stored for audit/history; expiry only removes edit eligibility.
       const { data: outputs, error: outputsError } = await admin.from("encounter_schedule_generation_outputs")
         .select("id,batch_id,character_id,requested_model,provider,response_model,finish_reason,raw_response_text,raw_output_truncated,raw_response_body,response_body_truncated,http_status,status,failure_code,validation_errors,created_at")
         .eq("actor_user_id", actorUserId)
-        .in("status", ["failed", "partial", "received"])
+        .is("removed_at", null)
+        .in("status", ["failed", "partial", "received", "dismissed"])
         .gt("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false })
         .limit(20);
@@ -529,6 +551,7 @@ Deno.serve(async (request) => {
         })),
       });
     }
+    if (mode === "repair_hide") return await handleScheduleRepairHide(admin, actorUserId, body);
     return await handleScheduleRepair(admin, actorUserId, body);
   }
 

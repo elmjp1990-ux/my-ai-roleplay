@@ -10003,7 +10003,7 @@ async function loadEncounterScheduleRepairOutputs(){
         '<p class="small muted">'+model+'｜finish_reason：'+finish+'｜HTTP '+Number(item.http_status||0)+'｜'+e(created)+truncation+'</p>'+
         (errors?'<p class="small muted">驗證問題：'+e(errors)+'</p>':'')+
         '<textarea rows="12" maxlength="500000" data-encounter-repair-output="'+outputId+'" spellcheck="false" style="width:100%;font-family:monospace">'+raw+'</textarea>'+
-        '<div class="row wrap"><button type="button" data-action="repair-encounter-schedule-output" data-output-id="'+outputId+'">重新驗證並發布這份修正版</button></div>'+
+        '<div class="row wrap"><button type="button" data-action="repair-encounter-schedule-output" data-output-id="'+outputId+'">重新驗證並發布這份修正版</button><button type="button" class="ghost" data-action="hide-encounter-schedule-output" data-output-id="'+outputId+'">從修復清單隱藏</button></div>'+
       '</article>';
     }).join('');
   }catch(error){
@@ -10186,6 +10186,24 @@ document.addEventListener('click',async event=>{
   if(loadButton){
     event.preventDefault();
     await loadEncounterScheduleRepairOutputs();
+    return;
+  }
+  const hideButton=event.target.closest('[data-action="hide-encounter-schedule-output"]');
+  if(hideButton){
+    event.preventDefault();
+    const outputId=hideButton.dataset.outputId||'';
+    if(!outputId||!window.confirm('只會將這筆原始回覆從修復清單隱藏；原始 AI 回覆與所有修正版本仍會保留，不會刪除資料，也不會呼叫 AI。要繼續嗎？'))return;
+    hideButton.disabled=true;
+    try{
+      const {data,error}=await window.mySupabase.functions.invoke('encounter-schedule-organizer',{body:{mode:'repair_hide',output_id:outputId}});
+      if(error)throw error;
+      if(data?.status!=='hidden'||data?.ai_called!==false||data?.original_preserved!==true)throw new Error('repair_hide_result_invalid');
+      toast('已從修復清單隱藏；原始回覆與修正歷程仍保留，沒有呼叫 AI。');
+      await loadEncounterScheduleRepairOutputs();
+    }catch(error){
+      toast('隱藏失敗；原始回覆與修正歷程均未刪除。');
+      console.warn('Encounter schedule repair hide failed:',error?.message||error);
+    }finally{ hideButton.disabled=false; }
     return;
   }
   const repairButton=event.target.closest('[data-action="repair-encounter-schedule-output"]');

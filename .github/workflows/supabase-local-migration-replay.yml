@@ -8,6 +8,7 @@ on:
       - "supabase/drafts/encounter-schedule-pipeline.sql"
       - "supabase/drafts/replay-encounter-schedule-pipeline.sql"
       - "supabase/drafts/replay-encounter-schedule-output-repair.sql"
+      - "supabase/drafts/replay-encounter-schedule-output-soft-hide.sql"
       - "supabase/drafts/replay-encounter-sparse-schedule-windows.sql"
       - "supabase/drafts/replay-encounter-scene-catalog.sql"
       - "supabase/drafts/replay-encounter-session-evaluation-worker.sql"
@@ -278,6 +279,8 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-worldview-manual-review.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119000500_encounter_schedule_worldview_review_decisions.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-worldview-review-decisions.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119000600_encounter_schedule_output_soft_hide.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-schedule-output-soft-hide.sql
 
       - name: Replay hourly weighted Encounter schedules and weather fallback
         shell: bash
