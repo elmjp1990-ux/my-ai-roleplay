@@ -773,9 +773,9 @@
         const mode=cardAction==='city-character-history'?'history':'status';
         renderCityCharacterCard(person,0,mode);
         if(mode==='history'&&!person.encounterHistoryLoaded&&!person.encounterHistoryLoading){
-          person.encounterHistoryLoading=true;
+          const historyRequest=loadCloudEncounterHistory(person);
           renderCityCharacterCard(person,0,mode);
-          void loadCloudEncounterHistory(person).then(()=>{
+          void historyRequest.then(()=>{
             if(locationModal.dataset.cardMode==='history'&&locationModal.dataset.selectedPersonIndex===String(index))renderCityCharacterCard(person,0,mode);
           }).catch(error=>toast(error?.message||'讀取相遇紀錄失敗，請稍後再試。'));
         }
