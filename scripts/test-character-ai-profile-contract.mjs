@@ -66,10 +66,10 @@ for (const path of [
   assert.ok(!refreshPaths.has(path), `${path} must not trigger derived profile refresh`);
 }
 
-const aiProfileFields = coreUtils.slice(coreUtils.indexOf("const profileFields"), coreUtils.indexOf("for (const [key, label] of Object.entries(profileFields))"));
+const aiProfileFields = coreUtils.slice(coreUtils.indexOf("const fields"), coreUtils.indexOf("for (const key of fields)"));
 assert.ok(aiProfileFields.length > 0, "Character save classifier must define its personality field allowlist");
 for (const key of ["coreTraits", "values", "speechStyle", "behaviorRules", "likes", "dislikes", "boundaries", "relationshipPacing"]) {
-  assert.match(aiProfileFields, new RegExp(`\\b${key}:`), `Classifier must diff ${key}`);
+  assert.ok(aiProfileFields.includes(key), `Classifier must diff ${key}`);
 }
 for (const key of ["intro", "race", "style", "private_info"]) {
   assert.ok(coreUtils.includes(`compareSource('${key}'`),
