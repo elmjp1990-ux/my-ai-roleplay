@@ -3030,7 +3030,8 @@ if (characterError) {
     let profileQueueError = null;
     try {
       const { error: enqueueError } = await client.rpc('enqueue_character_profile_organization', {
-        p_character_id: character.id
+        p_character_id: character.id,
+        p_source_changed: aiOrganizationDecision.requiresDerivedRefresh === true
       });
       if (enqueueError) {
         profileQueueError = '角色已儲存，但 AI 角色資料整理尚未排入佇列：' + enqueueError.message;
