@@ -173,7 +173,8 @@ Deno.test("keeps free natural-language locations and applies system scene matchi
   if (normalizeEncounterSceneKey("酒吧") !== "night-bar" ||
       normalizeEncounterSceneKey("辦公大樓") !== "commercial" ||
       normalizeEncounterSceneKey("咖啡廳") !== "cafe" ||
-      normalizeEncounterSceneKey("展演廳") !== "live-house") throw new Error("canonical scene aliases regressed");
+      normalizeEncounterSceneKey("展演廳") !== "live-house" ||
+      normalizeEncounterSceneKey("代辦所") !== "commercial") throw new Error("canonical scene aliases regressed");
 
   const tooLong = hourlyBlocks();
   tooLong[8] = block(8, [option({ location: "音樂工作室" }), option({ weight: 40 })]);
@@ -326,6 +327,8 @@ Deno.test("builds concise schedule prompts without generated greetings", () => {
       prompt.includes("rain_fallback_greeting")) throw new Error("greeting generation remains in schedule prompt");
   if (prompt.includes("公司、咖啡廳") || prompt.includes("目前地圖可用地點範例") ||
       prompt.includes("AI 只會看到少量現有場景") ||
+      prompt.includes("百貨公司、書店、咖啡廳") ||
+      prompt.includes("車站、商業大樓") ||
       !prompt.includes("不得向模型提供任何地圖地點建議")) {
     throw new Error("scene suggestions were passed to the model");
   }
