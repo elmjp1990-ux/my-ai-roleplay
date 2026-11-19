@@ -13,9 +13,8 @@
     const stable = v => Array.isArray(v) ? v.map(stable) : v && typeof v === 'object'
       ? Object.fromEntries(Object.keys(v).sort().map(k => [k, stable(v[k])])) : v ?? null;
     const changed = (a, b) => JSON.stringify(stable(a)) !== JSON.stringify(stable(b));
-    const normalized = v => String(v ?? '').normalize('NFKC').replace(/[\s\u200B-\u200D\uFEFF]+/gu, '');
-    const sourceChanged = (a, b) => typeof a === 'string' && typeof b === 'string'
-      ? normalized(a) !== normalized(b) : changed(a, b);
+    // Match the database's exact source hash so a changed source can never reuse a stale profile.
+    const sourceChanged = changed;
     const ai = [], runtime = [], nonAi = [];
     const compare = (target, key, a, b) => { if (changed(a, b)) target.push({ key, label: key }); };
     const compareSource = (key, a, b) => {
