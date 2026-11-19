@@ -3772,6 +3772,8 @@ function chatSessionData(s) {
     encounterMode:s.encounterMode === true, storyMode:s.storyMode === true,
     encounterPlace:typeof s.encounterPlace === 'string' ? s.encounterPlace : null,
     encounterDay:s.encounterDay || (s.startedAt ? new Date(s.startedAt).toLocaleDateString('en-CA') : null),
+    encounterSummary:typeof s.encounterSummary==='string'?s.encounterSummary.slice(0,360):'',
+    encounterEndedAt:Number(s.encounterEndedAt)||null,
     openingMessage:initialOpening && String(initialOpening.text || '').trim()
       ? {text:String(initialOpening.text),at:Number(initialOpening.at) || Date.now()} : null,
     encounterVisuals:s.encounterVisuals&&typeof s.encounterVisuals==='object'?{
@@ -4087,7 +4089,8 @@ async function loadCloudChatSessions(user, options = {}) {
       'session_started_at:session_data->>startedAt','session_encounter_mode:session_data->>encounterMode',
       'session_encounter_metadata:session_data->encounter','session_encounter_visuals:session_data->encounterVisuals',
       'session_story_mode:session_data->>storyMode','session_encounter_place:session_data->>encounterPlace',
-      'session_encounter_day:session_data->>encounterDay','session_persona:session_data->>persona',
+      'session_encounter_day:session_data->>encounterDay','session_encounter_summary:session_data->>encounterSummary',
+      'session_encounter_ended_at:session_data->>encounterEndedAt','session_persona:session_data->>persona',
       'session_persona_custom:session_data->>personaCustom','session_suggestions:session_data->>suggestions',
       'session_background:session_data->>background','session_has_user_message:session_data->>hasUserMessage',
       'session_last_message_preview:session_data->>lastMessagePreview','session_last_message_at:session_data->>lastMessageAt',
@@ -4241,6 +4244,8 @@ async function loadCloudChatSessions(user, options = {}) {
         encounterPlace:row.session_encounter_place || existing?.encounterPlace || null,
         encounterVisuals:row.session_encounter_visuals&&typeof row.session_encounter_visuals==='object'?row.session_encounter_visuals:existing?.encounterVisuals||null,
         encounterDay:row.session_encounter_day || existing?.encounterDay || null,
+        encounterSummary:row.session_encounter_summary || existing?.encounterSummary || '',
+        encounterEndedAt:row.session_encounter_ended_at ? Date.parse(row.session_encounter_ended_at)||Number(row.session_encounter_ended_at)||null : existing?.encounterEndedAt||null,
         hidden:parseBool(row.session_hidden), pinned:parseBool(row.session_pinned),
         startedAt:Number(row.session_started_at) || (existing?.startedAt || (row.created_at ? new Date(row.created_at).getTime() : Date.now())),
         updatedAt:row.updated_at ? new Date(row.updated_at).getTime() : Number(existing?.updatedAt || 0),
@@ -4817,14 +4822,9 @@ async function executePendingChatTurn(s) {
   }
   const replyWasAdded = !s.messages.some(message => message.id === reply.id);
   const responseSuggestions=Array.isArray(result.suggestedReplies)?result.suggestedReplies:Array.isArray(result.suggested_replies)?result.suggested_replies:[];
-  const validResponseSuggestions=responseSuggestions.map(value=>String(value||'').trim()).filter(value=>value.length>0).slice(0,3);
-  // The server normally supplies three validated, contextual options. Keep the UI usable
-  // if an older Edge Function version or a malformed response omits them.
-  s.suggestedReplies=validResponseSuggestions.length===3?validResponseSuggestions:[
-    "*我稍微停下動作，認真看向你*你剛才提到的事，我還想再聽你多說一點，可以嗎？",
-    "*我輕輕點頭，語氣放緩一些*那我們先把眼前這件事處理好，之後再慢慢聊。",
-    "*我看了看四周，再把目光移回你身上*如果你願意，我想陪你一起確認接下來的安排。"
-  ];
+  const validResponseSuggestions=responseSuggestions.map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90).slice(0,3);
+  // Never substitute unrelated generic replies when contextual suggestions are absent.
+  s.suggestedReplies=validResponseSuggestions.length===3?validResponseSuggestions:[];
   if (replyWasAdded) {
     const assistantAt=Date.now();
     s.messages.push({
@@ -7995,7 +7995,7 @@ async function loadEncounterMemoryPage(list,session,pager){
     const pageSize=window.PoyozzListPagination.pageSize('encounterMemories');
     const pageStart=pager.offset;
     let sessionQuery=client.from('chat_sessions')
-      .select('id,chat_mode,updated_at,encounter_mode:session_data->>encounterMode,encounter_day:session_data->>encounterDay,encounter_archived:session_data->>archived,encounter_place:session_data->>encounterPlace,last_message_preview:session_data->>lastMessagePreview')
+      .select('id,chat_mode,updated_at,encounter_mode:session_data->>encounterMode,encounter_day:session_data->>encounterDay,encounter_archived:session_data->>archived,encounter_place:session_data->>encounterPlace,encounter_summary:session_data->>encounterSummary,last_message_preview:session_data->>lastMessagePreview')
       .eq('user_id',uid).eq('character_id',session.characterId).is('deleted_at',null)
       .or('chat_mode.eq.encounter,session_data->>encounterMode.eq.true')
       .order('updated_at',{ascending:false}).order('id',{ascending:false})
@@ -8023,10 +8023,10 @@ async function loadEncounterMemoryPage(list,session,pager){
       }
     }
     const cards=[];
-    const placeNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308 公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園'};
+    const placeNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308 公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園','shopping-street':'商店街','night-market':'夜市',restaurant:'餐廳',university:'大學',hospital:'醫院',gym:'健身房',cinema:'電影院',museum:'博物館',hotel:'飯店','train-station':'車站',library:'圖書館',theater:'劇院','art-gallery':'藝廊','community-center':'社區中心','music-studio':'音樂工作室',bakery:'麵包店','coworking-space':'共享辦公室'};
     for(const sessionRow of completedSessions){
       const newest=diaryBySession.get(sessionRow.id);
-      const preview=String(newest?.summary||sessionRow.last_message_preview||'這次相遇留下了一段回憶。').slice(0,180);
+      const preview=String(newest?.summary||sessionRow.encounter_summary||sessionRow.last_message_preview||'這次相遇留下了一段回憶。').slice(0,180);
       const at=newest?.occurred_at||sessionRow.updated_at;
       const date=new Date(at||Date.now()).toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
       const rawPlace=typeof sessionRow.encounter_place==='string'?sessionRow.encounter_place:'';
@@ -9001,7 +9001,7 @@ function conversationSuggestionsHTML(s) {
   const replies=Array.isArray(latestAssistantSuggestions)?latestAssistantSuggestions.slice(0,3)
     :(Array.isArray(s.suggestedReplies)?s.suggestedReplies.slice(0,3):[]);
   return `<div class="suggestions">
-    <details class="suggestions-panel" open>
+    <details class="suggestions-panel">
       <summary>建議回覆 <span class="suggestions-count" data-collapsed="點擊可展開" data-expanded="滑動或點選燈號可切換">滑動或點選燈號可切換</span></summary>
       ${!hasPlayerMessage||replies.length===0
         ? '<p class="suggestion-first-message-hint">本回合暫時沒有可用的建議回覆。</p>'
