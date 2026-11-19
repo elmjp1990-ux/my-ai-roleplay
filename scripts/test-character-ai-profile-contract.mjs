@@ -9,6 +9,7 @@ const schedulerMigration = fs.readFileSync("supabase/migrations/20261107123000_s
 const worker = fs.readFileSync("supabase/functions/character-profile-organization-worker/index.ts", "utf8");
 const providerPolicy = fs.readFileSync("supabase/functions/_shared/openrouter-provider-policy.ts", "utf8");
 const workerCore = fs.readFileSync("supabase/functions/_shared/character-profile-organization.ts", "utf8");
+const coreUtils = fs.readFileSync("core-utils.js", "utf8");
 const storyTurn = fs.readFileSync("supabase/functions/chat-turn/index.ts", "utf8");
 const scheduleGeneration = fs.readFileSync("supabase/functions/_shared/encounter-schedule-generation.ts", "utf8");
 const scheduleOrganizer = fs.readFileSync("supabase/functions/encounter-schedule-organizer/index.ts", "utf8");
