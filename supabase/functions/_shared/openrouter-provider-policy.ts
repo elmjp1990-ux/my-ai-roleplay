@@ -2,10 +2,11 @@
 export const APPROVED_OPENROUTER_PROVIDERS = ["deepinfra", "inference-net"] as const;
 
 /**
- * Restrict each request to providers currently labeled by OpenRouter as
- * non-training. No provider outside this allowlist may receive player content.
- * Fallbacks are disabled so an outage fails closed and follows the existing
- * refund/reconciliation state machine instead of widening the privacy boundary.
+ * Restrict each request to the two approved providers whose policies prohibit
+ * model training. Their permitted, time-limited operational retention is
+ * accepted; no provider outside this allowlist may receive player content.
+ * Fallbacks are disabled so only the application-controlled retry can switch
+ * between these two providers.
  *
  * Provider policy labels are operational metadata, not a substitute for
  * reviewing the providers' current contractual terms.
@@ -20,6 +21,6 @@ export function buildOpenRouterProviderOptions(provider: ApprovedOpenRouterProvi
   return {
     only: [provider],
     allow_fallbacks: false,
-    data_collection: "deny",
+    data_collection: "allow",
   } as const;
 }
