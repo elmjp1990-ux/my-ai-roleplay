@@ -186,7 +186,6 @@
     const hasStarted=!!raw;
     const composer=panel.querySelector('.composer');
     if(composer){
-      composer.querySelector('.encounter-first-turn-hint')?.remove();
       const input=composer.querySelector('#messageInput');
       if(input)input.placeholder=hasStarted?'留空發送，角色會繼續說下去':'輸入你想說的話，或留空發送';
       const suggestions=composer.querySelector('.suggestions');
