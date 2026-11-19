@@ -1,3 +1,4 @@
+-- Additive only: existing AI output and revision rows are not rewritten or deleted.
 BEGIN;
 ALTER TABLE public.encounter_schedule_generation_outputs
   ADD COLUMN IF NOT EXISTS removed_at timestamptz,
