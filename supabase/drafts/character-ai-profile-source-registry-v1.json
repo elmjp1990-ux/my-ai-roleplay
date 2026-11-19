@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "purpose": "Allowlisted creator-source registry for Character AI Profile generation and refresh decisions. Runtime-only sources are not copied into long-lived derived profile.",
+  "purpose": "Allowlisted creator-source registry for one combined Character AI Profile generation, including personality and life-context extraction. Runtime-only sources never trigger derived profile regeneration.",
   "profile_refresh_sources": [
     {
       "path": "characters.intro",
@@ -154,6 +154,12 @@
       "visibility": "server_runtime_context",
       "refresh_on_change": false,
       "reason": "Schedule description remains runtime context; changes do not rebuild personality profile."
+    },
+    {
+      "path": "character_stories.opening_message",
+      "visibility": "runtime_story_content",
+      "refresh_on_change": false,
+      "reason": "Opening text is loaded as the story's initial runtime message; polishing it does not alter durable personality or life context."
     }
   ],
   "excluded_sources": [
