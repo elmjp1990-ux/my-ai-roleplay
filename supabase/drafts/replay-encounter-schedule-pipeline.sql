@@ -131,6 +131,19 @@ INSERT INTO public.character_schedules (
 );
 SET LOCAL session_replication_role = origin;
 
+-- Hourly AI schedules intentionally omit greeting text. The resolver must
+-- snapshot NULL source greetings as an empty string in its NOT NULL weather table.
+INSERT INTO public.character_schedules (
+  id, character_id, day_type, start_time, end_time, location_key, activity,
+  priority, is_active, source_type, variant_key, variant_weight,
+  encounter_greeting, is_outdoor
+) VALUES (
+  '00000000-0000-4000-8000-000000000023'::uuid,
+  '00000000-0000-4000-8000-000000000010'::uuid,
+  'weekday', '08:00', '09:00', 'apartment', '在家整理房間',
+  70, true, 'manual', 'primary', 100, NULL, false
+);
+
 DO $schedule_source_version_smoke$
 DECLARE
   v_payload jsonb;
@@ -200,6 +213,33 @@ BEGIN
   END IF;
 END;
 $hourly_schedule_option_smoke$;
+
+DO $null_hourly_greeting_smoke$
+DECLARE
+  v_result record;
+  v_snapshot_greeting text;
+BEGIN
+  SELECT * INTO v_result
+  FROM public.resolve_encounter_character_schedule(
+    '00000000-0000-4000-8000-000000000010'::uuid,
+    NULL,
+    NULL,
+    '2026-11-17T08:30:00+08:00'::timestamptz
+  );
+
+  SELECT encounter_greeting INTO v_snapshot_greeting
+  FROM public.encounter_schedule_weather_decisions
+  WHERE schedule_id = '00000000-0000-4000-8000-000000000023'::uuid
+    AND scheduled_start_at = '2026-11-17T08:00:00+08:00'::timestamptz;
+
+  IF NOT FOUND
+     OR v_result.schedule_id <> '00000000-0000-4000-8000-000000000023'::uuid
+     OR v_result.encounter_greeting <> ''
+     OR v_snapshot_greeting <> '' THEN
+    RAISE EXCEPTION 'a schedule without an encounter greeting must resolve with an empty snapshot, not fail';
+  END IF;
+END;
+$null_hourly_greeting_smoke$;
 
 DO $unavailable_hourly_scene_option_smoke$
 DECLARE
