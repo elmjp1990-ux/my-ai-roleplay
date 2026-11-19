@@ -154,7 +154,10 @@ Deno.test("requires an indoor rain fallback for outdoor options only", () => {
     throw new Error("outdoor rain fallback to another outdoor scene accepted");
   }
   const unexpected = hourlyBlocks();
-  unexpected[1] = block(1, [option({ rain_fallback_location: "公寓", rain_fallback_activity: "改在家裡整理房間" })]);
+  unexpected[1] = block(1, [
+    option({ weight: 60, rain_fallback_location: "公寓", rain_fallback_activity: "改在家裡整理房間" }),
+    option({ weight: 40 }),
+  ]);
   const unexpectedResult = result([{ character_id: id1, placement: "modern_map", variants: variants(unexpected) }]);
   if (unexpectedResult.ok || !unexpectedResult.errors.some((error) => error.includes("unexpected_rain_fallback"))) {
     throw new Error("indoor option with rain fallback accepted");
@@ -163,7 +166,10 @@ Deno.test("requires an indoor rain fallback for outdoor options only", () => {
 
 Deno.test("keeps free natural-language locations and applies system scene matching", () => {
   const blocks = hourlyBlocks();
-  blocks[8] = block(8, [option({ location: "私人畫室", activity: "在私人畫室整理畫具並完成草稿" })]);
+  blocks[8] = block(8, [
+    option({ weight: 60, location: "私人畫室", activity: "在私人畫室整理畫具並完成草稿" }),
+    option({ weight: 40 }),
+  ]);
   const parsed = result([{ character_id: id1, placement: "modern_map", variants: variants(blocks) }]);
   if (!parsed.ok) throw new Error(parsed.errors.join(","));
   if (parsed.characters[0].variants.weekday[8].options[0].location_description !== "私人畫室" ||
@@ -177,7 +183,7 @@ Deno.test("keeps free natural-language locations and applies system scene matchi
       normalizeEncounterSceneKey("代辦所") !== "commercial") throw new Error("canonical scene aliases regressed");
 
   const tooLong = hourlyBlocks();
-  tooLong[8] = block(8, [option({ location: "音樂工作室" }), option({ weight: 40 })]);
+  tooLong[8] = block(8, [option({ weight: 60, location: "音樂工作室" }), option({ weight: 40 })]);
   const rejected = result([{ character_id: id1, placement: "modern_map", variants: variants(tooLong) }]);
   if (rejected.ok || !rejected.errors.some((error) => error.includes("location_invalid"))) {
     throw new Error("location label longer than four characters accepted");
@@ -301,7 +307,10 @@ Deno.test("keeps sleeping detection based on concise activity text", () => {
 
 Deno.test("rejects airport as a generic everyday location without character context", () => {
   const blocks = hourlyBlocks();
-  blocks[8] = block(8, [option({ location: "機場", activity: "在機場辦理航班報到與旅客服務" })]);
+  blocks[8] = block(8, [
+    option({ weight: 60, location: "機場", activity: "在機場辦理航班報到與旅客服務" }),
+    option({ weight: 40 }),
+  ]);
   const generic = result([{ character_id: id1, placement: "modern_map", variants: variants(blocks) }]);
   if (generic.ok || !generic.errors.some((error) => error.includes("airport_location_without_character_context"))) {
     throw new Error("generic airport schedule accepted");
