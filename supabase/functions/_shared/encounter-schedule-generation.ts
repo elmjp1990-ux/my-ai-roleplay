@@ -59,7 +59,7 @@ const SCENE_ALIASES: Record<string, string> = {
   公園: "park", park: "park",
   機場: "airport", airport: "airport",
   公寓: "apartment", 住宅: "apartment", apartment: "apartment",
-  livehouse: "live-house", "live house": "live-house", 現場音樂: "live-house", 音樂展演: "live-house",
+  livehouse: "live-house", "live house": "live-house", 現場音樂: "live-house", 音樂展演: "live-house", 展演廳: "live-house",
   購物街: "shopping-street", 商店街: "shopping-street", 逛街商圈: "shopping-street",
   夜市: "night-market", 夜間市集: "night-market", "night market": "night-market",
   餐廳: "restaurant", 飯店餐廳: "restaurant", 餐館: "restaurant",
