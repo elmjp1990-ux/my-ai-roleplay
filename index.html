@@ -2942,6 +2942,17 @@ async function saveSupabaseCharacter(character, expectedUserId) {
     };
     const characterValueChanged = (before, after) =>
       JSON.stringify(stableCharacterValue(before)) !== JSON.stringify(stableCharacterValue(after));
+    // Whitespace/line-wrap-only edits are presentation changes, not a new character meaning.
+    // Punctuation and words are preserved: even a one-word semantic change must refresh.
+    const normalizedProfileText = value => String(value ?? '').normalize('NFKC').replace(/[\\s\\u200B-\\u200D\\uFEFF]+/gu, '');
+    const profileSourceValueChanged = (before, after) => {
+      if (typeof before === 'string' && typeof after === 'string') return normalizedProfileText(before) !== normalizedProfileText(after);
+      return characterValueChanged(before, after);
+    };
+    const compareProfileSourceField = (key, label, before, after) => {
+      if (profileSourceValueChanged(before, after)) aiRelevantChanges.push({ key, label });
+      else if (characterValueChanged(before, after)) nonAiChanges.push({ key: key + '_format_only', label: label + '（僅空白／換行調整）' });
+    };
     const previousProfile = normalizePersonalityProfile(existingPrivateProfile?.personality_profile || {});
     const nextProfile = normalizePersonalityProfile(character.personalityProfile || {});
     const aiRelevantChanges = [];
@@ -2957,10 +2968,11 @@ async function saveSupabaseCharacter(character, expectedUserId) {
     compareCharacterField(nonAiChanges, 'name', '角色名稱', existingCharacter?.name, String(character.name || '').trim());
 
     // 只有會改變角色理解、個性或行為的原始設定才需要重新評估衍生資料。
-    compareCharacterField(aiRelevantChanges, 'intro', '角色介紹／背景', existingCharacter?.intro, character.intro || '');
-    compareCharacterField(aiRelevantChanges, 'race', '種族／世界觀', existingCharacter?.race, character.race || '');
-    compareCharacterField(aiRelevantChanges, 'style', '角色風格', existingCharacter?.style, character.style || '');
-    compareCharacterField(aiRelevantChanges, 'private_info', '作者私密設定', existingPrivateProfile?.private_info || '', String(character.privateInfo || '').slice(0, 10000));
+    compareProfileSourceField('intro', '角色介紹／背景', existingCharacter?.intro || '', character.intro || '');
+    compareProfileSourceField('race', '種族／世界觀', existingCharacter?.race || '', character.race || '');
+    compareProfileSourceField('style', '角色風格', existingCharacter?.style || '', character.style || '');
+    compareProfileSourceField('private_info', '作者私密設定', existingPrivateProfile?.private_info || '', String(character.privateInfo || '').slice(0, 10000));
+    // Story opening text is turn-time content, not a durable personality fact; it never refreshes this profile.
 
     // 個性欄位逐項比較，避免主要立繪名稱等純展示資料誤觸發 AI 整理。
     const aiProfileFields = {
@@ -2992,6 +3004,11 @@ async function saveSupabaseCharacter(character, expectedUserId) {
       reason: requiresDerivedRefresh
         ? (isNewCharacter ? 'new_character_ai_source_present' : 'ai_source_fields_changed')
         : (isNewCharacter ? 'new_character_source_fields_available' : 'no_ai_relevant_change'),
+      changeClass: requiresDerivedRefresh
+        ? (aiRelevantChanges.some(item => item.key.startsWith('personality_profile.'))
+          ? 'personality_or_character_context_changed' : 'background_context_changed')
+        : (nonAiChanges.length ? 'presentation_or_opening_only' : 'no_profile_source_change'),
+      openingMessagePolicy: 'runtime_only_no_profile_refresh',
       model: 'deepseek/deepseek-v4-flash-20260423',
       changedFields: aiRelevantChanges.map(item => item.key),
       changedFieldLabels: aiRelevantChanges.map(item => item.label),
