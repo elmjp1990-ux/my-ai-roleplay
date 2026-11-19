@@ -28,7 +28,7 @@ function parseJsonObject(raw) {
 export function parseEncounterTurnOutput(raw) {
   let value = parseJsonObject(raw);
   if (!value && typeof raw === "string") {
-    const cleaned = raw.trim().replace(/^\x60{3}(?:json)?\\s*/i, "").replace(/\\s*\x60{3}$/, "");
+    const cleaned = raw.trim().replace(/^\x60{3}(?:json)?\s*/i, "").replace(/\s*\x60{3}$/, "");
     // Some providers return a useful plain-text reply despite JSON mode. Recover
     // only ordinary text; malformed object/array output remains rejected.
     if (cleaned && !cleaned.startsWith("{") && !cleaned.startsWith("[") &&
