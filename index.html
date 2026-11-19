@@ -3024,21 +3024,21 @@ if (characterError) {
       throw new Error('手機設定回讀結果與送出內容不一致，請重新儲存。');
     }
 
-    // 只有 AI 來源欄位確實變更時才排隊；enqueue 失敗不回滾已成功保存的作者原始資料。
+    // Every save performs an idempotent freshness check. The database queues work only when
+    // source content changed, the previous job failed, or the saved profile schema is outdated.
+    // A current profile is reused; this RPC does not itself call an AI model.
     let profileQueueError = null;
-    if (aiOrganizationDecision.requiresDerivedRefresh === true) {
-      try {
-        const { error: enqueueError } = await client.rpc('enqueue_character_profile_organization', {
-          p_character_id: character.id
-        });
-        if (enqueueError) {
-          profileQueueError = '角色已儲存，但 AI 角色資料整理尚未排入佇列：' + enqueueError.message;
-          console.warn('character_profile_enqueue_failed', { code: enqueueError.code || 'enqueue_failed' });
-        }
-      } catch (enqueueError) {
-        profileQueueError = '角色已儲存，但 AI 角色資料整理尚未排入佇列。';
-        console.warn('character_profile_enqueue_failed');
+    try {
+      const { error: enqueueError } = await client.rpc('enqueue_character_profile_organization', {
+        p_character_id: character.id
+      });
+      if (enqueueError) {
+        profileQueueError = '角色已儲存，但 AI 角色資料整理尚未排入佇列：' + enqueueError.message;
+        console.warn('character_profile_enqueue_failed', { code: enqueueError.code || 'enqueue_failed' });
       }
+    } catch (enqueueError) {
+      profileQueueError = '角色已儲存，但 AI 角色資料整理尚未排入佇列。';
+      console.warn('character_profile_enqueue_failed');
     }
 
     // 每個角色先沿用最新的一筆故事；沒有故事時才新增，避免每次編輯都重複建立。
