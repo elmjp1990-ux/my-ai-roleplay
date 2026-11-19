@@ -207,7 +207,7 @@ async function generateProfile(
       }
 
       const errorCode = typeof result?.error?.code === "string"
-        ? result.error.code.toLowerCase().replace(/[\\s-]+/g, "_")
+        ? result.error.code.toLowerCase().replace(/[\s-]+/g, "_")
         : "";
       const isExplicitOverload = [
         "engine_overloaded",
