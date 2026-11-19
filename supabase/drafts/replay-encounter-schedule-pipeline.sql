@@ -204,6 +204,8 @@ $hourly_schedule_option_smoke$;
 DO $unavailable_hourly_scene_option_smoke$
 DECLARE
   v_result record;
+  v_option_roll integer;
+  v_option_weights integer[];
 BEGIN
   IF EXISTS (
     SELECT 1 FROM public.get_encounter_scene_catalog()
@@ -239,6 +241,32 @@ BEGIN
     pg_catalog.repeat('他在家準備簡單午餐，廚房傳來輕微的餐具聲。', 9), false
   );
 
+  SELECT array_agg(variant_weight ORDER BY variant_key)
+    INTO v_option_weights
+  FROM public.character_schedules
+  WHERE character_id = '00000000-0000-4000-8000-000000000010'::uuid
+    AND start_time = TIME '12:00'
+    AND end_time = TIME '13:00'
+    AND variant_key IN ('option_1', 'option_2', 'option_3');
+
+  IF v_option_weights IS DISTINCT FROM ARRAY[55, 30, 15] THEN
+    RAISE EXCEPTION 'unavailable scene must not alter the original option weights: %', v_option_weights;
+  END IF;
+
+  v_option_roll := pg_catalog.mod(
+    pg_catalog.abs(pg_catalog.hashtext(
+      '00000000-0000-4000-8000-000000000010'::uuid::text
+      || '2026-11-17'
+      || '12:00:00'
+      || 'hourly-options-v1'
+    )::bigint),
+    100
+  )::integer;
+
+  IF v_option_roll >= 55 THEN
+    RAISE EXCEPTION 'synthetic fixture no longer selects the unavailable restaurant option: %', v_option_roll;
+  END IF;
+
   SELECT * INTO v_result
   FROM public.resolve_encounter_character_schedule(
     '00000000-0000-4000-8000-000000000010'::uuid,
@@ -247,10 +275,9 @@ BEGIN
     '2026-11-17T12:30:00+08:00'::timestamptz
   );
 
-  IF NOT FOUND
-     OR v_result.location_key NOT IN ('commercial', 'apartment')
-     OR v_result.variant_key NOT IN ('option_2', 'option_3') THEN
-    RAISE EXCEPTION 'unavailable restaurant option must not hide the remaining available hourly options';
+  IF FOUND THEN
+    RAISE EXCEPTION 'when the original weighted choice is unavailable, the character must not appear or be rerolled; got % / %',
+      v_result.location_key, v_result.variant_key;
   END IF;
 END;
 $unavailable_hourly_scene_option_smoke$;
