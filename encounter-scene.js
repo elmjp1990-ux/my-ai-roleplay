@@ -1,6 +1,42 @@
 /* POYOZZ Encounter scene presentation. Uses the shared chat composer, wallet,
    suggested replies, swipe controls, persistence and pending-turn handler. */
 (function installEncounterScenePresentation(){
+  const processEncounterSpriteBackdrop=(image,source)=>{
+    image.crossOrigin='anonymous';
+    image.onload=()=>{
+      if(image.dataset.encounterProcessed===source)return;
+      try{
+        const canvas=document.createElement('canvas');
+        canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;
+        const ctx=canvas.getContext('2d',{willReadFrequently:true});
+        ctx.drawImage(image,0,0);
+        const frame=ctx.getImageData(0,0,canvas.width,canvas.height),pixels=frame.data,w=canvas.width,h=canvas.height,total=w*h;
+        const visited=new Uint8Array(total),stack=new Int32Array(total);let top=0;
+        const neutralBackdrop=i=>{
+          const p=i*4,r=pixels[p],g=pixels[p+1],b=pixels[p+2];
+          return (r+g+b)/3>=158&&Math.max(r,g,b)-Math.min(r,g,b)<=36;
+        };
+        const push=i=>{if(i>=0&&i<total&&!visited[i]&&neutralBackdrop(i)){visited[i]=1;stack[top++]=i;}};
+        for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
+        for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
+        while(top){
+          const i=stack[--top],p=i*4;pixels[p+3]=0;
+          const x=i%w,y=(i/w)|0;
+          if(x>0)push(i-1);if(x<w-1)push(i+1);if(y>0)push(i-w);if(y<h-1)push(i+w);
+        }
+        ctx.putImageData(frame,0,0);
+        const result=canvas.toDataURL('image/png');
+        image.dataset.encounterProcessed=source;
+        image.onload=null;
+        image.src=result;
+      }catch(error){
+        image.dataset.encounterProcessed=source;
+        image.classList.add('encounter-auto-bg-fallback');
+        image.onload=null;
+      }
+    };
+    image.src=source;
+  };
   const style=document.createElement('style');
   style.textContent=`
         .chat-main.encounter-scene{position:relative;isolation:isolate;overflow:hidden;height:100dvh!important;min-height:0!important;border:0!important;border-radius:0!important;background:#15141b!important}
@@ -366,7 +402,7 @@
           sprite.dataset.encounterSource=asset.src;
           sprite.dataset.encounterProcessed='';
           sprite.classList.remove('encounter-auto-bg-fallback');
-          sprite.src=asset.src;
+          processEncounterSpriteBackdrop(sprite,asset.src);
         }).catch(error=>console.warn('AI 選定立繪載入失敗：',error?.message||error));
       }
       }else{
@@ -393,7 +429,7 @@
               sprite.loading='eager';
               sprite.dataset.encounterSource=asset.src;
               if(asset.path)sprite.dataset.characterIllustrationPath=asset.path;
-              sprite.src=asset.src;
+              processEncounterSpriteBackdrop(sprite,asset.src);
               panel.insertBefore(sprite,panel.firstChild);
               panel.querySelector('.encounter-missing-art')?.remove();
             }else if(artNote.isConnected){
