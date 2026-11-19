@@ -221,10 +221,10 @@ Deno.test("keeps free natural-language locations and applies system scene matchi
       normalizeEncounterSceneKey("代辦所") !== "commercial") throw new Error("canonical scene aliases regressed");
 
   const tooLong = hourlyBlocks();
-  tooLong[8] = block(8, [option({ weight: 60, location: "音樂工作室" }), option({ weight: 40 })]);
+  tooLong[8] = block(8, [option({ weight: 60, location: "超級長的音樂工作室名稱" }), option({ weight: 40 })]);
   const rejected = result([{ character_id: id1, placement: "modern_map", variants: variants(tooLong) }]);
   if (rejected.ok || !rejected.errors.some((error) => error.includes("location_invalid"))) {
-    throw new Error("location label longer than four characters accepted");
+    throw new Error("location label longer than eight characters accepted");
   }
 });
 
