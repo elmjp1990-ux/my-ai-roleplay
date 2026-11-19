@@ -339,8 +339,8 @@ assert.match(encounterMemory,/\.range\(pageStart,pageStart\+pageSize-1\)/,
   "Encounter sessions must be paginated by the backend instead of fetching 200 diary rows");
 assert.match(encounterMemory,/\.in\('metadata->>session_id',sessionIds\)/,
   "diary summaries must be hydrated only for the current page of Encounter sessions");
-assert.match(encounterMemory,/encounter_archived!=='true'/,
-  "unfinished new Encounter sessions must remain hidden from the memory archive");
+assert.match(encounterMemory,/row\.encounter_archived==='true'\|\|diaryBySession\.has\(row\.id\)/,
+  "unfinished Encounter sessions must stay hidden until archived or diary evidence exists");
 assert.match(encounterMemory,/PoyozzListPagination\.observeEnd/,
   "Encounter memory lists must load the next ten sessions when the user reaches the end");
 assert.doesNotMatch(encounterMemory,/\.limit\(200\)/,
