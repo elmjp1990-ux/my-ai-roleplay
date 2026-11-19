@@ -119,7 +119,7 @@ assert.match(html, /if\(error\)throw new Error\('讀取角色行程失敗：'\+e
 assert.doesNotMatch(html, /城市角色排程批次載入失敗[\s\S]{0,180}return schedules/);
 assert.match(cityMap, /const hasAnySchedule=\(pager\?\.candidates\|\|\[\]\)\.some\(person=>String\(person\.encounterSchedules\|\|''\)\.trim\(\)\)/);
 assert.match(cityMap, /目前沒有角色出現在此場景/);
-assert.match(cityMap, /目前沒有角色在此地點與台灣時間活動。/);
+assert.match(cityMap, /目前沒有角色出現在此場景/);
 assert.match(cityMap, /角色行程載入失敗，請重試。/);
 assert.match(cityMap, /data-action="city-people-retry"/);
 assert.match(cityMap, /const retryButton=event\.target\.closest\('\[data-action="city-people-retry"\]'\)/);
