@@ -269,13 +269,13 @@
             : '<span class="city-location-avatar-fallback">'+escapeHTML(characterName.slice(0,1))+'</span>';
           return '<button type="button" class="city-location-avatar city-location-person" data-action="city-person" data-person-index="'+index+'" aria-label="查看 '+escapeHTML(characterName)+' 的角色資訊">'+portrait+'<span class="city-location-person-name">'+escapeHTML(characterName)+'</span></button>';
         }).join('')
-      : '<p class="city-location-empty">'+(pager?.loading?'正在讀取這個場景的角色…':'目前沒有角色排定在這個地點。')+'</p>';
+      : '<p class="city-location-empty">'+(pager?.loading?'正在讀取這個場景的角色…':'目前沒有角色出現在此場景')+'</p>';
     if(pager?.hasMore){
       strip.insertAdjacentHTML('beforeend','<button type="button" class="city-location-load-more" data-action="city-people-load-more" '+(pager.loading?'disabled':'')+'>載入更多角色（每次 10 位）</button>');
     }
     $('cityMapPeopleCount').textContent=people.length
       ? people.length+' 位角色符合目前時段'+(pager?.hasMore?' · 可載入更多':'')
-      : (pager?.loading?'正在讀取…':'目前沒有符合時段的角色');
+      : (pager?.loading?'正在讀取…':'目前沒有角色出現在此場景');
   };
   const loadCityPeoplePage=async(place)=>{
     const pager=cityScenePageStates.get(place);
