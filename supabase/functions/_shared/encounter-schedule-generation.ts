@@ -64,6 +64,7 @@ const SCENE_ALIASES: Record<string, string> = {
   夜市: "night-market", 夜間市集: "night-market", "night market": "night-market",
   餐廳: "restaurant", 飯店餐廳: "restaurant", 餐館: "restaurant", 小吃店: "restaurant",
   客戶家: "apartment", 街頭: "shopping-street", 街道: "shopping-street",
+  超商: "shopping-street", 便利商店: "shopping-street",
   大學: "university", 學校: "university", 校園: "university",
   醫院: "hospital", 診所: "hospital",
   健身房: "gym", 健身中心: "gym",
