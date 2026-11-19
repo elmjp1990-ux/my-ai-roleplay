@@ -16,7 +16,7 @@ const scheduleGeneration = fs.readFileSync("supabase/functions/_shared/encounter
 const scheduleOrganizer = fs.readFileSync("supabase/functions/encounter-schedule-organizer/index.ts", "utf8");
 
 assert.equal(schema.$schema, "https://json-schema.org/draft/2020-12/schema");
-assert.equal(schema.properties.schema_version.const, "1.0");
+assert.equal(schema.properties.schema_version.const, "1.1");
 assert.equal(schema.additionalProperties, false);
 
 const required = new Set(schema.required);
@@ -114,8 +114,8 @@ assert.match(coreUtils, /shouldCallModel: false/,
   "The browser must never call the model directly");
 assert.match(frontend, /enqueue_character_profile_organization/,
   "A verified character save must enqueue a derived-profile refresh");
-assert.match(frontend, /if \(aiOrganizationDecision\.requiresDerivedRefresh === true\)/,
-  "Only AI-relevant source changes may enqueue a refresh");
+assert.doesNotMatch(frontend, /if \(aiOrganizationDecision\.requiresDerivedRefresh === true\)/,
+  "Every save may check profile freshness, but the database must decide whether model work is needed");
 assert.ok(frontend.indexOf("const { data: savedCharacter") < frontend.indexOf("enqueue_character_profile_organization"),
   "Profile enqueue must happen only after persisted character data is verified");
 assert.ok(frontend.indexOf("enqueue_character_profile_organization") < frontend.indexOf("const { data: existingStory"),
