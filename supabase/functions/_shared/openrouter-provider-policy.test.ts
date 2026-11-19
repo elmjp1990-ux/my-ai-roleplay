@@ -6,8 +6,13 @@ import {
 
 Deno.test("OpenRouter only routes to the approved non-training provider allowlist", () => {
   assertEquals(APPROVED_OPENROUTER_PROVIDERS, ["deepinfra", "inference-net"]);
-  assertEquals(buildOpenRouterProviderOptions(), {
-    only: ["deepinfra", "inference-net"],
+  assertEquals(buildOpenRouterProviderOptions("deepinfra"), {
+    only: ["deepinfra"],
+    allow_fallbacks: false,
+    data_collection: "deny",
+  });
+  assertEquals(buildOpenRouterProviderOptions("inference-net"), {
+    only: ["inference-net"],
     allow_fallbacks: false,
     data_collection: "deny",
   });
