@@ -665,7 +665,7 @@
     const placeKey=locationModal.dataset.place;
     const placeName=escapeHTML(cityPlaceNames[placeKey]||'城市地點');
     const intro=String(person.intro||person.description||person.personalityProfile?.summary||'這位角色尚未填寫公開介紹。');
-    const localSessions=Object.values(state.sessions||{}).filter(session=>session?.encounterMode&&session.characterId===person.id)
+    const localSessions=Object.values(state.sessions||{}).filter(session=>session?.encounterMode&&session.characterId===person.id&&(!session.cloudOwned||session.cloudOwnerUid===currentUser()?.uid))
       .sort((a,b)=>(Number(b.startedAt)||0)-(Number(a.startedAt)||0));
     const cloudSessions=Array.isArray(person.encounterHistoryCloud)?person.encounterHistoryCloud:[];
     const sessions=[...new Map([...cloudSessions,...localSessions].map(session=>[session.id,session])).values()]
