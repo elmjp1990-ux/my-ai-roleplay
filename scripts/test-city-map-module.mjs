@@ -52,7 +52,7 @@ const hourlyOptionsMigration=fs.readFileSync('supabase/migrations/20261118074718
 assert.match(sceneAvailabilityMigration,/get_encounter_scene_catalog/,
   'Only scenes in the server-owned catalog may resolve onto the map.');
 assert.match(hourlyOptionsMigration,/hourly-options-v1/);
-assert.match(hourlyOptionsMigration,/),\s*100\s*\)/,
+assert.match(hourlyOptionsMigration,/\),\s*100\s*\)/,
   'Hourly options must keep the original 0–99 weighted roll; unavailable selections are not rerolled.');
 assert.equal(
   fs.existsSync('supabase/migrations/20261119001100_encounter_schedule_available_option_weighting.sql'),
