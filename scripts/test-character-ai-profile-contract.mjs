@@ -66,20 +66,20 @@ for (const path of [
   assert.ok(!refreshPaths.has(path), `${path} must not trigger derived profile refresh`);
 }
 
-const aiProfileFields = frontend.slice(frontend.indexOf("const aiProfileFields"), frontend.indexOf("for (const [key, label] of Object.entries(aiProfileFields))"));
+const aiProfileFields = coreUtils.slice(coreUtils.indexOf("const profileFields"), coreUtils.indexOf("for (const [key, label] of Object.entries(profileFields))"));
 assert.ok(aiProfileFields.length > 0, "Character save classifier must define its personality field allowlist");
 for (const key of ["coreTraits", "values", "speechStyle", "behaviorRules", "likes", "dislikes", "boundaries", "relationshipPacing"]) {
   assert.match(aiProfileFields, new RegExp(`\\b${key}:`), `Classifier must diff ${key}`);
 }
 for (const key of ["intro", "race", "style", "private_info"]) {
-  assert.ok(frontend.includes(`compareCharacterField(aiRelevantChanges, '${key}'`),
+  assert.ok(coreUtils.includes(`compareSource('${key}'`),
     `Classifier must diff AI source field ${key}`);
 }
-assert.match(frontend, /compareCharacterField\(runtimeAiChanges, 'phone_settings'/,
+assert.match(coreUtils, /compare\(runtime, 'phone_settings'/,
   "Phone settings must stay in runtime AI configuration changes");
-assert.match(frontend, /compareCharacterField\(nonAiChanges, 'name'/,
+assert.match(coreUtils, /compare\(nonAi, 'name'/,
   "Character renaming must not trigger profile generation");
-assert.match(frontend, /shouldCallModel: false/,
+assert.match(coreUtils, /shouldCallModel: false/,
   "The browser must never call the model directly");
 assert.match(frontend, /enqueue_character_profile_organization/,
   "A verified character save must enqueue a derived-profile refresh");
@@ -189,8 +189,8 @@ assert.ok(workerCore.includes("profile_output_too_large") && workerCore.includes
 assert.ok(worker.includes("provider_response_too_large") && worker.includes("requestId: response.headers.get"),
   "Oversized or malformed provider responses must be terminal with a traceable request ID");
 
-assert.match(frontend, /openingMessagePolicy: 'runtime_only_no_profile_refresh'/, "Opening-message edits must be runtime-only");
-assert.match(frontend, /profileSourceValueChanged/, "Profile source comparison must distinguish whitespace-only edits from substantive changes");
-assert.match(frontend, /personality_or_character_context_changed/, "Meaningful personality changes must be explicitly classified for refresh");
+assert.match(coreUtils, /openingMessagePolicy: 'runtime_only_no_profile_refresh'/, "Opening-message edits must be runtime-only");
+assert.match(coreUtils, /sourceChanged/, "Profile source comparison must distinguish whitespace-only edits from substantive changes");
+assert.match(coreUtils, /personality_or_character_context_changed/, "Meaningful personality changes must be explicitly classified for refresh");
 
 console.log("Character AI Profile schema, queue, Worker, scheduling, save enqueue, Story integration and privacy contracts passed.");
