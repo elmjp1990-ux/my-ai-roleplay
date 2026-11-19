@@ -50,7 +50,7 @@ assert.match(cityMap, /get_encounter_scene_catalog/);
 const availableOptionMigration=fs.readFileSync('supabase/migrations/20261119001100_encounter_schedule_available_option_weighting.sql','utf8');
 assert.match(availableOptionMigration,/v_available_option_weight/);
 assert.match(availableOptionMigration,/get_encounter_scene_catalog/);
-assert.match(availableOptionMigration,/v_option_roll[\\s\\S]*?v_available_option_weight/);
+assert.match(availableOptionMigration,/v_option_roll[\s\S]*?v_available_option_weight/);
 assert.match(cityMap, /refreshScenes\(\)/);
 assert.match(cityMap, /refreshSchedules\(\)/);
 assert.match(cityMap, /activeScheduleRefresh=async\(\)=>/);
