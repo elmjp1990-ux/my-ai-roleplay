@@ -629,7 +629,7 @@
     const placeKey=locationModal.dataset.place;
     const placeName=escapeHTML(cityPlaceNames[placeKey]||'城市地點');
     const intro=String(person.intro||person.description||person.personalityProfile?.summary||'這位角色尚未填寫公開介紹。');
-    const sessions=window.PoyozzEncounterHistory?.getSessions(person,state.sessions,currentUser())||[];
+    const sessions=Array.isArray(person.encounterHistoryCloud)?person.encounterHistoryCloud:[];
     const bookmarks='<div class="city-character-bookmarks" aria-label="角色功能"><button type="button" class="city-character-bookmark '+(mode==='status'?'active':'')+'" data-action="city-character-status" aria-label="角色資料">角色資料</button><button type="button" class="city-character-bookmark '+(mode==='history'?'active':'')+'" data-action="city-character-history" aria-label="相遇紀錄">相遇紀錄</button><button type="button" class="city-character-bookmark" data-action="city-character-story" aria-label="故事模式">故事模式</button></div>';
     const affinityMarkup=mode==='status'&&page===0?'<div class="city-character-affinity" id="cityCharacterAffinity" data-character-id="'+escapeHTML(person.id)+'">正在讀取好感度…</div>':'';
     const meetControl=isSleepingSchedule(person.cityActivity,person.citySceneDescription)
@@ -723,18 +723,11 @@
       if(person){
         const mode=cardAction==='city-character-history'?'history':'status';
         renderCityCharacterCard(person,0,mode);
-        if(mode==='history'&&!person.encounterHistoryLoaded&&!person.encounterHistoryLoading){
-          const historyRequest=window.PoyozzEncounterHistory?.loadCloudHistory(person,currentUser,window.mySupabase);
-          if(historyRequest){
-            renderCityCharacterCard(person,0,mode);
-            void historyRequest.then(()=>{
-              if(locationModal.dataset.cardMode==='history'&&locationModal.dataset.selectedPersonIndex===String(index))renderCityCharacterCard(person,0,mode);
-            }).catch(error=>toast(error?.message||'讀取相遇紀錄失敗，請稍後再試。'));
-          }else{
-            person.encounterHistoryLoaded=true;
-            person.encounterHistoryCloud=[];
-            renderCityCharacterCard(person,0,mode);
-          }
+        if(mode==='history'){
+          window.PoyozzEncounterHistory?.openHistory(person,currentUser,window.mySupabase,
+            ()=>renderCityCharacterCard(person,0,mode),
+            ()=>locationModal.dataset.cardMode==='history'&&locationModal.dataset.selectedPersonIndex===String(index),
+            error=>toast(error?.message||'讀取相遇紀錄失敗，請稍後再試。'));
         }
       }
       return;
