@@ -47,13 +47,14 @@ function isTransientProviderFailure(response: OpenRouterCompletionResult): boole
   }
   if (response.result.kind !== "provider_error") return false;
   if (response.result.retryable) return true;
+  const errorCode = response.result.code;
   return [
     "engine_overloaded",
     "upstream_overloaded",
     "upstream_unavailable",
     "provider_overloaded",
     "capacity_exceeded",
-  ].some((code) => response.result.kind === "provider_error" && response.result.code.includes(code));
+  ].some((code) => errorCode.includes(code));
 }
 
 async function requestFromProvider(
