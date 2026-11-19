@@ -39,6 +39,11 @@ on:
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/private-context-guard.ts"
       - "supabase/functions/_shared/openrouter-chat-completions.ts"
+      - "supabase/functions/_shared/openrouter-chat-completions.test.ts"
+      - "supabase/functions/_shared/openrouter-provider-policy.ts"
+      - "supabase/functions/_shared/openrouter-provider-policy.test.ts"
+      - "supabase/functions/character-profile-organization-worker/index.ts"
+      - "scripts/test-character-ai-profile-contract.mjs"
       - "supabase/functions/_shared/provider-failure-policy.ts"
       - "supabase/functions/_shared/chat-turn-claim.ts"
       - "supabase/functions/_shared/story-memory-summary.ts"
@@ -54,6 +59,8 @@ jobs:
           node-version: "22"
       - name: Test Encounter response schema and length boundaries
         run: node scripts/test-encounter-ai-output.mjs
+      - name: Verify Character AI Profile provider integration contract
+        run: node scripts/test-character-ai-profile-contract.mjs
       - name: Test Encounter session evaluation, affinity settlement and opt-in scheduler
         run: node scripts/test-encounter-session-evaluation-worker.mjs
       - name: Test city map dynamic scene registry contract
@@ -65,11 +72,13 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - name: Test approved OpenRouter provider routing and failover
+        run: deno test supabase/functions/_shared/openrouter-provider-policy.test.ts supabase/functions/_shared/openrouter-chat-completions.test.ts
       - name: Test AI schedule batch validation and compatibility
         run: deno test supabase/functions/_shared/encounter-schedule-generation.test.ts
       - name: Test lightweight seasonal Taipei weather simulation
         run: deno test supabase/functions/_shared/encounter-weather.test.ts
       - name: Test Taiwan holiday and make-up workday parser
         run: deno test supabase/functions/_shared/taiwan-calendar.test.ts
-      - name: Type-check Encounter Edge Functions and shared modules
-        run: deno check supabase/functions/encounter-turn/index.ts supabase/functions/encounter-evaluation-worker/index.ts supabase/functions/encounter-session/index.ts supabase/functions/encounter-schedule-organizer/index.ts supabase/functions/encounter-weather-sync/index.ts supabase/functions/encounter-taiwan-calendar-sync/index.ts
+      - name: Type-check Encounter and Character Profile Edge Functions
+        run: deno check supabase/functions/encounter-turn/index.ts supabase/functions/encounter-evaluation-worker/index.ts supabase/functions/encounter-session/index.ts supabase/functions/encounter-schedule-organizer/index.ts supabase/functions/encounter-weather-sync/index.ts supabase/functions/encounter-taiwan-calendar-sync/index.ts supabase/functions/character-profile-organization-worker/index.ts
