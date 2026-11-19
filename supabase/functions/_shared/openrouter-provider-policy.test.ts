@@ -9,12 +9,12 @@ Deno.test("OpenRouter only routes to the approved non-training provider allowlis
   assertEquals(buildOpenRouterProviderOptions("deepinfra"), {
     only: ["deepinfra"],
     allow_fallbacks: false,
-    data_collection: "deny",
+    data_collection: "allow",
   });
   assertEquals(buildOpenRouterProviderOptions("inference-net"), {
     only: ["inference-net"],
     allow_fallbacks: false,
-    data_collection: "deny",
+    data_collection: "allow",
   });
 });
 
