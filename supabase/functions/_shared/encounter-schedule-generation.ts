@@ -147,8 +147,8 @@ const isRecord = (value: unknown): value is RecordValue =>
 const text = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 const isValidEncounterLocationLabel = (value: string): boolean => {
   const label = value.trim().normalize("NFKC");
-  const chineseCharacterCount = Array.from(label).filter((character) => /\p{Script=Han}/u.test(character)).length;
-  return label.length > 0 && chineseCharacterCount <= 4 && !/[或、／\\/|，,;；]/.test(label);
+  const characterCount = Array.from(label.replace(/\s/g, "")).length;
+  return characterCount > 0 && characterCount <= 4 && !/[或、／\\/|，,;；]/.test(label);
 };
 const isUuid = (value: unknown): value is string =>
   typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -296,7 +296,7 @@ function validateHourlySchedule(
       errors.push(blockLabel + "_must_be_exactly_one_hour");
       continue;
     }
-    if (!Array.isArray(rawBlock.options) || rawBlock.options.length < 1 || rawBlock.options.length > 3) {
+    if (!Array.isArray(rawBlock.options) || rawBlock.options.length < 2 || rawBlock.options.length > 3) {
       errors.push(blockLabel + "_options_count_invalid");
       continue;
     }
@@ -385,10 +385,7 @@ function validateHourlySchedule(
       }
     }
   }
-  if (blocks.filter((block) => block.options.length >= 2).length < 8) {
-    errors.push(label + "_too_few_multi_option_hours");
-  }
-  const ordered = blocks.slice().sort((a, b) => (parseHour(a.start_time) ?? 0) - (parseHour(b.start_time) ?? 0));
+   const ordered = blocks.slice().sort((a, b) => (parseHour(a.start_time) ?? 0) - (parseHour(b.start_time) ?? 0));
   for (let index = 1; index < ordered.length; index++) {
     const previousStart = parseHour(ordered[index - 1].start_time) ?? 0;
     const currentStart = parseHour(ordered[index].start_time) ?? 0;
@@ -456,27 +453,22 @@ export function buildEncounterScheduleBatchMessages(
       author_private_context: privateContext.promptText,
     };
   });
-  const sceneSuggestions = [...new Set(sceneCatalog
-    .map((scene) => text(scene.display_name))
-    .filter((name) => name && isValidEncounterLocationLabel(name)))].slice(0, 9);
-  const sceneSuggestionText = sceneSuggestions.length
-    ? sceneSuggestions.join("、")
-    : "目前沒有可用的地圖場景範例";
+  // Scene names are withheld from the model; matching remains system-side.
+  void sceneCatalog;
   const system = [
     "你是 POYOZZ 的角色行程規劃器。一次為佇列提供的所有公開角色整理可驗證的城市地圖行程；不得自行省略任何角色。",
     "系統已先完成世界觀分類；本次送入的角色都已由系統判定為現代地圖相容。你不得重新判斷時代、世界觀或地圖資格，也不得輸出 no_matching_location。吸血鬼、狼人、精靈等種族不代表古代；依輸入角色的現代背景推演其日常。必須讀取角色名稱、稱號、職業、身分、世界觀、種族、性格、興趣、標籤、作者行程說明及 existing_author_schedules。existing_author_schedules 是作者已保存的固定時段與地點，必須原樣保留並視為最高優先限制，不得改寫或覆蓋；AI 只負責推演其餘時段。作者固定行程僅作為規劃限制。若 author_schedule_brief 為空，依角色卡設定推演合理日常；若作者只提供部分時段，保留明確時段與限制，只補足其他時段，不得覆蓋作者設定。只使用輸入角色的設定與作者提供的行程方向，不可替角色創造與背景衝突的現代身分。",
-    "目前地圖可用地點範例（只供參考，絕非白名單或限制）：" + sceneSuggestionText + "。只有角色的真實生活本來就適合時才使用；不適合就不要套用。必須依角色職業、經濟能力、個性、興趣、作息、生活圈與背景自由生成合理地點，清單以外的地點也必須照常產生。絕不可為了配合現有場景而改寫角色生活、硬塞不合理地點、拒絕生成或刪除行程。每個時段只寫一個明確地點，地點名稱最多 4 個中文字，不得用「或」、斜線、頓號等串接多個地點；一般住所寫「公寓」，富裕角色住所寫「高級公寓」，不得把高級公寓媒合到一般公寓。不得輸出 location_key、場景 ID、座標或任何系統場景分類。地點是否能對應地圖由系統自行判斷，無法媒合時仍保留原地點與行程。",
-    "AI 只會看到少量現有場景的公開顯示名稱作為參考例子；不得接收場景 ID、完整合法清單、場景啟用狀態、座標或地圖顯示資格，也不得把參考例子當成可選白名單。不得產生場景 metadata、座標、圖片 URL、Storage path 或地標 ID。每個合理行程時段都要保留，即使地點目前沒有地圖場景也不可省略。地點映射、場景啟用狀態、座標與是否顯示全部由系統處理。",
+    "不得向模型提供任何地圖地點建議、場景名稱範例或地點白名單。必須只依角色職業、經濟能力、個性、興趣、作息、生活圈與背景，自行推演合理地點；不可為了配合地圖而改寫角色生活或硬塞地點。每個選項只寫一個明確地點，地點名稱最多 4 個字（空格不計），不得用「或」、斜線、頓號等串接多個地點。工作活動必須使用實際工作場所，居家活動才使用住所；例如在代辦所辦公就寫「代辦所」，不可因角色住公寓就把工作地點寫成公寓。不得輸出 location_key、場景 ID、座標或任何系統場景分類。地點是否能對應地圖由系統自行判斷，無法媒合時仍保留原地點與行程。",
     "airport 是特殊地點：只有角色本身職業／設定與航空機場有明確關聯，或作者設定有具體搭機、接送、轉機、出入境行程時才能使用。不得把機場當一般休閒、辦公或隨機偶遇地點；沒有明確理由時使用更合理的車站、商業大樓或其他場景。",
-    "行程以角色自身日常活動為準，AI 不得判斷玩家是否能相遇、地點是否適合公開相遇或地圖是否顯示。weekday 與 holiday 各自必須完整輸出 24 個逐小時時段，從 00:00–01:00 到 23:00–00:00，不能有空檔、重疊或合併時段。每小時提供 1–3 個選項；每個選項只輸出 weight、location、activity、is_outdoor、rain_fallback_location、rain_fallback_activity 六個欄位。activity 與 rain_fallback_activity 各 10–30 個中文字，直接描述角色正在做的事；不需要 scene_description、招呼語或長篇敘事。若角色正在睡覺，activity 必須明確寫出熟睡、睡著、睡覺中等可辨識狀態。每個時段所有選項 weight 為 1–100 的整數且總和必須恰好 100；weight 是該時段整組地點與行為實際發生的相對機率。固定工作或固定睡眠等日常應占較高權重，偶發活動應占較低權重；不可習慣性平均分配或為了湊滿三個選項而虛構活動。只有一種合理可能時可用 100%，但每種日期至少 8 個時段必須有兩種以上合理選項，避免整天都只有單一機率。不同時段獨立抽取：各時段依權重獨立抽選，同一時段的地點與行為必須整組一起切換；相鄰時段仍須符合交通與作息邏輯。即使地點無法媒合地圖，也必須保留自然地點與行為描述，是否能相遇及是否顯示由系統判斷。",
+    "行程以角色自身日常活動為準，AI 不得判斷玩家是否能相遇、地點是否適合公開相遇或地圖是否顯示。weekday 與 holiday 各自必須完整輸出 24 個逐小時時段，從 00:00–01:00 到 23:00–00:00，不能有空檔、重疊或合併時段。每個時段必須提供 2–3 個選項，不得少於 2 個或多於 3 個；即使固定工作或睡眠，也必須提出至少兩種符合角色背景的合理活動或情境，不得用單一選項 100% 規避機率，也不可為湊數虛構不合理活動。每個選項只輸出 weight、location、activity、is_outdoor、rain_fallback_location、rain_fallback_activity 六個欄位。activity 與 rain_fallback_activity 各 10–30 個中文字，直接描述角色正在做的事；不需要 scene_description、招呼語或長篇敘事。若角色正在睡覺，activity 必須明確寫出熟睡、睡著、睡覺中等可辨識狀態。每個時段所有選項 weight 必須是 1–99 的整數且總和必須恰好 100；weight 是該時段整組地點與行為實際發生的相對機率，依角色日常發生可能性設定，不可全部固定相同權重。不同時段獨立抽取：各時段依權重獨立抽選，同一時段的地點與行為必須整組一起切換；相鄰時段仍須符合交通與作息邏輯。即使地點無法媒合地圖，也必須保留自然地點與行為描述，是否能相遇及是否顯示由系統判斷。",
     "weekday 與 holiday 是日曆情境，不等於角色的上班日與休假日。依台灣政府正式辦公日曆及補班日決定 day_type；AI 必須根據角色職業與作者設定，分別推演平日和假日的生活節奏，不可假設所有人週末休息。系統每天依角色、日期與時段獨立執行加權抽取，同一天同一時段結果固定，重新整理地圖不會重新抽籤；不同日期會使用不同抽取種子。機率只在同一角色、同一日期類型、同一個小時的 options 內比較，絕不可跨時段或跨平日／假日共用權重。",
     "行程只分 weekday 與 holiday；節日、國定假日與補班日由系統依台灣日曆映射到相應日期類型，不要另外生成 special_events，也不可自行推算角色生日。",
-    "戶外時段必須提供雨天室內替代地點與替代行為，雨天行為也限制 10–30 個中文字；雨天替代地點請使用可媒合的室內地點：公寓、公司、酒吧、Live House、百貨公司、書店、咖啡廳或機場，不可使用公園、商店街、夜市。室內時段 rain_fallback_location 與 rain_fallback_activity 必須為 null。是否戶外及地點對應何種系統場景，由系統判斷。",
+    "戶外時段必須提供雨天室內替代地點與替代行為，雨天行為也限制 10–30 個中文字；雨天替代地點請使用合理的室內地點：公寓、公司、酒吧、展演廳、百貨公司、書店、咖啡廳或機場，不可使用公園、商店街、夜市。室內時段 rain_fallback_location 與 rain_fallback_activity 必須為 null。是否戶外及地點對應何種系統場景，由系統判斷。",
 
     "作者行程說明只供內部規劃；activity 必須使用公開可見、簡短自然的描述，不得逐字複製整段說明或揭露私密情節。",
 
 
-    "輸出必須是嚴格 JSON object，唯一根欄位 characters。每個角色欄位為 character_id, placement, variants。所有送入的角色一律使用 placement=modern_map，variants 只包含 weekday 與 holiday，各自必須恰好 24 個逐小時時段；每個時段物件欄位為 start_time, end_time, options。options 為 1–3 個選項，每個選項且只能有 weight, location, activity, is_outdoor, rain_fallback_location, rain_fallback_activity 六個欄位。同一時段 options 的 weight 總和必須為 100。不輸出 no_matching_location、special_events、scenes、招呼語、scene_description、關係招呼池、場景 ID、座標、額外欄位或 Markdown。",
+    "輸出必須是嚴格 JSON object，唯一根欄位 characters。每個角色欄位為 character_id, placement, variants。所有送入的角色一律使用 placement=modern_map，variants 只包含 weekday 與 holiday，各自必須恰好 24 個逐小時時段；每個時段物件欄位為 start_time, end_time, options。options 為 2–3 個選項，每個選項且只能有 weight, location, activity, is_outdoor, rain_fallback_location, rain_fallback_activity 六個欄位。同一時段 options 的 weight 總和必須為 100。不輸出 no_matching_location、special_events、scenes、招呼語、scene_description、關係招呼池、場景 ID、座標、額外欄位或 Markdown。",
   ].join("\n");
   return {
     messages: [
