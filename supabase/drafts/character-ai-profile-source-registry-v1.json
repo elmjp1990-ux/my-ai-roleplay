@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "purpose": "Allowlisted creator-source registry for one combined Character AI Profile generation, including personality and life-context extraction. Runtime-only sources never trigger derived profile regeneration.",
   "profile_refresh_sources": [
     {
@@ -59,6 +59,15 @@
       "categories": [
         "core_personality",
         "inner_motivations"
+      ],
+      "refresh_on_change": true
+    },
+    {
+      "path": "character_private_info.personality_profile.occupation",
+      "visibility": "server_only",
+      "categories": [
+        "work_environment",
+        "identity_background"
       ],
       "refresh_on_change": true
     },
