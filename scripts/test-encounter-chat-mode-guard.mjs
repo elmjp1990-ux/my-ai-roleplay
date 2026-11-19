@@ -433,3 +433,6 @@ assert.match(encounterPresentation, /neutralBackdrop/);
 assert.match(encounterPresentation, /brightness>=158&&spread<=36/);
 assert.match(encounterPresentation, /encounter-auto-bg-fallback\{mix-blend-mode:normal!important/);
 assert.match(encounterPresentation, /body\.encounter-mode-active \.chat-main\.encounter-scene>\.chat-heading/);
+assert.match(encounterPresentation, /processEncounterSpriteBackdrop/);
+assert.match(encounterPresentation, /panel\.clientHeight-\(viewport\.height\+viewport\.offsetTop\)/);
+assert.match(encounterPresentation, /bottom:var\(--encounter-keyboard-offset,0px\)!important/);
