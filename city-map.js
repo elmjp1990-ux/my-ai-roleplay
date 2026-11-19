@@ -757,7 +757,7 @@
       if(meetButton)meetButton.disabled=true;
       try{
         // 同一個角色今天仍在同一地標出現時，優先接回暫時離開的相遇 session。
-        const resumedSession=findResumableEncounterSession(person.id,placeKey);
+        const resumedSession=await findResumableEncounterSession(person.id,placeKey);
         let encounterSession=null;
         if(resumedSession){
           try{
