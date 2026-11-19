@@ -142,7 +142,7 @@ assert.match(frontend, /ENCOUNTER_DISCOVERY_SENTINEL/);
 assert.match(frontend, /text = s\.encounterMode && !encounterHasStarted \? ENCOUNTER_DISCOVERY_SENTINEL : GROUP_CONTINUE_SENTINEL/);
 assert.doesNotMatch(frontend, /poyozz-encounter-opening-choice/);
 assert.doesNotMatch(scene, /encounter-first-turn-hint/);
-assert.match(scene, /先跟'\\+characterName\\+'打招呼/);
+assert.match(scene, /先跟'\+characterName\+'打招呼/);
 assert.match(scene, /留空發送，角色會繼續說下去/);
 assert.doesNotMatch(frontend, /<details class="suggestions-panel" open>/);
 assert.doesNotMatch(frontend, /我稍微停下動作，認真看向你/);
