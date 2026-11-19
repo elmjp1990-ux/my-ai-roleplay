@@ -89,8 +89,8 @@ Deno.test("transient DeepInfra failures retry once through Inference.net without
 
     assertEquals(call, 2);
     assertEquals(capturedBodies.map((body) => body.provider), [
-      { only: ["deepinfra"], allow_fallbacks: false, data_collection: "deny" },
-      { only: ["inference-net"], allow_fallbacks: false, data_collection: "deny" },
+      { only: ["deepinfra"], allow_fallbacks: false, data_collection: "allow" },
+      { only: ["inference-net"], allow_fallbacks: false, data_collection: "allow" },
     ]);
     assertEquals(capturedBodies[0].model, "deepseek/deepseek-v4-flash-20260423");
     assertEquals(capturedBodies[1].model, "deepseek/deepseek-v4-flash-20260423");
