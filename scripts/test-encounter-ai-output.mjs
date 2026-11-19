@@ -176,7 +176,7 @@ assert.match(compactScheduleMigration, /schedule_hourly_too_few_multi_option_hou
 assert.match(strictHourlyScheduleMigration, /NOT BETWEEN 2 AND 3/);
 assert.match(strictHourlyScheduleMigration, /NOT BETWEEN 1 AND 4/);
 assert.match(strictHourlyScheduleMigration, /v_old := '      IF v_multi_option_hours < 8 THEN'/);
-assert.match(strictHourlyScheduleMigration, /pg_catalog\\.replace\\(v_definition, v_old, ''\\)/);
+assert.match(strictHourlyScheduleMigration, /pg_catalog\.replace\(v_definition, v_old, ''\)/);
 assert.match(compactScheduleMigration, /create_encounter_session_with_lifecycle/);
 assert.match(compactScheduleMigration, /''affinity'', v_affinity/);
 assert.match(compactScheduleMigration, /''relationshipStage'', v_relationship_stage/);
