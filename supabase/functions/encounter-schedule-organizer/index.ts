@@ -642,6 +642,30 @@ Deno.serve(async (request) => {
     return json({ error: "claimed_batch_payload_invalid" }, 503);
   }
 
+  // Reuse the source-current Character AI Profile. This is a database read only;
+  // schedule generation must never trigger a second profile-analysis model call.
+  const enrichedSources = await Promise.all(sources.map(async (source) => {
+    try {
+      const { data: profileData, error: profileError } = await admin.rpc("get_character_ai_profile_for_chat", {
+        p_character_id: source.character_id,
+        p_author_id: source.author_id,
+      });
+      if (profileError) {
+        console.warn("Character life context unavailable; using original creator sources:", profileError.message);
+        return source;
+      }
+      const profile = profileData && typeof profileData === "object" && !Array.isArray(profileData)
+        ? profileData as Record<string, unknown> : {};
+      const lifeContext = profile.life_context && typeof profile.life_context === "object" && !Array.isArray(profile.life_context)
+        ? profile.life_context : null;
+      return { ...source, derived_life_context: lifeContext };
+    } catch (error) {
+      console.warn("Character life context read failed; using original creator sources:",
+        error instanceof Error ? error.message : "unknown_error");
+      return source;
+    }
+  }));
+
   const { data: sceneCatalogData, error: sceneCatalogError } = await admin.rpc("get_encounter_scene_catalog");
   // Scene metadata is only an optional exact-name hint. A catalog read failure
   // must not prevent the model call or discard natural-language locations:
@@ -667,7 +691,7 @@ Deno.serve(async (request) => {
   // Worldview is classified locally before any provider call. Known non-modern
   // roles are marked not applicable; unknown roles are held for manual review.
   // Neither group is sent to AI, and review-required roles are not published as unplaced.
-  const generationSources = sources.filter((source) => {
+  const generationSources = enrichedSources.filter((source) => {
     const classification = classifyEncounterWorldview(source);
     const disposition = getEncounterWorldviewScheduleDisposition(
       classification,
@@ -809,7 +833,7 @@ Deno.serve(async (request) => {
     character: Record<string, unknown>;
     scenes: Array<Record<string, unknown>>;
   }> = [];
-  for (const source of sources) {
+  for (const source of enrichedSources) {
     if (failedCharacterIds.has(source.character_id)) continue;
     const matches = rawCharacters.filter((item) => asText(asRow(item).character_id) === source.character_id);
     if (matches.length !== 1) {
