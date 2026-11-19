@@ -665,9 +665,9 @@
     const placeKey=locationModal.dataset.place;
     const placeName=escapeHTML(cityPlaceNames[placeKey]||'城市地點');
     const intro=String(person.intro||person.description||person.personalityProfile?.summary||'這位角色尚未填寫公開介紹。');
-    const localSessions=Object.values(state.sessions||{}).filter(session=>session?.encounterMode&&session.characterId===person.id&&!session.archived)
+    const localSessions=Object.values(state.sessions||{}).filter(session=>session?.encounterMode&&session.characterId===person.id)
       .sort((a,b)=>(Number(b.startedAt)||0)-(Number(a.startedAt)||0));
-    const cloudSessions=Array.isArray(person.encounterHistoryCloud)?person.encounterHistoryCloud.filter(session=>!session.archived):[];
+    const cloudSessions=Array.isArray(person.encounterHistoryCloud)?person.encounterHistoryCloud:[];
     const sessions=[...new Map([...cloudSessions,...localSessions].map(session=>[session.id,session])).values()]
       .sort((a,b)=>(Number(b.startedAt)||0)-(Number(a.startedAt)||0)).slice(0,2);
     const bookmarks='<div class="city-character-bookmarks" aria-label="角色功能"><button type="button" class="city-character-bookmark '+(mode==='status'?'active':'')+'" data-action="city-character-status" aria-label="角色資料">角色資料</button><button type="button" class="city-character-bookmark '+(mode==='history'?'active':'')+'" data-action="city-character-history" aria-label="相遇紀錄">相遇紀錄</button><button type="button" class="city-character-bookmark" data-action="city-character-story" aria-label="故事模式">故事模式</button></div>';
