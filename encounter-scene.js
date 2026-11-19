@@ -3,13 +3,11 @@
 (function installEncounterScenePresentation(){
   const style=document.createElement('style');
   style.textContent=`
-    .encounter-first-turn-hint{margin:0 2px 8px;padding:9px 11px;border:1px solid rgba(255,255,255,.20);border-radius:12px;background:rgba(255,255,255,.10);color:#fff;font-size:12px;line-height:1.55;text-align:center;backdrop-filter:blur(12px)}
-    .chat-main.encounter-scene{position:relative;isolation:isolate;overflow:hidden;height:100dvh!important;min-height:0!important;border:0!important;border-radius:0!important;background:#15141b!important}
+        .chat-main.encounter-scene{position:relative;isolation:isolate;overflow:hidden;height:100dvh!important;min-height:0!important;border:0!important;border-radius:0!important;background:#15141b!important}
     .chat-main.encounter-scene:before{content:"";position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,rgba(10,9,17,.26),rgba(10,9,17,.08) 34%,rgba(10,9,17,.36) 57%,rgba(10,9,17,.88) 100%),var(--encounter-scene-photo,none) center/cover no-repeat,radial-gradient(ellipse at 70% 22%,#6a5a65 0%,#322b36 48%,#17141b 100%);filter:saturate(.9);transform:scale(1.025);pointer-events:none}
     .encounter-scene .chat-layout{height:100dvh!important;min-height:0!important}
     .encounter-scene .chat-heading{position:absolute!important;z-index:4;left:0;right:0;top:0;background:linear-gradient(180deg,rgba(10,9,17,.72),rgba(10,9,17,.18))!important;backdrop-filter:blur(8px);color:#fff;border:0!important;padding:calc(10px + env(safe-area-inset-top)) 10px 18px!important}
     .encounter-scene .chat-heading .chat-name,.encounter-scene .chat-heading .character-status-label{color:#fff}
-    .encounter-scene .chat-heading .row.between>.row:last-child button:not([data-action="chat-settings-menu"]){display:none!important}
     .encounter-scene .chat-heading .character-status-dot{box-shadow:0 0 8px #22c55e55}
     .encounter-scene .messages{position:absolute!important;z-index:2;left:0;right:0;bottom:clamp(390px,48dvh,470px);height:auto;max-height:22dvh;min-height:0!important;overflow-y:auto;background:transparent!important;padding:12px 22px!important;overscroll-behavior:contain}
     .encounter-scene .message{max-width:100%;background:transparent!important;align-items:flex-start}
@@ -18,7 +16,7 @@
     .encounter-scene .bubble,.encounter-scene .narration{color:#fff!important;text-shadow:0 2px 8px #000b;font-size:clamp(14px,3.7vw,18px);line-height:1.6}
     .encounter-scene .message-more{color:#fff;background:#17141b66}
     .encounter-character-sprite.encounter-card-portrait-fallback{object-fit:contain;object-position:center bottom;filter:drop-shadow(0 10px 22px rgba(0,0,0,.22))}.encounter-character-sprite.encounter-auto-bg-fallback{mix-blend-mode:multiply}
-    .encounter-character-sprite{position:absolute;z-index:1;pointer-events:none;right:-2%;bottom:0;width:min(108%,680px);height:78dvh;object-fit:contain;object-position:center bottom;filter:drop-shadow(0 12px 24px rgba(0,0,0,.28));opacity:.98}
+     .encounter-character-sprite{position:absolute;z-index:1;pointer-events:none;right:-2%;bottom:0;width:min(108%,680px);height:min(78dvh,calc(var(--encounter-visual-height,100dvh)*.78));object-fit:contain;object-position:center bottom;filter:drop-shadow(0 12px 24px rgba(0,0,0,.28));opacity:.98}
     .encounter-scene .composer{position:absolute!important;z-index:3;left:0;right:0;bottom:0;max-height:56dvh;overflow-y:auto;background:linear-gradient(180deg,rgba(17,14,24,.12),rgba(17,14,24,.92) 18%)!important;border:0!important;border-radius:24px 24px 0 0!important;padding:12px 14px calc(12px + env(safe-area-inset-bottom))!important;backdrop-filter:blur(12px)}
     .encounter-scene .suggestions{margin:0 0 8px!important}
     .encounter-scene .suggestions-panel{border:0!important;background:transparent!important;overflow:visible!important}
@@ -53,6 +51,10 @@
     .encounter-scene .chat-heading>.row.between{align-items:center}
     .encounter-scene .chat-heading .row.grow{align-items:center;gap:7px!important;flex-wrap:wrap}
     .encounter-scene .chat-heading .chat-name{font-size:14px;max-width:38vw}
+    .encounter-scene .chat-heading{box-sizing:border-box;left:0!important;right:0!important;width:100%!important;border-bottom:1px solid rgba(255,255,255,.16)!important}
+    .encounter-scene .chat-heading>.row.between{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;flex-wrap:nowrap!important}
+    .encounter-scene .chat-heading .row.grow{min-width:0!important;flex-wrap:nowrap!important;align-items:center!important}
+    .encounter-scene .chat-heading button{visibility:visible!important;opacity:1!important}
     .encounter-scene .chat-heading .encounter-scene-label{display:inline-flex!important;align-items:center;margin:0!important;padding:3px 7px!important;border-radius:999px;background:rgba(225,226,232,.13);border:1px solid rgba(255,255,255,.18);color:#f1f1f4!important;font-size:10px!important;letter-spacing:.04em!important;white-space:nowrap}
     .encounter-scene .messages{bottom:clamp(220px,30dvh,300px)!important;max-height:35dvh!important;padding:10px 16px!important}
     .encounter-scene .message.user{display:none!important}
@@ -184,22 +186,9 @@
     const hasStarted=!!raw;
     const composer=panel.querySelector('.composer');
     if(composer){
-      let hint=composer.querySelector('.encounter-first-turn-hint');
-      if(!hasStarted){
-        if(!hint){
-          hint=document.createElement('div');
-          hint.className='encounter-first-turn-hint';
-          const inputRow=composer.querySelector('.composer-input-row');
-          if(inputRow)composer.insertBefore(hint,inputRow);
-          else composer.prepend(hint);
-        }
-        const speakerName=String(sessionCharacter(session)?.name||session?.cloudCharacterSnapshot?.name||'角色').trim();
-        hint.textContent='先跟'+speakerName+'打招呼，或者留空發送，讓'+speakerName+'發現你';
-      }else{
-        hint?.remove();
-      }
+      composer.querySelector('.encounter-first-turn-hint')?.remove();
       const input=composer.querySelector('#messageInput');
-      if(input)input.placeholder=hasStarted?'留空發送，讓角色繼續說下去':'輸入你想說的話，或留空發送';
+      if(input)input.placeholder=hasStarted?'留空發送，角色會繼續說下去':'輸入你想說的話，或留空發送';
       const suggestions=composer.querySelector('.suggestions');
       if(suggestions)suggestions.hidden=!hasPlayerMessage;
     }
@@ -381,11 +370,21 @@
           if(identityRow)identityRow.appendChild(tag);else title.appendChild(tag);
         }
       }
-      const composer=panel.querySelector('.composer');
-      if(composer){
-        const input=composer.querySelector('#messageInput');
-        if(input){input.placeholder='說點什麼，或留空讓角色繼續…';input.setAttribute('aria-label','相遇模式對話');}
+      const viewport=window.visualViewport;
+      panel.style.setProperty('--encounter-visual-height',(viewport?.height||window.innerHeight)+'px');
+      if(!panel.dataset.encounterViewportBound){
+        panel.dataset.encounterViewportBound='true';
+        const syncViewport=()=>{
+          const active=document.querySelector('.chat-main.encounter-scene');
+          if(active)active.style.setProperty('--encounter-visual-height',(window.visualViewport?.height||window.innerHeight)+'px');
+        };
+        window.visualViewport?.addEventListener('resize',syncViewport,{passive:true});
+        window.visualViewport?.addEventListener('scroll',syncViewport,{passive:true});
+        window.addEventListener('resize',syncViewport,{passive:true});
       }
+      const composer=panel.querySelector('.composer');
+      const input=composer?.querySelector('#messageInput');
+      if(input)input.setAttribute('aria-label','相遇模式對話');
       applyEncounterDialogue(panel,session);
     });
     encounterRenderLifecycle.register('afterMessages','encounter.progressive-dialogue',({session:renderSession,panel:renderPanel})=>{
