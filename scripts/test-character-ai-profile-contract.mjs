@@ -102,7 +102,10 @@ assert.match(migration, /REVOKE ALL ON public\.character_profile_organization[\s
 assert.match(worker, /deepseek\/deepseek-v4-flash-20260423|CHARACTER_PROFILE_MODEL/,
   "Worker must use the confirmed DeepSeek V4 Flash 0423 model");
 assert.match(worker, /OPENROUTER_API_KEY/, "Worker must read the provider key only from server environment");
-assert.match(worker, /buildOpenRouterProviderOptions\(\)/, "Profile requests must use the shared OpenRouter provider policy");
+assert.match(worker, /buildOpenRouterProviderOptions\(provider\)/, "Profile requests must pin each attempt to the shared OpenRouter provider policy");
+assert.match(worker, /APPROVED_OPENROUTER_PROVIDERS/, "Profile requests must use only the approved provider order");
+assert.match(worker, /response\.status === 429/, "Profile requests may fail over on explicit provider rate limits");
+assert.match(worker, /Generic 5xx responses are[\s\S]*not retried/, "Ambiguous profile-generation outcomes must not be retried on another provider");
 assert.match(providerPolicy, /data_collection: "deny"/, "Profile requests must enforce POYOZZ's no-provider-data-collection policy");
 assert.match(providerPolicy, /APPROVED_OPENROUTER_PROVIDERS = \["deepinfra", "inference-net"\]/, "Profile requests must use the same approved provider allowlist as Story generation");
 assert.match(migration, /character_profile_organization_usage/,
