@@ -9977,6 +9977,80 @@ function renderChatOverlay(kind) {
 }
 
 
+function compactEncounterScheduleDescription(value){
+  const original=String(value||'').trim();
+  const count=text=>Array.from(text).length;
+  if(count(original)>=10&&count(original)<=30)return original;
+  const clauses=original.split(/[，,。；;：:]/).map(part=>part.trim()).filter(Boolean);
+  let compact='';
+  for(const clause of clauses){
+    const candidate=compact?compact+'，'+clause:clause;
+    if(count(candidate)>30)break;
+    compact=candidate;
+    if(count(compact)>=10)break;
+  }
+  if(count(compact)>=10){
+    if(count(compact)<30&&!/[。！？!?]$/.test(compact))compact+='。';
+    return compact;
+  }
+  const sliced=Array.from(original).slice(0,29).join('').replace(/[，,。；;：:]$/,'');
+  return count(sliced)>=10?sliced+'。':original;
+}
+
+function classifyEncounterRepairSpace(activityValue,locationValue,requestedOutdoor){
+  const activity=String(activityValue||'').normalize('NFKC');
+  const location=String(locationValue||'').normalize('NFKC');
+  if(/計程車|車內|車上|車廂|車裡|車中|搭車|乘車|駕車|開車|副駕|後座/.test(activity))return 'vehicle';
+  if(/陽台/.test(activity)&&/抽菸|吸菸|抽煙/.test(activity))return 'indoor';
+  if(/站在騎樓下|街頭|街道|路邊|在街上|公園步道|戶外|沿著.{0,8}步道|下車後|走出車外|走出車門|下車道別|在路上散步/.test(activity))return 'outdoor';
+  if(/室內|家中|家裡|公寓|客戶家|客戶住處|修理電燈|組裝書架|搬家打包|除蟲|清理雜物|餐廳|包廂|晚宴|家庭聚餐|吃午餐|吃早餐|吃晚餐|用餐|超商內|貨架前|店內|結帳|選購飲料|挑選飲料|購物/.test(activity))return 'indoor';
+  if(/^(客戶家|客戶住處|住所|住家|公寓|餐廳|餐館|小吃店|超商|便利商店|代辦所|公司|辦公室|咖啡廳|書店|百貨公司)$/i.test(location))return 'indoor';
+  return requestedOutdoor?'outdoor':'indoor';
+}
+
+function autoCorrectEncounterScheduleOutput(rawText){
+  const parsed=JSON.parse(String(rawText||''));
+  if(!parsed||!Array.isArray(parsed.characters))throw new Error('行程 JSON 格式不正確');
+  const fallbackLocations=new Set(['機場','公司','酒吧','Live House','住所','百貨公司','書店','咖啡廳']);
+  let changed=0;
+  for(const character of parsed.characters){
+    for(const dayType of ['weekday','holiday']){
+      const blocks=character&&character.variants&&character.variants[dayType];
+      if(!Array.isArray(blocks))continue;
+      for(const block of blocks){
+        for(const option of (Array.isArray(block&&block.options)?block.options:[])){
+          const activity=String(option.activity||'').trim();
+          const space=classifyEncounterRepairSpace(activity,option.location,option.is_outdoor===true);
+          if(space==='vehicle'&&/餐廳|小吃店/.test(String(option.location||''))){
+            option.location='街頭';changed++;
+          }
+          const compactActivity=compactEncounterScheduleDescription(activity);
+          if(compactActivity!==activity){option.activity=compactActivity;changed++;}
+          const shouldBeOutdoor=space==='outdoor';
+          if(option.is_outdoor!==shouldBeOutdoor){option.is_outdoor=shouldBeOutdoor;changed++;}
+          if(!shouldBeOutdoor){
+            if(option.rain_fallback_location!==null||option.rain_fallback_activity!==null)changed++;
+            option.rain_fallback_location=null;
+            option.rain_fallback_activity=null;
+          }else{
+            const fallbackLocation=String(option.rain_fallback_location||'').trim();
+            const originalFallback=String(option.rain_fallback_activity||'');
+            const fallbackActivity=compactEncounterScheduleDescription(originalFallback);
+            if(!fallbackLocations.has(fallbackLocation)||Array.from(originalFallback).length<10||Array.from(originalFallback).length>30){
+              option.rain_fallback_location='咖啡廳';
+              option.rain_fallback_activity='改到咖啡廳內等雨停，喝杯熱飲休息。';
+              changed++;
+            }else if(fallbackActivity!==originalFallback){
+              option.rain_fallback_activity=fallbackActivity;changed++;
+            }
+          }
+        }
+      }
+    }
+  }
+  return {text:JSON.stringify(parsed,null,2),changed};
+}
+
 async function loadEncounterScheduleRepairOutputs(){
   const container=document.getElementById('encounterScheduleRepairOutputs');
   if(!container)return;
@@ -10003,7 +10077,7 @@ async function loadEncounterScheduleRepairOutputs(){
         '<p class="small muted">'+model+'｜finish_reason：'+finish+'｜HTTP '+Number(item.http_status||0)+'｜'+e(created)+truncation+'</p>'+
         (errors?'<p class="small muted">驗證問題：'+e(errors)+'</p>':'')+
         '<textarea rows="12" maxlength="500000" data-encounter-repair-output="'+outputId+'" spellcheck="false" style="width:100%;font-family:monospace">'+raw+'</textarea>'+
-        '<div class="row wrap"><button type="button" data-action="repair-encounter-schedule-output" data-output-id="'+outputId+'">重新驗證並發布這份修正版</button><button type="button" class="ghost" data-action="hide-encounter-schedule-output" data-output-id="'+outputId+'">從修復清單隱藏</button></div>'+
+        '<div class="row wrap"><button type="button" data-action="auto-repair-encounter-schedule-output" data-output-id="'+outputId+'" '+(truncation?'disabled title="原始回覆不完整，不能自動修正"':'')+'>自動修正並發布（不呼叫 AI）</button><button type="button" data-action="repair-encounter-schedule-output" data-output-id="'+outputId+'">重新驗證並發布這份修正版</button><button type="button" class="ghost" data-action="hide-encounter-schedule-output" data-output-id="'+outputId+'">從修復清單隱藏</button></div>'+
       '</article>';
     }).join('');
   }catch(error){
@@ -10186,6 +10260,40 @@ document.addEventListener('click',async event=>{
   if(loadButton){
     event.preventDefault();
     await loadEncounterScheduleRepairOutputs();
+    return;
+  }
+  const autoRepairButton=event.target.closest('[data-action="auto-repair-encounter-schedule-output"]');
+  if(autoRepairButton){
+    event.preventDefault();
+    const outputId=autoRepairButton.dataset.outputId||'';
+    const textarea=document.querySelector('[data-encounter-repair-output="'+outputId+'"]');
+    if(!textarea||!textarea.value.trim())return toast('找不到完整的原始行程內容。');
+    let corrected;
+    try{corrected=autoCorrectEncounterScheduleOutput(textarea.value);}
+    catch(error){return toast(error&&error.message?error.message:'無法解析原始行程。');}
+    if(!window.confirm('將依 POYOZZ 空間規則修正室內／戶外／車內判斷、地點與超長描述，保留時段、選項與權重，並立即重新驗證及發布？不會呼叫 AI，原始回覆會完整保留。'))return;
+    autoRepairButton.disabled=true;
+    textarea.value=corrected.text;
+    try{
+      const {data,error}=await window.mySupabase.functions.invoke('encounter-schedule-organizer',{
+        body:{mode:'repair',output_id:outputId,corrected_response:corrected.text}
+      });
+      if(error&&data&&data.status!=='validation_failed')throw error;
+      if(data&&data.status==='validation_failed'){
+        toast('自動修正後仍有驗證問題：'+(data.validation_errors||[]).join('、')+'；修正版已保留在文字框，可再人工調整。');
+      }else if(data&&data.status==='completed'){
+        toast('顧言行程已自動修正並發布；未重新呼叫 AI。');
+        window.PoyozzCityMap?.refreshScenes?.();
+        window.PoyozzCityMap?.refreshSchedules?.();
+        await loadEncounterScheduleRepairOutputs();
+        await loadEncounterScheduleTestTools();
+      }else{
+        toast('自動修正結果：'+String(data&& (data.error||data.status)||'未知狀態'));
+      }
+    }catch(error){
+      toast('自動修正發布未完成；原始 AI 回覆仍完整保留。');
+      console.warn('Encounter schedule auto-repair failed:',error&&error.message?error.message:error);
+    }finally{autoRepairButton.disabled=false;}
     return;
   }
   const hideButton=event.target.closest('[data-action="hide-encounter-schedule-output"]');
