@@ -405,6 +405,7 @@
     });
   };
   const cityPresenceByPlace={};
+  const cityAvatarHydrationPending=new Set();
   void loadCityDynamicScenes();
   void loadCityWeather();
   const cityScenePageStates=new Map();
@@ -431,7 +432,7 @@
           const image=safeImage(person.image||person.avatar_url||person.avatar);
           const portrait=image
             ? '<img class="city-location-person-image" src="'+escapeHTML(image)+'" alt="" loading="lazy" referrerpolicy="no-referrer">'
-            : '<span class="city-location-avatar-fallback">'+escapeHTML(characterName.slice(0,1))+'</span>';
+            : '';
           return '<button type="button" class="city-location-avatar city-location-person" data-action="city-person" data-person-index="'+index+'" aria-label="查看 '+escapeHTML(characterName)+' 的角色資訊">'+portrait+'<span class="city-location-person-name">'+escapeHTML(characterName)+'</span></button>';
         }).join('')
       : '<p class="city-location-empty">'+emptyMessage+'</p>';
@@ -443,6 +444,20 @@
     $('cityMapPeopleCount').textContent=people.length
       ? people.length+' 位角色符合目前時段'+(pager?.hasMore?' · 可載入更多':'')
       : (pager?.loading?'正在讀取…':pager?.error?'載入失敗':hasAnySchedule?'目前無符合時段角色':'尚無角色行程');
+    for(const person of people){
+      const id=String(person?.id||'');
+      if(!id||person.cloudPublic!==true||safeImage(person.image||person.avatar_url||person.avatar)||person.publicIllustrationsLoaded===true||cityAvatarHydrationPending.has(id))continue;
+      cityAvatarHydrationPending.add(id);
+      void hydratePublicCharacterIllustrations(id).then(()=>{
+        const current=state.characters.find(character=>character.id===id);
+        if(!current)return;
+        person.image=current.image||'';
+        person.primaryIllustrationPath=current.primaryIllustrationPath||'';
+        person.publicIllustrationsLoaded=current.publicIllustrationsLoaded===true;
+        const livePager=cityScenePageStates.get(place);
+        if(livePager===pager&&livePager.people.some(item=>item.id===id))renderCityPeopleStrip(place);
+      }).catch(error=>console.warn('城市角色頭像載入失敗：',error?.message||error)).finally(()=>cityAvatarHydrationPending.delete(id));
+    }
   };
   const loadCityPeoplePage=async(place)=>{
     const pager=cityScenePageStates.get(place);
@@ -607,7 +622,7 @@
     const name=escapeHTML(person.name||'未命名角色');
     const gender=escapeHTML(person.gender||'未設定');
     const age=escapeHTML(person.age?String(person.age)+' 歲':'未設定');
-    const activity=escapeHTML(person.cityActivity||'在這個場景中度過自己的時間');
+    const statusDescription=escapeHTML(person.citySceneDescription||person.cityActivity||'在這個場景中度過自己的時間');
     const timeRange=person.cityStartTime&&person.cityEndTime?escapeHTML(person.cityStartTime+'–'+person.cityEndTime):'時間未設定';
     const placeKey=locationModal.dataset.place;
     const placeName=escapeHTML(cityPlaceNames[placeKey]||'城市地點');
@@ -635,7 +650,7 @@
       copy='<div class="city-character-copy"><h3>'+name+'｜故事模式</h3><p>正在開啟傳統角色聊天……</p></div>';
       $('cityCharacterPageLabel').textContent='故事模式';
     }else if(page===0){
-      copy='<div class="city-character-copy"><h3>'+name+'</h3><div class="city-character-meta"><span>'+gender+'</span><span>'+age+'</span></div><p><strong>當前行程</strong><br>'+timeRange+'<br>'+placeName+'</p><p><strong>心情</strong><br>'+escapeHTML(person.cityMood||person.mood||'平靜')+'</p><p><strong>現在狀態</strong><br>'+activity+'</p></div>';
+      copy='<div class="city-character-copy"><h3>'+name+'</h3><div class="city-character-meta"><span>'+gender+'</span><span>'+age+'</span></div><p><strong>當前行程</strong><br>'+timeRange+'<br>'+placeName+'</p><p><strong>現在狀態</strong><br>'+statusDescription+'</p></div>';
       $('cityCharacterPageLabel').textContent='角色狀態 · 01 / 02';
     }else{
       copy='<div class="city-character-copy"><h3>'+name+'｜角色介紹</h3><p>'+escapeHTML(intro)+'</p></div>';
