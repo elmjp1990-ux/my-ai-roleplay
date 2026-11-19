@@ -175,6 +175,8 @@ Deno.test("classifies activity space independently from scene location", () => {
     ["下車後在街頭向客戶道別", "街頭", false, "outdoor"],
     ["站在騎樓下抽菸放空", "街頭", false, "outdoor"],
     ["在舊公寓臥室熟睡，窗外的街道寂靜無聲", "住所", false, "indoor"],
+    ["在街頭咖啡店內用餐", "街頭", true, "indoor"],
+    ["在餐廳門口等客戶下車", "餐廳", false, "outdoor"],
   ];
   for (const [activity, location, requestedOutdoor, expected] of cases) {
     const actual = classifyEncounterActivitySpace(activity, location, requestedOutdoor);
