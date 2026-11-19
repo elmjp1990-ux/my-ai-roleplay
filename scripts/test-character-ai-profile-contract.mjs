@@ -10,6 +10,8 @@ const worker = fs.readFileSync("supabase/functions/character-profile-organizatio
 const providerPolicy = fs.readFileSync("supabase/functions/_shared/openrouter-provider-policy.ts", "utf8");
 const workerCore = fs.readFileSync("supabase/functions/_shared/character-profile-organization.ts", "utf8");
 const storyTurn = fs.readFileSync("supabase/functions/chat-turn/index.ts", "utf8");
+const scheduleGeneration = fs.readFileSync("supabase/functions/_shared/encounter-schedule-generation.ts", "utf8");
+const scheduleOrganizer = fs.readFileSync("supabase/functions/encounter-schedule-organizer/index.ts", "utf8");
 
 assert.equal(schema.$schema, "https://json-schema.org/draft/2020-12/schema");
 assert.equal(schema.properties.schema_version.const, "1.0");
@@ -122,6 +124,9 @@ assert.match(storyTurn, /get_character_ai_profile_for_chat/,
   "Story chat-turn must load only a source-current derived profile");
 assert.match(storyTurn, /collectDerivedPrivateProfileValues/,
   "Private-derived evidence must join the server-side output leak guard");
+assert.match(scheduleOrganizer, /get_character_ai_profile_for_chat/, "Schedule worker must read the saved current profile without generating a second profile");
+assert.match(scheduleGeneration, /character_life_context/, "Schedule prompt must receive the saved structured life context");
+assert.match(scheduleGeneration, /不得為取得生活環境而在行程生成階段再次呼叫分析 AI/, "Schedule prompt must not request another life-context analysis call");
 assert.match(storyTurn, /CHAR_AI_PROFILE/,
   "Story system prompt must receive the derived profile and OOC context");
 assert.match(migration, /Keep profile organization serial by default/,
