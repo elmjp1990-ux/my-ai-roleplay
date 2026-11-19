@@ -184,6 +184,7 @@ Deno.test("classifies activity space independently from scene location", () => {
   }
   if (normalizeEncounterSceneKey("客戶家") !== "apartment") throw new Error("customer home must resolve to the apartment scene");
   if (normalizeEncounterSceneKey("街頭") !== "shopping-street") throw new Error("street must resolve to the existing street scene family");
+  if (normalizeEncounterSceneKey("超商") !== "shopping-street") throw new Error("convenience store must retain a valid shopping-district scene key");
   if (normalizeEncounterSceneKey("小吃店") !== "restaurant") throw new Error("small eatery must resolve to restaurant");
 });
 
