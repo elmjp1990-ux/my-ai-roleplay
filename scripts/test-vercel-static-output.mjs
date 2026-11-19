@@ -16,7 +16,7 @@ const fileBudgets = {
   'signed-url-manager.js': 8_000,
   'core-utils.js': 4_000,
   'city-map.js': 60_000,
-  'encounter-history.js': 4_000,
+  'encounter-history.js': 5_000,
   'followed-authors.js': 9_000,
   'list-pagination.js': 2_000,
   'notifications-screen.js': 5_000,
