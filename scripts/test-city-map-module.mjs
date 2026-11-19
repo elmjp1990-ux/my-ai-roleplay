@@ -69,7 +69,8 @@ assert.match(cityMap, /cityPlaceAliases\[key\]=\[key\]/);
 assert.match(cityMap, /row\.event_label/);
 assert.match(cityMap, /row\.is_dynamic!==true/);
 assert.match(cityMap, /builtInMarker\.setAttribute\('aria-label',name\)/);
-assert.match(cityMap, /glyph\.replaceWith\(textGlyph\)/);
+assert.doesNotMatch(cityMap, /glyph\.replaceWith\(textGlyph\)/);
+assert.equal((cityMap.match(/class="city-marker-glyph city-marker-emoji\"/g)||[]).length,9, 'Built-in markers render color emoji immediately.');
 
 assert.match(cityMap, /cityPlaceNames\[key\]=name;\s*cityVenueScenes\[key\]=scene;/);
 assert.match(cityMap, /if\(row\.is_dynamic!==true\)[\s\S]*?continue;/);
