@@ -281,6 +281,7 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-worldview-review-decisions.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119000600_encounter_schedule_output_soft_hide.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-schedule-output-soft-hide.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119000900_encounter_schedule_strict_hourly_options.sql
 
       - name: Replay hourly weighted Encounter schedules and weather fallback
         shell: bash
