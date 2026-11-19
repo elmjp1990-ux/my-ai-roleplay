@@ -6713,10 +6713,11 @@ async function createEncounterSession(character) {
 async function findResumableEncounterSession(characterId, placeKey) {
   const uid=currentUser()?.uid;
   if(!uid)return null;
+  const dateKey=value=>String(value||'').replaceAll('/','-');
   const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei'}).format(new Date());
   const matches=item=>item?.encounterMode===true&&item.archived!==true&&item.characterId===characterId&&
     item.encounterPlace===placeKey&&item.cloudOwned===true&&item.cloudOwnerUid===uid&&
-    (item.encounterDay || (item.startedAt?new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei'}).format(new Date(item.startedAt)):''))===today;
+    dateKey(item.encounterDay || (item.startedAt?new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei'}).format(new Date(item.startedAt)):''))===today;
   const local=Object.values(state.sessions).filter(matches)
     .sort((a,b)=>(b.messages?.at(-1)?.at||b.startedAt||0)-(a.messages?.at(-1)?.at||a.startedAt||0))[0];
   if(local)return local;
@@ -6731,7 +6732,7 @@ async function findResumableEncounterSession(characterId, placeKey) {
   if(error)throw error;
   const candidate=(rows||[]).find(row=>{
     const data=row.session_data&&typeof row.session_data==='object'&&!Array.isArray(row.session_data)?row.session_data:{};
-    return data.encounterMode===true&&data.archived!==true&&data.encounterPlace===placeKey&&String(data.encounterDay||'')===today;
+    return data.encounterMode===true&&data.archived!==true&&data.encounterPlace===placeKey&&dateKey(data.encounterDay)===today;
   });
   if(!candidate)return null;
   await loadCloudChatSessions(user,{onlySessionId:candidate.id,force:true,listPage:false});
