@@ -2933,90 +2933,10 @@ async function saveSupabaseCharacter(character, expectedUserId) {
       throw new Error('讀取角色舊版隱藏設定失敗：' + existingPrivateProfileError.message);
     }
 
-    const stableCharacterValue = value => {
-      if (Array.isArray(value)) return value.map(stableCharacterValue);
-      if (value && typeof value === 'object') {
-        return Object.fromEntries(Object.keys(value).sort().map(key => [key, stableCharacterValue(value[key])]));
-      }
-      return value ?? null;
-    };
-    const characterValueChanged = (before, after) =>
-      JSON.stringify(stableCharacterValue(before)) !== JSON.stringify(stableCharacterValue(after));
-    // Whitespace/line-wrap-only edits are presentation changes, not a new character meaning.
-    // Punctuation and words are preserved: even a one-word semantic change must refresh.
-    const normalizedProfileText = value => String(value ?? '').normalize('NFKC').replace(/[\s\u200B-\u200D\uFEFF]+/gu, '');
-    const profileSourceValueChanged = (before, after) => {
-      if (typeof before === 'string' && typeof after === 'string') return normalizedProfileText(before) !== normalizedProfileText(after);
-      return characterValueChanged(before, after);
-    };
-    const compareProfileSourceField = (key, label, before, after) => {
-      if (profileSourceValueChanged(before, after)) aiRelevantChanges.push({ key, label });
-      else if (characterValueChanged(before, after)) nonAiChanges.push({ key: key + '_format_only', label: label + '（僅空白／換行調整）' });
-    };
-    const previousProfile = normalizePersonalityProfile(existingPrivateProfile?.personality_profile || {});
-    const nextProfile = normalizePersonalityProfile(character.personalityProfile || {});
-    const aiRelevantChanges = [];
-    const runtimeAiChanges = [];
-    const nonAiChanges = [];
-
-    const compareCharacterField = (target, key, label, before, after) => {
-      if (!characterValueChanged(before, after)) return;
-      target.push({ key, label });
-    };
-
-    // 角色名稱是提示詞中的即時識別資料；改名不改變角色個性，不需重建衍生資料。
-    compareCharacterField(nonAiChanges, 'name', '角色名稱', existingCharacter?.name, String(character.name || '').trim());
-
-    // 只有會改變角色理解、個性或行為的原始設定才需要重新評估衍生資料。
-    compareProfileSourceField('intro', '角色介紹／背景', existingCharacter?.intro || '', character.intro || '');
-    compareProfileSourceField('race', '種族／世界觀', existingCharacter?.race || '', character.race || '');
-    compareProfileSourceField('style', '角色風格', existingCharacter?.style || '', character.style || '');
-    compareProfileSourceField('private_info', '作者私密設定', existingPrivateProfile?.private_info || '', String(character.privateInfo || '').slice(0, 10000));
-    // Story opening text is turn-time content, not a durable personality fact; it never refreshes this profile.
-
-    // 個性欄位逐項比較，避免主要立繪名稱等純展示資料誤觸發 AI 整理。
-    const aiProfileFields = {
-      coreTraits: '核心特質',
-      values: '價值觀',
-      speechStyle: '說話方式',
-      behaviorRules: '行為規則',
-      likes: '喜好',
-      dislikes: '厭惡',
-      boundaries: '互動界線',
-      relationshipPacing: '關係進展節奏'
-    };
-    for (const [key, label] of Object.entries(aiProfileFields)) {
-      compareCharacterField(aiRelevantChanges, 'personality_profile.' + key, label, previousProfile[key], nextProfile[key]);
-    }
-    compareCharacterField(nonAiChanges, 'personality_profile.primaryIllustrationName', '主要立繪名稱', previousProfile.primaryIllustrationName, nextProfile.primaryIllustrationName);
-
-    // 手機通知指示會直接影響每回合生成，但由對話流程即時讀取，不必重做角色摘要。
-    compareCharacterField(runtimeAiChanges, 'phone_settings', '手機通知生成設定', existingCharacter?.phone_settings || {}, rowPhoneSettingsForDiff(character.phoneSettings));
-
-    // 標籤與媒體只影響展示／搜尋；不觸發角色衍生資料整理。
-    compareCharacterField(nonAiChanges, 'tags', '角色標籤', existingCharacter?.tags || [], character.tags || []);
-
-    const isNewCharacter = !existingCharacter;
-    const requiresDerivedRefresh = aiRelevantChanges.length > 0;
-    const aiOrganizationDecision = {
-      version: 3,
-      status: requiresDerivedRefresh ? 'needs_review' : 'not_needed',
-      reason: requiresDerivedRefresh
-        ? (isNewCharacter ? 'new_character_ai_source_present' : 'ai_source_fields_changed')
-        : (isNewCharacter ? 'new_character_source_fields_available' : 'no_ai_relevant_change'),
-      changeClass: requiresDerivedRefresh
-        ? (aiRelevantChanges.some(item => item.key.startsWith('personality_profile.'))
-          ? 'personality_or_character_context_changed' : 'background_context_changed')
-        : (nonAiChanges.length ? 'presentation_or_opening_only' : 'no_profile_source_change'),
-      openingMessagePolicy: 'runtime_only_no_profile_refresh',
-      model: 'deepseek/deepseek-v4-flash-20260423',
-      changedFields: aiRelevantChanges.map(item => item.key),
-      changedFieldLabels: aiRelevantChanges.map(item => item.label),
-      runtimeAiChangedFields: runtimeAiChanges.map(item => item.key),
-      nonAiChangedFields: nonAiChanges.map(item => item.key),
-      requiresDerivedRefresh,
-      shouldCallModel: false
-    };
+    const aiOrganizationDecision = window.PoyozzCoreUtils.classifyCharacterProfileChanges({
+      existingCharacter, existingPrivateProfile, character,
+      normalizePersonalityProfile, rowPhoneSettingsForDiff
+    });
 
     const firstPublishedAt = existingCharacter?.first_published_at ||
       (nextVisibility === 'public' ? new Date().toISOString() : null);
