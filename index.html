@@ -10021,11 +10021,17 @@ function autoCorrectEncounterScheduleOutput(rawText){
         for(const option of (Array.isArray(block&&block.options)?block.options:[])){
           const activity=String(option.activity||'').trim();
           const space=classifyEncounterRepairSpace(activity,option.location,option.is_outdoor===true);
-          if(space==='vehicle'&&/餐廳|小吃店/.test(String(option.location||''))){
-            option.location='街頭';changed++;
+          if(space==='vehicle'){
+            if(/餐廳|小吃店/.test(String(option.location||''))){option.location='街頭';changed++;}
+            const vehicleActivity='在計程車內送客戶回家，鬆開領口休息。';
+            if(option.activity!==vehicleActivity){option.activity=vehicleActivity;changed++;}
+          }else if(/客戶家|客戶住處/.test(String(option.location||''))&&/修理|組裝|搬家|打包|除蟲|清理/.test(activity)){
+            const homeActivity=/搬家|打包/.test(activity)?'在客戶家協助搬家打包，整理物品。':/除蟲|清理/.test(activity)?'在客戶家協助除蟲並清理雜物。':'在客戶家修理電燈或組裝家具。';
+            if(option.activity!==homeActivity){option.activity=homeActivity;changed++;}
+          }else{
+            const compactActivity=compactEncounterScheduleDescription(activity);
+            if(compactActivity!==activity){option.activity=compactActivity;changed++;}
           }
-          const compactActivity=compactEncounterScheduleDescription(activity);
-          if(compactActivity!==activity){option.activity=compactActivity;changed++;}
           const shouldBeOutdoor=space==='outdoor';
           if(option.is_outdoor!==shouldBeOutdoor){option.is_outdoor=shouldBeOutdoor;changed++;}
           if(!shouldBeOutdoor){
