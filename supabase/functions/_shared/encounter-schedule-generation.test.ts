@@ -5,6 +5,7 @@ import {
   getEncounterWorldviewScheduleDisposition,
   isEncounterModernMapCompatible,
   normalizeEncounterSceneKey,
+  classifyEncounterActivitySpace,
   resolveEncounterScheduleAvailability,
   parseEncounterScheduleBatchOutput,
 } from "./encounter-schedule-generation.ts";
@@ -162,6 +163,25 @@ Deno.test("requires an indoor rain fallback for outdoor options only", () => {
   if (unexpectedResult.ok || !unexpectedResult.errors.some((error) => error.includes("unexpected_rain_fallback"))) {
     throw new Error("indoor option with rain fallback accepted");
   }
+});
+
+Deno.test("classifies activity space independently from scene location", () => {
+  const cases: Array<[string, string, boolean, string]> = [
+    ["在公寓陽台抽菸，望著夜景發呆", "住所", true, "indoor"],
+    ["前往客戶住處修理電燈與組裝書架", "客戶家", true, "indoor"],
+    ["在餐廳包廂陪客戶出席晚宴", "餐廳", true, "indoor"],
+    ["在超商貨架前挑選飲料並結帳", "超商", true, "indoor"],
+    ["晚宴結束後在計程車內送客戶回家", "街頭", true, "vehicle"],
+    ["下車後在街頭向客戶道別", "街頭", false, "outdoor"],
+    ["站在騎樓下抽菸放空", "街頭", false, "outdoor"],
+  ];
+  for (const [activity, location, requestedOutdoor, expected] of cases) {
+    const actual = classifyEncounterActivitySpace(activity, location, requestedOutdoor);
+    if (actual !== expected) throw new Error(activity + " classified as " + actual + " instead of " + expected);
+  }
+  if (normalizeEncounterSceneKey("客戶家") !== "apartment") throw new Error("customer home must resolve to the apartment scene");
+  if (normalizeEncounterSceneKey("街頭") !== "shopping-street") throw new Error("street must resolve to the existing street scene family");
+  if (normalizeEncounterSceneKey("小吃店") !== "restaurant") throw new Error("small eatery must resolve to restaurant");
 });
 
 Deno.test("keeps free natural-language locations and applies system scene matching", () => {
