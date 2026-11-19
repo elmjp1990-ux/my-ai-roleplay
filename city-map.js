@@ -584,6 +584,42 @@
       }
     }
   };
+  const loadCloudEncounterHistory=async person=>{
+    if(!person||person.encounterHistoryLoaded===true||person.encounterHistoryLoading===true)return;
+    person.encounterHistoryLoading=true;
+    person.encounterHistoryError='';
+    const client=window.mySupabase,uid=currentUser()?.uid;
+    try{
+      if(!client||!uid){person.encounterHistoryCloud=[];person.encounterHistoryLoaded=true;return;}
+      const {data:authData,error:authError}=await client.auth.getUser();
+      if(authError||authData?.user?.id!==uid||currentUser()?.uid!==uid)throw new Error('登入狀態已變更，請重新登入。');
+      const {data:rows,error}=await client.from('chat_sessions')
+        .select('id,session_data,created_at,updated_at')
+        .eq('user_id',uid).eq('character_id',person.id).eq('chat_mode','encounter')
+        .is('deleted_at',null).order('updated_at',{ascending:false}).limit(2);
+      if(error)throw error;
+      if(currentUser()?.uid!==uid)throw new Error('登入狀態已變更，請重新登入。');
+      const records=await Promise.all((rows||[]).map(async row=>{
+        const data=row.session_data&&typeof row.session_data==='object'&&!Array.isArray(row.session_data)?row.session_data:{};
+        const {data:messages,error:messageError}=await client.from('chat_messages')
+          .select('role,content,created_at').eq('session_id',row.id).eq('role','user')
+          .is('deleted_at',null).order('created_at',{ascending:false}).limit(3);
+        if(messageError)throw messageError;
+        const lastUser=(messages||[]).find(message=>!['[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]','（請接續目前的故事。）'].includes(String(message.content||'').trim()));
+        return {
+          id:row.id,encounterMode:true,characterId:person.id,archived:data.archived===true,
+          startedAt:Number(data.startedAt)||Date.parse(row.created_at)||0,
+          encounterPlace:data.encounterPlace||data.encounter?.locationKey||'',
+          messages:lastUser?[{role:'user',content:lastUser.content,createdAt:lastUser.created_at}]:[]
+        };
+      }));
+      person.encounterHistoryCloud=records;
+      person.encounterHistoryLoaded=true;
+    }catch(error){
+      person.encounterHistoryError=error?.message||'讀取相遇紀錄失敗。';
+      throw error;
+    }finally{person.encounterHistoryLoading=false;}
+  };
   const renderCityCharacterCard=(person,page=0,mode='status')=>{
     const card=$('cityCharacterCard'),body=$('cityCharacterCardBody');
     if(!card||!body||!person)return;
@@ -629,8 +665,11 @@
     const placeKey=locationModal.dataset.place;
     const placeName=escapeHTML(cityPlaceNames[placeKey]||'城市地點');
     const intro=String(person.intro||person.description||person.personalityProfile?.summary||'這位角色尚未填寫公開介紹。');
-    const sessions=Object.values(state.sessions||{}).filter(session=>session?.encounterMode&&session.characterId===person.id&&!session.archived)
+    const localSessions=Object.values(state.sessions||{}).filter(session=>session?.encounterMode&&session.characterId===person.id&&!session.archived)
       .sort((a,b)=>(Number(b.startedAt)||0)-(Number(a.startedAt)||0));
+    const cloudSessions=Array.isArray(person.encounterHistoryCloud)?person.encounterHistoryCloud.filter(session=>!session.archived):[];
+    const sessions=[...new Map([...cloudSessions,...localSessions].map(session=>[session.id,session])).values()]
+      .sort((a,b)=>(Number(b.startedAt)||0)-(Number(a.startedAt)||0)).slice(0,2);
     const bookmarks='<div class="city-character-bookmarks" aria-label="角色功能"><button type="button" class="city-character-bookmark '+(mode==='status'?'active':'')+'" data-action="city-character-status" aria-label="角色資料">角色資料</button><button type="button" class="city-character-bookmark '+(mode==='history'?'active':'')+'" data-action="city-character-history" aria-label="相遇紀錄">相遇紀錄</button><button type="button" class="city-character-bookmark" data-action="city-character-story" aria-label="故事模式">故事模式</button></div>';
     const affinityMarkup=mode==='status'&&page===0?'<div class="city-character-affinity" id="cityCharacterAffinity" data-character-id="'+escapeHTML(person.id)+'">正在讀取好感度…</div>':'';
     const meetControl=isSleepingSchedule(person.cityActivity,person.citySceneDescription)
@@ -639,13 +678,16 @@
     const left='<div class="city-character-photo-column">'+portrait+affinityMarkup+meetControl+'</div>';
     let copy='';
     if(mode==='history'){
-      const records=sessions.length?sessions.map(session=>{
-        const when=new Date(Number(session.startedAt)||Date.now()).toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'});
-        const venue=cityPlaceNames[session.encounterPlace]||'城市相遇';
-        const lastUser=(session.messages||[]).filter(message=>message.role==='user'&&!['[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]','（請接續目前的故事。）'].includes(String(message.content||'').trim())).at(-1)?.content;
-        const summary=lastUser?'對話片段：'+String(lastUser).slice(0,90):'兩人在'+venue+'相遇，故事仍待續。';
-        return '<article class="city-encounter-history-item"><strong>'+escapeHTML(when)+' · '+escapeHTML(venue)+'</strong><p>'+escapeHTML(summary)+'</p></article>';
-      }).join(''):'<p>目前還沒有已保存的相遇紀錄。完成「與他相遇」對話後，紀錄會顯示在這裡。</p>';
+      const records=person.encounterHistoryLoading
+        ?'<p>正在讀取雲端相遇紀錄…</p>'
+        :sessions.length?sessions.map(session=>{
+          const when=new Date(Number(session.startedAt)||Date.now()).toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'});
+          const venue=cityPlaceNames[session.encounterPlace]||'城市相遇';
+          const lastUser=(session.messages||[]).filter(message=>message.role==='user'&&!['[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]','（請接續目前的故事。）'].includes(String(message.content||message.text||'').trim())).at(-1)?.content||session.encounterSummary;
+          const summary=lastUser?'對話片段：'+String(lastUser).slice(0,90):'兩人在'+venue+'相遇，故事仍待續。';
+          return '<article class="city-encounter-history-item"><strong>'+escapeHTML(when)+' · '+escapeHTML(venue)+'</strong><p>'+escapeHTML(summary)+'</p></article>';
+        }).join('')
+        :'<p>目前還沒有已保存的相遇紀錄。完成「與他相遇」對話後，紀錄會顯示在這裡。</p>';
       copy='<div class="city-character-copy"><h3>'+name+'｜過往相遇</h3><div class="city-encounter-history-list">'+records+'</div></div>';
       $('cityCharacterPageLabel').textContent='相遇紀錄';
     }else if(mode==='story'){
@@ -727,7 +769,17 @@
     if(cardAction==='city-character-status'||cardAction==='city-character-history'){
       const index=Number(locationModal.dataset.selectedPersonIndex);
       const person=cityPresenceByPlace[locationModal.dataset.place]?.[index];
-      if(person)renderCityCharacterCard(person,0,cardAction==='city-character-history'?'history':'status');
+      if(person){
+        const mode=cardAction==='city-character-history'?'history':'status';
+        renderCityCharacterCard(person,0,mode);
+        if(mode==='history'&&!person.encounterHistoryLoaded&&!person.encounterHistoryLoading){
+          person.encounterHistoryLoading=true;
+          renderCityCharacterCard(person,0,mode);
+          void loadCloudEncounterHistory(person).then(()=>{
+            if(locationModal.dataset.cardMode==='history'&&locationModal.dataset.selectedPersonIndex===String(index))renderCityCharacterCard(person,0,mode);
+          }).catch(error=>toast(error?.message||'讀取相遇紀錄失敗，請稍後再試。'));
+        }
+      }
       return;
     }
     if(cardAction==='city-character-story'){
