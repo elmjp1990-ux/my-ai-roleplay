@@ -20,9 +20,11 @@ for (const key of [
   "identity_background", "core_personality", "inner_motivations",
   "emotional_response_patterns", "relationship_dynamics", "behavior_and_agency",
   "knowledge_boundaries", "speech_style", "appearance_markers",
-  "author_private_context", "ooc_rules", "unknowns", "source_conflicts",
+  "life_context", "author_private_context", "ooc_rules", "unknowns", "source_conflicts",
 ]) assert.ok(required.has(key), `Profile schema must require ${key}`);
 assert.ok(!required.has("life_schedule_context"), "Schedules must remain runtime context, not stale derived profile data");
+for (const key of ["work_environment", "residence_environment", "daily_routines", "interests_and_leisure", "social_circles", "recurring_places", "environmental_constraints"]) assert.ok(schema.properties.life_context.properties[key], "Missing life context section " + key);
+assert.ok(registry.runtime_only_sources.some(item => item.path === "character_stories.opening_message" && item.refresh_on_change === false), "Opening-message polishing must not regenerate the profile");
 
 const ooc = schema.properties.ooc_rules;
 assert.ok(ooc.allOf.some(rule => rule.if?.properties?.status?.const === "ready" && rule.then?.properties?.rules?.minItems === 3),
@@ -181,5 +183,9 @@ assert.ok(workerCore.includes("profile_output_too_large") && workerCore.includes
   "Profile validator must enforce output byte, string and item-count limits");
 assert.ok(worker.includes("provider_response_too_large") && worker.includes("requestId: response.headers.get"),
   "Oversized or malformed provider responses must be terminal with a traceable request ID");
+
+assert.match(frontend, /openingMessagePolicy: 'runtime_only_no_profile_refresh'/, "Opening-message edits must be runtime-only");
+assert.match(frontend, /profileSourceValueChanged/, "Profile source comparison must distinguish whitespace-only edits from substantive changes");
+assert.match(frontend, /personality_or_character_context_changed/, "Meaningful personality changes must be explicitly classified for refresh");
 
 console.log("Character AI Profile schema, queue, Worker, scheduling, save enqueue, Story integration and privacy contracts passed.");
